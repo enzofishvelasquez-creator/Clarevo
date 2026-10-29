@@ -61,7 +61,7 @@ Não use `app.clarevo.app.br` (nem `clarevo.pages.dev`) na apresentação: é a 
 | 9:20 | Fechamento e perguntas | 0:40 |
 
 **Abertura (0:30).** Aba A, na tela "Mais clareza para decidir".
-- Diga: "O Clarevo ajuda a entender o próprio mês: o que entrou, o que foi pago, o que vence e o que é só previsão. Tudo o que vocês vão ver é fictício, e a tela diz isso."
+- Diga: "A Clarevo ajuda a entender o próprio mês: o que entrou, o que foi pago, o que vence e o que é só previsão. Tudo o que vocês vão ver é fictício, e a tela diz isso."
 - Aponte a frase da tela: "Seus registros pessoais são só seus. Se uma empresa oferecer o plano, ela não vê suas finanças."
 - Toque em "Ver demonstração com dados fictícios" e, se aparecer o tour, em "Pular".
 
@@ -105,12 +105,12 @@ Não use `app.clarevo.app.br` (nem `clarevo.pages.dev`) na apresentação: é a 
 - Resumo › avatar "MA" › Conta › "Abrir painel da empresa". Mostre o "Contrato" e role até "Uso do app".
 - Diga: "A empresa paga o benefício e administra vagas e licenças. Vê os e-mails que ela mesma convidou e a situação de cada licença. Não vê quem usa o app, nem quando, e nenhum valor, categoria, meta, conta ou cartão, nem somado." (D-056)
 - Role até "Relatório de adesão" e toque em "Baixar relatório em planilha (CSV)": o app responde "Relatório baixado. Confira a pasta de downloads." A caixa "Incluir a lista de licenças" começa desmarcada, e sem ela o arquivo tem só o contrato e as quatro contagens, sem e-mail. Não toque em "Baixar relatório em PDF" ao vivo: ele abre a página de impressão em outra janela, e o navegador pode pedir para permitir janelas.
-- Diga: "Para a reunião com o RH, o relatório leva o contrato e as contagens de licenças, o mesmo que o painel mostra. O arquivo é montado neste navegador, e o Clarevo não guarda cópia. O rodapé repete que a empresa não vê dados financeiros de ninguém, nem somados." (D-062)
+- Diga: "Para a reunião com o RH, o relatório leva o contrato e as contagens de licenças, o mesmo que o painel mostra. O arquivo é montado neste navegador, e a Clarevo não guarda cópia. O rodapé repete que a empresa não vê dados financeiros de ninguém, nem somados." (D-062)
 - A empresa e as pessoas da demonstração são fictícias, e a tela diz: "Nada é gravado fora deste aparelho."
 
 **10. Quem vê estes dados? (0:30).**
 - Aba Resumo › role até o fim › "Quem vê estes dados?".
-- Diga: "No Pessoal, entre as pessoas do app, só você vê, anota, edita e exclui. A equipe do Clarevo não olha os dados no dia a dia. A permissão é conferida no banco a cada leitura, não só escondida na tela."
+- Diga: "No Pessoal, entre as pessoas do app, só você vê, anota, edita e exclui. A equipe da Clarevo não olha os dados no dia a dia. A permissão é conferida no banco a cada leitura, não só escondida na tela."
 
 **Fechamento (0:50).**
 - Diga: "Hoje existe o produto funcionando em demonstração, com as regras financeiras e as permissões testadas. O que falta para chegar às pessoas é, em boa parte, de fora do código: contas das lojas, política de privacidade e termos com advogado, teste com pessoas reais e preço." Abra para perguntas.
@@ -129,7 +129,7 @@ Vê os e-mails que ela mesma convidou, a situação de cada licença (convite en
 A licença termina e a pessoa mantém 30 dias de acesso pleno. Depois passa ao plano gratuito, com leitura do histórico. Nada é apagado nem passa para a empresa (D-056). A trava de recursos depois dos 30 dias entra junto com a cobrança, então hoje o que existe é o prazo registrado.
 
 **A4. Que dados sensíveis o app guarda?**
-Não guarda número completo do cartão, validade nem código de segurança (só apelido e final). Da nota fiscal guarda só o resumo (SHA-256) da chave, nunca o CPF. Dos convites guarda só o resumo do código. Não pede senha de banco e avisa para não informá-la a ninguém em nome do Clarevo.
+Não guarda número completo do cartão, validade nem código de segurança (só apelido e final). Da nota fiscal guarda só o resumo (SHA-256) da chave, nunca o CPF. Dos convites guarda só o resumo do código. Não pede senha de banco e avisa para não informá-la a ninguém em nome da Clarevo.
 
 **A5. A pessoa consegue levar ou apagar os dados?**
 Sim. "Exportar meus dados" gera planilha (CSV) ou resumo em PDF. "Excluir minha conta" apaga o Pessoal de verdade e encerra a licença. Os prazos de guarda e os textos finais estão marcados como "a confirmar com advogado" (D-058).
@@ -138,7 +138,7 @@ Sim. "Exportar meus dados" gera planilha (CSV) ou resumo em PDF. "Excluir minha 
 Em 20/10/2026, 2.056 testes automatizados das regras financeiras e de texto passaram (`npm test`). Há também testes do banco (`supabase/tests`) e um roteiro automatizado das telas da versão web. Houve uma revisão de segurança em 16/10/2026 (D-056). Não há registro de auditoria externa nos documentos.
 
 **A7. Está em conformidade com a LGPD?**
-O desenho segue minimização: a empresa não acessa finanças, o app não registra leituras nem buscas e existe exclusão da conta. Mas a política de privacidade, os termos, a página pública de exclusão e a definição de papéis (a empresa só paga e o Clarevo é controlador) dependem de advogado e ainda não existem (D-056 item M-5 e `docs/16_PUBLICACAO_LOJAS.md`, seção 9). Não afirme conformidade.
+O desenho segue minimização: a empresa não acessa finanças, o app não registra leituras nem buscas e existe exclusão da conta. Mas a política de privacidade, os termos, a página pública de exclusão e a definição de papéis (a empresa só paga e a Clarevo é controlador) dependem de advogado e ainda não existem (D-056 item M-5 e `docs/16_PUBLICACAO_LOJAS.md`, seção 9). Não afirme conformidade.
 
 ### Integração bancária
 
@@ -176,7 +176,7 @@ Existe, mas foi testada só com páginas e PDFs sintéticos. A validação com c
 
 ### Produto e negócio
 
-**D1. Como o Clarevo ganha dinheiro?**
+**D1. Como a Clarevo ganha dinheiro?**
 Ainda não está definido. O desenho é de benefício pago por empresas (uma vaga por pessoa que recebe) e plano para pessoas e famílias. Preços e limites dos planos são pergunta aberta (P-005), e a cobrança e a trava por plano ainda não existem. A Família está aberta a todas as pessoas durante o piloto (D-055).
 
 **D2. Quantas pessoas usam?**
@@ -200,7 +200,7 @@ Expo (React Native), um código para iOS, Android e web, e Supabase (Postgres, a
 - **Saldo de conta ou conciliação com o banco.** O app não calcula saldo por conta, e "Diferença do mês" não é saldo.
 - **Recomendação de investimento, crédito ou produto financeiro**, nem IA.
 - **Resultado garantido para a pessoa.** O app mostra o que ela registrou; não guarda nem movimenta dinheiro.
-- **Funções que dependem das lojas:** lembretes, widget, biometria, abrir convites direto no app e "Compartilhar com o Clarevo".
+- **Funções que dependem das lojas:** lembretes, widget, biometria, abrir convites direto no app e "Compartilhar com a Clarevo".
 - **O painel da empresa no app nativo.** O painel é só da web.
 - **Feriados municipais e estaduais no aviso de dia útil.** Só valem os feriados nacionais de data fixa definidos em lei federal, e o aviso nunca diz que não há multa ou juros.
 
@@ -228,7 +228,7 @@ Expo (React Native), um código para iOS, Android e web, e Supabase (Postgres, a
 | 8 | Metas | Metas: reserva para imprevistos e plano de guardar |
 | 9 | Aprender, "Neste mês" | Neste mês: o 13º salário, com exemplo calculado e fonte |
 | 10 | Painel "Empresa Exemplo (demonstração)" | Uso do app: só contagens de licenças, nenhum dado financeiro |
-| 11 | Relatório de adesão do RH, planilha baixada (novo) | O arquivo é montado no navegador, e o Clarevo não guarda cópia |
+| 11 | Relatório de adesão do RH, planilha baixada (novo) | O arquivo é montado no navegador, e a Clarevo não guarda cópia |
 | 12 | Quem vê estes dados? | Quem vê estes dados?: só a própria pessoa, não a empresa |
 
 No passo 7 o vídeo toca em "Renda comprometida" e em "Guardado em metas", mostra o estado vazio de cada um (o cenário não tem renda de referência nem meta) e volta a "Pago". No passo 11 ele baixa só a planilha: o PDF abriria outra janela e fica de fora da gravação.
