@@ -368,8 +368,8 @@ export const EVOLUTION_TEXT = {
     },
   },
   table: {
-    show: 'Ver valores mês a mês',
-    hide: 'Esconder valores mês a mês',
+    show: 'Ver tabela mês a mês',
+    hide: 'Ocultar tabela mês a mês',
     title: 'Valores mês a mês',
     columns: { month: 'Mês', value: 'Valor', state: 'Estado', included: 'Na comparação?' },
     yes: 'Sim',

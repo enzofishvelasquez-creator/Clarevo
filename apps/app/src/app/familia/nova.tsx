@@ -111,7 +111,8 @@ export default function NovaFamiliaScreen() {
               setName(t);
               setFieldError(undefined);
             }}
-            maxLength={FAMILY_NAME_MAX}
+            // O campo conta unidades de texto (um emoji vale 2); o limite de 60 caracteres, contados como o banco conta, vem de familyNameError.
+            maxLength={FAMILY_NAME_MAX * 2}
             autoFocus
             error={fieldError}
             returnKeyType="done"

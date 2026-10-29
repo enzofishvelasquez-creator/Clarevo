@@ -148,6 +148,21 @@ describe('Empresas: a lista colada', () => {
       'edu@x.com',
     ]);
     expect(splitEmailList('Ana Souza <ana@x.com>, "Bia" <bia@x.com>')).toEqual(['ana@x.com', 'bia@x.com']);
+    // Formato do Outlook: o nome tem vírgula e os itens vêm separados por ponto e vírgula.
+    expect(splitEmailList('Silva, Ana <ana@empresa.com.br>; Souza, Bia <bia@empresa.com.br>')).toEqual(['ana@empresa.com.br', 'bia@empresa.com.br']);
+    expect(splitEmailList('"Silva, Ana" <ana@x.com>\nSouza, Bia <bia@x.com>\ncaio@x.com')).toEqual(['ana@x.com', 'bia@x.com', 'caio@x.com']);
+    // Um e-mail solto antes do nome continua valendo, e o nome sem arroba sai.
+    expect(splitEmailList('caio@x.com, Ana <ana@x.com>')).toEqual(['caio@x.com', 'ana@x.com']);
+    expect(splitEmailList('Ana <>, bia@x.com')).toEqual(['bia@x.com']);
+    // Nome igual ao e-mail, com ou sem aspas (Outlook e cabeçalhos de e-mail): o e-mail conta uma vez.
+    expect(splitEmailList('"ana@x.com" <ana@x.com>, "bia@x.com" <bia@x.com>')).toEqual(['ana@x.com', 'bia@x.com']);
+    expect(splitEmailList("'ana@x.com' <ana@x.com>, 'bia@x.com' <bia@x.com>")).toEqual(['ana@x.com', 'bia@x.com']);
+    expect(splitEmailList('ana@x.com <ana@x.com>, bia@x.com <bia@x.com>')).toEqual(['ana@x.com', 'bia@x.com']);
+    expect(splitEmailList('"Silva, Ana, RH" <ana@x.com>; "Souza, Bia" <bia@x.com>')).toEqual(['ana@x.com', 'bia@x.com']);
+    // Um item errado longe do nome continua aparecendo (como inválido); o pedaço logo antes do nome, sem arroba, é o sobrenome.
+    expect(splitEmailList('ana.x.com, carlos, Bia <bia@x.com>')).toEqual(['ana.x.com', 'bia@x.com']);
+    // E-mail entre aspas sem sinal depois continua como foi colado (e aparece como inválido).
+    expect(splitEmailList('"ana@x.com"')).toEqual(['"ana@x.com"']);
     expect(splitEmailList('')).toEqual([]);
     expect(splitEmailList('  \n ,; ')).toEqual([]);
     expect(splitEmailList(undefined)).toEqual([]);
@@ -160,6 +175,13 @@ describe('Empresas: a lista colada', () => {
     expect(p.invalid).toEqual(['xis', 'sem arroba.com']);
     expect(p.total).toBe(8);
     expect(parseEmailList('')).toEqual({ valid: [], repeated: [], invalid: [], total: 0 });
+    expect(parseEmailList('Silva, Ana <ana@empresa.com.br>; Souza, Bia <bia@empresa.com.br>')).toEqual({
+      valid: ['ana@empresa.com.br', 'bia@empresa.com.br'],
+      repeated: [],
+      invalid: [],
+      total: 2,
+    });
+    expect(parseEmailList('"ana@x.com" <ana@x.com>, ana@x.com <ana@x.com>')).toEqual({ valid: ['ana@x.com'], repeated: ['ana@x.com'], invalid: [], total: 2 });
     // Um item com espaço no meio é um item só, e inválido (a lista não é cortada por espaços).
     expect(parseEmailList('ana@x.com bia@x.com').invalid).toEqual(['ana@x.com bia@x.com']);
   });
@@ -396,7 +418,7 @@ describe('Empresas: telas do app (lidas como código-fonte)', () => {
     const hooks = appFile('state/company.ts');
     expect(hooks).toMatch(/Platform\.OS === 'web'/);
     expect(COMPANY_TEXT.webOnly).toContain('só na web');
-    expect(COMPANY_TEXT.notAdmin).toContain('equipe da Clarevo');
+    expect(COMPANY_TEXT.notAdmin).toContain('suporte@clarevo.app.br');
   });
 
   it('as rotas: o painel está entre as telas protegidas e o convite da empresa abre com ou sem conta, sem barra', () => {

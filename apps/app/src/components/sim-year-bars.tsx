@@ -76,12 +76,14 @@ function Bars({ years, width }: { years: readonly SimulationYear[]; width: numbe
   const n = years.length;
   const gap = n > 30 ? 1 : n > 15 ? 2 : 4;
   const barWidth = Math.max(2, Math.min(BAR_MAX_WIDTH, (width - gap * (n - 1)) / n));
+  // Cada ano tem a sua faixa da largura, com a barra no meio: com poucos anos, as barras se espalham em vez de ficar à esquerda.
+  const slot = width / n;
   const max = Math.max(1, years[n - 1]?.finalCents ?? 1);
   return (
     <Svg width={width} height={BARS_HEIGHT} accessible={false}>
       <StripesDefs id={id} />
       {years.map((y, i) => {
-        const x = i * (barWidth + gap);
+        const x = i * slot + (slot - barWidth) / 2;
         const total = Math.max(1, Math.round((y.finalCents / max) * BARS_HEIGHT));
         const contributed = Math.min(total, Math.round((y.contributedCents / max) * BARS_HEIGHT));
         const earnings = total - contributed;
@@ -147,6 +149,11 @@ export function YearBars({ growth, months }: { growth: SimulationGrowth; months:
   const last = growth.byYear[growth.byYear.length - 1];
   if (!last) return null;
   const first = growth.byYear[0]!;
+  const n = growth.byYear.length;
+  // Com faixas largas (poucos anos), o rótulo do primeiro e do último ano fica centrado debaixo da barra dele; com muitos anos, nas pontas.
+  const slot = width > 0 ? width / n : 0;
+  const centered = slot >= BAR_MAX_WIDTH * 2;
+  const labelStyle = centered ? { width: slot, textAlign: 'center' as const } : null;
   return (
     <View style={{ gap: space[2] }}>
       <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={3}>
@@ -159,12 +166,12 @@ export function YearBars({ growth, months }: { growth: SimulationGrowth; months:
         <View onLayout={(e) => setWidth(Math.floor(e.nativeEvent.layout.width))} style={{ height: BARS_HEIGHT }} {...decorative}>
           {width > 0 ? <Bars years={growth.byYear} width={width} /> : null}
         </View>
-        <View style={styles.axis} {...decorative}>
-          <Txt variant="caption" color={colors.textSecondary}>
+        <View style={[styles.axis, centered && { gap: 0 }]} {...decorative}>
+          <Txt variant="caption" color={colors.textSecondary} style={labelStyle}>
             {T.yearLabel(first)}
           </Txt>
-          {growth.byYear.length > 1 ? (
-            <Txt variant="caption" color={colors.textSecondary} style={{ flexShrink: 1, textAlign: 'right' }}>
+          {n > 1 ? (
+            <Txt variant="caption" color={colors.textSecondary} style={labelStyle ?? { flexShrink: 1, textAlign: 'right' }}>
               {T.yearLabel(last)}
             </Txt>
           ) : null}

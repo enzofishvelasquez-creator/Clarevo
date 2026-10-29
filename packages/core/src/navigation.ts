@@ -63,6 +63,17 @@ const FORM_PATHS: readonly RegExp[] = [
   /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado|conta-excluida)$/,
 ];
 
+/**
+ * Endereço que não existe no app (`+not-found` e `_sitemap`): no lugar da tela padrão do roteador, em inglês e com a lista de rotas,
+ * uma tela em português com a saída para o Resumo (com sessão) ou para o início (sem sessão).
+ */
+export const NOT_FOUND_TEXT = {
+  title: 'Página não encontrada',
+  body: 'Este endereço não existe no app ou mudou de lugar. Confira o link ou siga por aqui.',
+  goSummary: 'Ir para o Resumo',
+  goStart: 'Ir para o início',
+} as const;
+
 /** Caminho sem parâmetros nem barra final: "/a-pagar/vencidas/?x=1" → "/a-pagar/vencidas". */
 export function normalizePath(pathname: string): string {
   const path = (pathname.split(/[?#]/)[0] ?? '').replace(/\/+$/, '');

@@ -19,7 +19,7 @@
 // Tamanhos, faixas e nome do campo-isca: os mesmos que o gerador usa para desenhar os formulários.
 const LIMITES = {"tamanhos":{"nome":100,"email":254,"empresa":120,"mensagem":2000},"faixas":{"ate-50":"Até 50 pessoas","51-200":"De 51 a 200 pessoas","201-1000":"De 201 a 1.000 pessoas","mais-de-1000":"Mais de 1.000 pessoas","nao-sei":"Ainda não sei"},"isca":"website","campos":{"contato":["nome","email","empresa","faixa","mensagem"],"newsletter":["email","consentimento"]}};
 // Os cabeçalhos de segurança do _headers, para as respostas que o worker devolve (o _headers não vale para elas).
-const CABECALHOS = {"Content-Security-Policy":"default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"same-origin","Permissions-Policy":"camera=(), microphone=(), geolocation=()"};
+const CABECALHOS = {"Content-Security-Policy":"default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"same-origin","Permissions-Policy":"camera=(), microphone=(), geolocation=()","Strict-Transport-Security":"max-age=31536000"};
 // Quais rotas existem: os interruptores `formulario_contato` e `newsletter` de site/dados-da-empresa.json, lidos pelo gerador.
 const ROTAS = {"contato":false,"newsletter":false};
 

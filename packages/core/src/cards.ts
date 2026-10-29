@@ -766,8 +766,11 @@ export function buildInvoices(
     for (const l of lines) {
       if (l.kind === 'parcela' || l.kind === 'estorno') addMix(buckets, { category: l.category, charges: false }, l.amountCents);
       else if (l.kind === 'encargo') addMix(buckets, { category: null, charges: true }, l.amountCents);
-      else if (l.kind === 'credito_anterior') addMix(buckets, { category: null, charges: false }, l.amountCents);
     }
+    // Crédito levado: um déficit à parte, abatido de todas as categorias na proporção (e não só de "Sem categoria").
+    const creditCents = lines.filter((l) => l.kind === 'credito_anterior').reduce((acc, l) => acc + l.amountCents, 0);
+    if (creditCents < 0) buckets.set('\u0000credito', { category: null, charges: false, cents: creditCents });
+    else if (creditCents > 0) addMix(buckets, { category: null, charges: false }, creditCents);
     // Saldo anterior: herda a composição do que ficou sem pagar da fatura anterior; sem ela, "Sem categoria".
     if (balanceCents > 0) {
       const inherited = previous && previous.remainingCents === balanceCents && previous.month === addMonths(month, -1) ? previous.unpaidMix : null;
@@ -1268,7 +1271,7 @@ export function cardSummaryTexts(s: CardSummary, today: IsoDate): CardSummaryTex
 /** Mensagens de erro de cartões, faturas e lançamentos (códigos do banco). Sem "disponível" nem julgamento. */
 export const CARD_ERROR_TEXT = {
   ...ERROR_TEXT,
-  apelido_invalido: 'Dê um apelido de 1 a 30 caracteres, como Nubank.',
+  apelido_invalido: 'Dê um apelido de 1 a 30 caracteres, como Cartão principal.',
   final_invalido: 'Informe só os 4 últimos dígitos, sem o número completo.',
   dia_de_fechamento_invalido: 'Informe o dia do fechamento, de 1 a 31.',
   dia_de_vencimento_invalido: 'Informe o dia do vencimento, de 1 a 31.',
@@ -1339,7 +1342,7 @@ export const CARDS_TEXT = {
     newTitle: 'Novo cartão',
     editTitle: 'Editar cartão',
     name: 'Apelido do cartão',
-    nameHint: 'Por exemplo: Nubank ou Cartão do mercado',
+    nameHint: 'Por exemplo: Cartão principal ou Cartão do mercado',
     nameHasNumber: 'Não use o número do cartão no apelido. Use os 4 últimos dígitos no campo próprio.',
     lastDigits: 'Últimos 4 dígitos (opcional)',
     lastDigitsHint: 'Só os 4 últimos dígitos. Nunca o número completo, o código de segurança nem a validade.',

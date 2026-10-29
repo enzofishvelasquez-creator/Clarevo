@@ -1,5 +1,5 @@
-import { normalizeSiteUrl, sitePageUrl, type SitePage } from '@clarevo/core';
-import { Linking } from 'react-native';
+import { SUPPORT_EMAIL, normalizeSiteUrl, sitePageUrl, type SitePage } from '@clarevo/core';
+import { Linking, Platform } from 'react-native';
 
 /**
  * O endereço do site público do Clarevo (D-064). **A única leitura de `EXPO_PUBLIC_SITE_URL` do app** (a regra do endereço e os caminhos
@@ -22,6 +22,23 @@ export async function openSitePage(page: SitePage): Promise<boolean> {
   if (!url) return false;
   try {
     await Linking.openURL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * "Escrever para o suporte" (Conta, card "Ajuda e contato"): abre o programa de e-mail com o endereço do suporte. Na web, o
+ * `mailto:` vai na própria janela (o navegador entrega ao programa de e-mail e o app continua aberto, sem uma aba vazia), e a web
+ * não diz se havia programa de e-mail: devolve `true`. No aparelho, devolve `false` quando o sistema não conseguiu abrir. Nos
+ * dois casos o endereço também aparece escrito no card.
+ */
+export async function openSupportEmail(): Promise<boolean> {
+  const url = `mailto:${SUPPORT_EMAIL}`;
+  try {
+    if (Platform.OS === 'web') window.location.href = url;
+    else await Linking.openURL(url);
     return true;
   } catch {
     return false;

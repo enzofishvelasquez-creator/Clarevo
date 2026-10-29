@@ -77,6 +77,7 @@ export { default as ListChecks } from 'lucide-react-native/icons/list-checks';
 export { default as ListOrdered } from 'lucide-react-native/icons/list-ordered';
 export { default as LockKeyhole } from 'lucide-react-native/icons/lock-keyhole';
 export { default as LogOut } from 'lucide-react-native/icons/log-out';
+export { default as Mail } from 'lucide-react-native/icons/mail';
 export { default as MailCheck } from 'lucide-react-native/icons/mail-check';
 export { default as Minus } from 'lucide-react-native/icons/minus';
 export { default as MonitorSmartphone } from 'lucide-react-native/icons/monitor-smartphone';

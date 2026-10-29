@@ -787,7 +787,7 @@ export const BUDGET_TEXT = {
      */
     restore: (cents: Cents, fromMonth: IsoMonth) => `Voltar a ${formatBRL(cents)} por mês, valor de ${formatMonthYearBR(fromMonth)}`,
     restoreTitle: (cents: Cents, month: IsoMonth) => `Voltar a ${formatBRL(cents)} por mês a partir de ${formatMonthYearBR(month)}?`,
-    restoreBody: 'Tiramos a linha que encerrava o orçamento neste mês. O valor anterior volta a valer.',
+    restoreBody: 'A retirada deste mês é desfeita, e o valor anterior volta a valer.',
     restoreConfirm: 'Voltar ao valor anterior',
     /** "Orçamento de Mercado salvo. Vale a partir de outubro." */
     saved: (category: string, month: IsoMonth) => `Orçamento de ${category} salvo. Vale a partir de ${formatMonthName(month)}.`,
@@ -797,7 +797,7 @@ export const BUDGET_TEXT = {
     /** Linhas do histórico do orçamento da categoria. */
     historyTitle: 'Histórico',
     historyRow: (month: IsoMonth, cents: Cents | null) => `${capitalizeFirst(formatMonthYearBR(month))}: ${cents === null ? 'sem orçamento' : `${formatBRL(cents)} por mês`}`,
-    existing: (month: IsoMonth) => `Já existe uma linha a partir de ${formatMonthYearBR(month)}. Ao salvar, ela é alterada.`,
+    existing: (month: IsoMonth) => `Já existe um orçamento a partir de ${formatMonthYearBR(month)}. Ao salvar, ele é alterado.`,
     monthPrev: (month: IsoMonth) => `Mês anterior: ${formatMonthYearBR(month)}`,
     monthNext: (month: IsoMonth) => `Próximo mês: ${formatMonthYearBR(month)}`,
     unknown: 'Esta categoria não tem orçamento.',
@@ -852,7 +852,7 @@ export const LIMIT_TEXT = {
     /** Desfazer a retirada: só quando a linha anterior tem percentual, e o texto diz qual. */
     restore: (percent: number, fromMonth: IsoMonth) => `Voltar a ${percent}% da renda, limite de ${formatMonthYearBR(fromMonth)}`,
     restoreTitle: (percent: number, month: IsoMonth) => `Voltar a ${percent}% da renda a partir de ${formatMonthYearBR(month)}?`,
-    restoreBody: 'Tiramos a linha que encerrava o limite neste mês. O limite anterior volta a valer.',
+    restoreBody: 'A retirada deste mês é desfeita, e o limite anterior volta a valer.',
     restoreConfirm: 'Voltar ao limite anterior',
     /** "Limite de 40% salvo. Vale a partir de outubro." */
     saved: (percent: number, month: IsoMonth) => `Limite de ${percent}% salvo. Vale a partir de ${formatMonthName(month)}.`,

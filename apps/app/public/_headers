@@ -1,0 +1,11 @@
+# Cabeçalhos de segurança do app web (Cloudflare Pages lê este arquivo e não o publica). Vale para app.clarevo.app.br e demo.clarevo.app.br.
+# Sem CSP de scripts por enquanto: o app usa estilos em linha do React Native Web e chama o Supabase; uma CSP completa precisa ser testada no ar.
+# frame-ancestors e X-Frame-Options impedem que o app seja aberto dentro de outra página (proteção contra clique enganoso).
+# HSTS sem includeSubDomains e sem preload, como no site (docs/07).
+/*
+  Content-Security-Policy: frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: same-origin
+  Permissions-Policy: microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000

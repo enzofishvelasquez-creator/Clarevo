@@ -2,6 +2,7 @@ import type { IsoDate } from './dates';
 import { formatDateBR, todayIn } from './dates';
 import { CSV_BOM, CSV_EOL, csvCell, csvText } from './export';
 import { INVITE_BASE_URL, INVITE_CODE_PATTERN, normalizeInviteCode } from './family';
+import { CONTACT_EMAIL, SUPPORT_EMAIL } from './legal';
 import { seasonalCard } from './learn/epoca';
 import type { RepoErrorCode } from './repository';
 import { sha256Hex } from './sha256';
@@ -181,18 +182,34 @@ export function sameEmail(a: unknown, b: unknown): boolean {
 
 /**
  * Divide o texto colado em itens: um por linha, ou separados por vírgula ou ponto e vírgula. "Nome <email>" vale como o e-mail
- * dentro dos sinais. Itens vazios saem; o resto fica como a pessoa digitou, sem os espaços das pontas.
+ * dentro dos sinais, também no formato do Outlook, em que o nome tem vírgula ("Silva, Ana <ana@x.com>; Souza, Bia <bia@x.com>"),
+ * e quando o nome é o próprio e-mail ("ana@x.com" <ana@x.com>). Nome entre aspas logo antes do sinal sai antes de dividir. Entre o
+ * último ponto e vírgula (ou quebra de linha) e o sinal, o último pedaço depois de vírgula é o nome e sai; o pedaço logo antes dele,
+ * sem arroba, é o sobrenome ("Silva, Ana") e também sai; os outros ficam como itens. Itens vazios saem; o resto fica como a pessoa
+ * digitou, sem os espaços das pontas (um item errado aparece como inválido).
  */
 export function splitEmailList(text: unknown): string[] {
   if (typeof text !== 'string') return [];
-  return text
-    .split(/[\r\n,;]+/)
-    .map((raw) => {
-      const item = raw.trim();
-      const inside = /<([^<>]*)>\s*$/.exec(item);
-      return (inside ? inside[1]! : item).trim();
-    })
-    .filter((item) => item !== '');
+  const source = text.replace(/"[^"]*"(?=\s*<)/g, ' ');
+  const items: string[] = [];
+  const plain = (chunk: string) => {
+    for (const raw of chunk.split(/[\r\n,;]+/)) if (raw.trim() !== '') items.push(raw.trim());
+  };
+  const angle = /<([^<>]*)>/g;
+  let last = 0;
+  for (let m = angle.exec(source); m !== null; m = angle.exec(source)) {
+    const before = source.slice(last, m.index);
+    const cut = Math.max(before.lastIndexOf(';'), before.lastIndexOf('\n'), before.lastIndexOf('\r'));
+    plain(before.slice(0, cut + 1));
+    const pieces = before.slice(cut + 1).split(',');
+    pieces.pop();
+    if (pieces.length > 0 && !pieces[pieces.length - 1]!.includes('@')) pieces.pop();
+    for (const raw of pieces) if (raw.trim() !== '') items.push(raw.trim());
+    if (m[1]!.trim() !== '') items.push(m[1]!.trim());
+    last = m.index + m[0].length;
+  }
+  plain(source.slice(last));
+  return items;
 }
 
 /** O que a pessoa colou: válidos (únicos), repetidos na lista e inválidos. */
@@ -442,7 +459,7 @@ export const COMPANY_TEXT = {
   accountHint: 'Convide pessoas para o benefício e acompanhe as vagas e as licenças.',
   accountOpen: 'Abrir painel da empresa',
   webOnly: 'O painel da empresa está disponível só na web. Abra o app da Clarevo no navegador para usá-lo.',
-  notAdmin: 'Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe da Clarevo.',
+  notAdmin: `Esta área é para quem administra o benefício de uma empresa. Se a sua empresa contratou a Clarevo e você administra o benefício, escreva para ${SUPPORT_EMAIL}.`,
   loading: 'Carregando o painel…',
   loadFailed: 'Não foi possível carregar o painel. Tente novamente.',
   demoBadge: 'Demonstração: empresa e pessoas fictícias. Nada é gravado fora deste aparelho.',
@@ -477,8 +494,8 @@ export const COMPANY_TEXT = {
     vazia: 'Nenhum e-mail novo para convidar.',
     invalidos: 'Corrija ou retire os itens que não parecem um e-mail para continuar.',
     lote_grande: `Convide até ${LICENSE_BATCH_MAX} pessoas por vez.`,
-    sem_vagas: 'A lista tem mais pessoas novas do que vagas livres. Retire alguns e-mails ou fale com a equipe da Clarevo para ampliar as vagas.',
-    contrato_fora_da_vigencia: 'O contrato não está em vigor. Fale com a equipe da Clarevo.',
+    sem_vagas: `A lista tem mais pessoas novas do que vagas livres. Retire alguns e-mails ou escreva para ${CONTACT_EMAIL} para ampliar as vagas.`,
+    contrato_fora_da_vigencia: `O contrato não está em vigor. Escreva para ${CONTACT_EMAIL}.`,
   } as const,
   confirm: (n: number): string => (n === 1 ? 'Convidar 1 pessoa' : `Convidar ${n} pessoas`),
   confirmBusy: 'Convidando…',
@@ -655,8 +672,8 @@ export const BENEFIT_TEXT = {
 export const COMPANY_ERROR_TEXT = {
   email_invalido: 'Um dos itens não parece um e-mail. Corrija a lista e tente de novo.',
   itens_invalidos: `Convide de 1 a ${LICENSE_BATCH_MAX} pessoas por vez.`,
-  contrato_nao_vigente: 'O contrato não está em vigor. Fale com a equipe da Clarevo.',
-  vagas_insuficientes: 'Não há vagas livres para todas as pessoas da lista. Retire alguns e-mails ou fale com a equipe da Clarevo.',
+  contrato_nao_vigente: `O contrato não está em vigor. Escreva para ${CONTACT_EMAIL}.`,
+  vagas_insuficientes: `Não há vagas livres para todas as pessoas da lista. Retire alguns e-mails ou escreva para ${CONTACT_EMAIL} para ampliar as vagas.`,
   licenca_nao_convidada: 'Esta licença já não é um convite pendente. Atualize a tela.',
   licenca_nao_ativa: 'Esta licença já não está ativa. Atualize a tela.',
   convite_invalido: BENEFIT_TEXT.invalid,

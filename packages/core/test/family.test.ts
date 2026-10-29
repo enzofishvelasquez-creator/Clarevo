@@ -81,6 +81,10 @@ describe('Família: constantes e validação', () => {
     expect(familyNameError('  Casa  ')).toBeNull();
     expect(familyNameError('x'.repeat(60))).toBeNull();
     expect(familyNameError('x'.repeat(61))).toBe('nome_da_familia_invalido');
+    // Contado em caracteres, como o banco (char_length): emoji vale 1, não 2.
+    expect(familyNameError('🏠'.repeat(31))).toBeNull();
+    expect(familyNameError('🏠'.repeat(60))).toBeNull();
+    expect(familyNameError('🏠'.repeat(61))).toBe('nome_da_familia_invalido');
     expect(familyNameError('')).toBe('nome_da_familia_invalido');
     expect(familyNameError('   ')).toBe('nome_da_familia_invalido');
     expect(familyNameError('\t\n')).toBe('nome_da_familia_invalido');

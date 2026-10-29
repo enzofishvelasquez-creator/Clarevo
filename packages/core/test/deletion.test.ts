@@ -163,7 +163,7 @@ describe('textos de excluir a conta (D-058)', () => {
     expect(DELETE_TEXT.erased).toHaveLength(5);
     expect(DELETE_TEXT.erased.join(' ')).toContain('de verdade');
     expect(DELETE_TEXT.erased.join(' ')).toContain('A empresa vê só que a licença terminou');
-    expect(DELETE_TEXT.keptNone).toBe('Nada é guardado por garantia.');
+    expect(DELETE_TEXT.keptNone).toBe('Nada fica guardado para uso depois. As cópias de segurança do banco de dados podem manter dados apagados por um tempo.');
     expect(DELETE_TEXT.familyGeneral).toContain('"Pessoa que saiu"');
     expect(DELETE_TEXT.exportButton).toBe('Exportar meus dados antes');
     expect(DELETE_TEXT.submit).toBe('Excluir minha conta');

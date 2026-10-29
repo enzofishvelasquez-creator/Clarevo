@@ -416,6 +416,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Conta na web: "Lembretes estão disponíveis no app para celular.", sem interruptor de lembretes nem de biometria', t.includes('Lembretes') && t.includes('Lembretes estão disponíveis no app para celular.') &&
     !t.includes('Pedir biometria ao abrir') && !t.includes('Avisar') && JSON.stringify(contaSwitches) === JSON.stringify([['Ocultar valores ao abrir', 'false'], ['Mostrar valores no widget', 'false']]), JSON.stringify(contaSwitches));
   ok('Conta: "Privacidade neste aparelho" com "Ocultar valores ao abrir" desligado por padrão e a legenda', t.includes('Privacidade neste aparelho') && t.includes('Ao abrir o app, os valores aparecem como R$ ••••. Vale só para este aparelho.'));
+  ok('Conta: "Ajuda e contato" com o e-mail do suporte por escrito (sem depender do site) e o botão "Escrever para o suporte"', t.includes('Ajuda e contato') &&
+    t.includes('Dúvidas sobre o app ou um problema: escreva para suporte@clarevo.app.br. Pedidos sobre os seus dados: privacidade@clarevo.app.br.') && (await visibleCount('button', 'Escrever para o suporte')) === 1);
   await keepText();
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   ok('sair volta para boas-vindas', (await body()).includes('Cuidar da vida financeira'));
@@ -672,7 +674,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('tab', { name: 'Movimentações' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
   await shot('13_movimentacoes');
   ok('movimentações agrupadas por dia com totais do mês', /ONTEM|Ontem/.test(await body()) && (await body()).includes('Pago em outubro'));
-  await p.getByRole('radio', { name: 'Recebidos' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  await p.getByRole('radio', { name: 'Recebidos' }).filter({ visible: true }).first().click();
+  // Espera a lista trocar (e não uma pausa fixa): com a máquina carregada, 300 ms não bastavam.
+  await p.waitForFunction(() => !document.body.innerText.includes('Pago · '), null, { timeout: 8000 }).catch(() => {});
   ok('filtro Recebidos mostra só recebimentos', !(await body()).includes('Pago · '));
   await p.getByRole('radio', { name: 'Todos' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
   // Atalhos de Movimentações: "Organizar", com Contas a pagar, Gastos fixos e parcelamentos e Calculadoras (Ciclo A6).
@@ -3127,7 +3131,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('C conta nova: nenhuma meta nem reserva de exemplo', (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 0 && !t.includes('Viagem de férias'));
   await btn('Sim, consigo').click(); await waitText('Quanto você consegue guardar por mês?'); await p.waitForTimeout(500);
   t = await body();
-  ok('C "Sim, consigo": campo de valor com a dica (R$ 1,00 a R$ 9.999.999,99), privacidade e o pedido dos gastos essenciais (conta nova, nada calculável)', (await h1Name()) === 'Seu plano de guardar' && t.includes('De R$ 1,00 a R$ 9.999.999,99.') && t.includes('Sua resposta e as datas de volta não aparecem para outras pessoas do app.') &&
+  ok('C "Sim, consigo": campo de valor com a dica (R$ 1,00 a R$ 9.999.999,99), privacidade e o pedido dos gastos essenciais (conta nova, nada calculável)', (await h1Name()) === 'Seu plano de guardar' && t.includes('De R$ 1,00 a R$ 9.999.999,99.') && t.includes('Sua resposta e as datas em que a pergunta volta não aparecem para outras pessoas do app.') &&
     t.includes('Informe quanto você gasta por mês com moradia, mercado, transporte, saúde e educação.'));
   await field('Quanto você consegue guardar por mês?').fill('400'); await field('Gastos essenciais por mês').fill('2000'); await p.waitForTimeout(500);
   t = await body();
@@ -3815,7 +3819,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await field('Descrição').fill('Mercado do mês'); await field('Valor em reais').fill('90');
   await btn('Cadastrar cartão').click(); await waitText('Apelido do cartão'); await p.waitForTimeout(500); t = await body();
   ok('E Novo cartão (vindo de Anotar gasto): apelido, últimos 4 dígitos (opcional), dias, limite, a regra de privacidade e o aviso de que volta para anotar a compra', (await h1Name()) === 'Novo cartão' &&
-    ['Apelido do cartão', 'Por exemplo: Nubank ou Cartão do mercado', 'Últimos 4 dígitos (opcional)', 'Só os 4 últimos dígitos. Nunca o número completo, o código de segurança nem a validade.', 'Dia do fechamento', 'Compras depois desse dia entram na fatura seguinte.',
+    ['Apelido do cartão', 'Por exemplo: Cartão principal ou Cartão do mercado', 'Últimos 4 dígitos (opcional)', 'Só os 4 últimos dígitos. Nunca o número completo, o código de segurança nem a validade.', 'Dia do fechamento', 'Compras depois desse dia entram na fatura seguinte.',
       'Dia do vencimento', 'Se o mês for mais curto, usamos o último dia dele.', 'Limite (opcional)', 'Guardamos só o apelido e os 4 últimos dígitos. Nunca digite o número completo, o código de segurança nem a validade.', 'Depois de cadastrar, você volta para anotar a compra.'].every((x) => t.includes(x)), t.slice(0, 300));
   await keepText();
   await innerChecks('novo cartão 390px');
@@ -3825,7 +3829,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('149_novo_cartao_320px', true);
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await btn('Salvar cartão').click(); await p.waitForTimeout(400); t = await body();
-  ok('E cartão sem nada: as mensagens de apelido e dos dois dias, junto dos campos, e nada gravado', t.includes('Dê um apelido de 1 a 30 caracteres, como Nubank.') && t.includes('Informe o dia do fechamento, de 1 a 31.') && t.includes('Informe o dia do vencimento, de 1 a 31.') &&
+  ok('E cartão sem nada: as mensagens de apelido e dos dois dias, junto dos campos, e nada gravado', t.includes('Dê um apelido de 1 a 30 caracteres, como Cartão principal.') && t.includes('Informe o dia do fechamento, de 1 a 31.') && t.includes('Informe o dia do vencimento, de 1 a 31.') &&
     (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 0);
   await field('Apelido do cartão').fill('4111 1111 1111 1111'); await field('Dia do fechamento').fill('3'); await field('Dia do vencimento').fill('10'); await btn('Salvar cartão').click(); await p.waitForTimeout(400);
   ok('E apelido que parece número de cartão: recusado com "Não use o número do cartão no apelido. Use os 4 últimos dígitos no campo próprio." e nada gravado', (await body()).includes('Não use o número do cartão no apelido. Use os 4 últimos dígitos no campo próprio.') &&
@@ -5978,7 +5982,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('Com estes números, são 48 parcelas de R$ 1.041,14.') && t.includes('Você paga por 48 meses (4 anos), até outubro de 2030.') &&
     t.includes('Total pago: R$ 57.974,72 (entrada de R$ 8.000,00 mais 48 × R$ 1.041,14).') && t.includes('Juros: R$ 17.974,72.'), t.slice(-1800));
   ok('D44 peso na renda: a parcela seria 17,4% da renda e o comprometido de outubro iria de 52,5% para 69,9% enquanto durar o financiamento',
-    t.includes('A parcela seria 17,4% da sua renda.') && t.includes('Seu comprometido iria de 52,5% para 69,9% enquanto durar o financiamento.'));
+    t.includes('A parcela seria 17,4% da sua renda.') && t.includes('Sua renda comprometida iria de 52,5% para 69,9% enquanto durar o financiamento.'));
   ok('D44 a referência de 30% aparece só como referência, com a fonte e a data (como na tela da renda), e o aviso fixo da estimativa',
     t.includes('Referência usada pela Serasa: até 30% da renda líquida com parcelas de dívidas. É uma referência geral, não uma regra para você.') &&
     t.includes('Fonte: Serasa, página sobre comprometimento de renda, consultada em 09/10/2026.') && t.includes('Estimativa. As condições oficiais são as da proposta; peça o CET.'));
@@ -6014,12 +6018,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // ---- 4. A conta muda com a renda, com a primeira parcela na compra e com o que se junta ----
   await d44Fill('Sua renda líquida por mês', '5000');
   t = await body();
-  ok('D44 renda digitada aqui (R$ 5.000,00, sem gravar): 20,8% da renda, e o comprometido vai de 63,0% para 83,8%', t.includes('A parcela seria 20,8% da sua renda.') && t.includes('Seu comprometido iria de 63,0% para 83,8% enquanto durar o financiamento.') &&
+  ok('D44 renda digitada aqui (R$ 5.000,00, sem gravar): 20,8% da renda, e o comprometido vai de 63,0% para 83,8%', t.includes('A parcela seria 20,8% da sua renda.') && t.includes('Sua renda comprometida iria de 63,0% para 83,8% enquanto durar o financiamento.') &&
     t.includes('Percentuais sobre a renda líquida por mês que você informou aqui.') && !t.includes('Veio da sua renda de referência.'));
   await d44Fill('Sua renda líquida por mês', '');
   t = await body();
-  ok('D44 sem renda: só valores em reais ("Seu comprometido do mês iria de R$ 3.150,00 para R$ 4.191,14"), sem percentuais e sem a referência de 30%',
-    t.includes('Seu comprometido do mês iria de R$ 3.150,00 para R$ 4.191,14 enquanto durar o financiamento.') && !t.includes('A parcela seria') && !t.includes('Referência usada pela Serasa') && !t.includes('Veio da sua renda de referência.') && t.includes('Estimativa. As condições oficiais são as da proposta; peça o CET.'));
+  ok('D44 sem renda: só valores em reais ("O total comprometido por mês iria de R$ 3.150,00 para R$ 4.191,14"), sem percentuais e sem a referência de 30%',
+    t.includes('O total comprometido por mês iria de R$ 3.150,00 para R$ 4.191,14 enquanto durar o financiamento.') && !t.includes('A parcela seria') && !t.includes('Referência usada pela Serasa') && !t.includes('Veio da sua renda de referência.') && t.includes('Estimativa. As condições oficiais são as da proposta; peça o CET.'));
   await d44Fill('Sua renda líquida por mês', '6000');
   await radio('Não').click(); await p.waitForTimeout(300);
   t = await body();
@@ -6134,7 +6138,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await d44Renda.inputValue()) === '••••' && !(await d44Renda.isEditable()) && (await field('Taxa de juros ao mês (%)').inputValue()) === '1,99' && t.includes('Valor oculto. Mostre os valores para editar.'));
   const d44Leaks = await moneyLeaks();
   ok('D44 valores ocultos: nenhum valor em reais à vista (texto e nomes acessíveis); "R$ ••••" no resultado, nas linhas de juntar antes e de entrada maior; os percentuais e os meses continuam',
-    d44Leaks.length === 0 && t.includes('Com estes números, são 48 parcelas de R$ ••••.') && t.includes('A parcela seria 17,4% da sua renda.') && t.includes('Seu comprometido iria de 52,5% para 69,9% enquanto durar o financiamento.') &&
+    d44Leaks.length === 0 && t.includes('Com estes números, são 48 parcelas de R$ ••••.') && t.includes('A parcela seria 17,4% da sua renda.') && t.includes('Sua renda comprometida iria de 52,5% para 69,9% enquanto durar o financiamento.') &&
     t.includes('Você paga por 48 meses (4 anos), até outubro de 2030.') && t.includes('em 31 meses (2 anos e 7 meses).') && (await spokenHidden()) > 0, `${d44Leaks.slice(0, 3).join(' | ')}`);
   await atWidths(async (w) => {
     await layoutChecks(`D44 valores ocultos ${w}px`);
@@ -6174,10 +6178,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await d44Fill1();
   t = await body();
   ok('D44 conta nova: parcela, prazo e juros calculados; sem renda e sem nada comprometido, nenhuma linha de peso na renda (nem "de R$ 0,00 para")',
-    t.includes('Com estes números, são 48 parcelas de R$ 1.041,14.') && t.includes('Juros: R$ 17.974,72.') && !t.includes('A parcela seria') && !t.includes('Seu comprometido') && !t.includes('Referência usada pela Serasa'), t.slice(-900));
+    t.includes('Com estes números, são 48 parcelas de R$ 1.041,14.') && t.includes('Juros: R$ 17.974,72.') && !t.includes('A parcela seria') && !t.includes('comprometida iria') && !t.includes('O total comprometido') && !t.includes('Referência usada pela Serasa'), t.slice(-900));
   await d44Fill('Sua renda líquida por mês', '4500');
   t = await body();
-  ok('D44 conta nova com a renda digitada (R$ 4.500,00): a parcela seria 23,1% e o comprometido iria de 0,0% para 23,1%', t.includes('A parcela seria 23,1% da sua renda.') && t.includes('Seu comprometido iria de 0,0% para 23,1% enquanto durar o financiamento.'), t.slice(-900));
+  ok('D44 conta nova com a renda digitada (R$ 4.500,00): a parcela seria 23,1% e o comprometido iria de 0,0% para 23,1%', t.includes('A parcela seria 23,1% da sua renda.') && t.includes('Sua renda comprometida iria de 0,0% para 23,1% enquanto durar o financiamento.'), t.slice(-900));
   ok('D44 conta nova: nada gravado ao digitar (nenhuma escrita, nada no aparelho, nenhum parcelamento)', writes.length === d44Writes2 && (await storage()) === d44Store2 && (await otherDevice(async (repo, ctx) => (await repo.listSeries(ctx)).length)) === 0, `${writes.length - d44Writes2} escritas`);
   await d44Keep();
   const d44Vetoed = d44Texts.map((s) => (s.match(D44_VETOED) ?? s.match(JUDGMENT) ?? [])[0]).filter(Boolean);
@@ -7756,6 +7760,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('I1 revisar: o nome de cada caixa diz a descrição, o valor e a data', boxes[0][0] === 'Incluir: COMPRA PADARIA SÃO JOÃO, R$ 45,90, 02/10/2026', String(boxes[0][0]));
   ok('I1 revisar: o saldo do arquivo continua ignorado e nenhuma linha traz saldo', t1.includes('O saldo que vem no arquivo é ignorado.') && !t1.includes('1.234,56 ·') && (await visibleCount('button', 'Importar 4 lançamentos')) === 1);
   await atWidths(async (w) => { await innerChecks(`I1 revisar ${w}px`); if (w === 390) await shot('303_importar_revisar'); if (w === 320) await shot('303_importar_revisar_320px'); });
+  // O texto do botão principal cabe nele, ao lado de "Voltar" (lido como "Voltar ao destino"), também em 320 px.
+  await atWidths(async (w) => {
+    const spill = await p.evaluate(() => [...document.querySelectorAll('[role=button]')].filter((b) => /^Importar \d+ lançamentos?$/.test((b.textContent || '').trim()) && b.getBoundingClientRect().width > 0).map((b) => {
+      const box = b.getBoundingClientRect(); const range = document.createRange(); range.selectNodeContents(b); const text = range.getBoundingClientRect();
+      return text.left < box.left - 0.5 || text.right > box.right + 0.5;
+    }));
+    ok(`I1 revisar ${w}px: o texto de "Importar 4 lançamentos" cabe no botão, ao lado de "Voltar" (lido como "Voltar ao destino")`, spill.length === 1 && !spill[0] && (await visibleCount('button', 'Voltar ao destino')) === 1, JSON.stringify(spill));
+  });
   // Selecionar tudo e limpar a seleção.
   await btn('Selecionar tudo').click(); await p.waitForTimeout(300);
   ok('I1 "Selecionar tudo" marca as 7 linhas e o botão vira "Limpar seleção"', (await body()).includes('7 linhas · 7 marcadas') && (await visibleCount('button', 'Limpar seleção')) === 1 && (await visibleCount('button', 'Importar 7 lançamentos')) === 1);
@@ -10850,15 +10862,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await evMark('Fevereiro')).kind === 'vazio' && (await evMark('Abril')).kind === 'vazio' && (await evMark('Junho')).kind === 'escolhido_vazio', JSON.stringify(await evRuns()));
   await evShots('448_evolucao_varios_meses_fora');
   // Tabela equivalente, com os meses fora rotulados.
-  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: 'Ver tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
   t = await evKeep();
   const evRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem] button')].filter((e) => e.getBoundingClientRect().width > 0 && /de (2025|2026), /.test(e.getAttribute('aria-label') || '')).map((e) => (e.getAttribute('aria-label') || '').replace(/ /g, ' ')));
-  ok('Evolução tabela "Ver valores mês a mês": uma linha por mês (12), com mês, valor, estado e "Na comparação?" ("Sim" ou "Fora da comparação"), e "Sem valor" nos meses sem registros', evRows.length === 12 &&
+  ok('Evolução tabela "Ver tabela mês a mês": uma linha por mês (12), com mês, valor, estado e "Na comparação?" ("Sim" ou "Fora da comparação"), e "Sem valor" nos meses sem registros', evRows.length === 12 &&
     evRows[2] === 'Janeiro de 2026, R$ 3.200,00, Com registros, Na comparação? Sim' && evRows[3] === 'Fevereiro de 2026, R$ 3.400,00, Com registros, Na comparação? Fora da comparação' && evRows[0] === 'Novembro de 2025, Sem valor, Sem registros, Na comparação? Fora da comparação' &&
-    t.includes('Na comparação?\nFora da comparação') && t.includes('Sem valor') && (await visibleCount('button', 'Esconder valores mês a mês')) === 1 && t.includes('O total dos meses exibidos não depende do que está na comparação.'), JSON.stringify(evRows.slice(0, 4)));
-  await evShots('449_evolucao_tabela', { scroll: evScrollBtn('Esconder valores mês a mês') });
-  await p.getByRole('button', { name: 'Esconder valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
-  ok('Evolução tabela: "Esconder valores mês a mês" fecha a tabela', (await visibleCount('button', 'Ver valores mês a mês')) === 1 && (await p.locator('[role=listitem]').filter({ visible: true }).count()) === 0);
+    t.includes('Na comparação?\nFora da comparação') && t.includes('Sem valor') && (await visibleCount('button', 'Ocultar tabela mês a mês')) === 1 && t.includes('O total dos meses exibidos não depende do que está na comparação.'), JSON.stringify(evRows.slice(0, 4)));
+  await evShots('449_evolucao_tabela', { scroll: evScrollBtn('Ocultar tabela mês a mês') });
+  await p.getByRole('button', { name: 'Ocultar tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  ok('Evolução tabela: "Ocultar tabela mês a mês" fecha a tabela', (await visibleCount('button', 'Ver tabela mês a mês')) === 1 && (await p.locator('[role=listitem]').filter({ visible: true }).count()) === 0);
 
   // ---- 14. T08 e T09 no cenário: todos fora, depois um só mês ----
   await evSet('Janeiro', false); await evSet('Março', false); await evSet('Maio', false);
@@ -10956,7 +10968,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução leitor de tela: títulos em ordem (h1 "Evolução", h2 "Recebido/Pago por mês" e o mês do painel, h2 da seção de comparação)', evA11y.headings[0] === '1:Evolução' && evA11y.headings.includes('2:Pago por mês') && evA11y.headings.includes('2:Junho de 2026'), JSON.stringify(evA11y.headings));
   // Com 12 meses a coluna do gráfico é estreita (22 px em 320 px), então o caminho de 44 px é o painel ("Mês anterior" e "Mês seguinte") e a
   // tabela, cujas linhas são botões que escolhem o mês e levam o foco ao painel. Mede em 390 e em 320 px, com a tabela aberta.
-  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Ver tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
   const evTouch390 = await evTouch();
   const evBig = (sz) => Array.isArray(sz) && sz[0] >= 44 && sz[1] >= 44;
   ok('Evolução alvos de toque (12 meses, 390 px): as 12 colunas do gráfico têm 22 px ou mais de largura, e "Mês anterior", "Mês seguinte" e as 12 linhas da tabela são botões de 44 px ou mais, de largura e de altura', evTouch390.cols.length === 12 && evTouch390.cols.every((w) => w >= 22) &&
@@ -10971,7 +10983,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução tabela (320 px): tocar na linha de março escolhe o mês (o gráfico e a linha ficam pressionados) e leva o foco ao título do painel ("Março de 2026")', (await evPressed()).join('').startsWith('Março de 2026') &&
     (await p.locator('[role=listitem] button[aria-pressed="true"]').count()) === 1 && evTableFocus && evTableFocus.role === 'heading' && evTableFocus.text === 'Março de 2026', JSON.stringify(evTableFocus));
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(500);
-  await p.getByRole('button', { name: 'Esconder valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: 'Ocultar tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
   // "Mês seguinte" e "Mês anterior": o painel muda de mês, o botão segue com o foco e o leitor de tela ouve o mês novo; nos limites, o botão fica desativado.
   const evStepBtn = (name) => p.getByRole('button', { name, exact: true }).filter({ visible: true }).first();
   await evStepBtn('Mês seguinte').click(); await p.waitForTimeout(400);
@@ -11124,7 +11136,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução entender, valores ocultos: o leitor de tela ouve "Reparo do carro, 22/04/2026, valor oculto" nos lançamentos relacionados', evE5names[0] === 'Reparo do carro, 22/04/2026, valor oculto' && evE5names.every((n) => !/R\$/.test(n)), JSON.stringify(evE5names));
   await evShots('477_evolucao_entender_valores_ocultos', { scroll: evScrollBtn('Entender o que mudou') });
   await evExplainClose();
-  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Ver tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
   await hiddenShows('Evolução, tabela');
   t = await body();
   ok('Evolução valores ocultos: a tabela mostra R$ •••• nos meses com registros e "Sem valor" nos outros', t.includes('Sem valor') && t.includes('R$ ••••') && !/R\$ \d/.test(t));
@@ -11184,11 +11196,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Evolução entender, abril contra março com lacuna: o aviso diz o mês ("Pode faltar algo em março: há conta prevista sem registro"), sem o aviso do mês escolhido', evE7.includes('Pode faltar algo em março: há conta prevista sem registro') && !evE7.includes(evGapText));
   await evExplainClose();
   await evPick('Março');
-  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Ver tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
   const evGapRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem] button')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => ({ label: (e.getAttribute('aria-label') || '').replace(/\u00a0/g, ' '), text: e.textContent })));
   ok('Evolução lacuna: a linha de março da tabela traz o aviso (no nome e no texto) e as outras linhas não', evGapRows.length === 12 && evGapRows[4].label === `Março de 2026, R$ 3.300,00, Com registros, Na comparação? Sim, ${evGapText}` && evGapRows[4].text.includes(evGapText) &&
     evGapRows.filter((r) => r.label.includes('Pode faltar algo')).length === 1, JSON.stringify(evGapRows[4]));
-  await p.getByRole('button', { name: 'Esconder valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: 'Ocultar tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
   await radio('Recebido').click(); await p.waitForTimeout(600);
   names = await evNames();
   t = await body();
@@ -11842,8 +11854,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Excluir: título, introdução (perde o acesso na hora, não é possível desfazer, e-mail livre, conta nova vazia) e as duas listas', (await famH1()) === 'Excluir minha conta' &&
     t.includes('Ao excluir, você perde o acesso na hora e não é possível desfazer. O seu e-mail fica livre para uma conta nova, que começa vazia.') && t.includes('O que é apagado') && t.includes('O que continua') &&
     t.includes('O seu Pessoal inteiro, de verdade e não só escondido') && t.includes('O benefício pela empresa, se você tem um: a licença termina na hora') && t.includes('A empresa vê só que a licença terminou.') &&
-    t.includes('Nada é guardado por garantia.'), t.slice(0, 900));
-  ok('Excluir sem Família: diz que não está em nenhuma Família e explica o que acontece em cada papel', t.includes('Você não está em nenhuma Família.') && t.includes('Se você é membro ou só vê, sai da Família e o que anotou continua, com a autoria "Pessoa que saiu".') &&
+    t.includes('Nada fica guardado para uso depois. As cópias de segurança do banco de dados podem manter dados apagados por um tempo.'), t.slice(0, 900));
+  ok('Excluir sem Família: diz que não está em nenhuma Família e explica o que acontece em cada papel', t.includes('Você não está em nenhuma Família.') && t.includes('Se você anota e vê ou só vê, sai da Família e o que anotou continua, com a autoria "Pessoa que saiu".') &&
     t.includes('Se é titular com outras pessoas, passa a titularidade antes. Se é titular sem mais ninguém, a Família é apagada junto.'), t.slice(900, 1800));
   ok('Excluir: oferece "Exportar meus dados antes" e pede a palavra EXCLUIR; o botão final está desligado e não há alerta de erro', t.includes('Depois de excluir, não há como recuperar.') && (await visibleCount('button', 'Exportar meus dados antes')) === 1 &&
     t.includes('Digite EXCLUIR para confirmar') && t.includes('Escreva a palavra EXCLUIR, em maiúsculas ou minúsculas.') && (await visibleCount('button', 'Excluir minha conta')) === 1 && !(await delFinalEnabled()) && !t.includes('Digite EXCLUIR para confirmar.'), t.slice(1800, 2600));
@@ -11994,6 +12006,19 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Sem o parâmetro (ou com outro valor), a tela é a de sempre: "Sua conta foi excluída".
   await p.goto(`http://localhost:${PORT}/conta-excluida?estado=qualquer`); await waitText('Sua conta foi excluída');
   ok('Sua conta foi excluída: um estado desconhecido cai na tela de sempre', (await famH1()) === 'Sua conta foi excluída' && !(await body()).includes('Não foi possível confirmar'));
+
+  // ---- 11c. Endereço que não existe: a tela em português, sem barra, no lugar da tela padrão do roteador (em inglês, com a lista de rotas) ----
+  await p.goto(`http://localhost:${PORT}/endereco-que-nao-existe`); await waitText('Página não encontrada'); await p.waitForTimeout(500);
+  t = await body();
+  ok('Endereço que não existe: título e texto em português, "Ir para o início", sem a tela padrão em inglês e sem a barra de abas', (await famH1()) === 'Página não encontrada' &&
+    t.includes('Este endereço não existe no app ou mudou de lugar. Confira o link ou siga por aqui.') && (await visibleCount('button', 'Ir para o início')) === 1 &&
+    !/Unmatched|Sitemap|Go back/.test(t) && (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0, t.slice(0, 400));
+  await delShots('613_endereco_inexistente');
+  await btn('Ir para o início').click(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(300);
+  ok('Endereço que não existe: "Ir para o início" leva à boas-vindas', (await body()).includes('Cuidar da vida financeira'));
+  await p.goto(`http://localhost:${PORT}/_sitemap`); await waitText('Página não encontrada'); await p.waitForTimeout(400);
+  t = await body();
+  ok('/_sitemap não lista as rotas do app: mostra a mesma tela de endereço que não existe', t.includes('Página não encontrada') && !/Sitemap|registro\/|\(tabs\)|_layout/.test(t), t.slice(0, 300));
   await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(300);
 
   // ---- 12. A demonstração com dados fictícios: a tela abre e explica, o botão final diz que nada é apagado e os totais não mudam ----
@@ -12328,11 +12353,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await evShots('501_conferi_evolucao_conferido', { scroll: evScroll('Setembro de 2026') });
   await evShots('511_conferi_evolucao_grafico');
   // A tabela equivalente.
-  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Ver tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
   const mcRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem] button')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => ({ label: (e.getAttribute('aria-label') || '').replace(/ /g, ' '), text: e.textContent.replace(/ /g, ' ') })));
   ok('Mês conferido, tabela: a linha de setembro traz "R$ 0,00", o estado "Conferido" e "Na comparação? Sim"; a de agosto segue "Sem registros"', mcRows.length === 12 && mcRows[10].label === 'Setembro de 2026, R$ 0,00, Conferido, Na comparação? Sim' && mcRows[10].text.includes('Conferido') && mcRows[9].label.includes('Sem valor, Sem registros'), JSON.stringify([mcRows[9], mcRows[10]]));
-  await evShots('502_conferi_evolucao_tabela', { scroll: evScrollBtn('Esconder valores mês a mês') });
-  await p.getByRole('button', { name: 'Esconder valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  await evShots('502_conferi_evolucao_tabela', { scroll: evScrollBtn('Ocultar tabela mês a mês') });
+  await p.getByRole('button', { name: 'Ocultar tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
   // O zero confirmado pode sair da comparação como qualquer mês escolhido.
   await evSwitch().click(); await p.waitForTimeout(500);
   t = await body();
@@ -13128,7 +13153,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitText('Esta área é para quem administra o benefício de uma empresa.');
   ok('Relatório do RH, conta sem empresa: o endereço é /empresa', famPath() === '/empresa', p.url());
   t = await rhKeep();
-  ok('Relatório do RH, conta sem empresa: /empresa mostra só o aviso "Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe da Clarevo." e nada de relatório, de contrato nem de download', t.includes('Esta área é para quem administra o benefício de uma empresa. Se você deveria ter acesso, fale com a equipe da Clarevo.') &&
+  ok('Relatório do RH, conta sem empresa: /empresa mostra só o aviso "Esta área é para quem administra o benefício de uma empresa. Se a sua empresa contratou a Clarevo e você administra o benefício, escreva para suporte@clarevo.app.br." e nada de relatório, de contrato nem de download', t.includes('Esta área é para quem administra o benefício de uma empresa. Se a sua empresa contratou a Clarevo e você administra o benefício, escreva para suporte@clarevo.app.br.') &&
     !(await headingShown('Relatório de adesão')) && !(await headingShown('Contrato')) && (await visibleCount('button', /^Baixar relatório/)) === 0 && (await visibleCount('checkbox', /^Incluir a lista/)) === 0, t.slice(0, 300));
   await famSignOut();
 
@@ -13299,13 +13324,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0 && !t.includes('52,5%') && (await evNames())[5] === 'Outubro de 2026, mês em andamento, fora da comparação');
   await evPick('Setembro');
   // A tabela equivalente.
-  await p.getByRole('button', { name: 'Ver valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: 'Ver tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
   t = await f3Keep();
   const f3Rows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem] button')].filter((e) => e.getBoundingClientRect().width > 0 && /de 2026, /.test(e.getAttribute('aria-label') || '')).map((e) => (e.getAttribute('aria-label') || '').replace(/ /g, ' ')));
   ok('Evolução fase 3, tabela: uma linha por mês com o percentual ou "Sem valor", o estado ("Sem base", "Com registros", "Mês em andamento") e "Na comparação?", e a nota sem total', f3Rows.length === 6 && f3Rows[0] === 'Maio de 2026, Sem valor, Sem base, Na comparação? Fora da comparação' && f3Rows[2] === 'Julho de 2026, 44,0%, Com registros, Na comparação? Sim' &&
     f3Rows[5] === 'Outubro de 2026, Sem valor, Mês em andamento, Na comparação? Fora da comparação' && t.includes('Tirar um mês da comparação só muda a média e a mediana. O percentual de cada mês não muda.') && !t.includes('O total dos meses exibidos não depende'), JSON.stringify(f3Rows));
-  await evShots('575_evolucao_f3_comprometida_tabela', { scroll: evScrollBtn('Esconder valores mês a mês') });
-  await p.getByRole('button', { name: 'Esconder valores mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+  await evShots('575_evolucao_f3_comprometida_tabela', { scroll: evScrollBtn('Ocultar tabela mês a mês') });
+  await p.getByRole('button', { name: 'Ocultar tabela mês a mês', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
   // Agosto fora da comparação: média e mediana dos outros dois (julho e setembro), com o aviso próprio deste valor.
   await evSet('Agosto', false);
   await evPick('Setembro');

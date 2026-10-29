@@ -3,7 +3,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { LEGAL_TEXT, SIGNUP_CONSENT_TEXT, SITE_PAGES, normalizeSiteUrl, signupConsentParts, sitePageUrl } from '../src/legal';
+import { CONTACT_EMAIL, LEGAL_TEXT, PRIVACY_EMAIL, SIGNUP_CONSENT_TEXT, SITE_PAGES, SUPPORT_EMAIL, SUPPORT_TEXT, normalizeSiteUrl, signupConsentParts, sitePageUrl } from '../src/legal';
+import { COMPANY_ERROR_TEXT, COMPANY_TEXT } from '../src/company';
 
 /**
  * Privacidade e termos dentro do app (D-064): os caminhos fixos das páginas do site, a regra do endereço (`EXPO_PUBLIC_SITE_URL`, lida
@@ -120,5 +121,29 @@ describe('textos de privacidade e termos no app', () => {
     expect(tela).toContain('LEGAL_TEXT.whoSees.personal');
     expect(tela).toContain('LEGAL_TEXT.whoSees.team');
     expect(ler('apps/app/src/app/conta.tsx')).toContain('LEGAL_TEXT.whoSees.security');
+  });
+});
+
+describe('Ajuda e contato', () => {
+  it('os e-mails do app são os mesmos do site (site/dados-da-empresa.json)', () => {
+    const dados = JSON.parse(ler('site/dados-da-empresa.json')) as Record<string, string>;
+    expect(SUPPORT_EMAIL).toBe(dados['E-MAIL DE SUPORTE']);
+    expect(CONTACT_EMAIL).toBe(dados['E-MAIL DE CONTATO']);
+    expect(PRIVACY_EMAIL).toBe(dados['E-MAIL DE PRIVACIDADE']);
+  });
+
+  it('o card de Conta diz o endereço por escrito, sem depender do site, e os avisos da empresa apontam para um canal', () => {
+    expect(SUPPORT_TEXT.hint).toContain(SUPPORT_EMAIL);
+    // Pedidos sobre os dados vão para o e-mail de privacidade, como na política.
+    expect(SUPPORT_TEXT.hint).toContain(`Pedidos sobre os seus dados: ${PRIVACY_EMAIL}.`);
+    expect(SUPPORT_TEXT.writeFailed).toContain(SUPPORT_EMAIL);
+    for (const texto of Object.values(SUPPORT_TEXT)) expect(texto).not.toMatch(PROIBIDO);
+    const tela = ler('apps/app/src/app/conta.tsx');
+    expect(tela).toContain('SUPPORT_TEXT.title');
+    expect(tela).toContain('openSupportEmail');
+    expect(COMPANY_TEXT.notAdmin).toContain(SUPPORT_EMAIL);
+    // Nenhum texto manda "falar com a equipe" sem dizer como.
+    const textos = JSON.stringify([COMPANY_TEXT, COMPANY_ERROR_TEXT]);
+    expect(textos).not.toMatch(/fale com a equipe/i);
   });
 });

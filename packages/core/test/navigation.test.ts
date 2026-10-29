@@ -1,10 +1,11 @@
 /// <reference types="node" />
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   APP_SCREENS,
+  NOT_FOUND_TEXT,
   APP_SEARCH_LIMIT,
   PAYABLES_MONTH_RANGE,
   TAB_ROUTES,
@@ -28,7 +29,8 @@ function routeFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return routeFiles(path);
-    return /\.tsx$/.test(name) && !name.startsWith('_') ? [path] : [];
+    // _layout, _sitemap e +not-found (endereço que não existe) não são telas com caminho próprio.
+    return /\.tsx$/.test(name) && !/^[_+]/.test(name) ? [path] : [];
   });
 }
 
@@ -328,5 +330,21 @@ describe('Lembretes de vencimento em Contas a pagar (D-039)', () => {
 
   it('leva à seção de lembretes de Conta', () => {
     expect(REMINDERS_SETTINGS_HREF).toBe('/conta?secao=lembretes');
+  });
+});
+
+describe('endereço que não existe', () => {
+  it('+not-found e _sitemap mostram a tela em português, no lugar da tela padrão do roteador (em inglês e com a lista de rotas)', () => {
+    const ler = (name: string) => readFileSync(join(APP_DIR, name), 'utf8');
+    expect(ler('+not-found.tsx')).toContain('export default NotFound');
+    expect(ler('_sitemap.tsx')).toContain('export default NotFound');
+    const tela = readFileSync(fileURLToPath(new URL('../../../apps/app/src/components/not-found.tsx', import.meta.url)), 'utf8');
+    expect(tela).toContain('NOT_FOUND_TEXT.title');
+    expect(NOT_FOUND_TEXT).toEqual({
+      title: 'Página não encontrada',
+      body: 'Este endereço não existe no app ou mudou de lugar. Confira o link ou siga por aqui.',
+      goSummary: 'Ir para o Resumo',
+      goStart: 'Ir para o início',
+    });
   });
 });

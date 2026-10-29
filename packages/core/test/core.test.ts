@@ -93,7 +93,12 @@ describe('dinheiro', () => {
     [' 80,00 ', 8000],
   ])('lê "%s"', (text, cents) => expect(parseBRL(text)).toBe(cents));
 
-  it.each(['', 'abc', '1,234', '-10', '10,', '80,001', '1.2345,00', '12 34', '1.2.3', '12.345.6'])('rejeita "%s"', (text) =>
+  it('milhar com ponto: "1.000" é mil, e "0.50" é cinquenta centavos', () => {
+    expect(parseBRL('1.000')).toBe(100000);
+    expect(parseBRL('0.50')).toBe(50);
+  });
+
+  it.each(['', 'abc', '1,234', '-10', '10,', '80,001', '1.2345,00', '12 34', '1.2.3', '12.345.6', '0.500', '00.500', '0.500,00'])('rejeita "%s"', (text) =>
     expect(parseBRL(text)).toBeNull(),
   );
 });

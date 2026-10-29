@@ -517,7 +517,7 @@ export const SAVINGS_TEXT = {
   later: 'Responder depois',
   changeValue: 'Mudar valor',
   keepValue: 'Manter o valor',
-  privacy: 'Sua resposta e as datas de volta não aparecem para outras pessoas do app. A empresa que oferece o benefício não vê, nem somada às de outras pessoas.',
+  privacy: 'Sua resposta e as datas em que a pergunta volta não aparecem para outras pessoas do app. A empresa que oferece o benefício não vê, nem somada às de outras pessoas.',
   /** 4º passo de "Primeiros passos" no Resumo. */
   firstStepTitle: 'Planejar quanto guardar',
   firstStepText: 'Diga se consegue guardar um valor por mês e veja um plano.',

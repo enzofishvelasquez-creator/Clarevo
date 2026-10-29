@@ -737,7 +737,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Toque em ${q(FAMILY_TEXT.invite)}, escolha ${q('Anota e vê')} ou ${q('Só vê')} e toque em ${q(FAMILY_TEXT.inviteGenerate)}. Envie o link com ${q(FAMILY_TEXT.share)}: ele vale por 7 dias e serve uma vez.`,
       `Quem recebe o link entra ou cria a conta, vê o nome da Família e quem convidou e toca em ${q(INVITE_TEXT.accept)}.`,
       `Com Família, o seletor ${q('Pessoal')} e ${q(FAMILY_TEXT.context)} aparece no topo das abas: cada tela usa o contexto escolhido, e os formulários dizem onde a anotação vai ficar.`,
-      `O titular muda o papel de cada pessoa, remove, usa ${q(FAMILY_TEXT.transfer)} ou ${q(FAMILY_TEXT.end)}. Quem não é titular usa ${q(FAMILY_TEXT.leave)}.`,
+      `Quem é titular muda o papel de cada pessoa, remove, usa ${q(FAMILY_TEXT.transfer)} ou ${q(FAMILY_TEXT.end)}. Quem não é titular usa ${q(FAMILY_TEXT.leave)}.`,
       'O que alguém anotou continua na Família depois que sai, como "ex-membro" e o primeiro nome. Quem exclui a conta fica como "Pessoa que saiu", sem nome.',
     ],
     screenName: FAMILY_TEXT.title,

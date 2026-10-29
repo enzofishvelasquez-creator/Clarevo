@@ -1,5 +1,5 @@
 import { BAR_TEXT, LEARN_UI_TEXT, barModeFor, topicTabFor } from '@clarevo/core';
-import { router, usePathname } from 'expo-router';
+import { router, usePathname, useSegments } from 'expo-router';
 import type { TabListProps, TabTriggerSlotProps } from 'expo-router/ui';
 import { ArrowLeftRight, BookOpen, Flag, House, type LucideIcon } from 'lucide-react-native';
 import { forwardRef, useEffect, useState, useSyncExternalStore } from 'react';
@@ -105,7 +105,9 @@ export function BrowseTabBar() {
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardVisible();
   const origin = useLastTab();
-  const visible = barModeFor(pathname) === 'consulta' && !keyboard;
+  // Endereço que não existe (+not-found, e _sitemap, que mostra a mesma tela): tela de entrada, sem barra, com a saída no botão.
+  const unmatched = useSegments().some((s) => s === '+not-found' || s === '_sitemap');
+  const visible = !unmatched && barModeFor(pathname) === 'consulta' && !keyboard;
   useEffect(() => {
     if (!visible) setBrowseBarInset(0);
   }, [visible]);

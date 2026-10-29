@@ -1,5 +1,5 @@
-import { BENEFIT_TEXT, COMPANY_TEXT, DELETE_TEXT, EXPORT_TEXT, FAMILY_ROLE_LABEL, FAMILY_TEXT, LEGAL_TEXT, type SitePage } from '@clarevo/core';
-import { AlertCircle, Building2, Check, FileDown, FileText, KeyRound, LogOut, MonitorSmartphone, ShieldCheck, Trash2, Users } from 'lucide-react-native';
+import { BENEFIT_TEXT, COMPANY_TEXT, DELETE_TEXT, EXPORT_TEXT, FAMILY_ROLE_LABEL, FAMILY_TEXT, LEGAL_TEXT, SUPPORT_TEXT, type SitePage } from '@clarevo/core';
+import { AlertCircle, Building2, Check, FileDown, FileText, KeyRound, LogOut, Mail, MonitorSmartphone, ShieldCheck, Trash2, Users } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
@@ -15,7 +15,7 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
-import { SITE_URL, openSitePage } from '@/lib/site';
+import { SITE_URL, openSitePage, openSupportEmail } from '@/lib/site';
 import { useCompanies, useMyBenefit } from '@/state/company';
 import { useWork } from '@/state/data';
 import { useFamily } from '@/state/family';
@@ -50,6 +50,7 @@ export default function ContaScreen() {
   const [cooldown, setCooldown] = useState(0);
   const [confirmAll, setConfirmAll] = useState(false);
   const [siteFailed, setSiteFailed] = useState(false);
+  const [supportFailed, setSupportFailed] = useState(false);
   // ?secao=lembretes (vindo de Contas a pagar) ou ?secao=contas (o atalho "Gerenciar contas" dos seletores): rola até o card.
   const { secao } = useLocalSearchParams<{ secao?: string }>();
   const scroll = useRef<ScrollView>(null);
@@ -90,6 +91,12 @@ export default function ContaScreen() {
   const openSite = async (page: SitePage) => {
     setSiteFailed(false);
     if (!(await openSitePage(page))) setSiteFailed(true);
+  };
+
+  /** "Ajuda e contato": abre o e-mail com o endereço do suporte; se não abrir, avisa no próprio card (o endereço já está escrito nele). */
+  const writeSupport = async () => {
+    setSupportFailed(false);
+    if (!(await openSupportEmail())) setSupportFailed(true);
   };
 
   const signOutEverywhere = async () => {
@@ -215,6 +222,24 @@ export default function ContaScreen() {
 
         {/* "Como você conheceu o Clarevo?" (D-067): opcional, só em conta real; a pessoa vê e muda a resposta. */}
         <SignupSourceAccountCard />
+
+        {/* Ajuda e contato: o canal para dúvidas, problemas e pedidos sobre os dados, com ou sem o site publicado. */}
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {SUPPORT_TEXT.title}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {SUPPORT_TEXT.hint}
+          </Txt>
+          {supportFailed ? (
+            <Banner tone="erro" icon={AlertCircle}>
+              <Txt variant="label" color={colors.error}>
+                {SUPPORT_TEXT.writeFailed}
+              </Txt>
+            </Banner>
+          ) : null}
+          <Button label={SUPPORT_TEXT.write} icon={Mail} tone="soft" onPress={writeSupport} />
+        </Card>
 
         {/* Privacidade e termos (D-064): só quando `EXPO_PUBLIC_SITE_URL` aponta para o site publicado; sem endereço, nada é desenhado. */}
         {SITE_URL ? (

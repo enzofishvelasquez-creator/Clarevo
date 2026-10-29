@@ -5,9 +5,11 @@
 # contato e de novidades, que enviam só para o próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
 # Referrer-Policy: same-origin (e não no-referrer): com no-referrer o navegador manda "Origin: null" nos formulários, e o worker recusa o valor null.
 # Nenhum outro site recebe o endereço da página (a política só manda o referenciador para o próprio site).
+# HSTS desde 29/10/2026, com o domínio clarevo.app.br abrindo por HTTPS: sem includeSubDomains e sem preload (docs/07).
 /*
   Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: same-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000

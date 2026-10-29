@@ -561,6 +561,22 @@ describe('fatura: composição, total e situação', () => {
     f.repo.checkInvariants();
   });
 
+  it('crédito levado abate todas as categorias da fatura seguinte na proporção, não só "Sem categoria"', async () => {
+    const f = await fresh();
+    await f.purchase('Camiseta', 10_000, '2026-10-05', 1, 'Lazer'); // novembro
+    await f.repo.addCardRefund(key(), f.cardId, { description: 'Devolução', category: 'Lazer', amountCents: 13_000, invoiceMonth: NOV }); // crédito de 30,00
+    f.clock.today = '2026-11-10';
+    await f.purchase('Compras do mês', 20_000, '2026-11-05', 1, 'Mercado'); // dezembro
+    await f.purchase('Farmácia', 10_000, '2026-11-06'); // dezembro, sem categoria
+    const dec = await f.invoice(DEC);
+    expect([dec.creditInCents, dec.totalCents]).toEqual([3_000, 27_000]);
+    expect(dec.mix).toEqual([
+      { category: 'Mercado', charges: false, cents: 18_000 },
+      { category: null, charges: false, cents: 9_000 },
+    ]);
+    f.repo.checkInvariants();
+  });
+
   it('crédito em cadeia: um estorno grande passa por duas faturas e desaparece quando o estorno é excluído', async () => {
     const f = await fresh();
     await f.purchase('Notebook', 45_000, '2026-10-05', 3, 'Educação'); // novembro, dezembro e janeiro: 150,00 cada

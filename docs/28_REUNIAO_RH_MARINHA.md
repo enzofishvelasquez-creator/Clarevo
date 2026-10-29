@@ -51,10 +51,13 @@
 
 **17. E o suporte às pessoas?** Pelo e-mail suporte@clarevo.app.br, com a oficina de primeiros passos no lançamento e a Ajuda dentro do app.
 
+**18. E as apostas on-line?** O tema apareceu em conversa com um oficial da Marinha, e a apresentação tem dois slides sobre ele: o contexto nacional, com fonte (perdas de R$ 62,5 bilhões das famílias em 2025, Comsefaz; 57% dos endividados que apostaram não tinham dívida em atraso antes, Serasa e Opinion Box; estimativa de 1,4 milhão de pessoas com transtorno do jogo, IEPS; a MP 1.394/2026, de 25/09/2026, proíbe as bets e está em análise no Congresso), e o que a Clarevo oferece: ver para onde o dinheiro vai, calculadoras de dívidas, as contas essenciais primeiro e metas com prazo, sem a Marinha ver nada de ninguém. Não afirmar quantos militares apostam ou estão endividados (não há dado público), não prometer efeito sobre vício ou saúde mental e dizer que a Clarevo não é tratamento: quem precisa de ajuda com o jogo segue para a assistência social e a saúde (em sofrimento emocional, CVV, 188). O app hoje não tem categoria de apostas nem identifica apostas. Um tema de Aprender sobre apostas e dívidas, com fonte oficial, pode ser um desdobramento do piloto, a combinar.
+
 ## 3. Perguntas para fazer ao RH
 
 - Como a Marinha costuma conduzir benefícios e pilotos, e quem mais participa da decisão?
 - Qual tamanho de grupo seria viável para o piloto, e em qual Organização Militar ou Distrito Naval?
 - Quais canais internos são usados para comunicar um benefício?
 - Há exigências de segurança da informação ou de localização dos dados que a Clarevo precisa atender?
+- Como as dívidas e as apostas aparecem no dia a dia do pessoal, e quem acompanha esses casos hoje?
 - Qual seria o próximo passo: reunião técnica com a assistência social e a área de tecnologia?

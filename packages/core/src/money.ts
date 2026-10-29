@@ -29,7 +29,7 @@ export function centsToInput(cents: Cents): string {
  * Aceita "80", "80,00", "80,5", "1.234,56", "1234,56", "R$ 80" e, sem vírgula, ponto como decimal
  * com 1 ou 2 casas ("12.50"), comum em teclados numéricos.
  * Rejeita (retorna null): vazio, negativo, mais de duas casas, espaços no meio ("12 34")
- * e agrupamento ambíguo ("1,234", "1.2345,00").
+ * e agrupamento ambíguo ("1,234", "1.2345,00", e milhar começando em zero, como "0.500").
  * Converte direto para centavos inteiros, sem passar por ponto flutuante.
  * Valores com dígitos demais voltam acima do limite, para a mensagem de limite aparecer.
  */
@@ -38,7 +38,7 @@ export function parseBRL(input: string): Cents | null {
   if (raw === '') return null;
   let intPart: string;
   let decPart = '';
-  const brl = /^(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/.exec(raw);
+  const brl = /^([1-9]\d{0,2}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/.exec(raw);
   const dotDecimal = /^(\d+)\.(\d{1,2})$/.exec(raw);
   if (brl) {
     intPart = brl[1]!.replace(/\./g, '');
