@@ -5461,7 +5461,7 @@ describe('API real: contas de origem do dinheiro (Ciclo G1, D-043)', () => {
     expect((await ana.getSpace())!.accounts.map((a) => a.id)).toEqual([principal, wallet.id]);
   });
 
-  it('altera nome e tipo com a versão; a versão velha traz a atual; o app publicado ainda renomeia direto', async () => {
+  it('altera nome e tipo com a versão; a versão velha traz a atual; a renomeação direta é recusada (0019)', async () => {
     expect(await code(ana.updateAccount(newOperationKey(), wallet.id, 5, { name: 'Dinheiro', kind: 'dinheiro' }))).toEqual(['versao_desatualizada', 'versao_atual=1']);
     expect(await code(ana.updateAccount(newOperationKey(), wallet.id, 1, { name: '', kind: 'dinheiro' }))).toEqual(['nome_da_conta_invalido', null]);
     expect(await code(bruno.updateAccount(newOperationKey(), wallet.id, 1, { name: 'Roubada', kind: 'dinheiro' }))).toEqual(['nao_encontrado', null]);

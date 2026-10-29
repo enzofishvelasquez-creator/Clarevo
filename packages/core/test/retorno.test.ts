@@ -704,13 +704,15 @@ describe('rowActions, batchEligible, rowPaymentDraft e looseExpenseFor', () => {
   });
 
   it('textos e nomes acessíveis das linhas', () => {
-    expect(reviewRowText(carro!)).toBe('Financiamento do carro · Parcela 10 de 48 · R$ 850,00 · vencimento em 10/07/2026 · sem conta registrada');
-    expect(reviewRowText(luz!)).toBe('Luz · cerca de R$ 180,00 (estimado) · vencimento em 12/07/2026 · sem conta registrada');
-    expect(reviewRowText({ ...aluguel!, state: 'aberta', dueOn: '2026-06-05', month: '2026-06' })).toBe(
-      'Aluguel · R$ 2.500,00 · venceu em 05/06/2026 · em aberto',
+    expect(reviewRowText(carro!, DEMO_TODAY)).toBe('Financiamento do carro · Parcela 10 de 48 · R$ 850,00 · vencimento em 10/07 · sem conta registrada');
+    expect(reviewRowText(luz!, DEMO_TODAY)).toBe('Luz · cerca de R$ 180,00 (estimado) · vencimento em 12/07 · sem conta registrada');
+    expect(reviewRowText({ ...aluguel!, state: 'aberta', dueOn: '2026-06-05', month: '2026-06' }, DEMO_TODAY)).toBe(
+      'Aluguel · R$ 2.500,00 · venceu em 05/06 · em aberto',
     );
-    expect(reviewRowA11yLabel(luz!)).toBe('Luz, cerca de R$ 180,00, valor estimado, vencimento em 12/07/2026, sem conta registrada');
-    expect(reviewRowA11yLabel(carro!)).toBe('Financiamento do carro, parcela 10 de 48, R$ 850,00, vencimento em 10/07/2026, sem conta registrada');
+    // Em outro ano que o de hoje, a data leva o ano (como em Contas a pagar).
+    expect(reviewRowText(luz!, '2027-01-10')).toBe('Luz · cerca de R$ 180,00 (estimado) · vencimento em 12/07/2026 · sem conta registrada');
+    expect(reviewRowA11yLabel(luz!, DEMO_TODAY)).toBe('Luz, cerca de R$ 180,00, valor estimado, vencimento em 12/07, sem conta registrada');
+    expect(reviewRowA11yLabel(carro!, DEMO_TODAY)).toBe('Financiamento do carro, parcela 10 de 48, R$ 850,00, vencimento em 10/07, sem conta registrada');
     expect(rowName(carro!)).toBe('Financiamento do carro (parcela 10 de 48)');
     expect(rowName(iptu!)).toBe('IPTU (parcela 6 de 10 de 2027)');
     expect(rowShortName(luz!)).toBe('Luz de julho');
@@ -1261,7 +1263,7 @@ describe('textos do Ciclo A4', () => {
         const card = reviewMonthCard(m);
         return [card.title, card.received, card.paid, ...card.lines];
       }),
-      ...rows.flatMap((x) => [reviewRowText(x), reviewRowA11yLabel(x), rowName(x), rowShortName(x)]),
+      ...rows.flatMap((x) => [reviewRowText(x, DEMO_TODAY), reviewRowA11yLabel(x, DEMO_TODAY), rowName(x), rowShortName(x)]),
     );
     for (const text of texts) {
       expect(text, text).not.toMatch(FORBIDDEN);

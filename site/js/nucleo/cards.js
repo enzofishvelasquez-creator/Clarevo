@@ -693,7 +693,7 @@ export function invoiceTexts(invoice, today) {
     const total = formatBRL(invoice.totalCents);
     const closes = closesText(invoice.closingOn, today);
     const due = dueTextOf(invoice.dueOn, today);
-    const paid = invoice.paidCents !== null && invoice.paidOn ? `Pago ${formatBRL(invoice.paidCents)} em ${formatDateBR(invoice.paidOn)}` : null;
+    const paid = invoice.paidCents !== null && invoice.paidOn ? `Pago ${formatBRL(invoice.paidCents)} em ${formatListDate(invoice.paidOn, today)}` : null;
     return {
         title,
         situation,

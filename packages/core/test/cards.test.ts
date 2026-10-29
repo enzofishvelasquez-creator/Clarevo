@@ -721,7 +721,7 @@ describe('pagar a fatura', () => {
     expect(invoiceTexts(after, f.clock.today).partial).toBe(
       'Ficaram R$ 230,00 para a fatura de dezembro. Juros e encargos do banco entram quando você informar a fatura de dezembro.',
     );
-    expect(invoiceTexts(after, f.clock.today).paid).toBe('Pago R$ 300,00 em 08/11/2026');
+    expect(invoiceTexts(after, f.clock.today).paid).toBe('Pago R$ 300,00 em 08/11');
     // A fatura de dezembro paga por inteiro: o saldo anterior entra em Pago na data desse pagamento.
     f.clock.today = '2026-12-09';
     const dec2 = await f.invoice(DEC);

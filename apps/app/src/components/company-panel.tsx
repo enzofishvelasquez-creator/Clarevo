@@ -494,7 +494,7 @@ export function LicensesCard({
           )}
           {paged.total > 0 ? (
             <View style={styles.pager}>
-              <Txt variant="caption" color={colors.textSecondary} accessibilityLiveRegion="polite">
+              <Txt variant="caption" color={colors.textSecondary} accessibilityLabel={T.pageInfoA11y(paged.from, paged.to, paged.total)}>
                 {T.pageInfo(paged.from, paged.to, paged.total)}
               </Txt>
               {paged.pages > 1 ? (

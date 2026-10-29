@@ -540,7 +540,7 @@ describe('contas do ano: cadastro (validação na ordem do banco)', () => {
     // Matrícula de dezembro: 2026 e 2027; padrão 2026. Cada escolha passa na validação.
     const m = annualStartChoices(1, 12, 10, DEMO_TODAY);
     expect(m.years.map((c) => [c.label, c.isDefault])).toEqual([
-      ['2026 (vence em 10/12/2026)', true],
+      ['2026 (vence em 10/12)', true],
       ['2027 (vence em 10/12/2027)', false],
     ]);
     for (const c of [...iptu.years, ...iptu.started!.parts]) {
@@ -549,7 +549,7 @@ describe('contas do ano: cadastro (validação na ordem do banco)', () => {
     // Ano que começou neste mês (12 parcelas de outubro, a 1ª vencida em 05/10): parcela 1 ou a próxima a pagar.
     const oct = annualStartChoices(12, 10, 5, DEMO_TODAY);
     expect(oct.years.map((c) => [c.label, c.isDefault])).toEqual([
-      ['2026/2027 (primeira venceu em 05/10/2026)', false],
+      ['2026/2027 (primeira venceu em 05/10)', false],
       ['2027/2028 (primeira vence em 05/10/2027)', false],
     ]);
     expect(oct.started!.title).toBe('Próxima parcela a pagar em 2026/2027');
@@ -559,11 +559,11 @@ describe('contas do ano: cadastro (validação na ordem do banco)', () => {
     ]);
     // Cota única vencida neste mês: o padrão é o ano seguinte.
     expect(annualStartChoices(1, 10, 5, DEMO_TODAY).years.map((c) => [c.label, c.isDefault])).toEqual([
-      ['2026 (venceu em 05/10/2026)', false],
+      ['2026 (venceu em 05/10)', false],
       ['2027 (vence em 05/10/2027)', true],
     ]);
     // Seguro de 4 parcelas a partir de novembro: o rótulo atravessa o ano.
-    expect(annualStartChoices(4, 11, 15, DEMO_TODAY).years[0]!.label).toBe('2026/2027 (primeira vence em 15/11/2026)');
+    expect(annualStartChoices(4, 11, 15, DEMO_TODAY).years[0]!.label).toBe('2026/2027 (primeira vence em 15/11)');
   });
 
   it('findSeriesConflicts: começar no ano seguinte; série encerrada não conta como parecida', () => {

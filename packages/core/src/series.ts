@@ -4,6 +4,7 @@ import {
   dateInMonth,
   formatDateBR,
   formatDayMonth,
+  formatListDate,
   formatMonthName,
   formatMonthSpanBR,
   formatMonthYearBR,
@@ -1145,7 +1146,7 @@ export function seriesPreview(input: SeriesInput, today: IsoDate): SeriesPreview
  * passada em dia que não é útil, ainda no próximo dia útil, diz "vence terça, 13/10 (próximo dia útil)". A conta do ano não tem essa tolerância.
  */
 function whenDue(dueOn: IsoDate, today: IsoDate, withYear: boolean, kind: DueKind): string {
-  const date = withYear ? formatDateBR(dueOn) : formatDayMonth(dueOn);
+  const date = withYear ? formatListDate(dueOn, today) : formatDayMonth(dueOn);
   if (effectiveOverdue(dueOn, kind, today)) return `venceu em ${date}`;
   if (dueOn < today) {
     const grace = nextBusinessDayWhen(dueOn, kind, today);
@@ -1176,7 +1177,7 @@ export interface AnnualStartChoice {
   firstDueMonth: IsoMonth;
   firstNumber: number;
   dueOn: IsoDate;
-  /** "2027 (vence em 20/01/2027)" ou "Parcela 9 (vence em 10/10)". */
+  /** "2027 (vence em 20/01/2027)", "2026 (vence em 10/12)" (o ano só quando muda) ou "Parcela 9 (vence em 10/10)". */
   label: string;
   isDefault: boolean;
 }

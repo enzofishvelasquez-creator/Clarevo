@@ -552,6 +552,8 @@ export const COMPANY_TEXT = {
   searchNone: (query: string): string => `Nenhum e-mail com "${query.trim()}" nesta situação.`,
   /** "21 a 40 de 230". */
   pageInfo: (from: number, to: number, total: number): string => `${from} a ${to} de ${total}`,
+  /** "Licenças 21 a 40 de 230" (o leitor de tela diz do que se trata). */
+  pageInfoA11y: (from: number, to: number, total: number): string => `Licenças ${from} a ${to} de ${total}`,
   pagePrev: 'Anteriores',
   pageNext: 'Próximas',
   /** Nome acessível com o rótulo visível no começo (WCAG 2.5.3): "Anteriores: página 1 de 3". */

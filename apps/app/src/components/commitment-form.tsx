@@ -16,6 +16,7 @@ import {
   fieldForErrorCode,
   formatBRL,
   formatDateBR,
+  formatListDate,
   formatMonthBR,
   formatMonthName,
   isRepoError,
@@ -411,7 +412,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
               {COMMITMENT_ERROR_TEXT.versao_desatualizada}
             </Txt>
             <MoneyTxt variant="caption">
-              {`Versão atual: ${conflict.description} · ${formatBRL(conflict.amountCents)} · vence em ${formatDateBR(conflict.dueOn)}`}
+              {`Versão atual: ${conflict.description} · ${formatBRL(conflict.amountCents)} · vence em ${formatListDate(conflict.dueOn, today)}`}
             </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
             <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={applyOverConflict} />

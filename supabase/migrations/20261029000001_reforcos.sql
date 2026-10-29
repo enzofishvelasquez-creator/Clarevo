@@ -5,8 +5,10 @@
 -- (2) A chave de serviço (service_role) perde o execute nas funções internas clarevo_*: nada no app, nos testes ou na equipe as chama
 --     com essa chave, e as funções da equipe (clarevo_staff_*) seguem só para quem roda no SQL Editor. No Supabase, os privilégios
 --     padrão davam esse execute a cada função nova; o teste 99w_reforcos.sql recusa qualquer clarevo_* executável por service_role.
--- (3) Excluir a conta (D-058): a licença encerrada guarda só o dia (meia-noite de Brasília), não o horário exato, para a empresa não
---     saber a hora em que a pessoa excluiu a conta. clarevo_erase_person é a mesma da 0018, só com essa linha. O encerramento feito
+-- (3) Excluir a conta (D-058): a licença encerrada guarda só o dia (o meio-dia de Brasília daquele dia), não o horário exato, para a
+--     empresa não saber a hora em que a pessoa excluiu a conta. Meio-dia, e não meia-noite, para o mesmo dia aparecer no painel e no
+--     relatório em qualquer fuso de UTC-12 a UTC+8 (o painel converte para o fuso de quem administra); se a licença foi aceita no
+--     mesmo dia depois do meio-dia, vale o horário do aceite, que a empresa já vê, para o fim nunca vir antes do começo. clarevo_erase_person é a mesma da 0018, só com essa linha. O encerramento feito
 --     pela própria empresa (end_license) continua com o horário, porque é ela que encerra.
 --
 -- Aplicar no SQL Editor depois da 0018 (docs/05, passo 12i). Testes em supabase/tests/99w_reforcos.sql.
@@ -113,10 +115,11 @@ begin
   delete from public.signup_sources where person_id = p_person;
 
   -- Regra 4: a licença ativa termina no ato; os direitos ao plano saem; a empresa fica só com a licença encerrada, sem a pessoa.
-  -- Só o dia (meia-noite de Brasília), não o horário: a empresa vê que a licença terminou, sem saber a hora em que a conta foi excluída.
+  -- Só o dia (o meio-dia de Brasília), não o horário: a empresa vê que a licença terminou, sem saber a hora em que a conta foi excluída.
   update public.licenses
      set status = 'encerrada',
-         ended_at = (date_trunc('day', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo')
+         ended_at = greatest((date_trunc('day', now() at time zone 'America/Sao_Paulo') + interval '12 hours') at time zone 'America/Sao_Paulo',
+                             activated_at)
    where person_id = p_person and status = 'ativa';
   delete from public.plan_entitlements where person_id = p_person;
   update public.licenses set person_id = null where person_id = p_person;

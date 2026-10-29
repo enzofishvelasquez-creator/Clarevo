@@ -558,6 +558,10 @@ describe('importar: parcelas na fatura', () => {
     expect(installmentMark('PADARIA 3/10', '2026-10-03')).toBeNull();
     expect(installmentMark('LOJA 03/10', '2026-10-15')).toEqual({ number: 3, count: 10 });
     expect(installmentMark('LOJA 15/10 03/12', '2026-10-15')).toEqual({ number: 3, count: 12 });
+    // Com a palavra de parcela antes, vale mesmo coincidindo com a data da linha.
+    expect(installmentMark('LOJA PARC 03/10', '2026-10-03')).toEqual({ number: 3, count: 10 });
+    expect(installmentMark('PARCELA 2/11', '2026-11-02')).toEqual({ number: 2, count: 11 });
+    expect(installmentMark('LOJA PARC03/10', '2026-10-03')).toEqual({ number: 3, count: 10 });
   });
 
   it('fatura com parcela: "Parece parcela", desmarcada mas podendo ser marcada', () => {

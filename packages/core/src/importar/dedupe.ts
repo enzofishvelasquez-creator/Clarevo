@@ -92,7 +92,8 @@ export interface InstallmentMark {
 /**
  * Parcela escrita na descrição: "03/10", "3/10", "PARC 03/10". Uma data com ano ("03/10/2026") não conta, nem número maior que o
  * total ou total fora de 2 a 48 parcelas (o limite do app). Com a data da linha, o dia e o mês dela escritos na descrição ("PADARIA
- * 03/10" numa compra de 03/10) também não contam: é a data da compra, não a parcela 3 de 10. null quando não há parcela.
+ * 03/10" numa compra de 03/10) também não contam: é a data da compra, não a parcela 3 de 10; com "PARC" ou "PARCELA" antes ("PARC
+ * 03/10"), contam. null quando não há parcela.
  */
 export function installmentMark(description: string, date?: IsoDate): InstallmentMark | null {
   const re = /(?:^|[^\d/])(\d{1,2})\/(\d{1,2})(?![\d/])/g;
@@ -101,7 +102,10 @@ export function installmentMark(description: string, date?: IsoDate): Installmen
   for (let m = re.exec(description); m !== null; m = re.exec(description)) {
     const number = Number(m[1]);
     const count = Number(m[2]);
-    if (number === day && count === month) continue;
+    // A data da compra só fica de fora quando não há palavra de parcela antes ("PARC 03/10" numa compra de 03/10 é a parcela).
+    const numberStart = m.index + m[0].length - (m[1]!.length + 1 + m[2]!.length);
+    const marked = /PARC(?:ELA)?\.?\s*$/i.test(description.slice(0, numberStart));
+    if (!marked && number === day && count === month) continue;
     if (count >= 2 && count <= 48 && number >= 1 && number <= count) return { number, count };
   }
   return null;

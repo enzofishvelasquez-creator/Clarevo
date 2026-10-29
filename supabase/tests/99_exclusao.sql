@@ -653,8 +653,10 @@ begin
   select * into l from public.licenses where id = pg_temp.id('lic_eli');
   assert (l.status, l.person_id is null, l.ended_at is not null, l.activated_at is not null, l.invited_email, l.code_hash is null, l.cancelled_at is null)
        = ('encerrada'::public.license_status, true, true, true, 'eli@exemplo.test'::text, true, true), 'licença encerrada, sem pessoa, com a data do fim';
-  -- Migração 0019: só o dia (meia-noite de Brasília), sem o horário em que a conta foi excluída.
-  assert l.ended_at = (date_trunc('day', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'), 'a licença terminou hoje, só com o dia';
+  -- Migração 0019: só o dia (o meio-dia de Brasília, ou o aceite, se veio depois), sem o horário em que a conta foi excluída.
+  assert l.ended_at = greatest((date_trunc('day', now() at time zone 'America/Sao_Paulo') + interval '12 hours') at time zone 'America/Sao_Paulo', l.activated_at),
+    'a licença terminou hoje, só com o dia';
+  assert l.ended_at >= l.activated_at, 'o fim nunca vem antes do aceite';
   assert pg_temp.snap_company(eli, pg_temp.id('lic_eli')) = pg_temp.was('empresa'), 'organização, contrato, outras licenças, administração e direitos da empresa estão idênticos';
   assert (select count(*) from public.licenses where status = 'ativa' and person_id = pg_temp.id('mia')) = 1
      and (select count(*) from public.plan_entitlements where person_id = pg_temp.id('mia')) = 1, 'o benefício da Mia segue ativo';

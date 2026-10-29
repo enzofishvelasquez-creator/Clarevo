@@ -247,7 +247,8 @@ export interface OverflowBar {
  */
 export function overflowBar(usedCents: Cents, limitCents: Cents): OverflowBar {
   if (limitCents <= 0) return { overCents: Math.max(0, usedCents), solidTenths: 0, stripedTenths: usedCents > 0 ? 1000 : 0 };
-  if (usedCents <= limitCents) return { overCents: 0, solidTenths: Math.min(1000, percentTenths(usedCents, limitCents)), stripedTenths: 0 };
+  // Cheia só quando o usado é igual ao limite: 99,96% fica em 999, como o texto (99,9%).
+  if (usedCents <= limitCents) return { overCents: 0, solidTenths: Math.min(usedCents < limitCents ? 999 : 1000, percentTenths(usedCents, limitCents)), stripedTenths: 0 };
   const overCents = usedCents - limitCents;
   const stripedTenths = Math.min(1000, Math.max(OVERFLOW_MIN_TENTHS, percentTenths(overCents, limitCents)));
   return { overCents, solidTenths: 1000 - stripedTenths, stripedTenths };

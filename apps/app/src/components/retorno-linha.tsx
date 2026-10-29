@@ -71,7 +71,7 @@ export function ReturnRow({
   const hidden = useValuesHidden();
   const { today } = useSession();
   const short = rowShortName(row);
-  const text = reviewRowText(row);
+  const text = reviewRowText(row, today);
   // reviewRowText começa pela descrição: a descrição fica em negrito e o resto abaixo.
   const details = text.startsWith(`${row.description} · `) ? text.slice(row.description.length + 3) : text;
   const actions = rowActions(row);
@@ -126,7 +126,7 @@ export function ReturnRow({
                 </View>
               </Pressable>
             ) : null}
-            <View style={[{ flex: 1, minWidth: 0, gap: 2 }, !canSelect && selectable && styles.alignWithBox]} accessible accessibilityLabel={yearA11y(maskMoneyLabel(reviewRowA11yLabel(row), hidden))}>
+            <View style={[{ flex: 1, minWidth: 0, gap: 2 }, !canSelect && selectable && styles.alignWithBox]} accessible accessibilityLabel={yearA11y(maskMoneyLabel(reviewRowA11yLabel(row, today), hidden))}>
               <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
                 {row.description}
               </Txt>

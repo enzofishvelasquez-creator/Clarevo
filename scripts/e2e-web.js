@@ -746,15 +746,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Ciclo A: Aluguel, Luz e o financiamento são gastos fixos; Internet, Condomínio e Seguro continuam avulsas.
   // D-037: as dez faturas do "Cartão Exemplo" (novembro a agosto de 2027) são contas a pagar de "Próximos meses"; a de novembro vem
   // depois do Seguro (também dia 10) e antes da Luz (dia 12); as outras nove vêm no fim, por vencimento.
-  // D-060 item 3 e D-061: a fatura que vence em sábado ou domingo (10/01, 10/04 e 10/07/2027) aparece como "vence segunda, 11/01 (próximo dia útil)" e ganha, no
+  // D-060 item 3 e D-061: a fatura que vence em sábado ou domingo (10/01, 10/04 e 10/07/2027) aparece como "vence segunda, 11/01/2027 (próximo dia útil)" e ganha, no
   // nome acessível, "não é dia útil, vencimento anotado domingo, 10/01"; a data anotada não muda.
   const FAT = (due, cents, grace = null) =>
     grace
       ? `Fatura Cartão Exemplo, vence ${grace.next} (próximo dia útil), cerca de R$ ${cents}, valor estimado, não é dia útil, vencimento anotado ${grace.registered}`
       : `Fatura Cartão Exemplo, vence em ${due.replace(/\/2026$/, '')}, cerca de R$ ${cents}, valor estimado`;
   const laterBase = ['Aluguel, vence em 05/11, R$ 2.500,00, gasto fixo', 'Financiamento do carro, vence em 10/11, R$ 850,00, parcela 13 de 48', 'Seguro do carro, vence em 10/11, R$ 300,00', FAT('10/11/2026', '550,00'),
-    'Luz, vence em 12/11, cerca de R$ 180,00, valor estimado, gasto fixo', FAT('10/12/2026', '350,00'), FAT('10/01/2027', '350,00', { next: 'segunda, 11/01', registered: 'domingo, 10/01' }),
-    ...['10/02/2027', '10/03/2027', '10/04/2027', '10/05/2027', '10/06/2027', '10/07/2027', '10/08/2027'].map((d) => FAT(d, '150,00', { '10/04/2027': { next: 'segunda, 12/04', registered: 'sábado, 10/04' }, '10/07/2027': { next: 'segunda, 12/07', registered: 'sábado, 10/07' } }[d]))];
+    'Luz, vence em 12/11, cerca de R$ 180,00, valor estimado, gasto fixo', FAT('10/12/2026', '350,00'), FAT('10/01/2027', '350,00', { next: 'segunda, 11/01/2027', registered: 'domingo, 10/01' }),
+    ...['10/02/2027', '10/03/2027', '10/04/2027', '10/05/2027', '10/06/2027', '10/07/2027', '10/08/2027'].map((d) => FAT(d, '150,00', { '10/04/2027': { next: 'segunda, 12/04/2027', registered: 'sábado, 10/04' }, '10/07/2027': { next: 'segunda, 12/07/2027', registered: 'sábado, 10/07' } }[d]))];
   // Espera a lista completa (e não só a seção): as faturas do cartão chegam na mesma leitura, mas a tela pode estar num instante intermediário.
   const laterBaseJson = JSON.stringify(laterBase);
   await waitUntil(async () => JSON.stringify(await sectionRows('Próximos meses')) === laterBaseJson, 10000);
@@ -1145,7 +1145,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar a repetir').click(); await waitText('Gasto fixo retomado.');
   await waitText('Prevista · vence em 10/12').catch(() => {});
   t = await body();
-  ok('Escola retomada sem data para terminar: as previstas voltam (10/01/2027 é domingo: vence na segunda, 11/01, no próximo dia útil)', ['Todo mês, dia 10 · desde novembro de 2026', 'Prevista · vence em 10/12', 'Prevista · vence segunda, 11/01 (próximo dia útil)'].every((x) => t.includes(x)));
+  ok('Escola retomada sem data para terminar: as previstas voltam (10/01/2027 é domingo: vence na segunda, 11/01/2027, no próximo dia útil)', ['Todo mês, dia 10 · desde novembro de 2026', 'Prevista · vence em 10/12', 'Prevista · vence segunda, 11/01/2027 (próximo dia útil)'].every((x) => t.includes(x)));
 
   // A geração do dia rodou de novo depois dessas gravações: a Luz de novembro, excluída só neste mês, não volta.
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
@@ -3588,8 +3588,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await keepText();
   await shot('136_pagar_parcial');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado.'); await waitInvoice('Paga em parte'); t = await body();
-  ok('E fatura paga em parte: "Pago R$ 250,00 em 07/10/2026", o aviso do pagamento, o que ficou (R$ 150,00) com o caminho da calculadora e "Desfazer pagamento"; sem pagar de novo nem mudar valor, data ou parcelas',
-    t.includes('Pagamento registrado. R$ 250,00 em Pago de outubro.') && t.includes('Pago R$ 250,00 em 07/10/2026') && t.includes('Ficaram R$ 150,00 para a fatura de novembro.') && (await visibleCount('button', 'Quanto custa pagar só uma parte?')) === 1 &&
+  ok('E fatura paga em parte: "Pago R$ 250,00 em 07/10", o aviso do pagamento, o que ficou (R$ 150,00) com o caminho da calculadora e "Desfazer pagamento"; sem pagar de novo nem mudar valor, data ou parcelas',
+    t.includes('Pagamento registrado. R$ 250,00 em Pago de outubro.') && t.includes('Pago R$ 250,00 em 07/10') && t.includes('Ficaram R$ 150,00 para a fatura de novembro.') && (await visibleCount('button', 'Quanto custa pagar só uma parte?')) === 1 &&
     (await visibleCount('button', 'Desfazer pagamento')) === 1 && (await visibleCount('button', 'Pagar fatura')) === 0 && (await visibleCount('button', 'Informar encargos')) === 0 && (await visibleCount('button', 'Registrar estorno')) === 0 &&
     (await visibleCount('button', 'Mercado de setembro · R$ 300,00')) === 1 && (await visibleCount('button', 'Cinema · R$ 100,00')) === 1 && t.includes('Fatura paga: só a descrição e a categoria das compras mudam. Para mudar o resto, desfaça o pagamento.'), t.slice(0, 500));
   // Compra com parcela em fatura paga: o menu só oferece editar a descrição e a categoria (sem excluir), e o formulário só tem esses campos.
@@ -3601,7 +3601,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await keepText();
   await shot('137a_editar_compra_fatura_paga');
   await field('Descrição').fill('Cinema com a turma'); await btn('Salvar compra').click(); await waitText('Compra alterada.'); await waitInvoice('Paga em parte'); t = await body();
-  ok('E descrição alterada numa fatura paga: "Compra alterada." (sem dizer que recalculou as parcelas), a linha nova e o total e o pagamento iguais', (await visibleCount('button', 'Cinema com a turma · R$ 100,00')) === 1 && t.includes('Pago R$ 250,00 em 07/10/2026') && (await heroTotal()) === 'R$ 400,00' && !t.includes('parcelas foram recalculadas'), t.slice(0, 400));
+  ok('E descrição alterada numa fatura paga: "Compra alterada." (sem dizer que recalculou as parcelas), a linha nova e o total e o pagamento iguais', (await visibleCount('button', 'Cinema com a turma · R$ 100,00')) === 1 && t.includes('Pago R$ 250,00 em 07/10') && (await heroTotal()) === 'R$ 400,00' && !t.includes('parcelas foram recalculadas'), t.slice(0, 400));
   await keepText();
   await shot('137_fatura_paga_em_parte');
   await goTab('Resumo'); await waitText('Diferença do mês');
@@ -3687,7 +3687,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('E fatura de outubro com a anuidade (R$ 30,00) e o estorno (R$ 50,00): R$ 380,00 (400 + 30 - 50)', (await heroTotal()) === 'R$ 380,00' && (await visibleCount('button', 'Anuidade · R$ 30,00')) === 1 && (await visibleCount('button', 'Devolução do ingresso · − R$ 50,00')) === 1 && /Total da fatura\s+R\$ 380,00/.test(t));
   await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await btn('Confirmar pagamento').click(); await waitText('Fatura paga. R$ 380,00 em Pago de outubro.'); await waitInvoice('Paga');
   t = await body();
-  ok('E pagamento total da fatura fechada: "Paga", "Pago R$ 380,00 em 07/10/2026", encargo e estorno travados (só as compras aceitam descrição e categoria), "Desfazer pagamento" e nenhum saldo anterior', t.includes('Pago R$ 380,00 em 07/10/2026') && (await visibleCount('button', 'Anuidade · R$ 30,00')) === 0 && t.includes('Anuidade') &&
+  ok('E pagamento total da fatura fechada: "Paga", "Pago R$ 380,00 em 07/10", encargo e estorno travados (só as compras aceitam descrição e categoria), "Desfazer pagamento" e nenhum saldo anterior', t.includes('Pago R$ 380,00 em 07/10') && (await visibleCount('button', 'Anuidade · R$ 30,00')) === 0 && t.includes('Anuidade') &&
     (await visibleCount('button', 'Desfazer pagamento')) === 1 && !t.includes('Ficaram'));
   await goTab('Resumo'); await waitText('Diferença do mês');
   await expectTotals('E fatura de R$ 380,00 paga em 07/10: Pago 4.280 e diferença 1.720; recebido 6.000 e a pagar 650', 'R$ 6.000,00', 'R$ 4.280,00', 'R$ 1.720,00', 'R$ 650,00');
@@ -4436,8 +4436,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Atualizar agora').click(); await waitText('Mês 1 de 4');
   ok('atualizar de novo: junho resolvido sai dos passos e julho é o passo 1 de 4', (await stepTitle()) === 'Julho de 2026, Mês 1 de 4', await stepTitle());
   t = await body();
-  ok('julho: as 3 contas sem conta registrada, com "Ainda não paguei"', ['R$ 2.500,00 · vencimento em 05/07/2026 · sem conta registrada', 'Parcela 10 de 48 · R$ 850,00 · vencimento em 10/07/2026 · sem conta registrada',
-    'cerca de R$ 180,00 (estimado) · vencimento em 12/07/2026 · sem conta registrada'].every((x) => t.includes(x)) && (await visibleCount('button', 'Ainda não paguei: Luz de julho')) === 1 &&
+  ok('julho: as 3 contas sem conta registrada, com "Ainda não paguei"', ['R$ 2.500,00 · vencimento em 05/07 · sem conta registrada', 'Parcela 10 de 48 · R$ 850,00 · vencimento em 10/07 · sem conta registrada',
+    'cerca de R$ 180,00 (estimado) · vencimento em 12/07 · sem conta registrada'].every((x) => t.includes(x)) && (await visibleCount('button', 'Ainda não paguei: Luz de julho')) === 1 &&
     (await visibleCount('button', 'Não houve: Financiamento do carro de julho')) === 0, t.slice(0, 500));
   ok('julho: sem aviso de gasto já anotado', !t.includes('Você já anotou o gasto'));
   for (const name of ['Selecionar Aluguel de julho, R$ 2.500,00', 'Selecionar Financiamento do carro de julho, R$ 850,00']) await p.getByRole('checkbox', { name }).click();
@@ -4626,14 +4626,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     return { cid: w.commitment.id, due: w.commitment.dueOn };
   }, number);
   await enterReturnDemo(); await toStep(1);
-  ok('julho: Luz sem conta registrada', (await body()).includes('cerca de R$ 180,00 (estimado) · vencimento em 12/07/2026 · sem conta registrada'));
+  ok('julho: Luz sem conta registrada', (await body()).includes('cerca de R$ 180,00 (estimado) · vencimento em 12/07 · sem conta registrada'));
   await btn('Já paguei: Luz de julho').click(); await waitText('Registrar pagamento');
   const luzJulho = await createLuz(3);
   await btn('Cancelar').click(); await waitText('Mês 2 de 5');
   await waitUntil(async () => (await body()).includes('cerca de R$ 180,00 (estimado) · venceu em 12/07 · em aberto'), 6000);
   t = await body();
   ok('conta criada em outro aparelho, "Cancelar" no pagamento: a linha da Luz é recarregada como conta em aberto', luzJulho.due === '2026-07-12' &&
-    t.includes('cerca de R$ 180,00 (estimado) · venceu em 12/07 · em aberto') && !t.includes('vencimento em 12/07/2026 · sem conta registrada'), t.slice(0, 500));
+    t.includes('cerca de R$ 180,00 (estimado) · venceu em 12/07 · em aberto') && !t.includes('vencimento em 12/07 · sem conta registrada'), t.slice(0, 500));
   await btn('Pular este mês').click(); await waitText('Mês 3 de 5');
   await btn('Já paguei: Luz de agosto').click(); await waitText('Registrar pagamento');
   await createLuz(4);
@@ -12124,10 +12124,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     duDemoOct.some((r) => r.startsWith('Internet, vence em 15/10')) && duDemoOct.some((r) => r.startsWith('Condomínio, vence em 20/10')) && !duDemoOct.some((r) => /dia útil/.test(r)), JSON.stringify(duDemoOct));
   const duFatura = (date) => duDemoNext.find((r) => r.startsWith(`Fatura Cartão Exemplo, vence em ${date}`)) ?? '';
   const duFaturaGrace = (when) => duDemoNext.find((r) => r.startsWith(`Fatura Cartão Exemplo, vence ${when} (próximo dia útil)`)) ?? '';
-  ok('Dia útil, demonstração, "Próximos meses" (D-061): as faturas de 10/01/2027 (domingo) e 10/04 e 10/07/2027 (sábados) aparecem como "vence segunda, 11/01 (próximo dia útil)" (e 12/04 e 12/07) e levam "não é dia útil, vencimento anotado ..."; as de 10/12/2026, 10/02 e 10/03/2027 (dias úteis), não',
-    /não é dia útil, vencimento anotado domingo, 10\/01$/.test(duFaturaGrace('segunda, 11/01')) && /não é dia útil, vencimento anotado sábado, 10\/04$/.test(duFaturaGrace('segunda, 12/04')) && /não é dia útil, vencimento anotado sábado, 10\/07$/.test(duFaturaGrace('segunda, 12/07')) &&
+  ok('Dia útil, demonstração, "Próximos meses" (D-061): as faturas de 10/01/2027 (domingo) e 10/04 e 10/07/2027 (sábados) aparecem como "vence segunda, 11/01/2027 (próximo dia útil)" (e 12/04 e 12/07) e levam "não é dia útil, vencimento anotado ..."; as de 10/12/2026, 10/02 e 10/03/2027 (dias úteis), não',
+    /não é dia útil, vencimento anotado domingo, 10\/01$/.test(duFaturaGrace('segunda, 11/01/2027')) && /não é dia útil, vencimento anotado sábado, 10\/04$/.test(duFaturaGrace('segunda, 12/04/2027')) && /não é dia útil, vencimento anotado sábado, 10\/07$/.test(duFaturaGrace('segunda, 12/07/2027')) &&
     ['10/11,', '10/12,', '10/02/2027', '10/03/2027'].every((d) => duFatura(d) !== '' && !/dia útil/.test(duFatura(d))) && duFatura('10/01/2027') === '' && duFatura('10/04/2027') === '', JSON.stringify(duDemoNext));
-  ok('Dia útil, demonstração: o sinal aparece escrito ("Não é dia útil · vencimento anotado: domingo, 10/01") e a legenda diz "Vence segunda, 11/01 (próximo dia útil)"', (await body()).includes('Não é dia útil · vencimento anotado: domingo, 10/01') && (await body()).includes('Vence segunda, 11/01 (próximo dia útil)'));
+  ok('Dia útil, demonstração: o sinal aparece escrito ("Não é dia útil · vencimento anotado: domingo, 10/01") e a legenda diz "Vence segunda, 11/01/2027 (próximo dia útil)"', (await body()).includes('Não é dia útil · vencimento anotado: domingo, 10/01') && (await body()).includes('Vence segunda, 11/01/2027 (próximo dia útil)'));
   ok('Dia útil, demonstração (D-061): nenhuma conta vencida em outubro (a contagem não muda: sem a palavra "vencida" no Resumo e sem a seção "Vencidas" na lista)', duResumoSemVencida && (await sectionRows('Vencidas')) === null);
   await duKeep();
 
@@ -12267,8 +12267,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await duTab('Resumo'); await duOpenList();
   await p.getByRole('button', { name: /^Fatura Cartão Exemplo, vence segunda, 11\/01 \(próximo dia útil\)/ }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await waitText('Fatura de janeiro de 2027'); await p.waitForTimeout(700);
   t = await body();
-  ok('Dia útil, detalhe da fatura (vence em 10/01/2027, domingo): "Fecha em 03/01 · Vence segunda, 11/01 (próximo dia útil)", "Vence no domingo, 10/01/2027, que não é dia útil. O próximo dia útil é segunda, 11/01/2027. Só depois desse dia ela passa a vencida." e a frase neutra',
-    t.includes(DU_NOTICE_FATURA) && t.includes(DU_ADVICE) && t.includes('Fecha em 03/01 · Vence segunda, 11/01 (próximo dia útil)') && !t.includes('Vence em 10/01'), t.slice(0, 900));
+  ok('Dia útil, detalhe da fatura (vence em 10/01/2027, domingo): "Fecha em 03/01 · Vence segunda, 11/01/2027 (próximo dia útil)", "Vence no domingo, 10/01/2027, que não é dia útil. O próximo dia útil é segunda, 11/01/2027. Só depois desse dia ela passa a vencida." e a frase neutra',
+    t.includes(DU_NOTICE_FATURA) && t.includes(DU_ADVICE) && t.includes('Fecha em 03/01/2027 · Vence segunda, 11/01/2027 (próximo dia útil)') && !t.includes('Vence em 10/01'), t.slice(0, 900));
   ok('Dia útil, detalhe da fatura: "Saiba mais" também abre a explicação, com as fontes', (await duMoreButton().count()) === 1 && await (async () => { await duMoreButton().first().click(); await p.waitForTimeout(300); return (await body()).includes('Consultadas em 19/10/2026.'); })());
   await duMoreButton().first().click(); await p.waitForTimeout(300);
   await duKeep();

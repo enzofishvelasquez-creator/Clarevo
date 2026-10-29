@@ -93,6 +93,7 @@ function Panel() {
         </>
       ) : null}
       <LicensesCard
+        key={company.organization.id}
         licenses={licenses}
         onRenewed={(email, code) => addLinks([{ email, link: licenseLink(code, inviteBaseUrl()) }])}
         onRemoved={(email) => setLinks((prev) => prev.filter((r) => r.email !== email))}

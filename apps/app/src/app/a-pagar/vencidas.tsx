@@ -587,7 +587,7 @@ export default function ContasVencidas() {
           onCancel={() => setPending(null)}
           onConfirm={() => doRemove(target)}>
           <MoneyTxt style={{ fontFamily: fonts.bold }}>
-            {`${target.description} · ${formatBRL(target.amountCents)} · venceu em ${formatDateBR(target.dueOn)}`}
+            {`${target.description} · ${formatBRL(target.amountCents)} · venceu em ${formatListDate(target.dueOn, today)}`}
           </MoneyTxt>
           <Txt color={colors.textSecondary}>
             {target.series ? 'Ela sai de Contas a pagar e não volta a ser criada.' : 'Ela sai de Contas a pagar.'}

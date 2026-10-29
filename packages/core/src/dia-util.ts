@@ -1,4 +1,4 @@
-import { addDays, formatDateBR, formatDayMonth, isValidIsoDate, type IsoDate } from './dates';
+import { addDays, formatDateBR, formatDayMonth, formatListDate, isValidIsoDate, type IsoDate } from './dates';
 import type { Invoice } from './cards';
 import type { Commitment, SeriesKind } from './records';
 
@@ -313,7 +313,7 @@ export function nextBusinessDayWhen(dueOn: IsoDate, kind: DueKind, today: IsoDat
   if (!hasNextBusinessDayGrace(kind) || !isValidIsoDate(dueOn) || isBusinessDay(dueOn)) return null;
   const last = nextBusinessDay(dueOn)!;
   if (last < today) return null;
-  const when = last === today ? 'hoje' : `${weekdayName(last)}, ${formatDayMonth(last)}`;
+  const when = last === today ? 'hoje' : `${weekdayName(last)}, ${formatListDate(last, today)}`;
   return { lastOnTime: last, when: `${when} ${DUE_DAY_TEXT.nextBusinessDayTag}` };
 }
 
