@@ -21,7 +21,7 @@ export default function EditarRegistro() {
     return (
       <View style={{ flex: 1, padding: space[6], gap: space[4], justifyContent: 'center', backgroundColor: colors.background }}>
         <Txt>{ERROR_TEXT.nao_encontrado}</Txt>
-        <Button label="Ir para Movimentações" onPress={() => router.replace('/movimentacoes')} />
+        <Button label="Ir para Movimentos" onPress={() => router.replace('/movimentacoes')} />
       </View>
     );
   }

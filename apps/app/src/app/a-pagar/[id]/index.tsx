@@ -438,7 +438,7 @@ export default function DetalheContaAPagar() {
                   </View>
                 ) : null}
                 <View>
-                  <Row label="Contexto" value={by.contextName} />
+                  <Row label="Espaço" value={by.contextName} />
                   <Row label="Vencimento" value={formatDateBR(c.dueOn)} />
                   <Row label="Categoria" value={c.category ?? NO_CATEGORY_LABEL} />
                   {paid ? (
@@ -535,7 +535,7 @@ export default function DetalheContaAPagar() {
                     </>
                   )}
                   <Txt variant="caption" color={colors.textSecondary}>
-                    Para alterar esta conta a pagar, desfaça o pagamento. O gasto registrado pode ser editado em Movimentações.
+                    Para alterar esta conta a pagar, desfaça o pagamento. O gasto registrado pode ser editado em Movimentos.
                   </Txt>
                 </>
               ) : (

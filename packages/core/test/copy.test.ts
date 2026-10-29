@@ -1939,7 +1939,7 @@ describe('textos das contas de origem (D-043)', () => {
   });
 });
 
-describe('textos de Buscar em Movimentações (D-045)', () => {
+describe('textos de Buscar em Movimentos (D-045)', () => {
   const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b/i;
   const check = (texts: string[]) => {
     expect(texts.length).toBeGreaterThan(0);

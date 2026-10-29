@@ -123,7 +123,7 @@ export default function DetalheRegistro() {
           ) : !r ? (
             <Card style={{ gap: space[3] }}>
               <Txt>{ERROR_TEXT.nao_encontrado}</Txt>
-              <Button label="Ir para Movimentações" onPress={() => router.replace('/movimentacoes')} />
+              <Button label="Ir para Movimentos" onPress={() => router.replace('/movimentacoes')} />
             </Card>
           ) : (
             <>
@@ -148,7 +148,7 @@ export default function DetalheRegistro() {
                 </Txt>
                 <FitMoney cents={r.amountCents} />
                 <View>
-                  <Row label="Contexto" value={by.contextName} />
+                  <Row label="Espaço" value={by.contextName} />
                   <Row
                     label={r.kind === 'despesa' ? ACCOUNTS_TEXT.out : ACCOUNTS_TEXT.into}
                     value={accountName}

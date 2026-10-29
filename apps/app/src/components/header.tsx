@@ -161,7 +161,7 @@ export function ContextPill({ label: given, fixed }: { label: string; fixed?: bo
   const label = fixed ? given : contextLabelFor(given, kind);
   const text = contextPillText(label, demo);
   return (
-    <View style={[styles.pill, demo && styles.pillDemo]} accessible accessibilityLabel={`Contexto: ${text}`}>
+    <View style={[styles.pill, demo && styles.pillDemo]} accessible accessibilityLabel={`Espaço: ${text}`}>
       <Txt variant="caption" color={demo ? colors.text : colors.brand} style={{ fontFamily: fonts.bold }}>
         {text}
       </Txt>
@@ -204,7 +204,7 @@ function ContextSwitchTrack() {
       style={styles.track}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       accessibilityRole="tablist"
-      accessibilityLabel="Contexto financeiro">
+      accessibilityLabel="Espaço: Pessoal ou Família">
       {half > 0 ? <Animated.View style={[styles.indicator, { width: half }, pill]} /> : null}
       {OPTIONS.map((o) => {
         const selected = o.kind === active;

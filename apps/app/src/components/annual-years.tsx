@@ -307,7 +307,7 @@ export function AnnualYears({
               ) : inYear.length > 0 ? (
                 <View>
                   <LinkButton
-                    label={isOpen ? 'Esconder as parcelas' : inYear.length === 1 ? 'Ver a parcela' : `Ver as ${inYear.length} parcelas`}
+                    label={isOpen ? 'Ocultar as parcelas' : inYear.length === 1 ? 'Ver a parcela' : `Ver as ${inYear.length} parcelas`}
                     accessibilityState={{ expanded: isOpen }}
                     // Na web, o estado só chega ao leitor de tela pelo atributo aria (como aria-checked nos chips).
                     aria-expanded={isOpen}

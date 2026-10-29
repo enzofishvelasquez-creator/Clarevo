@@ -41,13 +41,13 @@ export const ACCOUNT_STATUSES: readonly AccountStatus[] = ['ativa', 'arquivada']
 
 export const ACCOUNTS_TEXT = {
   /** Card em Conta. */
-  title: 'Suas contas',
+  title: 'Contas de origem',
   intro:
     'Cadastre de onde sai o dinheiro, como a conta do banco ou a carteira, e escolha uma em cada gasto, pagamento e aporte. É só a origem informada: a Clarevo não guarda saldo nem movimenta dinheiro.',
   principal: 'Principal',
   archived: 'Arquivada',
   add: 'Adicionar conta',
-  manage: 'Gerenciar contas',
+  manage: 'Gerenciar contas de origem',
   limitNote: 'Você tem 10 contas ativas. Arquive uma para adicionar outra.',
   balanceNote: 'A Clarevo não calcula saldo por conta.',
   /** Seletores. */
@@ -56,7 +56,7 @@ export const ACCOUNTS_TEXT = {
   to: 'Foi para',
   none: 'Sem conta',
   notFound: 'Conta não encontrada',
-  /** Filtro de Movimentações. */
+  /** Filtro de Movimentos. */
   filterLabel: 'Conta',
   filterAll: 'Todas',
   /** Formulário. */
@@ -332,7 +332,7 @@ export interface AccountFilterOption {
 }
 
 /**
- * Chips do filtro de Movimentações: "Todas" e cada conta, quando há 2 ou mais contas ativas (senão, nenhum). Uma conta arquivada só
+ * Chips do filtro de Movimentos: "Todas" e cada conta, quando há 2 ou mais contas ativas (senão, nenhum). Uma conta arquivada só
  * entra se algum registro do mês é dela.
  */
 export function accountFilterOptions(

@@ -51,7 +51,7 @@ export default function ContaScreen() {
   const [confirmAll, setConfirmAll] = useState(false);
   const [siteFailed, setSiteFailed] = useState(false);
   const [supportFailed, setSupportFailed] = useState(false);
-  // ?secao=lembretes (vindo de Contas a pagar) ou ?secao=contas (o atalho "Gerenciar contas" dos seletores): rola até o card.
+  // ?secao=lembretes (vindo de Contas a pagar) ou ?secao=contas (o atalho "Gerenciar contas de origem" dos seletores): rola até o card.
   const { secao } = useLocalSearchParams<{ secao?: string }>();
   const scroll = useRef<ScrollView>(null);
   const [remindersY, setRemindersY] = useState<number | null>(null);

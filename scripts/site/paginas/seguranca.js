@@ -86,7 +86,7 @@ function paginaSeguranca({ valores, img }) {
 <div class="grade">
 <article class="cartao">
 <h3>Você</h3>
-<p>Entre as pessoas que usam o app, só você vê, anota, edita e exclui o que está no seu Pessoal. A tela "Quem vê estes dados?" mostra quem tem acesso em cada contexto.</p>
+<p>Entre as pessoas que usam o app, só você vê, anota, edita e exclui o que está no seu Pessoal. A tela "Quem vê estes dados?" mostra quem tem acesso em cada espaço (Pessoal ou Família).</p>
 ${celular(img['quem-ve'], ARQUIVO)}
 </article>
 <article class="cartao">

@@ -322,7 +322,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
       // O detalhe mostra a versão atual ao voltar; a rota mantém este formulário aberto.
       qc.setQueryData(['commitment', current.id], current);
       if (current.status === 'quitado') {
-        // O gasto do pagamento já conta em Pago: o Resumo e as Movimentações abertos recarregam.
+        // O gasto do pagamento já conta em Pago: o Resumo e as Movimentos abertos recarregam.
         qc.invalidateQueries({ queryKey: ['records'] });
         setPaidElsewhere(true);
         return;

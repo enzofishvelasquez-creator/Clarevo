@@ -186,7 +186,7 @@ describe('regras puras das contas (D-043)', () => {
     expect(accountForPaymentForms(list, ['pix', 'pix'])).toBe('a');
   });
 
-  it('a conta nas linhas e o filtro de Movimentações: só com mais de uma conta ativa', () => {
+  it('a conta nas linhas e o filtro de Movimentos: só com mais de uma conta ativa', () => {
     const records = [{ accountId: 'a' }, { accountId: 'b' }, { accountId: 'c' }];
     expect(recordAccountName(list, { accountId: 'b' })).toBe('Carteira');
     expect(recordAccountName(list, { accountId: 'c' })).toBe('Antiga');

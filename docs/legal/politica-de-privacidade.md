@@ -198,7 +198,7 @@ Não tomamos decisões automatizadas sobre você, e a Clarevo não faz análise 
 
 ## 7. Quem vê os seus dados?
 
-**Você.** Entre as pessoas que usam o app, só você vê, anota, edita e exclui o que está no seu Pessoal. A tela "Quem vê estes dados?" mostra, em cada contexto, quem tem acesso e traz o aviso sobre a equipe da Clarevo.
+**Você.** Entre as pessoas que usam o app, só você vê, anota, edita e exclui o que está no seu Pessoal. A tela "Quem vê estes dados?" mostra, em cada espaço (Pessoal ou Família), quem tem acesso e traz o aviso sobre a equipe da Clarevo.
 
 **As pessoas da sua Família, na Família.** Cada pessoa vê o que o papel permite. Quem tem o papel "Titular" vê, anota e edita o que é de outras pessoas. Quem tem "Anota e vê" vê e anota, e altera só o que anotou. Quem tem "Só vê" não anota nem altera nada. As pessoas da Família veem o primeiro nome de quem anotou, nunca o e-mail nem o nome inteiro.
 
@@ -286,7 +286,7 @@ Você tem direito, a qualquer momento, de pedir (LGPD, art. 18):
 
 **Como pedir.**
 
-- Dentro do app, você já pode: ver e corrigir o que anotou, em cada tela; ver quem acessa cada contexto em "Quem vê estes dados?"; exportar os seus gastos e recebimentos do Pessoal e as compras no cartão em planilha ou PDF, em Conta, "Exportar meus dados" (a exportação não inclui tudo o que guardamos); e excluir a conta, em Conta, no último item. [PROPOSTA: a resposta de "Como você conheceu a Clarevo?" (seção 3.8) você muda, ou troca por "Prefiro não dizer", em Conta; para apagar só a resposta, sem excluir a conta, peça pelo e-mail de privacidade da seção 16.]
+- Dentro do app, você já pode: ver e corrigir o que anotou, em cada tela; ver quem acessa cada espaço em "Quem vê estes dados?"; exportar os seus gastos e recebimentos do Pessoal e as compras no cartão em planilha ou PDF, em Conta, "Exportar meus dados" (a exportação não inclui tudo o que guardamos); e excluir a conta, em Conta, no último item. [PROPOSTA: a resposta de "Como você conheceu a Clarevo?" (seção 3.8) você muda, ou troca por "Prefiro não dizer", em Conta; para apagar só a resposta, sem excluir a conta, peça pelo e-mail de privacidade da seção 16.]
 - Nas Novidades por e-mail, cancele pelo link de qualquer e-mail das Novidades.
 - Para os demais pedidos, escreva para [E-MAIL DE PRIVACIDADE], do e-mail cadastrado na sua conta.
 - Prazo de resposta: [A DEFINIR].

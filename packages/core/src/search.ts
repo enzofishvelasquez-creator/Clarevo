@@ -7,7 +7,7 @@ import type { CardEntry, FinancialAccount, FinancialRecord, RecordKind } from '.
 import { CATEGORIES, NO_CATEGORY_LABEL } from './records';
 
 /**
- * Buscar em Movimentações (D-045, Ciclo H1; docs/08 §5 item 5). Responde "quanto paguei de luz?" e acha um lançamento antigo em
+ * Buscar em Movimentos (D-045, Ciclo H1; docs/08 §5 item 5). Responde "quanto paguei de luz?" e acha um lançamento antigo em
  * todos os meses. Regras puras: nada aqui grava, e o app não registra buscas (como Aprender).
  *
  * O servidor filtra por período, tipo, categoria, conta, valor e texto e devolve até `SEARCH_LIMIT` linhas, das mais recentes. O
@@ -83,7 +83,7 @@ export interface SearchPage<T> {
 const PARTIAL_RECORDS = 'nos 1.000 registros mais recentes';
 
 export const SEARCH_TEXT = {
-  /** Entrada em Movimentações. */
+  /** Entrada em Movimentos. */
   entry: 'Buscar',
   entryHint: 'Gastos e recebimentos de todos os meses',
   entryA11y: 'Buscar. Abre a busca em todos os meses.',

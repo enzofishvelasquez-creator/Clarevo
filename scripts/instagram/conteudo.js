@@ -141,7 +141,7 @@ const PECAS = [
     conferencia: [
       { afirmacao: 'Cuidar da vida financeira faz parte de cuidar de você.', situacao: 'Sem afirmação sobre o app', nota: 'Mensagem central da marca (D-068); não promete resultado nem efeito sobre saúde.' },
       { afirmacao: 'Contas para lembrar, compras para decidir, planos para organizar.', situacao: 'Confirmado como descrição de situação', nota: 'Contas a pagar, calculadoras e simulador, Metas. Os lembretes no aparelho só existem no app de celular, não na web: se disser que o app "lembra", mostrar o celular.' },
-      { afirmacao: 'Um app para organizar a vida financeira pessoal e familiar.', situacao: 'Confirmado, com limite', nota: 'Contextos Pessoal e Família (D-055, até 6 pessoas). "Apoia o bem-estar financeiro" é posicionamento: nenhuma tela promete efeito sobre saúde, sono, produtividade ou tranquilidade.' },
+      { afirmacao: 'Um app para organizar a vida financeira pessoal e familiar.', situacao: 'Confirmado, com limite', nota: 'Espaços Pessoal e Família (D-055, até 6 pessoas). "Apoia o bem-estar financeiro" é posicionamento: nenhuma tela promete efeito sobre saúde, sono, produtividade ou tranquilidade.' },
       { afirmacao: 'Comparar o que você orçou com o que usou no mês.', situacao: 'Ajustado ao app', nota: 'Orçamento por categoria (D-041) mostra Orçado, Usado e Faltam ou acima; o usado é por competência (compra no cartão conta no mês da compra).' },
       { afirmacao: 'Orientação prática e espaço para rever planos.', situacao: 'Confirmado, com limite', nota: '"Aqui" é o perfil. No app, a orientação prática é Aprender (com fonte e data de revisão) e há orçamento por mês, metas e plano de guardar editáveis.' },
     ],

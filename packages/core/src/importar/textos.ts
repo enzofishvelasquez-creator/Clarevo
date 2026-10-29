@@ -35,7 +35,7 @@ export const IMPORT_TEXT = {
   destinationAccountHint: 'Extrato: gastos e recebimentos entram no mês de cada data.',
   destinationCard: 'Cartão de crédito',
   destinationCardHint: 'Fatura: as compras entram na fatura e só viram gasto quando você paga a fatura.',
-  pickAccount: 'Conta de destino',
+  pickAccount: 'Conta de origem',
   pickCard: 'Cartão de destino',
   noCards: 'Você ainda não cadastrou nenhum cartão.',
   addCard: 'Cadastrar um cartão',

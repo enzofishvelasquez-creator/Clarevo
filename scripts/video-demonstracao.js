@@ -4,7 +4,7 @@
  * numa faixa no rodapé (fundo #17223B, texto branco), injetada na página só durante a gravação.
  *
  * Percurso (12 passos, um quadro de conferência por passo): Resumo, Anotar gasto (salvo só na memória da demonstração), Contas a
- * pagar (com o aviso de dia útil), Cartões e a fatura, Movimentações e Análises (Bolhas, tocando numa categoria), Evolução (cenário
+ * pagar (com o aviso de dia útil), Cartões e a fatura, Movimentos e Análises (Bolhas, tocando numa categoria), Evolução (cenário
  * "evolucao", 12 meses, abril fora da comparação, média, mediana e "Entender o que mudou"), o seletor da Evolução com "Renda
  * comprometida" e "Guardado em metas" (D-062 item 4, só de meses fechados), Metas, Aprender ("Neste mês"), o painel "Empresa
  * Exemplo (demonstração)", o "Relatório de adesão" do RH (D-062 item 1, planilha só com contagens) e "Quem vê estes dados?".
@@ -84,7 +84,7 @@ const LEGENDAS = {
   diaUtil: 'Vencimento em fim de semana: o app avisa o próximo dia útil',
   cartoes: 'Cartões: a compra só entra em Pago quando a fatura é paga',
   fatura: 'A fatura mostra cada parcela e como o total é formado',
-  movimentacoes: 'Movimentações: tudo o que entrou e saiu no mês',
+  movimentacoes: 'Movimentos: tudo o que entrou e saiu no mês',
   analises: 'Análises: as Bolhas mostram o peso de cada categoria',
   categoria: 'Toque numa categoria para ver os lançamentos do mês',
   evolucao: 'Evolução: o Pago mês a mês, com média e mediana',
@@ -487,7 +487,7 @@ function instantesDosSinais(nome, esperados, achados) {
 
         // 4. Cartões e a fatura
         await legenda(LEGENDAS.cartoes);
-        await tocar(aba('Movimentos: movimentações do mês'));
+        await tocar(aba('Movimentos do mês'));
         await esperar('Registrar recebimento');
         await pausa(800);
         await tocar(p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first());
@@ -505,9 +505,9 @@ function instantesDosSinais(nome, esperados, achados) {
         await quadro('passo-04-cartoes-e-fatura');
         await pausa(1200);
 
-        // 5. Movimentações e Análises, com as Bolhas
+        // 5. Movimentos e Análises, com as Bolhas
         await legenda(LEGENDAS.movimentacoes);
-        await tocar(aba('Movimentos: movimentações do mês'));
+        await tocar(aba('Movimentos do mês'));
         await esperar('Registrar recebimento');
         await rolarPara(0, 800);
         await pausa(2200);
@@ -537,7 +537,7 @@ function instantesDosSinais(nome, esperados, achados) {
       nome: 'trecho 2', cenario: 'evolucao', intro: ENTRE, lead: 0.5, despedida: ENTRE,
       preparar: async (c) => {
         await c.entrar();
-        await c.aba('Movimentos: movimentações do mês').click();
+        await c.aba('Movimentos do mês').click();
         await c.esperar('Registrar recebimento');
         await c.legenda(LEGENDAS.evolucao);
       },
