@@ -29,6 +29,9 @@ import {
   contractState,
   currentContract,
   filterLicenses,
+  LICENSE_PAGE_SIZE,
+  licensePage,
+  searchLicenses,
   inviteCsvFileName,
   inviteLinkRows,
   isCompanyAction,
@@ -466,5 +469,31 @@ describe('Empresas: telas do app (lidas como código-fonte)', () => {
       const text = appFile(rel);
       expect(text, rel).not.toMatch(/\buseWork\b|\buseFamily\b|listRecords|listCommitments|listGoals|listCards|financial_records|getSpace/);
     }
+  });
+});
+
+describe('Empresas: busca e páginas da lista de licenças', () => {
+  const lic = (email: string) => ({ email });
+  it('a busca acha o trecho do e-mail sem diferença de maiúsculas; vazia mostra todas', () => {
+    const list = [lic('ana@empresa.com.br'), lic('bia@empresa.com.br'), lic('caio@outra.com')];
+    expect(searchLicenses(list, '  ANA ').map((l) => l.email)).toEqual(['ana@empresa.com.br']);
+    expect(searchLicenses(list, '@empresa').map((l) => l.email)).toEqual(['ana@empresa.com.br', 'bia@empresa.com.br']);
+    expect(searchLicenses(list, '')).toHaveLength(3);
+    expect(searchLicenses(list, 'zzz')).toEqual([]);
+  });
+
+  it('páginas de 20: "21 a 40 de 45", a última com o resto, e a página fora do intervalo é ajustada', () => {
+    const list = Array.from({ length: 45 }, (_, i) => i + 1);
+    expect(LICENSE_PAGE_SIZE).toBe(20);
+    expect(licensePage(list, 2)).toMatchObject({ page: 2, pages: 3, from: 21, to: 40, total: 45 });
+    expect(licensePage(list, 3).items).toEqual([41, 42, 43, 44, 45]);
+    expect(licensePage(list, 9)).toMatchObject({ page: 3, from: 41, to: 45 });
+    expect(licensePage(list, 0)).toMatchObject({ page: 1, from: 1, to: 20 });
+    expect(licensePage([], 1)).toMatchObject({ items: [], page: 1, pages: 1, from: 0, to: 0, total: 0 });
+    expect(COMPANY_TEXT.pageInfo(21, 40, 45)).toBe('21 a 40 de 45');
+    expect(COMPANY_TEXT.searchNone(' ana ')).toBe('Nenhum e-mail com "ana" nesta situação.');
+    // O nome acessível começa pelo rótulo visível; nas pontas, só o rótulo.
+    expect([COMPANY_TEXT.pagePrevA11y(1, 3), COMPANY_TEXT.pagePrevA11y(2, 3)]).toEqual(['Anteriores', 'Anteriores: página 1 de 3']);
+    expect([COMPANY_TEXT.pageNextA11y(3, 3), COMPANY_TEXT.pageNextA11y(2, 3)]).toEqual(['Próximas', 'Próximas: página 3 de 3']);
   });
 });

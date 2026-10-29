@@ -514,18 +514,6 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
-  /** A renomeação direta do app publicado antes da 0010: soma 1 à versão, como o gatilho do banco, e recusa nome repetido. */
-  async renameAccount(accountId: string, name: string) {
-    return this.write(() => {
-      const acc = this.accountsById.get(accountId);
-      if (!acc || acc.deletedAt || !this.canRead(acc.contextId)) throw new RepoError('nao_encontrado');
-      const trimmed = name.trim();
-      if (trimmed.length < 1 || trimmed.length > 40) throw new RepoError('nome_da_conta_invalido');
-      if (accountNameTaken(this.liveAccounts(), trimmed, accountId)) throw new RepoError('nome_da_conta_repetido');
-      this.accountsById.set(accountId, { ...acc, name: trimmed, version: acc.version + 1 });
-    });
-  }
-
   // ---------------------------------------------------------------------------
   // Contas de origem do dinheiro (D-043): as cinco funções da migração 0010
   // ---------------------------------------------------------------------------

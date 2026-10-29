@@ -20,9 +20,11 @@ import {
   inviteLinkRows,
   licenseCounts,
   licenseKind,
+  licensePage,
   parseEmailList,
   planInvites,
   promoTexts,
+  searchLicenses,
   seatsOf,
   type BenefitContract,
   type CompanyOverview,
@@ -357,8 +359,13 @@ export function LicensesCard({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
   const counts = licenseCounts(licenses);
-  const shown = filterLicenses(licenses, filter);
+  // Busca por e-mail e páginas de 20: com centenas de convidados, a lista não vira uma rolagem sem fim.
+  const found = filterLicenses(searchLicenses(licenses, query), filter);
+  const paged = licensePage(found, page);
+  const shown = paged.items;
 
   async function run(slot: string, work: (key: string) => Promise<unknown>, done: string): Promise<boolean> {
     if (busy) return false;
@@ -416,12 +423,27 @@ export function LicensesCard({
                 label={`${LICENSE_FILTER_LABEL[f]} (${counts[f]})`}
                 accessibilityLabel={T.filterCount(LICENSE_FILTER_LABEL[f], counts[f])}
                 selected={filter === f}
-                onPress={() => setFilter(f)}
+                onPress={() => {
+                  setFilter(f);
+                  setPage(1);
+                }}
               />
             ))}
           </ChoiceGroup>
+          <TextField
+            label={T.searchLabel}
+            value={query}
+            onChangeText={(v) => {
+              setQuery(v);
+              setPage(1);
+            }}
+            placeholder={T.searchPlaceholder}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+          />
           {shown.length === 0 ? (
-            <Txt color={colors.textSecondary}>{T.licensesNone}</Txt>
+            <Txt color={colors.textSecondary}>{query.trim() === '' ? T.licensesNone : T.searchNone(query)}</Txt>
           ) : (
             <View>
               {shown.map((l, i) => {
@@ -470,6 +492,33 @@ export function LicensesCard({
               })}
             </View>
           )}
+          {paged.total > 0 ? (
+            <View style={styles.pager}>
+              <Txt variant="caption" color={colors.textSecondary} accessibilityLiveRegion="polite">
+                {T.pageInfo(paged.from, paged.to, paged.total)}
+              </Txt>
+              {paged.pages > 1 ? (
+                <View style={styles.actions}>
+                  <Button
+                    label={T.pagePrev}
+                    tone="soft"
+                    compact
+                    disabled={paged.page === 1}
+                    accessibilityLabel={T.pagePrevA11y(paged.page, paged.pages)}
+                    onPress={() => setPage(paged.page - 1)}
+                  />
+                  <Button
+                    label={T.pageNext}
+                    tone="soft"
+                    compact
+                    disabled={paged.page === paged.pages}
+                    accessibilityLabel={T.pageNextA11y(paged.page, paged.pages)}
+                    onPress={() => setPage(paged.page + 1)}
+                  />
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </>
       )}
 
@@ -664,4 +713,5 @@ const styles = StyleSheet.create({
   license: { gap: space[2], paddingVertical: space[3] },
   licenseDivider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  pager: { gap: space[2], paddingTop: space[2], borderTopWidth: 1, borderTopColor: colors.border },
 });

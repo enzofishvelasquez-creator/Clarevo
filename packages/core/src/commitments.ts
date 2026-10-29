@@ -1,5 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
-import { addDays, addMonths, addMonthsToDate, daysBetween, formatDateBR, formatDayMonth, formatMonthBR, formatMonthName, monthOf, monthRange } from './dates';
+import { addDays, addMonths, addMonthsToDate, daysBetween, formatDateBR, formatListDate, formatMonthBR, formatMonthName, monthOf, monthRange } from './dates';
 import { dueKindOf, isCommitmentOverdue, lastOnTimeDay, nextBusinessDayWhen } from './dia-util';
 import { formatBRL } from './money';
 import type { Commitment, CommitmentInput } from './records';
@@ -45,21 +45,22 @@ function monthLabelFor(month: string, today: IsoDate): string {
 }
 
 /**
- * Legenda da conta a pagar: "Vence amanhã", "Vence em 3 dias · 10/10", "Venceu em 05/10/2026", "Paga em 07/10/2026" e, na conta de
- * uma fatura paga em parte, "Paga em parte em 08/11/2026 · R$ 230,00 foram para a fatura de dezembro". Com vencimento em dia que não
+ * Legenda da conta a pagar: "Vence amanhã", "Vence em 3 dias · 10/10", "Vence em 15/10", "Venceu em 05/10", "Paga em 07/10" e, na
+ * conta de uma fatura paga em parte, "Paga em parte em 08/11 · R$ 230,00 foram para a fatura de dezembro". A data leva o ano só
+ * quando é de outro ano que o de hoje ("Venceu em 20/12/2025"; formatListDate). Com vencimento em dia que não
  * é útil (D-061): "Vence terça, 13/10 (próximo dia útil)" ou "Vence hoje (próximo dia útil)"; a data cadastrada segue no detalhe.
  */
 export function dueText(c: Commitment, today: IsoDate): string {
   switch (commitmentSituation(c, today)) {
     case 'paga':
-      return c.payment ? `Paga em ${formatDateBR(c.payment.paidOn)}` : 'Paga';
+      return c.payment ? `Paga em ${formatListDate(c.payment.paidOn, today)}` : 'Paga';
     case 'paga_em_parte': {
       const paid = c.payment!;
       const next = addMonths(c.invoice!.month, 1);
-      return `Paga em parte em ${formatDateBR(paid.paidOn)} · ${formatBRL(c.amountCents - paid.amountCents)} foram para a fatura de ${monthLabelFor(next, today)}`;
+      return `Paga em parte em ${formatListDate(paid.paidOn, today)} · ${formatBRL(c.amountCents - paid.amountCents)} foram para a fatura de ${monthLabelFor(next, today)}`;
     }
     case 'vencida':
-      return `Venceu em ${formatDateBR(c.dueOn)}`;
+      return `Venceu em ${formatListDate(c.dueOn, today)}`;
     case 'vence_hoje':
       return nextBusinessDayDueLabel(c, today) ?? 'Vence hoje';
     case 'a_vencer': {
@@ -67,8 +68,8 @@ export function dueText(c: Commitment, today: IsoDate): string {
       if (grace) return grace;
       const days = daysBetween(today, c.dueOn);
       if (days === 1) return 'Vence amanhã';
-      if (days <= 7) return `Vence em ${days} dias · ${formatDayMonth(c.dueOn)}`;
-      return `Vence em ${formatDateBR(c.dueOn)}`;
+      if (days <= 7) return `Vence em ${days} dias · ${formatListDate(c.dueOn, today)}`;
+      return `Vence em ${formatListDate(c.dueOn, today)}`;
     }
   }
 }
@@ -126,12 +127,12 @@ function shortDue(c: Pick<Commitment, 'dueOn' | 'invoice' | 'series'>, today: Is
   if (grace) return grace.when;
   if (c.dueOn === today) return 'hoje';
   if (c.dueOn === addDays(today, 1)) return 'amanhã';
-  return formatDayMonth(c.dueOn);
+  return formatListDate(c.dueOn, today);
 }
 
 /** Com um único item: "vence em 15/10", "vence hoje", "vence amanhã", "vence terça, 13/10 (próximo dia útil)" ou "venceu em 05/10". */
 function singleDue(c: Pick<Commitment, 'dueOn' | 'invoice' | 'series'>, today: IsoDate): string {
-  if (isCommitmentOverdue(c, today)) return `venceu em ${formatDayMonth(c.dueOn)}`;
+  if (isCommitmentOverdue(c, today)) return `venceu em ${formatListDate(c.dueOn, today)}`;
   const when = shortDue(c, today);
   return when === 'hoje' || when === 'amanhã' || nextBusinessDayWhen(c.dueOn, dueKindOf(c), today) ? `vence ${when}` : `vence em ${when}`;
 }
@@ -191,7 +192,7 @@ export function quickPayAction(c: Commitment, today: IsoDate): 'pagar' | 'inform
 }
 
 /** Vencimento curto do nome acessível: "vence hoje" ou "vence 12/10". */
-const dueShort = (dueOn: IsoDate, today: IsoDate) => (dueOn === today ? 'vence hoje' : `vence ${formatDayMonth(dueOn)}`);
+const dueShort = (dueOn: IsoDate, today: IsoDate) => (dueOn === today ? 'vence hoje' : `vence ${formatListDate(dueOn, today)}`);
 
 /** Textos de "Já paguei" na lista (diálogo e nomes acessíveis). `name` é o nome mostrado na linha. */
 export const QUICK_PAY_TEXT = {

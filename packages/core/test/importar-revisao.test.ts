@@ -553,6 +553,11 @@ describe('importar: parcelas na fatura', () => {
       ['LOJA 15/10/2026 03/12', [3, 12]],
     ];
     for (const [text, expected] of cases) expect(installmentMark(text), text).toEqual(expected ? { number: expected[0], count: expected[1] } : null);
+    // Com a data da linha: o dia e o mês dela na descrição são a data da compra, não a parcela.
+    expect(installmentMark('PADARIA 03/10', '2026-10-03')).toBeNull();
+    expect(installmentMark('PADARIA 3/10', '2026-10-03')).toBeNull();
+    expect(installmentMark('LOJA 03/10', '2026-10-15')).toEqual({ number: 3, count: 10 });
+    expect(installmentMark('LOJA 15/10 03/12', '2026-10-15')).toEqual({ number: 3, count: 12 });
   });
 
   it('fatura com parcela: "Parece parcela", desmarcada mas podendo ser marcada', () => {

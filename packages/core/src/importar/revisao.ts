@@ -132,7 +132,7 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
     kind: p.kind as ExistingEntry['kind'],
     // Fatura com parcela na descrição ("LOJA 03/10"): compara com as parcelas das compras parceladas já anotadas.
     ...(destination === 'cartao' && p.kind === 'compra' && input.card
-      ? { invoiceMonth: invoiceMonthOf(input.card.days, p.l.date), installment: installmentMark(p.l.description) }
+      ? { invoiceMonth: invoiceMonthOf(input.card.days, p.l.date), installment: installmentMark(p.l.description, p.l.date) }
       : {}),
   }));
   const similar = findLookalikes(
@@ -165,7 +165,7 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
     if (label === null && destination === 'cartao' && kind === 'compra') {
       // Compra parcelada: anotar uma vez em Anotar gasto, com o número de parcelas, não parcela por parcela da fatura. E uma
       // linha de "pagamento" que o arquivo trouxe como compra (planilha com o sinal trocado) é o pagamento da fatura.
-      if (installmentMark(l.description)) label = 'parcela';
+      if (installmentMark(l.description, l.date)) label = 'parcela';
       else if (looksLikeCardPaymentLine(l.description)) label = 'pagamento_fatura';
     }
     if (label === null && destination === 'conta') {

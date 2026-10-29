@@ -399,7 +399,7 @@ describe('API real: espaço pessoal, registros e permissões', () => {
     expect(await err(bruno.updateRecord(newOperationKey(), a.id, 2, input(1)))).toBe('nao_encontrado');
     expect(await err(bruno.deleteRecord(newOperationKey(), a.id, 2))).toBe('nao_encontrado');
     expect(await err(bruno.createRecord(newOperationKey(), ctx, 'despesa', input(1)))).toBe('sem_permissao');
-    expect(await err(bruno.renameAccount(account, 'Invasão'))).toBe('nao_encontrado');
+    expect(await err(bruno.updateAccount(newOperationKey(), account, 1, { name: 'Invasão', kind: 'banco' }))).toBe('nao_encontrado');
     expect((await ana.getRecord(a.id))!.amountCents).toBe(3400);
     await ana.deleteRecord(newOperationKey(), a.id, 2);
   });
@@ -415,10 +415,14 @@ describe('API real: espaço pessoal, registros e permissões', () => {
     expect(rpc.error).not.toBeNull();
   });
 
-  it('renomear a própria conta', async () => {
-    await ana.renameAccount(account, 'Conta corrente');
+  it('renomear a própria conta: só pela função (o update direto da tabela é recusado desde a 0019)', async () => {
+    const acc = (await ana.getSpace())!.accounts[0]!;
+    await ana.updateAccount(newOperationKey(), account, acc.version, { name: 'Conta corrente', kind: acc.kind });
     expect((await ana.getSpace())!.accounts[0]!.name).toBe('Conta corrente');
-    expect(await err(ana.renameAccount(account, '   '))).toBe('nome_da_conta_invalido');
+    expect(await err(ana.updateAccount(newOperationKey(), account, acc.version + 1, { name: '   ', kind: acc.kind }))).toBe('nome_da_conta_invalido');
+    const direct = await clientFor(ANA).from('financial_accounts').update({ name: 'Direto' }).eq('id', account);
+    expect(direct.error).not.toBeNull();
+    expect((await ana.getSpace())!.accounts[0]!.name).toBe('Conta corrente');
   });
 });
 
@@ -5465,12 +5469,16 @@ describe('API real: contas de origem do dinheiro (Ciclo G1, D-043)', () => {
     const updated = await ana.updateAccount(k, wallet.id, 1, { name: 'Dinheiro vivo', kind: 'outra' });
     expect(shape(updated)).toBe('Dinheiro vivo|outra|ativa|-|2');
     expect(await ana.updateAccount(k, wallet.id, 1, { name: 'Dinheiro vivo', kind: 'outra' })).toEqual(updated);
-    // Renomeação direta (update (name)), como o app publicado faz: vale, soma 1 à versão e recusa nome repetido.
-    await ana.renameAccount(wallet.id, 'Carteira');
+    // Sem renomeação direta (saiu na 0019): o update da tabela é recusado e nada muda; renomear é pela função, que recusa nome repetido.
+    const directRename = await clientFor(ANA).from('financial_accounts').update({ name: 'Carteira' }).eq('id', wallet.id);
+    expect(directRename.error).not.toBeNull();
+    await ana.updateAccount(newOperationKey(), wallet.id, 2, { name: 'Carteira', kind: 'outra' });
     wallet = (await ana.listAccounts(ctx)).find((a) => a.id === wallet.id)!;
     expect(wallet).toMatchObject({ name: 'Carteira', kind: 'outra', version: 3 });
-    expect(await code(ana.renameAccount(wallet.id, (await ana.listAccounts(ctx))[0]!.name.toLowerCase()))).toEqual(['nome_da_conta_repetido', null]);
-    expect(await code(ana.renameAccount(wallet.id, ''))).toEqual(['nome_da_conta_invalido', null]);
+    expect(await code(ana.updateAccount(newOperationKey(), wallet.id, 3, { name: (await ana.listAccounts(ctx))[0]!.name.toLowerCase(), kind: 'outra' }))).toEqual([
+      'nome_da_conta_repetido',
+      null,
+    ]);
     await ana.updateAccount(newOperationKey(), wallet.id, 3, { name: 'Carteira', kind: 'dinheiro' });
     wallet = (await ana.listAccounts(ctx)).find((a) => a.id === wallet.id)!;
   });
@@ -5677,20 +5685,20 @@ describe('API real: contas de origem do dinheiro (Ciclo G1, D-043)', () => {
     expect(await code(ana.setAccountStatus(newOperationKey(), principal, only[0]!.version, 'arquivada'))).toEqual(['ultima_conta_ativa', null]);
   });
 
-  it('escrita direta: sem inserir, excluir ou mudar outra coluna; a pessoa de fora não renomeia nem lê', async () => {
+  it('escrita direta: sem inserir, excluir, renomear ou mudar outra coluna; a pessoa de fora não renomeia nem lê', async () => {
     const db = clientFor(ANA, T0);
     const ins = await db.from('financial_accounts').insert({ context_id: ctx, name: 'Direta', created_by: ANA });
     expect(ins.error?.code).toBe('42501');
     const del = await db.from('financial_accounts').delete().eq('id', principal);
     expect(del.error?.code).toBe('42501');
-    for (const patch of [{ status: 'arquivada' }, { is_default: false }, { kind: 'outra' }, { version: 99 }, { deleted_at: new Date().toISOString() }]) {
+    // Desde a 0019, nem o nome (a renomeação direta do app publicado antes da 0010 saiu).
+    for (const patch of [{ name: 'Direto' }, { status: 'arquivada' }, { is_default: false }, { kind: 'outra' }, { version: 99 }, { deleted_at: new Date().toISOString() }]) {
       const upd = await db.from('financial_accounts').update(patch).eq('id', principal);
       expect(upd.error?.code, JSON.stringify(patch)).toBe('42501');
     }
     const outsider = clientFor(BRUNO, T0);
     const rename = await outsider.from('financial_accounts').update({ name: 'Invasão' }, { count: 'exact' }).eq('id', principal);
-    expect(rename.error).toBeNull();
-    expect(rename.count).toBe(0);
+    expect(rename.error?.code).toBe('42501');
     expect((await outsider.from('financial_accounts').select('id').eq('id', principal)).data).toEqual([]);
     const anon = await clientFor(null).from('financial_accounts').select('id');
     expect(anon.error?.code).toBe('42501');
@@ -5800,9 +5808,6 @@ describe('conversor das contas de origem', () => {
       }
       const stale = fake({}, {}, { message: 'versao_desatualizada', code: 'PT409', details: 'versao_atual=7' });
       expect(await failure(stale.updateAccount('chave-4004', 'a1', 1, { name: 'X', kind: 'banco' }))).toEqual(['versao_desatualizada', 'versao_desatualizada', 'versao_atual=7']);
-      // A renomeação direta: nome repetido (índice único) e nome fora do tamanho (restrição de coluna).
-      expect(await failure(fake({}, {}, { message: 'duplicate key value violates unique constraint "financial_accounts_name_live"', code: '23505' }).renameAccount('a1', 'X'))).toEqual(['nome_da_conta_repetido', 'nome_da_conta_repetido', null]);
-      expect(await failure(fake({}, {}, { message: 'new row violates check constraint', code: '23514' }).renameAccount('a1', 'X'))).toEqual(['nome_da_conta_invalido', 'nome_da_conta_invalido', null]);
       for (const spy of spies) expect(spy).not.toHaveBeenCalled();
     } finally {
       for (const spy of spies) spy.mockRestore();

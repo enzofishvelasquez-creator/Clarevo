@@ -885,11 +885,11 @@ describe('a etiqueta "Vence terça, 13/10 (próximo dia útil)" (D-061)', () => 
     expect(row('2026-10-11')).toEqual(['a_vencer', 'Vence terça, 13/10 (próximo dia útil)']);
     expect(row('2026-10-12')).toEqual(['a_vencer', 'Vence terça, 13/10 (próximo dia útil)']);
     expect(row('2026-10-13')).toEqual(['vence_hoje', 'Vence hoje (próximo dia útil)']);
-    expect(row('2026-10-14')).toEqual(['vencida', 'Venceu em 11/10/2026']);
+    expect(row('2026-10-14')).toEqual(['vencida', 'Venceu em 11/10']);
     // Conta do ano: vencida a partir do dia seguinte à data cadastrada, e o texto de sempre.
     const ano = bill('2026-10-11', { series: serie('anual') });
     expect([commitmentSituation(ano, '2026-10-11'), dueText(ano, '2026-10-11')]).toEqual(['vence_hoje', 'Vence hoje']);
-    expect([commitmentSituation(ano, '2026-10-12'), dueText(ano, '2026-10-12')]).toEqual(['vencida', 'Venceu em 11/10/2026']);
+    expect([commitmentSituation(ano, '2026-10-12'), dueText(ano, '2026-10-12')]).toEqual(['vencida', 'Venceu em 11/10']);
     // Paga nunca é vencida.
     expect(commitmentSituation(bill('2026-10-11', { status: 'quitado' }), '2026-10-20')).toBe('paga');
   });

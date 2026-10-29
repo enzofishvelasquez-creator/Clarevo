@@ -15,6 +15,7 @@ import {
   formatDateTimeBR,
   formatDayHeader,
   formatDayMonth,
+  formatListDate,
   formatMonthName,
   maskDateBR,
   monthOf,
@@ -503,12 +504,12 @@ describe('contas a pagar', () => {
       [commitment({ dueOn: '2026-10-11' }), 'a_vencer', 'Vence terça, 13/10 (próximo dia útil)'],
       [commitment({ dueOn: '2026-10-13' }), 'a_vencer', 'Vence em 6 dias · 13/10'],
       [commitment({ dueOn: '2026-10-14' }), 'a_vencer', 'Vence em 7 dias · 14/10'],
-      [commitment({ dueOn: '2026-10-15' }), 'a_vencer', 'Vence em 15/10/2026'],
-      [commitment({ dueOn: '2026-10-05' }), 'vencida', 'Venceu em 05/10/2026'],
+      [commitment({ dueOn: '2026-10-15' }), 'a_vencer', 'Vence em 15/10'],
+      [commitment({ dueOn: '2026-10-05' }), 'vencida', 'Venceu em 05/10'],
       // Sábado, 03/10: o próximo dia útil (segunda, 05/10) já terminou, então está vencida.
-      [commitment({ dueOn: '2026-10-03' }), 'vencida', 'Venceu em 03/10/2026'],
-      [paidCommitment('2026-10-15', '2026-10-01'), 'paga', 'Paga em 01/10/2026'],
-      [paidCommitment('2026-10-05', '2026-10-07'), 'paga', 'Paga em 07/10/2026'],
+      [commitment({ dueOn: '2026-10-03' }), 'vencida', 'Venceu em 03/10'],
+      [paidCommitment('2026-10-15', '2026-10-01'), 'paga', 'Paga em 01/10'],
+      [paidCommitment('2026-10-05', '2026-10-07'), 'paga', 'Paga em 07/10'],
     ] as const)('4. situação e texto: %#', (c, situation, text) => {
       expect(commitmentSituation(c, DEMO_TODAY)).toBe(situation);
       expect(dueText(c, DEMO_TODAY)).toBe(text);
@@ -1131,5 +1132,16 @@ describe('contas a pagar', () => {
       expect(toPayCaption(s, DEMO_TODAY)).toEqual({ main: '2 contas · próxima: Internet, 15/10', overdue: null, includes: null, estimated: null });
       repo.checkInvariants();
     });
+  });
+});
+
+describe('datas das listas de contas (um só formato)', () => {
+  it('"15/10" no ano de hoje e "15/01/2027" em outro ano, em Vence, Venceu e Paga', () => {
+    expect(formatListDate('2026-10-15', '2026-10-07')).toBe('15/10');
+    expect(formatListDate('2027-01-15', '2026-10-07')).toBe('15/01/2027');
+    expect(formatListDate('2025-12-20', '2026-01-10')).toBe('20/12/2025');
+    expect(dueText(commitment({ dueOn: '2025-12-20' }), '2026-01-10')).toBe('Venceu em 20/12/2025');
+    expect(dueText(commitment({ dueOn: '2027-01-15' }), '2026-10-07')).toBe('Vence em 15/01/2027');
+    expect(dueText(commitment({ dueOn: '2026-10-20' }), '2026-10-07')).toBe('Vence em 20/10');
   });
 });
