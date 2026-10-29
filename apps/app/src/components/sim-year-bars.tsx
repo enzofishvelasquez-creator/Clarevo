@@ -166,7 +166,7 @@ export function YearBars({ growth, months }: { growth: SimulationGrowth; months:
         <View onLayout={(e) => setWidth(Math.floor(e.nativeEvent.layout.width))} style={{ height: BARS_HEIGHT }} {...decorative}>
           {width > 0 ? <Bars years={growth.byYear} width={width} /> : null}
         </View>
-        <View style={styles.axis} {...decorative}>
+        <View style={[styles.axis, centered && { gap: 0 }]} {...decorative}>
           <Txt variant="caption" color={colors.textSecondary} style={labelStyle}>
             {T.yearLabel(first)}
           </Txt>

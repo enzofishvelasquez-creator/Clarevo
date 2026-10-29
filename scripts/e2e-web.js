@@ -417,7 +417,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     !t.includes('Pedir biometria ao abrir') && !t.includes('Avisar') && JSON.stringify(contaSwitches) === JSON.stringify([['Ocultar valores ao abrir', 'false'], ['Mostrar valores no widget', 'false']]), JSON.stringify(contaSwitches));
   ok('Conta: "Privacidade neste aparelho" com "Ocultar valores ao abrir" desligado por padrão e a legenda', t.includes('Privacidade neste aparelho') && t.includes('Ao abrir o app, os valores aparecem como R$ ••••. Vale só para este aparelho.'));
   ok('Conta: "Ajuda e contato" com o e-mail do suporte por escrito (sem depender do site) e o botão "Escrever para o suporte"', t.includes('Ajuda e contato') &&
-    t.includes('Dúvidas sobre o app, um problema ou um pedido sobre os seus dados: escreva para suporte@clarevo.app.br.') && (await visibleCount('button', 'Escrever para o suporte')) === 1);
+    t.includes('Dúvidas sobre o app ou um problema: escreva para suporte@clarevo.app.br. Pedidos sobre os seus dados: privacidade@clarevo.app.br.') && (await visibleCount('button', 'Escrever para o suporte')) === 1);
   await keepText();
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   ok('sair volta para boas-vindas', (await body()).includes('Cuidar da vida financeira'));
@@ -11854,7 +11854,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Excluir: título, introdução (perde o acesso na hora, não é possível desfazer, e-mail livre, conta nova vazia) e as duas listas', (await famH1()) === 'Excluir minha conta' &&
     t.includes('Ao excluir, você perde o acesso na hora e não é possível desfazer. O seu e-mail fica livre para uma conta nova, que começa vazia.') && t.includes('O que é apagado') && t.includes('O que continua') &&
     t.includes('O seu Pessoal inteiro, de verdade e não só escondido') && t.includes('O benefício pela empresa, se você tem um: a licença termina na hora') && t.includes('A empresa vê só que a licença terminou.') &&
-    t.includes('Nada fica guardado para uso depois. As cópias de segurança do banco de dados podem manter dados apagados por um tempo; se uma for restaurada, a exclusão é feita de novo.'), t.slice(0, 900));
+    t.includes('Nada fica guardado para uso depois. As cópias de segurança do banco de dados podem manter dados apagados por um tempo.'), t.slice(0, 900));
   ok('Excluir sem Família: diz que não está em nenhuma Família e explica o que acontece em cada papel', t.includes('Você não está em nenhuma Família.') && t.includes('Se você anota e vê ou só vê, sai da Família e o que anotou continua, com a autoria "Pessoa que saiu".') &&
     t.includes('Se é titular com outras pessoas, passa a titularidade antes. Se é titular sem mais ninguém, a Família é apagada junto.'), t.slice(900, 1800));
   ok('Excluir: oferece "Exportar meus dados antes" e pede a palavra EXCLUIR; o botão final está desligado e não há alerta de erro', t.includes('Depois de excluir, não há como recuperar.') && (await visibleCount('button', 'Exportar meus dados antes')) === 1 &&

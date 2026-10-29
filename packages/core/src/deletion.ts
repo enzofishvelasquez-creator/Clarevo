@@ -66,7 +66,7 @@ export const DELETE_TEXT = {
     'O benefício pela empresa, se você tem um: a licença termina na hora e os seus direitos ao plano são apagados. A empresa vê só que a licença terminou.',
   ],
   keptTitle: 'O que continua',
-  keptNone: 'Nada fica guardado para uso depois. As cópias de segurança do banco de dados podem manter dados apagados por um tempo; se uma for restaurada, a exclusão é feita de novo.',
+  keptNone: 'Nada fica guardado para uso depois. As cópias de segurança do banco de dados podem manter dados apagados por um tempo.',
   /** A Família de quem excluiu, conforme o papel. */
   familyTitle: 'Sua Família',
   familyNone: 'Você não está em nenhuma Família.',

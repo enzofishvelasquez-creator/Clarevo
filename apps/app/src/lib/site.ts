@@ -30,8 +30,9 @@ export async function openSitePage(page: SitePage): Promise<boolean> {
 
 /**
  * "Escrever para o suporte" (Conta, card "Ajuda e contato"): abre o programa de e-mail com o endereço do suporte. Na web, o
- * `mailto:` vai na própria janela (o navegador entrega ao programa de e-mail e o app continua aberto, sem uma aba vazia). Devolve
- * `false` quando o sistema não conseguiu abrir; o endereço também aparece escrito no card.
+ * `mailto:` vai na própria janela (o navegador entrega ao programa de e-mail e o app continua aberto, sem uma aba vazia), e a web
+ * não diz se havia programa de e-mail: devolve `true`. No aparelho, devolve `false` quando o sistema não conseguiu abrir. Nos
+ * dois casos o endereço também aparece escrito no card.
  */
 export async function openSupportEmail(): Promise<boolean> {
   const url = `mailto:${SUPPORT_EMAIL}`;

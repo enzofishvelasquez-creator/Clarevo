@@ -154,6 +154,15 @@ describe('Empresas: a lista colada', () => {
     // Um e-mail solto antes do nome continua valendo, e o nome sem arroba sai.
     expect(splitEmailList('caio@x.com, Ana <ana@x.com>')).toEqual(['caio@x.com', 'ana@x.com']);
     expect(splitEmailList('Ana <>, bia@x.com')).toEqual(['bia@x.com']);
+    // Nome igual ao e-mail, com ou sem aspas (Outlook e cabeçalhos de e-mail): o e-mail conta uma vez.
+    expect(splitEmailList('"ana@x.com" <ana@x.com>, "bia@x.com" <bia@x.com>')).toEqual(['ana@x.com', 'bia@x.com']);
+    expect(splitEmailList("'ana@x.com' <ana@x.com>, 'bia@x.com' <bia@x.com>")).toEqual(['ana@x.com', 'bia@x.com']);
+    expect(splitEmailList('ana@x.com <ana@x.com>, bia@x.com <bia@x.com>')).toEqual(['ana@x.com', 'bia@x.com']);
+    expect(splitEmailList('"Silva, Ana, RH" <ana@x.com>; "Souza, Bia" <bia@x.com>')).toEqual(['ana@x.com', 'bia@x.com']);
+    // Um item errado longe do nome continua aparecendo (como inválido); o pedaço logo antes do nome, sem arroba, é o sobrenome.
+    expect(splitEmailList('ana.x.com, carlos, Bia <bia@x.com>')).toEqual(['ana.x.com', 'bia@x.com']);
+    // E-mail entre aspas sem sinal depois continua como foi colado (e aparece como inválido).
+    expect(splitEmailList('"ana@x.com"')).toEqual(['"ana@x.com"']);
     expect(splitEmailList('')).toEqual([]);
     expect(splitEmailList('  \n ,; ')).toEqual([]);
     expect(splitEmailList(undefined)).toEqual([]);
@@ -172,6 +181,7 @@ describe('Empresas: a lista colada', () => {
       invalid: [],
       total: 2,
     });
+    expect(parseEmailList('"ana@x.com" <ana@x.com>, ana@x.com <ana@x.com>')).toEqual({ valid: ['ana@x.com'], repeated: ['ana@x.com'], invalid: [], total: 2 });
     // Um item com espaço no meio é um item só, e inválido (a lista não é cortada por espaços).
     expect(parseEmailList('ana@x.com bia@x.com').invalid).toEqual(['ana@x.com bia@x.com']);
   });

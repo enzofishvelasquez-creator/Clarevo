@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { CONTACT_EMAIL, LEGAL_TEXT, SIGNUP_CONSENT_TEXT, SITE_PAGES, SUPPORT_EMAIL, SUPPORT_TEXT, normalizeSiteUrl, signupConsentParts, sitePageUrl } from '../src/legal';
+import { CONTACT_EMAIL, LEGAL_TEXT, PRIVACY_EMAIL, SIGNUP_CONSENT_TEXT, SITE_PAGES, SUPPORT_EMAIL, SUPPORT_TEXT, normalizeSiteUrl, signupConsentParts, sitePageUrl } from '../src/legal';
 import { COMPANY_ERROR_TEXT, COMPANY_TEXT } from '../src/company';
 
 /**
@@ -129,10 +129,13 @@ describe('Ajuda e contato', () => {
     const dados = JSON.parse(ler('site/dados-da-empresa.json')) as Record<string, string>;
     expect(SUPPORT_EMAIL).toBe(dados['E-MAIL DE SUPORTE']);
     expect(CONTACT_EMAIL).toBe(dados['E-MAIL DE CONTATO']);
+    expect(PRIVACY_EMAIL).toBe(dados['E-MAIL DE PRIVACIDADE']);
   });
 
   it('o card de Conta diz o endereço por escrito, sem depender do site, e os avisos da empresa apontam para um canal', () => {
     expect(SUPPORT_TEXT.hint).toContain(SUPPORT_EMAIL);
+    // Pedidos sobre os dados vão para o e-mail de privacidade, como na política.
+    expect(SUPPORT_TEXT.hint).toContain(`Pedidos sobre os seus dados: ${PRIVACY_EMAIL}.`);
     expect(SUPPORT_TEXT.writeFailed).toContain(SUPPORT_EMAIL);
     for (const texto of Object.values(SUPPORT_TEXT)) expect(texto).not.toMatch(PROIBIDO);
     const tela = ler('apps/app/src/app/conta.tsx');
