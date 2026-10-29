@@ -3800,7 +3800,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('E valores ocultos ao pagar em parte: o aviso do que fica e o resumo do pagamento aparecem como "R$ ••••"', (await body()).includes('Ficaram R$ •••• para a fatura de novembro.') && (await body()).includes('O pagamento de R$ •••• entra em Pago de outubro, saindo da conta Conta principal.'));
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado.'); await waitInvoice('Paga em parte');
   await hiddenShows('fatura paga em parte');
-  ok('E valores ocultos depois de pagar: "Pagamento registrado. R$ •••• em Pago de outubro." e "Pago R$ •••• em 07/10/2026"', (await body()).includes('Pagamento registrado. R$ •••• em Pago de outubro.') && (await body()).includes('Pago R$ •••• em 07/10/2026'));
+  ok('E valores ocultos depois de pagar: "Pagamento registrado. R$ •••• em Pago de outubro." e "Pago R$ •••• em 07/10"', (await body()).includes('Pagamento registrado. R$ •••• em Pago de outubro.') && (await body()).includes('Pago R$ •••• em 07/10'));
   await goTab('Resumo'); await waitText('Diferença do mês');
   await btn('Anotar gasto').click(); await waitText('Será salvo em'); await radio('Cartão de crédito').click(); await field('Descrição').fill('Livro'); await field('Valor em reais').fill('90'); await field('Em quantas vezes?').fill('3'); await p.waitForTimeout(500);
   await hiddenShows('Anotar compra no cartão');
@@ -12265,7 +12265,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // ---- 9. Fatura da demonstração que vence em 10/01/2027 (domingo): o aviso no detalhe da fatura ----
   await duTab('Resumo'); await duOpenList();
-  await p.getByRole('button', { name: /^Fatura Cartão Exemplo, vence segunda, 11\/01 \(próximo dia útil\)/ }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await waitText('Fatura de janeiro de 2027'); await p.waitForTimeout(700);
+  await p.getByRole('button', { name: /^Fatura Cartão Exemplo, vence segunda, 11\/01\/2027 \(próximo dia útil\)/ }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await waitText('Fatura de janeiro de 2027'); await p.waitForTimeout(700);
   t = await body();
   ok('Dia útil, detalhe da fatura (vence em 10/01/2027, domingo): "Fecha em 03/01 · Vence segunda, 11/01/2027 (próximo dia útil)", "Vence no domingo, 10/01/2027, que não é dia útil. O próximo dia útil é segunda, 11/01/2027. Só depois desse dia ela passa a vencida." e a frase neutra',
     t.includes(DU_NOTICE_FATURA) && t.includes(DU_ADVICE) && t.includes('Fecha em 03/01/2027 · Vence segunda, 11/01/2027 (próximo dia útil)') && !t.includes('Vence em 10/01'), t.slice(0, 900));
