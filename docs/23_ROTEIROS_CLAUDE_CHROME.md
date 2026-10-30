@@ -190,6 +190,48 @@ Relatório: região e situação do domínio no Resend, os registros criados na 
 
 **Depois, a pessoa:** cria uma conta de teste no app com um e-mail próprio e confere que o e-mail de confirmação chega de "Clarevo <nao-responda@clarevo.app.br>", fora do spam, e que o link abre o app. Em seguida, a equipe atualiza a política de privacidade (provedor de e-mail escolhido: Resend, P-008), `docs/05`, `docs/07` e `docs/16`.
 
+## 5d. Mudar o banco para São Paulo e para o plano Pro (D-075, 30/10/2026)
+
+O projeto atual do Supabase ("enzofishvelasquez-creator's Project", na organização "Clarevo by Enzo Velasquez") está na região us-east-1, nos Estados Unidos, e no plano gratuito, que pausa o projeto depois de dias sem uso. O Supabase não muda a região de um projeto: a mudança é criar um projeto novo em São Paulo, aplicar as 19 migrações, repetir a configuração de login, trocar o endereço do banco no app e só então desligar o projeto antigo. Ainda não há uso real, então os dados não são copiados: quem testou cria a conta de novo. A organização "bios-producao" é de outro produto e não entra em nenhuma fase.
+
+Regras para o Claude Chrome em todas as fases: não criar, ler nem copiar senhas, chaves de API, tokens ou strings de conexão (a pessoa faz isso); não mexer em Billing nem em planos; não tocar na organização "bios-producao"; no SQL Editor, colar com Ctrl+V (digitar fecha aspas sozinho); parar e relatar a qualquer erro.
+
+**Fase 1 (Claude Chrome, só leitura, no projeto atual).** Rodar no SQL Editor e relatar os números:
+
+```sql
+select (select count(*) from auth.users) as pessoas,
+       (select count(*) from public.financial_records) as registros,
+       (select count(*) from public.organizations) as empresas,
+       (select count(*) from public.licenses) as licencas;
+```
+
+```sql
+select (select count(*) from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE') as tabelas,
+       (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity) as tabelas_com_rls,
+       (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')
+           and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')) as funcoes_do_app,
+       (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
+           and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')) as funcoes_anon,
+       (not has_column_privilege('authenticated', 'public.financial_accounts', 'name', 'update')) as reforco_0019;
+```
+
+E, só lendo, anotar: em Authentication, URL Configuration, o Site URL e a lista inteira de Redirect URLs; em Sign In / Providers, o Email (Confirm email ligado ou não, tamanho e validade do código, tamanho mínimo e exigências da senha); em Emails, SMTP Settings, só o servidor, a porta, o usuário, o e-mail e o nome do remetente (o campo de senha não); em Emails, Templates, o assunto e o texto de cada modelo que não estiver no padrão do Supabase; em Rate Limits, os valores. Num banco local com as 19 migrações, a segunda consulta devolve 27, 27, 83, 0 e verdadeiro; o projeto novo precisa dar os mesmos números do atual.
+
+**Fase 2 (a pessoa, cerca de 5 minutos).** Na organização "Clarevo by Enzo Velasquez", New project: nome `clarevo-producao`, região South America (São Paulo), senha do banco gerada pelo próprio painel e guardada no gerenciador de senhas (ninguém mais vê). Não ligar o projeto novo ao GitHub.
+
+**Fase 3 (Claude Chrome, no projeto novo).** No SQL Editor, uma consulta nova para cada arquivo, na ordem: abrir o arquivo em `https://github.com/enzofishvelasquez-creator/clarevo/blob/main/supabase/migrations/<arquivo>`, clicar em "Copy raw file", colar e clicar em Run (aviso de operação destrutiva: confirmar só isso). Cada um termina em "Success". Os 19 arquivos: `20261007000001_fundacao.sql`, `20261007000002_contas_a_pagar.sql`, `20261008000001_gastos_fixos.sql`, `20261008000002_contas_do_ano.sql`, `20261009000001_retorno.sql`, `20261009000002_renda_comprometida.sql`, `20261009000003_metas.sql`, `20261010000001_cartoes.sql`, `20261010000002_orcamento.sql`, `20261010000003_contas.sql`, `20261011000001_assinaturas.sql`, `20261011000002_importar.sql`, `20261016000001_familia.sql`, `20261017000001_empresas.sql`, `20261018000001_exclusao.sql`, `20261019000001_mes_conferido.sql`, `20261021000001_verificador.sql`, `20261024000001_como_conheceu.sql` e `20261029000001_reforcos.sql`. Depois, rodar `notify pgrst, 'reload schema';` e a segunda consulta da fase 1: os números precisam ser os mesmos do projeto atual.
+
+**Fase 4 (Claude Chrome, no projeto novo).** Repetir em Authentication tudo o que a fase 1 anotou: Site URL, Redirect URLs, Email, senha, SMTP (servidor, porta, usuário, e-mail e nome do remetente, sem a senha), os modelos de e-mail e os Rate Limits.
+
+**Fase 5 (a pessoa).** No Resend, criar uma chave de API nova só de envio para o domínio clarevo.app.br e colar no campo de senha do SMTP do projeto novo. Na Cloudflare, no projeto `clarevo` do Pages (o app), em Settings, Variables and Secrets, trocar `EXPO_PUBLIC_SUPABASE_URL` pela Project URL do projeto novo e `EXPO_PUBLIC_SUPABASE_KEY` pela chave pública (publishable) dele, e publicar de novo (Deployments, Retry deployment). Se o app de celular já tiver build no EAS, trocar as mesmas duas variáveis lá (docs/16).
+
+**Fase 6 (a pessoa e o Claude Chrome).** Em app.clarevo.app.br, criar a conta, confirmar pelo e-mail que chega de nao-responda@clarevo.app.br e entrar. No projeto novo, `select count(*) from auth.users;` deve dar 1.
+
+**Fase 7 (a pessoa).** Pausar o projeto antigo (Settings, General, Pause project). Uma semana depois, sem problema, excluir. Com o antigo fora, passar a organização "Clarevo by Enzo Velasquez" para o plano Pro (Billing; cerca de US$ 25 por mês, inclui o crédito de uma instância pequena) e ligar a proteção contra senhas vazadas (Authentication, Password, no Pro). A política de privacidade, docs/05 e a resposta 7 da reunião com o RH voltam a dizer São Paulo depois da fase 6.
+
 ## 6. Conta PJ (a própria pessoa abre)
 
 Abertura de conta é feita pela representante no app do banco escolhido (sugestão em D-064: Inter Empresas; alternativa C6 Empresas), com os documentos da empresa e dela. Conferir antes: se o banco aceita empresa do Inova Simples, se o cartão aceita compra internacional (Apple e Google cobram em dólar) e quantos boletos grátis por mês.
