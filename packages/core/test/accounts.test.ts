@@ -595,14 +595,14 @@ describe('MemoryRepository: contas de origem (D-043)', () => {
     expect(principal).toBeTruthy();
   });
 
-  it('renameAccount (app publicado antes da 0010): soma 1 à versão e recusa nome repetido', async () => {
+  it('renomear é só por updateAccount: a renomeação direta do app publicado antes da 0010 saiu (migração 0019)', async () => {
     const { repo, ctx, principal } = await setup();
     await repo.createAccount(key(), ctx, { name: 'Carteira', kind: 'dinheiro' });
-    await repo.renameAccount(principal, 'Conta corrente');
-    expect((await repo.getSpace())!.accounts[0]).toMatchObject({ name: 'Conta corrente', version: 2 });
-    await expectCode(repo.renameAccount(principal, 'carteira'), 'nome_da_conta_repetido');
-    await expectCode(repo.renameAccount(principal, ' '), 'nome_da_conta_invalido');
-    await expectCode(repo.renameAccount('nao-existe', 'X'), 'nao_encontrado');
+    expect('renameAccount' in repo).toBe(false);
+    const acc = (await repo.getSpace())!.accounts[0]!;
+    await repo.updateAccount(key(), principal, acc.version, { name: 'Conta corrente', kind: acc.kind });
+    expect((await repo.getSpace())!.accounts[0]).toMatchObject({ name: 'Conta corrente', version: acc.version + 1 });
+    await expectCode(repo.updateAccount(key(), principal, acc.version + 1, { name: 'carteira', kind: acc.kind }), 'nome_da_conta_repetido');
   });
 });
 

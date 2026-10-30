@@ -230,11 +230,6 @@ export interface RecordsRepository {
   getSpace(): Promise<PersonalSpace | null>;
   /** Cria (uma única vez) contexto pessoal e primeira conta. Idempotente. O fuso vem do aparelho. */
   ensurePersonalSpace(accountName: string, timeZone?: string): Promise<PersonalSpace>;
-  /**
-   * Renomeia a conta direto (o app publicado antes da 0010; o banco soma 1 à versão). Em tela nova, use updateAccount. Nome fora de
-   * 1 a 40 caracteres: nome_da_conta_invalido; nome de outra conta: nome_da_conta_repetido.
-   */
-  renameAccount(accountId: string, name: string): Promise<void>;
 
   // Contas de origem do dinheiro (D-043, Ciclo G1). Regras e textos em accounts.ts, iguais aos da migração 0010.
   // PersonalSpace.accounts traz só as contas ativas, a principal primeiro (os seletores "Saiu de" e "Entrou em").

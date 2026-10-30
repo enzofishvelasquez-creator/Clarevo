@@ -247,7 +247,8 @@ export interface OverflowBar {
  */
 export function overflowBar(usedCents: Cents, limitCents: Cents): OverflowBar {
   if (limitCents <= 0) return { overCents: Math.max(0, usedCents), solidTenths: 0, stripedTenths: usedCents > 0 ? 1000 : 0 };
-  if (usedCents <= limitCents) return { overCents: 0, solidTenths: Math.min(1000, percentTenths(usedCents, limitCents)), stripedTenths: 0 };
+  // Cheia só quando o usado é igual ao limite: 99,96% fica em 999, como o texto (99,9%).
+  if (usedCents <= limitCents) return { overCents: 0, solidTenths: Math.min(usedCents < limitCents ? 999 : 1000, percentTenths(usedCents, limitCents)), stripedTenths: 0 };
   const overCents = usedCents - limitCents;
   const stripedTenths = Math.min(1000, Math.max(OVERFLOW_MIN_TENTHS, percentTenths(overCents, limitCents)));
   return { overCents, solidTenths: 1000 - stripedTenths, stripedTenths };
@@ -345,7 +346,9 @@ const balanceOf = (b: number, used: number) =>
 
 export function budgetRow(line: MonthBudgetLine & { budgetId: string; budgetVersion: number; budgetFrom: IsoMonth; budgetCents: Cents }): BudgetRow {
   const { category, budgetCents: b, usedCents: used } = line;
-  const tenths = percentTenths(used, b);
+  // 100,0% só quando o usado é igual ao orçado: 99,96% aparece como 99,9% (ainda faltam centavos) e 100,04% como 100,1% (passou).
+  const rounded = percentTenths(used, b);
+  const tenths = used < b ? Math.min(rounded, 999) : used > b ? Math.max(rounded, 1001) : rounded;
   const percentText = formatPermille(tenths, used);
   const balanceLine = balanceOf(b, used);
   const amountLine = BUDGET_TEXT.amounts(used, b);

@@ -1406,17 +1406,6 @@ export class SupabaseRepository implements RecordsRepository {
     return space;
   }
 
-  /** A renomeação direta (update (name)) que o app publicado antes da 0010 faz; o app novo usa updateAccount. */
-  async renameAccount(accountId: string, name: string) {
-    const { error, count } = await this.db.from('financial_accounts').update({ name: name.trim() }, { count: 'exact' }).eq('id', accountId);
-    if (error) {
-      if (error.code === '23514') throw new RepoError('nome_da_conta_invalido');
-      if (error.code === '23505') throw new RepoError('nome_da_conta_repetido');
-      throw repoError(error);
-    }
-    if (count === 0) throw new RepoError('nao_encontrado');
-  }
-
   // -------------------------------------------------------------------------
   // Contas de origem do dinheiro (D-043): as cinco funções da migração 0010
   // -------------------------------------------------------------------------

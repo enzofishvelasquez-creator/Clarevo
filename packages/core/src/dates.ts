@@ -38,6 +38,14 @@ export function formatDayMonth(iso: IsoDate): string {
   return `${d}/${m}`;
 }
 
+/**
+ * Data das listas de contas e faturas: "15/10" no ano de hoje e "15/01/2027" em outro ano. O ano só aparece quando muda, para
+ * "Vence em", "Venceu em" e "Paga em" seguirem um só formato em Contas a pagar, nas faturas e em Seus últimos meses.
+ */
+export function formatListDate(iso: IsoDate, today: IsoDate): string {
+  return iso.slice(0, 4) === today.slice(0, 4) ? formatDayMonth(iso) : formatDateBR(iso);
+}
+
 /** "2026-10-07" → "7 out". */
 export function formatShortDate(iso: IsoDate): string {
   const [, m, d] = iso.split('-');

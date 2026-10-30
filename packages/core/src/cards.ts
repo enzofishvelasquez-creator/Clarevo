@@ -6,6 +6,7 @@ import {
   dateInMonth,
   formatDateBR,
   formatDayMonth,
+  formatListDate,
   formatMonthName,
   isValidIsoDate,
   isValidIsoMonth,
@@ -1139,7 +1140,7 @@ export const CARD_STATUS_LABEL: Readonly<Record<CardStatus, string>> = { ativo: 
 /** "Fecha hoje", "Fechou em 03/10" ou "Fecha em 03/11". */
 export function closesText(closingOn: IsoDate, today: IsoDate): string {
   if (closingOn === today) return 'Fecha hoje';
-  return closingOn < today ? `Fechou em ${formatDayMonth(closingOn)}` : `Fecha em ${formatDayMonth(closingOn)}`;
+  return closingOn < today ? `Fechou em ${formatListDate(closingOn, today)}` : `Fecha em ${formatListDate(closingOn, today)}`;
 }
 
 /**
@@ -1150,7 +1151,7 @@ export function dueTextOf(dueOn: IsoDate, today: IsoDate): string {
   const grace = nextBusinessDayDueText(dueOn, 'fatura', today);
   if (grace) return grace;
   if (dueOn === today) return 'Vence hoje';
-  return dueOn < today ? `Venceu em ${formatDayMonth(dueOn)}` : `Vence em ${formatDayMonth(dueOn)}`;
+  return dueOn < today ? `Venceu em ${formatListDate(dueOn, today)}` : `Vence em ${formatListDate(dueOn, today)}`;
 }
 
 /** "Limite usado: R$ 2.300,00 de R$ 5.000,00" ou, sem limite, "Limite usado: R$ 2.300,00". */
@@ -1218,7 +1219,7 @@ export function invoiceTexts(invoice: Invoice, today: IsoDate): InvoiceTexts {
   const total = formatBRL(invoice.totalCents);
   const closes = closesText(invoice.closingOn, today);
   const due = dueTextOf(invoice.dueOn, today);
-  const paid = invoice.paidCents !== null && invoice.paidOn ? `Pago ${formatBRL(invoice.paidCents)} em ${formatDateBR(invoice.paidOn)}` : null;
+  const paid = invoice.paidCents !== null && invoice.paidOn ? `Pago ${formatBRL(invoice.paidCents)} em ${formatListDate(invoice.paidOn, today)}` : null;
   return {
     title,
     situation,

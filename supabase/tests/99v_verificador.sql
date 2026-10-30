@@ -163,6 +163,14 @@ begin
   get diagnostics v = row_count;
   return v;
 end $$;
+-- O comando foi recusado pelo privilégio (permission denied), antes da RLS.
+create function pg_temp.denied(p_sql text) returns boolean language plpgsql as $$
+begin
+  execute p_sql;
+  return false;
+exception when insufficient_privilege then
+  return true;
+end $$;
 
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
   (:ana,   'ana@exemplo.test',   now(), '{"display_name":"Ana"}'),
@@ -261,10 +269,10 @@ begin
   assert pg_temp.n('select count(*) from public.context_memberships') = 3, 'Ana: o vínculo do Pessoal e os 2 da Família';
   assert pg_temp.n(format('select count(*) from public.context_memberships where context_id = %L', fam)) = 2, 'Ana lê os vínculos da Família';
   assert pg_temp.n(format('select count(*) from public.context_memberships where context_id = %L', pg_temp.id('bruno_ctx'))) = 0, 'Ana não lê o vínculo do Pessoal do Bruno';
-  -- accounts_rename: titular edita a conta do Bruno e a própria; não vê conta de fora.
-  assert pg_temp.changed(format('update public.financial_accounts set name = %L where id = %L', 'Casa da Ana', pg_temp.id('fam_conta_ana'))) = 1, 'Ana renomeia a própria conta da Família';
-  assert pg_temp.changed(format('update public.financial_accounts set name = %L where id = %L', 'Conta do Bruno 2', pg_temp.id('fam_conta_bruno'))) = 1, 'Ana (editar o que outras pessoas anotaram) renomeia a conta do Bruno';
-  assert pg_temp.changed(format('update public.financial_accounts set name = %L where id = %L', 'Intrusa', pg_temp.id('davi_conta'))) = 0, 'Ana não renomeia a conta do Davi';
+  -- accounts_rename: desde a 0019, sem o privilégio de update (name), ninguém renomeia direto (contas de origem só pelas funções).
+  assert pg_temp.denied(format('update public.financial_accounts set name = %L where id = %L', 'Casa da Ana', pg_temp.id('fam_conta_ana'))), 'Ana não renomeia direto a própria conta da Família';
+  assert pg_temp.denied(format('update public.financial_accounts set name = %L where id = %L', 'Conta do Bruno 2', pg_temp.id('fam_conta_bruno'))), 'nem a conta do Bruno';
+  assert pg_temp.denied(format('update public.financial_accounts set name = %L where id = %L', 'Intrusa', pg_temp.id('davi_conta'))), 'nem a conta do Davi';
   -- licenses_own_read e entitlements_own_read: só a própria.
   assert pg_temp.n('select count(*) from public.licenses') = 1 and pg_temp.n(format('select count(*) from public.licenses where id = %L', pg_temp.id('lic_ana'))) = 1,
     'Ana lê só a própria licença';
@@ -295,8 +303,8 @@ begin
   assert pg_temp.changed(format('update public.persons set locale = %L where id = %L', 'en-US', ana)) = 0, 'Bruno não muda a pessoa da Ana';
   assert pg_temp.n('select count(*) from public.context_memberships') = 3, 'Bruno: o vínculo do Pessoal e os 2 da Família';
   assert pg_temp.n(format('select count(*) from public.context_memberships where context_id = %L', pg_temp.id('ana_ctx'))) = 0, 'Bruno não lê o vínculo do Pessoal da Ana';
-  assert pg_temp.changed(format('update public.financial_accounts set name = %L where id = %L', 'Conta do Bruno 3', pg_temp.id('fam_conta_bruno'))) = 1, 'Bruno renomeia a própria conta da Família';
-  assert pg_temp.changed(format('update public.financial_accounts set name = %L where id = %L', 'Casa do Bruno', pg_temp.id('fam_conta_ana'))) = 0, 'Bruno não renomeia a conta da Ana (não pode editar o que outras pessoas anotaram)';
+  assert pg_temp.denied(format('update public.financial_accounts set name = %L where id = %L', 'Conta do Bruno 3', pg_temp.id('fam_conta_bruno'))), 'Bruno não renomeia direto a própria conta (0019)';
+  assert pg_temp.denied(format('update public.financial_accounts set name = %L where id = %L', 'Casa do Bruno', pg_temp.id('fam_conta_ana'))), 'nem a conta da Ana';
   assert pg_temp.n('select count(*) from public.licenses') = 1 and pg_temp.n(format('select count(*) from public.licenses where id = %L', pg_temp.id('lic_bruno'))) = 1, 'Bruno lê só a própria licença';
   assert pg_temp.n('select count(*) from public.plan_entitlements') = 1 and pg_temp.n(format('select count(*) from public.plan_entitlements where person_id = %L', bruno)) = 1, 'Bruno lê só o próprio direito ao plano';
   assert pg_temp.n('select count(*) from public.record_operations') = 2 and pg_temp.n(format('select count(*) from public.record_operations where actor_id <> %L', bruno)) = 0, 'Bruno lê só as próprias 2 operações';
@@ -315,8 +323,8 @@ begin
   assert pg_temp.n('select count(*) from public.persons') = 1 and pg_temp.n(format('select count(*) from public.persons where id = %L', davi)) = 1, 'Davi lê só a própria pessoa';
   assert pg_temp.changed(format('update public.persons set display_name = %L where id = %L', 'Intruso', ana)) = 0, 'Davi não muda a pessoa da Ana';
   assert pg_temp.n('select count(*) from public.context_memberships') = 1, 'Davi lê só o próprio vínculo';
-  assert pg_temp.changed(format('update public.financial_accounts set name = %L where id in (%L, %L)', 'Intrusa', pg_temp.id('fam_conta_ana'), pg_temp.id('fam_conta_bruno'))) = 0,
-    'Davi não renomeia conta da Família';
+  assert pg_temp.denied(format('update public.financial_accounts set name = %L where id in (%L, %L)', 'Intrusa', pg_temp.id('fam_conta_ana'), pg_temp.id('fam_conta_bruno'))),
+    'Davi não renomeia conta da Família (sem o privilégio, desde a 0019)';
   assert pg_temp.n('select count(*) from public.licenses') = 0 and pg_temp.n('select count(*) from public.plan_entitlements') = 0, 'Davi não lê licença nem direito ao plano';
   assert pg_temp.n('select count(*) from public.record_operations') = 0 and pg_temp.n('select count(*) from public.context_activity') = 0, 'Davi não lê operações nem atividade';
   assert pg_temp.n('select count(*) from public.return_reviews') = 0 and pg_temp.n('select count(*) from public.savings_checks') = 0, 'Davi não lê respostas de ninguém';
@@ -340,7 +348,7 @@ begin
     'Bruno sem o vínculo não lê a resposta de últimos meses da Família';
   assert pg_temp.n(format('select count(*) from public.savings_checks where context_id = %L', fam)) = 0 and pg_temp.n('select count(*) from public.savings_checks') = 1,
     'Bruno sem o vínculo não lê a resposta do plano de guardar da Família';
-  assert pg_temp.changed(format('update public.financial_accounts set name = %L where id = %L', 'Conta do Bruno 4', pg_temp.id('fam_conta_bruno'))) = 0,
+  assert pg_temp.denied(format('update public.financial_accounts set name = %L where id = %L', 'Conta do Bruno 4', pg_temp.id('fam_conta_bruno'))),
     'Bruno sem o vínculo não renomeia nem a própria conta da Família';
   -- O que é só dele continua (a própria operação é lida mesmo sem o vínculo: operations_read_own não depende do contexto).
   assert pg_temp.n('select count(*) from public.record_operations') = 2, 'Bruno ainda lê as próprias operações';

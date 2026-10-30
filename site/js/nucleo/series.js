@@ -1,5 +1,5 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/series.ts. Não edite: rode "node scripts/gerar-site.js".
-import { addMonths, dateInMonth, formatDateBR, formatDayMonth, formatMonthName, formatMonthSpanBR, formatMonthYearBR, monthOf, monthsBetween, } from './dates.js';
+import { addMonths, dateInMonth, formatDateBR, formatDayMonth, formatListDate, formatMonthName, formatMonthSpanBR, formatMonthYearBR, monthOf, monthsBetween, } from './dates.js';
 import { dueKindOfSeries, effectiveOverdue, nextBusinessDayWhen } from './dia-util.js';
 import { formatBRL, roundDiv } from './money.js';
 import { ANNUAL_LEAD_MONTHS, PARTS_PER_YEAR_MAX } from './records.js';
@@ -790,7 +790,7 @@ export function seriesPreview(input, today) {
     };
 }
 function whenDue(dueOn, today, withYear, kind) {
-    const date = withYear ? formatDateBR(dueOn) : formatDayMonth(dueOn);
+    const date = withYear ? formatListDate(dueOn, today) : formatDayMonth(dueOn);
     if (effectiveOverdue(dueOn, kind, today))
         return `venceu em ${date}`;
     if (dueOn < today) {

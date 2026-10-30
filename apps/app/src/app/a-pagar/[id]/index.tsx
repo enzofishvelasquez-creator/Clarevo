@@ -17,6 +17,7 @@ import {
   firstMonthBounds,
   formatBRL,
   formatDateBR,
+  formatListDate,
   formatDateTimeBR,
   formatMonthBR,
   formatMonthName,
@@ -579,7 +580,7 @@ export default function DetalheContaAPagar() {
                 onCancel={() => setConfirming(null)}
                 onConfirm={doDelete}>
                 <MoneyTxt style={{ fontFamily: fonts.bold }}>
-                  {`${c.description} · ${formatBRL(c.amountCents)} · vence em ${formatDateBR(c.dueOn)} · Pessoal`}
+                  {`${c.description} · ${formatBRL(c.amountCents)} · vence em ${formatListDate(c.dueOn, today)} · Pessoal`}
                 </MoneyTxt>
                 {ref ? (
                   <Txt color={colors.textSecondary}>

@@ -1,5 +1,5 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/dia-util.ts. Não edite: rode "node scripts/gerar-site.js".
-import { addDays, formatDateBR, formatDayMonth, isValidIsoDate } from './dates.js';
+import { addDays, formatDateBR, formatDayMonth, formatListDate, isValidIsoDate } from './dates.js';
 const PLANALTO = 'Presidência da República';
 export const NATIONAL_HOLIDAYS_CONSULTED_ON = '2026-10-19';
 export const NATIONAL_HOLIDAYS_REVIEWED_ON = '2026-10-19';
@@ -161,7 +161,7 @@ export function nextBusinessDayWhen(dueOn, kind, today) {
     const last = nextBusinessDay(dueOn);
     if (last < today)
         return null;
-    const when = last === today ? 'hoje' : `${weekdayName(last)}, ${formatDayMonth(last)}`;
+    const when = last === today ? 'hoje' : `${weekdayName(last)}, ${formatListDate(last, today)}`;
     return { lastOnTime: last, when: `${when} ${DUE_DAY_TEXT.nextBusinessDayTag}` };
 }
 export function nextBusinessDayDueText(dueOn, kind, today) {

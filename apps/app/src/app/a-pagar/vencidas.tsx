@@ -7,6 +7,7 @@ import {
   annualYearErrorText,
   formatBRL,
   formatDateBR,
+  formatListDate,
   formatMonthBR,
   formatMonthName,
   annualYearLabelOf,
@@ -586,7 +587,7 @@ export default function ContasVencidas() {
           onCancel={() => setPending(null)}
           onConfirm={() => doRemove(target)}>
           <MoneyTxt style={{ fontFamily: fonts.bold }}>
-            {`${target.description} · ${formatBRL(target.amountCents)} · venceu em ${formatDateBR(target.dueOn)}`}
+            {`${target.description} · ${formatBRL(target.amountCents)} · venceu em ${formatListDate(target.dueOn, today)}`}
           </MoneyTxt>
           <Txt color={colors.textSecondary}>
             {target.series ? 'Ela sai de Contas a pagar e não volta a ser criada.' : 'Ela sai de Contas a pagar.'}
@@ -618,9 +619,10 @@ export default function ContasVencidas() {
 /** Descrição, "Venceu em 12/02/2027" e o valor. Valor fixo: caixa de seleção para o lote; estimado: "≈ R$ 180,00 · estimado". */
 function OverdueInfo({ commitment: c, checked, onToggle }: { commitment: Commitment; checked: boolean; onToggle: () => void }) {
   const hidden = useValuesHidden();
-  // Conta do ano: a parcela e o ano junto do vencimento ("Venceu em 10/02/2027 · Parcela 1 de 10 de 2027").
+  const { today } = useSession();
+  // Conta do ano: a parcela e o ano junto do vencimento ("Venceu em 10/02 · Parcela 1 de 10 de 2027"); a data leva o ano só quando muda.
   const yearPart = c.series?.kind === 'anual' ? ` · ${occurrenceLabel(c)}` : '';
-  const due = `Venceu em ${formatDateBR(c.dueOn)}${yearPart}`;
+  const due = `Venceu em ${formatListDate(c.dueOn, today)}${yearPart}`;
   // Fatura de cartão (D-037): sem caixa de seleção; o pagamento é na própria fatura.
   if (c.invoice) {
     return (

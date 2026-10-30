@@ -276,9 +276,9 @@ declare
 begin
   assert exists (select 1 from pg_roles where rolname = 'service_role' and rolbypassrls and not rolinherit and not rolcanlogin),
     'o papel service_role existe, como no Supabase (sem login, sem herança, ignora a RLS)';
-  -- O teste vale: service_role executa as funções comuns (privilégio padrão), então só as da equipe foram tiradas dele.
-  assert has_function_privilege('service_role', 'public.clarevo_normalize_email(text)', 'execute')
-     and has_function_privilege('service_role', 'public.month_totals(uuid, date)', 'execute'), 'service_role mantém o execute padrão nas outras funções';
+  -- O teste vale: service_role executa as funções do app (privilégio padrão); desde a 0019, nenhuma interna clarevo_* (99w_reforcos.sql).
+  assert has_function_privilege('service_role', 'public.month_totals(uuid, date)', 'execute'), 'service_role mantém o execute padrão nas funções do app';
+  assert not has_function_privilege('service_role', 'public.clarevo_normalize_email(text)', 'execute'), 'e nenhuma interna clarevo_* (0019)';
   foreach f in array array['clarevo_staff_create_organization(text, integer, text, date, date, text)', 'clarevo_staff_add_org_admin(uuid, text)',
                            'clarevo_staff_update_contract(uuid, integer, date)', 'clarevo_staff_find_admin(text)'] loop
     assert not has_function_privilege('authenticated', 'public.' || f, 'execute') and not has_function_privilege('anon', 'public.' || f, 'execute'),

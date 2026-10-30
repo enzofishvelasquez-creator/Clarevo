@@ -27,6 +27,9 @@ export function formatDayMonth(iso) {
     const [, m, d] = iso.split('-');
     return `${d}/${m}`;
 }
+export function formatListDate(iso, today) {
+    return iso.slice(0, 4) === today.slice(0, 4) ? formatDayMonth(iso) : formatDateBR(iso);
+}
 export function formatShortDate(iso) {
     const [, m, d] = iso.split('-');
     return `${Number(d)} ${(MONTHS[Number(m) - 1] ?? '').slice(0, 3)}`;

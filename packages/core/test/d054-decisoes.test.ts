@@ -501,3 +501,13 @@ describe('"Neste mês" em Metas: o mesmo card de Aprender (D-054, P-028)', () =>
     expect(metas).not.toMatch(/Notification|AsyncStorage|localStorage/);
   });
 });
+
+describe('orçamento: 100,0% só quando o usado é igual ao orçado', () => {
+  const row = (usedCents: number) => budgetRow({ category: 'Mercado', budgetId: 'b', budgetVersion: 1, budgetFrom: '2026-10', budgetCents: 100_000, usedCents });
+  it('99,96% aparece como 99,9% e a barra não fica cheia; 100,04% aparece como 100,1%', () => {
+    expect([row(99_960).percentText, row(99_960).barTenths, row(99_960).solidTenths, row(99_960).balanceLine]).toEqual(['99,9%', 999, 999, 'Faltam R$ 0,40']);
+    expect([row(100_000).percentText, row(100_000).barTenths, row(100_000).solidTenths]).toEqual(['100,0%', 1000, 1000]);
+    expect(row(100_040).percentText).toBe('100,1%');
+    expect(row(50_000).percentText).toBe('50,0%');
+  });
+});

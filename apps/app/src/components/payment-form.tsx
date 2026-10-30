@@ -14,6 +14,7 @@ import {
   fieldForErrorCode,
   formatBRL,
   formatDateBR,
+  formatListDate,
   formatMonthBR,
   isCommitmentOverdue,
   isRepoError,
@@ -454,7 +455,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
               {COMMITMENT_ERROR_TEXT.versao_desatualizada}
             </Txt>
             <MoneyTxt variant="caption">
-              {`Versão atual: ${shown.description} · previsto ${formatBRL(shown.amountCents)} · vence em ${formatDateBR(shown.dueOn)}`}
+              {`Versão atual: ${shown.description} · previsto ${formatBRL(shown.amountCents)} · vence em ${formatListDate(shown.dueOn, today)}`}
             </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
             <Button label="Confirmar pagamento na versão atual" tone="soft" onPress={() => submit()} />
@@ -474,7 +475,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
             {shown.description}
           </Txt>
           <MoneyTxt variant="caption" color={overdue ? colors.error : colors.textSecondary}>
-            {`${overdue ? `Venceu em ${formatDateBR(shown.dueOn)}` : (graceDue ?? `Vence em ${formatDateBR(shown.dueOn)}`)} · ${
+            {`${overdue ? `Venceu em ${formatListDate(shown.dueOn, today)}` : (graceDue ?? `Vence em ${formatListDate(shown.dueOn, today)}`)} · ${
               shown.amountIsEstimate ? `estimado ≈ ${keepTogether(formatBRL(shown.amountCents))}` : `previsto ${keepTogether(formatBRL(shown.amountCents))}`
             }`}
           </MoneyTxt>

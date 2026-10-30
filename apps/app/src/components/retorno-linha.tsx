@@ -21,6 +21,7 @@ import { yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { Banner, Button, LinkButton, spaceKeyPress, Txt } from '@/components/ui';
 import { openCommitment } from '@/lib/cards';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
+import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
 /** Linha resolvida troca o conteúdo em 240 ms e a altura em 280 ms (CL-V008), só depois da resposta do servidor. */
@@ -68,8 +69,9 @@ export function ReturnRow({
   last?: boolean;
 }) {
   const hidden = useValuesHidden();
+  const { today } = useSession();
   const short = rowShortName(row);
-  const text = reviewRowText(row);
+  const text = reviewRowText(row, today);
   // reviewRowText começa pela descrição: a descrição fica em negrito e o resto abaixo.
   const details = text.startsWith(`${row.description} · `) ? text.slice(row.description.length + 3) : text;
   const actions = rowActions(row);
@@ -89,7 +91,7 @@ export function ReturnRow({
             </Txt>
             <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
               {outcome.type === 'paga' && outcome.commitment.payment
-                ? RETURN_TEXT.resolvedPaid(outcome.commitment.payment.paidOn, outcome.commitment.payment.amountCents)
+                ? RETURN_TEXT.resolvedPaid(outcome.commitment.payment.paidOn, outcome.commitment.payment.amountCents, today)
                 : outcome.type === 'nao_houve'
                   ? RETURN_TEXT.resolvedNotHappened
                   : RETURN_TEXT.stillOpenDone}
@@ -124,7 +126,7 @@ export function ReturnRow({
                 </View>
               </Pressable>
             ) : null}
-            <View style={[{ flex: 1, minWidth: 0, gap: 2 }, !canSelect && selectable && styles.alignWithBox]} accessible accessibilityLabel={yearA11y(maskMoneyLabel(reviewRowA11yLabel(row), hidden))}>
+            <View style={[{ flex: 1, minWidth: 0, gap: 2 }, !canSelect && selectable && styles.alignWithBox]} accessible accessibilityLabel={yearA11y(maskMoneyLabel(reviewRowA11yLabel(row, today), hidden))}>
               <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
                 {row.description}
               </Txt>

@@ -3500,7 +3500,7 @@ describe('textos do aviso de dia útil (D-060) e do próximo dia útil (D-061)',
       const label = nextBusinessDayDueText(d, 'conta', addDays(d, -3));
       if (label) {
         labels.push(label);
-        expect(label, d).toMatch(/^Vence (segunda|terça|quarta|quinta|sexta), \d{2}\/\d{2} \(próximo dia útil\)$/);
+        expect(label, d).toMatch(/^Vence (segunda|terça|quarta|quinta|sexta), \d{2}\/\d{2}(\/\d{4})? \(próximo dia útil\)$/);
       }
     }
     expect(labels.length).toBeGreaterThan(550);

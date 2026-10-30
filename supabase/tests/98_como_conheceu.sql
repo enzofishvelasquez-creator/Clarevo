@@ -463,7 +463,7 @@ declare
   f constant text := 'clarevo_staff_signup_metrics(date, date)';
 begin
   assert exists (select 1 from pg_roles where rolname = 'service_role' and rolbypassrls and not rolinherit and not rolcanlogin), 'o papel service_role existe, como no Supabase';
-  assert has_function_privilege('service_role', 'public.clarevo_normalize_email(text)', 'execute'), 'o teste vale: service_role mantém o execute padrão nas outras funções';
+  assert has_function_privilege('service_role', 'public.month_totals(uuid, date)', 'execute'), 'o teste vale: service_role mantém o execute padrão nas funções do app';
   assert not has_function_privilege('authenticated', 'public.' || f, 'execute') and not has_function_privilege('anon', 'public.' || f, 'execute'),
     'sem execute para authenticated nem anon';
   assert not has_function_privilege('service_role', 'public.' || f, 'execute'), 'sem execute para service_role';

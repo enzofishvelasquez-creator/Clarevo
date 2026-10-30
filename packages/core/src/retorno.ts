@@ -5,6 +5,7 @@ import {
   daysBetween,
   formatDateBR,
   formatDayMonth,
+  formatListDate,
   formatMonthBR,
   formatMonthName,
   formatMonthSpanBR,
@@ -855,7 +856,7 @@ export const RETURN_TEXT = {
   notHappenedOpenConfirm: 'Tirar conta',
   stillOpenDone: 'Registrada em aberto. Ela continua em Contas a pagar.',
   /** Linha resolvida: "Paga em 05/07/2026 · R$ 2.500,00" */
-  resolvedPaid: (paidOn: IsoDate, amountCents: Cents) => `Paga em ${formatDateBR(paidOn)} · ${formatBRL(amountCents)}`,
+  resolvedPaid: (paidOn: IsoDate, amountCents: Cents, today: IsoDate) => `Paga em ${formatListDate(paidOn, today)} · ${formatBRL(amountCents)}`,
   resolvedNotHappened: 'Não houve',
   resolvedOpen: 'Registrada em aberto',
   undo: 'Desfazer',
@@ -1061,20 +1062,21 @@ export function reviewStepTitle(step: ReviewStep): string {
 }
 
 /**
- * Linha do passo: "Aluguel · R$ 2.500,00 · venceu em 05/06/2026 · em aberto", "Financiamento do carro · Parcela 10 de
- * 48 · R$ 850,00 · vencimento em 10/07/2026 · sem conta registrada" ou "Luz · cerca de R$ 180,00 (estimado) · …".
+ * Linha do passo: "Aluguel · R$ 2.500,00 · venceu em 05/06 · em aberto", "Financiamento do carro · Parcela 10 de 48 ·
+ * R$ 850,00 · vencimento em 10/07 · sem conta registrada" ou "Luz · cerca de R$ 180,00 (estimado) · …". A data leva o ano só
+ * quando é de outro ano que o de hoje (formatListDate), como em Contas a pagar.
  */
-export function reviewRowText(row: ReviewRow): string {
+export function reviewRowText(row: ReviewRow, today: IsoDate): string {
   const amount = `${money(row.amountCents, row.amountIsEstimate)}${row.amountIsEstimate ? ` (${RETURN_TEXT.stateEstimate})` : ''}`;
-  const when = row.state === 'aberta' ? `venceu em ${formatDateBR(row.dueOn)}` : `vencimento em ${formatDateBR(row.dueOn)}`;
+  const when = row.state === 'aberta' ? `venceu em ${formatListDate(row.dueOn, today)}` : `vencimento em ${formatListDate(row.dueOn, today)}`;
   const state = row.state === 'aberta' ? RETURN_TEXT.stateOpen : RETURN_TEXT.stateGap;
   return [row.description, row.label, amount, when, state].filter(Boolean).join(' · ');
 }
 
-/** Nome acessível completo: "Luz, cerca de R$ 180,00, valor estimado, vencimento em 12/07/2026, sem conta registrada". */
-export function reviewRowA11yLabel(row: ReviewRow): string {
+/** Nome acessível completo: "Luz, cerca de R$ 180,00, valor estimado, vencimento em 12/07, sem conta registrada". */
+export function reviewRowA11yLabel(row: ReviewRow, today: IsoDate): string {
   const label = row.label ? `${row.label.charAt(0).toLowerCase()}${row.label.slice(1)}` : null;
-  const when = row.state === 'aberta' ? `venceu em ${formatDateBR(row.dueOn)}` : `vencimento em ${formatDateBR(row.dueOn)}`;
+  const when = row.state === 'aberta' ? `venceu em ${formatListDate(row.dueOn, today)}` : `vencimento em ${formatListDate(row.dueOn, today)}`;
   const state = row.state === 'aberta' ? RETURN_TEXT.stateOpen : RETURN_TEXT.stateGap;
   return [row.description, label, money(row.amountCents, row.amountIsEstimate), row.amountIsEstimate ? 'valor estimado' : null, when, state]
     .filter(Boolean)
@@ -1202,7 +1204,7 @@ export function returnTextSamples(): string[] {
     T.notHappenedGapTitle('2026-07'),
     T.notHappenedGapBody('2026-07', 'Academia'),
     T.notHappenedOpenTitle('2026-06'),
-    T.resolvedPaid('2026-07-05', 250_000),
+    T.resolvedPaid('2026-07-05', 250_000, '2026-10-07'),
     T.announcePaid(rowShortName(carro)),
     T.announceNotHappened(rowShortName(luz)),
     T.announceStillOpen(rowShortName(luz)),
@@ -1240,11 +1242,11 @@ export function returnTextSamples(): string[] {
     T.nothingNoted('2026-06'),
     T.noReceiptsNoted('2026-08'),
     T.noExpensesNoted('2026-08'),
-    reviewRowText(luz),
-    reviewRowText(carro),
-    reviewRowText(iptu),
-    reviewRowA11yLabel(luz),
-    reviewRowA11yLabel(carro),
+    reviewRowText(luz, '2026-10-07'),
+    reviewRowText(carro, '2026-10-07'),
+    reviewRowText(iptu, '2026-10-07'),
+    reviewRowA11yLabel(luz, '2026-10-07'),
+    reviewRowA11yLabel(carro, '2026-10-07'),
     ...Object.values(notHappenedDialog(luz)),
     ...Object.values(notHappenedDialog(carro)),
     ...Object.values(notHappenedDialog(avulsa)),

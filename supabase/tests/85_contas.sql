@@ -953,17 +953,14 @@ begin
   perform pg_temp.expect_code(pg_temp.da('ct-f-0026', e, 2), 'sem_permissao', '42501');
   assert pg_temp.acc('fam_acc') = 'Conta da casa|banco|ativa|principal|1' and pg_temp.acc('fam_elisa') like 'Cartão de vale|outra|ativa|-|2',
     'a recusa não mudou nada';
-  -- Renomeação direta (update (name), do app publicado): só a própria conta (ou com "editar de outras pessoas"), como as funções.
-  update public.financial_accounts set name = 'Invasão da Elisa' where id = casa;
-  get diagnostics n = row_count;
-  assert n = 0, 'Elisa não renomeia direto a conta da Ada';
-  update public.financial_accounts set name = 'Vale da Elisa' where id = e;
-  get diagnostics n = row_count;
-  assert n = 1 and pg_temp.acc('fam_elisa') = 'Vale da Elisa|outra|ativa|-|3', 'a própria conta ela renomeia direto (versão +1)';
+  -- Sem renomeação direta (migração 0019): nem a conta dos outros nem a própria; renomear é só por update_account.
+  perform pg_temp.expect_error(format($f$update public.financial_accounts set name = 'Invasão da Elisa' where id = %L$f$, casa), 'permission denied%');
+  perform pg_temp.expect_error(format($f$update public.financial_accounts set name = 'Vale da Elisa' where id = %L$f$, e), 'permission denied%');
+  r := public.update_account('ct-f-0027', e, 2, 'Vale da Elisa', 'outra');
+  assert pg_temp.acc('fam_elisa') = 'Vale da Elisa|outra|ativa|-|3', 'a própria conta ela renomeia pela função (versão +1)';
   perform pg_temp.as_('fabio');
-  update public.financial_accounts set name = 'Cartão de vale' where id = e;
-  get diagnostics n = row_count;
-  assert n = 1 and pg_temp.acc('fam_elisa') = 'Cartão de vale|outra|ativa|-|4', 'Fábio renomeia direto a conta da Elisa';
+  r := public.update_account('ct-f-0028', e, 3, 'Cartão de vale', 'outra');
+  assert pg_temp.acc('fam_elisa') = 'Cartão de vale|outra|ativa|-|4', 'Fábio renomeia pela função a conta da Elisa';
   perform pg_temp.as_('elisa');
   -- Fábio (altera o que é dos outros): renomeia a da Elisa e a da Ada, torna a de Elisa principal e a arquiva depois.
   perform pg_temp.as_('fabio');
@@ -1017,18 +1014,11 @@ declare
   n int;
 begin
   perform pg_temp.as_('hugo');
-  -- A renomeação direta do app publicado (update (name)) continua valendo e a versão sobe (gatilho).
+  -- Sem renomeação direta (migração 0019): o update (name) do app publicado antes da 0010 saiu; contas de origem só pelas funções.
   v := pg_temp.accver('hugo_cart2');
-  update public.financial_accounts set name = 'Dinheiro' where id = hugo_cart;
-  get diagnostics n = row_count;
-  assert n = 1 and pg_temp.accver('hugo_cart2') = v + 1 and (select name from public.financial_accounts where id = hugo_cart) = 'Dinheiro',
-    'update (name) direto: renomeia e soma 1 à versão';
-  update public.financial_accounts set name = 'Carteira' where id = hugo_cart;
-  -- Nome repetido na renomeação direta: o índice único recusa.
-  perform pg_temp.expect_error(format($f$update public.financial_accounts set name = 'conta PRINCIPAL' where id = %L$f$, hugo_cart),
-    '%financial_accounts_name_live%');
-  perform pg_temp.expect_error(format($f$update public.financial_accounts set name = '' where id = %L$f$, hugo_cart), '%financial_accounts_name_check%');
-  -- Nenhuma outra coluna e nenhuma outra operação direta.
+  perform pg_temp.expect_error(format($f$update public.financial_accounts set name = 'Dinheiro' where id = %L$f$, hugo_cart), 'permission denied%');
+  assert pg_temp.accver('hugo_cart2') = v and (select name from public.financial_accounts where id = hugo_cart) = 'Carteira', 'a recusa não mudou nada';
+  -- Nenhuma coluna e nenhuma operação direta.
   perform pg_temp.expect_error(format($f$update public.financial_accounts set status = 'arquivada' where id = %L$f$, hugo_cart), 'permission denied%');
   perform pg_temp.expect_error(format($f$update public.financial_accounts set is_default = true where id = %L$f$, hugo_cart), 'permission denied%');
   perform pg_temp.expect_error(format($f$update public.financial_accounts set kind = 'banco' where id = %L$f$, hugo_cart), 'permission denied%');
@@ -1040,15 +1030,11 @@ begin
   perform pg_temp.expect_error($f$insert into public.financial_accounts (context_id, name, created_by) values (gen_random_uuid(), 'X', gen_random_uuid())$f$,
     'permission denied%');
   perform pg_temp.expect_error(format($f$delete from public.financial_accounts where id = %L$f$, hugo_cart), 'permission denied%');
-  -- RLS na renomeação direta: quem só lê ou não vê a conta não a renomeia.
+  -- Quem só lê ou não vê a conta também recebe a recusa do privilégio, antes da RLS.
   perform pg_temp.as_('davi');
-  update public.financial_accounts set name = 'Invasão' where id = pg_temp.id('fam_acc');
-  get diagnostics n = row_count;
-  assert n = 0, 'Davi (só leitura) não renomeia';
+  perform pg_temp.expect_error(format($f$update public.financial_accounts set name = 'Invasão' where id = %L$f$, pg_temp.id('fam_acc')), 'permission denied%');
   perform pg_temp.as_('gaia');
-  update public.financial_accounts set name = 'Invasão' where id = hugo_cart;
-  get diagnostics n = row_count;
-  assert n = 0, 'Gaia não renomeia a conta de Hugo';
+  perform pg_temp.expect_error(format($f$update public.financial_accounts set name = 'Invasão' where id = %L$f$, hugo_cart), 'permission denied%');
 end $$;
 reset role;
 
@@ -1277,13 +1263,13 @@ do $$ begin
   assert has_table_privilege('authenticated', 'public.financial_accounts', 'select')
      and not has_table_privilege('authenticated', 'public.financial_accounts', 'insert, delete, truncate')
      and not has_table_privilege('anon', 'public.financial_accounts', 'select')
-     and has_column_privilege('authenticated', 'public.financial_accounts', 'name', 'update')
+     and not has_column_privilege('authenticated', 'public.financial_accounts', 'name', 'update')
      and not has_column_privilege('authenticated', 'public.financial_accounts', 'status', 'update')
      and not has_column_privilege('authenticated', 'public.financial_accounts', 'kind', 'update')
      and not has_column_privilege('authenticated', 'public.financial_accounts', 'is_default', 'update')
      and not has_column_privilege('authenticated', 'public.financial_accounts', 'version', 'update')
      and not has_column_privilege('authenticated', 'public.financial_accounts', 'deleted_at', 'update'),
-    'leitura (filtrada pela RLS); a única escrita direta é update (name), do app publicado, até a publicação da 0010';
+    'leitura (filtrada pela RLS) e nenhuma escrita direta (o update (name) do app publicado antes da 0010 saiu na 0019)';
   assert (select relrowsecurity from pg_class where oid = 'public.financial_accounts'::regclass), 'RLS ligada';
   assert (select count(*) from pg_policies where tablename = 'financial_accounts') = 2
      and (select qual from pg_policies where tablename = 'financial_accounts' and policyname = 'accounts_read') like '%deleted_at IS NULL%'
@@ -1370,9 +1356,10 @@ begin
   set role authenticated;
   perform pg_temp.as_('ada');
   assert (select count(*) from public.financial_accounts where context_id = cx) = 2, 'as duas contas de X são lidas';
-  update public.financial_accounts set name = 'Banco' where id = a1;           -- renomeação direta do app publicado
-  get diagnostics n = row_count;
-  assert n = 1 and (select version from public.financial_accounts where id = a1) = 2, 'a renomeação direta funciona e soma 1 à versão';
+  -- A renomeação direta do app publicado saiu na 0019; a linha antiga se renomeia pela função, como qualquer outra.
+  perform pg_temp.expect_error(format($f$update public.financial_accounts set name = 'Banco' where id = %L$f$, a1), 'permission denied%');
+  r := public.update_account('ct-u-0000', a1, 1, 'Banco', 'banco');
+  assert (select version from public.financial_accounts where id = a1) = 2, 'update_account sobre a linha antiga soma 1 à versão';
   r := public.update_account('ct-u-0001', a1, 2, 'Banco do dia a dia', 'banco');
   assert r ->> 'name' = 'Banco do dia a dia' and (r ->> 'version')::int = 3, 'update_account sobre a linha antiga';
   r := public.update_account('ct-u-0002', a2, 1, 'Carteira', 'dinheiro');

@@ -311,6 +311,34 @@ export function filterLicenses<T extends Pick<License, 'status' | 'email' | 'id'
     .sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || a.email.localeCompare(b.email) || a.id.localeCompare(b.id));
 }
 
+/** Licenças por página na lista do painel: com centenas de convidados, a lista não vira uma rolagem sem fim. */
+export const LICENSE_PAGE_SIZE = 20;
+
+/** Busca por e-mail: o trecho digitado, sem diferença de maiúsculas nem os espaços das pontas; busca vazia mostra todas. */
+export function searchLicenses<T extends Pick<License, 'email'>>(licenses: readonly T[], query: string): T[] {
+  const q = normalizeEmail(query);
+  return q === '' ? licenses.slice() : licenses.filter((l) => l.email.toLowerCase().includes(q));
+}
+
+/** Uma página da lista: os itens, a página (de 1 a `pages`, ajustada se passar), e "21 a 40 de 230" (`from`, `to`, `total`). */
+export interface ListPage<T> {
+  items: T[];
+  page: number;
+  pages: number;
+  from: number;
+  to: number;
+  total: number;
+}
+
+export function licensePage<T>(list: readonly T[], page: number, size: number = LICENSE_PAGE_SIZE): ListPage<T> {
+  const total = list.length;
+  const pages = Math.max(1, Math.ceil(total / size));
+  const p = Math.min(Math.max(1, Number.isFinite(page) ? Math.floor(page) : 1), pages);
+  const start = (p - 1) * size;
+  const items = list.slice(start, start + size);
+  return { items, page: p, pages, from: total === 0 ? 0 : start + 1, to: start + items.length, total };
+}
+
 /** Dia (no fuso da pessoa) de um instante gravado. */
 export function dayOf(instant: string, timeZone: string): IsoDate {
   return todayIn(timeZone, new Date(instant));
@@ -519,6 +547,18 @@ export const COMPANY_TEXT = {
   licensesTitle: 'Licenças',
   licensesEmpty: 'Nenhuma licença ainda. Convide pessoas acima.',
   licensesNone: 'Nenhuma licença nesta situação.',
+  searchLabel: 'Buscar por e-mail',
+  searchPlaceholder: 'Parte do e-mail, como ana ou @empresa',
+  searchNone: (query: string): string => `Nenhum e-mail com "${query.trim()}" nesta situação.`,
+  /** "21 a 40 de 230". */
+  pageInfo: (from: number, to: number, total: number): string => `${from} a ${to} de ${total}`,
+  /** "Licenças 21 a 40 de 230" (o leitor de tela diz do que se trata). */
+  pageInfoA11y: (from: number, to: number, total: number): string => `Licenças ${from} a ${to} de ${total}`,
+  pagePrev: 'Anteriores',
+  pageNext: 'Próximas',
+  /** Nome acessível com o rótulo visível no começo (WCAG 2.5.3): "Anteriores: página 1 de 3". */
+  pagePrevA11y: (page: number, pages: number): string => (page > 1 ? `Anteriores: página ${page - 1} de ${pages}` : 'Anteriores'),
+  pageNextA11y: (page: number, pages: number): string => (page < pages ? `Próximas: página ${page + 1} de ${pages}` : 'Próximas'),
   filterLabel: 'Situação',
   filterCount: (label: string, n: number): string => `${label}, ${n}`,
   invitedOn: (day: IsoDate): string => `Convite enviado em ${formatDateBR(day)}`,

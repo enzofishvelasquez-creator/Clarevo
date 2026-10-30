@@ -19,6 +19,7 @@ import {
   fieldForErrorCode,
   formatDateBR,
   formatDayMonth,
+  formatListDate,
   formatMonthInputBR,
   formatMonthName,
   formatMonthYearBR,
@@ -202,7 +203,7 @@ export function SeriesEditForm({
       for (let n = start; n <= Math.min(maxNumber, start + 5); n++) if (!s.skippedNumbers.includes(n)) future.push(n);
     }
     const dueLabel = (c: Commitment, withYear: boolean) => {
-      const date = withYear ? formatDateBR(c.dueOn) : formatDayMonth(c.dueOn);
+      const date = withYear ? formatListDate(c.dueOn, today) : formatDayMonth(c.dueOn);
       return isCommitmentOverdue(c, today) ? `venceu em ${date}` : `vence em ${date}`;
     };
     return [

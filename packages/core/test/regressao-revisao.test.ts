@@ -924,7 +924,7 @@ describe('CL-07: situação da fatura nas telas do cartão e em Contas a pagar',
     expect([aberta.overdue, invoiceTexts(aberta, '2026-11-11').situation]).toEqual([false, 'Aberta']);
   });
 
-  it('conta da fatura paga em parte: "Paga em parte" em Contas a pagar, igual à tela da fatura (antes: "Paga em 08/11/2026")', async () => {
+  it('conta da fatura paga em parte: "Paga em parte" em Contas a pagar, igual à tela da fatura (antes: "Paga em 08/11")', async () => {
     const c = await cartao('2026-11-08');
     const nov = (await faturas(c, '2026-11-08')).find((i) => i.month === NOV)!;
     const pago = await c.repo.payInvoice(key(), c.card.id, NOV, nov.commitmentVersion!, 30_000, '2026-11-08');
@@ -937,8 +937,8 @@ describe('CL-07: situação da fatura nas telas do cartão e em Contas a pagar',
     expect(conta.payment!.amountCents).toBe(30_000);
     expect(isPartialInvoicePayment(conta)).toBe(true);
     expect(commitmentSituation(conta, '2026-11-08')).toBe('paga_em_parte');
-    expect(dueText(conta, '2026-11-08')).toBe('Paga em parte em 08/11/2026 · R$ 230,00 foram para a fatura de dezembro');
-    expect(dueText(conta, '2026-11-08')).not.toBe('Paga em 08/11/2026');
+    expect(dueText(conta, '2026-11-08')).toBe('Paga em parte em 08/11 · R$ 230,00 foram para a fatura de dezembro');
+    expect(dueText(conta, '2026-11-08')).not.toBe('Paga em 08/11');
     expect(pago.entry).toMatchObject({ kind: 'saldo_anterior', amountCents: 23_000 });
     // O valor pago e os totais: Pago de novembro R$ 300,00; dezembro com saldo anterior de R$ 230,00 e total de R$ 580,00.
     const totals = summarizeMonth(await c.repo.listRecords(c.ctx, NOV), c.ctx, NOV);
@@ -952,16 +952,16 @@ describe('CL-07: situação da fatura nas telas do cartão e em Contas a pagar',
     expect((await comprometido(NOV)) + (await comprometido(DEC))).toBe(53_000 + 35_000);
   });
 
-  it('fatura paga por inteiro continua "Paga em 08/11/2026"; conta comum paga por menos que o previsto também (só fatura é "em parte")', async () => {
+  it('fatura paga por inteiro continua "Paga em 08/11"; conta comum paga por menos que o previsto também (só fatura é "em parte")', async () => {
     const c = await cartao('2026-11-08');
     const nov = (await faturas(c, '2026-11-08')).find((i) => i.month === NOV)!;
     await c.repo.payInvoice(key(), c.card.id, NOV, nov.commitmentVersion!, 53_000, '2026-11-08');
     const conta = (await c.repo.listInvoiceCommitments(c.card.id)).find((x) => x.invoice!.month === NOV)!;
-    expect([commitmentSituation(conta, '2026-11-08'), dueText(conta, '2026-11-08')]).toEqual(['paga', 'Paga em 08/11/2026']);
+    expect([commitmentSituation(conta, '2026-11-08'), dueText(conta, '2026-11-08')]).toEqual(['paga', 'Paga em 08/11']);
     // Conta comum: pagar R$ 90,00 de uma de R$ 100,00 quita a conta inteira.
     const avulsa = await c.repo.createCommitment(key(), c.ctx, { description: 'Água', amountCents: 10_000, dueOn: '2026-11-08', category: 'Moradia' });
     const paga = await c.repo.payCommitment(key(), avulsa.commitment.id, avulsa.commitment.version, { accountId: (await c.repo.getSpace())!.accounts[0]!.id, amountCents: 9_000, paidOn: '2026-11-08', category: 'Moradia' });
-    expect([commitmentSituation(paga.commitment, '2026-11-08'), dueText(paga.commitment, '2026-11-08')]).toEqual(['paga', 'Paga em 08/11/2026']);
+    expect([commitmentSituation(paga.commitment, '2026-11-08'), dueText(paga.commitment, '2026-11-08')]).toEqual(['paga', 'Paga em 08/11']);
   });
 
   it('as telas usam as mesmas palavras: o rótulo da linha e do detalhe vem de commitmentSituation, e o do cartão de invoiceTexts', () => {

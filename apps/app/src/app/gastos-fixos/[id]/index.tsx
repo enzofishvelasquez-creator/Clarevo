@@ -17,6 +17,7 @@ import {
   dueKindOfSeries,
   formatBRL,
   formatDateBR,
+  formatListDate,
   installmentProgress,
   isActiveSubscription,
   isRepoError,
@@ -668,7 +669,7 @@ function ProjectedRow({ planned: p, kind, today, last }: { planned: PlannedOccur
   const amount = estimateText(p.amountCents, p.amountIsEstimate, hidden);
   const dueNotice = plannedDueNotice(p.dueOn, today, kind);
   const graceDue = nextBusinessDayDueText(p.dueOn, kind, today);
-  const dueText = graceDue ? graceDue.toLowerCase() : `vence em ${formatDateBR(p.dueOn)}`;
+  const dueText = graceDue ? graceDue.toLowerCase() : `vence em ${formatListDate(p.dueOn, today)}`;
   const label = `${p.description}, prevista, ${dueText}, ${amount.a11y}${p.amountIsEstimate ? ', valor estimado' : ''}${dueNotice ? `, ${dueNotice.signA11y}` : ''}`;
   return (
     <View style={[styles.row, !last && styles.divider]} accessible accessibilityLabel={label}>
@@ -689,14 +690,14 @@ function ProjectedRow({ planned: p, kind, today, last }: { planned: PlannedOccur
   );
 }
 
-/** "Outubro · paga em 05/10/2026 · R$ 2.500,00" (parcelamento: com o número da parcela). Abre a conta. */
+/** "Outubro · paga em 05/10 · R$ 2.500,00" (o ano só quando muda; parcelamento: com o número da parcela). Abre a conta. */
 function PaidRow({ commitment: c, today, last }: { commitment: Commitment; today: IsoDate; last: boolean }) {
   const month = occurrenceMonthLabel(c.dueOn, today);
   const hidden = useValuesHidden();
   const number = c.series?.kind === 'parcelada' ? `Parcela ${c.series.number} · ` : '';
   const cents = c.payment?.amountCents ?? c.amountCents;
   const amount = moneyText(cents, hidden);
-  const paidOn = c.payment ? formatDateBR(c.payment.paidOn) : '';
+  const paidOn = c.payment ? formatListDate(c.payment.paidOn, today) : '';
   return (
     <Pressable
       onPress={() => router.push(`/a-pagar/${c.id}`)}

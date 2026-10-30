@@ -1,5 +1,5 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/cards.ts. Não edite: rode "node scripts/gerar-site.js".
-import { addDays, addMonths, addYearsClamped, dateInMonth, formatDateBR, formatDayMonth, formatMonthName, isValidIsoDate, isValidIsoMonth, monthOf, parseDateBR, } from './dates.js';
+import { addDays, addMonths, addYearsClamped, dateInMonth, formatDateBR, formatDayMonth, formatListDate, formatMonthName, isValidIsoDate, isValidIsoMonth, monthOf, parseDateBR, } from './dates.js';
 import { effectiveOverdue, nextBusinessDayDueText } from './dia-util.js';
 import { sharesCents } from './learn/math.js';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL } from './money.js';
@@ -654,7 +654,7 @@ export const CARD_STATUS_LABEL = { ativo: 'Ativo', arquivado: 'Arquivado' };
 export function closesText(closingOn, today) {
     if (closingOn === today)
         return 'Fecha hoje';
-    return closingOn < today ? `Fechou em ${formatDayMonth(closingOn)}` : `Fecha em ${formatDayMonth(closingOn)}`;
+    return closingOn < today ? `Fechou em ${formatListDate(closingOn, today)}` : `Fecha em ${formatListDate(closingOn, today)}`;
 }
 export function dueTextOf(dueOn, today) {
     const grace = nextBusinessDayDueText(dueOn, 'fatura', today);
@@ -662,7 +662,7 @@ export function dueTextOf(dueOn, today) {
         return grace;
     if (dueOn === today)
         return 'Vence hoje';
-    return dueOn < today ? `Venceu em ${formatDayMonth(dueOn)}` : `Vence em ${formatDayMonth(dueOn)}`;
+    return dueOn < today ? `Venceu em ${formatListDate(dueOn, today)}` : `Vence em ${formatListDate(dueOn, today)}`;
 }
 export function limitUsedText(usedCents, limitCents) {
     return limitCents === null ? `Limite usado: ${formatBRL(usedCents)}` : `Limite usado: ${formatBRL(usedCents)} de ${formatBRL(limitCents)}`;
@@ -693,7 +693,7 @@ export function invoiceTexts(invoice, today) {
     const total = formatBRL(invoice.totalCents);
     const closes = closesText(invoice.closingOn, today);
     const due = dueTextOf(invoice.dueOn, today);
-    const paid = invoice.paidCents !== null && invoice.paidOn ? `Pago ${formatBRL(invoice.paidCents)} em ${formatDateBR(invoice.paidOn)}` : null;
+    const paid = invoice.paidCents !== null && invoice.paidOn ? `Pago ${formatBRL(invoice.paidCents)} em ${formatListDate(invoice.paidOn, today)}` : null;
     return {
         title,
         situation,
