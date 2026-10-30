@@ -48,6 +48,8 @@ import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, 
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
 import type { SignupSource, SignupSourceOption } from './signup-source';
+import type { GoalImage, GoalImageChoice } from './goal-images';
+import type { WhatsAppCode, WhatsAppLinkState } from './whatsapp/app';
 
 /**
  * Ações de conta a pagar gravadas em record_operations (mesmo espaço de chaves dos registros). 'criar_ocorrencia':
@@ -109,6 +111,9 @@ export type GoalAction =
   | 'registrar_movimento_meta'
   | 'alterar_movimento_meta'
   | 'excluir_movimento_meta';
+
+/** Imagem da meta (D-077, migração 0021): set_goal_image, com a meta em target_id. Não conta como anotação na atividade. */
+export type GoalImageAction = 'imagem_meta';
 
 /**
  * Resultado das escritas de metas: a meta no estado atual (com os totais de goal_items, inclusive excluída) e o
@@ -194,6 +199,13 @@ export type MonthCheckAction = 'marcar_mes_conferido' | 'desmarcar_mes_conferido
  * pessoa. Como 'decidir_revisao' e 'responder_guardar', não conta como anotação na atividade (D-030).
  */
 export type SignupSourceAction = 'responder_origem_cadastro';
+
+/**
+ * WhatsApp (D-076, migração 0020): gerar o código de ligar (create_whatsapp_code) e desligar pelo app (unlink_whatsapp), gravadas em
+ * record_operations sem alvo. Ligar e desligar pelo próprio WhatsApp ('ligar_whatsapp' e 'desligar_whatsapp') vêm da função do servidor.
+ * Nenhuma conta como anotação na atividade (D-030); anotar e desfazer pelo WhatsApp são 'criar' e 'excluir', como no app.
+ */
+export type WhatsAppAction = 'gerar_codigo_whatsapp' | 'desligar_whatsapp';
 
 /**
  * Importar extrato ou fatura (import_records, D-048), gravada em record_operations com a conta ou o cartão de destino em
@@ -521,6 +533,17 @@ export interface RecordsRepository {
   setGoalStatus(key: string, goalId: string, expectedVersion: number, status: GoalStatus): Promise<GoalWrite>;
   /** delete_goal: exclui a meta e os movimentos vivos (versão + 1 em cada), em qualquer situação. Ordem: repetição; trava; versão. */
   deleteGoal(key: string, goalId: string, expectedVersion: number): Promise<GoalWrite>;
+  /** Imagens guardadas das metas vivas do contexto (goal_images, sem a foto). Meta sem linha: a sugestão automática. Sem leitura: vazia. */
+  listGoalImages(contextId: string): Promise<GoalImage[]>;
+  /** goal_photo: a foto da meta (tipo e base64) ou null (sem foto, sem leitura ou meta excluída). */
+  getGoalPhoto(goalId: string): Promise<{ mime: string; base64: string; version: number } | null>;
+  /**
+   * set_goal_image (D-077). Escolher uma sugestão, mandar uma foto ou voltar à automática. A mesma permissão de updateGoal. Ordem:
+   * repetição (chave_reutilizada se o pedido muda); nao_encontrado; sem_permissao; imagem_invalida; foto_invalida (não é JPEG, PNG
+   * nem WebP); foto_grande (mais de 300 KB); versao_desatualizada (0 = sem imagem guardada; detalhe "versao_atual=N"). Não conta
+   * como anotação na atividade.
+   */
+  setGoalImage(key: string, goalId: string, expectedVersion: number, choice: GoalImageChoice): Promise<GoalImage>;
   /**
    * add_goal_movement: sem versão (como create_record); a versão da meta não sobe. Ordem: repetição; nao_encontrado;
    * sem_permissao; meta_arquivada; tipo_invalido ('saldo_inicial' só por createGoal); valor_invalido;
@@ -569,6 +592,19 @@ export interface RecordsRepository {
    * Não conta como anotação na atividade. Reconciliação: repetir a chave.
    */
   setSignupSource(key: string, expectedVersion: number, source: SignupSourceOption): Promise<SignupSource>;
+
+  // WhatsApp (D-076; migração 0020). O número nunca chega ao app: o banco guarda só o resumo dele, e só a função do servidor liga.
+
+  /** my_whatsapp: se a pessoa tem número ligado, em que espaço, e o código ainda válido (espaço e validade). */
+  getWhatsApp(): Promise<WhatsAppLinkState>;
+  /**
+   * create_whatsapp_code. Gera o código de ligar (8 símbolos, 15 minutos, uso único), no lugar do anterior. Ordem: repetição
+   * (chave_reutilizada se a ação ou o espaço mudam; a repetição certa devolve code nulo, porque o código só é mostrado uma vez);
+   * sem_permissao (a pessoa precisa anotar no espaço). Não conta como anotação na atividade. Reconciliação: gerar outro.
+   */
+  createWhatsAppCode(key: string, contextId: string): Promise<WhatsAppCode>;
+  /** unlink_whatsapp. Desliga o número e apaga o código pendente. sem_permissao sem o Pessoal. Repetição: o estado atual. */
+  unlinkWhatsApp(key: string): Promise<WhatsAppLinkState>;
 
   // Cartões de crédito (D-037, Ciclo E). Regras e ordem das conferências em cards.ts (CARD_*_CODE_ORDER), iguais às da migração 0008.
 
@@ -914,6 +950,9 @@ export type RepoErrorCode =
   | 'licenca_nao_convidada'
   | 'licenca_nao_ativa'
   | 'ja_tem_licenca'
+  | 'imagem_invalida'
+  | 'foto_invalida'
+  | 'foto_grande'
   | 'desconhecido';
 
 export class RepoError extends Error {

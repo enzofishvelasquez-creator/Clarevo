@@ -15,6 +15,8 @@ EVA=00000000-0000-0000-0000-0000000000e1
 CARLA=00000000-0000-0000-0000-0000000000c1
 DAVI=00000000-0000-0000-0000-0000000000d1
 FABIO=00000000-0000-0000-0000-0000000000f1
+GIL=00000000-0000-0000-0000-0000000000a7
+HUGO=00000000-0000-0000-0000-0000000000a8
 
 createdb "$DB"
 cleanup() {
@@ -33,14 +35,17 @@ do \$\$ begin
     create role clarevo_api_teste login noinherit password 'senha-local-de-teste';
   end if;
 end \$\$;
-grant anon, authenticated to clarevo_api_teste;
+-- service_role: só o teste do WhatsApp usa, como a função do servidor (chave de serviço).
+grant anon, authenticated, service_role to clarevo_api_teste;
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
   ('$ANA', 'ana@exemplo.test', now(), '{"display_name":"Ana"}'),
   ('$BRUNO', 'bruno@exemplo.test', now(), '{"display_name":"Bruno"}'),
   ('$EVA', 'eva@exemplo.test', null, '{"display_name":"Eva"}'),
   ('$CARLA', 'carla@exemplo.test', now(), '{"display_name":"Carla Souza"}'),
   ('$DAVI', 'davi@exemplo.test', now(), '{"display_name":"Davi Prado"}'),
-  ('$FABIO', 'fabio@exemplo.test', now(), '{"display_name":"Fábio Reis"}');
+  ('$FABIO', 'fabio@exemplo.test', now(), '{"display_name":"Fábio Reis"}'),
+  ('$GIL', 'gil@exemplo.test', now(), '{"display_name":"Gil"}'),
+  ('$HUGO', 'hugo@exemplo.test', now(), '{"display_name":"Hugo"}');
 alter database "$DB" set clarevo.today = '2026-10-07';
 -- Só neste banco descartável: o cabeçalho x-clarevo-today muda o "hoje" de uma requisição, para conferir a geração
 -- de contas de gasto fixo com o passar dos meses. Sem o cabeçalho, vale o dia fixo acima.
@@ -73,3 +78,9 @@ cd "$ROOT"
 CLAREVO_DB="$DB" CLAREVO_API_URL="http://127.0.0.1:$PROXY_PORT" CLAREVO_JWT_SECRET="$SECRET" \
 CLAREVO_ANA=$ANA CLAREVO_BRUNO=$BRUNO CLAREVO_EVA=$EVA CLAREVO_CARLA=$CARLA CLAREVO_DAVI=$DAVI CLAREVO_FABIO=$FABIO \
   npx vitest run --root apps/app test/supabase-api.int.test.ts
+# WhatsApp (D-076): depois do teste principal, com a pessoa só dele (Gil) e a chave de serviço, como a função do servidor.
+CLAREVO_API_URL="http://127.0.0.1:$PROXY_PORT" CLAREVO_JWT_SECRET="$SECRET" CLAREVO_GIL=$GIL \
+  npx vitest run --root apps/app test/whatsapp-api.int.test.ts
+# Imagem das metas (D-077), com a pessoa só dele (Hugo).
+CLAREVO_API_URL="http://127.0.0.1:$PROXY_PORT" CLAREVO_JWT_SECRET="$SECRET" CLAREVO_HUGO=$HUGO \
+  npx vitest run --root apps/app test/goal-images-api.int.test.ts

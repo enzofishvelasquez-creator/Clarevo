@@ -1441,6 +1441,12 @@ export function useGoals(contextId: string | undefined) {
   return useQuery({ queryKey: ['goals', 'list', contextId], queryFn: () => repo.listGoals(contextId!), enabled: Boolean(contextId) });
 }
 
+/** Imagens guardadas das metas do contexto (D-077), por meta; meta sem linha usa a sugestão automática. */
+export function useGoalImages(contextId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: ['goals', 'images', contextId], queryFn: () => repo.listGoalImages(contextId!), enabled: Boolean(contextId) });
+}
+
 /** Uma meta com os totais, ou null (excluída, inexistente ou sem leitura). */
 export function useGoal(id: string | undefined) {
   const repo = useRepo();

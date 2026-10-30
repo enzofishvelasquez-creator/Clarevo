@@ -14,7 +14,8 @@
     "test:web": "npm --workspace apps/app run export:demo && node scripts/e2e-web.js",
     "test:api": "bash supabase/tests/run_api.sh",
     "test:site": "node scripts/e2e-site.js",
-    "manual": "node scripts/gerar-manual.js"
+    "manual": "node scripts/gerar-manual.js",
+    "whatsapp": "node scripts/gerar-whatsapp.js"
   },
   "devDependencies": {
     "playwright": "1.56.1"

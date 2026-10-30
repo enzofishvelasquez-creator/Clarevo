@@ -52,6 +52,7 @@ import type {
   CommitmentAction,
   CommitmentWrite,
   GoalAction,
+  GoalImageAction,
   GoalWrite,
   ImportAction,
   IncomeReferenceAction,
@@ -61,6 +62,7 @@ import type {
   ReturnReviewAction,
   SavingsAction,
   SignupSourceAction,
+  WhatsAppAction,
   SeriesAction,
   SeriesWrite,
   SubscriptionReviewAction,
@@ -140,6 +142,10 @@ import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import { savingsAnswerError, savingsAskAgainOn } from './savings';
 import { signupSourceError, type SignupSource, type SignupSourceOption } from './signup-source';
+import { WHATSAPP_CODE_ALPHABET, WHATSAPP_CODE_LENGTH } from './whatsapp/mensagem';
+import { GOAL_PHOTO_MAX_BYTES, base64Bytes, goalPhotoMime, type GoalImage, type GoalImageChoice } from './goal-images';
+import { WHATSAPP_CODE_MINUTES } from './whatsapp/respostas';
+import type { WhatsAppCode, WhatsAppLinkState } from './whatsapp/app';
 import {
   ANNUAL_MAX_YEARS,
   SERIES_LIMIT,
@@ -167,12 +173,14 @@ interface Operation {
     | IncomeReferenceAction
     | BudgetAction
     | GoalAction
+    | GoalImageAction
     | SavingsAction
     | CardAction
     | AccountAction
     | SubscriptionReviewAction
     | MonthCheckAction
     | SignupSourceAction
+    | WhatsAppAction
     | ImportAction
     | FamilyAction
     | CompanyAction;
@@ -358,6 +366,10 @@ export class MemoryRepository implements RecordsRepository {
   private savingsChecks = new Map<string, SavingsCheck>();
   /** signup_sources da pessoa (só ela usa este repositório): no máximo uma resposta, de "Como você conheceu o Clarevo?" (D-067). */
   private signupSource: SignupSource | null = null;
+  /** Código de ligar o WhatsApp pendente (na memória não há servidor: nada liga o número). */
+  private whatsappCode: { contextId: string; expiresAt: string } | null = null;
+  /** Imagem das metas (goal_images): a sugestão escolhida ou a foto (base64), com a versão. */
+  private goalImages = new Map<string, { imageKey: string | null; photo: { mime: string; base64: string } | null; version: number; updatedAt: string }>();
   private cards = new Map<string, StoredCard>();
   private cardEntries = new Map<string, StoredCardEntry>();
   private seq = 0;
@@ -428,6 +440,8 @@ export class MemoryRepository implements RecordsRepository {
       goalMovements: new Map(this.goalMovements),
       savingsChecks: new Map(this.savingsChecks),
       signupSource: this.signupSource,
+      whatsappCode: this.whatsappCode,
+      goalImages: new Map(this.goalImages),
       cards: new Map(this.cards),
       cardEntries: new Map(this.cardEntries),
       accountsById: new Map(this.accountsById),
@@ -454,6 +468,8 @@ export class MemoryRepository implements RecordsRepository {
         goalMovements: this.goalMovements,
         savingsChecks: this.savingsChecks,
         signupSource: this.signupSource,
+        whatsappCode: this.whatsappCode,
+        goalImages: this.goalImages,
         cards: this.cards,
         cardEntries: this.cardEntries,
         accountsById: this.accountsById,
@@ -1954,8 +1970,73 @@ export class MemoryRepository implements RecordsRepository {
         this.goalMovements.set(m.id, { ...m, version: m.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
       }
       this.goals.set(goalId, { ...current, version: current.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
+      // Como o gatilho goals_image_cleanup (0021): a imagem sai com a meta.
+      this.goalImages.delete(goalId);
       this.saveOperation(key, 'excluir_meta', payload, { contextId: current.contextId, recordId: null, commitmentId: null, goalId, movementId: null });
       return this.goalResult(goalId, null);
+    });
+  }
+
+  // Imagem das metas (D-077, migração 0021)
+
+  private goalImageOf(goalId: string): GoalImage {
+    const i = this.goalImages.get(goalId);
+    return i
+      ? { goalId, imageKey: (i.imageKey as GoalImage['imageKey']) ?? null, hasPhoto: i.photo !== null, version: i.version, updatedAt: i.updatedAt }
+      : { goalId, imageKey: null, hasPhoto: false, version: 0, updatedAt: null };
+  }
+
+  /** Como a leitura de goal_images (RLS): as linhas das metas vivas do contexto, sem a foto. */
+  async listGoalImages(contextId: string) {
+    return this.read(() =>
+      [...this.goalImages.keys()]
+        .filter((id) => {
+          const g = this.goals.get(id);
+          return g && !g.deletedAt && g.contextId === contextId && this.canRead(g.contextId);
+        })
+        .sort()
+        .map((id) => this.goalImageOf(id)),
+    );
+  }
+
+  /** Como goal_photo. */
+  async getGoalPhoto(goalId: string) {
+    return this.read(() => {
+      const g = this.goals.get(goalId);
+      const i = this.goalImages.get(goalId);
+      if (!g || g.deletedAt || !this.canRead(g.contextId) || !i?.photo) return null;
+      return { mime: i.photo.mime, base64: i.photo.base64, version: i.version };
+    });
+  }
+
+  /** Como set_goal_image. Ordem: repetição; trava da meta (nao_encontrado, sem_permissao); imagem_invalida; foto_invalida; foto_grande; versão. */
+  async setGoalImage(key: string, goalId: string, expectedVersion: number, choice: GoalImageChoice) {
+    return this.write(() => {
+      const imageKey = choice.kind === 'sugestao' ? choice.key : null;
+      const photo = choice.kind === 'foto' ? choice.base64.replace(/\s+/g, '') : null;
+      const payload = [goalId, imageKey, photo === null ? null : hash([photo]), expectedVersion];
+      const replayed = this.replay(key, 'imagem_meta', payload);
+      if (replayed) return this.goalImageOf(replayed.goalId!);
+      const current = this.liveGoal(goalId);
+      if (imageKey !== null && !/^[a-z_]{2,30}$/.test(imageKey)) throw new RepoError('imagem_invalida');
+      let mime: string | null = null;
+      if (photo !== null) {
+        mime = goalPhotoMime(photo);
+        if (base64Bytes(photo) < 1 || mime === null) throw new RepoError('foto_invalida');
+        if (base64Bytes(photo) > GOAL_PHOTO_MAX_BYTES) throw new RepoError('foto_grande');
+      }
+      const now = this.goalImageOf(goalId);
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion !== now.version) {
+        throw new RepoError('versao_desatualizada', undefined, `versao_atual=${now.version}`);
+      }
+      this.goalImages.set(goalId, {
+        imageKey,
+        photo: photo !== null && mime !== null ? { mime, base64: photo } : null,
+        version: now.version + 1,
+        updatedAt: this.stamp(),
+      });
+      this.saveOperation(key, 'imagem_meta', payload, { contextId: current.contextId, recordId: null, commitmentId: null, goalId, movementId: null });
+      return this.goalImageOf(goalId);
     });
   }
 
@@ -2123,6 +2204,52 @@ export class MemoryRepository implements RecordsRepository {
       else if (current.source !== source) this.signupSource = { ...current, source, version: current.version + 1, updatedAt: now };
       this.saveOperation(key, 'responder_origem_cadastro', payload, { contextId: this.space.personalContextId, recordId: null, commitmentId: null });
       return this.signupSource!;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // WhatsApp (D-076, migração 0020): my_whatsapp, create_whatsapp_code e unlink_whatsapp. Na memória (demonstração e testes) não há
+  // servidor: o código é gerado, mas nenhum número é ligado.
+  // ---------------------------------------------------------------------------
+
+  private whatsappState(): WhatsAppLinkState {
+    return {
+      linked: false,
+      contextId: null,
+      linkedAt: null,
+      codeContextId: this.whatsappCode?.contextId ?? null,
+      codeExpiresAt: this.whatsappCode?.expiresAt ?? null,
+    };
+  }
+
+  async getWhatsApp() {
+    return this.read(() => this.whatsappState());
+  }
+
+  /** Como create_whatsapp_code. Ordem: repetição (code nulo); sem_permissao (anotar no espaço); código novo no lugar do anterior. */
+  async createWhatsAppCode(key: string, contextId: string): Promise<WhatsAppCode> {
+    return this.write(() => {
+      const payload = [contextId];
+      const replayed = this.replay(key, 'gerar_codigo_whatsapp', payload);
+      if (replayed) return { code: null, contextId: replayed.contextId, expiresAt: this.whatsappCode?.expiresAt ?? null };
+      if (!this.space || !this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      let code = '';
+      for (let i = 0; i < WHATSAPP_CODE_LENGTH; i++) code += WHATSAPP_CODE_ALPHABET[Math.floor(Math.random() * WHATSAPP_CODE_ALPHABET.length)];
+      const expiresAt = new Date(Date.parse(this.stamp()) + WHATSAPP_CODE_MINUTES * 60_000).toISOString();
+      this.whatsappCode = { contextId, expiresAt };
+      this.saveOperation(key, 'gerar_codigo_whatsapp', payload, { contextId, recordId: null, commitmentId: null });
+      return { code, contextId, expiresAt };
+    });
+  }
+
+  /** Como unlink_whatsapp: apaga o código pendente (não há número ligado na memória). Operação no Pessoal. */
+  async unlinkWhatsApp(key: string): Promise<WhatsAppLinkState> {
+    return this.write(() => {
+      if (this.replay(key, 'desligar_whatsapp', [])) return this.whatsappState();
+      if (!this.space) throw new RepoError('sem_permissao');
+      this.whatsappCode = null;
+      this.saveOperation(key, 'desligar_whatsapp', [], { contextId: this.space.personalContextId, recordId: null, commitmentId: null });
+      return this.whatsappState();
     });
   }
 
@@ -3839,7 +3966,7 @@ export class MemoryRepository implements RecordsRepository {
 
   /**
    * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao,
-   * responder_guardar, responder_origem_cadastro, revisar_assinaturas e as duas de "Conferi este mês", deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
+   * responder_guardar, responder_origem_cadastro, revisar_assinaturas, as duas de "Conferi este mês" e as do WhatsApp, deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
    * ela passa a ser a última ausência. Mesmo dia ou relógio para trás: nada muda.
    */
   private trackActivity(action: Operation['action'], contextId: string) {
@@ -3850,6 +3977,9 @@ export class MemoryRepository implements RecordsRepository {
       action === 'revisar_assinaturas' ||
       action === 'marcar_mes_conferido' ||
       action === 'desmarcar_mes_conferido' ||
+      action === 'gerar_codigo_whatsapp' ||
+      action === 'imagem_meta' ||
+      action === 'desligar_whatsapp' ||
       isFamilyAction(action) ||
       isCompanyAction(action)
     )
@@ -4274,7 +4404,9 @@ export class MemoryRepository implements RecordsRepository {
       this.goals.clear();
       this.goalMovements.clear();
       this.savingsChecks.clear();
+      this.goalImages.clear();
       this.signupSource = null;
+      this.whatsappCode = null;
       this.cards.clear();
       this.cardEntries.clear();
       this.accountsById.clear();

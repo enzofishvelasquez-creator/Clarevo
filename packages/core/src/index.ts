@@ -59,3 +59,5 @@ export * from './renda-media';
 export * from './contrast';
 export * from './long-list';
 export * from './text-scale';
+export * from './whatsapp';
+export * from './goal-images';

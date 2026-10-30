@@ -148,6 +148,8 @@ begin
   -- Metas: movimentos (um excluído) e uma meta excluída.
   res := public.create_goal(t || '-gol-0001', p_ctx, 'objetivo', 'Viagem ' || t, 500000, '2027-10-01', 50000, null, null, null, 10000, '2026-10-07');
   goal := (res #>> '{goal,id}')::uuid;
+  -- Imagem da meta (D-077, 0021): uma foto (os primeiros bytes de um JPEG bastam para o banco).
+  perform public.set_goal_image(goal, null, '/9j/4AAQSkZJRgABAQ==', 0, t || '-img-0001');
   perform public.add_goal_movement(t || '-gol-0002', goal, 'aporte', 2500, '2026-10-05', 'Extra', acc2);
   mov := (public.add_goal_movement(t || '-gol-0003', goal, 'rendimento', 100, '2026-10-06', null) #>> '{movement,id}')::uuid;
   perform public.delete_goal_movement(t || '-gol-0004', mov, 1);
@@ -466,6 +468,29 @@ begin
   end loop;
 end $$;
 reset role;
+-- WhatsApp (D-076, 0020): o Eli e a Bia ligam um número no Pessoal (o Eli também anota por ele) e deixam outro código pendente. A exclusão
+-- da conta apaga o vínculo, o código e as mensagens de quem sai, e a de outra pessoa não mexe nos dela. As funções do servidor rodam aqui
+-- como o dono do banco, com a sessão vazia (como a chave de serviço).
+do $$
+declare
+  n text;
+  r jsonb;
+  k int := 0;
+begin
+  foreach n in array array['eli', 'bia'] loop
+    k := k + 1;
+    perform pg_temp.as_(n);
+    r := public.create_whatsapp_code(pg_temp.id(n || '_ctx'), 'ex-wa-code-' || n);
+    perform set_config('request.jwt.claim.sub', '', true);
+    assert public.whatsapp_link('ex-wa-msg-' || n, encode(sha256(convert_to('552190000000' || k, 'UTF8')), 'hex'), r ->> 'code') ->> 'result' = 'ligado',
+      n || ' liga o WhatsApp';
+    perform pg_temp.as_(n);
+    perform public.create_whatsapp_code(pg_temp.id(n || '_ctx'), 'ex-wa-code2-' || n);
+  end loop;
+  perform set_config('request.jwt.claim.sub', '', true);
+  assert public.whatsapp_add_record('ex-wa-msg-eli-2', encode(sha256(convert_to('5521900000001', 'UTF8')), 'hex'), now(), 'despesa', 990,
+                                    null, '2026-10-01', 'Pelo WhatsApp', null) ->> 'result' = 'anotado', 'o Eli anota pelo WhatsApp';
+end $$;
 select pg_temp.check_links();
 
 -- ---------------------------------------------------------------------------
@@ -475,11 +500,12 @@ do $$
 declare
   t text;
   expected text[] := array['card_entries', 'cards', 'category_budgets', 'commitment_limits', 'commitment_series', 'commitments',
-    'context_activity', 'context_memberships', 'family_invites', 'financial_accounts', 'financial_records', 'goal_movements', 'goals',
-    'income_references', 'month_checks', 'record_operations', 'return_reviews', 'savings_checks', 'series_terms'];
+    'context_activity', 'context_memberships', 'family_invites', 'financial_accounts', 'financial_records', 'goal_images', 'goal_movements',
+    'goals', 'income_references', 'month_checks', 'record_operations', 'return_reviews', 'savings_checks', 'series_terms',
+    'whatsapp_link_codes', 'whatsapp_links'];
 begin
   -- A lista das tabelas com context_id é a que a exclusão cobre: tabela nova com context_id obriga a revisar clarevo_erase_context.
-  assert pg_temp.ctx_tables() = expected, 'as tabelas com context_id são as 19 que a exclusão cobre: ' || array_to_string(pg_temp.ctx_tables(), ', ');
+  assert pg_temp.ctx_tables() = expected, 'as tabelas com context_id são as 22 que a exclusão cobre: ' || array_to_string(pg_temp.ctx_tables(), ', ');
   -- O Pessoal do Eli tem linhas em todas as tabelas de dados (menos convites, que só existem na Família).
   foreach t in array expected loop
     assert (t = 'family_invites' and pg_temp.rows_of('eli_ctx', t) = 0) or pg_temp.rows_of('eli_ctx', t) > 0, 'o Pessoal do Eli tem linhas em ' || t;
@@ -1012,7 +1038,8 @@ do $$
 declare
   f text;
 begin
-  -- As 37 chaves estrangeiras para persons: 11 são do que é só da pessoa (apagadas), 26 são autoria e vínculo (ficam, anônimas).
+  -- As 40 chaves estrangeiras para persons: 14 são do que é só da pessoa (apagadas; as 3 do WhatsApp vêm da 0020), 26 são autoria e
+  -- vínculo (ficam, anônimas).
   -- Uma chave nova obriga a decidir aqui, e em clarevo_erase_person, o que fazer com ela.
   assert pg_temp.person_fks() = array[
       'card_entries.created_by', 'card_entries.deleted_by', 'cards.created_by', 'cards.deleted_by', 'category_budgets.created_by',
@@ -1023,16 +1050,17 @@ begin
       'goal_movements.created_by', 'goal_movements.deleted_by', 'goals.created_by', 'goals.deleted_by', 'income_references.created_by',
       'income_references.deleted_by', 'licenses.person_id', 'month_checks.updated_by', 'organization_admins.person_id', 'plan_entitlements.person_id',
       'record_operations.actor_id', 'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by',
-      'signup_sources.person_id'],
-    'as chaves estrangeiras para persons são as 37 que a exclusão da conta trata';
+      'signup_sources.person_id', 'whatsapp_link_codes.person_id', 'whatsapp_links.person_id', 'whatsapp_messages.person_id'],
+    'as chaves estrangeiras para persons são as 40 que a exclusão da conta trata';
   -- E as que apontam para financial_contexts (financial_records é restrict: por isso os registros saem antes do contexto).
   assert (select array_agg(c.conrelid::regclass::text || '.' || a.attname || ' ' || c.confdeltype::text order by c.conrelid::regclass::text, a.attname)
             from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
            where c.contype = 'f' and c.confrelid = 'public.financial_contexts'::regclass)
        = array['cards.context_id c', 'category_budgets.context_id c', 'commitment_limits.context_id c', 'commitment_series.context_id c', 'commitments.context_id c',
                'context_activity.context_id c', 'context_memberships.context_id c', 'family_invites.context_id c', 'financial_accounts.context_id c',
-               'financial_records.context_id r', 'goals.context_id c', 'income_references.context_id c', 'month_checks.context_id c', 'return_reviews.context_id c', 'savings_checks.context_id c'],
-    'as chaves estrangeiras para financial_contexts: 14 com cascata e financial_records com restrict';
+               'financial_records.context_id r', 'goals.context_id c', 'income_references.context_id c', 'month_checks.context_id c', 'return_reviews.context_id c', 'savings_checks.context_id c',
+               'whatsapp_link_codes.context_id c', 'whatsapp_links.context_id c'],
+    'as chaves estrangeiras para financial_contexts: 16 com cascata e financial_records com restrict';
   assert not exists (select 1 from pg_constraint where conrelid = 'public.persons'::regclass and contype = 'f'), 'persons não depende mais de auth.users por chave estrangeira';
   assert (select count(*) from pg_attribute where attrelid = 'public.persons'::regclass and attname = 'deleted_at' and not attisdropped) = 1
      and (select pg_get_constraintdef(oid) from pg_constraint where conname = 'persons_display_name_check') like '%deleted_at IS NOT NULL%', 'persons.deleted_at e a regra do nome vazio';
@@ -1060,7 +1088,7 @@ begin
     assert (select prosecdef from pg_proc where oid = ('public.' || f)::regprocedure), 'security definer: ' || f;
   end loop;
   assert (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 83, 'authenticated executa 83 funções (as 80 da 0015, as 2 de conferir o mês e a de responder de onde conheceu o Clarevo)';
+           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 88, 'authenticated executa 88 funções (as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo, as 3 do WhatsApp e as 2 da imagem das metas)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
 
@@ -1107,11 +1135,11 @@ begin
            where (x.def ~* '(insert into|update|delete from) (public|auth)\.' or x.def ~* 'clarevo_materialize_series') and x.def !~* 'insert into public\.record_operations')
        = array['delete_my_account', 'ensure_personal_space', 'sync_series_occurrences'],
     'toda função de escrita grava a operação, menos delete_my_account, ensure_personal_space e sync_series_occurrences';
-  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 66,
-    'as 66 funções de escrita com operação são as que o gatilho de record_operations protege';
+  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 69,
+    'as 69 funções de escrita com operação são as que o gatilho de record_operations protege (com create_whatsapp_code e unlink_whatsapp, 0020, e set_goal_image, 0021)';
   -- Nada novo em record_operations pela exclusão: a conta some com o rastro, então nenhuma ação nova (as 2 de conferir o mês vêm da 0016).
-  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 66,
-    'a lista de ações de record_operations segue com 66 (excluir a conta não deixa operação)';
+  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 70,
+    'a lista de ações de record_operations segue com 70 (excluir a conta não deixa operação; as 3 do WhatsApp vêm da 0020 e a da imagem das metas, da 0021)';
 end $$;
 rollback;
 

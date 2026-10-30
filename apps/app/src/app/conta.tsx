@@ -1,5 +1,32 @@
-import { BENEFIT_TEXT, COMPANY_TEXT, DELETE_TEXT, EXPORT_TEXT, FAMILY_ROLE_LABEL, FAMILY_TEXT, LEGAL_TEXT, SUPPORT_TEXT, type SitePage } from '@clarevo/core';
-import { AlertCircle, Building2, Check, FileDown, FileText, KeyRound, LogOut, Mail, MonitorSmartphone, ShieldCheck, Trash2, Users } from 'lucide-react-native';
+import {
+  BENEFIT_TEXT,
+  COMPANY_TEXT,
+  DELETE_TEXT,
+  EXPORT_TEXT,
+  FAMILY_ROLE_LABEL,
+  FAMILY_TEXT,
+  LEGAL_TEXT,
+  SUPPORT_TEXT,
+  WHATSAPP_IN_ACCOUNT,
+  WHATSAPP_NUMBER,
+  WHATSAPP_TEXT,
+  type SitePage,
+} from '@clarevo/core';
+import {
+  AlertCircle,
+  Building2,
+  Check,
+  FileDown,
+  FileText,
+  KeyRound,
+  LogOut,
+  Mail,
+  MessageCircle,
+  MonitorSmartphone,
+  ShieldCheck,
+  Trash2,
+  Users,
+} from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
@@ -145,6 +172,20 @@ export default function ContaScreen() {
             onPress={() => router.push('/familia')}
           />
         </Card>
+
+        {/* WhatsApp (D-076): anotar por mensagem escrita. Só em conta real, com o número da Clarevo, e só depois do piloto fechado (no
+            piloto, a tela abre pelo link /conta/whatsapp). */}
+        {auth.mode !== 'demo' && WHATSAPP_NUMBER !== null && WHATSAPP_IN_ACCOUNT ? (
+          <Card style={{ gap: space[3] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {WHATSAPP_TEXT.cardTitle}
+            </Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {WHATSAPP_TEXT.cardBody}
+            </Txt>
+            <Button label={WHATSAPP_TEXT.cardOpen} icon={MessageCircle} tone="soft" onPress={() => router.push('/conta/whatsapp')} />
+          </Card>
+        ) : null}
 
         {/* Painel da empresa (D-056): só na web e só para quem administra uma organização; no celular nada aparece. */}
         {Platform.OS === 'web' && (companies.data?.length ?? 0) > 0 ? (

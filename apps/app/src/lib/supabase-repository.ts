@@ -121,6 +121,11 @@ import {
   type SeriesWrite,
   type SignupSource,
   type SignupSourceOption,
+  type WhatsAppCode,
+  type WhatsAppLinkState,
+  type GoalImage,
+  type GoalImageChoice,
+  isGoalImageKey,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -683,6 +688,9 @@ const KNOWN: RepoErrorCode[] = [
   'licenca_nao_convidada',
   'licenca_nao_ativa',
   'ja_tem_licenca',
+  'imagem_invalida',
+  'foto_invalida',
+  'foto_grande',
 ];
 
 /**
@@ -1033,6 +1041,24 @@ function toMonthBudget(month: IsoMonth, rows: readonly MonthBudgetRow[]): MonthB
  * prazo fora do dia 1, reserva sem os três campos (ou outra meta com algum) ou com alvo diferente de base × meses, e guardado
  * que não fecha com os totais. Nunca mostrar um guardado errado.
  */
+/** Linha de goal_images (sem a foto) e retorno de set_goal_image. */
+interface GoalImageRow {
+  goal_id: string;
+  image_key: string | null;
+  has_photo: boolean;
+  version: number;
+  updated_at: string | null;
+}
+
+/** Sugestão desconhecida (de uma versão mais nova do app) vira "automática"; sugestão e foto juntas nunca. */
+function toGoalImage(r: GoalImageRow | null): GoalImage {
+  const version = whole(r?.version);
+  if (!r || typeof r.goal_id !== 'string' || typeof r.has_photo !== 'boolean' || (r.has_photo && r.image_key !== null) || version < 0) {
+    throw new RepoError('desconhecido', 'imagem_inconsistente');
+  }
+  return { goalId: r.goal_id, imageKey: isGoalImageKey(r.image_key) ? r.image_key : null, hasPhoto: r.has_photo, version, updatedAt: r.updated_at };
+}
+
 function toGoal(g: GoalRow): Goal {
   const targetCents = whole(g.target_cents);
   const base = wholeOrNull(g.essential_base_cents);
@@ -1164,6 +1190,31 @@ function toSavingsCheck(r: SavingsCheckRow): SavingsCheck {
 }
 
 /** "Como você conheceu o Clarevo?": uma das seis origens, versão de 1 em diante e as duas datas. Sem resposta (versão 0), o banco devolve origem nula. */
+/** Retorno de my_whatsapp e unlink_whatsapp. O número nunca vem: o banco não o guarda. */
+interface WhatsAppStateRow {
+  linked: boolean;
+  context_id: string | null;
+  linked_at: string | null;
+  code_context_id: string | null;
+  code_expires_at: string | null;
+}
+
+function toWhatsAppState(r: WhatsAppStateRow | null): WhatsAppLinkState {
+  if (!r || typeof r.linked !== 'boolean' || r.linked !== (r.context_id !== null) || r.linked !== (r.linked_at !== null)
+      || (r.code_context_id === null) !== (r.code_expires_at === null)) {
+    throw new RepoError('desconhecido', 'whatsapp_inconsistente');
+  }
+  return { linked: r.linked, contextId: r.context_id, linkedAt: r.linked_at, codeContextId: r.code_context_id, codeExpiresAt: r.code_expires_at };
+}
+
+/** Retorno de create_whatsapp_code: o código só na primeira resposta (na repetição, nulo). */
+function toWhatsAppCode(r: { code: string | null; context_id: string; expires_at: string | null } | null): WhatsAppCode {
+  if (!r || typeof r.context_id !== 'string' || (r.code !== null && !/^[A-HJ-NP-Z2-9]{8}$/.test(r.code)) || (r.code !== null && !r.expires_at)) {
+    throw new RepoError('desconhecido', 'codigo_inconsistente');
+  }
+  return { code: r.code, contextId: r.context_id, expiresAt: r.expires_at };
+}
+
 function toSignupSource(r: SignupSourceRow): SignupSource {
   const version = whole(r.version);
   if (typeof r.source !== 'string' || !(SIGNUP_SOURCES as readonly string[]).includes(r.source) || version < 1 || !r.answered_at || !r.updated_at) {
@@ -2223,6 +2274,38 @@ export class SupabaseRepository implements RecordsRepository {
     return data ? toGoal(data as GoalRow) : null;
   }
 
+  /** Imagens guardadas das metas do contexto (goal_images, sem a coluna da foto). */
+  async listGoalImages(contextId: string): Promise<GoalImage[]> {
+    const rows = await readAll<GoalImageRow>((from, to) =>
+      this.db.from('goal_images').select('goal_id, image_key, has_photo, version, updated_at').eq('context_id', contextId).order('goal_id').range(from, to),
+    );
+    return rows.map(toGoalImage);
+  }
+
+  /** A foto pela função goal_photo (base64): só quem lê o espaço; sem foto, null. */
+  async getGoalPhoto(goalId: string): Promise<{ mime: string; base64: string; version: number } | null> {
+    const { data, error } = await this.db.rpc('goal_photo', { p_goal_id: goalId });
+    if (error) throw repoError(error);
+    if (data === null || data === undefined) return null;
+    const d = data as { mime?: unknown; base64?: unknown; version?: unknown };
+    if (typeof d.mime !== 'string' || !/^image\/(jpeg|png|webp)$/.test(d.mime) || typeof d.base64 !== 'string') {
+      throw new RepoError('desconhecido', 'imagem_inconsistente');
+    }
+    return { mime: d.mime, base64: d.base64.replace(/\s+/g, ''), version: whole(d.version) };
+  }
+
+  async setGoalImage(key: string, goalId: string, expectedVersion: number, choice: GoalImageChoice): Promise<GoalImage> {
+    const { data, error } = await this.db.rpc('set_goal_image', {
+      p_goal_id: goalId,
+      p_image_key: choice.kind === 'sugestao' ? choice.key : null,
+      p_photo: choice.kind === 'foto' ? choice.base64 : null,
+      p_expected_version: expectedVersion,
+      p_key: key,
+    });
+    if (error) throw repoError(error);
+    return toGoalImage(data as GoalImageRow | null);
+  }
+
   /** Movimentos vivos da meta, do mais recente ao mais antigo (data, criação, id). */
   async listGoalMovements(goalId: string): Promise<GoalMovement[]> {
     const rows = await readAll<GoalMovementRow>((from, to) =>
@@ -2427,6 +2510,29 @@ export class SupabaseRepository implements RecordsRepository {
     if (error) throw repoError(error);
     if (!data) throw new RepoError('desconhecido');
     return toSignupSource(data as SignupSourceRow);
+  }
+
+  // -------------------------------------------------------------------------
+  // WhatsApp (D-076, migração 0020)
+  // -------------------------------------------------------------------------
+
+  async getWhatsApp(): Promise<WhatsAppLinkState> {
+    const { data, error } = await this.db.rpc('my_whatsapp');
+    if (error) throw repoError(error);
+    return toWhatsAppState(data as WhatsAppStateRow | null);
+  }
+
+  /** O código vem só na primeira resposta; a repetição da chave devolve code nulo (quem perdeu a resposta gera outro). */
+  async createWhatsAppCode(key: string, contextId: string): Promise<WhatsAppCode> {
+    const { data, error } = await this.db.rpc('create_whatsapp_code', { p_context_id: contextId, p_key: key });
+    if (error) throw repoError(error);
+    return toWhatsAppCode(data as { code: string | null; context_id: string; expires_at: string | null } | null);
+  }
+
+  async unlinkWhatsApp(key: string): Promise<WhatsAppLinkState> {
+    const { data, error } = await this.db.rpc('unlink_whatsapp', { p_key: key });
+    if (error) throw repoError(error);
+    return toWhatsAppState(data as WhatsAppStateRow | null);
   }
 
   // -------------------------------------------------------------------------

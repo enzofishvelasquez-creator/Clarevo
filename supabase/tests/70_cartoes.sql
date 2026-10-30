@@ -1919,7 +1919,7 @@ reset role;
 
 -- ---------------------------------------------------------------------------
 -- 10. record_operations: as onze ações de cartão apontam para o cartão (target_id); as cinco de lançamento também para o
--- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 66 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98).
+-- lançamento (entry_id); pagar e desfazer a fatura, também para a conta da fatura e o gasto; a lista vigente tem 70 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98).
 -- Uma operação por escrita. Atividade (A4): toda ação de cartão é anotação de quem a fez no contexto.
 -- ---------------------------------------------------------------------------
 reset role;
@@ -1988,7 +1988,7 @@ begin
     = array['alterar_cartao', 'alterar_lancamento_cartao', 'criar_cartao', 'criar_compra_cartao', 'criar_encargo_cartao', 'criar_estorno_cartao',
             'desfazer_pagamento_fatura', 'excluir_cartao', 'excluir_lancamento_cartao', 'pagar_fatura', 'situacao_cartao'], 'as 11 ações de cartão';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 66, 'a lista vigente tem 66 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
+           where c.conname = 'record_operations_action_check') = 70, 'a lista vigente tem 70 ações (37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
 
   -- Cada operação aponta para um cartão do mesmo contexto; a de lançamento, para um lançamento do mesmo cartão; a de fatura, para
   -- a conta e o gasto daquele cartão.
@@ -2808,17 +2808,17 @@ do $$ begin
     = array['accept_family_invite', 'accept_license', 'add_card_charge', 'add_card_purchase', 'add_card_refund',
             'add_goal_movement', 'cancel_family_invite', 'cancel_license_invite', 'clear_month_check', 'context_permission', 'create_account',
             'create_card', 'create_commitment', 'create_family', 'create_family_invite', 'create_goal', 'create_record',
-            'create_series', 'create_series_occurrence', 'decide_return_review', 'delete_account', 'delete_card',
+            'create_series', 'create_series_occurrence', 'create_whatsapp_code', 'decide_return_review', 'delete_account', 'delete_card',
             'delete_card_entry', 'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal',
             'delete_goal_movement', 'delete_income_reference', 'delete_my_account', 'delete_record', 'delete_series', 'end_family', 'end_license',
-            'end_series', 'ensure_personal_space', 'import_records', 'inform_series_year', 'invite_licenses',
+            'end_series', 'ensure_personal_space', 'goal_photo', 'import_records', 'inform_series_year', 'invite_licenses',
             'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_family',
             'mark_subscriptions_reviewed', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals',
-            'months_overview', 'my_today', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
+            'months_overview', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
-            'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_status', 'set_income_reference',
+            'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_status', 'set_income_reference',
             'set_member_role', 'set_month_check', 'set_savings_answer', 'set_series_subscription', 'set_signup_source', 'skip_series_year', 'sync_series_occurrences',
-            'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'update_account', 'update_card',
+            'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'unlink_whatsapp', 'update_account', 'update_card',
             'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
             'update_series_from'],
     'authenticated executa só as 80 funções expostas (as 5 de contas, testadas em 85, as 5 de orçamento e limite, testadas em 80, as 11 de cartão, as 4 de data, a exclusão da conta, testada em 99, e as de antes)';
