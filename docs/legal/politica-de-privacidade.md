@@ -216,7 +216,7 @@ A Clarevo não vende dados e não compartilha dados para publicidade.
 
 Hoje usamos:
 
-- **Supabase** (autenticação e banco de dados). Recebe todos os dados guardados pela Clarevo descritos na seção 3. O projeto de produção fica hoje na região us-east-1 (Virgínia, Estados Unidos). [A DEFINIR: manter nos Estados Unidos ou mudar o projeto para a região de São Paulo antes do lançamento]
+- **Supabase** (autenticação e banco de dados). Recebe todos os dados guardados pela Clarevo descritos na seção 3. O projeto de produção fica na região de São Paulo (Brasil).
 - **Cloudflare** (hospedagem da versão web e do site). Pela hospedagem, recebe os dados de acesso às páginas, como o IP, para entregá-las, e não recebe o que você anota. Se o formulário de contato ou o cadastro das Novidades estiver ligado, o pedido de envio também passa por ela, que o entrega ao site e não o guarda. [A DEFINIR: confirmar com a Cloudflare] [A DEFINIR: confirmar se a Cloudflare também fica na frente do Supabase, caso em que as requisições do app ao banco passam por ela em trânsito, conferindo na lista de suboperadores do Supabase] [A DEFINIR: confirmar onde a Cloudflare processa os acessos e se define algum cookie técnico]
 - **Google (ML Kit), só no Android.** Componente de leitura de código incluído no app, usado quando você lê o QR Code da nota. A imagem é lida no aparelho, mas o componente pode enviar ao Google dados técnicos de uso e identificadores do aparelho, para fins de diagnóstico e funcionamento. Não recebe o que você anota. [A DEFINIR: confirmar na documentação do fornecedor o que é enviado, para quê e onde é tratado]
 - **Expo** (geração dos builds do app). Recebe o código do app. Não recebe dados de quem usa o app.

@@ -4,7 +4,7 @@
 
 Não consegui abrir a documentação do Supabase deste ambiente (acesso bloqueado pela rede). Os nomes dos menus abaixo podem variar um pouco no painel; o conteúdo de cada passo é o mesmo.
 
-**O projeto real (conferido no painel em 30/10/2026, D-074).** Organização "Clarevo by Enzo Velasquez", projeto "enzofishvelasquez-creator's Project" (o nome `clarevo-producao` abaixo era só a sugestão da criação), região **us-east-1 (Estados Unidos)**, plano gratuito, Site URL `https://app.clarevo.app.br`. A organização "bios-producao" é de outro produto: nada desta página vale para ela. As migrações até a 0019 estão aplicadas (a 0019 em 30/10/2026, conferida pela consulta do passo 21g).
+**O projeto real (D-074 e D-075).** Desde 30/10/2026, o app usa o projeto `clarevo-producao`, na organização "Clarevo by Enzo Velasquez", região **South America (São Paulo)**, com as 19 migrações (conferidas: 27 tabelas, 27 com RLS, 83 funções do app, nenhuma para `anon`, reforço da 0019 ativo), o login como na seção 3 e o SMTP do Resend com a chave própria do projeto. O projeto anterior, "enzofishvelasquez-creator's Project" (us-east-1, Estados Unidos), tinha só uma conta de teste e nenhum registro: fica pausado e depois é excluído (docs/23, seção 5d, fase 7). A organização "bios-producao" é de outro produto: nada desta página vale para ela.
 
 ## 1. Criar o projeto (você, ~5 min)
 
@@ -460,6 +460,7 @@ Em **Authentication**:
   - *Site URL*: o endereço da versão web quando publicada (por enquanto, `http://localhost:8081`).
   - *Redirect URLs*: adicione `clarevo://**`, `exp://**` (para testar no Expo Go) e `http://localhost:8081/**`.
 - **Rate limits**: mantenha os limites padrão contra tentativas abusivas.
+- **Como está no projeto real (lido no painel em 30/10/2026, D-075):** Site URL `https://app.clarevo.app.br`; Redirect URLs `clarevo://**`, `exp://**`, `http://localhost:8081/**`, `https://clarevo.pages.dev/**` e `https://app.clarevo.app.br/**`; Email com Confirm email ligado, cadastro aberto, sem vínculo manual e sem acesso anônimo; código por e-mail de 8 dígitos, válido por 3600 segundos; senha de 8 caracteres no mínimo com letras e números; Secure email change ligado (Secure password change, Require current password e Prevent leaked passwords desligados; o último só existe no Pro); SMTP do Resend como abaixo; modelos personalizados só os dois abaixo (os outros no padrão); Rate Limits: e-mails 30 por hora, renovação de sessão 150 a cada 5 minutos, verificação de código 30 a cada 5 minutos, cadastro e entrada 30 a cada 5 minutos, intervalo mínimo por pessoa de 60 segundos, encaminhamento de IP desligado.
 - **Emails → SMTP**: o envio padrão do Supabase tem limite baixo e serve só para testes. No projeto da Clarevo, o SMTP próprio está ligado desde 27/10/2026: Resend, remetente `nao-responda@clarevo.app.br`, nome Clarevo, servidor `smtp.resend.com`, porta 465 (roteiro 5c de `docs/23`). Com SMTP próprio, o limite padrão é de 30 e-mails de autenticação por hora (Rate Limits).
 
 ### Textos dos e-mails (Authentication → Emails → Templates)
