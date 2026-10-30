@@ -16,7 +16,7 @@ const K: readonly number[] = [
 ];
 
 /** Texto em bytes UTF-8 (sem TextEncoder, que o Hermes antigo não tem). Pares substitutos viram um caractere só; sobra isolada vira U+FFFD. */
-function utf8Bytes(text: string): number[] {
+export function utf8Bytes(text: string): number[] {
   const bytes: number[] = [];
   for (let i = 0; i < text.length; i++) {
     let code = text.charCodeAt(i);

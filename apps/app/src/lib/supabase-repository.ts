@@ -121,6 +121,8 @@ import {
   type SeriesWrite,
   type SignupSource,
   type SignupSourceOption,
+  type WhatsAppCode,
+  type WhatsAppLinkState,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -1164,6 +1166,31 @@ function toSavingsCheck(r: SavingsCheckRow): SavingsCheck {
 }
 
 /** "Como você conheceu o Clarevo?": uma das seis origens, versão de 1 em diante e as duas datas. Sem resposta (versão 0), o banco devolve origem nula. */
+/** Retorno de my_whatsapp e unlink_whatsapp. O número nunca vem: o banco não o guarda. */
+interface WhatsAppStateRow {
+  linked: boolean;
+  context_id: string | null;
+  linked_at: string | null;
+  code_context_id: string | null;
+  code_expires_at: string | null;
+}
+
+function toWhatsAppState(r: WhatsAppStateRow | null): WhatsAppLinkState {
+  if (!r || typeof r.linked !== 'boolean' || r.linked !== (r.context_id !== null) || r.linked !== (r.linked_at !== null)
+      || (r.code_context_id === null) !== (r.code_expires_at === null)) {
+    throw new RepoError('desconhecido', 'whatsapp_inconsistente');
+  }
+  return { linked: r.linked, contextId: r.context_id, linkedAt: r.linked_at, codeContextId: r.code_context_id, codeExpiresAt: r.code_expires_at };
+}
+
+/** Retorno de create_whatsapp_code: o código só na primeira resposta (na repetição, nulo). */
+function toWhatsAppCode(r: { code: string | null; context_id: string; expires_at: string | null } | null): WhatsAppCode {
+  if (!r || typeof r.context_id !== 'string' || (r.code !== null && !/^[A-HJ-NP-Z2-9]{8}$/.test(r.code)) || (r.code !== null && !r.expires_at)) {
+    throw new RepoError('desconhecido', 'codigo_inconsistente');
+  }
+  return { code: r.code, contextId: r.context_id, expiresAt: r.expires_at };
+}
+
 function toSignupSource(r: SignupSourceRow): SignupSource {
   const version = whole(r.version);
   if (typeof r.source !== 'string' || !(SIGNUP_SOURCES as readonly string[]).includes(r.source) || version < 1 || !r.answered_at || !r.updated_at) {
@@ -2427,6 +2454,29 @@ export class SupabaseRepository implements RecordsRepository {
     if (error) throw repoError(error);
     if (!data) throw new RepoError('desconhecido');
     return toSignupSource(data as SignupSourceRow);
+  }
+
+  // -------------------------------------------------------------------------
+  // WhatsApp (D-076, migração 0020)
+  // -------------------------------------------------------------------------
+
+  async getWhatsApp(): Promise<WhatsAppLinkState> {
+    const { data, error } = await this.db.rpc('my_whatsapp');
+    if (error) throw repoError(error);
+    return toWhatsAppState(data as WhatsAppStateRow | null);
+  }
+
+  /** O código vem só na primeira resposta; a repetição da chave devolve code nulo (quem perdeu a resposta gera outro). */
+  async createWhatsAppCode(key: string, contextId: string): Promise<WhatsAppCode> {
+    const { data, error } = await this.db.rpc('create_whatsapp_code', { p_context_id: contextId, p_key: key });
+    if (error) throw repoError(error);
+    return toWhatsAppCode(data as { code: string | null; context_id: string; expires_at: string | null } | null);
+  }
+
+  async unlinkWhatsApp(key: string): Promise<WhatsAppLinkState> {
+    const { data, error } = await this.db.rpc('unlink_whatsapp', { p_key: key });
+    if (error) throw repoError(error);
+    return toWhatsAppState(data as WhatsAppStateRow | null);
   }
 
   // -------------------------------------------------------------------------

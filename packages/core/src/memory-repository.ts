@@ -61,6 +61,7 @@ import type {
   ReturnReviewAction,
   SavingsAction,
   SignupSourceAction,
+  WhatsAppAction,
   SeriesAction,
   SeriesWrite,
   SubscriptionReviewAction,
@@ -140,6 +141,9 @@ import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import { savingsAnswerError, savingsAskAgainOn } from './savings';
 import { signupSourceError, type SignupSource, type SignupSourceOption } from './signup-source';
+import { WHATSAPP_CODE_ALPHABET, WHATSAPP_CODE_LENGTH } from './whatsapp/mensagem';
+import { WHATSAPP_CODE_MINUTES } from './whatsapp/respostas';
+import type { WhatsAppCode, WhatsAppLinkState } from './whatsapp/app';
 import {
   ANNUAL_MAX_YEARS,
   SERIES_LIMIT,
@@ -173,6 +177,7 @@ interface Operation {
     | SubscriptionReviewAction
     | MonthCheckAction
     | SignupSourceAction
+    | WhatsAppAction
     | ImportAction
     | FamilyAction
     | CompanyAction;
@@ -358,6 +363,8 @@ export class MemoryRepository implements RecordsRepository {
   private savingsChecks = new Map<string, SavingsCheck>();
   /** signup_sources da pessoa (só ela usa este repositório): no máximo uma resposta, de "Como você conheceu o Clarevo?" (D-067). */
   private signupSource: SignupSource | null = null;
+  /** Código de ligar o WhatsApp pendente (na memória não há servidor: nada liga o número). */
+  private whatsappCode: { contextId: string; expiresAt: string } | null = null;
   private cards = new Map<string, StoredCard>();
   private cardEntries = new Map<string, StoredCardEntry>();
   private seq = 0;
@@ -428,6 +435,7 @@ export class MemoryRepository implements RecordsRepository {
       goalMovements: new Map(this.goalMovements),
       savingsChecks: new Map(this.savingsChecks),
       signupSource: this.signupSource,
+      whatsappCode: this.whatsappCode,
       cards: new Map(this.cards),
       cardEntries: new Map(this.cardEntries),
       accountsById: new Map(this.accountsById),
@@ -454,6 +462,7 @@ export class MemoryRepository implements RecordsRepository {
         goalMovements: this.goalMovements,
         savingsChecks: this.savingsChecks,
         signupSource: this.signupSource,
+        whatsappCode: this.whatsappCode,
         cards: this.cards,
         cardEntries: this.cardEntries,
         accountsById: this.accountsById,
@@ -2123,6 +2132,52 @@ export class MemoryRepository implements RecordsRepository {
       else if (current.source !== source) this.signupSource = { ...current, source, version: current.version + 1, updatedAt: now };
       this.saveOperation(key, 'responder_origem_cadastro', payload, { contextId: this.space.personalContextId, recordId: null, commitmentId: null });
       return this.signupSource!;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // WhatsApp (D-076, migração 0020): my_whatsapp, create_whatsapp_code e unlink_whatsapp. Na memória (demonstração e testes) não há
+  // servidor: o código é gerado, mas nenhum número é ligado.
+  // ---------------------------------------------------------------------------
+
+  private whatsappState(): WhatsAppLinkState {
+    return {
+      linked: false,
+      contextId: null,
+      linkedAt: null,
+      codeContextId: this.whatsappCode?.contextId ?? null,
+      codeExpiresAt: this.whatsappCode?.expiresAt ?? null,
+    };
+  }
+
+  async getWhatsApp() {
+    return this.read(() => this.whatsappState());
+  }
+
+  /** Como create_whatsapp_code. Ordem: repetição (code nulo); sem_permissao (anotar no espaço); código novo no lugar do anterior. */
+  async createWhatsAppCode(key: string, contextId: string): Promise<WhatsAppCode> {
+    return this.write(() => {
+      const payload = [contextId];
+      const replayed = this.replay(key, 'gerar_codigo_whatsapp', payload);
+      if (replayed) return { code: null, contextId: replayed.contextId, expiresAt: this.whatsappCode?.expiresAt ?? null };
+      if (!this.space || !this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      let code = '';
+      for (let i = 0; i < WHATSAPP_CODE_LENGTH; i++) code += WHATSAPP_CODE_ALPHABET[Math.floor(Math.random() * WHATSAPP_CODE_ALPHABET.length)];
+      const expiresAt = new Date(Date.parse(this.stamp()) + WHATSAPP_CODE_MINUTES * 60_000).toISOString();
+      this.whatsappCode = { contextId, expiresAt };
+      this.saveOperation(key, 'gerar_codigo_whatsapp', payload, { contextId, recordId: null, commitmentId: null });
+      return { code, contextId, expiresAt };
+    });
+  }
+
+  /** Como unlink_whatsapp: apaga o código pendente (não há número ligado na memória). Operação no Pessoal. */
+  async unlinkWhatsApp(key: string): Promise<WhatsAppLinkState> {
+    return this.write(() => {
+      if (this.replay(key, 'desligar_whatsapp', [])) return this.whatsappState();
+      if (!this.space) throw new RepoError('sem_permissao');
+      this.whatsappCode = null;
+      this.saveOperation(key, 'desligar_whatsapp', [], { contextId: this.space.personalContextId, recordId: null, commitmentId: null });
+      return this.whatsappState();
     });
   }
 
@@ -3839,7 +3894,7 @@ export class MemoryRepository implements RecordsRepository {
 
   /**
    * Como o gatilho clarevo_track_activity em record_operations: toda operação nova, menos decidir_revisao,
-   * responder_guardar, responder_origem_cadastro, revisar_assinaturas e as duas de "Conferi este mês", deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
+   * responder_guardar, responder_origem_cadastro, revisar_assinaturas, as duas de "Conferi este mês" e as do WhatsApp, deixa o último dia com anotação >= hoje; se o intervalo desde o último for uma ausência longa,
    * ela passa a ser a última ausência. Mesmo dia ou relógio para trás: nada muda.
    */
   private trackActivity(action: Operation['action'], contextId: string) {
@@ -3850,6 +3905,8 @@ export class MemoryRepository implements RecordsRepository {
       action === 'revisar_assinaturas' ||
       action === 'marcar_mes_conferido' ||
       action === 'desmarcar_mes_conferido' ||
+      action === 'gerar_codigo_whatsapp' ||
+      action === 'desligar_whatsapp' ||
       isFamilyAction(action) ||
       isCompanyAction(action)
     )
@@ -4275,6 +4332,7 @@ export class MemoryRepository implements RecordsRepository {
       this.goalMovements.clear();
       this.savingsChecks.clear();
       this.signupSource = null;
+      this.whatsappCode = null;
       this.cards.clear();
       this.cardEntries.clear();
       this.accountsById.clear();

@@ -81,7 +81,12 @@ const SOURCE_TEXT = [
 const quoted = (text: string): string[] => [...text.matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
 
 /** Telas de consulta (e as abas) sem entrada de guia, com a razão. Vazia: toda tela de consulta tem entrada. */
-const COVERAGE_EXCEPTIONS: readonly { route: string; reason: string }[] = [];
+const COVERAGE_EXCEPTIONS: readonly { route: string; reason: string }[] = [
+  {
+    route: '/conta/whatsapp',
+    reason: 'WhatsApp (D-076): a tela só aparece quando o número da Clarevo existir (WHATSAPP_NUMBER); a entrada do guia e a captura entram junto com o número.',
+  },
+];
 
 /** Telas de consulta ou abas que nenhuma entrada cobre e que não estão na lista de exceções. */
 function uncovered(routes: readonly { pattern: string; sample: string }[], entries: readonly GuideEntry[], exceptions: readonly { route: string }[]): string[] {
@@ -346,8 +351,8 @@ describe('cobertura: toda tela de consulta tem entrada (D-049)', () => {
 
   it('uma tela de consulta nova, sem entrada nem exceção, reprova', () => {
     const fake = [...ROUTES, { pattern: '/tela-nova', sample: '/tela-nova' }, { pattern: '/outra/nova', sample: '/outra/nova' }];
-    expect(uncovered(fake, GUIDE_ENTRIES, [])).toEqual(['/tela-nova', '/outra/nova']);
-    expect(uncovered(fake, GUIDE_ENTRIES, [{ route: '/tela-nova' }])).toEqual(['/outra/nova']);
+    expect(uncovered(fake, GUIDE_ENTRIES, COVERAGE_EXCEPTIONS)).toEqual(['/tela-nova', '/outra/nova']);
+    expect(uncovered(fake, GUIDE_ENTRIES, [...COVERAGE_EXCEPTIONS, { route: '/tela-nova' }])).toEqual(['/outra/nova']);
     // Formulário não precisa de entrada própria: a entrada da função explica o passo a passo.
     expect(uncovered([{ pattern: '/meta/nova', sample: '/meta/nova' }], [], [])).toEqual([]);
   });
@@ -355,7 +360,8 @@ describe('cobertura: toda tela de consulta tem entrada (D-049)', () => {
   it('cada tela de consulta ou aba tem pelo menos uma entrada que a cobre', () => {
     const browse = ROUTES.filter((r) => barModeFor(r.sample) !== 'formulario').map((r) => r.pattern);
     expect(browse.length).toBeGreaterThan(20);
-    for (const route of browse) expect(GUIDE_ENTRIES.filter((e) => e.routes.includes(route)).length, route).toBeGreaterThan(0);
+    const excepted = new Set(COVERAGE_EXCEPTIONS.map((e) => e.route));
+    for (const route of browse.filter((r) => !excepted.has(r))) expect(GUIDE_ENTRIES.filter((e) => e.routes.includes(route)).length, route).toBeGreaterThan(0);
   });
 });
 

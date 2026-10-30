@@ -468,7 +468,7 @@ end $$;
 
 -- ---------------------------------------------------------------------------
 -- 6. record_operations: responder_guardar não aponta para nada (o contexto já está em context_id), como decidir_revisao;
--- a lista vigente tem 66 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98); uma operação por escrita.
+-- a lista vigente tem 69 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98); uma operação por escrita.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -507,7 +507,7 @@ begin
     end if;
   end;
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 66, 'a lista vigente tem 66 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
+           where c.conname = 'record_operations_action_check') = 69, 'a lista vigente tem 69 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''responder_guardar''::text', 'g') m
            where c.conname = 'record_operations_action_check') = 1, 'responder_guardar na lista de ações';
   -- As 25 anteriores continuam aceitas pela restrição de ação (cada caso desfeito no próprio bloco).
@@ -520,10 +520,10 @@ begin
             'criar_compra_cartao', 'criar_compromisso', 'criar_conta', 'criar_convite_familia', 'criar_encargo_cartao',
             'criar_estorno_cartao', 'criar_familia', 'criar_meta', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao',
             'definir_limite_comprometimento', 'definir_orcamento_categoria', 'definir_renda_referencia', 'desfazer_pagamento',
-            'desfazer_pagamento_fatura', 'desmarcar_mes_conferido', 'editar', 'editar_compromisso', 'encerrar_familia', 'encerrar_licenca',
+            'desfazer_pagamento_fatura', 'desligar_whatsapp', 'desmarcar_mes_conferido', 'editar', 'editar_compromisso', 'encerrar_familia', 'encerrar_licenca',
             'encerrar_serie', 'excluir', 'excluir_cartao', 'excluir_compromisso', 'excluir_conta',
             'excluir_lancamento_cartao', 'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta',
-            'excluir_orcamento_categoria', 'excluir_renda_referencia', 'excluir_serie', 'importar_extrato', 'informar_ano',
+            'excluir_orcamento_categoria', 'excluir_renda_referencia', 'excluir_serie', 'gerar_codigo_whatsapp', 'importar_extrato', 'informar_ano', 'ligar_whatsapp',
             'marcar_assinatura', 'marcar_mes_conferido', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_meta', 'remover_membro_familia',
             'renovar_convite_licenca', 'responder_origem_cadastro', 'revisar_assinaturas', 'sair_familia', 'situacao_cartao', 'situacao_conta',
             'situacao_meta', 'tirar_ano', 'transferir_titularidade_familia'],

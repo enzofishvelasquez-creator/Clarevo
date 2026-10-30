@@ -1007,7 +1007,7 @@ begin
   perform pg_temp.expect_error(format($f$insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, target_id, import_result)
     values (%L, 'fa-op-0005', 'encerrar_familia', %L, 'x', gen_random_uuid(), '{"created":1,"skipped":0}')$f$, pg_temp.id('mauro'), fam), '%record_operations_import_check%');
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 66, 'a lista vigente tem 66 ações';
+           where c.conname = 'record_operations_action_check') = 69, 'a lista vigente tem 69 ações';
   assert (select array_agg(m[1] order by m[1] collate "C") from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
            where c.conname = 'record_operations_action_check' and m[1] in ('criar_familia', 'criar_convite_familia', 'cancelar_convite_familia',
              'aceitar_convite_familia', 'sair_familia', 'remover_membro_familia', 'alterar_papel_familia', 'transferir_titularidade_familia',

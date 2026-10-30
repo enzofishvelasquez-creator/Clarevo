@@ -14023,6 +14023,27 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Acessibilidade: nenhum termo proibido, travessão longo nem expressão vetada nas telas com letra grande', acTexts.length >= 2 && acBad.length === 0, `${acTexts.length} telas ${acBad.join(' | ')}`);
   ok('Acessibilidade: nenhuma escrita direta na rede (a demonstração e as 1.000 gravações do roteiro vivem na memória)', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
 
+  // ==================================================================================================================
+  // WhatsApp (D-076): na demonstração não há card em Conta (a demonstração não liga número, e o número da Clarevo ainda não existe), e a
+  // tela /conta/whatsapp, aberta pelo endereço, só explica: sem botão de gerar código. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const waWrites0 = writes.length;
+    await demoHome(); await openConta();
+    t = await body();
+    ok('WhatsApp: sem card em Conta na demonstração', !(await headingShown('WhatsApp')) && (await visibleCount('button', 'Anotar pelo WhatsApp')) === 0 && !t.includes('WhatsApp'), t.slice(0, 300));
+    await p.goto(`http://localhost:${PORT}/conta/whatsapp`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Na demonstração, o WhatsApp não é ligado.', 12000); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    ok('WhatsApp: a tela pelo endereço, com título, exemplos, privacidade e o aviso da demonstração',
+      new URL(p.url()).pathname === '/conta/whatsapp' && (await h1Name()) === 'WhatsApp' && t.includes('mercado 52,30') && t.includes('recebi 1500 salário') &&
+      t.includes('O microfone do teclado do celular transforma a sua fala em texto') && t.includes('As mensagens passam pelos servidores da Meta') &&
+      t.includes('Na demonstração, o WhatsApp não é ligado.'), t.slice(0, 600));
+    ok('WhatsApp: na demonstração, sem gerar código nem desligar', (await visibleCount('button', 'Gerar código')) === 0 && (await visibleCount('button', 'Desligar o WhatsApp')) === 0);
+    await atWidths(async (w) => { await layoutChecks(`WhatsApp na demonstração ${w}px`); });
+    ok('WhatsApp: nada vai à rede na demonstração', writes.length === waWrites0, writes.slice(waWrites0).join(' | '));
+  }
+
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);
   const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);
