@@ -3,7 +3,8 @@
 // Clarevo · função do servidor "whatsapp" (Edge Function do Supabase, D-076): recebe as mensagens da Meta, confere a assinatura, lê o
 // texto (regras simples, sem IA), chama as funções whatsapp_* do banco com a chave de serviço e RESPONDE só a quem escreveu, em texto
 // simples. Nunca inicia conversa nem usa mensagem de modelo (as cobradas). Segredos no painel do Supabase (Edge Functions, Secrets):
-// WHATSAPP_VERIFY_TOKEN, WHATSAPP_APP_SECRET, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID e, opcional, WHATSAPP_GRAPH_VERSION.
+// WHATSAPP_VERIFY_TOKEN, WHATSAPP_APP_SECRET, WHATSAPP_PHONE_KEY, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID e, opcional,
+// WHATSAPP_GRAPH_VERSION.
 // SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY o próprio Supabase fornece. Publicar com "Verify JWT" desligado (a Meta não manda login).
 
 const __mods = [
@@ -166,11 +167,13 @@ const __mods = [
             tokens = tokens.filter((_, i) => i !== verb);
         }
         let occurredOn = null;
+        let daysAgo = null;
         const dateIdx = new Set();
-        const setDate = (d) => {
+        const setDate = (d, rel) => {
             if (occurredOn !== null && occurredOn !== d)
                 return false;
             occurredOn = d;
+            daysAgo = rel;
             return true;
         };
         for (let i = 0; i < tokens.length; i++) {
@@ -190,7 +193,7 @@ const __mods = [
                 d = dateOf(t.folded, today);
             if (d === undefined)
                 continue;
-            if (d === null || !setDate(d))
+            if (d === null || !setDate(d, rel))
                 return { type: 'erro', reason: 'data_invalida' };
             dateIdx.add(i);
         }
@@ -238,7 +241,15 @@ const __mods = [
         if (kind === null) {
             kind = whatsappCategory(description, 'receita') !== null && whatsappCategory(description, 'despesa') === null ? 'receita' : 'despesa';
         }
-        return { type: 'anotar', kind, amountCents: chosen.cents, occurredOn: date, description, category: whatsappCategory(description, kind) };
+        return {
+            type: 'anotar',
+            kind,
+            amountCents: chosen.cents,
+            occurredOn: date,
+            daysAgo: occurredOn === null ? 0 : daysAgo,
+            description,
+            category: whatsappCategory(description, kind),
+        };
     }
   },
   // packages/core/src/dates.ts
@@ -839,9 +850,12 @@ const __mods = [
     function whatsappParseReply(reason) {
         return PARSE_REPLY[reason];
     }
-    function whatsappOutcomeReply(outcome, today) {
+    function whatsappOutcomeReply(outcome, messageDay) {
+        const today = outcome.today ?? messageDay;
         switch (outcome.result) {
             case 'repetida':
+            case 'silencio':
+            case 'registrada':
                 return null;
             case 'ligado':
                 return `Pronto, este WhatsApp está ligado à Clarevo, no ${spaceLabel(outcome.space)}.\n\n${EXAMPLES}\n\n${WORDS}`;
@@ -926,7 +940,7 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.WHATSAPP_MAX_MESSAGES = exports.WHATSAPP_GRAPH_VERSION = exports.WHATSAPP_TIME_ZONE = void 0;
+    exports.WhatsAppFinalError = exports.WHATSAPP_MAX_BODY_BYTES = exports.WHATSAPP_MAX_MESSAGES = exports.WHATSAPP_GRAPH_VERSION = exports.WHATSAPP_TIME_ZONE = void 0;
     exports.hmacSha256Hex = hmacSha256Hex;
     exports.verifyMetaSignature = verifyMetaSignature;
     exports.whatsappPhoneHash = whatsappPhoneHash;
@@ -942,7 +956,8 @@ const __mods = [
     const respostas_1 = __req(8);
     exports.WHATSAPP_TIME_ZONE = 'America/Sao_Paulo';
     exports.WHATSAPP_GRAPH_VERSION = 'v23.0';
-    exports.WHATSAPP_MAX_MESSAGES = 20;
+    exports.WHATSAPP_MAX_MESSAGES = 100;
+    exports.WHATSAPP_MAX_BODY_BYTES = 256 * 1024;
     function hexToBytes(hex) {
         const out = [];
         for (let i = 0; i < hex.length; i += 2)
@@ -969,8 +984,8 @@ const __mods = [
             return false;
         return sameText(hmacSha256Hex((0, sha256_1.utf8Bytes)(appSecret), body), header.slice(7).toLowerCase());
     }
-    function whatsappPhoneHash(waId) {
-        return (0, sha256_1.sha256Hex)(waId.replace(/\D/g, ''));
+    function whatsappPhoneHash(waId, phoneKey) {
+        return hmacSha256Hex((0, sha256_1.utf8Bytes)(phoneKey), (0, sha256_1.utf8Bytes)(waId.replace(/\D/g, '')));
     }
     function obj(v) {
         return typeof v === 'object' && v !== null && !Array.isArray(v) ? v : null;
@@ -1000,34 +1015,51 @@ const __mods = [
                         continue;
                     const type = typeof msg?.type === 'string' ? msg.type : 'unsupported';
                     const body = obj(msg?.text)?.body;
-                    out.push({ id, from, timestamp: ts, type, text: type === 'text' && typeof body === 'string' ? body : null });
+                    const system = obj(msg?.system)?.type;
+                    out.push({
+                        id,
+                        from,
+                        timestamp: ts,
+                        type,
+                        text: type === 'text' && typeof body === 'string' ? body : null,
+                        ...(type === 'system' ? { systemType: typeof system === 'string' ? system : null } : {}),
+                    });
                 }
             }
         }
         return out;
     }
     const SILENT_TYPES = new Set(['reaction', 'system', 'unsupported', 'errors']);
-    async function handleWhatsAppMessage(msg, rpc) {
+    async function handleWhatsAppMessage(msg, rpc, phoneKey) {
+        const base = { p_message_id: msg.id, p_phone_hash: whatsappPhoneHash(msg.from, phoneKey) };
+        if (msg.type === 'system' && msg.systemType === 'user_changed_number') {
+            await rpc('whatsapp_unlink', base);
+            return null;
+        }
         if (SILENT_TYPES.has(msg.type))
             return null;
-        if (msg.type === 'request_welcome')
-            return respostas_1.WHATSAPP_REPLY.ajuda;
-        if (msg.type !== 'text' || msg.text === null)
-            return respostas_1.WHATSAPP_REPLY.midia;
         const today = (0, dates_1.todayIn)(exports.WHATSAPP_TIME_ZONE, new Date(msg.timestamp * 1000));
+        const sentAt = new Date(msg.timestamp * 1000).toISOString();
+        const noted = async (outcome, reply) => {
+            const r = await rpc('whatsapp_note', { ...base, p_outcome: outcome });
+            return r.result === 'registrada' ? reply : (0, respostas_1.whatsappOutcomeReply)(r, today);
+        };
+        if (msg.type === 'request_welcome')
+            return noted('ajuda', respostas_1.WHATSAPP_REPLY.ajuda);
+        if (msg.type !== 'text' || msg.text === null)
+            return noted('midia', respostas_1.WHATSAPP_REPLY.midia);
         const cmd = (0, mensagem_1.readWhatsAppMessage)(msg.text, today);
-        const base = { p_message_id: msg.id, p_phone_hash: whatsappPhoneHash(msg.from) };
         let outcome;
         switch (cmd.type) {
             case 'ajuda':
-                return respostas_1.WHATSAPP_REPLY.ajuda;
+                return noted('ajuda', respostas_1.WHATSAPP_REPLY.ajuda);
             case 'erro':
-                return (0, respostas_1.whatsappParseReply)(cmd.reason);
+                return noted('nao_entendi', (0, respostas_1.whatsappParseReply)(cmd.reason));
             case 'ligar':
                 outcome = await rpc('whatsapp_link', { ...base, p_code: cmd.code });
                 break;
             case 'desfazer':
-                outcome = await rpc('whatsapp_undo', base);
+                outcome = await rpc('whatsapp_undo', { ...base, p_sent_at: sentAt });
                 break;
             case 'desligar':
                 outcome = await rpc('whatsapp_unlink', base);
@@ -1035,9 +1067,11 @@ const __mods = [
             case 'anotar':
                 outcome = await rpc('whatsapp_add_record', {
                     ...base,
+                    p_sent_at: sentAt,
                     p_kind: cmd.kind,
                     p_amount_cents: cmd.amountCents,
-                    p_occurred_on: cmd.occurredOn,
+                    p_days_ago: cmd.daysAgo,
+                    p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
                     p_description: cmd.description,
                     p_category: cmd.category,
                 });
@@ -1048,6 +1082,7 @@ const __mods = [
     const REQUIRED_ENV = [
         'WHATSAPP_VERIFY_TOKEN',
         'WHATSAPP_APP_SECRET',
+        'WHATSAPP_PHONE_KEY',
         'WHATSAPP_ACCESS_TOKEN',
         'WHATSAPP_PHONE_NUMBER_ID',
         'SUPABASE_URL',
@@ -1060,6 +1095,7 @@ const __mods = [
         return {
             verifyToken: v('WHATSAPP_VERIFY_TOKEN'),
             appSecret: v('WHATSAPP_APP_SECRET'),
+            phoneKey: v('WHATSAPP_PHONE_KEY'),
             accessToken: v('WHATSAPP_ACCESS_TOKEN'),
             phoneNumberId: v('WHATSAPP_PHONE_NUMBER_ID'),
             supabaseUrl: v('SUPABASE_URL').replace(/\/+$/, ''),
@@ -1070,8 +1106,11 @@ const __mods = [
     const RESULTS = new Set([
         'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido',
         'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida', 'repetida',
-        'erro',
+        'silencio', 'registrada',
     ]);
+    class WhatsAppFinalError extends Error {
+    }
+    exports.WhatsAppFinalError = WhatsAppFinalError;
     function supabaseWhatsAppRpc(config, fetcher) {
         return async (fn, args) => {
             const headers = { apikey: config.serviceKey, 'Content-Type': 'application/json' };
@@ -1079,6 +1118,8 @@ const __mods = [
                 headers.Authorization = `Bearer ${config.serviceKey}`;
             const res = await fetcher(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args) });
             const text = await res.text();
+            if (res.status >= 400 && res.status < 500)
+                throw new WhatsAppFinalError(`banco recusou (${res.status}) em ${fn}`);
             if (res.status !== 200)
                 throw new Error(`banco respondeu ${res.status} em ${fn}`);
             const outcome = obj(JSON.parse(text));
@@ -1135,7 +1176,11 @@ const __mods = [
             }
             if (req.method !== 'POST')
                 return { status: 405, body: 'método não aceito' };
+            if (Number(req.header('content-length') ?? 0) > exports.WHATSAPP_MAX_BODY_BYTES)
+                return { status: 413, body: 'grande demais' };
             const { bytes, text } = await req.body();
+            if (bytes.length > exports.WHATSAPP_MAX_BODY_BYTES)
+                return { status: 413, body: 'grande demais' };
             if (!verifyMetaSignature(bytes, req.header('x-hub-signature-256'), config.appSecret))
                 return { status: 401, body: 'assinatura inválida' };
             let payload;
@@ -1146,14 +1191,19 @@ const __mods = [
                 return { status: 400, body: 'corpo inválido' };
             }
             const rpc = supabaseWhatsAppRpc(config, deps.fetch);
-            for (const msg of whatsappInbound(payload, config.phoneNumberId).slice(0, exports.WHATSAPP_MAX_MESSAGES)) {
+            const messages = whatsappInbound(payload, config.phoneNumberId);
+            if (messages.length > exports.WHATSAPP_MAX_MESSAGES)
+                log(`entrega com ${messages.length} mensagens: só as primeiras ${exports.WHATSAPP_MAX_MESSAGES} tratadas`);
+            for (const msg of messages.slice(0, exports.WHATSAPP_MAX_MESSAGES)) {
                 let reply;
                 try {
-                    reply = await handleWhatsAppMessage(msg, rpc);
+                    reply = await handleWhatsAppMessage(msg, rpc, config.phoneKey);
                 }
                 catch (e) {
                     log(`falha ao tratar uma mensagem: ${e instanceof Error ? e.message : 'erro'}`);
-                    return { status: 500, body: 'tente de novo' };
+                    if (!(e instanceof WhatsAppFinalError))
+                        return { status: 500, body: 'tente de novo' };
+                    reply = respostas_1.WHATSAPP_REPLY.erro;
                 }
                 if (reply === null)
                     continue;
@@ -1232,7 +1282,7 @@ const __mods = [
         unlinkConfirm: 'Desligar',
         unlinked: 'WhatsApp desligado.',
         privacyTitle: 'Privacidade',
-        privacy: 'As mensagens passam pelos servidores da Meta, empresa dona do WhatsApp. A Clarevo guarda só o que você anotou, como qualquer registro do app. O texto das mensagens e o seu número não ficam guardados: do número, só um resumo (SHA-256), para reconhecer quem escreve.',
+        privacy: 'As mensagens passam pelos servidores da Meta, empresa dona do WhatsApp. A Clarevo guarda só o que você anotou, como qualquer registro do app. O texto das mensagens e o seu número não ficam guardados: do número, só um resumo feito com uma chave secreta, para reconhecer quem escreve.',
         error: 'Não deu para concluir agora. Tente de novo.',
         demo: 'Na demonstração, o WhatsApp não é ligado.',
         notReady: 'O número da Clarevo no WhatsApp ainda está sendo preparado.',

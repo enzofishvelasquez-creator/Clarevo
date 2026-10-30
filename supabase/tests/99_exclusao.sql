@@ -486,8 +486,8 @@ begin
     perform public.create_whatsapp_code(pg_temp.id(n || '_ctx'), 'ex-wa-code2-' || n);
   end loop;
   perform set_config('request.jwt.claim.sub', '', true);
-  assert public.whatsapp_add_record('ex-wa-msg-eli-2', encode(sha256(convert_to('5521900000001', 'UTF8')), 'hex'), 'despesa', 990,
-                                    '2026-10-01', 'Pelo WhatsApp', null) ->> 'result' = 'anotado', 'o Eli anota pelo WhatsApp';
+  assert public.whatsapp_add_record('ex-wa-msg-eli-2', encode(sha256(convert_to('5521900000001', 'UTF8')), 'hex'), now(), 'despesa', 990,
+                                    null, '2026-10-01', 'Pelo WhatsApp', null) ->> 'result' = 'anotado', 'o Eli anota pelo WhatsApp';
 end $$;
 select pg_temp.check_links();
 

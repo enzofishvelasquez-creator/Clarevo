@@ -84,7 +84,8 @@ export default function WhatsAppScreen() {
     try {
       const s = await repo.getWhatsApp();
       setState(s);
-      if (s.linked && (!code || s.contextId === code.contextId)) {
+      // Ligado com o código desta tela: o código foi usado (some do estado) e o espaço é o dele.
+      if (s.linked && s.codeExpiresAt === null && (!code || s.contextId === code.contextId)) {
         setCode(null);
         setChanging(false);
         setMsg({ tone: 'sucesso', text: T.linkedNow });

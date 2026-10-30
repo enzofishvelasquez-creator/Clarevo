@@ -31,7 +31,17 @@ export type WhatsAppCommand =
   | { type: 'desfazer' }
   | { type: 'desligar' }
   | { type: 'ajuda' }
-  | { type: 'anotar'; kind: RecordKind; amountCents: Cents; occurredOn: IsoDate; description: string; category: string | null }
+  | {
+      type: 'anotar';
+      kind: RecordKind;
+      amountCents: Cents;
+      /** A data pelo dia de `today` (o servidor manda ao banco a data escrita ou os dias antes, e o banco usa o dia da pessoa). */
+      occurredOn: IsoDate;
+      /** "hoje" (0, também sem data), "ontem" (1), "anteontem" (2); null quando a data foi escrita ("dia 5", "12/10"). */
+      daysAgo: number | null;
+      description: string;
+      category: string | null;
+    }
   | { type: 'erro'; reason: WhatsAppParseError };
 
 /** Sem acento e em minúsculas, para comparar palavras. */
@@ -186,10 +196,12 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
 
   // Data: uma só (repetir a mesma vale).
   let occurredOn: IsoDate | null = null;
+  let daysAgo: number | null = null;
   const dateIdx = new Set<number>();
-  const setDate = (d: IsoDate): boolean => {
+  const setDate = (d: IsoDate, rel: number | null): boolean => {
     if (occurredOn !== null && occurredOn !== d) return false;
     occurredOn = d;
+    daysAgo = rel;
     return true;
   };
   for (let i = 0; i < tokens.length; i++) {
@@ -205,7 +217,7 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
       i++;
     } else d = dateOf(t.folded, today);
     if (d === undefined) continue;
-    if (d === null || !setDate(d)) return { type: 'erro', reason: 'data_invalida' };
+    if (d === null || !setDate(d, rel)) return { type: 'erro', reason: 'data_invalida' };
     dateIdx.add(i);
   }
   tokens = tokens.filter((_, i) => !dateIdx.has(i));
@@ -249,5 +261,13 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
     // Sem palavra de tipo: recebimento só quando a descrição é de recebimento e não de gasto ("salário 3000", "reembolso 80").
     kind = whatsappCategory(description, 'receita') !== null && whatsappCategory(description, 'despesa') === null ? 'receita' : 'despesa';
   }
-  return { type: 'anotar', kind, amountCents: chosen.cents, occurredOn: date, description, category: whatsappCategory(description, kind) };
+  return {
+    type: 'anotar',
+    kind,
+    amountCents: chosen.cents,
+    occurredOn: date,
+    daysAgo: occurredOn === null ? 0 : daysAgo,
+    description,
+    category: whatsappCategory(description, kind),
+  };
 }

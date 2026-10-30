@@ -6,9 +6,10 @@
 -- não cobra) e nunca inicia conversa nem usa mensagem de modelo.
 --
 -- Invariantes:
--- W1. Nada da mensagem fica guardado: nem o texto, nem o número. Do número fica só o resumo SHA-256 (64 hexadecimais, calculado no
---     servidor); da mensagem, só o identificador da Meta (para não anotar duas vezes a mesma entrega), o resumo do número, a pessoa, o
---     resultado e o registro anotado, por 30 dias (whatsapp_messages). Do código de ligar, só o SHA-256.
+-- W1. Nada da mensagem fica guardado: nem o texto, nem o número. Do número fica só um resumo HMAC-SHA256 com uma chave que só a função do
+--     servidor conhece (64 hexadecimais; sem a chave, o banco não volta ao número); da mensagem, só o identificador da Meta (para não
+--     anotar duas vezes a mesma entrega), o resumo do número, a pessoa, o resultado e o registro anotado, por 30 dias (whatsapp_messages).
+--     Do código de ligar, só o SHA-256.
 -- W2. Um número por pessoa e uma pessoa por número (whatsapp_links): ligar de novo troca o número ou o espaço; o número que passa a
 --     outra pessoa sai da anterior (quem mandou o código pelo número prova as duas pontas).
 -- W3. O código de ligar (create_whatsapp_code) tem 8 símbolos de um alfabeto de 32 (sem I, O, 0 e 1), vale 15 minutos, serve uma vez e é
@@ -18,17 +19,21 @@
 --     função define a sessão como a da pessoa só dentro da transação (request.jwt.claims) e devolve a anterior. Permissão, validação,
 --     idempotência (chave whatsapp:<md5 do identificador>), operação em record_operations, conta excluída e atividade são as de sempre.
 --     A conta de origem é a principal do espaço ligado. Desfazer vale só para a última anotação feita pelo WhatsApp, nas últimas 24 horas.
--- W5. A mesma entrega repetida pela Meta (mesmo identificador) não grava nada e devolve {result: 'repetida'} (o servidor não responde).
---     Mais de 30 mensagens em 10 minutos pelo mesmo número: muitas_mensagens, sem anotar.
--- W6. As funções whatsapp_link, whatsapp_add_record, whatsapp_undo e whatsapp_unlink só são executáveis pela chave de serviço
+-- W5. A mesma entrega repetida pela Meta (mesmo identificador) não grava nada e devolve {result: 'repetida'} (o servidor não responde),
+--     inclusive nas mensagens respondidas sem ir aos dados (ajuda, mídia, não entendi: whatsapp_note). 30 mensagens em 10 minutos pelo
+--     mesmo número, ligado ou não: muitas_mensagens uma vez, depois silencio (sem resposta), sem anotar. O dia ("hoje", "ontem") é o da
+--     pessoa no instante da mensagem, no fuso dela (clarevo_whatsapp_day), o mesmo que o banco usa para recusar data futura.
+-- W6. As funções whatsapp_note, whatsapp_link, whatsapp_add_record, whatsapp_undo e whatsapp_unlink só são executáveis pela chave de serviço
 --     (service_role); nem anon, nem authenticated. As do app (create_whatsapp_code, unlink_whatsapp e my_whatsapp) só por authenticated.
 --     As internas clarevo_whatsapp_* por ninguém (como toda clarevo_*, 0019). As três tabelas têm RLS e nenhuma leitura direta pelo app.
 -- W7. Gerar código, ligar e desligar ficam em record_operations sem alvo e NÃO contam como anotação na atividade (D-030); anotar e
 --     desfazer contam, como no app (são criar e excluir).
--- W8. Exclusão da conta (D-058): clarevo_erase_person apaga o vínculo, o código e as mensagens da pessoa (a mesma função da 0019, com
---     três linhas a mais). As chaves para persons e financial_contexts também têm cascata.
+-- W8. Exclusão da conta (D-058): clarevo_erase_person toma a trava do WhatsApp da pessoa antes de travar a linha dela e apaga o vínculo, o
+--     código e as mensagens da pessoa (a mesma função da 0019, com essas linhas a mais). As funções do servidor releem o vínculo com a mesma
+--     trava, então nada fica para trás de uma mensagem que chega durante a exclusão. As chaves para persons e financial_contexts também têm
+--     cascata.
 --
--- Esta migração cria três tabelas, quatro funções internas, três funções do app e quatro do servidor; recria clarevo_track_activity e
+-- Esta migração cria três tabelas, oito funções internas, três funções do app e cinco do servidor; recria clarevo_track_activity e
 -- clarevo_erase_person (só com as linhas novas) e as listas de ações de record_operations. Privilégios no fim, só do que é novo.
 -- Aplicar no SQL Editor depois da 0019 (docs/05, passo 12j). Testes em supabase/tests/99x_whatsapp.sql e no npm run test:api.
 
@@ -64,7 +69,8 @@ create table public.whatsapp_messages (
   person_id uuid references public.persons (id) on delete cascade,
   outcome text not null check (outcome in (
     'ligado', 'anotado', 'desfeito', 'desligado', 'nao_ligado', 'codigo_invalido', 'muitas_tentativas', 'muitas_mensagens',
-    'nada_para_desfazer', 'sem_permissao', 'sem_conta', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida')),
+    'nada_para_desfazer', 'sem_permissao', 'sem_conta', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
+    'ajuda', 'midia', 'nao_entendi')),
   record_id uuid references public.financial_records (id) on delete set null,
   undone_at timestamptz,
   received_at timestamptz not null default now()
@@ -375,9 +381,110 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Servidor (só service_role). Todas: trava do número; repetição (W5); formato do identificador e do resumo (22023, o servidor manda
--- sempre certo). Os casos esperados voltam em {result}; só falha inesperada vira erro (o servidor devolve 500 e a Meta entrega de novo).
+-- Servidor (só service_role). Todas começam pela porta (clarevo_whatsapp_gate): formato do identificador e do resumo (22023, o
+-- servidor manda sempre certo), trava do número, repetição (W5) e excesso de mensagens. Os casos esperados voltam em {result}; só falha
+-- inesperada vira erro (o servidor devolve 500 e a Meta entrega de novo). A trava da pessoa ('whatsapp:p:') vem sempre depois da do
+-- número, e a exclusão da conta a toma antes de travar a pessoa (W8).
 -- ---------------------------------------------------------------------------
+
+-- O dia da pessoa no instante da mensagem (o "hoje" e o "ontem" de quem escreveu, no fuso dela). Gancho de teste: clarevo.today.
+create or replace function public.clarevo_whatsapp_day(p_person uuid, p_at timestamptz)
+returns date
+language plpgsql
+stable
+set search_path = public
+as $$
+declare
+  v_override text := nullif(current_setting('clarevo.today', true), '');
+  v_tz text;
+begin
+  if v_override is not null then
+    return v_override::date;
+  end if;
+  select time_zone into v_tz from public.persons where id = p_person;
+  begin
+    return (coalesce(p_at, now()) at time zone coalesce(v_tz, 'America/Sao_Paulo'))::date;
+  exception when others then
+    return (coalesce(p_at, now()) at time zone 'America/Sao_Paulo')::date;
+  end;
+end;
+$$;
+
+-- A porta de todas as funções do servidor. Devolve o resultado quando a mensagem para aqui (repetida; muitas_mensagens na primeira
+-- vez que passa de 30 em 10 minutos; silencio nas seguintes, para não responder a uma enxurrada), ou null para seguir.
+create or replace function public.clarevo_whatsapp_gate(p_message_id text, p_phone_hash text)
+returns jsonb
+language plpgsql
+volatile
+set search_path = public
+as $$
+declare
+  v_last text;
+begin
+  if p_message_id is null or char_length(p_message_id) not between 1 and 200 or p_phone_hash is null or p_phone_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'mensagem_invalida' using errcode = '22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtext('whatsapp:' || p_phone_hash));
+  if exists (select 1 from public.whatsapp_messages where message_id = p_message_id) then
+    return jsonb_build_object('result', 'repetida');
+  end if;
+  if (select count(*) from public.whatsapp_messages
+       where phone_hash = p_phone_hash and received_at > now() - interval '10 minutes') >= 30 then
+    select outcome into v_last from public.whatsapp_messages where phone_hash = p_phone_hash order by received_at desc, message_id desc limit 1;
+    perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, null, 'muitas_mensagens');
+    return jsonb_build_object('result', case when v_last = 'muitas_mensagens' then 'silencio' else 'muitas_mensagens' end);
+  end if;
+  return null;
+end;
+$$;
+
+-- O vínculo do número, lido de novo com a trava da pessoa (a exclusão da conta e o desligar pelo app esperam aqui). null: sem vínculo.
+create or replace function public.clarevo_whatsapp_link_locked(p_phone_hash text)
+returns public.whatsapp_links
+language plpgsql
+volatile
+set search_path = public
+as $$
+declare
+  v_link public.whatsapp_links%rowtype;
+  v_person uuid;
+begin
+  select person_id into v_person from public.whatsapp_links where phone_hash = p_phone_hash;
+  if v_person is null then
+    return null;
+  end if;
+  perform pg_advisory_xact_lock(hashtext('whatsapp:p:' || v_person::text));
+  select * into v_link from public.whatsapp_links where phone_hash = p_phone_hash and person_id = v_person;
+  if not found then
+    return null;
+  end if;
+  return v_link;
+end;
+$$;
+
+-- Mensagem respondida sem ir aos dados (ajuda, mídia, texto que a Clarevo não entendeu): fica registrada para a repetição e para o
+-- limite de mensagens. Retorno: {result: registrada | repetida | muitas_mensagens | silencio}.
+create or replace function public.whatsapp_note(p_message_id text, p_phone_hash text, p_outcome text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_gate jsonb;
+begin
+  if p_outcome is null or p_outcome not in ('ajuda', 'midia', 'nao_entendi') then
+    raise exception 'resultado_invalido' using errcode = '22023';
+  end if;
+  v_gate := public.clarevo_whatsapp_gate(p_message_id, p_phone_hash);
+  if v_gate is not null then
+    return v_gate;
+  end if;
+  perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, null, p_outcome);
+  return jsonb_build_object('result', 'registrada');
+end;
+$$;
 
 -- Ligar o número com o código. Retorno: {result: ligado | codigo_invalido | muitas_tentativas | sem_permissao, space?}.
 create or replace function public.whatsapp_link(p_message_id text, p_phone_hash text, p_code text)
@@ -388,6 +495,7 @@ security definer
 set search_path = public
 as $$
 declare
+  v_gate jsonb;
   v_code text := upper(regexp_replace(coalesce(p_code, ''), '[\s-]+', '', 'g'));
   v_code_hash text;
   v_person uuid;
@@ -396,12 +504,9 @@ declare
   v_sub text := coalesce(current_setting('request.jwt.claim.sub', true), '');
   v_ok boolean;
 begin
-  if p_message_id is null or char_length(p_message_id) not between 1 and 200 or p_phone_hash is null or p_phone_hash !~ '^[0-9a-f]{64}$' then
-    raise exception 'mensagem_invalida' using errcode = '22023';
-  end if;
-  perform pg_advisory_xact_lock(hashtext('whatsapp:' || p_phone_hash));
-  if exists (select 1 from public.whatsapp_messages where message_id = p_message_id) then
-    return jsonb_build_object('result', 'repetida');
+  v_gate := public.clarevo_whatsapp_gate(p_message_id, p_phone_hash);
+  if v_gate is not null then
+    return v_gate;
   end if;
 
   if (select count(*) from public.whatsapp_messages
@@ -411,7 +516,7 @@ begin
   end if;
 
   v_code_hash := encode(sha256(convert_to(v_code, 'UTF8')), 'hex');
-  -- A trava da pessoa vem antes da trava da linha do código (mesma ordem de create_whatsapp_code e unlink_whatsapp).
+  -- A trava da pessoa vem antes da trava da linha do código (mesma ordem de create_whatsapp_code, unlink_whatsapp e da exclusão).
   select person_id into v_person from public.whatsapp_link_codes where code_hash = v_code_hash;
   if v_person is not null then
     perform pg_advisory_xact_lock(hashtext('whatsapp:p:' || v_person::text));
@@ -446,12 +551,13 @@ begin
 end;
 $$;
 
--- Anotar um gasto ou recebimento (W4) pela create_record, na conta de origem principal do espaço ligado.
--- Retorno: {result: anotado | nao_ligado | muitas_mensagens | sem_conta | sem_permissao | data_futura | valor_invalido |
--- valor_acima_do_limite | descricao_invalida, space?, record?}.
+-- Anotar um gasto ou recebimento (W4) pela create_record, na conta de origem principal do espaço ligado. A data: p_days_ago dias antes
+-- do dia da pessoa no instante p_sent_at (no fuso dela), ou a data escrita (p_occurred_on); exatamente uma das duas.
+-- Retorno: {result: anotado | nao_ligado | sem_conta | sem_permissao | data_futura | valor_invalido | valor_acima_do_limite |
+-- descricao_invalida, space?, record?, today}.
 create or replace function public.whatsapp_add_record(
-  p_message_id text, p_phone_hash text, p_kind public.record_kind, p_amount_cents bigint, p_occurred_on date, p_description text,
-  p_category text default null
+  p_message_id text, p_phone_hash text, p_sent_at timestamptz, p_kind public.record_kind, p_amount_cents bigint, p_days_ago integer,
+  p_occurred_on date, p_description text, p_category text default null
 )
 returns jsonb
 language plpgsql
@@ -460,7 +566,10 @@ security definer
 set search_path = public
 as $$
 declare
+  v_gate jsonb;
   v_link public.whatsapp_links%rowtype;
+  v_today date;
+  v_on date;
   v_account uuid;
   v_record public.financial_records%rowtype;
   v_claims text := coalesce(current_setting('request.jwt.claims', true), '');
@@ -468,36 +577,33 @@ declare
   v_error text;
   v_result text;
 begin
-  if p_message_id is null or char_length(p_message_id) not between 1 and 200 or p_phone_hash is null or p_phone_hash !~ '^[0-9a-f]{64}$' then
+  if p_sent_at is null or (p_days_ago is null) = (p_occurred_on is null) or p_days_ago not between 0 and 31 then
     raise exception 'mensagem_invalida' using errcode = '22023';
   end if;
-  perform pg_advisory_xact_lock(hashtext('whatsapp:' || p_phone_hash));
-  if exists (select 1 from public.whatsapp_messages where message_id = p_message_id) then
-    return jsonb_build_object('result', 'repetida');
+  v_gate := public.clarevo_whatsapp_gate(p_message_id, p_phone_hash);
+  if v_gate is not null then
+    return v_gate;
   end if;
 
-  select * into v_link from public.whatsapp_links where phone_hash = p_phone_hash;
-  if not found then
+  v_link := public.clarevo_whatsapp_link_locked(p_phone_hash);
+  if v_link.person_id is null then
     perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, null, 'nao_ligado');
     return jsonb_build_object('result', 'nao_ligado');
   end if;
-  if (select count(*) from public.whatsapp_messages
-       where phone_hash = p_phone_hash and received_at > now() - interval '10 minutes') >= 30 then
-    perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, v_link.person_id, 'muitas_mensagens');
-    return jsonb_build_object('result', 'muitas_mensagens');
-  end if;
+  v_today := public.clarevo_whatsapp_day(v_link.person_id, p_sent_at);
+  v_on := coalesce(p_occurred_on, v_today - p_days_ago);
 
   select a.id into v_account from public.financial_accounts a
    where a.context_id = v_link.context_id and a.is_default and a.deleted_at is null;
   if v_account is null then
     perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, v_link.person_id, 'sem_conta');
-    return jsonb_build_object('result', 'sem_conta', 'space', public.clarevo_whatsapp_space(v_link.context_id));
+    return jsonb_build_object('result', 'sem_conta', 'space', public.clarevo_whatsapp_space(v_link.context_id), 'today', v_today);
   end if;
 
   begin
     perform public.clarevo_whatsapp_as(v_link.person_id);
     v_record := public.create_record('whatsapp:' || md5(p_message_id), v_link.context_id, v_account, p_kind, p_amount_cents,
-                                     p_occurred_on, p_description, p_category, null);
+                                     v_on, p_description, p_category, null);
     perform public.clarevo_whatsapp_as(null, v_claims, v_sub);
   exception when others then
     -- O bloco desfaz o que a create_record gravou e a sessão emprestada. Só os casos esperados viram resposta.
@@ -517,19 +623,20 @@ begin
     if v_result is null then
       raise;
     end if;
-    perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, v_link.person_id, v_result);
-    return jsonb_build_object('result', v_result, 'space', public.clarevo_whatsapp_space(v_link.context_id));
+    perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, case when v_result = 'nao_ligado' then null else v_link.person_id end, v_result);
+    return jsonb_build_object('result', v_result, 'space', public.clarevo_whatsapp_space(v_link.context_id), 'today', v_today);
   end;
 
   perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, v_link.person_id, 'anotado', v_record.id);
   return jsonb_build_object('result', 'anotado', 'space', public.clarevo_whatsapp_space(v_link.context_id),
-                            'record', public.clarevo_whatsapp_record(v_record.id));
+                            'record', public.clarevo_whatsapp_record(v_record.id), 'today', v_today);
 end;
 $$;
 
--- Desfazer a última anotação feita pelo WhatsApp nas últimas 24 horas (W4), pela delete_record.
--- Retorno: {result: desfeito | nada_para_desfazer | nao_ligado | sem_permissao, space?, record?}.
-create or replace function public.whatsapp_undo(p_message_id text, p_phone_hash text)
+-- Desfazer a última anotação feita pelo WhatsApp nas últimas 24 horas (W4), pela delete_record. Só entram as anotações que a pessoa ainda
+-- pode apagar (dela, vivas, num espaço em que ainda anota): uma de um espaço que ela deixou não trava as outras.
+-- Retorno: {result: desfeito | nada_para_desfazer | nao_ligado | sem_permissao, space?, record?, today?}.
+create or replace function public.whatsapp_undo(p_message_id text, p_phone_hash text, p_sent_at timestamptz default null)
 returns jsonb
 language plpgsql
 volatile
@@ -537,62 +644,75 @@ security definer
 set search_path = public
 as $$
 declare
+  v_gate jsonb;
   v_link public.whatsapp_links%rowtype;
   v_msg public.whatsapp_messages%rowtype;
   v_record public.financial_records%rowtype;
+  v_today date;
   v_claims text := coalesce(current_setting('request.jwt.claims', true), '');
   v_sub text := coalesce(current_setting('request.jwt.claim.sub', true), '');
   v_error text;
+  v_result text;
 begin
-  if p_message_id is null or char_length(p_message_id) not between 1 and 200 or p_phone_hash is null or p_phone_hash !~ '^[0-9a-f]{64}$' then
-    raise exception 'mensagem_invalida' using errcode = '22023';
-  end if;
-  perform pg_advisory_xact_lock(hashtext('whatsapp:' || p_phone_hash));
-  if exists (select 1 from public.whatsapp_messages where message_id = p_message_id) then
-    return jsonb_build_object('result', 'repetida');
+  v_gate := public.clarevo_whatsapp_gate(p_message_id, p_phone_hash);
+  if v_gate is not null then
+    return v_gate;
   end if;
 
-  select * into v_link from public.whatsapp_links where phone_hash = p_phone_hash;
-  if not found then
+  v_link := public.clarevo_whatsapp_link_locked(p_phone_hash);
+  if v_link.person_id is null then
     perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, null, 'nao_ligado');
     return jsonb_build_object('result', 'nao_ligado');
   end if;
+  v_today := public.clarevo_whatsapp_day(v_link.person_id, p_sent_at);
 
   select m.* into v_msg from public.whatsapp_messages m
-    join public.financial_records r on r.id = m.record_id and r.deleted_at is null
+    join public.financial_records r on r.id = m.record_id and r.deleted_at is null and r.created_by = v_link.person_id
    where m.person_id = v_link.person_id and m.outcome = 'anotado' and m.undone_at is null
      and m.received_at > now() - interval '24 hours'
+     and exists (select 1 from public.context_memberships cm
+                  where cm.context_id = r.context_id and cm.person_id = v_link.person_id and cm.revoked_at is null and cm.can_write)
    order by m.received_at desc, m.message_id desc
    limit 1
    for update of m;
-  if not found then
+  -- A versão é lida com a linha travada: uma edição no app ao mesmo tempo espera aqui.
+  if found then
+    select * into v_record from public.financial_records where id = v_msg.record_id and deleted_at is null for update;
+  end if;
+  if v_record.id is null then
     perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, v_link.person_id, 'nada_para_desfazer');
     return jsonb_build_object('result', 'nada_para_desfazer');
   end if;
 
-  -- A versão é lida com a linha travada: uma edição no app ao mesmo tempo espera aqui.
-  select * into v_record from public.financial_records where id = v_msg.record_id for update;
   begin
     perform public.clarevo_whatsapp_as(v_link.person_id);
     perform public.delete_record('whatsapp:' || md5(p_message_id), v_record.id, v_record.version);
     perform public.clarevo_whatsapp_as(null, v_claims, v_sub);
   exception when others then
     get stacked diagnostics v_error = message_text;
-    if v_error not in ('sem_permissao', 'nao_encontrado', 'conta_excluida') then
+    v_result := case v_error
+      when 'sem_permissao' then 'sem_permissao'
+      when 'nao_encontrado' then 'nada_para_desfazer'
+      when 'conta_excluida' then 'nao_ligado'
+    end;
+    if v_result is null then
       raise;
     end if;
-    perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, v_link.person_id, 'sem_permissao');
-    return jsonb_build_object('result', 'sem_permissao', 'space', public.clarevo_whatsapp_space(v_record.context_id));
+    perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, case when v_result = 'nao_ligado' then null else v_link.person_id end, v_result);
+    return case when v_result = 'sem_permissao'
+                then jsonb_build_object('result', v_result, 'space', public.clarevo_whatsapp_space(v_record.context_id))
+                else jsonb_build_object('result', v_result) end;
   end;
 
   update public.whatsapp_messages set undone_at = now() where message_id = v_msg.message_id;
   perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, v_link.person_id, 'desfeito', v_record.id);
   return jsonb_build_object('result', 'desfeito', 'space', public.clarevo_whatsapp_space(v_record.context_id),
-                            'record', public.clarevo_whatsapp_record(v_record.id));
+                            'record', public.clarevo_whatsapp_record(v_record.id), 'today', v_today);
 end;
 $$;
 
--- Desligar pelo próprio WhatsApp ("desligar", "parar", "sair"). Retorno: {result: desligado | nao_ligado}.
+-- Desligar pelo próprio WhatsApp ("desligar", "parar", "sair") ou porque a pessoa trocou de número no WhatsApp (aviso do sistema da
+-- Meta: o número antigo sai). Retorno: {result: desligado | nao_ligado}.
 create or replace function public.whatsapp_unlink(p_message_id text, p_phone_hash text)
 returns jsonb
 language plpgsql
@@ -601,22 +721,19 @@ security definer
 set search_path = public
 as $$
 declare
+  v_gate jsonb;
   v_link public.whatsapp_links%rowtype;
 begin
-  if p_message_id is null or char_length(p_message_id) not between 1 and 200 or p_phone_hash is null or p_phone_hash !~ '^[0-9a-f]{64}$' then
-    raise exception 'mensagem_invalida' using errcode = '22023';
-  end if;
-  perform pg_advisory_xact_lock(hashtext('whatsapp:' || p_phone_hash));
-  if exists (select 1 from public.whatsapp_messages where message_id = p_message_id) then
-    return jsonb_build_object('result', 'repetida');
+  v_gate := public.clarevo_whatsapp_gate(p_message_id, p_phone_hash);
+  if v_gate is not null then
+    return v_gate;
   end if;
 
-  select * into v_link from public.whatsapp_links where phone_hash = p_phone_hash;
-  if not found then
+  v_link := public.clarevo_whatsapp_link_locked(p_phone_hash);
+  if v_link.person_id is null then
     perform public.clarevo_whatsapp_log(p_message_id, p_phone_hash, null, 'nao_ligado');
     return jsonb_build_object('result', 'nao_ligado');
   end if;
-  perform pg_advisory_xact_lock(hashtext('whatsapp:p:' || v_link.person_id::text));
   delete from public.whatsapp_links where person_id = v_link.person_id and phone_hash = p_phone_hash;
   delete from public.whatsapp_link_codes where person_id = v_link.person_id;
 
@@ -649,6 +766,8 @@ begin
   end if;
   -- 1. Trava por pessoa: a mesma de create_family, accept_family_invite e ensure_personal_space.
   perform pg_advisory_xact_lock(hashtext('familia:p:' || p_person::text));
+  -- W8 (0020): a trava do WhatsApp da pessoa, antes da linha da pessoa; as funções do servidor a tomam depois da do número.
+  perform pg_advisory_xact_lock(hashtext('whatsapp:p:' || p_person::text));
 
   -- 2. As Famílias candidatas (dona, titular, membro, leitora ou ex-membro) e a trava de cada uma, em ordem de identificador.
   select coalesce(array_agg(x.id order by x.id), '{}') into v_cand
@@ -752,12 +871,16 @@ revoke all on function public.clarevo_whatsapp_record(uuid) from public, anon, a
 revoke all on function public.clarevo_whatsapp_as(uuid, text, text) from public, anon, authenticated;
 revoke all on function public.clarevo_whatsapp_log(text, text, uuid, text, uuid) from public, anon, authenticated;
 revoke all on function public.clarevo_whatsapp_state(uuid) from public, anon, authenticated;
+revoke all on function public.clarevo_whatsapp_day(uuid, timestamptz) from public, anon, authenticated;
+revoke all on function public.clarevo_whatsapp_gate(text, text) from public, anon, authenticated;
+revoke all on function public.clarevo_whatsapp_link_locked(text) from public, anon, authenticated;
 revoke all on function public.my_whatsapp() from public, anon, authenticated;
 revoke all on function public.create_whatsapp_code(uuid, text) from public, anon, authenticated;
 revoke all on function public.unlink_whatsapp(text) from public, anon, authenticated;
 revoke all on function public.whatsapp_link(text, text, text) from public, anon, authenticated;
-revoke all on function public.whatsapp_add_record(text, text, public.record_kind, bigint, date, text, text) from public, anon, authenticated;
-revoke all on function public.whatsapp_undo(text, text) from public, anon, authenticated;
+revoke all on function public.whatsapp_note(text, text, text) from public, anon, authenticated;
+revoke all on function public.whatsapp_add_record(text, text, timestamptz, public.record_kind, bigint, integer, date, text, text) from public, anon, authenticated;
+revoke all on function public.whatsapp_undo(text, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.whatsapp_unlink(text, text) from public, anon, authenticated;
 do $$
 declare
@@ -766,12 +889,13 @@ begin
   if exists (select 1 from pg_roles where rolname = 'service_role') then
     execute 'revoke all on public.whatsapp_links, public.whatsapp_link_codes, public.whatsapp_messages from service_role';
     foreach f in array array['clarevo_whatsapp_space(uuid)', 'clarevo_whatsapp_record(uuid)', 'clarevo_whatsapp_as(uuid, text, text)',
-                             'clarevo_whatsapp_log(text, text, uuid, text, uuid)', 'clarevo_whatsapp_state(uuid)'] loop
+                             'clarevo_whatsapp_log(text, text, uuid, text, uuid)', 'clarevo_whatsapp_state(uuid)',
+                             'clarevo_whatsapp_day(uuid, timestamptz)', 'clarevo_whatsapp_gate(text, text)', 'clarevo_whatsapp_link_locked(text)'] loop
       execute format('revoke all on function public.%s from service_role', f);
     end loop;
-    foreach f in array array['whatsapp_link(text, text, text)',
-                             'whatsapp_add_record(text, text, public.record_kind, bigint, date, text, text)',
-                             'whatsapp_undo(text, text)', 'whatsapp_unlink(text, text)'] loop
+    foreach f in array array['whatsapp_note(text, text, text)', 'whatsapp_link(text, text, text)',
+                             'whatsapp_add_record(text, text, timestamptz, public.record_kind, bigint, integer, date, text, text)',
+                             'whatsapp_undo(text, text, timestamptz)', 'whatsapp_unlink(text, text)'] loop
       execute format('grant execute on function public.%s to service_role', f);
     end loop;
   end if;

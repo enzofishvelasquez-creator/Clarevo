@@ -23,12 +23,16 @@ export interface WhatsAppRecordInfo {
   account_name: string;
 }
 
-/** Resultado das funções whatsapp_* do banco. "repetida": a Meta mandou de novo a mesma mensagem; nada é respondido. */
+/**
+ * Resultado das funções whatsapp_* do banco. Nada é respondido em "repetida" (a Meta mandou de novo a mesma mensagem) nem em "silencio"
+ * (enxurrada de mensagens, depois do primeiro aviso). "registrada": mensagem sem dados (ajuda, mídia, não entendi), respondida pelo
+ * servidor. `today`: o dia da pessoa no instante da mensagem, no fuso dela (para "hoje" e "ontem" na resposta).
+ */
 export type WhatsAppOutcome =
-  | { result: 'ligado'; space: WhatsAppSpace }
-  | { result: 'anotado'; space: WhatsAppSpace; record: WhatsAppRecordInfo }
-  | { result: 'desfeito'; space: WhatsAppSpace; record: WhatsAppRecordInfo }
-  | { result: 'sem_permissao' | 'sem_conta'; space: WhatsAppSpace }
+  | { result: 'ligado'; space: WhatsAppSpace; today?: IsoDate }
+  | { result: 'anotado'; space: WhatsAppSpace; record: WhatsAppRecordInfo; today?: IsoDate }
+  | { result: 'desfeito'; space: WhatsAppSpace; record: WhatsAppRecordInfo; today?: IsoDate }
+  | { result: 'sem_permissao' | 'sem_conta'; space: WhatsAppSpace; today?: IsoDate }
   | {
       result:
         | 'nada_para_desfazer'
@@ -42,7 +46,10 @@ export type WhatsAppOutcome =
         | 'valor_acima_do_limite'
         | 'descricao_invalida'
         | 'repetida'
+        | 'silencio'
+        | 'registrada'
         | 'erro';
+      today?: IsoDate;
     };
 
 /** "espaço Pessoal" ou "espaço Família Souza". */
@@ -118,9 +125,12 @@ export function whatsappParseReply(reason: WhatsAppParseError): string {
 }
 
 /** Resposta para o resultado do banco. null: não responder (mensagem repetida pela Meta). */
-export function whatsappOutcomeReply(outcome: WhatsAppOutcome, today: IsoDate): string | null {
+export function whatsappOutcomeReply(outcome: WhatsAppOutcome, messageDay: IsoDate): string | null {
+  const today = outcome.today ?? messageDay;
   switch (outcome.result) {
     case 'repetida':
+    case 'silencio':
+    case 'registrada':
       return null;
     case 'ligado':
       return `Pronto, este WhatsApp está ligado à Clarevo, no ${spaceLabel(outcome.space)}.\n\n${EXAMPLES}\n\n${WORDS}`;

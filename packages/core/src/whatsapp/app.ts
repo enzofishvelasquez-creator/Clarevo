@@ -88,7 +88,7 @@ export const WHATSAPP_TEXT = {
   unlinked: 'WhatsApp desligado.',
   privacyTitle: 'Privacidade',
   privacy:
-    'As mensagens passam pelos servidores da Meta, empresa dona do WhatsApp. A Clarevo guarda só o que você anotou, como qualquer registro do app. O texto das mensagens e o seu número não ficam guardados: do número, só um resumo (SHA-256), para reconhecer quem escreve.',
+    'As mensagens passam pelos servidores da Meta, empresa dona do WhatsApp. A Clarevo guarda só o que você anotou, como qualquer registro do app. O texto das mensagens e o seu número não ficam guardados: do número, só um resumo feito com uma chave secreta, para reconhecer quem escreve.',
   error: 'Não deu para concluir agora. Tente de novo.',
   demo: 'Na demonstração, o WhatsApp não é ligado.',
   notReady: 'O número da Clarevo no WhatsApp ainda está sendo preparado.',

@@ -46,9 +46,16 @@ $$;
 create function pg_temp.link(p_msg text, p_number text, p_code text) returns jsonb language sql as $$
   select public.whatsapp_link(p_msg, pg_temp.ph(p_number), p_code)
 $$;
+-- Data escrita na mensagem (p_on); pg_temp.addrel: "hoje" e "ontem" (dias antes do dia da pessoa no instante da mensagem).
 create function pg_temp.add(p_msg text, p_number text, p_kind public.record_kind, p_cents bigint, p_on date, p_desc text, p_cat text default null)
 returns jsonb language sql as $$
-  select public.whatsapp_add_record(p_msg, pg_temp.ph(p_number), p_kind, p_cents, p_on, p_desc, p_cat)
+  select public.whatsapp_add_record(p_msg, pg_temp.ph(p_number), now(), p_kind, p_cents, null, p_on, p_desc, p_cat)
+$$;
+create function pg_temp.addrel(p_msg text, p_number text, p_days integer, p_desc text) returns jsonb language sql as $$
+  select public.whatsapp_add_record(p_msg, pg_temp.ph(p_number), now(), 'despesa', 100, p_days, null, p_desc, null)
+$$;
+create function pg_temp.note(p_msg text, p_number text, p_outcome text) returns jsonb language sql as $$
+  select public.whatsapp_note(p_msg, pg_temp.ph(p_number), p_outcome)
 $$;
 create function pg_temp.undo(p_msg text, p_number text) returns jsonb language sql as $$
   select public.whatsapp_undo(p_msg, pg_temp.ph(p_number))
@@ -130,8 +137,9 @@ begin
     assert has_function_privilege('authenticated', 'public.' || f, 'execute'), 'authenticated executa ' || f;
     assert not has_function_privilege('anon', 'public.' || f, 'execute'), 'anon não executa ' || f;
   end loop;
-  foreach f in array array['whatsapp_link(text, text, text)', 'whatsapp_add_record(text, text, public.record_kind, bigint, date, text, text)',
-                           'whatsapp_undo(text, text)', 'whatsapp_unlink(text, text)'] loop
+  foreach f in array array['whatsapp_note(text, text, text)', 'whatsapp_link(text, text, text)',
+                           'whatsapp_add_record(text, text, timestamptz, public.record_kind, bigint, integer, date, text, text)',
+                           'whatsapp_undo(text, text, timestamptz)', 'whatsapp_unlink(text, text)'] loop
     assert has_function_privilege('service_role', 'public.' || f, 'execute'), 'service_role executa ' || f;
     assert not has_function_privilege('authenticated', 'public.' || f, 'execute') and not has_function_privilege('anon', 'public.' || f, 'execute'),
       'só o servidor executa ' || f;
@@ -139,7 +147,7 @@ begin
                         where p.oid = ('public.' || f)::regprocedure and a.grantee = 0), 'sem execute para public: ' || f;
   end loop;
   assert (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and p.proname like 'clarevo\_whatsapp\_%') = 5, 'as cinco internas';
+           where n.nspname = 'public' and p.proname like 'clarevo\_whatsapp\_%') = 8, 'as oito internas';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       cross join (values ('service_role'), ('authenticated'), ('anon')) r (rolname)
                      where n.nspname = 'public' and p.proname like 'clarevo\_whatsapp\_%' and has_function_privilege(r.rolname, p.oid, 'execute')),
@@ -160,7 +168,7 @@ end $$;
 
 set role anon;
 select pg_temp.expect_code('select public.my_whatsapp()', 'permission denied for function my_whatsapp', '42501');
-select pg_temp.expect_code($q$select public.whatsapp_add_record('m', repeat('a', 64), 'despesa', 100, '2026-10-30', 'x')$q$,
+select pg_temp.expect_code($q$select public.whatsapp_add_record('m', repeat('a', 64), now(), 'despesa', 100, 0, null, 'x')$q$,
                            'permission denied for function whatsapp_add_record', '42501');
 reset role;
 set role authenticated;
@@ -349,8 +357,9 @@ begin
   r := pg_temp.add('wa-m-101', '5521900000001', 'despesa', 5230, '2026-10-30', 'Mercado', 'Mercado');
   assert r = jsonb_build_object('result', 'anotado', 'space', jsonb_build_object('kind', 'pessoal', 'name', 'Pessoal'),
                                 'record', jsonb_build_object('kind', 'despesa', 'amount_cents', 5230, 'occurred_on', '2026-10-30',
-                                                             'description', 'Mercado', 'category', 'Mercado', 'account_name', 'Conta principal')),
-    'anotado, com o registro e a conta de origem: ' || r::text;
+                                                             'description', 'Mercado', 'category', 'Mercado', 'account_name', 'Conta principal'),
+                                'today', '2026-10-30'),
+    'anotado, com o registro, a conta de origem e o dia da pessoa: ' || r::text;
   assert current_setting('request.jwt.claims', true) = '{"role":"service_role"}' and current_setting('request.jwt.claim.sub', true) = '',
     'a sessão emprestada é devolvida';
   assert pg_temp.add('wa-m-101', '5521900000001', 'despesa', 5230, '2026-10-30', 'Mercado', 'Mercado') = '{"result": "repetida"}',
@@ -370,7 +379,11 @@ begin
     'a sessão volta também depois das recusas';
 end $$;
 select pg_temp.expect_code($q$select pg_temp.add('', '5521900000001', 'despesa', 100, '2026-10-30', 'x')$q$, 'mensagem_invalida', '22023');
-select pg_temp.expect_code($q$select public.whatsapp_add_record('wa-m-109', '5521900000001', 'despesa', 100, '2026-10-30', 'x')$q$,
+select pg_temp.expect_code($q$select public.whatsapp_add_record('wa-m-109', pg_temp.ph('5521900000001'), now(), 'despesa', 100, 0, '2026-10-30', 'x')$q$,
+                           'mensagem_invalida', '22023');
+select pg_temp.expect_code($q$select public.whatsapp_add_record('wa-m-109', pg_temp.ph('5521900000001'), now(), 'despesa', 100, null, null, 'x')$q$,
+                           'mensagem_invalida', '22023');
+select pg_temp.expect_code($q$select public.whatsapp_add_record('wa-m-109', pg_temp.ph('5521900000001'), null, 'despesa', 100, 0, null, 'x')$q$,
                            'mensagem_invalida', '22023');
 reset role;
 do $$
@@ -396,7 +409,7 @@ set role service_role;
 select pg_temp.as_service();
 do $$ begin
   assert pg_temp.add('wa-m-110', '5521900000003', 'despesa', 100, '2026-10-30', 'Café')
-       = '{"result": "sem_conta", "space": {"kind": "pessoal", "name": "Pessoal"}}', 'sem conta principal';
+       = '{"result": "sem_conta", "space": {"kind": "pessoal", "name": "Pessoal"}, "today": "2026-10-30"}', 'sem conta principal';
   assert pg_temp.outcome('wa-m-110') = 'sem_conta', 'registrada';
 end $$;
 reset role;
@@ -445,11 +458,11 @@ declare
   r jsonb;
 begin
   r := pg_temp.add('wa-m-203', '5521900000004', 'despesa', 100, '2026-10-30', 'Café');
-  assert r = '{"result": "sem_permissao", "space": {"kind": "familia", "name": "Família da Ana"}}', 'quem saiu não anota: ' || r::text;
+  assert r = '{"result": "sem_permissao", "space": {"kind": "familia", "name": "Família da Ana"}, "today": "2026-10-30"}', 'quem saiu não anota: ' || r::text;
   assert pg_temp.nrecords() = n, 'nada anotado';
-  -- O desfazer também respeita a permissão de hoje.
+  -- O desfazer também respeita a permissão de hoje: a anotação da Família que a pessoa deixou não entra (nem trava as outras).
   r := pg_temp.undo('wa-m-204', '5521900000004');
-  assert r ->> 'result' = 'sem_permissao', 'quem saiu não desfaz: ' || r::text;
+  assert r = '{"result": "nada_para_desfazer"}', 'quem saiu não desfaz a anotação da Família: ' || r::text;
 end $$;
 reset role;
 
@@ -568,7 +581,10 @@ select 'wa-lote-' || g, pg_temp.ph('5521900000006'), pg_temp.id('ana'), 'nao_lig
 set role service_role;
 select pg_temp.as_service();
 do $$ begin
-  assert pg_temp.add('wa-m-500', '5521900000006', 'despesa', 100, '2026-10-30', 'Café') ->> 'result' = 'muitas_mensagens', 'trinta em dez minutos';
+  assert pg_temp.add('wa-m-500', '5521900000006', 'despesa', 100, '2026-10-30', 'Café') = '{"result": "muitas_mensagens"}', 'trinta em dez minutos';
+  assert pg_temp.add('wa-m-500b', '5521900000006', 'despesa', 100, '2026-10-30', 'Café') = '{"result": "silencio"}', 'depois, sem resposta';
+  assert pg_temp.note('wa-m-500c', '5521900000006', 'ajuda') = '{"result": "silencio"}', 'vale também para a ajuda';
+  assert pg_temp.link('wa-m-500d', '5521900000006', 'ZZZZ2222') = '{"result": "silencio"}', 'e para o código';
 end $$;
 reset role;
 update public.whatsapp_messages set received_at = now() - interval '11 minutes' where phone_hash = pg_temp.ph('5521900000006');
@@ -679,5 +695,84 @@ do $$ begin
   assert pg_temp.add('wa-m-802', '5521900000007', 'despesa', 100, '2026-10-30', 'Café') = '{"result": "nao_ligado"}', 'conta excluída não anota';
 end $$;
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- 13. Mensagens respondidas sem ir aos dados (whatsapp_note): ficam registradas para a repetição e para o limite, sem pessoa.
+-- ---------------------------------------------------------------------------
+set role service_role;
+select pg_temp.as_service();
+do $$ begin
+  assert pg_temp.note('wa-m-900', '5521900000020', 'ajuda') = '{"result": "registrada"}', 'ajuda registrada';
+  assert pg_temp.note('wa-m-900', '5521900000020', 'ajuda') = '{"result": "repetida"}', 'a repetição não responde de novo';
+  assert pg_temp.note('wa-m-901', '5521900000020', 'midia') = '{"result": "registrada"}', 'mídia';
+  assert pg_temp.note('wa-m-902', '5521900000020', 'nao_entendi') = '{"result": "registrada"}', 'não entendi';
+end $$;
+select pg_temp.expect_code($q$select pg_temp.note('wa-m-903', '5521900000020', 'outro')$q$, 'resultado_invalido', '22023');
+reset role;
+do $$ begin
+  assert pg_temp.outcome('wa-m-900') = 'ajuda' and pg_temp.outcome('wa-m-901') = 'midia' and pg_temp.outcome('wa-m-902') = 'nao_entendi', 'registradas';
+  assert (select count(*) from public.whatsapp_messages where message_id like 'wa-m-90%' and person_id is not null) = 0, 'sem pessoa';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 14. O dia da mensagem no fuso da pessoa (o mesmo que o banco usa para recusar data futura).
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_at timestamptz := '2026-10-31 03:30:00+00';  -- 00h30 de 31/10 em Brasília; 22h30 de 30/10 no Acre
+begin
+  perform set_config('clarevo.today', '', true);
+  update public.persons set time_zone = 'America/Rio_Branco' where id = pg_temp.id('bia');
+  assert public.clarevo_whatsapp_day(pg_temp.id('bia'), v_at) = '2026-10-30', 'no Acre ainda é 30/10';
+  update public.persons set time_zone = 'America/Sao_Paulo' where id = pg_temp.id('bia');
+  assert public.clarevo_whatsapp_day(pg_temp.id('bia'), v_at) = '2026-10-31', 'em Brasília já é 31/10';
+  update public.persons set time_zone = 'Fuso/Inexistente' where id = pg_temp.id('bia');
+  assert public.clarevo_whatsapp_day(pg_temp.id('bia'), v_at) = '2026-10-31', 'fuso inválido: Brasília';
+  perform set_config('clarevo.today', '2026-10-30', true);
+  assert public.clarevo_whatsapp_day(pg_temp.id('bia'), v_at) = '2026-10-30', 'o gancho de teste vale';
+  update public.persons set time_zone = 'America/Sao_Paulo' where id = pg_temp.id('bia');
+end $$;
+-- "ontem" pelo dia da pessoa: a Bia liga um número e anota com p_days_ago = 1.
+set role authenticated;
+do $$
+declare
+  r jsonb;
+begin
+  perform pg_temp.as_('bia');
+  r := public.create_whatsapp_code(pg_temp.id('bia_ctx'), 'wa-bia-code-0009');
+  insert into codes values ('bia9', r ->> 'code');
+end $$;
+reset role;
+set role service_role;
+select pg_temp.as_service();
+do $$
+declare
+  r jsonb;
+begin
+  assert pg_temp.link('wa-m-910', '5521900000021', pg_temp.code('bia9')) ->> 'result' = 'ligado', 'liga';
+  r := pg_temp.addrel('wa-m-911', '5521900000021', 1, 'Pão de ontem');
+  assert r #>> '{record,occurred_on}' = '2026-10-29' and r ->> 'today' = '2026-10-30', 'ontem é 29/10: ' || r::text;
+  r := pg_temp.addrel('wa-m-912', '5521900000021', 0, 'Pão de hoje');
+  assert r #>> '{record,occurred_on}' = '2026-10-30', 'hoje é 30/10';
+end $$;
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- 15. A exclusão da conta toma a trava do WhatsApp da pessoa antes de travar a linha dela (W8), e as funções do servidor releem o vínculo
+-- com a mesma trava.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  d text := pg_get_functiondef('public.clarevo_erase_person(uuid)'::regprocedure);
+begin
+  assert position('whatsapp:p:' in d) > 0
+     and position('whatsapp:p:' in d) < position('from public.persons p where p.id = p_person and p.deleted_at is null for update' in d),
+    'clarevo_erase_person: trava do WhatsApp antes da linha da pessoa';
+  assert position('clarevo_whatsapp_link_locked' in pg_get_functiondef('public.whatsapp_add_record(text, text, timestamptz, public.record_kind, bigint, integer, date, text, text)'::regprocedure)) > 0
+     and position('clarevo_whatsapp_link_locked' in pg_get_functiondef('public.whatsapp_undo(text, text, timestamptz)'::regprocedure)) > 0
+     and position('clarevo_whatsapp_link_locked' in pg_get_functiondef('public.whatsapp_unlink(text, text)'::regprocedure)) > 0,
+    'anotar, desfazer e desligar releem o vínculo com a trava da pessoa';
+  assert position('whatsapp:p:' in pg_get_functiondef('public.clarevo_whatsapp_link_locked(text)'::regprocedure)) > 0, 'a trava da pessoa';
+end $$;
 
 rollback;

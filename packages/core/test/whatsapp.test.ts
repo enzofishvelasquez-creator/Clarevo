@@ -34,14 +34,14 @@ import {
 
 const TODAY = '2026-10-30';
 const read = (text: string) => readWhatsAppMessage(text, TODAY);
-const anotar = (kind: 'despesa' | 'receita', amountCents: number, description: string, category: string | null, occurredOn = TODAY) => ({
-  type: 'anotar',
-  kind,
-  amountCents,
-  occurredOn,
-  description,
-  category,
-});
+const anotar = (
+  kind: 'despesa' | 'receita',
+  amountCents: number,
+  description: string,
+  category: string | null,
+  occurredOn = TODAY,
+  daysAgo: number | null = 0,
+) => ({ type: 'anotar', kind, amountCents, occurredOn, daysAgo, description, category });
 
 describe('WhatsApp: leitura das mensagens (sem IA)', () => {
   it('gasto com valor e descrição, em vários jeitos de escrever', () => {
@@ -73,16 +73,16 @@ describe('WhatsApp: leitura das mensagens (sem IA)', () => {
   });
 
   it('data: hoje, ontem, anteontem, dia N e dia/mês', () => {
-    expect(read('farmácia 38 ontem')).toEqual(anotar('despesa', 3800, 'Farmácia', 'Saúde', '2026-10-29'));
-    expect(read('anteontem feira 45')).toEqual(anotar('despesa', 4500, 'Feira', 'Mercado', '2026-10-28'));
-    expect(read('luz 180 12/10')).toEqual(anotar('despesa', 18000, 'Luz', 'Moradia', '2026-10-12'));
-    expect(read('luz 180 12/10/2025')).toEqual(anotar('despesa', 18000, 'Luz', 'Moradia', '2025-10-12'));
-    expect(read('luz 180 12/10/25')).toEqual(anotar('despesa', 18000, 'Luz', 'Moradia', '2025-10-12'));
-    expect(read('gás 120 dia 5')).toEqual(anotar('despesa', 12000, 'Gás', 'Moradia', '2026-10-05'));
+    expect(read('farmácia 38 ontem')).toEqual(anotar('despesa', 3800, 'Farmácia', 'Saúde', '2026-10-29', 1));
+    expect(read('anteontem feira 45')).toEqual(anotar('despesa', 4500, 'Feira', 'Mercado', '2026-10-28', 2));
+    expect(read('luz 180 12/10')).toEqual(anotar('despesa', 18000, 'Luz', 'Moradia', '2026-10-12', null));
+    expect(read('luz 180 12/10/2025')).toEqual(anotar('despesa', 18000, 'Luz', 'Moradia', '2025-10-12', null));
+    expect(read('luz 180 12/10/25')).toEqual(anotar('despesa', 18000, 'Luz', 'Moradia', '2025-10-12', null));
+    expect(read('gás 120 dia 5')).toEqual(anotar('despesa', 12000, 'Gás', 'Moradia', '2026-10-05', null));
     expect(read('café 8 hoje')).toEqual(anotar('despesa', 800, 'Café', 'Lazer'));
     expect(read('café 8 hoje hoje')).toEqual(anotar('despesa', 800, 'Café', 'Lazer'));
     // Na virada do ano, "ontem" é o dia anterior de verdade.
-    expect(readWhatsAppMessage('café 8 ontem', '2027-01-01')).toEqual(anotar('despesa', 800, 'Café', 'Lazer', '2026-12-31'));
+    expect(readWhatsAppMessage('café 8 ontem', '2027-01-01')).toEqual(anotar('despesa', 800, 'Café', 'Lazer', '2026-12-31', 1));
   });
 
   it('recusas com o motivo, sem anotar nada', () => {
@@ -255,9 +255,11 @@ describe('WhatsApp: servidor', () => {
     expect(verifyMetaSignature(body, sig, '')).toBe(false);
   });
 
-  it('resumo do número: SHA-256 só dos algarismos (o mesmo do banco)', () => {
-    expect(whatsappPhoneHash('5521900000001')).toBe(createHash('sha256').update('5521900000001').digest('hex'));
-    expect(whatsappPhoneHash('+55 21 90000-0001')).toBe(whatsappPhoneHash('5521900000001'));
+  it('resumo do número: HMAC-SHA256 dos algarismos com a chave da função (sem a chave, não volta ao número)', () => {
+    expect(whatsappPhoneHash('5521900000001', 'chave')).toBe(createHmac('sha256', 'chave').update('5521900000001').digest('hex'));
+    expect(whatsappPhoneHash('+55 21 90000-0001', 'chave')).toBe(whatsappPhoneHash('5521900000001', 'chave'));
+    expect(whatsappPhoneHash('5521900000001', 'outra')).not.toBe(whatsappPhoneHash('5521900000001', 'chave'));
+    expect(whatsappPhoneHash('5521900000001', 'chave')).not.toBe(createHash('sha256').update('5521900000001').digest('hex'));
   });
 
   const payload = (messages: unknown[], phoneNumberId = '111') => ({
@@ -301,51 +303,86 @@ describe('WhatsApp: servidor', () => {
       result: 'anotado',
       space: { kind: 'pessoal', name: 'Pessoal' },
       record: { kind: 'despesa', amount_cents: 1000, occurred_on: '2026-10-30', description: 'Mercado', category: 'Mercado', account_name: 'Conta principal' },
+      today: '2026-10-30',
     };
     const rpc = async (fn: string, args: Record<string, unknown>) => {
       calls.push([fn, args]);
+      if (fn === 'whatsapp_note') return { result: 'registrada' } as WhatsAppOutcome;
       return fn === 'whatsapp_add_record' ? outcome : ({ result: 'repetida' } as WhatsAppOutcome);
     };
     // 1793361600 = 30/10/2026 às 12h (UTC), 9h em Brasília.
-    const msg = (t: string, type = 'text'): WhatsAppInbound => ({ id: 'wamid.1', from: '5521988887777', timestamp: 1793361600, type, text: type === 'text' ? t : null });
-    const hash = whatsappPhoneHash('5521988887777');
+    const msg = (t: string, type = 'text', systemType?: string): WhatsAppInbound => ({
+      id: 'wamid.1', from: '5521988887777', timestamp: 1793361600, type, text: type === 'text' ? t : null, ...(systemType ? { systemType } : {}),
+    });
+    const hash = whatsappPhoneHash('5521988887777', 'chave');
+    const sentAt = '2026-10-30T12:00:00.000Z';
 
-    expect(await handleWhatsAppMessage(msg('mercado 10'), rpc)).toContain('Anotado no espaço Pessoal');
+    expect(await handleWhatsAppMessage(msg('mercado 10'), rpc, 'chave')).toContain('Anotado no espaço Pessoal');
     expect(calls).toEqual([
-      ['whatsapp_add_record', { p_message_id: 'wamid.1', p_phone_hash: hash, p_kind: 'despesa', p_amount_cents: 1000, p_occurred_on: '2026-10-30', p_description: 'Mercado', p_category: 'Mercado' }],
+      ['whatsapp_add_record', {
+        p_message_id: 'wamid.1', p_phone_hash: hash, p_sent_at: sentAt, p_kind: 'despesa', p_amount_cents: 1000, p_days_ago: 0, p_occurred_on: null,
+        p_description: 'Mercado', p_category: 'Mercado',
+      }],
     ]);
     calls.length = 0;
-    expect(await handleWhatsAppMessage(msg('Ativar ABCD-EF23'), rpc)).toBeNull();
-    expect(await handleWhatsAppMessage(msg('desfazer'), rpc)).toBeNull();
-    expect(await handleWhatsAppMessage(msg('parar'), rpc)).toBeNull();
+    // "ontem" vai como 1 dia antes (o banco usa o dia da pessoa, no fuso dela); a data escrita vai como está.
+    await handleWhatsAppMessage(msg('farmácia 38 ontem'), rpc, 'chave');
+    await handleWhatsAppMessage(msg('luz 180 12/10'), rpc, 'chave');
+    expect(calls.map((c) => [c[1].p_days_ago, c[1].p_occurred_on])).toEqual([[1, null], [null, '2026-10-12']]);
+    calls.length = 0;
+    expect(await handleWhatsAppMessage(msg('Ativar ABCD-EF23'), rpc, 'chave')).toBeNull();
+    expect(await handleWhatsAppMessage(msg('desfazer'), rpc, 'chave')).toBeNull();
+    expect(await handleWhatsAppMessage(msg('parar'), rpc, 'chave')).toBeNull();
     expect(calls.map((c) => c[0])).toEqual(['whatsapp_link', 'whatsapp_undo', 'whatsapp_unlink']);
     expect(calls[0]![1]).toEqual({ p_message_id: 'wamid.1', p_phone_hash: hash, p_code: 'ABCDEF23' });
+    expect(calls[1]![1]).toEqual({ p_message_id: 'wamid.1', p_phone_hash: hash, p_sent_at: sentAt });
     calls.length = 0;
-    // Sem ir ao banco: ajuda, recusa de leitura, mídia, reação.
-    expect(await handleWhatsAppMessage(msg('oi'), rpc)).toBe(WHATSAPP_REPLY.ajuda);
-    expect(await handleWhatsAppMessage(msg('mercado'), rpc)).toBe(whatsappParseReply('sem_valor'));
-    expect(await handleWhatsAppMessage(msg('', 'audio'), rpc)).toBe(WHATSAPP_REPLY.midia);
-    expect(await handleWhatsAppMessage(msg('', 'image'), rpc)).toBe(WHATSAPP_REPLY.midia);
-    expect(await handleWhatsAppMessage(msg('', 'reaction'), rpc)).toBeNull();
-    expect(await handleWhatsAppMessage(msg('', 'request_welcome'), rpc)).toBe(WHATSAPP_REPLY.ajuda);
-    expect(calls).toEqual([]);
+    // Sem dados, mas registradas (repetição da Meta e limite de mensagens): ajuda, recusa de leitura, mídia; reação nem isso.
+    expect(await handleWhatsAppMessage(msg('oi'), rpc, 'chave')).toBe(WHATSAPP_REPLY.ajuda);
+    expect(await handleWhatsAppMessage(msg('mercado'), rpc, 'chave')).toBe(whatsappParseReply('sem_valor'));
+    expect(await handleWhatsAppMessage(msg('', 'audio'), rpc, 'chave')).toBe(WHATSAPP_REPLY.midia);
+    expect(await handleWhatsAppMessage(msg('', 'image'), rpc, 'chave')).toBe(WHATSAPP_REPLY.midia);
+    expect(await handleWhatsAppMessage(msg('', 'reaction'), rpc, 'chave')).toBeNull();
+    expect(await handleWhatsAppMessage(msg('', 'request_welcome'), rpc, 'chave')).toBe(WHATSAPP_REPLY.ajuda);
+    expect(calls.map((c) => [c[0], c[1].p_outcome])).toEqual([
+      ['whatsapp_note', 'ajuda'], ['whatsapp_note', 'nao_entendi'], ['whatsapp_note', 'midia'], ['whatsapp_note', 'midia'], ['whatsapp_note', 'ajuda'],
+    ]);
+    calls.length = 0;
+    // Troca de número no WhatsApp (aviso do sistema): o número antigo é desligado, sem resposta.
+    expect(await handleWhatsAppMessage(msg('', 'system', 'user_changed_number'), rpc, 'chave')).toBeNull();
+    expect(await handleWhatsAppMessage(msg('', 'system', 'outro_aviso'), rpc, 'chave')).toBeNull();
+    expect(calls.map((c) => c[0])).toEqual(['whatsapp_unlink']);
   });
 
-  it('"hoje" é o dia da mensagem em Brasília, não o do servidor', async () => {
-    const seen: unknown[] = [];
-    const rpc = async (_fn: string, args: Record<string, unknown>) => {
-      seen.push(args.p_occurred_on);
-      return { result: 'repetida' } as WhatsAppOutcome;
+  it('a repetição e a enxurrada também calam as respostas sem dados', async () => {
+    const msg: WhatsAppInbound = { id: 'w', from: '5521988887777', timestamp: 1793361600, type: 'text', text: 'oi' };
+    for (const result of ['repetida', 'silencio'] as const) {
+      expect(await handleWhatsAppMessage(msg, async () => ({ result }) as WhatsAppOutcome, 'k')).toBeNull();
+    }
+    expect(await handleWhatsAppMessage(msg, async () => ({ result: 'muitas_mensagens' }) as WhatsAppOutcome, 'k')).toBe(WHATSAPP_REPLY.muitas_mensagens);
+  });
+
+  it('a resposta usa o dia da pessoa que o banco devolve ("hoje" no fuso dela)', async () => {
+    // 31/10/2026 às 02h30 (UTC): 23h30 de 30/10 em Brasília, 21h30 no Acre. O banco devolve o dia da pessoa.
+    const outcome: WhatsAppOutcome = {
+      result: 'anotado',
+      space: { kind: 'pessoal', name: 'Pessoal' },
+      record: { kind: 'despesa', amount_cents: 500, occurred_on: '2026-10-30', description: 'Café', category: 'Lazer', account_name: 'Conta principal' },
+      today: '2026-10-30',
     };
-    // 31/10/2026 às 02h (UTC) ainda é 30/10 em Brasília (23h).
-    await handleWhatsAppMessage({ id: 'w', from: '5521988887777', timestamp: Date.UTC(2026, 9, 31, 2) / 1000, type: 'text', text: 'café 5' }, rpc);
-    expect(seen).toEqual(['2026-10-30']);
+    const reply = await handleWhatsAppMessage(
+      { id: 'w', from: '5521988887777', timestamp: Date.UTC(2026, 9, 31, 2, 30) / 1000, type: 'text', text: 'café 5' },
+      async () => outcome,
+      'k',
+    );
+    expect(reply).toContain('Data: hoje, 30/10');
   });
 
   describe('a função inteira (sem Deno)', () => {
     const config: WhatsAppConfig = {
       verifyToken: 'token-de-verificacao',
       appSecret: 'segredo-do-app',
+      phoneKey: 'chave-dos-numeros',
       accessToken: 'token-de-acesso',
       phoneNumberId: '111',
       supabaseUrl: 'https://projeto.supabase.co',
@@ -362,11 +399,12 @@ describe('WhatsApp: servidor', () => {
       header: (name: string) => (name.toLowerCase() === 'x-hub-signature-256' ? sig : null),
       body: async () => ({ bytes: utf8Bytes(body), text: body }),
     });
-    function fakeNet(dbStatus = 200, outcome: WhatsAppOutcome = { result: 'nao_ligado' }) {
+    function fakeNet(dbStatus = 200, outcome: WhatsAppOutcome = { result: 'nao_ligado' }, statusOf?: (body: string) => number) {
       const sent: { url: string; headers: Record<string, string>; body: unknown }[] = [];
       const fetcher: WhatsAppFetch = async (url, init) => {
         sent.push({ url, headers: init.headers, body: JSON.parse(init.body) });
-        if (url.startsWith(config.supabaseUrl)) return { status: dbStatus, text: async () => JSON.stringify(outcome) };
+        if (url.endsWith('/rpc/whatsapp_note')) return { status: 200, text: async () => '{"result":"registrada"}' };
+        if (url.startsWith(config.supabaseUrl)) return { status: statusOf ? statusOf(init.body) : dbStatus, text: async () => JSON.stringify(outcome) };
         return { status: 200, text: async () => '{}' };
       };
       return { sent, fetcher };
@@ -385,9 +423,15 @@ describe('WhatsApp: servidor', () => {
       const h = createWhatsAppHandler({ config: whatsappConfigFrom(() => undefined), fetch: fakeNet().fetcher, log: (m) => logs.push(m) });
       expect((await h(request('POST', 'https://f/whatsapp', '{}', 'sha256=00'))).status).toBe(503);
       expect(logs).toHaveLength(1);
-      expect(whatsappConfigFrom((n) => ({ WHATSAPP_VERIFY_TOKEN: 'a', WHATSAPP_APP_SECRET: 'b', WHATSAPP_ACCESS_TOKEN: 'c', WHATSAPP_PHONE_NUMBER_ID: 'd', SUPABASE_URL: 'https://x.supabase.co/', SUPABASE_SERVICE_ROLE_KEY: 'e' })[n])).toEqual({
-        verifyToken: 'a', appSecret: 'b', accessToken: 'c', phoneNumberId: 'd', supabaseUrl: 'https://x.supabase.co', serviceKey: 'e', graphVersion: 'v23.0',
+      const env: Record<string, string> = {
+        WHATSAPP_VERIFY_TOKEN: 'a', WHATSAPP_APP_SECRET: 'b', WHATSAPP_PHONE_KEY: 'k', WHATSAPP_ACCESS_TOKEN: 'c', WHATSAPP_PHONE_NUMBER_ID: 'd',
+        SUPABASE_URL: 'https://x.supabase.co/', SUPABASE_SERVICE_ROLE_KEY: 'e',
+      };
+      expect(whatsappConfigFrom((n) => env[n])).toEqual({
+        verifyToken: 'a', appSecret: 'b', phoneKey: 'k', accessToken: 'c', phoneNumberId: 'd', supabaseUrl: 'https://x.supabase.co', serviceKey: 'e', graphVersion: 'v23.0',
       });
+      // Sem a chave dos números, nada roda (o resumo dependeria de um valor vazio).
+      expect(whatsappConfigFrom((n) => (n === 'WHATSAPP_PHONE_KEY' ? undefined : env[n]))).toBeNull();
     });
 
     it('POST sem assinatura válida é recusado antes de qualquer chamada', async () => {
@@ -447,12 +491,45 @@ describe('WhatsApp: servidor', () => {
       expect(net.sent.map((s) => s.url)).toEqual(['https://projeto.supabase.co/rest/v1/rpc/whatsapp_add_record']);
     });
 
-    it('no máximo 20 mensagens por entrega', async () => {
+    it('no máximo 100 mensagens por entrega, com aviso no log', async () => {
+      const net = fakeNet();
+      const logs: string[] = [];
+      const h = createWhatsAppHandler({ config, fetch: net.fetcher, log: (m) => logs.push(m) });
+      const { t, sig } = signed(payload(Array.from({ length: 105 }, (_, i) => text(`wamid.${i}`, 'oi'))));
+      await h(request('POST', 'https://f/whatsapp', t, sig));
+      // Cada uma: o registro (whatsapp_note) e a resposta.
+      expect(net.sent).toHaveLength(200);
+      expect(logs).toEqual(['entrega com 105 mensagens: só as primeiras 100 tratadas']);
+    });
+
+    it('recusa definitiva do banco (4xx): responde que não deu, segue com as outras e devolve 200', async () => {
+      const net = fakeNet(200, { result: 'nao_ligado' }, (body) => (body.includes('wamid.ruim') ? 400 : 200));
+      const logs: string[] = [];
+      const h = createWhatsAppHandler({ config, fetch: net.fetcher, log: (m) => logs.push(m) });
+      const { t, sig } = signed(payload([text('wamid.ruim', 'mercado 10'), text('wamid.boa', 'mercado 20')]));
+      expect((await h(request('POST', 'https://f/whatsapp', t, sig))).status).toBe(200);
+      const replies = net.sent.filter((s) => s.url.includes('graph.facebook.com')).map((s) => (s.body as { text: { body: string } }).text.body);
+      expect(replies).toEqual([WHATSAPP_REPLY.erro, WHATSAPP_REPLY.nao_ligado]);
+      expect(logs).toHaveLength(1);
+    });
+
+    it('corpo grande demais: 413 antes da assinatura', async () => {
       const net = fakeNet();
       const h = createWhatsAppHandler({ config, fetch: net.fetcher });
-      const { t, sig } = signed(payload(Array.from({ length: 25 }, (_, i) => text(`wamid.${i}`, 'oi'))));
-      await h(request('POST', 'https://f/whatsapp', t, sig));
-      expect(net.sent).toHaveLength(20);
+      const big = 'x'.repeat(256 * 1024 + 1);
+      const bodyCalled: string[] = [];
+      const declared = {
+        ...request('POST', 'https://f/whatsapp', big, 'sha256=' + '0'.repeat(64)),
+        header: (n: string) => (n === 'content-length' ? String(big.length) : null),
+        body: async () => {
+          bodyCalled.push('lido');
+          return { bytes: utf8Bytes(big), text: big };
+        },
+      };
+      expect((await h(declared)).status).toBe(413);
+      expect(bodyCalled).toEqual([]);
+      expect((await h(request('POST', 'https://f/whatsapp', big, 'sha256=' + '0'.repeat(64)))).status).toBe(413);
+      expect(net.sent).toEqual([]);
     });
   });
 
@@ -463,6 +540,7 @@ describe('WhatsApp: servidor', () => {
     const env: Record<string, string> = {
       WHATSAPP_VERIFY_TOKEN: 'verifica',
       WHATSAPP_APP_SECRET: 'segredo',
+      WHATSAPP_PHONE_KEY: 'chave',
       WHATSAPP_ACCESS_TOKEN: 'acesso',
       WHATSAPP_PHONE_NUMBER_ID: '111',
       SUPABASE_URL: 'https://projeto.supabase.co',

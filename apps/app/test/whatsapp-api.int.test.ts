@@ -41,6 +41,7 @@ const repo = new SupabaseRepository(clientFor(GIL), { id: GIL });
 const config: WhatsAppConfig = {
   verifyToken: 'verifica-local',
   appSecret: 'segredo-local-do-app',
+  phoneKey: 'chave-local-dos-numeros',
   accessToken: 'token-local',
   phoneNumberId: '100200300',
   supabaseUrl: API,
@@ -144,17 +145,21 @@ describe('WhatsApp pela API, com a função do servidor', () => {
     expect((await repo.listRecords(pessoal, '2026-10')).map((x) => x.description).sort()).toEqual(['Mercado', 'Salário']);
   });
 
-  it('o que não vai ao banco: ajuda, áudio e mensagem sem valor', async () => {
+  it('sem dados: ajuda, áudio e mensagem sem valor (só registradas, para a repetição não responder de novo)', async () => {
     expect((await send(PHONE, 'oi')).reply!.body).toBe(WHATSAPP_REPLY.ajuda);
     expect((await send(PHONE, '', { type: 'audio' })).reply!.body).toBe(WHATSAPP_REPLY.midia);
     expect((await send(PHONE, 'mercado')).reply!.body).toContain('Não encontrei o valor');
     expect((await send(PHONE, 'luz 180 25/12')).reply!.body).toBe(WHATSAPP_REPLY.data_futura);
+    const once = await send(PHONE, 'oi', { id: 'wamid.ajuda.repetida' });
+    expect(once.reply!.body).toBe(WHATSAPP_REPLY.ajuda);
+    expect((await send(PHONE, 'oi', { id: 'wamid.ajuda.repetida' })).reply).toBeNull();
   });
 
   it('as funções do servidor não abrem para o app nem para quem não entrou', async () => {
     for (const db of [clientFor(GIL), clientFor(null)]) {
       const { error } = await db.rpc('whatsapp_add_record', {
-        p_message_id: 'x', p_phone_hash: 'a'.repeat(64), p_kind: 'despesa', p_amount_cents: 100, p_occurred_on: '2026-10-07', p_description: 'x', p_category: null,
+        p_message_id: 'x', p_phone_hash: 'a'.repeat(64), p_sent_at: '2026-10-07T15:00:00Z', p_kind: 'despesa', p_amount_cents: 100,
+        p_days_ago: 0, p_occurred_on: null, p_description: 'x', p_category: null,
       });
       expect(error?.code).toBe('42501');
     }

@@ -1,5 +1,5 @@
 import { todayIn } from '../dates';
-import { sha256Hex, sha256HexOfBytes, utf8Bytes } from '../sha256';
+import { sha256HexOfBytes, utf8Bytes } from '../sha256';
 import { readWhatsAppMessage } from './mensagem';
 import { WHATSAPP_REPLY, whatsappOutcomeReply, whatsappParseReply, type WhatsAppOutcome } from './respostas';
 
@@ -13,8 +13,10 @@ import { WHATSAPP_REPLY, whatsappOutcomeReply, whatsappParseReply, type WhatsApp
 export const WHATSAPP_TIME_ZONE = 'America/Sao_Paulo';
 /** Versão da API da Meta. Dá para trocar sem publicar o app, pelo segredo WHATSAPP_GRAPH_VERSION da função. */
 export const WHATSAPP_GRAPH_VERSION = 'v23.0';
-/** Mensagens tratadas por entrega da Meta (o resto é ignorado). */
-export const WHATSAPP_MAX_MESSAGES = 20;
+/** Mensagens tratadas por entrega da Meta (a Meta manda poucas por entrega; o excesso fica registrado no log e é ignorado). */
+export const WHATSAPP_MAX_MESSAGES = 100;
+/** Corpo máximo aceito (bytes), conferido antes da assinatura: as entregas da Meta com texto têm poucos KB. */
+export const WHATSAPP_MAX_BODY_BYTES = 256 * 1024;
 
 function hexToBytes(hex: string): number[] {
   const out: number[] = [];
@@ -44,9 +46,12 @@ export function verifyMetaSignature(body: readonly number[], header: string | nu
   return sameText(hmacSha256Hex(utf8Bytes(appSecret), body), header.slice(7).toLowerCase());
 }
 
-/** Resumo do número que a Meta manda (só algarismos): é o que o banco guarda, nunca o número. */
-export function whatsappPhoneHash(waId: string): string {
-  return sha256Hex(waId.replace(/\D/g, ''));
+/**
+ * Resumo do número que a Meta manda (só algarismos), com a chave secreta da função (WHATSAPP_PHONE_KEY): é o que o banco guarda, nunca o
+ * número. Com HMAC, quem lê o banco sem a chave não volta ao número testando todos os celulares possíveis (com SHA-256 puro, voltaria).
+ */
+export function whatsappPhoneHash(waId: string, phoneKey: string): string {
+  return hmacSha256Hex(utf8Bytes(phoneKey), utf8Bytes(waId.replace(/\D/g, '')));
 }
 
 export interface WhatsAppInbound {
@@ -58,6 +63,8 @@ export interface WhatsAppInbound {
   timestamp: number;
   type: string;
   text: string | null;
+  /** Só em aviso do sistema (type 'system'): o tipo do aviso, como 'user_changed_number'. */
+  systemType?: string | null;
 }
 
 function obj(v: unknown): Record<string, unknown> | null {
@@ -90,41 +97,59 @@ export function whatsappInbound(payload: unknown, phoneNumberId: string): WhatsA
         if (typeof from !== 'string' || !/^\d{8,15}$/.test(from) || !Number.isFinite(ts)) continue;
         const type = typeof msg?.type === 'string' ? msg.type : 'unsupported';
         const body = obj(msg?.text)?.body;
-        out.push({ id, from, timestamp: ts, type, text: type === 'text' && typeof body === 'string' ? body : null });
+        const system = obj(msg?.system)?.type;
+        out.push({
+          id,
+          from,
+          timestamp: ts,
+          type,
+          text: type === 'text' && typeof body === 'string' ? body : null,
+          ...(type === 'system' ? { systemType: typeof system === 'string' ? system : null } : {}),
+        });
       }
     }
   }
   return out;
 }
 
-export type WhatsAppFunction = 'whatsapp_link' | 'whatsapp_add_record' | 'whatsapp_undo' | 'whatsapp_unlink';
+export type WhatsAppFunction = 'whatsapp_note' | 'whatsapp_link' | 'whatsapp_add_record' | 'whatsapp_undo' | 'whatsapp_unlink';
 export type WhatsAppRpc = (fn: WhatsAppFunction, args: Record<string, unknown>) => Promise<WhatsAppOutcome>;
 
 /** Tipos que não pedem resposta: reação a uma resposta da Clarevo, aviso do sistema e tipo desconhecido. */
 const SILENT_TYPES = new Set(['reaction', 'system', 'unsupported', 'errors']);
 
 /**
- * Uma mensagem: o que ela pede, a função do banco (quando precisa) e o texto da resposta. null: não responder.
- * Ajuda, mídia e mensagem que a Clarevo não entendeu são respondidas sem ir ao banco.
+ * Uma mensagem: o que ela pede, a função do banco e o texto da resposta. null: não responder. Ajuda, mídia e mensagem que a Clarevo não
+ * entendeu também passam pelo banco (whatsapp_note), só para a repetição da Meta não responder duas vezes e para o limite de mensagens.
+ * Aviso do sistema de troca de número desliga o número antigo, sem resposta.
  */
-export async function handleWhatsAppMessage(msg: WhatsAppInbound, rpc: WhatsAppRpc): Promise<string | null> {
+export async function handleWhatsAppMessage(msg: WhatsAppInbound, rpc: WhatsAppRpc, phoneKey: string): Promise<string | null> {
+  const base = { p_message_id: msg.id, p_phone_hash: whatsappPhoneHash(msg.from, phoneKey) };
+  if (msg.type === 'system' && msg.systemType === 'user_changed_number') {
+    await rpc('whatsapp_unlink', base);
+    return null;
+  }
   if (SILENT_TYPES.has(msg.type)) return null;
-  if (msg.type === 'request_welcome') return WHATSAPP_REPLY.ajuda;
-  if (msg.type !== 'text' || msg.text === null) return WHATSAPP_REPLY.midia;
   const today = todayIn(WHATSAPP_TIME_ZONE, new Date(msg.timestamp * 1000));
+  const sentAt = new Date(msg.timestamp * 1000).toISOString();
+  const noted = async (outcome: 'ajuda' | 'midia' | 'nao_entendi', reply: string) => {
+    const r = await rpc('whatsapp_note', { ...base, p_outcome: outcome });
+    return r.result === 'registrada' ? reply : whatsappOutcomeReply(r, today);
+  };
+  if (msg.type === 'request_welcome') return noted('ajuda', WHATSAPP_REPLY.ajuda);
+  if (msg.type !== 'text' || msg.text === null) return noted('midia', WHATSAPP_REPLY.midia);
   const cmd = readWhatsAppMessage(msg.text, today);
-  const base = { p_message_id: msg.id, p_phone_hash: whatsappPhoneHash(msg.from) };
   let outcome: WhatsAppOutcome;
   switch (cmd.type) {
     case 'ajuda':
-      return WHATSAPP_REPLY.ajuda;
+      return noted('ajuda', WHATSAPP_REPLY.ajuda);
     case 'erro':
-      return whatsappParseReply(cmd.reason);
+      return noted('nao_entendi', whatsappParseReply(cmd.reason));
     case 'ligar':
       outcome = await rpc('whatsapp_link', { ...base, p_code: cmd.code });
       break;
     case 'desfazer':
-      outcome = await rpc('whatsapp_undo', base);
+      outcome = await rpc('whatsapp_undo', { ...base, p_sent_at: sentAt });
       break;
     case 'desligar':
       outcome = await rpc('whatsapp_unlink', base);
@@ -132,9 +157,12 @@ export async function handleWhatsAppMessage(msg: WhatsAppInbound, rpc: WhatsAppR
     case 'anotar':
       outcome = await rpc('whatsapp_add_record', {
         ...base,
+        p_sent_at: sentAt,
         p_kind: cmd.kind,
         p_amount_cents: cmd.amountCents,
-        p_occurred_on: cmd.occurredOn,
+        // "hoje" e "ontem" pelo dia da pessoa no fuso dela (o banco calcula); a data escrita vai como está.
+        p_days_ago: cmd.daysAgo,
+        p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
         p_description: cmd.description,
         p_category: cmd.category,
       });
@@ -147,6 +175,8 @@ export async function handleWhatsAppMessage(msg: WhatsAppInbound, rpc: WhatsAppR
 export interface WhatsAppConfig {
   verifyToken: string;
   appSecret: string;
+  /** Chave do resumo dos números (HMAC). Trocar a chave desliga todos os números ligados. */
+  phoneKey: string;
   accessToken: string;
   phoneNumberId: string;
   supabaseUrl: string;
@@ -157,6 +187,7 @@ export interface WhatsAppConfig {
 const REQUIRED_ENV = [
   'WHATSAPP_VERIFY_TOKEN',
   'WHATSAPP_APP_SECRET',
+  'WHATSAPP_PHONE_KEY',
   'WHATSAPP_ACCESS_TOKEN',
   'WHATSAPP_PHONE_NUMBER_ID',
   'SUPABASE_URL',
@@ -170,6 +201,7 @@ export function whatsappConfigFrom(env: (name: string) => string | undefined): W
   return {
     verifyToken: v('WHATSAPP_VERIFY_TOKEN'),
     appSecret: v('WHATSAPP_APP_SECRET'),
+    phoneKey: v('WHATSAPP_PHONE_KEY'),
     accessToken: v('WHATSAPP_ACCESS_TOKEN'),
     phoneNumberId: v('WHATSAPP_PHONE_NUMBER_ID'),
     supabaseUrl: v('SUPABASE_URL').replace(/\/+$/, ''),
@@ -203,8 +235,11 @@ export interface WhatsAppResponse {
 const RESULTS = new Set([
   'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido',
   'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida', 'repetida',
-  'erro',
+  'silencio', 'registrada',
 ]);
+
+/** Recusa do banco que se repetiria a cada nova entrega (pedido inválido, 4xx): não adianta a Meta mandar de novo. */
+export class WhatsAppFinalError extends Error {}
 
 /** Chamada a uma função whatsapp_* do banco pela API do Supabase, com a chave de serviço (que só existe no servidor). */
 export function supabaseWhatsAppRpc(config: WhatsAppConfig, fetcher: WhatsAppFetch): WhatsAppRpc {
@@ -214,6 +249,7 @@ export function supabaseWhatsAppRpc(config: WhatsAppConfig, fetcher: WhatsAppFet
     if (config.serviceKey.startsWith('eyJ')) headers.Authorization = `Bearer ${config.serviceKey}`;
     const res = await fetcher(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args) });
     const text = await res.text();
+    if (res.status >= 400 && res.status < 500) throw new WhatsAppFinalError(`banco recusou (${res.status}) em ${fn}`);
     if (res.status !== 200) throw new Error(`banco respondeu ${res.status} em ${fn}`);
     const outcome = obj(JSON.parse(text) as unknown);
     if (!outcome || typeof outcome.result !== 'string' || !RESULTS.has(outcome.result)) throw new Error(`resposta inesperada de ${fn}`);
@@ -283,7 +319,9 @@ export function createWhatsAppHandler(deps: WhatsAppHandlerDeps): (req: WhatsApp
     }
     if (req.method !== 'POST') return { status: 405, body: 'método não aceito' };
 
+    if (Number(req.header('content-length') ?? 0) > WHATSAPP_MAX_BODY_BYTES) return { status: 413, body: 'grande demais' };
     const { bytes, text } = await req.body();
+    if (bytes.length > WHATSAPP_MAX_BODY_BYTES) return { status: 413, body: 'grande demais' };
     if (!verifyMetaSignature(bytes, req.header('x-hub-signature-256'), config.appSecret)) return { status: 401, body: 'assinatura inválida' };
     let payload: unknown;
     try {
@@ -292,13 +330,17 @@ export function createWhatsAppHandler(deps: WhatsAppHandlerDeps): (req: WhatsApp
       return { status: 400, body: 'corpo inválido' };
     }
     const rpc = supabaseWhatsAppRpc(config, deps.fetch);
-    for (const msg of whatsappInbound(payload, config.phoneNumberId).slice(0, WHATSAPP_MAX_MESSAGES)) {
+    const messages = whatsappInbound(payload, config.phoneNumberId);
+    if (messages.length > WHATSAPP_MAX_MESSAGES) log(`entrega com ${messages.length} mensagens: só as primeiras ${WHATSAPP_MAX_MESSAGES} tratadas`);
+    for (const msg of messages.slice(0, WHATSAPP_MAX_MESSAGES)) {
       let reply: string | null;
       try {
-        reply = await handleWhatsAppMessage(msg, rpc);
+        reply = await handleWhatsAppMessage(msg, rpc, config.phoneKey);
       } catch (e) {
         log(`falha ao tratar uma mensagem: ${e instanceof Error ? e.message : 'erro'}`);
-        return { status: 500, body: 'tente de novo' };
+        // Recusa definitiva (4xx): responde que não deu e segue com as outras; falha passageira: 500, e a Meta entrega de novo.
+        if (!(e instanceof WhatsAppFinalError)) return { status: 500, body: 'tente de novo' };
+        reply = WHATSAPP_REPLY.erro;
       }
       if (reply === null) continue;
       try {
