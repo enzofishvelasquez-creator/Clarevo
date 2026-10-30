@@ -43,4 +43,18 @@ describe('rotas: toda tela fica dentro da guarda de sessão', () => {
     expect(outside).toEqual(['beneficio/[codigo]', 'carregando', 'confirmado', 'conta-excluida', 'convite/[codigo]']);
     expect(guarded.has(lines.findIndex((l) => l.includes('<Stack.Screen name="(tabs)" />')))).toBe(true);
   });
+
+  it('a tela aberta pelo endereço sem sessão volta depois da entrada (ENTRY_PATH), com as exceções escritas aqui', () => {
+    const source = layout.match(/const ENTRY_PATH =\s*\/(\^[^\n]+\$)\/;/)?.[1];
+    expect(source, 'ENTRY_PATH escrito no layout').toBeTruthy();
+    const entry = new RegExp(source!);
+    const sample = (s: string) => `/${s.replace(/\/?index$/, '').replace('[mes]', '2026-10').replace(/\[[a-z]+\]/g, 'abc')}`;
+    const notResumed = all.filter((s) => !entry.test(sample(s)));
+    // Telas de entrada e de sessão, links de convite e benefício, e duas telas que de propósito só abrem pelo app: Importar (escolher o
+    // arquivo no aparelho) e Excluir minha conta.
+    expect(notResumed.sort()).toEqual(
+      ['beneficio/[codigo]', 'boas-vindas', 'carregando', 'confirmado', 'confirmar-email', 'conta-excluida', 'conta/excluir', 'convite/[codigo]',
+        'criar-conta', 'entrar', 'importar/index', 'nova-senha', 'primeira-conta', 'recuperar-acesso'].sort(),
+    );
+  });
 });
