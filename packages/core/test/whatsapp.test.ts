@@ -433,6 +433,14 @@ describe('WhatsApp: servidor', () => {
       });
       // Sem a chave dos números, nada roda (o resumo dependeria de um valor vazio).
       expect(whatsappConfigFrom((n) => (n === 'WHATSAPP_PHONE_KEY' ? undefined : env[n]))).toBeNull();
+      // A chave secreta nova do Supabase (SUPABASE_SECRET_KEYS) vale antes da antiga; JSON inválido volta para a antiga.
+      const withNew = (keys: string) => whatsappConfigFrom((n) => (n === 'SUPABASE_SECRET_KEYS' ? keys : env[n]))?.serviceKey;
+      expect(withNew('{"default":"sb_secret_novo"}')).toBe('sb_secret_novo');
+      expect(withNew('{"outra":"sb_secret_outra"}')).toBe('sb_secret_outra');
+      expect(withNew('não é json')).toBe('e');
+      expect(withNew('{}')).toBe('e');
+      expect(whatsappConfigFrom((n) => (n === 'SUPABASE_SERVICE_ROLE_KEY' ? undefined : n === 'SUPABASE_SECRET_KEYS' ? '{"default":"sb_secret_x"}' : env[n]))?.serviceKey).toBe('sb_secret_x');
+      expect(whatsappConfigFrom((n) => (n === 'SUPABASE_SERVICE_ROLE_KEY' ? undefined : env[n]))).toBeNull();
     });
 
     it('POST sem assinatura válida é recusado antes de qualquer chamada', async () => {
