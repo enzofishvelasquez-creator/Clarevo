@@ -71,6 +71,21 @@ Credenciais (token, chave secreta do app) nunca no chat nem no repositório: só
 9. **Piloto fechado** (fase 3): as pessoas do teste (até 5 no número de teste) ligam o WhatsApp e anotam por uma semana. Conferir no SQL Editor quantas mensagens deram "não entendi" para ajustar as regras.
 10. **Abrir a todos**: número próprio registrado com armazenamento no Brasil, nome de exibição "Clarevo" aprovado, política atualizada e resposta do advogado.
 
+## 5b. Abrir a todos: o número próprio, passo a passo
+
+O número de teste da Meta só conversa com até 5 números cadastrados. Para todas as pessoas, a Clarevo precisa de um número próprio. Ordem:
+
+1. **Escolher o número** (Enzo). Precisa receber SMS ou ligação, **não pode estar no WhatsApp** (nem no comum nem no Business; se estiver, apagar a conta do WhatsApp nele antes) e vai ser o endereço da Clarevo para sempre. Opções: chip pré-pago novo usado só para isso (o único custo: o chip e uma recarga mínima de tempos em tempos para a operadora não cancelar a linha), um número que a empresa já tenha e não use no WhatsApp, ou um fixo da empresa (confirmado por ligação).
+2. **Verificação da empresa** na Meta (Enzo, com o cartão CNPJ).
+3. **Cadastrar o número** no WhatsApp Manager (Claude Chrome; o código de confirmação é o Enzo quem digita): Números de telefone > Adicionar, nome de exibição "Clarevo", categoria de finanças. Sai um Phone number ID novo.
+4. **Ativar o número na API, com armazenamento no Brasil** (Enzo, no Graph API Explorer da Meta): `POST <Phone number ID>/register` com `messaging_product=whatsapp`, `pin=<6 dígitos inventados e guardados no gerenciador de senhas>` e `data_localization_region=BR`. Pela documentação da Meta, o registro só se faz pela API (não pelo painel), e o armazenamento no Brasil só se escolhe aqui; mudar depois exige desligar e registrar de novo.
+5. **Trocar o segredo** `WHATSAPP_PHONE_NUMBER_ID` no Supabase pelo novo (Enzo).
+6. **Deixar o app da Meta ao vivo** (Claude Chrome): em Configurações > Básico, URL da política `https://clarevo.app.br/privacidade.html` e de exclusão de dados `https://clarevo.app.br/excluir-conta.html`, ícone e categoria; depois, trocar o modo do app de desenvolvimento para ao vivo.
+7. **App da Clarevo** (equipe): `WHATSAPP_NUMBER` com o número novo e `WHATSAPP_IN_ACCOUNT = true`; PR e merge.
+8. **Teste** com um número que não estava no piloto e aviso às pessoas.
+
+Antes disso, vale terminar o teste com o número de teste (segredos, webhook e "oi"): ele prova a função e o banco, e o número próprio só troca o passo 4 em diante.
+
 ## 6. Identificadores (não são segredos)
 
 Criados em 30/10/2026. Os segredos (token, chave secreta do app, token de verificação e chave dos números) nunca entram aqui.
