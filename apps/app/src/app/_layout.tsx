@@ -242,6 +242,8 @@ function Navigation() {
           <Stack.Screen name="empresa/index" />
           {/* Exportar meus dados (D-047): planilha (CSV) ou resumo em PDF, montado no aparelho. */}
           <Stack.Screen name="conta/exportar" />
+          {/* WhatsApp (D-076): ligar o número com um código e desligar; o card em Conta só aparece com o número da Clarevo. */}
+          <Stack.Screen name="conta/whatsapp" />
           {/* Excluir minha conta (D-058): o que é apagado e o que continua, exportar antes e digitar EXCLUIR; sem barra. */}
           <Stack.Screen name="conta/excluir" />
           {/* Contas de origem do dinheiro (D-043). /contas/nova é rota estática e tem precedência sobre /contas/[id]/editar. */}
@@ -256,10 +258,16 @@ function Navigation() {
           {/* Renda comprometida (D-026) e renda de referência. */}
           <Stack.Screen name="renda-comprometida/index" />
           <Stack.Screen name="renda-comprometida/referencia" />
+          <Stack.Screen name="renda-comprometida/limite" />
+          {/* Orçamento por categoria (D-039): a lista e uma categoria. */}
+          <Stack.Screen name="orcamento/index" />
+          <Stack.Screen name="orcamento/[categoria]" />
           {/* Metas e reserva para imprevistos (D-027). /meta/nova é rota estática e tem precedência sobre /meta/[id]. */}
           <Stack.Screen name="reserva" />
           <Stack.Screen name="meta/nova" />
           <Stack.Screen name="meta/[id]/index" />
+          {/* Imagem da meta (D-077): sugeridas, automática ou foto da galeria. */}
+          <Stack.Screen name="meta/[id]/imagem" />
           <Stack.Screen name="meta/[id]/editar" />
           <Stack.Screen name="meta/[id]/movimento" />
           {/* Plano de guardar (D-036): "Sim, consigo" e a reserva mínima de "Agora não". */}
