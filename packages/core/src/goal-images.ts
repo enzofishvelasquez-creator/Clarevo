@@ -3,7 +3,8 @@ import type { GoalType } from './records';
 
 /**
  * Imagem das metas (D-077). Cada meta mostra uma imagem: a que a pessoa escolheu entre as sugeridas, a foto que ela mandou (guardada na
- * Clarevo, até 300 KB) ou, sem escolha, a sugerida pelo nome e pelo tipo da meta ("Viagem para a Grécia" → praia; reserva → cofrinho).
+ * Clarevo, até 300 KB) ou, sem escolha, a sugerida pelo nome e pelo tipo da meta ("Viagem para a Grécia" → praia; reserva → porquinho).
+ * Nas telas, "Porquinho" e nunca "cofrinho" nem "caixinha", que são nomes de produtos de bancos (a palavra só serve para reconhecer o nome).
  * As sugeridas são fotos com licença livre (créditos em docs/33_METAS_COM_IMAGEM.md); enquanto a foto de uma sugestão não existe no app,
  * aparece o ícone dela sobre a cor da marca.
  */
@@ -42,8 +43,8 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
   },
   {
     key: 'reserva',
-    label: 'Cofrinho',
-    alt: 'Cofrinho em forma de porquinho',
+    label: 'Porquinho',
+    alt: 'Porquinho de guardar moedas',
     words: ['reserva', 'imprevisto', 'imprevistos', 'emergencia', 'guardar', 'poupar', 'poupanca', 'cofrinho', 'colchao'],
   },
   { key: 'carro', label: 'Carro', alt: 'Carro na estrada', words: ['carro', 'moto', 'veiculo', 'automovel', 'habilitacao', 'cnh'] },
@@ -83,7 +84,7 @@ export function goalImageOf(key: GoalImageKey): GoalImageSuggestion {
   return GOAL_IMAGES.find((g) => g.key === key)!;
 }
 
-/** Sugestão pelo nome e pelo tipo: a reserva para imprevistos é sempre o cofrinho; sem pista no nome, "objetivo". */
+/** Sugestão pelo nome e pelo tipo: a reserva para imprevistos é sempre o porquinho; sem pista no nome, "objetivo". */
 export function suggestGoalImage(name: string, goalType: GoalType): GoalImageKey {
   if (goalType === 'emergencia') return 'reserva';
   const padded = ` ${normalizeDescription(name)} `;

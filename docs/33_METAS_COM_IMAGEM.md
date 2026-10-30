@@ -4,9 +4,9 @@
 
 ## 1. O que a pessoa vê e faz
 
-- **Sem escolher nada**, a meta mostra a imagem sugerida pelo nome: "Viagem para a Grécia" mostra a praia, "Troca do carro" o carro, "Entrada do imóvel" a casa. A reserva para imprevistos mostra sempre o cofrinho. Sem pista no nome, aparece a trilha na montanha ("Objetivo"). A sugestão muda sozinha se o nome da meta mudar.
+- **Sem escolher nada**, a meta mostra a imagem sugerida pelo nome: "Viagem para a Grécia" mostra a praia, "Troca do carro" o carro, "Entrada do imóvel" a casa. A reserva para imprevistos mostra sempre o porquinho. Sem pista no nome, aparece a trilha na montanha ("Objetivo"). A sugestão muda sozinha se o nome da meta mudar.
 - **Para trocar**: na meta, "Mais ações", depois "Trocar imagem". A tela mostra a imagem atual e:
-  - **Sugeridas**: a "Automática" (a do nome) e as 12 sugestões (Viagem, Cofrinho, Carro, Casa, Estudos, Casamento, Bebê, Tecnologia, Saúde, Futuro, Pet e Objetivo);
+  - **Sugeridas**: a "Automática" (a do nome) e as 12 sugestões (Viagem, Porquinho, Carro, Casa, Estudos, Casamento, Bebê, Tecnologia, Saúde, Futuro, Pet e Objetivo);
   - **Sua foto**: "Escolher uma foto" abre a galeria do celular (o seletor do sistema; só a foto escolhida chega ao app). O app recorta em 16:9 quando o aparelho oferece, reduz o lado maior para 1080 px em JPEG e manda (até 300 KB). Com foto, aparecem "Escolher outra foto" e "Tirar a foto".
 - Na Família, todas as pessoas do espaço veem a imagem; trocar segue a mesma regra de editar a meta (quem só vê não troca).
 
@@ -14,14 +14,16 @@ Palavras que puxam cada sugestão: `packages/core/src/goal-images.ts` (`GOAL_IMA
 
 ## 2. Fotos sugeridas
 
-As sugestões serão fotos com licença livre (Unsplash: uso gratuito, inclusive comercial, sem exigir crédito; damos o crédito aqui mesmo assim). Enquanto a foto de uma sugestão não está no app, ela aparece como o ícone do tema sobre o azul da marca (avião, cofrinho, carro, casa e assim por diante), o que já funciona hoje.
+Nas telas, a sugestão da reserva se chama "Porquinho", nunca "cofrinho" nem "caixinha": são nomes de produtos de bancos, e a Clarevo não usa nomes de produtos financeiros (o roteiro de telas recusa essas palavras).
+
+As sugestões serão fotos com licença livre (Unsplash: uso gratuito, inclusive comercial, sem exigir crédito; damos o crédito aqui mesmo assim). Enquanto a foto de uma sugestão não está no app, ela aparece como o ícone do tema sobre o azul da marca (avião, porquinho, carro, casa e assim por diante), o que já funciona hoje.
 
 Para baixar as fotos, o ambiente da equipe precisa liberar `unsplash.com` e `images.unsplash.com` (configuração de rede do ambiente). Cada foto entra em `apps/app/assets/metas/<chave>.jpg` (lado maior de 1080 px, cerca de 100 KB) e em `apps/app/src/lib/goal-image-assets.ts`.
 
 | Sugestão | Foto | Autoria e link |
 |---|---|---|
 | Viagem | Praia de água azul com casas brancas | a definir |
-| Cofrinho | Cofrinho em forma de porquinho | a definir |
+| Porquinho | Porquinho de guardar moedas | a definir |
 | Carro | Carro na estrada | a definir |
 | Casa | Fachada de uma casa com jardim | a definir |
 | Estudos | Livros abertos sobre uma mesa | a definir |

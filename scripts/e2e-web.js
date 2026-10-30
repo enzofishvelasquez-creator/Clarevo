@@ -14073,7 +14073,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ok('Metas com imagem: escolher "Casa" salva e marca a escolha', JSON.stringify(r.find((x) => x[0] === 'Casa')) === JSON.stringify(['Casa', 'true']) &&
       (r.find((x) => x[0] === 'Automática (agora: Viagem)') || [])[1] === 'false' &&
       (await p.getByRole('img', { name: 'Fachada de uma casa com jardim' }).filter({ visible: true }).count()) === 1, JSON.stringify(r));
-    await p.getByRole('radio', { name: 'Automática (agora: Viagem)' }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+    await p.getByRole('radio', { name: 'Automática (agora: Viagem)' }).filter({ visible: true }).first().click();
+    await p.waitForFunction(() => [...document.querySelectorAll('[role=radio]')].some((e) => (e.getAttribute('aria-label') || '').startsWith('Automática') &&
+      e.getBoundingClientRect().width > 0 && e.getAttribute('aria-checked') === 'true'), null, { timeout: 8000 }).catch(() => {});
     r = await radios();
     ok('Metas com imagem: voltar à automática', (r[0] || [])[1] === 'true' && (await p.getByRole('img', { name: 'Praia de água azul com casas brancas' }).filter({ visible: true }).count()) === 1, JSON.stringify(r));
     ok('Metas com imagem: nada vai à rede na demonstração', writes.length === giWrites0, writes.slice(giWrites0).join(' | '));

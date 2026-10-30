@@ -54,7 +54,7 @@ describe('metas com imagem (D-077): sugestão pelo nome e pelo tipo', () => {
     expect(suggestGoalImage('Celular novo', 'oportunidade')).toBe('tecnologia');
   });
 
-  it('a reserva para imprevistos é sempre o cofrinho', () => {
+  it('a reserva para imprevistos é sempre o porquinho', () => {
     expect(suggestGoalImage('Reserva para imprevistos', 'emergencia')).toBe('reserva');
     expect(suggestGoalImage('Viagem', 'emergencia')).toBe('reserva');
   });
@@ -83,7 +83,8 @@ describe('metas com imagem (D-077): sugestão pelo nome e pelo tipo', () => {
       ...GOAL_IMAGES.flatMap((g) => [g.label, g.alt]),
       ...Object.values(GOAL_IMAGE_TEXT).map((v) => (typeof v === 'function' ? v('Viagem') : v)),
     ];
-    for (const t of texts) expect(t, t).not.toMatch(/—|–|contexto|fazer sentido/i);
+    // "cofrinho" e "caixinha" são nomes de produtos de bancos: nas telas, "Porquinho".
+    for (const t of texts) expect(t, t).not.toMatch(/—|–|contexto|fazer sentido|\bcofrinho\b|\bcaixinha\b/i);
   });
 });
 
