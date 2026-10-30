@@ -34,7 +34,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 
 | Serviço | Para quê | O que recebe | País ou região | Situação |
 |---|---|---|---|---|
-| Supabase | Autenticação e banco | Todos os dados da seção b | Projeto na região us-east-1 (Virgínia, Estados Unidos), conferido no painel em 30/10/2026; sede no exterior | Em uso |
+| Supabase | Autenticação e banco | Todos os dados da seção b | Projeto `clarevo-producao` na região de São Paulo desde 30/10/2026 (antes, us-east-1, Estados Unidos, só com uma conta de teste); sede no exterior | Em uso |
 | Cloudflare | Hospedagem da web e do site | IP e dados de acesso às páginas; não o que a pessoa anota. Se também ficar na frente do Supabase (a conferir), as requisições do app ao banco passam por ela em trânsito | Rede global; sede no exterior (confirmar) | Em uso |
 | Expo (EAS) | Gerar os builds | Código do app; nenhum dado de quem usa (sem atualização remota nem push) | Sede no exterior (confirmar) | Quando houver builds |
 | Google, no Android | Leitura de código (ML Kit) | Possíveis dados técnicos do aparelho e de uso | Exterior | Embutido no app; a confirmar |
@@ -62,7 +62,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 - O cadastro não pedia aceite nem maioridade, e o app não tinha acesso à política. Agora mostra "Ao criar a conta, você confirma que tem 18 anos ou mais e concorda com os Termos de uso e a Política de privacidade", com links quando o site estiver publicado. Sem caixa de seleção e sem registro no banco (pergunta 25). Conta ganha "Privacidade e termos", também só com o site publicado.
 - A privacidade das lojas dizia que o fuso era digitado: vem do aparelho no primeiro acesso. Corrigido.
 - A premissa da primeira versão da pergunta 4 (registros de acesso por 6 meses no Supabase e na Cloudflare) estava errada: o prazo é curto, conforme o plano (a conferir no painel). Corrigido.
-- Projeto do Supabase conferido no painel em 30/10/2026: "enzofishvelasquez-creator's Project", na organização "Clarevo by Enzo Velasquez", região us-east-1 (Estados Unidos), plano gratuito. O nome `clarevo-producao` de docs/05 era só a sugestão da criação. A política dizia São Paulo e foi corrigida.
+- Projeto do Supabase: até 30/10/2026, "enzofishvelasquez-creator's Project", na região us-east-1 (Estados Unidos), com só uma conta de teste e nenhum registro; desde 30/10/2026, `clarevo-producao`, na região de São Paulo (D-075). Nenhum dado de uso real passou pelos Estados Unidos.
 
 ## e) Perguntas ao advogado
 
@@ -74,7 +74,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 6. **Exclusão e "Pessoa que saiu" (D-058).** O que a pessoa anotou numa Família de outros fica sem nome e sem e-mail. Isso é anonimização suficiente (arts. 5º, XI, e 12) e base de legítimo interesse da Família? Quem sai sem excluir a conta continua como "ex-membro" e primeiro nome: isso exige eliminar o nome ao sair? Proposta: manter como está e informar; apagar o nome do ex-membro se a pessoa pedir.
 7. **Papel da empresa (M-5).** A empresa é só pagadora e a Clarevo é controladora dos dados financeiros? E o e-mail que a empresa informa no convite? Proposta: sim; a empresa controla a lista de convidados, e a Clarevo a trata só para validar convite e licença. Hoje o e-mail fica na licença encerrada depois da exclusão da conta: proposta de anonimizar.
 8. **Canal para pedidos da pessoa titular dos dados (P-023).** E-mail dedicado, sem formulário. Prazo de resposta? Proposta: 15 dias (art. 19, II). Confirmação de identidade? Proposta: resposta ao e-mail cadastrado, sem pedir documentos.
-9. **Transferência internacional (art. 33).** O banco fica hoje nos Estados Unidos (região us-east-1, conferido em 30/10/2026), e Supabase, Cloudflare, Google (ML Kit), Sentry e o provedor de e-mail têm sede ou processamento fora do Brasil. Qual mecanismo e qual contrato exigir de cada um? Proposta: usar os contratos padrão dos fornecedores e citar os países na política.
+9. **Transferência internacional (art. 33).** O banco fica em São Paulo desde 30/10/2026 (D-075), mas Supabase, Cloudflare, Google (ML Kit), Sentry e o provedor de e-mail têm sede ou processamento fora do Brasil. Qual mecanismo e qual contrato exigir de cada um? Proposta: usar os contratos padrão dos fornecedores e citar os países na política.
 10. **Bases legais.** Confirmar o quadro: contrato (art. 7º, V) para conta, Família e benefício; legítimo interesse (IX) para segurança e rastro; obrigação legal (II) para registros de acesso. Consentimento só onde o sistema pede (câmera, notificação, biometria), dados que não chegam à Clarevo. Proposta: manter assim.
 11. **Família: dados de outra pessoa.** Quem anota "Pix para Maria" grava nome de terceiro, que a Família vê. Proposta: cláusula nos termos de que a pessoa anota só o necessário e responde pelo que anota; sem aviso ao terceiro.
 12. **Idade mínima (P-002).** 18 anos, sem menores. O cadastro mostra a frase de confirmação de idade (ver pergunta 25 para a forma do aceite). Proposta: manter 18 anos, com a Apple classificando 18+.

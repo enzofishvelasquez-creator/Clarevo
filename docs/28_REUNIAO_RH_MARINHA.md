@@ -29,7 +29,7 @@
 
 **6. Como a Marinha contrataria depois do piloto?** O formato é definido pela assessoria jurídica e pela área de contratos. Caminhos possíveis: contratação de menor valor (até R$ 65.492,11 em 2026) ou Contrato Público para Solução Inovadora (Lei Complementar 182/2021). Não afirmar que algum caminho dispensa licitação além da dispensa por valor.
 
-**7. Onde ficam os dados?** Num provedor de banco de dados em nuvem, com regras de acesso no próprio banco. Hoje o banco fica nos Estados Unidos (região us-east-1, conferido em 30/10/2026). Não afirmar que os dados ficam no Brasil. Se a Marinha exigir dados no Brasil, dá para mudar o banco para a região de São Paulo antes do piloto; as exigências de segurança da Marinha (por exemplo, sobre o país dos dados) entram no plano de trabalho.
+**7. Onde ficam os dados?** Num provedor de banco de dados em nuvem, com regras de acesso no próprio banco. O banco fica no Brasil, na região de São Paulo do provedor (desde 30/10/2026). A empresa do provedor tem sede no exterior, e a política de privacidade trata disso. As exigências de segurança da Marinha entram no plano de trabalho.
 
 **8. E a LGPD?** A Clarevo é a controladora dos dados de cada pessoa. A política de privacidade e os termos estão em revisão jurídica. A pessoa pode excluir a própria conta no app quando quiser. Sem anúncios, sem venda de dados e sem rastreamento para publicidade.
 

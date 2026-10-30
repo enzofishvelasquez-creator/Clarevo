@@ -4,7 +4,7 @@
 
 Não consegui abrir a documentação do Supabase deste ambiente (acesso bloqueado pela rede). Os nomes dos menus abaixo podem variar um pouco no painel; o conteúdo de cada passo é o mesmo.
 
-**O projeto real (conferido no painel em 30/10/2026, D-074).** Organização "Clarevo by Enzo Velasquez", projeto "enzofishvelasquez-creator's Project" (o nome `clarevo-producao` abaixo era só a sugestão da criação), região **us-east-1 (Estados Unidos)**, plano gratuito, Site URL `https://app.clarevo.app.br`. A organização "bios-producao" é de outro produto: nada desta página vale para ela. As migrações até a 0019 estão aplicadas (a 0019 em 30/10/2026, conferida pela consulta do passo 21g).
+**O projeto real (D-074 e D-075).** Desde 30/10/2026, o app usa o projeto `clarevo-producao`, na organização "Clarevo by Enzo Velasquez", região **South America (São Paulo)**, com as 19 migrações (conferidas: 27 tabelas, 27 com RLS, 83 funções do app, nenhuma para `anon`, reforço da 0019 ativo), o login como na seção 3 e o SMTP do Resend com a chave própria do projeto. O projeto anterior, "enzofishvelasquez-creator's Project" (us-east-1, Estados Unidos), tinha só uma conta de teste e nenhum registro: fica pausado e depois é excluído (docs/23, seção 5d, fase 7). A organização "bios-producao" é de outro produto: nada desta página vale para ela.
 
 ## 1. Criar o projeto (você, ~5 min)
 
