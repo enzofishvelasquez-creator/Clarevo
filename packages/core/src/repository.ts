@@ -48,6 +48,7 @@ import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, 
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
 import type { SignupSource, SignupSourceOption } from './signup-source';
+import type { GoalImage, GoalImageChoice } from './goal-images';
 import type { WhatsAppCode, WhatsAppLinkState } from './whatsapp/app';
 
 /**
@@ -110,6 +111,9 @@ export type GoalAction =
   | 'registrar_movimento_meta'
   | 'alterar_movimento_meta'
   | 'excluir_movimento_meta';
+
+/** Imagem da meta (D-077, migração 0021): set_goal_image, com a meta em target_id. Não conta como anotação na atividade. */
+export type GoalImageAction = 'imagem_meta';
 
 /**
  * Resultado das escritas de metas: a meta no estado atual (com os totais de goal_items, inclusive excluída) e o
@@ -529,6 +533,17 @@ export interface RecordsRepository {
   setGoalStatus(key: string, goalId: string, expectedVersion: number, status: GoalStatus): Promise<GoalWrite>;
   /** delete_goal: exclui a meta e os movimentos vivos (versão + 1 em cada), em qualquer situação. Ordem: repetição; trava; versão. */
   deleteGoal(key: string, goalId: string, expectedVersion: number): Promise<GoalWrite>;
+  /** Imagens guardadas das metas vivas do contexto (goal_images, sem a foto). Meta sem linha: a sugestão automática. Sem leitura: vazia. */
+  listGoalImages(contextId: string): Promise<GoalImage[]>;
+  /** goal_photo: a foto da meta (tipo e base64) ou null (sem foto, sem leitura ou meta excluída). */
+  getGoalPhoto(goalId: string): Promise<{ mime: string; base64: string; version: number } | null>;
+  /**
+   * set_goal_image (D-077). Escolher uma sugestão, mandar uma foto ou voltar à automática. A mesma permissão de updateGoal. Ordem:
+   * repetição (chave_reutilizada se o pedido muda); nao_encontrado; sem_permissao; imagem_invalida; foto_invalida (não é JPEG, PNG
+   * nem WebP); foto_grande (mais de 300 KB); versao_desatualizada (0 = sem imagem guardada; detalhe "versao_atual=N"). Não conta
+   * como anotação na atividade.
+   */
+  setGoalImage(key: string, goalId: string, expectedVersion: number, choice: GoalImageChoice): Promise<GoalImage>;
   /**
    * add_goal_movement: sem versão (como create_record); a versão da meta não sobe. Ordem: repetição; nao_encontrado;
    * sem_permissao; meta_arquivada; tipo_invalido ('saldo_inicial' só por createGoal); valor_invalido;
@@ -935,6 +950,9 @@ export type RepoErrorCode =
   | 'licenca_nao_convidada'
   | 'licenca_nao_ativa'
   | 'ja_tem_licenca'
+  | 'imagem_invalida'
+  | 'foto_invalida'
+  | 'foto_grande'
   | 'desconhecido';
 
 export class RepoError extends Error {

@@ -123,6 +123,9 @@ import {
   type SignupSourceOption,
   type WhatsAppCode,
   type WhatsAppLinkState,
+  type GoalImage,
+  type GoalImageChoice,
+  isGoalImageKey,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -685,6 +688,9 @@ const KNOWN: RepoErrorCode[] = [
   'licenca_nao_convidada',
   'licenca_nao_ativa',
   'ja_tem_licenca',
+  'imagem_invalida',
+  'foto_invalida',
+  'foto_grande',
 ];
 
 /**
@@ -1035,6 +1041,24 @@ function toMonthBudget(month: IsoMonth, rows: readonly MonthBudgetRow[]): MonthB
  * prazo fora do dia 1, reserva sem os três campos (ou outra meta com algum) ou com alvo diferente de base × meses, e guardado
  * que não fecha com os totais. Nunca mostrar um guardado errado.
  */
+/** Linha de goal_images (sem a foto) e retorno de set_goal_image. */
+interface GoalImageRow {
+  goal_id: string;
+  image_key: string | null;
+  has_photo: boolean;
+  version: number;
+  updated_at: string | null;
+}
+
+/** Sugestão desconhecida (de uma versão mais nova do app) vira "automática"; sugestão e foto juntas nunca. */
+function toGoalImage(r: GoalImageRow | null): GoalImage {
+  const version = whole(r?.version);
+  if (!r || typeof r.goal_id !== 'string' || typeof r.has_photo !== 'boolean' || (r.has_photo && r.image_key !== null) || version < 0) {
+    throw new RepoError('desconhecido', 'imagem_inconsistente');
+  }
+  return { goalId: r.goal_id, imageKey: isGoalImageKey(r.image_key) ? r.image_key : null, hasPhoto: r.has_photo, version, updatedAt: r.updated_at };
+}
+
 function toGoal(g: GoalRow): Goal {
   const targetCents = whole(g.target_cents);
   const base = wholeOrNull(g.essential_base_cents);
@@ -2248,6 +2272,38 @@ export class SupabaseRepository implements RecordsRepository {
     const { data, error } = await this.db.from('goal_items').select('*').eq('id', id).maybeSingle();
     if (error) throw repoError(error);
     return data ? toGoal(data as GoalRow) : null;
+  }
+
+  /** Imagens guardadas das metas do contexto (goal_images, sem a coluna da foto). */
+  async listGoalImages(contextId: string): Promise<GoalImage[]> {
+    const rows = await readAll<GoalImageRow>((from, to) =>
+      this.db.from('goal_images').select('goal_id, image_key, has_photo, version, updated_at').eq('context_id', contextId).order('goal_id').range(from, to),
+    );
+    return rows.map(toGoalImage);
+  }
+
+  /** A foto pela função goal_photo (base64): só quem lê o espaço; sem foto, null. */
+  async getGoalPhoto(goalId: string): Promise<{ mime: string; base64: string; version: number } | null> {
+    const { data, error } = await this.db.rpc('goal_photo', { p_goal_id: goalId });
+    if (error) throw repoError(error);
+    if (data === null || data === undefined) return null;
+    const d = data as { mime?: unknown; base64?: unknown; version?: unknown };
+    if (typeof d.mime !== 'string' || !/^image\/(jpeg|png|webp)$/.test(d.mime) || typeof d.base64 !== 'string') {
+      throw new RepoError('desconhecido', 'imagem_inconsistente');
+    }
+    return { mime: d.mime, base64: d.base64.replace(/\s+/g, ''), version: whole(d.version) };
+  }
+
+  async setGoalImage(key: string, goalId: string, expectedVersion: number, choice: GoalImageChoice): Promise<GoalImage> {
+    const { data, error } = await this.db.rpc('set_goal_image', {
+      p_goal_id: goalId,
+      p_image_key: choice.kind === 'sugestao' ? choice.key : null,
+      p_photo: choice.kind === 'foto' ? choice.base64 : null,
+      p_expected_version: expectedVersion,
+      p_key: key,
+    });
+    if (error) throw repoError(error);
+    return toGoalImage(data as GoalImageRow | null);
   }
 
   /** Movimentos vivos da meta, do mais recente ao mais antigo (data, criação, id). */

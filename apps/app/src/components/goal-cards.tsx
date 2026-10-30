@@ -4,6 +4,7 @@ import {
   goalCardCaption,
   reserveCardTexts,
   type Goal,
+  type GoalImage,
   type GoalPlan,
 } from '@clarevo/core';
 import { router } from 'expo-router';
@@ -12,6 +13,7 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
+import { GoalImageView } from '@/components/goal-image';
 import { GoalProgress } from '@/components/goal-progress';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { Button, Card, LinkButton, Txt, styles as ui } from '@/components/ui';
@@ -134,7 +136,7 @@ export function ReserveCard({
  * Cartão de uma meta ativa: ícone em disco lima (só enfeite), nome, "R$ 1.200,00 de R$ 6.000,00", barra, percentual e a
  * legenda do prazo ou do plano. O cartão inteiro abre o detalhe e carrega a frase completa; a barra é só desenho.
  */
-export function GoalCard({ goal, plan }: { goal: Goal; plan: GoalPlan }) {
+export function GoalCard({ goal, plan, image }: { goal: Goal; plan: GoalPlan; image?: GoalImage | null }) {
   const maskLabel = useMoneyLabelMask();
   const caption = goalCardCaption(plan);
   const amounts = GOALS_TEXT.savedOfTarget(goal.savedCents, goal.targetCents);
@@ -147,6 +149,8 @@ export function GoalCard({ goal, plan }: { goal: Goal; plan: GoalPlan }) {
       accessibilityHint="Abre a meta"
       onPress={() => router.push({ pathname: '/meta/[id]', params: { id: goal.id } })}
       style={(st) => [ui.card, styles.goal, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
+      {/* Imagem da meta (D-077): decorativa aqui, o cartão já diz o nome. */}
+      <GoalImageView goal={goal} image={image} height={104} decorative />
       <View style={styles.goalHead}>
         <View style={styles.disc}>
           <Target size={18} color={colors.text} strokeWidth={2.25} aria-hidden />

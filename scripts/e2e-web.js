@@ -14044,6 +14044,41 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ok('WhatsApp: nada vai à rede na demonstração', writes.length === waWrites0, writes.slice(waWrites0).join(' | '));
   }
 
+  // ==================================================================================================================
+  // Metas com imagem (D-077): na demonstração, a meta "Viagem de férias" mostra a sugestão automática (viagem) no alto da tela da meta;
+  // "Mais ações", "Trocar imagem" abre a escolha (Automática e as 12 sugeridas, como botões de opção), escolher "Casa" salva e marca,
+  // e voltar à automática também. A foto da galeria não é aberta aqui (o seletor do sistema); a regra dela está nos testes do núcleo,
+  // do banco e da API. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const giWrites0 = writes.length;
+    const radios = () => p.evaluate(() => [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0)
+      .map((e) => [e.getAttribute('aria-label') || e.textContent, e.getAttribute('aria-checked')]));
+    await demoHome();
+    await tabByName('Metas').click(); await waitText('Viagem de férias'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Viagem de férias/ }).filter({ visible: true }).first().click(); await waitText('Mais ações'); await p.waitForTimeout(400);
+    ok('Metas com imagem: a tela da meta mostra a sugestão automática pelo nome (viagem), com texto alternativo',
+      (await p.getByRole('img', { name: 'Praia de água azul com casas brancas' }).filter({ visible: true }).count()) === 1);
+    await btn('Mais ações').click(); await p.getByRole('alert').getByRole('button', { name: 'Trocar imagem' }).last().click();
+    await waitText('Sugeridas'); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    let r = await radios();
+    ok('Metas com imagem: a escolha em /meta/<id>/imagem, título "Imagem da meta", a automática marcada e as 12 sugeridas',
+      /^\/meta\/[^/]+\/imagem$/.test(new URL(p.url()).pathname) && (await h1Name()) === 'Imagem da meta' && r.length === 13 &&
+      JSON.stringify(r[0]) === JSON.stringify(['Automática (agora: Viagem)', 'true']) && r.slice(1).every((x) => x[1] === 'false') &&
+      t.includes('Sua foto') && t.includes('Escolher uma foto') && t.includes('Escolha uma foto que você pode compartilhar.'), JSON.stringify(r));
+    await atWidths(async (w) => { await layoutChecks(`Metas com imagem ${w}px`); if (w === 390) await shot('520_meta_imagem'); });
+    await p.getByRole('radio', { name: 'Casa' }).filter({ visible: true }).first().click(); await waitText('Imagem salva.'); await p.waitForTimeout(300);
+    r = await radios();
+    ok('Metas com imagem: escolher "Casa" salva e marca a escolha', JSON.stringify(r.find((x) => x[0] === 'Casa')) === JSON.stringify(['Casa', 'true']) &&
+      (r.find((x) => x[0] === 'Automática (agora: Viagem)') || [])[1] === 'false' &&
+      (await p.getByRole('img', { name: 'Fachada de uma casa com jardim' }).filter({ visible: true }).count()) === 1, JSON.stringify(r));
+    await p.getByRole('radio', { name: 'Automática (agora: Viagem)' }).filter({ visible: true }).first().click(); await p.waitForTimeout(500);
+    r = await radios();
+    ok('Metas com imagem: voltar à automática', (r[0] || [])[1] === 'true' && (await p.getByRole('img', { name: 'Praia de água azul com casas brancas' }).filter({ visible: true }).count()) === 1, JSON.stringify(r));
+    ok('Metas com imagem: nada vai à rede na demonstração', writes.length === giWrites0, writes.slice(giWrites0).join(' | '));
+  }
+
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);
   const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);

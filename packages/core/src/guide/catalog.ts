@@ -14,6 +14,7 @@ import { DELETE_CONFIRMATION_WORD, DELETE_TEXT } from '../deletion';
 import { EVOLUTION_TEXT, EVOLUTION_WINDOWS } from '../evolucao-tela';
 import { EXPORT_TEXT } from '../export';
 import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, INVITE_TEXT } from '../family';
+import { GOAL_IMAGE_TEXT } from '../goal-images';
 import { GOALS_TEXT } from '../goals';
 import { MONTH_CHECK_TEXT } from '../month-check';
 import { IMPORT_TEXT } from '../importar/textos';
@@ -479,14 +480,14 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Em ${q(GOALS_TEXT.reserveTitle)}, toque em ${q(GOALS_TEXT.reserveCalculate)} para ver quantos meses de gastos essenciais você quer cobrir.`,
       `Toque em ${q(GOALS_TEXT.newGoal)}, dê um nome e informe o valor e, se quiser, o prazo.`,
       `Quando guardar dinheiro, abra a meta e use ${q(GOALS_TEXT.detail.addDeposit)}. O valor guardado só anda com o que você registrar.`,
-      `Para usar o dinheiro, use ${q(GOALS_TEXT.detail.addWithdrawal)}. Resgate não entra como recebido.`,
-      'Aportes e resgates não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.',
+      `Para usar o dinheiro, use ${q(GOALS_TEXT.detail.addWithdrawal)}. Aportes e resgates não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.`,
+      `Cada meta mostra uma imagem sugerida pelo nome. Para trocar, abra a meta, toque em "Mais ações" e em ${q(GOAL_IMAGE_TEXT.change)}: escolha outra sugestão ou uma foto sua.`,
       `Quando a meta chegar ao valor, use ${q(GOALS_TEXT.detail.conclude)}. No fim da tela, ${q(SEASONAL_TEXT.title)} traz os temas de Aprender do mês.`,
     ],
     screenName: TAB.metas,
     href: '/metas',
-    keywords: ['meta', 'metas', 'guardar', 'poupar', 'economizar', 'reserva', 'imprevistos', 'emergência', 'objetivo', 'aporte', 'resgate'],
-    routes: ['/metas', '/meta/nova', '/meta/[id]', '/meta/[id]/editar', '/meta/[id]/movimento', '/reserva'],
+    keywords: ['meta', 'metas', 'guardar', 'poupar', 'economizar', 'reserva', 'imprevistos', 'emergência', 'objetivo', 'aporte', 'resgate', 'imagem', 'foto'],
+    routes: ['/metas', '/meta/nova', '/meta/[id]', '/meta/[id]/editar', '/meta/[id]/movimento', '/meta/[id]/imagem', '/reserva'],
     screenshot: '16_metas.png',
   },
   {

@@ -64,7 +64,7 @@ describe('widget: desligado por padrão (a configuração de hoje não muda)', (
     expect(text).not.toMatch(/widget|appGroup|application-groups|appExtensions/i);
     const config = appJson();
     const names = (config.plugins as unknown[]).map((p) => (Array.isArray(p) ? p[0] : p));
-    expect(names).toEqual(['expo-router', 'expo-splash-screen', 'expo-notifications', 'expo-camera', 'expo-local-authentication']);
+    expect(names).toEqual(['expo-router', 'expo-splash-screen', 'expo-notifications', 'expo-image-picker', 'expo-camera', 'expo-local-authentication']);
     expect(config.android.permissions).toBeUndefined();
     expect(config.ios.entitlements).toBeUndefined();
     expect(config.ios.bundleIdentifier).toBe('app.clarevo');

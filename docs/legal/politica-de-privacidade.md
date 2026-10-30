@@ -58,6 +58,7 @@ Tudo o que está nesta lista é digitado, importado ou confirmado por você. A C
 - Contas de origem do dinheiro: só o nome que você escolhe e o tipo (conta bancária, dinheiro ou outra). Não há número de conta, agência nem saldo.
 - Cartões de crédito: apelido (até 30 caracteres), os 4 últimos dígitos (opcional), os dias de fechamento e de vencimento e o limite (opcional). Também as compras, as parcelas, os encargos, os estornos e os pagamentos de fatura.
 - Metas, aportes e resgates, a resposta do plano de guardar, a renda de referência, o orçamento por categoria, o limite pessoal de comprometimento e as assinaturas que você marca.
+- A imagem de cada meta, se você escolher: uma das imagens sugeridas pela Clarevo ou uma foto sua. A foto é reduzida no seu aparelho antes de enviar (até 300 KB), fica guardada com a meta, só para quem vê a meta (na Família, todas as pessoas do espaço), e é apagada quando você troca a imagem, exclui a meta ou exclui a conta. Escolha uma foto que você pode compartilhar; evite fotos com documentos ou com outras pessoas que não querem aparecer.
 - Marcas que você faz, como "Conferi este mês" e as escolhas da revisão dos últimos meses.
 - A data da sua última anotação, usada só para oferecer a revisão depois de um tempo sem anotar. Só você lê essa data.
 - Um resumo matemático (SHA-256), calculado no seu aparelho, da chave da nota fiscal e de cada linha de extrato ou fatura importada. Ele serve para avisar quando a mesma nota ou linha aparece de novo. Não guardamos a chave da nota nem o texto do extrato.

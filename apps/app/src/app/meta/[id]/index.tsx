@@ -5,6 +5,7 @@ import {
   GOAL_STATUS_LABEL,
   GOAL_TYPE_LABEL,
   UNCERTAIN_TEXT,
+  GOAL_IMAGE_TEXT,
   goalDetailTexts,
   goalErrorText,
   goalPlan,
@@ -27,6 +28,7 @@ import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
+import { GoalImageView } from '@/components/goal-image';
 import { GoalProgress } from '@/components/goal-progress';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
@@ -37,7 +39,7 @@ import { showsCoverage } from '@/lib/essentials';
 import { statusAttemptMatches } from '@/lib/goal-status-attempt';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
-import { useDeleteGoal, useGoalDetail, useGoalOperationKey, useSetGoalStatus } from '@/state/data';
+import { useDeleteGoal, useGoalDetail, useGoalImages, useGoalOperationKey, useSetGoalStatus } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -61,6 +63,7 @@ export default function MetaDetalhe() {
   const goal = detail.data?.goal ?? null;
   const movements = detail.data?.movements ?? [];
   const reserve = goal?.goalType === 'emergencia';
+  const images = useGoalImages(goal?.contextId);
 
   function haptic() {
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -131,6 +134,7 @@ export default function MetaDetalhe() {
     };
     if (g.status !== 'arquivada') choices.push({ label: D.addIncome, onPress: go(() => open('/meta/[id]/movimento', { tipo: 'rendimento' })) });
     choices.push({ label: D.edit, onPress: go(() => (g.goalType === 'emergencia' ? router.push('/reserva') : open('/meta/[id]/editar'))) });
+    choices.push({ label: GOAL_IMAGE_TEXT.change, onPress: go(() => router.push({ pathname: '/meta/[id]/imagem', params: { id } })) });
     if (g.status === 'ativa' && !reached) choices.push({ label: D.conclude, onPress: go(() => changeStatus(g, 'concluida', D.concluded)) });
     if (g.status !== 'ativa') choices.push({ label: D.reactivate, onPress: go(() => changeStatus(g, 'ativa', D.reactivated)) });
     if (g.status !== 'arquivada') choices.push({ label: D.archive, onPress: go(() => changeStatus(g, 'arquivada', D.archived)) });
@@ -166,6 +170,11 @@ export default function MetaDetalhe() {
             </Card>
           </Body>
         ) : (
+          <>
+          {/* Imagem da meta (D-077): a foto, a sugestão escolhida ou a automática. Trocar em "Mais ações". */}
+          <View style={{ paddingHorizontal: space[5], paddingTop: space[4] }}>
+            <GoalImageView goal={goal} image={images.data?.find((i) => i.goalId === goal.id) ?? null} height={168} />
+          </View>
           <GoalBody
             goal={goal}
             movements={movements}
@@ -181,6 +190,7 @@ export default function MetaDetalhe() {
             onMenu={() => setMenu(true)}
             onDelete={() => setConfirmDelete(true)}
           />
+          </>
         )}
       </Screen>
 

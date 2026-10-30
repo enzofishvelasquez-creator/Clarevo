@@ -1,4 +1,4 @@
-import { CALC_UI_TEXT, COMMITTED_TEXT, calculatorBySlug, ERROR_TEXT, GOALS_NAV_TEXT, GOALS_TEXT, goalsMonthTexts, monthOf, type Goal } from '@clarevo/core';
+import { CALC_UI_TEXT, COMMITTED_TEXT, calculatorBySlug, ERROR_TEXT, GOALS_NAV_TEXT, GOALS_TEXT, goalsMonthTexts, monthOf, type Goal, type GoalImage } from '@clarevo/core';
 import { router } from 'expo-router';
 import { Calculator, ChartLine, ListOrdered, Plus, ShieldCheck } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -15,7 +15,7 @@ import { EmptyState, ErrorState } from '@/components/states';
 import { TopicRow } from '@/components/topic-link';
 import { Body, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { explanationHref, isTopicPublished, seasonalCard, topicBySlug } from '@/lib/learn';
-import { useCommittedSummary, useGoalsOverview, useSavingsCard, useWork, type GoalsOverview } from '@/state/data';
+import { useCommittedSummary, useGoalImages, useGoalsOverview, useSavingsCard, useWork, type GoalsOverview } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -34,6 +34,7 @@ export default function MetasScreen() {
   const overview = useGoalsOverview(contextId);
   const committed = useCommittedSummary(contextId, monthOf(today));
   const savings = useSavingsCard(contextId);
+  const images = useGoalImages(contextId);
   const [notice, setNotice] = useFlash();
   const data = overview.data;
   // "Neste mês" (D-054, P-028): o mesmo card de Aprender, só pela data de hoje; some nos meses sem tema. Nada é gravado nem pedido.
@@ -67,7 +68,7 @@ export default function MetasScreen() {
                 planSlot={<SavingsPlanInReserve contextId={contextId} card={savings} />}
                 planLink={savings.data?.state.kind === 'oculto'}
               />
-              <GoalsSection active={data.active} plans={data.plans} canWrite={personal.data?.canWrite ?? true} />
+              <GoalsSection active={data.active} plans={data.plans} images={images.data} canWrite={personal.data?.canWrite ?? true} />
               <MonthCard overview={data} committed={committed} />
             </>
           ) : (
@@ -161,7 +162,17 @@ function MonthCard({ overview, committed }: { overview: GoalsOverview; committed
   );
 }
 
-function GoalsSection({ active, plans, canWrite }: { active: readonly Goal[]; plans: GoalsOverview['plans']; canWrite: boolean }) {
+function GoalsSection({
+  active,
+  plans,
+  images,
+  canWrite,
+}: {
+  active: readonly Goal[];
+  plans: GoalsOverview['plans'];
+  images: readonly GoalImage[] | undefined;
+  canWrite: boolean;
+}) {
   return (
     <View style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -174,7 +185,7 @@ function GoalsSection({ active, plans, canWrite }: { active: readonly Goal[]; pl
           </EmptyState>
         </Card>
       ) : (
-        active.map((g) => <GoalCard key={g.id} goal={g} plan={plans[g.id]!} />)
+        active.map((g) => <GoalCard key={g.id} goal={g} plan={plans[g.id]!} image={images?.find((i) => i.goalId === g.id) ?? null} />)
       )}
       {canWrite ? <Button label={GOALS_TEXT.newGoal} icon={Plus} tone="soft" onPress={() => router.push('/meta/nova')} /> : null}
     </View>

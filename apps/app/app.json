@@ -53,6 +53,14 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "A Clarevo usa as suas fotos só quando você escolhe uma imagem para uma meta.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "A Clarevo usa a câmera só para ler o código da nota fiscal. Nenhuma foto é guardada.",

@@ -148,6 +148,8 @@ begin
   -- Metas: movimentos (um excluído) e uma meta excluída.
   res := public.create_goal(t || '-gol-0001', p_ctx, 'objetivo', 'Viagem ' || t, 500000, '2027-10-01', 50000, null, null, null, 10000, '2026-10-07');
   goal := (res #>> '{goal,id}')::uuid;
+  -- Imagem da meta (D-077, 0021): uma foto (os primeiros bytes de um JPEG bastam para o banco).
+  perform public.set_goal_image(goal, null, '/9j/4AAQSkZJRgABAQ==', 0, t || '-img-0001');
   perform public.add_goal_movement(t || '-gol-0002', goal, 'aporte', 2500, '2026-10-05', 'Extra', acc2);
   mov := (public.add_goal_movement(t || '-gol-0003', goal, 'rendimento', 100, '2026-10-06', null) #>> '{movement,id}')::uuid;
   perform public.delete_goal_movement(t || '-gol-0004', mov, 1);
@@ -498,12 +500,12 @@ do $$
 declare
   t text;
   expected text[] := array['card_entries', 'cards', 'category_budgets', 'commitment_limits', 'commitment_series', 'commitments',
-    'context_activity', 'context_memberships', 'family_invites', 'financial_accounts', 'financial_records', 'goal_movements', 'goals',
-    'income_references', 'month_checks', 'record_operations', 'return_reviews', 'savings_checks', 'series_terms', 'whatsapp_link_codes',
-    'whatsapp_links'];
+    'context_activity', 'context_memberships', 'family_invites', 'financial_accounts', 'financial_records', 'goal_images', 'goal_movements',
+    'goals', 'income_references', 'month_checks', 'record_operations', 'return_reviews', 'savings_checks', 'series_terms',
+    'whatsapp_link_codes', 'whatsapp_links'];
 begin
   -- A lista das tabelas com context_id é a que a exclusão cobre: tabela nova com context_id obriga a revisar clarevo_erase_context.
-  assert pg_temp.ctx_tables() = expected, 'as tabelas com context_id são as 21 que a exclusão cobre: ' || array_to_string(pg_temp.ctx_tables(), ', ');
+  assert pg_temp.ctx_tables() = expected, 'as tabelas com context_id são as 22 que a exclusão cobre: ' || array_to_string(pg_temp.ctx_tables(), ', ');
   -- O Pessoal do Eli tem linhas em todas as tabelas de dados (menos convites, que só existem na Família).
   foreach t in array expected loop
     assert (t = 'family_invites' and pg_temp.rows_of('eli_ctx', t) = 0) or pg_temp.rows_of('eli_ctx', t) > 0, 'o Pessoal do Eli tem linhas em ' || t;
@@ -1086,7 +1088,7 @@ begin
     assert (select prosecdef from pg_proc where oid = ('public.' || f)::regprocedure), 'security definer: ' || f;
   end loop;
   assert (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 86, 'authenticated executa 86 funções (as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo e as 3 do WhatsApp)';
+           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 88, 'authenticated executa 88 funções (as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo, as 3 do WhatsApp e as 2 da imagem das metas)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
 
@@ -1133,11 +1135,11 @@ begin
            where (x.def ~* '(insert into|update|delete from) (public|auth)\.' or x.def ~* 'clarevo_materialize_series') and x.def !~* 'insert into public\.record_operations')
        = array['delete_my_account', 'ensure_personal_space', 'sync_series_occurrences'],
     'toda função de escrita grava a operação, menos delete_my_account, ensure_personal_space e sync_series_occurrences';
-  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 68,
-    'as 68 funções de escrita com operação são as que o gatilho de record_operations protege (com create_whatsapp_code e unlink_whatsapp, 0020)';
+  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 69,
+    'as 69 funções de escrita com operação são as que o gatilho de record_operations protege (com create_whatsapp_code e unlink_whatsapp, 0020, e set_goal_image, 0021)';
   -- Nada novo em record_operations pela exclusão: a conta some com o rastro, então nenhuma ação nova (as 2 de conferir o mês vêm da 0016).
-  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 69,
-    'a lista de ações de record_operations segue com 69 (excluir a conta não deixa operação; as 3 do WhatsApp vêm da 0020)';
+  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 70,
+    'a lista de ações de record_operations segue com 70 (excluir a conta não deixa operação; as 3 do WhatsApp vêm da 0020 e a da imagem das metas, da 0021)';
 end $$;
 rollback;
 

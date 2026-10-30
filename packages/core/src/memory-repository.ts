@@ -52,6 +52,7 @@ import type {
   CommitmentAction,
   CommitmentWrite,
   GoalAction,
+  GoalImageAction,
   GoalWrite,
   ImportAction,
   IncomeReferenceAction,
@@ -142,6 +143,7 @@ import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from '
 import { savingsAnswerError, savingsAskAgainOn } from './savings';
 import { signupSourceError, type SignupSource, type SignupSourceOption } from './signup-source';
 import { WHATSAPP_CODE_ALPHABET, WHATSAPP_CODE_LENGTH } from './whatsapp/mensagem';
+import { GOAL_PHOTO_MAX_BYTES, base64Bytes, goalPhotoMime, type GoalImage, type GoalImageChoice } from './goal-images';
 import { WHATSAPP_CODE_MINUTES } from './whatsapp/respostas';
 import type { WhatsAppCode, WhatsAppLinkState } from './whatsapp/app';
 import {
@@ -171,6 +173,7 @@ interface Operation {
     | IncomeReferenceAction
     | BudgetAction
     | GoalAction
+    | GoalImageAction
     | SavingsAction
     | CardAction
     | AccountAction
@@ -365,6 +368,8 @@ export class MemoryRepository implements RecordsRepository {
   private signupSource: SignupSource | null = null;
   /** Código de ligar o WhatsApp pendente (na memória não há servidor: nada liga o número). */
   private whatsappCode: { contextId: string; expiresAt: string } | null = null;
+  /** Imagem das metas (goal_images): a sugestão escolhida ou a foto (base64), com a versão. */
+  private goalImages = new Map<string, { imageKey: string | null; photo: { mime: string; base64: string } | null; version: number; updatedAt: string }>();
   private cards = new Map<string, StoredCard>();
   private cardEntries = new Map<string, StoredCardEntry>();
   private seq = 0;
@@ -436,6 +441,7 @@ export class MemoryRepository implements RecordsRepository {
       savingsChecks: new Map(this.savingsChecks),
       signupSource: this.signupSource,
       whatsappCode: this.whatsappCode,
+      goalImages: new Map(this.goalImages),
       cards: new Map(this.cards),
       cardEntries: new Map(this.cardEntries),
       accountsById: new Map(this.accountsById),
@@ -463,6 +469,7 @@ export class MemoryRepository implements RecordsRepository {
         savingsChecks: this.savingsChecks,
         signupSource: this.signupSource,
         whatsappCode: this.whatsappCode,
+        goalImages: this.goalImages,
         cards: this.cards,
         cardEntries: this.cardEntries,
         accountsById: this.accountsById,
@@ -1963,8 +1970,73 @@ export class MemoryRepository implements RecordsRepository {
         this.goalMovements.set(m.id, { ...m, version: m.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
       }
       this.goals.set(goalId, { ...current, version: current.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
+      // Como o gatilho goals_image_cleanup (0021): a imagem sai com a meta.
+      this.goalImages.delete(goalId);
       this.saveOperation(key, 'excluir_meta', payload, { contextId: current.contextId, recordId: null, commitmentId: null, goalId, movementId: null });
       return this.goalResult(goalId, null);
+    });
+  }
+
+  // Imagem das metas (D-077, migração 0021)
+
+  private goalImageOf(goalId: string): GoalImage {
+    const i = this.goalImages.get(goalId);
+    return i
+      ? { goalId, imageKey: (i.imageKey as GoalImage['imageKey']) ?? null, hasPhoto: i.photo !== null, version: i.version, updatedAt: i.updatedAt }
+      : { goalId, imageKey: null, hasPhoto: false, version: 0, updatedAt: null };
+  }
+
+  /** Como a leitura de goal_images (RLS): as linhas das metas vivas do contexto, sem a foto. */
+  async listGoalImages(contextId: string) {
+    return this.read(() =>
+      [...this.goalImages.keys()]
+        .filter((id) => {
+          const g = this.goals.get(id);
+          return g && !g.deletedAt && g.contextId === contextId && this.canRead(g.contextId);
+        })
+        .sort()
+        .map((id) => this.goalImageOf(id)),
+    );
+  }
+
+  /** Como goal_photo. */
+  async getGoalPhoto(goalId: string) {
+    return this.read(() => {
+      const g = this.goals.get(goalId);
+      const i = this.goalImages.get(goalId);
+      if (!g || g.deletedAt || !this.canRead(g.contextId) || !i?.photo) return null;
+      return { mime: i.photo.mime, base64: i.photo.base64, version: i.version };
+    });
+  }
+
+  /** Como set_goal_image. Ordem: repetição; trava da meta (nao_encontrado, sem_permissao); imagem_invalida; foto_invalida; foto_grande; versão. */
+  async setGoalImage(key: string, goalId: string, expectedVersion: number, choice: GoalImageChoice) {
+    return this.write(() => {
+      const imageKey = choice.kind === 'sugestao' ? choice.key : null;
+      const photo = choice.kind === 'foto' ? choice.base64.replace(/\s+/g, '') : null;
+      const payload = [goalId, imageKey, photo === null ? null : hash([photo]), expectedVersion];
+      const replayed = this.replay(key, 'imagem_meta', payload);
+      if (replayed) return this.goalImageOf(replayed.goalId!);
+      const current = this.liveGoal(goalId);
+      if (imageKey !== null && !/^[a-z_]{2,30}$/.test(imageKey)) throw new RepoError('imagem_invalida');
+      let mime: string | null = null;
+      if (photo !== null) {
+        mime = goalPhotoMime(photo);
+        if (base64Bytes(photo) < 1 || mime === null) throw new RepoError('foto_invalida');
+        if (base64Bytes(photo) > GOAL_PHOTO_MAX_BYTES) throw new RepoError('foto_grande');
+      }
+      const now = this.goalImageOf(goalId);
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion !== now.version) {
+        throw new RepoError('versao_desatualizada', undefined, `versao_atual=${now.version}`);
+      }
+      this.goalImages.set(goalId, {
+        imageKey,
+        photo: photo !== null && mime !== null ? { mime, base64: photo } : null,
+        version: now.version + 1,
+        updatedAt: this.stamp(),
+      });
+      this.saveOperation(key, 'imagem_meta', payload, { contextId: current.contextId, recordId: null, commitmentId: null, goalId, movementId: null });
+      return this.goalImageOf(goalId);
     });
   }
 
@@ -3906,6 +3978,7 @@ export class MemoryRepository implements RecordsRepository {
       action === 'marcar_mes_conferido' ||
       action === 'desmarcar_mes_conferido' ||
       action === 'gerar_codigo_whatsapp' ||
+      action === 'imagem_meta' ||
       action === 'desligar_whatsapp' ||
       isFamilyAction(action) ||
       isCompanyAction(action)
@@ -4331,6 +4404,7 @@ export class MemoryRepository implements RecordsRepository {
       this.goals.clear();
       this.goalMovements.clear();
       this.savingsChecks.clear();
+      this.goalImages.clear();
       this.signupSource = null;
       this.whatsappCode = null;
       this.cards.clear();
