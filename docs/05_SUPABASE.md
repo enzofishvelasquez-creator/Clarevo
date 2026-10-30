@@ -4,6 +4,8 @@
 
 Não consegui abrir a documentação do Supabase deste ambiente (acesso bloqueado pela rede). Os nomes dos menus abaixo podem variar um pouco no painel; o conteúdo de cada passo é o mesmo.
 
+**O projeto real (conferido no painel em 30/10/2026, D-074).** Organização "Clarevo by Enzo Velasquez", projeto "enzofishvelasquez-creator's Project" (o nome `clarevo-producao` abaixo era só a sugestão da criação), região **us-east-1 (Estados Unidos)**, plano gratuito, Site URL `https://app.clarevo.app.br`. A organização "bios-producao" é de outro produto: nada desta página vale para ela. As migrações até a 0019 estão aplicadas (a 0019 em 30/10/2026, conferida pela consulta do passo 21g).
+
 ## 1. Criar o projeto (você, ~5 min)
 
 1. Entre em supabase.com e crie uma conta (pode usar o GitHub).
