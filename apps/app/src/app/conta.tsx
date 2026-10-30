@@ -7,6 +7,7 @@ import {
   FAMILY_TEXT,
   LEGAL_TEXT,
   SUPPORT_TEXT,
+  WHATSAPP_IN_ACCOUNT,
   WHATSAPP_NUMBER,
   WHATSAPP_TEXT,
   type SitePage,
@@ -172,8 +173,9 @@ export default function ContaScreen() {
           />
         </Card>
 
-        {/* WhatsApp (D-076): anotar por mensagem escrita. Só em conta real e só depois que o número da Clarevo existir (WHATSAPP_NUMBER). */}
-        {auth.mode !== 'demo' && WHATSAPP_NUMBER !== null ? (
+        {/* WhatsApp (D-076): anotar por mensagem escrita. Só em conta real, com o número da Clarevo, e só depois do piloto fechado (no
+            piloto, a tela abre pelo link /conta/whatsapp). */}
+        {auth.mode !== 'demo' && WHATSAPP_NUMBER !== null && WHATSAPP_IN_ACCOUNT ? (
           <Card style={{ gap: space[3] }}>
             <Txt variant="title" accessibilityRole="header" aria-level={2}>
               {WHATSAPP_TEXT.cardTitle}

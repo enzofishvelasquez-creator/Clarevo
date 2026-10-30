@@ -1222,13 +1222,14 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.WHATSAPP_TEXT = exports.WHATSAPP_UNLINKED = exports.WHATSAPP_NUMBER = void 0;
+    exports.WHATSAPP_TEXT = exports.WHATSAPP_UNLINKED = exports.WHATSAPP_IN_ACCOUNT = exports.WHATSAPP_NUMBER = void 0;
     exports.whatsappActivationText = whatsappActivationText;
     exports.whatsappChatLink = whatsappChatLink;
     exports.formatWhatsAppNumber = formatWhatsAppNumber;
     const mensagem_1 = __req(1);
     const respostas_1 = __req(8);
-    exports.WHATSAPP_NUMBER = null;
+    exports.WHATSAPP_NUMBER = '15552087378';
+    exports.WHATSAPP_IN_ACCOUNT = false;
     exports.WHATSAPP_UNLINKED = {
         linked: false,
         contextId: null,
@@ -1243,8 +1244,11 @@ const __mods = [
         return `https://wa.me/${number}?text=${encodeURIComponent(whatsappActivationText(code))}`;
     }
     function formatWhatsAppNumber(number) {
-        const m = /^55(\d{2})(\d{4,5})(\d{4})$/.exec(number);
-        return m ? `+55 ${m[1]} ${m[2]}-${m[3]}` : `+${number}`;
+        const br = /^55(\d{2})(\d{4,5})(\d{4})$/.exec(number);
+        if (br)
+            return `+55 ${br[1]} ${br[2]}-${br[3]}`;
+        const us = /^1(\d{3})(\d{3})(\d{4})$/.exec(number);
+        return us ? `+1 (${us[1]}) ${us[2]}-${us[3]}` : `+${number}`;
     }
     exports.WHATSAPP_TEXT = {
         cardTitle: 'WhatsApp',

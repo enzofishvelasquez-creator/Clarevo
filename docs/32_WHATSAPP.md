@@ -71,6 +71,21 @@ Credenciais (token, chave secreta do app) nunca no chat nem no repositório: só
 9. **Piloto fechado** (fase 3): as pessoas do teste (até 5 no número de teste) ligam o WhatsApp e anotam por uma semana. Conferir no SQL Editor quantas mensagens deram "não entendi" para ajustar as regras.
 10. **Abrir a todos**: número próprio registrado com armazenamento no Brasil, nome de exibição "Clarevo" aprovado, política atualizada e resposta do advogado.
 
+## 6. Identificadores (não são segredos)
+
+Criados em 30/10/2026. Os segredos (token, chave secreta do app, token de verificação e chave dos números) nunca entram aqui.
+
+| O quê | Valor |
+|---|---|
+| Portfólio empresarial "Clarevo" | 1913629572938246 |
+| App "Clarevo" (Meta for Developers) | 1686700749544098 |
+| Conta do WhatsApp Business (WABA) | 1679227277245978 |
+| Número de teste (piloto) | +1 (555) 208-7378 |
+| Phone number ID do número de teste | 1370020676203219 |
+| Função do servidor | https://gywufwrdegucnoonoenr.supabase.co/functions/v1/whatsapp |
+
+**Piloto fechado:** o app usa o número de teste (`WHATSAPP_NUMBER`) e esconde o card em Conta (`WHATSAPP_IN_ACCOUNT = false`). As pessoas do piloto recebem o link https://app.clarevo.app.br/conta/whatsapp. O número de teste só troca mensagens com os até 5 números cadastrados no app da Meta.
+
 ## 6. Fontes
 
 - Preços: [Meta, preços da plataforma do WhatsApp](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing) e guias de terceiros ([calculadora Brasil 2026](https://hyperleap.ai/whatsapp-pricing-calculator-brazil), [wati](https://www.wati.io/blog/whatsapp-api-pricing-guide)). Valores a conferir no painel da Meta, porque a página oficial não abriu no ambiente da equipe.

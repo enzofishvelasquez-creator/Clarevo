@@ -2,10 +2,15 @@ import { formatWhatsAppCode } from './mensagem';
 import { WHATSAPP_CODE_MINUTES } from './respostas';
 
 /**
- * Número da Clarevo no WhatsApp (D-076): só algarismos, com o país (ex.: '5521912345678'). Enquanto for null, o app não mostra o
- * WhatsApp em Conta (a conta na Meta e o número ainda estão sendo preparados, docs/05, passo 12j).
+ * Número da Clarevo no WhatsApp (D-076): só algarismos, com o país. Null: a tela só explica. No piloto fechado, é o número de teste que a
+ * Meta dá (atende só os até 5 números cadastrados no app da Meta); o número próprio entra quando abrir a todos (docs/32, seção 5).
  */
-export const WHATSAPP_NUMBER: string | null = null;
+export const WHATSAPP_NUMBER: string | null = '15552087378';
+/**
+ * Piloto fechado (D-076): o card em Conta fica escondido e a tela abre só pelo link (app.clarevo.app.br/conta/whatsapp), mandado às
+ * pessoas do piloto. true quando abrir a todos, com o número próprio, a política e a resposta do advogado.
+ */
+export const WHATSAPP_IN_ACCOUNT = false;
 
 /** Estado do WhatsApp da própria pessoa (my_whatsapp). O número nunca volta ao app: o banco não o guarda. */
 export interface WhatsAppLinkState {
@@ -43,10 +48,12 @@ export function whatsappChatLink(number: string, code: string): string {
   return `https://wa.me/${number}?text=${encodeURIComponent(whatsappActivationText(code))}`;
 }
 
-/** '5521912345678' → '+55 21 91234-5678'; outro país ou tamanho: '+' e os algarismos. */
+/** '5521912345678' → '+55 21 91234-5678'; '15552087378' → '+1 (555) 208-7378'; outro país ou tamanho: '+' e os algarismos. */
 export function formatWhatsAppNumber(number: string): string {
-  const m = /^55(\d{2})(\d{4,5})(\d{4})$/.exec(number);
-  return m ? `+55 ${m[1]} ${m[2]}-${m[3]}` : `+${number}`;
+  const br = /^55(\d{2})(\d{4,5})(\d{4})$/.exec(number);
+  if (br) return `+55 ${br[1]} ${br[2]}-${br[3]}`;
+  const us = /^1(\d{3})(\d{3})(\d{4})$/.exec(number);
+  return us ? `+1 (${us[1]}) ${us[2]}-${us[3]}` : `+${number}`;
 }
 
 /** Textos da tela Conta > WhatsApp. */

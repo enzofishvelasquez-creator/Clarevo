@@ -219,7 +219,8 @@ describe('WhatsApp: código e link do app', () => {
     // O que o app preenche é o que a leitura reconhece.
     expect(read(whatsappActivationText('ABCDEF23'))).toEqual({ type: 'ligar', code: 'ABCDEF23' });
     expect(formatWhatsAppNumber('5521912345678')).toBe('+55 21 91234-5678');
-    expect(formatWhatsAppNumber('15551234567')).toBe('+15551234567');
+    expect(formatWhatsAppNumber('15551234567')).toBe('+1 (555) 123-4567');
+    expect(formatWhatsAppNumber('447911123456')).toBe('+447911123456');
   });
 });
 
