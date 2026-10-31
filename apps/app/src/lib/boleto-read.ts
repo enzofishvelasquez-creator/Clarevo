@@ -1,7 +1,7 @@
 import { BOLETO_TEXT, boletoFromText, type BoletoReading, type IsoDate } from '@clarevo/core';
 import * as DocumentPicker from 'expo-document-picker';
 
-import { isImageAsset } from '@/lib/comprovante-read';
+import { imageTooBig, isImageAsset } from '@/lib/comprovante-read';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { bytesOf, deleteCachedCopy, readPdfText } from '@/lib/receipt-read';
 
@@ -29,6 +29,7 @@ export async function pickAndReadBoletoPdf(today: IsoDate, onImage?: () => void)
   if (!asset) return { ok: false, message: '', cancelled: true };
   try {
     if (OCR_AVAILABLE && isImageAsset(asset)) {
+      if (imageTooBig(asset)) return { ok: false, message: BOLETO_TEXT.errors.imageTooBig };
       onImage?.();
       let imageText: string;
       try {

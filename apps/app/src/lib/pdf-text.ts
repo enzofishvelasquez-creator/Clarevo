@@ -15,6 +15,11 @@ import type { PdfTextItem } from '@clarevo/core';
 
 export const PDF_MAX_BYTES = 10 * 1024 * 1024;
 const PDF_MAX_PAGES = 3;
+/** Extrato ou fatura em PDF (D-078 A): até 30 páginas, cerca de um trimestre de lançamentos. */
+export const PDF_STATEMENT_MAX_PAGES = 30;
+
+/** O PDF passa do número de páginas que a leitura aceita: avisar, em vez de ler só uma parte. */
+export class PdfTooManyPagesError extends Error {}
 
 type CloneFn = (value: unknown, options?: unknown) => unknown;
 type GuardedClone = CloneFn & { __clarevoGuard?: true };
@@ -60,7 +65,17 @@ export function newPdfReadControl(): PdfReadControl {
  * abre ou se a leitura foi abortada. A tarefa é criada aqui (`getDocument`) para ser destruída em qualquer saída: sucesso, falha
  * ao abrir, falha numa página ou `control.abort()` (tempo limite).
  */
-export async function pdfTextFromBytes(bytes: Uint8Array, control?: PdfReadControl, items?: PdfTextItem[]): Promise<string> {
+/**
+ * `maxPages`: nota e comprovante leem só as 3 primeiras páginas (o que importa está nelas); o extrato passa o limite dele e, com
+ * `strict`, recusa o PDF maior (`PdfTooManyPagesError`) em vez de ler só uma parte sem avisar.
+ */
+export async function pdfTextFromBytes(
+  bytes: Uint8Array,
+  control?: PdfReadControl,
+  items?: PdfTextItem[],
+  maxPages: number = PDF_MAX_PAGES,
+  strict = false,
+): Promise<string> {
   installStructuredCloneGuard();
   const { getResolvedPDFJS } = await import('unpdf');
   const { getDocument } = await getResolvedPDFJS();
@@ -70,7 +85,8 @@ export async function pdfTextFromBytes(bytes: Uint8Array, control?: PdfReadContr
   try {
     const pdf = await task.promise;
     const parts: string[] = [];
-    for (let n = 1; n <= Math.min(pdf.numPages, PDF_MAX_PAGES); n++) {
+    if (strict && pdf.numPages > maxPages) throw new PdfTooManyPagesError();
+    for (let n = 1; n <= Math.min(pdf.numPages, maxPages); n++) {
       if (control?.aborted) throw new Error('leitura cancelada');
       const content = await (await pdf.getPage(n)).getTextContent();
       for (const item of content.items) {

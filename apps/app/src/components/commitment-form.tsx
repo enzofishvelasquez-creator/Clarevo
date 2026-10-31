@@ -179,20 +179,22 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
   // "Ler boleto" (D-078 G): a leitura e os campos de antes dela, para "Desfazer leitura".
   const [boleto, setBoleto] = useState<{ reading: BoletoReading; before: CommitmentDraft } | null>(null);
   const applyBoleto = (reading: BoletoReading) => {
+    // "Desfazer leitura" volta ao que estava antes da primeira leitura; a leitura nova vale sobre o que está nos campos agora (o
+    // que a pessoa digitou depois da primeira leitura continua).
     const before = boleto ? boleto.before : draft;
     setBoleto({ reading, before });
-    setDraft({
-      ...before,
-      amountText: reading.amountCents !== null ? centsToInput(reading.amountCents) : before.amountText,
-      dateText: reading.dueOn ? formatDateBR(reading.dueOn) : before.dateText,
-      description: before.description.trim() === '' && reading.description ? reading.description : before.description,
-    });
+    setDraft((d) => ({
+      ...d,
+      amountText: reading.amountCents !== null ? centsToInput(reading.amountCents) : d.amountText,
+      dateText: reading.dueOn ? formatDateBR(reading.dueOn) : d.dateText,
+      description: d.description.trim() === '' && reading.description ? reading.description : d.description,
+    }));
     setErrors({});
     // O primeiro campo que falta recebe o foco: valor, depois vencimento, depois descrição.
     setTimeout(() => {
       if (reading.amountCents === null) refs.amountText.current?.focus();
       else if (reading.dueOn === null) refs.dateText.current?.focus();
-      else if (before.description.trim() === '' && !reading.description) refs.description.current?.focus();
+      else if (draft.description.trim() === '' && !reading.description) refs.description.current?.focus();
     }, 50);
   };
   const undoBoleto = () => {

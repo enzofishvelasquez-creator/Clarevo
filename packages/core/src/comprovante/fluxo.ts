@@ -75,6 +75,7 @@ export const COMPROVANTE_TEXT = {
     /** Imagem (print ou foto) sem texto que dê para ler. */
     imageNoText: 'Não conseguimos ler esta imagem. Confira se está nítida e inteira, ou digite os dados à mão.',
     imageFailed: 'Não foi possível ler esta imagem. Digite os dados à mão.',
+    imageTooBig: 'Esta imagem passa de 10 MB. Use um print ou uma foto menor.',
     notSupported: 'Este arquivo não é um PDF nem uma imagem.',
   },
   /** "Parece já anotado em 05/10/2026: Padaria, R$ 85,00." */

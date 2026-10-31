@@ -58,18 +58,50 @@ describe('extrato da conta em PDF', () => {
 });
 
 describe('fatura de cartão em PDF', () => {
-  it('compras sem sinal ficam positivas para a revisão inverter no destino cartão', () => {
+  it('compra sem sinal sai; "-", "C", estorno e pagamento são crédito; nada a inverter na revisão', () => {
     const items = [
       ...row(800, [['Fatura do cartão', 40]]),
       ...row(700, [['12/09', 40], ['LOJA EXEMPLO PARC 02/05', 120], ['150,00', 400]]),
       ...row(680, [['15/09', 40], ['STREAMING EXEMPLO', 120], ['39,90', 400]]),
+      ...row(660, [['08/10', 40], ['PAGAMENTO EFETUADO', 120], ['-1.000,00', 400]]),
+      ...row(640, [['09/10', 40], ['ESTORNO LOJA EXEMPLO', 120], ['-50,00', 400]]),
+      ...row(620, [['10/10', 40], ['AJUSTE', 120], ['20,00 C', 400]]),
+      ...row(600, [['11/10', 40], ['ESTORNO OUTRA LOJA', 120], ['30,00', 400]]),
     ];
     const r = statementFromPdfItems(items, TODAY)!;
     expect(r.statement).toBe('cartao');
-    expect(r.cardPositive).toBe(true);
+    expect(r.cardPositive).toBe(false);
     expect(r.lines.map((l) => [l.description, l.amountCents])).toEqual([
-      ['LOJA EXEMPLO PARC 02/05', 15_000],
-      ['STREAMING EXEMPLO', 3_990],
+      ['LOJA EXEMPLO PARC 02/05', -15_000],
+      ['STREAMING EXEMPLO', -3_990],
+      ['PAGAMENTO EFETUADO', 100_000],
+      ['ESTORNO LOJA EXEMPLO', 5_000],
+      ['AJUSTE', 2_000],
+      ['ESTORNO OUTRA LOJA', 3_000],
+    ]);
+  });
+
+  it('extrato da conta que cita o pagamento da fatura do cartão continua extrato da conta', () => {
+    const items = [
+      ...row(800, [['Extrato de conta corrente', 40]]),
+      ...row(700, [['05/10/2026', 40], ['PAGTO FATURA CARTAO', 120], ['800,00', 400]]),
+      ...row(680, [['06/10/2026', 40], ['MERCADO EXEMPLO', 120], ['100,00', 400]]),
+    ];
+    const r = statementFromPdfItems(items, TODAY)!;
+    expect(r.statement).toBe('conta');
+    expect(r.lines.map((l) => l.amountCents)).toEqual([-80_000, -10_000]);
+  });
+});
+
+describe('valor da linha no PDF', () => {
+  it('o "-" do saldo na coluna seguinte não vira sinal do lançamento; valor sem ponto de milhar é lido inteiro', () => {
+    const items = [
+      ...row(700, [['05/10/2026', 40], ['PIX RECEBIDO FULANO EXEMPLO', 120], ['150,00', 380], ['-1.234,56', 470]]),
+      ...row(680, [['06/10/2026', 40], ['COMPRA MERCADO', 120], ['1234,56', 380]]),
+    ];
+    expect(statementFromPdfItems(items, TODAY)!.lines.map((l) => [l.description, l.amountCents])).toEqual([
+      ['PIX RECEBIDO FULANO EXEMPLO', 15_000],
+      ['COMPRA MERCADO', -123_456],
     ]);
   });
 });

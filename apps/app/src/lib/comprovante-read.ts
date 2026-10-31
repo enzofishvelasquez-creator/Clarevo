@@ -41,11 +41,19 @@ export function isImageAsset(asset: Pick<DocumentPicker.DocumentPickerAsset, 'mi
   return /^image\/(png|jpe?g|webp)$/i.test(asset.mimeType ?? '') || /\.(png|jpe?g|webp)$/i.test(asset.name ?? '');
 }
 
+/** Imagem acima de 10 MB (foto de câmera muito grande): não é lida, para a leitura não travar o aparelho. */
+export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export function imageTooBig(asset: Pick<DocumentPicker.DocumentPickerAsset, 'size' | 'file'>): boolean {
+  const size = asset.file?.size ?? asset.size;
+  return typeof size === 'number' && size > IMAGE_MAX_BYTES;
+}
+
 /**
- * Texto de um print ou de uma foto (D-078 B), lido no próprio aparelho, para o mesmo leitor do PDF. O tamanho máximo é o do PDF.
- * Sem texto que dê para ler, a mensagem diz para conferir a imagem.
+ * Texto de um print ou de uma foto (D-078 B), lido no próprio aparelho, para o mesmo leitor do PDF. Até 10 MB. Sem texto que dê
+ * para ler, a mensagem diz para conferir a imagem.
  */
 export async function readComprovanteImage(asset: DocumentPicker.DocumentPickerAsset, defaultDirection: ComprovanteDirection, onProgress?: (f: number) => void): Promise<ComprovanteRead> {
+  if (imageTooBig(asset)) return { ok: false, message: COMPROVANTE_TEXT.pdf.imageTooBig };
   let text: string;
   try {
     const source: Blob | string = asset.file ?? asset.uri;

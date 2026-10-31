@@ -50,11 +50,11 @@ describe('média por categoria → orçamento', () => {
       line('2026-09-03', 'POSTO EXEMPLO', 15_000, 'despesa', 'Transporte'),
       line('2026-09-20', 'POSTO EXEMPLO', 12_000, 'compra', 'Transporte'),
       line('2026-10-03', 'POSTO EXEMPLO', 31_000, 'despesa', 'Transporte'),
-      line('2026-10-04', 'MERCADO EXEMPLO', 40_000, 'despesa', 'Mercado'),
+      line('2026-10-30', 'MERCADO EXEMPLO', 40_000, 'despesa', 'Mercado'),
       line('2026-10-04', 'CINEMA', 2_000, 'despesa', 'Lazer'),
       line('2026-10-05', 'SALARIO', 500_000, 'receita', 'Salário'),
     ];
-    // Transporte: 580,00 em 2 meses = 290,00. Mercado: 400,00 / 2 = 200,00. Lazer: 20,00 / 2 = 10,00 (abaixo de R$ 50,00).
+    // De 03/09 a 30/10: 58 dias, 2 meses. Transporte: 580,00 em 2 meses = 290,00. Mercado: 400,00 / 2 = 200,00. Lazer: 20,00 / 2 = 10,00 (abaixo de R$ 50,00).
     expect(importSuggestions(lines, NONE).budgets).toEqual([
       { category: 'Transporte', monthlyCents: 29_000 },
       { category: 'Mercado', monthlyCents: 20_000 },
@@ -84,3 +84,39 @@ describe('média por categoria → orçamento', () => {
     expect(IMPORT_SUGGESTION_TEXT.budgetLine({ category: 'Transporte', monthlyCents: 30_000 })).toBe('Transporte · R$ 300,00 por mês');
   });
 });
+
+describe('chave da conta que se repete e período da média (revisão de 31/10/2026)', () => {
+  it('as palavras do meio de pagamento saem da chave: contas diferentes ficam separadas', () => {
+    expect(recurringKey('PAG BOLETO ENEL 0912')).toBe('enel');
+    expect(recurringKey('DEB AUTOMATICO SABESP')).toBe('sabesp');
+    expect(recurringKey('PAGAMENTO DE BOLETO NET SERVICOS')).not.toBe(recurringKey('PAGAMENTO DE BOLETO CONDOMINIO'));
+    const lines = [
+      line('2026-09-10', 'PAG BOLETO ENEL 0910', 18_000),
+      line('2026-10-10', 'PAG BOLETO ENEL 1010', 19_000),
+      line('2026-09-12', 'DEB AUTOMATICO SABESP', 9_000),
+      line('2026-10-12', 'DEB AUTOMATICO SABESP', 9_500),
+      line('2026-09-15', 'PAGAMENTO DE BOLETO NET SERVICOS', 12_000),
+      line('2026-10-15', 'PAGAMENTO DE BOLETO NET SERVICOS', 12_000),
+      line('2026-09-20', 'PAGAMENTO DE BOLETO CONDOMINIO', 10_000),
+      line('2026-10-20', 'PAGAMENTO DE BOLETO CONDOMINIO', 10_000),
+    ];
+    expect(importSuggestions(lines, NONE).recurring.map((s) => s.description)).toEqual([
+      'PAG BOLETO ENEL 1010',
+      'PAGAMENTO DE BOLETO NET SERVICOS',
+      'PAGAMENTO DE BOLETO CONDOMINIO',
+      'DEB AUTOMATICO SABESP',
+    ]);
+  });
+
+  it('extrato de 15/09 a 14/10 conta como 1 mês; parcela com data antiga não estica o período', () => {
+    const extrato = [line('2026-09-15', 'POSTO', 15_000, 'despesa', 'Transporte'), line('2026-10-14', 'POSTO', 15_000, 'despesa', 'Transporte')];
+    expect(importSuggestions(extrato, NONE).budgets).toEqual([{ category: 'Transporte', monthlyCents: 30_000 }]);
+    const fatura = [
+      line('2026-05-10', 'LOJA EXEMPLO PARC 05/10', 10_000, 'compra', 'Lazer'),
+      line('2026-09-20', 'CINEMA', 5_000, 'compra', 'Lazer'),
+      line('2026-10-05', 'TEATRO', 5_000, 'compra', 'Lazer'),
+    ];
+    expect(importSuggestions(fatura, NONE).budgets).toEqual([{ category: 'Lazer', monthlyCents: 20_000 }]);
+  });
+});
+

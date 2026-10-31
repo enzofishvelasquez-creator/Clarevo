@@ -154,6 +154,7 @@ export const IMPORT_ERROR_TEXT: Record<ImportErrorCode, string> = {
   pdf_sem_lancamentos:
     'Não achamos lançamentos neste PDF. Confira se é o extrato ou a fatura (com data, descrição e valor em cada linha) ou peça ao banco o arquivo em OFX ou CSV.',
   pdf_ilegivel: 'Não conseguimos abrir este PDF. Se ele tem senha, peça ao banco o extrato sem senha, em OFX ou CSV.',
+  pdf_paginas_demais: 'O PDF passa de 30 páginas. Peça ao banco o extrato de um período menor, ou em OFX ou CSV.',
   planilha_excel: 'Este arquivo é uma planilha de Excel. Abra a planilha, salve uma cópia no formato CSV e escolha esse arquivo de novo.',
   sem_lancamentos: 'Não achamos lançamentos neste arquivo.',
   moeda_diferente: 'Este arquivo não está em reais. A Clarevo importa só valores em reais.',

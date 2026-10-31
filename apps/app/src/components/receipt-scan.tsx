@@ -24,6 +24,7 @@ import { Banner, Button, LinkButton, TextField, Txt, styles as ui } from '@/comp
 import { improveCameraFocus } from '@/lib/camera-focus';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { invoiceHref } from '@/lib/cards';
+import { imageTooBig } from '@/lib/comprovante-read';
 import { useCard, useCardEntry, useRecord } from '@/state/data';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -144,6 +145,10 @@ export function PasteModal({
     }
     const asset = picked.canceled ? null : picked.assets[0];
     if (!asset) return;
+    if (imageTooBig(asset)) {
+      setPhotoError(NOTA_TEXT.keyPhotoNone);
+      return;
+    }
     setPhotoBusy(true);
     try {
       const key = accessKeyFromText(await textFromImage(asset.file ?? asset.uri));

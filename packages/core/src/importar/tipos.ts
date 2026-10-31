@@ -25,6 +25,7 @@ export type ImportErrorCode =
   | 'arquivo_pdf'
   | 'pdf_sem_lancamentos'
   | 'pdf_ilegivel'
+  | 'pdf_paginas_demais'
   | 'planilha_excel'
   | 'sem_lancamentos'
   | 'moeda_diferente'

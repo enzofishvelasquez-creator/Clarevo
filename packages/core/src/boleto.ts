@@ -60,14 +60,18 @@ export function readBoleto(raw: string, today: IsoDate): BoletoReading | null {
 /** Trechos de algarismos com pontos, espaços e hífens no meio (como a linha digitável aparece), até 120 caracteres. */
 const DIGIT_RUN = /\d[\d.\s-]{30,118}\d/g;
 
-/** O código do boleto dentro de um texto: o trecho inteiro ou um pedaço de 47, 48 ou 44 algarismos que passe na conferência. */
+/**
+ * O código do boleto dentro de um texto: o trecho inteiro ou, com algarismos sobrando nas pontas, um pedaço de 47 ou 48 que passe na
+ * conferência. O código de barras (44) só vale com o trecho inteiro: um pedaço de 44 dentro de uma linha digitável lida com um
+ * algarismo errado passa no dígito verificador com frequência e daria valor e vencimento falsos.
+ */
 function codeInText(text: string, today: IsoDate): BoletoReading | null {
   for (const line of toLines(text)) {
     for (const m of line.matchAll(DIGIT_RUN)) {
       const whole = readBoleto(m[0], today);
       if (whole) return whole;
       const only = m[0].replace(/\D/g, '');
-      for (const size of [47, 48, 44]) {
+      for (const size of [47, 48]) {
         for (let i = 0; i + size <= only.length; i++) {
           const part = readBoleto(only.slice(i, i + size), today);
           if (part) return part;
@@ -137,6 +141,7 @@ export const BOLETO_TEXT = {
     notaFiscal: 'Este é o código de uma nota fiscal, não de um boleto. Para anotar um gasto já pago, use Anotar gasto.',
     pdfNone: 'Não achamos a linha digitável neste PDF. Cole ou digite os números do boleto.',
     imageNone: 'Não achamos a linha digitável nesta imagem. Tente uma foto mais nítida, só da linha, ou digite os números.',
+    imageTooBig: 'Esta imagem passa de 10 MB. Use uma foto menor.',
     pdfFailed: 'Não foi possível ler este PDF. Cole ou digite os números do boleto.',
     pdfTooBig: 'Este PDF é grande demais para ler aqui. Cole ou digite os números do boleto.',
     notPdf: 'Este arquivo não é um PDF.',

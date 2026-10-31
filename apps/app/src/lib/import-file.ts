@@ -1,8 +1,11 @@
-import { IMPORT_MAX_BYTES, deviceTimeZone, readImportFile, statementFromPdfItems, todayIn, type ImportRead, type PdfTextItem } from '@clarevo/core';
+import { IMPORT_MAX_BYTES, deviceTimeZone, raceWithTimeout, readImportFile, statementFromPdfItems, todayIn, type ImportRead, type PdfTextItem } from '@clarevo/core';
 import * as DocumentPicker from 'expo-document-picker';
 import { Platform } from 'react-native';
 
-import { newPdfReadControl, pdfTextFromBytes } from '@/lib/pdf-text';
+import { PDF_STATEMENT_MAX_PAGES, PdfTooManyPagesError, newPdfReadControl, pdfTextFromBytes } from '@/lib/pdf-text';
+
+/** Tempo máximo para abrir e ler o PDF de um extrato (até 30 páginas). */
+const PDF_STATEMENT_TIMEOUT_MS = 60_000;
 
 /**
  * Escolher e ler o arquivo de "Importar extrato ou fatura" (D-048), no aparelho. O arquivo (OFX ou planilha CSV) vai do seletor
@@ -47,10 +50,13 @@ async function deleteCachedCopy(asset: DocumentPicker.DocumentPickerAsset): Prom
  */
 async function readImportPdf(bytes: Uint8Array, timeZone: string | undefined): Promise<ImportRead> {
   const items: PdfTextItem[] = [];
-  try {
-    await pdfTextFromBytes(bytes, newPdfReadControl(), items);
-  } catch {
-    return { kind: 'erro', code: 'pdf_ilegivel' };
+  const control = newPdfReadControl();
+  const work = pdfTextFromBytes(bytes, control, items, PDF_STATEMENT_MAX_PAGES, true);
+  const raced = await raceWithTimeout(work, PDF_STATEMENT_TIMEOUT_MS, () => control.abort());
+  if (raced === 'tempo') return { kind: 'erro', code: 'pdf_ilegivel' };
+  if (raced === 'erro') {
+    const cause = await work.then(() => null, (e: unknown) => e);
+    return { kind: 'erro', code: cause instanceof PdfTooManyPagesError ? 'pdf_paginas_demais' : 'pdf_ilegivel' };
   }
   const parse = statementFromPdfItems(items, todayIn(timeZone ?? deviceTimeZone()));
   return parse ? { kind: 'ok', parse, table: null } : { kind: 'erro', code: 'pdf_sem_lancamentos' };

@@ -92,3 +92,18 @@ describe('boleto: PDF (texto) com a linha digitável e o beneficiário', () => {
     expect(BOLETO_TEXT.readLine({ amountCents: null, dueOn: null, description: null })).toBe('Boleto lido: sem valor nem vencimento');
   });
 });
+
+describe('boleto lido com um algarismo errado (leitura de imagem)', () => {
+  it('nenhum pedaço de 44 dentro da linha de 47 vira leitura: com um algarismo trocado, o resultado é nulo', () => {
+    let wrong = 0;
+    for (let i = 0; i < BANK_LINE.length; i++) {
+      for (let d = 0; d <= 9; d++) {
+        if (String(d) === BANK_LINE[i]) continue;
+        const changed = BANK_LINE.slice(0, i) + String(d) + BANK_LINE.slice(i + 1);
+        const r = boletoFromText(`Linha: ${changed}`, TODAY);
+        if (r && (r.amountCents !== 123_456 || r.dueOn !== '2026-11-10')) wrong++;
+      }
+    }
+    expect(wrong).toBe(0);
+  });
+});

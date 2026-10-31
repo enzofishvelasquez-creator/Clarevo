@@ -1,8 +1,9 @@
 import { fold } from '../comprovante/texto';
-import type { IsoMonth } from '../dates';
+import { daysBetween } from '../dates';
 import { formatBRL, MAX_RECORD_CENTS, type Cents } from '../money';
 import { CATEGORIES } from '../records';
 import { DESCRIPTION_MAX } from '../validation';
+import { installmentMark } from './dedupe';
 import type { ReviewLine } from './revisao';
 
 /**
@@ -12,10 +13,10 @@ import type { ReviewLine } from './revisao';
  * abre o cadastro já preenchido, e a pessoa confere e salva.
  *
  * 1. Conta que se repete → gasto fixo: gastos da conta (não compras no cartão, que já entram na fatura) com a mesma descrição, sem
- *    os números, em 2 meses ou mais, e valores parecidos (o maior até 30% acima do menor). Fica de fora o que já tem um gasto fixo
+ *    os números e as palavras do meio de pagamento ("pagamento de boleto", "pix enviado"), em 2 meses ou mais, e valores parecidos (o maior até 30% acima do menor). Fica de fora o que já tem um gasto fixo
  *    com descrição parecida. Até 5, os de maior valor. Valor e dia: os da ocorrência mais recente.
- * 2. Média por categoria → orçamento: gastos e compras no cartão de cada categoria, somados e divididos pelos meses do arquivo,
- *    arredondados para cima em R$ 10,00. Só categorias de gasto sem orçamento, a partir de R$ 50,00 por mês. Até 3, as maiores.
+ * 2. Média por categoria → orçamento: gastos e compras no cartão de cada categoria, somados e divididos pelos meses do período dos
+ *    gastos (da primeira à última data, 30 dias por mês, sem as parcelas), arredondados para cima em R$ 10,00. Só categorias de gasto sem orçamento, a partir de R$ 50,00 por mês. Até 3, as maiores.
  */
 
 export interface RecurringSuggestion {
@@ -45,13 +46,24 @@ export const BUDGET_SUGGESTION_MAX = 3;
 export const BUDGET_SUGGESTION_MIN_CENTS = 5_000;
 const RECURRING_SPREAD = 1.3;
 
-/** Descrição sem números, acentos e sinais, com as três primeiras palavras: "PAG*LUZ 0412 12/10" e "PAG LUZ 0511" ficam iguais. */
+/** Palavras que só dizem o meio de pagamento ("pagamento de boleto", "pix enviado", "débito automático"): saem da chave. */
+const PAYMENT_WORDS = new Set([
+  'pag', 'pagto', 'pagamento', 'pgto', 'boleto', 'bol', 'pix', 'enviado', 'enviada', 'env', 'ted', 'doc', 'transferencia', 'transf',
+  'deb', 'debito', 'automatico', 'aut', 'compra', 'cartao', 'de', 'do', 'da', 'dos', 'das', 'para', 'em', 'no', 'na', 'via', 'conta',
+]);
+
+/**
+ * Descrição sem números, acentos, sinais e as palavras do meio de pagamento: "PAG*BOLETO ENEL 0412" e "PAG BOLETO ENEL 0511" ficam
+ * iguais ("enel"), e "PAGAMENTO DE BOLETO NET" e "PAGAMENTO DE BOLETO CONDOMINIO" ficam diferentes. Sem nada além dessas palavras,
+ * fica a descrição inteira sem números.
+ */
 export function recurringKey(description: string): string {
   const words = fold(description)
     .replace(/[^a-z\s]/g, ' ')
     .split(/\s+/)
     .filter((w) => w.length >= 2);
-  return words.slice(0, 3).join(' ');
+  const named = words.filter((w) => !PAYMENT_WORDS.has(w));
+  return (named.length > 0 ? named : words).join(' ');
 }
 
 function similar(a: string, b: string): boolean {
@@ -93,9 +105,12 @@ export function importSuggestions(
   }
   recurring.sort((a, b) => b.amountCents - a.amountCents || a.description.localeCompare(b.description, 'pt-BR'));
 
-  // 2. Média por categoria.
-  const fileMonths = new Set<IsoMonth>(lines.map((l) => l.date.slice(0, 7) as IsoMonth));
-  const span = Math.max(1, fileMonths.size);
+  // 2. Média por categoria. Os meses são o intervalo entre a primeira e a última data dos gastos (30 dias = 1 mês), sem as compras
+  // parceladas, que trazem a data da compra original (uma parcela 05/10 de maio numa fatura de outubro não estica o período).
+  const spending = lines.filter((l) => (l.kind === 'despesa' || l.kind === 'compra') && l.amountCents > 0);
+  const dated = spending.filter((l) => installmentMark(l.description, l.date) === null);
+  const range = (dated.length > 0 ? dated : spending).map((l) => l.date).sort();
+  const span = range.length === 0 ? 1 : Math.max(1, Math.round((daysBetween(range[0]!, range[range.length - 1]!) + 1) / 30.4));
   const totals = new Map<string, number>();
   for (const l of lines) {
     if ((l.kind !== 'despesa' && l.kind !== 'compra') || l.category === null || l.amountCents <= 0) continue;
