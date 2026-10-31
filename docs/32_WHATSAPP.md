@@ -86,6 +86,14 @@ O número de teste da Meta só conversa com até 5 números cadastrados. Para to
 
 Antes disso, vale terminar o teste com o número de teste (segredos, webhook e "oi"): ele prova a função e o banco, e o número próprio só troca o passo 4 em diante.
 
+## 5c. Bloqueio da conta do WhatsApp (31/10/2026) e regra para as contas da Meta
+
+No primeiro teste, as mensagens do número de teste falharam com o erro 131031 ("Business Account locked"). Os avisos do webhook de 31/10/2026 mostram uma violação `SCRIPTED_BM` (a Meta entendeu que o portfólio empresarial foi criado por automação) e um pedido de verificação da empresa, na conta do WhatsApp 1679227277245978 do portfólio 1913629572938246. O portfólio e o app foram criados pelo Claude Chrome, operando o navegador do Enzo, a pedido da equipe: a causa mais provável é essa.
+
+**Regra daqui em diante:** contas, portfólios, apps, verificações e pedidos de revisão na Meta são feitos **só pelo Enzo, à mão, no próprio navegador**. O Claude Chrome não cria nem opera páginas da Meta; a equipe manda o passo a passo e lê os prints.
+
+O que fazer: (1) o Enzo pede a revisão da restrição em Qualidade da conta do portfólio, com uma explicação verdadeira; (2) completa a verificação da empresa com o cartão CNPJ; (3) se a revisão for negada, cria um portfólio novo, à mão, liga o app a ele e troca os segredos que mudarem (token, Phone number ID).
+
 ## 6. Identificadores (não são segredos)
 
 Criados em 30/10/2026. Os segredos (token, chave secreta do app, token de verificação e chave dos números) nunca entram aqui.
