@@ -14058,7 +14058,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await tabByName('Metas').click(); await waitText('Viagem de férias'); await p.waitForTimeout(400);
     await p.getByRole('button', { name: /^Viagem de férias/ }).filter({ visible: true }).first().click(); await waitText('Mais ações'); await p.waitForTimeout(400);
     ok('Metas com imagem: a tela da meta mostra a sugestão automática pelo nome (viagem), com texto alternativo',
-      (await p.getByRole('img', { name: 'Praia de água azul com casas brancas' }).filter({ visible: true }).count()) === 1);
+      (await p.getByRole('img', { name: 'Casas brancas e cúpulas azuis diante do mar' }).filter({ visible: true }).count()) === 1);
     await btn('Mais ações').click(); await p.getByRole('alert').getByRole('button', { name: 'Trocar imagem' }).last().click();
     await waitText('Sugeridas'); await p.waitForTimeout(400);
     t = await body(); screenTexts.push(t);
@@ -14077,7 +14077,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await p.waitForFunction(() => [...document.querySelectorAll('[role=radio]')].some((e) => (e.getAttribute('aria-label') || '').startsWith('Automática') &&
       e.getBoundingClientRect().width > 0 && e.getAttribute('aria-checked') === 'true'), null, { timeout: 8000 }).catch(() => {});
     r = await radios();
-    ok('Metas com imagem: voltar à automática', (r[0] || [])[1] === 'true' && (await p.getByRole('img', { name: 'Praia de água azul com casas brancas' }).filter({ visible: true }).count()) === 1, JSON.stringify(r));
+    ok('Metas com imagem: voltar à automática', (r[0] || [])[1] === 'true' && (await p.getByRole('img', { name: 'Casas brancas e cúpulas azuis diante do mar' }).filter({ visible: true }).count()) === 1, JSON.stringify(r));
     ok('Metas com imagem: nada vai à rede na demonstração', writes.length === giWrites0, writes.slice(giWrites0).join(' | '));
   }
 

@@ -4,7 +4,7 @@
 
 ## 1. O que a pessoa vê e faz
 
-- **Sem escolher nada**, a meta mostra a imagem sugerida pelo nome: "Viagem para a Grécia" mostra a praia, "Troca do carro" o carro, "Entrada do imóvel" a casa. A reserva para imprevistos mostra sempre o porquinho. Sem pista no nome, aparece a trilha na montanha ("Objetivo"). A sugestão muda sozinha se o nome da meta mudar.
+- **Sem escolher nada**, a meta mostra a imagem sugerida pelo nome: "Viagem para a Grécia" mostra as casas brancas diante do mar, "Troca do carro" o carro, "Entrada do imóvel" a casa. A reserva para imprevistos mostra sempre o porquinho. Sem pista no nome, aparece a trilha na montanha ("Objetivo"). A sugestão muda sozinha se o nome da meta mudar.
 - **Para trocar**: na meta, "Mais ações", depois "Trocar imagem". A tela mostra a imagem atual e:
   - **Sugeridas**: a "Automática" (a do nome) e as 12 sugestões (Viagem, Porquinho, Carro, Casa, Estudos, Casamento, Bebê, Tecnologia, Saúde, Futuro, Pet e Objetivo);
   - **Sua foto**: "Escolher uma foto" abre a galeria do celular (o seletor do sistema; só a foto escolhida chega ao app). O app recorta em 16:9 quando o aparelho oferece, reduz o lado maior para 1080 px em JPEG e manda (até 300 KB). Com foto, aparecem "Escolher outra foto" e "Tirar a foto".
@@ -16,24 +16,31 @@ Palavras que puxam cada sugestão: `packages/core/src/goal-images.ts` (`GOAL_IMA
 
 Nas telas, a sugestão da reserva se chama "Porquinho", nunca "cofrinho" nem "caixinha": são nomes de produtos de bancos, e a Clarevo não usa nomes de produtos financeiros (o roteiro de telas recusa essas palavras).
 
-As sugestões serão fotos com licença livre (Unsplash: uso gratuito, inclusive comercial, sem exigir crédito; damos o crédito aqui mesmo assim). Enquanto a foto de uma sugestão não está no app, ela aparece como o ícone do tema sobre o azul da marca (avião, porquinho, carro, casa e assim por diante), o que já funciona hoje.
+As sugestões são fotos da Unsplash com uso gratuito (Licença Unsplash: uso livre, inclusive comercial, sem exigir crédito; damos o crédito aqui mesmo assim). Escolhidas em 31/10/2026 com o filtro "Grátis" (nenhuma do Unsplash+), conferindo na página de cada uma "Uso gratuito sob a Licença da Unsplash", sem rosto de pessoa em destaque e sem marca ou texto legível no tamanho do app.
 
-Para baixar as fotos, o ambiente da equipe precisa liberar `unsplash.com` e `images.unsplash.com` (configuração de rede do ambiente). Cada foto entra em `apps/app/assets/metas/<chave>.jpg` (lado maior de 1080 px, cerca de 100 KB) e em `apps/app/src/lib/goal-image-assets.ts`.
+Cada foto está em `apps/app/assets/metas/<chave>.jpg` (recortada em 16:9 pelo centro, 1080 x 608 px, de 56 a 152 KB; 1,35 MB as 12) e em `apps/app/src/lib/goal-image-assets.ts`. Baixadas de `images.unsplash.com`. Sugestão sem foto no app aparece como o ícone do tema sobre o azul da marca (avião, porquinho, carro e assim por diante).
 
 | Sugestão | Foto | Autoria e link |
 |---|---|---|
-| Viagem | Praia de água azul com casas brancas | a definir |
-| Porquinho | Porquinho de guardar moedas | a definir |
-| Carro | Carro na estrada | a definir |
-| Casa | Fachada de uma casa com jardim | a definir |
-| Estudos | Livros abertos sobre uma mesa | a definir |
-| Casamento | Duas alianças | a definir |
-| Bebê | Sapatinhos de bebê | a definir |
-| Tecnologia | Notebook e celular sobre uma mesa | a definir |
-| Saúde | Tênis de corrida e garrafa de água | a definir |
-| Futuro | Nascer do sol sobre o mar | a definir |
-| Pet | Cachorro olhando para a câmera | a definir |
-| Objetivo | Trilha subindo uma montanha | a definir |
+| Viagem | Casas brancas e cúpulas azuis diante do mar (Santorini, Grécia) | Wojciech Wyszkowski, [unsplash.com/photos/64nCpuzkgVY](https://unsplash.com/photos/64nCpuzkgVY) |
+| Porquinho | Porquinho de guardar moedas | Braňo, [unsplash.com/photos/heYdDdq0cbE](https://unsplash.com/photos/heYdDdq0cbE) |
+| Carro | Carro na estrada, visto de cima | Hyundai Motor Group, [unsplash.com/photos/Ax5hexSdvCg](https://unsplash.com/photos/Ax5hexSdvCg) |
+| Casa | Fachada de uma casa com jardim | QY Liu, [unsplash.com/photos/RykkS_DVhPQ](https://unsplash.com/photos/RykkS_DVhPQ) |
+| Estudos | Livros abertos lado a lado | Patrick Tomasso, [unsplash.com/photos/Oaqk7qqNh_c](https://unsplash.com/photos/Oaqk7qqNh_c) |
+| Casamento | Duas alianças | Sandy Millar, [unsplash.com/photos/8vaQKYnawHw](https://unsplash.com/photos/8vaQKYnawHw) |
+| Bebê | Sapatinhos de bebê | Elsa Lilja, [unsplash.com/photos/xlkuA0VQshU](https://unsplash.com/photos/xlkuA0VQshU) |
+| Tecnologia | Notebook, celular e café sobre uma mesa | Unsplash, [unsplash.com/photos/NuFUbftUu_s](https://unsplash.com/photos/NuFUbftUu_s) |
+| Saúde | Tapete de exercício com toalha e halteres | Andrea Stuart, [unsplash.com/photos/zBYG9kzN-8s](https://unsplash.com/photos/zBYG9kzN-8s) |
+| Futuro | Nascer do sol sobre o mar | Sebastien Gabriel, [unsplash.com/photos/-IMlv9Jlb24](https://unsplash.com/photos/-IMlv9Jlb24) |
+| Pet | Cachorro olhando para a câmera | Alvan Nee, [unsplash.com/photos/Nms-W0u4J7c](https://unsplash.com/photos/Nms-W0u4J7c) |
+| Objetivo | Trilha subindo uma montanha | Mateusz Sobczak, [unsplash.com/photos/9hhhZaj1CxA](https://unsplash.com/photos/9hhhZaj1CxA) |
+
+Observações da escolha:
+
+- **Saúde**: as fotos de tênis de corrida com uso gratuito mostravam marca (no tênis ou na garrafa); ficou o tapete de exercício com toalha e halteres, sem marca.
+- **Carro**: a foto é da conta oficial de uma montadora na Unsplash, com a mesma licença das outras. Vista de cima, sem logotipo nem placa legível.
+- **Tecnologia**: o nome do notebook, embaixo da tela, não se lê no tamanho do app.
+- Para trocar uma foto: escolher outra com o filtro "Grátis", baixar de `images.unsplash.com`, recortar e reduzir do mesmo jeito, trocar o arquivo, o texto alternativo (`alt` em `GOAL_IMAGES`) e a linha desta tabela.
 
 ## 3. Onde a foto da pessoa fica
 
