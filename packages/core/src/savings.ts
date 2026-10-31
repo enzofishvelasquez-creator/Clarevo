@@ -520,7 +520,7 @@ export const SAVINGS_TEXT = {
   privacy: 'Sua resposta e as datas em que a pergunta volta não aparecem para outras pessoas do app. A empresa que oferece o benefício não vê, nem somada às de outras pessoas.',
   /** 4º passo de "Primeiros passos" no Resumo. */
   firstStepTitle: 'Planejar quanto guardar',
-  firstStepText: 'Diga se consegue guardar um valor por mês e veja um plano.',
+  firstStepText: 'Diga se consegue guardar um valor por mês e veja em quanto tempo chega à sua reserva.',
 
   // "Sim, consigo".
   amountLabel: 'Quanto você consegue guardar por mês?',
@@ -704,6 +704,8 @@ export const EXTRA_SAVINGS_TEXT = {
   save: 'Guardar uma parte',
   createReserve: 'Criar uma reserva',
   later: 'Agora não',
+  /** Nome para leitor de tela: o Resumo pode ter outro "Agora não" (a oferta de lembrete de vencimento). */
+  laterA11y: 'Agora não: ocultar o lembrete de valor extra até o mês que vem',
   stop: 'Parar de lembrar',
   stopped: 'Lembrete de valor extra desligado.',
   deviceOnly: 'O lembrete vale para este aparelho.',

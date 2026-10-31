@@ -13,7 +13,7 @@ import { colors, space } from '@/theme/tokens';
 /**
  * Lembrete de valor extra no Resumo (D-078 F): só para quem escolheu "Guardar quando entrar um valor extra" na reserva mínima (a
  * escolha fica neste aparelho), no Pessoal e no mês atual, quando o mês tem dinheiro a mais (`extraIncomeOfMonth`). "Guardar uma
- * parte" abre o aporte da reserva (ou a reserva mínima, se ainda não existe); "Agora não" esconde até o mês seguinte; "Parar de
+ * parte" abre o aporte da reserva (ou a reserva mínima, se ainda não existe); "Agora não" oculta até o mês seguinte; "Parar de
  * lembrar" desliga. Não grava nada no servidor.
  */
 export function ExtraSavingsCard({
@@ -60,7 +60,11 @@ export function ExtraSavingsCard({
         }
       />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[4] }}>
-        <LinkButton label={EXTRA_SAVINGS_TEXT.later} onPress={() => updatePrefs(user.id, { extraSavingsDismissedMonth: month }, persist)} />
+        <LinkButton
+          label={EXTRA_SAVINGS_TEXT.later}
+          accessibilityLabel={EXTRA_SAVINGS_TEXT.laterA11y}
+          onPress={() => updatePrefs(user.id, { extraSavingsDismissedMonth: month }, persist)}
+        />
         <LinkButton
           label={EXTRA_SAVINGS_TEXT.stop}
           onPress={() => {

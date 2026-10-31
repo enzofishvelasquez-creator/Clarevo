@@ -327,7 +327,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     fixos: 'Cadastre seus gastos fixos. Aluguel, escola, luz, internet e parcelas, uma vez só.',
     recebido: 'Registre o que você recebeu este mês. Salário ou outra renda.',
     pago: 'Anote um gasto já pago. Mercado, farmácia ou transporte.',
-    guardar: 'Planejar quanto guardar. Diga se consegue guardar um valor por mês e veja um plano.',
+    guardar: 'Planejar quanto guardar. Diga se consegue guardar um valor por mês e veja em quanto tempo chega à sua reserva.',
   };
   const ppDone = (k) => PP[k].replace('. ', ', concluído. ');
   const ppRows = () => cardButtons('Primeiros passos');
@@ -14186,7 +14186,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       t.includes('Entrou um valor extra') && t.includes('Este mês entraram R$ 800,00 a mais. Você pediu para lembrar de guardar uma parte.') &&
       t.includes('Reembolsos não contam.') && (await visibleCount('button', 'Criar uma reserva')) === 1 && (await visibleCount('button', 'Parar de lembrar')) === 1, t.slice(0, 600));
     await atWidths(async (w) => { await layoutChecks(`lembrete de valor extra ${w}px`); if (w === 390) await shot('531_lembrete_valor_extra'); });
-    await btn('Agora não').click(); await p.waitForTimeout(400);
+    await btn('Agora não: ocultar o lembrete de valor extra até o mês que vem').click(); await p.waitForTimeout(400);
     ok('Valor extra: "Agora não" esconde o lembrete neste mês', !(await body()).includes('Entrou um valor extra'));
   }
 

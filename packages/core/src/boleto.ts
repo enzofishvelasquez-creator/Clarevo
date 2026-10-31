@@ -141,7 +141,7 @@ export const BOLETO_TEXT = {
     notaFiscal: 'Este é o código de uma nota fiscal, não de um boleto. Para anotar um gasto já pago, use Anotar gasto.',
     pdfNone: 'Não achamos a linha digitável neste PDF. Cole ou digite os números do boleto.',
     imageNone: 'Não achamos a linha digitável nesta imagem. Tente uma foto mais nítida, só da linha, ou digite os números.',
-    imageTooBig: 'Esta imagem passa de 10 MB. Use uma foto menor.',
+    imageTooBig: 'Esta imagem é grande demais para ler aqui. Use uma foto menor.',
     pdfFailed: 'Não foi possível ler este PDF. Cole ou digite os números do boleto.',
     pdfTooBig: 'Este PDF é grande demais para ler aqui. Cole ou digite os números do boleto.',
     notPdf: 'Este arquivo não é um PDF.',
