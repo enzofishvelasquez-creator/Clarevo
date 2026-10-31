@@ -31,3 +31,28 @@ Situação: **no app** (publicado), **pronto** (no código, esperando o PR e a p
 | 23 | Extrato importado: "identificamos 300 reais em postos de gasolina, gostaria de adicionar no seu planejamento?" | No fim da importação, "Planejamento por categoria": a média por mês de cada categoria vira sugestão de orçamento, com o valor preenchido (H) | pronto |
 | 24 | "Uma leitura inteligente dos extratos, tanto para conta mensal como para planejamento e leitura dos dados" | Itens 22 e 23, por regras simples e sem enviar dados a serviço nenhum | pronto |
 | 25 | Post para as redes: "Já pensou em organizar suas finanças usando a câmera do celular?", em reels e carrossel: o diferencial é facilitar a entrada das informações, sem custo, porque notas, comprovantes e extratos já trazem tudo | Texto do carrossel e do reels quando a leitura de boleto e de imagem estiverem no app | a fazer |
+
+## Rascunho para as redes (item 25)
+
+Publicar só depois que a leitura de boleto, de print e de holerite estiver no app publicado (depois do PR e da publicação), e conferir as telas antes de gravar. Textos sem nome de banco, de loja nem de produto financeiro.
+
+**Carrossel (6 cartões)**
+
+1. Já pensou em organizar suas finanças com a câmera do celular?
+2. Nota fiscal: aponte a câmera para o QR code do cupom. A Clarevo preenche a loja, o valor e a data.
+3. Comprovante de Pix: um print basta. A Clarevo lê o valor, a data e quem recebeu ou enviou.
+4. Boleto: leia o código de barras ou uma foto. A conta entra nas contas a pagar, com valor e vencimento.
+5. Holerite: o valor líquido e o mês de competência vão direto para o seu recebimento.
+6. Tudo é lido no seu celular. A imagem não é guardada nem enviada para ninguém. Você confere e salva.
+
+Legenda: As notas, os comprovantes e os boletos já trazem as informações. A Clarevo lê para você, no seu celular, e você só confere. Menos digitação, mais tempo para o que importa.
+
+**Reels (20 a 30 segundos)**
+
+1. (0 a 3 s) Texto na tela: "Anotar gasto à mão? Já pensou em usar a câmera?"
+2. (3 a 9 s) Câmera no QR code do cupom; o formulário aparece preenchido. Texto: "Nota fiscal: lida na hora."
+3. (9 a 15 s) Print de um Pix escolhido na galeria; aparece "Comprovante lido". Texto: "Comprovante: um print basta."
+4. (15 a 21 s) Câmera no código de barras de um boleto; a conta a pagar aparece com valor e vencimento. Texto: "Boleto: vira conta a pagar."
+5. (21 a 27 s) Texto na tela: "Tudo lido no seu celular. Nada é guardado nem enviado." Logotipo "clarevo." e o endereço do app.
+
+Gravar com dados fictícios (a demonstração tem nota de exemplo) e sem mostrar nome, CPF, conta ou chave Pix de ninguém.
