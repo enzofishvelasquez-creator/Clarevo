@@ -4,14 +4,16 @@ import {
   NOTA_FLOW_TEXT,
   NOTA_TEXT,
   SEFAZ_TEXT,
+  accessKeyFromText,
   scanOptionLabel,
   scanSheetOptions,
   type ReceiptMatch,
   type ScanOption,
 } from '@clarevo/core';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
-import { ChevronRight, FileText, Flashlight, FlashlightOff, Info, QrCode } from 'lucide-react-native';
+import { Camera, ChevronRight, FileText, Flashlight, FlashlightOff, Info, QrCode } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -19,6 +21,8 @@ import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { Banner, Button, LinkButton, TextField, Txt, styles as ui } from '@/components/ui';
+import { improveCameraFocus } from '@/lib/camera-focus';
+import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { invoiceHref } from '@/lib/cards';
 import { useCard, useCardEntry, useRecord } from '@/state/data';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -39,7 +43,7 @@ export function ScanLine({ onPress, disabled, variant = 'nota' }: { onPress: () 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={proof ? COMPROVANTE_TEXT.lineA11y : NOTA_FLOW_TEXT.scanLineA11y}
+      accessibilityLabel={proof ? (OCR_AVAILABLE ? COMPROVANTE_TEXT.lineA11y : COMPROVANTE_TEXT.lineA11yPdf) : NOTA_FLOW_TEXT.scanLineA11y}
       disabled={disabled}
       onPress={onPress}
       style={(s) => [styles.scanLine, (s as { focused?: boolean }).focused && ui.focusRing, s.pressed && { backgroundColor: colors.brandTintPressed }]}>
@@ -49,7 +53,7 @@ export function ScanLine({ onPress, disabled, variant = 'nota' }: { onPress: () 
           {proof ? COMPROVANTE_TEXT.option : NOTA_TEXT.scanButton}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>
-          {proof ? COMPROVANTE_TEXT.lineHint : NOTA_FLOW_TEXT.scanLineHint}
+          {proof ? (OCR_AVAILABLE ? COMPROVANTE_TEXT.lineHint : COMPROVANTE_TEXT.lineHintPdf) : NOTA_FLOW_TEXT.scanLineHint}
         </Txt>
       </View>
       <ChevronRight size={20} color={colors.brand} aria-hidden />
@@ -120,9 +124,39 @@ export function PasteModal({
   onClose: () => void;
 }) {
   const [text, setText] = useState('');
+  // "Ler a chave numa foto" (D-078 B): a foto é lida no aparelho e só a chave achada vai para o campo.
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   useEffect(() => {
-    if (visible) setText('');
+    if (visible) {
+      setText('');
+      setPhotoError(null);
+    }
   }, [visible]);
+  async function keyFromPhoto() {
+    setPhotoError(null);
+    let picked: DocumentPicker.DocumentPickerResult;
+    try {
+      picked = await DocumentPicker.getDocumentAsync({ type: ['image/png', 'image/jpeg', 'image/webp'], copyToCacheDirectory: true, multiple: false, base64: false });
+    } catch {
+      setPhotoError(NOTA_TEXT.keyPhotoNone);
+      return;
+    }
+    const asset = picked.canceled ? null : picked.assets[0];
+    if (!asset) return;
+    setPhotoBusy(true);
+    try {
+      const key = accessKeyFromText(await textFromImage(asset.file ?? asset.uri));
+      if (key) {
+        setText(key);
+        onSubmit(key);
+      } else setPhotoError(NOTA_TEXT.keyPhotoNone);
+    } catch {
+      setPhotoError(NOTA_TEXT.keyPhotoNone);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -149,6 +183,19 @@ export function PasteModal({
                 <Txt variant="label">{NOTA_FLOW_TEXT.boleto}</Txt>
                 <Button label={NOTA_FLOW_TEXT.boletoAction} tone="soft" onPress={onBoleto} />
               </Banner>
+            ) : null}
+            {OCR_AVAILABLE ? (
+              <View style={{ gap: space[1] }}>
+                <Button label={photoBusy ? NOTA_TEXT.keyPhotoWorking : NOTA_TEXT.keyPhoto} icon={Camera} tone="soft" disabled={photoBusy} onPress={() => void keyFromPhoto()} />
+                <Txt variant="caption" color={colors.textSecondary}>
+                  {NOTA_TEXT.keyPhotoHint}
+                </Txt>
+                {photoError ? (
+                  <Txt variant="label" color={colors.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
+                    {photoError}
+                  </Txt>
+                ) : null}
+              </View>
             ) : null}
             <View style={{ gap: space[2], marginTop: space[1] }}>
               <Button label={NOTA_FLOW_TEXT.pasteSubmit} onPress={() => onSubmit(text)} />
@@ -200,6 +247,8 @@ export function CameraModal({
   const [mountError, setMountError] = useState(false);
   const last = useRef({ data: '', at: 0 });
   const done = useRef(false);
+  /** O quadro da câmera: na web, o vídeo dentro dele recebe o pedido de foco contínuo (lib/camera-focus.web.ts). */
+  const previewRef = useRef<View>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -211,6 +260,15 @@ export function CameraModal({
     setReady(false);
     setMountError(false);
   }, [visible]);
+
+  // Na web, com a câmera pronta (e a cada troca da lanterna, depois do pedido do expo-camera), pede foco contínuo e resolução maior.
+  useEffect(() => {
+    if (!visible || !ready || Platform.OS !== 'web') return;
+    const timer = setTimeout(() => {
+      improveCameraFocus(previewRef.current, torch).catch(() => {});
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [visible, ready, torch]);
 
   // As dicas contam a partir de a câmera estar pronta: o tempo de pedir a permissão e de abrir a câmera não entra na conta.
   useEffect(() => {
@@ -257,7 +315,7 @@ export function CameraModal({
             <Txt>{NOTA_FLOW_TEXT.cameraUnavailable}</Txt>
           ) : (
             <View style={{ gap: space[3] }}>
-              <View style={styles.preview}>
+              <View ref={previewRef} style={styles.preview}>
                 <CameraView
                   style={StyleSheet.absoluteFill}
                   facing="back"

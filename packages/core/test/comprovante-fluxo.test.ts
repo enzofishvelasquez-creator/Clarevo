@@ -256,11 +256,11 @@ describe('"Parece já anotado"', () => {
 });
 
 describe('folha "Escanear nota fiscal" e erros', () => {
-  it('"Ler comprovante de Pix ou pagamento (PDF)" é a última opção da folha, com ou sem câmera', () => {
+  it('"Ler comprovante de Pix ou pagamento" é a última opção da folha, com ou sem câmera', () => {
     expect(scanSheetOptions(true)).toEqual(['camera', 'pdf', 'colar', 'comprovante']);
     expect(scanSheetOptions(false)).toEqual(['pdf', 'colar', 'comprovante']);
-    expect(scanOptionLabel('comprovante')).toBe('Ler comprovante de Pix ou pagamento (PDF)');
-    expect(scanSheetOptions(true).map(scanOptionLabel)).toEqual(['Usar a câmera', 'Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante de Pix ou pagamento (PDF)']);
+    expect(scanOptionLabel('comprovante')).toBe('Ler comprovante de Pix ou pagamento');
+    expect(scanSheetOptions(true).map(scanOptionLabel)).toEqual(['Usar a câmera', 'Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante de Pix ou pagamento']);
   });
 
   it('um erro por causa, sem devolver o texto do PDF', () => {

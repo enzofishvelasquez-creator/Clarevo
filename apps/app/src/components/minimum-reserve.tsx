@@ -1,4 +1,5 @@
 import {
+  EXTRA_SAVINGS_TEXT,
   GOAL_ERROR_TEXT,
   SAVINGS_ERROR_TEXT,
   SAVINGS_TEXT,
@@ -29,8 +30,10 @@ import { SAVINGS_NOTICE } from '@/components/savings-card';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { updatePrefs } from '@/lib/device-prefs';
 import { guardedWrite } from '@/lib/guarded-write';
 import { useCreateGoal, useGoalOperationKey, useSavingsOperationKey, useSetSavingsAnswer, type SavingsPlanInputs } from '@/state/data';
+import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
 /**
@@ -41,6 +44,7 @@ import { colors, fonts, space } from '@/theme/tokens';
  */
 export function MinimumReserve({ contextId, check, inputs }: { contextId: string; check: SavingsCheck | null; inputs: SavingsPlanInputs }) {
   const qc = useQueryClient();
+  const { user, auth } = useSession();
   const maskLabel = useMoneyLabelMask();
   const createGoal = useCreateGoal();
   const setAnswer = useSetSavingsAnswer();
@@ -67,8 +71,21 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
   const other = option?.kind === 'outro' ? validateMinimumReserveDraft(otherText) : null;
   const target: Cents | null = option === null ? null : option.kind === 'outro' ? (other && other.ok ? other.targetCents : null) : option.cents;
 
+  /** "Guardar quando entrar um valor extra" (D-078 F): liga o lembrete do Resumo neste aparelho. */
+  const rememberExtra = () => {
+    if (user) updatePrefs(user.id, { extraSavingsReminder: true }, auth.mode !== 'demo');
+  };
+  const extraOnly = option === null && step?.id === 'extra';
+
   async function create() {
     if (busy || asking) return;
+    // Só o passo "valor extra", sem reserva: salva a escolha (o lembrete) e volta, sem criar meta.
+    if (extraOnly) {
+      rememberExtra();
+      flash.set(EXTRA_SAVINGS_TEXT.saved);
+      guard.leave(() => (router.canGoBack() ? router.back() : router.replace('/metas')));
+      return;
+    }
     if (option === null) {
       setError('Escolha um valor para a reserva mínima.');
       return;
@@ -94,6 +111,7 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
         (s) => s.action === 'criar_meta',
       );
       if (r.status === 'ok' || r.status === 'reconciled') {
+        if (step?.id === 'extra') rememberExtra();
         flash.set(SAVINGS_TEXT.minimumCreated);
         guard.leave(() => (router.canGoBack() ? router.back() : router.replace('/metas')));
         return;
@@ -212,6 +230,9 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
               <Txt variant="label" color={colors.textSecondary}>
                 {SAVINGS_TEXT.smallStepsHint}
               </Txt>
+              <Txt variant="label" color={colors.textSecondary}>
+                {EXTRA_SAVINGS_TEXT.stepHint}
+              </Txt>
               <ChoiceGroup label="Um passo pequeno (opcional)">
                 {steps.map((s) => (
                   <Chip
@@ -264,7 +285,7 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
           error={error}
           onCancel={guard.requestCancel}
           cancelLabel="Fechar"
-          submitLabel={SAVINGS_TEXT.minimumCreate}
+          submitLabel={extraOnly ? EXTRA_SAVINGS_TEXT.saveOnly : SAVINGS_TEXT.minimumCreate}
           busy={busy}
           onSubmit={create}
         />

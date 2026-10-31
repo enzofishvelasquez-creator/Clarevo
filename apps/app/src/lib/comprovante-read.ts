@@ -1,7 +1,8 @@
-import { COMPROVANTE_TEXT, comprovanteErrorText, comprovanteFromText, type ComprovanteDirection, type ComprovanteReading } from '@clarevo/core';
+import { COMPROVANTE_TEXT, comprovanteErrorText, comprovanteFromText, type ComprovanteDirection, type ComprovanteReading, type PdfTextItem } from '@clarevo/core';
 import * as DocumentPicker from 'expo-document-picker';
 
 import type { PdfReadControl } from '@/lib/pdf-text';
+import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { bytesOf, deleteCachedCopy, readPdfText } from '@/lib/receipt-read';
 
 /**
@@ -23,27 +24,63 @@ export async function readComprovantePdfBytes(
   read: () => Promise<Uint8Array>,
   size: number | undefined,
   defaultDirection: ComprovanteDirection,
-  options: { timeoutMs?: number; extract?: (bytes: Uint8Array, control: PdfReadControl) => Promise<string> } = {},
+  options: { timeoutMs?: number; extract?: (bytes: Uint8Array, control: PdfReadControl, items?: PdfTextItem[]) => Promise<string> } = {},
 ): Promise<ComprovanteRead> {
-  const text = await readPdfText(read, size, options);
+  // As posições dos pedaços de texto (o holerite usa) ficam só nesta leitura, como o texto.
+  const items: PdfTextItem[] = [];
+  const text = await readPdfText(read, size, { ...options, items });
   if (!text.ok) {
     return { ok: false, message: text.reason === 'grande' ? COMPROVANTE_TEXT.pdf.tooBig : text.reason === 'nao_pdf' ? COMPROVANTE_TEXT.pdf.notPdf : COMPROVANTE_TEXT.pdf.failed };
   }
-  const result = comprovanteFromText(text.text, { defaultDirection });
+  const result = comprovanteFromText(text.text, { defaultDirection, items });
   return result.ok ? { ok: true, reading: result.reading } : { ok: false, message: comprovanteErrorText(result.code) };
 }
 
-/** Abre o seletor de arquivos (só PDF) e lê o escolhido. Cancelar não é erro. A cópia do cache é apagada ao fim, com ou sem erro. */
-export async function pickAndReadComprovantePdf(defaultDirection: ComprovanteDirection): Promise<ComprovanteRead> {
+/** A imagem é PNG, JPEG ou WebP, pelo tipo que o seletor informa ou pela extensão do nome. */
+export function isImageAsset(asset: Pick<DocumentPicker.DocumentPickerAsset, 'mimeType' | 'name'>): boolean {
+  return /^image\/(png|jpe?g|webp)$/i.test(asset.mimeType ?? '') || /\.(png|jpe?g|webp)$/i.test(asset.name ?? '');
+}
+
+/**
+ * Texto de um print ou de uma foto (D-078 B), lido no próprio aparelho, para o mesmo leitor do PDF. O tamanho máximo é o do PDF.
+ * Sem texto que dê para ler, a mensagem diz para conferir a imagem.
+ */
+export async function readComprovanteImage(asset: DocumentPicker.DocumentPickerAsset, defaultDirection: ComprovanteDirection, onProgress?: (f: number) => void): Promise<ComprovanteRead> {
+  let text: string;
+  try {
+    const source: Blob | string = asset.file ?? asset.uri;
+    text = await textFromImage(source, onProgress);
+  } catch {
+    return { ok: false, message: COMPROVANTE_TEXT.pdf.imageFailed };
+  }
+  const result = comprovanteFromText(text, { defaultDirection });
+  if (result.ok) return { ok: true, reading: result.reading };
+  return { ok: false, message: result.code === 'texto_vazio' ? COMPROVANTE_TEXT.pdf.imageNoText : comprovanteErrorText(result.code) };
+}
+
+/**
+ * Abre o seletor de arquivos e lê o escolhido: PDF e, onde a leitura de imagem existe (no navegador), também print ou foto. Cancelar
+ * não é erro. A cópia do cache é apagada ao fim, com ou sem erro. `onImage` avisa a tela de que a leitura é de imagem (mais lenta).
+ */
+export async function pickAndReadComprovantePdf(defaultDirection: ComprovanteDirection, onImage?: () => void): Promise<ComprovanteRead> {
   let picked: DocumentPicker.DocumentPickerResult;
   try {
-    picked = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true, multiple: false, base64: false });
+    picked = await DocumentPicker.getDocumentAsync({
+      type: OCR_AVAILABLE ? ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'] : 'application/pdf',
+      copyToCacheDirectory: true,
+      multiple: false,
+      base64: false,
+    });
   } catch {
     return { ok: false, message: COMPROVANTE_TEXT.pdf.failed };
   }
   const asset = picked.canceled ? null : picked.assets[0];
   if (!asset) return { ok: false, message: '', cancelled: true };
   try {
+    if (OCR_AVAILABLE && isImageAsset(asset)) {
+      onImage?.();
+      return await readComprovanteImage(asset, defaultDirection);
+    }
     return await readComprovantePdfBytes(() => bytesOf(asset), asset.size, defaultDirection);
   } finally {
     await deleteCachedCopy(asset);

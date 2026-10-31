@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  entryInviteFromText,
   BENEFIT_GRACE_DAYS,
   BENEFIT_PLAN_LABEL,
   BENEFIT_TEXT,
@@ -495,5 +496,20 @@ describe('Empresas: busca e páginas da lista de licenças', () => {
     // O nome acessível começa pelo rótulo visível; nas pontas, só o rótulo.
     expect([COMPANY_TEXT.pagePrevA11y(1, 3), COMPANY_TEXT.pagePrevA11y(2, 3)]).toEqual(['Anteriores', 'Anteriores: página 1 de 3']);
     expect([COMPANY_TEXT.pageNextA11y(3, 3), COMPANY_TEXT.pageNextA11y(2, 3)]).toEqual(['Próximas', 'Próximas: página 3 de 3']);
+  });
+});
+
+describe('convite na tela de entrada (D-078 E)', () => {
+  const CODE = 'a'.repeat(32);
+  it('link da empresa abre o convite da empresa; o da Família, o da Família; o código sozinho é da empresa', () => {
+    expect(entryInviteFromText(`Oi! Seu convite: https://app.clarevo.app.br/beneficio/${CODE}`)).toEqual({ kind: 'empresa', code: CODE });
+    expect(entryInviteFromText(`https://app.clarevo.app.br/convite/${CODE}`)).toEqual({ kind: 'familia', code: CODE });
+    expect(entryInviteFromText(` ${CODE.toUpperCase()} `)).toEqual({ kind: 'empresa', code: CODE });
+  });
+  it('texto sem convite, link quebrado ou nada: null', () => {
+    expect(entryInviteFromText('não tenho link')).toBeNull();
+    expect(entryInviteFromText('https://app.clarevo.app.br/beneficio/123')).toBeNull();
+    expect(entryInviteFromText('https://app.clarevo.app.br/convite/xyz')).toBeNull();
+    expect(entryInviteFromText(undefined)).toBeNull();
   });
 });

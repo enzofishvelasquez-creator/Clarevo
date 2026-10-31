@@ -65,7 +65,13 @@ export function TourDialog({ onClose }: { onClose: () => void }) {
             <Txt variant="title" accessibilityRole="header" aria-level={2} style={styles.title}>
               {card.title}
             </Txt>
-            <Txt color={colors.text}>{card.body}</Txt>
+            <View style={styles.lines}>
+              {card.lines.map((line) => (
+                <Txt key={line} color={colors.text}>
+                  {line}
+                </Txt>
+              ))}
+            </View>
           </ScrollView>
           {/* Região viva escondida só da vista (1×1 px cortado, sem opacity 0): a troca de cartão é dita uma vez. */}
           <View style={styles.liveClip} accessibilityElementsHidden={Platform.OS === 'ios'}>
@@ -114,6 +120,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(23,34,59,0.55)', alignItems: 'center', justifyContent: 'center', padding: space[4] },
   box: { width: '100%', maxWidth: 440, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space[6], gap: space[4] },
   content: { gap: space[3] },
+  lines: { gap: space[2] },
   icon: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   dots: { flexDirection: 'row', gap: space[1] },

@@ -50,7 +50,7 @@ import { colors, fonts, space } from '@/theme/tokens';
  * `?mes=AAAA-MM` escolhe o mês inicial de "A partir de" (sem ele, o mês atual).
  */
 export default function OrcamentoCategoriaScreen() {
-  const params = useLocalSearchParams<{ categoria?: string; mes?: string }>();
+  const params = useLocalSearchParams<{ categoria?: string; mes?: string; valor?: string }>();
   const category = budgetCategoryFromParam(params.categoria);
   const contextId = useWork().data?.contextId;
   if (!category) {
@@ -67,7 +67,7 @@ export default function OrcamentoCategoriaScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {contextId ? (
-        <BudgetForm contextId={contextId} category={category} startMonth={params.mes} />
+        <BudgetForm contextId={contextId} category={category} startMonth={params.mes} suggestedCents={params.valor} />
       ) : (
         <>
           <SubHeader title={BUDGET_TEXT.form.title(category)} right={<ContextPill label="Salvando em Pessoal" />} />
@@ -83,7 +83,11 @@ export default function OrcamentoCategoriaScreen() {
 const errorText = (code: string) =>
   code in BUDGET_ERROR_TEXT ? BUDGET_ERROR_TEXT[code as keyof typeof BUDGET_ERROR_TEXT] : ERROR_TEXT.salvar_falhou;
 
-function BudgetForm({ contextId, category, startMonth }: { contextId: string; category: string; startMonth: string | undefined }) {
+/**
+ * `suggestedCents`: valor sugerido em centavos (D-078 H, a média por mês vinda do extrato importado). Só preenche o campo quando a
+ * categoria ainda não tem orçamento em vigor; a pessoa confere e salva.
+ */
+function BudgetForm({ contextId, category, startMonth, suggestedCents }: { contextId: string; category: string; startMonth: string | undefined; suggestedCents?: string }) {
   const { today } = useSession();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -119,7 +123,9 @@ function BudgetForm({ contextId, category, startMonth }: { contextId: string; ca
   /** A linha em vigor no mês anterior: é a que volta a valer se a deste mês sair. */
   const before = budgetRowFor(mine, category, addMonths(month, -1));
   const beforeCents = before?.amountCents ?? null;
-  const amountText = amountDraft ?? (inEffect && inEffect.amountCents !== null ? centsToInput(inEffect.amountCents) : '');
+  const suggested = typeof suggestedCents === 'string' && /^\d{1,10}$/.test(suggestedCents) && Number(suggestedCents) > 0 ? Number(suggestedCents) : null;
+  const amountText =
+    amountDraft ?? (inEffect && inEffect.amountCents !== null ? centsToInput(inEffect.amountCents) : suggested !== null && rows.data ? centsToInput(suggested) : '');
   const dirty = amountDraft !== null;
 
   usePreventRemove(dirty && !leaveTo, ({ data }) => {

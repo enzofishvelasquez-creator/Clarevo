@@ -175,7 +175,7 @@ describe('folha "Escanear nota fiscal"', () => {
       'Usar a câmera',
       'Escolher o PDF da nota',
       'Colar o link ou a chave',
-      'Ler comprovante de Pix ou pagamento (PDF)',
+      'Ler comprovante de Pix ou pagamento',
     ]);
     expect(NOTA_TEXT.sheet.camera).toBe('Usar a câmera');
   });

@@ -14,6 +14,7 @@ import { RecordRow } from '@/components/record-row';
 import { ReturnBand, useReturnBand } from '@/components/retorno-faixa';
 import { SignupSourceCard } from '@/components/signup-source';
 import { EmptyState, ErrorState } from '@/components/states';
+import { ExtraSavingsCard } from '@/components/extra-savings';
 import { WelcomeTour } from '@/components/tour';
 import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange, type TotalChange } from '@/lib/highlight';
@@ -157,6 +158,9 @@ export default function ResumoScreen() {
           {band.status === 'oculta' ? <PrimeirosPassos contextId={contextId} onState={setStepsState} /> : null}
           {band.status === 'oculta' ? (
             <SignupSourceCard eligible={kind === 'pessoal' && month === currentMonth} blocked={stepsState !== 'oculto'} onSaved={(text) => setNotice(text)} />
+          ) : null}
+          {band.status === 'oculta' ? (
+            <ExtraSavingsCard contextId={contextId} month={month} eligible={kind === 'pessoal' && month === currentMonth} records={records.data} onNotice={(text) => setNotice(text)} />
           ) : null}
 
           <>

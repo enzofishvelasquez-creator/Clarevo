@@ -60,6 +60,7 @@ export const ANTES_TEXT = {
     noBiggerEntry: 'Com mais 10% do preço, a entrada já cobriria o preço inteiro.',
     otherEntry: 'Fazer a conta com outra entrada',
     noteInstallment: 'Anotar como parcelamento',
+    noteInstallmentHint: 'Vai fazer este financiamento? As parcelas entram nas contas a pagar deste mês e dos próximos. Você confere antes de salvar.',
     createGoal: 'Criar meta com este valor',
     createGoalHint: 'A meta recebe o valor, o prazo e o valor por mês. A taxa de rendimento não é gravada.',
     rendaFromReference: 'Veio da sua renda de referência. Mudar aqui não altera a referência.',

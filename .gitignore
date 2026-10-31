@@ -10,3 +10,6 @@ expo-env.d.ts
 ios/
 android/
 .DS_Store
+
+# Leitura de imagem (D-078 B): gerada por scripts/copiar-ocr.js antes do export
+apps/app/public/ocr/

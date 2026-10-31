@@ -38,6 +38,7 @@ export * from './sha256';
 export * from './sefaz-page';
 export * from './nota-pagamento';
 export * from './nota-flow';
+export * from './boleto';
 export * from './navigation';
 export * from './legal';
 export * from './budget';

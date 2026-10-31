@@ -11,6 +11,8 @@
  * No nativo o Metro não separa o código: o PDF.js (cerca de 1,7 MB de JavaScript) entra no pacote. Na web, o `import()` abaixo vira
  * um pedaço separado que só carrega quando a pessoa escolhe o PDF.
  */
+import type { PdfTextItem } from '@clarevo/core';
+
 export const PDF_MAX_BYTES = 10 * 1024 * 1024;
 const PDF_MAX_PAGES = 3;
 
@@ -53,11 +55,12 @@ export function newPdfReadControl(): PdfReadControl {
 }
 
 /**
- * Texto das primeiras páginas do PDF, com os itens separados por espaço e quebra de linha onde o PDF a indica. Lança se o PDF não
+ * Texto das primeiras páginas do PDF, com os itens separados por espaço e quebra de linha onde o PDF a indica. Com `items`, também
+ * a posição de cada pedaço de texto (o holerite usa). Lança se o PDF não
  * abre ou se a leitura foi abortada. A tarefa é criada aqui (`getDocument`) para ser destruída em qualquer saída: sucesso, falha
  * ao abrir, falha numa página ou `control.abort()` (tempo limite).
  */
-export async function pdfTextFromBytes(bytes: Uint8Array, control?: PdfReadControl): Promise<string> {
+export async function pdfTextFromBytes(bytes: Uint8Array, control?: PdfReadControl, items?: PdfTextItem[]): Promise<string> {
   installStructuredCloneGuard();
   const { getResolvedPDFJS } = await import('unpdf');
   const { getDocument } = await getResolvedPDFJS();
@@ -70,7 +73,12 @@ export async function pdfTextFromBytes(bytes: Uint8Array, control?: PdfReadContr
     for (let n = 1; n <= Math.min(pdf.numPages, PDF_MAX_PAGES); n++) {
       if (control?.aborted) throw new Error('leitura cancelada');
       const content = await (await pdf.getPage(n)).getTextContent();
-      for (const item of content.items) if ('str' in item) parts.push(item.str, item.hasEOL ? '\n' : ' ');
+      for (const item of content.items) {
+        if (!('str' in item)) continue;
+        parts.push(item.str, item.hasEOL ? '\n' : ' ');
+        // Posição na página (só o holerite usa; ver PdfTextItem no core). Descartada junto do texto.
+        if (items && item.str.trim() !== '') items.push({ str: item.str, x: item.transform[4] ?? 0, y: item.transform[5] ?? 0, width: item.width ?? 0, page: n });
+      }
       parts.push('\n');
     }
     return parts.join('');

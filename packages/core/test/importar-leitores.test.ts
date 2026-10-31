@@ -625,7 +625,12 @@ describe('importar: do arquivo escolhido às linhas', () => {
     expect(readImportFile(new Uint8Array(0))).toEqual({ kind: 'erro', code: 'arquivo_vazio' });
     expect(readImportFile(utf8('   \n \n'))).toEqual({ kind: 'erro', code: 'arquivo_vazio' });
     expect(readImportFile(new Uint8Array(IMPORT_MAX_BYTES + 1))).toEqual({ kind: 'erro', code: 'arquivo_grande' });
-    expect(readImportFile(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]))).toEqual({ kind: 'erro', code: 'formato_desconhecido' });
+    // PDF e Excel têm aviso próprio, que diz o que fazer; um zip qualquer continua desconhecido.
+    expect(readImportFile(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]), 'extrato.pdf')).toEqual({ kind: 'erro', code: 'arquivo_pdf' });
+    expect(readImportFile(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]), 'extrato.ofx')).toEqual({ kind: 'erro', code: 'arquivo_pdf' });
+    expect(readImportFile(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]), 'Extrato.XLSX')).toEqual({ kind: 'erro', code: 'planilha_excel' });
+    expect(readImportFile(new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]), 'extrato.xls')).toEqual({ kind: 'erro', code: 'planilha_excel' });
+    expect(readImportFile(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]), 'fotos.zip')).toEqual({ kind: 'erro', code: 'formato_desconhecido' });
     expect(readImportFile(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]))).toEqual({ kind: 'erro', code: 'formato_desconhecido' });
     expect(readImportFile(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]))).toEqual({ kind: 'erro', code: 'formato_desconhecido' });
     expect(readImportFile(new Uint8Array([0x61, 0x62, 0x00, 0x63]))).toEqual({ kind: 'erro', code: 'formato_desconhecido' });

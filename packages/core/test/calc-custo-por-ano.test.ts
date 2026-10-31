@@ -14,7 +14,10 @@ describe('8. Quanto custa por ano? (docs/08 §3.2)', () => {
     const r = run({ valor: '130,60', frequencia: 'mes' });
     expect(r.monthlyCents).toBe(13_060);
     expect(r.yearlyCents).toBe(156_720);
-    expect(r.resultLines).toEqual(['Com estes números, o gasto soma R$ 1.567,20 por ano.', 'Por mês, fica em R$ 130,60.']);
+    // Por dia: 1.567,20 ÷ 365 = 4,2937... → R$ 4,29.
+    expect(r.dailyCents).toBe(429);
+    expect(r.resultLines).toEqual(['Com estes números, o gasto soma R$ 1.567,20 por ano.', 'Por mês, fica em R$ 130,60.', 'Por dia, fica em R$ 4,29.']);
+    expect(r.hypotheses).toContain('Por dia, o valor do ano dividido por 365.');
   });
 
   it('R$ 25,00 por semana: R$ 108,33 por mês, R$ 1.300,00 por ano; hipótese de 52 semanas', () => {
@@ -23,12 +26,18 @@ describe('8. Quanto custa por ano? (docs/08 §3.2)', () => {
     expect(r.resultLines.join(' ')).toContain('R$ 108,33');
     expect(r.resultLines.join(' ')).toContain('R$ 1.300,00');
     expect(r.hypotheses).toContain('52 semanas por ano.');
+    // 1.300,00 ÷ 365 = 3,5616... → R$ 3,56.
+    expect(r.dailyCents).toBe(356);
+    expect(r.resultLines.at(-1)).toBe('Por dia, fica em R$ 3,56.');
   });
 
   it('R$ 18,00 por dia útil: R$ 396,00 por mês, R$ 4.752,00 por ano; hipótese de 22 dias úteis', () => {
     const r = run({ valor: '18,00', frequencia: 'dia_util' });
     expect([r.monthlyCents, r.yearlyCents]).toEqual([39_600, 475_200]);
     expect(r.hypotheses).toContain('22 dias úteis por mês.');
+    // No dia útil, sem o valor por dia corrido: seria diferente do valor digitado e confundiria.
+    expect(r.dailyCents).toBeNull();
+    expect(r.resultLines.join(' ')).not.toContain('Por dia');
   });
 
   it('"Anotar como gasto fixo" leva o valor por mês, até o limite', () => {

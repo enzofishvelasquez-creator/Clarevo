@@ -114,6 +114,7 @@ export function SumValues({ onUse, target }: { onUse: (text: string) => void; ta
     <View style={{ gap: space[2], marginTop: -space[2] }}>
       <LinkButton
         label={SUM_TEXT.open}
+        accessibilityHint={SUM_TEXT.hint}
         icon={Sigma}
         accessibilityState={{ expanded: open }}
         aria-expanded={open}
@@ -122,6 +123,9 @@ export function SumValues({ onUse, target }: { onUse: (text: string) => void; ta
       />
       {open ? (
         <View style={styles.panel}>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {SUM_TEXT.explain}
+          </Txt>
           <View style={styles.items}>
             {items.map((item, i) => {
               const invalid = errorShown && errorIndex === i;

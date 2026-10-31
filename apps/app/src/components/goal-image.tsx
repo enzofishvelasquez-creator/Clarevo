@@ -56,7 +56,8 @@ export function SuggestedImage({ imageKey, style, label }: { imageKey: GoalImage
   return (
     <View style={[{ backgroundColor: colors.brand, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }, style]} {...a11y}>
       {source ? (
-        <Image source={source} resizeMode="cover" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+        // Largura e altura explícitas: na web, sem elas a imagem do pacote assume o tamanho do arquivo (1080 px) e passa da tela.
+        <Image source={source} resizeMode="cover" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
       ) : (
         <Icon size={36} color={colors.textOnBrand} strokeWidth={1.75} aria-hidden />
       )}

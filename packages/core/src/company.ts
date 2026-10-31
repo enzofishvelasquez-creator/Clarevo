@@ -1,7 +1,7 @@
 import type { IsoDate } from './dates';
 import { formatDateBR, todayIn } from './dates';
 import { CSV_BOM, CSV_EOL, csvCell, csvText } from './export';
-import { INVITE_BASE_URL, INVITE_CODE_PATTERN, normalizeInviteCode } from './family';
+import { INVITE_BASE_URL, INVITE_CODE_PATTERN, inviteCodeFromText, normalizeInviteCode } from './family';
 import { CONTACT_EMAIL, SUPPORT_EMAIL } from './legal';
 import { seasonalCard } from './learn/epoca';
 import type { RepoErrorCode } from './repository';
@@ -425,6 +425,31 @@ export function licenseCodeFromText(text: unknown): string | null {
   const m = /\/beneficio\/([0-9a-fA-F]{32})(?![0-9a-fA-F])/.exec(text);
   return m ? normalizeLicenseCode(m[1]) : null;
 }
+
+/**
+ * "Tenho um convite da empresa" na tela de entrada (D-078 E; retorno do teste: "esse link também tem que ser possível colocar ao
+ * entrar"). O link da empresa (`/beneficio/`) abre o convite da empresa; o da Família (`/convite/`) também é aceito, para ninguém
+ * errar de lugar. O código sozinho é tomado como o da empresa (é o que esta entrada pede). null quando não há convite no texto.
+ */
+export function entryInviteFromText(text: unknown): { kind: 'empresa' | 'familia'; code: string } | null {
+  if (typeof text !== 'string') return null;
+  if (/\/convite\//.test(text)) {
+    const family = inviteCodeFromText(text);
+    return family ? { kind: 'familia', code: family } : null;
+  }
+  const code = licenseCodeFromText(text);
+  return code ? { kind: 'empresa', code } : null;
+}
+
+/** Textos da entrada com convite. */
+export const ENTRY_INVITE_TEXT = {
+  open: 'Tenho um convite da empresa',
+  hint: 'Abre o campo para colar o link do convite.',
+  label: 'Link do convite',
+  fieldHint: 'Cole o link que o RH enviou. O convite mostra a empresa e o plano antes de você criar a conta ou entrar.',
+  submit: 'Ver convite',
+  invalid: 'Não encontramos um convite neste texto. Confira o link que você recebeu.',
+} as const;
 
 /** Uma pessoa e o link dela. */
 export interface InviteLinkRow {

@@ -5,6 +5,8 @@ import { parseMoney } from './inputs';
 /**
  * 2. Quanto custa por ano? (docs/08 §3.2). ano = valor × 12, × 52, ou × 22 × 12 no dia útil;
  * mês = valor × 22 no dia útil, arredonda(valor × 52 ÷ 12) na semana, ou o próprio valor.
+ * Na semana e no mês, também o valor por dia: arredonda(ano ÷ 365), para ver quanto custa por dia uma conta mensal (retorno do teste,
+ * 31/10/2026: "quanto custa ter a internet por dia"). No dia útil não, para não confundir com o valor digitado.
  */
 export type Frequencia = 'dia_util' | 'semana' | 'mes';
 export type CustoPorAnoField = 'valor' | 'frequencia';
@@ -19,12 +21,15 @@ export interface CustoPorAnoResult extends CalcTexts {
   frequencia: Frequencia;
   monthlyCents: Cents;
   yearlyCents: Cents;
+  /** Valor por dia corrido (ano ÷ 365); null no dia útil. */
+  dailyCents: Cents | null;
   /** "Anotar como gasto fixo": /gastos-fixos/novo?tipo=mensal&valor=<por mês em centavos>; null acima do limite. */
   noteParams: { tipo: 'mensal'; valor: Cents } | null;
 }
 
 export const WORKDAYS_PER_MONTH = 22;
 export const WEEKS_PER_YEAR = 52;
+export const DAYS_PER_YEAR = 365;
 
 export const CUSTO_POR_ANO_FIELDS: Record<CustoPorAnoField, CalcFieldSpec> = {
   valor: moneyField('Valor', 'o valor', '39,90'),
@@ -68,7 +73,11 @@ export function calcCustoPorAno(input: CustoPorAnoInput): CalcOutcome<CustoPorAn
       hypotheses = ['12 meses por ano.'];
       break;
   }
+  const dailyCents = frequencia === 'dia_util' ? null : roundDiv(yearlyCents, DAYS_PER_YEAR);
+  if (dailyCents !== null) hypotheses.push('Por dia, o valor do ano dividido por 365.');
   hypotheses.push('O mesmo valor em todos os períodos.');
+  const resultLines = [`Com estes números, o gasto soma ${formatBRL(yearlyCents)} por ano.`, `Por mês, fica em ${formatBRL(monthlyCents)}.`];
+  if (dailyCents !== null) resultLines.push(`Por dia, fica em ${formatBRL(dailyCents)}.`);
   return {
     ok: true,
     result: {
@@ -76,8 +85,9 @@ export function calcCustoPorAno(input: CustoPorAnoInput): CalcOutcome<CustoPorAn
       frequencia,
       monthlyCents,
       yearlyCents,
+      dailyCents,
       noteParams: monthlyCents <= MAX_RECORD_CENTS ? { tipo: 'mensal', valor: monthlyCents } : null,
-      resultLines: [`Com estes números, o gasto soma ${formatBRL(yearlyCents)} por ano.`, `Por mês, fica em ${formatBRL(monthlyCents)}.`],
+      resultLines,
       hypotheses,
       notes: [],
     },

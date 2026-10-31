@@ -150,6 +150,8 @@ export const IMPORT_ERROR_TEXT: Record<ImportErrorCode, string> = {
   arquivo_grande: 'O arquivo passa de 5 MB. Peça ao banco um período menor.',
   linhas_demais: `O arquivo tem mais de ${IMPORT_MAX_LINES.toLocaleString('pt-BR')} linhas. Peça ao banco um período menor.`,
   formato_desconhecido: 'Não reconhecemos este arquivo. Use um OFX ou uma planilha CSV do banco.',
+  arquivo_pdf: 'Este arquivo é um PDF, e a Clarevo ainda não lê extrato em PDF. No app ou no site do banco, procure a opção de exportar o extrato em OFX ou CSV.',
+  planilha_excel: 'Este arquivo é uma planilha de Excel. Abra a planilha, salve uma cópia no formato CSV e escolha esse arquivo de novo.',
   sem_lancamentos: 'Não achamos lançamentos neste arquivo.',
   moeda_diferente: 'Este arquivo não está em reais. A Clarevo importa só valores em reais.',
   ofx_invalido: 'Este arquivo OFX não tem um extrato que possamos ler.',

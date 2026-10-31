@@ -4,6 +4,9 @@ const { spawnSync } = require('node:child_process');
 
 // --clear: o cache do Metro guarda as variáveis EXPO_PUBLIC_* já embutidas; sem limpar, um build anterior
 // com o Supabase configurado poderia vazar para a demonstração (ou o contrário).
+// Leitura de imagem no aparelho (D-078 B): os arquivos do tesseract.js vão para public/ocr antes do export.
+require('../../../scripts/copiar-ocr.js');
+
 const result = spawnSync('npx', ['expo', 'export', '--platform', 'web', '--clear'], {
   stdio: 'inherit',
   shell: process.platform === 'win32',

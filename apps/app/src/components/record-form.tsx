@@ -283,7 +283,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const [proof, setProof] = useState<ProofState | null>(null);
   const proofRef = useRef<ProofState | null>(null);
   /** Qual leitura de PDF está em andamento (decide o texto "Lendo ... aqui no aparelho"). */
-  const [readingWhat, setReadingWhat] = useState<'nota' | 'comprovante'>('nota');
+  const [readingWhat, setReadingWhat] = useState<'nota' | 'comprovante' | 'imagem'>('nota');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -555,7 +555,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     setReadingWhat('comprovante');
     setReading(true);
     try {
-      const r = await pickAndReadComprovantePdf(kind === 'despesa' ? 'saida' : 'entrada');
+      // Print ou foto (D-078 B): a leitura de imagem é mais lenta e ganha o aviso próprio.
+      const r = await pickAndReadComprovantePdf(kind === 'despesa' ? 'saida' : 'entrada', () => setReadingWhat('imagem'));
       if (token !== readSeq.current) return;
       if (r.ok) await applyProof(r.reading);
       else if (!r.cancelled) setScanMessage(r.message);
@@ -1450,7 +1451,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           ) : null}
           {reading ? (
             <Banner tone="info" icon={Info}>
-              <Txt variant="label">{readingWhat === 'comprovante' ? COMPROVANTE_TEXT.working : NOTA_FLOW_TEXT.pdfWorking}</Txt>
+              <Txt variant="label">
+                {readingWhat === 'imagem' ? COMPROVANTE_TEXT.workingImage : readingWhat === 'comprovante' ? COMPROVANTE_TEXT.working : NOTA_FLOW_TEXT.pdfWorking}
+              </Txt>
             </Banner>
           ) : null}
           {scanMessage ? (

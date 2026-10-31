@@ -175,22 +175,25 @@ Você pode ligar o seu número de WhatsApp à Clarevo, em Conta, e anotar gastos
 - Número completo de cartão, código de segurança (CVV) e validade. O app recusa apelidos que pareçam número de cartão.
 - Senha ou qualquer dado de acesso a banco. A Clarevo não tem integração bancária.
 - CPF da nota fiscal. O CPF do destinatário é descartado na leitura, e da chave da nota guardamos só o resumo.
-- Dados do comprovante de Pix ou de pagamento: CPF e CNPJ, chave Pix (e-mail, telefone ou chave aleatória), banco, agência, conta, identificador da transação, código de autenticação, protocolo e número de cartão. Também não guardamos o PDF nem o texto lido.
-- Fotos e imagens da câmera. A câmera só lê o código da nota, e nenhuma foto é guardada.
-- Os arquivos que você escolhe ler: PDF de nota, PDF de comprovante, extrato e fatura em OFX ou planilha.
-- O código de um boleto. Se você colar um, o app avisa e não o guarda.
+- Dados do comprovante de Pix ou de pagamento: CPF e CNPJ, chave Pix (e-mail, telefone ou chave aleatória), banco, agência, conta, identificador da transação, código de autenticação, protocolo e número de cartão. Também não guardamos o PDF, a imagem nem o texto lido.
+- Dados do holerite: nome, CPF, empresa, cargo, banco, conta, salário base, descontos (como plano de saúde e empréstimos) e bases de impostos. Da leitura saem só o valor líquido e o mês de competência, que você confere antes de salvar.
+- Fotos e imagens da câmera ou da galeria usadas para ler um documento. A câmera só lê o código da nota ou do boleto, e nenhuma foto é guardada.
+- Os arquivos que você escolhe ler: PDF de nota, PDF ou imagem de comprovante, holerite e boleto, extrato e fatura em OFX ou planilha.
+- O código de um boleto. O app lê dele só o valor e o vencimento para a conta a pagar, e não guarda o código.
 - Saldo por conta.
 - Biometria, localização, contatos, microfone e identificador de publicidade. Da galeria, só a foto que você mesmo escolher para uma meta (seção 3.2).
 - O texto das mensagens do WhatsApp e o seu número de telefone. Do número, guardamos só um resumo feito com chave secreta (seção 3.10).
 
 O que você confirma com "Salvar" vira registro e é guardado como descrito na seção 3. Se a descrição de um gasto trouxer o nome de outra pessoa (por exemplo, o nome que veio de um comprovante), esse nome fica guardado como parte da descrição.
 
-## 5. Como funciona a leitura de nota fiscal, comprovante e extrato?
+## 5. Como funciona a leitura de nota fiscal, comprovante, holerite, boleto e extrato?
 
 A leitura acontece no seu aparelho. A Clarevo não tem servidor que receba esses arquivos.
 
 - A câmera lê o QR Code ou o código de barras da nota e pede a sua permissão antes. O código vira, no aparelho, só o resumo matemático citado na seção 3.2.
-- O PDF de nota ou de comprovante (até 10 MB e 3 páginas) é lido no aparelho, o texto é descartado depois da leitura e a cópia temporária é apagada.
+- O PDF de nota, de comprovante, de holerite ou de boleto (até 10 MB e 3 páginas) é lido no aparelho, o texto é descartado depois da leitura e a cópia temporária é apagada.
+- No app pelo navegador, você também pode escolher uma imagem (print ou foto) de comprovante, holerite ou boleto, ou uma foto da chave da nota. O texto da imagem é reconhecido no próprio aparelho, por um programa de código aberto (Tesseract) que o app baixa do próprio endereço da Clarevo. A imagem não sai do aparelho e não vai para nenhum serviço, nosso ou de terceiros. O reconhecimento usa um modelo de aprendizado de máquina, sempre no aparelho e só para ler o texto.
+- Depois de importar um extrato, o app pode sugerir gastos fixos (pagamentos que se repetem todo mês) e orçamentos por categoria (a média por mês). A conta é feita no aparelho, com as linhas importadas, e nada muda sem você confirmar.
 - O app só preenche o formulário. Nada é gravado sem você tocar em "Salvar".
 - Se você tocar, no celular, para ler a página oficial de uma nota de NFC-e do Rio de Janeiro, o seu aparelho consulta diretamente o site da Secretaria de Fazenda. Esse site recebe o endereço da nota e o seu IP e segue a política dele. A Clarevo não recebe nem guarda essa consulta.
 - No Android, a leitura de códigos usa componentes do Google incluídos no app. A imagem é lida no aparelho, mas esses componentes podem enviar ao Google dados técnicos de uso e do aparelho. [A DEFINIR: confirmar na documentação do fornecedor o que é enviado e para quê]

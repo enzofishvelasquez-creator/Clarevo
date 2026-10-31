@@ -22,6 +22,8 @@ export type ImportErrorCode =
   | 'arquivo_grande'
   | 'linhas_demais'
   | 'formato_desconhecido'
+  | 'arquivo_pdf'
+  | 'planilha_excel'
   | 'sem_lancamentos'
   | 'moeda_diferente'
   | 'ofx_invalido'

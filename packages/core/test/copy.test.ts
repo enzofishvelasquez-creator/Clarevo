@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  BOLETO_TEXT,
+  ENTRY_INVITE_TEXT,
+  EXTRA_SAVINGS_TEXT,
   ACCOUNTS_TEXT,
   ACCOUNT_ERROR_TEXT,
   ACCOUNT_KIND_LABEL,
@@ -575,6 +578,8 @@ describe('textos das calculadoras e de "Achar tudo"', () => {
       DIVIDIR_TEXT.incomeLabel('Pessoa 2'),
       DIVIDIR_TEXT.peopleRange,
       SUM_TEXT.open,
+      SUM_TEXT.hint,
+      SUM_TEXT.explain,
       SUM_TEXT.add,
       SUM_TEXT.use,
       SUM_TEXT.close,
@@ -2220,7 +2225,7 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
   it('erros de leitura e de gravação, um por código', () => {
     check([...Object.values(IMPORT_ERROR_TEXT), ...Object.values(IMPORT_SAVE_ERROR_TEXT)]);
     expect(Object.keys(IMPORT_ERROR_TEXT).sort()).toEqual(
-      ['arquivo_grande', 'arquivo_vazio', 'csv_invalido', 'formato_desconhecido', 'linhas_demais', 'moeda_diferente', 'ofx_invalido', 'sem_lancamentos'].sort(),
+      ['arquivo_grande', 'arquivo_pdf', 'arquivo_vazio', 'csv_invalido', 'formato_desconhecido', 'linhas_demais', 'moeda_diferente', 'ofx_invalido', 'planilha_excel', 'sem_lancamentos'].sort(),
     );
   });
 
@@ -2344,7 +2349,7 @@ describe('textos do guia, da ajuda no lugar, do tour e do manual (D-049)', () =>
       const caught = [FORBIDDEN, JUDGMENT, NEUTRAL, GENDERED, BRANDS, PRODUCTS, ALERT, ENGLISH].some((re) => re.test(bad));
       expect(caught, bad).toBe(true);
     }
-    for (const ok of [GUIDE_TEXT.intro, HELP_TEXT.button, TOUR_TEXT.skip, TOUR_CARDS[0]!.body, 'Toque em "Anotar gasto", logo abaixo do cabeçalho do Resumo.']) {
+    for (const ok of [GUIDE_TEXT.intro, HELP_TEXT.button, TOUR_TEXT.skip, TOUR_CARDS[0]!.lines[0]!, 'Toque em "Anotar gasto", logo abaixo do cabeçalho do Resumo.']) {
       expect([FORBIDDEN, JUDGMENT, NEUTRAL, GENDERED, BRANDS, PRODUCTS, ALERT, ENGLISH].some((re) => re.test(ok)), ok).toBe(false);
     }
   });
@@ -2364,10 +2369,10 @@ describe('textos do guia, da ajuda no lugar, do tour e do manual (D-049)', () =>
 
   it('os cinco grupos e os cinco cartões do tour', () => {
     check(GUIDE_GROUPS.flatMap((g) => [g.title, g.caption]));
-    check(TOUR_CARDS.flatMap((c) => [c.title, c.body]));
+    check(TOUR_CARDS.flatMap((c) => [c.title, ...c.lines]));
     for (const c of TOUR_CARDS) {
-      expect(c.body, c.id).toMatch(/[.]$/);
-      expect(c.body, c.id).toMatch(PORTUGUESE);
+      for (const line of c.lines) expect(line, c.id).toMatch(/[.]$/);
+      expect(c.lines.join(' '), c.id).toMatch(PORTUGUESE);
     }
   });
 
@@ -2479,8 +2484,9 @@ describe('textos do comprovante de Pix e de pagamento (D-051)', () => {
       expect(text).toContain('não');
       for (const word of ['CPF', 'CNPJ', 'chave Pix', 'conta', 'códigos']) expect(text, word).toContain(word);
     }
-    expect(COMPROVANTE_TEXT.option).toBe('Ler comprovante de Pix ou pagamento (PDF)');
-    expect(COMPROVANTE_TEXT.lineHint).toBe('Comprovante em PDF, lido aqui no aparelho');
+    expect(COMPROVANTE_TEXT.option).toBe('Ler comprovante de Pix ou pagamento');
+    expect(COMPROVANTE_TEXT.lineHint).toBe('Comprovante ou holerite, em PDF ou imagem, lido aqui no aparelho');
+    expect(COMPROVANTE_TEXT.lineHintPdf).toBe('Comprovante ou holerite em PDF, lido aqui no aparelho');
     expect(COMPROVANTE_TEXT.filled).toBe('Preenchemos o que o comprovante informa. Confira e toque em Salvar.');
     expect(COMPROVANTE_TEXT.looksNotedHint).toBe('Pode ser o mesmo lançamento. Se for outro, é só salvar.');
     expect(COMPROVANTE_TEXT.looksNoted('2026-10-05', 'Padaria', 8500)).toBe('Parece já anotado em 05/10/2026: Padaria, R$ 85,00.');
@@ -3674,5 +3680,31 @@ describe('"Como você conheceu a Clarevo?" (D-067, item 2)', () => {
     const source = readFileSync(join(CORE_SRC, 'signup-source.ts'), 'utf8');
     expect(source).not.toMatch(FORBIDDEN);
     expect(source).not.toMatch(FORBIDDEN_EXPANDED);
+  });
+});
+
+describe('textos do retorno do teste de 31/10/2026 (D-078)', () => {
+  it('boleto, convite na entrada, valor extra, holerite e importação: pt-BR, neutros, sem travessão, sem a expressão vetada', () => {
+    const texts = [
+      ...staticStrings(BOLETO_TEXT),
+      BOLETO_TEXT.readLine({ amountCents: 123_456, dueOn: '2026-11-10', description: 'Seguros Exemplo S.A.' }),
+      ...staticStrings(ENTRY_INVITE_TEXT),
+      ...staticStrings(EXTRA_SAVINGS_TEXT),
+      EXTRA_SAVINGS_TEXT.body(80_000),
+      COMPROVANTE_TEXT.holeriteLegend,
+      COMPROVANTE_TEXT.holeriteDay,
+      IMPORT_ERROR_TEXT.arquivo_pdf,
+      IMPORT_ERROR_TEXT.planilha_excel,
+      SUM_TEXT.hint,
+      SUM_TEXT.explain,
+    ];
+    expect(texts.length).toBeGreaterThan(30);
+    for (const t of texts) {
+      expect(t, t).not.toMatch(FORBIDDEN);
+      expect(t, t).not.toMatch(FORBIDDEN_EXPANDED);
+      expect(t, t).not.toMatch(JUDGMENT);
+      expect(t, t).not.toMatch(GENDERED);
+      expect(t, t).not.toMatch(/[–—]/);
+    }
   });
 });

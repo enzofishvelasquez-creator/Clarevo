@@ -161,9 +161,12 @@ describe('textos de excluir a conta (D-058)', () => {
     expect(DELETE_TEXT.intro).toContain('e-mail fica livre');
     expect(DELETE_TEXT.intro).toContain('começa vazia');
     expect(DELETE_TEXT.erased).toHaveLength(5);
-    expect(DELETE_TEXT.erased.join(' ')).toContain('de verdade');
+    expect(DELETE_TEXT.erased.join(' ')).toContain('apagados de verdade, não ficam só escondidos');
+    // Revisão de textos (31/10/2026): sem "movimentos" nem "respostas do plano de guardar", e nenhum item começa uma lista com dois-pontos.
+    expect(DELETE_TEXT.erased.join(' ')).not.toMatch(/movimentos|respostas do plano/);
+    for (const line of [...DELETE_TEXT.erased, DELETE_TEXT.keptNone, DELETE_TEXT.familyGeneral]) expect(line).not.toContain(':');
     expect(DELETE_TEXT.erased.join(' ')).toContain('A empresa vê só que a licença terminou');
-    expect(DELETE_TEXT.keptNone).toBe('Nada fica guardado para uso depois. As cópias de segurança do banco de dados podem manter dados apagados por um tempo.');
+    expect(DELETE_TEXT.keptNone).toBe('Nada da sua conta fica guardado para uso depois. Só as cópias de segurança do banco de dados podem manter os dados apagados por um tempo, até serem descartadas.');
     expect(DELETE_TEXT.familyGeneral).toContain('"Pessoa que saiu"');
     expect(DELETE_TEXT.exportButton).toBe('Exportar meus dados antes');
     expect(DELETE_TEXT.submit).toBe('Excluir minha conta');

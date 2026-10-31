@@ -180,6 +180,31 @@ export function formatCnpj(cnpj: string): string {
  * Ordem das conferências: forma, dígito verificador, UF, mês e ano, CNPJ, modelo. O banco não vê a chave (só o resumo dela,
  * `digest`), então estas conferências são só do core.
  */
+/**
+ * A chave de acesso (44 algarismos) dentro de um texto lido de uma foto da nota (D-078 B): os algarismos costumam vir em grupos de
+ * quatro, com espaços, e o reconhecimento pode juntar números vizinhos. Cada janela de 44 algarismos seguidos é conferida pelo
+ * dígito verificador e pela UF (`parseAccessKey`), então um número qualquer não passa. null sem chave válida.
+ */
+export function accessKeyFromText(raw: string): string | null {
+  if (typeof raw !== 'string') return null;
+  for (const line of raw.slice(0, 20_000).split(/\n/)) {
+    for (const m of line.matchAll(/\d[\d\s.]{42,140}\d/g)) {
+      const digits = m[0].replace(/\D/g, '');
+      for (let i = 0; i + 44 <= digits.length; i++) {
+        const key = digits.slice(i, i + 44);
+        if (parseAccessKey(key).ok) return key;
+      }
+    }
+  }
+  // Chave quebrada em duas linhas: tenta o texto todo, só com os algarismos de cada linha juntos.
+  const all = raw.slice(0, 20_000).replace(/[^\d\n]/g, '').split('\n').join('');
+  for (let i = 0; i + 44 <= all.length && i < 4_000; i++) {
+    const key = all.slice(i, i + 44);
+    if (parseAccessKey(key).ok) return key;
+  }
+  return null;
+}
+
 export function parseAccessKey(input: string): AccessKeyResult {
   if (typeof input !== 'string') return { ok: false, code: 'chave_invalida' };
   const key = input.replace(/\s+/g, '').toUpperCase();
@@ -806,6 +831,11 @@ export const NOTA_TEXT = {
   cameraDenied: 'Sem acesso à câmera. Você pode colar o link ou a chave da nota.',
   pasteLabel: 'Colar o link ou a chave da nota',
   pasteHint: 'Cole o link do QR da nota ou os 44 caracteres da chave de acesso.',
+  /** Leitura da chave numa foto (no navegador, D-078 B). */
+  keyPhoto: 'Ler a chave numa foto',
+  keyPhotoHint: 'Tire uma foto só da chave de acesso (os 44 números da nota), bem de perto e sem reflexo.',
+  keyPhotoWorking: 'Lendo a foto aqui no aparelho. Pode levar alguns segundos…',
+  keyPhotoNone: 'Não achamos a chave de acesso nesta foto. Tente mais de perto, só a linha dos números, ou digite a chave.',
   pasteAction: 'Usar',
   pdfButton: 'Ler o PDF da nota',
   pdfHint: 'Escolha o PDF da nota fiscal (o DANFE que a loja enviou). A leitura é feita aqui no aparelho e o arquivo não sai dele.',

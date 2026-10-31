@@ -27,27 +27,35 @@ import { fitWords, fold, trimEdges } from './texto';
 
 export const COMPROVANTE_TEXT = {
   /** Opção da folha "Escanear nota fiscal" (Anotar gasto) e linha de Registrar recebimento. */
-  option: 'Ler comprovante de Pix ou pagamento (PDF)',
-  lineHint: 'Comprovante em PDF, lido aqui no aparelho',
-  lineA11y: 'Ler comprovante de Pix ou pagamento (PDF). Comprovante em PDF, lido aqui no aparelho.',
+  option: 'Ler comprovante de Pix ou pagamento',
+  /** Com a leitura de imagem (no navegador, D-078 B): PDF ou print. */
+  lineHint: 'Comprovante ou holerite, em PDF ou imagem, lido aqui no aparelho',
+  lineA11y: 'Ler comprovante de Pix ou pagamento. Comprovante ou holerite, em PDF ou imagem, lido aqui no aparelho.',
+  /** Sem a leitura de imagem (app das lojas, por enquanto): só PDF. */
+  lineHintPdf: 'Comprovante ou holerite em PDF, lido aqui no aparelho',
+  lineA11yPdf: 'Ler comprovante de Pix ou pagamento. Comprovante ou holerite em PDF, lido aqui no aparelho.',
+  workingImage: 'Lendo a imagem aqui no aparelho. Pode levar alguns segundos…',
   /** Na folha de Anotar gasto, abaixo da frase de privacidade da nota. */
-  sheetPrivacy: 'Comprovante em PDF: lido aqui no aparelho e não guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.',
+  sheetPrivacy: 'Comprovante em PDF ou imagem: lido aqui no aparelho e não guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.',
   working: 'Lendo o comprovante aqui no aparelho…',
   readTitle: 'Comprovante lido',
   readAnnounce: 'Comprovante lido',
   readAgain: 'Ler outro comprovante',
   undoRead: 'Desfazer leitura',
   filled: 'Preenchemos o que o comprovante informa. Confira e toque em Salvar.',
-  privacy: 'O PDF foi lido aqui no aparelho e não é guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.',
+  privacy: 'O arquivo foi lido aqui no aparelho e não é guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.',
   messageLabel: 'Mensagem do comprovante',
   lastTimeLegend: 'Como da última vez com este nome',
   nameLegend: 'Nome lido do comprovante',
   messageLegend: 'Mensagem lida do comprovante',
+  holeriteLegend: 'Mês de competência lido do holerite',
   placeholderOut: 'Ex.: Pix para Maria',
   placeholderIn: 'Ex.: Pix de Maria',
   /** O que o comprovante não trouxe (a leitura não falhou). */
   missingAmount: 'O valor não apareceu no comprovante. Digite o valor.',
   missingDay: 'A data não apareceu no comprovante. Escolha o dia.',
+  /** Holerite: traz o mês de competência, não o dia do pagamento. */
+  holeriteDay: 'O holerite mostra o mês de competência, não o dia do pagamento. Escolha o dia em que o salário entrou.',
   futureDay: 'A data do comprovante ainda não chegou. Escolha o dia.',
   missingName: 'O nome não apareceu no comprovante. Digite uma descrição.',
   directionGuessed: 'O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo.',
@@ -64,6 +72,10 @@ export const COMPROVANTE_TEXT = {
     tooBig: 'Este PDF é grande demais para ler aqui. Digite os dados à mão.',
     failed: 'Não foi possível ler este PDF. Digite os dados à mão.',
     notPdf: 'Este arquivo não é um PDF.',
+    /** Imagem (print ou foto) sem texto que dê para ler. */
+    imageNoText: 'Não conseguimos ler esta imagem. Confira se está nítida e inteira, ou digite os dados à mão.',
+    imageFailed: 'Não foi possível ler esta imagem. Digite os dados à mão.',
+    notSupported: 'Este arquivo não é um PDF nem uma imagem.',
   },
   /** "Parece já anotado em 05/10/2026: Padaria, R$ 85,00." */
   looksNoted: (date: IsoDate, description: string, cents: Cents): string => `Parece já anotado em ${formatDateBR(date)}: ${description}, ${formatBRL(cents)}.`,
@@ -89,6 +101,8 @@ export function comprovanteKindLabel(kind: ComprovanteKind, direction: Comprovan
       return 'Boleto pago';
     case 'debito':
       return 'Débito';
+    case 'holerite':
+      return 'Holerite';
     default:
       return direction === 'saida' ? 'Pagamento' : direction === 'entrada' ? 'Recebimento' : 'Comprovante';
   }
@@ -105,6 +119,8 @@ export function comprovanteKindPhrase(kind: ComprovanteKind, direction: Comprova
       return 'um boleto pago';
     case 'debito':
       return 'um débito';
+    case 'holerite':
+      return 'um holerite';
     default:
       return direction === 'entrada' ? 'um recebimento' : 'um pagamento';
   }
@@ -185,7 +201,7 @@ export interface ComprovanteGaps {
 export function comprovanteGaps(draft: ComprovanteDraft): ComprovanteGaps {
   return {
     amount: draft.amountCents === null ? COMPROVANTE_TEXT.missingAmount : null,
-    day: draft.occurredOn === null ? (draft.dayFuture ? COMPROVANTE_TEXT.futureDay : COMPROVANTE_TEXT.missingDay) : null,
+    day: draft.occurredOn === null ? (draft.dayFuture ? COMPROVANTE_TEXT.futureDay : draft.kind === 'holerite' ? COMPROVANTE_TEXT.holeriteDay : COMPROVANTE_TEXT.missingDay) : null,
     name: draft.counterpart === null && draft.message === null ? COMPROVANTE_TEXT.missingName : null,
     guessed: draft.directionGuessed ? COMPROVANTE_TEXT.directionGuessed : null,
   };
@@ -240,6 +256,11 @@ export function suggestComprovanteDescription(draft: ComprovanteDraft, lastTime:
       legend: COMPROVANTE_TEXT.nameLegend,
       placeholder,
     };
+  }
+  if (draft.message && draft.kind === 'holerite') {
+    // "Salário de setembro de 2026", na categoria Salário quando a tela é de recebimento.
+    const category = kind === 'receita' && CATEGORIES.receita.includes('Salário') ? 'Salário' : null;
+    return { description: fitWords(draft.message, DESCRIPTION_MAX), category, source: 'mensagem', legend: COMPROVANTE_TEXT.holeriteLegend, placeholder };
   }
   if (draft.message) {
     return { description: fitWords(draft.message, DESCRIPTION_MAX), category: null, source: 'mensagem', legend: COMPROVANTE_TEXT.messageLegend, placeholder };
