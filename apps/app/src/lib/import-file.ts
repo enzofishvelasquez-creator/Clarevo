@@ -1,6 +1,8 @@
-import { IMPORT_MAX_BYTES, readImportFile, type ImportRead } from '@clarevo/core';
+import { IMPORT_MAX_BYTES, deviceTimeZone, readImportFile, statementFromPdfItems, todayIn, type ImportRead, type PdfTextItem } from '@clarevo/core';
 import * as DocumentPicker from 'expo-document-picker';
 import { Platform } from 'react-native';
+
+import { newPdfReadControl, pdfTextFromBytes } from '@/lib/pdf-text';
 
 /**
  * Escolher e ler o arquivo de "Importar extrato ou fatura" (D-048), no aparelho. O arquivo (OFX ou planilha CSV) vai do seletor
@@ -39,6 +41,23 @@ async function deleteCachedCopy(asset: DocumentPicker.DocumentPickerAsset): Prom
   }
 }
 
+/**
+ * Extrato ou fatura em PDF (D-078 A): o texto e a posição de cada pedaço vêm do PDF.js no aparelho e vão para a leitura genérica do
+ * core (`statementFromPdfItems`); a pessoa revê cada linha antes de importar. PDF com senha ou quebrado: `pdf_ilegivel`.
+ */
+async function readImportPdf(bytes: Uint8Array, timeZone: string | undefined): Promise<ImportRead> {
+  const items: PdfTextItem[] = [];
+  try {
+    await pdfTextFromBytes(bytes, newPdfReadControl(), items);
+  } catch {
+    return { kind: 'erro', code: 'pdf_ilegivel' };
+  }
+  const parse = statementFromPdfItems(items, todayIn(timeZone ?? deviceTimeZone()));
+  return parse ? { kind: 'ok', parse, table: null } : { kind: 'erro', code: 'pdf_sem_lancamentos' };
+}
+
+const isPdf = (bytes: Uint8Array) => bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+
 /** Abre o seletor de arquivos e lê o escolhido. Cancelar não é erro. */
 export async function pickImportFile(timeZone?: string): Promise<PickedImport> {
   let picked: DocumentPicker.DocumentPickerResult;
@@ -55,6 +74,7 @@ export async function pickImportFile(timeZone?: string): Promise<PickedImport> {
     const bytes = await bytesOf(asset);
     // A leitura é síncrona e pode levar um tempo num arquivo grande: cede a vez antes, para a tela mostrar "Lendo o arquivo…".
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (isPdf(bytes)) return { cancelled: false, name: asset.name, read: await readImportPdf(bytes, timeZone) };
     return { cancelled: false, name: asset.name, read: readImportFile(bytes, asset.name, timeZone) };
   } catch (e) {
     return { cancelled: false, name: asset.name, read: { kind: 'erro', code: e instanceof TooBigError ? 'arquivo_grande' : 'csv_invalido' } };

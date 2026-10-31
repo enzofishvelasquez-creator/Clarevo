@@ -11,7 +11,7 @@ Situação: **no app** (publicado), **pronto** (no código, esperando o PR e a p
 | 3 | Tour, cartão "Onde achar ajuda": confuso, repete "tela" | Duas frases, "tela" uma vez só | pronto |
 | 4 | Calculadora de financiamento: levar o que foi calculado para as contas do mês e dos próximos (áudio) | O botão "Anotar como parcelamento" já existia no fim da página; agora fica logo abaixo do resultado, com uma frase que explica | pronto |
 | 5 | Importar: "Não reconheceu o extrato do banco. O arquivo do banco é PDF" | O aviso diz que é PDF (ou planilha de Excel) e como pedir OFX ou CSV ao banco | pronto |
-| 6 | Importar o extrato em PDF, que é o que o banco entrega | Leitura de extrato em PDF, banco a banco (A) | a fazer (falta um extrato de exemplo) |
+| 6 | Importar o extrato em PDF, que é o que o banco entrega | Importar aceita PDF: cada linha com data, descrição e valor vira lançamento, com o sinal pelo próprio valor ou pela descrição; saldo e total ficam de fora; a pessoa revê tudo antes de importar (A). Leitura genérica, testada com extratos inventados: falta conferir com um extrato real de cada banco | pronto (a conferir com extratos reais) |
 | 7 | Convite da empresa: "tem que ser possível colocar ao entrar" | "Tenho um convite da empresa" nas boas-vindas abre o campo do link e leva ao convite antes de criar a conta ou entrar (E) | pronto |
 | 8 | "O e-mail para o suporte chegou?" | Conferir a caixa contato@clarevo.app.br | com Enzo |
 | 9 | Excluir conta: "várias frases estranhas"; "não é movimento, são movimentações"; "as respostas do plano de guardar"; "depois dos dois-pontos é letra maiúscula" | Itens reescritos sem dois-pontos (pela norma, depois de dois-pontos vai minúscula; tirar os dois-pontos resolve), "o que você guardou ou retirou das metas", "o que você respondeu sobre guardar dinheiro por mês" | pronto |
@@ -23,7 +23,7 @@ Situação: **no app** (publicado), **pronto** (no código, esperando o PR e a p
 | 15 | Câmera da nota: "não foca, fica um borrão; só foca depois de sair e voltar" | No navegador, a câmera agora pede foco automático contínuo e resolução maior ao celular | pronto (confirmar no celular depois de publicar) |
 | 16 | Câmera que lê a chave de acesso numa faixa, como o app de um shopping | Em "Colar o link ou a chave", "Ler a chave numa foto": a foto da chave é lida no aparelho e os 44 números são conferidos pelo dígito verificador (B) | pronto |
 | 17 | Importar o PDF ou a imagem de uma conta, como o boleto do seguro do carro | "Ler boleto" em Anotar conta a pagar: câmera (código de barras), PDF ou foto, ou a linha digitável colada; preenche valor, vencimento e o nome de quem recebe (G) | pronto |
-| 18 | "Tá dando muito trabalho para cadastrar toda a vida no app" | É o motivo dos itens 6, 12, 13, 16, 17, 22 e 23 | em andamento (falta o 6) |
+| 18 | "Tá dando muito trabalho para cadastrar toda a vida no app" | É o motivo dos itens 6, 12, 13, 16, 17, 22 e 23 | pronto |
 | 19 | "Pra que serve esse somar valores? Precisa explicar" | A soma aberta explica: para quando o valor tem várias partes | pronto |
 | 20 | Calculadora de custo: ver quanto custa por dia uma conta mensal ("quanto custa ter a internet por dia") | "Quanto custa por ano?" mostra também o valor por dia, na semana e no mês | pronto |
 | 21 | Integração com o WhatsApp | Anotar pelo WhatsApp já está pronto (D-076); espera a liberação da Meta | com Enzo (Meta) |

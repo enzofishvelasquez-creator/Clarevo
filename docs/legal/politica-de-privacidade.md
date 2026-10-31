@@ -178,7 +178,7 @@ Você pode ligar o seu número de WhatsApp à Clarevo, em Conta, e anotar gastos
 - Dados do comprovante de Pix ou de pagamento: CPF e CNPJ, chave Pix (e-mail, telefone ou chave aleatória), banco, agência, conta, identificador da transação, código de autenticação, protocolo e número de cartão. Também não guardamos o PDF, a imagem nem o texto lido.
 - Dados do holerite: nome, CPF, empresa, cargo, banco, conta, salário base, descontos (como plano de saúde e empréstimos) e bases de impostos. Da leitura saem só o valor líquido e o mês de competência, que você confere antes de salvar.
 - Fotos e imagens da câmera ou da galeria usadas para ler um documento. A câmera só lê o código da nota ou do boleto, e nenhuma foto é guardada.
-- Os arquivos que você escolhe ler: PDF de nota, PDF ou imagem de comprovante, holerite e boleto, extrato e fatura em OFX ou planilha.
+- Os arquivos que você escolhe ler: PDF de nota, PDF ou imagem de comprovante, holerite e boleto, extrato e fatura em PDF, OFX ou planilha.
 - O código de um boleto. O app lê dele só o valor e o vencimento para a conta a pagar, e não guarda o código.
 - Saldo por conta.
 - Biometria, localização, contatos, microfone e identificador de publicidade. Da galeria, só a foto que você mesmo escolher para uma meta (seção 3.2).

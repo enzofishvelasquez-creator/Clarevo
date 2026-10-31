@@ -2225,7 +2225,7 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
   it('erros de leitura e de gravação, um por código', () => {
     check([...Object.values(IMPORT_ERROR_TEXT), ...Object.values(IMPORT_SAVE_ERROR_TEXT)]);
     expect(Object.keys(IMPORT_ERROR_TEXT).sort()).toEqual(
-      ['arquivo_grande', 'arquivo_pdf', 'arquivo_vazio', 'csv_invalido', 'formato_desconhecido', 'linhas_demais', 'moeda_diferente', 'ofx_invalido', 'planilha_excel', 'sem_lancamentos'].sort(),
+      ['arquivo_grande', 'arquivo_pdf', 'arquivo_vazio', 'csv_invalido', 'formato_desconhecido', 'linhas_demais', 'moeda_diferente', 'ofx_invalido', 'pdf_ilegivel', 'pdf_sem_lancamentos', 'planilha_excel', 'sem_lancamentos'].sort(),
     );
   });
 

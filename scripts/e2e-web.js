@@ -7988,7 +7988,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const x = await i1Keep();
     ok(`I1 ${name}: a mensagem aparece junto do botão e nada é lido`, x.includes(text) && (await visibleCount('button', 'Escolher o arquivo')) === 1 && (await visibleCount('button', 'Revisar as linhas')) === 0);
   };
-  await i1Bad(i1Pdf, 'Este arquivo é um PDF, e a Clarevo ainda não lê extrato em PDF. No app ou no site do banco, procure a opção de exportar o extrato em OFX ou CSV.', 'PDF');
+  // D-078 A: PDF agora é lido; um PDF quebrado (sem páginas) não abre e a mensagem explica o que fazer.
+  await i1Bad(i1Pdf, 'Não conseguimos abrir este PDF. Se ele tem senha, peça ao banco o extrato sem senha, em OFX ou CSV.', 'PDF que não abre');
   await atWidths(async (w) => { await innerChecks(`I1 arquivo que não serve ${w}px`); if (w === 390) await shot('311_importar_arquivo_invalido'); });
   await i1Bad(i1Big, 'O arquivo passa de 5 MB. Peça ao banco um período menor.', 'arquivo maior que 5 MB');
   await i1Bad(i1Many, 'O arquivo tem mais de 5.000 linhas. Peça ao banco um período menor.', 'arquivo com mais de 5.000 linhas');

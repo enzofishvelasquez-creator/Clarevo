@@ -23,6 +23,8 @@ export type ImportErrorCode =
   | 'linhas_demais'
   | 'formato_desconhecido'
   | 'arquivo_pdf'
+  | 'pdf_sem_lancamentos'
+  | 'pdf_ilegivel'
   | 'planilha_excel'
   | 'sem_lancamentos'
   | 'moeda_diferente'
@@ -46,7 +48,7 @@ export interface ParsedLine {
 
 /** O arquivo lido: as linhas e o que foi deixado de lado. O saldo do arquivo é sempre ignorado (não existe saldo por conta, P-018). */
 export interface ImportParse {
-  source: 'ofx' | 'csv';
+  source: 'ofx' | 'csv' | 'pdf';
   /** O arquivo diz que é extrato de conta ou fatura de cartão (OFX); null quando não dá para saber (planilha). */
   statement: ImportDestination | null;
   lines: ParsedLine[];
