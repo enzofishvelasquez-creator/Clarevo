@@ -8643,7 +8643,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const i2Order = i2File('pedido.pdf', ['PEDIDO DE COMPRA', 'Obrigado pela compra', 'Valor total 150,00', 'Entrega em até 5 dias úteis']);
   const i2NotPdf = path.join(i2Dir, 'texto.pdf'); fs.writeFileSync(i2NotPdf, 'isto não é um PDF, só texto');
   const I2_OPTION = 'Ler comprovante de Pix ou pagamento';
-  const i2Line = () => p.getByRole('button', { name: /^Ler comprovante de Pix ou pagamento \(PDF\)\./ }).filter({ visible: true }).first();
+  const i2Line = () => p.getByRole('button', { name: /^Ler comprovante de Pix ou pagamento\./ }).filter({ visible: true }).first();
   const i2ScanLine = () => p.getByRole('button', { name: /^Escanear nota fiscal\./ }).filter({ visible: true }).first();
   const i2Sheet = async () => { await i2ScanLine().click(); await waitText('Como você quer ler a nota?'); await p.waitForTimeout(300); };
   const i2DialogButtons = () => p.getByRole('alert').filter({ visible: true }).last().getByRole('button').evaluateAll((es) => es.map((e) => e.getAttribute('aria-label') || e.textContent));
