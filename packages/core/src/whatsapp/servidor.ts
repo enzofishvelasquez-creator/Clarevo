@@ -191,13 +191,34 @@ const REQUIRED_ENV = [
   'WHATSAPP_ACCESS_TOKEN',
   'WHATSAPP_PHONE_NUMBER_ID',
   'SUPABASE_URL',
-  'SUPABASE_SERVICE_ROLE_KEY',
 ] as const;
+
+/**
+ * Chave de serviço do banco: a chave secreta nova do Supabase (SUPABASE_SECRET_KEYS, um JSON por nome; vale a "default" ou, sem ela,
+ * a primeira) e, sem ela, a chave antiga (SUPABASE_SERVICE_ROLE_KEY, que o painel já marca como antiga). Vazio: nenhuma.
+ */
+function serviceKeyFrom(v: (name: string) => string): string {
+  const keys = v('SUPABASE_SECRET_KEYS');
+  if (keys !== '') {
+    try {
+      const parsed = JSON.parse(keys) as unknown;
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        const values = parsed as Record<string, unknown>;
+        const chosen = typeof values.default === 'string' ? values.default : Object.values(values).find((x) => typeof x === 'string');
+        if (typeof chosen === 'string' && chosen.trim() !== '') return chosen.trim();
+      }
+    } catch {
+      // JSON inválido: segue para a chave antiga.
+    }
+  }
+  return v('SUPABASE_SERVICE_ROLE_KEY');
+}
 
 /** Configuração lida dos segredos. null quando falta algum (a função responde 503 e não faz nada). */
 export function whatsappConfigFrom(env: (name: string) => string | undefined): WhatsAppConfig | null {
   const v = (name: string) => (env(name) ?? '').trim();
-  if (REQUIRED_ENV.some((name) => v(name) === '')) return null;
+  const serviceKey = serviceKeyFrom(v);
+  if (REQUIRED_ENV.some((name) => v(name) === '') || serviceKey === '') return null;
   return {
     verifyToken: v('WHATSAPP_VERIFY_TOKEN'),
     appSecret: v('WHATSAPP_APP_SECRET'),
@@ -205,7 +226,7 @@ export function whatsappConfigFrom(env: (name: string) => string | undefined): W
     accessToken: v('WHATSAPP_ACCESS_TOKEN'),
     phoneNumberId: v('WHATSAPP_PHONE_NUMBER_ID'),
     supabaseUrl: v('SUPABASE_URL').replace(/\/+$/, ''),
-    serviceKey: v('SUPABASE_SERVICE_ROLE_KEY'),
+    serviceKey,
     graphVersion: v('WHATSAPP_GRAPH_VERSION') || WHATSAPP_GRAPH_VERSION,
   };
 }

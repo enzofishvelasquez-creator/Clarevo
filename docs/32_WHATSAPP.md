@@ -65,11 +65,34 @@ Credenciais (token, chave secreta do app) nunca no chat nem no repositório: só
 3. **Meta, app**: em developers.facebook.com, criar um app do tipo empresa com o caso de uso do WhatsApp, ligado ao portfólio. Na página de configuração da API aparecem o número de teste, o identificador do número (Phone number ID) e o lugar para cadastrar até 5 números que recebem mensagens no teste.
 4. **Segredos inventados**: dois textos longos e aleatórios, diferentes (o "token de verificação" e a chave dos números), guardados no gerenciador de senhas.
 5. **Supabase, função**: em Edge Functions, criar a função `whatsapp` pelo editor, colar todo o conteúdo de `supabase/functions/whatsapp/index.ts`, **desligar a verificação de JWT** (a Meta não manda login) e publicar. O endereço fica `https://gywufwrdegucnoonoenr.supabase.co/functions/v1/whatsapp`.
-6. **Supabase, segredos** (Edge Functions > Secrets, pela própria pessoa): `WHATSAPP_VERIFY_TOKEN` (o do passo 4), `WHATSAPP_PHONE_KEY` (outro texto longo e aleatório, só para o resumo dos números; trocar depois desliga todos os números ligados), `WHATSAPP_APP_SECRET` (chave secreta do app, em Configurações do app > Básico), `WHATSAPP_ACCESS_TOKEN` (token permanente de um usuário do sistema do portfólio, com as permissões de mensagens do WhatsApp) e `WHATSAPP_PHONE_NUMBER_ID`. `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` o Supabase já fornece; se não aparecerem na lista, avisar.
+6. **Supabase, segredos** (Edge Functions > Secrets, pela própria pessoa): `WHATSAPP_VERIFY_TOKEN` (o do passo 4), `WHATSAPP_PHONE_KEY` (outro texto longo e aleatório, só para o resumo dos números; trocar depois desliga todos os números ligados), `WHATSAPP_APP_SECRET` (chave secreta do app, em Configurações do app > Básico), `WHATSAPP_ACCESS_TOKEN` (token permanente de um usuário do sistema do portfólio, com as permissões de mensagens do WhatsApp) e `WHATSAPP_PHONE_NUMBER_ID`. `SUPABASE_URL` e a chave de serviço o Supabase já fornece (a função usa `SUPABASE_SECRET_KEYS`, a chave nova, e, sem ela, `SUPABASE_SERVICE_ROLE_KEY`).
 7. **Meta, webhook**: na configuração do WhatsApp do app, URL de retorno = o endereço do passo 5, token de verificação = o do passo 4; assinar o campo `messages`.
 8. **App**: com o número definido, a equipe põe o número em `WHATSAPP_NUMBER`, publica o app e o card aparece em Conta.
 9. **Piloto fechado** (fase 3): as pessoas do teste (até 5 no número de teste) ligam o WhatsApp e anotam por uma semana. Conferir no SQL Editor quantas mensagens deram "não entendi" para ajustar as regras.
 10. **Abrir a todos**: número próprio registrado com armazenamento no Brasil, nome de exibição "Clarevo" aprovado, política atualizada e resposta do advogado.
+
+## 5b. Abrir a todos: o número próprio, passo a passo
+
+O número de teste da Meta só conversa com até 5 números cadastrados. Para todas as pessoas, a Clarevo precisa de um número próprio. Ordem:
+
+1. **Escolher o número** (Enzo). Precisa receber SMS ou ligação, **não pode estar no WhatsApp** (nem no comum nem no Business; se estiver, apagar a conta do WhatsApp nele antes) e vai ser o endereço da Clarevo para sempre. Opções: chip pré-pago novo usado só para isso (o único custo: o chip e uma recarga mínima de tempos em tempos para a operadora não cancelar a linha), um número que a empresa já tenha e não use no WhatsApp, ou um fixo da empresa (confirmado por ligação).
+2. **Verificação da empresa** na Meta (Enzo, com o cartão CNPJ).
+3. **Cadastrar o número** no WhatsApp Manager (Claude Chrome; o código de confirmação é o Enzo quem digita): Números de telefone > Adicionar, nome de exibição "Clarevo", categoria de finanças. Sai um Phone number ID novo.
+4. **Ativar o número na API, com armazenamento no Brasil** (Enzo, no Graph API Explorer da Meta): `POST <Phone number ID>/register` com `messaging_product=whatsapp`, `pin=<6 dígitos inventados e guardados no gerenciador de senhas>` e `data_localization_region=BR`. Pela documentação da Meta, o registro só se faz pela API (não pelo painel), e o armazenamento no Brasil só se escolhe aqui; mudar depois exige desligar e registrar de novo.
+5. **Trocar o segredo** `WHATSAPP_PHONE_NUMBER_ID` no Supabase pelo novo (Enzo).
+6. **Deixar o app da Meta ao vivo** (Claude Chrome): em Configurações > Básico, URL da política `https://clarevo.app.br/privacidade.html` e de exclusão de dados `https://clarevo.app.br/excluir-conta.html`, ícone e categoria; depois, trocar o modo do app de desenvolvimento para ao vivo.
+7. **App da Clarevo** (equipe): `WHATSAPP_NUMBER` com o número novo e `WHATSAPP_IN_ACCOUNT = true`; PR e merge.
+8. **Teste** com um número que não estava no piloto e aviso às pessoas.
+
+Antes disso, vale terminar o teste com o número de teste (segredos, webhook e "oi"): ele prova a função e o banco, e o número próprio só troca o passo 4 em diante.
+
+## 5c. Bloqueio da conta do WhatsApp (31/10/2026) e regra para as contas da Meta
+
+No primeiro teste, as mensagens do número de teste falharam com o erro 131031 ("Business Account locked"). Os avisos do webhook de 31/10/2026 mostram uma violação `SCRIPTED_BM` (a Meta entendeu que o portfólio empresarial foi criado por automação) e um pedido de verificação da empresa, na conta do WhatsApp 1679227277245978 do portfólio 1913629572938246. O portfólio e o app foram criados pelo Claude Chrome, operando o navegador do Enzo, a pedido da equipe: a causa mais provável é essa.
+
+**Regra daqui em diante:** contas, portfólios, apps, verificações e pedidos de revisão na Meta são feitos **só pelo Enzo, à mão, no próprio navegador**. O Claude Chrome não cria nem opera páginas da Meta; a equipe manda o passo a passo e lê os prints.
+
+O que fazer: (1) o Enzo pede a revisão da restrição em Qualidade da conta do portfólio, com uma explicação verdadeira; (2) completa a verificação da empresa com o cartão CNPJ; (3) se a revisão for negada, cria um portfólio novo, à mão, liga o app a ele e troca os segredos que mudarem (token, Phone number ID).
 
 ## 6. Identificadores (não são segredos)
 

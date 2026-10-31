@@ -13,6 +13,7 @@ Esta política explica, em linguagem simples, quais dados pessoais a Clarevo gua
 - Não guardamos número completo de cartão, código de segurança, validade, CPF de nota fiscal nem imagens de notas ou comprovantes.
 - Se a sua empresa oferecer a Clarevo como benefício, ela nunca vê as suas finanças, nem somadas às de outras pessoas.
 - Sem anúncios, sem venda de dados e sem rastreamento para publicidade.
+- Se você ligar o WhatsApp para anotar por mensagem, as mensagens passam pela Meta, dona do WhatsApp. A Clarevo não guarda o texto das mensagens nem o seu número.
 - Você pode excluir a sua conta dentro do app.
 
 ## 1. Quem somos?
@@ -154,6 +155,21 @@ Essas contagens:
 
 [PROPOSTA: legítimo interesse (art. 7º, IX), para saber se o serviço funciona e planejar o seu desenvolvimento, com dados agregados.] [A DEFINIR: confirmar se a contagem agregada, que não identifica ninguém, exige base própria, e fazer o teste de legítimo interesse]
 
+### 3.10 Anotar pelo WhatsApp (opcional)
+
+[PROPOSTA: seção a incluir junto com a abertura do WhatsApp a todas as pessoas. A base legal, o papel da Meta e a transferência internacional ainda não foram confirmados juridicamente.]
+
+Você pode ligar o seu número de WhatsApp à Clarevo, em Conta, e anotar gastos e recebimentos mandando mensagens escritas para o número da Clarevo, como "mercado 52,30". Ligar é opcional, e nada no app depende disso.
+
+- **Como liga.** O app gera um código, que vale 15 minutos e serve uma vez, e você o manda pelo WhatsApp do número que vai usar. Da Clarevo, fica guardado só um resumo do código, nunca o código.
+- **O que guardamos.** O que vira registro, como qualquer anotação do app (seção 3.2), no espaço que você escolheu (Pessoal ou Família). Do seu número, só um resumo feito com uma chave secreta (HMAC-SHA256), que serve para reconhecer quem escreve; sem a chave, o resumo não volta ao número. De cada mensagem tratada, por 30 dias, guardamos o identificador que a Meta dá à mensagem (para não anotar duas vezes a mesma), o resumo do número, o resultado (por exemplo, "anotado") e o registro criado, para você poder desfazer. **Não guardamos o texto das mensagens nem o seu número.**
+- **Áudio, foto e figurinha.** A Clarevo não lê nem guarda. A resposta pede uma mensagem escrita.
+- **Quem participa.** As mensagens passam pelos servidores da Meta, empresa dona do WhatsApp, que presta o serviço de mensagens para empresas (WhatsApp Cloud API). Nesse trecho, a mensagem deixa de ter a criptografia de ponta a ponta do WhatsApp, e a Meta trata o conteúdo como operadora, em nome da Clarevo (seção 8).
+- **As respostas.** A Clarevo só responde à mensagem que você mandou, em texto, para o mesmo número. Ela não manda mensagens por iniciativa própria, propaganda nem lembretes pelo WhatsApp.
+- **Para quê.** Só para anotar, desfazer e responder às suas mensagens. Não usamos o WhatsApp para anúncio, para montar perfil nem para falar com você sobre outros assuntos.
+- **Como desliga.** Em Conta, na tela do WhatsApp, ou mandando DESLIGAR (ou PARAR) para o número da Clarevo. Ao desligar, o vínculo é apagado na hora; o que você já anotou continua no app. Se você trocar de número no WhatsApp, o número antigo é desligado sozinho.
+- **Por quanto tempo.** O vínculo, enquanto você não desligar nem excluir a conta. As mensagens tratadas, por 30 dias. Ao excluir a conta, o vínculo, o código e as mensagens tratadas são apagados junto.
+
 ## 4. O que não guardamos?
 
 - Número completo de cartão, código de segurança (CVV) e validade. O app recusa apelidos que pareçam número de cartão.
@@ -164,7 +180,8 @@ Essas contagens:
 - Os arquivos que você escolhe ler: PDF de nota, PDF de comprovante, extrato e fatura em OFX ou planilha.
 - O código de um boleto. Se você colar um, o app avisa e não o guarda.
 - Saldo por conta.
-- Biometria, localização, contatos, fotos da galeria, microfone e identificador de publicidade.
+- Biometria, localização, contatos, microfone e identificador de publicidade. Da galeria, só a foto que você mesmo escolher para uma meta (seção 3.2).
+- O texto das mensagens do WhatsApp e o seu número de telefone. Do número, guardamos só um resumo feito com chave secreta (seção 3.10).
 
 O que você confirma com "Salvar" vira registro e é guardado como descrito na seção 3. Se a descrição de um gasto trouxer o nome de outra pessoa (por exemplo, o nome que veio de um comprovante), esse nome fica guardado como parte da descrição.
 
@@ -193,6 +210,7 @@ A leitura acontece no seu aparelho. A Clarevo não tem servidor que receba esses
 - Novidades por e-mail (seção 3.7): consentimento (art. 7º, I), que você pode revogar a qualquer momento, cancelando pelo link de qualquer e-mail (art. 8º, § 5º). [A DEFINIR: confirmar a base e a forma de registrar o consentimento]
 - Pergunta opcional "Como você conheceu a Clarevo?" (seção 3.8): [PROPOSTA: consentimento (art. 7º, I), que você pode retirar mudando a resposta para "Prefiro não dizer" ou excluindo a conta; alternativa, legítimo interesse (art. 7º, IX)]. [A DEFINIR: confirmar a base]
 - Contagens de cadastros e de uso, sem identificar ninguém (seção 3.9): [PROPOSTA: legítimo interesse (art. 7º, IX), com dados agregados]. [A DEFINIR: confirmar a base e fazer o teste de legítimo interesse]
+- Anotar pelo WhatsApp (seção 3.10): [PROPOSTA: execução de contrato, a pedido da pessoa, que liga o número quando quer (art. 7º, V)]. [A DEFINIR: confirmar a base e o papel da Meta como operadora]
 - Funções do aparelho (câmera, biometria e lembretes): você liga e pode desligar a qualquer momento, e os dados dessas funções não chegam à Clarevo. [A DEFINIR: confirmar se precisam de base própria]
 
 Não tomamos decisões automatizadas sobre você, e a Clarevo não faz análise de crédito.
@@ -223,6 +241,7 @@ Hoje usamos:
 - **Expo** (geração dos builds do app). Recebe o código do app. Não recebe dados de quem usa o app.
 - **Zoho Mail** (caixas de e-mail da Clarevo, como [E-MAIL DE SUPORTE] e [E-MAIL DE PRIVACIDADE]). Quando você escreve para a Clarevo, a sua mensagem e o seu e-mail ficam nessas caixas. [A DEFINIR: país do tratamento e contrato; a conta foi criada em zoho.com]
 - **Resend** (envio dos e-mails de confirmação de cadastro e de nova senha, com o nome da Clarevo, a partir de um endereço do domínio da Clarevo). Recebe o seu e-mail e o conteúdo dessas mensagens e guarda registros do envio. O envio sai pela região de São Paulo do Resend. [A DEFINIR: país da sede, prazo de guarda dos registros e contrato]
+- **Meta (WhatsApp Business, Cloud API), só para quem liga o WhatsApp** (seção 3.10). Recebe as mensagens que você manda para o número da Clarevo, o seu número e as respostas, e atua como operadora, em nome da Clarevo. Guarda o conteúdo das mensagens por até 30 dias, para entregá-las. [PROPOSTA: pedir à Meta o armazenamento das mensagens no Brasil ao registrar o número da Clarevo; sem isso, o conteúdo fica guardado nos Estados Unidos.] [A DEFINIR: termos da Meta para empresas, transferência internacional (LGPD, art. 33) e o que a Meta faz com os dados técnicos das conversas]
 - **Apple App Store e Google Play** (distribuição). Tratam os dados de download e de conta nas lojas, conforme as políticas delas.
 
 Estão previstos, mas ainda não ligados:
@@ -266,6 +285,7 @@ A exceção é a leitura de código no Android: o componente do Google (ML Kit) 
 - **Cópias de segurança.** O serviço de banco de dados pode manter cópias de segurança, e dados já apagados podem ficar nelas por um tempo. [A DEFINIR: prazo, previsto em 7 dias no plano contratado; confirmar no painel] Se uma cópia for restaurada, as contas excluídas depois dela serão excluídas de novo.
 - **Registros de acesso.** A Clarevo não cria registros de acesso próprios. Os do Supabase e da Cloudflare têm prazo curto, que depende do plano, e o registro de auditoria da autenticação pode manter e-mail e IP depois da exclusão da conta. [A DEFINIR: o que guardar, onde e por quanto tempo, frente à guarda de registros de acesso do Marco Civil da Internet, art. 15, e conferir nos painéis o que cada serviço mantém]
 - **Resposta de "Como você conheceu a Clarevo?"** (seção 3.8). [PROPOSTA: enquanto a conta existir; sai junto com a conta. As contagens da seção 3.9 não guardam histórico: são refeitas do que existe no momento.] [A DEFINIR: confirmar o prazo]
+- **WhatsApp** (seção 3.10). O vínculo do número, enquanto você não desligar nem excluir a conta. As mensagens tratadas (sem o texto e sem o número), por 30 dias. O que virou registro segue a regra dos registros. Na Meta, o conteúdo das mensagens fica por até 30 dias.
 - **Mensagem do formulário de contato** (seção 3.6). Fica na caixa de e-mail da Clarevo por [A DEFINIR: prazo na caixa de e-mail], e uma cópia fica nos registros do Resend por [A DEFINIR: prazo de guarda no Resend]. O site não a guarda.
 - **E-mail das Novidades** (seção 3.7). Fica no Brevo enquanto você não cancelar. [A DEFINIR: prazo depois do cancelamento]
 - **Contas sem uso.** Hoje a Clarevo não apaga contas por inatividade. [A DEFINIR: política para contas inativas]

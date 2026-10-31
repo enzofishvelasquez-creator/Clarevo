@@ -5,7 +5,8 @@
 // simples. Nunca inicia conversa nem usa mensagem de modelo (as cobradas). Segredos no painel do Supabase (Edge Functions, Secrets):
 // WHATSAPP_VERIFY_TOKEN, WHATSAPP_APP_SECRET, WHATSAPP_PHONE_KEY, WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID e, opcional,
 // WHATSAPP_GRAPH_VERSION.
-// SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY o próprio Supabase fornece. Publicar com "Verify JWT" desligado (a Meta não manda login).
+// SUPABASE_URL e a chave de serviço (SUPABASE_SECRET_KEYS ou, sem ela, SUPABASE_SERVICE_ROLE_KEY) o próprio Supabase fornece.
+// Publicar com "Verify JWT" desligado (a Meta não manda login).
 
 const __mods = [
   // packages/core/src/whatsapp/index.ts
@@ -1086,11 +1087,28 @@ const __mods = [
         'WHATSAPP_ACCESS_TOKEN',
         'WHATSAPP_PHONE_NUMBER_ID',
         'SUPABASE_URL',
-        'SUPABASE_SERVICE_ROLE_KEY',
     ];
+    function serviceKeyFrom(v) {
+        const keys = v('SUPABASE_SECRET_KEYS');
+        if (keys !== '') {
+            try {
+                const parsed = JSON.parse(keys);
+                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                    const values = parsed;
+                    const chosen = typeof values.default === 'string' ? values.default : Object.values(values).find((x) => typeof x === 'string');
+                    if (typeof chosen === 'string' && chosen.trim() !== '')
+                        return chosen.trim();
+                }
+            }
+            catch {
+            }
+        }
+        return v('SUPABASE_SERVICE_ROLE_KEY');
+    }
     function whatsappConfigFrom(env) {
         const v = (name) => (env(name) ?? '').trim();
-        if (REQUIRED_ENV.some((name) => v(name) === ''))
+        const serviceKey = serviceKeyFrom(v);
+        if (REQUIRED_ENV.some((name) => v(name) === '') || serviceKey === '')
             return null;
         return {
             verifyToken: v('WHATSAPP_VERIFY_TOKEN'),
@@ -1099,7 +1117,7 @@ const __mods = [
             accessToken: v('WHATSAPP_ACCESS_TOKEN'),
             phoneNumberId: v('WHATSAPP_PHONE_NUMBER_ID'),
             supabaseUrl: v('SUPABASE_URL').replace(/\/+$/, ''),
-            serviceKey: v('SUPABASE_SERVICE_ROLE_KEY'),
+            serviceKey,
             graphVersion: v('WHATSAPP_GRAPH_VERSION') || exports.WHATSAPP_GRAPH_VERSION,
         };
     }
