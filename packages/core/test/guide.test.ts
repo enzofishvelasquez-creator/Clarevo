@@ -86,6 +86,10 @@ const COVERAGE_EXCEPTIONS: readonly { route: string; reason: string }[] = [
     route: '/conta/whatsapp',
     reason: 'WhatsApp (D-076): a tela só aparece quando o número da Clarevo existir (WHATSAPP_NUMBER); a entrada do guia e a captura entram junto com o número.',
   },
+  {
+    route: '/conta/telegram',
+    reason: 'Telegram (D-080): piloto fechado, a tela abre só pelo link; a entrada do guia e a captura entram quando o card aparecer em Conta (TELEGRAM_IN_ACCOUNT).',
+  },
 ];
 
 /** Telas de consulta ou abas que nenhuma entrada cobre e que não estão na lista de exceções. */

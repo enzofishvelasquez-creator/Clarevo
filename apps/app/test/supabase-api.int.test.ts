@@ -8038,7 +8038,9 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
     // A licença já encerrada não muda com o contrato (segue nos 30 dias do encerramento).
     const left = (await fabio.getMyBenefit())!;
     expect(left.status).toBe('encerrada');
-    expect(Date.parse(left.accessUntil!)).toBeLessThan(Date.parse('2026-12-01'));
+    // O encerramento é no relógio de verdade (não no dia fixo do banco de teste): o acesso vai até 30 dias depois dele, não até o fim do
+    // contrato mais 30 dias.
+    expect(Date.parse(left.accessUntil!)).toBeLessThanOrEqual(Date.now() + 30 * 86_400_000);
     // O convite que a Hana tinha foi cancelado: o link dela diz convite_invalido. Com um convite novo, o aceite cria o direito já com
     // o fim + 30 dias.
     expect(await err(hana.acceptLicense(newOperationKey(), codes.hana!))).toBe('convite_invalido');
@@ -8074,7 +8076,7 @@ describe('API real: Empresas (Ciclo M, D-056)', () => {
     expect(staff(`select public.clarevo_staff_update_contract('${alfa.contract}', 6, null)`)).toMatchObject({ seats: 6, ends_on: null });
     expect(await hana.getMyBenefit()).toMatchObject({ status: 'ativa', accessUntil: null, contractEndsOn: null });
     expect(await gil.getMyBenefit()).toMatchObject({ status: 'ativa', accessUntil: null, contractEndsOn: null });
-    expect(Date.parse((await fabio.getMyBenefit())!.accessUntil!)).toBeLessThan(Date.parse('2026-12-01'));
+    expect(Date.parse((await fabio.getMyBenefit())!.accessUntil!)).toBeLessThanOrEqual(Date.now() + 30 * 86_400_000);
   });
 
   it('11. sem sessão e gravação direta: nada é lido nem gravado fora das funções; nenhuma delas toca dados financeiros', async () => {

@@ -1,7 +1,7 @@
 import { todayIn } from '../dates';
 import { sha256HexOfBytes, utf8Bytes } from '../sha256';
 import { readWhatsAppMessage } from './mensagem';
-import { WHATSAPP_REPLY, whatsappOutcomeReply, whatsappParseReply, type WhatsAppOutcome } from './respostas';
+import { chatReply, whatsappOutcomeReply, whatsappParseReply, type ChatChannel, type WhatsAppOutcome } from './respostas';
 
 /**
  * Recebimento das mensagens do WhatsApp (D-076): a função do servidor (supabase/functions/whatsapp) só chama o que está aqui.
@@ -32,8 +32,8 @@ export function hmacSha256Hex(key: readonly number[], message: readonly number[]
   return sha256HexOfBytes([...block.map((b) => b ^ 0x5c), ...hexToBytes(inner)]);
 }
 
-/** Comparação que leva o mesmo tempo para qualquer diferença (assinatura). */
-function sameText(a: string, b: string): boolean {
+/** Comparação que leva o mesmo tempo para qualquer diferença (assinatura e segredos). */
+export function sameText(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -54,6 +54,15 @@ export function whatsappPhoneHash(waId: string, phoneKey: string): string {
   return hmacSha256Hex(utf8Bytes(phoneKey), utf8Bytes(waId.replace(/\D/g, '')));
 }
 
+/**
+ * O identificador que o banco guarda para uma mensagem: o canal e um resumo HMAC-SHA256 do identificador do canal, com a chave da função.
+ * O identificador do WhatsApp (wamid) traz o número de quem escreveu, e o do Telegram, a conta: guardado como veio, ele desfaria o resumo
+ * de quem escreve. O resumo é o mesmo a cada nova entrega da mesma mensagem, então a repetição continua reconhecida.
+ */
+export function chatMessageKey(channel: ChatChannel, rawId: string, key: string): string {
+  return `${channel}:${hmacSha256Hex(utf8Bytes(key), utf8Bytes(`${channel}-mensagem:${rawId}`))}`;
+}
+
 export interface WhatsAppInbound {
   /** Identificador da mensagem na Meta (wamid): a chave de repetição no banco. */
   id: string;
@@ -67,7 +76,7 @@ export interface WhatsAppInbound {
   systemType?: string | null;
 }
 
-function obj(v: unknown): Record<string, unknown> | null {
+export function obj(v: unknown): Record<string, unknown> | null {
   return typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
@@ -115,48 +124,53 @@ export function whatsappInbound(payload: unknown, phoneNumberId: string): WhatsA
 export type WhatsAppFunction = 'whatsapp_note' | 'whatsapp_link' | 'whatsapp_add_record' | 'whatsapp_undo' | 'whatsapp_unlink';
 export type WhatsAppRpc = (fn: WhatsAppFunction, args: Record<string, unknown>) => Promise<WhatsAppOutcome>;
 
-/** Tipos que não pedem resposta: reação a uma resposta da Clarevo, aviso do sistema e tipo desconhecido. */
-const SILENT_TYPES = new Set(['reaction', 'system', 'unsupported', 'errors']);
+/** O que a mensagem pede ao banco, igual nos dois canais: a função de cada canal é `<canal>_<op>` (whatsapp_link, telegram_link...). */
+export type ChatOp = 'note' | 'link' | 'add_record' | 'undo' | 'unlink';
+/** Chamada ao banco já com o identificador da mensagem e o resumo de quem escreve: aqui só entram os argumentos da operação. */
+export type ChatCall = (op: ChatOp, args: Record<string, unknown>) => Promise<WhatsAppOutcome>;
+
+/** Uma mensagem já tirada do formato do canal: texto, outra coisa (áudio, foto, figurinha) ou o pedido de boas-vindas. */
+export interface ChatMessage {
+  channel: ChatChannel;
+  kind: 'texto' | 'midia' | 'boas_vindas';
+  text: string | null;
+  /** Segundos desde 1970 (UTC). */
+  timestamp: number;
+}
 
 /**
- * Uma mensagem: o que ela pede, a função do banco e o texto da resposta. null: não responder. Ajuda, mídia e mensagem que a Clarevo não
- * entendeu também passam pelo banco (whatsapp_note), só para a repetição da Meta não responder duas vezes e para o limite de mensagens.
- * Aviso do sistema de troca de número desliga o número antigo, sem resposta.
+ * Resposta a uma mensagem, igual nos dois canais (D-076 e D-080): o que ela pede, a operação do banco e o texto da resposta. null: não
+ * responder. Ajuda, mídia e mensagem que a Clarevo não entendeu também passam pelo banco (note), só para a repetição do canal não
+ * responder duas vezes e para o limite de mensagens.
  */
-export async function handleWhatsAppMessage(msg: WhatsAppInbound, rpc: WhatsAppRpc, phoneKey: string): Promise<string | null> {
-  const base = { p_message_id: msg.id, p_phone_hash: whatsappPhoneHash(msg.from, phoneKey) };
-  if (msg.type === 'system' && msg.systemType === 'user_changed_number') {
-    await rpc('whatsapp_unlink', base);
-    return null;
-  }
-  if (SILENT_TYPES.has(msg.type)) return null;
+export async function answerChatMessage(msg: ChatMessage, call: ChatCall): Promise<string | null> {
+  const replies = chatReply(msg.channel);
   const today = todayIn(WHATSAPP_TIME_ZONE, new Date(msg.timestamp * 1000));
   const sentAt = new Date(msg.timestamp * 1000).toISOString();
   const noted = async (outcome: 'ajuda' | 'midia' | 'nao_entendi', reply: string) => {
-    const r = await rpc('whatsapp_note', { ...base, p_outcome: outcome });
-    return r.result === 'registrada' ? reply : whatsappOutcomeReply(r, today);
+    const r = await call('note', { p_outcome: outcome });
+    return r.result === 'registrada' ? reply : whatsappOutcomeReply(r, today, msg.channel);
   };
-  if (msg.type === 'request_welcome') return noted('ajuda', WHATSAPP_REPLY.ajuda);
-  if (msg.type !== 'text' || msg.text === null) return noted('midia', WHATSAPP_REPLY.midia);
+  if (msg.kind === 'boas_vindas') return noted('ajuda', replies.ajuda);
+  if (msg.kind !== 'texto' || msg.text === null) return noted('midia', replies.midia);
   const cmd = readWhatsAppMessage(msg.text, today);
   let outcome: WhatsAppOutcome;
   switch (cmd.type) {
     case 'ajuda':
-      return noted('ajuda', WHATSAPP_REPLY.ajuda);
+      return noted('ajuda', replies.ajuda);
     case 'erro':
-      return noted('nao_entendi', whatsappParseReply(cmd.reason));
+      return noted('nao_entendi', whatsappParseReply(cmd.reason, msg.channel));
     case 'ligar':
-      outcome = await rpc('whatsapp_link', { ...base, p_code: cmd.code });
+      outcome = await call('link', { p_code: cmd.code });
       break;
     case 'desfazer':
-      outcome = await rpc('whatsapp_undo', { ...base, p_sent_at: sentAt });
+      outcome = await call('undo', { p_sent_at: sentAt });
       break;
     case 'desligar':
-      outcome = await rpc('whatsapp_unlink', base);
+      outcome = await call('unlink', {});
       break;
     case 'anotar':
-      outcome = await rpc('whatsapp_add_record', {
-        ...base,
+      outcome = await call('add_record', {
         p_sent_at: sentAt,
         p_kind: cmd.kind,
         p_amount_cents: cmd.amountCents,
@@ -168,7 +182,28 @@ export async function handleWhatsAppMessage(msg: WhatsAppInbound, rpc: WhatsAppR
       });
       break;
   }
-  return whatsappOutcomeReply(outcome, today);
+  return whatsappOutcomeReply(outcome, today, msg.channel);
+}
+
+/** Tipos que não pedem resposta: reação a uma resposta da Clarevo, aviso do sistema e tipo desconhecido. */
+const SILENT_TYPES = new Set(['reaction', 'system', 'unsupported', 'errors']);
+
+/**
+ * Uma mensagem: o que ela pede, a função do banco e o texto da resposta. null: não responder. Ajuda, mídia e mensagem que a Clarevo não
+ * entendeu também passam pelo banco (whatsapp_note), só para a repetição da Meta não responder duas vezes e para o limite de mensagens.
+ * Aviso do sistema de troca de número desliga o número antigo, sem resposta.
+ */
+export async function handleWhatsAppMessage(msg: WhatsAppInbound, rpc: WhatsAppRpc, phoneKey: string): Promise<string | null> {
+  const base = { p_message_id: chatMessageKey('whatsapp', msg.id, phoneKey), p_phone_hash: whatsappPhoneHash(msg.from, phoneKey) };
+  if (msg.type === 'system' && msg.systemType === 'user_changed_number') {
+    await rpc('whatsapp_unlink', base);
+    return null;
+  }
+  if (SILENT_TYPES.has(msg.type)) return null;
+  const kind = msg.type === 'request_welcome' ? 'boas_vindas' : msg.type === 'text' && msg.text !== null ? 'texto' : 'midia';
+  return answerChatMessage({ channel: 'whatsapp', kind, text: msg.text, timestamp: msg.timestamp }, (op, args) =>
+    rpc(`whatsapp_${op}`, { ...base, ...args }),
+  );
 }
 
 /** Segredos e endereços da função do servidor (painel do Supabase, Edge Functions, Secrets). */
@@ -197,7 +232,7 @@ const REQUIRED_ENV = [
  * Chave de serviço do banco: a chave secreta nova do Supabase (SUPABASE_SECRET_KEYS, um JSON por nome; vale a "default" ou, sem ela,
  * a primeira) e, sem ela, a chave antiga (SUPABASE_SERVICE_ROLE_KEY, que o painel já marca como antiga). Vazio: nenhuma.
  */
-function serviceKeyFrom(v: (name: string) => string): string {
+export function serviceKeyFrom(v: (name: string) => string): string {
   const keys = v('SUPABASE_SECRET_KEYS');
   if (keys !== '') {
     try {
@@ -254,16 +289,19 @@ export interface WhatsAppResponse {
 }
 
 const RESULTS = new Set([
-  'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido',
+  'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
   'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida', 'repetida',
   'silencio', 'registrada',
 ]);
 
-/** Recusa do banco que se repetiria a cada nova entrega (pedido inválido, 4xx): não adianta a Meta mandar de novo. */
+/** Recusa do banco que se repetiria a cada nova entrega (pedido inválido, 4xx): não adianta o canal mandar de novo. */
 export class WhatsAppFinalError extends Error {}
 
-/** Chamada a uma função whatsapp_* do banco pela API do Supabase, com a chave de serviço (que só existe no servidor). */
-export function supabaseWhatsAppRpc(config: WhatsAppConfig, fetcher: WhatsAppFetch): WhatsAppRpc {
+/** Chamada a uma função do servidor no banco (whatsapp_* ou telegram_*) pela API do Supabase, com a chave de serviço. */
+export function supabaseChatRpc(
+  config: { supabaseUrl: string; serviceKey: string },
+  fetcher: WhatsAppFetch,
+): (fn: string, args: Record<string, unknown>) => Promise<WhatsAppOutcome> {
   return async (fn, args) => {
     const headers: Record<string, string> = { apikey: config.serviceKey, 'Content-Type': 'application/json' };
     // Chave antiga (JWT) também vai em Authorization; a chave secreta nova (sb_secret_...) vai só em apikey.
@@ -276,6 +314,11 @@ export function supabaseWhatsAppRpc(config: WhatsAppConfig, fetcher: WhatsAppFet
     if (!outcome || typeof outcome.result !== 'string' || !RESULTS.has(outcome.result)) throw new Error(`resposta inesperada de ${fn}`);
     return outcome as unknown as WhatsAppOutcome;
   };
+}
+
+/** Chamada a uma função whatsapp_* do banco pela API do Supabase, com a chave de serviço (que só existe no servidor). */
+export function supabaseWhatsAppRpc(config: WhatsAppConfig, fetcher: WhatsAppFetch): WhatsAppRpc {
+  return supabaseChatRpc(config, fetcher);
 }
 
 /**
@@ -361,7 +404,7 @@ export function createWhatsAppHandler(deps: WhatsAppHandlerDeps): (req: WhatsApp
         log(`falha ao tratar uma mensagem: ${e instanceof Error ? e.message : 'erro'}`);
         // Recusa definitiva (4xx): responde que não deu e segue com as outras; falha passageira: 500, e a Meta entrega de novo.
         if (!(e instanceof WhatsAppFinalError)) return { status: 500, body: 'tente de novo' };
-        reply = WHATSAPP_REPLY.erro;
+        reply = chatReply('whatsapp').erro;
       }
       if (reply === null) continue;
       try {

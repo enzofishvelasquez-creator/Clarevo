@@ -62,7 +62,7 @@ import type {
   ReturnReviewAction,
   SavingsAction,
   SignupSourceAction,
-  WhatsAppAction,
+  ChatAction,
   SeriesAction,
   SeriesWrite,
   SubscriptionReviewAction,
@@ -145,7 +145,8 @@ import { signupSourceError, type SignupSource, type SignupSourceOption } from '.
 import { WHATSAPP_CODE_ALPHABET, WHATSAPP_CODE_LENGTH } from './whatsapp/mensagem';
 import { GOAL_PHOTO_MAX_BYTES, base64Bytes, goalPhotoMime, type GoalImage, type GoalImageChoice } from './goal-images';
 import { WHATSAPP_CODE_MINUTES } from './whatsapp/respostas';
-import type { WhatsAppCode, WhatsAppLinkState } from './whatsapp/app';
+import type { ChatCode, ChatLinkState } from './whatsapp/app';
+import type { ChatChannel } from './whatsapp/respostas';
 import {
   ANNUAL_MAX_YEARS,
   SERIES_LIMIT,
@@ -180,7 +181,7 @@ interface Operation {
     | SubscriptionReviewAction
     | MonthCheckAction
     | SignupSourceAction
-    | WhatsAppAction
+    | ChatAction
     | ImportAction
     | FamilyAction
     | CompanyAction;
@@ -366,8 +367,8 @@ export class MemoryRepository implements RecordsRepository {
   private savingsChecks = new Map<string, SavingsCheck>();
   /** signup_sources da pessoa (só ela usa este repositório): no máximo uma resposta, de "Como você conheceu o Clarevo?" (D-067). */
   private signupSource: SignupSource | null = null;
-  /** Código de ligar o WhatsApp pendente (na memória não há servidor: nada liga o número). */
-  private whatsappCode: { contextId: string; expiresAt: string } | null = null;
+  /** Código de ligar pendente de cada canal (na memória não há servidor: nada liga o canal). */
+  private chatCodes: Partial<Record<ChatChannel, { contextId: string; expiresAt: string }>> = {};
   /** Imagem das metas (goal_images): a sugestão escolhida ou a foto (base64), com a versão. */
   private goalImages = new Map<string, { imageKey: string | null; photo: { mime: string; base64: string } | null; version: number; updatedAt: string }>();
   private cards = new Map<string, StoredCard>();
@@ -440,7 +441,7 @@ export class MemoryRepository implements RecordsRepository {
       goalMovements: new Map(this.goalMovements),
       savingsChecks: new Map(this.savingsChecks),
       signupSource: this.signupSource,
-      whatsappCode: this.whatsappCode,
+      chatCodes: { ...this.chatCodes },
       goalImages: new Map(this.goalImages),
       cards: new Map(this.cards),
       cardEntries: new Map(this.cardEntries),
@@ -468,7 +469,7 @@ export class MemoryRepository implements RecordsRepository {
         goalMovements: this.goalMovements,
         savingsChecks: this.savingsChecks,
         signupSource: this.signupSource,
-        whatsappCode: this.whatsappCode,
+        chatCodes: this.chatCodes,
         goalImages: this.goalImages,
         cards: this.cards,
         cardEntries: this.cardEntries,
@@ -2208,48 +2209,46 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   // ---------------------------------------------------------------------------
-  // WhatsApp (D-076, migração 0020): my_whatsapp, create_whatsapp_code e unlink_whatsapp. Na memória (demonstração e testes) não há
-  // servidor: o código é gerado, mas nenhum número é ligado.
+  // WhatsApp e Telegram (D-076, D-080; migrações 0020 e 0022): my_<canal>, create_<canal>_code e unlink_<canal>. Na memória
+  // (demonstração e testes) não há servidor: o código é gerado, mas nenhum canal é ligado.
   // ---------------------------------------------------------------------------
 
-  private whatsappState(): WhatsAppLinkState {
-    return {
-      linked: false,
-      contextId: null,
-      linkedAt: null,
-      codeContextId: this.whatsappCode?.contextId ?? null,
-      codeExpiresAt: this.whatsappCode?.expiresAt ?? null,
-    };
+  private chatState(channel: ChatChannel): ChatLinkState {
+    const code = this.chatCodes[channel];
+    return { linked: false, contextId: null, linkedAt: null, codeContextId: code?.contextId ?? null, codeExpiresAt: code?.expiresAt ?? null };
   }
 
-  async getWhatsApp() {
-    return this.read(() => this.whatsappState());
+  async getChatLink(channel: ChatChannel) {
+    return this.read(() => this.chatState(channel));
   }
 
-  /** Como create_whatsapp_code. Ordem: repetição (code nulo); sem_permissao (anotar no espaço); código novo no lugar do anterior. */
-  async createWhatsAppCode(key: string, contextId: string): Promise<WhatsAppCode> {
+  /** Como create_<canal>_code. Ordem: repetição (code nulo); sem_permissao (anotar no espaço); código novo no lugar do anterior do canal. */
+  async createChatCode(channel: ChatChannel, key: string, contextId: string): Promise<ChatCode> {
     return this.write(() => {
       const payload = [contextId];
-      const replayed = this.replay(key, 'gerar_codigo_whatsapp', payload);
-      if (replayed) return { code: null, contextId: replayed.contextId, expiresAt: this.whatsappCode?.expiresAt ?? null };
+      const action = channel === 'telegram' ? 'gerar_codigo_telegram' : 'gerar_codigo_whatsapp';
+      const replayed = this.replay(key, action, payload);
+      if (replayed) return { code: null, contextId: replayed.contextId, expiresAt: this.chatCodes[channel]?.expiresAt ?? null };
       if (!this.space || !this.canWrite(contextId)) throw new RepoError('sem_permissao');
       let code = '';
       for (let i = 0; i < WHATSAPP_CODE_LENGTH; i++) code += WHATSAPP_CODE_ALPHABET[Math.floor(Math.random() * WHATSAPP_CODE_ALPHABET.length)];
       const expiresAt = new Date(Date.parse(this.stamp()) + WHATSAPP_CODE_MINUTES * 60_000).toISOString();
-      this.whatsappCode = { contextId, expiresAt };
-      this.saveOperation(key, 'gerar_codigo_whatsapp', payload, { contextId, recordId: null, commitmentId: null });
+      this.chatCodes = { ...this.chatCodes, [channel]: { contextId, expiresAt } };
+      this.saveOperation(key, action, payload, { contextId, recordId: null, commitmentId: null });
       return { code, contextId, expiresAt };
     });
   }
 
-  /** Como unlink_whatsapp: apaga o código pendente (não há número ligado na memória). Operação no Pessoal. */
-  async unlinkWhatsApp(key: string): Promise<WhatsAppLinkState> {
+  /** Como unlink_<canal>: apaga o código pendente do canal (não há canal ligado na memória). Operação no Pessoal. */
+  async unlinkChat(channel: ChatChannel, key: string): Promise<ChatLinkState> {
     return this.write(() => {
-      if (this.replay(key, 'desligar_whatsapp', [])) return this.whatsappState();
+      const action = channel === 'telegram' ? 'desligar_telegram' : 'desligar_whatsapp';
+      if (this.replay(key, action, [])) return this.chatState(channel);
       if (!this.space) throw new RepoError('sem_permissao');
-      this.whatsappCode = null;
-      this.saveOperation(key, 'desligar_whatsapp', [], { contextId: this.space.personalContextId, recordId: null, commitmentId: null });
-      return this.whatsappState();
+      const { [channel]: _gone, ...rest } = this.chatCodes;
+      this.chatCodes = rest;
+      this.saveOperation(key, action, [], { contextId: this.space.personalContextId, recordId: null, commitmentId: null });
+      return this.chatState(channel);
     });
   }
 
@@ -3980,6 +3979,8 @@ export class MemoryRepository implements RecordsRepository {
       action === 'gerar_codigo_whatsapp' ||
       action === 'imagem_meta' ||
       action === 'desligar_whatsapp' ||
+      action === 'gerar_codigo_telegram' ||
+      action === 'desligar_telegram' ||
       isFamilyAction(action) ||
       isCompanyAction(action)
     )
@@ -4406,7 +4407,7 @@ export class MemoryRepository implements RecordsRepository {
       this.savingsChecks.clear();
       this.goalImages.clear();
       this.signupSource = null;
-      this.whatsappCode = null;
+      this.chatCodes = {};
       this.cards.clear();
       this.cardEntries.clear();
       this.accountsById.clear();

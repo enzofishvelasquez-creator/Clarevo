@@ -61,4 +61,5 @@ export * from './contrast';
 export * from './long-list';
 export * from './text-scale';
 export * from './whatsapp';
+export * from './telegram';
 export * from './goal-images';

@@ -28,7 +28,7 @@ SplashScreen.preventAutoHideAsync();
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp))?|familia(\/(nova|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram))?|familia(\/(nova|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -244,6 +244,8 @@ function Navigation() {
           <Stack.Screen name="conta/exportar" />
           {/* WhatsApp (D-076): ligar o número com um código e desligar; o card em Conta só aparece com o número da Clarevo. */}
           <Stack.Screen name="conta/whatsapp" />
+          {/* Telegram (D-080): a mesma tela do WhatsApp, para o bot da Clarevo; o card em Conta só aparece com o bot. */}
+          <Stack.Screen name="conta/telegram" />
           {/* Excluir minha conta (D-058): o que é apagado e o que continua, exportar antes e digitar EXCLUIR; sem barra. */}
           <Stack.Screen name="conta/excluir" />
           {/* Contas de origem do dinheiro (D-043). /contas/nova é rota estática e tem precedência sobre /contas/[id]/editar. */}

@@ -49,7 +49,8 @@ import type { ImportDestination, ImportItem, ImportResult } from './importar/tip
 import type { RecordSearchFilter, SearchPage } from './search';
 import type { SignupSource, SignupSourceOption } from './signup-source';
 import type { GoalImage, GoalImageChoice } from './goal-images';
-import type { WhatsAppCode, WhatsAppLinkState } from './whatsapp/app';
+import type { ChatCode, ChatLinkState } from './whatsapp/app';
+import type { ChatChannel } from './whatsapp/respostas';
 
 /**
  * Ações de conta a pagar gravadas em record_operations (mesmo espaço de chaves dos registros). 'criar_ocorrencia':
@@ -201,11 +202,12 @@ export type MonthCheckAction = 'marcar_mes_conferido' | 'desmarcar_mes_conferido
 export type SignupSourceAction = 'responder_origem_cadastro';
 
 /**
- * WhatsApp (D-076, migração 0020): gerar o código de ligar (create_whatsapp_code) e desligar pelo app (unlink_whatsapp), gravadas em
- * record_operations sem alvo. Ligar e desligar pelo próprio WhatsApp ('ligar_whatsapp' e 'desligar_whatsapp') vêm da função do servidor.
- * Nenhuma conta como anotação na atividade (D-030); anotar e desfazer pelo WhatsApp são 'criar' e 'excluir', como no app.
+ * WhatsApp e Telegram (D-076, migração 0020; D-080, migração 0022): gerar o código de ligar (create_whatsapp_code, create_telegram_code)
+ * e desligar pelo app (unlink_whatsapp, unlink_telegram), gravadas em record_operations sem alvo. Ligar e desligar pela própria conversa
+ * ('ligar_<canal>' e 'desligar_<canal>') vêm da função do servidor. Nenhuma conta como anotação na atividade (D-030); anotar e desfazer
+ * pela conversa são 'criar' e 'excluir', como no app.
  */
-export type WhatsAppAction = 'gerar_codigo_whatsapp' | 'desligar_whatsapp';
+export type ChatAction = 'gerar_codigo_whatsapp' | 'desligar_whatsapp' | 'gerar_codigo_telegram' | 'desligar_telegram';
 
 /**
  * Importar extrato ou fatura (import_records, D-048), gravada em record_operations com a conta ou o cartão de destino em
@@ -593,18 +595,20 @@ export interface RecordsRepository {
    */
   setSignupSource(key: string, expectedVersion: number, source: SignupSourceOption): Promise<SignupSource>;
 
-  // WhatsApp (D-076; migração 0020). O número nunca chega ao app: o banco guarda só o resumo dele, e só a função do servidor liga.
+  // WhatsApp e Telegram (D-076, D-080; migrações 0020 e 0022). Quem escreve nunca chega ao app: o banco guarda só o resumo, e só a função
+  // do servidor de cada canal liga. Cada canal tem o seu vínculo e o seu código.
 
-  /** my_whatsapp: se a pessoa tem número ligado, em que espaço, e o código ainda válido (espaço e validade). */
-  getWhatsApp(): Promise<WhatsAppLinkState>;
+  /** my_whatsapp ou my_telegram: se a pessoa tem o canal ligado, em que espaço, e o código ainda válido (espaço e validade). */
+  getChatLink(channel: ChatChannel): Promise<ChatLinkState>;
   /**
-   * create_whatsapp_code. Gera o código de ligar (8 símbolos, 15 minutos, uso único), no lugar do anterior. Ordem: repetição
-   * (chave_reutilizada se a ação ou o espaço mudam; a repetição certa devolve code nulo, porque o código só é mostrado uma vez);
-   * sem_permissao (a pessoa precisa anotar no espaço). Não conta como anotação na atividade. Reconciliação: gerar outro.
+   * create_whatsapp_code ou create_telegram_code. Gera o código de ligar o canal (8 símbolos, 15 minutos, uso único, só vale no canal),
+   * no lugar do anterior do mesmo canal. Ordem: repetição (chave_reutilizada se a ação ou o espaço mudam; a repetição certa devolve code
+   * nulo, porque o código só é mostrado uma vez); sem_permissao (a pessoa precisa anotar no espaço). Não conta como anotação na
+   * atividade. Reconciliação: gerar outro.
    */
-  createWhatsAppCode(key: string, contextId: string): Promise<WhatsAppCode>;
-  /** unlink_whatsapp. Desliga o número e apaga o código pendente. sem_permissao sem o Pessoal. Repetição: o estado atual. */
-  unlinkWhatsApp(key: string): Promise<WhatsAppLinkState>;
+  createChatCode(channel: ChatChannel, key: string, contextId: string): Promise<ChatCode>;
+  /** unlink_whatsapp ou unlink_telegram. Desliga o canal e apaga o código pendente dele. sem_permissao sem o Pessoal. Repetição: o estado atual. */
+  unlinkChat(channel: ChatChannel, key: string): Promise<ChatLinkState>;
 
   // Cartões de crédito (D-037, Ciclo E). Regras e ordem das conferências em cards.ts (CARD_*_CODE_ORDER), iguais às da migração 0008.
 

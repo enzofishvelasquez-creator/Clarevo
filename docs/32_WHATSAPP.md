@@ -20,7 +20,7 @@
 | `DESLIGAR` ou `PARAR` | Desliga o número da Clarevo |
 | `AJUDA` ou `oi` | Mostra os exemplos |
 
-"Hoje" e "ontem" são os do fuso de quem escreve (o mesmo do app). Mais de 30 mensagens em 10 minutos de um mesmo número recebem um aviso e, depois, nenhuma resposta. Se a pessoa troca de número no WhatsApp, o número antigo é desligado.
+Desde a D-080, um número já ligado a outra pessoa não passa sozinho a quem manda um código: quem tem o número manda DESLIGAR antes, e a resposta de ligado diz o nome da conta da Clarevo. No piloto fechado, as respostas apontam o endereço da tela (app.clarevo.app.br/conta/whatsapp). "Hoje" e "ontem" são os do fuso de quem escreve (o mesmo do app). Mais de 30 mensagens em 10 minutos de um mesmo número recebem um aviso e, depois, nenhuma resposta. Se a pessoa troca de número no WhatsApp, o número antigo é desligado.
 
 A resposta sempre repete o que foi anotado (espaço, valor, categoria, data e conta de origem) e lembra do DESFAZER. O registro aparece no app na hora, com a autoria da pessoa, na conta de origem principal do espaço. Áudio, foto e figurinha recebem a resposta "só mensagens escritas" com a dica do microfone do teclado do celular, que transforma a fala em texto antes de enviar (nada disso passa pela Clarevo).
 
@@ -40,7 +40,7 @@ Se um dia a Clarevo quiser mandar lembretes pelo WhatsApp, aí sim há custo por
 
 ## 3. Privacidade
 
-- **No banco da Clarevo** fica só o que vira registro, pelas mesmas funções do app. Do número, só um resumo HMAC-SHA256 feito com uma chave que só a função do servidor conhece (para reconhecer quem escreve; sem a chave, quem lê o banco não volta ao número). O texto das mensagens nunca é guardado. Das mensagens tratadas (inclusive ajuda e as que a Clarevo não entendeu) ficam, por 30 dias, o identificador da Meta (para não anotar duas vezes a mesma entrega), o resumo do número, o resultado e o registro anotado (para o DESFAZER).
+- **No banco da Clarevo** fica só o que vira registro, pelas mesmas funções do app. Do número, só um resumo HMAC-SHA256 feito com uma chave que só a função do servidor conhece (para reconhecer quem escreve; sem a chave, quem lê o banco não volta ao número). O texto das mensagens nunca é guardado. Das mensagens tratadas (inclusive ajuda e as que a Clarevo não entendeu) ficam, por 30 dias, um resumo do identificador da Meta, feito com a mesma chave (para não anotar duas vezes a mesma entrega; o identificador da Meta traz o número, por isso não é guardado como veio, desde a D-080: até a função do WhatsApp ser publicada de novo, a que está no ar ainda manda o identificador como veio), o resumo do número, o resultado e o registro anotado (para o DESFAZER).
 - **Na Meta**: as mensagens passam pelos servidores da Meta, que deixa de ter a criptografia de ponta a ponta nesse trecho e atua como operadora dos dados (Cloud API). A Meta guarda o conteúdo por até 30 dias. Por padrão, nos Estados Unidos; existe a opção de armazenamento no Brasil, a pedir ao registrar o número.
 - **Só para quem quiser**: o WhatsApp só funciona depois de a própria pessoa ligar o número no app, e desliga a qualquer momento (pelo app ou escrevendo DESLIGAR).
 - **Exclusão da conta** apaga o vínculo, o código e as mensagens tratadas da pessoa.
@@ -51,8 +51,8 @@ Se um dia a Clarevo quiser mandar lembretes pelo WhatsApp, aí sim há custo por
 | Parte | Onde | O que faz |
 |---|---|---|
 | Leitura, respostas e servidor | `packages/core/src/whatsapp/` | Lê a mensagem, monta a resposta, confere a assinatura da Meta (HMAC-SHA256) e chama o banco. Testes em `packages/core/test/whatsapp.test.ts` |
-| Função do servidor | `supabase/functions/whatsapp/index.ts` | Arquivo único, gerado por `npm run whatsapp` a partir do núcleo (não editar à mão). É o que se cola no painel do Supabase |
-| Banco | `supabase/migrations/20261030000001_whatsapp.sql` (0020) | Tabelas do vínculo, do código e das mensagens; funções do app (`my_whatsapp`, `create_whatsapp_code`, `unlink_whatsapp`) e do servidor (`whatsapp_note`, `whatsapp_link`, `whatsapp_add_record`, `whatsapp_undo`, `whatsapp_unlink`, só com a chave de serviço). Anotar e desfazer passam por `create_record` e `delete_record`. Testes em `supabase/tests/99x_whatsapp.sql` |
+| Função do servidor | `supabase/functions/whatsapp/index.ts` | Arquivo único, gerado por `npm run whatsapp` a partir do núcleo (`scripts/gerar-funcoes.js`, que gera também a do Telegram; não editar à mão). É o que se cola no painel do Supabase |
+| Banco | `supabase/migrations/20261030000001_whatsapp.sql` (0020; desde a 0022, D-080, as tabelas são `chat_links`, `chat_link_codes` e `chat_messages`, dos dois canais, e as regras ficam nas internas `clarevo_chat_*`, com as mesmas funções do WhatsApp) | Tabelas do vínculo, do código e das mensagens; funções do app (`my_whatsapp`, `create_whatsapp_code`, `unlink_whatsapp`) e do servidor (`whatsapp_note`, `whatsapp_link`, `whatsapp_add_record`, `whatsapp_undo`, `whatsapp_unlink`, só com a chave de serviço). Anotar e desfazer passam por `create_record` e `delete_record`. Testes em `supabase/tests/99x_whatsapp.sql` |
 | App | `apps/app/src/app/conta/whatsapp.tsx` e o card em Conta | Gerar o código, abrir a conversa, conferir se ligou, desligar. O card só aparece quando `WHATSAPP_NUMBER` (em `packages/core/src/whatsapp/app.ts`) tiver o número |
 | Ponta a ponta | `apps/app/test/whatsapp-api.int.test.ts` (`npm run test:api`) | O app gera o código, a função recebe entregas assinadas como as da Meta e fala com o banco real |
 

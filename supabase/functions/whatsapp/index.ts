@@ -1,5 +1,5 @@
 // @ts-nocheck
-// GERADO por scripts/gerar-whatsapp.js a partir de packages/core/src/whatsapp. Não editar à mão: mude o núcleo e rode `npm run whatsapp`.
+// GERADO por scripts/gerar-funcoes.js a partir de packages/core/src/whatsapp. Não editar à mão: mude o núcleo e rode `npm run whatsapp`.
 // Clarevo · função do servidor "whatsapp" (Edge Function do Supabase, D-076): recebe as mensagens da Meta, confere a assinatura, lê o
 // texto (regras simples, sem IA), chama as funções whatsapp_* do banco com a chave de serviço e RESPONDE só a quem escreveu, em texto
 // simples. Nunca inicia conversa nem usa mensagem de modelo (as cobradas). Segredos no painel do Supabase (Edge Functions, Secrets):
@@ -29,8 +29,8 @@ const __mods = [
     Object.defineProperty(exports, "__esModule", { value: true });
     __exportStar(__req(1), exports);
     __exportStar(__req(8), exports);
-    __exportStar(__req(10), exports);
     __exportStar(__req(11), exports);
+    __exportStar(__req(12), exports);
   },
   // packages/core/src/whatsapp/mensagem.ts
   function (module, exports, __req) {
@@ -783,13 +783,15 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.WHATSAPP_REPLY = exports.WHATSAPP_CODE_MINUTES = void 0;
+    exports.TELEGRAM_REPLY = exports.WHATSAPP_REPLY = exports.WHATSAPP_CODE_MINUTES = void 0;
+    exports.chatReply = chatReply;
     exports.whatsappParseReply = whatsappParseReply;
     exports.whatsappOutcomeReply = whatsappOutcomeReply;
     const dates_1 = __req(2);
     const legal_1 = __req(9);
     const money_1 = __req(7);
     const records_1 = __req(4);
+    const canais_1 = __req(10);
     exports.WHATSAPP_CODE_MINUTES = 15;
     function spaceLabel(space) {
         return space.kind === 'pessoal' ? 'espaço Pessoal' : `espaço ${space.name}`;
@@ -821,55 +823,101 @@ const __mods = [
         '',
         'A data é hoje, se você não disser outra: "farmácia 38 ontem" ou "luz 180 12/10".',
     ].join('\n');
-    const WORDS = 'DESFAZER apaga a última anotação feita por aqui, AJUDA mostra os exemplos e DESLIGAR desliga este número da Clarevo.';
-    const HOW_TO_LINK = 'No app da Clarevo, abra Conta, toque em WhatsApp e siga os passos.';
-    exports.WHATSAPP_REPLY = {
-        ajuda: `Oi! Por aqui você anota gastos e recebimentos na Clarevo.\n\n${EXAMPLES}\n\n${WORDS}\n\nSe este número ainda não está ligado: ${HOW_TO_LINK}`,
-        midia: 'Por enquanto, a Clarevo entende só mensagens escritas. Dica: o microfone do teclado do celular transforma a sua fala em texto antes de enviar.',
-        nao_ligado: `Este número ainda não está ligado a uma conta da Clarevo. ${HOW_TO_LINK}`,
-        codigo_invalido: `Este código não vale mais ou não existe. No app, abra Conta, toque em WhatsApp e gere outro. Cada código vale por ${exports.WHATSAPP_CODE_MINUTES} minutos.`,
-        muitas_tentativas: 'Muitas tentativas com códigos que não valem. Espere uma hora e gere um código novo no app.',
-        muitas_mensagens: 'Muitas mensagens em pouco tempo. Espere alguns minutos e mande de novo.',
-        nada_para_desfazer: 'Não há anotação recente feita por aqui para desfazer. Para mudar algo mais antigo, use o app.',
-        desligado: 'Pronto, este WhatsApp foi desligado da Clarevo e nada mais será anotado por aqui. Para ligar de novo, use o app.',
-        data_futura: 'A data fica no futuro. Para uma conta que ainda vai vencer, use Contas a pagar no app.',
-        valor_invalido: 'O valor precisa ser maior que zero. Por exemplo: mercado 52,30',
-        valor_acima_do_limite: `O valor passa do limite de ${(0, money_1.formatBRL)(money_1.MAX_RECORD_CENTS)} por registro.`,
-        descricao_invalida: 'A descrição ficou longa demais. Escreva em poucas palavras o que foi e o valor, por exemplo: mercado 52,30',
-        erro: `Não deu para anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${legal_1.SUPPORT_EMAIL}.`,
+    const CHANNEL_WORDS = {
+        whatsapp: { name: 'WhatsApp', who: 'este número', whoLinked: 'este WhatsApp', inAccount: canais_1.WHATSAPP_IN_ACCOUNT },
+        telegram: { name: 'Telegram', who: 'este Telegram', whoLinked: 'este Telegram', inAccount: canais_1.TELEGRAM_IN_ACCOUNT },
     };
-    const PARSE_REPLY = {
-        sem_valor: 'Não encontrei o valor. Escreva o que foi e o valor, por exemplo: mercado 52,30',
-        valor_ambiguo: 'Encontrei mais de um valor. Mande uma anotação por mensagem, por exemplo: mercado 52,30',
-        valor_invalido: exports.WHATSAPP_REPLY.valor_invalido,
-        valor_acima_do_limite: exports.WHATSAPP_REPLY.valor_acima_do_limite,
-        sem_descricao: 'Faltou dizer o que foi. Por exemplo: mercado 52,30',
-        data_invalida: 'Não entendi a data. Use hoje, ontem, anteontem ou dia/mês, por exemplo: mercado 52,30 ontem',
-        data_futura: exports.WHATSAPP_REPLY.data_futura,
-        codigo_invalido: exports.WHATSAPP_REPLY.codigo_invalido,
-    };
-    function whatsappParseReply(reason) {
-        return PARSE_REPLY[reason];
+    function whereTo(channel) {
+        const w = CHANNEL_WORDS[channel];
+        if (w.inAccount) {
+            return {
+                link: `No app da Clarevo, abra Conta, toque em ${w.name} e siga os passos.`,
+                newCode: `No app, abra Conta, toque em ${w.name} e gere outro.`,
+                relink: `No app, abra Conta, toque em ${w.name} e ligue de novo, escolhendo o espaço.`,
+            };
+        }
+        const page = `app.clarevo.app.br/conta/${channel}`;
+        return {
+            link: `Abra ${page} e siga os passos.`,
+            newCode: `Gere outro em ${page}.`,
+            relink: `Ligue de novo em ${page}, escolhendo o espaço.`,
+        };
     }
-    function whatsappOutcomeReply(outcome, messageDay) {
+    const upperFirst = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+    function chatReplies(channel) {
+        const w = CHANNEL_WORDS[channel];
+        const where = whereTo(channel);
+        const words = `DESFAZER apaga a última anotação feita por aqui, AJUDA mostra os exemplos e DESLIGAR desliga ${w.who} da Clarevo.`;
+        const howToLink = where.link;
+        return {
+            words,
+            ajuda: `Oi! Por aqui você anota gastos e recebimentos na Clarevo.\n\n${EXAMPLES}\n\n${words}\n\nSe ${w.who} ainda não está ligado: ${howToLink}`,
+            midia: 'Por enquanto, a Clarevo entende só mensagens escritas. Dica: o microfone do teclado do celular transforma a sua fala em texto antes de enviar.',
+            nao_ligado: `${upperFirst(w.who)} ainda não está ligado a uma conta da Clarevo. ${howToLink}`,
+            codigo_invalido: `Este código não vale mais ou não existe. ${where.newCode} Cada código vale por ${exports.WHATSAPP_CODE_MINUTES} minutos.`,
+            ja_ligado: `${upperFirst(w.who)} já está ligado a outra conta da Clarevo. Se for seu, mande DESLIGAR e depois mande o código de novo.`,
+            muitas_tentativas: 'Muitas tentativas com códigos que não valem. Espere uma hora e gere um código novo no app.',
+            muitas_mensagens: 'Muitas mensagens em pouco tempo. Espere alguns minutos e mande de novo.',
+            nada_para_desfazer: 'Não há anotação recente feita por aqui para desfazer. Para mudar algo mais antigo, use o app.',
+            desligado: `Pronto, ${w.whoLinked} foi desligado da Clarevo e nada mais será anotado por aqui. Para ligar de novo, use o app.`,
+            data_futura: 'A data fica no futuro. Para uma conta que ainda vai vencer, use Contas a pagar no app.',
+            valor_invalido: 'O valor precisa ser maior que zero. Por exemplo: mercado 52,30',
+            valor_acima_do_limite: `O valor passa do limite de ${(0, money_1.formatBRL)(money_1.MAX_RECORD_CENTS)} por registro.`,
+            descricao_invalida: 'A descrição ficou longa demais. Escreva em poucas palavras o que foi e o valor, por exemplo: mercado 52,30',
+            erro: `Não deu para anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${legal_1.SUPPORT_EMAIL}.`,
+            ligado: (space, name) => `Pronto, ${w.whoLinked} está ligado à ${name ? `conta de ${name} na ` : ''}Clarevo, no ${spaceLabel(space)}.\n\n${EXAMPLES}\n\n${words}`,
+            sem_permissao: (space) => `Você não anota mais no ${spaceLabel(space)}. ${where.relink}`,
+        };
+    }
+    const REPLIES = { whatsapp: chatReplies('whatsapp'), telegram: chatReplies('telegram') };
+    function fixedReplies(channel) {
+        const { words: _w, ligado: _l, sem_permissao: _s, ...fixed } = REPLIES[channel];
+        return fixed;
+    }
+    exports.WHATSAPP_REPLY = fixedReplies('whatsapp');
+    exports.TELEGRAM_REPLY = fixedReplies('telegram');
+    function chatReply(channel) {
+        return channel === 'telegram' ? exports.TELEGRAM_REPLY : exports.WHATSAPP_REPLY;
+    }
+    function parseReplies(r) {
+        return {
+            sem_valor: 'Não encontrei o valor. Escreva o que foi e o valor, por exemplo: mercado 52,30',
+            valor_ambiguo: 'Encontrei mais de um valor. Mande uma anotação por mensagem, por exemplo: mercado 52,30',
+            valor_invalido: r.valor_invalido,
+            valor_acima_do_limite: r.valor_acima_do_limite,
+            sem_descricao: 'Faltou dizer o que foi. Por exemplo: mercado 52,30',
+            data_invalida: 'Não entendi a data. Use hoje, ontem, anteontem ou dia/mês, por exemplo: mercado 52,30 ontem',
+            data_futura: r.data_futura,
+            codigo_invalido: r.codigo_invalido,
+        };
+    }
+    const PARSE_REPLY = {
+        whatsapp: parseReplies(exports.WHATSAPP_REPLY),
+        telegram: parseReplies(exports.TELEGRAM_REPLY),
+    };
+    function whatsappParseReply(reason, channel = 'whatsapp') {
+        return PARSE_REPLY[channel][reason];
+    }
+    function whatsappOutcomeReply(outcome, messageDay, channel = 'whatsapp') {
         const today = outcome.today ?? messageDay;
+        const r = REPLIES[channel];
         switch (outcome.result) {
             case 'repetida':
             case 'silencio':
             case 'registrada':
                 return null;
             case 'ligado':
-                return `Pronto, este WhatsApp está ligado à Clarevo, no ${spaceLabel(outcome.space)}.\n\n${EXAMPLES}\n\n${WORDS}`;
+                return r.ligado(outcome.space, outcome.name);
             case 'anotado':
                 return `Anotado no ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
             case 'desfeito':
                 return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today)}`;
             case 'sem_permissao':
-                return `Você não anota mais no ${spaceLabel(outcome.space)}. No app, abra Conta, toque em WhatsApp e ligue de novo, escolhendo o espaço.`;
+                return r.sem_permissao(outcome.space);
             case 'sem_conta':
                 return `O ${spaceLabel(outcome.space)} está sem conta de origem principal. No app, abra Conta e escolha a principal em Contas de origem.`;
             default:
-                return exports.WHATSAPP_REPLY[outcome.result];
+                return chatReply(channel)[outcome.result];
         }
     }
   },
@@ -937,17 +985,31 @@ const __mods = [
         .map((p) => p.text)
         .join('');
   },
+  // packages/core/src/whatsapp/canais.ts
+  function (module, exports, __req) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.TELEGRAM_IN_ACCOUNT = exports.WHATSAPP_IN_ACCOUNT = void 0;
+    exports.WHATSAPP_IN_ACCOUNT = false;
+    exports.TELEGRAM_IN_ACCOUNT = false;
+  },
   // packages/core/src/whatsapp/servidor.ts
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.WhatsAppFinalError = exports.WHATSAPP_MAX_BODY_BYTES = exports.WHATSAPP_MAX_MESSAGES = exports.WHATSAPP_GRAPH_VERSION = exports.WHATSAPP_TIME_ZONE = void 0;
     exports.hmacSha256Hex = hmacSha256Hex;
+    exports.sameText = sameText;
     exports.verifyMetaSignature = verifyMetaSignature;
     exports.whatsappPhoneHash = whatsappPhoneHash;
+    exports.chatMessageKey = chatMessageKey;
+    exports.obj = obj;
     exports.whatsappInbound = whatsappInbound;
+    exports.answerChatMessage = answerChatMessage;
     exports.handleWhatsAppMessage = handleWhatsAppMessage;
+    exports.serviceKeyFrom = serviceKeyFrom;
     exports.whatsappConfigFrom = whatsappConfigFrom;
+    exports.supabaseChatRpc = supabaseChatRpc;
     exports.supabaseWhatsAppRpc = supabaseWhatsAppRpc;
     exports.sendWhatsAppReply = sendWhatsAppReply;
     exports.createWhatsAppHandler = createWhatsAppHandler;
@@ -987,6 +1049,9 @@ const __mods = [
     }
     function whatsappPhoneHash(waId, phoneKey) {
         return hmacSha256Hex((0, sha256_1.utf8Bytes)(phoneKey), (0, sha256_1.utf8Bytes)(waId.replace(/\D/g, '')));
+    }
+    function chatMessageKey(channel, rawId, key) {
+        return `${channel}:${hmacSha256Hex((0, sha256_1.utf8Bytes)(key), (0, sha256_1.utf8Bytes)(`${channel}-mensagem:${rawId}`))}`;
     }
     function obj(v) {
         return typeof v === 'object' && v !== null && !Array.isArray(v) ? v : null;
@@ -1030,44 +1095,36 @@ const __mods = [
         }
         return out;
     }
-    const SILENT_TYPES = new Set(['reaction', 'system', 'unsupported', 'errors']);
-    async function handleWhatsAppMessage(msg, rpc, phoneKey) {
-        const base = { p_message_id: msg.id, p_phone_hash: whatsappPhoneHash(msg.from, phoneKey) };
-        if (msg.type === 'system' && msg.systemType === 'user_changed_number') {
-            await rpc('whatsapp_unlink', base);
-            return null;
-        }
-        if (SILENT_TYPES.has(msg.type))
-            return null;
+    async function answerChatMessage(msg, call) {
+        const replies = (0, respostas_1.chatReply)(msg.channel);
         const today = (0, dates_1.todayIn)(exports.WHATSAPP_TIME_ZONE, new Date(msg.timestamp * 1000));
         const sentAt = new Date(msg.timestamp * 1000).toISOString();
         const noted = async (outcome, reply) => {
-            const r = await rpc('whatsapp_note', { ...base, p_outcome: outcome });
-            return r.result === 'registrada' ? reply : (0, respostas_1.whatsappOutcomeReply)(r, today);
+            const r = await call('note', { p_outcome: outcome });
+            return r.result === 'registrada' ? reply : (0, respostas_1.whatsappOutcomeReply)(r, today, msg.channel);
         };
-        if (msg.type === 'request_welcome')
-            return noted('ajuda', respostas_1.WHATSAPP_REPLY.ajuda);
-        if (msg.type !== 'text' || msg.text === null)
-            return noted('midia', respostas_1.WHATSAPP_REPLY.midia);
+        if (msg.kind === 'boas_vindas')
+            return noted('ajuda', replies.ajuda);
+        if (msg.kind !== 'texto' || msg.text === null)
+            return noted('midia', replies.midia);
         const cmd = (0, mensagem_1.readWhatsAppMessage)(msg.text, today);
         let outcome;
         switch (cmd.type) {
             case 'ajuda':
-                return noted('ajuda', respostas_1.WHATSAPP_REPLY.ajuda);
+                return noted('ajuda', replies.ajuda);
             case 'erro':
-                return noted('nao_entendi', (0, respostas_1.whatsappParseReply)(cmd.reason));
+                return noted('nao_entendi', (0, respostas_1.whatsappParseReply)(cmd.reason, msg.channel));
             case 'ligar':
-                outcome = await rpc('whatsapp_link', { ...base, p_code: cmd.code });
+                outcome = await call('link', { p_code: cmd.code });
                 break;
             case 'desfazer':
-                outcome = await rpc('whatsapp_undo', { ...base, p_sent_at: sentAt });
+                outcome = await call('undo', { p_sent_at: sentAt });
                 break;
             case 'desligar':
-                outcome = await rpc('whatsapp_unlink', base);
+                outcome = await call('unlink', {});
                 break;
             case 'anotar':
-                outcome = await rpc('whatsapp_add_record', {
-                    ...base,
+                outcome = await call('add_record', {
                     p_sent_at: sentAt,
                     p_kind: cmd.kind,
                     p_amount_cents: cmd.amountCents,
@@ -1078,7 +1135,19 @@ const __mods = [
                 });
                 break;
         }
-        return (0, respostas_1.whatsappOutcomeReply)(outcome, today);
+        return (0, respostas_1.whatsappOutcomeReply)(outcome, today, msg.channel);
+    }
+    const SILENT_TYPES = new Set(['reaction', 'system', 'unsupported', 'errors']);
+    async function handleWhatsAppMessage(msg, rpc, phoneKey) {
+        const base = { p_message_id: chatMessageKey('whatsapp', msg.id, phoneKey), p_phone_hash: whatsappPhoneHash(msg.from, phoneKey) };
+        if (msg.type === 'system' && msg.systemType === 'user_changed_number') {
+            await rpc('whatsapp_unlink', base);
+            return null;
+        }
+        if (SILENT_TYPES.has(msg.type))
+            return null;
+        const kind = msg.type === 'request_welcome' ? 'boas_vindas' : msg.type === 'text' && msg.text !== null ? 'texto' : 'midia';
+        return answerChatMessage({ channel: 'whatsapp', kind, text: msg.text, timestamp: msg.timestamp }, (op, args) => rpc(`whatsapp_${op}`, { ...base, ...args }));
     }
     const REQUIRED_ENV = [
         'WHATSAPP_VERIFY_TOKEN',
@@ -1122,14 +1191,14 @@ const __mods = [
         };
     }
     const RESULTS = new Set([
-        'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido',
+        'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
         'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida', 'repetida',
         'silencio', 'registrada',
     ]);
     class WhatsAppFinalError extends Error {
     }
     exports.WhatsAppFinalError = WhatsAppFinalError;
-    function supabaseWhatsAppRpc(config, fetcher) {
+    function supabaseChatRpc(config, fetcher) {
         return async (fn, args) => {
             const headers = { apikey: config.serviceKey, 'Content-Type': 'application/json' };
             if (config.serviceKey.startsWith('eyJ'))
@@ -1145,6 +1214,9 @@ const __mods = [
                 throw new Error(`resposta inesperada de ${fn}`);
             return outcome;
         };
+    }
+    function supabaseWhatsAppRpc(config, fetcher) {
+        return supabaseChatRpc(config, fetcher);
     }
     async function sendWhatsAppReply(config, fetcher, to, replyTo, body) {
         const res = await fetcher(`https://graph.facebook.com/${config.graphVersion}/${config.phoneNumberId}/messages`, {
@@ -1221,7 +1293,7 @@ const __mods = [
                     log(`falha ao tratar uma mensagem: ${e instanceof Error ? e.message : 'erro'}`);
                     if (!(e instanceof WhatsAppFinalError))
                         return { status: 500, body: 'tente de novo' };
-                    reply = respostas_1.WHATSAPP_REPLY.erro;
+                    reply = (0, respostas_1.chatReply)('whatsapp').erro;
                 }
                 if (reply === null)
                     continue;
@@ -1247,7 +1319,8 @@ const __mods = [
     const mensagem_1 = __req(1);
     const respostas_1 = __req(8);
     exports.WHATSAPP_NUMBER = '15552087378';
-    exports.WHATSAPP_IN_ACCOUNT = false;
+    var canais_1 = __req(10);
+    Object.defineProperty(exports, "WHATSAPP_IN_ACCOUNT", { enumerable: true, get: function () { return canais_1.WHATSAPP_IN_ACCOUNT; } });
     exports.WHATSAPP_UNLINKED = {
         linked: false,
         contextId: null,
@@ -1281,8 +1354,8 @@ const __mods = [
         generating: 'Gerando…',
         codeTitle: 'Seu código',
         codeHelp: `Mande "Ativar" e o código para a Clarevo no WhatsApp, do número que você vai usar. O código vale por ${respostas_1.WHATSAPP_CODE_MINUTES} minutos e serve uma vez.`,
-        openWhatsApp: 'Abrir o WhatsApp com a mensagem pronta',
-        numberLabel: (n) => `Número da Clarevo: ${formatWhatsAppNumber(n)}`,
+        openChat: 'Abrir o WhatsApp com a mensagem pronta',
+        targetLabel: (n) => `Número da Clarevo: ${formatWhatsAppNumber(n)}`,
         codeLost: 'O código já foi mostrado. Gere outro.',
         checkLinked: 'Já mandei a mensagem',
         linkedTitle: 'WhatsApp ligado',
