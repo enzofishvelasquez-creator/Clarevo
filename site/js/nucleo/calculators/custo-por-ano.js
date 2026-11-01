@@ -4,6 +4,7 @@ import { FieldReader, moneyField } from './common.js';
 import { parseMoney } from './inputs.js';
 export const WORKDAYS_PER_MONTH = 22;
 export const WEEKS_PER_YEAR = 52;
+export const DAYS_PER_YEAR = 365;
 export const CUSTO_POR_ANO_FIELDS = {
     valor: moneyField('Valor', 'o valor', '39,90'),
     frequencia: {
@@ -44,7 +45,13 @@ export function calcCustoPorAno(input) {
             hypotheses = ['12 meses por ano.'];
             break;
     }
+    const dailyCents = frequencia === 'dia_util' ? null : roundDiv(yearlyCents, DAYS_PER_YEAR);
+    if (dailyCents !== null)
+        hypotheses.push('Por dia, o valor do ano dividido por 365.');
     hypotheses.push('O mesmo valor em todos os períodos.');
+    const resultLines = [`Com estes números, o gasto soma ${formatBRL(yearlyCents)} por ano.`, `Por mês, fica em ${formatBRL(monthlyCents)}.`];
+    if (dailyCents !== null)
+        resultLines.push(`Por dia, fica em ${formatBRL(dailyCents)}.`);
     return {
         ok: true,
         result: {
@@ -52,8 +59,9 @@ export function calcCustoPorAno(input) {
             frequencia,
             monthlyCents,
             yearlyCents,
+            dailyCents,
             noteParams: monthlyCents <= MAX_RECORD_CENTS ? { tipo: 'mensal', valor: monthlyCents } : null,
-            resultLines: [`Com estes números, o gasto soma ${formatBRL(yearlyCents)} por ano.`, `Por mês, fica em ${formatBRL(monthlyCents)}.`],
+            resultLines,
             hypotheses,
             notes: [],
         },

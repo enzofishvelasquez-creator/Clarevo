@@ -9,3 +9,5 @@ export * from './categorias';
 export * from './revisao';
 export * from './execucao';
 export * from './textos';
+export * from './sugestoes';
+export * from './pdf';

@@ -34,6 +34,9 @@ export function sumAmounts(texts: readonly string[]): SumResult {
 
 export const SUM_TEXT = {
   open: 'Somar valores',
+  /** Dica do link e primeira linha da soma aberta (retorno do teste, 31/10/2026: "Pra que serve esse somar valores?"). */
+  hint: 'Junta várias partes num valor só.',
+  explain: 'Para quando o valor tem várias partes, como duas compras no mesmo dia. Digite cada parte e toque em Usar o total.',
   add: 'Adicionar outro valor',
   use: 'Usar o total',
   close: 'Fechar a soma',

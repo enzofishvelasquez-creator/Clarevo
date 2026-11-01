@@ -41,6 +41,7 @@ import { AccountPicker } from '@/components/account-picker';
 import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { ColumnChoice, ReviewRow, guessColumns, maskCell } from '@/components/import-parts';
+import { ImportSuggestionsCard } from '@/components/import-suggestions';
 import { useLeaveGuard } from '@/components/leave-guard';
 import { MoneyTxt } from '@/components/money-text';
 import { CheckOption, ChoiceGroup } from '@/components/series-parts';
@@ -664,6 +665,7 @@ export function ImportFlow() {
             <LinkButton label={IMPORT_TEXT.importAnother} onPress={again} />
           </Card>
         ) : null}
+        {step === 'pronto' && result ? <ImportSuggestionsCard contextId={contextId} lines={includedLines(lines)} /> : null}
       </Screen>
 
       {step === 'revisar' ? (

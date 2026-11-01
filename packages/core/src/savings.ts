@@ -1,5 +1,5 @@
 import { WEEKS_PER_YEAR } from './calculators/custo-por-ano';
-import type { CommittedSummary } from './committed';
+import { isReimbursement, type CommittedSummary } from './committed';
 import type { IsoDate, IsoMonth } from './dates';
 import { addDays, addMonths, formatMonthYearBR, todayIn } from './dates';
 import {
@@ -18,7 +18,7 @@ import {
 } from './goals';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, ceilDiv, formatBRL, parseBRL, roundDiv } from './money';
-import type { EssentialBaseSource, Goal, GoalMovement, IncomeReference, NewGoalInput, SavingsAnswer, SavingsCheck } from './records';
+import type { EssentialBaseSource, FinancialRecord, Goal, GoalMovement, IncomeReference, NewGoalInput, SavingsAnswer, SavingsCheck } from './records';
 
 /**
  * Plano de guardar (spec7, Ciclo C). A pessoa responde se consegue guardar algum valor por mês; com "sim", o core monta um
@@ -520,7 +520,7 @@ export const SAVINGS_TEXT = {
   privacy: 'Sua resposta e as datas em que a pergunta volta não aparecem para outras pessoas do app. A empresa que oferece o benefício não vê, nem somada às de outras pessoas.',
   /** 4º passo de "Primeiros passos" no Resumo. */
   firstStepTitle: 'Planejar quanto guardar',
-  firstStepText: 'Diga se consegue guardar um valor por mês e veja um plano.',
+  firstStepText: 'Diga se consegue guardar um valor por mês e veja em quanto tempo chega à sua reserva.',
 
   // "Sim, consigo".
   amountLabel: 'Quanto você consegue guardar por mês?',
@@ -660,3 +660,54 @@ export function savingsPlanTexts(plan: SavingsPlan): SavingsPlanTexts {
     noInterest: SAVINGS_TEXT.noInterest,
   };
 }
+
+// ---------------------------------------------------------------------------
+// "Guardar quando entrar um valor extra" (D-078 F)
+// ---------------------------------------------------------------------------
+
+/** Abaixo disto, o valor a mais do mês não chama o lembrete (R$ 20,00). */
+export const EXTRA_SAVINGS_MIN_CENTS = 2_000;
+
+/**
+ * Valor extra do mês, para o lembrete do Resumo (retorno do teste, 31/10/2026: a pessoa quer salvar "Guardar quando entrar um valor extra"
+ * sem informar valor e ser lembrada no Resumo): o maior entre o que entrou na categoria Renda extra e o que os
+ * recebimentos do mês passaram da renda de referência. Reembolso não conta (é dinheiro que volta, não renda). Abaixo de
+ * `EXTRA_SAVINGS_MIN_CENTS`, zero.
+ */
+export function extraIncomeOfMonth(
+  records: readonly Pick<FinancialRecord, 'kind' | 'amountCents' | 'category' | 'occurredOn'>[],
+  month: IsoMonth,
+  referenceCents: Cents | null,
+): Cents {
+  let received = 0;
+  let extra = 0;
+  for (const r of records) {
+    if (r.kind !== 'receita' || !r.occurredOn.startsWith(month) || isReimbursement(r.category)) continue;
+    received += r.amountCents;
+    if (r.category !== null && r.category.trim().toLocaleLowerCase('pt-BR') === 'renda extra') extra += r.amountCents;
+  }
+  const over = referenceCents !== null && referenceCents > 0 ? Math.max(0, received - referenceCents) : 0;
+  const value = Math.max(extra, over);
+  return value >= EXTRA_SAVINGS_MIN_CENTS ? value : 0;
+}
+
+/** Textos do lembrete de valor extra (Resumo) e da escolha na reserva mínima. */
+export const EXTRA_SAVINGS_TEXT = {
+  /** O botão da reserva mínima quando só "Guardar quando entrar um valor extra" está escolhido. */
+  saveOnly: 'Lembrar quando entrar um valor extra',
+  saved: 'Combinado. Quando entrar um valor extra, a Clarevo lembra você no Resumo.',
+  stepHint: 'Com "Guardar quando entrar um valor extra", a Clarevo lembra você no Resumo quando entrar dinheiro a mais. Dá para salvar só essa escolha.',
+  title: 'Entrou um valor extra',
+  /** "Este mês entraram R$ 800,00 a mais. Você pediu para lembrar de guardar uma parte." */
+  body: (cents: Cents) => `Este mês entraram ${formatBRL(cents)} a mais. Você pediu para lembrar de guardar uma parte.`,
+  basis: 'Conta como valor extra o que entrou na categoria Renda extra ou o que passou da sua renda de referência. Reembolsos não contam.',
+  save: 'Guardar uma parte',
+  createReserve: 'Criar uma reserva',
+  later: 'Agora não',
+  /** Nome para leitor de tela: o Resumo pode ter outro "Agora não" (a oferta de lembrete de vencimento). */
+  laterA11y: 'Agora não: ocultar o lembrete de valor extra até o mês que vem',
+  stop: 'Parar de lembrar',
+  stopped: 'Lembrete de valor extra desligado.',
+  deviceOnly: 'O lembrete vale para este aparelho.',
+} as const;
+

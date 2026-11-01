@@ -38,7 +38,7 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
   {
     key: 'viagem',
     label: 'Viagem',
-    alt: 'Praia de água azul com casas brancas',
+    alt: 'Casas brancas e cúpulas azuis diante do mar',
     words: ['viagem', 'viagens', 'viajar', 'ferias', 'praia', 'grecia', 'europa', 'turismo', 'passeio', 'lua de mel', 'mochilao', 'cruzeiro', 'exterior', 'disney'],
   },
   {
@@ -57,7 +57,7 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
   {
     key: 'estudos',
     label: 'Estudos',
-    alt: 'Livros abertos sobre uma mesa',
+    alt: 'Livros abertos lado a lado',
     words: ['estudo', 'estudos', 'faculdade', 'curso', 'pos', 'mestrado', 'doutorado', 'intercambio', 'escola', 'livros', 'idioma', 'ingles', 'formatura', 'vestibular'],
   },
   { key: 'casamento', label: 'Casamento', alt: 'Duas alianças', words: ['casamento', 'casar', 'noivado', 'aliancas'] },
@@ -65,10 +65,10 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
   {
     key: 'tecnologia',
     label: 'Tecnologia',
-    alt: 'Notebook e celular sobre uma mesa',
+    alt: 'Notebook, celular e café sobre uma mesa',
     words: ['celular', 'notebook', 'computador', 'tablet', 'videogame', 'console', 'televisao', 'tv', 'camera'],
   },
-  { key: 'saude', label: 'Saúde', alt: 'Tênis de corrida e garrafa de água', words: ['saude', 'cirurgia', 'tratamento', 'dentista', 'oculos', 'academia', 'plano de saude'] },
+  { key: 'saude', label: 'Saúde', alt: 'Tapete de exercício com toalha e halteres', words: ['saude', 'cirurgia', 'tratamento', 'dentista', 'oculos', 'academia', 'plano de saude'] },
   { key: 'aposentadoria', label: 'Futuro', alt: 'Nascer do sol sobre o mar', words: ['aposentadoria', 'aposentar', 'futuro', 'previdencia', 'independencia', 'liberdade'] },
   { key: 'pet', label: 'Pet', alt: 'Cachorro olhando para a câmera', words: ['pet', 'cachorro', 'cachorra', 'gato', 'gata', 'veterinario'] },
   { key: 'objetivo', label: 'Objetivo', alt: 'Trilha subindo uma montanha', words: [] },

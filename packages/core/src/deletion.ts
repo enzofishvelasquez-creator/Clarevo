@@ -59,14 +59,14 @@ export const DELETE_TEXT = {
   intro: 'Ao excluir, você perde o acesso na hora e não é possível desfazer. O seu e-mail fica livre para uma conta nova, que começa vazia.',
   erasedTitle: 'O que é apagado',
   erased: [
-    'O seu Pessoal inteiro, de verdade e não só escondido: gastos e recebimentos, contas a pagar, gastos fixos, parcelamentos e contas do ano.',
-    'Metas e movimentos, cartões, lançamentos, faturas e notas, orçamento, limite e renda de referência.',
-    'Contas de origem, assinaturas, importações, a revisão dos últimos meses e as respostas do plano de guardar e de "Como você conheceu a Clarevo?".',
-    'O histórico de operações e de atividade da sua conta.',
-    'O benefício pela empresa, se você tem um: a licença termina na hora e os seus direitos ao plano são apagados. A empresa vê só que a licença terminou.',
+    'Tudo o que você anotou no seu Pessoal, como gastos, recebimentos, contas a pagar, gastos fixos, parcelamentos e contas do ano. Os dados são apagados de verdade, não ficam só escondidos.',
+    'As metas e o que você guardou ou retirou delas. Também os cartões, as compras e as faturas, as notas fiscais, o orçamento, o limite e a renda de referência.',
+    'As contas de origem, as assinaturas, as importações e a revisão dos últimos meses. Também o que você respondeu sobre guardar dinheiro por mês e em "Como você conheceu a Clarevo?".',
+    'O histórico de operações e de uso da sua conta.',
+    'Se você usa a Clarevo como benefício da empresa, o benefício termina na hora. A empresa vê só que a licença terminou.',
   ],
   keptTitle: 'O que continua',
-  keptNone: 'Nada fica guardado para uso depois. As cópias de segurança do banco de dados podem manter dados apagados por um tempo.',
+  keptNone: 'Nada da sua conta fica guardado para uso depois. Só as cópias de segurança do banco de dados podem manter os dados apagados por um tempo, até serem descartadas.',
   /** A Família de quem excluiu, conforme o papel. */
   familyTitle: 'Sua Família',
   familyNone: 'Você não está em nenhuma Família.',
@@ -80,7 +80,7 @@ export const DELETE_TEXT = {
   familyBlockedHow: `Na Família, toque em "${FAMILY_TEXT.manage}" ao lado de uma pessoa e escolha "${FAMILY_TEXT.transfer}" ou "${FAMILY_TEXT.remove}".`,
   familyOpen: 'Abrir a Família',
   familyGeneral:
-    'Se você anota e vê ou só vê, sai da Família e o que anotou continua, com a autoria "Pessoa que saiu". Se é titular com outras pessoas, passa a titularidade antes. Se é titular sem mais ninguém, a Família é apagada junto.',
+    'Para quem está em uma Família, funciona assim. Quem anota ou só vê sai da Família, e o que anotou fica lá com o nome "Pessoa que saiu". Quem é titular e tem outras pessoas na Família precisa passar a titularidade antes. Se a Família tem só a pessoa titular, a Família é apagada junto.',
   /** Exportar antes (D-047). */
   exportTitle: 'Antes de excluir',
   exportHint: 'Depois de excluir, não há como recuperar. Se quiser guardar uma cópia, exporte os seus dados antes.',

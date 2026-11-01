@@ -1,5 +1,7 @@
 import {
   ANNUAL_SERIES_ERROR_TEXT,
+  BOLETO_TEXT,
+  boletoGaps,
   CATEGORIES,
   COMMITMENT_ERROR_TEXT,
   COMMITMENT_FIELD_ORDER,
@@ -33,6 +35,7 @@ import {
   parseBRL,
   parseDateBR,
   validateCommitmentDraft,
+  type BoletoReading,
   type Commitment,
   type CommitmentDraft,
   type CommitmentInput,
@@ -49,6 +52,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BoletoReader } from '@/components/boleto-scan';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -171,6 +175,33 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     },
     busy,
   );
+
+  // "Ler boleto" (D-078 G): a leitura e os campos de antes dela, para "Desfazer leitura".
+  const [boleto, setBoleto] = useState<{ reading: BoletoReading; before: CommitmentDraft } | null>(null);
+  const applyBoleto = (reading: BoletoReading) => {
+    // "Desfazer leitura" volta ao que estava antes da primeira leitura; a leitura nova vale sobre o que está nos campos agora (o
+    // que a pessoa digitou depois da primeira leitura continua).
+    const before = boleto ? boleto.before : draft;
+    setBoleto({ reading, before });
+    setDraft((d) => ({
+      ...d,
+      amountText: reading.amountCents !== null ? centsToInput(reading.amountCents) : d.amountText,
+      dateText: reading.dueOn ? formatDateBR(reading.dueOn) : d.dateText,
+      description: d.description.trim() === '' && reading.description ? reading.description : d.description,
+    }));
+    setErrors({});
+    // O primeiro campo que falta recebe o foco: valor, depois vencimento, depois descrição.
+    setTimeout(() => {
+      if (reading.amountCents === null) refs.amountText.current?.focus();
+      else if (reading.dueOn === null) refs.dateText.current?.focus();
+      else if (draft.description.trim() === '' && !reading.description) refs.description.current?.focus();
+    }, 50);
+  };
+  const undoBoleto = () => {
+    if (!boleto) return;
+    setDraft(boleto.before);
+    setBoleto(null);
+  };
 
   const set = <K extends keyof CommitmentDraft>(k: K, v: CommitmentDraft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
@@ -426,6 +457,29 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
             </Txt>
             <Button label="Ver conta a pagar" tone="soft" onPress={() => leave(goBack)} />
           </Banner>
+        ) : null}
+
+        {mode.type === 'nova' ? (
+          <View style={{ gap: space[2] }}>
+            <BoletoReader today={today} disabled={busy} onRead={applyBoleto} />
+            {boleto ? (
+              <Banner tone="info" icon={Info}>
+                <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }} accessibilityLiveRegion="polite">
+                  {BOLETO_TEXT.readLine(boleto.reading)}
+                </MoneyTxt>
+                {boletoGaps(boleto.reading, today).map((gap) => (
+                  <Txt key={gap} variant="label">
+                    {gap}
+                  </Txt>
+                ))}
+                {boletoGaps(boleto.reading, today).length === 0 ? <Txt variant="label">{BOLETO_TEXT.filled}</Txt> : null}
+                <Txt variant="caption" color={colors.textSecondary}>
+                  {BOLETO_TEXT.privacy}
+                </Txt>
+                <LinkButton label={BOLETO_TEXT.undo} onPress={undoBoleto} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+              </Banner>
+            ) : null}
+          </View>
         ) : null}
 
         <Card style={{ gap: space[4] }}>

@@ -147,28 +147,34 @@ export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-
 
       {result && !result.nothingToFinance ? (
         <>
+          {/* Logo depois do resultado, para quem já decidiu: as parcelas vão para as contas a pagar (o cadastro abre preenchido). */}
+          {!fromContext && result.noteParams ? (
+            <View style={{ gap: space[1] }}>
+              <Button
+                label={ANTES_TEXT.noteInstallment}
+                icon={Layers}
+                tone="soft"
+                onPress={() =>
+                  router.push({
+                    pathname: '/gastos-fixos/novo',
+                    params: {
+                      tipo: result.noteParams!.tipo,
+                      natureza: result.noteParams!.natureza,
+                      parcelas: String(result.noteParams!.parcelas),
+                      ...(result.noteParams!.valor !== undefined ? { valor: String(result.noteParams!.valor) } : {}),
+                    },
+                  })
+                }
+              />
+              <Txt variant="caption" color={colors.textSecondary}>
+                {ANTES_TEXT.noteInstallmentHint}
+              </Txt>
+            </View>
+          ) : null}
           <SavingCard result={result} />
           <EntryCard result={result} onOther={() => entradaRef.current?.focus()} />
-          {!fromContext && (result.noteParams || result.goalParams) ? (
+          {!fromContext && result.goalParams ? (
             <View style={{ gap: space[3] }}>
-              {result.noteParams ? (
-                <Button
-                  label={ANTES_TEXT.noteInstallment}
-                  icon={Layers}
-                  tone="soft"
-                  onPress={() =>
-                    router.push({
-                      pathname: '/gastos-fixos/novo',
-                      params: {
-                        tipo: result.noteParams!.tipo,
-                        natureza: result.noteParams!.natureza,
-                        parcelas: String(result.noteParams!.parcelas),
-                        ...(result.noteParams!.valor !== undefined ? { valor: String(result.noteParams!.valor) } : {}),
-                      },
-                    })
-                  }
-                />
-              ) : null}
               {result.goalParams ? (
                 <View style={{ gap: space[1] }}>
                   <Button

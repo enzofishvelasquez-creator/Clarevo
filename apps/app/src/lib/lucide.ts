@@ -21,6 +21,7 @@ export { default as ArrowLeftRight } from 'lucide-react-native/icons/arrow-left-
 export { default as ArrowRight } from 'lucide-react-native/icons/arrow-right';
 export { default as ArrowUpRight } from 'lucide-react-native/icons/arrow-up-right';
 export { default as Baby } from 'lucide-react-native/icons/baby';
+export { default as Barcode } from 'lucide-react-native/icons/barcode';
 export { default as BadgePercent } from 'lucide-react-native/icons/badge-percent';
 export { default as Ban } from 'lucide-react-native/icons/ban';
 export { default as Bell } from 'lucide-react-native/icons/bell';
@@ -36,6 +37,7 @@ export { default as CalendarRange } from 'lucide-react-native/icons/calendar-ran
 export { default as CalendarSync } from 'lucide-react-native/icons/calendar-sync';
 export { default as CalendarX } from 'lucide-react-native/icons/calendar-x';
 export { default as CalendarX2 } from 'lucide-react-native/icons/calendar-x-2';
+export { default as Camera } from 'lucide-react-native/icons/camera';
 export { default as Car } from 'lucide-react-native/icons/car';
 export { default as ChartLine } from 'lucide-react-native/icons/chart-line';
 export { default as ChartPie } from 'lucide-react-native/icons/chart-pie';

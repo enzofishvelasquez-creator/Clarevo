@@ -1,5 +1,6 @@
 import type { IsoDate } from '../dates';
 import type { Cents } from '../money';
+import { holeriteReading, looksLikeHolerite } from './holerite';
 import type { ComprovanteDirection, ComprovanteKind, ComprovanteOptions, ComprovanteReading, ComprovanteResult } from './tipos';
 import { cleanMessage, cleanPersonName, cleanText, fold, isDigit, isLetter, scanDate, scanMoney, scanTime, toLines, trimEdges } from './texto';
 
@@ -264,6 +265,8 @@ export function comprovanteFromText(raw: string, options: ComprovanteOptions = {
   if (everything.includes('danfe') || everything.includes('documento auxiliar da nota') || everything.includes('chave de acesso')) {
     return { ok: false, code: 'nota_fiscal' };
   }
+  // Holerite: só o valor líquido e o mês de competência (holerite.ts); o resto do texto nem é lido.
+  if (looksLikeHolerite(everything)) return { ok: true, reading: holeriteReading(lines, everything, options.items) };
 
   const fields = fieldsOf(lines);
   let section: 'destino' | 'origem' | null = null;

@@ -379,3 +379,26 @@ export function looksLikeBoleto(raw: string): boolean {
   if (code.length === 48) return collectionLineValid(code);
   return false;
 }
+
+/**
+ * O código de barras (44 dígitos) de um boleto, a partir do próprio código, da linha digitável de 47 (boleto bancário) ou de 48
+ * dígitos (contas de consumo e tributos, que começam por 8), com os dígitos verificadores conferidos. null quando não é boleto.
+ * A leitura do valor e do vencimento fica em `boleto.ts`.
+ */
+export function boletoBarcodeOf(raw: string): { kind: 'bancario' | 'arrecadacao'; barcode: string } | null {
+  if (typeof raw !== 'string' || raw.length > 80) return null;
+  const code = digitsOnly(raw.trim());
+  if (code === null) return null;
+  if (code.length === 44) {
+    if (bankBarcodeValid(code)) return { kind: 'bancario', barcode: code };
+    if (collectionBarcodeValid(code)) return { kind: 'arrecadacao', barcode: code };
+    return null;
+  }
+  if (code.length === 47 && bankLineValid(code)) {
+    return { kind: 'bancario', barcode: code.slice(0, 4) + code[32] + code.slice(33) + code.slice(4, 9) + code.slice(10, 20) + code.slice(21, 31) };
+  }
+  if (code.length === 48 && collectionLineValid(code)) {
+    return { kind: 'arrecadacao', barcode: [0, 1, 2, 3].map((i) => code.slice(i * 12, i * 12 + 11)).join('') };
+  }
+  return null;
+}

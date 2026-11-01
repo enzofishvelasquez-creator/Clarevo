@@ -71,6 +71,13 @@ export interface DevicePrefs {
    * precisa). Só neste aparelho, por pessoa; não é dado financeiro e nada vai para o servidor. Valor desconhecido volta às barras.
    */
   categoryView: CategoryView;
+  /**
+   * "Guardar quando entrar um valor extra" (D-078 F): a pessoa pediu para ser lembrada no Resumo quando entrar dinheiro a mais. Só
+   * neste aparelho, como os lembretes de vencimento; não é dado financeiro e nada vai para o servidor.
+   */
+  extraSavingsReminder: boolean;
+  /** "Agora não" no lembrete de valor extra: o mês (AAAA-MM) em que ele fica escondido. */
+  extraSavingsDismissedMonth: string | null;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -87,6 +94,8 @@ export const DEFAULT_PREFS: DevicePrefs = {
   widgetShowValues: DEFAULT_WIDGET_SHOW_VALUES,
   budgetNoticesDismissed: [],
   categoryView: DEFAULT_CATEGORY_VIEW,
+  extraSavingsReminder: false,
+  extraSavingsDismissedMonth: null,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -116,6 +125,9 @@ function parse(raw: string | null | undefined): DevicePrefs {
       widgetShowValues: v.widgetShowValues === true,
       budgetNoticesDismissed: Array.isArray(v.budgetNoticesDismissed) ? v.budgetNoticesDismissed.filter(isBudgetNoticeKey).slice(-BUDGET_NOTICE_KEEP) : [],
       categoryView: isCategoryView(v.categoryView) ? v.categoryView : DEFAULT_CATEGORY_VIEW,
+      extraSavingsReminder: v.extraSavingsReminder === true,
+      extraSavingsDismissedMonth:
+        typeof v.extraSavingsDismissedMonth === 'string' && /^\d{4}-\d{2}$/.test(v.extraSavingsDismissedMonth) ? v.extraSavingsDismissedMonth : null,
     };
   } catch {
     return DEFAULT_PREFS;

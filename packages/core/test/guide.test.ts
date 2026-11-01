@@ -206,7 +206,7 @@ describe('catálogo do guia (D-049)', () => {
     const nota = guideEntry('nota-fiscal')!;
     const step = nota.steps.find((x) => x.includes(COMPROVANTE_TEXT.option));
     expect(step).toBeDefined();
-    expect(step).toContain('"Ler comprovante de Pix ou pagamento (PDF)"');
+    expect(step).toContain('"Ler comprovante de Pix ou pagamento"');
     expect(step).toContain('Registrar recebimento');
     expect(step).toContain('não é guardado');
     // O passo entra antes de "Salvar gasto", que continua sendo o último.
@@ -526,11 +526,20 @@ describe('tour de boas-vindas (D-049(2))', () => {
     expect(new Set(TOUR_CARDS.map((c) => c.icon)).size).toBe(5);
     for (const c of TOUR_CARDS) {
       expect(c.title.trim(), c.id).not.toBe('');
-      expect(c.body.trim(), c.id).not.toBe('');
-      expect(c.body.length, c.id).toBeLessThanOrEqual(190);
+      // Uma ideia por frase, em parágrafos separados: de 2 a 3 frases curtas, sem passar de 190 caracteres no cartão.
+      expect(c.lines.length, c.id).toBeGreaterThanOrEqual(2);
+      expect(c.lines.length, c.id).toBeLessThanOrEqual(3);
+      for (const line of c.lines) {
+        expect(line.trim(), c.id).not.toBe('');
+        expect(line.length, c.id).toBeLessThanOrEqual(80);
+      }
+      expect(c.lines.join(' ').length, c.id).toBeLessThanOrEqual(190);
     }
-    // O último cartão diz onde achar a ajuda.
-    expect(TOUR_CARDS[4]!.body).toContain('Aprender › Como usar o app da Clarevo');
+    // O último cartão diz onde achar a ajuda, e a palavra "tela" aparece no máximo uma vez por cartão (revisão de 31/10/2026).
+    expect(TOUR_CARDS[4]!.lines[0]).toContain('Aprender › Como usar o app da Clarevo');
+    for (const c of TOUR_CARDS) expect(c.lines.join(' ').match(/\btelas?\b/gi)?.length ?? 0, c.id).toBeLessThanOrEqual(1);
+    // "Veja um plano" ficou vago: o cartão de Metas diz o que o plano mostra.
+    expect(TOUR_CARDS[3]!.lines.join(' ')).toContain('quanto guardar por mês');
     expect(TOUR_TEXT.skip).toBe('Pular');
     expect(TOUR_TEXT.next).toBe('Próximo');
     expect(TOUR_TEXT.start).toBe('Começar');

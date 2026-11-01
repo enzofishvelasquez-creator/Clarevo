@@ -12,6 +12,7 @@ import {
   readReceiptCode,
   receiptDraft,
   type IsoDate,
+  type PdfTextItem,
   type ReceiptDraft,
   type ReceiptFacts,
 } from '@clarevo/core';
@@ -85,7 +86,7 @@ export type PdfTextRead = { ok: true; text: string } | { ok: false; reason: 'gra
 export async function readPdfText(
   read: () => Promise<Uint8Array>,
   size: number | undefined,
-  options: { timeoutMs?: number; extract?: (bytes: Uint8Array, control: PdfReadControl) => Promise<string> } = {},
+  options: { timeoutMs?: number; extract?: (bytes: Uint8Array, control: PdfReadControl, items?: PdfTextItem[]) => Promise<string>; items?: PdfTextItem[] } = {},
 ): Promise<PdfTextRead> {
   if (typeof size === 'number' && size > PDF_MAX_BYTES) return { ok: false, reason: 'grande' };
   const control = newPdfReadControl();
@@ -94,7 +95,7 @@ export async function readPdfText(
     const bytes = await read();
     if (bytes.length > PDF_MAX_BYTES) return { ok: false, reason: 'grande' };
     if (!hasPdfHeader(bytes)) return { ok: false, reason: 'nao_pdf' };
-    return { ok: true, text: await extract(bytes, control) };
+    return { ok: true, text: await extract(bytes, control, options.items) };
   })();
   const raced = await raceWithTimeout(work, options.timeoutMs ?? PDF_READ_TIMEOUT_MS, () => control.abort());
   if (raced === 'tempo') return { ok: false, reason: 'falhou' };

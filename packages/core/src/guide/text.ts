@@ -70,7 +70,8 @@ export interface TourCard {
   id: 'resumo' | 'anotar' | 'contas' | 'metas' | 'ajuda';
   icon: TourIcon;
   title: string;
-  body: string;
+  /** Frases curtas, uma ideia por frase, mostradas em parágrafos separados (retorno da revisão de textos, 31/10/2026). */
+  lines: readonly string[];
 }
 
 /** Os cinco cartões do tour de boas-vindas, na ordem (D-049(2)). */
@@ -79,31 +80,35 @@ export const TOUR_CARDS: readonly TourCard[] = [
     id: 'resumo',
     icon: 'resumo',
     title: 'Resumo do mês',
-    body: 'Veja o que você recebeu, o que pagou e o que ainda vai vencer no mês. Os valores só entram em Pago quando o pagamento já aconteceu.',
+    lines: ['Veja o que você recebeu, o que pagou e o que ainda vai vencer no mês.', 'Os valores só entram em Pago quando o pagamento já aconteceu.'],
   },
   {
     id: 'anotar',
     icon: 'anotar',
     title: 'Anotar um gasto',
-    body: 'Toque em Anotar gasto para registrar o que você pagou. Com uma nota fiscal, escaneie o QR code e confira o que a Clarevo preencheu.',
+    lines: ['Toque em Anotar gasto para registrar o que você pagou.', 'Com uma nota fiscal, escaneie o QR code e confira o que a Clarevo preencheu.'],
   },
   {
     id: 'contas',
     icon: 'contas',
     title: 'Contas a pagar e lembretes',
-    body: 'Anote as contas que ainda vão vencer e toque em Já paguei na hora de pagar. No app para celular, um lembrete avisa no dia anterior.',
+    lines: ['Anote as contas que ainda vão vencer, como luz e aluguel.', 'Quando pagar, toque em Já paguei.', 'No app para celular, um lembrete avisa um dia antes do vencimento.'],
   },
   {
     id: 'metas',
     icon: 'metas',
     title: 'Metas e calculadoras',
-    body: 'Em Metas, acompanhe o que você guarda e veja um plano. As calculadoras fazem as contas com os seus números, sem gravar nada.',
+    lines: [
+      'Em Metas, crie um objetivo, como uma viagem.',
+      'Com um prazo, a Clarevo mostra quanto guardar por mês até lá.',
+      'As calculadoras comparam opções, como parcelado ou à vista, sem gravar nada.',
+    ],
   },
   {
     id: 'ajuda',
     icon: 'ajuda',
     title: 'Onde achar ajuda',
-    body: 'Em Aprender › Como usar o app da Clarevo, cada função tem o passo a passo. Em várias telas, o botão ? no cabeçalho explica a tela.',
+    lines: ['Em Aprender › Como usar o app da Clarevo, cada função tem o passo a passo.', 'Em várias telas, o botão ? no topo explica o que aparece ali.'],
   },
 ];
 

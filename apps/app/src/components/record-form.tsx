@@ -106,6 +106,7 @@ import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { LookalikeBanner, NoteBlock, ProofBlock, type SefazState } from '@/components/receipt-block';
+import { ChoiceDialog } from '@/components/choice-dialog';
 import { AlreadyNotedBanner, CameraModal, PasteModal, ScanLine, ScanSheet, cameraIsAvailable } from '@/components/receipt-scan';
 import { returnSession } from '@/components/retorno-acoes';
 import { ChoiceGroup } from '@/components/series-parts';
@@ -122,7 +123,8 @@ import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
 import { cameraWasUsed, markCameraUsed, payeeMemoryOf, rememberPayee, rememberStore, storeMemoryOf } from '@/lib/note-prefs';
 import { comprovanteHandoff } from '@/lib/comprovante-handoff';
-import { pickAndReadComprovantePdf } from '@/lib/comprovante-read';
+import { pickAndReadComprovanteImage, pickAndReadComprovantePdf } from '@/lib/comprovante-read';
+import { OCR_AVAILABLE } from '@/lib/ocr';
 import { pickAndReadNotePdf, readNoteCode, type NoteReading } from '@/lib/receipt-read';
 import { receiptLinks, openOfficialUrl } from '@/lib/receipt-link';
 import { readSefazOnDevice, sefazReadAvailable } from '@/lib/sefaz-fetch';
@@ -283,7 +285,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const [proof, setProof] = useState<ProofState | null>(null);
   const proofRef = useRef<ProofState | null>(null);
   /** Qual leitura de PDF está em andamento (decide o texto "Lendo ... aqui no aparelho"). */
-  const [readingWhat, setReadingWhat] = useState<'nota' | 'comprovante'>('nota');
+  const [readingWhat, setReadingWhat] = useState<'nota' | 'comprovante' | 'imagem'>('nota');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
@@ -507,7 +509,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     setSheetOpen(false);
     if (option === 'camera') afterModal(() => setCameraOpen(true));
     else if (option === 'pdf') afterModal(choosePdf);
-    else if (option === 'comprovante') afterModal(chooseProofPdf);
+    else if (option === 'comprovante') afterModal(chooseProof);
     else afterModal(openPaste);
   };
 
@@ -545,8 +547,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
    * Comprovante de Pix ou de pagamento em PDF (D-051): abre o seletor de arquivos e lê o escolhido no aparelho. A direção da tela
    * (gasto: o dinheiro saiu; recebimento: entrou) só vale quando o comprovante não diz.
    */
-  const chooseProofPdf = async () => {
+  const chooseProofPdf = async (source: 'arquivo' | 'galeria' | 'camera' = 'arquivo') => {
     if (readingRef.current) return;
+    setProofChoice(false);
     setCameraOpen(false);
     setPasteOpen(false);
     setScanMessage(null);
@@ -555,7 +558,12 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     setReadingWhat('comprovante');
     setReading(true);
     try {
-      const r = await pickAndReadComprovantePdf(kind === 'despesa' ? 'saida' : 'entrada');
+      // Print ou foto (D-078 B): a leitura de imagem é mais lenta e ganha o aviso próprio.
+      const direction = kind === 'despesa' ? 'saida' : 'entrada';
+      const r =
+        source === 'arquivo'
+          ? await pickAndReadComprovantePdf(direction, () => setReadingWhat('imagem'))
+          : await pickAndReadComprovanteImage(source, direction, () => setReadingWhat('imagem'));
       if (token !== readSeq.current) return;
       if (r.ok) await applyProof(r.reading);
       else if (!r.cancelled) setScanMessage(r.message);
@@ -565,6 +573,18 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         setReading(false);
       }
     }
+  };
+
+  /**
+   * "Ler comprovante": no app de celular com leitor de texto (D-078 B), a pessoa escolhe PDF, print ou foto da galeria, ou tirar uma
+   * foto; na web, o seletor de arquivos já aceita PDF e imagem.
+   */
+  const [proofChoice, setProofChoice] = useState(false);
+  const chooseProof = () => {
+    if (Platform.OS !== 'web' && OCR_AVAILABLE) {
+      setScanMessage(null);
+      setProofChoice(true);
+    } else void chooseProofPdf('arquivo');
   };
 
   /** Texto lido pela câmera: devolve o erro (a câmera continua procurando) ou null quando a nota foi aceita. */
@@ -1418,7 +1438,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               dayEmpty={draft.dateText.trim() === ''}
               descriptionEmpty={draft.description.trim() === ''}
               onSwitch={switchKind}
-              onReadAnother={chooseProofPdf}
+              onReadAnother={chooseProof}
               readAnotherDisabled={reading}
               onUndo={undoProof}
             />
@@ -1446,11 +1466,13 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               <ScanLine onPress={onScan} disabled={reading} />
             )
           ) : proofMode ? (
-            <ScanLine variant="comprovante" onPress={chooseProofPdf} disabled={reading} />
+            <ScanLine variant="comprovante" onPress={chooseProof} disabled={reading} />
           ) : null}
           {reading ? (
             <Banner tone="info" icon={Info}>
-              <Txt variant="label">{readingWhat === 'comprovante' ? COMPROVANTE_TEXT.working : NOTA_FLOW_TEXT.pdfWorking}</Txt>
+              <Txt variant="label">
+                {readingWhat === 'imagem' ? COMPROVANTE_TEXT.workingImage : readingWhat === 'comprovante' ? COMPROVANTE_TEXT.working : NOTA_FLOW_TEXT.pdfWorking}
+              </Txt>
             </Banner>
           ) : null}
           {scanMessage ? (
@@ -1788,10 +1810,23 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             }}
             onProof={() => {
               setCameraOpen(false);
-              afterModal(chooseProofPdf);
+              afterModal(chooseProof);
             }}
             onClose={() => setCameraOpen(false)}
           />
+          <ChoiceDialog
+            visible={proofChoice}
+            title={COMPROVANTE_TEXT.chooseTitle}
+            choices={[
+              { label: COMPROVANTE_TEXT.chooseGallery, tone: 'brand', onPress: () => { setProofChoice(false); afterModal(() => void chooseProofPdf('galeria')); } },
+              { label: COMPROVANTE_TEXT.chooseCamera, tone: 'soft', onPress: () => { setProofChoice(false); afterModal(() => void chooseProofPdf('camera')); } },
+              { label: COMPROVANTE_TEXT.choosePdf, tone: 'soft', onPress: () => { setProofChoice(false); afterModal(() => void chooseProofPdf('arquivo')); } },
+            ]}
+            onCancel={() => setProofChoice(false)}>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {COMPROVANTE_TEXT.chooseIntro}
+            </Txt>
+          </ChoiceDialog>
           <PasteModal
             visible={pasteOpen}
             message={pasteMessage}

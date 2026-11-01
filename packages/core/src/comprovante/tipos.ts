@@ -10,8 +10,11 @@ import type { Cents } from '../money';
  * recebimento).
  */
 
-/** Pix, TED, boleto pago, débito; `outro` quando o comprovante é de pagamento ou transferência sem dizer qual. */
-export type ComprovanteKind = 'pix' | 'ted' | 'boleto' | 'debito' | 'outro';
+/**
+ * Pix, TED, boleto pago, débito; `outro` quando o comprovante é de pagamento ou transferência sem dizer qual; `holerite` para o
+ * holerite (contracheque), sempre um recebimento (`holerite.ts`).
+ */
+export type ComprovanteKind = 'pix' | 'ted' | 'boleto' | 'debito' | 'outro' | 'holerite';
 
 /** `saida`: o dinheiro saiu (gasto). `entrada`: o dinheiro entrou (recebimento). */
 export type ComprovanteDirection = 'saida' | 'entrada';
@@ -38,7 +41,21 @@ export type ComprovanteErrorCode = 'texto_vazio' | 'nota_fiscal' | 'nao_e_compro
 
 export type ComprovanteResult = { ok: true; reading: ComprovanteReading } | { ok: false; code: ComprovanteErrorCode };
 
+/**
+ * Um pedaço de texto do PDF com a posição na página (em pontos, a partir do canto de baixo à esquerda, como no PDF). Só o holerite
+ * usa: nele, o rótulo e o valor ficam em colunas que o texto corrido separa. O app monta a lista na leitura e a descarta junto do texto.
+ */
+export interface PdfTextItem {
+  str: string;
+  x: number;
+  y: number;
+  width: number;
+  page: number;
+}
+
 export interface ComprovanteOptions {
+  /** Os pedaços de texto com a posição (opcional; ver `PdfTextItem`). */
+  items?: readonly PdfTextItem[];
   /**
    * Direção a usar quando o comprovante não diz se o dinheiro saiu ou entrou (muitos comprovantes de transferência trazem "Origem"
    * e "Destino" e nenhum aviso): a de Anotar gasto (`saida`) ou a de Registrar recebimento (`entrada`).

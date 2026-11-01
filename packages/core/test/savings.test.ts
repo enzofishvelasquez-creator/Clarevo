@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EXTRA_SAVINGS_TEXT,
+  extraIncomeOfMonth,
   DEMO_TODAY,
   MAX_RECORD_CENTS,
   MINIMUM_RESERVE_CHIPS,
@@ -970,5 +972,27 @@ describe('MemoryRepository: getSavingsCheck e setSavingsAnswer', () => {
     const p = savingsPlan({ monthlyCents: c.monthlyCents!, essentialCents: reserve.essentialBaseCents, goals, movements, today: TODAY });
     expect(p.stages[2]!.targetCents).toBe(reserve.targetCents);
     expect(p.stages[2]!.reachMonth).toBe(goalPlan(reserve, movements, TODAY).reachMonth);
+  });
+});
+
+describe('valor extra do mês (D-078 F)', () => {
+  const rec = (kind: 'receita' | 'despesa', amountCents: number, category: string | null, occurredOn = '2026-10-10') => ({ kind, amountCents, category, occurredOn });
+  it('o maior entre a categoria Renda extra e o que passou da renda de referência; reembolso não conta', () => {
+    const records = [rec('receita', 500_000, 'Salário'), rec('receita', 80_000, 'Renda extra'), rec('receita', 30_000, 'Reembolso'), rec('despesa', 90_000, 'Mercado')];
+    // Recebido sem reembolso: 5.800,00. Referência 5.000,00: passou 800,00; Renda extra: 800,00.
+    expect(extraIncomeOfMonth(records, '2026-10', 500_000)).toBe(80_000);
+    // Referência 4.500,00: passou 1.300,00, mais que a Renda extra.
+    expect(extraIncomeOfMonth(records, '2026-10', 450_000)).toBe(130_000);
+    // Sem referência: só a Renda extra.
+    expect(extraIncomeOfMonth(records, '2026-10', null)).toBe(80_000);
+  });
+  it('outro mês não conta; abaixo de R$ 20,00 é zero', () => {
+    expect(extraIncomeOfMonth([rec('receita', 80_000, 'Renda extra', '2026-09-30')], '2026-10', null)).toBe(0);
+    expect(extraIncomeOfMonth([rec('receita', 1_999, 'Renda extra')], '2026-10', null)).toBe(0);
+    expect(extraIncomeOfMonth([rec('receita', 2_000, 'Renda extra')], '2026-10', null)).toBe(2_000);
+    expect(extraIncomeOfMonth([rec('receita', 500_000, 'Salário')], '2026-10', 500_000)).toBe(0);
+  });
+  it('textos', () => {
+    expect(EXTRA_SAVINGS_TEXT.body(80_000)).toBe('Este mês entraram R$ 800,00 a mais. Você pediu para lembrar de guardar uma parte.');
   });
 });
