@@ -2,6 +2,7 @@ import { BOLETO_TEXT, boletoFromText, type BoletoReading, type IsoDate } from '@
 import * as DocumentPicker from 'expo-document-picker';
 
 import { imageTooBig, isImageAsset } from '@/lib/comprovante-read';
+import { pickImageForReading } from '@/lib/image-pick';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { bytesOf, deleteCachedCopy, readPdfText } from '@/lib/receipt-read';
 
@@ -50,3 +51,21 @@ export async function pickAndReadBoletoPdf(today: IsoDate, onImage?: () => void)
     await deleteCachedCopy(asset);
   }
 }
+
+/** App de celular (D-078 B): foto ou print do boleto, da galeria, lido pelo leitor de texto do aparelho. Cancelar não é erro. */
+export async function pickAndReadBoletoImage(today: IsoDate, onImage?: () => void): Promise<BoletoRead> {
+  const picked = await pickImageForReading('galeria');
+  if (picked.kind === 'cancelado') return { ok: false, message: '', cancelled: true };
+  if (picked.kind !== 'ok') return { ok: false, message: BOLETO_TEXT.errors.imageNone };
+  if (imageTooBig(picked.image)) return { ok: false, message: BOLETO_TEXT.errors.imageTooBig };
+  onImage?.();
+  let text: string;
+  try {
+    text = await textFromImage(picked.image.uri);
+  } catch {
+    return { ok: false, message: BOLETO_TEXT.errors.imageNone };
+  }
+  const reading = boletoFromText(text, today);
+  return reading ? { ok: true, reading } : { ok: false, message: BOLETO_TEXT.errors.imageNone };
+}
+

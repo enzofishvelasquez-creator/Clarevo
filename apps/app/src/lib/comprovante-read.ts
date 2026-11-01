@@ -2,6 +2,7 @@ import { COMPROVANTE_TEXT, comprovanteErrorText, comprovanteFromText, type Compr
 import * as DocumentPicker from 'expo-document-picker';
 
 import type { PdfReadControl } from '@/lib/pdf-text';
+import { pickImageForReading } from '@/lib/image-pick';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { bytesOf, deleteCachedCopy, readPdfText } from '@/lib/receipt-read';
 
@@ -43,7 +44,7 @@ export function isImageAsset(asset: Pick<DocumentPicker.DocumentPickerAsset, 'mi
 
 /** Imagem acima de 10 MB (foto de câmera muito grande): não é lida, para a leitura não travar o aparelho. */
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-export function imageTooBig(asset: Pick<DocumentPicker.DocumentPickerAsset, 'size' | 'file'>): boolean {
+export function imageTooBig(asset: { size?: number | null; file?: File }): boolean {
   const size = asset.file?.size ?? asset.size;
   return typeof size === 'number' && size > IMAGE_MAX_BYTES;
 }
@@ -52,7 +53,11 @@ export function imageTooBig(asset: Pick<DocumentPicker.DocumentPickerAsset, 'siz
  * Texto de um print ou de uma foto (D-078 B), lido no próprio aparelho, para o mesmo leitor do PDF. Até 10 MB. Sem texto que dê
  * para ler, a mensagem diz para conferir a imagem.
  */
-export async function readComprovanteImage(asset: DocumentPicker.DocumentPickerAsset, defaultDirection: ComprovanteDirection, onProgress?: (f: number) => void): Promise<ComprovanteRead> {
+export async function readComprovanteImage(
+  asset: { uri: string; size?: number | null; file?: File },
+  defaultDirection: ComprovanteDirection,
+  onProgress?: (f: number) => void,
+): Promise<ComprovanteRead> {
   if (imageTooBig(asset)) return { ok: false, message: COMPROVANTE_TEXT.pdf.imageTooBig };
   let text: string;
   try {
@@ -93,4 +98,21 @@ export async function pickAndReadComprovantePdf(defaultDirection: ComprovanteDir
   } finally {
     await deleteCachedCopy(asset);
   }
+}
+
+/**
+ * App de celular (D-078 B): um print ou foto da galeria, ou uma foto tirada na hora, lido no aparelho pelo leitor de texto do sistema.
+ * Cancelar não é erro.
+ */
+export async function pickAndReadComprovanteImage(
+  source: 'galeria' | 'camera',
+  defaultDirection: ComprovanteDirection,
+  onImage?: () => void,
+): Promise<ComprovanteRead> {
+  const picked = await pickImageForReading(source);
+  if (picked.kind === 'cancelado') return { ok: false, message: '', cancelled: true };
+  if (picked.kind === 'sem_permissao') return { ok: false, message: COMPROVANTE_TEXT.pdf.cameraDenied };
+  if (picked.kind === 'falhou') return { ok: false, message: COMPROVANTE_TEXT.pdf.imageFailed };
+  onImage?.();
+  return readComprovanteImage(picked.image, defaultDirection);
 }

@@ -35,6 +35,12 @@ export const COMPROVANTE_TEXT = {
   lineHintPdf: 'Comprovante ou holerite em PDF, lido aqui no aparelho',
   lineA11yPdf: 'Ler comprovante de Pix ou pagamento. Comprovante ou holerite em PDF, lido aqui no aparelho.',
   workingImage: 'Lendo a imagem aqui no aparelho. Pode levar alguns segundos…',
+  /** App de celular (D-078 B): de onde vem o comprovante. */
+  chooseTitle: 'Ler comprovante de Pix ou pagamento',
+  chooseIntro: 'Escolha o PDF ou uma imagem (print ou foto). Tudo é lido aqui no aparelho e não é guardado.',
+  choosePdf: 'Escolher o PDF',
+  chooseGallery: 'Escolher um print ou foto da galeria',
+  chooseCamera: 'Tirar uma foto',
   /** Na folha de Anotar gasto, abaixo da frase de privacidade da nota. */
   sheetPrivacy: 'Comprovante em PDF ou imagem: lido aqui no aparelho e não guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.',
   working: 'Lendo o comprovante aqui no aparelho…',
@@ -76,6 +82,7 @@ export const COMPROVANTE_TEXT = {
     imageNoText: 'Não conseguimos ler esta imagem. Confira se está nítida e inteira, ou digite os dados à mão.',
     imageFailed: 'Não foi possível ler esta imagem. Digite os dados à mão.',
     imageTooBig: 'Esta imagem é grande demais para ler aqui. Use um print ou uma foto menor.',
+    cameraDenied: 'Sem acesso à câmera. Permita nos ajustes do aparelho ou escolha uma imagem da galeria.',
     notSupported: 'Este arquivo não é um PDF nem uma imagem.',
   },
   /** "Parece já anotado em 05/10/2026: Padaria, R$ 85,00." */

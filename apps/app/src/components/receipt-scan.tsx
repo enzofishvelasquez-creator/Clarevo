@@ -25,6 +25,7 @@ import { improveCameraFocus } from '@/lib/camera-focus';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { invoiceHref } from '@/lib/cards';
 import { imageTooBig } from '@/lib/comprovante-read';
+import { pickImageForReading } from '@/lib/image-pick';
 import { useCard, useCardEntry, useRecord } from '@/state/data';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -134,8 +135,32 @@ export function PasteModal({
       setPhotoError(null);
     }
   }, [visible]);
+  /** No app de celular: a foto da chave pela câmera (ou, sem a permissão, da galeria), lida pelo leitor de texto do aparelho. */
+  async function keyFromNativePhoto() {
+    let picked = await pickImageForReading('camera');
+    if (picked.kind === 'sem_permissao') picked = await pickImageForReading('galeria');
+    if (picked.kind === 'cancelado') return;
+    if (picked.kind !== 'ok' || imageTooBig(picked.image)) {
+      setPhotoError(NOTA_TEXT.keyPhotoNone);
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const key = accessKeyFromText(await textFromImage(picked.image.uri));
+      if (key) {
+        setText(key);
+        onSubmit(key);
+      } else setPhotoError(NOTA_TEXT.keyPhotoNone);
+    } catch {
+      setPhotoError(NOTA_TEXT.keyPhotoNone);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
   async function keyFromPhoto() {
     setPhotoError(null);
+    if (Platform.OS !== 'web') return keyFromNativePhoto();
     let picked: DocumentPicker.DocumentPickerResult;
     try {
       picked = await DocumentPicker.getDocumentAsync({ type: ['image/png', 'image/jpeg', 'image/webp'], copyToCacheDirectory: true, multiple: false, base64: false });

@@ -114,6 +114,8 @@ export const BOLETO_TEXT = {
   pdf: 'Ler o PDF do boleto',
   /** Com a leitura de imagem (no navegador, D-078 B). */
   pdfOrImage: 'Ler o PDF ou uma foto do boleto',
+  /** App de celular: foto ou print do boleto, da galeria. */
+  photo: 'Escolher uma foto do boleto',
   workingImage: 'Lendo a imagem aqui no aparelho. Pode levar alguns segundos…',
   paste: 'Colar ou digitar a linha digitável',
   privacy: 'O boleto é lido aqui no aparelho e não é guardado. Ficam só o valor, o vencimento e a descrição que você salvar.',

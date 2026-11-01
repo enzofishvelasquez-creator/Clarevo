@@ -8,7 +8,7 @@ import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
 import { SubHeader } from '@/components/header';
 import { cameraIsAvailable } from '@/components/receipt-scan';
 import { Button, TextField, Txt, styles as ui } from '@/components/ui';
-import { pickAndReadBoletoPdf } from '@/lib/boleto-read';
+import { pickAndReadBoletoImage, pickAndReadBoletoPdf } from '@/lib/boleto-read';
 import { improveCameraFocus } from '@/lib/camera-focus';
 import { OCR_AVAILABLE } from '@/lib/ocr';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -49,13 +49,16 @@ export function BoletoReader({ today, disabled, onRead }: { today: IsoDate; disa
     return readReceiptCode(raw).ok ? BOLETO_TEXT.errors.notaFiscal : BOLETO_TEXT.errors.invalid;
   };
 
-  async function readPdf() {
+  /** No app de celular, a foto vem da galeria; na web, o seletor de arquivos já aceita PDF e imagem. */
+  const nativeImage = Platform.OS !== 'web' && OCR_AVAILABLE;
+
+  async function readPdf(source: 'arquivo' | 'galeria' = 'arquivo') {
     setStep(null);
     setBusy(true);
     setImageReading(false);
     setMessage(null);
     try {
-      const r = await pickAndReadBoletoPdf(today, () => setImageReading(true));
+      const r = source === 'galeria' ? await pickAndReadBoletoImage(today, () => setImageReading(true)) : await pickAndReadBoletoPdf(today, () => setImageReading(true));
       if (r.ok) onRead(r.reading);
       else if (!r.cancelled) setMessage(r.message);
     } finally {
@@ -65,7 +68,8 @@ export function BoletoReader({ today, disabled, onRead }: { today: IsoDate; disa
 
   const choices: DialogChoice[] = [
     ...(hasCamera ? [{ label: BOLETO_TEXT.camera, tone: 'brand' as const, onPress: () => setStep('camera') }] : []),
-    { label: OCR_AVAILABLE ? BOLETO_TEXT.pdfOrImage : BOLETO_TEXT.pdf, tone: hasCamera ? ('soft' as const) : ('brand' as const), onPress: () => void readPdf() },
+    { label: OCR_AVAILABLE && !nativeImage ? BOLETO_TEXT.pdfOrImage : BOLETO_TEXT.pdf, tone: hasCamera ? ('soft' as const) : ('brand' as const), onPress: () => void readPdf() },
+    ...(nativeImage ? [{ label: BOLETO_TEXT.photo, tone: 'soft' as const, onPress: () => void readPdf('galeria') }] : []),
     { label: BOLETO_TEXT.paste, tone: 'soft' as const, onPress: () => setStep('colar') },
   ];
 
@@ -300,7 +304,7 @@ function BoletoCamera({
             </View>
           )}
           <View style={{ gap: space[2] }}>
-            <Button label={OCR_AVAILABLE ? BOLETO_TEXT.pdfOrImage : BOLETO_TEXT.pdf} tone="soft" onPress={onPdf} />
+            <Button label={OCR_AVAILABLE && Platform.OS === 'web' ? BOLETO_TEXT.pdfOrImage : BOLETO_TEXT.pdf} tone="soft" onPress={onPdf} />
             <Button label={BOLETO_TEXT.paste} tone="soft" onPress={onPaste} />
             <Button label={NOTA_FLOW_TEXT.back} tone="ghost" onPress={onClose} />
           </View>
