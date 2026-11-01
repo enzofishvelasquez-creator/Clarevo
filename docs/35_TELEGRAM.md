@@ -9,7 +9,7 @@
 3. A Clarevo responde que a conta está ligada e mostra os exemplos.
 4. Daí em diante, as mesmas mensagens do WhatsApp: `mercado 52,30`, `farmácia 38 ontem`, `recebi 1500 salário`, `DESFAZER`, `DESLIGAR`, `AJUDA`. No Telegram também valem os comandos `/desfazer`, `/desligar` e `/ajuda`.
 
-A leitura e as respostas são as do WhatsApp (`packages/core/src/whatsapp/mensagem.ts` e `respostas.ts`), com o nome do canal: "este Telegram está ligado", "toque em Telegram". A pessoa pode ter o WhatsApp e o Telegram ligados ao mesmo tempo: cada canal tem o seu vínculo e o seu código, e DESFAZER e DESLIGAR só mexem no próprio canal.
+A leitura e as respostas são as do WhatsApp (`packages/core/src/whatsapp/mensagem.ts` e `respostas.ts`), com o nome do canal: "este Telegram está ligado à conta de Ana na Clarevo". No piloto fechado, as respostas apontam o endereço da tela (app.clarevo.app.br/conta/telegram), porque o card em Conta está escondido (`packages/core/src/whatsapp/canais.ts`). A pessoa pode ter o WhatsApp e o Telegram ligados ao mesmo tempo: cada canal tem o seu vínculo e o seu código, e DESFAZER e DESLIGAR só mexem no próprio canal.
 
 ## 2. Sem custo, por construção
 
@@ -23,7 +23,8 @@ A função do servidor **não tem o token do bot**: a resposta volta junto com a
 
 ## 3. Privacidade
 
-- **No banco da Clarevo** fica só o que vira registro, pelas mesmas funções do app. O Telegram informa ao bot o identificador da conta, o nome e o usuário da pessoa (não o telefone); a função usa só o identificador e manda ao banco um resumo HMAC-SHA256 feito com uma chave que só ela conhece (`TELEGRAM_ID_KEY`). O texto, o nome e o usuário nunca são guardados. Das mensagens tratadas ficam, por 30 dias, o identificador da mensagem (`telegram:<conversa>:<mensagem>`, para não anotar duas vezes a mesma entrega), o resumo, o resultado e o registro anotado (para o DESFAZER).
+- **No banco da Clarevo** fica só o que vira registro, pelas mesmas funções do app. O Telegram informa ao bot o identificador da conta, o nome e o usuário da pessoa (não o telefone); a função usa só o identificador e manda ao banco um resumo HMAC-SHA256 feito com uma chave que só ela conhece (`TELEGRAM_ID_KEY`). O texto, o nome e o usuário nunca são guardados. Das mensagens tratadas ficam, por 30 dias, um resumo do identificador da mensagem (`telegram:` e 64 hexadecimais, feito com a mesma chave sobre a conversa e o número da mensagem: a conversa é a própria conta, e o banco recusa o identificador sem resumo), o resumo da conta, o resultado e o registro anotado (para o DESFAZER).
+- **Ninguém desvia as mensagens de outra pessoa**: o botão Iniciar não mostra o código, então um link com o código de outra pessoa poderia ligar um Telegram à conta errada. Por isso, uma conta do Telegram já ligada a uma pessoa não passa a outra sozinha (resposta "já está ligado a outra conta"; é preciso mandar DESLIGAR antes), e a resposta de ligado diz o nome da conta da Clarevo, para quem escreve conferir. O WhatsApp segue a mesma regra.
 - **No Telegram**: as conversas com bots passam pelos servidores do Telegram e ficam na conversa da pessoa, como as conversas comuns do Telegram (sem criptografia de ponta a ponta), até ela apagar. A Clarevo não tem contrato com o Telegram: a pessoa usa o Telegram pelas regras dele.
 - **Só para quem quiser**: funciona depois de a própria pessoa ligar a conta no app, e desliga a qualquer momento (pelo app ou escrevendo DESLIGAR).
 - **Exclusão da conta** apaga os vínculos, os códigos e as mensagens tratadas dos dois canais.

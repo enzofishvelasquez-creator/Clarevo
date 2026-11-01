@@ -54,6 +54,15 @@ export function whatsappPhoneHash(waId: string, phoneKey: string): string {
   return hmacSha256Hex(utf8Bytes(phoneKey), utf8Bytes(waId.replace(/\D/g, '')));
 }
 
+/**
+ * O identificador que o banco guarda para uma mensagem: o canal e um resumo HMAC-SHA256 do identificador do canal, com a chave da função.
+ * O identificador do WhatsApp (wamid) traz o número de quem escreveu, e o do Telegram, a conta: guardado como veio, ele desfaria o resumo
+ * de quem escreve. O resumo é o mesmo a cada nova entrega da mesma mensagem, então a repetição continua reconhecida.
+ */
+export function chatMessageKey(channel: ChatChannel, rawId: string, key: string): string {
+  return `${channel}:${hmacSha256Hex(utf8Bytes(key), utf8Bytes(`${channel}-mensagem:${rawId}`))}`;
+}
+
 export interface WhatsAppInbound {
   /** Identificador da mensagem na Meta (wamid): a chave de repetição no banco. */
   id: string;
@@ -185,7 +194,7 @@ const SILENT_TYPES = new Set(['reaction', 'system', 'unsupported', 'errors']);
  * Aviso do sistema de troca de número desliga o número antigo, sem resposta.
  */
 export async function handleWhatsAppMessage(msg: WhatsAppInbound, rpc: WhatsAppRpc, phoneKey: string): Promise<string | null> {
-  const base = { p_message_id: msg.id, p_phone_hash: whatsappPhoneHash(msg.from, phoneKey) };
+  const base = { p_message_id: chatMessageKey('whatsapp', msg.id, phoneKey), p_phone_hash: whatsappPhoneHash(msg.from, phoneKey) };
   if (msg.type === 'system' && msg.systemType === 'user_changed_number') {
     await rpc('whatsapp_unlink', base);
     return null;
@@ -280,7 +289,7 @@ export interface WhatsAppResponse {
 }
 
 const RESULTS = new Set([
-  'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido',
+  'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
   'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida', 'repetida',
   'silencio', 'registrada',
 ]);

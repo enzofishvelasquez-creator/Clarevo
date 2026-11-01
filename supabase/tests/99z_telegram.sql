@@ -36,8 +36,11 @@ $$;
 -- Resumos de quem escreve (o servidor usa HMAC com a chave de cada canal; aqui basta um resumo diferente por pessoa e canal).
 create function pg_temp.th(p_user text) returns text language sql as $$ select encode(sha256(convert_to('telegram:' || p_user, 'UTF8')), 'hex') $$;
 create function pg_temp.ph(p_number text) returns text language sql as $$ select encode(sha256(convert_to(p_number, 'UTF8')), 'hex') $$;
--- Identificador de uma mensagem do Telegram, como o servidor monta: telegram:<conversa>:<mensagem>.
-create function pg_temp.tm(p_user text, p_n int) returns text language sql as $$ select 'telegram:' || p_user || ':' || p_n $$;
+-- Identificador de uma mensagem do Telegram, como o servidor manda: 'telegram:' e um resumo de 64 hexadecimais (nunca a conversa, que é
+-- a conta de quem escreve).
+create function pg_temp.tm(p_user text, p_n int) returns text language sql as $$
+  select 'telegram:' || encode(sha256(convert_to(p_user || ':' || p_n, 'UTF8')), 'hex')
+$$;
 create temp table codes (name text primary key, code text);
 grant select, insert, update on codes to authenticated, service_role;
 create function pg_temp.code(p_name text) returns text language sql as $$ select code from codes where name = p_name $$;
@@ -168,7 +171,9 @@ set role service_role;
 select pg_temp.as_service();
 select pg_temp.expect_code(format('select public.telegram_note(%L, %L, %L)', '123:45', pg_temp.th('ana'), 'ajuda'), 'mensagem_invalida', '22023');
 select pg_temp.expect_code(format('select public.whatsapp_note(%L, %L, %L)', 'telegram:1:2', pg_temp.ph('5521900000071'), 'ajuda'), 'mensagem_invalida', '22023');
-select pg_temp.expect_code(format('select public.telegram_note(%L, %L, %L)', 'telegram:1:3', 'nao-e-resumo', 'ajuda'), 'mensagem_invalida', '22023');
+select pg_temp.expect_code(format('select public.telegram_note(%L, %L, %L)', pg_temp.tm('x', 1), 'nao-e-resumo', 'ajuda'), 'mensagem_invalida', '22023');
+-- O identificador do Telegram com a conversa à vista (telegram:<conta>:<mensagem>) é recusado: só o resumo entra (T1).
+select pg_temp.expect_code(format('select public.telegram_note(%L, %L, %L)', 'telegram:700100200:5', pg_temp.th('ana'), 'ajuda'), 'mensagem_invalida', '22023');
 do $$
 declare
   r jsonb;
@@ -181,7 +186,8 @@ begin
   assert public.telegram_link(pg_temp.tm('ana', 2), pg_temp.th('ana'), pg_temp.code('ana_tg0')) ->> 'result' = 'codigo_invalido',
     'o código substituído não vale mais';
   r := public.telegram_link(pg_temp.tm('ana', 3), pg_temp.th('ana'), pg_temp.code('ana_tg'));
-  assert r = jsonb_build_object('result', 'ligado', 'space', jsonb_build_object('kind', 'pessoal', 'name', 'Pessoal')), 'o Telegram liga: ' || r::text;
+  assert r = jsonb_build_object('result', 'ligado', 'space', jsonb_build_object('kind', 'pessoal', 'name', 'Pessoal'), 'name', 'Ana'),
+    'o Telegram liga, com o nome de quem gerou o código: ' || r::text;
   assert public.telegram_link(pg_temp.tm('ana', 3), pg_temp.th('ana'), pg_temp.code('ana_tg')) = '{"result": "repetida"}', 'a mesma entrega não liga de novo';
   -- O WhatsApp liga com o código dele, que continuou valendo.
   assert public.whatsapp_link('tg-wa-m-002', pg_temp.ph('5521900000071'), pg_temp.code('ana_wa')) ->> 'result' = 'ligado', 'o WhatsApp também liga';
@@ -198,7 +204,9 @@ do $$ begin
   assert pg_temp.lastwrite('ana', 'ana_ctx') = '-', 'ligar o Telegram não conta como anotação (T6)';
 end $$;
 -- Uma mensagem do Telegram não pode entrar como de outro canal, nem o contrário.
-select pg_temp.expect_code(format($q$insert into public.chat_messages (channel, message_id, sender_hash, outcome) values ('whatsapp', 'telegram:9:9', %L, 'ajuda')$q$,
+select pg_temp.expect_code(format($q$insert into public.chat_messages (channel, message_id, sender_hash, outcome) values ('whatsapp', %L, %L, 'ajuda')$q$,
+                                  pg_temp.tm('x', 9), pg_temp.th('x')), 'new row for relation "chat_messages" violates check constraint "chat_messages_id_channel_check"', '23514');
+select pg_temp.expect_code(format($q$insert into public.chat_messages (channel, message_id, sender_hash, outcome) values ('telegram', 'telegram:9:9', %L, 'ajuda')$q$,
                                   pg_temp.th('x')), 'new row for relation "chat_messages" violates check constraint "chat_messages_id_channel_check"', '23514');
 select pg_temp.expect_code(format($q$insert into public.chat_messages (channel, message_id, sender_hash, outcome) values ('sms', 'x-1', %L, 'ajuda')$q$,
                                   pg_temp.th('x')), 'new row for relation "chat_messages" violates check constraint "chat_messages_channel_check"', '23514');
@@ -306,7 +314,8 @@ do $$ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 6. Quem escreve passa a outra pessoa: a conta do Telegram que liga com o código da Bia sai do vínculo anterior (W2).
+-- 6. Quem escreve já ligado a outra pessoa não passa sozinho a quem mandou o código (T2, ja_ligado): o link do Telegram com o código de
+-- outra pessoa não desvia as mensagens. Desligando antes, pela própria conversa, liga.
 -- ---------------------------------------------------------------------------
 set role authenticated;
 do $$
@@ -325,11 +334,21 @@ set role service_role;
 select pg_temp.as_service();
 do $$ begin
   assert public.telegram_link(pg_temp.tm('compartilhado', 1), pg_temp.th('compartilhado'), pg_temp.code('ana_tg3')) ->> 'result' = 'ligado', 'liga como Ana';
-  assert public.telegram_link(pg_temp.tm('compartilhado', 2), pg_temp.th('compartilhado'), pg_temp.code('bia_tg')) ->> 'result' = 'ligado', 'e depois como Bia';
+  assert public.telegram_link(pg_temp.tm('compartilhado', 2), pg_temp.th('compartilhado'), pg_temp.code('bia_tg')) = '{"result": "ja_ligado"}',
+    'o código da Bia não tira a conta da Ana';
+  assert public.telegram_link(pg_temp.tm('compartilhado', 2), pg_temp.th('compartilhado'), pg_temp.code('bia_tg')) = '{"result": "repetida"}',
+    'a mesma entrega repetida';
+  assert public.telegram_add_record(pg_temp.tm('compartilhado', 5), pg_temp.th('compartilhado'), now(), 'despesa', 100, 0, null, 'Segue na Ana', null)
+       #>> '{record,description}' = 'Segue na Ana', 'e as mensagens seguem na Ana';
+  assert public.telegram_unlink(pg_temp.tm('compartilhado', 6), pg_temp.th('compartilhado')) = '{"result": "desligado"}', 'quem escreve desliga';
+  assert public.telegram_link(pg_temp.tm('compartilhado', 7), pg_temp.th('compartilhado'), pg_temp.code('bia_tg')) ->> 'result' = 'ligado',
+    'e o código da Bia, que não se gastou, liga';
 end $$;
 reset role;
 do $$ begin
   assert pg_temp.links('ana') = 'whatsapp' and pg_temp.links('bia') = 'telegram', 'a conta do Telegram passou à Bia; o WhatsApp da Ana fica';
+  assert (select outcome from public.chat_messages where message_id = pg_temp.tm('compartilhado', 2)) = 'ja_ligado'
+     and (select person_id from public.chat_messages where message_id = pg_temp.tm('compartilhado', 2)) is null, 'registrado sem pessoa';
   assert (select count(*) from public.chat_links where sender_hash = pg_temp.th('compartilhado')) = 1, 'um vínculo por resumo';
 end $$;
 

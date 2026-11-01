@@ -11,6 +11,7 @@ import {
   TELEGRAM_REPLY,
   TELEGRAM_TEXT,
   WHATSAPP_REPLY,
+  chatMessageKey,
   createTelegramHandler,
   handleTelegramMessage,
   isTelegramBotName,
@@ -40,13 +41,15 @@ function update(message: Record<string, unknown>, extra: Record<string, unknown>
 }
 const text = (t: string, id = 5) => update({ message_id: id, text: t });
 const inbound = (t: string | null, kind: 'texto' | 'midia' = 'texto'): TelegramInbound => ({
-  id: `telegram:${USER}:5`, chatId: USER, messageId: 5, fromId: USER, timestamp: NOW, kind, text: t,
+  chatId: USER, messageId: 5, fromId: USER, timestamp: NOW, kind, text: t,
 });
+/** O identificador que vai ao banco: 'telegram:' e o resumo da conversa e da mensagem (a conversa é a conta de quem escreve). */
+const stored = (messageId = 5) => chatMessageKey('telegram', `${USER}:${messageId}`, KEY);
 
 describe('Telegram: leitura da entrega', () => {
-  it('só mensagem de conversa particular, de uma pessoa, com o identificador telegram:<conversa>:<mensagem>', () => {
+  it('só mensagem de conversa particular, de uma pessoa', () => {
     expect(telegramInbound(text('mercado 52,30'))).toEqual({
-      id: `telegram:${USER}:5`, chatId: USER, messageId: 5, fromId: USER, timestamp: NOW, kind: 'texto', text: 'mercado 52,30',
+      chatId: USER, messageId: 5, fromId: USER, timestamp: NOW, kind: 'texto', text: 'mercado 52,30',
     });
     expect(telegramInbound(update({ photo: [{ file_id: 'x' }], caption: 'mercado 10' }))?.kind).toBe('midia');
     expect(telegramInbound(update({ voice: { file_id: 'x' } }))).toMatchObject({ kind: 'midia', text: null });
@@ -109,11 +112,15 @@ describe('Telegram: resposta a cada mensagem', () => {
     expect(calls.map((c) => c.fn)).toEqual(['telegram_add_record', 'telegram_link', 'telegram_undo', 'telegram_unlink']);
     const hash = telegramSenderHash(USER, KEY);
     for (const c of calls) {
-      expect(c.args.p_message_id).toBe(`telegram:${USER}:5`);
+      expect(c.args.p_message_id).toBe(stored());
+      expect(c.args.p_message_id).toMatch(/^telegram:[0-9a-f]{64}$/);
       expect(c.args.p_sender_hash).toBe(hash);
-      expect(JSON.stringify(c.args)).not.toContain(String(USER).slice(0, 6) + '"');
+      // A conta de quem escreve não vai ao banco em lugar nenhum, nem dentro do identificador da mensagem.
+      expect(JSON.stringify(c.args)).not.toContain(String(USER));
       expect(c.args).not.toHaveProperty('p_phone_hash');
     }
+    expect(stored(5)).not.toBe(stored(6));
+    expect(stored()).not.toBe(chatMessageKey('whatsapp', `${USER}:5`, KEY).replace('whatsapp:', 'telegram:'));
     expect(calls[0]!.args).toMatchObject({ p_kind: 'despesa', p_amount_cents: 5230, p_days_ago: 0, p_occurred_on: null, p_description: 'Mercado', p_category: 'Mercado' });
     expect(calls[1]!.args).toMatchObject({ p_code: 'ABCD2345' });
     expect(calls[2]!.args.p_sent_at).toBe(new Date(NOW * 1000).toISOString());
@@ -136,8 +143,12 @@ describe('Telegram: resposta a cada mensagem', () => {
     const ask = (o: WhatsAppOutcome, t = 'café 5') => handleTelegramMessage(inbound(t), fakeRpc(() => o).rpc, KEY);
     expect(await ask({ result: 'nao_ligado' })).toBe(TELEGRAM_REPLY.nao_ligado);
     expect(await ask({ result: 'ligado', space }, '/start ABCD2345')).toContain('Pronto, este Telegram está ligado à Clarevo, no espaço Pessoal.');
+    expect(await ask({ result: 'ligado', space, name: 'Ana Exemplo' }, '/start ABCD2345')).toContain(
+      'Pronto, este Telegram está ligado à conta de Ana Exemplo na Clarevo, no espaço Pessoal.',
+    );
+    expect(await ask({ result: 'ja_ligado' }, '/start ABCD2345')).toBe(TELEGRAM_REPLY.ja_ligado);
     expect(await ask({ result: 'desligado' }, '/desligar')).toBe(TELEGRAM_REPLY.desligado);
-    expect(await ask({ result: 'sem_permissao', space })).toContain('toque em Telegram e ligue de novo');
+    expect(await ask({ result: 'sem_permissao', space })).toBe('Você não anota mais no espaço Pessoal. Ligue de novo em app.clarevo.app.br/conta/telegram, escolhendo o espaço.');
     expect(await ask({ result: 'repetida' })).toBeNull();
     expect(await ask({ result: 'silencio' })).toBeNull();
     const noted = await ask({
@@ -154,7 +165,11 @@ describe('Telegram: resposta a cada mensagem', () => {
     expect(Object.keys(TELEGRAM_REPLY).sort()).toEqual(Object.keys(WHATSAPP_REPLY).sort());
     expect(TELEGRAM_REPLY.midia).toBe(WHATSAPP_REPLY.midia);
     expect(TELEGRAM_REPLY.erro).toBe(WHATSAPP_REPLY.erro);
-    expect(TELEGRAM_REPLY.nao_ligado).toBe('Este Telegram ainda não está ligado a uma conta da Clarevo. No app da Clarevo, abra Conta, toque em Telegram e siga os passos.');
+    // Piloto fechado: o card em Conta está escondido, então as respostas apontam o endereço da tela.
+    expect(TELEGRAM_REPLY.nao_ligado).toBe('Este Telegram ainda não está ligado a uma conta da Clarevo. Abra app.clarevo.app.br/conta/telegram e siga os passos.');
+    expect(TELEGRAM_REPLY.codigo_invalido).toBe('Este código não vale mais ou não existe. Gere outro em app.clarevo.app.br/conta/telegram. Cada código vale por 15 minutos.');
+    expect(TELEGRAM_REPLY.ja_ligado).toBe('Este Telegram já está ligado a outra conta da Clarevo. Se for seu, mande DESLIGAR e depois mande o código de novo.');
+    expect(WHATSAPP_REPLY.nao_ligado).toContain('app.clarevo.app.br/conta/whatsapp');
     const texts = [
       ...Object.values(TELEGRAM_REPLY),
       whatsappOutcomeReply({ result: 'ligado', space: { kind: 'pessoal', name: 'Pessoal' } }, '2026-11-01', 'telegram')!,
@@ -231,7 +246,7 @@ describe('Telegram: a função do servidor', () => {
     expect(res.body).not.toMatch(/parse_mode|reply_markup/);
     expect(net.sent).toHaveLength(1);
     expect(net.sent[0]!.url).toBe('https://projeto.supabase.co/rest/v1/rpc/telegram_add_record');
-    expect(net.sent[0]!.body).toMatchObject({ p_message_id: `telegram:${USER}:77`, p_sender_hash: telegramSenderHash(USER, KEY) });
+    expect(net.sent[0]!.body).toMatchObject({ p_message_id: stored(77), p_sender_hash: telegramSenderHash(USER, KEY) });
   });
 
   it('entrega sem mensagem para tratar e mensagem repetida: 200 sem resposta', async () => {

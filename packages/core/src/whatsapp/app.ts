@@ -6,11 +6,8 @@ import { WHATSAPP_CODE_MINUTES } from './respostas';
  * Meta dá (atende só os até 5 números cadastrados no app da Meta); o número próprio entra quando abrir a todos (docs/32, seção 5).
  */
 export const WHATSAPP_NUMBER: string | null = '15552087378';
-/**
- * Piloto fechado (D-076): o card em Conta fica escondido e a tela abre só pelo link (app.clarevo.app.br/conta/whatsapp), mandado às
- * pessoas do piloto. true quando abrir a todos, com o número próprio, a política e a resposta do advogado.
- */
-export const WHATSAPP_IN_ACCOUNT = false;
+/** Piloto fechado (D-076): o card em Conta só aparece quando abrir a todos (packages/core/src/whatsapp/canais.ts). */
+export { WHATSAPP_IN_ACCOUNT } from './canais';
 
 /** Estado de um canal de mensagens da própria pessoa (my_whatsapp, my_telegram). Quem escreve nunca volta ao app: o banco não o guarda. */
 export interface ChatLinkState {

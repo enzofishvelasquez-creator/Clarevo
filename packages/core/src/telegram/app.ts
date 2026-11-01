@@ -6,11 +6,8 @@ import type { ChatScreenText } from '../whatsapp/app';
  * no próprio Telegram (docs/35_TELEGRAM.md); depois, a equipe põe o usuário aqui e publica o app.
  */
 export const TELEGRAM_BOT: string | null = null;
-/**
- * Piloto fechado (D-080): o card em Conta fica escondido e a tela abre só pelo link (app.clarevo.app.br/conta/telegram). true quando
- * abrir a todos, com a política e a resposta do advogado.
- */
-export const TELEGRAM_IN_ACCOUNT = false;
+/** Piloto fechado (D-080): o card em Conta só aparece quando abrir a todos (packages/core/src/whatsapp/canais.ts). */
+export { TELEGRAM_IN_ACCOUNT } from '../whatsapp/canais';
 
 /** Usuário de bot do Telegram: 5 a 32 letras, algarismos ou _, terminando em "bot". */
 export function isTelegramBotName(name: string): boolean {

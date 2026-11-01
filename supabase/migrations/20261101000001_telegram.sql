@@ -12,10 +12,15 @@
 --
 -- Invariantes (as W1 a W8 da 0020 valem para os dois canais, com "número" lido como "quem escreve"):
 -- T1. Do Telegram fica só o resumo HMAC-SHA256 do identificador da pessoa no Telegram, feito com uma chave que só a função do servidor
---     conhece (TELEGRAM_ID_KEY), em sender_hash, o mesmo campo do resumo do número do WhatsApp. Nunca o nome, o @ nem o texto. O
---     identificador da mensagem guardado é 'telegram:<conversa>:<mensagem>'; o do WhatsApp nunca começa por 'telegram:' (mensagem_invalida).
+--     conhece (TELEGRAM_ID_KEY), em sender_hash, o mesmo campo do resumo do número do WhatsApp. Nunca o nome, o @ nem o texto. Da
+--     mensagem, só 'telegram:' e um resumo HMAC-SHA256 (64 hexadecimais) da conversa e do número da mensagem: a conversa é a própria
+--     conta, e guardá-la desfaria o resumo. O identificador do WhatsApp nunca começa por 'telegram:' (mensagem_invalida); a função do
+--     WhatsApp desta versão também manda só o resumo do wamid ('whatsapp:' e 64 hexadecimais), porque o wamid traz o número.
 -- T2. Um vínculo por pessoa e canal (chave person_id, channel) e um canal por resumo (sender_hash único): ligar o Telegram não desliga o
---     WhatsApp, e vice-versa.
+--     WhatsApp, e vice-versa. Quem escreve já ligado a outra pessoa não passa a quem mandou o código (ja_ligado; vale para os dois canais
+--     e substitui a troca silenciosa da W2): precisa mandar DESLIGAR antes. Assim, um link do Telegram com o código de outra pessoa (o
+--     botão Iniciar não mostra o código) não desvia as mensagens de quem já anota. Ao ligar, a resposta traz o nome de quem gerou o código,
+--     para quem escreve conferir a conta.
 -- T3. O código de ligar é por pessoa e canal e só vale no canal em que foi gerado: o código do WhatsApp mandado ao Telegram é
 --     codigo_invalido. Gerar outro código só substitui o do mesmo canal.
 -- T4. DESFAZER desfaz a última anotação feita pelo mesmo canal; DESLIGAR e o desligar do app desligam só o canal deles.
@@ -51,7 +56,14 @@ alter table public.chat_link_codes add constraint chat_link_codes_pkey primary k
 
 alter table public.chat_messages add column channel text not null default 'whatsapp' check (channel in ('whatsapp', 'telegram'));
 alter table public.chat_messages alter column channel drop default;
-alter table public.chat_messages add constraint chat_messages_id_channel_check check ((channel = 'telegram') = (message_id like 'telegram:%'));
+alter table public.chat_messages add constraint chat_messages_id_channel_check check (
+  case when channel = 'telegram' then message_id ~ '^telegram:[0-9a-f]{64}$' else message_id !~ '^telegram:' end);
+-- O resultado novo ja_ligado (T2): a lista da 0020 e ele.
+alter table public.chat_messages drop constraint whatsapp_messages_outcome_check;
+alter table public.chat_messages add constraint chat_messages_outcome_check check (outcome in (
+  'ligado', 'anotado', 'desfeito', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado', 'muitas_tentativas', 'muitas_mensagens',
+  'nada_para_desfazer', 'sem_permissao', 'sem_conta', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
+  'ajuda', 'midia', 'nao_entendi'));
 
 -- Os nomes das restrições e dos índices acompanham as tabelas (whatsapp_links_phone_hash_key → chat_links_sender_hash_key).
 do $$
@@ -239,8 +251,8 @@ as $$
     left join public.chat_link_codes c on c.person_id = p.id and c.channel = p_channel and c.expires_at > now();
 $$;
 
--- A porta de todas as funções do servidor (W5): formato (22023: o servidor manda sempre certo; o identificador do Telegram começa por
--- 'telegram:' e o do WhatsApp nunca), trava de quem escreve, repetição e excesso de mensagens. Devolve o resultado quando a mensagem
+-- A porta de todas as funções do servidor (W5): formato (22023: o servidor manda sempre certo; o identificador do Telegram é 'telegram:' e
+-- um resumo de 64 hexadecimais, e o do WhatsApp nunca começa por 'telegram:'), trava de quem escreve, repetição e excesso de mensagens. Devolve o resultado quando a mensagem
 -- para aqui (repetida; muitas_mensagens na primeira vez que passa de 30 em 10 minutos; silencio nas seguintes), ou null para seguir.
 create or replace function public.clarevo_chat_gate(p_channel text, p_message_id text, p_sender_hash text)
 returns jsonb
@@ -253,7 +265,7 @@ declare
 begin
   perform public.clarevo_chat_check_channel(p_channel);
   if p_message_id is null or char_length(p_message_id) not between 1 and 200 or p_sender_hash is null or p_sender_hash !~ '^[0-9a-f]{64}$'
-     or (p_channel = 'telegram') <> (p_message_id like 'telegram:%') then
+     or (case when p_channel = 'telegram' then p_message_id !~ '^telegram:[0-9a-f]{64}$' else p_message_id ~ '^telegram:' end) then
     raise exception 'mensagem_invalida' using errcode = '22023';
   end if;
   perform pg_advisory_xact_lock(hashtext('chat:' || p_sender_hash));
@@ -426,7 +438,9 @@ begin
 end;
 $$;
 
--- Ligar com o código do mesmo canal (T3). Retorno: {result: ligado | codigo_invalido | muitas_tentativas | sem_permissao, space?}.
+-- Ligar com o código do mesmo canal (T3). Quem escreve já ligado a outra pessoa precisa desligar antes (T2: ja_ligado, sem gastar o
+-- código). Retorno: {result: ligado | codigo_invalido | ja_ligado | muitas_tentativas | sem_permissao, space?, name?}; name é o nome de
+-- quem gerou o código (vazio: nulo).
 create or replace function public.clarevo_chat_link(p_channel text, p_message_id text, p_sender_hash text, p_code text)
 returns jsonb
 language plpgsql
@@ -467,6 +481,12 @@ begin
     return jsonb_build_object('result', 'codigo_invalido');
   end if;
 
+  -- T2: quem escreve já está ligado a outra pessoa. Não passa sozinho a quem mandou o código: desliga antes, pela própria conversa.
+  if exists (select 1 from public.chat_links where sender_hash = p_sender_hash and person_id <> v_c.person_id) then
+    perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, null, 'ja_ligado');
+    return jsonb_build_object('result', 'ja_ligado');
+  end if;
+
   -- Ainda anota no espaço do código (pode ter saído da Família depois de gerar o código).
   perform public.clarevo_chat_as(v_c.person_id);
   v_ok := public.context_permission(v_c.context_id, 'write');
@@ -477,8 +497,6 @@ begin
     return jsonb_build_object('result', 'sem_permissao', 'space', public.clarevo_chat_space(v_c.context_id));
   end if;
 
-  -- Quem escreve passa a esta pessoa: sai do vínculo anterior (W2), de outra pessoa.
-  delete from public.chat_links where sender_hash = p_sender_hash and not (person_id = v_c.person_id and channel = p_channel);
   insert into public.chat_links as l (person_id, channel, sender_hash, context_id)
   values (v_c.person_id, p_channel, p_sender_hash, v_c.context_id)
   on conflict (person_id, channel) do update set sender_hash = excluded.sender_hash, context_id = excluded.context_id, linked_at = now();
@@ -488,7 +506,8 @@ begin
   values (v_c.person_id, p_channel || ':' || md5(p_message_id), 'ligar_' || p_channel, v_c.context_id,
           md5(jsonb_build_array('ligar_' || p_channel, p_message_id)::text), null, null, null);
   perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, v_c.person_id, 'ligado');
-  return jsonb_build_object('result', 'ligado', 'space', public.clarevo_chat_space(v_c.context_id));
+  return jsonb_build_object('result', 'ligado', 'space', public.clarevo_chat_space(v_c.context_id),
+                            'name', (select nullif(p.display_name, '') from public.persons p where p.id = v_c.person_id));
 end;
 $$;
 
@@ -985,7 +1004,8 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Privilégios (T5), só do que é novo. As tabelas renomeadas e as funções recriadas com o mesmo nome e os mesmos argumentos mantêm os
 -- privilégios que tinham (tabelas sem leitura e escrita direta; whatsapp_* só service_role; my_whatsapp, create_whatsapp_code e
--- unlink_whatsapp só authenticated). As internas renomeadas mantêm o execute retirado de todos.
+-- unlink_whatsapp para authenticated, e agora sem a chave de serviço, como as do Telegram). As internas renomeadas mantêm o execute
+-- retirado de todos.
 -- ---------------------------------------------------------------------------
 revoke all on function public.clarevo_chat_check_channel(text) from public, anon, authenticated;
 revoke all on function public.clarevo_chat_log(text, text, text, uuid, text, uuid) from public, anon, authenticated;
@@ -1018,7 +1038,8 @@ begin
                              'clarevo_chat_note(text, text, text, text)', 'clarevo_chat_link(text, text, text, text)',
                              'clarevo_chat_add_record(text, text, text, timestamptz, public.record_kind, bigint, integer, date, text, text)',
                              'clarevo_chat_undo(text, text, text, timestamptz)', 'clarevo_chat_unlink(text, text, text)',
-                             'my_telegram()', 'create_telegram_code(uuid, text)', 'unlink_telegram(text)'] loop
+                             'my_telegram()', 'create_telegram_code(uuid, text)', 'unlink_telegram(text)',
+                             'my_whatsapp()', 'create_whatsapp_code(uuid, text)', 'unlink_whatsapp(text)'] loop
       execute format('revoke all on function public.%s from service_role', f);
     end loop;
     foreach f in array array['telegram_note(text, text, text)', 'telegram_link(text, text, text)',

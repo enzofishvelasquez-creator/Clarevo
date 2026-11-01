@@ -110,7 +110,7 @@ describe('WhatsApp pela API, com a função do servidor', () => {
     const wrong = await send(PHONE, 'Ativar ZZZZ-2222');
     expect(wrong.reply!.body).toBe(WHATSAPP_REPLY.codigo_invalido);
     const ok = await send(PHONE, `Ativar ${code.code!.slice(0, 4)}-${code.code!.slice(4)}`);
-    expect(ok.reply!.body).toContain('ligado à Clarevo, no espaço Pessoal');
+    expect(ok.reply!.body).toContain('ligado à conta de Gil na Clarevo, no espaço Pessoal');
     const linked = await repo.getChatLink('whatsapp');
     expect([linked.linked, linked.contextId, linked.codeContextId]).toEqual([true, pessoal, null]);
   });
@@ -173,7 +173,7 @@ describe('WhatsApp pela API, com a função do servidor', () => {
     expect((await send(PHONE, 'café 5')).reply!.body).toBe(WHATSAPP_REPLY.nao_ligado);
 
     const code = await repo.createChatCode('whatsapp', newOperationKey(), pessoal);
-    expect((await send(OTHER, `Ativar ${code.code}`)).reply!.body).toContain('ligado à Clarevo');
+    expect((await send(OTHER, `Ativar ${code.code}`)).reply!.body).toContain('ligado à conta de Gil na Clarevo');
     const key = newOperationKey();
     const off = await repo.unlinkChat('whatsapp', key);
     expect(off).toEqual({ linked: false, contextId: null, linkedAt: null, codeContextId: null, codeExpiresAt: null });

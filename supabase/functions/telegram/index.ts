@@ -27,7 +27,7 @@ const __mods = [
     };
     Object.defineProperty(exports, "__esModule", { value: true });
     __exportStar(__req(1), exports);
-    __exportStar(__req(12), exports);
+    __exportStar(__req(13), exports);
   },
   // packages/core/src/telegram/servidor.ts
   function (module, exports, __req) {
@@ -43,7 +43,7 @@ const __mods = [
     exports.createTelegramHandler = createTelegramHandler;
     const sha256_1 = __req(2);
     const respostas_1 = __req(3);
-    const servidor_1 = __req(8);
+    const servidor_1 = __req(9);
     exports.TELEGRAM_MAX_BODY_BYTES = 64 * 1024;
     exports.TELEGRAM_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
     exports.TELEGRAM_ID_KEY_MIN = 32;
@@ -68,7 +68,7 @@ const __mods = [
         const date = msg.date;
         if (!isId(chatId) || !isId(fromId) || chatId !== fromId || !isId(messageId) || messageId <= 0 || !isId(date) || date <= 0)
             return null;
-        const base = { id: `telegram:${chatId}:${messageId}`, chatId, messageId, fromId, timestamp: date };
+        const base = { chatId, messageId, fromId, timestamp: date };
         if (typeof msg.text === 'string')
             return { ...base, kind: 'texto', text: msg.text };
         if (MEDIA_KEYS.some((k) => k in msg))
@@ -94,7 +94,7 @@ const __mods = [
         }
     }
     async function handleTelegramMessage(msg, rpc, idKey) {
-        const base = { p_message_id: msg.id, p_sender_hash: telegramSenderHash(msg.fromId, idKey) };
+        const base = { p_message_id: (0, servidor_1.chatMessageKey)('telegram', `${msg.chatId}:${msg.messageId}`, idKey), p_sender_hash: telegramSenderHash(msg.fromId, idKey) };
         return (0, servidor_1.answerChatMessage)({ channel: 'telegram', kind: msg.kind, text: msg.text === null ? null : telegramCommandText(msg.text), timestamp: msg.timestamp }, (op, args) => rpc(`telegram_${op}`, { ...base, ...args }));
     }
     function telegramConfigFrom(env) {
@@ -266,6 +266,7 @@ const __mods = [
     const legal_1 = __req(5);
     const money_1 = __req(6);
     const records_1 = __req(7);
+    const canais_1 = __req(8);
     exports.WHATSAPP_CODE_MINUTES = 15;
     function spaceLabel(space) {
         return space.kind === 'pessoal' ? 'espaço Pessoal' : `espaço ${space.name}`;
@@ -298,20 +299,38 @@ const __mods = [
         'A data é hoje, se você não disser outra: "farmácia 38 ontem" ou "luz 180 12/10".',
     ].join('\n');
     const CHANNEL_WORDS = {
-        whatsapp: { name: 'WhatsApp', who: 'este número', whoLinked: 'este WhatsApp' },
-        telegram: { name: 'Telegram', who: 'este Telegram', whoLinked: 'este Telegram' },
+        whatsapp: { name: 'WhatsApp', who: 'este número', whoLinked: 'este WhatsApp', inAccount: canais_1.WHATSAPP_IN_ACCOUNT },
+        telegram: { name: 'Telegram', who: 'este Telegram', whoLinked: 'este Telegram', inAccount: canais_1.TELEGRAM_IN_ACCOUNT },
     };
+    function whereTo(channel) {
+        const w = CHANNEL_WORDS[channel];
+        if (w.inAccount) {
+            return {
+                link: `No app da Clarevo, abra Conta, toque em ${w.name} e siga os passos.`,
+                newCode: `No app, abra Conta, toque em ${w.name} e gere outro.`,
+                relink: `No app, abra Conta, toque em ${w.name} e ligue de novo, escolhendo o espaço.`,
+            };
+        }
+        const page = `app.clarevo.app.br/conta/${channel}`;
+        return {
+            link: `Abra ${page} e siga os passos.`,
+            newCode: `Gere outro em ${page}.`,
+            relink: `Ligue de novo em ${page}, escolhendo o espaço.`,
+        };
+    }
     const upperFirst = (text) => text.charAt(0).toUpperCase() + text.slice(1);
     function chatReplies(channel) {
         const w = CHANNEL_WORDS[channel];
+        const where = whereTo(channel);
         const words = `DESFAZER apaga a última anotação feita por aqui, AJUDA mostra os exemplos e DESLIGAR desliga ${w.who} da Clarevo.`;
-        const howToLink = `No app da Clarevo, abra Conta, toque em ${w.name} e siga os passos.`;
+        const howToLink = where.link;
         return {
             words,
             ajuda: `Oi! Por aqui você anota gastos e recebimentos na Clarevo.\n\n${EXAMPLES}\n\n${words}\n\nSe ${w.who} ainda não está ligado: ${howToLink}`,
             midia: 'Por enquanto, a Clarevo entende só mensagens escritas. Dica: o microfone do teclado do celular transforma a sua fala em texto antes de enviar.',
             nao_ligado: `${upperFirst(w.who)} ainda não está ligado a uma conta da Clarevo. ${howToLink}`,
-            codigo_invalido: `Este código não vale mais ou não existe. No app, abra Conta, toque em ${w.name} e gere outro. Cada código vale por ${exports.WHATSAPP_CODE_MINUTES} minutos.`,
+            codigo_invalido: `Este código não vale mais ou não existe. ${where.newCode} Cada código vale por ${exports.WHATSAPP_CODE_MINUTES} minutos.`,
+            ja_ligado: `${upperFirst(w.who)} já está ligado a outra conta da Clarevo. Se for seu, mande DESLIGAR e depois mande o código de novo.`,
             muitas_tentativas: 'Muitas tentativas com códigos que não valem. Espere uma hora e gere um código novo no app.',
             muitas_mensagens: 'Muitas mensagens em pouco tempo. Espere alguns minutos e mande de novo.',
             nada_para_desfazer: 'Não há anotação recente feita por aqui para desfazer. Para mudar algo mais antigo, use o app.',
@@ -321,8 +340,8 @@ const __mods = [
             valor_acima_do_limite: `O valor passa do limite de ${(0, money_1.formatBRL)(money_1.MAX_RECORD_CENTS)} por registro.`,
             descricao_invalida: 'A descrição ficou longa demais. Escreva em poucas palavras o que foi e o valor, por exemplo: mercado 52,30',
             erro: `Não deu para anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${legal_1.SUPPORT_EMAIL}.`,
-            ligado: (space) => `Pronto, ${w.whoLinked} está ligado à Clarevo, no ${spaceLabel(space)}.\n\n${EXAMPLES}\n\n${words}`,
-            sem_permissao: (space) => `Você não anota mais no ${spaceLabel(space)}. No app, abra Conta, toque em ${w.name} e ligue de novo, escolhendo o espaço.`,
+            ligado: (space, name) => `Pronto, ${w.whoLinked} está ligado à ${name ? `conta de ${name} na ` : ''}Clarevo, no ${spaceLabel(space)}.\n\n${EXAMPLES}\n\n${words}`,
+            sem_permissao: (space) => `Você não anota mais no ${spaceLabel(space)}. ${where.relink}`,
         };
     }
     const REPLIES = { whatsapp: chatReplies('whatsapp'), telegram: chatReplies('telegram') };
@@ -363,7 +382,7 @@ const __mods = [
             case 'registrada':
                 return null;
             case 'ligado':
-                return r.ligado(outcome.space);
+                return r.ligado(outcome.space, outcome.name);
             case 'anotado':
                 return `Anotado no ${spaceLabel(outcome.space)}:\n${recordLines(outcome.record, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
             case 'desfeito':
@@ -691,6 +710,14 @@ const __mods = [
         receita: ['Salário', 'Renda extra', 'Reembolso'],
     };
   },
+  // packages/core/src/whatsapp/canais.ts
+  function (module, exports, __req) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.TELEGRAM_IN_ACCOUNT = exports.WHATSAPP_IN_ACCOUNT = void 0;
+    exports.WHATSAPP_IN_ACCOUNT = false;
+    exports.TELEGRAM_IN_ACCOUNT = false;
+  },
   // packages/core/src/whatsapp/servidor.ts
   function (module, exports, __req) {
     "use strict";
@@ -700,6 +727,7 @@ const __mods = [
     exports.sameText = sameText;
     exports.verifyMetaSignature = verifyMetaSignature;
     exports.whatsappPhoneHash = whatsappPhoneHash;
+    exports.chatMessageKey = chatMessageKey;
     exports.obj = obj;
     exports.whatsappInbound = whatsappInbound;
     exports.answerChatMessage = answerChatMessage;
@@ -712,7 +740,7 @@ const __mods = [
     exports.createWhatsAppHandler = createWhatsAppHandler;
     const dates_1 = __req(4);
     const sha256_1 = __req(2);
-    const mensagem_1 = __req(9);
+    const mensagem_1 = __req(10);
     const respostas_1 = __req(3);
     exports.WHATSAPP_TIME_ZONE = 'America/Sao_Paulo';
     exports.WHATSAPP_GRAPH_VERSION = 'v23.0';
@@ -746,6 +774,9 @@ const __mods = [
     }
     function whatsappPhoneHash(waId, phoneKey) {
         return hmacSha256Hex((0, sha256_1.utf8Bytes)(phoneKey), (0, sha256_1.utf8Bytes)(waId.replace(/\D/g, '')));
+    }
+    function chatMessageKey(channel, rawId, key) {
+        return `${channel}:${hmacSha256Hex((0, sha256_1.utf8Bytes)(key), (0, sha256_1.utf8Bytes)(`${channel}-mensagem:${rawId}`))}`;
     }
     function obj(v) {
         return typeof v === 'object' && v !== null && !Array.isArray(v) ? v : null;
@@ -833,7 +864,7 @@ const __mods = [
     }
     const SILENT_TYPES = new Set(['reaction', 'system', 'unsupported', 'errors']);
     async function handleWhatsAppMessage(msg, rpc, phoneKey) {
-        const base = { p_message_id: msg.id, p_phone_hash: whatsappPhoneHash(msg.from, phoneKey) };
+        const base = { p_message_id: chatMessageKey('whatsapp', msg.id, phoneKey), p_phone_hash: whatsappPhoneHash(msg.from, phoneKey) };
         if (msg.type === 'system' && msg.systemType === 'user_changed_number') {
             await rpc('whatsapp_unlink', base);
             return null;
@@ -885,7 +916,7 @@ const __mods = [
         };
     }
     const RESULTS = new Set([
-        'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido',
+        'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
         'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida', 'repetida',
         'silencio', 'registrada',
     ]);
@@ -1012,8 +1043,8 @@ const __mods = [
     exports.whatsappCategory = whatsappCategory;
     exports.readWhatsAppMessage = readWhatsAppMessage;
     const dates_1 = __req(4);
-    const categorias_1 = __req(10);
-    const dedupe_1 = __req(11);
+    const categorias_1 = __req(11);
+    const dedupe_1 = __req(12);
     const money_1 = __req(6);
     const records_1 = __req(7);
     exports.WHATSAPP_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -1233,7 +1264,7 @@ const __mods = [
     exports.suggestCategory = suggestCategory;
     exports.rememberCategories = rememberCategories;
     const records_1 = __req(7);
-    const dedupe_1 = __req(11);
+    const dedupe_1 = __req(12);
     exports.MEMORY_LIMIT = 300;
     function memoryKey(description) {
         const words = (0, dedupe_1.descriptionTokens)(description).slice(0, 3);
@@ -1414,7 +1445,8 @@ const __mods = [
     exports.telegramStartLink = telegramStartLink;
     const respostas_1 = __req(3);
     exports.TELEGRAM_BOT = null;
-    exports.TELEGRAM_IN_ACCOUNT = false;
+    var canais_1 = __req(8);
+    Object.defineProperty(exports, "TELEGRAM_IN_ACCOUNT", { enumerable: true, get: function () { return canais_1.TELEGRAM_IN_ACCOUNT; } });
     function isTelegramBotName(name) {
         return /^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(name) && /bot$/i.test(name);
     }

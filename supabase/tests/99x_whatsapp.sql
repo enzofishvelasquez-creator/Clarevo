@@ -256,7 +256,7 @@ begin
   assert pg_temp.link('wa-m-001', '5521900000001', 'ZZZZ2222') = '{"result": "codigo_invalido"}', 'código que não existe';
   assert pg_temp.link('wa-m-002', '5521900000001', pg_temp.code('ana1')) = '{"result": "codigo_invalido"}', 'o código anterior não vale mais';
   r := pg_temp.link('wa-m-003', '5521900000001', lower(substr(pg_temp.code('ana2'), 1, 4) || '-' || substr(pg_temp.code('ana2'), 5)));
-  assert r = '{"result": "ligado", "space": {"kind": "pessoal", "name": "Pessoal"}}', 'ligado no Pessoal (com hífen e minúsculas): ' || r::text;
+  assert r = '{"result": "ligado", "space": {"kind": "pessoal", "name": "Pessoal"}, "name": "Ana"}', 'ligado no Pessoal (com hífen e minúsculas), com o nome de quem gerou o código: ' || r::text;
   -- A sessão de serviço volta ao que era.
   assert current_setting('request.jwt.claims', true) = '{"role":"service_role"}' and current_setting('request.jwt.claim.sub', true) = '',
     'a sessão emprestada é devolvida';
@@ -437,7 +437,7 @@ begin
   r := pg_temp.link('wa-m-200', '5521900000004', 'ativar' || pg_temp.code('eli1'));
   assert r ->> 'result' = 'codigo_invalido', 'a palavra "ativar" é tirada pelo servidor, não pelo banco';
   r := pg_temp.link('wa-m-201', '5521900000004', pg_temp.code('eli1'));
-  assert r = '{"result": "ligado", "space": {"kind": "familia", "name": "Família da Ana"}}', 'ligado na Família: ' || r::text;
+  assert r = '{"result": "ligado", "space": {"kind": "familia", "name": "Família da Ana"}, "name": "Eli"}', 'ligado na Família, com o nome do Eli: ' || r::text;
   r := pg_temp.add('wa-m-202', '5521900000004', 'despesa', 4500, '2026-10-30', 'Farmácia', 'Saúde');
   assert r ->> 'result' = 'anotado' and r #>> '{space,name}' = 'Família da Ana', 'anotado na Família';
 end $$;
@@ -540,7 +540,8 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- 8. Um número por pessoa e uma pessoa por número (W2).
 -- ---------------------------------------------------------------------------
--- A Bia liga o número que era da Ana: a Ana fica sem vínculo. Depois a Ana liga outro número.
+-- O número que era da Ana passa à Bia: o código da Bia sozinho não tira o número da Ana (ja_ligado, 0022); quem tem o número manda
+-- DESLIGAR e, depois, o código da Bia liga. Depois a Ana liga outro número.
 set role authenticated;
 do $$
 declare
@@ -557,14 +558,28 @@ reset role;
 set role service_role;
 select pg_temp.as_service();
 do $$ begin
-  assert pg_temp.link('wa-m-400', '5521900000001', pg_temp.code('bia2')) ->> 'result' = 'ligado', 'a Bia liga o número da Ana';
+  assert pg_temp.link('wa-m-399', '5521900000001', pg_temp.code('bia2')) = '{"result": "ja_ligado"}', 'o número da Ana não passa sozinho à Bia';
+  assert pg_temp.outcome('wa-m-399') = 'ja_ligado' and pg_temp.code_of('bia') is not null, 'registrado, sem gastar o código da Bia';
+  assert pg_temp.unlink('wa-m-399b', '5521900000001') = '{"result": "desligado"}', 'quem tem o número desliga';
+  assert pg_temp.link('wa-m-400', '5521900000001', pg_temp.code('bia2')) ->> 'result' = 'ligado', 'e a Bia liga o número que era da Ana';
 end $$;
 reset role;
 do $$ begin
   assert pg_temp.linked('ana') = '-', 'a Ana perde o número';
   assert pg_temp.linked('bia') = pg_temp.ph('5521900000001') || '@' || pg_temp.id('bia_ctx'), 'a Bia troca de número';
   assert (select count(*) from public.chat_links where sender_hash = pg_temp.ph('5521900000003')) = 0, 'o número antigo da Bia sai';
+  assert pg_temp.code_of('ana') is null, 'desligar pelo número apagou também o código pendente da Ana';
 end $$;
+set role authenticated;
+do $$
+declare
+  r jsonb;
+begin
+  perform pg_temp.as_('ana');
+  r := public.create_whatsapp_code(pg_temp.id('fam'), 'wa-ana-code-0405');
+  update codes set code = r ->> 'code' where name = 'ana3';
+end $$;
+reset role;
 set role service_role;
 select pg_temp.as_service();
 do $$ begin

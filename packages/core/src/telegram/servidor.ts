@@ -3,6 +3,7 @@ import { TELEGRAM_REPLY, type WhatsAppOutcome } from '../whatsapp/respostas';
 import {
   WhatsAppFinalError,
   answerChatMessage,
+  chatMessageKey,
   hmacSha256Hex,
   obj,
   sameText,
@@ -40,8 +41,7 @@ export function telegramSenderHash(userId: number, idKey: string): string {
 }
 
 export interface TelegramInbound {
-  /** Identificador da mensagem, como o banco guarda: 'telegram:<conversa>:<mensagem>' (a chave de repetição). */
-  id: string;
+  /** A conversa (para a resposta). Numa conversa particular, é a própria conta de quem escreveu: nunca vai ao banco. */
   chatId: number;
   messageId: number;
   /** Quem mandou: usado só para o resumo, nunca guardado. Numa conversa particular, é o mesmo da conversa. */
@@ -74,7 +74,7 @@ export function telegramInbound(payload: unknown): TelegramInbound | null {
   const messageId = msg.message_id;
   const date = msg.date;
   if (!isId(chatId) || !isId(fromId) || chatId !== fromId || !isId(messageId) || messageId <= 0 || !isId(date) || date <= 0) return null;
-  const base = { id: `telegram:${chatId}:${messageId}`, chatId, messageId, fromId, timestamp: date };
+  const base = { chatId, messageId, fromId, timestamp: date };
   if (typeof msg.text === 'string') return { ...base, kind: 'texto', text: msg.text };
   if (MEDIA_KEYS.some((k) => k in msg)) return { ...base, kind: 'midia', text: null };
   return null;
@@ -107,7 +107,8 @@ export type TelegramRpc = (fn: string, args: Record<string, unknown>) => Promise
 
 /** Uma mensagem do Telegram: a resposta (null: não responder), pelas mesmas regras do WhatsApp, com as funções telegram_* do banco. */
 export async function handleTelegramMessage(msg: TelegramInbound, rpc: TelegramRpc, idKey: string): Promise<string | null> {
-  const base = { p_message_id: msg.id, p_sender_hash: telegramSenderHash(msg.fromId, idKey) };
+  // Ao banco vão só resumos: o da conta e o da mensagem (a conversa e o número da mensagem juntos), nunca o identificador da conta.
+  const base = { p_message_id: chatMessageKey('telegram', `${msg.chatId}:${msg.messageId}`, idKey), p_sender_hash: telegramSenderHash(msg.fromId, idKey) };
   return answerChatMessage(
     { channel: 'telegram', kind: msg.kind, text: msg.text === null ? null : telegramCommandText(msg.text), timestamp: msg.timestamp },
     (op, args) => rpc(`telegram_${op}`, { ...base, ...args }),

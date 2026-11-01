@@ -9,6 +9,7 @@ import {
   WHATSAPP_CODE_ALPHABET,
   WHATSAPP_REPLY,
   WHATSAPP_TEXT,
+  chatMessageKey,
   createWhatsAppHandler,
   formatWhatsAppNumber,
   handleWhatsAppMessage,
@@ -317,11 +318,14 @@ describe('WhatsApp: servidor', () => {
     });
     const hash = whatsappPhoneHash('5521988887777', 'chave');
     const sentAt = '2026-10-30T12:00:00.000Z';
+    // O identificador da Meta (wamid) traz o número: ao banco vai só o resumo dele, com a chave da função.
+    const key = chatMessageKey('whatsapp', 'wamid.1', 'chave');
+    expect(key).toBe(`whatsapp:${createHmac('sha256', 'chave').update('whatsapp-mensagem:wamid.1').digest('hex')}`);
 
     expect(await handleWhatsAppMessage(msg('mercado 10'), rpc, 'chave')).toContain('Anotado no espaço Pessoal');
     expect(calls).toEqual([
       ['whatsapp_add_record', {
-        p_message_id: 'wamid.1', p_phone_hash: hash, p_sent_at: sentAt, p_kind: 'despesa', p_amount_cents: 1000, p_days_ago: 0, p_occurred_on: null,
+        p_message_id: key, p_phone_hash: hash, p_sent_at: sentAt, p_kind: 'despesa', p_amount_cents: 1000, p_days_ago: 0, p_occurred_on: null,
         p_description: 'Mercado', p_category: 'Mercado',
       }],
     ]);
@@ -335,8 +339,8 @@ describe('WhatsApp: servidor', () => {
     expect(await handleWhatsAppMessage(msg('desfazer'), rpc, 'chave')).toBeNull();
     expect(await handleWhatsAppMessage(msg('parar'), rpc, 'chave')).toBeNull();
     expect(calls.map((c) => c[0])).toEqual(['whatsapp_link', 'whatsapp_undo', 'whatsapp_unlink']);
-    expect(calls[0]![1]).toEqual({ p_message_id: 'wamid.1', p_phone_hash: hash, p_code: 'ABCDEF23' });
-    expect(calls[1]![1]).toEqual({ p_message_id: 'wamid.1', p_phone_hash: hash, p_sent_at: sentAt });
+    expect(calls[0]![1]).toEqual({ p_message_id: key, p_phone_hash: hash, p_code: 'ABCDEF23' });
+    expect(calls[1]![1]).toEqual({ p_message_id: key, p_phone_hash: hash, p_sent_at: sentAt });
     calls.length = 0;
     // Sem dados, mas registradas (repetição da Meta e limite de mensagens): ajuda, recusa de leitura, mídia; reação nem isso.
     expect(await handleWhatsAppMessage(msg('oi'), rpc, 'chave')).toBe(WHATSAPP_REPLY.ajuda);
@@ -512,7 +516,7 @@ describe('WhatsApp: servidor', () => {
     });
 
     it('recusa definitiva do banco (4xx): responde que não deu, segue com as outras e devolve 200', async () => {
-      const net = fakeNet(200, { result: 'nao_ligado' }, (body) => (body.includes('wamid.ruim') ? 400 : 200));
+      const net = fakeNet(200, { result: 'nao_ligado' }, (body) => (body.includes(chatMessageKey('whatsapp', 'wamid.ruim', config.phoneKey)) ? 400 : 200));
       const logs: string[] = [];
       const h = createWhatsAppHandler({ config, fetch: net.fetcher, log: (m) => logs.push(m) });
       const { t, sig } = signed(payload([text('wamid.ruim', 'mercado 10'), text('wamid.boa', 'mercado 20')]));

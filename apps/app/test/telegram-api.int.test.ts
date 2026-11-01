@@ -98,7 +98,7 @@ describe('Telegram pela API, com a função do servidor', () => {
 
     expect((await send(`/start ${whatsapp.code}`)).reply!.text).toBe(TELEGRAM_REPLY.codigo_invalido);
     const ok = await send(`/start ${code.code}`);
-    expect(ok.reply!.text).toContain('Pronto, este Telegram está ligado à Clarevo, no espaço Pessoal.');
+    expect(ok.reply!.text).toContain('Pronto, este Telegram está ligado à conta de Ivo na Clarevo, no espaço Pessoal.');
     const linked = await repo.getChatLink('telegram');
     expect([linked.linked, linked.contextId, linked.codeContextId]).toEqual([true, pessoal, null]);
     // O WhatsApp é outro canal: o código dele continua, e nada foi ligado lá.
@@ -146,7 +146,7 @@ describe('Telegram pela API, com a função do servidor', () => {
     expect((await repo.getChatLink('telegram')).linked).toBe(false);
     expect((await send('café 5')).reply!.text).toBe(TELEGRAM_REPLY.nao_ligado);
     const code = await repo.createChatCode('telegram', newOperationKey(), pessoal);
-    expect((await send(`/start ${code.code}`)).reply!.text).toContain('ligado à Clarevo');
+    expect((await send(`/start ${code.code}`)).reply!.text).toContain('ligado à conta de Ivo na Clarevo');
     const key = newOperationKey();
     const off = await repo.unlinkChat('telegram', key);
     expect(off).toEqual({ linked: false, contextId: null, linkedAt: null, codeContextId: null, codeExpiresAt: null });
