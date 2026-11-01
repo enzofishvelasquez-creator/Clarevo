@@ -8195,17 +8195,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
-  // ---- 7. A lista do guia: cinco grupos, trinta e cinco entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Análises", D-059, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, e "Excluir minha conta", D-058) ----
+  // ---- 7. A lista do guia: cinco grupos, trinta e sete entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Análises", D-059, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, "Excluir minha conta", D-058, e "Ler comprovante, holerite ou nota de serviço" e "Ler boleto", D-078 e D-079) ----
   await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   const j1Groups = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => ({
     title: h.textContent, rows: [...h.parentElement.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label') || b.textContent) })));
   const j1G = await j1Groups();
   ok('Tutorial guia: /aprender/guia com o título "Como usar o app da Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
-  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 10, 7, 8, 2 e 8 entradas (Dia a dia ganhou "Seu mês em 30 segundos", "Evolução" e "Análises" e Conta e privacidade ganhou "Família", "Painel da empresa" e "Benefício pela empresa")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
-    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([10, 7, 8, 2, 8]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
+  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 8, 2 e 8 entradas (Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa" e "Benefício pela empresa")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
+    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 8, 2, 8]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
-  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 35 &&
+  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 37 &&
     j1Rows.includes('Buscar em Movimentos. Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.') &&
     j1Rows.includes('Exportar meus dados. Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.') &&
     j1Rows.some((r) => r.startsWith('Importar extrato ou fatura. Traz gastos, recebimentos e compras no cartão de um arquivo do banco')) &&
@@ -8642,14 +8642,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Nota fiscal de serviço fictícia (NFS-e, D-079), no formato do DANFSe nacional: o rodapé com número e chave, a data da DPS, o valor
   // do serviço, as retenções e o "Valor Líquido da NFS-e + IBS/CBS" zerado são armadilhas; CNPJ, e-mail, endereço e chave nunca saem.
   const I2_NFSE_KEY = '33045572251234567800019000000000003526100001234567';
-  const I2_NFSE_SECRETS = ['12.345.678', '11.222.333', 'alex@exemplo.com', 'AVENIDA MODELO', I2_NFSE_KEY, 'material de exemplo', 'R$ 4.500,00', 'R$ 300,00'];
+  const I2_NFSE_SECRETS = ['12.345.678', '11.222.333', 'alex@exemplo.com', 'AVENIDA MODELO', I2_NFSE_KEY, 'material de exemplo', 'R$ 4.517,45', 'R$ 317,45'];
   const i2Nfse = i2File('nfse.pdf', [
     `N° NFS-e / CHAVE NFS-e`, `35 / ${I2_NFSE_KEY}`, 'DANFSe v2.0', 'Documento Auxiliar da NFS-e', 'CHAVE DE ACESSO DA NFS-e', I2_NFSE_KEY,
     'NÚMERO DA NFS-e', '35', 'COMPETÊNCIA DA NFS-e', '01/10/2026', 'DATA E HORA DA EMISSÃO DA NFS-e', '05/10/2026 16:49:04',
     'DATA E HORA DA EMISSÃO DA DPS', '04/10/2026 10:00:00', 'PRESTADOR / FORNECEDOR', 'CNPJ / CPF / NIF', '12.345.678/0001-90',
     'Nome / Nome Empresarial', '12.345.678 ALEX EXEMPLO DA SILVA', 'E-mail', 'alex@exemplo.com', 'TOMADOR / ADQUIRENTE', 'CNPJ / CPF / NIF', '11.222.333/0001-81',
     'Nome / Nome Empresarial', 'EMPRESA EXEMPLO DE TECNOLOGIA LTDA', 'Endereço', 'AVENIDA MODELO, 20', 'SERVIÇO PRESTADO', 'Descrição do Serviço',
-    'Criação de material de exemplo', 'VALOR DA OPERAÇÃO / SERVIÇO', 'R$ 4.500,00', 'Total das Retenções (ISSQN / Federais)', 'R$ 300,00',
+    'Criação de material de exemplo', 'VALOR DA OPERAÇÃO / SERVIÇO', 'R$ 4.517,45', 'Total das Retenções (ISSQN / Federais)', 'R$ 317,45',
     'VALOR LÍQUIDO DA NFS-e', 'R$ 4.200,00', 'VALOR LÍQUIDO DA NFS-e + IBS/CBS', 'R$ 0,00',
   ]);
   const i2Danfe = i2File('nota.pdf', ['DANFE', 'Documento Auxiliar da Nota Fiscal Eletrônica', 'CHAVE DE ACESSO', '3326 1011 2223 3300 0181 5500 1000 0043 2118 7654 3216', 'VALOR TOTAL DA NOTA', '150,00']);
