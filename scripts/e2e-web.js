@@ -14178,7 +14178,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ok('Telegram: a tela pelo endereço, com título, exemplos, privacidade e o aviso da demonstração, sem falar em WhatsApp nem em número',
       new URL(p.url()).pathname === '/conta/telegram' && (await h1Name()) === 'Telegram' && t.includes('mercado 52,30') && t.includes('recebi 1500 salário') &&
       t.includes('DESLIGAR: desliga o Telegram') && t.includes('As mensagens passam pelos servidores do Telegram') &&
-      t.includes('Na demonstração, o Telegram não é ligado.') && !/whatsapp|meta|número/i.test(t.replace(/Conta principal/g, '')), t.slice(0, 600));
+      t.includes('Na demonstração, o Telegram não é ligado.') && !/whatsapp|\bmeta\b|número/i.test(t), t.slice(0, 600));
     ok('Telegram: na demonstração, sem gerar código nem desligar', (await visibleCount('button', 'Gerar código')) === 0 && (await visibleCount('button', 'Desligar o Telegram')) === 0);
     await atWidths(async (w) => { await layoutChecks(`Telegram na demonstração ${w}px`); });
     await shot('614_telegram_demonstracao');
