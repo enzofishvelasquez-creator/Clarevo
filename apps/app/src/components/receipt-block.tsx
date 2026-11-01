@@ -103,7 +103,8 @@ const linkStyle = { alignSelf: 'flex-start', paddingHorizontal: 0 } as const;
  * pagamento: "Comprovante lido: Pix enviado · Maria Souza · R$ 85,00 · 05/10/2026 às 14:32", o que o comprovante não trouxe (valor,
  * dia, nome), a mensagem que a pessoa escreveu nele, a frase de privacidade, "Ler outro comprovante" e "Desfazer leitura". Quando o
  * comprovante é do outro lado (um Pix recebido em Anotar gasto, um Pix enviado em Registrar recebimento), nada foi preenchido: o
- * bloco avisa e oferece a troca. Região viva: a leitura é anunciada. Nada foi salvo.
+ * bloco avisa e oferece a troca. Nota de serviço (D-079): diz de que lado a leitura pôs a pessoa (prestou ou contratou), com a troca de
+ * tela, e que a data é a da emissão. Região viva: a leitura é anunciada. Nada foi salvo.
  */
 export function ProofBlock({
   draft,
@@ -142,6 +143,18 @@ export function ProofBlock({
         <>
           {!gaps.amount && !gaps.day ? <Txt variant="label">{COMPROVANTE_TEXT.filled}</Txt> : null}
           {gaps.guessed ? <Txt variant="label">{gaps.guessed}</Txt> : null}
+          {gaps.side ? (
+            // Nota de serviço (D-079): a tela decidiu o lado; quem está do outro lado troca de tela com a mesma leitura.
+            <View style={{ gap: space[1] }}>
+              <Txt variant="label">{gaps.side}</Txt>
+              <LinkButton
+                label={draft.direction === 'entrada' ? COMPROVANTE_TEXT.switchToExpense : COMPROVANTE_TEXT.switchToIncome}
+                style={linkStyle}
+                onPress={onSwitch}
+              />
+            </View>
+          ) : null}
+          {!dayEmpty && gaps.issued ? <Txt variant="label">{gaps.issued}</Txt> : null}
           {amountEmpty && gaps.amount ? <Txt variant="label">{gaps.amount}</Txt> : null}
           {dayEmpty && gaps.day ? <Txt variant="label">{gaps.day}</Txt> : null}
           {descriptionEmpty && gaps.name ? <Txt variant="label">{gaps.name}</Txt> : null}
@@ -153,7 +166,7 @@ export function ProofBlock({
         </>
       )}
       <Txt variant="caption" color={colors.textSecondary}>
-        {COMPROVANTE_TEXT.privacy}
+        {draft.kind === 'nota_servico' ? COMPROVANTE_TEXT.note.privacy : COMPROVANTE_TEXT.privacy}
       </Txt>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[5] }}>
         <LinkButton

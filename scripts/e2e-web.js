@@ -8639,6 +8639,19 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     'Data de vencimento', '01/10/2026', 'Data do pagamento', '05/10/2026', 'Autenticação', '7F3A9C21B8D04E56A1F2C3D4E5B6A7C8',
   ]);
   const i2Photo = i2File('foto.pdf', []);
+  // Nota fiscal de serviço fictícia (NFS-e, D-079), no formato do DANFSe nacional: o rodapé com número e chave, a data da DPS, o valor
+  // do serviço, as retenções e o "Valor Líquido da NFS-e + IBS/CBS" zerado são armadilhas; CNPJ, e-mail, endereço e chave nunca saem.
+  const I2_NFSE_KEY = '33045572251234567800019000000000003526100001234567';
+  const I2_NFSE_SECRETS = ['12.345.678', '11.222.333', 'alex@exemplo.com', 'AVENIDA MODELO', I2_NFSE_KEY, 'material de exemplo', 'R$ 4.500,00', 'R$ 300,00'];
+  const i2Nfse = i2File('nfse.pdf', [
+    `N° NFS-e / CHAVE NFS-e`, `35 / ${I2_NFSE_KEY}`, 'DANFSe v2.0', 'Documento Auxiliar da NFS-e', 'CHAVE DE ACESSO DA NFS-e', I2_NFSE_KEY,
+    'NÚMERO DA NFS-e', '35', 'COMPETÊNCIA DA NFS-e', '01/10/2026', 'DATA E HORA DA EMISSÃO DA NFS-e', '05/10/2026 16:49:04',
+    'DATA E HORA DA EMISSÃO DA DPS', '04/10/2026 10:00:00', 'PRESTADOR / FORNECEDOR', 'CNPJ / CPF / NIF', '12.345.678/0001-90',
+    'Nome / Nome Empresarial', '12.345.678 ALEX EXEMPLO DA SILVA', 'E-mail', 'alex@exemplo.com', 'TOMADOR / ADQUIRENTE', 'CNPJ / CPF / NIF', '11.222.333/0001-81',
+    'Nome / Nome Empresarial', 'EMPRESA EXEMPLO DE TECNOLOGIA LTDA', 'Endereço', 'AVENIDA MODELO, 20', 'SERVIÇO PRESTADO', 'Descrição do Serviço',
+    'Criação de material de exemplo', 'VALOR DA OPERAÇÃO / SERVIÇO', 'R$ 4.500,00', 'Total das Retenções (ISSQN / Federais)', 'R$ 300,00',
+    'VALOR LÍQUIDO DA NFS-e', 'R$ 4.200,00', 'VALOR LÍQUIDO DA NFS-e + IBS/CBS', 'R$ 0,00',
+  ]);
   const i2Danfe = i2File('nota.pdf', ['DANFE', 'Documento Auxiliar da Nota Fiscal Eletrônica', 'CHAVE DE ACESSO', '3326 1011 2223 3300 0181 5500 1000 0043 2118 7654 3216', 'VALOR TOTAL DA NOTA', '150,00']);
   const i2Order = i2File('pedido.pdf', ['PEDIDO DE COMPRA', 'Obrigado pela compra', 'Valor total 150,00', 'Entrega em até 5 dias úteis']);
   const i2NotPdf = path.join(i2Dir, 'texto.pdf'); fs.writeFileSync(i2NotPdf, 'isto não é um PDF, só texto');
@@ -8800,9 +8813,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const situation = text('Recebimento já realizado');
     return { line: line ? line.getBoundingClientRect().top : null, height: line ? Math.round(line.getBoundingClientRect().height) : null, situation: situation ? situation.getBoundingClientRect().top : null, label: line?.getAttribute('aria-label') };
   });
-  ok('I2 Registrar recebimento: "Ler comprovante de Pix ou pagamento" é o primeiro elemento (linha de 56 px, acima de "Recebimento já realizado"), com a dica "Comprovante ou holerite, em PDF ou imagem, lido aqui no aparelho", e não há "Escanear nota fiscal"',
+  ok('I2 Registrar recebimento: "Ler comprovante de Pix ou pagamento" é o primeiro elemento (linha de 56 px, acima de "Recebimento já realizado"), com a dica "Comprovante, holerite ou nota de serviço, em PDF ou imagem, lido aqui no aparelho", e não há "Escanear nota fiscal"',
     i2IncomeTops.line !== null && i2IncomeTops.situation !== null && i2IncomeTops.line < i2IncomeTops.situation && i2IncomeTops.height >= 56 &&
-    i2IncomeTops.label === 'Ler comprovante de Pix ou pagamento. Comprovante ou holerite, em PDF ou imagem, lido aqui no aparelho.' && (await body()).includes('Comprovante ou holerite, em PDF ou imagem, lido aqui no aparelho') && (await visibleCount('button', /^Escanear nota fiscal\./)) === 0, JSON.stringify(i2IncomeTops));
+    i2IncomeTops.label === 'Ler comprovante de Pix ou pagamento. Comprovante, holerite ou nota de serviço, em PDF ou imagem, lido aqui no aparelho.' && (await body()).includes('Comprovante, holerite ou nota de serviço, em PDF ou imagem, lido aqui no aparelho') && (await visibleCount('button', /^Escanear nota fiscal\./)) === 0, JSON.stringify(i2IncomeTops));
   await i2Keep();
   await i2Shots('355_comprovante_recebimento');
   await i2ReadIncome(i2Sent);
@@ -8842,6 +8855,38 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   i2t = await i2PageText();
   ok('I2 holerite: nome, CNPJ, banco, conta, plano de saúde e os outros valores não aparecem em lugar nenhum da página',
     ['ALEX', 'EMPRESA EXEMPLO', '12.345.678', '12345-6', 'PLANO DE SAUDE', '3.100,00', '754,33', '444,33'].every((s) => !i2t.includes(s)), ['ALEX', 'EMPRESA EXEMPLO', '12.345.678', '12345-6', 'PLANO DE SAUDE', '3.100,00', '754,33', '444,33'].filter((s) => i2t.includes(s)).join(' | '));
+  await i2Leave();
+
+  // ---- 8b2. Nota fiscal de serviço (NFS-e, D-079) em Registrar recebimento: o líquido, a data de emissão e "Nota fiscal 35 para" quem
+  // contratou; "Trocar para Anotar gasto" põe o nome de quem prestou; no PDF da nota, a nota de serviço aponta a leitura certa ----
+  await i2NewIncome();
+  await i2ReadIncome(i2Nfse, 'Nota de serviço lida:');
+  i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
+  ok('I2 nota de serviço em Registrar recebimento: "Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026", o líquido (não o do serviço nem o zerado), a data de emissão (não a da DPS), "Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda" com a legenda, o lado e a data explicados, a privacidade da nota e "Trocar para Anotar gasto"',
+    i2t.includes('Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026') && i2v.amount === '4.200,00' && i2v.date === '05/10/2026' &&
+    i2v.desc === 'Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda' && i2t.includes('Número e nome lidos da nota') &&
+    i2t.includes('Lemos como um serviço que você prestou: o nome é de quem contratou.') && i2t.includes('A data é a da emissão da nota. Se o pagamento foi em outro dia, troque a data.') &&
+    i2t.includes('A nota foi lida aqui no aparelho e não é guardada. Não guardamos CPF, CNPJ, endereço nem a chave da nota.') && (await visibleCount('button', 'Trocar para Anotar gasto')) === 1, JSON.stringify(i2v));
+  i2t = await i2PageText();
+  ok('I2 nota de serviço: CNPJ, e-mail, endereço, chave, descrição do serviço e os outros valores não aparecem em lugar nenhum da página',
+    I2_NFSE_SECRETS.every((x) => !i2t.includes(x)), I2_NFSE_SECRETS.filter((x) => i2t.includes(x)).join(' | '));
+  await i2Shots('357_nota_servico_recebimento');
+  await btn('Trocar para Anotar gasto').click(); await waitText('Será salvo em', 12000); await waitText('Nota de serviço lida:', 12000); await p.waitForTimeout(900);
+  i2t = await i2Keep(); i2v = await i2Values();
+  ok('I2 nota de serviço trocada para Anotar gasto: o nome passa a ser o de quem prestou ("Nota fiscal 35 de Alex Exemplo da Silva", sem a raiz do CNPJ), com o mesmo valor e a mesma data, e a troca de volta',
+    (await h1Name()) === 'Anotar gasto' && i2t.includes('Nota de serviço lida: Alex Exemplo da Silva · R$ 4.200,00 · 05/10/2026') && i2v.desc === 'Nota fiscal 35 de Alex Exemplo da Silva' &&
+    i2v.amount === '4.200,00' && i2v.date === '05/10/2026' && i2t.includes('Lemos como um serviço que você contratou: o nome é de quem prestou.') &&
+    (await visibleCount('button', 'Trocar para Registrar recebimento')) === 1, JSON.stringify(i2v));
+  i2t = await i2PageText();
+  ok('I2 nota de serviço em Anotar gasto: nenhum dado da nota além do nome, do valor e da data', I2_NFSE_SECRETS.every((x) => !i2t.includes(x)), I2_NFSE_SECRETS.filter((x) => i2t.includes(x)).join(' | '));
+  await i2Leave();
+  await i2NewExpense();
+  await i2Sheet();
+  { const [chooser] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]); await chooser.setFiles(i2Nfse); }
+  await waitText('Esta é uma nota de serviço. Para lê-la, use Ler comprovante de Pix ou pagamento, nesta mesma lista.', 20000); await p.waitForTimeout(400);
+  i2t = await i2Keep(); i2v = await i2Values();
+  ok('I2 nota de serviço pelo PDF da nota: "Esta é uma nota de serviço. Para lê-la, use Ler comprovante de Pix ou pagamento, nesta mesma lista." e nada preenchido',
+    !i2t.includes('Nota lida') && i2v.amount === '' && i2v.desc === '', i2t.slice(0, 300));
   await i2Leave();
 
   // ---- 8c. Print (imagem) de comprovante, lido no aparelho (D-078 B): o texto da imagem vai para o mesmo leitor do PDF, sem pedido
@@ -8905,7 +8950,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   };
   await i2Bad(i2Photo, 'Não encontramos texto neste PDF. Ele pode ser uma foto do comprovante. Digite os dados à mão.', 'PDF sem texto (foto)');
   await i2Shots('356_comprovante_erro', false);
-  await i2Bad(i2Danfe, 'Este PDF parece ser de uma nota fiscal, não de um comprovante. Para ler notas, use Escanear nota fiscal em Anotar gasto.', 'PDF de nota fiscal (DANFE)');
+  await i2Bad(i2Danfe, 'Esta é uma nota fiscal de produto. Para anotar uma compra com nota, use Escanear nota fiscal em Anotar gasto. Aqui lemos comprovantes, holerites e notas de serviço.', 'PDF de nota fiscal de produto (DANFE)');
   await i2Bad(i2Order, 'Não reconhecemos um comprovante neste PDF. Confira se é o comprovante de um Pix, de uma TED, de um boleto ou de um pagamento.', 'PDF que não é de comprovante');
   await i2Bad(i2NotPdf, 'Este arquivo não é um PDF.', 'arquivo que não é PDF');
   await i2Leave();

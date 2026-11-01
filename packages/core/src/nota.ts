@@ -866,6 +866,8 @@ export const NOTA_TEXT = {
   pdf: {
     noText: 'Não encontramos texto neste PDF. Ele pode ser uma foto da nota. Tente escanear o código de barras da chave ou colar a chave.',
     noKey: 'Não encontramos a chave de acesso neste PDF. Confira se é o PDF da nota fiscal (o DANFE).',
+    /** NFS-e (D-079): lida por Ler comprovante de Pix ou pagamento, na mesma lista. */
+    serviceNote: 'Esta é uma nota de serviço. Para lê-la, use Ler comprovante de Pix ou pagamento, nesta mesma lista.',
     tooBig: 'Este PDF é grande demais para ler aqui. Tente escanear o código de barras da chave ou colar a chave.',
     failed: 'Não foi possível ler este PDF. Tente escanear o código de barras da chave ou colar a chave.',
     notPdf: 'Este arquivo não é um PDF.',

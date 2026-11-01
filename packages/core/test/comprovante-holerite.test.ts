@@ -147,7 +147,7 @@ describe('holerite em PDF: valor líquido e mês de competência', () => {
     const draft = comprovanteDraft(r.reading, '2026-10-31');
     expect(comprovanteKindLabel('holerite', 'entrada')).toBe('Holerite');
     expect(comprovanteReadLine(draft)).toBe('Comprovante lido: Holerite · R$ 2.345,67');
-    expect(comprovanteGaps(draft)).toEqual({ amount: null, day: COMPROVANTE_TEXT.holeriteDay, name: null, guessed: null });
+    expect(comprovanteGaps(draft)).toEqual({ amount: null, day: COMPROVANTE_TEXT.holeriteDay, name: null, guessed: null, side: null, issued: null });
     expect(suggestComprovanteDescription(draft, null, 'receita')).toEqual({
       description: 'Salário de setembro de 2026',
       category: 'Salário',

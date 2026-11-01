@@ -2474,6 +2474,16 @@ describe('textos do comprovante de Pix e de pagamento (D-051)', () => {
         }
       }
     }
+    // Nota de serviço (D-079): a tela decide o lado; com e sem número, nome, valor e data.
+    const note = reading({ kind: 'nota_servico', direction: 'entrada', serviceNote: { number: '35', provider: 'Alex Exemplo', client: 'Empresa Exemplo Ltda' } });
+    for (const over of [{}, { amountCents: null }, { occurredOn: null }, { occurredOn: '2027-01-01' }, { serviceNote: { number: null, provider: null, client: null } }] as const) {
+      for (const screen of ['despesa', 'receita'] as const) {
+        const draft = comprovanteDraft({ ...note, ...over }, '2026-10-07', screen);
+        texts.push(comprovanteReadLine(draft), ...Object.values(comprovanteGaps(draft)).filter((t): t is string => t !== null));
+        const sug = suggestComprovanteDescription(draft, null, screen);
+        texts.push(sug.description, ...(sug.legend ? [sug.legend] : []));
+      }
+    }
     for (const code of ['texto_vazio', 'nota_fiscal', 'nao_e_comprovante'] as const) texts.push(comprovanteErrorText(code));
     check(texts.filter((t) => t !== ''));
   });
@@ -2485,8 +2495,10 @@ describe('textos do comprovante de Pix e de pagamento (D-051)', () => {
       for (const word of ['CPF', 'CNPJ', 'chave Pix', 'conta', 'códigos']) expect(text, word).toContain(word);
     }
     expect(COMPROVANTE_TEXT.option).toBe('Ler comprovante de Pix ou pagamento');
-    expect(COMPROVANTE_TEXT.lineHint).toBe('Comprovante ou holerite, em PDF ou imagem, lido aqui no aparelho');
-    expect(COMPROVANTE_TEXT.lineHintPdf).toBe('Comprovante ou holerite em PDF, lido aqui no aparelho');
+    expect(COMPROVANTE_TEXT.lineHint).toBe('Comprovante, holerite ou nota de serviço, em PDF ou imagem, lido aqui no aparelho');
+    expect(COMPROVANTE_TEXT.lineHintPdf).toBe('Comprovante, holerite ou nota de serviço em PDF, lido aqui no aparelho');
+    expect(COMPROVANTE_TEXT.note.privacy).toContain('aqui no aparelho');
+    for (const word of ['CPF', 'CNPJ', 'endereço', 'chave da nota']) expect(COMPROVANTE_TEXT.note.privacy, word).toContain(word);
     expect(COMPROVANTE_TEXT.filled).toBe('Preenchemos o que o comprovante informa. Confira e toque em Salvar.');
     expect(COMPROVANTE_TEXT.looksNotedHint).toBe('Pode ser o mesmo lançamento. Se for outro, é só salvar.');
     expect(COMPROVANTE_TEXT.looksNoted('2026-10-05', 'Padaria', 8500)).toBe('Parece já anotado em 05/10/2026: Padaria, R$ 85,00.');

@@ -11,6 +11,7 @@ import {
   raceWithTimeout,
   readReceiptCode,
   receiptDraft,
+  serviceNoteInText,
   type IsoDate,
   type PdfTextItem,
   type ReceiptDraft,
@@ -127,6 +128,8 @@ export async function readNotePdfBytes(
   const danfe = danfeFromText(text.text);
   if (!danfe.ok) {
     if (danfe.code === 'texto_vazio') return fail(NOTA_TEXT.pdf.noText);
+    // Nota de serviço (NFS-e, D-079): é lida por "Ler comprovante de Pix ou pagamento".
+    if (serviceNoteInText(text.text)) return fail(NOTA_TEXT.pdf.serviceNote);
     if (danfe.code === 'chave_nao_encontrada') return fail(NOTA_TEXT.pdf.noKey);
     return fail(noteErrorText(danfe.code));
   }
