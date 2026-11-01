@@ -8866,7 +8866,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     i2t.includes('Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026') && i2v.amount === '4.200,00' && i2v.date === '05/10/2026' &&
     i2v.desc === 'Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda' && i2t.includes('Número e nome lidos da nota') &&
     i2t.includes('Lemos como um serviço que você prestou: o nome é de quem contratou.') && i2t.includes('A data é a da emissão da nota. Se o pagamento foi em outro dia, troque a data.') &&
-    i2t.includes('A nota foi lida aqui no aparelho e não é guardada. Não guardamos CPF, CNPJ, endereço nem a chave da nota.') && (await visibleCount('button', 'Trocar para Anotar gasto')) === 1, JSON.stringify(i2v));
+    i2t.includes('A nota foi lida aqui no aparelho e não é guardada. Não guardamos CPF, CNPJ, endereço nem a chave da nota.') && i2t.includes('Preenchemos o que a nota informa. Confira e toque em Salvar.') &&
+    (await visibleCount('button', 'Trocar para Anotar gasto')) === 1, JSON.stringify(i2v));
   i2t = await i2PageText();
   ok('I2 nota de serviço: CNPJ, e-mail, endereço, chave, descrição do serviço e os outros valores não aparecem em lugar nenhum da página',
     I2_NFSE_SECRETS.every((x) => !i2t.includes(x)), I2_NFSE_SECRETS.filter((x) => i2t.includes(x)).join(' | '));

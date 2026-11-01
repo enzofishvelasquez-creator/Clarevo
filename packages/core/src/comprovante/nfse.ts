@@ -54,16 +54,19 @@ const NAME =
 const LABELISH = /^(?:municipio|endereco|cnpj|cpf|e-mail|email|telefone|inscricao|indicador|codigo|cep|bairro|uf|nome|razao\s+social)\b/;
 
 /**
- * O resto da linha depois do rótulo, quando o rótulo ocupa o começo dela inteiro: vazio (o valor vem abaixo), depois de dois pontos,
- * ou já o valor. `valueStart` diz como o valor começa. null quando a linha é outro rótulo ("Valor Líquido da NFS-e + IBS/CBS").
+ * O resto da linha depois do rótulo, quando o rótulo ocupa o começo dela inteiro: vazio (o valor vem abaixo), depois de dois pontos
+ * ou de "=" ("VALOR TOTAL DO SERVIÇO = R$ 1.500,00"), ou já o valor. "(R$)" ou "R$" logo depois do rótulo ("Valor Líquido (R$)") é
+ * parte dele. `valueStart` diz como o valor começa. null quando a linha é outro rótulo ("Valor Líquido da NFS-e + IBS/CBS").
  */
 function afterLabel(folded: string, label: RegExp, valueStart: RegExp): string | null {
   const m = label.exec(folded);
   if (!m) return null;
   let rest = folded.slice(m[0].length).trimStart();
-  const colon = rest.startsWith(':');
-  if (colon) rest = rest.slice(1).trimStart();
-  if (rest === '' || colon || valueStart.test(rest)) return rest;
+  if (rest.startsWith('(r$)')) rest = rest.slice(4).trimStart();
+  else if (rest === 'r$' || rest.startsWith('r$:') || rest.startsWith('r$ :') || rest.startsWith('r$=') || rest.startsWith('r$ =')) rest = rest.slice(2).trimStart();
+  const separated = rest.startsWith(':') || rest.startsWith('=');
+  if (separated) rest = rest.slice(1).trimStart();
+  if (rest === '' || separated || valueStart.test(rest)) return rest;
   return null;
 }
 
@@ -77,15 +80,20 @@ function moneyIn(text: string): Cents | null {
 }
 
 function dateIn(text: string): IsoDate | null {
-  const d = scanDate(fold(text), 0, Math.min(text.length, 60));
+  const d = scanDate(fold(text.slice(0, 60)));
   return d ? d.iso : null;
 }
 
+/** Quantos rótulos iguais a busca pela posição confere (uma nota tem um ou dois; um PDF montado com milhares não trava a leitura). */
+const LABEL_TRIES = 6;
+
 /** O valor de um rótulo pela posição na página: no mesmo pedaço de texto, na mesma linha à direita ou logo abaixo (até 30 pt). */
 function nearLabel<T>(items: readonly PdfTextItem[], label: RegExp, valueStart: RegExp, valueOf: (s: string) => T | null, valueItem: (s: string) => boolean): T | null {
+  let tries = 0;
   for (const item of items) {
     const rest = afterLabel(fold(item.str.trim()), label, valueStart);
     if (rest === null) continue;
+    if (++tries > LABEL_TRIES) break;
     if (rest !== '') {
       const inside = valueOf(rest);
       if (inside !== null) return inside;
@@ -108,9 +116,11 @@ function nearLabel<T>(items: readonly PdfTextItem[], label: RegExp, valueStart: 
 
 /** Sem posições: o valor depois do rótulo, na mesma linha ou na seguinte (se ela começa como o valor). */
 function nextToLabel<T>(lines: readonly string[], label: RegExp, valueStart: RegExp, valueOf: (s: string) => T | null): T | null {
+  let tries = 0;
   for (let i = 0; i < lines.length; i++) {
     const rest = afterLabel(fold(lines[i]!), label, valueStart);
     if (rest === null) continue;
+    if (++tries > LABEL_TRIES) break;
     if (rest !== '') {
       const same = valueOf(rest);
       if (same !== null) return same;
@@ -137,22 +147,57 @@ function byLabel<T>(
 }
 
 /**
- * Valor: o líquido; sem ele, o do serviço; sem rótulo que dê para ler (a foto de uma nota em colunas, em que o texto lido perde a
- * coluna de cada valor), o maior valor da nota, que é o do serviço (os outros são partes dele: tributos, retenções, descontos).
+ * Os valores de uma linha que só tem valores ("R$ 300,00 R$ 4.200,00 R$ 0,00", "- R$ 4.200,00 - -"), um por coluna, com "-" para a
+ * coluna vazia; null se a linha tem qualquer outra coisa (texto, como a descrição do serviço).
+ */
+function valueRow(line: string): (Cents | null)[] | null {
+  const tokens = fold(line).split(' ');
+  const out: (Cents | null)[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    let t = tokens[i]!;
+    if (t === '') continue;
+    if (t === '-') {
+      out.push(null);
+      continue;
+    }
+    if (t === 'r$') t = tokens[++i] ?? '';
+    else if (t.startsWith('r$')) t = t.slice(2);
+    if (!/^\d{1,3}(?:\.\d{3})*,\d{2}$/.test(t)) return null;
+    out.push(moneyIn(t) ?? 0);
+  }
+  return out.length > 0 ? out : null;
+}
+
+/**
+ * Foto do DANFSe nacional lida linha a linha: a linha dos rótulos "Total das Retenções", "Valor Líquido da NFS-e", "Total do IBS/CBS"
+ * e "Valor Líquido da NFS-e + IBS/CBS" vem seguida dos quatro valores, na mesma ordem; o líquido é o segundo.
+ */
+function netFromDanfseRow(lines: readonly string[]): Cents | null {
+  for (let i = 0; i + 1 < lines.length; i++) {
+    const folded = fold(lines[i]!);
+    if (!folded.includes('total das retencoes') || !folded.includes('valor liquido da nfs')) continue;
+    const row = valueRow(lines[i + 1]!);
+    if (row && row.length === 4 && row[1]) return row[1];
+  }
+  return null;
+}
+
+/**
+ * Valor: o líquido; sem ele, o do serviço; numa foto do DANFSe nacional, o líquido pela ordem das colunas; sem nada disso, o maior
+ * valor das linhas que só têm valores, que é o do serviço (os outros são partes dele: tributos, retenções, descontos). Valores no meio
+ * de um texto (a descrição do serviço, "parcela 1 de 12 do contrato de R$ 18.000,00") não contam.
  */
 function amountOf(lines: readonly string[], items: readonly PdfTextItem[] | undefined): Cents | null {
   const isMoney = (s: string) => MONEY_ONLY.test(s);
   const labeled = byLabel(lines, items, NET, MONEY_START, moneyIn, isMoney) ?? byLabel(lines, items, GROSS, MONEY_START, moneyIn, isMoney);
   if (labeled !== null) return labeled;
+  const fromRow = netFromDanfseRow(lines);
+  if (fromRow !== null) return fromRow;
   let largest: Cents | null = null;
-  for (const line of lines) {
-    let from = 0;
-    for (let guard = 0; guard < 20; guard++) {
-      const m = scanMoney(line, from);
-      if (!m) break;
-      if (largest === null || m.cents > largest) largest = m.cents;
-      from = m.end;
-    }
+  for (let i = 0; i < lines.length; i++) {
+    // A linha de baixo de "Valor Líquido da NFS-e + IBS/CBS" soma os tributos novos ao líquido: não é o valor da nota.
+    if (i > 0 && fold(lines[i - 1]!).includes('+ ibs/cbs')) continue;
+    for (const cents of valueRow(lines[i]!) ?? []) if (cents && (largest === null || cents > largest)) largest = cents;
   }
   return largest;
 }
@@ -180,9 +225,17 @@ function numberOf(lines: readonly string[], items: readonly PdfTextItem[] | unde
   return byLabel(lines, items, NUMBER, DIGIT_START, valueOf, (s) => valueOf(s) !== null);
 }
 
-/** "12.345.678 FULANO DE TAL": a raiz do CNPJ que o MEI leva na frente do nome sai antes de limpar o nome. */
+/** Outro campo na mesma linha do nome ("EMPRESA EXEMPLO LTDA Endereço: RUA ...", "... CPF/CNPJ: ..."): o nome para antes dele. */
+const NAME_STOP = /\s(?:endereco|cpf|cnpj|inscricao|municipio|telefone|fone|e-?mail|cep|bairro|complemento|codigo|uf)\b|:/;
+
+/**
+ * Nome sem documento: para no próximo rótulo da linha e tira a raiz do CNPJ que o MEI leva na frente ("12.345.678 FULANO DE TAL")
+ * antes de limpar o nome.
+ */
 function nameFrom(raw: string): string | null {
-  return cleanPersonName(raw.replace(/^\s*\d{2}\.?\d{3}\.?\d{3}\s+/, ''));
+  const stop = NAME_STOP.exec(fold(raw));
+  const value = stop ? raw.slice(0, stop.index) : raw;
+  return cleanPersonName(value.replace(/^\s*\d{2}\.?\d{3}\.?\d{3}\s+/, ''));
 }
 
 /** Nome de quem prestou e de quem contratou: o primeiro "Nome" ou "Razão Social" de cada seção, na mesma linha ou na seguinte. */

@@ -68,6 +68,7 @@ export const COMPROVANTE_TEXT = {
   /** Nota de serviço (NFS-e, D-079): a tela decide de que lado a pessoa está. */
   note: {
     readTitle: 'Nota de serviço lida',
+    filled: 'Preenchemos o que a nota informa. Confira e toque em Salvar.',
     legend: 'Número e nome lidos da nota',
     /** Descrição quando a nota não traz número nem nome. */
     fallback: 'Nota fiscal de serviço',
@@ -366,11 +367,13 @@ export function normalizeCounterpart(name: string): string {
 
 /**
  * Chave da memória por nome: o resumo SHA-256 do nome normalizado (com o tipo do registro, porque "Pix para Maria" e "Pix de Maria"
- * são lembranças diferentes). null sem nome. O nome em si nunca é guardado como chave.
+ * são lembranças diferentes). null sem nome. O nome em si nunca é guardado como chave. A nota de serviço (D-079) tem memória própria:
+ * "Nota fiscal 35 para Empresa" não pode virar a sugestão do Pix que a mesma empresa mandar depois.
  */
-export function counterpartMemoryId(name: string | null, kind: RecordKind): string | null {
+export function counterpartMemoryId(name: string | null, kind: RecordKind, source: 'comprovante' | 'nota_servico' = 'comprovante'): string | null {
   const normalized = name ? normalizeCounterpart(name) : '';
-  return normalized.length >= 2 ? sha256Hex(`pessoa:${kind}:${normalized}`) : null;
+  if (normalized.length < 2) return null;
+  return sha256Hex(source === 'nota_servico' ? `nota-servico:${kind}:${normalized}` : `pessoa:${kind}:${normalized}`);
 }
 
 /** O que guardar depois de salvar: descrição (1 a 80) e categoria do tipo do registro. Descrição vazia não é guardada. */

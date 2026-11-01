@@ -9,6 +9,7 @@ import {
   comprovanteKindPhrase,
   comprovanteMismatch,
   comprovanteReadLine,
+  counterpartMemoryId,
   looksLikeNfse,
   serviceNoteInText,
   suggestComprovanteDescription,
@@ -142,8 +143,8 @@ const FOTO = [
   'TOMADOR / ADQUIRENTE CNPJ / CPF / NIF',
   'VALOR TOTAL DA NFS-e VALOR DA OPERAÇÃO / SERVIÇO Desconto Incondicionado',
   'R$ 4.500,00 - -',
-  'Total das Retenções (ISSQN / Federais) VALOR LÍQUIDO DA NFS-e Total do IBS/CBS',
-  'R$ 300,00 R$ 4.200,00 R$ 0,00',
+  'Total das Retenções (ISSQN / Federais) VALOR LÍQUIDO DA NFS-e Total do IBS/CBS VALOR LÍQUIDO DA NFS-e + IBS/CBS',
+  'R$ 300,00 R$ 4.200,00 R$ 0,00 R$ 0,00',
 ].join('\n');
 
 function read(text: string, direction: 'entrada' | 'saida' = 'entrada', items?: PdfTextItem[]): ComprovanteReading {
@@ -201,9 +202,49 @@ describe('nota de serviço (NFS-e): leitura', () => {
     expect(read(PREFEITURA.replace('Valor Líquido: R$ 1.410,00', ''), 'entrada').amountCents).toBe(150_000);
   });
 
-  it('foto da nota lida linha a linha: o maior valor (o do serviço) e a data seguida de hora; o nome fica para a pessoa', () => {
+  it('foto do DANFSe lida linha a linha: o líquido pela ordem das colunas e a data seguida de hora; o nome fica para a pessoa', () => {
     const r = read(FOTO, 'entrada');
-    expect([r.amountCents, r.occurredOn, r.counterpart]).toEqual([450_000, '2026-10-05', null]);
+    expect([r.amountCents, r.occurredOn, r.counterpart]).toEqual([420_000, '2026-10-05', null]);
+    // Com IBS/CBS: o líquido, não o líquido mais os tributos novos.
+    const ibs = FOTO.replace('R$ 4.500,00 - -', 'R$ 10.000,00 - -').replace('R$ 300,00 R$ 4.200,00 R$ 0,00 R$ 0,00', '- R$ 10.000,00 R$ 100,00 R$ 10.100,00');
+    expect(read(ibs, 'entrada').amountCents).toBe(1_000_000);
+    // Sem a linha de quatro valores, o maior valor das linhas só de valores, fora a do líquido mais IBS/CBS e fora o texto.
+    const scrambled = [
+      'Documento Auxiliar da NFS-e PRESTADOR TOMADOR',
+      'Descrição do Serviço: parcela 1 de 12 do contrato de R$ 18.000,00',
+      'R$ 1.500,00 - -',
+      'VALOR LÍQUIDO DA NFS-e + IBS/CBS',
+      'R$ 1.600,00',
+    ].join('\n');
+    expect(read(scrambled, 'entrada').amountCents).toBe(150_000);
+  });
+
+  it('rótulos com "=" (São Paulo, Nota Carioca) e com "(R$)" ou "R$" e o valor abaixo; valores no texto do serviço não contam', () => {
+    const sp = PREFEITURA.replace('Valor Líquido: R$ 1.410,00', '').replace('Criação de identidade visual', 'Parcela 1 de 12 do contrato de R$ 18.000,00');
+    expect(read(sp, 'entrada').amountCents).toBe(150_000);
+    const rio = sp.replace('VALOR TOTAL DO SERVIÇO = R$ 1.500,00', 'VALOR DA NOTA = R$ 4.500,00');
+    expect(read(rio, 'entrada').amountCents).toBe(450_000);
+    const below = ['Documento Auxiliar da NFS-e', 'PRESTADOR', 'TOMADOR', 'Valor dos Serviços (R$)', '4.500,00', 'Valor Líquido (R$)', '4.200,00'].join('\n');
+    expect(read(below, 'entrada').amountCents).toBe(420_000);
+    expect(read(below.replace('Valor Líquido (R$)', 'Valor Líquido R$'), 'entrada').amountCents).toBe(420_000);
+  });
+
+  it('o nome para antes de outro campo da mesma linha (endereço, CPF/CNPJ)', () => {
+    const joined = PREFEITURA.replace('Nome/Razão Social: ESTÚDIO EXEMPLO DE DESIGN LTDA', 'Razão Social: ESTÚDIO EXEMPLO DE DESIGN LTDA Endereço: RUA DAS FLORES, 100 - CENTRO').replace(
+      'Nome/Razão Social: COMÉRCIO MODELO S.A.',
+      'Nome/Razão Social: COMÉRCIO MODELO S.A. CPF/CNPJ: 11.222.333/0001-81',
+    );
+    const r = read(joined, 'saida');
+    expect(r.serviceNote).toEqual({ number: '123', provider: 'Estúdio Exemplo de Design Ltda', client: 'Comércio Modelo S.A.' });
+    expect(JSON.stringify(r)).not.toMatch(/FLORES|Flores|Endere|Cpf|11\.222/);
+  });
+
+  it('um PDF montado com milhares de rótulos não trava a leitura', () => {
+    const items: PdfTextItem[] = [];
+    for (let i = 0; i < 3000; i++) items.push({ str: i % 2 ? 'Data de emissão' : '05/10/2026', x: 12, y: 800 - (i % 40) * 10, width: 50, page: 1 });
+    const start = Date.now();
+    read('Documento Auxiliar da NFS-e\nPRESTADOR\nTOMADOR', 'entrada', items);
+    expect(Date.now() - start).toBeLessThan(1500);
   });
 
   it('sem a tela, a direção fica em aberto e o nome também', () => {
@@ -267,6 +308,14 @@ describe('nota de serviço (NFS-e): formulário', () => {
     });
   });
 
+  it('a memória por nome da nota é separada da do comprovante: a descrição da nota não vira a sugestão do Pix da mesma empresa', () => {
+    const pix = counterpartMemoryId('Empresa Exemplo Ltda', 'receita');
+    const note = counterpartMemoryId('Empresa Exemplo Ltda', 'receita', 'nota_servico');
+    expect(note).not.toBeNull();
+    expect(note).not.toBe(pix);
+    expect(counterpartMemoryId('Empresa Exemplo Ltda', 'receita', 'comprovante')).toBe(pix);
+  });
+
   it('linha da leitura, rótulos e avisos: o lado escolhido pela tela e a data de emissão', () => {
     const income = comprovanteDraft(read(NACIONAL, 'entrada'), today, 'receita');
     expect(comprovanteReadLine(income)).toBe('Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026');
@@ -284,6 +333,7 @@ describe('nota de serviço (NFS-e): formulário', () => {
     expect(comprovanteGaps(expense).side).toBe('Lemos como um serviço que você contratou: o nome é de quem prestou.');
     // Sem valor e com data futura.
     const future = comprovanteDraft({ ...read(NACIONAL, 'entrada'), amountCents: null, occurredOn: '2026-11-20' }, today, 'receita');
+    expect(COMPROVANTE_TEXT.note.filled).toBe('Preenchemos o que a nota informa. Confira e toque em Salvar.');
     expect(comprovanteGaps(future)).toMatchObject({ amount: 'O valor não apareceu na nota. Digite o valor.', day: 'A data da nota ainda não chegou. Escolha o dia.', issued: null });
     expect(comprovanteReadLine(comprovanteDraft({ ...read(FOTO, 'entrada'), amountCents: null, occurredOn: null }, today, 'receita'))).toBe('Nota de serviço lida');
   });

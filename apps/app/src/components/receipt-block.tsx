@@ -141,7 +141,7 @@ export function ProofBlock({
         </>
       ) : (
         <>
-          {!gaps.amount && !gaps.day ? <Txt variant="label">{COMPROVANTE_TEXT.filled}</Txt> : null}
+          {!gaps.amount && !gaps.day ? <Txt variant="label">{draft.kind === 'nota_servico' ? COMPROVANTE_TEXT.note.filled : COMPROVANTE_TEXT.filled}</Txt> : null}
           {gaps.guessed ? <Txt variant="label">{gaps.guessed}</Txt> : null}
           {gaps.side ? (
             // Nota de serviço (D-079): a tela decidiu o lado; quem está do outro lado troca de tela com a mesma leitura.
