@@ -12,8 +12,8 @@ export const WHATSAPP_NUMBER: string | null = '15552087378';
  */
 export const WHATSAPP_IN_ACCOUNT = false;
 
-/** Estado do WhatsApp da própria pessoa (my_whatsapp). O número nunca volta ao app: o banco não o guarda. */
-export interface WhatsAppLinkState {
+/** Estado de um canal de mensagens da própria pessoa (my_whatsapp, my_telegram). Quem escreve nunca volta ao app: o banco não o guarda. */
+export interface ChatLinkState {
   linked: boolean;
   /** Espaço em que as mensagens anotam. */
   contextId: string | null;
@@ -23,7 +23,10 @@ export interface WhatsAppLinkState {
   codeExpiresAt: string | null;
 }
 
-export const WHATSAPP_UNLINKED: WhatsAppLinkState = {
+/** Estado do WhatsApp da própria pessoa (my_whatsapp). O número nunca volta ao app: o banco não o guarda. */
+export type WhatsAppLinkState = ChatLinkState;
+
+export const WHATSAPP_UNLINKED: ChatLinkState = {
   linked: false,
   contextId: null,
   linkedAt: null,
@@ -31,12 +34,16 @@ export const WHATSAPP_UNLINKED: WhatsAppLinkState = {
   codeExpiresAt: null,
 };
 
-/** Resultado de create_whatsapp_code. code nulo: repetição da mesma chave (o código só é mostrado uma vez; validade nula se já foi usado). */
-export interface WhatsAppCode {
+/**
+ * Resultado de create_whatsapp_code e create_telegram_code. code nulo: repetição da mesma chave (o código só é mostrado uma vez;
+ * validade nula se já foi usado).
+ */
+export interface ChatCode {
   code: string | null;
   contextId: string;
   expiresAt: string | null;
 }
+export type WhatsAppCode = ChatCode;
 
 /** Texto que o app preenche na conversa: "Ativar ABCD-EFGH". */
 export function whatsappActivationText(code: string): string {
@@ -56,6 +63,46 @@ export function formatWhatsAppNumber(number: string): string {
   return us ? `+1 (${us[1]}) ${us[2]}-${us[3]}` : `+${number}`;
 }
 
+/** Textos da tela de um canal de mensagens (Conta > WhatsApp, Conta > Telegram): as mesmas partes, com o nome do canal. */
+export interface ChatScreenText {
+  cardTitle: string;
+  cardBody: string;
+  cardOpen: string;
+  cardLinked: (space: string) => string;
+  title: string;
+  intro: string;
+  textOnly: string;
+  spaceLabel: string;
+  generate: string;
+  generating: string;
+  codeTitle: string;
+  codeHelp: string;
+  openChat: string;
+  /** Onde achar a Clarevo no canal: o número do WhatsApp ou o @ do bot do Telegram. */
+  targetLabel: (target: string) => string;
+  codeLost: string;
+  checkLinked: string;
+  linkedTitle: string;
+  linkedBody: (space: string) => string;
+  linkedGone: string;
+  changeSpace: string;
+  examplesTitle: string;
+  examples: readonly string[];
+  unlink: string;
+  unlinkTitle: string;
+  unlinkBody: string;
+  unlinkConfirm: string;
+  unlinked: string;
+  privacyTitle: string;
+  privacy: string;
+  error: string;
+  demo: string;
+  notReady: string;
+  openFailed: string;
+  linkedNow: string;
+  notYet: string;
+}
+
 /** Textos da tela Conta > WhatsApp. */
 export const WHATSAPP_TEXT = {
   cardTitle: 'WhatsApp',
@@ -71,8 +118,8 @@ export const WHATSAPP_TEXT = {
   generating: 'Gerando…',
   codeTitle: 'Seu código',
   codeHelp: `Mande "Ativar" e o código para a Clarevo no WhatsApp, do número que você vai usar. O código vale por ${WHATSAPP_CODE_MINUTES} minutos e serve uma vez.`,
-  openWhatsApp: 'Abrir o WhatsApp com a mensagem pronta',
-  numberLabel: (n: string) => `Número da Clarevo: ${formatWhatsAppNumber(n)}`,
+  openChat: 'Abrir o WhatsApp com a mensagem pronta',
+  targetLabel: (n: string) => `Número da Clarevo: ${formatWhatsAppNumber(n)}`,
   codeLost: 'O código já foi mostrado. Gere outro.',
   checkLinked: 'Já mandei a mensagem',
   linkedTitle: 'WhatsApp ligado',
@@ -102,4 +149,4 @@ export const WHATSAPP_TEXT = {
   openFailed: 'Não deu para abrir o WhatsApp neste aparelho. Mande a mensagem com o código para o número acima.',
   linkedNow: 'Pronto, o WhatsApp está ligado.',
   notYet: 'Ainda não chegou a mensagem com o código. Confira se mandou do número que vai usar e tente de novo em alguns segundos.',
-} as const;
+} as const satisfies ChatScreenText;

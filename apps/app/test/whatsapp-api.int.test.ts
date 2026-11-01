@@ -93,7 +93,7 @@ beforeAll(async () => {
 
 describe('WhatsApp pela API, com a função do servidor', () => {
   it('conta nova: nada ligado; número sem vínculo recebe o caminho para ligar', async () => {
-    expect(await repo.getWhatsApp()).toEqual({ linked: false, contextId: null, linkedAt: null, codeContextId: null, codeExpiresAt: null });
+    expect(await repo.getChatLink('whatsapp')).toEqual({ linked: false, contextId: null, linkedAt: null, codeContextId: null, codeExpiresAt: null });
     const r = await send(PHONE, 'mercado 52,30');
     expect(r.status).toBe(200);
     expect(r.reply).toEqual({ to: PHONE, replyTo: r.id, body: WHATSAPP_REPLY.nao_ligado, type: 'text' });
@@ -101,9 +101,9 @@ describe('WhatsApp pela API, com a função do servidor', () => {
   });
 
   it('o app gera o código e a mensagem "Ativar" liga o número', async () => {
-    const code = await repo.createWhatsAppCode(newOperationKey(), pessoal);
+    const code = await repo.createChatCode('whatsapp', newOperationKey(), pessoal);
     expect(code.code).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
-    const state = await repo.getWhatsApp();
+    const state = await repo.getChatLink('whatsapp');
     expect(state.linked).toBe(false);
     expect([state.codeContextId, state.codeExpiresAt]).toEqual([pessoal, code.expiresAt]);
 
@@ -111,7 +111,7 @@ describe('WhatsApp pela API, com a função do servidor', () => {
     expect(wrong.reply!.body).toBe(WHATSAPP_REPLY.codigo_invalido);
     const ok = await send(PHONE, `Ativar ${code.code!.slice(0, 4)}-${code.code!.slice(4)}`);
     expect(ok.reply!.body).toContain('ligado à Clarevo, no espaço Pessoal');
-    const linked = await repo.getWhatsApp();
+    const linked = await repo.getChatLink('whatsapp');
     expect([linked.linked, linked.contextId, linked.codeContextId]).toEqual([true, pessoal, null]);
   });
 
@@ -169,27 +169,27 @@ describe('WhatsApp pela API, com a função do servidor', () => {
 
   it('DESLIGAR pelo WhatsApp e, depois de ligar de novo, desligar pelo app', async () => {
     expect((await send(PHONE, 'desligar')).reply!.body).toBe(WHATSAPP_REPLY.desligado);
-    expect((await repo.getWhatsApp()).linked).toBe(false);
+    expect((await repo.getChatLink('whatsapp')).linked).toBe(false);
     expect((await send(PHONE, 'café 5')).reply!.body).toBe(WHATSAPP_REPLY.nao_ligado);
 
-    const code = await repo.createWhatsAppCode(newOperationKey(), pessoal);
+    const code = await repo.createChatCode('whatsapp', newOperationKey(), pessoal);
     expect((await send(OTHER, `Ativar ${code.code}`)).reply!.body).toContain('ligado à Clarevo');
     const key = newOperationKey();
-    const off = await repo.unlinkWhatsApp(key);
+    const off = await repo.unlinkChat('whatsapp', key);
     expect(off).toEqual({ linked: false, contextId: null, linkedAt: null, codeContextId: null, codeExpiresAt: null });
-    expect(await repo.unlinkWhatsApp(key)).toEqual(off);
+    expect(await repo.unlinkChat('whatsapp', key)).toEqual(off);
     expect((await send(OTHER, 'café 5')).reply!.body).toBe(WHATSAPP_REPLY.nao_ligado);
   });
 
   it('a repetição da chave de gerar código não devolve o código; outro espaço com a mesma chave é recusado', async () => {
     const key = newOperationKey();
-    const first = await repo.createWhatsAppCode(key, pessoal);
+    const first = await repo.createChatCode('whatsapp', key, pessoal);
     expect(first.code).not.toBeNull();
-    const again = await repo.createWhatsAppCode(key, pessoal);
+    const again = await repo.createChatCode('whatsapp', key, pessoal);
     expect([again.code, again.contextId, again.expiresAt]).toEqual([null, pessoal, first.expiresAt]);
-    const other = await repo.createWhatsAppCode(key, '00000000-0000-0000-0000-000000000000').catch((e: unknown) => e);
+    const other = await repo.createChatCode('whatsapp', key, '00000000-0000-0000-0000-000000000000').catch((e: unknown) => e);
     expect((other as RepoError).code).toBe('chave_reutilizada');
-    const noAccess = await repo.createWhatsAppCode(newOperationKey(), '00000000-0000-0000-0000-000000000000').catch((e: unknown) => e);
+    const noAccess = await repo.createChatCode('whatsapp', newOperationKey(), '00000000-0000-0000-0000-000000000000').catch((e: unknown) => e);
     expect((noAccess as RepoError).code).toBe('sem_permissao');
   });
 

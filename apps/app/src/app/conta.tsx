@@ -7,6 +7,9 @@ import {
   FAMILY_TEXT,
   LEGAL_TEXT,
   SUPPORT_TEXT,
+  TELEGRAM_BOT,
+  TELEGRAM_IN_ACCOUNT,
+  TELEGRAM_TEXT,
   WHATSAPP_IN_ACCOUNT,
   WHATSAPP_NUMBER,
   WHATSAPP_TEXT,
@@ -184,6 +187,20 @@ export default function ContaScreen() {
               {WHATSAPP_TEXT.cardBody}
             </Txt>
             <Button label={WHATSAPP_TEXT.cardOpen} icon={MessageCircle} tone="soft" onPress={() => router.push('/conta/whatsapp')} />
+          </Card>
+        ) : null}
+
+        {/* Telegram (D-080): o mesmo, com o bot da Clarevo. Só em conta real, com o bot, e só depois do piloto fechado (no piloto, a tela
+            abre pelo link /conta/telegram). */}
+        {auth.mode !== 'demo' && TELEGRAM_BOT !== null && TELEGRAM_IN_ACCOUNT ? (
+          <Card style={{ gap: space[3] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {TELEGRAM_TEXT.cardTitle}
+            </Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {TELEGRAM_TEXT.cardBody}
+            </Txt>
+            <Button label={TELEGRAM_TEXT.cardOpen} icon={MessageCircle} tone="soft" onPress={() => router.push('/conta/telegram')} />
           </Card>
         ) : null}
 

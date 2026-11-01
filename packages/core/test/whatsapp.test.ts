@@ -544,7 +544,7 @@ describe('WhatsApp: servidor', () => {
 
   it('a função gerada (supabase/functions/whatsapp) está em dia com o núcleo e roda como no Deno', async () => {
     const root = join(__dirname, '../../..');
-    execFileSync('node', [join(root, 'scripts/gerar-whatsapp.js'), '--conferir']);
+    execFileSync('node', [join(root, 'scripts/gerar-funcoes.js'), '--conferir']);
     const src = readFileSync(join(root, 'supabase/functions/whatsapp/index.ts'), 'utf8');
     const env: Record<string, string> = {
       WHATSAPP_VERIFY_TOKEN: 'verifica',

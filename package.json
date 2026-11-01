@@ -15,7 +15,8 @@
     "test:api": "bash supabase/tests/run_api.sh",
     "test:site": "node scripts/e2e-site.js",
     "manual": "node scripts/gerar-manual.js",
-    "whatsapp": "node scripts/gerar-whatsapp.js"
+    "whatsapp": "node scripts/gerar-funcoes.js",
+    "telegram": "node scripts/gerar-funcoes.js"
   },
   "devDependencies": {
     "playwright": "1.56.1"

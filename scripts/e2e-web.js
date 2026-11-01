@@ -14164,6 +14164,28 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   }
 
   // ==================================================================================================================
+  // Telegram (D-080): a mesma tela do WhatsApp, para o bot da Clarevo. Na demonstração não há card em Conta, e /conta/telegram, aberta pelo
+  // endereço, só explica: sem gerar código. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const tgWrites0 = writes.length;
+    await demoHome(); await openConta();
+    t = await body();
+    ok('Telegram: sem card em Conta na demonstração', !(await headingShown('Telegram')) && (await visibleCount('button', 'Anotar pelo Telegram')) === 0 && !t.includes('Telegram'), t.slice(0, 300));
+    await p.goto(`http://localhost:${PORT}/conta/telegram`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Na demonstração, o Telegram não é ligado.', 12000); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    ok('Telegram: a tela pelo endereço, com título, exemplos, privacidade e o aviso da demonstração, sem falar em WhatsApp nem em número',
+      new URL(p.url()).pathname === '/conta/telegram' && (await h1Name()) === 'Telegram' && t.includes('mercado 52,30') && t.includes('recebi 1500 salário') &&
+      t.includes('DESLIGAR: desliga o Telegram') && t.includes('As mensagens passam pelos servidores do Telegram') &&
+      t.includes('Na demonstração, o Telegram não é ligado.') && !/whatsapp|meta|número/i.test(t.replace(/Conta principal/g, '')), t.slice(0, 600));
+    ok('Telegram: na demonstração, sem gerar código nem desligar', (await visibleCount('button', 'Gerar código')) === 0 && (await visibleCount('button', 'Desligar o Telegram')) === 0);
+    await atWidths(async (w) => { await layoutChecks(`Telegram na demonstração ${w}px`); });
+    await shot('614_telegram_demonstracao');
+    ok('Telegram: nada vai à rede na demonstração', writes.length === tgWrites0, writes.slice(tgWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
   // Metas com imagem (D-077): na demonstração, a meta "Viagem de férias" mostra a sugestão automática (viagem) no alto da tela da meta;
   // "Mais ações", "Trocar imagem" abre a escolha (Automática e as 12 sugeridas, como botões de opção), escolher "Casa" salva e marca,
   // e voltar à automática também. A foto da galeria não é aberta aqui (o seletor do sistema); a regra dela está nos testes do núcleo,
