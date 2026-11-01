@@ -1,3 +1,4 @@
+import { DEMO_TEXT } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, MailCheck } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -77,7 +78,7 @@ export default function ConfirmarEmail() {
       </Txt>
       {auth instanceof DemoAuth ? (
         <Banner tone="info">
-          <Txt variant="label">Demonstração: nenhum e-mail é enviado.</Txt>
+          <Txt variant="label">{DEMO_TEXT.confirmNotice}</Txt>
           <Button label="Simular abertura do link" tone="soft" onPress={() => auth.simulateConfirmation(email)} />
         </Banner>
       ) : null}

@@ -1,7 +1,8 @@
+import { DEMO_TEXT, INVITE_BASE_URL } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, CheckCircle2 } from 'lucide-react-native';
+import { AlertCircle, CheckCircle2, Info } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import type { TextInput } from 'react-native';
+import { Linking, type TextInput } from 'react-native';
 
 import { AuthShell } from '@/components/auth-shell';
 import { Banner, Button, LinkButton, TextField, Txt } from '@/components/ui';
@@ -18,6 +19,8 @@ export default function Entrar() {
   const [banner, setBanner] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const passwordRef = useRef<TextInput>(null);
+  // Na demonstração, a conta de verdade não existe: o aviso diz isso antes de a pessoa tentar e leva ao app.
+  const demo = auth.mode === 'demo';
 
   const submit = async () => {
     if (busy) return;
@@ -52,6 +55,12 @@ export default function Entrar() {
 
   return (
     <AuthShell back title="Entrar">
+      {demo ? (
+        <Banner tone="info" icon={Info}>
+          <Txt variant="label">{DEMO_TEXT.signInNotice}</Txt>
+          <Button label={DEMO_TEXT.openApp} tone="soft" onPress={() => Linking.openURL(`${INVITE_BASE_URL}/entrar`).catch(() => {})} />
+        </Banner>
+      ) : null}
       {params.aviso === 'senha-atualizada' ? (
         <Banner tone="sucesso" icon={CheckCircle2}>
           <Txt variant="label" color={colors.successText}>

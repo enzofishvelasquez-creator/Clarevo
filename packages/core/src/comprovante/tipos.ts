@@ -12,9 +12,19 @@ import type { Cents } from '../money';
 
 /**
  * Pix, TED, boleto pago, débito; `outro` quando o comprovante é de pagamento ou transferência sem dizer qual; `holerite` para o
- * holerite (contracheque), sempre um recebimento (`holerite.ts`).
+ * holerite (contracheque), sempre um recebimento (`holerite.ts`); `nota_servico` para a nota fiscal de serviço (NFS-e), recebimento
+ * ou gasto conforme a tela (`nfse.ts`).
  */
-export type ComprovanteKind = 'pix' | 'ted' | 'boleto' | 'debito' | 'outro' | 'holerite';
+export type ComprovanteKind = 'pix' | 'ted' | 'boleto' | 'debito' | 'outro' | 'holerite' | 'nota_servico';
+
+/** Nota de serviço: o número e o nome das duas pontas (sem documento). A tela escolhe a outra ponta (`comprovanteDraft`). */
+export interface ServiceNoteParties {
+  number: string | null;
+  /** Quem prestou o serviço (emitiu a nota). */
+  provider: string | null;
+  /** Quem contratou o serviço (o tomador). */
+  client: string | null;
+}
 
 /** `saida`: o dinheiro saiu (gasto). `entrada`: o dinheiro entrou (recebimento). */
 export type ComprovanteDirection = 'saida' | 'entrada';
@@ -35,6 +45,8 @@ export interface ComprovanteReading {
   counterpart: string | null;
   /** Descrição ou mensagem que a pessoa escreveu no comprovante, sem números longos; null quando não há. */
   message: string | null;
+  /** Só na nota de serviço. */
+  serviceNote?: ServiceNoteParties;
 }
 
 export type ComprovanteErrorCode = 'texto_vazio' | 'nota_fiscal' | 'nao_e_comprovante';
@@ -42,8 +54,8 @@ export type ComprovanteErrorCode = 'texto_vazio' | 'nota_fiscal' | 'nao_e_compro
 export type ComprovanteResult = { ok: true; reading: ComprovanteReading } | { ok: false; code: ComprovanteErrorCode };
 
 /**
- * Um pedaço de texto do PDF com a posição na página (em pontos, a partir do canto de baixo à esquerda, como no PDF). Só o holerite
- * usa: nele, o rótulo e o valor ficam em colunas que o texto corrido separa. O app monta a lista na leitura e a descarta junto do texto.
+ * Um pedaço de texto do PDF com a posição na página (em pontos, a partir do canto de baixo à esquerda, como no PDF). O holerite e a
+ * nota de serviço usam: neles, o rótulo e o valor ficam em colunas que o texto corrido separa. O app monta a lista na leitura e a descarta junto do texto.
  */
 export interface PdfTextItem {
   str: string;

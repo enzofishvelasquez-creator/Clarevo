@@ -31,14 +31,14 @@ const TEMAS = [
     id: 'organizar',
     titulo: 'Anotar e organizar',
     descricao: 'Anotar gastos e recebimentos, ler notas, importar extratos, orçamento, metas, simulador e calculadoras.',
-    guias: ['anotar-gasto', 'nota-fiscal', 'movimentos', 'buscar', 'importar-extrato', 'ultimos-meses', 'evolucao', 'analises', 'orcamento', 'renda-comprometida', 'metas', 'plano-de-guardar', 'simulador', 'calculadoras', 'antes-de-financiar', 'plano-dividas'],
+    guias: ['anotar-gasto', 'nota-fiscal', 'comprovante-e-holerite', 'movimentos', 'buscar', 'importar-extrato', 'ultimos-meses', 'evolucao', 'analises', 'orcamento', 'renda-comprometida', 'metas', 'plano-de-guardar', 'simulador', 'calculadoras', 'antes-de-financiar', 'plano-dividas'],
     topicos: ['sem-registro', 'contei-duas-vezes', 'voltei-depois'],
   },
   {
     id: 'contas',
     titulo: 'Contas e cartões',
     descricao: 'Contas a pagar, gastos fixos, parcelamentos, contas do ano, assinaturas, cartões e faturas.',
-    guias: ['contas-a-pagar', 'vencidas', 'gastos-fixos', 'contas-do-ano', 'assinaturas', 'cartoes', 'contas-de-origem'],
+    guias: ['contas-a-pagar', 'ler-boleto', 'vencidas', 'gastos-fixos', 'contas-do-ano', 'assinaturas', 'cartoes', 'contas-de-origem'],
     topicos: ['fatura', 'gasto-fixo', 'estimativa', 'parcelamentos', 'marcar-como-paga'],
   },
   {

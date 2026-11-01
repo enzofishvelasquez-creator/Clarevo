@@ -80,7 +80,7 @@ describe('rascunho do comprovante', () => {
   });
 
   it('o que o comprovante não trouxe vira mensagem, sem parecer falha', () => {
-    expect(comprovanteGaps(draftOf())).toEqual({ amount: null, day: null, name: null, guessed: null });
+    expect(comprovanteGaps(draftOf())).toEqual({ amount: null, day: null, name: null, guessed: null, side: null, issued: null });
     expect(comprovanteGaps(draftOf({ amountCents: null })).amount).toBe('O valor não apareceu no comprovante. Digite o valor.');
     expect(comprovanteGaps(draftOf({ occurredOn: null })).day).toBe('A data não apareceu no comprovante. Escolha o dia.');
     expect(comprovanteGaps(draftOf({ occurredOn: '2026-11-01' })).day).toBe('A data do comprovante ainda não chegou. Escolha o dia.');

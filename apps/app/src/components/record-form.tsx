@@ -807,9 +807,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const applyProof = async (reading: ComprovanteReading) => {
     const prevProof = proofRef.current;
     const prevNote = noteRef.current;
-    const d = comprovanteDraft(reading, today);
+    // Na nota de serviço, a tela decide o lado (prestou ou contratou) e o nome da outra ponta (D-079).
+    const d = comprovanteDraft(reading, today, kind);
     const mismatch = comprovanteMismatch(d, kind);
-    const payeeId = counterpartMemoryId(d.counterpart, kind);
+    const payeeId = counterpartMemoryId(d.counterpart, kind, d.kind === 'nota_servico' ? 'nota_servico' : 'comprovante');
     const lastTime = !mismatch && payeeId && userId ? await payeeMemoryOf(userId, payeeId, persistPrefs) : null;
     if (unmounted.current) return;
     const sug = suggestComprovanteDescription(d, lastTime, kind);
@@ -855,7 +856,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       payPickedRef.current = false;
       setPayPicked(false);
     }
-    if (!mismatch && cardMode && payRef.current.payWith === 'cartao') {
+    // A nota de serviço não diz como foi pago: a escolha do cartão fica (D-079).
+    if (!mismatch && cardMode && payRef.current.payWith === 'cartao' && d.kind !== 'nota_servico') {
       paySet = true;
       paymentTouched.current = true;
       payRef.current = { ...payRef.current, payWith: 'dinheiro' };

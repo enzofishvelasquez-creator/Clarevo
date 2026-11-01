@@ -7,7 +7,7 @@ import { CATEGORIES } from '../records';
 import type { FinancialRecord, RecordKind } from '../records';
 import { sha256Hex } from '../sha256';
 import { DESCRIPTION_MAX } from '../validation';
-import type { ComprovanteDirection, ComprovanteErrorCode, ComprovanteKind, ComprovanteReading } from './tipos';
+import type { ComprovanteDirection, ComprovanteErrorCode, ComprovanteKind, ComprovanteReading, ServiceNoteParties } from './tipos';
 import { fitWords, fold, trimEdges } from './texto';
 
 /**
@@ -29,11 +29,11 @@ export const COMPROVANTE_TEXT = {
   /** Opção da folha "Escanear nota fiscal" (Anotar gasto) e linha de Registrar recebimento. */
   option: 'Ler comprovante de Pix ou pagamento',
   /** Com a leitura de imagem (no navegador, D-078 B): PDF ou print. */
-  lineHint: 'Comprovante ou holerite, em PDF ou imagem, lido aqui no aparelho',
-  lineA11y: 'Ler comprovante de Pix ou pagamento. Comprovante ou holerite, em PDF ou imagem, lido aqui no aparelho.',
+  lineHint: 'Comprovante, holerite ou nota de serviço, em PDF ou imagem, lido aqui no aparelho',
+  lineA11y: 'Ler comprovante de Pix ou pagamento. Comprovante, holerite ou nota de serviço, em PDF ou imagem, lido aqui no aparelho.',
   /** Sem a leitura de imagem (app das lojas, por enquanto): só PDF. */
-  lineHintPdf: 'Comprovante ou holerite em PDF, lido aqui no aparelho',
-  lineA11yPdf: 'Ler comprovante de Pix ou pagamento. Comprovante ou holerite em PDF, lido aqui no aparelho.',
+  lineHintPdf: 'Comprovante, holerite ou nota de serviço em PDF, lido aqui no aparelho',
+  lineA11yPdf: 'Ler comprovante de Pix ou pagamento. Comprovante, holerite ou nota de serviço em PDF, lido aqui no aparelho.',
   workingImage: 'Lendo a imagem aqui no aparelho. Pode levar alguns segundos…',
   /** App de celular (D-078 B): de onde vem o comprovante. */
   chooseTitle: 'Ler comprovante de Pix ou pagamento',
@@ -65,13 +65,28 @@ export const COMPROVANTE_TEXT = {
   futureDay: 'A data do comprovante ainda não chegou. Escolha o dia.',
   missingName: 'O nome não apareceu no comprovante. Digite uma descrição.',
   directionGuessed: 'O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo.',
+  /** Nota de serviço (NFS-e, D-079): a tela decide de que lado a pessoa está. */
+  note: {
+    readTitle: 'Nota de serviço lida',
+    filled: 'Preenchemos o que a nota informa. Confira e toque em Salvar.',
+    legend: 'Número e nome lidos da nota',
+    /** Descrição quando a nota não traz número nem nome. */
+    fallback: 'Nota fiscal de serviço',
+    incomeSide: 'Lemos como um serviço que você prestou: o nome é de quem contratou.',
+    expenseSide: 'Lemos como um serviço que você contratou: o nome é de quem prestou.',
+    issued: 'A data é a da emissão da nota. Se o pagamento foi em outro dia, troque a data.',
+    missingAmount: 'O valor não apareceu na nota. Digite o valor.',
+    missingDay: 'A data de emissão não apareceu na nota. Escolha o dia.',
+    futureDay: 'A data da nota ainda não chegou. Escolha o dia.',
+    privacy: 'A nota foi lida aqui no aparelho e não é guardada. Não guardamos CPF, CNPJ, endereço nem a chave da nota.',
+  },
   /** Tipo trocado: o comprovante é do outro lado. */
   switchToIncome: 'Trocar para Registrar recebimento',
   switchToExpense: 'Trocar para Anotar gasto',
   /** Erros da leitura do PDF, um por causa. */
   errors: {
     texto_vazio: 'Não encontramos texto neste PDF. Ele pode ser uma foto do comprovante. Digite os dados à mão.',
-    nota_fiscal: 'Este PDF parece ser de uma nota fiscal, não de um comprovante. Para ler notas, use Escanear nota fiscal em Anotar gasto.',
+    nota_fiscal: 'Esta é uma nota fiscal de produto. Para anotar uma compra com nota, use Escanear nota fiscal em Anotar gasto. Aqui lemos comprovantes, holerites e notas de serviço.',
     nao_e_comprovante: 'Não reconhecemos um comprovante neste PDF. Confira se é o comprovante de um Pix, de uma TED, de um boleto ou de um pagamento.',
   } satisfies Record<ComprovanteErrorCode, string>,
   pdf: {
@@ -111,6 +126,8 @@ export function comprovanteKindLabel(kind: ComprovanteKind, direction: Comprovan
       return 'Débito';
     case 'holerite':
       return 'Holerite';
+    case 'nota_servico':
+      return 'Nota de serviço';
     default:
       return direction === 'saida' ? 'Pagamento' : direction === 'entrada' ? 'Recebimento' : 'Comprovante';
   }
@@ -129,6 +146,8 @@ export function comprovanteKindPhrase(kind: ComprovanteKind, direction: Comprova
       return 'um débito';
     case 'holerite':
       return 'um holerite';
+    case 'nota_servico':
+      return 'uma nota de serviço';
     default:
       return direction === 'entrada' ? 'um recebimento' : 'um pagamento';
   }
@@ -168,21 +187,34 @@ export interface ComprovanteDraft {
   time: string | null;
   counterpart: string | null;
   message: string | null;
+  /** Só na nota de serviço: o número e as duas pontas. */
+  serviceNote?: ServiceNoteParties;
 }
 
-export function comprovanteDraft(reading: ComprovanteReading, today: IsoDate): ComprovanteDraft {
+/**
+ * O rascunho conferido. `screen` é o tipo do formulário: na nota de serviço, ele decide o lado (a nota não diz qual ponta é a
+ * pessoa), e o nome passa a ser o da outra ponta (recebimento: quem contratou; gasto: quem prestou). Nos comprovantes, não muda nada.
+ */
+export function comprovanteDraft(reading: ComprovanteReading, today: IsoDate, screen?: RecordKind): ComprovanteDraft {
   const future = reading.occurredOn !== null && reading.occurredOn > today;
+  let direction = reading.direction;
+  let counterpart = reading.counterpart;
+  if (reading.kind === 'nota_servico' && screen) {
+    direction = screen === 'receita' ? 'entrada' : 'saida';
+    counterpart = (direction === 'entrada' ? reading.serviceNote?.client : reading.serviceNote?.provider) ?? null;
+  }
   return {
     kind: reading.kind,
-    direction: reading.direction,
+    direction,
     directionGuessed: reading.directionGuessed,
-    recordKind: reading.direction === 'saida' ? 'despesa' : reading.direction === 'entrada' ? 'receita' : null,
+    recordKind: direction === 'saida' ? 'despesa' : direction === 'entrada' ? 'receita' : null,
     amountCents: reading.amountCents !== null && reading.amountCents >= 1 && reading.amountCents <= MAX_RECORD_CENTS ? reading.amountCents : null,
     occurredOn: reading.occurredOn !== null && !future ? reading.occurredOn : null,
     dayFuture: future,
     time: reading.time,
-    counterpart: reading.counterpart,
+    counterpart,
     message: reading.message,
+    ...(reading.serviceNote ? { serviceNote: reading.serviceNote } : {}),
   };
 }
 
@@ -192,6 +224,11 @@ export function comprovanteDraft(reading: ComprovanteReading, today: IsoDate): C
  * respeita "Ocultar valores".
  */
 export function comprovanteReadLine(draft: ComprovanteDraft): string {
+  if (draft.kind === 'nota_servico') {
+    // "Nota de serviço lida: Empresa Exemplo Ltda · R$ 4.200,00 · 05/10/2026" (a data é a da emissão, sem a hora).
+    const parts = [draft.counterpart, draft.amountCents === null ? null : formatBRL(draft.amountCents), draft.occurredOn ? formatDateBR(draft.occurredOn) : null].filter(Boolean);
+    return parts.length > 0 ? `${COMPROVANTE_TEXT.note.readTitle}: ${parts.join(' · ')}` : COMPROVANTE_TEXT.note.readTitle;
+  }
   const kind = comprovanteKindLabel(draft.kind, draft.directionGuessed ? null : draft.direction);
   const when = draft.occurredOn ? `${formatDateBR(draft.occurredOn)}${draft.time ? ` às ${draft.time}` : ''}` : null;
   const amount = draft.amountCents === null ? null : formatBRL(draft.amountCents);
@@ -203,15 +240,32 @@ export interface ComprovanteGaps {
   day: string | null;
   name: string | null;
   guessed: string | null;
+  /** Nota de serviço: de que lado a leitura pôs a pessoa (prestou ou contratou). */
+  side: string | null;
+  /** Nota de serviço: a data preenchida é a da emissão. */
+  issued: string | null;
 }
 
 /** As mensagens do que o comprovante não trouxe, para a leitura não parecer falha. */
 export function comprovanteGaps(draft: ComprovanteDraft): ComprovanteGaps {
+  if (draft.kind === 'nota_servico') {
+    const t = COMPROVANTE_TEXT.note;
+    return {
+      amount: draft.amountCents === null ? t.missingAmount : null,
+      day: draft.occurredOn === null ? (draft.dayFuture ? t.futureDay : t.missingDay) : null,
+      name: null,
+      guessed: null,
+      side: draft.direction === 'entrada' ? t.incomeSide : draft.direction === 'saida' ? t.expenseSide : null,
+      issued: draft.occurredOn !== null ? t.issued : null,
+    };
+  }
   return {
     amount: draft.amountCents === null ? COMPROVANTE_TEXT.missingAmount : null,
     day: draft.occurredOn === null ? (draft.dayFuture ? COMPROVANTE_TEXT.futureDay : draft.kind === 'holerite' ? COMPROVANTE_TEXT.holeriteDay : COMPROVANTE_TEXT.missingDay) : null,
     name: draft.counterpart === null && draft.message === null ? COMPROVANTE_TEXT.missingName : null,
     guessed: draft.directionGuessed ? COMPROVANTE_TEXT.directionGuessed : null,
+    side: null,
+    issued: null,
   };
 }
 
@@ -247,6 +301,7 @@ export interface ComprovanteDescription {
  */
 export function suggestComprovanteDescription(draft: ComprovanteDraft, lastTime: StoreMemory | null, kind: RecordKind): ComprovanteDescription {
   const placeholder = kind === 'despesa' ? COMPROVANTE_TEXT.placeholderOut : COMPROVANTE_TEXT.placeholderIn;
+  if (draft.kind === 'nota_servico') return noteDescription(draft, lastTime, kind, placeholder);
   if (lastTime && lastTime.description.trim() !== '') {
     return {
       description: fitWords(lastTime.description, DESCRIPTION_MAX),
@@ -276,6 +331,25 @@ export function suggestComprovanteDescription(draft: ComprovanteDraft, lastTime:
   return { description: '', category: null, source: 'em_branco', legend: null, placeholder };
 }
 
+/**
+ * Nota de serviço: "Nota fiscal 35 para Empresa Exemplo Ltda" (recebimento) ou "Nota fiscal 35 de Empresa Exemplo Ltda" (gasto). A
+ * descrição da última vez com o mesmo nome não se repete (traria o número da nota anterior); só a categoria dela vale.
+ */
+function noteDescription(draft: ComprovanteDraft, lastTime: StoreMemory | null, kind: RecordKind, placeholder: string): ComprovanteDescription {
+  const number = draft.serviceNote?.number ?? null;
+  const head = number ? `Nota fiscal ${number}` : 'Nota fiscal';
+  const name = draft.counterpart;
+  const description = name ? `${head} ${kind === 'receita' ? 'para' : 'de'} ${name}` : number ? head : COMPROVANTE_TEXT.note.fallback;
+  const category = lastTime?.category && CATEGORIES[kind].includes(lastTime.category) ? lastTime.category : null;
+  return {
+    description: fitWords(description, DESCRIPTION_MAX),
+    category,
+    source: name ? 'nome' : 'mensagem',
+    legend: name || number ? COMPROVANTE_TEXT.note.legend : null,
+    placeholder,
+  };
+}
+
 /** Nome sem acento, em minúsculas, só com letras e números separados por um espaço. */
 export function normalizeCounterpart(name: string): string {
   let out = '';
@@ -293,11 +367,13 @@ export function normalizeCounterpart(name: string): string {
 
 /**
  * Chave da memória por nome: o resumo SHA-256 do nome normalizado (com o tipo do registro, porque "Pix para Maria" e "Pix de Maria"
- * são lembranças diferentes). null sem nome. O nome em si nunca é guardado como chave.
+ * são lembranças diferentes). null sem nome. O nome em si nunca é guardado como chave. A nota de serviço (D-079) tem memória própria:
+ * "Nota fiscal 35 para Empresa" não pode virar a sugestão do Pix que a mesma empresa mandar depois.
  */
-export function counterpartMemoryId(name: string | null, kind: RecordKind): string | null {
+export function counterpartMemoryId(name: string | null, kind: RecordKind, source: 'comprovante' | 'nota_servico' = 'comprovante'): string | null {
   const normalized = name ? normalizeCounterpart(name) : '';
-  return normalized.length >= 2 ? sha256Hex(`pessoa:${kind}:${normalized}`) : null;
+  if (normalized.length < 2) return null;
+  return sha256Hex(source === 'nota_servico' ? `nota-servico:${kind}:${normalized}` : `pessoa:${kind}:${normalized}`);
 }
 
 /** O que guardar depois de salvar: descrição (1 a 80) e categoria do tipo do registro. Descrição vazia não é guardada. */

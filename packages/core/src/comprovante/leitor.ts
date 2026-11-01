@@ -1,6 +1,7 @@
 import type { IsoDate } from '../dates';
 import type { Cents } from '../money';
 import { holeriteReading, looksLikeHolerite } from './holerite';
+import { looksLikeNfse, nfseReading } from './nfse';
 import type { ComprovanteDirection, ComprovanteKind, ComprovanteOptions, ComprovanteReading, ComprovanteResult } from './tipos';
 import { cleanMessage, cleanPersonName, cleanText, fold, isDigit, isLetter, scanDate, scanMoney, scanTime, toLines, trimEdges } from './texto';
 
@@ -262,6 +263,8 @@ export function comprovanteFromText(raw: string, options: ComprovanteOptions = {
   if (alnumCount(text) < 20) return { ok: false, code: 'texto_vazio' };
   const lines = toLines(text);
   const everything = fold(lines.join('\n'));
+  // Nota de serviço (NFS-e): antes da recusa das notas de produto, porque o DANFSe também traz "chave de acesso" (nfse.ts).
+  if (looksLikeNfse(everything)) return { ok: true, reading: nfseReading(lines, options.items, options.defaultDirection ?? null) };
   if (everything.includes('danfe') || everything.includes('documento auxiliar da nota') || everything.includes('chave de acesso')) {
     return { ok: false, code: 'nota_fiscal' };
   }
