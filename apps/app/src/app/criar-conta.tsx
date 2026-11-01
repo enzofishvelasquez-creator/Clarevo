@@ -1,8 +1,8 @@
-import { LEGAL_TEXT, signupConsentParts } from '@clarevo/core';
+import { DEMO_TEXT, INVITE_BASE_URL, LEGAL_TEXT, signupConsentParts } from '@clarevo/core';
 import { router } from 'expo-router';
-import { AlertCircle } from 'lucide-react-native';
+import { AlertCircle, Info } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import type { TextInput } from 'react-native';
+import { Linking, type TextInput } from 'react-native';
 
 import { AuthShell } from '@/components/auth-shell';
 import { SiteTextLink } from '@/components/site-link';
@@ -57,6 +57,12 @@ export default function CriarConta() {
 
   return (
     <AuthShell back title="Criar conta" subtitle="Leva menos de um minuto. Você confirma o e-mail e já começa a organizar o mês.">
+      {auth.mode === 'demo' ? (
+        <Banner tone="info" icon={Info}>
+          <Txt variant="label">{DEMO_TEXT.signUpNotice}</Txt>
+          <Button label={DEMO_TEXT.openApp} tone="soft" onPress={() => Linking.openURL(`${INVITE_BASE_URL}/criar-conta`).catch(() => {})} />
+        </Banner>
+      ) : null}
       <TextField
         ref={refs.name}
         label="Nome de apresentação"

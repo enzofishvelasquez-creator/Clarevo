@@ -1753,7 +1753,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const DISCLAIMER = 'Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.';
   const INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
   const CALC_LIST = [
-    ['Decidir uma compra', [['Antes de financiar', 'Parcela, juros e o que muda se juntar antes'], ['Parcelado ou à vista?', 'Descubra os juros embutidos no parcelado'], ['Quanto custa por ano?', 'Assinaturas e gastos que se repetem']]],
+    ['Decidir uma compra', [['Antes de financiar', 'Parcela, juros e o que muda se juntar antes'], ['Parcelado ou à vista?', 'Descubra os juros embutidos no parcelado'], ['Quanto custa por ano?', 'Por ano, por mês e por dia']]],
     ['Dívidas e atrasos', [['Quanto custa uma dívida?', 'Rotativo, cheque especial ou empréstimo'], ['Quitar antes ou adiantar parcelas', 'Uma estimativa de quanto dos juros sai da conta'], ['Multa e juros por atraso', 'Com os valores do boleto'], ['Em que ordem quitar as dívidas?', 'Duas ordens de pagamento, lado a lado']]],
     ['Guardar e dividir', [['Reserva para imprevistos', 'Quantos meses seus gastos essenciais cobrem'], ['Juntar para um objetivo', 'Quanto guardar por mês ou em quanto tempo'], ['Dividir as contas da casa', 'Partes iguais ou pela renda de cada pessoa']]],
   ];
@@ -8256,7 +8256,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Entry('Calculadoras').click(); await waitText('Uma por uma');
   const j1Calc = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading][aria-level="2"]')].find((e) => e.textContent === 'Uma por uma' && e.getBoundingClientRect().width > 0); return h ? [...h.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label')) : null; });
   ok('Tutorial guia: "Calculadoras" lista as dez calculadoras, cada uma em uma linha, com título e legenda', j1Calc !== null && j1Calc.length === 10 && j1Calc[0] === 'Antes de financiar. Parcela, juros e o que muda se juntar antes' &&
-    j1Calc.includes('Em que ordem quitar as dívidas? Duas ordens de pagamento, lado a lado') && j1Calc.includes('Quanto custa por ano? Assinaturas e gastos que se repetem'), JSON.stringify(j1Calc));
+    j1Calc.includes('Em que ordem quitar as dívidas? Duas ordens de pagamento, lado a lado') && j1Calc.includes('Quanto custa por ano? Por ano, por mês e por dia'), JSON.stringify(j1Calc));
   await shot('323_guia_entrada_calculadoras');
   await p.getByRole('button', { name: /^Quanto custa por ano\? / }).filter({ visible: true }).first().click(); await waitText('Hipóteses').catch(() => {}); await p.waitForTimeout(500);
   ok('Tutorial guia: a linha "Quanto custa por ano?" abre a calculadora (/calcular/custo-por-ano)', j1Path() === '/calcular/custo-por-ano', j1Path());

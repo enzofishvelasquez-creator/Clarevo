@@ -11,6 +11,16 @@ export const DEMO_TEXT = {
   saveNote: 'Fica só nesta demonstração, com dados fictícios.',
   /** Pílula do cabeçalho compacto: "Demonstração · Pessoal". */
   pill: (context: string): string => `Demonstração · ${context}`,
+  /**
+   * Tela "Entrar" da demonstração: as contas existem só na memória da página, e a conta de verdade da pessoa não entra aqui
+   * (retorno de 01/11/2026: tentar entrar com o próprio e-mail na demonstração dava "Não foi possível entrar").
+   */
+  signInNotice: 'Esta é a demonstração. Aqui só entram as contas criadas nesta página, e elas somem ao fechar. Para entrar com a sua conta, use o app.',
+  openApp: 'Abrir o app da Clarevo',
+  /** Tela "Criar conta" da demonstração. */
+  signUpNotice: 'Esta é a demonstração: a conta criada aqui é só para testar e some ao fechar a página. Para criar a sua conta de verdade, use o app.',
+  /** Tela "Confira seu e-mail" da demonstração: nada é enviado, a confirmação é simulada em dois toques. */
+  confirmNotice: 'Demonstração: nenhum e-mail é enviado. Toque em "Simular abertura do link" e depois em "Já confirmei meu e-mail".',
 } as const;
 
 /** "Salvando em Pessoal" e "Importando em Pessoal" viram só o contexto, para a pílula caber ao lado do título em 320 px. */

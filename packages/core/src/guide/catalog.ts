@@ -7,7 +7,8 @@ import { PLANO_FIELDS, PLANO_TEXT } from '../calculators/plano-dividas';
 import { CARDS_TEXT } from '../cards';
 import { QUICK_PAY_TEXT } from '../commitments';
 import { COMMITTED_TEXT } from '../committed';
-import { BENEFIT_TEXT, COMPANY_TEXT } from '../company';
+import { BOLETO_TEXT } from '../boleto';
+import { BENEFIT_TEXT, COMPANY_TEXT, ENTRY_INVITE_TEXT } from '../company';
 import { COMPANY_REPORT_TEXT } from '../company-report';
 import { COMPROVANTE_TEXT } from '../comprovante/fluxo';
 import { DELETE_CONFIRMATION_WORD, DELETE_TEXT } from '../deletion';
@@ -17,6 +18,7 @@ import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOAL_IMAGE_TEXT } from '../goal-images';
 import { GOALS_TEXT } from '../goals';
 import { MONTH_CHECK_TEXT } from '../month-check';
+import { IMPORT_SUGGESTION_TEXT } from '../importar/sugestoes';
 import { IMPORT_TEXT } from '../importar/textos';
 import { LEARN_SECTIONS } from '../learn/sections';
 import { LEARN_UI_TEXT, SEASONAL_TEXT } from '../learn/ui-text';
@@ -25,7 +27,7 @@ import { NOTA_TEXT } from '../nota';
 import { INCOME_AVERAGE_TEXT } from '../renda-media';
 import { REMINDER_TEXT } from '../reminders';
 import { RETURN_TEXT } from '../retorno';
-import { SAVINGS_TEXT } from '../savings';
+import { EXTRA_SAVINGS_TEXT, SAVINGS_TEXT } from '../savings';
 import { SEARCH_TEXT } from '../search';
 import { SEU_MES_TEXT } from '../seu-mes';
 import { ORGANIZE_TEXT } from '../shortcuts';
@@ -177,9 +179,9 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     steps: [
       `Abra ${q('Anotar gasto')} e toque em ${q(NOTA_TEXT.scanButton)}, a primeira linha da tela.`,
       `Escolha como ler a nota: ${list([NOTA_TEXT.sheet.camera, NOTA_TEXT.sheet.pdf, NOTA_TEXT.sheet.paste], 'ou')}.`,
-      'Aponte a câmera para o QR code do cupom ou para o código de barras da chave de acesso.',
+      `Aponte a câmera para o QR code do cupom ou para o código de barras da chave de acesso. Em ${q(NOTA_TEXT.sheet.paste)}, também dá para usar ${q(NOTA_TEXT.keyPhoto)}: uma foto dos 44 números da chave.`,
       'Confira o que foi preenchido, como valor, data e descrição, e mude o que precisar.',
-      `Para ler o PDF do comprovante de um Pix, de uma TED, de um boleto ou de uma compra no débito, escolha ${q(COMPROVANTE_TEXT.option)} na mesma folha. Em Registrar recebimento, a linha tem o mesmo nome. O PDF é lido no aparelho e não é guardado.`,
+      `Para ler o comprovante de um Pix, de uma TED, de um boleto pago ou de uma compra no débito, em PDF ou imagem (print ou foto), escolha ${q(COMPROVANTE_TEXT.option)} na mesma folha. Em Registrar recebimento, a linha tem o mesmo nome. O arquivo é lido no aparelho e não é guardado.`,
       `Toque em ${q('Salvar gasto')}. Só um resumo da chave é guardado, nunca o CPF, a chave inteira nem o link.`,
     ],
     screenName: 'Anotar gasto',
@@ -187,6 +189,27 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     keywords: ['nota', 'fiscal', 'cupom', 'qr', 'qr code', 'nfc-e', 'nf-e', 'danfe', 'escanear', 'câmera', 'chave de acesso', 'recibo', 'comprovante', 'pix', 'ted', 'boleto'],
     routes: [],
     screenshot: '153_nota_lida.png',
+  },
+  {
+    id: 'comprovante-e-holerite',
+    group: 'dia-a-dia',
+    title: 'Ler comprovante, print ou holerite',
+    purpose:
+      'Preenche o gasto ou o recebimento com um comprovante de Pix, TED, boleto pago ou débito, em PDF ou imagem, ou com o holerite em PDF. Tudo é lido no aparelho e nada é guardado.',
+    where: [TAB.movimentos, 'Registrar recebimento', COMPROVANTE_TEXT.option],
+    alsoWhere: [[TAB.resumo, 'Anotar gasto', NOTA_TEXT.scanButton, COMPROVANTE_TEXT.option]],
+    steps: [
+      `Em ${q('Registrar recebimento')}, toque em ${q(COMPROVANTE_TEXT.option)}, a primeira linha. Em ${q('Anotar gasto')}, a opção fica em ${q(NOTA_TEXT.scanButton)}.`,
+      `Escolha o PDF do comprovante ou do holerite, ou uma imagem: um print do app do banco ou uma foto. No app de celular, escolha ${list([COMPROVANTE_TEXT.chooseGallery, COMPROVANTE_TEXT.chooseCamera, COMPROVANTE_TEXT.choosePdf], 'ou')}.`,
+      `A Clarevo preenche o valor, a data e a descrição com o nome de quem enviou ou recebeu. Se o comprovante for do outro lado, como um Pix enviado em Registrar recebimento, aparece ${q(COMPROVANTE_TEXT.switchToExpense)}.`,
+      'No holerite, entram o valor líquido e a descrição com o mês de competência, como Salário de setembro de 2026, na categoria Salário. Escolha o dia em que o salário entrou.',
+      `Confira e toque em ${q('Salvar recebimento')} (ou ${q('Salvar gasto')}). CPF, CNPJ, chave Pix, conta e os descontos do holerite nem saem da leitura.`,
+    ],
+    screenName: 'Registrar recebimento',
+    href: '/registro/novo?tipo=receita',
+    keywords: ['comprovante', 'print', 'imagem', 'foto', 'captura de tela', 'pix', 'ted', 'transferência', 'holerite', 'contracheque', 'salário', 'recebimento'],
+    routes: [],
+    screenshot: '355_comprovante_recebimento.png',
   },
   {
     id: 'movimentos',
@@ -234,20 +257,20 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     id: 'importar-extrato',
     group: 'dia-a-dia',
     title: 'Importar extrato ou fatura',
-    purpose: 'Traz gastos, recebimentos e compras no cartão de um arquivo do banco (OFX ou planilha CSV), com revisão de cada linha antes de importar.',
+    purpose: 'Traz gastos, recebimentos e compras no cartão de um arquivo do banco (PDF, OFX ou planilha CSV), com revisão de cada linha antes de importar.',
     where: organizar(IMPORT_TEXT.rowTitle),
     alsoWhere: [[ACCOUNT_SCREEN, ACCOUNTS_TEXT.title, IMPORT_TEXT.accountsShortcut]],
     steps: [
-      `Toque em ${q(IMPORT_TEXT.pickFile)} e escolha o arquivo OFX ou a planilha CSV que o banco gera. Ele é lido neste aparelho e não é guardado.`,
-      `Diga para onde vão os lançamentos: ${q(IMPORT_TEXT.destinationAccount)} (extrato) ou ${q(IMPORT_TEXT.destinationCard)} (fatura), e escolha a conta ou o cartão.`,
+      `Toque em ${q(IMPORT_TEXT.pickFile)} e escolha o PDF, o arquivo OFX ou a planilha CSV que o banco gera. Ele é lido neste aparelho e não é guardado.`,
+      `Diga para onde vão os lançamentos: ${q(IMPORT_TEXT.destinationAccount)} (extrato) ou ${q(IMPORT_TEXT.destinationCard)} (fatura), e escolha a conta ou o cartão. Compras no cartão só contam em Pago quando a fatura é paga.`,
       `Se a Clarevo não reconhecer as colunas, escolha qual é a data, a descrição e o valor e toque em ${q(IMPORT_TEXT.columnsApply)}.`,
       `Toque em ${q(IMPORT_TEXT.continueToReview)}. Marque o que vira lançamento e mude a descrição ou a categoria de uma linha, se quiser.`,
       `Linhas com ${list([IMPORT_TEXT.labels.ja_anotado, IMPORT_TEXT.labels.parcela, IMPORT_TEXT.labels.pagamento_fatura], 'ou')} vêm desmarcadas, para nada entrar duas vezes.`,
-      'Toque no botão de importar, que mostra quantos lançamentos entram. Compras no cartão só contam em Pago quando a fatura é paga.',
+      `Toque no botão de importar, que mostra quantos lançamentos entram. No fim, ${q(IMPORT_SUGGESTION_TEXT.title)} propõe gasto fixo para o que se repete todo mês e orçamento pela média de cada categoria, sempre com o cadastro preenchido para você conferir.`,
     ],
     screenName: IMPORT_TEXT.rowTitle,
     href: '/importar',
-    keywords: ['importar', 'importação', 'extrato', 'ofx', 'banco', 'planilha', 'csv', 'arquivo do banco', 'trazer lançamentos', 'fatura'],
+    keywords: ['importar', 'importação', 'extrato', 'ofx', 'pdf', 'banco', 'planilha', 'csv', 'arquivo do banco', 'trazer lançamentos', 'fatura', 'sugestões', 'conta recorrente'],
     routes: ['/importar'],
     help: ['importar'],
     screenshot: '303_importar_revisar.png',
@@ -294,6 +317,25 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     keywords: ['conta', 'pagar', 'boleto', 'vencimento', 'vencer', 'vencida', 'já paguei', 'marcar como paga', 'ainda a pagar', 'internet', 'condomínio'],
     routes: ['/a-pagar', '/a-pagar/nova', '/a-pagar/[id]', '/a-pagar/[id]/editar', '/a-pagar/[id]/pagar'],
     screenshot: '175_contas_a_pagar_outubro.png',
+  },
+  {
+    id: 'ler-boleto',
+    group: 'contas-e-cartoes',
+    title: 'Ler boleto',
+    purpose: 'Anota uma conta a pagar a partir do boleto: o valor e o vencimento saem do código de barras, da linha digitável, do PDF ou de uma foto.',
+    where: [...organizar(ORGANIZE_TEXT.payables.title), 'Anotar conta a pagar', BOLETO_TEXT.line],
+    steps: [
+      `Em Contas a pagar, toque em ${q('Anotar conta a pagar')} e depois em ${q(BOLETO_TEXT.line)}, a primeira linha.`,
+      `Escolha ${list([BOLETO_TEXT.camera, BOLETO_TEXT.pdfOrImage, BOLETO_TEXT.paste], 'ou')}. Com a câmera, deixe o código de barras inteiro dentro da moldura.`,
+      'Os números são conferidos pelos dígitos verificadores do boleto. O valor e o vencimento vão para os campos, e o nome de quem recebe, quando o PDF traz.',
+      `Contas de luz, água e telefone não trazem o vencimento no código: digite a data. Para voltar ao que estava, toque em ${q(BOLETO_TEXT.undo)}.`,
+      `Confira e toque em ${q('Salvar conta a pagar')}. O boleto é lido no aparelho e não é guardado.`,
+    ],
+    screenName: ORGANIZE_TEXT.payables.title,
+    href: '/a-pagar/nova',
+    keywords: ['boleto', 'código de barras', 'linha digitável', 'ler boleto', 'conta', 'vencimento', 'seguro', 'conta de luz', 'pagar conta'],
+    routes: [],
+    screenshot: '530_boleto_lido.png',
   },
   {
     id: 'vencidas',
@@ -502,12 +544,12 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Com ${q(SAVINGS_TEXT.yes)}, informe quanto por mês. O plano mostra etapas de 1, 3 e 6 meses de gastos essenciais e o mês previsto de cada uma.`,
       'Se o plano pedir, informe quanto você gasta por mês com o essencial: moradia, mercado, transporte, saúde e educação.',
       `Toque em ${q(SAVINGS_TEXT.useThisPlan)} para criar ou atualizar a sua reserva com o valor por mês.`,
-      `Com ${q(SAVINGS_TEXT.notNow)}, você pode começar uma reserva mínima, a partir de R$ 100,00, ou ver passos pequenos. Nada é gravado até você escolher.`,
+      `Com ${q(SAVINGS_TEXT.notNow)}, você pode começar uma reserva mínima, a partir de R$ 100,00, ou escolher um passo pequeno. Com só ${q(SAVINGS_TEXT.extraStep)}, toque em ${q(EXTRA_SAVINGS_TEXT.saveOnly)} e o Resumo avisa quando entrar dinheiro a mais.`,
       'Só você vê a sua resposta, e a pergunta pode voltar mais tarde, sem cobrança.',
     ],
     screenName: TAB.metas,
     href: '/metas',
-    keywords: ['plano de guardar', 'guardar', 'quanto guardar', 'reserva mínima', 'etapas', 'plano', 'poupar', 'economizar'],
+    keywords: ['plano de guardar', 'guardar', 'quanto guardar', 'reserva mínima', 'etapas', 'plano', 'poupar', 'economizar', 'valor extra', 'renda extra'],
     routes: ['/guardar', '/guardar/minima'],
     screenshot: '119_plano_de_guardar.png',
   },
@@ -569,7 +611,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Digite o ${q(ANTES_FIELDS.parcelas.label)} e a ${q(ANTES_FIELDS.taxaMes.label)}, que está na proposta do banco ou da loja.`,
       `Em ${q(ANTES_FIELDS.primeiraEmUmMes.label)}, escolha Sim ou Não.`,
       `Para ver quanto a parcela pesa, informe ${q(ANTES_FIELDS.renda.label)}. A renda de referência entra automaticamente, e mudar aqui não altera a referência.`,
-      `Veja o total pago, os juros e a alternativa ${q(ANTES_TEXT.savingTitle)}, com quanto tempo leva para juntar o valor.`,
+      `Veja o total pago, os juros e a alternativa ${q(ANTES_TEXT.savingTitle)}. Se for financiar, ${q(ANTES_TEXT.noteInstallment)}, logo abaixo do resultado, leva as parcelas para as contas a pagar.`,
       'É uma estimativa: as condições oficiais são as da proposta, e vale pedir o CET.',
     ],
     screenName: calcTitle('antes-de-financiar'),
@@ -776,7 +818,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     steps: [
       `Abra o link de convite que o RH enviou. Sem sessão, toque em ${q(BENEFIT_TEXT.enter)} ou ${q(BENEFIT_TEXT.createAccount)} com o e-mail do convite; depois você volta ao convite.`,
       `Confira o nome da empresa e o plano e toque em ${q(BENEFIT_TEXT.accept)}. O link serve uma vez e só com o e-mail do convite.`,
-      `Sem o link aberto, em Conta, no card ${q(BENEFIT_TEXT.accountTitle)}, toque em ${q(BENEFIT_TEXT.haveInvite)}, cole o link e toque em ${q(BENEFIT_TEXT.pasteSubmit)}.`,
+      `Sem o link aberto, em Conta, no card ${q(BENEFIT_TEXT.accountTitle)}, toque em ${q(BENEFIT_TEXT.haveInvite)}, cole o link e toque em ${q(BENEFIT_TEXT.pasteSubmit)}. Antes de ter conta, a tela de entrada tem o mesmo ${q(ENTRY_INVITE_TEXT.open)}.`,
       `Depois de aceitar, o card mostra a empresa, o plano e desde quando vale. Em ${q('Acesso ao plano')}, a situação aparece como ${q(BENEFIT_TEXT.planCardSituation)}.`,
       'Se a licença for encerrada, você fica com a conta, o histórico e a Família. O acesso pleno continua por 30 dias, e o card diz até quando.',
       `Para saber o que a empresa vê, toque em ${q('Quem vê estes dados?')}. Ela não vê seus registros, contas, metas, cartões nem a sua Família.`,

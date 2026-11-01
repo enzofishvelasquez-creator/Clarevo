@@ -7,7 +7,7 @@ import { CalcChoice, CalcField, CalcResult, CalcScreen, onlyChoicesMissing, useC
 import { Button, Card } from '@/components/ui';
 import { space } from '@/theme/tokens';
 
-/** 2. Quanto custa por ano? Assinaturas e gastos que se repetem; "Anotar como gasto fixo" com o valor por mês. */
+/** 2. Quanto custa por ano? Por ano, por mês e por dia; "Anotar como gasto fixo" com o valor por mês. */
 export function CustoPorAnoCalc({ prefill }: { prefill: CalcPrefill<'custo-por-ano'> }) {
   const specs = calcFields('custo-por-ano');
   const form = useCalcForm<'valor'>(() => ({ valor: prefill.valor ?? '' }));

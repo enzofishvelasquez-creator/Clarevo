@@ -29,7 +29,7 @@ export const CALC_GROUPS: readonly { id: CalcGroup; title: string }[] = [
 export const CALCULATORS: readonly CalcInfo[] = [
   { slug: 'antes-de-financiar', title: 'Antes de financiar', subtitle: 'Parcela, juros e o que muda se juntar antes', group: 'compra' },
   { slug: 'parcelado-ou-a-vista', title: 'Parcelado ou à vista?', subtitle: 'Descubra os juros embutidos no parcelado', group: 'compra' },
-  { slug: 'custo-por-ano', title: 'Quanto custa por ano?', subtitle: 'Assinaturas e gastos que se repetem', group: 'compra' },
+  { slug: 'custo-por-ano', title: 'Quanto custa por ano?', subtitle: 'Por ano, por mês e por dia', group: 'compra' },
   { slug: 'custo-da-divida', title: 'Quanto custa uma dívida?', subtitle: 'Rotativo, cheque especial ou empréstimo', group: 'dividas' },
   { slug: 'quitar-antes', title: 'Quitar antes ou adiantar parcelas', subtitle: 'Uma estimativa de quanto dos juros sai da conta', group: 'dividas' },
   { slug: 'multa-e-juros', title: 'Multa e juros por atraso', subtitle: 'Com os valores do boleto', group: 'dividas' },
