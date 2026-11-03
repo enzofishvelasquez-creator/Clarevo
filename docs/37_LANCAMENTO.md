@@ -32,7 +32,7 @@ O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que 
 
 | # | O quê | Quem | Estado |
 |---|---|---|---|
-| 1.1 | Conferir se a Clarevo já tem D-U-N-S e, se não, pedir (seção 4) | Enzo | |
+| 1.1 | Conferir se a Clarevo já tem D-U-N-S e, se não, pedir (seção 4) | Enzo | Pedido feito pela ferramenta da Apple em 03/11/2026; a Dun & Bradstreet entra em contato em até 5 dias úteis para confirmar os dados (se não entrar, falar com a Apple pelo link da mesma página) |
 | 1.2 | Caixa de e-mail no domínio funcionando (contato@clarevo.app.br): a Apple exige e-mail da empresa no domínio | Enzo | |
 | 1.3 | Inscrição na Apple como organização, assim que o D-U-N-S sair (seção 4) | Enzo | |
 | 1.4 | Conta de organização no Google Play Console (seção 4) | Enzo | |
@@ -40,7 +40,7 @@ O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que 
 | 1.6 | Mandar ao advogado: `docs/legal/resumo-para-advogado.md` (perguntas 41 a 45), a política e os termos; pedir resposta até 17/11 | Enzo | |
 | 1.7 | Supabase: plano Pro (cópias de segurança), proteção contra senhas vazadas; apagar o projeto antigo e a chave antiga do Resend | Enzo | |
 | 1.8 | Aprovar as 13 decisões das lojas (seção 3) | Enzo | Aprovadas em 03/11/2026 |
-| 1.9 | Telegram: aviso "Baixar o Telegram", PR e função publicada de novo | Equipe e Claude Chrome | Feito o código; falta o PR |
+| 1.9 | Telegram: aviso "Baixar o Telegram", PR e função publicada de novo | Equipe e Claude Chrome | Código pronto e roteiro de telas 9.091 de 9.091 (03/11/2026); falta o PR e publicar a função |
 | 1.10 | Aplicar as decisões aprovadas em `app.json` e atualizar `docs/16` e `docs/lojas/` | Equipe | Feito em 03/11/2026 (falta a razão social, que vem do Enzo) |
 
 ### Semana 2: 10 a 16/11, primeiro build
