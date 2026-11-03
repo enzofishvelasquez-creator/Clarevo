@@ -70,7 +70,18 @@ O token do bot e os segredos nunca vão para o chat, para o repositório nem par
 8. **Teste** (Enzo): em https://app.clarevo.app.br/conta/telegram, gerar o código, tocar em Abrir o Telegram e em Iniciar; mandar `mercado 52,30`, conferir o gasto no app e mandar `DESFAZER`.
 9. **Abrir a todos**: `TELEGRAM_IN_ACCOUNT = true` (o card aparece em Conta), a seção 3.11 entra na política publicada e a resposta do advogado (pergunta 45).
 
-## 6. Fontes
+## 6. Identificadores (não são segredos)
+
+O token do bot, o segredo do endereço e a chave dos resumos nunca entram aqui.
+
+| O quê | Valor |
+|---|---|
+| Bot da Clarevo no Telegram | @ClarevoBot (https://t.me/ClarevoBot), criado pelo Enzo em 03/11/2026 |
+| Função do servidor | https://gywufwrdegucnoonoenr.supabase.co/functions/v1/telegram (publicada em 03/11/2026, sem verificação de JWT) |
+| Banco | migração 0022 aplicada no clarevo-producao em 03/11/2026 (conferência 21j: 3, 0, 10, 3, 0 e 91) |
+| Tela do piloto | https://app.clarevo.app.br/conta/telegram |
+
+## 7. Fontes
 
 - API de bots do Telegram: [setWebhook e o segredo no cabeçalho](https://core.telegram.org/bots/api#setwebhook), [resposta no corpo da entrega](https://core.telegram.org/bots/api#making-requests-when-getting-updates), [sendMessage](https://core.telegram.org/bots/api#sendmessage) e [links de bot com /start](https://core.telegram.org/api/links#bot-links).
 - Criar e configurar o bot: [BotFather](https://core.telegram.org/bots/features#botfather).
