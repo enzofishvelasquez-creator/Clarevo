@@ -71,6 +71,11 @@ const HELP = new Set([
   'bom dia', 'boa tarde', 'boa noite',
 ]);
 const LINK_WORDS = new Set(['ativar', 'ligar', 'codigo']);
+/**
+ * Pergunta sem valor ("O que este bot pode fazer?", "como eu anoto?", "preciso de ajuda"): recebe a ajuda, com os exemplos, e não o
+ * erro de valor. Só vale quando nenhum valor foi encontrado; "quanto gastei 50?" segue a leitura de sempre.
+ */
+const QUESTION = /\?\s*$|^(?:o que|como|qual|quais|onde|pode|posso|consigo)\b|\bajuda\b/;
 
 /** Código como o banco guarda o resumo: 8 símbolos do alfabeto, em maiúsculas, sem hífen. null se o formato não serve. */
 export function normalizeWhatsAppCode(text: string): string | null {
@@ -239,7 +244,7 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
     const m = moneyOf(t.folded);
     if (m) candidates.push({ idx: [i], ...m });
   }
-  if (candidates.length === 0) return { type: 'erro', reason: 'sem_valor' };
+  if (candidates.length === 0) return QUESTION.test(fold(text.trim())) ? { type: 'ajuda' } : { type: 'erro', reason: 'sem_valor' };
   let chosen = candidates[0]!;
   if (candidates.length > 1) {
     const strong = candidates.filter((c) => c.strong);

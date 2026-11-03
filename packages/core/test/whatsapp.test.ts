@@ -93,6 +93,14 @@ describe('WhatsApp: leitura das mensagens (sem IA)', () => {
     };
     expect(reason('mercado')).toBe('sem_valor');
     expect(reason('oi, tudo bem com vocês')).toBe('sem_valor');
+    // Pergunta sem valor recebe a ajuda, não o erro de valor (teste do Enzo no Telegram, 03/11/2026).
+    expect(reason('O que este bot pode fazer?')).toBe('ajuda');
+    expect(reason('como eu anoto um gasto')).toBe('ajuda');
+    expect(reason('preciso de ajuda')).toBe('ajuda');
+    expect(reason('mercado?')).toBe('ajuda');
+    expect(reason('posso anotar pelo cartão?')).toBe('ajuda');
+    // Com valor, a pergunta segue a leitura de sempre.
+    expect(read('quanto deu o mercado 52,30?').type).toBe('anotar');
     expect(reason('mercado 50 farmácia 30')).toBe('valor_ambiguo');
     expect(reason('52,30')).toBe('sem_descricao');
     expect(reason('R$ 52,30 reais')).toBe('sem_descricao');

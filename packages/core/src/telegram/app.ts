@@ -2,10 +2,10 @@ import { WHATSAPP_CODE_MINUTES } from '../whatsapp/respostas';
 import type { ChatScreenText } from '../whatsapp/app';
 
 /**
- * Usuário do bot da Clarevo no Telegram (D-080), sem o @. Null: a tela só explica. O bot é criado pela pessoa responsável pela empresa,
- * no próprio Telegram (docs/35_TELEGRAM.md); depois, a equipe põe o usuário aqui e publica o app.
+ * Usuário do bot da Clarevo no Telegram (D-080), sem o @: https://t.me/ClarevoBot, criado pelo Enzo no próprio Telegram em 03/11/2026
+ * (docs/35_TELEGRAM.md, seção 6). Null: a tela só explica. Não é segredo; o token do bot fica só com o Enzo.
  */
-export const TELEGRAM_BOT: string | null = null;
+export const TELEGRAM_BOT: string | null = 'ClarevoBot';
 /** Piloto fechado (D-080): o card em Conta só aparece quando abrir a todos (packages/core/src/whatsapp/canais.ts). */
 export { TELEGRAM_IN_ACCOUNT } from '../whatsapp/canais';
 

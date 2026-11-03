@@ -8,27 +8,6 @@
 // Publicar com "Verify JWT" desligado (o Telegram não manda login; manda o segredo no cabeçalho).
 
 const __mods = [
-  // packages/core/src/telegram/index.ts
-  function (module, exports, __req) {
-    "use strict";
-    var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-        if (k2 === undefined) k2 = k;
-        var desc = Object.getOwnPropertyDescriptor(m, k);
-        if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-          desc = { enumerable: true, get: function() { return m[k]; } };
-        }
-        Object.defineProperty(o, k2, desc);
-    }) : (function(o, m, k, k2) {
-        if (k2 === undefined) k2 = k;
-        o[k2] = m[k];
-    }));
-    var __exportStar = (this && this.__exportStar) || function(m, exports) {
-        for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
-    };
-    Object.defineProperty(exports, "__esModule", { value: true });
-    __exportStar(__req(1), exports);
-    __exportStar(__req(13), exports);
-  },
   // packages/core/src/telegram/servidor.ts
   function (module, exports, __req) {
     "use strict";
@@ -41,9 +20,9 @@ const __mods = [
     exports.telegramConfigFrom = telegramConfigFrom;
     exports.telegramReplyBody = telegramReplyBody;
     exports.createTelegramHandler = createTelegramHandler;
-    const sha256_1 = __req(2);
-    const respostas_1 = __req(3);
-    const servidor_1 = __req(9);
+    const sha256_1 = __req(1);
+    const respostas_1 = __req(2);
+    const servidor_1 = __req(8);
     exports.TELEGRAM_MAX_BODY_BYTES = 64 * 1024;
     exports.TELEGRAM_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
     exports.TELEGRAM_ID_KEY_MIN = 32;
@@ -262,11 +241,11 @@ const __mods = [
     exports.chatReply = chatReply;
     exports.whatsappParseReply = whatsappParseReply;
     exports.whatsappOutcomeReply = whatsappOutcomeReply;
-    const dates_1 = __req(4);
-    const legal_1 = __req(5);
-    const money_1 = __req(6);
-    const records_1 = __req(7);
-    const canais_1 = __req(8);
+    const dates_1 = __req(3);
+    const legal_1 = __req(4);
+    const money_1 = __req(5);
+    const records_1 = __req(6);
+    const canais_1 = __req(7);
     exports.WHATSAPP_CODE_MINUTES = 15;
     function spaceLabel(space) {
         return space.kind === 'pessoal' ? 'espaço Pessoal' : `espaço ${space.name}`;
@@ -738,10 +717,10 @@ const __mods = [
     exports.supabaseWhatsAppRpc = supabaseWhatsAppRpc;
     exports.sendWhatsAppReply = sendWhatsAppReply;
     exports.createWhatsAppHandler = createWhatsAppHandler;
-    const dates_1 = __req(4);
-    const sha256_1 = __req(2);
-    const mensagem_1 = __req(10);
-    const respostas_1 = __req(3);
+    const dates_1 = __req(3);
+    const sha256_1 = __req(1);
+    const mensagem_1 = __req(9);
+    const respostas_1 = __req(2);
     exports.WHATSAPP_TIME_ZONE = 'America/Sao_Paulo';
     exports.WHATSAPP_GRAPH_VERSION = 'v23.0';
     exports.WHATSAPP_MAX_MESSAGES = 100;
@@ -1042,11 +1021,11 @@ const __mods = [
     exports.formatWhatsAppCode = formatWhatsAppCode;
     exports.whatsappCategory = whatsappCategory;
     exports.readWhatsAppMessage = readWhatsAppMessage;
-    const dates_1 = __req(4);
-    const categorias_1 = __req(11);
-    const dedupe_1 = __req(12);
-    const money_1 = __req(6);
-    const records_1 = __req(7);
+    const dates_1 = __req(3);
+    const categorias_1 = __req(10);
+    const dedupe_1 = __req(11);
+    const money_1 = __req(5);
+    const records_1 = __req(6);
     exports.WHATSAPP_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     exports.WHATSAPP_CODE_LENGTH = 8;
     exports.WHATSAPP_DESCRIPTION_MAX = 80;
@@ -1070,6 +1049,7 @@ const __mods = [
         'bom dia', 'boa tarde', 'boa noite',
     ]);
     const LINK_WORDS = new Set(['ativar', 'ligar', 'codigo']);
+    const QUESTION = /\?\s*$|^(?:o que|como|qual|quais|onde|pode|posso|consigo)\b|\bajuda\b/;
     function normalizeWhatsAppCode(text) {
         const code = text.toUpperCase().replace(/[\s-]+/g, '');
         if (code.length !== exports.WHATSAPP_CODE_LENGTH)
@@ -1219,7 +1199,7 @@ const __mods = [
                 candidates.push({ idx: [i], ...m });
         }
         if (candidates.length === 0)
-            return { type: 'erro', reason: 'sem_valor' };
+            return QUESTION.test(fold(text.trim())) ? { type: 'ajuda' } : { type: 'erro', reason: 'sem_valor' };
         let chosen = candidates[0];
         if (candidates.length > 1) {
             const strong = candidates.filter((c) => c.strong);
@@ -1263,8 +1243,8 @@ const __mods = [
     exports.categoryByRules = categoryByRules;
     exports.suggestCategory = suggestCategory;
     exports.rememberCategories = rememberCategories;
-    const records_1 = __req(7);
-    const dedupe_1 = __req(12);
+    const records_1 = __req(6);
+    const dedupe_1 = __req(11);
     exports.MEMORY_LIMIT = 300;
     function memoryKey(description) {
         const words = (0, dedupe_1.descriptionTokens)(description).slice(0, 3);
@@ -1333,8 +1313,8 @@ const __mods = [
     exports.importKey = importKey;
     exports.installmentMark = installmentMark;
     exports.findLookalikes = findLookalikes;
-    const dates_1 = __req(4);
-    const sha256_1 = __req(2);
+    const dates_1 = __req(3);
+    const sha256_1 = __req(1);
     function normalizeDescription(text) {
         return text
             .normalize('NFD')
@@ -1435,68 +1415,6 @@ const __mods = [
         }
         return flagged;
     }
-  },
-  // packages/core/src/telegram/app.ts
-  function (module, exports, __req) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    exports.TELEGRAM_TEXT = exports.TELEGRAM_IN_ACCOUNT = exports.TELEGRAM_BOT = void 0;
-    exports.isTelegramBotName = isTelegramBotName;
-    exports.telegramStartLink = telegramStartLink;
-    const respostas_1 = __req(3);
-    exports.TELEGRAM_BOT = null;
-    var canais_1 = __req(8);
-    Object.defineProperty(exports, "TELEGRAM_IN_ACCOUNT", { enumerable: true, get: function () { return canais_1.TELEGRAM_IN_ACCOUNT; } });
-    function isTelegramBotName(name) {
-        return /^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(name) && /bot$/i.test(name);
-    }
-    function telegramStartLink(bot, code) {
-        return `https://t.me/${bot}?start=${encodeURIComponent(code)}`;
-    }
-    exports.TELEGRAM_TEXT = {
-        cardTitle: 'Telegram',
-        cardBody: 'Anote gastos e recebimentos mandando uma mensagem para a Clarevo no Telegram.',
-        cardOpen: 'Anotar pelo Telegram',
-        cardLinked: (space) => `Ligado ao espaço ${space}.`,
-        title: 'Telegram',
-        intro: 'Mande uma mensagem como "mercado 52,30" para a Clarevo no Telegram e o gasto entra no app na hora. Para um recebimento: "recebi 1500 salário".',
-        textOnly: 'Por enquanto, só mensagens escritas. O microfone do teclado do celular transforma a sua fala em texto antes de enviar.',
-        spaceLabel: 'Anotar no espaço',
-        generate: 'Gerar código',
-        generating: 'Gerando…',
-        codeTitle: 'Seu código',
-        codeHelp: `Toque em Abrir o Telegram e depois em Iniciar: o código chega à Clarevo sozinho. Ele vale por ${respostas_1.WHATSAPP_CODE_MINUTES} minutos e serve uma vez.`,
-        openChat: 'Abrir o Telegram',
-        targetLabel: (bot) => `Se o Telegram não abrir, procure @${bot} e mande "Ativar" e o código.`,
-        codeLost: 'O código já foi mostrado. Gere outro.',
-        checkLinked: 'Já toquei em Iniciar',
-        linkedTitle: 'Telegram ligado',
-        linkedBody: (space) => `As mensagens desta conta do Telegram anotam no espaço ${space}.`,
-        linkedGone: 'Ligado a um espaço em que você não anota mais. Gere um código novo para escolher outro.',
-        changeSpace: 'Trocar o espaço ou a conta',
-        examplesTitle: 'O que dá para mandar',
-        examples: [
-            'mercado 52,30',
-            'farmácia 38 ontem',
-            'luz 180 12/10',
-            'recebi 1500 salário',
-            'DESFAZER: apaga a última anotação feita por lá',
-            'DESLIGAR: desliga o Telegram',
-        ],
-        unlink: 'Desligar o Telegram',
-        unlinkTitle: 'Desligar o Telegram?',
-        unlinkBody: 'As mensagens desta conta do Telegram deixam de anotar. O que já foi anotado continua no app.',
-        unlinkConfirm: 'Desligar',
-        unlinked: 'Telegram desligado.',
-        privacyTitle: 'Privacidade',
-        privacy: 'As mensagens passam pelos servidores do Telegram. A Clarevo guarda só o que você anotou, como qualquer registro do app. O texto das mensagens, o seu nome e o seu usuário no Telegram não ficam guardados: da conta, só um resumo feito com uma chave secreta, para reconhecer quem escreve.',
-        error: 'Não deu para concluir agora. Tente de novo.',
-        demo: 'Na demonstração, o Telegram não é ligado.',
-        notReady: 'A Clarevo no Telegram ainda está sendo preparada.',
-        openFailed: 'Não deu para abrir o Telegram neste aparelho. Procure a Clarevo no Telegram e mande "Ativar" e o código.',
-        linkedNow: 'Pronto, o Telegram está ligado.',
-        notYet: 'O código ainda não chegou. Confira se tocou em Iniciar no Telegram e tente de novo em alguns segundos.',
-    };
   },
 ];
 const __cache = [];

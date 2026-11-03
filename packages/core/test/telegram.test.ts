@@ -326,6 +326,8 @@ describe('Telegram: a função do servidor', () => {
 describe('Telegram: app', () => {
   it('o bot, o link de Iniciar com o código e o piloto fechado', () => {
     expect(TELEGRAM_BOT === null || isTelegramBotName(TELEGRAM_BOT)).toBe(true);
+    expect(TELEGRAM_BOT).toBe('ClarevoBot');
+    expect(telegramStartLink(TELEGRAM_BOT!, 'ABCD2345')).toBe('https://t.me/ClarevoBot?start=ABCD2345');
     expect(TELEGRAM_IN_ACCOUNT).toBe(false);
     expect(telegramStartLink('ClarevoBot', 'ABCD2345')).toBe('https://t.me/ClarevoBot?start=ABCD2345');
     expect(isTelegramBotName('ClarevoBot')).toBe(true);
