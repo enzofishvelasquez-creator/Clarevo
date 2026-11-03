@@ -178,14 +178,14 @@ Estes campos não podem ser inventados. As quatro URLs abaixo são as do site p�
 
 | Campo | Loja | O que a loja exige | Valor |
 |---|---|---|---|
-| E-mail de suporte | Apple (contato da revisão e suporte) e Google (contato do desenvolvedor) | Caixa lida por uma pessoa de verdade | [preencher: e-mail de suporte] |
-| URL de suporte | Apple | Página que leve a contato real (a Apple pede endereço legal, e-mail ou telefone) | `https://clarevo-site.pages.dev/suporte` (a conferir o endereço que a Cloudflare der) ou `https://[DOMÍNIO]/suporte` |
-| URL da política de privacidade | Apple e Google | Página pública, aberta sem login; também precisa de um acesso dentro do app (App Review Guidelines 5.1.1(i)) | `https://clarevo-site.pages.dev/privacidade` ou `https://[DOMÍNIO]/privacidade` |
-| URL dos termos de uso | Apple e Google (se pedirem) | Página pública, aberta sem login | `https://clarevo-site.pages.dev/termos` ou `https://[DOMÍNIO]/termos` |
-| URL de exclusão da conta e dos dados | Google | Página que explique como pedir a exclusão (o app já exclui pela tela Conta, D-058; a página existe no site, ainda não publicada) | `https://clarevo-site.pages.dev/excluir-conta` ou `https://[DOMÍNIO]/excluir-conta` |
-| URL de marketing (opcional) | Apple | Site do produto | `https://clarevo-site.pages.dev/` ou `https://[DOMÍNIO]/`, depois de publicado |
-| Direitos autorais | Apple | "2026 Nome legal de quem é dona ou dono do app" | [preencher: 2026 nome da empresa] |
-| Nome do desenvolvedor exibido | Apple (nome legal da organização) e Google | Nome que aparece como vendedora ou vendedor | [preencher: decisão de Enzo, `docs/16`] |
+| E-mail de suporte | Apple (contato da revisão e suporte) e Google (contato do desenvolvedor) | Caixa lida por uma pessoa de verdade | contato@clarevo.app.br (decidido em 03/11/2026; a caixa precisa estar sendo lida) |
+| URL de suporte | Apple | Página que leve a contato real (a Apple pede endereço legal, e-mail ou telefone) | `https://clarevo.app.br/suporte` |
+| URL da política de privacidade | Apple e Google | Página pública, aberta sem login; também precisa de um acesso dentro do app (App Review Guidelines 5.1.1(i)) | `https://clarevo.app.br/privacidade` (depois da revisão do advogado) |
+| URL dos termos de uso | Apple e Google (se pedirem) | Página pública, aberta sem login | `https://clarevo.app.br/termos` (depois da revisão do advogado) |
+| URL de exclusão da conta e dos dados | Google | Página que explique como pedir a exclusão (o app já exclui pela tela Conta, D-058; a página existe no site, ainda não publicada) | `https://clarevo.app.br/excluir-conta` |
+| URL de marketing (opcional) | Apple | Site do produto | `https://clarevo.app.br/` |
+| Direitos autorais | Apple | "2026 Nome legal de quem é dona ou dono do app" | 2026 [preencher: razão social do CNPJ da Clarevo] |
+| Nome do desenvolvedor exibido | Apple (nome legal da organização) e Google | Nome que aparece como vendedora ou vendedor | [preencher: razão social do CNPJ da Clarevo] (decidido em 03/11/2026: a razão social; na Apple, só se escolhe ao criar o primeiro app) |
 
 ## 9. Classificação etária (respostas do questionário)
 
@@ -206,7 +206,7 @@ Resultado esperado: **4+** na Apple e a menor faixa na classificação do Google
 | Violência de qualquer tipo; armas | Nenhum | |
 | Apostas, apostas simuladas, concursos, caixas de recompensa | Não ou nenhum | |
 | Categoria "Feito para crianças" | Não se aplica | |
-| **Substituir por uma classificação mais alta** | **Decisão de Enzo (P-002)** | P-002 recomenda 18+ no lançamento. Se os termos de uso exigirem 18 anos, a Apple exige substituir a classificação calculada por 18+ (`.../manage-app-information/set-an-app-age-rating`) |
+| **Substituir por uma classificação mais alta** | **Sim, 18+** (decidido em 03/11/2026: os termos e a política dizem 18 anos ou mais) | P-002 recomenda 18+ no lançamento. Se os termos de uso exigirem 18 anos, a Apple exige substituir a classificação calculada por 18+ (`.../manage-app-information/set-an-app-age-rating`) |
 
 **Google Play** (questionário de classificação por faixa etária, IARC, em Conteúdo do app; **a conferir** na hora, a rede não abriu a página oficial):
 

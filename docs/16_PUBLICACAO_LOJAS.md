@@ -20,6 +20,8 @@
 
 ## 2. Decisões que ficam com Enzo
 
+**Aprovadas em 03/11/2026 (D-082, `docs/37_LANCAMENTO.md`, seção 3):** 1 `app.clarevo`; 2 a razão social do CNPJ; 3 contato@clarevo.app.br e `https://clarevo.app.br/suporte`; 4 `https://clarevo.app.br/privacidade` e `/termos`, depois do advogado; 5 Enzo; 6 Clarevo; 7 18+; 8 isenta (`ios.config.usesNonExemptEncryption: false` em `app.json`); 9 backup desligado (`android.allowBackup: false`); 10 declarar os 4 últimos dígitos; 11 sem Sentry no lançamento; 12 gratuito; 13 Brasil. As contas são de empresa, com o CNPJ da Clarevo e o D-U-N-S.
+
 Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no repositório hoje ou o que o Claude recomenda.
 
 | # | Decisão | Proposta | O que está em jogo |

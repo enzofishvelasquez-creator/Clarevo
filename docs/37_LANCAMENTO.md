@@ -28,9 +28,9 @@ Fontes: [Apple, D-U-N-S](https://developer.apple.com/br/help/account/membership/
 | 1.5 | Conta no Expo (gratuita), para os builds | Enzo | |
 | 1.6 | Mandar ao advogado: `docs/legal/resumo-para-advogado.md` (perguntas 41 a 45), a política e os termos; pedir resposta até 17/11 | Enzo | |
 | 1.7 | Supabase: plano Pro (cópias de segurança), proteção contra senhas vazadas; apagar o projeto antigo e a chave antiga do Resend | Enzo | |
-| 1.8 | Aprovar as 13 decisões das lojas (seção 3) | Enzo | |
+| 1.8 | Aprovar as 13 decisões das lojas (seção 3) | Enzo | Aprovadas em 03/11/2026 |
 | 1.9 | Telegram: aviso "Baixar o Telegram", PR e função publicada de novo | Equipe e Claude Chrome | Feito o código; falta o PR |
-| 1.10 | Aplicar as decisões aprovadas em `app.json` e atualizar `docs/16` para o estado de hoje | Equipe | |
+| 1.10 | Aplicar as decisões aprovadas em `app.json` e atualizar `docs/16` e `docs/lojas/` | Equipe | Feito em 03/11/2026 (falta a razão social, que vem do Enzo) |
 
 ### Semana 2: 10 a 16/11, primeiro build
 
