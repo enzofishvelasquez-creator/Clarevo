@@ -69,6 +69,7 @@ const __mods = [
         'bom dia', 'boa tarde', 'boa noite',
     ]);
     const LINK_WORDS = new Set(['ativar', 'ligar', 'codigo']);
+    const QUESTION = /\?\s*$|^(?:o que|como|qual|quais|onde|pode|posso|consigo)\b|\bajuda\b/;
     function normalizeWhatsAppCode(text) {
         const code = text.toUpperCase().replace(/[\s-]+/g, '');
         if (code.length !== exports.WHATSAPP_CODE_LENGTH)
@@ -218,7 +219,7 @@ const __mods = [
                 candidates.push({ idx: [i], ...m });
         }
         if (candidates.length === 0)
-            return { type: 'erro', reason: 'sem_valor' };
+            return QUESTION.test(fold(text.trim())) ? { type: 'ajuda' } : { type: 'erro', reason: 'sem_valor' };
         let chosen = candidates[0];
         if (candidates.length > 1) {
             const strong = candidates.filter((c) => c.strong);
