@@ -77,7 +77,7 @@ O token do bot, o segredo do endereço e a chave dos resumos nunca entram aqui.
 | O quê | Valor |
 |---|---|
 | Bot da Clarevo no Telegram | @ClarevoBot (https://t.me/ClarevoBot), criado pelo Enzo em 03/11/2026 |
-| Função do servidor | https://gywufwrdegucnoonoenr.supabase.co/functions/v1/telegram (publicada em 03/11/2026, sem verificação de JWT) |
+| Função do servidor | https://gywufwrdegucnoonoenr.supabase.co/functions/v1/telegram (publicada em 03/11/2026, sem verificação de JWT; segredos cadastrados e endereço do bot ligado no mesmo dia, testado com "oi" e "mercado 52,30"). Depois disso, o arquivo gerado passou a levar só o servidor (`scripts/gerar-funcoes.js`, entrada `telegram/servidor.ts`): o comportamento é o mesmo da versão publicada, então não é preciso publicar de novo por isso |
 | Banco | migração 0022 aplicada no clarevo-producao em 03/11/2026 (conferência 21j: 3, 0, 10, 3, 0 e 91) |
 | Tela do piloto | https://app.clarevo.app.br/conta/telegram |
 

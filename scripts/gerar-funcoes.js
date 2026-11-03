@@ -2,7 +2,7 @@
 /**
  * Gera as funções do servidor que recebem as mensagens de cada canal, cada uma num arquivo só: supabase/functions/whatsapp/index.ts
  * (D-076) e supabase/functions/telegram/index.ts (D-080). Cada arquivo leva o código do núcleo (packages/core/src/whatsapp ou
- * packages/core/src/telegram, e o que ele usa), sem tipos, mais a ligação com o Deno do Supabase. Um arquivo só para colar no editor de
+ * packages/core/src/telegram/servidor.ts, e o que eles usam), sem tipos, mais a ligação com o Deno do Supabase. Um arquivo só para colar no editor de
  * funções do painel do Supabase, sem instalar nada (docs/05, passos 12j e 12l).
  *
  * Uso: npm run whatsapp  ou  npm run telegram   (geram as duas)
@@ -100,7 +100,8 @@ const FUNCTIONS = [
     ],
   },
   {
-    entry: 'packages/core/src/telegram/index.ts',
+    // Só o servidor: os textos e o nome do bot da tela do app (telegram/app.ts) não entram na função, então mudar a tela não muda a função.
+    entry: 'packages/core/src/telegram/servidor.ts',
     out: 'supabase/functions/telegram/index.ts',
     header: [
       '// GERADO por scripts/gerar-funcoes.js a partir de packages/core/src/telegram. Não editar à mão: mude o núcleo e rode `npm run telegram`.',
