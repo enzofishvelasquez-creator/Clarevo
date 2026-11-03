@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   TELEGRAM_BOT,
+  TELEGRAM_DOWNLOAD,
+  TELEGRAM_DOWNLOAD_TEXT,
   TELEGRAM_IN_ACCOUNT,
   TELEGRAM_REPLY,
   TELEGRAM_TEXT,
@@ -17,6 +19,7 @@ import {
   isTelegramBotName,
   telegramCommandText,
   telegramConfigFrom,
+  telegramDownloadLink,
   telegramInbound,
   telegramReplyBody,
   telegramSenderHash,
@@ -320,6 +323,26 @@ describe('Telegram: a função do servidor', () => {
       const src = readFileSync(f, 'utf8');
       expect(src, f).not.toMatch(/api\.telegram\.org|TELEGRAM_BOT_TOKEN|bot_token|setWebhook/i);
     }
+  });
+});
+
+describe('Telegram: baixar o app', () => {
+  it('a loja certa para cada aparelho: pelo sistema do app ou, na web, pelo navegador', () => {
+    expect(telegramDownloadLink('ios')).toBe(TELEGRAM_DOWNLOAD.ios);
+    expect(telegramDownloadLink('android')).toBe(TELEGRAM_DOWNLOAD.android);
+    expect(telegramDownloadLink('web', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15')).toBe(TELEGRAM_DOWNLOAD.ios);
+    expect(telegramDownloadLink('web', 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/130 Mobile')).toBe(TELEGRAM_DOWNLOAD.android);
+    expect(telegramDownloadLink('web', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130')).toBe(TELEGRAM_DOWNLOAD.other);
+    expect(telegramDownloadLink('web')).toBe(TELEGRAM_DOWNLOAD.other);
+    // Só endereços oficiais, com https e sem parâmetro de rastreio.
+    for (const url of Object.values(TELEGRAM_DOWNLOAD)) expect(url).toMatch(/^https:\/\/(apps\.apple\.com|play\.google\.com|telegram\.org)\/[^?]*(\?id=org\.telegram\.messenger)?$/);
+  });
+
+  it('os textos de quem não tem o Telegram seguem as regras de escrita', () => {
+    for (const t of Object.values(TELEGRAM_DOWNLOAD_TEXT)) {
+      expect(t, t).not.toMatch(/—|–|fazer sentido|whatsapp|\bmeta\b|número/i);
+    }
+    expect(TELEGRAM_DOWNLOAD_TEXT.body).toContain('gratuito');
   });
 });
 

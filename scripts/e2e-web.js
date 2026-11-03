@@ -14180,6 +14180,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       t.includes('DESLIGAR: desliga o Telegram') && t.includes('As mensagens passam pelos servidores do Telegram') &&
       t.includes('Na demonstração, o Telegram não é ligado.') && !/whatsapp|\bmeta\b|número/i.test(t), t.slice(0, 600));
     ok('Telegram: na demonstração, sem gerar código nem desligar', (await visibleCount('button', 'Gerar código')) === 0 && (await visibleCount('button', 'Desligar o Telegram')) === 0);
+    // Quem ainda não tem o Telegram: o aviso e o botão de baixar (abre a loja do aparelho; aqui não é tocado).
+    ok('Telegram: "Ainda não tem o Telegram?" com "Baixar o Telegram" (nome acessível diz que abre a loja de aplicativos)',
+      t.includes('Ainda não tem o Telegram?') && t.includes('O Telegram é gratuito. Baixe, crie a sua conta e volte aqui para ligar à Clarevo.') &&
+      (await p.getByRole('button', { name: 'Baixar o Telegram, abre a loja de aplicativos', exact: true }).filter({ visible: true }).count()) === 1);
     await atWidths(async (w) => { await layoutChecks(`Telegram na demonstração ${w}px`); });
     await shot('614_telegram_demonstracao');
     ok('Telegram: nada vai à rede na demonstração', writes.length === tgWrites0, writes.slice(tgWrites0).join(' | '));
