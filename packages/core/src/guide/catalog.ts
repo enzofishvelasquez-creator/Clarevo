@@ -33,6 +33,7 @@ import { SEU_MES_TEXT } from '../seu-mes';
 import { ORGANIZE_TEXT } from '../shortcuts';
 import { SIMULATE_TEXT } from '../simulate';
 import { SUBSCRIPTION_TEXT } from '../subscriptions';
+import { TELEGRAM_TEXT } from '../telegram/app';
 import { WIDGET_TEXT } from '../widget';
 import { GUIDE_GROUPS, GUIDE_TEXT, HELP_TEXT } from './text';
 import type { GuideEntry, GuideGroup, GuideGroupId, GuideLine, HelpScreen } from './types';
@@ -749,6 +750,26 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     keywords: ['exportar', 'exportação', 'planilha', 'excel', 'csv', 'pdf', 'backup', 'baixar', 'baixar meus dados', 'levar meus dados', 'relatório', 'cópia dos dados'],
     routes: ['/conta/exportar'],
     screenshot: '291_exportar_meus_dados.png',
+  },
+  {
+    id: 'telegram',
+    group: 'conta-e-privacidade',
+    title: 'Anotar pelo Telegram',
+    purpose: 'Anota gastos e recebimentos mandando uma mensagem escrita, como mercado 52,30, para a Clarevo no Telegram.',
+    where: [ACCOUNT_SCREEN, TELEGRAM_TEXT.cardTitle],
+    steps: [
+      `Em Conta, no card ${q(TELEGRAM_TEXT.cardTitle)}, toque em ${q(TELEGRAM_TEXT.cardOpen)}.`,
+      `Se você anota também numa Família, escolha o espaço. Toque em ${q(TELEGRAM_TEXT.generate)}.`,
+      `Toque em ${q(TELEGRAM_TEXT.openChat)} e, no Telegram, em Iniciar. A Clarevo responde com o nome da conta que foi ligada; confira se é a sua.`,
+      'Mande o que foi e o valor, como mercado 52,30, farmácia 38 ontem ou recebi 1500 salário. A resposta repete o que foi anotado, e o registro aparece no app na hora.',
+      'DESFAZER apaga a última anotação feita pelo Telegram nas últimas 24 horas. DESLIGAR desliga o Telegram da Clarevo; o que já foi anotado continua no app.',
+      'Só mensagens escritas. O texto das mensagens, o seu nome e o seu usuário no Telegram não ficam guardados.',
+    ],
+    screenName: TELEGRAM_TEXT.title,
+    href: '/conta/telegram',
+    keywords: ['telegram', 'mensagem', 'bot', 'anotar por mensagem', 'chat', 'conversa', 'celular'],
+    routes: ['/conta/telegram'],
+    screenshot: '614_telegram_demonstracao.png',
   },
   {
     id: 'excluir-conta',

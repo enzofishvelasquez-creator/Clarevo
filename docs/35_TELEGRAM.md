@@ -4,12 +4,12 @@
 
 ## 1. O que a pessoa faz
 
-1. No app, em **Conta > Telegram** (no piloto, pelo link https://app.clarevo.app.br/conta/telegram), escolhe o espaço (Pessoal ou a Família em que anota) e toca em **Gerar código**.
+1. No app, em **Conta > Telegram** (aberto a todas as pessoas desde 03/11/2026, D-081; a tela também abre por https://app.clarevo.app.br/conta/telegram), escolhe o espaço (Pessoal ou a Família em que anota) e toca em **Gerar código**.
 2. Toca em **Abrir o Telegram**: abre a conversa com o bot da Clarevo. Toca em **Iniciar**, e o Telegram manda o código sozinho (se o Telegram não abrir, a tela mostra o @ do bot e a pessoa manda "Ativar" e o código).
 3. A Clarevo responde que a conta está ligada e mostra os exemplos.
 4. Daí em diante, as mesmas mensagens do WhatsApp: `mercado 52,30`, `farmácia 38 ontem`, `recebi 1500 salário`, `DESFAZER`, `DESLIGAR`, `AJUDA`. No Telegram também valem os comandos `/desfazer`, `/desligar` e `/ajuda`.
 
-A leitura e as respostas são as do WhatsApp (`packages/core/src/whatsapp/mensagem.ts` e `respostas.ts`), com o nome do canal: "este Telegram está ligado à conta de Ana na Clarevo". No piloto fechado, as respostas apontam o endereço da tela (app.clarevo.app.br/conta/telegram), porque o card em Conta está escondido (`packages/core/src/whatsapp/canais.ts`). A pessoa pode ter o WhatsApp e o Telegram ligados ao mesmo tempo: cada canal tem o seu vínculo e o seu código, e DESFAZER e DESLIGAR só mexem no próprio canal.
+A leitura e as respostas são as do WhatsApp (`packages/core/src/whatsapp/mensagem.ts` e `respostas.ts`), com o nome do canal: "este Telegram está ligado à conta de Ana na Clarevo". Com o card em Conta (D-081), as respostas mandam abrir Conta e tocar em Telegram; num piloto fechado, apontariam o endereço da tela (`packages/core/src/whatsapp/canais.ts`). A pessoa pode ter o WhatsApp e o Telegram ligados ao mesmo tempo: cada canal tem o seu vínculo e o seu código, e DESFAZER e DESLIGAR só mexem no próprio canal.
 
 ## 2. Sem custo, por construção
 
@@ -68,7 +68,7 @@ O token do bot e os segredos nunca vão para o chat, para o repositório nem par
    A resposta esperada é `{"ok":true,"result":true,"description":"Webhook was set"}`. Para conferir depois: `https://api.telegram.org/botTOKEN/getWebhookInfo` mostra o endereço e, se houver, o último erro. Depois, apague essas duas páginas do histórico do navegador (o token fica nelas).
 7. **App** (equipe): o Enzo manda o usuário do bot (o @, que não é segredo); a equipe põe em `TELEGRAM_BOT`, faz o PR e, depois do merge, a tela `/conta/telegram` passa a gerar código.
 8. **Teste** (Enzo): em https://app.clarevo.app.br/conta/telegram, gerar o código, tocar em Abrir o Telegram e em Iniciar; mandar `mercado 52,30`, conferir o gasto no app e mandar `DESFAZER`.
-9. **Abrir a todos**: `TELEGRAM_IN_ACCOUNT = true` (o card aparece em Conta), a seção 3.11 entra na política publicada e a resposta do advogado (pergunta 45).
+9. **Abrir a todos**: feito em 03/11/2026 (D-081), com `TELEGRAM_IN_ACCOUNT = true` (o card aparece em Conta e no guia) e a função do servidor publicada de novo, porque as respostas mudam. Falta a resposta do advogado (pergunta 45).
 
 ## 6. Identificadores (não são segredos)
 
