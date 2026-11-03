@@ -1,11 +1,13 @@
 import {
   TELEGRAM_BOT,
+  TELEGRAM_DOWNLOAD_TEXT,
   TELEGRAM_TEXT,
   WHATSAPP_NUMBER,
   WHATSAPP_TEXT,
   formatWhatsAppCode,
   newOperationKey,
   roleCanWrite,
+  telegramDownloadLink,
   telegramStartLink,
   whatsappChatLink,
   type ChatChannel,
@@ -14,9 +16,9 @@ import {
   type ChatScreenText,
 } from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Check, ExternalLink, Info, MessageCircle, RefreshCw, ShieldCheck, Unlink } from 'lucide-react-native';
+import { AlertCircle, Check, Download, ExternalLink, Info, MessageCircle, RefreshCw, ShieldCheck, Unlink } from 'lucide-react-native';
 import { useState } from 'react';
-import { Linking, View } from 'react-native';
+import { Linking, Platform, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
@@ -26,10 +28,19 @@ import { useFamily } from '@/state/family';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
-/** O que muda de um canal para o outro: os textos, onde achar a Clarevo (número ou bot) e o link que abre a conversa com o código. */
-const CHANNELS: Record<ChatChannel, { texts: ChatScreenText; target: string | null; link: (target: string, code: string) => string }> = {
+/** Navegador da web (iPhone ou Android), para o link de baixar o Telegram; no app, vale o sistema. */
+const userAgent = () => (Platform.OS === 'web' && typeof navigator !== 'undefined' ? navigator.userAgent : '');
+
+/**
+ * O que muda de um canal para o outro: os textos, onde achar a Clarevo (número ou bot), o link que abre a conversa com o código e, no
+ * Telegram, o link de baixar o app para quem ainda não tem (o WhatsApp quase todo mundo já tem).
+ */
+const CHANNELS: Record<
+  ChatChannel,
+  { texts: ChatScreenText; target: string | null; link: (target: string, code: string) => string; download?: () => string }
+> = {
   whatsapp: { texts: WHATSAPP_TEXT, target: WHATSAPP_NUMBER, link: whatsappChatLink },
-  telegram: { texts: TELEGRAM_TEXT, target: TELEGRAM_BOT, link: telegramStartLink },
+  telegram: { texts: TELEGRAM_TEXT, target: TELEGRAM_BOT, link: telegramStartLink, download: () => telegramDownloadLink(Platform.OS, userAgent()) },
 };
 
 type Msg = { tone: 'erro' | 'sucesso' | 'info'; text: string } | null;
@@ -42,7 +53,7 @@ type Msg = { tone: 'erro' | 'sucesso' | 'info'; text: string } | null;
  * existe no canal (número ou bot nulo), a tela só explica.
  */
 export function ChatLinkScreen({ channel }: { channel: ChatChannel }) {
-  const { texts: T, target, link } = CHANNELS[channel];
+  const { texts: T, target, link, download } = CHANNELS[channel];
   const { user, auth } = useSession();
   const repo = useRepo();
   const qc = useQueryClient();
@@ -109,6 +120,16 @@ export function ChatLinkScreen({ channel }: { channel: ChatChannel }) {
     }
   };
 
+  /** "Baixar o Telegram": abre a loja do aparelho (ou a página de apps do Telegram). */
+  const openDownload = async () => {
+    if (!download) return;
+    try {
+      await Linking.openURL(download());
+    } catch {
+      setMsg({ tone: 'erro', text: TELEGRAM_DOWNLOAD_TEXT.failed });
+    }
+  };
+
   const unlink = async () => {
     setBusy('desligar');
     try {
@@ -150,6 +171,22 @@ export function ChatLinkScreen({ channel }: { channel: ChatChannel }) {
             </Txt>
           ) : null}
         </Card>
+
+        {download && !state.data?.linked ? (
+          <Card style={{ gap: space[2] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {TELEGRAM_DOWNLOAD_TEXT.title}
+            </Txt>
+            <Txt color={colors.textSecondary}>{TELEGRAM_DOWNLOAD_TEXT.body}</Txt>
+            <Button
+              label={TELEGRAM_DOWNLOAD_TEXT.button}
+              icon={Download}
+              tone="soft"
+              accessibilityLabel={TELEGRAM_DOWNLOAD_TEXT.a11y}
+              onPress={openDownload}
+            />
+          </Card>
+        ) : null}
 
         {ready && state.isError ? (
           <Banner tone="erro" icon={AlertCircle}>

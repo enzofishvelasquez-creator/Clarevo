@@ -8195,17 +8195,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
-  // ---- 7. A lista do guia: cinco grupos, trinta e sete entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Análises", D-059, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, "Excluir minha conta", D-058, e "Ler comprovante, holerite ou nota de serviço" e "Ler boleto", D-078 e D-079) ----
+  // ---- 7. A lista do guia: cinco grupos, trinta e oito entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Análises", D-059, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, "Excluir minha conta", D-058, "Ler comprovante, holerite ou nota de serviço" e "Ler boleto", D-078 e D-079, e "Anotar pelo Telegram", D-081) ----
   await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   const j1Groups = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => ({
     title: h.textContent, rows: [...h.parentElement.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label') || b.textContent) })));
   const j1G = await j1Groups();
   ok('Tutorial guia: /aprender/guia com o título "Como usar o app da Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
-  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 8, 2 e 8 entradas (Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa" e "Benefício pela empresa")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
-    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 8, 2, 8]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
+  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 8, 2 e 9 entradas (Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa" e "Anotar pelo Telegram")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
+    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 8, 2, 9]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
-  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 37 &&
+  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 38 &&
     j1Rows.includes('Buscar em Movimentos. Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.') &&
     j1Rows.includes('Exportar meus dados. Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.') &&
     j1Rows.some((r) => r.startsWith('Importar extrato ou fatura. Traz gastos, recebimentos e compras no cartão de um arquivo do banco')) &&
@@ -14180,6 +14180,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       t.includes('DESLIGAR: desliga o Telegram') && t.includes('As mensagens passam pelos servidores do Telegram') &&
       t.includes('Na demonstração, o Telegram não é ligado.') && !/whatsapp|\bmeta\b|número/i.test(t), t.slice(0, 600));
     ok('Telegram: na demonstração, sem gerar código nem desligar', (await visibleCount('button', 'Gerar código')) === 0 && (await visibleCount('button', 'Desligar o Telegram')) === 0);
+    // Quem ainda não tem o Telegram: o aviso e o botão de baixar (abre a loja do aparelho; aqui não é tocado).
+    ok('Telegram: "Ainda não tem o Telegram?" com "Baixar o Telegram" (nome acessível diz que abre a loja de aplicativos)',
+      t.includes('Ainda não tem o Telegram?') && t.includes('O Telegram é gratuito. Baixe, crie a sua conta e volte aqui para ligar à Clarevo.') &&
+      (await p.getByRole('button', { name: 'Baixar o Telegram, abre a loja de aplicativos', exact: true }).filter({ visible: true }).count()) === 1);
     await atWidths(async (w) => { await layoutChecks(`Telegram na demonstração ${w}px`); });
     await shot('614_telegram_demonstracao');
     ok('Telegram: nada vai à rede na demonstração', writes.length === tgWrites0, writes.slice(tgWrites0).join(' | '));

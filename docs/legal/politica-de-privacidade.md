@@ -173,7 +173,7 @@ Você pode ligar o seu número de WhatsApp à Clarevo, em Conta, e anotar gastos
 
 ### 3.11 Anotar pelo Telegram (opcional)
 
-[PROPOSTA: seção a incluir junto com a abertura do Telegram a todas as pessoas. A base legal, o papel do Telegram e a transferência internacional ainda não foram confirmados juridicamente.]
+[A DEFINIR: o Telegram está aberto a todas as pessoas desde 03/11/2026; a base legal, o papel do Telegram e a transferência internacional ainda não foram confirmados juridicamente (pergunta 45 ao advogado).]
 
 Você pode ligar a sua conta do Telegram à Clarevo, em Conta, e anotar gastos e recebimentos mandando mensagens escritas para o bot da Clarevo no Telegram, como "mercado 52,30". Funciona como o WhatsApp (seção 3.10), e um não depende do outro. Ligar é opcional, e nada no app depende disso.
 

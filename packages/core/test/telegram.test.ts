@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   TELEGRAM_BOT,
+  TELEGRAM_DOWNLOAD,
+  TELEGRAM_DOWNLOAD_TEXT,
   TELEGRAM_IN_ACCOUNT,
   TELEGRAM_REPLY,
   TELEGRAM_TEXT,
@@ -17,6 +19,7 @@ import {
   isTelegramBotName,
   telegramCommandText,
   telegramConfigFrom,
+  telegramDownloadLink,
   telegramInbound,
   telegramReplyBody,
   telegramSenderHash,
@@ -148,7 +151,7 @@ describe('Telegram: resposta a cada mensagem', () => {
     );
     expect(await ask({ result: 'ja_ligado' }, '/start ABCD2345')).toBe(TELEGRAM_REPLY.ja_ligado);
     expect(await ask({ result: 'desligado' }, '/desligar')).toBe(TELEGRAM_REPLY.desligado);
-    expect(await ask({ result: 'sem_permissao', space })).toBe('Você não anota mais no espaço Pessoal. Ligue de novo em app.clarevo.app.br/conta/telegram, escolhendo o espaço.');
+    expect(await ask({ result: 'sem_permissao', space })).toBe('Você não anota mais no espaço Pessoal. No app, abra Conta, toque em Telegram e ligue de novo, escolhendo o espaço.');
     expect(await ask({ result: 'repetida' })).toBeNull();
     expect(await ask({ result: 'silencio' })).toBeNull();
     const noted = await ask({
@@ -165,9 +168,9 @@ describe('Telegram: resposta a cada mensagem', () => {
     expect(Object.keys(TELEGRAM_REPLY).sort()).toEqual(Object.keys(WHATSAPP_REPLY).sort());
     expect(TELEGRAM_REPLY.midia).toBe(WHATSAPP_REPLY.midia);
     expect(TELEGRAM_REPLY.erro).toBe(WHATSAPP_REPLY.erro);
-    // Piloto fechado: o card em Conta está escondido, então as respostas apontam o endereço da tela.
-    expect(TELEGRAM_REPLY.nao_ligado).toBe('Este Telegram ainda não está ligado a uma conta da Clarevo. Abra app.clarevo.app.br/conta/telegram e siga os passos.');
-    expect(TELEGRAM_REPLY.codigo_invalido).toBe('Este código não vale mais ou não existe. Gere outro em app.clarevo.app.br/conta/telegram. Cada código vale por 15 minutos.');
+    // Aberto a todas as pessoas (D-081): as respostas mandam abrir Conta. O WhatsApp, em piloto fechado, aponta o endereço da tela.
+    expect(TELEGRAM_REPLY.nao_ligado).toBe('Este Telegram ainda não está ligado a uma conta da Clarevo. No app da Clarevo, abra Conta, toque em Telegram e siga os passos.');
+    expect(TELEGRAM_REPLY.codigo_invalido).toBe('Este código não vale mais ou não existe. No app, abra Conta, toque em Telegram e gere outro. Cada código vale por 15 minutos.');
     expect(TELEGRAM_REPLY.ja_ligado).toBe('Este Telegram já está ligado a outra conta da Clarevo. Se for seu, mande DESLIGAR e depois mande o código de novo.');
     expect(WHATSAPP_REPLY.nao_ligado).toContain('app.clarevo.app.br/conta/whatsapp');
     const texts = [
@@ -323,12 +326,33 @@ describe('Telegram: a função do servidor', () => {
   });
 });
 
+describe('Telegram: baixar o app', () => {
+  it('a loja certa para cada aparelho: pelo sistema do app ou, na web, pelo navegador', () => {
+    expect(telegramDownloadLink('ios')).toBe(TELEGRAM_DOWNLOAD.ios);
+    expect(telegramDownloadLink('android')).toBe(TELEGRAM_DOWNLOAD.android);
+    expect(telegramDownloadLink('web', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15')).toBe(TELEGRAM_DOWNLOAD.ios);
+    expect(telegramDownloadLink('web', 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/130 Mobile')).toBe(TELEGRAM_DOWNLOAD.android);
+    expect(telegramDownloadLink('web', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130')).toBe(TELEGRAM_DOWNLOAD.other);
+    expect(telegramDownloadLink('web')).toBe(TELEGRAM_DOWNLOAD.other);
+    // Só endereços oficiais, com https e sem parâmetro de rastreio.
+    for (const url of Object.values(TELEGRAM_DOWNLOAD)) expect(url).toMatch(/^https:\/\/(apps\.apple\.com|play\.google\.com|telegram\.org)\/[^?]*(\?id=org\.telegram\.messenger)?$/);
+  });
+
+  it('os textos de quem não tem o Telegram seguem as regras de escrita', () => {
+    for (const t of Object.values(TELEGRAM_DOWNLOAD_TEXT)) {
+      expect(t, t).not.toMatch(/—|–|fazer sentido|whatsapp|\bmeta\b|número/i);
+    }
+    expect(TELEGRAM_DOWNLOAD_TEXT.body).toContain('gratuito');
+  });
+});
+
 describe('Telegram: app', () => {
   it('o bot, o link de Iniciar com o código e o piloto fechado', () => {
     expect(TELEGRAM_BOT === null || isTelegramBotName(TELEGRAM_BOT)).toBe(true);
     expect(TELEGRAM_BOT).toBe('ClarevoBot');
     expect(telegramStartLink(TELEGRAM_BOT!, 'ABCD2345')).toBe('https://t.me/ClarevoBot?start=ABCD2345');
-    expect(TELEGRAM_IN_ACCOUNT).toBe(false);
+    // Aberto a todas as pessoas (D-081): o card aparece em Conta.
+    expect(TELEGRAM_IN_ACCOUNT).toBe(true);
     expect(telegramStartLink('ClarevoBot', 'ABCD2345')).toBe('https://t.me/ClarevoBot?start=ABCD2345');
     expect(isTelegramBotName('ClarevoBot')).toBe(true);
     expect(isTelegramBotName('clarevo_app_bot')).toBe(true);

@@ -28,6 +28,8 @@ A leitura é por regras simples (`packages/core/src/whatsapp/mensagem.ts`): o va
 
 ## 2. Sem custo, por construção
 
+**Atualização de 03/11/2026:** pelas fontes de outubro de 2026, a Meta voltou a cobrar as respostas dentro da janela de 24 horas a partir de 1º de outubro de 2026 (com possível franquia de 1.000 por número por mês). A tabela abaixo é a do D-076 e precisa ser conferida no painel antes de abrir o WhatsApp. Ver `docs/36_WHATSAPP_CAMINHOS.md`.
+
 | Item | Custo | Por quê |
 |---|---|---|
 | API da Meta (WhatsApp Cloud API) | R$ 0 | A hospedagem da Meta é gratuita e usamos a API direto, sem intermediário pago |
@@ -92,7 +94,7 @@ No primeiro teste, as mensagens do número de teste falharam com o erro 131031 (
 
 **Regra daqui em diante:** contas, portfólios, apps, verificações e pedidos de revisão na Meta são feitos **só pelo Enzo, à mão, no próprio navegador**. O Claude Chrome não cria nem opera páginas da Meta; a equipe manda o passo a passo e lê os prints.
 
-O que fazer: (1) o Enzo pede a revisão da restrição em Qualidade da conta do portfólio, com uma explicação verdadeira; (2) completa a verificação da empresa com o cartão CNPJ; (3) se a revisão for negada, cria um portfólio novo, à mão, liga o app a ele e troca os segredos que mudarem (token, Phone number ID).
+O que fazer: (1) o Enzo pede a revisão da restrição em Qualidade da conta do portfólio, com uma explicação verdadeira; (2) completa a verificação da empresa com o cartão CNPJ; (3) ~~se a revisão for negada, cria um portfólio novo~~: revisto em 03/11/2026, não recomendado, porque a Meta pode tratar como contorno da restrição e restringir os dois portfólios (`docs/36_WHATSAPP_CAMINHOS.md`).
 
 ## 6. Identificadores (não são segredos)
 

@@ -22,10 +22,39 @@ export function telegramStartLink(bot: string, code: string): string {
   return `https://t.me/${bot}?start=${encodeURIComponent(code)}`;
 }
 
+/**
+ * Onde baixar o Telegram, que é gratuito, para quem ainda não tem: a loja oficial do aparelho ou a página de apps do Telegram (computador
+ * e outros aparelhos). Links públicos, sem rastreio.
+ */
+export const TELEGRAM_DOWNLOAD = {
+  ios: 'https://apps.apple.com/app/telegram-messenger/id686449807',
+  android: 'https://play.google.com/store/apps/details?id=org.telegram.messenger',
+  other: 'https://telegram.org/apps',
+} as const;
+
+/**
+ * O link de baixar o Telegram para este aparelho: pelo sistema do app (Platform.OS) ou, na web, pelo navegador (userAgent) de um
+ * iPhone ou Android. Computador e outros: a página de apps do Telegram.
+ */
+export function telegramDownloadLink(os: string, userAgent = ''): string {
+  if (os === 'ios' || /iPhone|iPad|iPod/i.test(userAgent)) return TELEGRAM_DOWNLOAD.ios;
+  if (os === 'android' || /Android/i.test(userAgent)) return TELEGRAM_DOWNLOAD.android;
+  return TELEGRAM_DOWNLOAD.other;
+}
+
+/** Textos de quem ainda não tem o Telegram (só na tela do Telegram). */
+export const TELEGRAM_DOWNLOAD_TEXT = {
+  title: 'Ainda não tem o Telegram?',
+  body: 'O Telegram é gratuito. Baixe, crie a sua conta e volte aqui para ligar à Clarevo.',
+  button: 'Baixar o Telegram',
+  a11y: 'Baixar o Telegram, abre a loja de aplicativos',
+  failed: 'Não deu para abrir a loja de aplicativos. Procure por Telegram na loja do seu celular.',
+} as const;
+
 /** Textos da tela Conta > Telegram. */
 export const TELEGRAM_TEXT = {
   cardTitle: 'Telegram',
-  cardBody: 'Anote gastos e recebimentos mandando uma mensagem para a Clarevo no Telegram.',
+  cardBody: 'Anote gastos e recebimentos mandando uma mensagem para a Clarevo no Telegram, que é gratuito.',
   cardOpen: 'Anotar pelo Telegram',
   cardLinked: (space: string) => `Ligado ao espaço ${space}.`,
   title: 'Telegram',

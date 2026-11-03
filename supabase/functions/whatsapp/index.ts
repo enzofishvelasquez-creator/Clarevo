@@ -992,7 +992,7 @@ const __mods = [
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.TELEGRAM_IN_ACCOUNT = exports.WHATSAPP_IN_ACCOUNT = void 0;
     exports.WHATSAPP_IN_ACCOUNT = false;
-    exports.TELEGRAM_IN_ACCOUNT = false;
+    exports.TELEGRAM_IN_ACCOUNT = true;
   },
   // packages/core/src/whatsapp/servidor.ts
   function (module, exports, __req) {

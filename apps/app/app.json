@@ -12,7 +12,10 @@
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "app.clarevo",
       "buildNumber": "1",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,6 +27,7 @@
       "predictiveBackGestureEnabled": false,
       "package": "app.clarevo",
       "versionCode": 1,
+      "allowBackup": false,
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
