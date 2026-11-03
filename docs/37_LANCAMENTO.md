@@ -15,6 +15,15 @@ As contas de empresa nas lojas são o que mais demora, então começam **nesta s
 
 Fontes: [Apple, D-U-N-S](https://developer.apple.com/br/help/account/membership/D-U-N-S/), [fórum da Apple, prazos de inscrição](https://developer.apple.com/forums/thread/842701), [regra dos 12 testadores](https://ontest.app/blog/google-play-12-testers-14-days-requirement-explained) (conferir na página oficial do Play Console).
 
+### Risco: a natureza jurídica da Clarevo (Inova Simples)
+
+A Clarevo foi aberta em 23/10/2026 como **Empresa Simples de Inovação (Inova Simples)**, CNPJ 69.771.864/0001-03, razão social CLAREVO INOVA SIMPLES (I.S.), natureza jurídica própria desse regime (código 234-8, Resolução CGSIM 55/2020). Dois pontos a conferir **antes** de pagar a inscrição da Apple:
+
+1. **A Apple só aceita organização que seja pessoa jurídica capaz de assinar contratos** e recusa empresário individual, nome fantasia e filial. A lei não define bem as características da natureza Inova Simples nem a responsabilidade de quem a institui (Ofício Circular DREI 4767/2022). A Dun & Bradstreet pode emitir o D-U-N-S e a Apple ainda assim recusar, ou pedir documentos. Na App Store, o nome que aparece como vendedora seria "CLAREVO INOVA SIMPLES (I.S.)".
+2. **Saída prevista:** a resolução permite transformar a Inova Simples em empresário individual ou sociedade (inclusive limitada, Ofício Circular DREI 3785/2022), com novo nome empresarial. Uma sociedade limitada unipessoal (SLU) daria um nome como "CLAREVO LTDA", aceito pelas lojas, mas a transformação leva o tempo da Junta Comercial e pede D-U-N-S do novo registro.
+
+O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que é gratuita e mostra se a Dun & Bradstreet reconhece a empresa; (b) perguntar ao contador ou ao advogado (pergunta 46) se a Inova Simples pode assinar os contratos da Apple e do Google e se convém transformar em SLU antes do lançamento; (c) só pagar a inscrição da Apple depois dessa resposta. O Google e o Expo podem seguir em paralelo.
+
 ## 2. Semana a semana
 
 ### Semana 1: 3 a 9/11, contas e decisões

@@ -184,8 +184,8 @@ Estes campos não podem ser inventados. As quatro URLs abaixo são as do site p�
 | URL dos termos de uso | Apple e Google (se pedirem) | Página pública, aberta sem login | `https://clarevo.app.br/termos` (depois da revisão do advogado) |
 | URL de exclusão da conta e dos dados | Google | Página que explique como pedir a exclusão (o app já exclui pela tela Conta, D-058; a página existe no site, ainda não publicada) | `https://clarevo.app.br/excluir-conta` |
 | URL de marketing (opcional) | Apple | Site do produto | `https://clarevo.app.br/` |
-| Direitos autorais | Apple | "2026 Nome legal de quem é dona ou dono do app" | 2026 [preencher: razão social do CNPJ da Clarevo] |
-| Nome do desenvolvedor exibido | Apple (nome legal da organização) e Google | Nome que aparece como vendedora ou vendedor | [preencher: razão social do CNPJ da Clarevo] (decidido em 03/11/2026: a razão social; na Apple, só se escolhe ao criar o primeiro app) |
+| Direitos autorais | Apple | "2026 Nome legal de quem é dona ou dono do app" | 2026 CLAREVO INOVA SIMPLES (I.S.) |
+| Nome do desenvolvedor exibido | Apple (nome legal da organização) e Google | Nome que aparece como vendedora ou vendedor | CLAREVO INOVA SIMPLES (I.S.), CNPJ 69.771.864/0001-03 (decidido em 03/11/2026: a razão social; na Apple, é o nome da organização que aparece como vendedora) |
 
 ## 9. Classificação etária (respostas do questionário)
 
