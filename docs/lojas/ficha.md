@@ -17,9 +17,9 @@
 | Frase de apoio (gráfico e imagem do site) | 25 caracteres | 30 |
 | Texto promocional (Apple) | 165 caracteres | 170 |
 | Palavras-chave (Apple) | 98 bytes | 100 bytes |
-| Descrição (Apple) | 3005 caracteres | 4000 |
+| Descrição (Apple) | 3206 caracteres | 4000 |
 | Descrição curta (Google) | 79 caracteres | 80 (a conferir) |
-| Descrição completa (Google) | 3005 caracteres | 4000 (a conferir) |
+| Descrição completa (Google) | 3206 caracteres | 4000 (a conferir) |
 | Notas da versão (Google) | 94 caracteres | 500 (a conferir) |
 | Notas para a revisão (Apple) | 1004 bytes | 4000 bytes |
 
@@ -97,8 +97,9 @@ O QUE VOCÊ FAZ NA CLAREVO
 • Contas a pagar: vencimentos, lembretes no aparelho e o gasto só entra em Pago quando você marca a conta como paga.
 • Gastos fixos, parcelamentos e contas do ano (como IPVA e IPTU), que aparecem sozinhos nos meses certos.
 • Cartões de crédito: compras à vista e parceladas, faturas e limite usado. O app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro.
-• Leitura de nota fiscal pelo QR Code ou por PDF, e de comprovantes em PDF. A câmera só lê o código: nenhuma foto é guardada.
-• Importar arquivos de extrato e de fatura (OFX ou CSV), conferindo linha por linha antes de gravar.
+• Leitura de nota fiscal (QR Code, PDF ou a chave numa foto), de comprovantes de Pix e de pagamento, de holerite, de nota de serviço e de boleto, em PDF, print ou foto. A leitura acontece no próprio aparelho, e nenhuma foto é guardada por ela.
+• Importar extrato e fatura (PDF, OFX ou CSV), conferindo linha por linha antes de gravar.
+• Anotar pelo Telegram: mande "mercado 52,30" para a Clarevo e o gasto entra no app na hora.
 • Evolução e Análises: Recebido e Pago mês a mês, média e mediana, categorias em barras ou em bolhas e orçamento por categoria.
 • Metas e reserva para imprevistos, com um plano de guardar que mostra as etapas e o mês previsto, sem contar rendimento.
 • Simulador e calculadoras (parcelado ou à vista, quanto custa por ano, juros e multa, entre outras), feitos com os números que você digita.
@@ -142,8 +143,9 @@ O QUE VOCÊ FAZ NA CLAREVO
 • Contas a pagar: vencimentos, lembretes no aparelho e o gasto só entra em Pago quando você marca a conta como paga.
 • Gastos fixos, parcelamentos e contas do ano (como IPVA e IPTU), que aparecem sozinhos nos meses certos.
 • Cartões de crédito: compras à vista e parceladas, faturas e limite usado. O app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro.
-• Leitura de nota fiscal pelo QR Code ou por PDF, e de comprovantes em PDF. A câmera só lê o código: nenhuma foto é guardada.
-• Importar arquivos de extrato e de fatura (OFX ou CSV), conferindo linha por linha antes de gravar.
+• Leitura de nota fiscal (QR Code, PDF ou a chave numa foto), de comprovantes de Pix e de pagamento, de holerite, de nota de serviço e de boleto, em PDF, print ou foto. A leitura acontece no próprio aparelho, e nenhuma foto é guardada por ela.
+• Importar extrato e fatura (PDF, OFX ou CSV), conferindo linha por linha antes de gravar.
+• Anotar pelo Telegram: mande "mercado 52,30" para a Clarevo e o gasto entra no app na hora.
 • Evolução e Análises: Recebido e Pago mês a mês, média e mediana, categorias em barras ou em bolhas e orçamento por categoria.
 • Metas e reserva para imprevistos, com um plano de guardar que mostra as etapas e o mês previsto, sem contar rendimento.
 • Simulador e calculadoras (parcelado ou à vista, quanto custa por ano, juros e multa, entre outras), feitos com os números que você digita.
