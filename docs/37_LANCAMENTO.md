@@ -138,11 +138,11 @@ Com o app instalado pelo link do Expo (Android) ou pelo TestFlight (iPhone). Par
 
 ## 7. Assinatura paga (D-083)
 
-R$ 29,90 por mês, 14 dias grátis sem cartão, depois só ver e exportar; pelas lojas no celular e por cartão e Pix na web; o benefício pela empresa continua sem pagar; plano Família com valor próprio (a decidir). Isso entra no lançamento e é o maior pedaço que falta.
+R$ 29,90 por mês, 14 dias grátis sem cartão, depois só ver e exportar; pelas lojas no celular e por cartão e Pix na web; o benefício pela empresa continua sem pagar; plano Família de R$ 69,90 por mês, até 6 pessoas, pago pela titular. Isso entra no lançamento e é o maior pedaço que falta.
 
 | # | O quê | Quem |
 |---|---|---|
-| 7.1 | Valor do plano Família e se haverá plano anual | Enzo |
+| 7.1 | Valor do plano Família (R$ 69,90, decidido em 04/11/2026) e se haverá plano anual | Enzo |
 | 7.2 | Banco: o direito de uso de cada pessoa (teste, assinatura, benefício), a regra "só ver e exportar" nas funções de escrita e o registro de cada mudança; testes | Equipe |
 | 7.3 | App: tela de assinar, contagem dos dias do teste, aviso antes do fim, modo "só ver e exportar" e "Restaurar compras" | Equipe |
 | 7.4 | Lojas: assinaturas no App Store Connect e no Play Console (mesmo produto, R$ 29,90), contrato de apps pagos da Apple com conta bancária e dados fiscais da empresa, perfil de pagamentos do Google | Enzo, com roteiro |
