@@ -37,9 +37,10 @@ O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que 
 | 1.3 | Inscrição na Apple como organização, assim que o D-U-N-S sair (seção 4) | Enzo | |
 | 1.4 | Conta de organização no Google Play Console (seção 4) | Enzo | |
 | 1.5 | Conta no Expo (gratuita), para os builds | Enzo | |
-| 1.6 | Mandar ao advogado: `docs/legal/resumo-para-advogado.md` (perguntas 41 a 45), a política e os termos; pedir resposta até 17/11 | Enzo | |
+| 1.6 | Mandar ao advogado: `docs/legal/resumo-para-advogado.md` (perguntas 41 a 46), `docs/legal/pendencias-do-lancamento.md` (grupo B), a política e os termos; pedir resposta até 17/11 | Enzo | |
 | 1.7 | Supabase: plano Pro (cópias de segurança), proteção contra senhas vazadas; apagar o projeto antigo e a chave antiga do Resend | Enzo | |
 | 1.8 | Aprovar as 13 decisões das lojas (seção 3) | Enzo | Aprovadas em 03/11/2026 |
+| 1.8b | Aprovar as 16 decisões de produto dos textos legais (`docs/legal/pendencias-do-lancamento.md`, grupo A) | Enzo | |
 | 1.9 | Telegram: aviso "Baixar o Telegram", PR e função publicada de novo | Equipe e Claude Chrome | Código pronto e roteiro de telas 9.091 de 9.091 (03/11/2026); falta o PR e publicar a função |
 | 1.10 | Aplicar as decisões aprovadas em `app.json` e atualizar `docs/16` e `docs/lojas/` | Equipe | Feito em 03/11/2026 (falta a razão social, que vem do Enzo) |
 
