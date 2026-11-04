@@ -135,3 +135,19 @@ Com o app instalado pelo link do Expo (Android) ou pelo TestFlight (iPhone). Par
 | 15 | Conta > Telegram > Gerar código > Abrir o Telegram | Abre o Telegram com o @ClarevoBot; Iniciar liga a conta |
 | 16 | Modo avião e abrir o app | Mensagem clara de sem conexão, sem tela em branco |
 | 17 | Girar o celular, voltar com o botão do sistema, trocar de app e voltar | Nada se perde no meio de um cadastro |
+
+## 7. Assinatura paga (D-083)
+
+R$ 29,90 por mês, 14 dias grátis sem cartão, depois só ver e exportar; pelas lojas no celular e por cartão e Pix na web; o benefício pela empresa continua sem pagar; plano Família com valor próprio (a decidir). Isso entra no lançamento e é o maior pedaço que falta.
+
+| # | O quê | Quem |
+|---|---|---|
+| 7.1 | Valor do plano Família e se haverá plano anual | Enzo |
+| 7.2 | Banco: o direito de uso de cada pessoa (teste, assinatura, benefício), a regra "só ver e exportar" nas funções de escrita e o registro de cada mudança; testes | Equipe |
+| 7.3 | App: tela de assinar, contagem dos dias do teste, aviso antes do fim, modo "só ver e exportar" e "Restaurar compras" | Equipe |
+| 7.4 | Lojas: assinaturas no App Store Connect e no Play Console (mesmo produto, R$ 29,90), contrato de apps pagos da Apple com conta bancária e dados fiscais da empresa, perfil de pagamentos do Google | Enzo, com roteiro |
+| 7.5 | Web: escolher e abrir a conta do serviço de pagamento (cartão e Pix Automático), com o CNPJ; a equipe liga o retorno do pagamento ao banco | Enzo abre a conta; equipe integra |
+| 7.6 | Termos (preço, renovação, cancelamento, arrependimento) e política (serviços de pagamento) para o advogado | Equipe redige; advogado confere |
+| 7.7 | Contador: nota fiscal das vendas da web e dos repasses das lojas, e o que a Inova Simples permite vender (pergunta 46) | Enzo |
+
+**Prazo:** a assinatura acrescenta cerca de duas semanas de trabalho da equipe e as contas de pagamento do Enzo. Com a decisão "tudo junto", 30/11 continua sendo a meta, mas o mais provável passa a ser a primeira quinzena de dezembro.

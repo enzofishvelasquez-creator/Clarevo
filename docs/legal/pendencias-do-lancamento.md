@@ -4,13 +4,15 @@ O site só sai da "versão preliminar" quando `node scripts/gerar-site.js --fina
 
 ## A. Decisões do Enzo (produto), com a recomendação da equipe
 
+**Aprovadas em 04/11/2026 (D-083)**, com a A3 trocada pela assinatura paga.
+
 O advogado confere depois; se o Enzo aprovar, a equipe troca os marcadores pelo texto e implementa o que for do app.
 
 | # | Marcador (onde) | Recomendação |
 |---|---|---|
 | A1 | Forma do aceite e registro da versão e da data (termos, política) | Manter a frase acima de "Criar conta" (sem caixa de seleção) e **passar a registrar no banco a versão dos termos e da política aceita e a data**, no cadastro e a cada versão nova. A equipe implementa |
 | A2 | Forma da declaração de idade (termos, política, P-002) | A mesma frase do cadastro: "ao criar a conta, você confirma ter 18 anos ou mais" |
-| A3 | O que o plano gratuito inclui e se haverá cobrança (termos, P-005) | No lançamento, tudo gratuito e sem limite para pessoas. Se um dia houver cobrança, os termos ganham uma seção nova (preço, pagamento, arrependimento, cancelamento) antes de valer |
+| A3 | O que o plano inclui e se haverá cobrança (termos, P-005) | **Substituída pela D-083 (04/11/2026):** a Clarevo é paga, R$ 29,90 por mês, com 14 dias grátis sem cartão; depois, só ver e exportar. Os termos ganham a seção de preço, pagamento, renovação, cancelamento e arrependimento (CDC, art. 49), e a política, os serviços de pagamento (Apple, Google e o da web). Vai ao advogado |
 | A4 | Compromisso de disponibilidade (termos) | Sem compromisso formal: "fazemos o possível para o app funcionar sem interrupções e avisamos as manutenções planejadas" |
 | A5 | Prazo e forma do aviso de mudança dos termos e da política (termos, política) | Aviso **30 dias antes**, no app e por e-mail; mudança que reduza direitos pede novo aceite no app. A equipe faz o aviso no app |
 | A6 | Regras de suspensão e de encerramento por descumprimento (termos) | Só por uso que ponha outras pessoas ou o serviço em risco ou por descumprimento grave; aviso por e-mail com **10 dias** para a pessoa responder e exportar os dados, salvo risco imediato ou ordem legal |
