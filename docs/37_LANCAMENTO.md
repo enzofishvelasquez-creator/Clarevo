@@ -111,3 +111,27 @@ O Expo monta o app das lojas a partir do repositório no GitHub, pelo site expo.
 6. **iPhone:** só depois de a Apple aprovar a conta; as credenciais do iPhone pedem um passo a mais, que a equipe manda na hora.
 
 Fontes: [Expo, builds a partir do GitHub](https://docs.expo.dev/build/building-from-github), [tutorial do Expo](https://docs.expo.dev/tutorial/eas/using-github) (consultadas em 03/11/2026; as telas do expo.dev podem ter nomes um pouco diferentes).
+
+## 6. Teste no celular (semana 2, item 2.2)
+
+Com o app instalado pelo link do Expo (Android) ou pelo TestFlight (iPhone). Para cada item, anotar "ok" ou mandar um print do que deu errado. Dados de verdade só os seus; para testar outra pessoa, usar um e-mail de teste.
+
+| # | O que fazer | O esperado |
+|---|---|---|
+| 1 | Abrir o app e entrar com a sua conta | Entra no Resumo com os seus dados, igual à web |
+| 2 | Conta > ligar a biometria; fechar o app e abrir de novo | Pede a digital ou o rosto antes de mostrar os dados |
+| 3 | Conta > Ocultar valores | Os valores viram pontinhos em todas as telas |
+| 4 | Contas a pagar > nova conta vencendo amanhã, com lembrete; permitir as notificações | A notificação chega no horário (pode atrasar alguns minutos no Android) |
+| 5 | Anotar gasto > Escanear nota fiscal > apontar para o QR Code de um cupom | Preenche valor, data e descrição |
+| 6 | Escanear nota fiscal > foto da chave de uma nota (os 44 números) | Lê a chave e preenche |
+| 7 | Ler comprovante > escolher um print de Pix da galeria | Preenche valor, data e o nome de quem recebeu |
+| 8 | Contas a pagar > Ler boleto > foto de um boleto | Cria a conta a pagar com valor e vencimento |
+| 9 | Registrar recebimento > Ler comprovante > PDF do holerite e, depois, de uma nota de serviço | Preenche o valor líquido e a descrição |
+| 10 | Importar extrato > um PDF ou OFX do banco | Mostra as linhas para conferir antes de gravar |
+| 11 | Exportar meus dados > CSV e PDF > compartilhar | Abre a folha de compartilhar do celular |
+| 12 | Aumentar a letra nas configurações do celular e abrir Resumo, Movimentos e Conta | Nada cortado nem sobreposto |
+| 13 | Ligar o leitor de tela (TalkBack no Android, VoiceOver no iPhone) e passar pelo Resumo | Lê os números e os botões com nomes claros |
+| 14 | Criar uma conta nova com outro e-mail seu e tocar no link de confirmação no celular | O link abre o app (ou a web) e a conta fica confirmada |
+| 15 | Conta > Telegram > Gerar código > Abrir o Telegram | Abre o Telegram com o @ClarevoBot; Iniciar liga a conta |
+| 16 | Modo avião e abrir o app | Mensagem clara de sem conexão, sem tela em branco |
+| 17 | Girar o celular, voltar com o botão do sistema, trocar de app e voltar | Nada se perde no meio de um cadastro |
