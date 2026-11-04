@@ -857,6 +857,7 @@ const __mods = [
             nao_ligado: `${upperFirst(w.who)} ainda não está ligado a uma conta da Clarevo. ${howToLink}`,
             codigo_invalido: `Este código não vale mais ou não existe. ${where.newCode} Cada código vale por ${exports.WHATSAPP_CODE_MINUTES} minutos.`,
             ja_ligado: `${upperFirst(w.who)} já está ligado a outra conta da Clarevo. Se for seu, mande DESLIGAR e depois mande o código de novo.`,
+            sem_assinatura: 'A sua conta da Clarevo está só para ver e exportar: o teste grátis acabou ou a assinatura não está ativa. Para voltar a anotar, abra Conta no app e toque em Assinatura.',
             muitas_tentativas: 'Muitas tentativas com códigos que não valem. Espere uma hora e gere um código novo no app.',
             muitas_mensagens: 'Muitas mensagens em pouco tempo. Espere alguns minutos e mande de novo.',
             nada_para_desfazer: 'Não há anotação recente feita por aqui para desfazer. Para mudar algo mais antigo, use o app.',
@@ -1193,8 +1194,8 @@ const __mods = [
     }
     const RESULTS = new Set([
         'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
-        'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida', 'repetida',
-        'silencio', 'registrada',
+        'sem_assinatura', 'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
+        'repetida', 'silencio', 'registrada',
     ]);
     class WhatsAppFinalError extends Error {
     }

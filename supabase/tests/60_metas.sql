@@ -1580,7 +1580,7 @@ do $$ begin
             'end_series', 'ensure_personal_space', 'goal_photo', 'import_records', 'inform_series_year', 'invite_licenses',
             'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_family',
             'mark_subscriptions_reviewed', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals',
-            'months_overview', 'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
+            'months_overview', 'my_access', 'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
             'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_status', 'set_income_reference',
             'set_member_role', 'set_month_check', 'set_savings_answer', 'set_series_subscription', 'set_signup_source', 'skip_series_year', 'sync_series_occurrences',

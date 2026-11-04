@@ -290,8 +290,8 @@ export interface WhatsAppResponse {
 
 const RESULTS = new Set([
   'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
-  'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida', 'repetida',
-  'silencio', 'registrada',
+  'sem_assinatura', 'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
+  'repetida', 'silencio', 'registrada',
 ]);
 
 /** Recusa do banco que se repetiria a cada nova entrega (pedido inválido, 4xx): não adianta o canal mandar de novo. */
