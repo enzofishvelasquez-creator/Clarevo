@@ -59,7 +59,7 @@ O advogado confere depois; se o Enzo aprovar, a equipe troca os marcadores pelo 
 
 1. Registro da versão aceita dos termos e da política e da data (A1), com migração e testes.
 2. Aviso de mudança dos textos no app (A5).
-3. Apagar do aparelho as preferências da conta ao sair (A9).
+3. Apagar do aparelho as preferências da conta ao sair (A9). **Feito em 05/11/2026**, com a política (seção 9) e a A11 no texto.
 4. Tirar do texto publicado as seções do que está desligado (A14, A15) e guardar à parte.
 5. Página de licenças de código aberto (termos, seção de propriedade intelectual): lista gerada dos pacotes que vão no app, publicada no site e com link no app.
 6. Página de versões anteriores da política (A16).

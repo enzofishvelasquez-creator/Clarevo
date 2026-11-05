@@ -302,9 +302,9 @@ Estas informações ficam só no seu aparelho (no armazenamento do app, ou no na
 
 A biometria é verificada pelo sistema do aparelho. A Clarevo recebe só "sim" ou "não".
 
-Ao sair da conta, essas preferências e memórias continuam no aparelho, ligadas à sua conta. [A DEFINIR: decisão de produto sobre apagar ao sair] Ao excluir a conta, o app apaga tudo isso do aparelho em que você faz a exclusão. Em outro aparelho onde você já tenha entrado, o que ficou guardado lá continua até você desinstalar o app ou limpar os dados dele (na versão web, os dados do site no navegador). Em um aparelho compartilhado, saia da conta ao terminar e, se quiser tirar tudo, limpe os dados do app ou do navegador.
+Ao sair da conta, o app apaga do aparelho essas preferências e memórias e cancela os lembretes agendados; a sessão que termina sozinha, por tempo, mantém tudo para você entrar de novo. Ao excluir a conta, o app apaga tudo isso do aparelho em que você faz a exclusão. Em outro aparelho onde você ainda esteja com a sessão aberta, o que ficou guardado lá continua até você sair da conta nele, desinstalar o app ou limpar os dados dele (na versão web, os dados do site no navegador). Em um aparelho compartilhado, saia da conta ao terminar e, se quiser tirar tudo, limpe os dados do app ou do navegador.
 
-[A DEFINIR: no Android, o backup automático do sistema pode copiar os dados do app para o Google Drive da pessoa; decidir se fica ligado]
+No Android, o backup automático do sistema fica desligado para o app da Clarevo: os dados guardados pelo app no aparelho não são copiados para o Google Drive.
 
 ## 10. Cookies e rastreadores
 
