@@ -53,13 +53,13 @@ Texto proposto: "O contrato define o plano (individual ou familiar), o número d
 
 ## 7. Fim do contrato e efeito nas licenças
 
-Texto proposto: "Ao fim do contrato, as licenças ativas mantêm acesso pleno por mais 30 dias. Depois, a pessoa passa ao plano gratuito da Clarevo, com leitura do histórico. Nenhuma conta, registro, vínculo ou Família é apagado por causa do fim do contrato. A pessoa pode continuar usando o app da Clarevo por conta própria."
+Texto proposto: "Ao fim do contrato, as licenças ativas mantêm acesso pleno por mais 30 dias. Depois, vale o acesso da própria pessoa: com assinatura própria, tudo continua; sem assinatura, a conta fica só para ver e exportar, com o histórico guardado. Nenhuma conta, registro, vínculo ou Família é apagado por causa do fim do contrato. A pessoa pode continuar usando o app da Clarevo por conta própria."
 
-[A DEFINIR: o que o plano gratuito inclui, P-005. Hoje o app ainda não limita recursos por plano.]
+Decidido em 04/11/2026: a Clarevo é paga (R$ 29,90 por mês, com 14 dias grátis); sem assinatura, a conta fica só para ver e exportar.
 
 ## 8. Encerramento de uma licença
 
-Texto proposto: "A EMPRESA pode encerrar a licença de uma pessoa, por exemplo quando ela deixa a empresa. A licença encerrada mantém o acesso pleno por 30 dias e depois passa ao plano gratuito. A pessoa pode excluir a própria conta a qualquer momento, e a licença então termina na hora."
+Texto proposto: "A EMPRESA pode encerrar a licença de uma pessoa, por exemplo quando ela deixa a empresa. A licença encerrada mantém o acesso pleno por 30 dias; depois, vale o acesso da própria pessoa. A pessoa pode excluir a própria conta a qualquer momento, e a licença então termina na hora."
 
 [A DEFINIR: se a empresa é obrigada a encerrar a licença de quem deixa a empresa.]
 

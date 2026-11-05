@@ -1,4 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
+import { FULL_ACCESS, type Access } from './plano';
 import { addMonths, addYearsClamped, dateInMonth, isValidIsoDate, isValidIsoMonth, monthOf, monthsBetween } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS } from './money';
@@ -318,6 +319,11 @@ export interface MemoryRepositoryOptions {
   company?: MemoryCompanyHub;
   /** E-mail da conta, para o convite da empresa conferir o e-mail de quem aceita. Padrão: `<pessoa>@memoria.test`. */
   email?: string;
+  /**
+   * Assinatura (D-083): o que my_access devolveria. Padrão: acesso pleno, sem prazo (FULL_ACCESS). A trava da escrita é do banco; aqui
+   * só a leitura, para as telas.
+   */
+  access?: () => Access;
 }
 
 /**
@@ -4506,6 +4512,19 @@ export class MemoryRepository implements RecordsRepository {
 
   async getMyBenefit(): Promise<Benefit | null> {
     return this.read(() => this.company.myBenefit(this.opts.actorId));
+  }
+
+  async getMyAccess(): Promise<Access> {
+    return this.read(() => {
+      // Benefício da empresa (D-056): vale enquanto a licença está ativa e, depois do fim, até o acesso pleno acabar (30 dias), como o
+      // direito ao plano no banco.
+      const b = this.company.myBenefit(this.opts.actorId);
+      const now = Date.parse(`${this.opts.today()}T12:00:00.000Z`);
+      if (b && (b.status === 'ativa' || (b.accessUntil !== null && Date.parse(b.accessUntil) > now))) {
+        return { status: 'beneficio', plan: b.plan, until: b.accessUntil, canWrite: true };
+      }
+      return this.opts.access?.() ?? FULL_ACCESS;
+    });
   }
 }
 

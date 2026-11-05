@@ -24,6 +24,7 @@ import { LEARN_SECTIONS } from '../learn/sections';
 import { LEARN_UI_TEXT, SEASONAL_TEXT } from '../learn/ui-text';
 import { GOALS_NAV_TEXT, REMINDERS_SETTINGS_HREF, SUMMARY_NAV_TEXT } from '../navigation';
 import { NOTA_TEXT } from '../nota';
+import { ACCESS_TEXT, TRIAL_DAYS, TRIAL_WARNING_DAYS, planPrice } from '../plano';
 import { INCOME_AVERAGE_TEXT } from '../renda-media';
 import { REMINDER_TEXT } from '../reminders';
 import { RETURN_TEXT } from '../retorno';
@@ -772,6 +773,26 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     screenshot: '614_telegram_demonstracao.png',
   },
   {
+    id: 'assinatura',
+    group: 'conta-e-privacidade',
+    title: 'Assinatura e teste grátis',
+    purpose: `Mostra a situação do seu acesso (teste grátis, assinatura, benefício da empresa ou Plano Família) e os planos: Individual por ${planPrice('individual')} e Família por ${planPrice('familiar')}.`,
+    where: [ACCOUNT_SCREEN, ACCESS_TEXT.cardTitle],
+    steps: [
+      `Em Conta, no card ${q(ACCESS_TEXT.cardTitle)}, toque em ${q(ACCESS_TEXT.cardOpen)}.`,
+      `Em ${q(ACCESS_TEXT.situation)}, veja como está o seu acesso. Toda conta começa com ${TRIAL_DAYS} dias grátis, sem cartão, e a tela diz quando o teste termina.`,
+      `Nos últimos ${TRIAL_WARNING_DAYS} dias do teste, o Resumo mostra um aviso com ${q(ACCESS_TEXT.bannerAction)}.`,
+      'Sem assinatura depois do teste, a conta fica só para ver e exportar: os seus dados continuam guardados, você vê tudo, exporta e pode excluir a conta, mas não anota nem muda nada.',
+      `Em ${q(ACCESS_TEXT.plansTitle)}, compare o Individual e o Família. No celular, a assinatura é feita pela loja de aplicativos; na web, por cartão ou Pix. Cancele quando quiser.`,
+      'Com o benefício da empresa ou no Plano Família de outra pessoa, nada a pagar: a situação mostra quem cobre o seu acesso.',
+    ],
+    screenName: ACCESS_TEXT.screenTitle,
+    href: '/conta/assinatura',
+    keywords: ['assinatura', 'assinar', 'plano', 'preço', 'preco', 'quanto custa', 'mensalidade', 'pagar a clarevo', 'teste grátis', 'teste gratis', 'grátis', 'gratis', 'cancelar assinatura', 'só ver e exportar'],
+    routes: ['/conta/assinatura'],
+    screenshot: '615_assinatura_demonstracao.png',
+  },
+  {
     id: 'excluir-conta',
     group: 'conta-e-privacidade',
     title: 'Excluir minha conta',
@@ -841,7 +862,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Abra o link de convite que o RH enviou. Sem sessão, toque em ${q(BENEFIT_TEXT.enter)} ou ${q(BENEFIT_TEXT.createAccount)} com o e-mail do convite; depois você volta ao convite.`,
       `Confira o nome da empresa e o plano e toque em ${q(BENEFIT_TEXT.accept)}. O link serve uma vez e só com o e-mail do convite.`,
       `Sem o link aberto, em Conta, no card ${q(BENEFIT_TEXT.accountTitle)}, toque em ${q(BENEFIT_TEXT.haveInvite)}, cole o link e toque em ${q(BENEFIT_TEXT.pasteSubmit)}. Antes de ter conta, a tela de entrada tem o mesmo ${q(ENTRY_INVITE_TEXT.open)}.`,
-      `Depois de aceitar, o card mostra a empresa, o plano e desde quando vale. Em ${q('Acesso ao plano')}, a situação aparece como ${q(BENEFIT_TEXT.planCardSituation)}.`,
+      `Depois de aceitar, o card mostra a empresa, o plano e desde quando vale. No card ${q(ACCESS_TEXT.cardTitle)}, a situação aparece como ${q(BENEFIT_TEXT.planCardSituation)}, sem nada a pagar.`,
       'Se a licença for encerrada, você fica com a conta, o histórico e a Família. O acesso pleno continua por 30 dias, e o card diz até quando.',
       `Para saber o que a empresa vê, toque em ${q('Quem vê estes dados?')}. Ela não vê seus registros, contas, metas, cartões nem a sua Família.`,
     ],

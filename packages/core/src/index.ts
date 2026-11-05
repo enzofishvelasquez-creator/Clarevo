@@ -58,6 +58,7 @@ export * from './analises';
 export * from './dia-util';
 export * from './renda-media';
 export * from './contrast';
+export * from './plano';
 export * from './long-list';
 export * from './text-scale';
 export * from './whatsapp';

@@ -405,7 +405,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('demonstração (D-067): o Resumo, com os Primeiros passos fechados, não pergunta "Como você conheceu a Clarevo?" nem mostra as seis opções', await origemAusente());
 
   // Sair limpa a sessão
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
+  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await shot('05_conta');
   await shot('05b_conta_seguranca', true);
   // Ciclo A2 (D-025): na web não há lembretes nem biometria (só no app para celular); "Ocultar valores ao abrir" existe
@@ -453,7 +453,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('nova senha funciona e volta ao resumo', true);
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
   ok('"Agora não": depois de sair e entrar de novo, o card continua fora', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
+  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
 
   // Primeiros passos numa segunda conta nova: anotar um gasto marca o passo 3; com os três prontos, o card sai de vez.
@@ -564,13 +564,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
   await waitUntil(async () => !(await headingShown('Primeiros passos')), 8000);
   ok('primeiros passos: com os quatro passos prontos ("Agora não" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
+  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
   await field('E-mail').fill('bia@exemplo.com'); await field('Senha').fill('senha1234'); await btn('Entrar').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
   ok('primeiros passos concluídos: o card não volta depois de entrar de novo', !(await headingShown('Primeiros passos')));
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
+  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   // Na demonstração, as contas criadas existem só na memória da página: recarregar volta às boas-vindas e nada de
   // "Primeiros passos" fica gravado no aparelho (uma conta nova nunca herda o "Agora não" de outra com o mesmo identificador).
@@ -1516,7 +1516,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Sair e entrar de novo na demonstração: as listas são lidas de novo e a geração do dia roda outra vez.
   // Nada do que foi tirado volta (Matrícula de 2026, parcelas do Seguro residencial e do Material escolar).
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Acesso ao plano');
+  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   // Ciclo A5: "O que é isso?" ao lado de "Saldo inicial" abre o resumo no lugar; a explicação completa abre por cima e
   // "Voltar à tarefa" volta para a Conta.
   const saldoHint = p.getByRole('button', { name: 'O que é isso? Saldo inicial', exact: true }).filter({ visible: true }).first();
@@ -1533,7 +1533,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Ler explicação completa').click(); await waitText('Voltar à tarefa');
   ok('"Ler explicação completa" abre "Diferença do mês e saldo da conta"', new URL(p.url()).pathname === '/explicacao/saldo' &&
     (await p.locator('h1').filter({ hasText: /^Diferença do mês e saldo da conta$/ }).count()) === 1, p.url());
-  await btn('Voltar à tarefa').click(); await waitText('Acesso ao plano');
+  await btn('Voltar à tarefa').click(); await waitText('Ver a assinatura');
   ok('"Voltar à tarefa" volta para a Conta, com o resumo ainda aberto', new URL(p.url()).pathname === '/conta' && (await saldoHint.getAttribute('aria-expanded')) === 'true', p.url());
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
@@ -7502,7 +7502,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await h3Keep();
   ok('H3 Conta: o bloco "Exportar meus dados" (nível 2) com a legenda e o botão "Escolher período e formato", depois de Privacidade neste aparelho',
     (await headingShown('Exportar meus dados')) && t.includes('Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos') && (await visibleCount('button', 'Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.')) === 1 &&
-    t.indexOf('Privacidade neste aparelho') < t.indexOf('Exportar meus dados') && t.indexOf('Exportar meus dados') < t.indexOf('Acesso ao plano'), t.slice(0, 900));
+    t.indexOf('Privacidade neste aparelho') < t.indexOf('Exportar meus dados') && t.indexOf('Exportar meus dados') < t.indexOf('Ver a assinatura'), t.slice(0, 900));
   // D-064: a seção "Privacidade e termos" só existe com o endereço do site (EXPO_PUBLIC_SITE_URL); a demonstração sobe sem ele e não a mostra.
   ok('H3 Conta (D-064): sem EXPO_PUBLIC_SITE_URL (a demonstração), a seção "Privacidade e termos" e os botões de política, termos e "Excluir conta: como funciona" não aparecem, e "Excluir minha conta" continua',
     !(await headingShown('Privacidade e termos')) && !t.includes('Excluir conta: como funciona') && (await visibleCount('button', 'Política de privacidade')) === 0 && (await visibleCount('button', 'Termos de uso')) === 0 && t.includes('Excluir minha conta'));
@@ -8195,17 +8195,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
-  // ---- 7. A lista do guia: cinco grupos, trinta e oito entradas (28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Análises", D-059, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, "Excluir minha conta", D-058, "Ler comprovante, holerite ou nota de serviço" e "Ler boleto", D-078 e D-079, e "Anotar pelo Telegram", D-081) ----
+  // ---- 7. A lista do guia: cinco grupos, trinta e nove entradas ("Assinatura e teste grátis", D-083, 28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Análises", D-059, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, "Excluir minha conta", D-058, "Ler comprovante, holerite ou nota de serviço" e "Ler boleto", D-078 e D-079, e "Anotar pelo Telegram", D-081) ----
   await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   const j1Groups = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => ({
     title: h.textContent, rows: [...h.parentElement.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label') || b.textContent) })));
   const j1G = await j1Groups();
   ok('Tutorial guia: /aprender/guia com o título "Como usar o app da Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
-  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 8, 2 e 9 entradas (Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa" e "Anotar pelo Telegram")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
-    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 8, 2, 9]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
+  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 8, 2 e 10 entradas (Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa", "Anotar pelo Telegram" e "Assinatura e teste grátis")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
+    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 8, 2, 10]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
-  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 38 &&
+  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 39 &&
     j1Rows.includes('Buscar em Movimentos. Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.') &&
     j1Rows.includes('Exportar meus dados. Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.') &&
     j1Rows.some((r) => r.startsWith('Importar extrato ou fatura. Traz gastos, recebimentos e compras no cartão de um arquivo do banco')) &&
@@ -10450,8 +10450,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await empChip('Ativas, 12').click(); await p.waitForTimeout(300);
   await btn('Encerrar a licença de pessoa.12@empresa-exemplo.example').click(); await waitText('Encerrar a licença?'); await p.waitForTimeout(300);
   t = await dialogText();
-  ok('Encerrar licença: o diálogo explica os 30 dias de acesso pleno, o plano gratuito com leitura do histórico e que nada é apagado', t.includes('pessoa.12@empresa-exemplo.example') && t.includes('A pessoa continua com a conta, o histórico e a Família dela: nada é apagado.') &&
-    t.includes('O acesso pleno segue por 30 dias e depois ela passa para o plano gratuito, com leitura do histórico.') && t.includes('Para voltar a ter o benefício, será preciso convidar de novo.'), t);
+  ok('Encerrar licença: o diálogo explica os 30 dias de acesso pleno, o acesso da própria pessoa depois (D-083) e que nada é apagado', t.includes('pessoa.12@empresa-exemplo.example') && t.includes('A pessoa continua com a conta, o histórico e a Família dela: nada é apagado.') &&
+    t.includes('O acesso pleno segue por 30 dias; depois, vale o acesso da própria pessoa.') && t.includes('Para voltar a ter o benefício, será preciso convidar de novo.'), t);
   await empShots('425_empresa_encerrar');
   await confirmIn('Encerrar licença'); await waitText('Licença encerrada.'); await p.waitForTimeout(500);
   ok('Encerrar licença: aviso, Ativas 11 e Encerradas 6; as linhas das ativas seguem com "Encerrar licença"', (await empChip('Ativas, 11').count()) === 1 && (await empChip('Encerradas, 6').count()) === 1 && (await visibleCount('button', /^Encerrar a licença de /)) === 11);
@@ -10540,7 +10540,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('Aceitar: abre Conta com o aviso "Benefício ativado: Empresa Alfa." e o card (empresa, plano, desde quando, "Benefício ativo")', famPath() === '/conta' && t.includes('Benefício ativado: Empresa Alfa.') && (await empRow('Empresa')) === 'Empresa Alfa' && (await empRow('Plano')) === 'Individual' &&
     (await empRow('Desde')) === '07/10/2026' && (await empRow('Situação')) === 'Benefício ativo', `${famPath()} ${t.slice(0, 300)}`);
-  ok('Aceitar: o card "Acesso ao plano" passa a dizer "Benefício pela empresa", e "Tenho um convite da empresa" some', (await empCardText('Acesso ao plano')).includes('Situação') && (await empCardText('Acesso ao plano')).includes('Benefício pela empresa') && !t.includes('Tenho um convite da empresa'));
+  ok('Aceitar: o card "Assinatura" passa a dizer "Benefício pela empresa", sem nada a pagar, e "Tenho um convite da empresa" some', (await empCardText('Assinatura')).includes('Situação') && (await empCardText('Assinatura')).includes('Benefício pela empresa') && (await empCardText('Assinatura')).includes('nada a pagar') && !t.includes('Tenho um convite da empresa'));
   await empKeep();
   await empShots('433_conta_beneficio_ativo', { scroll: empScroll('Benefício pela empresa') });
   // O link usado não vale de novo.
@@ -10621,7 +10621,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('Bia com a licença encerrada: o card diz "Benefício encerrado em 07/10/2026", o acesso pleno até 06/11/2026 e que a conta, o histórico e a Família continuam com ela', (await empRow('Situação')) === 'Benefício encerrado em 07/10/2026' && t.includes('Acesso pleno até 06/11/2026') &&
     t.includes('Sua conta, seu histórico e a sua Família continuam com você.') && (await empRow('Empresa')) === 'Empresa Alfa', t.slice(0, 500));
-  ok('Bia com a licença encerrada: "Acesso ao plano" volta a "Plano pessoal"', (await empCardText('Acesso ao plano')).includes('Plano pessoal'));
+  ok('Bia com a licença encerrada: o card "Assinatura" continua "Benefício pela empresa" até 06/11/2026, o fim do acesso pleno (D-083, como o direito ao plano no banco)', (await empCardText('Assinatura')).includes('Benefício pela empresa') && (await empCardText('Assinatura')).includes('até 06/11/2026'));
   await empKeep();
   await empShots('434_conta_beneficio_encerrado', { scroll: empScroll('Benefício pela empresa') });
   await famGoResumo();
@@ -14187,6 +14187,36 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await atWidths(async (w) => { await layoutChecks(`Telegram na demonstração ${w}px`); });
     await shot('614_telegram_demonstracao');
     ok('Telegram: nada vai à rede na demonstração', writes.length === tgWrites0, writes.slice(tgWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Assinatura (D-083): na demonstração, a conta está no teste grátis (14 dias, contados do relógio real). Conta mostra o card
+  // "Assinatura" com a situação e "Ver a assinatura"; a tela traz a situação, os planos com os preços, como pagar e que a compra pelo app
+  // ainda não abriu. Sem aviso no Resumo (faltam mais de 3 dias) e nada vai à rede.
+  // ==================================================================================================================
+  {
+    const acWrites0 = writes.length;
+    await demoHome();
+    t = await body();
+    ok('Assinatura: sem aviso do teste no Resumo enquanto faltam mais de 3 dias', !t.includes('teste grátis termina') && (await visibleCount('button', 'Ver os planos')) === 0);
+    await openConta();
+    const card = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Assinatura' && e.getBoundingClientRect().width > 0); return h?.parentElement?.textContent ?? ''; });
+    ok('Assinatura: o card em Conta com "Situação: Teste grátis", os 14 dias e "Ver a assinatura"',
+      card.includes('Situação') && card.includes('Teste grátis') && card.includes('termina em 14 dias') && (await visibleCount('button', 'Ver a assinatura')) === 1, card.slice(0, 400));
+    await btn('Ver a assinatura').click(); await waitText('Planos'); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    ok('Assinatura: a tela /conta/assinatura com título, situação, os dois planos e os preços',
+      new URL(p.url()).pathname === '/conta/assinatura' && (await h1Name()) === 'Assinatura' && t.includes('Teste grátis') &&
+      t.includes('Individual') && t.includes('R$ 29,90 por mês') && t.includes('Família') && t.includes('R$ 69,90 por mês') && t.includes('até 6 pessoas'), t.slice(0, 700));
+    ok('Assinatura: como pagar, cancelar quando quiser, a compra ainda fechada e o que é "só ver e exportar"',
+      t.includes('No celular, a assinatura é feita pela App Store ou pelo Google Play. Na web, por cartão ou Pix.') && t.includes('Cancele quando quiser.') &&
+      t.includes('A assinatura pelo app abre no lançamento. Até lá, nada é cobrado.') && t.includes('você vê tudo, exporta e pode excluir a conta') &&
+      (await visibleCount('button', 'Assinar')) === 0);
+    ok('Assinatura: os planos são lidos inteiros pelo leitor de tela',
+      (await p.locator('[aria-label="Plano Individual, R$ 29,90 por mês. Para você."]').filter({ visible: true }).count()) === 1);
+    await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração ${w}px`); });
+    await shot('615_assinatura_demonstracao');
+    ok('Assinatura: nada vai à rede na demonstração', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
   }
 
   // ==================================================================================================================

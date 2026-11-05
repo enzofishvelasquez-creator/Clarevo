@@ -24,6 +24,8 @@ export const ERROR_TEXT = {
   versao_desatualizada: 'Este registro foi alterado em outro aparelho. Confira a versão atual antes de salvar.',
   nao_encontrado: 'Este registro não está mais disponível.',
   sem_permissao: 'Você não tem permissão para esta ação.',
+  /** Assinatura paga (D-083): depois do teste grátis, sem assinatura, o banco recusa a escrita. */
+  assinatura_necessaria: 'A sua conta está só para ver e exportar. Para voltar a anotar, abra Conta e toque em Assinatura.',
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_TEXT;

@@ -146,6 +146,7 @@ import { AppState } from 'react-native';
 
 import { pendingAttempts } from '@/lib/pending-attempts';
 import { valuesHidden } from '@/lib/privacy';
+import { useAccessCanWrite } from '@/state/access';
 import { useFamily } from '@/state/family';
 import { useRepo, useSession } from '@/state/session';
 
@@ -170,7 +171,7 @@ export interface WorkSpace extends PersonalSpace {
   familyName: string | null;
   /** Papel no contexto: titular no Pessoal; titular, membro ou leitor na Família. */
   role: FamilyRole;
-  /** Quem só lê a Família (leitor) não anota. */
+  /** Quem só lê a Família (leitor) não anota, nem quem está em só ver e exportar (assinatura paga, D-083). */
   canWrite: boolean;
 }
 
@@ -196,6 +197,7 @@ function useWorkOf(kind: SpaceKind): WorkResult {
   const personal = space.data;
   const fam = family.data;
   const famAccounts = accounts.data;
+  const accessCanWrite = useAccessCanWrite();
   const data = useMemo((): WorkSpace | undefined => {
     if (!personal) return undefined;
     if (kind === 'familia' && fam) {
@@ -208,7 +210,7 @@ function useWorkOf(kind: SpaceKind): WorkResult {
         contextName: contextName('familia'),
         familyName: fam.context.name,
         role: fam.role,
-        canWrite: fam.role !== 'leitor',
+        canWrite: fam.role !== 'leitor' && accessCanWrite,
       };
     }
     return {
@@ -218,9 +220,9 @@ function useWorkOf(kind: SpaceKind): WorkResult {
       contextName: contextName('pessoal'),
       familyName: null,
       role: 'titular',
-      canWrite: true,
+      canWrite: accessCanWrite,
     };
-  }, [personal, kind, fam, famAccounts]);
+  }, [personal, kind, fam, famAccounts, accessCanWrite]);
   const loadingFamily = kind === 'familia' && Boolean(fam) && accounts.isPending;
   const failed = space.isError || (kind === 'familia' && Boolean(fam) && accounts.isError);
   return {

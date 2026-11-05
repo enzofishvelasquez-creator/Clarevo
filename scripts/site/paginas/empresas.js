@@ -133,7 +133,7 @@ ${celular(img.beneficio, ARQUIVO)}
 <ul>
 <li>Se a licença for encerrada ou o contrato chegar ao fim, a pessoa mantém a conta, o histórico e a Família.</li>
 <li>O acesso pleno continua por 30 dias, contados do encerramento da licença ou do fim do contrato. O app mostra para a pessoa até quando vai.</li>
-<li>O que vale depois desses 30 dias ainda não está definido.</li>
+<li>Depois desses 30 dias, vale o acesso da própria pessoa: com assinatura, tudo continua; sem assinatura, a conta fica só para ver e exportar.</li>
 <li>Para voltar a ter o benefício, será preciso convidar de novo.</li>
 <li>Se a pessoa excluir a própria conta, a licença termina na hora e a empresa a vê como encerrada, com a data.</li>
 </ul>`,

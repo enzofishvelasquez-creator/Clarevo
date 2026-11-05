@@ -143,11 +143,11 @@ R$ 29,90 por mês, 14 dias grátis sem cartão, depois só ver e exportar; pelas
 | # | O quê | Quem |
 |---|---|---|
 | 7.1 | Valor do plano Família (R$ 69,90, decidido em 04/11/2026) e se haverá plano anual | Enzo |
-| 7.2 | Banco: o direito de uso de cada pessoa (teste, assinatura, benefício), a regra "só ver e exportar" nas funções de escrita e o registro de cada mudança; testes | Equipe |
-| 7.3 | App: tela de assinar, contagem dos dias do teste, aviso antes do fim, modo "só ver e exportar" e "Restaurar compras" | Equipe |
+| 7.2 | Banco: o direito de uso de cada pessoa (teste, assinatura, benefício), a regra "só ver e exportar" nas funções de escrita e o registro de cada mudança; testes | Equipe. **Fase 1 pronta em 04/11/2026** (migração 0023, `supabase/tests/99zz_assinatura.sql`): ainda não aplicada em produção; a cobrança só começa quando a equipe marcar a data (`clarevo_staff_set_billing_start`) |
+| 7.3 | App: tela de assinar, contagem dos dias do teste, aviso antes do fim, modo "só ver e exportar" e "Restaurar compras" | Equipe. **Fase 1 pronta em 04/11/2026:** card e tela Assinatura em Conta (situação, datas, planos e preços), aviso no Resumo nos últimos 3 dias e em só leitura, botões de anotar escondidos em só leitura, Telegram responde que a conta está só para ver. **Fase 2** (depende de 7.4 e 7.5): botão de assinar, compra nas lojas, "Restaurar compras", página de assinatura na web e o retorno de cada pagamento ao banco (`billing_apply`); excluir a conta cancela a assinatura da web |
 | 7.4 | Lojas: assinaturas no App Store Connect e no Play Console (mesmo produto, R$ 29,90), contrato de apps pagos da Apple com conta bancária e dados fiscais da empresa, perfil de pagamentos do Google | Enzo, com roteiro |
 | 7.5 | Web: escolher e abrir a conta do serviço de pagamento (cartão e Pix Automático), com o CNPJ; a equipe liga o retorno do pagamento ao banco | Enzo abre a conta; equipe integra |
-| 7.6 | Termos (preço, renovação, cancelamento, arrependimento) e política (serviços de pagamento) para o advogado | Equipe redige; advogado confere |
+| 7.6 | Termos (preço, renovação, cancelamento, arrependimento) e política (serviços de pagamento) para o advogado | Equipe redige; advogado confere. **Redigidos em 04/11/2026:** termos, seção 12; política, seção 3.12 e trechos das seções 6, 8 e 11; exclusão de conta; pergunta 47 do resumo para o advogado |
 | 7.7 | Contador: nota fiscal das vendas da web e dos repasses das lojas, e o que a Inova Simples permite vender (pergunta 46) | Enzo |
 
 **Prazo:** a assinatura acrescenta cerca de duas semanas de trabalho da equipe e as contas de pagamento do Enzo. Com a decisão "tudo junto", 30/11 continua sendo a meta, mas o mais provável passa a ser a primeira quinzena de dezembro.

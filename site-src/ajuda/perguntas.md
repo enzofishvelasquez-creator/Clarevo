@@ -35,7 +35,7 @@ A Família reúne até 6 pessoas. Quem cria é a pessoa titular e convida as out
 - tema: beneficio
 - id: ativar
 
-A empresa envia um link de convite, de uso único. Abra o link, entre ou crie a sua conta e siga as instruções na tela. Se o benefício terminar, você mantém a conta, o histórico e a Família, e o acesso pleno continua por 30 dias. O que vale depois desses 30 dias ainda não está definido. Nada é apagado. Veja também [Para empresas](empresas/index.html).
+A empresa envia um link de convite, de uso único. Abra o link, entre ou crie a sua conta e siga as instruções na tela. Se o benefício terminar, você mantém a conta, o histórico e a Família, e o acesso pleno continua por 30 dias. Depois desses 30 dias, vale o acesso da própria pessoa: com assinatura, tudo continua; sem assinatura, a conta fica só para ver e exportar. Nada é apagado. Veja também [Para empresas](empresas/index.html).
 
 ## O que a minha empresa vê?
 

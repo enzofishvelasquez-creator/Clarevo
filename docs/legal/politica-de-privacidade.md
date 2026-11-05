@@ -15,6 +15,7 @@ Esta política explica, em linguagem simples, quais dados pessoais a Clarevo gua
 - Sem anúncios, sem venda de dados e sem rastreamento para publicidade.
 - Se você ligar o WhatsApp para anotar por mensagem, as mensagens passam pela Meta, dona do WhatsApp. A Clarevo não guarda o texto das mensagens nem o seu número.
 - Se você ligar o Telegram para anotar por mensagem, as mensagens passam pelo Telegram. A Clarevo não guarda o texto das mensagens, o seu nome nem o seu usuário no Telegram.
+- A assinatura é paga pela App Store, pelo Google Play ou pelo serviço de pagamento da web. A Clarevo não recebe nem guarda o número do seu cartão.
 - Você pode excluir a sua conta dentro do app.
 
 ## 1. Quem somos?
@@ -186,6 +187,16 @@ Você pode ligar a sua conta do Telegram à Clarevo, em Conta, e anotar gastos e
 - **Como desliga.** Em Conta, na tela do Telegram, ou mandando DESLIGAR (ou PARAR) para o bot da Clarevo. Ao desligar, o vínculo é apagado na hora; o que você já anotou continua no app.
 - **Por quanto tempo.** O vínculo, enquanto você não desligar nem excluir a conta. As mensagens tratadas, por 30 dias. Ao excluir a conta, o vínculo, o código e as mensagens tratadas são apagados junto.
 
+### 3.12 Assinatura e pagamento
+
+A Clarevo é paga por assinatura mensal, com 14 dias grátis no começo (Termos de Uso, seção 12).
+
+- **O que guardamos.** A situação do seu acesso: o plano (Individual ou Família), até quando ele vale, por onde foi assinado (App Store, Google Play ou web) e um resumo (SHA-256) do identificador da assinatura informado pela loja ou pelo serviço de pagamento, que serve para reconhecer a renovação e o cancelamento. Dos avisos de pagamento que recebemos, guardamos só o identificador do aviso, a origem e a data, para não aplicar o mesmo aviso duas vezes, sem nenhum dado seu.
+- **O que não guardamos.** Número do cartão, código de segurança, validade, dados do Pix, CPF ou endereço de cobrança. Esses dados ficam com a loja ou com o serviço de pagamento da web, pelas regras de cada um.
+- **O teste grátis.** É contado no banco de dados a partir da criação da conta (ou do início da cobrança, para quem já usava antes). Não pedimos cartão para o teste.
+- **Plano Família.** Quem paga é a pessoa titular. As outras pessoas da Família não veem os dados de pagamento da titular, só que a conta delas está coberta pelo Plano Família.
+- **Para quê.** Só para liberar ou travar a escrita conforme a assinatura e para mostrar a situação em Conta. Não usamos esses dados para anúncio nem para montar perfil.
+
 ## 4. O que não guardamos?
 
 - Número completo de cartão, código de segurança (CVV) e validade. O app recusa apelidos que pareçam número de cartão.
@@ -233,6 +244,7 @@ A leitura acontece no seu aparelho. A Clarevo não tem servidor que receba esses
 - Contagens de cadastros e de uso, sem identificar ninguém (seção 3.9): [PROPOSTA: legítimo interesse (art. 7º, IX), com dados agregados]. [A DEFINIR: confirmar a base e fazer o teste de legítimo interesse]
 - Anotar pelo WhatsApp (seção 3.10): [PROPOSTA: execução de contrato, a pedido da pessoa, que liga o número quando quer (art. 7º, V)]. [A DEFINIR: confirmar a base e o papel da Meta como operadora]
 - Anotar pelo Telegram (seção 3.11): [PROPOSTA: execução de contrato, a pedido da pessoa, que liga a conta quando quer (art. 7º, V)]. [A DEFINIR: confirmar a base e o papel do Telegram]
+- Assinatura e pagamento (seção 3.12): [PROPOSTA: execução de contrato (art. 7º, V) e, para o que a lei fiscal exigir, cumprimento de obrigação legal (art. 7º, II)]. [A DEFINIR: confirmar a base]
 - Funções do aparelho (câmera, biometria e lembretes): você liga e pode desligar a qualquer momento, e os dados dessas funções não chegam à Clarevo. [A DEFINIR: confirmar se precisam de base própria]
 
 Não tomamos decisões automatizadas sobre você, e a Clarevo não faz análise de crédito.
@@ -265,9 +277,12 @@ Hoje usamos:
 - **Resend** (envio dos e-mails de confirmação de cadastro e de nova senha, com o nome da Clarevo, a partir de um endereço do domínio da Clarevo). Recebe o seu e-mail e o conteúdo dessas mensagens e guarda registros do envio. O envio sai pela região de São Paulo do Resend. [A DEFINIR: país da sede, prazo de guarda dos registros e contrato]
 - **Meta (WhatsApp Business, Cloud API), só para quem liga o WhatsApp** (seção 3.10). Recebe as mensagens que você manda para o número da Clarevo, o seu número e as respostas, e atua como operadora, em nome da Clarevo. Guarda o conteúdo das mensagens por até 30 dias, para entregá-las. [PROPOSTA: pedir à Meta o armazenamento das mensagens no Brasil ao registrar o número da Clarevo; sem isso, o conteúdo fica guardado nos Estados Unidos.] [A DEFINIR: termos da Meta para empresas, transferência internacional (LGPD, art. 33) e o que a Meta faz com os dados técnicos das conversas]
 - **Telegram, só para quem liga o Telegram** (seção 3.11). Recebe as mensagens que você manda para o bot da Clarevo e as respostas, e as guarda na sua conversa, pelas regras dele, que você aceitou ao usar o Telegram. A Clarevo não tem contrato com o Telegram e não recebe o seu número de telefone. [A DEFINIR: o papel do Telegram, o país do tratamento e a transferência internacional (LGPD, art. 33)]
-- **Apple App Store e Google Play** (distribuição). Tratam os dados de download e de conta nas lojas, conforme as políticas delas.
+- **Apple App Store e Google Play** (distribuição e pagamento no celular). Tratam os dados de download e de conta nas lojas e, para quem assina pelo app, os dados de pagamento, conforme as políticas delas. Para a Clarevo, informam só a situação da assinatura e um identificador dela.
 
 Estão previstos, mas ainda não ligados:
+
+- **Serviço de pagamento da web** (cartão e Pix, para quem assina pela web). Receberá o seu e-mail e os dados de pagamento que você informar a ele, e informará à Clarevo só a situação da assinatura e um identificador dela. [A DEFINIR: o serviço, o país do tratamento e o contrato, a escolher antes do lançamento]
+- **Serviço de gestão das assinaturas das lojas** (para juntar num lugar só as assinaturas da App Store e do Google Play). Se for usado, receberá um identificador da sua conta da Clarevo e a situação da assinatura, sem dados de pagamento nem o que você anota. [A DEFINIR: o serviço, o país e o contrato]
 
 - **Sentry** (relatório de falhas do app). Se for ligado, receberá só o erro técnico, sem valores, descrições, e-mails ou dados financeiros, com coleta de IP desligada. Esta política será atualizada antes.
 - **Resend** (envio da mensagem do formulário de contato do site, seção 3.6, se for ligado). Receberá o que você escrever no formulário e guarda uma cópia nos registros dele. [A DEFINIR: país e contrato; é o mesmo serviço dos e-mails de cadastro, acima]
@@ -312,6 +327,7 @@ A exceção é a leitura de código no Android: o componente do Google (ML Kit) 
 - **Telegram** (seção 3.11). O vínculo da conta, enquanto você não desligar nem excluir a conta. As mensagens tratadas (sem o texto e sem o identificador), por 30 dias. O que virou registro segue a regra dos registros. No Telegram, a conversa fica até você apagá-la.
 - **Mensagem do formulário de contato** (seção 3.6). Fica na caixa de e-mail da Clarevo por [A DEFINIR: prazo na caixa de e-mail], e uma cópia fica nos registros do Resend por [A DEFINIR: prazo de guarda no Resend]. O site não a guarda.
 - **E-mail das Novidades** (seção 3.7). Fica no Brevo enquanto você não cancelar. [A DEFINIR: prazo depois do cancelamento]
+- **Assinatura** (seção 3.12). A situação do acesso, enquanto a conta existir; sai junto com a conta. Os avisos de pagamento (sem dado pessoal), [A DEFINIR: prazo]. As lojas e o serviço de pagamento da web guardam os dados de pagamento pelas regras deles e da lei fiscal.
 - **Contas sem uso.** Hoje a Clarevo não apaga contas por inatividade. [A DEFINIR: política para contas inativas]
 - **Obrigação legal e defesa de direitos.** Podemos guardar o necessário por mais tempo se a lei exigir ou para nos defendermos em processo. [A DEFINIR]
 

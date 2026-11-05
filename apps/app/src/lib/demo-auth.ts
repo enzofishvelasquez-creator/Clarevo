@@ -5,6 +5,7 @@ import {
   MemoryFamilyHub,
   MemoryRepository,
   createDemoRepository,
+  demoTrialAccess,
   demoScenarioFrom,
   type DemoScenario,
   type RecordsRepository,
@@ -150,6 +151,8 @@ export class DemoAuth implements AuthService {
       return lazy(this.demoRepo);
     }
     const acc = this.accounts.get(user.email)!;
+    // Conta criada na demonstração: começa no teste grátis (D-083), como uma conta nova de verdade.
+    const trial = demoTrialAccess();
     acc.repo ??= new MemoryRepository({
       actorId: user.id,
       displayName: user.displayName,
@@ -158,6 +161,7 @@ export class DemoAuth implements AuthService {
       family: this.familyHub,
       company: this.companyHub,
       email: user.email,
+      access: () => trial,
     });
     return acc.repo;
   }

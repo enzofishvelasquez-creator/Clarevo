@@ -853,9 +853,9 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('link de uso único');
     expect(h).toContain('a Clarevo não envia e-mail de convite');
     // O fim do benefício: só o que o código garante (nada é apagado; 30 dias de acesso pleno, o prazo de `BENEFIT_GRACE_DAYS` e da migração
-    // de empresas). O plano gratuito é [A DEFINIR] (P-005) nos termos e não é afirmado como fato.
+    // de empresas) e, depois, o acesso da própria pessoa (assinatura paga, D-083, migração 0023). Não existe plano gratuito.
     expect(h).toContain('O acesso pleno continua por 30 dias, contados do encerramento da licença ou do fim do contrato');
-    expect(h).toContain('O que vale depois desses 30 dias ainda não está definido');
+    expect(h).toContain('Depois desses 30 dias, vale o acesso da própria pessoa: com assinatura, tudo continua; sem assinatura, a conta fica só para ver e exportar.');
     expect(h).not.toMatch(/plano gratuito|leitura do histórico/i);
     expect(h).toContain('Nada é apagado por causa do fim do benefício');
     // A empresa vê as datas do convite, do aceite ("Ativa desde") e do encerramento; não vê quando a pessoa abre o app nem o que anota.
@@ -1139,9 +1139,10 @@ describe('site público: Ajuda, busca e perguntas do suporte', () => {
     expect(indice.find((i) => i.i === 'tema-diferenca')!.x).toContain('Ver a conta');
   });
 
-  it('a Ajuda não afirma o plano gratuito como fato: o que vale depois dos 30 dias de acesso pleno ainda não está definido', () => {
+  it('a Ajuda não fala em plano gratuito: depois dos 30 dias de acesso pleno, vale o acesso da própria pessoa (assinatura paga, D-083)', () => {
     const b = h('ajuda/beneficio.html');
-    expect(b).toContain('o acesso pleno continua por 30 dias. O que vale depois desses 30 dias ainda não está definido. Nada é apagado.');
+    expect(b).toContain('o acesso pleno continua por 30 dias. Depois desses 30 dias, vale o acesso da própria pessoa: com assinatura, tudo continua; sem assinatura, a conta fica só para ver e exportar. Nada é apagado.');
+    expect(b).not.toMatch(/plano gratuito/i);
     expect(b).toContain('Também não vê quando você abre o app nem o que você anota.');
     expect(b).toContain('as datas (como a em que você aceitou o convite e a de encerramento)');
     expect(b).not.toContain('Os e-mails que ela convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens');

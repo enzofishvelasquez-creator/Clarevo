@@ -77,6 +77,7 @@ export function useAcceptLicense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { key: string; code: string }) => repo.acceptLicense(v.key, v.code),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['my-benefit'] }),
+    // O benefício também muda a assinatura (D-083): com ele, nada a pagar.
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: ['my-benefit'] }), qc.invalidateQueries({ queryKey: ['access'] })]),
   });
 }

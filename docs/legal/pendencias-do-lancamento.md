@@ -1,6 +1,6 @@
 # Pendências dos textos legais para o lançamento (04/11/2026)
 
-O site só sai da "versão preliminar" quando `node scripts/gerar-site.js --final` passa. Hoje ele recusa por **103 marcadores** na política de privacidade, nos termos de uso e na página de exclusão de conta, mais as frases de rascunho e as duas seções de formulários desligados. Este documento separa os marcadores em quatro grupos, para cada um ir a quem decide. O resumo para o advogado (`resumo-para-advogado.md`, perguntas 1 a 46) continua valendo; aqui está o que falta **no texto**.
+O site só sai da "versão preliminar" quando `node scripts/gerar-site.js --final` passa. Hoje ele recusa por **108 marcadores** (eram 103 antes da seção de preço e da seção 3.12, em 04/11/2026) na política de privacidade, nos termos de uso e na página de exclusão de conta, mais as frases de rascunho e as duas seções de formulários desligados. Este documento separa os marcadores em quatro grupos, para cada um ir a quem decide. O resumo para o advogado (`resumo-para-advogado.md`, perguntas 1 a 46) continua valendo; aqui está o que falta **no texto**.
 
 ## A. Decisões do Enzo (produto), com a recomendação da equipe
 
@@ -41,7 +41,7 @@ O advogado confere depois; se o Enzo aprovar, a equipe troca os marcadores pelo 
 | B8 | Cláusula de limitação de responsabilidade compatível com o CDC (termos) | 1 |
 | B9 | Categoria e descrição livre frente aos dados sensíveis da LGPD | 1 |
 | B10 | Guarda por obrigação legal e defesa de direitos | 2 |
-| B11 | Telegram (pergunta 45) e Inova Simples nas lojas (pergunta 46) | 3 |
+| B11 | Telegram (pergunta 45), Inova Simples nas lojas (pergunta 46) e assinatura paga (pergunta 47: arrependimento nas lojas, renovação, preço, só leitura, Plano Família, tributos e nota fiscal) | 7 |
 | B12 | Tirar as frases "Rascunho preparado pela equipe... Não é parecer jurídico" depois da revisão | 3 |
 
 ## C. Conferência em painel (Enzo, uns 15 minutos; a equipe manda o roteiro)
