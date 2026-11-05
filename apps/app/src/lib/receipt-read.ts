@@ -20,6 +20,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import { Platform } from 'react-native';
 
+import { deleteCacheFile } from '@/lib/image-pick';
 import { PDF_MAX_BYTES, hasPdfHeader, newPdfReadControl, pdfTextFromBytes, type PdfReadControl } from '@/lib/pdf-text';
 
 /**
@@ -64,17 +65,7 @@ export async function bytesOf(asset: DocumentPicker.DocumentPickerAsset): Promis
  * documento, chave Pix e conta). Só no nativo; nunca lança.
  */
 export async function deleteCachedCopy(asset: DocumentPicker.DocumentPickerAsset): Promise<void> {
-  if (Platform.OS === 'web') return;
-  try {
-    const { File, Paths } = await import('expo-file-system');
-    const cache = Paths.cache.uri;
-    if (asset.uri.startsWith(cache)) {
-      const file = new File(asset.uri);
-      if (file.exists) file.delete();
-    }
-  } catch {
-    // O sistema limpa o cache quando precisa; a cópia só fica até lá.
-  }
+  await deleteCacheFile(asset.uri);
 }
 
 export type PdfTextRead = { ok: true; text: string } | { ok: false; reason: 'grande' | 'nao_pdf' | 'falhou' };

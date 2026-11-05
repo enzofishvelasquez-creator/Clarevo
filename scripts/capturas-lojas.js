@@ -198,6 +198,9 @@ function dimensoesPng(arquivo) {
           for (const [nome, valor] of tela.confereCampos || []) if ((await campo(nome).inputValue()) !== valor) throw new Error(`o campo "${nome}" não tem "${valor}"`);
           // Toda captura mostra a identificação da demonstração, e nenhuma mostra a pílula de uma conta real.
           if (!texto.includes('Demonstração') && !texto.includes('demonstração')) throw new Error('a tela não identifica a demonstração');
+          // As capturas saem da web, mas vão para as lojas: a Apple e o Google recusam app que aponte para pagamento fora da loja
+          // (a tela Assinatura da web cita o cartão e o Pix).
+          if (/na web, por cartão|assinatura na web|assinar na web/i.test(texto)) throw new Error('a tela cita pagamento fora da loja');
           const arquivo = path.join(pasta, `${tela.id}.png`);
           await p.screenshot({ path: arquivo });
           const d = dimensoesPng(arquivo);

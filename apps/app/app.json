@@ -18,8 +18,7 @@
       },
       "infoPlist": {
         "CFBundleDevelopmentRegion": "pt-BR",
-        "CFBundleLocalizations": ["pt-BR"],
-        "CFBundleAllowMixedLocalizations": true
+        "CFBundleLocalizations": ["pt-BR"]
       }
     },
     "android": {

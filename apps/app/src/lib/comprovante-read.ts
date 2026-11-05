@@ -2,7 +2,7 @@ import { COMPROVANTE_TEXT, comprovanteErrorText, comprovanteFromText, type Compr
 import * as DocumentPicker from 'expo-document-picker';
 
 import type { PdfReadControl } from '@/lib/pdf-text';
-import { pickImageForReading } from '@/lib/image-pick';
+import { discardPickedImage, pickImageForReading } from '@/lib/image-pick';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { bytesOf, deleteCachedCopy, readPdfText } from '@/lib/receipt-read';
 
@@ -114,5 +114,9 @@ export async function pickAndReadComprovanteImage(
   if (picked.kind === 'sem_permissao') return { ok: false, message: COMPROVANTE_TEXT.pdf.cameraDenied };
   if (picked.kind === 'falhou') return { ok: false, message: COMPROVANTE_TEXT.pdf.imageFailed };
   onImage?.();
-  return readComprovanteImage(picked.image, defaultDirection);
+  try {
+    return await readComprovanteImage(picked.image, defaultDirection);
+  } finally {
+    await discardPickedImage(picked);
+  }
 }
