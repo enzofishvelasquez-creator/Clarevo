@@ -92,9 +92,9 @@ begin
   assert has_function_privilege('authenticated', 'public.my_access()', 'execute') and not has_function_privilege('anon', 'public.my_access()', 'execute'),
     'my_access só para quem entrou';
   assert (select prosecdef from pg_proc where oid = 'public.my_access()'::regprocedure), 'my_access é security definer';
-  assert has_function_privilege('service_role', 'public.billing_apply(text, text, uuid, text, text, timestamptz)', 'execute')
-     and not has_function_privilege('authenticated', 'public.billing_apply(text, text, uuid, text, text, timestamptz)', 'execute')
-     and not has_function_privilege('anon', 'public.billing_apply(text, text, uuid, text, text, timestamptz)', 'execute'),
+  assert has_function_privilege('service_role', 'public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz)', 'execute')
+     and not has_function_privilege('authenticated', 'public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz)', 'execute')
+     and not has_function_privilege('anon', 'public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz)', 'execute'),
     'billing_apply só com a chave de serviço';
   foreach f in array array['clarevo_access(uuid)', 'clarevo_write_free_actions()', 'clarevo_staff_set_billing_start(timestamptz)',
                            'clarevo_staff_grant_courtesy(text, text, timestamptz)'] loop
@@ -203,7 +203,8 @@ do $$ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 5. Avisos de pagamento (billing_apply): assinatura, repetição, plano familiar cobrindo a Família, fim e estorno.
+-- 5. Avisos de pagamento (billing_apply): assinatura, repetição, plano familiar cobrindo a Família, estorno, aviso atrasado (fora de
+--    ordem) e aviso que chega antes de a pessoa ser identificada. Dentro da transação now() não anda: as datas dos eventos são explícitas.
 -- ---------------------------------------------------------------------------
 select pg_temp.created_days_ago('ana', 30);
 select pg_temp.created_days_ago('bia', 30);
@@ -212,18 +213,26 @@ do $$ begin
 end $$;
 set role service_role;
 select pg_temp.as_service();
-select pg_temp.expect_code(format($q$select public.billing_apply('ev-x', 'loja', %L, %L, 'individual', now())$q$, pg_temp.id('ana'), pg_temp.sha('x')), 'aviso_invalido', '22023');
-select pg_temp.expect_code(format($q$select public.billing_apply('ev-x', 'apple', %L, 'nao-e-resumo', 'individual', now())$q$, pg_temp.id('ana')), 'aviso_invalido', '22023');
-select pg_temp.expect_code(format($q$select public.billing_apply('ev-x', 'apple', %L, %L, 'mensal', now())$q$, pg_temp.id('ana'), pg_temp.sha('x')), 'aviso_invalido', '22023');
+select pg_temp.expect_code(format($q$select public.billing_apply('ev-x', 'loja', %L, %L, 'individual', now(), now())$q$, pg_temp.id('ana'), pg_temp.sha('x')), 'aviso_invalido', '22023');
+select pg_temp.expect_code(format($q$select public.billing_apply('ev-x', 'apple', %L, 'nao-e-resumo', 'individual', now(), now())$q$, pg_temp.id('ana')), 'aviso_invalido', '22023');
+select pg_temp.expect_code(format($q$select public.billing_apply('ev-x', 'apple', %L, %L, 'mensal', now(), now())$q$, pg_temp.id('ana'), pg_temp.sha('x')), 'aviso_invalido', '22023');
+select pg_temp.expect_code(format($q$select public.billing_apply('ev-x', 'apple', %L, %L, 'individual', now(), null)$q$, pg_temp.id('ana'), pg_temp.sha('x')), 'aviso_invalido', '22023');
+select pg_temp.expect_code(format($q$select public.billing_apply('ev-x', 'apple', %L, %L, 'individual', now(), now() + interval '2 days')$q$, pg_temp.id('ana'), pg_temp.sha('x')), 'aviso_invalido', '22023');
 do $$
 declare
   r jsonb;
 begin
-  r := public.billing_apply('ev-ana-1', 'apple', pg_temp.id('ana'), pg_temp.sha('apple-sub-ana'), 'individual', now() + interval '30 days');
+  r := public.billing_apply('ev-ana-1', 'apple', pg_temp.id('ana'), pg_temp.sha('apple-sub-ana'), 'individual', now() + interval '30 days',
+                            now() - interval '10 days');
   assert r ->> 'result' = 'aplicado' and r #>> '{access,status}' = 'assinatura' and r #>> '{access,plan}' = 'individual', 'assinou: ' || r::text;
-  assert public.billing_apply('ev-ana-1', 'apple', pg_temp.id('ana'), pg_temp.sha('apple-sub-ana'), 'individual', now() + interval '30 days')
+  assert public.billing_apply('ev-ana-1', 'apple', pg_temp.id('ana'), pg_temp.sha('apple-sub-ana'), 'individual', now() + interval '30 days',
+                              now() - interval '10 days')
        = '{"result": "repetido"}', 'o mesmo aviso não se aplica duas vezes';
-  assert public.billing_apply('ev-sem-pessoa', 'web', '00000000-0000-0000-0000-00000000dead', pg_temp.sha('web-x'), 'individual', now() + interval '30 days')
+  -- Aviso sem pessoa identificada (ou de pessoa que não existe): não fica gravado, para valer quando chegar de novo com a pessoa.
+  assert public.billing_apply('ev-web-1', 'web', null, pg_temp.sha('web-bia'), 'individual', now() + interval '30 days', now() - interval '2 days')
+       = '{"result": "sem_pessoa"}', 'aviso sem pessoa';
+  assert public.billing_apply('ev-sem-pessoa', 'web', '00000000-0000-0000-0000-00000000dead', pg_temp.sha('web-x'), 'individual',
+                              now() + interval '30 days', now() - interval '2 days')
        = '{"result": "sem_pessoa"}', 'aviso de pessoa que não existe';
 end $$;
 reset role;
@@ -239,11 +248,13 @@ declare
   r jsonb;
 begin
   -- Ana passa para o plano familiar: a Bia, membro da Família da Ana, fica coberta.
-  r := public.billing_apply('ev-ana-2', 'apple', pg_temp.id('ana'), pg_temp.sha('apple-sub-ana'), 'familiar', now() + interval '30 days');
+  r := public.billing_apply('ev-ana-2', 'apple', pg_temp.id('ana'), pg_temp.sha('apple-sub-ana'), 'familiar', now() + interval '30 days',
+                            now() - interval '5 days');
   assert r #>> '{access,plan}' = 'familiar', 'troca para o familiar';
   -- A mesma assinatura não passa para outra pessoa.
   begin
-    perform public.billing_apply('ev-ana-3', 'apple', pg_temp.id('caio'), pg_temp.sha('apple-sub-ana'), 'familiar', now() + interval '30 days');
+    perform public.billing_apply('ev-ana-3', 'apple', pg_temp.id('caio'), pg_temp.sha('apple-sub-ana'), 'familiar', now() + interval '30 days',
+                                 now() - interval '4 days');
     raise exception 'deveria recusar';
   exception when others then
     assert sqlerrm = 'assinatura_de_outra_pessoa', 'assinatura de outra pessoa: ' || sqlerrm;
@@ -264,14 +275,35 @@ do $$ begin
   assert pg_temp.nrecords('bia_ctx') = 1, 'a Bia anotou enquanto coberta';
   assert pg_temp.status('bia') = 'leitura', 'fora da Família, a Bia volta ao que tem: só leitura';
 end $$;
--- Estorno: a Ana perde o acesso na hora.
+-- Estorno: a Ana perde o acesso na hora. Depois, chega atrasada a reentrega de um aviso anterior (de 7 dias atrás, com o período pago
+-- até daqui a 30 dias, plano individual): fica registrada, mas não devolve o acesso nem muda o plano.
 set role service_role;
 select pg_temp.as_service();
-select public.billing_apply('ev-ana-4', 'apple', pg_temp.id('ana'), pg_temp.sha('apple-sub-ana'), 'familiar', now() - interval '1 second');
+select public.billing_apply('ev-ana-4', 'apple', pg_temp.id('ana'), pg_temp.sha('apple-sub-ana'), 'familiar', now() - interval '1 second',
+                            now() - interval '1 day');
+do $$
+declare
+  r jsonb;
+begin
+  r := public.billing_apply('ev-ana-atrasado', 'apple', pg_temp.id('ana'), pg_temp.sha('apple-sub-ana'), 'individual', now() + interval '30 days',
+                            now() - interval '7 days');
+  assert r ->> 'result' = 'antigo' and r #>> '{access,status}' = 'leitura', 'aviso atrasado não muda nada: ' || r::text;
+  assert public.billing_apply('ev-ana-atrasado', 'apple', pg_temp.id('ana'), pg_temp.sha('apple-sub-ana'), 'individual', now() + interval '30 days',
+                              now() - interval '7 days') = '{"result": "repetido"}', 'e não volta a ser considerado';
+  -- O aviso que tinha chegado sem pessoa chega de novo, agora com a Bia: vale.
+  r := public.billing_apply('ev-web-1', 'web', pg_temp.id('bia'), pg_temp.sha('web-bia'), 'individual', now() + interval '30 days', now() - interval '2 days');
+  assert r ->> 'result' = 'aplicado' and r #>> '{access,status}' = 'assinatura', 'o aviso de antes vale com a pessoa: ' || r::text;
+end $$;
 reset role;
 do $$ begin
   assert pg_temp.status('ana') = 'leitura', 'depois do estorno, só leitura';
-  assert (select count(*) from public.billing_events where event_id like 'ev-%') = 4, 'cada aviso aceito fica registrado uma vez; os inválidos e o recusado não ficam';
+  assert (select plan from public.plan_entitlements where person_id = pg_temp.id('ana') and source = 'particular') = 'familiar'
+     and (select last_event_at from public.plan_entitlements where person_id = pg_temp.id('ana') and source = 'particular') = now() - interval '1 day',
+    'o aviso atrasado não mexeu no plano nem na data do último evento';
+  assert (select array_agg(event_id order by event_id) from public.billing_events where event_id like 'ev-%')
+       = array['ev-ana-1', 'ev-ana-2', 'ev-ana-4', 'ev-ana-atrasado', 'ev-web-1'],
+    'cada aviso aceito fica registrado uma vez; os inválidos, o recusado e os sem pessoa não ficam';
+  assert 'alterar_papel_familia' = any (public.clarevo_write_free_actions()), 'a titular em só leitura ainda administra quem está na Família';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -321,8 +353,15 @@ do $$ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 7. Excluir a conta continua possível em só leitura (não grava operação).
+-- 7. Excluir a conta continua possível em só leitura (não grava operação). A cortesia do Caio acaba antes, para ele estar em só leitura.
 -- ---------------------------------------------------------------------------
+create function pg_temp.end_courtesy(p_name text) returns void language sql security definer set search_path = public, pg_temp as $$
+  update public.plan_entitlements set valid_until = now() - interval '1 second' where person_id = pg_temp.id(p_name) and source = 'cortesia'
+$$;
+select pg_temp.end_courtesy('caio');
+do $$ begin
+  assert pg_temp.status('caio') = 'leitura', 'Caio em só leitura antes de excluir';
+end $$;
 set role authenticated;
 do $$ begin
   perform pg_temp.as_('caio');

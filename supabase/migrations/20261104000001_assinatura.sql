@@ -11,11 +11,14 @@
 --     maior entre a criação da pessoa e o início da cobrança > só leitura.
 -- A2. Só leitura: o gatilho de record_operations (o ponto por onde toda função de escrita passa, 0016) recusa 'assinatura_necessaria'
 --     (PT402) em toda ação que cria ou muda dados, salvo as de sair, desligar, aceitar um benefício ou convite de Família, administrar
---     as licenças da empresa e responder às marcações de tela (lista em clarevo_write_free_actions). Ler, exportar (no aparelho) e
+--     quem está na Família e as licenças da empresa, responder "Como você conheceu a Clarevo?" e decidir a revisão dos últimos meses
+--     (lista em clarevo_write_free_actions). Ler, exportar (no aparelho) e
 --     excluir a conta (sem operação) continuam sempre possíveis. A geração das contas de gastos fixos (sem operação) também continua.
 -- A3. O direito por assinatura só é gravado por billing_apply (chave de serviço, chamada pela função do servidor que recebe os avisos
---     das lojas e do pagamento na web), idempotente pelo identificador do evento (billing_events, sem dado pessoal); da assinatura na
---     loja fica só um resumo SHA-256 do identificador (plan_entitlements.external_ref). A cortesia só pela equipe no SQL Editor
+--     das lojas e do pagamento na web), idempotente pelo identificador do evento (billing_events, sem dado pessoal) e na ordem em que os
+--     eventos aconteceram (plan_entitlements.last_event_at: aviso mais antigo que o último aplicado não muda nada, porque as lojas
+--     reenviam avisos com atraso e fora de ordem); da assinatura na loja fica só um resumo SHA-256 do identificador
+--     (plan_entitlements.external_ref). A cortesia só pela equipe no SQL Editor
 --     (clarevo_staff_grant_courtesy), e o início da cobrança só por clarevo_staff_set_billing_start.
 -- A4. my_access (authenticated) devolve o acesso da própria pessoa: {status, plan, until, can_write}.
 -- A5. Telegram e WhatsApp: anotar e desfazer em só leitura respondem sem_assinatura (sem anotar nada).
@@ -47,6 +50,8 @@ comment on table public.billing_events is
 
 alter table public.plan_entitlements add column provider text check (provider in ('apple', 'google', 'web', 'equipe'));
 alter table public.plan_entitlements add column external_ref text check (external_ref ~ '^[0-9a-f]{64}$');
+-- Quando aconteceu o último evento aplicado (a data do evento na loja ou no serviço de pagamento, não a da chegada do aviso).
+alter table public.plan_entitlements add column last_event_at timestamptz;
 create unique index plan_entitlements_one_per_external on public.plan_entitlements (provider, external_ref) where external_ref is not null;
 
 -- ---------------------------------------------------------------------------
@@ -105,8 +110,8 @@ begin
 end;
 $$;
 
--- As ações que valem mesmo em só leitura (A2): sair, desligar, aceitar benefício ou convite, administrar as licenças da empresa e as
--- marcações de tela que não mudam dados financeiros.
+-- As ações que valem mesmo em só leitura (A2): sair, desligar, aceitar benefício ou convite, administrar quem está na Família e as
+-- licenças da empresa, responder "Como você conheceu a Clarevo?" e decidir a revisão dos últimos meses. Nenhuma muda dados financeiros.
 create or replace function public.clarevo_write_free_actions()
 returns text[]
 language sql
@@ -114,7 +119,7 @@ immutable
 set search_path = public
 as $$
   select array['sair_familia', 'aceitar_convite_familia', 'encerrar_familia', 'remover_membro_familia', 'transferir_titularidade_familia',
-               'cancelar_convite_familia', 'aceitar_licenca', 'convidar_licencas', 'renovar_convite_licenca', 'cancelar_convite_licenca',
+               'alterar_papel_familia', 'cancelar_convite_familia', 'aceitar_licenca', 'convidar_licencas', 'renovar_convite_licenca', 'cancelar_convite_licenca',
                'encerrar_licenca', 'ligar_whatsapp', 'desligar_whatsapp', 'ligar_telegram', 'desligar_telegram',
                'responder_origem_cadastro', 'decidir_revisao']::text[];
 $$;
@@ -162,10 +167,13 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Servidor (A3): aplicar um aviso de pagamento. p_external_ref é o resumo SHA-256 do identificador da assinatura na loja ou no serviço
 -- de pagamento; p_valid_until é o fim do período pago (renovar empurra a data; cancelar não mexe, e o acesso acaba sozinho no fim do
--- período; estorno manda a data de agora). Retorno: {result: aplicado | repetido | sem_pessoa, access?}.
+-- período; estorno manda a data de agora); p_event_at é quando o evento aconteceu na loja ou no serviço (a Apple manda signedDate, o
+-- Google eventTimeMillis). Ordem: aviso_invalido; trava da assinatura; repetido (o mesmo evento já aplicado); sem_pessoa (pessoa
+-- nula ou excluída: o aviso não é gravado, para valer quando chegar de novo com a pessoa); assinatura_de_outra_pessoa; antigo (evento
+-- anterior ao último aplicado: gravado, sem mudar nada); aplicado. Retorno: {result, access?}.
 -- ---------------------------------------------------------------------------
 create or replace function public.billing_apply(
-  p_event_id text, p_provider text, p_person uuid, p_external_ref text, p_plan text, p_valid_until timestamptz
+  p_event_id text, p_provider text, p_person uuid, p_external_ref text, p_plan text, p_valid_until timestamptz, p_event_at timestamptz
 )
 returns jsonb
 language plpgsql
@@ -175,30 +183,36 @@ set search_path = public
 as $$
 declare
   v_id uuid;
+  v_owner uuid;
+  v_last timestamptz;
 begin
   if p_event_id is null or char_length(p_event_id) not between 1 and 200 or p_provider is null or p_provider not in ('apple', 'google', 'web')
      or p_external_ref is null or p_external_ref !~ '^[0-9a-f]{64}$' or p_plan is null or p_plan not in ('individual', 'familiar')
-     or p_valid_until is null then
+     or p_valid_until is null or p_event_at is null or p_event_at > now() + interval '1 day' then
     raise exception 'aviso_invalido' using errcode = '22023';
   end if;
   perform pg_advisory_xact_lock(hashtext('billing:' || p_provider || ':' || p_external_ref));
   if exists (select 1 from public.billing_events where event_id = p_event_id) then
     return jsonb_build_object('result', 'repetido');
   end if;
-  insert into public.billing_events (event_id, provider) values (p_event_id, p_provider);
   if p_person is null or not exists (select 1 from public.persons p where p.id = p_person and p.deleted_at is null) then
     return jsonb_build_object('result', 'sem_pessoa');
   end if;
 
-  select e.id into v_id from public.plan_entitlements e where e.provider = p_provider and e.external_ref = p_external_ref for update;
+  select e.id, e.person_id, e.last_event_at into v_id, v_owner, v_last
+    from public.plan_entitlements e where e.provider = p_provider and e.external_ref = p_external_ref for update;
+  if v_id is not null and v_owner <> p_person then
+    raise exception 'assinatura_de_outra_pessoa' using errcode = '22023';
+  end if;
+  insert into public.billing_events (event_id, provider) values (p_event_id, p_provider);
+  if v_id is not null and v_last is not null and p_event_at < v_last then
+    return jsonb_build_object('result', 'antigo', 'access', public.clarevo_access(p_person));
+  end if;
   if v_id is null then
-    insert into public.plan_entitlements (person_id, source, plan, valid_from, valid_until, provider, external_ref)
-    values (p_person, 'particular', p_plan, now(), p_valid_until, p_provider, p_external_ref);
+    insert into public.plan_entitlements (person_id, source, plan, valid_from, valid_until, provider, external_ref, last_event_at)
+    values (p_person, 'particular', p_plan, now(), p_valid_until, p_provider, p_external_ref, p_event_at);
   else
-    update public.plan_entitlements set plan = p_plan, valid_until = p_valid_until where id = v_id and person_id = p_person;
-    if not found then
-      raise exception 'assinatura_de_outra_pessoa' using errcode = '22023';
-    end if;
+    update public.plan_entitlements set plan = p_plan, valid_until = p_valid_until, last_event_at = p_event_at where id = v_id;
   end if;
   return jsonb_build_object('result', 'aplicado', 'access', public.clarevo_access(p_person));
 end;
@@ -421,7 +435,7 @@ revoke all on public.billing_settings, public.billing_events from anon, authenti
 revoke all on function public.clarevo_access(uuid) from public, anon, authenticated;
 revoke all on function public.clarevo_write_free_actions() from public, anon, authenticated;
 revoke all on function public.my_access() from public, anon, authenticated;
-revoke all on function public.billing_apply(text, text, uuid, text, text, timestamptz) from public, anon, authenticated;
+revoke all on function public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz) from public, anon, authenticated;
 revoke all on function public.clarevo_staff_set_billing_start(timestamptz) from public, anon, authenticated;
 revoke all on function public.clarevo_staff_grant_courtesy(text, text, timestamptz) from public, anon, authenticated;
 do $$
@@ -434,7 +448,7 @@ begin
                              'clarevo_staff_set_billing_start(timestamptz)', 'clarevo_staff_grant_courtesy(text, text, timestamptz)'] loop
       execute format('revoke all on function public.%s from service_role', f);
     end loop;
-    execute 'grant execute on function public.billing_apply(text, text, uuid, text, text, timestamptz) to service_role';
+    execute 'grant execute on function public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz) to service_role';
   end if;
 end $$;
 

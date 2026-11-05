@@ -153,7 +153,8 @@ export function accessView(access: Access, now: Date, timeZone: string): AccessV
     case 'leitura':
       return {
         situation: 'Só ver e exportar',
-        body: `O teste grátis acabou${date ? ` em ${date}` : ''}. Os seus dados continuam aqui: você vê e exporta tudo. Para voltar a anotar, assine um dos planos.`,
+        // Neutro: só leitura vem do fim do teste, mas também do fim de uma assinatura ou do benefício da empresa.
+        body: 'Sem assinatura ativa, a conta está só para ver e exportar. Os seus dados continuam aqui: você vê e exporta tudo. Para voltar a anotar, assine um dos planos.',
         showPlans: true,
       };
     case 'assinatura':
@@ -192,7 +193,7 @@ export interface AccessBanner {
 /** Aviso no Resumo: nos últimos TRIAL_WARNING_DAYS dias do teste e em só leitura. Nulo nas outras situações. */
 export function accessBanner(access: Access, now: Date, timeZone: string): AccessBanner | null {
   if (access.status === 'leitura') {
-    return { text: 'O teste grátis acabou. A conta está só para ver e exportar. Para voltar a anotar, assine um dos planos.', tone: 'aviso' };
+    return { text: 'Sem assinatura ativa, a conta está só para ver e exportar. Para voltar a anotar, assine um dos planos.', tone: 'aviso' };
   }
   const days = trialDaysLeft(access, now, timeZone);
   if (days === null || days > TRIAL_WARNING_DAYS) return null;

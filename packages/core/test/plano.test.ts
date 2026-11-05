@@ -99,7 +99,7 @@ describe('teste grátis: dias que faltam, no fuso da pessoa', () => {
     expect(accessBanner(at('teste', '2026-11-05T13:00:00.000Z'), NOW, TZ)?.text).toContain('termina amanhã');
     expect(accessBanner(at('teste', '2026-11-04T20:00:00.000Z'), NOW, TZ)?.text).toContain('termina hoje');
     expect(accessBanner(at('leitura', '2026-11-01T13:00:00.000Z'), NOW, TZ)).toEqual({
-      text: 'O teste grátis acabou. A conta está só para ver e exportar. Para voltar a anotar, assine um dos planos.',
+      text: 'Sem assinatura ativa, a conta está só para ver e exportar. Para voltar a anotar, assine um dos planos.',
       tone: 'aviso',
     });
     for (const s of ['pre_lancamento', 'assinatura', 'beneficio', 'cortesia', 'familia'] as const) {
@@ -128,7 +128,7 @@ describe('accessView: a tela Assinatura e o card de Conta', () => {
     });
     expect(accessView(at('leitura', '2026-11-01T13:00:00.000Z'), NOW, TZ)).toEqual({
       situation: 'Só ver e exportar',
-      body: 'O teste grátis acabou em 01/11/2026. Os seus dados continuam aqui: você vê e exporta tudo. Para voltar a anotar, assine um dos planos.',
+      body: 'Sem assinatura ativa, a conta está só para ver e exportar. Os seus dados continuam aqui: você vê e exporta tudo. Para voltar a anotar, assine um dos planos.',
       showPlans: true,
     });
     const paid = accessView(at('assinatura', '2026-12-04T13:00:00.000Z', 'familiar'), NOW, TZ);
