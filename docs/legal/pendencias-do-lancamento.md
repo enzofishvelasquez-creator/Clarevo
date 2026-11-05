@@ -62,5 +62,5 @@ O advogado confere depois; se o Enzo aprovar, a equipe troca os marcadores pelo 
 3. Apagar do aparelho as preferências da conta ao sair (A9). **Feito em 05/11/2026**, com a política (seção 9) e a A11 no texto.
 4. Tirar do texto publicado as seções do que está desligado (A14, A15) e guardar à parte.
 5. Página de licenças de código aberto (termos, seção de propriedade intelectual): lista gerada dos pacotes que vão no app, publicada no site e com link no app.
-6. Página de versões anteriores da política (A16).
+6. Página de versões anteriores da política (A16). **Feito em 05/11/2026** (`docs/legal/versoes.md`, publicada como `versoes.html`, com link no rodapé e na política).
 7. Trocar os marcadores decididos pelo texto e rodar o `--final`.

@@ -38,6 +38,8 @@ const PAGINAS_LEGAIS = [
   { arquivo: 'privacidade.html', md: 'politica-de-privacidade.md', titulo: 'Política de privacidade', rotulo: 'Privacidade', descricao: 'Como a Clarevo trata os dados pessoais de quem usa o app.' },
   { arquivo: 'termos.html', md: 'termos-de-uso.md', titulo: 'Termos de uso', rotulo: 'Termos', descricao: 'As regras para usar o app e o serviço da Clarevo, de organização de finanças pessoais e da família.' },
   { arquivo: 'excluir-conta.html', md: 'exclusao-de-conta.md', titulo: 'Excluir conta e dados', rotulo: 'Excluir conta', descricao: 'Como pedir a exclusão da sua conta e dos seus dados da Clarevo.' },
+  // A16 (aprovada em 04/11/2026): as versões anteriores ficam publicadas, em vez de "mediante pedido".
+  { arquivo: 'versoes.html', md: 'versoes.md', titulo: 'Versões dos termos e da política', rotulo: 'Versões dos textos', descricao: 'As versões dos Termos de uso e da Política de privacidade da Clarevo, com a data de cada uma.' },
 ];
 /** Links entre os textos jurídicos: o Markdown aponta para o arquivo, o site para a página. */
 const MAPA_LINKS_SITE = Object.fromEntries(PAGINAS_LEGAIS.map((p) => [p.md, p.arquivo]));

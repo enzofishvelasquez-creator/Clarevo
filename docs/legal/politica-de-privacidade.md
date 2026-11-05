@@ -375,7 +375,7 @@ A Clarevo é para pessoas com 18 anos ou mais. Ela não é dirigida a crianças 
 
 ## 15. A política pode mudar?
 
-Sim. Quando mudar, a data de vigência no topo será atualizada. Avisamos as mudanças com pelo menos 30 dias de antecedência, no app e por e-mail, e mudança que reduza os seus direitos pede novo aceite no app. As versões anteriores ficam publicadas na página de versões do site.
+Sim. Quando mudar, a data de vigência no topo será atualizada. Avisamos as mudanças com pelo menos 30 dias de antecedência, no app e por e-mail, e mudança que reduza os seus direitos pede novo aceite no app. As versões anteriores ficam publicadas na página [Versões dos termos e da política](versoes.md).
 
 ## 16. Contato
 
