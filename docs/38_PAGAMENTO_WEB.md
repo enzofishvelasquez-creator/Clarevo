@@ -19,6 +19,10 @@ Valores das páginas e ajudas oficiais encontradas em 05/11/2026. Taxas mudam e 
 
 Fora da lista: **Stripe**, porque a ajuda dela diz que conta brasileira não tem Pix Automático (só Pix avulso).
 
+## Decisão (D-084, 05/11/2026)
+
+O Enzo escolheu o **Asaas**.
+
 ## Recomendação da equipe
 
 **Asaas.** Tem as duas formas que a Clarevo quer, com Pix Automático já documentado na API (inclusive novas tentativas quando o débito falha), cobra só quando recebe e sai mais barato nas duas formas. O Mercado Pago é a segunda opção, por ser conhecido das pessoas, mas é mais caro no cartão e não mostra a taxa do Pix Automático. O Efí cobra R$ 3,50 por Pix Automático, mais de 10% de uma assinatura de R$ 29,90.

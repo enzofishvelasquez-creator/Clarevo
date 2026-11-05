@@ -281,7 +281,7 @@ Hoje usamos:
 
 Estão previstos, mas ainda não ligados:
 
-- **Serviço de pagamento da web** (cartão e Pix, para quem assina pela web). Receberá o seu e-mail e os dados de pagamento que você informar a ele, e informará à Clarevo só a situação da assinatura e um identificador dela. [A DEFINIR: o serviço, o país do tratamento e o contrato, a escolher antes do lançamento]
+- **Asaas** (pagamento da assinatura na web, por cartão e Pix). Receberá os dados que você informar na página de pagamento dele (como nome, CPF, e-mail e os dados do cartão ou do Pix) e um identificador da sua conta da Clarevo, para ligar o pagamento à conta certa, e informará à Clarevo só a situação da assinatura e o identificador dela. A Clarevo não recebe o CPF nem os dados do cartão. [A DEFINIR: país do tratamento e contrato com o Asaas]
 - **Serviço de gestão das assinaturas das lojas** (para juntar num lugar só as assinaturas da App Store e do Google Play). Se for usado, receberá um identificador da sua conta da Clarevo e a situação da assinatura, sem dados de pagamento nem o que você anota. [A DEFINIR: o serviço, o país e o contrato]
 
 - **Sentry** (relatório de falhas do app). Se for ligado, receberá só o erro técnico, sem valores, descrições, e-mails ou dados financeiros, com coleta de IP desligada. Esta política será atualizada antes.
