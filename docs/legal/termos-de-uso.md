@@ -54,7 +54,7 @@ Cada conta é de uma pessoa. Para dividir as contas da casa, use a Família (se�
 - Quem deixa a Família, por escolha ou por remoção, perde o acesso na hora. O que a pessoa anotou continua na Família, como histórico da casa, com o primeiro nome e a marca "ex-membro".
 - Quem exclui a conta deixa o que anotou na Família com a autoria "Pessoa que saiu", sem nome e sem e-mail.
 - Quem é Titular só sai depois de passar a titularidade a outra pessoa ou de encerrar a Família. Quem é Titular com outras pessoas na Família precisa passar a titularidade ou remover as pessoas antes de excluir a conta.
-- Ao encerrar a Família, os dados dela ficam guardados, sem leitura por ninguém. [A DEFINIR: prazo de guarda, P-010]
+- Ao encerrar a Família, os dados dela ficam guardados, sem leitura por ninguém, por 6 meses, e depois são apagados de vez.
 
 ## 6. Benefício pela empresa
 

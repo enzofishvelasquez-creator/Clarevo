@@ -49,6 +49,8 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
 
 12n. **Por último (aceite dos termos, A1)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261105000001_aceite.sql` (migração 0024) e clique em **Run**. Ela passa a guardar a versão dos termos e da política que cada pessoa aceitou e a data: no cadastro (a versão vai nos metadados e é gravada quando a pessoa entra pela primeira vez) e no app (`accept_legal_terms`, lida por `my_legal_acceptance`). Quem já tinha conta antes desta migração vê, uma vez, o aviso "Termos de uso e política de privacidade" no app e toca em "Concordo e continuar". Não apaga nenhum dado. Depois, rode `notify pgrst, 'reload schema';` e a conferência do passo 21l.
 
+12o. **Por último (apagar de vez o que foi excluído, A7)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261105000002_apagar_excluidos.sql` (migração 0025) e clique em **Run**. Ela cria a rotina `clarevo_purge_deleted`, que apaga de vez o que foi marcado como excluído há mais de 6 meses e as Famílias encerradas há mais de 6 meses, como promete a política. Ninguém de fora executa a rotina: ela roda pelo agendamento do banco. Para agendar: (1) o Enzo liga, à mão, a extensão **pg_cron** no painel (Database, Extensions, procurar "pg_cron", ligar); (2) numa nova consulta, rode `select cron.schedule('clarevo-apagar-excluidos', '23 6 * * *', $$select public.clarevo_purge_deleted()$$);` (todo dia às 6h23 UTC, 3h23 em Brasília). Depois, rode a conferência do passo 21m. A migração não apaga nada sozinha; a primeira limpeza acontece no horário agendado.
+
 13. A ordem importa: cada arquivo altera tabelas e funções criadas pelos anteriores (a 0006 vem depois da 0005, a 0007 depois da 0006, a 0008 depois da 0007, a 0009 depois da 0008, a 0010 depois da 0009, a 0011 depois da 0010, a 0012 depois da 0011, a 0013 depois da 0012, a 0014 depois da 0013, a 0015 depois da 0014, a 0016 depois da 0015, a 0017 depois da 0016, a 0018 depois da 0017 e a 0019 depois da 0018 a 0020 depois da 0019 e a 0021 depois da 0020). Cada arquivo roda uma única vez; se o projeto já tinha os primeiros, rode só os que faltam, na ordem dos nomes.
 14. Todos devem terminar sem erro. Se aparecer erro, me envie a mensagem.
 15. Para conferir as migrações novas, rode numa nova consulta:
@@ -536,6 +538,21 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
    ```
 
    O resultado esperado é `tabela_com_rls_0024 = 1`, `gatilho_0024 = 1`, `versao_vigente_0024 = 1`, `do_app_0024 = 2`, `internas_abertas_0024 = 0` e `funcoes_do_app = 94` (eram 92 depois da 0023). Testada em 05/11/2026 num banco local descartável (apagado depois), montado com `supabase/tests/00_auth_shim.sql` e as vinte e quatro migrações: devolveu 1, 1, 1, 2, 0 e 94.
+
+
+21m. Para conferir a 0025 e o agendamento (A7), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = 'clarevo_purge_deleted'
+              and not has_function_privilege('authenticated', p.oid, 'execute') and not has_function_privilege('anon', p.oid, 'execute')
+              and not has_function_privilege('service_role', p.oid, 'execute')) as rotina_fechada_0025,
+          (select count(*) from cron.job where jobname = 'clarevo-apagar-excluidos' and schedule = '23 6 * * *') as agendada_0025,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `rotina_fechada_0025 = 1`, `agendada_0025 = 1` e `funcoes_do_app = 94` (a 0025 não cria função para o app). Se a consulta disser que `cron.job` não existe, a extensão pg_cron ainda não foi ligada. Testada em 05/11/2026 num banco local descartável, sem a parte do agendamento (que só existe no Supabase).
 
 22. Se o app mostrar erro ao abrir as contas a pagar, os gastos fixos, as contas do ano, as metas, os cartões, a renda comprometida, o orçamento, as contas de origem, as assinaturas, a importação de extrato, a Família, o painel da empresa, a exclusão da conta, a Evolução, a conferência de um mês ou o Resumo logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`. Faça isso depois de colar a 0016, antes de abrir o app (a 0016 recria `months_overview`, e a API precisa ler a função nova), e de novo depois de colar a 0018 (função nova, `set_signup_source`). A 0019 não cria função nem tabela: não precisa. A 0020, a 0021, a 0022, a 0023 e a 0024 criam funções novas (WhatsApp, imagem das metas, Telegram, assinatura e aceite dos termos): rode depois de colar cada uma.
 23. O consultor de segurança do Supabase (**Advisors**) pode apontar a visão `series_items` como visão com os privilégios de quem a criou (a migração de contas do ano a recria com as mesmas opções). É intencional: ela precisa ler as contas excluídas só em um mês, filtra a permissão de leitura de forma explícita e usa `security_barrier` (ver `docs/01_ARQUITETURA.md`). O mesmo vale para as outras sete visões e para o restante do que o verificador aponta: ver "Verificador do Supabase: o que é esperado", logo antes de "Custos".
