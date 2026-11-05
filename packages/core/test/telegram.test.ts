@@ -151,6 +151,10 @@ describe('Telegram: resposta a cada mensagem', () => {
     );
     expect(await ask({ result: 'ja_ligado' }, '/start ABCD2345')).toBe(TELEGRAM_REPLY.ja_ligado);
     expect(await ask({ result: 'desligado' }, '/desligar')).toBe(TELEGRAM_REPLY.desligado);
+    // Assinatura paga (D-083): depois do teste grátis, sem assinatura, a conta fica só para ver e exportar.
+    expect(await ask({ result: 'sem_assinatura' })).toBe(
+      'A sua conta da Clarevo está só para ver e exportar: o teste grátis acabou ou a assinatura não está ativa. Para voltar a anotar, abra Conta no app e toque em Assinatura.',
+    );
     expect(await ask({ result: 'sem_permissao', space })).toBe('Você não anota mais no espaço Pessoal. No app, abra Conta, toque em Telegram e ligue de novo, escolhendo o espaço.');
     expect(await ask({ result: 'repetida' })).toBeNull();
     expect(await ask({ result: 'silencio' })).toBeNull();

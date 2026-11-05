@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View, type ScrollView } from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, ReduceMotion } from 'react-native-reanimated';
 
+import { AccessBanner } from '@/components/access-parts';
 import { Meter, useMoneyMask } from '@/components/committed-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
@@ -154,6 +155,8 @@ export default function ResumoScreen() {
             <Button label="Anotar gasto" icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
           ) : null}
           <FlashBanner message={notice} />
+          {/* Assinatura (D-083): nos últimos dias do teste grátis e em só ver e exportar, o aviso com o atalho para os planos. */}
+          <AccessBanner />
           {band.status === 'visivel' ? <ReturnBand band={band} onMovedOn={(text) => setNotice(text)} /> : null}
           {band.status === 'oculta' ? <PrimeirosPassos contextId={contextId} onState={setStepsState} /> : null}
           {band.status === 'oculta' ? (

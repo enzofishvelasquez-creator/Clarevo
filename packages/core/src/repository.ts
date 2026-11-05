@@ -43,6 +43,7 @@ import type {
   SeriesEditInput,
   SeriesInput,
 } from './records';
+import type { Access } from './plano';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
@@ -840,6 +841,11 @@ export interface RecordsRepository {
   acceptLicense(key: string, code: string): Promise<Benefit>;
   /** O benefício que a própria pessoa recebe (my_benefit): a licença ativa, ou a encerrada mais recente; null se nunca teve. */
   getMyBenefit(): Promise<Benefit | null>;
+
+  // Assinatura paga (D-083, migração 0023). O banco decide e trava a escrita (assinatura_necessaria); o app só lê, para as telas.
+
+  /** my_access: a situação do acesso da própria pessoa (assinatura, benefício, cortesia, Família, antes do início, teste ou só leitura). */
+  getMyAccess(): Promise<Access>;
 }
 
 export type RepoErrorCode =
@@ -849,6 +855,7 @@ export type RepoErrorCode =
   | 'sem_permissao'
   | 'nao_autenticado'
   | 'email_nao_confirmado'
+  | 'assinatura_necessaria'
   | 'rede'
   | 'descricao_obrigatoria'
   | 'descricao_longa'

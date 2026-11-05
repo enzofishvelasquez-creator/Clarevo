@@ -127,8 +127,12 @@ import {
   type GoalImage,
   type GoalImageChoice,
   isGoalImageKey,
+  parseAccess,
+  type Access,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+import { accessRefused } from '@/lib/access-refused';
 
 // ---------------------------------------------------------------------------
 // Repositório: leitura filtrada pelo banco (RLS), escrita só por funções com idempotência e versão.
@@ -566,6 +570,8 @@ const GOAL_MOVEMENT_ACTIONS: readonly GoalAction[] = ['registrar_movimento_meta'
 
 const KNOWN: RepoErrorCode[] = [
   'versao_desatualizada',
+  // Assinatura paga (D-083): o gatilho de record_operations recusa a escrita em só leitura. Avisa a tela de acesso (accessRefused).
+  'assinatura_necessaria',
   'chave_reutilizada',
   'nao_encontrado',
   'sem_permissao',
@@ -726,6 +732,7 @@ function repoError(e: { message?: string; code?: string; details?: string | null
   const msg = e?.message ?? '';
   // O mais longo vence: 'modo_de_valor_invalido' termina com 'valor_invalido'.
   const known = KNOWN.filter((k) => msg === k || msg.endsWith(k)).sort((a, b) => b.length - a.length)[0];
+  if (known === 'assinatura_necessaria') accessRefused.notify();
   if (known) return new RepoError(known, undefined, safeDetail(known, e?.details));
   const broken = INCONSISTENCY_CODES.find((k) => msg === k || msg.endsWith(k));
   if (broken) return new RepoError('desconhecido', broken);
@@ -3108,6 +3115,13 @@ export class SupabaseRepository implements RecordsRepository {
     const { data, error } = await this.db.rpc('accept_license', { p_code: normalized, p_key: key });
     if (error) throw repoError(error);
     return toBenefit(data as Record<string, unknown> | null);
+  }
+
+  /** A situação do acesso da própria pessoa (my_access, D-083). */
+  async getMyAccess(): Promise<Access> {
+    const { data, error } = await this.db.rpc('my_access');
+    if (error) throw repoError(error);
+    return parseAccess(data);
   }
 
   /** O benefício da própria pessoa (visão my_benefit): a licença ativa, ou a encerrada mais recente; null se nunca teve. */

@@ -1,5 +1,4 @@
 import {
-  BENEFIT_TEXT,
   COMPANY_TEXT,
   DELETE_TEXT,
   EXPORT_TEXT,
@@ -35,6 +34,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
+import { AccessCard } from '@/components/access-parts';
 import { AccountsCard } from '@/components/accounts-card';
 import { BenefitCard } from '@/components/benefit-card';
 import { PrivacyCard, RemindersCard, WidgetCard } from '@/components/device-settings';
@@ -46,11 +46,11 @@ import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
 import { SITE_URL, openSitePage, openSupportEmail } from '@/lib/site';
-import { useCompanies, useMyBenefit } from '@/state/company';
+import { useCompanies } from '@/state/company';
 import { useWork } from '@/state/data';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
-import { colors, fonts, space } from '@/theme/tokens';
+import { colors, space } from '@/theme/tokens';
 
 type Msg = { tone: 'erro' | 'sucesso' | 'info'; text: string } | null;
 
@@ -72,7 +72,6 @@ export default function ContaScreen() {
   const personal = useWork().data;
   const family = useFamily();
   const companies = useCompanies();
-  const benefit = useMyBenefit();
   // Avisos das telas de contas ("Conta adicionada.", "Conta salva."): lidos uma única vez, quando esta tela abre.
   const [notice] = useFlash();
   const [securityMsg, setSecurityMsg] = useState<Msg>(null);
@@ -260,23 +259,8 @@ export default function ContaScreen() {
         {/* Benefício pela empresa (D-056): o que a empresa oferece, ou onde colar o link do convite. */}
         <BenefitCard />
 
-        <Card style={{ gap: space[2] }}>
-          <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            Acesso ao plano
-          </Txt>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3] }}>
-            <Txt variant="label" color={colors.textSecondary}>
-              Situação
-            </Txt>
-            <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-              {benefit.data?.status === 'ativa' ? BENEFIT_TEXT.planCardSituation : 'Plano pessoal'}
-            </Txt>
-          </View>
-          <Txt variant="caption" color={colors.textSecondary}>
-            Quando uma empresa oferecer a Clarevo como benefício, a validade e a cobertura aparecem aqui. A empresa administra seu acesso ao
-            plano. Seus registros financeiros têm permissões próprias.
-          </Txt>
-        </Card>
+        {/* Assinatura (D-083): a situação do acesso (teste, só ver e exportar, plano, benefício ou Família) e a tela com os planos. */}
+        <AccessCard />
 
         {/* "Como você conheceu o Clarevo?" (D-067): opcional, só em conta real; a pessoa vê e muda a resposta. */}
         <SignupSourceAccountCard />

@@ -37,9 +37,10 @@ O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que 
 | 1.3 | Inscrição na Apple como organização, assim que o D-U-N-S sair (seção 4) | Enzo | |
 | 1.4 | Conta de organização no Google Play Console (seção 4) | Enzo | |
 | 1.5 | Conta no Expo (gratuita), para os builds | Enzo | |
-| 1.6 | Mandar ao advogado: `docs/legal/resumo-para-advogado.md` (perguntas 41 a 45), a política e os termos; pedir resposta até 17/11 | Enzo | |
+| 1.6 | Mandar ao advogado: `docs/legal/resumo-para-advogado.md` (perguntas 41 a 46), `docs/legal/pendencias-do-lancamento.md` (grupo B), a política e os termos; pedir resposta até 17/11 | Enzo | |
 | 1.7 | Supabase: plano Pro (cópias de segurança), proteção contra senhas vazadas; apagar o projeto antigo e a chave antiga do Resend | Enzo | |
 | 1.8 | Aprovar as 13 decisões das lojas (seção 3) | Enzo | Aprovadas em 03/11/2026 |
+| 1.8b | Aprovar as 16 decisões de produto dos textos legais (`docs/legal/pendencias-do-lancamento.md`, grupo A) | Enzo | |
 | 1.9 | Telegram: aviso "Baixar o Telegram", PR e função publicada de novo | Equipe e Claude Chrome | Código pronto e roteiro de telas 9.091 de 9.091 (03/11/2026); falta o PR e publicar a função |
 | 1.10 | Aplicar as decisões aprovadas em `app.json` e atualizar `docs/16` e `docs/lojas/` | Equipe | Feito em 03/11/2026 (falta a razão social, que vem do Enzo) |
 
@@ -97,3 +98,56 @@ O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que 
 4. **Google:** em https://play.google.com/console, criar a conta como **organização**, com o D-U-N-S, os dados do CNPJ e o e-mail do domínio; pagar os US$ 25 e fazer a verificação pedida.
 5. **Expo:** em https://expo.dev, criar a conta com o e-mail do domínio (gratuita).
 6. Mandar à equipe só o estado de cada um (por exemplo "Apple: em análise"), sem senhas, códigos nem números de cartão.
+
+## 5. Primeiro build, sem terminal (semana 2)
+
+O Expo monta o app das lojas a partir do repositório no GitHub, pelo site expo.dev, com o botão "Build from GitHub" (o Enzo não precisa instalar nada no computador). Ordem:
+
+1. **Enzo, em expo.dev:** criar a conta com o e-mail do domínio e um projeto com o nome `clarevo`. Mandar à equipe o **usuário (owner)** e o **Project ID** da página do projeto (não são segredos).
+2. **Equipe:** pôr `owner` e `extra.eas.projectId` em `apps/app/app.json`, PR e merge.
+3. **Enzo, em expo.dev, no projeto:** instalar o app do Expo no GitHub e ligar o repositório `Clarevo`, com a pasta base `apps/app` (configuração "Base directory" da página GitHub do projeto). Em Environment variables, criar `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_KEY` (a chave pública do app, a mesma da web) nos ambientes `preview` e `production`, com visibilidade "plain text". Nenhuma senha nem chave secreta vai para o Expo.
+4. **Enzo:** na lista de builds do projeto, "Build from GitHub": ramo `main`, plataforma Android, perfil `preview`. Se o Expo pedir a chave de assinatura do Android, deixar o Expo gerar uma nova e guardar com ele (a conferir na tela; é a chave que assina o app para sempre, nunca vai ao repositório).
+5. **Enzo:** instalar o APK pelo link que o Expo mostra no fim, no próprio celular Android, e fazer o teste da semana 2 (item 2.2).
+6. **iPhone:** só depois de a Apple aprovar a conta; as credenciais do iPhone pedem um passo a mais, que a equipe manda na hora.
+
+Fontes: [Expo, builds a partir do GitHub](https://docs.expo.dev/build/building-from-github), [tutorial do Expo](https://docs.expo.dev/tutorial/eas/using-github) (consultadas em 03/11/2026; as telas do expo.dev podem ter nomes um pouco diferentes).
+
+## 6. Teste no celular (semana 2, item 2.2)
+
+Com o app instalado pelo link do Expo (Android) ou pelo TestFlight (iPhone). Para cada item, anotar "ok" ou mandar um print do que deu errado. Dados de verdade só os seus; para testar outra pessoa, usar um e-mail de teste.
+
+| # | O que fazer | O esperado |
+|---|---|---|
+| 1 | Abrir o app e entrar com a sua conta | Entra no Resumo com os seus dados, igual à web |
+| 2 | Conta > ligar a biometria; fechar o app e abrir de novo | Pede a digital ou o rosto antes de mostrar os dados |
+| 3 | Conta > Ocultar valores | Os valores viram pontinhos em todas as telas |
+| 4 | Contas a pagar > nova conta vencendo amanhã, com lembrete; permitir as notificações | A notificação chega no horário (pode atrasar alguns minutos no Android) |
+| 5 | Anotar gasto > Escanear nota fiscal > apontar para o QR Code de um cupom | Preenche valor, data e descrição |
+| 6 | Escanear nota fiscal > foto da chave de uma nota (os 44 números) | Lê a chave e preenche |
+| 7 | Ler comprovante > escolher um print de Pix da galeria | Preenche valor, data e o nome de quem recebeu |
+| 8 | Contas a pagar > Ler boleto > foto de um boleto | Cria a conta a pagar com valor e vencimento |
+| 9 | Registrar recebimento > Ler comprovante > PDF do holerite e, depois, de uma nota de serviço | Preenche o valor líquido e a descrição |
+| 10 | Importar extrato > um PDF ou OFX do banco | Mostra as linhas para conferir antes de gravar |
+| 11 | Exportar meus dados > CSV e PDF > compartilhar | Abre a folha de compartilhar do celular |
+| 12 | Aumentar a letra nas configurações do celular e abrir Resumo, Movimentos e Conta | Nada cortado nem sobreposto |
+| 13 | Ligar o leitor de tela (TalkBack no Android, VoiceOver no iPhone) e passar pelo Resumo | Lê os números e os botões com nomes claros |
+| 14 | Criar uma conta nova com outro e-mail seu e tocar no link de confirmação no celular | O link abre o app (ou a web) e a conta fica confirmada |
+| 15 | Conta > Telegram > Gerar código > Abrir o Telegram | Abre o Telegram com o @ClarevoBot; Iniciar liga a conta |
+| 16 | Modo avião e abrir o app | Mensagem clara de sem conexão, sem tela em branco |
+| 17 | Girar o celular, voltar com o botão do sistema, trocar de app e voltar | Nada se perde no meio de um cadastro |
+
+## 7. Assinatura paga (D-083)
+
+R$ 29,90 por mês, 14 dias grátis sem cartão, depois só ver e exportar; pelas lojas no celular e por cartão e Pix na web; o benefício pela empresa continua sem pagar; plano Família de R$ 69,90 por mês, até 6 pessoas, pago pela titular. Isso entra no lançamento e é o maior pedaço que falta.
+
+| # | O quê | Quem |
+|---|---|---|
+| 7.1 | Valor do plano Família (R$ 69,90, decidido em 04/11/2026) e se haverá plano anual | Enzo |
+| 7.2 | Banco: o direito de uso de cada pessoa (teste, assinatura, benefício), a regra "só ver e exportar" nas funções de escrita e o registro de cada mudança; testes | Equipe. **Fase 1 pronta em 04/11/2026** (migração 0023, `supabase/tests/99zz_assinatura.sql`): ainda não aplicada em produção; a cobrança só começa quando a equipe marcar a data (`clarevo_staff_set_billing_start`) |
+| 7.3 | App: tela de assinar, contagem dos dias do teste, aviso antes do fim, modo "só ver e exportar" e "Restaurar compras" | Equipe. **Fase 1 pronta em 04/11/2026:** card e tela Assinatura em Conta (situação, datas, planos e preços), aviso no Resumo nos últimos 3 dias e em só leitura, botões de anotar escondidos em só leitura, Telegram responde que a conta está só para ver. **Fase 2** (depende de 7.4 e 7.5): botão de assinar, compra nas lojas, "Restaurar compras", página de assinatura na web e o retorno de cada pagamento ao banco (`billing_apply`); excluir a conta cancela a assinatura da web |
+| 7.4 | Lojas: assinaturas no App Store Connect e no Play Console (mesmo produto, R$ 29,90), contrato de apps pagos da Apple com conta bancária e dados fiscais da empresa, perfil de pagamentos do Google | Enzo, com roteiro |
+| 7.5 | Web: escolher e abrir a conta do serviço de pagamento (cartão e Pix Automático), com o CNPJ; a equipe liga o retorno do pagamento ao banco | Enzo abre a conta; equipe integra |
+| 7.6 | Termos (preço, renovação, cancelamento, arrependimento) e política (serviços de pagamento) para o advogado | Equipe redige; advogado confere. **Redigidos em 04/11/2026:** termos, seção 12; política, seção 3.12 e trechos das seções 6, 8 e 11; exclusão de conta; pergunta 47 do resumo para o advogado |
+| 7.7 | Contador: nota fiscal das vendas da web e dos repasses das lojas, e o que a Inova Simples permite vender (pergunta 46) | Enzo |
+
+**Prazo:** a assinatura acrescenta cerca de duas semanas de trabalho da equipe e as contas de pagamento do Enzo. Com a decisão "tudo junto", 30/11 continua sendo a meta, mas o mais provável passa a ser a primeira quinzena de dezembro.

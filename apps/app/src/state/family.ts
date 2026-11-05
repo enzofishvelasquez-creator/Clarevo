@@ -67,10 +67,13 @@ function useReloadAll() {
   return () => qc.invalidateQueries();
 }
 
-/** Convidar, cancelar, remover, mudar papel e passar a titularidade só mudam a Família. */
+/**
+ * Convidar, cancelar, remover, mudar papel e passar a titularidade só mudam a Família e, com a titularidade, quem o Plano Família
+ * cobre (assinatura, D-083).
+ */
 function useReloadFamily() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ['family'] });
+  return () => Promise.all([qc.invalidateQueries({ queryKey: ['family'] }), qc.invalidateQueries({ queryKey: ['access'] })]);
 }
 
 export function useCreateFamily() {

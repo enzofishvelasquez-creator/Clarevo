@@ -106,9 +106,9 @@ De um lado, **[RAZÃO SOCIAL]**, CNPJ [CNPJ], com sede em [ENDEREÇO], neste con
 
 ## Cláusula 11. Fim do contrato e de uma licença
 
-11.1. Ao fim do contrato, por qualquer motivo, as licenças ativas mantêm o acesso pleno por mais 30 dias. Depois, a pessoa passa ao plano gratuito da Clarevo, com leitura do histórico. Nenhuma conta, registro, vínculo ou Família é apagado por causa do fim do contrato, e a pessoa pode continuar usando a Clarevo por conta própria. [A DEFINIR: o que o plano gratuito inclui, P-005.]
+11.1. Ao fim do contrato, por qualquer motivo, as licenças ativas mantêm o acesso pleno por mais 30 dias. Depois, vale o acesso da própria pessoa: com assinatura própria, tudo continua; sem assinatura, a conta fica só para ver e exportar, com o histórico guardado (Termos de Uso, seção 12). Nenhuma conta, registro, vínculo ou Família é apagado por causa do fim do contrato, e a pessoa pode continuar usando a Clarevo por conta própria.
 
-11.2. A EMPRESA pode encerrar a licença de uma pessoa, por exemplo quando ela deixa a EMPRESA. A licença encerrada mantém o acesso pleno por 30 dias e depois passa ao plano gratuito. A vaga fica livre na hora para um novo convite.
+11.2. A EMPRESA pode encerrar a licença de uma pessoa, por exemplo quando ela deixa a EMPRESA. A licença encerrada mantém o acesso pleno por 30 dias; depois, vale o acesso da própria pessoa. A vaga fica livre na hora para um novo convite.
 
 11.3. A pessoa pode excluir a própria conta a qualquer momento, e a licença termina na hora.
 

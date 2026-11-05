@@ -65,8 +65,8 @@ const TEMAS = [
   {
     id: 'conta',
     titulo: 'Conta e acesso',
-    descricao: 'Senha, lembretes, exportar os seus dados e excluir a conta.',
-    guias: ['lembretes', 'exportar', 'excluir-conta'],
+    descricao: 'Assinatura e teste grátis, senha, lembretes, exportar os seus dados e excluir a conta.',
+    guias: ['assinatura', 'lembretes', 'exportar', 'excluir-conta'],
     topicos: [],
   },
 ];

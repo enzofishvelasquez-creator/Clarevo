@@ -1,6 +1,7 @@
 import { MemoryCompanyHub } from './memory-company';
 import { MemoryRepository } from './memory-repository';
 import { newOperationKey } from './repository';
+import { demoTrialAccess } from './plano';
 
 /**
  * Dados FICTÍCIOS da conta de demonstração. Não representam nenhuma pessoa real
@@ -86,6 +87,8 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   if (opts.scenario === 'evolucao') return createEvolutionDemoRepository(opts.latencyMs);
   // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas'.
   let today: string = DEMO_TODAY;
+  // Assinatura (D-083): a demonstração aparece no teste grátis, como uma conta nova.
+  const trial = demoTrialAccess();
   const repo = new MemoryRepository({
     actorId: 'pessoa-demo',
     displayName: 'Maria Alves',
@@ -93,6 +96,7 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
     today: () => today,
     latencyMs: 0,
     company: createDemoCompanyHub(),
+    access: () => trial,
   });
   const space = await repo.ensurePersonalSpace('Conta principal');
   const ctx = space.personalContextId;

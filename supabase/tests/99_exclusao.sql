@@ -1087,7 +1087,7 @@ begin
     assert (select prosecdef from pg_proc where oid = ('public.' || f)::regprocedure), 'security definer: ' || f;
   end loop;
   assert (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 91, 'authenticated executa 91 funções (as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo, as 3 do WhatsApp, as 3 do Telegram e as 2 da imagem das metas)';
+           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 92, 'authenticated executa 92 funções (as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo, as 3 do WhatsApp, as 3 do Telegram, as 2 da imagem e a do acesso, my_access, das metas)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
 

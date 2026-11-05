@@ -64,7 +64,7 @@ Uma empresa pode oferecer a Clarevo como benefício às pessoas que trabalham ne
 - A empresa não escolhe quem aceita e não ativa a licença. Quem ativa é a pessoa, ao aceitar. Cada pessoa tem uma licença ativa por vez.
 - **O que a empresa vê:** os e-mails que ela convidou, a situação de cada licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens (vagas, convites, licenças ativas e encerradas).
 - **O que a empresa não vê:** valores, categorias, metas, contas, cartões, a Família de ninguém, nem números somados, e não vê quando ou como a pessoa usa o app.
-- **Quando o benefício acaba** (a empresa encerra a licença ou o contrato termina): a pessoa mantém a conta, o histórico e a Família, continua com acesso pleno por 30 dias e depois passa ao plano gratuito, com leitura do histórico. Nada é apagado. [A DEFINIR: o que o plano gratuito inclui e se haverá cobrança, P-005; hoje o app ainda não limita recursos por plano]
+- **Quando o benefício acaba** (a empresa encerra a licença ou o contrato termina): a pessoa mantém a conta, o histórico e a Família e continua com acesso pleno por 30 dias. Depois, vale o acesso dela: com assinatura própria ou no Plano Família de outra pessoa, tudo continua; sem assinatura, a conta fica só para ver e exportar (seção 12). Nada é apagado.
 - Se a pessoa excluir a conta, a licença termina na hora.
 
 ## 7. O que a pessoa se compromete a fazer?
@@ -107,9 +107,20 @@ Você pode excluir a sua conta quando quiser, no app, em Conta, no último item,
 
 A Clarevo pode encerrar uma conta em caso de descumprimento grave destes Termos, com aviso e chance de exportar os dados, salvo se a lei ou a segurança exigirem outro caminho. [A DEFINIR: procedimento e prazos]
 
-## 12. Preço
+## 12. Preço, pagamento e cancelamento
 
-Hoje a Clarevo não cobra de quem usa. [A DEFINIR: P-005, preços e planos; se houver cobrança, estes Termos ganharão uma seção sobre preço, forma de pagamento, direito de arrependimento e cancelamento]
+A Clarevo é paga por assinatura mensal. Os preços estão sempre na tela "Assinatura", em Conta, antes de assinar.
+
+- **Planos:** Individual, por R$ 29,90 por mês, para uma pessoa; Família, por R$ 69,90 por mês, para a pessoa titular e as pessoas da Família dela na Clarevo, até 6 pessoas no total. Os dois planos têm os mesmos recursos. [A DEFINIR: contador confirma se os preços já incluem os tributos e como fica a nota fiscal em cada forma de pagamento]
+- **Teste grátis:** toda conta começa com 14 dias grátis, sem pedir cartão. O app avisa antes de o teste acabar. Nada é cobrado sem você assinar.
+- **Depois do teste, sem assinatura:** a conta fica só para ver e exportar. Os seus dados continuam guardados: você vê tudo, exporta e pode excluir a conta, mas não anota nem muda nada até assinar. Sair de uma Família, aceitar um convite e desligar o Telegram continuam possíveis.
+- **Como pagar:** no app do iPhone, pela App Store; no app do Android, pelo Google Play; na web, por cartão de crédito ou Pix. A cobrança e os dados de pagamento ficam com a loja ou com o serviço de pagamento da web: a Clarevo não recebe nem guarda o número do cartão. [A DEFINIR: o serviço de pagamento da web, a ser escolhido antes do lançamento]
+- **Renovação:** a assinatura renova sozinha a cada mês, pelo mesmo preço, até você cancelar. Se o preço mudar, avisamos com pelo menos 30 dias de antecedência, e você pode cancelar antes da renovação com o preço novo.
+- **Cancelamento:** cancele quando quiser, sem multa, no mesmo lugar onde assinou (nas assinaturas da App Store ou do Google Play, no próprio aparelho, ou na página de assinatura na web). O acesso continua até o fim do mês já pago; depois, a conta fica só para ver e exportar.
+- **Direito de arrependimento:** quem assina pela internet pode desistir em até 7 dias da contratação e receber de volta o valor pago, como prevê o Código de Defesa do Consumidor (art. 49). Na web, peça pelo suporte. Nas compras pela App Store ou pelo Google Play, o reembolso é pedido à loja; se ela não atender, escreva para o suporte. [A DEFINIR: advogado confirma como o arrependimento funciona nas compras pelas lojas e se a Clarevo devolve diretamente quando a loja recusa]
+- **Plano Família:** quem paga é a pessoa titular. Quem sai da Família, é removido ou fica numa Família encerrada volta ao próprio acesso. Se a assinatura da titular acabar, as pessoas da Família também voltam ao próprio acesso.
+- **Benefício pela empresa:** quem usa a Clarevo pela empresa não paga enquanto o benefício valer (seção 6). Quem tem assinatura própria e passa a ter o benefício pode cancelar a assinatura no mesmo lugar onde assinou.
+- **Excluir a conta:** excluir a conta cancela a assinatura feita na web, mas não a feita na App Store ou no Google Play. Nesse caso, cancele também na loja, para não ser cobrado de novo.
 
 ## 13. Comunicações
 

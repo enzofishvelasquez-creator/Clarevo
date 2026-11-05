@@ -2406,9 +2406,9 @@ describe('textos do guia, da ajuda no lugar, do tour e do manual (D-049)', () =>
 
   it('dinheiro e privacidade: o guia não traz o valor de ninguém nem dado pessoal, só os limites do próprio app', () => {
     const all = GUIDE_ENTRIES.flatMap((e) => [e.purpose, ...e.steps]).join(' ');
-    // Os únicos valores em reais citados são os limites do app e o formato de exemplo dos valores ocultos.
+    // Os únicos valores em reais citados são os limites do app, o formato de exemplo dos valores ocultos e os preços dos planos (D-083).
     const amounts = [...all.matchAll(/R\$ ?(?:\d{1,3}(?:\.\d{3})*,\d{2}|•+)/g)].map((m) => m[0]);
-    expect([...new Set(amounts)].sort()).toEqual(['R$ 100,00', 'R$ ••••'].sort());
+    expect([...new Set(amounts)].sort()).toEqual(['R$ 100,00', 'R$ ••••', 'R$ 29,90', 'R$ 69,90'].sort());
     expect(all).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/);
     expect(all).not.toMatch(/@[a-z0-9-]+\.[a-z]/i);
   });

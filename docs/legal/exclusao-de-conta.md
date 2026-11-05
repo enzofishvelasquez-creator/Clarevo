@@ -11,6 +11,7 @@ Esta página explica como excluir a conta e os dados da Clarevo, aplicativo ofer
 - A exclusão é imediata e não pode ser desfeita. Você perde o acesso na hora.
 - Se quiser guardar uma cópia, exporte os seus dados antes: em Conta, "Exportar meus dados". A exportação leva os seus gastos e recebimentos do Pessoal, em planilha ou PDF, e as compras no cartão à parte. Ela não inclui tudo o que a Clarevo guarda, como metas e contas a pagar em aberto.
 - Se você é Titular de uma Família com outras pessoas, passe a titularidade ou remova as pessoas antes (veja "E a sua Família?").
+- Se você assinou pela App Store ou pelo Google Play, cancele a assinatura na loja: excluir a conta não cancela a cobrança da loja. A assinatura feita na web é cancelada junto com a conta. Se você é titular de um Plano Família, as outras pessoas da Família deixam de ser cobertas por ele.
 
 ## Como excluir pelo app
 

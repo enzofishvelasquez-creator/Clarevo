@@ -285,7 +285,7 @@ describe('catálogo do guia (D-049)', () => {
     expect(beneficio.routes).toEqual(['/beneficio/[codigo]']);
     expect(guideWhere(beneficio.where)).toBe('Conta › Benefício pela empresa');
     const passosBeneficio = beneficio.steps.join(' ');
-    for (const name of ['"Entrar"', '"Criar conta"', '"Aceitar benefício"', '"Tenho um convite da empresa"', '"Ver convite"', '"Acesso ao plano"', '"Quem vê estes dados?"']) {
+    for (const name of ['"Entrar"', '"Criar conta"', '"Aceitar benefício"', '"Tenho um convite da empresa"', '"Ver convite"', '"Assinatura"', '"Quem vê estes dados?"']) {
       expect(passosBeneficio, name).toContain(name);
     }
     for (const query of ['empresa', 'rh', 'licença']) expect(searchGuide(query).map((e) => e.id), query).toContain('painel-da-empresa');

@@ -18,7 +18,8 @@ import { ERROR_TEXT } from './validation';
  *   pode controlar contas próprias, então um número de acessos permitiria identificar quem entrou.
  * - M-2: o convite é um link da empresa, enviado pelo canal interno do RH (sem custo de envio pelo Clarevo).
  * - M-3: a equipe Clarevo cadastra a empresa, o contrato e a primeira pessoa administradora, pelo SQL Editor do Supabase.
- * - M-4: ao encerrar a licença, 30 dias de acesso pleno e depois o plano gratuito, com leitura do histórico. Nada é apagado.
+ * - M-4: ao encerrar a licença, 30 dias de acesso pleno e depois o acesso da própria pessoa (assinatura paga, D-083: sem assinatura, só
+ *   ver e exportar). Nada é apagado.
  * - M-6: uma vaga por pessoa que recebe o benefício.
  *
  * O painel só existe na web. A pessoa que recebe o convite abre o link no navegador ou no app.
@@ -604,7 +605,7 @@ export const COMPANY_TEXT = {
   endA11y: (email: string): string => `Encerrar a licença de ${email}`,
   endTitle: 'Encerrar a licença?',
   endBody:
-    'A pessoa continua com a conta, o histórico e a Família dela: nada é apagado. O acesso pleno segue por 30 dias e depois ela passa para o plano gratuito, com leitura do histórico. Para voltar a ter o benefício, será preciso convidar de novo.',
+    'A pessoa continua com a conta, o histórico e a Família dela: nada é apagado. O acesso pleno segue por 30 dias; depois, vale o acesso da própria pessoa. Para voltar a ter o benefício, será preciso convidar de novo.',
   endConfirm: 'Encerrar licença',
   ended: 'Licença encerrada.',
   keep: 'Voltar',
@@ -723,7 +724,7 @@ export const BENEFIT_TEXT = {
   active: 'Benefício ativo',
   endedLine: (day: IsoDate): string => `Benefício encerrado em ${formatDateBR(day)}`,
   fullAccessUntil: (day: IsoDate): string => `Acesso pleno até ${formatDateBR(day)}`,
-  freePlan: (day: IsoDate): string => `O acesso pleno terminou em ${formatDateBR(day)}. Você está no plano gratuito, com leitura do histórico.`,
+  freePlan: (day: IsoDate): string => `O acesso pleno terminou em ${formatDateBR(day)}. Agora vale o seu próprio acesso, que aparece no card Assinatura.`,
   contractUntil: (day: IsoDate): string => `O benefício vale até ${formatDateBR(day)}.`,
   keepsData: 'Sua conta, seu histórico e a sua Família continuam com você.',
   planCardSituation: 'Benefício pela empresa',

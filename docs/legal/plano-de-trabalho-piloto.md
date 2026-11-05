@@ -70,7 +70,7 @@ Não há repasse de recursos entre as partes. Cada parte arca com os próprios c
 ## 9. Vigência e encerramento
 
 - Vigência de [PROPOSTA: 90 dias] a partir da data de início, prorrogável por acordo das partes.
-- Ao fim do piloto, as licenças ativas mantêm o acesso pleno por mais 30 dias e depois passam ao plano gratuito da Clarevo, com leitura do histórico. Nada é apagado por causa do fim do piloto, e a pessoa pode continuar usando a Clarevo por conta própria.
+- Ao fim do piloto, as licenças ativas mantêm o acesso pleno por mais 30 dias e depois vale o acesso da própria pessoa: com assinatura própria, tudo continua; sem assinatura, a conta fica só para ver e exportar, com o histórico guardado. Nada é apagado por causa do fim do piloto, e a pessoa pode continuar usando a Clarevo por conta própria.
 - A continuidade, se houver, depende de instrumento próprio do ÓRGÃO (por exemplo, contratação de menor valor ou Contrato Público para Solução Inovadora).
 
 ## 10. Contatos
