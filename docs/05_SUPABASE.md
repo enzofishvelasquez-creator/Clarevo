@@ -537,7 +537,7 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
             where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
    ```
 
-   O resultado esperado é `tabela_com_rls_0024 = 1`, `gatilho_0024 = 1`, `versao_vigente_0024 = 1`, `do_app_0024 = 2`, `internas_abertas_0024 = 0` e `funcoes_do_app = 94` (eram 92 depois da 0023). Testada em 05/11/2026 num banco local descartável (apagado depois), montado com `supabase/tests/00_auth_shim.sql` e as vinte e quatro migrações: devolveu 1, 1, 1, 2, 0 e 94.
+   O resultado esperado é `tabela_com_rls_0024 = 1`, `gatilho_0024 = 1`, `versao_vigente_0024 = 1`, `do_app_0024 = 2`, `internas_abertas_0024 = 0` e `funcoes_do_app = 94` (eram 92 depois da 0023). Testada em 05/11/2026 num banco local descartável (apagado depois), montado com `supabase/tests/00_auth_shim.sql` e as vinte e quatro migrações: devolveu 1, 1, 1, 2, 0 e 94. **Aplicada em produção (`clarevo-producao`) em 05/11/2026:** a conferência devolveu 1, 1, 1, 2, 0 e 94.
 
 
 21m. Para conferir a 0025 e o agendamento (A7), rode em outra consulta (só leitura):
@@ -552,7 +552,7 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
             where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
    ```
 
-   O resultado esperado é `rotina_fechada_0025 = 1`, `agendada_0025 = 1` e `funcoes_do_app = 94` (a 0025 não cria função para o app). Se a consulta disser que `cron.job` não existe, a extensão pg_cron ainda não foi ligada. Testada em 05/11/2026 num banco local descartável, sem a parte do agendamento (que só existe no Supabase).
+   O resultado esperado é `rotina_fechada_0025 = 1`, `agendada_0025 = 1` e `funcoes_do_app = 94` (a 0025 não cria função para o app). Se a consulta disser que `cron.job` não existe, a extensão pg_cron ainda não foi ligada. Testada em 05/11/2026 num banco local descartável, sem a parte do agendamento (que só existe no Supabase). **Aplicada em produção (`clarevo-producao`) em 05/11/2026**, com o pg_cron ligado à mão e o agendamento criado (identificador 1): a conferência devolveu 1, 1 e 94.
 
 22. Se o app mostrar erro ao abrir as contas a pagar, os gastos fixos, as contas do ano, as metas, os cartões, a renda comprometida, o orçamento, as contas de origem, as assinaturas, a importação de extrato, a Família, o painel da empresa, a exclusão da conta, a Evolução, a conferência de um mês ou o Resumo logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`. Faça isso depois de colar a 0016, antes de abrir o app (a 0016 recria `months_overview`, e a API precisa ler a função nova), e de novo depois de colar a 0018 (função nova, `set_signup_source`). A 0019 não cria função nem tabela: não precisa. A 0020, a 0021, a 0022, a 0023 e a 0024 criam funções novas (WhatsApp, imagem das metas, Telegram, assinatura e aceite dos termos): rode depois de colar cada uma.
 23. O consultor de segurança do Supabase (**Advisors**) pode apontar a visão `series_items` como visão com os privilégios de quem a criou (a migração de contas do ano a recria com as mesmas opções). É intencional: ela precisa ler as contas excluídas só em um mês, filtra a permissão de leitura de forma explícita e usa `security_barrier` (ver `docs/01_ARQUITETURA.md`). O mesmo vale para as outras sete visões e para o restante do que o verificador aponta: ver "Verificador do Supabase: o que é esperado", logo antes de "Custos".
