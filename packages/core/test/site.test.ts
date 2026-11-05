@@ -113,6 +113,8 @@ const PAGINAS_BASE = [
   'privacidade.html',
   'termos.html',
   'excluir-conta.html',
+  'versoes.html',
+  'licencas.html',
   '404.html',
 ];
 /** As dez calculadoras do app (D-066), na ordem do catálogo, e o índice delas. */
@@ -177,12 +179,14 @@ Texto final.
 `;
 const TERMOS = '# Termos de exemplo\n\n## 1. Quem pode usar\n\nPessoas com 18 anos ou mais.\n';
 const EXCLUSAO = '# Excluir conta de exemplo\n\n## Como excluir\n\nNo app, abra Conta.\n';
+const VERSOES = '# Versões de exemplo\n\n## Versão 1\n\nA primeira versão.\n';
 
 function pastaDeExemplo(): string {
   const dir = mkdtempSync(join(tmpdir(), 'clarevo-site-'));
   writeFileSync(join(dir, 'politica-de-privacidade.md'), EXEMPLO);
   writeFileSync(join(dir, 'termos-de-uso.md'), TERMOS.replace('## 1. Quem pode usar', '## Quem pode usar'));
   writeFileSync(join(dir, 'exclusao-de-conta.md'), EXCLUSAO);
+  writeFileSync(join(dir, 'versoes.md'), VERSOES);
   return dir;
 }
 
@@ -565,8 +569,18 @@ describe('site público: as páginas geradas', () => {
     expect(achados.filter((a) => a !== 'dados-da-empresa.json' && !gerado.arquivos.has(a))).toEqual([]);
   });
 
+  it('a lista de licenças (licencas.html) está em dia com o package-lock.json e tem a versão e a licença de cada pacote', () => {
+    const r = spawnSync(process.execPath, [join(ROOT, 'scripts', 'gerar-licencas.js'), '--conferir'], { encoding: 'utf8' });
+    expect(r.status, r.stderr).toBe(0);
+    const lista = JSON.parse(readFileSync(join(ROOT, 'site-src', 'licencas.json'), 'utf8')) as { nome: string; versao: string; licenca: string }[];
+    expect(lista.length).toBeGreaterThan(100);
+    for (const nome of ['react', 'react-native', 'expo', '@supabase/supabase-js']) expect(lista.some((i) => i.nome === nome), nome).toBe(true);
+    expect(lista.every((i) => i.versao && i.licenca)).toBe(true);
+    expect(html('licencas.html')).toContain('<td>react-native</td>');
+  });
+
   it('cada página legal vem do Markdown quando ele existe e, senão, sai como espaço reservado com [A DEFINIR]', () => {
-    const origem: Record<string, string> = { 'privacidade.html': 'politica-de-privacidade.md', 'termos.html': 'termos-de-uso.md', 'excluir-conta.html': 'exclusao-de-conta.md' };
+    const origem: Record<string, string> = { 'privacidade.html': 'politica-de-privacidade.md', 'termos.html': 'termos-de-uso.md', 'excluir-conta.html': 'exclusao-de-conta.md', 'versoes.html': 'versoes.md' };
     for (const [pagina, md] of Object.entries(origem)) {
       if (existsSync(join(ROOT, 'docs', 'legal', md))) {
         expect(html(pagina), pagina).not.toContain('texto desta página, que vem de docs/legal');

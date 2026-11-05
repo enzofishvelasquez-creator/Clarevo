@@ -1,5 +1,6 @@
 import type { IsoDate, IsoMonth } from './dates';
 import { FULL_ACCESS, type Access } from './plano';
+import { LEGAL_VERSION, type LegalAcceptance } from './aceite';
 import { addMonths, addYearsClamped, dateInMonth, isValidIsoDate, isValidIsoMonth, monthOf, monthsBetween } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS } from './money';
@@ -324,6 +325,11 @@ export interface MemoryRepositoryOptions {
    * só a leitura, para as telas.
    */
   access?: () => Access;
+  /**
+   * Aceite dos termos (A1): a versão que a pessoa já aceitou ao começar. Padrão: a vigente (LEGAL_VERSION), como uma conta criada pelo
+   * cadastro de hoje; `null` simula uma conta criada antes do registro do aceite.
+   */
+  legalAccepted?: number | null;
 }
 
 /**
@@ -4512,6 +4518,38 @@ export class MemoryRepository implements RecordsRepository {
 
   async getMyBenefit(): Promise<Benefit | null> {
     return this.read(() => this.company.myBenefit(this.opts.actorId));
+  }
+
+  /** Aceites dos termos (legal_acceptances), por versão. */
+  private legal: Map<number, string> | null = null;
+
+  private legalRows(): Map<number, string> {
+    if (!this.legal) {
+      this.legal = new Map();
+      const start = this.opts.legalAccepted === undefined ? LEGAL_VERSION : this.opts.legalAccepted;
+      if (start !== null) this.legal.set(start, `${this.opts.today()}T12:00:00.000Z`);
+    }
+    return this.legal;
+  }
+
+  private legalResult(): LegalAcceptance {
+    const rows = this.legalRows();
+    const version = rows.size ? Math.max(...rows.keys()) : null;
+    return { current: LEGAL_VERSION, version, acceptedAt: version === null ? null : rows.get(version)! };
+  }
+
+  async getLegalAcceptance(): Promise<LegalAcceptance> {
+    return this.read(() => this.legalResult());
+  }
+
+  async acceptLegalTerms(key: string, version: number): Promise<LegalAcceptance> {
+    return this.read(() => {
+      if (!key) throw new RepoError('chave_reutilizada');
+      if (version !== LEGAL_VERSION) throw new RepoError('versao_invalida');
+      const rows = this.legalRows();
+      if (!rows.has(version)) rows.set(version, new Date().toISOString());
+      return this.legalResult();
+    });
   }
 
   async getMyAccess(): Promise<Access> {

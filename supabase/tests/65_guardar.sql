@@ -468,7 +468,7 @@ end $$;
 
 -- ---------------------------------------------------------------------------
 -- 6. record_operations: responder_guardar não aponta para nada (o contexto já está em context_id), como decidir_revisao;
--- a lista vigente tem 73 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98); uma operação por escrita.
+-- a lista vigente tem 74 ações (com a do aceite dos termos, testada em 99zzz, 26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98); uma operação por escrita.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -507,14 +507,14 @@ begin
     end if;
   end;
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 73, 'a lista vigente tem 73 ações (26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
+           where c.conname = 'record_operations_action_check') = 74, 'a lista vigente tem 74 ações (com a do aceite dos termos, testada em 99zzz, 26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''responder_guardar''::text', 'g') m
            where c.conname = 'record_operations_action_check') = 1, 'responder_guardar na lista de ações';
   -- As 25 anteriores continuam aceitas pela restrição de ação (cada caso desfeito no próprio bloco).
   assert (select array_agg(m[1] order by m[1] collate "C")
             from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
            where c.conname = 'record_operations_action_check' and m[1] <> 'responder_guardar')
-    = array['aceitar_convite_familia', 'aceitar_licenca', 'alterar_cartao', 'alterar_conta', 'alterar_lancamento_cartao',
+    = array['aceitar_convite_familia', 'aceitar_licenca', 'aceitar_termos', 'alterar_cartao', 'alterar_conta', 'alterar_lancamento_cartao',
             'alterar_meta', 'alterar_movimento_meta', 'alterar_papel_familia', 'alterar_serie', 'cancelar_convite_familia',
             'cancelar_convite_licenca', 'conta_principal', 'convidar_licencas', 'criar', 'criar_cartao',
             'criar_compra_cartao', 'criar_compromisso', 'criar_conta', 'criar_convite_familia', 'criar_encargo_cartao',

@@ -9,6 +9,7 @@ import { createHmac, randomUUID } from 'node:crypto';
 
 import {
   BUDGET_CATEGORIES,
+  LEGAL_VERSION,
   DEFAULT_SEARCH,
   MemoryRepository,
   NO_CATEGORY_LABEL,
@@ -325,6 +326,17 @@ describe('API real: espaço pessoal, registros e permissões', () => {
     ctx = space.personalContextId;
     account = space.accounts[0]!.id;
     await bruno.ensurePersonalSpace('Conta do Bruno');
+  });
+
+  it('assinatura (D-083) e aceite dos termos (A1) pela API: acesso completo antes do início da cobrança; aceite só da versão vigente', async () => {
+    expect(await ana.getMyAccess()).toEqual({ status: 'pre_lancamento', plan: null, until: null, canWrite: true });
+    const before = await bruno.getLegalAcceptance();
+    expect(before).toEqual({ current: LEGAL_VERSION, version: null, acceptedAt: null });
+    expect(await err(bruno.acceptLegalTerms(newOperationKey(), LEGAL_VERSION + 1))).toBe('versao_invalida');
+    const after = await bruno.acceptLegalTerms(newOperationKey(), LEGAL_VERSION);
+    expect(after.version).toBe(LEGAL_VERSION);
+    expect(Number.isNaN(Date.parse(after.acceptedAt ?? ''))).toBe(false);
+    expect(await bruno.getLegalAcceptance()).toEqual(after);
   });
 
   it('e-mail não confirmado não cria espaço', async () => {

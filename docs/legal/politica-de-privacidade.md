@@ -13,7 +13,6 @@ Esta política explica, em linguagem simples, quais dados pessoais a Clarevo gua
 - Não guardamos número completo de cartão, código de segurança, validade, CPF de nota fiscal nem imagens de notas ou comprovantes.
 - Se a sua empresa oferecer a Clarevo como benefício, ela nunca vê as suas finanças, nem somadas às de outras pessoas.
 - Sem anúncios, sem venda de dados e sem rastreamento para publicidade.
-- Se você ligar o WhatsApp para anotar por mensagem, as mensagens passam pela Meta, dona do WhatsApp. A Clarevo não guarda o texto das mensagens nem o seu número.
 - Se você ligar o Telegram para anotar por mensagem, as mensagens passam pelo Telegram. A Clarevo não guarda o texto das mensagens, o seu nome nem o seu usuário no Telegram.
 - A assinatura é paga pela App Store, pelo Google Play ou pelo serviço de pagamento da web. A Clarevo não recebe nem guarda o número do seu cartão.
 - Você pode excluir a sua conta dentro do app.
@@ -27,14 +26,14 @@ Para a LGPD, a [RAZÃO SOCIAL] é a empresa controladora dos dados pessoais trat
 - Contato sobre privacidade e pedidos sobre seus dados: [E-MAIL DE PRIVACIDADE]
 - Suporte: [E-MAIL DE SUPORTE]
 - Endereço do serviço: [DOMÍNIO]
-- Encarregado pelo tratamento de dados: [A DEFINIR: nomear uma pessoa encarregada ou manter só o canal de comunicação, conforme a Resolução CD/ANPD nº 2/2022]. O canal de contato é o e-mail de privacidade acima.
+- Encarregado pelo tratamento de dados: a Clarevo mantém o canal de comunicação no e-mail de privacidade acima, sob a responsabilidade de [A DEFINIR: nome de quem responde pelo canal], como permite a Resolução CD/ANPD nº 2/2022 aos agentes de tratamento de pequeno porte. [A DEFINIR: o advogado confirma o enquadramento como agente de pequeno porte]
 
 ## 2. A quem esta política se aplica?
 
 - Ao app Clarevo para iPhone e Android.
 - À versão web da Clarevo, em [DOMÍNIO].
 - Ao painel das empresas, que existe só na web e é usado por quem administra o benefício.
-- Às páginas informativas do site em [DOMÍNIO], inclusive as calculadoras (a conta é feita no navegador, e nada do que você digita é enviado nem guardado), o formulário de contato para empresas e o cadastro das Novidades por e-mail (seções 3.6 e 3.7). [PROPOSTA: os dois formulários só valem depois de ligados; até lá, o site não tem formulário.] [A DEFINIR: confirmar que o site não tem rastreador]
+- Às páginas informativas do site em [DOMÍNIO], inclusive as calculadoras (a conta é feita no navegador, e nada do que você digita é enviado nem guardado). O site não tem formulário. [A DEFINIR: confirmar que o site não tem rastreador]
 
 O modo de demonstração usa dados fictícios e não grava nada no servidor.
 
@@ -49,6 +48,7 @@ Esta política não cobre sites e serviços de terceiros, como as lojas de aplic
 - Nome de apresentação, de 1 a 80 caracteres.
 - Fuso horário, que o app lê do aparelho no primeiro acesso, e idioma (português do Brasil).
 - Um identificador interno da conta.
+- A versão dos termos de uso e desta política que você aceitou e a data do aceite (no cadastro ou, quando os textos mudam, no app).
 
 Usamos esses dados para criar e proteger a conta, permitir que você entre, recuperar o acesso e enviar os e-mails do serviço (confirmação de cadastro e nova senha).
 
@@ -100,31 +100,7 @@ Usamos esses dados para ativar, manter e encerrar o benefício. A empresa não r
 - Registros técnicos de acesso, como o endereço IP e o tipo de aparelho ou navegador, que o serviço de autenticação e a infraestrutura de hospedagem podem guardar. A Clarevo não cria registros de acesso próprios. Os registros desses serviços têm prazo curto, que depende do plano contratado, e o registro de auditoria da autenticação pode manter e-mail e IP depois que a conta é excluída. [A DEFINIR: conferir nos painéis quais registros cada serviço guarda, por quanto tempo e se algum deles mantém e-mail ou IP depois da exclusão da conta]
 - Hoje a Clarevo não envia relatórios de falha do app. Se isso passar a existir, esta política será atualizada antes (seção 8).
 
-### 3.6 Contato pelo site
-
-[PROPOSTA: seção a incluir só quando o formulário de contato da página "Para empresas" estiver ligado.]
-
-Se você usar o formulário de contato da página "Para empresas":
-
-- **Dados.** Nome, e-mail, nome da empresa, a faixa do número aproximado de pessoas (por exemplo, "de 51 a 200 pessoas") e a mensagem que você escrever. O formulário não pede nem envia outros dados. Não escreva dados financeiros nem de pessoas que trabalham na empresa.
-- **Para quê.** Para responder ao seu contato sobre a Clarevo para empresas, como a conversa sobre um piloto do benefício.
-- **O site não guarda a mensagem.** Ela não é gravada em banco de dados nem em arquivo do site. O pedido chega ao servidor do site, que o repassa por e-mail à equipe da Clarevo e não guarda nada.
-- **Quem trata.** A Cloudflare, que hospeda o site, recebe o pedido de envio e o seu IP, e o Resend, serviço de envio de e-mail, entrega a mensagem à equipe e guarda uma cópia dela nos registros dele, por [A DEFINIR: prazo de guarda no Resend]. Os dois tratam os dados a serviço da Clarevo, como operadores. [A DEFINIR: confirmar o papel de operador, o país e o contrato de cada um]
-- **Por quanto tempo.** A mensagem fica na caixa de e-mail da Clarevo por [A DEFINIR: prazo na caixa de e-mail], e a cópia nos registros do Resend, por [A DEFINIR: prazo de guarda no Resend]. Você pode pedir a eliminação por [E-MAIL DE PRIVACIDADE].
-
-### 3.7 Novidades por e-mail
-
-[PROPOSTA: seção a incluir só quando o cadastro das Novidades por e-mail estiver ligado.]
-
-Se você pedir para receber as Novidades por e-mail:
-
-- **Dado.** O seu e-mail. O formulário não pede mais nada.
-- **Para quê.** Só para enviar as Novidades da Clarevo, os textos curtos da página Novidades, com data e fonte. Não enviamos publicidade de terceiros nem vendemos a lista.
-- **Consentimento.** Você marca a caixa "Quero receber as Novidades da Clarevo por e-mail. Posso cancelar quando quiser.", que vem desmarcada, e depois confirma o cadastro em um e-mail que enviamos (dupla confirmação). Sem confirmar, você não entra na lista e não recebe nada.
-- **Quem trata.** O Brevo, serviço de envio de e-mail, guarda o seu e-mail na lista e a confirmação do cadastro, e envia as Novidades. A Cloudflare recebe o pedido do formulário. Os dois tratam os dados a serviço da Clarevo, como operadores. O site não grava o e-mail. [A DEFINIR: rastreamento de abertura e clique desligado no Brevo] [A DEFINIR: confirmar o que o Brevo registra da confirmação (data, hora e IP), o país e o contrato]
-- **Cancelar.** Todo e-mail das Novidades traz um link para cancelar, do próprio Brevo. Você também pode pedir por [E-MAIL DE PRIVACIDADE]. [A DEFINIR: por quanto tempo o Brevo mantém o e-mail depois do cancelamento, e se ele é eliminado da lista]
-
-### 3.8 Como você conheceu a Clarevo? (pergunta opcional)
+### 3.6 Como você conheceu a Clarevo? (pergunta opcional)
 
 [PROPOSTA: seção a incluir junto com a pergunta no app. A base legal e a guarda ainda não foram confirmadas juridicamente.]
 
@@ -133,11 +109,11 @@ O app pode perguntar, depois do primeiro dia de uso, de onde você conheceu a Cl
 - **Dado.** Uma entre seis opções: Instagram, Indicação de alguém, Empresa onde trabalho, Busca na internet, Outro e Prefiro não dizer. Não há campo de texto livre. Guardamos também quando você respondeu, a data da última mudança da resposta e um número de versão, que sobe quando você muda de opção.
 - **Para quê.** Só para contar, sem identificar ninguém, de onde as pessoas chegam. Não usamos a resposta para anúncio, para montar perfil, para decidir nada sobre você nem para falar com você.
 - **Base legal proposta.** Consentimento (LGPD, art. 7º, I): você escolhe se responde, pode tocar em "Agora não" (a pergunta some por 30 dias neste aparelho) e pode mudar a resposta, inclusive para "Prefiro não dizer", quando quiser, em Conta. [A DEFINIR: confirmar a base; alternativa, legítimo interesse (art. 7º, IX)]
-- **Quem vê.** Só você vê a sua resposta no app. A sua Família e a sua empresa não veem. A equipe da Clarevo vê apenas contagens por semana, sem identificar ninguém (seção 3.9).
+- **Quem vê.** Só você vê a sua resposta no app. A sua Família e a sua empresa não veem. A equipe da Clarevo vê apenas contagens por semana, sem identificar ninguém (seção 3.7).
 - **Por quanto tempo.** Enquanto a sua conta existir. Quando você exclui a conta, a resposta é apagada junto, e nenhuma contagem guardada a mantém, porque as contagens são refeitas do que existe no momento.
 - **No aparelho.** O app guarda neste aparelho só o dia em que você começou a usá-lo aqui e, se você tocar em "Agora não", até quando a pergunta fica escondida. A resposta em si não fica no aparelho.
 
-### 3.9 Contagens de cadastros e de uso, sem identificar ninguém
+### 3.7 Contagens de cadastros e de uso, sem identificar ninguém
 
 [PROPOSTA: seção a incluir junto com as contagens da equipe. A base legal e o enquadramento ainda não foram confirmados juridicamente.]
 
@@ -145,7 +121,7 @@ Para saber se a Clarevo está chegando às pessoas e sendo usada, a equipe faz c
 
 - quantas contas foram criadas na semana;
 - quantas dessas contas anotaram pelo menos um registro (gasto, recebimento, conta a pagar, gasto fixo, parcelamento ou compra no cartão) nos 7 primeiros dias;
-- quantas pessoas escolheram cada opção da pergunta da seção 3.8.
+- quantas pessoas escolheram cada opção da pergunta da seção 3.6.
 
 Essas contagens:
 
@@ -157,26 +133,11 @@ Essas contagens:
 
 [PROPOSTA: legítimo interesse (art. 7º, IX), para saber se o serviço funciona e planejar o seu desenvolvimento, com dados agregados.] [A DEFINIR: confirmar se a contagem agregada, que não identifica ninguém, exige base própria, e fazer o teste de legítimo interesse]
 
-### 3.10 Anotar pelo WhatsApp (opcional)
-
-[PROPOSTA: seção a incluir junto com a abertura do WhatsApp a todas as pessoas. A base legal, o papel da Meta e a transferência internacional ainda não foram confirmados juridicamente.]
-
-Você pode ligar o seu número de WhatsApp à Clarevo, em Conta, e anotar gastos e recebimentos mandando mensagens escritas para o número da Clarevo, como "mercado 52,30". Ligar é opcional, e nada no app depende disso.
-
-- **Como liga.** O app gera um código, que vale 15 minutos e serve uma vez, e você o manda pelo WhatsApp do número que vai usar. Da Clarevo, fica guardado só um resumo do código, nunca o código.
-- **O que guardamos.** O que vira registro, como qualquer anotação do app (seção 3.2), no espaço que você escolheu (Pessoal ou Família). Do seu número, só um resumo feito com uma chave secreta (HMAC-SHA256), que serve para reconhecer quem escreve; sem a chave, o resumo não volta ao número. De cada mensagem tratada, por 30 dias, guardamos um resumo, feito com a mesma chave, do identificador que a Meta dá à mensagem (para não anotar duas vezes a mesma; o identificador em si traz o número e não é guardado), o resumo do número, o resultado (por exemplo, "anotado") e o registro criado, para você poder desfazer. **Não guardamos o texto das mensagens nem o seu número.**
-- **Áudio, foto e figurinha.** A Clarevo não lê nem guarda. A resposta pede uma mensagem escrita.
-- **Quem participa.** As mensagens passam pelos servidores da Meta, empresa dona do WhatsApp, que presta o serviço de mensagens para empresas (WhatsApp Cloud API). Nesse trecho, a mensagem deixa de ter a criptografia de ponta a ponta do WhatsApp, e a Meta trata o conteúdo como operadora, em nome da Clarevo (seção 8).
-- **As respostas.** A Clarevo só responde à mensagem que você mandou, em texto, para o mesmo número. Ela não manda mensagens por iniciativa própria, propaganda nem lembretes pelo WhatsApp.
-- **Para quê.** Só para anotar, desfazer e responder às suas mensagens. Não usamos o WhatsApp para anúncio, para montar perfil nem para falar com você sobre outros assuntos.
-- **Como desliga.** Em Conta, na tela do WhatsApp, ou mandando DESLIGAR (ou PARAR) para o número da Clarevo. Ao desligar, o vínculo é apagado na hora; o que você já anotou continua no app. Se você trocar de número no WhatsApp, o número antigo é desligado sozinho.
-- **Por quanto tempo.** O vínculo, enquanto você não desligar nem excluir a conta. As mensagens tratadas, por 30 dias. Ao excluir a conta, o vínculo, o código e as mensagens tratadas são apagados junto.
-
-### 3.11 Anotar pelo Telegram (opcional)
+### 3.8 Anotar pelo Telegram (opcional)
 
 [A DEFINIR: o Telegram está aberto a todas as pessoas desde 03/11/2026; a base legal, o papel do Telegram e a transferência internacional ainda não foram confirmados juridicamente (pergunta 45 ao advogado).]
 
-Você pode ligar a sua conta do Telegram à Clarevo, em Conta, e anotar gastos e recebimentos mandando mensagens escritas para o bot da Clarevo no Telegram, como "mercado 52,30". Funciona como o WhatsApp (seção 3.10), e um não depende do outro. Ligar é opcional, e nada no app depende disso.
+Você pode ligar a sua conta do Telegram à Clarevo, em Conta, e anotar gastos e recebimentos mandando mensagens escritas para o bot da Clarevo no Telegram, como "mercado 52,30". Ligar é opcional, e nada no app depende disso.
 
 - **Como liga.** O app gera um código, que vale 15 minutos e serve uma vez, e abre a conversa com o bot da Clarevo; ao tocar em Iniciar, o Telegram manda o código. Da Clarevo, fica guardado só um resumo do código, nunca o código. A resposta diz o nome da conta da Clarevo que foi ligada, para você conferir, e uma conta do Telegram já ligada a outra pessoa só passa a você depois de desligada (mandando DESLIGAR).
 - **O que guardamos.** O que vira registro, como qualquer anotação do app (seção 3.2), no espaço que você escolheu (Pessoal ou Família). O Telegram informa a quem recebe a mensagem o identificador da sua conta no Telegram, o seu nome e o seu usuário; a Clarevo usa só o identificador, e guarda dele só um resumo feito com uma chave secreta (HMAC-SHA256), que serve para reconhecer quem escreve; sem a chave, o resumo não volta ao identificador. O Telegram não informa o seu número de telefone. De cada mensagem tratada, por 30 dias, guardamos um resumo, feito com a mesma chave, do identificador da mensagem (para não anotar duas vezes a mesma), o resumo da conta, o resultado e o registro criado, para você poder desfazer. **Não guardamos o texto das mensagens, o seu nome nem o seu usuário no Telegram.**
@@ -187,7 +148,7 @@ Você pode ligar a sua conta do Telegram à Clarevo, em Conta, e anotar gastos e
 - **Como desliga.** Em Conta, na tela do Telegram, ou mandando DESLIGAR (ou PARAR) para o bot da Clarevo. Ao desligar, o vínculo é apagado na hora; o que você já anotou continua no app.
 - **Por quanto tempo.** O vínculo, enquanto você não desligar nem excluir a conta. As mensagens tratadas, por 30 dias. Ao excluir a conta, o vínculo, o código e as mensagens tratadas são apagados junto.
 
-### 3.12 Assinatura e pagamento
+### 3.9 Assinatura e pagamento
 
 A Clarevo é paga por assinatura mensal, com 14 dias grátis no começo (Termos de Uso, seção 12).
 
@@ -210,8 +171,7 @@ A Clarevo é paga por assinatura mensal, com 14 dias grátis no começo (Termos 
 - O código de um boleto. O app lê dele só o valor e o vencimento para a conta a pagar, e não guarda o código.
 - Saldo por conta.
 - Biometria, localização, contatos, microfone e identificador de publicidade. Da galeria, só a foto que você mesmo escolher para uma meta (seção 3.2).
-- O texto das mensagens do WhatsApp e o seu número de telefone. Do número, guardamos só um resumo feito com chave secreta (seção 3.10).
-- O texto das mensagens do Telegram, o seu nome e o seu usuário no Telegram. Da conta, guardamos só um resumo do identificador feito com chave secreta (seção 3.11).
+- O texto das mensagens do Telegram, o seu nome e o seu usuário no Telegram. Da conta, guardamos só um resumo do identificador feito com chave secreta (seção 3.8).
 
 O que você confirma com "Salvar" vira registro e é guardado como descrito na seção 3. Se a descrição de um gasto trouxer o nome de outra pessoa (por exemplo, o nome que veio de um comprovante), esse nome fica guardado como parte da descrição.
 
@@ -238,13 +198,10 @@ A leitura acontece no seu aparelho. A Clarevo não tem servidor que receba esses
 - Guarda de registros de acesso exigida por lei e atendimento a ordem de autoridade: cumprimento de obrigação legal (art. 7º, II) e exercício regular de direitos (art. 7º, VI). [A DEFINIR: confirmar a base]
 - Manter, na Família, o histórico de quem saiu, sem identificar a pessoa: legítimo interesse das demais pessoas da Família (art. 7º, IX). [A DEFINIR: confirmar a base]
 - Benefício pela empresa: execução de contrato com a pessoa, que aceita o convite, e com a empresa (art. 7º, V). Para o e-mail que a empresa informa no convite: [A DEFINIR: base e papéis, conforme o contrato com a empresa].
-- Contato pelo formulário do site (seção 3.6): [PROPOSTA: procedimentos preliminares relacionados a contrato, a pedido da pessoa (art. 7º, V); alternativa, legítimo interesse (art. 7º, IX)]. [A DEFINIR: confirmar a base]
-- Novidades por e-mail (seção 3.7): consentimento (art. 7º, I), que você pode revogar a qualquer momento, cancelando pelo link de qualquer e-mail (art. 8º, § 5º). [A DEFINIR: confirmar a base e a forma de registrar o consentimento]
-- Pergunta opcional "Como você conheceu a Clarevo?" (seção 3.8): [PROPOSTA: consentimento (art. 7º, I), que você pode retirar mudando a resposta para "Prefiro não dizer" ou excluindo a conta; alternativa, legítimo interesse (art. 7º, IX)]. [A DEFINIR: confirmar a base]
-- Contagens de cadastros e de uso, sem identificar ninguém (seção 3.9): [PROPOSTA: legítimo interesse (art. 7º, IX), com dados agregados]. [A DEFINIR: confirmar a base e fazer o teste de legítimo interesse]
-- Anotar pelo WhatsApp (seção 3.10): [PROPOSTA: execução de contrato, a pedido da pessoa, que liga o número quando quer (art. 7º, V)]. [A DEFINIR: confirmar a base e o papel da Meta como operadora]
-- Anotar pelo Telegram (seção 3.11): [PROPOSTA: execução de contrato, a pedido da pessoa, que liga a conta quando quer (art. 7º, V)]. [A DEFINIR: confirmar a base e o papel do Telegram]
-- Assinatura e pagamento (seção 3.12): [PROPOSTA: execução de contrato (art. 7º, V) e, para o que a lei fiscal exigir, cumprimento de obrigação legal (art. 7º, II)]. [A DEFINIR: confirmar a base]
+- Pergunta opcional "Como você conheceu a Clarevo?" (seção 3.6): [PROPOSTA: consentimento (art. 7º, I), que você pode retirar mudando a resposta para "Prefiro não dizer" ou excluindo a conta; alternativa, legítimo interesse (art. 7º, IX)]. [A DEFINIR: confirmar a base]
+- Contagens de cadastros e de uso, sem identificar ninguém (seção 3.7): [PROPOSTA: legítimo interesse (art. 7º, IX), com dados agregados]. [A DEFINIR: confirmar a base e fazer o teste de legítimo interesse]
+- Anotar pelo Telegram (seção 3.8): [PROPOSTA: execução de contrato, a pedido da pessoa, que liga a conta quando quer (art. 7º, V)]. [A DEFINIR: confirmar a base e o papel do Telegram]
+- Assinatura e pagamento (seção 3.9): [PROPOSTA: execução de contrato (art. 7º, V) e, para o que a lei fiscal exigir, cumprimento de obrigação legal (art. 7º, II)]. [A DEFINIR: confirmar a base]
 - Funções do aparelho (câmera, biometria e lembretes): você liga e pode desligar a qualquer momento, e os dados dessas funções não chegam à Clarevo. [A DEFINIR: confirmar se precisam de base própria]
 
 Não tomamos decisões automatizadas sobre você, e a Clarevo não faz análise de crédito.
@@ -257,7 +214,7 @@ Não tomamos decisões automatizadas sobre você, e a Clarevo não faz análise 
 
 **A sua empresa, se ela oferecer o benefício.** A empresa vê só os e-mails que ela mesma convidou, a situação de cada licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens (vagas, convites, licenças ativas e encerradas). A empresa não vê valores, categorias, metas, contas, cartões, a Família de ninguém, nem números somados, e não vê quando ou como você usa o app. O painel das empresas não lê nenhuma tabela de finanças.
 
-**A equipe da Clarevo.** A Clarevo não consulta o conteúdo financeiro de ninguém no dia a dia. [PROPOSTA: a equipe só acessa o conteúdo quando a lei exigir ou para resolver um problema que a própria pessoa pediu.] [PROPOSTA: a equipe também consulta, só no banco de dados, as contagens por semana das seções 3.8 e 3.9, sem identificar ninguém.] Tecnicamente, pessoas da equipe com acesso ao banco de dados conseguem chegar aos dados guardados. [A DEFINIR: regra interna escrita de quem acessa e em que situações (manutenção, segurança, pedido da própria pessoa, obrigação legal) e registro desses acessos, que hoje não existe]
+**A equipe da Clarevo.** A Clarevo não consulta o conteúdo financeiro de ninguém no dia a dia. [PROPOSTA: a equipe só acessa o conteúdo quando a lei exigir ou para resolver um problema que a própria pessoa pediu.] [PROPOSTA: a equipe também consulta, só no banco de dados, as contagens por semana das seções 3.6 e 3.7, sem identificar ninguém.] Tecnicamente, pessoas da equipe com acesso ao banco de dados conseguem chegar aos dados guardados. [A DEFINIR: regra interna escrita de quem acessa e em que situações (manutenção, segurança, pedido da própria pessoa, obrigação legal) e registro desses acessos, que hoje não existe]
 
 **Serviços que ajudam a operar a Clarevo.** Veja a seção 8.
 
@@ -270,23 +227,20 @@ A Clarevo não vende dados e não compartilha dados para publicidade.
 Hoje usamos:
 
 - **Supabase** (autenticação e banco de dados). Recebe todos os dados guardados pela Clarevo descritos na seção 3. O projeto de produção fica na região de São Paulo (Brasil).
-- **Cloudflare** (hospedagem da versão web e do site). Pela hospedagem, recebe os dados de acesso às páginas, como o IP, para entregá-las, e não recebe o que você anota. Se o formulário de contato ou o cadastro das Novidades estiver ligado, o pedido de envio também passa por ela, que o entrega ao site e não o guarda. [A DEFINIR: confirmar com a Cloudflare] [A DEFINIR: confirmar se a Cloudflare também fica na frente do Supabase, caso em que as requisições do app ao banco passam por ela em trânsito, conferindo na lista de suboperadores do Supabase] [A DEFINIR: confirmar onde a Cloudflare processa os acessos e se define algum cookie técnico]
+- **Cloudflare** (hospedagem da versão web e do site). Pela hospedagem, recebe os dados de acesso às páginas, como o IP, para entregá-las, e não recebe o que você anota. [A DEFINIR: confirmar com a Cloudflare] [A DEFINIR: confirmar se a Cloudflare também fica na frente do Supabase, caso em que as requisições do app ao banco passam por ela em trânsito, conferindo na lista de suboperadores do Supabase] [A DEFINIR: confirmar onde a Cloudflare processa os acessos e se define algum cookie técnico]
 - **Google (ML Kit), só no Android.** Componente de leitura de código incluído no app, usado quando você lê o QR Code da nota. A imagem é lida no aparelho, mas o componente pode enviar ao Google dados técnicos de uso e identificadores do aparelho, para fins de diagnóstico e funcionamento. Não recebe o que você anota. [A DEFINIR: confirmar na documentação do fornecedor o que é enviado, para quê e onde é tratado]
 - **Expo** (geração dos builds do app). Recebe o código do app. Não recebe dados de quem usa o app.
 - **Zoho Mail** (caixas de e-mail da Clarevo, como [E-MAIL DE SUPORTE] e [E-MAIL DE PRIVACIDADE]). Quando você escreve para a Clarevo, a sua mensagem e o seu e-mail ficam nessas caixas. [A DEFINIR: país do tratamento e contrato; a conta foi criada em zoho.com]
 - **Resend** (envio dos e-mails de confirmação de cadastro e de nova senha, com o nome da Clarevo, a partir de um endereço do domínio da Clarevo). Recebe o seu e-mail e o conteúdo dessas mensagens e guarda registros do envio. O envio sai pela região de São Paulo do Resend. [A DEFINIR: país da sede, prazo de guarda dos registros e contrato]
-- **Meta (WhatsApp Business, Cloud API), só para quem liga o WhatsApp** (seção 3.10). Recebe as mensagens que você manda para o número da Clarevo, o seu número e as respostas, e atua como operadora, em nome da Clarevo. Guarda o conteúdo das mensagens por até 30 dias, para entregá-las. [PROPOSTA: pedir à Meta o armazenamento das mensagens no Brasil ao registrar o número da Clarevo; sem isso, o conteúdo fica guardado nos Estados Unidos.] [A DEFINIR: termos da Meta para empresas, transferência internacional (LGPD, art. 33) e o que a Meta faz com os dados técnicos das conversas]
-- **Telegram, só para quem liga o Telegram** (seção 3.11). Recebe as mensagens que você manda para o bot da Clarevo e as respostas, e as guarda na sua conversa, pelas regras dele, que você aceitou ao usar o Telegram. A Clarevo não tem contrato com o Telegram e não recebe o seu número de telefone. [A DEFINIR: o papel do Telegram, o país do tratamento e a transferência internacional (LGPD, art. 33)]
+- **Telegram, só para quem liga o Telegram** (seção 3.8). Recebe as mensagens que você manda para o bot da Clarevo e as respostas, e as guarda na sua conversa, pelas regras dele, que você aceitou ao usar o Telegram. A Clarevo não tem contrato com o Telegram e não recebe o seu número de telefone. [A DEFINIR: o papel do Telegram, o país do tratamento e a transferência internacional (LGPD, art. 33)]
 - **Apple App Store e Google Play** (distribuição e pagamento no celular). Tratam os dados de download e de conta nas lojas e, para quem assina pelo app, os dados de pagamento, conforme as políticas delas. Para a Clarevo, informam só a situação da assinatura e um identificador dela.
 
 Estão previstos, mas ainda não ligados:
 
-- **Serviço de pagamento da web** (cartão e Pix, para quem assina pela web). Receberá o seu e-mail e os dados de pagamento que você informar a ele, e informará à Clarevo só a situação da assinatura e um identificador dela. [A DEFINIR: o serviço, o país do tratamento e o contrato, a escolher antes do lançamento]
+- **Asaas** (pagamento da assinatura na web, por cartão e Pix). Receberá os dados que você informar na página de pagamento dele (como nome, CPF, e-mail e os dados do cartão ou do Pix) e um identificador da sua conta da Clarevo, para ligar o pagamento à conta certa, e informará à Clarevo só a situação da assinatura e o identificador dela. A Clarevo não recebe o CPF nem os dados do cartão. [A DEFINIR: país do tratamento e contrato com o Asaas]
 - **Serviço de gestão das assinaturas das lojas** (para juntar num lugar só as assinaturas da App Store e do Google Play). Se for usado, receberá um identificador da sua conta da Clarevo e a situação da assinatura, sem dados de pagamento nem o que você anota. [A DEFINIR: o serviço, o país e o contrato]
 
 - **Sentry** (relatório de falhas do app). Se for ligado, receberá só o erro técnico, sem valores, descrições, e-mails ou dados financeiros, com coleta de IP desligada. Esta política será atualizada antes.
-- **Resend** (envio da mensagem do formulário de contato do site, seção 3.6, se for ligado). Receberá o que você escrever no formulário e guarda uma cópia nos registros dele. [A DEFINIR: país e contrato; é o mesmo serviço dos e-mails de cadastro, acima]
-- **Brevo** (Novidades por e-mail, seção 3.7, se forem ligadas). Receberá o seu e-mail e a confirmação do cadastro. [A DEFINIR: país e contrato]
 
 **Transferência internacional.** Alguns desses serviços são prestados por empresas com sede fora do Brasil, e parte do tratamento pode ocorrer fora do país. [A DEFINIR: para cada serviço, país da sede e local do tratamento, mecanismo de transferência (LGPD, art. 33) e contrato com cada fornecedor]
 
@@ -295,40 +249,37 @@ Estão previstos, mas ainda não ligados:
 Estas informações ficam só no seu aparelho (no armazenamento do app, ou no navegador, na versão web) e não vão para a Clarevo:
 
 - a sessão, para você não precisar entrar toda vez;
-- as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, e avisos que você dispensou (inclusive, [PROPOSTA: o dia em que você começou a usar o app neste aparelho e o "Agora não" da pergunta da seção 3.8]);
+- as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, e avisos que você dispensou (inclusive, [PROPOSTA: o dia em que você começou a usar o app neste aparelho e o "Agora não" da pergunta da seção 3.6]);
 - memórias para preencher mais rápido: a descrição e a categoria da última nota de cada loja (a loja é identificada pelo resumo do CNPJ, até 50 lojas), o mesmo para o nome lido de comprovantes (pelo resumo do nome, até 50) e as categorias que você escolheu na importação de extrato (até 300 entradas);
 - lembretes de contas a pagar, que são notificações agendadas no aparelho. Na tela bloqueada eles não mostram valor nem descrição, e o app não guarda token de notificação remota;
 - o widget da tela inicial, que está desligado. Se for ligado, o aparelho guardará um resumo para o widget, com os valores ocultos por padrão.
 
 A biometria é verificada pelo sistema do aparelho. A Clarevo recebe só "sim" ou "não".
 
-Ao sair da conta, essas preferências e memórias continuam no aparelho, ligadas à sua conta. [A DEFINIR: decisão de produto sobre apagar ao sair] Ao excluir a conta, o app apaga tudo isso do aparelho em que você faz a exclusão. Em outro aparelho onde você já tenha entrado, o que ficou guardado lá continua até você desinstalar o app ou limpar os dados dele (na versão web, os dados do site no navegador). Em um aparelho compartilhado, saia da conta ao terminar e, se quiser tirar tudo, limpe os dados do app ou do navegador.
+Ao sair da conta, o app apaga do aparelho essas preferências e memórias e cancela os lembretes agendados; a sessão que termina sozinha, por tempo, mantém tudo para você entrar de novo. Ao excluir a conta, o app apaga tudo isso do aparelho em que você faz a exclusão. Em outro aparelho onde você ainda esteja com a sessão aberta, o que ficou guardado lá continua até você sair da conta nele, desinstalar o app ou limpar os dados dele (na versão web, os dados do site no navegador). Em um aparelho compartilhado, saia da conta ao terminar e, se quiser tirar tudo, limpe os dados do app ou do navegador.
 
-[A DEFINIR: no Android, o backup automático do sistema pode copiar os dados do app para o Google Drive da pessoa; decidir se fica ligado]
+No Android, o backup automático do sistema fica desligado para o app da Clarevo: os dados guardados pelo app no aparelho não são copiados para o Google Drive.
 
 ## 10. Cookies e rastreadores
 
 A Clarevo não usa cookies de publicidade, não tem ferramenta de análise de uso escolhida por nós dentro do app e não faz rastreamento para publicidade.
 
-Nas páginas do site, não usamos cookies próprios, script de análise de acesso nem recurso de terceiros carregado no navegador. As calculadoras do site fazem a conta no seu navegador e não enviam nem guardam o que você digita, nem no armazenamento do navegador. [PROPOSTA: para saber quantas pessoas visitam o site, usamos só as estatísticas de tráfego que a própria Cloudflare mostra no painel da hospedagem. Elas são medidas no servidor, sem script na página e sem cookie, e não são usadas para publicidade.] [A DEFINIR: confirmar com a Cloudflare o que essas estatísticas guardam (por exemplo, IP) e por quanto tempo] A versão web guarda a sessão e as preferências no armazenamento local do navegador, que serve só para o app funcionar. [PROPOSTA: as contagens de cadastros e de uso (seção 3.9) são feitas no banco de dados, sem ferramenta de análise, cookie, rastreador nem endereço de campanha, e não dependem de nada que o app ou o site leiam do seu aparelho.]
+Nas páginas do site, não usamos cookies próprios, script de análise de acesso nem recurso de terceiros carregado no navegador. As calculadoras do site fazem a conta no seu navegador e não enviam nem guardam o que você digita, nem no armazenamento do navegador. [PROPOSTA: para saber quantas pessoas visitam o site, usamos só as estatísticas de tráfego que a própria Cloudflare mostra no painel da hospedagem. Elas são medidas no servidor, sem script na página e sem cookie, e não são usadas para publicidade.] [A DEFINIR: confirmar com a Cloudflare o que essas estatísticas guardam (por exemplo, IP) e por quanto tempo] A versão web guarda a sessão e as preferências no armazenamento local do navegador, que serve só para o app funcionar. [PROPOSTA: as contagens de cadastros e de uso (seção 3.7) são feitas no banco de dados, sem ferramenta de análise, cookie, rastreador nem endereço de campanha, e não dependem de nada que o app ou o site leiam do seu aparelho.]
 
 A exceção é a leitura de código no Android: o componente do Google (ML Kit) pode enviar ao Google dados técnicos de uso e identificadores do aparelho, como descrito nas seções 5 e 8. Não usamos esses dados para publicidade. [A DEFINIR: confirmar que a hospedagem não define cookie técnico e confirmar na documentação do ML Kit o que o componente envia]
 
 ## 11. Por quanto tempo guardamos os dados?
 
 - **Enquanto a conta existir**, guardamos o que você anotou.
-- **Excluir um registro, uma conta a pagar, uma meta, um cartão ou uma conta de origem** (sem excluir a conta) tira o item das listas e dos totais, e ele deixa de aparecer no app. Mas o item não é apagado de verdade: a Clarevo só o marca como excluído, com a data e quem excluiu. Valor, descrição, data e categoria continuam guardados até você excluir a conta. [A DEFINIR: P-010, prazo para eliminar de vez os itens marcados como excluídos; proposta de 6 meses]
+- **Excluir um registro, uma conta a pagar, uma meta, um cartão ou uma conta de origem** (sem excluir a conta) tira o item das listas e dos totais, e ele deixa de aparecer no app. Mas o item não é apagado na hora: a Clarevo o marca como excluído, com a data e quem excluiu, para os totais e o histórico continuarem certos. Valor, descrição, data e categoria continuam guardados por 6 meses e depois são apagados de vez, todo dia, por uma rotina do banco de dados (ou antes, se você excluir a conta). Um item excluído que ainda é usado por outro, como o pagamento de uma conta a pagar, sai junto com ele.
 - **Ao excluir a conta**, o seu Pessoal é apagado de verdade, na hora, e a sua sessão termina. Veja "Como excluir a sua conta" para o passo a passo e para o que continua (por exemplo, o que você anotou numa Família de outras pessoas, sem o seu nome).
-- **Família encerrada.** Os dados ficam guardados, sem leitura por ninguém, até a regra de guarda. [A DEFINIR: prazo, P-010]
+- **Família encerrada.** Os dados ficam guardados, sem leitura por ninguém, por 6 meses, e depois são apagados de vez.
 - **Cópias de segurança.** O serviço de banco de dados pode manter cópias de segurança, e dados já apagados podem ficar nelas por um tempo. [A DEFINIR: prazo, previsto em 7 dias no plano contratado; confirmar no painel] Se uma cópia for restaurada, as contas excluídas depois dela serão excluídas de novo.
 - **Registros de acesso.** A Clarevo não cria registros de acesso próprios. Os do Supabase e da Cloudflare têm prazo curto, que depende do plano, e o registro de auditoria da autenticação pode manter e-mail e IP depois da exclusão da conta. [A DEFINIR: o que guardar, onde e por quanto tempo, frente à guarda de registros de acesso do Marco Civil da Internet, art. 15, e conferir nos painéis o que cada serviço mantém]
-- **Resposta de "Como você conheceu a Clarevo?"** (seção 3.8). [PROPOSTA: enquanto a conta existir; sai junto com a conta. As contagens da seção 3.9 não guardam histórico: são refeitas do que existe no momento.] [A DEFINIR: confirmar o prazo]
-- **WhatsApp** (seção 3.10). O vínculo do número, enquanto você não desligar nem excluir a conta. As mensagens tratadas (sem o texto e sem o número), por 30 dias. O que virou registro segue a regra dos registros. Na Meta, o conteúdo das mensagens fica por até 30 dias.
-- **Telegram** (seção 3.11). O vínculo da conta, enquanto você não desligar nem excluir a conta. As mensagens tratadas (sem o texto e sem o identificador), por 30 dias. O que virou registro segue a regra dos registros. No Telegram, a conversa fica até você apagá-la.
-- **Mensagem do formulário de contato** (seção 3.6). Fica na caixa de e-mail da Clarevo por [A DEFINIR: prazo na caixa de e-mail], e uma cópia fica nos registros do Resend por [A DEFINIR: prazo de guarda no Resend]. O site não a guarda.
-- **E-mail das Novidades** (seção 3.7). Fica no Brevo enquanto você não cancelar. [A DEFINIR: prazo depois do cancelamento]
-- **Assinatura** (seção 3.12). A situação do acesso, enquanto a conta existir; sai junto com a conta. Os avisos de pagamento (sem dado pessoal), [A DEFINIR: prazo]. As lojas e o serviço de pagamento da web guardam os dados de pagamento pelas regras deles e da lei fiscal.
-- **Contas sem uso.** Hoje a Clarevo não apaga contas por inatividade. [A DEFINIR: política para contas inativas]
+- **Resposta de "Como você conheceu a Clarevo?"** (seção 3.6). [PROPOSTA: enquanto a conta existir; sai junto com a conta. As contagens da seção 3.7 não guardam histórico: são refeitas do que existe no momento.] [A DEFINIR: confirmar o prazo]
+- **Telegram** (seção 3.8). O vínculo da conta, enquanto você não desligar nem excluir a conta. As mensagens tratadas (sem o texto e sem o identificador), por 30 dias. O que virou registro segue a regra dos registros. No Telegram, a conversa fica até você apagá-la.
+- **Assinatura** (seção 3.9). A situação do acesso, enquanto a conta existir; sai junto com a conta. Os avisos de pagamento (sem dado pessoal), [A DEFINIR: prazo]. As lojas e o serviço de pagamento da web guardam os dados de pagamento pelas regras deles e da lei fiscal.
+- **Contas sem uso.** A Clarevo não apaga contas por falta de uso.
 - **Obrigação legal e defesa de direitos.** Podemos guardar o necessário por mais tempo se a lei exigir ou para nos defendermos em processo. [A DEFINIR]
 
 ## 12. Quais são os seus direitos e como pedir?
@@ -347,8 +298,7 @@ Você tem direito, a qualquer momento, de pedir (LGPD, art. 18):
 
 **Como pedir.**
 
-- Dentro do app, você já pode: ver e corrigir o que anotou, em cada tela; ver quem acessa cada espaço em "Quem vê estes dados?"; exportar os seus gastos e recebimentos do Pessoal e as compras no cartão em planilha ou PDF, em Conta, "Exportar meus dados" (a exportação não inclui tudo o que guardamos); e excluir a conta, em Conta, no último item. [PROPOSTA: a resposta de "Como você conheceu a Clarevo?" (seção 3.8) você muda, ou troca por "Prefiro não dizer", em Conta; para apagar só a resposta, sem excluir a conta, peça pelo e-mail de privacidade da seção 16.]
-- Nas Novidades por e-mail, cancele pelo link de qualquer e-mail das Novidades.
+- Dentro do app, você já pode: ver e corrigir o que anotou, em cada tela; ver quem acessa cada espaço em "Quem vê estes dados?"; exportar os seus gastos e recebimentos do Pessoal e as compras no cartão em planilha ou PDF, em Conta, "Exportar meus dados" (a exportação não inclui tudo o que guardamos); e excluir a conta, em Conta, no último item. [PROPOSTA: a resposta de "Como você conheceu a Clarevo?" (seção 3.6) você muda, ou troca por "Prefiro não dizer", em Conta; para apagar só a resposta, sem excluir a conta, peça pelo e-mail de privacidade da seção 16.]
 - Para os demais pedidos, escreva para [E-MAIL DE PRIVACIDADE], do e-mail cadastrado na sua conta.
 - Prazo de resposta: [A DEFINIR].
 - Como confirmamos a sua identidade: [A DEFINIR]. Não pediremos documentos nem dados financeiros para isso.
@@ -370,11 +320,11 @@ Nenhum sistema é totalmente seguro. Se houver um incidente de segurança que po
 
 ## 14. Quem pode usar o app da Clarevo?
 
-A Clarevo é para pessoas com 18 anos ou mais. Ela não é dirigida a crianças nem a adolescentes. No cadastro, o app mostra, acima do botão "Criar conta", que ao criar a conta você confirma ter 18 anos ou mais e concorda com os Termos de uso e com esta política. Não há caixa de seleção, e o app não registra a versão aceita nem a data. [A DEFINIR: forma da declaração de idade e do aceite e registro da versão e da data, P-002]
+A Clarevo é para pessoas com 18 anos ou mais. Ela não é dirigida a crianças nem a adolescentes. No cadastro, o app mostra, acima do botão "Criar conta", que ao criar a conta você confirma ter 18 anos ou mais e concorda com os Termos de uso e com esta política. Não há caixa de seleção; a Clarevo guarda a versão dos textos que você aceitou e a data (seção 3.1).
 
 ## 15. A política pode mudar?
 
-Sim. Quando mudar, a data de vigência no topo será atualizada, e mudanças importantes serão avisadas antes de valerem. [A DEFINIR: forma do aviso, que hoje o app não tem] As versões anteriores ficam disponíveis mediante pedido. [A DEFINIR]
+Sim. Quando mudar, a data de vigência no topo será atualizada. Avisamos as mudanças com pelo menos 30 dias de antecedência, no app e por e-mail, e mudança que reduza os seus direitos pede novo aceite no app. As versões anteriores ficam publicadas na página [Versões dos termos e da política](versoes.md).
 
 ## 16. Contato
 

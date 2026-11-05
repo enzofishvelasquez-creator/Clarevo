@@ -36,9 +36,9 @@ Tudo o que está no seu Pessoal, de verdade, e não apenas escondido:
 - contas de origem do dinheiro, assinaturas, importações, a revisão dos últimos meses e as respostas do plano de guardar e de "Como você conheceu a Clarevo?";
 - o histórico de operações e de atividade da sua conta (o rastro técnico);
 - o seu cadastro: e-mail, nome de apresentação e login;
-- o que o app guardava no aparelho em que você faz a exclusão: preferências, memórias de lojas e nomes, lembretes agendados e o resumo do widget. Em outro aparelho onde você já tenha entrado, o que ficou lá continua até você desinstalar o app ou limpar os dados dele (na versão web, os dados do site no navegador).
+- o que o app guardava no aparelho em que você faz a exclusão: preferências, memórias de lojas e nomes, lembretes agendados e o resumo do widget. Em outro aparelho onde a sua sessão ainda esteja aberta, o que ficou lá continua até você sair da conta nele, desinstalar o app ou limpar os dados dele (na versão web, os dados do site no navegador).
 
-Apagar um registro isolado, sem excluir a conta, tira o item das listas e dos totais, e ele deixa de aparecer no app. Mas o item não é apagado de verdade: a Clarevo só o marca como excluído, com a data e quem excluiu, e o valor, a descrição, a data e a categoria continuam guardados. [A DEFINIR: P-010, prazo para eliminar de vez os itens marcados como excluídos; proposta de 6 meses] Excluir a conta apaga tudo, inclusive esses itens.
+Apagar um registro isolado, sem excluir a conta, tira o item das listas e dos totais, e ele deixa de aparecer no app. Mas o item não é apagado na hora: a Clarevo o marca como excluído, com a data e quem excluiu, e o valor, a descrição, a data e a categoria continuam guardados por 6 meses; depois, são apagados de vez. Excluir a conta apaga tudo na hora, inclusive esses itens.
 
 ## E a sua Família?
 

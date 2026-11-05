@@ -4,7 +4,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 
 Vigência: [DATA DE VIGÊNCIA]
 
-Estes Termos explicam as regras de uso da Clarevo, aplicativo e serviço web oferecidos por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO] (neste texto, "a Clarevo"). Ao criar uma conta, o app mostra, acima do botão "Criar conta", que você confirma ter 18 anos ou mais e concorda com estes Termos e com a Política de Privacidade. [A DEFINIR: forma do aceite (caixa de seleção ou só o texto) e registro da versão aceita e da data; hoje o aceite não é registrado]
+Estes Termos explicam as regras de uso da Clarevo, aplicativo e serviço web oferecidos por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO] (neste texto, "a Clarevo"). Ao criar uma conta, o app mostra, acima do botão "Criar conta", que você confirma ter 18 anos ou mais e concorda com estes Termos e com a Política de Privacidade. A Clarevo guarda a versão destes Termos e da Política que você aceitou e a data. Quando uma mudança pedir novo aceite (seção 8), o app pede de novo antes de você continuar.
 
 Para saber como tratamos os seus dados pessoais, leia a Política de Privacidade.
 
@@ -28,7 +28,7 @@ A Clarevo ajuda pessoas e famílias a entender o próprio mês: o que entrou, o 
 
 ## 3. Quem pode usar?
 
-A Clarevo é para pessoas com 18 anos ou mais e com capacidade para contratar. No cadastro, você confirma isso pelo texto acima do botão "Criar conta". [A DEFINIR: forma da declaração de idade, P-002]
+A Clarevo é para pessoas com 18 anos ou mais e com capacidade para contratar. No cadastro, você confirma isso pelo texto acima do botão "Criar conta": "ao criar a conta, você confirma que tem 18 anos ou mais".
 
 Cada conta é de uma pessoa. Para dividir as contas da casa, use a Família (seção 5).
 
@@ -39,7 +39,7 @@ Cada conta é de uma pessoa. Para dividir as contas da casa, use a Família (se�
 - Você pode pedir biometria para abrir o app, ocultar valores na tela e encerrar a sessão em todos os aparelhos, em Conta.
 - Avise o suporte, em [E-MAIL DE SUPORTE], se achar que alguém entrou na sua conta.
 - Cuide da sua senha e dos seus aparelhos. Se alguém entrar na sua conta sem a sua autorização, avise o suporte para que o acesso seja bloqueado. Você não responde por acesso indevido causado por falha de segurança da Clarevo.
-- A Clarevo pode suspender uma conta em caso de uso que ponha outras pessoas ou o serviço em risco. [A DEFINIR: regras de suspensão, aviso e prazo para a pessoa se manifestar]
+- A Clarevo pode suspender uma conta só em caso de uso que ponha outras pessoas ou o serviço em risco, ou de descumprimento grave destes Termos. Antes, avisamos por e-mail e damos 10 dias para você responder e exportar os seus dados, salvo risco imediato ou ordem legal.
 
 ## 5. Pessoal e Família
 
@@ -54,7 +54,7 @@ Cada conta é de uma pessoa. Para dividir as contas da casa, use a Família (se�
 - Quem deixa a Família, por escolha ou por remoção, perde o acesso na hora. O que a pessoa anotou continua na Família, como histórico da casa, com o primeiro nome e a marca "ex-membro".
 - Quem exclui a conta deixa o que anotou na Família com a autoria "Pessoa que saiu", sem nome e sem e-mail.
 - Quem é Titular só sai depois de passar a titularidade a outra pessoa ou de encerrar a Família. Quem é Titular com outras pessoas na Família precisa passar a titularidade ou remover as pessoas antes de excluir a conta.
-- Ao encerrar a Família, os dados dela ficam guardados, sem leitura por ninguém. [A DEFINIR: prazo de guarda, P-010]
+- Ao encerrar a Família, os dados dela ficam guardados, sem leitura por ninguém, por 6 meses, e depois são apagados de vez.
 
 ## 6. Benefício pela empresa
 
@@ -79,11 +79,11 @@ Uma empresa pode oferecer a Clarevo como benefício às pessoas que trabalham ne
 
 ## 8. Disponibilidade do serviço e mudanças
 
-A Clarevo trabalha para manter o serviço disponível, mas pode haver pausas para manutenção, falhas de fornecedores e outras situações fora do nosso controle. Quando possível, avisaremos antes. [A DEFINIR: compromisso de disponibilidade, se houver]
+A Clarevo trabalha para manter o serviço disponível, mas pode haver pausas para manutenção, falhas de fornecedores e outras situações fora do nosso controle. Não há um compromisso formal de disponibilidade: fazemos o possível para o app funcionar sem interrupções e avisamos antes as manutenções planejadas.
 
 Podemos mudar recursos para melhorar o serviço, por segurança, por exigência legal ou por limite técnico, sem prejudicar de forma injustificada quem já usa o app da Clarevo. Se uma mudança ou a retirada de um recurso afetar de forma importante o que você usa, avisaremos com antecedência, e você poderá exportar os seus dados e excluir a conta se não concordar. Se o serviço acabar, daremos prazo para você exportar os seus dados. [A DEFINIR: prazo de aviso; proposta de 30 dias]
 
-Podemos atualizar estes Termos. Mudanças importantes serão avisadas antes de valerem. [A DEFINIR: forma do aviso e do novo aceite]
+Podemos atualizar estes Termos. Avisamos as mudanças com pelo menos 30 dias de antecedência, no app e por e-mail. Mudança que reduza os seus direitos só vale para você depois que você aceitar a nova versão no app.
 
 ## 9. Responsabilidade
 
@@ -99,13 +99,13 @@ A marca "clarevo.", o logotipo, os textos, o design e o código da Clarevo perte
 
 Os seus dados continuam sendo seus. A Clarevo trata esses dados para prestar o serviço que você contratou e para cumprir obrigações legais, como explica a Política de Privacidade.
 
-O app usa programas de código aberto, cada um com a sua licença. [A DEFINIR: tela de licenças no app]
+O app usa programas de código aberto, cada um com a sua licença. A lista, com a versão e a licença de cada um, está na página [Licenças de código aberto](licencas.html), que também abre pelo app, em Conta.
 
 ## 11. Excluir a conta e encerrar o uso
 
 Você pode excluir a sua conta quando quiser, no app, em Conta, no último item, "Excluir minha conta". A exclusão é imediata e não pode ser desfeita. A página "Como excluir a sua conta" explica o que é apagado e o que continua.
 
-A Clarevo pode encerrar uma conta em caso de descumprimento grave destes Termos, com aviso e chance de exportar os dados, salvo se a lei ou a segurança exigirem outro caminho. [A DEFINIR: procedimento e prazos]
+A Clarevo pode encerrar uma conta só em caso de uso que ponha outras pessoas ou o serviço em risco, ou de descumprimento grave destes Termos. Antes, avisamos por e-mail e damos 10 dias para você responder e exportar os seus dados, salvo risco imediato ou ordem legal.
 
 ## 12. Preço, pagamento e cancelamento
 
@@ -114,7 +114,7 @@ A Clarevo é paga por assinatura mensal. Os preços estão sempre na tela "Assin
 - **Planos:** Individual, por R$ 29,90 por mês, para uma pessoa; Família, por R$ 69,90 por mês, para a pessoa titular e as pessoas da Família dela na Clarevo, até 6 pessoas no total. Os dois planos têm os mesmos recursos. [A DEFINIR: contador confirma se os preços já incluem os tributos e como fica a nota fiscal em cada forma de pagamento]
 - **Teste grátis:** toda conta começa com 14 dias grátis, sem pedir cartão. O app avisa antes de o teste acabar. Nada é cobrado sem você assinar.
 - **Depois do teste, sem assinatura:** a conta fica só para ver e exportar. Os seus dados continuam guardados: você vê tudo, exporta e pode excluir a conta, mas não anota nem muda nada até assinar. Sair de uma Família, aceitar um convite e desligar o Telegram continuam possíveis.
-- **Como pagar:** no app do iPhone, pela App Store; no app do Android, pelo Google Play; na web, por cartão de crédito ou Pix. A cobrança e os dados de pagamento ficam com a loja ou com o serviço de pagamento da web: a Clarevo não recebe nem guarda o número do cartão. [A DEFINIR: o serviço de pagamento da web, a ser escolhido antes do lançamento]
+- **Como pagar:** no app do iPhone, pela App Store; no app do Android, pelo Google Play; na web, por cartão de crédito ou Pix. A cobrança e os dados de pagamento ficam com a loja ou, na web, com o Asaas, o serviço de pagamento da Clarevo: a Clarevo não recebe nem guarda o número do cartão nem o seu CPF.
 - **Renovação:** a assinatura renova sozinha a cada mês, pelo mesmo preço, até você cancelar. Se o preço mudar, avisamos com pelo menos 30 dias de antecedência, e você pode cancelar antes da renovação com o preço novo.
 - **Cancelamento:** cancele quando quiser, sem multa, no mesmo lugar onde assinou (nas assinaturas da App Store ou do Google Play, no próprio aparelho, ou na página de assinatura na web). O acesso continua até o fim do mês já pago; depois, a conta fica só para ver e exportar.
 - **Direito de arrependimento:** quem assina pela internet pode desistir em até 7 dias da contratação e receber de volta o valor pago, como prevê o Código de Defesa do Consumidor (art. 49). Na web, peça pelo suporte. Nas compras pela App Store ou pelo Google Play, o reembolso é pedido à loja; se ela não atender, escreva para o suporte. [A DEFINIR: advogado confirma como o arrependimento funciona nas compras pelas lojas e se a Clarevo devolve diretamente quando a loja recusa]

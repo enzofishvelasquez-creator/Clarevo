@@ -620,7 +620,7 @@ reset role;
 do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
-    = array['accept_family_invite', 'accept_license', 'add_card_charge', 'add_card_purchase', 'add_card_refund',
+    = array['accept_family_invite', 'accept_legal_terms', 'accept_license', 'add_card_charge', 'add_card_purchase', 'add_card_refund',
             'add_goal_movement', 'cancel_family_invite', 'cancel_license_invite', 'clear_month_check', 'context_permission', 'create_account',
             'create_card', 'create_commitment', 'create_family', 'create_family_invite', 'create_goal', 'create_record',
             'create_series', 'create_series_occurrence', 'create_telegram_code', 'create_whatsapp_code', 'decide_return_review', 'delete_account', 'delete_card',
@@ -629,7 +629,7 @@ do $$ begin
             'end_series', 'ensure_personal_space', 'goal_photo', 'import_records', 'inform_series_year', 'invite_licenses',
             'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_family',
             'mark_subscriptions_reviewed', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals',
-            'months_overview', 'my_access', 'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
+            'months_overview', 'my_access', 'my_legal_acceptance', 'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
             'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_status', 'set_income_reference',
             'set_member_role', 'set_month_check', 'set_savings_answer', 'set_series_subscription', 'set_signup_source', 'skip_series_year', 'sync_series_occurrences',

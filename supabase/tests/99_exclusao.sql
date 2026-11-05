@@ -1048,10 +1048,10 @@ begin
       'context_memberships.person_id', 'family_invites.created_by', 'family_invites.used_by', 'financial_accounts.created_by',
       'financial_accounts.deleted_by', 'financial_contexts.owner_person_id', 'financial_records.created_by', 'financial_records.deleted_by',
       'goal_movements.created_by', 'goal_movements.deleted_by', 'goals.created_by', 'goals.deleted_by', 'income_references.created_by',
-      'income_references.deleted_by', 'licenses.person_id', 'month_checks.updated_by', 'organization_admins.person_id', 'plan_entitlements.person_id',
+      'income_references.deleted_by', 'legal_acceptances.person_id', 'licenses.person_id', 'month_checks.updated_by', 'organization_admins.person_id', 'plan_entitlements.person_id',
       'record_operations.actor_id', 'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by',
       'signup_sources.person_id'],
-    'as chaves estrangeiras para persons são as 40 que a exclusão da conta trata';
+    'as chaves estrangeiras para persons são as 41 que a exclusão da conta trata (com o aceite dos termos, 0024)';
   -- E as que apontam para financial_contexts (financial_records é restrict: por isso os registros saem antes do contexto).
   assert (select array_agg(c.conrelid::regclass::text || '.' || a.attname || ' ' || c.confdeltype::text order by c.conrelid::regclass::text, a.attname)
             from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
@@ -1087,7 +1087,7 @@ begin
     assert (select prosecdef from pg_proc where oid = ('public.' || f)::regprocedure), 'security definer: ' || f;
   end loop;
   assert (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 92, 'authenticated executa 92 funções (as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo, as 3 do WhatsApp, as 3 do Telegram, as 2 da imagem e a do acesso, my_access, das metas)';
+           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 94, 'authenticated executa 94 funções (as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo, as 3 do WhatsApp, as 3 do Telegram, as 2 da imagem das metas, a do acesso, my_access, e as 2 do aceite dos termos)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
 
@@ -1134,8 +1134,8 @@ begin
            where (x.def ~* '(insert into|update|delete from) (public|auth)\.' or x.def ~* 'clarevo_materialize_series') and x.def !~* 'insert into public\.record_operations')
        = array['delete_my_account', 'ensure_personal_space', 'sync_series_occurrences'],
     'toda função de escrita grava a operação, menos delete_my_account, ensure_personal_space e sync_series_occurrences';
-  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 67,
-    'as 67 funções de escrita com operação são as que o gatilho de record_operations protege (com set_goal_image, 0021)';
+  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 68,
+    'as 68 funções de escrita com operação são as que o gatilho de record_operations protege (com set_goal_image, 0021, e accept_legal_terms, 0024)';
   -- As do app para WhatsApp e Telegram (0022) só passam o canal às internas, e são elas que gravam a operação.
   assert (select array_agg(x.proname::text order by x.proname) from pg_temp.app_functions() x where x.def ~* 'clarevo_chat_(create_code|unlink_app)')
        = array['create_telegram_code', 'create_whatsapp_code', 'unlink_telegram', 'unlink_whatsapp']
@@ -1143,8 +1143,8 @@ begin
      and pg_get_functiondef('public.clarevo_chat_unlink_app(text, text)'::regprocedure) ~* 'insert into public\.record_operations',
     'gerar código e desligar, dos dois canais, gravam a operação pelas internas clarevo_chat_create_code e clarevo_chat_unlink_app';
   -- Nada novo em record_operations pela exclusão: a conta some com o rastro, então nenhuma ação nova (as 2 de conferir o mês vêm da 0016).
-  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 73,
-    'a lista de ações de record_operations segue com 73 (excluir a conta não deixa operação; as 3 do WhatsApp vêm da 0020, a da imagem das metas, da 0021, e as 3 do Telegram, da 0022)';
+  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 74,
+    'a lista de ações de record_operations segue com 74 (excluir a conta não deixa operação; as 3 do WhatsApp vêm da 0020, a da imagem das metas, da 0021, as 3 do Telegram, da 0022, e a do aceite dos termos, da 0024)';
 end $$;
 rollback;
 

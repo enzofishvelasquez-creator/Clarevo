@@ -452,7 +452,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await field('Senha').fill('nova12345'); await btn('Entrar').click(); await waitText('Diferença do mês');
   ok('nova senha funciona e volta ao resumo', true);
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
-  ok('"Agora não": depois de sair e entrar de novo, o card continua fora', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
+  // A9 (aprovada em 04/11/2026): sair da conta apaga deste aparelho as preferências da pessoa, inclusive o "Agora não" do card. Ao entrar
+  // de novo, "Primeiros passos" volta, com os passos já feitos marcados (eles vêm dos dados, não do aparelho).
+  await waitUntil(async () => (await headingShown('Primeiros passos')) && (await ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago, PP.guardar])()), 8000);
+  ok('A9: depois de sair e entrar de novo, o "Agora não" foi apagado do aparelho e o card "Primeiros passos" volta, com os passos feitos marcados',
+    (await headingShown('Primeiros passos')) && (await ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago, PP.guardar])()) && (await visibleCount('button', 'Anotar gasto')) === 1, JSON.stringify(await ppRows()));
   await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
 

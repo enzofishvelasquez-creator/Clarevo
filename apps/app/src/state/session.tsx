@@ -6,6 +6,7 @@ import { AppState, Text, View } from 'react-native';
 
 import { pendingCredentials, type AuthService, type AuthState } from '@/lib/auth';
 import { DemoAuth } from '@/lib/demo-auth';
+import { forgetDevice } from '@/lib/device-forget';
 import { comprovanteHandoff } from '@/lib/comprovante-handoff';
 import { evolutionSelection } from '@/lib/evolution-memory';
 import { pendingBenefit, pendingInvite } from '@/lib/invite-target';
@@ -37,7 +38,11 @@ interface SessionValue extends AuthState {
   /** Link de e-mail inválido ou expirado aberto no app. */
   linkProblem: boolean;
   clearLinkProblem: () => void;
-  signOut: (scope?: 'local' | 'global') => Promise<void>;
+  /**
+   * Sair da conta. Por padrão apaga do aparelho as preferências e memórias da pessoa (A9). `keepDevice`: a saída que o app pede por conta
+   * própria (depois de trocar a senha), em que a pessoa entra de novo em seguida e as preferências ficam.
+   */
+  signOut: (scope?: 'local' | 'global', options?: { keepDevice?: boolean }) => Promise<void>;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -128,15 +133,19 @@ function SessionProviderInner({ auth, children }: { auth: AuthService; children:
     return () => sub.remove();
   }, [auth]);
 
-  const signOut = useCallback(async (scope: 'local' | 'global' = 'local') => {
+  const signOut = useCallback(async (scope: 'local' | 'global' = 'local', options?: { keepDevice?: boolean }) => {
     pendingCredentials.clear();
     // O convite que esperava a entrada não passa para outra pessoa (D-055).
     pendingInvite.clear();
     pendingBenefit.clear();
+    // Sair da conta apaga do aparelho as preferências e memórias da pessoa e cancela os lembretes (A9, aprovada em 04/11/2026), como ao
+    // excluir a conta. A sessão que termina sozinha (por tempo) não passa por aqui, e a saída depois de trocar a senha pede para manter:
+    // o que está guardado fica para a mesma pessoa entrar de novo.
+    if (state.user && !options?.keepDevice) await forgetDevice(state.user.id);
     await auth.signOut(scope);
     queryClient.clear();
     clearReceiptMemory();
-  }, [queryClient, auth]);
+  }, [queryClient, auth, state.user]);
 
   const repo = useMemo(() => (state.user ? auth.repositoryFor(state.user) : null), [state.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -117,8 +117,9 @@ ${links}
  * problema é o contrário (o site recolhe dados sem avisar). Devolve o Markdown com as marcas e a lista de problemas para o `--final`.
  */
 const SECOES_DOS_FORMULARIOS = [
-  { interruptor: 'formulario_contato', titulo: /^###\s+3\.6\b.*$/m, nome: '3.6 (Contato pelo site)', formulario: 'o formulário de contato' },
-  { interruptor: 'newsletter', titulo: /^###\s+3\.7\b.*$/m, nome: '3.7 (Novidades por e-mail)', formulario: 'o cadastro das Novidades por e-mail' },
+  // Pelo título, não pelo número: desde 05/11/2026 (A14), as duas seções ficam fora do texto publicado e os números 3.6 e 3.7 são de outras.
+  { interruptor: 'formulario_contato', titulo: /^###\s+3\.\d+\s+Contato pelo site\b.*$/m, nome: '3.6 (Contato pelo site)', formulario: 'o formulário de contato' },
+  { interruptor: 'newsletter', titulo: /^###\s+3\.\d+\s+Novidades por e-mail\b.*$/m, nome: '3.7 (Novidades por e-mail)', formulario: 'o cadastro das Novidades por e-mail' },
 ];
 
 function secoesDosFormularios(md, valores) {
@@ -169,6 +170,39 @@ function paginaLegal(pagina, md, valores) {
   return { ...pg, avisos, problemasFinais };
 }
 
+/**
+ * Licenças de código aberto (D5 de docs/legal/pendencias-do-lancamento.md): a lista dos pacotes que vão no app, com a versão e a licença
+ * de cada um, gerada do package-lock.json por `node scripts/gerar-licencas.js` (site-src/licencas.json). Os termos e o app apontam para ela.
+ */
+function paginaLicencas({ valores }) {
+  const arquivo = 'licencas.html';
+  const lista = JSON.parse(require('node:fs').readFileSync(path.join(SITE_SRC, 'licencas.json'), 'utf8'));
+  const capa = `<h1>Licenças de código aberto</h1>
+<p class="lead">O app da Clarevo é construído com programas de código aberto. Esta é a lista dos pacotes usados para construir e rodar o app, com a versão e a licença de cada um.</p>`;
+  const linhas = lista.map((i) => `<tr><td>${esc(i.nome)}</td><td>${esc(i.versao)}</td><td>${esc(i.licenca)}</td></tr>`).join('\n');
+  const corpo = bloco(
+    `<h2 id="pacotes">Pacotes (${lista.length})</h2>
+<p>O texto de cada licença acompanha o pacote, no repositório público dele. Agradecemos a quem mantém cada um desses projetos.</p>
+<div class="tabela"><table>
+<thead><tr><th scope="col">Pacote</th><th scope="col">Versão</th><th scope="col">Licença</th></tr></thead>
+<tbody>
+${linhas}
+</tbody>
+</table></div>`,
+    { rotulo: 'pacotes' },
+  );
+  return montarPagina({
+    arquivo,
+    titulo: 'Licenças de código aberto',
+    descricao: 'Os pacotes de código aberto usados no app da Clarevo, com a versão e a licença de cada um.',
+    capa,
+    corpo,
+    fonte: capa,
+    valores,
+    classeCapa: 'capa-simples',
+  });
+}
+
 function pagina404({ valores }) {
   const arquivo = '404.html';
   const u = (d) => rel(arquivo, d);
@@ -192,4 +226,4 @@ function pagina404({ valores }) {
   return montarPagina({ arquivo, titulo: 'Página não encontrada', descricao: 'Esta página não existe no site da Clarevo.', capa, corpo, fonte: capa, valores, classeCapa: 'capa-simples', semIndexar: true });
 }
 
-module.exports = { paginaSobre, paginaSuporte, paginaLegal, pagina404, secoesDosFormularios, PAGINAS_LEGAIS };
+module.exports = { paginaSobre, paginaSuporte, paginaLegal, paginaLicencas, pagina404, secoesDosFormularios, PAGINAS_LEGAIS };

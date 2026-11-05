@@ -1018,13 +1018,17 @@ describe('site público: as seções 3.6 e 3.7 da política só existem com o fo
     }
   }, 60_000);
 
-  it('a política do repositório tem as duas seções e, com os formulários desligados, o site as marca para retirar', () => {
+  it('A14 (04/11/2026): a política publicada não tem as duas seções (guardadas à parte) e, com os formulários desligados, nada é marcado para retirar', () => {
     const politica = readFileSync(join(ROOT, 'docs', 'legal', 'politica-de-privacidade.md'), 'utf8');
-    expect(politica).toMatch(/^### 3\.6 Contato pelo site$/m);
-    expect(politica).toMatch(/^### 3\.7 Novidades por e-mail$/m);
+    expect(politica).not.toMatch(/^### 3\.\d+ Contato pelo site$/m);
+    expect(politica).not.toMatch(/^### 3\.\d+ Novidades por e-mail$/m);
+    const trechos = readFileSync(join(ROOT, 'docs', 'legal', 'politica-trechos-desligados.md'), 'utf8');
+    expect(trechos).toMatch(/^### 3\.6 Contato pelo site$/m);
+    expect(trechos).toMatch(/^### 3\.7 Novidades por e-mail$/m);
     const g = gerador.gerarSite({ dados: { ...PREENCHIDOS }, referencia: '2026-10-23' });
-    expect(texto(g.arquivos.get('privacidade.html'))).toContain(`<mark class="pendente">${MARCA_36}</mark>`);
-    expect(texto(readFileSync(join(SITE, 'privacidade.html')))).toContain(MARCA_37);
+    expect(texto(g.arquivos.get('privacidade.html'))).not.toContain('A RETIRAR');
+    expect(g.problemasFinais.filter((p) => p.startsWith('privacidade.html: a seção') || p.includes('a política não tem a seção'))).toEqual([]);
+    expect(texto(readFileSync(join(SITE, 'privacidade.html')))).not.toContain(MARCA_37);
   }, 60_000);
 });
 
@@ -1178,6 +1182,8 @@ describe('site público: kit de imprensa', () => {
 
 describe('site público: textos jurídicos propostos e documentação (D-066)', () => {
   const politica = readFileSync(join(ROOT, 'docs', 'legal', 'politica-de-privacidade.md'), 'utf8');
+  // A14 (04/11/2026): as seções dos formulários saíram do texto publicado e ficam guardadas à parte, para quando forem ligados.
+  const trechos = readFileSync(join(ROOT, 'docs', 'legal', 'politica-trechos-desligados.md'), 'utf8');
   const resumo = readFileSync(join(ROOT, 'docs', 'legal', 'resumo-para-advogado.md'), 'utf8');
   const secao = (md: string, titulo: string) => {
     const i = md.indexOf(titulo);
@@ -1186,29 +1192,29 @@ describe('site público: textos jurídicos propostos e documentação (D-066)', 
     return resto.slice(0, resto.search(/\n#{2,3} /));
   };
 
-  it('a política tem a seção proposta do contato pelo site: dados, finalidade, base, Resend e Cloudflare como operadores, sem guarda no site e prazo a definir', () => {
-    const s = secao(politica, '### 3.6 Contato pelo site');
+  it('os trechos guardados (A14) têm a seção proposta do contato pelo site: dados, finalidade, base, Resend e Cloudflare como operadores, sem guarda no site e prazo a definir', () => {
+    const s = secao(trechos, '### 3.6 Contato pelo site');
     expect(s).toContain('[PROPOSTA:');
     for (const trecho of ['Nome, e-mail, nome da empresa', 'faixa do número aproximado de pessoas', 'Para responder ao seu contato sobre a Clarevo para empresas', 'O site não guarda a mensagem', 'Cloudflare', 'Resend', 'operadores', '[A DEFINIR: prazo na caixa de e-mail]']) expect(s, trecho).toContain(trecho);
     // O Resend guarda uma cópia da mensagem nos registros dele: a seção diz isso, com o prazo a definir, e a seção de guarda também.
     expect(s).toContain('guarda uma cópia dela nos registros dele, por [A DEFINIR: prazo de guarda no Resend]');
     expect(s).toContain('e a cópia nos registros do Resend, por [A DEFINIR: prazo de guarda no Resend]');
-    expect(secao(politica, '## 11.')).toContain('Mensagem do formulário de contato');
-    expect(politica).toContain('uma cópia fica nos registros do Resend por [A DEFINIR: prazo de guarda no Resend]');
-    expect(politica).toContain('Receberá o que você escrever no formulário e guarda uma cópia nos registros dele.');
-    expect(politica.match(/\[A DEFINIR: prazo de guarda no Resend\]/g)).toHaveLength(3);
-    expect(politica).toMatch(/Contato pelo formulário do site \(seção 3\.6\): \[PROPOSTA: procedimentos preliminares/);
+    expect(trechos).toContain('Mensagem do formulário de contato');
+    expect(trechos).toContain('uma cópia fica nos registros do Resend por [A DEFINIR: prazo de guarda no Resend]');
+    expect(trechos).toContain('Receberá o que você escrever no formulário e guarda uma cópia nos registros dele.');
+    expect(trechos.match(/\[A DEFINIR: prazo de guarda no Resend\]/g)).toHaveLength(3);
+    expect(trechos).toMatch(/Contato pelo formulário do site \(seção 3\.6\): \[PROPOSTA: procedimentos preliminares/);
   });
 
-  it('a política tem a seção proposta das Novidades por e-mail: consentimento, Brevo, descadastro e dupla confirmação', () => {
-    const s = secao(politica, '### 3.7 Novidades por e-mail');
+  it('os trechos guardados (A14) têm a seção proposta das Novidades por e-mail: consentimento, Brevo, descadastro e dupla confirmação', () => {
+    const s = secao(trechos, '### 3.7 Novidades por e-mail');
     expect(s).toContain('[PROPOSTA:');
     for (const trecho of ['O seu e-mail', 'Consentimento', 'desmarcada', 'dupla confirmação', 'Brevo', 'link para cancelar', 'O site não grava o e-mail']) expect(s, trecho).toContain(trecho);
     // O rastreamento de abertura e clique do Brevo fica desligado, e a política declara isso como ponto a confirmar.
     expect(s).toContain('[A DEFINIR: rastreamento de abertura e clique desligado no Brevo]');
-    expect(politica).toMatch(/Novidades por e-mail \(seção 3\.7\): consentimento \(art\. 7º, I\)/);
-    expect(politica).toContain('- **Resend** (envio da mensagem do formulário de contato do site');
-    expect(politica).toContain('- **Brevo** (Novidades por e-mail');
+    expect(trechos).toMatch(/Novidades por e-mail \(seção 3\.7\): consentimento \(art\. 7º, I\)/);
+    expect(trechos).toContain('- **Resend** (envio da mensagem do formulário de contato do site');
+    expect(trechos).toContain('- **Brevo** (Novidades por e-mail');
   });
 
   it('a seção de cookies cita as estatísticas do painel da Cloudflare, sem script, como proposta para o advogado', () => {

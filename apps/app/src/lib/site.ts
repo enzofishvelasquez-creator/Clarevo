@@ -29,6 +29,29 @@ export async function openSitePage(page: SitePage): Promise<boolean> {
 }
 
 /**
+ * Abre a página de versões dos termos e da política (A16), do aviso de mudança dos textos (A5). Fica fora de `SITE_PAGES` (core/legal.ts),
+ * que as funções do servidor embutem. Devolve `false` sem endereço do site ou se o sistema não conseguiu abrir.
+ */
+export async function openLegalVersionsPage(): Promise<boolean> {
+  return openSiteFile('versoes.html');
+}
+
+/** Abre a página de licenças de código aberto (D5), em Conta, "Privacidade e termos". Fora de `SITE_PAGES` pelo mesmo motivo. */
+export async function openLicensesPage(): Promise<boolean> {
+  return openSiteFile('licencas.html');
+}
+
+async function openSiteFile(file: string): Promise<boolean> {
+  if (!SITE_URL) return false;
+  try {
+    await Linking.openURL(`${SITE_URL}/${file}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * "Escrever para o suporte" (Conta, card "Ajuda e contato"): abre o programa de e-mail com o endereço do suporte. Na web, o
  * `mailto:` vai na própria janela (o navegador entrega ao programa de e-mail e o app continua aberto, sem uma aba vazia), e a web
  * não diz se havia programa de e-mail: devolve `true`. No aparelho, devolve `false` quando o sistema não conseguiu abrir. Nos
