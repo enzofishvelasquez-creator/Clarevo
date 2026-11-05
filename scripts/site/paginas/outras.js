@@ -117,8 +117,9 @@ ${links}
  * problema é o contrário (o site recolhe dados sem avisar). Devolve o Markdown com as marcas e a lista de problemas para o `--final`.
  */
 const SECOES_DOS_FORMULARIOS = [
-  { interruptor: 'formulario_contato', titulo: /^###\s+3\.6\b.*$/m, nome: '3.6 (Contato pelo site)', formulario: 'o formulário de contato' },
-  { interruptor: 'newsletter', titulo: /^###\s+3\.7\b.*$/m, nome: '3.7 (Novidades por e-mail)', formulario: 'o cadastro das Novidades por e-mail' },
+  // Pelo título, não pelo número: desde 05/11/2026 (A14), as duas seções ficam fora do texto publicado e os números 3.6 e 3.7 são de outras.
+  { interruptor: 'formulario_contato', titulo: /^###\s+3\.\d+\s+Contato pelo site\b.*$/m, nome: '3.6 (Contato pelo site)', formulario: 'o formulário de contato' },
+  { interruptor: 'newsletter', titulo: /^###\s+3\.\d+\s+Novidades por e-mail\b.*$/m, nome: '3.7 (Novidades por e-mail)', formulario: 'o cadastro das Novidades por e-mail' },
 ];
 
 function secoesDosFormularios(md, valores) {

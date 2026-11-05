@@ -29,7 +29,7 @@ A função do servidor **não tem o token do bot**: a resposta volta junto com a
 - **Só para quem quiser**: funciona depois de a própria pessoa ligar a conta no app, e desliga a qualquer momento (pelo app ou escrevendo DESLIGAR).
 - **Exclusão da conta** apaga os vínculos, os códigos e as mensagens tratadas dos dois canais.
 - **Só conversa particular**: mensagens de grupo, de canal ou de outro bot são ignoradas, e o bot é configurado para não entrar em grupos (seção 5, passo 2).
-- **Antes de abrir para o público**: a seção 3.11 da política de privacidade (já redigida) e a pergunta 45 do resumo para o advogado (`docs/legal/resumo-para-advogado.md`). No piloto fechado, as pessoas do teste recebem a explicação acima antes de ligar.
+- **Antes de abrir para o público**: a seção do Telegram da política de privacidade (3.11 quando redigida; 3.8 depois de tirar as seções desligadas, em 05/11/2026) e a pergunta 45 do resumo para o advogado (`docs/legal/resumo-para-advogado.md`). No piloto fechado, as pessoas do teste recebem a explicação acima antes de ligar.
 
 ## 4. Como está montado
 
