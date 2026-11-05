@@ -52,6 +52,10 @@ export const LEGAL_ACCEPT_TEXT = {
   privacy: 'Ler a política de privacidade',
   accept: 'Concordo e continuar',
   signOut: 'Sair da conta',
+  /** Quem não concorda (Termos, seção 8). */
+  disagree: 'Se não concordar, você pode exportar os seus dados e excluir a conta.',
+  export: 'Exportar meus dados',
+  delete: 'Excluir minha conta',
   failed: 'Não foi possível guardar o aceite agora. Tente de novo em instantes.',
   openFailed: 'Não foi possível abrir a página agora. Tente de novo em instantes.',
 } as const;

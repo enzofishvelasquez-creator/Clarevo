@@ -57,7 +57,8 @@ export default function NovaSenha() {
       await auth.updatePassword(password);
       setDoneFor(user.email);
       signOutIntent.mark();
-      await signOut();
+      // A pessoa entra de novo com a senha nova em seguida: as preferências deste aparelho (lembretes, biometria) ficam.
+      await signOut('local', { keepDevice: true });
     } catch (e) {
       if (e instanceof AuthError && e.code === 'senha_fraca') setError(PASSWORD_RULE);
       else if (e instanceof AuthError && e.code === 'sem_sessao') setBanner('O link expirou ou já foi usado.');

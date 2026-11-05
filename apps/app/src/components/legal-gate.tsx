@@ -1,10 +1,12 @@
 import { LEGAL_ACCEPT_TEXT, legalAcceptanceNeeded, newOperationKey, type LegalAcceptance } from '@clarevo/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ExternalLink } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { AlertCircle, ExternalLink, FileDown, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Banner, Button, LinkButton, Txt } from '@/components/ui';
+import { useDeviceLocked } from '@/lib/device-lock';
 import { signOutIntent } from '@/lib/nav';
 import { SITE_URL, openSitePage } from '@/lib/site';
 import { useSession } from '@/state/session';
@@ -25,11 +27,13 @@ function useLegalAcceptance(enabled: boolean) {
 
 /**
  * Aceite dos termos e da política (A1): por cima do app, uma vez, para quem ainda não aceitou a versão vigente (contas criadas antes
- * do registro do aceite, ou uma versão nova que peça novo aceite, A5). Só "Concordo e continuar" ou "Sair da conta"; os links abrem as
- * páginas do site (quando há endereço do site). Se a leitura do aceite falhar, nada aparece: o aceite não pode travar o app por uma
- * falha de rede.
+ * do registro do aceite, ou uma versão nova que peça novo aceite, A5). "Concordo e continuar" ou "Sair da conta"; quem não concorda pode
+ * exportar os dados e excluir a conta (Termos, seção 8), e nessas duas telas o aviso sai da frente. Os links abrem as páginas do site
+ * (quando há endereço do site). Espera o app destravar (biometria). Se a leitura do aceite falhar, nada aparece: o aceite não pode
+ * travar o app por uma falha de rede.
  */
 export function LegalGate({ active }: { active: boolean }) {
+  const locked = useDeviceLocked();
   const { repo, user, signOut } = useSession();
   const qc = useQueryClient();
   const acceptance = useLegalAcceptance(active);
@@ -50,7 +54,7 @@ export function LegalGate({ active }: { active: boolean }) {
   });
 
   const a = acceptance.data;
-  if (!active || !a || !legalAcceptanceNeeded(a)) return null;
+  if (!active || locked || !a || !legalAcceptanceNeeded(a)) return null;
   const open = async (page: 'termos' | 'privacidade') => {
     setOpenFailed(false);
     if (!(await openSitePage(page))) setOpenFailed(true);
@@ -77,6 +81,14 @@ export function LegalGate({ active }: { active: boolean }) {
                 </Txt>
               </Banner>
             ) : null}
+            {/* Quem não concorda: exportar os dados e excluir a conta continuam possíveis (Termos, seção 8). */}
+            <Txt variant="caption" color={colors.textSecondary}>
+              {T.disagree}
+            </Txt>
+            <View style={{ gap: space[1] }}>
+              <LinkButton label={T.export} icon={FileDown} style={styles.link} onPress={() => router.push('/conta/exportar')} />
+              <LinkButton label={T.delete} icon={Trash2} style={styles.link} onPress={() => router.push('/conta/excluir')} />
+            </View>
             {error ? (
               <Banner tone="erro" icon={AlertCircle}>
                 <Txt variant="label" color={colors.error}>

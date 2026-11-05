@@ -184,7 +184,7 @@ function Navigation() {
     <SpaceStatusContext value={{ status, retry: () => space.refetch() }}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Aceite dos termos e da política (A1): uma vez, por cima do app, para quem ainda não aceitou a versão vigente. */}
-      <LegalGate active={!inRecovery && status === 'pronto'} />
+      <LegalGate active={!inRecovery && status === 'pronto' && !/^\/conta\/(exportar|excluir)\/?$/.test(pathname)} />
       <Stack
         screenOptions={{
           headerShown: false,

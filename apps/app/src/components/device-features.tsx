@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmDialog } from '@/components/dialog';
 import { Banner, Button, Txt } from '@/components/ui';
 import { authenticate, DEVICE_FEATURES, listenToReminders, openDeviceSettings } from '@/lib/device';
+import { deviceLock } from '@/lib/device-lock';
 import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { signOutIntent } from '@/lib/nav';
 import { PRIVACY_TEXT, setValuesHidden } from '@/lib/privacy';
@@ -175,6 +176,8 @@ function NativeFeatures() {
 
   // ---- Biometria ao abrir ---------------------------------------------------------------------
   const [locked, setLocked] = useState(false);
+  // O aviso de aceite dos termos espera o app destravar (lib/device-lock.ts).
+  useEffect(() => deviceLock.set(locked), [locked]);
   const [unlockMsg, setUnlockMsg] = useState<string | null>(null);
   const authenticating = useRef(false);
   /** Pessoa com sessão quando o app abriu (undefined: sessão ainda sendo conferida). Quem entra depois não é bloqueado. */

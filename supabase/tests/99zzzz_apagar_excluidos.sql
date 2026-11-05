@@ -1,6 +1,7 @@
 -- Apagar de vez, depois de 6 meses, o que foi marcado como excluído (A7, migração 0025): o prazo mínimo, os itens velhos que saem, os
--- novos e os vivos que ficam, a conta a pagar que ainda tem registro (fica até o registro sair), o orçamento, a Família encerrada há mais
--- de 6 meses (apagada inteira) e os privilégios. Pessoa FICTÍCIA: Iara. Tudo em uma transação desfeita no fim.
+-- novos e os vivos que ficam, a conta a pagar que ainda tem registro (fica até o registro sair), a conta de gasto fixo excluída "só neste
+-- mês" (fica enquanto o gasto fixo existir e sai com ele), o orçamento, a Família encerrada há mais de 6 meses (apagada inteira), o resumo
+-- das operações antigas e os privilégios. Depois de cada limpeza, `set constraints all immediate` roda as conferências adiadas (S3). Pessoa FICTÍCIA: Iara. Tudo em uma transação desfeita no fim.
 \set ON_ERROR_STOP 1
 \set iara '''00000000-0000-0000-0000-0000000000e1'''
 
@@ -83,6 +84,13 @@ begin
   insert into ids values ('b_velho', (b ->> 'id')::uuid);
   perform public.delete_category_budget('lp-b-0002', (b ->> 'id')::uuid, (b ->> 'version')::int);
 
+  -- Gasto fixo mensal com a conta de novembro excluída "só neste mês" (series_skipped).
+  c := public.create_series('lp-s-0001', ctx, 'mensal', 'conta', 'Internet', null, 9900, 'fixo', 15, '2026-11-01', null, null, null);
+  insert into ids values ('serie', (c #>> '{series,id}')::uuid);
+  perform public.sync_series_occurrences(ctx);
+  insert into ids select 'c_pulada', id from public.commitments where series_id = pg_temp.id('serie') and due_on = '2026-11-15';
+  perform public.delete_commitment('lp-s-0002', pg_temp.id('c_pulada'), (select version from public.commitments where id = pg_temp.id('c_pulada')));
+
   -- Família encerrada.
   insert into ids values ('fam', (public.create_family('Família da Iara', 'lp-f-0001') #>> '{context,id}')::uuid);
   perform public.end_family(pg_temp.id('fam'), 'lp-f-0002');
@@ -98,6 +106,9 @@ select pg_temp.age('financial_records', 'r_novo', 2);
 select pg_temp.age('commitments', 'c_velha', 7);
 select pg_temp.age('commitments', 'c_paga', 7);
 select pg_temp.age('category_budgets', 'b_velho', 7);
+select pg_temp.age('commitments', 'c_pulada', 7);
+-- Operações antigas: o resumo do pedido vira 'apagado'.
+update public.record_operations set created_at = now() - interval '7 months' where idempotency_key in ('lp-r-0001', 'lp-r-0002');
 update public.financial_contexts set ended_at = now() - interval '7 months' where id = (select id from ids where name = 'fam');
 
 -- ---------------------------------------------------------------------------
@@ -119,6 +130,8 @@ declare
   r jsonb;
 begin
   r := public.clarevo_purge_deleted();
+  set constraints all immediate;
+  set constraints all deferred;
   assert (r ->> 'familias')::int = 1 and (r ->> 'registros')::int = 1 and (r ->> 'contas_a_pagar')::int = 1 and (r ->> 'orcamentos')::int = 1,
     'contagens: ' || r::text;
   assert not pg_temp.exists_('financial_records', 'r_velho'), 'o registro excluído há 7 meses saiu';
@@ -130,8 +143,14 @@ begin
   assert not pg_temp.exists_('category_budgets', 'b_velho'), 'o orçamento velho saiu';
   assert not pg_temp.exists_('financial_contexts', 'fam'), 'a Família encerrada há 7 meses foi apagada inteira';
   assert pg_temp.exists_('financial_contexts', 'ctx'), 'o Pessoal fica';
+  assert pg_temp.exists_('commitments', 'c_pulada'), 'a conta excluída "só neste mês" fica enquanto o gasto fixo existe (senão ela voltaria)';
+  assert (select count(*) from public.record_operations where idempotency_key in ('lp-r-0001', 'lp-r-0002') and request_hash = 'apagado') = 2
+     and (select count(*) from public.record_operations where idempotency_key = 'lp-r-0003' and request_hash <> 'apagado') = 1,
+    'só as operações antigas perdem o resumo do pedido';
   -- Rodar de novo não apaga mais nada.
   r := public.clarevo_purge_deleted();
+  set constraints all immediate;
+  set constraints all deferred;
   assert (r ->> 'registros')::int = 0 and (r ->> 'contas_a_pagar')::int = 0 and (r ->> 'familias')::int = 0, 'nada mais a apagar: ' || r::text;
 end $$;
 
@@ -142,9 +161,39 @@ declare
   r jsonb;
 begin
   r := public.clarevo_purge_deleted();
+  set constraints all immediate;
+  set constraints all deferred;
   assert (r ->> 'registros')::int = 1 and (r ->> 'contas_a_pagar')::int = 1, 'o registro e depois a conta: ' || r::text;
   assert not pg_temp.exists_('commitments', 'c_paga') and not pg_temp.exists_('financial_records', 'r_pagamento'), 'saíram os dois';
   assert pg_temp.exists_('financial_records', 'r_vivo'), 'o vivo continua';
+end $$;
+
+-- O gasto fixo excluído há mais de 6 meses sai com as contas dele, inclusive a marca de "só neste mês".
+set role authenticated;
+select set_config('request.jwt.claim.sub', :iara, true);
+select public.delete_series('lp-s-0003', (select id from ids where name = 'serie'),
+  (select version from public.commitment_series where id = (select id from ids where name = 'serie')),
+  (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'version', version)), '[]') from public.commitment_items
+    where series_id = (select id from ids where name = 'serie')));
+reset role;
+create function pg_temp.age_series(p_name text) returns void language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  set local session_replication_role = replica;
+  update public.commitments set deleted_at = now() - interval '7 months' where series_id = pg_temp.id(p_name);
+  update public.commitment_series set deleted_at = now() - interval '7 months' where id = pg_temp.id(p_name);
+  set local session_replication_role = origin;
+end $$;
+select pg_temp.age_series('serie');
+do $$
+declare
+  r jsonb;
+begin
+  r := public.clarevo_purge_deleted();
+  set constraints all immediate;
+  set constraints all deferred;
+  assert (r ->> 'series')::int = 1, 'o gasto fixo saiu: ' || r::text;
+  assert not pg_temp.exists_('commitment_series', 'serie') and not pg_temp.exists_('commitments', 'c_pulada'), 'com a marca de "só neste mês"';
+  assert not exists (select 1 from public.commitments where series_id = pg_temp.id('serie')), 'nenhuma conta da série ficou';
 end $$;
 
 rollback;
