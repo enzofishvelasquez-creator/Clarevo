@@ -14,6 +14,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DeviceFeatures } from '@/components/device-features';
 import { BrowseTabBar } from '@/components/tab-bar';
+import { LegalGate } from '@/components/legal-gate';
 import { forgetDevice } from '@/lib/device-forget';
 import { afterLogin, deletedAccountIntent, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, useSession } from '@/state/session';
@@ -182,6 +183,8 @@ function Navigation() {
   return (
     <SpaceStatusContext value={{ status, retry: () => space.refetch() }}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Aceite dos termos e da política (A1): uma vez, por cima do app, para quem ainda não aceitou a versão vigente. */}
+      <LegalGate active={!inRecovery && status === 'pronto'} />
       <Stack
         screenOptions={{
           headerShown: false,

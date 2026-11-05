@@ -4,7 +4,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 
 Vigência: [DATA DE VIGÊNCIA]
 
-Estes Termos explicam as regras de uso da Clarevo, aplicativo e serviço web oferecidos por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO] (neste texto, "a Clarevo"). Ao criar uma conta, o app mostra, acima do botão "Criar conta", que você confirma ter 18 anos ou mais e concorda com estes Termos e com a Política de Privacidade. [A DEFINIR: forma do aceite (caixa de seleção ou só o texto) e registro da versão aceita e da data; hoje o aceite não é registrado]
+Estes Termos explicam as regras de uso da Clarevo, aplicativo e serviço web oferecidos por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO] (neste texto, "a Clarevo"). Ao criar uma conta, o app mostra, acima do botão "Criar conta", que você confirma ter 18 anos ou mais e concorda com estes Termos e com a Política de Privacidade. A Clarevo guarda a versão destes Termos e da Política que você aceitou e a data. Quando uma mudança pedir novo aceite (seção 8), o app pede de novo antes de você continuar.
 
 Para saber como tratamos os seus dados pessoais, leia a Política de Privacidade.
 
@@ -28,7 +28,7 @@ A Clarevo ajuda pessoas e famílias a entender o próprio mês: o que entrou, o 
 
 ## 3. Quem pode usar?
 
-A Clarevo é para pessoas com 18 anos ou mais e com capacidade para contratar. No cadastro, você confirma isso pelo texto acima do botão "Criar conta". [A DEFINIR: forma da declaração de idade, P-002]
+A Clarevo é para pessoas com 18 anos ou mais e com capacidade para contratar. No cadastro, você confirma isso pelo texto acima do botão "Criar conta": "ao criar a conta, você confirma que tem 18 anos ou mais".
 
 Cada conta é de uma pessoa. Para dividir as contas da casa, use a Família (seção 5).
 
@@ -83,7 +83,7 @@ A Clarevo trabalha para manter o serviço disponível, mas pode haver pausas par
 
 Podemos mudar recursos para melhorar o serviço, por segurança, por exigência legal ou por limite técnico, sem prejudicar de forma injustificada quem já usa o app da Clarevo. Se uma mudança ou a retirada de um recurso afetar de forma importante o que você usa, avisaremos com antecedência, e você poderá exportar os seus dados e excluir a conta se não concordar. Se o serviço acabar, daremos prazo para você exportar os seus dados. [A DEFINIR: prazo de aviso; proposta de 30 dias]
 
-Podemos atualizar estes Termos. Mudanças importantes serão avisadas antes de valerem. [A DEFINIR: forma do aviso e do novo aceite]
+Podemos atualizar estes Termos. Avisamos as mudanças com pelo menos 30 dias de antecedência, no app e por e-mail. Mudança que reduza os seus direitos só vale para você depois que você aceitar a nova versão no app.
 
 ## 9. Responsabilidade
 

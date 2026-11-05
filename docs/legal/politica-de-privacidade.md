@@ -49,6 +49,7 @@ Esta política não cobre sites e serviços de terceiros, como as lojas de aplic
 - Nome de apresentação, de 1 a 80 caracteres.
 - Fuso horário, que o app lê do aparelho no primeiro acesso, e idioma (português do Brasil).
 - Um identificador interno da conta.
+- A versão dos termos de uso e desta política que você aceitou e a data do aceite (no cadastro ou, quando os textos mudam, no app).
 
 Usamos esses dados para criar e proteger a conta, permitir que você entre, recuperar o acesso e enviar os e-mails do serviço (confirmação de cadastro e nova senha).
 
@@ -370,11 +371,11 @@ Nenhum sistema é totalmente seguro. Se houver um incidente de segurança que po
 
 ## 14. Quem pode usar o app da Clarevo?
 
-A Clarevo é para pessoas com 18 anos ou mais. Ela não é dirigida a crianças nem a adolescentes. No cadastro, o app mostra, acima do botão "Criar conta", que ao criar a conta você confirma ter 18 anos ou mais e concorda com os Termos de uso e com esta política. Não há caixa de seleção, e o app não registra a versão aceita nem a data. [A DEFINIR: forma da declaração de idade e do aceite e registro da versão e da data, P-002]
+A Clarevo é para pessoas com 18 anos ou mais. Ela não é dirigida a crianças nem a adolescentes. No cadastro, o app mostra, acima do botão "Criar conta", que ao criar a conta você confirma ter 18 anos ou mais e concorda com os Termos de uso e com esta política. Não há caixa de seleção; a Clarevo guarda a versão dos textos que você aceitou e a data (seção 3.1).
 
 ## 15. A política pode mudar?
 
-Sim. Quando mudar, a data de vigência no topo será atualizada, e mudanças importantes serão avisadas antes de valerem. [A DEFINIR: forma do aviso, que hoje o app não tem] As versões anteriores ficam disponíveis mediante pedido. [A DEFINIR]
+Sim. Quando mudar, a data de vigência no topo será atualizada. Avisamos as mudanças com pelo menos 30 dias de antecedência, no app e por e-mail, e mudança que reduza os seus direitos pede novo aceite no app. As versões anteriores ficam publicadas na página de versões do site.
 
 ## 16. Contato
 

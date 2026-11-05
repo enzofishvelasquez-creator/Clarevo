@@ -43,6 +43,7 @@ import type {
   SeriesEditInput,
   SeriesInput,
 } from './records';
+import type { LegalAcceptance } from './aceite';
 import type { Access } from './plano';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
@@ -846,6 +847,16 @@ export interface RecordsRepository {
 
   /** my_access: a situação do acesso da própria pessoa (assinatura, benefício, cortesia, Família, antes do início, teste ou só leitura). */
   getMyAccess(): Promise<Access>;
+
+  // Aceite dos termos e da política (A1, migração 0024).
+
+  /** my_legal_acceptance: a versão vigente e a última que a pessoa aceitou. */
+  getLegalAcceptance(): Promise<LegalAcceptance>;
+  /**
+   * accept_legal_terms: aceita a versão vigente. Idempotente pela chave; versao_invalida para outra versão; sem_permissao sem o Pessoal.
+   * Vale mesmo em só leitura e não conta como anotação.
+   */
+  acceptLegalTerms(key: string, version: number): Promise<LegalAcceptance>;
 }
 
 export type RepoErrorCode =
@@ -856,6 +867,7 @@ export type RepoErrorCode =
   | 'nao_autenticado'
   | 'email_nao_confirmado'
   | 'assinatura_necessaria'
+  | 'versao_invalida'
   | 'rede'
   | 'descricao_obrigatoria'
   | 'descricao_longa'

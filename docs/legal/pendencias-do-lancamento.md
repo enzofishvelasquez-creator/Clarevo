@@ -57,7 +57,7 @@ O advogado confere depois; se o Enzo aprovar, a equipe troca os marcadores pelo 
 
 ## D. Equipe (sem depender de ninguém, depois das decisões A)
 
-1. Registro da versão aceita dos termos e da política e da data (A1), com migração e testes.
+1. Registro da versão aceita dos termos e da política e da data (A1), com migração e testes. **Feito em 05/11/2026** (migração 0024, aviso de aceite no app, termos e política sem os marcadores da A1, A2 e A5).
 2. Aviso de mudança dos textos no app (A5).
 3. Apagar do aparelho as preferências da conta ao sair (A9). **Feito em 05/11/2026**, com a política (seção 9) e a A11 no texto.
 4. Tirar do texto publicado as seções do que está desligado (A14, A15) e guardar à parte.

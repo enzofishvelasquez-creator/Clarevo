@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { RecordsRepository } from '@clarevo/core';
+import { LEGAL_VERSION, type RecordsRepository } from '@clarevo/core';
 import { createClient, type AuthError as SupabaseAuthError, type SupabaseClient, type User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import { AppState, Platform } from 'react-native';
@@ -116,7 +116,8 @@ export class SupabaseAuth implements AuthService {
     const { error } = await this.client.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { display_name: displayName.trim() }, emailRedirectTo: this.redirect('/confirmado') },
+      // A versão dos termos e da política mostrada no cadastro (A1): o banco grava o aceite quando a pessoa entra pela primeira vez.
+      options: { data: { display_name: displayName.trim(), terms_version: String(LEGAL_VERSION) }, emailRedirectTo: this.redirect('/confirmado') },
     });
     if (error) throw authError(error);
   }

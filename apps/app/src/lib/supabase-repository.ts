@@ -128,11 +128,13 @@ import {
   type GoalImageChoice,
   isGoalImageKey,
   parseAccess,
+  parseLegalAcceptance,
   type Access,
+  type LegalAcceptance,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { accessRefused } from '@/lib/access-refused';
+import { accessRefused } from './access-refused';
 
 // ---------------------------------------------------------------------------
 // Repositório: leitura filtrada pelo banco (RLS), escrita só por funções com idempotência e versão.
@@ -572,6 +574,8 @@ const KNOWN: RepoErrorCode[] = [
   'versao_desatualizada',
   // Assinatura paga (D-083): o gatilho de record_operations recusa a escrita em só leitura. Avisa a tela de acesso (accessRefused).
   'assinatura_necessaria',
+  // Aceite dos termos (A1): só a versão vigente.
+  'versao_invalida',
   'chave_reutilizada',
   'nao_encontrado',
   'sem_permissao',
@@ -3115,6 +3119,20 @@ export class SupabaseRepository implements RecordsRepository {
     const { data, error } = await this.db.rpc('accept_license', { p_code: normalized, p_key: key });
     if (error) throw repoError(error);
     return toBenefit(data as Record<string, unknown> | null);
+  }
+
+  /** O aceite dos termos e da política da própria pessoa (my_legal_acceptance, A1). */
+  async getLegalAcceptance(): Promise<LegalAcceptance> {
+    const { data, error } = await this.db.rpc('my_legal_acceptance');
+    if (error) throw repoError(error);
+    return parseLegalAcceptance(data);
+  }
+
+  /** Aceita a versão vigente dos termos e da política (accept_legal_terms, A1). */
+  async acceptLegalTerms(key: string, version: number): Promise<LegalAcceptance> {
+    const { data, error } = await this.db.rpc('accept_legal_terms', { p_version: version, p_key: key });
+    if (error) throw repoError(error);
+    return parseLegalAcceptance(data);
   }
 
   /** A situação do acesso da própria pessoa (my_access, D-083). */
