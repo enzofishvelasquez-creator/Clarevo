@@ -26,7 +26,7 @@ Para a LGPD, a [RAZÃO SOCIAL] é a empresa controladora dos dados pessoais trat
 - Contato sobre privacidade e pedidos sobre seus dados: [E-MAIL DE PRIVACIDADE]
 - Suporte: [E-MAIL DE SUPORTE]
 - Endereço do serviço: [DOMÍNIO]
-- Encarregado pelo tratamento de dados: [A DEFINIR: nomear uma pessoa encarregada ou manter só o canal de comunicação, conforme a Resolução CD/ANPD nº 2/2022]. O canal de contato é o e-mail de privacidade acima.
+- Encarregado pelo tratamento de dados: a Clarevo mantém o canal de comunicação no e-mail de privacidade acima, sob a responsabilidade de [A DEFINIR: nome de quem responde pelo canal], como permite a Resolução CD/ANPD nº 2/2022 aos agentes de tratamento de pequeno porte. [A DEFINIR: o advogado confirma o enquadramento como agente de pequeno porte]
 
 ## 2. A quem esta política se aplica?
 
@@ -279,7 +279,7 @@ A exceção é a leitura de código no Android: o componente do Google (ML Kit) 
 - **Resposta de "Como você conheceu a Clarevo?"** (seção 3.6). [PROPOSTA: enquanto a conta existir; sai junto com a conta. As contagens da seção 3.7 não guardam histórico: são refeitas do que existe no momento.] [A DEFINIR: confirmar o prazo]
 - **Telegram** (seção 3.8). O vínculo da conta, enquanto você não desligar nem excluir a conta. As mensagens tratadas (sem o texto e sem o identificador), por 30 dias. O que virou registro segue a regra dos registros. No Telegram, a conversa fica até você apagá-la.
 - **Assinatura** (seção 3.9). A situação do acesso, enquanto a conta existir; sai junto com a conta. Os avisos de pagamento (sem dado pessoal), [A DEFINIR: prazo]. As lojas e o serviço de pagamento da web guardam os dados de pagamento pelas regras deles e da lei fiscal.
-- **Contas sem uso.** Hoje a Clarevo não apaga contas por inatividade. [A DEFINIR: política para contas inativas]
+- **Contas sem uso.** A Clarevo não apaga contas por falta de uso.
 - **Obrigação legal e defesa de direitos.** Podemos guardar o necessário por mais tempo se a lei exigir ou para nos defendermos em processo. [A DEFINIR]
 
 ## 12. Quais são os seus direitos e como pedir?

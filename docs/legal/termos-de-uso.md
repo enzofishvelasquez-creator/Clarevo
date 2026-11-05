@@ -39,7 +39,7 @@ Cada conta é de uma pessoa. Para dividir as contas da casa, use a Família (se�
 - Você pode pedir biometria para abrir o app, ocultar valores na tela e encerrar a sessão em todos os aparelhos, em Conta.
 - Avise o suporte, em [E-MAIL DE SUPORTE], se achar que alguém entrou na sua conta.
 - Cuide da sua senha e dos seus aparelhos. Se alguém entrar na sua conta sem a sua autorização, avise o suporte para que o acesso seja bloqueado. Você não responde por acesso indevido causado por falha de segurança da Clarevo.
-- A Clarevo pode suspender uma conta em caso de uso que ponha outras pessoas ou o serviço em risco. [A DEFINIR: regras de suspensão, aviso e prazo para a pessoa se manifestar]
+- A Clarevo pode suspender uma conta só em caso de uso que ponha outras pessoas ou o serviço em risco, ou de descumprimento grave destes Termos. Antes, avisamos por e-mail e damos 10 dias para você responder e exportar os seus dados, salvo risco imediato ou ordem legal.
 
 ## 5. Pessoal e Família
 
@@ -79,7 +79,7 @@ Uma empresa pode oferecer a Clarevo como benefício às pessoas que trabalham ne
 
 ## 8. Disponibilidade do serviço e mudanças
 
-A Clarevo trabalha para manter o serviço disponível, mas pode haver pausas para manutenção, falhas de fornecedores e outras situações fora do nosso controle. Quando possível, avisaremos antes. [A DEFINIR: compromisso de disponibilidade, se houver]
+A Clarevo trabalha para manter o serviço disponível, mas pode haver pausas para manutenção, falhas de fornecedores e outras situações fora do nosso controle. Não há um compromisso formal de disponibilidade: fazemos o possível para o app funcionar sem interrupções e avisamos antes as manutenções planejadas.
 
 Podemos mudar recursos para melhorar o serviço, por segurança, por exigência legal ou por limite técnico, sem prejudicar de forma injustificada quem já usa o app da Clarevo. Se uma mudança ou a retirada de um recurso afetar de forma importante o que você usa, avisaremos com antecedência, e você poderá exportar os seus dados e excluir a conta se não concordar. Se o serviço acabar, daremos prazo para você exportar os seus dados. [A DEFINIR: prazo de aviso; proposta de 30 dias]
 
@@ -105,7 +105,7 @@ O app usa programas de código aberto, cada um com a sua licença. [A DEFINIR: t
 
 Você pode excluir a sua conta quando quiser, no app, em Conta, no último item, "Excluir minha conta". A exclusão é imediata e não pode ser desfeita. A página "Como excluir a sua conta" explica o que é apagado e o que continua.
 
-A Clarevo pode encerrar uma conta em caso de descumprimento grave destes Termos, com aviso e chance de exportar os dados, salvo se a lei ou a segurança exigirem outro caminho. [A DEFINIR: procedimento e prazos]
+A Clarevo pode encerrar uma conta só em caso de uso que ponha outras pessoas ou o serviço em risco, ou de descumprimento grave destes Termos. Antes, avisamos por e-mail e damos 10 dias para você responder e exportar os seus dados, salvo risco imediato ou ordem legal.
 
 ## 12. Preço, pagamento e cancelamento
 

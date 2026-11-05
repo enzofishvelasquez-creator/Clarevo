@@ -1,6 +1,6 @@
 # Pendências dos textos legais para o lançamento (04/11/2026)
 
-O site só sai da "versão preliminar" quando `node scripts/gerar-site.js --final` passa. Hoje ele recusa por **80 marcadores** (05/11/2026, depois da A1, A2, A5, A9, A11, A14, A15 e A16; eram 103 antes da seção de preço e da seção da assinatura, em 04/11/2026) na política de privacidade, nos termos de uso e na página de exclusão de conta, mais as frases de rascunho e as duas seções de formulários desligados. Este documento separa os marcadores em quatro grupos, para cada um ir a quem decide. O resumo para o advogado (`resumo-para-advogado.md`, perguntas 1 a 46) continua valendo; aqui está o que falta **no texto**.
+O site só sai da "versão preliminar" quando `node scripts/gerar-site.js --final` passa. Hoje ele recusa por **77 marcadores** (05/11/2026, depois da A1, A2, A5, A9, A11, A14, A15 e A16; eram 103 antes da seção de preço e da seção da assinatura, em 04/11/2026) na política de privacidade, nos termos de uso e na página de exclusão de conta, mais as frases de rascunho e as duas seções de formulários desligados. Este documento separa os marcadores em quatro grupos, para cada um ir a quem decide. O resumo para o advogado (`resumo-para-advogado.md`, perguntas 1 a 46) continua valendo; aqui está o que falta **no texto**.
 
 ## A. Decisões do Enzo (produto), com a recomendação da equipe
 
@@ -63,4 +63,4 @@ O advogado confere depois; se o Enzo aprovar, a equipe troca os marcadores pelo 
 4. Tirar do texto publicado as seções do que está desligado (A14, A15) e guardar à parte. **Feito em 05/11/2026:** saíram as seções 3.6, 3.7 e 3.10 e os trechos ligados a elas (guardados em `politica-trechos-desligados.md`); as seções seguintes foram renumeradas (3.6 a 3.9).
 5. Página de licenças de código aberto (termos, seção de propriedade intelectual): lista gerada dos pacotes que vão no app, publicada no site e com link no app.
 6. Página de versões anteriores da política (A16). **Feito em 05/11/2026** (`docs/legal/versoes.md`, publicada como `versoes.html`, com link no rodapé e na política).
-7. Trocar os marcadores decididos pelo texto e rodar o `--final`.
+7. Trocar os marcadores decididos pelo texto e rodar o `--final`. **Em 05/11/2026:** trocados os da A1, A2, A4, A5, A6, A8, A9, A11, A14, A15 e A16 (A10 ficou só com o nome de quem responde pelo canal e a confirmação do advogado). Faltam a A7 (6 meses: depende do trabalho que apaga de vez o que foi excluído, ainda não feito), a A12 (endereço) e a A13 (data de vigência, no dia da publicação).
