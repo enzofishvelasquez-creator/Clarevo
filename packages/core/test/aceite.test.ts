@@ -2,7 +2,16 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { LEGAL_ACCEPT_TEXT, LEGAL_VERSION, MemoryRepository, RepoError, legalAcceptanceNeeded, parseLegalAcceptance } from '../src';
+import {
+  LEGAL_ACCEPT_TEXT,
+  LEGAL_NEXT,
+  LEGAL_VERSION,
+  MemoryRepository,
+  RepoError,
+  legalAcceptanceNeeded,
+  legalChangeNotice,
+  parseLegalAcceptance,
+} from '../src';
 
 const MIGRATIONS = join(__dirname, '..', '..', '..', 'supabase', 'migrations');
 
@@ -56,5 +65,15 @@ describe('aceite dos termos e da política (A1)', () => {
     const after = await repo.acceptLegalTerms('ac-0002', LEGAL_VERSION);
     expect(after.version).toBe(LEGAL_VERSION);
     expect(legalAcceptanceNeeded(after)).toBe(false);
+  });
+
+  it('aviso de mudança (A5): só enquanto a próxima versão não vale; hoje não há mudança marcada', () => {
+    expect(LEGAL_NEXT).toBeNull();
+    expect(legalChangeNotice(null, '2026-11-05')).toBeNull();
+    const next = { version: 2, effectiveOn: '2026-12-10', summary: 'Mudou o prazo de guarda das cópias de segurança.' };
+    expect(legalChangeNotice(next, '2026-11-05')).toBe(
+      'Os termos de uso e a política de privacidade mudam em 10/12/2026. Mudou o prazo de guarda das cópias de segurança.',
+    );
+    expect(legalChangeNotice(next, '2026-12-10')).toBeNull();
   });
 });

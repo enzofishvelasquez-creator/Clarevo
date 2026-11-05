@@ -2,6 +2,8 @@
  * Aceite dos termos de uso e da política de privacidade (A1, aprovada em 04/11/2026; migração 0024). Fica fora de legal.ts porque as
  * funções do servidor (WhatsApp e Telegram) embutem aquele arquivo.
  */
+import { formatDateBR, type IsoDate } from './dates';
+
 // ---------------------------------------------------------------------------
 // Aceite dos termos e da política (A1, migração 0024)
 // ---------------------------------------------------------------------------
@@ -53,3 +55,27 @@ export const LEGAL_ACCEPT_TEXT = {
   failed: 'Não foi possível guardar o aceite agora. Tente de novo em instantes.',
   openFailed: 'Não foi possível abrir a página agora. Tente de novo em instantes.',
 } as const;
+
+/**
+ * Próxima versão dos textos, anunciada com pelo menos 30 dias de antecedência (A5): a versão, o dia em que passa a valer e um resumo
+ * curto do que muda. `null` quando não há mudança marcada. Junto com a troca, a equipe manda o aviso por e-mail.
+ */
+export interface LegalNextVersion {
+  version: number;
+  effectiveOn: IsoDate;
+  summary: string;
+}
+
+export const LEGAL_NEXT: LegalNextVersion | null = null;
+
+/** Antecedência mínima do aviso, em dias (A5). */
+export const LEGAL_NOTICE_DAYS = 30;
+
+/** O aviso no Resumo enquanto a próxima versão não vale; nulo sem mudança marcada ou depois que ela passa a valer. */
+export function legalChangeNotice(next: LegalNextVersion | null, today: IsoDate): string | null {
+  if (!next || today >= next.effectiveOn) return null;
+  return `Os termos de uso e a política de privacidade mudam em ${formatDateBR(next.effectiveOn)}. ${next.summary}`;
+}
+
+/** O link do aviso: a página de versões do site. */
+export const LEGAL_NOTICE_LINK = 'Ver o que muda';

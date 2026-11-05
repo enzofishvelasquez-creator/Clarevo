@@ -58,7 +58,7 @@ O advogado confere depois; se o Enzo aprovar, a equipe troca os marcadores pelo 
 ## D. Equipe (sem depender de ninguém, depois das decisões A)
 
 1. Registro da versão aceita dos termos e da política e da data (A1), com migração e testes. **Feito em 05/11/2026** (migração 0024, aviso de aceite no app, termos e política sem os marcadores da A1, A2 e A5).
-2. Aviso de mudança dos textos no app (A5).
+2. Aviso de mudança dos textos no app (A5). **Feito em 05/11/2026:** aviso no Resumo enquanto a próxima versão anunciada (`LEGAL_NEXT`, em `packages/core/src/aceite.ts`) não vale, com o link para a página de versões; o novo aceite aparece quando a versão nova passa a valer. O e-mail aos usuários é mandado pela equipe.
 3. Apagar do aparelho as preferências da conta ao sair (A9). **Feito em 05/11/2026**, com a política (seção 9) e a A11 no texto.
 4. Tirar do texto publicado as seções do que está desligado (A14, A15) e guardar à parte.
 5. Página de licenças de código aberto (termos, seção de propriedade intelectual): lista gerada dos pacotes que vão no app, publicada no site e com link no app.
