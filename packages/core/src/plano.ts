@@ -110,7 +110,9 @@ export const ACCESS_TEXT = {
     { plan: 'familiar' as const, who: `Para você e as pessoas da sua Família na Clarevo, até ${FAMILY_MAX_PEOPLE} pessoas.` },
   ],
   plansNote: `Os dois planos têm tudo o que a Clarevo oferece. Toda conta começa com ${TRIAL_DAYS} dias grátis, sem cartão. Cancele quando quiser.`,
+  /** Na web. No app das lojas vale `howToPayStore`: a Apple e o Google não aceitam app que aponte para pagamento fora da loja. */
   howToPay: 'No celular, a assinatura é feita pela App Store ou pelo Google Play. Na web, por cartão ou Pix.',
+  howToPayStore: 'No celular, a assinatura é feita pela loja de aplicativos do aparelho.',
   notOpenYet: 'A assinatura pelo app abre no lançamento. Até lá, nada é cobrado.',
   readOnlyWhat: 'Em só ver e exportar, os seus dados continuam guardados: você vê tudo, exporta e pode excluir a conta, mas não anota nem muda nada.',
   benefitNote: 'Se a sua empresa oferece a Clarevo como benefício, use o link do convite: com o benefício, nada a pagar.',
@@ -160,7 +162,7 @@ export function accessView(access: Access, now: Date, timeZone: string): AccessV
     case 'assinatura':
       return {
         situation: `Plano ${PLAN_NAME[access.plan ?? 'individual']}`,
-        body: `Assinatura ativa${date ? `, renova em ${date}` : ''}. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou: a App Store, o Google Play ou a página de assinatura na web.`,
+        body: `Assinatura ativa${date ? `, renova em ${date}` : ''}. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.`,
         showPlans: false,
       };
     case 'beneficio':

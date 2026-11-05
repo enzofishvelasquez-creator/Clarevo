@@ -48,7 +48,7 @@ O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que 
 
 | # | O quê | Quem |
 |---|---|---|
-| 2.1 | Primeiro build Android (`preview`, APK por link) e teste no celular do Enzo | Enzo, com roteiro da equipe |
+| 2.1 | Primeiro build Android (`preview`, APK por link) e teste no celular do Enzo. Lista do que falta e do que conferir: `docs/40_PRIMEIRO_BUILD.md` | Enzo, com roteiro da equipe |
 | 2.2 | Teste em aparelho dos itens abertos (`docs/04`): câmera da nota, leitura de print e boleto, biometria, lembretes, exportar, importar, letra grande, e-mail de confirmação abrindo o app | Enzo |
 | 2.3 | Corrigir o que o teste mostrar | Equipe |
 | 2.4 | Conta de teste para a revisão das lojas, com dados fictícios (`docs/16`, seção 5) | Enzo |

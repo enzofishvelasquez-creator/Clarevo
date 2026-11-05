@@ -6,6 +6,8 @@
 
 ## 1. Resumo
 
+**Lista do primeiro build, atualizada em 05/11/2026: `docs/40_PRIMEIRO_BUILD.md`** (o que a equipe conferiu sem as contas, o que falta antes do primeiro build e o que conferir no aparelho). Nessa conferência, a câmera estava bloqueada no app do celular desde a foto das metas (D-077) e foi corrigida; ver a seção 8.
+
 | | Estado |
 |---|---|
 | Configuração de build (`apps/app/eas.json`, `apps/app/app.json`, `apps/app/app.config.js`) | Pronta e validada (seção 8), sem nenhum identificador de conta. Nunca rodou um build de verdade: o primeiro é do Enzo. O perfil `preview-widget` (D-063 item 3) liga o widget da tela inicial só para teste (`docs/21`) |
@@ -33,8 +35,8 @@ Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no
 | 5 | **Pessoa responsável pelas contas** (titular da conta Apple, "Account Holder") | Quem tem poder de assinar pela empresa | A Apple exige que a pessoa que inscreve a organização tenha autoridade legal para vinculá-la (dona ou fundador, diretoria, líder sênior ou quem recebeu autoridade por escrito): `developer.apple.com/programs/enroll/` |
 | 6 | Nome do app nas lojas | "Clarevo" (alternativa: "Clarevo: bem-estar financeiro") | O nome só vale para um app por localização na Apple; se estiver em uso, a Apple oferece alternativas (`.../add-a-new-app`) |
 | 7 | Classificação etária (P-002) | 4+ pelo questionário; 18+ por substituição se os termos exigirem | Se o contrato de uso tem idade mínima acima da calculada, a Apple exige substituir (`.../manage-app-information/set-an-app-age-rating`) |
-| 8 | Declaração de exportação de criptografia (`ITSAppUsesNonExemptEncryption`) | **Não foi escrita em `app.json`.** O app usa HTTPS e resumo SHA-256 | A Apple avisa que quem declara isenção responde por erro de interpretação (`.../manage-app-information/overview-of-export-compliance`). Sem a chave, o App Store Connect pergunta a cada build; depois de decidir, a chave `ios.config.usesNonExemptEncryption` em `app.json` evita a pergunta |
-| 9 | Backup automático do Android (`android.allowBackup`) | **Não foi mexido** (padrão do Android, ligado) | Com ele ligado, o Android copia os dados do app para o Google Drive da pessoa. Para um app financeiro, a recomendação é `"allowBackup": false` em `app.json`; é uma linha, mas muda o que a pessoa recebe ao trocar de celular |
+| 8 | Declaração de exportação de criptografia (`ITSAppUsesNonExemptEncryption`) | Escrita em `app.json` em 03/11/2026 (`ios.config.usesNonExemptEncryption: false`, aprovada). O app usa HTTPS e resumo SHA-256 | A Apple avisa que quem declara isenção responde por erro de interpretação (`.../manage-app-information/overview-of-export-compliance`). Sem a chave, o App Store Connect pergunta a cada build; depois de decidir, a chave `ios.config.usesNonExemptEncryption` em `app.json` evita a pergunta |
+| 9 | Backup automático do Android (`android.allowBackup`) | Desligado em 03/11/2026 (`"allowBackup": false`, aprovado) | Com ele ligado, o Android copia os dados do app para o Google Drive da pessoa. Para um app financeiro, a recomendação é `"allowBackup": false` em `app.json`; é uma linha, mas muda o que a pessoa recebe ao trocar de celular |
 | 10 | Os 4 últimos dígitos do cartão nas respostas de privacidade; compras no cartão e notas entram em "outras informações financeiras" nas duas lojas | Declarar por prudência (ou tirar o campo) | `docs/lojas/privacidade.md`, seções 1 a 3 |
 | 11 | Sentry (relatório de falhas) antes do lançamento? | Instalar antes, com `sendDefaultPii` desligado | Muda as respostas de diagnóstico nas duas lojas e a política |
 | 12 | Preço | Gratuito no lançamento (cobrança está fora do ciclo atual, P-005) | Com cobrança ou compra dentro do app, entram acordos e formulários que não estão aqui; conferir na página oficial |
@@ -209,7 +211,7 @@ O ícone da notificação (`notification-icon.png`) e o favicon continuam como e
 | Vibração | `expo-haptics`, em 28 arquivos de telas e formulários | Android `VIBRATE` |
 | Internet | Supabase | Android `INTERNET` |
 | Compartilhar a exportação, escolher arquivo | `lib/export-share.ts` (`expo-sharing`, `expo-print`, cache do app) e `expo-document-picker` | Nenhuma permissão: usam a folha de compartilhamento e o seletor do sistema |
-| Fotos e leitura de imagem | `lib/goal-photo.ts` (foto da meta, D-077) e `lib/image-pick.ts` (print ou foto de comprovante, holerite ou boleto, D-078 B), pelo seletor do sistema: só a imagem escolhida chega ao app. O texto é lido no aparelho por `lib/ocr.ts` (`expo-text-extractor`: Apple Vision no iPhone, ML Kit do Google no Android, com o modelo baixado na instalação pelo plugin `plugins/leitura-imagem.js`) | iOS: o seletor de fotos do sistema não pede permissão; o texto do plugin `expo-image-picker` (`photosPermission`) fica para versões antigas. Android: nenhuma permissão a mais (o seletor do sistema) |
+| Fotos e leitura de imagem | `lib/goal-photo.ts` (foto da meta, D-077) e `lib/image-pick.ts` (print ou foto de comprovante, holerite ou boleto, D-078 B), pelo seletor do sistema: só a imagem escolhida chega ao app. O texto é lido no aparelho por `lib/ocr.ts` (`expo-text-extractor`: Apple Vision no iPhone, ML Kit do Google no Android, com o modelo baixado na instalação pelo plugin `plugins/leitura-imagem.js`) | iOS: o seletor de fotos do sistema não pede permissão; o texto do plugin `expo-image-picker` (`photosPermission`) fica para versões antigas. Android: nenhuma permissão a mais (o seletor do sistema). **"Tirar uma foto" usa a câmera pelo `expo-image-picker`:** o `cameraPermission` desse plugin tem o mesmo texto do `expo-camera` e nunca pode ser `false`, porque `false` bloqueia a CAMERA no Android e apaga o texto da câmera no iOS para o app inteiro (aconteceu de 31/10 a 05/11/2026; `packages/core/test/lojas.test.ts` confere a configuração resolvida pelos plugins) |
 
 **Removidas do Android com `blockedPermissions`:** `READ_EXTERNAL_STORAGE` e `WRITE_EXTERNAL_STORAGE` (vêm do `expo-file-system` e do modelo do projeto, só até o Android 12L, e o app não acessa o armazenamento) e `SYSTEM_ALERT_WINDOW` (vem do modelo do projeto, só serve ao desenvolvimento). Pelo código das bibliotecas, o Android final deve ter exatamente: `CAMERA`, `INTERNET`, `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `USE_BIOMETRIC`, `USE_FINGERPRINT` e `VIBRATE`.
 
@@ -220,7 +222,7 @@ O ícone da notificação (`notification-icon.png`) e o favicon continuam como e
 3. **Página pública de exclusão da conta e dos dados**, exigida pelo Google na "Segurança dos dados" (a exclusão pelo app já existe). A página `excluir-conta` já está em `site/` (gerada de `docs/legal/exclusao-de-conta.md`); falta a mesma revisão e a publicação.
 4. Domínio, e-mail de suporte e de recuperação (P-006, P-008, P-023). O site já existe em `site/` e vai ao Cloudflare Pages (`docs/07`) depois da revisão do advogado.
 5. ~~Gráfico de recursos do Google Play (1024 x 500)~~ **Feito** (D-064): `apps/app/assets/loja/grafico-recursos-1024x500.png`, seção 6. Falta só conferir o formato na página oficial do Play Console.
-6. Migração 0015 colada e conferida no Supabase de produção (`docs/05`).
+6. ~~Migração 0015 colada e conferida no Supabase de produção (`docs/05`).~~ Feito: produção em dia até a 0025 (05/11/2026).
 7. Decisões 1 a 13 da seção 2.
 8. Conta de teste da revisão (seção 5).
 9. Teste em aparelho e teste de usabilidade (seção 4, fase 4).
