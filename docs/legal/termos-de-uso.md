@@ -99,7 +99,7 @@ A marca "clarevo.", o logotipo, os textos, o design e o código da Clarevo perte
 
 Os seus dados continuam sendo seus. A Clarevo trata esses dados para prestar o serviço que você contratou e para cumprir obrigações legais, como explica a Política de Privacidade.
 
-O app usa programas de código aberto, cada um com a sua licença. [A DEFINIR: tela de licenças no app]
+O app usa programas de código aberto, cada um com a sua licença. A lista, com a versão e a licença de cada um, está na página [Licenças de código aberto](licencas.html), que também abre pelo app, em Conta.
 
 ## 11. Excluir a conta e encerrar o uso
 

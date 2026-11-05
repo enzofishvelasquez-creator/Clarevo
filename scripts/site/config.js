@@ -86,6 +86,7 @@ const RODAPE_COLUNAS = [
     links: [
       { arquivo: 'seguranca.html', rotulo: 'Segurança e privacidade' },
       ...PAGINAS_LEGAIS.map((p) => ({ arquivo: p.arquivo, rotulo: p.rotulo })),
+      { arquivo: 'licencas.html', rotulo: 'Licenças de código aberto' },
       { arquivo: 'novidades/como-escrevemos.html', rotulo: 'Como escrevemos' },
     ],
   },

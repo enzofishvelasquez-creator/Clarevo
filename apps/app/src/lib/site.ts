@@ -33,9 +33,18 @@ export async function openSitePage(page: SitePage): Promise<boolean> {
  * que as funções do servidor embutem. Devolve `false` sem endereço do site ou se o sistema não conseguiu abrir.
  */
 export async function openLegalVersionsPage(): Promise<boolean> {
+  return openSiteFile('versoes.html');
+}
+
+/** Abre a página de licenças de código aberto (D5), em Conta, "Privacidade e termos". Fora de `SITE_PAGES` pelo mesmo motivo. */
+export async function openLicensesPage(): Promise<boolean> {
+  return openSiteFile('licencas.html');
+}
+
+async function openSiteFile(file: string): Promise<boolean> {
   if (!SITE_URL) return false;
   try {
-    await Linking.openURL(`${SITE_URL}/versoes.html`);
+    await Linking.openURL(`${SITE_URL}/${file}`);
     return true;
   } catch {
     return false;

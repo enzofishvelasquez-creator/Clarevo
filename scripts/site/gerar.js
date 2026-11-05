@@ -27,7 +27,7 @@ const { nucleo } = require('./nucleo');
 const { paginasNovidades } = require('./paginas/novidades');
 const { paginasAjuda, conferirCobertura } = require('./paginas/ajuda');
 const { paginaSeguranca } = require('./paginas/seguranca');
-const { paginaSobre, paginaSuporte, paginaLegal, pagina404 } = require('./paginas/outras');
+const { paginaSobre, paginaSuporte, paginaLegal, paginaLicencas, pagina404 } = require('./paginas/outras');
 
 const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê este arquivo e não o publica.
 # Nenhum recurso de fora é permitido: o site não carrega fontes, imagens, scripts nem estilos de outros endereços.
@@ -145,6 +145,7 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
     problemasFinais.push(...pg.problemasFinais);
     juntar({ ...pg, arquivo: p.arquivo });
   }
+  juntar(paginaLicencas(ctx));
   juntar(pagina404(ctx));
 
   for (const pg of paginas) {

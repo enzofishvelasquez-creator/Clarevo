@@ -114,6 +114,7 @@ const PAGINAS_BASE = [
   'termos.html',
   'excluir-conta.html',
   'versoes.html',
+  'licencas.html',
   '404.html',
 ];
 /** As dez calculadoras do app (D-066), na ordem do catálogo, e o índice delas. */
@@ -566,6 +567,16 @@ describe('site público: as páginas geradas', () => {
     };
     visitar(SITE, '');
     expect(achados.filter((a) => a !== 'dados-da-empresa.json' && !gerado.arquivos.has(a))).toEqual([]);
+  });
+
+  it('a lista de licenças (licencas.html) está em dia com o package-lock.json e tem a versão e a licença de cada pacote', () => {
+    const r = spawnSync(process.execPath, [join(ROOT, 'scripts', 'gerar-licencas.js'), '--conferir'], { encoding: 'utf8' });
+    expect(r.status, r.stderr).toBe(0);
+    const lista = JSON.parse(readFileSync(join(ROOT, 'site-src', 'licencas.json'), 'utf8')) as { nome: string; versao: string; licenca: string }[];
+    expect(lista.length).toBeGreaterThan(100);
+    for (const nome of ['react', 'react-native', 'expo', '@supabase/supabase-js']) expect(lista.some((i) => i.nome === nome), nome).toBe(true);
+    expect(lista.every((i) => i.versao && i.licenca)).toBe(true);
+    expect(html('licencas.html')).toContain('<td>react-native</td>');
   });
 
   it('cada página legal vem do Markdown quando ele existe e, senão, sai como espaço reservado com [A DEFINIR]', () => {

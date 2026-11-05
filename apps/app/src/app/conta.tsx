@@ -45,12 +45,15 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
-import { SITE_URL, openSitePage, openSupportEmail } from '@/lib/site';
+import { SITE_URL, openLicensesPage, openSitePage, openSupportEmail } from '@/lib/site';
 import { useCompanies } from '@/state/company';
 import { useWork } from '@/state/data';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
+
+/** O botão da página de licenças (D5). O texto fica aqui, e não em LEGAL_TEXT, porque core/legal.ts vai nas funções do servidor. */
+const LICENSES_LABEL = 'Licenças de código aberto';
 
 type Msg = { tone: 'erro' | 'sucesso' | 'info'; text: string } | null;
 
@@ -302,6 +305,16 @@ export default function ContaScreen() {
             <Button label={LEGAL_TEXT.account.privacy} icon={ShieldCheck} tone="soft" onPress={() => openSite('privacidade')} />
             <Button label={LEGAL_TEXT.account.terms} icon={FileText} tone="soft" onPress={() => openSite('termos')} />
             <Button label={LEGAL_TEXT.account.deletion} icon={Trash2} tone="soft" onPress={() => openSite('exclusao')} />
+            {/* Licenças de código aberto (D5): a página do site com a lista dos pacotes do app. */}
+            <Button
+              label={LICENSES_LABEL}
+              icon={FileText}
+              tone="soft"
+              onPress={async () => {
+                setSiteFailed(false);
+                if (!(await openLicensesPage())) setSiteFailed(true);
+              }}
+            />
           </Card>
         ) : null}
 
