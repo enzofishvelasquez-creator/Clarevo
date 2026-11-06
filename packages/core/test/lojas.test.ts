@@ -1,5 +1,7 @@
 /// <reference types="node" />
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -163,14 +165,57 @@ describe('configuração de publicação', () => {
     expect(app.ios.supportsTablet).toBe(false);
   });
 
-  it('app.json: textos de permissão do iOS em português, sem microfone nem fotos (o app não usa)', () => {
+  it('app.json: textos de permissão do iOS em português, sem microfone (o app não usa)', () => {
     const plugins = Object.fromEntries((app.plugins as unknown[]).filter(Array.isArray).map((p) => [(p as unknown[])[0], (p as unknown[])[1]]));
     expect(plugins['expo-camera'].cameraPermission).toMatch(/^A Clarevo usa a câmera só para ler o código da nota fiscal/);
     expect(plugins['expo-camera'].microphonePermission).toBe(false);
     expect(plugins['expo-camera'].recordAudioAndroid).toBe(false);
+    // A câmera do leitor de documentos (lib/image-pick.ts) é a do expo-image-picker: `false` aqui bloquearia a câmera do app inteiro.
+    expect(plugins['expo-image-picker'].cameraPermission).toBe(plugins['expo-camera'].cameraPermission);
     expect(plugins['expo-local-authentication'].faceIDPermission).toMatch(/^A Clarevo usa o Face ID só para desbloquear o app/);
     expect(JSON.stringify(app)).not.toMatch(/NSPhotoLibrary|NSMicrophone|READ_MEDIA|ACCESS_FINE_LOCATION|RECORD_AUDIO/);
   });
+
+  it('configuração nativa resolvida pelos plugins (o que o build gera): câmera liberada nas duas plataformas, sem microfone', () => {
+    // `expo config --type introspect` roda os plugins como o build roda. Pegou um caso real: `cameraPermission: false` no plugin do
+    // expo-image-picker bloqueava a CAMERA no Android e apagava o texto da câmera no iOS (o app fecharia ao abrir o leitor da nota).
+    const cli = createRequire(raiz('apps/app/package.json')).resolve('expo/bin/cli');
+    const out = execFileSync(process.execPath, [cli, 'config', '--type', 'introspect', '--json'], {
+      cwd: raiz('apps/app'),
+      env: { ...process.env, EXPO_NO_TELEMETRY: '1', EXPO_OFFLINE: '1', CLAREVO_WIDGET: '' },
+      encoding: 'utf8',
+      timeout: 60_000,
+    });
+    const mods = JSON.parse(out)._internal.modResults;
+    const plist = mods.ios.infoPlist;
+    expect(plist.NSCameraUsageDescription).toMatch(/^A Clarevo usa a câmera só para ler o código da nota fiscal/);
+    expect(plist.NSFaceIDUsageDescription).toMatch(/^A Clarevo usa o Face ID só para desbloquear o app/);
+    expect(plist.NSPhotoLibraryUsageDescription).toMatch(/^A Clarevo usa as suas fotos só quando você escolhe/);
+    expect(plist.NSMicrophoneUsageDescription).toBeUndefined();
+    expect(plist.ITSAppUsesNonExemptEncryption).toBe(false);
+    // Português como único idioma do app: as telas do sistema dentro do app (escolher foto, compartilhar) saem em português. Sem
+    // CFBundleAllowMixedLocalizations, que faria essas telas seguirem o idioma do aparelho.
+    expect([plist.CFBundleDevelopmentRegion, plist.CFBundleLocalizations, plist.CFBundleAllowMixedLocalizations]).toEqual(['pt-BR', ['pt-BR'], undefined]);
+    const perms = (mods.android.manifest.manifest['uses-permission'] as { $: Record<string, string> }[]).map((p) => p.$);
+    const ativa = (n: string) => perms.some((p) => p['android:name'] === `android.permission.${n}` && p['tools:node'] !== 'remove');
+    const bloqueada = (n: string) => perms.some((p) => p['android:name'] === `android.permission.${n}` && p['tools:node'] === 'remove');
+    for (const n of ['CAMERA', 'INTERNET', 'USE_BIOMETRIC', 'VIBRATE']) expect(ativa(n), n).toBe(true);
+    for (const n of ['CAMERA', 'INTERNET', 'USE_BIOMETRIC', 'VIBRATE']) expect(bloqueada(n), n).toBe(false);
+    for (const n of ['RECORD_AUDIO', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE', 'SYSTEM_ALERT_WINDOW']) expect(bloqueada(n), n).toBe(true);
+    expect(mods.android.manifest.manifest.application[0].$['android:allowBackup']).toBe('false');
+    // Marca dos modelos do ML Kit: o expo-camera declara a mesma no manifesto dele. Valores diferentes param a junção dos manifestos
+    // no build; a do app precisa listar todo modelo da biblioteca e substituir a dela.
+    const meta = (mods.android.manifest.manifest.application[0]['meta-data'] as { $: Record<string, string> }[])
+      .map((m) => m.$)
+      .find((m) => m['android:name'] === 'com.google.mlkit.vision.DEPENDENCIES');
+    expect(meta?.['tools:replace']).toBe('android:value');
+    expect(mods.android.manifest.manifest.$['xmlns:tools']).toBe('http://schemas.android.com/tools');
+    const camera = readFileSync(createRequire(raiz('apps/app/package.json')).resolve('expo-camera/android/src/main/AndroidManifest.xml'), 'utf8');
+    const daBiblioteca = [...camera.matchAll(/com\.google\.mlkit\.vision\.DEPENDENCIES"\s+android:value="([^"]+)"/g)].flatMap((m) => (m[1] ?? '').split(','));
+    expect(daBiblioteca.length).toBeGreaterThan(0);
+    const doApp = (meta?.['android:value'] ?? '').split(',');
+    for (const modelo of [...daBiblioteca, 'ocr']) expect(doApp, modelo).toContain(modelo);
+  }, 90_000);
 
   it('app.json: no Android, as permissões que vêm por padrão e o app não usa ficam bloqueadas', () => {
     expect(app.android.blockedPermissions).toEqual([

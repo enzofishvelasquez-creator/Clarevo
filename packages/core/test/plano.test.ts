@@ -12,6 +12,7 @@ import {
   accessBanner,
   accessView,
   demoTrialAccess,
+  guideEntry,
   parseAccess,
   planPrice,
   trialDaysLeft,
@@ -58,6 +59,22 @@ describe('assinatura paga (D-083): preços e textos', () => {
       expect(t).not.toMatch(/fa(z|ç)er? sentido|faz sentido/i);
       expect(t).not.toMatch(/D-0\d\d|cofrinho|caixinha|investimento|empréstimo|crédito pessoal/i);
     }
+  });
+
+  it('no app das lojas, nada aponta para pagamento fora da loja (a Apple e o Google recusam)', () => {
+    const store = [
+      ACCESS_TEXT.howToPayStore,
+      ...(['pre_lancamento', 'teste', 'leitura', 'assinatura', 'beneficio', 'cortesia', 'familia'] as const).map(
+        (s) => accessView(at(s, '2026-11-18T13:00:00.000Z', s === 'assinatura' ? 'familiar' : null), NOW, TZ).body,
+      ),
+      ...Object.entries(ACCESS_TEXT)
+        .filter(([k, v]) => k !== 'howToPay' && typeof v === 'string')
+        .map(([, v]) => v as string),
+      // O guia "Como usar o app" também aparece no app das lojas.
+      ...(guideEntry('assinatura')?.steps ?? ['sem o tema assinatura no guia']),
+    ];
+    for (const t of store) expect(t).not.toMatch(/\bweb\b|Pix|site|boleto/i);
+    expect(ACCESS_TEXT.howToPay).toContain('Na web, por cartão ou Pix.');
   });
 });
 

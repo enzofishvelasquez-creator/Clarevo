@@ -15,6 +15,10 @@
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "CFBundleDevelopmentRegion": "pt-BR",
+        "CFBundleLocalizations": ["pt-BR"]
       }
     },
     "android": {
@@ -60,7 +64,7 @@
         "expo-image-picker",
         {
           "photosPermission": "A Clarevo usa as suas fotos só quando você escolhe uma imagem para uma meta ou um print ou foto de comprovante ou boleto para ler.",
-          "cameraPermission": false,
+          "cameraPermission": "A Clarevo usa a câmera só para ler o código da nota fiscal ou do boleto e para fotografar um documento que você quer ler. Nenhuma foto é guardada.",
           "microphonePermission": false
         }
       ],

@@ -25,7 +25,7 @@ import { improveCameraFocus } from '@/lib/camera-focus';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { invoiceHref } from '@/lib/cards';
 import { imageTooBig } from '@/lib/comprovante-read';
-import { pickImageForReading } from '@/lib/image-pick';
+import { discardPickedImage, pickImageForReading } from '@/lib/image-pick';
 import { useCard, useCardEntry, useRecord } from '@/state/data';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -141,6 +141,7 @@ export function PasteModal({
     if (picked.kind === 'sem_permissao') picked = await pickImageForReading('galeria');
     if (picked.kind === 'cancelado') return;
     if (picked.kind !== 'ok' || imageTooBig(picked.image)) {
+      await discardPickedImage(picked);
       setPhotoError(NOTA_TEXT.keyPhotoNone);
       return;
     }
@@ -154,6 +155,7 @@ export function PasteModal({
     } catch {
       setPhotoError(NOTA_TEXT.keyPhotoNone);
     } finally {
+      await discardPickedImage(picked);
       setPhotoBusy(false);
     }
   }

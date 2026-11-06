@@ -10,7 +10,7 @@ import {
 } from '@clarevo/core';
 import { router } from 'expo-router';
 import { CreditCard, Hourglass, LockKeyhole } from 'lucide-react-native';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { Banner, Button, Card, LinkButton, Txt } from '@/components/ui';
 import { useAccess } from '@/state/access';
@@ -108,7 +108,7 @@ export function PlansCard({ access }: { access: Access }) {
         {T.plansNote}
       </Txt>
       <Txt variant="caption" color={colors.textSecondary}>
-        {T.howToPay}
+        {Platform.OS === 'web' ? T.howToPay : T.howToPayStore}
       </Txt>
       {SUBSCRIBE_OPEN ? null : (
         <Txt variant="caption" style={{ fontFamily: fonts.bold }}>

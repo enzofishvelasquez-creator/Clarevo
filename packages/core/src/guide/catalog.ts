@@ -783,7 +783,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Em ${q(ACCESS_TEXT.situation)}, veja como está o seu acesso. Toda conta começa com ${TRIAL_DAYS} dias grátis, sem cartão, e a tela diz quando o teste termina.`,
       `Nos últimos ${TRIAL_WARNING_DAYS} dias do teste, o Resumo mostra um aviso com ${q(ACCESS_TEXT.bannerAction)}.`,
       'Sem assinatura depois do teste, a conta fica só para ver e exportar: os seus dados continuam guardados, você vê tudo, exporta e pode excluir a conta, mas não anota nem muda nada.',
-      `Em ${q(ACCESS_TEXT.plansTitle)}, compare o Individual e o Família. No celular, a assinatura é feita pela loja de aplicativos; na web, por cartão ou Pix. Cancele quando quiser.`,
+      `Em ${q(ACCESS_TEXT.plansTitle)}, compare o Individual e o Família. No celular, a assinatura é feita pela loja de aplicativos do aparelho. Cancele quando quiser.`,
       'Com o benefício da empresa ou no Plano Família de outra pessoa, nada a pagar: a situação mostra quem cobre o seu acesso.',
     ],
     screenName: ACCESS_TEXT.screenTitle,
