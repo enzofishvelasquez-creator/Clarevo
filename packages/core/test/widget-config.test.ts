@@ -163,18 +163,20 @@ describe('widget: perfis do EAS', () => {
 
   it('preview e production seguem exatamente como eram, sem a variável', () => {
     const { build } = eas();
+    // `image: latest` entrou em 06/11/2026 porque o build pelo GitHub exige a imagem declarada (docs/40, seção 2a).
     expect(build.preview).toEqual({
       distribution: 'internal',
       environment: 'preview',
       autoIncrement: true,
-      android: { buildType: 'apk' },
-      ios: { distribution: 'store' },
+      android: { buildType: 'apk', image: 'latest' },
+      ios: { distribution: 'store', image: 'latest' },
     });
     expect(build.production).toEqual({
       distribution: 'store',
       environment: 'production',
       autoIncrement: true,
-      android: { buildType: 'app-bundle' },
+      android: { buildType: 'app-bundle', image: 'latest' },
+      ios: { image: 'latest' },
     });
     expect(JSON.stringify(build.preview)).not.toContain('CLAREVO_WIDGET');
     expect(JSON.stringify(build.production)).not.toContain('CLAREVO_WIDGET');
