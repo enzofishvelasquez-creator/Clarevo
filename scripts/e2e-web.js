@@ -28,7 +28,8 @@
  * no máximo um título de nível 1 por tela e nenhum salto de nível, conferidos em toda leitura de tela do roteiro e nas 63 telas) na versão
  * web, em modo demonstração (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
- * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
+ * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH (outra
+ * versão do Chromium, como a pré-instalada em /opt/pw-browsers/chromium quando a rede não baixa a fixada).
  * Se o roteiro parar no meio, a tela do momento vai para a pasta temporária do sistema (nunca para docs/telas/).
  */
 const http = require('http');
@@ -53,7 +54,10 @@ fs.mkdirSync(OUT, { recursive: true });
 const results = [];
 const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', name, extra]); };
 (async () => {
-  const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+  // O gesto de "voltar" por deslizar na horizontal fica desligado: versões novas do Chromium (1243) tratam o deslizar para a direita do
+  // bloco K1 (os cartões do Seu mês) como histórico do navegador e saem da tela; a 1194, fixada pelo Playwright 1.56.1, não.
+  const args = ['--disable-features=OverscrollHistoryNavigation'];
+  const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args } : { args });
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, reducedMotion: process.env.REDUZIR_MOVIMENTO ? 'reduce' : 'no-preference' });
   // Só para o roteiro: "outro aparelho" da mesma pessoa. Na demonstração, os dados ficam num repositório em memória; este
   // atalho acha a sessão e o QueryClient na árvore atual do React para gravar como outro aparelho faria (ou simular uma
