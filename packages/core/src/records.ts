@@ -692,6 +692,6 @@ export type CardEntryInput =
 
 export const NO_CATEGORY_LABEL = 'Sem categoria';
 export const CATEGORIES: Record<RecordKind, readonly string[]> = {
-  despesa: ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer'],
+  despesa: ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas'],
   receita: ['Salário', 'Renda extra', 'Reembolso'],
 };

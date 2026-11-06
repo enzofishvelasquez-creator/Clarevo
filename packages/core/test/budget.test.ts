@@ -70,7 +70,7 @@ describe('usado no mês por categoria (competência)', () => {
       ],
       entries: [],
     });
-    expect(used).toEqual({ Moradia: 0, Mercado: 42_230, Transporte: 0, 'Saúde': 0, 'Educação': 0, Lazer: 2_500 });
+    expect(used).toEqual({ Moradia: 0, Mercado: 42_230, Transporte: 0, 'Saúde': 0, 'Educação': 0, Lazer: 2_500, 'Crédito e parcelas': 0 });
     expect(Object.keys(used)).toEqual([...BUDGET_CATEGORIES]);
   });
 
@@ -85,7 +85,7 @@ describe('usado no mês por categoria (competência)', () => {
   it('compra parcelada: cada parcela conta no mês da compra mais (k - 1), com o resto de centavos na primeira', () => {
     const entries = [purchase('Lazer', 60_000, 3, '2026-10-05'), purchase('Educação', 15_000, 10, '2026-10-05'), purchase('Mercado', 100, 3, '2026-10-20')];
     const at = (m: string) => categoryUsage(m, { records: [], entries });
-    expect(at('2026-09')).toEqual({ Moradia: 0, Mercado: 0, Transporte: 0, 'Saúde': 0, 'Educação': 0, Lazer: 0 });
+    expect(at('2026-09')).toEqual({ Moradia: 0, Mercado: 0, Transporte: 0, 'Saúde': 0, 'Educação': 0, Lazer: 0, 'Crédito e parcelas': 0 });
     expect(at('2026-10')).toMatchObject({ Lazer: 20_000, 'Educação': 1_500, Mercado: 34 });
     expect(at('2026-11')).toMatchObject({ Lazer: 20_000, 'Educação': 1_500, Mercado: 33 });
     expect(at('2026-12')).toMatchObject({ Lazer: 20_000, 'Educação': 1_500, Mercado: 33 });
@@ -196,7 +196,7 @@ describe('resumo do mês e textos', () => {
     expect(m.a11yLabel).toBe('Mercado, R$ 412,30 de R$ 1.200,00, 34,4% do orçamento. Faltam R$ 787,70.');
     expect(s.totalLine).toBe('Orçado R$ 1.200,00 · Usado R$ 412,30');
     expect(budgetCaption(s)).toBe('Mercado: R$ 412,30 de R$ 1.200,00');
-    expect(s.without).toEqual(['Moradia', 'Transporte', 'Saúde', 'Educação', 'Lazer']);
+    expect(s.without).toEqual(['Moradia', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas']);
   });
 
   it('acima do orçamento: "R$ 12,30 acima do orçamento", barra cheia e percentual real', () => {
@@ -223,7 +223,7 @@ describe('resumo do mês e textos', () => {
 
   it('sem orçamento: "Nenhum orçamento definido", sem total', () => {
     const s = summarizeBudget(readMonthBudget('2026-10', [], { records: [], entries: [] }));
-    expect([s.hasAny, s.totalLine, s.nearest, budgetCaption(s), s.without.length]).toEqual([false, null, null, 'Nenhum orçamento definido', 6]);
+    expect([s.hasAny, s.totalLine, s.nearest, budgetCaption(s), s.without.length]).toEqual([false, null, null, 'Nenhum orçamento definido', 7]);
   });
 
   it('níveis pelo valor exato: 79,99% abaixo, 80% e 100% no nível 1, 100,01% passou', () => {
@@ -596,7 +596,7 @@ describe('a demonstração (fictícia): orçamento de outubro e limite de 60%', 
       ['Lazer', 'R$ 400,00 de R$ 300,00', '133,3%', 'R$ 100,00 acima do orçamento'],
     ]);
     expect(oct.totalLine).toBe('Orçado R$ 4.600,00 · Usado R$ 4.300,00');
-    expect(oct.without).toEqual(['Transporte', 'Saúde', 'Educação']);
+    expect(oct.without).toEqual(['Transporte', 'Saúde', 'Educação', 'Crédito e parcelas']);
     expect(budgetCaption(oct)).toBe('Lazer: R$ 400,00 de R$ 300,00');
     // Setembro, antes da vigência, não tem orçamento; novembro e dezembro seguem as parcelas do tênis (R$ 200,00).
     expect(summarizeBudget(await repo.getMonthBudget(ctx, '2026-09')).hasAny).toBe(false);
@@ -628,7 +628,7 @@ describe('a demonstração (fictícia): orçamento de outubro e limite de 60%', 
     expect(await repo.listCategoryBudgets(ctx)).toEqual([]);
     expect(await repo.listCommitmentLimits(ctx)).toEqual([]);
     const s = summarizeBudget(await repo.getMonthBudget(ctx, '2026-10'));
-    expect([s.hasAny, s.rows.length, s.without.length, budgetCaption(s)]).toEqual([false, 0, 6, 'Nenhum orçamento definido']);
+    expect([s.hasAny, s.rows.length, s.without.length, budgetCaption(s)]).toEqual([false, 0, 7, 'Nenhum orçamento definido']);
   });
 });
 

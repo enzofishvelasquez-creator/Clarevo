@@ -441,6 +441,7 @@ const __mods = [
     exports.MEMORY_LIMIT = void 0;
     exports.memoryKey = memoryKey;
     exports.categoryByRules = categoryByRules;
+    exports.categorySuggestionLabel = categorySuggestionLabel;
     exports.suggestCategory = suggestCategory;
     exports.rememberCategories = rememberCategories;
     const records_1 = __req(4);
@@ -451,6 +452,13 @@ const __mods = [
         return words.length === 0 ? null : words.join(' ');
     }
     const EXPENSE_RULES = [
+        {
+            category: 'Crédito e parcelas',
+            words: [
+                'emprestimo', 'financiamento', 'refinanciamento', 'consorcio', 'consignado', 'crediario', 'cdc', 'credito pessoal', 'cheque especial',
+                'prestacao', 'parcela do carro', 'parcela da casa', 'parcela do apartamento', 'parcela da moto', 'quitacao', 'amortizacao', 'juros do emprestimo',
+            ],
+        },
         { category: 'Saúde', words: ['farmacia', 'drogaria', 'clinica', 'consulta', 'laboratorio', 'exame', 'hospital', 'dentista', 'odontologia', 'medico', 'plano de saude', 'otica', 'psicologo', 'fisioterapia'] },
         { category: 'Educação', words: ['escola', 'faculdade', 'universidade', 'colegio', 'curso', 'matricula', 'livraria', 'papelaria', 'creche', 'mensalidade escolar'] },
         { category: 'Moradia', words: ['aluguel', 'condominio', 'iptu', 'energia', 'energia eletrica', 'luz', 'agua', 'esgoto', 'gas', 'internet', 'reforma', 'material de construcao', 'imobiliaria'] },
@@ -475,6 +483,9 @@ const __mods = [
                 return rule.category;
         }
         return null;
+    }
+    function categorySuggestionLabel(category) {
+        return { label: `Sugestão: ${category}`, a11y: `Usar a categoria sugerida, ${category}` };
     }
     function suggestCategory(description, kind, memory) {
         const key = memoryKey(description);
@@ -512,7 +523,7 @@ const __mods = [
     exports.MONTH_CHECK_KINDS = ['recebimentos', 'pagamentos'];
     exports.NO_CATEGORY_LABEL = 'Sem categoria';
     exports.CATEGORIES = {
-        despesa: ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer'],
+        despesa: ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas'],
         receita: ['Salário', 'Renda extra', 'Reembolso'],
     };
   },

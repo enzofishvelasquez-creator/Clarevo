@@ -8,6 +8,7 @@ import {
   buildReview,
   categoriesFor,
   categoryByRules,
+  categorySuggestionLabel,
   chunkItems,
   descriptionTokens,
   existingMonths,
@@ -204,6 +205,13 @@ describe('importar: categorias sugeridas', () => {
       ['Estacionamento', 'despesa', 'Transporte'],
       ['Restaurante Sabor', 'despesa', 'Lazer'],
       ['Cinema', 'despesa', 'Lazer'],
+      // D-086: empréstimo e financiamento antes das outras regras ("parcela do carro" é dívida, não transporte).
+      ['Empréstimo pessoal Banco Exemplo', 'despesa', 'Crédito e parcelas'],
+      ['Parcela do carro', 'despesa', 'Crédito e parcelas'],
+      ['Financiamento imobiliário', 'despesa', 'Crédito e parcelas'],
+      ['Consórcio do imóvel', 'despesa', 'Crédito e parcelas'],
+      ['Crédito consignado', 'despesa', 'Crédito e parcelas'],
+      ['Juros cheque especial', 'despesa', 'Crédito e parcelas'],
       ['Tarifa de manutenção', 'despesa', null],
       ['XPTO 123', 'despesa', null],
       ['', 'despesa', null],
@@ -216,6 +224,8 @@ describe('importar: categorias sugeridas', () => {
     for (const [text, kind, expected] of cases) expect(categoryByRules(text, kind), text).toBe(expected);
     // Palavra inteira: "bar" não está em "barato" nem "gas" em "gasolina" (esta tem a própria regra).
     expect(categoryByRules('Loja barata', 'despesa')).toBeNull();
+    // O atalho da sugestão no formulário (D-086).
+    expect(categorySuggestionLabel('Mercado')).toEqual({ label: 'Sugestão: Mercado', a11y: 'Usar a categoria sugerida, Mercado' });
     expect(categoryByRules('Gasolina', 'despesa')).toBe('Transporte');
     // Plural simples.
     expect(categoryByRules('Padarias reunidas', 'despesa')).toBe('Mercado');

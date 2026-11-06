@@ -2,10 +2,11 @@ import { CATEGORIES, type RecordKind } from '../records';
 import { descriptionTokens, normalizeDescription } from './dedupe';
 
 /**
- * Categoria sugerida para cada linha importada. Duas fontes, nessa ordem: a memória do aparelho (a categoria que a pessoa escolheu
- * da última vez para uma descrição parecida; fica só neste aparelho, como a memória das notas fiscais) e regras simples por
- * palavra em português. Sem marcas e sem produto: só palavras comuns de extrato. Sem pista, "Sem categoria" (null). A pessoa pode
- * trocar a categoria de cada linha antes de importar.
+ * Categoria sugerida para cada linha importada e, desde a D-086, para o que a pessoa digita em Anotar gasto e Registrar recebimento.
+ * Duas fontes, nessa ordem: a memória do aparelho (a categoria que a pessoa escolheu da última vez para uma descrição parecida; fica
+ * só neste aparelho, como a memória das notas fiscais, e vale para a importação e para os formulários) e regras simples por palavra em
+ * português. Sem marcas e sem produto: só palavras comuns de extrato. Sem pista, "Sem categoria" (null). A pessoa pode trocar a
+ * categoria de cada linha antes de importar, e no formulário a sugestão é só um atalho para tocar.
  */
 
 /** Memória do aparelho: chave da descrição → categoria. No máximo `MEMORY_LIMIT` entradas, das mais recentes. */
@@ -25,6 +26,14 @@ interface Rule {
 
 /** Gastos: a primeira regra que combina vence. Palavras sem acento, minúsculas; "x" também combina com "xs" (plural simples). */
 const EXPENSE_RULES: readonly Rule[] = [
+  // D-086: antes das outras, porque "parcela do carro" e "consórcio do imóvel" são dívida, não transporte nem moradia.
+  {
+    category: 'Crédito e parcelas',
+    words: [
+      'emprestimo', 'financiamento', 'refinanciamento', 'consorcio', 'consignado', 'crediario', 'cdc', 'credito pessoal', 'cheque especial',
+      'prestacao', 'parcela do carro', 'parcela da casa', 'parcela do apartamento', 'parcela da moto', 'quitacao', 'amortizacao', 'juros do emprestimo',
+    ],
+  },
   { category: 'Saúde', words: ['farmacia', 'drogaria', 'clinica', 'consulta', 'laboratorio', 'exame', 'hospital', 'dentista', 'odontologia', 'medico', 'plano de saude', 'otica', 'psicologo', 'fisioterapia'] },
   { category: 'Educação', words: ['escola', 'faculdade', 'universidade', 'colegio', 'curso', 'matricula', 'livraria', 'papelaria', 'creche', 'mensalidade escolar'] },
   { category: 'Moradia', words: ['aluguel', 'condominio', 'iptu', 'energia', 'energia eletrica', 'luz', 'agua', 'esgoto', 'gas', 'internet', 'reforma', 'material de construcao', 'imobiliaria'] },
@@ -51,6 +60,11 @@ export function categoryByRules(description: string, kind: RecordKind): string |
     if (rule.words.some((w) => ruleMatches(padded, w))) return rule.category;
   }
   return null;
+}
+
+/** O texto do atalho da sugestão no formulário ("Sugestão: Mercado") e o que o leitor de tela diz ao tocar. */
+export function categorySuggestionLabel(category: string): { label: string; a11y: string } {
+  return { label: `Sugestão: ${category}`, a11y: `Usar a categoria sugerida, ${category}` };
 }
 
 export interface CategorySuggestion {

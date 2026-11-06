@@ -338,9 +338,9 @@ describe('resultado: texto, ordem, resumo e agrupamento', () => {
 
 describe('opções e rascunho', () => {
   it('categorias por tipo, com "Sem categoria" no fim; a que não serve ao tipo é ignorada', () => {
-    expect(searchCategoryOptions('despesa')).toEqual(['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', NO_CATEGORY_LABEL]);
+    expect(searchCategoryOptions('despesa')).toEqual(['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas', NO_CATEGORY_LABEL]);
     expect(searchCategoryOptions('receita')).toEqual(['Salário', 'Renda extra', 'Reembolso', NO_CATEGORY_LABEL]);
-    expect(searchCategoryOptions('todos')).toHaveLength(10);
+    expect(searchCategoryOptions('todos')).toHaveLength(11);
     expect(effectiveSearchCategory('despesa', 'Salário')).toBeNull();
     expect(effectiveSearchCategory('todos', 'Salário')).toBe('Salário');
     expect(effectiveSearchCategory('despesa', NO_CATEGORY_LABEL)).toBe(NO_CATEGORY_LABEL);
