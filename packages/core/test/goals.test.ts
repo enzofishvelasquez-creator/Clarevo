@@ -385,7 +385,7 @@ describe('gastos essenciais (D-027(6), P-017)', () => {
       ],
       excludedAnnualCents: 0,
     });
-    expect(essentialEstimateText(e)).toBe('Média do que foi pago em setembro de 2026 em Moradia e Mercado (1 mês com gastos anotados). Contas ainda não pagas, Lazer e gastos sem categoria não entram.');
+    expect(essentialEstimateText(e)).toBe('Média do que foi pago em setembro de 2026 em Moradia e Mercado (1 mês com gastos anotados). Contas ainda não pagas, Lazer, Crédito e parcelas e gastos sem categoria não entram.');
   });
 
   it('pagamento de fatura de cartão conta pelas categorias da fatura (Moradia e Mercado entram; Lazer e encargos, não)', async () => {
@@ -473,7 +473,7 @@ describe('gastos essenciais (D-027(6), P-017)', () => {
       excludedAnnualCents: 240_000,
     });
     expect(essentialEstimateText(e)).toBe(
-      'Média do que foi pago em junho, julho e setembro de 2026 em Mercado, Saúde e Educação (3 meses com gastos anotados). Contas ainda não pagas, Lazer e gastos sem categoria não entram. Pagamentos de contas do ano, como IPVA e IPTU, também não entram.',
+      'Média do que foi pago em junho, julho e setembro de 2026 em Mercado, Saúde e Educação (3 meses com gastos anotados). Contas ainda não pagas, Lazer, Crédito e parcelas e gastos sem categoria não entram. Pagamentos de contas do ano, como IPVA e IPTU, também não entram.',
     );
     // Sem a lista de contas do ano, agosto e o IPVA entrariam.
     const without = essentialMonthly(records, OCT, 315_000);
@@ -481,7 +481,7 @@ describe('gastos essenciais (D-027(6), P-017)', () => {
     // Virada de ano: meses de dois anos no texto.
     const turn = essentialMonthly([rec('2026-12-05', 100_000, 'Moradia'), rec('2027-01-05', 100_001, 'Moradia')], '2027-02');
     expect(turn.amountCents).toBe(100_001); // 200.001 ÷ 2 = 100.000,5 → 100.001 (metade para cima)
-    expect(essentialEstimateText(turn)).toBe('Média do que foi pago em dezembro de 2026 e janeiro de 2027 em Moradia (2 meses com gastos anotados). Contas ainda não pagas, Lazer e gastos sem categoria não entram.');
+    expect(essentialEstimateText(turn)).toBe('Média do que foi pago em dezembro de 2026 e janeiro de 2027 em Moradia (2 meses com gastos anotados). Contas ainda não pagas, Lazer, Crédito e parcelas e gastos sem categoria não entram.');
   });
 });
 

@@ -44,7 +44,7 @@ import { formatPermille } from './committed';
 // Constantes
 // ---------------------------------------------------------------------------
 
-/** As seis categorias de despesa que têm orçamento, na ordem de sempre. "Sem categoria" não tem. */
+/** As categorias de despesa que têm orçamento (sete, com Crédito e parcelas, D-086), na ordem de sempre. "Sem categoria" não tem. */
 export const BUDGET_CATEGORIES: readonly string[] = CATEGORIES.despesa;
 /** Valor do orçamento: de R$ 1,00 a R$ 9.999.999,99. */
 export const BUDGET_MIN_CENTS = 100;
@@ -136,7 +136,7 @@ function installmentInMonth(e: BudgetUsageSource['entries'][number], month: IsoM
   return installmentAmounts(e.amountCents, e.installments)[k - 1]!;
 }
 
-/** Usado no mês por categoria (as seis), em centavos. Regra no cabeçalho do arquivo; o banco a repete em month_budget. */
+/** Usado no mês por categoria (as de BUDGET_CATEGORIES), em centavos. Regra no cabeçalho do arquivo; o banco a repete em month_budget. */
 export function categoryUsage(month: IsoMonth, source: BudgetUsageSource): Record<string, Cents> {
   const spent = new Map<string, Cents>();
   const add = (category: string | null, cents: Cents) => {

@@ -215,7 +215,7 @@ Revisar até 09/10/2027 (12 meses).
 
 Ressalvas e ajustes:
 
-- A lista Moradia, Mercado, Transporte, Saúde e Educação (Lazer e "Sem categoria" fora) é escolha do Clarevo, dita no texto, e não é atribuída a nenhuma instituição.
+- A lista Moradia, Mercado, Transporte, Saúde e Educação (Lazer, Crédito e parcelas e "Sem categoria" fora) é escolha do Clarevo, dita no texto, e não é atribuída a nenhuma instituição.
 - **A conferir (R5):** a classificação do Banco Central (necessários, supérfluos e desperdícios) e o exemplo de alimentação, moradia e vestuário foram confirmados só por resumos do buscador e por uma cópia do mesmo texto em material de outra instituição; não houve trecho literal de `bcb.gov.br`. Quem publicar de novo abre o PDF e confere o parágrafo dos gastos necessários.
 - O parágrafo 3 diz "impostos e matrículas", e não "IPVA e IPTU", porque a busca indexa os parágrafos e a palavra IPVA levaria a este tema; o exemplo, que não entra na busca, usa o IPVA. O tema cita só `D-027` como fonte do Clarevo (o validador aceita referências D-nnn ou CL-nnn; P-017 está resolvida em D-027(6)).
 

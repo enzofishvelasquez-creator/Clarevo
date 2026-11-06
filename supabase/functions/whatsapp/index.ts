@@ -447,16 +447,22 @@ const __mods = [
     const records_1 = __req(4);
     const dedupe_1 = __req(5);
     exports.MEMORY_LIMIT = 300;
-    function memoryKey(description) {
+    function memoryKey(description, kind) {
         const words = (0, dedupe_1.descriptionTokens)(description).slice(0, 3);
-        return words.length === 0 ? null : words.join(' ');
+        if (words.length === 0)
+            return null;
+        const base = words.join(' ');
+        return kind ? `${kind}:${base}` : base;
     }
     const EXPENSE_RULES = [
         {
             category: 'Crédito e parcelas',
             words: [
-                'emprestimo', 'financiamento', 'refinanciamento', 'consorcio', 'consignado', 'crediario', 'cdc', 'credito pessoal', 'cheque especial',
-                'prestacao', 'parcela do carro', 'parcela da casa', 'parcela do apartamento', 'parcela da moto', 'quitacao', 'amortizacao', 'juros do emprestimo',
+                'emprestimo', 'financiamento', 'refinanciamento', 'consignado', 'crediario', 'cdc', 'credito pessoal', 'cheque especial',
+                'consorcio do carro', 'consorcio da casa', 'consorcio do imovel', 'consorcio da moto', 'parcela do consorcio',
+                'prestacao do carro', 'prestacao da casa', 'prestacao do apartamento', 'prestacao da moto', 'prestacao do emprestimo', 'prestacao do financiamento',
+                'parcela do carro', 'parcela da casa', 'parcela do apartamento', 'parcela da moto', 'parcela do emprestimo', 'parcela do financiamento',
+                'quitacao', 'amortizacao', 'juros do emprestimo',
             ],
         },
         { category: 'Saúde', words: ['farmacia', 'drogaria', 'clinica', 'consulta', 'laboratorio', 'exame', 'hospital', 'dentista', 'odontologia', 'medico', 'plano de saude', 'otica', 'psicologo', 'fisioterapia'] },
@@ -488,8 +494,9 @@ const __mods = [
         return { label: `Sugestão: ${category}`, a11y: `Usar a categoria sugerida, ${category}` };
     }
     function suggestCategory(description, kind, memory) {
-        const key = memoryKey(description);
-        const remembered = key !== null ? memory[key] : undefined;
+        const typed = memoryKey(description, kind);
+        const legacy = memoryKey(description);
+        const remembered = (typed !== null ? memory[typed] : undefined) ?? (legacy !== null ? memory[legacy] : undefined);
         if (remembered !== undefined && records_1.CATEGORIES[kind].includes(remembered))
             return { category: remembered, source: 'memoria' };
         const byRule = categoryByRules(description, kind);
@@ -498,10 +505,13 @@ const __mods = [
     function rememberCategories(memory, lines) {
         const next = { ...memory };
         for (const l of lines) {
-            const key = memoryKey(l.description);
+            const key = memoryKey(l.description, l.kind);
             if (key === null)
                 continue;
             delete next[key];
+            const legacy = l.kind ? memoryKey(l.description) : null;
+            if (legacy !== null)
+                delete next[legacy];
             if (l.category !== null)
                 next[key] = l.category;
         }

@@ -981,7 +981,7 @@ function toIncomeReference(r: IncomeReferenceRow): IncomeReference {
   };
 }
 
-/** Orçamento de uma categoria: categoria entre as seis, mês no dia 1, valor nulo ou de R$ 1,00 a R$ 9.999.999,99 e versão a partir de 1. */
+/** Orçamento de uma categoria: categoria entre as de BUDGET_CATEGORIES, mês no dia 1, valor nulo ou de R$ 1,00 a R$ 9.999.999,99 e versão a partir de 1. */
 function toCategoryBudget(r: CategoryBudgetRow): CategoryBudget {
   const amountCents = wholeOrNull(r.amount_cents);
   const version = whole(r.version);
@@ -1022,7 +1022,7 @@ function toCommitmentLimit(r: CommitmentLimitRow): CommitmentLimit {
 }
 
 /**
- * month_budget: sempre as seis categorias, na ordem de BUDGET_CATEGORIES; orçamento (id, versão, mês e valor) e usado coerentes.
+ * month_budget: sempre as categorias de BUDGET_CATEGORIES (sete), na ordem delas; orçamento (id, versão, mês e valor) e usado coerentes.
  * Uma lista incompleta ou fora de ordem nunca aparece como um orçamento zerado.
  */
 function toMonthBudget(month: IsoMonth, rows: readonly MonthBudgetRow[]): MonthBudgetRead {

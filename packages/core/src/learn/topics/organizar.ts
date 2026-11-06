@@ -301,7 +301,7 @@ export const ORGANIZAR_TOPICS: Topic[] = [
       'São os gastos ligados às necessidades, como moradia e mercado. Na Clarevo, a reserva parte da média do que você pagou em Moradia, Mercado, Transporte, Saúde e Educação, e você ajusta o valor.',
     paragraphs: [
       'O Banco Central chama de necessários os gastos ligados às necessidades, como alimentação, moradia e vestuário. A reserva para imprevistos parte desses gastos, e não da renda: o Portal do Investidor, da CVM, fala em meses de gastos.',
-      'Na Clarevo, a sugestão olha os seis meses fechados mais recentes e usa até três deles, os mais recentes com gastos anotados. Soma o que você pagou em Moradia, Mercado, Transporte, Saúde e Educação em cada um e faz a média. Lazer e gastos sem categoria ficam fora. A lista de categorias é uma escolha da Clarevo, não uma regra oficial.',
+      'Na Clarevo, a sugestão olha os seis meses fechados mais recentes e usa até três deles, os mais recentes com gastos anotados. Soma o que você pagou em Moradia, Mercado, Transporte, Saúde e Educação em cada um e faz a média. Lazer, Crédito e parcelas e gastos sem categoria ficam fora. A lista de categorias é uma escolha da Clarevo, não uma regra oficial.',
       'Pagamentos de contas do ano, como impostos e matrículas, também ficam fora da média. A CVM lembra que a reserva não é para gastos sazonais e previsíveis, como tributos e matrículas: eles ficam no planejamento do ano. Sem meses com gastos anotados, a Clarevo começa pelas contas a pagar do mês, e você completa o valor.',
       'O valor é sempre uma sugestão. Ajuste quando souber que algum mês foi diferente do comum, por exemplo com uma compra maior que a de costume.',
     ],

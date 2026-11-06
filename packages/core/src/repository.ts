@@ -476,7 +476,7 @@ export interface RecordsRepository {
   /**
    * set_category_budget. Cria (expectedVersion 0) ou altera (versão atual) a linha viva da categoria no mês fromMonth; amountCents
    * null encerra a vigência ("Tirar o orçamento a partir de"). Exige escrita no contexto. Ordem do banco: repetição; sem_permissao;
-   * mes_invalido; categoria_invalida (só as seis de despesa); versao_desatualizada (nula ou negativa também; 0 com linha viva no
+   * mes_invalido; categoria_invalida (só as de despesa, BUDGET_CATEGORIES); versao_desatualizada (nula ou negativa também; 0 com linha viva no
    * mês; maior que 0 sem linha ou com outra versão); autoria ou "editar de outras pessoas" (sem_permissao);
    * vigencia_fora_do_intervalo (de mês atual − 24 a mês atual + 12); valor_invalido e valor_acima_do_limite (R$ 1,00 a
    * R$ 9.999.999,99). Mesma chave e conteúdo: devolve o estado atual; outro conteúdo ou outra ação: chave_reutilizada.
@@ -492,7 +492,7 @@ export interface RecordsRepository {
   /** delete_category_budget: exclusão lógica com versão (a linha anterior volta a valer). Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada; autoria. */
   deleteCategoryBudget(key: string, id: string, expectedVersion: number): Promise<CategoryBudget>;
   /**
-   * month_budget: o orçamento vigente e o usado no mês (competência) de cada uma das seis categorias, na ordem de
+   * month_budget: o orçamento vigente e o usado no mês (competência) de cada uma das categorias de despesa (BUDGET_CATEGORIES), na ordem de
    * BUDGET_CATEGORIES. Sem leitura no contexto: sem_permissao; mês que não é o dia 1: mes_invalido.
    */
   getMonthBudget(contextId: string, month: IsoMonth): Promise<MonthBudgetRead>;

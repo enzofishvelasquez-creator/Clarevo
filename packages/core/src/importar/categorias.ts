@@ -13,10 +13,15 @@ import { descriptionTokens, normalizeDescription } from './dedupe';
 export type ImportMemory = Record<string, string>;
 export const MEMORY_LIMIT = 300;
 
-/** Chave da memória: as três primeiras palavras que distinguem a descrição. null quando não sobra palavra útil. */
-export function memoryKey(description: string): string | null {
+/**
+ * Chave da memória: as três primeiras palavras que distinguem a descrição e, com o tipo, "despesa:" ou "receita:" na frente (D-086:
+ * gasto e recebimento com o mesmo nome não se sobrescrevem; as chaves sem tipo, de antes, continuam lidas). null sem palavra útil.
+ */
+export function memoryKey(description: string, kind?: RecordKind): string | null {
   const words = descriptionTokens(description).slice(0, 3);
-  return words.length === 0 ? null : words.join(' ');
+  if (words.length === 0) return null;
+  const base = words.join(' ');
+  return kind ? `${kind}:${base}` : base;
 }
 
 interface Rule {
@@ -26,12 +31,16 @@ interface Rule {
 
 /** Gastos: a primeira regra que combina vence. Palavras sem acento, minúsculas; "x" também combina com "xs" (plural simples). */
 const EXPENSE_RULES: readonly Rule[] = [
-  // D-086: antes das outras, porque "parcela do carro" e "consórcio do imóvel" são dívida, não transporte nem moradia.
+  // D-086: antes das outras, porque "parcela do carro" e "consórcio do imóvel" são dívida, não transporte nem moradia. "Prestação" e
+  // "consórcio" só em frase: "prestação de serviços" (nota de serviço, pagamento a autônomo) e o consórcio de uma empresa de ônibus não são dívida.
   {
     category: 'Crédito e parcelas',
     words: [
-      'emprestimo', 'financiamento', 'refinanciamento', 'consorcio', 'consignado', 'crediario', 'cdc', 'credito pessoal', 'cheque especial',
-      'prestacao', 'parcela do carro', 'parcela da casa', 'parcela do apartamento', 'parcela da moto', 'quitacao', 'amortizacao', 'juros do emprestimo',
+      'emprestimo', 'financiamento', 'refinanciamento', 'consignado', 'crediario', 'cdc', 'credito pessoal', 'cheque especial',
+      'consorcio do carro', 'consorcio da casa', 'consorcio do imovel', 'consorcio da moto', 'parcela do consorcio',
+      'prestacao do carro', 'prestacao da casa', 'prestacao do apartamento', 'prestacao da moto', 'prestacao do emprestimo', 'prestacao do financiamento',
+      'parcela do carro', 'parcela da casa', 'parcela do apartamento', 'parcela da moto', 'parcela do emprestimo', 'parcela do financiamento',
+      'quitacao', 'amortizacao', 'juros do emprestimo',
     ],
   },
   { category: 'Saúde', words: ['farmacia', 'drogaria', 'clinica', 'consulta', 'laboratorio', 'exame', 'hospital', 'dentista', 'odontologia', 'medico', 'plano de saude', 'otica', 'psicologo', 'fisioterapia'] },
@@ -74,8 +83,9 @@ export interface CategorySuggestion {
 
 /** Sugestão para uma linha: a memória do aparelho (se a categoria ainda serve ao tipo) e, depois, as regras. */
 export function suggestCategory(description: string, kind: RecordKind, memory: ImportMemory): CategorySuggestion {
-  const key = memoryKey(description);
-  const remembered = key !== null ? memory[key] : undefined;
+  const typed = memoryKey(description, kind);
+  const legacy = memoryKey(description);
+  const remembered = (typed !== null ? memory[typed] : undefined) ?? (legacy !== null ? memory[legacy] : undefined);
   if (remembered !== undefined && CATEGORIES[kind].includes(remembered)) return { category: remembered, source: 'memoria' };
   const byRule = categoryByRules(description, kind);
   return byRule !== null ? { category: byRule, source: 'regra' } : { category: null, source: null };
@@ -85,12 +95,18 @@ export function suggestCategory(description: string, kind: RecordKind, memory: I
  * Memória depois de importar: cada descrição importada com categoria passa a lembrar dela (a mais recente vence), até
  * `MEMORY_LIMIT` entradas. Linha sem categoria apaga o que a memória tinha para ela (a pessoa quis "Sem categoria").
  */
-export function rememberCategories(memory: ImportMemory, lines: readonly { description: string; category: string | null }[]): ImportMemory {
+export function rememberCategories(
+  memory: ImportMemory,
+  lines: readonly { description: string; category: string | null; kind?: RecordKind }[],
+): ImportMemory {
   const next: ImportMemory = { ...memory };
   for (const l of lines) {
-    const key = memoryKey(l.description);
+    const key = memoryKey(l.description, l.kind);
     if (key === null) continue;
     delete next[key];
+    // Com o tipo, a chave sem tipo (de antes da D-086) deixa de valer para este nome: a nova vence.
+    const legacy = l.kind ? memoryKey(l.description) : null;
+    if (legacy !== null) delete next[legacy];
     if (l.category !== null) next[key] = l.category;
   }
   const keys = Object.keys(next);

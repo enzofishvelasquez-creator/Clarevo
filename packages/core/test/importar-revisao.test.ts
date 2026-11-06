@@ -212,6 +212,11 @@ describe('importar: categorias sugeridas', () => {
       ['Consórcio do imóvel', 'despesa', 'Crédito e parcelas'],
       ['Crédito consignado', 'despesa', 'Crédito e parcelas'],
       ['Juros cheque especial', 'despesa', 'Crédito e parcelas'],
+      ['Prestação do carro', 'despesa', 'Crédito e parcelas'],
+      // "Prestação" e "consórcio" soltos não são dívida: nota de serviço e empresa de ônibus.
+      ['Prestação de serviços', 'despesa', null],
+      ['PIX ENVIADO PRESTACAO DE SERVICO', 'despesa', null],
+      ['Consórcio de ônibus passagem', 'despesa', 'Transporte'],
       ['Tarifa de manutenção', 'despesa', null],
       ['XPTO 123', 'despesa', null],
       ['', 'despesa', null],
@@ -245,6 +250,15 @@ describe('importar: categorias sugeridas', () => {
     expect(suggestCategory('Padaria São João', 'receita', memory)).toEqual({ category: null, source: null });
     expect(suggestCategory('Qualquer coisa', 'despesa', {})).toEqual({ category: null, source: null });
     expect(suggestCategory('Padaria São João', 'despesa', { 'padaria sao joao': 'Categoria que saiu' })).toEqual({ category: 'Mercado', source: 'regra' });
+    // D-086: a chave com o tipo vem antes da chave sem tipo, e gasto e recebimento com o mesmo nome não se misturam.
+    expect(memoryKey('Aluguel', 'receita')).toBe('receita:aluguel');
+    const typed = { 'despesa:aluguel': 'Moradia', 'receita:aluguel': 'Renda extra', aluguel: 'Lazer' };
+    expect(suggestCategory('Aluguel', 'despesa', typed)).toEqual({ category: 'Moradia', source: 'memoria' });
+    expect(suggestCategory('Aluguel', 'receita', typed)).toEqual({ category: 'Renda extra', source: 'memoria' });
+    expect(suggestCategory('Aluguel', 'despesa', { aluguel: 'Lazer' })).toEqual({ category: 'Lazer', source: 'memoria' });
+    const m = rememberCategories({ aluguel: 'Lazer' }, [{ description: 'Aluguel', category: 'Moradia', kind: 'despesa' }]);
+    expect(m).toEqual({ 'despesa:aluguel': 'Moradia' });
+    expect(rememberCategories(m, [{ description: 'Aluguel', category: 'Renda extra', kind: 'receita' }])).toEqual({ 'despesa:aluguel': 'Moradia', 'receita:aluguel': 'Renda extra' });
   });
 
   it('lembra a última escolha de cada descrição, esquece "Sem categoria" e guarda no máximo 300', () => {

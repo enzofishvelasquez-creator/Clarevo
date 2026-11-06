@@ -355,7 +355,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const registerCardRef = useRef<View>(null);
 
   useEffect(() => {
-    if (userId && (cardMode || mode.type === 'novo')) loadPrefs(userId, persistPrefs);
+    // Também no editar (D-086): a sugestão e a memória de categorias dependem das preferências já lidas.
+    if (userId) loadPrefs(userId, persistPrefs);
   }, [userId, persistPrefs, cardMode, mode.type]);
 
   // Conta que vem marcada (D-043): a principal ou, se ainda existir e estiver ativa, a última usada neste aparelho. Só até a pessoa
@@ -988,13 +989,15 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   };
 
   /**
-   * Categoria lembrada neste aparelho (D-086): a mesma memória da importação de extrato (descrição parecida → categoria escolhida da
-   * última vez). Gravada ao salvar, com ou sem categoria (sem categoria apaga o que a memória tinha para o nome). Nunca vai ao servidor.
+   * Categoria lembrada neste aparelho (D-086): a mesma memória da importação de extrato (nome parecido → categoria escolhida da última
+   * vez, por tipo). Gravada ao salvar com categoria; salvar sem categoria não mexe na memória (no formulário "Sem categoria" é o padrão,
+   * não uma escolha). Só com as preferências já lidas do aparelho, para não gravar por cima delas. Nunca vai ao servidor.
    */
   const rememberCategory = (description: string, category: string | null) => {
-    if (!userId) return;
-    const current = getPrefs(userId)?.importCategories ?? prefs?.importCategories ?? {};
-    updatePrefs(userId, { importCategories: rememberCategories(current, [{ description: description.trim(), category }]) }, persistPrefs);
+    if (!userId || category === null) return;
+    const current = getPrefs(userId);
+    if (!current) return;
+    updatePrefs(userId, { importCategories: rememberCategories(current.importCategories, [{ description: description.trim(), category, kind }]) }, persistPrefs);
   };
   /** A sugestão de categoria para o nome digitado, só com a categoria em "Sem categoria" (D-086). */
   const categorySuggestion =
@@ -1157,6 +1160,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         if (userId) updatePrefs(userId, { lastPayment: card.id }, persistPrefs);
         afterNoteSaved();
+    rememberCategory(draftRef.current.description, draftRef.current.category);
         let invoiceMonth: IsoMonth | null = r.status === 'ok' ? (r.value.entry?.invoiceMonth ?? null) : null;
         if (r.status === 'reconciled' && r.saved.entryId) {
           // A tentativa anterior foi gravada: a fatura real vem do lançamento.
@@ -1735,15 +1739,19 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
                 />
               ))}
             </View>
-            {categorySuggestion ? (
-              <LinkButton
-                label={categorySuggestionLabel(categorySuggestion).label}
-                accessibilityLabel={categorySuggestionLabel(categorySuggestion).a11y}
-                style={styles.inlineLink}
-                onPress={() => set('category', categorySuggestion)}
-              />
-            ) : null}
           </View>
+          {categorySuggestion ? (
+            // Fora do grupo de rádios (é um botão) e sem reservar espaço: aparece quando o nome combina com uma regra ou com a memória.
+            <LinkButton
+              label={categorySuggestionLabel(categorySuggestion).label}
+              accessibilityLabel={categorySuggestionLabel(categorySuggestion).a11y}
+              style={styles.inlineLink}
+              onPress={() => {
+                set('category', categorySuggestion);
+                announceOnIOS(`Categoria ${categorySuggestion}`);
+              }}
+            />
+          ) : null}
 
           {note && dateOutsideNoteMonth(parsedDate, note.reading.draft.month) ? (
             <Txt variant="label" color={colors.textSecondary}>
