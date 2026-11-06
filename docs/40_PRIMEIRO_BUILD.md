@@ -23,10 +23,10 @@ Regra de sempre: contas, senhas, códigos, chaves de assinatura, pagamentos e ve
 
 | # | O quê | Quem | Estado |
 |---|---|---|---|
-| 0 | PR com estas correções juntado ao `main` (o build sai do `main`; sem o PR, a câmera continua bloqueada no build) | Claude Chrome cria o PR; Enzo faz o merge | Falta |
-| 1 | Conta no expo.dev com o e-mail do domínio e um projeto `clarevo`; mandar à equipe o usuário (owner) e o Project ID | Enzo | Falta |
-| 2 | `owner` e `extra.eas.projectId` em `apps/app/app.json`, PR e merge (a imagem de build `latest` em `eas.json`, que o build pelo GitHub exige, já está no `main` desde 06/11) | Equipe | Depois do 1 |
-| 3 | No projeto do expo.dev: ligar o GitHub ao repositório `enzofishvelasquez-creator/clarevo`, pasta base `apps/app` | Enzo | Depois do 2 |
+| 0 | PR com estas correções juntado ao `main` (o build sai do `main`; sem o PR, a câmera continua bloqueada no build) | Claude Chrome cria o PR; Enzo faz o merge | Feito (PR #18, 06/11/2026) |
+| 1 | Conta no expo.dev com o e-mail do domínio e um projeto `clarevo`; mandar à equipe o usuário (owner) e o Project ID | Enzo | Feito (06/11/2026: conta `clarevos-team`, projeto `clarevo`) |
+| 2 | `owner` e `extra.eas.projectId` em `apps/app/app.json`, PR e merge (a imagem de build `latest` em `eas.json`, que o build pelo GitHub exige, já está no `main` desde 06/11) | Equipe | Feito no ramo em 06/11/2026 (`owner` `clarevos-team` e o Project ID); PR e merge |
+| 3 | No projeto do expo.dev: ligar o GitHub ao repositório `enzofishvelasquez-creator/clarevo`, pasta base `apps/app` | Enzo | Repositório ligado em 06/11/2026 (app do Expo instalado só nele); a pasta base `apps/app` a confirmar em Settings |
 | 4 | Variáveis `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_KEY` (a chave pública, a mesma da web) nos ambientes `preview` e `production`, visibilidade "plain text". Sem elas, o app abre "Configuração incompleta" de propósito | Enzo | Falta |
 | 5 | Endereços de retorno do Supabase com `clarevo://**` (para o e-mail de confirmação abrir o app) | Enzo | Feito (lido no painel em 30/10/2026, `docs/05`) |
 | 6 | "Build from GitHub": ramo `main`, Android, perfil `preview`; deixar o Expo gerar e guardar a chave de assinatura do Android (é a do app para sempre; nunca vai ao repositório) | Enzo | Depois do 4 |
@@ -36,7 +36,7 @@ Regra de sempre: contas, senhas, códigos, chaves de assinatura, pagamentos e ve
 
 Nada aqui é segredo além da senha da conta, que fica no Bitwarden. O Claude Chrome não entra no expo.dev.
 
-**Conta pessoal, não organização.** O repositório está numa conta pessoal do GitHub (`enzofishvelasquez-creator`), e o Expo só liga repositório de organização do GitHub a organização do Expo. A conta pessoal do Expo, a que nasce no cadastro, liga o repositório pessoal. Converter em organização depois é possível sem perder builds, chaves nem atualizações (documentação do Expo, "Account types", lida em 06/11/2026).
+**Como ficou (06/11/2026):** o cadastro criou a conta `clarevos-team` (o Expo a mostra como organização, "clarevo's team") e o projeto `clarevo`, e o repositório pessoal `enzofishvelasquez-creator/Clarevo` foi ligado sem problema, apesar de a documentação do Expo ("Trigger builds from the Expo GitHub App", lida no mesmo dia) dizer que só repositório de organização do GitHub liga a organização do Expo. Os passos abaixo ficam como registro.
 
 1. **Criar a conta:** `expo.dev/signup`, com o e-mail do domínio (`contato@clarevo.app.br`), senha nova no Bitwarden, confirmar o e-mail. Nome de usuário sugerido: `clarevo` (minúsculas; vira o `owner`). Se estiver tomado, outro curto, e avisar a equipe qual.
 2. **Ligar o GitHub ao usuário:** `expo.dev/settings`, em "Connections", "GitHub", "Connect", autorizar com a conta `enzofishvelasquez-creator`. Sem isso, o passo 6 não mostra o repositório.

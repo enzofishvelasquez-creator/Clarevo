@@ -93,7 +93,7 @@ A ordem importa: o caminho mais longo é o das contas (CNPJ, domínio, verifica�
 ### Fase 1. Expo e EAS
 
 1. Criar a conta em `expo.dev` (gratuita para começar; limites de build do plano gratuito: conferir na página oficial de preços).
-2. Em `apps/app`: `npx eas-cli@latest login` e `npx eas-cli@latest init`. O `init` grava `extra.eas.projectId` em `app.json`: é o primeiro identificador de conta no repositório, não é segredo, e só Enzo o gera.
+2. Em `apps/app`: `npx eas-cli@latest login` e `npx eas-cli@latest init`. O `init` grava `extra.eas.projectId` em `app.json`: é o primeiro identificador de conta no repositório, não é segredo, e só Enzo o gera. **Feito em 06/11/2026 sem terminal:** Enzo criou a conta (`clarevos-team`) e o projeto (`clarevo`) pelo site e a equipe gravou `owner` e `extra.eas.projectId` em `app.json` (`docs/40`, seção 2a).
 3. Variáveis de ambiente do app, criadas no EAS (nunca no repositório). O app lê `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_KEY` (a chave pública, `docs/07`). Cada perfil de `eas.json` aponta um ambiente do EAS: `preview` (use o projeto `clarevo-teste`) e `production` (`clarevo-producao`). Exemplo, com a visibilidade `plaintext` (as variáveis `EXPO_PUBLIC_*` vão dentro do app e **não podem** ser "secret", segundo a documentação do Expo):
    `npx eas-cli@latest env:set --name EXPO_PUBLIC_SUPABASE_URL --environment production --visibility plaintext` (o comando pede o valor).
    Sem as duas variáveis, o build de produção abre "Configuração incompleta" (`apps/app/src/state/session.tsx`), de propósito: nunca vira demonstração em silêncio.
