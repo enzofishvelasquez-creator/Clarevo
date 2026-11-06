@@ -145,13 +145,13 @@ function NativeFeatures() {
     const route = pendingOpen;
     setPendingOpen(null);
     setSpace('pessoal');
-    if (route !== REMINDER_ROUTE) {
-      router.navigate(route as Href);
-      return;
-    }
     setMonth(currentMonth);
-    // Mês atual sempre, com um parâmetro de abertura novo: se Contas a pagar já está aberta em outro mês, a tela sincroniza.
-    router.navigate({ pathname: REMINDER_ROUTE, params: { mes: currentMonth, abrir: String(Date.now()) } } as Href);
+    // Mês atual sempre, com um parâmetro de abertura novo: se a tela (Contas a pagar, Análises) já está aberta em outro mês, ela
+    // sincroniza. Anotar gasto e Registrar recebimento abrem com a data de hoje; o Resumo, no mês de hoje (setMonth).
+    const [screen, query] = route.split('?') as [string, string | undefined];
+    const params: Record<string, string> = Object.fromEntries(new URLSearchParams(query ?? ''));
+    if (screen === REMINDER_ROUTE || screen === '/analises') Object.assign(params, { mes: currentMonth, abrir: String(Date.now()) });
+    router.navigate({ pathname: screen, params } as Href);
   }, [pendingOpen, status, pathname, setSpace, setMonth, currentMonth]);
 
   // ---- Oferta depois do primeiro gasto fixo salvo -------------------------------------------

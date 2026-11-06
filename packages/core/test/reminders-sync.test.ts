@@ -2,7 +2,7 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as core from '../src';
-import { NO_ROUTINE_REMINDERS, REMINDER_ROUTE, createDemoRepository, isRoutineReminderId, type RecordsRepository } from '../src';
+import { NO_ROUTINE_REMINDERS, REMINDER_ROUTE, createDemoRepository, isRoutineReminderId, type RecordSearchFilter, type RecordsRepository } from '../src';
 import { APP_DIR, loadApp } from './app-sandbox';
 
 /**
@@ -27,7 +27,8 @@ async function setup(granted = true) {
   const listCommitments = vi.fn((ctx: string, month: string) => demo.listCommitments(ctx, month));
   const listRecords = vi.fn((ctx: string, month: string) => demo.listRecords(ctx, month));
   const getReturnReviewState = vi.fn(async (_ctx: string) => ({ activity: { lastWriteOn: '2026-10-05', absenceFromOn: null, absenceUntilOn: null }, mark: null }));
-  const repo = { listCommitments, listRecords, getReturnReviewState } as unknown as RecordsRepository;
+  const searchCardPurchases = vi.fn((ctx: string, filter: RecordSearchFilter, limit: number) => demo.searchCardPurchases(ctx, filter, limit));
+  const repo = { listCommitments, listRecords, getReturnReviewState, searchCardPurchases } as unknown as RecordsRepository;
   const synced: Record<string, unknown>[][] = [];
   const syncScheduledReminders = vi.fn(async (items: Record<string, unknown>[]) => {
     synced.push(items);
@@ -50,7 +51,7 @@ async function setup(granted = true) {
       '@/lib/device-prefs': { getPrefs: () => prefs, updatePrefs },
     },
   });
-  return { mod, contextId, repo, listCommitments, listRecords, getReturnReviewState, synced, cancelAllReminders, requestNotificationPermission, prefs, updatePrefs };
+  return { mod, contextId, repo, listCommitments, listRecords, getReturnReviewState, searchCardPurchases, synced, cancelAllReminders, requestNotificationPermission, prefs, updatePrefs };
 }
 
 describe('lib/reminders.ts: os dois planos numa só passada', () => {
@@ -67,6 +68,7 @@ describe('lib/reminders.ts: os dois planos numa só passada', () => {
     await settle();
     expect(t.listCommitments).toHaveBeenCalledWith(t.contextId, '2026-10');
     expect(t.listRecords).not.toHaveBeenCalled();
+    expect(t.searchCardPurchases).not.toHaveBeenCalled();
     expect(t.getReturnReviewState).not.toHaveBeenCalled();
     const items = t.synced.at(-1)!;
     expect(items.length).toBeGreaterThan(0);
@@ -88,6 +90,10 @@ describe('lib/reminders.ts: os dois planos numa só passada', () => {
     });
     await settle();
     expect(t.listRecords).toHaveBeenCalledWith(t.contextId, '2026-10');
+    // A compra no cartão de hoje: uma busca só do dia, com uma linha basta.
+    expect(t.searchCardPurchases).toHaveBeenCalledTimes(1);
+    expect(t.searchCardPurchases.mock.calls[0]![1]).toMatchObject({ from: CTX_TODAY, to: CTX_TODAY, kind: null, terms: [] });
+    expect(t.searchCardPurchases.mock.calls[0]![2]).toBe(1);
     expect(t.getReturnReviewState).not.toHaveBeenCalled();
     expect(t.synced).toHaveLength(1);
     const items = t.synced[0]!;
@@ -113,6 +119,8 @@ describe('lib/reminders.ts: os dois planos numa só passada', () => {
     });
     await settle();
     expect(t.getReturnReviewState).toHaveBeenCalledWith(t.contextId);
+    // Sem "Anotar os gastos do dia", as compras no cartão não são lidas.
+    expect(t.searchCardPurchases).toHaveBeenCalledTimes(1);
     const only = t.synced.at(-1)!;
     expect(only.map((i) => i.id)).toEqual(['clarevo-lembrete-rotina-ausencia-2026-10-12']);
     expect(only[0]).toMatchObject({ route: '/', channel: 'rotina', title: 'Resumo' });

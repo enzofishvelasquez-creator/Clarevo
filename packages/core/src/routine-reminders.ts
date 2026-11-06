@@ -9,7 +9,8 @@ import { REMINDER_ID_PREFIX } from './reminders';
  *
  * Quatro avisos, cada um com o seu interruptor em Conta:
  * - "gastos": todo dia, no horário escolhido, "Não se esqueça de anotar os gastos de hoje."; não entra no dia que já tem
- *   gasto anotado (pelo que o app sabe na hora de agendar);
+ *   gasto ou compra no cartão anotados (pelo que o app sabe na hora de agendar: anotações pelo WhatsApp ou Telegram só
+ *   contam na próxima abertura do app, e os avisos ficam agendados para as próximas duas semanas);
  * - "recebimentos": no dia 10 de cada mês, se o mês ainda não tem recebimento anotado;
  * - "mapa": no dia 15 de cada mês, para olhar o mapa de gastos do mês até agora;
  * - "ausencia": um aviso quando a última anotação completa 7 dias.
@@ -54,7 +55,7 @@ export const ROUTINE_REMINDER_TEXT = {
   kinds: {
     gastos: {
       toggle: 'Anotar os gastos do dia',
-      caption: 'Todo dia, no horário escolhido. Não avisa no dia que já tem gasto anotado.',
+      caption: 'Todo dia, no horário escolhido. Não avisa no dia em que você já anotou um gasto ou uma compra no cartão.',
       title: 'Anotar gasto',
       body: 'Não se esqueça de anotar os gastos de hoje.',
     },
@@ -123,6 +124,8 @@ export interface RoutineReminderPlanOptions {
   /** Só os registros deste contexto (o Pessoal de quem usa o aparelho). */
   contextId?: string;
   limit?: number;
+  /** Hoje já tem compra no cartão anotada (lida à parte, em card_entries): conta como gasto anotado para o aviso do dia. */
+  cardPurchaseToday?: boolean;
 }
 
 function hh(hour: number): string {
@@ -132,7 +135,8 @@ function hh(hour: number): string {
 /**
  * Plano dos avisos do dia a dia a partir dos registros do mês de hoje (`records`, os que o app já lê) e do dia da última
  * anotação (`activity`, de `getReturnReviewState`; nulo quando "Uma semana sem anotar" está desligado ou nunca houve anotação):
- * - "gastos": um por dia, de hoje a hoje + 13; o de hoje fica fora se o horário já passou ou se hoje já tem gasto anotado;
+ * - "gastos": um por dia, de hoje a hoje + 13; o de hoje fica fora se o horário já passou ou se hoje já tem gasto anotado
+ *   (registro de despesa ou, por `options.cardPurchaseToday`, compra no cartão);
  * - "recebimentos": dia 10 do mês atual (se ainda não passou e o mês não tem recebimento) e do mês seguinte;
  * - "mapa": dia 15 do mês atual (se ainda não passou) e do mês seguinte;
  * - "ausencia": última anotação + 7 dias, se ainda não passou.
@@ -152,7 +156,7 @@ export function routineReminderPlan(
   const todayPassed = options.nowMinutes !== undefined && options.nowMinutes >= hour * 60;
   const mine = (r: FinancialRecord) => options.contextId === undefined || r.contextId === options.contextId;
   const thisMonth = monthOf(today);
-  const expenseToday = records.some((r) => mine(r) && r.kind === 'despesa' && r.occurredOn === today);
+  const expenseToday = options.cardPurchaseToday === true || records.some((r) => mine(r) && r.kind === 'despesa' && r.occurredOn === today);
   const incomeThisMonth = records.some((r) => mine(r) && r.kind === 'receita' && isValidIsoDate(r.occurredOn) && monthOf(r.occurredOn) === thisMonth);
   /** O aviso em `date` ainda cabe: hoje só se o horário não passou; nunca no passado. */
   const fits = (date: IsoDate) => date > today || (date === today && !todayPassed);
@@ -197,9 +201,12 @@ export function routineReminderPlan(
   return items.sort((a, b) => (a.fireAt < b.fireAt ? -1 : a.fireAt > b.fireAt ? 1 : 0)).slice(0, Math.floor(limit));
 }
 
-/** Assinatura de um aviso agendado: muda quando o dia, a hora ou o texto muda, e só então o aparelho cancela e agenda de novo. */
-export function routineReminderSignature(item: Pick<RoutineReminderItem, 'fireAt' | 'body'>): string {
-  return `${item.fireAt}|${item.body}`;
+/**
+ * Assinatura de um aviso agendado: muda quando o dia, a hora, o texto ou a tela do toque muda, e só então o aparelho cancela e
+ * agenda de novo (um aviso já agendado por uma versão anterior do app, com outro texto ou outra tela, é trocado).
+ */
+export function routineReminderSignature(item: Pick<RoutineReminderItem, 'fireAt' | 'title' | 'body' | 'route'>): string {
+  return `${item.fireAt}|${item.title}|${item.body}|${item.route}`;
 }
 
 /** O identificador é de um aviso do dia a dia? (Os de vencimento são "clarevo-lembrete-AAAA-MM-DD".) */

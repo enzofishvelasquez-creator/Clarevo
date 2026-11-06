@@ -703,7 +703,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `No app para celular, abra Conta e ligue ${q(REMINDER_TEXT.toggle)}; permita os avisos quando o aparelho pedir.`,
       `Escolha o ${q(REMINDER_TEXT.hourLabel)}.`,
       `Em ${q(ROUTINE_REMINDER_TEXT.section)}, ligue só os que quiser: ${q(ROUTINE_REMINDER_TEXT.kinds.gastos.toggle)}, ${q(ROUTINE_REMINDER_TEXT.kinds.recebimentos.toggle)}, ${q(ROUTINE_REMINDER_TEXT.kinds.mapa.toggle)} e ${q(ROUTINE_REMINDER_TEXT.kinds.ausencia.toggle)}, com o horário deles.`,
-      'Nenhum aviso mostra valores nem descrições na tela bloqueada, e todos ficam só neste aparelho.',
+      'Nenhum aviso mostra valores nem descrições na tela bloqueada, e todos ficam só neste aparelho. O app refaz os avisos a cada abertura, para as próximas duas semanas; o que você anota pelo Telegram só conta na próxima abertura.',
       `Se o aparelho bloquear os avisos, use ${q(REMINDER_TEXT.openSettings)}.`,
       'Na versão para navegador, os lembretes não existem.',
     ],

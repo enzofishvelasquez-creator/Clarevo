@@ -137,6 +137,9 @@ describe('lembretes do dia a dia (D-087): o plano', () => {
     expect(ids(so, [registro('despesa', TODAY, OTHER)])).toContain(hoje);
     // Sem contexto nas opções, qualquer registro do dia conta.
     expect(routineReminderPlan(so, [registro('despesa', TODAY, OTHER)], null, TODAY, 20).map((i) => i.id)).not.toContain(hoje);
+    // Compra no cartão anotada hoje (lida à parte pelo app) também conta como gasto anotado.
+    expect(routineReminderPlan(so, [], null, TODAY, 20, { contextId: CTX, cardPurchaseToday: true }).map((i) => i.id)).not.toContain(hoje);
+    expect(routineReminderPlan(so, [], null, TODAY, 20, { contextId: CTX, cardPurchaseToday: false }).map((i) => i.id)).toContain(hoje);
   });
 
   it('"recebimentos": dia 10 do mês atual (se não passou e o mês não tem recebimento) e do mês seguinte', () => {
@@ -203,7 +206,10 @@ describe('lembretes do dia a dia (D-087): o plano', () => {
     expect(isRoutineReminderId('clarevo-lembrete-2026-11-07')).toBe(false);
     expect(isRoutineReminderId('outro-app-2026-11-07')).toBe(false);
     const first = plan[0]!;
-    expect(routineReminderSignature(first)).toBe(`${first.fireAt}|${first.body}`);
-    expect(routineReminderSignature({ fireAt: '2026-11-06T20:00', body: 'a' })).not.toBe(routineReminderSignature({ fireAt: '2026-11-06T21:00', body: 'a' }));
+    expect(routineReminderSignature(first)).toBe(`${first.fireAt}|${first.title}|${first.body}|${first.route}`);
+    const base = { fireAt: '2026-11-06T20:00', title: 't', body: 'a', route: '/x' };
+    expect(routineReminderSignature(base)).not.toBe(routineReminderSignature({ ...base, fireAt: '2026-11-06T21:00' }));
+    expect(routineReminderSignature(base)).not.toBe(routineReminderSignature({ ...base, route: '/y' }));
+    expect(routineReminderSignature(base)).not.toBe(routineReminderSignature({ ...base, title: 'u' }));
   });
 });

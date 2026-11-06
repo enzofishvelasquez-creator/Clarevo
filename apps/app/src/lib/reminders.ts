@@ -14,6 +14,7 @@ import {
   type RecordsRepository,
   type ReminderHour,
   type RoutineReminderChoices,
+  type RecordSearchFilter,
   type RoutineReminderHour,
   type RoutineReminderKind,
 } from '@clarevo/core';
@@ -35,6 +36,9 @@ import { getPrefs, updatePrefs } from '@/lib/device-prefs';
  * registros do mês e o dia da última anotação). Roda ao abrir o app, ao voltar para ele e depois de cada escrita
  * (components/device-features.tsx). Só no aparelho; na web, `device.web.ts` não faz nada.
  */
+
+/** Busca sem filtro, a preencher só com o dia de hoje (a compra no cartão de hoje). */
+const NO_SEARCH_FILTER: RecordSearchFilter = { from: null, to: null, kind: null, category: null, accountId: null, minCents: null, maxCents: null, terms: [] };
 
 /** Data e hora locais do aparelho do aviso ("AAAA-MM-DD" às `hour` horas). */
 export function fireDate(item: { date: IsoDate; hour: number }): Date {
@@ -80,13 +84,18 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
     }
   }
   if (job.routine !== null && anyRoutineReminder(job.routine.choices)) {
-    // Registros do mês de hoje (gasto de hoje e recebimento do mês) e o dia da última anotação (só para "Uma semana sem anotar").
+    // Registros do mês de hoje (gasto de hoje e recebimento do mês), uma compra no cartão de hoje (só para "Anotar os gastos do
+    // dia": a compra pelo mesmo formulário também é gasto anotado) e o dia da última anotação (só para "Uma semana sem anotar").
     const records = await job.repo.listRecords(job.contextId, monthOf(today));
+    const cardPurchaseToday = job.routine.choices.gastos
+      ? (await job.repo.searchCardPurchases(job.contextId, { ...NO_SEARCH_FILTER, from: today, to: today }, 1)).items.length > 0
+      : false;
     const activity = job.routine.choices.ausencia ? (await job.repo.getReturnReviewState(job.contextId)).activity : null;
     const plan = routineReminderPlan(job.routine.choices, records, activity, today, job.routine.hour, {
       nowMinutes,
       contextId: job.contextId,
       limit: ROUTINE_REMINDER_LIMIT,
+      cardPurchaseToday,
     });
     for (const i of plan) {
       items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });

@@ -36,14 +36,15 @@ const T = ANALYSES_TEXT;
 export default function AnalisesScreen() {
   const { today } = useSession();
   const currentMonth = monthOf(today);
-  const params = useLocalSearchParams<{ mes?: string; aba?: string }>();
+  const params = useLocalSearchParams<{ mes?: string; aba?: string; abrir?: string }>();
   const { setMonth: setViewMonth } = useView();
   const [month, setMonth] = useState<IsoMonth>(() => analysesStartMonth(params.mes, currentMonth));
   const [tab, setTab] = useState<AnalysesTab>(() => analysesTabFrom(params.aba));
-  // Entradas "de agora" (sem mês no endereço) abrem sempre no mês de hoje, mesmo com a tela já aberta.
+  // Entradas "de agora" (sem mês no endereço) abrem sempre no mês de hoje, mesmo com a tela já aberta; o toque no lembrete do mapa
+  // do mês (D-087) chega com `abrir` novo e o mês de hoje, e a tela já aberta em outro mês volta para ele.
   useEffect(() => {
     setMonth(analysesStartMonth(params.mes, currentMonth));
-  }, [params.mes, currentMonth]);
+  }, [params.mes, params.abrir, currentMonth]);
   useEffect(() => {
     setTab(analysesTabFrom(params.aba));
   }, [params.aba]);
