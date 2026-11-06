@@ -1,13 +1,21 @@
 import {
+  anyRoutineReminder,
   deviceTimeZone,
   monthOf,
   REMINDER_LIMIT,
+  REMINDER_ROUTE,
   reminderPlan,
   reminderSignature,
+  ROUTINE_REMINDER_LIMIT,
+  routineReminderPlan,
+  routineReminderSignature,
   todayIn,
+  type IsoDate,
   type RecordsRepository,
   type ReminderHour,
-  type ReminderItem,
+  type RoutineReminderChoices,
+  type RoutineReminderHour,
+  type RoutineReminderKind,
 } from '@clarevo/core';
 
 import {
@@ -17,28 +25,40 @@ import {
   requestNotificationPermission,
   syncScheduledReminders,
   type NotificationPermission,
+  type ScheduledReminder,
 } from '@/lib/device';
-import { updatePrefs } from '@/lib/device-prefs';
+import { getPrefs, updatePrefs } from '@/lib/device-prefs';
 
 /**
- * Lembretes de contas a pagar (D-025): cancela os avisos "clarevo-lembrete-*" que saíram do plano e agenda o plano do
- * core (reminderPlan) com as contas em aberto do Pessoal. Roda ao abrir o app, ao voltar para ele e depois de cada
- * escrita (components/device-features.tsx). Só no aparelho; na web, `device.web.ts` não faz nada.
+ * Lembretes de contas a pagar (D-025) e do dia a dia (D-087): cancela os avisos "clarevo-lembrete-*" que saíram do plano e
+ * agenda, numa só passada, o plano do core (reminderPlan, com as contas em aberto do Pessoal; routineReminderPlan, com os
+ * registros do mês e o dia da última anotação). Roda ao abrir o app, ao voltar para ele e depois de cada escrita
+ * (components/device-features.tsx). Só no aparelho; na web, `device.web.ts` não faz nada.
  */
 
 /** Data e hora locais do aparelho do aviso ("AAAA-MM-DD" às `hour` horas). */
-export function fireDate(item: Pick<ReminderItem, 'date' | 'hour'>): Date {
+export function fireDate(item: { date: IsoDate; hour: number }): Date {
   const [y, m, d] = item.date.split('-').map(Number) as [number, number, number];
   return new Date(y, m - 1, d, item.hour, 0, 0, 0);
 }
 
-export type ReminderJob = { enabled: false } | { enabled: true; repo: RecordsRepository; contextId: string; hour: ReminderHour };
+export type ReminderJob =
+  | { enabled: false }
+  | {
+      enabled: true;
+      repo: RecordsRepository;
+      contextId: string;
+      /** Horário dos lembretes de vencimento; nulo com "Lembretes de contas a pagar" desligado. */
+      due: ReminderHour | null;
+      /** Os lembretes do dia a dia ligados e o horário deles; nulo com todos desligados. */
+      routine: { hour: RoutineReminderHour; choices: RoutineReminderChoices } | null;
+    };
 
 export type ReminderOutcome = 'agendado' | 'desligado' | 'sem-permissao' | 'indisponivel';
 
 async function apply(job: ReminderJob): Promise<ReminderOutcome> {
   if (!DEVICE_FEATURES) return 'indisponivel';
-  if (!job.enabled) {
+  if (!job.enabled || (job.due === null && (job.routine === null || !anyRoutineReminder(job.routine.choices)))) {
     await cancelAllReminders();
     return 'desligado';
   }
@@ -49,15 +69,30 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
   }
   const now = new Date();
   const today = todayIn(deviceTimeZone(), now);
-  // Mês de hoje: todas as contas com vencimento no mês e todas as abertas de outros meses (listCommitments).
-  const list = await job.repo.listCommitments(job.contextId, monthOf(today));
-  const plan = reminderPlan(list, today, job.hour, REMINDER_LIMIT, {
-    nowMinutes: now.getHours() * 60 + now.getMinutes(),
-    contextId: job.contextId,
-  });
-  await syncScheduledReminders(
-    plan.map((i) => ({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: reminderSignature(i) })),
-  );
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const items: ScheduledReminder[] = [];
+  if (job.due !== null) {
+    // Mês de hoje: todas as contas com vencimento no mês e todas as abertas de outros meses (listCommitments).
+    const list = await job.repo.listCommitments(job.contextId, monthOf(today));
+    const plan = reminderPlan(list, today, job.due, REMINDER_LIMIT, { nowMinutes, contextId: job.contextId });
+    for (const i of plan) {
+      items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: reminderSignature(i), route: REMINDER_ROUTE, channel: 'contas' });
+    }
+  }
+  if (job.routine !== null && anyRoutineReminder(job.routine.choices)) {
+    // Registros do mês de hoje (gasto de hoje e recebimento do mês) e o dia da última anotação (só para "Uma semana sem anotar").
+    const records = await job.repo.listRecords(job.contextId, monthOf(today));
+    const activity = job.routine.choices.ausencia ? (await job.repo.getReturnReviewState(job.contextId)).activity : null;
+    const plan = routineReminderPlan(job.routine.choices, records, activity, today, job.routine.hour, {
+      nowMinutes,
+      contextId: job.contextId,
+      limit: ROUTINE_REMINDER_LIMIT,
+    });
+    for (const i of plan) {
+      items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });
+    }
+  }
+  await syncScheduledReminders(items);
   return 'agendado';
 }
 
@@ -83,21 +118,33 @@ export function queueReminders(job: ReminderJob) {
   })();
 }
 
+/** O interruptor ligado ou desligado: os lembretes de contas a pagar ("contas") ou um dos lembretes do dia a dia. */
+export type ReminderSwitch = 'contas' | RoutineReminderKind;
+
+function setSwitch(userId: string, persist: boolean, which: ReminderSwitch, on: boolean) {
+  if (which === 'contas') {
+    updatePrefs(userId, { reminders: on }, persist);
+    return;
+  }
+  const current = getPrefs(userId)?.routineReminders ?? { gastos: false, recebimentos: false, mapa: false, ausencia: false };
+  updatePrefs(userId, { routineReminders: { ...current, [which]: on } }, persist);
+}
+
 /**
- * Liga os lembretes depois do toque da pessoa: só então o sistema pede a permissão. A escolha fica ligada mesmo sem a
+ * Liga um lembrete depois do toque da pessoa: só então o sistema pede a permissão. A escolha fica ligada mesmo sem a
  * permissão; a tela mostra "Os avisos estão desativados nas configurações do aparelho." e, quando a pessoa libera os
- * avisos e volta ao app, os lembretes são agendados sem outro toque.
+ * avisos e volta ao app, os lembretes são agendados sem outro toque. O reagendamento sai da mudança da preferência
+ * (components/device-features.tsx).
  */
-export async function enableReminders(userId: string, persist: boolean): Promise<NotificationPermission> {
+export async function enableReminders(userId: string, persist: boolean, which: ReminderSwitch = 'contas'): Promise<NotificationPermission> {
   const permission = await requestNotificationPermission();
-  updatePrefs(userId, { reminders: true }, persist);
+  setSwitch(userId, persist, which, true);
   return permission;
 }
 
-/** Desliga e tira todos os avisos do Clarevo deste aparelho. */
-export function disableReminders(userId: string, persist: boolean) {
-  updatePrefs(userId, { reminders: false }, persist);
-  queueReminders({ enabled: false });
+/** Desliga um lembrete; com todos desligados, o reagendamento tira todos os avisos do Clarevo deste aparelho. */
+export function disableReminders(userId: string, persist: boolean, which: ReminderSwitch = 'contas') {
+  setSwitch(userId, persist, which, false);
 }
 
 export { getNotificationPermission };

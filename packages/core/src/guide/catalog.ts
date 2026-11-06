@@ -27,6 +27,7 @@ import { NOTA_TEXT } from '../nota';
 import { ACCESS_TEXT, TRIAL_DAYS, TRIAL_WARNING_DAYS, planPrice } from '../plano';
 import { INCOME_AVERAGE_TEXT } from '../renda-media';
 import { REMINDER_TEXT } from '../reminders';
+import { ROUTINE_REMINDER_TEXT } from '../routine-reminders';
 import { RETURN_TEXT } from '../retorno';
 import { EXTRA_SAVINGS_TEXT, SAVINGS_TEXT } from '../savings';
 import { SEARCH_TEXT } from '../search';
@@ -696,19 +697,19 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     id: 'lembretes',
     group: 'conta-e-privacidade',
     title: 'Lembretes de vencimento',
-    purpose: 'Um aviso no dia anterior ao vencimento de cada conta a pagar. Funciona no app para celular.',
+    purpose: 'Um aviso no dia anterior ao vencimento de cada conta a pagar e, se quiser, lembretes do dia a dia para manter o hábito de anotar. Funciona no app para celular.',
     where: [ACCOUNT_SCREEN, REMINDER_TEXT.section],
     steps: [
-      `No app para celular, abra Conta e ligue ${q(REMINDER_TEXT.toggle)}.`,
-      'Permita os avisos quando o aparelho pedir.',
+      `No app para celular, abra Conta e ligue ${q(REMINDER_TEXT.toggle)}; permita os avisos quando o aparelho pedir.`,
       `Escolha o ${q(REMINDER_TEXT.hourLabel)}.`,
-      'O aviso não mostra valores nem descrições na tela bloqueada e fica só neste aparelho.',
+      `Em ${q(ROUTINE_REMINDER_TEXT.section)}, ligue só os que quiser: ${q(ROUTINE_REMINDER_TEXT.kinds.gastos.toggle)}, ${q(ROUTINE_REMINDER_TEXT.kinds.recebimentos.toggle)}, ${q(ROUTINE_REMINDER_TEXT.kinds.mapa.toggle)} e ${q(ROUTINE_REMINDER_TEXT.kinds.ausencia.toggle)}, com o horário deles.`,
+      'Nenhum aviso mostra valores nem descrições na tela bloqueada, e todos ficam só neste aparelho.',
       `Se o aparelho bloquear os avisos, use ${q(REMINDER_TEXT.openSettings)}.`,
       'Na versão para navegador, os lembretes não existem.',
     ],
     screenName: ACCOUNT_SCREEN,
     href: REMINDERS_SETTINGS_HREF,
-    keywords: ['lembrete', 'lembretes', 'aviso', 'avisar', 'notificação', 'um dia antes', 'horário do aviso', 'vencimento'],
+    keywords: ['lembrete', 'lembretes', 'aviso', 'avisar', 'notificação', 'um dia antes', 'horário do aviso', 'vencimento', 'dia a dia', 'hábito', 'gastos do dia', 'semana sem anotar'],
     routes: ['/conta'],
     screenshot: '329_conta_privacidade.png',
   },

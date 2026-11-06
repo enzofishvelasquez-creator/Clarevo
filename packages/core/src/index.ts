@@ -26,6 +26,7 @@ export * from './shortcuts';
 export * from './retorno';
 export * from './committed';
 export * from './reminders';
+export * from './routine-reminders';
 export * from './goals';
 export * from './savings';
 export * from './signup-source';

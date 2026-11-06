@@ -122,6 +122,7 @@ Com o app instalado pelo link do Expo (Android) ou pelo TestFlight (iPhone). Par
 | 2 | Conta > ligar a biometria; fechar o app e abrir de novo | Pede a digital ou o rosto antes de mostrar os dados |
 | 3 | Conta > Ocultar valores | Os valores viram pontinhos em todas as telas |
 | 4 | Contas a pagar > nova conta vencendo amanhã, com lembrete; permitir as notificações | A notificação chega no horário (pode atrasar alguns minutos no Android) |
+| 4b | Conta > Lembretes > ligar "Anotar os gastos do dia" (horário daqui a pouco) e "Uma semana sem anotar" | O aviso do dia chega no horário, sem valores, e o toque abre Anotar gasto; com um gasto anotado antes do horário, o aviso de hoje não chega |
 | 5 | Anotar gasto > Escanear nota fiscal > apontar para o QR Code de um cupom | Preenche valor, data e descrição |
 | 6 | Escanear nota fiscal > foto da chave de uma nota (os 44 números) | Lê a chave e preenche |
 | 7 | Ler comprovante > escolher um print de Pix da galeria | Preenche valor, data e o nome de quem recebeu |

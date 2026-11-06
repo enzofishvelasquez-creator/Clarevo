@@ -1,4 +1,4 @@
-import { isReminderId, REMINDER_ROUTE, REMINDER_TEXT } from '@clarevo/core';
+import { isReminderId, REMINDER_ROUTE, REMINDER_TEXT, ROUTINE_REMINDER_TEXT } from '@clarevo/core';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Notifications from 'expo-notifications';
 import { Linking, Platform } from 'react-native';
@@ -11,8 +11,13 @@ import { Linking, Platform } from 'react-native';
  */
 export const DEVICE_FEATURES = true;
 
-/** Canal do Android (8 ou mais): precisa existir antes de pedir a permissão e de agendar. */
-const CHANNEL_ID = 'lembretes';
+/**
+ * Canais do Android (8 ou mais): precisam existir antes de pedir a permissão e de agendar. Um para os lembretes de vencimento
+ * (D-025) e outro para os do dia a dia (D-087), para a pessoa poder silenciar um sem o outro nas configurações do aparelho.
+ */
+export type ReminderChannel = 'contas' | 'rotina';
+const CHANNEL_ID: Readonly<Record<ReminderChannel, string>> = { contas: 'lembretes', rotina: 'lembretes-dia-a-dia' };
+const CHANNEL_NAME: Readonly<Record<ReminderChannel, string>> = { contas: REMINDER_TEXT.channelName, rotina: ROUTINE_REMINDER_TEXT.channelName };
 
 export interface NotificationPermission {
   granted: boolean;
@@ -27,10 +32,12 @@ function toPermission(s: Notifications.NotificationPermissionsStatus): Notificat
 
 async function ensureChannel() {
   if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-    name: REMINDER_TEXT.channelName,
-    importance: Notifications.AndroidImportance.DEFAULT,
-  });
+  for (const channel of ['contas', 'rotina'] as const) {
+    await Notifications.setNotificationChannelAsync(CHANNEL_ID[channel], {
+      name: CHANNEL_NAME[channel],
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+  }
 }
 
 export async function getNotificationPermission(): Promise<NotificationPermission> {
@@ -60,6 +67,9 @@ export interface ScheduledReminder {
   body: string;
   /** Muda quando o aviso muda (dia, horário, contagem ou texto): avisos iguais não são agendados de novo. */
   signature: string;
+  /** Endereço do app aberto pelo toque (Contas a pagar nos de vencimento; Anotar gasto, Registrar recebimento, Análises ou Resumo nos do dia a dia). */
+  route: string;
+  channel: ReminderChannel;
 }
 
 async function scheduledReminders() {
@@ -83,8 +93,8 @@ export async function syncScheduledReminders(items: readonly ScheduledReminder[]
     if (kept.has(item.id)) continue;
     await Notifications.scheduleNotificationAsync({
       identifier: item.id,
-      content: { title: item.title, body: item.body, data: { url: REMINDER_ROUTE, signature: item.signature }, sound: 'default' },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.date, channelId: CHANNEL_ID },
+      content: { title: item.title, body: item.body, data: { url: item.route, signature: item.signature }, sound: 'default' },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: item.date, channelId: CHANNEL_ID[item.channel] },
     });
   }
 }
@@ -95,17 +105,18 @@ export async function cancelAllReminders(): Promise<void> {
 }
 
 /**
- * Aviso com o app aberto aparece como faixa, sem som; o toque num aviso do Clarevo abre Contas a pagar (também quando
- * o toque abriu o app). Devolve a função que desfaz o registro.
+ * Aviso com o app aberto aparece como faixa, sem som; o toque num aviso do Clarevo abre a tela do aviso (`data.url`; Contas a pagar
+ * quando o aviso é antigo e não a tem), também quando o toque abriu o app. Devolve a função que desfaz o registro.
  */
-export function listenToReminders(onOpen: () => void): () => void {
+export function listenToReminders(onOpen: (route: string) => void): () => void {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
   });
   const handle = (r: Notifications.NotificationResponse | null) => {
     if (!r || r.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER || !isReminderId(r.notification.request.identifier)) return;
     Notifications.clearLastNotificationResponse();
-    onOpen();
+    const url = r.notification.request.content.data?.url;
+    onOpen(typeof url === 'string' && url.startsWith('/') ? url : REMINDER_ROUTE);
   };
   try {
     handle(Notifications.getLastNotificationResponse());

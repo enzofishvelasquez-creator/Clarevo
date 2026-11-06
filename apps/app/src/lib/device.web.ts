@@ -1,10 +1,11 @@
 /**
- * Versão web de `device.ts`: lembretes e bloqueio por biometria existem só no app para celular (D-025(5)). Mesmas
+ * Versão web de `device.ts`: lembretes (de vencimento e do dia a dia) e bloqueio por biometria existem só no app para celular
+ * (D-025(5), D-087). Mesmas
  * funções, sem efeito, para os pacotes nativos ficarem fora do site.
  */
-import type { NotificationPermission, ScheduledReminder, UnlockResult } from './device';
+import type { NotificationPermission, ReminderChannel, ScheduledReminder, UnlockResult } from './device';
 
-export type { NotificationPermission, ScheduledReminder, UnlockResult };
+export type { NotificationPermission, ReminderChannel, ScheduledReminder, UnlockResult };
 
 export const DEVICE_FEATURES = false;
 
@@ -20,7 +21,7 @@ export async function syncScheduledReminders(_items: readonly ScheduledReminder[
 
 export async function cancelAllReminders(): Promise<void> {}
 
-export function listenToReminders(_onOpen: () => void): () => void {
+export function listenToReminders(_onOpen: (route: string) => void): () => void {
   return () => {};
 }
 

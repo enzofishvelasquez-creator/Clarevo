@@ -1,4 +1,4 @@
-import { REMINDER_ROUTE, REMINDER_TEXT, offerCaption, type PersonalSpace, type SeriesWrite } from '@clarevo/core';
+import { anyRoutineReminder, REMINDER_ROUTE, REMINDER_TEXT, offerCaption, type PersonalSpace, type SeriesWrite } from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, usePathname, type Href } from 'expo-router';
 import { LockKeyhole } from 'lucide-react-native';
@@ -28,8 +28,8 @@ const LOCK_AFTER_MS = 60_000;
 /**
  * Recursos do Ciclo A2 montados no layout (fora de state/data.ts):
  * - "Ocultar valores ao abrir": aplica a preferência da pessoa ao abrir o app ou entrar (também na web);
- * - lembretes (só no aparelho): reagenda ao abrir, ao voltar para o app e depois de escritas, e o toque no aviso abre
- *   Contas a pagar;
+ * - lembretes de vencimento e do dia a dia (só no aparelho): reagenda ao abrir, ao voltar para o app e depois de escritas, e o
+ *   toque no aviso abre a tela dele (Contas a pagar, Anotar gasto, Registrar recebimento, Análises ou Resumo);
  * - widget da tela inicial (só no aparelho, só em build com o widget nativo; D-063 item 3): grava o resumo para o widget nos mesmos
  *   momentos dos lembretes, e ao mudar "Mostrar valores no widget" ou entrar e sair da conta (lib/widget-sync.ts);
  * - oferta de lembretes depois do primeiro gasto fixo salvo no Pessoal (só no aparelho);
@@ -87,8 +87,17 @@ function NativeFeatures() {
       return;
     }
     if (!prefs || status !== 'pronto' || !contextId) return;
-    if (demo || !prefs.reminders) queueReminders({ enabled: false });
-    else queueReminders({ enabled: true, repo, contextId, hour: prefs.reminderHour });
+    const routine = anyRoutineReminder(prefs.routineReminders);
+    if (demo || (!prefs.reminders && !routine)) queueReminders({ enabled: false });
+    else {
+      queueReminders({
+        enabled: true,
+        repo,
+        contextId,
+        due: prefs.reminders ? prefs.reminderHour : null,
+        routine: routine ? { hour: prefs.routineReminderHour, choices: prefs.routineReminders } : null,
+      });
+    }
     // Widget: sempre o contexto Pessoal (nunca a Família); na demonstração, nada é gravado.
     queueWidget(demo ? { kind: 'demo' } : { kind: 'signed-in', repo, contextId, showValues: prefs.widgetShowValues });
   };
@@ -97,10 +106,10 @@ function NativeFeatures() {
     runRef.current = run;
   });
 
-  // Ao abrir, ao entrar e ao mudar a preferência ou o horário (e "Mostrar valores no widget").
+  // Ao abrir, ao entrar e ao mudar uma preferência de lembrete ou um horário (e "Mostrar valores no widget").
   useEffect(() => {
     runRef.current();
-  }, [ready, userId, contextId, status, prefs?.reminders, prefs?.reminderHour, prefs?.widgetShowValues, demo]);
+  }, [ready, userId, contextId, status, prefs?.reminders, prefs?.reminderHour, prefs?.routineReminders, prefs?.routineReminderHour, prefs?.widgetShowValues, demo]);
 
   // Ao voltar para o app, depois de qualquer escrita concluída e da geração do dia dos gastos fixos.
   useEffect(() => {
@@ -127,13 +136,19 @@ function NativeFeatures() {
     };
   }, [qc]);
 
-  // ---- Toque no aviso: Contas a pagar (Pessoal, mês atual) ------------------------------------
-  const [pendingOpen, setPendingOpen] = useState(false);
-  useEffect(() => listenToReminders(() => setPendingOpen(true)), []);
+  // ---- Toque no aviso: a tela do aviso, no Pessoal (Contas a pagar no mês atual; Anotar gasto, Registrar recebimento,
+  // Análises ou Resumo nos lembretes do dia a dia) ---------------------------------------------------------------------
+  const [pendingOpen, setPendingOpen] = useState<string | null>(null);
+  useEffect(() => listenToReminders((route) => setPendingOpen(route)), []);
   useEffect(() => {
     if (!pendingOpen || status !== 'pronto' || pathname === '/carregando') return;
-    setPendingOpen(false);
+    const route = pendingOpen;
+    setPendingOpen(null);
     setSpace('pessoal');
+    if (route !== REMINDER_ROUTE) {
+      router.navigate(route as Href);
+      return;
+    }
     setMonth(currentMonth);
     // Mês atual sempre, com um parâmetro de abertura novo: se Contas a pagar já está aberta em outro mês, a tela sincroniza.
     router.navigate({ pathname: REMINDER_ROUTE, params: { mes: currentMonth, abrir: String(Date.now()) } } as Href);

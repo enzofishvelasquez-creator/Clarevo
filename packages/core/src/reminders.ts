@@ -48,7 +48,7 @@ export function isReminderHour(value: unknown): value is ReminderHour {
 }
 
 /** "8h", "9h", "12h", "19h". */
-export function reminderHourLabel(hour: ReminderHour): string {
+export function reminderHourLabel(hour: number): string {
   return `${hour}h`;
 }
 
@@ -62,7 +62,7 @@ export function offerCaption(hour: ReminderHour = DEFAULT_REMINDER_HOUR): string
 }
 
 /** Leitor de tela: "8 horas", "12 horas". */
-export function reminderHourA11y(hour: ReminderHour): string {
+export function reminderHourA11y(hour: number): string {
   return `${hour} horas`;
 }
 

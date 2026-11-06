@@ -34,7 +34,7 @@
 - Os PDFs de nota e de comprovante e os arquivos de extrato (OFX, CSV ou PDF): o texto é lido no aparelho e descartado; só o que a pessoa confirma vira lançamento.
 - As imagens lidas (print ou foto de comprovante, holerite, nota de serviço, boleto e a chave da nota, D-078 B e D-079): o texto é reconhecido no aparelho (Apple Vision no iPhone, ML Kit do Google no Android). A foto tirada em "Tirar uma foto" e a cópia que o seletor faz ficam só no cache do app durante a leitura e são apagadas logo depois (`apps/app/src/lib/image-pick.ts`); só o que a pessoa confirma vira lançamento.
 - A biometria: o sistema do aparelho decide e o app só recebe "sim" ou "não". Não há dado biométrico no app.
-- Os lembretes: são notificações locais agendadas no aparelho; o app não pede nem guarda token de notificação remota.
+- Os lembretes (de vencimento e do dia a dia, cada um ligado pela pessoa em Conta): são notificações locais agendadas no aparelho, sem valores nem descrições; o app não pede nem guarda token de notificação remota.
 - As preferências (ocultar valores, tema de bolhas ou barras, "Primeiros passos", o dia de primeiro uso e o "Agora não" da pergunta "Como você conheceu a Clarevo?") e a memória de lojas e nomes (pelo resumo SHA-256 do CNPJ).
 - As buscas e as leituras de Aprender: o app não registra (CLAUDE.md).
 - A exportação: o arquivo CSV ou PDF vai ao compartilhamento do aparelho por ação da pessoa.

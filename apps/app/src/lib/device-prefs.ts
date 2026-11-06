@@ -2,14 +2,20 @@ import {
   BUDGET_NOTICE_KEEP,
   DEFAULT_CATEGORY_VIEW,
   DEFAULT_REMINDER_HOUR,
+  DEFAULT_ROUTINE_REMINDER_HOUR,
   DEFAULT_WIDGET_SHOW_VALUES,
   MEMORY_LIMIT,
+  NO_ROUTINE_REMINDERS,
   isBudgetNoticeKey,
   isCategoryView,
   isReminderHour,
+  isRoutineReminderHour,
+  parseRoutineReminderChoices,
   type CategoryView,
   type ImportMemory,
   type ReminderHour,
+  type RoutineReminderChoices,
+  type RoutineReminderHour,
 } from '@clarevo/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
@@ -17,7 +23,8 @@ import { Platform } from 'react-native';
 
 /**
  * Preferências do Ciclo A2 guardadas só neste aparelho, por pessoa (chave com o identificador): lembretes e horário,
- * oferta de lembretes já mostrada, ocultar valores ao abrir e biometria ao abrir. Nada vai para o servidor.
+ * oferta de lembretes já mostrada, ocultar valores ao abrir, biometria ao abrir e, desde a D-087, os lembretes do dia a dia. Nada vai
+ * para o servidor.
  * Ler ou gravar pode falhar (navegação privada, armazenamento cheio ou bloqueado): vale o padrão (tudo desligado) e a
  * cópia em memória enquanto o app estiver aberto. Na demonstração, fica só em memória (o identificador se repete depois
  * de recarregar a página; uma conta nova nunca herda a escolha de outra).
@@ -79,6 +86,13 @@ export interface DevicePrefs {
   extraSavingsReminder: boolean;
   /** "Agora não" no lembrete de valor extra: o mês (AAAA-MM) em que ele fica escondido. */
   extraSavingsDismissedMonth: string | null;
+  /**
+   * Lembretes do dia a dia (D-087): um interruptor por aviso (gastos do dia, recebimentos do mês, mapa do mês, uma semana sem anotar)
+   * e o horário deles, separado do horário dos lembretes de vencimento. Só neste aparelho, como os lembretes de vencimento; não é dado
+   * financeiro e nada vai para o servidor.
+   */
+  routineReminders: RoutineReminderChoices;
+  routineReminderHour: RoutineReminderHour;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -97,6 +111,8 @@ export const DEFAULT_PREFS: DevicePrefs = {
   categoryView: DEFAULT_CATEGORY_VIEW,
   extraSavingsReminder: false,
   extraSavingsDismissedMonth: null,
+  routineReminders: NO_ROUTINE_REMINDERS,
+  routineReminderHour: DEFAULT_ROUTINE_REMINDER_HOUR,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -129,6 +145,8 @@ function parse(raw: string | null | undefined): DevicePrefs {
       extraSavingsReminder: v.extraSavingsReminder === true,
       extraSavingsDismissedMonth:
         typeof v.extraSavingsDismissedMonth === 'string' && /^\d{4}-\d{2}$/.test(v.extraSavingsDismissedMonth) ? v.extraSavingsDismissedMonth : null,
+      routineReminders: parseRoutineReminderChoices(v.routineReminders),
+      routineReminderHour: isRoutineReminderHour(v.routineReminderHour) ? v.routineReminderHour : DEFAULT_ROUTINE_REMINDER_HOUR,
     };
   } catch {
     return DEFAULT_PREFS;
