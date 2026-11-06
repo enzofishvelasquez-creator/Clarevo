@@ -257,6 +257,10 @@ describe('configuração de publicação', () => {
     // O preview gera build de loja no iOS (TestFlight) com versão remota: sem autoIncrement, o segundo envio repetiria o número de build.
     expect(eas.build.preview).toMatchObject({ distribution: 'internal', autoIncrement: true, android: { buildType: 'apk' }, ios: { distribution: 'store' } });
     expect(eas.build.production).toMatchObject({ distribution: 'store', autoIncrement: true, android: { buildType: 'app-bundle' } });
+    // "Build from GitHub" (docs/40): a documentação do Expo pede a imagem de build declarada em cada perfil e plataforma usados pelo GitHub.
+    for (const perfil of ['preview', 'production']) for (const plataforma of ['android', 'ios']) {
+      expect(eas.build[perfil][plataforma].image, `${perfil}.${plataforma}.image`).toBe('latest');
+    }
     // Nenhum segredo nem chave no repositório (o identificador do projeto EAS, que Enzo gera com `eas init`, não é segredo).
     // Os campos de conta da Apple e do Google ficam fora do arquivo: Enzo os informa no envio, nunca no repositório.
     const CONTA = 'appleId|ascAppId|appleTeamId|serviceAccountKeyPath';

@@ -25,12 +25,30 @@ Regra de sempre: contas, senhas, códigos, chaves de assinatura, pagamentos e ve
 |---|---|---|---|
 | 0 | PR com estas correções juntado ao `main` (o build sai do `main`; sem o PR, a câmera continua bloqueada no build) | Claude Chrome cria o PR; Enzo faz o merge | Falta |
 | 1 | Conta no expo.dev com o e-mail do domínio e um projeto `clarevo`; mandar à equipe o usuário (owner) e o Project ID | Enzo | Falta |
-| 2 | `owner` e `extra.eas.projectId` em `apps/app/app.json`, PR e merge | Equipe | Depois do 1 |
+| 2 | `owner` e `extra.eas.projectId` em `apps/app/app.json`, PR e merge (a imagem de build `latest` em `eas.json`, que o build pelo GitHub exige, já está no `main` desde 06/11) | Equipe | Depois do 1 |
 | 3 | No projeto do expo.dev: ligar o GitHub ao repositório `enzofishvelasquez-creator/clarevo`, pasta base `apps/app` | Enzo | Depois do 2 |
 | 4 | Variáveis `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_KEY` (a chave pública, a mesma da web) nos ambientes `preview` e `production`, visibilidade "plain text". Sem elas, o app abre "Configuração incompleta" de propósito | Enzo | Falta |
 | 5 | Endereços de retorno do Supabase com `clarevo://**` (para o e-mail de confirmação abrir o app) | Enzo | Feito (lido no painel em 30/10/2026, `docs/05`) |
 | 6 | "Build from GitHub": ramo `main`, Android, perfil `preview`; deixar o Expo gerar e guardar a chave de assinatura do Android (é a do app para sempre; nunca vai ao repositório) | Enzo | Depois do 4 |
 | 7 | Instalar o APK pelo link e fazer o teste de `docs/37`, seção 6 (17 itens), mais a seção 4 desta lista | Enzo | Depois do 6 |
+
+### 2a. Passo a passo no expo.dev (Enzo, à mão; 06/11/2026)
+
+Nada aqui é segredo além da senha da conta, que fica no Bitwarden. O Claude Chrome não entra no expo.dev.
+
+**Conta pessoal, não organização.** O repositório está numa conta pessoal do GitHub (`enzofishvelasquez-creator`), e o Expo só liga repositório de organização do GitHub a organização do Expo. A conta pessoal do Expo, a que nasce no cadastro, liga o repositório pessoal. Converter em organização depois é possível sem perder builds, chaves nem atualizações (documentação do Expo, "Account types", lida em 06/11/2026).
+
+1. **Criar a conta:** `expo.dev/signup`, com o e-mail do domínio (`contato@clarevo.app.br`), senha nova no Bitwarden, confirmar o e-mail. Nome de usuário sugerido: `clarevo` (minúsculas; vira o `owner`). Se estiver tomado, outro curto, e avisar a equipe qual.
+2. **Ligar o GitHub ao usuário:** `expo.dev/settings`, em "Connections", "GitHub", "Connect", autorizar com a conta `enzofishvelasquez-creator`. Sem isso, o passo 6 não mostra o repositório.
+3. **Criar o projeto:** na página inicial, "Projects", "Create a Project". Nome `Clarevo`, slug exatamente `clarevo` (igual ao `slug` de `app.json`; com outro slug o build recusa).
+4. **Mandar à equipe:** o `owner` (o nome da conta, que aparece no endereço `expo.dev/accounts/<owner>/projects/clarevo`) e o **Project ID** (na página do projeto, em "Overview", o "ID" de 36 caracteres com traços). Não são segredo.
+5. **Equipe:** PR com `owner` e `extra.eas.projectId`; Enzo faz o merge ("Create a merge commit").
+6. **Ligar o GitHub ao projeto:** `expo.dev/accounts/<owner>/projects/clarevo/github`. "Install the Expo GitHub App", escolhendo só o repositório `clarevo` ("Only select repositories"). De volta ao Expo, selecionar o repositório, e em "Base directory" escrever `apps/app`, salvar.
+7. **Variáveis:** no projeto, "Environment variables", "Add variable", duas vezes: nome `EXPO_PUBLIC_SUPABASE_URL` com a "Project URL" do `clarevo-producao` (Supabase, Project Settings, Data API), e nome `EXPO_PUBLIC_SUPABASE_KEY` com a chave pública (`sb_publishable_...`, Project Settings, API Keys; **nunca** a `secret` nem a `service_role`). Nas duas: ambientes `preview` e `production` marcados, visibilidade "Plain text" (as `EXPO_PUBLIC_*` vão dentro do app; "Secret" faz o build falhar). A chave pública é a mesma que a web usa na Cloudflare.
+8. **Build:** "Builds", "Build from GitHub": Git ref `main`, Platform `Android`, Build profile `preview`, "Build". Leva de 15 a 25 minutos; a página mostra o registro ao vivo. A chave de assinatura do Android é gerada e guardada pelo Expo sozinha (conferido no código do `eas-cli` 27.5.0: sem terminal, ele gera uma chave nova em vez de perguntar). A documentação do Expo lista "um build feito do computador" como pré-requisito do build pelo GitHub; se o build parar nas credenciais, mandar à equipe o link do build, que a saída é um build pelo computador do Enzo, com roteiro.
+9. **Instalar:** com o build pronto, abrir a página do build no celular Android (ou ler o QR da página), "Install", permitir a instalação de origem desconhecida quando o Android pedir. Depois, o teste da seção 4 e o de `docs/37`, seção 6.
+
+Se algo falhar, mandar à equipe o link da página do build (`expo.dev/accounts/<owner>/projects/clarevo/builds/...`): o registro não tem segredo, e as variáveis "Plain text" aparecem nele de propósito.
 
 O endereço do site (`EXPO_PUBLIC_SITE_URL`) **não** entra neste primeiro build: só depois de o site final estar publicado com os textos revisados pelo advogado. Sem ele, os links "Termos de uso", "Política de privacidade" e "Privacidade e termos" não aparecem no app; o aviso de aceite dos termos aparece, sem os links.
 
