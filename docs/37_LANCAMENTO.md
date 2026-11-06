@@ -104,9 +104,9 @@ O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que 
 O Expo monta o app das lojas a partir do repositório no GitHub, pelo site expo.dev, com o botão "Build from GitHub" (o Enzo não precisa instalar nada no computador). Ordem:
 
 1. **Enzo, em expo.dev:** criar a conta com o e-mail do domínio e um projeto com o nome `clarevo`. Mandar à equipe o **usuário (owner)** e o **Project ID** da página do projeto (não são segredos).
-2. **Equipe:** pôr `owner` e `extra.eas.projectId` em `apps/app/app.json`, PR e merge.
+2. **Equipe:** pôr `owner` e `extra.eas.projectId` em `apps/app/app.json`, PR e merge. (Feito em 06/11/2026: `clarevos-team` e o projeto `clarevo`.)
 3. **Enzo, em expo.dev, no projeto:** instalar o app do Expo no GitHub e ligar o repositório `Clarevo`, com a pasta base `apps/app` (configuração "Base directory" da página GitHub do projeto). Em Environment variables, criar `EXPO_PUBLIC_SUPABASE_URL` e `EXPO_PUBLIC_SUPABASE_KEY` (a chave pública do app, a mesma da web) nos ambientes `preview` e `production`, com visibilidade "plain text". Nenhuma senha nem chave secreta vai para o Expo.
-4. **Enzo:** na lista de builds do projeto, "Build from GitHub": ramo `main`, plataforma Android, perfil `preview`. Se o Expo pedir a chave de assinatura do Android, deixar o Expo gerar uma nova e guardar com ele (a conferir na tela; é a chave que assina o app para sempre, nunca vai ao repositório).
+4. **Enzo:** na lista de builds do projeto, "Build from GitHub": ramo `main`, plataforma Android, perfil `preview`. A chave de assinatura do Android é gerada e guardada pelo Expo (é a chave que assina o app para sempre, nunca vai ao repositório). O passo a passo com os nomes das telas está em `docs/40`, seção 2a.
 5. **Enzo:** instalar o APK pelo link que o Expo mostra no fim, no próprio celular Android, e fazer o teste da semana 2 (item 2.2).
 6. **iPhone:** só depois de a Apple aprovar a conta; as credenciais do iPhone pedem um passo a mais, que a equipe manda na hora.
 

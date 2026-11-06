@@ -2,6 +2,7 @@
   "expo": {
     "name": "Clarevo",
     "slug": "clarevo",
+    "owner": "clarevos-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -18,7 +19,9 @@
       },
       "infoPlist": {
         "CFBundleDevelopmentRegion": "pt-BR",
-        "CFBundleLocalizations": ["pt-BR"]
+        "CFBundleLocalizations": [
+          "pt-BR"
+        ]
       }
     },
     "android": {
@@ -87,6 +90,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f53a6647-ca75-48bb-bf06-50d9b78287e8"
+      }
     }
   }
 }
