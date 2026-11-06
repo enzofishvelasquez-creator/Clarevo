@@ -51,6 +51,7 @@ const config: AssinaturaWebConfig = {
   webhookToken: TOKEN,
   supabaseUrl: 'https://projeto.supabase.co',
   serviceKey: 'sb_secret_x',
+  userApiKey: 'sb_publishable_x',
   appUrl: APP_URL_DEFAULT,
 };
 
@@ -76,9 +77,9 @@ const pay = (dueDate: string, status = 'CONFIRMED', extra: Partial<AsaasPayment>
 
 /** A rede falsa: o Asaas e o banco, com o que cada endereço responde, e o registro do que foi mandado. */
 function fakeNet(answers: Partial<Record<string, (init: { method: string; body?: string }) => { status: number; body: unknown }>> = {}) {
-  const sent: { method: string; url: string; headers: Record<string, string>; body: unknown }[] = [];
+  const sent: { method: string; url: string; headers: Record<string, string>; body: unknown; timeoutMs: number }[] = [];
   const fetcher: HttpFetch = async (url, init) => {
-    sent.push({ method: init.method, url, headers: init.headers, body: init.body === undefined ? undefined : JSON.parse(init.body) });
+    sent.push({ method: init.method, url, headers: init.headers, body: init.body === undefined ? undefined : JSON.parse(init.body), timeoutMs: init.timeoutMs });
     const key = `${init.method} ${url.replace(/^https:\/\/[^/]+/, '').replace(/\?.*$/, '')}`;
     const match = Object.entries(answers).find(([k]) => k === key) ?? Object.entries(answers).find(([k]) => k.endsWith('*') && key.startsWith(k.slice(0, -1)));
     const r = match?.[1]?.(init) ?? { status: 404, body: { errors: [{ code: 'not_found' }] } };
@@ -145,6 +146,10 @@ describe('Assinatura na web (D-084): configuração e referência', () => {
     expect(assinaturaWebConfigFrom(env({ SUPABASE_SERVICE_ROLE_KEY: '', SUPABASE_SECRET_KEYS: '{"default":"sb_secret_nova"}' }))?.serviceKey).toBe('sb_secret_nova');
     expect(assinaturaWebConfigFrom(env({ CLAREVO_APP_URL: 'http://localhost:8081/' }))?.appUrl).toBe('http://localhost:8081');
     expect(assinaturaWebConfigFrom(env({ CLAREVO_APP_URL: 'javascript:alert(1)' }))).toBeNull();
+    // As chamadas feitas como a pessoa usam a chave pública do projeto (que o Supabase fornece à função); sem ela, a de serviço.
+    expect(assinaturaWebConfigFrom(env({}))?.userApiKey).toBe('sb_secret_x');
+    expect(assinaturaWebConfigFrom(env({ SUPABASE_ANON_KEY: 'sb_publishable_antiga' }))?.userApiKey).toBe('sb_publishable_antiga');
+    expect(assinaturaWebConfigFrom(env({ SUPABASE_ANON_KEY: 'x', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_nova' }))?.userApiKey).toBe('sb_publishable_nova');
   });
 
   it('a referência leva a pessoa e o plano, nunca nome ou e-mail, e só a nossa é lida', () => {
@@ -279,12 +284,15 @@ describe('Assinatura na web: a função do servidor, avisos do Asaas', () => {
     expect(JSON.parse(res.body)).toEqual({ received: true, outcome: 'aplicado' });
     expect(net.sent.map((s) => `${s.method} ${s.url}`)).toEqual([
       `GET ${ASAAS_SANDBOX_URL}/subscriptions/${SUB}`,
-      `GET ${ASAAS_SANDBOX_URL}/payments?subscription=${SUB}&limit=100`,
+      // Só as cobranças com vencimento nos últimos 4 meses (a última paga e as seguintes), sem depender da página de 100 do Asaas.
+      `GET ${ASAAS_SANDBOX_URL}/payments?subscription=${SUB}&dueDate%5Bge%5D=2026-07-06&limit=100`,
       'POST https://projeto.supabase.co/rest/v1/rpc/billing_apply',
     ]);
     // A chave do Asaas vai só ao Asaas, no cabeçalho access_token, com o User-Agent que o Asaas exige; a de serviço, só ao banco.
     expect(net.sent[0]?.headers).toMatchObject({ access_token: API_KEY, 'User-Agent': 'Clarevo' });
     expect(net.sent[2]?.headers).toEqual({ apikey: 'sb_secret_x', 'Content-Type': 'application/json' });
+    // Cada chamada tem prazo, dentro do orçamento do pedido (o Asaas desiste em 10 segundos).
+    expect(net.sent.every((s) => s.timeoutMs > 0 && s.timeoutMs <= 3000)).toBe(true);
     expect(JSON.stringify(net.sent[2]?.headers)).not.toContain(API_KEY);
     expect(applied).toEqual([
       {
@@ -317,13 +325,26 @@ describe('Assinatura na web: a função do servidor, avisos do Asaas', () => {
     const put = net.sent.find((s) => s.method === 'PUT');
     expect(put?.body).toEqual({ externalReference: `clarevo:${ANA}:familiar` });
     expect(applied[0]).toMatchObject({ p_person: ANA, p_plan: 'familiar' });
-    // Sem Checkout conhecido: nada a aplicar, e 200 para a fila do Asaas não parar.
-    const unknown = fakeNet({ ...answers, 'POST /rest/v1/rpc/billing_checkout_person': () => ({ status: 200, body: null }) });
+    // Sem Checkout conhecido nem assinatura já aplicada: nada a aplicar, e 200 para a fila do Asaas não parar.
+    const nobody = { 'POST /rest/v1/rpc/billing_checkout_person': () => ({ status: 200, body: null }), 'POST /rest/v1/rpc/billing_person_by_external_ref': () => ({ status: 200, body: null }) };
+    const unknown = fakeNet({ ...answers, ...nobody });
     const h2 = createAssinaturaWebHandler({ config, fetch: unknown.fetcher, now: () => NOW });
     const r2 = await h2(webhookReq(event('SUBSCRIPTION_CREATED', { subscription: sub({ externalReference: null }) })).req);
     expect(r2.status).toBe(200);
     expect(JSON.parse(r2.body)).toEqual({ received: true, outcome: 'sem_referencia' });
     expect(unknown.sent.some((s) => s.url.endsWith('/rpc/billing_apply'))).toBe(false);
+    expect(unknown.sent.find((s) => s.url.endsWith('/rpc/billing_person_by_external_ref'))?.body).toEqual({ p_provider: 'web', p_external_ref: sha256Hex(SUB) });
+    // O PUT da referência recusado (4xx) só fica no registro: o aviso é aplicado do mesmo jeito.
+    const logs: string[] = [];
+    const putRefused = fakeNet({
+      ...answers,
+      'POST /rest/v1/rpc/billing_checkout_person': () => ({ status: 200, body: { person_id: ANA, plan: 'individual' } }),
+      [`PUT /v3/subscriptions/${SUB}`]: () => ({ status: 400, body: { errors: [{ code: 'invalid' }] } }),
+    });
+    const h3 = createAssinaturaWebHandler({ config, fetch: putRefused.fetcher, now: () => NOW, log: (m) => logs.push(m) });
+    const r3 = await h3(webhookReq(event('SUBSCRIPTION_CREATED', { subscription: sub({ externalReference: null }) })).req);
+    expect(JSON.parse(r3.body)).toEqual({ received: true, outcome: 'aplicado' });
+    expect(logs).toEqual(['não gravou a referência na assinatura (400)']);
   });
 
   it('aviso de Checkout, de cobrança avulsa ou de evento desconhecido: 200 sem tocar no Asaas nem no banco', async () => {
@@ -350,6 +371,60 @@ describe('Assinatura na web: a função do servidor, avisos do Asaas', () => {
     const res = await h(webhookReq(event('SUBSCRIPTION_DELETED', { subscription: sub({ deleted: true }) })).req);
     expect(JSON.parse(res.body)).toEqual({ received: true, outcome: 'aplicado' });
     expect(applied[0]).toMatchObject({ p_valid_until: '2026-12-07T02:59:59.999Z' });
+    // Estorno depois do cancelamento: o aviso de cobrança não traz a assinatura e o Asaas responde 404; a pessoa é achada pelo resumo da
+    // assinatura já aplicada (billing_person_by_external_ref) e, sem cobrança paga, o acesso acaba agora.
+    const refund = happyAnswers(undefined, [pay('2026-11-06', 'REFUNDED')]);
+    delete (refund.answers as Record<string, unknown>)[`GET /v3/subscriptions/${SUB}`];
+    const net2 = fakeNet({
+      ...refund.answers,
+      'POST /rest/v1/rpc/billing_checkout_person': () => ({ status: 200, body: null }),
+      'POST /rest/v1/rpc/billing_person_by_external_ref': () => ({ status: 200, body: { person_id: ANA, plan: 'individual' } }),
+    });
+    const h2 = createAssinaturaWebHandler({ config, fetch: net2.fetcher, now: () => NOW });
+    const r2 = await h2(webhookReq(event('PAYMENT_REFUNDED', { payment: { id: 'pay_1', status: 'REFUNDED', subscription: SUB } })).req);
+    expect(JSON.parse(r2.body)).toEqual({ received: true, outcome: 'aplicado' });
+    expect(refund.applied[0]).toMatchObject({ p_person: ANA, p_external_ref: sha256Hex(SUB), p_valid_until: NOW.toISOString() });
+    // Assinatura removida não recebe PUT.
+    expect(net2.sent.some((s) => s.method === 'PUT')).toBe(false);
+  });
+
+  it('orçamento de tempo: esgotado, responde 500 sem começar outra chamada (o Asaas entrega de novo), e nada da pessoa vai ao registro', async () => {
+    const { answers } = happyAnswers();
+    let t = NOW.getTime();
+    const slow = fakeNet(answers);
+    const fetcher: HttpFetch = async (url, init) => {
+      t += 5000; // cada chamada leva 5 segundos: a segunda ainda cabe no orçamento de 8,5; a terceira não começa
+      return slow.fetcher(url, init);
+    };
+    const logs: string[] = [];
+    const h = createAssinaturaWebHandler({ config, fetch: fetcher, now: () => new Date(t), log: (m) => logs.push(m) });
+    const res = await h(webhookReq(event('PAYMENT_CONFIRMED', { payment: { id: 'pay_1', status: 'CONFIRMED', subscription: SUB } })).req);
+    expect(res.status).toBe(500);
+    expect(slow.sent).toHaveLength(2);
+    expect(logs.join(' ')).toContain('sem tempo');
+    // Falha de rede ao listar assinaturas: o registro leva o caminho sem a consulta (que traz a referência da pessoa).
+    const broken: HttpFetch = async (url, init) => {
+      if (url.includes('/subscriptions?')) throw new Error(`fetch failed ${url}`);
+      return slow.fetcher(url, init);
+    };
+    const logs2: string[] = [];
+    const h2 = createAssinaturaWebHandler({
+      config,
+      fetch: broken,
+      now: () => NOW,
+      log: (m) => logs2.push(m),
+    });
+    const user = fakeNet({ 'GET /auth/v1/user': () => ({ status: 200, body: { id: ANA } }) });
+    const h3 = createAssinaturaWebHandler({
+      config,
+      fetch: async (url, init) => (url.includes('/subscriptions?') ? broken(url, init) : user.fetcher(url, init)),
+      now: () => NOW,
+      log: (m) => logs2.push(m),
+    });
+    expect((await h3(appReq({ action: 'cancelar' }).req)).status).toBe(503);
+    expect(logs2.join(' ')).not.toContain(ANA);
+    expect(logs2.join(' ')).toContain('Asaas indisponível em GET /subscriptions');
+    void h2;
   });
 
   it('conta excluída (sem_pessoa): remove a assinatura no Asaas para não cobrar mais; recusa do banco não se repete; falha passageira pede de novo', async () => {
@@ -417,7 +492,7 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
     expect((await h(appReq({ action: 'assinar', plan: 'individual' }, null).req)).status).toBe(401);
     expect((await h(appReq({ action: 'assinar', plan: 'individual' }).req)).status).toBe(401);
     expect(net.sent.map((s) => s.url)).toEqual(['https://projeto.supabase.co/auth/v1/user']);
-    expect(net.sent[0]?.headers).toEqual({ apikey: 'sb_secret_x', Authorization: `Bearer ${JWT}` });
+    expect(net.sent[0]?.headers).toEqual({ apikey: 'sb_publishable_x', Authorization: `Bearer ${JWT}` });
     const h2 = createAssinaturaWebHandler({ config, fetch: fakeNet(user).fetcher });
     for (const body of [{ action: 'assinar' }, { action: 'assinar', plan: 'mensal' }, { action: 'outra' }, 'texto', null]) {
       const res = await h2(appReq(body).req);
@@ -454,8 +529,9 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
       `POST ${ASAAS_SANDBOX_URL}/checkouts`,
       'POST https://projeto.supabase.co/rest/v1/rpc/billing_checkout_record',
     ]);
-    // my_access como a pessoa: o token dela em Authorization, a chave de serviço só como apikey.
-    expect(net.sent[1]?.headers).toMatchObject({ apikey: 'sb_secret_x', Authorization: `Bearer ${JWT}` });
+    // my_access como a pessoa: o token dela em Authorization e a chave pública do projeto em apikey (nunca a de serviço com o token dela).
+    expect(net.sent[1]?.headers).toMatchObject({ apikey: 'sb_publishable_x', Authorization: `Bearer ${JWT}` });
+    expect(net.sent[0]?.headers).toEqual({ apikey: 'sb_publishable_x', Authorization: `Bearer ${JWT}` });
     expect(net.sent[4]?.body).toMatchObject({ externalReference: `clarevo:${ANA}:familiar`, subscription: { cycle: 'MONTHLY', nextDueDate: '2026-11-06' } });
     expect(recorded).toEqual([{ p_checkout_hash: sha256Hex(CHECKOUT), p_person: ANA, p_plan: 'familiar' }]);
   });
@@ -482,6 +558,12 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
     const e = h({ ...access('leitura'), 'POST /rest/v1/rpc/billing_checkout_record': () => ({ status: 503, body: '' }), [`POST /v3/checkouts/${CHECKOUT}/cancel`]: () => ({ status: 200, body: {} }) });
     expect((await e.h(appReq({ action: 'assinar', plan: 'individual' }).req)).status).toBe(503);
     expect(e.net.sent.some((s) => s.url.endsWith(`/checkouts/${CHECKOUT}/cancel`))).toBe(true);
+    // Mais de 5 Checkouts em uma hora: o banco recusa, o Checkout criado é cancelado e a resposta é 429.
+    const f = h({ ...access('leitura'), 'POST /rest/v1/rpc/billing_checkout_record': () => ({ status: 200, body: { result: 'muitas_tentativas' } }), [`POST /v3/checkouts/${CHECKOUT}/cancel`]: () => ({ status: 200, body: {} }) });
+    const tooMany = await f.h(appReq({ action: 'assinar', plan: 'individual' }).req);
+    expect(tooMany.status).toBe(429);
+    expect(JSON.parse(tooMany.body)).toEqual({ result: 'muitas_tentativas' });
+    expect(f.net.sent.some((s) => s.url.endsWith(`/checkouts/${CHECKOUT}/cancel`))).toBe(true);
   });
 
   it('cancelar: remove no Asaas as assinaturas ativas da pessoa (pela referência); sem nenhuma, diz que não há', async () => {
@@ -498,6 +580,8 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
     expect(JSON.parse((await h(appReq({ action: 'cancelar' }).req)).body)).toEqual({ result: 'sem_assinatura' });
     const withSub = fakeNet({
       ...user,
+      // A busca é por referência exata, uma por plano: a assinatura Individual aparece só na primeira; a mesma assinatura em duas
+      // respostas (não acontece no Asaas) também seria removida uma vez só.
       'GET /v3/subscriptions': () => ({ status: 200, body: { data: [sub()] } }),
       [`DELETE /v3/subscriptions/${SUB}`]: () => {
         deleted.push(SUB);
@@ -506,8 +590,8 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
     });
     const h2 = createAssinaturaWebHandler({ config, fetch: withSub.fetcher });
     expect(JSON.parse((await h2(appReq({ action: 'cancelar' }).req)).body)).toEqual({ result: 'cancelada' });
-    // A mesma assinatura aparece nas duas buscas (uma por plano) e é removida duas vezes sem problema: o Asaas devolve 404 na segunda.
-    expect(deleted.length).toBeGreaterThanOrEqual(1);
+    expect(deleted).toEqual([SUB]);
+    expect(withSub.sent.filter((s) => s.method === 'GET' && s.url.includes('/subscriptions?'))).toHaveLength(2);
     expect(withSub.sent.filter((s) => s.method === 'DELETE').every((s) => s.headers.access_token === API_KEY)).toBe(true);
   });
 
@@ -520,8 +604,9 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
     const deno = { env: { get: (n: string) => env[n] }, serve: (h: (req: Request) => Promise<Response>) => (serve = h) };
     const { answers } = happyAnswers();
     const sent: string[] = [];
-    const fakeFetch = async (url: string, init: { method: string; body?: string }) => {
+    const fakeFetch = async (url: string, init: { method: string; body?: string; signal?: AbortSignal }) => {
       sent.push(`${init.method} ${url}`);
+      expect(init.signal).toBeInstanceOf(AbortSignal);
       const key = `${init.method} ${url.replace(/^https:\/\/[^/]+/, '').replace(/\?.*$/, '')}`;
       const r = answers[key as keyof typeof answers]?.(init) ?? { status: 404, body: {} };
       return new Response(JSON.stringify(r.body), { status: r.status });

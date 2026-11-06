@@ -149,9 +149,10 @@ function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boo
 /**
  * Os planos e os preços, para quem ainda não paga nem tem quem pague. Na web, com a compra aberta (SUBSCRIBE_OPEN), os botões de assinar.
  * `webTest`: o teste da equipe no sandbox do Asaas antes de abrir (`/conta/assinatura?assinar=teste`, docs/39): mostra os botões com a
- * compra fechada. Só faz diferença enquanto a função do servidor tem a chave do sandbox, que não cobra ninguém.
+ * compra fechada. Só faz diferença enquanto a função do servidor tem a chave do sandbox, que não cobra ninguém. `subscribeHidden`: a
+ * pessoa acabou de pagar (`?pagamento=sucesso`) e o aviso do Asaas ainda não chegou: sem botões, para não abrir um segundo Checkout.
  */
-export function PlansCard({ access, webTest = false }: { access: Access; webTest?: boolean }) {
+export function PlansCard({ access, webTest = false, subscribeHidden = false }: { access: Access; webTest?: boolean; subscribeHidden?: boolean }) {
   return (
     <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -178,7 +179,7 @@ export function PlansCard({ access, webTest = false }: { access: Access; webTest
       <Txt variant="caption" color={colors.textSecondary}>
         {Platform.OS === 'web' ? T.howToPay : T.howToPayStore}
       </Txt>
-      {(SUBSCRIBE_OPEN || webTest) && Platform.OS === 'web' ? <WebSubscribeButtons access={access} webTest={webTest} /> : null}
+      {(SUBSCRIBE_OPEN || webTest) && Platform.OS === 'web' && !subscribeHidden ? <WebSubscribeButtons access={access} webTest={webTest} /> : null}
       {SUBSCRIBE_OPEN ? null : (
         <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
           {T.notOpenYet}

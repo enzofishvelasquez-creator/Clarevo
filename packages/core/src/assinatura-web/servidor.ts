@@ -9,21 +9,24 @@
  * 2. **Para o Asaas (avisos, webhooks)**, com o token combinado no cabeçalho `asaas-access-token`: a cada aviso de assinatura ou de
  *    cobrança de assinatura, consulta o estado atual no Asaas (a assinatura e as cobranças dela), calcula até quando o acesso vale e
  *    chama `billing_apply` no banco (idempotente pelo identificador do aviso e na ordem dos eventos). Responde 200 a todo aviso
- *    autenticado que não precisa ser repetido, porque 15 falhas seguidas param a fila do Asaas; só falha passageira responde 500.
+ *    autenticado que não precisa ser repetido, porque 15 falhas seguidas param a fila do Asaas; só falha passageira responde 500, e
+ *    antes de o Asaas desistir (10 segundos): cada pedido tem um prazo e o aviso inteiro tem um orçamento de tempo.
  *
  * Quem é a pessoa: a referência `clarevo:<id da pessoa>:<plano>` vai no Checkout (`externalReference`) e, por garantia, o Checkout fica
  * ligado à pessoa no banco (`billing_checkout_record`, só o resumo SHA-256 do identificador). O aviso traz a assinatura com a
  * referência ou com o identificador do Checkout (`checkoutSession`); sem referência, a função a grava na assinatura do Asaas para as
- * próximas vezes. Ninguém de fora cria assinatura na conta da Clarevo no Asaas, então a referência é confiável.
+ * próximas vezes. Assinatura já aplicada antes é achada também pelo resumo dela no banco (`billing_person_by_external_ref`), o que
+ * cobre estorno depois de cancelar. Ninguém de fora cria assinatura na conta da Clarevo no Asaas, então a referência é confiável.
  *
  * Até quando vale: o fim do período coberto pela última cobrança paga (vencimento mais um ciclo) e, com a assinatura ativa, mais
  * WEB_GRACE_DAYS de tolerância para a renovação; cancelada, vale até o fim do período pago; estorno ou contestação tira o período da
  * cobrança na hora. Sem cobrança paga, nada vale.
  *
  * Segredos (painel do Supabase, Edge Functions, Secrets, só o Enzo): ASAAS_API_KEY (começa com $aact_prod_ em produção e $aact_hmlg_ no
- * sandbox, que define o ambiente) e ASAAS_WEBHOOK_TOKEN (32 a 255 caracteres, inventado, diferente da chave). SUPABASE_URL e a chave de
- * serviço o Supabase fornece. Opcional: CLAREVO_APP_URL (padrão https://app.clarevo.app.br), de onde o app chama e para onde o Asaas
- * devolve a pessoa. Nenhum segredo entra no app nem no repositório.
+ * sandbox, que define o ambiente) e ASAAS_WEBHOOK_TOKEN (32 a 255 caracteres, inventado, diferente da chave). SUPABASE_URL, a chave de
+ * serviço e a chave pública (SUPABASE_PUBLISHABLE_KEY ou SUPABASE_ANON_KEY, usada nas chamadas feitas como a pessoa) o Supabase fornece.
+ * Opcional: CLAREVO_APP_URL (padrão https://app.clarevo.app.br), de onde o app chama e para onde o Asaas devolve a pessoa. Nenhum
+ * segredo entra no app nem no repositório, e nenhum identificador da pessoa vai para o registro (logs).
  */
 import { addDays, addMonthsToDate, todayIn, type IsoDate } from '../dates';
 import { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind } from '../plano-precos';
@@ -44,6 +47,11 @@ export const WEB_GRACE_DAYS = 3;
 export const CHECKOUT_MINUTES = 60;
 export const ASAAS_MAX_BODY_BYTES = 256 * 1024;
 export const APP_MAX_BODY_BYTES = 4 * 1024;
+/** Orçamento de tempo de um pedido (o Asaas conta como falha a resposta depois de 10 segundos) e o prazo de cada chamada. */
+export const REQUEST_BUDGET_MS = 8500;
+export const CALL_TIMEOUT_MS = 3000;
+/** Só as cobranças com vencimento nos últimos meses interessam (a última paga e as seguintes); evita a página de 100 do Asaas. */
+export const PAYMENTS_LOOKBACK_MONTHS = 4;
 /** Fuso do Asaas (datas dos avisos e vencimentos): Brasília, sem horário de verão desde 2019. */
 export const ASAAS_TIME_ZONE = 'America/Sao_Paulo';
 const ASAAS_OFFSET = '-03:00';
@@ -58,6 +66,8 @@ export interface AssinaturaWebConfig {
   webhookToken: string;
   supabaseUrl: string;
   serviceKey: string;
+  /** A chave pública do projeto, para as chamadas feitas como a pessoa (com o token da sessão dela); sem ela, a de serviço. */
+  userApiKey: string;
   /** Origem do app na web (sem barra no fim): de onde a tela chama e para onde o Asaas devolve a pessoa. */
   appUrl: string;
 }
@@ -73,9 +83,10 @@ export function assinaturaWebConfigFrom(env: (name: string) => string | undefine
   const supabaseUrl = v('SUPABASE_URL').replace(/\/+$/, '');
   const serviceKey = serviceKeyFrom(v);
   if (supabaseUrl === '' || serviceKey === '') return null;
+  const userApiKey = v('SUPABASE_PUBLISHABLE_KEY') || v('SUPABASE_ANON_KEY') || serviceKey;
   const appUrl = (v('CLAREVO_APP_URL') || APP_URL_DEFAULT).replace(/\/+$/, '');
   if (!/^https:\/\/[a-z0-9.-]+$/.test(appUrl) && !/^http:\/\/localhost(:\d+)?$/.test(appUrl)) return null;
-  return { apiKey, apiBase: sandbox ? ASAAS_SANDBOX_URL : ASAAS_PRODUCTION_URL, sandbox, webhookToken, supabaseUrl, serviceKey, appUrl };
+  return { apiKey, apiBase: sandbox ? ASAAS_SANDBOX_URL : ASAAS_PRODUCTION_URL, sandbox, webhookToken, supabaseUrl, serviceKey, userApiKey, appUrl };
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +148,11 @@ export function asaasSubscriptionFrom(raw: unknown): AsaasSubscription | null {
     externalReference: text(s.externalReference),
     checkoutSession: text(s.checkoutSession),
   };
+}
+
+/** Uma assinatura que o Asaas já não devolve (removida): só o identificador; nada vale além do período pago. */
+export function goneSubscription(id: string): AsaasSubscription {
+  return { id, status: 'INACTIVE', deleted: true, cycle: 'MONTHLY', value: null, nextDueDate: null, externalReference: null, checkoutSession: null };
 }
 
 export function asaasPaymentFrom(raw: unknown): AsaasPayment | null {
@@ -229,18 +245,31 @@ export interface HttpResponse {
   status: number;
   text(): Promise<string>;
 }
-export type HttpFetch = (
-  url: string,
-  init: { method: 'GET' | 'POST' | 'PUT' | 'DELETE'; headers: Record<string, string>; body?: string },
-) => Promise<HttpResponse>;
+export interface HttpInit {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  headers: Record<string, string>;
+  body?: string;
+  /** Prazo da chamada; quem liga a função ao `fetch` o transforma em `AbortSignal.timeout`. */
+  timeoutMs: number;
+}
+export type HttpFetch = (url: string, init: HttpInit) => Promise<HttpResponse>;
 
 interface JsonResponse {
   status: number;
   json: unknown;
 }
 
-/** Falha passageira (rede, 5xx): quem chamou pode tentar de novo (o Asaas entrega o aviso de novo). */
+/** Falha passageira (rede, prazo, 5xx): quem chamou pode tentar de novo (o Asaas entrega o aviso de novo). */
 export class TransientError extends Error {}
+
+/** O orçamento de tempo de um pedido: cada chamada recebe o que falta, até CALL_TIMEOUT_MS; esgotado, nem começa. */
+export function budget(startedAt: number, clock: () => number = Date.now) {
+  return (): number => {
+    const left = REQUEST_BUDGET_MS - (clock() - startedAt);
+    if (left < 200) throw new TransientError('sem tempo para concluir o pedido');
+    return Math.min(CALL_TIMEOUT_MS, left);
+  };
+}
 
 async function readJson(res: HttpResponse): Promise<JsonResponse> {
   const body = await res.text();
@@ -253,52 +282,57 @@ async function readJson(res: HttpResponse): Promise<JsonResponse> {
   return { status: res.status, json };
 }
 
-function asaasClient(config: AssinaturaWebConfig, fetcher: HttpFetch) {
-  return async (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<JsonResponse> => {
-    const init = {
+/** O caminho sem a consulta (a consulta pode levar a referência da pessoa; o registro não a recebe). */
+const bare = (path: string) => path.replace(/\?.*$/, '');
+
+function asaasClient(config: AssinaturaWebConfig, fetcher: HttpFetch, timeLeft: () => number) {
+  return async (method: HttpInit['method'], path: string, body?: unknown): Promise<JsonResponse> => {
+    const init: HttpInit = {
       method,
       headers: { access_token: config.apiKey, 'User-Agent': 'Clarevo', 'Content-Type': 'application/json' },
+      timeoutMs: timeLeft(),
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     };
     let res: HttpResponse;
     try {
       res = await fetcher(`${config.apiBase}${path}`, init);
-    } catch (e) {
-      throw new TransientError(`Asaas indisponível: ${e instanceof Error ? e.message : 'erro'}`);
+    } catch {
+      throw new TransientError(`Asaas indisponível em ${method} ${bare(path)}`);
     }
     const out = await readJson(res);
-    if (out.status >= 500) throw new TransientError(`Asaas respondeu ${out.status} em ${method} ${path}`);
+    if (out.status >= 500) throw new TransientError(`Asaas respondeu ${out.status} em ${method} ${bare(path)}`);
     return out;
   };
 }
 type AsaasCall = ReturnType<typeof asaasClient>;
 
-function supabaseClient(config: AssinaturaWebConfig, fetcher: HttpFetch) {
-  const call = async (url: string, init: Parameters<HttpFetch>[1]): Promise<JsonResponse> => {
+function supabaseClient(config: AssinaturaWebConfig, fetcher: HttpFetch, timeLeft: () => number) {
+  const call = async (what: string, url: string, init: Omit<HttpInit, 'timeoutMs'>): Promise<JsonResponse> => {
+    const timeoutMs = timeLeft();
     let res: HttpResponse;
     try {
-      res = await fetcher(url, init);
-    } catch (e) {
-      throw new TransientError(`banco indisponível: ${e instanceof Error ? e.message : 'erro'}`);
+      res = await fetcher(url, { ...init, timeoutMs });
+    } catch {
+      throw new TransientError(`banco indisponível em ${what}`);
     }
     const out = await readJson(res);
-    if (out.status >= 500) throw new TransientError(`banco respondeu ${out.status}`);
+    if (out.status >= 500) throw new TransientError(`banco respondeu ${out.status} em ${what}`);
     return out;
   };
   return {
-    /** Função do banco com a chave de serviço (billing_apply, billing_checkout_*). */
+    /** Função do banco com a chave de serviço (billing_apply, billing_checkout_*, billing_person_by_external_ref). */
     rpcService: (fn: string, args: Record<string, unknown>) =>
-      call(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: serviceHeaders(config.serviceKey), body: JSON.stringify(args) }),
-    /** Função do banco como a pessoa (my_access), com o token da sessão dela. */
+      call(fn, `${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: serviceHeaders(config.serviceKey), body: JSON.stringify(args) }),
+    /** Função do banco como a pessoa (my_access), com o token da sessão dela e a chave pública do projeto. */
     rpcAsUser: (fn: string, jwt: string) =>
-      call(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, {
+      call(fn, `${config.supabaseUrl}/rest/v1/rpc/${fn}`, {
         method: 'POST',
-        headers: { apikey: config.serviceKey, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+        headers: { apikey: config.userApiKey, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
         body: '{}',
       }),
     /** Quem é a pessoa do token (o Supabase confere a assinatura e a validade). null quando o token não vale. */
     userId: async (jwt: string): Promise<string | null> => {
-      const r = await call(`${config.supabaseUrl}/auth/v1/user`, { method: 'GET', headers: { apikey: config.serviceKey, Authorization: `Bearer ${jwt}` } });
+      const r = await call('auth', `${config.supabaseUrl}/auth/v1/user`, { method: 'GET', headers: { apikey: config.userApiKey, Authorization: `Bearer ${jwt}` } });
       const id = text(obj(r.json)?.id);
       return r.status === 200 && id && UUID.test(id) ? id.toLowerCase() : null;
     },
@@ -355,7 +389,18 @@ export interface AssinaturaWebDeps {
 /** As respostas da função ao app. */
 export type AssinaturaWebResult =
   | { result: 'checkout'; url: string }
-  | { result: 'ja_assinante' | 'sem_necessidade' | 'cancelada' | 'sem_assinatura' | 'nao_autenticado' | 'pedido_invalido' | 'indisponivel' | 'tente_de_novo' };
+  | {
+      result:
+        | 'ja_assinante'
+        | 'sem_necessidade'
+        | 'muitas_tentativas'
+        | 'cancelada'
+        | 'sem_assinatura'
+        | 'nao_autenticado'
+        | 'pedido_invalido'
+        | 'indisponivel'
+        | 'tente_de_novo';
+    };
 
 const JSON_TYPE = 'application/json; charset=utf-8';
 
@@ -384,54 +429,67 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
   const log = deps.log ?? (() => {});
   const now = deps.now ?? (() => new Date());
   const config = deps.config;
-  const asaas = config ? asaasClient(config, deps.fetch) : null;
-  const db = config ? supabaseClient(config, deps.fetch) : null;
+
+  interface Clients {
+    asaas: AsaasCall;
+    db: ReturnType<typeof supabaseClient>;
+  }
 
   /** As assinaturas ativas da pessoa no Asaas (uma por plano, no máximo; a busca é pela referência exata). */
-  async function activeSubscriptions(call: AsaasCall, personId: string): Promise<AsaasSubscription[]> {
+  async function activeSubscriptions(asaas: AsaasCall, personId: string): Promise<AsaasSubscription[]> {
     const found: AsaasSubscription[] = [];
     for (const plan of PLANS) {
-      const r = await call('GET', `/subscriptions?externalReference=${encodeURIComponent(webReference(personId, plan))}&status=ACTIVE&limit=10`);
-      if (r.status !== 200) throw new TransientError(`Asaas respondeu ${r.status} ao listar assinaturas`);
+      const r = await asaas('GET', `/subscriptions?externalReference=${encodeURIComponent(webReference(personId, plan))}&status=ACTIVE&limit=10`);
+      if (r.status !== 200) throw new TransientError('Asaas não listou as assinaturas');
       const data = obj(r.json)?.data;
       for (const raw of Array.isArray(data) ? data : []) {
         const s = asaasSubscriptionFrom(raw);
-        if (s && !s.deleted && s.status === 'ACTIVE') found.push(s);
+        if (s && !s.deleted && s.status === 'ACTIVE' && !found.some((f) => f.id === s.id)) found.push(s);
       }
     }
     return found;
   }
 
-  async function applyEvent(ev: AsaasEvent): Promise<WebhookOutcome> {
-    if (!config || !asaas || !db || !ev.subscriptionId) return 'ignorado';
-    // O estado atual, não o do aviso (os avisos chegam repetidos e fora de ordem). Assinatura removida pode não ser lida: vale o aviso.
-    const got = await asaas('GET', `/subscriptions/${encodeURIComponent(ev.subscriptionId)}`);
-    let sub = got.status === 200 ? asaasSubscriptionFrom(got.json) : null;
-    if (!sub && got.status === 404) sub = ev.subscription;
-    if (!sub) {
-      if (got.status === 200 || got.status === 404) return 'ignorado';
-      throw new TransientError(`Asaas respondeu ${got.status} ao ler a assinatura`);
-    }
-    let ref = parseWebReference(sub.externalReference);
-    if (!ref && sub.checkoutSession) {
-      const r = await db.rpcService('billing_checkout_person', { p_checkout_hash: sha256Hex(sub.checkoutSession) });
+  /** A pessoa e o plano de uma assinatura: a referência; sem ela, o Checkout no banco; por fim, a própria assinatura já aplicada. */
+  async function resolveReference({ asaas, db }: Clients, sub: AsaasSubscription): Promise<WebReference | null> {
+    const direct = parseWebReference(sub.externalReference);
+    if (direct) return direct;
+    const fromRpc = (r: JsonResponse): WebReference | null => {
       const found = obj(r.json);
       const personId = text(found?.person_id);
       const plan = found?.plan;
-      if (r.status === 200 && personId && UUID.test(personId) && (plan === 'individual' || plan === 'familiar')) {
-        ref = { personId: personId.toLowerCase(), plan };
-        // Grava a referência na assinatura do Asaas, para os próximos avisos e para o cancelamento acharem a pessoa.
-        if (!sub.deleted) {
-          const put = await asaas('PUT', `/subscriptions/${encodeURIComponent(sub.id)}`, { externalReference: webReference(ref.personId, ref.plan) });
-          if (put.status !== 200) log(`não gravou a referência na assinatura (${put.status})`);
-        }
-      }
+      return r.status === 200 && personId && UUID.test(personId) && (plan === 'individual' || plan === 'familiar') ? { personId: personId.toLowerCase(), plan } : null;
+    };
+    let ref: WebReference | null = null;
+    if (sub.checkoutSession) ref = fromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: sha256Hex(sub.checkoutSession) }));
+    if (!ref) ref = fromRpc(await db.rpcService('billing_person_by_external_ref', { p_provider: 'web', p_external_ref: sha256Hex(sub.id) }));
+    if (ref && !sub.deleted) {
+      // Grava a referência na assinatura do Asaas, para os próximos avisos e para o cancelamento acharem a pessoa.
+      const put = await asaas('PUT', `/subscriptions/${encodeURIComponent(sub.id)}`, { externalReference: webReference(ref.personId, ref.plan) });
+      if (put.status !== 200) log(`não gravou a referência na assinatura (${put.status})`);
     }
+    return ref;
+  }
+
+  async function applyEvent(clients: Clients, ev: AsaasEvent): Promise<WebhookOutcome> {
+    const { asaas, db } = clients;
+    if (!ev.subscriptionId) return 'ignorado';
+    // O estado atual, não o do aviso (os avisos chegam repetidos e fora de ordem). Assinatura removida pode não ser devolvida: vale o
+    // aviso ou, sem ele, só o que já está pago.
+    const got = await asaas('GET', `/subscriptions/${encodeURIComponent(ev.subscriptionId)}`);
+    let sub = got.status === 200 ? asaasSubscriptionFrom(got.json) : null;
+    if (!sub && got.status === 404) sub = ev.subscription ?? goneSubscription(ev.subscriptionId);
+    if (!sub) {
+      if (got.status === 200) return 'ignorado';
+      throw new TransientError(`Asaas respondeu ${got.status} ao ler a assinatura`);
+    }
+    const ref = await resolveReference(clients, sub);
     if (!ref) {
       log(`aviso ${ev.event} de assinatura sem referência da Clarevo`);
       return 'sem_referencia';
     }
-    const list = await asaas('GET', `/payments?subscription=${encodeURIComponent(sub.id)}&limit=100`);
+    const since = addMonthsToDate(todayIn(ASAAS_TIME_ZONE, now()), -PAYMENTS_LOOKBACK_MONTHS);
+    const list = await asaas('GET', `/payments?subscription=${encodeURIComponent(sub.id)}&dueDate%5Bge%5D=${since}&limit=100`);
     if (list.status !== 200) throw new TransientError(`Asaas respondeu ${list.status} ao listar cobranças`);
     const data = obj(list.json)?.data;
     const payments = (Array.isArray(data) ? data : []).map(asaasPaymentFrom).filter((p): p is AsaasPayment => p !== null);
@@ -461,7 +519,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     return 'aplicado';
   }
 
-  async function webhook(req: AssinaturaWebRequest, token: string): Promise<AssinaturaWebResponse> {
+  async function webhook(clients: Clients, req: AssinaturaWebRequest, token: string): Promise<AssinaturaWebResponse> {
     if (!config || !sameText(token, config.webhookToken)) return json(401, { result: 'recusado' });
     if (Number(req.header('content-length') ?? 0) > ASAAS_MAX_BODY_BYTES) return json(413, { result: 'grande_demais' });
     const body = await req.body();
@@ -475,7 +533,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     const ev = asaasEventFrom(payload, now());
     if (!ev) return json(200, { received: true, outcome: 'ignorado' });
     try {
-      const outcome = await applyEvent(ev);
+      const outcome = await applyEvent(clients, ev);
       return json(200, { received: true, outcome });
     } catch (e) {
       log(`falha ao tratar o aviso ${ev.event}: ${e instanceof Error ? e.message : 'erro'}`);
@@ -485,9 +543,9 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     }
   }
 
-  async function app(req: AssinaturaWebRequest, cors: Record<string, string>): Promise<AssinaturaWebResponse> {
+  async function app({ asaas, db }: Clients, req: AssinaturaWebRequest, cors: Record<string, string>): Promise<AssinaturaWebResponse> {
     const reply = (status: number, body: AssinaturaWebResult) => json(status, body, cors);
-    if (!config || !asaas || !db) return reply(503, { result: 'indisponivel' });
+    if (!config) return reply(503, { result: 'indisponivel' });
     const auth = /^Bearer\s+(\S+)$/i.exec(req.header('authorization') ?? '');
     if (!auth) return reply(401, { result: 'nao_autenticado' });
     if (Number(req.header('content-length') ?? 0) > APP_MAX_BODY_BYTES) return reply(413, { result: 'pedido_invalido' });
@@ -544,6 +602,11 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
         log(`banco não gravou o Checkout (${recorded.status})`);
         return reply(500, { result: 'tente_de_novo' });
       }
+      if (obj(recorded.json)?.result === 'muitas_tentativas') {
+        // Mais de alguns Checkouts na última hora: o banco recusa (protege a cota da API do Asaas); o Checkout criado sai.
+        await cancelCheckout();
+        return reply(429, { result: 'muitas_tentativas' });
+      }
       return reply(200, { result: 'checkout', url });
     } catch (e) {
       log(`falha no pedido ${String(action)}: ${e instanceof Error ? e.message : 'erro'}`);
@@ -559,8 +622,10 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       return json(503, { result: 'indisponivel' }, cors);
     }
     if (req.method !== 'POST') return json(405, { result: 'metodo_nao_aceito' }, cors);
+    const timeLeft = budget(now().getTime(), () => now().getTime());
+    const clients: Clients = { asaas: asaasClient(config, deps.fetch, timeLeft), db: supabaseClient(config, deps.fetch, timeLeft) };
     const token = req.header('asaas-access-token');
-    if (token !== null) return webhook(req, token);
-    return app(req, cors);
+    if (token !== null) return webhook(clients, req, token);
+    return app(clients, req, cors);
   };
 }

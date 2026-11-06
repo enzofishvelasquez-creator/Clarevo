@@ -60,6 +60,10 @@ do $$ begin
      and not has_table_privilege('service_role', 'public.billing_checkouts', 'select'),
     'ninguém lê billing_checkouts direto';
   assert has_function_privilege('authenticated', 'public.my_access()', 'execute'), 'my_access continua do app';
+  assert has_function_privilege('service_role', 'public.billing_person_by_external_ref(text, text)', 'execute')
+     and not has_function_privilege('authenticated', 'public.billing_person_by_external_ref(text, text)', 'execute')
+     and not has_function_privilege('anon', 'public.billing_person_by_external_ref(text, text)', 'execute'),
+    'billing_person_by_external_ref só com a chave de serviço';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -85,8 +89,20 @@ begin
   r := public.billing_apply('evt_web_dora_1', 'web', pg_temp.dora(), pg_temp.sha('sub_dora'), 'familiar', now() + interval '33 days', now() - interval '1 minute');
   assert r ->> 'result' = 'aplicado' and r #>> '{access,status}' = 'assinatura' and r #>> '{access,provider}' = 'web'
      and r #>> '{access,plan}' = 'familiar', 'assinatura da web: ' || r::text;
+  -- A pessoa de uma assinatura já aplicada, pelo resumo (estorno depois de cancelar, quando o Asaas já não devolve a assinatura).
+  assert public.billing_person_by_external_ref('web', pg_temp.sha('sub_dora')) = jsonb_build_object('person_id', pg_temp.dora(), 'plan', 'familiar'),
+    'a pessoa pelo resumo da assinatura';
+  assert public.billing_person_by_external_ref('apple', pg_temp.sha('sub_dora')) is null and public.billing_person_by_external_ref('web', pg_temp.sha('outra')) is null,
+    'outro provedor ou outro resumo: nulo';
 end $$;
 reset role;
+-- A cortesia da equipe (só quem roda no SQL Editor) fica atrás da assinatura: o acesso continua dizendo 'web'.
+do $$
+declare
+  r jsonb := public.clarevo_staff_grant_courtesy('dora.assinatura.web@exemplo.test', 'individual', now() + interval '10 days');
+begin
+  assert r ->> 'status' = 'assinatura' and r ->> 'provider' = 'web', 'a assinatura vem antes da cortesia: ' || r::text;
+end $$;
 set role authenticated;
 select pg_temp.as_(:dora);
 do $$
@@ -116,17 +132,25 @@ begin
   assert public.billing_checkout_record(pg_temp.sha('checkout-2'), '00000000-0000-0000-0000-00000000dead', 'individual') = '{"result": "sem_pessoa"}',
     'pessoa que não existe: nada gravado';
   assert pg_temp.checkouts(pg_temp.dora()) = 1, 'uma ligação da Dora';
+  -- Mais de 5 Checkouts em uma hora: recusa, sem gravar (a cota da API do Asaas).
+  for i in 2..5 loop
+    perform public.billing_checkout_record(pg_temp.sha('checkout-h' || i), pg_temp.dora(), 'individual');
+  end loop;
+  assert pg_temp.checkouts(pg_temp.dora()) = 5, 'cinco ligações na hora';
+  assert public.billing_checkout_record(pg_temp.sha('checkout-h6'), pg_temp.dora(), 'individual') = '{"result": "muitas_tentativas"}', 'a sexta é recusada';
+  assert pg_temp.checkouts(pg_temp.dora()) = 5 and public.billing_checkout_person(pg_temp.sha('checkout-h6')) is null, 'nada gravado na recusa';
 end $$;
 select pg_temp.expect_code(format($q$select public.billing_checkout_record('nao-e-resumo', %L, 'individual')$q$, :dora), 'checkout_invalido', '22023');
 select pg_temp.expect_code(format($q$select public.billing_checkout_record(%L, %L, 'mensal')$q$, pg_temp.sha('checkout-3'), :dora), 'checkout_invalido', '22023');
 reset role;
--- Ligação com mais de 90 dias sai na próxima gravação.
+-- Ligação com mais de 90 dias sai na próxima gravação (as outras, com mais de uma hora, liberam a contagem).
 select pg_temp.age_checkout(pg_temp.sha('checkout-1'), 91);
+select pg_temp.age_checkout(pg_temp.sha('checkout-h' || i), 1) from generate_series(2, 5) i;
 set role service_role;
 select pg_temp.as_service();
 do $$ begin
-  perform public.billing_checkout_record(pg_temp.sha('checkout-4'), pg_temp.dora(), 'individual');
-  assert public.billing_checkout_person(pg_temp.sha('checkout-1')) is null and pg_temp.checkouts(pg_temp.dora()) = 1, 'a ligação antiga saiu';
+  assert public.billing_checkout_record(pg_temp.sha('checkout-4'), pg_temp.dora(), 'individual') = '{"result": "gravado"}', 'volta a aceitar';
+  assert public.billing_checkout_person(pg_temp.sha('checkout-1')) is null and pg_temp.checkouts(pg_temp.dora()) = 5, 'a ligação antiga saiu';
 end $$;
 reset role;
 
@@ -137,15 +161,17 @@ set role authenticated;
 select pg_temp.as_(:dora);
 select pg_temp.expect_code(format($q$select public.billing_checkout_record(%L, %L, 'individual')$q$, pg_temp.sha('checkout-5'), :dora), 'permission denied for function billing_checkout_record', '42501');
 select pg_temp.expect_code(format($q$select public.billing_checkout_person(%L)$q$, pg_temp.sha('checkout-4')), 'permission denied for function billing_checkout_person', '42501');
+select pg_temp.expect_code(format($q$select public.billing_person_by_external_ref('web', %L)$q$, pg_temp.sha('sub_dora')), 'permission denied for function billing_person_by_external_ref', '42501');
 select pg_temp.expect_code('select count(*) from public.billing_checkouts', 'permission denied for table billing_checkouts', '42501');
 reset role;
 
 -- ---------------------------------------------------------------------------
--- 5. A ligação some com a pessoa (a exclusão da conta apaga a linha de persons).
+-- 5. A ligação some com a pessoa (a exclusão da conta apaga a linha de persons), e a pessoa deixa de ser achada pelo resumo.
 -- ---------------------------------------------------------------------------
 do $$ begin
   perform public.clarevo_erase_person(pg_temp.dora());
   assert pg_temp.checkouts(pg_temp.dora()) = 0, 'a ligação saiu com a pessoa';
+  assert public.billing_person_by_external_ref('web', pg_temp.sha('sub_dora')) is null, 'pessoa excluída não é achada pelo resumo';
 end $$;
 
 rollback;

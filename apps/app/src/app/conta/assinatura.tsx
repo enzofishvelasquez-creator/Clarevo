@@ -115,7 +115,7 @@ export default function AssinaturaScreen() {
               <Txt color={colors.text}>{view.body}</Txt>
             </Card>
             {access.data.status === 'assinatura' && access.data.provider === 'web' && Platform.OS === 'web' ? <WebCancelCard /> : null}
-            {view.showPlans ? <PlansCard access={access.data} webTest={webTest} /> : null}
+            {view.showPlans ? <PlansCard access={access.data} webTest={webTest} subscribeHidden={returned === 'sucesso'} /> : null}
             {view.showPlans ? (
               <Txt variant="caption" color={colors.textSecondary}>
                 {T.benefitNote}

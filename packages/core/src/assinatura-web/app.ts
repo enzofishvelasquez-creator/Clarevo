@@ -11,7 +11,7 @@ export const WEB_SUBSCRIPTION_FUNCTION = 'assinatura-web';
 /** O que a função devolve ao app em "assinar". */
 export type WebSubscriptionStart =
   | { result: 'checkout'; url: string }
-  | { result: 'ja_assinante' | 'sem_necessidade' | 'indisponivel' | 'tente_de_novo' };
+  | { result: 'ja_assinante' | 'sem_necessidade' | 'muitas_tentativas' | 'indisponivel' | 'tente_de_novo' };
 
 /** O que a função devolve ao app em "cancelar". */
 export type WebSubscriptionCancel = 'cancelada' | 'sem_assinatura' | 'indisponivel' | 'tente_de_novo';
@@ -28,7 +28,7 @@ export function parseWebSubscriptionStart(raw: unknown): WebSubscriptionStart {
   const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
   const result = r?.result;
   if (result === 'checkout' && typeof r?.url === 'string' && /^https:\/\/[a-z0-9.-]*asaas\.com\//.test(r.url)) return { result: 'checkout', url: r.url };
-  if (result === 'ja_assinante' || result === 'sem_necessidade' || result === 'indisponivel') return { result };
+  if (result === 'ja_assinante' || result === 'sem_necessidade' || result === 'muitas_tentativas' || result === 'indisponivel') return { result };
   return { result: 'tente_de_novo' };
 }
 
@@ -58,12 +58,13 @@ export const WEB_SUBSCRIPTION_TEXT = {
   cancelKeep: 'Manter a assinatura',
   cancelBusy: 'Cancelando',
   cancelDone: 'Assinatura cancelada. O acesso completo continua até o fim do período já pago.',
-  changePlan: 'Para mudar de plano, cancele a assinatura atual e assine o outro plano.',
-  /** A assinatura da web vista no app das lojas, ou a da loja vista na web. */
-  manageElsewhere: 'Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.',
+  changePlan: 'Para mudar de plano, cancele a assinatura atual e, quando o período já pago terminar, assine o outro plano.',
+  /** Excluir a conta: a assinatura da web precisa ser cancelada antes, e não deu. */
+  cancelBeforeDeleteFailed: 'Não foi possível cancelar a assinatura feita na web. Tente de novo em instantes ou cancele em Conta, Assinatura, antes de excluir a conta.',
   errors: {
-    ja_assinante: 'Você já tem uma assinatura ativa. Para mudar de plano, cancele a atual primeiro.',
+    ja_assinante: 'Você já tem uma assinatura ativa. Para mudar de plano, cancele a atual e assine o outro plano quando o período pago terminar.',
     sem_necessidade: 'A sua conta já tem acesso completo, sem precisar assinar.',
+    muitas_tentativas: 'Muitas tentativas em pouco tempo. Tente de novo daqui a uma hora.',
     sem_assinatura: 'Não há assinatura pela web para cancelar.',
     indisponivel: 'A assinatura pela web não está disponível agora. Tente de novo mais tarde.',
     tente_de_novo: 'Não foi possível concluir. Tente de novo em instantes.',

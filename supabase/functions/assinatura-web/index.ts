@@ -12,17 +12,19 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.TransientError = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
+    exports.TransientError = exports.PLANS = exports.PAID_STATUSES = exports.ASAAS_TIME_ZONE = exports.PAYMENTS_LOOKBACK_MONTHS = exports.CALL_TIMEOUT_MS = exports.REQUEST_BUDGET_MS = exports.APP_MAX_BODY_BYTES = exports.ASAAS_MAX_BODY_BYTES = exports.CHECKOUT_MINUTES = exports.WEB_GRACE_DAYS = exports.APP_URL_DEFAULT = exports.ASAAS_WEBHOOK_TOKEN_PATTERN = exports.ASAAS_KEY_SANDBOX = exports.ASAAS_KEY_PRODUCTION = exports.ASAAS_SANDBOX_URL = exports.ASAAS_PRODUCTION_URL = void 0;
     exports.assinaturaWebConfigFrom = assinaturaWebConfigFrom;
     exports.webReference = webReference;
     exports.parseWebReference = parseWebReference;
     exports.asaasSubscriptionFrom = asaasSubscriptionFrom;
+    exports.goneSubscription = goneSubscription;
     exports.asaasPaymentFrom = asaasPaymentFrom;
     exports.periodEnd = periodEnd;
     exports.endOfDayBrasilia = endOfDayBrasilia;
     exports.webValidity = webValidity;
     exports.parseAsaasDate = parseAsaasDate;
     exports.asaasEventFrom = asaasEventFrom;
+    exports.budget = budget;
     exports.checkoutRequest = checkoutRequest;
     exports.checkoutLink = checkoutLink;
     exports.corsHeaders = corsHeaders;
@@ -41,6 +43,9 @@ const __mods = [
     exports.CHECKOUT_MINUTES = 60;
     exports.ASAAS_MAX_BODY_BYTES = 256 * 1024;
     exports.APP_MAX_BODY_BYTES = 4 * 1024;
+    exports.REQUEST_BUDGET_MS = 8500;
+    exports.CALL_TIMEOUT_MS = 3000;
+    exports.PAYMENTS_LOOKBACK_MONTHS = 4;
     exports.ASAAS_TIME_ZONE = 'America/Sao_Paulo';
     const ASAAS_OFFSET = '-03:00';
     exports.PAID_STATUSES = new Set(['CONFIRMED', 'RECEIVED', 'RECEIVED_IN_CASH', 'DUNNING_RECEIVED', 'AWAITING_CHARGEBACK_REVERSAL']);
@@ -58,10 +63,11 @@ const __mods = [
         const serviceKey = (0, servidor_comum_1.serviceKeyFrom)(v);
         if (supabaseUrl === '' || serviceKey === '')
             return null;
+        const userApiKey = v('SUPABASE_PUBLISHABLE_KEY') || v('SUPABASE_ANON_KEY') || serviceKey;
         const appUrl = (v('CLAREVO_APP_URL') || exports.APP_URL_DEFAULT).replace(/\/+$/, '');
         if (!/^https:\/\/[a-z0-9.-]+$/.test(appUrl) && !/^http:\/\/localhost(:\d+)?$/.test(appUrl))
             return null;
-        return { apiKey, apiBase: sandbox ? exports.ASAAS_SANDBOX_URL : exports.ASAAS_PRODUCTION_URL, sandbox, webhookToken, supabaseUrl, serviceKey, appUrl };
+        return { apiKey, apiBase: sandbox ? exports.ASAAS_SANDBOX_URL : exports.ASAAS_PRODUCTION_URL, sandbox, webhookToken, supabaseUrl, serviceKey, userApiKey, appUrl };
     }
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     function webReference(personId, plan) {
@@ -92,6 +98,9 @@ const __mods = [
             externalReference: text(s.externalReference),
             checkoutSession: text(s.checkoutSession),
         };
+    }
+    function goneSubscription(id) {
+        return { id, status: 'INACTIVE', deleted: true, cycle: 'MONTHLY', value: null, nextDueDate: null, externalReference: null, checkoutSession: null };
     }
     function asaasPaymentFrom(raw) {
         const p = (0, servidor_comum_1.obj)(raw);
@@ -158,6 +167,14 @@ const __mods = [
     class TransientError extends Error {
     }
     exports.TransientError = TransientError;
+    function budget(startedAt, clock = Date.now) {
+        return () => {
+            const left = exports.REQUEST_BUDGET_MS - (clock() - startedAt);
+            if (left < 200)
+                throw new TransientError('sem tempo para concluir o pedido');
+            return Math.min(exports.CALL_TIMEOUT_MS, left);
+        };
+    }
     async function readJson(res) {
         const body = await res.text();
         let json = null;
@@ -169,49 +186,52 @@ const __mods = [
         }
         return { status: res.status, json };
     }
-    function asaasClient(config, fetcher) {
+    const bare = (path) => path.replace(/\?.*$/, '');
+    function asaasClient(config, fetcher, timeLeft) {
         return async (method, path, body) => {
             const init = {
                 method,
                 headers: { access_token: config.apiKey, 'User-Agent': 'Clarevo', 'Content-Type': 'application/json' },
+                timeoutMs: timeLeft(),
                 ...(body === undefined ? {} : { body: JSON.stringify(body) }),
             };
             let res;
             try {
                 res = await fetcher(`${config.apiBase}${path}`, init);
             }
-            catch (e) {
-                throw new TransientError(`Asaas indisponível: ${e instanceof Error ? e.message : 'erro'}`);
+            catch {
+                throw new TransientError(`Asaas indisponível em ${method} ${bare(path)}`);
             }
             const out = await readJson(res);
             if (out.status >= 500)
-                throw new TransientError(`Asaas respondeu ${out.status} em ${method} ${path}`);
+                throw new TransientError(`Asaas respondeu ${out.status} em ${method} ${bare(path)}`);
             return out;
         };
     }
-    function supabaseClient(config, fetcher) {
-        const call = async (url, init) => {
+    function supabaseClient(config, fetcher, timeLeft) {
+        const call = async (what, url, init) => {
+            const timeoutMs = timeLeft();
             let res;
             try {
-                res = await fetcher(url, init);
+                res = await fetcher(url, { ...init, timeoutMs });
             }
-            catch (e) {
-                throw new TransientError(`banco indisponível: ${e instanceof Error ? e.message : 'erro'}`);
+            catch {
+                throw new TransientError(`banco indisponível em ${what}`);
             }
             const out = await readJson(res);
             if (out.status >= 500)
-                throw new TransientError(`banco respondeu ${out.status}`);
+                throw new TransientError(`banco respondeu ${out.status} em ${what}`);
             return out;
         };
         return {
-            rpcService: (fn, args) => call(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: (0, servidor_comum_1.serviceHeaders)(config.serviceKey), body: JSON.stringify(args) }),
-            rpcAsUser: (fn, jwt) => call(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, {
+            rpcService: (fn, args) => call(fn, `${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: (0, servidor_comum_1.serviceHeaders)(config.serviceKey), body: JSON.stringify(args) }),
+            rpcAsUser: (fn, jwt) => call(fn, `${config.supabaseUrl}/rest/v1/rpc/${fn}`, {
                 method: 'POST',
-                headers: { apikey: config.serviceKey, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+                headers: { apikey: config.userApiKey, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
                 body: '{}',
             }),
             userId: async (jwt) => {
-                const r = await call(`${config.supabaseUrl}/auth/v1/user`, { method: 'GET', headers: { apikey: config.serviceKey, Authorization: `Bearer ${jwt}` } });
+                const r = await call('auth', `${config.supabaseUrl}/auth/v1/user`, { method: 'GET', headers: { apikey: config.userApiKey, Authorization: `Bearer ${jwt}` } });
                 const id = text((0, servidor_comum_1.obj)(r.json)?.id);
                 return r.status === 200 && id && UUID.test(id) ? id.toLowerCase() : null;
             },
@@ -259,55 +279,63 @@ const __mods = [
         const log = deps.log ?? (() => { });
         const now = deps.now ?? (() => new Date());
         const config = deps.config;
-        const asaas = config ? asaasClient(config, deps.fetch) : null;
-        const db = config ? supabaseClient(config, deps.fetch) : null;
-        async function activeSubscriptions(call, personId) {
+        async function activeSubscriptions(asaas, personId) {
             const found = [];
             for (const plan of exports.PLANS) {
-                const r = await call('GET', `/subscriptions?externalReference=${encodeURIComponent(webReference(personId, plan))}&status=ACTIVE&limit=10`);
+                const r = await asaas('GET', `/subscriptions?externalReference=${encodeURIComponent(webReference(personId, plan))}&status=ACTIVE&limit=10`);
                 if (r.status !== 200)
-                    throw new TransientError(`Asaas respondeu ${r.status} ao listar assinaturas`);
+                    throw new TransientError('Asaas não listou as assinaturas');
                 const data = (0, servidor_comum_1.obj)(r.json)?.data;
                 for (const raw of Array.isArray(data) ? data : []) {
                     const s = asaasSubscriptionFrom(raw);
-                    if (s && !s.deleted && s.status === 'ACTIVE')
+                    if (s && !s.deleted && s.status === 'ACTIVE' && !found.some((f) => f.id === s.id))
                         found.push(s);
                 }
             }
             return found;
         }
-        async function applyEvent(ev) {
-            if (!config || !asaas || !db || !ev.subscriptionId)
+        async function resolveReference({ asaas, db }, sub) {
+            const direct = parseWebReference(sub.externalReference);
+            if (direct)
+                return direct;
+            const fromRpc = (r) => {
+                const found = (0, servidor_comum_1.obj)(r.json);
+                const personId = text(found?.person_id);
+                const plan = found?.plan;
+                return r.status === 200 && personId && UUID.test(personId) && (plan === 'individual' || plan === 'familiar') ? { personId: personId.toLowerCase(), plan } : null;
+            };
+            let ref = null;
+            if (sub.checkoutSession)
+                ref = fromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: (0, sha256_1.sha256Hex)(sub.checkoutSession) }));
+            if (!ref)
+                ref = fromRpc(await db.rpcService('billing_person_by_external_ref', { p_provider: 'web', p_external_ref: (0, sha256_1.sha256Hex)(sub.id) }));
+            if (ref && !sub.deleted) {
+                const put = await asaas('PUT', `/subscriptions/${encodeURIComponent(sub.id)}`, { externalReference: webReference(ref.personId, ref.plan) });
+                if (put.status !== 200)
+                    log(`não gravou a referência na assinatura (${put.status})`);
+            }
+            return ref;
+        }
+        async function applyEvent(clients, ev) {
+            const { asaas, db } = clients;
+            if (!ev.subscriptionId)
                 return 'ignorado';
             const got = await asaas('GET', `/subscriptions/${encodeURIComponent(ev.subscriptionId)}`);
             let sub = got.status === 200 ? asaasSubscriptionFrom(got.json) : null;
             if (!sub && got.status === 404)
-                sub = ev.subscription;
+                sub = ev.subscription ?? goneSubscription(ev.subscriptionId);
             if (!sub) {
-                if (got.status === 200 || got.status === 404)
+                if (got.status === 200)
                     return 'ignorado';
                 throw new TransientError(`Asaas respondeu ${got.status} ao ler a assinatura`);
             }
-            let ref = parseWebReference(sub.externalReference);
-            if (!ref && sub.checkoutSession) {
-                const r = await db.rpcService('billing_checkout_person', { p_checkout_hash: (0, sha256_1.sha256Hex)(sub.checkoutSession) });
-                const found = (0, servidor_comum_1.obj)(r.json);
-                const personId = text(found?.person_id);
-                const plan = found?.plan;
-                if (r.status === 200 && personId && UUID.test(personId) && (plan === 'individual' || plan === 'familiar')) {
-                    ref = { personId: personId.toLowerCase(), plan };
-                    if (!sub.deleted) {
-                        const put = await asaas('PUT', `/subscriptions/${encodeURIComponent(sub.id)}`, { externalReference: webReference(ref.personId, ref.plan) });
-                        if (put.status !== 200)
-                            log(`não gravou a referência na assinatura (${put.status})`);
-                    }
-                }
-            }
+            const ref = await resolveReference(clients, sub);
             if (!ref) {
                 log(`aviso ${ev.event} de assinatura sem referência da Clarevo`);
                 return 'sem_referencia';
             }
-            const list = await asaas('GET', `/payments?subscription=${encodeURIComponent(sub.id)}&limit=100`);
+            const since = (0, dates_1.addMonthsToDate)((0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now()), -exports.PAYMENTS_LOOKBACK_MONTHS);
+            const list = await asaas('GET', `/payments?subscription=${encodeURIComponent(sub.id)}&dueDate%5Bge%5D=${since}&limit=100`);
             if (list.status !== 200)
                 throw new TransientError(`Asaas respondeu ${list.status} ao listar cobranças`);
             const data = (0, servidor_comum_1.obj)(list.json)?.data;
@@ -336,7 +364,7 @@ const __mods = [
             }
             return 'aplicado';
         }
-        async function webhook(req, token) {
+        async function webhook(clients, req, token) {
             if (!config || !(0, servidor_comum_1.sameText)(token, config.webhookToken))
                 return json(401, { result: 'recusado' });
             if (Number(req.header('content-length') ?? 0) > exports.ASAAS_MAX_BODY_BYTES)
@@ -355,7 +383,7 @@ const __mods = [
             if (!ev)
                 return json(200, { received: true, outcome: 'ignorado' });
             try {
-                const outcome = await applyEvent(ev);
+                const outcome = await applyEvent(clients, ev);
                 return json(200, { received: true, outcome });
             }
             catch (e) {
@@ -365,9 +393,9 @@ const __mods = [
                 return json(200, { received: true, outcome: 'recusado' });
             }
         }
-        async function app(req, cors) {
+        async function app({ asaas, db }, req, cors) {
             const reply = (status, body) => json(status, body, cors);
-            if (!config || !asaas || !db)
+            if (!config)
                 return reply(503, { result: 'indisponivel' });
             const auth = /^Bearer\s+(\S+)$/i.exec(req.header('authorization') ?? '');
             if (!auth)
@@ -436,6 +464,10 @@ const __mods = [
                     log(`banco não gravou o Checkout (${recorded.status})`);
                     return reply(500, { result: 'tente_de_novo' });
                 }
+                if ((0, servidor_comum_1.obj)(recorded.json)?.result === 'muitas_tentativas') {
+                    await cancelCheckout();
+                    return reply(429, { result: 'muitas_tentativas' });
+                }
                 return reply(200, { result: 'checkout', url });
             }
             catch (e) {
@@ -453,10 +485,12 @@ const __mods = [
             }
             if (req.method !== 'POST')
                 return json(405, { result: 'metodo_nao_aceito' }, cors);
+            const timeLeft = budget(now().getTime(), () => now().getTime());
+            const clients = { asaas: asaasClient(config, deps.fetch, timeLeft), db: supabaseClient(config, deps.fetch, timeLeft) };
             const token = req.header('asaas-access-token');
             if (token !== null)
-                return webhook(req, token);
-            return app(req, cors);
+                return webhook(clients, req, token);
+            return app(clients, req, cors);
         };
     }
   },
@@ -798,7 +832,8 @@ function __req(i) {
 const assinatura = __req(0);
 const handler = assinatura.createAssinaturaWebHandler({
   config: assinatura.assinaturaWebConfigFrom((name) => Deno.env.get(name)),
-  fetch: (url, init) => fetch(url, init),
+  // Cada chamada tem prazo (o Asaas conta como falha a resposta depois de 10 segundos).
+  fetch: (url, init) => fetch(url, { method: init.method, headers: init.headers, body: init.body, signal: AbortSignal.timeout(init.timeoutMs) }),
   log: (message) => console.error(message),
 });
 

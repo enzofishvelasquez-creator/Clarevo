@@ -7,7 +7,10 @@
 --     referência da Clarevo. Só o resumo SHA-256 do identificador do Checkout, a pessoa, o plano e a hora: nenhum dado do pagamento,
 --     do cartão ou do Asaas. Escrita e leitura só com a chave de serviço (billing_checkout_record e billing_checkout_person); o app não lê
 --     nem grava a tabela. A linha some com a pessoa (on delete cascade; a exclusão da conta apaga a linha de persons) e as linhas com
---     mais de 90 dias saem a cada gravação nova (o Checkout vale 60 minutos; depois disso a assinatura já leva a referência).
+--     mais de 90 dias saem a cada gravação nova (o Checkout vale 60 minutos; depois disso a assinatura já leva a referência). Mais de 5
+--     Checkouts da mesma pessoa em uma hora são recusados (muitas_tentativas): protege a cota da API do Asaas.
+-- (3) billing_person_by_external_ref: a pessoa e o plano de uma assinatura já aplicada (plan_entitlements, pelo resumo do identificador),
+--     para o aviso de estorno ou contestação de uma assinatura que o Asaas já não devolve (removida) achar a pessoa. Só a chave de serviço.
 -- Nada muda para ninguém: nenhum dado existente é alterado. Aplicar no SQL Editor depois da 0025 (docs/05, passo 12p). Testes em
 -- supabase/tests/99zzzzz_assinatura_web.sql.
 
@@ -84,7 +87,8 @@ comment on table public.billing_checkouts is
   'leitura só pela função do servidor, com a chave de serviço (billing_checkout_record, billing_checkout_person). Some com a pessoa.';
 
 -- A função do servidor grava a ligação logo depois de criar o Checkout. Pessoa inexistente ou excluída: sem_pessoa (nada gravado).
--- A cada gravação, as ligações com mais de 90 dias saem.
+-- Mais de 5 Checkouts da pessoa na última hora: muitas_tentativas (nada gravado; a função cancela o Checkout no Asaas). A cada
+-- gravação, as ligações com mais de 90 dias saem.
 create or replace function public.billing_checkout_record(p_checkout_hash text, p_person uuid, p_plan text)
 returns jsonb
 language plpgsql
@@ -98,6 +102,10 @@ begin
   end if;
   if p_person is null or not exists (select 1 from public.persons p where p.id = p_person and p.deleted_at is null) then
     return jsonb_build_object('result', 'sem_pessoa');
+  end if;
+  perform pg_advisory_xact_lock(hashtext('billing_checkout:' || p_person::text));
+  if (select count(*) from public.billing_checkouts c where c.person_id = p_person and c.created_at > now() - interval '1 hour') >= 5 then
+    return jsonb_build_object('result', 'muitas_tentativas');
   end if;
   delete from public.billing_checkouts where created_at < now() - interval '90 days';
   insert into public.billing_checkouts (checkout_hash, person_id, plan) values (p_checkout_hash, p_person, p_plan)
@@ -121,17 +129,39 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- Privilégios: o app não lê nem grava; só a chave de serviço (a função do servidor) usa as duas funções.
+-- (3) A pessoa de uma assinatura já aplicada
+-- ---------------------------------------------------------------------------
+-- A função do servidor lê a pessoa e o plano de uma assinatura pelo resumo do identificador (como billing_apply o guarda), quando o
+-- aviso chega sem referência e sem Checkout conhecido (assinatura removida no Asaas, estorno depois do cancelamento). null quando não há.
+create or replace function public.billing_person_by_external_ref(p_provider text, p_external_ref text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object('person_id', e.person_id, 'plan', e.plan)
+    from public.plan_entitlements e
+    join public.persons p on p.id = e.person_id and p.deleted_at is null
+   where e.provider = p_provider and e.external_ref = p_external_ref
+   order by e.valid_until desc nulls first
+   limit 1
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Privilégios: o app não lê nem grava; só a chave de serviço (a função do servidor) usa as três funções.
 -- ---------------------------------------------------------------------------
 alter table public.billing_checkouts enable row level security;
 revoke all on public.billing_checkouts from anon, authenticated;
 revoke all on function public.billing_checkout_record(text, uuid, text) from public, anon, authenticated;
 revoke all on function public.billing_checkout_person(text) from public, anon, authenticated;
+revoke all on function public.billing_person_by_external_ref(text, text) from public, anon, authenticated;
 do $$
 begin
   if exists (select 1 from pg_roles where rolname = 'service_role') then
     execute 'revoke all on public.billing_checkouts from service_role';
     execute 'grant execute on function public.billing_checkout_record(text, uuid, text) to service_role';
     execute 'grant execute on function public.billing_checkout_person(text) to service_role';
+    execute 'grant execute on function public.billing_person_by_external_ref(text, text) to service_role';
   end if;
 end $$;
