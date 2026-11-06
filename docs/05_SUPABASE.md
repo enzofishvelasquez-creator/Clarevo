@@ -4,7 +4,7 @@
 
 Não consegui abrir a documentação do Supabase deste ambiente (acesso bloqueado pela rede). Os nomes dos menus abaixo podem variar um pouco no painel; o conteúdo de cada passo é o mesmo.
 
-**O projeto real (D-074 e D-075).** Desde 30/10/2026, o app usa o projeto `clarevo-producao`, na organização "Clarevo by Enzo Velasquez", região **South America (São Paulo)**, com as 19 migrações (conferidas: 27 tabelas, 27 com RLS, 83 funções do app, nenhuma para `anon`, reforço da 0019 ativo), o login como na seção 3 e o SMTP do Resend com a chave própria do projeto. O projeto anterior, "enzofishvelasquez-creator's Project" (us-east-1, Estados Unidos), tinha só uma conta de teste e nenhum registro: fica pausado e depois é excluído (docs/23, seção 5d, fase 7). A organização "bios-producao" é de outro produto: nada desta página vale para ela.
+**O projeto real (D-074 e D-075).** Desde 30/10/2026, o app usa o projeto `clarevo-producao`, na organização "Clarevo by Enzo Velasquez", região **South America (São Paulo)**, com as 19 migrações (conferidas: 27 tabelas, 27 com RLS, 83 funções do app, nenhuma para `anon`, reforço da 0019 ativo); em 06/11/2026 já com as 27 migrações (94 funções do app), o login como na seção 3 e o SMTP do Resend com a chave própria do projeto. O projeto anterior, "enzofishvelasquez-creator's Project" (us-east-1, Estados Unidos), tinha só uma conta de teste e nenhum registro: fica pausado e depois é excluído (docs/23, seção 5d, fase 7). A organização "bios-producao" é de outro produto: nada desta página vale para ela.
 
 ## 1. Criar o projeto (você, ~5 min)
 
@@ -573,7 +573,7 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
             where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
    ```
 
-   O resultado esperado é `funcoes_do_servidor_0026 = 3`, `tabela_0026 = 1`, `provider_0026 = 1` e `funcoes_do_app = 94` (a 0026 não cria função para o app). Testada em 06/11/2026 num banco local descartável.
+   O resultado esperado é `funcoes_do_servidor_0026 = 3`, `tabela_0026 = 1`, `provider_0026 = 1` e `funcoes_do_app = 94` (a 0026 não cria função para o app). Testada em 06/11/2026 num banco local descartável. **Aplicada em produção (`clarevo-producao`) em 06/11/2026:** a conferência devolveu 3, 1, 1 e 94.
 
 
 21o. Para conferir a 0027 (categoria "Crédito e parcelas", D-086), rode em outra consulta (só leitura):
@@ -586,7 +586,7 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
             where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
    ```
 
-   O resultado esperado é `restricao_0027 = 1`, `funcoes_0027 = 2` e `funcoes_do_app = 94` (a 0027 não cria função). Testada em 06/11/2026 num banco local descartável.
+   O resultado esperado é `restricao_0027 = 1`, `funcoes_0027 = 2` e `funcoes_do_app = 94` (a 0027 não cria função). Testada em 06/11/2026 num banco local descartável. **Aplicada em produção (`clarevo-producao`) em 06/11/2026:** a conferência devolveu 1, 2 e 94. O aviso de operação destrutiva do SQL Editor não apareceu nela (ele aparece com alguns comandos, como o `delete` da limpeza das ligações antigas dentro da 0026, e não com o `alter table ... drop constraint` da 0027); o resultado da conferência é o que vale.
 
 22. Se o app mostrar erro ao abrir as contas a pagar, os gastos fixos, as contas do ano, as metas, os cartões, a renda comprometida, o orçamento, as contas de origem, as assinaturas, a importação de extrato, a Família, o painel da empresa, a exclusão da conta, a Evolução, a conferência de um mês ou o Resumo logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`. Faça isso depois de colar a 0016, antes de abrir o app (a 0016 recria `months_overview`, e a API precisa ler a função nova), e de novo depois de colar a 0018 (função nova, `set_signup_source`). A 0019 não cria função nem tabela: não precisa. A 0020, a 0021, a 0022, a 0023 e a 0024 criam funções novas (WhatsApp, imagem das metas, Telegram, assinatura e aceite dos termos): rode depois de colar cada uma.
 23. O consultor de segurança do Supabase (**Advisors**) pode apontar a visão `series_items` como visão com os privilégios de quem a criou (a migração de contas do ano a recria com as mesmas opções). É intencional: ela precisa ler as contas excluídas só em um mês, filtra a permissão de leitura de forma explícita e usa `security_barrier` (ver `docs/01_ARQUITETURA.md`). O mesmo vale para as outras sete visões e para o restante do que o verificador aponta: ver "Verificador do Supabase: o que é esperado", logo antes de "Custos".
