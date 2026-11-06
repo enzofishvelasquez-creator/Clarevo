@@ -30,7 +30,7 @@ const __mods = [
     __exportStar(__req(1), exports);
     __exportStar(__req(8), exports);
     __exportStar(__req(11), exports);
-    __exportStar(__req(12), exports);
+    __exportStar(__req(13), exports);
   },
   // packages/core/src/whatsapp/mensagem.ts
   function (module, exports, __req) {
@@ -999,17 +999,14 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.WhatsAppFinalError = exports.WHATSAPP_MAX_BODY_BYTES = exports.WHATSAPP_MAX_MESSAGES = exports.WHATSAPP_GRAPH_VERSION = exports.WHATSAPP_TIME_ZONE = void 0;
+    exports.WhatsAppFinalError = exports.WHATSAPP_MAX_BODY_BYTES = exports.WHATSAPP_MAX_MESSAGES = exports.WHATSAPP_GRAPH_VERSION = exports.WHATSAPP_TIME_ZONE = exports.serviceKeyFrom = exports.sameText = exports.obj = void 0;
     exports.hmacSha256Hex = hmacSha256Hex;
-    exports.sameText = sameText;
     exports.verifyMetaSignature = verifyMetaSignature;
     exports.whatsappPhoneHash = whatsappPhoneHash;
     exports.chatMessageKey = chatMessageKey;
-    exports.obj = obj;
     exports.whatsappInbound = whatsappInbound;
     exports.answerChatMessage = answerChatMessage;
     exports.handleWhatsAppMessage = handleWhatsAppMessage;
-    exports.serviceKeyFrom = serviceKeyFrom;
     exports.whatsappConfigFrom = whatsappConfigFrom;
     exports.supabaseChatRpc = supabaseChatRpc;
     exports.supabaseWhatsAppRpc = supabaseWhatsAppRpc;
@@ -1017,6 +1014,10 @@ const __mods = [
     exports.createWhatsAppHandler = createWhatsAppHandler;
     const dates_1 = __req(2);
     const sha256_1 = __req(6);
+    const servidor_comum_1 = __req(12);
+    Object.defineProperty(exports, "obj", { enumerable: true, get: function () { return servidor_comum_1.obj; } });
+    Object.defineProperty(exports, "sameText", { enumerable: true, get: function () { return servidor_comum_1.sameText; } });
+    Object.defineProperty(exports, "serviceKeyFrom", { enumerable: true, get: function () { return servidor_comum_1.serviceKeyFrom; } });
     const mensagem_1 = __req(1);
     const respostas_1 = __req(8);
     exports.WHATSAPP_TIME_ZONE = 'America/Sao_Paulo';
@@ -1036,18 +1037,10 @@ const __mods = [
         const inner = (0, sha256_1.sha256HexOfBytes)([...block.map((b) => b ^ 0x36), ...message]);
         return (0, sha256_1.sha256HexOfBytes)([...block.map((b) => b ^ 0x5c), ...hexToBytes(inner)]);
     }
-    function sameText(a, b) {
-        if (a.length !== b.length)
-            return false;
-        let diff = 0;
-        for (let i = 0; i < a.length; i++)
-            diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-        return diff === 0;
-    }
     function verifyMetaSignature(body, header, appSecret) {
         if (appSecret === '' || header === null || !/^sha256=[0-9a-fA-F]{64}$/.test(header))
             return false;
-        return sameText(hmacSha256Hex((0, sha256_1.utf8Bytes)(appSecret), body), header.slice(7).toLowerCase());
+        return (0, servidor_comum_1.sameText)(hmacSha256Hex((0, sha256_1.utf8Bytes)(appSecret), body), header.slice(7).toLowerCase());
     }
     function whatsappPhoneHash(waId, phoneKey) {
         return hmacSha256Hex((0, sha256_1.utf8Bytes)(phoneKey), (0, sha256_1.utf8Bytes)(waId.replace(/\D/g, '')));
@@ -1055,25 +1048,22 @@ const __mods = [
     function chatMessageKey(channel, rawId, key) {
         return `${channel}:${hmacSha256Hex((0, sha256_1.utf8Bytes)(key), (0, sha256_1.utf8Bytes)(`${channel}-mensagem:${rawId}`))}`;
     }
-    function obj(v) {
-        return typeof v === 'object' && v !== null && !Array.isArray(v) ? v : null;
-    }
     function list(v) {
         return Array.isArray(v) ? v : [];
     }
     function whatsappInbound(payload, phoneNumberId) {
-        const root = obj(payload);
+        const root = (0, servidor_comum_1.obj)(payload);
         if (!root || root.object !== 'whatsapp_business_account')
             return [];
         const out = [];
         for (const entry of list(root.entry)) {
-            for (const change of list(obj(entry)?.changes)) {
-                const c = obj(change);
-                const value = obj(c?.value);
-                if (c?.field !== 'messages' || !value || obj(value.metadata)?.phone_number_id !== phoneNumberId)
+            for (const change of list((0, servidor_comum_1.obj)(entry)?.changes)) {
+                const c = (0, servidor_comum_1.obj)(change);
+                const value = (0, servidor_comum_1.obj)(c?.value);
+                if (c?.field !== 'messages' || !value || (0, servidor_comum_1.obj)(value.metadata)?.phone_number_id !== phoneNumberId)
                     continue;
                 for (const m of list(value.messages)) {
-                    const msg = obj(m);
+                    const msg = (0, servidor_comum_1.obj)(m);
                     const id = msg?.id;
                     const from = msg?.from;
                     const ts = Number(msg?.timestamp);
@@ -1082,8 +1072,8 @@ const __mods = [
                     if (typeof from !== 'string' || !/^\d{8,15}$/.test(from) || !Number.isFinite(ts))
                         continue;
                     const type = typeof msg?.type === 'string' ? msg.type : 'unsupported';
-                    const body = obj(msg?.text)?.body;
-                    const system = obj(msg?.system)?.type;
+                    const body = (0, servidor_comum_1.obj)(msg?.text)?.body;
+                    const system = (0, servidor_comum_1.obj)(msg?.system)?.type;
                     out.push({
                         id,
                         from,
@@ -1159,26 +1149,9 @@ const __mods = [
         'WHATSAPP_PHONE_NUMBER_ID',
         'SUPABASE_URL',
     ];
-    function serviceKeyFrom(v) {
-        const keys = v('SUPABASE_SECRET_KEYS');
-        if (keys !== '') {
-            try {
-                const parsed = JSON.parse(keys);
-                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-                    const values = parsed;
-                    const chosen = typeof values.default === 'string' ? values.default : Object.values(values).find((x) => typeof x === 'string');
-                    if (typeof chosen === 'string' && chosen.trim() !== '')
-                        return chosen.trim();
-                }
-            }
-            catch {
-            }
-        }
-        return v('SUPABASE_SERVICE_ROLE_KEY');
-    }
     function whatsappConfigFrom(env) {
         const v = (name) => (env(name) ?? '').trim();
-        const serviceKey = serviceKeyFrom(v);
+        const serviceKey = (0, servidor_comum_1.serviceKeyFrom)(v);
         if (REQUIRED_ENV.some((name) => v(name) === '') || serviceKey === '')
             return null;
         return {
@@ -1202,16 +1175,13 @@ const __mods = [
     exports.WhatsAppFinalError = WhatsAppFinalError;
     function supabaseChatRpc(config, fetcher) {
         return async (fn, args) => {
-            const headers = { apikey: config.serviceKey, 'Content-Type': 'application/json' };
-            if (config.serviceKey.startsWith('eyJ'))
-                headers.Authorization = `Bearer ${config.serviceKey}`;
-            const res = await fetcher(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args) });
+            const res = await fetcher(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: (0, servidor_comum_1.serviceHeaders)(config.serviceKey), body: JSON.stringify(args) });
             const text = await res.text();
             if (res.status >= 400 && res.status < 500)
                 throw new WhatsAppFinalError(`banco recusou (${res.status}) em ${fn}`);
             if (res.status !== 200)
                 throw new Error(`banco respondeu ${res.status} em ${fn}`);
-            const outcome = obj(JSON.parse(text));
+            const outcome = (0, servidor_comum_1.obj)(JSON.parse(text));
             if (!outcome || typeof outcome.result !== 'string' || !RESULTS.has(outcome.result))
                 throw new Error(`resposta inesperada de ${fn}`);
             return outcome;
@@ -1262,7 +1232,7 @@ const __mods = [
                 return { status: 503, body: 'indisponível' };
             }
             if (req.method === 'GET') {
-                const ok = queryParam(req.url, 'hub.mode') === 'subscribe' && sameText(queryParam(req.url, 'hub.verify_token') ?? '', config.verifyToken);
+                const ok = queryParam(req.url, 'hub.mode') === 'subscribe' && (0, servidor_comum_1.sameText)(queryParam(req.url, 'hub.verify_token') ?? '', config.verifyToken);
                 const challenge = queryParam(req.url, 'hub.challenge');
                 return ok && challenge !== null ? { status: 200, body: challenge } : { status: 403, body: 'recusado' };
             }
@@ -1308,6 +1278,49 @@ const __mods = [
             }
             return { status: 200, body: 'ok' };
         };
+    }
+  },
+  // packages/core/src/servidor-comum.ts
+  function (module, exports, __req) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.sameText = sameText;
+    exports.obj = obj;
+    exports.serviceKeyFrom = serviceKeyFrom;
+    exports.serviceHeaders = serviceHeaders;
+    function sameText(a, b) {
+        if (a.length !== b.length)
+            return false;
+        let diff = 0;
+        for (let i = 0; i < a.length; i++)
+            diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+        return diff === 0;
+    }
+    function obj(v) {
+        return typeof v === 'object' && v !== null && !Array.isArray(v) ? v : null;
+    }
+    function serviceKeyFrom(v) {
+        const keys = v('SUPABASE_SECRET_KEYS');
+        if (keys !== '') {
+            try {
+                const parsed = JSON.parse(keys);
+                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                    const values = parsed;
+                    const chosen = typeof values.default === 'string' ? values.default : Object.values(values).find((x) => typeof x === 'string');
+                    if (typeof chosen === 'string' && chosen.trim() !== '')
+                        return chosen.trim();
+                }
+            }
+            catch {
+            }
+        }
+        return v('SUPABASE_SERVICE_ROLE_KEY');
+    }
+    function serviceHeaders(serviceKey) {
+        const headers = { apikey: serviceKey, 'Content-Type': 'application/json' };
+        if (serviceKey.startsWith('eyJ'))
+            headers.Authorization = `Bearer ${serviceKey}`;
+        return headers;
     }
   },
   // packages/core/src/whatsapp/app.ts

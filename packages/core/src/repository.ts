@@ -44,7 +44,9 @@ import type {
   SeriesInput,
 } from './records';
 import type { LegalAcceptance } from './aceite';
+import type { WebSubscriptionCancel, WebSubscriptionStart } from './assinatura-web/app';
 import type { Access } from './plano';
+import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
@@ -847,6 +849,13 @@ export interface RecordsRepository {
 
   /** my_access: a situação do acesso da própria pessoa (assinatura, benefício, cortesia, Família, antes do início, teste ou só leitura). */
   getMyAccess(): Promise<Access>;
+
+  // Assinatura na web pelo Asaas (D-084), pela função do servidor "assinatura-web" com a sessão da pessoa. Só na web.
+
+  /** "assinar": cria o Checkout do Asaas e devolve o link da página de pagamento, ou por que não (já assinante, sem necessidade...). */
+  startWebSubscription(plan: PlanKind): Promise<WebSubscriptionStart>;
+  /** "cancelar": remove no Asaas a assinatura ativa feita na web; o período já pago continua valendo. */
+  cancelWebSubscription(): Promise<WebSubscriptionCancel>;
 
   // Aceite dos termos e da política (A1, migração 0024).
 

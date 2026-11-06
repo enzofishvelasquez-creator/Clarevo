@@ -2,22 +2,27 @@ import {
   ACCESS_TEXT,
   PLAN_NAME,
   SUBSCRIBE_OPEN,
+  WEB_SUBSCRIPTION_TEXT,
   accessBanner,
   accessView,
   deviceTimeZone,
   planPrice,
   type Access,
+  type PlanKind,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { CreditCard, Hourglass, LockKeyhole } from 'lucide-react-native';
+import { AlertCircle, CreditCard, Hourglass, LockKeyhole } from 'lucide-react-native';
+import { useState } from 'react';
 import { Platform, View } from 'react-native';
 
 import { Banner, Button, Card, LinkButton, Txt } from '@/components/ui';
 import { useAccess } from '@/state/access';
 import { useSpace } from '@/state/data';
+import { useRepo } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
 const T = ACCESS_TEXT;
+const W = WEB_SUBSCRIPTION_TEXT;
 
 /** O fuso da pessoa (o do espaço; sem ele, o do aparelho), para as datas do teste e da renovação. */
 export function useAccessTimeZone(): string {
@@ -82,8 +87,71 @@ export function AccessCard() {
   );
 }
 
-/** Os planos e os preços, para quem ainda não paga nem tem quem pague. Sem botão de assinar até a compra abrir (SUBSCRIBE_OPEN). */
-export function PlansCard({ access }: { access: Access }) {
+/**
+ * Os botões de assinar na web (D-084): a função do servidor cria o Checkout do Asaas e a página de pagamento abre nesta mesma aba; o
+ * Asaas devolve a pessoa a /conta/assinatura?pagamento=... No app das lojas nada disto aparece (lá a assinatura é pela loja). Só para
+ * quem pode assinar: no teste, em só leitura ou coberta pelo Plano Família de outra pessoa.
+ */
+function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boolean }) {
+  const repo = useRepo();
+  const [busy, setBusy] = useState<PlanKind | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  // No teste do sandbox (antes do início da cobrança, todo mundo está em pre_lancamento), os botões aparecem também nessa situação.
+  if (access.status !== 'teste' && access.status !== 'leitura' && access.status !== 'familia' && !(webTest && access.status === 'pre_lancamento')) return null;
+  const subscribe = async (plan: PlanKind) => {
+    if (busy) return;
+    setMsg(null);
+    setBusy(plan);
+    try {
+      const r = await repo.startWebSubscription(plan);
+      if (r.result === 'checkout') {
+        // A página de pagamento abre no lugar do app; o botão fica ocupado até a troca.
+        window.location.assign(r.url);
+        return;
+      }
+      setMsg(W.errors[r.result]);
+    } catch {
+      setMsg(W.errors.tente_de_novo);
+    }
+    setBusy(null);
+  };
+  return (
+    <View style={{ gap: space[3] }}>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {W.howItWorks}
+      </Txt>
+      {T.plans.map((p) => (
+        <Button
+          key={p.plan}
+          label={W.subscribe(p.plan)}
+          icon={CreditCard}
+          tone={p.plan === 'individual' ? 'brand' : 'soft'}
+          busy={busy === p.plan}
+          busyLabel={W.subscribeBusy}
+          disabled={busy !== null && busy !== p.plan}
+          onPress={() => void subscribe(p.plan)}
+        />
+      ))}
+      <Txt variant="caption" color={colors.textSecondary}>
+        {W.afterPayment}
+      </Txt>
+      {msg ? (
+        <Banner tone="erro" icon={AlertCircle}>
+          <Txt variant="label" color={colors.error}>
+            {msg}
+          </Txt>
+        </Banner>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Os planos e os preços, para quem ainda não paga nem tem quem pague. Na web, com a compra aberta (SUBSCRIBE_OPEN), os botões de assinar.
+ * `webTest`: o teste da equipe no sandbox do Asaas antes de abrir (`/conta/assinatura?assinar=teste`, docs/39): mostra os botões com a
+ * compra fechada. Só faz diferença enquanto a função do servidor tem a chave do sandbox, que não cobra ninguém.
+ */
+export function PlansCard({ access, webTest = false }: { access: Access; webTest?: boolean }) {
   return (
     <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -110,6 +178,7 @@ export function PlansCard({ access }: { access: Access }) {
       <Txt variant="caption" color={colors.textSecondary}>
         {Platform.OS === 'web' ? T.howToPay : T.howToPayStore}
       </Txt>
+      {(SUBSCRIBE_OPEN || webTest) && Platform.OS === 'web' ? <WebSubscribeButtons access={access} webTest={webTest} /> : null}
       {SUBSCRIBE_OPEN ? null : (
         <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
           {T.notOpenYet}

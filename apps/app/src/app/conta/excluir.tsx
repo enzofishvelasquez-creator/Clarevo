@@ -2,15 +2,16 @@ import { DELETE_CONFIRMATION_WORD, DELETE_TEXT, FAMILY_TEXT, canSubmitDelete, de
 import { router } from 'expo-router';
 import { AlertCircle, FileDown, Info, Users } from 'lucide-react-native';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { SubHeader } from '@/components/header';
 import { Banner, Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { forgetDevice } from '@/lib/device-forget';
 import { signOutIntent } from '@/lib/nav';
+import { useAccess } from '@/state/access';
 import { useDeleteAccount } from '@/state/account';
 import { useFamily } from '@/state/family';
-import { useSession } from '@/state/session';
+import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
 const T = DELETE_TEXT;
@@ -37,6 +38,8 @@ function Line({ text }: { text: string }) {
  */
 export default function ExcluirContaScreen() {
   const { user, auth, signOut } = useSession();
+  const repo = useRepo();
+  const access = useAccess();
   const family = useFamily();
   const deleteAccount = useDeleteAccount();
   const demo = auth.mode === 'demo';
@@ -54,6 +57,9 @@ export default function ExcluirContaScreen() {
       return;
     }
     setBusy(true);
+    // Assinatura feita na web (D-084): cancela no Asaas antes, para não cobrar uma conta que já não existe (se falhar, o próximo aviso
+    // do Asaas encontra a conta excluída e a função do servidor cancela do mesmo jeito).
+    if (Platform.OS === 'web' && access.data?.provider === 'web') await repo.cancelWebSubscription().catch(() => undefined);
     const r = await deleteAccount(DELETE_CONFIRMATION_WORD);
     if (!r.ok) {
       setBusy(false);

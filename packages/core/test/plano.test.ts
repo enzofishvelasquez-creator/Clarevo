@@ -27,6 +27,7 @@ const at = (status: Access['status'], until: string | null, plan: Access['plan']
   plan,
   until,
   canWrite: status !== 'leitura',
+  provider: null,
 });
 
 describe('assinatura paga (D-083): preços e textos', () => {
@@ -85,7 +86,12 @@ describe('parseAccess: a resposta de my_access', () => {
       plan: null,
       until: '2026-11-18T13:00:00+00:00',
       canWrite: true,
+      provider: null,
     });
+    // De onde vem o direito (migração 0026): só os valores conhecidos; o app antigo nem recebia a chave.
+    expect(parseAccess({ status: 'assinatura', plan: 'individual', until: null, can_write: true, provider: 'web' }).provider).toBe('web');
+    expect(parseAccess({ status: 'cortesia', plan: 'individual', until: null, can_write: true, provider: 'equipe' }).provider).toBe('equipe');
+    expect(parseAccess({ status: 'assinatura', plan: 'individual', until: null, can_write: true, provider: 'loja' }).provider).toBeNull();
     expect(parseAccess({ status: 'assinatura', plan: 'familiar', until: null, can_write: true }).plan).toBe('familiar');
     expect(parseAccess({ status: 'leitura', plan: null, until: '2026-11-01T00:00:00Z', can_write: false }).canWrite).toBe(false);
     expect(() => parseAccess(null)).toThrow('acesso_invalido');
@@ -168,7 +174,7 @@ describe('repositório em memória e demonstração', () => {
   it('a demonstração fica no teste grátis, contado do relógio real', () => {
     const now = NOW.getTime();
     const demo = demoTrialAccess(now);
-    expect(demo).toEqual({ status: 'teste', plan: null, until: '2026-11-18T13:00:00.000Z', canWrite: true });
+    expect(demo).toEqual({ status: 'teste', plan: null, until: '2026-11-18T13:00:00.000Z', canWrite: true, provider: null });
     expect(trialDaysLeft(demo, NOW, TZ)).toBe(14);
   });
 });

@@ -128,8 +128,14 @@ import {
   type GoalImageChoice,
   isGoalImageKey,
   parseAccess,
+  parseWebSubscriptionCancel,
+  parseWebSubscriptionStart,
+  WEB_SUBSCRIPTION_FUNCTION,
   parseLegalAcceptance,
   type Access,
+  type PlanKind,
+  type WebSubscriptionCancel,
+  type WebSubscriptionStart,
   type LegalAcceptance,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -3142,6 +3148,21 @@ export class SupabaseRepository implements RecordsRepository {
     return parseAccess(data);
   }
 
+  /**
+   * Assinatura na web (D-084): a função do servidor "assinatura-web", chamada com o token da sessão (o cliente do Supabase o manda em
+   * Authorization). A função responde em JSON também quando recusa (401, 503...): o corpo da recusa é lido do mesmo jeito; sem corpo,
+   * "tente_de_novo".
+   */
+  async startWebSubscription(plan: PlanKind): Promise<WebSubscriptionStart> {
+    const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'assinar', plan } });
+    return parseWebSubscriptionStart(error ? await functionErrorBody(error) : data);
+  }
+
+  async cancelWebSubscription(): Promise<WebSubscriptionCancel> {
+    const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'cancelar' } });
+    return parseWebSubscriptionCancel(error ? await functionErrorBody(error) : data);
+  }
+
   /** O benefício da própria pessoa (visão my_benefit): a licença ativa, ou a encerrada mais recente; null se nunca teve. */
   async getMyBenefit(): Promise<Benefit | null> {
     const { data, error } = await this.db
@@ -3335,4 +3356,15 @@ function toImportResult(data: unknown): ImportResult {
   const ok = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 500;
   if (!r || !ok(r.created) || !ok(r.skipped)) throw new RepoError('desconhecido', 'importacao_inconsistente');
   return { created: r.created, skipped: r.skipped };
+}
+
+/** O corpo JSON de uma recusa da função do servidor (FunctionsHttpError traz a resposta em `context`); null quando não há. */
+async function functionErrorBody(error: unknown): Promise<unknown> {
+  const ctx = (error as { context?: unknown } | null)?.context;
+  if (typeof Response === 'undefined' || !(ctx instanceof Response)) return null;
+  try {
+    return await ctx.json();
+  } catch {
+    return null;
+  }
 }

@@ -1,5 +1,7 @@
 import type { IsoDate, IsoMonth } from './dates';
+import type { WebSubscriptionCancel, WebSubscriptionStart } from './assinatura-web/app';
 import { FULL_ACCESS, type Access } from './plano';
+import type { PlanKind } from './plano-precos';
 import { LEGAL_VERSION, type LegalAcceptance } from './aceite';
 import { addMonths, addYearsClamped, dateInMonth, isValidIsoDate, isValidIsoMonth, monthOf, monthsBetween } from './dates';
 import type { Cents } from './money';
@@ -4559,10 +4561,19 @@ export class MemoryRepository implements RecordsRepository {
       const b = this.company.myBenefit(this.opts.actorId);
       const now = Date.parse(`${this.opts.today()}T12:00:00.000Z`);
       if (b && (b.status === 'ativa' || (b.accessUntil !== null && Date.parse(b.accessUntil) > now))) {
-        return { status: 'beneficio', plan: b.plan, until: b.accessUntil, canWrite: true };
+        return { status: 'beneficio', plan: b.plan, until: b.accessUntil, canWrite: true, provider: null };
       }
       return this.opts.access?.() ?? FULL_ACCESS;
     });
+  }
+
+  // Assinatura na web (D-084): só existe com o Supabase e o Asaas; na demonstração e nos testes, indisponível.
+  async startWebSubscription(_plan: PlanKind): Promise<WebSubscriptionStart> {
+    return { result: 'indisponivel' };
+  }
+
+  async cancelWebSubscription(): Promise<WebSubscriptionCancel> {
+    return 'indisponivel';
   }
 }
 

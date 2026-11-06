@@ -1,5 +1,8 @@
 import { todayIn } from '../dates';
 import { sha256HexOfBytes, utf8Bytes } from '../sha256';
+import { obj, sameText, serviceHeaders, serviceKeyFrom } from '../servidor-comum';
+
+export { obj, sameText, serviceKeyFrom };
 import { readWhatsAppMessage } from './mensagem';
 import { chatReply, whatsappOutcomeReply, whatsappParseReply, type ChatChannel, type WhatsAppOutcome } from './respostas';
 
@@ -30,14 +33,6 @@ export function hmacSha256Hex(key: readonly number[], message: readonly number[]
   while (block.length < 64) block.push(0);
   const inner = sha256HexOfBytes([...block.map((b) => b ^ 0x36), ...message]);
   return sha256HexOfBytes([...block.map((b) => b ^ 0x5c), ...hexToBytes(inner)]);
-}
-
-/** Comparação que leva o mesmo tempo para qualquer diferença (assinatura e segredos). */
-export function sameText(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
 }
 
 /** Cabeçalho X-Hub-Signature-256 ("sha256=<hex>") da Meta: HMAC do corpo exato com a chave secreta do app. */
@@ -74,10 +69,6 @@ export interface WhatsAppInbound {
   text: string | null;
   /** Só em aviso do sistema (type 'system'): o tipo do aviso, como 'user_changed_number'. */
   systemType?: string | null;
-}
-
-export function obj(v: unknown): Record<string, unknown> | null {
-  return typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
 function list(v: unknown): unknown[] {
@@ -228,27 +219,6 @@ const REQUIRED_ENV = [
   'SUPABASE_URL',
 ] as const;
 
-/**
- * Chave de serviço do banco: a chave secreta nova do Supabase (SUPABASE_SECRET_KEYS, um JSON por nome; vale a "default" ou, sem ela,
- * a primeira) e, sem ela, a chave antiga (SUPABASE_SERVICE_ROLE_KEY, que o painel já marca como antiga). Vazio: nenhuma.
- */
-export function serviceKeyFrom(v: (name: string) => string): string {
-  const keys = v('SUPABASE_SECRET_KEYS');
-  if (keys !== '') {
-    try {
-      const parsed = JSON.parse(keys) as unknown;
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        const values = parsed as Record<string, unknown>;
-        const chosen = typeof values.default === 'string' ? values.default : Object.values(values).find((x) => typeof x === 'string');
-        if (typeof chosen === 'string' && chosen.trim() !== '') return chosen.trim();
-      }
-    } catch {
-      // JSON inválido: segue para a chave antiga.
-    }
-  }
-  return v('SUPABASE_SERVICE_ROLE_KEY');
-}
-
 /** Configuração lida dos segredos. null quando falta algum (a função responde 503 e não faz nada). */
 export function whatsappConfigFrom(env: (name: string) => string | undefined): WhatsAppConfig | null {
   const v = (name: string) => (env(name) ?? '').trim();
@@ -303,10 +273,7 @@ export function supabaseChatRpc(
   fetcher: WhatsAppFetch,
 ): (fn: string, args: Record<string, unknown>) => Promise<WhatsAppOutcome> {
   return async (fn, args) => {
-    const headers: Record<string, string> = { apikey: config.serviceKey, 'Content-Type': 'application/json' };
-    // Chave antiga (JWT) também vai em Authorization; a chave secreta nova (sb_secret_...) vai só em apikey.
-    if (config.serviceKey.startsWith('eyJ')) headers.Authorization = `Bearer ${config.serviceKey}`;
-    const res = await fetcher(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args) });
+    const res = await fetcher(`${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: serviceHeaders(config.serviceKey), body: JSON.stringify(args) });
     const text = await res.text();
     if (res.status >= 400 && res.status < 500) throw new WhatsAppFinalError(`banco recusou (${res.status}) em ${fn}`);
     if (res.status !== 200) throw new Error(`banco respondeu ${res.status} em ${fn}`);

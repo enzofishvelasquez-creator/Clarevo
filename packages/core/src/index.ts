@@ -62,6 +62,8 @@ export * from './plano';
 export * from './aceite';
 export * from './long-list';
 export * from './text-scale';
+export * from './servidor-comum';
 export * from './whatsapp';
 export * from './telegram';
+export * from './assinatura-web';
 export * from './goal-images';
