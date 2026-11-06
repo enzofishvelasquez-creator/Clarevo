@@ -35,6 +35,7 @@ import {
   UNCERTAIN_TEXT,
   dayErrorText,
   dayInMonthDate,
+  categorySuggestionLabel,
   descriptionAfterCategory,
   exampleReceiptQr,
   factsWithPage,
@@ -90,6 +91,8 @@ import {
   type StoreMemory,
   type RecordInput,
   type RecordKind,
+  rememberCategories,
+  suggestCategory,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -116,7 +119,7 @@ import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt, styles 
 import { UnsavedChangesText } from '@/components/context-text';
 import { announceOnIOS } from '@/lib/a11y';
 import { cardHref, invoiceHref } from '@/lib/cards';
-import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
+import { getPrefs, loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { totalChange } from '@/lib/highlight';
@@ -352,7 +355,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const registerCardRef = useRef<View>(null);
 
   useEffect(() => {
-    if (userId && (cardMode || mode.type === 'novo')) loadPrefs(userId, persistPrefs);
+    // Também no editar (D-086): a sugestão e a memória de categorias dependem das preferências já lidas.
+    if (userId) loadPrefs(userId, persistPrefs);
   }, [userId, persistPrefs, cardMode, mode.type]);
 
   // Conta que vem marcada (D-043): a principal ou, se ainda existir e estiver ativa, a última usada neste aparelho. Só até a pessoa
@@ -984,10 +988,26 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     }
   };
 
+  /**
+   * Categoria lembrada neste aparelho (D-086): a mesma memória da importação de extrato (nome parecido → categoria escolhida da última
+   * vez, por tipo). Gravada ao salvar com categoria; salvar sem categoria não mexe na memória (no formulário "Sem categoria" é o padrão,
+   * não uma escolha). Só com as preferências já lidas do aparelho, para não gravar por cima delas. Nunca vai ao servidor.
+   */
+  const rememberCategory = (description: string, category: string | null) => {
+    if (!userId || category === null) return;
+    const current = getPrefs(userId);
+    if (!current) return;
+    updatePrefs(userId, { importCategories: rememberCategories(current.importCategories, [{ description: description.trim(), category, kind }]) }, persistPrefs);
+  };
+  /** A sugestão de categoria para o nome digitado, só com a categoria em "Sem categoria" (D-086). */
+  const categorySuggestion =
+    draft.category === null && draft.description.trim().length >= 3 ? suggestCategory(draft.description, kind, prefs?.importCategories ?? {}).category : null;
+
   /** Modo "Dia": gravação confirmada. another: "Salvar e anotar outro" (o formulário fica, limpo); senão volta à revisão. */
   const finishDay = (input: RecordInput, another: boolean) => {
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (userId && input.accountId) updatePrefs(userId, { lastAccount: input.accountId }, persistPrefs);
+    rememberCategory(input.description, input.category);
     if (fromReview) returnSession.noteAction();
     const text = RETURN_TEXT.noted(input);
     if (!another) {
@@ -1016,6 +1036,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       else totalChange.set({ total, month, deltaCents: saved.amountCents });
     }
     afterNoteSaved();
+    rememberCategory(draftRef.current.description, draftRef.current.category);
     // A última conta usada vale só neste aparelho (D-043): abre o próximo formulário já nela.
     if (userId && !cardPurchase && draftRef.current.accountId) updatePrefs(userId, { lastAccount: draftRef.current.accountId }, persistPrefs);
     if (mode.type === 'novo') {
@@ -1139,6 +1160,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         if (userId) updatePrefs(userId, { lastPayment: card.id }, persistPrefs);
         afterNoteSaved();
+    rememberCategory(draftRef.current.description, draftRef.current.category);
         let invoiceMonth: IsoMonth | null = r.status === 'ok' ? (r.value.entry?.invoiceMonth ?? null) : null;
         if (r.status === 'reconciled' && r.saved.entryId) {
           // A tentativa anterior foi gravada: a fatura real vem do lançamento.
@@ -1718,6 +1740,18 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               ))}
             </View>
           </View>
+          {categorySuggestion ? (
+            // Fora do grupo de rádios (é um botão) e sem reservar espaço: aparece quando o nome combina com uma regra ou com a memória.
+            <LinkButton
+              label={categorySuggestionLabel(categorySuggestion).label}
+              accessibilityLabel={categorySuggestionLabel(categorySuggestion).a11y}
+              style={styles.inlineLink}
+              onPress={() => {
+                set('category', categorySuggestion);
+                announceOnIOS(`Categoria ${categorySuggestion}`);
+              }}
+            />
+          ) : null}
 
           {note && dateOutsideNoteMonth(parsedDate, note.reading.draft.month) ? (
             <Txt variant="label" color={colors.textSecondary}>

@@ -7,17 +7,17 @@
 import { daysBetween, formatDateBR, todayIn, type IsoDate } from './dates';
 import { BENEFIT_TEXT } from './company';
 import { FAMILY_MAX_PEOPLE } from './family';
-import { formatBRL, type Cents } from './money';
+import { formatBRL } from './money';
+import { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind } from './plano-precos';
+
+export { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind };
 
 /** Dias de teste grátis (o mesmo intervalo do banco, em clarevo_access). */
 export const TRIAL_DAYS = 14;
 /** A partir de quantos dias para o fim o teste ganha o aviso no Resumo. */
 export const TRIAL_WARNING_DAYS = 3;
 
-export type PlanKind = 'individual' | 'familiar';
 
-/** Preço mensal de cada plano, em centavos. */
-export const PLAN_PRICE_CENTS: Readonly<Record<PlanKind, Cents>> = { individual: 2990, familiar: 6990 };
 
 /**
  * A assinatura pelo app ainda não está aberta: a compra pelas lojas e pela web entra na fase 2, antes do início da cobrança. Até lá
@@ -30,6 +30,8 @@ export const SUBSCRIBE_OPEN = false;
  * titular; antes do início da cobrança; teste grátis; só leitura.
  */
 export type AccessStatus = 'assinatura' | 'beneficio' | 'cortesia' | 'familia' | 'pre_lancamento' | 'teste' | 'leitura';
+/** De onde vem o direito: as lojas, a web (Asaas, D-084) ou a equipe (cortesia). */
+export type AccessProvider = 'apple' | 'google' | 'web' | 'equipe';
 
 export interface Access {
   status: AccessStatus;
@@ -42,19 +44,22 @@ export interface Access {
   until: string | null;
   /** Se a pessoa anota e muda dados. Falso só em só leitura. */
   canWrite: boolean;
+  /** De onde vem a assinatura, o benefício ou a cortesia (migração 0026); nulo nas outras situações. Só a da web é cancelada pelo app. */
+  provider: AccessProvider | null;
 }
 
 const STATUSES: readonly AccessStatus[] = ['assinatura', 'beneficio', 'cortesia', 'familia', 'pre_lancamento', 'teste', 'leitura'];
+const PROVIDERS: readonly AccessProvider[] = ['apple', 'google', 'web', 'equipe'];
 
 /** Acesso pleno, sem prazo: o que o app assume enquanto não sabe (o banco trava a escrita de qualquer forma). */
-export const FULL_ACCESS: Access = { status: 'pre_lancamento', plan: null, until: null, canWrite: true };
+export const FULL_ACCESS: Access = { status: 'pre_lancamento', plan: null, until: null, canWrite: true, provider: null };
 
 /**
  * O acesso da demonstração (dados fictícios): o teste grátis começando agora, para a demonstração mostrar a assinatura como uma conta
  * nova a vê. Conta a partir do relógio real, e não do dia fixo da demonstração, para o prazo não aparecer vencido.
  */
 export function demoTrialAccess(now: number = Date.now()): Access {
-  return { status: 'teste', plan: null, until: new Date(now + TRIAL_DAYS * 86_400_000).toISOString(), canWrite: true };
+  return { status: 'teste', plan: null, until: new Date(now + TRIAL_DAYS * 86_400_000).toISOString(), canWrite: true, provider: null };
 }
 
 /** Lê a resposta de `my_access`. Resposta fora do formato vira erro: a tela mostra a falha, sem inventar situação. */
@@ -68,7 +73,8 @@ export function parseAccess(raw: unknown): Access {
   if (typeof r.can_write !== 'boolean') throw new Error('acesso_invalido');
   // Só leitura nunca escreve, e nenhuma outra situação deixa de escrever.
   if (r.can_write !== (status !== 'leitura')) throw new Error('acesso_invalido');
-  return { status: status as AccessStatus, plan, until, canWrite: r.can_write };
+  const provider = typeof r.provider === 'string' && (PROVIDERS as readonly string[]).includes(r.provider) ? (r.provider as AccessProvider) : null;
+  return { status: status as AccessStatus, plan, until, canWrite: r.can_write, provider };
 }
 
 /** O dia de `until` no fuso da pessoa. */
@@ -91,7 +97,6 @@ function trialEnds(days: number, end: IsoDate): string {
   return `termina em ${days} dias, em ${formatDateBR(end)}`;
 }
 
-export const PLAN_NAME: Readonly<Record<PlanKind, string>> = { individual: 'Individual', familiar: 'Família' };
 
 /** "R$ 29,90 por mês". */
 export function planPrice(plan: PlanKind): string {

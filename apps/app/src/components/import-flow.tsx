@@ -401,7 +401,7 @@ export function ImportFlow() {
     tally.current = EMPTY_TALLY;
     rowY.current = new Map();
     if (user) {
-      updatePrefs(user.id, { importCategories: rememberCategories(memory(), chosen.map((l) => ({ description: l.description.trim(), category: l.category }))) }, persist);
+      updatePrefs(user.id, { importCategories: rememberCategories(memory(), chosen.map((l) => ({ description: l.description.trim(), category: l.category, kind: l.kind === 'receita' ? 'receita' : 'despesa' }))) }, persist);
     }
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setMonth(latestMonthOf(chosen.map((l) => l.date), currentMonth));

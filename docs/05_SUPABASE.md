@@ -51,6 +51,10 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
 
 12o. **Por último (apagar de vez o que foi excluído, A7)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261105000002_apagar_excluidos.sql` (migração 0025) e clique em **Run**. Ela cria a rotina `clarevo_purge_deleted`, que apaga de vez o que foi marcado como excluído há mais de 6 meses e as Famílias encerradas há mais de 6 meses, como promete a política. Ninguém de fora executa a rotina: ela roda pelo agendamento do banco. Para agendar: (1) o Enzo liga, à mão, a extensão **pg_cron** no painel (Database, Extensions, procurar "pg_cron", ligar); (2) numa nova consulta, rode `select cron.schedule('clarevo-apagar-excluidos', '23 6 * * *', $$select public.clarevo_purge_deleted()$$);` (todo dia às 6h23 UTC, 3h23 em Brasília). Depois, rode a conferência do passo 21m. A migração não apaga nada sozinha; a primeira limpeza acontece no horário agendado.
 
+12p. **Por último (assinatura na web pelo Asaas, D-084)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261106000001_assinatura_web.sql` (migração 0026) e clique em **Run**. Ela faz `my_access` dizer de onde vem o direito (`provider`: as lojas, a web ou a equipe) e cria a tabela `billing_checkouts` (o Checkout do Asaas ligado à pessoa, só o resumo do identificador) com as funções `billing_checkout_record`, `billing_checkout_person` e `billing_person_by_external_ref`, só com a chave de serviço, para a função do servidor `assinatura-web`. Não muda nenhum dado nem o acesso de ninguém. Depois, rode `notify pgrst, 'reload schema';` e a conferência do passo 21n. A função do servidor, os segredos e o Asaas estão em `docs/39_ASAAS.md`, seção 4; enquanto a compra não abre (`SUBSCRIBE_OPEN`), o app não mostra os botões de assinar.
+
+12q. **Por último (categoria "Crédito e parcelas", D-086)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261106000002_categoria_credito.sql` (migração 0027) e clique em **Run**. Ela põe a sétima categoria de gasto na restrição de `category_budgets`, em `set_category_budget` e em `month_budget` (que passa a devolver sete linhas: o app recusa a leitura do orçamento com um número de linhas diferente do dele, então o app novo precisa desta migração, e o app antigo continua funcionando com ela). Não muda nenhum dado. Depois, rode `notify pgrst, 'reload schema';` e a conferência do passo 21o.
+
 13. A ordem importa: cada arquivo altera tabelas e funções criadas pelos anteriores (a 0006 vem depois da 0005, a 0007 depois da 0006, a 0008 depois da 0007, a 0009 depois da 0008, a 0010 depois da 0009, a 0011 depois da 0010, a 0012 depois da 0011, a 0013 depois da 0012, a 0014 depois da 0013, a 0015 depois da 0014, a 0016 depois da 0015, a 0017 depois da 0016, a 0018 depois da 0017 e a 0019 depois da 0018 a 0020 depois da 0019 e a 0021 depois da 0020). Cada arquivo roda uma única vez; se o projeto já tinha os primeiros, rode só os que faltam, na ordem dos nomes.
 14. Todos devem terminar sem erro. Se aparecer erro, me envie a mensagem.
 15. Para conferir as migrações novas, rode numa nova consulta:
@@ -553,6 +557,36 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
    ```
 
    O resultado esperado é `rotina_fechada_0025 = 1`, `agendada_0025 = 1` e `funcoes_do_app = 94` (a 0025 não cria função para o app). Se a consulta disser que `cron.job` não existe, a extensão pg_cron ainda não foi ligada. Testada em 05/11/2026 num banco local descartável, sem a parte do agendamento (que só existe no Supabase). **Aplicada em produção (`clarevo-producao`) em 05/11/2026**, com o pg_cron ligado à mão e o agendamento criado (identificador 1): a conferência devolveu 1, 1 e 94.
+
+
+21n. Para conferir a 0026 (assinatura na web, D-084), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('billing_checkout_record', 'billing_checkout_person', 'billing_person_by_external_ref')
+              and has_function_privilege('service_role', p.oid, 'execute')
+              and not has_function_privilege('authenticated', p.oid, 'execute') and not has_function_privilege('anon', p.oid, 'execute')) as funcoes_do_servidor_0026,
+          (select count(*) from information_schema.tables where table_schema = 'public' and table_name = 'billing_checkouts') as tabela_0026,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = 'clarevo_access' and pg_get_functiondef(p.oid) like '%''provider''%') as provider_0026,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `funcoes_do_servidor_0026 = 3`, `tabela_0026 = 1`, `provider_0026 = 1` e `funcoes_do_app = 94` (a 0026 não cria função para o app). Testada em 06/11/2026 num banco local descartável.
+
+
+21o. Para conferir a 0027 (categoria "Crédito e parcelas", D-086), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from pg_constraint where conname = 'category_budgets_categoria' and pg_get_constraintdef(oid) like '%Crédito e parcelas%') as restricao_0027,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('set_category_budget', 'month_budget') and pg_get_functiondef(p.oid) like '%Crédito e parcelas%') as funcoes_0027,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `restricao_0027 = 1`, `funcoes_0027 = 2` e `funcoes_do_app = 94` (a 0027 não cria função). Testada em 06/11/2026 num banco local descartável.
 
 22. Se o app mostrar erro ao abrir as contas a pagar, os gastos fixos, as contas do ano, as metas, os cartões, a renda comprometida, o orçamento, as contas de origem, as assinaturas, a importação de extrato, a Família, o painel da empresa, a exclusão da conta, a Evolução, a conferência de um mês ou o Resumo logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`. Faça isso depois de colar a 0016, antes de abrir o app (a 0016 recria `months_overview`, e a API precisa ler a função nova), e de novo depois de colar a 0018 (função nova, `set_signup_source`). A 0019 não cria função nem tabela: não precisa. A 0020, a 0021, a 0022, a 0023 e a 0024 criam funções novas (WhatsApp, imagem das metas, Telegram, assinatura e aceite dos termos): rode depois de colar cada uma.
 23. O consultor de segurança do Supabase (**Advisors**) pode apontar a visão `series_items` como visão com os privilégios de quem a criou (a migração de contas do ano a recria com as mesmas opções). É intencional: ela precisa ler as contas excluídas só em um mês, filtra a permissão de leitura de forma explícita e usa `security_barrier` (ver `docs/01_ARQUITETURA.md`). O mesmo vale para as outras sete visões e para o restante do que o verificador aponta: ver "Verificador do Supabase: o que é esperado", logo antes de "Custos".

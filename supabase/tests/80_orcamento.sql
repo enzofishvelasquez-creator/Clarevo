@@ -154,11 +154,11 @@ do $$ begin
   assert (select count(*) from public.category_budgets) = 0 and (select count(*) from public.commitment_limits) = 0,
     'conta nova sem orçamento nem limite';
   assert (select array_agg(category) from public.month_budget(pg_temp.id('ivo_ctx'), '2026-10-01'))
-       = array['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer'], 'as seis categorias, na ordem de sempre';
+       = array['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas'], 'as sete categorias, na ordem de sempre (D-086)';
   assert not exists (select 1 from public.month_budget(pg_temp.id('ivo_ctx'), '2026-10-01')
                       where budget_id is not null or budget_version is not null or budget_from is not null or budget_cents is not null
                          or used_cents <> 0), 'nenhum orçamento, nenhum uso';
-  assert (select count(*) from public.month_budget(pg_temp.id('ivo_ctx'), '2026-10-01')) = 6, 'sempre seis linhas';
+  assert (select count(*) from public.month_budget(pg_temp.id('ivo_ctx'), '2026-10-01')) = 7, 'sempre sete linhas';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -483,7 +483,7 @@ begin
   perform pg_temp.as_('cris');
   assert pg_temp.totals('cris_ctx', '2026-10-01') = '{650000,296230,353770}', 'Recebido 6.500,00 e Pago 2.962,30 (gastos e o aluguel)';
   assert pg_temp.committed('cris_ctx', '2026-10-01') = '256000 - -', 'comprometido de outubro: o aluguel e a fatura de outubro (sem referência)';
-  assert (select count(*) from public.month_budget(ctx, '2026-10-01')) = 6, 'sempre seis linhas';
+  assert (select count(*) from public.month_budget(ctx, '2026-10-01')) = 7, 'sempre sete linhas';
 
   -- Sem nenhum orçamento: o usado já aparece (sem dado de exemplo), sem valor de orçamento.
   assert pg_temp.mb('cris_ctx', '2026-10-01', 'Mercado') = '-@- 47230', 'Mercado: 472,30 em outubro (a feira e a 2ª parcela da geladeira)';

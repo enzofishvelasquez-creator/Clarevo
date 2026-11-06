@@ -1,4 +1,4 @@
-import { DELETE_CONFIRMATION_WORD, DELETE_TEXT, FAMILY_TEXT, canSubmitDelete, deleteErrorText, deleteFamilyOutcome, deleteFamilyText } from '@clarevo/core';
+import { DELETE_CONFIRMATION_WORD, DELETE_TEXT, FAMILY_TEXT, WEB_SUBSCRIPTION_TEXT, canSubmitDelete, deleteErrorText, deleteFamilyOutcome, deleteFamilyText } from '@clarevo/core';
 import { router } from 'expo-router';
 import { AlertCircle, FileDown, Info, Users } from 'lucide-react-native';
 import { useState } from 'react';
@@ -8,9 +8,10 @@ import { SubHeader } from '@/components/header';
 import { Banner, Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { forgetDevice } from '@/lib/device-forget';
 import { signOutIntent } from '@/lib/nav';
+import { useAccess } from '@/state/access';
 import { useDeleteAccount } from '@/state/account';
 import { useFamily } from '@/state/family';
-import { useSession } from '@/state/session';
+import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
 const T = DELETE_TEXT;
@@ -37,6 +38,8 @@ function Line({ text }: { text: string }) {
  */
 export default function ExcluirContaScreen() {
   const { user, auth, signOut } = useSession();
+  const repo = useRepo();
+  const access = useAccess();
   const family = useFamily();
   const deleteAccount = useDeleteAccount();
   const demo = auth.mode === 'demo';
@@ -54,6 +57,17 @@ export default function ExcluirContaScreen() {
       return;
     }
     setBusy(true);
+    // Assinatura feita na web (D-084): cancela no Asaas antes (em qualquer plataforma; a chamada não tem tela), para não cobrar uma
+    // conta que já não existe. Sem conseguir, não exclui ainda: a rede de segurança (o próximo aviso do Asaas encontra a conta excluída
+    // e a função do servidor cancela) chegaria depois de mais uma cobrança.
+    if (access.data?.provider === 'web') {
+      const cancelled = await repo.cancelWebSubscription().catch(() => 'tente_de_novo' as const);
+      if (cancelled !== 'cancelada' && cancelled !== 'sem_assinatura') {
+        setBusy(false);
+        setMsg({ tone: 'erro', text: WEB_SUBSCRIPTION_TEXT.cancelBeforeDeleteFailed });
+        return;
+      }
+    }
     const r = await deleteAccount(DELETE_CONFIRMATION_WORD);
     if (!r.ok) {
       setBusy(false);

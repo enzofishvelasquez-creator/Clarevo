@@ -45,8 +45,9 @@ export interface DevicePrefs {
    */
   subscriptionSnoozedUntil: string | null;
   /**
-   * Memória das categorias de "Importar extrato ou fatura" (D-048): palavras da descrição → categoria que a pessoa escolheu da última
-   * vez. Só neste aparelho, como a memória das notas fiscais; não é dado financeiro e nada vai para o servidor. No máximo 300 entradas.
+   * Memória das categorias de "Importar extrato ou fatura" (D-048) e, desde a D-086, de Anotar gasto e Registrar recebimento: palavras
+   * da descrição (com o tipo na frente) → categoria que a pessoa escolheu da última vez. Só neste aparelho, como a memória das notas
+   * fiscais; não é dado financeiro e nada vai para o servidor. No máximo 300 entradas.
    */
   importCategories: ImportMemory;
   /**

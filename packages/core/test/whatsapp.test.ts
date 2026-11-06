@@ -57,6 +57,9 @@ describe('WhatsApp: leitura das mensagens (sem IA)', () => {
     expect(read('aluguel 1.500,00')).toEqual(anotar('despesa', 150000, 'Aluguel', 'Moradia'));
     expect(read('-40 cinema')).toEqual(anotar('despesa', 4000, 'Cinema', 'Lazer'));
     expect(read('lazer 80')).toEqual(anotar('despesa', 8000, 'Lazer', 'Lazer'));
+    // D-086: "prestação do carro" é Crédito e parcelas; "prestação de serviço" fica sem categoria.
+    expect(read('prestação do carro 450')).toEqual(anotar('despesa', 45000, 'Prestação do carro', 'Crédito e parcelas'));
+    expect(read('prestação de serviço 300')).toEqual(anotar('despesa', 30000, 'Prestação de serviço', null));
     expect(read('pizza 12.5')).toEqual(anotar('despesa', 1250, 'Pizza', null));
     expect(read('mercado - 50')).toEqual(anotar('despesa', 5000, 'Mercado', 'Mercado'));
     expect(read('luz \u2013 180')).toEqual(anotar('despesa', 18000, 'Luz', 'Moradia'));

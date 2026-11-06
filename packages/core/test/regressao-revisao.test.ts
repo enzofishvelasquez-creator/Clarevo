@@ -1000,11 +1000,11 @@ describe('CL-09: explicações da reserva para imprevistos', () => {
     expect(detail.planned).toBe('Você planejou guardar R$ 500,00 por mês. Contando a partir de novembro de 2026, sem rendimentos, chega lá em dezembro de 2029.');
     expect(detail.rounding).toBe(GOALS_TEXT.roundingNote);
     expect(detail.coverage).toBe('Cobre 0,9 mês dos seus gastos essenciais');
-    // Base: só o que foi pago, o número de meses e o que fica de fora. Antes: "Média de setembro de 2026 em Moradia e Mercado. Lazer e gastos sem categoria não entram."
+    // Base: só o que foi pago, o número de meses e o que fica de fora. Antes: "Média de setembro de 2026 em Moradia e Mercado. Lazer, Crédito e parcelas e gastos sem categoria não entram."
     const months = ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
     const records = (await Promise.all(months.map((m) => repo.listRecords(ctx, m)))).flat();
     expect(essentialEstimateText(essentialMonthly(records, '2026-10', 315_000))).toBe(
-      'Média do que foi pago em setembro de 2026 em Moradia e Mercado (1 mês com gastos anotados). Contas ainda não pagas, Lazer e gastos sem categoria não entram.',
+      'Média do que foi pago em setembro de 2026 em Moradia e Mercado (1 mês com gastos anotados). Contas ainda não pagas, Lazer, Crédito e parcelas e gastos sem categoria não entram.',
     );
     for (const text of [detail.planned!, detail.rounding!, GOALS_TEXT.plannedShort(50_000), GOALS_TEXT.cardPlanned(50_000, '2029-12'), GOALS_TEXT.reserve.essentialsAverage(['2026-07', '2026-09'], ['Moradia'])]) {
       expect(text).not.toMatch(FORBIDDEN);

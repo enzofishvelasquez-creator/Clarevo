@@ -149,7 +149,7 @@ de produto financeiro nem oferta de crédito.
 
 **Composição do mês (toque em "Pago"): "Por registro | Por categoria".**
 
-- Mostra barras horizontais com valor e percentual de cada categoria. São as 6 categorias fixas mais "Sem categoria" (`records.ts:222`), e a soma fecha com Pago.
+- Mostra barras horizontais com valor e percentual de cada categoria. São as 7 categorias fixas mais "Sem categoria" (`records.ts:222`), e a soma fecha com Pago.
 - Não há cor de alerta. O cálculo é em centavos, no core, e não mexe no banco.
 - Hoje não existe visão por categoria em nenhuma tela.
 

@@ -4971,13 +4971,13 @@ describe('API real: orçamento por categoria e limite pessoal (Ciclo F2, D-041)'
     account = space.accounts[0]!.id;
   });
 
-  it('conta sem orçamento nem limite: seis categorias, sem orçamento e sem uso, igual ao core', async () => {
+  it('conta sem orçamento nem limite: sete categorias, sem orçamento e sem uso, igual ao core', async () => {
     expect(await bruno.listCategoryBudgets(ctx)).toEqual([]);
     expect(await bruno.listCommitmentLimits(ctx)).toEqual([]);
     const read = await checked(OCT);
     expect(read.lines).toEqual(BUDGET_CATEGORIES.map((category) => ({ category, budgetId: null, budgetVersion: null, budgetFrom: null, budgetCents: null, usedCents: 0 })));
     const s = summarizeBudget(read);
-    expect([s.hasAny, s.totalLine, budgetCaption(s), s.without.length]).toEqual([false, null, 'Nenhum orçamento definido', 6]);
+    expect([s.hasAny, s.totalLine, budgetCaption(s), s.without.length]).toEqual([false, null, 'Nenhum orçamento definido', 7]);
   });
 
   it('o usado do banco é o do core: gastos, parcelas pelo mês da compra, estornos e fatura paga fora', async () => {

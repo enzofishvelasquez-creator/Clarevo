@@ -8,6 +8,7 @@ import {
   buildReview,
   categoriesFor,
   categoryByRules,
+  categorySuggestionLabel,
   chunkItems,
   descriptionTokens,
   existingMonths,
@@ -204,6 +205,18 @@ describe('importar: categorias sugeridas', () => {
       ['Estacionamento', 'despesa', 'Transporte'],
       ['Restaurante Sabor', 'despesa', 'Lazer'],
       ['Cinema', 'despesa', 'Lazer'],
+      // D-086: empréstimo e financiamento antes das outras regras ("parcela do carro" é dívida, não transporte).
+      ['Empréstimo pessoal Banco Exemplo', 'despesa', 'Crédito e parcelas'],
+      ['Parcela do carro', 'despesa', 'Crédito e parcelas'],
+      ['Financiamento imobiliário', 'despesa', 'Crédito e parcelas'],
+      ['Consórcio do imóvel', 'despesa', 'Crédito e parcelas'],
+      ['Crédito consignado', 'despesa', 'Crédito e parcelas'],
+      ['Juros cheque especial', 'despesa', 'Crédito e parcelas'],
+      ['Prestação do carro', 'despesa', 'Crédito e parcelas'],
+      // "Prestação" e "consórcio" soltos não são dívida: nota de serviço e empresa de ônibus.
+      ['Prestação de serviços', 'despesa', null],
+      ['PIX ENVIADO PRESTACAO DE SERVICO', 'despesa', null],
+      ['Consórcio de ônibus passagem', 'despesa', 'Transporte'],
       ['Tarifa de manutenção', 'despesa', null],
       ['XPTO 123', 'despesa', null],
       ['', 'despesa', null],
@@ -216,6 +229,8 @@ describe('importar: categorias sugeridas', () => {
     for (const [text, kind, expected] of cases) expect(categoryByRules(text, kind), text).toBe(expected);
     // Palavra inteira: "bar" não está em "barato" nem "gas" em "gasolina" (esta tem a própria regra).
     expect(categoryByRules('Loja barata', 'despesa')).toBeNull();
+    // O atalho da sugestão no formulário (D-086).
+    expect(categorySuggestionLabel('Mercado')).toEqual({ label: 'Sugestão: Mercado', a11y: 'Usar a categoria sugerida, Mercado' });
     expect(categoryByRules('Gasolina', 'despesa')).toBe('Transporte');
     // Plural simples.
     expect(categoryByRules('Padarias reunidas', 'despesa')).toBe('Mercado');
@@ -235,6 +250,15 @@ describe('importar: categorias sugeridas', () => {
     expect(suggestCategory('Padaria São João', 'receita', memory)).toEqual({ category: null, source: null });
     expect(suggestCategory('Qualquer coisa', 'despesa', {})).toEqual({ category: null, source: null });
     expect(suggestCategory('Padaria São João', 'despesa', { 'padaria sao joao': 'Categoria que saiu' })).toEqual({ category: 'Mercado', source: 'regra' });
+    // D-086: a chave com o tipo vem antes da chave sem tipo, e gasto e recebimento com o mesmo nome não se misturam.
+    expect(memoryKey('Aluguel', 'receita')).toBe('receita:aluguel');
+    const typed = { 'despesa:aluguel': 'Moradia', 'receita:aluguel': 'Renda extra', aluguel: 'Lazer' };
+    expect(suggestCategory('Aluguel', 'despesa', typed)).toEqual({ category: 'Moradia', source: 'memoria' });
+    expect(suggestCategory('Aluguel', 'receita', typed)).toEqual({ category: 'Renda extra', source: 'memoria' });
+    expect(suggestCategory('Aluguel', 'despesa', { aluguel: 'Lazer' })).toEqual({ category: 'Lazer', source: 'memoria' });
+    const m = rememberCategories({ aluguel: 'Lazer' }, [{ description: 'Aluguel', category: 'Moradia', kind: 'despesa' }]);
+    expect(m).toEqual({ 'despesa:aluguel': 'Moradia' });
+    expect(rememberCategories(m, [{ description: 'Aluguel', category: 'Renda extra', kind: 'receita' }])).toEqual({ 'despesa:aluguel': 'Moradia', 'receita:aluguel': 'Renda extra' });
   });
 
   it('lembra a última escolha de cada descrição, esquece "Sem categoria" e guarda no máximo 300', () => {

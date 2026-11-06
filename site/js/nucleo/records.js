@@ -6,6 +6,6 @@ export const INSTALLMENT_NATURES = ['financiamento', 'compra_parcelada', 'outro_
 export const MONTH_CHECK_KINDS = ['recebimentos', 'pagamentos'];
 export const NO_CATEGORY_LABEL = 'Sem categoria';
 export const CATEGORIES = {
-    despesa: ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer'],
+    despesa: ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas'],
     receita: ['Salário', 'Renda extra', 'Reembolso'],
 };

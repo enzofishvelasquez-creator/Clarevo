@@ -44,7 +44,9 @@ import type {
   SeriesInput,
 } from './records';
 import type { LegalAcceptance } from './aceite';
+import type { WebSubscriptionCancel, WebSubscriptionStart } from './assinatura-web/app';
 import type { Access } from './plano';
+import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
@@ -474,7 +476,7 @@ export interface RecordsRepository {
   /**
    * set_category_budget. Cria (expectedVersion 0) ou altera (versão atual) a linha viva da categoria no mês fromMonth; amountCents
    * null encerra a vigência ("Tirar o orçamento a partir de"). Exige escrita no contexto. Ordem do banco: repetição; sem_permissao;
-   * mes_invalido; categoria_invalida (só as seis de despesa); versao_desatualizada (nula ou negativa também; 0 com linha viva no
+   * mes_invalido; categoria_invalida (só as de despesa, BUDGET_CATEGORIES); versao_desatualizada (nula ou negativa também; 0 com linha viva no
    * mês; maior que 0 sem linha ou com outra versão); autoria ou "editar de outras pessoas" (sem_permissao);
    * vigencia_fora_do_intervalo (de mês atual − 24 a mês atual + 12); valor_invalido e valor_acima_do_limite (R$ 1,00 a
    * R$ 9.999.999,99). Mesma chave e conteúdo: devolve o estado atual; outro conteúdo ou outra ação: chave_reutilizada.
@@ -490,7 +492,7 @@ export interface RecordsRepository {
   /** delete_category_budget: exclusão lógica com versão (a linha anterior volta a valer). Ordem: repetição; nao_encontrado; sem_permissao; versao_desatualizada; autoria. */
   deleteCategoryBudget(key: string, id: string, expectedVersion: number): Promise<CategoryBudget>;
   /**
-   * month_budget: o orçamento vigente e o usado no mês (competência) de cada uma das seis categorias, na ordem de
+   * month_budget: o orçamento vigente e o usado no mês (competência) de cada uma das categorias de despesa (BUDGET_CATEGORIES), na ordem de
    * BUDGET_CATEGORIES. Sem leitura no contexto: sem_permissao; mês que não é o dia 1: mes_invalido.
    */
   getMonthBudget(contextId: string, month: IsoMonth): Promise<MonthBudgetRead>;
@@ -847,6 +849,13 @@ export interface RecordsRepository {
 
   /** my_access: a situação do acesso da própria pessoa (assinatura, benefício, cortesia, Família, antes do início, teste ou só leitura). */
   getMyAccess(): Promise<Access>;
+
+  // Assinatura na web pelo Asaas (D-084), pela função do servidor "assinatura-web" com a sessão da pessoa. Só na web.
+
+  /** "assinar": cria o Checkout do Asaas e devolve o link da página de pagamento, ou por que não (já assinante, sem necessidade...). */
+  startWebSubscription(plan: PlanKind): Promise<WebSubscriptionStart>;
+  /** "cancelar": remove no Asaas a assinatura ativa feita na web; o período já pago continua valendo. */
+  cancelWebSubscription(): Promise<WebSubscriptionCancel>;
 
   // Aceite dos termos e da política (A1, migração 0024).
 

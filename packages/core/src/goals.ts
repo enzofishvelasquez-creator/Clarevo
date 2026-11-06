@@ -922,7 +922,7 @@ export const GOALS_TEXT = {
      * gastos sem categoria não entram." Só entra o que foi pago (CL-09): conta em aberto e fatura não paga ficam fora.
      */
     essentialsAverage: (months: readonly IsoMonth[], categories: readonly string[]) =>
-      `Média do que foi pago em ${monthsListText(months)} em ${listText(categories)} (${months.length === 1 ? '1 mês' : `${months.length} meses`} com gastos anotados). Contas ainda não pagas, Lazer e gastos sem categoria não entram.`,
+      `Média do que foi pago em ${monthsListText(months)} em ${listText(categories)} (${months.length === 1 ? '1 mês' : `${months.length} meses`} com gastos anotados). Contas ainda não pagas, Lazer, Crédito e parcelas e gastos sem categoria não entram.`,
     essentialsAnnualOut: 'Pagamentos de contas do ano, como IPVA e IPTU, também não entram.',
     /** "Começamos pelas contas de outubro: R$ 3.150,00. Some o que costuma gastar com mercado, transporte e saúde." */
     essentialsBills: (month: IsoMonth, cents: Cents) =>

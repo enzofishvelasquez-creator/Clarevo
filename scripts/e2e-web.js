@@ -471,6 +471,12 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn(PP.pago).click(); await waitText('Será salvo em');
   ok('primeiros passos: o passo 3 abre "Anotar gasto"', (await visibleCount('button', 'Salvar gasto')) === 1);
   await field('Descrição').fill('Mercado'); await field('Valor em reais').fill('120');
+  // D-086: o nome combina com a regra de Mercado e a categoria está em "Sem categoria": o atalho aparece, preenche ao tocar e some.
+  ok('D-086: ao digitar "Mercado" com "Sem categoria", aparece o atalho "Sugestão: Mercado"', (await visibleCount('button', 'Usar a categoria sugerida, Mercado')) === 1);
+  await btn('Usar a categoria sugerida, Mercado').click(); await p.waitForTimeout(200);
+  ok('D-086: tocar no atalho marca a categoria Mercado e o atalho some', (await radio('Mercado').getAttribute('aria-checked')) === 'true' && (await visibleCount('button', 'Usar a categoria sugerida, Mercado')) === 0);
+  await radio('Sem categoria').click(); await p.waitForTimeout(200);
+  ok('D-086: voltar a "Sem categoria" traz o atalho de novo (o gasto segue sem categoria, como antes)', (await visibleCount('button', 'Usar a categoria sugerida, Mercado')) === 1);
   await btn('Salvar gasto').click(); await waitText('Gasto salvo');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await waitUntil(ppIs([PP.fixos, PP.recebido, ppDone('pago'), PP.guardar]), 8000);
@@ -6287,8 +6293,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Definir orçamento' && e.getBoundingClientRect().width > 0);
     return h ? [h.getAttribute('aria-level'), ...[...h.parentElement.querySelectorAll('[role=button]')].map((b) => b.getAttribute('aria-label'))] : null;
   });
-  ok('F2 /orcamento "Definir orçamento" (título de nível 2): Transporte, Saúde e Educação, nessa ordem; "Sem categoria" não tem orçamento',
-    JSON.stringify(await f2Define()) === JSON.stringify(['2', 'Definir orçamento de Transporte', 'Definir orçamento de Saúde', 'Definir orçamento de Educação']) && t.includes('Gastos sem categoria não têm orçamento.'), JSON.stringify(await f2Define()));
+  ok('F2 /orcamento "Definir orçamento" (título de nível 2): Transporte, Saúde, Educação e Crédito e parcelas, nessa ordem; "Sem categoria" não tem orçamento',
+    JSON.stringify(await f2Define()) === JSON.stringify(['2', 'Definir orçamento de Transporte', 'Definir orçamento de Saúde', 'Definir orçamento de Educação', 'Definir orçamento de Crédito e parcelas']) && t.includes('Gastos sem categoria não têm orçamento.'), JSON.stringify(await f2Define()));
   ok('F2 /orcamento deixa claro que Pago por categoria é do Pago e o orçamento é do usado no mês', t.includes('O orçamento conta o usado no mês. Pago por categoria mostra o que foi pago, e a compra no cartão entra em Pago quando a fatura é paga.'));
   const f2b = await f2Bars();
   ok('F2 /orcamento: barras só na cor da marca, o trecho sólido nas proporções 100%, 77,8% e 66,7% (acima de 100% a barra enche e o final é listrado, D-054), e nenhuma cor de alerta', JSON.stringify(f2b.widths) === JSON.stringify([1, 0.778, 0.667]) && f2b.red.length === 0, JSON.stringify(f2b));
@@ -6306,7 +6312,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // ---- 3. Seletor de mês local: o orçamento vale a partir de outubro e as parcelas do cartão caem mês a mês ----
   await f2Month(/^Mês anterior: setembro de 2026$/, 'Setembro de 2026');
   t = await f2Keep();
-  ok('F2 setembro (antes da vigência): nenhum orçamento, as seis categorias em "Definir orçamento" e o aviso "Nenhum orçamento definido neste mês"', t.includes('Nenhum orçamento definido neste mês.') && !t.includes('Orçado R$') && (await f2Define())?.length === 7 && (await visibleCount('button', 'Voltar para outubro de 2026')) === 1, JSON.stringify(await f2Define()));
+  ok('F2 setembro (antes da vigência): nenhum orçamento, as sete categorias em "Definir orçamento" e o aviso "Nenhum orçamento definido neste mês"', t.includes('Nenhum orçamento definido neste mês.') && !t.includes('Orçado R$') && (await f2Define())?.length === 8 && (await visibleCount('button', 'Voltar para outubro de 2026')) === 1, JSON.stringify(await f2Define()));
   await btn('Voltar para outubro de 2026').click(); await waitText('Pessoal · Outubro de 2026'); await p.waitForTimeout(400);
   await f2Month(/^Próximo mês: novembro de 2026$/, 'Novembro de 2026');
   t = await f2Keep();
@@ -6593,7 +6599,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('F2 conta nova: Primeiros passos com os mesmos quatro passos (o orçamento não é um passo)', await ppIs([PP.fixos, PP.recebido, PP.pago, PP.guardar])(), JSON.stringify(await ppRows()));
   await f2Open();
   t = await f2Keep();
-  ok('F2 conta nova: nenhum orçamento de exemplo ("Nenhum orçamento definido neste mês."), as seis categorias para definir e nenhum total', t.includes('Nenhum orçamento definido neste mês.') && !t.includes('Orçado R$') && (await f2Define())?.length === 7 && !t.includes('Usado R$'), JSON.stringify(await f2Define()));
+  ok('F2 conta nova: nenhum orçamento de exemplo ("Nenhum orçamento definido neste mês."), as sete categorias para definir e nenhum total', t.includes('Nenhum orçamento definido neste mês.') && !t.includes('Orçado R$') && (await f2Define())?.length === 8 && !t.includes('Usado R$'), JSON.stringify(await f2Define()));
   ok('F2 conta nova: nada guardado (nenhum orçamento, nenhum limite, nenhuma conta ou cartão)', (await otherDevice(async (repo, ctx) => `${(await repo.listCategoryBudgets(ctx)).length} ${(await repo.listCommitmentLimits(ctx)).length} ${(await repo.listCards(ctx)).length}`)) === '0 0 0');
   await atWidths(async (w) => { await layoutChecks(`F2 /orcamento conta nova ${w}px`); if (w === 390) await shot('218_orcamento_conta_nova'); if (w === 320) await shot('218_orcamento_conta_nova_320px'); });
   await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(400);
@@ -7016,8 +7022,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H1 "Mais filtros" fechado mostra só o nome', (await visibleCount('button', 'Mais filtros')) === 1 && (await visibleCount('textbox', 'Valor de')) === 0);
   await h1More();
   t = await h1Keep();
-  ok('H1 Mais filtros aberto: Categoria (Todas, as seis de gasto, as três de recebimento e Sem categoria), Conta (Todas, Conta principal, Carteira) e os dois valores com "R$"',
-    JSON.stringify(await h1Group('Categoria').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent))) === JSON.stringify(['Todas', 'Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Salário', 'Renda extra', 'Reembolso', 'Sem categoria']) &&
+  ok('H1 Mais filtros aberto: Categoria (Todas, as sete de gasto, as três de recebimento e Sem categoria), Conta (Todas, Conta principal, Carteira) e os dois valores com "R$"',
+    JSON.stringify(await h1Group('Categoria').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent))) === JSON.stringify(['Todas', 'Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas', 'Salário', 'Renda extra', 'Reembolso', 'Sem categoria']) &&
     JSON.stringify(await h1Group('Conta').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent))) === JSON.stringify(['Todas', 'Conta principal', 'Carteira']) &&
     (await visibleCount('textbox', 'Valor de')) === 1 && (await visibleCount('textbox', 'Valor até')) === 1 && (await visibleCount('button', 'Menos filtros')) === 1 && t.includes('Opcional. Deixe em branco para qualquer valor.'));
   await atWidths(async (w) => { await innerChecks(`H1 Buscar com Mais filtros ${w}px`); if (w === 390) await shot('264_buscar_mais_filtros'); });
