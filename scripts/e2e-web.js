@@ -7595,7 +7595,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       JSON.stringify(['Este mês', 'Últimos 3 meses', 'Últimos 6 meses', 'Últimos 12 meses', 'Este ano', 'Ano passado', 'Tudo', 'Planilha (CSV)', 'Resumo em PDF']) &&
     JSON.stringify(await h3Checked()) === JSON.stringify(['Últimos 12 meses', 'Planilha (CSV)']), JSON.stringify(await h3Checked()));
   ok('H3 formato Planilha (CSV): explica as colunas, o segundo arquivo das compras no cartão e o que fica de fora (chave da nota, número do cartão, códigos internos)',
-    t.includes('Abre no Excel e no Google Planilhas') && t.includes('Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem e Origem') && t.includes('segundo arquivo') &&
+    t.includes('Abre no Excel e no Google Planilhas') && t.includes('Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem, Origem e Mês do resumo (o mês em que o lançamento conta)') && t.includes('segundo arquivo') &&
     t.includes('Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo.'));
   ok('H3 o aviso dos valores: "O arquivo mostra os valores, mesmo com Ocultar valores ligado." e o de dados financeiros', t.includes('O arquivo mostra os valores, mesmo com Ocultar valores ligado.') && t.includes('O arquivo tem dados financeiros.'));
   ok('H3 nenhum arquivo antes de pedir: sem "Arquivo pronto" e com o botão "Preparar arquivo"', !t.includes('Arquivo pronto') && (await visibleCount('button', 'Preparar arquivo')) === 1);
@@ -11712,7 +11712,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   anCard = await anCardText();
   anInfo = await anBubbleInfo();
   ok('Análises bolha tocada: Moradia vira a categoria selecionada (R$ 2.500,00, "64,1% do pago") e a bolha dela fica marcada no lugar da outra', anCard.includes('Moradia') && anCard.includes('R$ 2.500,00') && anCard.includes('64,1% do pago') && anInfo.items[0].pressed === 'true' && anInfo.items[1].pressed === 'false' &&
-    anInfo.circles[0].fill === '#D4F05B' && anInfo.circles[1].fill === '#2457F5', anCard);
+    // D-089 D: o Mercado, segunda maior, fica no segundo tom (#7D9DF9), com o contorno no azul da marca.
+    anInfo.circles[0].fill === '#D4F05B' && anInfo.circles[1].fill === '#7D9DF9' && anInfo.circles[1].stroke === '#2457F5', anCard);
   ok('Análises bolha tocada: o leitor de tela ouve a nova escolha', (await evLive()).includes('Categoria selecionada: Moradia, 64,1%, R$ 2.500,00.'), JSON.stringify(await evLive()));
   await anShots('484_analises_bolha_selecionada', { scroll: evScroll('Pago em outubro de 2026'), extra: async (w) => { await anBubbleChecks(`Análises bolha tocada ${w}px`, 2); } });
   await radio('Barras').click(); await p.waitForTimeout(600);
