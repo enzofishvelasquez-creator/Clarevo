@@ -187,6 +187,22 @@ Arquivos: `p11-primeiro-gasto-anotar.mp4`, `.srt`, `-capa.png` (o Resumo depois 
 
 A cena de resultado, que o Playbook torna obrigatória, está nos 20 s finais. A gravação usa a conta de demonstração, que já tem registros. A demonstração também deixa criar uma conta nova simulada ("Criar conta" e "Simular abertura do link"), que abre vazia, com o cartão "Primeiros passos", e o mesmo fluxo termina certo nela (conferido, mas **não gravado**): como a conta nova tem R$ 0,00 recebidos, o primeiro gasto de R$ 35,00 deixa a Diferença do mês negativa, de menos R$ 35,00, com o aviso "Pagamentos acima dos recebimentos no período", e a peça teria de explicar isso. A equipe decide se quer essa versão; o script grava de novo com um roteiro novo.
 
+### 2.4b Reels: uma compra de mercado e o orçamento (D-089 F; 39,3 s, 2,9 MB)
+
+Pedido no retorno do teste de 09/11/2026 (`docs/34`, decisão F). Gravado com `node scripts/gravar-redes.js --so reels` (peça `reels`), na demonstração, em 1080 x 1920. Arquivos: `reels-compra-de-mercado-e-orcamento.mp4`, `.srt`, `-capa.png` (a tela "Gasto salvo" com a linha do orçamento) e `-conferencia-1`, `-2` e `-3.png` (o Resumo aos 0,8 s; o formulário preenchido aos 10,2 s; o card de Mercado no orçamento aos 27 s). Fluxo: Resumo, "Anotar gasto", Descrição "Feira", Valor "38,90", categoria Mercado, "Salvar gasto" (o aviso traz "Mercado: R$ 1.438,90 de R$ 1.800,00 em outubro (79%).", D-089 E), Movimentos, "Orçamento por categoria" e o card de Mercado ("R$ 1.438,90 de R$ 1.800,00", 79,9%, "Faltam R$ 361,10"). O valor de R$ 38,90 fica abaixo de 80%: assim aparece a linha de uso, e não o aviso de cruzar 80% (com R$ 150,00, o aviso seria "Mercado chegou a 86% do orçamento de outubro."; o roteiro aceita os dois e a narração lê o que estiver na tela). Os arquivos de mídia não vão para o repositório.
+
+| Início | Narração sugerida, lida da tela |
+|---|---|
+| 0,0 s | Uma compra de mercado e o orçamento do mês, lado a lado. |
+| 4,1 s | No exemplo fictício, uma compra de R$ 38,90 na feira, já paga, na categoria Mercado. |
+| 10,2 s | Ao salvar, o aviso mostra quanto do orçamento de Mercado já foi usado no mês. |
+| 15,2 s | Neste exemplo, Mercado fica em R$ 1.438,90 de R$ 1.800,00 em outubro: 79% do orçamento. |
+| 20,9 s | O mesmo número aparece em Orçamento por categoria. |
+| 24,3 s | O card de Mercado mostra R$ 1.438,90 de R$ 1.800,00, 79,9%. Faltam R$ 361,10. |
+| 29,4 s | O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar. Para conhecer o acesso, veja o fixado Como acessar. |
+
+"79%" no aviso e "79,9%" no card são o mesmo número: o aviso arredonda para baixo, sem casa decimal (D-089 E). A arte final (pergunta na tela, "Exemplo fictício", trilha) fica com a equipe, como nas outras peças.
+
 ### 2.5 Capturas estáticas 1080 x 1350 (4:5)
 
 Telas como o app as mostra, **sem montagem de arte** (a arte final é feita no Canva), com a etiqueta "Demonstração" no cabeçalho. Ficam em `capturas/`.
