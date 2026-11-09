@@ -152,10 +152,10 @@ export function installmentAmounts(totalCents: Cents, count: number): Cents[] {
   return Array.from({ length: count }, (_, i) => (i === 0 ? base + rest : base));
 }
 
-/** Parcela de uma compra, já na fatura que ela cai. */
+/** Parcela de uma compra, já na fatura que ela cai. `number` e `count` já somam o deslocamento de uma compra importada em andamento. */
 export interface Installment {
   entryId: string;
-  /** De 1 a count. */
+  /** De 1 a count (numa compra importada com a parcela 3 de 10 em andamento, de 3 a 10). */
   number: number;
   count: number;
   amountCents: Cents;
@@ -163,12 +163,17 @@ export interface Installment {
   invoiceMonth: IsoMonth;
 }
 
-/** Parcelas de uma compra (uma linha de CardEntry com kind 'compra'): a parcela k cai k - 1 faturas depois da 1ª. */
-export function purchaseInstallments(entry: Pick<CardEntry, 'id' | 'amountCents' | 'installments' | 'invoiceMonth'>): Installment[] {
+/**
+ * Parcelas de uma compra (uma linha de CardEntry com kind 'compra'): a parcela guardada i cai i - 1 faturas depois da 1ª guardada.
+ * Numa compra importada em andamento (`installmentOffset`), a numeração mostrada soma o deslocamento: 8 parcelas guardadas com
+ * deslocamento 2 são as parcelas 3 a 10 de 10.
+ */
+export function purchaseInstallments(entry: Pick<CardEntry, 'id' | 'amountCents' | 'installments' | 'invoiceMonth' | 'installmentOffset'>): Installment[] {
+  const offset = entry.installmentOffset ?? 0;
   return installmentAmounts(entry.amountCents, entry.installments).map((amountCents, i) => ({
     entryId: entry.id,
-    number: i + 1,
-    count: entry.installments,
+    number: offset + i + 1,
+    count: offset + entry.installments,
     amountCents,
     invoiceMonth: addMonths(entry.invoiceMonth, i),
   }));
@@ -1481,6 +1486,8 @@ export const CARDS_TEXT = {
     invoiceHeader: 'Fatura',
     organizeNone: 'Nenhum cadastrado. Anote compras na fatura',
     noteOnCard: 'Anotar compra neste cartão',
+    /** D-089 B: abre Importar extrato ou fatura já com este cartão escolhido. */
+    importInvoice: 'Importar fatura',
     deleteBlocked: 'Um cartão com lançamentos não pode ser excluído. Arquive em vez de excluir.',
     futureLegend: 'As parcelas das compras já anotadas entram nas faturas seguintes.',
     entriesTitle: 'Lançamentos',

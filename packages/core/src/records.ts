@@ -604,8 +604,14 @@ export interface CardEntry {
   purchasedOn: IsoDate | null;
   /** Compra: valor total; os outros: valor positivo (o sinal vem do tipo; estorno abate). */
   amountCents: Cents;
-  /** Compra: de 1 a 48 parcelas; os outros: 1. */
+  /** Compra: de 1 a 48 parcelas (as guardadas aqui); os outros: 1. */
   installments: number;
+  /**
+   * Compra importada da fatura com a parcela em andamento (D-089 B): quantas parcelas já tinham passado antes da primeira guardada
+   * aqui (0, ou ausente, nas compras anotadas no app). As parcelas guardadas são as que faltavam: `installments` é quantas são, e a
+   * numeração mostrada soma o deslocamento ("parcela 3 de 10" = deslocamento 2 e 8 parcelas guardadas). Só na compra.
+   */
+  installmentOffset?: number;
   /**
    * Compra: fatura da 1ª parcela (fixada ao gravar, não muda se o cartão mudar de dias); os outros: a fatura do
    * lançamento. Mês do vencimento.

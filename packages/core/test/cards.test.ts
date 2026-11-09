@@ -246,6 +246,18 @@ describe('parcelas', () => {
     expect(purchaseInstallments({ id: 'c2', amountCents: 100_000, installments: 1, invoiceMonth: '2027-12' }).map((p) => p.invoiceMonth)).toEqual(['2027-12']);
     const last = purchaseInstallments({ id: 'c3', amountCents: 480_000, installments: 48, invoiceMonth: DEC });
     expect(last[47]!.invoiceMonth).toBe('2030-11');
+    // Compra importada da fatura com a parcela 3 de 10 em andamento (D-089 B): 8 parcelas guardadas, numeradas de 3 a 10.
+    const imported = purchaseInstallments({ id: 'c4', amountCents: 96_000, installments: 8, installmentOffset: 2, invoiceMonth: DEC });
+    expect(imported.map((p) => [p.number, p.count, p.amountCents, p.invoiceMonth])).toEqual([
+      [3, 10, 12_000, DEC],
+      [4, 10, 12_000, '2027-01'],
+      [5, 10, 12_000, '2027-02'],
+      [6, 10, 12_000, '2027-03'],
+      [7, 10, 12_000, '2027-04'],
+      [8, 10, 12_000, '2027-05'],
+      [9, 10, 12_000, '2027-06'],
+      [10, 10, 12_000, '2027-07'],
+    ]);
   });
 });
 

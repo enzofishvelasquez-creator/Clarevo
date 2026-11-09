@@ -2913,13 +2913,15 @@ do $$ begin
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.card_entries'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'card_id', 'kind', 'invoice_month', 'amount_cents', 'description', 'category', 'purchase_id', 'purchased_on',
             'installment_number', 'installment_total', 'purchase_total_cents', 'charge_kind', 'source_month', 'payment_record_id', 'receipt_key',
-            'created_by', 'version', 'created_at', 'updated_at', 'deleted_at', 'deleted_by', 'import_key'], 'colunas de card_entries (a chave da importação, 0012, no fim)';
+            'created_by', 'version', 'created_at', 'updated_at', 'deleted_at', 'deleted_by', 'import_key', 'installment_offset'],
+    'colunas de card_entries (a chave da importação, 0012, e o deslocamento da parcela, 0029, no fim)';
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.card_items'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'nickname', 'last_digits', 'closing_day', 'due_day', 'limit_cents', 'status', 'created_by', 'version', 'created_at',
             'updated_at', 'used_cents', 'current_month', 'current_closing_on', 'current_due_on'], 'colunas de card_items';
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.card_entry_items'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'card_id', 'kind', 'description', 'category', 'charge_kind', 'purchased_on', 'amount_cents', 'installments', 'invoice_month',
-            'source_month', 'payment_record_id', 'receipt_key', 'created_by', 'version', 'created_at', 'updated_at'], 'colunas de card_entry_items';
+            'source_month', 'payment_record_id', 'receipt_key', 'created_by', 'version', 'created_at', 'updated_at', 'installment_offset'],
+    'colunas de card_entry_items (o deslocamento da parcela, 0029, no fim)';
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.invoice_items'::regclass and attnum > 0 and not attisdropped)
     = array['card_id', 'context_id', 'month', 'closing_on', 'due_on', 'status', 'total_cents', 'purchases_cents', 'charges_cents', 'carried_in_cents',
             'refunds_cents', 'credit_cents', 'entry_count', 'commitment_id', 'commitment_version', 'amount_is_estimate', 'to_pay_cents',

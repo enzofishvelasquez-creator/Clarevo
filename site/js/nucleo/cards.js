@@ -59,10 +59,11 @@ export function installmentAmounts(totalCents, count) {
     return Array.from({ length: count }, (_, i) => (i === 0 ? base + rest : base));
 }
 export function purchaseInstallments(entry) {
+    const offset = entry.installmentOffset ?? 0;
     return installmentAmounts(entry.amountCents, entry.installments).map((amountCents, i) => ({
         entryId: entry.id,
-        number: i + 1,
-        count: entry.installments,
+        number: offset + i + 1,
+        count: offset + entry.installments,
         amountCents,
         invoiceMonth: addMonths(entry.invoiceMonth, i),
     }));
@@ -897,6 +898,7 @@ export const CARDS_TEXT = {
         invoiceHeader: 'Fatura',
         organizeNone: 'Nenhum cadastrado. Anote compras na fatura',
         noteOnCard: 'Anotar compra neste cartão',
+        importInvoice: 'Importar fatura',
         deleteBlocked: 'Um cartão com lançamentos não pode ser excluído. Arquive em vez de excluir.',
         futureLegend: 'As parcelas das compras já anotadas entram nas faturas seguintes.',
         entriesTitle: 'Lançamentos',

@@ -2245,8 +2245,8 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
     expect(IMPORT_TEXT.labels.ja_anotado).toBe('Já anotado');
     expect(IMPORT_TEXT.labels.pagamento_fatura).toBe('Parece pagamento de fatura');
     expect(IMPORT_TEXT.labels.transferencia).toBe('Parece transferência');
-    expect(IMPORT_TEXT.labels.parcela).toBe('Parece parcela');
-    expect(IMPORT_TEXT.labelHints.parcela).toBe('Compra parcelada: anote uma vez em Anotar gasto, com o número de parcelas.');
+    expect(IMPORT_TEXT.labels.parcela).toBe('Parcela em andamento');
+    expect(IMPORT_TEXT.labelHints.parcela).toBe('Compra parcelada em andamento: entram esta parcela e as que faltam, nas faturas seguintes, com a numeração da fatura.');
     expect(IMPORT_TEXT.reading).toBe('Lendo o arquivo…');
     expect(importSaveErrorText('fatura_paga', { description: 'Padaria', amount: 'R$ 45,90', date: '02/10/2026' })).toBe(
       `${IMPORT_SAVE_ERROR_TEXT.fatura_paga} Linha: Padaria, R$ 45,90, 02/10/2026.`,

@@ -4,7 +4,8 @@ import { CATEGORIES } from '../records';
 import { DESCRIPTION_MAX } from '../validation';
 import { invoiceMonthOf, type CardDays } from '../cards';
 import { suggestCategory, type ImportMemory } from './categorias';
-import { DUPLICATE_WINDOW_DAYS, findLookalikes, importKeys, installmentMark, normalizeDescription, type ExistingEntry } from './dedupe';
+import { DUPLICATE_WINDOW_DAYS, findLookalikes, importKeys, installmentMark, normalizeDescription, type ExistingEntry, type InstallmentMark } from './dedupe';
+import { IMPORT_TEXT } from './textos';
 import { IMPORT_BATCH, type ImportDestination, type ImportItem, type ImportParse } from './tipos';
 import { cleanDescription } from './valores';
 
@@ -46,6 +47,10 @@ export interface ReviewLine {
   /** import_key: calculada do arquivo, não muda se a pessoa edita a descrição. */
   key: string;
   label: ReviewLabel | null;
+  /** Cartão, compra com a parcela escrita na descrição (D-089 B): entra com as parcelas que faltam. null nas outras linhas. */
+  installment: InstallmentMark | null;
+  /** Explicação própria da linha (a parcela e a fatura em que entra); null quando vale só a da marca. */
+  hint: string | null;
   /** A chave já foi importada: o banco pularia a linha. */
   keyExists: boolean;
   /** A linha pode ser importada (não tem marca que a impede). */
@@ -112,6 +117,16 @@ function recordKind(kind: ReviewKind): 'despesa' | 'receita' {
 }
 
 /** Monta as linhas da revisão, na ordem do arquivo. */
+/**
+ * Fatura em que entra a parcela escrita na linha (D-089 B). A data da linha costuma ser a da compra original: a parcela k cai k - 1
+ * faturas depois da fatura natural dessa data. Se isso cair depois da próxima fatura (a linha trazia a data da cobrança, e não a da
+ * compra), a parcela entra na fatura natural da própria data. O banco (import_records) aplica a mesma regra.
+ */
+export function installmentInvoiceMonth(firstMonth: IsoMonth, mark: InstallmentMark, today: IsoDate): IsoMonth {
+  const target = addMonths(firstMonth, mark.number - 1);
+  return target > addMonths(monthOf(today), 1) ? firstMonth : target;
+}
+
 export function buildReview(input: ReviewInput): ReviewLine[] {
   const { parse, destination, today } = input;
   const s = sign(input);
@@ -154,18 +169,24 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
     };
     if (kind === 'pagamento') block('pagamento_recebido');
     if (l.date > today) block('data_futura');
+    // Cartão, compra com a parcela escrita (D-089 B): a parcela desta linha e as que faltam, da fatura em que ela entra em diante.
+    const mark = destination === 'cartao' && kind === 'compra' ? installmentMark(l.description, l.date) : null;
+    let hint: string | null = null;
     if (destination === 'cartao' && (kind === 'compra' || kind === 'estorno') && input.card) {
-      const month = invoiceMonthOf(input.card.days, l.date);
-      if ((kind === 'compra' ? l.date < oldest : month < monthOf(oldest)) && importable) block('data_antiga');
-      else if (input.card.paidMonths.has(month) && importable) block('fatura_paga');
+      const natural = invoiceMonthOf(input.card.days, l.date);
+      const first = mark ? installmentInvoiceMonth(natural, mark, today) : natural;
+      const months = mark ? Array.from({ length: mark.count - mark.number + 1 }, (_, i) => addMonths(first, i)) : [natural];
+      if ((kind === 'compra' ? l.date < oldest : natural < monthOf(oldest)) && importable) block('data_antiga');
+      else if (months.some((m) => input.card!.paidMonths.has(m)) && importable) block('fatura_paga');
+      if (mark) hint = IMPORT_TEXT.installmentHint(mark.number, mark.count, first);
     }
     if (amount > MAX_RECORD_CENTS && importable) block('valor_alto');
     if (keyExists && importable) block('ja_anotado');
     if (label === null && similar[i]) label = 'ja_anotado';
     if (label === null && destination === 'cartao' && kind === 'compra') {
-      // Compra parcelada: anotar uma vez em Anotar gasto, com o número de parcelas, não parcela por parcela da fatura. E uma
-      // linha de "pagamento" que o arquivo trouxe como compra (planilha com o sinal trocado) é o pagamento da fatura.
-      if (installmentMark(l.description, l.date)) label = 'parcela';
+      // Compra parcelada em andamento (D-089 B): entra marcada, com as parcelas que faltam. E uma linha de "pagamento" que o arquivo
+      // trouxe como compra (planilha com o sinal trocado) é o pagamento da fatura.
+      if (mark) label = 'parcela';
       else if (looksLikeCardPaymentLine(l.description)) label = 'pagamento_fatura';
     }
     if (label === null && destination === 'conta') {
@@ -183,9 +204,11 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
       categorySource: suggestion.source,
       key,
       label,
+      installment: label === 'parcela' ? mark : null,
+      hint: label === 'parcela' ? hint : null,
       keyExists,
       importable,
-      include: importable && label === null && kind !== 'estorno',
+      include: importable && (label === null || label === 'parcela') && kind !== 'estorno',
     };
   });
 }
@@ -235,6 +258,7 @@ export function toImportItems(lines: readonly ReviewLine[]): ImportItem[] {
     occurredOn: l.date,
     description: cleanDescription(l.description) || l.description.trim(),
     category: l.category !== null && categoriesFor(l.kind).includes(l.category) ? l.category : null,
+    ...(l.kind === 'compra' && l.installment ? { installment: { number: l.installment.number, count: l.installment.count } } : {}),
   }));
 }
 

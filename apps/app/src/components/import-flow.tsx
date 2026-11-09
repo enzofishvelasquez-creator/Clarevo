@@ -32,7 +32,7 @@ import {
   type ReviewLine,
 } from '@clarevo/core';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { CircleAlert, FileUp, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
@@ -103,9 +103,11 @@ export function ImportFlow() {
   const [noSignAsk, setNoSignAsk] = useState(false);
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
-  const [destination, setDestination] = useState<ImportDestination | null>(null);
+  // Aberta da tela de um cartão ("Importar fatura", D-089 B): o destino e o cartão já vêm escolhidos; a pessoa só confirma.
+  const params = useLocalSearchParams<{ destino?: string; cartao?: string }>();
+  const [destination, setDestination] = useState<ImportDestination | null>(params.destino === 'cartao' ? 'cartao' : params.destino === 'conta' ? 'conta' : null);
   const [accountId, setAccountId] = useState<string | null>(null);
-  const [cardId, setCardId] = useState<string | null>(null);
+  const [cardId, setCardId] = useState<string | null>(params.destino === 'cartao' && typeof params.cartao === 'string' && params.cartao !== '' ? params.cartao : null);
   const [preparing, setPreparing] = useState(false);
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [ctxData, setCtxData] = useState<ImportContext | null>(null);

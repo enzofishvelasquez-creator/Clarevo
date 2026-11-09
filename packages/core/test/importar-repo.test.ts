@@ -7,6 +7,7 @@ import {
   summarizeMonth,
   summarizeToPay,
   type ImportItem,
+  purchaseInstallments,
   type RepoErrorCode,
 } from '../src';
 
@@ -195,6 +196,40 @@ describe('importRecords: cartão', () => {
     expect(summarizeToPay(await f.repo.listCommitments(f.ctx, '2026-10'), f.ctx, '2026-10', TODAY).toPayCents - before).toBe(28050);
     expect(await f.repo.findImportOperation('imp-card-0001')).toEqual({ targetId: f.card, result: { created: 5, skipped: 0 } });
     expect(await f.repo.findCardOperation('imp-card-0001')).toBeNull();
+  });
+
+  it('linha com a parcela escrita (D-089 B): a compra entra com as parcelas que faltam, da fatura em que a parcela entra em diante, numeradas como na fatura', async () => {
+    const f = await fresh();
+    // Compra original de 15/07 (fatura de agosto, fechamento dia 3), parcela 3 de 10 de R$ 120,00: entra em outubro com as 8 que faltam.
+    const r = await f.repo.importRecords('imp-card-parc-0001', f.ctx, 'cartao', f.card, [
+      { ...item('p1', 'compra', 12000, '2026-07-15', 'Loja de móveis 03/10', 'Lazer'), installment: { number: 3, count: 10 } },
+      // Última parcela: uma linha só, nesta fatura.
+      { ...item('p2', 'compra', 5000, '2026-10-02', 'Papelaria 03/03', null), installment: { number: 3, count: 3 } },
+      // Data da cobrança (fatura de outubro) com a parcela 3 de 10: dezembro passaria da próxima fatura, então entra em outubro.
+      { ...item('p3', 'compra', 2000, '2026-10-02', 'Tênis 03/10', null), installment: { number: 3, count: 10 } },
+    ]);
+    expect(r).toEqual({ created: 3, skipped: 0 });
+    const entries = await f.repo.listCardEntries(f.card);
+    expect(entries.map((e) => [e.description, e.amountCents, e.installments, e.installmentOffset ?? 0, e.invoiceMonth, e.purchasedOn]).sort()).toEqual(
+      [
+        ['Loja de móveis 03/10', 96000, 8, 2, '2026-10', '2026-07-15'],
+        ['Papelaria 03/03', 5000, 1, 2, '2026-10', '2026-10-02'],
+        ['Tênis 03/10', 16000, 8, 2, '2026-10', '2026-10-02'],
+      ].sort(),
+    );
+    const moveis = entries.find((e) => e.description === 'Loja de móveis 03/10')!;
+    expect(purchaseInstallments(moveis).map((p) => [p.number, p.count, p.invoiceMonth]).slice(0, 2)).toEqual([[3, 10, '2026-10'], [4, 10, '2026-11']]);
+    const invoices = await f.repo.listInvoiceItems(f.card);
+    expect(invoices.slice(0, 3).map((i) => [i.month, i.totalCents])).toEqual([
+      ['2026-10', 19000],
+      ['2026-11', 14000],
+      ['2026-12', 14000],
+    ]);
+    expect(invoices.at(-1)!.month).toBe('2027-05');
+    // Números fora da faixa: recusa, nada gravado.
+    for (const installment of [{ number: 0, count: 3 }, { number: 4, count: 3 }, { number: 1, count: 1 }, { number: 1, count: 49 }]) {
+      await expect(f.repo.importRecords(`imp-card-parc-x-${installment.number}-${installment.count}`, f.ctx, 'cartao', f.card, [{ ...item('px', 'compra', 100, '2026-10-02', 'X', null), installment }])).rejects.toMatchObject({ code: 'parcelas_invalidas' });
+    }
   });
 
   it('repetição, pulados e chaves iguais no lote; a compra editada para parcelada continua "já anotada"', async () => {

@@ -146,7 +146,8 @@ Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C
 - [x] D: bolhas das categorias em cinco tons do azul da marca (`CATEGORY_BUBBLE_TONES`, `analises.test.ts`, `contrast.test.ts`)
 - [x] C: "cartão" na mensagem do Telegram e do WhatsApp vira compra no cartão (migração 0028, `clarevo_chat_add_card_purchase`, DESFAZER com `entry_id`; `99zzzzzzz_chat_cartao.sql`, `whatsapp.test.ts`, `telegram.test.ts`)
 - [ ] **Você (Claude Chrome):** aplicar a migração 0028 no `clarevo-producao` (docs/05, passo 12r) e conferir (passo 21p); depois, publicar de novo as funções `telegram` e `whatsapp` com o conteúdo gerado em `supabase/functions/` (a do WhatsApp só se ela estiver publicada)
-- [ ] B: "Importar fatura" na tela do cartão com as parcelas "3/4" (migração)
+- [x] B: "Importar fatura" na tela do cartão; a linha com a parcela escrita entra como compra com as parcelas que faltam (migração 0029, `installment_offset`; `99zzzzzzzz_importar_parcelas.sql`, `importar-revisao.test.ts`, `importar-repo.test.ts`, `cards.test.ts`)
+- [ ] **Você (Claude Chrome):** aplicar a migração 0029 no `clarevo-producao` (docs/05, passo 12s) e conferir (passo 21q); o app novo precisa dela (a visão `card_entry_items` ganha uma coluna) e o app antigo continua funcionando
 - [ ] A: recebimento do fim do mês contando no mês seguinte (migração)
 - [ ] F: vídeo em formato de reels (compra de mercado e orçamento)
 - [ ] G, depois do lançamento: modo "Fatura de cartão depois do vencimento" em Multa e juros

@@ -7949,13 +7949,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await i1Open(); await i1Pick(i1Parc); await waitText('Arquivo lido: fatura-parcelas.csv', 12000);
   await radio('Cartão de crédito').click(); await p.waitForTimeout(300); await i1Review();
   t1 = await i1Keep(); boxes = await i1Boxes();
-  ok('I1 fatura com parcelas: a parcela da compra já anotada vem "Já anotado", a outra "Parece parcela" com a explicação, e só o café fica marcado',
-    t1.includes('4 linhas · 1 marcada') && (t1.match(/Já anotado/g) ?? []).length === 2 && t1.includes('Parece parcela') && t1.includes('Compra parcelada: anote uma vez em Anotar gasto, com o número de parcelas.') &&
-    JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['false', false], ['false', false], ['true', false], ['false', true]]), JSON.stringify(boxes));
+  ok('I1 fatura com parcelas: a parcela da compra já anotada vem "Já anotado"; a outra, "Parcela em andamento" (D-089 B), marcada, com a fatura em que entra; o café marcado; o mercado já anotado pela chave',
+    t1.includes('4 linhas · 2 marcadas') && (t1.match(/Já anotado/g) ?? []).length === 2 && t1.includes('Parcela em andamento') && t1.includes('Parcela 1 de 3: entra na fatura de novembro de 2026 e as 2 que faltam nas seguintes.') &&
+    !t1.includes('anote uma vez em Anotar gasto') &&
+    JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['false', false], ['true', false], ['true', false], ['false', true]]), JSON.stringify(boxes));
   await atWidths(async (w) => { await layoutChecks(`I1 revisar fatura com parcelas ${w}px`); if (w === 390) await shot('313_importar_parcelas'); });
-  // O resumo diz quantas linhas já estavam anotadas (a parcela por semelhança e o mercado pela chave) e quantas foram importadas.
-  await btn('Importar 1 lançamento').click(); await waitText('Importação concluída', 12000);
-  ok('I1 resumo da fatura: "1 lançamento importado, 2 já estavam anotados."', (await body()).includes('1 lançamento importado, 2 já estavam anotados.'), (await body()).slice(0, 300));
+  // O resumo diz quantas linhas já estavam anotadas (a parcela por semelhança e o mercado pela chave) e quantas foram importadas: o café
+  // e a parcela em andamento (que entra com as 3 parcelas da papelaria, de novembro a janeiro).
+  await btn('Importar 2 lançamentos').click(); await waitText('Importação concluída', 12000);
+  ok('I1 resumo da fatura: "2 lançamentos importados, 2 já estavam anotados."', (await body()).includes('2 lançamentos importados, 2 já estavam anotados.'), (await body()).slice(0, 300));
+  ok('I1 a parcela em andamento virou compra parcelada no cartão: 3 parcelas de R$ 50,00, a 1ª na fatura de novembro, numeradas de 1 a 3',
+    await otherDevice(async (repo, ctx) => {
+      const card = (await repo.listCards(ctx))[0];
+      const e = (await repo.listCardEntries(card.id)).find((x) => x.description === 'PAPELARIA CENTRAL 01/03');
+      return Boolean(e) && e.installments === 3 && (e.installmentOffset ?? 0) === 0 && e.amountCents === 15000 && e.invoiceMonth === '2026-11' && e.purchasedOn === '2026-10-06';
+    }));
   await btn('Importar outro arquivo').click(); await waitText('Escolha o arquivo');
   await btn('Voltar').click(); await waitText('Organizar'); await p.waitForTimeout(300);
   // OFX com fuso e TRNAMT ambíguo: 01h30 GMT do dia 5 é dia 4 em São Paulo; "-1.500" (três casas) deixa a linha de fora.

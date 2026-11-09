@@ -16,6 +16,8 @@ import {
   importKey,
   importedSummary,
   installmentMark,
+  IMPORT_TEXT,
+  installmentInvoiceMonth,
   EMPTY_TALLY,
   alreadyNotedLeftOut,
   attemptProgress,
@@ -588,15 +590,43 @@ describe('importar: parcelas na fatura', () => {
     expect(installmentMark('LOJA PARC03/10', '2026-10-03')).toEqual({ number: 3, count: 10 });
   });
 
-  it('fatura com parcela: "Parece parcela", desmarcada mas podendo ser marcada', () => {
+  it('fatura com parcela (D-089 B): "Parcela em andamento", marcada, com a parcela e a fatura em que entra; o item leva a parcela', () => {
     const p = parse([line(1, '2026-10-02', 'LOJA 03/10', 12000), line(2, '2026-10-02', 'Padaria', 4590), line(3, '2026-10-03', 'Loja 15/10/2026', 500)], { source: 'csv', cardPositive: true });
     const review = buildReview(cardInput(p));
     expect(review.map((l) => [l.label, l.importable, l.include])).toEqual([
-      ['parcela', true, false],
+      ['parcela', true, true],
       [null, true, true],
       [null, true, true],
     ]);
-    expect(setAll(review, true)[0]!.include).toBe(true);
+    // Cartão fecha dia 3: 02/10 cai na fatura de outubro. A parcela 3 cairia 2 faturas depois (dezembro), mas isso passa da próxima
+    // fatura (hoje é 07/10): a data da linha é a da cobrança, então a parcela entra em outubro mesmo.
+    expect(review[0]!.installment).toEqual({ number: 3, count: 10 });
+    expect(review[0]!.hint).toBe('Parcela 3 de 10: entra na fatura de outubro de 2026 e as 7 que faltam nas seguintes.');
+    expect(review[1]!.installment).toBeNull();
+    expect(review[1]!.hint).toBeNull();
+    expect(toImportItems(review)[0]).toMatchObject({ kind: 'compra', amountCents: 12000, installment: { number: 3, count: 10 } });
+    expect(toImportItems(review)[1]).not.toHaveProperty('installment');
+    expect(setAll(review, false)[0]!.include).toBe(false);
+    // A última parcela e a penúltima: as frases.
+    expect(IMPORT_TEXT.installmentHint(10, 10, '2026-12')).toBe('Parcela 10 de 10: entra na fatura de dezembro de 2026, a última.');
+    expect(IMPORT_TEXT.installmentHint(9, 10, '2026-12')).toBe('Parcela 9 de 10: entra na fatura de dezembro de 2026 e a última na seguinte.');
+  });
+
+  it('a fatura em que a parcela entra (installmentInvoiceMonth): k - 1 faturas depois da natural; passando da próxima fatura, a natural', () => {
+    // Hoje 07/10/2026: a próxima fatura é a de novembro. Compra original de julho (fatura de agosto), parcela 3: outubro.
+    expect(installmentInvoiceMonth('2026-08', { number: 3, count: 10 }, '2026-10-07')).toBe('2026-10');
+    expect(installmentInvoiceMonth('2026-09', { number: 3, count: 10 }, '2026-10-07')).toBe('2026-11');
+    // Linha com a data da cobrança (fatura de outubro), parcela 3: dezembro passa da próxima fatura, então entra em outubro.
+    expect(installmentInvoiceMonth('2026-10', { number: 3, count: 10 }, '2026-10-07')).toBe('2026-10');
+    expect(installmentInvoiceMonth('2026-10', { number: 1, count: 10 }, '2026-10-07')).toBe('2026-10');
+    expect(installmentInvoiceMonth('2026-10', { number: 2, count: 10 }, '2026-10-07')).toBe('2026-11');
+  });
+
+  it('parcela em fatura já paga, ou com parcela seguinte em fatura paga: "Fatura já paga, não entra"', () => {
+    const p = parse([line(1, '2026-10-02', 'LOJA 01/03', 12000)], { source: 'csv', cardPositive: true });
+    // A parcela 1 entra em outubro e as outras em novembro e dezembro: dezembro paga trava a linha.
+    expect(buildReview(cardInput(p, [], { card: { days: { closingDay: 3, dueDay: 10 }, paidMonths: new Set(['2026-12']) } }))[0]!.label).toBe('fatura_paga');
+    expect(buildReview(cardInput(p, [], { card: { days: { closingDay: 3, dueDay: 10 }, paidMonths: new Set(['2027-01']) } }))[0]!.label).toBe('parcela');
   });
 
   it('no extrato da conta a marca de parcela não aparece (a data na descrição é comum)', () => {
@@ -637,12 +667,12 @@ describe('importar: parcelas na fatura', () => {
     expect(labelOf('TENIS 02/03', '2026-09-20', odd, 3333)).toBe('ja_anotado');
   });
 
-  it('cada parcela anotada cobre uma linha só; a outra linha igual fica como "Parece parcela"', () => {
+  it('cada parcela anotada cobre uma linha só; a outra linha igual fica como "Parcela em andamento", marcada', () => {
     const existing = installmentEntries(120000, 10, '2026-07-15', '2026-08', 'Loja de móveis');
     const p = parse([line(1, '2026-10-02', 'LOJA DE MOVEIS 03/10', 12000), line(2, '2026-10-02', 'LOJA DE MOVEIS 03/10', 12000)], { source: 'csv', cardPositive: true });
     expect(buildReview(cardInput(p, [], { existing })).map((l) => [l.label, l.include])).toEqual([
       ['ja_anotado', false],
-      ['parcela', false],
+      ['parcela', true],
     ]);
   });
 

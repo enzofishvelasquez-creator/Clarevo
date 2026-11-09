@@ -1,4 +1,4 @@
-import { formatDateBR } from '../dates';
+import { formatDateBR, formatMonthYearBR, type IsoMonth } from '../dates';
 import { formatBRL } from '../money';
 import { IMPORT_BATCH, IMPORT_MAX_LINES, type ImportErrorCode } from './tipos';
 import type { ReviewLabel } from './revisao';
@@ -90,7 +90,7 @@ export const IMPORT_TEXT = {
   /** Marcas. */
   labels: {
     ja_anotado: 'Já anotado',
-    parcela: 'Parece parcela',
+    parcela: 'Parcela em andamento',
     pagamento_fatura: 'Parece pagamento de fatura',
     transferencia: 'Parece transferência',
     pagamento_recebido: 'Pagamento da fatura, não entra',
@@ -101,10 +101,16 @@ export const IMPORT_TEXT = {
   } satisfies Record<ReviewLabel, string>,
   labelHints: {
     ja_anotado: 'Parece igual a um lançamento que já existe. Vem desmarcado.',
-    parcela: 'Compra parcelada: anote uma vez em Anotar gasto, com o número de parcelas.',
+    parcela: 'Compra parcelada em andamento: entram esta parcela e as que faltam, nas faturas seguintes, com a numeração da fatura.',
     pagamento_fatura: 'O pagamento da fatura já é registrado em Pagar fatura. Vem desmarcado.',
     transferencia: 'Transferência entre as suas contas não é gasto. Vem desmarcada.',
   } satisfies Partial<Record<ReviewLabel, string>>,
+  /** D-089 B: a parcela da linha e a fatura em que ela entra. "Parcela 3 de 10: entra na fatura de dezembro de 2026 e as 7 que faltam nas seguintes." */
+  installmentHint: (number: number, count: number, month: IsoMonth): string => {
+    const rest = count - number;
+    const tail = rest === 0 ? ', a última' : rest === 1 ? ' e a última na seguinte' : ` e as ${num(rest)} que faltam nas seguintes`;
+    return `Parcela ${num(number)} de ${num(count)}: entra na fatura de ${formatMonthYearBR(month)}${tail}.`;
+  },
   /** Rodapé. */
   importButton: (n: number) => (n === 0 ? 'Importar' : `Importar ${num(n)} ${plural(n, 'lançamento', 'lançamentos')}`),
   importing: (done: number, total: number) => `Importando… lote ${num(done)} de ${num(total)}`,

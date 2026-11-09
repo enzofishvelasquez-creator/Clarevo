@@ -474,6 +474,8 @@ interface CardEntryRow {
   purchased_on: string | null;
   amount_cents: number;
   installments: number;
+  /** D-089 B: parcelas que já tinham passado antes da primeira guardada (0 nas compras do app); ausente nas funções antigas. */
+  installment_offset?: number | null;
   invoice_month: string;
   source_month: string | null;
   payment_record_id: string | null;
@@ -1293,6 +1295,7 @@ function toCard(c: CardRow): Card {
 function toCardEntry(e: CardEntryRow): CardEntry {
   const amountCents = whole(e.amount_cents);
   const installments = whole(e.installments);
+  const installmentOffset = whole(e.installment_offset ?? 0);
   const purchase = e.kind === 'compra';
   const receiptKey = e.receipt_key ?? null;
   const consistent =
@@ -1300,6 +1303,9 @@ function toCardEntry(e: CardEntryRow): CardEntry {
     amountCents >= 1 &&
     installments >= 1 &&
     installments <= 48 &&
+    installmentOffset >= 0 &&
+    installmentOffset + installments <= 48 &&
+    (purchase || installmentOffset === 0) &&
     (purchase ? e.purchased_on != null && ISO_DATE.test(e.purchased_on) : e.purchased_on == null && installments === 1) &&
     (e.kind === 'encargo' ? e.charge_kind != null && CARD_CHARGE_TYPES.includes(e.charge_kind) : e.charge_kind == null) &&
     (receiptKey === null || (purchase && receiptKeyValid(receiptKey)));
@@ -1315,6 +1321,7 @@ function toCardEntry(e: CardEntryRow): CardEntry {
     purchasedOn: e.purchased_on ?? null,
     amountCents,
     installments,
+    ...(installmentOffset > 0 ? { installmentOffset } : {}),
     invoiceMonth: invoiceMonthOf(e.invoice_month),
     sourceMonth: e.source_month == null ? null : invoiceMonthOf(e.source_month),
     paymentRecordId: e.payment_record_id ?? null,
@@ -2851,6 +2858,8 @@ export class SupabaseRepository implements RecordsRepository {
         occurred_on: i.occurredOn,
         description: i.description,
         category: i.category,
+        // D-089 B: a parcela escrita na linha da fatura; o banco cria as que faltam.
+        ...(i.installment ? { installment_number: i.installment.number, installment_count: i.installment.count } : {}),
       })),
     });
     if (error) throw repoError(error);

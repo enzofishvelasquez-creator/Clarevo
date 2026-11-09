@@ -85,6 +85,7 @@ import { MemoryCompanyHub } from './memory-company';
 import { SEARCH_LIMIT, compareNewestPurchase, compareNewestRecord, purchaseMatchesFilter, recordMatchesFilter } from './search';
 import type { RecordSearchFilter, SearchPage } from './search';
 import { referenceMonthError } from './committed';
+import { installmentInvoiceMonth } from './importar/revisao';
 import { ACCOUNTS_ACTIVE_MAX, ACCOUNT_KINDS, ACCOUNT_NAME_MAX, accountInputError, accountNameTaken, activeAccounts, normalizeAccountInput } from './accounts';
 import {
   BUDGET_CATEGORIES,
@@ -2553,6 +2554,8 @@ export class MemoryRepository implements RecordsRepository {
       if (norm.kind === 'compra') {
         const code = cardPurchaseError(norm, today, norm.purchasedOn !== entry.purchasedOn);
         if (code) throw new RepoError(code);
+        // Compra importada em andamento (D-089 B): as parcelas guardadas mais as que já passaram não passam de 48.
+        if (norm.installments + (entry.installmentOffset ?? 0) > 48) throw new RepoError('parcelas_invalidas');
         const change = norm.totalCents !== entry.amountCents || norm.installments !== entry.installments || norm.purchasedOn !== entry.purchasedOn;
         if (change) {
           const first = norm.purchasedOn === entry.purchasedOn ? entry.invoiceMonth : invoiceMonthOf(card, norm.purchasedOn);
@@ -2776,6 +2779,7 @@ export class MemoryRepository implements RecordsRepository {
         occurredOn: it.occurredOn,
         description: typeof it.description === 'string' ? it.description.trim() : it.description,
         category: trimCategory(it.category),
+        installment: it.installment ?? null,
       }));
       const payload = [contextId, destination, targetId, norm];
       const op = this.operations.get(key);
@@ -2842,14 +2846,26 @@ export class MemoryRepository implements RecordsRepository {
           } else {
             const c = card!;
             let month: IsoMonth;
+            let remaining = 1;
+            let offset = 0;
             if (it.kind === 'compra') {
+              // Parcela escrita na linha (D-089 B): entram esta e as que faltam, com a numeração da fatura (deslocamento).
+              const mark = it.installment ?? null;
+              if (mark !== null) {
+                const n = mark.count;
+                const k = mark.number;
+                if (!Number.isInteger(n) || !Number.isInteger(k) || n < 2 || n > 48 || k < 1 || k > n) throw new RepoError('parcelas_invalidas');
+                remaining = n - k + 1;
+                offset = k - 1;
+              }
               const code = cardPurchaseError(
-                { purchasedOn: it.occurredOn, totalCents: it.amountCents, installments: 1, description: it.description, category: it.category },
+                { purchasedOn: it.occurredOn, totalCents: it.amountCents * remaining, installments: remaining, description: it.description, category: it.category },
                 today,
                 true,
               );
               if (code) throw new RepoError(code);
-              month = invoiceMonthOf(c, it.occurredOn);
+              const natural = invoiceMonthOf(c, it.occurredOn);
+              month = mark ? installmentInvoiceMonth(natural, mark, today) : natural;
             } else {
               // Estorno: valor, descrição e categoria; depois o dia (a fatura é a da data) e a faixa de 48 meses da fatura.
               const text = cardRefundError({ amountCents: it.amountCents, description: it.description, category: it.category, invoiceMonth: monthOf(today) }, today, false);
@@ -2860,23 +2876,24 @@ export class MemoryRepository implements RecordsRepository {
               const range = cardRefundError({ amountCents: it.amountCents, description: it.description, category: it.category, invoiceMonth: month }, today, true);
               if (range) throw new RepoError(range);
             }
-            if (live + 1 > CARD_ENTRIES_MAX) throw new RepoError('limite_de_lancamentos');
-            if (this.invoicePaid(c.id, month)) throw new RepoError('fatura_paga');
+            if (live + remaining > CARD_ENTRIES_MAX) throw new RepoError('limite_de_lancamentos');
+            for (let j = 0; j < remaining; j++) if (this.invoicePaid(c.id, addMonths(month, j))) throw new RepoError('fatura_paga');
             const entry = this.newEntry(c, {
               kind: it.kind as 'compra' | 'estorno',
               description: it.description,
               category: it.category,
               chargeType: null,
               purchasedOn: it.kind === 'compra' ? it.occurredOn : null,
-              amountCents: it.amountCents,
-              installments: 1,
+              amountCents: it.amountCents * remaining,
+              installments: remaining,
+              ...(offset > 0 ? { installmentOffset: offset } : {}),
               invoiceMonth: month,
               sourceMonth: null,
               paymentRecordId: null,
               receiptKey: null,
             });
             this.cardEntries.set(entry.id, { ...entry, importKey: it.importKey });
-            live += 1;
+            live += remaining;
           }
           created += 1;
         } catch (e) {
