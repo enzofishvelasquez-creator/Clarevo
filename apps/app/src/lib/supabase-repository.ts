@@ -180,6 +180,8 @@ interface RecordRow {
   invoice_month: string | null;
   /** Resumo SHA-256 da chave da nota (64 hexadecimais minúsculos), nunca a chave. */
   receipt_key: string | null;
+  /** Recebimento que conta no mês seguinte (D-089 A, migração 0030); ausente antes da 0030. */
+  next_month?: boolean | null;
   created_by: string;
   version: number;
   created_at: string;
@@ -595,6 +597,7 @@ const KNOWN: RepoErrorCode[] = [
   'valor_acima_do_limite',
   'data_invalida',
   'data_futura',
+  'mes_seguinte_invalido',
   'conta_invalida',
   'categoria_invalida',
   'nome_da_conta_invalido',
@@ -780,6 +783,8 @@ function toRecord(r: RecordRow): FinancialRecord {
     commitmentId: r.commitment_id ?? null,
     invoice: cardId !== null && month !== null ? { cardId, month: invoiceMonthOf(month) } : null,
     receiptKey,
+    // Só quando ligado, como o repositório em memória: o registro sem a marca fica como antes.
+    ...(r.next_month === true ? { nextMonth: true } : {}),
     createdBy: r.created_by,
     version: r.version,
     createdAt: r.created_at,
@@ -1560,9 +1565,12 @@ export class SupabaseRepository implements RecordsRepository {
     return { action: data.action as AccountAction, accountId: target };
   }
 
-  /** Lê o mês inteiro em páginas: a API limita cada resposta, e um total incompleto não pode aparecer como confirmado. */
+  /**
+   * Lê o mês inteiro em páginas: a API limita cada resposta, e um total incompleto não pode aparecer como confirmado. O mês é o
+   * em que o registro conta (`counted_month`, migração 0030): o da data ou, no recebimento marcado do mês seguinte, o seguinte (D-089 A).
+   */
   async listRecords(contextId: string, month: IsoMonth) {
-    const { start, endExclusive } = monthRange(month);
+    const { start } = monthRange(month);
     const PAGE = 500;
     const rows: RecordRow[] = [];
     for (let from = 0; ; from += PAGE) {
@@ -1570,8 +1578,7 @@ export class SupabaseRepository implements RecordsRepository {
         .from('financial_records')
         .select('*')
         .eq('context_id', contextId)
-        .gte('occurred_on', start)
-        .lt('occurred_on', endExclusive)
+        .eq('counted_month', start)
         .order('occurred_on', { ascending: false })
         .order('id')
         .range(from, from + PAGE - 1);
@@ -1713,6 +1720,8 @@ export class SupabaseRepository implements RecordsRepository {
       p_category: input.category,
       // Só despesa lida de uma nota (D-038): o resumo SHA-256, nunca a chave. Sem nota, o hash é o de antes.
       ...(input.receiptKey != null ? { p_receipt_key: input.receiptKey } : {}),
+      // Só quando ligado (D-089 A): sem a marca, a chamada é a de antes.
+      ...(input.nextMonth === true ? { p_next_month: true } : {}),
     });
   }
 
@@ -1726,6 +1735,8 @@ export class SupabaseRepository implements RecordsRepository {
       p_occurred_on: input.occurredOn,
       p_description: input.description,
       p_category: input.category,
+      // Ausente mantém a marca do mês seguinte enquanto a data cabe (D-089 A); o formulário de recebimento manda true ou false.
+      ...(input.nextMonth !== undefined ? { p_next_month: input.nextMonth } : {}),
     });
   }
 

@@ -1,4 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
+import { addMonths, daysInMonth, formatMonthYearBR, monthOf } from './dates';
 import type { Cents } from './money';
 
 export type ContextKind = 'pessoal' | 'familia';
@@ -71,11 +72,47 @@ export interface FinancialRecord {
    * por contexto entre gastos e compras no cartão vivos. Só em despesa comum; null nos demais.
    */
   receiptKey: string | null;
+  /**
+   * Recebimento do fim do mês que conta no mês seguinte (D-089 A): o salário que cai em 30/10 e paga as contas de novembro entra no
+   * Recebido de novembro (e na Evolução, nas Análises, na exportação e na marca "Conferi este mês"). Só em recebimento com a data nos
+   * últimos 7 dias do mês (`nextMonthAllowed`); ausente ou false nos demais. A data do recebimento não muda: só o mês em que conta
+   * (`recordMonth`). Gravado por create_record e update_record (`p_next_month`).
+   */
+  nextMonth?: boolean;
   createdBy: string;
   version: number;
   createdAt: string;
   updatedAt: string;
 }
+
+/** Quantos dias no fim do mês um recebimento pode contar no mês seguinte (D-089 A). */
+export const NEXT_MONTH_WINDOW_DAYS = 7;
+
+/** A data cai nos últimos 7 dias do mês (dia 25 a 31 em mês de 31 dias; 22 a 28 em fevereiro comum). */
+export function nextMonthAllowed(date: IsoDate): boolean {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  return d > daysInMonth(y, m) - NEXT_MONTH_WINDOW_DAYS;
+}
+
+/** O mês em que o registro conta (Recebido, Pago, Evolução, Análises, exportação): o da data, ou o seguinte quando marcado. */
+export function recordMonth(record: Pick<FinancialRecord, 'occurredOn' | 'nextMonth'>): IsoMonth {
+  const month = monthOf(record.occurredOn);
+  return record.nextMonth === true ? addMonths(month, 1) : month;
+}
+
+/** Textos do ajuste "Este valor é do mês seguinte" (D-089 A). */
+export const NEXT_MONTH_TEXT = {
+  toggle: 'Este valor é do mês seguinte',
+  /** Legenda do ajuste: "Entra no Recebido de novembro de 2026, não no de outubro de 2026." */
+  caption: (date: IsoDate): string => {
+    const own = monthOf(date);
+    return `Entra no Recebido de ${formatMonthYearBR(addMonths(own, 1))}, não no de ${formatMonthYearBR(own)}.`;
+  },
+  /** Na linha da lista, depois da data: "Recebido · 30/10/2026 · conta em novembro". */
+  rowNote: (month: IsoMonth): string => `conta em ${formatMonthYearBR(month).replace(/ de \d{4}$/, '')}`,
+  /** No detalhe, depois do mês do resumo: "Novembro de 2026 (mês seguinte)". */
+  detailSuffix: ' (mês seguinte)',
+} as const;
 
 /** Conta a pagar (compromisso previsto). Origem separada; só o gasto gerado ao pagar entra em Pago. */
 export interface Commitment {
@@ -194,6 +231,8 @@ export interface RecordInput {
   category: string | null;
   /** Só ao criar uma despesa lida de uma nota fiscal (D-038): o resumo SHA-256 da chave (`ReceiptDraft.receiptKey`), nunca a chave. A edição ignora o campo. */
   receiptKey?: string | null;
+  /** Recebimento que conta no mês seguinte (D-089 A): só com a data nos últimos 7 dias do mês; ausente = false. */
+  nextMonth?: boolean;
 }
 
 /** Gasto fixo (todo mês), parcelamento ou conta do ano (todo ano, D-029). */

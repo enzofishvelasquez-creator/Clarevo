@@ -1,7 +1,8 @@
 import type { Card, CardEntry, Commitment, FinancialAccount, FinancialRecord } from './records';
+import { NEXT_MONTH_WINDOW_DAYS, recordMonth } from './records';
 import { NO_CATEGORY_LABEL } from './records';
 import type { IsoDate, IsoMonth } from './dates';
-import { addMonths, formatDateBR, formatMonthBR, formatMonthSpanBR, monthOf } from './dates';
+import { addDays, addMonths, formatDateBR, formatMonthBR, formatMonthSpanBR, monthOf, formatMonthInputBR } from './dates';
 import type { Cents } from './money';
 import { formatBRL } from './money';
 import type { Invoice } from './cards';
@@ -87,7 +88,7 @@ export const EXPORT_TEXT = {
   } as Readonly<Record<ExportFormat, string>>,
   contentTitle: 'O que vai no arquivo',
   contentCsv:
-    'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem e Origem. As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga.',
+    'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga.',
   contentPdf:
     'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga.',
   notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do espaço Pessoal.',
@@ -176,11 +177,12 @@ export function exportFilterOf(period: ExportPeriod, today: IsoDate): RecordSear
 export function exportMonths(
   period: ExportPeriod,
   today: IsoDate,
-  records: readonly Pick<FinancialRecord, 'occurredOn'>[],
+  records: readonly Pick<FinancialRecord, 'occurredOn' | 'nextMonth'>[],
   purchases: readonly Pick<CardEntry, 'kind' | 'purchasedOn'>[] = [],
 ): IsoMonth[] {
   const { from, to } = exportRange(period, today);
-  const recordMonths = records.map((r) => monthOf(r.occurredOn)).sort();
+  // O recebimento marcado "do mês seguinte" (D-089 A) conta no mês seguinte, também aqui.
+  const recordMonths = records.map((r) => recordMonth(r)).sort();
   const purchaseMonths = purchases.flatMap((e) => (e.kind === 'compra' && e.purchasedOn !== null ? [monthOf(e.purchasedOn)] : [])).sort();
   const current = monthOf(today);
   let start = from ? monthOf(from) : ([recordMonths[0], purchaseMonths[0]].filter((m): m is IsoMonth => !!m).sort()[0] ?? current);
@@ -199,6 +201,8 @@ export function exportMonths(
 
 export interface ExportRow {
   date: IsoDate;
+  /** O mês do resumo em que o lançamento conta: o da data, ou o seguinte no recebimento marcado "do mês seguinte" (D-089 A). */
+  month: IsoMonth;
   kind: ExportKind;
   description: string;
   /** "Sem categoria" quando não há. */
@@ -258,6 +262,7 @@ function oldestFirst(a: FinancialRecord, b: FinancialRecord): number {
 export function exportRows(records: readonly FinancialRecord[], ctx: ExportContext): ExportRow[] {
   return [...records].sort(oldestFirst).map((r) => ({
     date: r.occurredOn,
+    month: recordMonth(r),
     kind: recordKindOf(r),
     description: r.description,
     category: r.category ?? NO_CATEGORY_LABEL,
@@ -294,7 +299,7 @@ export const CSV_SEPARATOR = ';';
 /** Fim de linha do Excel. */
 export const CSV_EOL = '\r\n';
 
-export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Valor (R$)', 'Conta de origem', 'Origem'];
+export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Valor (R$)', 'Conta de origem', 'Origem', 'Mês do resumo'];
 export const CSV_PURCHASE_HEADER: readonly string[] = ['Data da compra', 'Cartão', 'Descrição', 'Categoria', 'Valor total (R$)', 'Parcelas'];
 
 /**
@@ -335,6 +340,7 @@ export function buildRecordsCsv(rows: readonly ExportRow[]): string {
         csvAmount(r.amountCents),
         csvText(r.account),
         EXPORT_ORIGIN_LABEL[r.origin],
+        formatMonthInputBR(r.month),
       ]),
     ),
   ];
@@ -405,7 +411,7 @@ export function buildExportReport(source: ExportSource): ExportReport {
       paidCents: summary.paidCents,
       differenceCents: summary.differenceCents,
       categories: categoryBreakdown(summary.composition.paid, source.invoices),
-      rows: rows.filter((r) => monthOf(r.date) === month),
+      rows: rows.filter((r) => r.month === month),
     };
   });
   const receivedCents = built.reduce((acc, m) => acc + m.receivedCents, 0);
@@ -633,12 +639,17 @@ export async function loadExportSource(
   options: { withInvoices?: boolean } = {},
 ): Promise<ExportLoad> {
   const filter = exportFilterOf(period, today);
+  // O recebimento dos últimos dias do mês anterior marcado "do mês seguinte" (D-089 A) conta no primeiro mês do período: a leitura
+  // começa uma semana antes e fica só o que conta nos meses do período (`recordMonth`), como no Resumo.
+  const wide: RecordSearchFilter = filter.from ? { ...filter, from: addDays(filter.from, -NEXT_MONTH_WINDOW_DAYS) } : filter;
   const [found, bought] = await Promise.all([
-    repo.searchRecords(contextId, filter, EXPORT_MAX_ROWS),
+    repo.searchRecords(contextId, wide, EXPORT_MAX_ROWS),
     repo.searchCardPurchases(contextId, filter, EXPORT_MAX_ROWS),
   ]);
   if (found.truncated || bought.truncated || found.items.length + bought.items.length > EXPORT_MAX_ROWS) return { ok: false, reason: 'muitas_linhas' };
-  const records = found.items;
+  const firstMonth = filter.from ? monthOf(filter.from) : null;
+  const lastMonth = filter.to ? monthOf(filter.to) : null;
+  const records = found.items.filter((r) => (firstMonth === null || recordMonth(r) >= firstMonth) && (lastMonth === null || recordMonth(r) <= lastMonth));
   const [accounts, cards] = await Promise.all([repo.listAccounts(contextId), repo.listCards(contextId)]);
 
   // Contas a pagar quitadas pelos gastos (o pagamento de fatura é "Fatura" e não precisa da conta). Uma leitura por vencimento cobre

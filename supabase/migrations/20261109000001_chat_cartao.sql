@@ -24,7 +24,8 @@ alter table public.chat_messages drop constraint chat_messages_outcome_check;
 alter table public.chat_messages add constraint chat_messages_outcome_check check (outcome in (
   'ligado', 'anotado', 'desfeito', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado', 'muitas_tentativas', 'muitas_mensagens',
   'nada_para_desfazer', 'sem_permissao', 'sem_conta', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
-  'sem_assinatura', 'ajuda', 'midia', 'nao_entendi', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga'));
+  'sem_assinatura', 'ajuda', 'midia', 'nao_entendi', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga',
+  'limite_do_cartao'));
 
 -- O registro da mensagem aceita o lançamento do cartão (a assinatura muda, então a função é recriada; quem a chama resolve pelo nome).
 drop function public.clarevo_chat_log(text, text, text, uuid, text, uuid);
@@ -93,6 +94,7 @@ declare
   v_names text[];
   v_card uuid;
   v_matches integer;
+  v_pick text;
   v_hint text := nullif(public.clarevo_chat_fold(btrim(coalesce(p_card_hint, ''))), '');
   v_key text := p_channel || ':' || md5(p_message_id);
   v_entry uuid;
@@ -126,18 +128,23 @@ begin
     perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, v_link.person_id, 'sem_cartao');
     return jsonb_build_object('result', 'sem_cartao', 'space', public.clarevo_chat_space(v_link.context_id), 'today', v_today);
   end if;
-  -- Um cartão só: é ele. Com mais de um, o nome escrito depois de "cartão" escolhe (um só que combine); sem isso, a resposta pergunta.
+  -- Um cartão só: é ele. Com mais de um, o nome escrito depois de "cartão" escolhe: primeiro o apelido igual (sem acento e sem caixa;
+  -- "azul" escolhe "Azul" mesmo havendo "Azul Infinite"); senão, um só cujo apelido contenha o nome escrito ou esteja nele ("cartão
+  -- azul obrigado" escolhe "Azul"). Sem isso, a resposta pergunta.
   if cardinality(v_names) = 1 then
     select c.id into v_card from public.cards c
      where c.context_id = v_link.context_id and c.status = 'ativo' and c.deleted_at is null;
   elsif v_hint is not null then
-    select count(*) into v_matches from public.cards c
+    select count(*), min(c.id::text) into v_matches, v_pick from public.cards c
      where c.context_id = v_link.context_id and c.status = 'ativo' and c.deleted_at is null
-       and position(v_hint in public.clarevo_chat_fold(c.nickname)) > 0;
-    if v_matches = 1 then
-      select c.id into v_card from public.cards c
+       and public.clarevo_chat_fold(c.nickname) = v_hint;
+    if v_matches <> 1 then
+      select count(*), min(c.id::text) into v_matches, v_pick from public.cards c
        where c.context_id = v_link.context_id and c.status = 'ativo' and c.deleted_at is null
-         and position(v_hint in public.clarevo_chat_fold(c.nickname)) > 0;
+         and (position(v_hint in public.clarevo_chat_fold(c.nickname)) > 0 or position(public.clarevo_chat_fold(c.nickname) in v_hint) > 0);
+    end if;
+    if v_matches = 1 then
+      v_card := v_pick::uuid;
     end if;
   end if;
   if v_card is null then
@@ -167,6 +174,8 @@ begin
       when 'descricao_longa' then 'descricao_invalida'
       when 'categoria_invalida' then 'descricao_invalida'
       when 'assinatura_necessaria' then 'sem_assinatura'
+      -- 5.000 lançamentos vivos no cartão: resposta, e não erro (a Meta e o Telegram entregariam a mensagem de novo).
+      when 'limite_de_lancamentos' then 'limite_do_cartao'
     end;
     if v_result is null then
       raise;

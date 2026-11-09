@@ -290,6 +290,38 @@ describe('importRecords: cartão', () => {
   }, 60_000);
 });
 
+describe('importRecords: compra em andamento depois da importação (revisão independente do D-089 B)', () => {
+  it('o orçamento conta a parcela no mês certo e corrigir a data mantém a distância das faturas, como o banco', async () => {
+    const f = await fresh();
+    // Compra original de 15/08 (fatura natural de setembro), parcela 3 de 6: novembro a fevereiro.
+    await f.repo.importRecords('imp-sofa-0001', f.ctx, 'cartao', f.card, [{ ...item('s3', 'compra', 4000, '2026-08-15', 'Sofá 03/06', 'Educação'), installment: { number: 3, count: 6 } }]);
+    const used = async (m: string) => (await f.repo.getMonthBudget(f.ctx, m)).lines.find((l) => l.category === 'Educação')!.usedCents;
+    expect([await used('2026-08'), await used('2026-10'), await used('2027-01'), await used('2027-02')]).toEqual([0, 4000, 4000, 0]);
+    let sofa = (await f.repo.listCardEntries(f.card)).find((e) => e.description === 'Sofá 03/06')!;
+    expect([sofa.invoiceMonth, sofa.installments, sofa.installmentOffset]).toEqual(['2026-11', 4, 2]);
+    // 20/08 está na mesma fatura natural: nada anda (antes, a primeira voltava para setembro).
+    await f.repo.updateCardEntry('imp-sofa-u1', sofa.id, sofa.version, {
+      kind: 'compra', purchasedOn: '2026-08-20', totalCents: sofa.amountCents, installments: sofa.installments, description: 'Sofá 03/06', category: 'Educação',
+    });
+    sofa = (await f.repo.listCardEntries(f.card)).find((e) => e.description === 'Sofá 03/06')!;
+    expect([sofa.invoiceMonth, sofa.purchasedOn]).toEqual(['2026-11', '2026-08-20']);
+    // 02/08 (fatura natural de agosto): a primeira guardada anda uma fatura para trás, para outubro.
+    await f.repo.updateCardEntry('imp-sofa-u2', sofa.id, sofa.version, {
+      kind: 'compra', purchasedOn: '2026-08-02', totalCents: sofa.amountCents, installments: sofa.installments, description: 'Sofá 03/06', category: 'Educação',
+    });
+    sofa = (await f.repo.listCardEntries(f.card)).find((e) => e.description === 'Sofá 03/06')!;
+    expect(sofa.invoiceMonth).toBe('2026-10');
+  });
+
+  it('a fatura aberta é a do cartão: fecha dia 6 e vence dia 1, hoje 07/10, a fatura aberta é a de dezembro', async () => {
+    const f = await fresh();
+    const verde = (await f.repo.createCard('op-card-verde', f.ctx, { name: 'Verde', lastDigits: null, closingDay: 6, dueDay: 1, limitCents: 500_000 })).card.id;
+    await f.repo.importRecords('imp-verde-0001', f.ctx, 'cartao', verde, [{ ...item('v3', 'compra', 1000, '2026-08-10', 'Loja verde 03/05', null), installment: { number: 3, count: 5 } }]);
+    const e = (await f.repo.listCardEntries(verde)).find((x) => x.description === 'Loja verde 03/05')!;
+    expect([e.invoiceMonth, e.installments, e.installmentOffset]).toEqual(['2026-12', 3, 2]);
+  });
+});
+
 describe('importRecords: o erro conhecido do app', () => {
   it('RepoError com código e detalhe', async () => {
     const f = await fresh();

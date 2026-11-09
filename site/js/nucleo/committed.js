@@ -3,7 +3,7 @@ import { addMonths, formatMonthBR, formatMonthName, formatMonthYearBR, isValidIs
 import { formatInteger } from './learn/format.js';
 import { monthlyShareCents, percentTenths, sharesCents } from './learn/math.js';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL, roundDiv } from './money.js';
-import { DEBT_NATURES } from './records.js';
+import { DEBT_NATURES, recordMonth } from './records.js';
 import { isCommitmentOverdue } from './dia-util.js';
 import { annualYearOf, projectSeries, seriesMonthOf, seriesYearlyTotal, termFor } from './series.js';
 import { ERROR_TEXT } from './validation.js';
@@ -290,7 +290,7 @@ export function suggestReference(records, currentMonth) {
     const closed = [-3, -2, -1].map((d) => addMonths(currentMonth, d));
     const totals = new Map();
     for (const r of records) {
-        const m = monthOf(r.occurredOn);
+        const m = recordMonth(r);
         if (r.kind !== 'receita' || !closed.includes(m) || isReimbursement(r.category))
             continue;
         totals.set(m, (totals.get(m) ?? 0) + r.amountCents);

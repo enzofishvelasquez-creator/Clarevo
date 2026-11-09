@@ -24,6 +24,17 @@ export interface WhatsAppRecordInfo {
   account_name: string;
 }
 
+/** O apelido sem a palavra "cartão" no começo ("Cartão Azul" vira "Azul"), para não repetir a palavra. */
+function withoutCardWord(nickname: string): string {
+  const rest = nickname.replace(/^\s*cart[aã]o\s+/i, '');
+  return rest === '' ? nickname : rest;
+}
+
+/** "cartão Azul", ou o apelido como está quando ele já começa com "Cartão" ("Cartão Azul"). */
+function cardLabel(nickname: string): string {
+  return withoutCardWord(nickname) === nickname ? `cartão ${nickname}` : nickname;
+}
+
 /** Compra no cartão anotada ou desfeita (D-089 C), como o banco devolve: o apelido do cartão, nunca os dígitos; a fatura como dia 1. */
 export interface WhatsAppPurchaseInfo {
   amount_cents: Cents;
@@ -46,7 +57,7 @@ export type WhatsAppOutcome =
   | { result: 'desfeito'; space: WhatsAppSpace; record: WhatsAppRecordInfo; today?: IsoDate }
   | { result: 'sem_permissao' | 'sem_conta'; space: WhatsAppSpace; today?: IsoDate }
   | { result: 'compra_anotada' | 'compra_desfeita'; space: WhatsAppSpace; purchase: WhatsAppPurchaseInfo; today?: IsoDate }
-  | { result: 'sem_cartao' | 'fatura_paga'; space: WhatsAppSpace; today?: IsoDate }
+  | { result: 'sem_cartao' | 'fatura_paga' | 'limite_do_cartao'; space: WhatsAppSpace; today?: IsoDate }
   | { result: 'qual_cartao'; space: WhatsAppSpace; cards: string[]; today?: IsoDate }
   | {
       result:
@@ -90,7 +101,7 @@ function invoiceLabel(invoiceMonth: string, today: IsoDate): string {
 
 function purchaseLines(p: WhatsAppPurchaseInfo, today: IsoDate): string {
   return [
-    `Compra no cartão ${p.card_nickname}: ${p.description}, ${formatBRL(p.amount_cents)}`,
+    `Compra no ${cardLabel(p.card_nickname)}: ${p.description}, ${formatBRL(p.amount_cents)}`,
     `Categoria: ${p.category ?? NO_CATEGORY_LABEL}`,
     `Data da compra: ${dayLabel(p.purchased_on, today)}`,
     `Fatura de ${invoiceLabel(p.invoice_month, today)}`,
@@ -263,9 +274,11 @@ export function whatsappOutcomeReply(outcome: WhatsAppOutcome, messageDay: IsoDa
         ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Conta e Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
         : `Compras no cartão entram só no espaço Pessoal, e ${CHANNEL_WORDS[channel].whoLinked} está ligado ao ${spaceLabel(outcome.space)}. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.`;
     case 'qual_cartao':
-      return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${(outcome.cards[0] ?? 'azul').toLowerCase()}".`;
+      return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${withoutCardWord(outcome.cards[0] ?? 'azul').toLowerCase()}".`;
     case 'fatura_paga':
       return 'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.';
+    case 'limite_do_cartao':
+      return 'Este cartão chegou a 5.000 lançamentos guardados. Exclua no app os que não precisa mais para anotar outros.';
     default:
       return chatReply(channel)[outcome.result];
   }

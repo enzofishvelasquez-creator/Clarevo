@@ -164,6 +164,15 @@ export interface Installment {
 }
 
 /**
+ * As parcelas de uma compra em palavras: "à vista", "em 4 vezes" ou, na compra importada em andamento (D-089 B), com a numeração da
+ * fatura: "parcelas 3 a 10 de 10" ou "parcela 3 de 3".
+ */
+export function installmentsWords(installments: number, offset = 0): string {
+  if (offset > 0) return installments === 1 ? `parcela ${offset + 1} de ${offset + 1}` : `parcelas ${offset + 1} a ${offset + installments} de ${offset + installments}`;
+  return installments === 1 ? 'à vista' : `em ${installments} vezes`;
+}
+
+/**
  * Parcelas de uma compra (uma linha de CardEntry com kind 'compra'): a parcela guardada i cai i - 1 faturas depois da 1ª guardada.
  * Numa compra importada em andamento (`installmentOffset`), a numeração mostrada soma o deslocamento: 8 parcelas guardadas com
  * deslocamento 2 são as parcelas 3 a 10 de 10.
@@ -227,6 +236,8 @@ export interface RefundEditChoice {
   description: string;
   amountCents: Cents;
   installments: number;
+  /** Compra importada em andamento (D-089 B): parcelas que já tinham passado; 0 nas demais. */
+  installmentOffset: number;
   /** Fatura da 1ª parcela (mês do vencimento): o mês que a tela de edição recebe. */
   invoiceMonth: IsoMonth;
 }
@@ -238,7 +249,7 @@ export interface RefundEditChoice {
  * `paidInvoiceMonths(faturas)`.
  */
 export function refundEditChoices(
-  entries: readonly Pick<CardEntry, 'id' | 'kind' | 'description' | 'amountCents' | 'installments' | 'invoiceMonth' | 'purchasedOn'>[],
+  entries: readonly (Pick<CardEntry, 'id' | 'kind' | 'description' | 'amountCents' | 'installments' | 'invoiceMonth' | 'purchasedOn'> & Partial<Pick<CardEntry, 'installmentOffset'>>)[],
   paidMonths: Iterable<IsoMonth>,
   refundMonth: IsoMonth,
   max = REFUND_EDIT_MAX,
@@ -248,7 +259,14 @@ export function refundEditChoices(
     .filter((e) => e.kind === 'compra' && e.invoiceMonth <= refundMonth && !purchaseBlockedByPaidInvoice(e.invoiceMonth, e.installments, paid))
     .sort((a, b) => (b.purchasedOn ?? '').localeCompare(a.purchasedOn ?? '') || (a.description ?? '').localeCompare(b.description ?? '', 'pt-BR') || a.id.localeCompare(b.id))
     .slice(0, Math.max(0, max))
-    .map((e) => ({ entryId: e.id, description: e.description ?? '', amountCents: e.amountCents, installments: e.installments, invoiceMonth: e.invoiceMonth }));
+    .map((e) => ({
+      entryId: e.id,
+      description: e.description ?? '',
+      amountCents: e.amountCents,
+      installments: e.installments,
+      installmentOffset: e.installmentOffset ?? 0,
+      invoiceMonth: e.invoiceMonth,
+    }));
 }
 
 /**
@@ -1451,10 +1469,11 @@ export const CARDS_TEXT = {
     rule: 'O estorno conta no mês da fatura em que foi informado e, por isso, o usado do mês da compra no orçamento não diminui.',
     editInstead: 'Se nenhuma fatura da compra foi paga, corrija o valor em Editar compra, em vez de registrar um estorno.',
     /** Nome acessível do link: "Editar compra Tênis de corrida, R$ 800,00 em 4 vezes". */
-    editA11y: (description: string, amountCents: Cents, installments: number) =>
-      `Editar compra ${description}, ${formatBRL(amountCents)}${installments > 1 ? ` em ${installments} vezes` : ''}`,
-    /** Legenda da compra sob o link: "R$ 800,00 em 4x" ou "R$ 89,90". */
-    editCaption: (amountCents: Cents, installments: number) => `${formatBRL(amountCents)}${installments > 1 ? ` em ${installments}x` : ''}`,
+    editA11y: (description: string, amountCents: Cents, installments: number, offset = 0) =>
+      `Editar compra ${description}, ${formatBRL(amountCents)}${offset > 0 ? `, ${installmentsWords(installments, offset)}` : installments > 1 ? ` em ${installments} vezes` : ''}`,
+    /** Legenda da compra sob o link: "R$ 800,00 em 4x", "R$ 89,90" ou, importada em andamento, "R$ 960,00, parcelas 3 a 10 de 10". */
+    editCaption: (amountCents: Cents, installments: number, offset = 0) =>
+      `${formatBRL(amountCents)}${offset > 0 ? `, ${installmentsWords(installments, offset)}` : installments > 1 ? ` em ${installments}x` : ''}`,
   },
 
   // Pago e Por categoria.
@@ -1533,6 +1552,11 @@ export const CARDS_TEXT = {
     paymentRecordNote: 'Este gasto é o pagamento de uma fatura. Para mudar ou desfazer o pagamento, abra a fatura.',
     notStarted: 'Ainda não começou',
     purchaseDateLabel: 'Data da compra',
+    /** Editar uma compra importada em andamento (D-089 B): o que os campos de valor e parcelas guardam. */
+    importedInProgressNote: (installments: number, offset: number): string =>
+      installments === 1
+        ? `Compra importada na última parcela (${offset + 1} de ${offset + 1}): o valor e as parcelas aqui são só dela.`
+        : `Compra importada na parcela ${offset + 1} de ${offset + installments}: o valor e as parcelas aqui são os das ${installments} que faltam.`,
     purchaseSituation: 'Compra no cartão',
     registerHint: 'Depois de cadastrar, você volta para anotar a compra.',
     archivedNote: 'Este cartão está arquivado. As faturas e o histórico continuam aqui.',

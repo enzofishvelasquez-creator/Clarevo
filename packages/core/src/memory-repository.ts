@@ -143,7 +143,7 @@ import {
   normalizeGoalNote,
   type GoalMovementChange,
 } from './goals';
-import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX } from './records';
+import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX, nextMonthAllowed, recordMonth } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import { savingsAnswerError, savingsAskAgainOn } from './savings';
 import { signupSourceError, type SignupSource, type SignupSourceOption } from './signup-source';
@@ -723,7 +723,7 @@ export class MemoryRepository implements RecordsRepository {
   async listRecords(contextId: string, month: IsoMonth) {
     return this.read(() =>
       this.canRead(contextId)
-        ? [...this.records.values()].filter((r) => !r.deletedAt && r.contextId === contextId && monthOf(r.occurredOn) === month).map(strip)
+        ? [...this.records.values()].filter((r) => !r.deletedAt && r.contextId === contextId && recordMonth(r) === month).map(strip)
         : [],
     );
   }
@@ -769,13 +769,16 @@ export class MemoryRepository implements RecordsRepository {
   async createRecord(key: string, contextId: string, kind: RecordKind, input: RecordInput) {
     return this.write(() => {
       const norm = normalize(input);
-      // Com a chave da nota (D-038) o conteúdo ganha o último item; sem ela, o hash é o de antes.
+      // Com a chave da nota (D-038) o conteúdo ganha o último item; sem ela, o hash é o de antes. O mês seguinte (D-089 A) entra no
+      // conteúdo só quando ligado, como no banco (false e ausente são o mesmo conteúdo de antes).
       const receipt = input.receiptKey?.trim() ? input.receiptKey.trim() : null;
-      const payload = receipt === null ? [contextId, kind, norm] : [contextId, kind, norm, receipt];
+      const nextMonth = input.nextMonth === true;
+      const body = nextMonth ? { ...norm, nextMonth: true } : norm;
+      const payload = receipt === null ? [contextId, kind, body] : [contextId, kind, body, receipt];
       const replay = this.replayRecord(key, 'criar', payload);
       if (replay) return replay;
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
-      this.validate(contextId, norm);
+      this.validate(contextId, kind, { ...norm, nextMonth });
       if (receipt !== null) {
         if (kind !== 'despesa' || !receiptKeyValid(receipt)) throw new RepoError('chave_de_nota_invalida');
         this.checkReceiptFree(contextId, receipt);
@@ -791,6 +794,7 @@ export class MemoryRepository implements RecordsRepository {
         commitmentId: null,
         invoice: null,
         receiptKey: receipt,
+        ...(nextMonth ? { nextMonth: true } : {}),
         createdBy: this.opts.actorId,
         version: 1,
         createdAt: now,
@@ -805,7 +809,9 @@ export class MemoryRepository implements RecordsRepository {
   async updateRecord(key: string, id: string, expectedVersion: number, input: RecordInput) {
     return this.write(() => {
       const norm = normalize(input);
-      const payload = [id, expectedVersion, norm];
+      // Mês seguinte (D-089 A): ausente mantém a marca enquanto a data nova cabe (como p_next_month nulo no banco); entra no conteúdo
+      // só quando veio.
+      const payload = input.nextMonth === undefined ? [id, expectedVersion, norm] : [id, expectedVersion, { ...norm, nextMonth: input.nextMonth === true }];
       const replay = this.replayRecord(key, 'editar', payload);
       if (replay) return replay;
       const current = this.liveRecord(id);
@@ -814,9 +820,10 @@ export class MemoryRepository implements RecordsRepository {
       if (current.invoice && (norm.amountCents !== current.amountCents || norm.description !== current.description || norm.category !== current.category)) {
         throw new RepoError('pagamento_de_fatura');
       }
-      this.validate(current.contextId, norm, current.accountId);
+      const nextMonth = input.nextMonth === undefined ? current.nextMonth === true && nextMonthAllowed(norm.occurredOn) : input.nextMonth === true;
+      this.validate(current.contextId, current.kind, { ...norm, nextMonth }, current.accountId);
       const now = new Date().toISOString();
-      const next = { ...current, ...norm, version: current.version + 1, updatedAt: now };
+      const next = withNextMonth({ ...current, ...norm, version: current.version + 1, updatedAt: now }, nextMonth);
       this.records.set(id, next);
       // Gasto de conta a pagar: a conta sobe de versão; o valor previsto não muda.
       if (current.commitmentId) this.bumpCommitment(current.commitmentId, {}, now);
@@ -980,7 +987,7 @@ export class MemoryRepository implements RecordsRepository {
         description: current.description,
         category: norm.category,
       };
-      this.validate(current.contextId, recordInput);
+      this.validate(current.contextId, 'despesa', recordInput);
       const now = new Date().toISOString();
       const record: FinancialRecord = {
         id: this.id('reg'),
@@ -1559,7 +1566,7 @@ export class MemoryRepository implements RecordsRepository {
       const line = this.monthChecks.get(`${contextId}|${month}|${kind}`);
       if (expectedVersion !== (line?.version ?? 0) || line?.checked) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${line?.version ?? 0}`);
       const wanted: RecordKind = kind === 'recebimentos' ? 'receita' : 'despesa';
-      const hasRecords = [...this.records.values()].some((r) => !r.deletedAt && r.contextId === contextId && r.kind === wanted && monthOf(r.occurredOn) === month);
+      const hasRecords = [...this.records.values()].some((r) => !r.deletedAt && r.contextId === contextId && r.kind === wanted && recordMonth(r) === month);
       if (hasRecords) throw new RepoError('mes_com_registros');
       this.monthChecks.set(`${contextId}|${month}|${kind}`, { contextId, month, kind, checked: true, updatedAt: this.stamp(), version: (line?.version ?? 0) + 1 });
       this.saveOperation(key, 'marcar_mes_conferido', payload, { contextId, recordId: null, commitmentId: null });
@@ -1765,7 +1772,8 @@ export class MemoryRepository implements RecordsRepository {
       const budgets = [...this.budgets.values()].filter((b) => !b.deletedAt && b.contextId === contextId).map(stripBudget);
       const records = [...this.records.values()].filter((r) => !r.deletedAt && r.contextId === contextId);
       const entries = [...this.cardEntries.values()].filter((e) => !e.deletedAt && e.contextId === contextId);
-      return readMonthBudget(month, budgets, { records, entries });
+      const cardDays = new Map([...this.cards.values()].filter((c) => c.contextId === contextId).map((c) => [c.id, { closingDay: c.closingDay, dueDay: c.dueDay }]));
+      return readMonthBudget(month, budgets, { records, entries, cardDays });
     });
   }
 
@@ -2558,7 +2566,14 @@ export class MemoryRepository implements RecordsRepository {
         if (norm.installments + (entry.installmentOffset ?? 0) > 48) throw new RepoError('parcelas_invalidas');
         const change = norm.totalCents !== entry.amountCents || norm.installments !== entry.installments || norm.purchasedOn !== entry.purchasedOn;
         if (change) {
-          const first = norm.purchasedOn === entry.purchasedOn ? entry.invoiceMonth : invoiceMonthOf(card, norm.purchasedOn);
+          // Data nova: a fatura natural da data. Na compra importada em andamento (D-089 B), a primeira guardada anda tantas faturas
+          // quanto a natural andou, para manter a distância que a importação deu (a parcela k em k - 1 faturas depois).
+          const first =
+            norm.purchasedOn === entry.purchasedOn
+              ? entry.invoiceMonth
+              : (entry.installmentOffset ?? 0) > 0 && entry.purchasedOn !== null
+                ? addMonths(entry.invoiceMonth, monthsBetween(invoiceMonthOf(card, entry.purchasedOn), invoiceMonthOf(card, norm.purchasedOn)))
+                : invoiceMonthOf(card, norm.purchasedOn);
           for (let k = 0; k < entry.installments; k++) if (this.invoicePaid(card.id, addMonths(entry.invoiceMonth, k))) throw new RepoError('fatura_paga');
           for (let k = 0; k < norm.installments; k++) if (this.invoicePaid(card.id, addMonths(first, k))) throw new RepoError('fatura_paga');
           if (norm.installments > entry.installments) this.checkEntryCap(card.id, norm.installments - entry.installments);
@@ -2821,7 +2836,7 @@ export class MemoryRepository implements RecordsRepository {
           if (!kinds.includes(it.kind)) throw new RepoError('tipo_invalido');
           const now = new Date().toISOString();
           if (account) {
-            this.validate(contextId, { accountId: account.id, amountCents: it.amountCents, occurredOn: it.occurredOn, description: it.description, category: it.category });
+            this.validate(contextId, it.kind as RecordKind, { accountId: account.id, amountCents: it.amountCents, occurredOn: it.occurredOn, description: it.description, category: it.category });
             const record: StoredRecord = {
               id: this.id('reg'),
               contextId,
@@ -2865,7 +2880,7 @@ export class MemoryRepository implements RecordsRepository {
               );
               if (code) throw new RepoError(code);
               const natural = invoiceMonthOf(c, it.occurredOn);
-              month = mark ? installmentInvoiceMonth(natural, mark, today) : natural;
+              month = mark ? installmentInvoiceMonth(natural, mark, invoiceMonthOf(c, today)) : natural;
             } else {
               // Estorno: valor, descrição e categoria; depois o dia (a fatura é a da data) e a faixa de 48 meses da fatura.
               const text = cardRefundError({ amountCents: it.amountCents, description: it.description, category: it.category, invoiceMonth: monthOf(today) }, today, false);
@@ -4218,10 +4233,12 @@ export class MemoryRepository implements RecordsRepository {
    * Como clarevo_validate_record: a conta é ativa, não excluída e do contexto. keepAccountId é a conta que o registro já tem
    * (update_record), que continua valendo mesmo arquivada.
    */
-  private validate(contextId: string, input: RecordInput, keepAccountId: string | null = null) {
+  private validate(contextId: string, kind: RecordKind, input: RecordInput, keepAccountId: string | null = null) {
     validateCommon(input.amountCents, input.description, input.category);
     if (typeof input.occurredOn !== 'string' || !isValidIsoDate(input.occurredOn)) throw new RepoError('data_invalida');
     if (input.occurredOn > this.opts.today()) throw new RepoError('data_futura');
+    // Mês seguinte (D-089 A, clarevo_check_next_month): só recebimento, só nos últimos 7 dias do mês.
+    if (input.nextMonth === true && (kind !== 'receita' || !nextMonthAllowed(input.occurredOn))) throw new RepoError('mes_seguinte_invalido');
     const acc = this.accountsById.get(input.accountId);
     if (!acc || acc.deletedAt || acc.contextId !== contextId || (acc.status !== 'ativa' && acc.id !== keepAccountId)) throw new RepoError('conta_invalida');
   }
@@ -4667,6 +4684,15 @@ function normalize(input: RecordInput): RecordInput {
     description: input.description.trim(),
     category: trimCategory(input.category),
   };
+}
+
+/**
+ * O mês seguinte (D-089 A) guardado só quando ligado: o registro sem a marca fica como antes (sem a propriedade), igual ao que
+ * `toRecord` lê do banco.
+ */
+function withNextMonth<T extends object>(record: T, nextMonth: boolean): T & { nextMonth?: boolean } {
+  const { nextMonth: _old, ...rest } = record as T & { nextMonth?: boolean };
+  return (nextMonth ? { ...rest, nextMonth: true } : rest) as T & { nextMonth?: boolean };
 }
 
 function normalizeCommitment(input: CommitmentInput): CommitmentInput {

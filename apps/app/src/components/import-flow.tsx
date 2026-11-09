@@ -105,7 +105,8 @@ export function ImportFlow() {
   const [readError, setReadError] = useState<string | null>(null);
   // Aberta da tela de um cartão ("Importar fatura", D-089 B): o destino e o cartão já vêm escolhidos; a pessoa só confirma.
   const params = useLocalSearchParams<{ destino?: string; cartao?: string }>();
-  const [destination, setDestination] = useState<ImportDestination | null>(params.destino === 'cartao' ? 'cartao' : params.destino === 'conta' ? 'conta' : null);
+  const presetDestination: ImportDestination | null = params.destino === 'cartao' ? 'cartao' : params.destino === 'conta' ? 'conta' : null;
+  const [destination, setDestination] = useState<ImportDestination | null>(presetDestination);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [cardId, setCardId] = useState<string | null>(params.destino === 'cartao' && typeof params.cartao === 'string' && params.cartao !== '' ? params.cartao : null);
   const [preparing, setPreparing] = useState(false);
@@ -174,7 +175,8 @@ export function ImportFlow() {
   }
 
   function startDestination(p: ImportParse) {
-    setDestination(p.statement);
+    // Vinda de "Importar fatura" (tela do cartão), a escolha fica: o tipo que o arquivo sugere não troca o cartão pela conta.
+    setDestination(presetDestination ?? p.statement);
     setPrepareError(null);
     setStep('destino');
   }

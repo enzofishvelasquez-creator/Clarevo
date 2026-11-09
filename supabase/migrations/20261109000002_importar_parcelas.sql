@@ -141,7 +141,12 @@ begin
     end if;
     v_change := p_amount_cents <> v_first.purchase_total_cents or v_n <> v_old_n or p_occurred_on <> v_first.purchased_on;
     if v_change then
+      -- Data nova: a fatura natural da data. Na compra importada em andamento (D-089 B), a primeira guardada anda tantas faturas
+      -- quanto a natural andou, para manter a distância que a importação deu.
       v_m1 := case when p_occurred_on = v_first.purchased_on then v_first.invoice_month
+                   when coalesce(v_first.installment_offset, 0) > 0 then
+                     (v_first.invoice_month + age(public.invoice_month_for(v_card.closing_day, v_card.due_day, p_occurred_on),
+                                                  public.invoice_month_for(v_card.closing_day, v_card.due_day, v_first.purchased_on)))::date
                    else public.invoice_month_for(v_card.closing_day, v_card.due_day, p_occurred_on) end;
       if exists (select 1 from public.card_entries x
                   where x.purchase_id = v_e.purchase_id and x.deleted_at is null
@@ -393,10 +398,10 @@ begin
         v_month := public.invoice_month_for(v_card.closing_day, v_card.due_day, v_date);
         if v_kind = 'compra' and v_offset > 0 then
           -- A data da linha costuma ser a da compra original: a parcela k cai k - 1 faturas depois da natural. Se isso passar da
-          -- próxima fatura (a linha trazia a data da cobrança), a parcela entra na fatura natural da própria data: a mesma regra de
-          -- installmentInvoiceMonth, no núcleo.
+          -- fatura aberta do cartão (a em que entraria uma compra feita hoje; a linha trazia a data da cobrança), a parcela entra na
+          -- fatura natural da própria data: a mesma regra de installmentInvoiceMonth, no núcleo.
           v_target := (v_month + make_interval(months => v_offset))::date;
-          if v_target <= (date_trunc('month', public.clarevo_today(v_uid)::timestamp) + interval '1 month')::date then
+          if v_target <= public.invoice_month_for(v_card.closing_day, v_card.due_day, public.clarevo_today(v_uid)) then
             v_month := v_target;
           end if;
         end if;
@@ -449,5 +454,76 @@ begin
           jsonb_build_object('created', v_created, 'skipped', v_skipped));
 
   return jsonb_build_object('created', v_created, 'skipped', v_skipped);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Orçamento: a parcela da compra importada em andamento no mês certo (a mesma de antes, 0027, com o deslocamento)
+-- ---------------------------------------------------------------------------
+create or replace function public.month_budget(p_context_id uuid, p_month date)
+returns table (
+  category text,
+  budget_id uuid,
+  budget_version integer,
+  budget_from date,
+  budget_cents bigint,
+  used_cents bigint
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_next date;
+begin
+  if p_month is null or extract(day from p_month) <> 1 then
+    raise exception 'mes_invalido' using errcode = '22023';
+  end if;
+  if not public.context_permission(p_context_id, 'read') then
+    raise exception 'sem_permissao' using errcode = '42501';
+  end if;
+  v_next := (p_month + interval '1 month')::date;
+
+  -- Gastos, parcelas e estornos de cada categoria, agregados uma vez só (uma leitura de financial_records e uma de card_entries,
+  -- esta pelo índice card_entries_ctx_kind), em vez de uma subconsulta por categoria.
+  return query
+  with spent as (
+    select r.category as cat, sum(r.amount_cents)::bigint as cents
+      from public.financial_records r
+     where r.context_id = p_context_id and r.deleted_at is null and r.kind = 'despesa' and r.card_id is null
+       and r.occurred_on >= p_month and r.occurred_on < v_next
+     group by r.category
+  ), cards as (
+    select e.category as cat,
+           sum(case when e.kind = 'parcela' then e.amount_cents else -e.amount_cents end)::bigint as cents
+      from public.card_entries e
+      left join public.cards cd on cd.id = e.card_id
+      -- Compra importada em andamento (D-089 B): a parcela anda no orçamento a mesma distância que a importação deu à fatura
+      -- (a da linha em relação à fatura natural da data da compra); sem deslocamento, a regra de sempre (categoryUsage no núcleo).
+      cross join lateral (select case when e.kind = 'parcela' and e.installment_offset > 0
+                                      then public.invoice_month_for(cd.closing_day, cd.due_day, e.purchased_on) end as natural_month) n
+     where e.context_id = p_context_id and e.deleted_at is null
+       and ((e.kind = 'parcela' and e.installment_offset = 0
+             and (date_trunc('month', e.purchased_on::timestamp) + make_interval(months => e.installment_number - 1))::date = p_month)
+            or (e.kind = 'parcela' and e.installment_offset > 0
+                and (date_trunc('month', e.purchased_on::timestamp)
+                     + make_interval(months => ((extract(year from e.invoice_month) - extract(year from n.natural_month)) * 12
+                                                + extract(month from e.invoice_month) - extract(month from n.natural_month))::int))::date = p_month)
+            or (e.kind = 'estorno' and e.source_month is null and e.invoice_month = p_month))
+     group by e.category
+  )
+  select c.category,
+         b.id, b.version, b.from_month, b.amount_cents,
+         greatest(0::bigint, coalesce(s.cents, 0) + coalesce(k.cents, 0))::bigint
+    from (values ('Moradia', 1), ('Mercado', 2), ('Transporte', 3), ('Saúde', 4), ('Educação', 5), ('Lazer', 6), ('Crédito e parcelas', 7)) as c (category, ord)
+    left join spent s on s.cat = c.category
+    left join cards k on k.cat = c.category
+    left join lateral (select x.* from public.category_budgets x
+                        where x.context_id = p_context_id and x.category = c.category and x.deleted_at is null
+                          and x.from_month <= p_month
+                        order by x.from_month desc
+                        limit 1) b on true
+   order by c.ord;
 end;
 $$;

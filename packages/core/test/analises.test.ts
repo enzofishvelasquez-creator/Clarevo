@@ -346,7 +346,7 @@ describe('bolhas: os cinco tons do azul (D-089 D)', () => {
 
   it('a maior bolha leva o azul da marca; as seguintes alternam claro e escuro; da sexta em diante os tons repetem; a bolha de valor zero não entra na contagem', () => {
     expect(CATEGORY_BUBBLE_TONES).toHaveLength(5);
-    expect(CATEGORY_BUBBLE_TONES[0]).toEqual({ fill: '#2457F5', text: '#FFFFFF' });
+    expect(CATEGORY_BUBBLE_TONES[0]).toEqual({ fill: '#2457F5', text: '#FFFFFF', stroke: '#FFFFFF' });
     const shares = [
       share('Lazer', 10_000, 50, '5,0%'),
       share('Mercado', 90_000, 450, '45,0%'),

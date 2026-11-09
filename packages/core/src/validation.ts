@@ -3,7 +3,7 @@ import { addMonths, addYearsClamped, formatMonthYearBR, isValidIsoMonth, monthOf
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, parseBRL } from './money';
 import type { AmountMode, CommitmentInput, PaymentInput, RecordInput, SeriesInput, SeriesKind, SeriesNature } from './records';
-import { PARTS_PER_YEAR_MAX } from './records';
+import { PARTS_PER_YEAR_MAX, nextMonthAllowed } from './records';
 import { ANNUAL_MAX_YEARS, annualLastMonth } from './series';
 
 /**
@@ -18,6 +18,7 @@ export const ERROR_TEXT = {
   categoria_invalida: 'Use uma categoria de até 40 caracteres.',
   data_invalida: 'Confira a data informada.',
   data_futura: 'Use uma data até hoje. Aqui entram só valores já pagos ou recebidos.',
+  mes_seguinte_invalido: 'Só um recebimento dos últimos 7 dias do mês pode contar no mês seguinte.',
   conta_invalida: 'Escolha a conta.',
   salvar_falhou: 'Não foi possível salvar. Seu preenchimento foi mantido. Tente novamente.',
   carregar_falhou: 'Não foi possível carregar. Tente novamente.',
@@ -169,6 +170,8 @@ export interface RecordDraft {
   category: string | null;
   /** DD/MM/AAAA */
   dateText: string;
+  /** "Este valor é do mês seguinte" (D-089 A), só em recebimento; vale só com a data nos últimos 7 dias do mês. */
+  nextMonth?: boolean;
 }
 
 export const DESCRIPTION_MAX = 80;
@@ -200,9 +203,18 @@ export function validateRecordDraft(draft: RecordDraft, today: IsoDate): DraftVa
   if (draft.accountId.trim() === '') errors.accountId = ERROR_TEXT.conta_invalida;
 
   if (Object.keys(errors).length > 0 || amount === null || occurredOn === null) return { ok: false, errors };
+  // O ajuste do mês seguinte só vale com a data nos últimos 7 dias do mês: fora disso, cai em silêncio (o formulário já o esconde).
+  const nextMonth = draft.nextMonth === true && nextMonthAllowed(occurredOn);
   return {
     ok: true,
-    input: { accountId: draft.accountId, amountCents: amount, occurredOn, description, category: normalizeCategory(draft.category) },
+    input: {
+      accountId: draft.accountId,
+      amountCents: amount,
+      occurredOn,
+      description,
+      category: normalizeCategory(draft.category),
+      ...(nextMonth ? { nextMonth: true } : {}),
+    },
   };
 }
 
@@ -587,6 +599,7 @@ export function fieldForErrorCode(code: string, form?: 'series'): DraftField | S
       return 'amountText';
     case 'data_invalida':
     case 'data_futura':
+    case 'mes_seguinte_invalido':
     case 'vencimento_fora_do_intervalo':
     case 'vencimento_fora_do_mes':
       return 'dateText';

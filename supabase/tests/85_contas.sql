@@ -1251,10 +1251,10 @@ do $$ begin
      and to_regprocedure('public.clarevo_validate_record(uuid, uuid, uuid, bigint, date, text, text, uuid)') is not null
      and (select count(*) from pg_proc where proname in ('add_goal_movement', 'update_goal_movement', 'clarevo_validate_record')) = 3,
     'as assinaturas antigas de metas e da validação saíram';
-  assert to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text)') is not null
+  assert to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean)') is not null
      and to_regprocedure('public.pay_invoice(text, uuid, date, integer, bigint, date, uuid)') is not null
      and to_regprocedure('public.pay_commitment(text, uuid, integer, uuid, bigint, date, text)') is not null
-     and to_regprocedure('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text)') is not null,
+     and to_regprocedure('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean)') is not null,
     'demais assinaturas sem mudança';
   assert (select array_agg(attname::text order by attnum) from pg_attribute
            where attrelid = 'public.financial_accounts'::regclass and attnum > 0 and not attisdropped)

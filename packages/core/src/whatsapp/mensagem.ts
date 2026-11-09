@@ -121,6 +121,10 @@ function readLink(text: string): WhatsAppCommand | undefined {
 const CARD_WORD = 'cartao';
 const CARD_PREPOSITIONS = new Set(['no', 'com', 'pelo', 'via']);
 const NOT_CARD_BEFORE = new Set(['do', 'da', 'de', 'dos', 'das']);
+/** Com uma destas palavras na mensagem, "cartão" é parte da descrição: estorno, reembolso, fatura e pagamento não são compra nova. */
+const NOT_CARD_WORDS = new Set(['estorno', 'reembolso', 'devolucao', 'fatura', 'pagamento', 'pagto', 'pgto', 'recarga', 'anuidade']);
+/** Marca do lugar do valor na mensagem, enquanto a palavra "cartão" é lida. */
+const AMOUNT_MARK = '\u0000valor';
 
 const INCOME_WORDS = new Set(['recebi', 'recebido', 'recebimento', 'ganhei', 'entrou', 'entrada', 'caiu', 'receita']);
 const EXPENSE_WORDS = new Set(['gastei', 'gasto', 'paguei', 'pago', 'comprei', 'compra', 'despesa']);
@@ -267,11 +271,16 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
   }
   if (chosen.cents < 1) return { type: 'erro', reason: 'valor_invalido' };
   if (chosen.cents > MAX_RECORD_CENTS) return { type: 'erro', reason: 'valor_acima_do_limite' };
-  tokens = tokens.filter((_, i) => !chosen.idx.includes(i));
+  // O valor sai, mas o lugar dele fica marcado enquanto a palavra "cartão" é lida (o nome do cartão vem antes do valor ou no fim).
+  const at = chosen.idx[0]!;
+  tokens = tokens.flatMap((t, i) => (i === at ? [{ ...t, folded: AMOUNT_MARK, word: '' }] : chosen.idx.includes(i) ? [] : [t]));
 
-  // Compra no cartão de crédito (D-089 C), só em gasto: a palavra sai da descrição; no fim da mensagem, o que vem depois é o nome do cartão.
+  // Compra no cartão de crédito (D-089 C), só em gasto e fora de estorno, reembolso, fatura, pagamento e recarga: a palavra sai da
+  // descrição; o nome do cartão é o que vem depois dela, até o valor (se o valor vem depois) ou até o fim ("farmácia 41 cartão
+  // azul", "cartão azul 50 mercado", "mercado 120 no cartão nubank"); "de crédito" logo depois só qualifica o cartão. Se o nome
+  // levaria a descrição inteira ("cartão mercado 50"), as palavras são a descrição.
   let card: { hint: string | null } | null = null;
-  if (kind !== 'receita') {
+  if (kind !== 'receita' && !tokens.some((t) => NOT_CARD_WORDS.has(t.folded))) {
     const i = tokens.findIndex(
       (t, k) =>
         (t.folded === CARD_WORD && !NOT_CARD_BEFORE.has(tokens[k - 1]?.folded ?? '')) ||
@@ -279,14 +288,21 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
     );
     if (i >= 0) {
       const prep = i > 0 && CARD_PREPOSITIONS.has(tokens[i - 1]!.folded);
-      const after = tokens.slice(i + 1);
-      const nameAfter = !prep && i > 0 && tokens[i]!.folded === CARD_WORD;
-      const hint = nameAfter ? after.map((t) => t.word).join(' ').trim() : '';
+      let j = i + 1;
+      if (tokens[j]?.folded === 'de' && tokens[j + 1]?.folded === 'credito') j += 2;
+      else if (tokens[j]?.folded === 'credito') j += 1;
+      const amountAt = tokens.findIndex((t) => t.folded === AMOUNT_MARK);
+      const end = amountAt > i ? amountAt : tokens.length;
+      const rest = [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(end)];
+      const hasDescription = rest.some((t) => t.folded !== AMOUNT_MARK && t.word !== '' && !isEdgeStop(t.folded));
+      const name = hasDescription ? tokens.slice(j, end).filter((t) => t.folded !== AMOUNT_MARK) : [];
+      const hint = name.map((t) => t.word).join(' ').trim();
       card = { hint: hint === '' ? null : clip(hint) };
-      tokens = nameAfter ? tokens.slice(0, i) : [...tokens.slice(0, prep ? i - 1 : i), ...after];
+      tokens = hasDescription ? rest : [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(j)];
       kind = 'despesa';
     }
   }
+  tokens = tokens.filter((t) => t.folded !== AMOUNT_MARK);
 
   // Descrição: o que sobrou, sem as palavras de ligação nas pontas.
   while (tokens.length > 0 && isEdgeStop(tokens[0]!.folded)) tokens = tokens.slice(1);

@@ -111,6 +111,9 @@ export const IMPORT_TEXT = {
     const tail = rest === 0 ? ', a última' : rest === 1 ? ' e a última na seguinte' : ` e as ${num(rest)} que faltam nas seguintes`;
     return `Parcela ${num(number)} de ${num(count)}: entra na fatura de ${formatMonthYearBR(month)}${tail}.`;
   },
+  /** A marca "k/n" que pode ser só a data da compra (D-089 B): a linha vem desmarcada. */
+  installmentOrDateHint: (number: number, count: number): string =>
+    `Pode ser a parcela ${num(number)} de ${num(count)} ou só a data ${String(number).padStart(2, '0')}/${String(count).padStart(2, '0')}. Desmarcada: marque se for a parcela.`,
   /** Rodapé. */
   importButton: (n: number) => (n === 0 ? 'Importar' : `Importar ${num(n)} ${plural(n, 'lançamento', 'lançamentos')}`),
   importing: (done: number, total: number) => `Importando… lote ${num(done)} de ${num(total)}`,

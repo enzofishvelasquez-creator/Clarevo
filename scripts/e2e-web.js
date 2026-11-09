@@ -775,6 +775,51 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await goResumo();
   await expectTotals('excluir recebimento → 6.000 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
 
+  // D-089 A: recebimento do fim do mês que conta no mês seguinte. Hoje é 07/10: a janela de setembro vai de 24 a 30.
+  const aSwitch = () => p.getByRole('switch', { name: 'Este valor é do mês seguinte' }).filter({ visible: true });
+  await p.getByRole('tab', { name: 'Movimentos' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
+  await btn('Registrar recebimento').click(); await waitText('Data do recebimento');
+  ok('A: com a data de hoje (07/10), o ajuste "Este valor é do mês seguinte" não aparece', (await aSwitch().count()) === 0);
+  await field('Descrição').fill('Freela do fim do mês'); await field('Valor em reais').fill('150');
+  await field('Data do recebimento').fill('23/09/2026'); await p.waitForTimeout(300);
+  ok('A: 23/09 fica fora dos últimos 7 dias de setembro: sem o ajuste', (await aSwitch().count()) === 0);
+  await field('Data do recebimento').fill('28/09/2026');
+  await aSwitch().first().waitFor({ timeout: 8000 }).catch(() => {});
+  t = await body();
+  ok('A: com 28/09, o ajuste aparece desligado, com a legenda dos dois meses',
+    (await aSwitch().count()) === 1 && (await aSwitch().first().getAttribute('aria-checked')) === 'false' && t.includes('Entra no Recebido de outubro de 2026, não no de setembro de 2026.'));
+  await aSwitch().first().click(); await p.waitForTimeout(200);
+  ok('A: o ajuste liga', (await aSwitch().first().getAttribute('aria-checked')) === 'true');
+  await layoutChecks('A recebimento do mês seguinte 390px');
+  await scrollTo('Este valor é do mês seguinte');
+  await shot('616_recebimento_mes_seguinte');
+  await btn('Salvar recebimento').click(); await waitText('Recebimento salvo');
+  t = await body();
+  ok('A: o detalhe mantém a data (28/09/2026) e diz "Resumo afetado: Outubro de 2026 (mês seguinte)"', t.includes('28/09/2026') && t.includes('Outubro de 2026 (mês seguinte)'));
+  await shot('617_recebimento_mes_seguinte_detalhe');
+  await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
+  await expectTotals('A: o freela de 28/09 marcado conta em outubro → 6.150 / 2.250', 'R$ 6.150,00', 'R$ 3.900,00', 'R$ 2.250,00');
+  await p.getByRole('tab', { name: 'Movimentos' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
+  const aRow = p.getByRole('button', { name: /^Freela do fim do mês, Recebido · 28\/09\/2026 · conta em outubro/ }).filter({ visible: true });
+  await aRow.first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok('A: em Movimentos de outubro, a linha mantém a data e diz "conta em outubro"', (await aRow.count()) === 1);
+  await aRow.first().click(); await waitText('Editar registro');
+  await btn('Editar registro').click(); await waitText('Editar recebimento');
+  ok('A: ao editar, o ajuste vem ligado', (await aSwitch().count()) === 1 && (await aSwitch().first().getAttribute('aria-checked')) === 'true');
+  await field('Data do recebimento').fill('15/09/2026'); await p.waitForTimeout(300);
+  t = await body();
+  ok('A: com 15/09, o ajuste some e o aviso diz que o registro sai de outubro e passa a contar em setembro',
+    (await aSwitch().count()) === 0 && t.includes('O registro sai de outubro de 2026 e passa a contar em setembro de 2026.'));
+  await field('Data do recebimento').fill('28/09/2026'); await aSwitch().first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok('A: de volta a 28/09, o ajuste volta ligado e sem aviso de mudança de mês',
+    (await aSwitch().first().getAttribute('aria-checked')) === 'true' && !(await body()).includes('O registro sai de'));
+  await btn('Voltar').click(); await waitText('Editar registro');
+  await btn('Excluir registro').click(); await waitText('Excluir registro?');
+  ok('A: excluir avisa que o valor deixa de contar no resumo de outubro', (await body()).includes('O valor deixa de contar no resumo de outubro de 2026.'));
+  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registro excluído');
+  await goResumo();
+  await expectTotals('A: excluir o freela marcado → 6.000 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
+
   // Contas a pagar (D-020, D-021): começa e termina na base completa
   await p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$ 650,00/ }).filter({ visible: true }).first().click(); await waitText('Contas em aberto com vencimento até o fim do mês');
   t = await body();
@@ -7569,11 +7614,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H3 CSV de lançamentos: nome clarevo-lancamentos-2026-10-07.csv e UTF-8 com BOM (EF BB BF)',
     h3Lanc.name === 'clarevo-lancamentos-2026-10-07.csv' && h3Lanc.buf[0] === 0xef && h3Lanc.buf[1] === 0xbb && h3Lanc.buf[2] === 0xbf, `${h3Lanc.name} ${[...h3Lanc.buf.slice(0, 4)].join(',')}`);
   ok('H3 CSV de lançamentos: cabeçalho separado por ponto e vírgula e uma linha por lançamento (6), terminando em CRLF',
-    h3Lines[0] === '﻿Data;Tipo;Descrição;Categoria;Valor (R$);Conta de origem;Origem' && h3Lines.length === 8 && h3Lines[7] === '', JSON.stringify(h3Lines.slice(0, 3)));
+    h3Lines[0] === '﻿Data;Tipo;Descrição;Categoria;Valor (R$);Conta de origem;Origem;Mês do resumo' && h3Lines.length === 8 && h3Lines[7] === '', JSON.stringify(h3Lines.slice(0, 3)));
   ok('H3 CSV de lançamentos: um gasto anotado em outra conta (Mercado, Carteira), valor com vírgula e data dd/mm/aaaa',
-    h3Lines.includes('06/10/2026;Gasto;Mercado;Mercado;1400,00;Carteira;Anotado'), h3Lines.join(' | '));
+    h3Lines.includes('06/10/2026;Gasto;Mercado;Mercado;1400,00;Carteira;Anotado;10/2026'), h3Lines.join(' | '));
   ok('H3 CSV de lançamentos: o gasto fixo pago (Aluguel) com a origem "Gasto fixo", e o recebimento como "Recebimento"',
-    h3Lines.includes('05/10/2026;Gasto;Aluguel;Moradia;2500,00;Conta principal;Gasto fixo') && h3Lines.includes('01/10/2026;Recebimento;Salário;Salário;6000,00;Conta principal;Anotado'));
+    h3Lines.includes('05/10/2026;Gasto;Aluguel;Moradia;2500,00;Conta principal;Gasto fixo;10/2026') && h3Lines.includes('01/10/2026;Recebimento;Salário;Salário;6000,00;Conta principal;Anotado;10/2026'));
   ok('H3 CSV de lançamentos: sem sinal de menos, sem "R$" nem ponto de milhar nos valores, e sem as compras no cartão',
     h3Lines.slice(1, 7).every((l) => /;\d+,\d{2};/.test(l)) && !h3Lanc.text.includes('Notebook'));
   await waitText('Pronto. Confira o arquivo na pasta de downloads.').catch(() => {});
@@ -7598,9 +7643,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await h3Prepare();
   const h3Esc = await h3Download('Baixar lançamentos (CSV)');
   const h3EscLines = h3Esc.text.split('\r\n');
-  ok('H3 fórmula: "=SOMA(1+1)" sai como \'=SOMA(1+1) (texto), "Sem categoria" onde não há categoria', h3EscLines.includes("07/10/2026;Gasto;'=SOMA(1+1);Sem categoria;19,90;Conta principal;Anotado"), h3EscLines.join(' | '));
+  ok('H3 fórmula: "=SOMA(1+1)" sai como \'=SOMA(1+1) (texto), "Sem categoria" onde não há categoria', h3EscLines.includes("07/10/2026;Gasto;'=SOMA(1+1);Sem categoria;19,90;Conta principal;Anotado;10/2026"), h3EscLines.join(' | '));
   ok('H3 fórmula: "+55…" ganha o apóstrofo e, por ter ponto e vírgula e aspas, vai entre aspas com as aspas dobradas',
-    h3EscLines.includes('07/10/2026;Gasto;"\'+55 11 99999; ""teste""";Lazer;5,00;Conta principal;Anotado'), h3EscLines.join(' | '));
+    h3EscLines.includes('07/10/2026;Gasto;"\'+55 11 99999; ""teste""";Lazer;5,00;Conta principal;Anotado;10/2026'), h3EscLines.join(' | '));
   ok('H3 fórmula: nenhuma célula do arquivo começa com =, +, - ou @', h3EscLines.slice(1).filter(Boolean).every((l) => !/(^|;)[=+\-@]/.test(l.replace(/"[^"]*(""[^"]*)*"/g, 'x'))), h3EscLines.join(' | '));
   const h3Compras2 = await h3Download('Baixar compras no cartão (CSV)');
   ok('H3 as compras no cartão continuam as mesmas (3) depois dos novos gastos', h3Compras2.text.split('\r\n').length === 5);
@@ -7922,6 +7967,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Ver o cartão').click(); await waitText('Cartão Exemplo'); await p.waitForTimeout(600);
   t1 = await body();
   ok('I1 cartão: a fatura de novembro soma as compras (R$ 550,00 + R$ 158,90 = R$ 708,90)', t1.includes('R$ 708,90'), t1.slice(0, 400));
+  // "Importar fatura" na tela do cartão (D-089 B): depois de ler o arquivo, o destino continua o cartão, já escolhido.
+  await btn('Importar fatura').click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
+  await i1Pick(i1CardNeg); await waitText('Arquivo lido: fatura-negativa.csv', 12000); await p.waitForTimeout(300);
+  ok('I1 "Importar fatura": depois de ler a planilha, "Cartão de crédito" e "Cartão Exemplo" continuam escolhidos',
+    (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'true' && (await radio('Cartão Exemplo').getAttribute('aria-checked')) === 'true');
+  await btn('Voltar').click(); await p.waitForTimeout(400);
+  if ((await p.getByText('Descartar o preenchimento?').filter({ visible: true }).count()) > 0) await confirmIn('Descartar alterações');
+  await waitText('Cartão Exemplo'); await p.waitForTimeout(400);
   await goResumo().catch(() => {});
   await expectTotals('I1 Resumo depois da fatura: compras no cartão não entram em Pago (nada muda)', 'R$ 11.250,00', 'R$ 4.155,70', 'R$ 7.094,30', 'R$ 650,00');
 

@@ -240,6 +240,36 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------------------
+-- 5b. O apelido igual vence ("verde" escolhe "Verde" mesmo havendo "Verde Limão"); sem igual, um só que contenha o nome escrito ou esteja
+--     nele ("verde obrigado" escolhe "Verde"). Num ponto de salvamento desfeito no fim, para não mexer na ordem do DESFAZER.
+-- ---------------------------------------------------------------------------
+savepoint escolha_do_cartao;
+set role authenticated;
+select pg_temp.as_('ana');
+do $$ begin
+  insert into ids values ('verde', (public.create_card('cc-verde-0001', pg_temp.id('ana_ctx'), 'Verde', null, 20, 27, null) #>> '{card,id}')::uuid);
+  insert into ids values ('verde_limao', (public.create_card('cc-verde-0002', pg_temp.id('ana_ctx'), 'Verde Limão', null, 20, 27, null) #>> '{card,id}')::uuid);
+end $$;
+reset role;
+set role service_role;
+select pg_temp.as_service();
+do $$
+declare
+  r jsonb;
+begin
+  r := pg_temp.buy(50, 'Feira', 'verde', 900);
+  assert r ->> 'result' = 'compra_anotada' and r #>> '{purchase,card_nickname}' = 'Verde', 'o apelido igual vence: ' || r::text;
+  r := pg_temp.buy(51, 'Feira', 'Verde obrigado', 900);
+  assert r ->> 'result' = 'compra_anotada' and r #>> '{purchase,card_nickname}' = 'Verde', 'o apelido dentro do nome escrito: ' || r::text;
+  r := pg_temp.buy(52, 'Feira', 'limao', 900);
+  assert r ->> 'result' = 'compra_anotada' and r #>> '{purchase,card_nickname}' = 'Verde Limão', 'o nome escrito dentro do apelido: ' || r::text;
+  r := pg_temp.buy(53, 'Feira', 'ver', 900);
+  assert r ->> 'result' = 'qual_cartao', 'parte comum a dois apelidos: pergunta';
+end $$;
+reset role;
+rollback to savepoint escolha_do_cartao;
+
+-- ---------------------------------------------------------------------------
 -- 6. DESFAZER: a última anotação do canal, compra no cartão ou gasto, na ordem; depois de tudo, nada para desfazer.
 -- ---------------------------------------------------------------------------
 set role service_role;

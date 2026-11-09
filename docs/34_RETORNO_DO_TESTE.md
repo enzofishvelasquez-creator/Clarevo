@@ -38,7 +38,7 @@ Elis mandou a Enzo prints com o que achou confuso e o que gostaria de ter, e ped
 
 | # | O que a pessoa disse | O que foi feito | Situação |
 |---|---|---|---|
-| 1 | Salário que cai no fim do mês somou no mês anterior: "é necessário ter a opção de reconhecer esse valor como algo que encontrou para o mês vigente" | Decisão A do pacote 2 (abaixo) | com Enzo |
+| 1 | Salário que cai no fim do mês somou no mês anterior: "é necessário ter a opção de reconhecer esse valor como algo que encontrou para o mês vigente" | Decisão A do pacote 2 (abaixo): em Registrar recebimento, com a data nos últimos 7 dias do mês, o ajuste "Este valor é do mês seguinte" | pronto |
 | 2 | "Ele leu o print do boleto da conta de luz, o que é ótimo, mas a descrição precisa informar isso. Hoje ele só diz ler comprovante Pix ou pagamento" | Em Anotar gasto, a opção passou a "Ler comprovante ou boleto"; o guia e o site dizem que lê boleto e conta de luz | pronto |
 | 3 | "O boleto da Protebem, que não tem imagem, só o código de barras e as informações, ele não leu" | O leitor reconhece o boleto pela linha digitável ou pelo código de barras: valor e vencimento do código e o nome do beneficiário; a linha lida diz "Boleto · ... · vence em ..." e avisa que a data é o vencimento | pronto (conferir com a foto do boleto no celular) |
 | 4 | Cartão: "uma compra parcelada não foi feita hoje"; importar a fatura reconhecendo as compras que já existem e as parcelas "3/4", todo mês | Decisão B do pacote 2 | com Enzo |
@@ -63,7 +63,7 @@ Enzo aprovou as sete em 09/11/2026 ("Aprovo", D-089), na ordem E, D, C, B, A, F 
 
 | Letra | Decisão | Recomendação da equipe | Tamanho | Situação |
 |---|---|---|---|---|
-| A | Salário no fim do mês: (1) no recebimento, um ajuste "Este valor é do mês seguinte", mostrado quando a data cai nos últimos 7 dias do mês, respeitado pelo Recebido do Resumo, pela Evolução, pelas Análises e pela exportação (coluna nova e migração); (2) sem mexer no banco, uma dica no formulário sugerindo anotar com a data do dia 1º | Opção 1, só para recebimentos | cerca de 1 dia | a fazer |
+| A | Salário no fim do mês: (1) no recebimento, um ajuste "Este valor é do mês seguinte", mostrado quando a data cai nos últimos 7 dias do mês, respeitado pelo Recebido do Resumo, pela Evolução, pelas Análises e pela exportação (coluna nova e migração); (2) sem mexer no banco, uma dica no formulário sugerindo anotar com a data do dia 1º | Opção 1, só para recebimentos | cerca de 1 dia | pronto (migração 0030 ainda a aplicar em produção) |
 | B | Botão "Importar fatura" na tela do cartão; a importação cria a compra com as parcelas que faltam, mantendo a numeração do extrato (3 de 4, 4 de 4) | Fazer: é o que destrava quem já tem cartão | cerca de 1 dia, com migração | pronto (09/11/2026; falta aplicar a migração 0029) |
 | C | "cartão" (ou o nome do cartão) na mensagem do Telegram vira compra no cartão; DESFAZER desfaz | Fazer | meio dia, com migração e a função republicada | pronto (09/11/2026; falta aplicar a migração 0028 e publicar as funções) |
 | D | Bolhas das categorias em cinco tons do azul da marca, contraste conferido, a escolhida em lima como hoje | Fazer | meio período | pronto (09/11/2026) |

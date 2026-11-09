@@ -135,6 +135,20 @@ describe('WhatsApp: leitura das mensagens (sem IA)', () => {
     expect(read('cartão 41')).toEqual({ type: 'erro', reason: 'sem_descricao' });
   });
 
+  it('compra no cartão, revisão independente: nome do cartão antes do valor ou depois de "no cartão"; "de crédito" não é nome; estorno, fatura e pagamento não são compra', () => {
+    const card = (description: string, category: string | null, hint: string | null, cents: number) => ({ ...anotar('despesa', cents, description, category), card: { hint } });
+    expect(read('cartão azul 50 mercado')).toEqual(card('Mercado', 'Mercado', 'azul', 5000));
+    expect(read('mercado 120 no cartão nubank')).toEqual(card('Mercado', 'Mercado', 'nubank', 12000));
+    expect(read('farmácia 41 no cartão de crédito')).toEqual(card('Farmácia', 'Saúde', null, 4100));
+    expect(read('farmácia 41 cartão de crédito azul')).toEqual(card('Farmácia', 'Saúde', 'azul', 4100));
+    expect(read('cartão mercado 50')).toEqual(card('Mercado', 'Mercado', null, 5000));
+    // Com estorno, reembolso, fatura, pagamento ou recarga, "cartão" é parte da descrição: nada de compra nova no cartão.
+    for (const text of ['estorno cartão 30', 'reembolso cartão 50', 'fatura cartão 500', 'pagamento cartão 800', 'recarga cartão transporte 20']) {
+      const r = read(text);
+      expect(r.type === 'anotar' && r.card, text).toBeNull();
+    }
+  });
+
   it('dois números: vale o que tem centavos ou R$, se for só um', () => {
     expect(read('13 salário 3.000,00')).toEqual(anotar('receita', 300000, '13 salário', 'Salário'));
     expect(read('2 pães 10,50')).toEqual(anotar('despesa', 1050, '2 pães', null));
@@ -221,6 +235,10 @@ describe('WhatsApp: respostas', () => {
       'Qual cartão? Você tem: Azul e Roxo. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão azul".',
     );
     expect(whatsappOutcomeReply({ result: 'qual_cartao', space, cards: ['Azul', 'Roxo', 'Verde'] }, TODAY)).toContain('Azul, Roxo e Verde');
+    // Apelido que já começa com "Cartão": a palavra não se repete.
+    expect(whatsappOutcomeReply({ result: 'qual_cartao', space, cards: ['Cartão Azul', 'Roxo'] }, TODAY)).toContain('"farmácia 41 cartão azul"');
+    expect(whatsappOutcomeReply({ result: 'limite_do_cartao', space }, TODAY)).toBe('Este cartão chegou a 5.000 lançamentos guardados. Exclua no app os que não precisa mais para anotar outros.');
+    expect(whatsappOutcomeReply({ result: 'compra_anotada', space, purchase: { ...purchase, card_nickname: 'Cartão Azul' } } as never, TODAY)).toContain('Compra no Cartão Azul: Farmácia');
     expect(whatsappOutcomeReply({ result: 'fatura_paga', space }, TODAY)).toBe(
       'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.',
     );

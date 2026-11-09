@@ -1,5 +1,6 @@
 import { addDays, addMonths, isValidIsoDate, monthOf, type IsoDate, type IsoMonth } from './dates';
 import type { ContextActivity, FinancialRecord } from './records';
+import { recordMonth } from './records';
 import { REMINDER_ID_PREFIX } from './reminders';
 
 /**
@@ -157,7 +158,7 @@ export function routineReminderPlan(
   const mine = (r: FinancialRecord) => options.contextId === undefined || r.contextId === options.contextId;
   const thisMonth = monthOf(today);
   const expenseToday = options.cardPurchaseToday === true || records.some((r) => mine(r) && r.kind === 'despesa' && r.occurredOn === today);
-  const incomeThisMonth = records.some((r) => mine(r) && r.kind === 'receita' && isValidIsoDate(r.occurredOn) && monthOf(r.occurredOn) === thisMonth);
+  const incomeThisMonth = records.some((r) => mine(r) && r.kind === 'receita' && isValidIsoDate(r.occurredOn) && recordMonth(r) === thisMonth);
   /** O aviso em `date` ainda cabe: hoje só se o horário não passou; nunca no passado. */
   const fits = (date: IsoDate) => date > today || (date === today && !todayPassed);
 

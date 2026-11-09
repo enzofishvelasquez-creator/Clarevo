@@ -58,6 +58,11 @@ export function installmentAmounts(totalCents, count) {
     const rest = totalCents - base * count;
     return Array.from({ length: count }, (_, i) => (i === 0 ? base + rest : base));
 }
+export function installmentsWords(installments, offset = 0) {
+    if (offset > 0)
+        return installments === 1 ? `parcela ${offset + 1} de ${offset + 1}` : `parcelas ${offset + 1} a ${offset + installments} de ${offset + installments}`;
+    return installments === 1 ? 'à vista' : `em ${installments} vezes`;
+}
 export function purchaseInstallments(entry) {
     const offset = entry.installmentOffset ?? 0;
     return installmentAmounts(entry.amountCents, entry.installments).map((amountCents, i) => ({
@@ -95,7 +100,14 @@ export function refundEditChoices(entries, paidMonths, refundMonth, max = REFUND
         .filter((e) => e.kind === 'compra' && e.invoiceMonth <= refundMonth && !purchaseBlockedByPaidInvoice(e.invoiceMonth, e.installments, paid))
         .sort((a, b) => (b.purchasedOn ?? '').localeCompare(a.purchasedOn ?? '') || (a.description ?? '').localeCompare(b.description ?? '', 'pt-BR') || a.id.localeCompare(b.id))
         .slice(0, Math.max(0, max))
-        .map((e) => ({ entryId: e.id, description: e.description ?? '', amountCents: e.amountCents, installments: e.installments, invoiceMonth: e.invoiceMonth }));
+        .map((e) => ({
+        entryId: e.id,
+        description: e.description ?? '',
+        amountCents: e.amountCents,
+        installments: e.installments,
+        installmentOffset: e.installmentOffset ?? 0,
+        invoiceMonth: e.invoiceMonth,
+    }));
 }
 export function invoiceCanBePaid(invoice) {
     return invoice.situation === 'fechada' && invoice.commitmentId !== null && invoice.totalCents > 0;
@@ -877,8 +889,8 @@ export const CARDS_TEXT = {
     refundBudget: {
         rule: 'O estorno conta no mês da fatura em que foi informado e, por isso, o usado do mês da compra no orçamento não diminui.',
         editInstead: 'Se nenhuma fatura da compra foi paga, corrija o valor em Editar compra, em vez de registrar um estorno.',
-        editA11y: (description, amountCents, installments) => `Editar compra ${description}, ${formatBRL(amountCents)}${installments > 1 ? ` em ${installments} vezes` : ''}`,
-        editCaption: (amountCents, installments) => `${formatBRL(amountCents)}${installments > 1 ? ` em ${installments}x` : ''}`,
+        editA11y: (description, amountCents, installments, offset = 0) => `Editar compra ${description}, ${formatBRL(amountCents)}${offset > 0 ? `, ${installmentsWords(installments, offset)}` : installments > 1 ? ` em ${installments} vezes` : ''}`,
+        editCaption: (amountCents, installments, offset = 0) => `${formatBRL(amountCents)}${offset > 0 ? `, ${installmentsWords(installments, offset)}` : installments > 1 ? ` em ${installments}x` : ''}`,
     },
     paymentOrigin: 'Pagamento de fatura',
     paidNote: 'Compras no cartão só entram em Pago quando a fatura é paga, na data do pagamento.',
@@ -941,6 +953,9 @@ export const CARDS_TEXT = {
         paymentRecordNote: 'Este gasto é o pagamento de uma fatura. Para mudar ou desfazer o pagamento, abra a fatura.',
         notStarted: 'Ainda não começou',
         purchaseDateLabel: 'Data da compra',
+        importedInProgressNote: (installments, offset) => installments === 1
+            ? `Compra importada na última parcela (${offset + 1} de ${offset + 1}): o valor e as parcelas aqui são só dela.`
+            : `Compra importada na parcela ${offset + 1} de ${offset + installments}: o valor e as parcelas aqui são os das ${installments} que faltam.`,
         purchaseSituation: 'Compra no cartão',
         registerHint: 'Depois de cadastrar, você volta para anotar a compra.',
         archivedNote: 'Este cartão está arquivado. As faturas e o histórico continuam aqui.',

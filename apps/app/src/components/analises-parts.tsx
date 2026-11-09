@@ -251,7 +251,7 @@ function CategoryBubbleChart({ shares, selectedKey, onSelect }: { shares: Catego
                   cy={b.cy}
                   r={b.r}
                   fill={selected ? colors.accent : b.tone.fill}
-                  stroke={selected ? colors.text : colors.surface}
+                  stroke={selected ? colors.text : b.tone.stroke === '#FFFFFF' ? colors.surface : b.tone.stroke}
                   strokeWidth={selected ? 3 : 2}
                 />
               );

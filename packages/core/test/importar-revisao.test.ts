@@ -18,6 +18,8 @@ import {
   installmentMark,
   IMPORT_TEXT,
   installmentInvoiceMonth,
+  invoiceMonthOf,
+  markLooksLikeDate,
   EMPTY_TALLY,
   alreadyNotedLeftOut,
   attemptProgress,
@@ -590,6 +592,23 @@ describe('importar: parcelas na fatura', () => {
     expect(installmentMark('LOJA PARC03/10', '2026-10-03')).toEqual({ number: 3, count: 10 });
   });
 
+  it('marca que pode ser só a data da semana anterior (markLooksLikeDate): continua "Parcela em andamento", mas desmarcada, com a explicação', () => {
+    expect(markLooksLikeDate({ number: 1, count: 11 }, '2026-11-02')).toBe(true);
+    expect(markLooksLikeDate({ number: 5, count: 10 }, '2026-10-06')).toBe(true);
+    expect(markLooksLikeDate({ number: 30, count: 12 }, '2027-01-02')).toBe(true);
+    // Depois da data da linha, mais de uma semana antes, ou mês impossível: parcela.
+    expect(markLooksLikeDate({ number: 3, count: 10 }, '2026-10-02')).toBe(false);
+    expect(markLooksLikeDate({ number: 3, count: 10 }, '2026-07-15')).toBe(false);
+    expect(markLooksLikeDate({ number: 2, count: 10 }, '2026-10-12')).toBe(false);
+    expect(markLooksLikeDate({ number: 3, count: 18 }, '2026-10-02')).toBe(false);
+    const p = parse([line(1, '2026-11-02', 'MERCADO 01/11', 12000)], { source: 'csv', cardPositive: true });
+    const [l] = buildReview(cardInput(p, [], { today: '2026-11-09' }));
+    expect([l!.label, l!.importable, l!.include]).toEqual(['parcela', true, false]);
+    expect(l!.hint).toBe('Pode ser a parcela 1 de 11 ou só a data 01/11. Desmarcada: marque se for a parcela.');
+    // Marcada à mão, entra como parcela (o item leva a marca).
+    expect(l!.installment).toEqual({ number: 1, count: 11 });
+  });
+
   it('fatura com parcela (D-089 B): "Parcela em andamento", marcada, com a parcela e a fatura em que entra; o item leva a parcela', () => {
     const p = parse([line(1, '2026-10-02', 'LOJA 03/10', 12000), line(2, '2026-10-02', 'Padaria', 4590), line(3, '2026-10-03', 'Loja 15/10/2026', 500)], { source: 'csv', cardPositive: true });
     const review = buildReview(cardInput(p));
@@ -613,13 +632,18 @@ describe('importar: parcelas na fatura', () => {
   });
 
   it('a fatura em que a parcela entra (installmentInvoiceMonth): k - 1 faturas depois da natural; passando da próxima fatura, a natural', () => {
-    // Hoje 07/10/2026: a próxima fatura é a de novembro. Compra original de julho (fatura de agosto), parcela 3: outubro.
-    expect(installmentInvoiceMonth('2026-08', { number: 3, count: 10 }, '2026-10-07')).toBe('2026-10');
-    expect(installmentInvoiceMonth('2026-09', { number: 3, count: 10 }, '2026-10-07')).toBe('2026-11');
-    // Linha com a data da cobrança (fatura de outubro), parcela 3: dezembro passa da próxima fatura, então entra em outubro.
-    expect(installmentInvoiceMonth('2026-10', { number: 3, count: 10 }, '2026-10-07')).toBe('2026-10');
-    expect(installmentInvoiceMonth('2026-10', { number: 1, count: 10 }, '2026-10-07')).toBe('2026-10');
-    expect(installmentInvoiceMonth('2026-10', { number: 2, count: 10 }, '2026-10-07')).toBe('2026-11');
+    // Hoje 07/10/2026, cartão que fecha dia 3: a fatura aberta é a de novembro. Compra original de julho (fatura de agosto), parcela 3: outubro.
+    expect(installmentInvoiceMonth('2026-08', { number: 3, count: 10 }, '2026-11')).toBe('2026-10');
+    expect(installmentInvoiceMonth('2026-09', { number: 3, count: 10 }, '2026-11')).toBe('2026-11');
+    // Linha com a data da cobrança (fatura de outubro), parcela 3: dezembro passa da fatura aberta, então entra em outubro.
+    expect(installmentInvoiceMonth('2026-10', { number: 3, count: 10 }, '2026-11')).toBe('2026-10');
+    expect(installmentInvoiceMonth('2026-10', { number: 1, count: 10 }, '2026-11')).toBe('2026-10');
+    expect(installmentInvoiceMonth('2026-10', { number: 2, count: 10 }, '2026-11')).toBe('2026-11');
+    // Cartão que fecha dia 25 e vence dia 5, hoje 27/11/2026: a fatura aberta é a de janeiro de 2027 (não "o mês de hoje mais um").
+    // Compra de 10/09 (fatura de outubro), parcela 4 de 10: janeiro de 2027.
+    const open = invoiceMonthOf({ closingDay: 25, dueDay: 5 }, '2026-11-27');
+    expect(open).toBe('2027-01');
+    expect(installmentInvoiceMonth(invoiceMonthOf({ closingDay: 25, dueDay: 5 }, '2026-09-10'), { number: 4, count: 10 }, open)).toBe('2027-01');
   });
 
   it('parcela em fatura já paga, ou com parcela seguinte em fatura paga: "Fatura já paga, não entra"', () => {

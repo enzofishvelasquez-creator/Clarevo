@@ -7,12 +7,13 @@ import { formatTenths } from './learn/format';
 import { sharesCents } from './learn/math';
 import { formatBRL } from './money';
 import type { Commitment, FinancialRecord } from './records';
-import { NO_CATEGORY_LABEL } from './records';
+import { NO_CATEGORY_LABEL, recordMonth } from './records';
 
 /**
  * Resumo do mês de um contexto (CL C004).
  *
- * Critério único: registros realizados do contexto cuja data de pagamento/recebimento cai no mês.
+ * Critério único: registros realizados do contexto cuja data de pagamento/recebimento cai no mês. Exceção (D-089 A): o recebimento
+ * marcado "do mês seguinte" conta no mês seguinte ao da data (`recordMonth`).
  * - Recebido: receitas. Pago: despesas.
  * - Diferença do mês = recebido − pago. Não é saldo da conta nem dinheiro disponível.
  * Registros excluídos não chegam aqui (o repositório não os devolve).
@@ -33,7 +34,7 @@ const newestFirst = (a: FinancialRecord, b: FinancialRecord) =>
   b.occurredOn.localeCompare(a.occurredOn) || b.createdAt.localeCompare(a.createdAt);
 
 export function summarizeMonth(records: readonly FinancialRecord[], contextId: string, month: IsoMonth): MonthSummary {
-  const inMonth = records.filter((r) => r.contextId === contextId && r.status === 'realizado' && monthOf(r.occurredOn) === month);
+  const inMonth = records.filter((r) => r.contextId === contextId && r.status === 'realizado' && recordMonth(r) === month);
   const received = inMonth.filter((r) => r.kind === 'receita').sort(newestFirst);
   const paid = inMonth.filter((r) => r.kind === 'despesa').sort(newestFirst);
   const receivedCents = sum(received);

@@ -148,7 +148,8 @@ Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C
 - [ ] **Você (Claude Chrome):** aplicar a migração 0028 no `clarevo-producao` (docs/05, passo 12r) e conferir (passo 21p); depois, publicar de novo as funções `telegram` e `whatsapp` com o conteúdo gerado em `supabase/functions/` (a do WhatsApp só se ela estiver publicada)
 - [x] B: "Importar fatura" na tela do cartão; a linha com a parcela escrita entra como compra com as parcelas que faltam (migração 0029, `installment_offset`; `99zzzzzzzz_importar_parcelas.sql`, `importar-revisao.test.ts`, `importar-repo.test.ts`, `cards.test.ts`)
 - [ ] **Você (Claude Chrome):** aplicar a migração 0029 no `clarevo-producao` (docs/05, passo 12s) e conferir (passo 21q); o app novo precisa dela (a visão `card_entry_items` ganha uma coluna) e o app antigo continua funcionando
-- [ ] A: recebimento do fim do mês contando no mês seguinte (migração)
+- [x] A: recebimento do fim do mês contando no mês seguinte (migração 0030, `next_month` e `counted_month`; `mes-seguinte.test.ts`, `99zzzzzzzzz_mes_seguinte.sql`; roteiro de telas depois de excluir o recebimento)
+- [ ] **Você (Claude Chrome):** aplicar a migração 0030 no `clarevo-producao` (docs/05, passo 12t) e conferir (passo 21r), antes de publicar o app novo: a lista do mês passa a ler `counted_month`
 - [ ] F: vídeo em formato de reels (compra de mercado e orçamento)
 - [ ] G, depois do lançamento: modo "Fatura de cartão depois do vencimento" em Multa e juros
 

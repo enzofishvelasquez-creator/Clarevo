@@ -3,6 +3,7 @@ import {
   CATEGORIES,
   ERROR_TEXT,
   NOTA_FLOW_TEXT,
+  NEXT_MONTH_TEXT,
   NOTA_TEXT,
   NO_CATEGORY_LABEL,
   ACCOUNTS_TEXT,
@@ -17,6 +18,7 @@ import {
   isRepoError,
   monthOf,
   newOperationKey,
+  recordMonth,
   type FinancialRecord,
   type IsoDate,
 } from '@clarevo/core';
@@ -93,7 +95,7 @@ export default function DetalheRegistro() {
       setConfirming(false);
       // Excluir o gasto de uma conta a pagar reabre a conta na mesma operação do banco (D-021, regra 2).
       flash.set(r.commitmentId ? 'Registro excluído. A conta a pagar voltou para Ainda a pagar.' : 'Registro excluído');
-      totalChange.set({ total: r.kind === 'despesa' ? 'pago' : 'recebido', month: monthOf(r.occurredOn), deltaCents: -r.amountCents });
+      totalChange.set({ total: r.kind === 'despesa' ? 'pago' : 'recebido', month: recordMonth(r), deltaCents: -r.amountCents });
       toList();
     } catch (e) {
       setConfirming(false);
@@ -157,7 +159,8 @@ export default function DetalheRegistro() {
                   <Row label="Categoria" value={r.category ?? NO_CATEGORY_LABEL} />
                   {r.invoice ? <Row label="Origem" value={CARDS_TEXT.paymentOrigin} /> : r.commitmentId ? <Row label="Origem" value="Conta a pagar" /> : null}
                   {r.receiptKey ? <Row label={NOTA_FLOW_TEXT.detailRow} value={NOTA_FLOW_TEXT.detailRowValue} /> : null}
-                  <Row label="Resumo afetado" value={formatMonthBR(monthOf(r.occurredOn))} last />
+                  {/* Recebimento marcado do mês seguinte (D-089 A): conta no mês seguinte ao da data. */}
+                  <Row label="Resumo afetado" value={`${formatMonthBR(recordMonth(r))}${r.nextMonth ? NEXT_MONTH_TEXT.detailSuffix : ''}`} last />
                 </View>
                 <View style={styles.trail} accessible>
                   <Txt variant="caption" color={colors.textSecondary}>
@@ -220,7 +223,7 @@ export default function DetalheRegistro() {
                 label="Ver resumo do mês"
                 tone="soft"
                 onPress={() => {
-                  view.setMonth(monthOf(r.occurredOn));
+                  view.setMonth(recordMonth(r));
                   openSummary();
                 }}
               />
@@ -240,7 +243,7 @@ export default function DetalheRegistro() {
                 onCancel={() => setConfirming(false)}
                 onConfirm={doDelete}>
                 <MoneyTxt style={{ fontFamily: fonts.bold }}>{`${r.description} · ${formatBRL(r.amountCents)} · Pessoal`}</MoneyTxt>
-                <Txt color={colors.textSecondary}>O valor deixa de contar no resumo de {formatMonthBR(monthOf(r.occurredOn)).toLowerCase()}.</Txt>
+                <Txt color={colors.textSecondary}>O valor deixa de contar no resumo de {formatMonthBR(recordMonth(r)).toLowerCase()}.</Txt>
                 {r.commitmentId ? <Txt color={colors.textSecondary}>A conta a pagar ligada a este gasto volta para Ainda a pagar.</Txt> : null}
               </ConfirmDialog>
             </>

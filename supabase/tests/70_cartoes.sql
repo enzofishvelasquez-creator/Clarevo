@@ -2858,8 +2858,8 @@ do $$ begin
        = 'p_idempotency_key text, p_card_id uuid, p_month date, p_expected_version integer, p_paid_cents bigint, p_paid_on date, p_account_id uuid DEFAULT NULL::uuid'
      and pg_get_function_arguments('public.undo_invoice_payment(text, uuid, date, integer)'::regprocedure)
        = 'p_idempotency_key text, p_card_id uuid, p_month date, p_expected_version integer'
-     and pg_get_function_arguments('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text)'::regprocedure)
-       = 'p_idempotency_key text, p_context_id uuid, p_account_id uuid, p_kind record_kind, p_amount_cents bigint, p_occurred_on date, p_description text, p_category text DEFAULT NULL::text, p_receipt_key text DEFAULT NULL::text'
+     and pg_get_function_arguments('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean)'::regprocedure)
+       = 'p_idempotency_key text, p_context_id uuid, p_account_id uuid, p_kind record_kind, p_amount_cents bigint, p_occurred_on date, p_description text, p_category text DEFAULT NULL::text, p_receipt_key text DEFAULT NULL::text, p_next_month boolean DEFAULT false'
      and pg_get_function_arguments('public.invoice_closing_on(integer, integer, date)'::regprocedure) = 'p_closing_day integer, p_due_day integer, p_month date'
      and pg_get_function_arguments('public.invoice_due_on(integer, date)'::regprocedure) = 'p_due_day integer, p_month date'
      and pg_get_function_arguments('public.invoice_month_for(integer, integer, date)'::regprocedure) = 'p_closing_day integer, p_due_day integer, p_date date',
@@ -2958,7 +2958,7 @@ do $$ begin
   assert (select count(*) from pg_trigger t where not t.tgisinternal and t.tgname in ('cards_guard', 'card_entries_guard', 'commitments_guard', 'financial_records_guard')
             and t.tgenabled = 'O') = 4, 'guardas ligadas';
   -- As assinaturas das migrações anteriores continuam (create_record mudou de forma compatível, testado acima).
-  assert to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text)') is not null
+  assert to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean)') is not null
      and to_regprocedure('public.delete_record(text, uuid, integer)') is not null
      and to_regprocedure('public.pay_commitment(text, uuid, integer, uuid, bigint, date, text)') is not null
      and to_regprocedure('public.undo_commitment_payment(text, uuid, integer)') is not null

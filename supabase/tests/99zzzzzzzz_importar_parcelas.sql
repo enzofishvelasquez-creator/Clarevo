@@ -182,6 +182,43 @@ begin
   perform pg_temp.expect_code(format('select public.update_card_entry(%L, %L, %s, %L, %s, %L, %L, null, %s)', 'pa-u-0004', e.id, e.version, 'compra', 117500, e.purchased_on, 'Última em novembro', 47),
                               'parcelas_invalidas', '22023');
 end $$;
+-- ---------------------------------------------------------------------------
+-- 5. Revisão independente: a data editada mantém a distância das faturas; o orçamento conta a parcela no mês certo; a fatura aberta
+--    é a do cartão (não "o mês de hoje mais um").
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  e public.card_entries;
+  r jsonb;
+begin
+  -- Compra original de 15/08 (fatura natural de setembro), parcela 3 de 6: novembro a fevereiro, deslocamento 2. Outubro está paga.
+  assert public.import_records('pa-i-0030', pg_temp.id('ctx'), 'cartao', pg_temp.id('card'), jsonb_build_array(pg_temp.it('s3', 'compra', 4000, '2026-08-15', 'Sofá 03/06', 'Educação', 3, 6)))
+       = '{"created": 1, "skipped": 0}'::jsonb, 'o sofá entra';
+  assert pg_temp.rows_of('card', 'Sofá 03/06') = '2026-11 1/4 +2 4000 k | 2026-12 2/4 +2 4000 - | 2027-01 3/4 +2 4000 - | 2027-02 4/4 +2 4000 -',
+    'novembro a fevereiro: ' || pg_temp.rows_of('card', 'Sofá 03/06');
+  -- Orçamento: as parcelas 3 a 6 de uma compra de agosto contam de outubro a janeiro (agosto mais 2 a 5), nunca em agosto e setembro.
+  assert (select used_cents from public.month_budget(pg_temp.id('ctx'), '2026-08-01') where category = 'Educação') = 0, 'agosto sem o sofá';
+  assert (select used_cents from public.month_budget(pg_temp.id('ctx'), '2026-10-01') where category = 'Educação') = 4000, 'outubro com a parcela 3';
+  assert (select used_cents from public.month_budget(pg_temp.id('ctx'), '2027-01-01') where category = 'Educação') = 4000, 'janeiro com a parcela 6';
+  assert (select used_cents from public.month_budget(pg_temp.id('ctx'), '2027-02-01') where category = 'Educação') = 0, 'fevereiro sem parcela no orçamento';
+  -- Corrigir a data para 20/08 (mesma fatura natural): as parcelas ficam onde estavam; antes, voltavam para setembro.
+  e := pg_temp.purchase('card', 'Sofá 03/06');
+  r := public.update_card_entry('pa-u-0030', e.id, e.version, 'compra', e.purchase_total_cents, '2026-08-20', 'Sofá 03/06', 'Educação', e.installment_total);
+  assert pg_temp.rows_of('card', 'Sofá 03/06') = '2026-11 1/4 +2 4000 k | 2026-12 2/4 +2 4000 - | 2027-01 3/4 +2 4000 - | 2027-02 4/4 +2 4000 -',
+    'a data nova na mesma fatura natural não move as parcelas: ' || pg_temp.rows_of('card', 'Sofá 03/06');
+  -- Para 02/08 (fatura natural de agosto, uma antes): a primeira guardada iria para outubro, que está paga.
+  e := pg_temp.purchase('card', 'Sofá 03/06');
+  perform pg_temp.expect_code(format('select public.update_card_entry(%L, %L, %s, %L, %s, %L, %L, %L, %s)', 'pa-u-0031', e.id, e.version, 'compra', e.purchase_total_cents, '2026-08-02', 'Sofá 03/06', 'Educação', e.installment_total),
+                              'fatura_paga', 'PT409');
+  -- Cartão que fecha dia 6 e vence dia 1, hoje 07/10: a fatura aberta é a de dezembro. Compra de 10/08 (fatura natural de outubro),
+  -- parcela 3 de 5: dezembro, que não passa da fatura aberta.
+  insert into ids values ('verde', (public.create_card('pa-c-0002', pg_temp.id('ctx'), 'Verde', null, 6, 1, 500000) #>> '{card,id}')::uuid);
+  assert public.import_records('pa-i-0031', pg_temp.id('ctx'), 'cartao', pg_temp.id('verde'), jsonb_build_array(pg_temp.it('v3', 'compra', 1000, '2026-08-10', 'Loja verde 03/05', null, 3, 5)))
+       = '{"created": 1, "skipped": 0}'::jsonb, 'a compra do cartão verde entra';
+  assert pg_temp.rows_of('verde', 'Loja verde 03/05') = '2026-12 1/3 +2 1000 k | 2027-01 2/3 +2 1000 - | 2027-02 3/3 +2 1000 -',
+    'dezembro a fevereiro, pela fatura aberta do cartão: ' || pg_temp.rows_of('verde', 'Loja verde 03/05');
+end $$;
+
 reset role;
 
 rollback;

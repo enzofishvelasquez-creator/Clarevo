@@ -403,16 +403,18 @@ export function fitBubbleLabel(name: string, percentText: string, radius: number
  * escuro, para bolhas vizinhas no tamanho não ficarem iguais; da sexta em diante, os tons repetem. A escolhida continua lima, com o
  * texto escuro. Nada depende só da cor: o nome e o percentual ficam escritos em cada bolha.
  */
-export const CATEGORY_BUBBLE_TONES: readonly { fill: string; text: string }[] = [
-  { fill: '#2457F5', text: '#FFFFFF' },
-  { fill: '#7D9DF9', text: '#17223B' },
-  { fill: '#1B45C9', text: '#FFFFFF' },
-  { fill: '#B3C6FB', text: '#17223B' },
-  { fill: '#15359E', text: '#FFFFFF' },
+export const CATEGORY_BUBBLE_TONES: readonly { fill: string; text: string; stroke: string }[] = [
+  // stroke: o contorno. Nos tons claros, o azul da marca (5,4:1 contra o fundo branco), para a bolha se ver como forma mesmo sem a
+  // cor (WCAG 1.4.11, 3:1); nos escuros, o branco da superfície separa as bolhas encostadas.
+  { fill: '#2457F5', text: '#FFFFFF', stroke: '#FFFFFF' },
+  { fill: '#7D9DF9', text: '#17223B', stroke: '#2457F5' },
+  { fill: '#1B45C9', text: '#FFFFFF', stroke: '#FFFFFF' },
+  { fill: '#B3C6FB', text: '#17223B', stroke: '#2457F5' },
+  { fill: '#15359E', text: '#FFFFFF', stroke: '#FFFFFF' },
 ];
 
 /** O tom da bolha de posição `rank` (0 = a maior): os cinco tons, repetidos da sexta em diante. */
-export function bubbleTone(rank: number): { fill: string; text: string } {
+export function bubbleTone(rank: number): { fill: string; text: string; stroke: string } {
   return CATEGORY_BUBBLE_TONES[((rank % CATEGORY_BUBBLE_TONES.length) + CATEGORY_BUBBLE_TONES.length) % CATEGORY_BUBBLE_TONES.length]!;
 }
 
@@ -421,7 +423,7 @@ export interface CategoryBubble extends Bubble {
   key: string;
   /** Posição pelo tamanho (0 = a maior) e o tom correspondente (`bubbleTone`). */
   rank: number;
-  tone: { fill: string; text: string };
+  tone: { fill: string; text: string; stroke: string };
   /** O nome inteiro ("Mercado", "Sem categoria"). */
   label: string;
   cents: Cents;

@@ -49,8 +49,10 @@ export async function loadImportContext(
     if (e.kind !== 'compra' || !e.purchasedOn) continue;
     const description = e.description ?? '';
     existing.push({ date: e.purchasedOn, amountCents: e.amountCents, description, kind: 'compra' });
-    // Compra parcelada: a fatura traz o valor de cada parcela ("LOJA 03/10"), na fatura em que ela cai.
-    if (e.installments > 1) {
+    // Compra parcelada: a fatura traz o valor de cada parcela ("LOJA 03/10"), na fatura em que ela cai. A compra importada em
+    // andamento (D-089 B) soma o deslocamento: a primeira guardada é a parcela 3 de 10, como na fatura.
+    const offset = e.installmentOffset ?? 0;
+    if (e.installments + offset > 1) {
       installmentAmounts(e.amountCents, e.installments).forEach((amountCents, i) =>
         existing.push({
           date: e.purchasedOn!,
@@ -58,8 +60,8 @@ export async function loadImportContext(
           description,
           kind: 'compra',
           invoiceMonth: addMonths(e.invoiceMonth, i),
-          installmentNumber: i + 1,
-          installmentCount: e.installments,
+          installmentNumber: offset + i + 1,
+          installmentCount: offset + e.installments,
         }),
       );
     }

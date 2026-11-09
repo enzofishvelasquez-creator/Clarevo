@@ -499,6 +499,7 @@ const __mods = [
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.isValidIsoDate = isValidIsoDate;
+    exports.daysInMonth = daysInMonth;
     exports.parseDateBR = parseDateBR;
     exports.formatDateBR = formatDateBR;
     exports.formatDayMonth = formatDayMonth;

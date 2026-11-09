@@ -1,4 +1,4 @@
-import { CARDS_TEXT, formatDateBR, isStackedLayout, type FinancialRecord } from '@clarevo/core';
+import { CARDS_TEXT, NEXT_MONTH_TEXT, formatDateBR, isStackedLayout, recordMonth, type FinancialRecord } from '@clarevo/core';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
@@ -32,7 +32,9 @@ export function RecordRow({
   // Gasto gerado ao marcar uma conta a pagar como paga: a origem aparece na legenda.
   // Pagamento de fatura de cartão: a origem é a fatura (D-037), não uma conta a pagar comum.
   const origin = record.invoice ? ` · ${CARDS_TEXT.paymentOrigin}` : record.commitmentId ? ' · conta a pagar' : '';
-  const when = `${kindLabel(record)} · ${formatDateBR(record.occurredOn)}${origin}${accountName ? ` · ${accountName}` : ''}`;
+  // Recebimento marcado do mês seguinte (D-089 A): a data fica, e a legenda diz em que mês conta ("conta em novembro").
+  const counted = record.nextMonth ? ` · ${NEXT_MONTH_TEXT.rowNote(recordMonth(record))}` : '';
+  const when = `${kindLabel(record)} · ${formatDateBR(record.occurredOn)}${counted}${origin}${accountName ? ` · ${accountName}` : ''}`;
   return (
     <Pressable
       onPress={onPress}

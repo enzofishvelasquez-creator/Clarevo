@@ -247,6 +247,13 @@ const __mods = [
     const records_1 = __req(6);
     const canais_1 = __req(7);
     exports.WHATSAPP_CODE_MINUTES = 15;
+    function withoutCardWord(nickname) {
+        const rest = nickname.replace(/^\s*cart[aã]o\s+/i, '');
+        return rest === '' ? nickname : rest;
+    }
+    function cardLabel(nickname) {
+        return withoutCardWord(nickname) === nickname ? `cartão ${nickname}` : nickname;
+    }
     function spaceLabel(space) {
         return space.kind === 'pessoal' ? 'espaço Pessoal' : `espaço ${space.name}`;
     }
@@ -264,7 +271,7 @@ const __mods = [
     }
     function purchaseLines(p, today) {
         return [
-            `Compra no cartão ${p.card_nickname}: ${p.description}, ${(0, money_1.formatBRL)(p.amount_cents)}`,
+            `Compra no ${cardLabel(p.card_nickname)}: ${p.description}, ${(0, money_1.formatBRL)(p.amount_cents)}`,
             `Categoria: ${p.category ?? records_1.NO_CATEGORY_LABEL}`,
             `Data da compra: ${dayLabel(p.purchased_on, today)}`,
             `Fatura de ${invoiceLabel(p.invoice_month, today)}`,
@@ -401,9 +408,11 @@ const __mods = [
                     ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Conta e Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
                     : `Compras no cartão entram só no espaço Pessoal, e ${CHANNEL_WORDS[channel].whoLinked} está ligado ao ${spaceLabel(outcome.space)}. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.`;
             case 'qual_cartao':
-                return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${(outcome.cards[0] ?? 'azul').toLowerCase()}".`;
+                return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${withoutCardWord(outcome.cards[0] ?? 'azul').toLowerCase()}".`;
             case 'fatura_paga':
                 return 'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.';
+            case 'limite_do_cartao':
+                return 'Este cartão chegou a 5.000 lançamentos guardados. Exclua no app os que não precisa mais para anotar outros.';
             default:
                 return chatReply(channel)[outcome.result];
         }
@@ -414,6 +423,7 @@ const __mods = [
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.isValidIsoDate = isValidIsoDate;
+    exports.daysInMonth = daysInMonth;
     exports.parseDateBR = parseDateBR;
     exports.formatDateBR = formatDateBR;
     exports.formatDayMonth = formatDayMonth;
@@ -711,7 +721,28 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.CATEGORIES = exports.NO_CATEGORY_LABEL = exports.MONTH_CHECK_KINDS = exports.INSTALLMENT_NATURES = exports.DEBT_NATURES = exports.PARTS_PER_YEAR_MAX = exports.ANNUAL_LEAD_MONTHS = void 0;
+    exports.CATEGORIES = exports.NO_CATEGORY_LABEL = exports.MONTH_CHECK_KINDS = exports.INSTALLMENT_NATURES = exports.DEBT_NATURES = exports.PARTS_PER_YEAR_MAX = exports.ANNUAL_LEAD_MONTHS = exports.NEXT_MONTH_TEXT = exports.NEXT_MONTH_WINDOW_DAYS = void 0;
+    exports.nextMonthAllowed = nextMonthAllowed;
+    exports.recordMonth = recordMonth;
+    const dates_1 = __req(3);
+    exports.NEXT_MONTH_WINDOW_DAYS = 7;
+    function nextMonthAllowed(date) {
+        const [y, m, d] = date.split('-').map(Number);
+        return d > (0, dates_1.daysInMonth)(y, m) - exports.NEXT_MONTH_WINDOW_DAYS;
+    }
+    function recordMonth(record) {
+        const month = (0, dates_1.monthOf)(record.occurredOn);
+        return record.nextMonth === true ? (0, dates_1.addMonths)(month, 1) : month;
+    }
+    exports.NEXT_MONTH_TEXT = {
+        toggle: 'Este valor é do mês seguinte',
+        caption: (date) => {
+            const own = (0, dates_1.monthOf)(date);
+            return `Entra no Recebido de ${(0, dates_1.formatMonthYearBR)((0, dates_1.addMonths)(own, 1))}, não no de ${(0, dates_1.formatMonthYearBR)(own)}.`;
+        },
+        rowNote: (month) => `conta em ${(0, dates_1.formatMonthYearBR)(month).replace(/ de \d{4}$/, '')}`,
+        detailSuffix: ' (mês seguinte)',
+    };
     exports.ANNUAL_LEAD_MONTHS = 2;
     exports.PARTS_PER_YEAR_MAX = 12;
     exports.DEBT_NATURES = ['financiamento', 'compra_parcelada'];
@@ -914,7 +945,7 @@ const __mods = [
     const RESULTS = new Set([
         'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
         'sem_assinatura', 'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
-        'repetida', 'silencio', 'registrada', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga',
+        'repetida', 'silencio', 'registrada', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga', 'limite_do_cartao',
     ]);
     class WhatsAppFinalError extends Error {
     }
@@ -1136,6 +1167,8 @@ const __mods = [
     const CARD_WORD = 'cartao';
     const CARD_PREPOSITIONS = new Set(['no', 'com', 'pelo', 'via']);
     const NOT_CARD_BEFORE = new Set(['do', 'da', 'de', 'dos', 'das']);
+    const NOT_CARD_WORDS = new Set(['estorno', 'reembolso', 'devolucao', 'fatura', 'pagamento', 'pagto', 'pgto', 'recarga', 'anuidade']);
+    const AMOUNT_MARK = '\u0000valor';
     const INCOME_WORDS = new Set(['recebi', 'recebido', 'recebimento', 'ganhei', 'entrou', 'entrada', 'caiu', 'receita']);
     const EXPENSE_WORDS = new Set(['gastei', 'gasto', 'paguei', 'pago', 'comprei', 'compra', 'despesa']);
     const EDGE_STOP = new Set([
@@ -1271,21 +1304,31 @@ const __mods = [
             return { type: 'erro', reason: 'valor_invalido' };
         if (chosen.cents > money_1.MAX_RECORD_CENTS)
             return { type: 'erro', reason: 'valor_acima_do_limite' };
-        tokens = tokens.filter((_, i) => !chosen.idx.includes(i));
+        const at = chosen.idx[0];
+        tokens = tokens.flatMap((t, i) => (i === at ? [{ ...t, folded: AMOUNT_MARK, word: '' }] : chosen.idx.includes(i) ? [] : [t]));
         let card = null;
-        if (kind !== 'receita') {
+        if (kind !== 'receita' && !tokens.some((t) => NOT_CARD_WORDS.has(t.folded))) {
             const i = tokens.findIndex((t, k) => (t.folded === CARD_WORD && !NOT_CARD_BEFORE.has(tokens[k - 1]?.folded ?? '')) ||
                 (t.folded === 'credito' && CARD_PREPOSITIONS.has(tokens[k - 1]?.folded ?? '')));
             if (i >= 0) {
                 const prep = i > 0 && CARD_PREPOSITIONS.has(tokens[i - 1].folded);
-                const after = tokens.slice(i + 1);
-                const nameAfter = !prep && i > 0 && tokens[i].folded === CARD_WORD;
-                const hint = nameAfter ? after.map((t) => t.word).join(' ').trim() : '';
+                let j = i + 1;
+                if (tokens[j]?.folded === 'de' && tokens[j + 1]?.folded === 'credito')
+                    j += 2;
+                else if (tokens[j]?.folded === 'credito')
+                    j += 1;
+                const amountAt = tokens.findIndex((t) => t.folded === AMOUNT_MARK);
+                const end = amountAt > i ? amountAt : tokens.length;
+                const rest = [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(end)];
+                const hasDescription = rest.some((t) => t.folded !== AMOUNT_MARK && t.word !== '' && !isEdgeStop(t.folded));
+                const name = hasDescription ? tokens.slice(j, end).filter((t) => t.folded !== AMOUNT_MARK) : [];
+                const hint = name.map((t) => t.word).join(' ').trim();
                 card = { hint: hint === '' ? null : clip(hint) };
-                tokens = nameAfter ? tokens.slice(0, i) : [...tokens.slice(0, prep ? i - 1 : i), ...after];
+                tokens = hasDescription ? rest : [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(j)];
                 kind = 'despesa';
             }
         }
+        tokens = tokens.filter((t) => t.folded !== AMOUNT_MARK);
         while (tokens.length > 0 && isEdgeStop(tokens[0].folded))
             tokens = tokens.slice(1);
         while (tokens.length > 0 && isEdgeStop(tokens[tokens.length - 1].folded))

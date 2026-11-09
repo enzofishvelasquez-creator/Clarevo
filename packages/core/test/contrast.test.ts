@@ -87,6 +87,11 @@ describe('contraste: os tons das bolhas (D-089 D)', () => {
     expect(contrastRatio(theme.accent!, theme.text!)).toBeGreaterThanOrEqual(CONTRAST_TEXT);
     // Os cinco tons são diferentes entre si.
     expect(new Set(CATEGORY_BUBBLE_TONES.map((t) => t.fill)).size).toBe(5);
+    // A bolha se vê como forma contra o fundo branco: o preenchimento ou o contorno chega a 3:1 (WCAG 1.4.11).
+    for (const tone of CATEGORY_BUBBLE_TONES) {
+      const best = Math.max(contrastRatio(tone.fill, '#FFFFFF'), tone.stroke === '#FFFFFF' ? 0 : contrastRatio(tone.stroke, '#FFFFFF'));
+      expect(best, `${tone.fill} contra o branco`).toBeGreaterThanOrEqual(3);
+    }
   });
 });
 

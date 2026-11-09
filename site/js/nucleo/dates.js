@@ -9,7 +9,7 @@ export function isValidIsoDate(value) {
         return false;
     return d <= daysInMonth(y, mo);
 }
-function daysInMonth(y, mo) {
+export function daysInMonth(y, mo) {
     return new Date(Date.UTC(y, mo, 0)).getUTCDate();
 }
 export function parseDateBR(input) {

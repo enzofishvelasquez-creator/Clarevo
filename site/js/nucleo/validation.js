@@ -1,7 +1,7 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/validation.ts. Não edite: rode "node scripts/gerar-site.js".
 import { addMonths, addYearsClamped, formatMonthYearBR, isValidIsoMonth, monthOf, monthsBetween, parseDateBR, parseMonthBR } from './dates.js';
 import { MAX_RECORD_CENTS, parseBRL } from './money.js';
-import { PARTS_PER_YEAR_MAX } from './records.js';
+import { PARTS_PER_YEAR_MAX, nextMonthAllowed } from './records.js';
 import { ANNUAL_MAX_YEARS, annualLastMonth } from './series.js';
 export const ERROR_TEXT = {
     descricao_obrigatoria: 'Dê um nome para este registro.',
@@ -11,6 +11,7 @@ export const ERROR_TEXT = {
     categoria_invalida: 'Use uma categoria de até 40 caracteres.',
     data_invalida: 'Confira a data informada.',
     data_futura: 'Use uma data até hoje. Aqui entram só valores já pagos ou recebidos.',
+    mes_seguinte_invalido: 'Só um recebimento dos últimos 7 dias do mês pode contar no mês seguinte.',
     conta_invalida: 'Escolha a conta.',
     salvar_falhou: 'Não foi possível salvar. Seu preenchimento foi mantido. Tente novamente.',
     carregar_falhou: 'Não foi possível carregar. Tente novamente.',
@@ -127,9 +128,17 @@ export function validateRecordDraft(draft, today) {
         errors.accountId = ERROR_TEXT.conta_invalida;
     if (Object.keys(errors).length > 0 || amount === null || occurredOn === null)
         return { ok: false, errors };
+    const nextMonth = draft.nextMonth === true && nextMonthAllowed(occurredOn);
     return {
         ok: true,
-        input: { accountId: draft.accountId, amountCents: amount, occurredOn, description, category: normalizeCategory(draft.category) },
+        input: {
+            accountId: draft.accountId,
+            amountCents: amount,
+            occurredOn,
+            description,
+            category: normalizeCategory(draft.category),
+            ...(nextMonth ? { nextMonth: true } : {}),
+        },
     };
 }
 export const COMMITMENT_FIELD_ORDER = ['description', 'amountText', 'dateText'];
@@ -416,6 +425,7 @@ export function fieldForErrorCode(code, form) {
             return 'amountText';
         case 'data_invalida':
         case 'data_futura':
+        case 'mes_seguinte_invalido':
         case 'vencimento_fora_do_intervalo':
         case 'vencimento_fora_do_mes':
             return 'dateText';
