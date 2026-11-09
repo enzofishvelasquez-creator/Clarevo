@@ -6,6 +6,7 @@ import {
   buildExportReport,
   buildRecordsCsv,
   existingMonths,
+  extraIncomeOfMonth,
   exportMonths,
   exportRows,
   isRepoError,
@@ -81,6 +82,12 @@ describe('a janela dos últimos 7 dias e o mês em que conta', () => {
     expect(NEXT_MONTH_TEXT.toggle).toBe('Este valor é do mês seguinte');
     expect(NEXT_MONTH_TEXT.caption('2026-10-30')).toBe('Entra no Recebido de novembro de 2026, não no de outubro de 2026.');
     expect(NEXT_MONTH_TEXT.caption('2026-12-29')).toBe('Entra no Recebido de janeiro de 2027, não no de dezembro de 2026.');
+    // No mês de hoje, o mês seguinte ainda não abre no Resumo: a legenda diz quando aparece; num mês que já passou, não precisa.
+    expect(NEXT_MONTH_TEXT.caption('2026-10-30', '2026-10-30')).toBe(
+      'Entra no Recebido de novembro de 2026, não no de outubro de 2026. Novembro aparece no Resumo a partir de 01/11/2026.',
+    );
+    expect(NEXT_MONTH_TEXT.caption('2026-09-28', '2026-10-07')).toBe('Entra no Recebido de outubro de 2026, não no de setembro de 2026.');
+    expect(NEXT_MONTH_TEXT.futureNotice('2026-11')).toBe('Conta no Recebido de novembro de 2026, que aparece no Resumo a partir de 01/11/2026.');
     expect(NEXT_MONTH_TEXT.rowNote('2026-11')).toBe('conta em novembro');
     expect(NEXT_MONTH_TEXT.detailSuffix).toBe(' (mês seguinte)');
   });
@@ -143,6 +150,16 @@ describe('totais e leituras por mês', () => {
     ]);
   });
 
+  it('valor extra para guardar (extraIncomeOfMonth): o recebimento marcado conta no mês seguinte, como no Resumo', () => {
+    const nov = [
+      rec({ id: 's1', occurredOn: '2026-10-30', amountCents: 600_000, nextMonth: true }),
+      rec({ id: 's2', occurredOn: '2026-11-10', amountCents: 80_000, description: 'Freela', category: 'Renda extra' }),
+    ];
+    // Renda de referência de R$ 5.000,00: em novembro entraram R$ 6.800,00; o que passa da referência é R$ 1.800,00.
+    expect(extraIncomeOfMonth(nov, '2026-11', 500_000)).toBe(180_000);
+    expect(extraIncomeOfMonth(nov, '2026-10', 500_000)).toBe(0);
+  });
+
   it('importação: um dia do fim do mês também lê o mês seguinte (onde fica o recebimento marcado)', () => {
     expect(existingMonths([{ date: '2026-10-24' }])).toEqual(['2026-10', '2026-11']);
     expect(existingMonths([{ date: '2026-10-10' }])).toEqual(['2026-10']);
@@ -166,6 +183,13 @@ describe('repositório em memória (mesmas regras de create_record, update_recor
     const reused = await repo.createRecord('ms-1', ctx, 'receita', { ...input(600_000, '2026-10-30', 'Salário'), accountId: acc }).catch((e) => e);
     expect(isRepoError(reused, 'chave_reutilizada')).toBe(true);
     expect((await repo.createRecord('ms-2', ctx, 'receita', { ...input(5_000, '2026-10-31', 'Reembolso', false), accountId: acc })).id).toBe(plain.id);
+  });
+
+  it('editar: ausente com a data na janela de outro mês tira a marca (o app antigo não a mostra)', async () => {
+    const { repo, ctx, acc } = await fresh();
+    let sal = await repo.createRecord('ms-1', ctx, 'receita', { ...input(600_000, '2026-10-30', 'Salário', true), accountId: acc });
+    sal = await repo.updateRecord('ms-u1', sal.id, sal.version, { ...input(600_000, '2026-09-28', 'Salário'), accountId: acc });
+    expect('nextMonth' in sal).toBe(false);
   });
 
   it('editar: ausente mantém a marca enquanto a data cabe; false e true explícitos; fora da janela, true recusa', async () => {

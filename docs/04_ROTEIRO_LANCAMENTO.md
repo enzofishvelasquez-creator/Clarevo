@@ -149,7 +149,7 @@ Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C
 - [x] B: "Importar fatura" na tela do cartão; a linha com a parcela escrita entra como compra com as parcelas que faltam (migração 0029, `installment_offset`; `99zzzzzzzz_importar_parcelas.sql`, `importar-revisao.test.ts`, `importar-repo.test.ts`, `cards.test.ts`)
 - [ ] **Você (Claude Chrome):** aplicar a migração 0029 no `clarevo-producao` (docs/05, passo 12s) e conferir (passo 21q); o app novo precisa dela (a visão `card_entry_items` ganha uma coluna) e o app antigo continua funcionando
 - [x] A: recebimento do fim do mês contando no mês seguinte (migração 0030, `next_month` e `counted_month`; `mes-seguinte.test.ts`, `99zzzzzzzzz_mes_seguinte.sql`; roteiro de telas depois de excluir o recebimento)
-- [ ] **Você (Claude Chrome):** aplicar a migração 0030 no `clarevo-producao` (docs/05, passo 12t) e conferir (passo 21r), antes de publicar o app novo: a lista do mês passa a ler `counted_month`
+- [ ] **Você (Claude Chrome):** aplicar a migração 0030 no `clarevo-producao` (docs/05, passo 12t) e conferir (passo 21r), antes do merge do PR (o merge publica o app novo, e a lista do mês passa a ler `counted_month`); o merge vem logo depois, porque o app antigo mostra o recebimento marcado no mês da data
 - [x] F: vídeo em formato de reels (compra de mercado e orçamento): `node scripts/gravar-redes.js --so reels`, docs/24 seção 2.4b
 - [ ] G, depois do lançamento: modo "Fatura de cartão depois do vencimento" em Multa e juros
 

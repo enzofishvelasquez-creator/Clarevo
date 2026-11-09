@@ -820,7 +820,11 @@ export class MemoryRepository implements RecordsRepository {
       if (current.invoice && (norm.amountCents !== current.amountCents || norm.description !== current.description || norm.category !== current.category)) {
         throw new RepoError('pagamento_de_fatura');
       }
-      const nextMonth = input.nextMonth === undefined ? current.nextMonth === true && nextMonthAllowed(norm.occurredOn) : input.nextMonth === true;
+      // Ausente (o app antigo) mantém a marca só se a data nova continua no mesmo mês e na janela.
+      const nextMonth =
+        input.nextMonth === undefined
+          ? current.nextMonth === true && monthOf(norm.occurredOn) === monthOf(current.occurredOn) && nextMonthAllowed(norm.occurredOn)
+          : input.nextMonth === true;
       this.validate(current.contextId, current.kind, { ...norm, nextMonth }, current.accountId);
       const now = new Date().toISOString();
       const next = withNextMonth({ ...current, ...norm, version: current.version + 1, updatedAt: now }, nextMonth);
@@ -4237,10 +4241,10 @@ export class MemoryRepository implements RecordsRepository {
     validateCommon(input.amountCents, input.description, input.category);
     if (typeof input.occurredOn !== 'string' || !isValidIsoDate(input.occurredOn)) throw new RepoError('data_invalida');
     if (input.occurredOn > this.opts.today()) throw new RepoError('data_futura');
-    // Mês seguinte (D-089 A, clarevo_check_next_month): só recebimento, só nos últimos 7 dias do mês.
-    if (input.nextMonth === true && (kind !== 'receita' || !nextMonthAllowed(input.occurredOn))) throw new RepoError('mes_seguinte_invalido');
     const acc = this.accountsById.get(input.accountId);
     if (!acc || acc.deletedAt || acc.contextId !== contextId || (acc.status !== 'ativa' && acc.id !== keepAccountId)) throw new RepoError('conta_invalida');
+    // Mês seguinte (D-089 A, clarevo_check_next_month, depois da conta como no banco): só recebimento, só nos últimos 7 dias do mês.
+    if (input.nextMonth === true && (kind !== 'receita' || !nextMonthAllowed(input.occurredOn))) throw new RepoError('mes_seguinte_invalido');
   }
 
   /** Mesma ordem de clarevo_validate_commitment no banco. */

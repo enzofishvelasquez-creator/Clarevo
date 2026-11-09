@@ -155,6 +155,12 @@ begin
   assert sal.next_month, 'true explícito';
   sal := public.update_record('ms-upd-0004', sal.id, sal.version, acc, 610000, '2026-10-15', 'Salário', 'Salário');
   assert not sal.next_month and sal.counted_month = '2026-10-01', 'nulo com a data fora da janela: a marca cai';
+  -- Nulo com a data na janela de outro mês: a marca cai (o app antigo não a mostra e diria outro mês).
+  sal := public.update_record('ms-upd-0041', sal.id, sal.version, acc, 610000, '2026-10-30', 'Salário', 'Salário', true);
+  assert sal.next_month and sal.counted_month = '2026-11-01', 'marcado de novo';
+  sal := public.update_record('ms-upd-0042', sal.id, sal.version, acc, 610000, '2026-09-28', 'Salário', 'Salário');
+  assert not sal.next_month and sal.counted_month = '2026-09-01', 'nulo, data na janela de setembro: a marca cai';
+  sal := public.update_record('ms-upd-0043', sal.id, sal.version, acc, 610000, '2026-10-15', 'Salário', 'Salário');
   -- true explícito fora da janela: recusado, nada muda.
   perform pg_temp.expect_code(format('select public.update_record(%L, %L, %s, %L, %s, %L, %L, %L, true)', 'ms-upd-0005', sal.id, sal.version, acc, 610000, '2026-10-15', 'Salário', 'Salário'),
                               'mes_seguinte_invalido', '22023');

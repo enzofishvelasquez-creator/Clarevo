@@ -197,9 +197,12 @@ begin
   end if;
   perform public.clarevo_validate_record(v_uid, v_record.context_id, p_account_id, p_amount_cents, p_occurred_on, v_description, v_category,
                                           v_record.account_id);
-  -- Mês seguinte (D-089 A): nulo mantém a marca enquanto a data nova ainda cai nos últimos 7 dias do mês (o app antigo não manda o
-  -- campo e não pode apagar a marca sem querer); fora disso, cai. true ou false explícitos valem como vieram.
-  v_next := case when p_next_month is null then v_record.next_month and public.clarevo_next_month_allowed(p_occurred_on)
+  -- Mês seguinte (D-089 A): nulo (o app antigo, que não mostra a marca) a mantém só se a data nova continua no mesmo mês e nos últimos
+  -- 7 dias dele; fora disso, cai. true ou false explícitos valem como vieram.
+  v_next := case when p_next_month is null
+                   then v_record.next_month and public.clarevo_next_month_allowed(p_occurred_on)
+                        and extract(year from p_occurred_on) = extract(year from v_record.occurred_on)
+                        and extract(month from p_occurred_on) = extract(month from v_record.occurred_on)
                  else p_next_month end;
   perform public.clarevo_check_next_month(v_record.kind, p_occurred_on, v_next);
 

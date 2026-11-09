@@ -252,7 +252,7 @@ const __mods = [
         return rest === '' ? nickname : rest;
     }
     function cardLabel(nickname) {
-        return withoutCardWord(nickname) === nickname ? `cartão ${nickname}` : nickname;
+        return /^\s*cart[aã]o(\s|$)/i.test(nickname) ? nickname.trim() : `cartão ${nickname}`;
     }
     function spaceLabel(space) {
         return space.kind === 'pessoal' ? 'espaço Pessoal' : `espaço ${space.name}`;
@@ -412,7 +412,7 @@ const __mods = [
             case 'fatura_paga':
                 return 'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.';
             case 'limite_do_cartao':
-                return 'Este cartão chegou a 5.000 lançamentos guardados. Exclua no app os que não precisa mais para anotar outros.';
+                return 'Este cartão chegou a 5.000 lançamentos guardados. Para anotar outros, exclua no app os lançamentos que não usa mais.';
             default:
                 return chatReply(channel)[outcome.result];
         }
@@ -734,12 +734,19 @@ const __mods = [
         const month = (0, dates_1.monthOf)(record.occurredOn);
         return record.nextMonth === true ? (0, dates_1.addMonths)(month, 1) : month;
     }
+    function firstDayLine(month) {
+        const name = (0, dates_1.formatMonthYearBR)(month).replace(/ de \d{4}$/, '');
+        return `${name.charAt(0).toUpperCase()}${name.slice(1)} aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`;
+    }
     exports.NEXT_MONTH_TEXT = {
         toggle: 'Este valor é do mês seguinte',
-        caption: (date) => {
+        caption: (date, today) => {
             const own = (0, dates_1.monthOf)(date);
-            return `Entra no Recebido de ${(0, dates_1.formatMonthYearBR)((0, dates_1.addMonths)(own, 1))}, não no de ${(0, dates_1.formatMonthYearBR)(own)}.`;
+            const next = (0, dates_1.addMonths)(own, 1);
+            const base = `Entra no Recebido de ${(0, dates_1.formatMonthYearBR)(next)}, não no de ${(0, dates_1.formatMonthYearBR)(own)}.`;
+            return today !== undefined && own === (0, dates_1.monthOf)(today) ? `${base} ${firstDayLine(next)}` : base;
         },
+        futureNotice: (month) => `Conta no Recebido de ${(0, dates_1.formatMonthYearBR)(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
         rowNote: (month) => `conta em ${(0, dates_1.formatMonthYearBR)(month).replace(/ de \d{4}$/, '')}`,
         detailSuffix: ' (mês seguinte)',
     };
@@ -1321,7 +1328,12 @@ const __mods = [
                 const end = amountAt > i ? amountAt : tokens.length;
                 const rest = [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(end)];
                 const hasDescription = rest.some((t) => t.folded !== AMOUNT_MARK && t.word !== '' && !isEdgeStop(t.folded));
-                const name = hasDescription ? tokens.slice(j, end).filter((t) => t.folded !== AMOUNT_MARK) : [];
+                let name = hasDescription ? tokens.slice(j, end).filter((t) => t.folded !== AMOUNT_MARK) : [];
+                const loose = (t) => isEdgeStop(t.folded) || t.folded === 'dia';
+                while (name.length > 0 && loose(name[0]))
+                    name = name.slice(1);
+                while (name.length > 0 && loose(name[name.length - 1]))
+                    name = name.slice(0, -1);
                 const hint = name.map((t) => t.word).join(' ').trim();
                 card = { hint: hint === '' ? null : clip(hint) };
                 tokens = hasDescription ? rest : [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(j)];

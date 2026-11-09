@@ -30,9 +30,9 @@ function withoutCardWord(nickname: string): string {
   return rest === '' ? nickname : rest;
 }
 
-/** "cartão Azul", ou o apelido como está quando ele já começa com "Cartão" ("Cartão Azul"). */
+/** "cartão Azul", ou o apelido como está quando ele já começa com "Cartão" ("Cartão Azul", ou só "Cartão"). */
 function cardLabel(nickname: string): string {
-  return withoutCardWord(nickname) === nickname ? `cartão ${nickname}` : nickname;
+  return /^\s*cart[aã]o(\s|$)/i.test(nickname) ? nickname.trim() : `cartão ${nickname}`;
 }
 
 /** Compra no cartão anotada ou desfeita (D-089 C), como o banco devolve: o apelido do cartão, nunca os dígitos; a fatura como dia 1. */
@@ -278,7 +278,7 @@ export function whatsappOutcomeReply(outcome: WhatsAppOutcome, messageDay: IsoDa
     case 'fatura_paga':
       return 'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.';
     case 'limite_do_cartao':
-      return 'Este cartão chegou a 5.000 lançamentos guardados. Exclua no app os que não precisa mais para anotar outros.';
+      return 'Este cartão chegou a 5.000 lançamentos guardados. Para anotar outros, exclua no app os lançamentos que não usa mais.';
     default:
       return chatReply(channel)[outcome.result];
   }

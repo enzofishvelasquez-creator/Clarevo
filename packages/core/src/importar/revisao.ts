@@ -189,7 +189,8 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
     if (l.date > today) block('data_futura');
     // Cartão, compra com a parcela escrita (D-089 B): a parcela desta linha e as que faltam, da fatura em que ela entra em diante.
     const mark = destination === 'cartao' && kind === 'compra' ? installmentMark(l.description, l.date) : null;
-    const maybeDate = mark !== null && markLooksLikeDate(mark, l.date);
+    // Com "PARC" ou "PARCELA" antes, é parcela com certeza (installmentMark já aceita a data igual à da linha nesse caso).
+    const maybeDate = mark !== null && !/PARC(?:ELA)?\.?\s*\d{1,2}\/\d{1,2}/i.test(l.description) && markLooksLikeDate(mark, l.date);
     let hint: string | null = null;
     if (destination === 'cartao' && (kind === 'compra' || kind === 'estorno') && input.card) {
       const natural = invoiceMonthOf(input.card.days, l.date);
@@ -279,7 +280,10 @@ export function toImportItems(lines: readonly ReviewLine[]): ImportItem[] {
     occurredOn: l.date,
     description: cleanDescription(l.description) || l.description.trim(),
     category: l.category !== null && categoriesFor(l.kind).includes(l.category) ? l.category : null,
-    ...(l.kind === 'compra' && l.installment ? { installment: { number: l.installment.number, count: l.installment.count } } : {}),
+    // A parcela vai junto enquanto a descrição (talvez editada) ainda tem a marca: tirar "01/11" da descrição importa à vista.
+    ...(l.kind === 'compra' && l.installment && installmentMark(l.description, l.date) !== null
+      ? { installment: { number: l.installment.number, count: l.installment.count } }
+      : {}),
   }));
 }
 

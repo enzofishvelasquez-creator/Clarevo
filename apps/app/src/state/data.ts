@@ -139,6 +139,7 @@ import {
   type SeriesEditInput,
   type SeriesInput,
   type SeriesWrite,
+  nextMonthAllowed,
 } from '@clarevo/core';
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { createContext, use, useEffect, useMemo, useRef } from 'react';
@@ -970,7 +971,10 @@ const stamp = (results: readonly { dataUpdatedAt: number }[]) => results.map((r)
  * consulta e devolve lista vazia.
  */
 export function useRecordsNear(contextId: string | undefined, date: IsoDate | null): FinancialRecord[] {
-  const months = date ? [...new Set([addDays(date, -1), date, addDays(date, 1)].map(monthOf))] : [];
+  // O recebimento dos últimos dias do mês marcado "do mês seguinte" (D-089 A) está na lista do mês seguinte.
+  const months = date
+    ? [...new Set([addDays(date, -1), date, addDays(date, 1)].map(monthOf).concat(nextMonthAllowed(addDays(date, 1)) ? [addMonths(monthOf(addDays(date, 1)), 1)] : []))]
+    : [];
   const results = useRecordsOfMonths(contextId, months);
   return results.flatMap((r) => r.data ?? []);
 }

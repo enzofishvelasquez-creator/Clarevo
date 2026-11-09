@@ -604,9 +604,15 @@ describe('importar: parcelas na fatura', () => {
     const p = parse([line(1, '2026-11-02', 'MERCADO 01/11', 12000)], { source: 'csv', cardPositive: true });
     const [l] = buildReview(cardInput(p, [], { today: '2026-11-09' }));
     expect([l!.label, l!.importable, l!.include]).toEqual(['parcela', true, false]);
-    expect(l!.hint).toBe('Pode ser a parcela 1 de 11 ou só a data 01/11. Desmarcada: marque se for a parcela.');
-    // Marcada à mão, entra como parcela (o item leva a marca).
+    expect(l!.hint).toBe('Pode ser a parcela 1 de 11 ou só a data 01/11. Se for a parcela, marque. Se for a data, tire 01/11 da descrição e marque: entra à vista.');
+    // Marcada à mão, entra como parcela (o item leva a marca); com "01/11" tirado da descrição, entra à vista.
     expect(l!.installment).toEqual({ number: 1, count: 11 });
+    expect(toImportItems([{ ...l!, include: true }])[0]!.installment).toEqual({ number: 1, count: 11 });
+    expect(toImportItems([{ ...l!, include: true, description: 'MERCADO' }])[0]!.installment).toBeUndefined();
+    // Com "PARC" antes, é parcela com certeza: vem marcada.
+    const pp = parse([line(1, '2026-10-06', 'LOJA PARC 05/10', 12000)], { source: 'csv', cardPositive: true });
+    const [lp] = buildReview(cardInput(pp));
+    expect([lp!.label, lp!.include]).toEqual(['parcela', true]);
   });
 
   it('fatura com parcela (D-089 B): "Parcela em andamento", marcada, com a parcela e a fatura em que entra; o item leva a parcela', () => {

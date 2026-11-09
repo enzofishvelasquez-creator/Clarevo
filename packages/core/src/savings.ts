@@ -19,6 +19,7 @@ import {
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, ceilDiv, formatBRL, parseBRL, roundDiv } from './money';
 import type { EssentialBaseSource, FinancialRecord, Goal, GoalMovement, IncomeReference, NewGoalInput, SavingsAnswer, SavingsCheck } from './records';
+import { recordMonth } from './records';
 
 /**
  * Plano de guardar (spec7, Ciclo C). A pessoa responde se consegue guardar algum valor por mês; com "sim", o core monta um
@@ -675,14 +676,15 @@ export const EXTRA_SAVINGS_MIN_CENTS = 2_000;
  * `EXTRA_SAVINGS_MIN_CENTS`, zero.
  */
 export function extraIncomeOfMonth(
-  records: readonly Pick<FinancialRecord, 'kind' | 'amountCents' | 'category' | 'occurredOn'>[],
+  records: readonly Pick<FinancialRecord, 'kind' | 'amountCents' | 'category' | 'occurredOn' | 'nextMonth'>[],
   month: IsoMonth,
   referenceCents: Cents | null,
 ): Cents {
   let received = 0;
   let extra = 0;
   for (const r of records) {
-    if (r.kind !== 'receita' || !r.occurredOn.startsWith(month) || isReimbursement(r.category)) continue;
+    // O mês em que o recebimento conta (D-089 A): o marcado "do mês seguinte" entra no seguinte, como no Resumo.
+    if (r.kind !== 'receita' || recordMonth(r) !== month || isReimbursement(r.category)) continue;
     received += r.amountCents;
     if (r.category !== null && r.category.trim().toLocaleLowerCase('pt-BR') === 'renda extra') extra += r.amountCents;
   }

@@ -9,12 +9,19 @@ export function recordMonth(record) {
     const month = monthOf(record.occurredOn);
     return record.nextMonth === true ? addMonths(month, 1) : month;
 }
+function firstDayLine(month) {
+    const name = formatMonthYearBR(month).replace(/ de \d{4}$/, '');
+    return `${name.charAt(0).toUpperCase()}${name.slice(1)} aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`;
+}
 export const NEXT_MONTH_TEXT = {
     toggle: 'Este valor é do mês seguinte',
-    caption: (date) => {
+    caption: (date, today) => {
         const own = monthOf(date);
-        return `Entra no Recebido de ${formatMonthYearBR(addMonths(own, 1))}, não no de ${formatMonthYearBR(own)}.`;
+        const next = addMonths(own, 1);
+        const base = `Entra no Recebido de ${formatMonthYearBR(next)}, não no de ${formatMonthYearBR(own)}.`;
+        return today !== undefined && own === monthOf(today) ? `${base} ${firstDayLine(next)}` : base;
     },
+    futureNotice: (month) => `Conta no Recebido de ${formatMonthYearBR(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
     rowNote: (month) => `conta em ${formatMonthYearBR(month).replace(/ de \d{4}$/, '')}`,
     detailSuffix: ' (mês seguinte)',
 };

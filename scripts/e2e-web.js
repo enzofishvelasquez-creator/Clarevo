@@ -796,6 +796,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Salvar recebimento').click(); await waitText('Recebimento salvo');
   t = await body();
   ok('A: o detalhe mantém a data (28/09/2026) e diz "Resumo afetado: Outubro de 2026 (mês seguinte)"', t.includes('28/09/2026') && t.includes('Outubro de 2026 (mês seguinte)'));
+  ok('A: o mês seguinte (outubro) já começou: sem o aviso de quando ele aparece, e com "Registrar outro recebimento"',
+    !t.includes('que aparece no Resumo a partir de') && (await visibleCount('button', 'Registrar outro recebimento')) === 1);
   await shot('617_recebimento_mes_seguinte_detalhe');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('A: o freela de 28/09 marcado conta em outubro → 6.150 / 2.250', 'R$ 6.150,00', 'R$ 3.900,00', 'R$ 2.250,00');
@@ -6495,6 +6497,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await f2Expense('Feira pequena', '50', 'Mercado');
   ok('F2 aviso só no cruzamento: mais R$ 50,00 (86%) não repete o aviso; fora do cruzamento, a linha de uso (D-089 E) "Mercado: R$ 1.550,00 de R$ 1.800,00 em outubro (86%)."',
     t.includes('Gasto salvo') && !t.includes('chegou a') && !t.includes('passou do orçamento') && t.includes('Mercado: R$ 1.550,00 de R$ 1.800,00 em outubro (86%).'), t.slice(0, 300));
+  ok('F2 com a linha do orçamento no aviso, o detalhe continua oferecendo "Anotar outro gasto"', (await visibleCount('button', 'Anotar outro gasto')) === 1);
   t = await f2Expense('Feira grande', '300', 'Mercado');
   ok('F2 aviso: mais R$ 300,00 passam do orçamento (R$ 1.850,00): "Mercado passou do orçamento de outubro em R$ 50,00."', t.includes('Mercado passou do orçamento de outubro em R$ 50,00.'), t.slice(0, 300));
   await shot('207_aviso_100');

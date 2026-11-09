@@ -295,7 +295,11 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
       const end = amountAt > i ? amountAt : tokens.length;
       const rest = [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(end)];
       const hasDescription = rest.some((t) => t.folded !== AMOUNT_MARK && t.word !== '' && !isEdgeStop(t.folded));
-      const name = hasDescription ? tokens.slice(j, end).filter((t) => t.folded !== AMOUNT_MARK) : [];
+      // O nome sem palavras de ligação nem "dia" nas pontas ("cartão do Pedro" é Pedro; "no cartão dia 05/11" não tem nome).
+      let name = hasDescription ? tokens.slice(j, end).filter((t) => t.folded !== AMOUNT_MARK) : [];
+      const loose = (t: { folded: string }) => isEdgeStop(t.folded) || t.folded === 'dia';
+      while (name.length > 0 && loose(name[0]!)) name = name.slice(1);
+      while (name.length > 0 && loose(name[name.length - 1]!)) name = name.slice(0, -1);
       const hint = name.map((t) => t.word).join(' ').trim();
       card = { hint: hint === '' ? null : clip(hint) };
       tokens = hasDescription ? rest : [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(j)];

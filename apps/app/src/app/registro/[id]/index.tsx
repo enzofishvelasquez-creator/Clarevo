@@ -192,7 +192,8 @@ export default function DetalheRegistro() {
                 )
               ) : null}
 
-              {notice === 'Gasto salvo' || notice === 'Recebimento salvo' ? (
+              {/* O aviso pode trazer linhas depois da primeira (orçamento, D-089 E; mês seguinte, D-089 A): vale a primeira. */}
+              {notice?.split('\n')[0] === 'Gasto salvo' || notice?.split('\n')[0] === 'Recebimento salvo' ? (
                 <Button
                   label={r.kind === 'despesa' ? 'Anotar outro gasto' : 'Registrar outro recebimento'}
                   icon={Plus}

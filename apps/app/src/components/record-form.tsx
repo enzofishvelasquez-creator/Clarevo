@@ -1050,6 +1050,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       else if (recordMonth(mode.record) === month) totalChange.set({ total, month, deltaCents: saved.amountCents - mode.record.amountCents });
       else totalChange.set({ total, month, deltaCents: saved.amountCents });
     }
+    // Recebimento que conta num mês que ainda não começou (D-089 A): o aviso diz quando ele aparece no Resumo.
+    const counted = saved && saved.nextMonth === true && recordMonth(saved) > monthOf(today) ? NEXT_MONTH_TEXT.futureNotice(recordMonth(saved)) : null;
+    if (counted !== null) notice = notice === null ? counted : `${notice}\n${counted}`;
     afterNoteSaved();
     rememberCategory(draftRef.current.description, draftRef.current.category);
     // A última conta usada vale só neste aparelho (D-043): abre o próximo formulário já nela.
@@ -1762,7 +1765,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               {nextMonthShown && parsedDate ? (
                 <SettingSwitch
                   label={NEXT_MONTH_TEXT.toggle}
-                  caption={NEXT_MONTH_TEXT.caption(parsedDate)}
+                  caption={NEXT_MONTH_TEXT.caption(parsedDate, today)}
                   value={draft.nextMonth === true}
                   onChange={(v) => setDraft((d) => ({ ...d, nextMonth: v }))}
                 />

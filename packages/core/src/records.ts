@@ -100,14 +100,25 @@ export function recordMonth(record: Pick<FinancialRecord, 'occurredOn' | 'nextMo
   return record.nextMonth === true ? addMonths(month, 1) : month;
 }
 
+/** "Novembro aparece no Resumo a partir de 01/11/2026." */
+function firstDayLine(month: IsoMonth): string {
+  const name = formatMonthYearBR(month).replace(/ de \d{4}$/, '');
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`;
+}
+
 /** Textos do ajuste "Este valor é do mês seguinte" (D-089 A). */
 export const NEXT_MONTH_TEXT = {
   toggle: 'Este valor é do mês seguinte',
   /** Legenda do ajuste: "Entra no Recebido de novembro de 2026, não no de outubro de 2026." */
-  caption: (date: IsoDate): string => {
+  caption: (date: IsoDate, today?: IsoDate): string => {
     const own = monthOf(date);
-    return `Entra no Recebido de ${formatMonthYearBR(addMonths(own, 1))}, não no de ${formatMonthYearBR(own)}.`;
+    const next = addMonths(own, 1);
+    const base = `Entra no Recebido de ${formatMonthYearBR(next)}, não no de ${formatMonthYearBR(own)}.`;
+    // No mês de hoje, o mês seguinte ainda não abre no Resumo: a legenda diz quando ele aparece.
+    return today !== undefined && own === monthOf(today) ? `${base} ${firstDayLine(next)}` : base;
   },
+  /** Depois de salvar um recebimento que conta num mês que ainda não começou: "Conta no Recebido de novembro de 2026, que aparece no Resumo a partir de 01/11/2026." */
+  futureNotice: (month: IsoMonth): string => `Conta no Recebido de ${formatMonthYearBR(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
   /** Na linha da lista, depois da data: "Recebido · 30/10/2026 · conta em novembro". */
   rowNote: (month: IsoMonth): string => `conta em ${formatMonthYearBR(month).replace(/ de \d{4}$/, '')}`,
   /** No detalhe, depois do mês do resumo: "Novembro de 2026 (mês seguinte)". */

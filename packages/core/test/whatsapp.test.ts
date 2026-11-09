@@ -142,6 +142,10 @@ describe('WhatsApp: leitura das mensagens (sem IA)', () => {
     expect(read('farmácia 41 no cartão de crédito')).toEqual(card('Farmácia', 'Saúde', null, 4100));
     expect(read('farmácia 41 cartão de crédito azul')).toEqual(card('Farmácia', 'Saúde', 'azul', 4100));
     expect(read('cartão mercado 50')).toEqual(card('Mercado', 'Mercado', null, 5000));
+    // O nome sem palavras de ligação nem "dia" nas pontas.
+    expect(read('cinema 40 cartão do Pedro')).toEqual(card('Cinema', 'Lazer', 'Pedro', 4000));
+    const dia = read('mercado 120 no cartão dia 05/10');
+    expect(dia.type === 'anotar' && dia.card).toEqual({ hint: null });
     // Com estorno, reembolso, fatura, pagamento ou recarga, "cartão" é parte da descrição: nada de compra nova no cartão.
     for (const text of ['estorno cartão 30', 'reembolso cartão 50', 'fatura cartão 500', 'pagamento cartão 800', 'recarga cartão transporte 20']) {
       const r = read(text);
@@ -237,8 +241,9 @@ describe('WhatsApp: respostas', () => {
     expect(whatsappOutcomeReply({ result: 'qual_cartao', space, cards: ['Azul', 'Roxo', 'Verde'] }, TODAY)).toContain('Azul, Roxo e Verde');
     // Apelido que já começa com "Cartão": a palavra não se repete.
     expect(whatsappOutcomeReply({ result: 'qual_cartao', space, cards: ['Cartão Azul', 'Roxo'] }, TODAY)).toContain('"farmácia 41 cartão azul"');
-    expect(whatsappOutcomeReply({ result: 'limite_do_cartao', space }, TODAY)).toBe('Este cartão chegou a 5.000 lançamentos guardados. Exclua no app os que não precisa mais para anotar outros.');
+    expect(whatsappOutcomeReply({ result: 'limite_do_cartao', space }, TODAY)).toBe('Este cartão chegou a 5.000 lançamentos guardados. Para anotar outros, exclua no app os lançamentos que não usa mais.');
     expect(whatsappOutcomeReply({ result: 'compra_anotada', space, purchase: { ...purchase, card_nickname: 'Cartão Azul' } } as never, TODAY)).toContain('Compra no Cartão Azul: Farmácia');
+    expect(whatsappOutcomeReply({ result: 'compra_anotada', space, purchase: { ...purchase, card_nickname: 'Cartão' } } as never, TODAY)).toContain('Compra no Cartão: Farmácia');
     expect(whatsappOutcomeReply({ result: 'fatura_paga', space }, TODAY)).toBe(
       'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.',
     );

@@ -113,7 +113,7 @@ export const IMPORT_TEXT = {
   },
   /** A marca "k/n" que pode ser só a data da compra (D-089 B): a linha vem desmarcada. */
   installmentOrDateHint: (number: number, count: number): string =>
-    `Pode ser a parcela ${num(number)} de ${num(count)} ou só a data ${String(number).padStart(2, '0')}/${String(count).padStart(2, '0')}. Desmarcada: marque se for a parcela.`,
+    `Pode ser a parcela ${num(number)} de ${num(count)} ou só a data ${String(number).padStart(2, '0')}/${String(count).padStart(2, '0')}. Se for a parcela, marque. Se for a data, tire ${String(number).padStart(2, '0')}/${String(count).padStart(2, '0')} da descrição e marque: entra à vista.`,
   /** Rodapé. */
   importButton: (n: number) => (n === 0 ? 'Importar' : `Importar ${num(n)} ${plural(n, 'lançamento', 'lançamentos')}`),
   importing: (done: number, total: number) => `Importando… lote ${num(done)} de ${num(total)}`,
