@@ -36,15 +36,6 @@ export type ErrorCode = keyof typeof ERROR_TEXT;
  * anotar de novo; o preenchimento fica no formulário e salvar outra vez, com o mesmo conteúdo, confere antes e não duplica
  * (`guardedWrite` e `PendingAttemptStore`, em `pending.ts`). Uma frase por lugar onde a pessoa confere.
  */
-/**
- * Gasto com data futura (teste de 09/11/2026: "o mais intuitivo é adicionar aos gastos, com previsão futura"): além do erro, o
- * formulário oferece levar o que já foi digitado para Anotar conta a pagar, onde a data é o vencimento.
- */
-export const FUTURE_EXPENSE_TEXT = {
-  toCommitment: 'Ainda vai vencer? Anotar como conta a pagar',
-  toCommitmentA11y: 'Ainda vai vencer? Anotar como conta a pagar, com a descrição, o valor, a data e a categoria já digitados',
-} as const;
-
 export const UNCERTAIN_TEXT = {
   /** Gasto, recebimento, conta a pagar, pagamento, gasto fixo, conta do ano e fatura. */
   movimentos: 'Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.',
@@ -53,6 +44,15 @@ export const UNCERTAIN_TEXT = {
   conta: 'Não deu para confirmar se salvou. Confira em Conta antes de tentar de novo.',
   orcamento: 'Não deu para confirmar se salvou. Confira em Orçamento por categoria antes de tentar de novo.',
   renda: 'Não deu para confirmar se salvou. Confira em Renda comprometida antes de tentar de novo.',
+} as const;
+
+/**
+ * Gasto com data futura (teste de 09/11/2026: "o mais intuitivo é adicionar aos gastos, com previsão futura"): além do erro, o
+ * formulário oferece levar o que já foi digitado para Anotar conta a pagar, onde a data é o vencimento.
+ */
+export const FUTURE_EXPENSE_TEXT = {
+  toCommitment: 'Ainda vai vencer? Anotar como conta a pagar',
+  toCommitmentA11y: 'Ainda vai vencer? Anotar como conta a pagar, com a descrição, o valor, a data e a categoria já digitados',
 } as const;
 
 export type UncertainArea = keyof typeof UNCERTAIN_TEXT;

@@ -420,11 +420,36 @@ describe('leitor de comprovantes: boleto pelo código (teste de 09/11/2026)', ()
     expect(r.reading).toMatchObject({ kind: 'boleto', amountCents: 10200, occurredOn: '2026-10-05', counterpart: 'Empresa Exemplo de Energia S.A.' });
     expect(r.reading.dateIsDue).toBeUndefined();
     expect(boletoLeaks(r)).toEqual([]);
-    // Comprovante de pagamento sem o valor legível, mas com o código: o valor do código entra, e a data continua a do pagamento.
+    // Comprovante de pagamento sem o valor legível, mas com o código: o valor do código não entra no lugar do pago (pode ter juros ou
+    // desconto); a pessoa digita, e a data continua a do pagamento.
     const noAmount = comprovanteFromText(join('Comprovante de pagamento', 'Pagamento efetuado', 'Data do pagamento', '05/10/2026', 'Linha digitável', LINE), { today: '2026-11-12' });
     if (!noAmount.ok) throw new Error(noAmount.code);
-    expect(noAmount.reading).toMatchObject({ kind: 'boleto', direction: 'saida', amountCents: 123_456, occurredOn: '2026-10-05' });
+    expect(noAmount.reading).toMatchObject({ kind: 'boleto', direction: 'saida', amountCents: null, occurredOn: '2026-10-05' });
     expect(noAmount.reading.dateIsDue).toBeUndefined();
+    // Sem título nem tipo, só os rótulos que um boleto nunca tem ("Valor pago", "Data do pagamento"): continua um comprovante de pagamento
+    // (revisão de 09/11/2026), com o valor pago e a data do pagamento, e não o boleto em aberto.
+    const labelsOnly = comprovanteFromText(
+      join('Pagamento de título', 'Beneficiário', 'Empresa Exemplo de Energia S.A.', 'Pagador', `ELIS EXEMPLO ${CPF}`, 'Linha digitável', LINE, 'Valor do documento', '1.234,56', 'Valor pago', '1.240,00', 'Data de vencimento', '10/11/2026', 'Data do pagamento', '05/11/2026'),
+      { defaultDirection: 'saida', today: '2026-11-09' },
+    );
+    if (!labelsOnly.ok) throw new Error(labelsOnly.code);
+    expect(labelsOnly.reading).toMatchObject({ amountCents: 124_000, occurredOn: '2026-11-05', counterpart: 'Empresa Exemplo de Energia S.A.' });
+    expect(labelsOnly.reading.dateIsDue).toBeUndefined();
+    expect(boletoLeaks(labelsOnly)).toEqual([]);
+    const sideOnly = comprovanteFromText(join('Pago para', 'Loja Exemplo Ltda', 'Valor', 'R$ 500,00', 'Data', '05/11/2026 14:32', 'Código de barras', LINE), { today: '2026-11-09' });
+    if (!sideOnly.ok) throw new Error(sideOnly.code);
+    expect(sideOnly.reading).toMatchObject({ amountCents: 50_000, occurredOn: '2026-11-05', time: '14:32' });
+    expect(sideOnly.reading.dateIsDue).toBeUndefined();
+  });
+
+  it('conta de consumo (48 dígitos) e fator 0000: boleto do código sem vencimento, ainda marcado como lido pelo código', () => {
+    // Códigos fictícios de boleto.test.ts: arrecadação com valor R$ 189,90 e sem vencimento; bancário com fator 0000 e sem valor.
+    const collection = comprovanteFromText(join('Companhia Exemplo de Energia', 'Conta de luz', '83640000001-1 89900001001-2 23456789012-9 34567890123-1', 'Beneficiário', 'Companhia Exemplo de Energia S.A.'), { today: '2026-11-09' });
+    if (!collection.ok) throw new Error(collection.code);
+    expect(collection.reading).toMatchObject({ kind: 'boleto', amountCents: 18_990, occurredOn: null, dateIsDue: true, counterpart: 'Companhia Exemplo de Energia S.A.' });
+    const noDue = comprovanteFromText(join('Boleto', '23799876504321098765743210987657800000000000000', 'Beneficiário', 'Loja Exemplo Ltda'), { today: '2026-11-09' });
+    if (!noDue.ok) throw new Error(noDue.code);
+    expect(noDue.reading).toMatchObject({ kind: 'boleto', amountCents: null, occurredOn: null, dateIsDue: true });
   });
 
   it('nota fiscal, holerite e nota de serviço nunca viram boleto, mesmo com um código no texto', () => {

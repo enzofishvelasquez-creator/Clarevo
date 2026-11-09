@@ -91,6 +91,22 @@ add('descarte', [
 ]);
 add('descarte', ['conta', 'banco', 'id', 'cartao', 'documento', 'controle', 'endereco', 'cidade', 'estado'], { inline: false });
 
+/**
+ * Rótulos que só um comprovante de pagamento traz (um boleto ou uma conta de consumo nunca): valor pago, data e hora do pagamento,
+ * autenticação, protocolo e identificadores da transação. Com um deles, o texto é um pagamento feito, mesmo sem título nem tipo.
+ */
+const PAID_PHRASES: ReadonlySet<string> = new Set([
+  'valor pago', 'total pago', 'valor cobrado', 'valor debitado', 'valor da transferencia', 'valor do pix', 'valor do pagamento', 'valor da transacao', 'valor transferido',
+  'valor enviado', 'valor recebido', 'valor da operacao',
+  'data e hora', 'data/hora', 'data e horario', 'data da transferencia', 'data do pagamento', 'data de pagamento', 'data da transacao', 'data da operacao',
+  'data de efetivacao', 'data do pix', 'data da realizacao', 'data do recebimento', 'data de recebimento', 'realizado em', 'pago em', 'efetivado em',
+  'enviado em', 'recebido em', 'transferido em', 'hora', 'horario', 'hora da transferencia', 'hora do pagamento',
+  'pago para', 'pagou para', 'enviado para', 'transferido para', 'transferencia para', 'recebido de', 'recebeu de', 'enviado por', 'pago por',
+  'id da transacao', 'id da transferencia', 'id da operacao', 'id do pagamento', 'codigo de autenticacao', 'autenticacao', 'end to end', 'end-to-end',
+  'endtoend', 'e2e', 'protocolo', 'numero do protocolo', 'numero da transacao', 'numero da operacao', 'nsu', 'autorizacao', 'codigo da transacao',
+  'codigo do pagamento', 'numero do cartao', 'final do cartao', 'bandeira',
+]);
+
 /** Rótulos por primeira letra, do mais longo para o mais curto: o mais específico vale ("data do pagamento" antes de "data"). */
 const BY_FIRST: Map<string, LabelSpec[]> = new Map();
 for (const spec of LABELS) {
@@ -441,8 +457,11 @@ function readReceipt(raw: string, options: ComprovanteOptions): ReceiptRead {
   const kind: ComprovanteKind = kindCue ?? 'outro';
   const hasWord = heads.includes('comprovante') || heads.includes('recibo');
   // Um boleto ou uma conta de consumo também traz "Beneficiário", "Pagador" e "Valor do documento": o que diz que é um pagamento feito
-  // é o título ("Comprovante", "Pagamento efetuado", "Boleto pago"), o tipo (Pix, TED, débito) ou a direção.
-  const paid = hasWord || cueDirection !== null || (kindCue !== null && kindCue !== 'boleto');
+  // é o título ("Comprovante", "Pagamento efetuado", "Boleto pago"), o tipo (Pix, TED, débito), a direção ou um rótulo só de comprovante
+  // ("Valor pago", "Data do pagamento", "Autenticação"; revisão de 09/11/2026).
+  let paidLabel = false;
+  for (const phrase of phrases) if (PAID_PHRASES.has(phrase)) paidLabel = true;
+  const paid = hasWord || cueDirection !== null || (kindCue !== null && kindCue !== 'boleto') || paidLabel;
   const signals = [amountCents !== null, occurredOn !== null, kindCue !== null, counterpart !== null, hasWord, cueDirection !== null, sawDest || sawOrig].filter(Boolean).length;
   const strong = kindCue !== null || hasWord || cueDirection !== null || sawDest || sawOrig;
   if (!strong || signals < 2 || (amountCents === null && occurredOn === null && counterpart === null && message === null)) {
@@ -460,7 +479,8 @@ function boletoDocumentReading(boleto: BoletoReading, partial: ComprovanteReadin
     directionGuessed: false,
     amountCents: boleto.amountCents,
     occurredOn: boleto.dueOn,
-    dateIsDue: boleto.dueOn !== null,
+    // Sempre marcado: é o boleto lido pelo código, e a data, quando o código a traz, é o vencimento (sem data, a tela pede o dia do pagamento).
+    dateIsDue: true,
     time: null,
     counterpart: boleto.description ?? partial?.counterpart ?? null,
     message: null,
@@ -480,10 +500,8 @@ export function comprovanteFromText(raw: string, options: ComprovanteOptions = {
   if (!options.today) return regular;
   const boleto = boletoFromText(typeof raw === 'string' ? raw : '', options.today);
   if (!boleto) return regular;
-  // Comprovante de pagamento com o código do boleto no texto: vale o comprovante (valor pago e dia do pagamento); do código só sai o
-  // valor que faltar. Sem sinal de pagamento, é o próprio boleto.
-  if (paid && regular.ok) {
-    return regular.reading.amountCents !== null ? regular : { ok: true, reading: { ...regular.reading, amountCents: boleto.amountCents } };
-  }
+  // Comprovante de pagamento com o código do boleto no texto: vale o comprovante (valor pago e dia do pagamento), e o valor do código
+  // não entra no lugar do pago (pode ter juros ou desconto). Sem sinal de pagamento, é o próprio boleto.
+  if (paid) return regular;
   return { ok: true, reading: boletoDocumentReading(boleto, regular.ok ? regular.reading : null) };
 }

@@ -457,7 +457,29 @@ function differences(maior: PlanoScenario, menor: PlanoScenario): string[] {
 }
 
 function sameOutcome(a: PlanoScenario, b: PlanoScenario): boolean {
-  return a.months === b.months && a.interestCents === b.interestCents && a.firstMonth === b.firstMonth;
+  return (
+    a.months === b.months &&
+    a.interestCents === b.interestCents &&
+    a.firstMonth === b.firstMonth &&
+    a.sequence.length === b.sequence.length &&
+    a.sequence.every((s, i) => s.index === b.sequence[i]!.index && s.month === b.sequence[i]!.month)
+  );
+}
+
+/**
+ * A primeira linha quando as ordens diferem, com as duas no mesmo peso (D-040(2): nenhuma ordem em destaque): "Passando adiante a
+ * parcela de cada dívida quitada, tudo termina em 14 meses (1 ano e 2 meses) ou em 15 meses (1 ano e 3 meses), conforme a ordem."
+ */
+function ordersLead(maior: PlanoScenario, menor: PlanoScenario, extra: boolean): string {
+  const lead = extra ? 'Com o valor a mais e passando adiante a parcela de cada dívida quitada' : 'Passando adiante a parcela de cada dívida quitada';
+  const when = (s: PlanoScenario) => `${monthsDuration(s.months!)}${s.endMonth ? `, em ${formatMonthYearBR(s.endMonth)}` : ''}`;
+  if (maior.months !== null && menor.months !== null) {
+    if (maior.months === menor.months) return `${lead}, tudo termina em ${when(maior)}, nas duas ordens.`;
+    const [first, second] = maior.months < menor.months ? [maior, menor] : [menor, maior];
+    return `${lead}, tudo termina em ${when(first)} ou em ${when(second)}, conforme a ordem.`;
+  }
+  const ends = maior.months !== null ? maior : menor;
+  return `${lead}, tudo termina em ${when(ends)} em uma das ordens; na outra, as dívidas não terminam em 50 anos.`;
 }
 
 /** Das duas ordens, a que termina antes (empate: menos juros; depois, "Maior taxa primeiro"). */
@@ -473,14 +495,16 @@ function earlierOf(maior: PlanoScenario, menor: PlanoScenario): PlanoScenario {
  * A referência em uma frase, em relação à ordem que termina antes: "Sem passar nada adiante, só com os pagamentos de sempre, tudo
  * terminaria em 60 meses (5 anos), em novembro de 2031: 41 meses depois e R$ 1.495,19 a mais de juros." null quando nada muda.
  */
-function baselineLine(base: PlanoScenario, best: PlanoScenario, extra: boolean): string | null {
+function baselineLine(base: PlanoScenario, best: PlanoScenario, extra: boolean, same: boolean): string | null {
   if (best.months === null) return null;
   const lead = PLANO_TEXT.baselineLead(extra);
   if (base.months === null) return `${lead}, as dívidas não terminariam em 50 anos.`;
   const later = base.months - best.months;
   const more = base.interestCents! - best.interestCents!;
   if (later <= 0 && more <= 0) return null;
-  const tail = later > 0 && more > 0 ? `${monthsCount(later)} depois e ${formatBRL(more)} a mais de juros` : later > 0 ? `${monthsCount(later)} depois` : `${formatBRL(more)} a mais de juros`;
+  // Com ordens diferentes, a comparação é com a que termina antes, sem nomear qual (D-040(2)).
+  const after = same ? 'depois' : 'depois da ordem que termina antes';
+  const tail = later > 0 && more > 0 ? `${monthsCount(later)} ${after} e ${formatBRL(more)} a mais de juros` : later > 0 ? `${monthsCount(later)} ${after}` : `${formatBRL(more)} a mais de juros`;
   return `${lead}, tudo terminaria em ${monthsDuration(base.months)}${base.endMonth ? `, em ${formatMonthYearBR(base.endMonth)}` : ''}: ${tail}.`;
 }
 
@@ -601,9 +625,9 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
             : `${PLANO_TEXT.sameOutcome}: tudo termina em ${monthsDuration(maior.months)}${maior.endMonth ? `, em ${formatMonthYearBR(maior.endMonth)}` : ''}.`,
         );
       } else {
-        lines.push(maior.summary, menor.summary, ...diff);
+        lines.push(ordersLead(maior, menor, extraCents > 0), maior.summary, menor.summary, ...diff);
       }
-      const ref = baselineLine(base, earlierOf(maior, menor), extraCents > 0);
+      const ref = baselineLine(base, earlierOf(maior, menor), extraCents > 0, same);
       if (ref) lines.push(ref);
     }
   } else {

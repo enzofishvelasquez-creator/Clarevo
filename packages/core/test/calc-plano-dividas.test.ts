@@ -156,10 +156,11 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     ]);
     // Primeiro o que cada ordem dá (o destaque), as diferenças e, por último, a referência: o que muda em relação a só pagar as parcelas.
     expect(r.resultLines).toEqual([
+      'Com o valor a mais e passando adiante a parcela de cada dívida quitada, tudo termina em 14 meses (1 ano e 2 meses) ou em 15 meses (1 ano e 3 meses), conforme a ordem.',
       maior.summary,
       menor.summary,
       ...r.differences,
-      'Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 56 meses (4 anos e 8 meses): 42 meses depois e R$ 2.373,56 a mais de juros.',
+      'Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 56 meses (4 anos e 8 meses): 42 meses depois da ordem que termina antes e R$ 2.373,56 a mais de juros.',
     ]);
     expect(r.sameOutcome).toBe(false);
     expect(scenario(r, 'sem_extra').summary).toBe('Sem valor a mais: tudo termina em 56 meses (4 anos e 8 meses).');
@@ -180,8 +181,9 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     // Com o valor a mais, a referência diz que também fica sem ele.
     const e2e = run({ extra: '100,00', dividas: [parcelada('850,00', '36', '1,5', 'Financiamento do carro'), saldo('1.500,00', '1', '300,00', 'Cartão azul')] }, '2026-10-07');
     expect(e2e.sameOutcome).toBe(false);
+    expect(e2e.resultLines[0]).toBe('Com o valor a mais e passando adiante a parcela de cada dívida quitada, tudo termina em 24 meses (2 anos), em outubro de 2028, nas duas ordens.');
     expect(e2e.resultLines.at(-1)).toBe(
-      'Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 36 meses (3 anos), em outubro de 2029: 12 meses depois e R$ 2.216,64 a mais de juros.',
+      'Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 36 meses (3 anos), em outubro de 2029: 12 meses depois da ordem que termina antes e R$ 2.216,64 a mais de juros.',
     );
     // Quando nenhuma ordem termina em 50 anos, só a frase das ordens.
     const never = run({ dividas: [saldo('100.000,00', '1', '1.000,01'), saldo('50.000,00', '1', '500,01')] });

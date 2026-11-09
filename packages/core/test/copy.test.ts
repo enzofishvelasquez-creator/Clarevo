@@ -204,7 +204,7 @@ import { SUBSCRIPTION_ERROR_TEXT, SUBSCRIPTION_TEXT, subscriptionCount, subscrip
 import { EXPORT_FORMATS, EXPORT_PERIODS, EXPORT_TEXT, buildExportFiles, loadExportSource } from '../src';
 import { IMPORT_ERROR_TEXT, IMPORT_SAVE_ERROR_TEXT, IMPORT_TEXT, failedItemIndex, importSaveErrorText, importedSummary, reviewLineA11y } from '../src';
 import { GUIDE_ENTRIES, GUIDE_GROUPS, GUIDE_TEXT, HELP_TEXT, MANUAL_TEXT, TOUR_CARDS, TOUR_TEXT, guideSummary, guideWhere } from '../src';
-import { COMPROVANTE_TEXT, comprovanteDraft, comprovanteErrorText, comprovanteGaps, comprovanteKindLabel, comprovanteKindPhrase, comprovanteMismatch, comprovanteReadLine, suggestComprovanteDescription } from '../src';
+import { COMPROVANTE_TEXT, FUTURE_EXPENSE_TEXT, comprovanteDraft, comprovanteErrorText, comprovanteGaps, comprovanteKindLabel, comprovanteKindPhrase, comprovanteMismatch, comprovanteReadLine, suggestComprovanteDescription } from '../src';
 import type { ComprovanteDirection, ComprovanteKind, ComprovanteReading } from '../src';
 import { SAVED_BEFORE_TEXT } from '../src';
 import { SIGNUP_SOURCES, SIGNUP_SOURCE_LABEL, SIGNUP_SOURCE_TEXT, signupSourceErrorText, signupSourceTextSamples } from '../src';
@@ -2485,6 +2485,8 @@ describe('textos do comprovante de Pix e de pagamento (D-051)', () => {
       }
     }
     for (const code of ['texto_vazio', 'nota_fiscal', 'nao_e_comprovante'] as const) texts.push(comprovanteErrorText(code));
+    // O link de data futura em Anotar gasto (D-088) passa pelas mesmas regras.
+    texts.push(...Object.values(FUTURE_EXPENSE_TEXT));
     check(texts.filter((t) => t !== ''));
   });
 

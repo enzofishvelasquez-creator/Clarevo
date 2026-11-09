@@ -46,8 +46,9 @@ export interface ComprovanteReading {
   /** Descrição ou mensagem que a pessoa escreveu no comprovante, sem números longos; null quando não há. */
   message: string | null;
   /**
-   * Boleto lido pelo código (linha digitável ou código de barras), e não um comprovante de pagamento: `occurredOn` é o vencimento,
-   * não o dia do pagamento (a tela avisa). Ausente nos outros casos.
+   * Boleto lido pelo código (linha digitável ou código de barras), e não um comprovante de pagamento: `occurredOn`, quando o código
+   * traz o fator de vencimento, é o vencimento, não o dia do pagamento (a tela avisa); sem fator, fica nulo e a tela pede o dia do
+   * pagamento. Ausente nos outros casos.
    */
   dateIsDue?: boolean;
   /** Só na nota de serviço. */

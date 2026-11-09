@@ -1217,7 +1217,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
 
   /**
    * Gasto novo com data futura (teste de 09/11/2026): o erro continua, e o link leva o que já foi digitado para Anotar conta a pagar
-   * (descrição, valor em centavos, a data como vencimento e a categoria), sem gravar nada aqui. `push` mantém este formulário na pilha.
+   * (descrição, valor em centavos, a data como vencimento e a categoria), sem gravar nada aqui. `replace`, liberado pelo guarda de
+   * alterações (`leave`): nada deste formulário fica para trás, e voltar da conta a pagar não cai num gasto sujo.
    */
   const futureExpense = !cardPurchase && kind === 'despesa' && mode.type === 'novo' && errors.dateText === ERROR_TEXT.data_futura;
   const toCommitment = () => {
@@ -1228,7 +1229,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     if (cents !== null && cents >= 1) params.valor = String(cents);
     if (due) params.vencimento = due;
     if (draft.category) params.categoria = draft.category;
-    router.push({ pathname: '/a-pagar/nova', params });
+    leave(() => router.replace({ pathname: '/a-pagar/nova', params }));
   };
 
   const submit = async (versionOverride?: number, another = false) => {
@@ -1877,7 +1878,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           />
           <ChoiceDialog
             visible={proofChoice}
-            title={COMPROVANTE_TEXT.chooseTitle}
+            title={kind === 'despesa' ? COMPROVANTE_TEXT.chooseTitleExpense : COMPROVANTE_TEXT.chooseTitle}
             choices={[
               { label: COMPROVANTE_TEXT.chooseGallery, tone: 'brand', onPress: () => { setProofChoice(false); afterModal(() => void chooseProofPdf('galeria')); } },
               { label: COMPROVANTE_TEXT.chooseCamera, tone: 'soft', onPress: () => { setProofChoice(false); afterModal(() => void chooseProofPdf('camera')); } },

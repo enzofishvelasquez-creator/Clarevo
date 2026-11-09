@@ -39,6 +39,7 @@ export const COMPROVANTE_TEXT = {
   workingImage: 'Lendo a imagem aqui no aparelho. Pode levar alguns segundos…',
   /** App de celular (D-078 B): de onde vem o comprovante. */
   chooseTitle: 'Ler comprovante de Pix ou pagamento',
+  chooseTitleExpense: 'Ler comprovante ou boleto',
   chooseIntro: 'Escolha o PDF ou uma imagem (print ou foto). Tudo é lido aqui no aparelho e não é guardado.',
   choosePdf: 'Escolher o PDF',
   chooseGallery: 'Escolher um print ou foto da galeria',
@@ -69,6 +70,8 @@ export const COMPROVANTE_TEXT = {
   boletoDueDay: 'A data é o vencimento do boleto. Se pagou em outro dia, troque a data.',
   boletoFutureDay: 'O vencimento do boleto ainda não chegou. Se já pagou, escolha o dia do pagamento. Se ainda vai pagar, anote em Contas a pagar, com Ler boleto.',
   boletoNoAmount: 'O código do boleto não traz o valor. Digite o valor.',
+  /** Conta de consumo (48 dígitos) ou fator 0000: o código não traz o vencimento. */
+  boletoNoDue: 'O código do boleto não traz o vencimento. Escolha o dia do pagamento.',
   missingName: 'O nome não apareceu no comprovante. Digite uma descrição.',
   directionGuessed: 'O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo.',
   /** Nota de serviço (NFS-e, D-079): a tela decide de que lado a pessoa está. */
@@ -278,9 +281,11 @@ export function comprovanteGaps(draft: ComprovanteDraft): ComprovanteGaps {
           ? boleto
             ? COMPROVANTE_TEXT.boletoFutureDay
             : COMPROVANTE_TEXT.futureDay
-          : draft.kind === 'holerite'
-            ? COMPROVANTE_TEXT.holeriteDay
-            : COMPROVANTE_TEXT.missingDay
+          : boleto
+            ? COMPROVANTE_TEXT.boletoNoDue
+            : draft.kind === 'holerite'
+              ? COMPROVANTE_TEXT.holeriteDay
+              : COMPROVANTE_TEXT.missingDay
         : null,
     name: draft.counterpart === null && draft.message === null ? COMPROVANTE_TEXT.missingName : null,
     guessed: draft.directionGuessed ? COMPROVANTE_TEXT.directionGuessed : null,
@@ -293,7 +298,8 @@ export function comprovanteGaps(draft: ComprovanteDraft): ComprovanteGaps {
 /** A tela é a do outro lado: "Este comprovante é de um Pix recebido..." com a ação de trocar. null quando combina (ou não diz). */
 export function comprovanteMismatch(draft: ComprovanteDraft, screen: RecordKind): { text: string; action: string; other: RecordKind } | null {
   if (draft.recordKind === null || draft.recordKind === screen || draft.directionGuessed) return null;
-  const phrase = comprovanteKindPhrase(draft.kind, draft.direction);
+  // Boleto lido pelo código não é um boleto pago.
+  const phrase = draft.kind === 'boleto' && draft.dateIsDue ? 'um boleto' : comprovanteKindPhrase(draft.kind, draft.direction);
   return screen === 'despesa'
     ? { text: `Este comprovante é de ${phrase}. Ele entra como recebimento, não como gasto.`, action: COMPROVANTE_TEXT.switchToIncome, other: 'receita' }
     : { text: `Este comprovante é de ${phrase}. Ele entra como gasto, não como recebimento.`, action: COMPROVANTE_TEXT.switchToExpense, other: 'despesa' };

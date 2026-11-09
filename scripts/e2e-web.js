@@ -644,6 +644,17 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('data impossível 31/09: erro e campos preservados', (await body()).includes('Confira a data informada.') && (await field('Descrição').inputValue()) === 'Café' && (await field('Valor em reais').inputValue()) === '80,00');
   await field('Data do pagamento').fill('08/10/2026'); await btn('Salvar gasto').click(); await p.waitForTimeout(300);
   ok('data futura recusada', (await body()).includes('Use uma data até hoje.'));
+  // D-088: com data futura, o link leva o que foi digitado para Anotar conta a pagar (a data vira o vencimento) e este formulário sai da pilha.
+  const futureLink = () => p.getByRole('button', { name: /^Ainda vai vencer\? Anotar como conta a pagar/ }).filter({ visible: true });
+  ok('data futura: o link "Ainda vai vencer? Anotar como conta a pagar" aparece junto do erro (D-088)', (await futureLink().count()) === 1);
+  await futureLink().first().click(); await waitText('Demonstração · Pessoal'); await p.waitForTimeout(400);
+  ok('o link abre Anotar conta a pagar com descrição, valor e a data como vencimento, sem gravar nada',
+    new URL(p.url()).pathname === '/a-pagar/nova' && (await field('Descrição').inputValue()) === 'Café' && (await field('Valor em reais').inputValue()) === '80,00' && (await field('Data de vencimento').inputValue()) === '08/10/2026', p.url());
+  await btn('Cancelar').click(); await p.waitForTimeout(300);
+  if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
+  await goResumo();
+  await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  await field('Descrição').fill('Café'); await field('Valor em reais').fill('80,00');
   await field('Data do pagamento').fill(''); await field('Data do pagamento').pressSequentially('06102026');
   ok('data digitada só com números ganha as barras', (await field('Data do pagamento').inputValue()) === '06/10/2026');
   await p.getByRole('radio', { name: 'Hoje' }).filter({ visible: true }).first().click();
@@ -5338,7 +5349,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await f1Fill('Quanto você paga por mês, Cartão azul', '300,00');
   t = await body();
   ok('F1 duas dívidas: "Maior taxa primeiro" e "Menor dívida primeiro" (24 meses, outubro de 2028) lado a lado, e a referência "Sem valor a mais" (36 meses, juros R$ 7.135,09) em uma frase, no fim',
-    t.includes('Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 36 meses (3 anos), em outubro de 2029: 12 meses depois e R$ 2.216,64 a mais de juros.') &&
+    t.includes('Com o valor a mais e passando adiante a parcela de cada dívida quitada, tudo termina em 24 meses (2 anos), em outubro de 2028, nas duas ordens.') &&
+    t.includes('Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 36 meses (3 anos), em outubro de 2029: 12 meses depois da ordem que termina antes e R$ 2.216,64 a mais de juros.') &&
     !t.includes('Sem valor a mais: tudo termina em 36 meses') && t.includes('Juros estimados: R$ 7.135,09') &&
     t.includes('Maior taxa primeiro: tudo termina em 24 meses (2 anos), em outubro de 2028.') && t.includes('Menor dívida primeiro: tudo termina em 24 meses (2 anos), em outubro de 2028.') &&
     t.includes('Juros estimados: R$ 4.918,45') && t.includes('Juros estimados: R$ 4.925,13'), t.slice(-1800));
@@ -8971,6 +8983,18 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await i2Bad(i2Danfe, 'Esta é uma nota fiscal de produto. Para anotar uma compra com nota, use Escanear nota fiscal em Anotar gasto. Aqui lemos comprovantes, holerites e notas de serviço.', 'PDF de nota fiscal de produto (DANFE)');
   await i2Bad(i2Order, 'Não reconhecemos um comprovante neste PDF. Confira se é o comprovante de um Pix, de uma TED, de um boleto ou de um pagamento.', 'PDF que não é de comprovante');
   await i2Bad(i2NotPdf, 'Este arquivo não é um PDF.', 'arquivo que não é PDF');
+  await i2Leave();
+
+  // ---- 11b. Boleto em aberto pela linha digitável (D-088): "Boleto", o valor do código, o vencimento futuro pede o dia ----
+  // Linha digitável fictícia (a mesma de "Ler boleto" em Contas a pagar): vence em 10/11/2026, depois do dia de hoje da demonstração (07/10).
+  const i2BoletoAberto = i2File('boleto-aberto.pdf', ['Banco Exemplo S.A.', '237-2', '23791.23454 67890.123457 67890.123457 4 16260000123456', 'Beneficiário', 'Proteção Exemplo Assistência Ltda', 'Vencimento', '10/11/2026', 'Valor do documento', '1.234,56', 'Pagador', 'Elis Exemplo']);
+  await i2NewExpense();
+  await i2ReadExpense(i2BoletoAberto);
+  i2t = await i2Keep(); i2v = await i2Values();
+  ok('I2 boleto pela linha digitável: "Comprovante lido: Boleto · Proteção Exemplo Assistência Ltda · R$ 1.234,56", o valor do código no campo, a descrição "Boleto para ...", o vencimento futuro pede o dia e manda para Contas a pagar, e a linha digitável não aparece',
+    i2t.includes('Comprovante lido: Boleto · Proteção Exemplo Assistência Ltda · R$ 1.234,56') && i2v.amount === '1.234,56' && i2v.date === '' && i2v.desc === 'Boleto para Proteção Exemplo Assistência Ltda' &&
+    i2t.includes('O vencimento do boleto ainda não chegou. Se já pagou, escolha o dia do pagamento. Se ainda vai pagar, anote em Contas a pagar, com Ler boleto.') && !i2t.includes('23791') && !i2t.includes('16260000123456'), i2t.slice(0, 700));
+  await i2Shots('356b_comprovante_boleto', false);
   await i2Leave();
 
   // ---- 12. Valores ocultos: o valor do bloco e o do aviso "Parece já anotado" aparecem como "R$ ••••" ----

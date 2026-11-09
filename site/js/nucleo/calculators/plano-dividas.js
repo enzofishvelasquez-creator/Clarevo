@@ -272,7 +272,23 @@ function differences(maior, menor) {
     return out;
 }
 function sameOutcome(a, b) {
-    return a.months === b.months && a.interestCents === b.interestCents && a.firstMonth === b.firstMonth;
+    return (a.months === b.months &&
+        a.interestCents === b.interestCents &&
+        a.firstMonth === b.firstMonth &&
+        a.sequence.length === b.sequence.length &&
+        a.sequence.every((s, i) => s.index === b.sequence[i].index && s.month === b.sequence[i].month));
+}
+function ordersLead(maior, menor, extra) {
+    const lead = extra ? 'Com o valor a mais e passando adiante a parcela de cada dívida quitada' : 'Passando adiante a parcela de cada dívida quitada';
+    const when = (s) => `${monthsDuration(s.months)}${s.endMonth ? `, em ${formatMonthYearBR(s.endMonth)}` : ''}`;
+    if (maior.months !== null && menor.months !== null) {
+        if (maior.months === menor.months)
+            return `${lead}, tudo termina em ${when(maior)}, nas duas ordens.`;
+        const [first, second] = maior.months < menor.months ? [maior, menor] : [menor, maior];
+        return `${lead}, tudo termina em ${when(first)} ou em ${when(second)}, conforme a ordem.`;
+    }
+    const ends = maior.months !== null ? maior : menor;
+    return `${lead}, tudo termina em ${when(ends)} em uma das ordens; na outra, as dívidas não terminam em 50 anos.`;
 }
 function earlierOf(maior, menor) {
     if (maior.months === null)
@@ -285,7 +301,7 @@ function earlierOf(maior, menor) {
         return menor;
     return maior;
 }
-function baselineLine(base, best, extra) {
+function baselineLine(base, best, extra, same) {
     if (best.months === null)
         return null;
     const lead = PLANO_TEXT.baselineLead(extra);
@@ -295,7 +311,8 @@ function baselineLine(base, best, extra) {
     const more = base.interestCents - best.interestCents;
     if (later <= 0 && more <= 0)
         return null;
-    const tail = later > 0 && more > 0 ? `${monthsCount(later)} depois e ${formatBRL(more)} a mais de juros` : later > 0 ? `${monthsCount(later)} depois` : `${formatBRL(more)} a mais de juros`;
+    const after = same ? 'depois' : 'depois da ordem que termina antes';
+    const tail = later > 0 && more > 0 ? `${monthsCount(later)} ${after} e ${formatBRL(more)} a mais de juros` : later > 0 ? `${monthsCount(later)} ${after}` : `${formatBRL(more)} a mais de juros`;
     return `${lead}, tudo terminaria em ${monthsDuration(base.months)}${base.endMonth ? `, em ${formatMonthYearBR(base.endMonth)}` : ''}: ${tail}.`;
 }
 export function calcPlanoDividas(input, today) {
@@ -417,9 +434,9 @@ export function calcPlanoDividas(input, today) {
                     : `${PLANO_TEXT.sameOutcome}: tudo termina em ${monthsDuration(maior.months)}${maior.endMonth ? `, em ${formatMonthYearBR(maior.endMonth)}` : ''}.`);
             }
             else {
-                lines.push(maior.summary, menor.summary, ...diff);
+                lines.push(ordersLead(maior, menor, extraCents > 0), maior.summary, menor.summary, ...diff);
             }
-            const ref = baselineLine(base, earlierOf(maior, menor), extraCents > 0);
+            const ref = baselineLine(base, earlierOf(maior, menor), extraCents > 0, same);
             if (ref)
                 lines.push(ref);
         }

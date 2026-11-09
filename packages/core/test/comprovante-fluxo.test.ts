@@ -283,8 +283,13 @@ describe('folha "Escanear nota fiscal" e erros', () => {
     expect(paid.dateIsDue).toBe(false);
     expect(comprovanteReadLine(paid)).toBe('Comprovante lido: Boleto pago · R$ 85,00 · 05/10/2026 às 14:32');
     expect(comprovanteGaps(paid).issued).toBeNull();
-    // Em Registrar recebimento, o boleto é do outro lado.
-    expect(comprovanteMismatch(due, 'receita')).toMatchObject({ other: 'despesa' });
+    // Em Registrar recebimento, o boleto é do outro lado, e a frase não o chama de pago.
+    expect(comprovanteMismatch(due, 'receita')).toEqual({ text: 'Este comprovante é de um boleto. Ele entra como gasto, não como recebimento.', action: 'Trocar para Anotar gasto', other: 'despesa' });
+    expect(comprovanteMismatch(paid, 'receita')?.text).toBe('Este comprovante é de um boleto pago. Ele entra como gasto, não como recebimento.');
+    // Conta de consumo: o código não traz o vencimento; a linha diz "Boleto" e o dia pedido é o do pagamento.
+    const noDue = draftOf({ kind: 'boleto', amountCents: 18_990, occurredOn: null, time: null, counterpart: 'Companhia Exemplo', dateIsDue: true });
+    expect(comprovanteReadLine(noDue)).toBe('Comprovante lido: Boleto · Companhia Exemplo · R$ 189,90');
+    expect(comprovanteGaps(noDue).day).toBe('O código do boleto não traz o vencimento. Escolha o dia do pagamento.');
   });
 
   it('um erro por causa, sem devolver o texto do PDF', () => {

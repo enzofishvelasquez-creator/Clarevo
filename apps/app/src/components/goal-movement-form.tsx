@@ -371,7 +371,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
                 }}
                 onBlur={() => setAmountText(formatMoneyText(amountText))}
                 error={errors.amountText}
-                hint={plannedPrefilled ? M.aporte.planned : undefined}
+                hint={plannedPrefilled && amountText === first.amountText ? M.aporte.planned : undefined}
               />
               <View style={{ gap: space[2] }}>
                 <TextField

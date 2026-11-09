@@ -184,7 +184,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Escolha como ler a nota: ${list([NOTA_TEXT.sheet.camera, NOTA_TEXT.sheet.pdf, NOTA_TEXT.sheet.paste], 'ou')}.`,
       `Aponte a câmera para o QR code do cupom ou para o código de barras da chave de acesso. Em ${q(NOTA_TEXT.sheet.paste)}, também dá para usar ${q(NOTA_TEXT.keyPhoto)}: uma foto dos 44 números da chave.`,
       'Confira o que foi preenchido, como valor, data e descrição, e mude o que precisar.',
-      `Para ler o comprovante de um Pix, TED, boleto pago ou débito, ou um boleto e uma conta de luz pela linha digitável, em PDF ou imagem, escolha ${q(COMPROVANTE_TEXT.optionExpense)} na mesma folha. Em Registrar recebimento, a linha é ${q(COMPROVANTE_TEXT.option)}. O arquivo é lido no aparelho e não é guardado.`,
+      `Para ler o comprovante de um Pix, TED, boleto pago ou débito, e também um boleto ou uma conta de luz pela linha digitável, em PDF ou imagem, escolha ${q(COMPROVANTE_TEXT.optionExpense)} na mesma folha. Em Registrar recebimento, a linha é ${q(COMPROVANTE_TEXT.option)}. O arquivo é lido no aparelho e não é guardado.`,
       `Toque em ${q('Salvar gasto')}. Só um resumo da chave é guardado, nunca o CPF, a chave inteira nem o link.`,
     ],
     screenName: 'Anotar gasto',
