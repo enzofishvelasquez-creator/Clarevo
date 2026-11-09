@@ -29,7 +29,9 @@ export const PARCELADO_FIELDS = {
     },
 };
 export const COTA_UNICA_FIELDS = {
-    aVista: moneyField('Valor da cota única', 'o valor da cota única', '2.400,00'),
+    aVista: moneyField('Valor da cota única', 'o valor da cota única', '2.400,00', {
+        hint: 'Cota única é pagar o ano inteiro de uma vez, em geral com desconto, como no IPVA e no IPTU. O valor está no aviso ou no carnê.',
+    }),
     parcelas: countField('Número de parcelas', 'o número de parcelas', 2, 12, 'Use de 2 a 12 parcelas.', 'De 2 a 12'),
     parcela: moneyField('Valor de cada parcela', 'o valor de cada parcela', '480,00'),
     primeiraNaCompra: {
@@ -70,7 +72,7 @@ export function calcParceladoOuAVista(input) {
             ? `Com estes números, parcelar custa ${formatBRL(differenceCents)} a mais que a cota única.`
             : `Com estes números, o parcelado custa ${formatBRL(differenceCents)} a mais.`);
         resultLines.push(monthlyRate !== null && annualRate !== null
-            ? `Isso equivale a juros de ${rateText(monthlyRate)} ao mês (${rateText(annualRate)} ao ano).`
+            ? `Nas parcelas há juros embutidos de ${rateText(monthlyRate)} ao mês (${rateText(annualRate)} ao ano).`
             : `Como a primeira parcela já cobre ${base}, não há uma taxa ao mês para mostrar.`);
     }
     resultLines.push(`Total parcelado: ${formatBRL(totalCents)} (${n} × ${formatBRL(parcela)}).`);
@@ -82,7 +84,9 @@ export function calcParceladoOuAVista(input) {
             : first
                 ? 'Primeira parcela paga na compra e as outras a cada mês.'
                 : 'Primeira parcela 1 mês depois da compra e as outras a cada mês.',
-        ...(monthlyRate !== null ? [`Taxa que iguala as parcelas ${cota ? 'à cota única' : 'ao preço à vista'}, com juros compostos.`] : []),
+        ...(monthlyRate !== null
+            ? [`A taxa não vem do contrato: é calculada só com estes números, como o juro composto que faz as parcelas valerem hoje o mesmo que ${base}.`]
+            : []),
     ];
     const action = cota ? null : input.formaPagamento === 'cartao' ? 'aviso_cartao' : 'anotar_parcelamento';
     return {

@@ -359,6 +359,79 @@ describe('leitor de comprovantes: o que lê', () => {
   });
 });
 
+describe('leitor de comprovantes: boleto pelo código (teste de 09/11/2026)', () => {
+  // Linha digitável fictícia (a mesma de boleto.test.ts): banco 237, fator 1626 (vence em 10/11/2026), R$ 1.234,56.
+  const LINE = '23791.23454 67890.123457 67890.123457 4 16260000123456';
+  const LINE_DIGITS = LINE.replace(/\D/g, '');
+  const NOSSO_NUMERO = '109/12345678-9';
+  const BOLETO = join(
+    'Banco Exemplo S.A.',
+    '237-2',
+    LINE,
+    'Local de pagamento',
+    'Pagável em qualquer banco até o vencimento',
+    'Vencimento',
+    '10/11/2026',
+    'Beneficiário',
+    `PROTEÇÃO EXEMPLO ASSISTÊNCIA LTDA ${CNPJ}`,
+    'Agência/Código do beneficiário',
+    `${AGENCY}/${ACCOUNT}`,
+    'Data do documento',
+    '20/10/2026',
+    'Nosso número',
+    NOSSO_NUMERO,
+    'Valor do documento',
+    '1.234,56',
+    'Pagador',
+    `ELIS EXEMPLO ${CPF}`,
+  );
+  const boletoLeaks = (r: ComprovanteResult) => [...leaks(r), ...[LINE, LINE_DIGITS, '23791', '16260000123456', NOSSO_NUMERO, '12345678-9'].filter((s) => JSON.stringify(r).includes(s))];
+
+  it('o boleto (conta de luz, carnê, cobrança) sem comprovante de pagamento: valor e vencimento do código, o beneficiário sem documento, e nada do código sai', () => {
+    const r = comprovanteFromText(BOLETO, { defaultDirection: 'saida', today: '2026-11-12' });
+    expect(boletoLeaks(r)).toEqual([]);
+    if (!r.ok) throw new Error(r.code);
+    expect(r.reading).toEqual({
+      kind: 'boleto',
+      direction: 'saida',
+      directionGuessed: false,
+      amountCents: 123_456,
+      occurredOn: '2026-11-10',
+      dateIsDue: true,
+      time: null,
+      counterpart: 'Proteção Exemplo Assistência Ltda',
+      message: null,
+    });
+    // "Data do documento" (20/10) não vira a data: a data é o vencimento do código.
+    expect(r.reading.occurredOn).not.toBe('2026-10-20');
+  });
+
+  it('o mesmo boleto só com o código e o nome (como a leitura de uma foto apertada): ainda é lido; sem o dia de hoje, não', () => {
+    const r = comprovanteFromText(join('PROTEBEM', LINE, 'Beneficiário', 'Protebem Exemplo Ltda'), { defaultDirection: 'saida', today: '2026-11-09' });
+    if (!r.ok) throw new Error(r.code);
+    expect(r.reading).toMatchObject({ kind: 'boleto', amountCents: 123_456, occurredOn: '2026-11-10', dateIsDue: true, counterpart: 'Protebem Exemplo Ltda' });
+    // Sem `today` o vencimento não tem como ser calculado: vale a leitura comum (aqui, nada reconhecido).
+    expect(comprovanteFromText(join('PROTEBEM', LINE), { defaultDirection: 'saida' })).toEqual({ ok: false, code: 'nao_e_comprovante' });
+  });
+
+  it('o comprovante de pagamento que traz o código do boleto continua um comprovante: valor pago e dia do pagamento, sem "vence em"', () => {
+    const r = comprovanteFromText(join(LAYOUT_BOLETO, 'Linha digitável', LINE), { defaultDirection: 'saida', today: '2026-11-12' });
+    if (!r.ok) throw new Error(r.code);
+    expect(r.reading).toMatchObject({ kind: 'boleto', amountCents: 10200, occurredOn: '2026-10-05', counterpart: 'Empresa Exemplo de Energia S.A.' });
+    expect(r.reading.dateIsDue).toBeUndefined();
+    expect(boletoLeaks(r)).toEqual([]);
+    // Comprovante de pagamento sem o valor legível, mas com o código: o valor do código entra, e a data continua a do pagamento.
+    const noAmount = comprovanteFromText(join('Comprovante de pagamento', 'Pagamento efetuado', 'Data do pagamento', '05/10/2026', 'Linha digitável', LINE), { today: '2026-11-12' });
+    if (!noAmount.ok) throw new Error(noAmount.code);
+    expect(noAmount.reading).toMatchObject({ kind: 'boleto', direction: 'saida', amountCents: 123_456, occurredOn: '2026-10-05' });
+    expect(noAmount.reading.dateIsDue).toBeUndefined();
+  });
+
+  it('nota fiscal, holerite e nota de serviço nunca viram boleto, mesmo com um código no texto', () => {
+    expect(comprovanteFromText(join('DANFE Documento Auxiliar da Nota Fiscal Eletrônica', 'Chave de acesso', LINE), { today: '2026-11-12' })).toEqual({ ok: false, code: 'nota_fiscal' });
+  });
+});
+
 describe('leitor de comprovantes: o que não é comprovante', () => {
   it('texto vazio ou quase (PDF que é foto)', () => {
     for (const raw of ['', '   \n  ', 'Página 1', ' ​', 'a'.repeat(5)]) expect(comprovanteFromText(raw)).toEqual({ ok: false, code: 'texto_vazio' });

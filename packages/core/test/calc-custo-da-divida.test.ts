@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEBT_RESULT_MAX_CENTS, DIVIDA_TEXT, calcCustoDaDivida, calcErrorText, formatBRL, type DividaInput } from '../src';
+import { DEBT_RESULT_MAX_CENTS, DIVIDA_FIELDS,
+  DIVIDA_TEXT, calcCustoDaDivida, calcErrorText, formatBRL, type DividaInput } from '../src';
 
 const run = (input: DividaInput) => {
   const out = calcCustoDaDivida(input);
@@ -16,14 +17,18 @@ describe('2. Quanto custa uma dívida? (docs/08 §3.2)', () => {
       'Juros: R$ 259,71',
       'Isso equivale a 151,82% ao ano.',
     ]);
-    expect(r.notes).toEqual([]);
+    // A pergunta do teste de 09/11/2026 ("a gente inclui o CET no cálculo?"): a nota diz que a conta usa só a taxa de juros.
+    expect(r.notes).toEqual([DIVIDA_TEXT.cetOutNote]);
+    expect(DIVIDA_TEXT.cetOutNote).toBe(
+      'A conta usa só a taxa de juros, sem o CET. O CET da fatura ou do extrato soma o IOF e as tarifas, por isso o custo real tende a ser um pouco maior.',
+    );
     expect(r.aboveCap).toBe(false);
   });
 
   it('cheque especial acima de 8% ao mês: aviso do teto', () => {
     const r = run({ tipo: 'cheque_especial', valor: '500,00', taxaMes: '8,01', meses: '1' });
     expect(r.aboveCap).toBe(true);
-    expect(r.notes).toEqual([DIVIDA_TEXT.chequeCapNote]);
+    expect(r.notes).toEqual([DIVIDA_TEXT.chequeCapNote, DIVIDA_TEXT.cetOutNote]);
     expect(r.notes[0]).toBe(
       'A taxa informada passa do teto de 8% ao mês do cheque especial (Res. CMN 4.765/2019). Confira o extrato.',
     );
@@ -37,6 +42,8 @@ describe('2. Quanto custa uma dívida? (docs/08 §3.2)', () => {
     expect(r.resultLines[1]).toBe('O valor vai para R$ 798,00 na fatura seguinte.');
     expect(r.resultLines[2]).toBe('Isso equivale a 381,79% ao ano.');
     expect(r.parcelamento).toBeNull();
+    expect(r.notes).toEqual([DIVIDA_TEXT.cetOutNote]);
+    expect(DIVIDA_FIELDS.taxaMes!.hint).toBe('Está na fatura, no extrato ou no contrato. Use a taxa de juros ao mês, não o CET.');
   });
 
   it('parcelar em 24 × R$ 75,79 a 8% somaria R$ 1.818,96; o limite deixa o total em R$ 1.400,00', () => {

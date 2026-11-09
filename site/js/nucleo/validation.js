@@ -19,6 +19,10 @@ export const ERROR_TEXT = {
     sem_permissao: 'Você não tem permissão para esta ação.',
     assinatura_necessaria: 'A sua conta está só para ver e exportar. Para voltar a anotar, abra Conta e toque em Assinatura.',
 };
+export const FUTURE_EXPENSE_TEXT = {
+    toCommitment: 'Ainda vai vencer? Anotar como conta a pagar',
+    toCommitmentA11y: 'Ainda vai vencer? Anotar como conta a pagar, com a descrição, o valor, a data e a categoria já digitados',
+};
 export const UNCERTAIN_TEXT = {
     movimentos: 'Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.',
     metas: 'Não deu para confirmar se salvou. Confira em Metas antes de tentar de novo.',

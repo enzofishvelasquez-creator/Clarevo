@@ -291,14 +291,21 @@ function DebtCard({
   );
 }
 
-/** Total pago e juros de cada ordem e a sequência em que as dívidas terminam; o resumo e as diferenças ficam no resultado. */
+/**
+ * Total pago e juros de cada ordem e a sequência em que as dívidas terminam; o resumo e as diferenças ficam no resultado. Quando as
+ * duas ordens dão no mesmo, um bloco só para elas (teste de 09/11/2026: "informação demais junta e repetida").
+ */
 function Details({ result }: { result: PlanoResult }) {
+  const blocks =
+    result.sameOutcome && result.scenarios.length === 3
+      ? [result.scenarios[0]!, { ...result.scenarios[1]!, title: PLANO_TEXT.bothTitle, caption: PLANO_TEXT.bothCaption }]
+      : result.scenarios;
   return (
     <View style={{ gap: space[3] }}>
       <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={3}>
         {PLANO_TEXT.detailsTitle}
       </Txt>
-      {result.scenarios.map((s) => (
+      {blocks.map((s) => (
         <View key={s.id} style={styles.scenario}>
           <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={4}>
             {s.title}

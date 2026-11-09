@@ -105,6 +105,12 @@ export const PLANO_TEXT = {
     maior_taxa: 'Maior taxa primeiro',
     menor_divida: 'Menor dívida primeiro',
   },
+  /** Teste de 09/11/2026 ("não tem uma indicação clara"): quando as duas ordens terminam no mesmo mês com os mesmos juros, uma frase só. */
+  sameOutcome: 'As duas ordens dão no mesmo',
+  bothTitle: 'As duas ordens',
+  bothCaption: 'Maior taxa primeiro e Menor dívida primeiro: com estes números, dão no mesmo.',
+  /** A referência, em relação à ordem que termina antes: o que muda ao passar as parcelas adiante (e ao pôr o valor a mais). */
+  baselineLead: (extra: boolean) => `${extra ? 'Sem o valor a mais e sem' : 'Sem'} passar nada adiante, só com os pagamentos de sempre`,
   sameInterest: 'As duas ordens têm o mesmo total de juros.',
   sameFirst: 'A primeira dívida termina no mesmo mês nas duas ordens.',
   sameEnd: 'Tudo termina no mesmo mês nas duas ordens.',
@@ -176,8 +182,8 @@ export const PLANO_FIELDS: Record<PlanoCampo | 'extra' | 'dividas', CalcFieldSpe
   ),
   pagamento: moneyField('Quanto você paga por mês', 'quanto você paga por mês', '200,00'),
   extra: {
-    label: 'Quanto a mais você consegue pôr por mês nas dívidas?',
-    hint: 'Opcional. Em branco: só os pagamentos de sempre.',
+    label: 'Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?',
+    hint: 'Opcional, como 200,00. Em branco: a conta usa só as parcelas e os pagamentos informados acima.',
     kind: 'dinheiro',
     optional: true,
     errors: { invalido: 'Confira o valor, como 200,00.', acima_do_limite: LIMIT_TEXT },
@@ -250,6 +256,8 @@ export interface PlanoResult extends CalcTexts {
   scenarios: PlanoScenario[];
   /** Diferenças entre as duas ordens, em frases neutras (vazia com 1 dívida ou quando uma ordem passa de 600 meses). */
   differences: string[];
+  /** As duas ordens terminam no mesmo mês, com os mesmos juros e a primeira dívida no mesmo mês (sempre false com 1 dívida). */
+  sameOutcome: boolean;
 }
 
 interface SimDebt {
@@ -448,6 +456,34 @@ function differences(maior: PlanoScenario, menor: PlanoScenario): string[] {
   return out;
 }
 
+function sameOutcome(a: PlanoScenario, b: PlanoScenario): boolean {
+  return a.months === b.months && a.interestCents === b.interestCents && a.firstMonth === b.firstMonth;
+}
+
+/** Das duas ordens, a que termina antes (empate: menos juros; depois, "Maior taxa primeiro"). */
+function earlierOf(maior: PlanoScenario, menor: PlanoScenario): PlanoScenario {
+  if (maior.months === null) return menor.months === null ? maior : menor;
+  if (menor.months === null) return maior;
+  if (menor.months < maior.months) return menor;
+  if (menor.months === maior.months && menor.interestCents! < maior.interestCents!) return menor;
+  return maior;
+}
+
+/**
+ * A referência em uma frase, em relação à ordem que termina antes: "Sem passar nada adiante, só com os pagamentos de sempre, tudo
+ * terminaria em 60 meses (5 anos), em novembro de 2031: 41 meses depois e R$ 1.495,19 a mais de juros." null quando nada muda.
+ */
+function baselineLine(base: PlanoScenario, best: PlanoScenario, extra: boolean): string | null {
+  if (best.months === null) return null;
+  const lead = PLANO_TEXT.baselineLead(extra);
+  if (base.months === null) return `${lead}, as dívidas não terminariam em 50 anos.`;
+  const later = base.months - best.months;
+  const more = base.interestCents! - best.interestCents!;
+  if (later <= 0 && more <= 0) return null;
+  const tail = later > 0 && more > 0 ? `${monthsCount(later)} depois e ${formatBRL(more)} a mais de juros` : later > 0 ? `${monthsCount(later)} depois` : `${formatBRL(more)} a mais de juros`;
+  return `${lead}, tudo terminaria em ${monthsDuration(base.months)}${base.endMonth ? `, em ${formatMonthYearBR(base.endMonth)}` : ''}: ${tail}.`;
+}
+
 /**
  * Compara a ordem "Maior taxa primeiro" com "Menor dívida primeiro" e mostra "Sem valor a mais" como referência. Com uma só
  * dívida, mostra "Sem valor a mais" e "Com o valor a mais". `today` (a data de hoje) só serve para dar nome de mês ao fim de
@@ -527,12 +563,13 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
 
   const scenarios: PlanoScenario[] = [];
   let diff: string[] = [];
+  let same = false;
   const lines: string[] = [];
   if (included.length > 0) {
     const baseCaption = included.length > 1 && extraCents === 0 ? PLANO_TEXT.baselineCaption : null;
     const base = buildScenario('sem_extra', simulate(sim, null), included, today, baseCaption);
     scenarios.push(base);
-    lines.push(base.summary);
+    if (included.length === 1) lines.push(base.summary);
     if (included.length === 1) {
       if (extraCents > 0) {
         const withExtra = buildScenario('com_extra', simulate(sim, { order: [0], budget }), included, today);
@@ -554,9 +591,20 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
       const maior = buildScenario('maior_taxa', simulate(sim, { order: byRate, budget }), included, today);
       const menor = buildScenario('menor_divida', simulate(sim, { order: bySize, budget }), included, today);
       scenarios.push(maior, menor);
-      lines.push(maior.summary, menor.summary);
       diff = differences(maior, menor);
-      lines.push(...diff);
+      same = sameOutcome(maior, menor);
+      // Primeiro o que as ordens dão (uma frase só quando dão no mesmo), depois a referência: o que muda em relação a só pagar as parcelas.
+      if (same) {
+        lines.push(
+          maior.months === null
+            ? `${PLANO_TEXT.sameOutcome}: ${lowerFirst(PLANO_TEXT.noEnd)}`
+            : `${PLANO_TEXT.sameOutcome}: tudo termina em ${monthsDuration(maior.months)}${maior.endMonth ? `, em ${formatMonthYearBR(maior.endMonth)}` : ''}.`,
+        );
+      } else {
+        lines.push(maior.summary, menor.summary, ...diff);
+      }
+      const ref = baselineLine(base, earlierOf(maior, menor), extraCents > 0);
+      if (ref) lines.push(ref);
     }
   } else {
     lines.push(PLANO_TEXT.noDebtCompared);
@@ -581,6 +629,7 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
       initialSumCents: initialSum,
       scenarios,
       differences: diff,
+      sameOutcome: same,
       resultLines: lines,
       hypotheses,
       notes,

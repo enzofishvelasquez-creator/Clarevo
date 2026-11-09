@@ -2495,6 +2495,7 @@ describe('textos do comprovante de Pix e de pagamento (D-051)', () => {
       for (const word of ['CPF', 'CNPJ', 'chave Pix', 'conta', 'códigos']) expect(text, word).toContain(word);
     }
     expect(COMPROVANTE_TEXT.option).toBe('Ler comprovante de Pix ou pagamento');
+    expect(COMPROVANTE_TEXT.optionExpense).toBe('Ler comprovante ou boleto');
     expect(COMPROVANTE_TEXT.lineHint).toBe('Comprovante, holerite ou nota de serviço, em PDF ou imagem, lido aqui no aparelho');
     expect(COMPROVANTE_TEXT.lineHintPdf).toBe('Comprovante, holerite ou nota de serviço em PDF, lido aqui no aparelho');
     expect(COMPROVANTE_TEXT.note.privacy).toContain('aqui no aparelho');

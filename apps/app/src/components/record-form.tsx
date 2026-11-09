@@ -8,6 +8,7 @@ import {
   MAX_RECORD_CENTS,
   parseBRL,
   ERROR_TEXT,
+  FUTURE_EXPENSE_TEXT,
   addDays,
   cardErrorText,
   cardTitle,
@@ -566,8 +567,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       const direction = kind === 'despesa' ? 'saida' : 'entrada';
       const r =
         source === 'arquivo'
-          ? await pickAndReadComprovantePdf(direction, () => setReadingWhat('imagem'))
-          : await pickAndReadComprovanteImage(source, direction, () => setReadingWhat('imagem'));
+          ? await pickAndReadComprovantePdf(direction, today, () => setReadingWhat('imagem'))
+          : await pickAndReadComprovanteImage(source, direction, today, () => setReadingWhat('imagem'));
       if (token !== readSeq.current) return;
       if (r.ok) await applyProof(r.reading);
       else if (!r.cancelled) setScanMessage(r.message);
@@ -1214,6 +1215,22 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     }
   };
 
+  /**
+   * Gasto novo com data futura (teste de 09/11/2026): o erro continua, e o link leva o que já foi digitado para Anotar conta a pagar
+   * (descrição, valor em centavos, a data como vencimento e a categoria), sem gravar nada aqui. `push` mantém este formulário na pilha.
+   */
+  const futureExpense = !cardPurchase && kind === 'despesa' && mode.type === 'novo' && errors.dateText === ERROR_TEXT.data_futura;
+  const toCommitment = () => {
+    const cents = parseBRL(draft.amountText);
+    const due = parseDateBR(draft.dateText);
+    const params: Record<string, string> = {};
+    if (draft.description.trim()) params.descricao = draft.description.trim();
+    if (cents !== null && cents >= 1) params.valor = String(cents);
+    if (due) params.vencimento = due;
+    if (draft.category) params.categoria = draft.category;
+    router.push({ pathname: '/a-pagar/nova', params });
+  };
+
   const submit = async (versionOverride?: number, another = false) => {
     if (busy) return; // envio repetido bloqueado enquanto o anterior não termina
     if (cardPurchase) {
@@ -1715,6 +1732,14 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
                   onPress={() => set('dateText', formatDateBR(addDays(today, -1)))}
                 />
               </View>
+              {futureExpense ? (
+                <LinkButton
+                  label={FUTURE_EXPENSE_TEXT.toCommitment}
+                  accessibilityLabel={FUTURE_EXPENSE_TEXT.toCommitmentA11y}
+                  style={styles.inlineLink}
+                  onPress={toCommitment}
+                />
+              ) : null}
             </View>
           )}
 

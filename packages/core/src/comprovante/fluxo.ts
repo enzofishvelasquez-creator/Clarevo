@@ -26,8 +26,10 @@ import { fitWords, fold, trimEdges } from './texto';
 // ---------------------------------------------------------------------------
 
 export const COMPROVANTE_TEXT = {
-  /** Opção da folha "Escanear nota fiscal" (Anotar gasto) e linha de Registrar recebimento. */
+  /** Linha de Registrar recebimento (e o nome geral da leitura, no guia). */
   option: 'Ler comprovante de Pix ou pagamento',
+  /** Opção da folha "Escanear nota fiscal" (Anotar gasto): também lê um boleto ou uma conta de consumo pela linha digitável (teste de 09/11/2026). */
+  optionExpense: 'Ler comprovante ou boleto',
   /** Com a leitura de imagem (no navegador, D-078 B): PDF ou print. */
   lineHint: 'Comprovante, holerite ou nota de serviço, em PDF ou imagem, lido aqui no aparelho',
   lineA11y: 'Ler comprovante de Pix ou pagamento. Comprovante, holerite ou nota de serviço, em PDF ou imagem, lido aqui no aparelho.',
@@ -63,6 +65,10 @@ export const COMPROVANTE_TEXT = {
   /** Holerite: traz o mês de competência, não o dia do pagamento. */
   holeriteDay: 'O holerite mostra o mês de competência, não o dia do pagamento. Escolha o dia em que o salário entrou.',
   futureDay: 'A data do comprovante ainda não chegou. Escolha o dia.',
+  /** Boleto lido pelo código: a data preenchida é o vencimento. */
+  boletoDueDay: 'A data é o vencimento do boleto. Se pagou em outro dia, troque a data.',
+  boletoFutureDay: 'O vencimento do boleto ainda não chegou. Se já pagou, escolha o dia do pagamento. Se ainda vai pagar, anote em Contas a pagar, com Ler boleto.',
+  boletoNoAmount: 'O código do boleto não traz o valor. Digite o valor.',
   missingName: 'O nome não apareceu no comprovante. Digite uma descrição.',
   directionGuessed: 'O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo.',
   /** Nota de serviço (NFS-e, D-079): a tela decide de que lado a pessoa está. */
@@ -184,6 +190,8 @@ export interface ComprovanteDraft {
   occurredOn: IsoDate | null;
   /** A data do comprovante é depois de hoje: não é usada, a pessoa escolhe o dia. */
   dayFuture: boolean;
+  /** Boleto lido pelo código: a data (ou a data futura) é o vencimento, não o dia do pagamento. */
+  dateIsDue: boolean;
   time: string | null;
   counterpart: string | null;
   message: string | null;
@@ -211,6 +219,7 @@ export function comprovanteDraft(reading: ComprovanteReading, today: IsoDate, sc
     amountCents: reading.amountCents !== null && reading.amountCents >= 1 && reading.amountCents <= MAX_RECORD_CENTS ? reading.amountCents : null,
     occurredOn: reading.occurredOn !== null && !future ? reading.occurredOn : null,
     dayFuture: future,
+    dateIsDue: reading.dateIsDue === true,
     time: reading.time,
     counterpart,
     message: reading.message,
@@ -229,8 +238,9 @@ export function comprovanteReadLine(draft: ComprovanteDraft): string {
     const parts = [draft.counterpart, draft.amountCents === null ? null : formatBRL(draft.amountCents), draft.occurredOn ? formatDateBR(draft.occurredOn) : null].filter(Boolean);
     return parts.length > 0 ? `${COMPROVANTE_TEXT.note.readTitle}: ${parts.join(' · ')}` : COMPROVANTE_TEXT.note.readTitle;
   }
-  const kind = comprovanteKindLabel(draft.kind, draft.directionGuessed ? null : draft.direction);
-  const when = draft.occurredOn ? `${formatDateBR(draft.occurredOn)}${draft.time ? ` às ${draft.time}` : ''}` : null;
+  // Boleto lido pelo código: "Boleto · Empresa · R$ 102,00 · vence em 10/11/2026" (não é um boleto pago, e a data é o vencimento).
+  const kind = draft.kind === 'boleto' && draft.dateIsDue ? 'Boleto' : comprovanteKindLabel(draft.kind, draft.directionGuessed ? null : draft.direction);
+  const when = draft.occurredOn ? `${draft.dateIsDue ? 'vence em ' : ''}${formatDateBR(draft.occurredOn)}${draft.time ? ` às ${draft.time}` : ''}` : null;
   const amount = draft.amountCents === null ? null : formatBRL(draft.amountCents);
   return `${COMPROVANTE_TEXT.readTitle}: ${[kind, draft.counterpart, amount, when].filter(Boolean).join(' · ')}`;
 }
@@ -259,13 +269,24 @@ export function comprovanteGaps(draft: ComprovanteDraft): ComprovanteGaps {
       issued: draft.occurredOn !== null ? t.issued : null,
     };
   }
+  const boleto = draft.kind === 'boleto' && draft.dateIsDue;
   return {
-    amount: draft.amountCents === null ? COMPROVANTE_TEXT.missingAmount : null,
-    day: draft.occurredOn === null ? (draft.dayFuture ? COMPROVANTE_TEXT.futureDay : draft.kind === 'holerite' ? COMPROVANTE_TEXT.holeriteDay : COMPROVANTE_TEXT.missingDay) : null,
+    amount: draft.amountCents === null ? (boleto ? COMPROVANTE_TEXT.boletoNoAmount : COMPROVANTE_TEXT.missingAmount) : null,
+    day:
+      draft.occurredOn === null
+        ? draft.dayFuture
+          ? boleto
+            ? COMPROVANTE_TEXT.boletoFutureDay
+            : COMPROVANTE_TEXT.futureDay
+          : draft.kind === 'holerite'
+            ? COMPROVANTE_TEXT.holeriteDay
+            : COMPROVANTE_TEXT.missingDay
+        : null,
     name: draft.counterpart === null && draft.message === null ? COMPROVANTE_TEXT.missingName : null,
     guessed: draft.directionGuessed ? COMPROVANTE_TEXT.directionGuessed : null,
     side: null,
-    issued: null,
+    // Boleto: a data preenchida é o vencimento (a tela mostra junto da data, como a emissão da nota de serviço).
+    issued: boleto && draft.occurredOn !== null ? COMPROVANTE_TEXT.boletoDueDay : null,
   };
 }
 

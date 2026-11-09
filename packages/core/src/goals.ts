@@ -1033,6 +1033,8 @@ export const GOALS_TEXT = {
       help: 'Registre o dinheiro que você já separou. Intenção de guardar não conta como aporte. Guardar não é gasto: não anote este valor em Anotar gasto.',
       futureDate: 'Use uma data até hoje. Registre o aporte depois de guardar.',
       saved: 'Aporte registrado.',
+      /** O campo vem com o valor planejado por mês da meta (teste de 09/11/2026: "é mais prático eu concordar com o que defini"). */
+      planned: 'Preenchemos com o valor planejado por mês. Pode mudar.',
     },
     resgate: {
       title: 'Registrar resgate',

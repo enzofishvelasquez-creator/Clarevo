@@ -1,4 +1,4 @@
-import { COMPROVANTE_TEXT, comprovanteErrorText, comprovanteFromText, type ComprovanteDirection, type ComprovanteReading, type PdfTextItem } from '@clarevo/core';
+import { COMPROVANTE_TEXT, comprovanteErrorText, comprovanteFromText, type ComprovanteDirection, type ComprovanteReading, type IsoDate, type PdfTextItem } from '@clarevo/core';
 import * as DocumentPicker from 'expo-document-picker';
 
 import type { PdfReadControl } from '@/lib/pdf-text';
@@ -13,7 +13,8 @@ import { bytesOf, deleteCachedCopy, readPdfText } from '@/lib/receipt-read';
  * PDF no cache do aparelho é apagada ao fim, e o arquivo, o texto e o resultado não vão a servidor nenhum.
  *
  * `defaultDirection` é a do formulário onde a pessoa está (Anotar gasto: saiu; Registrar recebimento: entrou), usada só quando o
- * comprovante não diz se o dinheiro saiu ou entrou.
+ * comprovante não diz se o dinheiro saiu ou entrou. `today` deixa o leitor reconhecer um boleto pela linha digitável (o vencimento
+ * vem do fator, que depende do dia de hoje).
  */
 export type ComprovanteRead =
   | { ok: true; reading: ComprovanteReading }
@@ -25,7 +26,7 @@ export async function readComprovantePdfBytes(
   read: () => Promise<Uint8Array>,
   size: number | undefined,
   defaultDirection: ComprovanteDirection,
-  options: { timeoutMs?: number; extract?: (bytes: Uint8Array, control: PdfReadControl, items?: PdfTextItem[]) => Promise<string> } = {},
+  options: { today?: IsoDate; timeoutMs?: number; extract?: (bytes: Uint8Array, control: PdfReadControl, items?: PdfTextItem[]) => Promise<string> } = {},
 ): Promise<ComprovanteRead> {
   // As posições dos pedaços de texto (o holerite usa) ficam só nesta leitura, como o texto.
   const items: PdfTextItem[] = [];
@@ -33,7 +34,7 @@ export async function readComprovantePdfBytes(
   if (!text.ok) {
     return { ok: false, message: text.reason === 'grande' ? COMPROVANTE_TEXT.pdf.tooBig : text.reason === 'nao_pdf' ? COMPROVANTE_TEXT.pdf.notPdf : COMPROVANTE_TEXT.pdf.failed };
   }
-  const result = comprovanteFromText(text.text, { defaultDirection, items });
+  const result = comprovanteFromText(text.text, { defaultDirection, items, ...(options.today ? { today: options.today } : {}) });
   return result.ok ? { ok: true, reading: result.reading } : { ok: false, message: comprovanteErrorText(result.code) };
 }
 
@@ -56,6 +57,7 @@ export function imageTooBig(asset: { size?: number | null; file?: File }): boole
 export async function readComprovanteImage(
   asset: { uri: string; size?: number | null; file?: File },
   defaultDirection: ComprovanteDirection,
+  today?: IsoDate,
   onProgress?: (f: number) => void,
 ): Promise<ComprovanteRead> {
   if (imageTooBig(asset)) return { ok: false, message: COMPROVANTE_TEXT.pdf.imageTooBig };
@@ -66,7 +68,7 @@ export async function readComprovanteImage(
   } catch {
     return { ok: false, message: COMPROVANTE_TEXT.pdf.imageFailed };
   }
-  const result = comprovanteFromText(text, { defaultDirection });
+  const result = comprovanteFromText(text, { defaultDirection, ...(today ? { today } : {}) });
   if (result.ok) return { ok: true, reading: result.reading };
   return { ok: false, message: result.code === 'texto_vazio' ? COMPROVANTE_TEXT.pdf.imageNoText : comprovanteErrorText(result.code) };
 }
@@ -75,7 +77,7 @@ export async function readComprovanteImage(
  * Abre o seletor de arquivos e lê o escolhido: PDF e, onde a leitura de imagem existe (no navegador), também print ou foto. Cancelar
  * não é erro. A cópia do cache é apagada ao fim, com ou sem erro. `onImage` avisa a tela de que a leitura é de imagem (mais lenta).
  */
-export async function pickAndReadComprovantePdf(defaultDirection: ComprovanteDirection, onImage?: () => void): Promise<ComprovanteRead> {
+export async function pickAndReadComprovantePdf(defaultDirection: ComprovanteDirection, today: IsoDate, onImage?: () => void): Promise<ComprovanteRead> {
   let picked: DocumentPicker.DocumentPickerResult;
   try {
     picked = await DocumentPicker.getDocumentAsync({
@@ -92,9 +94,9 @@ export async function pickAndReadComprovantePdf(defaultDirection: ComprovanteDir
   try {
     if (OCR_AVAILABLE && isImageAsset(asset)) {
       onImage?.();
-      return await readComprovanteImage(asset, defaultDirection);
+      return await readComprovanteImage(asset, defaultDirection, today);
     }
-    return await readComprovantePdfBytes(() => bytesOf(asset), asset.size, defaultDirection);
+    return await readComprovantePdfBytes(() => bytesOf(asset), asset.size, defaultDirection, { today });
   } finally {
     await deleteCachedCopy(asset);
   }
@@ -107,6 +109,7 @@ export async function pickAndReadComprovantePdf(defaultDirection: ComprovanteDir
 export async function pickAndReadComprovanteImage(
   source: 'galeria' | 'camera',
   defaultDirection: ComprovanteDirection,
+  today: IsoDate,
   onImage?: () => void,
 ): Promise<ComprovanteRead> {
   const picked = await pickImageForReading(source);
@@ -115,7 +118,7 @@ export async function pickAndReadComprovanteImage(
   if (picked.kind === 'falhou') return { ok: false, message: COMPROVANTE_TEXT.pdf.imageFailed };
   onImage?.();
   try {
-    return await readComprovanteImage(picked.image, defaultDirection);
+    return await readComprovanteImage(picked.image, defaultDirection, today);
   } finally {
     await discardPickedImage(picked);
   }

@@ -3017,7 +3017,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await keepText();
   await innerChecks('aporte 390px');
   await shot('114_aporte');
-  await btn('Registrar aporte').click(); await p.waitForTimeout(300);
+  // O valor vem preenchido com o planejado por mês da reserva (R$ 500,00), editável (teste de 09/11/2026); apagado, a mensagem de campo.
+  ok('C aporte: o valor planejado por mês (R$ 500,00) já preenchido, com a legenda', (await field('Valor').inputValue()) === '500,00' && t.includes('Preenchemos com o valor planejado por mês. Pode mudar.'));
+  await field('Valor').fill(''); await btn('Registrar aporte').click(); await p.waitForTimeout(300);
   ok('C aporte: sem valor, a mensagem de campo e nada gravado', (await body()).includes('Informe um valor') && (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 2);
   await field('Valor').fill('200'); await btn('Registrar aporte').click(); await waitText('Aporte registrado.'); await p.waitForTimeout(700);
   t = await body();
@@ -4018,8 +4020,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // A folha do primeiro toque: câmera só quando há câmera (o navegador do roteiro não tem), PDF e colar sempre; "Cancelar" não faz nada.
   await openScan(); t = await dialogText(); const sheetButtons = await dialogButtons();
-  ok('N folha do primeiro toque: título, a frase de privacidade (só um resumo da chave, sem CPF nem link), "Escolher o PDF da nota" antes de "Colar o link ou a chave" (sem câmera no navegador do roteiro, o PDF vem primeiro), "Ler comprovante de Pix ou pagamento" por último (D-051) e "Cancelar"; "Usar a câmera" só aparece com câmera',
-    t.includes('Como você quer ler a nota?') && t.includes('Guardamos só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guardamos CPF, a chave nem o link.') && JSON.stringify(sheetButtons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante de Pix ou pagamento', 'Cancelar']) && (sheetButtons.length === 4 || sheetButtons[0] === 'Usar a câmera'), JSON.stringify(sheetButtons));
+  ok('N folha do primeiro toque: título, a frase de privacidade (só um resumo da chave, sem CPF nem link), "Escolher o PDF da nota" antes de "Colar o link ou a chave" (sem câmera no navegador do roteiro, o PDF vem primeiro), "Ler comprovante ou boleto" por último (D-051) e "Cancelar"; "Usar a câmera" só aparece com câmera',
+    t.includes('Como você quer ler a nota?') && t.includes('Guardamos só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guardamos CPF, a chave nem o link.') && JSON.stringify(sheetButtons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante ou boleto', 'Cancelar']) && (sheetButtons.length === 4 || sheetButtons[0] === 'Usar a câmera'), JSON.stringify(sheetButtons));
   await keepText();
   await shot('151_folha_escanear');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
@@ -5280,7 +5282,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('F1 demonstração: o Financiamento do carro vem preenchido (parcela R$ 850,00, 36 parcelas, taxa em branco) e o valor a mais fica vazio',
     t.includes(F1_NAME) && t.includes('Preenchido com os seus parcelamentos em aberto.') && (await f1Value(`Valor da parcela, ${F1_NAME}`)) === '850,00' && (await f1Value(`Parcelas que faltam, ${F1_NAME}`)) === '36' &&
-    (await f1Value(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`)) === '' && (await f1Value('Quanto a mais você consegue pôr por mês nas dívidas?')) === '', t.slice(0, 400));
+    (await f1Value(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`)) === '' && (await f1Value('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?')) === '', t.slice(0, 400));
   ok('F1 demonstração: sem a taxa, conta só as parcelas e diz isso; "Sem valor a mais" termina em 36 meses (outubro de 2029) e pede o valor a mais; a dica do plano de guardar não preenche o campo',
     t.includes('Sem valor a mais: tudo termina em 36 meses (3 anos), em outubro de 2029.') && t.includes('Informe quanto a mais você consegue pôr por mês para ver o efeito.') &&
     t.includes(`${F1_NAME}: sem juros informados, conta só as parcelas.`) && t.includes('No seu plano de guardar você informou R$ 500,00 por mês.') && t.includes('Total pago: R$ 30.600,00') && t.includes('Juros estimados: R$ 0,00'));
@@ -5304,7 +5306,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('F1 com a taxa de 1,5%: saldo inicial pelo valor presente (R$ 23.511,58), total pago R$ 30.600,00 (as 36 parcelas, sem pagamento final maior) e juros estimados R$ 7.088,42; some "sem juros informados"',
     t.includes('Total pago: R$ 30.600,00') && t.includes('Juros estimados: R$ 7.088,42') && t.includes('O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada.') && !t.includes('sem juros informados'), t.slice(-900));
-  await f1Fill('Quanto a mais você consegue pôr por mês nas dívidas?', '100,00');
+  await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '100,00');
   t = await body();
   ok('F1 com R$ 100,00 a mais: "Com o valor a mais" termina em 32 meses (junho de 2029), R$ 992,59 a menos de juros e 4 meses antes',
     t.includes('Com o valor a mais: tudo termina em 32 meses (2 anos e 8 meses), em junho de 2029.') && t.includes('Com o valor a mais: R$ 992,59 a menos de juros.') && t.includes('Com o valor a mais: tudo termina 4 meses antes.') &&
@@ -5335,8 +5337,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await f1Fill('Taxa de juros ao mês (%), Cartão azul', '1');
   await f1Fill('Quanto você paga por mês, Cartão azul', '300,00');
   t = await body();
-  ok('F1 duas dívidas: "Sem valor a mais" (36 meses, juros R$ 7.135,09), "Maior taxa primeiro" e "Menor dívida primeiro" (24 meses, outubro de 2028) lado a lado',
-    t.includes('Sem valor a mais: tudo termina em 36 meses (3 anos), em outubro de 2029.') && t.includes('Juros estimados: R$ 7.135,09') &&
+  ok('F1 duas dívidas: "Maior taxa primeiro" e "Menor dívida primeiro" (24 meses, outubro de 2028) lado a lado, e a referência "Sem valor a mais" (36 meses, juros R$ 7.135,09) em uma frase, no fim',
+    t.includes('Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 36 meses (3 anos), em outubro de 2029: 12 meses depois e R$ 2.216,64 a mais de juros.') &&
+    !t.includes('Sem valor a mais: tudo termina em 36 meses') && t.includes('Juros estimados: R$ 7.135,09') &&
     t.includes('Maior taxa primeiro: tudo termina em 24 meses (2 anos), em outubro de 2028.') && t.includes('Menor dívida primeiro: tudo termina em 24 meses (2 anos), em outubro de 2028.') &&
     t.includes('Juros estimados: R$ 4.918,45') && t.includes('Juros estimados: R$ 4.925,13'), t.slice(-1800));
   ok('F1 as diferenças em linguagem neutra: R$ 6,68 a menos de juros (Maior taxa primeiro), a primeira dívida termina 2 meses antes (Menor dívida primeiro) e o fim no mesmo mês',
@@ -5358,13 +5361,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Sem valor a mais (campo vazio ou zero) e 2 ou mais dívidas: a legenda de "Sem valor a mais" explica por que as ordens terminam antes.
   const F1_CAPTION = 'Cada dívida só com os pagamentos de sempre, sem passar nada adiante.';
   ok('F1 com R$ 100,00 a mais, "Sem valor a mais" não leva a legenda', !(await body()).includes(F1_CAPTION));
-  await f1Fill('Quanto a mais você consegue pôr por mês nas dívidas?', '');
+  await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '');
   ok('F1 valor a mais vazio e duas dívidas: a legenda "sem passar nada adiante" aparece junto do título de "Sem valor a mais" (uma só vez)',
     (await body()).split(F1_CAPTION).length === 2 && (await body()).includes('Maior taxa primeiro: tudo termina em'));
-  await f1Fill('Quanto a mais você consegue pôr por mês nas dívidas?', '0');
+  await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '0');
   ok('F1 valor a mais zero e duas dívidas: a legenda continua', (await body()).split(F1_CAPTION).length === 2);
   await atWidths(async (w) => { await scrollTo('Detalhes de cada ordem'); await layoutChecks(`F1 plano legenda ${w}px`); });
-  await f1Fill('Quanto a mais você consegue pôr por mês nas dívidas?', '100,00');
+  await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '100,00');
   ok('F1 de volta aos R$ 100,00 a mais: a legenda some', !(await body()).includes(F1_CAPTION));
   await keepText();
 
@@ -5452,14 +5455,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Voltar').click(); await waitText('Diferença do mês');
   await f1Open();
   await f1Fill(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`, '1,5');
-  await f1Fill('Quanto a mais você consegue pôr por mês nas dívidas?', '100,00');
+  await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '100,00');
   t = await body();
   const f1Parcela = field(`Valor da parcela, ${F1_NAME}, valor oculto`);
   ok('F1 valores ocultos: a parcela preenchida mostra "R$ ••••" e não se edita; o que a pessoa digitou (taxa 1,5 e valor a mais 100,00) continua à vista',
     (await f1Parcela.inputValue()) === '••••', await f1Parcela.inputValue());
   ok('F1 valores ocultos: o campo da parcela tem "valor oculto" no nome acessível e o link "Mostrar valores" ao lado',
     (await visibleCount('textbox', `Valor da parcela, ${F1_NAME}, valor oculto`)) === 1 && (await visibleCount('button', `Mostrar valores para editar a parcela, ${F1_NAME}`)) === 1 && t.includes('Mostrar valores'));
-  ok('F1 valores ocultos: o campo da parcela não se edita e a dica diz como editar', !(await f1Parcela.isEditable()) && t.includes('Valor oculto. Mostre os valores para editar.') && (await f1Value(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`)) === '1,5' && (await f1Value('Quanto a mais você consegue pôr por mês nas dívidas?')) === '100,00');
+  ok('F1 valores ocultos: o campo da parcela não se edita e a dica diz como editar', !(await f1Parcela.isEditable()) && t.includes('Valor oculto. Mostre os valores para editar.') && (await f1Value(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`)) === '1,5' && (await f1Value('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?')) === '100,00');
   const f1Leaks = await moneyLeaks();
   ok('F1 valores ocultos: nenhum valor em reais à vista (texto e nomes acessíveis), com "R$ ••••" no resultado e "valor oculto" nos nomes', f1Leaks.length === 0 && t.includes('Com o valor a mais: R$ •••• a menos de juros.') && t.includes('Total pago: R$ ••••') && t.includes('No seu plano de guardar você informou R$ •••• por mês.') && (await spokenHidden()) > 0, `${f1Leaks.slice(0, 3).join(' | ')} ${t.includes('R$ ••••')}`);
   ok('F1 valores ocultos: os meses e as ordens continuam (32 meses, junho de 2029)', t.includes('Com o valor a mais: tudo termina em 32 meses (2 anos e 8 meses), em junho de 2029.') && t.includes(`1. ${F1_NAME}: termina em 32 meses (junho de 2029).`));
@@ -8598,7 +8601,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // ==================================================================================================================
   // Comprovante de Pix (D-051) · Ciclo I2, item 2 da alternativa sem custo à integração bancária (docs/11). Em Anotar gasto, a folha
-  // de "Escanear nota fiscal" ganha "Ler comprovante de Pix ou pagamento"; em Registrar recebimento, uma linha própria. O PDF
+  // de "Escanear nota fiscal" ganha "Ler comprovante ou boleto" (em 09/11/2026 passou a ler boleto pelo código); em Registrar recebimento, uma linha própria. O PDF
   // é lido no aparelho (nada sai dele), o leitor do core devolve só tipo, direção, valor, data e hora, o nome da outra ponta e a
   // mensagem, e nada é gravado sem "Salvar". Os PDFs abaixo são sintéticos: nomes, documentos, chaves e códigos são inventados e
   // nenhum deles pode aparecer na tela, nos nomes acessíveis nem no armazenamento do navegador. Hoje é 07/10/2026.
@@ -8669,7 +8672,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const i2Danfe = i2File('nota.pdf', ['DANFE', 'Documento Auxiliar da Nota Fiscal Eletrônica', 'CHAVE DE ACESSO', '3326 1011 2223 3300 0181 5500 1000 0043 2118 7654 3216', 'VALOR TOTAL DA NOTA', '150,00']);
   const i2Order = i2File('pedido.pdf', ['PEDIDO DE COMPRA', 'Obrigado pela compra', 'Valor total 150,00', 'Entrega em até 5 dias úteis']);
   const i2NotPdf = path.join(i2Dir, 'texto.pdf'); fs.writeFileSync(i2NotPdf, 'isto não é um PDF, só texto');
-  const I2_OPTION = 'Ler comprovante de Pix ou pagamento';
+  const I2_OPTION = 'Ler comprovante ou boleto';
   const i2Line = () => p.getByRole('button', { name: /^Ler comprovante de Pix ou pagamento\./ }).filter({ visible: true }).first();
   const i2ScanLine = () => p.getByRole('button', { name: /^Escanear nota fiscal\./ }).filter({ visible: true }).first();
   const i2Sheet = async () => { await i2ScanLine().click(); await waitText('Como você quer ler a nota?'); await p.waitForTimeout(300); };
@@ -8709,11 +8712,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('I2 demonstração: a renda comprometida segue 52,5% antes de ler comprovantes', (await body()).includes('52,5%'));
   const i2Before = JSON.stringify(await i2Records());
 
-  // ---- 1. Anotar gasto: a folha ganha "Ler comprovante de Pix ou pagamento" por último ----
+  // ---- 1. Anotar gasto: a folha ganha "Ler comprovante ou boleto" por último ----
   await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
   await i2Sheet();
   let i2t = await dialogText(); const i2Buttons = await i2DialogButtons();
-  ok('I2 folha de "Escanear nota fiscal": "Ler comprovante de Pix ou pagamento" vem por último, antes de "Cancelar", e a frase de privacidade do comprovante (lido aqui, nada guardado, sem CPF, CNPJ, chave Pix, conta nem códigos) aparece',
+  ok('I2 folha de "Escanear nota fiscal": "Ler comprovante ou boleto" vem por último, antes de "Cancelar", e a frase de privacidade do comprovante (lido aqui, nada guardado, sem CPF, CNPJ, chave Pix, conta nem códigos) aparece',
     JSON.stringify(i2Buttons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', I2_OPTION, 'Cancelar']) &&
     i2t.includes('Comprovante em PDF ou imagem: lido aqui no aparelho e não guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') &&
     i2t.includes('Guardamos só um resumo da chave de acesso da nota'), JSON.stringify(i2Buttons));
@@ -8898,9 +8901,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await i2NewExpense();
   await i2Sheet();
   { const [chooser] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]); await chooser.setFiles(i2Nfse); }
-  await waitText('Esta é uma nota de serviço. Para lê-la, use Ler comprovante de Pix ou pagamento, nesta mesma lista.', 20000); await p.waitForTimeout(400);
+  await waitText('Esta é uma nota de serviço. Para lê-la, use Ler comprovante ou boleto, nesta mesma lista.', 20000); await p.waitForTimeout(400);
   i2t = await i2Keep(); i2v = await i2Values();
-  ok('I2 nota de serviço pelo PDF da nota: "Esta é uma nota de serviço. Para lê-la, use Ler comprovante de Pix ou pagamento, nesta mesma lista." e nada preenchido',
+  ok('I2 nota de serviço pelo PDF da nota: "Esta é uma nota de serviço. Para lê-la, use Ler comprovante ou boleto, nesta mesma lista." e nada preenchido',
     !i2t.includes('Nota lida') && i2v.amount === '' && i2v.desc === '', i2t.slice(0, 300));
   await i2Leave();
 

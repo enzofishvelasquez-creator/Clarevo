@@ -154,14 +154,39 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
       'Menor dívida primeiro: a primeira dívida termina 2 meses antes.',
       'Maior taxa primeiro: tudo termina 1 mês antes.',
     ]);
+    // Primeiro o que cada ordem dá (o destaque), as diferenças e, por último, a referência: o que muda em relação a só pagar as parcelas.
     expect(r.resultLines).toEqual([
-      scenario(r, 'sem_extra').summary,
       maior.summary,
       menor.summary,
       ...r.differences,
+      'Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 56 meses (4 anos e 8 meses): 42 meses depois e R$ 2.373,56 a mais de juros.',
     ]);
-    // A frase da referência é a primeira linha do resultado (o destaque).
-    expect(r.resultLines[0]).toBe('Sem valor a mais: tudo termina em 56 meses (4 anos e 8 meses).');
+    expect(r.sameOutcome).toBe(false);
+    expect(scenario(r, 'sem_extra').summary).toBe('Sem valor a mais: tudo termina em 56 meses (4 anos e 8 meses).');
+  });
+
+  it('as duas ordens dão no mesmo (teste de 09/11/2026: Acordo 9 × R$ 265,00 a 1% e Empréstimo 60 × R$ 100,00 a 1,88%, sem valor a mais): uma frase só e a referência', () => {
+    const r = run({ dividas: [parcelada('265,00', '9', '1', 'Acordo'), parcelada('100,00', '60', '1,88', 'Empréstimo')] }, '2026-11-09');
+    expect(r.sameOutcome).toBe(true);
+    expect(scenario(r, 'sem_extra')).toMatchObject({ months: 60, endMonth: '2031-11', interestCents: 253_569 });
+    expect(scenario(r, 'maior_taxa')).toMatchObject({ months: 19, endMonth: '2028-06', interestCents: 104_050 });
+    expect(scenario(r, 'menor_divida')).toMatchObject({ months: 19, endMonth: '2028-06', interestCents: 104_050 });
+    expect(r.resultLines).toEqual([
+      'As duas ordens dão no mesmo: tudo termina em 19 meses (1 ano e 7 meses), em junho de 2028.',
+      'Sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 60 meses (5 anos), em novembro de 2031: 41 meses depois e R$ 1.495,19 a mais de juros.',
+    ]);
+    // As diferenças continuam calculadas (a tela não as mostra quando dão no mesmo).
+    expect(r.differences).toEqual([PLANO_TEXT.sameInterest, PLANO_TEXT.sameFirst, PLANO_TEXT.sameEnd]);
+    // Com o valor a mais, a referência diz que também fica sem ele.
+    const e2e = run({ extra: '100,00', dividas: [parcelada('850,00', '36', '1,5', 'Financiamento do carro'), saldo('1.500,00', '1', '300,00', 'Cartão azul')] }, '2026-10-07');
+    expect(e2e.sameOutcome).toBe(false);
+    expect(e2e.resultLines.at(-1)).toBe(
+      'Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 36 meses (3 anos), em outubro de 2029: 12 meses depois e R$ 2.216,64 a mais de juros.',
+    );
+    // Quando nenhuma ordem termina em 50 anos, só a frase das ordens.
+    const never = run({ dividas: [saldo('100.000,00', '1', '1.000,01'), saldo('50.000,00', '1', '500,01')] });
+    expect(never.sameOutcome).toBe(true);
+    expect(never.resultLines).toEqual(['As duas ordens dão no mesmo: com estes números, as dívidas não terminam em 50 anos.']);
   });
 
   it('conservação: total pago = soma dos saldos iniciais + juros, em muitas combinações', () => {
@@ -323,6 +348,8 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     expect(order(same, 'menor_divida')).toEqual(['Primeira', 'Segunda']);
     expect(scenario(same, 'maior_taxa').interestCents).toBe(scenario(same, 'menor_divida').interestCents);
     expect(same.differences).toEqual([PLANO_TEXT.sameInterest, PLANO_TEXT.sameFirst, PLANO_TEXT.sameEnd]);
+    expect(same.sameOutcome).toBe(true);
+    expect(same.resultLines[0]).toBe('As duas ordens dão no mesmo: tudo termina em 5 meses.');
     // Trocar a ordem da lista troca quem vai primeiro quando tudo empata.
     const swapped = input([saldo('1.000,00', '5', '100,00', 'Segunda'), saldo('1.000,00', '5', '100,00', 'Primeira')]);
     expect(order(swapped, 'maior_taxa')).toEqual(['Segunda', 'Primeira']);

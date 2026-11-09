@@ -66,12 +66,14 @@ export const CHEQUE_ESPECIAL_CAP_BP = 800;
 export const DEBT_RATE_RANGE = { min: 1, max: 9_999 } as const;
 
 const RATE_RANGE_TEXT = 'Use uma taxa de 0,01% a 99,99% ao mês.';
-const RATE_HINT = 'Está na fatura, no extrato ou no contrato.';
+const RATE_HINT = 'Está na fatura, no extrato ou no contrato. Use a taxa de juros ao mês, não o CET.';
 
 export const DIVIDA_TEXT = {
   parcelarTitle: 'E se parcelar a fatura?',
   chequeCapNote: 'A taxa informada passa do teto de 8% ao mês do cheque especial (Res. CMN 4.765/2019). Confira o extrato.',
   cetNote: 'O CET do contrato inclui tarifas, seguros e IOF, e pode ser maior que a taxa de juros. Confira o CET no contrato.',
+  /** Rotativo e cheque especial: a pergunta do teste de 09/11/2026 ("a gente inclui o CET no cálculo?"). */
+  cetOutNote: 'A conta usa só a taxa de juros, sem o CET. O CET da fatura ou do extrato soma o IOF e as tarifas, por isso o custo real tende a ser um pouco maior.',
 } as const;
 
 export const DIVIDA_FIELDS: Record<DividaField | ParcelarFaturaField, CalcFieldSpec> = {
@@ -182,7 +184,7 @@ export function calcCustoDaDivida(input: DividaInput): CalcOutcome<DividaResult,
           annualLine,
         ],
         hypotheses: ['Rotativo por 1 ciclo, até a fatura seguinte (Res. CMN 4.549/2017).', 'Juros compostos, sem IOF, multa ou tarifas.'],
-        notes: [],
+        notes: [DIVIDA_TEXT.cetOutNote],
       },
     };
   }
@@ -206,7 +208,7 @@ export function calcCustoDaDivida(input: DividaInput): CalcOutcome<DividaResult,
           annualLine,
         ],
         hypotheses: ['Juros compostos, mês a mês, sem pagamentos no período.', 'Sem IOF e tarifas.'],
-        notes: aboveCap ? [DIVIDA_TEXT.chequeCapNote] : [],
+        notes: [...(aboveCap ? [DIVIDA_TEXT.chequeCapNote] : []), DIVIDA_TEXT.cetOutNote],
       },
     };
   }
