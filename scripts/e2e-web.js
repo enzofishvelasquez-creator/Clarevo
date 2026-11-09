@@ -1902,7 +1902,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await field('Número de parcelas').press('Tab');
   ok('parcelado: o erro de faixa aparece só depois de sair do campo', !earlyError && (await shows('Use de 2 a 480 parcelas.')));
   await typeIn('Número de parcelas', '10'); await typeIn('Valor de cada parcela', '120,00');
-  ok('parcelado: R$ 120,00 a mais, 1,96% ao mês e 26,27% ao ano, enquanto digita', await shows('Com estes números, o parcelado custa R$ 120,00 a mais.', 'Isso equivale a juros de 1,96% ao mês (26,27% ao ano).'));
+  ok('parcelado: R$ 120,00 a mais, 1,96% ao mês e 26,27% ao ano, enquanto digita', await shows('Com estes números, o parcelado custa R$ 120,00 a mais.', 'Nas parcelas há juros embutidos de 1,96% ao mês (26,27% ao ano).'));
   ok('parcelado: resultado na região viva educada (leitor de tela)', (await liveText()).includes('1,96% ao mês'));
   ok('parcelado: "Anotar como parcelamento" sem forma de pagamento escolhida', (await visibleCount('button', 'Anotar como parcelamento')) === 1);
   await calcShot('57_calc_parcelado');
@@ -5375,7 +5375,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('F1 com R$ 100,00 a mais, "Sem valor a mais" não leva a legenda', !(await body()).includes(F1_CAPTION));
   await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '');
   ok('F1 valor a mais vazio e duas dívidas: a legenda "sem passar nada adiante" aparece junto do título de "Sem valor a mais" (uma só vez)',
-    (await body()).split(F1_CAPTION).length === 2 && (await body()).includes('Maior taxa primeiro: tudo termina em'));
+    (await body()).split(F1_CAPTION).length === 2 && (await body()).includes('As duas ordens dão no mesmo: tudo termina em 27 meses (2 anos e 3 meses), em janeiro de 2029.') && (await body()).includes('As duas ordens'));
   await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '0');
   ok('F1 valor a mais zero e duas dívidas: a legenda continua', (await body()).split(F1_CAPTION).length === 2);
   await atWidths(async (w) => { await scrollTo('Detalhes de cada ordem'); await layoutChecks(`F1 plano legenda ${w}px`); });
