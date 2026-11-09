@@ -16,6 +16,8 @@
 | `luz 180 12/10` | Gasto de 12/10, categoria Moradia |
 | `recebi 1500 salário` | Recebimento de R$ 1.500,00, categoria Salário |
 | `+200 freela` | Recebimento, sem categoria |
+| `farmácia 41 cartão` | Compra à vista no cartão de crédito (D-089 C), na fatura da data; com um cartão só, é ele |
+| `mercado 120 cartão azul` | Compra no cartão cujo apelido tem "azul" (sem acento e sem caixa); com mais de um cartão e sem o nome, a Clarevo pergunta qual |
 | `DESFAZER` | Apaga a última anotação feita pelo WhatsApp (até 24 horas) |
 | `DESLIGAR` ou `PARAR` | Desliga o número da Clarevo |
 | `AJUDA` ou `oi` | Mostra os exemplos |

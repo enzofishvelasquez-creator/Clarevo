@@ -144,7 +144,8 @@ Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C
 
 - [x] E: linha do orçamento ao salvar o gasto (`budgetNotice`, `budget.test.ts`; roteiro de telas no bloco F2)
 - [x] D: bolhas das categorias em cinco tons do azul da marca (`CATEGORY_BUBBLE_TONES`, `analises.test.ts`, `contrast.test.ts`)
-- [ ] C: "cartão" na mensagem do Telegram vira compra no cartão (migração e função publicada de novo)
+- [x] C: "cartão" na mensagem do Telegram e do WhatsApp vira compra no cartão (migração 0028, `clarevo_chat_add_card_purchase`, DESFAZER com `entry_id`; `99zzzzzzz_chat_cartao.sql`, `whatsapp.test.ts`, `telegram.test.ts`)
+- [ ] **Você (Claude Chrome):** aplicar a migração 0028 no `clarevo-producao` (docs/05, passo 12r) e conferir (passo 21p); depois, publicar de novo as funções `telegram` e `whatsapp` com o conteúdo gerado em `supabase/functions/` (a do WhatsApp só se ela estiver publicada)
 - [ ] B: "Importar fatura" na tela do cartão com as parcelas "3/4" (migração)
 - [ ] A: recebimento do fim do mês contando no mês seguinte (migração)
 - [ ] F: vídeo em formato de reels (compra de mercado e orçamento)

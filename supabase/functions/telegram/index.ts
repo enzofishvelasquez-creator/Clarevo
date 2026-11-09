@@ -258,6 +258,23 @@ const __mods = [
             return `ontem, ${shown}`;
         return shown;
     }
+    function invoiceLabel(invoiceMonth, today) {
+        const month = invoiceMonth.slice(0, 7);
+        return month.slice(0, 4) === today.slice(0, 4) ? (0, dates_1.formatMonthName)(month) : (0, dates_1.formatMonthYearBR)(month);
+    }
+    function purchaseLines(p, today) {
+        return [
+            `Compra no cartão ${p.card_nickname}: ${p.description}, ${(0, money_1.formatBRL)(p.amount_cents)}`,
+            `Categoria: ${p.category ?? records_1.NO_CATEGORY_LABEL}`,
+            `Data da compra: ${dayLabel(p.purchased_on, today)}`,
+            `Fatura de ${invoiceLabel(p.invoice_month, today)}`,
+        ].join('\n');
+    }
+    function listNames(names) {
+        if (names.length <= 1)
+            return names[0] ?? '';
+        return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
+    }
     function recordLines(r, today) {
         const what = r.kind === 'despesa' ? 'Gasto' : 'Recebimento';
         const account = r.kind === 'despesa' ? 'Saiu de' : 'Entrou em';
@@ -276,6 +293,10 @@ const __mods = [
         'recebi 1500 salário',
         '',
         'A data é hoje, se você não disser outra: "farmácia 38 ontem" ou "luz 180 12/10".',
+        '',
+        'Para uma compra no cartão de crédito, acrescente a palavra cartão no fim:',
+        'farmácia 41 cartão',
+        'Com mais de um cartão, o nome dele depois: "farmácia 41 cartão azul".',
     ].join('\n');
     const CHANNEL_WORDS = {
         whatsapp: { name: 'WhatsApp', who: 'este número', whoLinked: 'este WhatsApp', inAccount: canais_1.WHATSAPP_IN_ACCOUNT },
@@ -371,6 +392,18 @@ const __mods = [
                 return r.sem_permissao(outcome.space);
             case 'sem_conta':
                 return `O ${spaceLabel(outcome.space)} está sem conta de origem principal. No app, abra Conta e escolha a principal em Contas de origem.`;
+            case 'compra_anotada':
+                return `Anotado no ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
+            case 'compra_desfeita':
+                return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}`;
+            case 'sem_cartao':
+                return outcome.space.kind === 'pessoal'
+                    ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Conta e Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
+                    : `Compras no cartão entram só no espaço Pessoal, e ${CHANNEL_WORDS[channel].whoLinked} está ligado ao ${spaceLabel(outcome.space)}. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.`;
+            case 'qual_cartao':
+                return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${(outcome.cards[0] ?? 'azul').toLowerCase()}".`;
+            case 'fatura_paga':
+                return 'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.';
             default:
                 return chatReply(channel)[outcome.result];
         }
@@ -819,15 +852,25 @@ const __mods = [
                 outcome = await call('unlink', {});
                 break;
             case 'anotar':
-                outcome = await call('add_record', {
-                    p_sent_at: sentAt,
-                    p_kind: cmd.kind,
-                    p_amount_cents: cmd.amountCents,
-                    p_days_ago: cmd.daysAgo,
-                    p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
-                    p_description: cmd.description,
-                    p_category: cmd.category,
-                });
+                outcome = cmd.card
+                    ? await call('add_card_purchase', {
+                        p_sent_at: sentAt,
+                        p_amount_cents: cmd.amountCents,
+                        p_days_ago: cmd.daysAgo,
+                        p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
+                        p_description: cmd.description,
+                        p_category: cmd.category,
+                        p_card_hint: cmd.card.hint,
+                    })
+                    : await call('add_record', {
+                        p_sent_at: sentAt,
+                        p_kind: cmd.kind,
+                        p_amount_cents: cmd.amountCents,
+                        p_days_ago: cmd.daysAgo,
+                        p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
+                        p_description: cmd.description,
+                        p_category: cmd.category,
+                    });
                 break;
         }
         return (0, respostas_1.whatsappOutcomeReply)(outcome, today, msg.channel);
@@ -871,7 +914,7 @@ const __mods = [
     const RESULTS = new Set([
         'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
         'sem_assinatura', 'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
-        'repetida', 'silencio', 'registrada',
+        'repetida', 'silencio', 'registrada', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga',
     ]);
     class WhatsAppFinalError extends Error {
     }
@@ -1090,6 +1133,9 @@ const __mods = [
         }
         return undefined;
     }
+    const CARD_WORD = 'cartao';
+    const CARD_PREPOSITIONS = new Set(['no', 'com', 'pelo', 'via']);
+    const NOT_CARD_BEFORE = new Set(['do', 'da', 'de', 'dos', 'das']);
     const INCOME_WORDS = new Set(['recebi', 'recebido', 'recebimento', 'ganhei', 'entrou', 'entrada', 'caiu', 'receita']);
     const EXPENSE_WORDS = new Set(['gastei', 'gasto', 'paguei', 'pago', 'comprei', 'compra', 'despesa']);
     const EDGE_STOP = new Set([
@@ -1226,6 +1272,20 @@ const __mods = [
         if (chosen.cents > money_1.MAX_RECORD_CENTS)
             return { type: 'erro', reason: 'valor_acima_do_limite' };
         tokens = tokens.filter((_, i) => !chosen.idx.includes(i));
+        let card = null;
+        if (kind !== 'receita') {
+            const i = tokens.findIndex((t, k) => (t.folded === CARD_WORD && !NOT_CARD_BEFORE.has(tokens[k - 1]?.folded ?? '')) ||
+                (t.folded === 'credito' && CARD_PREPOSITIONS.has(tokens[k - 1]?.folded ?? '')));
+            if (i >= 0) {
+                const prep = i > 0 && CARD_PREPOSITIONS.has(tokens[i - 1].folded);
+                const after = tokens.slice(i + 1);
+                const nameAfter = !prep && i > 0 && tokens[i].folded === CARD_WORD;
+                const hint = nameAfter ? after.map((t) => t.word).join(' ').trim() : '';
+                card = { hint: hint === '' ? null : clip(hint) };
+                tokens = nameAfter ? tokens.slice(0, i) : [...tokens.slice(0, prep ? i - 1 : i), ...after];
+                kind = 'despesa';
+            }
+        }
         while (tokens.length > 0 && isEdgeStop(tokens[0].folded))
             tokens = tokens.slice(1);
         while (tokens.length > 0 && isEdgeStop(tokens[tokens.length - 1].folded))
@@ -1245,6 +1305,7 @@ const __mods = [
             daysAgo: occurredOn === null ? 0 : daysAgo,
             description,
             category: whatsappCategory(description, kind),
+            card,
         };
     }
   },

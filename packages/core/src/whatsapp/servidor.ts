@@ -112,11 +112,11 @@ export function whatsappInbound(payload: unknown, phoneNumberId: string): WhatsA
   return out;
 }
 
-export type WhatsAppFunction = 'whatsapp_note' | 'whatsapp_link' | 'whatsapp_add_record' | 'whatsapp_undo' | 'whatsapp_unlink';
+export type WhatsAppFunction = 'whatsapp_note' | 'whatsapp_link' | 'whatsapp_add_record' | 'whatsapp_add_card_purchase' | 'whatsapp_undo' | 'whatsapp_unlink';
 export type WhatsAppRpc = (fn: WhatsAppFunction, args: Record<string, unknown>) => Promise<WhatsAppOutcome>;
 
 /** O que a mensagem pede ao banco, igual nos dois canais: a função de cada canal é `<canal>_<op>` (whatsapp_link, telegram_link...). */
-export type ChatOp = 'note' | 'link' | 'add_record' | 'undo' | 'unlink';
+export type ChatOp = 'note' | 'link' | 'add_record' | 'add_card_purchase' | 'undo' | 'unlink';
 /** Chamada ao banco já com o identificador da mensagem e o resumo de quem escreve: aqui só entram os argumentos da operação. */
 export type ChatCall = (op: ChatOp, args: Record<string, unknown>) => Promise<WhatsAppOutcome>;
 
@@ -161,16 +161,26 @@ export async function answerChatMessage(msg: ChatMessage, call: ChatCall): Promi
       outcome = await call('unlink', {});
       break;
     case 'anotar':
-      outcome = await call('add_record', {
-        p_sent_at: sentAt,
-        p_kind: cmd.kind,
-        p_amount_cents: cmd.amountCents,
-        // "hoje" e "ontem" pelo dia da pessoa no fuso dela (o banco calcula); a data escrita vai como está.
-        p_days_ago: cmd.daysAgo,
-        p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
-        p_description: cmd.description,
-        p_category: cmd.category,
-      });
+      // "hoje" e "ontem" pelo dia da pessoa no fuso dela (o banco calcula); a data escrita vai como está.
+      outcome = cmd.card
+        ? await call('add_card_purchase', {
+            p_sent_at: sentAt,
+            p_amount_cents: cmd.amountCents,
+            p_days_ago: cmd.daysAgo,
+            p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
+            p_description: cmd.description,
+            p_category: cmd.category,
+            p_card_hint: cmd.card.hint,
+          })
+        : await call('add_record', {
+            p_sent_at: sentAt,
+            p_kind: cmd.kind,
+            p_amount_cents: cmd.amountCents,
+            p_days_ago: cmd.daysAgo,
+            p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
+            p_description: cmd.description,
+            p_category: cmd.category,
+          });
       break;
   }
   return whatsappOutcomeReply(outcome, today, msg.channel);
@@ -261,7 +271,7 @@ export interface WhatsAppResponse {
 const RESULTS = new Set([
   'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
   'sem_assinatura', 'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
-  'repetida', 'silencio', 'registrada',
+  'repetida', 'silencio', 'registrada', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga',
 ]);
 
 /** Recusa do banco que se repetiria a cada nova entrega (pedido inválido, 4xx): não adianta o canal mandar de novo. */

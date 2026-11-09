@@ -42,7 +42,7 @@ const anotar = (
   category: string | null,
   occurredOn = TODAY,
   daysAgo: number | null = 0,
-) => ({ type: 'anotar', kind, amountCents, occurredOn, daysAgo, description, category });
+) => ({ type: 'anotar', kind, amountCents, occurredOn, daysAgo, description, category, card: null });
 
 describe('WhatsApp: leitura das mensagens (sem IA)', () => {
   it('gasto com valor e descrição, em vários jeitos de escrever', () => {
@@ -117,6 +117,24 @@ describe('WhatsApp: leitura das mensagens (sem IA)', () => {
     expect(reason('código 1234-0000')).toBe('codigo_invalido');
   });
 
+  it('compra no cartão (D-089 C): "cartão" no fim, com ou sem o nome do cartão, ou com "no cartão"; "do cartão" é descrição; recebimento nunca', () => {
+    const card = (description: string, category: string | null, hint: string | null, cents = 4100) => ({ ...anotar('despesa', cents, description, category), card: { hint } });
+    expect(read('Farmácia 41 hoje cartão')).toEqual(card('Farmácia', 'Saúde', null));
+    expect(read('farmácia 41 cartão')).toEqual(card('Farmácia', 'Saúde', null));
+    expect(read('farmácia 41 cartão azul')).toEqual(card('Farmácia', 'Saúde', 'azul'));
+    expect(read('mercado 120 ontem cartão roxo')).toEqual({ ...card('Mercado', 'Mercado', 'roxo', 12000), occurredOn: '2026-10-29', daysAgo: 1 });
+    expect(read('comprei no cartão 120 mercado')).toEqual(card('Mercado', 'Mercado', null, 12000));
+    expect(read('no crédito 120 mercado')).toEqual(card('Mercado', 'Mercado', null, 12000));
+    expect(read('Cartão farmácia 41')).toEqual(card('Farmácia', 'Saúde', null));
+    // "do cartão" é parte da descrição (recarga do cartão de transporte), e "crédito" sozinho também.
+    expect(read('recarga do cartão de transporte 50')).toEqual(anotar('despesa', 5000, 'Recarga do cartão de transporte', 'Transporte'));
+    expect(read('parcela do crédito 300')).toEqual(anotar('despesa', 30000, 'Parcela do crédito', null));
+    // Recebimento nunca vira compra no cartão.
+    expect(read('recebi 50 estorno cartão')).toEqual(anotar('receita', 5000, 'Estorno cartão', 'Reembolso'));
+    // Só a palavra e o valor: falta a descrição.
+    expect(read('cartão 41')).toEqual({ type: 'erro', reason: 'sem_descricao' });
+  });
+
   it('dois números: vale o que tem centavos ou R$, se for só um', () => {
     expect(read('13 salário 3.000,00')).toEqual(anotar('receita', 300000, '13 salário', 'Salário'));
     expect(read('2 pães 10,50')).toEqual(anotar('despesa', 1050, '2 pães', null));
@@ -184,6 +202,31 @@ describe('WhatsApp: respostas', () => {
     expect(whatsappOutcomeReply({ result: 'desfeito', space, record: old }, TODAY)).toContain('Data: 20/12/2025');
   });
 
+  it('compra no cartão (D-089 C): anotada e desfeita com o apelido do cartão e a fatura; sem cartão, qual cartão e fatura paga', () => {
+    const purchase = { amount_cents: 4100, purchased_on: TODAY, description: 'Farmácia', category: 'Saúde', card_nickname: 'Azul', invoice_month: '2026-12-01' };
+    expect(whatsappOutcomeReply({ result: 'compra_anotada', space, purchase }, TODAY)).toBe(
+      'Anotado no espaço Pessoal:\nCompra no cartão Azul: Farmácia, R$ 41,00\nCategoria: Saúde\nData da compra: hoje, 30/10\nFatura de dezembro\n\n' +
+        'Se algo ficou errado, responda DESFAZER.',
+    );
+    expect(whatsappOutcomeReply({ result: 'compra_desfeita', space, purchase: { ...purchase, category: null, invoice_month: '2027-01-01' } }, TODAY)).toBe(
+      'Desfeito. Saiu do espaço Pessoal:\nCompra no cartão Azul: Farmácia, R$ 41,00\nCategoria: Sem categoria\nData da compra: hoje, 30/10\nFatura de janeiro de 2027',
+    );
+    expect(whatsappOutcomeReply({ result: 'sem_cartao', space }, TODAY)).toBe(
+      'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Conta e Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.',
+    );
+    expect(whatsappOutcomeReply({ result: 'sem_cartao', space: { kind: 'familia', name: 'Família Souza' } }, TODAY, 'telegram')).toBe(
+      'Compras no cartão entram só no espaço Pessoal, e este Telegram está ligado ao espaço Família Souza. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.',
+    );
+    expect(whatsappOutcomeReply({ result: 'qual_cartao', space, cards: ['Azul', 'Roxo'] }, TODAY)).toBe(
+      'Qual cartão? Você tem: Azul e Roxo. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão azul".',
+    );
+    expect(whatsappOutcomeReply({ result: 'qual_cartao', space, cards: ['Azul', 'Roxo', 'Verde'] }, TODAY)).toContain('Azul, Roxo e Verde');
+    expect(whatsappOutcomeReply({ result: 'fatura_paga', space }, TODAY)).toBe(
+      'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.',
+    );
+    expect(WHATSAPP_REPLY.ajuda).toContain('farmácia 41 cartão');
+  });
+
   it('repetida não responde; as demais têm texto', () => {
     expect(whatsappOutcomeReply({ result: 'repetida' }, TODAY)).toBeNull();
     const all: WhatsAppOutcome[] = [
@@ -191,6 +234,9 @@ describe('WhatsApp: respostas', () => {
       { result: 'desfeito', space, record },
       { result: 'sem_permissao', space },
       { result: 'sem_conta', space },
+      { result: 'sem_cartao', space },
+      { result: 'fatura_paga', space },
+      { result: 'qual_cartao', space, cards: ['Azul'] },
       ...(['nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'muitas_tentativas', 'muitas_mensagens', 'data_futura',
         'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida', 'erro'] as const).map((result) => ({ result }) as WhatsAppOutcome),
     ];
@@ -345,6 +391,15 @@ describe('WhatsApp: servidor', () => {
     await handleWhatsAppMessage(msg('farmácia 38 ontem'), rpc, 'chave');
     await handleWhatsAppMessage(msg('luz 180 12/10'), rpc, 'chave');
     expect(calls.map((c) => [c[1].p_days_ago, c[1].p_occurred_on])).toEqual([[1, null], [null, '2026-10-12']]);
+    calls.length = 0;
+    // Compra no cartão (D-089 C): outra função do banco, com o nome do cartão escrito (ou nenhum).
+    await handleWhatsAppMessage(msg('farmácia 41 cartão azul'), rpc, 'chave');
+    await handleWhatsAppMessage(msg('mercado 120 cartão'), rpc, 'chave');
+    expect(calls.map((c) => c[0])).toEqual(['whatsapp_add_card_purchase', 'whatsapp_add_card_purchase']);
+    expect(calls[0]![1]).toEqual({
+      p_message_id: key, p_phone_hash: hash, p_sent_at: sentAt, p_amount_cents: 4100, p_days_ago: 0, p_occurred_on: null, p_description: 'Farmácia', p_category: 'Saúde', p_card_hint: 'azul',
+    });
+    expect(calls[1]![1]).toMatchObject({ p_amount_cents: 12000, p_description: 'Mercado', p_card_hint: null });
     calls.length = 0;
     expect(await handleWhatsAppMessage(msg('Ativar ABCD-EF23'), rpc, 'chave')).toBeNull();
     expect(await handleWhatsAppMessage(msg('desfazer'), rpc, 'chave')).toBeNull();

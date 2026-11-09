@@ -41,6 +41,11 @@ export type WhatsAppCommand =
       daysAgo: number | null;
       description: string;
       category: string | null;
+      /**
+       * Compra no cartão de crédito (D-089 C): "farmácia 41 cartão", "mercado 120 cartão azul" (o nome do cartão depois da palavra) ou
+       * "comprei no cartão 120 mercado". `hint` é o nome escrito (null sem nome: com um cartão só, é ele). Só em gasto.
+       */
+      card: { hint: string | null } | null;
     }
   | { type: 'erro'; reason: WhatsAppParseError };
 
@@ -107,6 +112,15 @@ function readLink(text: string): WhatsAppCommand | undefined {
   }
   return undefined;
 }
+
+/**
+ * Cartão de crédito (D-089 C): a palavra "cartão" vale como marca da compra no cartão, menos depois de "do", "da", "de" ("recarga do cartão
+ * de transporte 50" é descrição); "crédito" só com "no" ou "com" antes ("no crédito"). Com "no", "com", "pelo" ou "via" antes, o que vem
+ * depois é a descrição; no fim da mensagem, o que vem depois é o nome do cartão.
+ */
+const CARD_WORD = 'cartao';
+const CARD_PREPOSITIONS = new Set(['no', 'com', 'pelo', 'via']);
+const NOT_CARD_BEFORE = new Set(['do', 'da', 'de', 'dos', 'das']);
 
 const INCOME_WORDS = new Set(['recebi', 'recebido', 'recebimento', 'ganhei', 'entrou', 'entrada', 'caiu', 'receita']);
 const EXPENSE_WORDS = new Set(['gastei', 'gasto', 'paguei', 'pago', 'comprei', 'compra', 'despesa']);
@@ -255,6 +269,25 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
   if (chosen.cents > MAX_RECORD_CENTS) return { type: 'erro', reason: 'valor_acima_do_limite' };
   tokens = tokens.filter((_, i) => !chosen.idx.includes(i));
 
+  // Compra no cartão de crédito (D-089 C), só em gasto: a palavra sai da descrição; no fim da mensagem, o que vem depois é o nome do cartão.
+  let card: { hint: string | null } | null = null;
+  if (kind !== 'receita') {
+    const i = tokens.findIndex(
+      (t, k) =>
+        (t.folded === CARD_WORD && !NOT_CARD_BEFORE.has(tokens[k - 1]?.folded ?? '')) ||
+        (t.folded === 'credito' && CARD_PREPOSITIONS.has(tokens[k - 1]?.folded ?? '')),
+    );
+    if (i >= 0) {
+      const prep = i > 0 && CARD_PREPOSITIONS.has(tokens[i - 1]!.folded);
+      const after = tokens.slice(i + 1);
+      const nameAfter = !prep && i > 0 && tokens[i]!.folded === CARD_WORD;
+      const hint = nameAfter ? after.map((t) => t.word).join(' ').trim() : '';
+      card = { hint: hint === '' ? null : clip(hint) };
+      tokens = nameAfter ? tokens.slice(0, i) : [...tokens.slice(0, prep ? i - 1 : i), ...after];
+      kind = 'despesa';
+    }
+  }
+
   // Descrição: o que sobrou, sem as palavras de ligação nas pontas.
   while (tokens.length > 0 && isEdgeStop(tokens[0]!.folded)) tokens = tokens.slice(1);
   while (tokens.length > 0 && isEdgeStop(tokens[tokens.length - 1]!.folded)) tokens = tokens.slice(0, -1);
@@ -274,5 +307,6 @@ export function readWhatsAppMessage(text: string, today: IsoDate): WhatsAppComma
     daysAgo: occurredOn === null ? 0 : daysAgo,
     description,
     category: whatsappCategory(description, kind),
+    card,
   };
 }
