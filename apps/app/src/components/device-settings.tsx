@@ -1,4 +1,14 @@
-import { REMINDER_HOURS, REMINDER_TEXT, WIDGET_TEXT, reminderHourA11y, reminderHourLabel } from '@clarevo/core';
+import {
+  REMINDER_HOURS,
+  REMINDER_TEXT,
+  ROUTINE_REMINDER_HOURS,
+  ROUTINE_REMINDER_KINDS,
+  ROUTINE_REMINDER_TEXT,
+  WIDGET_TEXT,
+  anyRoutineReminder,
+  reminderHourA11y,
+  reminderHourLabel,
+} from '@clarevo/core';
 import { BellOff, Settings } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { AppState, View } from 'react-native';
@@ -9,7 +19,7 @@ import { Banner, Button, Card, Chip, Txt } from '@/components/ui';
 import { authenticate, biometricsAvailable, DEVICE_FEATURES, openDeviceSettings, type NotificationPermission } from '@/lib/device';
 import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { PRIVACY_TEXT, setValuesHidden } from '@/lib/privacy';
-import { disableReminders, enableReminders, getNotificationPermission } from '@/lib/reminders';
+import { disableReminders, enableReminders, getNotificationPermission, type ReminderSwitch } from '@/lib/reminders';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -33,9 +43,9 @@ function SectionTitle({ children }: { children: string }) {
 }
 
 /**
- * Conta › Lembretes (D-025): interruptor, horário do aviso e o caminho para as configurações quando o aparelho bloqueia
- * os avisos. A permissão do sistema só é pedida depois do toque. Na web, só o texto "Lembretes estão disponíveis no app
- * para celular."
+ * Conta › Lembretes: os lembretes de contas a pagar (D-025: interruptor e horário do aviso) e os do dia a dia (D-087: um interruptor
+ * por aviso e o horário deles), com o caminho para as configurações quando o aparelho bloqueia os avisos. A permissão do sistema só
+ * é pedida depois do toque. Na web, só o texto "Lembretes estão disponíveis no app para celular."
  */
 export function RemindersCard() {
   const { userId, persist, prefs, demo } = useDeviceSettings();
@@ -58,35 +68,28 @@ export function RemindersCard() {
     };
   }, []);
 
-  const toggle = async (next: boolean) => {
+  const toggle = async (which: ReminderSwitch, next: boolean) => {
     if (!userId || busy) return;
     if (!next) {
-      disableReminders(userId, persist);
+      disableReminders(userId, persist, which);
       return;
     }
     setBusy(true);
     try {
-      setPermission(await enableReminders(userId, persist));
+      setPermission(await enableReminders(userId, persist, which));
     } finally {
       setBusy(false);
     }
   };
 
+  const routineOn = prefs ? anyRoutineReminder(prefs.routineReminders) : false;
   const body = !DEVICE_FEATURES ? (
     <Txt color={colors.textSecondary}>{REMINDER_TEXT.web}</Txt>
   ) : demo ? (
     <Txt color={colors.textSecondary}>{REMINDER_TEXT.demo}</Txt>
   ) : !prefs || !permission || !userId ? null : (
     <>
-      <SettingSwitch label={REMINDER_TEXT.toggle} caption={REMINDER_TEXT.caption} value={prefs.reminders} disabled={busy} onChange={toggle} />
-      {prefs.reminders && !permission.granted ? (
-        <View style={{ gap: space[2] }}>
-          <Banner tone="info" icon={BellOff}>
-            <Txt variant="label">{REMINDER_TEXT.denied}</Txt>
-          </Banner>
-          <Button label={REMINDER_TEXT.openSettings} icon={Settings} tone="soft" onPress={openDeviceSettings} />
-        </View>
-      ) : null}
+      <SettingSwitch label={REMINDER_TEXT.toggle} caption={REMINDER_TEXT.caption} value={prefs.reminders} disabled={busy} onChange={(v) => toggle('contas', v)} />
       {prefs.reminders ? (
         <ChoiceGroup label={REMINDER_TEXT.hourLabel}>
           {REMINDER_HOURS.map((h) => (
@@ -99,6 +102,43 @@ export function RemindersCard() {
             />
           ))}
         </ChoiceGroup>
+      ) : null}
+      <View style={{ gap: space[1] }}>
+        <Txt variant="label" accessibilityRole="header" aria-level={3}>
+          {ROUTINE_REMINDER_TEXT.section}
+        </Txt>
+        <Txt color={colors.textSecondary}>{ROUTINE_REMINDER_TEXT.intro}</Txt>
+      </View>
+      {ROUTINE_REMINDER_KINDS.map((k) => (
+        <SettingSwitch
+          key={k}
+          label={ROUTINE_REMINDER_TEXT.kinds[k].toggle}
+          caption={ROUTINE_REMINDER_TEXT.kinds[k].caption}
+          value={prefs.routineReminders[k]}
+          disabled={busy}
+          onChange={(v) => toggle(k, v)}
+        />
+      ))}
+      {routineOn ? (
+        <ChoiceGroup label={ROUTINE_REMINDER_TEXT.hourLabel}>
+          {ROUTINE_REMINDER_HOURS.map((h) => (
+            <Chip
+              key={h}
+              label={reminderHourLabel(h)}
+              accessibilityLabel={reminderHourA11y(h)}
+              selected={prefs.routineReminderHour === h}
+              onPress={() => updatePrefs(userId, { routineReminderHour: h }, persist)}
+            />
+          ))}
+        </ChoiceGroup>
+      ) : null}
+      {(prefs.reminders || routineOn) && !permission.granted ? (
+        <View style={{ gap: space[2] }}>
+          <Banner tone="info" icon={BellOff}>
+            <Txt variant="label">{REMINDER_TEXT.denied}</Txt>
+          </Banner>
+          <Button label={REMINDER_TEXT.openSettings} icon={Settings} tone="soft" onPress={openDeviceSettings} />
+        </View>
       ) : null}
     </>
   );

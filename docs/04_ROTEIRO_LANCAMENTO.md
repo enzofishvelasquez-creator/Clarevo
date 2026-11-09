@@ -117,6 +117,15 @@ Sem mudança no banco. Última execução registrada pelas frentes de trabalho e
 - [ ] Gerar o build de desenvolvimento (iOS e Android) para testar lembretes e biometria, que não existem na web
 - [ ] **Você:** teste em aparelho, depois de o app estar pronto (Enzo, 08/10/2026: "O teste será feito, após o app estar pronto"): permissão só depois do toque, aviso no horário, texto sem valor, ícone em uma cor, pagar e reabrir reagenda, desligar cancela tudo, biometria com falha e com senha do aparelho, VoiceOver e TalkBack lendo "valor oculto"
 
+## Lembretes do dia a dia (D-087)
+
+Sem mudança no banco. Feito em 06/11/2026: `npm test`, `npm run typecheck` e `npm run test:web` passando (a web só mostra o texto de Conta, como antes).
+
+- [x] Core: `routine-reminders.ts` (quatro avisos com interruptor próprio, horário único de 12h, 18h, 20h ou 21h, no máximo 20, sem valor, descrição nem identificador; `routine-reminders.test.ts`, 11 testes)
+- [x] App: os interruptores e o horário em Conta › Lembretes, o pedido de permissão só depois do toque, os dois planos agendados numa só passada (`lib/reminders.ts`, `reminders-sync.test.ts`), canal próprio no Android e o toque abrindo Anotar gasto, Registrar recebimento, Análises ou Resumo
+- [x] Guia "Lembretes de vencimento" com os lembretes do dia a dia; docs/00 (D-087), docs/02, docs/03, docs/37 (teste em aparelho) e as respostas de privacidade das lojas
+- [ ] **Você:** teste em aparelho (build novo do Android): ligar "Anotar os gastos do dia" às 20h e ver o aviso chegar sem valores; anotar um gasto antes das 20h e ver que o aviso de hoje não chega; o toque abrindo a tela certa; desligar tudo e ver os avisos sumirem
+
 ## Ciclo B: renda comprometida (D-026)
 
 Última execução registrada pelas frentes de trabalho em 09/10/2026: `npm test` (30 arquivos, 599 testes), `npm run typecheck`, `npm run test:db` (10, 20, 30, 40, 45, 47, 50, 60 e 65), `npm run test:api` (92 testes, com as sequências de B e C) e `npm run test:web`, que passa (item abaixo).
