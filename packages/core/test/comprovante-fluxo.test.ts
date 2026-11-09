@@ -256,11 +256,40 @@ describe('"Parece já anotado"', () => {
 });
 
 describe('folha "Escanear nota fiscal" e erros', () => {
-  it('"Ler comprovante de Pix ou pagamento" é a última opção da folha, com ou sem câmera', () => {
+  it('"Ler comprovante ou boleto" é a última opção da folha, com ou sem câmera (em Registrar recebimento, a linha é "Ler comprovante de Pix ou pagamento")', () => {
     expect(scanSheetOptions(true)).toEqual(['camera', 'pdf', 'colar', 'comprovante']);
     expect(scanSheetOptions(false)).toEqual(['pdf', 'colar', 'comprovante']);
-    expect(scanOptionLabel('comprovante')).toBe('Ler comprovante de Pix ou pagamento');
-    expect(scanSheetOptions(true).map(scanOptionLabel)).toEqual(['Usar a câmera', 'Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante de Pix ou pagamento']);
+    expect(scanOptionLabel('comprovante')).toBe('Ler comprovante ou boleto');
+    expect(COMPROVANTE_TEXT.optionExpense).toBe('Ler comprovante ou boleto');
+    expect(COMPROVANTE_TEXT.option).toBe('Ler comprovante de Pix ou pagamento');
+    expect(scanSheetOptions(true).map(scanOptionLabel)).toEqual(['Usar a câmera', 'Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante ou boleto']);
+  });
+
+  it('boleto lido pelo código (teste de 09/11/2026): a linha diz "Boleto" e "vence em", a data preenchida ganha o aviso do vencimento, e o vencimento futuro manda para Contas a pagar', () => {
+    const due = draftOf({ kind: 'boleto', amountCents: 172_240, occurredOn: '2026-10-05', time: null, counterpart: 'Proteção Exemplo Ltda', dateIsDue: true });
+    expect(due).toMatchObject({ kind: 'boleto', recordKind: 'despesa', dateIsDue: true, occurredOn: '2026-10-05', dayFuture: false });
+    expect(comprovanteReadLine(due)).toBe('Comprovante lido: Boleto · Proteção Exemplo Ltda · R$ 1.722,40 · vence em 05/10/2026');
+    expect(comprovanteGaps(due)).toMatchObject({ amount: null, day: null, name: null, issued: 'A data é o vencimento do boleto. Se pagou em outro dia, troque a data.' });
+    const future = draftOf({ kind: 'boleto', amountCents: null, occurredOn: '2026-11-10', time: null, counterpart: null, dateIsDue: true });
+    expect(future).toMatchObject({ occurredOn: null, dayFuture: true, dateIsDue: true });
+    expect(comprovanteReadLine(future)).toBe('Comprovante lido: Boleto');
+    expect(comprovanteGaps(future)).toMatchObject({
+      amount: 'O código do boleto não traz o valor. Digite o valor.',
+      day: 'O vencimento do boleto ainda não chegou. Se já pagou, escolha o dia do pagamento. Se ainda vai pagar, anote em Contas a pagar, com Ler boleto.',
+      issued: null,
+    });
+    // Um boleto pago (comprovante) continua "Boleto pago", com a data do pagamento e sem o aviso do vencimento.
+    const paid = draftOf({ kind: 'boleto', counterpart: null });
+    expect(paid.dateIsDue).toBe(false);
+    expect(comprovanteReadLine(paid)).toBe('Comprovante lido: Boleto pago · R$ 85,00 · 05/10/2026 às 14:32');
+    expect(comprovanteGaps(paid).issued).toBeNull();
+    // Em Registrar recebimento, o boleto é do outro lado, e a frase não o chama de pago.
+    expect(comprovanteMismatch(due, 'receita')).toEqual({ text: 'Este comprovante é de um boleto. Ele entra como gasto, não como recebimento.', action: 'Trocar para Anotar gasto', other: 'despesa' });
+    expect(comprovanteMismatch(paid, 'receita')?.text).toBe('Este comprovante é de um boleto pago. Ele entra como gasto, não como recebimento.');
+    // Conta de consumo: o código não traz o vencimento; a linha diz "Boleto" e o dia pedido é o do pagamento.
+    const noDue = draftOf({ kind: 'boleto', amountCents: 18_990, occurredOn: null, time: null, counterpart: 'Companhia Exemplo', dateIsDue: true });
+    expect(comprovanteReadLine(noDue)).toBe('Comprovante lido: Boleto · Companhia Exemplo · R$ 189,90');
+    expect(comprovanteGaps(noDue).day).toBe('O código do boleto não traz o vencimento. Escolha o dia do pagamento.');
   });
 
   it('um erro por causa, sem devolver o texto do PDF', () => {

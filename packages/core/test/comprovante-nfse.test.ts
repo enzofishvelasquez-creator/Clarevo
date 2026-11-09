@@ -270,7 +270,7 @@ describe('nota de serviço (NFS-e): leitura', () => {
   });
 
   it('o PDF da nota em Anotar gasto aponta a leitura certa para a nota de serviço', () => {
-    expect(NOTA_TEXT.pdf.serviceNote).toBe('Esta é uma nota de serviço. Para lê-la, use Ler comprovante de Pix ou pagamento, nesta mesma lista.');
+    expect(NOTA_TEXT.pdf.serviceNote).toBe('Esta é uma nota de serviço. Para lê-la, use Ler comprovante ou boleto, nesta mesma lista.');
   });
 });
 

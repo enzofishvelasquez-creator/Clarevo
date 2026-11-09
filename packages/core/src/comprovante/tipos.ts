@@ -45,6 +45,12 @@ export interface ComprovanteReading {
   counterpart: string | null;
   /** Descrição ou mensagem que a pessoa escreveu no comprovante, sem números longos; null quando não há. */
   message: string | null;
+  /**
+   * Boleto lido pelo código (linha digitável ou código de barras), e não um comprovante de pagamento: `occurredOn`, quando o código
+   * traz o fator de vencimento, é o vencimento, não o dia do pagamento (a tela avisa); sem fator, fica nulo e a tela pede o dia do
+   * pagamento. Ausente nos outros casos.
+   */
+  dateIsDue?: boolean;
   /** Só na nota de serviço. */
   serviceNote?: ServiceNoteParties;
 }
@@ -73,6 +79,11 @@ export interface ComprovanteOptions {
    * e "Destino" e nenhum aviso): a de Anotar gasto (`saida`) ou a de Registrar recebimento (`entrada`).
    */
   defaultDirection?: ComprovanteDirection;
+  /**
+   * O dia de hoje: com ele, um boleto (conta de luz, carnê, cobrança) é reconhecido pela linha digitável ou pelo código de barras, com
+   * o valor e o vencimento do próprio código (o vencimento depende de hoje; `boleto.ts`). Sem ele, boleto sem texto de pagamento não é lido.
+   */
+  today?: IsoDate;
 }
 
 /** Quanto do texto do PDF é lido; o excedente é ignorado. Um comprovante tem uma ou duas páginas. */

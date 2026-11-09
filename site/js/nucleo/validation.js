@@ -27,6 +27,10 @@ export const UNCERTAIN_TEXT = {
     orcamento: 'Não deu para confirmar se salvou. Confira em Orçamento por categoria antes de tentar de novo.',
     renda: 'Não deu para confirmar se salvou. Confira em Renda comprometida antes de tentar de novo.',
 };
+export const FUTURE_EXPENSE_TEXT = {
+    toCommitment: 'Ainda vai vencer? Anotar como conta a pagar',
+    toCommitmentA11y: 'Ainda vai vencer? Anotar como conta a pagar, com a descrição, o valor, a data e a categoria já digitados',
+};
 export const COMMITMENT_ERROR_TEXT = {
     ...ERROR_TEXT,
     descricao_obrigatoria: 'Dê um nome para esta conta a pagar.',

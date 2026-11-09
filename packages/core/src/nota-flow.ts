@@ -125,15 +125,15 @@ export type ScanOption = 'camera' | 'pdf' | 'colar' | 'comprovante';
 
 /**
  * Opções da folha do primeiro toque, na ordem. Com câmera: câmera, PDF, colar. Sem câmera (computador, aparelho sem câmera):
- * o PDF vem primeiro, porque o e-mail com o DANFE costuma estar no próprio computador. Por último, "Ler comprovante de Pix ou
- * pagamento (PDF)" (D-051): não é leitura de nota, e não leva a câmera nem a chave.
+ * o PDF vem primeiro, porque o e-mail com o DANFE costuma estar no próprio computador. Por último, "Ler comprovante ou boleto"
+ * (D-051 e o boleto pelo código, 09/11/2026): não é leitura de nota, e não leva a câmera nem a chave.
  */
 export function scanSheetOptions(cameraAvailable: boolean): ScanOption[] {
   return cameraAvailable ? ['camera', 'pdf', 'colar', 'comprovante'] : ['pdf', 'colar', 'comprovante'];
 }
 
 export function scanOptionLabel(option: ScanOption): string {
-  if (option === 'comprovante') return COMPROVANTE_TEXT.option;
+  if (option === 'comprovante') return COMPROVANTE_TEXT.optionExpense;
   return NOTA_TEXT.sheet[option === 'colar' ? 'paste' : option];
 }
 

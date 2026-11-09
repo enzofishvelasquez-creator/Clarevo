@@ -1,3 +1,4 @@
+import { boletoFromText, type BoletoReading } from '../boleto';
 import type { IsoDate } from '../dates';
 import type { Cents } from '../money';
 import { holeriteReading, looksLikeHolerite } from './holerite';
@@ -89,6 +90,22 @@ add('descarte', [
   'competencia', 'chave',
 ]);
 add('descarte', ['conta', 'banco', 'id', 'cartao', 'documento', 'controle', 'endereco', 'cidade', 'estado'], { inline: false });
+
+/**
+ * Rótulos que só um comprovante de pagamento traz (um boleto ou uma conta de consumo nunca): valor pago, data e hora do pagamento,
+ * autenticação, protocolo e identificadores da transação. Com um deles, o texto é um pagamento feito, mesmo sem título nem tipo.
+ */
+const PAID_PHRASES: ReadonlySet<string> = new Set([
+  'valor pago', 'total pago', 'valor cobrado', 'valor debitado', 'valor da transferencia', 'valor do pix', 'valor do pagamento', 'valor da transacao', 'valor transferido',
+  'valor enviado', 'valor recebido', 'valor da operacao',
+  'data e hora', 'data/hora', 'data e horario', 'data da transferencia', 'data do pagamento', 'data de pagamento', 'data da transacao', 'data da operacao',
+  'data de efetivacao', 'data do pix', 'data da realizacao', 'data do recebimento', 'data de recebimento', 'realizado em', 'pago em', 'efetivado em',
+  'enviado em', 'recebido em', 'transferido em', 'hora', 'horario', 'hora da transferencia', 'hora do pagamento',
+  'pago para', 'pagou para', 'enviado para', 'transferido para', 'transferencia para', 'recebido de', 'recebeu de', 'enviado por', 'pago por',
+  'id da transacao', 'id da transferencia', 'id da operacao', 'id do pagamento', 'codigo de autenticacao', 'autenticacao', 'end to end', 'end-to-end',
+  'endtoend', 'e2e', 'protocolo', 'numero do protocolo', 'numero da transacao', 'numero da operacao', 'nsu', 'autorizacao', 'codigo da transacao',
+  'codigo do pagamento', 'numero do cartao', 'final do cartao', 'bandeira',
+]);
 
 /** Rótulos por primeira letra, do mais longo para o mais curto: o mais específico vale ("data do pagamento" antes de "data"). */
 const BY_FIRST: Map<string, LabelSpec[]> = new Map();
@@ -258,18 +275,24 @@ function alnumCount(text: string): number {
   return n;
 }
 
-export function comprovanteFromText(raw: string, options: ComprovanteOptions = {}): ComprovanteResult {
+/** A leitura e se o texto é mesmo um comprovante de pagamento (título, tipo ou direção), e não só um boleto ou uma conta com o código. */
+interface ReceiptRead {
+  result: ComprovanteResult;
+  paid: boolean;
+}
+
+function readReceipt(raw: string, options: ComprovanteOptions): ReceiptRead {
   const text = typeof raw === 'string' ? cleanText(raw) : '';
-  if (alnumCount(text) < 20) return { ok: false, code: 'texto_vazio' };
+  if (alnumCount(text) < 20) return { result: { ok: false, code: 'texto_vazio' }, paid: false };
   const lines = toLines(text);
   const everything = fold(lines.join('\n'));
   // Nota de serviço (NFS-e): antes da recusa das notas de produto, porque o DANFSe também traz "chave de acesso" (nfse.ts).
-  if (looksLikeNfse(everything)) return { ok: true, reading: nfseReading(lines, options.items, options.defaultDirection ?? null) };
+  if (looksLikeNfse(everything)) return { result: { ok: true, reading: nfseReading(lines, options.items, options.defaultDirection ?? null) }, paid: true };
   if (everything.includes('danfe') || everything.includes('documento auxiliar da nota') || everything.includes('chave de acesso')) {
-    return { ok: false, code: 'nota_fiscal' };
+    return { result: { ok: false, code: 'nota_fiscal' }, paid: false };
   }
   // Holerite: só o valor líquido e o mês de competência (holerite.ts); o resto do texto nem é lido.
-  if (looksLikeHolerite(everything)) return { ok: true, reading: holeriteReading(lines, everything, options.items) };
+  if (looksLikeHolerite(everything)) return { result: { ok: true, reading: holeriteReading(lines, everything, options.items) }, paid: true };
 
   const fields = fieldsOf(lines);
   let section: 'destino' | 'origem' | null = null;
@@ -433,11 +456,52 @@ export function comprovanteFromText(raw: string, options: ComprovanteOptions = {
   const message = messages[0] ?? null;
   const kind: ComprovanteKind = kindCue ?? 'outro';
   const hasWord = heads.includes('comprovante') || heads.includes('recibo');
+  // Um boleto ou uma conta de consumo também traz "Beneficiário", "Pagador" e "Valor do documento": o que diz que é um pagamento feito
+  // é o título ("Comprovante", "Pagamento efetuado", "Boleto pago"), o tipo (Pix, TED, débito), a direção ou um rótulo só de comprovante
+  // ("Valor pago", "Data do pagamento", "Autenticação"; revisão de 09/11/2026).
+  let paidLabel = false;
+  for (const phrase of phrases) if (PAID_PHRASES.has(phrase)) paidLabel = true;
+  const paid = hasWord || cueDirection !== null || (kindCue !== null && kindCue !== 'boleto') || paidLabel;
   const signals = [amountCents !== null, occurredOn !== null, kindCue !== null, counterpart !== null, hasWord, cueDirection !== null, sawDest || sawOrig].filter(Boolean).length;
   const strong = kindCue !== null || hasWord || cueDirection !== null || sawDest || sawOrig;
   if (!strong || signals < 2 || (amountCents === null && occurredOn === null && counterpart === null && message === null)) {
-    return { ok: false, code: 'nao_e_comprovante' };
+    return { result: { ok: false, code: 'nao_e_comprovante' }, paid };
   }
   const reading: ComprovanteReading = { kind, direction, directionGuessed: guessed, amountCents, occurredOn, time, counterpart, message };
-  return { ok: true, reading };
+  return { result: { ok: true, reading }, paid };
+}
+
+/** O boleto como leitura: sai (é uma conta), valor e vencimento do código, e o nome de quem recebe ("Beneficiário" do boleto; senão, o da leitura). */
+function boletoDocumentReading(boleto: BoletoReading, partial: ComprovanteReading | null): ComprovanteReading {
+  return {
+    kind: 'boleto',
+    direction: 'saida',
+    directionGuessed: false,
+    amountCents: boleto.amountCents,
+    occurredOn: boleto.dueOn,
+    // Sempre marcado: é o boleto lido pelo código, e a data, quando o código a traz, é o vencimento (sem data, a tela pede o dia do pagamento).
+    dateIsDue: true,
+    time: null,
+    counterpart: boleto.description ?? partial?.counterpart ?? null,
+    message: null,
+  };
+}
+
+/**
+ * Lê um comprovante de Pix ou de pagamento (`readReceipt`) e, com o dia de hoje em `options.today`, também um boleto que ainda não
+ * tem comprovante: a conta de luz, o carnê, a cobrança com linha digitável (teste de 09/11/2026: o boleto só com o código de barras
+ * "ele não leu"). O comprovante de pagamento com valor sempre vence, porque traz o valor pago e o dia do pagamento; o boleto só entra
+ * quando o texto não é um comprovante ou não trouxe o valor, e nunca no lugar de uma nota fiscal, de um holerite ou de uma nota de serviço.
+ */
+export function comprovanteFromText(raw: string, options: ComprovanteOptions = {}): ComprovanteResult {
+  const { result: regular, paid } = readReceipt(raw, options);
+  if (regular.ok && (regular.reading.kind === 'holerite' || regular.reading.kind === 'nota_servico')) return regular;
+  if (!regular.ok && regular.code === 'nota_fiscal') return regular;
+  if (!options.today) return regular;
+  const boleto = boletoFromText(typeof raw === 'string' ? raw : '', options.today);
+  if (!boleto) return regular;
+  // Comprovante de pagamento com o código do boleto no texto: vale o comprovante (valor pago e dia do pagamento), e o valor do código
+  // não entra no lugar do pago (pode ter juros ou desconto). Sem sinal de pagamento, é o próprio boleto.
+  if (paid) return regular;
+  return { ok: true, reading: boletoDocumentReading(boleto, regular.ok ? regular.reading : null) };
 }

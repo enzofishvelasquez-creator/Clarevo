@@ -395,7 +395,7 @@ export function CameraModal({
           <View style={{ gap: space[2] }}>
             <Button label={NOTA_TEXT.sheet.pdf} tone="soft" onPress={onPdf} />
             <Button label={NOTA_TEXT.sheet.paste} tone="soft" onPress={onPaste} />
-            <Button label={COMPROVANTE_TEXT.option} tone="soft" onPress={onProof} />
+            <Button label={COMPROVANTE_TEXT.optionExpense} tone="soft" onPress={onProof} />
             <Button label={NOTA_FLOW_TEXT.back} tone="ghost" onPress={onClose} />
           </View>
         </View>

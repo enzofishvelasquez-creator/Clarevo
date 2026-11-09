@@ -46,6 +46,10 @@ export const PLANO_TEXT = {
         maior_taxa: 'Maior taxa primeiro',
         menor_divida: 'Menor dívida primeiro',
     },
+    sameOutcome: 'As duas ordens dão no mesmo',
+    bothTitle: 'As duas ordens',
+    bothCaption: 'Maior taxa primeiro e Menor dívida primeiro: com estes números, dão no mesmo.',
+    baselineLead: (extra) => `${extra ? 'Sem o valor a mais e sem' : 'Sem'} passar nada adiante, só com os pagamentos de sempre`,
     sameInterest: 'As duas ordens têm o mesmo total de juros.',
     sameFirst: 'A primeira dívida termina no mesmo mês nas duas ordens.',
     sameEnd: 'Tudo termina no mesmo mês nas duas ordens.',
@@ -100,8 +104,8 @@ export const PLANO_FIELDS = {
     taxaSaldo: rateField('Taxa de juros ao mês (%)', 'a taxa ao mês', '8', PLANO_RATE_RANGE.saldo.min, PLANO_RATE_RANGE.saldo.max, 'Use uma taxa de 0,01% a 99,99% ao mês.', 'Está na fatura, no extrato ou no contrato.'),
     pagamento: moneyField('Quanto você paga por mês', 'quanto você paga por mês', '200,00'),
     extra: {
-        label: 'Quanto a mais você consegue pôr por mês nas dívidas?',
-        hint: 'Opcional. Em branco: só os pagamentos de sempre.',
+        label: 'Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?',
+        hint: 'Opcional, como 200,00. Em branco: a conta usa só as parcelas e os pagamentos informados acima.',
         kind: 'dinheiro',
         optional: true,
         errors: { invalido: 'Confira o valor, como 200,00.', acima_do_limite: LIMIT_TEXT },
@@ -267,6 +271,50 @@ function differences(maior, menor) {
         out.push(PLANO_TEXT.sameEnd);
     return out;
 }
+function sameOutcome(a, b) {
+    return (a.months === b.months &&
+        a.interestCents === b.interestCents &&
+        a.firstMonth === b.firstMonth &&
+        a.sequence.length === b.sequence.length &&
+        a.sequence.every((s, i) => s.index === b.sequence[i].index && s.month === b.sequence[i].month));
+}
+function ordersLead(maior, menor, extra) {
+    const lead = extra ? 'Com o valor a mais e passando adiante a parcela de cada dívida quitada' : 'Passando adiante a parcela de cada dívida quitada';
+    const when = (s) => `${monthsDuration(s.months)}${s.endMonth ? `, em ${formatMonthYearBR(s.endMonth)}` : ''}`;
+    if (maior.months !== null && menor.months !== null) {
+        if (maior.months === menor.months)
+            return `${lead}, tudo termina em ${when(maior)}, nas duas ordens.`;
+        const [first, second] = maior.months < menor.months ? [maior, menor] : [menor, maior];
+        return `${lead}, tudo termina em ${when(first)} ou em ${when(second)}, conforme a ordem.`;
+    }
+    const ends = maior.months !== null ? maior : menor;
+    return `${lead}, tudo termina em ${when(ends)} em uma das ordens; na outra, as dívidas não terminam em 50 anos.`;
+}
+function earlierOf(maior, menor) {
+    if (maior.months === null)
+        return menor.months === null ? maior : menor;
+    if (menor.months === null)
+        return maior;
+    if (menor.months < maior.months)
+        return menor;
+    if (menor.months === maior.months && menor.interestCents < maior.interestCents)
+        return menor;
+    return maior;
+}
+function baselineLine(base, best, extra, same) {
+    if (best.months === null)
+        return null;
+    const lead = PLANO_TEXT.baselineLead(extra);
+    if (base.months === null)
+        return `${lead}, as dívidas não terminariam em 50 anos.`;
+    const later = base.months - best.months;
+    const more = base.interestCents - best.interestCents;
+    if (later <= 0 && more <= 0)
+        return null;
+    const after = same ? 'depois' : 'depois da ordem que termina antes';
+    const tail = later > 0 && more > 0 ? `${monthsCount(later)} ${after} e ${formatBRL(more)} a mais de juros` : later > 0 ? `${monthsCount(later)} ${after}` : `${formatBRL(more)} a mais de juros`;
+    return `${lead}, tudo terminaria em ${monthsDuration(base.months)}${base.endMonth ? `, em ${formatMonthYearBR(base.endMonth)}` : ''}: ${tail}.`;
+}
 export function calcPlanoDividas(input, today) {
     const r = new FieldReader();
     const extra = r.read('extra', parseOptionalMoney(input.extra));
@@ -345,12 +393,14 @@ export function calcPlanoDividas(input, today) {
     const budget = extraCents + sim.reduce((s, d) => s + d.minimum, 0);
     const scenarios = [];
     let diff = [];
+    let same = false;
     const lines = [];
     if (included.length > 0) {
         const baseCaption = included.length > 1 && extraCents === 0 ? PLANO_TEXT.baselineCaption : null;
         const base = buildScenario('sem_extra', simulate(sim, null), included, today, baseCaption);
         scenarios.push(base);
-        lines.push(base.summary);
+        if (included.length === 1)
+            lines.push(base.summary);
         if (included.length === 1) {
             if (extraCents > 0) {
                 const withExtra = buildScenario('com_extra', simulate(sim, { order: [0], budget }), included, today);
@@ -376,9 +426,19 @@ export function calcPlanoDividas(input, today) {
             const maior = buildScenario('maior_taxa', simulate(sim, { order: byRate, budget }), included, today);
             const menor = buildScenario('menor_divida', simulate(sim, { order: bySize, budget }), included, today);
             scenarios.push(maior, menor);
-            lines.push(maior.summary, menor.summary);
             diff = differences(maior, menor);
-            lines.push(...diff);
+            same = sameOutcome(maior, menor);
+            if (same) {
+                lines.push(maior.months === null
+                    ? `${PLANO_TEXT.sameOutcome}: ${lowerFirst(PLANO_TEXT.noEnd)}`
+                    : `${PLANO_TEXT.sameOutcome}: tudo termina em ${monthsDuration(maior.months)}${maior.endMonth ? `, em ${formatMonthYearBR(maior.endMonth)}` : ''}.`);
+            }
+            else {
+                lines.push(ordersLead(maior, menor, extraCents > 0), maior.summary, menor.summary, ...diff);
+            }
+            const ref = baselineLine(base, earlierOf(maior, menor), extraCents > 0, same);
+            if (ref)
+                lines.push(ref);
         }
     }
     else {
@@ -407,6 +467,7 @@ export function calcPlanoDividas(input, today) {
             initialSumCents: initialSum,
             scenarios,
             differences: diff,
+            sameOutcome: same,
             resultLines: lines,
             hypotheses,
             notes,

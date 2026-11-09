@@ -96,8 +96,11 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
         accountId: editing.accountId,
       };
     }
-    return { amountText: '', dateText: formatDateBR(today), note: '', savedText: '', accountId: chooseAccountId(activeAccounts, lastAccount.last) || null };
+    // Aporte novo em meta ativa com plano por mês: o valor planejado já preenchido, editável (teste de 09/11/2026).
+    const planned = mode.type === 'novo' && mode.kind === 'aporte' && goal.status === 'ativa' && goal.plannedMonthlyCents ? centsToInput(goal.plannedMonthlyCents) : '';
+    return { amountText: planned, dateText: formatDateBR(today), note: '', savedText: '', accountId: chooseAccountId(activeAccounts, lastAccount.last) || null };
   })();
+  const plannedPrefilled = initial.amountText !== '' && !editing;
   const [first] = useState(initial);
   const [amountText, setAmountText] = useState(first.amountText);
   const [dateText, setDateText] = useState(first.dateText);
@@ -368,6 +371,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
                 }}
                 onBlur={() => setAmountText(formatMoneyText(amountText))}
                 error={errors.amountText}
+                hint={plannedPrefilled && amountText === first.amountText ? M.aporte.planned : undefined}
               />
               <View style={{ gap: space[2] }}>
                 <TextField

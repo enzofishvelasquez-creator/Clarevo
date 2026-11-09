@@ -15,7 +15,7 @@ describe('1. Parcelado ou à vista? (docs/08 §3.2)', () => {
     expect(r.totalCents).toBe(120_000);
     expect(r.resultLines).toEqual([
       'Com estes números, o parcelado custa R$ 120,00 a mais.',
-      'Isso equivale a juros de 1,96% ao mês (26,27% ao ano).',
+      'Nas parcelas há juros embutidos de 1,96% ao mês (26,27% ao ano).',
       'Total parcelado: R$ 1.200,00 (10 × R$ 120,00).',
     ]);
     expect(r.hypotheses[0]).toBe('Primeira parcela 1 mês depois da compra e as outras a cada mês.');
@@ -27,7 +27,7 @@ describe('1. Parcelado ou à vista? (docs/08 §3.2)', () => {
     const r = run({ primeiraNaCompra: true });
     expect(r.financedCents).toBe(96_000);
     expect(r.financedInstallments).toBe(9);
-    expect(r.resultLines[1]).toBe('Isso equivale a juros de 2,42% ao mês (33,28% ao ano).');
+    expect(r.resultLines[1]).toBe('Nas parcelas há juros embutidos de 2,42% ao mês (33,28% ao ano).');
     expect(r.hypotheses[0]).toBe('Primeira parcela paga na compra e as outras a cada mês.');
   });
 
@@ -54,12 +54,12 @@ describe('1. Parcelado ou à vista? (docs/08 §3.2)', () => {
     expect(r.monthlyRate).toBeGreaterThan(0);
     expect(r.resultLines).toEqual([
       'Com estes números, o parcelado custa R$ 0,08 a mais.',
-      'Isso equivale a juros de menos de 0,01% ao mês (0,01% ao ano).',
+      'Nas parcelas há juros embutidos de menos de 0,01% ao mês (0,01% ao ano).',
       'Total parcelado: R$ 1.000,08 (12 × R$ 83,34).',
     ]);
     // As duas taxas abaixo de 0,005%: "menos de 0,01%" ao mês e ao ano.
     expect(run({ aVista: '5.000,00', parcelas: '24', parcela: '208,34' }).resultLines[1]).toBe(
-      'Isso equivale a juros de menos de 0,01% ao mês (menos de 0,01% ao ano).',
+      'Nas parcelas há juros embutidos de menos de 0,01% ao mês (menos de 0,01% ao ano).',
     );
     for (const text of run({ aVista: '2.000,00', parcelas: '10', parcela: '200,01' }).resultLines) expect(text).not.toContain('0,00%');
   });
@@ -82,7 +82,7 @@ describe('1. Parcelado ou à vista? (docs/08 §3.2)', () => {
   it('modo cota-unica: frase da cota, 2 a 12 parcelas, sem forma de pagamento nem botão', () => {
     const r = run({ modo: 'cota-unica', aVista: '1.080,00', parcelas: '10', parcela: '120,00', primeiraNaCompra: true, formaPagamento: 'boleto' });
     expect(r.resultLines[0]).toBe('Com estes números, parcelar custa R$ 120,00 a mais que a cota única.');
-    expect(r.resultLines[1]).toBe('Isso equivale a juros de 2,42% ao mês (33,28% ao ano).');
+    expect(r.resultLines[1]).toBe('Nas parcelas há juros embutidos de 2,42% ao mês (33,28% ao ano).');
     expect(r.hypotheses[0]).toBe('Primeira parcela junto com a cota única e as outras a cada mês.');
     expect(r.action).toBeNull();
     const igual = run({ modo: 'cota-unica', parcela: '108,00' });

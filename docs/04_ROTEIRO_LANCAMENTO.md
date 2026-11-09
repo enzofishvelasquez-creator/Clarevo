@@ -126,6 +126,18 @@ Sem mudança no banco. Feito em 06/11/2026: `npm test`, `npm run typecheck` e `n
 - [x] Guia "Lembretes de vencimento" com os lembretes do dia a dia; docs/00 (D-087), docs/02, docs/03, docs/37 (teste em aparelho) e as respostas de privacidade das lojas
 - [ ] **Você:** teste em aparelho (build novo do Android): ligar "Anotar os gastos do dia" às 20h e ver o aviso chegar sem valores; anotar um gasto antes das 20h e ver que o aviso de hoje não chega; o toque abrindo a tela certa; desligar tudo e ver os avisos sumirem
 
+## Retorno do teste de 09/11/2026, pacote 1 (D-088)
+
+Sem mudança no banco. A lista completa dos 18 pontos da Elis, com a situação de cada um, está em `docs/34_RETORNO_DO_TESTE.md`, seção "Retorno de 09/11/2026".
+
+- [x] Calculadoras: dica da cota única, frase da taxa embutida, nota do CET (rotativo e cheque especial), juros até 99,99% ao mês em "Multa e juros" com a dica da fatura do cartão, pergunta do valor a mais do plano de dívidas
+- [x] Plano de dívidas: resultado começa pelo que as ordens dão (uma frase quando dão no mesmo) e termina pela referência em uma frase; detalhes com um bloco só para as duas ordens quando dão no mesmo (`calc-plano-dividas.test.ts`, com os números da Elis)
+- [x] Anotar gasto com data futura: link "Ainda vai vencer? Anotar como conta a pagar", com os campos levados para Anotar conta a pagar
+- [x] Registrar aporte: valor planejado por mês preenchido, editável, com legenda
+- [x] Ler comprovante: "Ler comprovante ou boleto" em Anotar gasto; boleto e conta de consumo lidos pela linha digitável (valor, vencimento e beneficiário; `comprovante-leitor.test.ts`, `comprovante-fluxo.test.ts`); guia e site
+- [ ] **Você:** as decisões A a G do pacote 2 (`docs/34`, seção "Retorno de 09/11/2026", tabela "Pacote 2")
+- [ ] **Você:** avisar a Elis quando o merge sair (ela quis conferir no dia seguinte) e, no celular, conferir o boleto da Protebem em "Ler comprovante ou boleto" (foto nítida, com a linha digitável inteira)
+
 ## Ciclo B: renda comprometida (D-026)
 
 Última execução registrada pelas frentes de trabalho em 09/10/2026: `npm test` (30 arquivos, 599 testes), `npm run typecheck`, `npm run test:db` (10, 20, 30, 40, 45, 47, 50, 60 e 65), `npm run test:api` (92 testes, com as sequências de B e C) e `npm run test:web`, que passa (item abaixo).
