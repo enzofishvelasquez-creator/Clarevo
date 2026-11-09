@@ -6448,12 +6448,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('206_aviso_80');
   await atWidths(async (w) => { await layoutChecks(`F2 aviso de 80% ${w}px`); });
   t = await f2Expense('Feira pequena', '50', 'Mercado');
-  ok('F2 aviso só no cruzamento: mais R$ 50,00 (86%) não repete o aviso', t.includes('Gasto salvo') && !t.includes('chegou a') && !t.includes('passou do orçamento'), t.slice(0, 300));
+  ok('F2 aviso só no cruzamento: mais R$ 50,00 (86%) não repete o aviso; fora do cruzamento, a linha de uso (D-089 E) "Mercado: R$ 1.550,00 de R$ 1.800,00 em outubro (86%)."',
+    t.includes('Gasto salvo') && !t.includes('chegou a') && !t.includes('passou do orçamento') && t.includes('Mercado: R$ 1.550,00 de R$ 1.800,00 em outubro (86%).'), t.slice(0, 300));
   t = await f2Expense('Feira grande', '300', 'Mercado');
   ok('F2 aviso: mais R$ 300,00 passam do orçamento (R$ 1.850,00): "Mercado passou do orçamento de outubro em R$ 50,00."', t.includes('Mercado passou do orçamento de outubro em R$ 50,00.'), t.slice(0, 300));
   await shot('207_aviso_100');
   t = await f2Expense('Feira outra', '10', 'Mercado');
-  ok('F2 aviso: depois de passar, outro gasto na categoria não repete o aviso', !t.includes('passou do orçamento') && !t.includes('chegou a'));
+  ok('F2 aviso: depois de passar, outro gasto na categoria não repete o aviso; a linha de uso mostra o que passou (R$ 1.860,00 de R$ 1.800,00, 103%)',
+    !t.includes('passou do orçamento') && !t.includes('chegou a') && t.includes('Mercado: R$ 1.860,00 de R$ 1.800,00 em outubro (103%).'), t.slice(0, 300));
   t = await f2Expense('Cinema', '20', 'Transporte');
   ok('F2 aviso: categoria sem orçamento (Transporte) não leva aviso nenhum', t.includes('Gasto salvo') && !t.includes('orçamento'), t.slice(0, 300));
   // Editar o gasto de R$ 300,00 para R$ 5,00 e de novo para R$ 400,00: o aviso volta só no cruzamento.

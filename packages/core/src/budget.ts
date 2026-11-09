@@ -448,6 +448,29 @@ export function budgetCrossing(
   return BUDGET_TEXT.crossedNear(after.category, percentFloor(after.usedCents, after.budgetCents), name);
 }
 
+/**
+ * Linha de uso do orçamento na mensagem de sucesso (D-089 E, ideia do teste de 09/11/2026: "para o usuário saber o quanto está se
+ * aproximando, ao salvar o gasto"): sempre que a categoria tem orçamento no mês, "Mercado: R$ 1.550,00 de R$ 1.800,00 em outubro
+ * (86%)."; com valores ocultos, "Mercado: 86% do orçamento de outubro.". null sem orçamento.
+ */
+export function budgetUsageLine(after: Pick<MonthBudgetLine, 'category' | 'usedCents' | 'budgetCents'> | null, month: IsoMonth, today: IsoDate, hideValues = false): string | null {
+  if (!after || after.budgetCents === null) return null;
+  const name = monthNameFor(month, today);
+  const percent = percentFloor(after.usedCents, after.budgetCents);
+  return hideValues ? BUDGET_TEXT.usageHidden(after.category, percent, name) : BUDGET_TEXT.usage(after.category, after.usedCents, after.budgetCents, percent, name);
+}
+
+/** O aviso depois de salvar: ao cruzar 80% ou 100%, a frase do cruzamento (budgetCrossing); senão, a linha de uso (budgetUsageLine). */
+export function budgetNotice(
+  before: Pick<MonthBudgetLine, 'usedCents' | 'budgetCents'> | null,
+  after: Pick<MonthBudgetLine, 'category' | 'usedCents' | 'budgetCents'> | null,
+  month: IsoMonth,
+  today: IsoDate,
+  hideValues = false,
+): string | null {
+  return budgetCrossing(before, after, month, today, hideValues) ?? budgetUsageLine(after, month, today, hideValues);
+}
+
 // ---------------------------------------------------------------------------
 // Formulário do orçamento
 // ---------------------------------------------------------------------------
@@ -812,6 +835,11 @@ export const BUDGET_TEXT = {
   crossedOver: (category: string, monthName: string, overCents: Cents) => `${category} passou do orçamento de ${monthName} em ${formatBRL(overCents)}.`,
   /** Valores ocultos: sem o valor. */
   crossedOverHidden: (category: string, monthName: string) => `${category} passou do orçamento de ${monthName}.`,
+  /** Fora do cruzamento (D-089 E): "Mercado: R$ 1.550,00 de R$ 1.800,00 em outubro (86%)." */
+  usage: (category: string, usedCents: Cents, budgetCents: Cents, percent: number, monthName: string) =>
+    `${category}: ${formatBRL(usedCents)} de ${formatBRL(budgetCents)} em ${monthName} (${formatInteger(percent)}%).`,
+  /** Valores ocultos: "Mercado: 86% do orçamento de outubro." */
+  usageHidden: (category: string, percent: number, monthName: string) => `${category}: ${formatInteger(percent)}% do orçamento de ${monthName}.`,
 } as const;
 
 /** Textos do limite pessoal de comprometimento. Neutros: sem cor que julgue, sem julgamento. */

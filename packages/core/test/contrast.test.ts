@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  CATEGORY_BUBBLE_TONES,
   CONTRAST_LARGE,
   CONTRAST_TEXT,
   THEME_CONTRAST_PAIRS,
@@ -71,6 +72,21 @@ describe('contraste: a conta do WCAG', () => {
     expect(isLargeText(18, true)).toBe(false);
     expect(contrastTarget('texto')).toBe(CONTRAST_TEXT);
     for (const k of ['texto grande', 'ícone', 'contorno'] as const) expect(contrastTarget(k)).toBe(CONTRAST_LARGE);
+  });
+});
+
+describe('contraste: os tons das bolhas (D-089 D)', () => {
+  it('o texto de cada tom chega a 4,5:1, o primeiro tom é o azul da marca e as cores do texto são as do tema', () => {
+    const theme = themeColors();
+    expect(CATEGORY_BUBBLE_TONES[0]!.fill).toBe(theme.brand);
+    for (const tone of CATEGORY_BUBBLE_TONES) {
+      expect([theme.textOnBrand, theme.text]).toContain(tone.text);
+      expect(contrastRatio(tone.fill, tone.text), `${tone.fill} com ${tone.text}`).toBeGreaterThanOrEqual(CONTRAST_TEXT);
+    }
+    // A escolhida (lima com texto escuro) continua acima de 4,5.
+    expect(contrastRatio(theme.accent!, theme.text!)).toBeGreaterThanOrEqual(CONTRAST_TEXT);
+    // Os cinco tons são diferentes entre si.
+    expect(new Set(CATEGORY_BUBBLE_TONES.map((t) => t.fill)).size).toBe(5);
   });
 });
 

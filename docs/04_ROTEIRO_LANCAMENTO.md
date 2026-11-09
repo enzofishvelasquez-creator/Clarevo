@@ -138,6 +138,18 @@ Sem mudança no banco. A lista completa dos 18 pontos da Elis, com a situação 
 - [ ] **Você:** as decisões A a G do pacote 2 (`docs/34`, seção "Retorno de 09/11/2026", tabela "Pacote 2")
 - [ ] **Você:** avisar a Elis quando o merge sair (ela quis conferir no dia seguinte) e, no celular, conferir o boleto da Protebem em "Ler comprovante ou boleto" (foto nítida, com a linha digitável inteira)
 
+## Retorno do teste de 09/11/2026, pacote 2 (D-089)
+
+Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C, B, A, F e, depois do lançamento, G.
+
+- [x] E: linha do orçamento ao salvar o gasto (`budgetNotice`, `budget.test.ts`; roteiro de telas no bloco F2)
+- [x] D: bolhas das categorias em cinco tons do azul da marca (`CATEGORY_BUBBLE_TONES`, `analises.test.ts`, `contrast.test.ts`)
+- [ ] C: "cartão" na mensagem do Telegram vira compra no cartão (migração e função publicada de novo)
+- [ ] B: "Importar fatura" na tela do cartão com as parcelas "3/4" (migração)
+- [ ] A: recebimento do fim do mês contando no mês seguinte (migração)
+- [ ] F: vídeo em formato de reels (compra de mercado e orçamento)
+- [ ] G, depois do lançamento: modo "Fatura de cartão depois do vencimento" em Multa e juros
+
 ## Ciclo B: renda comprometida (D-026)
 
 Última execução registrada pelas frentes de trabalho em 09/10/2026: `npm test` (30 arquivos, 599 testes), `npm run typecheck`, `npm run test:db` (10, 20, 30, 40, 45, 47, 50, 60 e 65), `npm run test:api` (92 testes, com as sequências de B e C) e `npm run test:web`, que passa (item abaixo).

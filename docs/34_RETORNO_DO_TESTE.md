@@ -59,15 +59,17 @@ Elis mandou a Enzo prints com o que achou confuso e o que gostaria de ter, e ped
 
 ### Pacote 2: decisões para Enzo (09/11/2026)
 
-| Letra | Decisão | Recomendação da equipe | Tamanho |
-|---|---|---|---|
-| A | Salário no fim do mês: (1) no recebimento, um ajuste "Este valor é do mês seguinte", mostrado quando a data cai nos últimos 7 dias do mês, respeitado pelo Recebido do Resumo, pela Evolução, pelas Análises e pela exportação (coluna nova e migração); (2) sem mexer no banco, uma dica no formulário sugerindo anotar com a data do dia 1º | Opção 1, só para recebimentos | cerca de 1 dia |
-| B | Botão "Importar fatura" na tela do cartão; a importação cria a compra com as parcelas que faltam, mantendo a numeração do extrato (3 de 4, 4 de 4) | Fazer: é o que destrava quem já tem cartão | cerca de 1 dia, com migração |
-| C | "cartão" (ou o nome do cartão) na mensagem do Telegram vira compra no cartão; DESFAZER desfaz | Fazer | meio dia, com migração e a função republicada |
-| D | Bolhas das categorias em cinco tons do azul da marca, contraste conferido, a escolhida em lima como hoje | Fazer | meio período |
-| E | Ao salvar um gasto com orçamento na categoria, uma linha "Mercado: R$ 1.400,00 de R$ 1.800,00 neste mês (78%)", sempre, não só ao cruzar 80% e 100% | Fazer | pequeno |
-| F | Vídeo em formato de reels (1080 por 1920) gravado na web com os dados de demonstração: salvar uma compra de mercado e abrir o orçamento | Fazer depois do pacote 1 | meio período |
-| G | Modo "Fatura de cartão depois do vencimento" em Multa e juros: rotativo, mora, multa e IOF estimado | Depois do lançamento | meio dia |
+Enzo aprovou as sete em 09/11/2026 ("Aprovo", D-089), na ordem E, D, C, B, A, F e G.
+
+| Letra | Decisão | Recomendação da equipe | Tamanho | Situação |
+|---|---|---|---|---|
+| A | Salário no fim do mês: (1) no recebimento, um ajuste "Este valor é do mês seguinte", mostrado quando a data cai nos últimos 7 dias do mês, respeitado pelo Recebido do Resumo, pela Evolução, pelas Análises e pela exportação (coluna nova e migração); (2) sem mexer no banco, uma dica no formulário sugerindo anotar com a data do dia 1º | Opção 1, só para recebimentos | cerca de 1 dia | a fazer |
+| B | Botão "Importar fatura" na tela do cartão; a importação cria a compra com as parcelas que faltam, mantendo a numeração do extrato (3 de 4, 4 de 4) | Fazer: é o que destrava quem já tem cartão | cerca de 1 dia, com migração | a fazer |
+| C | "cartão" (ou o nome do cartão) na mensagem do Telegram vira compra no cartão; DESFAZER desfaz | Fazer | meio dia, com migração e a função republicada | a fazer |
+| D | Bolhas das categorias em cinco tons do azul da marca, contraste conferido, a escolhida em lima como hoje | Fazer | meio período | pronto (09/11/2026) |
+| E | Ao salvar um gasto com orçamento na categoria, uma linha "Mercado: R$ 1.400,00 de R$ 1.800,00 neste mês (78%)", sempre, não só ao cruzar 80% e 100% | Fazer | pequeno | pronto (09/11/2026) |
+| F | Vídeo em formato de reels (1080 por 1920) gravado na web com os dados de demonstração: salvar uma compra de mercado e abrir o orçamento | Fazer depois do pacote 1 | meio período | a fazer |
+| G | Modo "Fatura de cartão depois do vencimento" em Multa e juros: rotativo, mora, multa e IOF estimado | Depois do lançamento | meio dia | depois do lançamento |
 
 ## Rascunho para as redes (item 25)
 

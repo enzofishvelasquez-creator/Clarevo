@@ -12,6 +12,8 @@ import {
   budgetCaption,
   budgetCategoryFromParam,
   budgetCrossing,
+  budgetNotice,
+  budgetUsageLine,
   budgetLevel,
   budgetMonthBounds,
   budgetMonthError,
@@ -286,6 +288,20 @@ describe('aviso dentro do app ao cruzar 80% ou 100%', () => {
 
   it('outro ano: o mês leva o ano', () => {
     expect(cross(0, 130_000, false, '2025-12')).toBe('Mercado passou do orçamento de dezembro de 2025 em R$ 100,00.');
+  });
+
+  it('fora do cruzamento, a linha de uso (D-089 E): valor usado, orçamento e percentual; com valores ocultos só o percentual; sem orçamento, nada', () => {
+    expect(budgetUsageLine(l(103_200), '2026-10', DEMO_TODAY)).toBe('Mercado: R$ 1.032,00 de R$ 1.200,00 em outubro (86%).');
+    expect(budgetUsageLine(l(103_200), '2026-10', DEMO_TODAY, true)).toBe('Mercado: 86% do orçamento de outubro.');
+    expect(budgetUsageLine(l(130_000), '2026-10', DEMO_TODAY)).toBe('Mercado: R$ 1.300,00 de R$ 1.200,00 em outubro (108%).');
+    expect(budgetUsageLine(l(0), '2025-12', DEMO_TODAY)).toBe('Mercado: R$ 0,00 de R$ 1.200,00 em dezembro de 2025 (0%).');
+    expect(budgetUsageLine(l(50_000, null), '2026-10', DEMO_TODAY)).toBeNull();
+    expect(budgetUsageLine(null, '2026-10', DEMO_TODAY)).toBeNull();
+    // O aviso depois de salvar: o cruzamento vence; sem cruzamento, a linha de uso.
+    expect(budgetNotice(l(90_000), l(102_000), '2026-10', DEMO_TODAY)).toBe('Mercado chegou a 85% do orçamento de outubro.');
+    expect(budgetNotice(l(100_000), l(110_000), '2026-10', DEMO_TODAY)).toBe('Mercado: R$ 1.100,00 de R$ 1.200,00 em outubro (91%).');
+    expect(budgetNotice(l(130_000), l(140_000), '2026-10', DEMO_TODAY, true)).toBe('Mercado: 116% do orçamento de outubro.');
+    expect(budgetNotice(l(0), l(130_000, null), '2026-10', DEMO_TODAY)).toBeNull();
   });
 });
 

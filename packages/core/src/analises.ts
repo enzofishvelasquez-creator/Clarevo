@@ -397,9 +397,31 @@ export function fitBubbleLabel(name: string, percentText: string, radius: number
   return { lines: [...cut, percentText], fontSize: round2(fontSize), lineHeight: round2(lineHeight) };
 }
 
+/**
+ * Os cinco tons das bolhas (D-089 D, ajusta D-059(8)): o azul da marca e quatro variações dele, com a cor do texto que dá contraste
+ * de 4,5:1 ou mais em cada uma (conferido em `contrast.test.ts`). A maior bolha leva o azul da marca; as seguintes alternam claro e
+ * escuro, para bolhas vizinhas no tamanho não ficarem iguais; da sexta em diante, os tons repetem. A escolhida continua lima, com o
+ * texto escuro. Nada depende só da cor: o nome e o percentual ficam escritos em cada bolha.
+ */
+export const CATEGORY_BUBBLE_TONES: readonly { fill: string; text: string }[] = [
+  { fill: '#2457F5', text: '#FFFFFF' },
+  { fill: '#7D9DF9', text: '#17223B' },
+  { fill: '#1B45C9', text: '#FFFFFF' },
+  { fill: '#B3C6FB', text: '#17223B' },
+  { fill: '#15359E', text: '#FFFFFF' },
+];
+
+/** O tom da bolha de posição `rank` (0 = a maior): os cinco tons, repetidos da sexta em diante. */
+export function bubbleTone(rank: number): { fill: string; text: string } {
+  return CATEGORY_BUBBLE_TONES[((rank % CATEGORY_BUBBLE_TONES.length) + CATEGORY_BUBBLE_TONES.length) % CATEGORY_BUBBLE_TONES.length]!;
+}
+
 export interface CategoryBubble extends Bubble {
   /** `categoryKey` da categoria. */
   key: string;
+  /** Posição pelo tamanho (0 = a maior) e o tom correspondente (`bubbleTone`). */
+  rank: number;
+  tone: { fill: string; text: string };
   /** O nome inteiro ("Mercado", "Sem categoria"). */
   label: string;
   cents: Cents;
@@ -431,12 +453,18 @@ export function categoryBubbles(shares: readonly CategoryShare[], width: number,
     width,
     { scale },
   );
+  // Posição pelo tamanho (a maior primeiro; empate pela ordem das categorias), só entre as bolhas desenhadas.
+  const order = layout.bubbles.map((b) => b.index).sort((a, b) => shares[b]!.cents - shares[a]!.cents || a - b);
+  const rankOf = new Map(order.map((index, rank) => [index, rank]));
   const bubbles = layout.bubbles.map((b): CategoryBubble => {
     const share = shares[b.index]!;
     const label = fitBubbleLabel(share.label, share.percentText, b.r, scale);
+    const rank = rankOf.get(b.index)!;
     return {
       ...b,
       key: categoryKey(share.category),
+      rank,
+      tone: bubbleTone(rank),
       label: share.label,
       cents: share.cents,
       percentText: share.percentText,
