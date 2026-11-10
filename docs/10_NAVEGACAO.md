@@ -2,6 +2,8 @@
 
 09/10/2026. Junta quatro análises independentes (mapa das telas com medidas, princípios de usabilidade, tarefas feitas por pessoas fictícias do público e comparação com outros apps de finanças). As medidas vêm da versão web de demonstração, em celular de 360 × 640 e de 390 × 844 (`nav_audit/m360x640/report.txt`, `m390x844/report.txt`, `measure.out`, capturas em `nav_audit/m360x640/` e `nav_audit/shots/`). Nada foi alterado no app.
 
+> **Situação em 10/11/2026 (D-091):** os itens que a D-039 não tratou foram conferidos no código e feitos: A3, A4, A10, A13, A14, A15, A16, A18 (só o fim da renda comprometida), A20 (falta só o nome da calculadora da reserva, com Enzo), A22, A23 e A25. Ficam como estão: A19, A24, B3 e B5. B4 já estava feito e B6 deixou de valer.
+>
 > **Situação em 10/10/2026: a navegação foi implementada e está registrada em D-039 (`docs/00`).** O texto abaixo é a proposta de 09/10/2026, mantida como registro; onde ele diz "hoje", leia a situação de antes da entrega. Enzo respondeu "Sim" a B1 e a B2 e pediu a barra inferior nas telas de consulta.
 >
 > **Entregue (D-039):**
