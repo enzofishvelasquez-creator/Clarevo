@@ -2,9 +2,11 @@
  * Compra da assinatura pelas lojas (D-090), no iPhone e no Android, pelo SDK do RevenueCat (`react-native-purchases`). A versão web
  * (`store-purchases.web.ts`) não tem nada disso: na web a assinatura é pelo Asaas (D-084), e o pacote nativo fica fora do site.
  *
- * O SDK só é configurado quando a pessoa toca em assinar, mudar de plano ou "Restaurar compras", já com o identificador da conta da
- * Clarevo (o mesmo `persons.id`, um código aleatório; nunca nome nem e-mail): quem só olha os planos não aparece no RevenueCat. Sem
- * coleta de identificadores do aparelho. As chaves públicas do SDK (uma por loja, `EXPO_PUBLIC_REVENUECAT_IOS_KEY` e
+ * O SDK é configurado, já com o identificador da conta da Clarevo (o mesmo `persons.id`, um código aleatório; nunca nome nem e-mail),
+ * quando a pessoa toca em assinar, mudar de plano ou "Restaurar compras" e, depois disso, a cada abertura do app (`warmUpStore`): a
+ * compra que termina fora da tela (pagamento pendente que a loja confirma depois, assinatura refeita pela própria loja, envio que
+ * falhou) só chega ao RevenueCat, e no Google só é confirmada antes de a loja devolver o dinheiro, com o SDK configurado. Quem só olha
+ * os planos não aparece no RevenueCat. Sem coleta de identificadores do aparelho. As chaves públicas do SDK (uma por loja, `EXPO_PUBLIC_REVENUECAT_IOS_KEY` e
  * `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`, nos ambientes do EAS) são feitas para ir no app, como a chave pública do Supabase; sem elas,
  * os botões de assinar não aparecem. `EXPO_PUBLIC_STORE_TEST=sim` (só em builds de teste) mostra os botões antes de a compra abrir.
  */
@@ -17,6 +19,7 @@ import {
   type StorePurchaseResult,
   type StoreRestoreResult,
 } from '@clarevo/core';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Linking, Platform } from 'react-native';
 import Purchases, { PRODUCT_CATEGORY, PURCHASES_ERROR_CODE, STORE_REPLACEMENT_MODE } from 'react-native-purchases';
 
@@ -35,6 +38,27 @@ export const STORE_TEST = process.env.EXPO_PUBLIC_STORE_TEST === 'sim';
 let configured = false;
 let currentPerson: string | null = null;
 
+/** A marca, só neste aparelho e por pessoa, de que a loja já foi usada aqui (o SDK já foi configurado para ela). */
+const USED_PREFIX = 'clarevo:lojas-usadas:';
+
+/** Se a pessoa já usou a loja neste aparelho (tocou em assinar, mudar de plano ou restaurar). Sem armazenamento: não. */
+export async function storeUsedHere(personId: string): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(USED_PREFIX + personId)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Esquece a marca (excluir a conta). */
+export async function forgetStoreUse(personId: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(USED_PREFIX + personId);
+  } catch {
+    // Sem armazenamento: nada a apagar.
+  }
+}
+
 /**
  * Configura o SDK na primeira vez, já com a pessoa; depois, troca de pessoa se outra conta entrou no mesmo aparelho (o SDK só é
  * configurado uma vez por abertura do app).
@@ -45,11 +69,24 @@ async function ready(personId: string): Promise<void> {
     Purchases.configure({ apiKey: KEY, appUserID: personId, automaticDeviceIdentifierCollectionEnabled: false });
     configured = true;
     currentPerson = personId;
-    return;
-  }
-  if (currentPerson !== personId) {
+  } else if (currentPerson !== personId) {
     await Purchases.logIn(personId);
     currentPerson = personId;
+  }
+  AsyncStorage.setItem(USED_PREFIX + personId, '1').catch(() => {});
+}
+
+/**
+ * Ao abrir o app, para quem já usou a loja (assinatura pela loja, ou a marca deste aparelho): configura o SDK, que entrega ao
+ * RevenueCat as compras que terminaram fora da tela. Para os outros, nada.
+ */
+export async function warmUpStore(personId: string, storeAccess: boolean): Promise<void> {
+  if (!STORE_PURCHASES_READY) return;
+  if (!storeAccess && !(await storeUsedHere(personId))) return;
+  try {
+    await ready(personId);
+  } catch {
+    // Sem rede ou sem a loja agora: a próxima abertura tenta de novo.
   }
 }
 

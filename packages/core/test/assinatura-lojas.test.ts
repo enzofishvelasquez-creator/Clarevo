@@ -44,6 +44,7 @@ const config: AssinaturaLojasConfig = {
   supabaseUrl: 'https://projeto.supabase.co',
   serviceKey: 'sb_secret_x',
   userApiKey: 'sb_publishable_x',
+  appUrl: 'https://app.clarevo.app.br',
 };
 
 /** Uma assinatura como a API v1 do RevenueCat a devolve em subscriber.subscriptions. */
@@ -148,6 +149,9 @@ describe('Assinatura pelas lojas (D-090): produtos e configuração', () => {
     expect(assinaturaLojasConfigFrom(env({ REVENUECAT_WEBHOOK_TOKEN: RC_KEY }))).toBeNull();
     expect(assinaturaLojasConfigFrom(env({ SUPABASE_URL: '' }))).toBeNull();
     expect(assinaturaLojasConfigFrom(env({ SUPABASE_SERVICE_ROLE_KEY: '' }))).toBeNull();
+    expect(assinaturaLojasConfigFrom(env({}))?.appUrl).toBe('https://app.clarevo.app.br');
+    expect(assinaturaLojasConfigFrom(env({ CLAREVO_APP_URL: 'http://localhost:8081/' }))?.appUrl).toBe('http://localhost:8081');
+    expect(assinaturaLojasConfigFrom(env({ CLAREVO_APP_URL: 'javascript:alert(1)' }))).toBeNull();
   });
 });
 
@@ -176,14 +180,19 @@ describe('Assinatura pelas lojas (D-090): o aviso e a validade', () => {
       }),
     );
     expect(subs).toHaveLength(3);
+    if (!subs) throw new Error('sem assinaturas');
     expect(subs[0]).toMatchObject({ product: 'clarevo_individual_mensal', plan: 'individual', provider: 'apple', expiresAt: new Date('2026-12-10T15:00:00Z'), sandbox: false });
     expect(subs[1]).toMatchObject({ plan: 'familiar', provider: 'google', graceUntil: new Date('2026-12-13T15:00:00Z'), sandbox: true });
     expect(subs[2]).toMatchObject({ plan: null, provider: null });
     expect(storeProviderOf('app_store')).toBe('apple');
     expect(storeProviderOf('play_store')).toBe('google');
     expect(storeProviderOf('rc_billing')).toBeNull();
-    expect(storeSubscriptionsFrom({})).toEqual([]);
-    expect(storeSubscriptionsFrom(null)).toEqual([]);
+    // Sem o cliente na resposta: inesperado (null, falha passageira). Cliente sem assinaturas: lista vazia.
+    expect(storeSubscriptionsFrom({})).toBeNull();
+    expect(storeSubscriptionsFrom(null)).toBeNull();
+    expect(storeSubscriptionsFrom({ subscriber: { original_app_user_id: ANA } })).toEqual([]);
+    const shared = storeSubscriptionsFrom(subscriber({ clarevo_familia_mensal: rcSub({ ownership_type: 'FAMILY_SHARED' }) }));
+    expect(shared?.[0]).toMatchObject({ familyShared: true, purchasedAt: new Date('2026-11-10T15:00:00Z') });
   });
 
   it('até quando vale: o período pago ou a tolerância da loja; o reembolso termina na data dele; outra loja não conta', () => {
@@ -194,23 +203,35 @@ describe('Assinatura pelas lojas (D-090): o aviso e a validade', () => {
       expiresAt: new Date('2026-12-10T15:00:00Z'),
       graceUntil: null,
       refundedAt: null,
+      purchasedAt: new Date('2026-11-10T15:00:00Z'),
+      familyShared: false,
       sandbox: false,
       ...extra,
     });
     expect(subscriptionEnd(s({}))).toEqual(new Date('2026-12-10T15:00:00Z'));
+    // Reembolso de um período passado (antes do início do atual) não corta a assinatura que continuou.
+    expect(subscriptionEnd(s({ refundedAt: new Date('2026-10-20T10:00:00Z') }))).toEqual(new Date('2026-12-10T15:00:00Z'));
     expect(subscriptionEnd(s({ graceUntil: new Date('2026-12-26T15:00:00Z') }))).toEqual(new Date('2026-12-26T15:00:00Z'));
     expect(subscriptionEnd(s({ refundedAt: new Date('2026-11-12T10:00:00Z') }))).toEqual(new Date('2026-11-12T10:00:00Z'));
     expect(subscriptionEnd(s({ expiresAt: new Date('2026-11-01T00:00:00Z'), refundedAt: new Date('2026-11-12T10:00:00Z') }))).toEqual(new Date('2026-11-01T00:00:00Z'));
-    expect(storeValidity([s({})], 'apple')).toEqual({ plan: 'individual', validUntil: new Date('2026-12-10T15:00:00Z') });
-    expect(storeValidity([s({})], 'google')).toBeNull();
-    // Na troca de plano, vale a de fim mais distante; empate fica com o Família.
-    const upgrade = [s({ expiresAt: new Date('2026-11-10T15:00:00Z') }), s({ product: STORE_PRODUCT_IDS.familiar, plan: 'familiar', expiresAt: new Date('2026-12-10T15:00:00Z') })];
-    expect(storeValidity(upgrade, 'apple')).toEqual({ plan: 'familiar', validUntil: new Date('2026-12-10T15:00:00Z') });
-    const tie = [s({}), s({ product: STORE_PRODUCT_IDS.familiar, plan: 'familiar' })];
-    expect(storeValidity(tie, 'apple')?.plan).toBe('familiar');
-    // Terminada: o direito acaba na data do fim; produto de fora não conta.
-    expect(storeValidity([s({ expiresAt: new Date('2026-10-10T15:00:00Z') })], 'apple')?.validUntil).toEqual(new Date('2026-10-10T15:00:00Z'));
-    expect(storeValidity([s({ plan: null, product: 'outro' })], 'apple')).toBeNull();
+    expect(storeValidity([s({})], 'apple', NOW)).toEqual({ plan: 'individual', validUntil: new Date('2026-12-10T15:00:00Z') });
+    expect(storeValidity([s({})], 'google', NOW)).toBeNull();
+    const familia = (extra: Partial<StoreSubscription>) => s({ product: STORE_PRODUCT_IDS.familiar, plan: 'familiar', ...extra });
+    // Troca para o Família no Google, com o tempo que sobrou descontado: o Família novo termina antes do Individual antigo, e vale o Família.
+    const upgrade = [s({ expiresAt: new Date('2026-12-10T15:00:00Z') }), familia({ expiresAt: new Date('2026-11-22T15:00:00Z') })];
+    expect(storeValidity(upgrade, 'apple', NOW)).toEqual({ plan: 'familiar', validUntil: new Date('2026-11-22T15:00:00Z') });
+    // Volta para o Individual na renovação: o Família vale até o fim dele.
+    const downgrade = [familia({ expiresAt: new Date('2026-11-20T15:00:00Z') }), s({ expiresAt: new Date('2026-12-20T15:00:00Z') })];
+    expect(storeValidity(downgrade, 'apple', NOW)).toEqual({ plan: 'familiar', validUntil: new Date('2026-11-20T15:00:00Z') });
+    // Família já terminado e Individual valendo: Individual.
+    const after = [familia({ expiresAt: new Date('2026-11-01T15:00:00Z') }), s({})];
+    expect(storeValidity(after, 'apple', NOW)).toEqual({ plan: 'individual', validUntil: new Date('2026-12-10T15:00:00Z') });
+    // Compartilhamento Familiar da Apple não dá direito.
+    expect(storeValidity([familia({ familyShared: true })], 'apple', NOW)).toBeNull();
+    // Terminada: o direito acaba na data do fim (a última); produto de fora não conta.
+    const ended = [s({ expiresAt: new Date('2026-10-10T15:00:00Z') }), familia({ expiresAt: new Date('2026-09-10T15:00:00Z') })];
+    expect(storeValidity(ended, 'apple', NOW)).toEqual({ plan: 'individual', validUntil: new Date('2026-10-10T15:00:00Z') });
+    expect(storeValidity([s({ plan: null, product: 'outro' })], 'apple', NOW)).toBeNull();
   });
 
   it('o identificador no banco é o resumo de "revenuecat:<pessoa>", o mesmo em maiúsculas e minúsculas', () => {
@@ -323,6 +344,52 @@ describe('Assinatura pelas lojas (D-090): a função, avisos do RevenueCat', () 
     expect((await createAssinaturaLojasHandler({ config, fetch: offline, now: () => NOW })(webhookReq(rcEvent()))).status).toBe(500);
   });
 
+  it('resposta inesperada do RevenueCat (404, sem o cliente, corpo que não é JSON) e corpo cortado no meio são passageiros: 500, nada encerrado', async () => {
+    const prev = { [`apple:${storeExternalRef(ANA)}`]: { person_id: ANA, plan: 'individual' } };
+    const cases: Record<string, Answer>[] = [
+      { [`GET /v1/subscribers/${ANA}`]: () => ({ status: 404, body: {} }) },
+      { [`GET /v1/subscribers/${ANA}`]: () => ({ status: 200, body: { request_date_ms: 1 } }) },
+      { [`GET /v1/subscribers/${ANA}`]: () => ({ status: 200, body: '<html>erro</html>' }) },
+    ];
+    for (const answer of cases) {
+      const base = db({ previous: prev });
+      const h = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...base.answers, ...answer }).fetcher, now: () => NOW });
+      expect((await h(webhookReq(rcEvent()))).status).toBe(500);
+      expect(base.applied).toEqual([]);
+    }
+    const cut: StoreHttpFetch = async () => ({ status: 200, text: async () => Promise.reject(new Error('cortado')) });
+    expect((await createAssinaturaLojasHandler({ config, fetch: cut, now: () => NOW })(webhookReq(rcEvent()))).status).toBe(500);
+  });
+
+  it('chave do banco recusada (401, 403) e falha ao procurar o direito anterior são passageiras: 500', async () => {
+    for (const status of [401, 403]) {
+      const net = fakeNet({ ...rcAnswer(ANA, { clarevo_individual_mensal: rcSub() }), 'POST /rest/v1/rpc/billing_apply': () => ({ status, body: {} }) });
+      const h = createAssinaturaLojasHandler({ config, fetch: net.fetcher, now: () => NOW });
+      expect((await h(webhookReq(rcEvent()))).status, String(status)).toBe(500);
+    }
+    const lookupFails = fakeNet({ ...rcAnswer(ANA, {}), 'POST /rest/v1/rpc/billing_person_by_external_ref': () => ({ status: 400, body: {} }) });
+    const h = createAssinaturaLojasHandler({ config, fetch: lookupFails.fetcher, now: () => NOW });
+    expect((await h(webhookReq(rcEvent()))).status).toBe(500);
+  });
+
+  it('conta já excluída com assinatura ainda na loja: o aviso apaga a pessoa no RevenueCat', async () => {
+    const gone = db({ result: 'sem_pessoa' });
+    const deleted: string[] = [];
+    const net = fakeNet({
+      ...gone.answers,
+      ...rcAnswer(ANA, { clarevo_individual_mensal: rcSub() }),
+      [`DELETE /v1/subscribers/${ANA}`]: () => {
+        deleted.push(ANA);
+        return { status: 200, body: {} };
+      },
+    });
+    const h = createAssinaturaLojasHandler({ config, fetch: net.fetcher, now: () => NOW });
+    const res = await h(webhookReq(rcEvent({ type: 'RENEWAL' })));
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body).outcome).toEqual(['sem_pessoa']);
+    expect(deleted).toEqual([ANA]);
+  });
+
   it('recusa do banco e conta excluída respondem 200 (repetir não resolve), com o resultado no corpo', async () => {
     const refused = db({ status: 400 });
     const h = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...refused.answers, ...rcAnswer(ANA, { clarevo_individual_mensal: rcSub() }) }).fetcher, now: () => NOW });
@@ -330,7 +397,8 @@ describe('Assinatura pelas lojas (D-090): a função, avisos do RevenueCat', () 
     expect(r1.status).toBe(200);
     expect(JSON.parse(r1.body).outcome).toEqual(['recusado']);
     const gone = db({ result: 'sem_pessoa' });
-    const h2 = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...gone.answers, ...rcAnswer(ANA, { clarevo_individual_mensal: rcSub() }) }).fetcher, now: () => NOW });
+    const forgot: Record<string, Answer> = { [`DELETE /v1/subscribers/${ANA}`]: () => ({ status: 200, body: {} }) };
+    const h2 = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...gone.answers, ...forgot, ...rcAnswer(ANA, { clarevo_individual_mensal: rcSub() }) }).fetcher, now: () => NOW });
     expect(JSON.parse((await h2(webhookReq(rcEvent()))).body).outcome).toEqual(['sem_pessoa']);
   });
 
@@ -361,6 +429,10 @@ describe('Assinatura pelas lojas (D-090): a função, pedido do app', () => {
     expect(String(base.applied[0]?.p_event_id)).toMatch(/^rc-app:[0-9a-f]{40}$/);
     await h(appReq({ action: 'sincronizar' }));
     expect(base.applied[1]?.p_event_id).toBe(base.applied[0]?.p_event_id);
+    // Noutro minuto, o mesmo estado é um aviso novo (a volta a um estado anterior, depois de transferir e restaurar, não fica de fora).
+    const later = createAssinaturaLojasHandler({ config, fetch: net.fetcher, now: () => new Date(NOW.getTime() + 60_000) });
+    await later(appReq({ action: 'sincronizar' }));
+    expect(base.applied[2]?.p_event_id).not.toBe(base.applied[0]?.p_event_id);
   });
 
   it('sem compra nas lojas: "sem_compra"; sem sessão válida: 401; pedido errado: 400; RevenueCat fora: 503', async () => {
@@ -378,7 +450,7 @@ describe('Assinatura pelas lojas (D-090): a função, pedido do app', () => {
     expect(JSON.parse(r.body)).toEqual({ result: 'tente_de_novo' });
   });
 
-  it('"esquecer" (antes de excluir a conta) apaga a pessoa no RevenueCat só se ela já teve direito por alguma loja', async () => {
+  it('"esquecer" (antes de excluir a conta) apaga a pessoa no RevenueCat só se ela já usou a loja e não tem assinatura valendo', async () => {
     const deleted: string[] = [];
     const del: Record<string, Answer> = {
       [`DELETE /v1/subscribers/${ANA}`]: () => {
@@ -386,22 +458,46 @@ describe('Assinatura pelas lojas (D-090): a função, pedido do app', () => {
         return { status: 200, body: { app_user_id: ANA, deleted: true } };
       },
     };
+    // Nunca usou a loja: o RevenueCat nem é consultado.
     const never = db();
-    const h = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...never.answers, ...user(), ...del }).fetcher, now: () => NOW });
+    const nNet = fakeNet({ ...never.answers, ...user(), ...del });
+    const h = createAssinaturaLojasHandler({ config, fetch: nNet.fetcher, now: () => NOW });
     expect(JSON.parse((await h(appReq({ action: 'esquecer' }))).body)).toEqual({ result: 'sem_compra' });
-    expect(deleted).toEqual([]);
+    expect(nNet.sent.some((x) => x.url.startsWith(REVENUECAT_API_URL))).toBe(false);
     expect(never.lookups).toHaveLength(2);
+    // Teve direito por uma loja e a assinatura já terminou: apaga.
     const had = db({ previous: { [`google:${storeExternalRef(ANA)}`]: { person_id: ANA, plan: 'individual' } } });
-    const net = fakeNet({ ...had.answers, ...user(), ...del });
+    const ended = { 'clarevo_individual_mensal:mensal': rcSub({ store: 'play_store', expires_date: '2026-10-01T00:00:00Z' }) };
+    const net = fakeNet({ ...had.answers, ...user(), ...rcAnswer(ANA, ended), ...del });
     const h2 = createAssinaturaLojasHandler({ config, fetch: net.fetcher, now: () => NOW });
     expect(JSON.parse((await h2(appReq({ action: 'esquecer' }))).body)).toEqual({ result: 'esquecido' });
     expect(deleted).toEqual([ANA]);
     expect(net.sent.find((x) => x.method === 'DELETE')?.headers.Authorization).toBe(`Bearer ${RC_KEY}`);
+    // Assinatura ainda valendo: não apaga agora (o aviso seguinte, com a conta excluída, apaga).
+    const live = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...had.answers, ...user(), ...rcAnswer(ANA, { clarevo_individual_mensal: rcSub() }), ...del }).fetcher, now: () => NOW });
+    expect(JSON.parse((await live(appReq({ action: 'esquecer' }))).body)).toEqual({ result: 'ativa' });
+    expect(deleted).toEqual([ANA]);
+    // Sem direito no banco, mas o app diz que usou a loja neste aparelho (tocou em assinar ou restaurar): apaga.
+    const seen = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...db().answers, ...user(), ...rcAnswer(ANA, {}), ...del }).fetcher, now: () => NOW });
+    expect(JSON.parse((await seen(appReq({ action: 'esquecer', visto: true }))).body)).toEqual({ result: 'esquecido' });
+    expect(deleted).toEqual([ANA, ANA]);
     // Já apagada no RevenueCat: tudo bem. RevenueCat fora: tente de novo (a exclusão da conta segue no app mesmo assim).
-    const gone = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...had.answers, ...user(), [`DELETE /v1/subscribers/${ANA}`]: () => ({ status: 404, body: {} }) }).fetcher, now: () => NOW });
+    const gone = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...had.answers, ...user(), ...rcAnswer(ANA, ended), [`DELETE /v1/subscribers/${ANA}`]: () => ({ status: 404, body: {} }) }).fetcher, now: () => NOW });
     expect(JSON.parse((await gone(appReq({ action: 'esquecer' }))).body)).toEqual({ result: 'esquecido' });
-    const down = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...had.answers, ...user(), [`DELETE /v1/subscribers/${ANA}`]: () => ({ status: 503, body: {} }) }).fetcher, now: () => NOW });
+    const down = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...had.answers, ...user(), ...rcAnswer(ANA, ended), [`DELETE /v1/subscribers/${ANA}`]: () => ({ status: 503, body: {} }) }).fetcher, now: () => NOW });
     expect((await down(appReq({ action: 'esquecer' }))).status).toBe(503);
+  });
+
+  it('o app na web recebe os cabeçalhos de CORS (para "esquecer" antes de excluir a conta); outra origem, não', async () => {
+    const h = createAssinaturaLojasHandler({ config, fetch: fakeNet({ ...db().answers, ...user() }).fetcher, now: () => NOW });
+    const pre = await h(request({ method: 'OPTIONS', headers: { Origin: 'https://app.clarevo.app.br' } }));
+    expect(pre.status).toBe(204);
+    expect(pre.headers['Access-Control-Allow-Origin']).toBe('https://app.clarevo.app.br');
+    expect(pre.headers['Access-Control-Allow-Headers']).toContain('authorization');
+    const post = await h(request({ headers: { Authorization: `Bearer ${JWT}`, Origin: 'https://app.clarevo.app.br' }, body: JSON.stringify({ action: 'esquecer' }) }));
+    expect(post.headers['Access-Control-Allow-Origin']).toBe('https://app.clarevo.app.br');
+    const other = await h(request({ method: 'OPTIONS', headers: { Origin: 'https://outro.site' } }));
+    expect(other.headers['Access-Control-Allow-Origin']).toBeUndefined();
   });
 
   it('a resposta lida pelo app: o que não é conhecido vira "tente_de_novo"', () => {
@@ -417,15 +513,14 @@ describe('Assinatura pelas lojas (D-090): a função, pedido do app', () => {
 });
 
 describe('Assinatura pelas lojas (D-090): a tela', () => {
-  it('assinar pela loja aparece no teste, em só leitura e para quem está coberto pela Família; antes do lançamento, só no teste da equipe', () => {
-    expect(canSubscribeInStore('teste', false)).toBe(true);
-    expect(canSubscribeInStore('leitura', false)).toBe(true);
-    expect(canSubscribeInStore('familia', false)).toBe(true);
-    expect(canSubscribeInStore('pre_lancamento', false)).toBe(false);
-    expect(canSubscribeInStore('pre_lancamento', true)).toBe(true);
-    expect(canSubscribeInStore('assinatura', true)).toBe(false);
-    expect(canSubscribeInStore('beneficio', true)).toBe(false);
-    expect(canSubscribeInStore('cortesia', true)).toBe(false);
+  it('assinar pela loja aparece antes do início da cobrança (a revisão das lojas), no teste, em só leitura e para quem está coberto pela Família', () => {
+    expect(canSubscribeInStore('pre_lancamento')).toBe(true);
+    expect(canSubscribeInStore('teste')).toBe(true);
+    expect(canSubscribeInStore('leitura')).toBe(true);
+    expect(canSubscribeInStore('familia')).toBe(true);
+    expect(canSubscribeInStore('assinatura')).toBe(false);
+    expect(canSubscribeInStore('beneficio')).toBe(false);
+    expect(canSubscribeInStore('cortesia')).toBe(false);
   });
 
   it('gerenciar e mudar de plano só para a assinatura desta loja', () => {

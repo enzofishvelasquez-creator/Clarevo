@@ -19,11 +19,11 @@ export type StoreName = 'apple' | 'google';
 export type StoreSync = 'sincronizado' | 'sem_compra' | 'indisponivel' | 'tente_de_novo';
 
 /** O que a função devolve ao app em "esquecer" (antes de excluir a conta). */
-export type StoreForget = 'esquecido' | 'sem_compra' | 'indisponivel' | 'tente_de_novo';
+export type StoreForget = 'esquecido' | 'ativa' | 'sem_compra' | 'indisponivel' | 'tente_de_novo';
 
 export function parseStoreForget(raw: unknown): StoreForget {
   const result = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).result : null;
-  return result === 'esquecido' || result === 'sem_compra' || result === 'indisponivel' ? result : 'tente_de_novo';
+  return result === 'esquecido' || result === 'ativa' || result === 'sem_compra' || result === 'indisponivel' ? result : 'tente_de_novo';
 }
 
 export function parseStoreSync(raw: unknown): StoreSync {
@@ -45,9 +45,13 @@ export type StorePurchaseResult =
 /** O resultado de "Restaurar compras". */
 export type StoreRestoreResult = 'restaurado' | 'nada' | 'rede' | 'indisponivel' | 'tente_de_novo';
 
-/** Situações em que a tela oferece assinar pela loja: no teste, em só leitura e coberta pelo Plano Família de outra pessoa. */
-export function canSubscribeInStore(status: AccessStatus, storeTest: boolean): boolean {
-  return status === 'teste' || status === 'leitura' || status === 'familia' || (storeTest && status === 'pre_lancamento');
+/**
+ * Situações em que a tela oferece assinar pela loja (com a compra aberta): antes do início da cobrança, no teste, em só leitura e
+ * coberta pelo Plano Família de outra pessoa. Antes do início da cobrança também, porque a revisão da Apple e do Google acontece antes
+ * do lançamento e precisa achar a compra (a conta de teste da revisão está nessa situação até a cobrança começar).
+ */
+export function canSubscribeInStore(status: AccessStatus): boolean {
+  return status === 'pre_lancamento' || status === 'teste' || status === 'leitura' || status === 'familia';
 }
 
 /** A assinatura da pessoa é desta loja (e então se gerencia e se troca de plano por aqui). */

@@ -862,8 +862,11 @@ export interface RecordsRepository {
 
   /** "sincronizar": depois de uma compra ou de "Restaurar compras", consulta o RevenueCat e atualiza o direito da pessoa no banco. */
   syncStoreSubscription(): Promise<StoreSync>;
-  /** "esquecer": antes de excluir a conta, apaga a pessoa no RevenueCat, se ela já teve assinatura por alguma loja. Em qualquer plataforma. */
-  forgetStoreCustomer(): Promise<StoreForget>;
+  /**
+   * "esquecer": antes de excluir a conta, apaga a pessoa no RevenueCat, se ela já teve assinatura por alguma loja ou usou a loja neste
+   * aparelho (`usedHere`) e a assinatura da loja já não vale. Em qualquer plataforma.
+   */
+  forgetStoreCustomer(usedHere: boolean): Promise<StoreForget>;
 
   // Aceite dos termos e da política (A1, migração 0024).
 

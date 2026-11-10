@@ -19,3 +19,11 @@ export async function restorePurchases(_personId: string): Promise<StoreRestoreR
 export async function openStoreSubscriptions(): Promise<boolean> {
   return false;
 }
+
+export async function storeUsedHere(_personId: string): Promise<boolean> {
+  return false;
+}
+
+export async function forgetStoreUse(_personId: string): Promise<void> {}
+
+export async function warmUpStore(_personId: string, _storeAccess: boolean): Promise<void> {}

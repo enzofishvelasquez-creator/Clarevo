@@ -3198,8 +3198,8 @@ export class SupabaseRepository implements RecordsRepository {
   }
 
   /** Antes de excluir a conta (D-090): a função apaga a pessoa no RevenueCat, se ela já teve assinatura por alguma loja. */
-  async forgetStoreCustomer(): Promise<StoreForget> {
-    const { data, error } = await this.db.functions.invoke(STORE_SUBSCRIPTION_FUNCTION, { body: { action: 'esquecer' } });
+  async forgetStoreCustomer(usedHere: boolean): Promise<StoreForget> {
+    const { data, error } = await this.db.functions.invoke(STORE_SUBSCRIPTION_FUNCTION, { body: { action: 'esquecer', visto: usedHere } });
     return parseStoreForget(error ? await functionErrorBody(error) : data);
   }
 

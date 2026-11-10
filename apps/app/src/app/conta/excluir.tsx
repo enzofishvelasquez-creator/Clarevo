@@ -18,7 +18,7 @@ import { SubHeader } from '@/components/header';
 import { Banner, Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { forgetDevice } from '@/lib/device-forget';
 import { signOutIntent } from '@/lib/nav';
-import { DEVICE_STORE, openStoreSubscriptions } from '@/lib/store-purchases';
+import { DEVICE_STORE, openStoreSubscriptions, storeUsedHere } from '@/lib/store-purchases';
 import { useAccess } from '@/state/access';
 import { useDeleteAccount } from '@/state/account';
 import { useFamily } from '@/state/family';
@@ -79,9 +79,9 @@ export default function ExcluirContaScreen() {
         return;
       }
     }
-    // Assinatura que já passou por uma loja (D-090): a função apaga a pessoa no RevenueCat antes. Sem trava: se falhar, a conta sai do
-    // mesmo jeito (no RevenueCat fica só o código aleatório da conta, sem ligação com ninguém depois da exclusão).
-    await repo.forgetStoreCustomer().catch(() => 'tente_de_novo' as const);
+    // Quem já usou uma loja (D-090): a função apaga a pessoa no RevenueCat antes, se a assinatura da loja já não vale (valendo, o
+    // próximo aviso da loja, com a conta excluída, apaga). Sem trava: se falhar, a conta sai do mesmo jeito.
+    await repo.forgetStoreCustomer(user ? await storeUsedHere(user.id) : false).catch(() => 'tente_de_novo' as const);
     const r = await deleteAccount(DELETE_CONFIRMATION_WORD);
     if (!r.ok) {
       setBusy(false);

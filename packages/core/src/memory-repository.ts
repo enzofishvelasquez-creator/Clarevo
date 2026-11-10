@@ -4620,7 +4620,7 @@ export class MemoryRepository implements RecordsRepository {
     return 'indisponivel';
   }
 
-  async forgetStoreCustomer(): Promise<StoreForget> {
+  async forgetStoreCustomer(_usedHere: boolean): Promise<StoreForget> {
     return 'indisponivel';
   }
 }

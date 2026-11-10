@@ -213,15 +213,16 @@ function StoreLegalLinks() {
 /**
  * Os botões de assinar pela loja (D-090), no iPhone e no Android: a compra abre a folha da App Store ou do Google Play, e depois a
  * função do servidor sincroniza. Antes, o preço, a renovação mensal automática e como cancelar, com os Termos e a Política; depois,
- * "Restaurar compras". Só para quem pode assinar (teste, só leitura ou coberta pelo Plano Família de outra pessoa) e com a chave do
- * RevenueCat no build. Na web nada disto aparece.
+ * "Restaurar compras". Só para quem pode assinar (antes do início da cobrança, no teste, em só leitura ou coberta pelo Plano Família de
+ * outra pessoa), com a chave do RevenueCat e o endereço do site no build. Na web nada disto aparece.
  */
 function StoreSubscribeButtons({ access }: { access: Access }) {
   const { user } = useSession();
   const followUp = useStoreFollowUp();
   const [busy, setBusy] = useState<PlanKind | 'restaurar' | null>(null);
   const [msg, setMsg] = useState<StoreMsg>(null);
-  if (!DEVICE_STORE || !STORE_PURCHASES_READY || !user || !canSubscribeInStore(access.status, STORE_TEST)) return null;
+  // Sem o endereço do site não há os links dos Termos e da Política, que as lojas pedem junto da compra: sem eles, sem os botões.
+  if (!DEVICE_STORE || !STORE_PURCHASES_READY || !SITE_URL || !user || !canSubscribeInStore(access.status)) return null;
   const store = DEVICE_STORE;
   const subscribe = async (plan: PlanKind) => {
     if (busy) return;

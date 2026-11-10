@@ -12,8 +12,9 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.StoreTransientError = exports.STORE_PROVIDERS = exports.STORE_CALL_TIMEOUT_MS = exports.STORE_REQUEST_BUDGET_MS = exports.STORE_MAX_CUSTOMERS_PER_EVENT = exports.STORE_APP_MAX_BODY_BYTES = exports.STORE_WEBHOOK_MAX_BODY_BYTES = exports.REVENUECAT_WEBHOOK_TOKEN_PATTERN = exports.REVENUECAT_SECRET_PREFIX = exports.REVENUECAT_API_URL = void 0;
+    exports.StoreTransientError = exports.STORE_PROVIDERS = exports.STORE_APP_URL_DEFAULT = exports.STORE_CALL_TIMEOUT_MS = exports.STORE_REQUEST_BUDGET_MS = exports.STORE_MAX_CUSTOMERS_PER_EVENT = exports.STORE_APP_MAX_BODY_BYTES = exports.STORE_WEBHOOK_MAX_BODY_BYTES = exports.REVENUECAT_WEBHOOK_TOKEN_PATTERN = exports.REVENUECAT_SECRET_PREFIX = exports.REVENUECAT_API_URL = void 0;
     exports.assinaturaLojasConfigFrom = assinaturaLojasConfigFrom;
+    exports.storeCorsHeaders = storeCorsHeaders;
     exports.revenueCatEventFrom = revenueCatEventFrom;
     exports.storeProviderOf = storeProviderOf;
     exports.storeSubscriptionsFrom = storeSubscriptionsFrom;
@@ -32,6 +33,7 @@ const __mods = [
     exports.STORE_MAX_CUSTOMERS_PER_EVENT = 4;
     exports.STORE_REQUEST_BUDGET_MS = 20000;
     exports.STORE_CALL_TIMEOUT_MS = 4000;
+    exports.STORE_APP_URL_DEFAULT = 'https://app.clarevo.app.br';
     exports.STORE_PROVIDERS = ['apple', 'google'];
     function assinaturaLojasConfigFrom(env) {
         const v = (name) => (env(name) ?? '').trim();
@@ -46,7 +48,23 @@ const __mods = [
         if (supabaseUrl === '' || serviceKey === '')
             return null;
         const userApiKey = v('SUPABASE_PUBLISHABLE_KEY') || v('SUPABASE_ANON_KEY') || serviceKey;
-        return { revenueCatKey, webhookToken, supabaseUrl, serviceKey, userApiKey };
+        const appUrl = (v('CLAREVO_APP_URL') || exports.STORE_APP_URL_DEFAULT).replace(/\/+$/, '');
+        if (!/^https:\/\/[a-z0-9.-]+$/.test(appUrl) && !/^http:\/\/localhost(:\d+)?$/.test(appUrl))
+            return null;
+        return { revenueCatKey, webhookToken, supabaseUrl, serviceKey, userApiKey, appUrl };
+    }
+    function storeCorsHeaders(origin, appUrl) {
+        if (origin === null)
+            return {};
+        if (origin !== appUrl && !/^http:\/\/localhost(:\d+)?$/.test(origin))
+            return {};
+        return {
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Max-Age': '86400',
+            Vary: 'Origin',
+        };
     }
     const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const text = (v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
@@ -91,7 +109,10 @@ const __mods = [
         return null;
     }
     function storeSubscriptionsFrom(raw) {
-        const subs = (0, servidor_comum_1.obj)((0, servidor_comum_1.obj)((0, servidor_comum_1.obj)(raw)?.subscriber)?.subscriptions);
+        const subscriber = (0, servidor_comum_1.obj)((0, servidor_comum_1.obj)(raw)?.subscriber);
+        if (!subscriber)
+            return null;
+        const subs = (0, servidor_comum_1.obj)(subscriber.subscriptions);
         if (!subs)
             return [];
         const out = [];
@@ -106,6 +127,8 @@ const __mods = [
                 expiresAt: date(s.expires_date),
                 graceUntil: date(s.grace_period_expires_date),
                 refundedAt: date(s.refunded_at),
+                purchasedAt: date(s.purchase_date),
+                familyShared: s.ownership_type === 'FAMILY_SHARED',
                 sandbox: s.is_sandbox === true,
             });
         }
@@ -114,27 +137,31 @@ const __mods = [
     function subscriptionEnd(s) {
         const paid = [s.expiresAt, s.graceUntil].filter((d) => d !== null);
         const end = paid.length > 0 ? new Date(Math.max(...paid.map((d) => d.getTime()))) : null;
-        if (s.refundedAt)
-            return end && end.getTime() < s.refundedAt.getTime() ? end : s.refundedAt;
+        const refund = s.refundedAt && !(s.purchasedAt && s.refundedAt.getTime() < s.purchasedAt.getTime()) ? s.refundedAt : null;
+        if (refund)
+            return end && end.getTime() < refund.getTime() ? end : refund;
         return end;
     }
-    function storeValidity(subs, provider) {
-        let best = null;
+    function storeValidity(subs, provider, now) {
+        const ends = [];
         for (const s of subs) {
-            if (s.provider !== provider || !s.plan)
+            if (s.provider !== provider || !s.plan || s.familyShared)
                 continue;
             const end = subscriptionEnd(s);
-            if (!end)
-                continue;
-            const better = !best ||
-                end.getTime() > best.end.getTime() ||
-                (end.getTime() === best.end.getTime() && s.plan === 'familiar' && best.plan !== 'familiar');
-            if (better)
-                best = { plan: s.plan, end };
+            if (end)
+                ends.push({ plan: s.plan, end });
         }
-        if (!best)
+        if (ends.length === 0)
             return null;
-        return { plan: best.plan, validUntil: best.end };
+        const latest = (list) => list.reduce((a, b) => (b.end.getTime() > a.end.getTime() ? b : a));
+        const active = ends.filter((e) => e.end.getTime() > now.getTime());
+        if (active.length === 0) {
+            const last = latest(ends);
+            return { plan: last.plan, validUntil: last.end };
+        }
+        const family = active.filter((e) => e.plan === 'familiar');
+        const chosen = latest(family.length > 0 ? family : active);
+        return { plan: chosen.plan, validUntil: chosen.end };
     }
     function storeExternalRef(personId) {
         return (0, sha256_1.sha256Hex)(`revenuecat:${personId.toLowerCase()}`);
@@ -164,14 +191,13 @@ const __mods = [
     function clients(config, fetcher, timeLeft) {
         const call = async (what, url, init) => {
             const timeoutMs = timeLeft();
-            let res;
+            let out;
             try {
-                res = await fetcher(url, { ...init, timeoutMs });
+                out = await readJson(await fetcher(url, { ...init, timeoutMs }));
             }
             catch {
                 throw new StoreTransientError(`${what} indisponível`);
             }
-            const out = await readJson(res);
             if (out.status >= 500)
                 throw new StoreTransientError(`${what} respondeu ${out.status}`);
             return out;
@@ -182,11 +208,12 @@ const __mods = [
                     method: 'GET',
                     headers: { Authorization: `Bearer ${config.revenueCatKey}`, Accept: 'application/json' },
                 });
-                if (r.status === 404)
-                    return [];
                 if (r.status !== 200)
                     throw new StoreTransientError(`RevenueCat respondeu ${r.status}`);
-                return storeSubscriptionsFrom(r.json);
+                const subs = storeSubscriptionsFrom(r.json);
+                if (!subs)
+                    throw new StoreTransientError('RevenueCat respondeu sem o cliente');
+                return subs;
             },
             forget: async (personId) => {
                 const r = await call('RevenueCat', `${exports.REVENUECAT_API_URL}/subscribers/${encodeURIComponent(personId)}`, {
@@ -196,7 +223,12 @@ const __mods = [
                 if (r.status !== 200 && r.status !== 404)
                     throw new StoreTransientError(`RevenueCat respondeu ${r.status}`);
             },
-            rpcService: (fn, args) => call(fn, `${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: (0, servidor_comum_1.serviceHeaders)(config.serviceKey), body: JSON.stringify(args) }),
+            rpcService: async (fn, args) => {
+                const r = await call(fn, `${config.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: (0, servidor_comum_1.serviceHeaders)(config.serviceKey), body: JSON.stringify(args) });
+                if (r.status === 401 || r.status === 403)
+                    throw new StoreTransientError(`banco recusou a chave em ${fn} (${r.status})`);
+                return r;
+            },
             userId: async (jwt) => {
                 const r = await call('auth', `${config.supabaseUrl}/auth/v1/user`, { method: 'GET', headers: { apikey: config.userApiKey, Authorization: `Bearer ${jwt}` } });
                 const id = text((0, servidor_comum_1.obj)(r.json)?.id);
@@ -205,8 +237,8 @@ const __mods = [
         };
     }
     const JSON_TYPE = 'application/json; charset=utf-8';
-    function json(status, body) {
-        return { status, body: JSON.stringify(body), headers: { 'Content-Type': JSON_TYPE } };
+    function json(status, body, extra = {}) {
+        return { status, body: JSON.stringify(body), headers: { 'Content-Type': JSON_TYPE, ...extra } };
     }
     function createAssinaturaLojasHandler(deps) {
         const log = deps.log ?? (() => { });
@@ -217,21 +249,24 @@ const __mods = [
             const ref = storeExternalRef(personId);
             const outcomes = [];
             for (const provider of exports.STORE_PROVIDERS) {
-                let validity = storeValidity(subs, provider);
+                let validity = storeValidity(subs, provider, now());
                 let ended = false;
                 if (!validity) {
                     const found = await c.rpcService('billing_person_by_external_ref', { p_provider: provider, p_external_ref: ref });
+                    if (found.status !== 200)
+                        throw new StoreTransientError(`banco respondeu ${found.status}`);
                     const row = (0, servidor_comum_1.obj)(found.json);
                     const plan = row?.plan;
-                    if (found.status !== 200 || text(row?.person_id)?.toLowerCase() !== personId || (plan !== 'individual' && plan !== 'familiar'))
+                    if (text(row?.person_id)?.toLowerCase() !== personId || (plan !== 'individual' && plan !== 'familiar'))
                         continue;
                     validity = { plan, validUntil: now() };
                     ended = true;
                 }
                 const tag = (0, sha256_1.sha256Hex)(`${personId}:${provider}`).slice(0, 16);
+                const minute = now().toISOString().slice(0, 16);
                 const id = eventId
                     ? `rc:${eventId}:${tag}`
-                    : `rc-app:${(0, sha256_1.sha256Hex)(`${personId}:${provider}:${validity.plan}:${ended ? 'fim' : validity.validUntil.toISOString()}`).slice(0, 40)}`;
+                    : `rc-app:${(0, sha256_1.sha256Hex)(`${personId}:${provider}:${validity.plan}:${ended ? 'fim' : validity.validUntil.toISOString()}:${minute}`).slice(0, 40)}`;
                 const applied = await c.rpcService('billing_apply', {
                     p_event_id: id,
                     p_provider: provider,
@@ -249,6 +284,8 @@ const __mods = [
                 const result = (0, servidor_comum_1.obj)(applied.json)?.result;
                 outcomes.push(result === 'sem_pessoa' ? 'sem_pessoa' : result === 'aplicado' ? (ended ? 'encerrado' : 'aplicado') : 'sem_mudanca');
             }
+            if (outcomes.includes('sem_pessoa'))
+                await c.forget(personId);
             return outcomes;
         }
         async function webhook(c, req) {
@@ -280,8 +317,8 @@ const __mods = [
                 return json(200, { received: true, outcome: 'recusado' });
             }
         }
-        async function app(c, req, jwt) {
-            const reply = (status, result) => json(status, { result });
+        async function app(c, req, jwt, cors) {
+            const reply = (status, result) => json(status, { result }, cors);
             if (Number(req.header('content-length') ?? 0) > exports.STORE_APP_MAX_BODY_BYTES)
                 return reply(413, 'pedido_invalido');
             const body = await req.body();
@@ -300,7 +337,7 @@ const __mods = [
                     return reply(401, 'nao_autenticado');
                 if (payload?.action === 'esquecer') {
                     const ref = storeExternalRef(personId);
-                    let seen = false;
+                    let seen = payload.visto === true;
                     for (const provider of exports.STORE_PROVIDERS) {
                         const found = await c.rpcService('billing_person_by_external_ref', { p_provider: provider, p_external_ref: ref });
                         if (found.status !== 200)
@@ -310,6 +347,9 @@ const __mods = [
                     }
                     if (!seen)
                         return reply(200, 'sem_compra');
+                    const subs = await c.subscriber(personId);
+                    if (exports.STORE_PROVIDERS.some((p) => (storeValidity(subs, p, now())?.validUntil.getTime() ?? 0) > now().getTime()))
+                        return reply(200, 'ativa');
                     await c.forget(personId);
                     return reply(200, 'esquecido');
                 }
@@ -326,14 +366,15 @@ const __mods = [
             }
         }
         return async (req) => {
+            const cors = storeCorsHeaders(req.header('origin'), config?.appUrl ?? exports.STORE_APP_URL_DEFAULT);
             if (req.method === 'OPTIONS')
-                return { status: 204, body: '', headers: {} };
+                return { status: 204, body: '', headers: cors };
             if (!config) {
                 log('configuração incompleta: faltam segredos da função');
-                return json(503, { result: 'indisponivel' });
+                return json(503, { result: 'indisponivel' }, cors);
             }
             if (req.method !== 'POST')
-                return json(405, { result: 'metodo_nao_aceito' });
+                return json(405, { result: 'metodo_nao_aceito' }, cors);
             const timeLeft = timeBudget(now().getTime(), () => now().getTime());
             const c = clients(config, deps.fetch, timeLeft);
             const auth = (req.header('authorization') ?? '').trim();
@@ -341,8 +382,8 @@ const __mods = [
             if (bearer !== '' && (0, servidor_comum_1.sameText)(bearer, config.webhookToken))
                 return webhook(c, req);
             if (!/^Bearer\s+\S+$/i.test(auth))
-                return json(401, { result: 'nao_autenticado' });
-            return app(c, req, bearer);
+                return json(401, { result: 'nao_autenticado' }, cors);
+            return app(c, req, bearer, cors);
         };
     }
   },
