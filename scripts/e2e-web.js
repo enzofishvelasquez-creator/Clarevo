@@ -14417,7 +14417,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     r = await gridRadios();
     ok('D-092 Nova meta: "Moto" preenche o nome, fica marcada, mostra a imagem da moto (não a do carro) e o que costuma entrar na conta',
       (await field('Nome da meta').inputValue()) === 'Moto' && JSON.stringify((r || []).find((x) => x[0] === 'Moto')) === JSON.stringify(['Moto', 'true']) &&
-        (await p.getByRole('img', { name: 'Imagem: Moto' }).filter({ visible: true }).count()) === 1 && (await p.getByRole('img', { name: 'Carro na estrada' }).filter({ visible: true }).count()) === 0 &&
+        (await p.getByRole('img', { name: 'Moto estacionada ao pôr do sol' }).filter({ visible: true }).count()) === 1 && (await p.getByRole('img', { name: 'Carro na estrada' }).filter({ visible: true }).count()) === 0 &&
         t.includes('O que costuma entrar na conta') && t.includes('Além do preço, conte documentação, capacete e equipamentos.') &&
         t.includes('Imagem sugerida pelo nome. Depois de criar, dá para trocar por outra ou por uma foto sua.'), t.slice(0, 600));
     await atWidths(async (w) => { await layoutChecks(`D-092 Nova meta ${w}px`); if (w === 390) await shot('521_nova_meta_moto'); });

@@ -66,7 +66,7 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
     // Habilitação serve para carro e para moto: "CNH da moto" é a moto.
     contextWords: ['habilitacao', 'cnh'],
   },
-  { key: 'moto', label: 'Moto', alt: 'Moto estacionada', words: ['moto', 'motinha', 'motoca', 'motocicleta', 'scooter', 'motoneta', 'lambreta', 'cinquentinha'] },
+  { key: 'moto', label: 'Moto', alt: 'Moto estacionada ao pôr do sol', words: ['moto', 'motinha', 'motoca', 'motocicleta', 'scooter', 'motoneta', 'lambreta', 'cinquentinha'] },
   {
     key: 'casa',
     label: 'Casa',
@@ -77,7 +77,7 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
   {
     key: 'reforma',
     label: 'Reforma',
-    alt: 'Rolo de pintura e lata de tinta',
+    alt: 'Rolo pintando uma parede de azul',
     words: ['reforma', 'reformar', 'obra', 'obras', 'puxadinho', 'pintura', 'piso', 'telhado', 'laje'],
     contextWords: ['construcao', 'construir', 'cozinha', 'banheiro'],
   },
@@ -110,21 +110,21 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
   {
     key: 'dividas',
     label: 'Dívidas',
-    alt: 'Mão com moedas',
+    alt: 'Pilhas de moedas, da menor para a maior',
     words: ['divida', 'quitar', 'emprestimo'],
     contextWords: ['nome limpo', 'limpar o nome', 'sair do vermelho', 'fatura', 'cartao', 'financiamento'],
   },
   {
     key: 'negocio',
     label: 'Negócio',
-    alt: 'Fachada de uma pequena loja',
+    alt: 'Vitrine de uma pequena loja',
     words: ['negocio', 'empresa', 'empreender', 'mei', 'cnpj', 'loja', 'lojinha', 'food truck', 'capital de giro'],
     contextWords: ['salao'],
   },
   {
     key: 'festa',
     label: 'Festa',
-    alt: 'Confete e balões de festa',
+    alt: 'Balões transparentes com confete',
     words: ['aniversario', 'niver', 'debutante', '15 anos', 'natal', 'salao de festa'],
     // "Festa de casamento" é o casamento; "Festa" sozinha é a festa.
     contextWords: ['festa'],
