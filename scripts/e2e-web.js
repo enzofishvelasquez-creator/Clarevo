@@ -775,6 +775,53 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await goResumo();
   await expectTotals('excluir recebimento → 6.000 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
 
+  // D-089 A: recebimento do fim do mês que conta no mês seguinte. Hoje é 07/10: a janela de setembro vai de 24 a 30.
+  const aSwitch = () => p.getByRole('switch', { name: 'Este valor é do mês seguinte' }).filter({ visible: true });
+  await p.getByRole('tab', { name: 'Movimentos' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
+  await btn('Registrar recebimento').click(); await waitText('Data do recebimento');
+  ok('A: com a data de hoje (07/10), o ajuste "Este valor é do mês seguinte" não aparece', (await aSwitch().count()) === 0);
+  await field('Descrição').fill('Freela do fim do mês'); await field('Valor em reais').fill('150');
+  await field('Data do recebimento').fill('23/09/2026'); await p.waitForTimeout(300);
+  ok('A: 23/09 fica fora dos últimos 7 dias de setembro: sem o ajuste', (await aSwitch().count()) === 0);
+  await field('Data do recebimento').fill('28/09/2026');
+  await aSwitch().first().waitFor({ timeout: 8000 }).catch(() => {});
+  t = await body();
+  ok('A: com 28/09, o ajuste aparece desligado, com a legenda dos dois meses',
+    (await aSwitch().count()) === 1 && (await aSwitch().first().getAttribute('aria-checked')) === 'false' && t.includes('Entra no Recebido de outubro de 2026, não no de setembro de 2026.'));
+  await aSwitch().first().click(); await p.waitForTimeout(200);
+  ok('A: o ajuste liga', (await aSwitch().first().getAttribute('aria-checked')) === 'true');
+  await layoutChecks('A recebimento do mês seguinte 390px');
+  await scrollTo('Este valor é do mês seguinte');
+  await shot('616_recebimento_mes_seguinte');
+  await btn('Salvar recebimento').click(); await waitText('Recebimento salvo');
+  t = await body();
+  ok('A: o detalhe mantém a data (28/09/2026) e diz "Resumo afetado: Outubro de 2026 (mês seguinte)"', t.includes('28/09/2026') && t.includes('Outubro de 2026 (mês seguinte)'));
+  ok('A: o mês seguinte (outubro) já começou: sem o aviso de quando ele aparece, e com "Registrar outro recebimento"',
+    !t.includes('que aparece no Resumo a partir de') && (await visibleCount('button', 'Registrar outro recebimento')) === 1);
+  await shot('617_recebimento_mes_seguinte_detalhe');
+  await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
+  await expectTotals('A: o freela de 28/09 marcado conta em outubro → 6.150 / 2.250', 'R$ 6.150,00', 'R$ 3.900,00', 'R$ 2.250,00');
+  await p.getByRole('tab', { name: 'Movimentos' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
+  const aRow = p.getByRole('button', { name: /^Freela do fim do mês, Recebido · 28\/09\/2026 · conta em outubro/ }).filter({ visible: true });
+  await aRow.first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok('A: em Movimentos de outubro, a linha mantém a data e diz "conta em outubro"', (await aRow.count()) === 1);
+  await aRow.first().click(); await waitText('Editar registro');
+  await btn('Editar registro').click(); await waitText('Editar recebimento');
+  ok('A: ao editar, o ajuste vem ligado', (await aSwitch().count()) === 1 && (await aSwitch().first().getAttribute('aria-checked')) === 'true');
+  await field('Data do recebimento').fill('15/09/2026'); await p.waitForTimeout(300);
+  t = await body();
+  ok('A: com 15/09, o ajuste some e o aviso diz que o registro sai de outubro e passa a contar em setembro',
+    (await aSwitch().count()) === 0 && t.includes('O registro sai de outubro de 2026 e passa a contar em setembro de 2026.'));
+  await field('Data do recebimento').fill('28/09/2026'); await aSwitch().first().waitFor({ timeout: 8000 }).catch(() => {});
+  ok('A: de volta a 28/09, o ajuste volta ligado e sem aviso de mudança de mês',
+    (await aSwitch().first().getAttribute('aria-checked')) === 'true' && !(await body()).includes('O registro sai de'));
+  await btn('Voltar').click(); await waitText('Editar registro');
+  await btn('Excluir registro').click(); await waitText('Excluir registro?');
+  ok('A: excluir avisa que o valor deixa de contar no resumo de outubro', (await body()).includes('O valor deixa de contar no resumo de outubro de 2026.'));
+  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registro excluído');
+  await goResumo();
+  await expectTotals('A: excluir o freela marcado → 6.000 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
+
   // Contas a pagar (D-020, D-021): começa e termina na base completa
   await p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$ 650,00/ }).filter({ visible: true }).first().click(); await waitText('Contas em aberto com vencimento até o fim do mês');
   t = await body();
@@ -6448,12 +6495,15 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('206_aviso_80');
   await atWidths(async (w) => { await layoutChecks(`F2 aviso de 80% ${w}px`); });
   t = await f2Expense('Feira pequena', '50', 'Mercado');
-  ok('F2 aviso só no cruzamento: mais R$ 50,00 (86%) não repete o aviso', t.includes('Gasto salvo') && !t.includes('chegou a') && !t.includes('passou do orçamento'), t.slice(0, 300));
+  ok('F2 aviso só no cruzamento: mais R$ 50,00 (86%) não repete o aviso; fora do cruzamento, a linha de uso (D-089 E) "Mercado: R$ 1.550,00 de R$ 1.800,00 em outubro (86%)."',
+    t.includes('Gasto salvo') && !t.includes('chegou a') && !t.includes('passou do orçamento') && t.includes('Mercado: R$ 1.550,00 de R$ 1.800,00 em outubro (86%).'), t.slice(0, 300));
+  ok('F2 com a linha do orçamento no aviso, o detalhe continua oferecendo "Anotar outro gasto"', (await visibleCount('button', 'Anotar outro gasto')) === 1);
   t = await f2Expense('Feira grande', '300', 'Mercado');
   ok('F2 aviso: mais R$ 300,00 passam do orçamento (R$ 1.850,00): "Mercado passou do orçamento de outubro em R$ 50,00."', t.includes('Mercado passou do orçamento de outubro em R$ 50,00.'), t.slice(0, 300));
   await shot('207_aviso_100');
   t = await f2Expense('Feira outra', '10', 'Mercado');
-  ok('F2 aviso: depois de passar, outro gasto na categoria não repete o aviso', !t.includes('passou do orçamento') && !t.includes('chegou a'));
+  ok('F2 aviso: depois de passar, outro gasto na categoria não repete o aviso; a linha de uso mostra o que passou (R$ 1.860,00 de R$ 1.800,00, 103%)',
+    !t.includes('passou do orçamento') && !t.includes('chegou a') && t.includes('Mercado: R$ 1.860,00 de R$ 1.800,00 em outubro (103%).'), t.slice(0, 300));
   t = await f2Expense('Cinema', '20', 'Transporte');
   ok('F2 aviso: categoria sem orçamento (Transporte) não leva aviso nenhum', t.includes('Gasto salvo') && !t.includes('orçamento'), t.slice(0, 300));
   // Editar o gasto de R$ 300,00 para R$ 5,00 e de novo para R$ 400,00: o aviso volta só no cruzamento.
@@ -7548,7 +7598,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       JSON.stringify(['Este mês', 'Últimos 3 meses', 'Últimos 6 meses', 'Últimos 12 meses', 'Este ano', 'Ano passado', 'Tudo', 'Planilha (CSV)', 'Resumo em PDF']) &&
     JSON.stringify(await h3Checked()) === JSON.stringify(['Últimos 12 meses', 'Planilha (CSV)']), JSON.stringify(await h3Checked()));
   ok('H3 formato Planilha (CSV): explica as colunas, o segundo arquivo das compras no cartão e o que fica de fora (chave da nota, número do cartão, códigos internos)',
-    t.includes('Abre no Excel e no Google Planilhas') && t.includes('Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem e Origem') && t.includes('segundo arquivo') &&
+    t.includes('Abre no Excel e no Google Planilhas') && t.includes('Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem, Origem e Mês do resumo (o mês em que o lançamento conta)') && t.includes('segundo arquivo') &&
     t.includes('Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo.'));
   ok('H3 o aviso dos valores: "O arquivo mostra os valores, mesmo com Ocultar valores ligado." e o de dados financeiros', t.includes('O arquivo mostra os valores, mesmo com Ocultar valores ligado.') && t.includes('O arquivo tem dados financeiros.'));
   ok('H3 nenhum arquivo antes de pedir: sem "Arquivo pronto" e com o botão "Preparar arquivo"', !t.includes('Arquivo pronto') && (await visibleCount('button', 'Preparar arquivo')) === 1);
@@ -7567,11 +7617,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('H3 CSV de lançamentos: nome clarevo-lancamentos-2026-10-07.csv e UTF-8 com BOM (EF BB BF)',
     h3Lanc.name === 'clarevo-lancamentos-2026-10-07.csv' && h3Lanc.buf[0] === 0xef && h3Lanc.buf[1] === 0xbb && h3Lanc.buf[2] === 0xbf, `${h3Lanc.name} ${[...h3Lanc.buf.slice(0, 4)].join(',')}`);
   ok('H3 CSV de lançamentos: cabeçalho separado por ponto e vírgula e uma linha por lançamento (6), terminando em CRLF',
-    h3Lines[0] === '﻿Data;Tipo;Descrição;Categoria;Valor (R$);Conta de origem;Origem' && h3Lines.length === 8 && h3Lines[7] === '', JSON.stringify(h3Lines.slice(0, 3)));
+    h3Lines[0] === '﻿Data;Tipo;Descrição;Categoria;Valor (R$);Conta de origem;Origem;Mês do resumo' && h3Lines.length === 8 && h3Lines[7] === '', JSON.stringify(h3Lines.slice(0, 3)));
   ok('H3 CSV de lançamentos: um gasto anotado em outra conta (Mercado, Carteira), valor com vírgula e data dd/mm/aaaa',
-    h3Lines.includes('06/10/2026;Gasto;Mercado;Mercado;1400,00;Carteira;Anotado'), h3Lines.join(' | '));
+    h3Lines.includes('06/10/2026;Gasto;Mercado;Mercado;1400,00;Carteira;Anotado;10/2026'), h3Lines.join(' | '));
   ok('H3 CSV de lançamentos: o gasto fixo pago (Aluguel) com a origem "Gasto fixo", e o recebimento como "Recebimento"',
-    h3Lines.includes('05/10/2026;Gasto;Aluguel;Moradia;2500,00;Conta principal;Gasto fixo') && h3Lines.includes('01/10/2026;Recebimento;Salário;Salário;6000,00;Conta principal;Anotado'));
+    h3Lines.includes('05/10/2026;Gasto;Aluguel;Moradia;2500,00;Conta principal;Gasto fixo;10/2026') && h3Lines.includes('01/10/2026;Recebimento;Salário;Salário;6000,00;Conta principal;Anotado;10/2026'));
   ok('H3 CSV de lançamentos: sem sinal de menos, sem "R$" nem ponto de milhar nos valores, e sem as compras no cartão',
     h3Lines.slice(1, 7).every((l) => /;\d+,\d{2};/.test(l)) && !h3Lanc.text.includes('Notebook'));
   await waitText('Pronto. Confira o arquivo na pasta de downloads.').catch(() => {});
@@ -7596,9 +7646,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await h3Prepare();
   const h3Esc = await h3Download('Baixar lançamentos (CSV)');
   const h3EscLines = h3Esc.text.split('\r\n');
-  ok('H3 fórmula: "=SOMA(1+1)" sai como \'=SOMA(1+1) (texto), "Sem categoria" onde não há categoria', h3EscLines.includes("07/10/2026;Gasto;'=SOMA(1+1);Sem categoria;19,90;Conta principal;Anotado"), h3EscLines.join(' | '));
+  ok('H3 fórmula: "=SOMA(1+1)" sai como \'=SOMA(1+1) (texto), "Sem categoria" onde não há categoria', h3EscLines.includes("07/10/2026;Gasto;'=SOMA(1+1);Sem categoria;19,90;Conta principal;Anotado;10/2026"), h3EscLines.join(' | '));
   ok('H3 fórmula: "+55…" ganha o apóstrofo e, por ter ponto e vírgula e aspas, vai entre aspas com as aspas dobradas',
-    h3EscLines.includes('07/10/2026;Gasto;"\'+55 11 99999; ""teste""";Lazer;5,00;Conta principal;Anotado'), h3EscLines.join(' | '));
+    h3EscLines.includes('07/10/2026;Gasto;"\'+55 11 99999; ""teste""";Lazer;5,00;Conta principal;Anotado;10/2026'), h3EscLines.join(' | '));
   ok('H3 fórmula: nenhuma célula do arquivo começa com =, +, - ou @', h3EscLines.slice(1).filter(Boolean).every((l) => !/(^|;)[=+\-@]/.test(l.replace(/"[^"]*(""[^"]*)*"/g, 'x'))), h3EscLines.join(' | '));
   const h3Compras2 = await h3Download('Baixar compras no cartão (CSV)');
   ok('H3 as compras no cartão continuam as mesmas (3) depois dos novos gastos', h3Compras2.text.split('\r\n').length === 5);
@@ -7920,6 +7970,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Ver o cartão').click(); await waitText('Cartão Exemplo'); await p.waitForTimeout(600);
   t1 = await body();
   ok('I1 cartão: a fatura de novembro soma as compras (R$ 550,00 + R$ 158,90 = R$ 708,90)', t1.includes('R$ 708,90'), t1.slice(0, 400));
+  // "Importar fatura" na tela do cartão (D-089 B): depois de ler o arquivo, o destino continua o cartão, já escolhido.
+  await btn('Importar fatura').click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
+  await i1Pick(i1CardNeg); await waitText('Arquivo lido: fatura-negativa.csv', 12000); await p.waitForTimeout(300);
+  ok('I1 "Importar fatura": depois de ler a planilha, "Cartão de crédito" e "Cartão Exemplo" continuam escolhidos',
+    (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'true' && (await radio('Cartão Exemplo').getAttribute('aria-checked')) === 'true');
+  await btn('Voltar').click(); await p.waitForTimeout(400);
+  if ((await p.getByText('Descartar o preenchimento?').filter({ visible: true }).count()) > 0) await confirmIn('Descartar alterações');
+  await waitText('Cartão Exemplo'); await p.waitForTimeout(400);
   await goResumo().catch(() => {});
   await expectTotals('I1 Resumo depois da fatura: compras no cartão não entram em Pago (nada muda)', 'R$ 11.250,00', 'R$ 4.155,70', 'R$ 7.094,30', 'R$ 650,00');
 
@@ -7947,13 +8005,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await i1Open(); await i1Pick(i1Parc); await waitText('Arquivo lido: fatura-parcelas.csv', 12000);
   await radio('Cartão de crédito').click(); await p.waitForTimeout(300); await i1Review();
   t1 = await i1Keep(); boxes = await i1Boxes();
-  ok('I1 fatura com parcelas: a parcela da compra já anotada vem "Já anotado", a outra "Parece parcela" com a explicação, e só o café fica marcado',
-    t1.includes('4 linhas · 1 marcada') && (t1.match(/Já anotado/g) ?? []).length === 2 && t1.includes('Parece parcela') && t1.includes('Compra parcelada: anote uma vez em Anotar gasto, com o número de parcelas.') &&
-    JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['false', false], ['false', false], ['true', false], ['false', true]]), JSON.stringify(boxes));
+  ok('I1 fatura com parcelas: a parcela da compra já anotada vem "Já anotado"; a outra, "Parcela em andamento" (D-089 B), marcada, com a fatura em que entra; o café marcado; o mercado já anotado pela chave',
+    t1.includes('4 linhas · 2 marcadas') && (t1.match(/Já anotado/g) ?? []).length === 2 && t1.includes('Parcela em andamento') && t1.includes('Parcela 1 de 3: entra na fatura de novembro de 2026 e as 2 que faltam nas seguintes.') &&
+    !t1.includes('anote uma vez em Anotar gasto') &&
+    JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['false', false], ['true', false], ['true', false], ['false', true]]), JSON.stringify(boxes));
   await atWidths(async (w) => { await layoutChecks(`I1 revisar fatura com parcelas ${w}px`); if (w === 390) await shot('313_importar_parcelas'); });
-  // O resumo diz quantas linhas já estavam anotadas (a parcela por semelhança e o mercado pela chave) e quantas foram importadas.
-  await btn('Importar 1 lançamento').click(); await waitText('Importação concluída', 12000);
-  ok('I1 resumo da fatura: "1 lançamento importado, 2 já estavam anotados."', (await body()).includes('1 lançamento importado, 2 já estavam anotados.'), (await body()).slice(0, 300));
+  // O resumo diz quantas linhas já estavam anotadas (a parcela por semelhança e o mercado pela chave) e quantas foram importadas: o café
+  // e a parcela em andamento (que entra com as 3 parcelas da papelaria, de novembro a janeiro).
+  await btn('Importar 2 lançamentos').click(); await waitText('Importação concluída', 12000);
+  ok('I1 resumo da fatura: "2 lançamentos importados, 2 já estavam anotados."', (await body()).includes('2 lançamentos importados, 2 já estavam anotados.'), (await body()).slice(0, 300));
+  ok('I1 a parcela em andamento virou compra parcelada no cartão: 3 parcelas de R$ 50,00, a 1ª na fatura de novembro, numeradas de 1 a 3',
+    await otherDevice(async (repo, ctx) => {
+      const card = (await repo.listCards(ctx))[0];
+      const e = (await repo.listCardEntries(card.id)).find((x) => x.description === 'PAPELARIA CENTRAL 01/03');
+      return Boolean(e) && e.installments === 3 && (e.installmentOffset ?? 0) === 0 && e.amountCents === 15000 && e.invoiceMonth === '2026-11' && e.purchasedOn === '2026-10-06';
+    }));
   await btn('Importar outro arquivo').click(); await waitText('Escolha o arquivo');
   await btn('Voltar').click(); await waitText('Organizar'); await p.waitForTimeout(300);
   // OFX com fuso e TRNAMT ambíguo: 01h30 GMT do dia 5 é dia 4 em São Paulo; "-1.500" (três casas) deixa a linha de fora.
@@ -11649,7 +11715,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   anCard = await anCardText();
   anInfo = await anBubbleInfo();
   ok('Análises bolha tocada: Moradia vira a categoria selecionada (R$ 2.500,00, "64,1% do pago") e a bolha dela fica marcada no lugar da outra', anCard.includes('Moradia') && anCard.includes('R$ 2.500,00') && anCard.includes('64,1% do pago') && anInfo.items[0].pressed === 'true' && anInfo.items[1].pressed === 'false' &&
-    anInfo.circles[0].fill === '#D4F05B' && anInfo.circles[1].fill === '#2457F5', anCard);
+    // D-089 D: o Mercado, segunda maior, fica no segundo tom (#7D9DF9), com o contorno no azul da marca.
+    anInfo.circles[0].fill === '#D4F05B' && anInfo.circles[1].fill === '#7D9DF9' && anInfo.circles[1].stroke === '#2457F5', anCard);
   ok('Análises bolha tocada: o leitor de tela ouve a nova escolha', (await evLive()).includes('Categoria selecionada: Moradia, 64,1%, R$ 2.500,00.'), JSON.stringify(await evLive()));
   await anShots('484_analises_bolha_selecionada', { scroll: evScroll('Pago em outubro de 2026'), extra: async (w) => { await anBubbleChecks(`Análises bolha tocada ${w}px`, 2); } });
   await radio('Barras').click(); await p.waitForTimeout(600);

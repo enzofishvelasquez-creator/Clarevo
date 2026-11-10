@@ -228,8 +228,9 @@ function CategoryBars({ shares, selectedKey, onSelect }: { shares: CategoryShare
  * Pago por categoria em bolhas (SVG): a área de cada bolha é proporcional ao valor (raio pela raiz), com um tamanho mínimo legível, e o
  * arranjo vem do core (`categoryBubbles`): nenhuma bolha toca outra, em qualquer largura. O nome e o percentual ficam escritos dentro
  * de cada bolha (nunca só cor), e cada bolha é um botão com o nome acessível "Mercado, 23,4%, R$ 920,00". O toque escolhe a bolha que
- * contém o ponto tocado (`bubbleForTap`), não a do quadrado do botão. A escolhida fica lima, com contorno escuro mais grosso. As bolhas
- * não mostram valor em reais; o nome acessível, sim (e segue "Ocultar valores").
+ * contém o ponto tocado (`bubbleForTap`), não a do quadrado do botão. Cada bolha tem um dos cinco tons do azul da marca, pela posição
+ * no tamanho (`CATEGORY_BUBBLE_TONES`, D-089 D), com o texto na cor que dá contraste. A escolhida fica lima, com contorno escuro mais
+ * grosso. As bolhas não mostram valor em reais; o nome acessível, sim (e segue "Ocultar valores").
  */
 function CategoryBubbleChart({ shares, selectedKey, onSelect }: { shares: CategoryShare[]; selectedKey: string | null; onSelect: (key: string) => void }) {
   const hidden = useValuesHidden();
@@ -249,8 +250,8 @@ function CategoryBubbleChart({ shares, selectedKey, onSelect }: { shares: Catego
                   cx={b.cx}
                   cy={b.cy}
                   r={b.r}
-                  fill={selected ? colors.accent : colors.brand}
-                  stroke={selected ? colors.text : colors.surface}
+                  fill={selected ? colors.accent : b.tone.fill}
+                  stroke={selected ? colors.text : b.tone.stroke === '#FFFFFF' ? colors.surface : b.tone.stroke}
                   strokeWidth={selected ? 3 : 2}
                 />
               );
@@ -282,7 +283,7 @@ function CategoryBubbleChart({ shares, selectedKey, onSelect }: { shares: Catego
                       key={`${i}-${line}`}
                       allowFontScaling={false}
                       numberOfLines={1}
-                      color={selected ? colors.text : colors.textOnBrand}
+                      color={selected ? colors.text : b.tone.text}
                       style={{ fontFamily: fonts.bold, fontSize: b.fontSize, lineHeight: b.lineHeight, textAlign: 'center' }}>
                       {line}
                     </Txt>

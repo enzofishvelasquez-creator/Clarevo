@@ -10,7 +10,8 @@ import type { CategoryPart } from './summary';
  * Evolução financeira, fase 1a (docs/14 §4): só contas puras sobre as linhas que months_overview já entrega. Sem banco,
  * sem tela e sem texto. Dinheiro em centavos inteiros; somas em bigint; arredondamento metade para cima.
  *
- * - Recebido e Pago pela data do pagamento, como no Resumo (a mesma soma de month_totals).
+ * - Recebido e Pago pelo mês em que o registro conta (a data do pagamento ou, no recebimento marcado do mês seguinte, o mês
+ *   seguinte, D-089 A), como no Resumo (a mesma soma de month_totals).
  * - Mês sem lançamentos é "sem registros" (nunca um zero), a não ser que a pessoa tenha conferido (D-060, "Conferi este mês",
  *   P-022): aí é "zero confirmado", um zero de verdade que entra nas médias e na mediana (D04).
  * - Ocultar um mês só tira o ponto da comparação: o total canônico não depende dele.

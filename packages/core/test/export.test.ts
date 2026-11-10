@@ -156,8 +156,8 @@ describe('CSV de lançamentos (D-047)', () => {
     const csv = buildRecordsCsv(rows);
     expect(csv.charCodeAt(0)).toBe(0xfeff);
     expect(new TextEncoder().encode(csv).slice(0, 3)).toEqual(new Uint8Array([0xef, 0xbb, 0xbf]));
-    expect(csv.slice(1).split(CSV_EOL)[0]).toBe('Data;Tipo;Descrição;Categoria;Valor (R$);Conta de origem;Origem');
-    expect(CSV_RECORD_HEADER).toHaveLength(7);
+    expect(csv.slice(1).split(CSV_EOL)[0]).toBe('Data;Tipo;Descrição;Categoria;Valor (R$);Conta de origem;Origem;Mês do resumo');
+    expect(CSV_RECORD_HEADER).toHaveLength(8);
     expect(csv.endsWith(CSV_EOL)).toBe(true);
     expect(csv.split(CSV_EOL)).toHaveLength(rows.length + 2);
     // Nenhum caractere de controle solto, nem separador de linha no meio do texto.
@@ -167,11 +167,11 @@ describe('CSV de lançamentos (D-047)', () => {
   it('uma linha por lançamento, do mais antigo ao mais novo, com data dd/mm/aaaa, valor positivo e rótulos em português', () => {
     const parsed = parseCsv(buildRecordsCsv(rows));
     expect(parsed).toHaveLength(5);
-    expect(parsed[1]).toEqual(['01/09/2026', 'Recebimento', 'Salário', 'Salário', '6000,00', 'Conta principal', 'Anotado']);
-    expect(parsed[2]).toEqual(['06/10/2026', 'Gasto', 'Mercado; feira "boa"', 'Moradia', '1400,00', 'Conta principal', 'Anotado']);
-    expect(parsed[3]).toEqual(['06/10/2026', 'Gasto', "'=CMD()", 'Sem categoria', '0,05', 'Conta principal', 'Anotado']);
-    expect(parsed[4]).toEqual(['07/10/2026', 'Pagamento de fatura', 'Fatura Cartão Exemplo (novembro)', 'Moradia', '550,00', 'Conta principal', 'Fatura']);
-    for (const line of parsed.slice(1)) expect(line).toHaveLength(7);
+    expect(parsed[1]).toEqual(['01/09/2026', 'Recebimento', 'Salário', 'Salário', '6000,00', 'Conta principal', 'Anotado', '09/2026']);
+    expect(parsed[2]).toEqual(['06/10/2026', 'Gasto', 'Mercado; feira "boa"', 'Moradia', '1400,00', 'Conta principal', 'Anotado', '10/2026']);
+    expect(parsed[3]).toEqual(['06/10/2026', 'Gasto', "'=CMD()", 'Sem categoria', '0,05', 'Conta principal', 'Anotado', '10/2026']);
+    expect(parsed[4]).toEqual(['07/10/2026', 'Pagamento de fatura', 'Fatura Cartão Exemplo (novembro)', 'Moradia', '550,00', 'Conta principal', 'Fatura', '10/2026']);
+    for (const line of parsed.slice(1)) expect(line).toHaveLength(8);
     // Nenhum valor negativo: o tipo diz se é gasto ou recebimento.
     for (const line of parsed.slice(1)) expect(line[4]).not.toMatch(/^-/);
   });
@@ -353,8 +353,8 @@ describe('leitura (D-047)', () => {
     ]);
     expect(records).toHaveLength(7);
     const aluguel = records.find((r) => r[0] === '05/10/2026')!;
-    expect(aluguel).toEqual(['05/10/2026', 'Gasto', 'Aluguel', 'Moradia', '2500,00', 'Conta principal', 'Gasto fixo']);
-    expect(records.find((r) => r[0] === '06/10/2026')).toEqual(['06/10/2026', 'Gasto', 'Mercado', 'Mercado', '1400,00', 'Carteira', 'Anotado']);
+    expect(aluguel).toEqual(['05/10/2026', 'Gasto', 'Aluguel', 'Moradia', '2500,00', 'Conta principal', 'Gasto fixo', '10/2026']);
+    expect(records.find((r) => r[0] === '06/10/2026')).toEqual(['06/10/2026', 'Gasto', 'Mercado', 'Mercado', '1400,00', 'Carteira', 'Anotado', '10/2026']);
     const purchases = parseCsv(built.files[1]!.content);
     expect(purchases).toHaveLength(4);
     expect(purchases.find((r) => r[2] === 'Notebook')).toEqual(['05/10/2026', 'Cartão Exemplo (final 1234)', 'Notebook', 'Educação', '1500,00', '10']);

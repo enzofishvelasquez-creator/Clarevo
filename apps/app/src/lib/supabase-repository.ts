@@ -180,6 +180,8 @@ interface RecordRow {
   invoice_month: string | null;
   /** Resumo SHA-256 da chave da nota (64 hexadecimais minúsculos), nunca a chave. */
   receipt_key: string | null;
+  /** Recebimento que conta no mês seguinte (D-089 A, migração 0030); ausente antes da 0030. */
+  next_month?: boolean | null;
   created_by: string;
   version: number;
   created_at: string;
@@ -474,6 +476,8 @@ interface CardEntryRow {
   purchased_on: string | null;
   amount_cents: number;
   installments: number;
+  /** D-089 B: parcelas que já tinham passado antes da primeira guardada (0 nas compras do app); ausente nas funções antigas. */
+  installment_offset?: number | null;
   invoice_month: string;
   source_month: string | null;
   payment_record_id: string | null;
@@ -593,6 +597,7 @@ const KNOWN: RepoErrorCode[] = [
   'valor_acima_do_limite',
   'data_invalida',
   'data_futura',
+  'mes_seguinte_invalido',
   'conta_invalida',
   'categoria_invalida',
   'nome_da_conta_invalido',
@@ -778,6 +783,8 @@ function toRecord(r: RecordRow): FinancialRecord {
     commitmentId: r.commitment_id ?? null,
     invoice: cardId !== null && month !== null ? { cardId, month: invoiceMonthOf(month) } : null,
     receiptKey,
+    // Só quando ligado, como o repositório em memória: o registro sem a marca fica como antes.
+    ...(r.next_month === true ? { nextMonth: true } : {}),
     createdBy: r.created_by,
     version: r.version,
     createdAt: r.created_at,
@@ -1293,6 +1300,7 @@ function toCard(c: CardRow): Card {
 function toCardEntry(e: CardEntryRow): CardEntry {
   const amountCents = whole(e.amount_cents);
   const installments = whole(e.installments);
+  const installmentOffset = whole(e.installment_offset ?? 0);
   const purchase = e.kind === 'compra';
   const receiptKey = e.receipt_key ?? null;
   const consistent =
@@ -1300,6 +1308,9 @@ function toCardEntry(e: CardEntryRow): CardEntry {
     amountCents >= 1 &&
     installments >= 1 &&
     installments <= 48 &&
+    installmentOffset >= 0 &&
+    installmentOffset + installments <= 48 &&
+    (purchase || installmentOffset === 0) &&
     (purchase ? e.purchased_on != null && ISO_DATE.test(e.purchased_on) : e.purchased_on == null && installments === 1) &&
     (e.kind === 'encargo' ? e.charge_kind != null && CARD_CHARGE_TYPES.includes(e.charge_kind) : e.charge_kind == null) &&
     (receiptKey === null || (purchase && receiptKeyValid(receiptKey)));
@@ -1315,6 +1326,7 @@ function toCardEntry(e: CardEntryRow): CardEntry {
     purchasedOn: e.purchased_on ?? null,
     amountCents,
     installments,
+    ...(installmentOffset > 0 ? { installmentOffset } : {}),
     invoiceMonth: invoiceMonthOf(e.invoice_month),
     sourceMonth: e.source_month == null ? null : invoiceMonthOf(e.source_month),
     paymentRecordId: e.payment_record_id ?? null,
@@ -1553,9 +1565,12 @@ export class SupabaseRepository implements RecordsRepository {
     return { action: data.action as AccountAction, accountId: target };
   }
 
-  /** Lê o mês inteiro em páginas: a API limita cada resposta, e um total incompleto não pode aparecer como confirmado. */
+  /**
+   * Lê o mês inteiro em páginas: a API limita cada resposta, e um total incompleto não pode aparecer como confirmado. O mês é o
+   * em que o registro conta (`counted_month`, migração 0030): o da data ou, no recebimento marcado do mês seguinte, o seguinte (D-089 A).
+   */
   async listRecords(contextId: string, month: IsoMonth) {
-    const { start, endExclusive } = monthRange(month);
+    const { start } = monthRange(month);
     const PAGE = 500;
     const rows: RecordRow[] = [];
     for (let from = 0; ; from += PAGE) {
@@ -1563,8 +1578,7 @@ export class SupabaseRepository implements RecordsRepository {
         .from('financial_records')
         .select('*')
         .eq('context_id', contextId)
-        .gte('occurred_on', start)
-        .lt('occurred_on', endExclusive)
+        .eq('counted_month', start)
         .order('occurred_on', { ascending: false })
         .order('id')
         .range(from, from + PAGE - 1);
@@ -1706,6 +1720,8 @@ export class SupabaseRepository implements RecordsRepository {
       p_category: input.category,
       // Só despesa lida de uma nota (D-038): o resumo SHA-256, nunca a chave. Sem nota, o hash é o de antes.
       ...(input.receiptKey != null ? { p_receipt_key: input.receiptKey } : {}),
+      // Só quando ligado (D-089 A): sem a marca, a chamada é a de antes.
+      ...(input.nextMonth === true ? { p_next_month: true } : {}),
     });
   }
 
@@ -1719,6 +1735,8 @@ export class SupabaseRepository implements RecordsRepository {
       p_occurred_on: input.occurredOn,
       p_description: input.description,
       p_category: input.category,
+      // Ausente mantém a marca do mês seguinte enquanto a data cabe (D-089 A); o formulário de recebimento manda true ou false.
+      ...(input.nextMonth !== undefined ? { p_next_month: input.nextMonth } : {}),
     });
   }
 
@@ -2851,6 +2869,8 @@ export class SupabaseRepository implements RecordsRepository {
         occurred_on: i.occurredOn,
         description: i.description,
         category: i.category,
+        // D-089 B: a parcela escrita na linha da fatura; o banco cria as que faltam.
+        ...(i.installment ? { installment_number: i.installment.number, installment_count: i.installment.count } : {}),
       })),
     });
     if (error) throw repoError(error);

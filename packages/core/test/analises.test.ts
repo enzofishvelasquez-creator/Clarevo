@@ -35,6 +35,8 @@ import {
   buildEvolutionView,
   categoryAccessibleName,
   categoryBreakdown,
+  CATEGORY_BUBBLE_TONES,
+  bubbleTone,
   categoryBubbles,
   categoryKey,
   createDemoRepository,
@@ -329,6 +331,46 @@ describe('bolhas: qual bolha o toque escolhe (bubbleAtPoint e bubbleForTap)', ()
     }
     // O defeito existe nos arranjos reais: pontos do quadrado de uma bolha que são de outra.
     expect(overlapsOfSquare).toBeGreaterThan(0);
+  });
+});
+
+describe('bolhas: os cinco tons do azul (D-089 D)', () => {
+  const share = (category: string | null, cents: number, tenths: number, percentText: string): CategoryShare => ({
+    category,
+    label: category ?? NO_CATEGORY_LABEL,
+    cents,
+    tenths,
+    percentText,
+    a11yLabel: '',
+  });
+
+  it('a maior bolha leva o azul da marca; as seguintes alternam claro e escuro; da sexta em diante os tons repetem; a bolha de valor zero não entra na contagem', () => {
+    expect(CATEGORY_BUBBLE_TONES).toHaveLength(5);
+    expect(CATEGORY_BUBBLE_TONES[0]).toEqual({ fill: '#2457F5', text: '#FFFFFF', stroke: '#FFFFFF' });
+    const shares = [
+      share('Lazer', 10_000, 50, '5,0%'),
+      share('Mercado', 90_000, 450, '45,0%'),
+      share('Moradia', 60_000, 300, '30,0%'),
+      share('Saúde', 0, 0, '0%'),
+      share('Transporte', 20_000, 100, '10,0%'),
+      share('Educação', 15_000, 75, '7,5%'),
+      share('Outros', 5_000, 25, '2,5%'),
+    ];
+    const layout = categoryBubbles(shares, 360);
+    const byKey = Object.fromEntries(layout.bubbles.map((b) => [b.label, b]));
+    expect(byKey['Saúde']).toBeUndefined();
+    expect(['Mercado', 'Moradia', 'Transporte', 'Educação', 'Lazer', 'Outros'].map((k) => byKey[k]!.rank)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(['Mercado', 'Moradia', 'Transporte', 'Educação', 'Lazer', 'Outros'].map((k) => byKey[k]!.tone.fill)).toEqual([
+      '#2457F5',
+      '#7D9DF9',
+      '#1B45C9',
+      '#B3C6FB',
+      '#15359E',
+      '#2457F5',
+    ]);
+    // Duas bolhas vizinhas no tamanho nunca têm o mesmo tom.
+    for (let i = 1; i < 5; i++) expect(bubbleTone(i).fill).not.toBe(bubbleTone(i - 1).fill);
+    expect(bubbleTone(7)).toEqual(bubbleTone(2));
   });
 });
 

@@ -1,10 +1,11 @@
-import { addDays, addMonths, monthOf, type IsoDate, type IsoMonth } from '../dates';
+import { addDays, addMonths, isValidIsoDate, monthOf, type IsoDate, type IsoMonth } from '../dates';
 import { MAX_RECORD_CENTS } from '../money';
-import { CATEGORIES } from '../records';
+import { CATEGORIES, nextMonthAllowed } from '../records';
 import { DESCRIPTION_MAX } from '../validation';
 import { invoiceMonthOf, type CardDays } from '../cards';
 import { suggestCategory, type ImportMemory } from './categorias';
-import { DUPLICATE_WINDOW_DAYS, findLookalikes, importKeys, installmentMark, normalizeDescription, type ExistingEntry } from './dedupe';
+import { DUPLICATE_WINDOW_DAYS, findLookalikes, importKeys, installmentMark, normalizeDescription, type ExistingEntry, type InstallmentMark } from './dedupe';
+import { IMPORT_TEXT } from './textos';
 import { IMPORT_BATCH, type ImportDestination, type ImportItem, type ImportParse } from './tipos';
 import { cleanDescription } from './valores';
 
@@ -46,6 +47,10 @@ export interface ReviewLine {
   /** import_key: calculada do arquivo, não muda se a pessoa edita a descrição. */
   key: string;
   label: ReviewLabel | null;
+  /** Cartão, compra com a parcela escrita na descrição (D-089 B): entra com as parcelas que faltam. null nas outras linhas. */
+  installment: InstallmentMark | null;
+  /** Explicação própria da linha (a parcela e a fatura em que entra); null quando vale só a da marca. */
+  hint: string | null;
   /** A chave já foi importada: o banco pularia a linha. */
   keyExists: boolean;
   /** A linha pode ser importada (não tem marca que a impede). */
@@ -111,7 +116,35 @@ function recordKind(kind: ReviewKind): 'despesa' | 'receita' {
   return kind === 'receita' ? 'receita' : 'despesa';
 }
 
+/**
+ * Fatura em que entra a parcela escrita na linha (D-089 B). A data da linha costuma ser a da compra original: a parcela k cai k - 1
+ * faturas depois da fatura natural dessa data. Se isso cair depois da fatura aberta do cartão (`openMonth`: a fatura em que entraria
+ * uma compra feita hoje, `invoiceMonthOf(card, today)`), a linha trazia a data da cobrança, e não a da compra: a parcela entra na
+ * fatura natural da própria data. O banco (import_records) aplica a mesma regra.
+ */
+export function installmentInvoiceMonth(firstMonth: IsoMonth, mark: InstallmentMark, openMonth: IsoMonth): IsoMonth {
+  const target = addMonths(firstMonth, mark.number - 1);
+  return target > openMonth ? firstMonth : target;
+}
+
+/**
+ * A marca "k/n" também pode ser uma data sem ano (dia k do mês n) da semana anterior à data da linha, como "MERCADO 01/11" numa linha
+ * de 02/11. Nesse caso a linha continua "Parcela em andamento", mas vem desmarcada, com a explicação de que pode ser só a data.
+ */
+export function markLooksLikeDate(mark: InstallmentMark, lineDate: IsoDate): boolean {
+  if (mark.count < 1 || mark.count > 12) return false;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const year = Number(lineDate.slice(0, 4));
+  for (const y of [year, year - 1]) {
+    const candidate = `${y}-${pad(mark.count)}-${pad(mark.number)}`;
+    if (!isValidIsoDate(candidate) || candidate > lineDate) continue;
+    return candidate >= addDays(lineDate, -7);
+  }
+  return false;
+}
+
 /** Monta as linhas da revisão, na ordem do arquivo. */
+
 export function buildReview(input: ReviewInput): ReviewLine[] {
   const { parse, destination, today } = input;
   const s = sign(input);
@@ -154,18 +187,26 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
     };
     if (kind === 'pagamento') block('pagamento_recebido');
     if (l.date > today) block('data_futura');
+    // Cartão, compra com a parcela escrita (D-089 B): a parcela desta linha e as que faltam, da fatura em que ela entra em diante.
+    const mark = destination === 'cartao' && kind === 'compra' ? installmentMark(l.description, l.date) : null;
+    // Com "PARC" ou "PARCELA" antes, é parcela com certeza (installmentMark já aceita a data igual à da linha nesse caso).
+    const maybeDate = mark !== null && !/PARC(?:ELA)?\.?\s*\d{1,2}\/\d{1,2}/i.test(l.description) && markLooksLikeDate(mark, l.date);
+    let hint: string | null = null;
     if (destination === 'cartao' && (kind === 'compra' || kind === 'estorno') && input.card) {
-      const month = invoiceMonthOf(input.card.days, l.date);
-      if ((kind === 'compra' ? l.date < oldest : month < monthOf(oldest)) && importable) block('data_antiga');
-      else if (input.card.paidMonths.has(month) && importable) block('fatura_paga');
+      const natural = invoiceMonthOf(input.card.days, l.date);
+      const first = mark ? installmentInvoiceMonth(natural, mark, invoiceMonthOf(input.card.days, today)) : natural;
+      const months = mark ? Array.from({ length: mark.count - mark.number + 1 }, (_, i) => addMonths(first, i)) : [natural];
+      if ((kind === 'compra' ? l.date < oldest : natural < monthOf(oldest)) && importable) block('data_antiga');
+      else if (months.some((m) => input.card!.paidMonths.has(m)) && importable) block('fatura_paga');
+      if (mark) hint = maybeDate ? IMPORT_TEXT.installmentOrDateHint(mark.number, mark.count) : IMPORT_TEXT.installmentHint(mark.number, mark.count, first);
     }
     if (amount > MAX_RECORD_CENTS && importable) block('valor_alto');
     if (keyExists && importable) block('ja_anotado');
     if (label === null && similar[i]) label = 'ja_anotado';
     if (label === null && destination === 'cartao' && kind === 'compra') {
-      // Compra parcelada: anotar uma vez em Anotar gasto, com o número de parcelas, não parcela por parcela da fatura. E uma
-      // linha de "pagamento" que o arquivo trouxe como compra (planilha com o sinal trocado) é o pagamento da fatura.
-      if (installmentMark(l.description, l.date)) label = 'parcela';
+      // Compra parcelada em andamento (D-089 B): entra marcada, com as parcelas que faltam. E uma linha de "pagamento" que o arquivo
+      // trouxe como compra (planilha com o sinal trocado) é o pagamento da fatura.
+      if (mark) label = 'parcela';
       else if (looksLikeCardPaymentLine(l.description)) label = 'pagamento_fatura';
     }
     if (label === null && destination === 'conta') {
@@ -183,9 +224,13 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
       categorySource: suggestion.source,
       key,
       label,
+      // A parcela vai junto também quando a linha está "Já anotado" por semelhança: marcada à mão, entra com as que faltam.
+      installment: mark,
+      hint: label === 'parcela' ? hint : null,
       keyExists,
       importable,
-      include: importable && label === null && kind !== 'estorno',
+      // A marca que pode ser só a data (markLooksLikeDate) vem desmarcada: um clique não cria parcelas que não existem.
+      include: importable && (label === null || (label === 'parcela' && !maybeDate)) && kind !== 'estorno',
     };
   });
 }
@@ -235,6 +280,10 @@ export function toImportItems(lines: readonly ReviewLine[]): ImportItem[] {
     occurredOn: l.date,
     description: cleanDescription(l.description) || l.description.trim(),
     category: l.category !== null && categoriesFor(l.kind).includes(l.category) ? l.category : null,
+    // A parcela vai junto enquanto a descrição (talvez editada) ainda tem a marca: tirar "01/11" da descrição importa à vista.
+    ...(l.kind === 'compra' && l.installment && installmentMark(l.description, l.date) !== null
+      ? { installment: { number: l.installment.number, count: l.installment.count } }
+      : {}),
   }));
 }
 
@@ -251,7 +300,10 @@ export function existingMonths(lines: readonly { date: IsoDate }[]): IsoMonth[] 
   for (const l of lines) {
     months.add(monthOf(addDays(l.date, -DUPLICATE_WINDOW_DAYS)));
     months.add(monthOf(l.date));
-    months.add(monthOf(addDays(l.date, DUPLICATE_WINDOW_DAYS)));
+    const last = addDays(l.date, DUPLICATE_WINDOW_DAYS);
+    months.add(monthOf(last));
+    // Um recebimento dos últimos dias do mês marcado "do mês seguinte" (D-089 A) é lido com o mês seguinte.
+    if (nextMonthAllowed(last)) months.add(addMonths(monthOf(last), 1));
   }
   return [...months].sort();
 }

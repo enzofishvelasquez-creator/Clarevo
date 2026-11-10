@@ -126,7 +126,7 @@ describe('estorno no orçamento: a regra fica e a tela explica (D-054, E1)', () 
     expect(refundEditChoices(entries, [], '2026-10', 10).map((c) => c.entryId)).toEqual(['b', 'd']);
     expect(refundEditChoices(entries, [], '2026-11', 2)).toHaveLength(2);
     expect(REFUND_EDIT_MAX).toBe(3);
-    expect(refundEditChoices(entries, [], '2026-11')[0]).toEqual({ entryId: 'c', description: 'Restaurante', amountCents: 20_000, installments: 1, invoiceMonth: '2026-11' });
+    expect(refundEditChoices(entries, [], '2026-11')[0]).toEqual({ entryId: 'c', description: 'Restaurante', amountCents: 20_000, installments: 1, installmentOffset: 0, invoiceMonth: '2026-11' });
   });
 
   it('refundEditChoices ignora o que não é compra e lê o mesmo conjunto de faturas pagas que o resto do app', () => {

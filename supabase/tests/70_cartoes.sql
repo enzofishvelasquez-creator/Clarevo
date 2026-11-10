@@ -2858,8 +2858,8 @@ do $$ begin
        = 'p_idempotency_key text, p_card_id uuid, p_month date, p_expected_version integer, p_paid_cents bigint, p_paid_on date, p_account_id uuid DEFAULT NULL::uuid'
      and pg_get_function_arguments('public.undo_invoice_payment(text, uuid, date, integer)'::regprocedure)
        = 'p_idempotency_key text, p_card_id uuid, p_month date, p_expected_version integer'
-     and pg_get_function_arguments('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text)'::regprocedure)
-       = 'p_idempotency_key text, p_context_id uuid, p_account_id uuid, p_kind record_kind, p_amount_cents bigint, p_occurred_on date, p_description text, p_category text DEFAULT NULL::text, p_receipt_key text DEFAULT NULL::text'
+     and pg_get_function_arguments('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean)'::regprocedure)
+       = 'p_idempotency_key text, p_context_id uuid, p_account_id uuid, p_kind record_kind, p_amount_cents bigint, p_occurred_on date, p_description text, p_category text DEFAULT NULL::text, p_receipt_key text DEFAULT NULL::text, p_next_month boolean DEFAULT false'
      and pg_get_function_arguments('public.invoice_closing_on(integer, integer, date)'::regprocedure) = 'p_closing_day integer, p_due_day integer, p_month date'
      and pg_get_function_arguments('public.invoice_due_on(integer, date)'::regprocedure) = 'p_due_day integer, p_month date'
      and pg_get_function_arguments('public.invoice_month_for(integer, integer, date)'::regprocedure) = 'p_closing_day integer, p_due_day integer, p_date date',
@@ -2913,13 +2913,15 @@ do $$ begin
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.card_entries'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'card_id', 'kind', 'invoice_month', 'amount_cents', 'description', 'category', 'purchase_id', 'purchased_on',
             'installment_number', 'installment_total', 'purchase_total_cents', 'charge_kind', 'source_month', 'payment_record_id', 'receipt_key',
-            'created_by', 'version', 'created_at', 'updated_at', 'deleted_at', 'deleted_by', 'import_key'], 'colunas de card_entries (a chave da importação, 0012, no fim)';
+            'created_by', 'version', 'created_at', 'updated_at', 'deleted_at', 'deleted_by', 'import_key', 'installment_offset'],
+    'colunas de card_entries (a chave da importação, 0012, e o deslocamento da parcela, 0029, no fim)';
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.card_items'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'nickname', 'last_digits', 'closing_day', 'due_day', 'limit_cents', 'status', 'created_by', 'version', 'created_at',
             'updated_at', 'used_cents', 'current_month', 'current_closing_on', 'current_due_on'], 'colunas de card_items';
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.card_entry_items'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'card_id', 'kind', 'description', 'category', 'charge_kind', 'purchased_on', 'amount_cents', 'installments', 'invoice_month',
-            'source_month', 'payment_record_id', 'receipt_key', 'created_by', 'version', 'created_at', 'updated_at'], 'colunas de card_entry_items';
+            'source_month', 'payment_record_id', 'receipt_key', 'created_by', 'version', 'created_at', 'updated_at', 'installment_offset'],
+    'colunas de card_entry_items (o deslocamento da parcela, 0029, no fim)';
   assert (select array_agg(attname::text order by attnum) from pg_attribute where attrelid = 'public.invoice_items'::regclass and attnum > 0 and not attisdropped)
     = array['card_id', 'context_id', 'month', 'closing_on', 'due_on', 'status', 'total_cents', 'purchases_cents', 'charges_cents', 'carried_in_cents',
             'refunds_cents', 'credit_cents', 'entry_count', 'commitment_id', 'commitment_version', 'amount_is_estimate', 'to_pay_cents',
@@ -2956,7 +2958,7 @@ do $$ begin
   assert (select count(*) from pg_trigger t where not t.tgisinternal and t.tgname in ('cards_guard', 'card_entries_guard', 'commitments_guard', 'financial_records_guard')
             and t.tgenabled = 'O') = 4, 'guardas ligadas';
   -- As assinaturas das migrações anteriores continuam (create_record mudou de forma compatível, testado acima).
-  assert to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text)') is not null
+  assert to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean)') is not null
      and to_regprocedure('public.delete_record(text, uuid, integer)') is not null
      and to_regprocedure('public.pay_commitment(text, uuid, integer, uuid, bigint, date, text)') is not null
      and to_regprocedure('public.undo_commitment_payment(text, uuid, integer)') is not null

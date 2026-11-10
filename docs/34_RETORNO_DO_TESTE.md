@@ -38,12 +38,12 @@ Elis mandou a Enzo prints com o que achou confuso e o que gostaria de ter, e ped
 
 | # | O que a pessoa disse | O que foi feito | Situação |
 |---|---|---|---|
-| 1 | Salário que cai no fim do mês somou no mês anterior: "é necessário ter a opção de reconhecer esse valor como algo que encontrou para o mês vigente" | Decisão A do pacote 2 (abaixo) | com Enzo |
+| 1 | Salário que cai no fim do mês somou no mês anterior: "é necessário ter a opção de reconhecer esse valor como algo que encontrou para o mês vigente" | Decisão A do pacote 2 (abaixo): em Registrar recebimento, com a data nos últimos 7 dias do mês, o ajuste "Este valor é do mês seguinte" | pronto |
 | 2 | "Ele leu o print do boleto da conta de luz, o que é ótimo, mas a descrição precisa informar isso. Hoje ele só diz ler comprovante Pix ou pagamento" | Em Anotar gasto, a opção passou a "Ler comprovante ou boleto"; o guia e o site dizem que lê boleto e conta de luz | pronto |
 | 3 | "O boleto da Protebem, que não tem imagem, só o código de barras e as informações, ele não leu" | O leitor reconhece o boleto pela linha digitável ou pelo código de barras: valor e vencimento do código e o nome do beneficiário; a linha lida diz "Boleto · ... · vence em ..." e avisa que a data é o vencimento | pronto (conferir com a foto do boleto no celular) |
-| 4 | Cartão: "uma compra parcelada não foi feita hoje"; importar a fatura reconhecendo as compras que já existem e as parcelas "3/4", todo mês | Decisão B do pacote 2 | com Enzo |
-| 5 | Telegram: "Farmácia 41 hoje cartão" virou gasto na conta; "ele não reconhece pagamento em cartão" | Decisão C do pacote 2 | com Enzo |
-| 6 | Análises: "as categorias poderiam ter variações de cor" | Decisão D do pacote 2 | com Enzo |
+| 4 | Cartão: "uma compra parcelada não foi feita hoje"; importar a fatura reconhecendo as compras que já existem e as parcelas "3/4", todo mês | Decisão B do pacote 2: "Importar fatura" na tela do cartão; a linha "3/4" entra como compra com as parcelas que faltam | pronto |
+| 5 | Telegram: "Farmácia 41 hoje cartão" virou gasto na conta; "ele não reconhece pagamento em cartão" | Decisão C do pacote 2: "cartão" na mensagem vira compra no cartão | pronto |
+| 6 | Análises: "as categorias poderiam ter variações de cor" | Decisão D do pacote 2: cinco tons do azul da marca | pronto |
 | 7 | Reserva: "se eu coloco que o valor que eu vou guardar é 50, a opção registrar aporte tem que indicar colocar esse valor, mesmo que eu queira editar" | Registrar aporte abre com o valor planejado por mês, editável, com a legenda "Preenchemos com o valor planejado por mês. Pode mudar." | pronto |
 | 8 | Calculadora da cota única: "precisa da explicação do que é cota única" | Dica no campo: pagar o ano inteiro de uma vez, em geral com desconto, como no IPVA e no IPTU | pronto |
 | 9 | "Precisa explicar melhor essa questão da taxa. É uma afirmação?" | O resultado diz "Nas parcelas há juros embutidos de X ao mês" e a hipótese explica que a taxa é calculada só com os números, não vem do contrato | pronto |
@@ -54,20 +54,22 @@ Elis mandou a Enzo prints com o que achou confuso e o que gostaria de ter, e ped
 | 14 | Gasto com data futura: "o mais intuitivo é adicionar aos gastos, com previsão futura, não ter que procurar outra aba ou esperar vencer" | Com data futura, o link "Ainda vai vencer? Anotar como conta a pagar" leva descrição, valor, data e categoria para Anotar conta a pagar | pronto |
 | 15 | Plano de dívidas: "é muito confuso saber qual é a indicação, é informação demais junta e repetida... não tem uma indicação do que quitar primeiro" | O resultado começa pelo que as ordens dão (uma frase só quando dão no mesmo) e termina pela referência: quanto antes tudo termina e quanto de juros a menos em relação a só pagar as parcelas; nos detalhes, um bloco só para as duas ordens quando dão no mesmo. Nenhum texto diz qual ordem é a certa (D-040) | pronto |
 | 16 | "Qual informação nova ela trouxe? A data do fim das contas já haviam sido informadas quando eu informei que era um gasto parcelado" | A informação nova é a frase da referência (com os números dela: tudo termina 41 meses antes, com R$ 1.495,19 a menos de juros, só por passar a parcela do Acordo para o Empréstimo quando ele terminar) | pronto |
-| 17 | Vídeo para o Instagram: salvar uma compra de mercado e ir ao orçamento ver quanto falta; ou um aviso discreto no próprio app ao salvar | Decisões E (aviso) e F (vídeo) do pacote 2 | com Enzo |
+| 17 | Vídeo para o Instagram: salvar uma compra de mercado e ir ao orçamento ver quanto falta; ou um aviso discreto no próprio app ao salvar | Decisões E (aviso) e F (vídeo) do pacote 2: a linha do orçamento ao salvar e o vídeo em formato de reels | pronto |
 | 18 | "Naquele dia, vc recebeu o meu email de teste?" | Conferir a caixa contato@clarevo.app.br | com Enzo |
 
 ### Pacote 2: decisões para Enzo (09/11/2026)
 
-| Letra | Decisão | Recomendação da equipe | Tamanho |
-|---|---|---|---|
-| A | Salário no fim do mês: (1) no recebimento, um ajuste "Este valor é do mês seguinte", mostrado quando a data cai nos últimos 7 dias do mês, respeitado pelo Recebido do Resumo, pela Evolução, pelas Análises e pela exportação (coluna nova e migração); (2) sem mexer no banco, uma dica no formulário sugerindo anotar com a data do dia 1º | Opção 1, só para recebimentos | cerca de 1 dia |
-| B | Botão "Importar fatura" na tela do cartão; a importação cria a compra com as parcelas que faltam, mantendo a numeração do extrato (3 de 4, 4 de 4) | Fazer: é o que destrava quem já tem cartão | cerca de 1 dia, com migração |
-| C | "cartão" (ou o nome do cartão) na mensagem do Telegram vira compra no cartão; DESFAZER desfaz | Fazer | meio dia, com migração e a função republicada |
-| D | Bolhas das categorias em cinco tons do azul da marca, contraste conferido, a escolhida em lima como hoje | Fazer | meio período |
-| E | Ao salvar um gasto com orçamento na categoria, uma linha "Mercado: R$ 1.400,00 de R$ 1.800,00 neste mês (78%)", sempre, não só ao cruzar 80% e 100% | Fazer | pequeno |
-| F | Vídeo em formato de reels (1080 por 1920) gravado na web com os dados de demonstração: salvar uma compra de mercado e abrir o orçamento | Fazer depois do pacote 1 | meio período |
-| G | Modo "Fatura de cartão depois do vencimento" em Multa e juros: rotativo, mora, multa e IOF estimado | Depois do lançamento | meio dia |
+Enzo aprovou as sete em 09/11/2026 ("Aprovo", D-089), na ordem E, D, C, B, A, F e G.
+
+| Letra | Decisão | Recomendação da equipe | Tamanho | Situação |
+|---|---|---|---|---|
+| A | Salário no fim do mês: (1) no recebimento, um ajuste "Este valor é do mês seguinte", mostrado quando a data cai nos últimos 7 dias do mês, respeitado pelo Recebido do Resumo, pela Evolução, pelas Análises e pela exportação (coluna nova e migração); (2) sem mexer no banco, uma dica no formulário sugerindo anotar com a data do dia 1º | Opção 1, só para recebimentos | cerca de 1 dia | pronto (migração 0030 ainda a aplicar em produção) |
+| B | Botão "Importar fatura" na tela do cartão; a importação cria a compra com as parcelas que faltam, mantendo a numeração do extrato (3 de 4, 4 de 4) | Fazer: é o que destrava quem já tem cartão | cerca de 1 dia, com migração | pronto (09/11/2026; falta aplicar a migração 0029) |
+| C | "cartão" (ou o nome do cartão) na mensagem do Telegram vira compra no cartão; DESFAZER desfaz | Fazer | meio dia, com migração e a função republicada | pronto (09/11/2026; falta aplicar a migração 0028 e publicar as funções) |
+| D | Bolhas das categorias em cinco tons do azul da marca, contraste conferido, a escolhida em lima como hoje | Fazer | meio período | pronto (09/11/2026) |
+| E | Ao salvar um gasto com orçamento na categoria, uma linha "Mercado: R$ 1.400,00 de R$ 1.800,00 neste mês (78%)", sempre, não só ao cruzar 80% e 100% | Fazer | pequeno | pronto (09/11/2026) |
+| F | Vídeo em formato de reels (1080 por 1920) gravado na web com os dados de demonstração: salvar uma compra de mercado e abrir o orçamento | Fazer depois do pacote 1 | meio período | pronto (vídeo enviado a Enzo; docs/24, seção 2.4b) |
+| G | Modo "Fatura de cartão depois do vencimento" em Multa e juros: rotativo, mora, multa e IOF estimado | Depois do lançamento | meio dia | depois do lançamento |
 
 ## Rascunho para as redes (item 25)
 

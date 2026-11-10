@@ -147,7 +147,7 @@ begin
                         where p.oid = ('public.' || f)::regprocedure and a.grantee = 0), 'sem execute para public: ' || f;
   end loop;
   assert (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and p.proname like 'clarevo\_chat\_%') = 16, 'as dezesseis internas (as oito da 0020, renomeadas ou recriadas com o canal na 0022, e as oito novas da 0022)';
+           where n.nspname = 'public' and p.proname like 'clarevo\_chat\_%') = 19, 'as dezenove internas (as oito da 0020, renomeadas ou recriadas com o canal na 0022, as oito novas da 0022 e as três da 0028)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       cross join (values ('service_role'), ('authenticated'), ('anon')) r (rolname)
                      where n.nspname = 'public' and p.proname like 'clarevo\_chat\_%' and has_function_privilege(r.rolname, p.oid, 'execute')),

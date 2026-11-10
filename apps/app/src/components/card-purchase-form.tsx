@@ -23,6 +23,7 @@ import {
   type Card as CardData,
   type CardEntry,
   type IsoMonth,
+  installmentsWords,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
@@ -211,7 +212,7 @@ export function CardPurchaseForm({ card, month, entry, textOnly = false }: { car
           />
           {textOnly ? (
             <View style={{ gap: space[1] }}>
-              <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{`${formatBRL(entry.amountCents)}${entry.installments > 1 ? ` em ${entry.installments} vezes` : ''}`}</MoneyTxt>
+              <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{`${formatBRL(entry.amountCents)}${(entry.installmentOffset ?? 0) > 0 ? `, ${installmentsWords(entry.installments, entry.installmentOffset)}` : entry.installments > 1 ? ` em ${entry.installments} vezes` : ''}`}</MoneyTxt>
               {entry.purchasedOn ? (
                 <Txt variant="caption" color={colors.textSecondary}>
                   {`${S.purchaseDateLabel}: ${formatDateBR(entry.purchasedOn)}`}
@@ -260,7 +261,7 @@ export function CardPurchaseForm({ card, month, entry, textOnly = false }: { car
                 inputMode="numeric"
                 maxLength={2}
                 placeholder="1"
-                hint={CARDS_TEXT.expense.installmentsHint}
+                hint={(entry.installmentOffset ?? 0) > 0 ? S.importedInProgressNote(entry.installments, entry.installmentOffset!) : CARDS_TEXT.expense.installmentsHint}
                 error={errors.installmentsText}
               />
               {installmentsLine ? (

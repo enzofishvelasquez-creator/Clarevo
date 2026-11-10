@@ -138,6 +138,21 @@ Sem mudança no banco. A lista completa dos 18 pontos da Elis, com a situação 
 - [ ] **Você:** as decisões A a G do pacote 2 (`docs/34`, seção "Retorno de 09/11/2026", tabela "Pacote 2")
 - [ ] **Você:** avisar a Elis quando o merge sair (ela quis conferir no dia seguinte) e, no celular, conferir o boleto da Protebem em "Ler comprovante ou boleto" (foto nítida, com a linha digitável inteira)
 
+## Retorno do teste de 09/11/2026, pacote 2 (D-089)
+
+Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C, B, A, F e, depois do lançamento, G.
+
+- [x] E: linha do orçamento ao salvar o gasto (`budgetNotice`, `budget.test.ts`; roteiro de telas no bloco F2)
+- [x] D: bolhas das categorias em cinco tons do azul da marca (`CATEGORY_BUBBLE_TONES`, `analises.test.ts`, `contrast.test.ts`)
+- [x] C: "cartão" na mensagem do Telegram e do WhatsApp vira compra no cartão (migração 0028, `clarevo_chat_add_card_purchase`, DESFAZER com `entry_id`; `99zzzzzzz_chat_cartao.sql`, `whatsapp.test.ts`, `telegram.test.ts`)
+- [ ] **Você (Claude Chrome):** aplicar a migração 0028 no `clarevo-producao` (docs/05, passo 12r) e conferir (passo 21p); depois, publicar de novo as funções `telegram` e `whatsapp` com o conteúdo gerado em `supabase/functions/` (a do WhatsApp só se ela estiver publicada)
+- [x] B: "Importar fatura" na tela do cartão; a linha com a parcela escrita entra como compra com as parcelas que faltam (migração 0029, `installment_offset`; `99zzzzzzzz_importar_parcelas.sql`, `importar-revisao.test.ts`, `importar-repo.test.ts`, `cards.test.ts`)
+- [ ] **Você (Claude Chrome):** aplicar a migração 0029 no `clarevo-producao` (docs/05, passo 12s) e conferir (passo 21q); o app novo precisa dela (a visão `card_entry_items` ganha uma coluna) e o app antigo continua funcionando
+- [x] A: recebimento do fim do mês contando no mês seguinte (migração 0030, `next_month` e `counted_month`; `mes-seguinte.test.ts`, `99zzzzzzzzz_mes_seguinte.sql`; roteiro de telas depois de excluir o recebimento)
+- [ ] **Você (Claude Chrome):** aplicar a migração 0030 no `clarevo-producao` (docs/05, passo 12t) e conferir (passo 21r), antes do merge do PR (o merge publica o app novo, e a lista do mês passa a ler `counted_month`); o merge vem logo depois, porque o app antigo mostra o recebimento marcado no mês da data
+- [x] F: vídeo em formato de reels (compra de mercado e orçamento): `node scripts/gravar-redes.js --so reels`, docs/24 seção 2.4b
+- [ ] G, depois do lançamento: modo "Fatura de cartão depois do vencimento" em Multa e juros
+
 ## Ciclo B: renda comprometida (D-026)
 
 Última execução registrada pelas frentes de trabalho em 09/10/2026: `npm test` (30 arquivos, 599 testes), `npm run typecheck`, `npm run test:db` (10, 20, 30, 40, 45, 47, 50, 60 e 65), `npm run test:api` (92 testes, com as sequências de B e C) e `npm run test:web`, que passa (item abaixo).

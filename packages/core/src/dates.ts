@@ -14,7 +14,7 @@ export function isValidIsoDate(value: string): boolean {
 }
 
 /** Dias do mês (mo de 1 a 12). */
-function daysInMonth(y: number, mo: number): number {
+export function daysInMonth(y: number, mo: number): number {
   return new Date(Date.UTC(y, mo, 0)).getUTCDate();
 }
 

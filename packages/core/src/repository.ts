@@ -884,6 +884,7 @@ export type RepoErrorCode =
   | 'valor_acima_do_limite'
   | 'data_invalida'
   | 'data_futura'
+  | 'mes_seguinte_invalido'
   | 'conta_invalida'
   | 'categoria_invalida'
   | 'nome_da_conta_invalido'

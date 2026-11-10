@@ -8,6 +8,7 @@
  *   - P05: começar o orçamento de uma categoria (Transporte, R$ 600,00 por mês, salvar e ver o card);
  *   - P08: criar uma meta (modelo "Estudos") e ver o progresso;
  *   - P11: anotar o primeiro gasto (R$ 35,00) e ver onde ele aparece;
+ *   - reels (D-089 F): salvar uma compra de mercado (Feira, R$ 38,90, com a linha do orçamento no aviso) e abrir o orçamento, no card de Mercado;
  *   - capturas estáticas 1080 x 1350 (4:5) do orçamento, do Resumo, de Contas a pagar e de "Seu mês em 30 segundos".
  *
  * Cada vídeo sai em 1080 x 1920 (9:16), H.264 (yuv420p, +faststart), sem áudio, com uma legenda `.srt` da narração sugerida, a capa (PNG
@@ -26,7 +27,7 @@
  *
  * Uso:
  *   node scripts/gravar-redes.js --saida <pasta>        grava tudo (padrão da pasta: <pasta temporária>/clarevo-redes)
- *   node scripts/gravar-redes.js --so p02,p05,capturas  só estas peças (p02, p05, p08, p11, capturas)
+ *   node scripts/gravar-redes.js --so p02,p05,capturas  só estas peças (p02, p05, p08, p11, reels, capturas)
  *   node scripts/gravar-redes.js --build                refaz o build de demonstração antes (sem ele, usa apps/app/dist se existir)
  *   node scripts/gravar-redes.js --manter-quadros       guarda os quadros brutos da captura em <pasta>/quadros-brutos
  *   node scripts/gravar-redes.js --apresentacao         só os clipes da apresentação (abaixo), em vez das peças das redes
@@ -63,7 +64,7 @@ const opcao = (nome) => { const i = argv.indexOf(nome); return i >= 0 ? argv[i +
 const SAIDA = path.resolve(opcao('--saida') || path.join(os.tmpdir(), argv.includes('--apresentacao') ? 'clarevo-apresentacao' : 'clarevo-redes'));
 const APRESENTACAO = argv.includes('--apresentacao');
 const PORTA = Number(opcao('--porta') || 8599);
-const SO = (opcao('--so') || (APRESENTACAO ? 'clipe-1,clipe-2,clipe-3,clipe-4,clipe-5' : 'p02,p05,p08,p11,capturas')).split(',').map((s) => s.trim()).filter(Boolean);
+const SO = (opcao('--so') || (APRESENTACAO ? 'clipe-1,clipe-2,clipe-3,clipe-4,clipe-5' : 'p02,p05,p08,p11,reels,capturas')).split(',').map((s) => s.trim()).filter(Boolean);
 const FFMPEG = process.env.FFMPEG || (fs.existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 'ffmpeg');
 const FFPROBE = process.env.FFPROBE || (fs.existsSync('/usr/bin/ffprobe') ? '/usr/bin/ffprobe' : 'ffprobe');
 
@@ -794,6 +795,79 @@ const VIDEOS = [
       await rolarPara(520, 1700);
       await pausa(3000);
       await rolarPara(0, 1400);
+      await s.fim();
+    },
+  },
+  {
+    // D-089 F: o vídeo em formato de reels pedido no retorno do teste de 09/11/2026. Salva uma compra de mercado (a linha do orçamento
+    // aparece no aviso de "Gasto salvo", D-089 E) e abre Orçamento por categoria, no card de Mercado.
+    id: 'reels',
+    slug: 'reels-compra-de-mercado-e-orcamento',
+    titulo: 'uma compra de mercado e o orçamento do mês',
+    preparar: async (c) => {
+      await c.rolarPara(0, 0);
+      await c.pausa(500);
+    },
+    roteiro: async (c) => {
+      const { p, botao, campo, radio, aba, esperar, pausa, rolarAte, rolarPara, tocar, digitar } = c;
+      // O Resumo e o botão "Anotar gasto".
+      let s = await c.fala('Uma compra de mercado e o orçamento do mês, lado a lado.', { min: 3.8 });
+      await c.quadro('conferencia', 0.8);
+      await pausa(1500);
+      await tocar(botao('Anotar gasto'), { antes: 400 });
+      await esperar('Será salvo em');
+      await s.fim();
+      // Descrição, valor e a categoria Mercado.
+      s = await c.fala('No exemplo fictício, uma compra de R$ 38,90 na feira, já paga, na categoria Mercado.');
+      await digitar(campo('Descrição'), 'Feira', 110);
+      await pausa(400);
+      await digitar(campo('Valor em reais'), '38,90', 140);
+      await pausa(500);
+      await tocar(radio('Mercado'), { antes: 400 });
+      await pausa(600);
+      await rolarPara(0, 900);
+      await pausa(500);
+      await c.quadro('conferencia', 0);
+      await s.fim();
+      // Salvar: o aviso traz a linha do orçamento de Mercado (D-089 E).
+      s = await c.fala('Ao salvar, o aviso mostra quanto do orçamento de Mercado já foi usado no mês.');
+      await tocar(botao('Salvar gasto'), { antes: 400 });
+      await esperar('Gasto salvo');
+      await p.waitForFunction(() => /Mercado: R\$|Mercado (chegou a|passou)/.test(document.body.innerText), null, { timeout: 12000 });
+      // A linha de uso ("Mercado: R$ 1.438,90 de R$ 1.800,00 em outubro (79%).") ou, se a compra cruzar 80% ou 100%, o aviso de sempre.
+      const corpo = (await p.locator('body').innerText()).replace(/\s+/g, ' ');
+      const uso = new RegExp(`Mercado: (${REAIS}) de (${REAIS}) em ([a-zç]+) \\((\\d+%)\\)\\.`).exec(corpo);
+      const cruzou = /Mercado (chegou a \d+%|passou) do orçamento de ([a-zç]+)/.exec(corpo);
+      if (!uso && !cruzou) throw new Error(`não achei o orçamento no aviso de "Gasto salvo": ${corpo.slice(0, 400)}`);
+      const aviso = uso ? uso[0] : cruzou[0];
+      await pausa(900);
+      await c.quadro('capa', 0);
+      await s.fim();
+      s = await c.fala(
+        uso
+          ? `Neste exemplo, Mercado fica em ${uso[1]} de ${uso[2]} em ${uso[3]}: ${uso[4]} do orçamento.`
+          : `Neste exemplo, o aviso diz: ${cruzou[0]}.`,
+      );
+      await pausa(1800);
+      await s.fim();
+      // Orçamento por categoria, pela aba Movimentos.
+      s = await c.fala('O mesmo número aparece em Orçamento por categoria.');
+      await tocar(p.getByRole('tab', { name: /^Movimentos/ }).filter({ visible: true }).first(), { antes: 300 });
+      await esperar('Registrar recebimento');
+      const linha = botao(/^Orçamento por categoria/);
+      await rolarAte(linha, 1400, 250);
+      await tocar(linha, { antes: 300 });
+      await esperar('Orçado R$');
+      await s.fim();
+      const mercado = await c.lerCategoria('Mercado');
+      c.numeros = { descricao: 'Feira', valor: 'R$ 38,90', aviso, mercado };
+      s = await c.fala(`O card de Mercado mostra ${mercado.usado} de ${mercado.orcado}, ${mercado.percentual}. ${mercado.situacao}.`);
+      await rolarAte(botao(/^Mercado, R\$/), 1500, 215);
+      await pausa(1200);
+      await c.quadro('conferencia', 0);
+      await s.fim();
+      s = await c.fala('O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar. Para conhecer o acesso, veja o fixado Como acessar.');
+      await pausa(2600);
       await s.fim();
     },
   },

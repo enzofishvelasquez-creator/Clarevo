@@ -14,7 +14,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Archive, CircleAlert, Pencil, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { Archive, CircleAlert, FileUp, Pencil, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -290,6 +290,15 @@ function CardBody({
             label={T.screens.noteOnCard}
             icon={Plus}
             onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa', cartao: card.id } })}
+          />
+        ) : null}
+        {!archived ? (
+          // D-089 B: a fatura do banco (OFX, planilha ou PDF) entra neste cartão, com as compras parceladas em andamento.
+          <Button
+            label={T.screens.importInvoice}
+            icon={FileUp}
+            tone="soft"
+            onPress={() => router.push({ pathname: '/importar', params: { destino: 'cartao', cartao: card.id } })}
           />
         ) : null}
 

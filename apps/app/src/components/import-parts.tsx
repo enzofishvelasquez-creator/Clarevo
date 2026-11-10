@@ -54,7 +54,7 @@ export const ReviewRow = memo(function ReviewRow({
   const date = formatDateBR(line.date);
   const toggle = () => line.importable && onToggle(line.id);
   const label = IMPORT_TEXT.labels;
-  const hint = line.label ? (IMPORT_TEXT.labelHints as Record<string, string>)[line.label] : undefined;
+  const hint = line.hint ?? (line.label ? (IMPORT_TEXT.labelHints as Record<string, string>)[line.label] : undefined);
   return (
     <View style={[styles.row, !last && styles.divider]}>
       <View style={styles.head}>

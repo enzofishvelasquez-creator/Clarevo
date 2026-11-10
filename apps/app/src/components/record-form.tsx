@@ -9,6 +9,7 @@ import {
   parseBRL,
   ERROR_TEXT,
   FUTURE_EXPENSE_TEXT,
+  NEXT_MONTH_TEXT,
   addDays,
   cardErrorText,
   cardTitle,
@@ -94,6 +95,8 @@ import {
   type RecordKind,
   rememberCategories,
   suggestCategory,
+  nextMonthAllowed,
+  recordMonth,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -106,6 +109,7 @@ import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccountPicker } from '@/components/account-picker';
+import { SettingSwitch } from '@/components/setting-switch';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -318,13 +322,22 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
 
   const [initial, setInitial] = useState<RecordDraft>(() =>
       mode.type === 'novo'
-        ? { accountId: chooseAccountId(personal.accounts), amountText: '', description: '', category: null, dateText: formatDateBR(today) }
+        ? {
+            accountId: chooseAccountId(personal.accounts),
+            amountText: '',
+            description: '',
+            category: null,
+            dateText: formatDateBR(today),
+            // "Este valor é do mês seguinte" (D-089 A): só no recebimento.
+            ...(mode.kind === 'receita' ? { nextMonth: false } : {}),
+          }
         : {
             accountId: mode.record.accountId,
             amountText: centsToInput(mode.record.amountCents),
             description: mode.record.description,
             category: mode.record.category,
             dateText: formatDateBR(mode.record.occurredOn),
+            ...(mode.record.kind === 'receita' ? { nextMonth: mode.record.nextMonth === true } : {}),
           },
   );
   const [dayMode, setDayMode] = useState(dayMonth !== null);
@@ -1026,16 +1039,20 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     refs.description.current?.focus();
   };
 
-  const finish = (recordId: string, saved?: Pick<FinancialRecord, 'amountCents' | 'occurredOn'>, notice: string | null = null) => {
+  const finish = (recordId: string, saved?: Pick<FinancialRecord, 'amountCents' | 'occurredOn' | 'nextMonth'>, notice: string | null = null) => {
     // Confirmação tátil só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (saved) {
       const total = kind === 'despesa' ? 'pago' : 'recebido';
-      const month = monthOf(saved.occurredOn);
+      // O mês em que conta (D-089 A): o da data ou, no recebimento marcado, o seguinte.
+      const month = recordMonth(saved);
       if (mode.type === 'novo') totalChange.set({ total, month, deltaCents: saved.amountCents });
-      else if (monthOf(mode.record.occurredOn) === month) totalChange.set({ total, month, deltaCents: saved.amountCents - mode.record.amountCents });
+      else if (recordMonth(mode.record) === month) totalChange.set({ total, month, deltaCents: saved.amountCents - mode.record.amountCents });
       else totalChange.set({ total, month, deltaCents: saved.amountCents });
     }
+    // Recebimento que conta num mês que ainda não começou (D-089 A): o aviso diz quando ele aparece no Resumo.
+    const counted = saved && saved.nextMonth === true && recordMonth(saved) > monthOf(today) ? NEXT_MONTH_TEXT.futureNotice(recordMonth(saved)) : null;
+    if (counted !== null) notice = notice === null ? counted : `${notice}\n${counted}`;
     afterNoteSaved();
     rememberCategory(draftRef.current.description, draftRef.current.category);
     // A última conta usada vale só neste aparelho (D-043): abre o próximo formulário já nela.
@@ -1254,7 +1271,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     setBusy(true);
     const version = versionOverride ?? baseVersion;
     // Gasto lido de uma nota: leva o resumo da chave (nunca a chave) para o aviso de nota repetida.
-    const input: RecordInput = note && mode.type === 'novo' ? { ...v.input, receiptKey: note.reading.draft.receiptKey } : v.input;
+    const base: RecordInput = kind === 'receita' ? { ...v.input, nextMonth: v.input.nextMonth === true } : v.input;
+    const input: RecordInput = note && mode.type === 'novo' ? { ...base, receiptKey: note.reading.draft.receiptKey } : base;
     const snapshot = JSON.stringify([input, version]);
     try {
       if (relevantAttempts(attempts, snapshot).length > 0) {
@@ -1267,7 +1285,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         if (found) {
           const saved = found.record;
           if (dayMode || fromReview) finishDay(v.input, another);
-          else finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn } : undefined);
+          else finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn, nextMonth: saved.nextMonth } : undefined);
           return;
         }
       }
@@ -1338,7 +1356,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   };
 
   const parsedDate = day ? ('date' in day ? day.date : null) : parseDateBR(draft.dateText);
-  const movesMonth = mode.type === 'editar' && parsedDate && monthOf(parsedDate) !== monthOf(mode.record.occurredOn);
+  // "Este valor é do mês seguinte" (D-089 A): só no recebimento, fora do modo "Dia", com a data nos últimos 7 dias do mês.
+  const nextMonthShown = kind === 'receita' && !dayMode && parsedDate !== null && nextMonthAllowed(parsedDate);
+  const countedMonth = parsedDate ? recordMonth({ occurredOn: parsedDate, nextMonth: nextMonthShown && draft.nextMonth === true }) : null;
+  const movesMonth = mode.type === 'editar' && countedMonth !== null && countedMonth !== recordMonth(mode.record);
 
   // "Parece já anotado" (D-051): o comprovante não deixa chave no registro, então a duplicidade só se avisa por semelhança (mesmo tipo,
   // mesmo valor e data a até um dia de um registro que já existe). Vale para o que está nos campos agora, e nunca bloqueia o Salvar.
@@ -1741,6 +1762,14 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
                   onPress={toCommitment}
                 />
               ) : null}
+              {nextMonthShown && parsedDate ? (
+                <SettingSwitch
+                  label={NEXT_MONTH_TEXT.toggle}
+                  caption={NEXT_MONTH_TEXT.caption(parsedDate, today)}
+                  value={draft.nextMonth === true}
+                  onChange={(v) => setDraft((d) => ({ ...d, nextMonth: v }))}
+                />
+              ) : null}
             </View>
           )}
 
@@ -1788,8 +1817,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           {movesMonth && parsedDate ? (
             <Banner tone="info" icon={Info}>
               <Txt variant="label">
-                O registro sai de {formatMonthBR(monthOf(mode.record.occurredOn)).toLowerCase()} e passa a contar em{' '}
-                {formatMonthBR(monthOf(parsedDate)).toLowerCase()}.
+                O registro sai de {formatMonthBR(recordMonth(mode.record)).toLowerCase()} e passa a contar em{' '}
+                {formatMonthBR(countedMonth ?? monthOf(parsedDate)).toLowerCase()}.
               </Txt>
             </Banner>
           ) : null}

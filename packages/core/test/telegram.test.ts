@@ -112,7 +112,8 @@ describe('Telegram: resposta a cada mensagem', () => {
     await handleTelegramMessage(inbound('/start ABCD2345'), rpc, KEY);
     await handleTelegramMessage(inbound('desfazer'), rpc, KEY);
     await handleTelegramMessage(inbound('/desligar'), rpc, KEY);
-    expect(calls.map((c) => c.fn)).toEqual(['telegram_add_record', 'telegram_link', 'telegram_undo', 'telegram_unlink']);
+    await handleTelegramMessage(inbound('farmácia 41 cartão'), rpc, KEY);
+    expect(calls.map((c) => c.fn)).toEqual(['telegram_add_record', 'telegram_link', 'telegram_undo', 'telegram_unlink', 'telegram_add_card_purchase']);
     const hash = telegramSenderHash(USER, KEY);
     for (const c of calls) {
       expect(c.args.p_message_id).toBe(stored());
@@ -127,6 +128,8 @@ describe('Telegram: resposta a cada mensagem', () => {
     expect(calls[0]!.args).toMatchObject({ p_kind: 'despesa', p_amount_cents: 5230, p_days_ago: 0, p_occurred_on: null, p_description: 'Mercado', p_category: 'Mercado' });
     expect(calls[1]!.args).toMatchObject({ p_code: 'ABCD2345' });
     expect(calls[2]!.args.p_sent_at).toBe(new Date(NOW * 1000).toISOString());
+    expect(calls[4]!.args).toMatchObject({ p_amount_cents: 4100, p_description: 'Farmácia', p_category: 'Saúde', p_card_hint: null });
+    expect(calls[4]!.args).not.toHaveProperty('p_kind');
   });
 
   it('Iniciar, ajuda, mídia e mensagem que a Clarevo não entendeu passam pelo banco (telegram_note) e recebem as respostas do Telegram', async () => {

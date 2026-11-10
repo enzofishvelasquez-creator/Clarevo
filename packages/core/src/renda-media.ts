@@ -4,6 +4,7 @@ import { comparisonStats, evolutionPoints, type EvolutionPoint } from './evoluca
 import type { Cents } from './money';
 import { formatBRL } from './money';
 import type { FinancialRecord, MonthOverview } from './records';
+import { recordMonth } from './records';
 import type { RecordsRepository } from './repository';
 import { ERROR_TEXT } from './validation';
 
@@ -111,14 +112,14 @@ export function incomeAverage(overview: readonly MonthOverview[], choice: Income
  */
 export function withoutReimbursements(
   overview: readonly MonthOverview[],
-  records: readonly Pick<FinancialRecord, 'kind' | 'category' | 'occurredOn' | 'amountCents'>[],
+  records: readonly Pick<FinancialRecord, 'kind' | 'category' | 'occurredOn' | 'amountCents' | 'nextMonth'>[],
 ): MonthOverview[] {
   return overview.map((row) => {
     if (row.receivedCount === 0) return row;
     let receivedCount = 0;
     let receivedCents = 0;
     for (const r of records) {
-      if (r.kind !== 'receita' || monthOf(r.occurredOn) !== row.month || isReimbursement(r.category)) continue;
+      if (r.kind !== 'receita' || recordMonth(r) !== row.month || isReimbursement(r.category)) continue;
       receivedCount += 1;
       receivedCents += r.amountCents;
     }

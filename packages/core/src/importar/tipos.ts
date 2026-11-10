@@ -71,6 +71,11 @@ export type ImportFileResult = { ok: true; parse: ImportParse } | { ok: false; c
 export interface ImportItem {
   /** Resumo SHA-256 da linha (64 hexadecimais minúsculos). */
   importKey: string;
+  /**
+   * Só em compra no cartão (D-089 B): a parcela escrita na linha da fatura ("LOJA 03/10"). O banco cria a compra com as parcelas que
+   * faltam (da 3 à 10), a desta linha na fatura em que ela cai e as outras nas seguintes, com a numeração da fatura. Ausente: à vista.
+   */
+  installment?: { number: number; count: number } | null;
   kind: 'despesa' | 'receita' | 'compra' | 'estorno';
   /** Positivo, em centavos. */
   amountCents: number;

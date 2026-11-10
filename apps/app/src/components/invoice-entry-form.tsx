@@ -277,12 +277,12 @@ function RefundBudgetNote({ card, month, suggest }: { card: CardData; month: Iso
             <View key={c.entryId}>
               <LinkButton
                 label={`${I.purchaseEdit}: ${c.description}`}
-                accessibilityLabel={maskLabel(R.editA11y(c.description, c.amountCents, c.installments))}
+                accessibilityLabel={maskLabel(R.editA11y(c.description, c.amountCents, c.installments, c.installmentOffset))}
                 style={styles.inlineLink}
                 onPress={() => router.push({ pathname: '/cartoes/[id]/fatura/[mes]/compra', params: { id: card.id, mes: c.invoiceMonth, lancamento: c.entryId } })}
               />
               <MoneyTxt variant="caption" color={colors.textSecondary}>
-                {R.editCaption(c.amountCents, c.installments)}
+                {R.editCaption(c.amountCents, c.installments, c.installmentOffset)}
               </MoneyTxt>
             </View>
           ))}

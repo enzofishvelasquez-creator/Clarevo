@@ -5,7 +5,7 @@ import { monthlyShareCents, percentTenths, sharesCents } from './learn/math';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL, roundDiv } from './money';
 import type { Commitment, CommitmentSeries, FinancialRecord, IncomeReference, SeriesKind, SeriesNature } from './records';
-import { DEBT_NATURES } from './records';
+import { DEBT_NATURES, recordMonth } from './records';
 import { isCommitmentOverdue } from './dia-util';
 import { annualYearOf, projectSeries, seriesMonthOf, seriesYearlyTotal, termFor } from './series';
 import type { ToPaySummary } from './summary';
@@ -551,7 +551,7 @@ export function suggestReference(records: readonly FinancialRecord[], currentMon
   const closed = [-3, -2, -1].map((d) => addMonths(currentMonth, d));
   const totals = new Map<IsoMonth, Cents>();
   for (const r of records) {
-    const m = monthOf(r.occurredOn);
+    const m = recordMonth(r);
     if (r.kind !== 'receita' || !closed.includes(m) || isReimbursement(r.category)) continue;
     totals.set(m, (totals.get(m) ?? 0) + r.amountCents);
   }

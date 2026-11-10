@@ -39,7 +39,7 @@ export function PurchaseRow({ entry, cardName, last, onPress }: { entry: CardEnt
   const { width, fontScale } = useWindowDimensions();
   const hidden = useValuesHidden();
   const stacked = isStackedLayout(width, fontScale);
-  const caption = SEARCH_TEXT.purchaseCaption(entry.purchasedOn ?? '', cardName, entry.installments);
+  const caption = SEARCH_TEXT.purchaseCaption(entry.purchasedOn ?? '', cardName, entry.installments, entry.installmentOffset ?? 0);
   return (
     <Pressable
       onPress={onPress}

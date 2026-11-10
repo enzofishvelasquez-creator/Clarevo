@@ -27,6 +27,7 @@ import type {
   ReturnReviewState,
   SeriesKind,
 } from './records';
+import { recordMonth } from './records';
 import { isCommitmentOverdue } from './dia-util';
 import type { AnnualYearSummary } from './series';
 import { annualYearLabelOf, numberAtOrAfter, numberAtOrBefore, occurrenceLabel, seriesMonthOf, termFor } from './series';
@@ -604,7 +605,7 @@ export function monthsOverview(
   return monthList(from, to).map((month) => {
     const out = zeroOverview(month);
     for (const r of records) {
-      if (r.contextId !== contextId || r.status !== 'realizado' || monthOf(r.occurredOn) !== month) continue;
+      if (r.contextId !== contextId || r.status !== 'realizado' || recordMonth(r) !== month) continue;
       if (r.kind === 'receita') {
         out.receivedCount += 1;
         out.receivedCents += r.amountCents;

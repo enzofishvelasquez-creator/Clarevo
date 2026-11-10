@@ -1,4 +1,4 @@
-import { addDays, formatListDate, type IsoDate } from '../dates';
+import { addDays, formatListDate, formatMonthName, formatMonthYearBR, type IsoDate } from '../dates';
 import { SUPPORT_EMAIL } from '../legal';
 import { MAX_RECORD_CENTS, formatBRL, type Cents } from '../money';
 import { NO_CATEGORY_LABEL, type RecordKind } from '../records';
@@ -24,6 +24,28 @@ export interface WhatsAppRecordInfo {
   account_name: string;
 }
 
+/** O apelido sem a palavra "cartão" no começo ("Cartão Azul" vira "Azul"), para não repetir a palavra. */
+function withoutCardWord(nickname: string): string {
+  const rest = nickname.replace(/^\s*cart[aã]o\s+/i, '');
+  return rest === '' ? nickname : rest;
+}
+
+/** "cartão Azul", ou o apelido como está quando ele já começa com "Cartão" ("Cartão Azul", ou só "Cartão"). */
+function cardLabel(nickname: string): string {
+  return /^\s*cart[aã]o(\s|$)/i.test(nickname) ? nickname.trim() : `cartão ${nickname}`;
+}
+
+/** Compra no cartão anotada ou desfeita (D-089 C), como o banco devolve: o apelido do cartão, nunca os dígitos; a fatura como dia 1. */
+export interface WhatsAppPurchaseInfo {
+  amount_cents: Cents;
+  purchased_on: IsoDate;
+  description: string;
+  category: string | null;
+  card_nickname: string;
+  /** "2026-12-01": a fatura em que a compra caiu (o mês do vencimento). */
+  invoice_month: string;
+}
+
 /**
  * Resultado das funções whatsapp_* do banco. Nada é respondido em "repetida" (a Meta mandou de novo a mesma mensagem) nem em "silencio"
  * (enxurrada de mensagens, depois do primeiro aviso). "registrada": mensagem sem dados (ajuda, mídia, não entendi), respondida pelo
@@ -34,6 +56,9 @@ export type WhatsAppOutcome =
   | { result: 'anotado'; space: WhatsAppSpace; record: WhatsAppRecordInfo; today?: IsoDate }
   | { result: 'desfeito'; space: WhatsAppSpace; record: WhatsAppRecordInfo; today?: IsoDate }
   | { result: 'sem_permissao' | 'sem_conta'; space: WhatsAppSpace; today?: IsoDate }
+  | { result: 'compra_anotada' | 'compra_desfeita'; space: WhatsAppSpace; purchase: WhatsAppPurchaseInfo; today?: IsoDate }
+  | { result: 'sem_cartao' | 'fatura_paga' | 'limite_do_cartao'; space: WhatsAppSpace; today?: IsoDate }
+  | { result: 'qual_cartao'; space: WhatsAppSpace; cards: string[]; today?: IsoDate }
   | {
       result:
         | 'nada_para_desfazer'
@@ -68,6 +93,27 @@ function dayLabel(date: IsoDate, today: IsoDate): string {
   return shown;
 }
 
+/** "dezembro" ou "janeiro de 2027" (com o ano quando não é o ano de hoje). */
+function invoiceLabel(invoiceMonth: string, today: IsoDate): string {
+  const month = invoiceMonth.slice(0, 7);
+  return month.slice(0, 4) === today.slice(0, 4) ? formatMonthName(month) : formatMonthYearBR(month);
+}
+
+function purchaseLines(p: WhatsAppPurchaseInfo, today: IsoDate): string {
+  return [
+    `Compra no ${cardLabel(p.card_nickname)}: ${p.description}, ${formatBRL(p.amount_cents)}`,
+    `Categoria: ${p.category ?? NO_CATEGORY_LABEL}`,
+    `Data da compra: ${dayLabel(p.purchased_on, today)}`,
+    `Fatura de ${invoiceLabel(p.invoice_month, today)}`,
+  ].join('\n');
+}
+
+/** "Azul", "Azul e Roxo", "Azul, Roxo e Verde". */
+function listNames(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
+}
+
 function recordLines(r: WhatsAppRecordInfo, today: IsoDate): string {
   const what = r.kind === 'despesa' ? 'Gasto' : 'Recebimento';
   const account = r.kind === 'despesa' ? 'Saiu de' : 'Entrou em';
@@ -87,6 +133,10 @@ const EXAMPLES = [
   'recebi 1500 salário',
   '',
   'A data é hoje, se você não disser outra: "farmácia 38 ontem" ou "luz 180 12/10".',
+  '',
+  'Para uma compra no cartão de crédito, acrescente a palavra cartão no fim:',
+  'farmácia 41 cartão',
+  'Com mais de um cartão, o nome dele depois: "farmácia 41 cartão azul".',
 ].join('\n');
 
 /** Canal da conversa (D-076 e D-080). As respostas e as regras são as mesmas; mudam o nome do canal e o de quem escreve. */
@@ -215,6 +265,20 @@ export function whatsappOutcomeReply(outcome: WhatsAppOutcome, messageDay: IsoDa
       return r.sem_permissao(outcome.space);
     case 'sem_conta':
       return `O ${spaceLabel(outcome.space)} está sem conta de origem principal. No app, abra Conta e escolha a principal em Contas de origem.`;
+    case 'compra_anotada':
+      return `Anotado no ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
+    case 'compra_desfeita':
+      return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}`;
+    case 'sem_cartao':
+      return outcome.space.kind === 'pessoal'
+        ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Conta e Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
+        : `Compras no cartão entram só no espaço Pessoal, e ${CHANNEL_WORDS[channel].whoLinked} está ligado ao ${spaceLabel(outcome.space)}. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.`;
+    case 'qual_cartao':
+      return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${withoutCardWord(outcome.cards[0] ?? 'azul').toLowerCase()}".`;
+    case 'fatura_paga':
+      return 'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.';
+    case 'limite_do_cartao':
+      return 'Este cartão chegou a 5.000 lançamentos guardados. Para anotar outros, exclua no app os lançamentos que não usa mais.';
     default:
       return chatReply(channel)[outcome.result];
   }

@@ -55,6 +55,12 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
 
 12q. **Por último (categoria "Crédito e parcelas", D-086)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261106000002_categoria_credito.sql` (migração 0027) e clique em **Run**. Ela põe a sétima categoria de gasto na restrição de `category_budgets`, em `set_category_budget` e em `month_budget` (que passa a devolver sete linhas: o app recusa a leitura do orçamento com um número de linhas diferente do dele, então o app novo precisa desta migração, e o app antigo continua funcionando com ela). Não muda nenhum dado. Depois, rode `notify pgrst, 'reload schema';` e a conferência do passo 21o.
 
+12r. **Por último (compra no cartão pelo Telegram e pelo WhatsApp, D-089 C)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261109000001_chat_cartao.sql` (migração 0028) e clique em **Run**. Ela acrescenta `entry_id` a `chat_messages`, recria `clarevo_chat_log` (com o lançamento do cartão) e `clarevo_chat_undo` (DESFAZER também desfaz a compra), e cria `clarevo_chat_add_card_purchase`, `clarevo_chat_purchase`, `clarevo_chat_fold` e as funções do servidor `whatsapp_add_card_purchase` e `telegram_add_card_purchase` (só a chave de serviço). Nenhum dado existente é alterado. Depois dela, publique de novo as funções `telegram` e `whatsapp` (o conteúdo gerado em `supabase/functions/`), porque a mensagem "farmácia 41 cartão" passa a chamar a função nova; o app não muda. Se o SQL Editor avisar operação destrutiva (o `drop function` da `clarevo_chat_log`), confirme: a função é recriada na linha seguinte.
+
+12s. **Por último (importar a fatura com as parcelas em andamento, D-089 B)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261109000002_importar_parcelas.sql` (migração 0029) e clique em **Run**. Ela acrescenta `installment_offset` a `card_entries` (0 em tudo o que já existe), põe a coluna na visão `card_entry_items` e no retorno das funções de cartão (`clarevo_entry_json`), e recria `import_records` (a linha com a parcela escrita vira a compra com as parcelas que faltam) e `update_card_entry` (carrega o deslocamento, mantém a distância das faturas ao corrigir a data e recusa passar de 48 parcelas no total), e `month_budget` (a parcela da compra importada em andamento conta no mês certo do orçamento). Nenhum dado existente muda. Depois, recarregue o esquema da API (`notify pgrst, 'reload schema';`): o app novo lê a coluna nova da visão.
+
+12t. **Por último (recebimento do fim do mês que conta no mês seguinte, D-089 A)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261109000003_recebimento_mes_seguinte.sql` (migração 0030) e clique em **Run**. Ela acrescenta `next_month` e `counted_month` a `financial_records` (false e o mês da data em tudo o que já existe), recria `create_record` e `update_record` com `p_next_month` no fim (o app antigo continua funcionando) e faz `month_totals`, `months_overview` e `set_month_check` contarem pelo mês em que o registro conta. Nenhum dado existente muda. Depois, recarregue o esquema da API (`notify pgrst, 'reload schema';`). Aplique antes de publicar o app novo: a lista do mês do app novo lê `counted_month`.
+
 13. A ordem importa: cada arquivo altera tabelas e funções criadas pelos anteriores (a 0006 vem depois da 0005, a 0007 depois da 0006, a 0008 depois da 0007, a 0009 depois da 0008, a 0010 depois da 0009, a 0011 depois da 0010, a 0012 depois da 0011, a 0013 depois da 0012, a 0014 depois da 0013, a 0015 depois da 0014, a 0016 depois da 0015, a 0017 depois da 0016, a 0018 depois da 0017 e a 0019 depois da 0018 a 0020 depois da 0019 e a 0021 depois da 0020). Cada arquivo roda uma única vez; se o projeto já tinha os primeiros, rode só os que faltam, na ordem dos nomes.
 14. Todos devem terminar sem erro. Se aparecer erro, me envie a mensagem.
 15. Para conferir as migrações novas, rode numa nova consulta:
@@ -587,6 +593,49 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
    ```
 
    O resultado esperado é `restricao_0027 = 1`, `funcoes_0027 = 2` e `funcoes_do_app = 94` (a 0027 não cria função). Testada em 06/11/2026 num banco local descartável. **Aplicada em produção (`clarevo-producao`) em 06/11/2026:** a conferência devolveu 1, 2 e 94. O aviso de operação destrutiva do SQL Editor não apareceu nela (ele aparece com alguns comandos, como o `delete` da limpeza das ligações antigas dentro da 0026, e não com o `alter table ... drop constraint` da 0027); o resultado da conferência é o que vale.
+
+21p. Para conferir a 0028 (compra no cartão pelo chat, D-089 C), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('whatsapp_add_card_purchase', 'telegram_add_card_purchase')
+              and has_function_privilege('service_role', p.oid, 'execute')
+              and not has_function_privilege('authenticated', p.oid, 'execute') and not has_function_privilege('anon', p.oid, 'execute')) as funcoes_do_servidor_0028,
+          (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'chat_messages' and column_name = 'entry_id') as coluna_0028,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = 'clarevo_chat_undo' and pg_get_functiondef(p.oid) like '%compra_desfeita%') as desfazer_0028,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `funcoes_do_servidor_0028 = 2`, `coluna_0028 = 1`, `desfazer_0028 = 1` e `funcoes_do_app = 94` (a 0028 não cria função para o app). Depois, publicar de novo as funções `telegram` e `whatsapp` e recarregar o esquema (`notify pgrst, 'reload schema';`).
+
+21q. Para conferir a 0029 (importar a fatura com as parcelas em andamento, D-089 B), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'card_entries' and column_name = 'installment_offset') as coluna_0029,
+          (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'card_entry_items' and column_name = 'installment_offset') as visao_0029,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('import_records', 'update_card_entry') and pg_get_functiondef(p.oid) like '%installment_offset%') as funcoes_0029,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `coluna_0029 = 1`, `visao_0029 = 1`, `funcoes_0029 = 2` e `funcoes_do_app = 94` (a 0029 não cria função). Depois, recarregar o esquema (`notify pgrst, 'reload schema';`).
+
+21r. Para conferir a 0030 (recebimento do fim do mês que conta no mês seguinte, D-089 A), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'financial_records' and column_name in ('next_month', 'counted_month')) as colunas_0030,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('month_totals', 'months_overview', 'set_month_check') and pg_get_functiondef(p.oid) like '%counted_month%') as totais_0030,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('create_record', 'update_record') and pg_get_function_arguments(p.oid) like '%p_next_month%') as funcoes_0030,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `colunas_0030 = 2`, `totais_0030 = 3`, `funcoes_0030 = 2` e `funcoes_do_app = 94` (a 0030 troca as duas funções de registro pelas novas e não abre as auxiliares). Depois, recarregar o esquema (`notify pgrst, 'reload schema';`).
 
 22. Se o app mostrar erro ao abrir as contas a pagar, os gastos fixos, as contas do ano, as metas, os cartões, a renda comprometida, o orçamento, as contas de origem, as assinaturas, a importação de extrato, a Família, o painel da empresa, a exclusão da conta, a Evolução, a conferência de um mês ou o Resumo logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`. Faça isso depois de colar a 0016, antes de abrir o app (a 0016 recria `months_overview`, e a API precisa ler a função nova), e de novo depois de colar a 0018 (função nova, `set_signup_source`). A 0019 não cria função nem tabela: não precisa. A 0020, a 0021, a 0022, a 0023 e a 0024 criam funções novas (WhatsApp, imagem das metas, Telegram, assinatura e aceite dos termos): rode depois de colar cada uma.
 23. O consultor de segurança do Supabase (**Advisors**) pode apontar a visão `series_items` como visão com os privilégios de quem a criou (a migração de contas do ano a recria com as mesmas opções). É intencional: ela precisa ler as contas excluídas só em um mês, filtra a permissão de leitura de forma explícita e usa `security_barrier` (ver `docs/01_ARQUITETURA.md`). O mesmo vale para as outras sete visões e para o restante do que o verificador aponta: ver "Verificador do Supabase: o que é esperado", logo antes de "Custos".

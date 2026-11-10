@@ -1,4 +1,5 @@
 import { ACCOUNTS_TEXT, activeAccounts, hasAccountChoice } from './accounts';
+import { installmentsWords } from './cards';
 import type { IsoDate, IsoMonth } from './dates';
 import { addMonths, formatDateBR, monthOf } from './dates';
 import type { Cents } from './money';
@@ -144,8 +145,8 @@ export const SEARCH_TEXT = {
   cardsHiddenByAccount: 'Compras no cartão não têm conta de origem: a conta vem do pagamento da fatura. Limpe o filtro de conta para vê-las.',
   cardsLoadFailed: 'Não foi possível carregar as compras no cartão. Tente novamente.',
   retry: 'Tentar de novo',
-  purchaseCaption: (purchasedOn: IsoDate, cardName: string | null, installments: number): string =>
-    ['Compra', formatDateBR(purchasedOn), cardName, installments === 1 ? 'à vista' : `em ${installments} vezes`].filter(Boolean).join(' · '),
+  purchaseCaption: (purchasedOn: IsoDate, cardName: string | null, installments: number, offset = 0): string =>
+    ['Compra', formatDateBR(purchasedOn), cardName, installmentsWords(installments, offset)].filter(Boolean).join(' · '),
   purchaseA11y: (description: string, caption: string, value: string): string => `${description}, ${caption}, ${value}. Abre a fatura.`,
 } as const;
 

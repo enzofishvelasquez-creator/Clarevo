@@ -8,7 +8,7 @@ import {
   contextName,
   addMonths,
   annualCommitmentIds,
-  budgetCrossing,
+  budgetNotice,
   buildSeuMes,
   categoryRefunds,
   categoryBreakdown,
@@ -139,6 +139,7 @@ import {
   type SeriesEditInput,
   type SeriesInput,
   type SeriesWrite,
+  nextMonthAllowed,
 } from '@clarevo/core';
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { createContext, use, useEffect, useMemo, useRef } from 'react';
@@ -970,7 +971,10 @@ const stamp = (results: readonly { dataUpdatedAt: number }[]) => results.map((r)
  * consulta e devolve lista vazia.
  */
 export function useRecordsNear(contextId: string | undefined, date: IsoDate | null): FinancialRecord[] {
-  const months = date ? [...new Set([addDays(date, -1), date, addDays(date, 1)].map(monthOf))] : [];
+  // O recebimento dos últimos dias do mês marcado "do mês seguinte" (D-089 A) está na lista do mês seguinte.
+  const months = date
+    ? [...new Set([addDays(date, -1), date, addDays(date, 1)].map(monthOf).concat(nextMonthAllowed(addDays(date, 1)) ? [addMonths(monthOf(addDays(date, 1)), 1)] : []))]
+    : [];
   const results = useRecordsOfMonths(contextId, months);
   return results.flatMap((r) => r.data ?? []);
 }
@@ -1342,10 +1346,10 @@ export interface BudgetBefore {
 }
 
 /**
- * Aviso dentro do app, sem notificação, depois de salvar um gasto ou uma compra no cartão (ou editar): se a categoria cruzou 80%
- * ou 100% do orçamento do mês, a mensagem de sucesso ganha uma linha neutra (budgetCrossing). before() lê o estado antes de
- * gravar e after() lê de novo e compara; qualquer falha de leitura apaga o aviso, nunca bloqueia o salvamento. Valores ocultos:
- * a frase sai sem o valor.
+ * Aviso dentro do app, sem notificação, depois de salvar um gasto ou uma compra no cartão (ou editar): com orçamento na categoria,
+ * a mensagem de sucesso ganha uma linha neutra (budgetNotice): a do cruzamento de 80% ou 100%, quando cruza, ou a de uso
+ * ("Mercado: R$ 1.550,00 de R$ 1.800,00 em outubro (86%).", D-089 E). before() lê o estado antes de gravar e after() lê de novo e
+ * compara; qualquer falha de leitura apaga o aviso, nunca bloqueia o salvamento. Valores ocultos: a frase sai sem o valor.
  */
 export function useBudgetWatch() {
   const repo = useRepo();
@@ -1367,7 +1371,7 @@ export function useBudgetWatch() {
         if (!before) return null;
         try {
           const line = (await repo.getMonthBudget(before.contextId, before.month)).lines.find((l) => l.category === before.line.category);
-          return budgetCrossing(before.line, line ?? null, before.month, today, valuesHidden());
+          return budgetNotice(before.line, line ?? null, before.month, today, valuesHidden());
         } catch {
           return null;
         }

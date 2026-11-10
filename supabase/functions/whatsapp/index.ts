@@ -96,6 +96,11 @@ const __mods = [
         }
         return undefined;
     }
+    const CARD_WORD = 'cartao';
+    const CARD_PREPOSITIONS = new Set(['no', 'com', 'pelo', 'via']);
+    const NOT_CARD_BEFORE = new Set(['do', 'da', 'de', 'dos', 'das']);
+    const NOT_CARD_WORDS = new Set(['estorno', 'reembolso', 'devolucao', 'fatura', 'pagamento', 'pagto', 'pgto', 'recarga', 'anuidade']);
+    const AMOUNT_MARK = '\u0000valor';
     const INCOME_WORDS = new Set(['recebi', 'recebido', 'recebimento', 'ganhei', 'entrou', 'entrada', 'caiu', 'receita']);
     const EXPENSE_WORDS = new Set(['gastei', 'gasto', 'paguei', 'pago', 'comprei', 'compra', 'despesa']);
     const EDGE_STOP = new Set([
@@ -231,7 +236,36 @@ const __mods = [
             return { type: 'erro', reason: 'valor_invalido' };
         if (chosen.cents > money_1.MAX_RECORD_CENTS)
             return { type: 'erro', reason: 'valor_acima_do_limite' };
-        tokens = tokens.filter((_, i) => !chosen.idx.includes(i));
+        const at = chosen.idx[0];
+        tokens = tokens.flatMap((t, i) => (i === at ? [{ ...t, folded: AMOUNT_MARK, word: '' }] : chosen.idx.includes(i) ? [] : [t]));
+        let card = null;
+        if (kind !== 'receita' && !tokens.some((t) => NOT_CARD_WORDS.has(t.folded))) {
+            const i = tokens.findIndex((t, k) => (t.folded === CARD_WORD && !NOT_CARD_BEFORE.has(tokens[k - 1]?.folded ?? '')) ||
+                (t.folded === 'credito' && CARD_PREPOSITIONS.has(tokens[k - 1]?.folded ?? '')));
+            if (i >= 0) {
+                const prep = i > 0 && CARD_PREPOSITIONS.has(tokens[i - 1].folded);
+                let j = i + 1;
+                if (tokens[j]?.folded === 'de' && tokens[j + 1]?.folded === 'credito')
+                    j += 2;
+                else if (tokens[j]?.folded === 'credito')
+                    j += 1;
+                const amountAt = tokens.findIndex((t) => t.folded === AMOUNT_MARK);
+                const end = amountAt > i ? amountAt : tokens.length;
+                const rest = [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(end)];
+                const hasDescription = rest.some((t) => t.folded !== AMOUNT_MARK && t.word !== '' && !isEdgeStop(t.folded));
+                let name = hasDescription ? tokens.slice(j, end).filter((t) => t.folded !== AMOUNT_MARK) : [];
+                const loose = (t) => isEdgeStop(t.folded) || t.folded === 'dia';
+                while (name.length > 0 && loose(name[0]))
+                    name = name.slice(1);
+                while (name.length > 0 && loose(name[name.length - 1]))
+                    name = name.slice(0, -1);
+                const hint = name.map((t) => t.word).join(' ').trim();
+                card = { hint: hint === '' ? null : clip(hint) };
+                tokens = hasDescription ? rest : [...tokens.slice(0, prep ? i - 1 : i), ...tokens.slice(j)];
+                kind = 'despesa';
+            }
+        }
+        tokens = tokens.filter((t) => t.folded !== AMOUNT_MARK);
         while (tokens.length > 0 && isEdgeStop(tokens[0].folded))
             tokens = tokens.slice(1);
         while (tokens.length > 0 && isEdgeStop(tokens[tokens.length - 1].folded))
@@ -251,6 +285,7 @@ const __mods = [
             daysAgo: occurredOn === null ? 0 : daysAgo,
             description,
             category: whatsappCategory(description, kind),
+            card,
         };
     }
   },
@@ -259,6 +294,7 @@ const __mods = [
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.isValidIsoDate = isValidIsoDate;
+    exports.daysInMonth = daysInMonth;
     exports.parseDateBR = parseDateBR;
     exports.formatDateBR = formatDateBR;
     exports.formatDayMonth = formatDayMonth;
@@ -525,7 +561,35 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.CATEGORIES = exports.NO_CATEGORY_LABEL = exports.MONTH_CHECK_KINDS = exports.INSTALLMENT_NATURES = exports.DEBT_NATURES = exports.PARTS_PER_YEAR_MAX = exports.ANNUAL_LEAD_MONTHS = void 0;
+    exports.CATEGORIES = exports.NO_CATEGORY_LABEL = exports.MONTH_CHECK_KINDS = exports.INSTALLMENT_NATURES = exports.DEBT_NATURES = exports.PARTS_PER_YEAR_MAX = exports.ANNUAL_LEAD_MONTHS = exports.NEXT_MONTH_TEXT = exports.NEXT_MONTH_WINDOW_DAYS = void 0;
+    exports.nextMonthAllowed = nextMonthAllowed;
+    exports.recordMonth = recordMonth;
+    const dates_1 = __req(2);
+    exports.NEXT_MONTH_WINDOW_DAYS = 7;
+    function nextMonthAllowed(date) {
+        const [y, m, d] = date.split('-').map(Number);
+        return d > (0, dates_1.daysInMonth)(y, m) - exports.NEXT_MONTH_WINDOW_DAYS;
+    }
+    function recordMonth(record) {
+        const month = (0, dates_1.monthOf)(record.occurredOn);
+        return record.nextMonth === true ? (0, dates_1.addMonths)(month, 1) : month;
+    }
+    function firstDayLine(month) {
+        const name = (0, dates_1.formatMonthYearBR)(month).replace(/ de \d{4}$/, '');
+        return `${name.charAt(0).toUpperCase()}${name.slice(1)} aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`;
+    }
+    exports.NEXT_MONTH_TEXT = {
+        toggle: 'Este valor é do mês seguinte',
+        caption: (date, today) => {
+            const own = (0, dates_1.monthOf)(date);
+            const next = (0, dates_1.addMonths)(own, 1);
+            const base = `Entra no Recebido de ${(0, dates_1.formatMonthYearBR)(next)}, não no de ${(0, dates_1.formatMonthYearBR)(own)}.`;
+            return today !== undefined && own === (0, dates_1.monthOf)(today) ? `${base} ${firstDayLine(next)}` : base;
+        },
+        futureNotice: (month) => `Conta no Recebido de ${(0, dates_1.formatMonthYearBR)(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
+        rowNote: (month) => `conta em ${(0, dates_1.formatMonthYearBR)(month).replace(/ de \d{4}$/, '')}`,
+        detailSuffix: ' (mês seguinte)',
+    };
     exports.ANNUAL_LEAD_MONTHS = 2;
     exports.PARTS_PER_YEAR_MAX = 12;
     exports.DEBT_NATURES = ['financiamento', 'compra_parcelada'];
@@ -815,6 +879,13 @@ const __mods = [
     const records_1 = __req(4);
     const canais_1 = __req(10);
     exports.WHATSAPP_CODE_MINUTES = 15;
+    function withoutCardWord(nickname) {
+        const rest = nickname.replace(/^\s*cart[aã]o\s+/i, '');
+        return rest === '' ? nickname : rest;
+    }
+    function cardLabel(nickname) {
+        return /^\s*cart[aã]o(\s|$)/i.test(nickname) ? nickname.trim() : `cartão ${nickname}`;
+    }
     function spaceLabel(space) {
         return space.kind === 'pessoal' ? 'espaço Pessoal' : `espaço ${space.name}`;
     }
@@ -825,6 +896,23 @@ const __mods = [
         if (date === (0, dates_1.addDays)(today, -1))
             return `ontem, ${shown}`;
         return shown;
+    }
+    function invoiceLabel(invoiceMonth, today) {
+        const month = invoiceMonth.slice(0, 7);
+        return month.slice(0, 4) === today.slice(0, 4) ? (0, dates_1.formatMonthName)(month) : (0, dates_1.formatMonthYearBR)(month);
+    }
+    function purchaseLines(p, today) {
+        return [
+            `Compra no ${cardLabel(p.card_nickname)}: ${p.description}, ${(0, money_1.formatBRL)(p.amount_cents)}`,
+            `Categoria: ${p.category ?? records_1.NO_CATEGORY_LABEL}`,
+            `Data da compra: ${dayLabel(p.purchased_on, today)}`,
+            `Fatura de ${invoiceLabel(p.invoice_month, today)}`,
+        ].join('\n');
+    }
+    function listNames(names) {
+        if (names.length <= 1)
+            return names[0] ?? '';
+        return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
     }
     function recordLines(r, today) {
         const what = r.kind === 'despesa' ? 'Gasto' : 'Recebimento';
@@ -844,6 +932,10 @@ const __mods = [
         'recebi 1500 salário',
         '',
         'A data é hoje, se você não disser outra: "farmácia 38 ontem" ou "luz 180 12/10".',
+        '',
+        'Para uma compra no cartão de crédito, acrescente a palavra cartão no fim:',
+        'farmácia 41 cartão',
+        'Com mais de um cartão, o nome dele depois: "farmácia 41 cartão azul".',
     ].join('\n');
     const CHANNEL_WORDS = {
         whatsapp: { name: 'WhatsApp', who: 'este número', whoLinked: 'este WhatsApp', inAccount: canais_1.WHATSAPP_IN_ACCOUNT },
@@ -939,6 +1031,20 @@ const __mods = [
                 return r.sem_permissao(outcome.space);
             case 'sem_conta':
                 return `O ${spaceLabel(outcome.space)} está sem conta de origem principal. No app, abra Conta e escolha a principal em Contas de origem.`;
+            case 'compra_anotada':
+                return `Anotado no ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
+            case 'compra_desfeita':
+                return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}`;
+            case 'sem_cartao':
+                return outcome.space.kind === 'pessoal'
+                    ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Conta e Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
+                    : `Compras no cartão entram só no espaço Pessoal, e ${CHANNEL_WORDS[channel].whoLinked} está ligado ao ${spaceLabel(outcome.space)}. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.`;
+            case 'qual_cartao':
+                return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${withoutCardWord(outcome.cards[0] ?? 'azul').toLowerCase()}".`;
+            case 'fatura_paga':
+                return 'A fatura desse mês já está marcada como paga no app, então a compra não pode entrar nem sair por aqui. Confira a data ou anote no app.';
+            case 'limite_do_cartao':
+                return 'Este cartão chegou a 5.000 lançamentos guardados. Para anotar outros, exclua no app os lançamentos que não usa mais.';
             default:
                 return chatReply(channel)[outcome.result];
         }
@@ -1137,15 +1243,25 @@ const __mods = [
                 outcome = await call('unlink', {});
                 break;
             case 'anotar':
-                outcome = await call('add_record', {
-                    p_sent_at: sentAt,
-                    p_kind: cmd.kind,
-                    p_amount_cents: cmd.amountCents,
-                    p_days_ago: cmd.daysAgo,
-                    p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
-                    p_description: cmd.description,
-                    p_category: cmd.category,
-                });
+                outcome = cmd.card
+                    ? await call('add_card_purchase', {
+                        p_sent_at: sentAt,
+                        p_amount_cents: cmd.amountCents,
+                        p_days_ago: cmd.daysAgo,
+                        p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
+                        p_description: cmd.description,
+                        p_category: cmd.category,
+                        p_card_hint: cmd.card.hint,
+                    })
+                    : await call('add_record', {
+                        p_sent_at: sentAt,
+                        p_kind: cmd.kind,
+                        p_amount_cents: cmd.amountCents,
+                        p_days_ago: cmd.daysAgo,
+                        p_occurred_on: cmd.daysAgo === null ? cmd.occurredOn : null,
+                        p_description: cmd.description,
+                        p_category: cmd.category,
+                    });
                 break;
         }
         return (0, respostas_1.whatsappOutcomeReply)(outcome, today, msg.channel);
@@ -1189,7 +1305,7 @@ const __mods = [
     const RESULTS = new Set([
         'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
         'sem_assinatura', 'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
-        'repetida', 'silencio', 'registrada',
+        'repetida', 'silencio', 'registrada', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga', 'limite_do_cartao',
     ]);
     class WhatsAppFinalError extends Error {
     }
