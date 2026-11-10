@@ -104,7 +104,7 @@ Das decisões maiores do produto nas últimas semanas, três nasceram dela: anot
 > 8. **Orçamento:** ao salvar um gasto numa categoria com orçamento, aparece uma linha como "Mercado: R$ 1.400,00 de R$ 1.800,00 em novembro (78%)".
 > 9. **Análises:** as bolhas das categorias ganharam tons de azul.
 >
-> O modo próprio para a fatura do cartão vencida em Multa e juros fica para depois do lançamento. Se puder, me conta como foi o boleto pela foto no celular. Obrigado pelos testes, eles mudaram muita coisa no app!
+> O modo próprio para a fatura do cartão vencida em Multa e juros fica para depois do lançamento. Se puder, me conta como foi o boleto pela foto no celular. Agradeço muito pelos testes, eles mudaram muita coisa no app!
 
 ## 7. O que vale pedir a ela
 
