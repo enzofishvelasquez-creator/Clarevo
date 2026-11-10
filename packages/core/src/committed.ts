@@ -697,6 +697,14 @@ export function groupPermilleShares(s: Pick<CommittedSummary, 'committedPermille
 }
 
 /** Textos fixos e montados da renda comprometida, da renda de referência e da previsão dos pagamentos do mês. */
+/** Atalhos de outras telas para a renda comprometida (docs/10 A14). */
+export const COMMITTED_LINK_TEXT = {
+  /** Gastos fixos, logo abaixo de "Por mês, se os valores não mudarem". */
+  fromSeries: 'Quanto isso pesa na sua renda? Ver renda comprometida',
+  /** Detalhe de um financiamento, empréstimo ou compra parcelada. */
+  fromDebt: 'Conta como dívida na renda comprometida. Ver',
+} as const;
+
 export const COMMITTED_TEXT = {
   title: 'Renda comprometida',
   planned: 'Previsto',

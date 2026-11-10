@@ -97,7 +97,13 @@ export const CALC_UI_TEXT = {
   shortcutCaption: 'Parcelado ou à vista, dívidas, reserva e outras contas',
   /** Aprender: card branco no topo. */
   learnCardTitle: 'Calculadoras',
-  learnCardCaption: 'Parcelado ou à vista, dívidas, reserva e outras contas com os seus números',
+  learnCardCaption: 'Parcelado ou à vista, dívidas, reserva, simular um plano e outras contas com os seus números',
+  /** A linha do simulador no grupo "Guardar e dividir" de Calculadoras (docs/10 A20): o mesmo nome em todas as portas. */
+  simulateTitle: 'Simular um plano',
+  simulateCaption: 'Quanto guardar por mês e em quanto tempo, com hipóteses suas',
+  /** Na calculadora da reserva, quando a pessoa já tem a reserva em Metas. */
+  reserveExists: 'Você já tem uma reserva para imprevistos em Metas.',
+  reserveSee: 'Ver em Metas',
   /** Metas: card com as duas calculadoras de guardar e a lista inteira. */
   goalsCardTitle: 'Enquanto isso, faça as contas',
   goalsSlugs: ['reserva', 'juntar-para-objetivo'] as readonly CalcSlug[],

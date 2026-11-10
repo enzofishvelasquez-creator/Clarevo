@@ -19,9 +19,10 @@ import {
   type CommittedSummary,
   type CommittedTexts,
   type IsoMonth,
+  SAVINGS_TEXT,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ExternalLink, HandCoins, ListChecks, ListOrdered, Repeat, ShieldCheck, Wallet } from 'lucide-react-native';
+import { ExternalLink, HandCoins, ListChecks, ListOrdered, PiggyBank, Repeat, ShieldCheck, Wallet } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInLeft, FadeInRight, ReduceMotion } from 'react-native-reanimated';
@@ -563,6 +564,8 @@ function Links({ month, currentMonth }: { month: IsoMonth; currentMonth: IsoMont
       <LinkButton label={CALC_UI_TEXT.links.financiar} icon={HandCoins} onPress={() => openCalc('antes-de-financiar')} />
       <LinkButton label={COMMITTED_TEXT.links.series} icon={Repeat} onPress={() => router.push('/gastos-fixos')} />
       <LinkButton label={COMMITTED_TEXT.links.payables} icon={Wallet} onPress={() => router.push({ pathname: '/a-pagar', params: payablesMonthParams(month, currentMonth) })} />
+      {/* A pergunta de quanto guardar também por aqui, depois de ver o que a renda já tem de compromisso (docs/10 A18, D-091 E). */}
+      <LinkButton label={SAVINGS_TEXT.firstStepTitle} icon={PiggyBank} onPress={() => router.push('/guardar')} />
       <LinkButton label={COMMITTED_TEXT.links.whoSees} icon={ShieldCheck} color={colors.textSecondary} onPress={() => router.push('/quem-ve')} />
     </View>
   );

@@ -93,6 +93,11 @@ export interface DevicePrefs {
    */
   routineReminders: RoutineReminderChoices;
   routineReminderHour: RoutineReminderHour;
+  /**
+   * "Agora não" na sugestão de atualizar a reserva com os registros (D-091 F): a média dispensada, em centavos. A sugestão volta
+   * quando a média muda. Só neste aparelho; nada vai para o servidor.
+   */
+  reserveRefreshDismissed: number | null;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -113,6 +118,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   extraSavingsDismissedMonth: null,
   routineReminders: NO_ROUTINE_REMINDERS,
   routineReminderHour: DEFAULT_ROUTINE_REMINDER_HOUR,
+  reserveRefreshDismissed: null,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -147,6 +153,8 @@ function parse(raw: string | null | undefined): DevicePrefs {
         typeof v.extraSavingsDismissedMonth === 'string' && /^\d{4}-\d{2}$/.test(v.extraSavingsDismissedMonth) ? v.extraSavingsDismissedMonth : null,
       routineReminders: parseRoutineReminderChoices(v.routineReminders),
       routineReminderHour: isRoutineReminderHour(v.routineReminderHour) ? v.routineReminderHour : DEFAULT_ROUTINE_REMINDER_HOUR,
+      reserveRefreshDismissed:
+        typeof v.reserveRefreshDismissed === 'number' && Number.isSafeInteger(v.reserveRefreshDismissed) && v.reserveRefreshDismissed > 0 ? v.reserveRefreshDismissed : null,
     };
   } catch {
     return DEFAULT_PREFS;

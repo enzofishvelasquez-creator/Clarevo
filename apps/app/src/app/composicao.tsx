@@ -98,7 +98,7 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
             : { label: 'Pago', total: s.paidCents, list: s.composition.paid, kind: 'despesa' as const },
         ];
 
-  /** Estado vazio com a ação certa: anotar o que falta neste critério. */
+  /** A ação certa deste critério: anotar o que falta (no estado vazio e no fim da lista). */
   const emptyAction = (k: 'receita' | 'despesa') => (
     <Button
       label={k === 'receita' ? 'Registrar recebimento' : 'Anotar gasto'}
@@ -225,7 +225,11 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
         contentStyle={{ padding: space[5] }}
         header={header}
         footer={
-          <View style={styles.cellFirst}>
+          <View style={[styles.cellFirst, { gap: space[3] }]}>
+            {/* A ação de anotar sempre no fim da lista, não só no estado vazio (docs/10 A13). Em "Por categoria", o cartão já a traz. */}
+            {canWrite && !byCategory
+              ? sections.filter((sec) => sec.list.length > 0).map((sec) => <View key={sec.kind}>{emptyAction(sec.kind)}</View>)
+              : null}
             <TopicLink slug="diferenca" label="Como este total é calculado?" color={colors.textSecondary} />
           </View>
         }

@@ -74,6 +74,7 @@ function write(key: string, value: FirstStepsClose, persist: boolean) {
 
 /** Esquece, neste aparelho, o fechamento do card da pessoa (excluir a conta, D-058): a memória e o que foi gravado. */
 export function forgetFirstSteps(userId: string): void {
+  forgetDoneSteps(userId);
   const key = `${PREFIX}${userId}`;
   memory.delete(key);
   try {
@@ -119,4 +120,101 @@ export function useFirstSteps(userId: string | undefined, persist: boolean) {
 
   const status: FirstStepsStatus = !known ? 'carregando' : known.closed ? 'fechado' : 'aberto';
   return { status, close };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Passos já concluídos (docs/10 A25): um passo que ficou pronto continua pronto, mesmo quando o mês vira e o Recebido e o Pago do
+// mês novo começam vazios. Guardado como o fechamento do card: só neste aparelho, por pessoa, e só em memória na demonstração.
+// ---------------------------------------------------------------------------------------------------------------------
+const STEPS_PREFIX = 'clarevo.primeiros-passos.passos.v1.';
+const stepsMemory = new Map<string, string[]>();
+
+function parseSteps(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw) as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 10) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readStepsNow(key: string, persist: boolean): string[] | undefined {
+  const cached = stepsMemory.get(key);
+  if (cached) return cached;
+  if (!persist) return [];
+  if (Platform.OS !== 'web') return undefined;
+  let steps: string[] = [];
+  try {
+    steps = parseSteps(webStorage()?.getItem(key));
+  } catch {
+    steps = [];
+  }
+  stepsMemory.set(key, steps);
+  return steps;
+}
+
+function forgetDoneSteps(userId: string): void {
+  const key = `${STEPS_PREFIX}${userId}`;
+  stepsMemory.delete(key);
+  try {
+    if (Platform.OS === 'web') webStorage()?.removeItem(key);
+    else AsyncStorage.removeItem(key).catch(() => {});
+  } catch {
+    // Sem armazenamento: nada a apagar.
+  }
+}
+
+/**
+ * Os passos que a pessoa já concluiu neste aparelho. `steps` nulo enquanto a leitura não terminou (o card espera). `add` guarda
+ * passos novos (por exemplo, "Não tenho gastos fixos", ou um passo que acabou de ficar pronto).
+ */
+export function useDoneSteps(userId: string | undefined, persist: boolean) {
+  const key = userId ? `${STEPS_PREFIX}${userId}` : null;
+  const [state, setState] = useState<{ key: string; steps: string[] } | null>(() => {
+    if (!key) return null;
+    const now = readStepsNow(key, persist);
+    return now === undefined ? null : { key, steps: now };
+  });
+  const known = state && key && state.key === key ? state : null;
+
+  useEffect(() => {
+    if (!key || known) return;
+    let alive = true;
+    (async () => {
+      let steps: string[] = [];
+      try {
+        steps = parseSteps(await AsyncStorage.getItem(key));
+      } catch {
+        steps = [];
+      }
+      const merged = [...new Set([...(stepsMemory.get(key) ?? []), ...steps])];
+      stepsMemory.set(key, merged);
+      if (alive) setState({ key, steps: merged });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [key, known]);
+
+  const add = useCallback(
+    (more: readonly string[]) => {
+      if (!key) return;
+      const current = stepsMemory.get(key) ?? known?.steps ?? [];
+      const next = [...new Set([...current, ...more])];
+      if (next.length === current.length) return;
+      stepsMemory.set(key, next);
+      setState({ key, steps: next });
+      if (!persist) return;
+      try {
+        if (Platform.OS === 'web') webStorage()?.setItem(key, JSON.stringify(next));
+        else AsyncStorage.setItem(key, JSON.stringify(next)).catch(() => {});
+      } catch {
+        // Sem armazenamento: vale enquanto o app estiver aberto.
+      }
+    },
+    [key, persist, known],
+  );
+
+  return { steps: known ? new Set(known.steps) : null, add };
 }

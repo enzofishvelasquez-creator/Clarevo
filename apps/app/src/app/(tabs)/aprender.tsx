@@ -103,6 +103,8 @@ export default function AprenderScreen() {
   };
 
   const sections = topicsBySection().filter((s) => s.topics.length > 0);
+  /** A fileira "Ir para": "Dúvidas frequentes" primeiro (docs/10 A22), as outras na ordem da aba. */
+  const jumpOrder = [...sections.filter((s) => s.section.id === 'duvidas'), ...sections.filter((s) => s.section.id !== 'duvidas')];
   const startHere = START_HERE.flatMap((slug) => {
     const t = topicBySlug(slug);
     return t ? [t] : [];
@@ -131,6 +133,28 @@ export default function AprenderScreen() {
               <SearchResults query={query} results={results} appResults={appResults} guideResults={guideResults} onShowAll={clear} />
             ) : (
               <>
+                {/* "Ir para" logo abaixo da busca, com "Dúvidas frequentes" primeiro (docs/10 A22): os cards do topo empurravam a fileira
+                    para longe. As seções continuam na ordem de D-031(2) mais abaixo. */}
+                <View style={{ gap: space[2] }}>
+                  <Txt variant="label" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
+                    {LEARN_UI_TEXT.goTo}
+                  </Txt>
+                  <View style={styles.shortcuts}>
+                    {jumpOrder.map(({ section }) => (
+                      <Pressable
+                        key={section.id}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${LEARN_UI_TEXT.goTo} ${section.title}`}
+                        onPress={() => goToSection(section.id)}
+                        style={(s) => [styles.shortcut, s.pressed && { opacity: 0.8 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
+                        <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold }}>
+                          {section.title}
+                        </Txt>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
                 {/* Como usar o Clarevo (D-049): o guia de uso, no topo, antes das calculadoras. */}
                 <Pressable
                   accessibilityRole="button"
@@ -182,26 +206,6 @@ export default function AprenderScreen() {
                     </View>
                   </View>
                 ) : null}
-
-                <View style={{ gap: space[2] }}>
-                  <Txt variant="label" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
-                    {LEARN_UI_TEXT.goTo}
-                  </Txt>
-                  <View style={styles.shortcuts}>
-                    {sections.map(({ section }) => (
-                      <Pressable
-                        key={section.id}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${LEARN_UI_TEXT.goTo} ${section.title}`}
-                        onPress={() => goToSection(section.id)}
-                        style={(s) => [styles.shortcut, s.pressed && { opacity: 0.8 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-                        <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold }}>
-                          {section.title}
-                        </Txt>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
 
                 <View style={{ gap: space[4] }} onLayout={(e) => (sectionsY.current = e.nativeEvent.layout.y)}>
                   {sections.map(({ section, topics }) => (

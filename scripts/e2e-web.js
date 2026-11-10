@@ -409,7 +409,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('demonstração (D-067): o Resumo, com os Primeiros passos fechados, não pergunta "Como você conheceu a Clarevo?" nem mostra as seis opções', await origemAusente());
 
   // Sair limpa a sessão
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await shot('05_conta');
   await shot('05b_conta_seguranca', true);
   // Ciclo A2 (D-025): na web não há lembretes nem biometria (só no app para celular); "Ocultar valores ao abrir" existe
@@ -461,7 +461,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitUntil(async () => (await headingShown('Primeiros passos')) && (await ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago, PP.guardar])()), 8000);
   ok('A9: depois de sair e entrar de novo, o "Agora não" foi apagado do aparelho e o card "Primeiros passos" volta, com os passos feitos marcados',
     (await headingShown('Primeiros passos')) && (await ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago, PP.guardar])()) && (await visibleCount('button', 'Anotar gasto')) === 1, JSON.stringify(await ppRows()));
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
 
   // Primeiros passos numa segunda conta nova: anotar um gasto marca o passo 3; com os três prontos, o card sai de vez.
@@ -578,13 +578,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
   await waitUntil(async () => !(await headingShown('Primeiros passos')), 8000);
   ok('primeiros passos: com os quatro passos prontos ("Agora não" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
   await field('E-mail').fill('bia@exemplo.com'); await field('Senha').fill('senha1234'); await btn('Entrar').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
   ok('primeiros passos concluídos: o card não volta depois de entrar de novo', !(await headingShown('Primeiros passos')));
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   // Na demonstração, as contas criadas existem só na memória da página: recarregar volta às boas-vindas e nada de
   // "Primeiros passos" fica gravado no aparelho (uma conta nova nunca herda o "Agora não" de outra com o mesmo identificador).
@@ -620,7 +620,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // "Ver resumo do mês" volta ao Resumo que já está na pilha (dismissTo): um único Resumo montado, nada para voltar,
   // mostrado do topo (o acesso à Conta, no alto do cabeçalho, fica dentro da tela).
   const singleResumo = async (name) => {
-    const top = await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().boundingBox();
+    const top = await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().boundingBox();
     ok(name, (await p.getByText('Diferença do mês', { exact: true }).count()) === 1 && (await p.getByRole('button', { name: 'Voltar', exact: true }).filter({ visible: true }).count()) === 0 && top !== null && top.y >= 0, `topo y=${top?.y}`);
   };
   // Telas empilhadas (detalhe, lista) escondem a barra de abas: volta até ela aparecer.
@@ -1588,7 +1588,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Sair e entrar de novo na demonstração: as listas são lidas de novo e a geração do dia roda outra vez.
   // Nada do que foi tirado volta (Matrícula de 2026, parcelas do Seguro residencial e do Material escolar).
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   // Ciclo A5: "O que é isso?" ao lado de "Saldo inicial" abre o resumo no lugar; a explicação completa abre por cima e
   // "Voltar à tarefa" volta para a Conta.
   const saldoHint = p.getByRole('button', { name: 'O que é isso? Saldo inicial', exact: true }).filter({ visible: true }).first();
@@ -2082,7 +2082,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const repoBeforeLinks = await repoSnapshot();
   const writesBeforeLinks = writes.length;
   // Sem Família (D-055) o link vive na tela Família, aberta por Conta (o seletor só aparece para quem tem uma Família).
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
   await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto');
   await btn('Enquanto isso, dividir as contas da casa').click();
   await waitUntil(async () => (await h1Name()) === 'Dividir as contas da casa', 8000);
@@ -2287,7 +2287,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Família na demonstração (D-055): sem seletor, e a tela Família (por Conta) explica, sem membros simulados nem botão de anotar
   ok('demonstração: o Resumo não mostra o seletor "Pessoal | Família"', (await p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count()) === 0);
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
   await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto');
   t = await body();
   ok('família sem membros simulados nem botão de anotar', t.includes('Anotar a casa em conjunto') && t.includes('Na demonstração não há Família de exemplo.') && !t.includes('Anotar gasto') && !t.includes('Anotar conta a pagar') && !t.includes('Titular'));
@@ -2993,7 +2993,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ok(`A2 valores ocultos, ${name}: nenhum valor em reais à vista (texto e nomes acessíveis)`, leaks.length === 0, leaks.slice(0, 4).join(' | '));
     ok(`A2 valores ocultos, ${name}: "R$ ••••" na tela e "valor oculto" nos nomes acessíveis`, text.includes('R$ ••••') && (await spokenHidden()) > 0, `${text.includes('R$ ••••')} ${await spokenHidden()}`);
   };
-  const openConta = async () => { await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
+  const openConta = async () => { await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
   const hideSwitch = () => p.getByRole('switch', { name: 'Ocultar valores ao abrir' }).filter({ visible: true }).first();
 
   await freshDemo();
@@ -3477,8 +3477,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     while (el && el.querySelectorAll('[role=button]').length < 2) el = el.parentElement;
     return el ? [...el.querySelectorAll('[role=button]')].map((x) => x.getAttribute('aria-label')).slice(0, 3) : [];
   });
-  ok('D Aprender: o atalho "Simular" abre "Dinheiro no tempo", antes dos temas', timeSection.length === 3 && /^Simular\. Quanto guardar por mês/.test(timeSection[0]) && !/^Simular/.test(timeSection[1]), JSON.stringify(timeSection));
-  await p.getByRole('button', { name: /^Simular\. Quanto guardar/ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
+  ok('D Aprender: o atalho "Simular" abre "Dinheiro no tempo", antes dos temas', timeSection.length === 3 && /^Simular um plano\. Quanto guardar por mês/.test(timeSection[0]) && !/^Simular/.test(timeSection[1]), JSON.stringify(timeSection));
+  await p.getByRole('button', { name: /^Simular um plano\. Quanto guardar/ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
   ok('D do atalho de Aprender: o simulador vazio (origem=aprender no endereço)', (await formValues()).every((x) => x.endsWith('=')) && p.url().includes('origem=aprender'), p.url());
   await btn('Voltar').click(); await waitText('Diferença do mês e saldo da conta');
   await p.getByRole('button', { name: /^Como ler uma simulação/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(600);
@@ -6715,7 +6715,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   };
   const g1OpenConta = async () => {
     await goResumo();
-    await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Contas de origem'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Contas de origem'); await p.waitForTimeout(400);
   };
   const g1Rows = async () => ((await sectionRows('Contas de origem')) ?? []).filter((x) => / Abrir a conta\.$/.test(x));
   const g1Row = (name) => p.getByRole('button', { name: new RegExp(`^${name}, .*Abrir a conta\\.$`) }).filter({ visible: true }).first();
@@ -8487,7 +8487,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Help('Renda comprometida', 'Renda comprometida e limite pessoal', 'Toque em "Informar renda de referência"');
   await btn('Voltar').click(); await waitText('Diferença do mês');
   // Contas de origem: Conta › Adicionar conta
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
   await j1Keep(); await scrollTo('Lembretes'); await shot('329_conta_privacidade');
   await btn('Adicionar conta').click(); await waitText('Nome da conta');
   await j1Help('Contas de origem', 'Contas de origem', 'Toque no círculo com as suas iniciais', '327_ajuda_contas_de_origem');
@@ -9374,7 +9374,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Concluir').click(); await p.waitForTimeout(600);
 
   // ---- 12. Conta › "Widget na tela inicial": o interruptor "Mostrar valores no widget" (desligado) fica guardado no aparelho ----
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
   const k1Widget = () => p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).first();
   await scrollTo('Widget na tela inicial');
   t = await k1Keep();
@@ -9388,7 +9388,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('K1 Conta: ligar mostra o interruptor ligado e não muda "Ocultar valores ao abrir" (são duas escolhas)', (await k1Widget().getAttribute('aria-checked')) === 'true' && (await hideSwitch().getAttribute('aria-checked')) === 'false', `${await k1Widget().getAttribute('aria-checked')} ${await hideSwitch().getAttribute('aria-checked')}`);
   ok('K1 Conta: na demonstração e nas contas simuladas a escolha fica só em memória (nada vai para o armazenamento do navegador)', (await k1Store()) === k1StoreW0, await k1Store());
   await btn('Voltar').click(); await p.waitForTimeout(500);
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
   ok('K1 Conta: a escolha continua ligada ao voltar à tela', (await k1Widget().getAttribute('aria-checked')) === 'true', `${await k1Widget().getAttribute('aria-checked')}`);
   await k1Widget().click(); await p.waitForTimeout(300);
   ok('K1 Conta: desligar volta ao padrão', (await k1Widget().getAttribute('aria-checked')) === 'false', `${await k1Widget().getAttribute('aria-checked')}`);
@@ -10027,7 +10027,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     for (let i = 0; i < 5 && (await tab().count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
     await tab().first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
   };
-  const famConta = async () => { await famGoResumo(); await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
+  const famConta = async () => { await famGoResumo(); await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
   const famSignOut = async () => { await famConta(); await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira'); };
   const famTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
   const famGoFamilia = async () => { await famConta(); await p.getByRole('button', { name: /^(Criar Família|Abrir Família)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(500); };

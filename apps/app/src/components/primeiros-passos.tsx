@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, ReduceMotion } from 'react-native-reanimated';
 
 import { Card, LinkButton, Txt } from '@/components/ui';
-import { useFirstSteps } from '@/lib/onboarding';
+import { useDoneSteps, useFirstSteps } from '@/lib/onboarding';
 import { useMonthRecords, useSavingsStepDone, useSeriesList, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
@@ -76,6 +76,8 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
   // Só a demonstração tem dados de exemplo: uma conta real com este e-mail continua vendo o card (CL-11).
   const demoWithData = auth.mode === 'demo' && user?.email === DEMO_EMAIL;
   const firstSteps = useFirstSteps(demoWithData ? undefined : user?.id, auth.mode !== 'demo');
+  // Passos que já ficaram prontos continuam prontos (docs/10 A25): o Recebido e o Pago do mês novo não os desfazem.
+  const remembered = useDoneSteps(demoWithData ? undefined : user?.id, auth.mode !== 'demo');
   const eligible = kind === 'pessoal' && month === currentMonth && firstSteps.status === 'aberto';
   // Nenhuma consulta depois que o card fechou. Enquanto ele está aberto, os registros do mês são os mesmos do Resumo
   // e a sincronização do dia é a mesma de "Ainda a pagar"; só a lista de gastos fixos é lida a mais.
@@ -83,13 +85,25 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
   const records = useMonthRecords(eligible ? contextId : undefined, currentMonth);
   const savings = useSavingsStepDone(eligible ? contextId : undefined);
   const summary = records.summary;
-  const ready = eligible && series.isSuccess && records.isSuccess && summary !== null;
-  const done: Record<Step['key'], boolean> = {
+  const ready = eligible && series.isSuccess && records.isSuccess && summary !== null && remembered.steps !== null;
+  const live: Record<Step['key'], boolean> = {
     fixos: Boolean(series.data && series.data.length > 0),
     recebido: Boolean(summary && summary.composition.received.length > 0),
     pago: Boolean(summary && summary.composition.paid.length > 0),
     guardar: savings.isSuccess && savings.data === true,
   };
+  const was = (k: Step['key']) => remembered.steps?.has(k) ?? false;
+  const done: Record<Step['key'], boolean> = {
+    fixos: live.fixos || was('fixos'),
+    recebido: live.recebido || was('recebido'),
+    pago: live.pago || was('pago'),
+    guardar: live.guardar || was('guardar'),
+  };
+  const newlyDone = ready ? (Object.keys(live) as Step['key'][]).filter((k) => live[k] && !was(k)) : [];
+  const { add: rememberSteps } = remembered;
+  useEffect(() => {
+    if (newlyDone.length > 0) rememberSteps(newlyDone);
+  }, [newlyDone.join(','), rememberSteps]); // eslint-disable-line react-hooks/exhaustive-deps
   const allDone = done.fixos && done.recebido && done.pago && done.guardar;
   const { close } = firstSteps;
   const state: PrimeirosPassosState =
@@ -120,6 +134,8 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
             <StepRow key={step.key} step={step} done={done[step.key]} last={i === STEPS.length - 1} />
           ))}
         </View>
+        {/* Quem não tem gastos fixos conclui o primeiro passo sem cadastrar nada (docs/10 A25). */}
+        {done.fixos ? null : <LinkButton label="Não tenho gastos fixos" style={styles.dismiss} onPress={() => rememberSteps(['fixos'])} />}
         <LinkButton label="Agora não" style={styles.dismiss} onPress={() => close('dispensado')} />
       </Card>
     </Animated.View>

@@ -74,6 +74,8 @@ export default function DetalheRegistro() {
   const { user, today } = useSession();
   const remove = useDeleteRecord();
   const [notice] = useFlash();
+  /** Acabou de salvar (o aviso pode trazer linhas depois da primeira: orçamento, D-089 E; mês seguinte, D-089 A). */
+  const justSaved = notice?.split('\n')[0] === 'Gasto salvo' || notice?.split('\n')[0] === 'Recebimento salvo';
   const [confirming, setConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
@@ -130,6 +132,25 @@ export default function DetalheRegistro() {
           ) : (
             <>
               <FlashBanner message={notice} />
+              {/* Logo depois de salvar (docs/10 A3): o próximo passo à vista, antes do card. "Ver resumo do mês" é o botão principal e
+                  "Anotar outro" vem logo abaixo; o aviso pode trazer linhas depois da primeira (orçamento, D-089 E; mês seguinte, D-089 A). */}
+              {justSaved ? (
+                <View style={{ gap: space[3] }}>
+                  <Button
+                    label="Ver resumo do mês"
+                    onPress={() => {
+                      view.setMonth(recordMonth(r));
+                      openSummary();
+                    }}
+                  />
+                  <Button
+                    label={r.kind === 'despesa' ? 'Anotar outro gasto' : 'Registrar outro recebimento'}
+                    icon={Plus}
+                    tone="soft"
+                    onPress={() => router.replace({ pathname: '/registro/novo', params: { tipo: r.kind } })}
+                  />
+                </View>
+              ) : null}
               {deleteError ? (
                 <Banner tone="erro" icon={AlertCircle}>
                   <Txt variant="label" color={colors.error}>
@@ -192,15 +213,6 @@ export default function DetalheRegistro() {
                 )
               ) : null}
 
-              {/* O aviso pode trazer linhas depois da primeira (orçamento, D-089 E; mês seguinte, D-089 A): vale a primeira. */}
-              {notice?.split('\n')[0] === 'Gasto salvo' || notice?.split('\n')[0] === 'Recebimento salvo' ? (
-                <Button
-                  label={r.kind === 'despesa' ? 'Anotar outro gasto' : 'Registrar outro recebimento'}
-                  icon={Plus}
-                  tone="soft"
-                  onPress={() => router.replace({ pathname: '/registro/novo', params: { tipo: r.kind } })}
-                />
-              ) : null}
               {/* Pagamento de fatura (D-037): só se muda ou se desfaz pela fatura. */}
               {r.invoice ? (
                 <>
@@ -210,7 +222,7 @@ export default function DetalheRegistro() {
                   <Button label={CARDS_TEXT.openInvoice} onPress={() => router.push(invoiceHref(r.invoice!.cardId, r.invoice!.month))} />
                 </>
               ) : (
-                <Button label="Editar registro" icon={Pencil} onPress={() => router.push(`/registro/${r.id}/editar`)} />
+                <Button label="Editar registro" icon={Pencil} tone={justSaved ? 'soft' : 'brand'} onPress={() => router.push(`/registro/${r.id}/editar`)} />
               )}
               {/* Gasto anotado sem conta a pagar: pode virar um gasto fixo, que começa no próximo vencimento. */}
               {r.kind === 'despesa' && !r.commitmentId && !r.invoice ? (
@@ -219,15 +231,17 @@ export default function DetalheRegistro() {
               {r.commitmentId && !r.invoice ? (
                 <Button label="Ver conta a pagar" tone="soft" onPress={() => router.push(`/a-pagar/${r.commitmentId}`)} />
               ) : null}
+              {justSaved ? null : (
+                <Button
+                  label="Ver resumo do mês"
+                  tone="soft"
+                  onPress={() => {
+                    view.setMonth(recordMonth(r));
+                    openSummary();
+                  }}
+                />
+              )}
               {r.invoice ? null : <Button label="Excluir registro" icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />}
-              <Button
-                label="Ver resumo do mês"
-                tone="soft"
-                onPress={() => {
-                  view.setMonth(recordMonth(r));
-                  openSummary();
-                }}
-              />
               <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy}>
                 <ShieldCheck size={18} color={colors.textSecondary} />
                 <Txt variant="label" color={colors.textSecondary}>

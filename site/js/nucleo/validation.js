@@ -28,6 +28,14 @@ export const UNCERTAIN_TEXT = {
     orcamento: 'Não deu para confirmar se salvou. Confira em Orçamento por categoria antes de tentar de novo.',
     renda: 'Não deu para confirmar se salvou. Confira em Renda comprometida antes de tentar de novo.',
 };
+export const KIND_SWITCH_TEXT = {
+    toIncome: 'É um recebimento? Registrar recebimento',
+    toExpense: 'É um gasto? Anotar gasto',
+};
+export const SERIES_CARD_TEXT = {
+    asCardPurchase: 'Anotar como compra no cartão',
+    cardNote: 'Compras parceladas no cartão ficam em Cartões, na fatura de cada mês.',
+};
 export const FUTURE_EXPENSE_TEXT = {
     toCommitment: 'Ainda vai vencer? Anotar como conta a pagar',
     toCommitmentA11y: 'Ainda vai vencer? Anotar como conta a pagar, com a descrição, o valor, a data e a categoria já digitados',

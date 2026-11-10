@@ -383,6 +383,10 @@ export function groupPermilleShares(s) {
     const shares = weights.some((w) => w > 0) ? sharesCents(s.committedPermille, weights) : weights.map(() => 0);
     return Object.fromEntries(COMMITTED_GROUPS.map((g, i) => [g, shares[i]]));
 }
+export const COMMITTED_LINK_TEXT = {
+    fromSeries: 'Quanto isso pesa na sua renda? Ver renda comprometida',
+    fromDebt: 'Conta como dívida na renda comprometida. Ver',
+};
 export const COMMITTED_TEXT = {
     title: 'Renda comprometida',
     planned: 'Previsto',

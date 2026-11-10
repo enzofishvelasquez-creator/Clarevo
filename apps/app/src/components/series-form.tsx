@@ -47,6 +47,7 @@ import {
   type SeriesKind,
   type SeriesNature,
   type SeriesWrite,
+  SERIES_CARD_TEXT,
 } from '@clarevo/core';
 import { router, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
@@ -91,6 +92,7 @@ import {
   withNotice,
   type WorkSpace,
 } from '@/state/data';
+import { draftHandoff } from '@/lib/draft-handoff';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -634,6 +636,21 @@ export function SeriesForm({
   };
   const variable = draft.amountMode === 'variavel';
   const looksLikeCard = INVOICE_HINT.test(draft.description);
+  /** Leva descrição, valor total (parcela vezes parcelas, quando os dois estão preenchidos) e parcelas para Anotar gasto no cartão. */
+  const asCardPurchase = () => {
+    const each = parseBRL(draft.amountText);
+    const count = Number(draft.installmentTotalText);
+    const n = parcelada && Number.isInteger(count) && count >= 1 && count <= 48 ? count : 1;
+    const total = each !== null && each > 0 ? each * n : null;
+    draftHandoff.set({
+      description: draft.description.trim(),
+      amountText: total !== null && total <= MAX_RECORD_CENTS ? centsToInput(total) : '',
+      dateText: formatDateBR(today),
+      accountId: null,
+      card: { installmentsText: String(n) },
+    });
+    router.replace({ pathname: '/registro/novo', params: { tipo: 'despesa' } });
+  };
   const firstMonthName = preview ? (anual ? firstYearLabel : formatMonthName(preview.firstMonth)) : '';
   const showCommitmentConflict = Boolean(conflicts?.texts.commitment && preview && !kept.includes(preview.firstMonth));
   const amountLabel = variable
@@ -962,6 +979,16 @@ export function SeriesForm({
                 financiamento.
               </Txt>
               <LinkButton label="Fatura sem contar duas vezes" style={styles.inlineLink} onPress={() => router.push(explanationHref('fatura'))} />
+              {/* Compra parcelada no cartão é anotada no cartão (docs/10 A15): Anotar gasto abre em "Cartão de crédito", já preenchido.
+                  Cartões são só do Pessoal (D-037). */}
+              {personal.contextKind === 'pessoal' ? (
+                <>
+                  <Button label={SERIES_CARD_TEXT.asCardPurchase} tone="soft" onPress={asCardPurchase} />
+                  <Txt variant="caption" color={colors.textSecondary}>
+                    {SERIES_CARD_TEXT.cardNote}
+                  </Txt>
+                </>
+              ) : null}
             </Banner>
           ) : null}
 

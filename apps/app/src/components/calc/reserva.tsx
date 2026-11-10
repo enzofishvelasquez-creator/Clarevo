@@ -1,4 +1,4 @@
-import { GOALS_TEXT, RESERVA_MONTH_CHIPS, RESERVA_REFERENCIA, RESERVA_TEXT, calcFields, calcReserva, organizeGoals, type CalcPrefill } from '@clarevo/core';
+import { CALC_UI_TEXT, GOALS_TEXT, RESERVA_MONTH_CHIPS, RESERVA_REFERENCIA, RESERVA_TEXT, calcFields, calcReserva, organizeGoals, type CalcPrefill } from '@clarevo/core';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { ExternalLink, ShieldCheck } from 'lucide-react-native';
@@ -7,7 +7,7 @@ import { View } from 'react-native';
 
 import { CalcChip, CalcField, CalcResult, CalcScreen, calcInlineLink, onlyChoicesMissing, useCalcForm, type CalcBinding } from '@/components/calc/parts';
 import { ChoiceGroup } from '@/components/series-parts';
-import { Button, Card, LinkButton, Txt } from '@/components/ui';
+import { Banner, Button, Card, LinkButton, Txt } from '@/components/ui';
 import { useGoals, useWork } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
@@ -42,6 +42,13 @@ export function ReservaCalc({ prefill }: { prefill: CalcPrefill<'reserva'> }) {
 
   return (
     <CalcScreen slug="reserva">
+      {/* Com a reserva já criada em Metas, o caminho até ela fica à vista no topo (docs/10 A20). */}
+      {hasReserve ? (
+        <Banner tone="info" icon={ShieldCheck}>
+          <Txt variant="label">{CALC_UI_TEXT.reserveExists}</Txt>
+          <LinkButton label={CALC_UI_TEXT.reserveSee} onPress={() => router.push('/reserva')} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+        </Banner>
+      ) : null}
       <Card style={{ gap: space[4] }}>
         <CalcField calc={calc} name="essenciais" />
         <ChoiceGroup
