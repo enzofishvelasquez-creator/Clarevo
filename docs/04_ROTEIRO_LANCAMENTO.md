@@ -253,6 +253,8 @@ Sem mudança no banco. Regras no core (`packages/core/src/navigation.ts`, `navig
 - [ ] **Você:** confirmar que `/reserva`, `/guardar`, `/guardar/minima`, `/retomar/atualizar`, `/retomar/pagar` e `/a-pagar/vencidas` ficam sem a barra (D-039(4)); confirmar o card "Seu mês" depois de "Suas metas" e o título "Marcar como paga" na tela de pagamento
 - [x] "Nova conta do ano" no topo da lista de Gastos fixos (`docs/10` A16), feito em 10/11/2026 (D-091)
 - [x] Itens de `docs/10` que D-039 não trata (A3, A4, A10, A13 a A15, o resto de A18, A19, A20, A22 a A25 e B3 a B6): conferidos e feitos em 10/11/2026 (D-091); A19, A24, B3 e B5 ficam como estão; B4 já estava feito e B6 deixou de valer; a calculadora da reserva passa a se chamar "Quanto guardar para imprevistos?" (D-091 D)
+- [x] Metas (D-092, `docs/43`): "Moto" com imagem própria, imagem pela primeira pista do nome, as 15 metas mais comuns prontas em "Nova meta" com a imagem e o que costuma entrar na conta, atalhos no Metas vazio; feito em 10/11/2026
+- [ ] Fotos das cinco imagens novas de metas (Moto, Reforma, Dívidas, Negócio e Festa): origem a decidir com o Enzo (`docs/43`, seção 5)
 - [ ] Teste em aparelho (iOS e Android): barra sobreposta e a altura reservada na rolagem, barra escondida com o teclado aberto, lembretes ligados pela linha de Contas a pagar e a rolagem de Conta até o card
 
 ## Ciclo F1: plano para quitar dívidas (D-040, `docs/08` §5 item 10)

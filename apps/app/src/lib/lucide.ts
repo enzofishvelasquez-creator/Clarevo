@@ -1,7 +1,7 @@
 /**
  * Os ícones do app, um por um (D-062 item 5, `docs/19`). O Metro troca `import ... from 'lucide-react-native'` por este arquivo
- * (`metro.config.js`): importar o pacote inteiro põe os 1.867 ícones no pacote web (2,1 MB a mais, antes de comprimir) e só
- * 98 são usados. Ícone novo: acrescente a linha aqui (o nome de `lucide-react-native` e o arquivo em kebab-case); o teste
+ * (`metro.config.js`): importar o pacote inteiro põe os 1.867 ícones no pacote web (2,1 MB a mais, antes de comprimir), e só
+ * os listados aqui são usados. Ícone novo: acrescente a linha aqui (o nome de `lucide-react-native` e o arquivo em kebab-case); o teste
  * `packages/core/test/lucide-barrel.test.ts` falha se uma tela importa um ícone que não está aqui. O TypeScript também lê este arquivo no lugar do
  * pacote (`paths` em `apps/app/tsconfig.json`): ícone que não está aqui é erro de tipo em `npm run typecheck`.
  */
@@ -90,10 +90,14 @@ export { default as MailCheck } from 'lucide-react-native/icons/mail-check';
 export { default as MessageCircle } from 'lucide-react-native/icons/message-circle';
 export { default as Minus } from 'lucide-react-native/icons/minus';
 export { default as MonitorSmartphone } from 'lucide-react-native/icons/monitor-smartphone';
+export { default as Motorbike } from 'lucide-react-native/icons/motorbike';
 export { default as Mountain } from 'lucide-react-native/icons/mountain';
 export { default as NotebookPen } from 'lucide-react-native/icons/notebook-pen';
+export { default as PaintRoller } from 'lucide-react-native/icons/paint-roller';
+export { default as PartyPopper } from 'lucide-react-native/icons/party-popper';
 export { default as PawPrint } from 'lucide-react-native/icons/paw-print';
 export { default as Pencil } from 'lucide-react-native/icons/pencil';
+export { default as PencilLine } from 'lucide-react-native/icons/pencil-line';
 export { default as Percent } from 'lucide-react-native/icons/percent';
 export { default as PieChart } from 'lucide-react-native/icons/chart-pie';
 export { default as PiggyBank } from 'lucide-react-native/icons/piggy-bank';
@@ -113,6 +117,7 @@ export { default as ShoppingBag } from 'lucide-react-native/icons/shopping-bag';
 export { default as Sigma } from 'lucide-react-native/icons/sigma';
 export { default as Smartphone } from 'lucide-react-native/icons/smartphone';
 export { default as Star } from 'lucide-react-native/icons/star';
+export { default as Store } from 'lucide-react-native/icons/store';
 export { default as Sunrise } from 'lucide-react-native/icons/sunrise';
 export { default as Target } from 'lucide-react-native/icons/target';
 export { default as Timer } from 'lucide-react-native/icons/timer';

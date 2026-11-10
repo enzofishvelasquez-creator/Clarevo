@@ -69,3 +69,4 @@ export * from './telegram';
 export * from './assinatura-web';
 export * from './assinatura-lojas';
 export * from './goal-images';
+export * from './goal-presets';

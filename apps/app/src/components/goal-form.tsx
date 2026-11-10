@@ -3,7 +3,8 @@ import {
   GOAL_ERROR_TEXT,
   GOAL_FIELD_ORDER,
   GOAL_NAME_MAX,
-  GOAL_TEMPLATES,
+  GOAL_PRESETS,
+  GOAL_PRESET_TEXT,
   MAX_RECORD_CENTS,
   UNCERTAIN_TEXT,
   centsToInput,
@@ -11,9 +12,12 @@ import {
   formatBRL,
   formatMonthInputBR,
   goalErrorText,
+  goalPresetById,
   goalPreview,
   maskMonthBR,
+  organizeGoals,
   parseBRL,
+  suggestGoalImage,
   validateGoalDraft,
   type Goal,
   type GoalDraft,
@@ -27,10 +31,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { CircleAlert } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { FormFooter } from '@/components/form-footer';
+import { SuggestedImage } from '@/components/goal-image';
+import { GoalPresetGrid, GoalPresetHint, type PresetChoice } from '@/components/goal-presets';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
 import { MoneyTxt } from '@/components/money-text';
@@ -39,13 +45,15 @@ import { ChoiceGroup } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
-import { useCreateGoal, useGoalOperationKey, useUpdateGoal } from '@/state/data';
+import { useCreateGoal, useGoalOperationKey, useGoals, useUpdateGoal } from '@/state/data';
 import { useSession } from '@/state/session';
-import { colors, fonts, space } from '@/theme/tokens';
+import { colors, fonts, radius, space } from '@/theme/tokens';
 
 /** O que a rota /meta/nova pode trazer pronto (simulador, atalhos): tudo opcional, já em texto de campo. */
 export interface GoalPrefill {
   goalType?: Extract<GoalType, 'objetivo' | 'oportunidade'>;
+  /** Meta pronta escolhida antes de abrir (Metas vazio, D-092): marca a opção e mostra a dica. */
+  preset?: Exclude<PresetChoice, null | 'outra' | 'reserva'>;
   name?: string;
   targetText?: string;
   targetMonthText?: string;
@@ -54,7 +62,7 @@ export interface GoalPrefill {
 }
 
 export type GoalPrefillParams = Partial<
-  Record<'tipo' | 'goalType' | 'nome' | 'name' | 'valor' | 'targetText' | 'prazo' | 'targetMonthText' | 'inicial' | 'initialText' | 'mensal' | 'plannedText', string | string[]>
+  Record<'tipo' | 'goalType' | 'modelo' | 'nome' | 'name' | 'valor' | 'targetText' | 'prazo' | 'targetMonthText' | 'inicial' | 'initialText' | 'mensal' | 'plannedText', string | string[]>
 >;
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -71,7 +79,7 @@ function amountText(cents: string | undefined, text: string | undefined): string
 
 /**
  * Parâmetros de /meta/nova (todos opcionais, conferidos um a um; inválidos são ignorados, nada lança):
- * tipo=objetivo|oportunidade, nome, valor (centavos), prazo (MM/AAAA), inicial e mensal (centavos). Os nomes do rascunho do
+ * tipo=objetivo|oportunidade, modelo (uma meta pronta, como "moto"), nome, valor (centavos), prazo (MM/AAAA), inicial e mensal (centavos). Os nomes do rascunho do
  * core (goalType, name, targetText, targetMonthText, initialText, plannedText) também valem, com o valor em texto de campo,
  * para quem passa direto o resultado de simulationGoalPrefill.
  */
@@ -79,9 +87,13 @@ export function readGoalPrefill(params: GoalPrefillParams): GoalPrefill {
   const type = first(params.tipo) ?? first(params.goalType);
   const name = (first(params.nome) ?? first(params.name) ?? '').trim();
   const month = first(params.prazo) ?? first(params.targetMonthText) ?? '';
+  // modelo: uma meta pronta (D-092); a reserva para imprevistos não, porque tem tela própria.
+  const found = goalPresetById(first(params.modelo));
+  const preset = found && found.id !== 'reserva' ? { id: found.id, name: found.name } : null;
   return {
     goalType: type === 'oportunidade' ? 'oportunidade' : type === 'objetivo' ? 'objetivo' : undefined,
-    name: name !== '' && charCount(name) <= GOAL_NAME_MAX ? name : undefined,
+    preset: preset ? (preset.id as NonNullable<GoalPrefill['preset']>) : undefined,
+    name: name !== '' && charCount(name) <= GOAL_NAME_MAX ? name : preset?.name,
     targetText: amountText(first(params.valor), first(params.targetText)),
     targetMonthText: /^\d{2}\/\d{4}$/.test(month) ? month : '',
     initialText: amountText(first(params.inicial), first(params.initialText)),
@@ -142,7 +154,13 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
   });
   const [goalType, setGoalType] = useState<GoalType>(initial.goalType);
   const [name, setName] = useState(initial.name);
-  const [otherChosen, setOtherChosen] = useState(false);
+  // Meta pronta escolhida na grade (D-092): só em "Nova meta". "outra" é o nome livre.
+  const [presetChoice, setPresetChoice] = useState<PresetChoice>(mode.type === 'nova' ? (mode.prefill.preset ?? null) : null);
+  const chosenPreset = presetChoice && presetChoice !== 'outra' ? goalPresetById(presetChoice) : null;
+  // A reserva para imprevistos aparece na grade só para quem ainda não tem uma (ela tem tela própria).
+  const goals = useGoals(mode.type === 'nova' ? contextId : undefined);
+  const hasReserve = goals.data ? organizeGoals(goals.data).reserve !== null : true;
+  const presets = GOAL_PRESETS.filter((p) => p.id !== 'reserva' || !hasReserve);
   const [targetText, setTargetText] = useState(initial.targetText);
   const [targetMonthText, setTargetMonthText] = useState(initial.targetMonthText);
   const [initialText, setInitialText] = useState(initial.initialText);
@@ -283,7 +301,21 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
     }
   }
 
-  const modelSelected = (t: string) => (t === 'Outro' ? otherChosen : !otherChosen && name.trim() === t);
+  const choosePreset = (choice: Exclude<PresetChoice, null>) => {
+    clear('name');
+    setPresetChoice(choice);
+    if (choice === 'outra') {
+      setName('');
+      refs.name.current?.focus();
+      return;
+    }
+    const p = goalPresetById(choice);
+    if (p) {
+      setName(p.name);
+      setGoalType('objetivo');
+    }
+  };
+  const previewKey = mode.type === 'nova' && name.trim() !== '' ? suggestGoalImage(name, goalType) : null;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -302,32 +334,32 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
           </Banner>
         ) : null}
 
+        {mode.type === 'nova' ? (
+          <Card style={{ gap: space[3] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {GOAL_PRESET_TEXT.title}
+            </Txt>
+            <Txt variant="label" color={colors.textSecondary}>
+              {GOAL_PRESET_TEXT.intro}
+            </Txt>
+            <GoalPresetGrid presets={presets} choice={presetChoice} onChoose={choosePreset} />
+          </Card>
+        ) : null}
+
         <Card style={{ gap: space[4] }}>
           <ChoiceGroup label="Tipo de meta" hint={goalType === 'oportunidade' ? T.opportunityHint : undefined}>
             <Chip label={T.typeObjective} selected={goalType === 'objetivo'} onPress={() => setGoalType('objetivo')} />
             <Chip label={T.typeOpportunity} selected={goalType === 'oportunidade'} onPress={() => setGoalType('oportunidade')} />
           </ChoiceGroup>
 
-          <ChoiceGroup label="Modelo de nome (opcional)">
-            {GOAL_TEMPLATES.map((t) => (
-              <Chip
-                key={t}
-                label={t}
-                selected={modelSelected(t)}
-                onPress={() => {
-                  clear('name');
-                  if (t === 'Outro') {
-                    setOtherChosen(true);
-                    setName('');
-                    refs.name.current?.focus();
-                  } else {
-                    setOtherChosen(false);
-                    setName(t);
-                  }
-                }}
-              />
-            ))}
-          </ChoiceGroup>
+          {previewKey ? (
+            <View style={{ gap: space[1] }}>
+              <SuggestedImage imageKey={previewKey} style={styles.preview} />
+              <Txt variant="caption" color={colors.textSecondary}>
+                {GOAL_PRESET_TEXT.imageCaption}
+              </Txt>
+            </View>
+          ) : null}
 
           <TextField
             ref={refs.name}
@@ -344,6 +376,8 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
             returnKeyType="next"
             onSubmitEditing={() => refs.targetText.current?.focus()}
           />
+
+          {chosenPreset ? <GoalPresetHint preset={chosenPreset} /> : null}
 
           <TextField
             ref={refs.targetText}
@@ -432,4 +466,5 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
 
 const styles = StyleSheet.create({
   body: { padding: space[5], gap: space[4], paddingBottom: space[6] },
+  preview: { height: 120, width: '100%', borderRadius: radius.md },
 });

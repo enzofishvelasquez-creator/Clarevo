@@ -84,8 +84,6 @@ export const RESERVE_NAME = 'Reserva para imprevistos';
  * começar e 6 a 12 meses de gastos.
  */
 export const RESERVE_MONTH_CHIPS: readonly number[] = [1, 3, 6, 12];
-/** Modelos de nome em "Nova meta" ("Outro" deixa o nome em branco). */
-export const GOAL_TEMPLATES: readonly string[] = ['Viagem', 'Troca do carro', 'Entrada do imóvel', 'Estudos', 'Outro'];
 
 /** Categorias que contam como gastos essenciais (P-017, proposta Claude, revisável). Lazer e "Sem categoria" ficam fora. */
 export const ESSENTIAL_CATEGORIES: readonly string[] = ['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação'];

@@ -13,7 +13,9 @@ export type GoalImageKey =
   | 'viagem'
   | 'reserva'
   | 'carro'
+  | 'moto'
   | 'casa'
+  | 'reforma'
   | 'estudos'
   | 'casamento'
   | 'bebe'
@@ -21,6 +23,9 @@ export type GoalImageKey =
   | 'saude'
   | 'aposentadoria'
   | 'pet'
+  | 'dividas'
+  | 'negocio'
+  | 'festa'
   | 'objetivo';
 
 export interface GoalImageSuggestion {
@@ -29,8 +34,13 @@ export interface GoalImageSuggestion {
   label: string;
   /** Texto alternativo (leitor de tela). */
   alt: string;
-  /** Palavras (sem acento, minúsculas) que, no nome da meta, puxam esta imagem. A primeira sugestão que combina vence. */
+  /** Palavras (sem acento, minúsculas) que, no nome da meta, puxam esta imagem (o que se quer: "moto", "casamento"). */
   words: readonly string[];
+  /**
+   * Palavras que só dão contexto ("entrada", "reforma", "futuro"): puxam a imagem quando o nome não tem uma palavra de `words` de
+   * outra sugestão ("Entrada da moto" é a moto; "Entrada" sozinha é a casa).
+   */
+  contextWords?: readonly string[];
 }
 
 /** Na ordem em que a escolha mostra e em que o nome é conferido. "objetivo" é a de qualquer meta sem pista. */
@@ -39,38 +49,68 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
     key: 'viagem',
     label: 'Viagem',
     alt: 'Casas brancas e cúpulas azuis diante do mar',
-    words: ['viagem', 'viagens', 'viajar', 'ferias', 'praia', 'grecia', 'europa', 'turismo', 'passeio', 'lua de mel', 'mochilao', 'cruzeiro', 'exterior', 'disney'],
+    words: ['viagem', 'viagens', 'viajar', 'ferias', 'praia', 'grecia', 'europa', 'turismo', 'lua de mel', 'mochilao', 'cruzeiro', 'disney', 'reveillon', 'trip'],
+    contextWords: ['passeio', 'exterior', 'passagem', 'passagens'],
   },
   {
     key: 'reserva',
     label: 'Porquinho',
     alt: 'Porquinho de guardar moedas',
-    words: ['reserva', 'imprevisto', 'imprevistos', 'emergencia', 'guardar', 'poupar', 'poupanca', 'cofrinho', 'colchao'],
+    words: ['reserva', 'imprevisto', 'imprevistos', 'emergencia', 'guardar', 'poupar', 'poupanca', 'cofrinho', 'colchao', 'pe de meia'],
   },
-  { key: 'carro', label: 'Carro', alt: 'Carro na estrada', words: ['carro', 'moto', 'veiculo', 'automovel', 'habilitacao', 'cnh'] },
+  {
+    key: 'carro',
+    label: 'Carro',
+    alt: 'Carro na estrada',
+    words: ['carro', 'veiculo', 'automovel', 'habilitacao', 'cnh', 'autoescola', 'caminhonete', 'picape', 'suv', 'seminovo', 'possante', 'carango'],
+  },
+  { key: 'moto', label: 'Moto', alt: 'Moto estacionada', words: ['moto', 'motinha', 'motoca', 'motocicleta', 'scooter', 'motoneta', 'lambreta', 'cinquentinha'] },
   {
     key: 'casa',
     label: 'Casa',
     alt: 'Fachada de uma casa com jardim',
-    words: ['casa', 'imovel', 'apartamento', 'apto', 'entrada', 'reforma', 'mudanca', 'terreno', 'moveis', 'casa propria'],
+    words: ['casa', 'casinha', 'imovel', 'apartamento', 'apto', 'ape', 'terreno', 'lote', 'moveis', 'casa propria'],
+    contextWords: ['entrada', 'mudanca', 'aluguel'],
+  },
+  {
+    key: 'reforma',
+    label: 'Reforma',
+    alt: 'Rolo de pintura e lata de tinta',
+    words: ['reforma', 'reformar', 'obra', 'obras', 'puxadinho', 'pintura', 'piso', 'telhado', 'laje'],
+    contextWords: ['construcao', 'construir', 'cozinha', 'banheiro'],
   },
   {
     key: 'estudos',
     label: 'Estudos',
     alt: 'Livros abertos lado a lado',
-    words: ['estudo', 'estudos', 'faculdade', 'curso', 'pos', 'mestrado', 'doutorado', 'intercambio', 'escola', 'livros', 'idioma', 'ingles', 'formatura', 'vestibular'],
+    words: ['estudo', 'estudos', 'faculdade', 'curso', 'pos', 'mba', 'mestrado', 'doutorado', 'intercambio', 'escola', 'livros', 'idioma', 'ingles', 'formatura', 'vestibular', 'cursinho', 'enem', 'concurso', 'tcc', 'mensalidade'],
+    contextWords: ['carreira'],
   },
-  { key: 'casamento', label: 'Casamento', alt: 'Duas alianças', words: ['casamento', 'casar', 'noivado', 'aliancas'] },
-  { key: 'bebe', label: 'Bebê', alt: 'Sapatinhos de bebê', words: ['bebe', 'filho', 'filha', 'filhos', 'gravidez', 'enxoval', 'maternidade', 'paternidade'] },
+  { key: 'casamento', label: 'Casamento', alt: 'Duas alianças', words: ['casamento', 'casar', 'noivado', 'noiva', 'noivo', 'aliancas', 'cha de panela'] },
+  { key: 'bebe', label: 'Bebê', alt: 'Sapatinhos de bebê', words: ['bebe', 'filho', 'filha', 'filhos', 'gravidez', 'enxoval', 'maternidade', 'paternidade', 'parto'] },
   {
     key: 'tecnologia',
     label: 'Tecnologia',
     alt: 'Notebook, celular e café sobre uma mesa',
-    words: ['celular', 'notebook', 'computador', 'tablet', 'videogame', 'console', 'televisao', 'tv', 'camera'],
+    words: ['celular', 'cel', 'notebook', 'computador', 'pc', 'tablet', 'videogame', 'game', 'console', 'televisao', 'tv', 'camera', 'eletronicos'],
   },
-  { key: 'saude', label: 'Saúde', alt: 'Tapete de exercício com toalha e halteres', words: ['saude', 'cirurgia', 'tratamento', 'dentista', 'oculos', 'academia', 'plano de saude'] },
-  { key: 'aposentadoria', label: 'Futuro', alt: 'Nascer do sol sobre o mar', words: ['aposentadoria', 'aposentar', 'futuro', 'previdencia', 'independencia', 'liberdade'] },
+  { key: 'saude', label: 'Saúde', alt: 'Tapete de exercício com toalha e halteres', words: ['saude', 'cirurgia', 'plastica', 'dentista', 'implante', 'oculos', 'academia', 'terapia', 'plano de saude'], contextWords: ['tratamento'] },
+  { key: 'aposentadoria', label: 'Futuro', alt: 'Nascer do sol sobre o mar', words: ['aposentadoria', 'aposentar', 'previdencia', 'velhice', 'renda passiva'], contextWords: ['futuro', 'independencia', 'liberdade'] },
   { key: 'pet', label: 'Pet', alt: 'Cachorro olhando para a câmera', words: ['pet', 'cachorro', 'cachorra', 'gato', 'gata', 'veterinario'] },
+  {
+    key: 'dividas',
+    label: 'Dívidas',
+    alt: 'Mão com moedas',
+    words: ['divida', 'quitar', 'emprestimo'],
+    contextWords: ['nome limpo', 'limpar o nome', 'sair do vermelho', 'fatura', 'cartao', 'financiamento'],
+  },
+  {
+    key: 'negocio',
+    label: 'Negócio',
+    alt: 'Fachada de uma pequena loja',
+    words: ['negocio', 'empresa', 'empreender', 'mei', 'cnpj', 'loja', 'lojinha', 'salao', 'food truck', 'capital de giro'],
+  },
+  { key: 'festa', label: 'Festa', alt: 'Confete e balões de festa', words: ['festa', 'aniversario', 'niver', 'debutante', '15 anos', 'natal'] },
   { key: 'objetivo', label: 'Objetivo', alt: 'Trilha subindo uma montanha', words: [] },
 ];
 
@@ -84,14 +124,42 @@ export function goalImageOf(key: GoalImageKey): GoalImageSuggestion {
   return GOAL_IMAGES.find((g) => g.key === key)!;
 }
 
-/** Sugestão pelo nome e pelo tipo: a reserva para imprevistos é sempre o porquinho; sem pista no nome, "objetivo". */
+/**
+ * Palavras que dizem só "guardar dinheiro", sem dizer para quê ("Guardar para a moto", "Poupança do casamento"): puxam o porquinho só
+ * quando o nome não tem outra pista.
+ */
+const GENERIC_IMAGE: GoalImageKey = 'reserva';
+
+/** Onde a palavra aparece no nome (com o plural simples), ou -1. */
+function wordAt(padded: string, word: string): number {
+  const exact = padded.indexOf(` ${word} `);
+  const plural = padded.indexOf(` ${word}s `);
+  return exact < 0 ? plural : plural < 0 ? exact : Math.min(exact, plural);
+}
+
+/**
+ * Sugestão pelo nome e pelo tipo: a reserva para imprevistos é sempre o porquinho; sem pista no nome, "objetivo". Vale a pista que
+ * aparece primeiro no nome, que em português costuma ser o que se quer: "Moto para viajar" é a moto, "Viagem de moto" é a viagem,
+ * "Casamento na praia" é o casamento. Palavras de só guardar ("guardar", "poupança", "reserva") ficam por último.
+ */
 export function suggestGoalImage(name: string, goalType: GoalType): GoalImageKey {
   if (goalType === 'emergencia') return 'reserva';
   const padded = ` ${normalizeDescription(name)} `;
+  const firstAt = (words: readonly string[] | undefined) =>
+    (words ?? []).reduce((min, w) => {
+      const i = wordAt(padded, w);
+      return i >= 0 && (min < 0 || i < min) ? i : min;
+    }, -1);
+  // Nível 0: o que se quer; 1: só contexto; 2: só guardar. Vence o menor nível e, nele, o que aparece primeiro no nome.
+  let best: { key: GoalImageKey; level: number; at: number } | null = null;
   for (const g of GOAL_IMAGES) {
-    if (g.words.some((w) => padded.includes(` ${w} `) || padded.includes(` ${w}s `))) return g.key;
+    const strong = firstAt(g.words);
+    const context = firstAt(g.contextWords);
+    const found =
+      strong >= 0 ? { level: g.key === GENERIC_IMAGE ? 2 : 0, at: strong } : context >= 0 ? { level: g.key === GENERIC_IMAGE ? 2 : 1, at: context } : null;
+    if (found && (best === null || found.level < best.level || (found.level === best.level && found.at < best.at))) best = { key: g.key, ...found };
   }
-  return 'objetivo';
+  return best?.key ?? 'objetivo';
 }
 
 /** Imagem guardada de uma meta (goal_images): a sugestão escolhida OU a foto da pessoa. Sem linha: a sugestão automática. */
@@ -130,6 +198,9 @@ export const GOAL_IMAGE_TEXT = {
   intro: 'Escolha uma das sugeridas ou uma foto sua. A imagem aparece na meta e na lista de metas.',
   suggestedTitle: 'Sugeridas',
   automatic: (label: string) => `Automática (agora: ${label})`,
+  /** Na grade, em duas linhas: "Automática" e, embaixo, "agora: Viagem". */
+  automaticShort: 'Automática',
+  automaticNow: (label: string) => `agora: ${label}`,
   automaticHint: 'Muda sozinha conforme o nome da meta.',
   photoTitle: 'Sua foto',
   pickPhoto: 'Escolher uma foto',

@@ -127,6 +127,8 @@ export default function MetaImagemScreen() {
           <View style={styles.grid} accessibilityRole="radiogroup" accessibilityLabel={T.suggestedTitle}>
             <Tile
               label={T.automatic(goalImageOf(autoKey).label)}
+              shown={T.automaticShort}
+              detail={T.automaticNow(goalImageOf(autoKey).label)}
               selected={view.kind === 'sugestao' && !view.chosen}
               disabled={busy !== null}
               onPress={() => save({ kind: 'automatica' }, 'automatica')}>
@@ -167,7 +169,27 @@ export default function MetaImagemScreen() {
   );
 }
 
-function Tile({ label, selected, disabled, onPress, children }: { label: string; selected: boolean; disabled: boolean; onPress: () => void; children: React.ReactNode }) {
+/**
+ * Uma opção da grade. `label` é o nome acessível; `shown` e `detail`, quando vêm, são o que aparece em duas linhas (a "Automática"
+ * mostra "Automática" e, embaixo, "agora: Viagem", sem cortar o nome no celular estreito).
+ */
+function Tile({
+  label,
+  shown,
+  detail,
+  selected,
+  disabled,
+  onPress,
+  children,
+}: {
+  label: string;
+  shown?: string;
+  detail?: string;
+  selected: boolean;
+  disabled: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <Pressable
       accessibilityRole="radio"
@@ -179,8 +201,13 @@ function Tile({ label, selected, disabled, onPress, children }: { label: string;
       style={(st) => [styles.tile, selected && styles.tileSelected, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
       {children}
       <Txt variant="caption" numberOfLines={2} style={{ fontFamily: selected ? fonts.bold : fonts.medium, textAlign: 'center' }}>
-        {label}
+        {shown ?? label}
       </Txt>
+      {detail ? (
+        <Txt variant="caption" numberOfLines={2} color={colors.textSecondary} style={{ textAlign: 'center' }}>
+          {detail}
+        </Txt>
+      ) : null}
     </Pressable>
   );
 }

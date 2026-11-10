@@ -6,11 +6,11 @@
 
 - **Sem escolher nada**, a meta mostra a imagem sugerida pelo nome: "Viagem para a Grécia" mostra as casas brancas diante do mar, "Troca do carro" o carro, "Entrada do imóvel" a casa. A reserva para imprevistos mostra sempre o porquinho. Sem pista no nome, aparece a trilha na montanha ("Objetivo"). A sugestão muda sozinha se o nome da meta mudar.
 - **Para trocar**: na meta, "Mais ações", depois "Trocar imagem". A tela mostra a imagem atual e:
-  - **Sugeridas**: a "Automática" (a do nome) e as 12 sugestões (Viagem, Porquinho, Carro, Casa, Estudos, Casamento, Bebê, Tecnologia, Saúde, Futuro, Pet e Objetivo);
+  - **Sugeridas**: a "Automática" (a do nome) e as 17 sugestões (Viagem, Porquinho, Carro, Moto, Casa, Reforma, Estudos, Casamento, Bebê, Tecnologia, Saúde, Futuro, Pet, Dívidas, Negócio, Festa e Objetivo; as cinco de D-092, Moto, Reforma, Dívidas, Negócio e Festa, ainda sem foto, aparecem como o ícone sobre o azul da marca);
   - **Sua foto**: "Escolher uma foto" abre a galeria do celular (o seletor do sistema; só a foto escolhida chega ao app). O app recorta em 16:9 quando o aparelho oferece, reduz o lado maior para 1080 px em JPEG e manda (até 300 KB). Com foto, aparecem "Escolher outra foto" e "Tirar a foto".
 - Na Família, todas as pessoas do espaço veem a imagem; trocar segue a mesma regra de editar a meta (quem só vê não troca).
 
-Palavras que puxam cada sugestão: `packages/core/src/goal-images.ts` (`GOAL_IMAGES`), testadas em `packages/core/test/goal-images.test.ts`.
+Palavras que puxam cada sugestão: `packages/core/src/goal-images.ts` (`GOAL_IMAGES`), testadas em `packages/core/test/goal-images.test.ts`. Desde D-092 vale a pista que aparece primeiro no nome ("Casamento na praia" é o casamento), palavras de contexto ("entrada", "futuro") só valem sem uma pista mais forte e palavras de só guardar ("guardar", "poupança") ficam por último (`docs/43_METAS_MAIS_COMUNS.md`).
 
 ## 2. Fotos sugeridas
 

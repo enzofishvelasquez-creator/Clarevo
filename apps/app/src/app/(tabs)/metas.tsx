@@ -7,6 +7,7 @@ import { openCalc } from '@/components/calc/open';
 import { CalcNavRow } from '@/components/calc/parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ClosedGoals, GoalCard, ReserveCard } from '@/components/goal-cards';
+import { GoalPresetShortcuts } from '@/components/goal-presets';
 import { ReserveRefresh } from '@/components/reserve-refresh';
 import { AppHeader, ContextSwitch } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -185,6 +186,7 @@ function GoalsSection({
           <EmptyState title={GOALS_TEXT.emptyTitle} art="metas">
             {GOALS_TEXT.emptyBody}
           </EmptyState>
+          {canWrite ? <GoalPresetShortcuts /> : null}
         </Card>
       ) : (
         active.map((g) => <GoalCard key={g.id} goal={g} plan={plans[g.id]!} image={images?.find((i) => i.goalId === g.id) ?? null} />)
