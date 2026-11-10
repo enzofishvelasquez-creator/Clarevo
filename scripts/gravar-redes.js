@@ -9,7 +9,10 @@
  *   - P08: criar uma meta (modelo "Estudos") e ver o progresso;
  *   - P11: anotar o primeiro gasto (R$ 35,00) e ver onde ele aparece;
  *   - reels (D-089 F): salvar uma compra de mercado (Feira, R$ 38,90, com a linha do orçamento no aviso) e abrir o orçamento, no card de Mercado;
- *   - capturas estáticas 1080 x 1350 (4:5) do orçamento, do Resumo, de Contas a pagar e de "Seu mês em 30 segundos".
+ *   - camera (item 25 do retorno de 31/10, peça R02): uma nota fiscal em PDF, um comprovante de Pix e um boleto lidos, sem digitar (os
+ *     arquivos são PDFs fictícios gerados aqui, lidos no próprio navegador; nada é salvo);
+ *   - capturas estáticas 1080 x 1350 (4:5) do orçamento, do Resumo, de Contas a pagar, de "Seu mês em 30 segundos" e das leituras (nota,
+ *     comprovante, boleto e holerite).
  *
  * Cada vídeo sai em 1080 x 1920 (9:16), H.264 (yuv420p, +faststart), sem áudio, com uma legenda `.srt` da narração sugerida, a capa (PNG
  * 1080 x 1920) e 3 quadros de conferência, todos tirados do próprio MP4. A narração é montada com os números LIDOS DA TELA no momento da
@@ -27,7 +30,7 @@
  *
  * Uso:
  *   node scripts/gravar-redes.js --saida <pasta>        grava tudo (padrão da pasta: <pasta temporária>/clarevo-redes)
- *   node scripts/gravar-redes.js --so p02,p05,capturas  só estas peças (p02, p05, p08, p11, reels, capturas)
+ *   node scripts/gravar-redes.js --so p02,p05,capturas  só estas peças (p02, p05, p08, p11, reels, camera, capturas)
  *   node scripts/gravar-redes.js --build                refaz o build de demonstração antes (sem ele, usa apps/app/dist se existir)
  *   node scripts/gravar-redes.js --manter-quadros       guarda os quadros brutos da captura em <pasta>/quadros-brutos
  *   node scripts/gravar-redes.js --apresentacao         só os clipes da apresentação (abaixo), em vez das peças das redes
@@ -64,7 +67,7 @@ const opcao = (nome) => { const i = argv.indexOf(nome); return i >= 0 ? argv[i +
 const SAIDA = path.resolve(opcao('--saida') || path.join(os.tmpdir(), argv.includes('--apresentacao') ? 'clarevo-apresentacao' : 'clarevo-redes'));
 const APRESENTACAO = argv.includes('--apresentacao');
 const PORTA = Number(opcao('--porta') || 8599);
-const SO = (opcao('--so') || (APRESENTACAO ? 'clipe-1,clipe-2,clipe-3,clipe-4,clipe-5' : 'p02,p05,p08,p11,reels,capturas')).split(',').map((s) => s.trim()).filter(Boolean);
+const SO = (opcao('--so') || (APRESENTACAO ? 'clipe-1,clipe-2,clipe-3,clipe-4,clipe-5' : 'p02,p05,p08,p11,reels,camera,capturas')).split(',').map((s) => s.trim()).filter(Boolean);
 const FFMPEG = process.env.FFMPEG || (fs.existsSync('/usr/bin/ffmpeg') ? '/usr/bin/ffmpeg' : 'ffmpeg');
 const FFPROBE = process.env.FFPROBE || (fs.existsSync('/usr/bin/ffprobe') ? '/usr/bin/ffprobe' : 'ffprobe');
 
@@ -76,6 +79,56 @@ const ALTURA_4X5 = 500;
 const ESCALA_4X5 = 2.7;
 const ESCALA = 3;
 const AGORA = '2026-10-07T10:42:00-03:00'; // o "hoje" da demonstração (DEMO_TODAY)
+
+/** PDF mínimo de texto (Helvetica, uma linha por Tj), como o do roteiro de telas: os documentos fictícios das leituras. */
+function pdfDeTexto(linhas) {
+  const esc = (t) => t.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  const conteudo = `BT /F1 10 Tf 40 800 Td 14 TL\n${linhas.map((l) => `(${esc(l)}) Tj T*`).join('\n')}\nET`;
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${Buffer.byteLength(conteudo, 'latin1')} >>\nstream\n${conteudo}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets = [];
+  objs.forEach((o, i) => { offsets.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = Buffer.byteLength(out, 'latin1');
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
+
+/** Os documentos fictícios das leituras (nomes, números e códigos inventados; nenhum dado de pessoa real), gravados numa pasta temporária. */
+const DOCUMENTOS = (() => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clarevo-redes-docs-'));
+  const gravar = (nome, linhas) => { const f = path.join(dir, nome); fs.writeFileSync(f, pdfDeTexto(linhas)); return f; };
+  // Chave de acesso de NF-e sintética (CNPJ fictício 45.723.174/0001-10, como no roteiro de telas), com o dígito verificador por módulo 11.
+  const corpo43 = `33${'2610'}${'45723174000110'}${'55'}001${'000008899'}187654321`;
+  let soma = 0;
+  for (let i = 0; i < 43; i++) soma += (corpo43.charCodeAt(42 - i) - 48) * (2 + (i % 8));
+  const resto = soma % 11;
+  const chave = corpo43 + String(resto < 2 ? 0 : 11 - resto);
+  return {
+    danfe: gravar('danfe-exemplo.pdf', [
+      'RECEBEMOS DE LOJA EXEMPLO LTDA OS PRODUTOS E/OU SERVIÇOS CONSTANTES DA NOTA FISCAL ELETRÔNICA INDICADA AO LADO',
+      'DANFE', 'Documento Auxiliar da Nota Fiscal Eletrônica', 'CHAVE DE ACESSO', chave.replace(/(.{4})/g, '$1 ').trim(),
+      'DATA DA EMISSÃO', '05/10/2026', 'CÁLCULO DO IMPOSTO', 'VALOR TOTAL DA NOTA', '150,00',
+    ]),
+    pix: gravar('pix-enviado.pdf', [
+      'Pix enviado', '06 OUT 2026 - 12:41:08', 'Valor', 'R$ 58,90', 'Tipo de transferência', 'Pix',
+      'Destino', 'Nome', 'PADARIA EXEMPLO', 'Instituição', 'Banco Exemplo S.A.',
+      'Origem', 'Nome', 'PESSOA EXEMPLO', 'Instituição', 'Banco Exemplo S.A.', 'Descrição', 'Café da manhã',
+    ]),
+    holerite: gravar('holerite.pdf', [
+      'EMPRESA EXEMPLO DE ENSINO LTDA', 'Folha Mensal', 'Setembro de 2026', 'Nome do Funcionário', 'PESSOA EXEMPLO',
+      'Código Descrição Referência Vencimentos Descontos', 'SALARIO MENSAL 3.100,00', 'I.N.S.S. 310,00',
+      'Total de Vencimentos 3.100,00', 'Total de Descontos 310,00', 'Valor Líquido 2.790,00',
+    ]),
+  };
+})();
+/** A linha digitável fictícia do roteiro de telas (dígitos verificadores certos): R$ 1.234,56, vencimento em 10/11/2026. */
+const BOLETO_LINHA = '23791.23454 67890.123457 67890.123457 4 16260000123456';
 const FPS = 25;
 /** Ritmo da narração sugerida: cerca de 16 caracteres por segundo (uns 190 palavras por minuto, calmo para uma voz de vídeo curto). */
 const CARACTERES_POR_SEGUNDO = 16;
@@ -565,7 +618,7 @@ const VIDEOS = [
     titulo: 'orçamento por categoria, o orçado e o usado',
     /** Movimentos, com o orçamento ainda fechado. */
     preparar: async (c) => {
-      await c.tocar(c.aba('Movimentos: movimentações do mês'), { antes: 0 });
+      await c.tocar(c.aba(/^Movimentos/), { antes: 0 });
       await c.esperar('Registrar recebimento');
       await c.rolarPara(0, 0);
       await c.pausa(500);
@@ -619,7 +672,7 @@ const VIDEOS = [
     slug: 'p05-orcamento-comecar-uma-categoria',
     titulo: 'começar o orçamento de uma categoria',
     preparar: async (c) => {
-      await c.tocar(c.aba('Movimentos: movimentações do mês'), { antes: 0 });
+      await c.tocar(c.aba(/^Movimentos/), { antes: 0 });
       await c.esperar('Registrar recebimento');
       await c.tocar(c.botao(/^Orçamento por categoria/), { antes: 0 });
       await c.esperar('Orçado R$');
@@ -867,6 +920,89 @@ const VIDEOS = [
       await c.quadro('conferencia', 0);
       await s.fim();
       s = await c.fala('O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar. Para conhecer o acesso, veja o fixado Como acessar.');
+      await pausa(2600);
+      await s.fim();
+    },
+  },
+  {
+    // Item 25 do retorno de 31/10/2026 (peça R02): entrar com os dados sem digitar. Na web da demonstração não há câmera: a nota, o
+    // comprovante e o boleto são dois PDFs e uma linha digitável fictícios, lidos no navegador.
+    id: 'camera',
+    slug: 'camera-nota-comprovante-e-boleto',
+    titulo: 'nota, comprovante e boleto lidos sem digitar',
+    preparar: async (c) => {
+      await c.rolarPara(0, 0);
+      await c.pausa(500);
+    },
+    roteiro: async (c) => {
+      const { p, botao, campo, esperar, pausa, rolarAte, tocar, digitar, texto } = c;
+      const varredura = () => p.getByRole('button', { name: /^Escanear nota fiscal/ }).filter({ visible: true }).first();
+      const linhaLida = async (rotulo) => {
+        const corpo = (await p.locator('body').innerText()).replace(/\s+/g, ' ');
+        const m = new RegExp(`${rotulo}[^.]*?R\\$ ?[\\d.]+,\\d{2}[^.]*`).exec(corpo);
+        if (!m) throw new Error(`não achei "${rotulo}" com valor na tela: ${corpo.slice(0, 300)}`);
+        return m[0].trim();
+      };
+      const sair = async () => {
+        await tocar(botao('Cancelar'), { antes: 300 });
+        await pausa(300);
+        if ((await botao('Descartar alterações').count()) > 0) await tocar(botao('Descartar alterações'), { antes: 200 });
+        await esperar('Diferença do mês');
+        await pausa(400);
+      };
+      let s = await c.fala('Notas, comprovantes e boletos já trazem as informações. A Clarevo lê, e você só confere.', { min: 4.5 });
+      await c.quadro('conferencia', 0.8);
+      await pausa(1400);
+      await tocar(botao('Anotar gasto'), { antes: 400 });
+      await esperar('Será salvo em');
+      await s.fim();
+      // 1. Nota fiscal: o PDF de uma compra on-line (DANFE fictício).
+      s = await c.fala('Nota fiscal de uma compra on-line, em PDF: a loja, o valor e a data entram sozinhos.');
+      await tocar(varredura(), { antes: 400 });
+      await esperar('Como você quer ler a nota?');
+      await pausa(700);
+      const [pdfNota] = await Promise.all([p.waitForEvent('filechooser'), tocar(botao('Escolher o PDF da nota'), { antes: 400 })]);
+      await pdfNota.setFiles(DOCUMENTOS.danfe);
+      await esperar('Nota lida:', 20000);
+      const nota = await linhaLida('Nota lida:');
+      await rolarAte(texto('Nota lida:'), 1200, 14);
+      await pausa(1500);
+      await c.quadro('capa', 0);
+      await s.fim();
+      await sair();
+      // 2. Comprovante de Pix em PDF.
+      s = await c.fala('Comprovante de Pix, em PDF ou print: o valor, a data e quem recebeu.');
+      await tocar(botao('Anotar gasto'), { antes: 300 });
+      await esperar('Será salvo em');
+      await tocar(varredura(), { antes: 300 });
+      await esperar('Como você quer ler a nota?');
+      await pausa(600);
+      const [escolha] = await Promise.all([p.waitForEvent('filechooser'), tocar(botao('Ler comprovante ou boleto'), { antes: 400 })]);
+      await escolha.setFiles(DOCUMENTOS.pix);
+      await esperar('Comprovante lido:', 20000);
+      const comprovante = await linhaLida('Comprovante lido:');
+      await rolarAte(texto('Comprovante lido:'), 1200, 14);
+      await pausa(1600);
+      await c.quadro('conferencia', 0);
+      await s.fim();
+      await sair();
+      // 3. Boleto: a linha digitável vira conta a pagar.
+      s = await c.fala('Boleto: a linha digitável vira conta a pagar, com o valor e o vencimento.');
+      await tocar(botao('Anotar conta a pagar'), { antes: 300 });
+      await esperar('Data de vencimento');
+      await tocar(p.getByRole('button', { name: /^Ler boleto\./ }).filter({ visible: true }).first(), { antes: 400 });
+      await tocar(botao('Colar ou digitar a linha digitável'), { antes: 400 });
+      await campo('Linha digitável ou código de barras').waitFor({ timeout: 6000 });
+      await digitar(campo('Linha digitável ou código de barras'), BOLETO_LINHA, 18);
+      await tocar(botao('Ler o boleto'), { antes: 300 });
+      await esperar('Boleto lido:');
+      const boleto = await linhaLida('Boleto lido:');
+      await rolarAte(texto('Boleto lido:'), 1000, 14);
+      await pausa(1400);
+      await c.quadro('conferencia', 0);
+      await s.fim();
+      c.numeros = { nota, comprovante, boleto };
+      s = await c.fala('Comprovantes e boletos são lidos aqui no aparelho, e o arquivo não é guardado. Você confere e salva.');
       await pausa(2600);
       await s.fim();
     },
@@ -1212,7 +1348,7 @@ async function gravarCapturas(browser, servidor, saida, manifesto, problemas) {
   };
 
   // Orçamento por categoria (P01, P02, P05). A margem de 14 pontos deixa o card logo abaixo do cabeçalho.
-  await f.tocar(f.aba('Movimentos: movimentações do mês'), { antes: 0 });
+  await f.tocar(f.aba(/^Movimentos/), { antes: 0 });
   await f.esperar('Registrar recebimento');
   await f.tocar(f.botao(/^Orçamento por categoria/), { antes: 0 });
   await f.esperar('Orçado R$');
@@ -1239,7 +1375,7 @@ async function gravarCapturas(browser, servidor, saida, manifesto, problemas) {
   await captura('contas-a-pagar-2-a-vencer', 'Contas a pagar de outubro: as contas que ainda vencem no mês', 'P04', ['A vencer em outubro']);
 
   // Seu mês em 30 segundos (P10): a revisão do mês, em cartões curtos.
-  await f.tocar(f.aba('Movimentos: movimentações do mês'), { antes: 0 });
+  await f.tocar(f.aba(/^Movimentos/), { antes: 0 });
   await f.esperar('Registrar recebimento');
   await f.tocar(f.botao(/^Seu mês em 30 segundos/), { antes: 0 });
   await f.esperar('Entrou e saiu');
@@ -1249,6 +1385,47 @@ async function gravarCapturas(browser, servidor, saida, manifesto, problemas) {
   await p.waitForTimeout(900);
   await f.rolarPara(0, 0);
   await captura('seu-mes-2-segundo-cartao', 'Seu mês em 30 segundos: o segundo cartão', 'P10', ['2 de 5']);
+
+  // Leituras (R02): cada uma parte de uma demonstração nova (sair de um formulário preenchido pediria para descartar).
+  const varredura = () => p.getByRole('button', { name: /^Escanear nota fiscal/ }).filter({ visible: true }).first();
+  const doTopo = async (rotulo) => { await f.esperar(rotulo, 20000); await p.waitForTimeout(500); await f.rolarAte(f.texto(rotulo), 0, 14); };
+  await entrarNaDemo(p, servidor.base, f);
+  await f.tocar(f.botao('Anotar gasto'), { antes: 0 });
+  await f.esperar('Será salvo em');
+  await f.tocar(varredura(), { antes: 0 });
+  const [nota] = await Promise.all([p.waitForEvent('filechooser'), f.tocar(f.botao('Escolher o PDF da nota'), { antes: 0 })]);
+  await nota.setFiles(DOCUMENTOS.danfe);
+  await doTopo('Nota lida:');
+  await captura('leitura-1-nota', 'Anotar gasto: a nota fiscal em PDF de uma compra on-line (fictícia) lida, com a loja, o valor e a data', 'R02', ['Nota lida: Loja Exemplo Ltda']);
+
+  await entrarNaDemo(p, servidor.base, f);
+  await f.tocar(f.botao('Anotar gasto'), { antes: 0 });
+  await f.esperar('Será salvo em');
+  await f.tocar(varredura(), { antes: 0 });
+  const [comp] = await Promise.all([p.waitForEvent('filechooser'), f.tocar(f.botao('Ler comprovante ou boleto'), { antes: 0 })]);
+  await comp.setFiles(DOCUMENTOS.pix);
+  await doTopo('Comprovante lido:');
+  await captura('leitura-2-comprovante', 'Anotar gasto: um comprovante de Pix fictício lido, com o valor, a data e quem recebeu', 'R02', ['Comprovante lido: Pix enviado']);
+
+  await entrarNaDemo(p, servidor.base, f);
+  await f.tocar(f.botao('Anotar conta a pagar'), { antes: 0 });
+  await f.esperar('Data de vencimento');
+  await f.tocar(p.getByRole('button', { name: /^Ler boleto\./ }).filter({ visible: true }).first(), { antes: 0 });
+  await f.tocar(f.botao('Colar ou digitar a linha digitável'), { antes: 0 });
+  await f.campo('Linha digitável ou código de barras').fill(BOLETO_LINHA);
+  await f.tocar(f.botao('Ler o boleto'), { antes: 0 });
+  await doTopo('Boleto lido:');
+  await captura('leitura-3-boleto', 'Anotar conta a pagar: um boleto fictício lido pela linha digitável, com o valor e o vencimento', 'R02', ['Boleto lido:']);
+
+  await entrarNaDemo(p, servidor.base, f);
+  await f.tocar(f.aba(/^Movimentos/), { antes: 0 });
+  await f.esperar('Registrar recebimento');
+  await f.tocar(f.botao('Registrar recebimento'), { antes: 0 });
+  await f.esperar('Data do recebimento');
+  const [hol] = await Promise.all([p.waitForEvent('filechooser'), f.tocar(p.getByRole('button', { name: /^Ler comprovante/ }).filter({ visible: true }).first(), { antes: 0 })]);
+  await hol.setFiles(DOCUMENTOS.holerite);
+  await doTopo('Comprovante lido:');
+  await captura('leitura-4-holerite', 'Registrar recebimento: um holerite fictício lido, com o valor líquido e o mês de competência', 'R02', ['Comprovante lido: Holerite']);
 
   await ctx.close();
   if (fora.length) problemas.push(`capturas: requisições para fora de localhost bloqueadas: ${[...new Set(fora)].slice(0, 3).join(' | ')}`);
