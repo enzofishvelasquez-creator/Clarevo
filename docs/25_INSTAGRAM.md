@@ -15,7 +15,7 @@ Saída em `--saida <pasta>` (nesta rodada, uma pasta fora do repositório). Quan
 | Prévia do perfil no celular (cabeçalho, nome, bio, link, destaques e a grade com as 9 primeiras peças) | 1 | `perfil/previa-do-perfil.png` |
 | Nome de exibição, bio (com a contagem de caracteres), link, destaques e fixados | 1 texto | `perfil/nome-e-bio.txt` |
 | Carrosséis do calendário, todas as páginas 1080 x 1350: P01 (6), P03 (5), P04 (5), P07 (5), P10 (6), B01 (5) e T01 (5) | 7 peças, 37 páginas | uma pasta por peça, na ordem do calendário |
-| Carrosséis de reserva, fora do calendário: R01 (5), B do Manual (5), F01 (7) e F02 (6) | 4 peças, 23 páginas | `reserva-*` |
+| Peças de reserva, fora do calendário: os carrosséis R01 (5), R02 (6, "Organizar as finanças com a câmera do celular"), B do Manual (5), F01 (7) e F02 (6), e o Reels R03 (nota, comprovante e boleto lidos sem digitar) | 6 peças, 29 páginas e um Reels | `reserva-*` |
 | Capas de Reel 1080 x 1920 (P02, P05, P08, P11) | 4 | `capa.png` |
 | Rascunhos em MP4 com a gravação real e o texto na tela do roteiro, em trechos (1080 x 1920, H.264, 25 quadros por segundo, sem áudio, de 33 a 36 s, de 1,4 a 1,9 MB) | 4 | `rascunho.mp4`, mais `rascunho-conferencia.png` (3 quadros), `gravacao-limpa.mp4` e `legendas.srt` (a narração) |
 | Capas de vídeo com integrante real, com o quadro "[Gravação com integrante real]" (P06, P09 e P12) | 3 | `capa.png` e `roteiro.md` |
@@ -84,7 +84,7 @@ Na ordem do calendário do Playbook v2.2. O detalhe de cada peça (objetivo, aç
 | D25 | P11 Primeiro registro de despesa | Reel | Concluir a primeira tarefa | Capa, rascunho em MP4 (36 s, 7 trechos): Farmácia, R$ 35,00; o último avisa que, na conta da pessoa, o primeiro registro começa do zero |
 | D27 | B01 Bem-estar financeiro nas empresas | Carrossel, 5 páginas | Solicitar apresentação pelo canal conferido | 5 páginas, com a ressalva da NR-1 e a frase de D-056 (a empresa nunca vê as finanças de ninguém, nem somadas); **bloqueada** (seção 6) |
 | Stories e destaque Ajuda | P12 Dúvida de acesso | Vídeo com integrante | Acessar ou pedir orientação pelo canal confirmado | Capa, roteiro (com [pergunta real] e [resposta conferida] para a equipe), legenda completa, sequência de Stories e respostas-base |
-| Reserva | R01, B (Manual), F01, F02 | Carrosséis | Ver cada `ficha.md` | R01 (calendário visual e a barra de 100% do Manual; a página 4 diz "Não é saldo disponível."), B (à vista ou em 10 parcelas; a página 5 cita a calculadora "Parcelado ou à vista?"), F01 (5 perguntas) e F02 (conversa sobre as contas da casa) |
+| Reserva | R01, R02, R03, B (Manual), F01, F02 | Carrosséis e um Reels (R03) | Ver cada `ficha.md` | R01 (calendário visual e a barra de 100% do Manual; a página 4 diz "Não é saldo disponível."), B (à vista ou em 10 parcelas; a página 5 cita a calculadora "Parcelado ou à vista?"), F01 (5 perguntas) e F02 (conversa sobre as contas da casa) |
 
 ### Os rascunhos em vídeo
 

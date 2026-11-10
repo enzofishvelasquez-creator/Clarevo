@@ -203,6 +203,20 @@ Pedido no retorno do teste de 09/11/2026 (`docs/34`, decisão F). Gravado com `n
 
 "79%" no aviso e "79,9%" no card são o mesmo número: o aviso arredonda para baixo, sem casa decimal (D-089 E). A arte final (pergunta na tela, "Exemplo fictício", trilha) fica com a equipe, como nas outras peças.
 
+### 2.4c Reels R03: nota, comprovante e boleto lidos sem digitar (item 25 do retorno de 31/10; 33,2 s)
+
+Gravado com `node scripts/gravar-redes.js --so camera` (peça `camera`), na demonstração, em 1080 x 1920. Na web da demonstração não há câmera: a nota é um PDF de compra on-line (DANFE) fictício, o comprovante é um PDF de Pix fictício, e o boleto é a linha digitável fictícia do roteiro de telas, todos gerados pelo script e lidos no navegador; nada é salvo. A peça do Instagram é a R03 (`scripts/instagram/conteudo.js`), e o carrossel da mesma pauta, a R02, usa as capturas `leitura-1-nota` a `leitura-4-holerite` (seção 2.5).
+
+| Início | Narração sugerida, lida da tela |
+|---|---|
+| 0,0 s | Notas, comprovantes e boletos já trazem as informações. A Clarevo lê, e você só confere. |
+| 5,8 s | Nota fiscal de uma compra on-line, em PDF: a loja, o valor e a data entram sozinhos. |
+| 12,6 s | Comprovante de Pix, em PDF ou print: o valor, a data e quem recebeu. |
+| 18,7 s | Boleto: a linha digitável vira conta a pagar, com o valor e o vencimento. |
+| 24,4 s | Comprovantes e boletos são lidos aqui no aparelho, e o arquivo não é guardado. Você confere e salva. |
+
+Os tempos variam alguns décimos a cada gravação. Uma versão com a câmera do celular (o QR code do cupom e o código de barras do boleto) só pode ser gravada no aparelho, com o app das lojas.
+
 ### 2.5 Capturas estáticas 1080 x 1350 (4:5)
 
 Telas como o app as mostra, **sem montagem de arte** (a arte final é feita no Canva), com a etiqueta "Demonstração" no cabeçalho. Ficam em `capturas/`.

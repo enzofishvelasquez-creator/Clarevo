@@ -92,6 +92,7 @@ const GRAVACOES = {
   p05: { base: 'p05-orcamento-comecar-uma-categoria', quadroDaCapa: 'p05-orcamento-comecar-uma-categoria-conferencia-2.png', recorte: { x: 40, y: 290, w: 1000, h: 960 } },
   p08: { base: 'p08-meta-criar-e-ver-o-progresso', quadroDaCapa: 'p08-meta-criar-e-ver-o-progresso-capa.png', recorte: { x: 40, y: 215, w: 1000, h: 945 } },
   p11: { base: 'p11-primeiro-gasto-anotar', quadroDaCapa: 'p11-primeiro-gasto-anotar-conferencia-3.png', recorte: { x: 40, y: 240, w: 1000, h: 960 } },
+  camera: { base: 'camera-nota-comprovante-e-boleto', quadroDaCapa: 'camera-nota-comprovante-e-boleto-capa.png', recorte: { x: 40, y: 200, w: 1000, h: 950 } },
 };
 
 const PECAS = [
@@ -817,6 +818,108 @@ const PECAS = [
     depende: ['Peça de reserva: a equipe decide a data. Montar no Canva e publicar.'],
     conferencia: [
       { afirmacao: 'R$ 4.200 − R$ 2.550 − R$ 800 = R$ 850, diferença após essas despesas.', situacao: 'Exemplo fictício, conta conferida', nota: 'Rotular como diferença do exemplo; o app tem outra conta (Diferença do mês é só Recebido menos Pago) e não mostra saldo.' },
+    ],
+  },
+  {
+    // Item 25 do retorno do teste de 31/10/2026 (docs/34, "Rascunho para as redes"): o diferencial de entrar com os dados sem digitar.
+    id: 'R02',
+    pasta: 'reserva-R02-organizar-com-a-camera-do-celular',
+    reserva: true,
+    nome: 'Organizar as finanças com a câmera do celular',
+    formato: 'carrossel',
+    objetivo: 'Mostrar que notas, comprovantes, boletos e holerites já trazem as informações, e que a Clarevo lê para a pessoa conferir.',
+    acao: 'Salvar o carrossel e conhecer o app pelo link do perfil.',
+    familia: 'Demonstração real',
+    paginas: [
+      { modelo: 'capaAzul', rotulo: 'Sem digitar', titulo: 'Já pensou em organizar suas finanças com a *câmera do celular*?' },
+      {
+        modelo: 'tela',
+        titulo: 'Nota fiscal: o QR code do cupom ou o PDF da compra on-line. A Clarevo preenche o que a nota informa.',
+        captura: { arquivo: 'capturas/leitura-1-nota.png', recorte: { x: 40, y: 175, w: 1000, h: 830 } },
+        chip: 'Exemplo fictício · demonstração',
+      },
+      {
+        modelo: 'tela',
+        titulo: 'Comprovante de Pix: um print basta. A Clarevo lê o valor, a data e quem recebeu ou enviou.',
+        captura: { arquivo: 'capturas/leitura-2-comprovante.png', recorte: { x: 40, y: 175, w: 1000, h: 830 } },
+        chip: 'Exemplo fictício · demonstração',
+      },
+      {
+        modelo: 'tela',
+        titulo: 'Boleto: o código de barras, uma foto ou a linha digitável. A conta entra nas contas a pagar, com valor e vencimento.',
+        captura: { arquivo: 'capturas/leitura-3-boleto.png', recorte: { x: 40, y: 175, w: 1000, h: 830 } },
+        chip: 'Exemplo fictício · demonstração',
+      },
+      {
+        modelo: 'tela',
+        titulo: 'Holerite: o valor líquido e o mês de competência vão direto para o seu recebimento.',
+        captura: { arquivo: 'capturas/leitura-4-holerite.png', recorte: { x: 40, y: 175, w: 1000, h: 830 } },
+        chip: 'Exemplo fictício · demonstração',
+      },
+      { modelo: 'final', titulo: 'Tudo é lido no seu *aparelho*.', corpo: 'O arquivo não é guardado nem enviado para ninguém. Você confere e salva.' },
+    ],
+    legenda:
+      'As notas, os comprovantes, os boletos e os holerites já trazem as informações. A Clarevo lê para você, no seu aparelho, e você só confere antes de salvar. Menos digitação, mais tempo para o que importa. As telas do carrossel são da demonstração, com dados fictícios.',
+    alt: [
+      'Capa em fundo azul, com o rótulo "Sem digitar": "Já pensou em organizar suas finanças com a câmera do celular?"',
+      'Tela da demonstração da Clarevo, em Anotar gasto: o bloco "Nota lida" com o nome da loja, o valor e a data de uma nota fictícia, e a descrição já preenchida. Texto: "Nota fiscal: o QR code do cupom ou o PDF da compra on-line. A Clarevo preenche o que a nota informa."',
+      'Tela da demonstração em Anotar gasto: o bloco "Comprovante lido" de um Pix fictício, com o valor, a data e quem recebeu, e o aviso de que o arquivo foi lido no aparelho e não é guardado. Texto: "Comprovante de Pix: um print basta. A Clarevo lê o valor, a data e quem recebeu ou enviou."',
+      'Tela da demonstração em Anotar conta a pagar: o bloco "Boleto lido" com o valor e o vencimento de um boleto fictício. Texto: "Boleto: o código de barras, uma foto ou a linha digitável. A conta entra nas contas a pagar, com valor e vencimento."',
+      'Tela da demonstração em Registrar recebimento: o bloco "Comprovante lido: Holerite" com o valor líquido e o aviso de escolher o dia em que o salário entrou. Texto: "Holerite: o valor líquido e o mês de competência vão direto para o seu recebimento."',
+      'Fundo azul com o texto "Tudo é lido no seu aparelho. O arquivo não é guardado nem enviado para ninguém. Você confere e salva."',
+    ],
+    ajustes: [
+      'O rascunho da página 2 dizia que a nota preenche "a loja, o valor e a data". No celular, o QR code do cupom traz o valor e a data só em parte das notas (a leitura da página da Sefaz é do RJ); o PDF da compra on-line traz tudo. Por isso a página diz "o que a nota informa", e a captura é a do PDF.',
+      'Na página 6, "no seu celular" virou "no seu aparelho": na web a leitura também acontece no próprio navegador.',
+      'As capturas são da web da demonstração (sem câmera): a nota e o comprovante são PDFs fictícios, e o boleto, uma linha digitável fictícia (`scripts/gravar-redes.js`, capturas `leitura-*`).',
+    ],
+    depende: [
+      'Publicar depois que a leitura de boleto, de print e de holerite estiver no app publicado (já está na web desde 10/11/2026); no celular, quando o app sair nas lojas.',
+      'Montar no Canva e publicar; para o Reels da mesma pauta, ver a peça R03.',
+    ],
+    conferencia: [
+      { afirmacao: 'A nota fiscal é lida pelo QR code do cupom ou pelo PDF da compra on-line, e a Clarevo preenche o que a nota informa.', situacao: 'Confirmado', nota: 'Escanear nota fiscal: câmera, PDF da nota ou o link e a chave (D-038). Valor e data dependem do que a nota traz (D-039).' },
+      { afirmacao: 'Comprovante de Pix em print, foto ou PDF, com valor, data e quem recebeu ou enviou.', situacao: 'Confirmado', nota: '"Ler comprovante ou boleto" (D-051, D-078 B, D-088); captura leitura-2.' },
+      { afirmacao: 'Boleto pelo código de barras, foto, PDF ou linha digitável, entrando nas contas a pagar com valor e vencimento.', situacao: 'Confirmado', nota: '"Ler boleto" em Anotar conta a pagar (D-078 G); captura leitura-3.' },
+      { afirmacao: 'Holerite: valor líquido e mês de competência no recebimento.', situacao: 'Confirmado', nota: 'D-078; o dia do pagamento a pessoa escolhe; captura leitura-4.' },
+      { afirmacao: 'Tudo é lido no aparelho; o arquivo não é guardado nem enviado.', situacao: 'Confirmado', nota: 'Leitura local (D-078); a imagem e o PDF não vão a servidor da Clarevo. No Android, os componentes do Google podem enviar dados técnicos de uso (política, seção 8), não o documento.' },
+    ],
+  },
+  {
+    // A mesma pauta da R02 em vídeo (docs/34, rascunho do Reels), gravada por `scripts/gravar-redes.js --so camera`.
+    id: 'R03',
+    pasta: 'reserva-R03-reel-nota-comprovante-e-boleto',
+    reserva: true,
+    nome: 'Nota, comprovante e boleto lidos sem digitar',
+    formato: 'reel',
+    objetivo: 'Mostrar, na tela real, a leitura de uma nota, de um comprovante e de um boleto.',
+    acao: 'Conhecer o app pelo link do perfil.',
+    familia: 'Demonstração real',
+    gravacao: 'camera',
+    capa: { tag: 'Sem digitar', titulo: 'Nota, comprovante e boleto lidos pela Clarevo', chip: 'Exemplo fictício' },
+    roteiro: [
+      { em: 0, tela: 'Notas, comprovantes e boletos já trazem as informações', fala: 'Notas, comprovantes e boletos já trazem as informações. A Clarevo lê, e você só confere.' },
+      { em: 5.8, tela: 'Nota fiscal em PDF: loja, valor e data', fala: 'Nota fiscal de uma compra on-line, em PDF: a loja, o valor e a data entram sozinhos.' },
+      { em: 12.6, tela: 'Comprovante de Pix: um print basta', fala: 'Comprovante de Pix, em PDF ou print: o valor, a data e quem recebeu.' },
+      { em: 18.7, tela: 'Boleto: vira conta a pagar', fala: 'Boleto: a linha digitável vira conta a pagar, com o valor e o vencimento.' },
+      { em: 24.4, tela: 'Lido no aparelho, sem guardar o arquivo', fala: 'Comprovantes e boletos são lidos aqui no aparelho, e o arquivo não é guardado. Você confere e salva.' },
+    ],
+    legenda:
+      'Notas, comprovantes e boletos já trazem as informações. Na Clarevo, você escolhe o arquivo ou digita a linha do boleto, confere e salva. O vídeo usa a demonstração, com dados fictícios.',
+    alt: 'Gravação da tela da demonstração da Clarevo, com dados fictícios: a pessoa abre Anotar gasto e escolhe o PDF de uma nota, que preenche a loja, o valor e a data; depois lê um comprovante de Pix em PDF; por fim, em Anotar conta a pagar, digita a linha digitável de um boleto, que preenche o valor e o vencimento. Legendas na tela repetem a narração.',
+    altCapa: 'Capa do Reels "Nota, comprovante e boleto lidos pela Clarevo", com o trecho da tela "Nota lida" (dados fictícios).',
+    ajustes: [
+      'Na web da demonstração não há câmera: a nota e o comprovante são PDFs fictícios escolhidos no seletor de arquivos, e o boleto é uma linha digitável fictícia. Uma versão com a câmera do celular só pode ser gravada no aparelho, com o app das lojas.',
+    ],
+    depende: [
+      'Edição final no Edits e capa no Canva; "Exemplo fictício" visível enquanto os valores aparecerem.',
+      'Refazer a gravação na versão que for ao ar (`node scripts/gravar-redes.js --so camera`).',
+    ],
+    conferencia: [
+      { afirmacao: 'A nota fiscal em PDF preenche a loja, o valor e a data.', situacao: 'Confirmado', nota: 'Gravação camera, "Nota lida: Loja Exemplo Ltda" com valor e data (DANFE fictício).' },
+      { afirmacao: 'O comprovante de Pix preenche o valor, a data e quem recebeu.', situacao: 'Confirmado', nota: 'Gravação camera, "Comprovante lido: Pix enviado".' },
+      { afirmacao: 'A linha digitável do boleto vira conta a pagar com valor e vencimento.', situacao: 'Confirmado', nota: 'Gravação camera, "Boleto lido" em Anotar conta a pagar.' },
+      { afirmacao: 'Comprovantes e boletos são lidos no aparelho, e o arquivo não é guardado.', situacao: 'Confirmado', nota: 'Texto do próprio app ("O arquivo foi lido aqui no aparelho e não é guardado").' },
     ],
   },
   {

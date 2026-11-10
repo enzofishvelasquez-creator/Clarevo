@@ -53,7 +53,7 @@ function conferirValoresCitados(textos = textosPublicos()) {
 }
 
 /** Páginas por carrossel, como o Playbook e o Manual definem. */
-const PAGINAS_ESPERADAS = { P01: 6, P03: 5, P04: 5, P07: 5, P10: 6, B01: 5, T01: 5, R01: 5, B: 5, F01: 7, F02: 6 };
+const PAGINAS_ESPERADAS = { P01: 6, P03: 5, P04: 5, P07: 5, P10: 6, B01: 5, T01: 5, R01: 5, R02: 6, B: 5, F01: 7, F02: 6 };
 
 function conferirEstrutura(pecas = PECAS, modelos = null) {
   const erros = [];
