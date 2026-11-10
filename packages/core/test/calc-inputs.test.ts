@@ -106,7 +106,7 @@ describe('calculadoras: catálogo e textos fixos', () => {
       'Quitar antes ou adiantar parcelas',
       'Multa e juros por atraso',
       'Em que ordem quitar as dívidas?',
-      'Reserva para imprevistos',
+      'Quanto guardar para imprevistos?',
       'Juntar para um objetivo',
       'Dividir as contas da casa',
     ]);
@@ -124,7 +124,8 @@ describe('calculadoras: catálogo e textos fixos', () => {
     expect(labels[1]).toBe('Parcelado ou à vista? Descubra os juros embutidos no parcelado');
     expect(labels[3]).toBe('Quanto custa uma dívida? Rotativo, cheque especial ou empréstimo');
     expect(labels[6]).toBe('Em que ordem quitar as dívidas? Duas ordens de pagamento, lado a lado');
-    expect(labels[7]).toBe('Reserva para imprevistos. Quantos meses seus gastos essenciais cobrem');
+    expect(labels[7]).toBe('Quanto guardar para imprevistos? Quantos meses seus gastos essenciais cobrem');
+    expect(labels[8]).toBe('Juntar para um objetivo. Quanto guardar por mês ou em quanto tempo');
     for (const label of labels) expect(label).not.toMatch(/[?!.]\./);
     expect(calcRowA11yLabel('Todas as calculadoras')).toBe('Todas as calculadoras');
     expect(calcRowA11yLabel('Calculadoras', '')).toBe('Calculadoras');

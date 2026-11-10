@@ -34,7 +34,7 @@ export const CALCULATORS: readonly CalcInfo[] = [
   { slug: 'quitar-antes', title: 'Quitar antes ou adiantar parcelas', subtitle: 'Uma estimativa de quanto dos juros sai da conta', group: 'dividas' },
   { slug: 'multa-e-juros', title: 'Multa e juros por atraso', subtitle: 'Com os valores do boleto', group: 'dividas' },
   { slug: 'plano-dividas', title: 'Em que ordem quitar as dívidas?', subtitle: 'Duas ordens de pagamento, lado a lado', group: 'dividas' },
-  { slug: 'reserva', title: 'Reserva para imprevistos', subtitle: 'Quantos meses seus gastos essenciais cobrem', group: 'guardar' },
+  { slug: 'reserva', title: 'Quanto guardar para imprevistos?', subtitle: 'Quantos meses seus gastos essenciais cobrem', group: 'guardar' },
   { slug: 'juntar-para-objetivo', title: 'Juntar para um objetivo', subtitle: 'Quanto guardar por mês ou em quanto tempo', group: 'guardar' },
   { slug: 'dividir-contas', title: 'Dividir as contas da casa', subtitle: 'Partes iguais ou pela renda de cada pessoa', group: 'guardar' },
 ];
@@ -73,8 +73,8 @@ export function calcTitle(slug: CalcSlug, modo?: string): string {
 }
 
 /**
- * Nome acessível de uma linha com título e legenda: "Reserva para imprevistos. Quantos meses seus gastos essenciais
- * cobrem"; título que já termina em "?", "!" ou "." não ganha outro ponto ("Parcelado ou à vista? Descubra ...").
+ * Nome acessível de uma linha com título e legenda: "Juntar para um objetivo. Quanto guardar por mês ou em quanto tempo";
+ * título que já termina em "?", "!" ou "." não ganha outro ponto ("Parcelado ou à vista? Descubra ...").
  */
 export function calcRowA11yLabel(title: string, caption?: string | null): string {
   if (!caption) return title;

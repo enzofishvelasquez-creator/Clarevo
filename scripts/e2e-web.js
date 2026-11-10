@@ -1842,7 +1842,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const CALC_LIST = [
     ['Decidir uma compra', [['Antes de financiar', 'Parcela, juros e o que muda se juntar antes'], ['Parcelado ou à vista?', 'Descubra os juros embutidos no parcelado'], ['Quanto custa por ano?', 'Por ano, por mês e por dia']]],
     ['Dívidas e atrasos', [['Quanto custa uma dívida?', 'Rotativo, cheque especial ou empréstimo'], ['Quitar antes ou adiantar parcelas', 'Uma estimativa de quanto dos juros sai da conta'], ['Multa e juros por atraso', 'Com os valores do boleto'], ['Em que ordem quitar as dívidas?', 'Duas ordens de pagamento, lado a lado']]],
-    ['Guardar e dividir', [['Reserva para imprevistos', 'Quantos meses seus gastos essenciais cobrem'], ['Juntar para um objetivo', 'Quanto guardar por mês ou em quanto tempo'], ['Dividir as contas da casa', 'Partes iguais ou pela renda de cada pessoa']]],
+    ['Guardar e dividir', [['Quanto guardar para imprevistos?', 'Quantos meses seus gastos essenciais cobrem'], ['Juntar para um objetivo', 'Quanto guardar por mês ou em quanto tempo'], ['Dividir as contas da casa', 'Partes iguais ou pela renda de cada pessoa']]],
   ];
   // Palavras de julgamento que nunca aparecem num resultado (spec4 §1.2, como em copy.test.ts).
   const JUDGMENT = /vale a pena|\bruim\b|\bcuidado\b|desperd[ií]cio|\bcorte\b|\batras(o|ad[oa])\b|estourou|\binvista\b|caixinha|saldo devedor/i;
@@ -2026,7 +2026,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await backToCalcList();
 
   // 7. Reserva: 3.750,00 por mês e 6 meses; 4.500,00 guardados; 500,00 por mês.
-  await openCalc('Reserva para imprevistos');
+  await openCalc('Quanto guardar para imprevistos?');
   await typeIn('Gastos essenciais por mês', '3.750,00');
   await radio('6 meses').click();
   ok('reserva: 6 meses de 3.750,00 → R$ 22.500,00', await shows('Com estes números, a reserva de 6 meses é de R$ 22.500,00.'));
@@ -2041,7 +2041,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitUntil(async () => (await visibleCount('button', 'Salvar na minha reserva')) === 1, 4000);
   ok('reserva: com o resultado, o botão "Salvar na minha reserva" (a demonstração já tem reserva) e nenhum "Anotar..."', (await visibleCount('button', 'Salvar na minha reserva')) === 1 && (await visibleCount('button', /^(Criar reserva|Anotar)/)) === 0);
   await calcShot('61_calc_reserva');
-  await calcWidths('reserva', 'Reserva para imprevistos');
+  await calcWidths('reserva', 'Quanto guardar para imprevistos?');
   await backToCalcList();
 
   // 8. Juntar para um objetivo: 22.500,00 com 4.500,00 em 14 meses; ou 1.000,00 por mês.
@@ -2365,10 +2365,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   };
   await fromGoals('Calculadoras', 'Calculadoras');
   const calcNames = calcExpected.flatMap(([, items]) => items);
-  ok('Metas › Calculadoras: a lista com as 10 (D-044)', calcNames.length === 10 && (await Promise.all(calcNames.map((n) => visibleCount('button', n)))).every((n) => n === 1));
-  await openCalc('Reserva para imprevistos');
+  ok('Metas › Calculadoras: a lista com as 10 e a linha do simulador (D-044, D-091)', calcNames.length === 11 && (await Promise.all(calcNames.map((n) => visibleCount('button', n)))).every((n) => n === 1));
+  await openCalc('Quanto guardar para imprevistos?');
   await typeIn('Gastos essenciais por mês', '1.000,00'); await radio('3 meses').click();
-  ok('Metas › Calculadoras › Reserva para imprevistos: funciona (3 meses de 1.000,00 → R$ 3.000,00)', await shows('Com estes números, a reserva de 3 meses é de R$ 3.000,00.'));
+  ok('Metas › Calculadoras › Quanto guardar para imprevistos? funciona (3 meses de 1.000,00 → R$ 3.000,00)', await shows('Com estes números, a reserva de 3 meses é de R$ 3.000,00.'));
   await backToCalcList();
   await openCalc('Juntar para um objetivo');
   await typeIn('Quanto quer juntar', '1.200,00'); await typeIn('Em quantos meses', '12');
@@ -2395,7 +2395,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await layoutChecks('aprender com as calculadoras 320px');
   await shot('71_aprender_calculadoras_320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
-  await btn('Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números').click(); await waitText('Decidir uma compra');
+  await btn('Calculadoras. Parcelado ou à vista, dívidas, reserva, simular um plano e outras contas com os seus números').click(); await waitText('Decidir uma compra');
   ok('Aprender › Calculadoras abre /calcular', new URL(p.url()).pathname === '/calcular' && (await h1Name()) === 'Calculadoras');
   await btn('Voltar').click(); await waitText('Diferença do mês e saldo da conta');
 
@@ -2410,12 +2410,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const learnBackToTab = async () => { await btn('Voltar para Aprender').click(); await waitText('Comece por aqui'); };
   await logoChecks('Aprender: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   t = await body();
-  const learnOrder = ['Buscar um tema', 'Calculadoras', 'Neste mês', 'Comece por aqui', 'Ir para', ...LEARN_SECTIONS].map((x) => t.indexOf(x));
+  // "Ir para" logo abaixo da busca (D-091); as seções são procuradas depois de "Comece por aqui", porque os atalhos repetem os nomes.
+  const learnTop = ['Buscar um tema', 'Ir para', 'Calculadoras', 'Neste mês', 'Comece por aqui'].map((x) => t.indexOf(x));
+  const learnOrder = [...learnTop, ...LEARN_SECTIONS.map((x) => t.indexOf(x, learnTop[4]))];
   ok('Aprender: título "Aprender e dúvidas", aba "Aprender" com o nome "Aprender e dúvidas" e a introdução', (await h1Name()) === 'Aprender e dúvidas' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).count()) === 1 &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).first().innerText()).trim() === 'Aprender' &&
     t.includes('Explicações curtas sobre contas, juros e o próprio app, com exemplos fictícios e fontes.'), await h1Name());
-  ok('Aprender: busca, card "Calculadoras", card "Neste mês" (D-053), "Comece por aqui", "Ir para" e as cinco seções, nessa ordem', learnOrder.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])) &&
+  ok('Aprender: busca, "Ir para", card "Calculadoras", card "Neste mês" (D-053), "Comece por aqui" e as cinco seções, nessa ordem', learnOrder.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])) &&
     JSON.stringify(await learnH2()) === JSON.stringify(['Neste mês', 'Comece por aqui', ...LEARN_SECTIONS]), `${learnOrder.join(',')} ${JSON.stringify(await learnH2())}`);
   ok('Aprender: "Comece por aqui" com Diferença do mês, Juros simples e compostos e Gasto fixo', JSON.stringify((await cardButtons('Comece por aqui')).slice(0, 3).map((x) => x.split('. ')[0])) ===
     JSON.stringify(['Diferença do mês', 'Juros simples e juros compostos', 'Gasto fixo, conta a pagar e gasto anotado']), JSON.stringify(await cardButtons('Comece por aqui')));
@@ -3278,7 +3280,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await newAcct('Davi Teste', 'davi@exemplo.com');
   await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Você consegue guardar algum valor por mês?');
   await p.getByRole('button', { name: /^Calculadoras\./ }).filter({ visible: true }).first().click(); await waitUntil(async () => (await h1Name()) === 'Calculadoras', 8000);
-  await openCalc('Reserva para imprevistos');
+  await openCalc('Quanto guardar para imprevistos?');
   await typeIn('Gastos essenciais por mês', '3.750,00'); await radio('6 meses').click(); await typeIn('Quanto já tem guardado', '3.500,00'); await typeIn('Quanto guarda por mês', '500,00');
   ok('C calculadora da reserva (conta sem reserva): 22.500,00 e o botão "Criar reserva"', (await shows('Com estes números, a reserva de 6 meses é de R$ 22.500,00.')) && (await visibleCount('button', 'Criar reserva')) === 1 && (await visibleCount('button', 'Salvar na minha reserva')) === 0);
   await calcShot('125_calc_reserva_criar');
@@ -5055,7 +5057,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /^Calculadoras, / }).filter({ visible: true }).first().click(); await waitText('Decidir uma compra'); await p.waitForTimeout(400);
   await checkBar('nav barra: Calculadoras (o caso que sumia)', 'Movimentos');
   await shot('172_calculadoras_com_barra');
-  await p.getByRole('button', { name: /^Reserva para imprevistos\./ }).filter({ visible: true }).first().click(); await waitText('Gastos essenciais por mês'); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: /^Quanto guardar para imprevistos\? / }).filter({ visible: true }).first().click(); await waitText('Gastos essenciais por mês'); await p.waitForTimeout(300);
   await checkBar('nav barra: uma calculadora aberta', 'Movimentos');
   await navBackTo('Metas');
   ok('nav barra: tocar numa aba da barra volta à aba, sem telas empilhadas por baixo', urlPath() === '/metas' && (await visibleCount('button', 'Voltar')) === 0 && (await h1Name()) === 'Metas', p.url());
@@ -8302,12 +8304,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Tab('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
   const j1First = await p.evaluate(() => {
     const top = (e) => e.getBoundingClientRect().top;
-    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^Conta:/.test(e.getAttribute('aria-label') || ''));
+    // Os atalhos "Ir para" ficam acima dos cards, logo abaixo da busca (D-091).
+    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^(Conta:|Ir para )/.test(e.getAttribute('aria-label') || ''));
     return shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b)).slice(0, 2).map((e) => e.getAttribute('aria-label') || e.textContent);
   });
   const j1H2 = await p.evaluate(() => [...document.querySelectorAll('h2, [role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
-  ok('Tutorial Aprender: o card "Como usar o app da Clarevo" é o primeiro botão, e o card "Calculadoras" vem logo depois', j1First[0] === 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.' &&
-    j1First[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números', JSON.stringify(j1First));
+  ok('Tutorial Aprender: depois dos atalhos, o card "Como usar o app da Clarevo" é o primeiro, e o card "Calculadoras" vem logo depois', j1First[0] === 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.' &&
+    j1First[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva, simular um plano e outras contas com os seus números', JSON.stringify(j1First));
   ok('Tutorial Aprender: o card não é título (os títulos de Aprender seguem os mesmos, com "Neste mês" do conteúdo de época, D-053)', JSON.stringify(j1H2) === JSON.stringify(['Neste mês', 'Comece por aqui', 'Usar o app da Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']), JSON.stringify(j1H2));
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
@@ -9537,8 +9540,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const k2Notification0 = await k2Notification();
   await k2Tab('Aprender e dúvidas').click(); await waitText('Neste mês'); await p.waitForTimeout(400);
   t = await k2Keep(true);
-  const k2Order = ['Como usar o app da Clarevo', 'Calculadoras', 'Neste mês', 'Comece por aqui', 'Ir para', ...LEARN_SECTIONS].map((x) => t.indexOf(x));
-  ok('K2 Aprender: o card "Neste mês" vem depois de "Como usar o app da Clarevo" e de "Calculadoras" e antes de "Comece por aqui", dos atalhos e das seções', k2Order.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])), k2Order.join(','));
+  const k2Top = ['Ir para', 'Como usar o app da Clarevo', 'Calculadoras', 'Neste mês', 'Comece por aqui'].map((x) => t.indexOf(x));
+  const k2Order = [...k2Top, ...LEARN_SECTIONS.map((x) => t.indexOf(x, k2Top[4]))];
+  ok('K2 Aprender: o card "Neste mês" vem depois dos atalhos, de "Como usar o app da Clarevo" e de "Calculadoras" e antes de "Comece por aqui" e das seções', k2Order.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])), k2Order.join(','));
   ok('K2 Aprender: "Neste mês" é título de nível 2, e os títulos de Aprender são os de sempre mais ele', JSON.stringify(await learnH2()) === JSON.stringify(['Neste mês', 'Comece por aqui', ...LEARN_SECTIONS]), JSON.stringify(await learnH2()));
   ok('K2 Aprender (outubro): a legenda diz "Temas para outubro"', t.includes('Neste mês\nTemas para outubro'), t.slice(t.indexOf('Neste mês') - 20, t.indexOf('Neste mês') + 120));
   const k2Rows = await cardButtons('Neste mês');
