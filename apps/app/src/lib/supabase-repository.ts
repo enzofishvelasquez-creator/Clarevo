@@ -128,12 +128,17 @@ import {
   type GoalImageChoice,
   isGoalImageKey,
   parseAccess,
+  parseStoreForget,
+  parseStoreSync,
   parseWebSubscriptionCancel,
   parseWebSubscriptionStart,
+  STORE_SUBSCRIPTION_FUNCTION,
   WEB_SUBSCRIPTION_FUNCTION,
   parseLegalAcceptance,
   type Access,
   type PlanKind,
+  type StoreForget,
+  type StoreSync,
   type WebSubscriptionCancel,
   type WebSubscriptionStart,
   type LegalAcceptance,
@@ -3181,6 +3186,21 @@ export class SupabaseRepository implements RecordsRepository {
   async cancelWebSubscription(): Promise<WebSubscriptionCancel> {
     const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'cancelar' } });
     return parseWebSubscriptionCancel(error ? await functionErrorBody(error) : data);
+  }
+
+  /**
+   * Assinatura pelas lojas (D-090): a função do servidor "assinatura-lojas", com o token da sessão, consulta o RevenueCat e atualiza o
+   * direito da pessoa, logo depois de uma compra ou de "Restaurar compras" (o aviso do RevenueCat faz o mesmo, um pouco depois).
+   */
+  async syncStoreSubscription(): Promise<StoreSync> {
+    const { data, error } = await this.db.functions.invoke(STORE_SUBSCRIPTION_FUNCTION, { body: { action: 'sincronizar' } });
+    return parseStoreSync(error ? await functionErrorBody(error) : data);
+  }
+
+  /** Antes de excluir a conta (D-090): a função apaga a pessoa no RevenueCat, se ela já teve assinatura por alguma loja. */
+  async forgetStoreCustomer(usedHere: boolean): Promise<StoreForget> {
+    const { data, error } = await this.db.functions.invoke(STORE_SUBSCRIPTION_FUNCTION, { body: { action: 'esquecer', visto: usedHere } });
+    return parseStoreForget(error ? await functionErrorBody(error) : data);
   }
 
   /** O benefício da própria pessoa (visão my_benefit): a licença ativa, ou a encerrada mais recente; null se nunca teve. */

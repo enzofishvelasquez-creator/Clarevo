@@ -135,7 +135,7 @@ Sem mudança no banco. A lista completa dos 18 pontos da Elis, com a situação 
 - [x] Anotar gasto com data futura: link "Ainda vai vencer? Anotar como conta a pagar", com os campos levados para Anotar conta a pagar
 - [x] Registrar aporte: valor planejado por mês preenchido, editável, com legenda
 - [x] Ler comprovante: "Ler comprovante ou boleto" em Anotar gasto; boleto e conta de consumo lidos pela linha digitável (valor, vencimento e beneficiário; `comprovante-leitor.test.ts`, `comprovante-fluxo.test.ts`); guia e site
-- [ ] **Você:** as decisões A a G do pacote 2 (`docs/34`, seção "Retorno de 09/11/2026", tabela "Pacote 2")
+- [x] **Você:** as decisões A a G do pacote 2 (`docs/34`, seção "Retorno de 09/11/2026", tabela "Pacote 2"): "Aprovo", 09/11/2026 (D-089)
 - [ ] **Você:** avisar a Elis quando o merge sair (ela quis conferir no dia seguinte) e, no celular, conferir o boleto da Protebem em "Ler comprovante ou boleto" (foto nítida, com a linha digitável inteira)
 
 ## Retorno do teste de 09/11/2026, pacote 2 (D-089)
@@ -145,13 +145,28 @@ Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C
 - [x] E: linha do orçamento ao salvar o gasto (`budgetNotice`, `budget.test.ts`; roteiro de telas no bloco F2)
 - [x] D: bolhas das categorias em cinco tons do azul da marca (`CATEGORY_BUBBLE_TONES`, `analises.test.ts`, `contrast.test.ts`)
 - [x] C: "cartão" na mensagem do Telegram e do WhatsApp vira compra no cartão (migração 0028, `clarevo_chat_add_card_purchase`, DESFAZER com `entry_id`; `99zzzzzzz_chat_cartao.sql`, `whatsapp.test.ts`, `telegram.test.ts`)
-- [ ] **Você (Claude Chrome):** aplicar a migração 0028 no `clarevo-producao` (docs/05, passo 12r) e conferir (passo 21p); depois, publicar de novo as funções `telegram` e `whatsapp` com o conteúdo gerado em `supabase/functions/` (a do WhatsApp só se ela estiver publicada)
+- [x] **Você (Claude Chrome):** aplicar a migração 0028 no `clarevo-producao` (docs/05, passo 12r) e conferir (passo 21p); depois, publicar de novo as funções `telegram` e `whatsapp` com o conteúdo gerado em `supabase/functions/` (a do WhatsApp só se ela estiver publicada)
 - [x] B: "Importar fatura" na tela do cartão; a linha com a parcela escrita entra como compra com as parcelas que faltam (migração 0029, `installment_offset`; `99zzzzzzzz_importar_parcelas.sql`, `importar-revisao.test.ts`, `importar-repo.test.ts`, `cards.test.ts`)
-- [ ] **Você (Claude Chrome):** aplicar a migração 0029 no `clarevo-producao` (docs/05, passo 12s) e conferir (passo 21q); o app novo precisa dela (a visão `card_entry_items` ganha uma coluna) e o app antigo continua funcionando
+- [x] **Você (Claude Chrome):** aplicar a migração 0029 no `clarevo-producao` (docs/05, passo 12s) e conferir (passo 21q); o app novo precisa dela (a visão `card_entry_items` ganha uma coluna) e o app antigo continua funcionando
 - [x] A: recebimento do fim do mês contando no mês seguinte (migração 0030, `next_month` e `counted_month`; `mes-seguinte.test.ts`, `99zzzzzzzzz_mes_seguinte.sql`; roteiro de telas depois de excluir o recebimento)
-- [ ] **Você (Claude Chrome):** aplicar a migração 0030 no `clarevo-producao` (docs/05, passo 12t) e conferir (passo 21r), antes do merge do PR (o merge publica o app novo, e a lista do mês passa a ler `counted_month`); o merge vem logo depois, porque o app antigo mostra o recebimento marcado no mês da data
+- [x] **Você (Claude Chrome):** aplicar a migração 0030 no `clarevo-producao` (docs/05, passo 12t) e conferir (passo 21r), antes do merge do PR (o merge publica o app novo, e a lista do mês passa a ler `counted_month`); o merge vem logo depois, porque o app antigo mostra o recebimento marcado no mês da data
 - [x] F: vídeo em formato de reels (compra de mercado e orçamento): `node scripts/gravar-redes.js --so reels`, docs/24 seção 2.4b
+- [x] Publicado em 10/11/2026: 0028, 0029 e 0030 aplicadas no `clarevo-producao` com as conferências 21p, 21q e 21r certas, funções `telegram` e `whatsapp` publicadas de novo e, logo depois, o merge do PR #23 (que publica o app)
+- [ ] **Você:** avisar a Elis que o pacote 2 está no ar
 - [ ] G, depois do lançamento: modo "Fatura de cartão depois do vencimento" em Multa e juros
+
+## Assinatura pelas lojas (D-090, `docs/42_ASSINATURA_LOJAS.md`)
+
+Enzo aprovou em 10/11/2026: compra pela própria loja (App Store e Google Play), mensal de R$ 29,90 e Família de R$ 69,90, com o RevenueCat; 14 dias grátis pela Clarevo e só o mensal no lançamento.
+
+- [x] Produtos, compra no app (`react-native-purchases`, `apps/app/src/lib/store-purchases.ts`), botões, renovação e "Restaurar compras" na tela Assinatura, ajustes da loja e troca de plano, aviso ao excluir a conta
+- [x] Função do servidor `assinatura-lojas` (avisos do RevenueCat, "sincronizar" e "esquecer"), sem migração nova (`assinatura-lojas.test.ts`)
+- [x] Política (seções 3.9 e 8) e pergunta 48 do resumo para o advogado
+- [ ] **Você:** o roteiro de `docs/42`, seção 4 (acordos de apps pagos, produtos nas duas lojas, chave de compras da Apple, conta de serviço do Google, RevenueCat, segredos no Supabase, chaves públicas no Expo)
+- [ ] **Você (Claude Chrome):** publicar a função `assinatura-lojas` (docs/05, passo 12u), sem mexer nos segredos
+- [ ] **Você:** teste com compras de teste no Android (faixa de teste interno) e no iPhone (TestFlight), `docs/42`, passo 9
+- [ ] Abrir a compra (`SUBSCRIBE_OPEN`) junto com a web e o início da cobrança, num build `production` novo
+- [ ] Respostas de privacidade das lojas: "Compras, histórico de compras" passa a Sim quando a compra abrir (`docs/lojas/privacidade.md`)
 
 ## Ciclo B: renda comprometida (D-026)
 

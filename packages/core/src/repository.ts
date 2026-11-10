@@ -45,6 +45,7 @@ import type {
 } from './records';
 import type { LegalAcceptance } from './aceite';
 import type { WebSubscriptionCancel, WebSubscriptionStart } from './assinatura-web/app';
+import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import type { Access } from './plano';
 import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
@@ -856,6 +857,16 @@ export interface RecordsRepository {
   startWebSubscription(plan: PlanKind): Promise<WebSubscriptionStart>;
   /** "cancelar": remove no Asaas a assinatura ativa feita na web; o período já pago continua valendo. */
   cancelWebSubscription(): Promise<WebSubscriptionCancel>;
+
+  // Assinatura pelas lojas (D-090), pela função do servidor "assinatura-lojas" com a sessão da pessoa. Só no app do iPhone e do Android.
+
+  /** "sincronizar": depois de uma compra ou de "Restaurar compras", consulta o RevenueCat e atualiza o direito da pessoa no banco. */
+  syncStoreSubscription(): Promise<StoreSync>;
+  /**
+   * "esquecer": antes de excluir a conta, apaga a pessoa no RevenueCat, se ela já teve assinatura por alguma loja ou usou a loja neste
+   * aparelho (`usedHere`) e a assinatura da loja já não vale. Em qualquer plataforma.
+   */
+  forgetStoreCustomer(usedHere: boolean): Promise<StoreForget>;
 
   // Aceite dos termos e da política (A1, migração 0024).
 

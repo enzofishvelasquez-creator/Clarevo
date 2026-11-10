@@ -1,28 +1,35 @@
 import {
   ACCESS_TEXT,
   PLAN_NAME,
+  STORE_SUBSCRIPTION_TEXT,
   SUBSCRIBE_OPEN,
   WEB_SUBSCRIPTION_TEXT,
   accessBanner,
   accessView,
+  canSubscribeInStore,
   deviceTimeZone,
+  isStoreSubscription,
   planPrice,
   type Access,
   type PlanKind,
+  type StorePurchaseResult,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { AlertCircle, CreditCard, Hourglass, LockKeyhole } from 'lucide-react-native';
+import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Hourglass, Info, LockKeyhole, RefreshCw } from 'lucide-react-native';
 import { useState } from 'react';
 import { Platform, View } from 'react-native';
 
 import { Banner, Button, Card, LinkButton, Txt } from '@/components/ui';
-import { useAccess } from '@/state/access';
+import { SITE_URL, openSitePage } from '@/lib/site';
+import { DEVICE_STORE, STORE_PURCHASES_READY, STORE_TEST, buyPlan, openStoreSubscriptions, restorePurchases } from '@/lib/store-purchases';
+import { useAccess, useReloadAccess } from '@/state/access';
 import { useSpace } from '@/state/data';
-import { useRepo } from '@/state/session';
+import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
 const T = ACCESS_TEXT;
 const W = WEB_SUBSCRIPTION_TEXT;
+const S = STORE_SUBSCRIPTION_TEXT;
 
 /** O fuso da pessoa (o do espaço; sem ele, o do aparelho), para as datas do teste e da renovação. */
 export function useAccessTimeZone(): string {
@@ -146,8 +153,187 @@ function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boo
   );
 }
 
+type StoreMsg = { tone: 'erro' | 'sucesso' | 'info'; text: string; refresh: boolean } | null;
+
+/** O aviso depois de tocar na compra: nada quando a pessoa cancelou na loja. */
+function purchaseMessage(r: StorePurchaseResult, changing: boolean): StoreMsg {
+  if (r === 'cancelado') return null;
+  if (r === 'comprado') return { tone: 'sucesso', text: changing ? S.changed : S.purchased, refresh: true };
+  if (r === 'pendente') return { tone: 'info', text: S.pending, refresh: true };
+  return { tone: 'erro', text: S.errors[r], refresh: false };
+}
+
 /**
- * Os planos e os preços, para quem ainda não paga nem tem quem pague. Na web, com a compra aberta (SUBSCRIBE_OPEN), os botões de assinar.
+ * Depois de uma compra ou de "Restaurar compras": a função do servidor consulta o RevenueCat e atualiza o direito, e a tela recarrega
+ * a situação. Se a função falhar, o aviso do RevenueCat chega logo depois, e "Atualizar" mostra.
+ */
+function useStoreFollowUp() {
+  const repo = useRepo();
+  const reload = useReloadAccess();
+  return async () => {
+    await repo.syncStoreSubscription().catch(() => 'tente_de_novo' as const);
+    await reload();
+  };
+}
+
+function StoreMessage({ msg }: { msg: StoreMsg }) {
+  const reload = useReloadAccess();
+  if (!msg) return null;
+  const icon = msg.tone === 'erro' ? AlertCircle : msg.tone === 'sucesso' ? CheckCircle2 : Info;
+  return (
+    <Banner tone={msg.tone} icon={icon}>
+      <Txt variant="label" color={msg.tone === 'erro' ? colors.error : colors.text}>
+        {msg.text}
+      </Txt>
+      {msg.refresh ? <LinkButton label={S.refresh} onPress={() => void reload()} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} /> : null}
+    </Banner>
+  );
+}
+
+/** Os Termos de uso e a Política de privacidade junto da compra, como as lojas pedem (só com o endereço do site configurado). */
+function StoreLegalLinks() {
+  const [failed, setFailed] = useState(false);
+  if (!SITE_URL) return null;
+  const open = async (page: 'termos' | 'privacidade') => setFailed(!(await openSitePage(page)));
+  return (
+    <View style={{ gap: space[1] }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[4] }}>
+        <LinkButton label={S.terms} onPress={() => void open('termos')} style={{ paddingHorizontal: 0 }} />
+        <LinkButton label={S.privacy} onPress={() => void open('privacidade')} style={{ paddingHorizontal: 0 }} />
+      </View>
+      {failed ? (
+        <Txt variant="caption" color={colors.error}>
+          {S.legalOpenFailed}
+        </Txt>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Os botões de assinar pela loja (D-090), no iPhone e no Android: a compra abre a folha da App Store ou do Google Play, e depois a
+ * função do servidor sincroniza. Antes, o preço, a renovação mensal automática e como cancelar, com os Termos e a Política; depois,
+ * "Restaurar compras". Só para quem pode assinar (antes do início da cobrança, no teste, em só leitura ou coberta pelo Plano Família de
+ * outra pessoa), com a chave do RevenueCat e o endereço do site no build. Na web nada disto aparece.
+ */
+function StoreSubscribeButtons({ access }: { access: Access }) {
+  const { user } = useSession();
+  const followUp = useStoreFollowUp();
+  const [busy, setBusy] = useState<PlanKind | 'restaurar' | null>(null);
+  const [msg, setMsg] = useState<StoreMsg>(null);
+  // Sem o endereço do site não há os links dos Termos e da Política, que as lojas pedem junto da compra: sem eles, sem os botões.
+  if (!DEVICE_STORE || !STORE_PURCHASES_READY || !SITE_URL || !user || !canSubscribeInStore(access.status)) return null;
+  const store = DEVICE_STORE;
+  const subscribe = async (plan: PlanKind) => {
+    if (busy) return;
+    setMsg(null);
+    setBusy(plan);
+    const r = await buyPlan(user.id, plan);
+    if (r === 'comprado' || r === 'pendente') await followUp();
+    setMsg(purchaseMessage(r, false));
+    setBusy(null);
+  };
+  const restore = async () => {
+    if (busy) return;
+    setMsg(null);
+    setBusy('restaurar');
+    const r = await restorePurchases(user.id);
+    if (r === 'restaurado') {
+      await followUp();
+      setMsg({ tone: 'sucesso', text: S.restored, refresh: true });
+    } else if (r === 'nada') {
+      setMsg({ tone: 'info', text: S.restoreNone, refresh: false });
+    } else {
+      setMsg({ tone: 'erro', text: S.errors[r], refresh: false });
+    }
+    setBusy(null);
+  };
+  return (
+    <View style={{ gap: space[3] }}>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {S.howItWorks(store)}
+      </Txt>
+      {T.plans.map((p) => (
+        <Button
+          key={p.plan}
+          label={S.subscribe(p.plan)}
+          icon={CreditCard}
+          tone={p.plan === 'individual' ? 'brand' : 'soft'}
+          busy={busy === p.plan}
+          busyLabel={S.subscribeBusy}
+          disabled={busy !== null && busy !== p.plan}
+          onPress={() => void subscribe(p.plan)}
+        />
+      ))}
+      <Txt variant="caption" color={colors.textSecondary}>
+        {S.autoRenew}
+      </Txt>
+      <StoreLegalLinks />
+      <Txt variant="caption" color={colors.textSecondary}>
+        {S.restoreHint}
+      </Txt>
+      <Button
+        label={S.restore}
+        icon={RefreshCw}
+        tone="soft"
+        busy={busy === 'restaurar'}
+        busyLabel={S.restoreBusy}
+        disabled={busy !== null && busy !== 'restaurar'}
+        onPress={() => void restore()}
+      />
+      <StoreMessage msg={msg} />
+    </View>
+  );
+}
+
+/**
+ * Para quem assina por esta loja (D-090): os ajustes de assinatura da loja (cancelar é lá) e a troca de plano, que abre a folha da
+ * loja. A assinatura feita na outra loja ou na web se gerencia onde foi feita (o texto da situação já diz).
+ */
+export function StoreManageCard({ access }: { access: Access }) {
+  const { user } = useSession();
+  const followUp = useStoreFollowUp();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<StoreMsg>(null);
+  if (!DEVICE_STORE || !isStoreSubscription(access.status, access.provider, DEVICE_STORE)) return null;
+  const store = DEVICE_STORE;
+  const current = access.plan;
+  const other: PlanKind | null = current === 'individual' ? 'familiar' : current === 'familiar' ? 'individual' : null;
+  const manage = async () => {
+    setMsg(null);
+    if (!(await openStoreSubscriptions())) setMsg({ tone: 'erro', text: S.manageFailed, refresh: false });
+  };
+  const change = async (plan: PlanKind) => {
+    if (busy || !user) return;
+    setMsg(null);
+    setBusy(true);
+    const r = await buyPlan(user.id, plan, current);
+    if (r === 'comprado' || r === 'pendente') await followUp();
+    setMsg(purchaseMessage(r, true));
+    setBusy(false);
+  };
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {S.manageHint(store)}
+      </Txt>
+      <Button label={S.manage(store)} icon={ExternalLink} tone="soft" onPress={() => void manage()} />
+      {other && STORE_PURCHASES_READY && user ? (
+        <>
+          <Button label={S.changePlan(other)} tone="soft" busy={busy} busyLabel={S.changeBusy} onPress={() => void change(other)} />
+          <Txt variant="caption" color={colors.textSecondary}>
+            {S.changeNote}
+          </Txt>
+        </>
+      ) : null}
+      <StoreMessage msg={msg} />
+    </Card>
+  );
+}
+
+/**
+ * Os planos e os preços, para quem ainda não paga nem tem quem pague. Com a compra aberta (SUBSCRIBE_OPEN), os botões de assinar: na web,
+ * pelo Asaas (D-084); no iPhone e no Android, pela loja (D-090; também no build de teste da equipe, STORE_TEST).
  * `webTest`: o teste da equipe no sandbox do Asaas antes de abrir (`/conta/assinatura?assinar=teste`, docs/39): mostra os botões com a
  * compra fechada. Só faz diferença enquanto a função do servidor tem a chave do sandbox, que não cobra ninguém. `subscribeHidden`: a
  * pessoa acabou de pagar (`?pagamento=sucesso`) e o aviso do Asaas ainda não chegou: sem botões, para não abrir um segundo Checkout.
@@ -180,6 +366,7 @@ export function PlansCard({ access, webTest = false, subscribeHidden = false }: 
         {Platform.OS === 'web' ? T.howToPay : T.howToPayStore}
       </Txt>
       {(SUBSCRIBE_OPEN || webTest) && Platform.OS === 'web' && !subscribeHidden ? <WebSubscribeButtons access={access} webTest={webTest} /> : null}
+      {(SUBSCRIBE_OPEN || STORE_TEST) && Platform.OS !== 'web' ? <StoreSubscribeButtons access={access} /> : null}
       {SUBSCRIBE_OPEN ? null : (
         <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
           {T.notOpenYet}

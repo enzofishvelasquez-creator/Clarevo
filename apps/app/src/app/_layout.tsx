@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DeviceFeatures } from '@/components/device-features';
 import { BrowseTabBar } from '@/components/tab-bar';
 import { LegalGate } from '@/components/legal-gate';
+import { StoreWarmup } from '@/components/store-warmup';
 import { forgetDevice } from '@/lib/device-forget';
 import { afterLogin, deletedAccountIntent, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, useSession } from '@/state/session';
@@ -316,6 +317,7 @@ function Navigation() {
       </View>
       {/* Lembretes, ocultar valores e biometria ao abrir (A2). */}
       <DeviceFeatures />
+      {Platform.OS !== 'web' ? <StoreWarmup /> : null}
     </SpaceStatusContext>
   );
 }

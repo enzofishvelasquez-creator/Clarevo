@@ -1,6 +1,16 @@
-import { DELETE_CONFIRMATION_WORD, DELETE_TEXT, FAMILY_TEXT, WEB_SUBSCRIPTION_TEXT, canSubmitDelete, deleteErrorText, deleteFamilyOutcome, deleteFamilyText } from '@clarevo/core';
+import {
+  DELETE_CONFIRMATION_WORD,
+  DELETE_TEXT,
+  FAMILY_TEXT,
+  STORE_SUBSCRIPTION_TEXT,
+  WEB_SUBSCRIPTION_TEXT,
+  canSubmitDelete,
+  deleteErrorText,
+  deleteFamilyOutcome,
+  deleteFamilyText,
+} from '@clarevo/core';
 import { router } from 'expo-router';
-import { AlertCircle, FileDown, Info, Users } from 'lucide-react-native';
+import { AlertCircle, ExternalLink, FileDown, Info, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 
@@ -8,6 +18,7 @@ import { SubHeader } from '@/components/header';
 import { Banner, Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { forgetDevice } from '@/lib/device-forget';
 import { signOutIntent } from '@/lib/nav';
+import { DEVICE_STORE, openStoreSubscriptions, storeUsedHere } from '@/lib/store-purchases';
 import { useAccess } from '@/state/access';
 import { useDeleteAccount } from '@/state/account';
 import { useFamily } from '@/state/family';
@@ -68,6 +79,9 @@ export default function ExcluirContaScreen() {
         return;
       }
     }
+    // Quem já usou uma loja (D-090): a função apaga a pessoa no RevenueCat antes, se a assinatura da loja já não vale (valendo, o
+    // próximo aviso da loja, com a conta excluída, apaga). Sem trava: se falhar, a conta sai do mesmo jeito.
+    await repo.forgetStoreCustomer(user ? await storeUsedHere(user.id) : false).catch(() => 'tente_de_novo' as const);
     const r = await deleteAccount(DELETE_CONFIRMATION_WORD);
     if (!r.ok) {
       setBusy(false);
@@ -91,6 +105,21 @@ export default function ExcluirContaScreen() {
       <SubHeader title={T.title} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <Txt color={colors.textSecondary}>{T.intro}</Txt>
+
+        {/* Assinatura pela App Store ou pelo Google Play (D-090): a Clarevo não consegue cancelar na loja; a pessoa cancela lá antes. */}
+        {access.data?.status === 'assinatura' && (access.data.provider === 'apple' || access.data.provider === 'google') ? (
+          <Banner tone="info" icon={Info}>
+            <Txt variant="label">{STORE_SUBSCRIPTION_TEXT.deleteNote(access.data.provider)}</Txt>
+            {DEVICE_STORE === access.data.provider ? (
+              <LinkButton
+                label={STORE_SUBSCRIPTION_TEXT.manage(access.data.provider)}
+                icon={ExternalLink}
+                onPress={() => void openStoreSubscriptions()}
+                style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+              />
+            ) : null}
+          </Banner>
+        ) : null}
 
         <Card style={{ gap: space[3] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>

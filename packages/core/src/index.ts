@@ -67,4 +67,5 @@ export * from './servidor-comum';
 export * from './whatsapp';
 export * from './telegram';
 export * from './assinatura-web';
+export * from './assinatura-lojas';
 export * from './goal-images';

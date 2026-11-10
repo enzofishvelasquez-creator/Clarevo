@@ -77,7 +77,7 @@ Além dos 17 itens de `docs/37`, seção 6:
 
 | # | O quê | Quem |
 |---|---|---|
-| 1 | **Compra da assinatura pelas lojas** (fase 2 da D-083): produto de R$ 29,90 e R$ 69,90 nas duas lojas, botão de assinar e "Restaurar compras". A Apple e o Google exigem a compra pela loja para assinatura de app; sem ela, o app só pode ir à loja sem cobrança (data de início vazia) | Equipe, depois das contas e dos acordos de apps pagos de cada loja (Enzo) |
+| 1 | **Compra da assinatura pelas lojas** (fase 2 da D-083, D-090): produto de R$ 29,90 e R$ 69,90 nas duas lojas, botão de assinar e "Restaurar compras". A Apple e o Google exigem a compra pela loja para assinatura de app; sem ela, o app só pode ir à loja sem cobrança (data de início vazia). **Código pronto em 10/11/2026** (RevenueCat, `docs/42_ASSINATURA_LOJAS.md`); falta o que é do Enzo na seção 4 de lá: acordos de apps pagos, produtos, chaves, RevenueCat, segredos e as variáveis `EXPO_PUBLIC_REVENUECAT_IOS_KEY` e `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` | Enzo, com o roteiro de `docs/42`; a equipe abre a compra depois do teste |
 | 2 | Site final publicado (advogado, endereço, nome do canal de privacidade) e `EXPO_PUBLIC_SITE_URL` nos dois ambientes: a Apple exige o acesso à política dentro do app | Enzo passa os dados; equipe publica |
 | 3 | Conta de teste da revisão, com dados fictícios (`docs/16`, seção 5) | Enzo |
 | 4 | Ficha, capturas novas (com o Telegram; sem a tela Assinatura da web, que cita o pagamento na web) e respostas de privacidade conferidas na tela de cada loja (`docs/lojas/`) | Equipe prepara; Enzo cola |
