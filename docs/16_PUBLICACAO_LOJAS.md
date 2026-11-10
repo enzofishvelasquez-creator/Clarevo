@@ -12,7 +12,7 @@
 |---|---|
 | Configuração de build (`apps/app/eas.json`, `apps/app/app.json`, `apps/app/app.config.js`) | Pronta e validada (seção 8), sem nenhum identificador de conta. Nunca rodou um build de verdade: o primeiro é do Enzo. O perfil `preview-widget` (D-063 item 3) liga o widget da tela inicial só para teste (`docs/21`) |
 | Ícones e abertura | Prontos, gerados por `scripts/gerar-icones.js` a partir de `docs/marca/` (seção 6) |
-| Capturas das lojas | Prontas, 8 telas em 3 tamanhos, geradas por `scripts/capturas-lojas.js` com a demonstração (seção 7) |
+| Capturas das lojas | Prontas, 10 telas em 3 tamanhos (refeitas em 10/11/2026, com o comprovante lido e o Telegram), geradas por `scripts/capturas-lojas.js` com a demonstração (seção 7) |
 | Ficha (pt-BR) | Pronta, com limites conferidos: `docs/lojas/ficha.md`. Campos de contato, URLs e direitos autorais: vazios para Enzo |
 | Privacidade nas lojas | Roteiro pronto, derivado do código e do banco: `docs/lojas/privacidade.md`. Depende do advogado e da decisão sobre o Sentry |
 | Gráfico de recursos do Google Play (1024 x 500) | **Feito** (D-064): `apps/app/assets/loja/grafico-recursos-1024x500.png`, gerado por `scripts/gerar-grafico-loja.js` (seção 6) |
@@ -57,7 +57,7 @@ Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no
 | `packages/core/test/site.test.ts` | Teste do site (conversor de Markdown, páginas em dia, Aprender, Ajuda, Novidades, imagens, redação, contraste, `--final`), da imagem de compartilhamento e do gráfico |
 | `scripts/gerar-icones.js` | Gera os PNG a partir de `docs/marca/` (`--verificar` confere sem gravar) |
 | `scripts/capturas-lojas.js` | Gera as capturas a partir da demonstração |
-| `docs/lojas/capturas/` | 24 capturas (8 telas em 3 tamanhos) |
+| `docs/lojas/capturas/` | 30 capturas (10 telas em 3 tamanhos) |
 | `docs/lojas/ficha.md` | Ficha em pt-BR com limites conferidos |
 | `docs/lojas/privacidade.md` | Respostas de privacidade da Apple e do Google |
 | `packages/core/test/lojas.test.ts` | Teste dos limites e termos da ficha e da configuração (`npm test`) |
@@ -171,7 +171,7 @@ O ícone da notificação (`notification-icon.png`) e o favicon continuam como e
 
 ## 7. Capturas das lojas
 
-`node scripts/capturas-lojas.js` gera o build de demonstração (`export:demo`, que ignora o Supabase), sobe um servidor local e percorre, com o Playwright, oito telas por tamanho: **Resumo, Anotar gasto (preenchido, sem salvar), Contas a pagar, Cartões, Evolução, Análises em bolhas, Metas e Aprender**. Os dados são os fictícios da demonstração (07/10/2026), e cada tela mostra a etiqueta "Demonstração". O script bloqueia qualquer requisição para fora de `localhost` e falha se alguma tentar sair; confere o tamanho exato e a ausência de canal alfa de cada PNG. `--sem-build` reaproveita o `apps/app/dist` de um build de demonstração; `--saida` e `--tamanho` escolhem a pasta e o tamanho. Porta: `E2E_PORT` (padrão 8098).
+`node scripts/capturas-lojas.js` gera o build de demonstração (`export:demo`, que ignora o Supabase), sobe um servidor local e percorre, com o Playwright, dez telas por tamanho: **Resumo, Anotar gasto (preenchido, sem salvar), Contas a pagar, Cartões, Evolução, Análises em bolhas, Metas, Aprender, um comprovante de Pix lido (um PDF fictício gerado pelo script, lido no próprio navegador, sem salvar) e o Telegram (o que dá para mandar)**. Os dados são os fictícios da demonstração (07/10/2026), e cada tela mostra a etiqueta "Demonstração". O script bloqueia qualquer requisição para fora de `localhost` e falha se alguma tentar sair; confere o tamanho exato e a ausência de canal alfa de cada PNG. `--sem-build` reaproveita o `apps/app/dist` de um build de demonstração; `--saida` e `--tamanho` escolhem a pasta e o tamanho. Porta: `E2E_PORT` (padrão 8098).
 
 | Pasta em `docs/lojas/capturas/` | Pixels | Loja e uso | Fonte e situação |
 |---|---|---|---|
@@ -181,7 +181,7 @@ O ícone da notificação (`notification-icon.png`) e o favicon continuam como e
 
 **Regras da Apple que o script segue** (mesma página): de 1 a 10 capturas por tamanho, em `.jpeg`, `.jpg` ou `.png`, "sem canal alfa nem transparência". Se a interface é igual em vários tamanhos, basta o tamanho exigido, e o App Store Connect escala para os menores. O app não é para iPad (`ios.supportsTablet` falso), então **não há capturas de iPad** (a Apple só exige 13 polegadas "se o app roda no iPadOS").
 
-**Ordem e uso sugerido na loja:** 01 Resumo, 02 Anotar gasto, 03 Contas a pagar, 04 Cartões, 05 Evolução, 06 Análises em bolhas, 07 Metas, 08 Aprender. A Evolução usa o cenário fictício "evolucao" da demonstração com a janela de 12 meses (para o gráfico mostrar meses de comparação); as outras usam a demonstração padrão. As capturas não foram retocadas.
+**Ordem e uso sugerido na loja (10/11/2026):** as primeiras capturas são as que mais aparecem, então elas mostram o que diferencia a Clarevo. **Apple, as dez nesta ordem:** 01 Resumo, 09 Comprovante lido, 10 Telegram, 03 Contas a pagar, 04 Cartões, 06 Análises em bolhas, 07 Metas, 05 Evolução, 02 Anotar gasto, 08 Aprender. **Google Play (até oito), as oito primeiras da mesma ordem:** 01, 09, 10, 03, 04, 06, 07 e 05. Os números dos arquivos ficaram os de antes, porque o site usa algumas dessas capturas pelo nome. A Evolução usa o cenário fictício "evolucao" da demonstração com a janela de 12 meses (para o gráfico mostrar meses de comparação); as outras usam a demonstração padrão. As capturas não foram retocadas.
 
 ## 8. Configuração de build e permissões
 

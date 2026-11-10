@@ -80,6 +80,7 @@ export const TELEGRAM_TEXT = {
     'farmácia 38 ontem',
     'luz 180 12/10',
     'recebi 1500 salário',
+    'farmácia 41 cartão: compra no cartão de crédito',
     'DESFAZER: apaga a última anotação feita por lá',
     'DESLIGAR: desliga o Telegram',
   ],

@@ -142,9 +142,35 @@ describe('ficha das lojas (docs/lojas/ficha.md)', () => {
     expect(tela.match(/<Txt\b/g)).toHaveLength(3);
   });
 
-  it('as descrições da Apple e do Google contam a mesma história (mesmo corpo, de "O QUE VOCÊ FAZ" até o fim)', () => {
-    const corpo = (n: string) => todos.find((c) => c.nome === n)!.texto;
-    expect(corpo('google-descricao-completa')).toBe(corpo('apple-descricao'));
+  it('as descrições da Apple e do Google contam a mesma história; só a seção ASSINATURA muda, cada uma citando só a própria loja', () => {
+    const texto = (n: string) => todos.find((c) => c.nome === n)!.texto;
+    const semAssinatura = (t: string) => t.replace(/ASSINATURA\n[\s\S]*?\n\nSEUS DADOS/, 'SEUS DADOS');
+    expect(semAssinatura(texto('google-descricao-completa'))).toBe(semAssinatura(texto('apple-descricao')));
+    const apple = texto('apple-descricao');
+    const google = texto('google-descricao-completa');
+    // Diretriz 2.3.10 da Apple: nada de outra plataforma nos textos dela; e o Google, o mesmo cuidado.
+    expect(apple).not.toMatch(/Google|Android/);
+    expect(google).not.toMatch(/App Store|Apple|iPhone/);
+    // Assinatura automática (diretriz 3.1.2 da Apple): preço, período, renovação, como cancelar e o link dos Termos de uso.
+    for (const [nome, t, loja] of [['apple', apple, 'App Store'], ['google', google, 'Google Play']] as const) {
+      expect(t, nome).toContain('ASSINATURA');
+      expect(t, nome).toContain('R$ 29,90 por mês');
+      expect(t, nome).toContain('R$ 69,90 por mês');
+      expect(t, nome).toContain('14 dias grátis');
+      expect(t, nome).toContain('renova sozinha a cada mês');
+      expect(t, nome).toContain(`pel${loja === 'App Store' ? 'a' : 'o'} ${loja}`);
+      expect(t, nome).toContain('Termos de uso: https://clarevo.app.br/termos');
+      expect(t, nome).toContain('Política de privacidade: https://clarevo.app.br/privacidade');
+    }
+  });
+
+  it('as notas para a revisão da Apple dizem onde está a compra dentro do app e quais são os produtos', () => {
+    const notas = todos.find((c) => c.nome === 'apple-notas-da-revisao')!.texto;
+    expect(notas).toContain('Conta, Assinatura');
+    expect(notas).toContain('clarevo_individual_mensal');
+    expect(notas).toContain('clarevo_familia_mensal');
+    expect(notas).toContain('Restaurar compras');
+    expect(notas).not.toContain('não vende nada');
   });
 });
 
