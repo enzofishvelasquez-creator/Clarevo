@@ -744,8 +744,8 @@ export const SIMULATE_TEXT = {
   createGoalHint: 'A meta recebe o valor, o prazo, o que você já tem e o valor por mês. A taxa não é gravada, e o progresso só anda com o que você registrar.',
   /** Link na calculadora "Juntar para um objetivo" (e no detalhe da meta, GOALS_TEXT.detail.simulate). */
   calcLink: 'Simular com rendimento',
-  /** Atalho no topo da seção "Dinheiro no tempo" de Aprender. */
-  learnShortcut: 'Simular',
+  /** Atalho no topo da seção "Dinheiro no tempo" de Aprender e linha em Calculadoras: um nome só para o simulador (docs/10 A20). */
+  learnShortcut: 'Simular um plano',
   learnShortcutHint: 'Quanto guardar por mês, em quanto tempo e quanto você pode ter, com hipóteses suas.',
 
   /** "Para juntar R$ 22.500,00 em 14 meses, começando com R$ 4.500,00:" */

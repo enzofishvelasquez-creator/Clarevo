@@ -170,7 +170,7 @@ function montarRespostas(valores) {
       const tambem = (e.alsoWhere || []).map((w) => c.guiaPasso(w));
       const html = `<p>${esc(e.purpose)}</p>
 <p class="onde"><strong>Onde fica:</strong> ${esc(onde)}${tambem.length ? `. Também em ${esc(tambem.join('; '))}` : ''}</p>
-<ol>${e.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>${e.lines && e.lines.length ? `\n<ul>${e.lines.map((l) => `<li><strong>${esc(l.title)}.</strong> ${esc(l.caption)}</li>`).join('')}</ul>` : ''}`;
+<ol>${e.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>${e.lines && e.lines.length ? `\n<ul>${e.lines.map((l) => `<li><strong>${esc(l.title)}${/[?!.]$/.test(l.title) ? '' : '.'}</strong> ${esc(l.caption)}</li>`).join('')}</ul>` : ''}`;
       porTema.get(t.id).push({ id: `guia-${id}`, grupo: 'guias', pergunta: `Como usar: ${e.title}`, html, palavras: e.keywords.join(' ') });
     }
   }

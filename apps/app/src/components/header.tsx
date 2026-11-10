@@ -70,7 +70,7 @@ function BrandRow() {
         {eyeFits(width, narrow, demo) ? <HideValuesButton /> : null}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Conta: perfil, segurança e acesso ao plano"
+          accessibilityLabel="Conta: perfil, assinatura, lembretes, privacidade e segurança"
           onPress={() => router.push('/conta')}
           style={(s) => [styles.avatar, (s as { focused?: boolean }).focused && focusOnBrand]}>
           <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.extrabold }} maxFontSizeMultiplier={1.3}>

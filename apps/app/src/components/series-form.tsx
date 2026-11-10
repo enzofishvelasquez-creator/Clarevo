@@ -47,6 +47,8 @@ import {
   type SeriesKind,
   type SeriesNature,
   type SeriesWrite,
+  CARD_INSTALLMENTS_MAX,
+  SERIES_CARD_TEXT,
 } from '@clarevo/core';
 import { router, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
@@ -91,6 +93,7 @@ import {
   withNotice,
   type WorkSpace,
 } from '@/state/data';
+import { draftHandoff } from '@/lib/draft-handoff';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -634,6 +637,29 @@ export function SeriesForm({
   };
   const variable = draft.amountMode === 'variavel';
   const looksLikeCard = INVOICE_HINT.test(draft.description);
+  /**
+   * Leva descrição, valor e parcelas para Anotar gasto no cartão. As parcelas são as que faltam, a partir de "Número da próxima parcela";
+   * o valor é a parcela vezes as que faltam. Sem um número de parcelas que o cartão aceite (1 a 48), os dois vão vazios, para a pessoa
+   * preencher: nunca uma compra à vista com o valor de uma parcela.
+   */
+  const asCardPurchase = () => {
+    const each = parseBRL(draft.amountText);
+    const total = parseCount(draft.installmentTotalText, 2, 480);
+    const first = draft.firstNumberText.trim() === '' ? { ok: true as const, value: 1 } : parseCount(draft.firstNumberText, 1, 480);
+    const remaining = total.ok && first.ok && first.value <= total.value ? total.value - (first.value - 1) : null;
+    const n = remaining !== null && remaining <= CARD_INSTALLMENTS_MAX ? remaining : null;
+    const amount = n !== null && each !== null && each > 0 && each * n <= MAX_RECORD_CENTS ? each * n : null;
+    leave(() => {
+      draftHandoff.set({
+        description: draft.description.trim(),
+        amountText: amount !== null ? centsToInput(amount) : '',
+        dateText: formatDateBR(today),
+        accountId: null,
+        card: { installmentsText: n !== null ? String(n) : '' },
+      });
+      router.replace({ pathname: '/registro/novo', params: { tipo: 'despesa' } });
+    });
+  };
   const firstMonthName = preview ? (anual ? firstYearLabel : formatMonthName(preview.firstMonth)) : '';
   const showCommitmentConflict = Boolean(conflicts?.texts.commitment && preview && !kept.includes(preview.firstMonth));
   const amountLabel = variable
@@ -962,6 +988,16 @@ export function SeriesForm({
                 financiamento.
               </Txt>
               <LinkButton label="Fatura sem contar duas vezes" style={styles.inlineLink} onPress={() => router.push(explanationHref('fatura'))} />
+              {/* Compra parcelada no cartão é anotada no cartão (docs/10 A15): Anotar gasto abre em "Cartão de crédito", já preenchido.
+                  Cartões são só do Pessoal (D-037). */}
+              {parcelada && personal.contextKind === 'pessoal' ? (
+                <>
+                  <Button label={SERIES_CARD_TEXT.asCardPurchase} tone="soft" onPress={asCardPurchase} />
+                  <Txt variant="caption" color={colors.textSecondary}>
+                    {SERIES_CARD_TEXT.cardNote}
+                  </Txt>
+                </>
+              ) : null}
             </Banner>
           ) : null}
 

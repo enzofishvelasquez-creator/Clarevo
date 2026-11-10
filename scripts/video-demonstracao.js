@@ -641,7 +641,7 @@ function instantesDosSinais(nome, esperados, achados) {
         await tocar(aba('Resumo'));
         await esperar('Diferença do mês');
         await pausa(500);
-        await tocar(botao('Conta: perfil, segurança e acesso ao plano'));
+        await tocar(botao('Conta: perfil, assinatura, lembretes, privacidade e segurança'));
         await esperar('Abrir painel da empresa');
         await pausa(900);
         await tocar(botao('Abrir painel da empresa'));

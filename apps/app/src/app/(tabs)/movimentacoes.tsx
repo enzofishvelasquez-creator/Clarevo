@@ -10,6 +10,7 @@ import {
   dayRows,
   filterByAccount,
   formatDayHeader,
+  formatBRL,
   formatMonthBR,
   groupRecordsByDay,
   isLongList,
@@ -119,6 +120,7 @@ const rowLayout = LinearTransition.duration(motion.detail).reduceMotion(ReduceMo
 
 export default function MovimentacoesScreen() {
   const { today } = useSession();
+  const hidden = useValuesHidden();
   const { month, currentMonth } = useView();
   const work = useWork().data;
   const contextId = work?.contextId;
@@ -205,18 +207,33 @@ export default function MovimentacoesScreen() {
 
         {s ? (
           <View style={styles.totals}>
-            <Card style={styles.total}>
-              <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
-                Recebido em {formatMonthBR(month).split(' ')[0]!.toLowerCase()}
-              </Txt>
-              <Money cents={s.receivedCents} variant="label" style={styles.totalValue} color={colors.success} />
-            </Card>
-            <Card style={styles.total}>
-              <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
-                Pago em {formatMonthBR(month).split(' ')[0]!.toLowerCase()}
-              </Txt>
-              <Money cents={s.paidCents} variant="label" style={styles.totalValue} />
-            </Card>
+            {/* Os totais abrem a composição do mês (docs/10 A10), como o Recebido e o Pago do Resumo. */}
+            {(
+              [
+                { tipo: 'recebido', label: 'Recebido', cents: s.receivedCents, color: colors.success },
+                { tipo: 'pago', label: 'Pago', cents: s.paidCents, color: undefined },
+              ] as const
+            ).map((t) => {
+              const title = `${t.label} em ${formatMonthBR(month).split(' ')[0]!.toLowerCase()}`;
+              return (
+                <Pressable
+                  key={t.tipo}
+                  accessibilityRole="button"
+                  accessibilityLabel={maskMoneyLabel(`${title}, ${formatBRL(t.cents)}. Ver a composição`, hidden)}
+                  onPress={() => router.push({ pathname: '/composicao', params: { tipo: t.tipo } })}
+                  style={(st) => [styles.totalPress, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
+                  <Card style={styles.total}>
+                    <View style={styles.totalHead}>
+                      <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
+                        {title}
+                      </Txt>
+                      <ChevronRight size={16} color={colors.textSecondary} />
+                    </View>
+                    <Money cents={t.cents} variant="label" style={styles.totalValue} color={t.color} />
+                  </Card>
+                </Pressable>
+              );
+            })}
           </View>
         ) : null}
 
@@ -361,7 +378,9 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
   action: { flexGrow: 1, flexBasis: 220, alignSelf: 'auto' },
   totals: { flexDirection: 'row', gap: space[3], flexWrap: 'wrap' },
-  total: { flexGrow: 1, flexBasis: 140, padding: space[4], gap: space[1] },
+  totalPress: { flexGrow: 1, flexBasis: 140 },
+  total: { flexGrow: 1, padding: space[4], gap: space[1] },
+  totalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] },
   totalValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 },
   filters: { flexDirection: 'row', gap: space[2], flexWrap: 'wrap' },
   day: { fontFamily: fonts.bold, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: space[2] },

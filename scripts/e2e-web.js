@@ -335,7 +335,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   };
   const ppDone = (k) => PP[k].replace('. ', ', concluído. ');
   const ppRows = () => cardButtons('Primeiros passos');
-  const ppIs = (rows) => async () => JSON.stringify(await ppRows()) === JSON.stringify([...rows, 'Agora não']);
+  // Com o primeiro passo em aberto, "Não tenho gastos fixos" vem antes de "Agora não" (D-091, docs/10 A25).
+  const ppIs = (rows) => async () => JSON.stringify(await ppRows()) === JSON.stringify([...rows, ...(rows[0] === PP.fixos ? ['Não tenho gastos fixos'] : []), 'Agora não']);
   await waitText('Primeiros passos');
   t = await body();
   ok('primeiros passos: conta nova vê os quatro passos (o quarto é "Planejar quanto guardar"), nenhum concluído, e "Agora não"', await ppIs([PP.fixos, PP.recebido, PP.pago, PP.guardar])() &&
@@ -409,7 +410,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('demonstração (D-067): o Resumo, com os Primeiros passos fechados, não pergunta "Como você conheceu a Clarevo?" nem mostra as seis opções', await origemAusente());
 
   // Sair limpa a sessão
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await shot('05_conta');
   await shot('05b_conta_seguranca', true);
   // Ciclo A2 (D-025): na web não há lembretes nem biometria (só no app para celular); "Ocultar valores ao abrir" existe
@@ -461,7 +462,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitUntil(async () => (await headingShown('Primeiros passos')) && (await ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago, PP.guardar])()), 8000);
   ok('A9: depois de sair e entrar de novo, o "Agora não" foi apagado do aparelho e o card "Primeiros passos" volta, com os passos feitos marcados',
     (await headingShown('Primeiros passos')) && (await ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago, PP.guardar])()) && (await visibleCount('button', 'Anotar gasto')) === 1, JSON.stringify(await ppRows()));
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
 
   // Primeiros passos numa segunda conta nova: anotar um gasto marca o passo 3; com os três prontos, o card sai de vez.
@@ -578,13 +579,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
   await waitUntil(async () => !(await headingShown('Primeiros passos')), 8000);
   ok('primeiros passos: com os quatro passos prontos ("Agora não" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
   await field('E-mail').fill('bia@exemplo.com'); await field('Senha').fill('senha1234'); await btn('Entrar').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
   ok('primeiros passos concluídos: o card não volta depois de entrar de novo', !(await headingShown('Primeiros passos')));
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   // Na demonstração, as contas criadas existem só na memória da página: recarregar volta às boas-vindas e nada de
   // "Primeiros passos" fica gravado no aparelho (uma conta nova nunca herda o "Agora não" de outra com o mesmo identificador).
@@ -620,7 +621,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // "Ver resumo do mês" volta ao Resumo que já está na pilha (dismissTo): um único Resumo montado, nada para voltar,
   // mostrado do topo (o acesso à Conta, no alto do cabeçalho, fica dentro da tela).
   const singleResumo = async (name) => {
-    const top = await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().boundingBox();
+    const top = await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().boundingBox();
     ok(name, (await p.getByText('Diferença do mês', { exact: true }).count()) === 1 && (await p.getByRole('button', { name: 'Voltar', exact: true }).filter({ visible: true }).count()) === 0 && top !== null && top.y >= 0, `topo y=${top?.y}`);
   };
   // Telas empilhadas (detalhe, lista) escondem a barra de abas: volta até ela aparecer.
@@ -653,7 +654,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Cancelar').click(); await p.waitForTimeout(300);
   if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
   await goResumo();
+  // D-091 (docs/10 A4): trocar de tipo leva descrição e valor, sem pedir para descartar; o rascunho não sobra para o próximo formulário.
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  await field('Descrição').fill('Café'); await field('Valor em reais').fill('80,00');
+  await btn('É um recebimento? Registrar recebimento').click(); await p.waitForTimeout(600);
+  ok('"É um recebimento?" abre Registrar recebimento com descrição e valor, sem pedir para descartar (D-091)',
+    (await visibleCount('button', 'Salvar recebimento')) === 1 && (await visibleCount('button', 'Descartar alterações')) === 0 &&
+      (await field('Descrição').inputValue()) === 'Café' && (await field('Valor em reais').inputValue()) === '80,00');
+  await btn('É um gasto? Anotar gasto').click(); await p.waitForTimeout(600);
+  ok('"É um gasto?" volta para Anotar gasto levando o que foi digitado (D-091)',
+    (await visibleCount('button', 'Salvar gasto')) === 1 && (await field('Descrição').inputValue()) === 'Café' && (await field('Valor em reais').inputValue()) === '80,00');
+  await btn('Cancelar').click(); await p.waitForTimeout(300);
+  if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
+  await goResumo();
+  await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  ok('depois da troca de tipo, um Anotar gasto novo abre vazio (D-091)', (await field('Descrição').inputValue()) === '' && (await field('Valor em reais').inputValue()) === '');
   await field('Descrição').fill('Café'); await field('Valor em reais').fill('80,00');
   await field('Data do pagamento').fill(''); await field('Data do pagamento').pressSequentially('06102026');
   ok('data digitada só com números ganha as barras', (await field('Data do pagamento').inputValue()) === '06/10/2026');
@@ -1588,7 +1603,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Sair e entrar de novo na demonstração: as listas são lidas de novo e a geração do dia roda outra vez.
   // Nada do que foi tirado volta (Matrícula de 2026, parcelas do Seguro residencial e do Material escolar).
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   // Ciclo A5: "O que é isso?" ao lado de "Saldo inicial" abre o resumo no lugar; a explicação completa abre por cima e
   // "Voltar à tarefa" volta para a Conta.
   const saldoHint = p.getByRole('button', { name: 'O que é isso? Saldo inicial', exact: true }).filter({ visible: true }).first();
@@ -1827,7 +1842,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const CALC_LIST = [
     ['Decidir uma compra', [['Antes de financiar', 'Parcela, juros e o que muda se juntar antes'], ['Parcelado ou à vista?', 'Descubra os juros embutidos no parcelado'], ['Quanto custa por ano?', 'Por ano, por mês e por dia']]],
     ['Dívidas e atrasos', [['Quanto custa uma dívida?', 'Rotativo, cheque especial ou empréstimo'], ['Quitar antes ou adiantar parcelas', 'Uma estimativa de quanto dos juros sai da conta'], ['Multa e juros por atraso', 'Com os valores do boleto'], ['Em que ordem quitar as dívidas?', 'Duas ordens de pagamento, lado a lado']]],
-    ['Guardar e dividir', [['Reserva para imprevistos', 'Quantos meses seus gastos essenciais cobrem'], ['Juntar para um objetivo', 'Quanto guardar por mês ou em quanto tempo'], ['Dividir as contas da casa', 'Partes iguais ou pela renda de cada pessoa']]],
+    ['Guardar e dividir', [['Quanto guardar para imprevistos?', 'Quantos meses seus gastos essenciais cobrem'], ['Juntar para um objetivo', 'Quanto guardar por mês ou em quanto tempo'], ['Dividir as contas da casa', 'Partes iguais ou pela renda de cada pessoa']]],
   ];
   // Palavras de julgamento que nunca aparecem num resultado (spec4 §1.2, como em copy.test.ts).
   const JUDGMENT = /vale a pena|\bruim\b|\bcuidado\b|desperd[ií]cio|\bcorte\b|\batras(o|ad[oa])\b|estourou|\binvista\b|caixinha|saldo devedor/i;
@@ -1922,7 +1937,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     return [h.textContent, box ? [...box.querySelectorAll('[role=button]')].map((x) => x.getAttribute('aria-label')) : []];
   }));
   // Título e legenda no nome; sem ponto depois de um título que já termina em "?" (calcRowA11yLabel no core).
-  const calcExpected = CALC_LIST.map(([g, items]) => [g, items.map(([a, b]) => `${a}${/[?.!]$/.test(a) ? '' : '.'} ${b}`)]);
+  // O simulador fecha o grupo "Guardar e dividir", com o mesmo nome das outras portas (D-091, docs/10 A20).
+  const calcExpected = CALC_LIST.map(([g, items]) => [
+    g,
+    [...items.map(([a, b]) => `${a}${/[?.!]$/.test(a) ? '' : '.'} ${b}`), ...(g === 'Guardar e dividir' ? ['Simular um plano. Quanto guardar por mês e em quanto tempo, com hipóteses suas'] : [])],
+  ]);
   ok('calculadoras: 3 grupos e as 10 calculadoras, na ordem, com título e subtítulo no nome', JSON.stringify(calcSections) === JSON.stringify(calcExpected), JSON.stringify(calcSections));
   t = await body();
   ok('calculadoras: abertura e aviso fixo, sem pílula de contexto', t.includes(INTRO) && t.includes(DISCLAIMER) && (await p.locator('[aria-label^="Espaço:"]').filter({ visible: true }).count()) === 0);
@@ -2007,7 +2026,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await backToCalcList();
 
   // 7. Reserva: 3.750,00 por mês e 6 meses; 4.500,00 guardados; 500,00 por mês.
-  await openCalc('Reserva para imprevistos');
+  await openCalc('Quanto guardar para imprevistos?');
   await typeIn('Gastos essenciais por mês', '3.750,00');
   await radio('6 meses').click();
   ok('reserva: 6 meses de 3.750,00 → R$ 22.500,00', await shows('Com estes números, a reserva de 6 meses é de R$ 22.500,00.'));
@@ -2022,7 +2041,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await waitUntil(async () => (await visibleCount('button', 'Salvar na minha reserva')) === 1, 4000);
   ok('reserva: com o resultado, o botão "Salvar na minha reserva" (a demonstração já tem reserva) e nenhum "Anotar..."', (await visibleCount('button', 'Salvar na minha reserva')) === 1 && (await visibleCount('button', /^(Criar reserva|Anotar)/)) === 0);
   await calcShot('61_calc_reserva');
-  await calcWidths('reserva', 'Reserva para imprevistos');
+  await calcWidths('reserva', 'Quanto guardar para imprevistos?');
   await backToCalcList();
 
   // 8. Juntar para um objetivo: 22.500,00 com 4.500,00 em 14 meses; ou 1.000,00 por mês.
@@ -2082,7 +2101,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const repoBeforeLinks = await repoSnapshot();
   const writesBeforeLinks = writes.length;
   // Sem Família (D-055) o link vive na tela Família, aberta por Conta (o seletor só aparece para quem tem uma Família).
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
   await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto');
   await btn('Enquanto isso, dividir as contas da casa').click();
   await waitUntil(async () => (await h1Name()) === 'Dividir as contas da casa', 8000);
@@ -2287,7 +2306,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // Família na demonstração (D-055): sem seletor, e a tela Família (por Conta) explica, sem membros simulados nem botão de anotar
   ok('demonstração: o Resumo não mostra o seletor "Pessoal | Família"', (await p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count()) === 0);
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
   await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto');
   t = await body();
   ok('família sem membros simulados nem botão de anotar', t.includes('Anotar a casa em conjunto') && t.includes('Na demonstração não há Família de exemplo.') && !t.includes('Anotar gasto') && !t.includes('Anotar conta a pagar') && !t.includes('Titular'));
@@ -2346,10 +2365,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   };
   await fromGoals('Calculadoras', 'Calculadoras');
   const calcNames = calcExpected.flatMap(([, items]) => items);
-  ok('Metas › Calculadoras: a lista com as 10 (D-044)', calcNames.length === 10 && (await Promise.all(calcNames.map((n) => visibleCount('button', n)))).every((n) => n === 1));
-  await openCalc('Reserva para imprevistos');
+  ok('Metas › Calculadoras: a lista com as 10 e a linha do simulador (D-044, D-091)', calcNames.length === 11 && (await Promise.all(calcNames.map((n) => visibleCount('button', n)))).every((n) => n === 1));
+  await openCalc('Quanto guardar para imprevistos?');
   await typeIn('Gastos essenciais por mês', '1.000,00'); await radio('3 meses').click();
-  ok('Metas › Calculadoras › Reserva para imprevistos: funciona (3 meses de 1.000,00 → R$ 3.000,00)', await shows('Com estes números, a reserva de 3 meses é de R$ 3.000,00.'));
+  ok('Metas › Calculadoras › Quanto guardar para imprevistos? funciona (3 meses de 1.000,00 → R$ 3.000,00)', await shows('Com estes números, a reserva de 3 meses é de R$ 3.000,00.'));
   await backToCalcList();
   await openCalc('Juntar para um objetivo');
   await typeIn('Quanto quer juntar', '1.200,00'); await typeIn('Em quantos meses', '12');
@@ -2363,17 +2382,20 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const top = (e) => e.getBoundingClientRect().top;
     const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^Conta:/.test(e.getAttribute('aria-label') || ''));
     const main = shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b));
-    return main.slice(0, 2).map((e) => e.getAttribute('aria-label') || e.textContent);
+    const labels = main.map((e) => e.getAttribute('aria-label') || e.textContent);
+    return { jump: labels.filter((x) => /^Ir para /.test(x)), first: labels.filter((x) => !/^Ir para /.test(x)).slice(0, 2), firstOfAll: labels[0] };
   });
+  // D-091 (docs/10 A22): a fileira "Ir para" logo abaixo da busca, com "Dúvidas frequentes" primeiro.
+  ok('Aprender: "Ir para" logo abaixo da busca, com "Dúvidas frequentes" primeiro', learnFirst.firstOfAll === 'Ir para Dúvidas frequentes' && learnFirst.jump[0] === 'Ir para Dúvidas frequentes', JSON.stringify(learnFirst));
   // D-049: o card "Como usar o Clarevo" vem primeiro; o card "Calculadoras" (A6) continua logo depois, antes dos temas.
-  ok('Aprender: card "Calculadoras" logo depois do card "Como usar o app da Clarevo", no topo', learnFirst[0] === 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.' &&
-    learnFirst[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números', JSON.stringify(learnFirst));
+  ok('Aprender: card "Calculadoras" logo depois do card "Como usar o app da Clarevo", no topo', learnFirst.first[0] === 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.' &&
+    learnFirst.first[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva, simular um plano e outras contas com os seus números', JSON.stringify(learnFirst));
   await layoutChecks('aprender com as calculadoras 390px');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await layoutChecks('aprender com as calculadoras 320px');
   await shot('71_aprender_calculadoras_320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
-  await btn('Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números').click(); await waitText('Decidir uma compra');
+  await btn('Calculadoras. Parcelado ou à vista, dívidas, reserva, simular um plano e outras contas com os seus números').click(); await waitText('Decidir uma compra');
   ok('Aprender › Calculadoras abre /calcular', new URL(p.url()).pathname === '/calcular' && (await h1Name()) === 'Calculadoras');
   await btn('Voltar').click(); await waitText('Diferença do mês e saldo da conta');
 
@@ -2388,12 +2410,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const learnBackToTab = async () => { await btn('Voltar para Aprender').click(); await waitText('Comece por aqui'); };
   await logoChecks('Aprender: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   t = await body();
-  const learnOrder = ['Buscar um tema', 'Calculadoras', 'Neste mês', 'Comece por aqui', 'Ir para', ...LEARN_SECTIONS].map((x) => t.indexOf(x));
+  // "Ir para" logo abaixo da busca (D-091); as seções são procuradas depois de "Comece por aqui", porque os atalhos repetem os nomes.
+  const learnTop = ['Buscar um tema', 'Ir para', 'Calculadoras', 'Neste mês', 'Comece por aqui'].map((x) => t.indexOf(x));
+  const learnOrder = [...learnTop, ...LEARN_SECTIONS.map((x) => t.indexOf(x, learnTop[4]))];
   ok('Aprender: título "Aprender e dúvidas", aba "Aprender" com o nome "Aprender e dúvidas" e a introdução', (await h1Name()) === 'Aprender e dúvidas' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).count()) === 1 &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).first().innerText()).trim() === 'Aprender' &&
     t.includes('Explicações curtas sobre contas, juros e o próprio app, com exemplos fictícios e fontes.'), await h1Name());
-  ok('Aprender: busca, card "Calculadoras", card "Neste mês" (D-053), "Comece por aqui", "Ir para" e as cinco seções, nessa ordem', learnOrder.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])) &&
+  ok('Aprender: busca, "Ir para", card "Calculadoras", card "Neste mês" (D-053), "Comece por aqui" e as cinco seções, nessa ordem', learnOrder.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])) &&
     JSON.stringify(await learnH2()) === JSON.stringify(['Neste mês', 'Comece por aqui', ...LEARN_SECTIONS]), `${learnOrder.join(',')} ${JSON.stringify(await learnH2())}`);
   ok('Aprender: "Comece por aqui" com Diferença do mês, Juros simples e compostos e Gasto fixo', JSON.stringify((await cardButtons('Comece por aqui')).slice(0, 3).map((x) => x.split('. ')[0])) ===
     JSON.stringify(['Diferença do mês', 'Juros simples e juros compostos', 'Gasto fixo, conta a pagar e gasto anotado']), JSON.stringify(await cardButtons('Comece por aqui')));
@@ -2993,7 +3017,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ok(`A2 valores ocultos, ${name}: nenhum valor em reais à vista (texto e nomes acessíveis)`, leaks.length === 0, leaks.slice(0, 4).join(' | '));
     ok(`A2 valores ocultos, ${name}: "R$ ••••" na tela e "valor oculto" nos nomes acessíveis`, text.includes('R$ ••••') && (await spokenHidden()) > 0, `${text.includes('R$ ••••')} ${await spokenHidden()}`);
   };
-  const openConta = async () => { await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
+  const openConta = async () => { await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
   const hideSwitch = () => p.getByRole('switch', { name: 'Ocultar valores ao abrir' }).filter({ visible: true }).first();
 
   await freshDemo();
@@ -3256,7 +3280,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await newAcct('Davi Teste', 'davi@exemplo.com');
   await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Você consegue guardar algum valor por mês?');
   await p.getByRole('button', { name: /^Calculadoras\./ }).filter({ visible: true }).first().click(); await waitUntil(async () => (await h1Name()) === 'Calculadoras', 8000);
-  await openCalc('Reserva para imprevistos');
+  await openCalc('Quanto guardar para imprevistos?');
   await typeIn('Gastos essenciais por mês', '3.750,00'); await radio('6 meses').click(); await typeIn('Quanto já tem guardado', '3.500,00'); await typeIn('Quanto guarda por mês', '500,00');
   ok('C calculadora da reserva (conta sem reserva): 22.500,00 e o botão "Criar reserva"', (await shows('Com estes números, a reserva de 6 meses é de R$ 22.500,00.')) && (await visibleCount('button', 'Criar reserva')) === 1 && (await visibleCount('button', 'Salvar na minha reserva')) === 0);
   await calcShot('125_calc_reserva_criar');
@@ -3477,8 +3501,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     while (el && el.querySelectorAll('[role=button]').length < 2) el = el.parentElement;
     return el ? [...el.querySelectorAll('[role=button]')].map((x) => x.getAttribute('aria-label')).slice(0, 3) : [];
   });
-  ok('D Aprender: o atalho "Simular" abre "Dinheiro no tempo", antes dos temas', timeSection.length === 3 && /^Simular\. Quanto guardar por mês/.test(timeSection[0]) && !/^Simular/.test(timeSection[1]), JSON.stringify(timeSection));
-  await p.getByRole('button', { name: /^Simular\. Quanto guardar/ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
+  ok('D Aprender: o atalho "Simular" abre "Dinheiro no tempo", antes dos temas', timeSection.length === 3 && /^Simular um plano\. Quanto guardar por mês/.test(timeSection[0]) && !/^Simular/.test(timeSection[1]), JSON.stringify(timeSection));
+  await p.getByRole('button', { name: /^Simular um plano\. Quanto guardar/ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(300);
   ok('D do atalho de Aprender: o simulador vazio (origem=aprender no endereço)', (await formValues()).every((x) => x.endsWith('=')) && p.url().includes('origem=aprender'), p.url());
   await btn('Voltar').click(); await waitText('Diferença do mês e saldo da conta');
   await p.getByRole('button', { name: /^Como ler uma simulação/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(600);
@@ -5033,7 +5057,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.getByRole('button', { name: /^Calculadoras, / }).filter({ visible: true }).first().click(); await waitText('Decidir uma compra'); await p.waitForTimeout(400);
   await checkBar('nav barra: Calculadoras (o caso que sumia)', 'Movimentos');
   await shot('172_calculadoras_com_barra');
-  await p.getByRole('button', { name: /^Reserva para imprevistos\./ }).filter({ visible: true }).first().click(); await waitText('Gastos essenciais por mês'); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: /^Quanto guardar para imprevistos\? / }).filter({ visible: true }).first().click(); await waitText('Gastos essenciais por mês'); await p.waitForTimeout(300);
   await checkBar('nav barra: uma calculadora aberta', 'Movimentos');
   await navBackTo('Metas');
   ok('nav barra: tocar numa aba da barra volta à aba, sem telas empilhadas por baixo', urlPath() === '/metas' && (await visibleCount('button', 'Voltar')) === 0 && (await h1Name()) === 'Metas', p.url());
@@ -6715,7 +6739,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   };
   const g1OpenConta = async () => {
     await goResumo();
-    await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Contas de origem'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Contas de origem'); await p.waitForTimeout(400);
   };
   const g1Rows = async () => ((await sectionRows('Contas de origem')) ?? []).filter((x) => / Abrir a conta\.$/.test(x));
   const g1Row = (name) => p.getByRole('button', { name: new RegExp(`^${name}, .*Abrir a conta\\.$`) }).filter({ visible: true }).first();
@@ -7579,9 +7603,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   h3Storage0 = await h3Storage();
   await openConta();
   t = await h3Keep();
-  ok('H3 Conta: o bloco "Exportar meus dados" (nível 2) com a legenda e o botão "Escolher período e formato", depois de Privacidade neste aparelho',
+  ok('H3 Conta: o bloco "Exportar meus dados" (nível 2) com a legenda e o botão "Escolher período e formato", depois da assinatura e de Privacidade neste aparelho (D-091)',
     (await headingShown('Exportar meus dados')) && t.includes('Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos') && (await visibleCount('button', 'Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.')) === 1 &&
-    t.indexOf('Privacidade neste aparelho') < t.indexOf('Exportar meus dados') && t.indexOf('Exportar meus dados') < t.indexOf('Ver a assinatura'), t.slice(0, 900));
+    t.indexOf('Ver a assinatura') < t.indexOf('Privacidade neste aparelho') && t.indexOf('Privacidade neste aparelho') < t.indexOf('Exportar meus dados'), t.slice(0, 900));
   // D-064: a seção "Privacidade e termos" só existe com o endereço do site (EXPO_PUBLIC_SITE_URL); a demonstração sobe sem ele e não a mostra.
   ok('H3 Conta (D-064): sem EXPO_PUBLIC_SITE_URL (a demonstração), a seção "Privacidade e termos" e os botões de política, termos e "Excluir conta: como funciona" não aparecem, e "Excluir minha conta" continua',
     !(await headingShown('Privacidade e termos')) && !t.includes('Excluir conta: como funciona') && (await visibleCount('button', 'Política de privacidade')) === 0 && (await visibleCount('button', 'Termos de uso')) === 0 && t.includes('Excluir minha conta'));
@@ -8280,12 +8304,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Tab('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
   const j1First = await p.evaluate(() => {
     const top = (e) => e.getBoundingClientRect().top;
-    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^Conta:/.test(e.getAttribute('aria-label') || ''));
+    // Os atalhos "Ir para" ficam acima dos cards, logo abaixo da busca (D-091).
+    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^(Conta:|Ir para )/.test(e.getAttribute('aria-label') || ''));
     return shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b)).slice(0, 2).map((e) => e.getAttribute('aria-label') || e.textContent);
   });
   const j1H2 = await p.evaluate(() => [...document.querySelectorAll('h2, [role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
-  ok('Tutorial Aprender: o card "Como usar o app da Clarevo" é o primeiro botão, e o card "Calculadoras" vem logo depois', j1First[0] === 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.' &&
-    j1First[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números', JSON.stringify(j1First));
+  ok('Tutorial Aprender: depois dos atalhos, o card "Como usar o app da Clarevo" é o primeiro, e o card "Calculadoras" vem logo depois', j1First[0] === 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.' &&
+    j1First[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva, simular um plano e outras contas com os seus números', JSON.stringify(j1First));
   ok('Tutorial Aprender: o card não é título (os títulos de Aprender seguem os mesmos, com "Neste mês" do conteúdo de época, D-053)', JSON.stringify(j1H2) === JSON.stringify(['Neste mês', 'Comece por aqui', 'Usar o app da Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']), JSON.stringify(j1H2));
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
@@ -8487,7 +8512,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await j1Help('Renda comprometida', 'Renda comprometida e limite pessoal', 'Toque em "Informar renda de referência"');
   await btn('Voltar').click(); await waitText('Diferença do mês');
   // Contas de origem: Conta › Adicionar conta
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
   await j1Keep(); await scrollTo('Lembretes'); await shot('329_conta_privacidade');
   await btn('Adicionar conta').click(); await waitText('Nome da conta');
   await j1Help('Contas de origem', 'Contas de origem', 'Toque no círculo com as suas iniciais', '327_ajuda_contas_de_origem');
@@ -9374,7 +9399,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Concluir').click(); await p.waitForTimeout(600);
 
   // ---- 12. Conta › "Widget na tela inicial": o interruptor "Mostrar valores no widget" (desligado) fica guardado no aparelho ----
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
   const k1Widget = () => p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).first();
   await scrollTo('Widget na tela inicial');
   t = await k1Keep();
@@ -9388,7 +9413,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('K1 Conta: ligar mostra o interruptor ligado e não muda "Ocultar valores ao abrir" (são duas escolhas)', (await k1Widget().getAttribute('aria-checked')) === 'true' && (await hideSwitch().getAttribute('aria-checked')) === 'false', `${await k1Widget().getAttribute('aria-checked')} ${await hideSwitch().getAttribute('aria-checked')}`);
   ok('K1 Conta: na demonstração e nas contas simuladas a escolha fica só em memória (nada vai para o armazenamento do navegador)', (await k1Store()) === k1StoreW0, await k1Store());
   await btn('Voltar').click(); await p.waitForTimeout(500);
-  await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
   ok('K1 Conta: a escolha continua ligada ao voltar à tela', (await k1Widget().getAttribute('aria-checked')) === 'true', `${await k1Widget().getAttribute('aria-checked')}`);
   await k1Widget().click(); await p.waitForTimeout(300);
   ok('K1 Conta: desligar volta ao padrão', (await k1Widget().getAttribute('aria-checked')) === 'false', `${await k1Widget().getAttribute('aria-checked')}`);
@@ -9515,8 +9540,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const k2Notification0 = await k2Notification();
   await k2Tab('Aprender e dúvidas').click(); await waitText('Neste mês'); await p.waitForTimeout(400);
   t = await k2Keep(true);
-  const k2Order = ['Como usar o app da Clarevo', 'Calculadoras', 'Neste mês', 'Comece por aqui', 'Ir para', ...LEARN_SECTIONS].map((x) => t.indexOf(x));
-  ok('K2 Aprender: o card "Neste mês" vem depois de "Como usar o app da Clarevo" e de "Calculadoras" e antes de "Comece por aqui", dos atalhos e das seções', k2Order.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])), k2Order.join(','));
+  const k2Top = ['Ir para', 'Como usar o app da Clarevo', 'Calculadoras', 'Neste mês', 'Comece por aqui'].map((x) => t.indexOf(x));
+  const k2Order = [...k2Top, ...LEARN_SECTIONS.map((x) => t.indexOf(x, k2Top[4]))];
+  ok('K2 Aprender: o card "Neste mês" vem depois dos atalhos, de "Como usar o app da Clarevo" e de "Calculadoras" e antes de "Comece por aqui" e das seções', k2Order.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])), k2Order.join(','));
   ok('K2 Aprender: "Neste mês" é título de nível 2, e os títulos de Aprender são os de sempre mais ele', JSON.stringify(await learnH2()) === JSON.stringify(['Neste mês', 'Comece por aqui', ...LEARN_SECTIONS]), JSON.stringify(await learnH2()));
   ok('K2 Aprender (outubro): a legenda diz "Temas para outubro"', t.includes('Neste mês\nTemas para outubro'), t.slice(t.indexOf('Neste mês') - 20, t.indexOf('Neste mês') + 120));
   const k2Rows = await cardButtons('Neste mês');
@@ -10027,7 +10053,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     for (let i = 0; i < 5 && (await tab().count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
     await tab().first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
   };
-  const famConta = async () => { await famGoResumo(); await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
+  const famConta = async () => { await famGoResumo(); await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
   const famSignOut = async () => { await famConta(); await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira'); };
   const famTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
   const famGoFamilia = async () => { await famConta(); await p.getByRole('button', { name: /^(Criar Família|Abrir Família)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(500); };
@@ -10445,6 +10471,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const empChip = (name) => radio(name);
   // O texto do card cujo título (nível 2) é este.
   const empCardText = (title) => p.evaluate((title) => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === title && e.getBoundingClientRect().width > 0); return h?.parentElement?.textContent ?? ''; }, title);
+  // Uma linha do card "Benefício pela empresa" de Conta: o card "Assinatura" vem antes e também tem a linha "Situação" (D-091, docs/10 A23).
+  const empBenefitRow = (label) => p.evaluate((label) => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Benefício pela empresa' && e.getBoundingClientRect().width > 0); const e = h ? [...h.parentElement.querySelectorAll('[aria-label]')].find((x) => x.getAttribute('aria-label').startsWith(`${label}: `)) : null; return e ? e.getAttribute('aria-label').slice(label.length + 2) : null; }, label);
   const empPush = (pathname) => p.evaluate((path) => { history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }, pathname);
 
   // ---- 1. Demonstração (investidor): Conta, o painel da "Empresa Exemplo (demonstração)", fictícia e identificada ----
@@ -10645,8 +10673,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await field('Link do convite da empresa').fill(empBia); await btn('Ver convite').click(); await waitText('Aceitar benefício');
   await btn('Aceitar benefício').click(); await waitText('Benefício ativado: Empresa Alfa.'); await p.waitForTimeout(600);
   t = await body();
-  ok('Aceitar: abre Conta com o aviso "Benefício ativado: Empresa Alfa." e o card (empresa, plano, desde quando, "Benefício ativo")', famPath() === '/conta' && t.includes('Benefício ativado: Empresa Alfa.') && (await empRow('Empresa')) === 'Empresa Alfa' && (await empRow('Plano')) === 'Individual' &&
-    (await empRow('Desde')) === '07/10/2026' && (await empRow('Situação')) === 'Benefício ativo', `${famPath()} ${t.slice(0, 300)}`);
+  ok('Aceitar: abre Conta com o aviso "Benefício ativado: Empresa Alfa." e o card (empresa, plano, desde quando, "Benefício ativo")', famPath() === '/conta' && t.includes('Benefício ativado: Empresa Alfa.') && (await empBenefitRow('Empresa')) === 'Empresa Alfa' && (await empBenefitRow('Plano')) === 'Individual' &&
+    (await empBenefitRow('Desde')) === '07/10/2026' && (await empBenefitRow('Situação')) === 'Benefício ativo', `${famPath()} ${t.slice(0, 300)}`);
   ok('Aceitar: o card "Assinatura" passa a dizer "Benefício pela empresa", sem nada a pagar, e "Tenho um convite da empresa" some', (await empCardText('Assinatura')).includes('Situação') && (await empCardText('Assinatura')).includes('Benefício pela empresa') && (await empCardText('Assinatura')).includes('nada a pagar') && !t.includes('Tenho um convite da empresa'));
   await empKeep();
   await empShots('433_conta_beneficio_ativo', { scroll: empScroll('Benefício pela empresa') });
@@ -10678,7 +10706,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Começar meu mês').click(); await waitText('Aceitar benefício'); await p.waitForTimeout(500);
   ok('Convite da empresa sem conta: depois de criar a conta, volta ao convite e mostra a prévia da Empresa Alfa', famPath() === new URL(empCaio).pathname && (await body()).includes('Convite de Empresa Alfa'), `${famPath()}`);
   await btn('Aceitar benefício').click(); await waitText('Benefício ativado: Empresa Alfa.'); await p.waitForTimeout(500);
-  ok('Caio: aceitou e a Conta mostra o benefício ativo', (await empRow('Empresa')) === 'Empresa Alfa' && (await empRow('Situação')) === 'Benefício ativo');
+  ok('Caio: aceitou e a Conta mostra o benefício ativo', (await empBenefitRow('Empresa')) === 'Empresa Alfa' && (await empBenefitRow('Situação')) === 'Benefício ativo');
 
   // ---- 7. Rita de volta: duas ativas, uma cancelada; as contagens seguem as licenças, sem indicador de uso ----
   await famSignOut();
@@ -10726,8 +10754,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await famSignIn('bia.empresa@exemplo.com');
   await famConta(); await waitText('Benefício encerrado em'); await p.waitForTimeout(300);
   t = await body();
-  ok('Bia com a licença encerrada: o card diz "Benefício encerrado em 07/10/2026", o acesso pleno até 06/11/2026 e que a conta, o histórico e a Família continuam com ela', (await empRow('Situação')) === 'Benefício encerrado em 07/10/2026' && t.includes('Acesso pleno até 06/11/2026') &&
-    t.includes('Sua conta, seu histórico e a sua Família continuam com você.') && (await empRow('Empresa')) === 'Empresa Alfa', t.slice(0, 500));
+  ok('Bia com a licença encerrada: o card diz "Benefício encerrado em 07/10/2026", o acesso pleno até 06/11/2026 e que a conta, o histórico e a Família continuam com ela', (await empBenefitRow('Situação')) === 'Benefício encerrado em 07/10/2026' && t.includes('Acesso pleno até 06/11/2026') &&
+    t.includes('Sua conta, seu histórico e a sua Família continuam com você.') && (await empBenefitRow('Empresa')) === 'Empresa Alfa', t.slice(0, 500));
   ok('Bia com a licença encerrada: o card "Assinatura" continua "Benefício pela empresa" até 06/11/2026, o fim do acesso pleno (D-083, como o direito ao plano no banco)', (await empCardText('Assinatura')).includes('Benefício pela empresa') && (await empCardText('Assinatura')).includes('até 06/11/2026'));
   await empKeep();
   await empShots('434_conta_beneficio_encerrado', { scroll: empScroll('Benefício pela empresa') });

@@ -42,10 +42,11 @@ import {
   type IsoDate,
   type PlannedOccurrence,
   type ReviewRow,
+  COMMITTED_LINK_TEXT,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AlertCircle, CalendarSync, CalendarX, Calculator, Info, Pencil, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { AlertCircle, CalendarSync, CalendarX, Calculator, Gauge, Info, Pencil, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -227,6 +228,7 @@ export default function DetalheGastoFixo() {
               ) : (
                 <Occurrences
                   series={s}
+                  personalContext={personal?.contextKind === 'pessoal'}
                   occurrences={occurrences}
                   open={openOcc.data}
                   today={today}
@@ -409,12 +411,15 @@ function CalcLink({ series: s, today }: { series: CommitmentSeries; today: IsoDa
 /** Progresso, próximas contas (criadas e previstas), pagas, meses sem conta e sugestão de referência. */
 function Occurrences({
   series: s,
+  personalContext,
   occurrences,
   open: allOpen,
   today,
   onNotice,
 }: {
   series: CommitmentSeries;
+  /** A série é do Pessoal (a renda comprometida é só do Pessoal). */
+  personalContext: boolean;
   /** As 60 mais recentes (abertas e pagas), por número crescente. */
   occurrences: Commitment[];
   /** Todas as em aberto, sem limite (useSeriesOpenOccurrences). */
@@ -474,6 +479,10 @@ function Occurrences({
               ) : null}
               <LinkButton label="Quitar antes do prazo" style={styles.inlineLink} onPress={() => router.push(explanationHref('quitar-antes'))} />
               <TopicLink slug="amortizacao-price-sac" label="Quanto das parcelas é juros?" style={styles.inlineLink} />
+              {/* A parcela de dívida entra em "Dívidas" na renda comprometida, que é do Pessoal (docs/10 A14). */}
+              {personalContext ? (
+                <LinkButton label={COMMITTED_LINK_TEXT.fromDebt} icon={Gauge} style={styles.inlineLink} onPress={() => router.push('/renda-comprometida')} />
+              ) : null}
             </View>
           ) : null}
         </Card>

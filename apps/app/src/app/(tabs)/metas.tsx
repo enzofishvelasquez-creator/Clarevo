@@ -7,6 +7,7 @@ import { openCalc } from '@/components/calc/open';
 import { CalcNavRow } from '@/components/calc/parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ClosedGoals, GoalCard, ReserveCard } from '@/components/goal-cards';
+import { ReserveRefresh } from '@/components/reserve-refresh';
 import { AppHeader, ContextSwitch } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { SavingsCard, SavingsPlanInReserve } from '@/components/savings-card';
@@ -68,6 +69,7 @@ export default function MetasScreen() {
                 planSlot={<SavingsPlanInReserve contextId={contextId} card={savings} />}
                 planLink={savings.data?.state.kind === 'oculto'}
               />
+              <ReserveRefresh contextId={contextId} reserve={data.reserve} canWrite={personal.data?.canWrite ?? true} />
               <GoalsSection active={data.active} plans={data.plans} images={images.data} canWrite={personal.data?.canWrite ?? true} />
               <MonthCard overview={data} committed={committed} />
             </>

@@ -161,67 +161,19 @@ export default function ContaScreen() {
           ) : null}
         </Card>
 
-        {/* Família (D-055): criar, convidar e administrar; abre a tela Família. */}
-        <Card style={{ gap: space[3] }}>
-          <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            {FAMILY_TEXT.accountTitle}
-          </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
-            {family.data ? FAMILY_TEXT.accountHintIn(family.data.context.name, family.data.role) : FAMILY_TEXT.accountHintNone}
-          </Txt>
-          <Button
-            label={family.data ? FAMILY_TEXT.accountOpen : FAMILY_TEXT.accountCreate}
-            icon={Users}
-            tone="soft"
-            accessibilityLabel={family.data ? `${FAMILY_TEXT.accountOpen}, ${FAMILY_ROLE_LABEL[family.data.role]}` : undefined}
-            onPress={() => router.push('/familia')}
-          />
-        </Card>
+        {/* Ordem de Conta (docs/10 A23): a assinatura, o que é deste aparelho (lembretes, privacidade, widget), a segurança, quem divide
+            o app com você (Família, empresa, Telegram), as contas de origem, exportar e, por fim, ajuda, termos, sair e excluir. */}
+        {/* Assinatura (D-083): a situação do acesso (teste, só ver e exportar, plano, benefício ou Família) e a tela com os planos. */}
+        <AccessCard />
 
-        {/* WhatsApp (D-076): anotar por mensagem escrita. Só em conta real, com o número da Clarevo, e só depois do piloto fechado (no
-            piloto, a tela abre pelo link /conta/whatsapp). */}
-        {auth.mode !== 'demo' && WHATSAPP_NUMBER !== null && WHATSAPP_IN_ACCOUNT ? (
-          <Card style={{ gap: space[3] }}>
-            <Txt variant="title" accessibilityRole="header" aria-level={2}>
-              {WHATSAPP_TEXT.cardTitle}
-            </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
-              {WHATSAPP_TEXT.cardBody}
-            </Txt>
-            <Button label={WHATSAPP_TEXT.cardOpen} icon={MessageCircle} tone="soft" onPress={() => router.push('/conta/whatsapp')} />
-          </Card>
-        ) : null}
+        {/* Benefício pela empresa (D-056): o que a empresa oferece, ou onde colar o link do convite. */}
+        <BenefitCard />
 
-        {/* Telegram (D-080): o mesmo, com o bot da Clarevo. Só em conta real, com o bot, e só depois do piloto fechado (no piloto, a tela
-            abre pelo link /conta/telegram). */}
-        {auth.mode !== 'demo' && TELEGRAM_BOT !== null && TELEGRAM_IN_ACCOUNT ? (
-          <Card style={{ gap: space[3] }}>
-            <Txt variant="title" accessibilityRole="header" aria-level={2}>
-              {TELEGRAM_TEXT.cardTitle}
-            </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
-              {TELEGRAM_TEXT.cardBody}
-            </Txt>
-            <Button label={TELEGRAM_TEXT.cardOpen} icon={MessageCircle} tone="soft" onPress={() => router.push('/conta/telegram')} />
-          </Card>
-        ) : null}
-
-        {/* Painel da empresa (D-056): só na web e só para quem administra uma organização; no celular nada aparece. */}
-        {Platform.OS === 'web' && (companies.data?.length ?? 0) > 0 ? (
-          <Card style={{ gap: space[3] }}>
-            <Txt variant="title" accessibilityRole="header" aria-level={2}>
-              {COMPANY_TEXT.accountTitle}
-            </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
-              {COMPANY_TEXT.accountHint}
-            </Txt>
-            <Button label={COMPANY_TEXT.accountOpen} icon={Building2} tone="soft" onPress={() => router.push('/empresa')} />
-          </Card>
-        ) : null}
-
-        <View onLayout={(e) => setAccountsY(e.nativeEvent.layout.y)}>
-          <AccountsCard contextId={personal?.contextId} canWrite={personal?.canWrite ?? true} />
+        <View onLayout={(e) => setRemindersY(e.nativeEvent.layout.y)}>
+          <RemindersCard />
         </View>
+        <PrivacyCard />
+        <WidgetCard />
 
         <Card style={{ gap: space[3] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -243,11 +195,67 @@ export default function ContaScreen() {
           <Button label="Encerrar sessão em todos os aparelhos" icon={MonitorSmartphone} tone="soft" onPress={() => setConfirmAll(true)} />
         </Card>
 
-        <View onLayout={(e) => setRemindersY(e.nativeEvent.layout.y)}>
-          <RemindersCard />
+        {/* Família (D-055): criar, convidar e administrar; abre a tela Família. */}
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {FAMILY_TEXT.accountTitle}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {family.data ? FAMILY_TEXT.accountHintIn(family.data.context.name, family.data.role) : FAMILY_TEXT.accountHintNone}
+          </Txt>
+          <Button
+            label={family.data ? FAMILY_TEXT.accountOpen : FAMILY_TEXT.accountCreate}
+            icon={Users}
+            tone="soft"
+            accessibilityLabel={family.data ? `${FAMILY_TEXT.accountOpen}, ${FAMILY_ROLE_LABEL[family.data.role]}` : undefined}
+            onPress={() => router.push('/familia')}
+          />
+        </Card>
+
+        {/* Painel da empresa (D-056): só na web e só para quem administra uma organização; no celular nada aparece. */}
+        {Platform.OS === 'web' && (companies.data?.length ?? 0) > 0 ? (
+          <Card style={{ gap: space[3] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {COMPANY_TEXT.accountTitle}
+            </Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {COMPANY_TEXT.accountHint}
+            </Txt>
+            <Button label={COMPANY_TEXT.accountOpen} icon={Building2} tone="soft" onPress={() => router.push('/empresa')} />
+          </Card>
+        ) : null}
+
+        {/* Telegram (D-080): o mesmo, com o bot da Clarevo. Só em conta real, com o bot, e só depois do piloto fechado (no piloto, a tela
+            abre pelo link /conta/telegram). */}
+        {auth.mode !== 'demo' && TELEGRAM_BOT !== null && TELEGRAM_IN_ACCOUNT ? (
+          <Card style={{ gap: space[3] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {TELEGRAM_TEXT.cardTitle}
+            </Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {TELEGRAM_TEXT.cardBody}
+            </Txt>
+            <Button label={TELEGRAM_TEXT.cardOpen} icon={MessageCircle} tone="soft" onPress={() => router.push('/conta/telegram')} />
+          </Card>
+        ) : null}
+
+        {/* WhatsApp (D-076): anotar por mensagem escrita. Só em conta real, com o número da Clarevo, e só depois do piloto fechado (no
+            piloto, a tela abre pelo link /conta/whatsapp). */}
+        {auth.mode !== 'demo' && WHATSAPP_NUMBER !== null && WHATSAPP_IN_ACCOUNT ? (
+          <Card style={{ gap: space[3] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {WHATSAPP_TEXT.cardTitle}
+            </Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {WHATSAPP_TEXT.cardBody}
+            </Txt>
+            <Button label={WHATSAPP_TEXT.cardOpen} icon={MessageCircle} tone="soft" onPress={() => router.push('/conta/whatsapp')} />
+          </Card>
+        ) : null}
+
+        <View onLayout={(e) => setAccountsY(e.nativeEvent.layout.y)}>
+          <AccountsCard contextId={personal?.contextId} canWrite={personal?.canWrite ?? true} />
         </View>
-        <PrivacyCard />
-        <WidgetCard />
 
         <Card style={{ gap: space[3] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -258,12 +266,6 @@ export default function ContaScreen() {
           </Txt>
           <Button label={EXPORT_TEXT.entryButton} icon={FileDown} tone="soft" accessibilityLabel={EXPORT_TEXT.entryA11y} onPress={() => router.push('/conta/exportar')} />
         </Card>
-
-        {/* Benefício pela empresa (D-056): o que a empresa oferece, ou onde colar o link do convite. */}
-        <BenefitCard />
-
-        {/* Assinatura (D-083): a situação do acesso (teste, só ver e exportar, plano, benefício ou Família) e a tela com os planos. */}
-        <AccessCard />
 
         {/* "Como você conheceu o Clarevo?" (D-067): opcional, só em conta real; a pessoa vê e muda a resposta. */}
         <SignupSourceAccountCard />

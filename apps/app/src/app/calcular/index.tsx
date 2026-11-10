@@ -1,5 +1,6 @@
 import { CALC_GROUPS, CALC_UI_TEXT, calculatorsInGroup } from '@clarevo/core';
 import { router } from 'expo-router';
+import { ChartLine } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { CALC_ICONS } from '@/components/calc/open';
@@ -10,7 +11,8 @@ import { colors, space } from '@/theme/tokens';
 
 /**
  * Calculadoras (docs/08 §2.2; spec4 §2.1): tela interna sem pílula de contexto, porque nada é gravado. A abertura e o
- * aviso fixo ficam antes da lista, visíveis sem rolar em 360 px. Três grupos, na ordem do catálogo do core.
+ * aviso fixo ficam antes da lista, visíveis sem rolar em 360 px. Três grupos, na ordem do catálogo do core; o simulador fecha o
+ * grupo "Guardar e dividir".
  */
 export default function CalculadorasScreen() {
   return (
@@ -33,10 +35,20 @@ export default function CalculadorasScreen() {
                     icon={CALC_ICONS[c.slug]}
                     title={c.title}
                     caption={c.subtitle}
-                    last={i === items.length - 1}
+                    last={i === items.length - 1 && g.id !== 'guardar'}
                     onPress={() => router.push({ pathname: '/calcular/[slug]', params: { slug: c.slug } })}
                   />
                 ))}
+                {/* O simulador (D-028) também mora em "Guardar e dividir", com o mesmo nome das outras portas (docs/10 A20). */}
+                {g.id === 'guardar' ? (
+                  <CalcNavRow
+                    icon={ChartLine}
+                    title={CALC_UI_TEXT.simulateTitle}
+                    caption={CALC_UI_TEXT.simulateCaption}
+                    last
+                    onPress={() => router.push({ pathname: '/simular', params: { origem: 'calculadoras' } })}
+                  />
+                ) : null}
               </Card>
             </View>
           );

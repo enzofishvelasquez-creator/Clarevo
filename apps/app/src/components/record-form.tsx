@@ -97,6 +97,7 @@ import {
   suggestCategory,
   nextMonthAllowed,
   recordMonth,
+  KIND_SWITCH_TEXT,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -131,6 +132,7 @@ import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
 import { cameraWasUsed, markCameraUsed, payeeMemoryOf, rememberPayee, rememberStore, storeMemoryOf } from '@/lib/note-prefs';
 import { comprovanteHandoff } from '@/lib/comprovante-handoff';
+import { draftHandoff } from '@/lib/draft-handoff';
 import { pickAndReadComprovanteImage, pickAndReadComprovantePdf } from '@/lib/comprovante-read';
 import { OCR_AVAILABLE } from '@/lib/ocr';
 import { pickAndReadNotePdf, readNoteCode, type NoteReading } from '@/lib/receipt-read';
@@ -957,6 +959,35 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     const handed = comprovanteHandoff.take();
     if (handed) applyProof(handed);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // O que foi digitado no formulário do outro tipo ("É um recebimento? Registrar recebimento", docs/10 A4) entra ao abrir (uma vez).
+  useEffect(() => {
+    if (mode.type !== 'novo' || dayMonth !== null) return;
+    const handed = draftHandoff.take();
+    if (!handed) return;
+    const handedAccount = handed.accountId;
+    const keepAccount = handedAccount !== null && personal.accounts.some((a) => a.id === handedAccount);
+    // A conta escolhida no outro formulário vale como escolha da pessoa: a última usada não a troca depois.
+    if (keepAccount) accountPickedRef.current = true;
+    const accountId = keepAccount ? handedAccount : draftRef.current.accountId;
+    setDraft((d) => ({ ...d, description: handed.description, amountText: handed.amountText, dateText: handed.dateText, accountId }));
+    // Do parcelamento que fala em cartão (docs/10 A15): já em "Cartão de crédito", com as parcelas.
+    if (handed.card && cardMode) {
+      paymentTouched.current = true;
+      setPayWith('cartao');
+      setInstallmentsText(handed.card.installmentsText);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Troca para o outro tipo levando descrição, valor, data e conta (a categoria não vai: as listas são outras). */
+  const switchKindKeeping = () => {
+    const d = draftRef.current;
+    // Sem pedir para descartar: o que foi digitado vai junto. O rascunho só é entregue ao sair, para não sobrar para outro formulário.
+    leave(() => {
+      draftHandoff.set({ description: d.description, amountText: d.amountText, dateText: d.dateText, accountId: d.accountId });
+      router.replace({ pathname: '/registro/novo', params: { tipo: kind === 'despesa' ? 'receita' : 'despesa' } });
+    });
+  };
 
   const installmentsFromNote = () => {
     const name = draft.description.trim() || note?.reading.draft.issuerName || '';
@@ -1839,6 +1870,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           ) : null}
         </Card>
 
+        {/* Abriu o tipo errado (docs/10 A4): troca sem perder o que foi digitado. Só ao anotar um novo, fora da revisão dos meses e
+            sem comprovante lido (que já tem a própria troca). */}
+        {mode.type === 'novo' && dayMonth === null && !proof ? (
+          <LinkButton label={kind === 'despesa' ? KIND_SWITCH_TEXT.toIncome : KIND_SWITCH_TEXT.toExpense} onPress={switchKindKeeping} />
+        ) : null}
         <LinkButton label="Como este registro entra no mês?" color={colors.textSecondary} onPress={() => router.push(explanationHref('diferenca'))} />
       </Screen>
 

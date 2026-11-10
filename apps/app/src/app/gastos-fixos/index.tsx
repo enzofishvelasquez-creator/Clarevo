@@ -25,9 +25,10 @@ import {
   type CommitmentSeries,
   type IsoDate,
   type SubscriptionRow as SubscriptionRowData,
+  COMMITTED_LINK_TEXT,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, CalendarSync, ClipboardCheck, Info, Layers, Plus, Repeat, ShieldCheck, Users } from 'lucide-react-native';
+import { Calculator, CalendarSync, ClipboardCheck, Gauge, Info, Layers, Plus, Repeat, ShieldCheck, Users } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { openCalc } from '@/components/calc/open';
@@ -314,6 +315,10 @@ export default function GastosFixosScreen() {
                     {totalsTexts.monthlyLater}
                   </MoneyTxt>
                 ) : null}
+                {/* A renda comprometida é do Pessoal (docs/10 A14): o atalho só aparece nele. */}
+                {personal?.contextKind === 'pessoal' ? (
+                  <LinkButton label={COMMITTED_LINK_TEXT.fromSeries} icon={Gauge} style={styles.inlineLink} onPress={() => router.push('/renda-comprometida')} />
+                ) : null}
               </View>
             ) : null}
             {totalsTexts.yearly ? (
@@ -340,7 +345,13 @@ export default function GastosFixosScreen() {
           </>
         )}
 
-        {personal?.canWrite === false ? null : <Button label="Novo gasto fixo ou parcelamento" icon={Plus} onPress={() => router.push('/gastos-fixos/novo')} />}
+        {personal?.canWrite === false ? null : (
+          <View style={{ gap: space[3] }}>
+            <Button label="Novo gasto fixo ou parcelamento" icon={Plus} onPress={() => router.push('/gastos-fixos/novo')} />
+            {/* A conta do ano à vista no topo (docs/10 A16), não só no card do fim da lista. */}
+            <Button label="Nova conta do ano" icon={CalendarSync} tone="soft" onPress={() => router.push('/gastos-fixos/novo?tipo=anual')} />
+          </View>
+        )}
 
         {list.isPending ? (
           <View style={{ gap: space[3] }}>

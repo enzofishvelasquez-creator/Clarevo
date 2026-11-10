@@ -1026,7 +1026,7 @@ function auxiliaresDaFamilia(c) {
     for (let i = 0; i < 6 && (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0; i++) { await bt('Voltar').click(); await p.waitForTimeout(400); }
     await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click();
     await esperar('Diferença do mês');
-    await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click();
+    await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click();
     await esperar('Privacidade neste aparelho');
   };
   const aFamilia = async () => {
@@ -1266,7 +1266,7 @@ const CLIPES = [
     mostra: 'Painel da "Empresa Exemplo (demonstração)": contrato e vagas, convite por e-mail (links desfocados), licenças ativas, "Uso do app" só com contagens, e a tela "Quem vê estes dados?".',
     preparar: async (c) => {
       const { p, botao, esperar } = c;
-      await p.getByRole('button', { name: 'Conta: perfil, segurança e acesso ao plano' }).filter({ visible: true }).first().click();
+      await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click();
       await esperar('Abrir painel da empresa');
       await botao('Abrir painel da empresa').click();
       await esperar('Empresa Exemplo (demonstração)');

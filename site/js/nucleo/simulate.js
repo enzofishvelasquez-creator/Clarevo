@@ -486,7 +486,7 @@ export const SIMULATE_TEXT = {
     createGoal: 'Criar meta com estes valores',
     createGoalHint: 'A meta recebe o valor, o prazo, o que você já tem e o valor por mês. A taxa não é gravada, e o progresso só anda com o que você registrar.',
     calcLink: 'Simular com rendimento',
-    learnShortcut: 'Simular',
+    learnShortcut: 'Simular um plano',
     learnShortcutHint: 'Quanto guardar por mês, em quanto tempo e quanto você pode ter, com hipóteses suas.',
     introSave: (targetCents, months, initialCents) => `Para juntar ${brl(targetCents)} em ${monthsCount(months)}${initialCents > 0 ? `, começando com ${brl(initialCents)}` : ''}:`,
     introTime: (targetCents, initialCents) => `Para juntar ${brl(targetCents)}${initialCents > 0 ? `, começando com ${brl(initialCents)}` : ''}:`,
