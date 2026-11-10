@@ -39,8 +39,11 @@ describe('D-091 F: atualizar a reserva com os registros', () => {
       newTargetCents: 2_160_000,
       averageMonths: 3,
     });
-    // Para baixo também.
-    expect(reserveRefreshSuggestion(reserve(), average(250_000))?.newTargetCents).toBe(1_500_000);
+    // Para baixo, só quando a base já veio da média dos registros (um valor informado pode ter gastos que não são anotados).
+    expect(reserveRefreshSuggestion(reserve({ essentialBaseSource: 'media_gastos' }), average(250_000))?.newTargetCents).toBe(1_500_000);
+    expect(reserveRefreshSuggestion(reserve(), average(250_000))).toBeNull();
+    expect(reserveRefreshSuggestion(reserve({ essentialBaseSource: 'contas_do_mes' }), average(250_000))).toBeNull();
+    expect(reserveRefreshSuggestion(reserve({ essentialBaseSource: 'contas_do_mes' }), average(360_000))).not.toBeNull();
     // Exatamente 15% conta; menos que isso, não.
     expect(reserveRefreshSuggestion(reserve(), average(345_000))).not.toBeNull();
     expect(reserveRefreshSuggestion(reserve(), average(344_999))).toBeNull();
@@ -62,7 +65,7 @@ describe('D-091 F: atualizar a reserva com os registros', () => {
   it('o texto diz a média, os meses e a base de hoje, e que nada muda sozinho', () => {
     const R = GOALS_TEXT.reserve;
     expect(R.refreshBody(3, 360_000, 300_000)).toBe(
-      'Nos seus registros dos últimos 3 meses, moradia, mercado, transporte, saúde e educação ficam em média R$ 3.600,00 por mês. A reserva usa R$ 3.000,00.',
+      'Nos 3 meses mais recentes com registros, moradia, mercado, transporte, saúde e educação ficam em média R$ 3.600,00 por mês. A reserva usa R$ 3.000,00.',
     );
     expect(R.refreshNote).toMatch(/Nada muda sozinho/);
   });

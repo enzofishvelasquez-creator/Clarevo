@@ -53,6 +53,7 @@ export const CALC_UI_TEXT = {
     shortcutCaption: 'Parcelado ou à vista, dívidas, reserva e outras contas',
     learnCardTitle: 'Calculadoras',
     learnCardCaption: 'Parcelado ou à vista, dívidas, reserva, simular um plano e outras contas com os seus números',
+    siteLearnCardCaption: 'Parcelado ou à vista, dívidas, reserva e outras contas com os seus números',
     simulateTitle: 'Simular um plano',
     simulateCaption: 'Quanto guardar por mês e em quanto tempo, com hipóteses suas',
     reserveExists: 'Você já tem uma reserva para imprevistos em Metas.',

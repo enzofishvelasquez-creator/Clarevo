@@ -452,6 +452,9 @@ export function reserveRefreshSuggestion(
   if (base === null || months === null || estimate.source !== 'media_gastos' || estimate.months.length < ESSENTIAL_AVERAGE_MONTHS) return null;
   const diff = Math.abs(estimate.amountCents - base);
   if (diff * 1000 < base * RESERVE_REFRESH_DIFF_PERMILLE) return null;
+  // Para baixo, só quando a base já veio da média dos registros: um valor que a pessoa informou (ou as contas de um mês) pode ter
+  // gastos que não são anotados, e uma reserva menor por falta de registro deixaria a pessoa menos protegida.
+  if (estimate.amountCents < base && reserve.essentialBaseSource !== 'media_gastos') return null;
   const target = emergencyTarget(estimate.amountCents, months);
   if (target === null) return null;
   return { currentBaseCents: base, newBaseCents: estimate.amountCents, months, newTargetCents: target, averageMonths: estimate.months.length };
@@ -968,7 +971,7 @@ export const GOALS_TEXT = {
     /** Atualizar a reserva com os registros (D-091 F). */
     refreshTitle: 'Seus gastos essenciais mudaram',
     refreshBody: (averageMonths: number, newBaseCents: Cents, currentBaseCents: Cents) =>
-      `Nos seus registros dos últimos ${averageMonths} meses, moradia, mercado, transporte, saúde e educação ficam em média ${formatBRL(newBaseCents)} por mês. A reserva usa ${formatBRL(currentBaseCents)}.`,
+      `Nos ${averageMonths} meses mais recentes com registros, moradia, mercado, transporte, saúde e educação ficam em média ${formatBRL(newBaseCents)} por mês. A reserva usa ${formatBRL(currentBaseCents)}.`,
     refreshAction: 'Atualizar a reserva',
     refreshLater: 'Agora não',
     refreshNote: 'Você confere o valor antes de salvar. Nada muda sozinho.',

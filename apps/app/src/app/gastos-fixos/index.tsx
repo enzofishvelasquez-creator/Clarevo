@@ -41,7 +41,7 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useSubscriptionSnooze } from '@/lib/subscription-reminder';
-import { useSeriesList, useView, useWork } from '@/state/data';
+import { useSeriesList, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -253,7 +253,6 @@ function SubscriptionGroup({ list, today }: { list: readonly CommitmentSeries[];
 export default function GastosFixosScreen() {
   const { today } = useSession();
   const personal = useWork().data;
-  const { space: spaceKind } = useView();
   const list = useSeriesList(personal?.contextId);
   const [notice] = useFlash();
   const snooze = useSubscriptionSnooze();
@@ -317,7 +316,7 @@ export default function GastosFixosScreen() {
                   </MoneyTxt>
                 ) : null}
                 {/* A renda comprometida é do Pessoal (docs/10 A14): o atalho só aparece nele. */}
-                {spaceKind === 'pessoal' ? (
+                {personal?.contextKind === 'pessoal' ? (
                   <LinkButton label={COMMITTED_LINK_TEXT.fromSeries} icon={Gauge} style={styles.inlineLink} onPress={() => router.push('/renda-comprometida')} />
                 ) : null}
               </View>

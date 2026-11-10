@@ -35,7 +35,8 @@ export function ReservaCalc({ prefill }: { prefill: CalcPrefill<'reserva'> }) {
   // Só para o nome do botão: com uma reserva não arquivada, os valores vão para ela. Se a lista não carregar, vale "Criar reserva".
   const personal = useWork();
   const goals = useGoals(personal.data?.contextId);
-  const hasReserve = goals.data ? organizeGoals(goals.data).reserve !== null : false;
+  const reserveGoal = goals.data ? organizeGoals(goals.data).reserve : null;
+  const hasReserve = reserveGoal !== null;
   const calc: CalcBinding<Key> = { slug: 'reserva', form, errors };
   // Sem mês escolhido, o aviso ("Escolha ...") aparece quando é a única coisa que falta. O "Digite ..." fica para "Outro".
   const showChoice = pick === null && onlyChoicesMissing(errors, ['meses']);
@@ -44,9 +45,13 @@ export function ReservaCalc({ prefill }: { prefill: CalcPrefill<'reserva'> }) {
     <CalcScreen slug="reserva">
       {/* Com a reserva já criada em Metas, o caminho até ela fica à vista no topo (docs/10 A20). */}
       {hasReserve ? (
-        <Banner tone="info" icon={ShieldCheck}>
+        <Banner tone="info" icon={ShieldCheck} live={false}>
           <Txt variant="label">{CALC_UI_TEXT.reserveExists}</Txt>
-          <LinkButton label={CALC_UI_TEXT.reserveSee} onPress={() => router.push('/reserva')} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+          <LinkButton
+            label={CALC_UI_TEXT.reserveSee}
+            onPress={() => router.push(reserveGoal ? { pathname: '/meta/[id]', params: { id: reserveGoal.id } } : '/metas')}
+            style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+          />
         </Banner>
       ) : null}
       <Card style={{ gap: space[4] }}>

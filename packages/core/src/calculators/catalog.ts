@@ -98,6 +98,8 @@ export const CALC_UI_TEXT = {
   /** Aprender: card branco no topo. */
   learnCardTitle: 'Calculadoras',
   learnCardCaption: 'Parcelado ou à vista, dívidas, reserva, simular um plano e outras contas com os seus números',
+  /** O mesmo card na página Aprender do site, onde o simulador não existe (ele usa os registros do app). */
+  siteLearnCardCaption: 'Parcelado ou à vista, dívidas, reserva e outras contas com os seus números',
   /** A linha do simulador no grupo "Guardar e dividir" de Calculadoras (docs/10 A20): o mesmo nome em todas as portas. */
   simulateTitle: 'Simular um plano',
   simulateCaption: 'Quanto guardar por mês e em quanto tempo, com hipóteses suas',

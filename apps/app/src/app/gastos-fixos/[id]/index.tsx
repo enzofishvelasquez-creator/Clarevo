@@ -67,7 +67,7 @@ import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/compo
 import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
 import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
-import { useDeleteSeries, useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useView, useWork } from '@/state/data';
+import { useDeleteSeries, useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useWork } from '@/state/data';
 import { useAuthorship } from '@/components/family-parts';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -228,6 +228,7 @@ export default function DetalheGastoFixo() {
               ) : (
                 <Occurrences
                   series={s}
+                  personalContext={personal?.contextKind === 'pessoal'}
                   occurrences={occurrences}
                   open={openOcc.data}
                   today={today}
@@ -410,12 +411,15 @@ function CalcLink({ series: s, today }: { series: CommitmentSeries; today: IsoDa
 /** Progresso, próximas contas (criadas e previstas), pagas, meses sem conta e sugestão de referência. */
 function Occurrences({
   series: s,
+  personalContext,
   occurrences,
   open: allOpen,
   today,
   onNotice,
 }: {
   series: CommitmentSeries;
+  /** A série é do Pessoal (a renda comprometida é só do Pessoal). */
+  personalContext: boolean;
   /** As 60 mais recentes (abertas e pagas), por número crescente. */
   occurrences: Commitment[];
   /** Todas as em aberto, sem limite (useSeriesOpenOccurrences). */
@@ -426,7 +430,6 @@ function Occurrences({
 }) {
   /** Linha da revisão aberta na folha "Registrar este mês" (D-030). */
   const [sheet, setSheet] = useState<ReviewRow | null>(null);
-  const { space: spaceKind } = useView();
   const currentMonth = monthOf(today);
   const ended = seriesEnded(s, today);
   const open = occurrences.filter((c) => c.status === 'aberto');
@@ -477,7 +480,7 @@ function Occurrences({
               <LinkButton label="Quitar antes do prazo" style={styles.inlineLink} onPress={() => router.push(explanationHref('quitar-antes'))} />
               <TopicLink slug="amortizacao-price-sac" label="Quanto das parcelas é juros?" style={styles.inlineLink} />
               {/* A parcela de dívida entra em "Dívidas" na renda comprometida, que é do Pessoal (docs/10 A14). */}
-              {spaceKind === 'pessoal' ? (
+              {personalContext ? (
                 <LinkButton label={COMMITTED_LINK_TEXT.fromDebt} icon={Gauge} style={styles.inlineLink} onPress={() => router.push('/renda-comprometida')} />
               ) : null}
             </View>

@@ -965,7 +965,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     if (mode.type !== 'novo' || dayMonth !== null) return;
     const handed = draftHandoff.take();
     if (!handed) return;
-    const accountId = handed.accountId && personal.accounts.some((a) => a.id === handed.accountId) ? handed.accountId : draftRef.current.accountId;
+    const handedAccount = handed.accountId;
+    const keepAccount = handedAccount !== null && personal.accounts.some((a) => a.id === handedAccount);
+    // A conta escolhida no outro formulário vale como escolha da pessoa: a última usada não a troca depois.
+    if (keepAccount) accountPickedRef.current = true;
+    const accountId = keepAccount ? handedAccount : draftRef.current.accountId;
     setDraft((d) => ({ ...d, description: handed.description, amountText: handed.amountText, dateText: handed.dateText, accountId }));
     // Do parcelamento que fala em cartão (docs/10 A15): já em "Cartão de crédito", com as parcelas.
     if (handed.card && cardMode) {
@@ -978,8 +982,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   /** Troca para o outro tipo levando descrição, valor, data e conta (a categoria não vai: as listas são outras). */
   const switchKindKeeping = () => {
     const d = draftRef.current;
-    draftHandoff.set({ description: d.description, amountText: d.amountText, dateText: d.dateText, accountId: d.accountId });
-    router.replace({ pathname: '/registro/novo', params: { tipo: kind === 'despesa' ? 'receita' : 'despesa' } });
+    // Sem pedir para descartar: o que foi digitado vai junto. O rascunho só é entregue ao sair, para não sobrar para outro formulário.
+    leave(() => {
+      draftHandoff.set({ description: d.description, amountText: d.amountText, dateText: d.dateText, accountId: d.accountId });
+      router.replace({ pathname: '/registro/novo', params: { tipo: kind === 'despesa' ? 'receita' : 'despesa' } });
+    });
   };
 
   const installmentsFromNote = () => {

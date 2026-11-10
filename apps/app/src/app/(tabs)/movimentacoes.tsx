@@ -221,7 +221,7 @@ export default function MovimentacoesScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={maskMoneyLabel(`${title}, ${formatBRL(t.cents)}. Ver a composição`, hidden)}
                   onPress={() => router.push({ pathname: '/composicao', params: { tipo: t.tipo } })}
-                  style={({ pressed }) => [styles.totalPress, pressed && { opacity: 0.85 }]}>
+                  style={(st) => [styles.totalPress, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
                   <Card style={styles.total}>
                     <View style={styles.totalHead}>
                       <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   action: { flexGrow: 1, flexBasis: 220, alignSelf: 'auto' },
   totals: { flexDirection: 'row', gap: space[3], flexWrap: 'wrap' },
   totalPress: { flexGrow: 1, flexBasis: 140 },
-  total: { padding: space[4], gap: space[1] },
+  total: { flexGrow: 1, padding: space[4], gap: space[1] },
   totalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] },
   totalValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 },
   filters: { flexDirection: 'row', gap: space[2], flexWrap: 'wrap' },

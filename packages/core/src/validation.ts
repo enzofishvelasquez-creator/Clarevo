@@ -47,10 +47,6 @@ export const UNCERTAIN_TEXT = {
   renda: 'Não deu para confirmar se salvou. Confira em Renda comprometida antes de tentar de novo.',
 } as const;
 
-/**
- * Gasto com data futura (teste de 09/11/2026: "o mais intuitivo é adicionar aos gastos, com previsão futura"): além do erro, o
- * formulário oferece levar o que já foi digitado para Anotar conta a pagar, onde a data é o vencimento.
- */
 /** No fim de Anotar gasto e de Registrar recebimento (docs/10 A4): trocar de tipo levando o que foi digitado. */
 export const KIND_SWITCH_TEXT = {
   toIncome: 'É um recebimento? Registrar recebimento',
@@ -63,6 +59,10 @@ export const SERIES_CARD_TEXT = {
   cardNote: 'Compras parceladas no cartão ficam em Cartões, na fatura de cada mês.',
 } as const;
 
+/**
+ * Gasto com data futura (teste de 09/11/2026: "o mais intuitivo é adicionar aos gastos, com previsão futura"): além do erro, o
+ * formulário oferece levar o que já foi digitado para Anotar conta a pagar, onde a data é o vencimento.
+ */
 export const FUTURE_EXPENSE_TEXT = {
   toCommitment: 'Ainda vai vencer? Anotar como conta a pagar',
   toCommitmentA11y: 'Ainda vai vencer? Anotar como conta a pagar, com a descrição, o valor, a data e a categoria já digitados',

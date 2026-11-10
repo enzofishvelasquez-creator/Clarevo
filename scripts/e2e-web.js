@@ -335,7 +335,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   };
   const ppDone = (k) => PP[k].replace('. ', ', concluído. ');
   const ppRows = () => cardButtons('Primeiros passos');
-  const ppIs = (rows) => async () => JSON.stringify(await ppRows()) === JSON.stringify([...rows, 'Agora não']);
+  // Com o primeiro passo em aberto, "Não tenho gastos fixos" vem antes de "Agora não" (D-091, docs/10 A25).
+  const ppIs = (rows) => async () => JSON.stringify(await ppRows()) === JSON.stringify([...rows, ...(rows[0] === PP.fixos ? ['Não tenho gastos fixos'] : []), 'Agora não']);
   await waitText('Primeiros passos');
   t = await body();
   ok('primeiros passos: conta nova vê os quatro passos (o quarto é "Planejar quanto guardar"), nenhum concluído, e "Agora não"', await ppIs([PP.fixos, PP.recebido, PP.pago, PP.guardar])() &&
@@ -653,7 +654,21 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Cancelar').click(); await p.waitForTimeout(300);
   if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
   await goResumo();
+  // D-091 (docs/10 A4): trocar de tipo leva descrição e valor, sem pedir para descartar; o rascunho não sobra para o próximo formulário.
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  await field('Descrição').fill('Café'); await field('Valor em reais').fill('80,00');
+  await btn('É um recebimento? Registrar recebimento').click(); await p.waitForTimeout(600);
+  ok('"É um recebimento?" abre Registrar recebimento com descrição e valor, sem pedir para descartar (D-091)',
+    (await visibleCount('button', 'Salvar recebimento')) === 1 && (await visibleCount('button', 'Descartar alterações')) === 0 &&
+      (await field('Descrição').inputValue()) === 'Café' && (await field('Valor em reais').inputValue()) === '80,00');
+  await btn('É um gasto? Anotar gasto').click(); await p.waitForTimeout(600);
+  ok('"É um gasto?" volta para Anotar gasto levando o que foi digitado (D-091)',
+    (await visibleCount('button', 'Salvar gasto')) === 1 && (await field('Descrição').inputValue()) === 'Café' && (await field('Valor em reais').inputValue()) === '80,00');
+  await btn('Cancelar').click(); await p.waitForTimeout(300);
+  if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
+  await goResumo();
+  await btn('Anotar gasto').click(); await waitText('Será salvo em');
+  ok('depois da troca de tipo, um Anotar gasto novo abre vazio (D-091)', (await field('Descrição').inputValue()) === '' && (await field('Valor em reais').inputValue()) === '');
   await field('Descrição').fill('Café'); await field('Valor em reais').fill('80,00');
   await field('Data do pagamento').fill(''); await field('Data do pagamento').pressSequentially('06102026');
   ok('data digitada só com números ganha as barras', (await field('Data do pagamento').inputValue()) === '06/10/2026');
@@ -1922,7 +1937,11 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     return [h.textContent, box ? [...box.querySelectorAll('[role=button]')].map((x) => x.getAttribute('aria-label')) : []];
   }));
   // Título e legenda no nome; sem ponto depois de um título que já termina em "?" (calcRowA11yLabel no core).
-  const calcExpected = CALC_LIST.map(([g, items]) => [g, items.map(([a, b]) => `${a}${/[?.!]$/.test(a) ? '' : '.'} ${b}`)]);
+  // O simulador fecha o grupo "Guardar e dividir", com o mesmo nome das outras portas (D-091, docs/10 A20).
+  const calcExpected = CALC_LIST.map(([g, items]) => [
+    g,
+    [...items.map(([a, b]) => `${a}${/[?.!]$/.test(a) ? '' : '.'} ${b}`), ...(g === 'Guardar e dividir' ? ['Simular um plano. Quanto guardar por mês e em quanto tempo, com hipóteses suas'] : [])],
+  ]);
   ok('calculadoras: 3 grupos e as 10 calculadoras, na ordem, com título e subtítulo no nome', JSON.stringify(calcSections) === JSON.stringify(calcExpected), JSON.stringify(calcSections));
   t = await body();
   ok('calculadoras: abertura e aviso fixo, sem pílula de contexto', t.includes(INTRO) && t.includes(DISCLAIMER) && (await p.locator('[aria-label^="Espaço:"]').filter({ visible: true }).count()) === 0);
@@ -2363,11 +2382,14 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     const top = (e) => e.getBoundingClientRect().top;
     const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^Conta:/.test(e.getAttribute('aria-label') || ''));
     const main = shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b));
-    return main.slice(0, 2).map((e) => e.getAttribute('aria-label') || e.textContent);
+    const labels = main.map((e) => e.getAttribute('aria-label') || e.textContent);
+    return { jump: labels.filter((x) => /^Ir para /.test(x)), first: labels.filter((x) => !/^Ir para /.test(x)).slice(0, 2), firstOfAll: labels[0] };
   });
+  // D-091 (docs/10 A22): a fileira "Ir para" logo abaixo da busca, com "Dúvidas frequentes" primeiro.
+  ok('Aprender: "Ir para" logo abaixo da busca, com "Dúvidas frequentes" primeiro', learnFirst.firstOfAll === 'Ir para Dúvidas frequentes' && learnFirst.jump[0] === 'Ir para Dúvidas frequentes', JSON.stringify(learnFirst));
   // D-049: o card "Como usar o Clarevo" vem primeiro; o card "Calculadoras" (A6) continua logo depois, antes dos temas.
-  ok('Aprender: card "Calculadoras" logo depois do card "Como usar o app da Clarevo", no topo', learnFirst[0] === 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.' &&
-    learnFirst[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva e outras contas com os seus números', JSON.stringify(learnFirst));
+  ok('Aprender: card "Calculadoras" logo depois do card "Como usar o app da Clarevo", no topo', learnFirst.first[0] === 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.' &&
+    learnFirst.first[1] === 'Calculadoras. Parcelado ou à vista, dívidas, reserva, simular um plano e outras contas com os seus números', JSON.stringify(learnFirst));
   await layoutChecks('aprender com as calculadoras 390px');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await layoutChecks('aprender com as calculadoras 320px');

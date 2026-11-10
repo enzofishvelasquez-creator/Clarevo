@@ -65,7 +65,7 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
     );
   });
   const calculadoras = bloco(
-    `<a class="cartao cartao-calculadoras" href="${rel(arquivo, ARQUIVO_CALCULADORAS)}"><span class="titulo-cartao">${esc(c.CALC_UI.learnCardTitle)}</span><span class="tema-sub">${esc(c.CALC_UI.learnCardCaption)}. A conta é feita no seu navegador.</span></a>`,
+    `<a class="cartao cartao-calculadoras" href="${rel(arquivo, ARQUIVO_CALCULADORAS)}"><span class="titulo-cartao">${esc(c.CALC_UI.learnCardTitle)}</span><span class="tema-sub">${esc(c.CALC_UI.siteLearnCardCaption)}. A conta é feita no seu navegador.</span></a>`,
     { rotulo: null },
   );
   const rodape = bloco(
