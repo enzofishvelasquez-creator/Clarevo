@@ -7603,9 +7603,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   h3Storage0 = await h3Storage();
   await openConta();
   t = await h3Keep();
-  ok('H3 Conta: o bloco "Exportar meus dados" (nível 2) com a legenda e o botão "Escolher período e formato", depois de Privacidade neste aparelho',
+  ok('H3 Conta: o bloco "Exportar meus dados" (nível 2) com a legenda e o botão "Escolher período e formato", depois da assinatura e de Privacidade neste aparelho (D-091)',
     (await headingShown('Exportar meus dados')) && t.includes('Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos') && (await visibleCount('button', 'Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.')) === 1 &&
-    t.indexOf('Privacidade neste aparelho') < t.indexOf('Exportar meus dados') && t.indexOf('Exportar meus dados') < t.indexOf('Ver a assinatura'), t.slice(0, 900));
+    t.indexOf('Ver a assinatura') < t.indexOf('Privacidade neste aparelho') && t.indexOf('Privacidade neste aparelho') < t.indexOf('Exportar meus dados'), t.slice(0, 900));
   // D-064: a seção "Privacidade e termos" só existe com o endereço do site (EXPO_PUBLIC_SITE_URL); a demonstração sobe sem ele e não a mostra.
   ok('H3 Conta (D-064): sem EXPO_PUBLIC_SITE_URL (a demonstração), a seção "Privacidade e termos" e os botões de política, termos e "Excluir conta: como funciona" não aparecem, e "Excluir minha conta" continua',
     !(await headingShown('Privacidade e termos')) && !t.includes('Excluir conta: como funciona') && (await visibleCount('button', 'Política de privacidade')) === 0 && (await visibleCount('button', 'Termos de uso')) === 0 && t.includes('Excluir minha conta'));
@@ -10471,6 +10471,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const empChip = (name) => radio(name);
   // O texto do card cujo título (nível 2) é este.
   const empCardText = (title) => p.evaluate((title) => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === title && e.getBoundingClientRect().width > 0); return h?.parentElement?.textContent ?? ''; }, title);
+  // Uma linha do card "Benefício pela empresa" de Conta: o card "Assinatura" vem antes e também tem a linha "Situação" (D-091, docs/10 A23).
+  const empBenefitRow = (label) => p.evaluate((label) => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Benefício pela empresa' && e.getBoundingClientRect().width > 0); const e = h ? [...h.parentElement.querySelectorAll('[aria-label]')].find((x) => x.getAttribute('aria-label').startsWith(`${label}: `)) : null; return e ? e.getAttribute('aria-label').slice(label.length + 2) : null; }, label);
   const empPush = (pathname) => p.evaluate((path) => { history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }, pathname);
 
   // ---- 1. Demonstração (investidor): Conta, o painel da "Empresa Exemplo (demonstração)", fictícia e identificada ----
@@ -10671,8 +10673,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await field('Link do convite da empresa').fill(empBia); await btn('Ver convite').click(); await waitText('Aceitar benefício');
   await btn('Aceitar benefício').click(); await waitText('Benefício ativado: Empresa Alfa.'); await p.waitForTimeout(600);
   t = await body();
-  ok('Aceitar: abre Conta com o aviso "Benefício ativado: Empresa Alfa." e o card (empresa, plano, desde quando, "Benefício ativo")', famPath() === '/conta' && t.includes('Benefício ativado: Empresa Alfa.') && (await empRow('Empresa')) === 'Empresa Alfa' && (await empRow('Plano')) === 'Individual' &&
-    (await empRow('Desde')) === '07/10/2026' && (await empRow('Situação')) === 'Benefício ativo', `${famPath()} ${t.slice(0, 300)}`);
+  ok('Aceitar: abre Conta com o aviso "Benefício ativado: Empresa Alfa." e o card (empresa, plano, desde quando, "Benefício ativo")', famPath() === '/conta' && t.includes('Benefício ativado: Empresa Alfa.') && (await empBenefitRow('Empresa')) === 'Empresa Alfa' && (await empBenefitRow('Plano')) === 'Individual' &&
+    (await empBenefitRow('Desde')) === '07/10/2026' && (await empBenefitRow('Situação')) === 'Benefício ativo', `${famPath()} ${t.slice(0, 300)}`);
   ok('Aceitar: o card "Assinatura" passa a dizer "Benefício pela empresa", sem nada a pagar, e "Tenho um convite da empresa" some', (await empCardText('Assinatura')).includes('Situação') && (await empCardText('Assinatura')).includes('Benefício pela empresa') && (await empCardText('Assinatura')).includes('nada a pagar') && !t.includes('Tenho um convite da empresa'));
   await empKeep();
   await empShots('433_conta_beneficio_ativo', { scroll: empScroll('Benefício pela empresa') });
@@ -10704,7 +10706,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await btn('Começar meu mês').click(); await waitText('Aceitar benefício'); await p.waitForTimeout(500);
   ok('Convite da empresa sem conta: depois de criar a conta, volta ao convite e mostra a prévia da Empresa Alfa', famPath() === new URL(empCaio).pathname && (await body()).includes('Convite de Empresa Alfa'), `${famPath()}`);
   await btn('Aceitar benefício').click(); await waitText('Benefício ativado: Empresa Alfa.'); await p.waitForTimeout(500);
-  ok('Caio: aceitou e a Conta mostra o benefício ativo', (await empRow('Empresa')) === 'Empresa Alfa' && (await empRow('Situação')) === 'Benefício ativo');
+  ok('Caio: aceitou e a Conta mostra o benefício ativo', (await empBenefitRow('Empresa')) === 'Empresa Alfa' && (await empBenefitRow('Situação')) === 'Benefício ativo');
 
   // ---- 7. Rita de volta: duas ativas, uma cancelada; as contagens seguem as licenças, sem indicador de uso ----
   await famSignOut();
@@ -10752,8 +10754,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await famSignIn('bia.empresa@exemplo.com');
   await famConta(); await waitText('Benefício encerrado em'); await p.waitForTimeout(300);
   t = await body();
-  ok('Bia com a licença encerrada: o card diz "Benefício encerrado em 07/10/2026", o acesso pleno até 06/11/2026 e que a conta, o histórico e a Família continuam com ela', (await empRow('Situação')) === 'Benefício encerrado em 07/10/2026' && t.includes('Acesso pleno até 06/11/2026') &&
-    t.includes('Sua conta, seu histórico e a sua Família continuam com você.') && (await empRow('Empresa')) === 'Empresa Alfa', t.slice(0, 500));
+  ok('Bia com a licença encerrada: o card diz "Benefício encerrado em 07/10/2026", o acesso pleno até 06/11/2026 e que a conta, o histórico e a Família continuam com ela', (await empBenefitRow('Situação')) === 'Benefício encerrado em 07/10/2026' && t.includes('Acesso pleno até 06/11/2026') &&
+    t.includes('Sua conta, seu histórico e a sua Família continuam com você.') && (await empBenefitRow('Empresa')) === 'Empresa Alfa', t.slice(0, 500));
   ok('Bia com a licença encerrada: o card "Assinatura" continua "Benefício pela empresa" até 06/11/2026, o fim do acesso pleno (D-083, como o direito ao plano no banco)', (await empCardText('Assinatura')).includes('Benefício pela empresa') && (await empCardText('Assinatura')).includes('até 06/11/2026'));
   await empKeep();
   await empShots('434_conta_beneficio_encerrado', { scroll: empScroll('Benefício pela empresa') });
