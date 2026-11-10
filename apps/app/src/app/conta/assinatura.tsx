@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle2, Info } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 
-import { AccessSituation, PlansCard, useAccessTimeZone } from '@/components/access-parts';
+import { AccessSituation, PlansCard, StoreManageCard, useAccessTimeZone } from '@/components/access-parts';
 import { ConfirmDialog } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
@@ -78,7 +78,8 @@ function WebCancelCard() {
  * Conta > Assinatura (D-083): a situação do acesso (teste grátis, só ver e exportar, plano, benefício, cortesia ou Plano Família da
  * pessoa titular), com as datas no fuso da pessoa, e os planos com os preços para quem ainda não paga. Na web, com a compra aberta
  * (SUBSCRIBE_OPEN), os botões de assinar pelo Asaas (D-084) e, para quem assinou na web, o cancelamento; a volta da página de pagamento
- * chega com `?pagamento=sucesso|cancelado|expirado`. A compra pelas lojas entra com elas; a trava da escrita é do banco.
+ * chega com `?pagamento=sucesso|cancelado|expirado`. No iPhone e no Android, a compra pela loja (D-090) e, para quem assina por ela, os
+ * ajustes da loja e a troca de plano. A trava da escrita é do banco.
  */
 export default function AssinaturaScreen() {
   const access = useAccess();
@@ -115,6 +116,7 @@ export default function AssinaturaScreen() {
               <Txt color={colors.text}>{view.body}</Txt>
             </Card>
             {access.data.status === 'assinatura' && access.data.provider === 'web' && Platform.OS === 'web' ? <WebCancelCard /> : null}
+            {Platform.OS !== 'web' ? <StoreManageCard access={access.data} /> : null}
             {view.showPlans ? <PlansCard access={access.data} webTest={webTest} subscribeHidden={returned === 'sucesso'} /> : null}
             {view.showPlans ? (
               <Txt variant="caption" color={colors.textSecondary}>

@@ -17,7 +17,8 @@
     "manual": "node scripts/gerar-manual.js",
     "whatsapp": "node scripts/gerar-funcoes.js",
     "telegram": "node scripts/gerar-funcoes.js",
-    "assinatura-web": "node scripts/gerar-funcoes.js"
+    "assinatura-web": "node scripts/gerar-funcoes.js",
+    "assinatura-lojas": "node scripts/gerar-funcoes.js"
   },
   "devDependencies": {
     "playwright": "1.56.1"

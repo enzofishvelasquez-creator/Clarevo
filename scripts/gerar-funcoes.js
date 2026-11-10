@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * Gera as funções do servidor, cada uma num arquivo só: supabase/functions/whatsapp/index.ts (D-076), supabase/functions/telegram/index.ts
- * (D-080) e supabase/functions/assinatura-web/index.ts (D-084). Cada arquivo leva o código do núcleo (packages/core/src/whatsapp ou
+ * (D-080), supabase/functions/assinatura-web/index.ts (D-084) e supabase/functions/assinatura-lojas/index.ts (D-090). Cada arquivo leva o código do núcleo (packages/core/src/whatsapp ou
  * packages/core/src/telegram/servidor.ts, e o que eles usam), sem tipos, mais a ligação com o Deno do Supabase. Um arquivo só para colar no editor de
  * funções do painel do Supabase, sem instalar nada (docs/05, passos 12j e 12l).
  *
- * Uso: npm run whatsapp, npm run telegram ou npm run assinatura-web   (geram as três)
+ * Uso: npm run whatsapp, npm run telegram, npm run assinatura-web ou npm run assinatura-lojas   (geram as quatro)
  *      node scripts/gerar-funcoes.js --conferir   (sai com erro se algum arquivo gerado não é o do código atual; usado nos testes)
  */
 const fs = require('node:fs');
@@ -149,6 +149,38 @@ const FUNCTIONS = [
       'const handler = assinatura.createAssinaturaWebHandler({',
       '  config: assinatura.assinaturaWebConfigFrom((name) => Deno.env.get(name)),',
       '  // Cada chamada tem prazo (o Asaas conta como falha a resposta depois de 10 segundos).',
+      '  fetch: (url, init) => fetch(url, { method: init.method, headers: init.headers, body: init.body, signal: AbortSignal.timeout(init.timeoutMs) }),',
+      '  log: (message) => console.error(message),',
+      '});',
+      '',
+      'Deno.serve(async (req) => {',
+      '  const res = await handler({',
+      '    method: req.method,',
+      '    header: (name) => req.headers.get(name),',
+      '    body: () => req.text(),',
+      '  });',
+      '  return new Response(res.status === 204 ? null : res.body, { status: res.status, headers: res.headers });',
+      '});',
+      '',
+    ],
+  },
+  {
+    // Só o servidor: os textos da tela (assinatura-lojas/app.ts) não entram na função.
+    entry: 'packages/core/src/assinatura-lojas/servidor.ts',
+    out: 'supabase/functions/assinatura-lojas/index.ts',
+    header: [
+      '// GERADO por scripts/gerar-funcoes.js a partir de packages/core/src/assinatura-lojas. Não editar à mão: mude o núcleo e rode `npm run assinatura-lojas`.',
+      '// Clarevo · função do servidor "assinatura-lojas" (Edge Function do Supabase, D-090): recebe os avisos (webhooks) do RevenueCat com o',
+      '// token no cabeçalho Authorization e, para o app, o pedido "sincronizar" com a sessão da pessoa; nos dois casos consulta no',
+      '// RevenueCat o estado atual das assinaturas da App Store e do Google Play da pessoa e chama billing_apply no banco com a chave de',
+      '// serviço. Segredos no painel do Supabase (Edge Functions, Secrets): REVENUECAT_API_KEY (a chave secreta, sk_) e',
+      '// REVENUECAT_WEBHOOK_TOKEN. SUPABASE_URL e a chave de serviço o próprio Supabase fornece.',
+      '// Publicar com "Verify JWT" desligado (o RevenueCat não manda login; a função confere o token da sessão do app ela mesma).',
+    ],
+    serve: [
+      'const lojas = __req(0);',
+      'const handler = lojas.createAssinaturaLojasHandler({',
+      '  config: lojas.assinaturaLojasConfigFrom((name) => Deno.env.get(name)),',
       '  fetch: (url, init) => fetch(url, { method: init.method, headers: init.headers, body: init.body, signal: AbortSignal.timeout(init.timeoutMs) }),',
       '  log: (message) => console.error(message),',
       '});',

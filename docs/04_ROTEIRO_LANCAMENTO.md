@@ -155,6 +155,19 @@ Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C
 - [ ] **Você:** avisar a Elis que o pacote 2 está no ar
 - [ ] G, depois do lançamento: modo "Fatura de cartão depois do vencimento" em Multa e juros
 
+## Assinatura pelas lojas (D-090, `docs/42_ASSINATURA_LOJAS.md`)
+
+Enzo aprovou em 10/11/2026: compra pela própria loja (App Store e Google Play), mensal de R$ 29,90 e Família de R$ 69,90, com o RevenueCat; 14 dias grátis pela Clarevo e só o mensal no lançamento.
+
+- [x] Produtos, compra no app (`react-native-purchases`, `apps/app/src/lib/store-purchases.ts`), botões, renovação e "Restaurar compras" na tela Assinatura, ajustes da loja e troca de plano, aviso ao excluir a conta
+- [x] Função do servidor `assinatura-lojas` (avisos do RevenueCat, "sincronizar" e "esquecer"), sem migração nova (`assinatura-lojas.test.ts`)
+- [x] Política (seções 3.9 e 8) e pergunta 48 do resumo para o advogado
+- [ ] **Você:** o roteiro de `docs/42`, seção 4 (acordos de apps pagos, produtos nas duas lojas, chave de compras da Apple, conta de serviço do Google, RevenueCat, segredos no Supabase, chaves públicas no Expo)
+- [ ] **Você (Claude Chrome):** publicar a função `assinatura-lojas` (docs/05, passo 12u), sem mexer nos segredos
+- [ ] **Você:** teste com compras de teste no Android (faixa de teste interno) e no iPhone (TestFlight), `docs/42`, passo 9
+- [ ] Abrir a compra (`SUBSCRIBE_OPEN`) junto com a web e o início da cobrança, num build `production` novo
+- [ ] Respostas de privacidade das lojas: "Compras, histórico de compras" passa a Sim quando a compra abrir (`docs/lojas/privacidade.md`)
+
 ## Ciclo B: renda comprometida (D-026)
 
 Última execução registrada pelas frentes de trabalho em 09/10/2026: `npm test` (30 arquivos, 599 testes), `npm run typecheck`, `npm run test:db` (10, 20, 30, 40, 45, 47, 50, 60 e 65), `npm run test:api` (92 testes, com as sequências de B e C) e `npm run test:web`, que passa (item abaixo).
