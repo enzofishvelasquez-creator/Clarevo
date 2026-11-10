@@ -60,7 +60,7 @@ O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que 
 |---|---|---|
 | 3.1 | Respostas do advogado aplicadas na política, nos termos e nas telas | Equipe |
 | 3.2 | Site final: CNPJ, razão social, endereço e e-mails em `site/dados-da-empresa.json`; tirar a faixa "Versão preliminar" | Enzo passa os dados; equipe publica |
-| 3.3 | Ficha das lojas, capturas novas (com o Telegram) e respostas de privacidade (`docs/lojas/`) | Equipe; Enzo cola nos painéis |
+| 3.3 | Ficha das lojas, capturas novas (com o Telegram) e respostas de privacidade (`docs/lojas/`) | Equipe; Enzo cola nos painéis. **Capturas e ficha prontas em 10/11/2026:** 10 telas em 3 tamanhos, com o comprovante lido e o Telegram (ordem de envio em `docs/16`, seção 7); a ficha ganhou a seção ASSINATURA (preço, renovação, cancelamento e o link dos Termos), as notas para a revisão dizem onde está a compra, e a classificação do Google responde que há compra de bens digitais. Falta o que depende do advogado (as páginas publicadas) e das respostas de privacidade quando a compra abrir |
 | 3.4 | Build de produção nas duas lojas e teste interno | Enzo, com roteiro |
 
 ### Semana 4: 24 a 30/11, lançamento

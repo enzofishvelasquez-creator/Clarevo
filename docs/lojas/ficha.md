@@ -1,6 +1,6 @@
 # Ficha das lojas (pt-BR)
 
-19/10/2026 (Ciclo R, D-060 item 1), revista em 25/10/2026 (Ciclo Marca 2.2, D-068: bem-estar financeiro e "a Clarevo"). Textos prontos para colar no App Store Connect (Apple) e no Google Play Console. Cada campo tem o limite da loja e a contagem feita por script (`npm test` confere os limites e os termos proibidos em `packages/core/test/lojas.test.ts`). Nada aqui depende de conta de desenvolvedor, e nenhum identificador, senha ou chave foi escrito: o que for da conta de Enzo aparece entre colchetes, como "[preencher]".
+19/10/2026 (Ciclo R, D-060 item 1), revista em 25/10/2026 (Ciclo Marca 2.2, D-068: bem-estar financeiro e "a Clarevo") e em 10/11/2026 (assinatura pelas lojas, D-090, e o Telegram com compra no cartão). Textos prontos para colar no App Store Connect (Apple) e no Google Play Console. Cada campo tem o limite da loja e a contagem feita por script (`npm test` confere os limites e os termos proibidos em `packages/core/test/lojas.test.ts`). Nada aqui depende de conta de desenvolvedor, e nenhum identificador, senha ou chave foi escrito: o que for da conta de Enzo aparece entre colchetes, como "[preencher]".
 
 **Limites.** Apple, conferidos em 19/10/2026 em `developer.apple.com/help/app-store-connect/reference/app-information/app-information` e `.../platform-version-information`: nome 30 caracteres, subtítulo 30, texto promocional 170, descrição 4000, palavras-chave 100 **bytes** (letra acentuada vale 2), notas para a revisão 4000 bytes. Google Play: título 30, descrição curta 80 e descrição completa 4000 caracteres são os limites que a página de ajuda do Play Console costuma trazer, **a conferir**: a rede desta sessão não abriu `support.google.com`, e esses valores não foram lidos da fonte oficial.
 
@@ -17,11 +17,11 @@
 | Frase de apoio (gráfico e imagem do site) | 25 caracteres | 30 |
 | Texto promocional (Apple) | 165 caracteres | 170 |
 | Palavras-chave (Apple) | 98 bytes | 100 bytes |
-| Descrição (Apple) | 3206 caracteres | 4000 |
+| Descrição (Apple) | 3943 caracteres | 4000 |
 | Descrição curta (Google) | 79 caracteres | 80 (a conferir) |
-| Descrição completa (Google) | 3206 caracteres | 4000 (a conferir) |
-| Notas da versão (Google) | 94 caracteres | 500 (a conferir) |
-| Notas para a revisão (Apple) | 1004 bytes | 4000 bytes |
+| Descrição completa (Google) | 3896 caracteres | 4000 (a conferir) |
+| Notas da versão (Google) | 146 caracteres | 500 (a conferir) |
+| Notas para a revisão (Apple) | 1716 bytes | 4000 bytes |
 
 ## 1. Nome, subtítulo e categoria
 
@@ -82,7 +82,7 @@ gastos,orçamento,contas a pagar,despesas,cartão,fatura,metas,reserva,família,
 
 ## 4. Descrição (Apple, até 4000)
 
-Texto simples, sem HTML. A mesma descrição serve de base para o Google (seção 6).
+Texto simples, sem HTML. A mesma descrição serve de base para o Google (seção 6); só a seção ASSINATURA muda, porque a Apple não aceita citar outra loja nos textos dela (diretriz 2.3.10), e a assinatura automática pede, na descrição, o preço, a renovação, como cancelar e o link dos Termos de uso (diretriz 3.1.2). **Os dois links só entram na loja depois de as páginas estarem publicadas, sem a faixa de versão preliminar** (seção 8).
 
 <!-- campo: apple-descricao | limite: 4000 | unidade: caracteres -->
 ```
@@ -99,7 +99,7 @@ O QUE VOCÊ FAZ NA CLAREVO
 • Cartões de crédito: compras à vista e parceladas, faturas e limite usado. O app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro.
 • Leitura de nota fiscal (QR Code, PDF ou a chave numa foto), de comprovantes de Pix e de pagamento, de holerite, de nota de serviço e de boleto, em PDF, print ou foto. A leitura acontece no próprio aparelho, e nenhuma foto é guardada por ela.
 • Importar extrato e fatura (PDF, OFX ou CSV), conferindo linha por linha antes de gravar.
-• Anotar pelo Telegram: mande "mercado 52,30" para a Clarevo e o gasto entra no app na hora.
+• Anotar pelo Telegram: mande "mercado 52,30", ou "farmácia 41 cartão" para uma compra no cartão, e o gasto entra no app na hora.
 • Evolução e Análises: Recebido e Pago mês a mês, média e mediana, categorias em barras ou em bolhas e orçamento por categoria.
 • Metas e reserva para imprevistos, com um plano de guardar que mostra as etapas e o mês previsto, sem contar rendimento.
 • Simulador e calculadoras (parcelado ou à vista, quanto custa por ano, juros e multa, entre outras), feitos com os números que você digita.
@@ -107,6 +107,13 @@ O QUE VOCÊ FAZ NA CLAREVO
 • Aprender: explicações curtas sobre juros, taxas e contas do dia a dia, cada uma com fonte e data de revisão.
 • Ocultar valores na tela e pedir biometria para abrir o app.
 • Exportar seus gastos e recebimentos em CSV ou PDF e excluir a conta dentro do app.
+
+ASSINATURA
+
+A Clarevo é paga por assinatura mensal, com dois planos e os mesmos recursos: Individual, por R$ 29,90 por mês, e Família, por R$ 69,90 por mês, para você e a sua Família na Clarevo, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão. A assinatura é feita pela App Store, com a forma de pagamento da sua conta Apple, e renova sozinha a cada mês, pelo mesmo preço, até você cancelar nos ajustes de assinatura da conta Apple, pelo menos 24 horas antes da renovação. Sem assinatura depois do teste, a conta fica só para ver e exportar, com os seus dados guardados.
+
+Termos de uso: https://clarevo.app.br/termos
+Política de privacidade: https://clarevo.app.br/privacidade
 
 SEUS DADOS
 
@@ -145,7 +152,7 @@ O QUE VOCÊ FAZ NA CLAREVO
 • Cartões de crédito: compras à vista e parceladas, faturas e limite usado. O app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro.
 • Leitura de nota fiscal (QR Code, PDF ou a chave numa foto), de comprovantes de Pix e de pagamento, de holerite, de nota de serviço e de boleto, em PDF, print ou foto. A leitura acontece no próprio aparelho, e nenhuma foto é guardada por ela.
 • Importar extrato e fatura (PDF, OFX ou CSV), conferindo linha por linha antes de gravar.
-• Anotar pelo Telegram: mande "mercado 52,30" para a Clarevo e o gasto entra no app na hora.
+• Anotar pelo Telegram: mande "mercado 52,30", ou "farmácia 41 cartão" para uma compra no cartão, e o gasto entra no app na hora.
 • Evolução e Análises: Recebido e Pago mês a mês, média e mediana, categorias em barras ou em bolhas e orçamento por categoria.
 • Metas e reserva para imprevistos, com um plano de guardar que mostra as etapas e o mês previsto, sem contar rendimento.
 • Simulador e calculadoras (parcelado ou à vista, quanto custa por ano, juros e multa, entre outras), feitos com os números que você digita.
@@ -153,6 +160,13 @@ O QUE VOCÊ FAZ NA CLAREVO
 • Aprender: explicações curtas sobre juros, taxas e contas do dia a dia, cada uma com fonte e data de revisão.
 • Ocultar valores na tela e pedir biometria para abrir o app.
 • Exportar seus gastos e recebimentos em CSV ou PDF e excluir a conta dentro do app.
+
+ASSINATURA
+
+A Clarevo é paga por assinatura mensal, com dois planos e os mesmos recursos: Individual, por R$ 29,90 por mês, e Família, por R$ 69,90 por mês, para você e a sua Família na Clarevo, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão. A assinatura é feita pelo Google Play, com a forma de pagamento da sua conta Google, e renova sozinha a cada mês, pelo mesmo preço, até você cancelar nas assinaturas do Google Play. Sem assinatura depois do teste, a conta fica só para ver e exportar, com os seus dados guardados.
+
+Termos de uso: https://clarevo.app.br/termos
+Política de privacidade: https://clarevo.app.br/privacidade
 
 SEUS DADOS
 
@@ -171,7 +185,7 @@ A Apple não mostra "O que há de novo" na primeira versão. No Google Play, o c
 
 <!-- campo: google-notas-da-versao | limite: 500 | unidade: caracteres -->
 ```
-Primeira versão da Clarevo: resumo do mês, contas a pagar, cartões, metas, Aprender e Família.
+Primeira versão da Clarevo: resumo do mês, contas a pagar, cartões, leitura de notas, comprovantes e boletos, Telegram, metas, Aprender e Família.
 ```
 
 ## 8. Contato, links e direitos (campos para Enzo)
@@ -218,7 +232,7 @@ Resultado esperado: **4+** na Apple e a menor faixa na classificação do Google
 | Violência, conteúdo sexual, linguagem imprópria, drogas, apostas | Não |
 | As pessoas interagem ou trocam conteúdo entre si? | Só dentro da Família (convite por link, sem mensagens, sem conteúdo público). Responder conforme a pergunta aceitar: se pedir "compartilha informações do usuário com outras pessoas", responder sim e descrever a Família |
 | Compartilha a localização? | Não |
-| Permite compras de bens digitais? | Não (cobrança está fora do ciclo atual) |
+| Permite compras de bens digitais? | Sim: a assinatura mensal, pelo Google Play (D-083, D-090) |
 | Acesso irrestrito à internet? | Não |
 
 ## 10. Informações para a revisão
@@ -227,13 +241,15 @@ Resultado esperado: **4+** na Apple e a menor faixa na classificação do Google
 
 <!-- campo: apple-notas-da-revisao | limite: 4000 | unidade: bytes -->
 ```
-A Clarevo é uma solução de bem-estar financeiro apoiada por um app que organiza o dinheiro do mês (gastos, recebimentos, contas a pagar, cartões, metas) e traz explicações de educação financeira. Não se conecta a contas bancárias, não movimenta dinheiro e não vende nada dentro do app.
+A Clarevo é uma solução de bem-estar financeiro apoiada por um app que organiza o dinheiro do mês (gastos, recebimentos, contas a pagar, cartões, metas) e traz explicações de educação financeira. Não se conecta a contas bancárias e não movimenta dinheiro.
+
+Assinatura: a Clarevo é paga por assinatura mensal, com compra dentro do app (dois produtos de assinatura automática no mesmo grupo: clarevo_individual_mensal, R$ 29,90, e clarevo_familia_mensal, R$ 69,90). Toda conta nova tem 14 dias de acesso completo grátis, dados pela própria conta, sem compra; depois, sem assinatura, a conta fica só para ver e exportar. Para ver e testar a compra: Conta, Assinatura, "Assinar o plano Individual" ou "Assinar o plano Família". "Restaurar compras" fica na mesma tela.
 
 Para entrar, use a conta de teste informada nos campos de acesso. Todos os dados dessa conta são fictícios e estão identificados como exemplo.
 
-Permissões: a câmera é usada só para ler o QR Code da nota fiscal (nenhuma foto é guardada); o Face ID é opcional e só desbloqueia o app (Conta, "Pedir biometria ao abrir"); as notificações são lembretes locais de contas a pagar, ligados pela pessoa em Conta.
+Permissões: a câmera é usada só para ler o QR Code da nota fiscal ou o código do boleto e para fotografar um documento que a pessoa quer ler (nenhuma foto é guardada); as fotos, só a imagem que a pessoa escolhe para ler ou para uma meta; o Face ID é opcional e só desbloqueia o app (Conta, "Pedir biometria ao abrir"); as notificações são lembretes locais, ligados pela pessoa em Conta.
 
-Exclusão da conta: Conta, último item, "Excluir minha conta" (exige digitar EXCLUIR).
+Exclusão da conta: Conta, último item, "Excluir minha conta" (exige digitar EXCLUIR). Com assinatura pela App Store, a tela avisa que a assinatura se cancela nos ajustes da conta Apple.
 
 Uma empresa pode oferecer a Clarevo como benefício. Ela vê os e-mails que convidou, a situação das licenças e as datas, e nunca vê gastos nem valores. O painel das empresas existe só na web.
 ```

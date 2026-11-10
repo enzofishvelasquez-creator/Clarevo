@@ -1,7 +1,9 @@
 /**
  * Capturas para a ficha das lojas (Ciclo R, D-060 item 1): abre a DEMONSTRAÇÃO do app (dados fictícios e identificados, "Demonstração ·
- * Pessoal" no alto de cada tela) com o Playwright e grava oito telas por tamanho em docs/lojas/capturas/:
- * Resumo, Anotar gasto, Contas a pagar, Cartões, Evolução, Análises em bolhas, Metas e Aprender.
+ * Pessoal" no alto de cada tela) com o Playwright e grava dez telas por tamanho em docs/lojas/capturas/:
+ * Resumo, Anotar gasto, Contas a pagar, Cartões, Evolução, Análises em bolhas, Metas, Aprender, um comprovante de Pix lido (um PDF
+ * fictício gerado aqui, lido no próprio navegador) e o Telegram. A Apple aceita até dez; no Google Play, até oito (a ordem de envio
+ * recomendada está em docs/16, seção 7).
  *
  * Tamanhos (tabela e fontes em docs/16_PUBLICACAO_LOJAS.md, seção "Capturas"; PNG sem canal alfa):
  *   Apple, iPhone com Dynamic Island de 6,3 pol. (o tamanho que a loja exige): 1206 x 2622  = 402 x 874 pontos a 3x
@@ -20,6 +22,7 @@
  */
 const http = require('node:http');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { chromium } = require('playwright');
@@ -40,6 +43,32 @@ const TAMANHOS = [
 ];
 
 const TIPOS = { '.js': 'text/javascript', '.html': 'text/html', '.ttf': 'font/ttf', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.css': 'text/css', '.webmanifest': 'application/manifest+json' };
+
+/** PDF mínimo de texto (Helvetica, uma linha por Tj), como o do roteiro de telas: um comprovante de Pix com dados fictícios. */
+function pdfDeTexto(linhas) {
+  const esc = (s) => s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  const conteudo = `BT /F1 10 Tf 40 800 Td 14 TL\n${linhas.map((l) => `(${esc(l)}) Tj T*`).join('\n')}\nET`;
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${Buffer.byteLength(conteudo, 'latin1')} >>\nstream\n${conteudo}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets = [];
+  objs.forEach((o, i) => { offsets.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = Buffer.byteLength(out, 'latin1');
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
+
+/** O comprovante fictício da captura (nomes e números inventados; nenhum dado de pessoa real). */
+const COMPROVANTE = [
+  'Pix enviado', '05 OUT 2026 - 12:41:08', 'Valor', 'R$ 58,90', 'Tipo de transferência', 'Pix',
+  'Destino', 'Nome', 'PADARIA EXEMPLO', 'Instituição', 'Banco Exemplo S.A.',
+  'Origem', 'Nome', 'PESSOA EXEMPLO', 'Instituição', 'Banco Exemplo S.A.', 'Descrição', 'Café da manhã',
+];
 
 function dimensoesPng(arquivo) {
   const b = fs.readFileSync(arquivo);
@@ -65,6 +94,9 @@ function dimensoesPng(arquivo) {
     .listen(PORTA);
   const base = `http://localhost:${PORTA}`;
 
+  const pastaTemp = fs.mkdtempSync(path.join(os.tmpdir(), 'clarevo-capturas-'));
+  const comprovante = path.join(pastaTemp, 'pix-enviado.pdf');
+  fs.writeFileSync(comprovante, pdfDeTexto(COMPROVANTE));
   const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
   const falhas = [];
   const gravadas = [];
@@ -99,7 +131,11 @@ function dimensoesPng(arquivo) {
         await esperar('Ainda a pagar neste mês').catch(() => {});
         await p.waitForTimeout(600);
       };
-      const movimentos = async () => { await aba('Movimentos: movimentações do mês').click(); await esperar('Registrar recebimento'); await p.waitForTimeout(400); };
+      const movimentos = async () => {
+        await p.getByRole('tab', { name: /^Movimentos/ }).filter({ visible: true }).first().click();
+        await esperar('Registrar recebimento');
+        await p.waitForTimeout(400);
+      };
 
       const TELAS = [
         {
@@ -184,6 +220,34 @@ function dimensoesPng(arquivo) {
             await p.waitForTimeout(600);
           },
           confere: ['Comece por aqui'],
+        },
+        {
+          // Entrar com os dados sem digitar (D-078, D-088): o comprovante de Pix em PDF, lido no próprio navegador, preenche o gasto.
+          id: '09_comprovante_lido',
+          abrir: async () => {
+            await botao('Anotar gasto').click();
+            await esperar('Será salvo em');
+            await p.getByRole('button', { name: /^Escanear nota fiscal/ }).filter({ visible: true }).first().click();
+            const [escolha] = await Promise.all([p.waitForEvent('filechooser'), botao('Ler comprovante ou boleto').click()]);
+            await escolha.setFiles(comprovante);
+            await esperar('Comprovante lido:', 20000);
+            await p.getByText('Comprovante lido:', { exact: false }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' }));
+            await p.waitForTimeout(600);
+          },
+          confere: ['Comprovante lido: Pix enviado', 'R$ 58,90', 'Preenchemos o que o comprovante informa'],
+        },
+        {
+          // Anotar por mensagem (D-080, D-081): o que dá para mandar ao bot da Clarevo no Telegram.
+          id: '10_telegram',
+          abrir: async () => {
+            // Na demonstração, Conta não tem o card do Telegram: a tela abre pelo endereço, e a demonstração entra direto nela.
+            await p.goto(`${base}/conta/telegram`);
+            await esperar('Cuidar da vida financeira');
+            await botao('Ver demonstração com dados fictícios').click();
+            await esperar('O que dá para mandar');
+            await p.waitForTimeout(600);
+          },
+          confere: ['mercado 52,30', 'farmácia 41 cartão', 'O que dá para mandar'],
         },
       ];
 
