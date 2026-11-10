@@ -3,8 +3,8 @@ import type { GoalImageKey } from './goal-images';
 /**
  * Metas prontas em "Nova meta" (D-092): as 15 metas que mais aparecem nas pesquisas sobre para que as pessoas guardam dinheiro no
  * Brasil (docs/43_METAS_MAIS_COMUNS.md), na ordem dessas pesquisas. Um toque preenche o nome; a imagem vem do nome (suggestGoalImage) e a
- * dica diz o que costuma entrar na conta. A reserva para imprevistos não é uma meta comum: abre a tela da reserva (D-027) e some de "Nova
- * meta" quando a pessoa já tem uma. Nenhuma dica indica produto financeiro; os links levam só a calculadoras e ao simulador da Clarevo.
+ * dica diz o que costuma entrar na conta. A reserva para imprevistos, a primeira das pesquisas, tem tela própria (D-027): em "Nova meta"
+ * ela fica fora da grade, como um caminho até essa tela, e some quando a pessoa já tem uma. Nenhuma dica indica produto financeiro; os links levam só a calculadoras e ao simulador da Clarevo.
  */
 
 export type GoalPresetId =
@@ -40,7 +40,7 @@ export interface GoalPreset {
 
 export const GOAL_PRESETS: readonly GoalPreset[] = [
   { id: 'reserva', name: 'Reserva para imprevistos', image: 'reserva', hint: 'A reserva tem uma tela própria, que calcula o valor pelos seus gastos essenciais.' },
-  { id: 'casa', name: 'Casa própria', image: 'casa', hint: 'Conte a entrada, a escritura e o registro, e a mudança.' },
+  { id: 'casa', name: 'Casa própria', image: 'casa', hint: 'Conte a entrada, os custos de escritura e registro e a mudança.' },
   { id: 'viagem', name: 'Viagem', image: 'viagem', hint: 'Some passagens, hospedagem, alimentação, passeios e uma folga para imprevistos.' },
   {
     id: 'dividas',
@@ -70,7 +70,7 @@ export const GOAL_PRESETS: readonly GoalPreset[] = [
     id: 'aposentadoria',
     name: 'Aposentadoria',
     image: 'aposentadoria',
-    hint: 'Quanto antes começar, menor o valor por mês. Veja com hipóteses suas.',
+    hint: 'Quanto antes começar, menor o valor por mês. Veja com as suas hipóteses.',
     link: { kind: 'simular', label: 'Simular um plano' },
   },
   { id: 'estudos', name: 'Estudos', image: 'estudos', hint: 'Conte matrícula, mensalidades e material.' },
@@ -89,6 +89,8 @@ export const GOAL_PRESET_TEXT = {
   title: 'O que você quer conquistar?',
   intro: 'Toque em uma das metas mais comuns ou escolha "Outra meta". Dá para mudar o nome depois.',
   other: 'Outra meta',
+  /** O caminho até a reserva para imprevistos, para quem ainda não tem uma. */
+  reserveOpen: 'Calcular minha reserva',
   hintTitle: 'O que costuma entrar na conta',
   /** A imagem que o nome puxa, logo acima do nome. */
   imageCaption: 'Imagem sugerida pelo nome. Depois de criar, dá para trocar por outra ou por uma foto sua.',

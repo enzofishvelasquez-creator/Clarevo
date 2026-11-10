@@ -12,7 +12,7 @@ A imagem sugerida vem das palavras do nome da meta (`packages/core/src/goal-imag
 | A primeira imagem da lista vencia, não a primeira pista do nome | "Casamento na praia" mostrava a viagem (por "praia") | Vale a pista que aparece primeiro no nome: casamento |
 | Palavras de só guardar venciam as outras | "Guardar para o casamento" mostrava o porquinho | "guardar", "poupança", "reserva" e "pé de meia" só valem quando o nome não tem outra pista |
 
-Também há palavras que só dão contexto ("entrada", "mudança", "aluguel", "futuro", "tratamento", "passeio"): valem quando o nome não tem uma palavra mais forte. "Entrada da moto" é a moto; "Entrada" sozinha é a casa. "Tratamento do cachorro" é o pet.
+Também há palavras que só dão contexto ("entrada", "mudança", "aluguel", "futuro", "tratamento", "cirurgia", "festa", "pós", "mensalidade", "habilitação"): valem quando o nome não tem uma palavra mais forte. "Entrada da moto" é a moto; "Entrada" sozinha é a casa. "Cirurgia do cachorro" é o pet, "Festa de casamento" é o casamento e "CNH da moto" é a moto.
 
 Os casos conferidos estão em `packages/core/test/goal-images.test.ts` (mais de 40 nomes, entre eles todos os das metas prontas).
 
@@ -45,7 +45,8 @@ Logo abaixo, com pouca evidência: móveis e eletrodomésticos, intercâmbio, ha
 - **"Nova meta" começa por "O que você quer conquistar?"**: uma grade com as metas mais comuns, cada uma com a sua imagem, e "Outra meta" no fim. Um toque preenche o nome (dá para mudar) e mostra **o que costuma entrar na conta** (por exemplo, Moto: "Além do preço, conte documentação, capacete e equipamentos."). A grade substitui os quatro "modelos de nome" de antes.
 - **A imagem aparece antes de criar**: logo acima do nome, a imagem que o nome puxa, que muda enquanto a pessoa digita. Assim, uma imagem errada aparece na hora, não depois de salvar.
 - Quatro metas têm um atalho na dica: Quitar dívidas abre "Em que ordem quitar as dívidas?" (com o aviso de que dívida com juros altos costuma crescer mais rápido do que o dinheiro guardado); Carro abre "Antes de financiar"; Celular novo abre "Parcelado ou à vista?"; Aposentadoria abre "Simular um plano". Abrem por cima do formulário, que continua preenchido.
-- **A reserva para imprevistos** aparece na grade só para quem ainda não tem uma, e abre a tela própria da reserva.
+- **A reserva para imprevistos**, que tem tela própria, aparece logo abaixo da grade só para quem ainda não tem uma, com "Calcular minha reserva".
+- Quando a pessoa muda o nome para outra coisa (por exemplo, de "Moto" para "Viagem para a Europa"), a meta pronta deixa de ficar marcada e a dica some. A calculadora ou o simulador abertos pela dica não oferecem criar uma segunda meta por cima.
 - **Metas vazia**: "Comece por uma das mais comuns", com Casa própria, Viagem, Carro, Moto, Reforma da casa e Meu negócio (cada uma abre "Nova meta" já escolhida) e "Ver todas".
 - **Cinco imagens novas**: Moto, Reforma, Dívidas, Negócio e Festa (17 ao todo). Enquanto não têm foto, aparecem como o ícone do tema sobre o azul da marca (veja a seção 5).
 - Na escolha de imagem, a opção "Automática (agora: …)" aparecia cortada; agora aparece em duas linhas: "Automática" e "agora: Viagem".

@@ -37,7 +37,7 @@ export interface GoalImageSuggestion {
   /** Palavras (sem acento, minúsculas) que, no nome da meta, puxam esta imagem (o que se quer: "moto", "casamento"). */
   words: readonly string[];
   /**
-   * Palavras que só dão contexto ("entrada", "reforma", "futuro"): puxam a imagem quando o nome não tem uma palavra de `words` de
+   * Palavras que só dão contexto ("entrada", "futuro", "festa"): puxam a imagem quando o nome não tem uma palavra de `words` de
    * outra sugestão ("Entrada da moto" é a moto; "Entrada" sozinha é a casa).
    */
   contextWords?: readonly string[];
@@ -56,20 +56,22 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
     key: 'reserva',
     label: 'Porquinho',
     alt: 'Porquinho de guardar moedas',
-    words: ['reserva', 'imprevisto', 'imprevistos', 'emergencia', 'guardar', 'poupar', 'poupanca', 'cofrinho', 'colchao', 'pe de meia'],
+    words: ['reserva', 'imprevisto', 'imprevistos', 'emergencia', 'guardar', 'poupar', 'poupanca', 'juntar', 'cofrinho', 'pe de meia'],
   },
   {
     key: 'carro',
     label: 'Carro',
     alt: 'Carro na estrada',
-    words: ['carro', 'veiculo', 'automovel', 'habilitacao', 'cnh', 'autoescola', 'caminhonete', 'picape', 'suv', 'seminovo', 'possante', 'carango'],
+    words: ['carro', 'veiculo', 'automovel', 'autoescola', 'auto escola', 'caminhonete', 'picape', 'suv', 'seminovo', 'possante', 'carango'],
+    // Habilitação serve para carro e para moto: "CNH da moto" é a moto.
+    contextWords: ['habilitacao', 'cnh'],
   },
   { key: 'moto', label: 'Moto', alt: 'Moto estacionada', words: ['moto', 'motinha', 'motoca', 'motocicleta', 'scooter', 'motoneta', 'lambreta', 'cinquentinha'] },
   {
     key: 'casa',
     label: 'Casa',
     alt: 'Fachada de uma casa com jardim',
-    words: ['casa', 'casinha', 'imovel', 'apartamento', 'apto', 'ape', 'terreno', 'lote', 'moveis', 'casa propria'],
+    words: ['casa', 'casinha', 'imovel', 'apartamento', 'apto', 'ape', 'ap', 'terreno', 'lote', 'moveis', 'casa propria'],
     contextWords: ['entrada', 'mudanca', 'aluguel'],
   },
   {
@@ -83,18 +85,26 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
     key: 'estudos',
     label: 'Estudos',
     alt: 'Livros abertos lado a lado',
-    words: ['estudo', 'estudos', 'faculdade', 'curso', 'pos', 'mba', 'mestrado', 'doutorado', 'intercambio', 'escola', 'livros', 'idioma', 'ingles', 'formatura', 'vestibular', 'cursinho', 'enem', 'concurso', 'tcc', 'mensalidade'],
-    contextWords: ['carreira'],
+    words: ['estudo', 'estudos', 'faculdade', 'curso', 'pos graduacao', 'mba', 'mestrado', 'doutorado', 'intercambio', 'escola', 'livros', 'idioma', 'ingles', 'formatura', 'vestibular', 'cursinho', 'enem', 'concurso', 'tcc'],
+    // "Pós" e "mensalidade" sozinhas são estudos; com outra pista ("Pós-parto", "Mensalidade da academia"), vale a outra.
+    contextWords: ['pos', 'mensalidade', 'carreira'],
   },
   { key: 'casamento', label: 'Casamento', alt: 'Duas alianças', words: ['casamento', 'casar', 'noivado', 'noiva', 'noivo', 'aliancas', 'cha de panela'] },
-  { key: 'bebe', label: 'Bebê', alt: 'Sapatinhos de bebê', words: ['bebe', 'filho', 'filha', 'filhos', 'gravidez', 'enxoval', 'maternidade', 'paternidade', 'parto'] },
+  { key: 'bebe', label: 'Bebê', alt: 'Sapatinhos de bebê', words: ['bebe', 'filho', 'filha', 'filhos', 'gravidez', 'enxoval', 'maternidade', 'paternidade', 'parto', 'pos parto'] },
   {
     key: 'tecnologia',
     label: 'Tecnologia',
     alt: 'Notebook, celular e café sobre uma mesa',
     words: ['celular', 'cel', 'notebook', 'computador', 'pc', 'tablet', 'videogame', 'game', 'console', 'televisao', 'tv', 'camera', 'eletronicos'],
   },
-  { key: 'saude', label: 'Saúde', alt: 'Tapete de exercício com toalha e halteres', words: ['saude', 'cirurgia', 'plastica', 'dentista', 'implante', 'oculos', 'academia', 'terapia', 'plano de saude'], contextWords: ['tratamento'] },
+  {
+    key: 'saude',
+    label: 'Saúde',
+    alt: 'Tapete de exercício com toalha e halteres',
+    words: ['saude', 'plastica', 'dentista', 'implante', 'oculos', 'academia', 'terapia', 'plano de saude', 'pos operatorio'],
+    // "Cirurgia do cachorro" é o pet, como "Tratamento do cachorro".
+    contextWords: ['cirurgia', 'tratamento'],
+  },
   { key: 'aposentadoria', label: 'Futuro', alt: 'Nascer do sol sobre o mar', words: ['aposentadoria', 'aposentar', 'previdencia', 'velhice', 'renda passiva'], contextWords: ['futuro', 'independencia', 'liberdade'] },
   { key: 'pet', label: 'Pet', alt: 'Cachorro olhando para a câmera', words: ['pet', 'cachorro', 'cachorra', 'gato', 'gata', 'veterinario'] },
   {
@@ -108,9 +118,17 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
     key: 'negocio',
     label: 'Negócio',
     alt: 'Fachada de uma pequena loja',
-    words: ['negocio', 'empresa', 'empreender', 'mei', 'cnpj', 'loja', 'lojinha', 'salao', 'food truck', 'capital de giro'],
+    words: ['negocio', 'empresa', 'empreender', 'mei', 'cnpj', 'loja', 'lojinha', 'food truck', 'capital de giro'],
+    contextWords: ['salao'],
   },
-  { key: 'festa', label: 'Festa', alt: 'Confete e balões de festa', words: ['festa', 'aniversario', 'niver', 'debutante', '15 anos', 'natal'] },
+  {
+    key: 'festa',
+    label: 'Festa',
+    alt: 'Confete e balões de festa',
+    words: ['aniversario', 'niver', 'debutante', '15 anos', 'natal', 'salao de festa'],
+    // "Festa de casamento" é o casamento; "Festa" sozinha é a festa.
+    contextWords: ['festa'],
+  },
   { key: 'objetivo', label: 'Objetivo', alt: 'Trilha subindo uma montanha', words: [] },
 ];
 

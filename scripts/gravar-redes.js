@@ -747,11 +747,11 @@ const VIDEOS = [
       s = await c.fala('Neste exemplo fictício, vamos criar uma meta e registrar o que a tela pede.');
       await pausa(900);
       await tocar(botao('Nova meta'), { antes: 300 });
-      await esperar('Modelo de nome');
+      await esperar('O que você quer conquistar?');
       await s.fim();
-      // Modelo de nome, valor, prazo, já guardado e plano por mês.
+      // Uma das metas prontas (D-092), valor, prazo, já guardado e plano por mês.
       const nome = 'Estudos';
-      s = await c.fala('Escolhemos um modelo de nome, o valor, o prazo, quanto já está guardado e quanto pretende guardar por mês.');
+      s = await c.fala('Escolhemos uma das metas mais comuns, o valor, o prazo, quanto já está guardado e quanto pretende guardar por mês.');
       await tocar(radio(nome).or(botao(nome)).first(), { antes: 300 });
       await pausa(400);
       await digitar(campo('Valor da meta'), '3000', 100);

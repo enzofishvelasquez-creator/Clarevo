@@ -36,7 +36,7 @@ import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from
 import { formatMoneyText } from '@/components/calc/parts';
 import { FormFooter } from '@/components/form-footer';
 import { SuggestedImage } from '@/components/goal-image';
-import { GoalPresetGrid, GoalPresetHint, type PresetChoice } from '@/components/goal-presets';
+import { GoalPresetGrid, GoalPresetHint, GoalPresetReserve, type PresetChoice } from '@/components/goal-presets';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
 import { MoneyTxt } from '@/components/money-text';
@@ -92,7 +92,8 @@ export function readGoalPrefill(params: GoalPrefillParams): GoalPrefill {
   const preset = found && found.id !== 'reserva' ? { id: found.id, name: found.name } : null;
   return {
     goalType: type === 'oportunidade' ? 'oportunidade' : type === 'objetivo' ? 'objetivo' : undefined,
-    preset: preset ? (preset.id as NonNullable<GoalPrefill['preset']>) : undefined,
+    // Com nome no endereço, vale o nome: a meta pronta não é marcada (a dica poderia ser de outra meta).
+    preset: preset && name === '' ? (preset.id as NonNullable<GoalPrefill['preset']>) : undefined,
     name: name !== '' && charCount(name) <= GOAL_NAME_MAX ? name : preset?.name,
     targetText: amountText(first(params.valor), first(params.targetText)),
     targetMonthText: /^\d{2}\/\d{4}$/.test(month) ? month : '',
@@ -115,8 +116,8 @@ const FIELD_OF_CODE: Partial<Record<string, GoalField>> = {
 };
 
 /**
- * Nova meta e Editar meta (objetivo e reserva de oportunidade; a reserva para imprevistos usa /reserva): tipo, modelo de
- * nome, nome, valor, prazo (opcional), quanto já tem guardado (só ao criar, vira o "já guardado ao criar") e quanto pretende
+ * Nova meta e Editar meta (objetivo e reserva de oportunidade; a reserva para imprevistos usa /reserva): em "Nova meta", as
+ * metas prontas (D-092) e a imagem que o nome puxa; tipo, nome, valor, prazo (opcional), quanto já tem guardado (só ao criar, vira o "já guardado ao criar") e quanto pretende
  * guardar por mês (opcional), com a prévia sem rendimento. Rascunho preservado em qualquer erro; a chave de operação
  * reconcilia um resultado incerto; nada de aviso ou animação antes de o servidor confirmar.
  */
@@ -157,10 +158,11 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
   // Meta pronta escolhida na grade (D-092): só em "Nova meta". "outra" é o nome livre.
   const [presetChoice, setPresetChoice] = useState<PresetChoice>(mode.type === 'nova' ? (mode.prefill.preset ?? null) : null);
   const chosenPreset = presetChoice && presetChoice !== 'outra' ? goalPresetById(presetChoice) : null;
-  // A reserva para imprevistos aparece na grade só para quem ainda não tem uma (ela tem tela própria).
+  // A reserva para imprevistos tem tela própria: fica fora da grade, como um caminho até ela, só para quem ainda não tem uma (e só depois
+  // de carregar as metas, abaixo da grade, sem mexer nas opções).
   const goals = useGoals(mode.type === 'nova' ? contextId : undefined);
-  const hasReserve = goals.data ? organizeGoals(goals.data).reserve !== null : true;
-  const presets = GOAL_PRESETS.filter((p) => p.id !== 'reserva' || !hasReserve);
+  const reservePreset = goals.data && organizeGoals(goals.data).reserve === null ? goalPresetById('reserva') : null;
+  const presets = GOAL_PRESETS.filter((p) => p.id !== 'reserva');
   const [targetText, setTargetText] = useState(initial.targetText);
   const [targetMonthText, setTargetMonthText] = useState(initial.targetMonthText);
   const [initialText, setInitialText] = useState(initial.initialText);
@@ -343,6 +345,7 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
               {GOAL_PRESET_TEXT.intro}
             </Txt>
             <GoalPresetGrid presets={presets} choice={presetChoice} onChoose={choosePreset} />
+            {reservePreset ? <GoalPresetReserve preset={reservePreset} /> : null}
           </Card>
         ) : null}
 
@@ -369,9 +372,10 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
             onChangeText={(t) => {
               setName(t);
               clear('name');
+              // A meta pronta deixa de valer quando o nome passa a falar de outra coisa (a dica seria de outra meta).
+              if (chosenPreset && (t.trim() === '' || suggestGoalImage(t, goalType) !== chosenPreset.image)) setPresetChoice(null);
             }}
             maxLength={GOAL_NAME_MAX}
-            autoFocus={mode.type === 'nova' && !mode.prefill.name}
             error={errors.name}
             returnKeyType="next"
             onSubmitEditing={() => refs.targetText.current?.focus()}

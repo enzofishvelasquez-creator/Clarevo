@@ -4,8 +4,8 @@ import type { LucideIcon } from 'lucide-react-native';
 import {
   Baby,
   Car,
+  Coins,
   GraduationCap,
-  HandCoins,
   Heart,
   HeartPulse,
   House,
@@ -41,7 +41,7 @@ export const GOAL_IMAGE_ICONS: Record<GoalImageKey, LucideIcon> = {
   saude: HeartPulse,
   aposentadoria: Sunrise,
   pet: PawPrint,
-  dividas: HandCoins,
+  dividas: Coins,
   negocio: Store,
   festa: PartyPopper,
   objetivo: Mountain,
