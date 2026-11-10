@@ -90,15 +90,21 @@ Das decisões maiores do produto nas últimas semanas, três nasceram dela: anot
 3. **Avisar a Elis quando o merge do pacote 1 sair:** ela quis conferir no dia seguinte. A web atualiza sozinha depois do merge.
 4. **O post para as redes** (item 25 de 31/10) pode sair agora: a leitura de boleto, de print e de holerite já está publicada e a leitura de boleto pelo código entra com o pacote 1. O rascunho do carrossel e do reels está em `docs/34`, seção "Rascunho para as redes".
 
-## 6. O que ela pode conferir depois do merge (sugestão de mensagem)
+## 6. O que ela pode conferir (mensagem, depois dos dois merges, 10/11/2026)
 
-> Oi, Elis! As mudanças do seu retorno já estão na web (é só recarregar o app). O que dá para conferir agora:
-> 1. Anotar gasto › Escanear nota fiscal › "Ler comprovante ou boleto": uma foto nítida do boleto da Protebem, com a linha digitável inteira. Deve preencher o valor, a data (o vencimento, com o aviso) e o nome.
-> 2. Anotar gasto com uma data futura: aparece "Ainda vai vencer? Anotar como conta a pagar", que leva tudo para a conta a pagar.
-> 3. Metas › Reserva › Registrar aporte: o valor planejado já vem preenchido.
-> 4. Aprender › Calculadoras: a explicação da cota única, a frase da taxa, a nota do CET, o campo de juros aceitando 20,99 e a dica de somar rotativo e mora, e o plano de dívidas com a frase do que muda ao passar a parcela adiante.
+> Oi, Elis! Tudo o que você apontou nos testes já está no ar. É só recarregar o app no navegador. O que dá para conferir:
 >
-> O salário do fim do mês, a fatura do cartão com as parcelas "3/4", o "cartão" no Telegram, as cores das bolhas e o vídeo ficaram para a próxima rodada: já estão decididos ou em decisão.
+> 1. **Boleto:** em Anotar gasto, "Ler comprovante ou boleto", com uma foto nítida do boleto da Protebem mostrando a linha digitável inteira. Deve preencher o valor, o vencimento e o nome de quem recebe.
+> 2. **Gasto com data futura:** aparece "Ainda vai vencer? Anotar como conta a pagar", que leva tudo para as contas a pagar.
+> 3. **Reserva:** em Registrar aporte, o valor planejado por mês já vem preenchido.
+> 4. **Calculadoras:** a explicação da cota única, a frase da taxa, a nota do CET, os juros aceitando 20,99 com a dica de somar rotativo e mora, e o plano de dívidas mais direto.
+> 5. **Salário do fim do mês:** em Registrar recebimento, com a data nos últimos 7 dias do mês, aparece "Este valor é do mês seguinte". Ligado, o valor conta no Resumo do mês seguinte.
+> 6. **Fatura do cartão:** na tela do cartão, "Importar fatura". A linha com "3/10" entra como a compra com as parcelas que faltam, na numeração da fatura.
+> 7. **Telegram:** "farmácia 41 cartão" agora vira compra no cartão. Com mais de um cartão, ponha o nome dele no fim, por exemplo "farmácia 41 cartão azul". DESFAZER desfaz.
+> 8. **Orçamento:** ao salvar um gasto numa categoria com orçamento, aparece uma linha como "Mercado: R$ 1.400,00 de R$ 1.800,00 em novembro (78%)".
+> 9. **Análises:** as bolhas das categorias ganharam tons de azul.
+>
+> O modo próprio para a fatura do cartão vencida em Multa e juros fica para depois do lançamento. Se puder, me conta como foi o boleto pela foto no celular. Obrigado pelos testes, eles mudaram muita coisa no app!
 
 ## 7. O que vale pedir a ela
 
