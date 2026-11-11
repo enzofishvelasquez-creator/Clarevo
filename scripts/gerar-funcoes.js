@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Gera as funções do servidor, cada uma num arquivo só: supabase/functions/whatsapp/index.ts (D-076), supabase/functions/telegram/index.ts
- * (D-080), supabase/functions/assinatura-web/index.ts (D-084) e supabase/functions/assinatura-lojas/index.ts (D-090). Cada arquivo leva o código do núcleo (packages/core/src/whatsapp ou
+ * (D-080), supabase/functions/assinatura-web/index.ts (D-084), supabase/functions/assinatura-lojas/index.ts (D-090) e supabase/functions/indices/index.ts (D-093). Cada arquivo leva o código do núcleo (packages/core/src/whatsapp ou
  * packages/core/src/telegram/servidor.ts, e o que eles usam), sem tipos, mais a ligação com o Deno do Supabase. Um arquivo só para colar no editor de
  * funções do painel do Supabase, sem instalar nada (docs/05, passos 12j e 12l).
  *
@@ -188,6 +188,37 @@ const FUNCTIONS = [
       'Deno.serve(async (req) => {',
       '  const res = await handler({',
       '    method: req.method,',
+      '    header: (name) => req.headers.get(name),',
+      '    body: () => req.text(),',
+      '  });',
+      '  return new Response(res.status === 204 ? null : res.body, { status: res.status, headers: res.headers });',
+      '});',
+      '',
+    ],
+  },
+  {
+    // Só o servidor: as séries públicas do CDI e do IPCA, sem dado de ninguém (D-093).
+    entry: 'packages/core/src/indices/servidor.ts',
+    out: 'supabase/functions/indices/index.ts',
+    header: [
+      '// GERADO por scripts/gerar-funcoes.js a partir de packages/core/src/indices. Não editar à mão: mude o núcleo e rode `npm run indices`.',
+      '// Clarevo · função do servidor "indices" (Edge Function do Supabase, D-093): busca no Banco Central as séries públicas do CDI (4391) e',
+      '// do IPCA (433) e devolve ao app, para comparar com a rentabilidade dos investimentos que a pessoa registra. Não recebe nem guarda dado',
+      '// de ninguém (só o mês de partida). Sem segredos; opcional CLAREVO_APP_URL. Publicar com "Verify JWT" ligado (só quem está no app).',
+    ],
+    serve: [
+      'const indices = __req(0);',
+      'const handler = indices.createIndicesHandler({',
+      '  config: indices.indicesConfigFrom((name) => Deno.env.get(name)),',
+      '  fetch: (url, init) => fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(init.timeoutMs) }),',
+      '  today: () => indices.brazilToday(),',
+      '  log: (message) => console.error(message),',
+      '});',
+      '',
+      'Deno.serve(async (req) => {',
+      '  const res = await handler({',
+      '    method: req.method,',
+      '    url: req.url,',
       '    header: (name) => req.headers.get(name),',
       '    body: () => req.text(),',
       '  });',

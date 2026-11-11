@@ -86,7 +86,7 @@ function BrandRow() {
  * Cabeçalho das abas: faixa azul de ponta a ponta, conteúdo limitado a 560 px,
  * com logo e avatar em todas as abas (padrão único). `title` aparece abaixo do logo.
  */
-export function AppHeader({ title, context, children }: { title?: string; context?: string; children?: ReactNode }) {
+export function AppHeader({ title, context, contextFixed, children }: { title?: string; context?: string; contextFixed?: boolean; children?: ReactNode }) {
   return (
     <View style={styles.band}>
       <TopInset color={colors.brand} />
@@ -97,7 +97,7 @@ export function AppHeader({ title, context, children }: { title?: string; contex
             <Txt variant="title" color={colors.textOnBrand} style={[styles.title, context ? { marginBottom: 0 } : null]} accessibilityRole="header" aria-level={1}>
               {title}
             </Txt>
-            {context ? <ContextPill label={context} /> : null}
+            {context ? <ContextPill label={context} fixed={contextFixed} /> : null}
           </View>
         ) : null}
         {children}

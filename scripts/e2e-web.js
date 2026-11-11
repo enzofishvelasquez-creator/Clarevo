@@ -3052,7 +3052,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await p.locator('[role=img]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter(Boolean))).some((l) => /^52,5% da renda de referência: já pago valor oculto, em aberto valor oculto\.$/.test(l)));
   await shot('112_renda_valores_ocultos');
   await btn('Voltar').click(); await waitText('Diferença do mês');
-  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await waitText('Planejado: R$ ••••');
+  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await waitText('Você planeja guardar R$ ••••');
   await hiddenShows('Metas');
   const metasHiddenBars = await p.getByRole('progressbar').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-valuenow'), e.getAttribute('aria-valuetext')]));
   ok('A2 Metas ocultas: a barra da reserva mantém o percentual (15%) e diz "valor oculto"', metasHiddenBars.length === 1 && metasHiddenBars[0][1] === '15' && /valor oculto/.test(metasHiddenBars[0][0]) && !/R\$/.test(metasHiddenBars[0][0] + metasHiddenBars[0][2]), JSON.stringify(metasHiddenBars));

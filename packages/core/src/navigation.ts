@@ -10,8 +10,8 @@ import { searchWords } from './learn/search';
 // Barra inferior
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** As quatro abas, na ordem da barra. */
-export const TAB_ROUTES = ['/', '/movimentacoes', '/metas', '/aprender'] as const;
+/** As cinco abas, na ordem da barra (Investir é da D-093). */
+export const TAB_ROUTES = ['/', '/movimentacoes', '/metas', '/investimentos', '/aprender'] as const;
 export type TabRoute = (typeof TAB_ROUTES)[number];
 
 /**
@@ -37,7 +37,8 @@ const FORM_PATHS: readonly RegExp[] = [
   // Gastos fixos, parcelamentos e contas do ano.
   new RegExp(`^/gastos-fixos/(novo|${ID}/(editar|encerrar|informar))$`),
   // Metas, reserva e plano de guardar.
-  new RegExp(`^/meta/(nova|${ID}/(editar|movimento))$`),
+  new RegExp(`^/meta/(nova|ordenar|${ID}/(editar|movimento))$`),
+  new RegExp(`^/investimento/(novo|${ID}/(editar|movimento))$`),
   /^\/(reserva|guardar|guardar\/minima)$/,
   // Renda de referência e limite pessoal (D-041).
   /^\/renda-comprometida\/(referencia|limite)$/,
@@ -90,6 +91,7 @@ export function barModeFor(pathname: string): BarMode {
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
   [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes|evolucao|analises)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
+  [/^\/investimento(\/|$)/, '/investimentos'],
   [/^\/(explicacao|aprender)(\/|$)/, '/aprender'],
 ];
 
@@ -432,6 +434,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Metas, reserva para imprevistos e plano de guardar',
     href: '/metas',
     keywords: ['meta', 'metas', 'guardar', 'poupar', 'economizar', 'reserva', 'imprevistos', 'emergência', 'objetivo', 'plano de guardar'],
+  },
+  {
+    id: 'investimentos',
+    title: 'Investimentos',
+    caption: 'O que você já investe: aportes, valor de hoje, rendimento, CDI e IPCA',
+    href: '/investimentos',
+    keywords: ['investimento', 'investimentos', 'investir', 'carteira', 'rendimento', 'rentabilidade', 'aporte', 'resgate', 'cdi', 'ipca', 'extrato', 'valor atual'],
   },
   {
     id: 'renda-comprometida',

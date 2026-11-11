@@ -1,7 +1,7 @@
-import { BAR_TEXT, LEARN_UI_TEXT, barModeFor, topicTabFor } from '@clarevo/core';
+import { BAR_TEXT, INVESTMENT_TEXT, LEARN_UI_TEXT, barModeFor, topicTabFor } from '@clarevo/core';
 import { router, usePathname, useSegments } from 'expo-router';
 import type { TabListProps, TabTriggerSlotProps } from 'expo-router/ui';
-import { ArrowLeftRight, BookOpen, Flag, House, type LucideIcon } from 'lucide-react-native';
+import { ArrowLeftRight, BookOpen, Flag, House, TrendingUp, type LucideIcon } from 'lucide-react-native';
 import { forwardRef, useEffect, useState, useSyncExternalStore } from 'react';
 import { Keyboard, Pressable, StyleSheet, useWindowDimensions, View, type PressableProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,15 +11,17 @@ import { setBrowseBarInset } from '@/lib/bar-inset';
 import { colors, fonts, radius } from '@/theme/tokens';
 
 /**
- * Navegação: Resumo, Movimentos, Metas e Aprender. "Movimentos" é o rótulo compacto; o nome acessível o contém
+ * Navegação: Resumo, Movimentos, Metas, Investir (D-093) e Aprender. "Movimentos" é o rótulo compacto; o nome acessível o contém
  * ("Movimentos do mês"; WCAG 2.5.3, rótulo no nome).
  * Aprender mantém o rótulo curto (quatro destinos do Primeiro Ciclo) e o nome acessível "Aprender e dúvidas", que
  * contém o rótulo visível (D-031(1); WCAG 2.5.3).
  */
-export const TABS: { name: string; href: '/' | '/movimentacoes' | '/metas' | '/aprender'; label: string; a11y: string; icon: LucideIcon }[] = [
+export const TABS: { name: string; href: '/' | '/movimentacoes' | '/metas' | '/investimentos' | '/aprender'; label: string; a11y: string; icon: LucideIcon }[] = [
   { name: 'index', href: '/', label: 'Resumo', a11y: 'Resumo', icon: House },
   { name: 'movimentacoes', href: '/movimentacoes', label: 'Movimentos', a11y: 'Movimentos do mês', icon: ArrowLeftRight },
   { name: 'metas', href: '/metas', label: 'Metas', a11y: 'Metas', icon: Flag },
+  // Investimentos (D-093): rótulo curto, para caber nas cinco abas a 320 px.
+  { name: 'investimentos', href: '/investimentos', label: INVESTMENT_TEXT.tabLabel, a11y: INVESTMENT_TEXT.tabLabel, icon: TrendingUp },
   { name: 'aprender', href: '/aprender', label: LEARN_UI_TEXT.tabLabel, a11y: LEARN_UI_TEXT.tabA11y, icon: BookOpen },
 ];
 

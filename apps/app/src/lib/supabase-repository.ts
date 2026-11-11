@@ -127,6 +127,18 @@ import {
   type GoalImage,
   type GoalImageChoice,
   type GoalOrderWrite,
+  INVESTMENT_KINDS,
+  INVESTMENT_MOVEMENT_KINDS,
+  INVESTMENT_STATUSES,
+  type Investment,
+  type InvestmentInput,
+  type InvestmentMovement,
+  type InvestmentMovementInput,
+  type InvestmentMovementKind,
+  type InvestmentStatus,
+  type InvestmentWrite,
+  type MarketIndices,
+  type NewInvestmentInput,
   isGoalImageKey,
   parseAccess,
   parseStoreForget,
@@ -590,6 +602,13 @@ const GOAL_MOVEMENT_ACTIONS: readonly GoalAction[] = ['registrar_movimento_meta'
 
 const KNOWN: RepoErrorCode[] = [
   'versao_desatualizada',
+  // Investimentos (D-093, 0032).
+  'investimento_encerrado',
+  'valor_insuficiente',
+  'limite_de_investimentos',
+  'situacao_invalida',
+  'nome_invalido',
+  'lista_invalida',
   // Assinatura paga (D-083): o gatilho de record_operations recusa a escrita em só leitura. Avisa a tela de acesso (accessRefused).
   'assinatura_necessaria',
   // Aceite dos termos (A1): só a versão vigente.
@@ -736,7 +755,7 @@ const INCONSISTENCY_CODES = ['fatura_inconsistente', 'compra_inconsistente'];
  */
 function safeDetail(code: RepoErrorCode, details: string | null | undefined): string | undefined {
   if (typeof details !== 'string') return undefined;
-  if (code === 'saldo_da_meta_insuficiente' && /^dia=\d{4}-\d{2}-\d{2}$/.test(details)) return details;
+  if ((code === 'saldo_da_meta_insuficiente' || code === 'valor_insuficiente') && /^dia=\d{4}-\d{2}-\d{2}$/.test(details)) return details;
   if (code === 'versao_desatualizada' && /^versao_atual=\d{1,9}$/.test(details)) return details;
   if (code === 'nota_ja_anotada' && /^(registro|compra)=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(details)) return details;
   // Importar (D-048) e convidar pela empresa (D-056): a posição do item recusado no lote, de 1 a 500.
@@ -1091,6 +1110,100 @@ function toGoalImage(r: GoalImageRow | null): GoalImage {
   }
   return { goalId: r.goal_id, imageKey: isGoalImageKey(r.image_key) ? r.image_key : null, hasPhoto: r.has_photo, version, updatedAt: r.updated_at };
 }
+
+/** Linha de investment_items (D-093). */
+interface InvestmentRow {
+  id: string;
+  context_id: string;
+  name: string;
+  kind: Investment['kind'];
+  status: Investment['status'];
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  deposits_cents: number;
+  withdrawals_cents: number;
+  income_cents: number;
+  value_cents: number;
+  last_value_on: string | null;
+  first_movement_on: string | null;
+}
+
+/** Linha de investment_movements. */
+interface InvestmentMovementRow {
+  id: string;
+  investment_id: string;
+  context_id: string;
+  kind: InvestmentMovement['kind'];
+  amount_cents: number;
+  occurred_on: string;
+  note: string | null;
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Investimento com os totais: tipo e situação da lista, valores inteiros não negativos e datas no formato. Nunca um valor errado. */
+function toInvestment(r: InvestmentRow): Investment {
+  const consistent =
+    INVESTMENT_KINDS.includes(r.kind) &&
+    INVESTMENT_STATUSES.includes(r.status) &&
+    (r.last_value_on === null || ISO_DATE.test(r.last_value_on)) &&
+    (r.first_movement_on === null || ISO_DATE.test(r.first_movement_on));
+  if (!consistent) throw new RepoError('desconhecido', 'investimento_inconsistente');
+  const value = whole(r.value_cents);
+  const deposits = whole(r.deposits_cents);
+  const withdrawals = whole(r.withdrawals_cents);
+  const income = whole(r.income_cents);
+  if (value < 0 || deposits < 0 || withdrawals < 0 || income < 0) throw new RepoError('desconhecido', 'investimento_inconsistente');
+  return {
+    id: r.id,
+    contextId: r.context_id,
+    name: r.name,
+    kind: r.kind,
+    status: r.status,
+    createdBy: r.created_by,
+    version: whole(r.version),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    depositsCents: deposits,
+    withdrawalsCents: withdrawals,
+    incomeCents: income,
+    valueCents: value,
+    lastValueOn: r.last_value_on,
+    firstMovementOn: r.first_movement_on,
+  };
+}
+
+function toInvestmentMovement(r: InvestmentMovementRow): InvestmentMovement {
+  const amount = whole(r.amount_cents);
+  if (!INVESTMENT_MOVEMENT_KINDS.includes(r.kind) || !ISO_DATE.test(r.occurred_on) || amount < 0) throw new RepoError('desconhecido', 'movimento_inconsistente');
+  return {
+    id: r.id,
+    investmentId: r.investment_id,
+    contextId: r.context_id,
+    kind: r.kind,
+    amountCents: amount,
+    occurredOn: r.occurred_on,
+    note: r.note,
+    accountId: null,
+    createdBy: r.created_by,
+    version: whole(r.version),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+function toInvestmentWrite(data: unknown): InvestmentWrite {
+  const d = (data ?? {}) as { investment?: InvestmentRow | null; movement?: InvestmentMovementRow | null };
+  return { investment: d.investment ? toInvestment(d.investment) : null, movement: d.movement ? toInvestmentMovement(d.movement) : null };
+}
+
+const INVESTMENT_MOVEMENT_COLUMNS = 'id, investment_id, context_id, kind, amount_cents, occurred_on, note, created_by, version, created_at, updated_at';
+/** A função do servidor do CDI e do IPCA (D-093). */
+const INDICES_FUNCTION = 'indices';
 
 function toGoal(g: GoalRow): Goal {
   const targetCents = whole(g.target_cents);
@@ -2360,6 +2473,134 @@ export class SupabaseRepository implements RecordsRepository {
       throw new RepoError('desconhecido', 'ordem_inconsistente');
     }
     return { contextId: d.context_id, ids: d.ids as string[] };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Investimentos (D-093, migração 0032)
+  // ---------------------------------------------------------------------------
+
+  async listInvestments(contextId: string): Promise<Investment[]> {
+    const rows = await readAll<InvestmentRow>((from, to) =>
+      this.db.from('investment_items').select('*').eq('context_id', contextId).order('created_at').order('id').range(from, to),
+    );
+    return rows.map(toInvestment);
+  }
+
+  async getInvestment(id: string): Promise<Investment | null> {
+    const { data, error } = await this.db.from('investment_items').select('*').eq('id', id).maybeSingle();
+    if (error) throw repoError(error);
+    return data ? toInvestment(data as InvestmentRow) : null;
+  }
+
+  async listInvestmentMovements(investmentId: string): Promise<InvestmentMovement[]> {
+    const rows = await readAll<InvestmentMovementRow>((from, to) =>
+      this.db
+        .from('investment_movements')
+        .select(INVESTMENT_MOVEMENT_COLUMNS)
+        .eq('investment_id', investmentId)
+        .order('occurred_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to),
+    );
+    return rows.map(toInvestmentMovement);
+  }
+
+  async listContextInvestmentMovements(contextId: string): Promise<InvestmentMovement[]> {
+    const rows = await readAll<InvestmentMovementRow>((from, to) =>
+      this.db
+        .from('investment_movements')
+        .select(INVESTMENT_MOVEMENT_COLUMNS)
+        .eq('context_id', contextId)
+        .order('occurred_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to),
+    );
+    return rows.map(toInvestmentMovement);
+  }
+
+  async createInvestment(key: string, contextId: string, input: NewInvestmentInput): Promise<InvestmentWrite> {
+    const { data, error } = await this.db.rpc('create_investment', {
+      p_key: key,
+      p_context_id: contextId,
+      p_name: input.name,
+      p_kind: input.kind,
+      p_invested_cents: input.investedCents,
+      p_start_on: input.startOn,
+      p_current_cents: input.currentCents,
+    });
+    if (error) throw repoError(error);
+    return toInvestmentWrite(data);
+  }
+
+  async updateInvestment(key: string, id: string, expectedVersion: number, input: InvestmentInput): Promise<InvestmentWrite> {
+    const { data, error } = await this.db.rpc('update_investment', { p_key: key, p_id: id, p_expected_version: expectedVersion, p_name: input.name, p_kind: input.kind });
+    if (error) throw repoError(error);
+    return toInvestmentWrite(data);
+  }
+
+  async setInvestmentStatus(key: string, id: string, expectedVersion: number, status: InvestmentStatus): Promise<InvestmentWrite> {
+    const { data, error } = await this.db.rpc('set_investment_status', { p_key: key, p_id: id, p_expected_version: expectedVersion, p_status: status });
+    if (error) throw repoError(error);
+    return toInvestmentWrite(data);
+  }
+
+  async deleteInvestment(key: string, id: string, expectedVersion: number): Promise<{ deleted: true; id: string }> {
+    const { data, error } = await this.db.rpc('delete_investment', { p_key: key, p_id: id, p_expected_version: expectedVersion });
+    if (error) throw repoError(error);
+    const d = data as { deleted?: unknown; id?: unknown } | null;
+    if (!d || d.deleted !== true || typeof d.id !== 'string') throw new RepoError('desconhecido', 'investimento_inconsistente');
+    return { deleted: true, id: d.id };
+  }
+
+  async addInvestmentMovement(key: string, investmentId: string, kind: InvestmentMovementKind, input: InvestmentMovementInput): Promise<InvestmentWrite> {
+    const { data, error } = await this.db.rpc('add_investment_movement', {
+      p_key: key,
+      p_investment_id: investmentId,
+      p_kind: kind,
+      p_amount_cents: input.amountCents,
+      p_occurred_on: input.occurredOn,
+      p_note: input.note,
+    });
+    if (error) throw repoError(error);
+    return toInvestmentWrite(data);
+  }
+
+  async updateInvestmentMovement(key: string, movementId: string, expectedVersion: number, input: InvestmentMovementInput): Promise<InvestmentWrite> {
+    const { data, error } = await this.db.rpc('update_investment_movement', {
+      p_key: key,
+      p_movement_id: movementId,
+      p_expected_version: expectedVersion,
+      p_amount_cents: input.amountCents,
+      p_occurred_on: input.occurredOn,
+      p_note: input.note,
+    });
+    if (error) throw repoError(error);
+    return toInvestmentWrite(data);
+  }
+
+  async deleteInvestmentMovement(key: string, movementId: string, expectedVersion: number): Promise<InvestmentWrite> {
+    const { data, error } = await this.db.rpc('delete_investment_movement', { p_key: key, p_movement_id: movementId, p_expected_version: expectedVersion });
+    if (error) throw repoError(error);
+    const d = (data ?? {}) as { investment?: InvestmentRow | null };
+    return { investment: d.investment ? toInvestment(d.investment) : null, movement: null };
+  }
+
+  /** CDI e IPCA pela função "indices" (que busca no Banco Central): sem dado de ninguém no pedido, só o mês de partida. */
+  async getMarketIndices(fromMonth: IsoMonth): Promise<MarketIndices> {
+    const { data, error } = await this.db.functions.invoke(INDICES_FUNCTION, { body: { desde: fromMonth } });
+    if (error) throw new RepoError('indices_indisponiveis');
+    const d = (data ?? {}) as { cdi?: unknown; ipca?: unknown; fetchedOn?: unknown };
+    const series = (v: unknown): Record<IsoMonth, number> => {
+      const out: Record<IsoMonth, number> = {};
+      if (typeof v !== 'object' || v === null) return out;
+      for (const [k, n] of Object.entries(v as Record<string, unknown>)) {
+        if (/^\d{4}-\d{2}$/.test(k) && typeof n === 'number' && Number.isFinite(n) && n > -10 && n < 10) out[k] = n;
+      }
+      return out;
+    };
+    return { cdi: series(d.cdi), ipca: series(d.ipca), fetchedOn: typeof d.fetchedOn === 'string' && ISO_DATE.test(d.fetchedOn) ? d.fetchedOn : null, example: false };
   }
 
   /** Movimentos vivos da meta, do mais recente ao mais antigo (data, criação, id). */

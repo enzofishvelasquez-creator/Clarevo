@@ -60,6 +60,8 @@ import type {
   GoalImageAction,
   GoalOrderAction,
   GoalOrderWrite,
+  InvestmentAction,
+  InvestmentWrite,
   GoalWrite,
   ImportAction,
   IncomeReferenceAction,
@@ -146,6 +148,25 @@ import {
   normalizeGoalNote,
   type GoalMovementChange,
 } from './goals';
+import {
+  INVESTMENT_ACTIVE_MAX,
+  applyInvestmentChange,
+  exampleIndices,
+  investmentInputError,
+  investmentMovementError,
+  investmentNegativeDay,
+  investmentTotals,
+  newInvestmentError,
+  normalizeInvestmentName,
+  type Investment,
+  type InvestmentInput,
+  type InvestmentMovement,
+  type InvestmentMovementChange,
+  type InvestmentMovementInput,
+  type InvestmentMovementKind,
+  type InvestmentStatus,
+  type NewInvestmentInput,
+} from './investments';
 import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX, nextMonthAllowed, recordMonth } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import { savingsAnswerError, savingsAskAgainOn } from './savings';
@@ -184,6 +205,7 @@ interface Operation {
     | GoalAction
     | GoalImageAction
     | GoalOrderAction
+    | InvestmentAction
     | SavingsAction
     | CardAction
     | AccountAction
@@ -256,6 +278,8 @@ type StoredGoal = Omit<
 > & { deletedAt?: string; deletedBy?: string };
 /** Movimento de meta (goal_movements): exclusão lógica. */
 type StoredGoalMovement = GoalMovement & { deletedAt?: string; deletedBy?: string };
+/** Investimento (investments) sem o que é calculado (investment_items); excluir apaga de vez, como no banco. */
+type StoredInvestment = Omit<Investment, 'depositsCents' | 'withdrawalsCents' | 'incomeCents' | 'valueCents' | 'lastValueOn' | 'firstMovementOn'>;
 /** Cartão (cards) sem o que é calculado (card_items: limite usado e fatura atual) e lançamento do cartão (card_entries): exclusão lógica. */
 type StoredCard = Omit<Card, 'usedCents' | 'currentMonth' | 'currentClosingOn' | 'currentDueOn'> & { deletedAt?: string; deletedBy?: string };
 type StoredCardEntry = CardEntry & { deletedAt?: string; deletedBy?: string; importKey?: string };
@@ -381,6 +405,8 @@ export class MemoryRepository implements RecordsRepository {
   private budgets = new Map<string, StoredBudget>();
   private limits = new Map<string, StoredLimit>();
   private goals = new Map<string, StoredGoal>();
+  private investments = new Map<string, StoredInvestment>();
+  private investmentMovements = new Map<string, InvestmentMovement>();
   private goalMovements = new Map<string, StoredGoalMovement>();
   /** savings_checks da pessoa (só ela usa este repositório), por contexto: uma resposta viva por contexto. */
   private savingsChecks = new Map<string, SavingsCheck>();
@@ -465,6 +491,8 @@ export class MemoryRepository implements RecordsRepository {
       cards: new Map(this.cards),
       cardEntries: new Map(this.cardEntries),
       accountsById: new Map(this.accountsById),
+      investments: new Map(this.investments),
+      investmentMovements: new Map(this.investmentMovements),
     };
     let result: T;
     try {
@@ -493,6 +521,8 @@ export class MemoryRepository implements RecordsRepository {
         cards: this.cards,
         cardEntries: this.cardEntries,
         accountsById: this.accountsById,
+        investments: this.investments,
+        investmentMovements: this.investmentMovements,
       } = saved);
       throw e;
     }
@@ -2100,6 +2130,235 @@ export class MemoryRepository implements RecordsRepository {
       this.saveOperation(key, 'ordenar_metas', payload, { contextId, recordId: null, commitmentId: null });
       return { contextId, ids };
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Investimentos (D-093, migração 0032)
+  // -------------------------------------------------------------------------
+
+  /** Como investment_items: os totais dos movimentos e o valor de hoje (a atualização fecha o dia). */
+  private toInvestment(i: StoredInvestment): Investment {
+    const list = [...this.investmentMovements.values()].filter((m) => m.investmentId === i.id);
+    const t = investmentTotals(list, '9999-12-31');
+    const first = list.map((m) => m.occurredOn).sort()[0] ?? null;
+    return { ...i, depositsCents: t.depositsCents, withdrawalsCents: t.withdrawalsCents, incomeCents: t.incomeCents, valueCents: t.valueCents, lastValueOn: t.lastValueOn, firstMovementOn: first };
+  }
+
+  private investmentResult(investmentId: string | null, movementId: string | null): InvestmentWrite {
+    const i = investmentId ? this.investments.get(investmentId) : undefined;
+    const m = movementId ? this.investmentMovements.get(movementId) : undefined;
+    return { investment: i ? this.toInvestment(i) : null, movement: m ? { ...m } : null };
+  }
+
+  /** Como clarevo_lock_investment: nao_encontrado sem leitura; sem_permissao sem escrita. */
+  private liveInvestment(id: string): StoredInvestment {
+    const i = this.investments.get(id);
+    if (!i || !this.canRead(i.contextId)) throw new RepoError('nao_encontrado');
+    if (!this.canWrite(i.contextId)) throw new RepoError('sem_permissao');
+    return i;
+  }
+
+  private sortedInvestmentMovements(filter: (m: InvestmentMovement) => boolean): InvestmentMovement[] {
+    return [...this.investmentMovements.values()]
+      .filter(filter)
+      .sort((a, b) => b.occurredOn.localeCompare(a.occurredOn) || b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+      .map((m) => ({ ...m }));
+  }
+
+  async listInvestments(contextId: string) {
+    return this.read(() => {
+      if (!this.canRead(contextId)) return [];
+      return [...this.investments.values()]
+        .filter((i) => i.contextId === contextId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+        .map((i) => this.toInvestment(i));
+    });
+  }
+
+  async getInvestment(id: string) {
+    return this.read(() => {
+      const i = this.investments.get(id);
+      return i && this.canRead(i.contextId) ? this.toInvestment(i) : null;
+    });
+  }
+
+  async listInvestmentMovements(investmentId: string) {
+    return this.read(() => {
+      const i = this.investments.get(investmentId);
+      if (!i || !this.canRead(i.contextId)) return [];
+      return this.sortedInvestmentMovements((m) => m.investmentId === investmentId);
+    });
+  }
+
+  async listContextInvestmentMovements(contextId: string) {
+    return this.read(() => (this.canRead(contextId) ? this.sortedInvestmentMovements((m) => m.contextId === contextId) : []));
+  }
+
+  private newInvestmentMovement(i: StoredInvestment, kind: InvestmentMovementKind, amountCents: Cents, occurredOn: IsoDate, note: string | null, now: string) {
+    const m: InvestmentMovement = {
+      id: this.id('movinv'),
+      investmentId: i.id,
+      contextId: i.contextId,
+      kind,
+      amountCents,
+      occurredOn,
+      note,
+      accountId: null,
+      createdBy: this.opts.actorId,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.investmentMovements.set(m.id, m);
+    return m;
+  }
+
+  /** I1 depois da mudança: valor_insuficiente com o dia no detalhe. */
+  private checkInvestmentBalance(investmentId: string, change: InvestmentMovementChange) {
+    const list = [...this.investmentMovements.values()].filter((m) => m.investmentId === investmentId);
+    const day = investmentNegativeDay(applyInvestmentChange(list, change));
+    if (day) throw new RepoError('valor_insuficiente', undefined, `dia=${day}`);
+  }
+
+  private checkInvestmentLimit(contextId: string) {
+    if ([...this.investments.values()].filter((i) => i.contextId === contextId && i.status === 'ativo').length >= INVESTMENT_ACTIVE_MAX) {
+      throw new RepoError('limite_de_investimentos');
+    }
+  }
+
+  /** Como create_investment: só no Pessoal; nome, tipo, valores e datas; limite de 50 ativos. */
+  async createInvestment(key: string, contextId: string, input: NewInvestmentInput) {
+    return this.write(() => {
+      const payload = [contextId, input.name, input.kind, input.investedCents, input.startOn, input.currentCents];
+      const replayed = this.replay(key, 'criar_investimento', payload);
+      if (replayed) return this.investmentResult(replayed.goalId, null);
+      if (!this.canRead(contextId)) throw new RepoError('nao_encontrado');
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      if (this.space?.personalContextId !== contextId) throw new RepoError('contexto_invalido');
+      const code = newInvestmentError(input, this.opts.today());
+      if (code) throw new RepoError(code);
+      this.checkInvestmentLimit(contextId);
+      const now = new Date().toISOString();
+      const i: StoredInvestment = {
+        id: this.id('inv'),
+        contextId,
+        name: normalizeInvestmentName(input.name),
+        kind: input.kind,
+        status: 'ativo',
+        createdBy: this.opts.actorId,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.investments.set(i.id, i);
+      this.newInvestmentMovement(i, 'aporte', input.investedCents, input.startOn, null, now);
+      if (input.currentCents !== null) this.newInvestmentMovement(i, 'valor', input.currentCents, this.opts.today(), null, now);
+      this.saveOperation(key, 'criar_investimento', payload, { contextId, recordId: null, commitmentId: null, goalId: i.id });
+      return this.investmentResult(i.id, null);
+    });
+  }
+
+  async updateInvestment(key: string, id: string, expectedVersion: number, input: InvestmentInput) {
+    return this.write(() => {
+      const payload = [id, expectedVersion, input.name, input.kind];
+      const replayed = this.replay(key, 'alterar_investimento', payload);
+      if (replayed) return this.investmentResult(replayed.goalId, null);
+      const i = this.liveInvestment(id);
+      if (expectedVersion !== i.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${i.version}`);
+      const code = investmentInputError(input);
+      if (code) throw new RepoError(code);
+      this.investments.set(id, { ...i, name: normalizeInvestmentName(input.name), kind: input.kind, version: i.version + 1, updatedAt: this.stamp() });
+      this.saveOperation(key, 'alterar_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: id });
+      return this.investmentResult(id, null);
+    });
+  }
+
+  async setInvestmentStatus(key: string, id: string, expectedVersion: number, status: InvestmentStatus) {
+    return this.write(() => {
+      const payload = [id, expectedVersion, status];
+      const replayed = this.replay(key, 'situacao_investimento', payload);
+      if (replayed) return this.investmentResult(replayed.goalId, null);
+      const i = this.liveInvestment(id);
+      if (status !== 'ativo' && status !== 'encerrado') throw new RepoError('situacao_invalida');
+      if (expectedVersion !== i.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${i.version}`);
+      if (status === 'ativo' && i.status !== 'ativo') this.checkInvestmentLimit(i.contextId);
+      this.investments.set(id, { ...i, status, version: i.version + 1, updatedAt: this.stamp() });
+      this.saveOperation(key, 'situacao_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: id });
+      return this.investmentResult(id, null);
+    });
+  }
+
+  async deleteInvestment(key: string, id: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [id, expectedVersion];
+      const replayed = this.replay(key, 'excluir_investimento', payload);
+      if (replayed) return { deleted: true as const, id: replayed.goalId! };
+      const i = this.liveInvestment(id);
+      if (expectedVersion !== i.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${i.version}`);
+      for (const m of [...this.investmentMovements.values()]) if (m.investmentId === id) this.investmentMovements.delete(m.id);
+      this.investments.delete(id);
+      this.saveOperation(key, 'excluir_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: id });
+      return { deleted: true as const, id };
+    });
+  }
+
+  async addInvestmentMovement(key: string, investmentId: string, kind: InvestmentMovementKind, input: InvestmentMovementInput) {
+    return this.write(() => {
+      const note = input.note === null ? null : input.note.trim() || null;
+      const payload = [investmentId, kind, input.amountCents, input.occurredOn, note];
+      const replayed = this.replay(key, 'registrar_movimento_investimento', payload);
+      if (replayed) return this.investmentResult(replayed.goalId, replayed.movementId);
+      const i = this.liveInvestment(investmentId);
+      if (i.status !== 'ativo') throw new RepoError('investimento_encerrado');
+      const code = investmentMovementError(kind, { ...input, note }, this.opts.today());
+      if (code) throw new RepoError(code);
+      this.checkInvestmentBalance(investmentId, { op: 'add', kind, amountCents: input.amountCents, occurredOn: input.occurredOn });
+      const m = this.newInvestmentMovement(i, kind, input.amountCents, input.occurredOn, note, new Date().toISOString());
+      this.saveOperation(key, 'registrar_movimento_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: i.id, movementId: m.id });
+      return this.investmentResult(i.id, m.id);
+    });
+  }
+
+  async updateInvestmentMovement(key: string, movementId: string, expectedVersion: number, input: InvestmentMovementInput) {
+    return this.write(() => {
+      const note = input.note === null ? null : input.note.trim() || null;
+      const payload = [movementId, expectedVersion, input.amountCents, input.occurredOn, note];
+      const replayed = this.replay(key, 'alterar_movimento_investimento', payload);
+      if (replayed) return this.investmentResult(replayed.goalId, replayed.movementId);
+      const m = this.investmentMovements.get(movementId);
+      if (!m || !this.canRead(m.contextId)) throw new RepoError('nao_encontrado');
+      const i = this.liveInvestment(m.investmentId);
+      if (i.status !== 'ativo') throw new RepoError('investimento_encerrado');
+      if (expectedVersion !== m.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${m.version}`);
+      const code = investmentMovementError(m.kind, { ...input, note }, this.opts.today());
+      if (code) throw new RepoError(code);
+      this.checkInvestmentBalance(i.id, { op: 'update', id: m.id, amountCents: input.amountCents, occurredOn: input.occurredOn });
+      this.investmentMovements.set(m.id, { ...m, amountCents: input.amountCents, occurredOn: input.occurredOn, note, version: m.version + 1, updatedAt: this.stamp() });
+      this.saveOperation(key, 'alterar_movimento_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: i.id, movementId: m.id });
+      return this.investmentResult(i.id, m.id);
+    });
+  }
+
+  async deleteInvestmentMovement(key: string, movementId: string, expectedVersion: number) {
+    return this.write(() => {
+      const payload = [movementId, expectedVersion];
+      const replayed = this.replay(key, 'excluir_movimento_investimento', payload);
+      if (replayed) return this.investmentResult(replayed.goalId, null);
+      const m = this.investmentMovements.get(movementId);
+      if (!m || !this.canRead(m.contextId)) throw new RepoError('nao_encontrado');
+      const i = this.liveInvestment(m.investmentId);
+      if (i.status !== 'ativo') throw new RepoError('investimento_encerrado');
+      if (expectedVersion !== m.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${m.version}`);
+      this.checkInvestmentBalance(i.id, { op: 'delete', id: m.id });
+      this.investmentMovements.delete(m.id);
+      this.saveOperation(key, 'excluir_movimento_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: i.id, movementId: m.id });
+      return this.investmentResult(i.id, null);
+    });
+  }
+
+  /** Na demonstração, valores de exemplo (nunca os índices reais, e nada vai à rede). */
+  async getMarketIndices(_fromMonth: IsoMonth) {
+    return this.read(() => exampleIndices());
   }
 
   /**

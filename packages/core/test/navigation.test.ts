@@ -148,7 +148,7 @@ describe('barra inferior (D-039)', () => {
   it('toda tela do app é classificada: o que se chama novo, editar ou pagar não tem barra, e o resto tem', () => {
     const routes = appRoutes();
     expect(routes.length).toBeGreaterThan(50);
-    const formName = /\/(novo|nova|editar|pagar|encargo|estorno|compra|encerrar|informar|movimento|atualizar|vencidas|referencia|limite|minima|reserva|guardar|importar|convidar|excluir)$/;
+    const formName = /\/(novo|nova|editar|ordenar|pagar|encargo|estorno|compra|encerrar|informar|movimento|atualizar|vencidas|referencia|limite|minima|reserva|guardar|importar|convidar|excluir)$/;
     // O formulário do orçamento de uma categoria é a rota dinâmica /orcamento/[categoria].
     const budgetForm = /^\/orcamento\/\[categoria\]$/;
     const entry = /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado|conta-excluida|convite\/\[codigo\]|beneficio\/\[codigo\])$/;
@@ -306,7 +306,7 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
     }
     expect(appScreenIsTab({ href: '/metas' })).toBe(true);
     expect(appScreenIsTab({ href: '/a-pagar' })).toBe(false);
-    expect(APP_SCREENS.filter(appScreenIsTab).map((s) => s.id)).toEqual(['movimentos', 'metas']);
+    expect(APP_SCREENS.filter(appScreenIsTab).map((s) => s.id)).toEqual(['movimentos', 'metas', 'investimentos']);
   });
 
   it('a busca não guarda nada: mesma entrada, mesma saída, e o índice não muda', () => {

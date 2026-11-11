@@ -125,6 +125,7 @@ export { default as Sunrise } from 'lucide-react-native/icons/sunrise';
 export { default as Target } from 'lucide-react-native/icons/target';
 export { default as Timer } from 'lucide-react-native/icons/timer';
 export { default as Trash2 } from 'lucide-react-native/icons/trash';
+export { default as TrendingUp } from 'lucide-react-native/icons/trending-up';
 export { default as Umbrella } from 'lucide-react-native/icons/umbrella';
 export { default as Undo2 } from 'lucide-react-native/icons/undo-2';
 export { default as Unlink } from 'lucide-react-native/icons/unlink';

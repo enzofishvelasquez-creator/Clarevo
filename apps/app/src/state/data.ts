@@ -190,7 +190,8 @@ export interface WorkResult {
  * O espaço de trabalho de um tipo de contexto, com as contas dele. A Família só vale com a Família carregada; sem ela, o Pessoal.
  * É o corpo de useWork (o contexto do seletor) e de useWorkFor (o contexto de um item).
  */
-function useWorkOf(kind: SpaceKind): WorkResult {
+/** O espaço de trabalho de um contexto fixo (Investimentos usa sempre o Pessoal, D-093). */
+export function useWorkOf(kind: SpaceKind): WorkResult {
   const space = useSpace();
   const family = useFamily();
   const familyId = kind === 'familia' ? family.data?.context.id : undefined;
@@ -1639,6 +1640,62 @@ function useInvalidateGoals() {
     qc.invalidateQueries({ queryKey: ['goals', 'list'] });
     qc.invalidateQueries({ queryKey: ['goals', 'month'] });
     // Toda escrita de metas é anotação: muda a atividade e, com ela, a revisão dos últimos meses.
+    qc.invalidateQueries({ queryKey: ['returnReview'] });
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Investimentos (D-093): só no Pessoal.
+// ---------------------------------------------------------------------------
+
+export function useInvestments(contextId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: ['investments', 'list', contextId], queryFn: () => repo.listInvestments(contextId!), enabled: Boolean(contextId) });
+}
+
+export function useInvestment(id: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: ['investments', 'one', id], queryFn: () => repo.getInvestment(id!), enabled: Boolean(id) });
+}
+
+export function useInvestmentMovements(investmentId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: ['investments', 'movements', investmentId], queryFn: () => repo.listInvestmentMovements(investmentId!), enabled: Boolean(investmentId) });
+}
+
+/** Movimentos de toda a carteira do contexto (para a rentabilidade da carteira). */
+export function useContextInvestmentMovements(contextId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({
+    queryKey: ['investments', 'context-movements', contextId],
+    queryFn: () => repo.listContextInvestmentMovements(contextId!),
+    enabled: Boolean(contextId),
+  });
+}
+
+/**
+ * CDI e IPCA desde `fromMonth` (função "indices"; exemplo na demonstração). Uma consulta por sessão e mês de partida, guardada por 6
+ * horas; falha não tenta de novo sozinha (a tela diz que não conseguiu e mostra a rentabilidade mesmo assim).
+ */
+export function useMarketIndices(fromMonth: IsoMonth | null) {
+  const repo = useRepo();
+  return useQuery({
+    queryKey: ['investments', 'indices', fromMonth],
+    queryFn: () => repo.getMarketIndices(fromMonth!),
+    enabled: fromMonth !== null,
+    staleTime: 6 * 60 * 60 * 1000,
+    retry: false,
+  });
+}
+
+/** Toda escrita de investimentos: recarrega a lista, o investimento, os movimentos e a atividade (é anotação). */
+export function useInvalidateInvestments() {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: ['investments', 'list'] });
+    qc.invalidateQueries({ queryKey: ['investments', 'one'] });
+    qc.invalidateQueries({ queryKey: ['investments', 'movements'] });
+    qc.invalidateQueries({ queryKey: ['investments', 'context-movements'] });
     qc.invalidateQueries({ queryKey: ['returnReview'] });
   };
 }

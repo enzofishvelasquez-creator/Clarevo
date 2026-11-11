@@ -2,7 +2,6 @@ import type { IsoDate, IsoMonth } from './dates';
 import { addDays, addMonths, daysInMonth, formatDateBR, formatMonthYearBR, isValidIsoDate, monthOf, monthsBetween, parseDateBR } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL } from './money';
-import { charCount } from './validation';
 
 /**
  * Investimentos (D-093, `docs/45_INVESTIMENTOS.md`): acompanhamento manual, só no Pessoal. A pessoa registra aportes, resgates,
@@ -111,6 +110,9 @@ export type InvestmentErrorCode =
   | 'valor_insuficiente'
   | 'limite_de_investimentos'
   | 'contexto_invalido';
+
+/** Caracteres (não unidades UTF-16), como charCount de validation.ts; aqui sem importar o resto (a função do servidor leva só este arquivo). */
+const charCount = (text: string) => [...text].length;
 
 type MovementLike = Pick<InvestmentMovement, 'kind' | 'amountCents' | 'occurredOn'>;
 type MovementWithId = MovementLike & { id: string };
