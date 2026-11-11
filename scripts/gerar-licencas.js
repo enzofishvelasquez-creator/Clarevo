@@ -15,6 +15,15 @@ const path = require('node:path');
 const RAIZ = path.join(__dirname, '..');
 const SAIDA = path.join(RAIZ, 'site-src', 'licencas.json');
 
+/**
+ * Código de terceiros que vem dentro de outro pacote (copiado no build dele, sem aparecer no package-lock.json). A chave é o pacote e a
+ * versão exata que o trazem: se a versão mudar, o script para e pede para conferir de novo o que vem dentro.
+ */
+const EMBUTIDOS = {
+  // unpdf 1.8.1 traz o PDF.js 6.1.200 da Mozilla em dist/pdfjs.mjs (apiVersion `6.1.200`), sob a licença Apache-2.0.
+  'unpdf@1.8.1': [{ nome: 'pdf.js (embutido em unpdf)', versao: '6.1.200', licenca: 'Apache-2.0' }],
+};
+
 function lista() {
   const lock = JSON.parse(fs.readFileSync(path.join(RAIZ, 'package-lock.json'), 'utf8'));
   const pacotes = lock.packages;
@@ -56,6 +65,16 @@ function lista() {
     const nome = chave.slice(chave.lastIndexOf('node_modules/') + 'node_modules/'.length);
     const item = { nome, versao: p.version, licenca: p.license ?? 'Ver o pacote' };
     itens.set(`${nome}@${p.version}`, item);
+    for (const e of EMBUTIDOS[`${nome}@${p.version}`] ?? []) itens.set(`${e.nome}@${e.versao}`, e);
+  }
+  // Um pacote com código embutido mudou de versão: conferir o que vem dentro e atualizar EMBUTIDOS antes de gravar.
+  for (const chave of Object.keys(EMBUTIDOS)) {
+    const nome = chave.slice(0, chave.lastIndexOf('@'));
+    const presentes = [...itens.values()].filter((i) => i.nome === nome);
+    if (presentes.length > 0 && !itens.has(chave)) {
+      console.error(`${nome} mudou de versão (${presentes.map((i) => i.versao).join(', ')}): confira o código embutido e atualize EMBUTIDOS em scripts/gerar-licencas.js`);
+      process.exit(1);
+    }
   }
   return [...itens.values()].sort((a, b) => (a.nome === b.nome ? a.versao.localeCompare(b.versao) : a.nome.localeCompare(b.nome)));
 }
