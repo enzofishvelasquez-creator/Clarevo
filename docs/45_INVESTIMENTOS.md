@@ -127,5 +127,5 @@ Em `docs/05_SUPABASE.md`, passos 12v, 12w e 12x, e as conferências 21s e 21t:
 2. Edge Functions: criar a função `indices` pelo editor, colar `supabase/functions/indices/index.ts` e publicar com **"Verify JWT with legacy secret"
    desligado**, como as outras funções: só quem está no app consulta, porque a função confere a sessão da pessoa no Supabase Auth (a
    verificação do painel só aceita o segredo antigo e recusaria as sessões assinadas com as chaves novas). Não há segredo: o Banco Central
-   é público. Feito em 11/11/2026 (com a verificação ligada, na primeira versão); falta publicar a versão que confere a sessão e desligar.
+   é público. Feito em 11/11/2026: a versão que confere a sessão, com a verificação do painel desligada (aba Settings da função).
 3. Aplicar antes de publicar o app novo: a aba nova lê `investment_items` e chama as funções novas.
