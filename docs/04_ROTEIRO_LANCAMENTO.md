@@ -192,7 +192,8 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [ ] **Você:** teste em aparelho pelo roteiro único `docs/47_TESTE_EM_APARELHO.md` (53 itens numerados: build `preview` no Android agora, iPhone quando houver TestFlight). Ele junta os "Teste em aparelho" deste arquivo, `docs/37` (seção 6), `docs/40` (seção 4), `docs/21` (seção 6) e `docs/46` (seção 2)
 - [ ] Site: formulário de contato para empresas ligado (Resend; as Novidades por e-mail continuam desligadas): pronto desde D-066; **aguarda o Enzo** (`docs/22`, seção 9, passos 1 a 3: a regra de limite e as variáveis na Cloudflare); depois, a equipe liga o interruptor e devolve a seção da política
 - [x] Relatório de falhas (Sentry) no app de celular, sem dado financeiro nem pessoal, com o trecho na política e a pergunta 50 ao advogado (`docs/46`)
-- [ ] Sentry: conta, projeto e `EXPO_PUBLIC_SENTRY_DSN` no EAS (`docs/46`, seção 2; Enzo)
+- [x] Sentry: conta (região da União Europeia), projeto e `EXPO_PUBLIC_SENTRY_DSN` no EAS, em 11/11/2026 (`docs/46`, seção 2; Enzo)
+- [ ] Sentry: conferir no primeiro build `preview` (o nome da variável no registro do build e, depois do teste, o Sentry sem dado pessoal; `docs/47`, item 49)
 - [ ] Leitura de documentos: teste com 5 a 10 documentos reais antes de anunciar nas redes (P-025, P-026)
 
 ## Ciclo B: renda comprometida (D-026)

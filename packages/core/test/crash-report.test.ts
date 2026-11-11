@@ -59,6 +59,10 @@ describe('relatório de falhas (D-093): limpeza antes do envio', () => {
     expect(crashReportDsn('')).toBeNull();
     expect(crashReportDsn('http://abc@o1.ingest.sentry.io/1')).toBeNull();
     expect(crashReportDsn(' https://0123456789abcdef0123456789abcdef@o123.ingest.us.sentry.io/4507 ')).toBe('https://0123456789abcdef0123456789abcdef@o123.ingest.us.sentry.io/4507');
+    // A organização da Clarevo foi criada na região da União Europeia (11/11/2026): o endereço é ".ingest.de.sentry.io" (fictício aqui).
+    expect(crashReportDsn('https://0123456789abcdef0123456789abcdef@o4508000000000000.ingest.de.sentry.io/4508000000000001')).toBe(
+      'https://0123456789abcdef0123456789abcdef@o4508000000000000.ingest.de.sentry.io/4508000000000001',
+    );
   });
 
   it('opções fixas: sem dado pessoal, captura de tela, desempenho nem sessões', () => {
