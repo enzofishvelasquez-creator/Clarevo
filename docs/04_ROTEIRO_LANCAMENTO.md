@@ -183,11 +183,12 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [x] Investimentos: aba nova, só no Pessoal, acompanhamento manual com comparação com CDI e IPCA (`docs/45_INVESTIMENTOS.md`)
 - [ ] Supabase (Enzo): migrações 0031 e 0032 e a função `indices` com JWT ligado (`docs/05`, passos 12v, 12w e 12x; conferências 21s e 21t)
 - [x] Multa e juros: modo "Fatura do cartão" (era D-089 G): rotativo, mora, multa, IOF estimado e o teto da Lei 14.690/2023; a fatura vencida abre a calculadora nesse modo
-- [ ] Assinatura na web com Pix Automático (Asaas), além do cartão
+- [ ] Assinatura na web com Pix Automático (Asaas), além do cartão: **aguarda decisão do Enzo** (o Pix Automático não passa pelo Checkout: pede CPF no app e a conta liberada pelo Asaas; desenho em `docs/39`, seção 6)
 - [x] Widget ligado nos perfis `preview` e `production` (`preview-sem-widget` de reserva) e o card de Conta com o passo a passo
 - [ ] Widget: primeiro build com ele e teste no iPhone e no Android (`docs/21`, seção 6; Enzo)
-- [ ] Site: formulário de contato para empresas ligado (Resend; as Novidades por e-mail continuam desligadas)
-- [ ] Relatório de falhas (Sentry), sem dado financeiro nem pessoal, com o trecho na política e a pergunta ao advogado
+- [ ] Site: formulário de contato para empresas ligado (Resend; as Novidades por e-mail continuam desligadas): pronto desde D-066; **aguarda o Enzo** (`docs/22`, seção 9, passos 1 a 3: a regra de limite e as variáveis na Cloudflare); depois, a equipe liga o interruptor e devolve a seção da política
+- [x] Relatório de falhas (Sentry) no app de celular, sem dado financeiro nem pessoal, com o trecho na política e a pergunta 50 ao advogado (`docs/46`)
+- [ ] Sentry: conta, projeto e `EXPO_PUBLIC_SENTRY_DSN` no EAS (`docs/46`, seção 2; Enzo)
 - [ ] Leitura de documentos: teste com 5 a 10 documentos reais antes de anunciar nas redes (P-025, P-026)
 
 ## Ciclo B: renda comprometida (D-026)

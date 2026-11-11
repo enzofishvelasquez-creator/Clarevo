@@ -50,6 +50,7 @@ export * from './export';
 export * from './importar';
 export * from './guide';
 export * from './comprovante';
+export * from './crash-report';
 export * from './widget';
 export * from './widget-sync';
 export * from './seu-mes';

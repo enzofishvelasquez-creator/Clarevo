@@ -16,12 +16,16 @@ import { DeviceFeatures } from '@/components/device-features';
 import { BrowseTabBar } from '@/components/tab-bar';
 import { LegalGate } from '@/components/legal-gate';
 import { StoreWarmup } from '@/components/store-warmup';
+import { initCrashReport } from '@/lib/crash-report';
 import { forgetDevice } from '@/lib/device-forget';
 import { afterLogin, deletedAccountIntent, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
 import { ViewProvider } from '@/state/view';
 import { colors, fonts } from '@/theme/tokens';
+
+// Relatório de falhas (D-093): só no celular e só com o endereço do projeto nas variáveis do EAS; antes de tudo, para pegar falhas do começo.
+initCrashReport();
 
 SplashScreen.preventAutoHideAsync();
 

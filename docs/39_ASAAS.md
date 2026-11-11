@@ -58,11 +58,42 @@ Lido em 06/11/2026 em `docs.asaas.com` (guias e referência da API, com os esque
 - **Avisos (webhooks):** `POST` com `id` do evento (`evt_...`), `event`, `dateCreated` (`AAAA-MM-DD HH:MM:SS`, Brasília) e o objeto (`subscription`, `payment`, `checkout`...). Entrega "pelo menos uma vez" e, no envio Sequencial, na ordem. O token escolhido na configuração vai no cabeçalho `asaas-access-token` (não usar a chave da API). Só a resposta **HTTP 200** em até 10 segundos conta como entregue; depois de **15 falhas seguidas a fila para** e os eventos parados por mais de 14 dias são apagados. Até 10 webhooks por conta. O Asaas avisa que novos campos podem aparecer no corpo: o código não falha com campo desconhecido.
 - **Sandbox:** conta separada, chave própria, aprovação automática, cartões fictícios, confirmação manual de cobranças, webhooks e assinaturas disponíveis para teste; chargeback só com pedido à equipe do Asaas.
 
-## 6. Fontes
+## 6. Pix Automático (D-093): desenho e o que falta decidir
+
+Enzo escolheu, em 11/11/2026 (D-093, item 5), o Pix Automático na assinatura pela web antes do lançamento. A leitura da documentação do Asaas
+no mesmo dia (`pix-automatico-implementacao`, `fluxos-de-webhook`, `criar-uma-autorizacao-pix-automatico`,
+`cancelar-uma-autorizacao-pix-automatico` e `checkout-com-assinatura-recorrente`; a página de eventos do Pix Automático respondeu 404)
+mostrou três diferenças em relação ao cartão:
+
+1. **Não passa pelo Checkout.** O Checkout recorrente é documentado só com cartão. O Pix Automático é a API própria
+   `POST /v3/pix/automatic/authorizations` (frequência `MONTHLY`, `contractId`, `startDate`, `value` com `paymentCreationMode:
+   SUBSCRIPTION`, e o primeiro pagamento em `immediateQrCode`), que devolve o QR Code (imagem e "copia e cola") do primeiro pagamento, que
+   também é o consentimento da recorrência. Cancelar: `DELETE /v3/pix/automatic/authorizations/{id}`.
+2. **Pede um cliente cadastrado no Asaas** (`customerId`), e o cadastro de cliente no Asaas pede nome e CPF. Ou seja, **a Clarevo passaria a
+   receber o CPF no app** e repassá-lo ao Asaas. Dá para não guardar nada na Clarevo (o CPF vai direto ao Asaas na mesma chamada, e a
+   pessoa é achada pela referência, como hoje), mas a política e a tela de Conta deixam de poder dizer que a Clarevo não recebe o CPF.
+3. **A conta do Asaas precisa estar liberada** para o Pix Automático ("confirme que a conta está elegível"), e a documentação não diz se o
+   sandbox tem o recurso.
+
+Caminhos (a escolha é do Enzo):
+
+- **A. Pix Automático de verdade** (recomendado só se o Asaas confirmar a conta liberada e o teste no sandbox): tela no app com nome e CPF
+  (sem guardar), QR Code e "copia e cola" na própria tela, os avisos `PIX_AUTOMATIC_RECURRING_AUTHORIZATION_*` e de cobrança na função
+  `assinatura-web`, cancelar pela autorização; trecho novo na política e pergunta ao advogado. Cerca de 2 a 3 dias da equipe, mais o
+  teste no sandbox.
+- **B. Pix mês a mês pelo Checkout** (sem CPF na Clarevo): "Pagar o mês com Pix" abre o Checkout do Asaas com Pix avulso
+  (`chargeTypes: DETACHED`), e cada pagamento libera um mês. Não é automático (a pessoa paga todo mês, com lembrete), mas usa o que já
+  existe e não muda a política. Cerca de 1 dia.
+- **C. Só cartão no lançamento** (como era em D-085) e o Pix Automático depois.
+
+Antes de A, o Enzo pergunta ao Asaas (pelo suporte, com a conta dele): a conta da Clarevo pode usar o Pix Automático e o sandbox tem o
+recurso?
+
+## 7. Fontes
 
 - Checkout: https://docs.asaas.com/reference/create-new-checkout, https://docs.asaas.com/docs/checkout-com-assinatura-recorrente, https://docs.asaas.com/docs/link-do-checkout-e-redirecionamento-do-cliente, https://docs.asaas.com/docs/como-informar-os-dados-do-cliente, https://docs.asaas.com/docs/eventos-para-checkout e https://docs.asaas.com/docs/faq-do-asaas-checkout
 - Assinaturas: https://docs.asaas.com/docs/criando-uma-assinatura, https://docs.asaas.com/reference/recuperar-uma-unica-assinatura, https://docs.asaas.com/reference/listar-assinaturas, https://docs.asaas.com/reference/atualizar-assinatura-existente, https://docs.asaas.com/reference/remover-assinatura, https://docs.asaas.com/docs/eventos-para-assinaturas e https://docs.asaas.com/docs/faq-assinaturas
 - Cobranças: https://docs.asaas.com/docs/webhook-para-cobrancas e https://docs.asaas.com/reference/listar-cobrancas
 - Avisos: https://docs.asaas.com/docs/sobre-os-webhooks, https://docs.asaas.com/docs/receba-eventos-do-asaas-no-seu-endpoint-de-webhook, https://docs.asaas.com/docs/fila-pausada, https://docs.asaas.com/docs/tipos-de-envio e https://docs.asaas.com/docs/criar-novo-webhook-pela-aplicacao-web
 - Autenticação e sandbox: https://docs.asaas.com/docs/autenticação-1, https://docs.asaas.com/docs/chaves-de-api, https://docs.asaas.com/docs/sandbox e https://docs.asaas.com/docs/o-que-pode-ser-testado
-- Pix Automático (para depois): https://docs.asaas.com/docs/pix-automatico-implementacao e https://docs.asaas.com/docs/fluxos-de-webhook
+- Pix Automático (seção 6, lidas em 11/11/2026): https://docs.asaas.com/docs/pix-automatico-implementacao, https://docs.asaas.com/docs/fluxos-de-webhook, https://docs.asaas.com/reference/criar-uma-autorizacao-pix-automatico, https://docs.asaas.com/reference/cancelar-uma-autorizacao-pix-automatico e https://docs.asaas.com/docs/pix-automatico
