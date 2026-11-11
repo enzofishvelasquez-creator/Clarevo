@@ -2,7 +2,9 @@
 
 27/10/2026. Pedido do marketing: a lista de funcionalidades do app, com olhar comercial, para planejar as publicações. Tudo aqui foi conferido com o app de hoje, com o site (`site/app/index.html`) e com a ficha de afirmações das redes (`docs/24`, seção 1). Cada item traz o **benefício** (como vender), o **que o app faz** (o que pode ser dito), **ganchos** para posts e os **cuidados**. Telas em posts sempre da demonstração, com dados fictícios identificados.
 
-**Situação de cada item:** **Hoje** = funciona na versão web; **Celular** = só no app para iPhone e Android, que ainda vai para as lojas (dizer "em breve"); **Não anunciar** = existe, mas ainda não pode ser divulgado.
+**Atualizado em 11/11/2026** com o que mudou até D-093 (Telegram aberto, leituras novas, preço decidido, pacote antes do lançamento). As regras completas de comunicação, o estado do lançamento e o que se pode afirmar estão em `docs/44_SESSAO_REDES_SOCIAIS.md`; em divergência, vale o `docs/44`.
+
+**Situação de cada item:** **Hoje** = funciona na versão web; **Celular** = só no app para iPhone e Android, que ainda não está nas lojas (não citar loja, plataforma nem "em breve" até Enzo liberar); **Em construção** = decidido para o lançamento (D-093), ainda não está no app: não anunciar; **Não anunciar** = existe, mas ainda não pode ser divulgado.
 
 ## 1. As 10 funcionalidades mais fortes para publicar
 
@@ -14,7 +16,7 @@
 
 **4. Orçamento por categoria · Hoje.** *Benefício:* comparar o que você planejou com o que já usou. *O app:* para cada categoria (Moradia, Mercado, Transporte, Saúde, Educação, Lazer, Crédito e parcelas), mostra orçado, usado e quanto falta ou passou. *Ganchos:* "Orçado e usado no mesmo exemplo" (gravação P02 pronta); "Comece por uma categoria só" (gravação P05). *Cuidado:* usar os nomes da tela (orçado, usado), não "planejado" nem "registrado"; o que falta não é dinheiro disponível.
 
-**5. Metas e reserva para imprevistos · Hoje.** *Benefício:* transformar um sonho em valor por mês. *O app:* metas com prazo (viagem, carro, estudos) e reserva para imprevistos; mostra o progresso e quanto guardar por mês até a data; plano de guardar em etapas. *Ganchos:* "Qual é o próximo passo da sua meta?" (gravação P08 pronta); "Quanto guardar por mês para chegar lá?" *Cuidado:* o app não guarda nem movimenta dinheiro e não conta rendimentos; o guardado é o que a pessoa registra.
+**5. Metas e reserva para imprevistos · Hoje.** *Benefício:* transformar um sonho em valor por mês. *O app:* as 15 metas mais comuns prontas em "Nova meta" (casa própria, viagem, quitar dívidas, carro, moto e outras), cada uma com a sua imagem e o que costuma entrar na conta (D-092), e a reserva para imprevistos; mostra o progresso e quanto guardar por mês até a data; plano de guardar em etapas. **Em construção (D-093):** ritmo da meta, marcos de 25%, 50% e 75%, prioridade, atalhos de prazo, metas da Família e lembrete do aporte. *Ganchos:* "Qual é o próximo passo da sua meta?" (gravação P08 pronta); "Quanto guardar por mês para chegar lá?" *Cuidado:* o app não guarda nem movimenta dinheiro e não conta rendimentos; o guardado é o que a pessoa registra.
 
 **6. Família · Hoje.** *Benefício:* organizar a casa a várias mãos, sem perder a privacidade. *O app:* até 6 pessoas; convite por link de uso único; quem anota e vê, quem só vê; o Pessoal de cada pessoa continua só dela. *Ganchos:* "As contas da casa não precisam ficar na cabeça de uma pessoa só"; "Dividir sem expor tudo." *Cuidado:* ainda não há gravação da Família; qualquer post precisa de conferência própria.
 
@@ -31,7 +33,8 @@
 | Funcionalidade | Situação | Para dizer |
 |---|---|---|
 | Anotar gasto e recebimento | Hoje | Poucos toques, com rascunho guardado; escolha como pagou e de onde saiu (gravação P11 pronta) |
-| Importar extrato e fatura | Hoje | Importe o arquivo OFX ou CSV do seu banco e confira linha por linha antes de gravar. Não é conexão com o banco |
+| Importar extrato e fatura | Hoje | Importe o arquivo OFX, CSV ou PDF do seu banco e confira linha por linha antes de gravar; na tela do cartão, "Importar fatura" entende parcelas como "3/4" (D-089 B). Não é conexão com o banco |
+| Anotar pelo Telegram | Hoje | Uma mensagem para o @ClarevoBot, como "mercado 52,30" ou "farmácia 41 cartão", depois de ligar a conta em Conta, Telegram (D-081, D-089 C). Conversa com o bot só com conta de teste de nome fictício (`docs/44`) |
 | Evolução e análises | Hoje | Recebido e Pago mês a mês, com média e mediana; categorias em barras ou bolhas; próximos meses sempre como "previsto" |
 | Seu mês em 30 segundos | Hoje | Comparação com o mês anterior, sem apontar causa |
 | Seus últimos meses | Hoje | Voltou depois de um tempo sem anotar? O app ajuda a colocar os meses em dia |
@@ -39,20 +42,23 @@
 | Guia de uso | Hoje | "Como usar, passo a passo" dentro do app |
 | Contas de origem | Hoje | De onde o dinheiro saiu (conta, carteira); sem saldo por conta |
 | Lembretes de vencimento | Celular | Aviso no dia anterior; na tela bloqueada, sem valor nem descrição |
-| Ocultar valores e bloqueio por biometria | Celular | Para abrir o app em público sem mostrar valores |
-| Widget da tela inicial | Celular | A próxima conta e o resumo, com valores ocultos por padrão |
+| Ocultar valores | Hoje | Para abrir o app em público sem mostrar valores |
+| Bloqueio por biometria e lembretes do dia a dia | Celular | Biometria para abrir o app; avisos para anotar os gastos do dia e conferir os recebimentos, desligados de início (D-087) |
+| Widget da tela inicial | Em construção | Entra no lançamento (D-093), depois do teste no iPhone e no Android: a próxima conta e o resumo, com valores ocultos por padrão |
 | Benefício pela empresa | Hoje | A pessoa aceita o convite e vê a empresa, o plano e desde quando vale |
 | Painel da empresa | Hoje, só web | Convites, vagas e relatório de adesão só com contagens; nunca finanças |
-| Leitura de nota fiscal e de comprovante de Pix | **Não anunciar** | Ainda só testada com documentos de teste |
+| Leitura de nota, comprovante, boleto e holerite | Hoje, **não anunciar ainda** | Está no app (print, foto ou PDF, lido no próprio aparelho), mas só é anunciada depois do teste com 5 a 10 documentos reais (D-093) |
+| Investimentos | Em construção | Aba nova (D-093): aportes, resgates, rendimentos e valor atual registrados pela pessoa, com ganho, rentabilidade e comparação com CDI e IPCA. Sem cotação automática e sem recomendar investimento |
+| Fatura vencida em Multa e juros | Em construção | Modo próprio para a fatura do cartão depois do vencimento (D-093) |
 
 ## 3. O que nunca dizer
 
 - **Saldo:** o app não mostra saldo de conta.
 - **Conexão com o banco:** não existe; tudo é anotado ou importado pela pessoa.
-- **Preço, grátis ou teste gratuito:** o preço ainda está em validação, e não há cobrança no app.
-- **Crédito, investimento ou produto financeiro:** a Clarevo não oferece nem recomenda.
+- **Preço, grátis ou teste gratuito:** o preço está decidido (R$ 29,90 por mês, D-083), mas não aparece em material público até Enzo liberar.
+- **Crédito, investimento ou produto financeiro:** a Clarevo não oferece nem recomenda. A aba Investimentos (D-093) só acompanha o que a pessoa já tem.
 - **Resultados:** nada de "reduz o estresse", "acaba com as dívidas", "melhora a produtividade" ou "dá tranquilidade".
-- **Lojas:** o app ainda não está na App Store nem no Google Play; dizer "em breve".
+- **Lojas:** o app ainda não está na App Store nem no Google Play; não citar loja, plataforma nem "em breve" até Enzo liberar.
 - **Acesso:** enquanto o acesso não abrir, usar a versão "acesso em preparação" da peça P03 (`docs/24`, seção 1.3).
 
 ## 4. Sugestão de calendário por tema (um tema por semana)

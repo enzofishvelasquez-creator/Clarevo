@@ -22,7 +22,7 @@
 
 ## 2. Decisões que ficam com Enzo
 
-**Aprovadas em 03/11/2026 (D-082, `docs/37_LANCAMENTO.md`, seção 3):** 1 `app.clarevo`; 2 a razão social do CNPJ; 3 contato@clarevo.app.br e `https://clarevo.app.br/suporte`; 4 `https://clarevo.app.br/privacidade` e `/termos`, depois do advogado; 5 Enzo; 6 Clarevo; 7 18+; 8 isenta (`ios.config.usesNonExemptEncryption: false` em `app.json`); 9 backup desligado (`android.allowBackup: false`); 10 declarar os 4 últimos dígitos; 11 sem Sentry no lançamento; 12 gratuito; 13 Brasil. As contas são de empresa, com o CNPJ da Clarevo e o D-U-N-S.
+**Aprovadas em 03/11/2026 (D-082, `docs/37_LANCAMENTO.md`, seção 3):** 1 `app.clarevo`; 2 a razão social do CNPJ; 3 contato@clarevo.app.br e `https://clarevo.app.br/suporte`; 4 `https://clarevo.app.br/privacidade` e `/termos`, depois do advogado; 5 Enzo; 6 Clarevo; 7 18+; 8 isenta (`ios.config.usesNonExemptEncryption: false` em `app.json`); 9 backup desligado (`android.allowBackup: false`); 10 declarar os 4 últimos dígitos; 11 sem Sentry no lançamento; 12 gratuito para baixar, com assinatura dentro do app desde a D-083 (linha 12 abaixo); 13 Brasil. As contas são de empresa, com o CNPJ da Clarevo e o D-U-N-S.
 
 Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no repositório hoje ou o que o Claude recomenda.
 
@@ -39,7 +39,7 @@ Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no
 | 9 | Backup automático do Android (`android.allowBackup`) | Desligado em 03/11/2026 (`"allowBackup": false`, aprovado) | Com ele ligado, o Android copia os dados do app para o Google Drive da pessoa. Para um app financeiro, a recomendação é `"allowBackup": false` em `app.json`; é uma linha, mas muda o que a pessoa recebe ao trocar de celular |
 | 10 | Os 4 últimos dígitos do cartão nas respostas de privacidade; compras no cartão e notas entram em "outras informações financeiras" nas duas lojas | Declarar por prudência (ou tirar o campo) | `docs/lojas/privacidade.md`, seções 1 a 3 |
 | 11 | Sentry (relatório de falhas) antes do lançamento? | Instalar antes, com `sendDefaultPii` desligado | Muda as respostas de diagnóstico nas duas lojas e a política |
-| 12 | Preço | Gratuito no lançamento (cobrança está fora do ciclo atual, P-005) | Com cobrança ou compra dentro do app, entram acordos e formulários que não estão aqui; conferir na página oficial |
+| 12 | Preço | Gratuito para baixar, com assinatura dentro do app (D-083, D-090; `docs/42_ASSINATURA_LOJAS.md`): `clarevo_individual_mensal` a R$ 29,90 e `clarevo_familia_mensal` a R$ 69,90 por mês | A compra dentro do app pede o contrato de apps pagos da Apple e o perfil de pagamentos do Google, com conta bancária e dados fiscais da empresa (`docs/42`, seção 4) |
 | 13 | Países e regiões | Brasil | |
 
 ## 3. O que já está no repositório

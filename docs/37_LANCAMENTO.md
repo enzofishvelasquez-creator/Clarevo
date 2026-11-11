@@ -28,6 +28,24 @@ O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que 
 
 ## 2. Semana a semana
 
+### Estado em 11/11/2026 e o pacote de D-093
+
+Enzo decidiu, em 11/11/2026, o que entra antes do lançamento (D-093). Isso acrescenta trabalho da equipe, estimado assim:
+
+| Pacote (D-093) | Estimativa da equipe | O que depende do Enzo |
+|---|---|---|
+| Oito melhorias da aba Metas (`docs/43`, seção 4) | 4 a 5 dias | Nada |
+| Investimentos, aba nova, com CDI e IPCA (`docs/45`) | 6 a 7 dias | Nada (os dados do Banco Central são públicos) |
+| Fatura vencida em Multa e juros | Meio dia | Nada |
+| Pix Automático na web | 1 a 2 dias | Ligar o Pix Automático no Asaas (roteiro) |
+| Widget ligado | Meio dia, mais o teste | O build `production` com o widget e o teste no iPhone e no Android |
+| Formulário de contato para empresas no site | Meio dia | A chave do Resend no painel da Cloudflare (roteiro; a chave nunca passa pelo chat) |
+| Relatório de falhas (Sentry) | 1 dia | A conta no Sentry e o endereço do projeto nas variáveis do EAS (roteiro); pergunta ao advogado |
+
+Somando, são cerca de 3 semanas de trabalho da equipe a partir de 11/11/2026: o código fica pronto por volta da primeira semana de dezembro. A meta de 30/11/2026 (D-082) não se mantém; com as contas da Apple e do Google e as respostas do advogado, a segunda quinzena de dezembro é o mais provável. **A nova data é decisão do Enzo.**
+
+O que já aconteceu desde o plano de 03/11: o Telegram para todas as pessoas está no ar (D-081, item 1.9); houve um primeiro build de teste no Android, instalado por link (item 2.1, D-086 e D-087); as capturas e a ficha das lojas estão prontas (item 3.3, 10/11/2026); a assinatura pelas lojas (D-090) e pela web (D-085) está pronta no código, com a compra fechada; o pacote do Instagram (item 4.2) passou para a sessão de redes sociais (`docs/44`).
+
 ### Semana 1: 3 a 9/11, contas e decisões
 
 | # | O quê | Quem | Estado |
@@ -86,8 +104,8 @@ O que fazer nesta semana: (a) consultar o D-U-N-S pela ferramenta da Apple, que 
 | 8 | Criptografia | Isenta: o app só usa a criptografia padrão (HTTPS) e resumos; `usesNonExemptEncryption: false` em `app.json` |
 | 9 | Backup automático do Android | Desligado (`allowBackup: false`): app financeiro |
 | 10 | 4 últimos dígitos do cartão e notas nas respostas de privacidade | Declarar, por prudência |
-| 11 | Relatório de falhas (Sentry) | Não no lançamento; avaliar em dezembro (menos uma conta, um segredo e uma mudança de política agora) |
-| 12 | Preço | Gratuito |
+| 11 | Relatório de falhas (Sentry) | **Entra no lançamento (D-093, 11/11/2026)**, sem dado financeiro nem pessoal, com conta criada pelo Enzo, trecho na política e pergunta ao advogado (era "avaliar em dezembro") |
+| 12 | Preço | Gratuito para baixar, com assinatura dentro do app (D-083 e D-090): R$ 29,90 e R$ 69,90 por mês, 14 dias grátis dados pela própria conta |
 | 13 | Países | Brasil |
 
 ## 4. Roteiro das contas (Enzo, à mão)

@@ -168,6 +168,26 @@ Enzo aprovou em 10/11/2026: compra pela própria loja (App Store e Google Play),
 - [ ] Abrir a compra (`SUBSCRIBE_OPEN`) junto com a web e o início da cobrança, num build `production` novo
 - [ ] Respostas de privacidade das lojas: "Compras, histórico de compras" passa a Sim quando a compra abrir (`docs/lojas/privacidade.md`)
 
+## Pacote antes do lançamento (D-093, 11/11/2026)
+
+Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas funcionalidades antes"). Estimativas e o que depende do Enzo em `docs/37`, seção 2.
+
+- [ ] Metas: card da reserva mais curto quando o plano já existe ("Ver o plano")
+- [ ] Metas: atalhos de prazo ("6 meses", "1 ano", "2 anos", "5 anos")
+- [ ] Metas: ritmo no card ("no ritmo" ou quantos meses atrás do plano, e quanto falta)
+- [ ] Metas: "Tipo de meta" depois do valor, com "Objetivo" marcado e "O que é isso?"
+- [ ] Metas: lembrete do aporte no dia escolhido (só no app de celular, com os lembretes de D-087)
+- [ ] Metas: marcos de 25%, 50% e 75%
+- [ ] Metas: metas da Família (banco, permissões e telas)
+- [ ] Metas: prioridade (a pessoa põe a mais importante em primeiro)
+- [ ] Investimentos: aba nova, só no Pessoal, acompanhamento manual com comparação com CDI e IPCA (`docs/45_INVESTIMENTOS.md`)
+- [ ] Multa e juros: modo "Fatura de cartão depois do vencimento" (era D-089 G)
+- [ ] Assinatura na web com Pix Automático (Asaas), além do cartão
+- [ ] Widget ligado no build de produção, com o teste no iPhone e no Android (`docs/21`)
+- [ ] Site: formulário de contato para empresas ligado (Resend; as Novidades por e-mail continuam desligadas)
+- [ ] Relatório de falhas (Sentry), sem dado financeiro nem pessoal, com o trecho na política e a pergunta ao advogado
+- [ ] Leitura de documentos: teste com 5 a 10 documentos reais antes de anunciar nas redes (P-025, P-026)
+
 ## Ciclo B: renda comprometida (D-026)
 
 Última execução registrada pelas frentes de trabalho em 09/10/2026: `npm test` (30 arquivos, 599 testes), `npm run typecheck`, `npm run test:db` (10, 20, 30, 40, 45, 47, 50, 60 e 65), `npm run test:api` (92 testes, com as sequências de B e C) e `npm run test:web`, que passa (item abaixo).

@@ -26,7 +26,7 @@ Alternativa para quem tem receio de baixa adesão, a decidir: cobrar só pelas *
 
 ## 3. Tabela de preços proposta
 
-**Preço de referência:** R$ 29,90 por pessoa por mês. É o valor do benefício para uma pessoa, e a empresa contrata com desconto por volume. A proposta mostra o preço de referência e o desconto. A venda direta para quem não tem o benefício está fora do ciclo atual.
+**Preço de referência:** R$ 29,90 por pessoa por mês. É o valor do benefício para uma pessoa, e a empresa contrata com desconto por volume. A proposta mostra o preço de referência e o desconto. A venda direta para quem não tem o benefício entrou com a D-083 (R$ 29,90 por mês no plano Individual e R$ 69,90 no Família, 14 dias grátis; `docs/37`, seção 7).
 
 Preço por vaga por mês, com impostos incluídos. O preço da faixa vale para todas as vagas do contrato.
 
