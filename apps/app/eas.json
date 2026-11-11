@@ -8,6 +8,9 @@
       "distribution": "internal",
       "environment": "preview",
       "autoIncrement": true,
+      "env": {
+        "CLAREVO_WIDGET": "1"
+      },
       "android": {
         "buildType": "apk",
         "image": "latest"
@@ -17,16 +20,19 @@
         "image": "latest"
       }
     },
-    "preview-widget": {
+    "preview-sem-widget": {
       "extends": "preview",
       "env": {
-        "CLAREVO_WIDGET": "1"
+        "CLAREVO_WIDGET": "0"
       }
     },
     "production": {
       "distribution": "store",
       "environment": "production",
       "autoIncrement": true,
+      "env": {
+        "CLAREVO_WIDGET": "1"
+      },
       "android": {
         "buildType": "app-bundle",
         "image": "latest"

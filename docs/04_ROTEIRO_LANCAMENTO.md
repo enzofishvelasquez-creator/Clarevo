@@ -153,7 +153,7 @@ Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C
 - [x] F: vídeo em formato de reels (compra de mercado e orçamento): `node scripts/gravar-redes.js --so reels`, docs/24 seção 2.4b
 - [x] Publicado em 10/11/2026: 0028, 0029 e 0030 aplicadas no `clarevo-producao` com as conferências 21p, 21q e 21r certas, funções `telegram` e `whatsapp` publicadas de novo e, logo depois, o merge do PR #23 (que publica o app)
 - [ ] **Você:** avisar a Elis que o pacote 2 está no ar
-- [ ] G, depois do lançamento: modo "Fatura de cartão depois do vencimento" em Multa e juros
+- [x] G: modo "Fatura do cartão" em Multa e juros (antecipado para antes do lançamento pela D-093)
 
 ## Assinatura pelas lojas (D-090, `docs/42_ASSINATURA_LOJAS.md`)
 
@@ -167,6 +167,30 @@ Enzo aprovou em 10/11/2026: compra pela própria loja (App Store e Google Play),
 - [ ] **Você:** teste com compras de teste no Android (faixa de teste interno) e no iPhone (TestFlight), `docs/42`, passo 9
 - [ ] Abrir a compra (`SUBSCRIBE_OPEN`) junto com a web e o início da cobrança, num build `production` novo
 - [ ] Respostas de privacidade das lojas: "Compras, histórico de compras" passa a Sim quando a compra abrir (`docs/lojas/privacidade.md`)
+
+## Pacote antes do lançamento (D-093, 11/11/2026)
+
+Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas funcionalidades antes"). Estimativas e o que depende do Enzo em `docs/37`, seção 2.
+
+- [x] Metas: card da reserva mais curto quando o plano já existe ("Ver o plano"; "Ver o plano" e "Mudar valor" viram links)
+- [x] Metas: atalhos de prazo ("6 meses", "1 ano", "2 anos", "5 anos")
+- [x] Metas: ritmo no card ("no ritmo" ou quantos meses atrás do plano, e quanto falta)
+- [x] Metas: "Tipo de meta" depois do valor, com "Objetivo" marcado e "O que é isso?"
+- [x] Metas: lembrete do aporte no dia escolhido (só no app de celular, com os lembretes de D-087; confirmar no aparelho)
+- [x] Metas: marcos de 25%, 50% e 75%
+- [x] Metas: metas da Família (já existiam desde a Família, D-055: com a Família escolhida, Metas mostra e cria as metas da casa, com a regra de edição de sempre)
+- [x] Metas: prioridade ("Ordenar metas", com duas ou mais metas; migração 0031, `docs/05` passo 12v)
+- [x] Investimentos: aba nova, só no Pessoal, acompanhamento manual com comparação com CDI e IPCA (`docs/45_INVESTIMENTOS.md`)
+- [x] Supabase (Enzo, 11/11/2026): migrações 0031 e 0032 aplicadas (conferência 21t: 2, 1, 7, 102) e a função `indices` publicada (`docs/05`, passos 12v, 12w e 12x)
+- [x] Supabase (Enzo, 11/11/2026): função `indices` publicada de novo (a versão que confere a sessão), com "Verify JWT with legacy secret" desligado (`docs/05`, passo 12x)
+- [x] Multa e juros: modo "Fatura do cartão" (era D-089 G): rotativo, mora, multa, IOF estimado e o teto da Lei 14.690/2023; a fatura vencida abre a calculadora nesse modo
+- [ ] Assinatura na web com Pix Automático (Asaas), além do cartão: **aguarda decisão do Enzo** (o Pix Automático não passa pelo Checkout: pede CPF no app e a conta liberada pelo Asaas; desenho em `docs/39`, seção 6)
+- [x] Widget ligado nos perfis `preview` e `production` (`preview-sem-widget` de reserva) e o card de Conta com o passo a passo
+- [ ] Widget: primeiro build com ele e teste no iPhone e no Android (`docs/21`, seção 6; Enzo)
+- [ ] Site: formulário de contato para empresas ligado (Resend; as Novidades por e-mail continuam desligadas): pronto desde D-066; **aguarda o Enzo** (`docs/22`, seção 9, passos 1 a 3: a regra de limite e as variáveis na Cloudflare); depois, a equipe liga o interruptor e devolve a seção da política
+- [x] Relatório de falhas (Sentry) no app de celular, sem dado financeiro nem pessoal, com o trecho na política e a pergunta 50 ao advogado (`docs/46`)
+- [ ] Sentry: conta, projeto e `EXPO_PUBLIC_SENTRY_DSN` no EAS (`docs/46`, seção 2; Enzo)
+- [ ] Leitura de documentos: teste com 5 a 10 documentos reais antes de anunciar nas redes (P-025, P-026)
 
 ## Ciclo B: renda comprometida (D-026)
 

@@ -53,7 +53,9 @@ Logo abaixo, com pouca evidência: móveis e eletrodomésticos, intercâmbio, ha
 
 Onde está: `packages/core/src/goal-presets.ts` (as metas prontas e os textos), `packages/core/src/goal-images.ts` (as imagens e as palavras), `apps/app/src/components/goal-presets.tsx` (a grade, a dica e os atalhos do Metas vazio) e `apps/app/src/components/goal-form.tsx`. Nada muda no banco: a chave da imagem já aceitava nomes novos.
 
-## 4. Sugestões para a aba Metas (para decidir)
+## 4. Sugestões para a aba Metas (decididas em D-093)
+
+**Situação em 11/11/2026:** Enzo escolheu as oito primeiras para antes do lançamento (D-093), e as oito estão no app: 1 a 6 e 8 feitas neste pacote (a 8 com a migração 0031); a 7, metas da Família, já existia desde a Família (D-055). A 9 continua fora até as fontes serem conferidas.
 
 Em ordem do que mais ajuda, pela leitura das telas e do código:
 

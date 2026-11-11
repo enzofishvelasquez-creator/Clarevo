@@ -530,6 +530,8 @@ export interface Goal {
   depreciationCents: Cents;
   /** goal_items: data do movimento vivo mais recente (null sem movimentos). */
   lastMovementOn: IsoDate | null;
+  /** Prioridade escolhida pela pessoa (D-093, set_goal_order): 1 é a mais importante; null sem ordem escolhida. */
+  priority: number | null;
 }
 
 /** Movimento de meta (goal_movements). O tipo nunca muda; a versão da meta não sobe com movimentos. */

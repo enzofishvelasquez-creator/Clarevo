@@ -113,7 +113,7 @@ Não use `app.clarevo.app.br` (nem `clarevo.pages.dev`) na apresentação: é a 
 - Diga: "No Pessoal, entre as pessoas do app, só você vê, anota, edita e exclui. A equipe da Clarevo não olha os dados no dia a dia. A permissão é conferida no banco a cada leitura, não só escondida na tela."
 
 **Fechamento (0:50).**
-- Diga: "Hoje existe o produto funcionando em demonstração, com as regras financeiras e as permissões testadas. O que falta para chegar às pessoas é, em boa parte, de fora do código: contas das lojas, política de privacidade e termos com advogado, teste com pessoas reais e preço." Abra para perguntas.
+- Diga: "Hoje existe o produto funcionando em demonstração, com as regras financeiras e as permissões testadas. O que falta para chegar às pessoas é, em boa parte, de fora do código: contas das lojas, política de privacidade e termos com advogado, teste com pessoas reais e as contas de pagamento." Abra para perguntas.
 
 ## 3. Perguntas comuns e respostas
 
@@ -157,33 +157,31 @@ Não é automática, não traz saldo nem investimentos e depende de o banco ofer
 ### Lojas e lançamento
 
 **C1. O app está nas lojas?**
-Não. Nada foi enviado à Apple nem ao Google. Está pronto o que não depende de conta: configuração de build, ícones, capturas, textos da ficha e respostas de privacidade (D-060, `docs/16`). Faltam as contas de desenvolvedor (dependem de CNPJ, domínio e de uma pessoa responsável, P-006), a política de privacidade e os termos, o primeiro build de verdade, o teste em aparelho e o teste de usabilidade com pessoas (`docs/15`). Custos previstos: Apple US$ 99 por ano e Google US$ 25, uma vez (`docs/04`).
+Ainda não (11/11/2026). Nada foi enviado à Apple nem ao Google. O D-U-N-S da empresa foi pedido em 03/11/2026 e as contas de empresa da Apple e do Google estão com o Enzo (`docs/37`, seção 1); houve um primeiro build de teste no Android, instalado por link. Está pronto o que não depende de conta: configuração de build, ícones, capturas, textos da ficha e respostas de privacidade (`docs/16`, `docs/lojas/`). O lançamento é web, iPhone e Android juntos (D-082); a data depende das contas da Apple e do Google e do pacote de D-093 (`docs/37`, seção 2). Custos: Apple US$ 99 por ano e Google US$ 25, uma vez.
 
 **C2. Dá para usar hoje?**
-A demonstração, sim. A versão web com login real existe, mas ainda não foi aberta a outras pessoas: faltam domínio e e-mail próprios e o plano Pro do Supabase (`docs/07`). As migrações mais recentes do banco ainda precisam ser coladas e conferidas no Supabase de produção (`docs/16`, seção 9, e D-060).
+A demonstração, sim (`demo.clarevo.app.br`). A versão web com login real está no ar em `app.clarevo.app.br`, usada pelas pessoas do teste; o acesso para o público abre no lançamento (D-082).
 
 **C3. E a leitura de nota fiscal e de comprovante?**
-Existe, mas foi testada só com páginas e PDFs sintéticos. A validação com cupons e comprovantes reais é uma pendência (P-025 e P-026).
+Existe e está no app: nota fiscal (página da Sefaz e DANFE), comprovante de Pix e de pagamento em PDF ou em imagem (print ou foto, lida no próprio aparelho, D-078), boleto pela linha digitável ou pelo código de barras (D-088), holerite e nota de serviço (D-079). Foi testada com documentos de teste e com os de uma pessoa do teste; a validação com 5 a 10 documentos reais continua pendente (P-025 e P-026) e é condição para anunciar a leitura nas redes (D-093).
 
 **C4. Quais são os próximos passos?**
-1. Contas Apple, Google e Expo, domínio e e-mail (P-006 e P-008).
-2. Política de privacidade, termos e página de exclusão, com advogado.
-3. Primeiro build no EAS, TestFlight e teste interno do Google.
-4. Teste de usabilidade com 5 pessoas e teste em aparelho.
+1. Contas de empresa da Apple e do Google, assinaturas nas lojas e no RevenueCat, e o Asaas para a web (Enzo, `docs/37`).
+2. Política de privacidade e termos com o advogado (perguntas 41 a 48).
+3. O pacote de D-093: melhorias da aba Metas, Investimentos (aba nova), widget, fatura vencida em Multa e juros, Pix Automático, contato de empresas no site e relatório de falhas.
+4. Build de produção, teste em aparelho e revisão das lojas.
 5. Validar as leituras com documentos reais.
-6. Preço e cobrança (P-005).
-7. Decidir sobre a integração bancária, com a revisão do Banco Central em vista.
 
 ### Produto e negócio
 
 **D1. Como a Clarevo ganha dinheiro?**
-Ainda não está definido. O desenho é de benefício pago por empresas (uma vaga por pessoa que recebe) e plano para pessoas e famílias. Preços e limites dos planos são pergunta aberta (P-005), e a cobrança e a trava por plano ainda não existem. A Família está aberta a todas as pessoas durante o piloto (D-055).
+Assinatura (D-083 e D-090): **R$ 29,90 por mês** no plano Individual e **R$ 69,90 por mês** no plano Família (até 6 pessoas), com **14 dias grátis** sem pedir cartão; depois, a conta fica só para ver e exportar. Compra pelas lojas no celular e pelo Asaas na web. Empresas oferecem o acesso como benefício, pago por vaga (proposta em `docs/26`, a validar com o investidor, P-005), e quem tem o benefício não paga. A cobrança está pronta e fechada até a data de início.
 
 **D2. Quantas pessoas usam?**
-Nenhuma pessoa real ainda: só a demonstração. O app não registra leituras nem buscas, e a empresa nem vê o uso (D-056). Não cite números.
+Só as pessoas do teste com o app real, nenhuma pessoa do público ainda. O app não registra leituras nem buscas, e a empresa nem vê o uso (D-056). Não cite números.
 
 **D3. Usa inteligência artificial? Recomenda investimento ou crédito?**
-Não. IA e recomendação de produtos financeiros estão fora do ciclo. Aprender traz conteúdo educativo com fonte pública, e as calculadoras e o simulador usam só os números que a pessoa informa.
+Não. IA e recomendação de produtos financeiros estão fora do ciclo. A única exceção é reconhecer texto em imagem no próprio aparelho, para ler comprovante, boleto e holerite (D-078). Investimentos (D-093, em construção) só acompanham o que a pessoa já tem e registra, sem recomendar. Aprender traz conteúdo educativo com fonte pública, e as calculadoras e o simulador usam só os números que a pessoa informa.
 
 **D4. Que tecnologia usa?**
 Expo (React Native), um código para iOS, Android e web, e Supabase (Postgres, autenticação e permissões por linha) (D-003 e D-004). O dinheiro é guardado em centavos inteiros, e as regras financeiras ficam num pacote próprio, repetidas e validadas no banco.
@@ -191,14 +189,14 @@ Expo (React Native), um código para iOS, Android e web, e Supabase (Postgres, a
 ## 4. O que NÃO prometer
 
 - **Integração bancária automática**, com ou sem data. Hoje existe importação de arquivo e de comprovante em PDF.
-- **Data ou garantia de publicação nas lojas.** Nenhuma conta existe, e a aprovação da Apple pode levar dias.
+- **Data ou garantia de publicação nas lojas.** As contas de empresa ainda estão em andamento, e a aprovação da Apple pode levar semanas.
 - **Conformidade com a LGPD ou parecer jurídico.** Política, termos e a definição de controlador e pagadora dependem de advogado.
 - **Segurança absoluta, criptografia ponta a ponta ou "ninguém consegue ver".** As permissões são conferidas no banco e testadas, mas os dados ficam no banco do Supabase, e quem administra o projeto tem acesso técnico a ele (um ponto que ainda precisa constar da política de privacidade). Diga só o que o produto faz: não há tela nem consulta que mostre os dados de uma pessoa à empresa ou a outra pessoa.
 - **Usuários, uso, retenção ou receita.** Não há pessoas reais nem medição de uso.
-- **Preço, planos e cobrança funcionando.** Estão por decidir e por fazer.
-- **Leitura de qualquer nota ou comprovante.** Só foi testada com documentos sintéticos; foto de comprovante e PDF escaneado não são lidos.
+- **Cobrança funcionando.** O preço está decidido (D-083), mas a compra está fechada até a data de início e as contas de pagamento estão com o Enzo.
+- **Leitura de qualquer nota, comprovante ou boleto.** Foi testada com documentos de teste e de uma pessoa; documentos de alguns bancos podem não ser lidos (P-025, P-026).
 - **Saldo de conta ou conciliação com o banco.** O app não calcula saldo por conta, e "Diferença do mês" não é saldo.
-- **Recomendação de investimento, crédito ou produto financeiro**, nem IA.
+- **Recomendação de investimento, crédito ou produto financeiro**, nem IA (fora a leitura de texto no aparelho, D-078).
 - **Resultado garantido para a pessoa.** O app mostra o que ela registrou; não guarda nem movimenta dinheiro.
 - **Funções que dependem das lojas:** lembretes, widget, biometria, abrir convites direto no app e "Compartilhar com a Clarevo".
 - **O painel da empresa no app nativo.** O painel é só da web.

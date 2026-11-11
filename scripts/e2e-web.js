@@ -52,7 +52,26 @@ const server = http
   .listen(PORT);
 fs.mkdirSync(OUT, { recursive: true });
 const results = [];
-const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', name, extra]); };
+// E2E_PROGRESSO=<arquivo>: cada verificação vai para o arquivo na hora (o resultado completo continua no fim, na saída).
+const PROGRESS = process.env.E2E_PROGRESSO || null;
+let lastOkAt = Date.now();
+const ok = (name, cond, extra='') => {
+  results.push([cond ? 'OK ' : 'FALHOU', name, extra]);
+  lastOkAt = Date.now();
+  if (PROGRESS) { try { fs.appendFileSync(PROGRESS, `${cond ? 'OK ' : 'FALHOU'}  ${name}  ${cond ? '' : extra}\n`); } catch {} }
+};
+// Vigia: 10 minutos sem nenhuma verificação é travamento (um p.evaluate que nunca volta não tem limite de tempo no Playwright).
+// Para com erro, a última verificação e a tela do momento, em vez de esperar o limite de tempo de quem rodou.
+const STALL_MS = Number(process.env.E2E_TRAVOU_MS || 10 * 60 * 1000);
+setInterval(async () => {
+  if (Date.now() - lastOkAt < STALL_MS) return;
+  lastOkAt = Infinity;
+  const shotPath = path.join(os.tmpdir(), 'clarevo-e2e-travou.png');
+  await Promise.race([globalThis.__page?.screenshot({ path: shotPath }).then(() => console.log(`Tela do travamento: ${shotPath}`)), new Promise((r) => setTimeout(r, 15000))]).catch(() => {});
+  for (const r of results) console.log(r.join('  '));
+  console.error(`ERRO NO ROTEIRO: nenhuma verificação nova em ${Math.round(STALL_MS / 60000)} minutos (travou depois de "${results.at(-1)?.[1] ?? 'início'}")`);
+  process.exit(1);
+}, 30000).unref();
 (async () => {
   // O gesto de "voltar" por deslizar na horizontal fica desligado: versões novas do Chromium (1243) tratam o deslizar para a direita do
   // bloco K1 (os cartões do Seu mês) como histórico do navegador e saem da tela; a 1194, fixada pelo Playwright 1.56.1, não.
@@ -2023,6 +2042,19 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('multa e juros: o resultado não fala em atraso', !/atras/i.test(await resultCardText()));
   await calcShot('60_calc_multa_e_juros');
   await calcWidths('multa e juros', 'Multa e juros por atraso');
+  // D-093 (era D-089 G): "Fatura do cartão" troca os campos: o que ficou sem pagar, rotativo, mora e multa, com o IOF estimado e o teto da lei.
+  await radio('Fatura do cartão').click(); await p.waitForTimeout(300);
+  ok('multa e juros, fatura: "Valor que ficou sem pagar", "Juros do rotativo ao mês (%)" e "Juros de mora ao mês (%)" no lugar de "Valor da conta" e "Juros ao mês (%)"',
+    (await field('Valor que ficou sem pagar').count()) === 1 && (await field('Juros do rotativo ao mês (%)').count()) === 1 && (await field('Juros de mora ao mês (%)').count()) === 1 &&
+      (await field('Juros ao mês (%)').count()) === 0);
+  await typeIn('Valor que ficou sem pagar', '1.000,00'); await typeIn('Juros do rotativo ao mês (%)', '15'); await typeIn('Juros de mora ao mês (%)', '1');
+  await typeIn('Multa (%)', '2'); await typeIn('Dias depois do vencimento', '30');
+  ok('multa e juros, fatura: R$ 1.186,26 com rotativo, mora, multa e IOF estimado', await shows('Com estes números, 30 dias depois do vencimento a fatura fica em R$ 1.186,26.',
+    'Juros do rotativo: R$ 150,00', 'Juros de mora: R$ 10,00', 'Multa: R$ 20,00', 'IOF estimado: R$ 6,26', 'O rotativo vale só até a próxima fatura.'));
+  await calcShot('60b_calc_multa_fatura');
+  await typeIn('Dias depois do vencimento', '365');
+  ok('multa e juros, fatura: em 365 dias, o teto da Lei 14.690/2023 (R$ 2.033,73 com o IOF)', await shows('a fatura fica em R$ 2.033,73.', 'Lei 14.690/2023'));
+  await calcWidths('multa e juros, fatura', 'Multa e juros por atraso');
   await backToCalcList();
 
   // 7. Reserva: 3.750,00 por mês e 6 meses; 4.500,00 guardados; 500,00 por mês.
@@ -2324,7 +2356,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Metas (Ciclo C), Aprender. A demonstração tem a reserva para imprevistos (15%) e a meta "Viagem de férias" (20%), e já
   // tem a resposta "consigo" com R$ 500,00 ao plano de guardar. Outubro continua na base nesta aba (as contas e os gastos
   // de antes não mexem nas metas).
-  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await waitText('Planejado: R$ 500,00 por mês'); await p.waitForTimeout(400);
+  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await waitText('Você planeja guardar R$ 500,00 por mês.'); await p.waitForTimeout(400);
   await logoChecks('Metas: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   const metasTitle = await p.evaluate(() => {
     const logo = [...document.querySelectorAll('[role=img][aria-label="Clarevo"]')].find((e) => e.getBoundingClientRect().width > 0);
@@ -2335,13 +2367,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('16_metas');
   t = await body();
   const metasBars = await p.getByRole('progressbar').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-valuenow'), e.getAttribute('aria-valuetext')]));
-  ok('Metas da demonstração: reserva 15% (R$ 3.500,00 de R$ 22.500,00, "Cobre 0,9 mês", planejado R$ 500,00 por mês) e a barra com valor e texto acessíveis', t.includes('R$ 3.500,00 de R$ 22.500,00') && t.includes('15%') &&
-    t.includes('Cobre 0,9 mês dos seus gastos essenciais') && t.includes('Planejado: R$ 500,00 por mês') &&
+  ok('Metas da demonstração: reserva 15% (R$ 3.500,00 de R$ 22.500,00, "Cobre 0,9 mês"), o card curto sem a linha "Planejado" (D-093, o plano de guardar já está nele) e a barra com valor e texto acessíveis', t.includes('R$ 3.500,00 de R$ 22.500,00') && t.includes('15%') &&
+    t.includes('Cobre 0,9 mês dos seus gastos essenciais') && !t.includes('Planejado: R$ 500,00 por mês, sem contar rendimentos') &&
     JSON.stringify(metasBars) === JSON.stringify([['Reserva para imprevistos: 15% da meta, R$ 3.500,00 de R$ 22.500,00.', '15', 'R$ 3.500,00 de R$ 22.500,00, 15%']]), JSON.stringify(metasBars));
   ok('Metas da demonstração: "Viagem de férias" 20% (R$ 1.200,00 de R$ 6.000,00), até julho de 2027 com R$ 480,00 por mês', (await visibleCount('button', /^Viagem de férias: 20% da meta, R\$ 1\.200,00 de R\$ 6\.000,00\. Até julho de 2027 · R\$ 480,00 por mês para chegar lá\./)) === 1 &&
     t.includes('R$ 1.200,00 de R$ 6.000,00') && t.includes('20%') && t.includes('Até julho de 2027 · R$ 480,00 por mês para chegar lá'));
-  ok('Metas da demonstração: plano de guardar com R$ 500,00 por mês e "Seu mês" com a renda comprometida e o guardado em outubro',
-    t.includes('Você planeja guardar R$ 500,00 por mês.') && t.includes('a terceira etapa (R$ 22.500,00, 6 meses dos seus gastos essenciais) chega em dezembro de 2029.') && t.includes('Guardado em outubro: R$ 500,00') &&
+  ok('Metas da demonstração: plano de guardar com R$ 500,00 por mês, curto no card da reserva (D-093: a frase da etapa fica em "Ver o plano"; "Ver o plano" e "Mudar valor" viram links), e "Seu mês" com a renda comprometida e o guardado em outubro',
+    t.includes('Você planeja guardar R$ 500,00 por mês.') && !t.includes('a terceira etapa (R$ 22.500,00, 6 meses dos seus gastos essenciais) chega em dezembro de 2029.') && t.includes('Guardado em outubro: R$ 500,00') &&
     /\d+,\d% da renda de referência já tem destino\./.test(t) && (await visibleCount('button', 'Ver renda comprometida')) === 1 && (await visibleCount('button', 'Ver o plano')) === 1 && (await visibleCount('button', 'Mudar valor')) === 1);
   ok('Metas: a pergunta "Você consegue guardar algum valor por mês?" não aparece depois da resposta "consigo"', !t.includes('Você consegue guardar algum valor por mês?') && (await visibleCount('button', 'Responder depois')) === 0);
   ok('Metas: títulos na ordem (Reserva para imprevistos com o plano dentro, Suas metas, Seu mês, Fazer as contas, Aprender e, depois do conteúdo principal, Neste mês; D-039 e D-054)', JSON.stringify((await headingList()).filter((h) => h.startsWith('2:'))) ===
@@ -3052,7 +3084,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     (await p.locator('[role=img]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter(Boolean))).some((l) => /^52,5% da renda de referência: já pago valor oculto, em aberto valor oculto\.$/.test(l)));
   await shot('112_renda_valores_ocultos');
   await btn('Voltar').click(); await waitText('Diferença do mês');
-  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await waitText('Planejado: R$ ••••');
+  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await waitText('Você planeja guardar R$ ••••');
   await hiddenShows('Metas');
   const metasHiddenBars = await p.getByRole('progressbar').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-valuenow'), e.getAttribute('aria-valuetext')]));
   ok('A2 Metas ocultas: a barra da reserva mantém o percentual (15%) e diz "valor oculto"', metasHiddenBars.length === 1 && metasHiddenBars[0][1] === '15' && /valor oculto/.test(metasHiddenBars[0][0]) && !/R\$/.test(metasHiddenBars[0][0] + metasHiddenBars[0][2]), JSON.stringify(metasHiddenBars));
@@ -3184,7 +3216,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('A Reserva para imprevistos passa a ter alvo de R$ 11.250,00 (3 meses dos seus gastos essenciais), com R$ 300,00 por mês planejados.') && t.includes('Depois, o mesmo valor pode ir para as suas metas.') && !NO_BALANCE.test(t));
   await btn('Usar este plano').click(); await waitText('Plano salvo na sua reserva.'); await p.waitForTimeout(700);
   t = await body();
-  ok('C usar o plano: Metas mostra "Você planeja guardar R$ 300,00 por mês." e a reserva com alvo de R$ 11.250,00 e R$ 300,00 por mês', new URL(p.url()).pathname === '/metas' && t.includes('Você planeja guardar R$ 300,00 por mês.') && t.includes('Planejado: R$ 300,00 por mês') && t.includes('de R$ 11.250,00'));
+  ok('C usar o plano: Metas mostra "Você planeja guardar R$ 300,00 por mês." e a reserva com alvo de R$ 11.250,00 e R$ 300,00 por mês', new URL(p.url()).pathname === '/metas' && t.includes('Você planeja guardar R$ 300,00 por mês.') && t.includes('de R$ 11.250,00'));
   await shot('120_metas_plano_usado');
   // "Mudar valor": um novo valor mantém o plano.
   await btn('Mudar valor').click(); await waitText('Quanto você consegue guardar por mês?'); await p.waitForTimeout(300);
@@ -3272,7 +3304,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await radio('Etapa de 3 meses dos gastos essenciais').click();
   await btn('Usar este plano').click(); await waitText('Plano salvo na sua reserva.'); await p.waitForTimeout(700);
   t = await body();
-  ok('C "Usar este plano": a reserva nasce com alvo de R$ 6.000,00 (3 × R$ 2.000,00), R$ 0,00 guardado, R$ 400,00 por mês, e o card vira o plano', t.includes('R$ 0,00 de R$ 6.000,00') && t.includes('Planejado: R$ 400,00 por mês') && t.includes('Você planeja guardar R$ 400,00 por mês.') && !t.includes('Você consegue guardar algum valor por mês?'), t.slice(0, 400));
+  ok('C "Usar este plano": a reserva nasce com alvo de R$ 6.000,00 (3 × R$ 2.000,00), R$ 0,00 guardado, R$ 400,00 por mês, e o card vira o plano', t.includes('R$ 0,00 de R$ 6.000,00') && t.includes('Você planeja guardar R$ 400,00 por mês.') && !t.includes('Você consegue guardar algum valor por mês?'), t.slice(0, 400));
   await shot('124_metas_reserva_pelo_plano');
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
   t = await body();
@@ -4941,9 +4973,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const MOV_TAB = 'Movimentos do mês';
   const tabLabel = (name) => (name === 'Movimentos' ? MOV_TAB : name);
   const tabByName = (name) => p.getByRole('tab', { name: tabLabel(name), exact: true }).filter({ visible: true }).first();
-  // Estado da barra inferior: as quatro abas visíveis, onde terminam e qual está marcada.
+  // Estado da barra inferior: as cinco abas visíveis (D-093: Investir entre Metas e Aprender), onde terminam e qual está marcada.
   const barState = () => p.evaluate(() => {
-    const names = ['Resumo', 'Movimentos do mês', 'Metas', 'Aprender e dúvidas'];
+    const names = ['Resumo', 'Movimentos do mês', 'Metas', 'Investir', 'Aprender e dúvidas'];
     const tabs = [...document.querySelectorAll('[role=tab]')].filter((e) => names.includes(e.getAttribute('aria-label')) && e.getBoundingClientRect().width > 0);
     const rects = tabs.map((e) => e.getBoundingClientRect());
     return {
@@ -4953,6 +4985,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       top: rects.length ? Math.round(Math.min(...rects.map((r) => r.top))) : 0,
       minH: rects.length ? Math.round(Math.min(...rects.map((r) => r.height))) : 0,
       out: rects.filter((r) => r.left < -0.5 || r.right > window.innerWidth + 0.5).length,
+      // Rótulo cortado (reticências): com cinco abas (D-093), "Movimentos" precisa caber inteiro.
+      cut: tabs.filter((e) => [...e.querySelectorAll('*')].some((c) => c.scrollWidth > c.clientWidth + 1)).map((e) => e.textContent),
       h: window.innerHeight,
       overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
     };
@@ -4963,10 +4997,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     for (const [w, h] of SMALL_SCREENS) { await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450); await fn(w, h); }
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(350);
   };
-  const barOk = (s) => s.n === 4 && s.bottom <= s.h + 1 && s.bottom >= s.h - 40 && s.out === 0 && s.minH >= 44 && !s.overflow;
+  const barOk = (s) => s.n === 5 && s.cut.length === 0 && s.bottom <= s.h + 1 && s.bottom >= s.h - 40 && s.out === 0 && s.minH >= 44 && !s.overflow;
   const checkBar = (label, selected = null) => atWidths(async (w) => {
     const s = await barState();
-    ok(`${label} (${w}px): barra inferior à vista, com as 4 abas${selected ? ` e "${selected}" marcada` : ''}`, barOk(s) && (selected === null || (s.selected.length === 1 && s.selected[0] === tabLabel(selected))), JSON.stringify(s));
+    ok(`${label} (${w}px): barra inferior à vista, com as 5 abas${selected ? ` e "${selected}" marcada` : ''}`, barOk(s) && (selected === null || (s.selected.length === 1 && s.selected[0] === tabLabel(selected))), JSON.stringify(s));
   });
   const checkNoBar = (label) => atWidths(async (w) => { ok(`${label} (${w}px): formulário sem barra inferior`, (await barState()).n === 0); });
   // Posições (topo e base) de elementos visíveis por papel e texto exato ou por nome acessível.
@@ -5045,7 +5079,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await demoHome();
   // Na abertura de uma tela de consulta a barra surge sobreposta ao fim da tela: as barras das abas e da consulta ocupam o mesmo
   // lugar (nada de barra dupla nem salto), e o conteúdo da tela não encolhe. Conferido no meio da transição.
-  const barTopsNow = () => p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => ['Resumo', 'Movimentos do mês', 'Metas', 'Aprender e dúvidas'].includes(e.getAttribute('aria-label')) && e.getBoundingClientRect().width > 0).map((e) => Math.round(e.getBoundingClientRect().top)));
+  const barTopsNow = () => p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => ['Resumo', 'Movimentos do mês', 'Metas', 'Investir', 'Aprender e dúvidas'].includes(e.getAttribute('aria-label')) && e.getBoundingClientRect().width > 0).map((e) => Math.round(e.getBoundingClientRect().top)));
   const beforeBars = await barTopsNow();
   await btn('Ver contas a pagar').click();
   const midBars = await barTopsNow();
@@ -8324,10 +8358,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const j1G = await j1Groups();
   ok('Tutorial guia: /aprender/guia com o título "Como usar o app da Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
-  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 8, 2 e 10 entradas (Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa", "Anotar pelo Telegram" e "Assinatura e teste grátis")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
-    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 8, 2, 10]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
+  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 9, 2 e 10 entradas (Planejar ganhou "Investimentos", Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa", "Anotar pelo Telegram" e "Assinatura e teste grátis")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
+    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 9, 2, 10]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
-  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 39 &&
+  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 40 &&
     j1Rows.includes('Buscar em Movimentos. Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.') &&
     j1Rows.includes('Exportar meus dados. Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.') &&
     j1Rows.some((r) => r.startsWith('Importar extrato ou fatura. Traz gastos, recebimentos e compras no cartão de um arquivo do banco')) &&
@@ -9405,8 +9439,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const k1Widget = () => p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).first();
   await scrollTo('Widget na tela inicial');
   t = await k1Keep();
-  ok('K1 Conta: o card "Widget na tela inicial" (título de nível 2) diz "Disponível quando o app estiver nas lojas" e tem o interruptor "Mostrar valores no widget" desligado, depois de Privacidade', (await headingShown('Widget na tela inicial')) &&
-    t.includes('Disponível quando o app estiver nas lojas') && t.includes('Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.') &&
+  ok('K1 Conta: o card "Widget na tela inicial" (título de nível 2) diz, na web, "Disponível no app da Clarevo para celular." (D-093) e tem o interruptor "Mostrar valores no widget" desligado, depois de Privacidade', (await headingShown('Widget na tela inicial')) &&
+    t.includes('Disponível no app da Clarevo para celular.') && t.includes('Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.') &&
     (await k1Widget().getAttribute('aria-checked')) === 'false' && (await hideSwitch().getAttribute('aria-checked')) === 'false' && t.indexOf('Privacidade neste aparelho') < t.indexOf('Widget na tela inicial'), `${await k1Widget().getAttribute('aria-checked')}`);
   ok('K1 Conta: o interruptor explica que, desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome, só neste aparelho (D-054)', t.includes('Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.'));
   await k1Shots('369_conta_widget', false, false);
@@ -11045,7 +11079,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(700);
   ok('Evolução endereço: /evolucao aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await evNames()).length === 6 &&
-    (await p.getByRole('tab').filter({ visible: true }).count()) === 4 && (await visibleCount('button', 'Voltar')) === 1, p.url());
+    (await p.getByRole('tab').filter({ visible: true }).count()) === 5 && (await visibleCount('button', 'Voltar')) === 1, p.url());
 
   // ---- 9. O cenário fictício "evolucao": janeiro a junho de 2026 (EF §6) ----
   await evEnter('evolucao');
@@ -11991,7 +12025,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.goto(`http://localhost:${PORT}/analises`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
   ok('Análises endereço: /analises aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', anPath() === '/analises' && (await h1Name()) === 'Análises' && (await anTabs()).length === 4 &&
-    (await p.getByRole('tab').filter({ visible: true }).count()) === 8 && (await visibleCount('button', 'Voltar')) === 1, p.url());
+    (await p.getByRole('tab').filter({ visible: true }).count()) === 9 && (await visibleCount('button', 'Voltar')) === 1, p.url());
   await p.goto(`http://localhost:${PORT}/analises?aba=orcamento&mes=2026-09`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
   ok('Análises endereço: ?aba=orcamento&mes=2026-09 abre na aba Orçamento, em setembro de 2026', (await anTabs()).map((x) => x.selected).join() === 'false,false,false,true' && (await anMonthLabel()).includes('Setembro de 2026'));
@@ -13023,7 +13057,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Média e mediana, Aprender: a linha abre o tema com "Voltar para Aprender" (origem Aprender) e o mesmo conteúdo', mmPath() === '/explicacao/media-e-mediana' && (await visibleCount('button', 'Voltar à tarefa')) === 0 && (await body()).includes('A média é R$ 4.125,00'));
   await btn('Ver na Evolução').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(600);
   t = await mmKeep();
-  ok('Média e mediana, "Ver na Evolução": abre /evolucao com o título "Evolução" e a barra inferior das telas de consulta, que marca a aba de onde a pessoa veio (Aprender)', mmPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await p.getByRole('tab').filter({ visible: true }).count()) === 4, `${mmPath()} ${await h1Name()}`);
+  ok('Média e mediana, "Ver na Evolução": abre /evolucao com o título "Evolução" e a barra inferior das telas de consulta, que marca a aba de onde a pessoa veio (Aprender)', mmPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await p.getByRole('tab').filter({ visible: true }).count()) === 5, `${mmPath()} ${await h1Name()}`);
   await btn('Voltar').click(); await waitText('Voltar para Aprender'); await learnBackToTab();
   const mmSearch = async (query, expectFirst) => {
     await learnSearch().fill(query); await waitText(`para "${query}"`); await p.waitForTimeout(350);
@@ -14049,7 +14083,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ['Manrope_500Medium', 'Manrope_600SemiBold', 'Manrope_700Bold', 'Manrope_800ExtraBold'].every((f) => acFontsLoaded.includes(f)), `${acFonts.map((x) => `${x.f.split('.')[0]} ${x.size} B`).join(', ')}; carregadas: ${acFontsLoaded.join(', ')}`);
   await acScan('resumo');
   await shot('590_acessibilidade_resumo_390px');
-  for (const name of ['Movimentos', 'Metas', 'Aprender e dúvidas']) { await tabByName(name).click(); await p.waitForTimeout(900); await acScan(`aba ${name}`); }
+  for (const name of ['Movimentos', 'Metas', 'Investir', 'Aprender e dúvidas']) { await tabByName(name).click(); await p.waitForTimeout(900); await acScan(`aba ${name}`); }
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento');
 
   // ---- 2. Em cerca de 60 telas: contraste, nomes, papéis e alvos de toque ----
@@ -14169,7 +14203,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Na web a escala de fonte é sempre 1: a simulação multiplica o tamanho e a altura da linha de todo texto (abas e avatar até 1,3, como
   // no app) e tira o limite de linhas dos títulos, como o app faz com a escala acima de 1. Só o aparelho confirma o resto.
   const AC_BIG = [
-    ['resumo', 'Resumo', null, null], ['movimentações', 'Movimentos', null, null], ['metas', 'Metas', null, null],
+    ['resumo', 'Resumo', null, null], ['movimentações', 'Movimentos', null, null], ['metas', 'Metas', null, null], ['investimentos', 'Investir', null, null],
     ['registrar gasto', null, 'registro/novo', { tipo: 'despesa' }], ['contas a pagar', null, 'a-pagar/index', {}], ['cartões', null, 'cartoes/index', {}],
     ['cartão', null, 'cartoes/[id]/index', { id: acIds.card }], ['fatura', null, 'cartoes/[id]/fatura/[mes]/index', { id: acIds.card, mes: '2026-10' }],
     ['buscar', null, 'movimentacoes/buscar', {}], ['composição', null, 'composicao', { tipo: 'pago' }], ['gastos fixos', null, 'gastos-fixos/index', {}], ['conta', null, 'conta', {}],
@@ -14180,7 +14214,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await acEnter();
     await p.setViewportSize({ width, height: 800 }); await p.waitForTimeout(500);
     for (const [name, tab, route, params] of AC_BIG) {
-      if (tab) { await tabByName(tab).click(); await waitText(tab === 'Resumo' ? 'Diferença do mês' : tab === 'Metas' ? 'Reserva para imprevistos' : 'Registrar recebimento'); }
+      if (tab) { await tabByName(tab).click(); await waitText(tab === 'Resumo' ? 'Diferença do mês' : tab === 'Metas' ? 'Reserva para imprevistos' : tab === 'Investir' ? 'Seus investimentos hoje' : 'Registrar recebimento'); }
       else await acNav(route, params);
       await p.waitForTimeout(700);
       await p.evaluate((k) => window.__acc.scale(k), scale);
@@ -14432,6 +14466,133 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await btn('Cancelar').click(); await p.waitForTimeout(300);
     if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
     ok('D-092 Nova meta: nada vai à rede na demonstração', writes.length === npWrites0, writes.slice(npWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // D-093 Metas: "Tipo de meta" depois do valor com "O que é isso?", atalhos de prazo, "Ordenar metas" (a mais importante em
+  // primeiro, só com duas ou mais metas) e o marco de 25% no aviso do aporte. Na demonstração, nada vai à rede.
+  // ==================================================================================================================
+  {
+    const omWrites0 = writes.length;
+    const cardTop = (prefix) => p.evaluate((pre) => {
+      const el = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || '').startsWith(pre) && e.getBoundingClientRect().width > 0);
+      return el ? el.getBoundingClientRect().top : null;
+    }, prefix);
+    await demoHome();
+    await tabByName('Metas').click(); await waitText('Viagem de férias'); await p.waitForTimeout(300);
+    ok('D-093 Metas: com uma meta só, "Ordenar metas" não aparece', (await visibleCount('button', 'Ordenar metas')) === 0);
+    await btn('Nova meta').click(); await waitText('O que você quer conquistar?'); await p.waitForTimeout(300);
+    await radio('Estudos').click(); await p.waitForTimeout(300);
+    await field('Valor da meta').fill('2400'); await p.waitForTimeout(200);
+    const typeOrder = await p.evaluate(() => {
+      const top = (sel, test) => [...document.querySelectorAll(sel)].find((e) => test(e) && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
+      return {
+        value: top('input', (e) => e.getAttribute('aria-label') === 'Valor da meta' || e.labels?.[0]?.textContent === 'Valor da meta'),
+        objective: top('[role=radio]', (e) => e.getAttribute('aria-label') === 'Objetivo' || e.textContent === 'Objetivo'),
+        deadline: top('input', (e) => (e.getAttribute('aria-label') || '').startsWith('Até quando?') || (e.labels?.[0]?.textContent || '').startsWith('Até quando?')),
+      };
+    });
+    ok('D-093 Nova meta: "Tipo de meta" vem depois do valor e antes do prazo, com "Objetivo" marcado',
+      typeOrder.value !== null && typeOrder.objective !== null && typeOrder.deadline !== null && typeOrder.value < typeOrder.objective && typeOrder.objective < typeOrder.deadline &&
+        (await radio('Objetivo').getAttribute('aria-checked')) === 'true', JSON.stringify(typeOrder));
+    await btn('O que é isso?').click(); await p.waitForTimeout(300);
+    ok('D-093 Nova meta: "O que é isso?" explica objetivo e reserva de oportunidade', (await body()).includes('Reserva de oportunidade é um valor guardado para aproveitar uma chance que aparecer'));
+    const shortcutNames = await p.getByRole('radiogroup', { name: 'Atalhos de prazo' }).filter({ visible: true }).first().getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+    ok('D-093 Nova meta: atalhos de prazo a partir de outubro de 2026 (6 meses, 1 ano, 2 anos e 5 anos)',
+      JSON.stringify(shortcutNames) === JSON.stringify(['6 meses: até 04/2027', '1 ano: até 10/2027', '2 anos: até 10/2028', '5 anos: até 10/2031']), JSON.stringify(shortcutNames));
+    await radio('1 ano: até 10/2027').click(); await p.waitForTimeout(300);
+    t = await body(); screenTexts.push(t);
+    ok('D-093 Nova meta: "1 ano" preenche o prazo (10/2027), fica marcado e a prévia diz quanto guardar por mês',
+      (await field('Até quando? (opcional)').inputValue()) === '10/2027' && (await radio('1 ano: até 10/2027').getAttribute('aria-checked')) === 'true' &&
+        t.includes('Para chegar até outubro de 2027: R$ 184,62 por mês, sem contar rendimentos.'), t.slice(0, 400));
+    await atWidths(async (w) => { await layoutChecks(`D-093 Nova meta ${w}px`); if (w === 390) await shot('530_nova_meta_prazo_e_tipo'); });
+    await btn('Criar meta').click(); await waitText('Meta criada.'); await p.waitForTimeout(400);
+    await tabByName('Metas').click(); await waitText('Ordenar metas'); await p.waitForTimeout(300);
+    ok('D-093 Metas: com duas metas, "Ordenar metas" aparece; sem ordem escolhida, pela criação (Viagem de férias, depois Estudos)',
+      (await visibleCount('button', 'Ordenar metas')) === 1 && (await cardTop('Viagem de férias:')) < (await cardTop('Estudos:')));
+    await btn('Ordenar metas').click(); await waitText('Ponha em primeiro a meta mais importante para você.'); await p.waitForTimeout(300);
+    ok('D-093 Ordenar metas: "Subir" desligado na primeira, "Descer" desligado na última',
+      (await btn('Subir Viagem de férias').getAttribute('aria-disabled')) === 'true' && (await btn('Descer Estudos').getAttribute('aria-disabled')) === 'true');
+    await btn('Subir Estudos').click(); await p.waitForTimeout(300);
+    await atWidths(async (w) => { await layoutChecks(`D-093 Ordenar metas ${w}px`); if (w === 390) await shot('531_ordenar_metas'); });
+    await btn('Salvar ordem').click(); await waitText('Ordem das metas salva.'); await p.waitForTimeout(500);
+    ok('D-093 Ordenar metas: salvo, Metas mostra Estudos antes de Viagem de férias', (await cardTop('Estudos:')) < (await cardTop('Viagem de férias:')));
+    // Marco: R$ 480,00 (o planejado) leva a Viagem de férias de 20% a 28%: passa de 25%.
+    await p.getByRole('button', { name: /^Viagem de férias:/ }).filter({ visible: true }).first().click(); await waitText('Histórico da meta'); await p.waitForTimeout(300);
+    await btn('Registrar aporte').click(); await waitText('Registre o dinheiro que você já separou'); await p.waitForTimeout(300);
+    await btn('Registrar aporte').click(); await waitText('Aporte registrado.'); await p.waitForTimeout(400);
+    ok('D-093 marcos: o aviso do aporte diz que a meta passou de 25%', (await body()).includes('Aporte registrado. Viagem de férias passou de 25% da meta.'));
+    ok('D-093 Metas: nada vai à rede na demonstração', writes.length === omWrites0, writes.slice(omWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // D-093 Investimentos: a aba "Investir" (só Pessoal), o resumo da carteira com o CDI e o IPCA de exemplo, o detalhe com o valor no fim
+  // de cada mês, atualizar o valor, o resgate maior que o valor recusado antes de enviar, novo investimento, encerrar, reabrir e excluir.
+  // A demonstração tem "Aplicação do banco" (R$ 10.875,00) e "Previdência" (R$ 5.080,00). Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const ivWrites0 = writes.length;
+    await demoHome();
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('D-093 Investimentos: título "Investimentos", contexto Pessoal fixo, total de R$ 15.955,00, aportado, ganho e a rentabilidade com o CDI e o IPCA de exemplo',
+      (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Aportado: R$ 15.500,00') && t.includes('Ganho: R$ 455,00') &&
+        t.includes('Neste mês, até hoje: +0,10%') && t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,54%.') &&
+        t.includes('CDI no mesmo período: +3,65%') && t.includes('IPCA no mesmo período: +1,41%') &&
+        t.includes('Na demonstração, o CDI e o IPCA são valores de exemplo, não os índices reais.'), t.slice(0, 700));
+    ok('D-093 Investimentos: diz que não é recomendação, que não entra em Pago nem em Recebido e que a Família não vê',
+      t.includes('Não é recomendação de investimento') && t.includes('não entram em Pago nem em Recebido') && t.includes('Ninguém da Família nem a empresa que oferece o benefício vê.') &&
+        t.includes('A Clarevo não guarda, não movimenta nem indica investimentos.'));
+    ok('D-093 Investimentos: os dois cards com nome, tipo e valor no nome acessível',
+      (await visibleCount('button', 'Aplicação do banco, Renda fixa: R$ 10.875,00. Ganho: R$ 375,00.')) === 1 && (await visibleCount('button', 'Previdência, Previdência: R$ 5.080,00. Ganho: R$ 80,00.')) === 1);
+    await checkBar('D-093 Investimentos', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-093 Investimentos ${w}px`); if (w === 390) await shot('540_investimentos'); });
+    // Detalhe.
+    await btn('Aplicação do banco, Renda fixa: R$ 10.875,00. Ganho: R$ 375,00.').click(); await waitText('Valor no fim de cada mês'); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    ok('D-093 Investimento: detalhe com o valor, a última atualização, o fim de cada mês (setembro R$ 10.360,00) e o histórico',
+      (await h1Name()) === 'Aplicação do banco' && t.includes('R$ 10.875,00') && t.includes('Valor atualizado em 06/10/2026') && t.includes('Outubro de 2026 (até hoje)') &&
+        t.includes('R$ 10.360,00') && (await visibleCount('button', 'Aporte, 06/10/2026, R$ 500,00')) === 1 && (await visibleCount('button', 'Valor atualizado, 30/09/2026, R$ 10.360,00')) === 1, t.slice(0, 700));
+    await checkBar('D-093 detalhe do investimento (consulta)', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-093 Investimento ${w}px`); if (w === 390) await shot('541_investimento_detalhe'); });
+    // Resgate maior que o valor: recusado antes de enviar, com a data.
+    await btn('Registrar resgate').click(); await waitText('O dinheiro que você tirou do investimento.'); await p.waitForTimeout(300);
+    await field('Valor').fill('20000'); await btn('Registrar resgate').click(); await p.waitForTimeout(400);
+    ok('D-093 resgate maior que o valor: recusado antes de enviar, com o dia em que ficaria negativo',
+      (await body()).includes('Com este movimento, o investimento ficaria com valor negativo em 07/10/2026. Confira o valor e a data.'));
+    await btn('Cancelar').click(); await p.waitForTimeout(300);
+    if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
+    await waitText('Valor no fim de cada mês');
+    // Atualizar valor.
+    await btn('Atualizar valor').click(); await waitText('O valor total que aparece no extrato nesta data'); await p.waitForTimeout(300);
+    ok('D-093 Atualizar valor: data de hoje preenchida e o contexto Pessoal fixo', (await field('Data').inputValue()) === '07/10/2026' && (await body()).includes('Demonstração · Pessoal'), await field('Data').inputValue());
+    await field('Valor no extrato').fill('10900'); await btn('Atualizar valor').click(); await waitText('Valor atualizado.'); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-093 Atualizar valor: o detalhe passa a R$ 10.900,00, ganho de R$ 400,00, atualizado em 07/10/2026', t.includes('R$ 10.900,00') && t.includes('Ganho: R$ 400,00') && t.includes('Valor atualizado em 07/10/2026'), t.slice(0, 500));
+    // Novo investimento.
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    ok('D-093 Investimentos: o total segue o valor novo (R$ 15.980,00)', (await body()).includes('R$ 15.980,00'));
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await btn('Criar investimento').click(); await p.waitForTimeout(300);
+    t = await body();
+    ok('D-093 Novo investimento: sem nome, tipo e valor aplicado, os erros aparecem nos campos', (await field('Nome').evaluate((e) => e === document.activeElement)) && t.includes('Escolha o tipo.'), t.slice(0, 600));
+    await field('Nome').fill('Ações da corretora'); await radio('Ações').click(); await field('Quanto você aplicou até hoje?').fill('2000');
+    await atWidths(async (w) => { await layoutChecks(`D-093 Novo investimento ${w}px`); if (w === 390) await shot('542_novo_investimento'); });
+    await checkNoBar('D-093 Novo investimento');
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-093 Novo investimento: abre o detalhe, com o aporte inicial e o aviso para atualizar o valor', (await h1Name()) === 'Ações da corretora' && t.includes('R$ 2.000,00') &&
+      t.includes('Atualize o valor com o que aparece no seu extrato para ver quanto rendeu.'), t.slice(0, 500));
+    // Encerrar, reabrir e excluir.
+    await btn('Encerrar investimento').click(); await waitText('Investimento encerrado.'); await p.waitForTimeout(400);
+    ok('D-093 Encerrar: some "Atualizar valor" e aparece "Reabrir investimento"', (await visibleCount('button', 'Atualizar valor')) === 0 && (await visibleCount('button', 'Reabrir investimento')) === 1);
+    await tabByName('Investir').click(); await waitText('Encerrados'); await p.waitForTimeout(300);
+    ok('D-093 Investimentos: o encerrado aparece em "Encerrados" e sai do total (R$ 15.980,00)', (await body()).includes('Encerrados') && (await body()).includes('R$ 15.980,00'));
+    await p.getByRole('button', { name: /^Ações da corretora, Ações:/ }).filter({ visible: true }).first().click(); await waitText('Reabrir investimento'); await p.waitForTimeout(300);
+    await btn('Excluir investimento').click(); await waitText('Excluir Ações da corretora?'); await p.waitForTimeout(300);
+    await confirmIn('Excluir investimento'); await waitText('Investimento excluído.'); await p.waitForTimeout(400);
+    ok('D-093 Excluir: volta para Investimentos sem o investimento excluído', urlPath() === '/investimentos' && !(await body()).includes('Ações da corretora'), urlPath());
+    ok('D-093 Investimentos: nada vai à rede na demonstração', writes.length === ivWrites0, writes.slice(ivWrites0).join(' | '));
   }
 
   // ==================================================================================================================

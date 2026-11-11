@@ -50,7 +50,7 @@ Elis mandou a Enzo prints com o que achou confuso e o que gostaria de ter, e ped
 | 10 | Custo da dívida: "precisa informar se a gente inclui o CET no cálculo" | Nota no rotativo e no cheque especial: a conta usa só a taxa de juros; o CET soma IOF e tarifas; a dica do campo diz para usar a taxa de juros | pronto |
 | 11 | Plano de dívidas: "muito confusa essa pergunta" (quanto a mais por mês) | Pergunta reescrita: "Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?", com exemplo e o que acontece em branco | pronto |
 | 12 | Multa e juros: "O meu é 20,99. Precisa aceitar" | Juros de 0% a 99,99% ao mês (a multa segue até 20%) | pronto |
-| 13 | "E todos esses demais encargos, como juros de mora, de parcelas, não coloca?" | Dica e nota: na fatura do cartão, somar os juros do rotativo com os de mora no campo de juros; o IOF fica de fora. Um modo próprio para a fatura é a decisão G | pronto (dica); com Enzo (modo) |
+| 13 | "E todos esses demais encargos, como juros de mora, de parcelas, não coloca?" | Modo "Fatura do cartão" (decisão G, D-093): campos próprios para rotativo, mora e multa, com o IOF estimado e o teto da Lei 14.690/2023 | pronto (11/11/2026) |
 | 14 | Gasto com data futura: "o mais intuitivo é adicionar aos gastos, com previsão futura, não ter que procurar outra aba ou esperar vencer" | Com data futura, o link "Ainda vai vencer? Anotar como conta a pagar" leva descrição, valor, data e categoria para Anotar conta a pagar | pronto |
 | 15 | Plano de dívidas: "é muito confuso saber qual é a indicação, é informação demais junta e repetida... não tem uma indicação do que quitar primeiro" | O resultado começa pelo que as ordens dão (uma frase só quando dão no mesmo) e termina pela referência: quanto antes tudo termina e quanto de juros a menos em relação a só pagar as parcelas; nos detalhes, um bloco só para as duas ordens quando dão no mesmo. Nenhum texto diz qual ordem é a certa (D-040) | pronto |
 | 16 | "Qual informação nova ela trouxe? A data do fim das contas já haviam sido informadas quando eu informei que era um gasto parcelado" | A informação nova é a frase da referência (com os números dela: tudo termina 41 meses antes, com R$ 1.495,19 a menos de juros, só por passar a parcela do Acordo para o Empréstimo quando ele terminar) | pronto |
@@ -69,7 +69,7 @@ Enzo aprovou as sete em 09/11/2026 ("Aprovo", D-089), na ordem E, D, C, B, A, F 
 | D | Bolhas das categorias em cinco tons do azul da marca, contraste conferido, a escolhida em lima como hoje | Fazer | meio período | pronto (no ar em 10/11/2026) |
 | E | Ao salvar um gasto com orçamento na categoria, uma linha "Mercado: R$ 1.400,00 de R$ 1.800,00 neste mês (78%)", sempre, não só ao cruzar 80% e 100% | Fazer | pequeno | pronto (no ar em 10/11/2026) |
 | F | Vídeo em formato de reels (1080 por 1920) gravado na web com os dados de demonstração: salvar uma compra de mercado e abrir o orçamento | Fazer depois do pacote 1 | meio período | pronto (vídeo enviado a Enzo; docs/24, seção 2.4b) |
-| G | Modo "Fatura de cartão depois do vencimento" em Multa e juros: rotativo, mora, multa e IOF estimado | Depois do lançamento | meio dia | depois do lançamento |
+| G | Modo "Fatura de cartão depois do vencimento" em Multa e juros: rotativo, mora, multa e IOF estimado | Depois do lançamento (antecipado pela D-093) | meio dia | pronto em 11/11/2026 (modo "Fatura do cartão", com o teto da Lei 14.690/2023) |
 
 ## Rascunho para as redes (item 25)
 

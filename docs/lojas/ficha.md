@@ -103,7 +103,7 @@ O QUE VOCÊ FAZ NA CLAREVO
 • Evolução e Análises: Recebido e Pago mês a mês, média e mediana, categorias em barras ou em bolhas e orçamento por categoria.
 • Metas e reserva para imprevistos, com um plano de guardar que mostra as etapas e o mês previsto, sem contar rendimento.
 • Simulador e calculadoras (parcelado ou à vista, quanto custa por ano, juros e multa, entre outras), feitos com os números que você digita.
-• Família: até 6 pessoas, com os papéis de titular, membro e leitor, convite por link e a opção de sair ou encerrar quando quiser.
+• Família: até 6 pessoas, com os papéis Titular, "Anota e vê" e "Só vê", convite por link e a opção de sair ou encerrar quando quiser.
 • Aprender: explicações curtas sobre juros, taxas e contas do dia a dia, cada uma com fonte e data de revisão.
 • Ocultar valores na tela e pedir biometria para abrir o app.
 • Exportar seus gastos e recebimentos em CSV ou PDF e excluir a conta dentro do app.
@@ -156,7 +156,7 @@ O QUE VOCÊ FAZ NA CLAREVO
 • Evolução e Análises: Recebido e Pago mês a mês, média e mediana, categorias em barras ou em bolhas e orçamento por categoria.
 • Metas e reserva para imprevistos, com um plano de guardar que mostra as etapas e o mês previsto, sem contar rendimento.
 • Simulador e calculadoras (parcelado ou à vista, quanto custa por ano, juros e multa, entre outras), feitos com os números que você digita.
-• Família: até 6 pessoas, com os papéis de titular, membro e leitor, convite por link e a opção de sair ou encerrar quando quiser.
+• Família: até 6 pessoas, com os papéis Titular, "Anota e vê" e "Só vê", convite por link e a opção de sair ou encerrar quando quiser.
 • Aprender: explicações curtas sobre juros, taxas e contas do dia a dia, cada uma com fonte e data de revisão.
 • Ocultar valores na tela e pedir biometria para abrir o app.
 • Exportar seus gastos e recebimentos em CSV ou PDF e excluir a conta dentro do app.

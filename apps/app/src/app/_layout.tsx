@@ -16,12 +16,16 @@ import { DeviceFeatures } from '@/components/device-features';
 import { BrowseTabBar } from '@/components/tab-bar';
 import { LegalGate } from '@/components/legal-gate';
 import { StoreWarmup } from '@/components/store-warmup';
+import { initCrashReport } from '@/lib/crash-report';
 import { forgetDevice } from '@/lib/device-forget';
 import { afterLogin, deletedAccountIntent, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
 import { ViewProvider } from '@/state/view';
 import { colors, fonts } from '@/theme/tokens';
+
+// Relatório de falhas (D-093): só no celular e só com o endereço do projeto nas variáveis do EAS; antes de tudo, para pegar falhas do começo.
+initCrashReport();
 
 SplashScreen.preventAutoHideAsync();
 
@@ -30,7 +34,7 @@ SplashScreen.preventAutoHideAsync();
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura))?|familia(\/(nova|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura))?|familia(\/(nova|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -273,6 +277,11 @@ function Navigation() {
           {/* Metas e reserva para imprevistos (D-027). /meta/nova é rota estática e tem precedência sobre /meta/[id]. */}
           <Stack.Screen name="reserva" />
           <Stack.Screen name="meta/nova" />
+          <Stack.Screen name="meta/ordenar" />
+          <Stack.Screen name="investimento/novo" />
+          <Stack.Screen name="investimento/[id]/index" />
+          <Stack.Screen name="investimento/[id]/editar" />
+          <Stack.Screen name="investimento/[id]/movimento" />
           <Stack.Screen name="meta/[id]/index" />
           {/* Imagem da meta (D-077): sugeridas, automática ou foto da galeria. */}
           <Stack.Screen name="meta/[id]/imagem" />

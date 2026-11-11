@@ -13,7 +13,21 @@ import { APP_DIR, createHooksHarness, loadApp } from './app-sandbox';
  */
 
 const SRC = path.join(APP_DIR, 'src');
-const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+const tick = () => new Promise((resolve) => setTimeout(resolve, 20));
+/**
+ * Espera o gravador do widget assentar: o que ele fez (pedidos, leituras e gravações) fica igual por três esperas seguidas de 20 ms, até
+ * 3 segundos. Um tempo fixo único falhava de vez em quando com a máquina ocupada (a leitura das contas terminava depois da espera).
+ */
+const settleOn = async (activity: () => number) => {
+  let last = activity();
+  let stable = 0;
+  for (let i = 0; i < 150 && stable < 3; i++) {
+    await tick();
+    const now = activity();
+    stable = now === last ? stable + 1 : 0;
+    last = now;
+  }
+};
 
 /** O app usa o dia de hoje do aparelho; nos testes o relógio fica no dia da demonstração (07/10/2026). */
 const withDemoClock = async <T>(run: () => Promise<T>) => {
@@ -117,6 +131,7 @@ async function setup(over: Partial<World> = {}) {
     },
   });
   const app = harness.mount(mod.DeviceFeatures);
+  const settle = () => settleOn(() => jobs.length + listCommitments.mock.calls.length + writeWidget.mock.calls.length + queueReminders.mock.calls.length);
   await settle();
   /** Muda o que os mocks devolvem, renderiza de novo e espera o gravador. */
   const change = async (next: Partial<World>) => {

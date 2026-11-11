@@ -20,7 +20,7 @@ Linguagem: os documentos de redes evitam nomes de pessoas e usam funções ("pro
 
 ## 2. A Clarevo em um minuto
 
-**O que é.** Um app para organizar a vida financeira pessoal e familiar, com a promessa de bem-estar financeiro (seção 3). Quatro abas: Resumo, Movimentos, Metas e Aprender; Conta fica no avatar. Pessoas e famílias são o foco; empresas podem oferecer o acesso como benefício. Só para maiores de 18 anos.
+**O que é.** Um app para organizar a vida financeira pessoal e familiar, com a promessa de bem-estar financeiro (seção 3). Cinco abas: Resumo, Movimentos, Metas, Investir e Aprender (Investir entrou em D-093, 11/11/2026); Conta fica no avatar. Pessoas e famílias são o foco; empresas podem oferecer o acesso como benefício. Só para maiores de 18 anos.
 
 **Estado em 11/11/2026** (confira em `docs/37_LANCAMENTO.md` e `docs/04_ROTEIRO_LANCAMENTO.md`, que andam rápido):
 
@@ -39,7 +39,7 @@ Linguagem: os documentos de redes evitam nomes de pessoas e usam funções ("pro
 
 **No app hoje (web):** Resumo do mês (Recebido, Pago, Diferença do mês, Ainda a pagar e renda comprometida), Contas a pagar, gastos fixos, parcelamentos e contas do ano (IPVA, IPTU), Cartões e faturas (com "Importar fatura"), Orçamento por categoria (sete categorias, entre elas "Crédito e parcelas"), Metas e reserva para imprevistos (com as 15 metas mais comuns prontas e 17 imagens, D-092), Família, as dez calculadoras e o simulador, Assinaturas, Aprender, Evolução, Análises, "Seu mês em 30 segundos", importar extrato (PDF, OFX ou CSV), ler comprovante, boleto, holerite, nota fiscal e nota de serviço, Ocultar valores, exportar os dados (CSV ou PDF) e excluir a conta.
 
-**Só no app de celular, que ainda não está nas lojas:** lembretes de vencimento, lembretes do dia a dia e biometria. Peça sobre eles espera o app das lojas. **Não anunciar:** widget (preparado e desligado), WhatsApp, Pix Automático, plano anual, integração bancária, saldo por conta, IA, recomendação de produto financeiro.
+**Só no app de celular, que ainda não está nas lojas:** lembretes de vencimento, lembretes do dia a dia e biometria. Peça sobre eles espera o app das lojas. **Não anunciar:** widget (ligado no lançamento pela D-093, mas ainda sem teste em aparelho: anunciar só depois do teste e com o app nas lojas), WhatsApp, Pix Automático, plano anual, integração bancária, saldo por conta, IA, recomendação de produto financeiro.
 
 **Confidencial, nunca em peça:** a conversa com a Marinha e qualquer número de militares (`docs/28`, `docs/30`); os valores para empresas (`docs/26`, "a validar"); o acordo de sócios e qualquer dado de quem investe na Clarevo; números de uso, de pessoas ou de receita.
 
@@ -86,7 +86,8 @@ Afirmações que atravessam as peças (atualizadas em 11/11/2026):
 |---|---|
 | Integração ou conexão com o banco | **Não existe.** Existe importar extrato e fatura (OFX, CSV ou PDF) escolhidos pela pessoa |
 | "Saldo" | **Não existe** no app |
-| Crédito, investimento, produto financeiro | **Não existe.** O app não oferece nem recomenda |
+| Crédito, produto financeiro | **Não existe.** O app não oferece nem recomenda |
+| Acompanhar investimentos | **Existe a partir da versão com a aba Investir (D-093, `docs/45_INVESTIMENTOS.md`)**: a pessoa registra à mão aportes, resgates, rendimentos e o valor do extrato, só no Pessoal, e vê o ganho e a rentabilidade ao lado do CDI e do IPCA (Banco Central). **Anunciar só depois que estiver no ar** (o Enzo aplica os passos do Supabase). Sempre com "não é recomendação de investimento"; nunca nome de produto, banco ou corretora, nem promessa de rendimento. Na demonstração, o CDI e o IPCA são de exemplo |
 | Ler sem digitar (comprovante, boleto, nota, holerite, extrato) | **Existe**, lido no próprio aparelho; a pessoa confere e salva. A versão com a câmera do celular só pode ser gravada no aparelho |
 | Anotar por mensagem | **Existe pelo Telegram** (texto escrito, regras simples, sem IA). WhatsApp: ver seção 2 |
 | Família | **Existe** (até 6 pessoas, papéis titular, "anota e vê" e "só vê", convite por link de uso único válido por 7 dias). A demonstração não tem Família de exemplo: peça sobre Família precisa de conferência própria |
@@ -94,7 +95,7 @@ Afirmações que atravessam as peças (atualizadas em 11/11/2026):
 | Educação | **Existe** em Aprender, com fonte e data de revisão, sem recomendar produto |
 | Segurança, LGPD, "100% seguro" | **Não afirmar** conformidade nem segurança absoluta. Dá para dizer o que o produto faz (seção 12.4), sem adjetivo |
 | IA | **Não dizer que o app usa IA.** A única exceção do produto é reconhecer texto em imagem no próprio aparelho |
-| Lembretes e biometria | Só no app das lojas, que ainda não está publicado, e o gravador só grava a web: peça sobre eles espera o app das lojas. O widget está desligado: não anunciar |
+| Lembretes e biometria | Só no app das lojas, que ainda não está publicado, e o gravador só grava a web: peça sobre eles espera o app das lojas. O widget entra no lançamento (D-093), mas só se anuncia depois do teste em aparelho e com o app nas lojas |
 
 ## 6. Pessoas, imagens e IA
 

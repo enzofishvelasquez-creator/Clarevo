@@ -17,6 +17,7 @@ import { EXPORT_TEXT } from '../export';
 import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOAL_IMAGE_TEXT } from '../goal-images';
 import { GOALS_TEXT } from '../goals';
+import { INVESTMENT_TEXT } from '../investments';
 import { MONTH_CHECK_TEXT } from '../month-check';
 import { IMPORT_SUGGESTION_TEXT } from '../importar/sugestoes';
 import { IMPORT_TEXT } from '../importar/textos';
@@ -50,7 +51,7 @@ const list = (labels: readonly string[], joiner: 'e' | 'ou'): string => {
 };
 
 /** Nomes que o app só desenha na tela (a barra, o cabeçalho e Conta); o teste confere cada um nos textos do código. */
-const TAB = { resumo: 'Resumo', movimentos: 'Movimentos', metas: 'Metas', aprender: LEARN_UI_TEXT.tabLabel } as const;
+const TAB = { resumo: 'Resumo', movimentos: 'Movimentos', metas: 'Metas', investimentos: INVESTMENT_TEXT.tabLabel, aprender: LEARN_UI_TEXT.tabLabel } as const;
 const ACCOUNT_SCREEN = 'Conta';
 const PRIVACY_SECTION = 'Privacidade neste aparelho';
 
@@ -533,8 +534,28 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     screenName: TAB.metas,
     href: '/metas',
     keywords: ['meta', 'metas', 'guardar', 'poupar', 'economizar', 'reserva', 'imprevistos', 'emergência', 'objetivo', 'aporte', 'resgate', 'imagem', 'foto'],
-    routes: ['/metas', '/meta/nova', '/meta/[id]', '/meta/[id]/editar', '/meta/[id]/movimento', '/meta/[id]/imagem', '/reserva'],
+    routes: ['/metas', '/meta/nova', '/meta/ordenar', '/meta/[id]', '/meta/[id]/editar', '/meta/[id]/movimento', '/meta/[id]/imagem', '/reserva'],
     screenshot: '16_metas.png',
+  },
+  {
+    id: 'investimentos',
+    group: 'planejar',
+    title: 'Investimentos',
+    purpose: 'Acompanha o que você já investe, com o valor que aparece no seu extrato: quanto aplicou, quanto vale, quanto rendeu e a comparação com o CDI e o IPCA.',
+    where: [TAB.investimentos],
+    steps: [
+      `Toque em ${q(INVESTMENT_TEXT.newInvestment)}, dê um nome, escolha o tipo e informe quanto você aplicou até hoje e, se souber, quanto vale hoje.`,
+      `Quando colocar ou tirar dinheiro, abra o investimento e use ${q(INVESTMENT_TEXT.detail.addDeposit)} ou ${q(INVESTMENT_TEXT.detail.addWithdrawal)}.`,
+      `De tempos em tempos, use ${q(INVESTMENT_TEXT.detail.updateValue)} com o valor do extrato. É com ele que a Clarevo calcula quanto rendeu.`,
+      `O que o investimento pagou e caiu na sua conta, como dividendos, entra em ${q(INVESTMENT_TEXT.detail.addIncome)}.`,
+      'A rentabilidade compara os meses fechados com o CDI e o IPCA do mesmo período, com os dados públicos do Banco Central. Não é recomendação de investimento.',
+      'Aportes, resgates e rendimentos não entram em Pago nem em Recebido, e os investimentos ficam só no seu Pessoal.',
+    ],
+    screenName: TAB.investimentos,
+    href: '/investimentos',
+    keywords: ['investimento', 'investimentos', 'investir', 'carteira', 'rendimento', 'rentabilidade', 'cdi', 'ipca', 'aporte', 'resgate', 'extrato', 'valor atual'],
+    routes: ['/investimentos', '/investimento/novo', '/investimento/[id]', '/investimento/[id]/editar', '/investimento/[id]/movimento'],
+    screenshot: '540_investimentos.png',
   },
   {
     id: 'plano-de-guardar',
@@ -725,7 +746,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Em telas estreitas, o olho não aparece. Ligue ${q('Ocultar valores ao abrir')}, em Conta: os valores ficam ocultos agora e sempre que você abrir o app.`,
       `No celular com biometria configurada, ligue ${q('Pedir biometria ao abrir')}. Sair da conta nunca depende dela.`,
       `O arquivo de ${q(EXPORT_TEXT.entry)} mostra os valores, mesmo com a ocultação ligada.`,
-      `Em Conta, ${q(WIDGET_TEXT.section)} guarda se o widget mostra valores: ${q(WIDGET_TEXT.showValues)} começa desligado e, desligado, o widget não mostra o nome da próxima conta, só o prazo. O widget só existe quando o app estiver nas lojas.`,
+      `Em Conta, ${q(WIDGET_TEXT.section)} guarda se o widget mostra valores: ${q(WIDGET_TEXT.showValues)} começa desligado e, desligado, o widget não mostra o nome da próxima conta, só o prazo. O widget existe só no app de celular; o card diz como pôr na tela inicial.`,
     ],
     screenName: ACCOUNT_SCREEN,
     href: '/conta',

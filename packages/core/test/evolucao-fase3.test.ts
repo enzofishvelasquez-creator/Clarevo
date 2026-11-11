@@ -108,6 +108,7 @@ const goal = (id: string, createdAt: string, over: Partial<Goal> = {}): Goal => 
   appreciationCents: 0,
   depreciationCents: 0,
   lastMovementOn: null,
+  priority: null,
   ...over,
 });
 let seq = 0;

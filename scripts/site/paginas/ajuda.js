@@ -31,7 +31,7 @@ const TEMAS = [
     id: 'organizar',
     titulo: 'Anotar e organizar',
     descricao: 'Anotar gastos e recebimentos, também pelo Telegram, ler notas, importar extratos, orçamento, metas, simulador e calculadoras.',
-    guias: ['anotar-gasto', 'nota-fiscal', 'comprovante-e-holerite', 'telegram', 'movimentos', 'buscar', 'importar-extrato', 'ultimos-meses', 'evolucao', 'analises', 'orcamento', 'renda-comprometida', 'metas', 'plano-de-guardar', 'simulador', 'calculadoras', 'antes-de-financiar', 'plano-dividas'],
+    guias: ['anotar-gasto', 'nota-fiscal', 'comprovante-e-holerite', 'telegram', 'movimentos', 'buscar', 'importar-extrato', 'ultimos-meses', 'evolucao', 'analises', 'orcamento', 'renda-comprometida', 'metas', 'investimentos', 'plano-de-guardar', 'simulador', 'calculadoras', 'antes-de-financiar', 'plano-dividas'],
     topicos: ['sem-registro', 'contei-duas-vezes', 'voltei-depois'],
   },
   {

@@ -521,7 +521,7 @@ begin
   assert (select array_agg(k order by k) from jsonb_object_keys(r1 -> 'goal') k)
     = array['appreciation_cents', 'context_id', 'created_at', 'created_by', 'deleted_at', 'deleted_by', 'deposits_cents',
             'depreciation_cents', 'essential_base_cents', 'essential_base_source', 'essential_months', 'goal_type', 'id', 'income_cents',
-            'initial_cents', 'last_movement_on', 'name', 'planned_monthly_cents', 'saved_cents', 'status', 'target_cents',
+            'initial_cents', 'last_movement_on', 'name', 'planned_monthly_cents', 'priority', 'saved_cents', 'status', 'target_cents',
             'target_month', 'updated_at', 'version', 'withdrawals_cents'], 'goal: a linha de goals com as somas de goal_items';
   assert (select array_agg(k order by k) from jsonb_object_keys(r1 -> 'movement') k)
     = array['account_id', 'amount_cents', 'context_id', 'created_at', 'created_by', 'deleted_at', 'deleted_by', 'goal_id', 'id', 'kind',
@@ -1332,20 +1332,23 @@ begin
   assert (select array_agg(m[1] order by m[1] collate "C")
             from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
            where c.conname = 'record_operations_action_check')
-    = array['aceitar_convite_familia', 'aceitar_licenca', 'aceitar_termos', 'alterar_cartao', 'alterar_conta', 'alterar_lancamento_cartao',
-            'alterar_meta', 'alterar_movimento_meta', 'alterar_papel_familia', 'alterar_serie', 'cancelar_convite_familia',
-            'cancelar_convite_licenca', 'conta_principal', 'convidar_licencas', 'criar', 'criar_cartao',
-            'criar_compra_cartao', 'criar_compromisso', 'criar_conta', 'criar_convite_familia', 'criar_encargo_cartao',
-            'criar_estorno_cartao', 'criar_familia', 'criar_meta', 'criar_ocorrencia', 'criar_serie', 'decidir_revisao',
-            'definir_limite_comprometimento', 'definir_orcamento_categoria', 'definir_renda_referencia', 'desfazer_pagamento',
-            'desfazer_pagamento_fatura', 'desligar_telegram', 'desligar_whatsapp', 'desmarcar_mes_conferido', 'editar', 'editar_compromisso', 'encerrar_familia', 'encerrar_licenca',
-            'encerrar_serie', 'excluir', 'excluir_cartao', 'excluir_compromisso', 'excluir_conta',
-            'excluir_lancamento_cartao', 'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta',
-            'excluir_orcamento_categoria', 'excluir_renda_referencia', 'excluir_serie', 'gerar_codigo_telegram', 'gerar_codigo_whatsapp', 'imagem_meta', 'importar_extrato', 'informar_ano', 'ligar_telegram', 'ligar_whatsapp',
-            'marcar_assinatura', 'marcar_mes_conferido', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_meta', 'remover_membro_familia',
-            'renovar_convite_licenca', 'responder_guardar', 'responder_origem_cadastro', 'revisar_assinaturas', 'sair_familia', 'situacao_cartao',
-            'situacao_conta', 'situacao_meta', 'tirar_ano', 'transferir_titularidade_familia'],
-    'as 71 ações vigentes (com a do aceite dos termos, testada em 99zzz, as 7 de metas, a de guardar, testada em 65, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
+    = array['aceitar_convite_familia', 'aceitar_licenca', 'aceitar_termos', 'alterar_cartao', 'alterar_conta', 'alterar_investimento',
+            'alterar_lancamento_cartao', 'alterar_meta', 'alterar_movimento_investimento', 'alterar_movimento_meta',
+            'alterar_papel_familia', 'alterar_serie', 'cancelar_convite_familia', 'cancelar_convite_licenca', 'conta_principal',
+            'convidar_licencas', 'criar', 'criar_cartao', 'criar_compra_cartao', 'criar_compromisso', 'criar_conta',
+            'criar_convite_familia', 'criar_encargo_cartao', 'criar_estorno_cartao', 'criar_familia', 'criar_investimento', 'criar_meta',
+            'criar_ocorrencia', 'criar_serie', 'decidir_revisao', 'definir_limite_comprometimento', 'definir_orcamento_categoria',
+            'definir_renda_referencia', 'desfazer_pagamento', 'desfazer_pagamento_fatura', 'desligar_telegram', 'desligar_whatsapp',
+            'desmarcar_mes_conferido', 'editar', 'editar_compromisso', 'encerrar_familia', 'encerrar_licenca', 'encerrar_serie', 'excluir',
+            'excluir_cartao', 'excluir_compromisso', 'excluir_conta', 'excluir_investimento', 'excluir_lancamento_cartao',
+            'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_investimento', 'excluir_movimento_meta',
+            'excluir_orcamento_categoria', 'excluir_renda_referencia', 'excluir_serie', 'gerar_codigo_telegram', 'gerar_codigo_whatsapp',
+            'imagem_meta', 'importar_extrato', 'informar_ano', 'ligar_telegram', 'ligar_whatsapp', 'marcar_assinatura',
+            'marcar_mes_conferido', 'ordenar_metas', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_investimento',
+            'registrar_movimento_meta', 'remover_membro_familia', 'renovar_convite_licenca', 'responder_guardar',
+            'responder_origem_cadastro', 'revisar_assinaturas', 'sair_familia', 'situacao_cartao', 'situacao_conta',
+            'situacao_investimento', 'situacao_meta', 'tirar_ano', 'transferir_titularidade_familia'],
+    'as 79 ações vigentes (com as 7 de investimentos, testadas em 99zzzzzzzzzzz, com a de ordenar as metas, testada em 99zzzzzzzzzz, com a do aceite dos termos, testada em 99zzz, as 7 de metas, a de guardar, testada em 65, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
   -- Toda operação de meta aponta para uma meta do mesmo contexto (a exclusão, para uma excluída); toda operação de
   -- movimento, para um movimento do mesmo contexto (a exclusão, para um excluído).
   assert not exists (select 1 from public.record_operations o
@@ -1572,21 +1575,23 @@ do $$ begin
   assert (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute'))
     = array['accept_family_invite', 'accept_legal_terms', 'accept_license', 'add_card_charge', 'add_card_purchase', 'add_card_refund',
-            'add_goal_movement', 'cancel_family_invite', 'cancel_license_invite', 'clear_month_check', 'context_permission', 'create_account',
-            'create_card', 'create_commitment', 'create_family', 'create_family_invite', 'create_goal', 'create_record',
-            'create_series', 'create_series_occurrence', 'create_telegram_code', 'create_whatsapp_code', 'decide_return_review', 'delete_account', 'delete_card',
-            'delete_card_entry', 'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal',
-            'delete_goal_movement', 'delete_income_reference', 'delete_my_account', 'delete_record', 'delete_series', 'end_family', 'end_license',
-            'end_series', 'ensure_personal_space', 'goal_photo', 'import_records', 'inform_series_year', 'invite_licenses',
-            'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_family',
-            'mark_subscriptions_reviewed', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals',
-            'months_overview', 'my_access', 'my_legal_acceptance', 'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
+            'add_goal_movement', 'add_investment_movement', 'cancel_family_invite', 'cancel_license_invite', 'clear_month_check',
+            'context_permission', 'create_account', 'create_card', 'create_commitment', 'create_family', 'create_family_invite',
+            'create_goal', 'create_investment', 'create_record', 'create_series', 'create_series_occurrence', 'create_telegram_code',
+            'create_whatsapp_code', 'decide_return_review', 'delete_account', 'delete_card', 'delete_card_entry', 'delete_category_budget',
+            'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement', 'delete_income_reference',
+            'delete_investment', 'delete_investment_movement', 'delete_my_account', 'delete_record', 'delete_series', 'end_family',
+            'end_license', 'end_series', 'ensure_personal_space', 'goal_photo', 'import_records', 'inform_series_year', 'invite_licenses',
+            'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_family', 'mark_subscriptions_reviewed',
+            'month_budget', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_access', 'my_legal_acceptance',
+            'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
-            'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_status', 'set_income_reference',
-            'set_member_role', 'set_month_check', 'set_savings_answer', 'set_series_subscription', 'set_signup_source', 'skip_series_year', 'sync_series_occurrences',
-            'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'unlink_telegram', 'unlink_whatsapp', 'update_account', 'update_card',
-            'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',
-            'update_series_from'],
+            'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_order', 'set_goal_status',
+            'set_income_reference', 'set_investment_status', 'set_member_role', 'set_month_check', 'set_savings_answer',
+            'set_series_subscription', 'set_signup_source', 'skip_series_year', 'sync_series_occurrences', 'transfer_family_ownership',
+            'undo_commitment_payment', 'undo_invoice_payment', 'unlink_telegram', 'unlink_whatsapp', 'update_account', 'update_card',
+            'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_investment',
+            'update_investment_movement', 'update_record', 'update_series_from'],
     'authenticated executa só as funções expostas (7 novas)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
@@ -1629,7 +1634,7 @@ do $$ begin
            where attrelid = 'public.goals'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'goal_type', 'name', 'target_cents', 'target_month', 'planned_monthly_cents', 'essential_base_cents',
             'essential_months', 'essential_base_source', 'status', 'created_by', 'version', 'created_at', 'updated_at', 'deleted_at',
-            'deleted_by'], 'colunas de goals';
+            'deleted_by', 'priority'], 'colunas de goals (priority, D-093)';
   assert (select array_agg(attname::text order by attnum) from pg_attribute
            where attrelid = 'public.goal_movements'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'goal_id', 'context_id', 'kind', 'amount_cents', 'occurred_on', 'note', 'created_by', 'version', 'created_at',
@@ -1641,7 +1646,7 @@ do $$ begin
             'status:text', 'created_by:uuid', 'version:integer', 'created_at:timestamp with time zone',
             'updated_at:timestamp with time zone', 'saved_cents:bigint', 'initial_cents:bigint', 'deposits_cents:bigint',
             'withdrawals_cents:bigint', 'income_cents:bigint', 'appreciation_cents:bigint', 'depreciation_cents:bigint',
-            'last_movement_on:date'], 'colunas e tipos de goal_items';
+            'last_movement_on:date', 'priority:integer'], 'colunas e tipos de goal_items (priority, D-093)';
   assert (select reloptions from pg_class where oid = 'public.goal_items'::regclass) @> array['security_invoker=true'],
     'goal_items com a RLS de quem consulta';
   assert has_table_privilege('authenticated', 'public.goals', 'select') and has_table_privilege('authenticated', 'public.goal_movements', 'select')

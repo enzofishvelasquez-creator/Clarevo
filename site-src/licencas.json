@@ -760,6 +760,101 @@
   "licenca": "MIT"
  },
  {
+  "nome": "@sentry-internal/browser-utils",
+  "versao": "10.37.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "@sentry-internal/feedback",
+  "versao": "10.37.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "@sentry-internal/replay",
+  "versao": "10.37.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "@sentry-internal/replay-canvas",
+  "versao": "10.37.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "@sentry/babel-plugin-component-annotate",
+  "versao": "4.8.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "@sentry/browser",
+  "versao": "10.37.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "@sentry/cli",
+  "versao": "2.58.4",
+  "licenca": "FSL-1.1-MIT"
+ },
+ {
+  "nome": "@sentry/cli-darwin",
+  "versao": "2.58.4",
+  "licenca": "FSL-1.1-MIT"
+ },
+ {
+  "nome": "@sentry/cli-linux-arm",
+  "versao": "2.58.4",
+  "licenca": "FSL-1.1-MIT"
+ },
+ {
+  "nome": "@sentry/cli-linux-arm64",
+  "versao": "2.58.4",
+  "licenca": "FSL-1.1-MIT"
+ },
+ {
+  "nome": "@sentry/cli-linux-i686",
+  "versao": "2.58.4",
+  "licenca": "FSL-1.1-MIT"
+ },
+ {
+  "nome": "@sentry/cli-linux-x64",
+  "versao": "2.58.4",
+  "licenca": "FSL-1.1-MIT"
+ },
+ {
+  "nome": "@sentry/cli-win32-arm64",
+  "versao": "2.58.4",
+  "licenca": "FSL-1.1-MIT"
+ },
+ {
+  "nome": "@sentry/cli-win32-i686",
+  "versao": "2.58.4",
+  "licenca": "FSL-1.1-MIT"
+ },
+ {
+  "nome": "@sentry/cli-win32-x64",
+  "versao": "2.58.4",
+  "licenca": "FSL-1.1-MIT"
+ },
+ {
+  "nome": "@sentry/core",
+  "versao": "10.37.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "@sentry/react",
+  "versao": "10.37.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "@sentry/react-native",
+  "versao": "7.11.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "@sentry/types",
+  "versao": "10.37.0",
+  "licenca": "MIT"
+ },
+ {
   "nome": "@sinclair/typebox",
   "versao": "0.27.12",
   "licenca": "MIT"
@@ -897,6 +992,11 @@
  {
   "nome": "acorn",
   "versao": "8.19.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "agent-base",
+  "versao": "6.0.2",
   "licenca": "MIT"
  },
  {
@@ -1736,6 +1836,11 @@
  },
  {
   "nome": "https-proxy-agent",
+  "versao": "5.0.1",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "https-proxy-agent",
   "versao": "7.0.6",
   "licenca": "MIT"
  },
@@ -2422,6 +2527,11 @@
  {
   "nome": "prompts",
   "versao": "2.4.2",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "proxy-from-env",
+  "versao": "1.1.0",
   "licenca": "MIT"
  },
  {

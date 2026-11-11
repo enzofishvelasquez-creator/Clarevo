@@ -5,7 +5,7 @@ import { DIVIDA_FIELDS } from './custo-da-divida.js';
 import { DIVIDIR_FIELDS } from './dividir-contas.js';
 import { CALC_ERROR_TEXT } from './inputs.js';
 import { OBJETIVO_FIELDS } from './juntar-para-objetivo.js';
-import { MULTA_FIELDS } from './multa-e-juros.js';
+import { MULTA_FATURA_FIELDS, MULTA_FIELDS } from './multa-e-juros.js';
 import { COTA_UNICA_FIELDS, PARCELADO_FIELDS } from './parcelado-ou-a-vista.js';
 import { PLANO_FIELDS } from './plano-dividas.js';
 import { QUITAR_FIELDS } from './quitar-antes.js';
@@ -25,6 +25,8 @@ export const CALC_FIELDS = {
 export function calcFields(slug, modo) {
     if (slug === 'parcelado-ou-a-vista' && modo === 'cota-unica')
         return COTA_UNICA_FIELDS;
+    if (slug === 'multa-e-juros' && modo === 'fatura')
+        return MULTA_FATURA_FIELDS;
     return CALC_FIELDS[slug];
 }
 export function calcErrorText(slug, field, code, modo) {

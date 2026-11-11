@@ -7,6 +7,7 @@ import {
   UNCERTAIN_TEXT,
   GOAL_IMAGE_TEXT,
   goalDetailTexts,
+  goalPace,
   goalErrorText,
   goalPlan,
   movementLine,
@@ -259,7 +260,11 @@ function GoalBody({
   const coverage = reserve && showsCoverage(goal) ? t.coverage : null;
   // "Simular com rendimento": só enquanto falta guardar (o simulador começa do guardado e do prazo da meta).
   const simulate = reached ? null : simulateLinkParams(simulateValuesFromGoal(plan));
-  const planLines = [t.deadline, t.planned, coverage, reserve ? t.rounding : null].filter((x): x is string => Boolean(x));
+  // Ritmo (D-093): a linha e, logo abaixo, de onde ele vem.
+  const pace = goalPace(goal, today);
+  const planLines = [t.deadline, t.planned, pace ? GOALS_TEXT.pace.line(pace) : null, pace ? GOALS_TEXT.pace.note(pace) : null, coverage, reserve ? t.rounding : null].filter(
+    (x): x is string => Boolean(x),
+  );
   const a11yBar = GOALS_TEXT.progressA11y(goal.name, plan.progress.percent, goal.savedCents, goal.targetCents);
   const a11yValue = `${GOALS_TEXT.savedOfTarget(goal.savedCents, goal.targetCents)}, ${GOALS_TEXT.percent(plan.progress.percent)}`;
 

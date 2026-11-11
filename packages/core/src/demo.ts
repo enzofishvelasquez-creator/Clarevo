@@ -36,6 +36,10 @@ import { demoTrialAccess } from './plano';
  * cenário 'assinaturas', aceitam). Assim nenhuma conta delas existe nem entra na previsão dos próximos meses: os totais de outubro
  * (6.000 / 3.900 / 2.100 / 650), a renda comprometida (52,5% em outubro, 63,8% em novembro...) e as contas a pagar não mudam. Contam
  * em "Por mês, se os valores não mudarem" e no grupo Assinaturas: R$ 138,90 por mês e R$ 1.666,80 por ano.
+ * Investimentos (D-093), só no Pessoal: "Aplicação do banco" (renda fixa, R$ 10.000,00 desde 01/06/2026, valor no extrato no fim de
+ * cada mês: R$ 10.085,00, R$ 10.180,00, R$ 10.270,00 e R$ 10.360,00; aporte de R$ 500,00 e valor de R$ 10.875,00 em 06/10) e
+ * "Previdência" (R$ 5.000,00 desde 01/08/2026; R$ 5.040,00 e R$ 5.080,00 no fim de agosto e de setembro, e R$ 5.080,00 de novo em 06/10). Hoje: R$ 15.955,00,
+ * aportado R$ 15.500,00, ganho de R$ 455,00. Não entram em nenhum total do mês, na renda comprometida nem nas metas.
  * Orçamento por categoria (D-041), a partir de outubro de 2026: Moradia R$ 2.500,00, Mercado R$ 1.800,00 e Lazer R$ 300,00.
  * Usado em outubro (competência): Moradia R$ 2.500,00 (o aluguel pago), Mercado R$ 1.400,00 e Lazer R$ 400,00 (a 1ª parcela do
  * tênis, R$ 200,00, e o restaurante, R$ 200,00; a compra no cartão conta no mês da compra). Limite pessoal de 60% a partir de
@@ -227,6 +231,33 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   // Plano de guardar (spec7): a pessoa respondeu "consigo" com R$ 500,00 por mês, o mesmo plano da reserva. Só é lida pela
   // própria pessoa; não conta como anotação e não muda nenhum total.
   await repo.setSavingsAnswer(newOperationKey(), ctx, 0, 'consigo', 50_000);
+  // Investimentos (D-093), só no Pessoal: não entram em nenhum total do mês, na renda comprometida nem nas metas.
+  const aplicacao = await repo.createInvestment(newOperationKey(), ctx, {
+    name: 'Aplicação do banco',
+    kind: 'renda_fixa',
+    investedCents: 1_000_000,
+    startOn: '2026-06-01',
+    currentCents: null,
+  });
+  const move = (id: string, kind: 'aporte' | 'valor', amountCents: number, occurredOn: string) =>
+    repo.addInvestmentMovement(newOperationKey(), id, kind, { amountCents, occurredOn, note: null });
+  await move(aplicacao.investment!.id, 'valor', 1_008_500, '2026-06-30');
+  await move(aplicacao.investment!.id, 'valor', 1_018_000, '2026-07-31');
+  await move(aplicacao.investment!.id, 'valor', 1_027_000, '2026-08-31');
+  await move(aplicacao.investment!.id, 'valor', 1_036_000, '2026-09-30');
+  await move(aplicacao.investment!.id, 'aporte', 50_000, '2026-10-06');
+  await move(aplicacao.investment!.id, 'valor', 1_087_500, '2026-10-06');
+  const previdencia = await repo.createInvestment(newOperationKey(), ctx, {
+    name: 'Previdência',
+    kind: 'previdencia',
+    investedCents: 500_000,
+    startOn: '2026-08-01',
+    currentCents: null,
+  });
+  await move(previdencia.investment!.id, 'valor', 504_000, '2026-08-31');
+  await move(previdencia.investment!.id, 'valor', 508_000, '2026-09-30');
+  // O extrato conferido de novo em 06/10, sem mudança: com as duas atualizadas no mês, a carteira tem a taxa de outubro até hoje.
+  await move(previdencia.investment!.id, 'valor', 508_000, '2026-10-06');
   // Cartões (D-037): o cartão fechou em 03/10, então as compras de 05 e 06/10 entram na fatura de novembro (vencimento 10/11).
   // cards: false monta a demonstração dos ciclos anteriores (testes das bases A, B e C), sem o cartão e sem as faturas.
   if (opts.cards !== false) {

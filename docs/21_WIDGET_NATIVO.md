@@ -1,4 +1,6 @@
-# Clarevo · Widget nativo da tela inicial (preparado e desligado)
+# Clarevo · Widget nativo da tela inicial (ligado no lançamento, D-093)
+
+> **Situação em 11/11/2026 (D-093):** Enzo decidiu ligar o widget no lançamento. Os perfis `preview` e `production` de `apps/app/eas.json` passam a ter `CLAREVO_WIDGET=1`; o `preview-widget` virou `preview-sem-widget` (`CLAREVO_WIDGET=0`), de reserva, se o build com o widget falhar. O card "Widget na tela inicial" em Conta diz como pôr o widget na tela inicial (iPhone e Android); na web, que ele existe no app de celular; num build sem ele, que vem numa próxima versão. **Falta, com o Enzo:** o primeiro build com o widget (o próximo `preview`) e o teste em aparelho da seção 6. As seções abaixo são de 21/10/2026: onde dizem `preview-widget`, leia o `preview` de agora.
 
 21/10/2026, Ciclo AA (D-063 item 3, `docs/00`). O código do widget do iPhone e do Android está no repositório, testado até onde dá sem aparelho, e **desligado**: nenhum build de hoje (`preview` e `production`) muda. Só o perfil novo `preview-widget` do EAS liga o widget, com `CLAREVO_WIDGET=1`. Conferir de verdade (na tela inicial, na tela bloqueada, no dia seguinte) só é possível em aparelho, depois das contas das lojas (P-006). **Nada foi compilado, publicado nem enviado a loja alguma**, e nenhuma chave, segredo ou identificador de conta foi escrito no repositório.
 

@@ -1,5 +1,15 @@
 import type { CategoryBudget, CommitmentLimit, MonthBudgetRead } from './budget';
 import type { IsoDate, IsoMonth } from './dates';
+import type {
+  Investment,
+  InvestmentInput,
+  InvestmentMovement,
+  InvestmentMovementInput,
+  InvestmentMovementKind,
+  InvestmentStatus,
+  MarketIndices,
+  NewInvestmentInput,
+} from './investments';
 import type { Cents } from './money';
 import type {
   AccountInput,
@@ -120,6 +130,34 @@ export type GoalAction =
 
 /** Imagem da meta (D-077, migração 0021): set_goal_image, com a meta em target_id. Não conta como anotação na atividade. */
 export type GoalImageAction = 'imagem_meta';
+
+/** Ordem das metas (D-093, migração 0031): set_goal_order, com o contexto em target_id. Não conta como anotação na atividade. */
+export type GoalOrderAction = 'ordenar_metas';
+
+/**
+ * Investimentos (D-093, migração 0032), gravados em record_operations com o investimento ou o movimento em target_id. Contam como
+ * anotação na atividade, como as metas.
+ */
+export type InvestmentAction =
+  | 'criar_investimento'
+  | 'alterar_investimento'
+  | 'situacao_investimento'
+  | 'excluir_investimento'
+  | 'registrar_movimento_investimento'
+  | 'alterar_movimento_investimento'
+  | 'excluir_movimento_investimento';
+
+/** Resultado das escritas de investimentos: o investimento (com os totais de investment_items) e o movimento envolvido, quando há. */
+export interface InvestmentWrite {
+  investment: Investment | null;
+  movement: InvestmentMovement | null;
+}
+
+/** Resultado de set_goal_order: o contexto e as metas ativas (sem a reserva) na ordem gravada. */
+export interface GoalOrderWrite {
+  contextId: string;
+  ids: string[];
+}
 
 /**
  * Resultado das escritas de metas: a meta no estado atual (com os totais de goal_items, inclusive excluída) e o
@@ -551,6 +589,29 @@ export interface RecordsRepository {
    * como anotação na atividade.
    */
   setGoalImage(key: string, goalId: string, expectedVersion: number, choice: GoalImageChoice): Promise<GoalImage>;
+  /**
+   * Ordem das metas ativas do contexto, sem a reserva (D-093): a lista completa na ordem nova. lista_invalida quando falta, sobra ou
+   * repete meta; sem_permissao para quem só vê.
+   */
+  setGoalOrder(key: string, contextId: string, goalIds: readonly string[]): Promise<GoalOrderWrite>;
+
+  // Investimentos (D-093): só no Pessoal.
+  /** Investimentos do contexto (ativos e encerrados), por criação, com os totais (investment_items). */
+  listInvestments(contextId: string): Promise<Investment[]>;
+  getInvestment(id: string): Promise<Investment | null>;
+  /** Movimentos de um investimento, do mais recente ao mais antigo (data, criação, id). */
+  listInvestmentMovements(investmentId: string): Promise<InvestmentMovement[]>;
+  /** Movimentos de todos os investimentos do contexto (a carteira), na mesma ordem. */
+  listContextInvestmentMovements(contextId: string): Promise<InvestmentMovement[]>;
+  createInvestment(key: string, contextId: string, input: NewInvestmentInput): Promise<InvestmentWrite>;
+  updateInvestment(key: string, id: string, expectedVersion: number, input: InvestmentInput): Promise<InvestmentWrite>;
+  setInvestmentStatus(key: string, id: string, expectedVersion: number, status: InvestmentStatus): Promise<InvestmentWrite>;
+  deleteInvestment(key: string, id: string, expectedVersion: number): Promise<{ deleted: true; id: string }>;
+  addInvestmentMovement(key: string, investmentId: string, kind: InvestmentMovementKind, input: InvestmentMovementInput): Promise<InvestmentWrite>;
+  updateInvestmentMovement(key: string, movementId: string, expectedVersion: number, input: InvestmentMovementInput): Promise<InvestmentWrite>;
+  deleteInvestmentMovement(key: string, movementId: string, expectedVersion: number): Promise<InvestmentWrite>;
+  /** CDI e IPCA mensais desde `fromMonth` (função "indices" no app real; valores de exemplo na demonstração). */
+  getMarketIndices(fromMonth: IsoMonth): Promise<MarketIndices>;
   /**
    * add_goal_movement: sem versão (como create_record); a versão da meta não sobe. Ordem: repetição; nao_encontrado;
    * sem_permissao; meta_arquivada; tipo_invalido ('saldo_inicial' só por createGoal); valor_invalido;
@@ -997,6 +1058,14 @@ export type RepoErrorCode =
   | 'imagem_invalida'
   | 'foto_invalida'
   | 'foto_grande'
+  | 'lista_invalida'
+  | 'nome_invalido'
+  | 'investimento_encerrado'
+  | 'valor_insuficiente'
+  | 'limite_de_investimentos'
+  | 'situacao_invalida'
+  | 'observacao_invalida'
+  | 'indices_indisponiveis'
   | 'desconhecido';
 
 export class RepoError extends Error {

@@ -14,13 +14,15 @@ import { REMINDER_ID_PREFIX } from './reminders';
  *   contam na próxima abertura do app, e os avisos ficam agendados para as próximas duas semanas);
  * - "recebimentos": no dia 10 de cada mês, se o mês ainda não tem recebimento anotado;
  * - "mapa": no dia 15 de cada mês, para olhar o mapa de gastos do mês até agora;
- * - "ausencia": um aviso quando a última anotação completa 7 dias.
+ * - "ausencia": um aviso quando a última anotação completa 7 dias;
+ * - "aporte" (D-093): no dia escolhido de cada mês, para guardar para as metas, quando há meta ativa com plano por mês e o mês
+ *   ainda não tem aporte registrado.
  *
  * Privacidade (tela bloqueada): nenhuma saída deste módulo leva valor, descrição, categoria ou identificador de registro.
  */
 
-export type RoutineReminderKind = 'gastos' | 'recebimentos' | 'mapa' | 'ausencia';
-export const ROUTINE_REMINDER_KINDS: readonly RoutineReminderKind[] = ['gastos', 'recebimentos', 'mapa', 'ausencia'];
+export type RoutineReminderKind = 'gastos' | 'recebimentos' | 'mapa' | 'ausencia' | 'aporte';
+export const ROUTINE_REMINDER_KINDS: readonly RoutineReminderKind[] = ['gastos', 'recebimentos', 'mapa', 'ausencia', 'aporte'];
 
 /** Horários oferecidos em Conta ("Horário dos lembretes do dia a dia"), separados do horário dos lembretes de vencimento. */
 export const ROUTINE_REMINDER_HOURS = [12, 18, 20, 21] as const;
@@ -34,8 +36,12 @@ export const ROUTINE_MONTHLY_MONTHS = 2;
 export const ROUTINE_INCOME_DAY = 10;
 export const ROUTINE_MAP_DAY = 15;
 export const ROUTINE_ABSENCE_DAYS = 7;
-/** No máximo 20 avisos do dia a dia (14 + 2 + 2 + 1 = 19), somados aos 30 de vencimento: abaixo das 64 do iOS. */
-export const ROUTINE_REMINDER_LIMIT = 20;
+/** Dias oferecidos para o lembrete do aporte (D-093), até o dia 25 para valer em todos os meses. */
+export const DEPOSIT_REMINDER_DAYS = [1, 5, 10, 15, 20, 25] as const;
+export type DepositReminderDay = (typeof DEPOSIT_REMINDER_DAYS)[number];
+export const DEFAULT_DEPOSIT_REMINDER_DAY: DepositReminderDay = 5;
+/** No máximo 21 avisos do dia a dia (14 + 2 + 2 + 1 + 2 = 21), somados aos 30 de vencimento: abaixo das 64 do iOS. */
+export const ROUTINE_REMINDER_LIMIT = 21;
 
 /** Identificadores "clarevo-lembrete-rotina-<tipo>-<dia ou mês>": o app cancela só os seus avisos (isReminderId). */
 export const ROUTINE_REMINDER_ID_PREFIX = `${REMINDER_ID_PREFIX}rotina-`;
@@ -46,12 +52,16 @@ export const ROUTINE_REMINDER_ROUTE: Readonly<Record<RoutineReminderKind, string
   recebimentos: '/registro/novo?tipo=receita',
   mapa: '/analises',
   ausencia: '/',
+  aporte: '/metas',
 };
 
 export const ROUTINE_REMINDER_TEXT = {
   section: 'Lembretes do dia a dia',
   intro: 'Avisos para manter o hábito de anotar. Cada um é opcional, sem valores nem descrições na tela bloqueada, e fica neste aparelho.',
   hourLabel: 'Horário dos lembretes do dia a dia',
+  depositDayLabel: 'Dia do lembrete para guardar',
+  /** "Dia 5" */
+  depositDay: (day: number) => `Dia ${day}`,
   channelName: 'Lembretes do dia a dia',
   kinds: {
     gastos: {
@@ -78,12 +88,18 @@ export const ROUTINE_REMINDER_TEXT = {
       title: 'Resumo',
       body: 'Faz uma semana sem anotações. Quando quiser, é só retomar.',
     },
+    aporte: {
+      toggle: 'Guardar para as metas',
+      caption: 'No dia escolhido de cada mês, se você tem meta com plano por mês e o mês ainda não tem aporte registrado.',
+      title: 'Metas',
+      body: 'Dia de guardar para as suas metas. Quando guardar, registre o aporte.',
+    },
   } as Readonly<Record<RoutineReminderKind, { toggle: string; caption: string; title: string; body: string }>>,
 } as const;
 
 /** As escolhas da pessoa, uma por aviso (ficam só no aparelho). */
 export type RoutineReminderChoices = Readonly<Record<RoutineReminderKind, boolean>>;
-export const NO_ROUTINE_REMINDERS: RoutineReminderChoices = { gastos: false, recebimentos: false, mapa: false, ausencia: false };
+export const NO_ROUTINE_REMINDERS: RoutineReminderChoices = { gastos: false, recebimentos: false, mapa: false, ausencia: false, aporte: false };
 
 export function isRoutineReminderKind(value: unknown): value is RoutineReminderKind {
   return typeof value === 'string' && (ROUTINE_REMINDER_KINDS as readonly string[]).includes(value);
@@ -93,10 +109,14 @@ export function isRoutineReminderHour(value: unknown): value is RoutineReminderH
   return typeof value === 'number' && (ROUTINE_REMINDER_HOURS as readonly number[]).includes(value);
 }
 
+export function isDepositReminderDay(value: unknown): value is DepositReminderDay {
+  return typeof value === 'number' && (DEPOSIT_REMINDER_DAYS as readonly number[]).includes(value);
+}
+
 /** O que foi guardado no aparelho vira escolhas válidas: só `true` liga; o resto (faltando, inválido) fica desligado. */
 export function parseRoutineReminderChoices(value: unknown): RoutineReminderChoices {
   const v = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-  return { gastos: v.gastos === true, recebimentos: v.recebimentos === true, mapa: v.mapa === true, ausencia: v.ausencia === true };
+  return { gastos: v.gastos === true, recebimentos: v.recebimentos === true, mapa: v.mapa === true, ausencia: v.ausencia === true, aporte: v.aporte === true };
 }
 
 /** Algum lembrete do dia a dia ligado? (Preferências ainda sem o campo, de uma versão anterior do app, contam como nenhum.) */
@@ -127,6 +147,11 @@ export interface RoutineReminderPlanOptions {
   limit?: number;
   /** Hoje já tem compra no cartão anotada (lida à parte, em card_entries): conta como gasto anotado para o aviso do dia. */
   cardPurchaseToday?: boolean;
+  /**
+   * Lembrete do aporte (D-093): o dia escolhido, se há meta ativa com plano por mês e se o mês de hoje já tem aporte registrado
+   * (lidos à parte, nas metas do Pessoal). Sem isso, o aviso "aporte" não entra.
+   */
+  deposit?: { day: DepositReminderDay; hasPlannedGoal: boolean; depositThisMonth: boolean };
 }
 
 function hh(hour: number): string {
@@ -140,7 +165,8 @@ function hh(hour: number): string {
  *   (registro de despesa ou, por `options.cardPurchaseToday`, compra no cartão);
  * - "recebimentos": dia 10 do mês atual (se ainda não passou e o mês não tem recebimento) e do mês seguinte;
  * - "mapa": dia 15 do mês atual (se ainda não passou) e do mês seguinte;
- * - "ausencia": última anotação + 7 dias, se ainda não passou.
+ * - "ausencia": última anotação + 7 dias, se ainda não passou;
+ * - "aporte": o dia escolhido do mês atual (se ainda não passou e o mês não tem aporte) e do mês seguinte, só com meta ativa com plano.
  * Em ordem de data e hora, cortado em `limit`. Escolhas todas desligadas, hoje inválido ou hora fora da lista: nenhum aviso.
  */
 export function routineReminderPlan(
@@ -194,6 +220,8 @@ export function routineReminderPlan(
   };
   if (choices.recebimentos) monthly('recebimentos', ROUTINE_INCOME_DAY, incomeThisMonth);
   if (choices.mapa) monthly('mapa', ROUTINE_MAP_DAY, false);
+  const deposit = options.deposit;
+  if (choices.aporte && deposit && deposit.hasPlannedGoal && isDepositReminderDay(deposit.day)) monthly('aporte', deposit.day, deposit.depositThisMonth);
   if (choices.ausencia && activity && isValidIsoDate(activity.lastWriteOn)) {
     const date = addDays(activity.lastWriteOn, ROUTINE_ABSENCE_DAYS);
     if (fits(date)) push('ausencia', date, date);

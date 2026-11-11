@@ -6,7 +6,7 @@ import { DIVIDA_FIELDS } from './custo-da-divida';
 import { DIVIDIR_FIELDS } from './dividir-contas';
 import { CALC_ERROR_TEXT, type CalcErrorCode } from './inputs';
 import { OBJETIVO_FIELDS } from './juntar-para-objetivo';
-import { MULTA_FIELDS } from './multa-e-juros';
+import { MULTA_FATURA_FIELDS, MULTA_FIELDS } from './multa-e-juros';
 import { COTA_UNICA_FIELDS, PARCELADO_FIELDS } from './parcelado-ou-a-vista';
 import { PLANO_FIELDS } from './plano-dividas';
 import { QUITAR_FIELDS } from './quitar-antes';
@@ -26,9 +26,10 @@ export const CALC_FIELDS: Record<CalcSlug, Record<string, CalcFieldSpec>> = {
   'dividir-contas': DIVIDIR_FIELDS,
 };
 
-/** Campos da calculadora; "Parcelado ou à vista?" no modo cota-unica usa os rótulos da conta do ano. */
+/** Campos da calculadora; "Parcelado ou à vista?" no modo cota-unica usa os rótulos da conta do ano; Multa e juros no modo fatura, os da fatura. */
 export function calcFields(slug: CalcSlug, modo?: string): Record<string, CalcFieldSpec> {
   if (slug === 'parcelado-ou-a-vista' && modo === 'cota-unica') return COTA_UNICA_FIELDS;
+  if (slug === 'multa-e-juros' && modo === 'fatura') return MULTA_FATURA_FIELDS;
   return CALC_FIELDS[slug];
 }
 

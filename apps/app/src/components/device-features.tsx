@@ -95,7 +95,7 @@ function NativeFeatures() {
         repo,
         contextId,
         due: prefs.reminders ? prefs.reminderHour : null,
-        routine: routine ? { hour: prefs.routineReminderHour, choices: prefs.routineReminders } : null,
+        routine: routine ? { hour: prefs.routineReminderHour, choices: prefs.routineReminders, depositDay: prefs.depositReminderDay } : null,
       });
     }
     // Widget: sempre o contexto Pessoal (nunca a Família); na demonstração, nada é gravado.
@@ -109,7 +109,7 @@ function NativeFeatures() {
   // Ao abrir, ao entrar e ao mudar uma preferência de lembrete ou um horário (e "Mostrar valores no widget").
   useEffect(() => {
     runRef.current();
-  }, [ready, userId, contextId, status, prefs?.reminders, prefs?.reminderHour, prefs?.routineReminders, prefs?.routineReminderHour, prefs?.widgetShowValues, demo]);
+  }, [ready, userId, contextId, status, prefs?.reminders, prefs?.reminderHour, prefs?.routineReminders, prefs?.routineReminderHour, prefs?.depositReminderDay, prefs?.widgetShowValues, demo]);
 
   // Ao voltar para o app, depois de qualquer escrita concluída e da geração do dia dos gastos fixos.
   useEffect(() => {

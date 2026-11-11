@@ -109,6 +109,7 @@ declare
   items jsonb;
   inv_ver int;
   inv_total bigint;
+  invest uuid;
   v_month date;
   v_month2 date;
 begin
@@ -155,6 +156,11 @@ begin
   perform public.delete_goal_movement(t || '-gol-0004', mov, 1);
   goal2 := (public.create_goal(t || '-gol-0005', p_ctx, 'oportunidade', 'Bicicleta ' || t, 50000, null, null, null, null, null, null, null) #>> '{goal,id}')::uuid;
   perform public.delete_goal(t || '-gol-0006', goal2, 1);
+  -- Investimentos (D-093, 0032), só no Pessoal: um com aporte, valor atual e um resgate.
+  if (select c.kind from public.financial_contexts c where c.id = p_ctx) = 'pessoal' then
+    invest := (public.create_investment(t || '-inv-0001', p_ctx, 'Reserva ' || t, 'renda_fixa', 100000, '2026-10-01', 101000) #>> '{investment,id}')::uuid;
+    perform public.add_investment_movement(t || '-inv-0002', invest, 'resgate', 1000, '2026-10-07', null);
+  end if;
   -- Plano de guardar, renda de referência, orçamento, limite e a revisão dos últimos meses.
   perform public.set_savings_answer(t || '-sav-0001', p_ctx, 0, 'depois');
   -- Renda de referência, orçamento e limite têm uma linha por mês no contexto: só quem preenche primeiro as grava.
@@ -501,11 +507,11 @@ declare
   t text;
   expected text[] := array['card_entries', 'cards', 'category_budgets', 'chat_link_codes', 'chat_links', 'commitment_limits',
     'commitment_series', 'commitments', 'context_activity', 'context_memberships', 'family_invites', 'financial_accounts', 'financial_records',
-    'goal_images', 'goal_movements', 'goals', 'income_references', 'month_checks', 'record_operations', 'return_reviews', 'savings_checks',
-    'series_terms'];
+    'goal_images', 'goal_movements', 'goals', 'income_references', 'investment_movements', 'investments', 'month_checks', 'record_operations',
+    'return_reviews', 'savings_checks', 'series_terms'];
 begin
   -- A lista das tabelas com context_id é a que a exclusão cobre: tabela nova com context_id obriga a revisar clarevo_erase_context.
-  assert pg_temp.ctx_tables() = expected, 'as tabelas com context_id são as 22 que a exclusão cobre: ' || array_to_string(pg_temp.ctx_tables(), ', ');
+  assert pg_temp.ctx_tables() = expected, 'as tabelas com context_id são as 24 que a exclusão cobre (investimentos, 0032, pela cascata do contexto): ' || array_to_string(pg_temp.ctx_tables(), ', ');
   -- O Pessoal do Eli tem linhas em todas as tabelas de dados (menos convites, que só existem na Família).
   foreach t in array expected loop
     assert (t = 'family_invites' and pg_temp.rows_of('eli_ctx', t) = 0) or pg_temp.rows_of('eli_ctx', t) > 0, 'o Pessoal do Eli tem linhas em ' || t;
@@ -1047,18 +1053,20 @@ begin
       'commitments.created_by', 'commitments.deleted_by', 'context_activity.person_id', 'context_memberships.person_id', 'family_invites.created_by',
       'family_invites.used_by', 'financial_accounts.created_by', 'financial_accounts.deleted_by', 'financial_contexts.owner_person_id',
       'financial_records.created_by', 'financial_records.deleted_by', 'goal_movements.created_by', 'goal_movements.deleted_by', 'goals.created_by',
-      'goals.deleted_by', 'income_references.created_by', 'income_references.deleted_by', 'legal_acceptances.person_id', 'licenses.person_id',
+      'goals.deleted_by', 'income_references.created_by', 'income_references.deleted_by', 'investment_movements.created_by',
+      'investments.created_by', 'legal_acceptances.person_id', 'licenses.person_id',
       'month_checks.updated_by', 'organization_admins.person_id', 'plan_entitlements.person_id', 'record_operations.actor_id',
       'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by', 'signup_sources.person_id'],
-    'as chaves estrangeiras para persons são as 42 que a exclusão da conta trata (com o aceite dos termos, 0024, e o Checkout do Asaas, 0026, que sai em cascata)';
+    'as chaves estrangeiras para persons são as 44 que a exclusão da conta trata (com o aceite dos termos, 0024, o Checkout do Asaas, 0026, que sai em cascata, e os investimentos, 0032, só no Pessoal, que saem com o contexto)';
   -- E as que apontam para financial_contexts (financial_records é restrict: por isso os registros saem antes do contexto).
   assert (select array_agg(c.conrelid::regclass::text || '.' || a.attname || ' ' || c.confdeltype::text order by c.conrelid::regclass::text, a.attname)
             from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
            where c.contype = 'f' and c.confrelid = 'public.financial_contexts'::regclass)
        = array['cards.context_id c', 'category_budgets.context_id c', 'chat_link_codes.context_id c', 'chat_links.context_id c', 'commitment_limits.context_id c', 'commitment_series.context_id c', 'commitments.context_id c',
                'context_activity.context_id c', 'context_memberships.context_id c', 'family_invites.context_id c', 'financial_accounts.context_id c',
-               'financial_records.context_id r', 'goals.context_id c', 'income_references.context_id c', 'month_checks.context_id c', 'return_reviews.context_id c', 'savings_checks.context_id c'],
-    'as chaves estrangeiras para financial_contexts: 16 com cascata e financial_records com restrict';
+               'financial_records.context_id r', 'goals.context_id c', 'income_references.context_id c', 'investment_movements.context_id c',
+               'investments.context_id c', 'month_checks.context_id c', 'return_reviews.context_id c', 'savings_checks.context_id c'],
+    'as chaves estrangeiras para financial_contexts: 18 com cascata (com as 2 de investimentos, 0032) e financial_records com restrict';
   assert not exists (select 1 from pg_constraint where conrelid = 'public.persons'::regclass and contype = 'f'), 'persons não depende mais de auth.users por chave estrangeira';
   assert (select count(*) from pg_attribute where attrelid = 'public.persons'::regclass and attname = 'deleted_at' and not attisdropped) = 1
      and (select pg_get_constraintdef(oid) from pg_constraint where conname = 'persons_display_name_check') like '%deleted_at IS NOT NULL%', 'persons.deleted_at e a regra do nome vazio';
@@ -1086,7 +1094,7 @@ begin
     assert (select prosecdef from pg_proc where oid = ('public.' || f)::regprocedure), 'security definer: ' || f;
   end loop;
   assert (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 94, 'authenticated executa 94 funções (as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo, as 3 do WhatsApp, as 3 do Telegram, as 2 da imagem das metas, a do acesso, my_access, e as 2 do aceite dos termos)';
+           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 102, 'authenticated executa 102 funções (as 7 de investimentos, da 0032, a de ordenar as metas, da 0031, as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo, as 3 do WhatsApp, as 3 do Telegram, as 2 da imagem das metas, a do acesso, my_access, e as 2 do aceite dos termos)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
 
@@ -1133,8 +1141,8 @@ begin
            where (x.def ~* '(insert into|update|delete from) (public|auth)\.' or x.def ~* 'clarevo_materialize_series') and x.def !~* 'insert into public\.record_operations')
        = array['delete_my_account', 'ensure_personal_space', 'sync_series_occurrences'],
     'toda função de escrita grava a operação, menos delete_my_account, ensure_personal_space e sync_series_occurrences';
-  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 68,
-    'as 68 funções de escrita com operação são as que o gatilho de record_operations protege (com set_goal_image, 0021, e accept_legal_terms, 0024)';
+  assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 76,
+    'as 76 funções de escrita com operação são as que o gatilho de record_operations protege (com set_goal_image, 0021, accept_legal_terms, 0024, e set_goal_order, 0031)';
   -- As do app para WhatsApp e Telegram (0022) só passam o canal às internas, e são elas que gravam a operação.
   assert (select array_agg(x.proname::text order by x.proname) from pg_temp.app_functions() x where x.def ~* 'clarevo_chat_(create_code|unlink_app)')
        = array['create_telegram_code', 'create_whatsapp_code', 'unlink_telegram', 'unlink_whatsapp']
@@ -1142,8 +1150,8 @@ begin
      and pg_get_functiondef('public.clarevo_chat_unlink_app(text, text)'::regprocedure) ~* 'insert into public\.record_operations',
     'gerar código e desligar, dos dois canais, gravam a operação pelas internas clarevo_chat_create_code e clarevo_chat_unlink_app';
   -- Nada novo em record_operations pela exclusão: a conta some com o rastro, então nenhuma ação nova (as 2 de conferir o mês vêm da 0016).
-  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 74,
-    'a lista de ações de record_operations segue com 74 (excluir a conta não deixa operação; as 3 do WhatsApp vêm da 0020, a da imagem das metas, da 0021, as 3 do Telegram, da 0022, e a do aceite dos termos, da 0024)';
+  assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m where c.conname = 'record_operations_action_check') = 82,
+    'a lista de ações de record_operations segue com 82 (as 7 de investimentos vêm da 0032; excluir a conta não deixa operação; as 3 do WhatsApp vêm da 0020, a da imagem das metas, da 0021, as 3 do Telegram, da 0022, a do aceite dos termos, da 0024, e a de ordenar as metas, da 0031)';
 end $$;
 rollback;
 

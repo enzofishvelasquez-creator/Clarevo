@@ -1,7 +1,7 @@
-import { BAR_TEXT, LEARN_UI_TEXT, barModeFor, topicTabFor } from '@clarevo/core';
+import { BAR_TEXT, INVESTMENT_TEXT, LEARN_UI_TEXT, barModeFor, topicTabFor } from '@clarevo/core';
 import { router, usePathname, useSegments } from 'expo-router';
 import type { TabListProps, TabTriggerSlotProps } from 'expo-router/ui';
-import { ArrowLeftRight, BookOpen, Flag, House, type LucideIcon } from 'lucide-react-native';
+import { ArrowLeftRight, BookOpen, Flag, House, TrendingUp, type LucideIcon } from 'lucide-react-native';
 import { forwardRef, useEffect, useState, useSyncExternalStore } from 'react';
 import { Keyboard, Pressable, StyleSheet, useWindowDimensions, View, type PressableProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,15 +11,17 @@ import { setBrowseBarInset } from '@/lib/bar-inset';
 import { colors, fonts, radius } from '@/theme/tokens';
 
 /**
- * Navegação: Resumo, Movimentos, Metas e Aprender. "Movimentos" é o rótulo compacto; o nome acessível o contém
+ * Navegação: Resumo, Movimentos, Metas, Investir (D-093) e Aprender. "Movimentos" é o rótulo compacto; o nome acessível o contém
  * ("Movimentos do mês"; WCAG 2.5.3, rótulo no nome).
  * Aprender mantém o rótulo curto (quatro destinos do Primeiro Ciclo) e o nome acessível "Aprender e dúvidas", que
  * contém o rótulo visível (D-031(1); WCAG 2.5.3).
  */
-export const TABS: { name: string; href: '/' | '/movimentacoes' | '/metas' | '/aprender'; label: string; a11y: string; icon: LucideIcon }[] = [
+export const TABS: { name: string; href: '/' | '/movimentacoes' | '/metas' | '/investimentos' | '/aprender'; label: string; a11y: string; icon: LucideIcon }[] = [
   { name: 'index', href: '/', label: 'Resumo', a11y: 'Resumo', icon: House },
   { name: 'movimentacoes', href: '/movimentacoes', label: 'Movimentos', a11y: 'Movimentos do mês', icon: ArrowLeftRight },
   { name: 'metas', href: '/metas', label: 'Metas', a11y: 'Metas', icon: Flag },
+  // Investimentos (D-093): rótulo curto, para caber nas cinco abas a 320 px.
+  { name: 'investimentos', href: '/investimentos', label: INVESTMENT_TEXT.tabLabel, a11y: INVESTMENT_TEXT.tabLabel, icon: TrendingUp },
   { name: 'aprender', href: '/aprender', label: LEARN_UI_TEXT.tabLabel, a11y: LEARN_UI_TEXT.tabA11y, icon: BookOpen },
 ];
 
@@ -47,7 +49,9 @@ type FaceProps = PressableProps & { focused: boolean; label: string; a11y: strin
 /** Botão da barra: o mesmo desenho nas abas e nas telas de consulta (ícone, rótulo curto, 56 px, aba marcada). */
 const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a11y, icon: Icon, ...props }, ref) {
   const color = focused ? colors.brand : colors.textSecondary;
-  const narrow = useWindowDimensions().width < 360;
+  // Cinco abas (D-093): o rótulo mais longo ("Movimentos") cabe inteiro de 320 px para cima, com letra de 12, 11 ou 10,5.
+  const width = useWindowDimensions().width;
+  const fontSize = width >= 375 ? 12 : width >= 340 ? 11 : 10.5;
   return (
     <Pressable
       ref={ref}
@@ -62,7 +66,7 @@ const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a
         (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
       ]}>
       <Icon size={22} color={color} strokeWidth={focused ? 2.25 : 2} />
-      <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize: narrow ? 11.5 : 13 }} numberOfLines={1} maxFontSizeMultiplier={1.3} adjustsFontSizeToFit minimumFontScale={0.8}>
+      <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize, letterSpacing: -0.1 }} numberOfLines={1} maxFontSizeMultiplier={1.3} adjustsFontSizeToFit minimumFontScale={0.8}>
         {label}
       </Txt>
     </Pressable>
@@ -142,7 +146,7 @@ export function TabBar({ children, ...props }: TabListProps) {
 const styles = StyleSheet.create({
   overlay: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   barWrap: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 },
-  bar: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 8, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  bar: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 4, width: '100%', maxWidth: 560, alignSelf: 'center' },
   button: { flex: 1, minHeight: 56, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: 4 },
   buttonActive: { backgroundColor: colors.brandTint },
 });
