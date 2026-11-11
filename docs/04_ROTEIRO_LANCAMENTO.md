@@ -153,7 +153,7 @@ Enzo aprovou as sete decisões em 09/11/2026 ("Aprovo"); ordem combinada E, D, C
 - [x] F: vídeo em formato de reels (compra de mercado e orçamento): `node scripts/gravar-redes.js --so reels`, docs/24 seção 2.4b
 - [x] Publicado em 10/11/2026: 0028, 0029 e 0030 aplicadas no `clarevo-producao` com as conferências 21p, 21q e 21r certas, funções `telegram` e `whatsapp` publicadas de novo e, logo depois, o merge do PR #23 (que publica o app)
 - [ ] **Você:** avisar a Elis que o pacote 2 está no ar
-- [ ] G, depois do lançamento: modo "Fatura de cartão depois do vencimento" em Multa e juros
+- [x] G: modo "Fatura do cartão" em Multa e juros (antecipado para antes do lançamento pela D-093)
 
 ## Assinatura pelas lojas (D-090, `docs/42_ASSINATURA_LOJAS.md`)
 
@@ -182,7 +182,7 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [x] Metas: prioridade ("Ordenar metas", com duas ou mais metas; migração 0031, `docs/05` passo 12v)
 - [x] Investimentos: aba nova, só no Pessoal, acompanhamento manual com comparação com CDI e IPCA (`docs/45_INVESTIMENTOS.md`)
 - [ ] Supabase (Enzo): migrações 0031 e 0032 e a função `indices` com JWT ligado (`docs/05`, passos 12v, 12w e 12x; conferências 21s e 21t)
-- [ ] Multa e juros: modo "Fatura de cartão depois do vencimento" (era D-089 G)
+- [x] Multa e juros: modo "Fatura do cartão" (era D-089 G): rotativo, mora, multa, IOF estimado e o teto da Lei 14.690/2023; a fatura vencida abre a calculadora nesse modo
 - [ ] Assinatura na web com Pix Automático (Asaas), além do cartão
 - [x] Widget ligado nos perfis `preview` e `production` (`preview-sem-widget` de reserva) e o card de Conta com o passo a passo
 - [ ] Widget: primeiro build com ele e teste no iPhone e no Android (`docs/21`, seção 6; Enzo)

@@ -2023,6 +2023,19 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('multa e juros: o resultado não fala em atraso', !/atras/i.test(await resultCardText()));
   await calcShot('60_calc_multa_e_juros');
   await calcWidths('multa e juros', 'Multa e juros por atraso');
+  // D-093 (era D-089 G): "Fatura do cartão" troca os campos: o que ficou sem pagar, rotativo, mora e multa, com o IOF estimado e o teto da lei.
+  await radio('Fatura do cartão').click(); await p.waitForTimeout(300);
+  ok('multa e juros, fatura: "Valor que ficou sem pagar", "Juros do rotativo ao mês (%)" e "Juros de mora ao mês (%)" no lugar de "Valor da conta" e "Juros ao mês (%)"',
+    (await field('Valor que ficou sem pagar').count()) === 1 && (await field('Juros do rotativo ao mês (%)').count()) === 1 && (await field('Juros de mora ao mês (%)').count()) === 1 &&
+      (await field('Juros ao mês (%)').count()) === 0);
+  await typeIn('Valor que ficou sem pagar', '1.000,00'); await typeIn('Juros do rotativo ao mês (%)', '15'); await typeIn('Juros de mora ao mês (%)', '1');
+  await typeIn('Multa (%)', '2'); await typeIn('Dias depois do vencimento', '30');
+  ok('multa e juros, fatura: R$ 1.186,26 com rotativo, mora, multa e IOF estimado', await shows('Com estes números, 30 dias depois do vencimento a fatura fica em R$ 1.186,26.',
+    'Juros do rotativo: R$ 150,00', 'Juros de mora: R$ 10,00', 'Multa: R$ 20,00', 'IOF estimado: R$ 6,26', 'O rotativo vale só até a próxima fatura.'));
+  await calcShot('60b_calc_multa_fatura');
+  await typeIn('Dias depois do vencimento', '365');
+  ok('multa e juros, fatura: em 365 dias, o teto da Lei 14.690/2023 (R$ 2.033,73 com o IOF)', await shows('a fatura fica em R$ 2.033,73.', 'Lei 14.690/2023'));
+  await calcWidths('multa e juros, fatura', 'Multa e juros por atraso');
   await backToCalcList();
 
   // 7. Reserva: 3.750,00 por mês e 6 meses; 4.500,00 guardados; 500,00 por mês.
