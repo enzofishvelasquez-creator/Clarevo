@@ -369,16 +369,12 @@ const __mods = [
     }
     const FLOW_SIGN = { aporte: 1, resgate: -1, rendimento: 0, valor: 0 };
     function sorted(movements) {
-        const created = (m) => m.createdAt ?? '\uffff';
+        const cmp = (x, y) => (x === y ? 0 : x === undefined ? 1 : y === undefined ? -1 : x < y ? -1 : 1);
         return [...movements].sort((a, b) => {
             if (a.occurredOn !== b.occurredOn)
                 return a.occurredOn < b.occurredOn ? -1 : 1;
             const kind = (a.kind === 'valor' ? 1 : 0) - (b.kind === 'valor' ? 1 : 0);
-            if (kind !== 0)
-                return kind;
-            if (created(a) !== created(b))
-                return created(a) < created(b) ? -1 : 1;
-            return (a.id ?? '\uffff') < (b.id ?? '\uffff') ? -1 : (a.id ?? '\uffff') > (b.id ?? '\uffff') ? 1 : 0;
+            return kind !== 0 ? kind : cmp(a.createdAt, b.createdAt) || cmp(a.id, b.id);
         });
     }
     function investmentValueOn(movements, date) {
@@ -625,6 +621,7 @@ const __mods = [
         thisMonth: (rate) => (rate === null ? 'Neste mês: sem taxa ainda' : `Neste mês, até hoje: ${pctText(rate)}`),
         sinceStart: (rate, from) => (rate === null ? null : `Desde ${(0, dates_1.formatMonthYearBR)(from)}: ${pctText(rate)}`),
         noValueYet: 'Atualize o valor com o que aparece no seu extrato para ver quanto rendeu.',
+        monthlyHint: 'Para ver quanto rendeu em cada mês, atualize o valor de cada investimento pelo menos uma vez por mês.',
         lastValue: (d) => `Valor atualizado em ${(0, dates_1.formatDateBR)(d)}`,
         indicesSource: (fetchedOn) => `Fonte do CDI e do IPCA: Banco Central do Brasil, séries ${exports.BCB_SERIES.cdi} e ${exports.BCB_SERIES.ipca}${fetchedOn ? `, consulta em ${(0, dates_1.formatDateBR)(fetchedOn)}` : ''}.`,
         indicesExample: 'Na demonstração, o CDI e o IPCA são valores de exemplo, não os índices reais.',

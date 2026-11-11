@@ -163,13 +163,12 @@ const FLOW_SIGN: Readonly<Record<InvestmentMovementKind, number>> = { aporte: 1,
  * Um movimento ainda não salvo (sem `createdAt`) vem por último no seu grupo.
  */
 function sorted<M extends MovementLike>(movements: readonly M[]): M[] {
-  const created = (m: MovementLike) => m.createdAt ?? '\uffff';
+  // Texto ausente vem depois de qualquer texto (o movimento ainda não salvo fica por último).
+  const cmp = (x: string | undefined, y: string | undefined) => (x === y ? 0 : x === undefined ? 1 : y === undefined ? -1 : x < y ? -1 : 1);
   return [...movements].sort((a, b) => {
     if (a.occurredOn !== b.occurredOn) return a.occurredOn < b.occurredOn ? -1 : 1;
     const kind = (a.kind === 'valor' ? 1 : 0) - (b.kind === 'valor' ? 1 : 0);
-    if (kind !== 0) return kind;
-    if (created(a) !== created(b)) return created(a) < created(b) ? -1 : 1;
-    return (a.id ?? '\uffff') < (b.id ?? '\uffff') ? -1 : (a.id ?? '\uffff') > (b.id ?? '\uffff') ? 1 : 0;
+    return kind !== 0 ? kind : cmp(a.createdAt, b.createdAt) || cmp(a.id, b.id);
   });
 }
 
