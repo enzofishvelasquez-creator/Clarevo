@@ -1,21 +1,28 @@
 import type { IsoDate, IsoMonth } from '../dates';
 import { addMonths, isValidIsoMonth, monthOf, monthsBetween, todayIn } from '../dates';
 import { BCB_SERIES, bcbSeriesUrl, parseBcbSeries } from '../investments';
+import { serviceKeyFrom } from '../servidor-comum';
 
 /**
  * Função do servidor "indices" (D-093, `docs/45_INVESTIMENTOS.md`): busca no Banco Central as séries mensais do CDI (4391, acumulado no
  * mês) e do IPCA (433, variação mensal), que são públicas, e devolve ao app para comparar com a rentabilidade dos investimentos. Não
  * recebe nem guarda dado de ninguém: só o mês de partida. Guarda a resposta por 6 horas na memória da função (o Banco Central atualiza
- * uma vez por mês), para não repetir a consulta a cada tela aberta. Publicada com "Verify JWT" ligado: só quem está no app consulta.
+ * uma vez por mês), para não repetir a consulta a cada tela aberta. Só quem está no app consulta: a função confere a sessão da pessoa no
+ * Supabase Auth (GET /auth/v1/user), como a da assinatura, e é publicada com a verificação de JWT do painel **desligada** (a do painel só
+ * aceita tokens assinados com o segredo antigo e recusaria as sessões assinadas com as chaves novas do Supabase).
  *
  * Pedido: POST com {"desde": "AAAA-MM"} (ou GET com ?desde=AAAA-MM); sem mês válido, os 24 meses anteriores ao mês de hoje; nunca antes
  * de 2000-01 nem depois do mês de hoje. Resposta 200: {"cdi": {"AAAA-MM": 0.93, ...}, "ipca": {...}, "fetchedOn": "AAAA-MM-DD"};
  * 502 {"erro": "indices_indisponiveis"} quando o Banco Central não responde (o app diz que não conseguiu, nunca inventa índice).
+ * Sem sessão válida: 401 {"erro": "nao_autenticado"}; o Supabase Auth fora do ar: 502 {"erro": "sessao_indisponivel"}.
  */
 
 export interface IndicesConfig {
   /** Endereço do app (CORS): só ele e o app em desenvolvimento no próprio computador recebem resposta no navegador. */
   appUrl: string;
+  /** Endereço do projeto (SUPABASE_URL) e a chave pública usada para conferir a sessão; o Supabase fornece os dois. Vazio: 503. */
+  supabaseUrl: string;
+  userApiKey: string;
 }
 
 /** Hoje no horário de Brasília (o dia do pedido; os índices são mensais). */
@@ -24,11 +31,16 @@ export function brazilToday(): IsoDate {
 }
 
 export function indicesConfigFrom(env: (name: string) => string | undefined): IndicesConfig {
-  return { appUrl: (env('CLAREVO_APP_URL') ?? 'https://app.clarevo.app.br').replace(/\/+$/, '') };
+  const v = (name: string) => (env(name) ?? '').trim();
+  return {
+    appUrl: (v('CLAREVO_APP_URL') || 'https://app.clarevo.app.br').replace(/\/+$/, ''),
+    supabaseUrl: v('SUPABASE_URL').replace(/\/+$/, ''),
+    userApiKey: v('SUPABASE_PUBLISHABLE_KEY') || v('SUPABASE_ANON_KEY') || serviceKeyFrom(v),
+  };
 }
 
 export interface IndicesFetch {
-  (url: string, init: { timeoutMs: number }): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+  (url: string, init: { timeoutMs: number; headers?: Record<string, string> }): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
 }
 
 export interface IndicesRequest {
@@ -76,7 +88,27 @@ export function createIndicesHandler(deps: { config: IndicesConfig; fetch: Indic
   return async (req: IndicesRequest): Promise<IndicesResponse> => {
     const headers = cors(req.header('origin'), deps.config.appUrl);
     if (req.method === 'OPTIONS') return { status: 204, body: '', headers };
-    if (req.method !== 'GET' && req.method !== 'POST') return { status: 405, body: JSON.stringify({ erro: 'metodo' }), headers: { ...headers, 'Content-Type': JSON_TYPE } };
+    const reply = (status: number, erro: string) => ({ status, body: JSON.stringify({ erro }), headers: { ...headers, 'Content-Type': JSON_TYPE } });
+    if (req.method !== 'GET' && req.method !== 'POST') return reply(405, 'metodo');
+    // A sessão da pessoa, conferida pelo próprio Supabase Auth (assinatura e validade), com qualquer tipo de chave de assinatura.
+    const auth = /^Bearer\s+(\S+)$/i.exec(req.header('authorization') ?? '');
+    if (!auth) return reply(401, 'nao_autenticado');
+    if (deps.config.supabaseUrl === '' || deps.config.userApiKey === '') {
+      deps.log?.('indices: configuracao');
+      return reply(503, 'indisponivel');
+    }
+    try {
+      const r = await deps.fetch(`${deps.config.supabaseUrl}/auth/v1/user`, { timeoutMs: 8000, headers: { apikey: deps.config.userApiKey, Authorization: `Bearer ${auth[1]}` } });
+      if (r.status === 401 || r.status === 403) return reply(401, 'nao_autenticado');
+      const id = r.ok ? ((await r.json()) as { id?: unknown } | null)?.id : null;
+      if (typeof id !== 'string' || id === '') {
+        deps.log?.(`indices: auth_${r.status}`);
+        return r.ok ? reply(401, 'nao_autenticado') : reply(502, 'sessao_indisponivel');
+      }
+    } catch (e) {
+      deps.log?.(`indices: auth_${e instanceof Error ? e.message : 'falha'}`);
+      return reply(502, 'sessao_indisponivel');
+    }
     let requested: unknown = null;
     if (req.method === 'GET') {
       try {
@@ -114,7 +146,7 @@ export function createIndicesHandler(deps: { config: IndicesConfig; fetch: Indic
       }
     };
     const [cdi, ipca] = await Promise.all([get(BCB_SERIES.cdi), get(BCB_SERIES.ipca)]);
-    if (!cdi.ok && !ipca.ok) return { status: 502, body: JSON.stringify({ erro: 'indices_indisponiveis' }), headers: { ...headers, 'Content-Type': JSON_TYPE } };
+    if (!cdi.ok && !ipca.ok) return reply(502, 'indices_indisponiveis');
     const body = JSON.stringify({ cdi: cdi.series, ipca: ipca.series, fetchedOn: today });
     if (cdi.ok && ipca.ok) cache.set(key, { at: now(), body });
     return { status: 200, body, headers: { ...headers, 'Content-Type': JSON_TYPE } };

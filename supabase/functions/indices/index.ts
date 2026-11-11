@@ -2,7 +2,8 @@
 // GERADO por scripts/gerar-funcoes.js a partir de packages/core/src/indices. Não editar à mão: mude o núcleo e rode `npm run indices`.
 // Clarevo · função do servidor "indices" (Edge Function do Supabase, D-093): busca no Banco Central as séries públicas do CDI (4391) e
 // do IPCA (433) e devolve ao app, para comparar com a rentabilidade dos investimentos que a pessoa registra. Não recebe nem guarda dado
-// de ninguém (só o mês de partida). Sem segredos; opcional CLAREVO_APP_URL. Publicar com "Verify JWT" ligado (só quem está no app).
+// de ninguém (só o mês de partida). Sem segredos; opcional CLAREVO_APP_URL. Confere a sessão da pessoa no Supabase Auth: publicar com
+// a verificação de JWT do painel ("Verify JWT with legacy secret") DESLIGADA.
 
 const __mods = [
   // packages/core/src/indices/servidor.ts
@@ -15,11 +16,17 @@ const __mods = [
     exports.createIndicesHandler = createIndicesHandler;
     const dates_1 = __req(1);
     const investments_1 = __req(2);
+    const servidor_comum_1 = __req(4);
     function brazilToday() {
         return (0, dates_1.todayIn)('America/Sao_Paulo');
     }
     function indicesConfigFrom(env) {
-        return { appUrl: (env('CLAREVO_APP_URL') ?? 'https://app.clarevo.app.br').replace(/\/+$/, '') };
+        const v = (name) => (env(name) ?? '').trim();
+        return {
+            appUrl: (v('CLAREVO_APP_URL') || 'https://app.clarevo.app.br').replace(/\/+$/, ''),
+            supabaseUrl: v('SUPABASE_URL').replace(/\/+$/, ''),
+            userApiKey: v('SUPABASE_PUBLISHABLE_KEY') || v('SUPABASE_ANON_KEY') || (0, servidor_comum_1.serviceKeyFrom)(v),
+        };
     }
     const CACHE_MS = 6 * 60 * 60 * 1000;
     const FIRST_MONTH = '2000-01';
@@ -54,8 +61,30 @@ const __mods = [
             const headers = cors(req.header('origin'), deps.config.appUrl);
             if (req.method === 'OPTIONS')
                 return { status: 204, body: '', headers };
+            const reply = (status, erro) => ({ status, body: JSON.stringify({ erro }), headers: { ...headers, 'Content-Type': JSON_TYPE } });
             if (req.method !== 'GET' && req.method !== 'POST')
-                return { status: 405, body: JSON.stringify({ erro: 'metodo' }), headers: { ...headers, 'Content-Type': JSON_TYPE } };
+                return reply(405, 'metodo');
+            const auth = /^Bearer\s+(\S+)$/i.exec(req.header('authorization') ?? '');
+            if (!auth)
+                return reply(401, 'nao_autenticado');
+            if (deps.config.supabaseUrl === '' || deps.config.userApiKey === '') {
+                deps.log?.('indices: configuracao');
+                return reply(503, 'indisponivel');
+            }
+            try {
+                const r = await deps.fetch(`${deps.config.supabaseUrl}/auth/v1/user`, { timeoutMs: 8000, headers: { apikey: deps.config.userApiKey, Authorization: `Bearer ${auth[1]}` } });
+                if (r.status === 401 || r.status === 403)
+                    return reply(401, 'nao_autenticado');
+                const id = r.ok ? (await r.json())?.id : null;
+                if (typeof id !== 'string' || id === '') {
+                    deps.log?.(`indices: auth_${r.status}`);
+                    return r.ok ? reply(401, 'nao_autenticado') : reply(502, 'sessao_indisponivel');
+                }
+            }
+            catch (e) {
+                deps.log?.(`indices: auth_${e instanceof Error ? e.message : 'falha'}`);
+                return reply(502, 'sessao_indisponivel');
+            }
             let requested = null;
             if (req.method === 'GET') {
                 try {
@@ -98,7 +127,7 @@ const __mods = [
             };
             const [cdi, ipca] = await Promise.all([get(investments_1.BCB_SERIES.cdi), get(investments_1.BCB_SERIES.ipca)]);
             if (!cdi.ok && !ipca.ok)
-                return { status: 502, body: JSON.stringify({ erro: 'indices_indisponiveis' }), headers: { ...headers, 'Content-Type': JSON_TYPE } };
+                return reply(502, 'indices_indisponiveis');
             const body = JSON.stringify({ cdi: cdi.series, ipca: ipca.series, fetchedOn: today });
             if (cdi.ok && ipca.ok)
                 cache.set(key, { at: now(), body });
@@ -788,6 +817,49 @@ const __mods = [
         return Math.floor((a + b - 1) / b);
     }
   },
+  // packages/core/src/servidor-comum.ts
+  function (module, exports, __req) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.sameText = sameText;
+    exports.obj = obj;
+    exports.serviceKeyFrom = serviceKeyFrom;
+    exports.serviceHeaders = serviceHeaders;
+    function sameText(a, b) {
+        if (a.length !== b.length)
+            return false;
+        let diff = 0;
+        for (let i = 0; i < a.length; i++)
+            diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+        return diff === 0;
+    }
+    function obj(v) {
+        return typeof v === 'object' && v !== null && !Array.isArray(v) ? v : null;
+    }
+    function serviceKeyFrom(v) {
+        const keys = v('SUPABASE_SECRET_KEYS');
+        if (keys !== '') {
+            try {
+                const parsed = JSON.parse(keys);
+                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                    const values = parsed;
+                    const chosen = typeof values.default === 'string' ? values.default : Object.values(values).find((x) => typeof x === 'string');
+                    if (typeof chosen === 'string' && chosen.trim() !== '')
+                        return chosen.trim();
+                }
+            }
+            catch {
+            }
+        }
+        return v('SUPABASE_SERVICE_ROLE_KEY');
+    }
+    function serviceHeaders(serviceKey) {
+        const headers = { apikey: serviceKey, 'Content-Type': 'application/json' };
+        if (serviceKey.startsWith('eyJ'))
+            headers.Authorization = `Bearer ${serviceKey}`;
+        return headers;
+    }
+  },
 ];
 const __cache = [];
 function __req(i) {
@@ -801,7 +873,7 @@ function __req(i) {
 const indices = __req(0);
 const handler = indices.createIndicesHandler({
   config: indices.indicesConfigFrom((name) => Deno.env.get(name)),
-  fetch: (url, init) => fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(init.timeoutMs) }),
+  fetch: (url, init) => fetch(url, { headers: { Accept: "application/json", ...(init.headers ?? {}) }, signal: AbortSignal.timeout(init.timeoutMs) }),
   today: () => indices.brazilToday(),
   log: (message) => console.error(message),
 });

@@ -76,7 +76,8 @@ Formulários sem a barra inferior; a aba e o detalhe com a barra (regra de naveg
   mês, % ao mês) e série **433** (IPCA, variação mensal, %). A tela diz a fonte e a data da consulta.
 - Quem busca é a função do servidor **`indices`** (`packages/core/src/indices/servidor.ts`, gerada em `supabase/functions/indices/index.ts`
   por `npm run indices`): recebe só o mês de partida (`{"desde": "AAAA-MM"}`), nunca dado de ninguém; guarda a resposta por 6 horas; só
-  responde ao endereço do app (`CLAREVO_APP_URL`, padrão `https://app.clarevo.app.br`) e ao app em desenvolvimento no próprio computador.
+  responde ao endereço do app (`CLAREVO_APP_URL`, padrão `https://app.clarevo.app.br`) e ao app em desenvolvimento no próprio computador;
+  e só para quem está no app (confere a sessão no Supabase Auth: sem sessão, `401 {"erro": "nao_autenticado"}`).
   Cada série é buscada à parte: o IPCA do mês ainda não publicado não leva o CDI junto (e uma resposta com uma série faltando não fica
   guardada). Se o Banco Central não responder para nenhuma das duas: `502 {"erro": "indices_indisponiveis"}`, e a tela diz "Não foi possível buscar o CDI e o IPCA agora. A
   sua rentabilidade continua aqui." O app nunca inventa índice.
@@ -123,6 +124,8 @@ Em `docs/05_SUPABASE.md`, passos 12v, 12w e 12x, e as conferências 21s e 21t:
 
 1. SQL Editor: rodar a migração 0031 (`20261111000001_metas_ordem.sql`, prioridade das metas) e depois a 0032
    (`20261111000002_investimentos.sql`), cada uma numa consulta nova, e recarregar o esquema.
-2. Edge Functions: criar a função `indices` pelo editor, colar `supabase/functions/indices/index.ts` e publicar com **"Verify JWT"
-   ligado** (só quem está no app consulta). Não há segredo: o Banco Central é público.
+2. Edge Functions: criar a função `indices` pelo editor, colar `supabase/functions/indices/index.ts` e publicar com **"Verify JWT with legacy secret"
+   desligado**, como as outras funções: só quem está no app consulta, porque a função confere a sessão da pessoa no Supabase Auth (a
+   verificação do painel só aceita o segredo antigo e recusaria as sessões assinadas com as chaves novas). Não há segredo: o Banco Central
+   é público. Feito em 11/11/2026 (com a verificação ligada, na primeira versão); falta publicar a versão que confere a sessão e desligar.
 3. Aplicar antes de publicar o app novo: a aba nova lê `investment_items` e chama as funções novas.
