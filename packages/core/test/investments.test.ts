@@ -79,33 +79,77 @@ describe('investimentos (D-093): valor, ganho e saldo dia a dia', () => {
 });
 
 describe('investimentos: rentabilidade mensal (Dietz modificado) e encadeada', () => {
+  // Cadastro com "Quanto vale hoje": o aporte e a atualização de valor no mesmo dia.
+  const cadastro = (cents: number, on: string, value = cents) => [mv('aporte', cents, on), mv('valor', value, on)];
+
   it('um mês simples: R$ 1.000,00 no início, R$ 1.010,00 no fim, sem fluxo, rende 1%', () => {
-    const r = monthlyReturns([[mv('aporte', 100_000, '2026-09-30'), mv('valor', 101_000, '2026-10-31')]], TODAY);
+    const r = monthlyReturns([[...cadastro(100_000, '2026-09-30'), mv('valor', 101_000, '2026-10-31')]], TODAY);
     expect(r.map((x) => x.month)).toEqual(['2026-09', '2026-10', '2026-11']);
-    // Setembro: o aporte entra no último dia, base zero, sem taxa.
+    // Setembro: entra no fim do último dia, nenhum dia investido, sem taxa.
     expect(r[0]!.rate).toBeNull();
     expect(r[1]!.rate).toBeCloseTo(0.01, 10);
     expect(r[1]!.endValueCents).toBe(101_000);
-    expect(r[2]).toMatchObject({ month: '2026-11', partial: true, endValueCents: 101_000, rate: 0 });
+    // Novembro ainda sem atualização de valor: sem taxa (o valor do fim é o último informado).
+    expect(r[2]).toMatchObject({ month: '2026-11', partial: true, endValueCents: 101_000, rate: null });
   });
 
   it('o aporte no meio do mês pesa pelos dias que ficou investido; o rendimento pago conta como retorno', () => {
     // Outubro (31 dias): V0 R$ 1.000,00; aporte de R$ 310,00 no dia 16 (peso 15/31 = R$ 150,00); V1 R$ 1.320,00; rendimento de R$ 5,00.
-    const g = [mv('aporte', 100_000, '2026-09-30'), mv('aporte', 31_000, '2026-10-16'), mv('rendimento', 500, '2026-10-20'), mv('valor', 132_000, '2026-10-31')];
+    const g = [...cadastro(100_000, '2026-09-30'), mv('aporte', 31_000, '2026-10-16'), mv('rendimento', 500, '2026-10-20'), mv('valor', 132_000, '2026-10-31')];
     const oct = monthlyReturns([g], TODAY).find((x) => x.month === '2026-10')!;
     expect(oct.rate).toBeCloseTo((132_000 - 100_000 - 31_000 + 500) / (100_000 + 15_000), 10);
   });
 
+  it('sem atualização no primeiro dia, os aportes desse dia entram no começo do dia (a demonstração começa assim)', () => {
+    const g = [mv('aporte', 1_000_000, '2026-06-01'), mv('valor', 1_008_500, '2026-06-30')];
+    expect(monthlyReturns([g], '2026-07-15')[0]!.rate).toBeCloseTo(0.0085, 10);
+  });
+
   it('a carteira soma os investimentos; encadear multiplica os meses e ignora os sem taxa', () => {
-    const a = [mv('aporte', 100_000, '2026-08-31'), mv('valor', 101_000, '2026-09-30'), mv('valor', 102_010, '2026-10-31')];
-    const b = [mv('aporte', 100_000, '2026-08-31'), mv('valor', 100_000, '2026-09-30'), mv('valor', 99_000, '2026-10-31')];
+    const a = [...cadastro(100_000, '2026-08-31'), mv('valor', 101_000, '2026-09-30'), mv('valor', 102_010, '2026-10-31')];
+    const b = [...cadastro(100_000, '2026-08-31'), mv('valor', 100_000, '2026-09-30'), mv('valor', 99_000, '2026-10-31')];
     const r = monthlyReturns([a, b], TODAY);
     expect(r.find((x) => x.month === '2026-09')!.rate).toBeCloseTo(0.005, 10);
     expect(r.find((x) => x.month === '2026-10')!.endValueCents).toBe(201_010);
+    // Um investimento sem atualização no mês deixa a carteira sem taxa naquele mês.
+    const c = [...cadastro(50_000, '2026-08-31')];
+    expect(monthlyReturns([a, c], TODAY).find((x) => x.month === '2026-09')!.rate).toBeNull();
     expect(chainRates([0.01, null, 0.01])).toBeCloseTo(0.0201, 10);
     expect(chainRates([null])).toBeNull();
     expect(chainRates([])).toBeNull();
     expect(monthlyReturns([[]], TODAY)).toEqual([]);
+  });
+
+  it('revisão de 11/11/2026: o ganho de antes do cadastro não vira rendimento de um mês só', () => {
+    // Cadastro em 29/11 com R$ 10.000,00 aplicados e R$ 11.200,00 de valor: no próprio dia, sem taxa; em dezembro, novembro fica em 0%.
+    const g = cadastro(1_000_000, '2026-11-29', 1_120_000);
+    expect(monthlyReturns([g], '2026-11-29')[0]!.rate).toBeNull();
+    const dec = monthlyReturns([g], '2026-12-05');
+    expect(dec[0]!.rate).toBeCloseTo(0, 10);
+    expect(dec[1]!.rate).toBeNull();
+    expect(compareLastClosedMonths(dec, exampleIndices())!.rate).toBeCloseTo(0, 10);
+    // Desde 01/11/2025, com o valor de hoje só: nenhum mês tem as duas pontas, nada de "+0,00%" contra o CDI.
+    const longo = [mv('aporte', 1_000_000, '2025-11-01'), mv('valor', 1_120_000, TODAY)];
+    const r = monthlyReturns([longo], TODAY);
+    expect(r.every((x) => x.rate === null)).toBe(true);
+    expect(compareLastClosedMonths(r, exampleIndices())).toBeNull();
+  });
+
+  it('taxa de −100% ou menos (aporte grande no fim do mês e valor zerado) fica sem taxa', () => {
+    const g = [...cadastro(100, '2026-08-31'), mv('valor', 100, '2026-09-30'), mv('aporte', 1_000_000, '2026-10-30'), mv('valor', 0, '2026-10-31')];
+    expect(monthlyReturns([g], TODAY).find((x) => x.month === '2026-10')!.rate).toBeNull();
+  });
+
+  it('duas atualizações no mesmo dia: vale a última criada, como no banco, mesmo com a lista do mais novo para o mais antigo', () => {
+    const list = [
+      { ...mv('resgate', 500_000, '2026-11-11'), createdAt: '2026-11-11T10:00:00Z' },
+      { ...mv('valor', 1_000_000, '2026-11-10'), createdAt: '2026-11-10T10:05:00Z' },
+      { ...mv('valor', 0, '2026-11-10'), createdAt: '2026-11-10T10:00:00Z' },
+    ];
+    expect(investmentNegativeDay(list)).toBeNull();
+    expect(investmentValueOn(list, '2026-11-11')).toBe(500_000);
+    // Um movimento novo (ainda sem data de criação) vale depois dos que já existem no mesmo dia.
+    expect(investmentValueOn(applyInvestmentChange(list.map((m, i) => ({ ...m, id: `m${i}` })), { op: 'add', kind: 'valor', amountCents: 700_000, occurredOn: '2026-11-10' }), '2026-11-10')).toBe(700_000);
   });
 });
 
@@ -135,7 +179,7 @@ describe('investimentos: CDI e IPCA', () => {
   });
 
   it('compara só os meses fechados (até 12) e diz quando os índices são de exemplo', () => {
-    const g = [mv('aporte', 100_000, '2026-08-31'), mv('valor', 101_000, '2026-09-30'), mv('valor', 102_010, '2026-10-31'), mv('valor', 110_000, TODAY)];
+    const g = [mv('aporte', 100_000, '2026-08-31'), mv('valor', 100_000, '2026-08-31'), mv('valor', 101_000, '2026-09-30'), mv('valor', 102_010, '2026-10-31'), mv('valor', 110_000, TODAY)];
     const c = compareLastClosedMonths(monthlyReturns([g], TODAY), exampleIndices())!;
     expect(c.months).toEqual(['2026-09', '2026-10']);
     expect(c.rate).toBeCloseTo(0.0201, 10);

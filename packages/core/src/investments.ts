@@ -111,7 +111,8 @@ export type InvestmentErrorCode =
 /** Caracteres (não unidades UTF-16), como charCount de validation.ts; aqui sem importar o resto (a função do servidor leva só este arquivo). */
 const charCount = (text: string) => [...text].length;
 
-type MovementLike = Pick<InvestmentMovement, 'kind' | 'amountCents' | 'occurredOn'>;
+/** Um movimento para as contas. `createdAt` e `id` só desempatam dois movimentos do mesmo tipo no mesmo dia (como o banco). */
+type MovementLike = Pick<InvestmentMovement, 'kind' | 'amountCents' | 'occurredOn'> & { createdAt?: string; id?: string };
 type MovementWithId = MovementLike & { id: string };
 
 // ---------------------------------------------------------------------------
@@ -156,9 +157,20 @@ export function investmentMovementError(kind: InvestmentMovementKind, input: Inv
 
 const FLOW_SIGN: Readonly<Record<InvestmentMovementKind, number>> = { aporte: 1, resgate: -1, rendimento: 0, valor: 0 };
 
-/** Movimentos em ordem: data; no mesmo dia, aportes e resgates antes da atualização de valor (o valor informado fecha o dia). */
+/**
+ * Movimentos em ordem, como `clarevo_investment_negative_day` no banco: data; no mesmo dia, aportes e resgates antes da atualização de
+ * valor (o valor informado fecha o dia); depois, pela criação (o mais antigo primeiro, então a última atualização do dia vale) e pelo id.
+ * Um movimento ainda não salvo (sem `createdAt`) vem por último no seu grupo.
+ */
 function sorted<M extends MovementLike>(movements: readonly M[]): M[] {
-  return [...movements].sort((a, b) => (a.occurredOn < b.occurredOn ? -1 : a.occurredOn > b.occurredOn ? 1 : (a.kind === 'valor' ? 1 : 0) - (b.kind === 'valor' ? 1 : 0)));
+  const created = (m: MovementLike) => m.createdAt ?? '\uffff';
+  return [...movements].sort((a, b) => {
+    if (a.occurredOn !== b.occurredOn) return a.occurredOn < b.occurredOn ? -1 : 1;
+    const kind = (a.kind === 'valor' ? 1 : 0) - (b.kind === 'valor' ? 1 : 0);
+    if (kind !== 0) return kind;
+    if (created(a) !== created(b)) return created(a) < created(b) ? -1 : 1;
+    return (a.id ?? '\uffff') < (b.id ?? '\uffff') ? -1 : (a.id ?? '\uffff') > (b.id ?? '\uffff') ? 1 : 0;
+  });
 }
 
 /** Valor ao fim do dia `date`. Sem movimentos até a data: 0. */
@@ -229,47 +241,82 @@ export function investmentGain(i: Pick<Investment, 'valueCents' | 'depositsCents
 
 export interface MonthReturn {
   month: IsoMonth;
-  /** Fração (0,0123 = 1,23%); null quando a base do mês é ≤ 0 (nada investido no mês). */
+  /**
+   * Fração (0,0123 = 1,23%); null quando não dá para medir o mês: base ≤ 0, nenhum dia passado, taxa de −100% ou menos, ou um
+   * investimento sem valor conhecido no começo ou no fim do mês (ver `monthlyReturns`).
+   */
   rate: number | null;
-  /** Valor ao fim do mês (ou de hoje, no mês em andamento). */
+  /** Valor ao fim do mês (ou de hoje, no mês em andamento). Sem atualização no mês, é o último valor informado mais aportes e resgates. */
   endValueCents: Cents;
   /** O mês ainda não fechou (vai até hoje). */
   partial: boolean;
 }
 
 /**
- * Rentabilidade de cada mês, do mês do primeiro movimento até o mês de hoje. `movements` pode ser de um investimento ou de vários
- * juntos (a carteira): o valor da carteira é a soma dos valores de cada um, então passe os movimentos agrupados por investimento.
+ * Rentabilidade de cada mês, do mês do primeiro movimento até o mês de hoje, pelo Dietz modificado. `groups` pode ser um investimento ou
+ * vários (a carteira): o valor da carteira é a soma dos valores de cada um, então passe os movimentos agrupados por investimento.
+ *
+ * O mês só tem taxa quando o valor é conhecido nas duas pontas (revisão independente de 11/11/2026; sem isso, o ganho de meses sem
+ * atualização caía todo num mês só):
+ * - no começo: o investimento já existia e teve uma atualização de valor no mês anterior, ou começou no próprio mês;
+ * - no fim: teve uma atualização de valor no mês (até hoje, no mês em andamento).
+ * Um investimento que começa no mês entra na carteira como um aporte: se o primeiro dia tem atualização de valor (o cadastro com
+ * "Quanto vale hoje"), entra no fim desse dia pelo valor informado, então o ganho de antes do cadastro não conta como rendimento do mês;
+ * sem ela, os movimentos do primeiro dia entram no começo do dia. Os demais aportes e resgates entram no fim do dia, pesando pelos dias
+ * que faltam até o fim do período (o fim do mês, ou hoje no mês em andamento). Rendimento recebido conta como retorno.
  */
 export function monthlyReturns(groups: readonly (readonly MovementLike[])[], today: IsoDate): MonthReturn[] {
-  const all = groups.flat().filter((m) => m.occurredOn <= today);
-  if (all.length === 0) return [];
-  const first = all.map((m) => m.occurredOn).sort()[0]!;
-  const valueOn = (date: IsoDate) => groups.reduce((acc, g) => acc + investmentValueOn(g, date), 0);
+  const live = groups.map((g) => sorted(g.filter((m) => m.occurredOn <= today))).filter((g) => g.length > 0);
+  if (live.length === 0) return [];
+  const first = live.map((g) => g[0]!.occurredOn).sort()[0]!;
   const out: MonthReturn[] = [];
   const last = monthOf(today);
   for (let month = monthOf(first); monthsBetween(month, last) >= 0; month = addMonths(month, 1)) {
     const [y, mo] = month.split('-').map(Number) as [number, number];
     const days = daysInMonth(y, mo);
     const start = `${month}-01` as IsoDate;
+    const prevStart = `${addMonths(month, -1)}-01` as IsoDate;
     const partial = month === last;
     const end = partial ? today : (`${month}-${String(days).padStart(2, '0')}` as IsoDate);
-    const v0 = valueOn(addDays(start, -1));
-    const v1 = valueOn(end);
+    const len = partial ? Number(today.slice(8, 10)) : days;
+    const dayOf = (d: IsoDate) => Number(d.slice(8, 10));
+    let v0 = 0;
+    let v1 = 0;
     let flows = 0;
     let weighted = 0;
     let income = 0;
-    for (const m of all) {
-      if (m.occurredOn < start || m.occurredOn > end) continue;
-      if (m.kind === 'rendimento') income += m.amountCents;
-      const f = FLOW_SIGN[m.kind] * m.amountCents;
-      if (f === 0) continue;
-      const day = Number(m.occurredOn.slice(8, 10));
-      flows += f;
-      weighted += ((days - day) / days) * f;
+    let measurable = true;
+    for (const g of live) {
+      if (g[0]!.occurredOn > end) continue;
+      v1 += investmentValueOn(g, end);
+      const inMonth = g.filter((m) => m.occurredOn >= start && m.occurredOn <= end);
+      income += inMonth.filter((m) => m.kind === 'rendimento').reduce((a, m) => a + m.amountCents, 0);
+      if (!inMonth.some((m) => m.kind === 'valor')) measurable = false;
+      const flow = (m: MovementLike, at: number) => {
+        const f = FLOW_SIGN[m.kind] * m.amountCents;
+        if (f === 0) return;
+        flows += f;
+        weighted += ((len - at) / len) * f;
+      };
+      if (g[0]!.occurredOn < start) {
+        if (!g.some((m) => m.kind === 'valor' && m.occurredOn >= prevStart && m.occurredOn < start)) measurable = false;
+        v0 += investmentValueOn(g, addDays(start, -1));
+        for (const m of inMonth) flow(m, dayOf(m.occurredOn));
+        continue;
+      }
+      // Começou neste mês, no dia k.
+      const k = g[0]!.occurredOn;
+      const firstDay = inMonth.filter((m) => m.occurredOn === k);
+      if (firstDay.some((m) => m.kind === 'valor')) {
+        const entry = investmentValueOn(g, k);
+        flows += entry;
+        weighted += ((len - dayOf(k)) / len) * entry;
+      } else for (const m of firstDay) flow(m, dayOf(k) - 1);
+      for (const m of inMonth) if (m.occurredOn > k) flow(m, dayOf(m.occurredOn));
     }
     const base = v0 + weighted;
-    out.push({ month, rate: base > 0 ? (v1 - v0 - flows + income) / base : null, endValueCents: v1, partial });
+    const rate = measurable && len > 0 && base > 0 ? (v1 - v0 - flows + income) / base : null;
+    out.push({ month, rate: rate !== null && Number.isFinite(rate) && rate > -1 ? rate : null, endValueCents: v1, partial });
   }
   return out;
 }
@@ -361,9 +408,14 @@ export interface PeriodComparison {
  * Sem mês fechado com taxa, null.
  */
 export function compareLastClosedMonths(returns: readonly MonthReturn[], indices: MarketIndices | null, max = 12): PeriodComparison | null {
-  const closed = returns.filter((r) => !r.partial && r.rate !== null);
-  if (closed.length === 0) return null;
-  const chosen = closed.slice(-max);
+  // Só os meses fechados seguidos mais recentes com taxa: um mês sem taxa no meio corta a sequência (o período é contínuo, como o do CDI).
+  const closed = returns.filter((r) => !r.partial);
+  const chosen: MonthReturn[] = [];
+  for (let i = closed.length - 1; i >= 0 && chosen.length < max; i -= 1) {
+    if (closed[i]!.rate === null) break;
+    chosen.unshift(closed[i]!);
+  }
+  if (chosen.length === 0) return null;
   const months = chosen.map((r) => r.month);
   return {
     months,
@@ -456,6 +508,8 @@ export const INVESTMENT_TEXT = {
   thisMonth: (rate: number | null) => (rate === null ? 'Neste mês: sem taxa ainda' : `Neste mês, até hoje: ${pctText(rate)}`),
   sinceStart: (rate: number | null, from: IsoMonth) => (rate === null ? null : `Desde ${formatMonthYearBR(from)}: ${pctText(rate)}`),
   noValueYet: 'Atualize o valor com o que aparece no seu extrato para ver quanto rendeu.',
+  /** Algum mês sem as duas pontas (docs/45, seção 3.2). */
+  monthlyHint: 'Para ver quanto rendeu em cada mês, atualize o valor de cada investimento pelo menos uma vez por mês.',
   lastValue: (d: IsoDate) => `Valor atualizado em ${formatDateBR(d)}`,
   indicesSource: (fetchedOn: IsoDate | null) =>
     `Fonte do CDI e do IPCA: Banco Central do Brasil, séries ${BCB_SERIES.cdi} e ${BCB_SERIES.ipca}${fetchedOn ? `, consulta em ${formatDateBR(fetchedOn)}` : ''}.`,

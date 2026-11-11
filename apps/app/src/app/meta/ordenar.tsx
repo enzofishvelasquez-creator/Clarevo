@@ -2,7 +2,7 @@ import { ERROR_TEXT, GOALS_TEXT, isRepoError, newOperationKey, organizeGoals, ty
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { ArrowDown, ArrowUp, CircleAlert } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { FormFooter } from '@/components/form-footer';
@@ -48,7 +48,6 @@ export default function OrdenarMetasScreen() {
   }
   return (
     <OrderForm
-      key={organizeGoals(goals.data).active.map((g) => g.id).join(',')}
       contextId={contextId}
       active={organizeGoals(goals.data).active}
       family={kind === 'familia'}
@@ -76,6 +75,17 @@ function OrderForm({
   const [order, setOrder] = useState<Goal[]>(() => [...active]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // As metas mudaram (outro aparelho, ou a recusa "lista_invalida"): a ordem escolhida fica para as que continuam, as novas entram no
+  // fim, e a mensagem continua na tela (revisão de 11/11/2026: antes, a tela recomeçava e perdia a ordem e o aviso).
+  const ids = active.map((g) => g.id).join(',');
+  useEffect(() => {
+    setOrder((o) => {
+      const byId = new Map(active.map((g) => [g.id, g]));
+      const kept = o.filter((g) => byId.has(g.id)).map((g) => byId.get(g.id)!);
+      return [...kept, ...active.filter((g) => !kept.some((k) => k.id === g.id))];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ids]);
   const dirty = order.some((g, i) => g.id !== active[i]?.id);
   const guard = useLeaveGuard(dirty && !busy, '/metas');
 

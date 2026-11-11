@@ -82,6 +82,12 @@ insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) value
   (:lia, 'lia.inv@exemplo.test', now(), '{"display_name":"Lia"}'),
   (:edu, 'edu.inv@exemplo.test', now(), '{"display_name":"Edu"}');
 
+-- Revisão de 11/11/2026: tabulação e quebra de linha viram um espaço antes de tirar das pontas (a regra da tabela não recusa o nome).
+do $$
+begin
+  assert public.clarevo_validate_investment(E'\tAções\n da   corretora \t', 'acoes') = 'Ações da corretora', 'espaços em branco normalizados';
+end $$;
+
 set role authenticated;
 do $$
 declare

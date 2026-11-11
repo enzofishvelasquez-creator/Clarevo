@@ -80,22 +80,29 @@ const __mods = [
             const hit = cache.get(key);
             if (hit && now() - hit.at < CACHE_MS)
                 return { status: 200, body: hit.body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
-            try {
-                const get = async (code) => {
+            const get = async (code) => {
+                try {
                     const r = await deps.fetch((0, investments_1.bcbSeriesUrl)(code, `${from}-01`, today), { timeoutMs: 8000 });
-                    if (!r.ok)
-                        throw new Error(`bcb_${code}_${r.status}`);
-                    return (0, investments_1.parseBcbSeries)(await r.json());
-                };
-                const [cdi, ipca] = await Promise.all([get(investments_1.BCB_SERIES.cdi), get(investments_1.BCB_SERIES.ipca)]);
-                const body = JSON.stringify({ cdi, ipca, fetchedOn: today });
-                cache.set(key, { at: now(), body });
-                return { status: 200, body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
-            }
-            catch (e) {
-                deps.log?.(`indices: ${e instanceof Error ? e.message : 'falha'}`);
+                    if (r.status === 404)
+                        return { ok: true, series: {} };
+                    if (!r.ok) {
+                        deps.log?.(`indices: bcb_${code}_${r.status}`);
+                        return { ok: false, series: {} };
+                    }
+                    return { ok: true, series: (0, investments_1.parseBcbSeries)(await r.json()) };
+                }
+                catch (e) {
+                    deps.log?.(`indices: bcb_${code}_${e instanceof Error ? e.message : 'falha'}`);
+                    return { ok: false, series: {} };
+                }
+            };
+            const [cdi, ipca] = await Promise.all([get(investments_1.BCB_SERIES.cdi), get(investments_1.BCB_SERIES.ipca)]);
+            if (!cdi.ok && !ipca.ok)
                 return { status: 502, body: JSON.stringify({ erro: 'indices_indisponiveis' }), headers: { ...headers, 'Content-Type': JSON_TYPE } };
-            }
+            const body = JSON.stringify({ cdi: cdi.series, ipca: ipca.series, fetchedOn: today });
+            if (cdi.ok && ipca.ok)
+                cache.set(key, { at: now(), body });
+            return { status: 200, body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
         };
     }
   },
@@ -362,7 +369,17 @@ const __mods = [
     }
     const FLOW_SIGN = { aporte: 1, resgate: -1, rendimento: 0, valor: 0 };
     function sorted(movements) {
-        return [...movements].sort((a, b) => (a.occurredOn < b.occurredOn ? -1 : a.occurredOn > b.occurredOn ? 1 : (a.kind === 'valor' ? 1 : 0) - (b.kind === 'valor' ? 1 : 0)));
+        const created = (m) => m.createdAt ?? '\uffff';
+        return [...movements].sort((a, b) => {
+            if (a.occurredOn !== b.occurredOn)
+                return a.occurredOn < b.occurredOn ? -1 : 1;
+            const kind = (a.kind === 'valor' ? 1 : 0) - (b.kind === 'valor' ? 1 : 0);
+            if (kind !== 0)
+                return kind;
+            if (created(a) !== created(b))
+                return created(a) < created(b) ? -1 : 1;
+            return (a.id ?? '\uffff') < (b.id ?? '\uffff') ? -1 : (a.id ?? '\uffff') > (b.id ?? '\uffff') ? 1 : 0;
+        });
     }
     function investmentValueOn(movements, date) {
         let value = 0;
@@ -408,38 +425,67 @@ const __mods = [
         return i.valueCents + i.withdrawalsCents + i.incomeCents - i.depositsCents;
     }
     function monthlyReturns(groups, today) {
-        const all = groups.flat().filter((m) => m.occurredOn <= today);
-        if (all.length === 0)
+        const live = groups.map((g) => sorted(g.filter((m) => m.occurredOn <= today))).filter((g) => g.length > 0);
+        if (live.length === 0)
             return [];
-        const first = all.map((m) => m.occurredOn).sort()[0];
-        const valueOn = (date) => groups.reduce((acc, g) => acc + investmentValueOn(g, date), 0);
+        const first = live.map((g) => g[0].occurredOn).sort()[0];
         const out = [];
         const last = (0, dates_1.monthOf)(today);
         for (let month = (0, dates_1.monthOf)(first); (0, dates_1.monthsBetween)(month, last) >= 0; month = (0, dates_1.addMonths)(month, 1)) {
             const [y, mo] = month.split('-').map(Number);
             const days = (0, dates_1.daysInMonth)(y, mo);
             const start = `${month}-01`;
+            const prevStart = `${(0, dates_1.addMonths)(month, -1)}-01`;
             const partial = month === last;
             const end = partial ? today : `${month}-${String(days).padStart(2, '0')}`;
-            const v0 = valueOn((0, dates_1.addDays)(start, -1));
-            const v1 = valueOn(end);
+            const len = partial ? Number(today.slice(8, 10)) : days;
+            const dayOf = (d) => Number(d.slice(8, 10));
+            let v0 = 0;
+            let v1 = 0;
             let flows = 0;
             let weighted = 0;
             let income = 0;
-            for (const m of all) {
-                if (m.occurredOn < start || m.occurredOn > end)
+            let measurable = true;
+            for (const g of live) {
+                if (g[0].occurredOn > end)
                     continue;
-                if (m.kind === 'rendimento')
-                    income += m.amountCents;
-                const f = FLOW_SIGN[m.kind] * m.amountCents;
-                if (f === 0)
+                v1 += investmentValueOn(g, end);
+                const inMonth = g.filter((m) => m.occurredOn >= start && m.occurredOn <= end);
+                income += inMonth.filter((m) => m.kind === 'rendimento').reduce((a, m) => a + m.amountCents, 0);
+                if (!inMonth.some((m) => m.kind === 'valor'))
+                    measurable = false;
+                const flow = (m, at) => {
+                    const f = FLOW_SIGN[m.kind] * m.amountCents;
+                    if (f === 0)
+                        return;
+                    flows += f;
+                    weighted += ((len - at) / len) * f;
+                };
+                if (g[0].occurredOn < start) {
+                    if (!g.some((m) => m.kind === 'valor' && m.occurredOn >= prevStart && m.occurredOn < start))
+                        measurable = false;
+                    v0 += investmentValueOn(g, (0, dates_1.addDays)(start, -1));
+                    for (const m of inMonth)
+                        flow(m, dayOf(m.occurredOn));
                     continue;
-                const day = Number(m.occurredOn.slice(8, 10));
-                flows += f;
-                weighted += ((days - day) / days) * f;
+                }
+                const k = g[0].occurredOn;
+                const firstDay = inMonth.filter((m) => m.occurredOn === k);
+                if (firstDay.some((m) => m.kind === 'valor')) {
+                    const entry = investmentValueOn(g, k);
+                    flows += entry;
+                    weighted += ((len - dayOf(k)) / len) * entry;
+                }
+                else
+                    for (const m of firstDay)
+                        flow(m, dayOf(k) - 1);
+                for (const m of inMonth)
+                    if (m.occurredOn > k)
+                        flow(m, dayOf(m.occurredOn));
             }
             const base = v0 + weighted;
-            out.push({ month, rate: base > 0 ? (v1 - v0 - flows + income) / base : null, endValueCents: v1, partial });
+            const rate = measurable && len > 0 && base > 0 ? (v1 - v0 - flows + income) / base : null;
+            out.push({ month, rate: rate !== null && Number.isFinite(rate) && rate > -1 ? rate : null, endValueCents: v1, partial });
         }
         return out;
     }
@@ -495,10 +541,15 @@ const __mods = [
         return { cdi, ipca, fetchedOn: null, example: true };
     }
     function compareLastClosedMonths(returns, indices, max = 12) {
-        const closed = returns.filter((r) => !r.partial && r.rate !== null);
-        if (closed.length === 0)
+        const closed = returns.filter((r) => !r.partial);
+        const chosen = [];
+        for (let i = closed.length - 1; i >= 0 && chosen.length < max; i -= 1) {
+            if (closed[i].rate === null)
+                break;
+            chosen.unshift(closed[i]);
+        }
+        if (chosen.length === 0)
             return null;
-        const chosen = closed.slice(-max);
         const months = chosen.map((r) => r.month);
         return {
             months,

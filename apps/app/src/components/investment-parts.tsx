@@ -83,6 +83,11 @@ export function InvestmentReturns({ groups, hasValue, onBrand = false }: { group
           )}
         </>
       ) : null}
+      {comparison === null || (current !== null && current.rate === null) ? (
+        <Txt variant="caption" color={soft}>
+          {T.monthlyHint}
+        </Txt>
+      ) : null}
     </View>
   );
 }

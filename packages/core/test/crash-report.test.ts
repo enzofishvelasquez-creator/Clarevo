@@ -32,7 +32,13 @@ describe('relatório de falhas (D-093): limpeza antes do envio', () => {
         { category: 'touch', message: 'Salvar meta' },
         { category: 'xhr', data: { url: 'https://supabase/rest/v1/rpc/create_goal' } },
       ],
-      contexts: { device: { name: 'iPhone de Maria', model: 'iPhone15,2', family: 'iOS' }, os: { name: 'iOS', version: '18.1' }, culture: { timezone: 'America/Sao_Paulo' }, profile: { x: 1 } },
+      contexts: {
+        device: { name: 'iPhone de Maria', model: 'iPhone15,2', family: 'iOS' },
+        os: { name: 'iOS', version: '18.1' },
+        app: { app_version: '1.0.0', app_build: '12', device_app_hash: 'abc123hash', app_id: 'inst-77' },
+        culture: { timezone: 'America/Sao_Paulo' },
+        profile: { x: 1 },
+      },
       tags: { environment: 'production' },
     };
     const out = scrubCrashEvent(event);
@@ -43,7 +49,7 @@ describe('relatório de falhas (D-093): limpeza antes do envio', () => {
     expect(out.message).toBe('Valor #');
     expect(out.exception!.values![0]).toEqual({ type: 'RepoError', value: 'versao_desatualizada #', stacktrace: { frames: [{ function: 'save' }] } });
     expect(out.breadcrumbs).toEqual([{ timestamp: 1, category: 'navigation', type: 'navigation', data: { from: '/meta/[id]/editar', to: '/metas' } }]);
-    expect(out.contexts).toEqual({ device: { model: 'iPhone15,2', family: 'iOS' }, os: { name: 'iOS', version: '18.1' } });
+    expect(out.contexts).toEqual({ device: { model: 'iPhone15,2', family: 'iOS' }, os: { name: 'iOS', version: '18.1' }, app: { app_version: '1.0.0', app_build: '12' } });
     expect(out.tags).toEqual({ environment: 'production' });
     expect(JSON.stringify(out)).not.toMatch(/Maria|maria@|12345|500,00|980/);
   });
@@ -57,6 +63,8 @@ describe('relatório de falhas (D-093): limpeza antes do envio', () => {
 
   it('opções fixas: sem dado pessoal, captura de tela, desempenho nem sessões', () => {
     expect(CRASH_REPORT_OPTIONS).toMatchObject({ sendDefaultPii: false, attachScreenshot: false, attachViewHierarchy: false, enableAutoSessionTracking: false, tracesSampleRate: 0 });
+    // Revisão de 11/11/2026: a parte nativa não passa pelo beforeSend, então fica desligada (falhas nativas, travamentos e rede do sistema).
+    expect(CRASH_REPORT_OPTIONS).toMatchObject({ enableNative: false, enableNativeCrashHandling: false, enableAppHangTracking: false, enableNdk: false, enableCaptureFailedRequests: false });
   });
 
   it('no app: só no celular (a web não importa o SDK), com a limpeza em beforeSend e beforeBreadcrumb e sem chave no código', () => {
@@ -67,7 +75,7 @@ describe('relatório de falhas (D-093): limpeza antes do envio', () => {
     expect(native).toContain("from '@sentry/react-native'");
     expect(native).toContain('crashReportDsn(process.env.EXPO_PUBLIC_SENTRY_DSN)');
     expect(native).toContain('beforeSend: (event) => scrubCrashEvent(event)');
-    expect(native).toContain('beforeBreadcrumb');
+    expect(native).toContain('beforeBreadcrumb: (breadcrumb) => scrubBreadcrumb(breadcrumb)');
     expect(native).toContain('...CRASH_REPORT_OPTIONS');
     expect(native).not.toMatch(/https:\/\/[0-9a-f]{16,}@/);
   });

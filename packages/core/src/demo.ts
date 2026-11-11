@@ -38,7 +38,7 @@ import { demoTrialAccess } from './plano';
  * em "Por mês, se os valores não mudarem" e no grupo Assinaturas: R$ 138,90 por mês e R$ 1.666,80 por ano.
  * Investimentos (D-093), só no Pessoal: "Aplicação do banco" (renda fixa, R$ 10.000,00 desde 01/06/2026, valor no extrato no fim de
  * cada mês: R$ 10.085,00, R$ 10.180,00, R$ 10.270,00 e R$ 10.360,00; aporte de R$ 500,00 e valor de R$ 10.875,00 em 06/10) e
- * "Previdência" (R$ 5.000,00 desde 01/08/2026; R$ 5.040,00 e R$ 5.080,00 no fim de agosto e de setembro). Hoje: R$ 15.955,00,
+ * "Previdência" (R$ 5.000,00 desde 01/08/2026; R$ 5.040,00 e R$ 5.080,00 no fim de agosto e de setembro, e R$ 5.080,00 de novo em 06/10). Hoje: R$ 15.955,00,
  * aportado R$ 15.500,00, ganho de R$ 455,00. Não entram em nenhum total do mês, na renda comprometida nem nas metas.
  * Orçamento por categoria (D-041), a partir de outubro de 2026: Moradia R$ 2.500,00, Mercado R$ 1.800,00 e Lazer R$ 300,00.
  * Usado em outubro (competência): Moradia R$ 2.500,00 (o aluguel pago), Mercado R$ 1.400,00 e Lazer R$ 400,00 (a 1ª parcela do
@@ -256,6 +256,8 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   });
   await move(previdencia.investment!.id, 'valor', 504_000, '2026-08-31');
   await move(previdencia.investment!.id, 'valor', 508_000, '2026-09-30');
+  // O extrato conferido de novo em 06/10, sem mudança: com as duas atualizadas no mês, a carteira tem a taxa de outubro até hoje.
+  await move(previdencia.investment!.id, 'valor', 508_000, '2026-10-06');
   // Cartões (D-037): o cartão fechou em 03/10, então as compras de 05 e 06/10 entram na fatura de novembro (vencimento 10/11).
   // cards: false monta a demonstração dos ciclos anteriores (testes das bases A, B e C), sem o cartão e sem as faturas.
   if (opts.cards !== false) {

@@ -186,7 +186,8 @@ immutable
 set search_path = public
 as $$
 declare
-  v_name text := regexp_replace(btrim(coalesce(p_name, '')), '\s+', ' ', 'g');
+  -- Primeiro troca todo espaço em branco (tabulação, quebra de linha) por um espaço, depois tira das pontas (btrim só tira espaços).
+  v_name text := btrim(regexp_replace(coalesce(p_name, ''), '\s+', ' ', 'g'));
 begin
   if char_length(v_name) < 1 or char_length(v_name) > 40 then
     raise exception 'nome_invalido' using errcode = '22023';
@@ -558,6 +559,10 @@ begin
   end if;
   v_i := public.clarevo_lock_investment(v_m.investment_id);
   select * into v_m from public.investment_movements where id = p_movement_id for update;
+  -- Excluído por outro pedido entre a primeira leitura e o bloqueio.
+  if not found then
+    raise exception 'nao_encontrado' using errcode = 'P0002';
+  end if;
   if v_i.status <> 'ativo' then
     raise exception 'investimento_encerrado' using errcode = 'PT409';
   end if;
@@ -611,6 +616,10 @@ begin
   end if;
   v_i := public.clarevo_lock_investment(v_m.investment_id);
   select * into v_m from public.investment_movements where id = p_movement_id for update;
+  -- Excluído por outro pedido entre a primeira leitura e o bloqueio.
+  if not found then
+    raise exception 'nao_encontrado' using errcode = 'P0002';
+  end if;
   if v_i.status <> 'ativo' then
     raise exception 'investimento_encerrado' using errcode = 'PT409';
   end if;

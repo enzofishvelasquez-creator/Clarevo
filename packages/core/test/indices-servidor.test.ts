@@ -64,4 +64,28 @@ describe('função "indices" (D-093): CDI e IPCA do Banco Central', () => {
     const ok = createIndicesHandler({ config: { appUrl: 'x' }, today: () => TODAY, fetch: async (url) => ({ ok: true, status: 200, json: async () => (url.includes('01/01/2026') ? [] : null) }) });
     expect((await ok(req({ method: 'GET', url: 'https://x/functions/v1/indices?desde=2026-01' }))).status).toBe(200);
   });
+
+  it('cada série à parte: o IPCA ainda não publicado (404) ou com falha não derruba o CDI, e a resposta incompleta não fica guardada', async () => {
+    let calls = 0;
+    let ipcaStatus = 404;
+    const handler = createIndicesHandler({
+      config: { appUrl: 'https://app.clarevo.app.br' },
+      today: () => TODAY,
+      fetch: async (url) => {
+        calls += 1;
+        if (url.includes('sgs.433')) return { ok: false, status: ipcaStatus, json: async () => null };
+        return { ok: true, status: 200, json: async () => [{ data: '01/10/2026', valor: '0,93' }] };
+      },
+    });
+    const r = await handler(req());
+    expect(r.status).toBe(200);
+    expect(JSON.parse(r.body)).toEqual({ cdi: { '2026-10': 0.93 }, ipca: {}, fetchedOn: TODAY });
+    // 404 é "ainda sem dado": a resposta fica guardada.
+    await handler(req());
+    expect(calls).toBe(2);
+    // Falha só do IPCA: 200 com o CDI, sem guardar (a próxima tenta de novo).
+    ipcaStatus = 500;
+    const other = createIndicesHandler({ config: { appUrl: 'x' }, today: () => TODAY, fetch: async (url) => (url.includes('sgs.433') ? { ok: false, status: 500, json: async () => null } : { ok: true, status: 200, json: async () => [] }) });
+    expect((await other(req())).status).toBe(200);
+  });
 });

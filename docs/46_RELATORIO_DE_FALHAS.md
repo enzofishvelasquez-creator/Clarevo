@@ -14,8 +14,12 @@ financeiro nem pessoal**, com a conta criada pelo Enzo, o trecho na política e 
   de rede, os dados extras, o nome do aparelho (como "iPhone de Maria") e todo rastro que não seja troca de tela; das trocas de tela, o
   caminho perde os identificadores (`/investimento/[id]/movimento`); no texto do erro, números, e-mails e identificadores viram `#`,
   `[e-mail]` e `[id]`. Ficam o tipo do erro, a pilha de chamadas do código, o modelo e o sistema do aparelho e a versão do app.
+- **Só os erros do JavaScript, sem a parte nativa do SDK** (revisão independente de 11/11/2026): o SDK nativo não passa pela limpeza do
+  JavaScript, e as falhas nativas, os travamentos e os rastros de rede do sistema (com os endereços das consultas ao banco) iriam sem ela.
+  Por isso `enableNative`, `enableNativeCrashHandling`, `enableAppHangTracking`, `enableNdk` e `enableCaptureFailedRequests` ficam
+  desligados: uma falha que derruba o app sem passar pelo JavaScript não é relatada. A versão do app vai à mão (`clarevo@<versão>`).
 - **Opções fixas** (`CRASH_REPORT_OPTIONS`): sem dado pessoal padrão do SDK, sem captura de tela, sem hierarquia de tela, sem medição de
-  desempenho e sem sessões. Sem o plugin de envio de mapas de código (precisaria de um segredo no EAS): a pilha chega com os nomes do
+  desempenho e sem sessões. Os rastros já entram limpos no escopo (`beforeBreadcrumb`), e do contexto do app só ficam nome, versão e build. Sem o plugin de envio de mapas de código (precisaria de um segredo no EAS): a pilha chega com os nomes do
   código compactado; dá para acrescentar depois, se a equipe precisar.
 - **Política de privacidade**, seção 8: o Sentry está em "Estão previstos", com o que recebe e o que não recebe.
 

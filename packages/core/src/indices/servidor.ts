@@ -97,19 +97,26 @@ export function createIndicesHandler(deps: { config: IndicesConfig; fetch: Indic
     const key = `${from}|${today}`;
     const hit = cache.get(key);
     if (hit && now() - hit.at < CACHE_MS) return { status: 200, body: hit.body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
-    try {
-      const get = async (code: number) => {
+    // Cada série à parte (revisão de 11/11/2026): o IPCA do mês ainda não publicado (404, ou uma falha só dele) não leva o CDI junto.
+    // Só as duas falhando dá 502; resposta com uma série faltando não fica guardada, para a próxima consulta tentar de novo.
+    const get = async (code: number): Promise<{ ok: boolean; series: Record<IsoMonth, number> }> => {
+      try {
         const r = await deps.fetch(bcbSeriesUrl(code, `${from}-01`, today), { timeoutMs: 8000 });
-        if (!r.ok) throw new Error(`bcb_${code}_${r.status}`);
-        return parseBcbSeries(await r.json());
-      };
-      const [cdi, ipca] = await Promise.all([get(BCB_SERIES.cdi), get(BCB_SERIES.ipca)]);
-      const body = JSON.stringify({ cdi, ipca, fetchedOn: today });
-      cache.set(key, { at: now(), body });
-      return { status: 200, body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
-    } catch (e) {
-      deps.log?.(`indices: ${e instanceof Error ? e.message : 'falha'}`);
-      return { status: 502, body: JSON.stringify({ erro: 'indices_indisponiveis' }), headers: { ...headers, 'Content-Type': JSON_TYPE } };
-    }
+        if (r.status === 404) return { ok: true, series: {} };
+        if (!r.ok) {
+          deps.log?.(`indices: bcb_${code}_${r.status}`);
+          return { ok: false, series: {} };
+        }
+        return { ok: true, series: parseBcbSeries(await r.json()) };
+      } catch (e) {
+        deps.log?.(`indices: bcb_${code}_${e instanceof Error ? e.message : 'falha'}`);
+        return { ok: false, series: {} };
+      }
+    };
+    const [cdi, ipca] = await Promise.all([get(BCB_SERIES.cdi), get(BCB_SERIES.ipca)]);
+    if (!cdi.ok && !ipca.ok) return { status: 502, body: JSON.stringify({ erro: 'indices_indisponiveis' }), headers: { ...headers, 'Content-Type': JSON_TYPE } };
+    const body = JSON.stringify({ cdi: cdi.series, ipca: ipca.series, fetchedOn: today });
+    if (cdi.ok && ipca.ok) cache.set(key, { at: now(), body });
+    return { status: 200, body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
   };
 }

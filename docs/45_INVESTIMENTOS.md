@@ -53,12 +53,21 @@ Formulários sem a barra inferior; a aba e o detalhe com a barra (regra de naveg
 ### 3.2 Rentabilidade
 
 - **Por mês, pelo método de Dietz modificado**: (valor no fim − valor no início − entradas + saídas + rendimentos) ÷ (valor no início +
-  entradas e saídas ponderadas pelos dias que ficaram no mês). Os movimentos contam no fim do dia em que aconteceram. Mês com base zero ou
-  negativa fica "sem taxa".
-- **A carteira** soma o valor de cada investimento dia a dia e usa o mesmo cálculo.
-- **Na tela**: "Neste mês, até hoje", e a comparação com os **meses fechados mais recentes, até 12** ("Nos 4 meses fechados, de junho a
-  setembro de 2026: +3,58%"), com o CDI e o IPCA **dos mesmos meses**, acumulados (produto de 1 + taxa de cada mês). Mês sem índice
-  publicado: "CDI: sem dados para todos os meses".
+  entradas e saídas ponderadas pelos dias que faltam até o fim do período). O período é o mês, ou do dia 1 até hoje no mês em andamento.
+  Os aportes e resgates contam no fim do dia em que aconteceram.
+- **O mês só tem taxa com o valor conhecido nas duas pontas** (revisão independente de 11/11/2026): no começo, o investimento teve uma
+  atualização de valor no mês anterior (ou começou no próprio mês); no fim, teve uma atualização no mês. Sem isso, o mês fica "sem taxa"
+  (antes, o ganho de meses sem atualização caía todo num mês só e dava taxas absurdas).
+- **Investimento que começa no mês** entra como um aporte: com "Quanto vale hoje" no cadastro, entra no fim daquele dia pelo valor
+  informado, então o ganho de antes do cadastro aparece no "Ganho", mas não como rendimento do mês; sem o valor, os aportes do primeiro dia
+  contam desde o começo do dia.
+- **Sem taxa** também quando a base é zero ou negativa, quando nenhum dia passou e quando a conta daria −100% ou menos.
+- **No mesmo dia**, duas atualizações de valor: vale a última criada, como no banco.
+- **A carteira** soma o valor de cada investimento ativo e usa o mesmo cálculo: um investimento sem atualização no mês deixa a carteira sem
+  taxa naquele mês. A tela sugere atualizar todos.
+- **Na tela**: "Neste mês, até hoje", e a comparação com os **meses fechados seguidos mais recentes com taxa, até 12** ("Nos 4 meses
+  fechados, de junho a setembro de 2026: +3,54%"), com o CDI e o IPCA **dos mesmos meses**, acumulados (produto de 1 + taxa de cada mês).
+  Mês sem índice publicado: "CDI: sem dados para todos os meses".
 - **Encerrados** saem do total e da rentabilidade da carteira; o detalhe continua mostrando o que aconteceu.
 
 ### 3.3 CDI e IPCA
@@ -68,7 +77,8 @@ Formulários sem a barra inferior; a aba e o detalhe com a barra (regra de naveg
 - Quem busca é a função do servidor **`indices`** (`packages/core/src/indices/servidor.ts`, gerada em `supabase/functions/indices/index.ts`
   por `npm run indices`): recebe só o mês de partida (`{"desde": "AAAA-MM"}`), nunca dado de ninguém; guarda a resposta por 6 horas; só
   responde ao endereço do app (`CLAREVO_APP_URL`, padrão `https://app.clarevo.app.br`) e ao app em desenvolvimento no próprio computador.
-  Se o Banco Central não responder: `502 {"erro": "indices_indisponiveis"}`, e a tela diz "Não foi possível buscar o CDI e o IPCA agora. A
+  Cada série é buscada à parte: o IPCA do mês ainda não publicado não leva o CDI junto (e uma resposta com uma série faltando não fica
+  guardada). Se o Banco Central não responder para nenhuma das duas: `502 {"erro": "indices_indisponiveis"}`, e a tela diz "Não foi possível buscar o CDI e o IPCA agora. A
   sua rentabilidade continua aqui." O app nunca inventa índice.
 - **Na demonstração**, os índices são de exemplo (CDI 0,90% e IPCA 0,35% ao mês), e a tela diz isso.
 

@@ -16,6 +16,7 @@ import {
   monthsBetween,
   parseDateBR,
   parseMonthBR,
+  todayIn,
 } from './dates';
 import { formatInteger } from './learn/format';
 import type { Cents } from './money';
@@ -1281,7 +1282,9 @@ export function goalPace(
   if (goal.status !== 'ativa' || planned === null || planned <= 0) return null;
   const progress = goalProgress(goal.savedCents, goal.targetCents);
   if (progress.reached) return null;
-  const created = goal.createdAt.slice(0, 10);
+  // O dia da criação no horário de Brasília (revisão de 11/11/2026): uma meta criada às 22h30 de 31/10 é de outubro, não de novembro.
+  const when = new Date(goal.createdAt);
+  const created = Number.isNaN(when.getTime()) ? goal.createdAt.slice(0, 10) : todayIn('America/Sao_Paulo', when);
   if (!isValidIsoDate(created)) return null;
   const fromMonth = addMonths(monthOf(created), 1);
   const countedMonths = monthsBetween(fromMonth, monthOf(today));

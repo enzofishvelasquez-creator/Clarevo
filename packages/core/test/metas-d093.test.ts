@@ -223,3 +223,13 @@ describe('D-093: textos novos seguem as regras de redação', () => {
     }
   });
 });
+
+describe('ritmo da meta: o dia da criação no horário de Brasília (revisão de 11/11/2026)', () => {
+  it('criada às 22h30 de 31/10 (01:30 do dia 01/11 em UTC) conta de novembro em diante, não de dezembro', async () => {
+    const { goalPace } = await import('../src');
+    const goal = { status: 'ativa' as const, createdAt: '2026-11-01T01:30:00Z', plannedMonthlyCents: 10_000, savedCents: 0, targetCents: 100_000, initialCents: 0, depositsCents: 0, withdrawalsCents: 0 };
+    const pace = goalPace(goal, '2026-12-05')!;
+    expect(pace.fromMonth).toBe('2026-11');
+    expect(pace.countedMonths).toBe(1);
+  });
+});

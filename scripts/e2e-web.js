@@ -14518,7 +14518,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t = await body(); screenTexts.push(t);
     ok('D-093 Investimentos: título "Investimentos", contexto Pessoal fixo, total de R$ 15.955,00, aportado, ganho e a rentabilidade com o CDI e o IPCA de exemplo',
       (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Aportado: R$ 15.500,00') && t.includes('Ganho: R$ 455,00') &&
-        t.includes('Neste mês, até hoje: +0,09%') && t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,58%.') &&
+        t.includes('Neste mês, até hoje: +0,10%') && t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,54%.') &&
         t.includes('CDI no mesmo período: +3,65%') && t.includes('IPCA no mesmo período: +1,41%') &&
         t.includes('Na demonstração, o CDI e o IPCA são valores de exemplo, não os índices reais.'), t.slice(0, 700));
     ok('D-093 Investimentos: diz que não é recomendação, que não entra em Pago nem em Recebido e que a Família não vê',
