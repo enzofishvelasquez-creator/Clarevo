@@ -1188,7 +1188,6 @@ function toInvestmentMovement(r: InvestmentMovementRow): InvestmentMovement {
     amountCents: amount,
     occurredOn: r.occurred_on,
     note: r.note,
-    accountId: null,
     createdBy: r.created_by,
     version: whole(r.version),
     createdAt: r.created_at,

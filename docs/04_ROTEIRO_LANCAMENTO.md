@@ -172,15 +172,16 @@ Enzo aprovou em 10/11/2026: compra pela própria loja (App Store e Google Play),
 
 Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas funcionalidades antes"). Estimativas e o que depende do Enzo em `docs/37`, seção 2.
 
-- [ ] Metas: card da reserva mais curto quando o plano já existe ("Ver o plano")
-- [ ] Metas: atalhos de prazo ("6 meses", "1 ano", "2 anos", "5 anos")
-- [ ] Metas: ritmo no card ("no ritmo" ou quantos meses atrás do plano, e quanto falta)
-- [ ] Metas: "Tipo de meta" depois do valor, com "Objetivo" marcado e "O que é isso?"
-- [ ] Metas: lembrete do aporte no dia escolhido (só no app de celular, com os lembretes de D-087)
-- [ ] Metas: marcos de 25%, 50% e 75%
-- [ ] Metas: metas da Família (banco, permissões e telas)
-- [ ] Metas: prioridade (a pessoa põe a mais importante em primeiro)
-- [ ] Investimentos: aba nova, só no Pessoal, acompanhamento manual com comparação com CDI e IPCA (`docs/45_INVESTIMENTOS.md`)
+- [x] Metas: card da reserva mais curto quando o plano já existe ("Ver o plano"; "Ver o plano" e "Mudar valor" viram links)
+- [x] Metas: atalhos de prazo ("6 meses", "1 ano", "2 anos", "5 anos")
+- [x] Metas: ritmo no card ("no ritmo" ou quantos meses atrás do plano, e quanto falta)
+- [x] Metas: "Tipo de meta" depois do valor, com "Objetivo" marcado e "O que é isso?"
+- [x] Metas: lembrete do aporte no dia escolhido (só no app de celular, com os lembretes de D-087; confirmar no aparelho)
+- [x] Metas: marcos de 25%, 50% e 75%
+- [x] Metas: metas da Família (já existiam desde a Família, D-055: com a Família escolhida, Metas mostra e cria as metas da casa, com a regra de edição de sempre)
+- [x] Metas: prioridade ("Ordenar metas", com duas ou mais metas; migração 0031, `docs/05` passo 12v)
+- [x] Investimentos: aba nova, só no Pessoal, acompanhamento manual com comparação com CDI e IPCA (`docs/45_INVESTIMENTOS.md`)
+- [ ] Supabase (Enzo): migrações 0031 e 0032 e a função `indices` com JWT ligado (`docs/05`, passos 12v, 12w e 12x; conferências 21s e 21t)
 - [ ] Multa e juros: modo "Fatura de cartão depois do vencimento" (era D-089 G)
 - [ ] Assinatura na web com Pix Automático (Asaas), além do cartão
 - [ ] Widget ligado no build de produção, com o teste no iPhone e no Android (`docs/21`)

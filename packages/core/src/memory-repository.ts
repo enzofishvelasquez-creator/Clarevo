@@ -2203,7 +2203,6 @@ export class MemoryRepository implements RecordsRepository {
       amountCents,
       occurredOn,
       note,
-      accountId: null,
       createdBy: this.opts.actorId,
       version: 1,
       createdAt: now,

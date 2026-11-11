@@ -61,7 +61,8 @@ export default function InvestimentosScreen() {
             </Card>
           ) : (
             <>
-              <Summary active={active} groups={groupByInvestment(movements.data)} />
+              {/* A carteira é só dos ativos: os encerrados saem do total e da rentabilidade (docs/45, seção 3.2). */}
+              <Summary active={active} groups={groupByInvestment(movements.data.filter((m) => active.some((i) => i.id === m.investmentId)))} />
               <View style={{ gap: space[3] }}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>
                   Seus investimentos

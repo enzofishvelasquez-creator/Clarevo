@@ -34,15 +34,15 @@ Enzo decidiu, em 11/11/2026, o que entra antes do lançamento (D-093). Isso acre
 
 | Pacote (D-093) | Estimativa da equipe | O que depende do Enzo |
 |---|---|---|
-| Oito melhorias da aba Metas (`docs/43`, seção 4) | 4 a 5 dias | Nada |
-| Investimentos, aba nova, com CDI e IPCA (`docs/45`) | 6 a 7 dias | Nada (os dados do Banco Central são públicos) |
+| Oito melhorias da aba Metas (`docs/43`, seção 4) | **Pronto no código em 11/11/2026** | Rodar a migração 0031 (`docs/05`, passo 12v) |
+| Investimentos, aba nova, com CDI e IPCA (`docs/45`) | **Pronto no código em 11/11/2026** | Rodar a migração 0032 e publicar a função `indices` (`docs/05`, passos 12w e 12x; sem segredo, os dados do Banco Central são públicos) |
 | Fatura vencida em Multa e juros | Meio dia | Nada |
 | Pix Automático na web | 1 a 2 dias | Ligar o Pix Automático no Asaas (roteiro) |
 | Widget ligado | Meio dia, mais o teste | O build `production` com o widget e o teste no iPhone e no Android |
 | Formulário de contato para empresas no site | Meio dia | A chave do Resend no painel da Cloudflare (roteiro; a chave nunca passa pelo chat) |
 | Relatório de falhas (Sentry) | 1 dia | A conta no Sentry e o endereço do projeto nas variáveis do EAS (roteiro); pergunta ao advogado |
 
-Somando, são cerca de 3 semanas de trabalho da equipe a partir de 11/11/2026: o código fica pronto por volta da primeira semana de dezembro. A meta de 30/11/2026 (D-082) não se mantém; com as contas da Apple e do Google e as respostas do advogado, a segunda quinzena de dezembro é o mais provável. **A nova data é decisão do Enzo.**
+Somando, eram cerca de 3 semanas de trabalho da equipe a partir de 11/11/2026 (Metas e Investimentos ficaram prontos no mesmo dia): o código fica pronto por volta da primeira semana de dezembro. A meta de 30/11/2026 (D-082) não se mantém; com as contas da Apple e do Google e as respostas do advogado, a segunda quinzena de dezembro é o mais provável. **A nova data é decisão do Enzo.**
 
 O que já aconteceu desde o plano de 03/11: o Telegram para todas as pessoas está no ar (D-081, item 1.9); houve um primeiro build de teste no Android, instalado por link (item 2.1, D-086 e D-087); as capturas e a ficha das lojas estão prontas (item 3.3, 10/11/2026); a assinatura pelas lojas (D-090) e pela web (D-085) está pronta no código, com a compra fechada; o pacote do Instagram (item 4.2) passou para a sessão de redes sociais (`docs/44`).
 

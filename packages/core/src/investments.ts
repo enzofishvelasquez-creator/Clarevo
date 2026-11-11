@@ -72,8 +72,6 @@ export interface InvestmentMovement {
   amountCents: Cents;
   occurredOn: IsoDate;
   note: string | null;
-  /** De onde saiu ou para onde foi o dinheiro (aporte e resgate), como nas metas (D-043). */
-  accountId: string | null;
   createdBy: string;
   version: number;
   createdAt: string;
@@ -96,7 +94,6 @@ export interface InvestmentMovementInput {
   amountCents: Cents;
   occurredOn: IsoDate;
   note: string | null;
-  accountId?: string | null;
 }
 
 export type InvestmentErrorCode =

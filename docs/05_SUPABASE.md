@@ -63,6 +63,12 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
 
 12u. **Função do servidor da assinatura pelas lojas (D-090), sem migração.** Quando o RevenueCat estiver pronto (`docs/42_ASSINATURA_LOJAS.md`, seção 4): em Edge Functions, criar a função `assinatura-lojas` pelo editor, colar todo o conteúdo de `supabase/functions/assinatura-lojas/index.ts`, desligar a verificação de JWT e publicar; os segredos `REVENUECAT_API_KEY` e `REVENUECAT_WEBHOOK_TOKEN` são do Enzo, à mão. A função usa `billing_apply` e `billing_person_by_external_ref`, que já estão no banco (migrações 0023 e 0026): nenhuma consulta nova a rodar no SQL Editor.
 
+12v. **Por último (prioridade das metas, D-093)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261111000001_metas_ordem.sql` (migração 0031) e clique em **Run**. Ela acrescenta `priority` a `goals` (vazia em tudo o que já existe: as metas continuam na ordem de criação), põe a coluna na visão `goal_items`, recria `goals_guard` (trocar só a ordem não sobe a versão da meta) e `clarevo_track_activity` (ordenar não conta como anotação) e cria `set_goal_order`. Nenhum dado existente muda.
+
+12w. **Por último (investimentos, D-093, `docs/45_INVESTIMENTOS.md`)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261111000002_investimentos.sql` (migração 0032) e clique em **Run**. Ela cria as tabelas `investments` e `investment_movements` (com RLS e apagadas em cascata com o contexto), a visão `investment_items` e as sete funções (`create_investment`, `update_investment`, `set_investment_status`, `delete_investment`, `add_investment_movement`, `update_investment_movement` e `delete_investment_movement`), e acrescenta as ações novas a `record_operations`. Nenhum dado existente muda. Depois, recarregue o esquema da API (`notify pgrst, 'reload schema';`). Aplique a 0031 e a 0032 antes de publicar o app novo: a aba Investir e "Ordenar metas" usam as funções novas.
+
+12x. **Função do servidor dos índices (D-093), sem segredo.** Em Edge Functions, criar a função `indices` pelo editor, colar todo o conteúdo de `supabase/functions/indices/index.ts` e publicar com a verificação de JWT **ligada** (só quem está no app consulta). Ela busca o CDI e o IPCA no Banco Central (dados públicos) e não recebe nem guarda dado de ninguém. Não há segredo a cadastrar; `CLAREVO_APP_URL` é opcional (padrão `https://app.clarevo.app.br`). Sem a função, a aba Investir funciona e diz que não conseguiu buscar os índices.
+
 13. A ordem importa: cada arquivo altera tabelas e funções criadas pelos anteriores (a 0006 vem depois da 0005, a 0007 depois da 0006, a 0008 depois da 0007, a 0009 depois da 0008, a 0010 depois da 0009, a 0011 depois da 0010, a 0012 depois da 0011, a 0013 depois da 0012, a 0014 depois da 0013, a 0015 depois da 0014, a 0016 depois da 0015, a 0017 depois da 0016, a 0018 depois da 0017 e a 0019 depois da 0018 a 0020 depois da 0019 e a 0021 depois da 0020). Cada arquivo roda uma única vez; se o projeto já tinha os primeiros, rode só os que faltam, na ordem dos nomes.
 14. Todos devem terminar sem erro. Se aparecer erro, me envie a mensagem.
 15. Para conferir as migrações novas, rode numa nova consulta:
@@ -638,6 +644,32 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
    ```
 
    O resultado esperado é `colunas_0030 = 2`, `totais_0030 = 3`, `funcoes_0030 = 2` e `funcoes_do_app = 94` (a 0030 troca as duas funções de registro pelas novas e não abre as auxiliares). Depois, recarregar o esquema (`notify pgrst, 'reload schema';`).
+
+21s. Para conferir a 0031 (prioridade das metas, D-093), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from information_schema.columns where table_schema = 'public' and table_name in ('goals', 'goal_items') and column_name = 'priority') as colunas_0031,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = 'set_goal_order' and has_function_privilege('authenticated', p.oid, 'execute')) as funcao_0031,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `colunas_0031 = 2`, `funcao_0031 = 1` e `funcoes_do_app = 95` (a 0031 cria uma função para o app; 102 se a 0032 já rodou). Depois, recarregar o esquema (`notify pgrst, 'reload schema';`).
+
+21t. Para conferir a 0032 (investimentos, D-093), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from pg_tables where schemaname = 'public' and tablename in ('investments', 'investment_movements') and rowsecurity) as tabelas_0032,
+          (select count(*) from pg_views where schemaname = 'public' and viewname = 'investment_items') as visao_0032,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('create_investment', 'update_investment', 'set_investment_status', 'delete_investment',
+              'add_investment_movement', 'update_investment_movement', 'delete_investment_movement') and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_0032,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `tabelas_0032 = 2`, `visao_0032 = 1`, `funcoes_0032 = 7` e `funcoes_do_app = 102` (as auxiliares `clarevo_*` da 0032 não abrem para o app). Depois, recarregar o esquema (`notify pgrst, 'reload schema';`).
 
 22. Se o app mostrar erro ao abrir as contas a pagar, os gastos fixos, as contas do ano, as metas, os cartões, a renda comprometida, o orçamento, as contas de origem, as assinaturas, a importação de extrato, a Família, o painel da empresa, a exclusão da conta, a Evolução, a conferência de um mês ou o Resumo logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`. Faça isso depois de colar a 0016, antes de abrir o app (a 0016 recria `months_overview`, e a API precisa ler a função nova), e de novo depois de colar a 0018 (função nova, `set_signup_source`). A 0019 não cria função nem tabela: não precisa. A 0020, a 0021, a 0022, a 0023 e a 0024 criam funções novas (WhatsApp, imagem das metas, Telegram, assinatura e aceite dos termos): rode depois de colar cada uma.
 23. O consultor de segurança do Supabase (**Advisors**) pode apontar a visão `series_items` como visão com os privilégios de quem a criou (a migração de contas do ano a recria com as mesmas opções). É intencional: ela precisa ler as contas excluídas só em um mês, filtra a permissão de leitura de forma explícita e usa `security_barrier` (ver `docs/01_ARQUITETURA.md`). O mesmo vale para as outras sete visões e para o restante do que o verificador aponta: ver "Verificador do Supabase: o que é esperado", logo antes de "Custos".
