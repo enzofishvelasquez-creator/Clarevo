@@ -533,7 +533,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     screenName: TAB.metas,
     href: '/metas',
     keywords: ['meta', 'metas', 'guardar', 'poupar', 'economizar', 'reserva', 'imprevistos', 'emergência', 'objetivo', 'aporte', 'resgate', 'imagem', 'foto'],
-    routes: ['/metas', '/meta/nova', '/meta/[id]', '/meta/[id]/editar', '/meta/[id]/movimento', '/meta/[id]/imagem', '/reserva'],
+    routes: ['/metas', '/meta/nova', '/meta/ordenar', '/meta/[id]', '/meta/[id]/editar', '/meta/[id]/movimento', '/meta/[id]/imagem', '/reserva'],
     screenshot: '16_metas.png',
   },
   {

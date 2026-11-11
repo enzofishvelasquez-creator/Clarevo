@@ -951,8 +951,6 @@ export const GOALS_TEXT = {
   },
   /** Marcos (D-093): "Viagem passou de 50% da meta." */
   milestone: (name: string, percent: number) => `${name} passou de ${pct(percent)} da meta.`,
-  /** Card da reserva com o plano de guardar recolhido (D-093). */
-  seeSavingsPlan: 'Ver o plano de guardar',
   /** Ordenar metas (D-093): a mais importante em primeiro. */
   order: {
     title: 'Ordenar metas',

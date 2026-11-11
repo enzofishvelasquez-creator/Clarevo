@@ -3854,10 +3854,12 @@ export class MemoryRepository implements RecordsRepository {
         fail();
       }
     }
-    // Metas: contexto, autoria e criação não mudam; excluída não volta; versão + 1 por escrita.
+    // Metas: contexto, autoria e criação não mudam; excluída não volta; versão + 1 por escrita. A troca só da prioridade (D-093,
+    // set_goal_order) não sobe a versão, como no banco.
     for (const [id, g] of this.goals) {
       const old = before.goals?.get(id);
       if (!old || old === g) continue;
+      if (!old.deletedAt && old.priority !== g.priority && JSON.stringify({ ...old, priority: null }) === JSON.stringify({ ...g, priority: null })) continue;
       if (old.deletedAt || old.contextId !== g.contextId || old.createdBy !== g.createdBy || old.createdAt !== g.createdAt || g.version !== old.version + 1) {
         fail();
       }

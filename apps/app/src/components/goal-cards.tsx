@@ -31,8 +31,8 @@ import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
  * "Planejar quanto guardar" de quem respondeu "Agora não" (a pergunta só volta mais tarde, mas a porta fica aqui).
  *
  * `compact` (D-093): com a reserva criada e o plano de guardar já feito, o card fica curto: valor, barra, percentual, cobertura,
- * ritmo e as ações, com o plano de guardar recolhido em "Ver o plano de guardar" (a tela /guardar). Assim "Suas metas" sobe
- * para a primeira tela do celular.
+ * ritmo, o plano em uma linha com "Ver o plano" (o `planSlot` compacto) e as ações, sem a linha "Planejado". Assim "Suas metas"
+ * sobe para a primeira tela do celular.
  */
 export function ReserveCard({
   reserve,
@@ -127,7 +127,7 @@ export function ReserveCard({
           {t.planned}
         </MoneyTxt>
       ) : null}
-      {compact ? null : planSlot}
+      {planSlot}
       <View style={styles.actions}>
         <Button
           label={GOALS_TEXT.addDeposit}
@@ -142,15 +142,6 @@ export function ReserveCard({
           onPress={() => router.push({ pathname: '/meta/[id]', params: { id: reserve.id } })}
         />
       </View>
-      {compact ? (
-        <LinkButton
-          label={GOALS_TEXT.seeSavingsPlan}
-          icon={PiggyBank}
-          color={colors.textOnBrand}
-          style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
-          onPress={() => router.push('/guardar')}
-        />
-      ) : null}
       {planAction}
     </View>
   );

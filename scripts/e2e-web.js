@@ -2324,7 +2324,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Metas (Ciclo C), Aprender. A demonstração tem a reserva para imprevistos (15%) e a meta "Viagem de férias" (20%), e já
   // tem a resposta "consigo" com R$ 500,00 ao plano de guardar. Outubro continua na base nesta aba (as contas e os gastos
   // de antes não mexem nas metas).
-  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await waitText('Planejado: R$ 500,00 por mês'); await p.waitForTimeout(400);
+  await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await waitText('Você planeja guardar R$ 500,00 por mês.'); await p.waitForTimeout(400);
   await logoChecks('Metas: logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   const metasTitle = await p.evaluate(() => {
     const logo = [...document.querySelectorAll('[role=img][aria-label="Clarevo"]')].find((e) => e.getBoundingClientRect().width > 0);
@@ -2335,13 +2335,13 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await shot('16_metas');
   t = await body();
   const metasBars = await p.getByRole('progressbar').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-valuenow'), e.getAttribute('aria-valuetext')]));
-  ok('Metas da demonstração: reserva 15% (R$ 3.500,00 de R$ 22.500,00, "Cobre 0,9 mês", planejado R$ 500,00 por mês) e a barra com valor e texto acessíveis', t.includes('R$ 3.500,00 de R$ 22.500,00') && t.includes('15%') &&
-    t.includes('Cobre 0,9 mês dos seus gastos essenciais') && t.includes('Planejado: R$ 500,00 por mês') &&
+  ok('Metas da demonstração: reserva 15% (R$ 3.500,00 de R$ 22.500,00, "Cobre 0,9 mês"), o card curto sem a linha "Planejado" (D-093, o plano de guardar já está nele) e a barra com valor e texto acessíveis', t.includes('R$ 3.500,00 de R$ 22.500,00') && t.includes('15%') &&
+    t.includes('Cobre 0,9 mês dos seus gastos essenciais') && !t.includes('Planejado: R$ 500,00 por mês, sem contar rendimentos') &&
     JSON.stringify(metasBars) === JSON.stringify([['Reserva para imprevistos: 15% da meta, R$ 3.500,00 de R$ 22.500,00.', '15', 'R$ 3.500,00 de R$ 22.500,00, 15%']]), JSON.stringify(metasBars));
   ok('Metas da demonstração: "Viagem de férias" 20% (R$ 1.200,00 de R$ 6.000,00), até julho de 2027 com R$ 480,00 por mês', (await visibleCount('button', /^Viagem de férias: 20% da meta, R\$ 1\.200,00 de R\$ 6\.000,00\. Até julho de 2027 · R\$ 480,00 por mês para chegar lá\./)) === 1 &&
     t.includes('R$ 1.200,00 de R$ 6.000,00') && t.includes('20%') && t.includes('Até julho de 2027 · R$ 480,00 por mês para chegar lá'));
-  ok('Metas da demonstração: plano de guardar com R$ 500,00 por mês e "Seu mês" com a renda comprometida e o guardado em outubro',
-    t.includes('Você planeja guardar R$ 500,00 por mês.') && t.includes('a terceira etapa (R$ 22.500,00, 6 meses dos seus gastos essenciais) chega em dezembro de 2029.') && t.includes('Guardado em outubro: R$ 500,00') &&
+  ok('Metas da demonstração: plano de guardar com R$ 500,00 por mês, curto no card da reserva (D-093: a frase da etapa fica em "Ver o plano"; "Ver o plano" e "Mudar valor" viram links), e "Seu mês" com a renda comprometida e o guardado em outubro',
+    t.includes('Você planeja guardar R$ 500,00 por mês.') && !t.includes('a terceira etapa (R$ 22.500,00, 6 meses dos seus gastos essenciais) chega em dezembro de 2029.') && t.includes('Guardado em outubro: R$ 500,00') &&
     /\d+,\d% da renda de referência já tem destino\./.test(t) && (await visibleCount('button', 'Ver renda comprometida')) === 1 && (await visibleCount('button', 'Ver o plano')) === 1 && (await visibleCount('button', 'Mudar valor')) === 1);
   ok('Metas: a pergunta "Você consegue guardar algum valor por mês?" não aparece depois da resposta "consigo"', !t.includes('Você consegue guardar algum valor por mês?') && (await visibleCount('button', 'Responder depois')) === 0);
   ok('Metas: títulos na ordem (Reserva para imprevistos com o plano dentro, Suas metas, Seu mês, Fazer as contas, Aprender e, depois do conteúdo principal, Neste mês; D-039 e D-054)', JSON.stringify((await headingList()).filter((h) => h.startsWith('2:'))) ===
@@ -3184,7 +3184,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     t.includes('A Reserva para imprevistos passa a ter alvo de R$ 11.250,00 (3 meses dos seus gastos essenciais), com R$ 300,00 por mês planejados.') && t.includes('Depois, o mesmo valor pode ir para as suas metas.') && !NO_BALANCE.test(t));
   await btn('Usar este plano').click(); await waitText('Plano salvo na sua reserva.'); await p.waitForTimeout(700);
   t = await body();
-  ok('C usar o plano: Metas mostra "Você planeja guardar R$ 300,00 por mês." e a reserva com alvo de R$ 11.250,00 e R$ 300,00 por mês', new URL(p.url()).pathname === '/metas' && t.includes('Você planeja guardar R$ 300,00 por mês.') && t.includes('Planejado: R$ 300,00 por mês') && t.includes('de R$ 11.250,00'));
+  ok('C usar o plano: Metas mostra "Você planeja guardar R$ 300,00 por mês." e a reserva com alvo de R$ 11.250,00 e R$ 300,00 por mês', new URL(p.url()).pathname === '/metas' && t.includes('Você planeja guardar R$ 300,00 por mês.') && t.includes('de R$ 11.250,00'));
   await shot('120_metas_plano_usado');
   // "Mudar valor": um novo valor mantém o plano.
   await btn('Mudar valor').click(); await waitText('Quanto você consegue guardar por mês?'); await p.waitForTimeout(300);
@@ -3272,7 +3272,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await radio('Etapa de 3 meses dos gastos essenciais').click();
   await btn('Usar este plano').click(); await waitText('Plano salvo na sua reserva.'); await p.waitForTimeout(700);
   t = await body();
-  ok('C "Usar este plano": a reserva nasce com alvo de R$ 6.000,00 (3 × R$ 2.000,00), R$ 0,00 guardado, R$ 400,00 por mês, e o card vira o plano', t.includes('R$ 0,00 de R$ 6.000,00') && t.includes('Planejado: R$ 400,00 por mês') && t.includes('Você planeja guardar R$ 400,00 por mês.') && !t.includes('Você consegue guardar algum valor por mês?'), t.slice(0, 400));
+  ok('C "Usar este plano": a reserva nasce com alvo de R$ 6.000,00 (3 × R$ 2.000,00), R$ 0,00 guardado, R$ 400,00 por mês, e o card vira o plano', t.includes('R$ 0,00 de R$ 6.000,00') && t.includes('Você planeja guardar R$ 400,00 por mês.') && !t.includes('Você consegue guardar algum valor por mês?'), t.slice(0, 400));
   await shot('124_metas_reserva_pelo_plano');
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
   t = await body();
@@ -14432,6 +14432,63 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await btn('Cancelar').click(); await p.waitForTimeout(300);
     if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
     ok('D-092 Nova meta: nada vai à rede na demonstração', writes.length === npWrites0, writes.slice(npWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // D-093 Metas: "Tipo de meta" depois do valor com "O que é isso?", atalhos de prazo, "Ordenar metas" (a mais importante em
+  // primeiro, só com duas ou mais metas) e o marco de 25% no aviso do aporte. Na demonstração, nada vai à rede.
+  // ==================================================================================================================
+  {
+    const omWrites0 = writes.length;
+    const cardTop = (prefix) => p.evaluate((pre) => {
+      const el = [...document.querySelectorAll('[role=button]')].find((e) => (e.getAttribute('aria-label') || '').startsWith(pre) && e.getBoundingClientRect().width > 0);
+      return el ? el.getBoundingClientRect().top : null;
+    }, prefix);
+    await demoHome();
+    await tabByName('Metas').click(); await waitText('Viagem de férias'); await p.waitForTimeout(300);
+    ok('D-093 Metas: com uma meta só, "Ordenar metas" não aparece', (await visibleCount('button', 'Ordenar metas')) === 0);
+    await btn('Nova meta').click(); await waitText('O que você quer conquistar?'); await p.waitForTimeout(300);
+    await radio('Estudos').click(); await p.waitForTimeout(300);
+    await field('Valor da meta').fill('2400'); await p.waitForTimeout(200);
+    const typeOrder = await p.evaluate(() => {
+      const top = (sel, test) => [...document.querySelectorAll(sel)].find((e) => test(e) && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
+      return {
+        value: top('input', (e) => e.getAttribute('aria-label') === 'Valor da meta' || e.labels?.[0]?.textContent === 'Valor da meta'),
+        objective: top('[role=radio]', (e) => e.getAttribute('aria-label') === 'Objetivo' || e.textContent === 'Objetivo'),
+        deadline: top('input', (e) => (e.getAttribute('aria-label') || '').startsWith('Até quando?') || (e.labels?.[0]?.textContent || '').startsWith('Até quando?')),
+      };
+    });
+    ok('D-093 Nova meta: "Tipo de meta" vem depois do valor e antes do prazo, com "Objetivo" marcado',
+      typeOrder.value !== null && typeOrder.objective !== null && typeOrder.deadline !== null && typeOrder.value < typeOrder.objective && typeOrder.objective < typeOrder.deadline &&
+        (await radio('Objetivo').getAttribute('aria-checked')) === 'true', JSON.stringify(typeOrder));
+    await btn('O que é isso?').click(); await p.waitForTimeout(300);
+    ok('D-093 Nova meta: "O que é isso?" explica objetivo e reserva de oportunidade', (await body()).includes('Reserva de oportunidade é um valor guardado para aproveitar uma chance que aparecer'));
+    const shortcutNames = await p.getByRole('radiogroup', { name: 'Atalhos de prazo' }).filter({ visible: true }).first().getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+    ok('D-093 Nova meta: atalhos de prazo a partir de outubro de 2026 (6 meses, 1 ano, 2 anos e 5 anos)',
+      JSON.stringify(shortcutNames) === JSON.stringify(['6 meses: até 04/2027', '1 ano: até 10/2027', '2 anos: até 10/2028', '5 anos: até 10/2031']), JSON.stringify(shortcutNames));
+    await radio('1 ano: até 10/2027').click(); await p.waitForTimeout(300);
+    t = await body(); screenTexts.push(t);
+    ok('D-093 Nova meta: "1 ano" preenche o prazo (10/2027), fica marcado e a prévia diz quanto guardar por mês',
+      (await field('Até quando? (opcional)').inputValue()) === '10/2027' && (await radio('1 ano: até 10/2027').getAttribute('aria-checked')) === 'true' &&
+        t.includes('Para chegar até outubro de 2027: R$ 184,62 por mês, sem contar rendimentos.'), t.slice(0, 400));
+    await atWidths(async (w) => { await layoutChecks(`D-093 Nova meta ${w}px`); if (w === 390) await shot('530_nova_meta_prazo_e_tipo'); });
+    await btn('Criar meta').click(); await waitText('Meta criada.'); await p.waitForTimeout(400);
+    await tabByName('Metas').click(); await waitText('Ordenar metas'); await p.waitForTimeout(300);
+    ok('D-093 Metas: com duas metas, "Ordenar metas" aparece; sem ordem escolhida, pela criação (Viagem de férias, depois Estudos)',
+      (await visibleCount('button', 'Ordenar metas')) === 1 && (await cardTop('Viagem de férias:')) < (await cardTop('Estudos:')));
+    await btn('Ordenar metas').click(); await waitText('Ponha em primeiro a meta mais importante para você.'); await p.waitForTimeout(300);
+    ok('D-093 Ordenar metas: "Subir" desligado na primeira, "Descer" desligado na última',
+      (await btn('Subir Viagem de férias').getAttribute('aria-disabled')) === 'true' && (await btn('Descer Estudos').getAttribute('aria-disabled')) === 'true');
+    await btn('Subir Estudos').click(); await p.waitForTimeout(300);
+    await atWidths(async (w) => { await layoutChecks(`D-093 Ordenar metas ${w}px`); if (w === 390) await shot('531_ordenar_metas'); });
+    await btn('Salvar ordem').click(); await waitText('Ordem das metas salva.'); await p.waitForTimeout(500);
+    ok('D-093 Ordenar metas: salvo, Metas mostra Estudos antes de Viagem de férias', (await cardTop('Estudos:')) < (await cardTop('Viagem de férias:')));
+    // Marco: R$ 480,00 (o planejado) leva a Viagem de férias de 20% a 28%: passa de 25%.
+    await p.getByRole('button', { name: /^Viagem de férias:/ }).filter({ visible: true }).first().click(); await waitText('Histórico da meta'); await p.waitForTimeout(300);
+    await btn('Registrar aporte').click(); await waitText('Registre o dinheiro que você já separou'); await p.waitForTimeout(300);
+    await btn('Registrar aporte').click(); await waitText('Aporte registrado.'); await p.waitForTimeout(400);
+    ok('D-093 marcos: o aviso do aporte diz que a meta passou de 25%', (await body()).includes('Aporte registrado. Viagem de férias passou de 25% da meta.'));
+    ok('D-093 Metas: nada vai à rede na demonstração', writes.length === omWrites0, writes.slice(omWrites0).join(' | '));
   }
 
   // ==================================================================================================================

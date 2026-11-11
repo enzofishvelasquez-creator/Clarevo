@@ -205,12 +205,34 @@ export function SavingsCard({
 /**
  * O plano de guardar dentro do card azul da reserva (D-039): "Seu plano de guardar", o valor por mês, a frase da etapa e
  * "Ver o plano" e "Mudar valor". Só no estado "plano" (nada nos demais). Texto claro sobre o azul.
+ *
+ * `compact` (D-093): com a reserva já criada, só o título, o valor por mês e "Ver o plano" e "Mudar valor" como links (a frase da
+ * etapa fica na tela do plano), para o card da reserva ficar curto e "Suas metas" subir para a primeira tela do celular.
  */
-export function SavingsPlanInReserve({ contextId, card }: { contextId: string | undefined; card: SyncedQuery<SavingsCardData> }) {
+export function SavingsPlanInReserve({ contextId, card, compact }: { contextId: string | undefined; card: SyncedQuery<SavingsCardData>; compact?: boolean }) {
   const { today } = useSession();
   const state = card.data?.state;
-  const inputs = useSavingsPlanInputs(state?.kind === 'plano' ? contextId : undefined);
+  const inputs = useSavingsPlanInputs(state?.kind === 'plano' && !compact ? contextId : undefined);
   if (state?.kind !== 'plano') return null;
+  if (compact) {
+    return (
+      <View style={styles.inReserve}>
+        <Txt variant="label" color={colors.textOnBrand} style={{ fontFamily: fonts.extrabold }} accessibilityRole="header" aria-level={3}>
+          {SAVINGS_TEXT.planTitle}
+        </Txt>
+        <MoneyTxt color={colors.textOnBrand}>{SAVINGS_TEXT.planMonthly(state.monthlyCents)}</MoneyTxt>
+        <View style={styles.compactRow}>
+          <LinkButton label="Ver o plano" color={colors.textOnBrand} style={styles.later} onPress={() => router.push('/guardar')} />
+          <LinkButton
+            label={SAVINGS_TEXT.changeValue}
+            color={colors.textOnBrand}
+            style={styles.later}
+            onPress={() => router.push({ pathname: '/guardar', params: { editar: '1' } })}
+          />
+        </View>
+      </View>
+    );
+  }
   const planInputs = inputs.data;
   const reserve = planInputs ? organizeGoals(planInputs.goals).reserve : null;
   const headline = planInputs
@@ -272,5 +294,6 @@ const styles = StyleSheet.create({
   sideBySide: { flexDirection: 'row', gap: space[2] },
   half: { flex: 1, minWidth: 0 },
   inReserve: { gap: space[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.28)', paddingTop: space[3] },
+  compactRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[5], rowGap: space[1] },
   later: { alignSelf: 'flex-start', paddingHorizontal: 0 },
 });

@@ -273,6 +273,7 @@ function Navigation() {
           {/* Metas e reserva para imprevistos (D-027). /meta/nova é rota estática e tem precedência sobre /meta/[id]. */}
           <Stack.Screen name="reserva" />
           <Stack.Screen name="meta/nova" />
+          <Stack.Screen name="meta/ordenar" />
           <Stack.Screen name="meta/[id]/index" />
           {/* Imagem da meta (D-077): sugeridas, automática ou foto da galeria. */}
           <Stack.Screen name="meta/[id]/imagem" />

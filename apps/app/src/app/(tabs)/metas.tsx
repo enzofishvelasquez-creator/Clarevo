@@ -67,7 +67,7 @@ export default function MetasScreen() {
               <ReserveCard
                 reserve={data.reserve}
                 plan={data.reserve ? data.plans[data.reserve.id]! : null}
-                planSlot={<SavingsPlanInReserve contextId={contextId} card={savings} />}
+                planSlot={<SavingsPlanInReserve contextId={contextId} card={savings} compact={data.reserve !== null} />}
                 planLink={savings.data?.state.kind === 'oculto'}
                 compact={savings.data?.state.kind === 'plano'}
               />
