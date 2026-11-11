@@ -142,6 +142,8 @@ export interface AsaasPayment {
   checkoutSession: string | null;
   /** O dia do pagamento: a liquidação no Asaas e, sem ela, o dia informado pelo pagador ou a confirmação. */
   paidOn: IsoDate | null;
+  /** PIX, CREDIT_CARD, BOLETO ou UNDEFINED (nulo quando o Asaas não diz). */
+  billingType: string | null;
 }
 
 const isoDate = (v: unknown): IsoDate | null => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null);
@@ -181,6 +183,7 @@ export function asaasPaymentFrom(raw: unknown): AsaasPayment | null {
     externalReference: text(p.externalReference),
     checkoutSession: text(p.checkoutSession),
     paidOn: isoDate(p.paymentDate) ?? isoDate(p.clientPaymentDate) ?? isoDate(p.confirmedDate),
+    billingType: text(p.billingType),
   };
 }
 
@@ -441,6 +444,7 @@ export type AssinaturaWebResult =
   | {
       result:
         | 'ja_assinante'
+        | 'cartao_ativo'
         | 'ja_pago'
         | 'sem_necessidade'
         | 'muitas_tentativas'
@@ -528,7 +532,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
    * Uma cobrança de Pix mês a mês (D-093): lê a cobrança atual no Asaas, acha a pessoa (a referência de Pix; sem ela, o Checkout no banco;
    * por fim, o pagamento já gravado) e grava a situação com billing_pix_apply. Cobrança de assinatura fica com o fluxo da assinatura.
    */
-  async function applyPixPayment(clients: Clients, ev: AsaasEvent, paymentId: string, eventId: string, checkoutId: string | null): Promise<WebhookOutcome> {
+  async function applyPixPayment(clients: Clients, ev: AsaasEvent, paymentId: string, eventId: string): Promise<WebhookOutcome> {
     const { asaas, db } = clients;
     const got = await asaas('GET', `/payments/${encodeURIComponent(paymentId)}`);
     let p = got.status === 200 ? asaasPaymentFrom(got.json) : null;
@@ -538,15 +542,14 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       if (got.status === 200 || got.status === 404) return 'ignorado';
       throw new TransientError(`Asaas respondeu ${got.status} ao ler a cobrança`);
     }
-    if (p.subscription) return 'ignorado';
+    // Só cobrança de Pix sem assinatura (revisão independente de 11/11/2026): cartão, boleto ou cobrança de assinatura não viram mês de Pix.
+    if (p.subscription || (p.billingType !== null && p.billingType !== 'PIX')) return 'ignorado';
     let ref = parsePixReference(p.externalReference);
-    for (const id of [p.checkoutSession, checkoutId]) {
-      if (ref || !id) continue;
-      ref = referenceFromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: sha256Hex(id) }));
-    }
+    if (!ref && p.checkoutSession) ref = referenceFromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: sha256Hex(p.checkoutSession) }));
     if (!ref) ref = referenceFromRpc(await db.rpcService('billing_pix_person', { p_payment_hash: sha256Hex(p.id) }));
     if (!ref) {
-      log(`aviso ${ev.event} de cobrança avulsa sem referência da Clarevo`);
+      // Paga e sem pessoa achada: conferir à mão no Asaas (o registro não leva identificador de ninguém).
+      log(PAID_STATUSES.has(p.status) ? `cobrança de Pix PAGA sem referência da Clarevo (${ev.event}): conferir no Asaas` : `aviso ${ev.event} de cobrança avulsa sem referência da Clarevo`);
       return 'sem_referencia';
     }
     const applied = await db.rpcService('billing_pix_apply', {
@@ -567,7 +570,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
 
   /** Avisos sem assinatura: a cobrança avulsa (PAYMENT_*) ou o Checkout pago (CHECKOUT_PAID, com as cobranças dele). */
   async function applyPixEvent(clients: Clients, ev: AsaasEvent): Promise<WebhookOutcome> {
-    if (ev.payment && ev.event.startsWith('PAYMENT_')) return applyPixPayment(clients, ev, ev.payment.id, ev.id, null);
+    if (ev.payment && ev.event.startsWith('PAYMENT_')) return applyPixPayment(clients, ev, ev.payment.id, ev.id);
     if (!ev.checkoutId || ev.event !== 'CHECKOUT_PAID') return 'ignorado';
     const list = await clients.asaas('GET', `/payments?checkoutSession=${encodeURIComponent(ev.checkoutId)}&limit=10`);
     if (list.status !== 200) throw new TransientError(`Asaas respondeu ${list.status} ao listar as cobranças do Checkout`);
@@ -575,8 +578,9 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     let outcome: WebhookOutcome = 'ignorado';
     for (const raw of Array.isArray(data) ? data : []) {
       const p = asaasPaymentFrom(raw);
-      if (!p) continue;
-      const o = await applyPixPayment(clients, ev, p.id, `${ev.id}:${p.id}`.slice(0, 200), ev.checkoutId);
+      // Só as cobranças deste Checkout, mesmo que o Asaas ignore o filtro (revisão independente de 11/11/2026).
+      if (!p || p.checkoutSession !== ev.checkoutId) continue;
+      const o = await applyPixPayment(clients, ev, p.id, `${ev.id}:${p.id}`.slice(0, 200));
       if (outcome === 'ignorado' || o === 'aplicado') outcome = o;
     }
     return outcome;
@@ -695,7 +699,9 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       if (status === 'assinatura' && !paysWithPix) return reply(200, { result: 'ja_assinante' });
       if (status === 'beneficio' || status === 'cortesia') return reply(200, { result: 'sem_necessidade' });
       if (status === 'assinatura' && !pixCanPayNext(typeof current?.until === 'string' ? current.until : null, now())) return reply(200, { result: 'ja_pago' });
-      if ((await activeSubscriptions(asaas, personId)).length > 0) return reply(200, { result: 'ja_assinante' });
+      // Assinatura no cartão ainda ativa no Asaas: com o acesso valendo, já assinante; sem ele (cobrança recusada ou em aberto), a tela
+      // oferece cancelar a do cartão antes de pagar de outro jeito (revisão independente de 11/11/2026).
+      if ((await activeSubscriptions(asaas, personId)).length > 0) return reply(200, { result: status === 'assinatura' ? 'ja_assinante' : 'cartao_ativo' });
       const request =
         action === 'pix'
           ? checkoutPixRequest(personId, plan as PlanKind, config.appUrl)

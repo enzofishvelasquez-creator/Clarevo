@@ -8,11 +8,15 @@
 -- (2) billing_pix_payments: cada pagamento por Pix, só com o resumo SHA-256 do identificador da cobrança no Asaas, a pessoa, o plano e o
 --     dia do pagamento (nulo enquanto não está pago, ou depois de estornado). Nada do pagador, do valor ou do Pix. Some com a pessoa.
 -- (3) billing_pix_apply: a função do servidor grava a situação atual de um pagamento (consultada no Asaas a cada aviso) e recalcula até
---     quando o acesso vale: os pagamentos do plano, em ordem, cada um começando no dia do pagamento ou no fim do mês anterior já pago (o
---     que vier depois) e valendo um mês; mais PIX_GRACE_DAYS (3) dias de tolerância, até o fim do dia em Brasília. Estorno tira o mês.
---     Idempotente pelo identificador do aviso (billing_events). billing_pix_person acha a pessoa de um pagamento já gravado (estorno
---     de um pagamento antigo). Só a chave de serviço usa as duas.
--- Nenhum dado existente muda. Aplicar no SQL Editor (docs/05, passo 12y). Testes em supabase/tests/99zzzzzzzzzzzzz_pix.sql.
+--     quando o acesso vale: os pagamentos do plano, em ordem do dia do pagamento, cada um valendo um mês. Pago antes do fim do mês já
+--     pago ou nos 3 dias de tolerância depois dele, continua a sequência (começa no fim do mês pago: a tolerância não vira dias a mais);
+--     pago depois, começa uma sequência nova no dia do pagamento. O fim de uma sequência é o início dela mais N meses (31/01, três meses:
+--     30/04, sem perder dias em fevereiro). O acesso vai até o fim do dia (Brasília) do último dia pago mais 3 dias. Estorno: o pagamento
+--     estornado sai e os outros são recontados. Idempotente pelo identificador do aviso (billing_events). billing_pix_person acha a
+--     pessoa de um pagamento já gravado (estorno de um pagamento antigo). Só a chave de serviço usa as duas.
+-- (4) clarevo_access: o mês pago com Pix vem depois do benefício, da cortesia e do Plano Família (revisão independente de 11/11/2026):
+--     quem passou a ter o benefício da empresa, uma cortesia ou entrou numa Família com plano não é chamado a pagar o próximo mês.
+-- Nenhum dado existente muda nem o acesso de ninguém (ninguém tem Pix ainda). Aplicar no SQL Editor (docs/05, passo 12y). Testes em supabase/tests/99zzzzzzzzzzzzz_pix.sql.
 
 -- ---------------------------------------------------------------------------
 -- (1) A origem 'pix'
@@ -55,7 +59,8 @@ set search_path = public
 as $$
 declare
   v_owner uuid;
-  v_start date;
+  v_anchor date;
+  v_months int := 0;
   v_end date;
   v_ref text;
   v_until timestamptz;
@@ -87,14 +92,19 @@ begin
   on conflict (payment_hash) do update set paid_on = excluded.paid_on, updated_at = now();
   select b.plan into p_plan from public.billing_pix_payments b where b.payment_hash = p_payment_hash;
 
-  -- Cada pagamento vale um mês, a partir do dia do pagamento ou do fim do mês já pago, o que vier depois.
+  -- Cada pagamento vale um mês. Pago até 3 dias depois do fim do mês já pago, continua a sequência; depois, começa outra no dia pago.
   for r in
     select b.paid_on from public.billing_pix_payments b
      where b.person_id = p_person and b.plan = p_plan and b.paid_on is not null
      order by b.paid_on, b.payment_hash
   loop
-    v_start := greatest(r.paid_on, coalesce(v_end, r.paid_on));
-    v_end := (v_start + interval '1 month')::date;
+    if v_end is null or r.paid_on > v_end + 3 then
+      v_anchor := r.paid_on;
+      v_months := 1;
+    else
+      v_months := v_months + 1;
+    end if;
+    v_end := (v_anchor + make_interval(months => v_months))::date;
   end loop;
 
   v_ref := encode(sha256(convert_to('pix:' || p_person::text || ':' || p_plan, 'UTF8')), 'hex');
@@ -128,6 +138,75 @@ as $$
     from public.billing_pix_payments b
     join public.persons p on p.id = b.person_id and p.deleted_at is null
    where b.payment_hash = p_payment_hash
+$$;
+
+-- ---------------------------------------------------------------------------
+-- (4) O acesso: o Pix depois do benefício, da cortesia e do Plano Família
+-- ---------------------------------------------------------------------------
+create or replace function public.clarevo_access(p_person uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_now timestamptz := now();
+  v_source public.entitlement_source;
+  v_plan text;
+  v_until timestamptz;
+  v_provider text;
+  v_from timestamptz;
+  v_created timestamptz;
+  v_trial timestamptz;
+begin
+  -- O direito da própria pessoa, menos o mês pago com Pix: assinatura (cartão ou lojas), benefício ou cortesia.
+  select e.source, e.plan, e.valid_until, e.provider into v_source, v_plan, v_until, v_provider
+    from public.plan_entitlements e
+   where e.person_id = p_person and e.valid_from <= v_now and (e.valid_until is null or e.valid_until > v_now)
+     and e.provider is distinct from 'pix'
+   order by case e.source when 'particular' then 0 when 'beneficio' then 1 else 2 end, e.valid_until desc nulls first
+   limit 1;
+  if found then
+    return jsonb_build_object('status', case v_source when 'particular' then 'assinatura' when 'beneficio' then 'beneficio' else 'cortesia' end,
+                              'plan', v_plan, 'until', v_until, 'can_write', true, 'provider', v_provider);
+  end if;
+
+  -- Membro ativo de uma Família que não terminou, cuja titular ativa tem um direito vigente de plano familiar.
+  select e.valid_until into v_until
+    from public.context_memberships m
+    join public.financial_contexts c on c.id = m.context_id and c.kind = 'familia' and c.ended_at is null
+    join public.context_memberships t on t.context_id = c.id and t.role = 'titular' and t.revoked_at is null and t.person_id <> p_person
+    join public.plan_entitlements e on e.person_id = t.person_id and e.plan = 'familiar'
+                                   and e.valid_from <= v_now and (e.valid_until is null or e.valid_until > v_now)
+   where m.person_id = p_person and m.revoked_at is null
+   order by e.valid_until desc nulls first
+   limit 1;
+  if found then
+    return jsonb_build_object('status', 'familia', 'plan', 'familiar', 'until', v_until, 'can_write', true, 'provider', null);
+  end if;
+
+  -- O mês pago com Pix (D-093): depois de tudo o que cobre a pessoa sem pagar, para ninguém ser chamado a pagar o próximo mês à toa.
+  select e.plan, e.valid_until into v_plan, v_until
+    from public.plan_entitlements e
+   where e.person_id = p_person and e.provider = 'pix' and e.valid_from <= v_now and e.valid_until > v_now
+   order by e.valid_until desc
+   limit 1;
+  if found then
+    return jsonb_build_object('status', 'assinatura', 'plan', v_plan, 'until', v_until, 'can_write', true, 'provider', 'pix');
+  end if;
+
+  select s.enforced_from into v_from from public.billing_settings s where s.id;
+  if v_from is null or v_now < v_from then
+    return jsonb_build_object('status', 'pre_lancamento', 'plan', null, 'until', v_from, 'can_write', true, 'provider', null);
+  end if;
+  select p.created_at into v_created from public.persons p where p.id = p_person;
+  v_trial := greatest(coalesce(v_created, v_now), v_from) + interval '14 days';
+  if v_now < v_trial then
+    return jsonb_build_object('status', 'teste', 'plan', null, 'until', v_trial, 'can_write', true, 'provider', null);
+  end if;
+  return jsonb_build_object('status', 'leitura', 'plan', null, 'until', v_trial, 'can_write', false, 'provider', null);
+end;
 $$;
 
 -- ---------------------------------------------------------------------------

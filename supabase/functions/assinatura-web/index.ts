@@ -119,6 +119,7 @@ const __mods = [
             externalReference: text(p.externalReference),
             checkoutSession: text(p.checkoutSession),
             paidOn: isoDate(p.paymentDate) ?? isoDate(p.clientPaymentDate) ?? isoDate(p.confirmedDate),
+            billingType: text(p.billingType),
         };
     }
     function pixPaidOn(p, today) {
@@ -346,7 +347,7 @@ const __mods = [
             }
             return ref;
         }
-        async function applyPixPayment(clients, ev, paymentId, eventId, checkoutId) {
+        async function applyPixPayment(clients, ev, paymentId, eventId) {
             const { asaas, db } = clients;
             const got = await asaas('GET', `/payments/${encodeURIComponent(paymentId)}`);
             let p = got.status === 200 ? asaasPaymentFrom(got.json) : null;
@@ -357,18 +358,15 @@ const __mods = [
                     return 'ignorado';
                 throw new TransientError(`Asaas respondeu ${got.status} ao ler a cobrança`);
             }
-            if (p.subscription)
+            if (p.subscription || (p.billingType !== null && p.billingType !== 'PIX'))
                 return 'ignorado';
             let ref = (0, pix_1.parsePixReference)(p.externalReference);
-            for (const id of [p.checkoutSession, checkoutId]) {
-                if (ref || !id)
-                    continue;
-                ref = referenceFromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: (0, sha256_1.sha256Hex)(id) }));
-            }
+            if (!ref && p.checkoutSession)
+                ref = referenceFromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: (0, sha256_1.sha256Hex)(p.checkoutSession) }));
             if (!ref)
                 ref = referenceFromRpc(await db.rpcService('billing_pix_person', { p_payment_hash: (0, sha256_1.sha256Hex)(p.id) }));
             if (!ref) {
-                log(`aviso ${ev.event} de cobrança avulsa sem referência da Clarevo`);
+                log(exports.PAID_STATUSES.has(p.status) ? `cobrança de Pix PAGA sem referência da Clarevo (${ev.event}): conferir no Asaas` : `aviso ${ev.event} de cobrança avulsa sem referência da Clarevo`);
                 return 'sem_referencia';
             }
             const applied = await db.rpcService('billing_pix_apply', {
@@ -387,7 +385,7 @@ const __mods = [
         }
         async function applyPixEvent(clients, ev) {
             if (ev.payment && ev.event.startsWith('PAYMENT_'))
-                return applyPixPayment(clients, ev, ev.payment.id, ev.id, null);
+                return applyPixPayment(clients, ev, ev.payment.id, ev.id);
             if (!ev.checkoutId || ev.event !== 'CHECKOUT_PAID')
                 return 'ignorado';
             const list = await clients.asaas('GET', `/payments?checkoutSession=${encodeURIComponent(ev.checkoutId)}&limit=10`);
@@ -397,9 +395,9 @@ const __mods = [
             let outcome = 'ignorado';
             for (const raw of Array.isArray(data) ? data : []) {
                 const p = asaasPaymentFrom(raw);
-                if (!p)
+                if (!p || p.checkoutSession !== ev.checkoutId)
                     continue;
-                const o = await applyPixPayment(clients, ev, p.id, `${ev.id}:${p.id}`.slice(0, 200), ev.checkoutId);
+                const o = await applyPixPayment(clients, ev, p.id, `${ev.id}:${p.id}`.slice(0, 200));
                 if (outcome === 'ignorado' || o === 'aplicado')
                     outcome = o;
             }
@@ -535,7 +533,7 @@ const __mods = [
                 if (status === 'assinatura' && !(0, pix_1.pixCanPayNext)(typeof current?.until === 'string' ? current.until : null, now()))
                     return reply(200, { result: 'ja_pago' });
                 if ((await activeSubscriptions(asaas, personId)).length > 0)
-                    return reply(200, { result: 'ja_assinante' });
+                    return reply(200, { result: status === 'assinatura' ? 'ja_assinante' : 'cartao_ativo' });
                 const request = action === 'pix'
                     ? checkoutPixRequest(personId, plan, config.appUrl)
                     : checkoutRequest(personId, plan, config.appUrl, (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now()));
@@ -923,8 +921,8 @@ const __mods = [
     exports.PIX_WARNING_DAYS = exports.PIX_PAY_AHEAD_DAYS = exports.PIX_GRACE_DAYS = void 0;
     exports.pixReference = pixReference;
     exports.parsePixReference = parsePixReference;
-    exports.pixCanPayNext = pixCanPayNext;
     exports.pixNextPaymentFrom = pixNextPaymentFrom;
+    exports.pixCanPayNext = pixCanPayNext;
     exports.PIX_GRACE_DAYS = 3;
     exports.PIX_PAY_AHEAD_DAYS = 10;
     exports.PIX_WARNING_DAYS = 7;
@@ -941,19 +939,15 @@ const __mods = [
             return null;
         return { personId: (m[1] ?? '').toLowerCase(), plan: m[2] };
     }
-    function pixCanPayNext(until, now) {
-        if (!until)
-            return true;
-        const end = Date.parse(until);
-        if (Number.isNaN(end))
-            return true;
-        return end - now.getTime() <= (exports.PIX_PAY_AHEAD_DAYS + exports.PIX_GRACE_DAYS) * DAY_MS;
-    }
     function pixNextPaymentFrom(until) {
         if (!until)
             return null;
         const end = Date.parse(until);
-        return Number.isNaN(end) ? null : new Date(end - (exports.PIX_PAY_AHEAD_DAYS + exports.PIX_GRACE_DAYS) * DAY_MS);
+        return Number.isNaN(end) ? null : new Date(end - (exports.PIX_PAY_AHEAD_DAYS + exports.PIX_GRACE_DAYS) * DAY_MS + 1);
+    }
+    function pixCanPayNext(until, now) {
+        const from = pixNextPaymentFrom(until);
+        return from === null || now.getTime() >= from.getTime();
     }
   },
 ];

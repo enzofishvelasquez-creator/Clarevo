@@ -75,17 +75,26 @@ recurso. Fica para depois, se o Asaas confirmar a conta liberada; o caminho C (s
   plano, 60 minutos de validade, a referência `clarevo-pix:<id da pessoa>:<plano>` e a mesma volta para a tela Assinatura; liga o Checkout
   à pessoa no banco (`billing_checkout_record`, o mesmo limite de 5 por hora) e abre a página do Asaas, onde a pessoa informa os dados e
   paga. A Clarevo não recebe CPF nem dado do Pix.
-- **Cada pagamento vale um mês**, a partir do dia do pagamento ou do fim do mês já pago (o que vier depois), mais 3 dias de tolerância, até
-  o fim do dia em Brasília. Não renova sozinho: nos últimos 7 dias, o Resumo (na web) avisa "O acesso pago com Pix vai até ...", com
-  "Pagar o próximo mês"; a tela Assinatura mostra "Pagar mais um mês com Pix" nos últimos 10 dias do mês pago (antes disso, a partir de
-  quando dá). Pagar antes da janela é recusado (`ja_pago`), para ninguém pagar vários meses sem querer. Quem tem assinatura no cartão, na
-  loja, benefício ou cortesia não vê o Pix (`ja_assinante`, `sem_necessidade`); quem paga com Pix não abre o cartão enquanto o mês vale.
+- **Cada pagamento vale um mês.** Pago antes do fim do mês já pago, ou até 3 dias depois dele, continua a sequência (o mês novo começa no
+  fim do anterior: a tolerância não vira dias a mais); pago depois disso, começa uma sequência nova no dia do pagamento. O fim de uma
+  sequência é o começo dela mais N meses (31/01 e mais dois pagamentos: até 30/04). O acesso vale até o fim do dia (Brasília) do último
+  dia pago mais 3 dias de tolerância, que a tela não anuncia: ela mostra "Pago com Pix até <último dia pago>" e, na tolerância, "O mês
+  pago com Pix terminou em ...". **Estorno:** o pagamento estornado sai, e os outros são recontados a partir do dia em que foram pagos.
+- **Não renova sozinho:** nos últimos 7 dias do mês pago (e na tolerância), o Resumo (na web) avisa, com "Pagar o próximo mês"; a tela
+  Assinatura mostra "Pagar mais um mês com Pix" nos últimos 10 dias do mês pago (antes disso, "Você pode pagar o próximo mês a partir de
+  ..."). Pagar antes da janela é recusado (`ja_pago`), para ninguém pagar vários meses sem querer. Quem tem assinatura no cartão ou na
+  loja não vê o Pix (`ja_assinante`); quem paga com Pix não abre o cartão enquanto o mês vale. **O Pix vem depois do benefício, da
+  cortesia e do Plano Família** no acesso (`clarevo_access`, migração 0033): quem passou a ter um deles não é chamado a pagar.
+- **Cartão recusado:** se a assinatura no cartão ficou ativa no Asaas sem pagar (a pessoa caiu para só ver e exportar), assinar ou pagar
+  com Pix responde `cartao_ativo`, e a tela oferece "Cancelar a assinatura no cartão" antes de escolher de novo.
 - **Os avisos:** os `PAYMENT_*` de cobrança sem assinatura levam à cobrança atual no Asaas (`GET /v3/payments/{id}`), que acha a pessoa pela
   referência de Pix (se o Asaas a levar do Checkout para a cobrança, o que a documentação não garante), pelo Checkout no banco
   (`checkoutSession` da cobrança) ou pelo pagamento já gravado (estorno de meses atrás); o `CHECKOUT_PAID` lista as cobranças do Checkout
   (`GET /v3/payments?checkoutSession=`) e faz o mesmo com cada uma. A função chama `billing_pix_apply` (migração 0033) com o resumo SHA-256
   do identificador da cobrança e o dia do pagamento (nulo se pendente, estornada ou removida); o banco recalcula até quando o acesso vale,
-  com a origem `pix` (o app mostra "pague o próximo mês" em vez de "cancelar"). Pix pago entra como `RECEIVED` (`PAYMENT_RECEIVED`).
+  com a origem `pix` (o app mostra "pague o próximo mês" em vez de "cancelar"). Pix pago entra como `RECEIVED` (`PAYMENT_RECEIVED`). Só
+  cobrança de Pix (`billingType` PIX) sem assinatura conta, e no `CHECKOUT_PAID` só as cobranças com `checkoutSession` igual ao Checkout
+  do aviso (revisão independente de 11/11/2026). Cobrança de Pix paga sem pessoa achada fica no registro ("conferir no Asaas").
 - **No app das lojas**, nada disso aparece (a Apple e o Google recusam app que aponte para pagamento fora da loja): quem pagou com Pix vê só
   "Acesso completo até ...".
 

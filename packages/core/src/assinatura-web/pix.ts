@@ -29,19 +29,18 @@ export function parsePixReference(ref: unknown): { personId: string; plan: PlanK
 }
 
 /**
- * Se já dá para pagar o próximo mês: o acesso pago com Pix (`until`, que já inclui a tolerância) termina em até PIX_PAY_AHEAD_DAYS mais
- * PIX_GRACE_DAYS dias. Sem data, sim.
+ * O primeiro instante em que o próximo mês pode ser pago: o começo do dia (Brasília) PIX_PAY_AHEAD_DAYS - 1 dias antes do último dia
+ * pago. `until` é o fim do acesso (23:59:59,999 em Brasília do último dia pago mais PIX_GRACE_DAYS), então é `until` menos
+ * PIX_PAY_AHEAD_DAYS + PIX_GRACE_DAYS dias, mais 1 milissegundo. null sem data.
  */
-export function pixCanPayNext(until: string | null, now: Date): boolean {
-  if (!until) return true;
-  const end = Date.parse(until);
-  if (Number.isNaN(end)) return true;
-  return end - now.getTime() <= (PIX_PAY_AHEAD_DAYS + PIX_GRACE_DAYS) * DAY_MS;
-}
-
-/** O primeiro instante em que o próximo mês pode ser pago (o contrário de `pixCanPayNext`), ou null sem data. */
 export function pixNextPaymentFrom(until: string | null): Date | null {
   if (!until) return null;
   const end = Date.parse(until);
-  return Number.isNaN(end) ? null : new Date(end - (PIX_PAY_AHEAD_DAYS + PIX_GRACE_DAYS) * DAY_MS);
+  return Number.isNaN(end) ? null : new Date(end - (PIX_PAY_AHEAD_DAYS + PIX_GRACE_DAYS) * DAY_MS + 1);
+}
+
+/** Se já dá para pagar o próximo mês (a mesma conta na tela e na função do servidor). Sem data, sim. */
+export function pixCanPayNext(until: string | null, now: Date): boolean {
+  const from = pixNextPaymentFrom(until);
+  return from === null || now.getTime() >= from.getTime();
 }

@@ -17,6 +17,7 @@ import {
   type Access,
   type PlanKind,
   type StorePurchaseResult,
+  type WebSubscriptionStart,
 } from '@clarevo/core';
 import { router } from 'expo-router';
 import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Hourglass, Info, LockKeyhole, QrCode, RefreshCw } from 'lucide-react-native';
@@ -105,13 +106,36 @@ export function AccessCard() {
  */
 function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boolean }) {
   const repo = useRepo();
-  const [busy, setBusy] = useState<PlanKind | `pix-${PlanKind}` | null>(null);
+  const [busy, setBusy] = useState<PlanKind | `pix-${PlanKind}` | 'cancelar' | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  // Assinatura no cartão ainda ativa no Asaas sem pagar (cobrança recusada): oferece cancelá-la para escolher de novo.
+  const [cardActive, setCardActive] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const show = (result: Exclude<WebSubscriptionStart['result'], 'checkout'>) => {
+    setCardActive(result === 'cartao_ativo');
+    setMsg(W.errors[result]);
+  };
+  const cancelCard = async () => {
+    if (busy) return;
+    setBusy('cancelar');
+    try {
+      const r = await repo.cancelWebSubscription();
+      if (r === 'cancelada' || r === 'sem_assinatura') {
+        setCardActive(false);
+        setMsg(null);
+        setDone(W.cancelCardDone);
+      } else setMsg(W.errors[r]);
+    } catch {
+      setMsg(W.errors.tente_de_novo);
+    }
+    setBusy(null);
+  };
   // No teste do sandbox (antes do início da cobrança, todo mundo está em pre_lancamento), os botões aparecem também nessa situação.
   if (access.status !== 'teste' && access.status !== 'leitura' && access.status !== 'familia' && !(webTest && access.status === 'pre_lancamento')) return null;
   const subscribe = async (plan: PlanKind) => {
     if (busy) return;
     setMsg(null);
+    setDone(null);
     setBusy(plan);
     try {
       const r = await repo.startWebSubscription(plan);
@@ -120,7 +144,7 @@ function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boo
         window.location.assign(r.url);
         return;
       }
-      setMsg(W.errors[r.result]);
+      show(r.result);
     } catch {
       setMsg(W.errors.tente_de_novo);
     }
@@ -130,6 +154,7 @@ function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boo
   const payPix = async (plan: PlanKind) => {
     if (busy) return;
     setMsg(null);
+    setDone(null);
     setBusy(`pix-${plan}`);
     try {
       const r = await repo.startPixPayment(plan);
@@ -137,7 +162,7 @@ function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boo
         window.location.assign(r.url);
         return;
       }
-      setMsg(W.errors[r.result]);
+      show(r.result);
     } catch {
       setMsg(W.errors.tente_de_novo);
     }
@@ -186,6 +211,12 @@ function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boo
           <Txt variant="label" color={colors.error}>
             {msg}
           </Txt>
+        </Banner>
+      ) : null}
+      {cardActive ? <Button label={W.cancelCard} tone="soft" busy={busy === 'cancelar'} busyLabel={W.cancelBusy} onPress={() => void cancelCard()} /> : null}
+      {done ? (
+        <Banner tone="sucesso" icon={CheckCircle2}>
+          <Txt variant="label">{done}</Txt>
         </Banner>
       ) : null}
     </View>

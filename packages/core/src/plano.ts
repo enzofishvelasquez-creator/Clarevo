@@ -4,11 +4,11 @@
  * O benefício pela empresa (D-056) continua sem pagar. O acesso vem do banco (`my_access`, migração 0023), que é quem trava a
  * escrita (gatilho de record_operations, `assinatura_necessaria`); aqui ficam a leitura da resposta, os preços e os textos das telas.
  */
-import { daysBetween, formatDateBR, todayIn, type IsoDate } from './dates';
+import { addDays, daysBetween, formatDateBR, todayIn, type IsoDate } from './dates';
 import { BENEFIT_TEXT } from './company';
 import { FAMILY_MAX_PEOPLE } from './family';
 import { formatBRL } from './money';
-import { PIX_WARNING_DAYS } from './assinatura-web/pix';
+import { PIX_GRACE_DAYS, PIX_WARNING_DAYS } from './assinatura-web/pix';
 import { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind } from './plano-precos';
 
 export { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind };
@@ -81,6 +81,16 @@ export function parseAccess(raw: unknown): Access {
 /** O dia de `until` no fuso da pessoa. */
 function untilDay(access: Access, timeZone: string): IsoDate | null {
   return access.until ? todayIn(timeZone, new Date(access.until)) : null;
+}
+
+/**
+ * O último dia pago com Pix (D-093): o fim do acesso menos os PIX_GRACE_DAYS de tolerância. É esse o prazo que a tela mostra (a tolerância
+ * não é anunciada, para não virar o prazo). Nulo sem data ou fora do Pix.
+ */
+export function pixPaidThrough(access: Access, timeZone: string): IsoDate | null {
+  if (access.provider !== 'pix') return null;
+  const end = untilDay(access, timeZone);
+  return end ? addDays(end, -PIX_GRACE_DAYS) : null;
 }
 
 /** Quantos dias de calendário faltam para o fim do teste (0 no último dia); nulo fora do teste. */
@@ -170,11 +180,15 @@ export function accessView(access: Access, now: Date, timeZone: string, opts: { 
       };
     case 'assinatura':
       if (access.provider === 'pix') {
+        const paid = pixPaidThrough(access, timeZone);
+        const ended = paid !== null && paid < todayIn(timeZone, now);
         return {
           situation: `Plano ${PLAN_NAME[access.plan ?? 'individual']}`,
-          body: opts.web
-            ? `Pago com Pix: acesso completo até ${date ?? 'o fim do mês pago'}. O Pix não renova sozinho: pague o próximo mês até essa data, aqui na tela Assinatura.`
-            : `Acesso completo${date ? ` até ${date}` : ''}.`,
+          body: !opts.web
+            ? `Acesso completo${date ? ` até ${date}` : ''}.`
+            : ended
+              ? `O mês pago com Pix terminou em ${formatDateBR(paid!)}. Para continuar anotando, pague o próximo mês aqui na tela Assinatura.`
+              : `Pago com Pix até ${paid ? formatDateBR(paid) : 'o fim do mês pago'}. O Pix não renova sozinho: pague o próximo mês até essa data, aqui na tela Assinatura.`,
           showPlans: false,
         };
       }
@@ -218,12 +232,14 @@ export interface AccessBanner {
  */
 export function accessBanner(access: Access, now: Date, timeZone: string, opts: { web?: boolean } = {}): AccessBanner | null {
   if (access.status === 'assinatura' && access.provider === 'pix') {
-    const end = untilDay(access, timeZone);
-    if (!opts.web || !end) return null;
-    const days = Math.max(0, daysBetween(todayIn(timeZone, now), end));
+    const paid = pixPaidThrough(access, timeZone);
+    if (!opts.web || !paid) return null;
+    const days = daysBetween(todayIn(timeZone, now), paid);
     if (days > PIX_WARNING_DAYS) return null;
-    const when = days === 0 ? 'termina hoje' : days === 1 ? 'termina amanhã' : `vai até ${formatDateBR(end)}`;
-    return { text: `O acesso pago com Pix ${when}. Para continuar anotando depois, pague o próximo mês.`, tone: 'info', action: 'Pagar o próximo mês' };
+    const action = 'Pagar o próximo mês';
+    if (days < 0) return { text: `O mês pago com Pix terminou em ${formatDateBR(paid)}. Para continuar anotando, pague o próximo mês.`, tone: 'aviso', action };
+    const when = days === 0 ? 'termina hoje' : days === 1 ? 'termina amanhã' : `vai até ${formatDateBR(paid)}`;
+    return { text: `O mês pago com Pix ${when}. Para continuar anotando depois, pague o próximo mês.`, tone: 'info', action };
   }
   if (access.status === 'leitura') {
     return { text: 'Sem assinatura ativa, a conta está só para ver e exportar. Para voltar a anotar, assine um dos planos.', tone: 'aviso' };

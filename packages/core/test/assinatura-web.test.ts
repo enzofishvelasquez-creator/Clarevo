@@ -81,6 +81,7 @@ const pay = (dueDate: string, status = 'CONFIRMED', extra: Partial<AsaasPayment>
   externalReference: null,
   checkoutSession: null,
   paidOn: null,
+  billingType: null,
   ...extra,
 });
 
@@ -557,8 +558,9 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
       expect(JSON.parse((await b.h(appReq({ action: 'assinar', plan: 'individual' }).req)).body), status).toEqual({ result: 'sem_necessidade' });
       expect(b.net.sent.some((s) => s.url.endsWith('/checkouts'))).toBe(false);
     }
+    // Assinatura no cartão ainda ativa no Asaas, mas sem acesso (cobrança recusada): a tela oferece cancelá-la antes de escolher de novo.
     const c = h({ ...access('leitura'), 'GET /v3/subscriptions': () => ({ status: 200, body: { data: [sub()] } }) });
-    expect(JSON.parse((await c.h(appReq({ action: 'assinar', plan: 'familiar' }).req)).body)).toEqual({ result: 'ja_assinante' });
+    expect(JSON.parse((await c.h(appReq({ action: 'assinar', plan: 'familiar' }).req)).body)).toEqual({ result: 'cartao_ativo' });
     expect(c.net.sent.some((s) => s.url.endsWith('/checkouts'))).toBe(false);
     // O Asaas recusou o Checkout: indisponível, sem gravar nada.
     const d = h({ ...access('leitura'), 'POST /v3/checkouts': () => ({ status: 400, body: { errors: [{ code: 'invalid' }] } }) });
@@ -711,9 +713,11 @@ describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do 
   it('a janela para pagar o próximo mês: nos últimos 10 dias do mês pago (o fim do acesso já tem os 3 dias de tolerância)', () => {
     const until = '2026-12-09T02:59:59.999Z'; // 08/12 em Brasília: pago até 05/12, mais 3 dias
     expect(pixCanPayNext(until, new Date('2026-11-24T12:00:00Z'))).toBe(false);
+    // A janela abre no começo de 26/11 em Brasília (05/12 menos 9 dias): às 23h de 25/11 ainda não, à meia-noite já.
+    expect(pixCanPayNext(until, new Date('2026-11-26T02:00:00Z'))).toBe(false);
     expect(pixCanPayNext(until, new Date('2026-11-26T03:00:00Z'))).toBe(true);
     expect(pixCanPayNext(null, NOW)).toBe(true);
-    expect(pixNextPaymentFrom(until)?.toISOString()).toBe('2026-11-26T02:59:59.999Z');
+    expect(pixNextPaymentFrom(until)?.toISOString()).toBe('2026-11-26T03:00:00.000Z');
   });
 
   it('cobrança de Pix paga: lê a cobrança atual no Asaas e grava só o resumo do identificador e o dia do pagamento, pela referência', async () => {
@@ -762,7 +766,7 @@ describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do 
     const rf = await hf(webhookReq(event('PAYMENT_RECEIVED', { payment: pixPay({ externalReference: null, checkoutSession: null }) })).req);
     expect(JSON.parse(rf.body)).toEqual({ received: true, outcome: 'sem_referencia' });
     expect(foreign.sent.some((s) => s.url.endsWith('/rpc/billing_pix_apply'))).toBe(false);
-    expect(logs).toEqual(['aviso PAYMENT_RECEIVED de cobrança avulsa sem referência da Clarevo']);
+    expect(logs).toEqual(['cobrança de Pix PAGA sem referência da Clarevo (PAYMENT_RECEIVED): conferir no Asaas']);
     expect(logs.join(' ')).not.toContain(ANA);
   });
 
@@ -770,6 +774,12 @@ describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do 
     const ofSub = pixNet(pixPay({ subscription: SUB }));
     expect(JSON.parse((await ofSub.h(webhookReq(event('PAYMENT_UPDATED', { payment: pixPay() })).req)).body)).toEqual({ received: true, outcome: 'ignorado' });
     expect(ofSub.applied).toEqual([]);
+    // Cartão ou boleto sem assinatura não vira mês de Pix, mesmo com a referência.
+    for (const billingType of ['CREDIT_CARD', 'BOLETO']) {
+      const other = pixNet(pixPay({ billingType }));
+      expect(JSON.parse((await other.h(webhookReq(event('PAYMENT_RECEIVED', { payment: pixPay({ billingType }) })).req)).body), billingType).toEqual({ received: true, outcome: 'ignorado' });
+      expect(other.applied).toEqual([]);
+    }
     const removed = pixNet(null);
     expect(JSON.parse((await removed.h(webhookReq(event('PAYMENT_DELETED', { payment: pixPay() })).req)).body)).toEqual({ received: true, outcome: 'aplicado' });
     expect(removed.applied[0]).toMatchObject({ p_paid_on: null, p_payment_hash: sha256Hex(PIX_PAY) });
@@ -790,6 +800,13 @@ describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do 
     expect(JSON.parse(res.body)).toEqual({ received: true, outcome: 'aplicado' });
     expect(t.net.sent[0]?.url).toBe(`${ASAAS_SANDBOX_URL}/payments?checkoutSession=${CHECKOUT}&limit=10`);
     expect(t.applied).toEqual([expect.objectContaining({ p_event_id: `evt_1:${PIX_PAY}`, p_person: ANA, p_paid_on: '2026-11-06' })]);
+    // Se o Asaas ignorar o filtro e listar cobranças de outros Checkouts (ou sem Checkout), elas ficam de fora.
+    const stray = pixNet(pixPay({ externalReference: null }), {
+      'GET /v3/payments': () => ({ status: 200, body: { object: 'list', data: [pixPay({ id: 'pay_outra', checkoutSession: 'outro-checkout' }), pixPay({ id: 'pay_sem', checkoutSession: null })] } }),
+    });
+    expect(JSON.parse((await stray.h(webhookReq(event('CHECKOUT_PAID', { checkout: { id: CHECKOUT, status: 'PAID' } })).req)).body)).toEqual({ received: true, outcome: 'ignorado' });
+    expect(stray.applied).toEqual([]);
+    expect(stray.net.sent.some((s) => s.url.includes('/payments/pay_'))).toBe(false);
   });
 
   describe('pedido do app: "pix"', () => {
@@ -837,8 +854,10 @@ describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do 
       expect(JSON.parse((await card.h(appReq({ action: 'assinar', plan: 'individual' }).req)).body)).toEqual({ result: 'ja_assinante' });
       const benefit = make(access('beneficio'));
       expect(JSON.parse((await benefit.h(appReq({ action: 'pix', plan: 'individual' }).req)).body)).toEqual({ result: 'sem_necessidade' });
+      // A assinatura no cartão ficou ativa no Asaas sem pagar (cobrança recusada): a tela oferece cancelá-la antes do Pix.
       const cardInAsaas = make({ ...access('leitura'), 'GET /v3/subscriptions': () => ({ status: 200, body: { data: [sub()] } }) });
-      expect(JSON.parse((await cardInAsaas.h(appReq({ action: 'pix', plan: 'individual' }).req)).body)).toEqual({ result: 'ja_assinante' });
+      expect(JSON.parse((await cardInAsaas.h(appReq({ action: 'pix', plan: 'individual' }).req)).body)).toEqual({ result: 'cartao_ativo' });
+      expect(cardInAsaas.net.sent.some((s) => s.url.endsWith('/checkouts'))).toBe(false);
     });
   });
 });

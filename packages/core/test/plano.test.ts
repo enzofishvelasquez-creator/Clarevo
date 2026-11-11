@@ -14,6 +14,7 @@ import {
   demoTrialAccess,
   guideEntry,
   parseAccess,
+  pixPaidThrough,
   planPrice,
   trialDaysLeft,
   type Access,
@@ -188,28 +189,40 @@ describe('Pix mês a mês (D-093, caminho B): a situação e o aviso', () => {
     expect(parseAccess({ status: 'assinatura', plan: 'individual', until: UNTIL, can_write: true, provider: 'pix' }).provider).toBe('pix');
   });
 
-  it('na web, a situação diz até quando o acesso vale e que o Pix não renova sozinho; no app das lojas, só até quando', () => {
+  it('na web, a situação diz o último dia pago (sem anunciar a tolerância) e que o Pix não renova sozinho; no app das lojas, só até quando', () => {
     const web = accessView(pix(UNTIL), NOW, TZ, { web: true });
+    expect(pixPaidThrough(pix(UNTIL), TZ)).toBe('2026-12-05');
     expect(web.situation).toBe('Plano Individual');
-    expect(web.body).toBe('Pago com Pix: acesso completo até 08/12/2026. O Pix não renova sozinho: pague o próximo mês até essa data, aqui na tela Assinatura.');
+    expect(web.body).toBe('Pago com Pix até 05/12/2026. O Pix não renova sozinho: pague o próximo mês até essa data, aqui na tela Assinatura.');
     expect(web.showPlans).toBe(false);
+    // Na tolerância (06/12 a 08/12), o acesso continua, e a tela diz que o mês terminou.
+    expect(accessView(pix(UNTIL), new Date('2026-12-07T13:00:00.000Z'), TZ, { web: true }).body).toBe(
+      'O mês pago com Pix terminou em 05/12/2026. Para continuar anotando, pague o próximo mês aqui na tela Assinatura.',
+    );
     const store = accessView(pix(UNTIL), NOW, TZ);
     expect(store.body).toBe('Acesso completo até 08/12/2026.');
     expect(store.body).not.toMatch(/\bweb\b|Pix|site|boleto/i);
     // A assinatura no cartão segue com o texto de sempre.
     expect(accessView({ ...pix(UNTIL), provider: 'web' }, NOW, TZ, { web: true }).body).toContain('renova em 08/12/2026');
+    expect(pixPaidThrough({ ...pix(UNTIL), provider: 'web' }, TZ)).toBeNull();
   });
 
-  it('o aviso no Resumo: só na web, nos últimos 7 dias, com o atalho "Pagar o próximo mês"; no app das lojas, nada', () => {
+  it('o aviso no Resumo: só na web, nos últimos 7 dias do mês pago e na tolerância, com o atalho "Pagar o próximo mês"; no app das lojas, nada', () => {
     expect(accessBanner(pix(UNTIL), NOW, TZ, { web: true })).toBeNull();
-    const near = new Date('2026-12-01T13:00:00.000Z');
+    const near = new Date('2026-11-28T13:00:00.000Z');
     expect(accessBanner(pix(UNTIL), near, TZ, { web: true })).toEqual({
-      text: 'O acesso pago com Pix vai até 08/12/2026. Para continuar anotando depois, pague o próximo mês.',
+      text: 'O mês pago com Pix vai até 05/12/2026. Para continuar anotando depois, pague o próximo mês.',
       tone: 'info',
       action: 'Pagar o próximo mês',
     });
-    expect(accessBanner(pix(UNTIL), new Date('2026-12-07T13:00:00.000Z'), TZ, { web: true })?.text).toContain('termina amanhã');
-    expect(accessBanner(pix(UNTIL), new Date('2026-12-08T13:00:00.000Z'), TZ, { web: true })?.text).toContain('termina hoje');
+    expect(accessBanner(pix(UNTIL), new Date('2026-11-27T13:00:00.000Z'), TZ, { web: true })).toBeNull();
+    expect(accessBanner(pix(UNTIL), new Date('2026-12-04T13:00:00.000Z'), TZ, { web: true })?.text).toContain('termina amanhã');
+    expect(accessBanner(pix(UNTIL), new Date('2026-12-05T13:00:00.000Z'), TZ, { web: true })?.text).toContain('termina hoje');
+    expect(accessBanner(pix(UNTIL), new Date('2026-12-07T13:00:00.000Z'), TZ, { web: true })).toEqual({
+      text: 'O mês pago com Pix terminou em 05/12/2026. Para continuar anotando, pague o próximo mês.',
+      tone: 'aviso',
+      action: 'Pagar o próximo mês',
+    });
     expect(accessBanner(pix(UNTIL), near, TZ)).toBeNull();
     expect(accessBanner(pix(null), near, TZ, { web: true })).toBeNull();
     for (const t of [accessBanner(pix(UNTIL), near, TZ, { web: true })!.text, accessView(pix(UNTIL), NOW, TZ, { web: true }).body]) {
