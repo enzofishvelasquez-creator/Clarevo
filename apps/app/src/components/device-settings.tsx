@@ -1,6 +1,7 @@
 import {
   REMINDER_HOURS,
   REMINDER_TEXT,
+  DEPOSIT_REMINDER_DAYS,
   ROUTINE_REMINDER_HOURS,
   ROUTINE_REMINDER_KINDS,
   ROUTINE_REMINDER_TEXT,
@@ -119,6 +120,18 @@ export function RemindersCard() {
           onChange={(v) => toggle(k, v)}
         />
       ))}
+      {prefs.routineReminders.aporte ? (
+        <ChoiceGroup label={ROUTINE_REMINDER_TEXT.depositDayLabel}>
+          {DEPOSIT_REMINDER_DAYS.map((d) => (
+            <Chip
+              key={d}
+              label={ROUTINE_REMINDER_TEXT.depositDay(d)}
+              selected={prefs.depositReminderDay === d}
+              onPress={() => updatePrefs(userId, { depositReminderDay: d }, persist)}
+            />
+          ))}
+        </ChoiceGroup>
+      ) : null}
       {routineOn ? (
         <ChoiceGroup label={ROUTINE_REMINDER_TEXT.hourLabel}>
           {ROUTINE_REMINDER_HOURS.map((h) => (

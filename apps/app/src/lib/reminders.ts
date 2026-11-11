@@ -17,6 +17,8 @@ import {
   type RecordSearchFilter,
   type RoutineReminderHour,
   type RoutineReminderKind,
+  type DepositReminderDay,
+  NO_ROUTINE_REMINDERS,
 } from '@clarevo/core';
 
 import {
@@ -55,7 +57,7 @@ export type ReminderJob =
       /** Horário dos lembretes de vencimento; nulo com "Lembretes de contas a pagar" desligado. */
       due: ReminderHour | null;
       /** Os lembretes do dia a dia ligados e o horário deles; nulo com todos desligados. */
-      routine: { hour: RoutineReminderHour; choices: RoutineReminderChoices } | null;
+      routine: { hour: RoutineReminderHour; choices: RoutineReminderChoices; depositDay: DepositReminderDay } | null;
     };
 
 export type ReminderOutcome = 'agendado' | 'desligado' | 'sem-permissao' | 'indisponivel';
@@ -91,11 +93,20 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
       ? (await job.repo.searchCardPurchases(job.contextId, { ...NO_SEARCH_FILTER, from: today, to: today }, 1)).items.length > 0
       : false;
     const activity = job.routine.choices.ausencia ? (await job.repo.getReturnReviewState(job.contextId)).activity : null;
+    // Lembrete do aporte (D-093): só com meta ativa com plano por mês; o deste mês sai se o mês já tem aporte registrado.
+    let deposit: { day: DepositReminderDay; hasPlannedGoal: boolean; depositThisMonth: boolean } | undefined;
+    if (job.routine.choices.aporte) {
+      const goals = await job.repo.listGoals(job.contextId);
+      const hasPlannedGoal = goals.some((g) => g.status === 'ativa' && (g.plannedMonthlyCents ?? 0) > 0);
+      const depositThisMonth = hasPlannedGoal ? (await job.repo.listGoalMovementsInMonth(job.contextId, monthOf(today))).some((m) => m.kind === 'aporte') : false;
+      deposit = { day: job.routine.depositDay, hasPlannedGoal, depositThisMonth };
+    }
     const plan = routineReminderPlan(job.routine.choices, records, activity, today, job.routine.hour, {
       nowMinutes,
       contextId: job.contextId,
       limit: ROUTINE_REMINDER_LIMIT,
       cardPurchaseToday,
+      deposit,
     });
     for (const i of plan) {
       items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });
@@ -135,7 +146,7 @@ function setSwitch(userId: string, persist: boolean, which: ReminderSwitch, on: 
     updatePrefs(userId, { reminders: on }, persist);
     return;
   }
-  const current = getPrefs(userId)?.routineReminders ?? { gastos: false, recebimentos: false, mapa: false, ausencia: false };
+  const current = getPrefs(userId)?.routineReminders ?? NO_ROUTINE_REMINDERS;
   updatePrefs(userId, { routineReminders: { ...current, [which]: on } }, persist);
 }
 

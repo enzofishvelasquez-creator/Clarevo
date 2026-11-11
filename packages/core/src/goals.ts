@@ -309,10 +309,12 @@ export function goalPlan(
 }
 
 /** Aba Metas: a reserva não arquivada, as metas ativas e as concluídas e arquivadas (recolhidas). */
-export function organizeGoals<G extends Pick<Goal, 'goalType' | 'status' | 'createdAt' | 'updatedAt' | 'id'>>(
+export function organizeGoals<G extends Pick<Goal, 'goalType' | 'status' | 'createdAt' | 'updatedAt' | 'id'> & { priority?: number | null }>(
   goals: readonly G[],
 ): { reserve: G | null; active: G[]; closed: G[] } {
-  const byCreation = (a: G, b: G) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
+  // A ordem escolhida pela pessoa (D-093) primeiro; as metas sem ordem depois, pela criação.
+  const rank = (g: G) => (g.priority === null || g.priority === undefined ? Number.MAX_SAFE_INTEGER : g.priority);
+  const byCreation = (a: G, b: G) => rank(a) - rank(b) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
   const reserve = goals.find((g) => g.goalType === 'emergencia' && g.status !== 'arquivada') ?? null;
   const active = goals.filter((g) => g.goalType !== 'emergencia' && g.status === 'ativa').sort(byCreation);
   const closed = goals
@@ -938,6 +940,35 @@ export const GOALS_TEXT = {
   cardPlanned: (cents: Cents, month: IsoMonth) => `Planejado: ${formatBRL(cents)} por mês · chega lá em ${formatMonthYearBR(month)}, sem contar rendimentos`,
   reachedBadge: 'Meta alcançada',
   closedTitle: 'Concluídas e arquivadas',
+  /** Ritmo da meta (D-093): "No ritmo do plano · faltam R$ 2.400,00" ou "2 meses atrás do plano · faltam R$ 2.400,00". */
+  pace: {
+    onTrack: 'No ritmo do plano',
+    behind: (months: number) => (months === 1 ? '1 mês atrás do plano' : `${formatInteger(months)} meses atrás do plano`),
+    line: (p: GoalPace) => `${p.onTrack ? 'No ritmo do plano' : p.monthsBehind === 1 ? '1 mês atrás do plano' : `${formatInteger(p.monthsBehind)} meses atrás do plano`} · faltam ${formatBRL(p.missingCents)}`,
+    /** No detalhe: de onde vem o ritmo. */
+    note: (p: GoalPace) =>
+      `Compara os aportes menos os resgates com o plano de ${formatBRL(p.plannedMonthlyCents)} por mês, a partir de ${formatMonthYearBR(p.fromMonth)}, só nos meses já fechados. O que já estava guardado ao criar e os rendimentos não entram.`,
+  },
+  /** Marcos (D-093): "Viagem passou de 50% da meta." */
+  milestone: (name: string, percent: number) => `${name} passou de ${pct(percent)} da meta.`,
+  /** Card da reserva com o plano de guardar recolhido (D-093). */
+  seeSavingsPlan: 'Ver o plano de guardar',
+  /** Ordenar metas (D-093): a mais importante em primeiro. */
+  order: {
+    title: 'Ordenar metas',
+    link: 'Ordenar metas',
+    intro: 'Ponha em primeiro a meta mais importante para você. A aba Metas mostra as metas nesta ordem.',
+    introFamily: 'Ponha em primeiro a meta mais importante para a casa. A ordem vale para todas as pessoas da Família.',
+    up: (name: string) => `Subir ${name}`,
+    down: (name: string) => `Descer ${name}`,
+    /** "1º", "2º"... */
+    position: (n: number) => `${formatInteger(n)}º`,
+    save: 'Salvar ordem',
+    saved: 'Ordem das metas salva.',
+    changed: 'As metas mudaram enquanto você ordenava. A lista foi atualizada: confira e salve de novo.',
+    error: 'Não foi possível salvar a ordem. Tente de novo.',
+    noPermission: 'Quem só vê não muda a ordem das metas.',
+  },
 
   // Simular e Aprender.
   simulateTitle: 'Simular um plano',
@@ -1015,6 +1046,12 @@ export const GOALS_TEXT = {
     nameHint: 'Use um nome curto, como Viagem ou Curso. Evite detalhes de saúde, religião ou de outras pessoas.',
     targetLabel: 'Valor da meta',
     deadlineLabel: 'Até quando? (opcional)',
+    /** Atalhos de prazo (D-093). */
+    deadlineShortcuts: 'Atalhos de prazo',
+    typeLabel: 'Tipo de meta',
+    typeHelp: 'O que é isso?',
+    typeHelpBody:
+      'Objetivo é algo que você quer comprar ou fazer, como uma viagem, um curso ou a troca do carro. Reserva de oportunidade é um valor guardado para aproveitar uma chance que aparecer, como uma compra que ficou mais barata ou um curso que abriu vaga. Ela fica separada da reserva para imprevistos.',
     initialLabel: 'Quanto você já tem guardado para isso? (opcional)',
     plannedLabel: 'Quanto pretende guardar por mês? (opcional)',
     create: 'Criar meta',
@@ -1201,6 +1238,73 @@ export function goalCardCaption(plan: GoalPlan): string | null {
   }
   if (plan.plannedMonthlyCents !== null && plan.reachMonth !== null) return GOALS_TEXT.cardPlanned(plan.plannedMonthlyCents, plan.reachMonth);
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Prazo, ritmo e marcos (D-093)
+// ---------------------------------------------------------------------------
+
+/** Atalhos ao lado de "Até quando?": o mês de hoje mais N meses. */
+export const GOAL_DEADLINE_SHORTCUTS: readonly { months: number; label: string }[] = [
+  { months: 6, label: '6 meses' },
+  { months: 12, label: '1 ano' },
+  { months: 24, label: '2 anos' },
+  { months: 60, label: '5 anos' },
+];
+
+/** O prazo de um atalho: o mês de hoje mais `months` (6 meses em novembro de 2026 dá maio de 2027). */
+export function deadlineShortcutMonth(today: IsoDate, months: number): IsoMonth {
+  return addMonths(monthOf(today), months);
+}
+
+/**
+ * Ritmo da meta (D-093): os aportes menos os resgates desde a criação, comparados com o plano por mês de hoje, contando a
+ * partir do mês seguinte ao da criação e só os meses já fechados (o mês de hoje ainda pode receber o aporte). O que já
+ * estava guardado ao criar, rendimentos e valorizações ficam fora. O esperado nunca passa do que faltava guardar ao criar
+ * (alvo menos o já guardado), para uma meta quase cheia não aparecer "atrás". null sem plano, meta não ativa, alcançada ou
+ * criada há menos de um mês fechado.
+ */
+export interface GoalPace {
+  onTrack: boolean;
+  /** Meses de plano que faltam aportar: teto((esperado − aportado) ÷ plano). 0 no ritmo. */
+  monthsBehind: number;
+  /** Primeiro mês contado (o seguinte ao da criação) e quantos meses fechados entram. */
+  fromMonth: IsoMonth;
+  countedMonths: number;
+  plannedMonthlyCents: Cents;
+  missingCents: Cents;
+}
+
+export function goalPace(
+  goal: Pick<Goal, 'status' | 'createdAt' | 'plannedMonthlyCents' | 'savedCents' | 'targetCents' | 'initialCents' | 'depositsCents' | 'withdrawalsCents'>,
+  today: IsoDate,
+): GoalPace | null {
+  const planned = goal.plannedMonthlyCents;
+  if (goal.status !== 'ativa' || planned === null || planned <= 0) return null;
+  const progress = goalProgress(goal.savedCents, goal.targetCents);
+  if (progress.reached) return null;
+  const created = goal.createdAt.slice(0, 10);
+  if (!isValidIsoDate(created)) return null;
+  const fromMonth = addMonths(monthOf(created), 1);
+  const countedMonths = monthsBetween(fromMonth, monthOf(today));
+  if (countedMonths < 1) return null;
+  const expected = Math.min(planned * countedMonths, Math.max(goal.targetCents - goal.initialCents, 0));
+  const gap = expected - (goal.depositsCents - goal.withdrawalsCents);
+  const monthsBehind = gap <= 0 ? 0 : ceilDiv(gap, planned);
+  return { onTrack: monthsBehind === 0, monthsBehind, fromMonth, countedMonths, plannedMonthlyCents: planned, missingCents: progress.missingCents };
+}
+
+/** Marcos de uma meta (D-093): uma frase curta ao passar de 25%, 50% e 75% (os 100% são "Meta alcançada"). */
+export const GOAL_MILESTONES: readonly number[] = [25, 50, 75];
+
+/** O maior marco atravessado para cima entre o guardado antes e depois de um movimento, ou null. */
+export function goalMilestoneCrossed(beforeCents: Cents, afterCents: Cents, targetCents: Cents): number | null {
+  if (targetCents <= 0 || afterCents <= beforeCents) return null;
+  const before = goalProgress(beforeCents, targetCents).percent;
+  const after = goalProgress(afterCents, targetCents).percent;
+  if (after >= 100) return null;
+  const crossed = GOAL_MILESTONES.filter((m) => before < m && after >= m);
+  return crossed.length === 0 ? null : crossed[crossed.length - 1]!;
 }
 
 /** Textos do card da reserva na aba Metas. */

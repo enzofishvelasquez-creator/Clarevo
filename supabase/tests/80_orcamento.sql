@@ -756,12 +756,12 @@ begin
             'encerrar_serie', 'excluir', 'excluir_cartao', 'excluir_compromisso', 'excluir_conta',
             'excluir_lancamento_cartao', 'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_meta',
             'excluir_orcamento_categoria', 'excluir_renda_referencia', 'excluir_serie', 'gerar_codigo_telegram', 'gerar_codigo_whatsapp', 'imagem_meta', 'importar_extrato', 'informar_ano', 'ligar_telegram', 'ligar_whatsapp',
-            'marcar_assinatura', 'marcar_mes_conferido', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_meta', 'remover_membro_familia',
+            'marcar_assinatura', 'marcar_mes_conferido', 'ordenar_metas', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_meta', 'remover_membro_familia',
             'renovar_convite_licenca', 'responder_guardar', 'responder_origem_cadastro', 'revisar_assinaturas', 'sair_familia', 'situacao_cartao',
             'situacao_conta', 'situacao_meta', 'tirar_ano', 'transferir_titularidade_familia'],
-    'as 71 ações vigentes (com a do aceite dos termos, testada em 99zzz, com as 4 de orçamento e limite, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas; as outras, testadas em 30 a 70)';
+    'as 72 ações vigentes (com a de ordenar as metas, testada em 99zzzzzzzzzz, com a do aceite dos termos, testada em 99zzz, com as 4 de orçamento e limite, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas; as outras, testadas em 30 a 70)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 74, '74 ações';
+           where c.conname = 'record_operations_action_check') = 75, '75 ações (com a de ordenar as metas, D-093)';
   -- Toda operação nova aponta para uma linha do mesmo contexto; a exclusão, para uma linha excluída.
   assert not exists (select 1 from public.record_operations o
                       where o.action in ('definir_orcamento_categoria', 'excluir_orcamento_categoria')
@@ -921,7 +921,7 @@ do $$ begin
             'mark_subscriptions_reviewed', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals',
             'months_overview', 'my_access', 'my_legal_acceptance', 'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
-            'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_status', 'set_income_reference',
+            'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_order', 'set_goal_status', 'set_income_reference',
             'set_member_role', 'set_month_check', 'set_savings_answer', 'set_series_subscription', 'set_signup_source', 'skip_series_year', 'sync_series_occurrences',
             'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'unlink_telegram', 'unlink_whatsapp', 'update_account', 'update_card',
             'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_record',

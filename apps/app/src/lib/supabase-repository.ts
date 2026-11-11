@@ -126,6 +126,7 @@ import {
   type ChatLinkState,
   type GoalImage,
   type GoalImageChoice,
+  type GoalOrderWrite,
   isGoalImageKey,
   parseAccess,
   parseStoreForget,
@@ -403,6 +404,8 @@ interface GoalRow {
   appreciation_cents: number;
   depreciation_cents: number;
   last_movement_on: string | null;
+  /** D-093 (0031); ausente num banco ainda sem a migração. */
+  priority?: number | null;
 }
 
 /** Linha de goal_movements. */
@@ -1136,6 +1139,7 @@ function toGoal(g: GoalRow): Goal {
     appreciationCents,
     depreciationCents,
     lastMovementOn: g.last_movement_on,
+    priority: g.priority === null || g.priority === undefined ? null : whole(g.priority),
   };
 }
 
@@ -2345,6 +2349,17 @@ export class SupabaseRepository implements RecordsRepository {
     });
     if (error) throw repoError(error);
     return toGoalImage(data as GoalImageRow | null);
+  }
+
+  /** Ordem das metas ativas do contexto, sem a reserva (D-093, set_goal_order). */
+  async setGoalOrder(key: string, contextId: string, goalIds: readonly string[]): Promise<GoalOrderWrite> {
+    const { data, error } = await this.db.rpc('set_goal_order', { p_key: key, p_context_id: contextId, p_goal_ids: [...goalIds] });
+    if (error) throw repoError(error);
+    const d = data as { context_id?: unknown; ids?: unknown } | null;
+    if (!d || typeof d.context_id !== 'string' || !Array.isArray(d.ids) || d.ids.some((x) => typeof x !== 'string')) {
+      throw new RepoError('desconhecido', 'ordem_inconsistente');
+    }
+    return { contextId: d.context_id, ids: d.ids as string[] };
   }
 
   /** Movimentos vivos da meta, do mais recente ao mais antigo (data, criação, id). */

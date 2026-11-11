@@ -2,6 +2,7 @@ import {
   GOALS_TEXT,
   GOAL_STATUS_LABEL,
   goalCardCaption,
+  goalPace,
   reserveCardTexts,
   type Goal,
   type GoalImage,
@@ -18,6 +19,7 @@ import { GoalProgress } from '@/components/goal-progress';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { Button, Card, LinkButton, Txt, styles as ui } from '@/components/ui';
 import { showsCoverage } from '@/lib/essentials';
+import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
 /**
@@ -27,18 +29,25 @@ import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
  *
  * `planSlot`: o plano de guardar dentro do card (D-039), em vez de um segundo card sobre o mesmo valor. `planLink`: a linha
  * "Planejar quanto guardar" de quem respondeu "Agora não" (a pergunta só volta mais tarde, mas a porta fica aqui).
+ *
+ * `compact` (D-093): com a reserva criada e o plano de guardar já feito, o card fica curto: valor, barra, percentual, cobertura,
+ * ritmo e as ações, com o plano de guardar recolhido em "Ver o plano de guardar" (a tela /guardar). Assim "Suas metas" sobe
+ * para a primeira tela do celular.
  */
 export function ReserveCard({
   reserve,
   plan,
   planSlot,
   planLink,
+  compact,
 }: {
   reserve: Goal | null;
   plan: GoalPlan | null;
   planSlot?: ReactNode;
   planLink?: boolean;
+  compact?: boolean;
 }) {
+  const { today } = useSession();
   const planAction = planLink ? (
     <LinkButton
       label="Planejar quanto guardar"
@@ -68,6 +77,7 @@ export function ReserveCard({
   }
   const t = reserveCardTexts(reserve);
   const coverage = showsCoverage(reserve) ? t.coverage : null;
+  const pace = goalPace(reserve, today);
   return (
     <View style={styles.blue}>
       <View style={styles.blueHead}>
@@ -104,15 +114,20 @@ export function ReserveCard({
           {coverage}
         </MoneyTxt>
       ) : null}
+      {pace ? (
+        <MoneyTxt variant="label" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }}>
+          {GOALS_TEXT.pace.line(pace)}
+        </MoneyTxt>
+      ) : null}
       <Txt variant="caption" color={colors.textOnBrandSoft}>
         {t.rounding}
       </Txt>
-      {t.planned ? (
+      {!compact && t.planned ? (
         <MoneyTxt variant="label" color={colors.textOnBrandSoft}>
           {t.planned}
         </MoneyTxt>
       ) : null}
-      {planSlot}
+      {compact ? null : planSlot}
       <View style={styles.actions}>
         <Button
           label={GOALS_TEXT.addDeposit}
@@ -127,6 +142,15 @@ export function ReserveCard({
           onPress={() => router.push({ pathname: '/meta/[id]', params: { id: reserve.id } })}
         />
       </View>
+      {compact ? (
+        <LinkButton
+          label={GOALS_TEXT.seeSavingsPlan}
+          icon={PiggyBank}
+          color={colors.textOnBrand}
+          style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+          onPress={() => router.push('/guardar')}
+        />
+      ) : null}
       {planAction}
     </View>
   );
@@ -138,10 +162,13 @@ export function ReserveCard({
  */
 export function GoalCard({ goal, plan, image }: { goal: Goal; plan: GoalPlan; image?: GoalImage | null }) {
   const maskLabel = useMoneyLabelMask();
+  const { today } = useSession();
   const caption = goalCardCaption(plan);
+  const pace = goalPace(goal, today);
+  const paceLine = pace ? GOALS_TEXT.pace.line(pace) : null;
   const amounts = GOALS_TEXT.savedOfTarget(goal.savedCents, goal.targetCents);
   const percent = GOALS_TEXT.percent(plan.progress.percent);
-  const label = maskLabel(`${GOALS_TEXT.progressA11y(goal.name, plan.progress.percent, goal.savedCents, goal.targetCents)}${caption ? ` ${caption}.` : ''}`);
+  const label = maskLabel(`${GOALS_TEXT.progressA11y(goal.name, plan.progress.percent, goal.savedCents, goal.targetCents)}${caption ? ` ${caption}.` : ''}${paceLine ? ` ${paceLine}.` : ''}`);
   return (
     <Pressable
       accessibilityRole="button"
@@ -172,6 +199,11 @@ export function GoalCard({ goal, plan, image }: { goal: Goal; plan: GoalPlan; im
       {caption ? (
         <MoneyTxt variant="caption" color={colors.textSecondary}>
           {caption}
+        </MoneyTxt>
+      ) : null}
+      {paceLine ? (
+        <MoneyTxt variant="caption" color={pace!.onTrack ? colors.textSecondary : colors.text} style={{ fontFamily: fonts.bold }}>
+          {paceLine}
         </MoneyTxt>
       ) : null}
     </Pressable>

@@ -58,6 +58,8 @@ import type {
   CommitmentWrite,
   GoalAction,
   GoalImageAction,
+  GoalOrderAction,
+  GoalOrderWrite,
   GoalWrite,
   ImportAction,
   IncomeReferenceAction,
@@ -181,6 +183,7 @@ interface Operation {
     | BudgetAction
     | GoalAction
     | GoalImageAction
+    | GoalOrderAction
     | SavingsAction
     | CardAction
     | AccountAction
@@ -1917,6 +1920,7 @@ export class MemoryRepository implements RecordsRepository {
         version: 1,
         createdAt: now,
         updatedAt: now,
+        priority: null,
       };
       this.goals.set(goal.id, goal);
       let movementId: string | null = null;
@@ -2066,6 +2070,35 @@ export class MemoryRepository implements RecordsRepository {
       });
       this.saveOperation(key, 'imagem_meta', payload, { contextId: current.contextId, recordId: null, commitmentId: null, goalId, movementId: null });
       return this.goalImageOf(goalId);
+    });
+  }
+
+  /**
+   * Como set_goal_order (D-093, migração 0031). Ordem: repetição; nao_encontrado (sem leitura); sem_permissao (sem escrita); lista_invalida
+   * (a lista não é exatamente a das metas ativas do contexto, sem a reserva). A prioridade muda sem subir a versão da meta.
+   */
+  async setGoalOrder(key: string, contextId: string, goalIds: readonly string[]): Promise<GoalOrderWrite> {
+    return this.write(() => {
+      const ids = [...goalIds];
+      const payload = [contextId, ids];
+      const replayed = this.replay(key, 'ordenar_metas', payload);
+      if (replayed) return { contextId: replayed.contextId, ids };
+      if (!this.canRead(contextId)) throw new RepoError('nao_encontrado');
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const expected = [...this.goals.values()]
+        .filter((g) => g.contextId === contextId && !g.deletedAt && g.status === 'ativa' && g.goalType !== 'emergencia')
+        .map((g) => g.id)
+        .sort();
+      const given = [...ids].sort();
+      if (ids.length === 0 || new Set(ids).size !== ids.length || given.length !== expected.length || given.some((id, i) => id !== expected[i])) {
+        throw new RepoError('lista_invalida');
+      }
+      ids.forEach((id, i) => {
+        const g = this.goals.get(id)!;
+        if (g.priority !== i + 1) this.goals.set(id, { ...g, priority: i + 1 });
+      });
+      this.saveOperation(key, 'ordenar_metas', payload, { contextId, recordId: null, commitmentId: null });
+      return { contextId, ids };
     });
   }
 
@@ -4029,6 +4062,7 @@ export class MemoryRepository implements RecordsRepository {
       action === 'desmarcar_mes_conferido' ||
       action === 'gerar_codigo_whatsapp' ||
       action === 'imagem_meta' ||
+      action === 'ordenar_metas' ||
       action === 'desligar_whatsapp' ||
       action === 'gerar_codigo_telegram' ||
       action === 'desligar_telegram' ||

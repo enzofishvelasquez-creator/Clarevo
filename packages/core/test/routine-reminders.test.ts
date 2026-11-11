@@ -31,7 +31,7 @@ import {
 const CTX = 'ctx-pessoal';
 const OTHER = 'ctx-familia';
 const TODAY = '2026-11-06';
-const ALL: RoutineReminderChoices = { gastos: true, recebimentos: true, mapa: true, ausencia: true };
+const ALL: RoutineReminderChoices = { gastos: true, recebimentos: true, mapa: true, ausencia: true, aporte: false };
 
 let seq = 0;
 function registro(kind: 'despesa' | 'receita', occurredOn: string, contextId = CTX): FinancialRecord {

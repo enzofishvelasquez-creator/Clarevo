@@ -9,13 +9,17 @@ import {
   UNCERTAIN_TEXT,
   accountsForPicker,
   addDays,
+  applyMovementChange,
   centsToInput,
   chooseAccountId,
   firstNegativeDay,
   formatDateBR,
   goalErrorText,
+  goalMilestoneCrossed,
   maskDateBR,
   negativeDayFromDetail,
+  savedOn,
+  type GoalMovementChange,
   validateGoalMovementDraft,
   validateSavedValueDraft,
   type Goal,
@@ -44,7 +48,7 @@ import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { useLastAccount } from '@/lib/last-account';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
-import { useAccounts, useAddGoalMovement, useDeleteGoalMovement, useGoalOperationKey, useWork, useUpdateGoalMovement } from '@/state/data';
+import { useAccounts, useAddGoalMovement, useDeleteGoalMovement, useGoalOperationKey, useUpdateGoalMovement, useWorkFor } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -78,7 +82,9 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
   // Aporte, resgate e rendimento novos: a tentativa incerta fica na memória do app, para sair e voltar não duplicar (CL-03 e CL-19).
   const keys = useGoalOperationKey(mode.type === 'editar' || mode.type === 'atualizar' ? undefined : `meta-movimento:${goal.id}:${mode.kind}`);
   const lastAccount = useLastAccount();
-  const activeAccounts = useWork().data?.accounts ?? [];
+  // As contas e o "Salvando em" são os do contexto da meta (uma meta da Família aberta com o seletor em Pessoal usa as contas da Família).
+  const itemWork = useWorkFor(goal.contextId);
+  const activeAccounts = itemWork.data?.accounts ?? [];
   const allAccounts = useAccounts(goal.contextId);
   const editing = mode.type === 'editar' ? mode.movement : null;
   // O movimento em edição pode ter mudado (outro aparelho): sempre o da lista mais recente.
@@ -154,8 +160,11 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
    * histórico recarrega antes de voltar, para a tela anterior mostrar o valor guardado e a lista de movimentos do mesmo
    * estado (a falha de rede nesse recarregamento não impede de voltar: a lista se atualiza quando a conexão voltar).
    */
-  async function done(text: string) {
-    flash.set(text);
+  async function done(text: string, change: GoalMovementChange | null = null) {
+    // Marcos (D-093): ao passar de 25%, 50% ou 75% da meta, uma frase curta junto do aviso de sempre.
+    const milestone =
+      change && goal.status === 'ativa' ? goalMilestoneCrossed(savedOn(movements, today), savedOn(applyMovementChange(movements, change), today), goal.targetCents) : null;
+    flash.set(milestone === null ? text : `${text} ${GOALS_TEXT.milestone(goal.name, milestone)}`);
     await qc.refetchQueries({ queryKey: ['goals', 'movements', goal.id] }).catch(() => undefined);
     guard.leave(() => (router.canGoBack() ? router.back() : router.replace(`/meta/${goal.id}`)));
   }
@@ -202,7 +211,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
           (key) => add.mutateAsync({ key, goalId: goal.id, kind: change.kind, input }),
           (s) => s.action === 'registrar_movimento_meta' && s.goalId === goal.id,
         );
-        if (r.status === 'ok' || r.status === 'reconciled') return await done(M[change.kind].saved);
+        if (r.status === 'ok' || r.status === 'reconciled') return await done(M[change.kind].saved, { op: 'add', kind: change.kind, amountCents: change.amountCents, occurredOn: today });
         if (r.status === 'refused') return fail(r.code, r.detail);
         setError(UNCERTAIN_TEXT.metas);
       } finally {
@@ -253,7 +262,12 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
       }
       if (r.status === 'ok' || r.status === 'reconciled') {
         if (withAccount) lastAccount.remember(accountId);
-        return await done(editing ? M.updated : M[kind === 'saldo_inicial' ? 'aporte' : kind].saved);
+        return await done(
+          editing ? M.updated : M[kind === 'saldo_inicial' ? 'aporte' : kind].saved,
+          editing
+            ? { op: 'update', id: editing.id, amountCents: v.input.amountCents, occurredOn: v.input.occurredOn }
+            : { op: 'add', kind, amountCents: v.input.amountCents, occurredOn: v.input.occurredOn },
+        );
       }
       if (r.status === 'refused') return fail(r.code, r.detail);
       setError(UNCERTAIN_TEXT.metas);
@@ -299,7 +313,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <SubHeader title={titleOf(mode)} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
+      <SubHeader title={titleOf(mode)} onBack={guard.requestCancel} right={<ContextPill label={`Salvando em ${itemWork.data?.contextName ?? 'Pessoal'}`} fixed={Boolean(itemWork.data)} />} />
       <Screen contentStyle={styles.body}>
         {savedBefore.banner}
         {archived ? (

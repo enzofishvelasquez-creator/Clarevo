@@ -1,5 +1,6 @@
 import {
   GOALS_TEXT,
+  GOAL_DEADLINE_SHORTCUTS,
   GOAL_ERROR_TEXT,
   GOAL_FIELD_ORDER,
   GOAL_NAME_MAX,
@@ -9,6 +10,7 @@ import {
   UNCERTAIN_TEXT,
   centsToInput,
   charCount,
+  deadlineShortcutMonth,
   formatBRL,
   formatMonthInputBR,
   goalErrorText,
@@ -42,7 +44,7 @@ import { useLeaveGuard } from '@/components/leave-guard';
 import { MoneyTxt } from '@/components/money-text';
 import { useSavedBefore } from '@/components/saved-before';
 import { ChoiceGroup } from '@/components/series-parts';
-import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
+import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { useCreateGoal, useGoalOperationKey, useGoals, useUpdateGoal } from '@/state/data';
@@ -165,6 +167,7 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
   const presets = GOAL_PRESETS.filter((p) => p.id !== 'reserva');
   const [targetText, setTargetText] = useState(initial.targetText);
   const [targetMonthText, setTargetMonthText] = useState(initial.targetMonthText);
+  const [typeHelpOpen, setTypeHelpOpen] = useState(false);
   const [initialText, setInitialText] = useState(initial.initialText);
   const [plannedText, setPlannedText] = useState(initial.plannedText);
   const [errors, setErrors] = useState<GoalFieldErrors>({});
@@ -350,11 +353,6 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
         ) : null}
 
         <Card style={{ gap: space[4] }}>
-          <ChoiceGroup label="Tipo de meta" hint={goalType === 'oportunidade' ? T.opportunityHint : undefined}>
-            <Chip label={T.typeObjective} selected={goalType === 'objetivo'} onPress={() => setGoalType('objetivo')} />
-            <Chip label={T.typeOpportunity} selected={goalType === 'oportunidade'} onPress={() => setGoalType('oportunidade')} />
-          </ChoiceGroup>
-
           {previewKey ? (
             <View style={{ gap: space[1] }}>
               <SuggestedImage imageKey={previewKey} style={styles.preview} />
@@ -400,6 +398,26 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
             error={errors.targetText}
           />
 
+          {/* Tipo de meta depois do valor, com "Objetivo" marcado (D-093): "Reserva de oportunidade" é pouco conhecido. */}
+          <View style={{ gap: space[1] }}>
+            <ChoiceGroup label={T.typeLabel} hint={goalType === 'oportunidade' ? T.opportunityHint : undefined}>
+              <Chip label={T.typeObjective} selected={goalType === 'objetivo'} onPress={() => setGoalType('objetivo')} />
+              <Chip label={T.typeOpportunity} selected={goalType === 'oportunidade'} onPress={() => setGoalType('oportunidade')} />
+            </ChoiceGroup>
+            <LinkButton
+              label={T.typeHelp}
+              style={styles.inlineLink}
+              accessibilityState={{ expanded: typeHelpOpen }}
+              aria-expanded={typeHelpOpen}
+              onPress={() => setTypeHelpOpen((o) => !o)}
+            />
+            {typeHelpOpen ? (
+              <Txt variant="label" color={colors.textSecondary}>
+                {T.typeHelpBody}
+              </Txt>
+            ) : null}
+          </View>
+
           <TextField
             ref={refs.targetMonthText}
             label={T.deadlineLabel}
@@ -415,6 +433,25 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
             error={errors.targetMonthText}
             hint="Digite só os números, como 072027."
           />
+          {/* Atalhos de prazo (D-093): o mês de hoje mais 6, 12, 24 ou 60 meses, editável no campo. */}
+          <View style={styles.shortcuts} accessibilityRole="radiogroup" accessibilityLabel={T.deadlineShortcuts}>
+            {GOAL_DEADLINE_SHORTCUTS.map((s) => {
+              const text = formatMonthInputBR(deadlineShortcutMonth(today, s.months));
+              return (
+                <Chip
+                  key={s.months}
+                  compact
+                  label={s.label}
+                  selected={targetMonthText === text}
+                  accessibilityLabel={`${s.label}: até ${text}`}
+                  onPress={() => {
+                    setTargetMonthText(text);
+                    clear('targetMonthText');
+                  }}
+                />
+              );
+            })}
+          </View>
 
           {goal ? null : (
             <TextField
@@ -471,4 +508,6 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
 const styles = StyleSheet.create({
   body: { padding: space[5], gap: space[4], paddingBottom: space[6] },
   preview: { height: 120, width: '100%', borderRadius: radius.md },
+  inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  shortcuts: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2], marginTop: -space[2] },
 });

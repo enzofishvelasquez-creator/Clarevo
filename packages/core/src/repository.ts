@@ -121,6 +121,15 @@ export type GoalAction =
 /** Imagem da meta (D-077, migração 0021): set_goal_image, com a meta em target_id. Não conta como anotação na atividade. */
 export type GoalImageAction = 'imagem_meta';
 
+/** Ordem das metas (D-093, migração 0031): set_goal_order, com o contexto em target_id. Não conta como anotação na atividade. */
+export type GoalOrderAction = 'ordenar_metas';
+
+/** Resultado de set_goal_order: o contexto e as metas ativas (sem a reserva) na ordem gravada. */
+export interface GoalOrderWrite {
+  contextId: string;
+  ids: string[];
+}
+
 /**
  * Resultado das escritas de metas: a meta no estado atual (com os totais de goal_items, inclusive excluída) e o
  * movimento envolvido (o saldo inicial em createGoal; o registrado, alterado ou excluído nas escritas de movimento).
@@ -551,6 +560,11 @@ export interface RecordsRepository {
    * como anotação na atividade.
    */
   setGoalImage(key: string, goalId: string, expectedVersion: number, choice: GoalImageChoice): Promise<GoalImage>;
+  /**
+   * Ordem das metas ativas do contexto, sem a reserva (D-093): a lista completa na ordem nova. lista_invalida quando falta, sobra ou
+   * repete meta; sem_permissao para quem só vê.
+   */
+  setGoalOrder(key: string, contextId: string, goalIds: readonly string[]): Promise<GoalOrderWrite>;
   /**
    * add_goal_movement: sem versão (como create_record); a versão da meta não sobe. Ordem: repetição; nao_encontrado;
    * sem_permissao; meta_arquivada; tipo_invalido ('saldo_inicial' só por createGoal); valor_invalido;
@@ -997,6 +1011,7 @@ export type RepoErrorCode =
   | 'imagem_invalida'
   | 'foto_invalida'
   | 'foto_grande'
+  | 'lista_invalida'
   | 'desconhecido';
 
 export class RepoError extends Error {

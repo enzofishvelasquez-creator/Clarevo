@@ -2,11 +2,13 @@ import {
   BUDGET_NOTICE_KEEP,
   DEFAULT_CATEGORY_VIEW,
   DEFAULT_REMINDER_HOUR,
+  DEFAULT_DEPOSIT_REMINDER_DAY,
   DEFAULT_ROUTINE_REMINDER_HOUR,
   DEFAULT_WIDGET_SHOW_VALUES,
   MEMORY_LIMIT,
   NO_ROUTINE_REMINDERS,
   isBudgetNoticeKey,
+  isDepositReminderDay,
   isCategoryView,
   isReminderHour,
   isRoutineReminderHour,
@@ -16,6 +18,7 @@ import {
   type ReminderHour,
   type RoutineReminderChoices,
   type RoutineReminderHour,
+  type DepositReminderDay,
 } from '@clarevo/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
@@ -93,6 +96,8 @@ export interface DevicePrefs {
    */
   routineReminders: RoutineReminderChoices;
   routineReminderHour: RoutineReminderHour;
+  /** Dia do lembrete para guardar para as metas (D-093), só neste aparelho. */
+  depositReminderDay: DepositReminderDay;
   /**
    * "Agora não" na sugestão de atualizar a reserva com os registros (D-091 F): a média dispensada, em centavos. A sugestão volta
    * quando a média muda. Só neste aparelho; nada vai para o servidor.
@@ -118,6 +123,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   extraSavingsDismissedMonth: null,
   routineReminders: NO_ROUTINE_REMINDERS,
   routineReminderHour: DEFAULT_ROUTINE_REMINDER_HOUR,
+  depositReminderDay: DEFAULT_DEPOSIT_REMINDER_DAY,
   reserveRefreshDismissed: null,
 };
 
@@ -153,6 +159,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
         typeof v.extraSavingsDismissedMonth === 'string' && /^\d{4}-\d{2}$/.test(v.extraSavingsDismissedMonth) ? v.extraSavingsDismissedMonth : null,
       routineReminders: parseRoutineReminderChoices(v.routineReminders),
       routineReminderHour: isRoutineReminderHour(v.routineReminderHour) ? v.routineReminderHour : DEFAULT_ROUTINE_REMINDER_HOUR,
+      depositReminderDay: isDepositReminderDay(v.depositReminderDay) ? v.depositReminderDay : DEFAULT_DEPOSIT_REMINDER_DAY,
       reserveRefreshDismissed:
         typeof v.reserveRefreshDismissed === 'number' && Number.isSafeInteger(v.reserveRefreshDismissed) && v.reserveRefreshDismissed > 0 ? v.reserveRefreshDismissed : null,
     };

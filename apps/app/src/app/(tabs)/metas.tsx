@@ -1,6 +1,6 @@
 import { CALC_UI_TEXT, COMMITTED_TEXT, calculatorBySlug, ERROR_TEXT, GOALS_NAV_TEXT, GOALS_TEXT, goalsMonthTexts, monthOf, type Goal, type GoalImage } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, ChartLine, ListOrdered, Plus, ShieldCheck } from 'lucide-react-native';
+import { ArrowUpDown, Calculator, ChartLine, ListOrdered, Plus, ShieldCheck } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { openCalc } from '@/components/calc/open';
@@ -69,6 +69,7 @@ export default function MetasScreen() {
                 plan={data.reserve ? data.plans[data.reserve.id]! : null}
                 planSlot={<SavingsPlanInReserve contextId={contextId} card={savings} />}
                 planLink={savings.data?.state.kind === 'oculto'}
+                compact={savings.data?.state.kind === 'plano'}
               />
               <ReserveRefresh contextId={contextId} reserve={data.reserve} canWrite={personal.data?.canWrite ?? true} />
               <GoalsSection active={data.active} plans={data.plans} images={images.data} canWrite={personal.data?.canWrite ?? true} />
@@ -178,9 +179,15 @@ function GoalsSection({
 }) {
   return (
     <View style={{ gap: space[3] }}>
-      <Txt variant="title" accessibilityRole="header" aria-level={2}>
-        {GOALS_TEXT.goalsTitle}
-      </Txt>
+      <View style={styles.sectionHead}>
+        <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ flex: 1 }}>
+          {GOALS_TEXT.goalsTitle}
+        </Txt>
+        {/* Prioridade (D-093): com duas ou mais metas, a pessoa põe a mais importante em primeiro. */}
+        {canWrite && active.length >= 2 ? (
+          <LinkButton label={GOALS_TEXT.order.link} icon={ArrowUpDown} style={styles.link} onPress={() => router.push('/meta/ordenar')} />
+        ) : null}
+      </View>
       {active.length === 0 ? (
         <Card>
           <EmptyState title={GOALS_TEXT.emptyTitle} art="metas">
@@ -221,6 +228,7 @@ function LearnCard() {
 
 const styles = StyleSheet.create({
   link: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[2] },
   learn: { backgroundColor: colors.accent, borderRadius: radius.lg, paddingTop: space[5], paddingBottom: space[2], paddingHorizontal: space[6], gap: space[1] },
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },
 });
