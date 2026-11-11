@@ -22,6 +22,12 @@
  * WEB_GRACE_DAYS de tolerância para a renovação; cancelada, vale até o fim do período pago; estorno ou contestação tira o período da
  * cobrança na hora. Sem cobrança paga, nada vale.
  *
+ * Pix mês a mês (D-093, caminho B, docs/39 seção 6): "pix" cria um Checkout do Asaas com Pix avulso (`chargeTypes: DETACHED`) de um mês,
+ * com a referência `clarevo-pix:<id da pessoa>:<plano>`; a pessoa informa os dados na página do Asaas. Os avisos de cobrança sem assinatura
+ * (`PAYMENT_*`) e o `CHECKOUT_PAID` levam à cobrança atual no Asaas, que acha a pessoa pela referência, pelo Checkout no banco ou pelo
+ * pagamento já gravado, e chamam `billing_pix_apply` (só o resumo SHA-256 do identificador da cobrança e o dia do pagamento), que
+ * recalcula até quando o acesso vale (origem 'pix'). Pagar o próximo mês só nos últimos PIX_PAY_AHEAD_DAYS dias do mês pago.
+ *
  * Segredos (painel do Supabase, Edge Functions, Secrets, só o Enzo): ASAAS_API_KEY (começa com $aact_prod_ em produção e $aact_hmlg_ no
  * sandbox, que define o ambiente) e ASAAS_WEBHOOK_TOKEN (32 a 255 caracteres, inventado, diferente da chave). SUPABASE_URL, a chave de
  * serviço e a chave pública (SUPABASE_PUBLISHABLE_KEY ou SUPABASE_ANON_KEY, usada nas chamadas feitas como a pessoa) o Supabase fornece.
@@ -32,6 +38,7 @@ import { addDays, addMonthsToDate, todayIn, type IsoDate } from '../dates';
 import { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind } from '../plano-precos';
 import { obj, sameText, serviceHeaders, serviceKeyFrom } from '../servidor-comum';
 import { sha256Hex, utf8Bytes } from '../sha256';
+import { parsePixReference, pixCanPayNext, pixReference } from './pix';
 
 export const ASAAS_PRODUCTION_URL = 'https://api.asaas.com/v3';
 export const ASAAS_SANDBOX_URL = 'https://api-sandbox.asaas.com/v3';
@@ -129,6 +136,12 @@ export interface AsaasPayment {
   deleted: boolean;
   dueDate: IsoDate | null;
   subscription: string | null;
+  /** A referência da Clarevo, quando o Asaas a leva do Checkout para a cobrança (a documentação não garante). */
+  externalReference: string | null;
+  /** O Checkout que criou a cobrança (cobrança avulsa do Pix). */
+  checkoutSession: string | null;
+  /** O dia do pagamento: a liquidação no Asaas e, sem ela, o dia informado pelo pagador ou a confirmação. */
+  paidOn: IsoDate | null;
 }
 
 const isoDate = (v: unknown): IsoDate | null => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null);
@@ -159,7 +172,22 @@ export function asaasPaymentFrom(raw: unknown): AsaasPayment | null {
   const p = obj(raw);
   const id = text(p?.id);
   if (!p || !id) return null;
-  return { id, status: text(p.status) ?? 'PENDING', deleted: p.deleted === true, dueDate: isoDate(p.dueDate), subscription: text(p.subscription) };
+  return {
+    id,
+    status: text(p.status) ?? 'PENDING',
+    deleted: p.deleted === true,
+    dueDate: isoDate(p.dueDate),
+    subscription: text(p.subscription),
+    externalReference: text(p.externalReference),
+    checkoutSession: text(p.checkoutSession),
+    paidOn: isoDate(p.paymentDate) ?? isoDate(p.clientPaymentDate) ?? isoDate(p.confirmedDate),
+  };
+}
+
+/** O dia que conta de uma cobrança de Pix: o do pagamento, se está paga (sem a data, hoje em Brasília); null se não está paga. */
+export function pixPaidOn(p: AsaasPayment, today: IsoDate): IsoDate | null {
+  if (p.deleted || !PAID_STATUSES.has(p.status)) return null;
+  return p.paidOn && p.paidOn <= today ? p.paidOn : today;
 }
 
 /** O fim do período que uma cobrança com vencimento `dueDate` cobre, pelo ciclo da assinatura (mensal na Clarevo). */
@@ -225,6 +253,10 @@ export interface AsaasEvent {
   /** A assinatura do aviso (eventos SUBSCRIPTION_*) ou a da cobrança (PAYMENT_* de assinatura); nula nos outros avisos. */
   subscriptionId: string | null;
   subscription: AsaasSubscription | null;
+  /** A cobrança do aviso (PAYMENT_*), com ou sem assinatura. */
+  payment: AsaasPayment | null;
+  /** O Checkout do aviso (CHECKOUT_*). */
+  checkoutId: string | null;
 }
 
 export function asaasEventFrom(payload: unknown, now: Date): AsaasEvent | null {
@@ -234,7 +266,8 @@ export function asaasEventFrom(payload: unknown, now: Date): AsaasEvent | null {
   if (!e || !id || id.length > 200 || !event) return null;
   const subscription = asaasSubscriptionFrom(e.subscription);
   const payment = asaasPaymentFrom(e.payment);
-  return { id, event, at: parseAsaasDate(e.dateCreated) ?? now, subscriptionId: subscription?.id ?? payment?.subscription ?? null, subscription };
+  const checkoutId = event.startsWith('CHECKOUT_') ? text(obj(e.checkout)?.id) : null;
+  return { id, event, at: parseAsaasDate(e.dateCreated) ?? now, subscriptionId: subscription?.id ?? payment?.subscription ?? null, subscription, payment, checkoutId };
 }
 
 // ---------------------------------------------------------------------------
@@ -353,6 +386,22 @@ export function checkoutRequest(personId: string, plan: PlanKind, appUrl: string
   };
 }
 
+/**
+ * O corpo do Checkout de um mês com Pix (D-093, caminho B): Pix avulso, a referência de Pix da pessoa e a mesma volta para a tela
+ * Assinatura. O nome do item tem até 30 caracteres (documentação do Asaas).
+ */
+export function checkoutPixRequest(personId: string, plan: PlanKind, appUrl: string): Record<string, unknown> {
+  const back = (result: string) => `${appUrl}/conta/assinatura?pagamento=${result}`;
+  return {
+    billingTypes: ['PIX'],
+    chargeTypes: ['DETACHED'],
+    minutesToExpire: CHECKOUT_MINUTES,
+    externalReference: pixReference(personId, plan),
+    callback: { successUrl: back('sucesso'), cancelUrl: back('cancelado'), expiredUrl: back('expirado') },
+    items: [{ name: `Clarevo, plano ${PLAN_NAME[plan]}`, description: 'Um mês de acesso, pago com Pix', quantity: 1, value: PLAN_PRICE_CENTS[plan] / 100 }],
+  };
+}
+
 /** O link da página de pagamento: o que o Asaas devolve ou, sem ele, o endereço padrão com o identificador. */
 export function checkoutLink(response: unknown, sandbox: boolean): string | null {
   const r = obj(response);
@@ -392,6 +441,7 @@ export type AssinaturaWebResult =
   | {
       result:
         | 'ja_assinante'
+        | 'ja_pago'
         | 'sem_necessidade'
         | 'muitas_tentativas'
         | 'cancelada'
@@ -423,7 +473,15 @@ function json(status: number, body: unknown, extra: Record<string, string> = {})
 }
 
 /** O que a função fez com um aviso (para o registro e os testes; a resposta ao Asaas é 200 em todos). */
-export type WebhookOutcome = 'aplicado' | 'ignorado' | 'sem_referencia' | 'recusado' | 'cancelada_sem_pessoa';
+export type WebhookOutcome = 'aplicado' | 'ignorado' | 'sem_referencia' | 'recusado' | 'cancelada_sem_pessoa' | 'sem_pessoa';
+
+/** A pessoa e o plano devolvidos por billing_checkout_person, billing_person_by_external_ref ou billing_pix_person. */
+function referenceFromRpc(r: JsonResponse): WebReference | null {
+  const found = obj(r.json);
+  const personId = text(found?.person_id);
+  const plan = found?.plan;
+  return r.status === 200 && personId && UUID.test(personId) && (plan === 'individual' || plan === 'familiar') ? { personId: personId.toLowerCase(), plan } : null;
+}
 
 export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: AssinaturaWebRequest) => Promise<AssinaturaWebResponse> {
   const log = deps.log ?? (() => {});
@@ -454,12 +512,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
   async function resolveReference({ asaas, db }: Clients, sub: AsaasSubscription): Promise<WebReference | null> {
     const direct = parseWebReference(sub.externalReference);
     if (direct) return direct;
-    const fromRpc = (r: JsonResponse): WebReference | null => {
-      const found = obj(r.json);
-      const personId = text(found?.person_id);
-      const plan = found?.plan;
-      return r.status === 200 && personId && UUID.test(personId) && (plan === 'individual' || plan === 'familiar') ? { personId: personId.toLowerCase(), plan } : null;
-    };
+    const fromRpc = referenceFromRpc;
     let ref: WebReference | null = null;
     if (sub.checkoutSession) ref = fromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: sha256Hex(sub.checkoutSession) }));
     if (!ref) ref = fromRpc(await db.rpcService('billing_person_by_external_ref', { p_provider: 'web', p_external_ref: sha256Hex(sub.id) }));
@@ -471,9 +524,67 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     return ref;
   }
 
+  /**
+   * Uma cobrança de Pix mês a mês (D-093): lê a cobrança atual no Asaas, acha a pessoa (a referência de Pix; sem ela, o Checkout no banco;
+   * por fim, o pagamento já gravado) e grava a situação com billing_pix_apply. Cobrança de assinatura fica com o fluxo da assinatura.
+   */
+  async function applyPixPayment(clients: Clients, ev: AsaasEvent, paymentId: string, eventId: string, checkoutId: string | null): Promise<WebhookOutcome> {
+    const { asaas, db } = clients;
+    const got = await asaas('GET', `/payments/${encodeURIComponent(paymentId)}`);
+    let p = got.status === 200 ? asaasPaymentFrom(got.json) : null;
+    // Removida no Asaas (404): conta como não paga.
+    if (!p && got.status === 404 && ev.payment?.id === paymentId) p = { ...ev.payment, deleted: true };
+    if (!p) {
+      if (got.status === 200 || got.status === 404) return 'ignorado';
+      throw new TransientError(`Asaas respondeu ${got.status} ao ler a cobrança`);
+    }
+    if (p.subscription) return 'ignorado';
+    let ref = parsePixReference(p.externalReference);
+    for (const id of [p.checkoutSession, checkoutId]) {
+      if (ref || !id) continue;
+      ref = referenceFromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: sha256Hex(id) }));
+    }
+    if (!ref) ref = referenceFromRpc(await db.rpcService('billing_pix_person', { p_payment_hash: sha256Hex(p.id) }));
+    if (!ref) {
+      log(`aviso ${ev.event} de cobrança avulsa sem referência da Clarevo`);
+      return 'sem_referencia';
+    }
+    const applied = await db.rpcService('billing_pix_apply', {
+      p_event_id: eventId,
+      p_person: ref.personId,
+      p_plan: ref.plan,
+      p_payment_hash: sha256Hex(p.id),
+      p_paid_on: pixPaidOn(p, todayIn(ASAAS_TIME_ZONE, now())),
+      p_event_at: ev.at.toISOString(),
+    });
+    if (applied.status !== 200) {
+      log(`banco recusou o aviso ${ev.event} de Pix (${applied.status})`);
+      return 'recusado';
+    }
+    // Conta excluída: o Pix não renova sozinho, então não há o que cancelar.
+    return obj(applied.json)?.result === 'sem_pessoa' ? 'sem_pessoa' : 'aplicado';
+  }
+
+  /** Avisos sem assinatura: a cobrança avulsa (PAYMENT_*) ou o Checkout pago (CHECKOUT_PAID, com as cobranças dele). */
+  async function applyPixEvent(clients: Clients, ev: AsaasEvent): Promise<WebhookOutcome> {
+    if (ev.payment && ev.event.startsWith('PAYMENT_')) return applyPixPayment(clients, ev, ev.payment.id, ev.id, null);
+    if (!ev.checkoutId || ev.event !== 'CHECKOUT_PAID') return 'ignorado';
+    const list = await clients.asaas('GET', `/payments?checkoutSession=${encodeURIComponent(ev.checkoutId)}&limit=10`);
+    if (list.status !== 200) throw new TransientError(`Asaas respondeu ${list.status} ao listar as cobranças do Checkout`);
+    const data = obj(list.json)?.data;
+    let outcome: WebhookOutcome = 'ignorado';
+    for (const raw of Array.isArray(data) ? data : []) {
+      const p = asaasPaymentFrom(raw);
+      if (!p) continue;
+      const o = await applyPixPayment(clients, ev, p.id, `${ev.id}:${p.id}`.slice(0, 200), ev.checkoutId);
+      if (outcome === 'ignorado' || o === 'aplicado') outcome = o;
+    }
+    return outcome;
+  }
+
   async function applyEvent(clients: Clients, ev: AsaasEvent): Promise<WebhookOutcome> {
     const { asaas, db } = clients;
-    if (!ev.subscriptionId) return 'ignorado';
+    if (!ev.subscriptionId) return applyPixEvent(clients, ev);
     // O estado atual, não o do aviso (os avisos chegam repetidos e fora de ordem). Assinatura removida pode não ser devolvida: vale o
     // aviso ou, sem ele, só o que já está pago.
     const got = await asaas('GET', `/subscriptions/${encodeURIComponent(ev.subscriptionId)}`);
@@ -559,7 +670,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     }
     const action = payload?.action;
     const plan = payload?.plan;
-    if ((action !== 'assinar' && action !== 'cancelar') || (action === 'assinar' && plan !== 'individual' && plan !== 'familiar')) {
+    if ((action !== 'assinar' && action !== 'cancelar' && action !== 'pix') || (action !== 'cancelar' && plan !== 'individual' && plan !== 'familiar')) {
       return reply(400, { result: 'pedido_invalido' });
     }
     try {
@@ -577,11 +688,19 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       const access = await db.rpcAsUser('my_access', auth[1] ?? '');
       if (access.status === 401 || access.status === 403) return reply(401, { result: 'nao_autenticado' });
       if (access.status !== 200) throw new TransientError(`banco respondeu ${access.status} em my_access`);
-      const status = obj(access.json)?.status;
-      if (status === 'assinatura') return reply(200, { result: 'ja_assinante' });
+      const current = obj(access.json);
+      const status = current?.status;
+      // Quem paga com Pix pode pagar o próximo mês (só com Pix, e só nos últimos dias do mês pago); qualquer outra assinatura bloqueia.
+      const paysWithPix = action === 'pix' && current?.provider === 'pix';
+      if (status === 'assinatura' && !paysWithPix) return reply(200, { result: 'ja_assinante' });
       if (status === 'beneficio' || status === 'cortesia') return reply(200, { result: 'sem_necessidade' });
+      if (status === 'assinatura' && !pixCanPayNext(typeof current?.until === 'string' ? current.until : null, now())) return reply(200, { result: 'ja_pago' });
       if ((await activeSubscriptions(asaas, personId)).length > 0) return reply(200, { result: 'ja_assinante' });
-      const created = await asaas('POST', '/checkouts', checkoutRequest(personId, plan as PlanKind, config.appUrl, todayIn(ASAAS_TIME_ZONE, now())));
+      const request =
+        action === 'pix'
+          ? checkoutPixRequest(personId, plan as PlanKind, config.appUrl)
+          : checkoutRequest(personId, plan as PlanKind, config.appUrl, todayIn(ASAAS_TIME_ZONE, now()));
+      const created = await asaas('POST', '/checkouts', request);
       const checkoutId = text(obj(created.json)?.id);
       const url = created.status === 200 ? checkoutLink(created.json, config.sandbox) : null;
       if (!checkoutId || !url) {

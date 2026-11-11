@@ -8,6 +8,7 @@ import { daysBetween, formatDateBR, todayIn, type IsoDate } from './dates';
 import { BENEFIT_TEXT } from './company';
 import { FAMILY_MAX_PEOPLE } from './family';
 import { formatBRL } from './money';
+import { PIX_WARNING_DAYS } from './assinatura-web/pix';
 import { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind } from './plano-precos';
 
 export { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind };
@@ -30,8 +31,8 @@ export const SUBSCRIBE_OPEN = false;
  * titular; antes do início da cobrança; teste grátis; só leitura.
  */
 export type AccessStatus = 'assinatura' | 'beneficio' | 'cortesia' | 'familia' | 'pre_lancamento' | 'teste' | 'leitura';
-/** De onde vem o direito: as lojas, a web (Asaas, D-084) ou a equipe (cortesia). */
-export type AccessProvider = 'apple' | 'google' | 'web' | 'equipe';
+/** De onde vem o direito: as lojas, a web com cartão (Asaas, D-084), a web com Pix mês a mês (D-093, migração 0033) ou a equipe (cortesia). */
+export type AccessProvider = 'apple' | 'google' | 'web' | 'pix' | 'equipe';
 
 export interface Access {
   status: AccessStatus;
@@ -49,7 +50,7 @@ export interface Access {
 }
 
 const STATUSES: readonly AccessStatus[] = ['assinatura', 'beneficio', 'cortesia', 'familia', 'pre_lancamento', 'teste', 'leitura'];
-const PROVIDERS: readonly AccessProvider[] = ['apple', 'google', 'web', 'equipe'];
+const PROVIDERS: readonly AccessProvider[] = ['apple', 'google', 'web', 'pix', 'equipe'];
 
 /** Acesso pleno, sem prazo: o que o app assume enquanto não sabe (o banco trava a escrita de qualquer forma). */
 export const FULL_ACCESS: Access = { status: 'pre_lancamento', plan: null, until: null, canWrite: true, provider: null };
@@ -136,8 +137,11 @@ export interface AccessView {
   showPlans: boolean;
 }
 
-/** O que a tela Assinatura e o card de Conta mostram para a situação. `now` e o fuso da pessoa dão as datas. */
-export function accessView(access: Access, now: Date, timeZone: string): AccessView {
+/**
+ * O que a tela Assinatura e o card de Conta mostram para a situação. `now` e o fuso da pessoa dão as datas. `web`: a tela está na web
+ * (só lá se fala em pagar com Pix; no app das lojas, nada aponta para pagamento fora da loja).
+ */
+export function accessView(access: Access, now: Date, timeZone: string, opts: { web?: boolean } = {}): AccessView {
   const end = untilDay(access, timeZone);
   const date = end ? formatDateBR(end) : null;
   switch (access.status) {
@@ -165,6 +169,15 @@ export function accessView(access: Access, now: Date, timeZone: string): AccessV
         showPlans: true,
       };
     case 'assinatura':
+      if (access.provider === 'pix') {
+        return {
+          situation: `Plano ${PLAN_NAME[access.plan ?? 'individual']}`,
+          body: opts.web
+            ? `Pago com Pix: acesso completo até ${date ?? 'o fim do mês pago'}. O Pix não renova sozinho: pague o próximo mês até essa data, aqui na tela Assinatura.`
+            : `Acesso completo${date ? ` até ${date}` : ''}.`,
+          showPlans: false,
+        };
+      }
       return {
         situation: `Plano ${PLAN_NAME[access.plan ?? 'individual']}`,
         body: `Assinatura ativa${date ? `, renova em ${date}` : ''}. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.`,
@@ -195,10 +208,23 @@ export interface AccessBanner {
   text: string;
   /** Só leitura pede mais destaque que o aviso do fim do teste. */
   tone: 'info' | 'aviso';
+  /** O texto do atalho para a tela Assinatura (sem ele, "Ver os planos"). */
+  action?: string;
 }
 
-/** Aviso no Resumo: nos últimos TRIAL_WARNING_DAYS dias do teste e em só leitura. Nulo nas outras situações. */
-export function accessBanner(access: Access, now: Date, timeZone: string): AccessBanner | null {
+/**
+ * Aviso no Resumo: nos últimos TRIAL_WARNING_DAYS dias do teste, em só leitura e, na web, nos últimos PIX_WARNING_DAYS dias do mês pago
+ * com Pix (o Pix não renova sozinho). Nulo nas outras situações.
+ */
+export function accessBanner(access: Access, now: Date, timeZone: string, opts: { web?: boolean } = {}): AccessBanner | null {
+  if (access.status === 'assinatura' && access.provider === 'pix') {
+    const end = untilDay(access, timeZone);
+    if (!opts.web || !end) return null;
+    const days = Math.max(0, daysBetween(todayIn(timeZone, now), end));
+    if (days > PIX_WARNING_DAYS) return null;
+    const when = days === 0 ? 'termina hoje' : days === 1 ? 'termina amanhã' : `vai até ${formatDateBR(end)}`;
+    return { text: `O acesso pago com Pix ${when}. Para continuar anotando depois, pague o próximo mês.`, tone: 'info', action: 'Pagar o próximo mês' };
+  }
   if (access.status === 'leitura') {
     return { text: 'Sem assinatura ativa, a conta está só para ver e exportar. Para voltar a anotar, assine um dos planos.', tone: 'aviso' };
   }

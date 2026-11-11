@@ -8,14 +8,18 @@ import {
   accessView,
   canSubscribeInStore,
   deviceTimeZone,
+  formatDateBR,
   isStoreSubscription,
+  pixCanPayNext,
+  pixNextPaymentFrom,
   planPrice,
+  todayIn,
   type Access,
   type PlanKind,
   type StorePurchaseResult,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Hourglass, Info, LockKeyhole, RefreshCw } from 'lucide-react-native';
+import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Hourglass, Info, LockKeyhole, QrCode, RefreshCw } from 'lucide-react-native';
 import { useState } from 'react';
 import { Platform, View } from 'react-native';
 
@@ -57,12 +61,12 @@ export function AccessSituation({ situation }: { situation: string }) {
 export function AccessBanner() {
   const access = useAccess().data;
   const timeZone = useAccessTimeZone();
-  const banner = access ? accessBanner(access, new Date(), timeZone) : null;
+  const banner = access ? accessBanner(access, new Date(), timeZone, { web: Platform.OS === 'web' }) : null;
   if (!banner) return null;
   return (
     <Banner tone="info" icon={access?.status === 'leitura' ? LockKeyhole : Hourglass} live={false}>
       <Txt variant="label">{banner.text}</Txt>
-      <LinkButton label={T.bannerAction} onPress={() => router.push('/conta/assinatura')} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+      <LinkButton label={banner.action ?? T.bannerAction} onPress={() => router.push('/conta/assinatura')} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
     </Banner>
   );
 }
@@ -71,7 +75,7 @@ export function AccessBanner() {
 export function AccessCard() {
   const access = useAccess();
   const timeZone = useAccessTimeZone();
-  const view = access.data ? accessView(access.data, new Date(), timeZone) : null;
+  const view = access.data ? accessView(access.data, new Date(), timeZone, { web: Platform.OS === 'web' }) : null;
   return (
     <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -101,7 +105,7 @@ export function AccessCard() {
  */
 function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boolean }) {
   const repo = useRepo();
-  const [busy, setBusy] = useState<PlanKind | null>(null);
+  const [busy, setBusy] = useState<PlanKind | `pix-${PlanKind}` | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   // No teste do sandbox (antes do início da cobrança, todo mundo está em pre_lancamento), os botões aparecem também nessa situação.
   if (access.status !== 'teste' && access.status !== 'leitura' && access.status !== 'familia' && !(webTest && access.status === 'pre_lancamento')) return null;
@@ -113,6 +117,23 @@ function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boo
       const r = await repo.startWebSubscription(plan);
       if (r.result === 'checkout') {
         // A página de pagamento abre no lugar do app; o botão fica ocupado até a troca.
+        window.location.assign(r.url);
+        return;
+      }
+      setMsg(W.errors[r.result]);
+    } catch {
+      setMsg(W.errors.tente_de_novo);
+    }
+    setBusy(null);
+  };
+  // Um mês com Pix (D-093, caminho B): o Checkout do Asaas com Pix avulso; cada pagamento libera um mês.
+  const payPix = async (plan: PlanKind) => {
+    if (busy) return;
+    setMsg(null);
+    setBusy(`pix-${plan}`);
+    try {
+      const r = await repo.startPixPayment(plan);
+      if (r.result === 'checkout') {
         window.location.assign(r.url);
         return;
       }
@@ -139,6 +160,24 @@ function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boo
           onPress={() => void subscribe(p.plan)}
         />
       ))}
+      <Txt variant="label" style={{ fontFamily: fonts.bold, marginTop: space[2] }}>
+        {W.pixTitle}
+      </Txt>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {W.pixHowItWorks}
+      </Txt>
+      {T.plans.map((p) => (
+        <Button
+          key={`pix-${p.plan}`}
+          label={W.payPix(p.plan)}
+          icon={QrCode}
+          tone="soft"
+          busy={busy === `pix-${p.plan}`}
+          busyLabel={W.pixBusy}
+          disabled={busy !== null && busy !== `pix-${p.plan}`}
+          onPress={() => void payPix(p.plan)}
+        />
+      ))}
       <Txt variant="caption" color={colors.textSecondary}>
         {W.afterPayment}
       </Txt>
@@ -150,6 +189,57 @@ function WebSubscribeButtons({ access, webTest }: { access: Access; webTest: boo
         </Banner>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * Quem paga com Pix mês a mês (D-093, caminho B; só na web): "Pagar mais um mês com Pix" nos últimos PIX_PAY_AHEAD_DAYS dias do mês pago;
+ * antes disso, a partir de quando dá. O mesmo Checkout do Asaas de um mês, do plano em vigor. A volta da página do Asaas esconde o botão
+ * (`hidden`) até o aviso do Asaas chegar.
+ */
+export function PixRenewCard({ access, hidden = false }: { access: Access; hidden?: boolean }) {
+  const repo = useRepo();
+  const timeZone = useAccessTimeZone();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const plan: PlanKind = access.plan ?? 'individual';
+  const now = new Date();
+  const ready = pixCanPayNext(access.until, now);
+  const from = pixNextPaymentFrom(access.until);
+  const pay = async () => {
+    if (busy) return;
+    setMsg(null);
+    setBusy(true);
+    try {
+      const r = await repo.startPixPayment(plan);
+      if (r.result === 'checkout') {
+        window.location.assign(r.url);
+        return;
+      }
+      setMsg(W.errors[r.result]);
+    } catch {
+      setMsg(W.errors.tente_de_novo);
+    }
+    setBusy(false);
+  };
+  return (
+    <Card style={{ gap: space[3] }}>
+      {hidden ? null : ready ? (
+        <Button label={W.payNextPix} icon={QrCode} busy={busy} busyLabel={W.pixBusy} onPress={() => void pay()} />
+      ) : from ? (
+        <Txt variant="label">{W.pixNextFrom(formatDateBR(todayIn(timeZone, from)))}</Txt>
+      ) : null}
+      <Txt variant="caption" color={colors.textSecondary}>
+        {W.pixChangePlan}
+      </Txt>
+      {msg ? (
+        <Banner tone="erro" icon={AlertCircle}>
+          <Txt variant="label" color={colors.error}>
+            {msg}
+          </Txt>
+        </Banner>
+      ) : null}
+    </Card>
   );
 }
 

@@ -918,6 +918,8 @@ export interface RecordsRepository {
   startWebSubscription(plan: PlanKind): Promise<WebSubscriptionStart>;
   /** "cancelar": remove no Asaas a assinatura ativa feita na web; o período já pago continua valendo. */
   cancelWebSubscription(): Promise<WebSubscriptionCancel>;
+  /** "pix": cria o Checkout do Asaas de um mês com Pix (D-093, caminho B) e devolve o link, ou por que não (mês já pago, já assinante...). */
+  startPixPayment(plan: PlanKind): Promise<WebSubscriptionStart>;
 
   // Assinatura pelas lojas (D-090), pela função do servidor "assinatura-lojas" com a sessão da pessoa. Só no app do iPhone e do Android.
 

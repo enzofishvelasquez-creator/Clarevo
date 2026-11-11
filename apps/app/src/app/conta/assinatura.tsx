@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle2, Info } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 
-import { AccessSituation, PlansCard, StoreManageCard, useAccessTimeZone } from '@/components/access-parts';
+import { AccessSituation, PixRenewCard, PlansCard, StoreManageCard, useAccessTimeZone } from '@/components/access-parts';
 import { ConfirmDialog } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
@@ -92,7 +92,7 @@ export default function AssinaturaScreen() {
   useEffect(() => {
     if (returned) void refetch();
   }, [returned, refetch]);
-  const view = access.data ? accessView(access.data, new Date(), timeZone) : null;
+  const view = access.data ? accessView(access.data, new Date(), timeZone, { web: Platform.OS === 'web' }) : null;
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={T.screenTitle} />
@@ -116,6 +116,9 @@ export default function AssinaturaScreen() {
               <Txt color={colors.text}>{view.body}</Txt>
             </Card>
             {access.data.status === 'assinatura' && access.data.provider === 'web' && Platform.OS === 'web' ? <WebCancelCard /> : null}
+            {access.data.status === 'assinatura' && access.data.provider === 'pix' && Platform.OS === 'web' ? (
+              <PixRenewCard access={access.data} hidden={returned === 'sucesso'} />
+            ) : null}
             {Platform.OS !== 'web' ? <StoreManageCard access={access.data} /> : null}
             {view.showPlans ? <PlansCard access={access.data} webTest={webTest} subscribeHidden={returned === 'sucesso'} /> : null}
             {view.showPlans ? (

@@ -178,3 +178,42 @@ describe('repositório em memória e demonstração', () => {
     expect(trialDaysLeft(demo, NOW, TZ)).toBe(14);
   });
 });
+
+describe('Pix mês a mês (D-093, caminho B): a situação e o aviso', () => {
+  // Pago até 05/12, com os 3 dias de tolerância: acesso até 08/12 (fim do dia em Brasília).
+  const pix = (until: string | null): Access => ({ status: 'assinatura', plan: 'individual', until, canWrite: true, provider: 'pix' });
+  const UNTIL = '2026-12-09T02:59:59.999Z';
+
+  it('a origem "pix" vem de my_access', () => {
+    expect(parseAccess({ status: 'assinatura', plan: 'individual', until: UNTIL, can_write: true, provider: 'pix' }).provider).toBe('pix');
+  });
+
+  it('na web, a situação diz até quando o acesso vale e que o Pix não renova sozinho; no app das lojas, só até quando', () => {
+    const web = accessView(pix(UNTIL), NOW, TZ, { web: true });
+    expect(web.situation).toBe('Plano Individual');
+    expect(web.body).toBe('Pago com Pix: acesso completo até 08/12/2026. O Pix não renova sozinho: pague o próximo mês até essa data, aqui na tela Assinatura.');
+    expect(web.showPlans).toBe(false);
+    const store = accessView(pix(UNTIL), NOW, TZ);
+    expect(store.body).toBe('Acesso completo até 08/12/2026.');
+    expect(store.body).not.toMatch(/\bweb\b|Pix|site|boleto/i);
+    // A assinatura no cartão segue com o texto de sempre.
+    expect(accessView({ ...pix(UNTIL), provider: 'web' }, NOW, TZ, { web: true }).body).toContain('renova em 08/12/2026');
+  });
+
+  it('o aviso no Resumo: só na web, nos últimos 7 dias, com o atalho "Pagar o próximo mês"; no app das lojas, nada', () => {
+    expect(accessBanner(pix(UNTIL), NOW, TZ, { web: true })).toBeNull();
+    const near = new Date('2026-12-01T13:00:00.000Z');
+    expect(accessBanner(pix(UNTIL), near, TZ, { web: true })).toEqual({
+      text: 'O acesso pago com Pix vai até 08/12/2026. Para continuar anotando depois, pague o próximo mês.',
+      tone: 'info',
+      action: 'Pagar o próximo mês',
+    });
+    expect(accessBanner(pix(UNTIL), new Date('2026-12-07T13:00:00.000Z'), TZ, { web: true })?.text).toContain('termina amanhã');
+    expect(accessBanner(pix(UNTIL), new Date('2026-12-08T13:00:00.000Z'), TZ, { web: true })?.text).toContain('termina hoje');
+    expect(accessBanner(pix(UNTIL), near, TZ)).toBeNull();
+    expect(accessBanner(pix(null), near, TZ, { web: true })).toBeNull();
+    for (const t of [accessBanner(pix(UNTIL), near, TZ, { web: true })!.text, accessView(pix(UNTIL), NOW, TZ, { web: true }).body]) {
+      expect(t).not.toMatch(/—|–|fazer sentido/);
+    }
+  });
+});

@@ -19,6 +19,7 @@ const __mods = [
     exports.asaasSubscriptionFrom = asaasSubscriptionFrom;
     exports.goneSubscription = goneSubscription;
     exports.asaasPaymentFrom = asaasPaymentFrom;
+    exports.pixPaidOn = pixPaidOn;
     exports.periodEnd = periodEnd;
     exports.endOfDayBrasilia = endOfDayBrasilia;
     exports.webValidity = webValidity;
@@ -26,6 +27,7 @@ const __mods = [
     exports.asaasEventFrom = asaasEventFrom;
     exports.budget = budget;
     exports.checkoutRequest = checkoutRequest;
+    exports.checkoutPixRequest = checkoutPixRequest;
     exports.checkoutLink = checkoutLink;
     exports.corsHeaders = corsHeaders;
     exports.createAssinaturaWebHandler = createAssinaturaWebHandler;
@@ -33,6 +35,7 @@ const __mods = [
     const plano_precos_1 = __req(2);
     const servidor_comum_1 = __req(3);
     const sha256_1 = __req(4);
+    const pix_1 = __req(5);
     exports.ASAAS_PRODUCTION_URL = 'https://api.asaas.com/v3';
     exports.ASAAS_SANDBOX_URL = 'https://api-sandbox.asaas.com/v3';
     exports.ASAAS_KEY_PRODUCTION = '$aact_prod_';
@@ -107,7 +110,21 @@ const __mods = [
         const id = text(p?.id);
         if (!p || !id)
             return null;
-        return { id, status: text(p.status) ?? 'PENDING', deleted: p.deleted === true, dueDate: isoDate(p.dueDate), subscription: text(p.subscription) };
+        return {
+            id,
+            status: text(p.status) ?? 'PENDING',
+            deleted: p.deleted === true,
+            dueDate: isoDate(p.dueDate),
+            subscription: text(p.subscription),
+            externalReference: text(p.externalReference),
+            checkoutSession: text(p.checkoutSession),
+            paidOn: isoDate(p.paymentDate) ?? isoDate(p.clientPaymentDate) ?? isoDate(p.confirmedDate),
+        };
+    }
+    function pixPaidOn(p, today) {
+        if (p.deleted || !exports.PAID_STATUSES.has(p.status))
+            return null;
+        return p.paidOn && p.paidOn <= today ? p.paidOn : today;
     }
     function periodEnd(dueDate, cycle) {
         switch (cycle) {
@@ -162,7 +179,8 @@ const __mods = [
             return null;
         const subscription = asaasSubscriptionFrom(e.subscription);
         const payment = asaasPaymentFrom(e.payment);
-        return { id, event, at: parseAsaasDate(e.dateCreated) ?? now, subscriptionId: subscription?.id ?? payment?.subscription ?? null, subscription };
+        const checkoutId = event.startsWith('CHECKOUT_') ? text((0, servidor_comum_1.obj)(e.checkout)?.id) : null;
+        return { id, event, at: parseAsaasDate(e.dateCreated) ?? now, subscriptionId: subscription?.id ?? payment?.subscription ?? null, subscription, payment, checkoutId };
     }
     class TransientError extends Error {
     }
@@ -249,6 +267,17 @@ const __mods = [
             subscription: { cycle: 'MONTHLY', nextDueDate: today },
         };
     }
+    function checkoutPixRequest(personId, plan, appUrl) {
+        const back = (result) => `${appUrl}/conta/assinatura?pagamento=${result}`;
+        return {
+            billingTypes: ['PIX'],
+            chargeTypes: ['DETACHED'],
+            minutesToExpire: exports.CHECKOUT_MINUTES,
+            externalReference: (0, pix_1.pixReference)(personId, plan),
+            callback: { successUrl: back('sucesso'), cancelUrl: back('cancelado'), expiredUrl: back('expirado') },
+            items: [{ name: `Clarevo, plano ${plano_precos_1.PLAN_NAME[plan]}`, description: 'Um mês de acesso, pago com Pix', quantity: 1, value: plano_precos_1.PLAN_PRICE_CENTS[plan] / 100 }],
+        };
+    }
     function checkoutLink(response, sandbox) {
         const r = (0, servidor_comum_1.obj)(response);
         const link = text(r?.link);
@@ -275,6 +304,12 @@ const __mods = [
     function json(status, body, extra = {}) {
         return { status, body: JSON.stringify(body), headers: { 'Content-Type': JSON_TYPE, ...extra } };
     }
+    function referenceFromRpc(r) {
+        const found = (0, servidor_comum_1.obj)(r.json);
+        const personId = text(found?.person_id);
+        const plan = found?.plan;
+        return r.status === 200 && personId && UUID.test(personId) && (plan === 'individual' || plan === 'familiar') ? { personId: personId.toLowerCase(), plan } : null;
+    }
     function createAssinaturaWebHandler(deps) {
         const log = deps.log ?? (() => { });
         const now = deps.now ?? (() => new Date());
@@ -298,12 +333,7 @@ const __mods = [
             const direct = parseWebReference(sub.externalReference);
             if (direct)
                 return direct;
-            const fromRpc = (r) => {
-                const found = (0, servidor_comum_1.obj)(r.json);
-                const personId = text(found?.person_id);
-                const plan = found?.plan;
-                return r.status === 200 && personId && UUID.test(personId) && (plan === 'individual' || plan === 'familiar') ? { personId: personId.toLowerCase(), plan } : null;
-            };
+            const fromRpc = referenceFromRpc;
             let ref = null;
             if (sub.checkoutSession)
                 ref = fromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: (0, sha256_1.sha256Hex)(sub.checkoutSession) }));
@@ -316,10 +346,69 @@ const __mods = [
             }
             return ref;
         }
+        async function applyPixPayment(clients, ev, paymentId, eventId, checkoutId) {
+            const { asaas, db } = clients;
+            const got = await asaas('GET', `/payments/${encodeURIComponent(paymentId)}`);
+            let p = got.status === 200 ? asaasPaymentFrom(got.json) : null;
+            if (!p && got.status === 404 && ev.payment?.id === paymentId)
+                p = { ...ev.payment, deleted: true };
+            if (!p) {
+                if (got.status === 200 || got.status === 404)
+                    return 'ignorado';
+                throw new TransientError(`Asaas respondeu ${got.status} ao ler a cobrança`);
+            }
+            if (p.subscription)
+                return 'ignorado';
+            let ref = (0, pix_1.parsePixReference)(p.externalReference);
+            for (const id of [p.checkoutSession, checkoutId]) {
+                if (ref || !id)
+                    continue;
+                ref = referenceFromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: (0, sha256_1.sha256Hex)(id) }));
+            }
+            if (!ref)
+                ref = referenceFromRpc(await db.rpcService('billing_pix_person', { p_payment_hash: (0, sha256_1.sha256Hex)(p.id) }));
+            if (!ref) {
+                log(`aviso ${ev.event} de cobrança avulsa sem referência da Clarevo`);
+                return 'sem_referencia';
+            }
+            const applied = await db.rpcService('billing_pix_apply', {
+                p_event_id: eventId,
+                p_person: ref.personId,
+                p_plan: ref.plan,
+                p_payment_hash: (0, sha256_1.sha256Hex)(p.id),
+                p_paid_on: pixPaidOn(p, (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now())),
+                p_event_at: ev.at.toISOString(),
+            });
+            if (applied.status !== 200) {
+                log(`banco recusou o aviso ${ev.event} de Pix (${applied.status})`);
+                return 'recusado';
+            }
+            return (0, servidor_comum_1.obj)(applied.json)?.result === 'sem_pessoa' ? 'sem_pessoa' : 'aplicado';
+        }
+        async function applyPixEvent(clients, ev) {
+            if (ev.payment && ev.event.startsWith('PAYMENT_'))
+                return applyPixPayment(clients, ev, ev.payment.id, ev.id, null);
+            if (!ev.checkoutId || ev.event !== 'CHECKOUT_PAID')
+                return 'ignorado';
+            const list = await clients.asaas('GET', `/payments?checkoutSession=${encodeURIComponent(ev.checkoutId)}&limit=10`);
+            if (list.status !== 200)
+                throw new TransientError(`Asaas respondeu ${list.status} ao listar as cobranças do Checkout`);
+            const data = (0, servidor_comum_1.obj)(list.json)?.data;
+            let outcome = 'ignorado';
+            for (const raw of Array.isArray(data) ? data : []) {
+                const p = asaasPaymentFrom(raw);
+                if (!p)
+                    continue;
+                const o = await applyPixPayment(clients, ev, p.id, `${ev.id}:${p.id}`.slice(0, 200), ev.checkoutId);
+                if (outcome === 'ignorado' || o === 'aplicado')
+                    outcome = o;
+            }
+            return outcome;
+        }
         async function applyEvent(clients, ev) {
             const { asaas, db } = clients;
             if (!ev.subscriptionId)
-                return 'ignorado';
+                return applyPixEvent(clients, ev);
             const got = await asaas('GET', `/subscriptions/${encodeURIComponent(ev.subscriptionId)}`);
             let sub = got.status === 200 ? asaasSubscriptionFrom(got.json) : null;
             if (!sub && got.status === 404)
@@ -414,7 +503,7 @@ const __mods = [
             }
             const action = payload?.action;
             const plan = payload?.plan;
-            if ((action !== 'assinar' && action !== 'cancelar') || (action === 'assinar' && plan !== 'individual' && plan !== 'familiar')) {
+            if ((action !== 'assinar' && action !== 'cancelar' && action !== 'pix') || (action !== 'cancelar' && plan !== 'individual' && plan !== 'familiar')) {
                 return reply(400, { result: 'pedido_invalido' });
             }
             try {
@@ -436,14 +525,21 @@ const __mods = [
                     return reply(401, { result: 'nao_autenticado' });
                 if (access.status !== 200)
                     throw new TransientError(`banco respondeu ${access.status} em my_access`);
-                const status = (0, servidor_comum_1.obj)(access.json)?.status;
-                if (status === 'assinatura')
+                const current = (0, servidor_comum_1.obj)(access.json);
+                const status = current?.status;
+                const paysWithPix = action === 'pix' && current?.provider === 'pix';
+                if (status === 'assinatura' && !paysWithPix)
                     return reply(200, { result: 'ja_assinante' });
                 if (status === 'beneficio' || status === 'cortesia')
                     return reply(200, { result: 'sem_necessidade' });
+                if (status === 'assinatura' && !(0, pix_1.pixCanPayNext)(typeof current?.until === 'string' ? current.until : null, now()))
+                    return reply(200, { result: 'ja_pago' });
                 if ((await activeSubscriptions(asaas, personId)).length > 0)
                     return reply(200, { result: 'ja_assinante' });
-                const created = await asaas('POST', '/checkouts', checkoutRequest(personId, plan, config.appUrl, (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now())));
+                const request = action === 'pix'
+                    ? checkoutPixRequest(personId, plan, config.appUrl)
+                    : checkoutRequest(personId, plan, config.appUrl, (0, dates_1.todayIn)(exports.ASAAS_TIME_ZONE, now()));
+                const created = await asaas('POST', '/checkouts', request);
                 const checkoutId = text((0, servidor_comum_1.obj)(created.json)?.id);
                 const url = created.status === 200 ? checkoutLink(created.json, config.sandbox) : null;
                 if (!checkoutId || !url) {
@@ -818,6 +914,46 @@ const __mods = [
     }
     function sha256Hex(text) {
         return sha256HexOfBytes(utf8Bytes(text));
+    }
+  },
+  // packages/core/src/assinatura-web/pix.ts
+  function (module, exports, __req) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.PIX_WARNING_DAYS = exports.PIX_PAY_AHEAD_DAYS = exports.PIX_GRACE_DAYS = void 0;
+    exports.pixReference = pixReference;
+    exports.parsePixReference = parsePixReference;
+    exports.pixCanPayNext = pixCanPayNext;
+    exports.pixNextPaymentFrom = pixNextPaymentFrom;
+    exports.PIX_GRACE_DAYS = 3;
+    exports.PIX_PAY_AHEAD_DAYS = 10;
+    exports.PIX_WARNING_DAYS = 7;
+    const DAY_MS = 86_400_000;
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    function pixReference(personId, plan) {
+        return `clarevo-pix:${personId.toLowerCase()}:${plan}`;
+    }
+    function parsePixReference(ref) {
+        if (typeof ref !== 'string')
+            return null;
+        const m = /^clarevo-pix:([0-9a-f-]{36}):(individual|familiar)$/i.exec(ref.trim());
+        if (!m || !UUID.test(m[1] ?? ''))
+            return null;
+        return { personId: (m[1] ?? '').toLowerCase(), plan: m[2] };
+    }
+    function pixCanPayNext(until, now) {
+        if (!until)
+            return true;
+        const end = Date.parse(until);
+        if (Number.isNaN(end))
+            return true;
+        return end - now.getTime() <= (exports.PIX_PAY_AHEAD_DAYS + exports.PIX_GRACE_DAYS) * DAY_MS;
+    }
+    function pixNextPaymentFrom(until) {
+        if (!until)
+            return null;
+        const end = Date.parse(until);
+        return Number.isNaN(end) ? null : new Date(end - (exports.PIX_PAY_AHEAD_DAYS + exports.PIX_GRACE_DAYS) * DAY_MS);
     }
   },
 ];

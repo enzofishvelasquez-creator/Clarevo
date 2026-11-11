@@ -16,15 +16,21 @@ import {
   asaasSubscriptionFrom,
   assinaturaWebConfigFrom,
   checkoutLink,
+  checkoutPixRequest,
   checkoutRequest,
   corsHeaders,
   createAssinaturaWebHandler,
   parseAsaasDate,
+  parsePixReference,
   parseWebPaymentReturn,
   parseWebReference,
   parseWebSubscriptionCancel,
   parseWebSubscriptionStart,
   periodEnd,
+  pixCanPayNext,
+  pixNextPaymentFrom,
+  pixPaidOn,
+  pixReference,
   sha256Hex,
   webReference,
   webValidity,
@@ -72,6 +78,9 @@ const pay = (dueDate: string, status = 'CONFIRMED', extra: Partial<AsaasPayment>
   deleted: false,
   dueDate,
   subscription: SUB,
+  externalReference: null,
+  checkoutSession: null,
+  paidOn: null,
   ...extra,
 });
 
@@ -347,12 +356,12 @@ describe('Assinatura na web: a função do servidor, avisos do Asaas', () => {
     expect(logs).toEqual(['não gravou a referência na assinatura (400)']);
   });
 
-  it('aviso de Checkout, de cobrança avulsa ou de evento desconhecido: 200 sem tocar no Asaas nem no banco', async () => {
+  it('aviso de Checkout criado ou expirado, de transferência ou de evento desconhecido: 200 sem tocar no Asaas nem no banco', async () => {
     const net = fakeNet();
     const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW });
     for (const payload of [
-      event('CHECKOUT_PAID', { checkout: { id: CHECKOUT, status: 'PAID' } }),
-      event('PAYMENT_RECEIVED', { payment: { id: 'pay_avulsa', status: 'RECEIVED' } }),
+      event('CHECKOUT_CREATED', { checkout: { id: CHECKOUT, status: 'ACTIVE' } }),
+      event('CHECKOUT_EXPIRED', { checkout: { id: CHECKOUT, status: 'EXPIRED' } }),
       event('TRANSFER_DONE', { transfer: { id: 'tra_1' } }),
       { id: 'evt_estranho' },
     ]) {
@@ -636,6 +645,201 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
       const src = readFileSync(f, 'utf8');
       expect(src, f).not.toMatch(/\$aact_(prod|hmlg)_[A-Za-z0-9]{8,}|sb_secret_[A-Za-z0-9]{8,}|eyJ[A-Za-z0-9_-]{20,}\./);
     }
+  });
+});
+
+describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do app', () => {
+  const PIX_PAY = 'pay_pix0001';
+  const pixPay = (extra: Record<string, unknown> = {}) => ({
+    id: PIX_PAY,
+    status: 'RECEIVED',
+    billingType: 'PIX',
+    dueDate: '2026-11-06',
+    paymentDate: '2026-11-06',
+    externalReference: pixReference(ANA, 'individual'),
+    checkoutSession: CHECKOUT,
+    ...extra,
+  });
+  /** O Asaas devolve a cobrança atual e o banco aplica; guarda o que foi aplicado e as pessoas procuradas. */
+  function pixNet(payment: Record<string, unknown> | null, extra: Record<string, (init: { method: string; body?: string }) => { status: number; body: unknown }> = {}) {
+    const applied: unknown[] = [];
+    const net = fakeNet({
+      [`GET /v3/payments/${PIX_PAY}`]: () => (payment ? { status: 200, body: payment } : { status: 404, body: { errors: [{ code: 'not_found' }] } }),
+      'POST /rest/v1/rpc/billing_pix_apply': (init) => {
+        applied.push(JSON.parse(init.body ?? '{}'));
+        return { status: 200, body: { result: 'aplicado', paid_through: '2026-12-06', access: { status: 'assinatura', provider: 'pix' } } };
+      },
+      ...extra,
+    });
+    return { net, applied, h: createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW }) };
+  }
+
+  it('a referência de Pix é própria e só a nossa é lida; o Checkout é Pix avulso de um mês, sem assinatura, com o nome do item curto', () => {
+    expect(pixReference(ANA.toUpperCase(), 'familiar')).toBe(`clarevo-pix:${ANA}:familiar`);
+    expect(parsePixReference(`clarevo-pix:${ANA}:individual`)).toEqual({ personId: ANA, plan: 'individual' });
+    for (const bad of [webReference(ANA, 'individual'), `clarevo-pix:${ANA}:anual`, 'clarevo-pix:nao-e-uuid:individual', null, 42]) expect(parsePixReference(bad)).toBeNull();
+    // A referência da assinatura no cartão não confunde com a de Pix.
+    expect(parseWebReference(pixReference(ANA, 'individual'))).toBeNull();
+    for (const plan of ['individual', 'familiar'] as const) {
+      const body = checkoutPixRequest(ANA, plan, APP_URL_DEFAULT) as { items: { name: string; value: number }[] };
+      expect(body).toMatchObject({
+        billingTypes: ['PIX'],
+        chargeTypes: ['DETACHED'],
+        minutesToExpire: 60,
+        externalReference: `clarevo-pix:${ANA}:${plan}`,
+        callback: { successUrl: `${APP_URL_DEFAULT}/conta/assinatura?pagamento=sucesso`, cancelUrl: `${APP_URL_DEFAULT}/conta/assinatura?pagamento=cancelado` },
+      });
+      expect(body).not.toHaveProperty('subscription');
+      expect(body.items[0]!.name.length).toBeLessThanOrEqual(30);
+      expect(body.items[0]!.value).toBe(PLAN_PRICE_CENTS[plan] / 100);
+    }
+  });
+
+  it('o dia que conta: o do pagamento (sem data ou no futuro, hoje); estornada, pendente ou removida não conta', () => {
+    const p = (extra: Partial<AsaasPayment>) => pay('2026-11-06', 'RECEIVED', { subscription: null, ...extra });
+    expect(pixPaidOn(p({ paidOn: '2026-11-05' }), '2026-11-06')).toBe('2026-11-05');
+    expect(pixPaidOn(p({ paidOn: null }), '2026-11-06')).toBe('2026-11-06');
+    expect(pixPaidOn(p({ paidOn: '2026-11-09' }), '2026-11-06')).toBe('2026-11-06');
+    for (const status of ['PENDING', 'REFUNDED', 'OVERDUE', 'REFUND_REQUESTED']) expect(pixPaidOn(p({ status }), '2026-11-06'), status).toBeNull();
+    expect(pixPaidOn(p({ deleted: true }), '2026-11-06')).toBeNull();
+    // A data vem da liquidação; sem ela, a do pagador ou a confirmação.
+    expect(asaasPaymentFrom({ id: 'x', paymentDate: '2026-11-04', clientPaymentDate: '2026-11-03' })?.paidOn).toBe('2026-11-04');
+    expect(asaasPaymentFrom({ id: 'x', clientPaymentDate: '2026-11-03' })?.paidOn).toBe('2026-11-03');
+    expect(asaasPaymentFrom({ id: 'x', confirmedDate: '2026-11-02' })?.paidOn).toBe('2026-11-02');
+  });
+
+  it('a janela para pagar o próximo mês: nos últimos 10 dias do mês pago (o fim do acesso já tem os 3 dias de tolerância)', () => {
+    const until = '2026-12-09T02:59:59.999Z'; // 08/12 em Brasília: pago até 05/12, mais 3 dias
+    expect(pixCanPayNext(until, new Date('2026-11-24T12:00:00Z'))).toBe(false);
+    expect(pixCanPayNext(until, new Date('2026-11-26T03:00:00Z'))).toBe(true);
+    expect(pixCanPayNext(null, NOW)).toBe(true);
+    expect(pixNextPaymentFrom(until)?.toISOString()).toBe('2026-11-26T02:59:59.999Z');
+  });
+
+  it('cobrança de Pix paga: lê a cobrança atual no Asaas e grava só o resumo do identificador e o dia do pagamento, pela referência', async () => {
+    const t = pixNet(pixPay());
+    const res = await t.h(webhookReq(event('PAYMENT_RECEIVED', { payment: pixPay() })).req);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ received: true, outcome: 'aplicado' });
+    expect(t.net.sent.map((s) => `${s.method} ${s.url}`)).toEqual([`GET ${ASAAS_SANDBOX_URL}/payments/${PIX_PAY}`, 'POST https://projeto.supabase.co/rest/v1/rpc/billing_pix_apply']);
+    expect(t.applied).toEqual([
+      { p_event_id: 'evt_1', p_person: ANA, p_plan: 'individual', p_payment_hash: sha256Hex(PIX_PAY), p_paid_on: '2026-11-06', p_event_at: '2026-11-06T14:59:00.000Z' },
+    ]);
+    // Criada e ainda não paga: grava sem dia (o banco não libera nada).
+    const pending = pixNet(pixPay({ status: 'PENDING', paymentDate: null }));
+    await pending.h(webhookReq(event('PAYMENT_CREATED', { payment: pixPay({ status: 'PENDING' }) })).req);
+    expect(pending.applied[0]).toMatchObject({ p_paid_on: null });
+  });
+
+  it('sem a referência na cobrança: acha a pessoa pelo Checkout no banco e, depois, pelo pagamento já gravado (estorno antigo)', async () => {
+    const looked: string[] = [];
+    const viaCheckout = pixNet(pixPay({ externalReference: null }), {
+      'POST /rest/v1/rpc/billing_checkout_person': (init) => {
+        looked.push(`checkout ${JSON.parse(init.body ?? '{}').p_checkout_hash}`);
+        return { status: 200, body: { person_id: ANA, plan: 'familiar' } };
+      },
+    });
+    expect(JSON.parse((await viaCheckout.h(webhookReq(event('PAYMENT_RECEIVED', { payment: pixPay({ externalReference: null }) })).req)).body)).toEqual({ received: true, outcome: 'aplicado' });
+    expect(looked).toEqual([`checkout ${sha256Hex(CHECKOUT)}`]);
+    expect(viaCheckout.applied[0]).toMatchObject({ p_person: ANA, p_plan: 'familiar' });
+    // Estorno de um pagamento de meses atrás: o Checkout já saiu do banco (90 dias), mas o pagamento está gravado.
+    const refunded = pixNet(pixPay({ externalReference: null, status: 'REFUNDED' }), {
+      'POST /rest/v1/rpc/billing_checkout_person': () => ({ status: 200, body: null }),
+      'POST /rest/v1/rpc/billing_pix_person': (init) => {
+        expect(JSON.parse(init.body ?? '{}')).toEqual({ p_payment_hash: sha256Hex(PIX_PAY) });
+        return { status: 200, body: { person_id: ANA, plan: 'individual' } };
+      },
+    });
+    await refunded.h(webhookReq(event('PAYMENT_REFUNDED', { payment: pixPay({ externalReference: null, status: 'REFUNDED' }) })).req);
+    expect(refunded.applied[0]).toMatchObject({ p_person: ANA, p_plan: 'individual', p_paid_on: null });
+    // Cobrança avulsa que não é da Clarevo (sem referência, sem Checkout, sem pagamento gravado): 200, sem gravar nada.
+    const logs: string[] = [];
+    const foreign = fakeNet({
+      [`GET /v3/payments/${PIX_PAY}`]: () => ({ status: 200, body: pixPay({ externalReference: null, checkoutSession: null }) }),
+      'POST /rest/v1/rpc/billing_pix_person': () => ({ status: 200, body: null }),
+    });
+    const hf = createAssinaturaWebHandler({ config, fetch: foreign.fetcher, now: () => NOW, log: (m) => logs.push(m) });
+    const rf = await hf(webhookReq(event('PAYMENT_RECEIVED', { payment: pixPay({ externalReference: null, checkoutSession: null }) })).req);
+    expect(JSON.parse(rf.body)).toEqual({ received: true, outcome: 'sem_referencia' });
+    expect(foreign.sent.some((s) => s.url.endsWith('/rpc/billing_pix_apply'))).toBe(false);
+    expect(logs).toEqual(['aviso PAYMENT_RECEIVED de cobrança avulsa sem referência da Clarevo']);
+    expect(logs.join(' ')).not.toContain(ANA);
+  });
+
+  it('cobrança que o Asaas diz ser de assinatura fica com o fluxo da assinatura; removida (404) conta como não paga; conta excluída não cancela nada', async () => {
+    const ofSub = pixNet(pixPay({ subscription: SUB }));
+    expect(JSON.parse((await ofSub.h(webhookReq(event('PAYMENT_UPDATED', { payment: pixPay() })).req)).body)).toEqual({ received: true, outcome: 'ignorado' });
+    expect(ofSub.applied).toEqual([]);
+    const removed = pixNet(null);
+    expect(JSON.parse((await removed.h(webhookReq(event('PAYMENT_DELETED', { payment: pixPay() })).req)).body)).toEqual({ received: true, outcome: 'aplicado' });
+    expect(removed.applied[0]).toMatchObject({ p_paid_on: null, p_payment_hash: sha256Hex(PIX_PAY) });
+    const gone = pixNet(pixPay(), { 'POST /rest/v1/rpc/billing_pix_apply': () => ({ status: 200, body: { result: 'sem_pessoa' } }) });
+    expect(JSON.parse((await gone.h(webhookReq(event('PAYMENT_RECEIVED', { payment: pixPay() })).req)).body)).toEqual({ received: true, outcome: 'sem_pessoa' });
+    expect(gone.net.sent.some((s) => s.method === 'DELETE')).toBe(false);
+    // Asaas fora do ar ao ler a cobrança: 500, e o Asaas entrega de novo.
+    const down = pixNet(pixPay(), { [`GET /v3/payments/${PIX_PAY}`]: () => ({ status: 503, body: '' }) });
+    expect((await down.h(webhookReq(event('PAYMENT_RECEIVED', { payment: pixPay() })).req)).status).toBe(500);
+  });
+
+  it('CHECKOUT_PAID: lista as cobranças do Checkout e aplica cada uma, com um identificador de aviso por cobrança', async () => {
+    const t = pixNet(pixPay({ externalReference: null }), {
+      'GET /v3/payments': () => ({ status: 200, body: { object: 'list', data: [pixPay({ externalReference: null })] } }),
+      'POST /rest/v1/rpc/billing_checkout_person': () => ({ status: 200, body: { person_id: ANA, plan: 'individual' } }),
+    });
+    const res = await t.h(webhookReq(event('CHECKOUT_PAID', { checkout: { id: CHECKOUT, status: 'PAID' } })).req);
+    expect(JSON.parse(res.body)).toEqual({ received: true, outcome: 'aplicado' });
+    expect(t.net.sent[0]?.url).toBe(`${ASAAS_SANDBOX_URL}/payments?checkoutSession=${CHECKOUT}&limit=10`);
+    expect(t.applied).toEqual([expect.objectContaining({ p_event_id: `evt_1:${PIX_PAY}`, p_person: ANA, p_paid_on: '2026-11-06' })]);
+  });
+
+  describe('pedido do app: "pix"', () => {
+    const user = { 'GET /auth/v1/user': () => ({ status: 200, body: { id: ANA, email: 'ana@exemplo.test' } }) };
+    const access = (status: string, provider: string | null = null, until: string | null = null) => ({
+      'POST /rest/v1/rpc/my_access': () => ({ status: 200, body: { status, plan: status === 'assinatura' ? 'individual' : null, until, can_write: true, provider } }),
+    });
+    const noSubs = { 'GET /v3/subscriptions': () => ({ status: 200, body: { object: 'list', data: [] } }) };
+    const make = (extra: Record<string, (init: { method: string; body?: string }) => { status: number; body: unknown }>) => {
+      const net = fakeNet({
+        ...user,
+        ...noSubs,
+        'POST /v3/checkouts': () => ({ status: 200, body: { id: CHECKOUT, link: `https://sandbox.asaas.com/checkoutSession/show?id=${CHECKOUT}` } }),
+        'POST /rest/v1/rpc/billing_checkout_record': () => ({ status: 200, body: { result: 'gravado' } }),
+        ...extra,
+      });
+      return { net, h: createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW }) };
+    };
+
+    it('no teste ou em só leitura: cria o Checkout de Pix, liga à pessoa no banco e devolve o link', async () => {
+      const t = make(access('leitura'));
+      const res = await t.h(appReq({ action: 'pix', plan: 'familiar' }).req);
+      expect(JSON.parse(res.body)).toEqual({ result: 'checkout', url: `https://sandbox.asaas.com/checkoutSession/show?id=${CHECKOUT}` });
+      const created = t.net.sent.find((s) => s.url.endsWith('/checkouts'));
+      expect(created?.body).toMatchObject({ billingTypes: ['PIX'], chargeTypes: ['DETACHED'], externalReference: `clarevo-pix:${ANA}:familiar` });
+      expect(t.net.sent.find((s) => s.url.endsWith('/rpc/billing_checkout_record'))?.body).toEqual({ p_checkout_hash: sha256Hex(CHECKOUT), p_person: ANA, p_plan: 'familiar' });
+      expect((await t.h(appReq({ action: 'pix' }).req)).status).toBe(400);
+      expect((await t.h(appReq({ action: 'pix', plan: 'anual' }).req)).status).toBe(400);
+    });
+
+    it('quem paga com Pix: o próximo mês só nos últimos dias do mês pago; cartão, loja, benefício ou assinatura ativa no Asaas não abrem Pix', async () => {
+      // Pago até 05/12 (acesso até 08/12): em 06/11 ainda é cedo.
+      const early = make(access('assinatura', 'pix', '2026-12-09T02:59:59.999Z'));
+      expect(JSON.parse((await early.h(appReq({ action: 'pix', plan: 'individual' }).req)).body)).toEqual({ result: 'ja_pago' });
+      expect(early.net.sent.some((s) => s.url.endsWith('/checkouts'))).toBe(false);
+      // Acesso até 15/11: já dá para pagar o próximo.
+      const ready = make(access('assinatura', 'pix', '2026-11-16T02:59:59.999Z'));
+      expect(JSON.parse((await ready.h(appReq({ action: 'pix', plan: 'individual' }).req)).body)).toMatchObject({ result: 'checkout' });
+      for (const provider of ['web', 'apple', 'google']) {
+        const other = make(access('assinatura', provider, '2026-11-16T02:59:59.999Z'));
+        expect(JSON.parse((await other.h(appReq({ action: 'pix', plan: 'individual' }).req)).body), provider).toEqual({ result: 'ja_assinante' });
+      }
+      // Quem paga com Pix não abre o Checkout do cartão enquanto o mês pago vale.
+      const card = make(access('assinatura', 'pix', '2026-11-16T02:59:59.999Z'));
+      expect(JSON.parse((await card.h(appReq({ action: 'assinar', plan: 'individual' }).req)).body)).toEqual({ result: 'ja_assinante' });
+      const benefit = make(access('beneficio'));
+      expect(JSON.parse((await benefit.h(appReq({ action: 'pix', plan: 'individual' }).req)).body)).toEqual({ result: 'sem_necessidade' });
+      const cardInAsaas = make({ ...access('leitura'), 'GET /v3/subscriptions': () => ({ status: 200, body: { data: [sub()] } }) });
+      expect(JSON.parse((await cardInAsaas.h(appReq({ action: 'pix', plan: 'individual' }).req)).body)).toEqual({ result: 'ja_assinante' });
+    });
   });
 });
 
