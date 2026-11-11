@@ -35,7 +35,7 @@ Enzo decidiu, em 11/11/2026, o que entra antes do lançamento (D-093). Isso acre
 | Pacote (D-093) | Estimativa da equipe | O que depende do Enzo |
 |---|---|---|
 | Oito melhorias da aba Metas (`docs/43`, seção 4) | **No ar em 11/11/2026** (PR #30) | Feito: migração 0031 aplicada em 11/11/2026 |
-| Investimentos, aba nova, com CDI e IPCA (`docs/45`) | **No ar em 11/11/2026** (PR #30) | Feito: migração 0032 e função `indices` em 11/11/2026. Falta conferir o CDI e o IPCA na aba Investir com uma conta real |
+| Investimentos, aba nova, com CDI e IPCA (`docs/45`) | **No ar em 11/11/2026** (PR #30) | Feito: migração 0032 e função `indices` em 11/11/2026, conferida no ar com uma conta real (CDI e fonte na tela) |
 | Fatura vencida em Multa e juros | **No ar em 11/11/2026** (PR #30) | Nada |
 | Pix Automático na web | 2 a 3 dias (caminho A) ou 1 dia (caminho B) | **Decidir o caminho** (`docs/39`, seção 6: o Pix Automático pede o CPF no app e a conta liberada pelo Asaas) e perguntar ao Asaas se a conta pode usar |
 | Widget ligado | **Pronto no código em 11/11/2026** (PR #30) | O próximo build (`preview`, já com o widget) e o teste no iPhone e no Android |

@@ -184,7 +184,7 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [x] Supabase (Enzo, 11/11/2026): migrações 0031 e 0032 aplicadas (conferência 21t: 2, 1, 7, 102) e a função `indices` publicada (`docs/05`, passos 12v, 12w e 12x)
 - [x] Supabase (Enzo, 11/11/2026): função `indices` publicada de novo (a versão que confere a sessão), com "Verify JWT with legacy secret" desligado (`docs/05`, passo 12x)
 - [x] PR #30 (D-093) na `main` em 11/11/2026: o app da web publica sozinho
-- [ ] **Você:** na web, com a sua conta, abrir a aba Investir, criar um investimento de teste e conferir se o CDI e o IPCA aparecem no card azul (depois, excluir o de teste)
+- [x] Na web, com a conta do Enzo (11/11/2026, pelo Claude Chrome): a função `indices` respondeu no ar. "Teste CDI" de setembro a outubro de 2026: +1,50%, CDI no mesmo período +2,16%, IPCA "sem dados para todos os meses" (o de outubro ainda não estava no Banco Central), fonte e data da consulta na tela
 - [x] Multa e juros: modo "Fatura do cartão" (era D-089 G): rotativo, mora, multa, IOF estimado e o teto da Lei 14.690/2023; a fatura vencida abre a calculadora nesse modo
 - [ ] Assinatura na web com Pix Automático (Asaas), além do cartão: **aguarda decisão do Enzo** (o Pix Automático não passa pelo Checkout: pede CPF no app e a conta liberada pelo Asaas; desenho em `docs/39`, seção 6)
 - [x] Widget ligado nos perfis `preview` e `production` (`preview-sem-widget` de reserva) e o card de Conta com o passo a passo
