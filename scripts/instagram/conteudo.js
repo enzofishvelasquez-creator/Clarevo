@@ -856,7 +856,7 @@ const PECAS = [
         captura: { arquivo: 'capturas/leitura-4-holerite.png', recorte: { x: 40, y: 175, w: 1000, h: 830 } },
         chip: 'Exemplo fictício · demonstração',
       },
-      { modelo: 'final', titulo: 'Tudo é lido no seu *aparelho*.', corpo: 'O arquivo não é guardado nem enviado para ninguém. Você confere e salva.' },
+      { modelo: 'final', titulo: 'Tudo é lido no seu *aparelho*.', corpo: 'A imagem não vai para nenhum servidor da Clarevo. Você confere e salva.' },
     ],
     legenda:
       'As notas, os comprovantes, os boletos e os holerites já trazem as informações. A Clarevo lê para você, no seu aparelho, e você só confere antes de salvar. Menos digitação, mais tempo para o que importa. As telas do carrossel são da demonstração, com dados fictícios.',
@@ -866,7 +866,7 @@ const PECAS = [
       'Tela da demonstração em Anotar gasto: o bloco "Comprovante lido" de um Pix fictício, com o valor, a data e quem recebeu, e o aviso de que o arquivo foi lido no aparelho e não é guardado. Texto: "Comprovante de Pix: um print basta. A Clarevo lê o valor, a data e quem recebeu ou enviou."',
       'Tela da demonstração em Anotar conta a pagar: o bloco "Boleto lido" com o valor e o vencimento de um boleto fictício. Texto: "Boleto: o código de barras, uma foto ou a linha digitável. A conta entra nas contas a pagar, com valor e vencimento."',
       'Tela da demonstração em Registrar recebimento: o bloco "Comprovante lido: Holerite" com o valor líquido e o aviso de escolher o dia em que o salário entrou. Texto: "Holerite: o valor líquido e o mês de competência vão direto para o seu recebimento."',
-      'Fundo azul com o texto "Tudo é lido no seu aparelho. O arquivo não é guardado nem enviado para ninguém. Você confere e salva."',
+      'Fundo azul com o texto "Tudo é lido no seu aparelho. A imagem não vai para nenhum servidor da Clarevo. Você confere e salva."',
     ],
     ajustes: [
       'O rascunho da página 2 dizia que a nota preenche "a loja, o valor e a data". No celular, o QR code do cupom traz o valor e a data só em parte das notas (a leitura da página da Sefaz é do RJ); o PDF da compra on-line traz tudo. Por isso a página diz "o que a nota informa", e a captura é a do PDF.',
@@ -882,7 +882,7 @@ const PECAS = [
       { afirmacao: 'Comprovante de Pix em print, foto ou PDF, com valor, data e quem recebeu ou enviou.', situacao: 'Confirmado', nota: '"Ler comprovante ou boleto" (D-051, D-078 B, D-088); captura leitura-2.' },
       { afirmacao: 'Boleto pelo código de barras, foto, PDF ou linha digitável, entrando nas contas a pagar com valor e vencimento.', situacao: 'Confirmado', nota: '"Ler boleto" em Anotar conta a pagar (D-078 G); captura leitura-3.' },
       { afirmacao: 'Holerite: valor líquido e mês de competência no recebimento.', situacao: 'Confirmado', nota: 'D-078; o dia do pagamento a pessoa escolhe; captura leitura-4.' },
-      { afirmacao: 'Tudo é lido no aparelho; o arquivo não é guardado nem enviado.', situacao: 'Confirmado', nota: 'Leitura local (D-078); a imagem e o PDF não vão a servidor da Clarevo. No Android, os componentes do Google podem enviar dados técnicos de uso (política, seção 8), não o documento.' },
+      { afirmacao: 'Tudo é lido no aparelho; a imagem não vai para nenhum servidor da Clarevo.', situacao: 'Confirmado', nota: 'Leitura local (D-078); a imagem e o PDF não vão a servidor da Clarevo. No Android, os componentes do Google podem enviar dados técnicos de uso (política, seção 8), não o documento.' },
     ],
   },
   {
