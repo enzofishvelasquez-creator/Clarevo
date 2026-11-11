@@ -14583,6 +14583,13 @@ setInterval(async () => {
     t = await body();
     ok('D-093 Novo investimento: abre o detalhe, com o aporte inicial e o aviso para atualizar o valor', (await h1Name()) === 'Ações da corretora' && t.includes('R$ 2.000,00') &&
       t.includes('Atualize o valor com o que aparece no seu extrato para ver quanto rendeu.'), t.slice(0, 500));
+    // Com o novo sem valor, a carteira fica sem taxa neste mês, e o card azul diz quem falta atualizar (pedido do Enzo, 11/11/2026).
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-093 Investimentos: com o novo sem valor, "Neste mês: sem taxa ainda" e o nome de quem falta atualizar no lugar do aviso geral',
+      t.includes('Neste mês: sem taxa ainda') && t.includes('Para ter a taxa deste mês, falta atualizar o valor de Ações da corretora.') &&
+        t.includes('Nos 4 meses fechados, de junho a setembro de 2026') && !t.includes('Para ver quanto rendeu em cada mês'), t.slice(0, 900));
+    await p.getByRole('button', { name: /^Ações da corretora, Ações:/ }).filter({ visible: true }).first().click(); await waitText('Encerrar investimento'); await p.waitForTimeout(300);
     // Encerrar, reabrir e excluir.
     await btn('Encerrar investimento').click(); await waitText('Investimento encerrado.'); await p.waitForTimeout(400);
     ok('D-093 Encerrar: some "Atualizar valor" e aparece "Reabrir investimento"', (await visibleCount('button', 'Atualizar valor')) === 0 && (await visibleCount('button', 'Reabrir investimento')) === 1);

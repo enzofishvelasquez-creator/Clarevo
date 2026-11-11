@@ -34,15 +34,15 @@ Enzo decidiu, em 11/11/2026, o que entra antes do lançamento (D-093). Isso acre
 
 | Pacote (D-093) | Estimativa da equipe | O que depende do Enzo |
 |---|---|---|
-| Oito melhorias da aba Metas (`docs/43`, seção 4) | **Pronto no código em 11/11/2026** | Rodar a migração 0031 (`docs/05`, passo 12v) |
-| Investimentos, aba nova, com CDI e IPCA (`docs/45`) | **Pronto no código em 11/11/2026** | Rodar a migração 0032 e publicar a função `indices` (`docs/05`, passos 12w e 12x; sem segredo, os dados do Banco Central são públicos) |
-| Fatura vencida em Multa e juros | **Pronto em 11/11/2026** | Nada |
+| Oito melhorias da aba Metas (`docs/43`, seção 4) | **No ar em 11/11/2026** (PR #30) | Feito: migração 0031 aplicada em 11/11/2026 |
+| Investimentos, aba nova, com CDI e IPCA (`docs/45`) | **No ar em 11/11/2026** (PR #30) | Feito: migração 0032 e função `indices` em 11/11/2026, conferida no ar com uma conta real (CDI e fonte na tela) |
+| Fatura vencida em Multa e juros | **No ar em 11/11/2026** (PR #30) | Nada |
 | Pix Automático na web | 2 a 3 dias (caminho A) ou 1 dia (caminho B) | **Decidir o caminho** (`docs/39`, seção 6: o Pix Automático pede o CPF no app e a conta liberada pelo Asaas) e perguntar ao Asaas se a conta pode usar |
-| Widget ligado | **Pronto no código em 11/11/2026** | O próximo build (`preview`, já com o widget) e o teste no iPhone e no Android |
+| Widget ligado | **Pronto no código em 11/11/2026** (PR #30) | O próximo build (`preview`, já com o widget) e o teste no iPhone e no Android |
 | Formulário de contato para empresas no site | Pronto desde D-066; ligar leva minutos | A regra de limite e as variáveis do Resend no painel da Cloudflare (`docs/22`, seção 9; a chave nunca passa pelo chat); depois, a equipe liga |
-| Relatório de falhas (Sentry) | **Pronto no código em 11/11/2026** | A conta no Sentry e o endereço do projeto nas variáveis do EAS (`docs/46`, seção 2); pergunta 50 ao advogado |
+| Relatório de falhas (Sentry) | **Pronto no código em 11/11/2026** (PR #30) | A conta no Sentry e o endereço do projeto nas variáveis do EAS (`docs/46`, seção 2); pergunta 50 ao advogado |
 
-Somando, eram cerca de 3 semanas de trabalho da equipe a partir de 11/11/2026 (Metas e Investimentos ficaram prontos no mesmo dia): o código fica pronto por volta da primeira semana de dezembro. A meta de 30/11/2026 (D-082) não se mantém; com as contas da Apple e do Google e as respostas do advogado, a segunda quinzena de dezembro é o mais provável. **A nova data é decisão do Enzo.**
+Somando, eram cerca de 3 semanas de trabalho da equipe a partir de 11/11/2026, mas Metas, Investimentos, a fatura vencida, o widget e o Sentry ficaram prontos no mesmo dia e entraram na `main` com o PR #30. Do código, falta só o Pix Automático (1 a 3 dias depois da decisão do caminho). O que mais pesa agora na data é o teste em aparelho (roteiro único em `docs/47_TESTE_EM_APARELHO.md`), as contas da Apple e do Google e as respostas do advogado. A meta de 30/11/2026 (D-082) não se mantém; com as contas da Apple e do Google e as respostas do advogado, a segunda quinzena de dezembro é o mais provável. **A nova data é decisão do Enzo.**
 
 O que já aconteceu desde o plano de 03/11: o Telegram para todas as pessoas está no ar (D-081, item 1.9); houve um primeiro build de teste no Android, instalado por link (item 2.1, D-086 e D-087); as capturas e a ficha das lojas estão prontas (item 3.3, 10/11/2026); a assinatura pelas lojas (D-090) e pela web (D-085) está pronta no código, com a compra fechada; o pacote do Instagram (item 4.2) passou para a sessão de redes sociais (`docs/44`).
 
@@ -132,7 +132,7 @@ Fontes: [Expo, builds a partir do GitHub](https://docs.expo.dev/build/building-f
 
 ## 6. Teste no celular (semana 2, item 2.2)
 
-Com o app instalado pelo link do Expo (Android) ou pelo TestFlight (iPhone). Para cada item, anotar "ok" ou mandar um print do que deu errado. Dados de verdade só os seus; para testar outra pessoa, usar um e-mail de teste.
+O roteiro completo, que inclui estes 17 itens e os testes em aparelho de todos os ciclos (widget, lembretes de D-087 e D-093, câmera, arquivos, letra grande, leitor de tela e Sentry), está em `docs/47_TESTE_EM_APARELHO.md`. Com o app instalado pelo link do Expo (Android) ou pelo TestFlight (iPhone). Para cada item, anotar "ok" ou mandar um print do que deu errado. Dados de verdade só os seus; para testar outra pessoa, usar um e-mail de teste.
 
 | # | O que fazer | O esperado |
 |---|---|---|

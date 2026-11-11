@@ -2465,6 +2465,11 @@
   "licenca": "BlueOak-1.0.0"
  },
  {
+  "nome": "pdf.js (embutido em unpdf)",
+  "versao": "6.1.200",
+  "licenca": "Apache-2.0"
+ },
+ {
   "nome": "picocolors",
   "versao": "1.1.1",
   "licenca": "ISC"

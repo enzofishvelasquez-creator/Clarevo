@@ -183,13 +183,17 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [x] Investimentos: aba nova, só no Pessoal, acompanhamento manual com comparação com CDI e IPCA (`docs/45_INVESTIMENTOS.md`)
 - [x] Supabase (Enzo, 11/11/2026): migrações 0031 e 0032 aplicadas (conferência 21t: 2, 1, 7, 102) e a função `indices` publicada (`docs/05`, passos 12v, 12w e 12x)
 - [x] Supabase (Enzo, 11/11/2026): função `indices` publicada de novo (a versão que confere a sessão), com "Verify JWT with legacy secret" desligado (`docs/05`, passo 12x)
+- [x] PR #30 (D-093) na `main` em 11/11/2026: o app da web publica sozinho
+- [x] Na web, com a conta do Enzo (11/11/2026, pelo Claude Chrome): a função `indices` respondeu no ar. "Teste CDI" de setembro a outubro de 2026: +1,50%, CDI no mesmo período +2,16%, IPCA "sem dados para todos os meses" (o de outubro ainda não estava no Banco Central), fonte e data da consulta na tela
 - [x] Multa e juros: modo "Fatura do cartão" (era D-089 G): rotativo, mora, multa, IOF estimado e o teto da Lei 14.690/2023; a fatura vencida abre a calculadora nesse modo
 - [ ] Assinatura na web com Pix Automático (Asaas), além do cartão: **aguarda decisão do Enzo** (o Pix Automático não passa pelo Checkout: pede CPF no app e a conta liberada pelo Asaas; desenho em `docs/39`, seção 6)
 - [x] Widget ligado nos perfis `preview` e `production` (`preview-sem-widget` de reserva) e o card de Conta com o passo a passo
 - [ ] Widget: primeiro build com ele e teste no iPhone e no Android (`docs/21`, seção 6; Enzo)
+- [ ] **Você:** teste em aparelho pelo roteiro único `docs/47_TESTE_EM_APARELHO.md` (53 itens numerados: build `preview` no Android agora, iPhone quando houver TestFlight). Ele junta os "Teste em aparelho" deste arquivo, `docs/37` (seção 6), `docs/40` (seção 4), `docs/21` (seção 6) e `docs/46` (seção 2)
 - [ ] Site: formulário de contato para empresas ligado (Resend; as Novidades por e-mail continuam desligadas): pronto desde D-066; **aguarda o Enzo** (`docs/22`, seção 9, passos 1 a 3: a regra de limite e as variáveis na Cloudflare); depois, a equipe liga o interruptor e devolve a seção da política
 - [x] Relatório de falhas (Sentry) no app de celular, sem dado financeiro nem pessoal, com o trecho na política e a pergunta 50 ao advogado (`docs/46`)
-- [ ] Sentry: conta, projeto e `EXPO_PUBLIC_SENTRY_DSN` no EAS (`docs/46`, seção 2; Enzo)
+- [x] Sentry: conta (região da União Europeia), projeto e `EXPO_PUBLIC_SENTRY_DSN` no EAS, em 11/11/2026 (`docs/46`, seção 2; Enzo)
+- [ ] Sentry: conferir no primeiro build `preview` (o nome da variável no registro do build e, depois do teste, o Sentry sem dado pessoal; `docs/47`, item 49)
 - [ ] Leitura de documentos: teste com 5 a 10 documentos reais antes de anunciar nas redes (P-025, P-026)
 
 ## Ciclo B: renda comprometida (D-026)
@@ -258,7 +262,8 @@ Sem mudança no banco. Mesmas execuções do Ciclo B, mais `simulate.test.ts` (3
 - [ ] Teste em aparelho (iOS e Android): câmera, permissão, lanterna, vibração, seletor de arquivos, Hermes com `Intl` real, o tamanho do `unpdf` (cerca de 3,1 MB de bytecode) e o atraso de 450 ms do iOS entre a folha e a câmera
 - [ ] Compartilhar o PDF de outro app direto para o Clarevo (folha de compartilhamento), quando houver build das lojas
 - [x] Aprender: tema `fatura` com `CARDS_TEXT.topicParagraph` e `rotativo-cartao` com `CARDS_TEXT.rotativoParagraph` (10/10/2026, `docs/09_APRENDER.md`)
-- [ ] Aprender: escrever o tema "Ler nota fiscal" com fonte (a busca já leva "nota", "cupom" e "QR" a "Escanear nota fiscal" pelo grupo "No app", D-039); incluir PDF.js (Apache-2.0) e `unpdf` (MIT) na tela de licenças
+- [ ] Aprender: escrever o tema "Ler nota fiscal" com fonte (a busca já leva "nota", "cupom" e "QR" a "Escanear nota fiscal" pelo grupo "No app", D-039)
+- [x] Tela de licenças com `unpdf` (MIT) e o PDF.js 6.1.200 que vem dentro dele (Apache-2.0), em 11/11/2026 (`scripts/gerar-licencas.js`, lista `EMBUTIDOS`)
 - [ ] Fora da entrega do passo 3: atalho `?ler=nota` do ícone, linha da nota em Primeiros passos e o aviso de "conta já anotada" para toda conta em aberto (`docs/10` §2.3 e §2.5)
 - [ ] Revisão dos textos por Enzo antes de publicar (tom sem cobrança e sem julgamento)
 

@@ -25,6 +25,8 @@ financeiro nem pessoal**, com a conta criada pelo Enzo, o trecho na política e 
 
 ## 2. Passos do Enzo (à mão; nenhum segredo passa pelo chat)
 
+**Feito em 11/11/2026:** organização "Clarevo" na região da **União Europeia** (o endereço do DSN termina em `.ingest.de.sentry.io/<número>`, que o app aceita), projeto React Native (ficou com o nome `react-native`; pode ser trocado em General Settings sem efeito no app), sem repositório ligado, sem o assistente de instalação (o app já estava pronto), os três itens de privacidade ligados e `EXPO_PUBLIC_SENTRY_DSN` no expo.dev, em `preview` e `production`. Conferido pelo Claude Chrome, só lendo, no mesmo dia: os três itens ligados, "Store Minidumps As Attachments" desligado (herdado da organização), nenhuma regra extra de limpeza e a região "European Union (EU)" na organização. A página não tem opção de retenção nesse plano: fica o prazo padrão do plano, a conferir na página de planos do Sentry antes de pôr na política. Falta o item 5 (conferir no primeiro build). No onboarding, o Sentry oferece um token secreto (`sntryh_...`) para um agente configurar: não usar nem copiar.
+
 1. **Conta**: criar em `sentry.io` com o e-mail da empresa, no plano gratuito (Developer). Na criação da organização, escolher a **região
    de dados** (Estados Unidos ou Alemanha). Recomendação da equipe: Alemanha, até a resposta do advogado (pergunta 50, item c).
 2. **Projeto**: novo projeto da plataforma **React Native**, nome `clarevo-app`. O Sentry mostra o **DSN** (um endereço que começa com

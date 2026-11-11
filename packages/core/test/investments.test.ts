@@ -15,6 +15,8 @@ import {
   investmentNegativeDay,
   investmentTotals,
   investmentValueOn,
+  investmentsMissingValue,
+  joinNamesBR,
   monthlyReturns,
   newInvestmentError,
   parseBcbSeries,
@@ -242,5 +244,66 @@ describe('investimentos: validação e textos', () => {
       expect(t).not.toMatch(/recomendamos|invista|aplique já|garantid[oa]/i);
     }
     expect(INVESTMENT_TEXT.disclaimer).toMatch(/Não é recomendação de investimento/);
+  });
+});
+
+describe('investimentos (pedido do Enzo, 11/11/2026): o card da carteira diz quem falta atualizar', () => {
+  // O caso do teste do Enzo na web: "Ações" (R$ 700,00 aplicados hoje, sem valor) e "Teste CDI" (desde 01/09, valores em 30/09, 31/10 e hoje).
+  const acoes = [mv('aporte', 70000, '2026-11-11')];
+  const teste = [mv('aporte', 100000, '2026-09-01'), mv('valor', 100800, '2026-09-30'), mv('valor', 101500, '2026-10-31'), mv('valor', 102000, '2026-11-11')];
+
+  it('a carteira fica sem taxa neste mês só por causa de "Ações", e é ela que o card cita', () => {
+    const returns = monthlyReturns([acoes, teste], TODAY);
+    expect(returns.at(-1)).toMatchObject({ month: '2026-11', rate: null, partial: true });
+    expect(monthlyReturns([teste], TODAY).at(-1)!.rate).toBeCloseTo(0.004926, 6);
+    const missing = investmentsMissingValue([{ name: 'Ações', movements: acoes }, { name: 'Teste CDI', movements: teste }], TODAY);
+    expect(missing).toEqual({ thisMonth: ['Ações'], lastMonth: [], previousMonth: '2026-10' });
+    expect(INVESTMENT_TEXT.missingThisMonth(missing.thisMonth)).toBe('Para ter a taxa deste mês, falta atualizar o valor de Ações.');
+    // Com "Atualizar valor" em "Ações" hoje, ninguém falta (começou neste mês: não precisa do mês passado).
+    expect(investmentsMissingValue([{ name: 'Ações', movements: [...acoes, mv('valor', 70000, TODAY)] }], TODAY)).toEqual({ thisMonth: [], lastMonth: [], previousMonth: '2026-10' });
+  });
+
+  it('quem começou antes deste mês e não tem valor no mês passado entra na segunda lista, com o nome do mês', () => {
+    const antigo = [mv('aporte', 50000, '2026-08-01'), mv('valor', 50500, '2026-08-31'), mv('valor', 51000, '2026-11-05')];
+    const missing = investmentsMissingValue([{ name: 'Previdência', movements: antigo }], TODAY);
+    expect(missing).toEqual({ thisMonth: [], lastMonth: ['Previdência'], previousMonth: '2026-10' });
+    expect(monthlyReturns([antigo], TODAY).at(-1)!.rate).toBeNull();
+    expect(INVESTMENT_TEXT.missingLastMonth(missing.previousMonth, missing.lastMonth)).toBe(
+      'Falta o valor de outubro para Previdência: em "Atualizar valor", use a data 31/10/2026.',
+    );
+    // O último dia do mês passado nunca é antes do primeiro aporte de quem começou nele (revisão independente de 11/11/2026).
+    expect(INVESTMENT_TEXT.missingLastMonth('2027-02', ['A'])).toContain('use a data 28/02/2027.');
+    expect(INVESTMENT_TEXT.missingLastMonth('2026-12', ['A'])).toContain('use a data 31/12/2026.');
+    expect(INVESTMENT_TEXT.missingLastMonth('2026-12', ['A'])).toContain(`"${INVESTMENT_TEXT.detail.updateValue}"`);
+    // Sem nenhum valor: falta nos dois; um valor de outubro resolve o mês passado; movimento só no futuro fica de fora.
+    const semValor = [mv('aporte', 10000, '2026-09-15')];
+    expect(investmentsMissingValue([{ name: 'X', movements: semValor }], TODAY)).toMatchObject({ thisMonth: ['X'], lastMonth: ['X'] });
+    expect(investmentsMissingValue([{ name: 'X', movements: [...semValor, mv('valor', 10100, '2026-10-20')] }], TODAY)).toMatchObject({ thisMonth: ['X'], lastMonth: [] });
+    expect(investmentsMissingValue([{ name: 'Futuro', movements: [mv('aporte', 100, '2026-12-01')] }], TODAY)).toMatchObject({ thisMonth: [], lastMonth: [] });
+    // Em janeiro, o mês passado é dezembro do ano anterior.
+    expect(investmentsMissingValue([{ name: 'X', movements: semValor }], '2027-01-10').previousMonth).toBe('2026-12');
+  });
+
+  it('só cita quando atualizar dá a taxa hoje: tudo começou hoje (base zero) fica com o aviso geral', () => {
+    // Revisão independente de 11/11/2026: "CDB" criado hoje com valor e "Ações" criado hoje sem valor. Atualizar "Ações" hoje não daria
+    // taxa (os dois entram no fim do dia, base zero), então ninguém é citado.
+    const cdb = [mv('aporte', 100000, TODAY), mv('valor', 100000, TODAY)];
+    expect(monthlyReturns([cdb, acoes], TODAY).at(-1)!.rate).toBeNull();
+    expect(investmentsMissingValue([{ name: 'CDB', movements: cdb }, { name: 'Ações', movements: acoes }], TODAY)).toEqual({ thisMonth: [], lastMonth: [], previousMonth: '2026-10' });
+    // Com um investimento de antes na carteira, a base fica positiva e "Ações" é citado (e atualizar resolve).
+    expect(investmentsMissingValue([{ name: 'Teste CDI', movements: teste }, { name: 'Ações', movements: acoes }], TODAY).thisMonth).toEqual(['Ações']);
+    expect(monthlyReturns([teste, [...acoes, mv('valor', 70000, TODAY)]], TODAY).at(-1)!.rate).not.toBeNull();
+    // Os textos novos seguem as regras de redação (são funções, fora da varredura das strings).
+    for (const t of [INVESTMENT_TEXT.missingThisMonth(['A', 'B']), INVESTMENT_TEXT.missingLastMonth('2026-10', ['A'])]) {
+      expect(t).not.toMatch(/[\u2013\u2014]|fazer sentido|recomendamos|invista/i);
+    }
+  });
+
+  it('os nomes em lista, com até três e "e mais"', () => {
+    expect(joinNamesBR([])).toBe('');
+    expect(joinNamesBR(['A'])).toBe('A');
+    expect(joinNamesBR(['A', 'B'])).toBe('A e B');
+    expect(joinNamesBR(['A', 'B', 'C'])).toBe('A, B e C');
+    expect(joinNamesBR(['A', 'B', 'C', 'D', 'E'])).toBe('A, B, C e mais 2');
   });
 });

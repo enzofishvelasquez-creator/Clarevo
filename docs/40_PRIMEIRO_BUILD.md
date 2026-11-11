@@ -63,7 +63,7 @@ O endereço do site (`EXPO_PUBLIC_SITE_URL`) **não** entra neste primeiro build
 
 ## 4. Conferir no aparelho, no primeiro build
 
-Além dos 17 itens de `docs/37`, seção 6:
+Além dos 17 itens de `docs/37`, seção 6 (tudo junto, numa ordem só, em `docs/47_TESTE_EM_APARELHO.md`):
 
 - **Câmera** (o que foi corrigido): Anotar gasto, "Escanear nota fiscal"; Contas a pagar, "Ler boleto"; "Ler comprovante de Pix ou pagamento", "Tirar uma foto". Na primeira vez, o celular pede a permissão com o texto da Clarevo.
 - **Foto da meta**: escolher uma foto da galeria; no iPhone, o seletor deve estar em português.
