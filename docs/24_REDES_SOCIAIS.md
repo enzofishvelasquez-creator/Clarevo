@@ -138,7 +138,7 @@ Arquivos: `p02-orcamento-orcado-e-usado.mp4`, `.srt`, `-capa.png` (Mercado e Laz
 | 9,4 s | Foram usados R$ 1.400,00, ou 77,8%. Faltam R$ 400,00. |
 | 13,0 s | Em Lazer, o usado passou: R$ 400,00 de R$ 300,00, R$ 100,00 acima. |
 | 17,4 s | Leia essa diferença junto com as despesas que ainda virão. Ela não é saldo nem autorização para gastar. |
-| 24,1 s | A Clarevo mostra essa comparação em Orçamento por categoria. Para conhecer o acesso, veja o fixado Como acessar. |
+| 24,1 s | A Clarevo mostra essa comparação em Orçamento por categoria. Veja no perfil as informações de acesso. |
 
 O que o Playbook pediu e a tela não tem: "planejado", "registrado" e "diferença" (a tela diz orçado, usado, faltam e acima) e os R$ 600 e R$ 450 do exemplo (os números reais são os acima).
 
@@ -153,7 +153,7 @@ Arquivos: `p05-orcamento-comecar-uma-categoria.mp4`, `.srt`, `-capa.png` (o card
 | 8,7 s | Escolhemos a categoria e preenchemos o valor por mês. Ele vale a partir do mês escolhido. |
 | 14,5 s | Ao salvar, o app avisa que o orçamento vale a partir de outubro. |
 | 18,8 s | A categoria entra com R$ 0,00 usados de R$ 600,00, e o total orçado passa de R$ 4.600,00 para R$ 5.200,00. |
-| 25,6 s | Depois, é preciso conferir os registros da categoria. Para saber como acessar a Clarevo, consulte o link da bio. |
+| 25,6 s | Depois, é preciso conferir os registros da categoria. Veja no perfil as informações de acesso. |
 
 A sequência terminou corretamente no teste, como o Playbook exige. Diferenças do roteiro original: não há "nome" para preencher (escolhe-se a categoria), a categoria é uma das seis do app e o valor aparece sem os centavos até a pessoa sair do campo.
 
@@ -168,7 +168,7 @@ Arquivos: `p08-meta-criar-e-ver-o-progresso.mp4`, `.srt`, `-capa.png` (a meta "E
 | 9,2 s | Escolhemos um modelo de nome, o valor, o prazo, quanto já está guardado e quanto pretende guardar por mês. |
 | 17,6 s | Depois de salvar, o app mostra R$ 600,00 guardados de R$ 3.000,00, 20%, e faltam R$ 2.400,00. |
 | 23,6 s | Com R$ 300,00 por mês, a meta chega em maio de 2027, sem rendimentos. A Clarevo não guarda nem movimenta dinheiro. |
-| 31,0 s | Veja no perfil como acessar a Clarevo. |
+| 31,0 s | Veja no perfil as informações de acesso. |
 
 Não narra contribuição automática, rendimento nem transferência (o app não faz nenhuma das três). Fica de fora da gravação a "Reserva para imprevistos" e o plano de guardar, que são outras peças.
 
@@ -199,7 +199,7 @@ Pedido no retorno do teste de 09/11/2026 (`docs/34`, decisão F). Gravado com `n
 | 15,2 s | Neste exemplo, Mercado fica em R$ 1.438,90 de R$ 1.800,00 em outubro: 79% do orçamento. |
 | 20,9 s | O mesmo número aparece em Orçamento por categoria. |
 | 24,3 s | O card de Mercado mostra R$ 1.438,90 de R$ 1.800,00, 79,9%. Faltam R$ 361,10. |
-| 29,4 s | O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar. Para conhecer o acesso, veja o fixado Como acessar. |
+| 29,4 s | O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar. Veja no perfil as informações de acesso. |
 
 "79%" no aviso e "79,9%" no card são o mesmo número: o aviso arredonda para baixo, sem casa decimal (D-089 E). A arte final (pergunta na tela, "Exemplo fictício", trilha) fica com a equipe, como nas outras peças.
 

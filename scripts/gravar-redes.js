@@ -659,7 +659,7 @@ const VIDEOS = [
       await rolarAte(texto('O orçamento conta o usado no mês.'), 1700, 190);
       await s.fim();
       // De volta ao topo, com o total do mês.
-      s = await c.fala('A Clarevo mostra essa comparação em Orçamento por categoria. Para conhecer o acesso, veja o fixado Como acessar.');
+      s = await c.fala('A Clarevo mostra essa comparação em Orçamento por categoria. Veja no perfil as informações de acesso.');
       await rolarPara(0, 1700);
       await pausa(1500);
       await c.quadro('conferencia', 0);
@@ -717,7 +717,7 @@ const VIDEOS = [
       await pausa(900);
       await c.quadro('capa', 0);
       await s.fim();
-      s = await c.fala('Depois, é preciso conferir os registros da categoria. Para saber como acessar a Clarevo, consulte o link da bio.');
+      s = await c.fala('Depois, é preciso conferir os registros da categoria. Veja no perfil as informações de acesso.');
       await rolarPara(0, 1500);
       await pausa(1500);
       await c.quadro('conferencia', 0);
@@ -785,7 +785,7 @@ const VIDEOS = [
       await c.quadro('conferencia', 0);
       await s.fim();
       // Fecho.
-      s = await c.fala('Veja no perfil como acessar a Clarevo.', { min: 3.5 });
+      s = await c.fala('Veja no perfil as informações de acesso.', { min: 3.5 });
       await rolarPara(0, 1400);
       await s.fim();
     },
@@ -919,7 +919,7 @@ const VIDEOS = [
       await pausa(1200);
       await c.quadro('conferencia', 0);
       await s.fim();
-      s = await c.fala('O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar. Para conhecer o acesso, veja o fixado Como acessar.');
+      s = await c.fala('O orçamento conta o usado no mês. Ele não é saldo nem autorização para gastar. Veja no perfil as informações de acesso.');
       await pausa(2600);
       await s.fim();
     },
