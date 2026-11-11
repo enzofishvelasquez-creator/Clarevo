@@ -323,7 +323,9 @@ export function monthlyReturns(groups: readonly (readonly MovementLike[])[], tod
 /**
  * Quem deixa a carteira sem taxa no mês de hoje por falta de "Atualizar valor" (pedido do Enzo, 11/11/2026), pela mesma regra de
  * `monthlyReturns`: `thisMonth`, sem nenhum valor registrado neste mês até hoje; `lastMonth`, começou antes deste mês e não tem nenhum
- * valor registrado no mês passado. Na ordem recebida; quem só tem movimentos futuros fica de fora.
+ * valor registrado no mês passado. Na ordem recebida; quem só tem movimentos futuros fica de fora. Só cita quando atualizar resolve:
+ * com os valores que faltam registrados (hoje e no último dia do mês passado), a carteira teria taxa hoje; se nem assim (tudo começou
+ * hoje, base zero, revisão independente de 11/11/2026), as listas ficam vazias e a tela mostra o aviso geral.
  */
 export function investmentsMissingValue(
   items: readonly { name: string; movements: readonly MovementLike[] }[],
@@ -335,13 +337,24 @@ export function investmentsMissingValue(
   const prevStart = `${previousMonth}-01`;
   const thisMonth: string[] = [];
   const lastMonth: string[] = [];
+  const prevEnd = addDays(start as IsoDate, -1);
+  const fixed: MovementLike[][] = [];
   for (const { name, movements } of items) {
     const live = movements.filter((m) => m.occurredOn <= today);
     if (live.length === 0) continue;
     const first = live.reduce((a, m) => (m.occurredOn < a ? m.occurredOn : a), live[0]!.occurredOn);
-    if (!live.some((m) => m.kind === 'valor' && m.occurredOn >= start)) thisMonth.push(name);
-    if (first < start && !live.some((m) => m.kind === 'valor' && m.occurredOn >= prevStart && m.occurredOn < start)) lastMonth.push(name);
+    const extra: MovementLike[] = [];
+    if (!live.some((m) => m.kind === 'valor' && m.occurredOn >= start)) {
+      thisMonth.push(name);
+      extra.push({ kind: 'valor', amountCents: investmentValueOn(live, today), occurredOn: today });
+    }
+    if (first < start && !live.some((m) => m.kind === 'valor' && m.occurredOn >= prevStart && m.occurredOn < start)) {
+      lastMonth.push(name);
+      extra.push({ kind: 'valor', amountCents: investmentValueOn(live, prevEnd), occurredOn: prevEnd });
+    }
+    fixed.push([...live, ...extra]);
   }
+  if (thisMonth.length + lastMonth.length > 0 && monthlyReturns(fixed, today).at(-1)?.rate == null) return { thisMonth: [], lastMonth: [], previousMonth };
   return { thisMonth, lastMonth, previousMonth };
 }
 
@@ -543,8 +556,9 @@ export const INVESTMENT_TEXT = {
   monthlyHint: 'Para ver quanto rendeu em cada mês, atualize o valor de cada investimento pelo menos uma vez por mês.',
   /** A carteira sem taxa neste mês: quem falta atualizar (`investmentsMissingValue`). */
   missingThisMonth: (names: readonly string[]) => `Para ter a taxa deste mês, falta atualizar o valor de ${joinNamesBR(names)}.`,
+  /** A data é o último dia do mês passado: nunca antes do primeiro aporte (revisão independente de 11/11/2026). */
   missingLastMonth: (month: IsoMonth, names: readonly string[]) =>
-    `Falta um valor de ${formatMonthName(month)} para ${joinNamesBR(names)}: em "Atualizar valor", use uma data de ${formatMonthName(month)}.`,
+    `Falta o valor de ${formatMonthName(month)} para ${joinNamesBR(names)}: em "Atualizar valor", use a data ${formatDateBR(addDays(`${addMonths(month, 1)}-01` as IsoDate, -1))}.`,
   lastValue: (d: IsoDate) => `Valor atualizado em ${formatDateBR(d)}`,
   indicesSource: (fetchedOn: IsoDate | null) =>
     `Fonte do CDI e do IPCA: Banco Central do Brasil, séries ${BCB_SERIES.cdi} e ${BCB_SERIES.ipca}${fetchedOn ? `, consulta em ${formatDateBR(fetchedOn)}` : ''}.`,

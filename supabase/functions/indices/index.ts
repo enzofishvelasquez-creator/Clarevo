@@ -523,16 +523,26 @@ const __mods = [
         const prevStart = `${previousMonth}-01`;
         const thisMonth = [];
         const lastMonth = [];
+        const prevEnd = (0, dates_1.addDays)(start, -1);
+        const fixed = [];
         for (const { name, movements } of items) {
             const live = movements.filter((m) => m.occurredOn <= today);
             if (live.length === 0)
                 continue;
             const first = live.reduce((a, m) => (m.occurredOn < a ? m.occurredOn : a), live[0].occurredOn);
-            if (!live.some((m) => m.kind === 'valor' && m.occurredOn >= start))
+            const extra = [];
+            if (!live.some((m) => m.kind === 'valor' && m.occurredOn >= start)) {
                 thisMonth.push(name);
-            if (first < start && !live.some((m) => m.kind === 'valor' && m.occurredOn >= prevStart && m.occurredOn < start))
+                extra.push({ kind: 'valor', amountCents: investmentValueOn(live, today), occurredOn: today });
+            }
+            if (first < start && !live.some((m) => m.kind === 'valor' && m.occurredOn >= prevStart && m.occurredOn < start)) {
                 lastMonth.push(name);
+                extra.push({ kind: 'valor', amountCents: investmentValueOn(live, prevEnd), occurredOn: prevEnd });
+            }
+            fixed.push([...live, ...extra]);
         }
+        if (thisMonth.length + lastMonth.length > 0 && monthlyReturns(fixed, today).at(-1)?.rate == null)
+            return { thisMonth: [], lastMonth: [], previousMonth };
         return { thisMonth, lastMonth, previousMonth };
     }
     function joinNamesBR(names, max = 3) {
@@ -680,7 +690,7 @@ const __mods = [
         noValueYet: 'Atualize o valor com o que aparece no seu extrato para ver quanto rendeu.',
         monthlyHint: 'Para ver quanto rendeu em cada mês, atualize o valor de cada investimento pelo menos uma vez por mês.',
         missingThisMonth: (names) => `Para ter a taxa deste mês, falta atualizar o valor de ${joinNamesBR(names)}.`,
-        missingLastMonth: (month, names) => `Falta um valor de ${(0, dates_1.formatMonthName)(month)} para ${joinNamesBR(names)}: em "Atualizar valor", use uma data de ${(0, dates_1.formatMonthName)(month)}.`,
+        missingLastMonth: (month, names) => `Falta o valor de ${(0, dates_1.formatMonthName)(month)} para ${joinNamesBR(names)}: em "Atualizar valor", use a data ${(0, dates_1.formatDateBR)((0, dates_1.addDays)(`${(0, dates_1.addMonths)(month, 1)}-01`, -1))}.`,
         lastValue: (d) => `Valor atualizado em ${(0, dates_1.formatDateBR)(d)}`,
         indicesSource: (fetchedOn) => `Fonte do CDI e do IPCA: Banco Central do Brasil, séries ${exports.BCB_SERIES.cdi} e ${exports.BCB_SERIES.ipca}${fetchedOn ? `, consulta em ${(0, dates_1.formatDateBR)(fetchedOn)}` : ''}.`,
         indicesExample: 'Na demonstração, o CDI e o IPCA são valores de exemplo, não os índices reais.',

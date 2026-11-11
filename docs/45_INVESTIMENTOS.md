@@ -66,8 +66,9 @@ Formulários sem a barra inferior; a aba e o detalhe com a barra (regra de naveg
 - **A carteira** soma o valor de cada investimento ativo e usa o mesmo cálculo: um investimento sem atualização no mês deixa a carteira sem
   taxa naquele mês. No mês de hoje, o card azul diz quem falta atualizar, no lugar do aviso geral (pedido do Enzo, 11/11/2026, depois do
   teste na web): "Para ter a taxa deste mês, falta atualizar o valor de Ações." e, para quem começou antes e não tem valor no mês
-  passado, "Falta um valor de outubro para Previdência: em "Atualizar valor", use uma data de outubro." (até três nomes, depois "e mais
-  N"; `investmentsMissingValue`).
+  passado, "Falta o valor de outubro para Previdência: em "Atualizar valor", use a data 31/10/2026." (o último dia do mês passado, que
+  nunca fica antes do primeiro aporte; até três nomes, depois "e mais N"; `investmentsMissingValue`). Só cita quando atualizar dá a taxa
+  hoje: se tudo começou hoje (base zero), fica o aviso geral (revisão independente de 11/11/2026).
 - **Na tela**: "Neste mês, até hoje", e a comparação com os **meses fechados seguidos mais recentes com taxa, até 12** ("Nos 4 meses
   fechados, de junho a setembro de 2026: +3,54%"), com o CDI e o IPCA **dos mesmos meses**, acumulados (produto de 1 + taxa de cada mês).
   Mês sem índice publicado: "CDI: sem dados para todos os meses".
