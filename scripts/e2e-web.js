@@ -52,7 +52,26 @@ const server = http
   .listen(PORT);
 fs.mkdirSync(OUT, { recursive: true });
 const results = [];
-const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', name, extra]); };
+// E2E_PROGRESSO=<arquivo>: cada verificação vai para o arquivo na hora (o resultado completo continua no fim, na saída).
+const PROGRESS = process.env.E2E_PROGRESSO || null;
+let lastOkAt = Date.now();
+const ok = (name, cond, extra='') => {
+  results.push([cond ? 'OK ' : 'FALHOU', name, extra]);
+  lastOkAt = Date.now();
+  if (PROGRESS) { try { fs.appendFileSync(PROGRESS, `${cond ? 'OK ' : 'FALHOU'}  ${name}  ${cond ? '' : extra}\n`); } catch {} }
+};
+// Vigia: 10 minutos sem nenhuma verificação é travamento (um p.evaluate que nunca volta não tem limite de tempo no Playwright).
+// Para com erro, a última verificação e a tela do momento, em vez de esperar o limite de tempo de quem rodou.
+const STALL_MS = Number(process.env.E2E_TRAVOU_MS || 10 * 60 * 1000);
+setInterval(async () => {
+  if (Date.now() - lastOkAt < STALL_MS) return;
+  lastOkAt = Infinity;
+  const shotPath = path.join(os.tmpdir(), 'clarevo-e2e-travou.png');
+  await Promise.race([globalThis.__page?.screenshot({ path: shotPath }).then(() => console.log(`Tela do travamento: ${shotPath}`)), new Promise((r) => setTimeout(r, 15000))]).catch(() => {});
+  for (const r of results) console.log(r.join('  '));
+  console.error(`ERRO NO ROTEIRO: nenhuma verificação nova em ${Math.round(STALL_MS / 60000)} minutos (travou depois de "${results.at(-1)?.[1] ?? 'início'}")`);
+  process.exit(1);
+}, 30000).unref();
 (async () => {
   // O gesto de "voltar" por deslizar na horizontal fica desligado: versões novas do Chromium (1243) tratam o deslizar para a direita do
   // bloco K1 (os cartões do Seu mês) como histórico do navegador e saem da tela; a 1194, fixada pelo Playwright 1.56.1, não.
@@ -8339,10 +8358,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const j1G = await j1Groups();
   ok('Tutorial guia: /aprender/guia com o título "Como usar o app da Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
-  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 8, 2 e 10 entradas (Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa", "Anotar pelo Telegram" e "Assinatura e teste grátis")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
-    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 8, 2, 10]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
+  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 9, 2 e 10 entradas (Planejar ganhou "Investimentos", Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa", "Anotar pelo Telegram" e "Assinatura e teste grátis")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
+    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 9, 2, 10]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
-  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 39 &&
+  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 40 &&
     j1Rows.includes('Buscar em Movimentos. Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.') &&
     j1Rows.includes('Exportar meus dados. Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.') &&
     j1Rows.some((r) => r.startsWith('Importar extrato ou fatura. Traz gastos, recebimentos e compras no cartão de um arquivo do banco')) &&
@@ -11060,7 +11079,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(700);
   ok('Evolução endereço: /evolucao aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await evNames()).length === 6 &&
-    (await p.getByRole('tab').filter({ visible: true }).count()) === 4 && (await visibleCount('button', 'Voltar')) === 1, p.url());
+    (await p.getByRole('tab').filter({ visible: true }).count()) === 5 && (await visibleCount('button', 'Voltar')) === 1, p.url());
 
   // ---- 9. O cenário fictício "evolucao": janeiro a junho de 2026 (EF §6) ----
   await evEnter('evolucao');
@@ -12006,7 +12025,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await p.goto(`http://localhost:${PORT}/analises`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
   ok('Análises endereço: /analises aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', anPath() === '/analises' && (await h1Name()) === 'Análises' && (await anTabs()).length === 4 &&
-    (await p.getByRole('tab').filter({ visible: true }).count()) === 8 && (await visibleCount('button', 'Voltar')) === 1, p.url());
+    (await p.getByRole('tab').filter({ visible: true }).count()) === 9 && (await visibleCount('button', 'Voltar')) === 1, p.url());
   await p.goto(`http://localhost:${PORT}/analises?aba=orcamento&mes=2026-09`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Consulte o mês escolhido', 12000); await p.waitForTimeout(900);
   ok('Análises endereço: ?aba=orcamento&mes=2026-09 abre na aba Orçamento, em setembro de 2026', (await anTabs()).map((x) => x.selected).join() === 'false,false,false,true' && (await anMonthLabel()).includes('Setembro de 2026'));
@@ -13038,7 +13057,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   ok('Média e mediana, Aprender: a linha abre o tema com "Voltar para Aprender" (origem Aprender) e o mesmo conteúdo', mmPath() === '/explicacao/media-e-mediana' && (await visibleCount('button', 'Voltar à tarefa')) === 0 && (await body()).includes('A média é R$ 4.125,00'));
   await btn('Ver na Evolução').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(600);
   t = await mmKeep();
-  ok('Média e mediana, "Ver na Evolução": abre /evolucao com o título "Evolução" e a barra inferior das telas de consulta, que marca a aba de onde a pessoa veio (Aprender)', mmPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await p.getByRole('tab').filter({ visible: true }).count()) === 4, `${mmPath()} ${await h1Name()}`);
+  ok('Média e mediana, "Ver na Evolução": abre /evolucao com o título "Evolução" e a barra inferior das telas de consulta, que marca a aba de onde a pessoa veio (Aprender)', mmPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await p.getByRole('tab').filter({ visible: true }).count()) === 5, `${mmPath()} ${await h1Name()}`);
   await btn('Voltar').click(); await waitText('Voltar para Aprender'); await learnBackToTab();
   const mmSearch = async (query, expectFirst) => {
     await learnSearch().fill(query); await waitText(`para "${query}"`); await p.waitForTimeout(350);
