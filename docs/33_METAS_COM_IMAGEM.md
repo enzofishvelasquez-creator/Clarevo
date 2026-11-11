@@ -6,11 +6,11 @@
 
 - **Sem escolher nada**, a meta mostra a imagem sugerida pelo nome: "Viagem para a Grécia" mostra as casas brancas diante do mar, "Troca do carro" o carro, "Entrada do imóvel" a casa. A reserva para imprevistos mostra sempre o porquinho. Sem pista no nome, aparece a trilha na montanha ("Objetivo"). A sugestão muda sozinha se o nome da meta mudar.
 - **Para trocar**: na meta, "Mais ações", depois "Trocar imagem". A tela mostra a imagem atual e:
-  - **Sugeridas**: a "Automática" (a do nome) e as 12 sugestões (Viagem, Porquinho, Carro, Casa, Estudos, Casamento, Bebê, Tecnologia, Saúde, Futuro, Pet e Objetivo);
+  - **Sugeridas**: a "Automática" (a do nome) e as 17 sugestões (Viagem, Porquinho, Carro, Moto, Casa, Reforma, Estudos, Casamento, Bebê, Tecnologia, Saúde, Futuro, Pet, Dívidas, Negócio, Festa e Objetivo; Moto, Reforma, Dívidas, Negócio e Festa entraram com D-092);
   - **Sua foto**: "Escolher uma foto" abre a galeria do celular (o seletor do sistema; só a foto escolhida chega ao app). O app recorta em 16:9 quando o aparelho oferece, reduz o lado maior para 1080 px em JPEG e manda (até 300 KB). Com foto, aparecem "Escolher outra foto" e "Tirar a foto".
 - Na Família, todas as pessoas do espaço veem a imagem; trocar segue a mesma regra de editar a meta (quem só vê não troca).
 
-Palavras que puxam cada sugestão: `packages/core/src/goal-images.ts` (`GOAL_IMAGES`), testadas em `packages/core/test/goal-images.test.ts`.
+Palavras que puxam cada sugestão: `packages/core/src/goal-images.ts` (`GOAL_IMAGES`), testadas em `packages/core/test/goal-images.test.ts`. Desde D-092 vale a pista que aparece primeiro no nome ("Casamento na praia" é o casamento), palavras de contexto ("entrada", "futuro") só valem sem uma pista mais forte e palavras de só guardar ("guardar", "poupança") ficam por último (`docs/43_METAS_MAIS_COMUNS.md`).
 
 ## 2. Fotos sugeridas
 
@@ -18,7 +18,7 @@ Nas telas, a sugestão da reserva se chama "Porquinho", nunca "cofrinho" nem "ca
 
 As sugestões são fotos da Unsplash com uso gratuito (Licença Unsplash: uso livre, inclusive comercial, sem exigir crédito; damos o crédito aqui mesmo assim). Escolhidas em 31/10/2026 com o filtro "Grátis" (nenhuma do Unsplash+), conferindo na página de cada uma "Uso gratuito sob a Licença da Unsplash", sem rosto de pessoa em destaque e sem marca ou texto legível no tamanho do app.
 
-Cada foto está em `apps/app/assets/metas/<chave>.jpg` (recortada em 16:9 pelo centro, 1080 x 608 px, de 56 a 152 KB; 1,35 MB as 12) e em `apps/app/src/lib/goal-image-assets.ts`. Baixadas de `images.unsplash.com`. Sugestão sem foto no app aparece como o ícone do tema sobre o azul da marca (avião, porquinho, carro e assim por diante).
+Cada foto está em `apps/app/assets/metas/<chave>.jpg` (recortada em 16:9 pelo centro, 1080 x 608 px, de 45 a 152 KB; 1,76 MB as 17) e em `apps/app/src/lib/goal-image-assets.ts`. Baixadas de `images.unsplash.com`. Sugestão sem foto no app aparece como o ícone do tema sobre o azul da marca (avião, porquinho, carro e assim por diante).
 
 | Sugestão | Foto | Autoria e link |
 |---|---|---|
@@ -34,8 +34,16 @@ Cada foto está em `apps/app/assets/metas/<chave>.jpg` (recortada em 16:9 pelo c
 | Futuro | Nascer do sol sobre o mar | Sebastien Gabriel, [unsplash.com/photos/-IMlv9Jlb24](https://unsplash.com/photos/-IMlv9Jlb24) |
 | Pet | Cachorro olhando para a câmera | Alvan Nee, [unsplash.com/photos/Nms-W0u4J7c](https://unsplash.com/photos/Nms-W0u4J7c) |
 | Objetivo | Trilha subindo uma montanha | Mateusz Sobczak, [unsplash.com/photos/9hhhZaj1CxA](https://unsplash.com/photos/9hhhZaj1CxA) |
+| Moto | Moto estacionada ao pôr do sol | Jan Kopřiva, [unsplash.com/photos/Y2i5PHCeMik](https://unsplash.com/photos/Y2i5PHCeMik) |
+| Reforma | Rolo pintando uma parede de azul | Theme Photos, [unsplash.com/photos/Cl-OpYWFFm0](https://unsplash.com/photos/Cl-OpYWFFm0) |
+| Dívidas | Pilhas de moedas, da menor para a maior | Kamil, [unsplash.com/photos/894I850Hyl0](https://unsplash.com/photos/894I850Hyl0) |
+| Negócio | Vitrine de uma pequena loja | Tem Rysh, [unsplash.com/photos/F6-U5fGAOik](https://unsplash.com/photos/F6-U5fGAOik) |
+| Festa | Balões transparentes com confete | Sarah Hopt, [unsplash.com/photos/CmFYYDG_7DY](https://unsplash.com/photos/CmFYYDG_7DY) |
 
 Observações da escolha:
+
+- **As cinco de D-092** (Moto, Reforma, Dívidas, Negócio e Festa): escolhidas em 10/11/2026 pelo navegador, na conta do Enzo, com o filtro "Free" e conferindo "Uso gratuito sob a Licença da Unsplash" em cada página; tamanho "Large" (1920 px), recortadas e reduzidas como as outras.
+- **Moto**: as primeiras fotos da busca mostravam a marca no tanque; ficou uma em contraluz, ao pôr do sol, sem marca legível.
 
 - **Saúde**: as fotos de tênis de corrida com uso gratuito mostravam marca (no tênis ou na garrafa); ficou o tapete de exercício com toalha e halteres, sem marca.
 - **Carro**: a foto é da conta oficial de uma montadora na Unsplash, com a mesma licença das outras. Vista de cima, sem logotipo nem placa legível.

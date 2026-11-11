@@ -3226,7 +3226,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     !t.includes('Sua renda de referência mudou. Quer rever quanto guardar por mês?') && (await visibleCount('button', 'Mudar valor')) === 1, JSON.stringify(savingsChanged));
 
   // Nova meta, editar, concluir, arquivar e excluir (uma meta de R$ 100,00 já alcançada).
-  await btn('Nova meta').click(); await waitText('Modelo de nome'); await p.waitForTimeout(300);
+  await btn('Nova meta').click(); await waitText('O que você quer conquistar?'); await p.waitForTimeout(300);
   await btn('Criar meta').click(); await p.waitForTimeout(300);
   ok('C nova meta: sem nome nem valor, as duas mensagens de campo', (await body()).includes('Dê um nome de 1 a 40 caracteres.') && /Informe (um|o) valor/.test(await body()), (await body()).split('\n').filter((l) => /nome|valor/i.test(l)).slice(0, 6).join(' | '));
   await radio('Estudos').click(); await field('Valor da meta').fill('100'); await field('Quanto você já tem guardado para isso? (opcional)').fill('100'); await p.waitForTimeout(300);
@@ -3255,6 +3255,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   t = await body();
   ok('C conta nova: Metas começa com a pergunta, sem metas, sem reserva e sem números de exemplo', t.includes('Só você vê esta resposta.') && t.includes('Nenhuma meta ainda') && t.includes('Calcular minha reserva') && t.includes('Guardado em outubro: R$ 0,00'));
   ok('C conta nova: nenhuma meta nem reserva de exemplo', (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 0 && !t.includes('Viagem de férias'));
+  ok('C conta nova (D-092): sem metas, "Comece por uma das mais comuns" com Casa própria, Viagem, Carro, Moto, Reforma da casa e Meu negócio, e "Ver todas"',
+    t.includes('Comece por uma das mais comuns') && (await Promise.all(['Casa própria', 'Viagem', 'Carro', 'Moto', 'Reforma da casa', 'Meu negócio', 'Ver todas'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
   await btn('Sim, consigo').click(); await waitText('Quanto você consegue guardar por mês?'); await p.waitForTimeout(500);
   t = await body();
   ok('C "Sim, consigo": campo de valor com a dica (R$ 1,00 a R$ 9.999.999,99), privacidade e o pedido dos gastos essenciais (conta nova, nada calculável)', (await h1Name()) === 'Seu plano de guardar' && t.includes('De R$ 1,00 a R$ 9.999.999,99.') && t.includes('Sua resposta e as datas em que a pergunta volta não aparecem para outras pessoas do app.') &&
@@ -3401,7 +3403,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await field('Em quantos meses').fill('14'); await simulate(); await waitText('por mês na hipótese informada');
   // Criar meta: abre o formulário de meta preenchido, sem a taxa no endereço e sem gravar nada.
   const goalsBeforeCreate = await goalCount();
-  await btn('Criar meta com estes valores').click(); await waitText('Modelo de nome'); await p.waitForTimeout(500);
+  await btn('Criar meta com estes valores').click(); await waitText('O que você quer conquistar?'); await p.waitForTimeout(500);
   const metaVals = await formValues();
   ok('D "Criar meta com estes valores": /meta/nova com valor 22.500,00, prazo 11/2027, já guardado 4.500,00 e plano de 1.175,15; nome em branco', new URL(p.url()).pathname === '/meta/nova' &&
     metaVals.some((v) => v === 'Valor da meta=22.500,00') && metaVals.some((v) => v.endsWith('=11/2027')) && metaVals.some((v) => v.endsWith('=4.500,00')) && metaVals.some((v) => v.endsWith('=1.175,15')) && metaVals.some((v) => /^Nome da meta=$/.test(v)), JSON.stringify(metaVals));
@@ -6211,7 +6213,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
   await waitUntil(async () => (await h1Name()) === 'Antes de financiar', 8000);
   ok('D44 voltar do cadastro sem salvar devolve a calculadora com o resultado', await shows('Com estes números, são 48 parcelas de R$ 1.041,14.'));
-  await btn('Criar meta com este valor').click(); await waitText('Modelo de nome'); await p.waitForTimeout(500);
+  await btn('Criar meta com este valor').click(); await waitText('O que você quer conquistar?'); await p.waitForTimeout(500);
   const d44Meta = await formValues();
   ok('D44 "Criar meta com este valor" abre /meta/nova (objetivo) com valor 32.000,00, prazo 04/2029 (31 meses a partir de outubro de 2026) e plano de 1.041,14; nome em branco; nada de taxa no endereço',
     urlPath() === '/meta/nova' && d44Meta.some((v) => v === 'Valor da meta=32.000,00') && d44Meta.some((v) => v.endsWith('=04/2029')) && d44Meta.some((v) => v.endsWith('=1.041,14')) && d44Meta.some((v) => /^Nome da meta=$/.test(v)) && !/taxa|rendimento|1,99/i.test(p.url()), `${JSON.stringify(d44Meta)} ${p.url()}`);
@@ -8681,7 +8683,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Outro formulário (meta, pelo guardedWrite): o mesmo conteúdo na visita seguinte pergunta "Esta meta já tinha sido salva. Criar outra igual?".
   const countMeta = () => otherDevice(async (repo, contextId) => (await repo.listGoals(contextId)).filter((g) => g.name === 'Estudos').length);
   const metasAntes = await countMeta();
-  const fillMeta = async () => { await btn('Nova meta').click(); await waitText('Modelo de nome'); await radio('Estudos').click(); await field('Valor da meta').fill('150'); await p.waitForTimeout(200); };
+  const fillMeta = async () => { await btn('Nova meta').click(); await waitText('O que você quer conquistar?'); await radio('Estudos').click(); await field('Valor da meta').fill('150'); await p.waitForTimeout(200); };
   await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(300);
   await fillMeta();
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
@@ -14357,7 +14359,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
 
   // ==================================================================================================================
   // Metas com imagem (D-077): na demonstração, a meta "Viagem de férias" mostra a sugestão automática (viagem) no alto da tela da meta;
-  // "Mais ações", "Trocar imagem" abre a escolha (Automática e as 12 sugeridas, como botões de opção), escolher "Casa" salva e marca,
+  // "Mais ações", "Trocar imagem" abre a escolha (Automática e as 17 sugeridas, como botões de opção), escolher "Casa" salva e marca,
   // e voltar à automática também. A foto da galeria não é aberta aqui (o seletor do sistema); a regra dela está nos testes do núcleo,
   // do banco e da API. Nada vai à rede.
   // ==================================================================================================================
@@ -14374,8 +14376,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await waitText('Sugeridas'); await p.waitForTimeout(400);
     t = await body(); screenTexts.push(t);
     let r = await radios();
-    ok('Metas com imagem: a escolha em /meta/<id>/imagem, título "Imagem da meta", a automática marcada e as 12 sugeridas',
-      /^\/meta\/[^/]+\/imagem$/.test(new URL(p.url()).pathname) && (await h1Name()) === 'Imagem da meta' && r.length === 13 &&
+    ok('Metas com imagem: a escolha em /meta/<id>/imagem, título "Imagem da meta", a automática marcada e as 17 sugeridas (com Moto, Reforma, Dívidas, Negócio e Festa, D-092)',
+      /^\/meta\/[^/]+\/imagem$/.test(new URL(p.url()).pathname) && (await h1Name()) === 'Imagem da meta' && r.length === 18 &&
+      ['Moto', 'Reforma', 'Dívidas', 'Negócio', 'Festa'].every((x) => r.some((y) => y[0] === x)) &&
       JSON.stringify(r[0]) === JSON.stringify(['Automática (agora: Viagem)', 'true']) && r.slice(1).every((x) => x[1] === 'false') &&
       t.includes('Sua foto') && t.includes('Escolher uma foto') && t.includes('Escolha uma foto que você pode compartilhar.'), JSON.stringify(r));
     await atWidths(async (w) => { await layoutChecks(`Metas com imagem ${w}px`); if (w === 390) await shot('520_meta_imagem'); });
@@ -14390,6 +14393,45 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     r = await radios();
     ok('Metas com imagem: voltar à automática', (r[0] || [])[1] === 'true' && (await p.getByRole('img', { name: 'Casas brancas e cúpulas azuis diante do mar' }).filter({ visible: true }).count()) === 1, JSON.stringify(r));
     ok('Metas com imagem: nada vai à rede na demonstração', writes.length === giWrites0, writes.slice(giWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // D-092: metas prontas em "Nova meta" (as 15 mais comuns nas pesquisas), com a imagem que o nome puxa e o que costuma entrar na conta.
+  // Na demonstração (que já tem a reserva), a reserva não aparece na grade. "Moto" tem imagem própria, não a do carro (pedido do Enzo).
+  // ==================================================================================================================
+  {
+    const npWrites0 = writes.length;
+    const gridRadios = () => p.evaluate(() => {
+      const g = document.querySelector('[role=radiogroup][aria-label="O que você quer conquistar?"]');
+      return g ? [...g.querySelectorAll('[role=radio]')].map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-checked')]) : null;
+    });
+    await demoHome();
+    await tabByName('Metas').click(); await waitText('Viagem de férias'); await p.waitForTimeout(300);
+    await btn('Nova meta').click(); await waitText('O que você quer conquistar?'); await p.waitForTimeout(400);
+    let r = await gridRadios();
+    ok('D-092 Nova meta: a grade com as metas mais comuns, na ordem das pesquisas, e "Outra meta" no fim; com a reserva já criada, ela não aparece',
+      JSON.stringify((r || []).map((x) => x[0])) === JSON.stringify(['Casa própria', 'Viagem', 'Quitar dívidas', 'Carro', 'Reforma da casa', 'Meu negócio', 'Moto', 'Celular novo', 'Aposentadoria', 'Estudos', 'Casamento', 'Futuro dos filhos', 'Saúde', 'Festa', 'Outra meta']) &&
+        (r || []).every((x) => x[1] === 'false') && (await visibleCount('button', 'Reserva para imprevistos')) === 0, JSON.stringify(r));
+    await p.getByRole('radio', { name: 'Moto', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    r = await gridRadios();
+    ok('D-092 Nova meta: "Moto" preenche o nome, fica marcada, mostra a imagem da moto (não a do carro) e o que costuma entrar na conta',
+      (await field('Nome da meta').inputValue()) === 'Moto' && JSON.stringify((r || []).find((x) => x[0] === 'Moto')) === JSON.stringify(['Moto', 'true']) &&
+        (await p.getByRole('img', { name: 'Moto estacionada ao pôr do sol' }).filter({ visible: true }).count()) === 1 && (await p.getByRole('img', { name: 'Carro na estrada' }).filter({ visible: true }).count()) === 0 &&
+        t.includes('O que costuma entrar na conta') && t.includes('Além do preço, conte documentação, capacete e equipamentos.') &&
+        t.includes('Imagem sugerida pelo nome. Depois de criar, dá para trocar por outra ou por uma foto sua.'), t.slice(0, 600));
+    await atWidths(async (w) => { await layoutChecks(`D-092 Nova meta ${w}px`); if (w === 390) await shot('521_nova_meta_moto'); });
+    await field('Nome da meta').fill('Casamento na praia'); await p.waitForTimeout(300);
+    ok('D-092 Nova meta: a imagem segue o nome digitado; "Casamento na praia" é o casamento (vale a primeira pista do nome)',
+      (await p.getByRole('img', { name: 'Duas alianças' }).filter({ visible: true }).count()) === 1);
+    await p.getByRole('radio', { name: 'Quitar dívidas', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    ok('D-092 Nova meta: "Quitar dívidas" diz que juros altos crescem mais rápido e leva a "Em que ordem quitar as dívidas?"',
+      (await body()).includes('Dívida com juros altos costuma crescer mais rápido do que o dinheiro guardado.') && (await visibleCount('button', 'Em que ordem quitar as dívidas?')) === 1);
+    await p.getByRole('radio', { name: 'Outra meta', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    ok('D-092 Nova meta: "Outra meta" limpa o nome e tira a dica', (await field('Nome da meta').inputValue()) === '' && !(await body()).includes('O que costuma entrar na conta'));
+    await btn('Cancelar').click(); await p.waitForTimeout(300);
+    if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
+    ok('D-092 Nova meta: nada vai à rede na demonstração', writes.length === npWrites0, writes.slice(npWrites0).join(' | '));
   }
 
   // ==================================================================================================================

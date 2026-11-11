@@ -4,15 +4,20 @@ import type { LucideIcon } from 'lucide-react-native';
 import {
   Baby,
   Car,
+  Coins,
   GraduationCap,
   Heart,
   HeartPulse,
   House,
+  Motorbike,
   Mountain,
+  PaintRoller,
+  PartyPopper,
   PawPrint,
   PiggyBank,
   Plane,
   Smartphone,
+  Store,
   Sunrise,
 } from 'lucide-react-native';
 import { Image, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
@@ -26,7 +31,9 @@ export const GOAL_IMAGE_ICONS: Record<GoalImageKey, LucideIcon> = {
   viagem: Plane,
   reserva: PiggyBank,
   carro: Car,
+  moto: Motorbike,
   casa: House,
+  reforma: PaintRoller,
   estudos: GraduationCap,
   casamento: Heart,
   bebe: Baby,
@@ -34,6 +41,9 @@ export const GOAL_IMAGE_ICONS: Record<GoalImageKey, LucideIcon> = {
   saude: HeartPulse,
   aposentadoria: Sunrise,
   pet: PawPrint,
+  dividas: Coins,
+  negocio: Store,
+  festa: PartyPopper,
   objetivo: Mountain,
 };
 
@@ -49,17 +59,29 @@ function useGoalPhoto(goalId: string, version: number, enabled: boolean) {
 }
 
 /** Uma sugestão: a foto do app, se existe, ou o ícone sobre a cor da marca. */
-export function SuggestedImage({ imageKey, style, label }: { imageKey: GoalImageKey; style?: StyleProp<ViewStyle>; label?: string | null }) {
+export function SuggestedImage({
+  imageKey,
+  style,
+  label,
+  iconSize = 36,
+}: {
+  imageKey: GoalImageKey;
+  style?: StyleProp<ViewStyle>;
+  label?: string | null;
+  iconSize?: number;
+}) {
   const source: ImageSourcePropType | undefined = GOAL_IMAGE_ASSETS[imageKey];
   const Icon = GOAL_IMAGE_ICONS[imageKey];
-  const a11y = label === null ? { accessible: false, 'aria-hidden': true } : { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: label ?? goalImageOf(imageKey).alt };
+  // Sem a foto no app, o texto alternativo da foto não descreve o que aparece: o leitor de tela ouve só o nome da sugestão.
+  const spoken = label ?? (source ? goalImageOf(imageKey).alt : `Imagem: ${goalImageOf(imageKey).label}`);
+  const a11y = label === null ? { accessible: false, 'aria-hidden': true } : { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: spoken };
   return (
     <View style={[{ backgroundColor: colors.brand, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }, style]} {...a11y}>
       {source ? (
         // Largura e altura explícitas: na web, sem elas a imagem do pacote assume o tamanho do arquivo (1080 px) e passa da tela.
         <Image source={source} resizeMode="cover" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
       ) : (
-        <Icon size={36} color={colors.textOnBrand} strokeWidth={1.75} aria-hidden />
+        <Icon size={iconSize} color={colors.textOnBrand} strokeWidth={1.75} aria-hidden />
       )}
     </View>
   );

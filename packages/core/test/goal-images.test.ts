@@ -5,7 +5,10 @@ import {
   GOAL_IMAGE_KEYS,
   GOAL_IMAGE_TEXT,
   GOAL_PHOTO_MAX_BYTES,
-  GOAL_TEMPLATES,
+  GOAL_PRESETS,
+  GOAL_PRESET_TEXT,
+  GOAL_PRESETS_EMPTY,
+  goalPresetById,
   MemoryRepository,
   base64Bytes,
   goalImageView,
@@ -23,13 +26,91 @@ const PNG = b64('89504e470d0a1a0a0000000d');
 const WEBP = b64('52494646240000005745425056503820');
 
 describe('metas com imagem (D-077): sugestão pelo nome e pelo tipo', () => {
-  it('os modelos de nome de "Nova meta" puxam a imagem certa', () => {
-    expect(GOAL_TEMPLATES.filter((t) => t !== 'Outro').map((t) => [t, suggestGoalImage(t, 'objetivo')])).toEqual([
-      ['Viagem', 'viagem'],
-      ['Troca do carro', 'carro'],
-      ['Entrada do imóvel', 'casa'],
-      ['Estudos', 'estudos'],
+  it('as metas prontas de "Nova meta" (D-092): as 15 mais comuns, e o nome de cada uma puxa a imagem dela', () => {
+    expect(GOAL_PRESETS.map((p) => p.name)).toEqual([
+      'Reserva para imprevistos',
+      'Casa própria',
+      'Viagem',
+      'Quitar dívidas',
+      'Carro',
+      'Reforma da casa',
+      'Meu negócio',
+      'Moto',
+      'Celular novo',
+      'Aposentadoria',
+      'Estudos',
+      'Casamento',
+      'Futuro dos filhos',
+      'Saúde',
+      'Festa',
     ]);
+    for (const p of GOAL_PRESETS) {
+      expect(suggestGoalImage(p.name, p.id === 'reserva' ? 'emergencia' : 'objetivo'), p.name).toBe(p.image);
+      expect(GOAL_IMAGE_KEYS).toContain(p.image);
+      expect(goalPresetById(p.id)).toBe(p);
+      for (const t of [p.name, p.hint, p.link?.label ?? '']) {
+        expect(t, t).not.toMatch(/—|–|fazer sentido|\bo Clarevo\b|obrigad|cobrad/i);
+      }
+      expect(p.name.length).toBeLessThanOrEqual(40);
+    }
+    expect(goalPresetById('nave')).toBeNull();
+    expect(GOAL_PRESETS_EMPTY.every((id) => goalPresetById(id) !== null && id !== 'reserva')).toBe(true);
+    expect(Object.values(GOAL_PRESET_TEXT).every((t) => !/—|–/.test(t))).toBe(true);
+  });
+
+  it('Moto tem imagem própria, separada do carro (pedido do Enzo, 10/11/2026)', () => {
+    for (const n of ['Moto', 'Moto nova', 'Minha moto', 'Motinha', 'Motos', 'Scooter elétrica', 'Entrada da moto', 'Guardar para a moto', 'Moto para trabalhar']) {
+      expect(suggestGoalImage(n, 'objetivo'), n).toBe('moto');
+    }
+    for (const n of ['Carro', 'Carro novo', 'Troca do carro', 'Entrada do carro', 'CNH', 'Picape']) expect(suggestGoalImage(n, 'objetivo'), n).toBe('carro');
+  });
+
+  it('vale a pista que aparece primeiro no nome; palavras de contexto e de só guardar ficam por último', () => {
+    const cases: [string, string][] = [
+      ['Moto para viajar', 'moto'],
+      ['Viagem de moto', 'viagem'],
+      ['Casamento na praia', 'casamento'],
+      ['Guardar para o casamento', 'casamento'],
+      ['Poupança para a viagem', 'viagem'],
+      ['Reserva para a reforma', 'reforma'],
+      ['Poupança', 'reserva'],
+      ['Pé de meia', 'reserva'],
+      ['Entrada do apê', 'casa'],
+      ['Entrada', 'casa'],
+      ['Sair do aluguel', 'casa'],
+      ['Construir a casa', 'casa'],
+      ['Reforma da cozinha', 'reforma'],
+      ['Reforma do carro', 'reforma'],
+      ['Tratamento do cachorro', 'pet'],
+      ['Futuro da Ana na faculdade', 'estudos'],
+      ['Liberdade financeira', 'aposentadoria'],
+      ['Quitar dívidas', 'dividas'],
+      ['Limpar o nome', 'dividas'],
+      ['Abrir meu negócio', 'negocio'],
+      ['Lojinha', 'negocio'],
+      ['Festa de 15 anos', 'festa'],
+      ['Natal', 'festa'],
+      ['Formatura', 'estudos'],
+      ['Festa de casamento', 'casamento'],
+      ['Festa', 'festa'],
+      ['Salão de festas', 'festa'],
+      ['Salão de beleza', 'negocio'],
+      ['Mensalidade da academia', 'saude'],
+      ['Mensalidade do plano de saúde', 'saude'],
+      ['Mensalidade', 'estudos'],
+      ['Pós-graduação', 'estudos'],
+      ['Pós-parto', 'bebe'],
+      ['Pós-operatório', 'saude'],
+      ['CNH da moto', 'moto'],
+      ['Habilitação para moto', 'moto'],
+      ['Auto escola', 'carro'],
+      ['Cirurgia do cachorro', 'pet'],
+      ['Cirurgia', 'saude'],
+      ['Colchão novo', 'objetivo'],
+      ['Juntar dinheiro', 'reserva'],
+      ['Entrada do ap', 'casa'],
+    ];
+    for (const [name, key] of cases) expect(suggestGoalImage(name, 'objetivo'), name).toBe(key);
   });
 
   it('nomes comuns, com acento, maiúsculas e plural', () => {
@@ -37,7 +118,7 @@ describe('metas com imagem (D-077): sugestão pelo nome e pelo tipo', () => {
       ['Lua de mel na Grécia', 'viagem'],
       ['Férias em família', 'viagem'],
       ['Cofrinho', 'reserva'],
-      ['Moto nova', 'carro'],
+      ['Moto nova', 'moto'],
       ['Apartamento próprio', 'casa'],
       ['Faculdade da Ana', 'estudos'],
       ['Intercâmbio', 'estudos'],

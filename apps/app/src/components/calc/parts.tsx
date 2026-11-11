@@ -58,18 +58,24 @@ export function CalcScreen({ slug, modo, children }: { slug: CalcSlug; modo?: st
 }
 
 /**
- * "Anotar como parcelamento" e "Anotar como gasto fixo" não aparecem quando a calculadora foi aberta de um cadastro
- * ou de algo que já existe: com origem no link (detalhe, conta, Família) ou com o cadastro de gasto fixo aberto logo
- * abaixo na pilha (o link do chip "Parcelado"), para não abrir um segundo cadastro por cima do primeiro.
+ * "Anotar como parcelamento", "Anotar como gasto fixo" e "Criar meta com este valor" não aparecem quando a calculadora foi aberta de
+ * um cadastro ou de algo que já existe: com origem no link (detalhe, conta, Família) ou com um cadastro aberto logo abaixo na pilha (o
+ * link do chip "Parcelado" do gasto fixo, ou a dica de uma meta pronta em "Nova meta", D-092), para não abrir um segundo cadastro por
+ * cima do primeiro.
  */
 export function useNoteHidden(origem: string | undefined): boolean {
+  const overForm = useOpenedOverForm();
+  return origem !== undefined || overForm;
+}
+
+/** Há um cadastro de gasto fixo ou de meta aberto embaixo, na pilha. Conferido uma vez, ao abrir (a tela está no topo). */
+export function useOpenedOverForm(): boolean {
   const navigation = useNavigation();
-  // Conferido uma vez, ao abrir: a calculadora está no topo, então o que há na pilha está abaixo dela.
-  const [hidden] = useState(() => {
+  const [over] = useState(() => {
     const routes = (navigation.getState()?.routes ?? []) as readonly { name: string }[];
-    return origem !== undefined || routes.some((r) => r.name === 'gastos-fixos/novo');
+    return routes.some((r) => r.name === 'gastos-fixos/novo' || r.name === 'meta/nova');
   });
-  return hidden;
+  return over;
 }
 
 /** Aviso fixo (CALC_DISCLAIMER), sem animação nem anúncio a cada mudança: é parte da tela. */

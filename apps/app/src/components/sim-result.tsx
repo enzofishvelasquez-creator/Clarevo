@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Target } from 'lucide-react-native';
 import { View } from 'react-native';
 
+import { useOpenedOverForm } from '@/components/calc/parts';
 import { YearBars } from '@/components/sim-year-bars';
 import { TermHint } from '@/components/term-hint';
 import { Button, Txt, styles as ui } from '@/components/ui';
@@ -19,6 +20,7 @@ const T = SIMULATE_TEXT;
 export function SimResultCard({ result, hypotheses, today }: { result: SimulationResult | null; hypotheses: readonly string[]; today: IsoDate }) {
   const { intro, highlight, lines } = result?.texts ?? { intro: null, highlight: '', lines: [] };
   const goal = result ? simulationGoalPrefill(result, today) : null;
+  const overForm = useOpenedOverForm();
   return (
     <View style={[ui.card, { gap: space[3] }]}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -70,7 +72,8 @@ export function SimResultCard({ result, hypotheses, today }: { result: Simulatio
         <TermHint term="Como ler uma simulação" slug="simulacao" />
       </View>
 
-      {goal ? (
+      {/* Aberto pela dica de uma meta pronta (D-092), "Nova meta" já está embaixo: não abre uma segunda por cima. */}
+      {goal && !overForm ? (
         <View style={{ gap: space[2] }}>
           <Button
             label={T.createGoal}
