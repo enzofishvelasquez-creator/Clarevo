@@ -3,6 +3,7 @@ import {
   compareLastClosedMonths,
   monthlyReturns,
   type InvestmentMovement,
+  type IsoMonth,
   type MonthReturn,
 } from '@clarevo/core';
 import { View } from 'react-native';
@@ -31,7 +32,18 @@ export function groupByInvestment(movements: readonly InvestmentMovement[]): Inv
  * primeiro mês. Os índices vêm da função "indices" (o Banco Central); se não vierem, a rentabilidade continua e a tela diz que não
  * conseguiu. Na demonstração, os índices são de exemplo, e a tela diz isso. Sem atualização de valor, o aviso para atualizar.
  */
-export function InvestmentReturns({ groups, hasValue, onBrand = false }: { groups: readonly (readonly InvestmentMovement[])[]; hasValue: boolean; onBrand?: boolean }) {
+export function InvestmentReturns({
+  groups,
+  hasValue,
+  onBrand = false,
+  missing = null,
+}: {
+  groups: readonly (readonly InvestmentMovement[])[];
+  hasValue: boolean;
+  onBrand?: boolean;
+  /** Na carteira: quem falta atualizar para ter a taxa deste mês (`investmentsMissingValue`); no lugar do aviso geral. */
+  missing?: { thisMonth: readonly string[]; lastMonth: readonly string[]; previousMonth: IsoMonth } | null;
+}) {
   const { today } = useSession();
   const returns: MonthReturn[] = monthlyReturns(groups, today);
   const base = compareLastClosedMonths(returns, null);
@@ -40,6 +52,8 @@ export function InvestmentReturns({ groups, hasValue, onBrand = false }: { group
   const current = returns.length > 0 ? returns[returns.length - 1]! : null;
   const color = onBrand ? colors.textOnBrand : colors.text;
   const soft = onBrand ? colors.textOnBrandSoft : colors.textSecondary;
+  // Sem taxa neste mês por falta de atualização: diz de quem, em vez do aviso geral (pedido do Enzo, 11/11/2026).
+  const specific = current !== null && current.rate === null && missing !== null && (missing.thisMonth.length > 0 || missing.lastMonth.length > 0);
   if (!hasValue) {
     return (
       <Txt variant="label" color={soft}>
@@ -83,7 +97,20 @@ export function InvestmentReturns({ groups, hasValue, onBrand = false }: { group
           )}
         </>
       ) : null}
-      {comparison === null || (current !== null && current.rate === null) ? (
+      {specific ? (
+        <>
+          {missing!.thisMonth.length > 0 ? (
+            <Txt variant="caption" color={soft}>
+              {T.missingThisMonth(missing!.thisMonth)}
+            </Txt>
+          ) : null}
+          {missing!.lastMonth.length > 0 ? (
+            <Txt variant="caption" color={soft}>
+              {T.missingLastMonth(missing!.previousMonth, missing!.lastMonth)}
+            </Txt>
+          ) : null}
+        </>
+      ) : comparison === null || (current !== null && current.rate === null) ? (
         <Txt variant="caption" color={soft}>
           {T.monthlyHint}
         </Txt>

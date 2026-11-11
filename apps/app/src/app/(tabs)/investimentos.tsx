@@ -1,4 +1,4 @@
-import { ERROR_TEXT, INVESTMENT_KIND_LABEL, INVESTMENT_TEXT, formatBRL, investmentGain, type Investment } from '@clarevo/core';
+import { ERROR_TEXT, INVESTMENT_KIND_LABEL, INVESTMENT_TEXT, formatBRL, investmentGain, investmentsMissingValue, type Investment, type InvestmentMovement } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ChevronRight, Plus, ShieldCheck } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -10,6 +10,7 @@ import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
 import { useContextInvestmentMovements, useInvestments, useSpace, useWorkOf } from '@/state/data';
+import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 const T = INVESTMENT_TEXT;
@@ -62,7 +63,7 @@ export default function InvestimentosScreen() {
           ) : (
             <>
               {/* A carteira é só dos ativos: os encerrados saem do total e da rentabilidade (docs/45, seção 3.2). */}
-              <Summary active={active} groups={groupByInvestment(movements.data.filter((m) => active.some((i) => i.id === m.investmentId)))} />
+              <Summary active={active} movements={movements.data} />
               <View style={{ gap: space[3] }}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>
                   Seus investimentos
@@ -108,7 +109,14 @@ export default function InvestimentosScreen() {
   );
 }
 
-function Summary({ active, groups }: { active: readonly Investment[]; groups: Parameters<typeof InvestmentReturns>[0]['groups'] }) {
+function Summary({ active, movements }: { active: readonly Investment[]; movements: readonly InvestmentMovement[] }) {
+  const { today } = useSession();
+  const groups = groupByInvestment(movements.filter((m) => active.some((i) => i.id === m.investmentId)));
+  // Quem falta atualizar para a carteira ter a taxa deste mês (o card diz os nomes, na ordem da lista).
+  const missing = investmentsMissingValue(
+    active.map((i) => ({ name: i.name, movements: movements.filter((m) => m.investmentId === i.id) })),
+    today,
+  );
   const value = active.reduce((a, i) => a + i.valueCents, 0);
   const deposits = active.reduce((a, i) => a + i.depositsCents, 0);
   const withdrawals = active.reduce((a, i) => a + i.withdrawalsCents, 0);
@@ -124,7 +132,7 @@ function Summary({ active, groups }: { active: readonly Investment[]; groups: Pa
       </MoneyTxt>
       <InvestmentTotalsLines depositsCents={deposits} withdrawalsCents={withdrawals} incomeCents={income} gainCents={value + withdrawals + income - deposits} onBrand />
       <View style={styles.sep} />
-      <InvestmentReturns groups={groups} hasValue={hasValue} onBrand />
+      <InvestmentReturns groups={groups} hasValue={hasValue} missing={missing} onBrand />
     </View>
   );
 }
