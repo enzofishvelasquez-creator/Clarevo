@@ -60,7 +60,7 @@ export const DELETE_TEXT = {
   erasedTitle: 'O que é apagado',
   erased: [
     'Tudo o que você anotou no seu Pessoal, como gastos, recebimentos, contas a pagar, gastos fixos, parcelamentos e contas do ano. Os dados são apagados de verdade, não ficam só escondidos.',
-    'As metas e o que você guardou ou retirou delas. Também os cartões, as compras e as faturas, as notas fiscais, o orçamento, o limite e a renda de referência.',
+    'As metas e o que você guardou ou retirou delas, e os investimentos e o que você registrou neles. Também os cartões, as compras e as faturas, as notas fiscais, o orçamento, o limite e a renda de referência.',
     'As contas de origem, as assinaturas, as importações e a revisão dos últimos meses. Também o que você respondeu sobre guardar dinheiro por mês e em "Como você conheceu a Clarevo?".',
     'O histórico de operações e de uso da sua conta.',
     'Se você usa a Clarevo como benefício da empresa, o benefício termina na hora. A empresa vê só que a licença terminou.',

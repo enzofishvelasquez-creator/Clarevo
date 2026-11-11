@@ -141,7 +141,7 @@ describe('investimentos: CDI e IPCA', () => {
     expect(c.rate).toBeCloseTo(0.0201, 10);
     expect(c.cdi).toBeCloseTo(1.009 * 1.009 - 1, 10);
     expect(c.ipca).toBeCloseTo(1.0035 * 1.0035 - 1, 10);
-    expect(INVESTMENT_TEXT.comparison(c)).toBe('Nos 2 meses fechados (setembro de 2026 a outubro de 2026): +2,01%.');
+    expect(INVESTMENT_TEXT.comparison(c)).toBe('Nos 2 meses fechados, de setembro a outubro de 2026: +2,01%.');
     expect(INVESTMENT_TEXT.cdi(c.cdi)).toBe('CDI no mesmo período: +1,81%');
     expect(INVESTMENT_TEXT.ipca(null)).toBe('IPCA: sem dados para todos os meses');
     expect(exampleIndices().example).toBe(true);

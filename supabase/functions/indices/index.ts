@@ -565,8 +565,8 @@ const __mods = [
         gain: (c) => (c < 0 ? `Perda: ${(0, money_1.formatBRL)(-c)}` : `Ganho: ${(0, money_1.formatBRL)(c)}`),
         percent: pctText,
         comparison: (c) => {
-            const span = c.months.length === 1 ? (0, dates_1.formatMonthYearBR)(c.months[0]) : `${(0, dates_1.formatMonthYearBR)(c.months[0])} a ${(0, dates_1.formatMonthYearBR)(c.months[c.months.length - 1])}`;
-            const head = c.months.length === 1 ? `No mês fechado de ${span}` : `Nos ${c.months.length} meses fechados (${span})`;
+            const first = c.months[0];
+            const head = c.months.length === 1 ? `No mês fechado de ${(0, dates_1.formatMonthYearBR)(first)}` : `Nos ${c.months.length} meses fechados, ${(0, dates_1.formatMonthSpanBR)(first, c.months[c.months.length - 1])}`;
             return `${head}: ${c.rate === null ? 'sem taxa' : pctText(c.rate)}.`;
         },
         cdi: (v) => (v === null ? 'CDI: sem dados para todos os meses' : `CDI no mesmo período: ${pctText(v)}`),

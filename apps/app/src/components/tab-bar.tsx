@@ -49,7 +49,9 @@ type FaceProps = PressableProps & { focused: boolean; label: string; a11y: strin
 /** Botão da barra: o mesmo desenho nas abas e nas telas de consulta (ícone, rótulo curto, 56 px, aba marcada). */
 const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a11y, icon: Icon, ...props }, ref) {
   const color = focused ? colors.brand : colors.textSecondary;
-  const narrow = useWindowDimensions().width < 360;
+  // Cinco abas (D-093): o rótulo mais longo ("Movimentos") cabe inteiro de 320 px para cima, com letra de 12, 11 ou 10,5.
+  const width = useWindowDimensions().width;
+  const fontSize = width >= 375 ? 12 : width >= 340 ? 11 : 10.5;
   return (
     <Pressable
       ref={ref}
@@ -64,7 +66,7 @@ const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a
         (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
       ]}>
       <Icon size={22} color={color} strokeWidth={focused ? 2.25 : 2} />
-      <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize: narrow ? 11.5 : 13 }} numberOfLines={1} maxFontSizeMultiplier={1.3} adjustsFontSizeToFit minimumFontScale={0.8}>
+      <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize, letterSpacing: -0.1 }} numberOfLines={1} maxFontSizeMultiplier={1.3} adjustsFontSizeToFit minimumFontScale={0.8}>
         {label}
       </Txt>
     </Pressable>
@@ -144,7 +146,7 @@ export function TabBar({ children, ...props }: TabListProps) {
 const styles = StyleSheet.create({
   overlay: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   barWrap: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 },
-  bar: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 8, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  bar: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 4, width: '100%', maxWidth: 560, alignSelf: 'center' },
   button: { flex: 1, minHeight: 56, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', gap: 4 },
   buttonActive: { backgroundColor: colors.brandTint },
 });

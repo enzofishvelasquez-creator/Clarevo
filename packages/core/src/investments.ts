@@ -1,5 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
-import { addDays, addMonths, daysInMonth, formatDateBR, formatMonthYearBR, isValidIsoDate, monthOf, monthsBetween, parseDateBR } from './dates';
+import { addDays, addMonths, daysInMonth, formatDateBR, formatMonthSpanBR, formatMonthYearBR, isValidIsoDate, monthOf, monthsBetween, parseDateBR } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL } from './money';
 
@@ -449,8 +449,9 @@ export const INVESTMENT_TEXT = {
   percent: pctText,
   /** "Nos últimos 12 meses fechados (novembro de 2025 a outubro de 2026): +8,12%. CDI: +10,50%. IPCA: +4,10%." */
   comparison: (c: PeriodComparison) => {
-    const span = c.months.length === 1 ? formatMonthYearBR(c.months[0]!) : `${formatMonthYearBR(c.months[0]!)} a ${formatMonthYearBR(c.months[c.months.length - 1]!)}`;
-    const head = c.months.length === 1 ? `No mês fechado de ${span}` : `Nos ${c.months.length} meses fechados (${span})`;
+    const first = c.months[0]!;
+    const head =
+      c.months.length === 1 ? `No mês fechado de ${formatMonthYearBR(first)}` : `Nos ${c.months.length} meses fechados, ${formatMonthSpanBR(first, c.months[c.months.length - 1]!)}`;
     return `${head}: ${c.rate === null ? 'sem taxa' : pctText(c.rate)}.`;
   },
   cdi: (v: number | null) => (v === null ? 'CDI: sem dados para todos os meses' : `CDI no mesmo período: ${pctText(v)}`),

@@ -41,9 +41,9 @@ export default function InvestimentoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const one = useInvestment(id);
   const movements = useInvestmentMovements(id);
-  const [notice] = useFlash();
+  const [notice, setNotice] = useFlash();
   if (one.isSuccess && one.data && movements.isSuccess) {
-    return <Detail investment={one.data} movements={movements.data} notice={notice} />;
+    return <Detail investment={one.data} movements={movements.data} notice={notice} onNotice={setNotice} />;
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -64,7 +64,17 @@ export default function InvestimentoScreen() {
   );
 }
 
-function Detail({ investment: i, movements, notice }: { investment: Investment; movements: readonly InvestmentMovement[]; notice: string | null }) {
+function Detail({
+  investment: i,
+  movements,
+  notice,
+  onNotice,
+}: {
+  investment: Investment;
+  movements: readonly InvestmentMovement[];
+  notice: string | null;
+  onNotice: (m: string | null) => void;
+}) {
   const repo = useRepo();
   const { today } = useSession();
   const invalidate = useInvalidateInvestments();
@@ -80,10 +90,12 @@ function Detail({ investment: i, movements, notice }: { investment: Investment; 
     if (busy) return;
     setBusy(true);
     setError(null);
+    onNotice(null);
     try {
       await repo.setInvestmentStatus(newOperationKey(), i.id, i.version, status);
       invalidate();
-      flash.set(status === 'ativo' ? D.reopened : D.closed);
+      // A tela continua aberta: a faixa aparece aqui mesmo (o flash é só para a próxima tela).
+      onNotice(status === 'ativo' ? D.reopened : D.closed);
     } catch (e) {
       invalidate();
       setError(investmentErrorText(isRepoError(e) ? e.code : 'desconhecido'));

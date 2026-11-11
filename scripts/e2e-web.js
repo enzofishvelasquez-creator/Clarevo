@@ -4941,9 +4941,9 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const MOV_TAB = 'Movimentos do mês';
   const tabLabel = (name) => (name === 'Movimentos' ? MOV_TAB : name);
   const tabByName = (name) => p.getByRole('tab', { name: tabLabel(name), exact: true }).filter({ visible: true }).first();
-  // Estado da barra inferior: as quatro abas visíveis, onde terminam e qual está marcada.
+  // Estado da barra inferior: as cinco abas visíveis (D-093: Investir entre Metas e Aprender), onde terminam e qual está marcada.
   const barState = () => p.evaluate(() => {
-    const names = ['Resumo', 'Movimentos do mês', 'Metas', 'Aprender e dúvidas'];
+    const names = ['Resumo', 'Movimentos do mês', 'Metas', 'Investir', 'Aprender e dúvidas'];
     const tabs = [...document.querySelectorAll('[role=tab]')].filter((e) => names.includes(e.getAttribute('aria-label')) && e.getBoundingClientRect().width > 0);
     const rects = tabs.map((e) => e.getBoundingClientRect());
     return {
@@ -4953,6 +4953,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
       top: rects.length ? Math.round(Math.min(...rects.map((r) => r.top))) : 0,
       minH: rects.length ? Math.round(Math.min(...rects.map((r) => r.height))) : 0,
       out: rects.filter((r) => r.left < -0.5 || r.right > window.innerWidth + 0.5).length,
+      // Rótulo cortado (reticências): com cinco abas (D-093), "Movimentos" precisa caber inteiro.
+      cut: tabs.filter((e) => [...e.querySelectorAll('*')].some((c) => c.scrollWidth > c.clientWidth + 1)).map((e) => e.textContent),
       h: window.innerHeight,
       overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
     };
@@ -4963,10 +4965,10 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     for (const [w, h] of SMALL_SCREENS) { await p.setViewportSize({ width: w, height: h }); await p.waitForTimeout(450); await fn(w, h); }
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(350);
   };
-  const barOk = (s) => s.n === 4 && s.bottom <= s.h + 1 && s.bottom >= s.h - 40 && s.out === 0 && s.minH >= 44 && !s.overflow;
+  const barOk = (s) => s.n === 5 && s.cut.length === 0 && s.bottom <= s.h + 1 && s.bottom >= s.h - 40 && s.out === 0 && s.minH >= 44 && !s.overflow;
   const checkBar = (label, selected = null) => atWidths(async (w) => {
     const s = await barState();
-    ok(`${label} (${w}px): barra inferior à vista, com as 4 abas${selected ? ` e "${selected}" marcada` : ''}`, barOk(s) && (selected === null || (s.selected.length === 1 && s.selected[0] === tabLabel(selected))), JSON.stringify(s));
+    ok(`${label} (${w}px): barra inferior à vista, com as 5 abas${selected ? ` e "${selected}" marcada` : ''}`, barOk(s) && (selected === null || (s.selected.length === 1 && s.selected[0] === tabLabel(selected))), JSON.stringify(s));
   });
   const checkNoBar = (label) => atWidths(async (w) => { ok(`${label} (${w}px): formulário sem barra inferior`, (await barState()).n === 0); });
   // Posições (topo e base) de elementos visíveis por papel e texto exato ou por nome acessível.
@@ -5045,7 +5047,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   await demoHome();
   // Na abertura de uma tela de consulta a barra surge sobreposta ao fim da tela: as barras das abas e da consulta ocupam o mesmo
   // lugar (nada de barra dupla nem salto), e o conteúdo da tela não encolhe. Conferido no meio da transição.
-  const barTopsNow = () => p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => ['Resumo', 'Movimentos do mês', 'Metas', 'Aprender e dúvidas'].includes(e.getAttribute('aria-label')) && e.getBoundingClientRect().width > 0).map((e) => Math.round(e.getBoundingClientRect().top)));
+  const barTopsNow = () => p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => ['Resumo', 'Movimentos do mês', 'Metas', 'Investir', 'Aprender e dúvidas'].includes(e.getAttribute('aria-label')) && e.getBoundingClientRect().width > 0).map((e) => Math.round(e.getBoundingClientRect().top)));
   const beforeBars = await barTopsNow();
   await btn('Ver contas a pagar').click();
   const midBars = await barTopsNow();
@@ -14049,7 +14051,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     ['Manrope_500Medium', 'Manrope_600SemiBold', 'Manrope_700Bold', 'Manrope_800ExtraBold'].every((f) => acFontsLoaded.includes(f)), `${acFonts.map((x) => `${x.f.split('.')[0]} ${x.size} B`).join(', ')}; carregadas: ${acFontsLoaded.join(', ')}`);
   await acScan('resumo');
   await shot('590_acessibilidade_resumo_390px');
-  for (const name of ['Movimentos', 'Metas', 'Aprender e dúvidas']) { await tabByName(name).click(); await p.waitForTimeout(900); await acScan(`aba ${name}`); }
+  for (const name of ['Movimentos', 'Metas', 'Investir', 'Aprender e dúvidas']) { await tabByName(name).click(); await p.waitForTimeout(900); await acScan(`aba ${name}`); }
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento');
 
   // ---- 2. Em cerca de 60 telas: contraste, nomes, papéis e alvos de toque ----
@@ -14169,7 +14171,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   // Na web a escala de fonte é sempre 1: a simulação multiplica o tamanho e a altura da linha de todo texto (abas e avatar até 1,3, como
   // no app) e tira o limite de linhas dos títulos, como o app faz com a escala acima de 1. Só o aparelho confirma o resto.
   const AC_BIG = [
-    ['resumo', 'Resumo', null, null], ['movimentações', 'Movimentos', null, null], ['metas', 'Metas', null, null],
+    ['resumo', 'Resumo', null, null], ['movimentações', 'Movimentos', null, null], ['metas', 'Metas', null, null], ['investimentos', 'Investir', null, null],
     ['registrar gasto', null, 'registro/novo', { tipo: 'despesa' }], ['contas a pagar', null, 'a-pagar/index', {}], ['cartões', null, 'cartoes/index', {}],
     ['cartão', null, 'cartoes/[id]/index', { id: acIds.card }], ['fatura', null, 'cartoes/[id]/fatura/[mes]/index', { id: acIds.card, mes: '2026-10' }],
     ['buscar', null, 'movimentacoes/buscar', {}], ['composição', null, 'composicao', { tipo: 'pago' }], ['gastos fixos', null, 'gastos-fixos/index', {}], ['conta', null, 'conta', {}],
@@ -14180,7 +14182,7 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await acEnter();
     await p.setViewportSize({ width, height: 800 }); await p.waitForTimeout(500);
     for (const [name, tab, route, params] of AC_BIG) {
-      if (tab) { await tabByName(tab).click(); await waitText(tab === 'Resumo' ? 'Diferença do mês' : tab === 'Metas' ? 'Reserva para imprevistos' : 'Registrar recebimento'); }
+      if (tab) { await tabByName(tab).click(); await waitText(tab === 'Resumo' ? 'Diferença do mês' : tab === 'Metas' ? 'Reserva para imprevistos' : tab === 'Investir' ? 'Seus investimentos hoje' : 'Registrar recebimento'); }
       else await acNav(route, params);
       await p.waitForTimeout(700);
       await p.evaluate((k) => window.__acc.scale(k), scale);
@@ -14489,6 +14491,76 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
     await btn('Registrar aporte').click(); await waitText('Aporte registrado.'); await p.waitForTimeout(400);
     ok('D-093 marcos: o aviso do aporte diz que a meta passou de 25%', (await body()).includes('Aporte registrado. Viagem de férias passou de 25% da meta.'));
     ok('D-093 Metas: nada vai à rede na demonstração', writes.length === omWrites0, writes.slice(omWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // D-093 Investimentos: a aba "Investir" (só Pessoal), o resumo da carteira com o CDI e o IPCA de exemplo, o detalhe com o valor no fim
+  // de cada mês, atualizar o valor, o resgate maior que o valor recusado antes de enviar, novo investimento, encerrar, reabrir e excluir.
+  // A demonstração tem "Aplicação do banco" (R$ 10.875,00) e "Previdência" (R$ 5.080,00). Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const ivWrites0 = writes.length;
+    await demoHome();
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('D-093 Investimentos: título "Investimentos", contexto Pessoal fixo, total de R$ 15.955,00, aportado, ganho e a rentabilidade com o CDI e o IPCA de exemplo',
+      (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Aportado: R$ 15.500,00') && t.includes('Ganho: R$ 455,00') &&
+        t.includes('Neste mês, até hoje: +0,09%') && t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,58%.') &&
+        t.includes('CDI no mesmo período: +3,65%') && t.includes('IPCA no mesmo período: +1,41%') &&
+        t.includes('Na demonstração, o CDI e o IPCA são valores de exemplo, não os índices reais.'), t.slice(0, 700));
+    ok('D-093 Investimentos: diz que não é recomendação, que não entra em Pago nem em Recebido e que a Família não vê',
+      t.includes('Não é recomendação de investimento') && t.includes('não entram em Pago nem em Recebido') && t.includes('Ninguém da Família nem a empresa que oferece o benefício vê.') &&
+        t.includes('A Clarevo não guarda, não movimenta nem indica investimentos.'));
+    ok('D-093 Investimentos: os dois cards com nome, tipo e valor no nome acessível',
+      (await visibleCount('button', 'Aplicação do banco, Renda fixa: R$ 10.875,00. Ganho: R$ 375,00.')) === 1 && (await visibleCount('button', 'Previdência, Previdência: R$ 5.080,00. Ganho: R$ 80,00.')) === 1);
+    await checkBar('D-093 Investimentos', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-093 Investimentos ${w}px`); if (w === 390) await shot('540_investimentos'); });
+    // Detalhe.
+    await btn('Aplicação do banco, Renda fixa: R$ 10.875,00. Ganho: R$ 375,00.').click(); await waitText('Valor no fim de cada mês'); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    ok('D-093 Investimento: detalhe com o valor, a última atualização, o fim de cada mês (setembro R$ 10.360,00) e o histórico',
+      (await h1Name()) === 'Aplicação do banco' && t.includes('R$ 10.875,00') && t.includes('Valor atualizado em 06/10/2026') && t.includes('Outubro de 2026 (até hoje)') &&
+        t.includes('R$ 10.360,00') && (await visibleCount('button', 'Aporte, 06/10/2026, R$ 500,00')) === 1 && (await visibleCount('button', 'Valor atualizado, 30/09/2026, R$ 10.360,00')) === 1, t.slice(0, 700));
+    await checkBar('D-093 detalhe do investimento (consulta)', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-093 Investimento ${w}px`); if (w === 390) await shot('541_investimento_detalhe'); });
+    // Resgate maior que o valor: recusado antes de enviar, com a data.
+    await btn('Registrar resgate').click(); await waitText('O dinheiro que você tirou do investimento.'); await p.waitForTimeout(300);
+    await field('Valor').fill('20000'); await btn('Registrar resgate').click(); await p.waitForTimeout(400);
+    ok('D-093 resgate maior que o valor: recusado antes de enviar, com o dia em que ficaria negativo',
+      (await body()).includes('Com este movimento, o investimento ficaria com valor negativo em 07/10/2026. Confira o valor e a data.'));
+    await btn('Cancelar').click(); await p.waitForTimeout(300);
+    if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
+    await waitText('Valor no fim de cada mês');
+    // Atualizar valor.
+    await btn('Atualizar valor').click(); await waitText('O valor total que aparece no extrato nesta data'); await p.waitForTimeout(300);
+    ok('D-093 Atualizar valor: data de hoje preenchida e o contexto Pessoal fixo', (await field('Data').inputValue()) === '07/10/2026' && (await body()).includes('Demonstração · Pessoal'), await field('Data').inputValue());
+    await field('Valor no extrato').fill('10900'); await btn('Atualizar valor').click(); await waitText('Valor atualizado.'); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-093 Atualizar valor: o detalhe passa a R$ 10.900,00, ganho de R$ 400,00, atualizado em 07/10/2026', t.includes('R$ 10.900,00') && t.includes('Ganho: R$ 400,00') && t.includes('Valor atualizado em 07/10/2026'), t.slice(0, 500));
+    // Novo investimento.
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    ok('D-093 Investimentos: o total segue o valor novo (R$ 15.980,00)', (await body()).includes('R$ 15.980,00'));
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await btn('Criar investimento').click(); await p.waitForTimeout(300);
+    t = await body();
+    ok('D-093 Novo investimento: sem nome, tipo e valor aplicado, os erros aparecem nos campos', (await field('Nome').evaluate((e) => e === document.activeElement)) && t.includes('Escolha o tipo.'), t.slice(0, 600));
+    await field('Nome').fill('Ações da corretora'); await radio('Ações').click(); await field('Quanto você aplicou até hoje?').fill('2000');
+    await atWidths(async (w) => { await layoutChecks(`D-093 Novo investimento ${w}px`); if (w === 390) await shot('542_novo_investimento'); });
+    await checkNoBar('D-093 Novo investimento');
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-093 Novo investimento: abre o detalhe, com o aporte inicial e o aviso para atualizar o valor', (await h1Name()) === 'Ações da corretora' && t.includes('R$ 2.000,00') &&
+      t.includes('Atualize o valor com o que aparece no seu extrato para ver quanto rendeu.'), t.slice(0, 500));
+    // Encerrar, reabrir e excluir.
+    await btn('Encerrar investimento').click(); await waitText('Investimento encerrado.'); await p.waitForTimeout(400);
+    ok('D-093 Encerrar: some "Atualizar valor" e aparece "Reabrir investimento"', (await visibleCount('button', 'Atualizar valor')) === 0 && (await visibleCount('button', 'Reabrir investimento')) === 1);
+    await tabByName('Investir').click(); await waitText('Encerrados'); await p.waitForTimeout(300);
+    ok('D-093 Investimentos: o encerrado aparece em "Encerrados" e sai do total (R$ 15.980,00)', (await body()).includes('Encerrados') && (await body()).includes('R$ 15.980,00'));
+    await p.getByRole('button', { name: /^Ações da corretora, Ações:/ }).filter({ visible: true }).first().click(); await waitText('Reabrir investimento'); await p.waitForTimeout(300);
+    await btn('Excluir investimento').click(); await waitText('Excluir Ações da corretora?'); await p.waitForTimeout(300);
+    await confirmIn('Excluir investimento'); await waitText('Investimento excluído.'); await p.waitForTimeout(400);
+    ok('D-093 Excluir: volta para Investimentos sem o investimento excluído', urlPath() === '/investimentos' && !(await body()).includes('Ações da corretora'), urlPath());
+    ok('D-093 Investimentos: nada vai à rede na demonstração', writes.length === ivWrites0, writes.slice(ivWrites0).join(' | '));
   }
 
   // ==================================================================================================================
