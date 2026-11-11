@@ -746,7 +746,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Em telas estreitas, o olho não aparece. Ligue ${q('Ocultar valores ao abrir')}, em Conta: os valores ficam ocultos agora e sempre que você abrir o app.`,
       `No celular com biometria configurada, ligue ${q('Pedir biometria ao abrir')}. Sair da conta nunca depende dela.`,
       `O arquivo de ${q(EXPORT_TEXT.entry)} mostra os valores, mesmo com a ocultação ligada.`,
-      `Em Conta, ${q(WIDGET_TEXT.section)} guarda se o widget mostra valores: ${q(WIDGET_TEXT.showValues)} começa desligado e, desligado, o widget não mostra o nome da próxima conta, só o prazo. O widget só existe quando o app estiver nas lojas.`,
+      `Em Conta, ${q(WIDGET_TEXT.section)} guarda se o widget mostra valores: ${q(WIDGET_TEXT.showValues)} começa desligado e, desligado, o widget não mostra o nome da próxima conta, só o prazo. O widget existe só no app de celular; o card diz como pôr na tela inicial.`,
     ],
     screenName: ACCOUNT_SCREEN,
     href: '/conta',

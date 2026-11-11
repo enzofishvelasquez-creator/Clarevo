@@ -12,7 +12,7 @@ import {
 } from '@clarevo/core';
 import { BellOff, Settings } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { AppState, Platform, View } from 'react-native';
 
 import { ChoiceGroup } from '@/components/series-parts';
 import { SettingSwitch } from '@/components/setting-switch';
@@ -21,6 +21,7 @@ import { authenticate, biometricsAvailable, DEVICE_FEATURES, openDeviceSettings,
 import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { PRIVACY_TEXT, setValuesHidden } from '@/lib/privacy';
 import { disableReminders, enableReminders, getNotificationPermission, type ReminderSwitch } from '@/lib/reminders';
+import { widgetAvailable } from '@/lib/widget-bridge';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -229,8 +230,9 @@ export function PrivacyCard() {
 }
 
 /**
- * Conta › "Widget na tela inicial" (D-052): o widget nativo só existe com o app nas lojas ("Disponível quando o app estiver nas
- * lojas"), mas a escolha de mostrar ou não os valores nele já fica guardada, só neste aparelho. Desligada de início: o widget mostra
+ * Conta › "Widget na tela inicial" (D-052; ligado no lançamento, D-093): no celular com o widget, como pô-lo na tela inicial; na web, que
+ * ele existe no app de celular; num build sem ele, que vem numa próxima versão. A escolha de mostrar ou não os valores fica só neste
+ * aparelho. Desligada de início: o widget mostra
  * R$ •••• no lugar dos valores. Não depende de "Ocultar valores ao abrir" e não muda nada no app.
  */
 export function WidgetCard() {
@@ -239,7 +241,9 @@ export function WidgetCard() {
   return (
     <Card style={{ gap: space[3] }}>
       <SectionTitle>{WIDGET_TEXT.section}</SectionTitle>
-      <Txt style={{ fontFamily: fonts.bold }}>{WIDGET_TEXT.availability}</Txt>
+      <Txt style={{ fontFamily: fonts.bold }}>
+        {Platform.OS === 'web' ? WIDGET_TEXT.availabilityWeb : widgetAvailable() ? WIDGET_TEXT.howTo[Platform.OS === 'ios' ? 'ios' : 'android'] : WIDGET_TEXT.availabilityLater}
+      </Txt>
       <Txt color={colors.textSecondary}>{WIDGET_TEXT.explain}</Txt>
       <SettingSwitch
         label={WIDGET_TEXT.showValues}

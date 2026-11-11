@@ -9407,8 +9407,8 @@ const ok = (name, cond, extra='') => { results.push([cond ? 'OK ' : 'FALHOU', na
   const k1Widget = () => p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).first();
   await scrollTo('Widget na tela inicial');
   t = await k1Keep();
-  ok('K1 Conta: o card "Widget na tela inicial" (título de nível 2) diz "Disponível quando o app estiver nas lojas" e tem o interruptor "Mostrar valores no widget" desligado, depois de Privacidade', (await headingShown('Widget na tela inicial')) &&
-    t.includes('Disponível quando o app estiver nas lojas') && t.includes('Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.') &&
+  ok('K1 Conta: o card "Widget na tela inicial" (título de nível 2) diz, na web, "Disponível no app da Clarevo para celular." (D-093) e tem o interruptor "Mostrar valores no widget" desligado, depois de Privacidade', (await headingShown('Widget na tela inicial')) &&
+    t.includes('Disponível no app da Clarevo para celular.') && t.includes('Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.') &&
     (await k1Widget().getAttribute('aria-checked')) === 'false' && (await hideSwitch().getAttribute('aria-checked')) === 'false' && t.indexOf('Privacidade neste aparelho') < t.indexOf('Widget na tela inicial'), `${await k1Widget().getAttribute('aria-checked')}`);
   ok('K1 Conta: o interruptor explica que, desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome, só neste aparelho (D-054)', t.includes('Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.'));
   await k1Shots('369_conta_widget', false, false);

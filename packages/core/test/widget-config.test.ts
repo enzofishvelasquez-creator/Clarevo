@@ -8,9 +8,9 @@ import { describe, expect, it } from 'vitest';
 import { WIDGET_NATIVE, WIDGET_ROUTES, WIDGET_TEXT } from '../src';
 
 /**
- * Configuração do widget nativo (D-063 item 3, Ciclo AA): DESLIGADO por padrão. Sem `CLAREVO_WIDGET=1` a configuração do app é a de
- * antes, igual, e os builds `preview` e `production` não mudam. Ligado, só o perfil `preview-widget` do EAS acrescenta os plugins do
- * widget. Nada aqui chama a rede nem exige conta de loja; nenhuma chave, segredo ou identificador de conta é escrito nos arquivos do widget.
+ * Configuração do widget nativo (D-063 item 3, Ciclo AA): sem `CLAREVO_WIDGET=1` a configuração do app é a de antes, igual (web, Expo Go
+ * e o perfil `preview-sem-widget`). Desde D-093 (ligado no lançamento), os perfis `preview` e `production` do EAS ligam a variável e
+ * ganham os plugins do widget. Nada aqui chama a rede nem exige conta de loja; nenhuma chave, segredo ou identificador de conta é escrito nos arquivos do widget.
  */
 const nodeRequire = createRequire(import.meta.url);
 const raiz = (p: string) => fileURLToPath(new URL(`../../../${p}`, import.meta.url));
@@ -161,13 +161,14 @@ describe('widget: pacotes nativos instalados, mas fora de todo build sem o widge
 describe('widget: perfis do EAS', () => {
   const eas = () => json('apps/app/eas.json');
 
-  it('preview e production seguem exatamente como eram, sem a variável', () => {
+  it('preview e production ligam o widget (D-093, ligado no lançamento) e nada mais muda neles', () => {
     const { build } = eas();
     // `image: latest` entrou em 06/11/2026 porque o build pelo GitHub exige a imagem declarada (docs/40, seção 2a).
     expect(build.preview).toEqual({
       distribution: 'internal',
       environment: 'preview',
       autoIncrement: true,
+      env: { CLAREVO_WIDGET: '1' },
       android: { buildType: 'apk', image: 'latest' },
       ios: { distribution: 'store', image: 'latest' },
     });
@@ -175,18 +176,17 @@ describe('widget: perfis do EAS', () => {
       distribution: 'store',
       environment: 'production',
       autoIncrement: true,
+      env: { CLAREVO_WIDGET: '1' },
       android: { buildType: 'app-bundle', image: 'latest' },
       ios: { image: 'latest' },
     });
-    expect(JSON.stringify(build.preview)).not.toContain('CLAREVO_WIDGET');
-    expect(JSON.stringify(build.production)).not.toContain('CLAREVO_WIDGET');
     expect(eas().submit.production).toEqual({ android: { track: 'internal', releaseStatus: 'draft' }, ios: { language: 'pt-BR' } });
   });
 
-  it('o perfil preview-widget parte do preview e só liga a variável', () => {
-    const profile = eas().build['preview-widget'];
-    expect(profile).toEqual({ extends: 'preview', env: { CLAREVO_WIDGET: '1' } });
-    expect(Object.keys(eas().build).sort()).toEqual(['preview', 'preview-widget', 'production']);
+  it('o perfil preview-sem-widget parte do preview e desliga a variável (reserva, se o build com o widget falhar)', () => {
+    const profile = eas().build['preview-sem-widget'];
+    expect(profile).toEqual({ extends: 'preview', env: { CLAREVO_WIDGET: '0' } });
+    expect(Object.keys(eas().build).sort()).toEqual(['preview', 'preview-sem-widget', 'production']);
   });
 });
 

@@ -5,7 +5,8 @@
  * App Group; Android: `react-native-android-widget`, um receptor de AppWidget) e o `package.json` deixa de excluir os dois pacotes do
  * autolinking. Desligado (o caso de todo build de hoje, `preview` e `production`), nada muda: a configuração devolvida é a de `app.json`,
  * sem plugin, sem permissão e sem pacote nativo a mais, e o Metro troca a pasta `src/widget-native` por módulos vazios.
- * O perfil `preview-widget` de `eas.json` é o que liga a variável. Passo a passo: `docs/21_WIDGET_NATIVO.md`.
+ * Os perfis `preview` e `production` de `eas.json` ligam a variável (D-093, widget ligado no lançamento); `preview-sem-widget` desliga.
+ * Passo a passo: `docs/21_WIDGET_NATIVO.md`.
  *
  * Este arquivo é JavaScript puro (sem TypeScript, sem dependências) porque o lê quem avalia a configuração (`app.config.js`), o Metro
  * (`metro.config.js`), o plugin local e os testes do núcleo (`packages/core/test/widget-config.test.ts`).

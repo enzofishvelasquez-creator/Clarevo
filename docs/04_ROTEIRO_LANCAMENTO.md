@@ -184,7 +184,8 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [ ] Supabase (Enzo): migrações 0031 e 0032 e a função `indices` com JWT ligado (`docs/05`, passos 12v, 12w e 12x; conferências 21s e 21t)
 - [ ] Multa e juros: modo "Fatura de cartão depois do vencimento" (era D-089 G)
 - [ ] Assinatura na web com Pix Automático (Asaas), além do cartão
-- [ ] Widget ligado no build de produção, com o teste no iPhone e no Android (`docs/21`)
+- [x] Widget ligado nos perfis `preview` e `production` (`preview-sem-widget` de reserva) e o card de Conta com o passo a passo
+- [ ] Widget: primeiro build com ele e teste no iPhone e no Android (`docs/21`, seção 6; Enzo)
 - [ ] Site: formulário de contato para empresas ligado (Resend; as Novidades por e-mail continuam desligadas)
 - [ ] Relatório de falhas (Sentry), sem dado financeiro nem pessoal, com o trecho na política e a pergunta ao advogado
 - [ ] Leitura de documentos: teste com 5 a 10 documentos reais antes de anunciar nas redes (P-025, P-026)

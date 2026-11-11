@@ -44,7 +44,15 @@ export const WIDGET_ROUTES = {
 export const WIDGET_TEXT = {
   /** Conta › "Widget na tela inicial". */
   section: 'Widget na tela inicial',
-  availability: 'Disponível quando o app estiver nas lojas',
+  /** Na web (e na demonstração): o widget só existe no app de celular. */
+  availabilityWeb: 'Disponível no app da Clarevo para celular.',
+  /** No celular com o widget (D-093: ligado nos builds de teste e de produção): como pôr na tela inicial. */
+  howTo: {
+    ios: 'Para pôr na tela inicial: toque e segure num espaço vazio da tela inicial, toque em Editar e em Adicionar widget e procure Clarevo.',
+    android: 'Para pôr na tela inicial: toque e segure num espaço vazio da tela inicial, toque em Widgets e procure Clarevo.',
+  },
+  /** No celular sem o widget (um build sem ele): vem numa próxima versão. */
+  availabilityLater: 'Disponível numa próxima versão do app.',
   explain: 'Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.',
   showValues: 'Mostrar valores no widget',
   showValuesCaption: 'Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.',

@@ -329,7 +329,11 @@ describe('o que o widget nativo lê', () => {
 
   it('os textos da tela de Conta', () => {
     expect(WIDGET_TEXT.section).toBe('Widget na tela inicial');
-    expect(WIDGET_TEXT.availability).toBe('Disponível quando o app estiver nas lojas');
+    // D-093: ligado no lançamento. Na web, o aviso de que existe no celular; no celular com o widget, como pôr na tela inicial.
+    expect(WIDGET_TEXT.availabilityWeb).toBe('Disponível no app da Clarevo para celular.');
+    expect(WIDGET_TEXT.howTo.ios).toContain('procure Clarevo');
+    expect(WIDGET_TEXT.howTo.android).toContain('toque em Widgets e procure Clarevo');
+    expect(WIDGET_TEXT.availabilityLater).toBe('Disponível numa próxima versão do app.');
     expect(WIDGET_TEXT.showValues).toBe('Mostrar valores no widget');
   });
 });
@@ -347,12 +351,13 @@ describe('a preferência do widget no app (D-052)', () => {
     expect(prefs).not.toMatch(/fetch\(|supabase/i);
   });
 
-  it('Conta mostra o card "Widget na tela inicial" logo depois de "Privacidade neste aparelho", com o interruptor e a nota das lojas', () => {
+  it('Conta mostra o card "Widget na tela inicial" logo depois de "Privacidade neste aparelho", com o interruptor e como pôr na tela inicial', () => {
     const conta = read('app/conta.tsx');
     expect(conta.indexOf('<PrivacyCard />')).toBeGreaterThan(0);
     expect(conta.indexOf('<WidgetCard />')).toBeGreaterThan(conta.indexOf('<PrivacyCard />'));
     const card = read('components/device-settings.tsx').match(/export function WidgetCard[\s\S]*$/)![0];
-    for (const key of ['WIDGET_TEXT.section', 'WIDGET_TEXT.availability', 'WIDGET_TEXT.explain', 'WIDGET_TEXT.showValues', 'WIDGET_TEXT.showValuesCaption']) expect(card, key).toContain(key);
+    expect(card).toContain('widgetAvailable()');
+    for (const key of ['WIDGET_TEXT.section', 'WIDGET_TEXT.availabilityWeb', 'WIDGET_TEXT.howTo', 'WIDGET_TEXT.availabilityLater', 'WIDGET_TEXT.explain', 'WIDGET_TEXT.showValues', 'WIDGET_TEXT.showValuesCaption']) expect(card, key).toContain(key);
     expect(card).toContain('widgetShowValues: v');
     // Independente de "Ocultar valores ao abrir".
     expect(card).not.toMatch(/hideOnOpen|setValuesHidden/);
