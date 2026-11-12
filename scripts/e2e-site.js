@@ -434,6 +434,50 @@ function roteiros(CALC) {
       await p.close();
     }
 
+    // 8. Espaçamento em todas as páginas (pedido do Enzo em 12/11/2026: "esse é um erro de espaçamento básico, precisamos evitar eles, em
+    // toda a Clarevo"): em 360, 768, 900 e 1280 px, nenhum cartão, moldura ou bloco com fundo ou borda encosta em outro ou fica por cima
+    // dele (menos de 8 px entre os dois, nos dois sentidos), e nada passa da largura da tela.
+    {
+      const paginas = [];
+      const andar = (d) => { for (const n of fs.readdirSync(d, { withFileTypes: true })) { const c = path.join(d, n.name); if (n.isDirectory()) andar(c); else if (n.name.endsWith('.html')) paginas.push(path.relative(saida, c)); } };
+      andar(saida);
+      const p = await pagina();
+      const encostados = [];
+      const largos = [];
+      for (const largura of [360, 768, 900, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        for (const arquivo of paginas) {
+          const url = `${origem}/${arquivo.replace(/\\/g, '/').replace(/index\.html$/, '').replace(/\.html$/, '')}`;
+          await p.goto(url);
+          const r = await p.evaluate(() => {
+            const caixas = [...document.querySelectorAll('main *, footer *')].filter((e) => {
+              const cs = getComputedStyle(e); const b = e.getBoundingClientRect();
+              if (b.width < 120 || b.height < 56 || cs.visibility === 'hidden' || cs.display === 'none') return false;
+              if ((parseFloat(cs.borderTopLeftRadius) || 0) < 8) return false;
+              const borda = parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none';
+              const fundo = cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent';
+              return borda || fundo || cs.boxShadow !== 'none';
+            });
+            const nome = (e) => `${e.tagName.toLowerCase()}${e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : ''} "${(e.textContent || '').trim().slice(0, 30)}"`;
+            const achados = [];
+            for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
+              const a = caixas[i], b = caixas[j];
+              if (a.contains(b) || b.contains(a)) continue;
+              const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+              const gx = Math.max(rb.left - ra.right, ra.left - rb.right), gy = Math.max(rb.top - ra.bottom, ra.top - rb.bottom);
+              if (gx < 8 && gy < 8) achados.push(`${nome(a)} e ${nome(b)} (${Math.round(Math.max(gx, gy))} px)`);
+            }
+            return { achados: achados.slice(0, 3), largo: document.documentElement.scrollWidth > window.innerWidth + 1 };
+          });
+          for (const x of r.achados) encostados.push(`${arquivo} em ${largura} px: ${x}`);
+          if (r.largo) largos.push(`${arquivo} em ${largura} px`);
+        }
+      }
+      ok(`espaçamento: em ${paginas.length} páginas e 4 larguras, nenhum cartão ou bloco encostado em outro ou por cima dele`, encostados.length === 0, `${encostados.length} casos: ${encostados.slice(0, 12).join(' | ')}`);
+      ok(`espaçamento: em ${paginas.length} páginas e 4 larguras, nada passa da largura da tela`, largos.length === 0, largos.slice(0, 6).join(' | '));
+      await p.close();
+    }
+
     if (process.env.PESOS_DAS_CALCULADORAS) console.log(`\nJavaScript carregado por página de calculadora (sem compressão):\n${Object.entries(pesos).map(([s, v]) => `  ${s.padEnd(22)} ${String(v.pedidos).padStart(3)} pedidos ${String(v.bytes).padStart(7)} B`).join('\n')}\n`);
     ok('nenhuma violação da política de segurança, erro de console ou de página', problemas.length === 0, problemas.slice(0, 3).join(' | '));
     ok('nenhum pedido para fora do próprio site', pedidosDeFora.length === 0, pedidosDeFora.slice(0, 3).join(' | '));

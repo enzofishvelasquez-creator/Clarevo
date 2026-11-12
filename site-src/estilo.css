@@ -159,6 +159,8 @@ blockquote>:last-child{margin-bottom:0}
 /* Cartões e grades */
 .grade{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(15.5rem,100%),1fr))}
 .grade-3{grid-template-columns:repeat(auto-fit,minmax(min(17rem,100%),1fr))}
+/* Duas grades seguidas (Para empresas): o mesmo respiro de dentro da grade entre uma e outra, nunca cartões encostados (12/11/2026). */
+:is(.grade,.mini)+:is(.grade,.mini){margin-top:1rem}
 .cartao{background:var(--superficie);border:1px solid var(--linha);border-radius:20px;padding:1.25rem}
 .bloco-alt .cartao{background:var(--fundo)}
 .cartao h3{margin-top:0}
@@ -169,8 +171,8 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .destaque{background:var(--lima-claro);border:2px solid var(--lima);border-radius:20px;padding:1.5rem}
 .destaque h2{margin-top:0}
 .destaque p:last-child,.destaque ul:last-child{margin-bottom:0}
-.nao-e{list-style:none;padding:0}
-.nao-e li{background:var(--superficie);border:1px solid var(--linha);border-radius:14px;padding:.75rem 1rem}
+.nao-e{list-style:none;padding:0;display:grid;gap:.75rem}
+.nao-e li{background:var(--superficie);border:1px solid var(--linha);border-radius:14px;padding:.75rem 1rem;margin:0}
 .etiqueta{display:inline-block;padding:.1rem .65rem;border-radius:999px;background:var(--lima-claro);color:var(--texto);border:1px solid var(--lima);font-size:.875rem;font-weight:700;line-height:1.6}
 .etiqueta-azul{background:var(--azul-claro);border-color:var(--link)}
 
