@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Txt } from '@/components/ui';
 import { setBrowseBarInset } from '@/lib/bar-inset';
+import { useWideLayout } from '@/lib/layout';
 import { colors, fonts, radius } from '@/theme/tokens';
 
 /**
@@ -42,13 +43,13 @@ const subscribeLastTab = (l: () => void) => {
   lastTabListeners.add(l);
   return () => void lastTabListeners.delete(l);
 };
-const useLastTab = () => useSyncExternalStore(subscribeLastTab, () => lastTab, () => null);
+export const useLastTab = () => useSyncExternalStore(subscribeLastTab, () => lastTab, () => null);
 
 type FaceProps = PressableProps & { focused: boolean; label: string; a11y: string; icon: LucideIcon };
 
 /** Botão da barra: o mesmo desenho nas abas e nas telas de consulta (ícone, rótulo curto, 56 px, aba marcada). */
 const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a11y, icon: Icon, ...props }, ref) {
-  const color = focused ? colors.brand : colors.textSecondary;
+  const color = focused ? colors.brandText : colors.textSecondary;
   // Cinco abas (D-093): o rótulo mais longo ("Movimentos") cabe inteiro de 320 px para cima, com letra de 12, 11 ou 10,5.
   const width = useWindowDimensions().width;
   const fontSize = width >= 375 ? 12 : width >= 340 ? 11 : 10.5;
@@ -63,7 +64,7 @@ const TabFace = forwardRef<View, FaceProps>(function TabFace({ focused, label, a
       style={(s) => [
         styles.button,
         focused && styles.buttonActive,
-        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
       <Icon size={22} color={color} strokeWidth={focused ? 2.25 : 2} />
       <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold, fontSize, letterSpacing: -0.1 }} numberOfLines={1} maxFontSizeMultiplier={1.3} adjustsFontSizeToFit minimumFontScale={0.8}>
@@ -109,9 +110,11 @@ export function BrowseTabBar() {
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboardVisible();
   const origin = useLastTab();
+  // Versão para computador (a partir de 1024 px): a barra lateral (`DesktopNav`) faz este papel.
+  const wide = useWideLayout();
   // Endereço que não existe (+not-found, e _sitemap, que mostra a mesma tela): tela de entrada, sem barra, com a saída no botão.
   const unmatched = useSegments().some((s) => s === '+not-found' || s === '_sitemap');
-  const visible = !unmatched && barModeFor(pathname) === 'consulta' && !keyboard;
+  const visible = !unmatched && barModeFor(pathname) === 'consulta' && !keyboard && !wide;
   useEffect(() => {
     if (!visible) setBrowseBarInset(0);
   }, [visible]);
@@ -131,9 +134,19 @@ export function BrowseTabBar() {
   );
 }
 
-/** Os TabTrigger precisam ser filhos diretos de TabList dentro do layout de Tabs. */
-export function TabBar({ children, ...props }: TabListProps) {
+/**
+ * Os TabTrigger precisam ser filhos diretos de TabList dentro do layout de Tabs. `hidden`: na versão para computador, a barra lateral
+ * navega; a lista continua montada (as abas existem para o roteador), mas fora da tela e do leitor de tela.
+ */
+export function TabBar({ children, hidden = false, ...props }: TabListProps & { hidden?: boolean }) {
   const insets = useSafeAreaInsets();
+  if (hidden) {
+    return (
+      <View style={{ display: 'none' }} aria-hidden>
+        <View {...props}>{children}</View>
+      </View>
+    );
+  }
   return (
     <View style={[styles.barWrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       <View {...props} style={styles.bar}>

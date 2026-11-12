@@ -49,7 +49,7 @@ export function TopicRow({
 }) {
   const minutes = topicReadingMinutes(topic);
   const sub = caption === undefined ? topic.subtitle : caption;
-  const secondary = onAccent ? colors.text : colors.textSecondary;
+  const secondary = onAccent ? colors.textOnAccent : colors.textSecondary;
   return (
     <Pressable
       accessibilityRole="button"
@@ -59,10 +59,10 @@ export function TopicRow({
         styles.row,
         !last && (onAccent ? styles.dividerOnAccent : styles.divider),
         s.pressed && { opacity: 0.7 },
-        (s as { focused?: boolean }).focused && ui.focusRing,
+        (s as { focused?: boolean }).focused && (onAccent ? styles.focusOnAccent : ui.focusRing),
       ]}>
       <View style={styles.texts}>
-        <Txt variant="label" style={styles.title}>
+        <Txt variant="label" color={onAccent ? colors.textOnAccent : colors.text} style={styles.title}>
           {topic.title}
         </Txt>
         {sub ? (
@@ -75,7 +75,7 @@ export function TopicRow({
         <Txt variant="caption" color={secondary} style={{ fontFamily: fonts.semibold }} maxFontSizeMultiplier={1.6}>
           {LEARN_UI_TEXT.minutesShort(minutes)}
         </Txt>
-        <ChevronRight size={20} color={onAccent ? colors.text : colors.textSecondary} aria-hidden />
+        <ChevronRight size={20} color={onAccent ? colors.textOnAccent : colors.textSecondary} aria-hidden />
       </View>
     </Pressable>
   );
@@ -84,7 +84,9 @@ export function TopicRow({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: space[3], minHeight: 56 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  dividerOnAccent: { borderBottomWidth: 1, borderBottomColor: 'rgba(23,34,59,0.14)' },
+  dividerOnAccent: { borderBottomWidth: 1, borderBottomColor: colors.lineOnAccent },
+  // Sobre o lima, o anel de foco é o azul da marca (4,4:1 sobre o lima nos dois temas; o azul claro do modo escuro sumiria).
+  focusOnAccent: { ...ui.focusRing, outlineColor: colors.brand } as object,
   texts: { flex: 1, minWidth: 0, gap: 2 },
   title: { fontFamily: fonts.bold, fontSize: 16, lineHeight: 22 },
   end: { flexDirection: 'row', alignItems: 'center', gap: space[1], flexShrink: 0 },

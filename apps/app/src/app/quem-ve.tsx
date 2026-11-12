@@ -24,7 +24,7 @@ export default function QuemVeScreen() {
     <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
       {kind === 'pessoal' ? (
         <Card style={{ flexDirection: 'row', gap: space[3], alignItems: 'center' }}>
-          <User size={22} color={colors.brand} />
+          <User size={22} color={colors.brandText} />
           <View style={{ flex: 1 }}>
             <Txt variant="label">{user?.displayName} (você)</Txt>
             <Txt variant="caption" color={colors.textSecondary}>

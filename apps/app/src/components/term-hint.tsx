@@ -39,7 +39,7 @@ export function TermHint({ term, slug, label, style }: { term: string; slug: Top
           </Txt>
           <LinkButton
             label={LEARN_UI_TEXT.readFull}
-            color={colors.brandDeep}
+            color={colors.brandTextDeep}
             onPress={() => router.push(explanationHref(topic.slug, 'tarefa'))}
             style={styles.readFull}
           />

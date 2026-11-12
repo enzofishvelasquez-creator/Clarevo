@@ -77,7 +77,7 @@ function EntryBody({ entry }: { entry: GuideEntry }) {
           {entry.steps.map((step, i) => (
             <View key={step} style={styles.step} accessible accessibilityLabel={GUIDE_TEXT.stepA11y(i + 1, step)}>
               <View style={styles.number} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-                <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.extrabold }}>
+                <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.extrabold }}>
                   {i + 1}
                 </Txt>
               </View>
@@ -116,7 +116,7 @@ function EntryBody({ entry }: { entry: GuideEntry }) {
 function Path({ path, quiet }: { path: readonly string[]; quiet?: boolean }) {
   return (
     <View style={[styles.path, quiet && styles.pathQuiet]} accessible accessibilityLabel={GUIDE_TEXT.whereA11y(path)}>
-      <Txt variant="label" color={quiet ? colors.textSecondary : colors.brand} style={{ fontFamily: fonts.bold }}>
+      <Txt variant="label" color={quiet ? colors.textSecondary : colors.brandText} style={{ fontFamily: fonts.bold }}>
         {guideWhere(path)}
       </Txt>
     </View>

@@ -362,7 +362,7 @@ export default function ContasAPagarScreen() {
           </View>
         ) : !s ? null : !s.hasAny ? (
           <Card>
-            <EmptyState title="Nenhuma conta a pagar em aberto" art="compromissos">
+            <EmptyState title="Nenhuma conta a pagar em aberto" art="contas">
               Anote contas que ainda vão vencer, como internet ou condomínio. Elas ficam separadas do que já foi pago até você marcar como
               paga.
             </EmptyState>
@@ -372,7 +372,7 @@ export default function ContasAPagarScreen() {
           <Card>
             <EmptyState
               title={`Nenhuma conta a pagar com vencimento em ${monthName.toLowerCase()}`}
-              art="compromissos"
+              art="contas"
               action={
                 isCurrent ? undefined : (
                   <Button label={`Ver ${formatMonthBR(currentMonth).toLowerCase()}`} tone="soft" onPress={() => setMonth(currentMonth)} />
@@ -507,7 +507,7 @@ function PayablesMonthPicker({ month, currentMonth, onChange }: { month: IsoMont
           hitSlop={4}
           onPress={() => prev && onChange(prev)}
           style={(st) => [styles.monthBtn, !prev && { opacity: 0.35 }, prev && (st as { focused?: boolean }).focused && styles.focusRing]}>
-          <ChevronLeft size={22} color={colors.brand} />
+          <ChevronLeft size={22} color={colors.brandText} />
         </Pressable>
         <Txt variant="caption" color={colors.textSecondary} style={{ flex: 1, textAlign: 'center' }} accessibilityLiveRegion="polite">
           Pessoal · {formatMonthBR(month)}
@@ -520,7 +520,7 @@ function PayablesMonthPicker({ month, currentMonth, onChange }: { month: IsoMont
           hitSlop={4}
           onPress={() => next && onChange(next)}
           style={(st) => [styles.monthBtn, !next && { opacity: 0.35 }, next && (st as { focused?: boolean }).focused && styles.focusRing]}>
-          <ChevronRight size={22} color={colors.brand} />
+          <ChevronRight size={22} color={colors.brandText} />
         </Pressable>
       </View>
       {month !== currentMonth ? (
@@ -556,9 +556,9 @@ function RemindersLink() {
       accessibilityLabel={`${t.title}. ${t.caption}`}
       onPress={() => router.push(REMINDERS_SETTINGS_HREF as Href)}
       style={(st) => [styles.remindersLink, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
-      <Bell size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
+      <Bell size={20} color={colors.brandText} strokeWidth={2.25} aria-hidden />
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
+        <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
           {t.title}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>
@@ -608,9 +608,9 @@ function SeriesLink({ count }: { count: number | null }) {
       accessibilityLabel={legend ? `Gastos fixos e parcelamentos, ${legend}` : 'Gastos fixos e parcelamentos'}
       onPress={() => router.push('/gastos-fixos')}
       style={(st) => [styles.seriesLink, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
-      <Repeat size={20} color={colors.brand} strokeWidth={2.25} />
+      <Repeat size={20} color={colors.brandText} strokeWidth={2.25} />
       <View style={{ flexShrink: 1 }}>
-        <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
+        <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
           Gastos fixos e parcelamentos
         </Txt>
         {legend ? (
@@ -630,5 +630,5 @@ const styles = StyleSheet.create({
   monthBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   remindersLink: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56, paddingHorizontal: space[4], paddingVertical: space[2], borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   seriesLink: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: space[2], minHeight: 44, paddingHorizontal: space[2], borderRadius: radius.sm },
-  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as object,
 });

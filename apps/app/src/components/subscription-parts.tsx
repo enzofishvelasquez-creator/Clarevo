@@ -41,11 +41,11 @@ export function BadgeConfetti({ inline = false }: { inline?: boolean }) {
   return (
     <Svg width={104} height={64} viewBox="0 0 104 64" style={inline ? undefined : styles.confetti} accessible={false} pointerEvents="none">
       <Circle cx={8} cy={30} r={3.5} fill={colors.accent} />
-      <Rect x={18} y={6} width={7} height={7} rx={2} fill={colors.surface} transform="rotate(20 21 9)" />
+      <Rect x={18} y={6} width={7} height={7} rx={2} fill={colors.surfaceOnBrand} transform="rotate(20 21 9)" />
       <Circle cx={30} cy={52} r={3} fill={colors.illustration} />
-      <Rect x={2} y={50} width={6} height={6} rx={1.5} fill={colors.surface} opacity={0.85} transform="rotate(35 5 53)" />
+      <Rect x={2} y={50} width={6} height={6} rx={1.5} fill={colors.surfaceOnBrand} opacity={0.85} transform="rotate(35 5 53)" />
       <Rect x={40} y={0} width={6} height={6} rx={1.5} fill={colors.illustration} transform="rotate(-15 43 3)" />
-      <Circle cx={98} cy={4} r={3} fill={colors.surface} />
+      <Circle cx={98} cy={4} r={3} fill={colors.surfaceOnBrand} />
     </Svg>
   );
 }
@@ -83,12 +83,12 @@ export function SubscriptionHero({
       <View style={styles.topRow}>
         {celebrate ? <BadgeConfetti /> : null}
         <View style={styles.eyebrow}>
-          <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold }}>
+          <Txt variant="caption" color={colors.textOnAccent} style={{ fontFamily: fonts.bold }}>
             {eyebrow}
           </Txt>
         </View>
         <Animated.View entering={ZoomIn.delay(120).duration(360).reduceMotion(ReduceMotion.System)} style={[styles.badge, celebrate ? styles.badgeCelebrate : styles.badgePlain]}>
-          <Icon size={30} color={celebrate ? colors.text : colors.brand} aria-hidden />
+          <Icon size={30} color={celebrate ? colors.textOnAccent : colors.brand} aria-hidden />
         </Animated.View>
       </View>
       <Txt variant="hero" color={colors.textOnBrand} accessibilityRole="header" aria-level={2} style={styles.title}>
@@ -146,7 +146,7 @@ export function BenefitsCard({ subscribed }: { subscribed: boolean }) {
         return (
           <View key={b.icon} style={styles.benefit}>
             <View style={[styles.benefitIcon, { backgroundColor: lime ? colors.accentTint : colors.brandTint }]}>
-              <Icon size={20} color={lime ? colors.text : colors.brand} aria-hidden />
+              <Icon size={20} color={lime ? colors.text : colors.brandText} aria-hidden />
             </View>
             <Txt variant="label" style={{ flex: 1 }}>
               {b.text}
@@ -165,9 +165,9 @@ const styles = StyleSheet.create({
   eyebrow: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1], alignSelf: 'flex-start', flexShrink: 1 },
   badge: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   badgeCelebrate: { backgroundColor: colors.accent },
-  badgePlain: { backgroundColor: colors.surface },
+  badgePlain: { backgroundColor: colors.surfaceOnBrand },
   title: { fontSize: 30, lineHeight: 38 },
-  track: { height: 10, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.28)', overflow: 'hidden' },
+  track: { height: 10, borderRadius: radius.pill, backgroundColor: colors.onBrandLine, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.accent },
   benefit: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 },
   benefitIcon: { width: 40, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },

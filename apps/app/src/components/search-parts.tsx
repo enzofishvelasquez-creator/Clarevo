@@ -49,10 +49,10 @@ export function PurchaseRow({ entry, cardName, last, onPress }: { entry: CardEnt
         styles.row,
         !last && styles.divider,
         s.pressed && { opacity: 0.7 },
-        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
       <View style={styles.icon}>
-        <CreditCard size={18} color={colors.brand} aria-hidden />
+        <CreditCard size={18} color={colors.brandText} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>

@@ -89,6 +89,8 @@ export interface DevicePrefs {
   extraSavingsReminder: boolean;
   /** "Agora não" no lembrete de valor extra: o mês (AAAA-MM) em que ele fica escondido. */
   extraSavingsDismissedMonth: string | null;
+  /** O último mês (AAAA-MM) cuja comemoração "fechou dentro do orçamento" a pessoa já fechou neste aparelho. */
+  budgetCelebratedMonth: string | null;
   /**
    * Lembretes do dia a dia (D-087): um interruptor por aviso (gastos do dia, recebimentos do mês, mapa do mês, uma semana sem anotar)
    * e o horário deles, separado do horário dos lembretes de vencimento. Só neste aparelho, como os lembretes de vencimento; não é dado
@@ -121,6 +123,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   categoryView: DEFAULT_CATEGORY_VIEW,
   extraSavingsReminder: false,
   extraSavingsDismissedMonth: null,
+  budgetCelebratedMonth: null,
   routineReminders: NO_ROUTINE_REMINDERS,
   routineReminderHour: DEFAULT_ROUTINE_REMINDER_HOUR,
   depositReminderDay: DEFAULT_DEPOSIT_REMINDER_DAY,
@@ -157,6 +160,8 @@ function parse(raw: string | null | undefined): DevicePrefs {
       extraSavingsReminder: v.extraSavingsReminder === true,
       extraSavingsDismissedMonth:
         typeof v.extraSavingsDismissedMonth === 'string' && /^\d{4}-\d{2}$/.test(v.extraSavingsDismissedMonth) ? v.extraSavingsDismissedMonth : null,
+      budgetCelebratedMonth:
+        typeof v.budgetCelebratedMonth === 'string' && /^\d{4}-\d{2}$/.test(v.budgetCelebratedMonth) ? v.budgetCelebratedMonth : null,
       routineReminders: parseRoutineReminderChoices(v.routineReminders),
       routineReminderHour: isRoutineReminderHour(v.routineReminderHour) ? v.routineReminderHour : DEFAULT_ROUTINE_REMINDER_HOUR,
       depositReminderDay: isDepositReminderDay(v.depositReminderDay) ? v.depositReminderDay : DEFAULT_DEPOSIT_REMINDER_DAY,

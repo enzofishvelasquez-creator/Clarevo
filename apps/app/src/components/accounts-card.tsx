@@ -94,7 +94,7 @@ function AccountRow({ account, last }: { account: FinancialAccount; last: boolea
         (s as { focused?: boolean }).focused && styles.focusRing,
       ]}>
       <View style={styles.icon}>
-        <Icon size={20} color={archived ? colors.textSecondary : colors.brand} strokeWidth={2.25} aria-hidden />
+        <Icon size={20} color={archived ? colors.textSecondary : colors.brandText} strokeWidth={2.25} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} color={archived ? colors.textSecondary : colors.text} numberOfLines={clampLines(2)}>
@@ -113,5 +113,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, minHeight: 56 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   icon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
-  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as object,
 });

@@ -370,7 +370,7 @@ function InvoiceTop({
               {t.title}
             </Txt>
             <View style={styles.statusPill}>
-              <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold }}>
+              <Txt variant="caption" color={colors.textOnAccent} style={{ fontFamily: fonts.bold }}>
                 {t.situation}
               </Txt>
             </View>

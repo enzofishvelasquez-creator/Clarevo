@@ -4,6 +4,7 @@ import { PiggyBank } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { MoneyTxt } from '@/components/money-text';
+import { useNotice } from '@/components/notice-queue';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
 import { updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { useCommittedSummary, useGoals } from '@/state/data';
@@ -34,16 +35,17 @@ export function ExtraSavingsCard({
   const on = eligible && prefs?.extraSavingsReminder === true && prefs.extraSavingsDismissedMonth !== month;
   const committed = useCommittedSummary(on ? contextId : undefined, month);
   const goals = useGoals(on ? contextId : undefined);
-  if (!on || !user || !records || committed.data === undefined) return null;
-  const extra = extraIncomeOfMonth(records, month, committed.data?.referenceCents ?? null);
-  if (extra === 0) return null;
+  const extra = on && user && records && committed.data !== undefined ? extraIncomeOfMonth(records, month, committed.data?.referenceCents ?? null) : 0;
+  // Entra na fila de avisos do Resumo (um aviso temporário por vez).
+  const show = useNotice('extra', extra > 0);
+  if (!show || !user || extra === 0) return null;
   const reserve = goals.data ? organizeGoals(goals.data).reserve : null;
   const persist = auth.mode !== 'demo';
 
   return (
     <Card style={{ gap: space[3] }}>
       <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'center' }}>
-        <PiggyBank size={22} color={colors.brand} aria-hidden />
+        <PiggyBank size={22} color={colors.brandText} aria-hidden />
         <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ flex: 1 }}>
           {EXTRA_SAVINGS_TEXT.title}
         </Txt>

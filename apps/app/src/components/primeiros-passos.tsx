@@ -175,7 +175,7 @@ function StepRow({ step, done, last }: { step: Step; done: boolean; last: boolea
         (st as { focused?: boolean }).focused && styles.focusRing,
       ]}>
       <View style={[styles.icon, done && styles.iconDone]}>
-        <Icon size={18} color={done ? colors.text : colors.brand} strokeWidth={done ? 2.75 : 2.25} aria-hidden />
+        <Icon size={18} color={done ? colors.textOnAccent : colors.brandText} strokeWidth={done ? 2.75 : 2.25} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   // Passo pronto: o lima da marca, com o visto escuro (12,4:1).
   iconDone: { backgroundColor: colors.accent },
   track: { height: 8, borderRadius: radius.pill, backgroundColor: colors.brandTint, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.brand },
+  fill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.brandMark },
   dismiss: { alignSelf: 'flex-start', paddingHorizontal: 0 },
-  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as object,
 });

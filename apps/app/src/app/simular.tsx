@@ -171,7 +171,7 @@ export default function SimularScreen() {
       <Screen scrollRef={scrollRef} contentStyle={{ padding: space[5], gap: space[4] }}>
         {/* Aviso fixo (D-028): no topo, para estar na tela sem rolagem, também em 360 px. */}
         <View style={styles.disclaimer}>
-          <Info size={18} color={colors.brand} style={{ marginTop: 1 }} aria-hidden />
+          <Info size={18} color={colors.brandText} style={{ marginTop: 1 }} aria-hidden />
           <Txt variant="caption" style={{ flex: 1 }}>
             {T.disclaimer}
           </Txt>

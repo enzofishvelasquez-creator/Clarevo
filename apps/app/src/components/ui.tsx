@@ -30,9 +30,10 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBrowseBarInset } from '@/lib/bar-inset';
+import { WIDE_TAB_MAX, useWideLayout } from '@/lib/layout';
 import { HIDDEN_MONEY, HIDDEN_MONEY_A11Y, maskMoneyLabel, maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { yearA11y, yearA11yLabel } from '@/lib/years';
-import { colors, fonts, motion, radius, space, tabular, type } from '@/theme/tokens';
+import { cardShadowOpacity, colors, fonts, motion, radius, space, tabular, type } from '@/theme/tokens';
 
 type Variant = keyof typeof type;
 
@@ -110,7 +111,9 @@ function useScreenContentStyle(contentStyle: StyleProp<ViewStyle> | undefined, b
   const own = StyleSheet.flatten(contentStyle) as ViewStyle | undefined;
   const ownBottom = own?.paddingBottom ?? own?.paddingVertical ?? own?.padding;
   const underBar = bottomInset && barInset > 0 ? { paddingBottom: barInset + (typeof ownBottom === 'number' ? ownBottom : space[10]) } : null;
-  return [!wide && styles.screenContent, bottomInset && { paddingBottom: insets.bottom + space[10] }, contentStyle, underBar];
+  // Versão para computador: as telas de consulta usam até 760 px (dentro do painel dos formulários, que tem 560, o limite não muda nada).
+  const desktop = useWideLayout();
+  return [!wide && styles.screenContent, !wide && desktop && { maxWidth: WIDE_TAB_MAX }, bottomInset && { paddingBottom: insets.bottom + space[10] }, contentStyle, underBar];
 }
 
 export function Screen({
@@ -218,7 +221,9 @@ export function CardSlice({ first, last, children, style }: { first?: boolean; l
 
 /** Conteúdo das abas abaixo do cabeçalho de ponta a ponta: limitado a 560 px e centralizado. */
 export function Body({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.body, style]}>{children}</View>;
+  // Versão para computador: as abas usam mais da largura (o Resumo, em painel, passa o próprio limite em `style`).
+  const wide = useWideLayout();
+  return <View style={[styles.body, wide && { maxWidth: WIDE_TAB_MAX, paddingTop: space[8] }, style]}>{children}</View>;
 }
 
 export function TopInset({ color }: { color: string }) {
@@ -233,13 +238,20 @@ export function TopInset({ color }: { color: string }) {
 export function IconBlock({ icon: Icon, lime = false, size = 40 }: { icon: LucideIcon; lime?: boolean; size?: number }) {
   return (
     <View style={{ width: size, height: size, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: lime ? colors.accentTint : colors.brandTint }}>
-      <Icon size={Math.round(size / 2)} color={lime ? colors.text : colors.brand} strokeWidth={2.25} aria-hidden />
+      <Icon size={Math.round(size / 2)} color={lime ? colors.text : colors.brandText} strokeWidth={2.25} aria-hidden />
     </View>
   );
 }
 
+/** Marca do cartão na web (`data-card`): o teste de telas confere que nenhum cartão encosta em outro ou fica por cima dele. */
+const CARD_MARK = { dataSet: { card: '1' } } as object;
+
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  return (
+    <View style={[styles.card, style]} {...CARD_MARK}>
+      {children}
+    </View>
+  );
 }
 
 /** Resposta ao toque: leve redução de escala em 120 ms (CL-V008). Com "reduzir movimento", não escala. */
@@ -258,14 +270,16 @@ function usePressScale() {
   };
 }
 
-type ButtonTone = 'brand' | 'soft' | 'danger' | 'ghost' | 'onBrand';
+type ButtonTone = 'brand' | 'soft' | 'danger' | 'ghost' | 'onBrand' | 'onBrandSoft';
 
 const TONES: Record<ButtonTone, { bg: string; bgPressed: string; fg: string }> = {
   brand: { bg: colors.brand, bgPressed: colors.brandPressed, fg: colors.textOnBrand },
-  soft: { bg: colors.brandTint, bgPressed: colors.brandTintPressed, fg: colors.brand },
+  soft: { bg: colors.brandTint, bgPressed: colors.brandTintPressed, fg: colors.brandText },
   danger: { bg: colors.surface, bgPressed: colors.errorTint, fg: colors.error },
-  ghost: { bg: 'transparent', bgPressed: colors.brandTint, fg: colors.brand },
-  onBrand: { bg: 'transparent', bgPressed: 'rgba(255,255,255,0.16)', fg: colors.textOnBrand },
+  ghost: { bg: 'transparent', bgPressed: colors.brandTint, fg: colors.brandText },
+  onBrand: { bg: 'transparent', bgPressed: colors.onBrandPressed, fg: colors.textOnBrand },
+  // Botão suave dentro de um cartão azul (reserva, plano de guardar): claro também no modo escuro, com o azul da marca.
+  onBrandSoft: { bg: colors.onBrandSoft, bgPressed: colors.onBrandSoftPressed, fg: colors.brand },
 };
 
 export function Button({
@@ -328,7 +342,7 @@ export function Button({
 
 export function LinkButton({
   label,
-  color = colors.brand,
+  color = colors.brandText,
   icon: Icon,
   trailing: Trailing,
   style,
@@ -488,8 +502,8 @@ export function Chip({
           selected && styles.chipSelected,
           (s as { focused?: boolean }).focused && styles.focusRing,
         ]}>
-        {selected ? <Check size={16} color={colors.brand} strokeWidth={2.5} style={{ flexShrink: 0 }} /> : null}
-        <Txt variant="label" color={selected ? colors.brand : colors.text} style={{ flexShrink: 1 }}>
+        {selected ? <Check size={16} color={colors.brandText} strokeWidth={2.5} style={{ flexShrink: 0 }} /> : null}
+        <Txt variant="label" color={selected ? colors.brandText : colors.text} style={{ flexShrink: 1 }}>
           {label}
         </Txt>
       </Pressable>
@@ -538,7 +552,7 @@ export function Skeleton({ width, height, onBrand, style }: { width: number | `$
     <Animated.View
       accessibilityElementsHidden
       importantForAccessibility="no"
-      style={[{ width, height, borderRadius: 8, backgroundColor: onBrand ? 'rgba(255,255,255,0.22)' : '#E6EBF5' }, anim, style]}
+      style={[{ width, height, borderRadius: 8, backgroundColor: onBrand ? colors.onBrandSkeleton : colors.muted }, anim, style]}
     />
   );
 }
@@ -547,7 +561,7 @@ export function Skeleton({ width, height, onBrand, style }: { width: number | `$
 export function DemoPill() {
   return (
     <View style={styles.demo} accessible accessibilityLabel="Demonstração: acesso simulado e dados fictícios">
-      <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold, fontSize: 12, lineHeight: 16 }} maxFontSizeMultiplier={DEMO_PILL_MAX_FONT_SCALE}>
+      <Txt variant="caption" color={colors.textOnAccent} style={{ fontFamily: fonts.bold, fontSize: 12, lineHeight: 16 }} maxFontSizeMultiplier={DEMO_PILL_MAX_FONT_SCALE}>
         Demonstração
       </Txt>
     </View>
@@ -566,8 +580,8 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: space[5],
-    shadowColor: '#17223B',
-    shadowOpacity: 0.06,
+    shadowColor: colors.shadow,
+    shadowOpacity: cardShadowOpacity,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
@@ -587,7 +601,7 @@ export const styles = StyleSheet.create({
   buttonText: { fontFamily: fonts.bold, fontSize: 16, textAlign: 'center', flexShrink: 1 },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'center', paddingHorizontal: space[2] },
   linkWithIcon: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brand, outlineOffset: 2 },
+  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brandText, outlineOffset: 2 },
   focusRingOnBrand: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.accent, outlineOffset: 2 },
   input: {
     minHeight: 52,
@@ -631,7 +645,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   chipCompact: { paddingHorizontal: space[2] },
-  chipSelected: { borderColor: colors.brand, backgroundColor: colors.brandTint },
+  chipSelected: { borderColor: colors.brandText, backgroundColor: colors.brandTint },
   banner: { flexDirection: 'row', gap: space[3], padding: space[4], borderRadius: radius.md, alignItems: 'flex-start' },
   demo: { backgroundColor: colors.accent, paddingHorizontal: space[2], paddingVertical: 2, borderRadius: radius.pill },
 });

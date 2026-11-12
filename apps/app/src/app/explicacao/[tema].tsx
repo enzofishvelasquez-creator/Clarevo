@@ -158,7 +158,7 @@ function SourceLine({ source, last, onOpen }: { source: LearnSource; last: boole
   const meta = [market ? LEARN_UI_TEXT.marketLabel : null, consulted].filter((t): t is string => !!t);
   const texts = (
     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      <Txt variant="label" color={source.kind === 'oficial' || market ? colors.brand : colors.text} style={{ fontFamily: fonts.bold }}>
+      <Txt variant="label" color={source.kind === 'oficial' || market ? colors.brandText : colors.text} style={{ fontFamily: fonts.bold }}>
         {line}
       </Txt>
       {meta.map((m) => (
@@ -178,7 +178,7 @@ function SourceLine({ source, last, onOpen }: { source: LearnSource; last: boole
         onPress={() => onOpen(url)}
         style={(s) => [styles.source, !last && styles.divider, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
         {texts}
-        <ExternalLink size={18} color={colors.brand} aria-hidden />
+        <ExternalLink size={18} color={colors.brandText} aria-hidden />
       </Pressable>
     );
   }

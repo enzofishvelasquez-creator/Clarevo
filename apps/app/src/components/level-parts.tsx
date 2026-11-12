@@ -14,6 +14,7 @@ import { useCallback, useEffect } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, ReduceMotion, ZoomIn } from 'react-native-reanimated';
 
+import { useNotice } from '@/components/notice-queue';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
 import { useLevelSeen } from '@/lib/level-seen';
 import { useAccountMarks } from '@/state/access';
@@ -33,7 +34,7 @@ export const WEB_IMG = Platform.OS === 'web' ? ('image' as const) : undefined;
 export function LevelBadge({ level, size = 32 }: { level: AccountLevel; size?: number }) {
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: levelColors[level], alignItems: 'center', justifyContent: 'center' }}>
-      <Award size={Math.round(size * 0.58)} color={colors.text} aria-hidden />
+      <Award size={Math.round(size * 0.58)} color={colors.textOnAccent} aria-hidden />
     </View>
   );
 }
@@ -105,7 +106,7 @@ export function LevelList({ level }: { level: AccountLevel }) {
             </View>
             {current ? (
               <View style={styles.tag}>
-                <Txt variant="caption" color={colors.brand} style={{ fontFamily: fonts.bold }}>
+                <Txt variant="caption" color={colors.brandText} style={{ fontFamily: fonts.bold }}>
                   {T.yourLevel}
                 </Txt>
               </View>
@@ -162,7 +163,9 @@ export function LevelUpCard() {
   useEffect(() => {
     if (level && loaded && last === null) mark(level);
   }, [level, loaded, last, mark]);
-  if (!level || !loaded || !shouldCelebrateLevel(last, level)) return null;
+  // Entra na fila de avisos do Resumo (um aviso temporário por vez).
+  const show = useNotice('nivel', Boolean(level && loaded && shouldCelebrateLevel(last, level)));
+  if (!show || !level) return null;
   return (
     <Animated.View entering={FadeInDown.duration(320).reduceMotion(ReduceMotion.System)}>
       <Card style={{ gap: space[3] }}>
@@ -171,7 +174,7 @@ export function LevelUpCard() {
             <LevelBadge level={level} size={40} />
           </Animated.View>
           <View style={{ flex: 1, gap: 2 }}>
-            <Txt variant="caption" color={colors.brand} style={{ fontFamily: fonts.bold }}>
+            <Txt variant="caption" color={colors.brandText} style={{ fontFamily: fonts.bold }}>
               {T.celebrateEyebrow}
             </Txt>
             <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -199,7 +202,7 @@ export function LevelUpCard() {
 
 const styles = StyleSheet.create({
   track: { height: 6, borderRadius: radius.pill, overflow: 'hidden', backgroundColor: colors.brandTint },
-  fill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.brand },
+  fill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.brandMark },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   actions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[3] },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 52, paddingVertical: space[2] },

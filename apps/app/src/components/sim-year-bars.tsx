@@ -8,7 +8,7 @@ import { LinkButton, Txt } from '@/components/ui';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 /**
- * Ano a ano do simulador (D-028, spec2 §4.2 e §4.7): uma barra por ano com "Aportado" (sólido, brandDeep) e "Rendimento
+ * Ano a ano do simulador (D-028, spec2 §4.2 e §4.7): uma barra por ano com "Aportado" (sólido, brandMarkDeep) e "Rendimento
  * na hipótese" (brandSoft com listras a 45°, separado por 2 px de branco), legenda sempre em texto, o valor só no último
  * ano e o botão "Ver tabela ano a ano" com o mesmo conteúdo. A cor não julga e não muda com o valor.
  * Acessibilidade: o gráfico é uma imagem com a frase completa (SIMULATE_TEXT.chartA11y); os desenhos e o rótulo do
@@ -40,7 +40,7 @@ function StripesDefs({ id }: { id: string }) {
 function Swatch({ kind }: { kind: 'aportado' | 'rendimento' }) {
   const id = `simlistras${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
-    <View style={[styles.swatch, kind === 'aportado' && { backgroundColor: colors.brandDeep }]} {...decorative}>
+    <View style={[styles.swatch, kind === 'aportado' && { backgroundColor: colors.brandMarkDeep }]} {...decorative}>
       {kind === 'rendimento' ? (
         <Svg width={14} height={14} accessible={false}>
           <StripesDefs id={id} />
@@ -91,7 +91,7 @@ function Bars({ years, width }: { years: readonly SimulationYear[]; width: numbe
         const separation = contributed > 0 && earnings > 4 ? 2 : 0;
         return (
           <G key={y.year}>
-            {contributed > 0 ? <Rect x={x} y={BARS_HEIGHT - contributed} width={barWidth} height={contributed} fill={colors.brandDeep} /> : null}
+            {contributed > 0 ? <Rect x={x} y={BARS_HEIGHT - contributed} width={barWidth} height={contributed} fill={colors.brandMarkDeep} /> : null}
             {earnings > 0 ? (
               <Rect x={x} y={BARS_HEIGHT - total} width={barWidth} height={Math.max(1, earnings - separation)} fill={`url(#${id})`} />
             ) : null}

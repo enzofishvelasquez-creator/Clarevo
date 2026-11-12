@@ -1,7 +1,7 @@
 import type { CardEntry } from './records';
 import { CARDS_TEXT, installmentAmounts, invoiceMonthOf, type CardDays } from './cards';
 import type { IsoDate, IsoMonth } from './dates';
-import { addMonths, formatMonthName, formatMonthYearBR, isValidIsoMonth, monthOf, monthsBetween } from './dates';
+import { addMonths, formatMonthBR, formatMonthName, formatMonthYearBR, isValidIsoMonth, monthOf, monthsBetween } from './dates';
 import { formatInteger } from './learn/format';
 import { percentTenths } from './learn/math';
 import type { Cents } from './money';
@@ -906,4 +906,28 @@ export const LIMIT_TEXT = {
     monthPrev: (month: IsoMonth) => `Mês anterior: ${formatMonthYearBR(month)}`,
     monthNext: (month: IsoMonth) => `Próximo mês: ${formatMonthYearBR(month)}`,
   },
+} as const;
+
+/**
+ * O mês que fechou dentro do orçamento (pedido do Enzo em 12/11/2026): todas as categorias com orçamento ficaram no valor definido ou
+ * abaixo, e pelo menos uma teve gasto (mês sem gasto nas categorias não é "dentro do orçamento", é mês sem anotação). null sem
+ * orçamento, sem gasto ou com alguma categoria acima: nesses casos nada aparece (nunca um recado negativo).
+ */
+export function budgetClosedWithin(s: BudgetSummary): { month: IsoMonth; categories: number } | null {
+  if (!s.hasAny || s.rows.some((r) => r.overCents > 0) || !s.rows.some((r) => r.usedCents > 0)) return null;
+  return { month: s.month, categories: s.rows.length };
+}
+
+/** Até que dia do mês seguinte o Resumo mostra a comemoração do mês que fechou dentro do orçamento. */
+export const BUDGET_CELEBRATION_LAST_DAY = 15;
+
+export const BUDGET_CELEBRATION_TEXT = {
+  eyebrow: 'Orçamento do mês',
+  title: (month: IsoMonth) => `${formatMonthBR(month)} fechou dentro do orçamento`,
+  body: (categories: number) =>
+    categories === 1
+      ? 'A categoria com orçamento ficou dentro do valor que você definiu.'
+      : `As ${categories} categorias com orçamento ficaram dentro do valor que você definiu.`,
+  open: (month: IsoMonth) => `Ver o orçamento de ${formatMonthBR(month).toLowerCase()}`,
+  dismiss: 'Fechar',
 } as const;

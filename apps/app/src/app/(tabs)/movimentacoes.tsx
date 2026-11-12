@@ -36,12 +36,14 @@ import { cardsCaption } from '@/components/card-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader, ContextSwitch, MonthSwitcher } from '@/components/header';
 import { RecordRow } from '@/components/record-row';
+import { RecordsTable } from '@/components/records-table';
 import { SearchEntry } from '@/components/search-parts';
 import { AnalysesEntry } from '@/components/analises-parts';
 import { EvolutionEntry } from '@/components/evolucao-parts';
 import { SeuMesEntry } from '@/components/seu-mes-parts';
 import { EmptyState, ErrorState } from '@/components/states';
-import { Body, Button, Card, CardSlice, Chip, ListCell, Money, ScreenList, Skeleton, Txt } from '@/components/ui';
+import { Body, Button, Card, CardSlice, Chip, ListCell, Money, Screen, ScreenList, Skeleton, Txt } from '@/components/ui';
+import { WIDE_CONTENT_MAX, useWideLayout } from '@/lib/layout';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { useAccounts, useCardsOverview, useCommitments, useMonthBudget, useMonthRecords, useSeriesList, useWork, useView } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -145,6 +147,7 @@ export default function MovimentacoesScreen() {
   const accountOptions = accounts.data && records.data ? accountFilterOptions(accounts.data, records.data) : [];
   const accountId = accountOptions.some((o) => o.id === accountFilter) ? accountFilter : null;
   const [notice] = useFlash();
+  const wide = useWideLayout();
   const s = records.summary;
   const list = useMemo(
     () => (records.data ? filterByAccount(sortNewestFirst(records.data), accountId).filter((r) => filter === 'todos' || r.kind === filter) : []),
@@ -156,14 +159,9 @@ export default function MovimentacoesScreen() {
   const rows = useMemo(() => (long ? dayRows(groups) : []), [long, groups]);
   const cells: Cell[] = long ? rows : [{ type: 'card', key: 'card', first: true, last: true }];
 
-  const header = (
+  /** Buscar, os atalhos de leitura, os botões de anotar e Organizar (no computador, a coluna da esquerda). */
+  const entries = (
     <>
-      <AppHeader title="Movimentos">
-        <ContextSwitch />
-        <MonthSwitcher />
-      </AppHeader>
-      <Body style={styles.bodyTop}>
-        <FlashBanner message={notice} />
         {/* Buscar (D-045): campo no topo que abre a busca em todos os meses; nada é digitado aqui. */}
         <SearchEntry onPress={() => router.push('/movimentacoes/buscar')} />
 
@@ -204,6 +202,12 @@ export default function MovimentacoesScreen() {
             ))}
           </View>
         </Card>
+    </>
+  );
+
+  /** Os totais do mês e os filtros da lista (no computador, acima da tabela). */
+  const listTools = (
+    <>
 
         {s ? (
           <View style={styles.totals}>
@@ -250,6 +254,19 @@ export default function MovimentacoesScreen() {
             ))}
           </View>
         ) : null}
+    </>
+  );
+
+  const header = (
+    <>
+      <AppHeader title="Movimentos">
+        <ContextSwitch />
+        <MonthSwitcher />
+      </AppHeader>
+      <Body style={styles.bodyTop}>
+        <FlashBanner message={notice} />
+        {entries}
+        {listTools}
       </Body>
     </>
   );
@@ -333,6 +350,42 @@ export default function MovimentacoesScreen() {
     );
   };
 
+  // Versão para computador (pedido do Enzo em 12/11/2026): duas colunas, com Buscar, os atalhos e Organizar à esquerda e, à direita, os
+  // totais, os filtros e a lista do mês em tabela (todas as linhas: no computador não é preciso montar só as que estão perto da tela).
+  if (wide) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <Screen wide>
+          <AppHeader title="Movimentos" wide>
+            <ContextSwitch />
+            <MonthSwitcher />
+          </AppHeader>
+          <Body style={{ maxWidth: WIDE_CONTENT_MAX }}>
+            <FlashBanner message={notice} />
+            <View style={styles.wideRow}>
+              <View style={styles.wideSide}>{entries}</View>
+              <View style={styles.wideMain}>
+                {listTools}
+                {/* Carregando, erro ou vazio: o mesmo cartão do celular. Com lançamentos, a tabela. */}
+                {records.isPending || records.isError || list.length === 0 ? (
+                  card
+                ) : (
+                  <Card>
+                    <RecordsTable
+                      records={list}
+                      accountName={accounts.data && accountOptions.length > 0 ? (r) => recordAccountName(accounts.data!, r) : null}
+                      onOpen={(r) => router.push(`/registro/${r.id}`)}
+                    />
+                  </Card>
+                )}
+              </View>
+            </View>
+          </Body>
+        </Screen>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScreenList wide data={cells} keyExtractor={(c) => c.key} renderItem={renderCell} extraData={[accounts.data, today]} header={header} />
@@ -355,7 +408,7 @@ function ShortcutRow({ icon: Icon, title, caption, open, last }: Shortcut & { la
         (st as { focused?: boolean }).focused && styles.focusRing,
       ]}>
       <View style={styles.shortcutIcon}>
-        <Icon size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
+        <Icon size={20} color={colors.brandText} strokeWidth={2.25} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
@@ -388,5 +441,8 @@ const styles = StyleSheet.create({
   shortcut: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, minHeight: 56 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   shortcutIcon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
-  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as object,
+  wideRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[6] },
+  wideSide: { width: 340, gap: space[4] },
+  wideMain: { flex: 1, minWidth: 0, gap: space[4] },
 });

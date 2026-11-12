@@ -218,11 +218,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxChecked: { backgroundColor: colors.brand, borderColor: colors.brand },
+  boxChecked: { backgroundColor: colors.brand, borderColor: colors.brandText },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 140 },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   resolved: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },
   doneIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.successTint, alignItems: 'center', justifyContent: 'center' },
-  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brand, outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brandText, outlineOffset: 2 } as object,
 });

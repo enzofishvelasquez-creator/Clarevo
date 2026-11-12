@@ -33,7 +33,7 @@ export function MemberLine({ member, trailing }: { member: FamilyMember; trailin
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-        <Users size={18} color={ex ? colors.textSecondary : colors.brand} />
+        <Users size={18} color={ex ? colors.textSecondary : colors.brandText} />
       </View>
       <View style={{ flex: 1 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold }} color={ex ? colors.textSecondary : colors.text}>

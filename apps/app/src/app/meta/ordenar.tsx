@@ -175,7 +175,7 @@ function MoveButton({ label, icon, disabled, onPress }: { label: string; icon: '
       hitSlop={4}
       onPress={onPress}
       style={(st) => [styles.move, disabled && { opacity: 0.35 }, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
-      <Icon size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
+      <Icon size={20} color={colors.brandText} strokeWidth={2.25} aria-hidden />
     </Pressable>
   );
 }

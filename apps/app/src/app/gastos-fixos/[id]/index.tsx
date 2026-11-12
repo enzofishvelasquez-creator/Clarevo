@@ -717,7 +717,7 @@ function PaidRow({ commitment: c, today, last }: { commitment: Commitment; today
         styles.row,
         !last && styles.divider,
         st.pressed && { opacity: 0.7 },
-        (st as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+        (st as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
       <Txt variant="label" style={[{ flex: 1 }, tabular]}>
         {number}

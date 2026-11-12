@@ -154,7 +154,7 @@ export default function ContaScreen() {
         {/* O perfil, com as iniciais no círculo e, no canto, o selo pequeno do nível da conta (D-095), como no gov.br. */}
         <Card style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space[4] }}>
           <View style={{ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandTint }} aria-hidden>
-            <Txt variant="title" color={colors.brand} maxFontSizeMultiplier={1.3}>
+            <Txt variant="title" color={colors.brandText} maxFontSizeMultiplier={1.3}>
               {initialsOf(user?.displayName ?? '')}
             </Txt>
             {level ? (

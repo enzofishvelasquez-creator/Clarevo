@@ -82,7 +82,7 @@ function MarkRow({ mark, done, last }: { mark: AccountMarkKey; done: boolean; la
   const { title, href } = ACCOUNT_MARK_TEXT[mark];
   const content = (
     <>
-      <View style={[styles.dot, done ? styles.dotDone : styles.dotTodo]}>{done ? <Check size={16} color={colors.brand} aria-hidden /> : null}</View>
+      <View style={[styles.dot, done ? styles.dotDone : styles.dotTodo]}>{done ? <Check size={16} color={colors.brandText} aria-hidden /> : null}</View>
       <Txt variant="label" style={{ flex: 1 }}>
         {title}
       </Txt>

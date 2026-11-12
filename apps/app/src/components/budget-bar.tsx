@@ -20,7 +20,7 @@ export function BudgetBar({ solidTenths, stripedTenths, minimal = false }: { sol
       <View style={[styles.fill, { width: `${solidTenths / 10}%` }, minimal && solidTenths === 0 && stripedTenths === 0 && styles.fillMin]} />
       {stripedTenths > 0 ? (
         <View style={[styles.striped, { width: `${stripedTenths / 10}%` }, solidTenths > 0 && styles.gap]} testID="trecho-listrado">
-          <Stripes height={12} color={colors.brand} />
+          <Stripes height={12} color={colors.brandMark} />
         </View>
       ) : null}
     </View>
@@ -29,7 +29,7 @@ export function BudgetBar({ solidTenths, stripedTenths, minimal = false }: { sol
 
 const styles = StyleSheet.create({
   track: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brandTint, overflow: 'hidden', flexDirection: 'row' },
-  fill: { height: 12, backgroundColor: colors.brand },
+  fill: { height: 12, backgroundColor: colors.brandMark },
   // Gasto de poucos centavos: ainda aparece um traço.
   fillMin: { width: 4 },
   striped: { height: 12, overflow: 'hidden', backgroundColor: colors.surface },

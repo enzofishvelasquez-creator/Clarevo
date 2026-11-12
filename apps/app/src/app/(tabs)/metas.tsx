@@ -216,7 +216,7 @@ function LearnCard() {
   if (shown.length === 0) return null;
   return (
     <View style={styles.learn}>
-      <Txt variant="title" style={{ fontFamily: fonts.extrabold }} accessibilityRole="header" aria-level={2}>
+      <Txt variant="title" color={colors.textOnAccent} style={{ fontFamily: fonts.extrabold }} accessibilityRole="header" aria-level={2}>
         Aprender
       </Txt>
       {shown.map((r, i) => (

@@ -45,10 +45,10 @@ export function RecordRow({
         styles.row,
         !last && styles.divider,
         s.pressed && { opacity: 0.7 },
-        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
       <View style={[styles.icon, isIn && { backgroundColor: colors.successTint }]}>
-        <Icon size={18} color={isIn ? colors.success : colors.brand} />
+        <Icon size={18} color={isIn ? colors.success : colors.brandText} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>

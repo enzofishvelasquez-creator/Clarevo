@@ -190,7 +190,7 @@ export const seriesStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   chips: seriesStyles.chips,
   track: { height: 8, borderRadius: 4, backgroundColor: colors.brandTint, borderWidth: 1, borderColor: colors.borderStrong, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: colors.brand, borderRadius: radius.sm },
+  fill: { height: '100%', backgroundColor: colors.brandMark, borderRadius: radius.sm },
   check: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], minHeight: 44, paddingVertical: space[2], borderRadius: radius.sm },
   box: {
     width: 24,
@@ -203,6 +203,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxChecked: { backgroundColor: colors.brand, borderColor: colors.brand },
-  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brand, outlineOffset: 2 },
+  boxChecked: { backgroundColor: colors.brand, borderColor: colors.brandText },
+  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brandText, outlineOffset: 2 },
 });

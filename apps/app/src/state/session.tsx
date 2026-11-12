@@ -14,6 +14,7 @@ import { clearNotePrefsMemory } from '@/lib/note-prefs';
 import { pendingAttempts } from '@/lib/pending-attempts';
 import { receiptLinks } from '@/lib/receipt-link';
 import { SupabaseAuth, supabaseConfigured } from '@/lib/supabase';
+import { colors } from '@/theme/tokens';
 
 /**
  * Demonstração pedida explicitamente (EXPO_PUBLIC_MODO_DEMO=1, como em `npm run export:demo`) sempre usa dados
@@ -54,9 +55,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
 function ConfigMissing() {
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: '#FFFFFF' }}>
-      <Text style={{ fontSize: 18, fontWeight: '700', color: '#17223B', textAlign: 'center' }}>Configuração incompleta</Text>
-      <Text style={{ fontSize: 16, color: '#4B5873', textAlign: 'center', marginTop: 8 }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: colors.surface }}>
+      <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' }}>Configuração incompleta</Text>
+      <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
         Este aplicativo foi gerado sem a ligação com o servidor. Consulte docs/05_SUPABASE.md.
       </Text>
     </View>

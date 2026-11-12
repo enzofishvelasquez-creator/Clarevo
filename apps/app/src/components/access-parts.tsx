@@ -52,7 +52,7 @@ export function AccessSituation({ situation }: { situation: string }) {
       </Txt>
       {/* A situação num selo lima, como no alto da tela Assinatura (12/11/2026). */}
       <View style={{ flexShrink: 1, backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: space[3], paddingVertical: space[1] }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, textAlign: 'right' }}>
+        <Txt variant="label" color={colors.textOnAccent} style={{ fontFamily: fonts.bold, textAlign: 'right' }}>
           {situation}
         </Txt>
       </View>
@@ -484,13 +484,13 @@ export function PlansCard({ access, webTest = false, subscribeHidden = false }: 
             accessibilityLabel={`Plano ${PLAN_NAME[p.plan]}, ${planPrice(p.plan)}. ${p.who}`}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
               <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: family ? colors.accent : colors.brand }}>
-                <PlanIcon size={20} color={family ? colors.text : colors.textOnBrand} aria-hidden />
+                <PlanIcon size={20} color={family ? colors.textOnAccent : colors.textOnBrand} aria-hidden />
               </View>
               <Txt variant="title" style={{ flex: 1 }}>
                 {PLAN_NAME[p.plan]}
               </Txt>
             </View>
-            <Txt variant="amount" color={family ? colors.text : colors.brandDeep}>
+            <Txt variant="amount" color={family ? colors.text : colors.brandTextDeep}>
               {planPriceAmount(p.plan)}
               <Txt variant="label" color={colors.textSecondary}>
                 {SUBSCRIPTION_SCREEN_TEXT.perMonth}

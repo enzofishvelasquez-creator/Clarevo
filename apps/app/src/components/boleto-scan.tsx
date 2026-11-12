@@ -84,20 +84,20 @@ export function BoletoReader({ today, disabled, onRead }: { today: IsoDate; disa
           setStep('folha');
         }}
         style={(s) => [styles.line, (s as { focused?: boolean }).focused && ui.focusRing, s.pressed && { backgroundColor: colors.brandTintPressed }]}>
-        <Barcode size={24} color={colors.brand} strokeWidth={2.25} />
+        <Barcode size={24} color={colors.brandText} strokeWidth={2.25} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold }}>
+          <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold }}>
             {BOLETO_TEXT.line}
           </Txt>
           <Txt variant="caption" color={colors.textSecondary}>
             {BOLETO_TEXT.lineHint}
           </Txt>
         </View>
-        <ChevronRight size={20} color={colors.brand} aria-hidden />
+        <ChevronRight size={20} color={colors.brandText} aria-hidden />
       </Pressable>
       {busy ? (
         <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'center' }} accessibilityLiveRegion="polite">
-          <ActivityIndicator color={colors.brand} />
+          <ActivityIndicator color={colors.brandText} />
           <Txt variant="label" color={colors.textSecondary}>
             {imageReading ? BOLETO_TEXT.workingImage : BOLETO_TEXT.working}
           </Txt>
@@ -325,10 +325,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.brandTint,
   },
-  backdrop: { flex: 1, backgroundColor: 'rgba(23,34,59,0.55)', alignItems: 'center', justifyContent: 'center', padding: space[6] },
+  backdrop: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: space[6] },
   box: { width: '100%', maxWidth: 420, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space[6], gap: space[3] },
   cameraBody: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', padding: space[5], gap: space[4], justifyContent: 'space-between' },
-  preview: { width: '100%', aspectRatio: 4 / 3, maxHeight: 360, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#0E1526' },
+  preview: { width: '100%', aspectRatio: 4 / 3, maxHeight: 360, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.camera },
   frameBox: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   // Moldura larga e baixa, do formato do código de barras do boleto.
   frame: { width: '90%', height: '34%', borderRadius: radius.md, borderWidth: 3, borderColor: colors.accent },

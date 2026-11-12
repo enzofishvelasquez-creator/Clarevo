@@ -225,5 +225,5 @@ const styles = StyleSheet.create({
   max: { minHeight: 44, textAlignVertical: 'center', paddingTop: space[3] },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 140 },
-  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brand, outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brandText, outlineOffset: 2 } as object,
 });

@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   dots: { flexDirection: 'row', gap: space[1] },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
-  dotOn: { backgroundColor: colors.brand, width: 20 },
+  dotOn: { backgroundColor: colors.brandMark, width: 20 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 120 },
   liveClip: { position: 'absolute', width: 1, height: 1, overflow: 'hidden' },

@@ -22,7 +22,7 @@ import { Card, FitMoney, LinkButton, Money, Txt, clampLines, styles as ui } from
 import { cardHref, invoiceHref } from '@/lib/cards';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
-const focusRing = { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as const;
+const focusRing = { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as const;
 
 /** "final 1234" ou nada (o número completo nunca existe no app). */
 export const finalText = (card: Pick<CardData, 'lastDigits'>) => (card.lastDigits ? `final ${card.lastDigits}` : null);
@@ -56,7 +56,7 @@ export function CardTile({ summary, today }: { summary: CardSummary; today: IsoD
       style={(st) => [ui.card, styles.tile, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && focusRing]}>
       <View style={styles.head}>
         <View style={styles.icon}>
-          <CreditCard size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
+          <CreditCard size={20} color={colors.brandText} strokeWidth={2.25} aria-hidden />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt variant="title" numberOfLines={clampLines(2)} style={{ fontSize: 17, lineHeight: 24 }}>
@@ -129,10 +129,10 @@ export function InvoiceRow({ invoice, today, last }: { invoice: Invoice; today: 
         styles.row,
         !last && styles.divider,
         st.pressed && { opacity: 0.7 },
-        (st as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+        (st as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
       <View style={styles.rowIcon}>
-        <Receipt size={18} color={colors.brand} aria-hidden />
+        <Receipt size={18} color={colors.brandText} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>

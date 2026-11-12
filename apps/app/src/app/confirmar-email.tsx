@@ -68,7 +68,7 @@ export default function ConfirmarEmail() {
     <AuthShell
       art={
         <View style={{ alignItems: 'center' }}>
-          <MailCheck size={56} color={colors.brand} />
+          <MailCheck size={56} color={colors.brandText} />
         </View>
       }
       title="Confira seu e-mail">

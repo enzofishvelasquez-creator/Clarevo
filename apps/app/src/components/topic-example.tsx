@@ -36,10 +36,10 @@ export function TopicExample({ topic }: { topic: Topic }) {
           onPress={() => setOpen((o) => !o)}
           hitSlop={6}
           style={(s) => [styles.toggle, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-          <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
+          <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
             {LEARN_UI_TEXT.showCalculation}
           </Txt>
-          <Chevron size={18} color={colors.brand} aria-hidden />
+          <Chevron size={18} color={colors.brandText} aria-hidden />
         </Pressable>
         {open ? (
           <Animated.View entering={FadeIn.duration(motion.context).reduceMotion(ReduceMotion.System)}>

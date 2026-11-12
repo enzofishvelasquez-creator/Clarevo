@@ -125,7 +125,7 @@ export function LegalGate({ active }: { active: boolean }) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(23,34,59,0.55)', alignItems: 'center', justifyContent: 'center', padding: space[4] },
+  backdrop: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: space[4] },
   box: { width: '100%', maxWidth: 440, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space[6], gap: space[4] },
   content: { gap: space[3] },
   title: { fontFamily: fonts.extrabold, fontSize: 22, lineHeight: 30 },

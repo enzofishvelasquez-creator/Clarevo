@@ -285,7 +285,7 @@ function LockScreen({ message, onUnlock }: { message: string | null; onUnlock: (
       <View style={[styles.lock, { paddingTop: insets.top + space[10], paddingBottom: insets.bottom + space[6] }]} accessibilityViewIsModal>
         <View style={styles.box}>
           <View style={styles.icon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <LockKeyhole size={32} color={colors.brand} />
+            <LockKeyhole size={32} color={colors.brandText} />
           </View>
           <Txt variant="title" accessibilityRole="header" style={{ textAlign: 'center', fontSize: 22, lineHeight: 30 }}>
             {PRIVACY_TEXT.lockTitle}

@@ -20,12 +20,12 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { MonthStepper } from '@/components/month-stepper';
-import { ErrorState } from '@/components/states';
+import { EmptyArt, ErrorState } from '@/components/states';
 import { Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { useBudgetNotices } from '@/lib/budget-notices';
 import { useMonthBudget, useMonthRefunds, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
-import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
+import { cardShadowOpacity, colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 /**
  * Orçamento por categoria (D-041): tela de consulta, com a barra inferior. Seletor de mês local (como Contas a pagar). Um card por
@@ -99,8 +99,9 @@ export default function OrcamentoScreen() {
                 </Txt>
               </Card>
             ) : (
-              <Card>
-                <Txt>{BUDGET_TEXT.noneYet}</Txt>
+              <Card style={{ alignItems: 'center', gap: space[3] }}>
+                <EmptyArt kind="orcamento" />
+                <Txt style={{ textAlign: 'center' }}>{BUDGET_TEXT.noneYet}</Txt>
               </Card>
             )}
 
@@ -219,7 +220,7 @@ function DefineRow({ category, last }: { category: string; last: boolean }) {
       <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 16, flex: 1 }}>
         {category}
       </Txt>
-      <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold }}>
+      <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold }}>
         Definir
       </Txt>
       <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
@@ -235,8 +236,8 @@ const styles = StyleSheet.create({
     padding: space[5],
     gap: space[3],
     minHeight: 56,
-    shadowColor: '#17223B',
-    shadowOpacity: 0.06,
+    shadowColor: colors.shadow,
+    shadowOpacity: cardShadowOpacity,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
@@ -247,5 +248,5 @@ const styles = StyleSheet.create({
   headRight: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   defineRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as object,
 });

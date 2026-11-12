@@ -25,8 +25,9 @@
  * adesão do painel da empresa, em planilha e em PDF, com ou sem a lista de licenças), de Evolução, fase 3 (D-062: "Renda comprometida" e "Guardado em metas" no
  * seletor, só de meses já fechados, com a própria base no subtítulo), de Acessibilidade (D-062 item 5: o pacote, o contraste, os
  * nomes, os alvos de toque, a letra grande, "reduzir movimento" e a lista com 500 lançamentos) e de Hierarquia de títulos (D-063 item 2:
- * no máximo um título de nível 1 por tela e nenhum salto de nível, conferidos em toda leitura de tela do roteiro e nas 63 telas) na versão
- * web, em modo demonstração (acesso simulado).
+ * no máximo um título de nível 1 por tela e nenhum salto de nível, conferidos em toda leitura de tela do roteiro e nas 63 telas) e do Modo
+ * escuro (D-096: as telas principais com o navegador no tema escuro, o fundo, o contraste e a largura) na versão web, em modo demonstração
+ * (acesso simulado).
  * Uso: npm run test:web   (gera a versão web, sobe um servidor local e percorre os fluxos)
  * Capturas de tela vão para docs/telas/ (ou para a pasta do 1º argumento). Navegador: Chromium do Playwright, ou CHROMIUM_PATH (outra
  * versão do Chromium, como a pré-instalada em /opt/pw-browsers/chromium quando a rede não baixa a fixada).
@@ -275,6 +276,21 @@ setInterval(async () => {
     const loose = await p.evaluate(() => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => e.getBoundingClientRect().width > 0 && [...e.childNodes].some((n) => n.nodeType === 3 && /R\$ (\d|$)|≈ /.test(n.textContent))).map((e) => e.textContent.slice(0, 40)));
     ok(`${prefix}: "R$" junto do valor`, loose.length === 0, loose.slice(0, 3).join(' | '));
     ok(`${prefix}: alvos de toque ≥ 44 px`, small.length === 0, small.join(' | '));
+    // Nenhum cartão encostado em outro ou por cima dele (pedido do Enzo em 12/11/2026: erros de espaçamento básicos em toda a Clarevo):
+    // entre dois cartões que não estão um dentro do outro, pelo menos 8 px em algum dos dois sentidos.
+    const touching = await p.evaluate(() => {
+      const cards = [...document.querySelectorAll('[data-card]')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
+      const out = [];
+      for (let i = 0; i < cards.length; i++) for (let j = i + 1; j < cards.length; j++) {
+        const a = cards[i], b = cards[j];
+        if (a.contains(b) || b.contains(a)) continue;
+        const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+        const gx = Math.max(rb.left - ra.right, ra.left - rb.right), gy = Math.max(rb.top - ra.bottom, ra.top - rb.bottom);
+        if (gx < 8 && gy < 8) out.push(`"${(a.textContent || '').trim().slice(0, 30)}" e "${(b.textContent || '').trim().slice(0, 30)}" (${Math.round(Math.max(gx, gy))} px)`);
+      }
+      return out;
+    });
+    ok(`${prefix}: nenhum cartão encostado em outro`, touching.length === 0, touching.slice(0, 3).join(' | '));
     const avatarOut = await p.evaluate(() => [...document.querySelectorAll('[aria-label^="Conta: perfil"]')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && (b.left < -0.5 || b.right > window.innerWidth + 0.5); }).length);
     ok(`${prefix}: avatar da conta inteiro na tela`, avatarOut === 0);
   };
@@ -14207,6 +14223,11 @@ setInterval(async () => {
     ['registrar gasto', null, 'registro/novo', { tipo: 'despesa' }], ['contas a pagar', null, 'a-pagar/index', {}], ['cartões', null, 'cartoes/index', {}],
     ['cartão', null, 'cartoes/[id]/index', { id: acIds.card }], ['fatura', null, 'cartoes/[id]/fatura/[mes]/index', { id: acIds.card, mes: '2026-10' }],
     ['buscar', null, 'movimentacoes/buscar', {}], ['composição', null, 'composicao', { tipo: 'pago' }], ['gastos fixos', null, 'gastos-fixos/index', {}], ['conta', null, 'conta', {}],
+    // As telas que ainda não passavam pela letra grande (pedido do Enzo em 12/11/2026: rever todas com texto ampliado a 200%).
+    ['aprender', 'Aprender', null, null], ['assinatura', null, 'conta/assinatura', {}], ['nível da conta', null, 'conta/nivel', {}], ['orçamento', null, 'orcamento/index', {}],
+    ['meta', null, 'meta/[id]/index', { id: acIds.goal }], ['família', null, 'familia/index', {}], ['evolução', null, 'evolucao', {}],
+    ['renda comprometida', null, 'renda-comprometida/index', {}], ['guardar', null, 'guardar/index', {}], ['importar', null, 'importar/index', {}],
+    ['calculadora', null, 'calcular/[slug]', { slug: 'multa-e-juros' }], ['exportar', null, 'conta/exportar', {}],
   ];
   let acShotN = 592;
   for (const [scale, width, suffix] of [[1.3, 360, '130'], [2, 359, '200']]) {
@@ -14214,7 +14235,7 @@ setInterval(async () => {
     await acEnter();
     await p.setViewportSize({ width, height: 800 }); await p.waitForTimeout(500);
     for (const [name, tab, route, params] of AC_BIG) {
-      if (tab) { await tabByName(tab).click(); await waitText(tab === 'Resumo' ? 'Diferença do mês' : tab === 'Metas' ? 'Reserva para imprevistos' : tab === 'Investir' ? 'Seus investimentos hoje' : 'Registrar recebimento'); }
+      if (tab) { await tabByName(tab).click(); await waitText(tab === 'Resumo' ? 'Diferença do mês' : tab === 'Metas' ? 'Reserva para imprevistos' : tab === 'Investir' ? 'Seus investimentos hoje' : tab === 'Aprender' ? 'Calculadoras' : 'Registrar recebimento'); }
       else await acNav(route, params);
       await p.waitForTimeout(700);
       await p.evaluate((k) => window.__acc.scale(k), scale);
@@ -14442,6 +14463,113 @@ setInterval(async () => {
     await p.evaluate(async () => { await window.__e2e.refresh(); }); await p.waitForTimeout(600);
     ok('Níveis: depois de "Fechar", a comemoração não volta', !(await body()).includes('Sua conta chegou ao nível'));
     ok('Níveis: nada vai à rede na demonstração', writes.length === lvWrites0, writes.slice(lvWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Mês dentro do orçamento e fila de avisos do Resumo (pedido do Enzo em 12/11/2026). Hoje é 07/10/2026: setembro fechou. Na
+  // demonstração, setembro não tem orçamento (o card não aparece); aqui a memória passa a dizer que setembro teve orçamento em duas
+  // categorias, as duas dentro do valor. O Resumo mostra "Setembro de 2026 fechou dentro do orçamento", um aviso temporário por vez
+  // (a comemoração do nível vem antes e o card do orçamento espera), "Fechar" guarda o mês e, com uma categoria acima, nada aparece.
+  // ==================================================================================================================
+  {
+    const bcWrites0 = writes.length;
+    await demoHome();
+    t = await body();
+    ok('Orçamento: setembro sem orçamento na demonstração, nenhum card de mês dentro do orçamento', !t.includes('fechou dentro do orçamento'));
+    const setSeptember = (over, level) => p.evaluate(async ({ over, level }) => {
+      const repo = await window.__e2e.repo();
+      if (!repo.__origMonthBudget) repo.__origMonthBudget = repo.getMonthBudget.bind(repo);
+      if (!repo.__origMarks) repo.__origMarks = repo.getAccountMarks.bind(repo);
+      repo.getMonthBudget = async (ctx, month) => {
+        const r = await repo.__origMonthBudget(ctx, month);
+        if (month !== '2026-09') return r;
+        return { ...r, lines: r.lines.map((l) => l.category === 'Mercado' ? { ...l, budgetId: 'e2e-b1', budgetVersion: 1, budgetFrom: '2026-09', budgetCents: 150000, usedCents: over ? 150100 : 125000 }
+          : l.category === 'Moradia' ? { ...l, budgetId: 'e2e-b2', budgetVersion: 1, budgetFrom: '2026-09', budgetCents: 250000, usedCents: 250000 } : l) };
+      };
+      repo.getAccountMarks = async () => ({ ...(await repo.__origMarks()), ...(level ? { imagem: true } : {}) });
+      await window.__e2e.refresh();
+    }, { over, level });
+    // A comemoração do nível (Diamante) e o mês dentro do orçamento querem aparecer: só o nível, que vem antes na fila.
+    await setSeptember(false, true);
+    await waitText('Sua conta chegou ao nível Diamante!'); await p.waitForTimeout(600);
+    t = await body();
+    ok('Fila de avisos: com o nível e o orçamento querendo aparecer, só a comemoração do nível (um aviso temporário por vez)',
+      t.includes('Sua conta chegou ao nível Diamante!') && !t.includes('fechou dentro do orçamento'));
+    await btn('Fechar').click();
+    await waitText('Setembro de 2026 fechou dentro do orçamento'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('Orçamento: fechada a comemoração do nível, o card do mês dentro do orçamento aparece, com as categorias e o atalho para setembro',
+      t.includes('Orçamento do mês') && t.includes('As 2 categorias com orçamento ficaram dentro do valor que você definiu.') &&
+      (await visibleCount('button', 'Ver o orçamento de setembro de 2026')) === 1 && (await visibleCount('button', 'Fechar')) === 1 && !t.includes('Sua conta chegou ao nível'));
+    await atWidths(async (w) => { await layoutChecks(`Orçamento, mês dentro ${w}px`); if (w === 390) await shot('622_orcamento_mes_dentro'); });
+    await btn('Ver o orçamento de setembro de 2026').click(); await waitText('Pessoal · Setembro de 2026'); await p.waitForTimeout(400);
+    ok('Orçamento: o atalho abre o orçamento de setembro', new URL(p.url()).pathname === '/orcamento');
+    await tabByName('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(600);
+    ok('Orçamento: depois de abrir, o card não volta para setembro', !(await body()).includes('fechou dentro do orçamento'));
+    // Com uma categoria acima do valor, nunca há card (e nunca um recado negativo). Outra demonstração, sem o mês guardado.
+    await demoHome();
+    await setSeptember(true, false); await p.waitForTimeout(1200);
+    t = await body();
+    ok('Orçamento: com uma categoria acima do valor, nenhum card (e nenhum recado negativo)', !t.includes('fechou dentro do orçamento') && !t.includes('acima do orçamento em setembro'));
+    ok('Orçamento: nada vai à rede na demonstração', writes.length === bcWrites0, writes.slice(bcWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Versão para computador (pedido do Enzo em 12/11/2026, D-098): a partir de 1024 px, a barra lateral no lugar das abas de baixo, o
+  // Resumo em painel com metas e orçamento à direita, Movimentos com a lista do mês em tabela e os formulários e os detalhes num painel
+  // à direita, por cima da tela de onde vieram (fecha com Esc ou tocando no fundo). Em 1280 e 1024 px. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const dkWrites0 = writes.length;
+    await demoHome();
+    await p.setViewportSize({ width: 1280, height: 860 }); await p.waitForTimeout(700);
+    const navLink = (name) => p.getByRole('navigation').getByRole('link', { name, exact: true }).filter({ visible: true }).first();
+    const visibleTabs = () => p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => e.getBoundingClientRect().width > 0).length);
+    t = await body();
+    ok('Computador: barra lateral com Anotar gasto, as cinco áreas e a Conta; sem as abas de baixo',
+      (await p.getByRole('navigation').filter({ visible: true }).count()) === 1 &&
+      (await Promise.all(['Resumo', 'Movimentos do mês', 'Metas', 'Investir', 'Aprender e dúvidas'].map((n) => navLink(n).count()))).every((c) => c === 1) &&
+      (await p.getByRole('navigation').getByRole('button', { name: 'Anotar gasto' }).filter({ visible: true }).count()) === 1 &&
+      (await navLink('Conta: perfil, assinatura, lembretes, privacidade e segurança').count()) === 1 && (await visibleTabs()) === 0);
+    ok('Computador: a área de agora vem marcada (aria-current)', (await navLink('Resumo').getAttribute('aria-current')) === 'page');
+    const cols = await p.evaluate(() => {
+      const h = (txt) => [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === txt && e.getBoundingClientRect().width > 0);
+      const a = h('Pagamentos do mês'), b = h('Metas'), c = h('Orçamento por categoria');
+      return a && b && c ? { main: a.getBoundingClientRect().left, side: b.getBoundingClientRect().left, budget: c.getBoundingClientRect().left } : null;
+    });
+    ok('Computador: o Resumo em painel, com metas e orçamento na coluna da direita', cols !== null && cols.side > cols.main + 200 && Math.abs(cols.budget - cols.side) < 2, JSON.stringify(cols));
+    await layoutChecks('Computador, Resumo 1280px'); await shot('630_computador_resumo');
+    await p.setViewportSize({ width: 1024, height: 768 }); await p.waitForTimeout(500);
+    await layoutChecks('Computador, Resumo 1024px');
+    await p.setViewportSize({ width: 1280, height: 860 }); await p.waitForTimeout(500);
+    // Movimentos em tabela; o detalhe de um lançamento abre no painel.
+    await navLink('Movimentos do mês').click(); await waitText('Organizar'); await p.waitForTimeout(700);
+    const tableRows = await p.evaluate(async () => { const repo = await window.__e2e.repo(); const sp = await repo.getSpace(); return (await repo.listRecords(sp.personalContextId, '2026-10')).length; });
+    t = await body();
+    ok('Computador: Movimentos com a lista do mês em tabela (data, descrição, categoria e valor), uma linha por lançamento',
+      new URL(p.url()).pathname === '/movimentacoes' && /descrição/i.test(t) && /categoria/i.test(t) && (await p.getByRole('button', { name: /^Mercado, Pago · 06\/10\/2026/ }).filter({ visible: true }).count()) === 1 && tableRows >= 2 &&
+      (await navLink('Movimentos do mês').getAttribute('aria-current')) === 'page', t.slice(0, 400));
+    await layoutChecks('Computador, Movimentos 1280px'); await shot('631_computador_movimentos');
+    await p.getByRole('button', { name: /^Mercado, Pago · 06\/10\/2026/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(900);
+    ok('Computador: o detalhe do lançamento abre num painel, com Movimentos à vista atrás',
+      (await p.getByRole('dialog').filter({ visible: true }).count()) === 1 && /^\/registro\/[^/]+$/.test(new URL(p.url()).pathname) && (await p.getByRole('button', { name: 'Fechar o formulário' }).filter({ visible: true }).count()) === 1);
+    await p.keyboard.press('Escape'); await p.waitForTimeout(800);
+    ok('Computador: Esc fecha o painel e volta a Movimentos', new URL(p.url()).pathname === '/movimentacoes' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 0);
+    // Anotar gasto pela barra lateral: o formulário no painel; tocar no fundo fecha.
+    await p.getByRole('navigation').getByRole('button', { name: 'Anotar gasto' }).first().click(); await waitText('Valor'); await p.waitForTimeout(700);
+    ok('Computador: Anotar gasto abre no painel à direita, por cima de Movimentos',
+      new URL(p.url()).pathname === '/registro/novo' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 1 &&
+      (await p.evaluate(() => { const d = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getBoundingClientRect().width > 0); const r = d.getBoundingClientRect(); return r.width <= 561 && r.right >= window.innerWidth - 1; })));
+    await layoutChecks('Computador, painel do formulário 1280px'); await shot('632_computador_painel_formulario');
+    await p.getByRole('button', { name: 'Fechar o formulário' }).filter({ visible: true }).first().click(); await p.waitForTimeout(800);
+    ok('Computador: tocar no fundo fecha o formulário', new URL(p.url()).pathname === '/movimentacoes' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 0);
+    await navLink('Conta: perfil, assinatura, lembretes, privacidade e segurança').click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(500);
+    ok('Computador: a Conta pela barra lateral, marcada', new URL(p.url()).pathname === '/conta' && (await navLink('Conta: perfil, assinatura, lembretes, privacidade e segurança').getAttribute('aria-current')) === 'page');
+    await navLink('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+    ok('Computador: voltar ao Resumo pela barra lateral fecha a Conta', new URL(p.url()).pathname === '/');
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(600);
+    ok('Computador: abaixo de 1024 px, as abas de baixo voltam e a barra lateral sai', (await visibleTabs()) === 5 && (await p.getByRole('navigation').filter({ visible: true }).count()) === 0);
+    ok('Computador: nada vai à rede na demonstração', writes.length === dkWrites0, writes.slice(dkWrites0).join(' | '));
   }
 
   // ==================================================================================================================
@@ -14689,6 +14817,136 @@ setInterval(async () => {
     await atWidths(async (w) => { await layoutChecks(`lembrete de valor extra ${w}px`); if (w === 390) await shot('531_lembrete_valor_extra'); });
     await btn('Agora não: ocultar o lembrete de valor extra até o mês que vem').click(); await p.waitForTimeout(400);
     ok('Valor extra: "Agora não" esconde o lembrete neste mês', !(await body()).includes('Entrou um valor extra'));
+  }
+
+  // ==================================================================================================================
+  // Modo escuro (D-096): o app segue o tema do aparelho, lido ao abrir (na web, `prefers-color-scheme` ao carregar a página). Num
+  // contexto do navegador com o tema escuro, na demonstração: as cinco abas, Conta, Assinatura, Nível da conta, Anotar gasto, uma meta,
+  // um cartão, Orçamento, Família e a calculadora de Multa e juros. Em cada tela: o fundo é escuro (azul-marinho, sem área clara grande
+  // esquecida), o contraste de cada texto visível chega a 4,5:1 (3:1 no texto grande; as mesmas funções da Acessibilidade, `AC_SRC`) e
+  // nada passa da largura em 390, 360 e 320 px. Capturas 700 a 714 (`7xx_escuro_*`), em 390 px. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const dkCtx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
+    await dkCtx.addInitScript(() => {
+      window.__clarevoSemTour = true;
+      window.__dkRepo = async () => {
+        const root = document.getElementById('root');
+        const key = root && Object.keys(root).find((k) => k.startsWith('__reactContainer$'));
+        const stack = key ? [root[key].stateNode.current] : [];
+        while (stack.length > 0) {
+          const f = stack.pop();
+          const v = f.memoizedProps?.value;
+          if (v && typeof v === 'object' && 'repo' in v && 'auth' in v && 'user' in v) return v.user.email === 'demo@clarevo.app' ? await v.auth.demoRepo : v.repo;
+          if (f.sibling) stack.push(f.sibling);
+          if (f.child) stack.push(f.child);
+        }
+        return null;
+      };
+    });
+    const dp = await dkCtx.newPage();
+    const dkErrors = [];
+    dp.on('pageerror', (e) => dkErrors.push(e.message));
+    dp.on('console', (m) => m.type() === 'error' && dkErrors.push(m.text().slice(0, 200)));
+    const dkWrites = [];
+    dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dkWrites.push(`${r.method()} ${r.url()}`));
+    const dkWait = (t, timeout = 10000) => dp.getByText(t, { exact: false }).filter({ visible: true }).first().waitFor({ timeout });
+    const dkBtn = (name) => dp.getByRole('button', { name, exact: true }).filter({ visible: true }).first();
+    const dkTab = (name) => dp.getByRole('tab', { name: name === 'Movimentos' ? 'Movimentos do mês' : name, exact: true }).filter({ visible: true }).first();
+    const dkNav = (route, params) => dp.evaluate(({ route, params }) => {
+      const root = document.getElementById('root');
+      const key = Object.keys(root).find((x) => x.startsWith('__reactContainer$'));
+      const stack = [root[key].stateNode.current];
+      while (stack.length > 0) {
+        const f = stack.pop();
+        const v = f.memoizedProps?.value;
+        if (v && typeof v === 'object' && typeof v.getRootState === 'function' && typeof v.navigate === 'function') { v.navigate(route, params); return; }
+        if (f.sibling) stack.push(f.sibling);
+        if (f.child) stack.push(f.child);
+      }
+      throw new Error('navegador de rotas não encontrado');
+    }, { route, params });
+    // O fundo de cada tela: as caixas opacas que cobrem quase toda a largura e metade da altura (a tela e o que rola) precisam ser escuras;
+    // e nenhuma caixa clara grande (branco esquecido) fica na tela. O lima (destaque), o branco sobre o azul e as fotos das metas
+    // (imagens) ficam de fora.
+    const dkBackground = () => dp.evaluate(() => {
+      const parse = (c) => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const a = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return a.length > 3 && a[3] === 0 ? null : a; };
+      const lum = (c) => { const ch = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * ch(c[0]) + 0.7152 * ch(c[1]) + 0.0722 * ch(c[2]); };
+      const big = []; const light = [];
+      for (const e of [document.body, ...document.querySelectorAll('body *')]) {
+        const r = e.getBoundingClientRect();
+        if (!(r.width > 0 && r.height > 0) || r.bottom < 0 || r.top > innerHeight || getComputedStyle(e).visibility === 'hidden') continue;
+        const c = parse(getComputedStyle(e).backgroundColor);
+        if (!c) continue;
+        const L = lum(c);
+        const area = Math.min(r.width, innerWidth) * Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+        if (r.width >= innerWidth * 0.9 && area >= innerWidth * innerHeight * 0.5) big.push(L);
+        const lime = Math.abs(c[0] - 212) < 4 && Math.abs(c[1] - 240) < 4 && Math.abs(c[2] - 91) < 4;
+        // O branco por cima do azul (seletor Pessoal | Família, pílulas do cabeçalho) é de propósito, nos dois temas.
+        let under = null;
+        for (let a = e.parentElement; a && !under; a = a.parentElement) under = parse(getComputedStyle(a).backgroundColor);
+        const onBrand = under && under[0] === 36 && under[1] === 87 && under[2] === 245;
+        if (L > 0.6 && !lime && !onBrand && area > 6000) light.push(`${(e.getAttribute('aria-label') || e.textContent || e.tagName).slice(0, 30)} ${Math.round(area)}px²`);
+      }
+      return { big: big.length, maxBig: big.length ? Math.max(...big) : 1, light: light.slice(0, 3) };
+    });
+    const dkFound = { fundo: [], claro: [], contraste: [], largura: [] };
+    let dkTexts = 0; let dkScreens = 0;
+    const dkScan = async (name, shotName) => {
+      await dp.waitForTimeout(900);
+      await dp.evaluate(AC_SRC);
+      const bg = await dkBackground();
+      if (bg.big === 0 || bg.maxBig > 0.05) dkFound.fundo.push(`${name}: ${bg.big} caixas, luminância ${bg.maxBig.toFixed(3)}`);
+      for (const x of bg.light) dkFound.claro.push(`${name}: ${x}`);
+      const c = await dp.evaluate(() => window.__acc.contrast());
+      dkTexts += c.n; dkScreens++;
+      for (const x of c.bad) dkFound.contraste.push(`${name}: ${x}`);
+      for (const w of [390, 360, 320]) {
+        await dp.setViewportSize({ width: w, height: 760 }); await dp.waitForTimeout(350);
+        const o = await dp.evaluate(() => window.__acc.overflow());
+        for (const x of o) dkFound.largura.push(`${name} ${w}px: ${x}`);
+      }
+      await dp.setViewportSize({ width: 390, height: 844 }); await dp.waitForTimeout(450);
+      await dp.screenshot({ path: `${OUT}/${shotName}.png` });
+    };
+    await dp.goto(`http://localhost:${PORT}/`); await dkWait('Cuidar da vida financeira');
+    const dkScheme = await dp.evaluate(() => ({ media: matchMedia('(prefers-color-scheme: dark)').matches, meta: document.querySelector('meta[name="color-scheme"]')?.getAttribute('content') ?? null, body: getComputedStyle(document.body).backgroundColor }));
+    ok('Modo escuro: com o navegador no tema escuro, a página declara os dois temas e o fundo da página é o azul-marinho (antes de o app desenhar)',
+      dkScheme.media && dkScheme.meta === 'light dark' && dkScheme.body === 'rgb(19, 30, 62)', JSON.stringify(dkScheme));
+    await dkScan('entrada', '700_escuro_entrada');
+    await dkBtn('Ver demonstração com dados fictícios').click(); await dkWait('Diferença do mês'); await dkWait('Ainda a pagar neste mês', 12000).catch(() => {});
+    const dkHeader = await dp.evaluate(() => {
+      const logo = [...document.querySelectorAll('[role=img][aria-label="Clarevo"]')].find((e) => e.getBoundingClientRect().width > 0);
+      let bg = null;
+      for (let e = logo?.parentElement; e && !bg; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (c !== 'rgba(0, 0, 0, 0)') bg = c; }
+      return { bg, fills: logo ? [...logo.querySelectorAll('path, circle')].map((x) => (x.getAttribute('fill') || '').toUpperCase()).join(' ') : '' };
+    });
+    ok('Modo escuro: o cabeçalho continua no azul da marca (#2457F5), com o logotipo reverso (branco e lima)', dkHeader.bg === 'rgb(36, 87, 245)' && dkHeader.fills === '#FFFFFF #D4F05B', JSON.stringify(dkHeader));
+    await dkScan('Resumo', '701_escuro_resumo');
+    const DK_TABS = [['Movimentos', 'Registrar recebimento', '702_escuro_movimentos'], ['Metas', 'Viagem de férias', '703_escuro_metas'], ['Investir', 'Seus investimentos hoje', '704_escuro_investir'], ['Aprender e dúvidas', 'Comece por aqui', '705_escuro_aprender']];
+    for (const [tab, text, shotName] of DK_TABS) { await dkTab(tab).click(); await dkWait(text).catch(() => {}); await dkScan(`aba ${tab}`, shotName); }
+    const dkIds = await dp.evaluate(async () => {
+      const repo = await window.__dkRepo(); const sp = await repo.getSpace(); const ctx = sp.personalContextId;
+      return { goal: (await repo.listGoals(ctx))[0].id, card: (await repo.listCards(ctx))[0].id };
+    });
+    const DK_ROUTES = [
+      ['Conta', 'conta', {}, 'Privacidade neste aparelho', '706_escuro_conta'],
+      ['Assinatura', 'conta/assinatura', {}, 'Planos', '707_escuro_assinatura'],
+      ['Nível da conta', 'conta/nivel', {}, 'Para conhecer', '708_escuro_nivel_da_conta'],
+      ['Anotar gasto', 'registro/novo', { tipo: 'despesa' }, 'Valor em reais', '709_escuro_anotar_gasto'],
+      ['meta', 'meta/[id]/index', { id: dkIds.goal }, 'Guardar', '710_escuro_meta'],
+      ['cartão', 'cartoes/[id]/index', { id: dkIds.card }, 'Fatura', '711_escuro_cartao'],
+      ['Orçamento', 'orcamento/index', {}, 'Orçamento', '712_escuro_orcamento'],
+      ['Família', 'familia/index', {}, 'Família', '713_escuro_familia'],
+      ['Multa e juros', 'calcular/[slug]', { slug: 'multa-e-juros' }, 'Multa e juros', '714_escuro_multa_e_juros'],
+    ];
+    for (const [name, route, params, text, shotName] of DK_ROUTES) { await dkNav(route, params); await dkWait(text).catch(() => {}); await dkScan(name, shotName); }
+    ok(`Modo escuro, ${dkScreens} telas: o fundo de cada tela é escuro (azul-marinho, luminância abaixo de 0,05)`, dkScreens >= 15 && dkFound.fundo.length === 0, dkFound.fundo.slice(0, 4).join(' | '));
+    ok('Modo escuro: nenhuma caixa clara grande esquecida (cartão, campo ou pílula branca fora do azul)', dkFound.claro.length === 0, dkFound.claro.slice(0, 4).join(' | '));
+    ok(`Modo escuro, ${dkScreens} telas: o contraste de cada texto visível chega a 4,5:1 (3:1 no texto grande), fora o botão desabilitado (${dkTexts} textos conferidos)`, dkTexts > 400 && dkFound.contraste.length === 0, dkFound.contraste.slice(0, 4).join(' | '));
+    ok('Modo escuro: nada passa da largura em 390, 360 e 320 px', dkFound.largura.length === 0, dkFound.largura.slice(0, 4).join(' | '));
+    ok('Modo escuro: sem erros de JavaScript e nada vai à rede', dkErrors.length === 0 && dkWrites.length === 0, [...dkErrors, ...dkWrites].slice(0, 3).join(' | '));
+    await dkCtx.close();
   }
 
   const returnBad = returnTexts.map((s) => s.replace('Junho tem 30 dias.', '').match(/\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i)?.[0]).filter(Boolean);

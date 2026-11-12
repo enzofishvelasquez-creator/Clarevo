@@ -108,7 +108,7 @@ export function CommitmentRow({
         styles.row,
         action ? styles.rowWithAction : !last && styles.divider,
         s.pressed && { opacity: 0.7 },
-        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
       <View style={[styles.icon, { backgroundColor: look.bg }]}>
         <look.Icon size={18} color={situation === 'paga' || situation === 'paga_em_parte' ? colors.success : look.fg} />
@@ -150,10 +150,10 @@ function RowActionButton({ label, accessibilityLabel, onPress, icon: Icon = Chec
       style={(s) => [
         styles.action,
         { backgroundColor: s.pressed ? colors.brandTintPressed : colors.brandTint, opacity: disabled ? 0.65 : 1 },
-        !disabled && (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 },
+        !disabled && (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 },
       ]}>
-      <Icon size={18} color={colors.brand} strokeWidth={2.25} />
-      <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
+      <Icon size={18} color={colors.brandText} strokeWidth={2.25} />
+      <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
         {label}
       </Txt>
     </Pressable>
@@ -193,10 +193,10 @@ export function AnnualGroupRow({ group: g, onPress, last }: { group: AnnualGroup
         styles.row,
         !last && styles.divider,
         s.pressed && { opacity: 0.7 },
-        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
       <View style={[styles.icon, { backgroundColor: colors.brandTint }]}>
-        <CalendarRange size={18} color={colors.brand} />
+        <CalendarRange size={18} color={colors.brandText} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>

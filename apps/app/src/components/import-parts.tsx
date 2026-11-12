@@ -84,7 +84,7 @@ export const ReviewRow = memo(function ReviewRow({
           </Txt>
           {line.label ? (
             <View style={[styles.badge, line.importable ? styles.badgeSoft : styles.badgeOff]}>
-              <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold }}>
+              <Txt variant="caption" color={line.importable ? colors.textOnAccent : colors.text} style={{ fontFamily: fonts.bold }}>
                 {label[line.label]}
               </Txt>
             </View>
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boxChecked: { backgroundColor: colors.brand, borderColor: colors.brand },
+  boxChecked: { backgroundColor: colors.brand, borderColor: colors.brandText },
   boxOff: { backgroundColor: colors.border, borderColor: colors.border },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2] },
   amount: { fontFamily: fonts.extrabold, fontSize: 15, flexShrink: 0 },
@@ -250,5 +250,5 @@ const styles = StyleSheet.create({
   columnsContent: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   editor: { gap: space[3], paddingLeft: 44 + space[1] },
   link: { alignSelf: 'flex-start', paddingHorizontal: 0, marginLeft: 44 + space[1] },
-  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brand, outlineOffset: 2 },
+  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brandText, outlineOffset: 2 },
 });

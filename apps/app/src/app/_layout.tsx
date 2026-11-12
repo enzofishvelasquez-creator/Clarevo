@@ -3,31 +3,44 @@
 // pesos usados (`fonts` em theme/tokens.ts). `packages/core/test/fontes.test.ts` confere que todo caractere dos textos está neles.
 import { sessionEndAfterDeletion } from '@clarevo/core';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { router, Stack, useGlobalSearchParams, usePathname, type Href } from 'expo-router';
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, useGlobalSearchParams, usePathname, type Href } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { Appearance, Platform, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DeviceFeatures } from '@/components/device-features';
+import { DesktopNav } from '@/components/desktop-nav';
+import { FormPanel, isFormRoute } from '@/components/form-panel';
 import { BrowseTabBar } from '@/components/tab-bar';
 import { LegalGate } from '@/components/legal-gate';
 import { StoreWarmup } from '@/components/store-warmup';
 import { initCrashReport } from '@/lib/crash-report';
+import { useWideLayout } from '@/lib/layout';
 import { forgetDevice } from '@/lib/device-forget';
 import { afterLogin, deletedAccountIntent, restoreTarget, signOutIntent } from '@/lib/nav';
 import { SessionProvider, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
 import { ViewProvider } from '@/state/view';
-import { colors, fonts } from '@/theme/tokens';
+import { colors, colorScheme, fonts } from '@/theme/tokens';
 
 // Relatório de falhas (D-093): só no celular e só com o endereço do projeto nas variáveis do EAS; antes de tudo, para pegar falhas do começo.
 initCrashReport();
 
 SplashScreen.preventAutoHideAsync();
+
+// Modo escuro (D-096): as cores do app foram escolhidas ao abrir (theme/tokens.ts) e só trocam na próxima abertura. No celular, o tema do
+// processo fica preso ao mesmo, para teclado, seletores e alertas nativos combinarem com o app mesmo se o aparelho trocar de tema agora.
+if (Platform.OS !== 'web') Appearance.setColorScheme(colorScheme);
+
+/** Tema da navegação: no escuro, o fundo atrás das telas (o que aparece numa transição) é o azul-marinho do app, e não o cinza claro padrão. */
+const NAV_THEME =
+  colorScheme === 'dark'
+    ? { ...DarkTheme, colors: { ...DarkTheme.colors, primary: colors.brandText, background: colors.background, card: colors.surface, text: colors.text, border: colors.border, notification: colors.error } }
+    : DefaultTheme;
 
 /**
  * Telas do app que podem ser abertas direto pelo endereço (atalhos do ícone na versão web instalada, link salvo ou
@@ -103,8 +116,11 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
           <ViewProvider>
+            {/* Texto claro na barra de estado nos dois temas: o alto de toda tela é o azul da marca (cabeçalho, topo ou carregamento). */}
             <StatusBar style="light" />
-            <Navigation />
+            <ThemeProvider value={NAV_THEME}>
+              <Navigation />
+            </ThemeProvider>
           </ViewProvider>
         </SessionProvider>
       </QueryClientProvider>
@@ -159,6 +175,8 @@ function Navigation() {
 
   // Navegação entre telas respeita "reduzir movimento".
   const reduceMotion = useReducedMotion();
+  // Versão para computador (pedido do Enzo em 12/11/2026): a partir de 1024 px, a barra lateral fica ao lado de todas as telas da conta pronta.
+  const wide = useWideLayout();
 
   // Dados já carregados prevalecem: uma falha de atualização em segundo plano não tira a pessoa da tela.
   const status: SpaceStatus = !ready
@@ -190,15 +208,26 @@ function Navigation() {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Aceite dos termos e da política (A1): uma vez, por cima do app, para quem ainda não aceitou a versão vigente. */}
       <LegalGate active={!inRecovery && status === 'pronto' && !/^\/conta\/(exportar|excluir)\/?$/.test(pathname)} />
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+      {wide && status === 'pronto' && !inRecovery ? <DesktopNav /> : null}
+      <View style={{ flex: 1, minWidth: 0 }}>
       <Stack
-        screenOptions={{
-          headerShown: false,
-          headerTintColor: colors.brand,
-          headerTitleStyle: { fontFamily: fonts.bold, color: colors.text },
-          headerBackButtonDisplayMode: 'minimal',
-          contentStyle: { backgroundColor: colors.background },
-          animation: reduceMotion ? 'none' : 'default',
-        }}>
+        screenOptions={({ route }) => {
+          // Versão para computador: os formulários abrem num painel à direita, por cima da tela de onde vieram (`FormPanel`).
+          const panel = wide && Platform.OS === 'web' && isFormRoute(route.name, route.params as Record<string, unknown> | undefined);
+          return {
+            headerShown: false,
+            headerTintColor: colors.brandText,
+            headerTitleStyle: { fontFamily: fonts.bold, color: colors.text },
+            headerBackButtonDisplayMode: 'minimal',
+            contentStyle: { backgroundColor: panel ? 'transparent' : colors.background },
+            animation: reduceMotion ? 'none' : panel ? 'fade' : 'default',
+            ...(panel ? { presentation: 'transparentModal' as const } : null),
+          };
+        }}
+        screenLayout={({ children, route }) =>
+          wide && Platform.OS === 'web' && isFormRoute(route.name, route.params as Record<string, unknown> | undefined) ? <FormPanel>{children}</FormPanel> : children
+        }>
         <Stack.Protected guard={signedOut}>
           <Stack.Screen name="boas-vindas" />
           <Stack.Screen name="criar-conta" />
@@ -322,6 +351,8 @@ function Navigation() {
           <Stack.Screen name="nova-senha" />
         </Stack.Protected>
       </Stack>
+      </View>
+      </View>
       {/* Barra das telas de consulta (D-039): só com a conta pronta; formulários e telas de entrada ficam sem barra. */}
       {status === 'pronto' && !inRecovery ? <BrowseTabBar /> : null}
       </View>

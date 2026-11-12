@@ -279,7 +279,7 @@ function GoalBody({
             </Txt>
             {goal.status !== 'ativa' ? (
               <View style={styles.statusPill}>
-                <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold }}>
+                <Txt variant="caption" color={colors.textOnAccent} style={{ fontFamily: fonts.bold }}>
                   {GOAL_STATUS_LABEL[goal.status]}
                 </Txt>
               </View>
@@ -308,8 +308,8 @@ function GoalBody({
               {/* A meta alcançada é comemorada (12/11/2026): o selo lima com confetes ao lado. */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
                 <View style={styles.reachedPill} accessible accessibilityLabel={t.reached.badge}>
-                  <CircleCheck size={18} color={colors.text} strokeWidth={2.5} aria-hidden />
-                  <Txt variant="label" color={colors.text} style={{ fontFamily: fonts.bold }}>
+                  <CircleCheck size={18} color={colors.textOnAccent} strokeWidth={2.5} aria-hidden />
+                  <Txt variant="label" color={colors.textOnAccent} style={{ fontFamily: fonts.bold }}>
                     {t.reached.badge}
                   </Txt>
                 </View>

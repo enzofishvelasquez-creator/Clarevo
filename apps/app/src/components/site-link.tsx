@@ -24,7 +24,7 @@ export function SiteTextLink({ page, children, onFail }: { page: SitePage; child
         },
       };
   return (
-    <Txt variant="caption" color={colors.brand} accessibilityRole="link" style={{ fontFamily: fonts.bold, textDecorationLine: 'underline' }} {...behavior}>
+    <Txt variant="caption" color={colors.brandText} accessibilityRole="link" style={{ fontFamily: fonts.bold, textDecorationLine: 'underline' }} {...behavior}>
       {children}
     </Txt>
   );

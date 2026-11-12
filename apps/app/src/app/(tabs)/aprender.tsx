@@ -147,7 +147,7 @@ export default function AprenderScreen() {
                         accessibilityLabel={`${LEARN_UI_TEXT.goTo} ${section.title}`}
                         onPress={() => goToSection(section.id)}
                         style={(s) => [styles.shortcut, s.pressed && { opacity: 0.8 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-                        <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold }}>
+                        <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold }}>
                           {section.title}
                         </Txt>
                       </Pressable>
@@ -162,7 +162,7 @@ export default function AprenderScreen() {
                   onPress={() => router.push('/aprender/guia')}
                   style={(s) => [styles.calc, s.pressed && { opacity: 0.85 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
                   <View style={styles.calcIcon}>
-                    <Compass size={22} color={colors.brand} strokeWidth={2.25} aria-hidden />
+                    <Compass size={22} color={colors.brandText} strokeWidth={2.25} aria-hidden />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Txt variant="label" style={{ fontFamily: fonts.extrabold, fontSize: 17 }}>
@@ -170,7 +170,7 @@ export default function AprenderScreen() {
                     </Txt>
                     <Txt variant="caption">{GUIDE_TEXT.cardCaption}</Txt>
                   </View>
-                  <ArrowRight size={20} color={colors.brand} aria-hidden />
+                  <ArrowRight size={20} color={colors.brandText} aria-hidden />
                 </Pressable>
 
                 {/* Calculadoras no topo (D-034; spec5_notes §2): card branco, ícone azul, depois do guia e antes de "Comece por aqui". */}
@@ -188,7 +188,7 @@ export default function AprenderScreen() {
                     </Txt>
                     <Txt variant="caption">{CALC_UI_TEXT.learnCardCaption}</Txt>
                   </View>
-                  <ArrowRight size={20} color={colors.brand} aria-hidden />
+                  <ArrowRight size={20} color={colors.brandText} aria-hidden />
                 </Pressable>
 
                 {/* Neste mês (D-053): os temas de época do mês de hoje, entre "Calculadoras" e "Comece por aqui". Sem notificação. */}
@@ -196,7 +196,7 @@ export default function AprenderScreen() {
 
                 {startHere.length > 0 ? (
                   <View style={styles.startHere}>
-                    <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ fontFamily: fonts.extrabold }}>
+                    <Txt variant="title" color={colors.textOnAccent} accessibilityRole="header" aria-level={2} style={{ fontFamily: fonts.extrabold }}>
                       {LEARN_UI_TEXT.startHere}
                     </Txt>
                     <View>
@@ -320,7 +320,7 @@ function SearchResults({
   if (results.length === 0 && appResults.length === 0 && guideResults.length === 0) {
     return (
       <Card style={styles.empty}>
-        <SearchX size={32} color={colors.brand} aria-hidden />
+        <SearchX size={32} color={colors.brandText} aria-hidden />
         <Txt variant="title" style={{ textAlign: 'center' }}>
           {LEARN_UI_TEXT.noResultTitle}
         </Txt>
