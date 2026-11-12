@@ -29,6 +29,17 @@ export const colors = {
   placeholder: '#616D85', // 5,2:1 sobre branco e 4,55:1 sobre o fundo de erro (era #68748C, 4,11:1 no campo com erro)
 } as const;
 
+/**
+ * Cores dos níveis de conta (D-095): `main` nos contornos, selos e barras; `tint` no fundo claro dos cartões. O texto sobre elas é
+ * sempre `text` (#17223B): 5,0:1 no bronze, 6,0:1 na prata, 8,6:1 no ouro e 7,6:1 no diamante; sobre os fundos claros, acima de 12:1.
+ */
+export const levelColors = {
+  bronze: { main: '#C98A52', tint: '#F8EBDD' },
+  prata: { main: '#A3AEC2', tint: '#EEF1F6' },
+  ouro: { main: '#E8B120', tint: '#FCF2CF' },
+  diamante: { main: '#4CC3E6', tint: '#DCF4FB' },
+} as const;
+
 export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 8: 32, 10: 40 } as const;
 
 export const radius = { sm: 12, md: 16, lg: 20, xl: 28, pill: 999 } as const;

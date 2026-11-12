@@ -143,6 +143,7 @@ import {
   parseAccess,
   parseStoreForget,
   parseStoreSync,
+  parseAccountMarks,
   parseWebSubscriptionCancel,
   parseWebSubscriptionStatus,
   parseWebSubscriptionStart,
@@ -153,6 +154,7 @@ import {
   type PlanKind,
   type StoreForget,
   type StoreSync,
+  type AccountMarks,
   type WebSubscriptionCancel,
   type WebSubscriptionStatus,
   type WebSubscriptionStart,
@@ -3421,6 +3423,13 @@ export class SupabaseRepository implements RecordsRepository {
     const { data, error } = await this.db.rpc('accept_legal_terms', { p_version: version, p_key: key });
     if (error) throw repoError(error);
     return parseLegalAcceptance(data);
+  }
+
+  /** Os marcos do nível da conta (my_account_marks, D-095). */
+  async getAccountMarks(): Promise<AccountMarks> {
+    const { data, error } = await this.db.rpc('my_account_marks');
+    if (error) throw repoError(error);
+    return parseAccountMarks(data);
   }
 
   /** A situação do acesso da própria pessoa (my_access, D-083). */

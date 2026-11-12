@@ -18,6 +18,7 @@ import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOAL_IMAGE_TEXT } from '../goal-images';
 import { GOALS_TEXT } from '../goals';
 import { INVESTMENT_TEXT } from '../investments';
+import { LEVEL_NAME, LEVEL_TEXT, LEVEL_THRESHOLD } from '../levels';
 import { MONTH_CHECK_TEXT } from '../month-check';
 import { IMPORT_SUGGESTION_TEXT } from '../importar/sugestoes';
 import { IMPORT_TEXT } from '../importar/textos';
@@ -813,6 +814,24 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     keywords: ['assinatura', 'assinar', 'plano', 'preço', 'preco', 'quanto custa', 'mensalidade', 'pagar a clarevo', 'teste grátis', 'teste gratis', 'grátis', 'gratis', 'cancelar assinatura', 'só ver e exportar'],
     routes: ['/conta/assinatura'],
     screenshot: '615_assinatura_demonstracao.png',
+  },
+  {
+    id: 'nivel-da-conta',
+    group: 'conta-e-privacidade',
+    title: 'Nível da conta',
+    purpose: `Mostra o nível da sua conta, de ${LEVEL_NAME.bronze} a ${LEVEL_NAME.diamante}, pelo quanto da Clarevo você já usa. Não tem a ver com quanto dinheiro você tem, e nunca desce.`,
+    where: [ACCOUNT_SCREEN, LEVEL_TEXT.cardTitle],
+    steps: [
+      `Em Conta, no card ${q(LEVEL_TEXT.cardTitle)}, veja o seu nível e toque em ${q(LEVEL_TEXT.open)}.`,
+      `O nível sobe com os marcos, que são coisas que você já fez alguma vez, como anotar um gasto, criar uma meta ou conferir um mês. Toda conta começa no ${LEVEL_NAME.bronze}; com ${LEVEL_THRESHOLD.prata} marcos, ${LEVEL_NAME.prata}; com ${LEVEL_THRESHOLD.ouro}, ${LEVEL_NAME.ouro}; com ${LEVEL_THRESHOLD.diamante}, ${LEVEL_NAME.diamante}.`,
+      `Em ${q(LEVEL_TEXT.todoTitle)}, cada linha leva à tela daquele marco. Nada ali é obrigatório: use só o que ajudar no seu dia a dia.`,
+      'Quando a conta muda de nível, o Resumo mostra um card de comemoração, e o contorno das suas iniciais ganha a cor do nível.',
+    ],
+    screenName: LEVEL_TEXT.screenTitle,
+    href: '/conta/nivel',
+    keywords: ['nível', 'nivel', 'níveis', 'niveis', 'bronze', 'prata', 'ouro', 'diamante', 'marcos', 'medalha', 'conquista'],
+    routes: ['/conta/nivel'],
+    screenshot: '620_nivel_da_conta.png',
   },
   {
     id: 'excluir-conta',

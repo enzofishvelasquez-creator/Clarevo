@@ -1,4 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
+import type { AccountMarks } from './levels';
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import { FULL_ACCESS, type Access } from './plano';
@@ -4884,6 +4885,36 @@ export class MemoryRepository implements RecordsRepository {
       const rows = this.legalRows();
       if (!rows.has(version)) rows.set(version, new Date().toISOString());
       return this.legalResult();
+    });
+  }
+
+  /**
+   * Os marcos do nível da conta (D-095), pelo que há na memória e pelas operações gravadas (as mesmas ações do banco). "Três meses
+   * diferentes" aqui usa o mês dos lançamentos (a memória não guarda quando cada operação foi feita).
+   */
+  async getAccountMarks(): Promise<AccountMarks> {
+    return this.read(() => {
+      const acts = new Set<string>([...this.operations.values()].map((o) => o.action));
+      const has = (...actions: string[]) => actions.some((a) => acts.has(a));
+      const recs = [...this.records.values()];
+      return {
+        gasto: recs.some((r) => r.kind === 'despesa') || this.cardEntries.size > 0 || has('criar_compra_cartao', 'importar_extrato'),
+        recebimento: recs.some((r) => r.kind === 'receita'),
+        gasto_fixo: this.seriesById.size > 0 || this.commitments.size > 0 || has('criar_serie', 'criar_compromisso'),
+        guardar: this.savingsChecks.size > 0 || has('responder_guardar'),
+        meta: this.goals.size > 0 || has('criar_meta'),
+        aporte: this.goalMovements.size > 0 || has('registrar_movimento_meta'),
+        orcamento: this.budgets.size > 0 || has('definir_orcamento_categoria'),
+        renda: this.incomeRefs.size > 0 || has('definir_renda_referencia'),
+        cartao: this.cards.size > 0 || has('criar_cartao'),
+        investimento: this.investments.size > 0 || has('criar_investimento'),
+        conferiu: has('marcar_mes_conferido'),
+        pagou: has('pagar_compromisso', 'pagar_fatura'),
+        tres_meses: new Set(recs.map((r) => r.occurredOn.slice(0, 7))).size >= 3,
+        importou: has('importar_extrato'),
+        telegram: has('ligar_telegram'),
+        familia: has('criar_familia', 'aceitar_convite_familia'),
+      };
     });
   }
 

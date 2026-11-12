@@ -56,6 +56,7 @@ import type {
 import type { LegalAcceptance } from './aceite';
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
+import type { AccountMarks } from './levels';
 import type { Access } from './plano';
 import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
@@ -911,6 +912,8 @@ export interface RecordsRepository {
 
   /** my_access: a situação do acesso da própria pessoa (assinatura, benefício, cortesia, Família, antes do início, teste ou só leitura). */
   getMyAccess(): Promise<Access>;
+  /** my_account_marks (migração 0034): os 16 marcos "já fez alguma vez" da própria pessoa, de onde sai o nível da conta (D-095). */
+  getAccountMarks(): Promise<AccountMarks>;
 
   // Assinatura na web pelo Asaas (D-084), pela função do servidor "assinatura-web" com a sessão da pessoa. Só na web.
 

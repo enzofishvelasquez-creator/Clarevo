@@ -34,7 +34,7 @@ SplashScreen.preventAutoHideAsync();
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura))?|familia(\/(nova|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura|nivel))?|familia(\/(nova|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -256,6 +256,7 @@ function Navigation() {
           <Stack.Screen name="conta/telegram" />
           {/* Assinatura (D-083): a situação do acesso e os planos. */}
           <Stack.Screen name="conta/assinatura" />
+          <Stack.Screen name="conta/nivel" />
           {/* Excluir minha conta (D-058): o que é apagado e o que continua, exportar antes e digitar EXCLUIR; sem barra. */}
           <Stack.Screen name="conta/excluir" />
           {/* Contas de origem do dinheiro (D-043). /contas/nova é rota estática e tem precedência sobre /contas/[id]/editar. */}

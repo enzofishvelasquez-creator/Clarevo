@@ -1,4 +1,4 @@
-import { FULL_ACCESS, type Access, type WebSubscriptionStatus } from '@clarevo/core';
+import { FULL_ACCESS, accountLevel, type Access, type AccountLevel, type AccountMarks, type WebSubscriptionStatus } from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
@@ -48,4 +48,25 @@ export function useWebSubscriptionStatus(enabled: boolean) {
     staleTime: 60_000,
     retry: false,
   });
+}
+
+/**
+ * Os marcos do nível da conta (D-095): `my_account_marks`, uma leitura por pessoa. Quem mostra o nível pede de novo ao voltar para a
+ * tela (`refetch`), porque qualquer anotação pode ter concluído um marco. Falha de leitura não mostra nível nenhum.
+ */
+export function useAccountMarks() {
+  const { repo, user } = useSession();
+  return useQuery({
+    queryKey: ['account-marks', user?.id ?? null],
+    queryFn: (): Promise<AccountMarks> => repo!.getAccountMarks(),
+    enabled: Boolean(repo && user),
+    staleTime: 15_000,
+    retry: false,
+  });
+}
+
+/** O nível da conta, ou nulo enquanto carrega ou se a leitura falhar. */
+export function useAccountLevel(): AccountLevel | null {
+  const marks = useAccountMarks().data;
+  return marks ? accountLevel(marks) : null;
 }

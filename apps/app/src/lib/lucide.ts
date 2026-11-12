@@ -24,6 +24,7 @@ export { default as ArrowUp } from 'lucide-react-native/icons/arrow-up';
 export { default as ArrowUpDown } from 'lucide-react-native/icons/arrow-up-down';
 export { default as ArrowUpRight } from 'lucide-react-native/icons/arrow-up-right';
 export { default as Baby } from 'lucide-react-native/icons/baby';
+export { default as Award } from 'lucide-react-native/icons/award';
 export { default as BadgeCheck } from 'lucide-react-native/icons/badge-check';
 export { default as Barcode } from 'lucide-react-native/icons/barcode';
 export { default as BadgePercent } from 'lucide-react-native/icons/badge-percent';
