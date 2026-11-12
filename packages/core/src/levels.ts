@@ -1,6 +1,7 @@
 /**
  * Níveis de conta (pedido do Enzo em 12/11/2026, D-095; `docs/48_NIVEIS.md`). A conta tem um nível, Bronze, Prata, Ouro ou Diamante,
- * pelo quanto a pessoa já usa a Clarevo: 16 marcos do tipo "já fez alguma vez", lidos do banco por `my_account_marks` (migração 0034).
+ * pelo quanto a pessoa já usa a Clarevo: 18 marcos do tipo "já fez alguma vez", lidos do banco por `my_account_marks` (migração 0034),
+ * que guarda os alcançados (`account_marks`).
  * O nível nunca mede dinheiro (nenhum valor entra na conta), nunca desce e não cobra nada de ninguém: é um reconhecimento do que já foi
  * feito, com a lista do que ainda dá para conhecer. A troca de nível gera um card de comemoração, e alguns itens da tela ganham a cor
  * do nível. Aqui ficam os marcos, quantos dão cada nível e os textos; as cores ficam no app (`theme/tokens.ts`).
@@ -17,12 +18,14 @@ export const ACCOUNT_MARK_KEYS = [
   'renda',
   'cartao',
   'investimento',
-  'conferiu',
   'pagou',
   'tres_meses',
   'importou',
   'telegram',
   'familia',
+  'conta',
+  'limite',
+  'imagem',
 ] as const;
 export type AccountMarkKey = (typeof ACCOUNT_MARK_KEYS)[number];
 export type AccountMarks = Readonly<Record<AccountMarkKey, boolean>>;
@@ -30,8 +33,12 @@ export type AccountMarks = Readonly<Record<AccountMarkKey, boolean>>;
 export const ACCOUNT_LEVELS = ['bronze', 'prata', 'ouro', 'diamante'] as const;
 export type AccountLevel = (typeof ACCOUNT_LEVELS)[number];
 
-/** Quantos marcos dão cada nível. Toda conta começa no Bronze; o Diamante pede 12 dos 16 (ninguém precisa de cartão ou de Família). */
-export const LEVEL_THRESHOLD: Readonly<Record<AccountLevel, number>> = { bronze: 0, prata: 4, ouro: 8, diamante: 12 };
+/**
+ * Quantos marcos dão cada nível (um quarto, metade e três quartos dos 18). Toda conta começa no Bronze; o Diamante pede 14 dos 18, e dá
+ * para chegar lá sem cartão, sem investimento, sem dinheiro guardado em meta e sem Família (há marcos que não envolvem dinheiro: conta
+ * de origem, limite pessoal, imagem da meta, Telegram).
+ */
+export const LEVEL_THRESHOLD: Readonly<Record<AccountLevel, number>> = { bronze: 0, prata: 4, ouro: 9, diamante: 14 };
 export const LEVEL_NAME: Readonly<Record<AccountLevel, string>> = { bronze: 'Bronze', prata: 'Prata', ouro: 'Ouro', diamante: 'Diamante' };
 
 /** Nenhum marco feito (a conta nova, e o que o app assume quando a leitura falha). */
@@ -103,12 +110,14 @@ export const ACCOUNT_MARK_TEXT: Readonly<Record<AccountMarkKey, { title: string;
   renda: { title: 'Informar a renda de referência', href: '/renda-comprometida' },
   cartao: { title: 'Cadastrar um cartão', href: '/cartoes' },
   investimento: { title: 'Registrar um investimento', href: '/investimento/novo' },
-  conferiu: { title: 'Conferir um mês', href: '/movimentacoes' },
   pagou: { title: 'Marcar uma conta como paga', href: '/a-pagar' },
   tres_meses: { title: 'Anotar em três meses diferentes', href: null },
   importou: { title: 'Importar um extrato ou uma fatura', href: '/importar' },
   telegram: { title: 'Ligar o Telegram', href: '/conta/telegram' },
   familia: { title: 'Criar ou entrar numa Família', href: '/familia' },
+  conta: { title: 'Cadastrar uma conta de origem', href: '/contas/nova' },
+  limite: { title: 'Definir o seu limite de renda comprometida', href: '/renda-comprometida/limite' },
+  imagem: { title: 'Escolher a imagem de uma meta', href: '/metas' },
 };
 
 export const LEVEL_TEXT = {
@@ -128,6 +137,10 @@ export const LEVEL_TEXT = {
   markDone: (title: string) => `${title}: feito`,
   markTodo: (title: string) => `${title}: ainda não`,
   progressLabel: 'Caminho até o próximo nível',
+  progressLabelTop: 'Nível mais alto alcançado',
+  levelsTitle: 'Os níveis',
+  levelFrom: (n: number) => (n === 0 ? 'Toda conta começa aqui' : `A partir de ${n} marcos`),
+  yourLevel: 'Seu nível',
   loadFailed: 'Não foi possível carregar o nível da conta. Tente novamente.',
   /** O card de comemoração da troca de nível (Resumo). */
   celebrateEyebrow: 'Novo nível',
@@ -136,7 +149,7 @@ export const LEVEL_TEXT = {
     bronze: 'A sua conta está pronta para começar.',
     prata: 'Você já deu os primeiros passos para ver o seu mês de verdade.',
     ouro: 'Você já usa boa parte da Clarevo para planejar e acompanhar.',
-    diamante: 'Você usa a Clarevo por inteiro. Que bom ter você aqui.',
+    diamante: 'A Clarevo já faz parte do seu dia a dia. Que bom ter você aqui.',
   } as Readonly<Record<AccountLevel, string>>,
   celebrateDismiss: 'Fechar',
 } as const;

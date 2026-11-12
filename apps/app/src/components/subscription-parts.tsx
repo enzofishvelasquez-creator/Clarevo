@@ -104,9 +104,13 @@ export function SubscriptionHero({
           </Txt>
           <View
             style={styles.track}
+            accessible
             accessibilityRole="progressbar"
             accessibilityLabel={T.trialProgressLabel}
-            accessibilityValue={{ min: 0, max: TRIAL_DAYS, now: Math.max(0, days) }}>
+            accessibilityValue={{ min: 0, max: TRIAL_DAYS, now: Math.max(0, days) }}
+            aria-valuemin={0}
+            aria-valuemax={TRIAL_DAYS}
+            aria-valuenow={Math.max(0, days)}>
             <View style={[styles.fill, { width: `${Math.max(4, Math.min(100, (Math.max(0, days) / TRIAL_DAYS) * 100))}%` }]} />
           </View>
         </View>

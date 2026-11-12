@@ -823,9 +823,9 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     where: [ACCOUNT_SCREEN, LEVEL_TEXT.cardTitle],
     steps: [
       `Em Conta, no card ${q(LEVEL_TEXT.cardTitle)}, veja o seu nível e toque em ${q(LEVEL_TEXT.open)}.`,
-      `O nível sobe com os marcos, que são coisas que você já fez alguma vez, como anotar um gasto, criar uma meta ou conferir um mês. Toda conta começa no ${LEVEL_NAME.bronze}; com ${LEVEL_THRESHOLD.prata} marcos, ${LEVEL_NAME.prata}; com ${LEVEL_THRESHOLD.ouro}, ${LEVEL_NAME.ouro}; com ${LEVEL_THRESHOLD.diamante}, ${LEVEL_NAME.diamante}.`,
-      `Em ${q(LEVEL_TEXT.todoTitle)}, cada linha leva à tela daquele marco. Nada ali é obrigatório: use só o que ajudar no seu dia a dia.`,
-      'Quando a conta muda de nível, o Resumo mostra um card de comemoração, e o contorno das suas iniciais ganha a cor do nível.',
+      `O nível sobe com os marcos, que são coisas que você já fez alguma vez, como anotar um gasto, criar uma meta ou cadastrar uma conta de origem. Toda conta começa no ${LEVEL_NAME.bronze}; com ${LEVEL_THRESHOLD.prata} marcos, ${LEVEL_NAME.prata}; com ${LEVEL_THRESHOLD.ouro}, ${LEVEL_NAME.ouro}; com ${LEVEL_THRESHOLD.diamante}, ${LEVEL_NAME.diamante}.`,
+      `Em ${q(LEVEL_TEXT.todoTitle)}, toque num marco para ir à tela dele. Nada ali é obrigatório: use só o que ajudar no seu dia a dia.`,
+      'Quando a conta muda de nível, o Resumo mostra um card de comemoração. Em Conta, um selo pequeno no canto das suas iniciais mostra o nível.',
     ],
     screenName: LEVEL_TEXT.screenTitle,
     href: '/conta/nivel',

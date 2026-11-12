@@ -30,14 +30,14 @@ export const colors = {
 } as const;
 
 /**
- * Cores dos níveis de conta (D-095): `main` nos contornos, selos e barras; `tint` no fundo claro dos cartões. O texto sobre elas é
- * sempre `text` (#17223B): 5,0:1 no bronze, 6,0:1 na prata, 8,6:1 no ouro e 7,6:1 no diamante; sobre os fundos claros, acima de 12:1.
+ * Cores dos níveis de conta (D-095), em tom suave (pedido do Enzo, 12/11/2026, no jeito do gov.br): só no selo pequeno do nível, nunca em
+ * borda de cartão nem em fundo. A medalha por cima é `text` (#17223B): 6,63:1 no bronze, 8,26:1 na prata, 8,12:1 no ouro e 8,51:1 no diamante.
  */
 export const levelColors = {
-  bronze: { main: '#C98A52', tint: '#F8EBDD' },
-  prata: { main: '#A3AEC2', tint: '#EEF1F6' },
-  ouro: { main: '#E8B120', tint: '#FCF2CF' },
-  diamante: { main: '#4CC3E6', tint: '#DCF4FB' },
+  bronze: '#C9A07E',
+  prata: '#B4BCC9',
+  ouro: '#D9B65A',
+  diamante: '#8CC7DB',
 } as const;
 
 export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 8: 32, 10: 40 } as const;

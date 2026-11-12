@@ -134,9 +134,13 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
         <View style={{ gap: space[1] }}>
           <View
             style={styles.track}
+            accessible
             accessibilityRole="progressbar"
             accessibilityLabel="Primeiros passos prontos"
-            accessibilityValue={{ min: 0, max: STEPS.length, now: doneCount }}>
+            accessibilityValue={{ min: 0, max: STEPS.length, now: doneCount }}
+            aria-valuemin={0}
+            aria-valuemax={STEPS.length}
+            aria-valuenow={doneCount}>
             <View style={[styles.fill, { width: `${Math.max(4, (doneCount / STEPS.length) * 100)}%` }]} />
           </View>
           <Txt variant="caption" style={{ fontFamily: fonts.bold }}>

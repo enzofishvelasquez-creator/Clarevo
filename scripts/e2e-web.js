@@ -1860,7 +1860,7 @@ setInterval(async () => {
   const INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
   const CALC_LIST = [
     ['Decidir uma compra', [['Antes de financiar', 'Parcela, juros e o que muda se juntar antes'], ['Parcelado ou à vista?', 'Descubra os juros embutidos no parcelado'], ['Quanto custa por ano?', 'Por ano, por mês e por dia']]],
-    ['Dívidas e atrasos', [['Quanto custa uma dívida?', 'Rotativo, cheque especial ou empréstimo'], ['Quitar antes ou adiantar parcelas', 'Uma estimativa de quanto dos juros sai da conta'], ['Multa e juros por atraso', 'Com os valores do boleto'], ['Em que ordem quitar as dívidas?', 'Duas ordens de pagamento, lado a lado']]],
+    ['Dívidas e atrasos', [['Quanto custa uma dívida?', 'Rotativo, cheque especial ou empréstimo'], ['Quitar antes ou adiantar parcelas', 'Uma estimativa de quanto dos juros sai da conta'], ['Multa e juros por atraso', 'Boleto, conta ou fatura do cartão'], ['Em que ordem quitar as dívidas?', 'Duas ordens de pagamento, lado a lado']]],
     ['Guardar e dividir', [['Quanto guardar para imprevistos?', 'Quantos meses seus gastos essenciais cobrem'], ['Juntar para um objetivo', 'Quanto guardar por mês ou em quanto tempo'], ['Dividir as contas da casa', 'Partes iguais ou pela renda de cada pessoa']]],
   ];
   // Palavras de julgamento que nunca aparecem num resultado (spec4 §1.2, como em copy.test.ts).
@@ -14405,9 +14405,9 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
-  // Níveis de conta (D-095): na demonstração, a conta tem 11 dos 16 marcos (nível Ouro). Conta mostra o card "Nível da conta" com a borda
+  // Níveis de conta (D-095): na demonstração, a conta tem 13 dos 18 marcos (nível Ouro). Conta mostra o card "Nível da conta" com a borda
   // do nível, e a tela /conta/nivel traz o nível, o caminho até o próximo, os quatro níveis, "Para conhecer" e "Já feitos". A troca de
-  // nível mostra o card de comemoração no Resumo uma vez (aqui, os marcos passam a 12 pela memória). Nada vai à rede.
+  // nível mostra o card de comemoração no Resumo uma vez (aqui, os marcos passam a 14 pela memória). Nada vai à rede.
   // ==================================================================================================================
   {
     const lvWrites0 = writes.length;
@@ -14416,27 +14416,27 @@ setInterval(async () => {
     ok('Níveis: sem troca de nível, o Resumo não mostra comemoração', !t.includes('Sua conta chegou ao nível'));
     await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
     const lvCard = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Nível da conta' && e.getBoundingClientRect().width > 0); return h?.parentElement?.textContent ?? ''; });
-    ok('Níveis: o card em Conta com "Nível Ouro", "11 de 16 marcos", o que falta para o Diamante e "Ver meu nível"',
-      lvCard.includes('Nível Ouro') && lvCard.includes('11 de 16 marcos') && lvCard.includes('Falta 1 marco para o nível Diamante.') && (await visibleCount('button', 'Ver meu nível')) === 1, lvCard.slice(0, 300));
+    ok('Níveis: o card em Conta com "Nível Ouro", "13 de 18 marcos", o que falta para o Diamante e "Ver meu nível"',
+      lvCard.includes('Nível Ouro') && lvCard.includes('13 de 18 marcos') && lvCard.includes('Falta 1 marco para o nível Diamante.') && (await visibleCount('button', 'Ver meu nível')) === 1, lvCard.slice(0, 300));
     await btn('Ver meu nível').click(); await waitText('Para conhecer'); await p.waitForTimeout(500);
     t = await body(); screenTexts.push(t);
     ok('Níveis: a tela /conta/nivel com o nível, o caminho, o que é o nível, os quatro níveis, "Para conhecer" e "Já feitos"',
-      new URL(p.url()).pathname === '/conta/nivel' && (await h1Name()) === 'Nível da conta' && t.includes('Nível Ouro') && t.includes('11 de 16 marcos') &&
+      new URL(p.url()).pathname === '/conta/nivel' && (await h1Name()) === 'Nível da conta' && t.includes('Nível Ouro') && t.includes('13 de 18 marcos') &&
       t.includes('Não tem a ver com quanto dinheiro você tem, e nunca desce.') && ['Bronze', 'Prata', 'Ouro', 'Diamante'].every((x) => t.includes(x)) &&
-      t.includes('Para conhecer') && t.includes('Nada aqui é obrigatório') && t.includes('Já feitos') && t.includes('Conferir um mês') && t.includes('Anotar um gasto'), t.slice(0, 900));
+      t.includes('Para conhecer') && t.includes('Nada aqui é obrigatório') && t.includes('Já feitos') && t.includes('Escolher a imagem de uma meta') && t.includes('Anotar um gasto'), t.slice(0, 900));
     ok('Níveis: os marcos por fazer levam à tela deles, e os feitos são lidos como feitos',
-      (await visibleCount('button', 'Conferir um mês: ainda não')) === 1 && (await p.locator('[aria-label="Anotar um gasto: feito"]').filter({ visible: true }).count()) === 1 &&
-      (await p.locator('[aria-label="Ouro, 8 marcos, o seu nível"]').filter({ visible: true }).count()) === 1);
+      (await visibleCount('button', 'Escolher a imagem de uma meta: ainda não')) === 1 && (await p.locator('[aria-label="Anotar um gasto: feito"]').filter({ visible: true }).count()) === 1 &&
+      (await p.locator('[aria-label="Ouro, 9 marcos, o seu nível"]').filter({ visible: true }).count()) === 1);
     await atWidths(async (w) => { await layoutChecks(`Nível da conta ${w}px`); if (w === 390) await shot('620_nivel_da_conta'); });
-    await btn('Conferir um mês: ainda não').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
-    ok('Níveis: "Conferir um mês" abre Movimentos', new URL(p.url()).pathname === '/movimentacoes');
-    // A troca de nível: os marcos passam a 12 (Diamante). O Resumo comemora uma vez; "Fechar" guarda o nível como visto.
+    await btn('Escolher a imagem de uma meta: ainda não').click(); await waitText('Viagem de férias'); await p.waitForTimeout(300);
+    ok('Níveis: "Escolher a imagem de uma meta" abre Metas', new URL(p.url()).pathname === '/metas', p.url());
+    // A troca de nível: os marcos passam a 14 (Diamante). O Resumo comemora uma vez; "Fechar" guarda o nível como visto.
     await tabByName('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
-    await p.evaluate(async () => { const repo = await window.__e2e.repo(); const orig = repo.getAccountMarks.bind(repo); repo.getAccountMarks = async () => ({ ...(await orig()), conferiu: true }); await window.__e2e.refresh(); });
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); const orig = repo.getAccountMarks.bind(repo); repo.getAccountMarks = async () => ({ ...(await orig()), imagem: true }); await window.__e2e.refresh(); });
     await waitText('Sua conta chegou ao nível Diamante!'); await p.waitForTimeout(500);
     t = await body(); screenTexts.push(t);
     ok('Níveis: a troca de nível mostra o card de comemoração no Resumo, com "Ver meu nível" e "Fechar"',
-      t.includes('Novo nível') && t.includes('Você usa a Clarevo por inteiro. Que bom ter você aqui.') && (await visibleCount('button', 'Ver meu nível')) === 1 && (await visibleCount('button', 'Fechar')) === 1);
+      t.includes('Novo nível') && t.includes('A Clarevo já faz parte do seu dia a dia. Que bom ter você aqui.') && (await visibleCount('button', 'Ver meu nível')) === 1 && (await visibleCount('button', 'Fechar')) === 1);
     await atWidths(async (w) => { await layoutChecks(`Níveis, comemoração ${w}px`); if (w === 390) await shot('621_nivel_comemoracao'); });
     await btn('Fechar').click(); await p.waitForTimeout(400);
     await p.evaluate(async () => { await window.__e2e.refresh(); }); await p.waitForTimeout(600);

@@ -40,7 +40,7 @@ import { BenefitCard } from '@/components/benefit-card';
 import { PrivacyCard, RemindersCard, WidgetCard } from '@/components/device-settings';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { SubHeader, initialsOf } from '@/components/header';
-import { LevelCard } from '@/components/level-parts';
+import { LevelBadge, LevelCard } from '@/components/level-parts';
 import { SignupSourceAccountCard } from '@/components/signup-source';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
@@ -52,7 +52,7 @@ import { useWork } from '@/state/data';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { useAccountLevel } from '@/state/access';
-import { colors, levelColors, space } from '@/theme/tokens';
+import { colors, space } from '@/theme/tokens';
 
 /** O botão da página de licenças (D5). O texto fica aqui, e não em LEGAL_TEXT, porque core/legal.ts vai nas funções do servidor. */
 const LICENSES_LABEL = 'Licenças de código aberto';
@@ -151,17 +151,17 @@ export default function ContaScreen() {
       <SubHeader title="Conta" />
       <Screen scrollRef={scroll} contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
-        {/* O perfil, com as iniciais no círculo e o contorno na cor do nível da conta (D-095). */}
+        {/* O perfil, com as iniciais no círculo e, no canto, o selo pequeno do nível da conta (D-095), como no gov.br. */}
         <Card style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space[4] }}>
-          <View
-            style={[
-              { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandTint, borderWidth: 3 },
-              { borderColor: level ? levelColors[level].main : colors.brandTint },
-            ]}
-            aria-hidden>
+          <View style={{ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandTint }} aria-hidden>
             <Txt variant="title" color={colors.brand} maxFontSizeMultiplier={1.3}>
               {initialsOf(user?.displayName ?? '')}
             </Txt>
+            {level ? (
+              <View style={{ position: 'absolute', right: -4, bottom: -4, borderRadius: 12, borderWidth: 2, borderColor: colors.surface }}>
+                <LevelBadge level={level} size={20} />
+              </View>
+            ) : null}
           </View>
           <View style={{ flex: 1, minWidth: 0, gap: space[1] }}>
           <Txt variant="title">{user?.displayName}</Txt>

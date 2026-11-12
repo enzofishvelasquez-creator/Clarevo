@@ -9,12 +9,11 @@ import {
   type AccountMarks,
 } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
-import { Award } from 'lucide-react-native';
+import { Award, ChevronRight } from 'lucide-react-native';
 import { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, ReduceMotion, ZoomIn } from 'react-native-reanimated';
 
-import { BadgeConfetti } from '@/components/subscription-parts';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
 import { useLevelSeen } from '@/lib/level-seen';
 import { useAccountMarks } from '@/state/access';
@@ -23,48 +22,92 @@ import { colors, fonts, levelColors, radius, space } from '@/theme/tokens';
 
 const T = LEVEL_TEXT;
 
-/** O selo do nível: um círculo na cor do nível, com a medalha. Só decoração: o nome do nível vem sempre escrito ao lado. */
-export function LevelBadge({ level, size = 44 }: { level: AccountLevel; size?: number }) {
+/**
+ * Os níveis em tom discreto (pedido do Enzo em 12/11/2026, no jeito do gov.br): a cor do nível fica só no selo pequeno; os cartões são
+ * os de sempre, brancos, sem borda colorida nem fundo forte, e a barra usa as cores da marca.
+ */
+
+/** O selo do nível: um círculo pequeno na cor do nível, com a medalha. Só decoração: o nome do nível vem sempre escrito ao lado. */
+export function LevelBadge({ level, size = 32 }: { level: AccountLevel; size?: number }) {
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: levelColors[level].main, alignItems: 'center', justifyContent: 'center' }}>
-      <Award size={Math.round(size * 0.55)} color={colors.text} aria-hidden />
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: levelColors[level], alignItems: 'center', justifyContent: 'center' }}>
+      <Award size={Math.round(size * 0.58)} color={colors.text} aria-hidden />
     </View>
   );
 }
 
-/** A barra do caminho até o próximo nível, na cor do nível. `onBrand`: sobre o azul. */
-export function LevelProgressBar({ marks, onBrand = false }: { marks: AccountMarks; onBrand?: boolean }) {
+/** A barra fina do caminho até o próximo nível: azul sobre o azul claro (contraste de 4,9:1 entre a barra e o trilho). */
+export function LevelProgressBar({ marks }: { marks: AccountMarks }) {
   const p = accountLevelProgress(marks);
+  const now = Math.round(p.fraction * 100);
   return (
     <View
-      style={[styles.track, { backgroundColor: onBrand ? 'rgba(255,255,255,0.28)' : colors.border }]}
+      style={styles.track}
+      accessible
       accessibilityRole="progressbar"
-      accessibilityLabel={T.progressLabel}
-      accessibilityValue={{ min: 0, max: 100, now: Math.round(p.fraction * 100) }}>
-      <View style={[styles.fill, { width: `${Math.max(4, Math.round(p.fraction * 100))}%`, backgroundColor: levelColors[p.level].main }]} />
+      accessibilityLabel={p.next ? T.progressLabel : T.progressLabelTop}
+      accessibilityValue={{ min: 0, max: 100, now }}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={now}>
+      <View style={[styles.fill, { width: `${Math.max(4, now)}%` }]} />
     </View>
   );
 }
 
-/** Os quatro níveis em fila, com o de agora em destaque e quantos marcos cada um pede. */
-export function LevelLadder({ level }: { level: AccountLevel }) {
+/** O resumo do nível: o selo, "Nível Ouro", quantos marcos, a barra e o que falta (ou que é o mais alto). */
+export function LevelSummary({ marks, badge = 32 }: { marks: AccountMarks; badge?: number }) {
+  const p = accountLevelProgress(marks);
   return (
-    <View style={styles.ladder}>
-      {ACCOUNT_LEVELS.map((l) => {
+    <View style={{ gap: space[3] }}>
+      <View style={styles.row}>
+        <LevelBadge level={p.level} size={badge} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+            {T.level(p.level)}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {T.progress(p.done, p.total)}
+          </Txt>
+        </View>
+      </View>
+      <LevelProgressBar marks={marks} />
+      <Txt variant="caption" color={colors.textSecondary}>
+        {p.next ? T.next(p.missing, p.next) : T.top}
+      </Txt>
+    </View>
+  );
+}
+
+/** Os quatro níveis numa lista simples, com o selo pequeno, quantos marcos cada um pede e "Seu nível" no de agora. */
+export function LevelList({ level }: { level: AccountLevel }) {
+  return (
+    <View>
+      {ACCOUNT_LEVELS.map((l, i) => {
         const current = l === level;
         return (
           <View
             key={l}
-            style={[styles.step, { backgroundColor: levelColors[l].tint, borderColor: current ? levelColors[l].main : 'transparent' }]}
+            style={[styles.levelRow, i < ACCOUNT_LEVELS.length - 1 && styles.divider]}
             accessible
+            accessibilityRole="image"
             accessibilityLabel={`${LEVEL_NAME[l]}, ${LEVEL_THRESHOLD[l]} marcos${current ? ', o seu nível' : ''}`}>
-            <LevelBadge level={l} size={28} />
-            <Txt variant="caption" style={{ fontFamily: current ? fonts.extrabold : fonts.semibold }} numberOfLines={1}>
-              {LEVEL_NAME[l]}
-            </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
-              {LEVEL_THRESHOLD[l]}
-            </Txt>
+            <LevelBadge level={l} size={24} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt variant="label" style={{ fontFamily: current ? fonts.bold : fonts.regular }}>
+                {LEVEL_NAME[l]}
+              </Txt>
+              <Txt variant="caption" color={colors.textSecondary}>
+                {T.levelFrom(LEVEL_THRESHOLD[l])}
+              </Txt>
+            </View>
+            {current ? (
+              <View style={styles.tag}>
+                <Txt variant="caption" color={colors.brand} style={{ fontFamily: fonts.bold }}>
+                  {T.yourLevel}
+                </Txt>
+              </View>
+            ) : null}
           </View>
         );
       })}
@@ -73,7 +116,7 @@ export function LevelLadder({ level }: { level: AccountLevel }) {
 }
 
 /**
- * Card "Nível da conta" em Conta (D-095): o selo, o nível, quantos marcos e o que falta para o próximo, com a borda na cor do nível.
+ * Card "Nível da conta" em Conta (D-095): um cartão como os outros de Conta, com o resumo do nível e "Ver meu nível".
  * Sem os marcos (carregando ou falha de leitura), nada aparece: o nível nunca é inventado.
  */
 export function LevelCard() {
@@ -85,36 +128,21 @@ export function LevelCard() {
     }, [refetch]),
   );
   if (!marks.data) return null;
-  const p = accountLevelProgress(marks.data);
   return (
-    <Card style={[{ gap: space[3], borderWidth: 2, borderColor: levelColors[p.level].main }]}>
+    <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
         {T.cardTitle}
       </Txt>
-      <View style={styles.row}>
-        <LevelBadge level={p.level} />
-        <View style={{ flex: 1, gap: 2 }}>
-          <Txt variant="label" style={{ fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 }}>
-            {T.level(p.level)}
-          </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
-            {T.progress(p.done, p.total)}
-          </Txt>
-        </View>
-      </View>
-      <LevelProgressBar marks={marks.data} />
-      <Txt variant="caption" color={colors.textSecondary}>
-        {p.next ? T.next(p.missing, p.next) : T.top}
-      </Txt>
-      <Button label={T.open} icon={Award} tone="soft" onPress={() => router.push('/conta/nivel')} />
+      <LevelSummary marks={marks.data} />
+      <LinkButton label={T.open} trailing={ChevronRight} onPress={() => router.push('/conta/nivel')} style={{ alignSelf: 'flex-start' }} />
     </Card>
   );
 }
 
 /**
- * O card de comemoração da troca de nível, no Resumo (D-095): aparece quando o nível de agora é maior que o último que este aparelho
- * mostrou, com a borda e o selo na cor do nível novo. "Ver meu nível" e "Fechar" guardam o nível como visto. Na primeira vez no
- * aparelho, só guarda o nível de agora, sem comemorar. Os marcos são pedidos de novo a cada volta ao Resumo.
+ * O card de comemoração da troca de nível, no Resumo (D-095): um cartão branco, discreto, com o selo do nível novo, o recado e "Ver meu
+ * nível" e "Fechar", que guardam o nível como visto. Aparece quando o nível de agora é maior que o último que este aparelho mostrou; na
+ * primeira vez no aparelho, só guarda o nível de agora, sem comemorar. Os marcos são pedidos de novo a cada volta ao Resumo.
  */
 export function LevelUpCard() {
   const { user, auth } = useSession();
@@ -135,30 +163,25 @@ export function LevelUpCard() {
   if (!level || !loaded || !shouldCelebrateLevel(last, level)) return null;
   return (
     <Animated.View entering={FadeInDown.duration(320).reduceMotion(ReduceMotion.System)}>
-      <Card style={[{ gap: space[3], borderWidth: 2, borderColor: levelColors[level].main, backgroundColor: levelColors[level].tint, overflow: 'hidden' }]}>
+      <Card style={{ gap: space[3] }}>
         <View style={styles.row}>
-          <View style={{ flex: 1, gap: space[1] }}>
-            <View style={[styles.eyebrow, { backgroundColor: levelColors[level].main }]}>
-              <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
-                {T.celebrateEyebrow}
-              </Txt>
-            </View>
-          </View>
-          <View>
-            <BadgeConfetti />
-            <Animated.View entering={ZoomIn.delay(120).duration(360).reduceMotion(ReduceMotion.System)}>
-              <LevelBadge level={level} size={56} />
-            </Animated.View>
+          <Animated.View entering={ZoomIn.delay(120).duration(360).reduceMotion(ReduceMotion.System)}>
+            <LevelBadge level={level} size={40} />
+          </Animated.View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Txt variant="caption" color={colors.brand} style={{ fontFamily: fonts.bold }}>
+              {T.celebrateEyebrow}
+            </Txt>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {T.celebrateTitle(level)}
+            </Txt>
           </View>
         </View>
-        <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ fontSize: 22, lineHeight: 30 }}>
-          {T.celebrateTitle(level)}
-        </Txt>
-        <Txt>{T.celebrateBody[level]}</Txt>
+        <Txt color={colors.textSecondary}>{T.celebrateBody[level]}</Txt>
         <View style={styles.actions}>
           <Button
             label={T.open}
-            icon={Award}
+            tone="soft"
             onPress={() => {
               mark(level);
               router.push('/conta/nivel');
@@ -173,11 +196,11 @@ export function LevelUpCard() {
 }
 
 const styles = StyleSheet.create({
-  track: { height: 10, borderRadius: radius.pill, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: radius.pill },
+  track: { height: 6, borderRadius: radius.pill, overflow: 'hidden', backgroundColor: colors.brandTint },
+  fill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.brand },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
-  eyebrow: { alignSelf: 'flex-start', borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1] },
   actions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[3] },
-  ladder: { flexDirection: 'row', gap: space[2] },
-  step: { flex: 1, minWidth: 0, alignItems: 'center', gap: 2, paddingVertical: space[2], paddingHorizontal: 2, borderRadius: radius.sm, borderWidth: 2 },
+  levelRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 52, paddingVertical: space[2] },
+  divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  tag: { backgroundColor: colors.brandTint, borderRadius: radius.pill, paddingHorizontal: space[2], paddingVertical: 2 },
 });

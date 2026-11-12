@@ -159,6 +159,14 @@ A Clarevo é paga por assinatura mensal, com 14 dias grátis no começo (Termos 
 - **Plano Família.** Quem paga é a pessoa titular. As outras pessoas da Família não veem os dados de pagamento da titular, só que a conta delas está coberta pelo Plano Família.
 - **Para quê.** Só para liberar ou travar a escrita conforme a assinatura e para mostrar a situação em Conta. Não usamos esses dados para anúncio nem para montar perfil.
 
+### 3.10 Nível da conta
+
+A conta tem um nível (Bronze, Prata, Ouro ou Diamante) pelo quanto você já usa o app, como já ter anotado um gasto ou criado uma meta.
+
+- **O que guardamos.** Quais desses marcos você já alcançou e quando, para o nível nunca descer. Nenhum valor em dinheiro entra no nível.
+- **Quem vê.** Só você, na tela "Nível da conta". Ninguém da Família nem a empresa que oferece o benefício vê o seu nível, e ele não entra em relatório nenhum.
+- **Por quanto tempo.** Enquanto a conta existir. Ao excluir a conta, os marcos são apagados junto.
+
 ## 4. O que não guardamos?
 
 - Número completo de cartão, código de segurança (CVV) e validade. O app recusa apelidos que pareçam número de cartão.
@@ -252,6 +260,7 @@ Estas informações ficam só no seu aparelho (no armazenamento do app, ou no na
 - a sessão, para você não precisar entrar toda vez;
 - as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, e avisos que você dispensou (inclusive, [PROPOSTA: o dia em que você começou a usar o app neste aparelho e o "Agora não" da pergunta da seção 3.6]);
 - memórias para preencher mais rápido: a descrição e a categoria da última nota de cada loja (a loja é identificada pelo resumo do CNPJ, até 50 lojas), o mesmo para o nome lido de comprovantes (pelo resumo do nome, até 50) e as categorias que você escolheu na importação de extrato (até 300 entradas);
+- o último nível da conta já mostrado neste aparelho, para a comemoração da troca de nível aparecer uma vez só;
 - lembretes de contas a pagar, que são notificações agendadas no aparelho. Na tela bloqueada eles não mostram valor nem descrição, e o app não guarda token de notificação remota;
 - o widget da tela inicial, que está desligado. Se for ligado, o aparelho guardará um resumo para o widget, com os valores ocultos por padrão.
 

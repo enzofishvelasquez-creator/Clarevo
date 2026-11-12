@@ -13,10 +13,9 @@ import type { HelpScreen } from '@/lib/guide';
 import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { canGoForward, useView, type SpaceKind } from '@/state/data';
 import { useFamily } from '@/state/family';
-import { useAccountLevel } from '@/state/access';
 import { useSession } from '@/state/session';
 import { LOGOTYPE_HEIGHT, LOGOTYPE_WIDTH } from '@/theme/logo-paths';
-import { colors, fonts, levelColors, motion, radius, space } from '@/theme/tokens';
+import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
 export function initialsOf(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -58,8 +57,6 @@ function HideValuesButton() {
 
 /** Logo reverso, selo de demonstração e acesso à Conta (perfil, segurança e benefício). */
 function BrandRow() {
-  // O contorno do avatar leva a cor do nível da conta (D-095); sem o nível carregado, fica sem contorno.
-  const level = useAccountLevel();
   const { user, auth } = useSession();
   const { width } = useWindowDimensions();
   // Abaixo de 360 px, logotipo, selo de demonstração e avatar não cabem lado a lado no tamanho normal.
@@ -75,7 +72,7 @@ function BrandRow() {
           accessibilityRole="button"
           accessibilityLabel="Conta: perfil, assinatura, lembretes, privacidade e segurança"
           onPress={() => router.push('/conta')}
-          style={(s) => [styles.avatar, level && { borderWidth: 3, borderColor: levelColors[level].main }, (s as { focused?: boolean }).focused && focusOnBrand]}>
+          style={(s) => [styles.avatar, (s as { focused?: boolean }).focused && focusOnBrand]}>
           <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.extrabold }} maxFontSizeMultiplier={1.3}>
             {initialsOf(user?.displayName ?? '')}
           </Txt>

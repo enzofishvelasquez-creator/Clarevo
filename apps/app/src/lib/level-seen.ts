@@ -31,6 +31,19 @@ async function writeStored(key: string, level: AccountLevel): Promise<void> {
   }
 }
 
+/** Ao sair da conta ou excluí-la (`forgetDevice`): o nível visto desta pessoa sai do aparelho. Nunca falha. */
+export async function forgetLevelSeen(personId: string): Promise<void> {
+  const key = `${PREFIX}${personId}`;
+  memory.delete(key);
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
+    } else await AsyncStorage.removeItem(key);
+  } catch {
+    // Sem armazenamento: não há o que apagar.
+  }
+}
+
 /** `loaded` falso enquanto lê; `level` nulo quando este aparelho ainda não viu nível nenhum desta pessoa. */
 export function useLevelSeen(personId: string | undefined, persist: boolean) {
   const key = personId ? `${PREFIX}${personId}` : null;

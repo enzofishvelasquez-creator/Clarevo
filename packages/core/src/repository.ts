@@ -912,7 +912,7 @@ export interface RecordsRepository {
 
   /** my_access: a situação do acesso da própria pessoa (assinatura, benefício, cortesia, Família, antes do início, teste ou só leitura). */
   getMyAccess(): Promise<Access>;
-  /** my_account_marks (migração 0034): os 16 marcos "já fez alguma vez" da própria pessoa, de onde sai o nível da conta (D-095). */
+  /** my_account_marks (migração 0034): os 18 marcos "já fez alguma vez" da própria pessoa (os alcançados ficam guardados), de onde sai o nível da conta (D-095). */
   getAccountMarks(): Promise<AccountMarks>;
 
   // Assinatura na web pelo Asaas (D-084), pela função do servidor "assinatura-web" com a sessão da pessoa. Só na web.

@@ -22,20 +22,20 @@ import {
 const marks = (n: number): AccountMarks => Object.fromEntries(ACCOUNT_MARK_KEYS.map((k, i) => [k, i < n])) as AccountMarks;
 
 describe('níveis de conta (D-095): marcos e níveis', () => {
-  it('16 marcos; toda conta começa no Bronze; Prata com 4, Ouro com 8 e Diamante com 12', () => {
-    expect(ACCOUNT_MARK_KEYS).toHaveLength(16);
-    expect(new Set(ACCOUNT_MARK_KEYS).size).toBe(16);
-    expect(LEVEL_THRESHOLD).toEqual({ bronze: 0, prata: 4, ouro: 8, diamante: 12 });
-    expect([0, 3, 4, 7, 8, 11, 12, 16].map((n) => accountLevel(marks(n)))).toEqual(['bronze', 'bronze', 'prata', 'prata', 'ouro', 'ouro', 'diamante', 'diamante']);
+  it('18 marcos; toda conta começa no Bronze; Prata com 4, Ouro com 9 e Diamante com 14', () => {
+    expect(ACCOUNT_MARK_KEYS).toHaveLength(18);
+    expect(new Set(ACCOUNT_MARK_KEYS).size).toBe(18);
+    expect(LEVEL_THRESHOLD).toEqual({ bronze: 0, prata: 4, ouro: 9, diamante: 14 });
+    expect([0, 3, 4, 8, 9, 13, 14, 18].map((n) => accountLevel(marks(n)))).toEqual(['bronze', 'bronze', 'prata', 'prata', 'ouro', 'ouro', 'diamante', 'diamante']);
     expect(accountMarksDone(NO_MARKS)).toBe(0);
     expect(accountLevel(NO_MARKS)).toBe('bronze');
   });
 
   it('o caminho até o próximo nível: quantos faltam e a fração dentro do nível; no Diamante, completo', () => {
-    expect(accountLevelProgress(marks(0))).toEqual({ level: 'bronze', done: 0, total: 16, next: 'prata', missing: 4, fraction: 0 });
-    expect(accountLevelProgress(marks(3))).toEqual({ level: 'bronze', done: 3, total: 16, next: 'prata', missing: 1, fraction: 0.75 });
-    expect(accountLevelProgress(marks(6))).toEqual({ level: 'prata', done: 6, total: 16, next: 'ouro', missing: 2, fraction: 0.5 });
-    expect(accountLevelProgress(marks(13))).toEqual({ level: 'diamante', done: 13, total: 16, next: null, missing: 0, fraction: 1 });
+    expect(accountLevelProgress(marks(0))).toEqual({ level: 'bronze', done: 0, total: 18, next: 'prata', missing: 4, fraction: 0 });
+    expect(accountLevelProgress(marks(3))).toEqual({ level: 'bronze', done: 3, total: 18, next: 'prata', missing: 1, fraction: 0.75 });
+    expect(accountLevelProgress(marks(6))).toEqual({ level: 'prata', done: 6, total: 18, next: 'ouro', missing: 3, fraction: 0.4 });
+    expect(accountLevelProgress(marks(15))).toEqual({ level: 'diamante', done: 15, total: 18, next: null, missing: 0, fraction: 1 });
   });
 
   it('lê a resposta do banco: só `true` conta, marco desconhecido é ignorado e o que não é objeto vira erro', () => {
@@ -60,7 +60,7 @@ describe('níveis de conta (D-095): marcos e níveis', () => {
       ...ACCOUNT_LEVELS.flatMap((l) => [LEVEL_NAME[l], LEVEL_TEXT.level(l), LEVEL_TEXT.celebrateTitle(l), LEVEL_TEXT.celebrateBody[l]]),
       LEVEL_TEXT.next(1, 'prata'),
       LEVEL_TEXT.next(3, 'ouro'),
-      LEVEL_TEXT.progress(5, 16),
+      LEVEL_TEXT.progress(5, 18),
       LEVEL_TEXT.markDone('Criar uma meta'),
       LEVEL_TEXT.markTodo('Criar uma meta'),
       ...(Object.values(LEVEL_TEXT).filter((v) => typeof v === 'string') as string[]),
@@ -81,6 +81,12 @@ describe('níveis de conta (D-095): marcos e níveis', () => {
     }
     expect(ACCOUNT_MARK_KEYS.filter((k) => ACCOUNT_MARK_TEXT[k].href === null)).toEqual(['tres_meses']);
   });
+
+  it('o Diamante é alcançável sem cartão, sem investimento, sem dinheiro guardado em meta e sem Família', () => {
+    const without = new Set(['cartao', 'investimento', 'aporte', 'familia']);
+    const possible = ACCOUNT_MARK_KEYS.filter((k) => !without.has(k)).length;
+    expect(possible).toBeGreaterThanOrEqual(LEVEL_THRESHOLD.diamante);
+  });
 });
 
 describe('níveis de conta: o repositório em memória (demonstração e testes)', () => {
@@ -90,5 +96,17 @@ describe('níveis de conta: o repositório em memória (demonstração e testes)
     expect(m).toMatchObject({ gasto: true, recebimento: true, gasto_fixo: true, meta: true, investimento: true, importou: false, telegram: false, familia: false });
     expect(['prata', 'ouro', 'diamante']).toContain(accountLevel(m));
     expect(Object.keys(m).sort()).toEqual([...ACCOUNT_MARK_KEYS].sort());
+  });
+
+  it('o nível nunca desce: o marco alcançado fica guardado, mesmo se o que o fez some', async () => {
+    const repo = await createDemoRepository();
+    const before = await repo.getAccountMarks();
+    expect(before.meta).toBe(true);
+    // Como a limpeza dos excluídos e a Família apagada no banco: o que fez o marco some do repositório.
+    const internals = repo as unknown as { goals: Map<string, unknown>; operations: Map<string, unknown> };
+    internals.goals.clear();
+    internals.operations.clear();
+    const after = await repo.getAccountMarks();
+    expect(after).toEqual(before);
   });
 });
