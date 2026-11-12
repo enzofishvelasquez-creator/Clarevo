@@ -1647,9 +1647,10 @@ describe('site público: imagens, tamanho e Open Graph', () => {
       }
     }
     expect(total, 'peso total das capturas').toBeLessThanOrEqual(1024 * 1024);
-    // O site inteiro, sem as fontes de licença aberta, cabe com folga.
+    // O site inteiro, sem as fontes de licença aberta, cabe com folga. Desde 12/11/2026, 5 MB: as capturas originais do kit de imprensa
+    // (só para baixar, nenhuma página as carrega) cresceram com as fotos das metas e as cinco abas; o peso das páginas segue o de antes.
     const tudo = [...gerado.arquivos.values()].reduce((n, c) => n + Buffer.byteLength(c), 0);
-    expect(tudo).toBeLessThanOrEqual(4 * 1024 * 1024);
+    expect(tudo).toBeLessThanOrEqual(5 * 1024 * 1024);
   });
 
   it('a chave do cache das imagens inclui o resumo do código de png.js e de imagens.js: mudar o método invalida o cache sozinho', () => {
