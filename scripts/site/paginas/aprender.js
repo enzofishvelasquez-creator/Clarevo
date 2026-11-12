@@ -205,7 +205,8 @@ ${meses.join('\n')}
     ),
     bloco(
       `<div class="aviso-edu"><p>O que depende do ano, como o prazo do Imposto de Renda e as datas e condições do IPVA e do IPTU de cada estado e município, deve ser conferido na fonte oficial do ano. Cada tema traz o link da fonte. ${esc(c.TEXTO.disclaimer)}</p></div>`,
-      { variante: 'azul', rotulo: null },
+      // Sem fundo azul na seção: o aviso já é uma caixa azul, e numa seção da mesma cor ele sumia e o texto saía da coluna dos meses (12/11/2026).
+      { rotulo: null },
     ),
   ].join('\n');
   const pg = montarPagina({

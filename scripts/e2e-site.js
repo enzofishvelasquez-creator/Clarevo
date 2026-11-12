@@ -436,7 +436,10 @@ function roteiros(CALC) {
 
     // 8. Espaçamento em todas as páginas (pedido do Enzo em 12/11/2026: "esse é um erro de espaçamento básico, precisamos evitar eles, em
     // toda a Clarevo"): em 360, 768, 900 e 1280 px, nenhum cartão, moldura ou bloco com fundo ou borda encosta em outro ou fica por cima
-    // dele (menos de 8 px entre os dois, nos dois sentidos), e nada passa da largura da tela.
+    // dele (menos de 8 px entre os dois, nos dois sentidos), e nada passa da largura da tela. Da varredura do mesmo dia: nenhum cartão
+    // sozinho na última linha de uma grade; nenhum título de seção mais perto do que vem antes do que do próprio conteúdo; nenhum texto
+    // colado numa caixa ou numa grade de cartões; nenhuma caixa com o primeiro ou o último item somando margem ao respiro dela (o de baixo
+    // ficava o dobro do de cima); e duas seções seguidas com o mesmo fundo, sem linha entre elas, não somam os dois respiros.
     {
       const paginas = [];
       const andar = (d) => { for (const n of fs.readdirSync(d, { withFileTypes: true })) { const c = path.join(d, n.name); if (n.isDirectory()) andar(c); else if (n.name.endsWith('.html')) paginas.push(path.relative(saida, c)); } };
@@ -444,6 +447,7 @@ function roteiros(CALC) {
       const p = await pagina();
       const encostados = [];
       const largos = [];
+      const varredura = { sozinhos: [], titulos: [], colados: [], margens: [], dobrados: [] };
       for (const largura of [360, 768, 900, 1280]) {
         await p.setViewportSize({ width: largura, height: 900 });
         for (const arquivo of paginas) {
@@ -467,14 +471,70 @@ function roteiros(CALC) {
               const gx = Math.max(rb.left - ra.right, ra.left - rb.right), gy = Math.max(rb.top - ra.bottom, ra.top - rb.bottom);
               if (gx < 8 && gy < 8) achados.push(`${nome(a)} e ${nome(b)} (${Math.round(Math.max(gx, gy))} px)`);
             }
-            return { achados: achados.slice(0, 3), largo: document.documentElement.scrollWidth > window.innerWidth + 1 };
+            // Varredura de 12/11/2026. Uma "caixa" é o mesmo que acima (fundo, borda ou sombra, com cantos arredondados), sem os campos.
+            const vis = (e) => { const cs = getComputedStyle(e); const b = e.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0; };
+            const caixa = (e) => caixas.includes(e) && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.tagName);
+            const noFluxo = (e) => vis(e) && getComputedStyle(e).position !== 'absolute';
+            const antes = (e) => { let x = e.previousElementSibling; while (x && !noFluxo(x)) x = x.previousElementSibling; return x; };
+            const depois = (e) => { let x = e.nextElementSibling; while (x && !noFluxo(x)) x = x.nextElementSibling; return x; };
+            const cartao = (f) => caixa(f) || (f.children.length === 1 && caixa(f.children[0]));
+            const gradeDeCartoes = (g) => getComputedStyle(g).display === 'grid' && g.children.length > 1 && [...g.children].filter(vis).every(cartao);
+            const sozinhos = [], titulos = [], colados = [], margens = [], dobrados = [];
+            for (const g of document.querySelectorAll('main *')) {
+              if (!vis(g) || !gradeDeCartoes(g)) continue;
+              const filhos = [...g.children].filter(vis);
+              if (filhos.length < 3) continue;
+              const linhas = new Map();
+              for (const f of filhos) { const t = Math.round(f.getBoundingClientRect().top); linhas.set(t, [...(linhas.get(t) || []), f]); }
+              const ultima = [...linhas.entries()].sort((a, b) => a[0] - b[0]).pop()[1];
+              if (linhas.size > 1 && ultima.length === 1 && ultima[0].getBoundingClientRect().width < g.getBoundingClientRect().width * 0.9) sozinhos.push(`${nome(g)} (${filhos.length} cartões)`);
+            }
+            for (const h of document.querySelectorAll('main h2')) {
+              const a = vis(h) && antes(h), d = vis(h) && depois(h);
+              if (!a || !d) continue;
+              const r = h.getBoundingClientRect();
+              const acima = r.top - a.getBoundingClientRect().bottom, abaixo = d.getBoundingClientRect().top - r.bottom;
+              if (acima < 24 || acima < abaixo * 1.5) titulos.push(`${nome(h)} (${Math.round(acima)} px acima, ${Math.round(abaixo)} px até o conteúdo)`);
+            }
+            for (const e of document.querySelectorAll('main *')) {
+              if (!caixa(e) && !(vis(e) && gradeDeCartoes(e))) continue;
+              for (const [x, lado] of [[depois(e), 'depois'], [antes(e), 'antes']]) {
+                if (!x || caixa(x) || gradeDeCartoes(x) || (lado === 'antes' && /^H[1-6]$/.test(x.tagName))) continue;
+                const a = e.getBoundingClientRect(), b = x.getBoundingClientRect();
+                const gy = lado === 'depois' ? b.top - a.bottom : a.top - b.bottom;
+                if (gy < 8 && Math.max(b.left - a.right, a.left - b.right) < 8) colados.push(`${nome(e)} e ${nome(x)} (${Math.round(gy)} px)`);
+              }
+            }
+            for (const c of caixas) {
+              const cs = getComputedStyle(c);
+              if (!caixa(c) || c.tagName === 'A' || cs.display.startsWith('inline') || parseFloat(cs.paddingTop) < 4) continue;
+              const filhos = [...c.children].filter(noFluxo);
+              if (!filhos.length) continue;
+              const mt = parseFloat(getComputedStyle(filhos[0]).marginTop), mb = parseFloat(getComputedStyle(filhos[filhos.length - 1]).marginBottom);
+              if (mt > 2 || mb > 2) margens.push(`${nome(c)} (${mt} px em cima, ${mb} px embaixo)`);
+            }
+            for (const s of document.querySelectorAll('main > section:not(.capa)')) {
+              const p = depois(s);
+              if (!p || p.tagName !== 'SECTION') continue;
+              const a = getComputedStyle(s), b = getComputedStyle(p);
+              if (a.backgroundColor === b.backgroundColor && !(parseFloat(a.borderBottomWidth) > 0) && !(parseFloat(b.borderTopWidth) > 0) && parseFloat(a.paddingBottom) > 0 && parseFloat(b.paddingTop) > 0) dobrados.push(`${nome(s)} e ${nome(p)}`);
+            }
+            const tres = (l) => l.slice(0, 3);
+            return { achados: achados.slice(0, 3), largo: document.documentElement.scrollWidth > window.innerWidth + 1, sozinhos: tres(sozinhos), titulos: tres(titulos), colados: tres(colados), margens: tres(margens), dobrados: tres(dobrados) };
           });
           for (const x of r.achados) encostados.push(`${arquivo} em ${largura} px: ${x}`);
           if (r.largo) largos.push(`${arquivo} em ${largura} px`);
+          for (const k of Object.keys(varredura)) for (const x of r[k]) varredura[k].push(`${arquivo} em ${largura} px: ${x}`);
         }
       }
       ok(`espaçamento: em ${paginas.length} páginas e 4 larguras, nenhum cartão ou bloco encostado em outro ou por cima dele`, encostados.length === 0, `${encostados.length} casos: ${encostados.slice(0, 12).join(' | ')}`);
       ok(`espaçamento: em ${paginas.length} páginas e 4 larguras, nada passa da largura da tela`, largos.length === 0, largos.slice(0, 6).join(' | '));
+      const regra = (k, texto) => ok(`espaçamento: em ${paginas.length} páginas e 4 larguras, ${texto}`, varredura[k].length === 0, `${varredura[k].length} casos: ${varredura[k].slice(0, 8).join(' | ')}`);
+      regra('sozinhos', 'nenhum cartão sozinho na última linha de uma grade');
+      regra('titulos', 'nenhum título de seção colado no que vem antes (pelo menos 24 px e 1,5 vez o espaço até o próprio conteúdo)');
+      regra('colados', 'nenhum texto colado numa caixa ou numa grade de cartões (menos de 8 px)');
+      regra('margens', 'nenhuma caixa com o primeiro ou o último item somando margem ao respiro dela');
+      regra('dobrados', 'duas seções seguidas com o mesmo fundo, sem linha entre elas, não somam os dois respiros');
       await p.close();
     }
 

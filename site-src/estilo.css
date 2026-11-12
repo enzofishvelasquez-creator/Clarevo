@@ -31,23 +31,29 @@
   --aparelho:#0B1330;
   --erro:#B3261E;
 }
+/* Tema escuro (12/11/2026, pedido do Enzo: o escuro antigo era quase preto e quebrava a identidade do app). Segue o tema do aparelho.
+   O azul da marca do topo e dos botões e o lima não mudam; fundo e cartões ficam em azul-marinho com o matiz da marca, mais claros que
+   antes, com os cartões um degrau acima do fundo (como no modo escuro do app). Contrastes: texto 14,6:1 no fundo e 12,3:1 no cartão;
+   secundário 7,5:1; link 7,3:1 no cartão e 5,7:1 no azul claro; contorno 3,7:1. */
 @media (prefers-color-scheme: dark){
   :root{
-    --topo:#1D47CC;
-    --texto:#EAF0FF;
-    --texto-2:#B8C3DD;
-    --fundo:#0E1526;
-    --superficie:#17223B;
-    --azul-claro:#1B2A55;
-    --lima-claro:#27321A;
-    --linha:#2B3857;
-    --contorno:#8C99B6;
-    --link:#9DB7FF;
-    --foco:#9DB7FF;
-    --rodape:#0A1020;
-    --disco:#183BAD;
+    --texto:#EEF2FB;
+    --texto-2:#B4C0DB;
+    --fundo:#131E3E;
+    --superficie:#1D2B54;
+    --azul-claro:#283B70;
+    --lima-claro:#344019;
+    --linha:#33436F;
+    --contorno:#7484AE;
+    --link:#A3BBFF;
+    --foco:#A3BBFF;
+    --rodape:#0F1838;
     --erro:#FFB4AB;
   }
+  /* O rodapé (#0F1838) fica quase igual ao fundo (#131E3E): uma linha em cima marca onde a página termina (12/11/2026). */
+  .rodape{border-top:1px solid var(--linha)}
+  /* No kit de imprensa, a amostra da cor de texto (#17223B) sumia no cartão escuro: o contorno dela fica no tom dos campos (duas classes, para valer sobre o contorno de .amostra, que vem depois). */
+  .amostra.amostra-texto{border-color:var(--contorno)}
 }
 
 *,*::before,*::after{box-sizing:border-box}
@@ -131,6 +137,10 @@ main:focus{outline:none}
 .bloco-azul{background:var(--azul-claro)}
 .bloco h2{margin:0 0 .6rem}
 .bloco>.miolo>h2:first-child{margin-top:0}
+/* Varredura de 12/11/2026: um segundo título na mesma seção (Contato, na página inicial) tem o respiro de um título, e não só o do
+   parágrafo de cima; e duas seções seguidas com o mesmo fundo, sem linha entre elas, não somam os dois respiros (96 px vazios). */
+.bloco>.miolo>h2:not(:first-child){margin-top:2.25rem}
+.bloco:not(.bloco-alt):not(.bloco-azul)+.bloco:not(.bloco-alt):not(.bloco-azul){padding-top:0}
 .lead-bloco{max-width:42rem;margin:0 0 1.75rem;color:var(--texto-2);font-size:1.0625rem}
 .bloco-azul .lead-bloco{color:var(--texto)}
 h1,h2,h3{text-wrap:balance}
@@ -159,8 +169,9 @@ blockquote>:last-child{margin-bottom:0}
 /* Cartões e grades */
 .grade{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(15.5rem,100%),1fr))}
 .grade-3{grid-template-columns:repeat(auto-fit,minmax(min(17rem,100%),1fr))}
-/* Duas grades seguidas (Para empresas): o mesmo respiro de dentro da grade entre uma e outra, nunca cartões encostados (12/11/2026). */
-:is(.grade,.mini)+:is(.grade,.mini){margin-top:1rem}
+/* Duas grades seguidas (Para empresas), ou uma grade e a nota logo abaixo dela (Para empresas, Segurança, Imprensa, Novidades por e-mail): o mesmo respiro de
+   dentro da grade entre uma e outra, nunca cartões encostados nem texto colado neles (12/11/2026). */
+:is(.grade,.mini,.ve-nao-ve,.passos)+:is(.grade,.mini,.ve-nao-ve,p){margin-top:1rem}
 .cartao{background:var(--superficie);border:1px solid var(--linha);border-radius:20px;padding:1.25rem}
 .bloco-alt .cartao{background:var(--fundo)}
 .cartao h3{margin-top:0}
@@ -195,7 +206,7 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .recurso:first-of-type{border-top:0}
 .recurso .celular{justify-self:center}
 .recurso h3{margin:0 0 .5rem;font-size:1.4rem;line-height:1.25}
-.recurso ul{margin-bottom:0}
+.recurso ul{margin-bottom:.75rem}
 @media (min-width:48rem){
   .recurso{grid-template-columns:minmax(0,1fr) 15.5rem;gap:4rem}
   .recurso:nth-of-type(even){grid-template-columns:15.5rem minmax(0,1fr)}
@@ -256,6 +267,11 @@ mark.pendente{background:var(--lima);color:var(--sobre-lima);padding:0 .25em;bor
 .exemplo{border-left:6px solid var(--azul)}
 .exemplo h2,.hipoteses h2,.fatos h2{margin:0 0 .5rem;font-size:1.1875rem}
 .exemplo p:last-child,.fatos ul:last-child,.hipoteses p:last-child{margin-bottom:0}
+/* O primeiro e o último item da caixa não somam margem ao respiro dela (o título do exemplo das calculadoras é h3, e a lista de hipóteses
+   fecha a caixa); "Ver a conta" fechado tem 44 px de área de toque, que entram no respiro de baixo, sem sobrar espaço embaixo do texto. */
+.exemplo>:first-child{margin-top:0}
+.exemplo>:last-child{margin-bottom:0}
+.exemplo>details.conta:not([open]):last-child{margin-bottom:-.5rem}
 details.conta{margin:.5rem 0 0}
 details.conta summary{cursor:pointer;font-weight:800;color:var(--link);min-height:44px;display:flex;align-items:center}
 details.conta ol{margin:.25rem 0 0;font-variant-numeric:tabular-nums}
@@ -264,13 +280,17 @@ details.conta ol{margin:.25rem 0 0;font-variant-numeric:tabular-nums}
 .fonte-meta{display:block;color:var(--texto-2);font-size:.875rem}
 .revisao{color:var(--texto-2);font-size:.9375rem}
 .aviso-edu{margin-top:1.5rem;padding:.9rem 1.1rem;border-radius:14px;background:var(--azul-claro);color:var(--texto);font-size:.9375rem}
+/* Sem a margem do parágrafo de dentro (o respiro de baixo ficava o dobro do de cima) e sem o texto seguinte colado na caixa (12/11/2026). */
+.aviso-edu>:last-child{margin-bottom:0}
+.aviso-edu:first-child{margin-top:0}
+.aviso-edu+p{margin-top:1rem}
 .no-app{margin:1rem 0 0;padding:.9rem 1.1rem;border-radius:14px;background:var(--lima-claro);border:1px solid var(--lima)}
 .meses{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(20rem,100%),1fr))}
 .mes{background:var(--superficie);border:1px solid var(--linha);border-radius:20px;padding:1.25rem}
 .mes h2{margin:0 0 .6rem;font-size:1.3rem}
 .mes ul{list-style:none;padding:0;margin:0}
 .mes li{margin:0 0 .9rem}
-.mes li:last-child{margin-bottom:0}
+.mes li:last-child,.mes>:last-child{margin-bottom:0}
 .mes .tema-meta{margin-top:.25rem}
 
 /* Calculadoras: o formulário vem do script da página (calculadoras/calculadora.js); sem JavaScript, o aviso fica no <noscript> */
@@ -391,6 +411,24 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .nav-temas a[aria-current="page"]{background:var(--botao);border-color:var(--botao);color:var(--sobre-botao)}
 [hidden]{display:none!important}
 
+/* Nenhum cartão sozinho na última linha (varredura de 12/11/2026). Com a grade automática, três cartões ficavam dois e um no tablet,
+   quatro ficavam três e um, e as listas de número ímpar sobravam com um no fim. Pela quantidade, a grade pula as larguras em que um
+   cartão sobraria: três vão de uma coluna direto para três; quatro (cartões, temas ou passos), de uma para duas e depois quatro; os cinco passos de Para empresas,
+   de uma para três (três e dois) e depois cinco. Nas listas ímpares de cinco ou mais temas e nos temas da Ajuda, o primeiro cartão ocupa
+   duas colunas, e a conta fecha em duas, três ou quatro colunas (vale enquanto a quantidade não for múltipla de três; o teste de navegador
+   confere). Os temas relacionados de um tema de Aprender ficam um embaixo do outro, na coluna do texto. O `:where` deixa estas regras com
+   o peso de uma classe só, para a coluna do texto (`.artigo .temas`) continuar valendo. */
+:is(.grade,.temas,.mini):where(:has(>:nth-child(3):last-child)),.passos:where(:has(>:nth-child(5):last-child)),.artigo .temas{grid-template-columns:minmax(0,1fr)}
+@media (min-width:40rem){:is(.grade,.temas,.passos):where(:has(>:nth-child(4):last-child)){grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:48rem){:is(.grade,.temas,.mini):where(:has(>:nth-child(3):last-child)),.passos:where(:has(>:nth-child(5):last-child)){grid-template-columns:repeat(3,minmax(0,1fr))}}
+.grade-3:where(:has(>:nth-child(3):last-child)){grid-template-columns:minmax(0,1fr)}
+@media (min-width:56rem){.grade-3:where(:has(>:nth-child(3):last-child)){grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:64rem){:is(.temas,.passos):where(:has(>:nth-child(4):last-child)){grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (min-width:68rem){.grade:where(:has(>:nth-child(4):last-child)){grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (min-width:72rem){.passos:where(:has(>:nth-child(5):last-child)){grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media (min-width:35rem){.ajuda-temas:where(:has(>:last-child:nth-child(odd)))>:first-child{grid-column:span 2}}
+@media (min-width:40.75rem){.miolo>.temas:where(:has(>:nth-child(5)):has(>:last-child:nth-child(odd)))>:first-child{grid-column:span 2}}
+
 /* Rodapé */
 .rodape{background:var(--rodape);color:var(--sobre-rodape-2);padding:2.5rem 0 2rem;font-size:.9375rem;margin-top:0}
 .rodape-grade{display:grid;gap:1.5rem 1.25rem;grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:1.5rem}
@@ -404,6 +442,11 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
   .rodape-marca,.rodape-grade>div:last-child{grid-column:auto}
   .rodape-grade>div:last-child ul{columns:auto}
   .rodape-grade>div:last-child a{align-items:center;padding:0}
+}
+/* Entre 768 e 911 px cabiam três colunas: a de "Confiança e regras" ficava sozinha numa linha. Ali, a marca vai em cima e as três de links lado a lado (12/11/2026). */
+@media (min-width:48rem) and (max-width:56.99rem){
+  .rodape-grade{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .rodape-marca{grid-column:1/-1}
 }
 .rodape h2{margin:0 0 .4rem;font-size:.9375rem;font-weight:800;color:var(--sobre-rodape);text-transform:none}
 .rodape ul{list-style:none;margin:0;padding:0}

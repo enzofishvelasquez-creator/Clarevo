@@ -14,7 +14,7 @@ const ARQUIVO = 'app/index.html';
 
 /**
  * Os recursos do passeio, na ordem. `guia`: ids do guia de uso (o primeiro dá o texto principal); `imagem`: id da captura; `itens`:
- * pontos curtos, escritos conferindo o código e o guia.
+ * pontos curtos, escritos conferindo o código e o guia, sem repetir o que o texto do guia já diz logo acima.
  */
 const RECURSOS = [
   {
@@ -56,7 +56,6 @@ const RECURSOS = [
     guia: ['contas-a-pagar', 'gastos-fixos', 'contas-do-ano'],
     imagem: 'contas',
     itens: [
-      'Gastos fixos e parcelamentos criam a conta de cada mês. Contas do ano, como IPVA e IPTU, entram dois meses antes de vencer.',
       'O gasto só entra em Pago quando você marca a conta como paga, e dá para desfazer.',
       'Lembretes de vencimento no app para celular, no dia anterior.',
     ],
@@ -78,8 +77,6 @@ const RECURSOS = [
     guia: ['evolucao', 'analises'],
     imagem: 'evolucao',
     itens: [
-      'Recebido e Pago mês a mês, com média e mediana.',
-      'Dá para tirar um mês da comparação sem mexer em nenhum lançamento.',
       'Categorias em barras ou em bolhas e o orçamento por categoria.',
     ],
   },
@@ -150,14 +147,14 @@ function paginaApp({ valores, img }) {
       if (!e) throw new Error(`o guia do core não tem a entrada "${id}" (página O app)`);
       return e;
     });
-    const propositos = [principal, ...extras].map((e) => `<p>${esc(e.purpose)}</p>`).join('\n');
+    // O texto do guia de cada entrada a mais leva o nome dela ("Contas do ano. Para contas que vencem..."): sem o título que o app mostra
+    // acima, a frase do guia ficava solta (12/11/2026).
+    const propositos = [`<p>${esc(principal.purpose)}</p>`, ...extras.map((e) => `<p><strong>${esc(e.title)}.</strong> ${esc(e.purpose)}</p>`)].join('\n');
     return `<article class="recurso" id="${r.id}" aria-labelledby="t-${r.id}">
 <div>
 <h3 id="t-${r.id}">${esc(r.titulo)}</h3>
 ${propositos}
-<ul>
-${r.itens.map((i) => `<li>${esc(i)}</li>`).join('\n')}
-</ul>
+${r.itens.length ? `<ul>\n${r.itens.map((i) => `<li>${esc(i)}</li>`).join('\n')}\n</ul>` : ''}
 <p class="pequeno"><a href="${u(`ajuda/${require('./ajuda').temaDoGuia(r.guia[0])}.html#guia-${r.guia[0]}`)}">Como usar, passo a passo</a></p>
 </div>
 ${celular(img[r.imagem], ARQUIVO)}

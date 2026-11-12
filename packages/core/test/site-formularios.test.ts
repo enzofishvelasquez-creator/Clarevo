@@ -25,7 +25,8 @@ const gerador = require(join(ROOT, 'scripts', 'gerar-site.js')) as {
 const formularios = require(join(ROOT, 'scripts', 'site', 'formularios.js')) as { TAMANHOS: Record<string, number>; FAIXAS: { valor: string; rotulo: string }[]; ISCA: string; CAMPOS: { contato: string[]; newsletter: string[] }; LIMITES: unknown; rotasLigadas: (v: unknown) => { contato: boolean; newsletter: boolean } };
 const { servir } = require(join(ROOT, 'scripts', 'site', 'servir.js')) as { servir: (pasta: string, o?: Record<string, unknown>) => Promise<{ url: string; pedidos: string[]; doWorker: string[]; fechar: () => Promise<void> }> };
 const texto = (v: string | Buffer | undefined): string => (typeof v === 'string' ? v : v ? v.toString('utf8') : '');
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+// O mesmo `esc` do gerador (scripts/site/texto.js), com o espaço fixo entre "R$" e o valor (12/11/2026).
+const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/R\$ (?=\d)/g, 'R$\u00a0');
 
 const PREENCHIDOS: Record<string, string> = {
   'RAZÃO SOCIAL': 'Empresa Exemplo Ltda',

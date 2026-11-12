@@ -5,6 +5,8 @@
  * altera. O resultado de cada imagem fica em um cache da pasta temporária. A chave junta os bytes do original, a largura e o resumo do
  * código que reduz e grava a imagem (`png.js` e este arquivo): qualquer mudança no método invalida o cache sozinha, e rodar o gerador
  * de novo, sem mudança, é rápido. Cada imagem declara largura e altura na página, para a página não pular ao carregar.
+ * Desde 12/11/2026, o nome do arquivo leva um resumo do conteúdo (`imagens/resumo.1a2b3c4d5e.png`): uma captura nova ganha outro nome,
+ * e o navegador pode guardar cada imagem por um ano (`_headers`) sem mostrar a antiga a quem já visitou o site.
  *
  * Todas as legendas dizem "Dados fictícios de demonstração" (`LEGENDA_DEMO`).
  */
@@ -58,6 +60,11 @@ function pastaDoCache() {
   return dir;
 }
 
+/** O resumo do conteúdo que vai no nome do arquivo publicado (10 caracteres do SHA-1 dos bytes gravados). */
+function resumoDoConteudo(bytes) {
+  return crypto.createHash('sha1').update(bytes).digest('hex').slice(0, 10);
+}
+
 /** A chave do cache de uma imagem: o original, a largura e o resumo do código. */
 function chaveDoCache(original, largura, resumoDoCodigo = RESUMO_DO_CODIGO) {
   return crypto.createHash('sha1').update(original).update(`|${largura}|${resumoDoCodigo}`).digest('hex').slice(0, 20);
@@ -89,11 +96,11 @@ function imagensDoSite() {
   for (const def of IMAGENS) {
     const bytes = processar(def);
     const { largura, altura } = png.dimensoes(bytes);
-    const caminho = `imagens/${def.id}.png`;
+    const caminho = `imagens/${def.id}.${resumoDoConteudo(bytes)}.png`;
     arquivos.set(caminho, bytes);
     info[def.id] = { caminho, largura, altura, alt: def.alt };
   }
   return { arquivos, info };
 }
 
-module.exports = { imagensDoSite, IMAGENS, LEGENDA_DEMO, RESUMO_DO_CODIGO, chaveDoCache };
+module.exports = { imagensDoSite, IMAGENS, LEGENDA_DEMO, RESUMO_DO_CODIGO, chaveDoCache, resumoDoConteudo };

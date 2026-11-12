@@ -88,7 +88,8 @@ const gerarSite = (opcoes?: GerarOpcoes): Gerado => {
   return geradoDoRepositorio;
 };
 
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+// O mesmo `esc` do gerador (scripts/site/texto.js), com o espaço fixo entre "R$" e o valor (12/11/2026).
+const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/R\$ (?=\d)/g, 'R$\u00a0');
 
 /** Os temas de Aprender que viram página: publicados, não legados, das seções organizar, juros e tempo. */
 const TEMAS_DO_SITE = publishedTopics().filter((t) => !t.legacy && ['organizar', 'juros', 'tempo'].includes(t.section));
@@ -772,7 +773,7 @@ describe('site público: as páginas geradas', () => {
     // De três a quatro recursos com captura e o herói com a tela Resumo, todos com a legenda de demonstração.
     expect(h.match(/<figure class="celular">/g)?.length).toBe(5);
     expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(5);
-    expect(h).toContain('src="imagens/resumo.png"');
+    expect(h).toMatch(/src="imagens\/resumo\.[0-9a-f]{10}\.png"/);
     for (const alvo of ['app/index.html', 'empresas/index.html', 'aprender/index.html', 'ajuda/index.html', 'novidades/index.html', 'seguranca.html']) expect(h, alvo).toContain(`href="${alvo}"`);
     // Sem selos das lojas, preço, depoimento, cliente, prêmio nem número de uso inventado.
     expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
@@ -890,7 +891,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toContain('o painel não mostra quem entrou no app');
     expect(h).toContain(dadoDoSite('E-MAIL DE CONTATO'));
     expect(h).toContain('Ainda não há tabela de preços');
-    expect(h).toContain('src="../imagens/empresa-painel.png"');
+    expect(h).toMatch(/src="\.\.\/imagens\/empresa-painel\.[0-9a-f]{10}\.png"/);
     expect(h).toContain('Dados fictícios de demonstração');
     expect(h).not.toMatch(/R\$\s?\d|por vaga|gr[áa]tis|nossos clientes|depoimento|\d+\s*empresas/i);
   });
@@ -1028,10 +1029,10 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(INVESTMENT_TEXT.whoSees).toContain('ficam só no seu Pessoal');
     // A captura é a da demonstração (a mesma do guia do app), com a legenda, e o passo a passo fica na Ajuda.
     expect(guia.screenshot).toBe('540_investimentos.png');
-    expect(secao).toContain('src="../imagens/investimentos.png"');
+    expect(secao).toMatch(/src="\.\.\/imagens\/investimentos\.[0-9a-f]{10}\.png"/);
     expect(secao).toContain('Dados fictícios de demonstração');
     expect(secao).toContain('href="../ajuda/organizar.html#guia-investimentos"');
-    expect(gerado.arquivos.has('imagens/investimentos.png')).toBe(true);
+    expect([...gerado.arquivos.keys()].some((k) => /^imagens\/investimentos\.[0-9a-f]{10}\.png$/.test(k))).toBe(true);
     // Vem depois de Metas e antes de Família, na ordem das abas, e a página diz quais são as cinco.
     expect(h.indexOf('<article class="recurso" id="metas"')).toBeGreaterThan(0);
     expect(h.indexOf('<article class="recurso" id="investir"')).toBeGreaterThan(h.indexOf('<article class="recurso" id="metas"'));
@@ -1077,8 +1078,9 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(recurso('nota')).toContain('>Leitura de nota fiscal e de comprovante</h3>');
     expect(recurso('anotar')).toContain(`alt="${esc(anotar.alt)}"`);
     // As duas capturas não são a mesma imagem (os pixels diferem) e toda captura do site tem origem que existe.
-    const a = png.decodificar(gerado.arquivos.get('imagens/anotar.png') as Buffer);
-    const b = png.decodificar(gerado.arquivos.get('imagens/nota.png') as Buffer);
+    const daImagem = (id: string) => gerado.arquivos.get([...gerado.arquivos.keys()].find((k) => k.startsWith(`imagens/${id}.`))!) as Buffer;
+    const a = png.decodificar(daImagem('anotar'));
+    const b = png.decodificar(daImagem('nota'));
     expect(a.rgb.equals(b.rgb)).toBe(false);
     for (const i of IMAGENS) expect(existsSync(join(ROOT, i.origem)), i.origem).toBe(true);
     expect(new Set(IMAGENS.map((i) => i.origem)).size).toBe(IMAGENS.length);
@@ -1169,7 +1171,7 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     const h = html('_headers');
     expect(h).toContain('/*\n  Content-Security-Policy: default-src \'none\';');
     expect(h).toContain('/fontes/*\n  Cache-Control: public, max-age=31536000, immutable\n');
-    expect(h).toContain('/imagens/*\n  Cache-Control: public, max-age=2592000\n');
+    expect(h).toContain('/imagens/*\n  Cache-Control: public, max-age=31536000, immutable\n');
     expect(h).toContain('/marca/*\n  Cache-Control: public, max-age=2592000\n');
     // O worker continua levando só os cabeçalhos do bloco /* (a guarda longa é dos arquivos estáticos).
     expect(html('_worker.js')).not.toContain('max-age=2592000');
@@ -1178,7 +1180,8 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     const { lerCabecalhosPorCaminho } = require(join(ROOT, 'scripts', 'site', 'servir.js')) as { lerCabecalhosPorCaminho: (pasta: string) => (caminho: string) => Record<string, string> };
     const doCaminho = lerCabecalhosPorCaminho(SITE);
     expect(doCaminho('/fontes/Manrope_500Medium.ttf')).toEqual({ 'Cache-Control': 'public, max-age=31536000, immutable' });
-    expect(doCaminho('/imagens/resumo.png')).toEqual({ 'Cache-Control': 'public, max-age=2592000' });
+    expect(doCaminho('/imagens/resumo.1a2b3c4d5e.png')).toEqual({ 'Cache-Control': 'public, max-age=31536000, immutable' });
+    expect(doCaminho('/marca/clarevo-simbolo.svg')).toEqual({ 'Cache-Control': 'public, max-age=2592000' });
     expect(doCaminho('/estilo.css')).toEqual({});
     expect(doCaminho('/index.html')).toEqual({});
   });
@@ -1826,7 +1829,8 @@ describe('site público: gerar-site.js na linha de comando', () => {
       const limpa = pasta(pastas);
       const r3 = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', limpa, '--referencia', REFERENCIA_DOS_POSTS, '--saida', saida]);
       expect(r3.status, r3.stderr).toBe(0);
-      for (const nome of [...PAGINAS, 'sitemap.xml', 'robots.txt', 'novidades/feed.xml', 'ajuda/indice.json', 'ajuda/busca.js', 'og/clarevo.png', 'imagens/resumo.png']) expect(existsSync(join(saida, nome)), nome).toBe(true);
+      for (const nome of [...PAGINAS, 'sitemap.xml', 'robots.txt', 'novidades/feed.xml', 'ajuda/indice.json', 'ajuda/busca.js', 'og/clarevo.png']) expect(existsSync(join(saida, nome)), nome).toBe(true);
+      expect(readdirSync(join(saida, 'imagens')).some((n) => /^resumo\.[0-9a-f]{10}\.png$/.test(n)), 'imagens/resumo.<resumo>.png').toBe(true);
       expect(readFileSync(join(saida, 'suporte.html'), 'utf8')).toContain('suporte@exemplo.test');
       expect(r3.stdout).toMatch(/\d+ páginas/);
       // Rodar de novo não muda nada (as capturas são comparadas pelos pixels).

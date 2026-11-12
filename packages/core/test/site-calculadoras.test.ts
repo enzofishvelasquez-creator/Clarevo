@@ -36,7 +36,8 @@ interface Exemplo {
 }
 
 const texto = (v: string | Buffer | undefined): string => (typeof v === 'string' ? v : v ? v.toString('utf8') : '');
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+// O mesmo `esc` do gerador (scripts/site/texto.js), com o espaço fixo entre "R$" e o valor (12/11/2026).
+const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/R\$ (?=\d)/g, 'R$\u00a0');
 const HOJE = '2026-10-23';
 const gerado = gerador.gerarSite();
 const pagina = (nome: string) => texto(gerado.arquivos.get(nome));
@@ -343,7 +344,7 @@ describe('site público: páginas das calculadoras', () => {
     expect(fatura.resultado.notes).toEqual([MULTA_FATURA_TEXT.rotativo, MULTA_FATURA_TEXT.exact]);
     const secao = /<section class="exemplo" aria-labelledby="exemplo-2">([\s\S]*?)<\/section>/.exec(h)?.[1] ?? '';
     expect(secao).toContain('<h3 id="exemplo-2">Outro exemplo, com a fatura do cartão</h3>');
-    expect(secao).toContain('<li>Valor que ficou sem pagar: <strong>R$ 1.000,00</strong></li>');
+    expect(secao).toContain(`<li>Valor que ficou sem pagar: <strong>${esc('R$ 1.000,00')}</strong></li>`);
     for (const l of ['Com estes números, 30 dias depois do vencimento a fatura fica em R$ 1.186,26.', 'Juros do rotativo: R$ 150,00', 'Juros de mora: R$ 10,00', 'Multa: R$ 20,00', 'IOF estimado: R$ 6,26']) expect(secao).toContain(`<li>${esc(l)}</li>`);
     // Sem JavaScript, a lista do que ela pede traz a escolha do modo e os campos da fatura.
     const sem = /<noscript>([\s\S]*?)<\/noscript>/.exec(h)?.[1] ?? '';

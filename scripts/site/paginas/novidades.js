@@ -64,8 +64,11 @@ function fontesDoPost(post) {
         problemas.push(`${post.origem}: a fonte "tema: ${f.slug}" não existe no catálogo de Aprender`);
         continue;
       }
-      itens.push(`<li><a href="${rel(post.arquivo, arquivoDoTema(t.slug))}">Aprender: ${esc(t.title)}</a><span class="fonte-meta">${esc(c.TEXTO.reviewedOn(t.reviewedOn))}. As fontes do tema:</span></li>`);
-      for (const s of t.sources) itens.push(fonteHtml(s, null));
+      // As fontes do tema ficam numa lista dentro do item do tema, e não soltas na numeração do post (12/11/2026).
+      itens.push(`<li><a href="${rel(post.arquivo, arquivoDoTema(t.slug))}">Aprender: ${esc(t.title)}</a><span class="fonte-meta">${esc(c.TEXTO.reviewedOn(t.reviewedOn))}. As fontes do tema:</span>
+<ol class="fontes">
+${t.sources.map((s) => fonteHtml(s, null)).join('\n')}
+</ol></li>`);
     } else if (f.tipo === 'link') {
       if (/^https:\/\//.test(f.destino)) itens.push(`<li><a href="${esc(f.destino)}" rel="noopener noreferrer">${esc(f.rotulo)}</a></li>`);
       else if (/^[a-z]+:/i.test(f.destino)) problemas.push(`${post.origem}: a fonte "${f.rotulo}" tem um endereço que não é https nem uma página do site`);
