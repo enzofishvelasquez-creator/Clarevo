@@ -4,7 +4,6 @@ import { PiggyBank } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { MoneyTxt } from '@/components/money-text';
-import { useNotice } from '@/components/notice-queue';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
 import { updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { useCommittedSummary, useGoals } from '@/state/data';
@@ -36,9 +35,8 @@ export function ExtraSavingsCard({
   const committed = useCommittedSummary(on ? contextId : undefined, month);
   const goals = useGoals(on ? contextId : undefined);
   const extra = on && user && records && committed.data !== undefined ? extraIncomeOfMonth(records, month, committed.data?.referenceCents ?? null) : 0;
-  // Entra na fila de avisos do Resumo (um aviso temporário por vez).
-  const show = useNotice('extra', extra > 0);
-  if (!show || !user || extra === 0) return null;
+  // Fora da fila de avisos do Resumo: é um lembrete que a própria pessoa ligou, e aparece sempre que vale.
+  if (!user || extra === 0) return null;
   const reserve = goals.data ? organizeGoals(goals.data).reserve : null;
   const persist = auth.mode !== 'demo';
 

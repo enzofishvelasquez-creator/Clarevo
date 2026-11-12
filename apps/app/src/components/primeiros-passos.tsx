@@ -107,8 +107,20 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
   const allDone = done.fixos && done.recebido && done.pago && done.guardar;
   const doneCount = (Object.keys(done) as Step['key'][]).filter((k) => done[k]).length;
   const { close } = firstSteps;
-  const state: PrimeirosPassosState =
-    firstSteps.status === 'carregando' ? 'carregando' : !eligible ? 'oculto' : !ready ? 'carregando' : allDone ? 'oculto' : 'visivel';
+  // A demonstração com dados nunca mostra o card, e uma leitura que falhou também não: nos dois casos o estado é "oculto", para a fila de
+  // avisos do Resumo não ficar esperando um card que não vai aparecer (revisão independente de 12/11/2026).
+  const failed = eligible && (series.isError || records.isError);
+  const state: PrimeirosPassosState = demoWithData || failed
+    ? 'oculto'
+    : firstSteps.status === 'carregando'
+      ? 'carregando'
+      : !eligible
+        ? 'oculto'
+        : !ready
+          ? 'carregando'
+          : allDone
+            ? 'oculto'
+            : 'visivel';
   useEffect(() => {
     onState?.(state);
   }, [state, onState]);

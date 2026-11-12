@@ -20,8 +20,8 @@ import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 /** Ícone e cores de cada situação. O texto da situação sempre acompanha o ícone (nunca só a cor). */
 export const SITUATION_LOOK = {
-  a_vencer: { Icon: CalendarClock, fg: colors.brand, bg: colors.brandTint, label: 'A vencer' },
-  vence_hoje: { Icon: CalendarClock, fg: colors.brand, bg: colors.brandTint, label: 'Vence hoje' },
+  a_vencer: { Icon: CalendarClock, fg: colors.brandText, bg: colors.brandTint, label: 'A vencer' },
+  vence_hoje: { Icon: CalendarClock, fg: colors.brandText, bg: colors.brandTint, label: 'Vence hoje' },
   vencida: { Icon: AlertCircle, fg: colors.error, bg: colors.errorTint, label: 'Vencida' },
   paga: { Icon: Check, fg: colors.successText, bg: colors.successTint, label: 'Paga' },
   // A conta de uma fatura paga por menos que o total (CL-07): igual à tela da fatura ("Paga em parte").

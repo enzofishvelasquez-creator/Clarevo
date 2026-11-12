@@ -43,7 +43,12 @@ export function DesktopNav() {
         ) : null}
       </View>
       {canWrite ? (
-        <Button label="Anotar gasto" icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
+        <Button
+          label="Anotar gasto"
+          icon={Plus}
+          // Com o formulário já aberto, não abre outro igual por cima.
+          onPress={() => (path === '/registro/novo' ? undefined : router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } }))}
+        />
       ) : null}
       <View style={{ gap: space[1], marginTop: space[2] }}>
         {TABS.map((t) => {

@@ -1,4 +1,4 @@
-import { useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 
 /**
  * Versão para computador (pedido do Enzo em 12/11/2026): a partir desta largura, a navegação vira uma barra lateral fixa, no lugar das
@@ -12,6 +12,8 @@ export const WIDE_CONTENT_MAX = 1080;
 /** Largura máxima do conteúdo das outras abas na versão para computador (era 560 px, a do celular). */
 export const WIDE_TAB_MAX = 760;
 
+/** Só na web: em tablet e Chromebook, o app nativo fica como no celular (o painel dos formulários é da web). */
 export function useWideLayout(): boolean {
-  return useWindowDimensions().width >= WIDE_MIN_WIDTH;
+  const { width } = useWindowDimensions();
+  return Platform.OS === 'web' && width >= WIDE_MIN_WIDTH;
 }

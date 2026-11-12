@@ -86,7 +86,7 @@ export const TOUR_CARDS: readonly TourCard[] = [
     id: 'anotar',
     icon: 'anotar',
     title: 'Anotar um gasto',
-    lines: ['Toque em Anotar gasto para registrar o que você pagou.', 'Com uma nota fiscal, escaneie o QR code e confira o que a Clarevo preencheu.'],
+    lines: ['Toque em Anotar gasto para registrar o que você pagou.', 'Com uma nota fiscal, escaneie o QR Code e confira o que a Clarevo preencheu.'],
   },
   {
     id: 'contas',

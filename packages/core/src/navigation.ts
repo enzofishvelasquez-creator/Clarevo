@@ -253,7 +253,7 @@ export const APP_SCREENS: readonly AppScreen[] = [
   {
     id: 'nota-fiscal',
     title: 'Escanear nota fiscal',
-    caption: 'Primeira linha de Anotar gasto: lê o QR code, o PDF ou a chave da nota',
+    caption: 'Primeira linha de Anotar gasto: lê o QR Code, o PDF ou a chave da nota',
     href: '/registro/novo?tipo=despesa',
     keywords: ['nota', 'fiscal', 'cupom', 'qr', 'qr code', 'nfc-e', 'nf-e', 'danfe', 'escanear', 'câmera', 'chave de acesso', 'recibo'],
   },

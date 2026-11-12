@@ -279,7 +279,8 @@ setInterval(async () => {
     // Nenhum cartão encostado em outro ou por cima dele (pedido do Enzo em 12/11/2026: erros de espaçamento básicos em toda a Clarevo):
     // entre dois cartões que não estão um dentro do outro, pelo menos 8 px em algum dos dois sentidos.
     const touching = await p.evaluate(() => {
-      const cards = [...document.querySelectorAll('[data-card]')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; });
+      // Os cartões da tela que fica atrás de um painel (fora do leitor de tela e do teclado) não contam.
+      const cards = [...document.querySelectorAll('[data-card]')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && !e.closest('[aria-hidden="true"],[inert]'); });
       const out = [];
       for (let i = 0; i < cards.length; i++) for (let j = i + 1; j < cards.length; j++) {
         const a = cards[i], b = cards[j];
@@ -14224,7 +14225,7 @@ setInterval(async () => {
     ['cartão', null, 'cartoes/[id]/index', { id: acIds.card }], ['fatura', null, 'cartoes/[id]/fatura/[mes]/index', { id: acIds.card, mes: '2026-10' }],
     ['buscar', null, 'movimentacoes/buscar', {}], ['composição', null, 'composicao', { tipo: 'pago' }], ['gastos fixos', null, 'gastos-fixos/index', {}], ['conta', null, 'conta', {}],
     // As telas que ainda não passavam pela letra grande (pedido do Enzo em 12/11/2026: rever todas com texto ampliado a 200%).
-    ['aprender', 'Aprender', null, null], ['assinatura', null, 'conta/assinatura', {}], ['nível da conta', null, 'conta/nivel', {}], ['orçamento', null, 'orcamento/index', {}],
+    ['aprender', 'Aprender e dúvidas', null, null], ['assinatura', null, 'conta/assinatura', {}], ['nível da conta', null, 'conta/nivel', {}], ['orçamento', null, 'orcamento/index', {}],
     ['meta', null, 'meta/[id]/index', { id: acIds.goal }], ['família', null, 'familia/index', {}], ['evolução', null, 'evolucao', {}],
     ['renda comprometida', null, 'renda-comprometida/index', {}], ['guardar', null, 'guardar/index', {}], ['importar', null, 'importar/index', {}],
     ['calculadora', null, 'calcular/[slug]', { slug: 'multa-e-juros' }], ['exportar', null, 'conta/exportar', {}],
@@ -14235,7 +14236,7 @@ setInterval(async () => {
     await acEnter();
     await p.setViewportSize({ width, height: 800 }); await p.waitForTimeout(500);
     for (const [name, tab, route, params] of AC_BIG) {
-      if (tab) { await tabByName(tab).click(); await waitText(tab === 'Resumo' ? 'Diferença do mês' : tab === 'Metas' ? 'Reserva para imprevistos' : tab === 'Investir' ? 'Seus investimentos hoje' : tab === 'Aprender' ? 'Calculadoras' : 'Registrar recebimento'); }
+      if (tab) { await tabByName(tab).click(); await waitText(tab === 'Resumo' ? 'Diferença do mês' : tab === 'Metas' ? 'Reserva para imprevistos' : tab === 'Investir' ? 'Seus investimentos hoje' : tab === 'Aprender e dúvidas' ? 'Calculadoras' : 'Registrar recebimento'); }
       else await acNav(route, params);
       await p.waitForTimeout(700);
       await p.evaluate((k) => window.__acc.scale(k), scale);
@@ -14552,7 +14553,8 @@ setInterval(async () => {
     await layoutChecks('Computador, Movimentos 1280px'); await shot('631_computador_movimentos');
     await p.getByRole('button', { name: /^Mercado, Pago · 06\/10\/2026/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(900);
     ok('Computador: o detalhe do lançamento abre num painel, com Movimentos à vista atrás',
-      (await p.getByRole('dialog').filter({ visible: true }).count()) === 1 && /^\/registro\/[^/]+$/.test(new URL(p.url()).pathname) && (await p.getByRole('button', { name: 'Fechar o formulário' }).filter({ visible: true }).count()) === 1);
+      (await p.getByRole('dialog').filter({ visible: true }).count()) === 1 && /^\/registro\/[^/]+$/.test(new URL(p.url()).pathname) && (await p.getByRole('button', { name: 'Fechar', exact: true }).filter({ visible: true }).count()) === 1 &&
+      (await p.evaluate(() => { const d = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getBoundingClientRect().width > 0); return Boolean(d && d.getAttribute('aria-label')) && document.activeElement && d.contains(document.activeElement); })));
     await p.keyboard.press('Escape'); await p.waitForTimeout(800);
     ok('Computador: Esc fecha o painel e volta a Movimentos', new URL(p.url()).pathname === '/movimentacoes' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 0);
     // Anotar gasto pela barra lateral: o formulário no painel; tocar no fundo fecha.
@@ -14561,7 +14563,7 @@ setInterval(async () => {
       new URL(p.url()).pathname === '/registro/novo' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 1 &&
       (await p.evaluate(() => { const d = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getBoundingClientRect().width > 0); const r = d.getBoundingClientRect(); return r.width <= 561 && r.right >= window.innerWidth - 1; })));
     await layoutChecks('Computador, painel do formulário 1280px'); await shot('632_computador_painel_formulario');
-    await p.getByRole('button', { name: 'Fechar o formulário' }).filter({ visible: true }).first().click(); await p.waitForTimeout(800);
+    await p.getByRole('button', { name: 'Fechar', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(800);
     ok('Computador: tocar no fundo fecha o formulário', new URL(p.url()).pathname === '/movimentacoes' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 0);
     await navLink('Conta: perfil, assinatura, lembretes, privacidade e segurança').click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(500);
     ok('Computador: a Conta pela barra lateral, marcada', new URL(p.url()).pathname === '/conta' && (await navLink('Conta: perfil, assinatura, lembretes, privacidade e segurança').getAttribute('aria-current')) === 'page');
@@ -14927,7 +14929,8 @@ setInterval(async () => {
     for (const [tab, text, shotName] of DK_TABS) { await dkTab(tab).click(); await dkWait(text).catch(() => {}); await dkScan(`aba ${tab}`, shotName); }
     const dkIds = await dp.evaluate(async () => {
       const repo = await window.__dkRepo(); const sp = await repo.getSpace(); const ctx = sp.personalContextId;
-      return { goal: (await repo.listGoals(ctx))[0].id, card: (await repo.listCards(ctx))[0].id };
+      const com = await repo.listCommitments(ctx, '2026-10');
+      return { goal: (await repo.listGoals(ctx))[0].id, card: (await repo.listCards(ctx))[0].id, com: (com.find((c) => c.status !== 'pago') ?? com[0]).id };
     });
     const DK_ROUTES = [
       ['Conta', 'conta', {}, 'Privacidade neste aparelho', '706_escuro_conta'],
@@ -14939,6 +14942,8 @@ setInterval(async () => {
       ['Orçamento', 'orcamento/index', {}, 'Orçamento', '712_escuro_orcamento'],
       ['Família', 'familia/index', {}, 'Família', '713_escuro_familia'],
       ['Multa e juros', 'calcular/[slug]', { slug: 'multa-e-juros' }, 'Multa e juros', '714_escuro_multa_e_juros'],
+      // "A vencer" e "Vence hoje" ficavam ilegíveis no escuro (revisão independente de 12/11/2026).
+      ['conta a pagar', 'a-pagar/[id]/index', { id: dkIds.com }, 'Internet', '715_escuro_conta_a_pagar'],
     ];
     for (const [name, route, params, text, shotName] of DK_ROUTES) { await dkNav(route, params); await dkWait(text).catch(() => {}); await dkScan(name, shotName); }
     ok(`Modo escuro, ${dkScreens} telas: o fundo de cada tela é escuro (azul-marinho, luminância abaixo de 0,05)`, dkScreens >= 15 && dkFound.fundo.length === 0, dkFound.fundo.slice(0, 4).join(' | '));

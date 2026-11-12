@@ -208,7 +208,9 @@ const LIST_WINDOW = 5;
 
 /** Uma linha de `ScreenList` com a largura do `Body` (560 px, centralizada, margem de 24 px dos lados). */
 export function ListCell({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.listCell, style]}>{children}</View>;
+  // Versão para computador: a mesma largura do `Body` das abas e das telas de consulta (760 px).
+  const wide = useWideLayout();
+  return <View style={[styles.listCell, wide && { maxWidth: WIDE_TAB_MAX }, style]}>{children}</View>;
 }
 
 /**

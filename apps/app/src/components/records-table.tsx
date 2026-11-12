@@ -57,7 +57,7 @@ export function RecordsTable({
           <Pressable
             key={r.id}
             accessibilityRole="button"
-            accessibilityLabel={`${r.description}, ${when}, ${moneyA11y(r.amountCents, hidden)}`}
+            accessibilityLabel={`${r.description}, ${when}, ${r.category ?? 'sem categoria'}, ${moneyA11y(r.amountCents, hidden)}`}
             onPress={() => onOpen(r)}
             style={(s) => [
               styles.row,
@@ -74,10 +74,11 @@ export function RecordsTable({
                 <Icon size={16} color={isIn ? colors.success : colors.brandText} aria-hidden />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Txt variant="label" style={{ fontFamily: fonts.bold }} numberOfLines={1}>
+                {/* Como na linha do celular: a descrição e a legenda quebram em vez de terminar em "…". */}
+                <Txt variant="label" style={{ fontFamily: fonts.bold }}>
                   {r.description}
                 </Txt>
-                <Txt variant="caption" color={colors.textSecondary} numberOfLines={1}>
+                <Txt variant="caption" color={colors.textSecondary}>
                   {note}
                 </Txt>
               </View>

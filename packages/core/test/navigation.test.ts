@@ -223,7 +223,7 @@ describe('busca de Aprender: grupo "No app" (D-039)', () => {
   it('acha a função pelo nome e pelos sinônimos', () => {
     expect(first('nota fiscal')).toBe('nota-fiscal');
     expect(first('cupom')).toBe('nota-fiscal');
-    expect(first('QR code')).toBe('nota-fiscal');
+    expect(first('QR Code')).toBe('nota-fiscal');
     expect(ids('boleto')).toContain('contas-a-pagar');
     expect(first('lembrete')).toBe('lembretes');
     expect(first('aviso')).toBe('lembretes');

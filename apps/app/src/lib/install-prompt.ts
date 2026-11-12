@@ -15,6 +15,8 @@ const notify = () => listeners.forEach((l) => l());
 
 if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('beforeinstallprompt', (e) => {
+    // Só no computador (a barra lateral tem o item); no celular, o navegador mostra a sugestão dele, como antes.
+    if (window.innerWidth < 1024) return;
     e.preventDefault();
     pending = e as InstallEvent;
     notify();
@@ -41,6 +43,10 @@ export async function promptInstall(): Promise<void> {
   if (!e) return;
   pending = null;
   notify();
-  await e.prompt();
-  await e.userChoice.catch(() => undefined);
+  try {
+    await e.prompt();
+    await e.userChoice;
+  } catch {
+    // O navegador recusou abrir a pergunta (já respondida ou fora do gesto): nada a fazer.
+  }
 }

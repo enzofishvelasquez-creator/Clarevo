@@ -14,7 +14,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DeviceFeatures } from '@/components/device-features';
 import { DesktopNav } from '@/components/desktop-nav';
-import { FormPanel, isFormRoute } from '@/components/form-panel';
+import { FormPanel, isPanelRoute } from '@/components/form-panel';
 import { BrowseTabBar } from '@/components/tab-bar';
 import { LegalGate } from '@/components/legal-gate';
 import { StoreWarmup } from '@/components/store-warmup';
@@ -214,7 +214,7 @@ function Navigation() {
       <Stack
         screenOptions={({ route }) => {
           // Versão para computador: os formulários abrem num painel à direita, por cima da tela de onde vieram (`FormPanel`).
-          const panel = wide && Platform.OS === 'web' && isFormRoute(route.name, route.params as Record<string, unknown> | undefined);
+          const panel = wide && status === 'pronto' && !inRecovery && isPanelRoute(route.name, route.params as Record<string, unknown> | undefined);
           return {
             headerShown: false,
             headerTintColor: colors.brandText,
@@ -226,7 +226,7 @@ function Navigation() {
           };
         }}
         screenLayout={({ children, route }) =>
-          wide && Platform.OS === 'web' && isFormRoute(route.name, route.params as Record<string, unknown> | undefined) ? <FormPanel>{children}</FormPanel> : children
+          wide && status === 'pronto' && !inRecovery && isPanelRoute(route.name, route.params as Record<string, unknown> | undefined) ? <FormPanel>{children}</FormPanel> : children
         }>
         <Stack.Protected guard={signedOut}>
           <Stack.Screen name="boas-vindas" />

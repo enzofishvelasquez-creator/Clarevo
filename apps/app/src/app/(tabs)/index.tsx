@@ -167,12 +167,13 @@ export default function ResumoScreen() {
           <FlashBanner message={notice} />
           {/*
             Fila dos avisos temporários (pedido do Enzo em 12/11/2026, `components/notice-queue.tsx`): um por vez, nesta ordem:
-            "Seus últimos meses", "Primeiros passos", a comemoração do nível, o mês dentro do orçamento, o valor extra e "Como você
-            conheceu a Clarevo?". Os avisos da assinatura e dos termos ficam fora da fila e aparecem sempre.
+            "Seus últimos meses", "Primeiros passos", a comemoração do nível, o mês dentro do orçamento e "Como você conheceu a
+            Clarevo?". Os avisos da assinatura e dos termos e o lembrete de valor extra ficam fora da fila e aparecem sempre. A fila
+            espera a faixa e os Primeiros passos carregarem.
           */}
-          <NoticeQueue>
+          <NoticeQueue hold={band.status === 'pendente' || (band.status === 'oculta' && stepsState === 'carregando')}>
           <NoticeClaim id="retorno" wants={band.status === 'visivel'} />
-          <NoticeClaim id="passos" wants={band.status === 'oculta' && stepsState !== 'oculto'} />
+          <NoticeClaim id="passos" wants={band.status === 'oculta' && stepsState === 'visivel'} />
           {/* Assinatura (D-083): nos últimos dias do teste grátis e em só ver e exportar, o aviso com o atalho para os planos. */}
           <AccessBanner />
           {/* Níveis de conta (D-095): a comemoração da troca de nível, uma vez por nível em cada aparelho. */}
