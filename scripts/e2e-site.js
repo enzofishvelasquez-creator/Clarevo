@@ -489,6 +489,14 @@ function roteiros(CALC) {
               const ultima = [...linhas.entries()].sort((a, b) => a[0] - b[0]).pop()[1];
               if (linhas.size > 1 && ultima.length === 1 && ultima[0].getBoundingClientRect().width < g.getBoundingClientRect().width * 0.9) sozinhos.push(`${nome(g)} (${filhos.length} cartões)`);
             }
+            // O rodapé não tem cartões, mas uma coluna de links sozinha na última linha é o mesmo erro (revisão de 12/11/2026).
+            for (const g of document.querySelectorAll('.rodape-grade')) {
+              const filhos = [...g.children].filter(vis);
+              const linhas = new Map();
+              for (const f of filhos) { const t = Math.round(f.getBoundingClientRect().top); linhas.set(t, [...(linhas.get(t) || []), f]); }
+              const ultima = [...linhas.entries()].sort((a, b) => a[0] - b[0]).pop()?.[1] || [];
+              if (linhas.size > 1 && ultima.length === 1 && ultima[0].getBoundingClientRect().width < g.getBoundingClientRect().width * 0.9) sozinhos.push(`rodapé (${filhos.length} colunas)`);
+            }
             for (const h of document.querySelectorAll('main h2')) {
               const a = vis(h) && antes(h), d = vis(h) && depois(h);
               if (!a || !d) continue;

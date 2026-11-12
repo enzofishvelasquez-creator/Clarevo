@@ -448,6 +448,8 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
   .rodape-grade{grid-template-columns:repeat(3,minmax(0,1fr))}
   .rodape-marca{grid-column:1/-1}
 }
+/* Daí em diante, quatro colunas fixas: com a barra de rolagem do Windows, a grade automática ainda montava três colunas entre 912 e 928 px (revisão de 12/11/2026). */
+@media (min-width:57rem){.rodape-grade{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .rodape h2{margin:0 0 .4rem;font-size:.9375rem;font-weight:800;color:var(--sobre-rodape);text-transform:none}
 .rodape ul{list-style:none;margin:0;padding:0}
 .rodape li{margin:0}
