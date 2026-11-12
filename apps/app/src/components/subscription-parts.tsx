@@ -26,18 +26,18 @@ const BADGE_ICON: Readonly<Record<Access['status'], LucideIcon>> = {
  * As formas do fundo (as mesmas da ilustração do app: abertas, em lima e azul). Só decoração: o texto fica em cima do azul, nunca do lima
  * (o lima fica no canto, dentro da margem).
  */
-function HeroBackdrop() {
+export function HeroBackdrop() {
   return (
     <Svg width="100%" height="100%" viewBox="0 0 320 220" preserveAspectRatio="xMaxYMax slice" style={StyleSheet.absoluteFill} accessible={false} pointerEvents="none">
-      <Path d="M250 120C290 112 330 140 326 186C322 232 280 250 240 244C200 238 180 206 186 172C192 142 214 126 250 120Z" fill={colors.brandDeep} />
-      <Path d="M300 196C318 194 332 208 330 226C328 244 312 252 298 250C284 248 276 236 278 222C280 208 288 198 300 196Z" fill={colors.accent} />
-      <Path d="M-30 -20C10 -36 52 -10 48 26C44 58 14 74 -14 70C-44 66 -60 40 -56 14C-52 -4 -44 -14 -30 -20Z" fill={colors.brandDeep} opacity={0.7} />
+      {/* As duas formas ficam dentro da área desenhada (nada passa da largura da tela, mesmo cortado pela borda do cartão). */}
+      <Path d="M244 112C284 104 320 132 318 176C316 208 300 220 240 220C204 220 180 202 186 168C192 138 208 120 244 112Z" fill={colors.brandDeep} />
+      <Path d="M296 188C310 186 320 196 320 208C320 216 320 220 320 220L276 220C274 210 280 192 296 188Z" fill={colors.accent} />
     </Svg>
   );
 }
 
 /** Confetes em volta do selo, só na faixa de cima (nunca sobre o título), na comemoração. */
-function BadgeConfetti() {
+export function BadgeConfetti() {
   return (
     <Svg width={104} height={64} viewBox="0 0 104 64" style={styles.confetti} accessible={false} pointerEvents="none">
       <Circle cx={8} cy={30} r={3.5} fill={colors.accent} />
