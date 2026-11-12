@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, ReduceMotion } from 'react-native-reanimated';
 
 import { SubHeader } from '@/components/header';
-import { LevelList, LevelSummary } from '@/components/level-parts';
+import { LevelList, LevelSummary, WEB_IMG } from '@/components/level-parts';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Card, Screen, Txt, styles as ui } from '@/components/ui';
 import { useAccountMarks } from '@/state/access';
@@ -91,7 +91,7 @@ function MarkRow({ mark, done, last }: { mark: AccountMarkKey; done: boolean; la
   );
   if (done || !href) {
     return (
-      <View style={[styles.mark, !last && styles.divider]} accessible accessibilityRole="image" accessibilityLabel={done ? T.markDone(title) : T.markTodo(title)}>
+      <View style={[styles.mark, !last && styles.divider]} accessible accessibilityRole={WEB_IMG} accessibilityLabel={done ? T.markDone(title) : T.markTodo(title)}>
         {content}
       </View>
     );

@@ -4756,6 +4756,7 @@ export class MemoryRepository implements RecordsRepository {
       this.goalMovements.clear();
       this.savingsChecks.clear();
       this.goalImages.clear();
+      this.reachedMarks.clear();
       this.signupSource = null;
       this.chatCodes = {};
       this.cards.clear();
@@ -4904,10 +4905,12 @@ export class MemoryRepository implements RecordsRepository {
       const live: AccountMarks = {
         gasto: recs.some((r) => r.kind === 'despesa') || this.cardEntries.size > 0 || has('criar_compra_cartao', 'pagar_compromisso', 'pagar_fatura'),
         recebimento: recs.some((r) => r.kind === 'receita'),
-        gasto_fixo: this.seriesById.size > 0 || this.commitments.size > 0 || has('criar_serie', 'criar_compromisso'),
+        // A conta de fatura (invoiceCardId) não é gasto fixo cadastrado pela pessoa.
+        gasto_fixo: this.seriesById.size > 0 || [...this.commitments.values()].some((c) => !c.invoiceCardId) || has('criar_serie', 'criar_compromisso'),
         guardar: this.savingsChecks.size > 0 || has('responder_guardar'),
         meta: this.goals.size > 0 || has('criar_meta'),
-        aporte: this.goalMovements.size > 0 || has('registrar_movimento_meta'),
+        // O saldo inicial vem com a meta (criar_meta), não é aporte registrado.
+        aporte: [...this.goalMovements.values()].some((m) => m.kind !== 'saldo_inicial') || has('registrar_movimento_meta'),
         orcamento: this.budgets.size > 0 || has('definir_orcamento_categoria'),
         renda: this.incomeRefs.size > 0 || has('definir_renda_referencia'),
         cartao: this.cards.size > 0 || has('criar_cartao'),

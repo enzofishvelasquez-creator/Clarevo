@@ -211,6 +211,7 @@ A leitura acontece no seu aparelho. A Clarevo não tem servidor que receba esses
 - Contagens de cadastros e de uso, sem identificar ninguém (seção 3.7): [PROPOSTA: legítimo interesse (art. 7º, IX), com dados agregados]. [A DEFINIR: confirmar a base e fazer o teste de legítimo interesse]
 - Anotar pelo Telegram (seção 3.8): [PROPOSTA: execução de contrato, a pedido da pessoa, que liga a conta quando quer (art. 7º, V)]. [A DEFINIR: confirmar a base e o papel do Telegram]
 - Assinatura e pagamento (seção 3.9): [PROPOSTA: execução de contrato (art. 7º, V) e, para o que a lei fiscal exigir, cumprimento de obrigação legal (art. 7º, II)]. [A DEFINIR: confirmar a base]
+- Nível da conta (seção 3.10): [PROPOSTA: execução de contrato (art. 7º, V), por ser parte do serviço que você usa]. [A DEFINIR: confirmar a base (pergunta 52 ao advogado)]
 - Funções do aparelho (câmera, biometria e lembretes): você liga e pode desligar a qualquer momento, e os dados dessas funções não chegam à Clarevo. [A DEFINIR: confirmar se precisam de base própria]
 
 Não tomamos decisões automatizadas sobre você, e a Clarevo não faz análise de crédito.

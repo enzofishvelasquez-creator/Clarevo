@@ -11,7 +11,7 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { Award, ChevronRight } from 'lucide-react-native';
 import { useCallback, useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, ReduceMotion, ZoomIn } from 'react-native-reanimated';
 
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
@@ -21,6 +21,8 @@ import { useSession } from '@/state/session';
 import { colors, fonts, levelColors, radius, space } from '@/theme/tokens';
 
 const T = LEVEL_TEXT;
+/** Na web, o rótulo de um bloco só é lido com um papel; no celular, o papel "imagem" faria o leitor dizer "imagem" numa linha de texto. */
+export const WEB_IMG = Platform.OS === 'web' ? ('image' as const) : undefined;
 
 /**
  * Os níveis em tom discreto (pedido do Enzo em 12/11/2026, no jeito do gov.br): a cor do nível fica só no selo pequeno; os cartões são
@@ -90,8 +92,8 @@ export function LevelList({ level }: { level: AccountLevel }) {
             key={l}
             style={[styles.levelRow, i < ACCOUNT_LEVELS.length - 1 && styles.divider]}
             accessible
-            accessibilityRole="image"
-            accessibilityLabel={`${LEVEL_NAME[l]}, ${LEVEL_THRESHOLD[l]} marcos${current ? ', o seu nível' : ''}`}>
+            accessibilityRole={WEB_IMG}
+            accessibilityLabel={T.levelRowLabel(LEVEL_NAME[l], LEVEL_THRESHOLD[l], current)}>
             <LevelBadge level={l} size={24} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Txt variant="label" style={{ fontFamily: current ? fonts.bold : fonts.regular }}>

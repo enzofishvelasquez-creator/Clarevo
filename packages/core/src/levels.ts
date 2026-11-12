@@ -140,6 +140,9 @@ export const LEVEL_TEXT = {
   progressLabelTop: 'Nível mais alto alcançado',
   levelsTitle: 'Os níveis',
   levelFrom: (n: number) => (n === 0 ? 'Toda conta começa aqui' : `A partir de ${n} marcos`),
+  /** O que o leitor de tela diz de cada nível da lista: o mesmo que a tela mostra. */
+  levelRowLabel: (name: string, n: number, current: boolean) =>
+    `${name}, ${n === 0 ? 'toda conta começa aqui' : `a partir de ${n} marcos`}${current ? ', seu nível' : ''}`,
   yourLevel: 'Seu nível',
   loadFailed: 'Não foi possível carregar o nível da conta. Tente novamente.',
   /** O card de comemoração da troca de nível (Resumo). */

@@ -14426,7 +14426,7 @@ setInterval(async () => {
       t.includes('Para conhecer') && t.includes('Nada aqui é obrigatório') && t.includes('Já feitos') && t.includes('Escolher a imagem de uma meta') && t.includes('Anotar um gasto'), t.slice(0, 900));
     ok('Níveis: os marcos por fazer levam à tela deles, e os feitos são lidos como feitos',
       (await visibleCount('button', 'Escolher a imagem de uma meta: ainda não')) === 1 && (await p.locator('[aria-label="Anotar um gasto: feito"]').filter({ visible: true }).count()) === 1 &&
-      (await p.locator('[aria-label="Ouro, 9 marcos, o seu nível"]').filter({ visible: true }).count()) === 1);
+      (await p.locator('[aria-label="Ouro, a partir de 9 marcos, seu nível"]').filter({ visible: true }).count()) === 1);
     await atWidths(async (w) => { await layoutChecks(`Nível da conta ${w}px`); if (w === 390) await shot('620_nivel_da_conta'); });
     await btn('Escolher a imagem de uma meta: ainda não').click(); await waitText('Viagem de férias'); await p.waitForTimeout(300);
     ok('Níveis: "Escolher a imagem de uma meta" abre Metas', new URL(p.url()).pathname === '/metas', p.url());

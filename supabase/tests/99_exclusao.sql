@@ -1134,6 +1134,16 @@ begin
               and position('persons p where p.id = v_creator' in d) < position('where id = p_series_id for update' in d)
             from (select pg_get_functiondef('public.clarevo_materialize_series(uuid)'::regprocedure) as d) x),
     'clarevo_materialize_series confere a pessoa que criou a série antes de travar a série';
+  -- Níveis (0034) e Pix (0033, refeito na 0034): a pessoa é conferida com a trava da linha antes de gravar, para uma chamada no meio da
+  -- exclusão da conta esperar e não gravar nada para a pessoa que fica anônima.
+  assert (select position('persons p where p.id = v_me and p.deleted_at is null for key share' in d) > 0
+              and position('persons p where p.id = v_me and p.deleted_at is null for key share' in d) < position('insert into public.account_marks' in d)
+            from (select pg_get_functiondef('public.my_account_marks()'::regprocedure) as d) x),
+    'my_account_marks trava a pessoa antes de guardar os marcos';
+  assert (select position('persons p where p.id = p_person and p.deleted_at is null for key share' in d) > 0
+              and position('persons p where p.id = p_person and p.deleted_at is null for key share' in d) < position('insert into public.billing_pix_payments' in d)
+            from (select pg_get_functiondef('public.billing_pix_apply(text, uuid, text, text, date, timestamp with time zone)'::regprocedure) as d) x),
+    'billing_pix_apply trava a pessoa antes de gravar o pagamento';
   -- Toda função de escrita que o app executa termina gravando a operação (o gatilho acima é o ponto comum). As únicas sem operação:
   -- delete_my_account (a pessoa sai com o rastro), ensure_personal_space (cria a pessoa, sob a trava por pessoa e a guarda de auth.users)
   -- e sync_series_occurrences (a geração, que confere a pessoa que criou a série).
