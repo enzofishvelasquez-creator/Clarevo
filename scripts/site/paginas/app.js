@@ -41,7 +41,7 @@ const RECURSOS = [
   },
   {
     id: 'nota',
-    titulo: 'Leitura de nota fiscal',
+    titulo: 'Leitura de nota fiscal e de comprovante',
     guia: ['nota-fiscal'],
     imagem: 'nota',
     itens: [
@@ -89,9 +89,21 @@ const RECURSOS = [
     guia: ['metas', 'plano-de-guardar'],
     imagem: 'metas',
     itens: [
-      'Reserva para imprevistos e metas com prazo, com o valor guardado só pelo que você registra.',
+      'Reserva para imprevistos e metas com prazo, com o valor guardado só pelo que você registra. Os atalhos de prazo (6 meses, 1 ano, 2 anos ou 5 anos) preenchem a data por você.',
+      'O cartão de cada meta com valor planejado por mês mostra o ritmo: se os aportes acompanham o plano e quanto falta. Ao passar de 25%, 50% e 75% da meta, uma frase curta marca o avanço.',
       'Aportes e resgates não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.',
       'O plano de guardar mostra as etapas e o mês previsto, sem contar rendimento.',
+    ],
+  },
+  {
+    id: 'investir',
+    titulo: 'Investir',
+    guia: ['investimentos'],
+    imagem: 'investimentos',
+    itens: [
+      'Você registra o que aplicou, os aportes, os resgates, os rendimentos e o valor de hoje, como aparecem no seu extrato.',
+      'A rentabilidade dos meses fechados aparece ao lado do CDI e do IPCA do mesmo período, com dados públicos do Banco Central.',
+      'Não é recomendação de investimento, e os investimentos ficam só no seu Pessoal.',
     ],
   },
   {
@@ -192,7 +204,7 @@ ${m.imagem ? celular(img[m.imagem], ARQUIVO) : ''}
     ),
     bloco(
       `<h2 id="recursos">Os recursos</h2>
-<p class="lead-bloco">A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração.</p>
+<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração.</p>
 <div class="recursos">
 ${linhas}
 </div>`,
@@ -218,8 +230,8 @@ ${mais}
   ];
   return montarPagina({
     arquivo: ARQUIVO,
-    titulo: 'O app',
-    descricao: 'Um passeio pelos recursos da Clarevo: Resumo, anotar gasto, contas a pagar, cartões, metas, Família e Aprender, com telas da demonstração.',
+    titulo: 'O app por dentro: recursos e telas',
+    descricao: 'Um passeio pelas cinco abas da Clarevo: Resumo, Movimentos, Metas, Investir e Aprender, com contas a pagar, cartões e Família, em telas da demonstração.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),
     fonte: brutas.join('\n') + capa,

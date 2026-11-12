@@ -8,7 +8,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { esc, markdownParaHtml, separarTitulo } = require('../texto');
-const { rel, dataPorExtensoIso, dataRfc822, caminhoLimpo } = require('../util');
+const { rel, dataPorExtensoIso, dataRfc822, caminhoLimpo, descricaoCurta } = require('../util');
 const { montarPagina, colunaTexto, bloco, dominioDe, urlDoSite } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { lerPosts, lerCabecalho } = require('../conteudo');
@@ -90,7 +90,7 @@ ${itens.join('\n')}
 </ol>
 <p class="revisao">Publicado em ${esc(dataPorExtensoIso(post.data))} por ${esc(post.autoria)}. Se encontrarmos um erro, corrigimos neste mesmo texto e registramos a correção aqui. Veja <a href="${rel(arquivo, 'novidades/como-escrevemos.html')}">como escrevemos</a>.</p>
 </section>
-<p><a href="${rel(arquivo, ARQUIVO_INDICE)}">Voltar para Novidades</a></p>`,
+<p class="voltar"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Voltar para Novidades</a></p>`,
     'texto',
   );
   const capa = `<p class="migalha"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Novidades</a></p>
@@ -113,7 +113,8 @@ ${itens.join('\n')}
   const pg = montarPagina({
     arquivo,
     titulo: post.titulo,
-    descricao: post.resumo,
+    // O resumo inteiro (até 220 caracteres) fica na capa, no índice e no feed; a descrição para as buscas cabe em 160.
+    descricao: descricaoCurta(post.resumo),
     capa,
     corpo,
     fonte: post.corpo + capa,
@@ -122,6 +123,7 @@ ${itens.join('\n')}
     tipoOg: 'article',
     jsonld: [artigo],
     cabecalho: linkDoFeed(arquivo, valores),
+    atualizada: post.data,
   });
   return { arquivo, ...pg, avisos: [...faltas, ...problemas] };
 }
@@ -155,6 +157,8 @@ ${cartoes}
     valores,
     classeCapa: 'capa-simples',
     cabecalho: linkDoFeed(arquivo, valores),
+    // O post mais novo (a lista vem do mais novo para o mais antigo), para o sitemap.
+    atualizada: posts.length ? posts[0].data : null,
   });
   return { arquivo, ...pg };
 }

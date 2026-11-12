@@ -41,6 +41,26 @@ function cabecalhosDoTexto(texto) {
   return cabecalhos;
 }
 
+/**
+ * Todos os blocos de um texto no formato do `_headers`, na ordem do arquivo: `[{ padrao: '/fontes/*', cabecalhos: { nome: valor } }]`.
+ * O servidor local usa os blocos que não são o `/*` (a guarda longa das fontes, das capturas e da marca) só nos arquivos estáticos.
+ */
+function blocosDeCabecalhos(texto) {
+  const blocos = [];
+  let atual = null;
+  for (const linha of texto.split('\n')) {
+    if (linha.startsWith('#') || linha.trim() === '') continue;
+    if (!linha.startsWith(' ')) {
+      atual = { padrao: linha.trim(), cabecalhos: {} };
+      blocos.push(atual);
+      continue;
+    }
+    const i = linha.indexOf(':');
+    if (atual && i > 0) atual.cabecalhos[linha.slice(0, i).trim()] = linha.slice(i + 1).trim();
+  }
+  return blocos;
+}
+
 /** Endereço limpo de uma página, como o Cloudflare Pages serve: `index.html` é a pasta, `x.html` é `x`. */
 function caminhoLimpo(arquivo) {
   if (arquivo === 'index.html') return '/';
@@ -64,6 +84,12 @@ function dataRfc822(iso) {
   return `${dias[d.getUTCDay()]}, ${p(d.getUTCDate())} ${meses[d.getUTCMonth()]} ${d.getUTCFullYear()} ${p(d.getUTCHours() - 3)}:00:00 -0300`;
 }
 
+/**
+ * A descrição de uma página (`<meta name="description">`) a partir de um texto corrido: até 160 caracteres, que é o que as buscas costumam
+ * mostrar. Um texto maior é cortado no fim de uma palavra e ganha reticências; o texto inteiro continua na página.
+ */
+const descricaoCurta = (texto) => (texto.length <= 160 ? texto : `${texto.slice(0, 157).replace(/\s+\S*$/, '')}...`);
+
 /** Um parágrafo `<p>` por texto, já escapado. */
 const paragrafos = (textos) => textos.map((t) => `<p>${esc(t)}</p>`).join('\n');
 
@@ -83,4 +109,4 @@ function textoSimples(html) {
 /** JSON para dentro de `<script type="application/ld+json">`: nada que feche a etiqueta. */
 const jsonSeguro = (obj) => JSON.stringify(obj).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
-module.exports = { cabecalhosDoTexto, rel, ARQUIVO_CALCULADORAS, arquivoDaCalculadora, enderecoDaCalculadora, caminhoLimpo, dataBR, dataPorExtensoIso, dataRfc822, maiuscula, paragrafos, textoSimples, jsonSeguro, MESES };
+module.exports = { cabecalhosDoTexto, blocosDeCabecalhos, descricaoCurta, rel, ARQUIVO_CALCULADORAS, arquivoDaCalculadora, enderecoDaCalculadora, caminhoLimpo, dataBR, dataPorExtensoIso, dataRfc822, maiuscula, paragrafos, textoSimples, jsonSeguro, MESES };

@@ -16,6 +16,10 @@ const MENSAGEM_CENTRAL = 'Cuidar da vida financeira faz parte de cuidar de você
 const FRASE_DE_APOIO = 'Mais clareza para decidir';
 const SUBTEXTO = 'A Clarevo ajuda a organizar o mês e acompanhar decisões financeiras pessoais e familiares, respeitando sua realidade.';
 const DESCRICAO = `${MENSAGEM_CENTRAL} ${SUBTEXTO} ${FRASE_DE_APOIO}.`;
+/** A linha curta acima do título, que diz o que a Clarevo é antes da mensagem central (12/11/2026). */
+const O_QUE_E = 'App de finanças pessoais e da família';
+/** A descrição da página para as buscas e o compartilhamento: a mensagem central e o que é, em até 160 caracteres (a completa, `DESCRICAO`, fica nos dados estruturados). */
+const DESCRICAO_CURTA = `${MENSAGEM_CENTRAL} Um app de finanças pessoais e da família para organizar o mês e decidir com mais clareza.`;
 
 function paginaInicial({ valores, img }) {
   const u = (d) => rel(ARQUIVO, d);
@@ -25,7 +29,7 @@ function paginaInicial({ valores, img }) {
   const recursos = [
     { id: 'anotar', titulo: 'Anotar e ver o mês', texto: 'Anote um gasto ou um recebimento em poucos toques. O Resumo mostra Recebido, Pago, a diferença entre os dois e o que ainda falta pagar, com a explicação de cada número.' },
     { id: 'contas', titulo: 'Contas, cartões e gastos fixos', texto: 'Contas a pagar com vencimentos e lembretes no aparelho. Cartões de crédito com faturas e limite usado: o app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro. Gastos fixos, parcelamentos e contas do ano, como IPVA e IPTU, aparecem sozinhos nos meses certos.' },
-    { id: 'metas', titulo: 'Metas e reserva', texto: 'Metas e reserva para imprevistos, com um plano de guardar que mostra as etapas e o mês previsto, sem contar rendimento.' },
+    { id: 'metas', titulo: 'Metas e reserva', texto: 'Metas e reserva para imprevistos, com atalhos de prazo, o ritmo do plano no cartão de cada meta e os marcos de 25%, 50% e 75%. O plano de guardar mostra as etapas e o mês previsto, sem contar rendimento.' },
     { id: 'aprender', titulo: 'Aprender e simular', texto: 'Explicações curtas sobre juros, taxas e contas do dia a dia, cada uma com fonte e data de revisão. O simulador e as calculadoras usam só os números que você digita, e as calculadoras também funcionam aqui no site.' },
   ];
   const mini = recursos
@@ -40,6 +44,7 @@ ${celular(img[r.id], ARQUIVO)}
 
   const capa = `<div class="capa-grade">
 <div>
+<p class="sobretitulo">${esc(O_QUE_E)}</p>
 <h1>${esc(MENSAGEM_CENTRAL)}</h1>
 <p class="lead">${esc(SUBTEXTO)}</p>
 <p class="frase-apoio">${esc(FRASE_DE_APOIO)}.</p>
@@ -59,7 +64,7 @@ ${celular(img.resumo, ARQUIVO, { carregamento: 'eager' })}
 <div class="grade">
 <article class="cartao">
 <h3>O que a Clarevo oferece</h3>
-<p>Um app para anotar o que entra e o que sai, ver o que ainda vai vencer, acompanhar metas e aprender o essencial sobre contas e juros, com fonte e data de revisão. Ele parte do que você registra e respeita a sua realidade: renda, trabalho, saúde e responsabilidades da família também limitam as escolhas, e dificuldade financeira não é falta de disciplina.</p>
+<p>Um app para anotar o que entra e o que sai, ver o que ainda vai vencer, acompanhar metas e o que você já investe e aprender o essencial sobre contas e juros, com fonte e data de revisão. Ele parte do que você registra e respeita a sua realidade: renda, trabalho, saúde e responsabilidades da família também limitam as escolhas, e dificuldade financeira não é falta de disciplina.</p>
 </article>
 <article class="cartao">
 <h3>O que a Clarevo não promete</h3>
@@ -71,7 +76,7 @@ ${celular(img.resumo, ARQUIVO, { carregamento: 'eager' })}
     bloco(
       `<h2 id="telas">O que o app faz</h2>
 <p class="lead-bloco">Apoio prático para organizar o mês. Telas da demonstração da Clarevo: os dados são fictícios, e uma conta nova começa vazia.</p>
-<div class="mini">
+<div class="mini mini-par">
 ${mini}
 </div>
 <p class="acoes"><a class="botao botao-principal" href="${u('app/index.html')}">Ver o app por dentro</a></p>`,
@@ -117,8 +122,9 @@ ${mini}
     ),
     bloco(
       `<h2 id="mais">Aprender, calcular, ficar por dentro e tirar dúvidas</h2>
-<div class="grade">
+<div class="grade grade-3">
 <a class="cartao" href="${u('aprender/index.html')}"><span class="titulo-cartao">Aprender</span><p>${temas} temas de educação financeira, cada um com fontes, data de revisão e, quando cabe, um exemplo calculado.</p></a>
+<a class="cartao" href="${u('aprender/agenda.html')}"><span class="titulo-cartao">Agenda financeira</span><p>Mês a mês, os temas que costumam importar, como 13º salário, férias, volta às aulas e Imposto de Renda.</p></a>
 <a class="cartao" href="${u('calculadoras/index.html')}"><span class="titulo-cartao">Calculadoras</span><p>${calculadoras} calculadoras para contas rápidas, como parcelado ou à vista, dívidas e reserva, feitas no navegador com os números que você digita. Nada é enviado.</p></a>
 <a class="cartao" href="${u('novidades/index.html')}"><span class="titulo-cartao">Novidades</span><p>Textos curtos da Equipe Clarevo, com fonte e data, e as regras de como escrevemos.</p></a>
 <a class="cartao" href="${u('ajuda/index.html')}"><span class="titulo-cartao">Ajuda</span><p>Respostas por tema e busca no próprio navegador, sem enviar o que você digita.</p></a>
@@ -152,7 +158,7 @@ ${mini}
     arquivo: ARQUIVO,
     titulo: 'Clarevo: bem-estar financeiro e mais clareza para decidir',
     tituloCompleto: true,
-    descricao: DESCRICAO,
+    descricao: DESCRICAO_CURTA,
     capa,
     corpo: secoes.join('\n'),
     fonte,

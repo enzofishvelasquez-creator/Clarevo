@@ -57,7 +57,8 @@ function paginaSobre({ valores }) {
   ];
   return montarPagina({
     arquivo,
-    titulo: 'Sobre',
+    titulo: 'Sobre a Clarevo: o que nos move e quem está por trás',
+    tituloCompleto: true,
     descricao: 'O que move a Clarevo: cuidado com a vida financeira, clareza, sem anúncio, sem venda de dados e sem recomendar produtos financeiros, e quem está por trás.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),

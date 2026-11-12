@@ -39,9 +39,11 @@ const IMAGENS = [
   { id: 'cartoes', origem: `${LOJA}/04_cartoes.png`, largura: LARGURA_CELULAR, alt: 'Tela de um cartão de crédito, com o limite usado, a fatura atual e as próximas faturas.' },
   { id: 'evolucao', origem: `${LOJA}/05_evolucao.png`, largura: LARGURA_CELULAR, alt: 'Tela Evolução, com o gráfico de Recebido e Pago mês a mês, a média e a mediana.' },
   { id: 'metas', origem: `${LOJA}/07_metas.png`, largura: LARGURA_CELULAR, alt: 'Tela Metas, com a reserva para imprevistos e o quanto já foi guardado.' },
+  { id: 'investimentos', origem: `${TELAS}/540_investimentos.png`, largura: LARGURA_CELULAR, alt: 'Tela Investimentos, com o valor de hoje, o que foi aportado, o ganho e a rentabilidade dos meses fechados ao lado do CDI e do IPCA do mesmo período.' },
   { id: 'aprender', origem: `${LOJA}/08_aprender.png`, largura: LARGURA_CELULAR, alt: 'Tela Aprender, com a busca, as calculadoras e os temas de educação financeira.' },
   { id: 'familia', origem: `${TELAS}/402_familia_titular.png`, largura: LARGURA_CELULAR, alt: 'Tela Família, com o nome da Família, as pessoas, o papel de cada uma e o botão Convidar.' },
-  { id: 'nota', origem: `${TELAS}/150_anotar_gasto_escanear.png`, largura: LARGURA_CELULAR, alt: 'Tela Anotar gasto com o botão Escanear nota fiscal no alto do formulário.' },
+  // Era a tela Anotar gasto com o botão de escanear, quase igual à captura "anotar": desde 12/11/2026 é o comprovante já lido.
+  { id: 'nota', origem: `${LOJA}/09_comprovante_lido.png`, largura: LARGURA_CELULAR, alt: 'Tela Anotar gasto depois de ler um comprovante de Pix: o aviso do que foi lido e a descrição e o valor já preenchidos, para conferir antes de salvar.' },
   { id: 'beneficio', origem: `${TELAS}/433_conta_beneficio_ativo.png`, largura: LARGURA_CELULAR, alt: 'Tela Conta de quem recebeu o benefício, com a empresa, o plano, a data de início e a situação.' },
   { id: 'quem-ve', origem: `${TELAS}/330_quem_ve.png`, largura: LARGURA_CELULAR, alt: 'Tela Quem vê estes dados, que mostra quem tem acesso aos registros.' },
   { id: 'empresa-painel', origem: `${TELAS}/421_empresa_painel_1280px.png`, largura: LARGURA_LARGA, alt: 'Painel da empresa no navegador, com o contrato, as vagas contratadas, as vagas em uso e as datas.' },

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Multa e juros por atraso · Clarevo</title>
-<meta name="description" content="Multa e juros por atraso Com os valores do boleto. Calculadora gratuita: a conta é feita no seu navegador e nada do que você digita é enviado.">
+<title>Calculadora: Multa e juros por atraso · Clarevo</title>
+<meta name="description" content="Multa e juros por atraso: boleto, conta ou fatura do cartão. A conta é feita no seu navegador, e nada do que você digita é enviado.">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#2457F5">
 <meta name="referrer" content="same-origin">
@@ -12,8 +12,8 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Clarevo">
 <meta property="og:locale" content="pt_BR">
-<meta property="og:title" content="Multa e juros por atraso · Clarevo">
-<meta property="og:description" content="Multa e juros por atraso Com os valores do boleto. Calculadora gratuita: a conta é feita no seu navegador e nada do que você digita é enviado.">
+<meta property="og:title" content="Calculadora: Multa e juros por atraso · Clarevo">
+<meta property="og:description" content="Multa e juros por atraso: boleto, conta ou fatura do cartão. A conta é feita no seu navegador, e nada do que você digita é enviado.">
 <meta property="og:url" content="https://clarevo.app.br/calculadoras/multa-e-juros">
 <meta property="og:image" content="https://clarevo.app.br/og/clarevo.png">
 <meta property="og:image:width" content="1200">
@@ -53,7 +53,7 @@
 <div class="miolo">
 <p class="migalha"><a href="index.html">Calculadoras</a> · Dívidas e atrasos</p>
 <h1>Multa e juros por atraso</h1>
-<p class="lead">Com os valores do boleto. A conta é feita no seu navegador, e nada do que você digita é enviado nem guardado.</p>
+<p class="lead">Boleto, conta ou fatura do cartão. A conta é feita no seu navegador, e nada do que você digita é enviado nem guardado.</p>
 </div>
 </section>
 <section class="bloco" aria-labelledby="calcular">
@@ -83,11 +83,12 @@
 <section class="bloco bloco-alt" aria-labelledby="o-que-faz">
 <div class="miolo">
 <h2 id="o-que-faz">O que ela faz</h2>
-<p class="lead-bloco">Calcula a multa e os juros de uma conta paga depois do vencimento, com os percentuais que estão no boleto ou no contrato.</p>
+<p class="lead-bloco">Calcula a multa e os juros de uma conta ou de um boleto pago depois do vencimento, com os percentuais que estão no boleto ou no contrato. Para a fatura do cartão, soma os juros do rotativo, os juros de mora, a multa e o IOF estimado, com os percentuais que estão na fatura.</p>
 <section class="exemplo" aria-labelledby="exemplo">
 <h3 id="exemplo">Um exemplo, com números fictícios</h3>
 <p>Preenchendo:</p>
 <ul>
+<li>Que conta passou do vencimento? <strong>Conta ou boleto</strong></li>
 <li>Valor da conta: <strong>R$ 200,00</strong></li>
 <li>Multa (%): <strong>2%</strong></li>
 <li>Juros ao mês (%): <strong>1%</strong></li>
@@ -105,6 +106,34 @@
 <ul>
 <li>Multa cobrada uma vez sobre o valor da conta.</li>
 <li>Juros simples, proporcionais aos dias, com 30 dias por mês.</li>
+</ul>
+</section>
+<section class="exemplo" aria-labelledby="exemplo-2">
+<h3 id="exemplo-2">Outro exemplo, com a fatura do cartão</h3>
+<p>Preenchendo:</p>
+<ul>
+<li>Que conta passou do vencimento? <strong>Fatura do cartão</strong></li>
+<li>Valor que ficou sem pagar: <strong>R$ 1.000,00</strong></li>
+<li>Juros do rotativo ao mês (%): <strong>15%</strong></li>
+<li>Juros de mora ao mês (%): <strong>1%</strong></li>
+<li>Multa (%): <strong>2%</strong></li>
+<li>Dias depois do vencimento: <strong>30</strong></li>
+</ul>
+<p>A calculadora mostra:</p>
+<ul class="calc-exemplo-resultado">
+<li>Com estes números, 30 dias depois do vencimento a fatura fica em R$ 1.186,26.</li>
+<li>Juros do rotativo: R$ 150,00</li>
+<li>Juros de mora: R$ 10,00</li>
+<li>Multa: R$ 20,00</li>
+<li>IOF estimado: R$ 6,26</li>
+</ul>
+<p class="calc-nota">O rotativo vale só até a próxima fatura. Depois, o banco precisa oferecer o parcelamento do que falta, com juros menores.</p>
+<p class="calc-nota">O valor exato é o da próxima fatura.</p>
+<h4>Hipóteses</h4>
+<ul>
+<li>Juros simples, proporcionais aos dias, com 30 dias por mês. O banco costuma cobrar juros sobre juros, então a fatura pode vir um pouco maior.</li>
+<li>Multa cobrada uma vez sobre o valor que ficou sem pagar.</li>
+<li>IOF de pessoa física: 0,38% mais 0,0082% por dia, até 365 dias.</li>
 </ul>
 </section>
 <p class="nota">Tudo é calculado no seu navegador, com o mesmo código do app, e nada é enviado nem guardado. No app, algumas calculadoras também oferecem atalhos para guardar o que você calculou, como anotar um parcelamento ou criar uma meta. <a href="index.html">Ver todas as calculadoras</a>.</p>

@@ -129,7 +129,7 @@ Decidir uma compra
 Dívidas e atrasos
   > Quanto custa uma dívida?           Rotativo, cheque especial ou empréstimo
   > Quitar antes ou adiantar parcelas  Quanto dos juros sai da conta (se aprovado)
-  > Multa e juros por atraso           Com os valores do boleto
+  > Multa e juros por atraso           Boleto, conta ou fatura do cartão
 Guardar e dividir
   > Reserva para imprevistos           Quantos meses seus gastos essenciais cobrem
   > Juntar para um objetivo            Quanto guardar por mês ou em quanto tempo

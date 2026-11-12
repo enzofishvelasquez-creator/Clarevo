@@ -101,6 +101,7 @@ main:focus{outline:none}
 .capa::before{content:"";position:absolute;right:-14rem;top:-12rem;width:34rem;height:34rem;border-radius:50%;background:var(--disco);pointer-events:none}
 .capa .miolo{position:relative}
 .capa h1{margin:0 0 .75rem;font-weight:800;font-size:clamp(1.9rem,6.2vw,3.1rem);line-height:1.12;letter-spacing:-.01em;max-width:22ch}
+.sobretitulo{margin:0 0 .6rem;font-weight:700;font-size:.9375rem;line-height:1.4;letter-spacing:.02em;color:var(--sobre-topo-suave)}
 .capa .lead{margin:0 0 1.25rem;max-width:40rem;font-size:1.125rem;color:var(--sobre-topo-suave)}
 .capa a{color:var(--sobre-topo)}
 .capa-grade{display:grid;gap:2rem;align-items:center}
@@ -120,6 +121,9 @@ main:focus{outline:none}
 .lojas{margin:.5rem 0 0;color:var(--sobre-topo-suave);font-size:.9375rem}
 .migalha{margin:0 0 .75rem;font-size:.9375rem;color:var(--sobre-topo-suave)}
 .migalha a{color:var(--sobre-topo)}
+/* Links soltos (migalhas, "Voltar para..." e "Fonte N"): área de toque de 44 px de altura, sem mudar a altura da linha. */
+.migalha a,.voltar a,.fatos li a{display:inline-block;padding:.65rem .3rem;margin:-.65rem -.3rem}
+.fatos li a{padding-top:.55rem;padding-bottom:.55rem;margin-top:-.55rem;margin-bottom:-.55rem}
 
 /* Seções */
 .bloco{padding:3rem 0}
@@ -167,7 +171,7 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .destaque p:last-child,.destaque ul:last-child{margin-bottom:0}
 .nao-e{list-style:none;padding:0}
 .nao-e li{background:var(--superficie);border:1px solid var(--linha);border-radius:14px;padding:.75rem 1rem}
-.etiqueta{display:inline-block;padding:.1rem .65rem;border-radius:999px;background:var(--lima-claro);color:var(--texto);border:1px solid var(--lima);font-size:.8125rem;font-weight:700;line-height:1.6}
+.etiqueta{display:inline-block;padding:.1rem .65rem;border-radius:999px;background:var(--lima-claro);color:var(--texto);border:1px solid var(--lima);font-size:.875rem;font-weight:700;line-height:1.6}
 .etiqueta-azul{background:var(--azul-claro);border-color:var(--link)}
 
 /* Passos numerados */
@@ -200,6 +204,8 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .mini .cartao>h3,.mini .cartao>p{margin-top:0;margin-bottom:0}
 .mini .celular{max-width:12rem;width:100%;margin:auto auto 0}
 .mini .sem-captura{align-self:start}
+/* Quatro cartões (página inicial): na largura em que caberiam três por linha, ficam dois, para nenhum sobrar sozinho. */
+@media (min-width:46rem) and (max-width:61.99rem){.mini-par{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .larga{margin:0 0 1.5rem}
 .larga img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid var(--linha);background:#F7F9FD}
 .larga-moldura{padding:10px;border-radius:20px;background:var(--aparelho);box-shadow:0 22px 50px rgba(6,16,64,.25)}
@@ -239,7 +245,7 @@ mark.pendente{background:var(--lima);color:var(--sobre-lima);padding:0 .25em;bor
 .temas li{margin:0}
 .temas a.cartao{height:100%;padding:1rem 1.15rem}
 .tema-sub{display:block;margin:.15rem 0 0;color:var(--texto);font-weight:500;font-size:.9375rem}
-.tema-meta{display:block;margin:.4rem 0 0;color:var(--texto-2);font-size:.8125rem;font-weight:700}
+.tema-meta{display:block;margin:.4rem 0 0;color:var(--texto-2);font-size:.875rem;font-weight:700}
 .artigo{max-width:46rem}
 .artigo h2{font-size:1.4rem;margin:2rem 0 .6rem}
 .meta-tema{margin:0 0 .5rem;color:var(--sobre-topo-suave);font-weight:700;font-size:.9375rem}
@@ -307,6 +313,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .calc-destaque{font-weight:800;font-size:1.25rem;line-height:1.4}
 .calc-destaque-2{font-weight:700}
 .calc-nota{margin:0;padding:.75rem 1rem;border-radius:12px;background:var(--azul-claro);color:var(--texto);font-size:.9375rem}
+.exemplo .calc-nota+.calc-nota{margin-top:.5rem}
 .calc-hipoteses ul{margin:.4rem 0 0}
 .calc-hipoteses li{color:var(--texto-2);font-size:.9375rem}
 .calc-detalhes{display:grid;gap:.75rem;margin-top:.5rem}
@@ -384,7 +391,18 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 
 /* Rodapé */
 .rodape{background:var(--rodape);color:var(--sobre-rodape-2);padding:2.5rem 0 2rem;font-size:.9375rem;margin-top:0}
-.rodape-grade{display:grid;gap:1.5rem 2rem;grid-template-columns:repeat(auto-fit,minmax(min(12rem,100%),1fr));margin-bottom:1.5rem}
+.rodape-grade{display:grid;gap:1.5rem 1.25rem;grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:1.5rem}
+.rodape-marca,.rodape-grade>div:last-child{grid-column:1/-1}
+.rodape-grade>div:last-child ul{columns:2;column-gap:1.25rem}
+.rodape-grade>div:last-child li{break-inside:avoid}
+/* Na lista em duas colunas, um nome que quebra em duas linhas começa na mesma altura dos outros. */
+.rodape-grade>div:last-child a{align-items:flex-start;padding:.6rem 0}
+@media (min-width:48rem){
+  .rodape-grade{gap:1.5rem 2rem;grid-template-columns:repeat(auto-fit,minmax(min(12rem,100%),1fr))}
+  .rodape-marca,.rodape-grade>div:last-child{grid-column:auto}
+  .rodape-grade>div:last-child ul{columns:auto}
+  .rodape-grade>div:last-child a{align-items:center;padding:0}
+}
 .rodape h2{margin:0 0 .4rem;font-size:.9375rem;font-weight:800;color:var(--sobre-rodape);text-transform:none}
 .rodape ul{list-style:none;margin:0;padding:0}
 .rodape li{margin:0}
@@ -404,7 +422,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa::before{display:none}
-  .capa h1,.capa .lead,.capa .frase-apoio,.capa a,.meta-tema,.migalha,.migalha a{color:#000}
+  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa a,.meta-tema,.migalha,.migalha a{color:#000}
   .marca .logo-tela{display:none}
   .marca .logo-papel{display:block}
   .rodape{background:#fff;color:#000}

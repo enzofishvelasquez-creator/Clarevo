@@ -16,7 +16,7 @@ export const NOMES_DOS_CAMPOS = {
   'custo-por-ano': { campos: 'CUSTO_POR_ANO_FIELDS' },
   'custo-da-divida': { campos: 'DIVIDA_FIELDS' },
   'quitar-antes': { campos: 'QUITAR_FIELDS' },
-  'multa-e-juros': { campos: 'MULTA_FIELDS' },
+  'multa-e-juros': { campos: 'MULTA_FIELDS', camposFatura: 'MULTA_FATURA_FIELDS' },
   'plano-dividas': { campos: 'PLANO_FIELDS' },
   reserva: { campos: 'RESERVA_FIELDS' },
   'juntar-para-objetivo': { campos: 'OBJETIVO_FIELDS' },
@@ -29,10 +29,15 @@ export function usarModulo(m) {
   modulo = m;
 }
 
-/** Os campos da calculadora, como `calcFields` do core: "Parcelado ou à vista?" na cota única usa os da conta do ano. */
+/**
+ * Os campos da calculadora, como `calcFields` do core: "Parcelado ou à vista?" na cota única usa os da conta do ano, e "Multa e juros" na
+ * fatura do cartão usa os da fatura.
+ */
 export function camposDe(slug, modo, doModulo = modulo) {
   const n = NOMES_DOS_CAMPOS[slug];
-  return doModulo[slug === 'parcelado-ou-a-vista' && modo === 'cota-unica' ? n.camposCotaUnica : n.campos];
+  if (slug === 'parcelado-ou-a-vista' && modo === 'cota-unica') return doModulo[n.camposCotaUnica];
+  if (slug === 'multa-e-juros' && modo === 'fatura') return doModulo[n.camposFatura];
+  return doModulo[n.campos];
 }
 
 /** A mensagem de um erro, como `calcErrorText` do core: a do campo ou, sem ela, a genérica do código; campos por pessoa ("renda.1") usam a de "renda". */

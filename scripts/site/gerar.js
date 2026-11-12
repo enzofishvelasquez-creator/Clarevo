@@ -44,6 +44,15 @@ const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê est
   Referrer-Policy: same-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Strict-Transport-Security: max-age=31536000
+# Guarda longa no navegador para o que quase nunca muda (12/11/2026). As fontes nunca mudam de conteúdo sem mudar de nome: um ano.
+# As capturas e a marca mantêm o nome quando o desenho muda: 30 dias, para uma captura nova chegar a quem já visitou o site.
+# As páginas, o estilo e os scripts ficam fora, com a guarda curta padrão da hospedagem, porque mudam a cada publicação.
+/fontes/*
+  Cache-Control: public, max-age=31536000, immutable
+/imagens/*
+  Cache-Control: public, max-age=2592000
+/marca/*
+  Cache-Control: public, max-age=2592000
 `;
 
 /**
@@ -67,11 +76,15 @@ function robots(preliminar, dominio) {
   return `User-agent: *\nAllow: /\n${dominio ? `\nSitemap: https://${dominio}/sitemap.xml\n` : ''}`;
 }
 
-/** O sitemap: toda página que se quer indexada. A 404 e as páginas de resposta dos formulários (`semIndexar`) ficam de fora. */
+/**
+ * O sitemap: toda página que se quer indexada. A 404 e as páginas de resposta dos formulários (`semIndexar`) ficam de fora.
+ * `<lastmod>` só entra onde o conteúdo tem uma data própria e estável (`atualizada`: a data de publicação de um post, a data de revisão
+ * de um tema de Aprender e, nos dois índices, a mais recente delas). Nunca a data da geração: gerar duas vezes dá o mesmo arquivo.
+ */
 function sitemap(paginas, dominio) {
   const urls = paginas
     .filter((p) => !p.semIndexar)
-    .map((p) => `<url><loc>https://${dominio}${caminhoLimpo(p.arquivo)}</loc></url>`)
+    .map((p) => `<url><loc>https://${dominio}${caminhoLimpo(p.arquivo)}</loc>${p.atualizada && dataExiste(p.atualizada) ? `<lastmod>${p.atualizada}</lastmod>` : ''}</url>`)
     .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }

@@ -14,7 +14,7 @@ const { URL_DEMO } = require('../config');
 const { montarPagina, marcadoresEmHtml, bloco } = require('../modelo');
 
 const ARQUIVO = 'comece.html';
-const DESCRICAO = 'Cuidar da vida financeira faz parte de cuidar de você. Veja o que é a Clarevo, como está o acesso hoje e por onde começar: demonstração, Aprender, calculadoras e dúvidas.';
+const DESCRICAO = 'Cuidar da vida financeira faz parte de cuidar de você. Veja o que é a Clarevo, como está o acesso e por onde começar: demonstração, Aprender e calculadoras.';
 
 /** O texto do estado do acesso, que as peças das redes repetem (P03, "versão com acesso em preparação"). */
 const ACESSO = 'A Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto; acompanhe as Novidades.';

@@ -77,11 +77,17 @@ const O_QUE_FAZ = {
   'custo-por-ano': 'Soma quanto uma assinatura ou um gasto que se repete custa por mês e por ano.',
   'custo-da-divida': 'Mostra quanto uma dívida custa: um ciclo do rotativo do cartão (e o que muda se a fatura for parcelada), os meses de cheque especial ou as parcelas de um empréstimo.',
   'quitar-antes': 'Estima quanto dos juros sai da conta se você quitar tudo ou adiantar as últimas parcelas, trazendo as parcelas a valor presente pela taxa do contrato.',
-  'multa-e-juros': 'Calcula a multa e os juros de uma conta paga depois do vencimento, com os percentuais que estão no boleto ou no contrato.',
+  'multa-e-juros':
+    'Calcula a multa e os juros de uma conta ou de um boleto pago depois do vencimento, com os percentuais que estão no boleto ou no contrato. Para a fatura do cartão, soma os juros do rotativo, os juros de mora, a multa e o IOF estimado, com os percentuais que estão na fatura.',
   reserva: 'Calcula o tamanho da reserva para imprevistos, quantos meses o que você já tem guardado cobre e em quanto tempo ela fica completa.',
   'juntar-para-objetivo': 'Mostra quanto guardar por mês para chegar a um valor em um prazo, ou em quanto tempo você chega guardando um valor por mês.',
   'dividir-contas': 'Divide o total das contas da casa entre 2 e 6 pessoas, em partes iguais ou pela renda de cada uma.',
 };
+/**
+ * Uma frase a mais na capa e na descrição da página, para a calculadora cujo subtítulo do catálogo não conta tudo o que ela faz hoje.
+ * Vazia desde 12/11/2026: o subtítulo de "Multa e juros por atraso" passou a falar da fatura do cartão ("Boleto, conta ou fatura do cartão").
+ */
+const TAMBEM_FAZ = {};
 /** Slugs cujo texto vem do guia de uso do app (`GUIDE_ENTRIES`, `purpose`). */
 const DO_GUIA = ['antes-de-financiar', 'plano-dividas'];
 
@@ -90,7 +96,9 @@ const FORA_DA_LISTA = { 'plano-dividas': ['dividas'], 'dividir-contas': ['pessoa
 
 /**
  * Um exemplo por calculadora, com números fictícios, calculado na geração pela função do core. `mostrar` é a ordem dos campos que a
- * página lista; `rotulos` troca o rótulo de um campo que se repete por item (dívidas e pessoas); `itens` descreve a lista.
+ * página lista; `rotulos` troca o rótulo de um campo que se repete por item (dívidas e pessoas); `itens` descreve a lista. `tambem`:
+ * outros exemplos da mesma calculadora, cada um com o seu título, quando ela tem um modo que troca os campos e a conta (`modoDosCampos`
+ * é o modo com que o core entrega os campos, como em `calcFields(slug, modo)`).
  */
 const EXEMPLOS = {
   'antes-de-financiar': {
@@ -116,8 +124,16 @@ const EXEMPLOS = {
   },
   'multa-e-juros': {
     funcao: 'calcMultaEJuros',
-    entrada: { valor: '200,00', multaPct: '2', jurosMesPct: '1', dias: '15' },
-    mostrar: ['valor', 'multaPct', 'jurosMesPct', 'dias'],
+    entrada: { modo: 'conta', valor: '200,00', multaPct: '2', jurosMesPct: '1', dias: '15' },
+    mostrar: ['modo', 'valor', 'multaPct', 'jurosMesPct', 'dias'],
+    tambem: [
+      {
+        titulo: 'Outro exemplo, com a fatura do cartão',
+        modoDosCampos: 'fatura',
+        entrada: { modo: 'fatura', valor: '1.000,00', rotativoPct: '15', moraPct: '1', multaPct: '2', jurosMesPct: '', dias: '30' },
+        mostrar: ['modo', 'valor', 'rotativoPct', 'moraPct', 'multaPct', 'dias'],
+      },
+    ],
   },
   'plano-dividas': {
     funcao: 'calcPlanoDividas',
@@ -152,11 +168,10 @@ const EXEMPLOS = {
   },
 };
 
-/** O exemplo de uma calculadora: as entradas para mostrar e o resultado calculado pelo core. */
-function exemploDa(slug) {
-  const ex = EXEMPLOS[slug];
+/** Um exemplo calculado: as entradas para mostrar (com os rótulos do modo do exemplo) e o resultado que o core devolve. */
+function calcularExemplo(slug, ex) {
   const c = catalogo();
-  const campos = c.CALC.calcFields(slug);
+  const campos = c.CALC.calcFields(slug, ex.modoDosCampos);
   const saida = c.CALC[ex.funcao](ex.entrada);
   if (!saida.ok) throw new Error(`o exemplo de ${slug} não calcula: ${JSON.stringify(saida.errors)}`);
   const valorDe = (chave) => {
@@ -170,6 +185,15 @@ function exemploDa(slug) {
   };
   const linhas = [...ex.mostrar.map((k) => ({ rotulo: campos[k].label, valor: valorDe(k) })), ...(ex.itens ?? []).map((t) => ({ texto: t }))];
   return { linhas, resultado: saida.result };
+}
+
+/**
+ * O exemplo de uma calculadora: as entradas para mostrar e o resultado calculado pelo core. `tambem` traz os outros exemplos dela, cada
+ * um com o título (hoje, só o da fatura do cartão em "Multa e juros por atraso").
+ */
+function exemploDa(slug) {
+  const ex = EXEMPLOS[slug];
+  return { ...calcularExemplo(slug, ex), tambem: (ex.tambem ?? []).map((outro) => ({ titulo: outro.titulo, ...calcularExemplo(slug, { funcao: ex.funcao, ...outro }) })) };
 }
 
 /** Os campos de uma calculadora, na ordem da tela, para quem está sem JavaScript. */
@@ -202,13 +226,13 @@ function paginaDaCalculadora(info, { valores }) {
   const arquivo = arquivoDaCalculadora(info.slug);
   const grupo = c.CALC_GRUPOS.find((g) => g.id === info.group);
   const u = (d) => rel(arquivo, d);
+  const tambemFaz = TAMBEM_FAZ[info.slug] ? `${TAMBEM_FAZ[info.slug]} ` : '';
   const ex = exemploDa(info.slug);
   const temas = temasDaCalculadora(info.slug);
-  const resultado = ex.resultado;
 
   const capa = `<p class="migalha"><a href="${u(ARQUIVO_CALCULADORAS)}">Calculadoras</a> · ${esc(grupo.title)}</p>
 <h1>${esc(info.title)}</h1>
-<p class="lead">${esc(info.subtitle)}. A conta é feita no seu navegador, e nada do que você digita é enviado nem guardado.</p>`;
+<p class="lead">${esc(info.subtitle)}. ${tambemFaz}A conta é feita no seu navegador, e nada do que você digita é enviado nem guardado.</p>`;
 
   const sem = `<noscript>
 <div class="calc-sem-js">
@@ -220,20 +244,21 @@ ${listaDeCampos(info.slug)}
 </div>
 </noscript>`;
 
-  const linhasDoExemplo = ex.linhas.map((l) => (l.texto ? `<li>${esc(l.texto)}</li>` : `<li>${esc(l.rotulo)}${/[?!.]$/.test(l.rotulo) ? '' : ':'} <strong>${esc(l.valor)}</strong></li>`)).join('\n');
-  const exemplo = `<section class="exemplo" aria-labelledby="exemplo">
-<h3 id="exemplo">Um exemplo, com números fictícios</h3>
+  const blocoDoExemplo = (e, id, titulo) => `<section class="exemplo" aria-labelledby="${id}">
+<h3 id="${id}">${esc(titulo)}</h3>
 <p>Preenchendo:</p>
 <ul>
-${linhasDoExemplo}
+${e.linhas.map((l) => (l.texto ? `<li>${esc(l.texto)}</li>` : `<li>${esc(l.rotulo)}${/[?!.]$/.test(l.rotulo) ? '' : ':'} <strong>${esc(l.valor)}</strong></li>`)).join('\n')}
 </ul>
 <p>A calculadora mostra:</p>
 <ul class="calc-exemplo-resultado">
-${resultado.resultLines.map((l) => `<li>${esc(l)}</li>`).join('\n')}
+${e.resultado.resultLines.map((l) => `<li>${esc(l)}</li>`).join('\n')}
 </ul>
-${resultado.notes.map((n) => `<p class="calc-nota">${esc(n)}</p>`).join('\n')}
-${resultado.hypotheses.length ? `<h4>${esc(c.CALC_UI.hypothesesTitle)}</h4>\n<ul>\n${resultado.hypotheses.map((h) => `<li>${esc(h)}</li>`).join('\n')}\n</ul>` : ''}
+${e.resultado.notes.map((n) => `<p class="calc-nota">${esc(n)}</p>`).join('\n')}
+${e.resultado.hypotheses.length ? `<h4>${esc(c.CALC_UI.hypothesesTitle)}</h4>\n<ul>\n${e.resultado.hypotheses.map((h) => `<li>${esc(h)}</li>`).join('\n')}\n</ul>` : ''}
 </section>`;
+  // O primeiro exemplo e, quando a calculadora tem outro modo (a fatura do cartão em "Multa e juros por atraso"), os outros, com números fictícios também.
+  const exemplo = [blocoDoExemplo(ex, 'exemplo', 'Um exemplo, com números fictícios'), ...ex.tambem.map((outro, i) => blocoDoExemplo(outro, `exemplo-${i + 2}`, outro.titulo))].join('\n');
 
   const aprender = temas.length
     ? `<h2 id="aprender">Para entender melhor</h2>
@@ -264,10 +289,15 @@ ${exemplo}
     bloco(aprender, { rotulo: 'aprender' }),
   ].join('\n');
 
-  const descricao = `${info.title} ${info.subtitle}. Calculadora gratuita: a conta é feita no seu navegador e nada do que você digita é enviado.`;
+  // Título e subtítulo com pontuação entre eles: "Antes de financiar: parcela, juros..." e, no título que já termina em "?", só o espaço.
+  // Depois dos dois-pontos, o subtítulo começa com minúscula (uma sigla, como IPVA, fica como está).
+  const pergunta = /[?!.]$/.test(info.title);
+  const subtitulo = pergunta || !/^\p{Lu}\p{Ll}/u.test(info.subtitle) ? info.subtitle : info.subtitle.charAt(0).toLowerCase() + info.subtitle.slice(1);
+  const descricao = `${info.title}${pergunta ? '' : ':'} ${subtitulo}. ${tambemFaz}A conta é feita no seu navegador, e nada do que você digita é enviado.`;
   const pg = montarPagina({
     arquivo,
-    titulo: info.title,
+    // "Calculadora: ..." no título da página, para ele não repetir o do tema de Aprender que explica o mesmo assunto.
+    titulo: `Calculadora: ${info.title}`,
     descricao,
     capa,
     corpo,
@@ -313,7 +343,7 @@ ${itens
   const pg = montarPagina({
     arquivo,
     titulo: c.CALC_UI.screenTitle,
-    descricao: 'Dez calculadoras de dinheiro do dia a dia: parcelado ou à vista, dívidas, multa e juros, reserva e divisão das contas da casa. A conta é feita no navegador, sem enviar nada.',
+    descricao: 'Dez calculadoras para o dia a dia: parcelado ou à vista, dívidas, multa e juros, reserva e contas da casa. A conta é feita no navegador, sem enviar nada.',
     capa,
     corpo: [...grupos, rodape].join('\n'),
     fonte: capa,
@@ -328,4 +358,4 @@ function paginasCalculadoras(ctx) {
   return [paginaIndice(ctx), ...catalogo().CALCULADORAS.map((info) => paginaDaCalculadora(info, ctx))];
 }
 
-module.exports = { paginasCalculadoras, exemploDa, precargaDaCalculadora, scriptsDasCalculadoras, EXEMPLOS, SCRIPT_DAS_CALCULADORAS, O_QUE_FAZ, DO_GUIA };
+module.exports = { paginasCalculadoras, exemploDa, precargaDaCalculadora, scriptsDasCalculadoras, EXEMPLOS, SCRIPT_DAS_CALCULADORAS, O_QUE_FAZ, TAMBEM_FAZ, DO_GUIA };

@@ -170,7 +170,7 @@ ${descricoes}
       `<h2 id="fatos">Fatos para conferir</h2>
 <ul>
 <li><strong>Nome:</strong> escreva Clarevo. O logotipo é "clarevo." em minúsculas, com o ponto lima.</li>
-<li><strong>O que é:</strong> um aplicativo e uma versão web para organizar finanças pessoais e da família, com educação financeira com fonte.</li>
+<li><strong>O que é:</strong> um aplicativo e uma versão web para organizar finanças pessoais e da família, em cinco abas (Resumo, Movimentos, Metas, Investir e Aprender), com educação financeira com fonte.</li>
 <li><strong>O que não é:</strong> não é banco, não movimenta dinheiro, não oferece crédito, não recomenda produtos financeiros e não se conecta a contas bancárias.</li>
 <li><strong>Onde usar:</strong> na versão web. Os apps para iPhone e Android estão em breve na App Store e no Google Play.</li>
 <li><strong>Para empresas:</strong> uma empresa pode oferecer a Clarevo como benefício e nunca vê as finanças de ninguém. <a href="${u('empresas/index.html')}">Veja como funciona</a>.</li>
