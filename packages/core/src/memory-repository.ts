@@ -4909,6 +4909,10 @@ export class MemoryRepository implements RecordsRepository {
     return 'indisponivel';
   }
 
+  async startPixPayment(_plan: PlanKind): Promise<WebSubscriptionStart> {
+    return { result: 'indisponivel' };
+  }
+
   // Assinatura pelas lojas (D-090): só existe com o Supabase, as lojas e o RevenueCat; na demonstração e nos testes, indisponível.
   async syncStoreSubscription(): Promise<StoreSync> {
     return 'indisponivel';

@@ -3443,6 +3443,12 @@ export class SupabaseRepository implements RecordsRepository {
     return parseWebSubscriptionCancel(error ? await functionErrorBody(error) : data);
   }
 
+  /** "pix": o Checkout do Asaas de um mês com Pix (D-093). As mesmas respostas de "assinar", mais "ja_pago". */
+  async startPixPayment(plan: PlanKind): Promise<WebSubscriptionStart> {
+    const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'pix', plan } });
+    return parseWebSubscriptionStart(error ? await functionErrorBody(error) : data);
+  }
+
   /**
    * Assinatura pelas lojas (D-090): a função do servidor "assinatura-lojas", com o token da sessão, consulta o RevenueCat e atualiza o
    * direito da pessoa, logo depois de uma compra ou de "Restaurar compras" (o aviso do RevenueCat faz o mesmo, um pouco depois).

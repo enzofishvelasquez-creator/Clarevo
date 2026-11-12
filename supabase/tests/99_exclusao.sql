@@ -1047,7 +1047,7 @@ begin
   -- As 40 chaves estrangeiras para persons: 14 são do que é só da pessoa (apagadas; as 3 das mensagens vêm da 0020, com as tabelas renomeadas na 0022), 26 são autoria e
   -- vínculo (ficam, anônimas).
   -- Uma chave nova obriga a decidir aqui, e em clarevo_erase_person, o que fazer com ela.
-  assert pg_temp.person_fks() = array['billing_checkouts.person_id', 'card_entries.created_by', 'card_entries.deleted_by', 'cards.created_by', 'cards.deleted_by',
+  assert pg_temp.person_fks() = array['billing_checkouts.person_id', 'billing_pix_payments.person_id', 'card_entries.created_by', 'card_entries.deleted_by', 'cards.created_by', 'cards.deleted_by',
       'category_budgets.created_by', 'category_budgets.deleted_by', 'chat_link_codes.person_id', 'chat_links.person_id', 'chat_messages.person_id',
       'commitment_limits.created_by', 'commitment_limits.deleted_by', 'commitment_series.created_by', 'commitment_series.deleted_by',
       'commitments.created_by', 'commitments.deleted_by', 'context_activity.person_id', 'context_memberships.person_id', 'family_invites.created_by',
@@ -1057,7 +1057,7 @@ begin
       'investments.created_by', 'legal_acceptances.person_id', 'licenses.person_id',
       'month_checks.updated_by', 'organization_admins.person_id', 'plan_entitlements.person_id', 'record_operations.actor_id',
       'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by', 'signup_sources.person_id'],
-    'as chaves estrangeiras para persons são as 44 que a exclusão da conta trata (com o aceite dos termos, 0024, o Checkout do Asaas, 0026, que sai em cascata, e os investimentos, 0032, só no Pessoal, que saem com o contexto)';
+    'as chaves estrangeiras para persons são as 45 que a exclusão da conta trata (com o aceite dos termos, 0024, o Checkout do Asaas, 0026, e os pagamentos por Pix, 0033, que saem em cascata, e os investimentos, 0032, só no Pessoal, que saem com o contexto)';
   -- E as que apontam para financial_contexts (financial_records é restrict: por isso os registros saem antes do contexto).
   assert (select array_agg(c.conrelid::regclass::text || '.' || a.attname || ' ' || c.confdeltype::text order by c.conrelid::regclass::text, a.attname)
             from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]

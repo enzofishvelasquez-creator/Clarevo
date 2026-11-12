@@ -8,10 +8,10 @@ import { PLAN_NAME, type PlanKind } from '../plano-precos';
 /** O nome da função do servidor no Supabase (Edge Functions). */
 export const WEB_SUBSCRIPTION_FUNCTION = 'assinatura-web';
 
-/** O que a função devolve ao app em "assinar". */
+/** O que a função devolve ao app em "assinar" e em "pix" (um mês com Pix, D-093). */
 export type WebSubscriptionStart =
   | { result: 'checkout'; url: string }
-  | { result: 'ja_assinante' | 'sem_necessidade' | 'muitas_tentativas' | 'indisponivel' | 'tente_de_novo' };
+  | { result: 'ja_assinante' | 'cartao_ativo' | 'ja_pago' | 'sem_necessidade' | 'muitas_tentativas' | 'indisponivel' | 'tente_de_novo' };
 
 /** O que a função devolve ao app em "cancelar". */
 export type WebSubscriptionCancel = 'cancelada' | 'sem_assinatura' | 'indisponivel' | 'tente_de_novo';
@@ -28,7 +28,7 @@ export function parseWebSubscriptionStart(raw: unknown): WebSubscriptionStart {
   const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
   const result = r?.result;
   if (result === 'checkout' && typeof r?.url === 'string' && /^https:\/\/[a-z0-9.-]*asaas\.com\//.test(r.url)) return { result: 'checkout', url: r.url };
-  if (result === 'ja_assinante' || result === 'sem_necessidade' || result === 'muitas_tentativas' || result === 'indisponivel') return { result };
+  if (result === 'ja_assinante' || result === 'cartao_ativo' || result === 'ja_pago' || result === 'sem_necessidade' || result === 'muitas_tentativas' || result === 'indisponivel') return { result };
   return { result: 'tente_de_novo' };
 }
 
@@ -45,6 +45,19 @@ export const WEB_SUBSCRIPTION_TEXT = {
   howItWorks:
     'O pagamento é feito na página do Asaas, parceiro de cobrança da Clarevo, com cartão de crédito. Os dados do cartão ficam só com o Asaas: a Clarevo não vê nem guarda.',
   afterPayment: 'Depois de pagar, você volta para esta tela e a assinatura aparece em alguns minutos.',
+  /** Pix mês a mês (D-093, caminho B). */
+  pixTitle: 'Ou pague um mês por vez, com Pix',
+  pixHowItWorks:
+    'Com Pix, você paga um mês por vez, na página do Asaas. Não renova sozinho: perto do fim do mês pago, a Clarevo avisa aqui para você pagar o próximo.',
+  payPix: (plan: PlanKind) => `Pagar um mês do plano ${PLAN_NAME[plan]} com Pix`,
+  payNextPix: 'Pagar mais um mês com Pix',
+  pixBusy: 'Abrindo a página do Pix',
+  /** Quem paga com Pix, antes da janela do próximo mês. */
+  pixNextFrom: (date: string) => `Você pode pagar o próximo mês a partir de ${date}.`,
+  pixChangePlan: 'Para mudar de plano ou passar para o cartão, espere o fim do mês pago e escolha de novo.',
+  /** A assinatura no cartão que ficou ativa sem pagar (cobrança recusada): cancelar para escolher de novo. */
+  cancelCard: 'Cancelar a assinatura no cartão',
+  cancelCardDone: 'Assinatura no cartão cancelada. Agora você pode escolher de novo.',
   returned: {
     sucesso: 'Pagamento concluído. A assinatura aparece aqui em alguns minutos; se não aparecer, toque em Atualizar.',
     cancelado: 'Pagamento cancelado. Nada foi cobrado.',
@@ -63,6 +76,8 @@ export const WEB_SUBSCRIPTION_TEXT = {
   cancelBeforeDeleteFailed: 'Não foi possível cancelar a assinatura feita na web. Tente de novo em instantes ou cancele em Conta, Assinatura, antes de excluir a conta.',
   errors: {
     ja_assinante: 'Você já tem uma assinatura ativa. Para mudar de plano, cancele a atual e assine o outro plano quando o período pago terminar.',
+    ja_pago: 'O mês já está pago. Você pode pagar o próximo nos últimos dias do mês pago.',
+    cartao_ativo: 'Há uma assinatura no cartão ainda ativa, com a cobrança em aberto. Para escolher de novo, cancele essa assinatura primeiro.',
     sem_necessidade: 'A sua conta já tem acesso completo, sem precisar assinar.',
     muitas_tentativas: 'Muitas tentativas em pouco tempo. Tente de novo daqui a uma hora.',
     sem_assinatura: 'Não há assinatura pela web para cancelar.',

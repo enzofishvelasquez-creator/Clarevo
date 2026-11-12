@@ -14388,6 +14388,19 @@ setInterval(async () => {
       (await p.locator('[aria-label="Plano Individual, R$ 29,90 por mês. Para você."]').filter({ visible: true }).count()) === 1);
     await atWidths(async (w) => { await layoutChecks(`Assinatura na demonstração ${w}px`); });
     await shot('615_assinatura_demonstracao');
+    // O teste da equipe no sandbox (`?assinar=teste`, docs/39): com a compra fechada, os botões do cartão e, desde D-093 (caminho B), os de
+    // pagar um mês com Pix. Na demonstração não há Asaas: tocar diz que não está disponível, sem ir à rede.
+    await p.goto(`http://localhost:${PORT}/conta/assinatura?assinar=teste`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Ou pague um mês por vez, com Pix', 15000); await p.waitForTimeout(600);
+    t = await body(); screenTexts.push(t);
+    ok('Assinatura (teste do sandbox): os botões do cartão e os de pagar um mês com Pix, com o que muda no Pix (não renova sozinho)',
+      (await visibleCount('button', 'Assinar o plano Individual')) === 1 && (await visibleCount('button', 'Pagar um mês do plano Individual com Pix')) === 1 &&
+        (await visibleCount('button', 'Pagar um mês do plano Família com Pix')) === 1 && t.includes('Ou pague um mês por vez, com Pix') &&
+        t.includes('Não renova sozinho: perto do fim do mês pago, a Clarevo avisa aqui para você pagar o próximo.'), t.slice(0, 900));
+    await btn('Pagar um mês do plano Individual com Pix').click(); await waitText('não está disponível agora'); await p.waitForTimeout(300);
+    ok('Assinatura (teste do sandbox): na demonstração, o Pix diz que não está disponível, e a tela continua', new URL(p.url()).pathname === '/conta/assinatura' &&
+      (await body()).includes('A assinatura pela web não está disponível agora. Tente de novo mais tarde.'));
+    await atWidths(async (w) => { await layoutChecks(`Assinatura com Pix ${w}px`); if (w === 390) await shot('616_assinatura_pix_teste'); });
     ok('Assinatura: nada vai à rede na demonstração', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
   }
 

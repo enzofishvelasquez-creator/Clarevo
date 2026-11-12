@@ -42,8 +42,8 @@ A chave da API e o token nunca vão para o chat, para o repositório nem para o 
 3. **Banco**: feito em 06/11/2026 (migração 0026 aplicada em `clarevo-producao` e conferida, docs/05, passos 12p e 21n).
 4. **Supabase, função** (Claude Chrome pode fazer): em Edge Functions, criar a função `assinatura-web` pelo editor, colar todo o conteúdo de `supabase/functions/assinatura-web/index.ts`, **desligar a verificação de JWT** (o Asaas não manda login; a função confere o token da sessão do app ela mesma) e publicar. O endereço fica `https://gywufwrdegucnoonoenr.supabase.co/functions/v1/assinatura-web`.
 5. **Supabase, segredos** (Enzo, em Edge Functions, Secrets): `ASAAS_API_KEY` (a do sandbox, por enquanto) e `ASAAS_WEBHOOK_TOKEN`.
-6. **Asaas (sandbox), aviso** (Enzo, no painel do sandbox): Integrações, Webhooks, novo: nome `Clarevo`, URL `https://gywufwrdegucnoonoenr.supabase.co/functions/v1/assinatura-web`, e-mail `contato@clarevo.app.br`, versão 3, token de autenticação = o `ASAAS_WEBHOOK_TOKEN`, envio **Sequencial**, fila ativa, e os eventos: `SUBSCRIPTION_CREATED`, `SUBSCRIPTION_UPDATED`, `SUBSCRIPTION_INACTIVATED`, `SUBSCRIPTION_DELETED`, `PAYMENT_CREATED`, `PAYMENT_UPDATED`, `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`, `PAYMENT_DELETED`, `PAYMENT_RESTORED`, `PAYMENT_REFUNDED`, `PAYMENT_REFUND_IN_PROGRESS`, `PAYMENT_CHARGEBACK_REQUESTED`, `PAYMENT_CHARGEBACK_DISPUTE`, `PAYMENT_AWAITING_CHARGEBACK_REVERSAL`, `PAYMENT_CREDIT_CARD_CAPTURE_REFUSED`. (Os de Checkout não são necessários: a função os ignora.)
-7. **Teste no sandbox** (Enzo, na web, com a própria conta): abrir `https://app.clarevo.app.br/conta/assinatura?assinar=teste`, "Assinar o plano Individual", pagar na página do Asaas com um cartão de teste do sandbox (a documentação do sandbox lista os números fictícios; nome e CPF podem ser fictícios no sandbox), voltar e ver "Plano Individual" em alguns minutos (ou "Atualizar"). Depois, "Cancelar assinatura": a situação continua "Plano Individual" até o fim do período pago. Enquanto isso, o acesso de verdade de ninguém muda: antes do início da cobrança todo mundo está com acesso completo. **O que conferir e contar à equipe** (a documentação não diz): (a) se o Checkout foi aceito sem imagem do item (`imageBase64` aparece como obrigatório na referência da API, mas o guia oficial não o usa); (b) nos Logs de Webhooks do Asaas, se os avisos receberam 200 e quanto tempo levaram; (c) no painel do Asaas, se a assinatura criada pelo Checkout traz a referência `clarevo:...` (se não trouxer, a função a grava no primeiro aviso: conferir que apareceu depois); (d) depois de cancelar, se o Asaas ainda mostra a assinatura como removida ou a esconde; (e) se der para pedir um estorno da cobrança no sandbox, se o acesso caiu para só ver e exportar; (f) o que acontece ao pagar um Checkout aberto antes da meia-noite e pago depois (o vencimento da primeira cobrança é o dia em que o Checkout foi criado).
+6. **Asaas (sandbox), aviso** (Enzo, no painel do sandbox): Integrações, Webhooks, novo: nome `Clarevo`, URL `https://gywufwrdegucnoonoenr.supabase.co/functions/v1/assinatura-web`, e-mail `contato@clarevo.app.br`, versão 3, token de autenticação = o `ASAAS_WEBHOOK_TOKEN`, envio **Sequencial**, fila ativa, e os eventos: `SUBSCRIPTION_CREATED`, `SUBSCRIPTION_UPDATED`, `SUBSCRIPTION_INACTIVATED`, `SUBSCRIPTION_DELETED`, `PAYMENT_CREATED`, `PAYMENT_UPDATED`, `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`, `PAYMENT_DELETED`, `PAYMENT_RESTORED`, `PAYMENT_REFUNDED`, `PAYMENT_REFUND_IN_PROGRESS`, `PAYMENT_CHARGEBACK_REQUESTED`, `PAYMENT_CHARGEBACK_DISPUTE`, `PAYMENT_AWAITING_CHARGEBACK_REVERSAL`, `PAYMENT_CREDIT_CARD_CAPTURE_REFUSED` e, para o Pix mês a mês (seção 6), `CHECKOUT_PAID`.
+7. **Teste no sandbox** (Enzo, na web, com a própria conta): abrir `https://app.clarevo.app.br/conta/assinatura?assinar=teste`, "Assinar o plano Individual", pagar na página do Asaas com um cartão de teste do sandbox (a documentação do sandbox lista os números fictícios; nome e CPF podem ser fictícios no sandbox), voltar e ver "Plano Individual" em alguns minutos (ou "Atualizar"). Depois, "Cancelar assinatura": a situação continua "Plano Individual" até o fim do período pago. Enquanto isso, o acesso de verdade de ninguém muda: antes do início da cobrança todo mundo está com acesso completo. **O que conferir e contar à equipe** (a documentação não diz): (a) se o Checkout foi aceito sem imagem do item (`imageBase64` aparece como obrigatório na referência da API, mas o guia oficial não o usa); (b) nos Logs de Webhooks do Asaas, se os avisos receberam 200 e quanto tempo levaram; (c) no painel do Asaas, se a assinatura criada pelo Checkout traz a referência `clarevo:...` (se não trouxer, a função a grava no primeiro aviso: conferir que apareceu depois); (d) depois de cancelar, se o Asaas ainda mostra a assinatura como removida ou a esconde; (e) se der para pedir um estorno da cobrança no sandbox, se o acesso caiu para só ver e exportar; (f) o que acontece ao pagar um Checkout aberto antes da meia-noite e pago depois (o vencimento da primeira cobrança é o dia em que o Checkout foi criado). **Pix mês a mês (seção 6):** depois do cartão, com outra conta de teste (ou depois de o período do cartão acabar), "Pagar um mês do plano Individual com Pix", na página do Asaas escolher o Pix e, no painel do sandbox, confirmar o recebimento da cobrança; voltar e ver "Pago com Pix: acesso completo até ..." (um mês mais 3 dias). Conferir e contar: (g) se a cobrança criada pelo Checkout de Pix traz a referência `clarevo-pix:...` e o campo `checkoutSession`; (h) quais avisos chegaram (`PAYMENT_CREATED`, `PAYMENT_RECEIVED`, `CHECKOUT_PAID`) e com 200; (i) se o estorno da cobrança de Pix no sandbox tirou o mês.
 8. **Conta de produção** (Enzo, com o CNPJ, depois do teste): criar em `https://www.asaas.com`, passar pela verificação, gerar a chave (`$aact_prod_`), configurar o mesmo aviso (passo 6) na conta de produção, trocar `ASAAS_API_KEY` no Supabase pela de produção e avisar a equipe. A equipe então abre a compra (`SUBSCRIBE_OPEN = true`) junto com o início da cobrança (`clarevo_staff_set_billing_start`).
 9. **Contador** (Enzo): nota fiscal das vendas pela web (o Asaas emite NFS-e automaticamente para as cobranças de assinatura, se configurado; conferir o que a Inova Simples permite, pergunta 46).
 
@@ -58,36 +58,51 @@ Lido em 06/11/2026 em `docs.asaas.com` (guias e referência da API, com os esque
 - **Avisos (webhooks):** `POST` com `id` do evento (`evt_...`), `event`, `dateCreated` (`AAAA-MM-DD HH:MM:SS`, Brasília) e o objeto (`subscription`, `payment`, `checkout`...). Entrega "pelo menos uma vez" e, no envio Sequencial, na ordem. O token escolhido na configuração vai no cabeçalho `asaas-access-token` (não usar a chave da API). Só a resposta **HTTP 200** em até 10 segundos conta como entregue; depois de **15 falhas seguidas a fila para** e os eventos parados por mais de 14 dias são apagados. Até 10 webhooks por conta. O Asaas avisa que novos campos podem aparecer no corpo: o código não falha com campo desconhecido.
 - **Sandbox:** conta separada, chave própria, aprovação automática, cartões fictícios, confirmação manual de cobranças, webhooks e assinaturas disponíveis para teste; chargeback só com pedido à equipe do Asaas.
 
-## 6. Pix Automático (D-093): desenho e o que falta decidir
+## 6. Pix mês a mês (D-093, caminho B)
 
-Enzo escolheu, em 11/11/2026 (D-093, item 5), o Pix Automático na assinatura pela web antes do lançamento. A leitura da documentação do Asaas
-no mesmo dia (`pix-automatico-implementacao`, `fluxos-de-webhook`, `criar-uma-autorizacao-pix-automatico`,
-`cancelar-uma-autorizacao-pix-automatico` e `checkout-com-assinatura-recorrente`; a página de eventos do Pix Automático respondeu 404)
-mostrou três diferenças em relação ao cartão:
+Enzo escolheu, em 11/11/2026 (D-093, item 5), o Pix na assinatura pela web antes do lançamento e, depois do desenho abaixo, o **caminho B**
+(Pix mês a mês pelo Checkout, sem CPF na Clarevo). **Pronto no código em 11/11/2026.**
 
-1. **Não passa pelo Checkout.** O Checkout recorrente é documentado só com cartão. O Pix Automático é a API própria
-   `POST /v3/pix/automatic/authorizations` (frequência `MONTHLY`, `contractId`, `startDate`, `value` com `paymentCreationMode:
-   SUBSCRIPTION`, e o primeiro pagamento em `immediateQrCode`), que devolve o QR Code (imagem e "copia e cola") do primeiro pagamento, que
-   também é o consentimento da recorrência. Cancelar: `DELETE /v3/pix/automatic/authorizations/{id}`.
-2. **Pede um cliente cadastrado no Asaas** (`customerId`), e o cadastro de cliente no Asaas pede nome e CPF. Ou seja, **a Clarevo passaria a
-   receber o CPF no app** e repassá-lo ao Asaas. Dá para não guardar nada na Clarevo (o CPF vai direto ao Asaas na mesma chamada, e a
-   pessoa é achada pela referência, como hoje), mas a política e a tela de Conta deixam de poder dizer que a Clarevo não recebe o CPF.
-3. **A conta do Asaas precisa estar liberada** para o Pix Automático ("confirme que a conta está elegível"), e a documentação não diz se o
-   sandbox tem o recurso.
+**Por que não o Pix Automático (caminho A):** ele não passa pelo Checkout (é a API própria `POST /v3/pix/automatic/authorizations`), pede um
+cliente cadastrado no Asaas com nome e CPF (a Clarevo passaria a receber o CPF no app) e depende de a conta do Asaas estar liberada para o
+recurso. Fica para depois, se o Asaas confirmar a conta liberada; o caminho C (só cartão) também foi descartado.
 
-Caminhos (a escolha é do Enzo):
+**Como funciona:**
 
-- **A. Pix Automático de verdade** (recomendado só se o Asaas confirmar a conta liberada e o teste no sandbox): tela no app com nome e CPF
-  (sem guardar), QR Code e "copia e cola" na própria tela, os avisos `PIX_AUTOMATIC_RECURRING_AUTHORIZATION_*` e de cobrança na função
-  `assinatura-web`, cancelar pela autorização; trecho novo na política e pergunta ao advogado. Cerca de 2 a 3 dias da equipe, mais o
-  teste no sandbox.
-- **B. Pix mês a mês pelo Checkout** (sem CPF na Clarevo): "Pagar o mês com Pix" abre o Checkout do Asaas com Pix avulso
-  (`chargeTypes: DETACHED`), e cada pagamento libera um mês. Não é automático (a pessoa paga todo mês, com lembrete), mas usa o que já
-  existe e não muda a política. Cerca de 1 dia.
-- **C. Só cartão no lançamento** (como era em D-085) e o Pix Automático depois.
+- Na tela Assinatura (só na web), abaixo dos botões do cartão: "Ou pague um mês por vez, com Pix", com "Pagar um mês do plano Individual
+  com Pix" e "Pagar um mês do plano Família com Pix". A função `assinatura-web` (ação `pix`) cria um Checkout do Asaas com
+  `billingTypes: ["PIX"]` e `chargeTypes: ["DETACHED"]` (o fluxo documentado em `checkout-para-pix`), um item de um mês com o preço do
+  plano, 60 minutos de validade, a referência `clarevo-pix:<id da pessoa>:<plano>` e a mesma volta para a tela Assinatura; liga o Checkout
+  à pessoa no banco (`billing_checkout_record`, o mesmo limite de 5 por hora) e abre a página do Asaas, onde a pessoa informa os dados e
+  paga. A Clarevo não recebe CPF nem dado do Pix.
+- **Cada pagamento vale um mês.** Pago antes do fim do mês já pago, ou até 3 dias depois dele, continua a sequência (o mês novo começa no
+  fim do anterior: a tolerância não vira dias a mais); pago depois disso, começa uma sequência nova no dia do pagamento. O fim de uma
+  sequência é o começo dela mais N meses (31/01 e mais dois pagamentos: até 30/04). O acesso vale até o fim do dia (Brasília) do último
+  dia pago mais 3 dias de tolerância, que a tela não anuncia: ela mostra "Pago com Pix até <último dia pago>" e, na tolerância, "O mês
+  pago com Pix terminou em ...". **Estorno:** o pagamento estornado sai, e os outros são recontados a partir do dia em que foram pagos.
+- **Não renova sozinho:** nos últimos 7 dias do mês pago (e na tolerância), o Resumo (na web) avisa, com "Pagar o próximo mês"; a tela
+  Assinatura mostra "Pagar mais um mês com Pix" nos últimos 10 dias do mês pago (antes disso, "Você pode pagar o próximo mês a partir de
+  ..."). Pagar antes da janela é recusado (`ja_pago`), para ninguém pagar vários meses sem querer. Quem tem assinatura no cartão ou na
+  loja não vê o Pix (`ja_assinante`); quem paga com Pix não abre o cartão enquanto o mês vale. **O Pix vem depois do benefício, da
+  cortesia e do Plano Família** no acesso (`clarevo_access`, migração 0033): quem passou a ter um deles não é chamado a pagar.
+- **Cartão recusado:** se a assinatura no cartão ficou ativa no Asaas sem pagar (a pessoa caiu para só ver e exportar), assinar ou pagar
+  com Pix responde `cartao_ativo`, e a tela oferece "Cancelar a assinatura no cartão" antes de escolher de novo.
+- **Os avisos:** os `PAYMENT_*` de cobrança sem assinatura levam à cobrança atual no Asaas (`GET /v3/payments/{id}`), que acha a pessoa pela
+  referência de Pix (se o Asaas a levar do Checkout para a cobrança, o que a documentação não garante), pelo Checkout no banco
+  (`checkoutSession` da cobrança) ou pelo pagamento já gravado (estorno de meses atrás); o `CHECKOUT_PAID` lista as cobranças do Checkout
+  (`GET /v3/payments?checkoutSession=`) e faz o mesmo com cada uma. A função chama `billing_pix_apply` (migração 0033) com o resumo SHA-256
+  do identificador da cobrança e o dia do pagamento (nulo se pendente, estornada ou removida); o banco recalcula até quando o acesso vale,
+  com a origem `pix` (o app mostra "pague o próximo mês" em vez de "cancelar"). Pix pago entra como `RECEIVED` (`PAYMENT_RECEIVED`). Só
+  cobrança de Pix (`billingType` PIX) sem assinatura conta, e no `CHECKOUT_PAID` só as cobranças com `checkoutSession` igual ao Checkout
+  do aviso (revisão independente de 11/11/2026). Cobrança de Pix paga sem pessoa achada fica no registro ("conferir no Asaas").
+- **No app das lojas**, nada disso aparece (a Apple e o Google recusam app que aponte para pagamento fora da loja): quem pagou com Pix vê só
+  "Acesso completo até ...".
 
-Antes de A, o Enzo pergunta ao Asaas (pelo suporte, com a conta dele): a conta da Clarevo pode usar o Pix Automático e o sandbox tem o
-recurso?
+**O que muda para o Enzo:** aplicar a migração 0033 (`docs/05`, passo 12y, conferência 21u); quando criar a função `assinatura-web` (seção
+4, passo 4), ela já vai com o Pix; no aviso do Asaas (passo 6), marcar também `CHECKOUT_PAID` (recomendado: é o aviso que a documentação
+indica para confirmar o Checkout); e, no teste do sandbox (passo 7), pagar também um mês com Pix e confirmar a cobrança pelo painel do
+sandbox. A política já dizia "por cartão e Pix"; a seção da assinatura passa a citar o resumo do pagamento por Pix e o dia (pergunta 51 do
+resumo para o advogado).
 
 ## 7. Fontes
 
