@@ -767,7 +767,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain(dadoDoSite('E-MAIL DE CONTATO'));
     expect(h).not.toContain(dadoDoSite('E-MAIL DE SUPORTE'));
     // A empresa não vê quando a pessoa abre o app nem o que anota; vê a data do aceite e a do encerramento.
-    expect(h).toContain('a em que você aceitou o convite e a de encerramento');
+    expect(h).toContain('a do aceite do convite e a do encerramento');
     expect(h).toContain('Também não vê quando você abre o app nem o que você anota.');
     expect(h).not.toContain('nem o que você faz no app');
     // De três a quatro recursos com captura e o herói com a tela Resumo, todos com a legenda de demonstração.
@@ -1376,7 +1376,7 @@ describe('site público: Ajuda, busca e perguntas do suporte', () => {
     expect(b).toContain('o acesso pleno continua por 30 dias. Depois desses 30 dias, vale o acesso da própria pessoa: com assinatura, tudo continua; sem assinatura, a conta fica só para ver e exportar. Nada é apagado.');
     expect(b).not.toMatch(/plano gratuito/i);
     expect(b).toContain('Também não vê quando você abre o app nem o que você anota.');
-    expect(b).toContain('as datas (como a em que você aceitou o convite e a de encerramento)');
+    expect(b).toContain('as datas (como a do aceite do convite e a do encerramento)');
     expect(b).not.toContain('Os e-mails que ela convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens');
     expect(b).not.toContain('o que você faz no app');
     expect(h('ajuda/comecar.html')).toContain('anotado por você ou pelas pessoas da sua Família, ou importado de um arquivo');

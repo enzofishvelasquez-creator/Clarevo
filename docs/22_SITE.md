@@ -348,7 +348,7 @@ Resolvido no mesmo dia: o subtítulo de "Multa e juros por atraso" no core e as 
 **Achado e não corrigido:**
 
 - "QR code" (minúsculo) no texto do guia de "Leitura de nota fiscal", que vem do núcleo (`packages/core/src/guide/catalog.ts`), enquanto o site escreve "QR Code"; o núcleo fica com a sessão do app.
-- "as datas (como a em que você aceitou o convite e a de encerramento)", na página inicial e na Ajuda: está correto, só é pesado, e os testes conferem essa redação de propósito (a data do aceite e a do encerramento). Se Enzo quiser, "como a do aceite do convite e a do encerramento" resolve, mudando junto o teste.
+- "as datas (como a em que você aceitou o convite e a de encerramento)", na página inicial e na Ajuda: trocada por "as datas (como a do aceite do convite e a do encerramento)", a pedido do Enzo no mesmo dia.
 - Nos textos legais (`docs/legal`, que o site converte): "Titular" com maiúscula nos Termos e em "Excluir conta", ao lado de "titular" minúsculo; fica para a revisão do advogado.
 - As calculadoras montam o resultado no navegador com o texto do núcleo, que ainda pode quebrar entre "R$" e o valor; mudar ali pede ajustar a comparação com o núcleo no teste de navegador.
 - Os temas da Ajuda em 900 a 1119 px: o primeiro cartão, em duas colunas, fica com espaço vazio embaixo, porque a linha acompanha o cartão mais alto ao lado.
