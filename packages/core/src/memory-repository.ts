@@ -1,5 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
-import type { WebSubscriptionCancel, WebSubscriptionStart } from './assinatura-web/app';
+import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import { FULL_ACCESS, type Access } from './plano';
 import type { PlanKind } from './plano-precos';
@@ -4911,6 +4911,10 @@ export class MemoryRepository implements RecordsRepository {
 
   async startPixPayment(_plan: PlanKind): Promise<WebSubscriptionStart> {
     return { result: 'indisponivel' };
+  }
+
+  async getWebSubscriptionStatus(): Promise<WebSubscriptionStatus | null> {
+    return null;
   }
 
   // Assinatura pelas lojas (D-090): só existe com o Supabase, as lojas e o RevenueCat; na demonstração e nos testes, indisponível.

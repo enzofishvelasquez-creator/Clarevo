@@ -26,6 +26,7 @@ import {
   parseWebReference,
   parseWebSubscriptionCancel,
   parseWebSubscriptionStart,
+  parseWebSubscriptionStatus,
   periodEnd,
   pixCanPayNext,
   pixNextPaymentFrom,
@@ -575,6 +576,29 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
     expect(tooMany.status).toBe(429);
     expect(JSON.parse(tooMany.body)).toEqual({ result: 'muitas_tentativas' });
     expect(f.net.sent.some((s) => s.url.endsWith(`/checkouts/${CHECKOUT}/cancel`))).toBe(true);
+  });
+
+  it('situacao: diz se ainda há assinatura no cartão ativa no Asaas (e quando renova) ou se foi cancelada, sem plano no pedido', async () => {
+    const active = fakeNet({ ...user, 'GET /v3/subscriptions': () => ({ status: 200, body: { data: [sub({ nextDueDate: '2026-12-12' })] } }) });
+    const h = createAssinaturaWebHandler({ config, fetch: active.fetcher, now: () => NOW });
+    const r = await h(appReq({ action: 'situacao' }).req);
+    expect(r.status).toBe(200);
+    expect(JSON.parse(r.body)).toEqual({ result: 'ativa', nextDueDate: '2026-12-12' });
+    expect(active.sent.some((s) => s.method !== 'GET')).toBe(false);
+    const none = fakeNet({ ...user, ...noSubs });
+    const h2 = createAssinaturaWebHandler({ config, fetch: none.fetcher, now: () => NOW });
+    expect(JSON.parse((await h2(appReq({ action: 'situacao' }).req)).body)).toEqual({ result: 'sem_assinatura' });
+    // Sem sessão: 401, sem perguntar ao Asaas.
+    const anon = fakeNet({ 'GET /auth/v1/user': () => ({ status: 401, body: {} }) });
+    const h3 = createAssinaturaWebHandler({ config, fetch: anon.fetcher, now: () => NOW });
+    expect((await h3(appReq({ action: 'situacao' }).req)).status).toBe(401);
+    expect(anon.sent.some((s) => s.url.includes('asaas'))).toBe(false);
+    // O app lê a resposta; qualquer outra coisa vira "não deu para saber".
+    expect(parseWebSubscriptionStatus({ result: 'ativa', nextDueDate: '2026-12-12' })).toEqual({ active: true, nextDueDate: '2026-12-12' });
+    expect(parseWebSubscriptionStatus({ result: 'ativa', nextDueDate: 'lixo' })).toEqual({ active: true, nextDueDate: null });
+    expect(parseWebSubscriptionStatus({ result: 'sem_assinatura' })).toEqual({ active: false });
+    expect(parseWebSubscriptionStatus({ result: 'tente_de_novo' })).toBeNull();
+    expect(parseWebSubscriptionStatus(null)).toBeNull();
   });
 
   it('cancelar: remove no Asaas as assinaturas ativas da pessoa (pela referência); sem nenhuma, diz que não há', async () => {

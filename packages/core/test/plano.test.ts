@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ACCESS_TEXT,
   ERROR_TEXT,
+  SUBSCRIPTION_SCREEN_TEXT,
   FAMILY_MAX_PEOPLE,
   FULL_ACCESS,
   MemoryRepository,
@@ -228,5 +229,49 @@ describe('Pix mês a mês (D-093, caminho B): a situação e o aviso', () => {
     for (const t of [accessBanner(pix(UNTIL), near, TZ, { web: true })!.text, accessView(pix(UNTIL), NOW, TZ, { web: true }).body]) {
       expect(t).not.toMatch(/—|–|fazer sentido/);
     }
+  });
+});
+
+describe('a tela Assinatura com cor e celebração (pedido do Enzo, 12/11/2026)', () => {
+  const card = (until: string): Access => ({ status: 'assinatura', plan: 'individual', until, canWrite: true, provider: 'web' });
+  const UNTIL = '2026-12-16T02:59:59.999Z'; // 15/12 em Brasília: pago até 12/12, mais 3 dias de tolerância
+
+  it('a assinatura no cartão com a situação lida no Asaas: a renovação de verdade, ou cancelada até o fim do período pago', () => {
+    expect(accessView(card(UNTIL), NOW, TZ, { web: true }).body).toContain('renova em 15/12/2026');
+    expect(accessView(card(UNTIL), NOW, TZ, { web: true, webSubscription: { active: true, nextDueDate: '2026-12-12' } }).body).toBe(
+      'Assinatura ativa, renova em 12/12/2026. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.',
+    );
+    expect(accessView(card(UNTIL), NOW, TZ, { web: true, webSubscription: { active: false } }).body).toBe(
+      'Assinatura cancelada: o acesso completo continua até 15/12/2026, sem nova cobrança.',
+    );
+    // Sem a situação do Asaas (não deu para saber), o texto de sempre.
+    expect(accessView(card(UNTIL), NOW, TZ, { web: true, webSubscription: null }).body).toContain('renova em 15/12/2026');
+  });
+
+  it('os textos novos seguem as regras e não apontam pagamento fora da loja (aparecem também no celular)', () => {
+    const T = SUBSCRIPTION_SCREEN_TEXT;
+    const texts = [
+      ...Object.values(T.eyebrow),
+      T.eyebrowCanceled,
+      T.celebrate,
+      T.justPaidEyebrow,
+      T.justPaidTitle('individual'),
+      T.justPaidTitle('familiar'),
+      ...[0, 1, 14].flatMap((d) => [T.trialDays(d), T.trialDaysCaption(d)]),
+      T.trialProgressLabel,
+      T.benefitsTitle,
+      T.benefitsTitleSubscribed,
+      ...T.benefits.map((b) => b.text),
+      T.perMonth,
+    ];
+    for (const t of texts) {
+      expect(t).not.toMatch(/—|–/);
+      expect(t).not.toMatch(/fa(z|ç)er? sentido|faz sentido/i);
+      expect(t).not.toMatch(/\bweb\b|Pix|site|boleto|cartão de crédito/i);
+      expect(t).not.toMatch(/bem-vind[oa]|obrigad[oa]/i);
+    }
+    expect(T.justPaidTitle('familiar')).toBe('Boas-vindas ao plano Família!');
+    expect(T.trialDays(0)).toBe('Último dia');
+    expect(T.benefits.some((b) => b.text.includes('até 6 pessoas'))).toBe(true);
   });
 });

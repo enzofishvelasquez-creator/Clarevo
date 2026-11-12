@@ -9,6 +9,7 @@ import { BENEFIT_TEXT } from './company';
 import { FAMILY_MAX_PEOPLE } from './family';
 import { formatBRL } from './money';
 import { PIX_GRACE_DAYS, PIX_WARNING_DAYS } from './assinatura-web/pix';
+import type { WebSubscriptionStatus } from './assinatura-web/app';
 import { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind } from './plano-precos';
 
 export { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind };
@@ -114,6 +115,11 @@ export function planPrice(plan: PlanKind): string {
   return `${formatBRL(PLAN_PRICE_CENTS[plan])} por mês`;
 }
 
+/** "R$ 29,90": o preço do plano em destaque (é público; não passa pelos valores ocultos). */
+export function planPriceAmount(plan: PlanKind): string {
+  return formatBRL(PLAN_PRICE_CENTS[plan]);
+}
+
 /** Os textos fixos da assinatura (Conta, tela Assinatura e avisos). */
 export const ACCESS_TEXT = {
   cardTitle: 'Assinatura',
@@ -138,6 +144,45 @@ export const ACCESS_TEXT = {
   bannerAction: 'Ver os planos',
 } as const;
 
+/**
+ * A tela Assinatura com mais cor e celebração (pedido do Enzo, 12/11/2026): o selo de cada situação no alto, a comemoração de quem assina
+ * (e de quem acabou de pagar), o que a assinatura libera e os dias do teste. Neutros quanto ao meio de pagamento: aparecem também no app
+ * das lojas, onde nada aponta para pagamento fora da loja.
+ */
+export const SUBSCRIPTION_SCREEN_TEXT = {
+  /** O selo acima do título (o título é a situação de `accessView`; o selo não a repete). */
+  eyebrow: {
+    assinatura: 'Assinatura ativa',
+    familia: 'Nada a pagar',
+    beneficio: 'Nada a pagar',
+    cortesia: 'Nada a pagar',
+    teste: 'Sem cartão e sem cobrança',
+    leitura: 'Seus dados continuam aqui',
+    pre_lancamento: 'Antes do lançamento',
+  } as Readonly<Record<AccessStatus, string>>,
+  /** A assinatura no cartão cancelada, com o período pago ainda valendo (sem comemoração). */
+  eyebrowCanceled: 'Assinatura cancelada',
+  /** Quem tem acesso completo por assinatura, Família, benefício ou cortesia. */
+  celebrate: 'Tudo liberado para você anotar, planejar e acompanhar. Que bom ter você aqui.',
+  /** Voltou do pagamento e o acesso já mudou. */
+  justPaidEyebrow: 'Assinatura confirmada',
+  justPaidTitle: (plan: PlanKind) => `Boas-vindas ao plano ${PLAN_NAME[plan]}!`,
+  /** Os dias do teste grátis, em destaque. */
+  trialDays: (days: number) => (days <= 0 ? 'Último dia' : days === 1 ? '1 dia' : `${days} dias`),
+  trialDaysCaption: (days: number) => (days <= 0 ? 'do teste grátis' : 'de teste grátis pela frente'),
+  trialProgressLabel: 'Dias restantes do teste grátis',
+  benefitsTitle: 'O que a assinatura libera',
+  benefitsTitleSubscribed: 'Tudo isso é seu',
+  benefits: [
+    { icon: 'registros', text: 'Gastos, recebimentos e contas a pagar' },
+    { icon: 'metas', text: 'Metas e a aba Investir, com o CDI e o IPCA' },
+    { icon: 'lembretes', text: 'Lembretes, cartões e a fatura de cada mês' },
+    { icon: 'analises', text: 'Seu mês em 30 segundos, a Evolução e as Análises' },
+    { icon: 'familia', text: `Plano Família: até ${FAMILY_MAX_PEOPLE} pessoas na mesma assinatura` },
+  ] as const,
+  perMonth: ' por mês',
+} as const;
+
 export interface AccessView {
   /** "Teste grátis", "Só ver e exportar", "Plano Individual"... */
   situation: string;
@@ -151,7 +196,7 @@ export interface AccessView {
  * O que a tela Assinatura e o card de Conta mostram para a situação. `now` e o fuso da pessoa dão as datas. `web`: a tela está na web
  * (só lá se fala em pagar com Pix; no app das lojas, nada aponta para pagamento fora da loja).
  */
-export function accessView(access: Access, now: Date, timeZone: string, opts: { web?: boolean } = {}): AccessView {
+export function accessView(access: Access, now: Date, timeZone: string, opts: { web?: boolean; webSubscription?: WebSubscriptionStatus | null } = {}): AccessView {
   const end = untilDay(access, timeZone);
   const date = end ? formatDateBR(end) : null;
   switch (access.status) {
@@ -189,6 +234,17 @@ export function accessView(access: Access, now: Date, timeZone: string, opts: { 
             : ended
               ? `O mês pago com Pix terminou em ${formatDateBR(paid!)}. Para continuar anotando, pague o próximo mês aqui na tela Assinatura.`
               : `Pago com Pix até ${paid ? formatDateBR(paid) : 'o fim do mês pago'}. O Pix não renova sozinho: pague o próximo mês até essa data, aqui na tela Assinatura.`,
+          showPlans: false,
+        };
+      }
+      // A assinatura no cartão da web, com a situação lida no Asaas (12/11/2026): a renovação de verdade (sem a tolerância) ou cancelada.
+      if (access.provider === 'web' && opts.webSubscription) {
+        const ws = opts.webSubscription;
+        return {
+          situation: `Plano ${PLAN_NAME[access.plan ?? 'individual']}`,
+          body: ws.active
+            ? `Assinatura ativa, renova em ${ws.nextDueDate ? formatDateBR(ws.nextDueDate) : (date ?? 'breve')}. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.`
+            : `Assinatura cancelada: o acesso completo continua${date ? ` até ${date}` : ' até o fim do período já pago'}, sem nova cobrança.`,
           showPlans: false,
         };
       }

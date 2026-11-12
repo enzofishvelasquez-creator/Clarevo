@@ -4,12 +4,13 @@ import { AlertCircle, CheckCircle2, Info } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 
-import { AccessSituation, PixRenewCard, PlansCard, StoreManageCard, useAccessTimeZone } from '@/components/access-parts';
+import { PixRenewCard, PlansCard, StoreManageCard, useAccessTimeZone } from '@/components/access-parts';
 import { ConfirmDialog } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
+import { BenefitsCard, SubscriptionHero } from '@/components/subscription-parts';
 import { Banner, Button, Card, LinkButton, Screen, Txt } from '@/components/ui';
-import { useAccess, useReloadAccess } from '@/state/access';
+import { useAccess, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
 import { useRepo } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -18,9 +19,10 @@ const W = WEB_SUBSCRIPTION_TEXT;
 
 /**
  * Cancelar a assinatura feita na web (D-084): só na web e só para a assinatura da web (provider 'web'); a das lojas se cancela na loja.
- * A função do servidor remove a assinatura no Asaas; o período já pago continua valendo (o aviso do Asaas recalcula até quando).
+ * A função do servidor remove a assinatura no Asaas; o período já pago continua valendo (o aviso do Asaas recalcula até quando). Já
+ * cancelada (`canceled`, lida no Asaas), o botão sai e fica o aviso de que o acesso continua até o fim do período pago (12/11/2026).
  */
-function WebCancelCard() {
+function WebCancelCard({ canceled }: { canceled: boolean }) {
   const repo = useRepo();
   const reload = useReloadAccess();
   const [open, setOpen] = useState(false);
@@ -31,7 +33,7 @@ function WebCancelCard() {
     setBusy(true);
     try {
       const r = await repo.cancelWebSubscription();
-      if (r === 'cancelada') {
+      if (r === 'cancelada' || r === 'sem_assinatura') {
         setDone(true);
         setMsg({ tone: 'sucesso', text: W.cancelDone });
         void reload();
@@ -44,6 +46,8 @@ function WebCancelCard() {
     setBusy(false);
     setOpen(false);
   };
+  // Já cancelada antes de abrir a tela: o alto da tela diz até quando vale, e não há mais o que cancelar.
+  if (canceled && !done) return null;
   return (
     <Card style={{ gap: space[3] }}>
       {done ? null : (
@@ -92,12 +96,18 @@ export default function AssinaturaScreen() {
   useEffect(() => {
     if (returned) void refetch();
   }, [returned, refetch]);
-  const view = access.data ? accessView(access.data, new Date(), timeZone, { web: Platform.OS === 'web' }) : null;
+  const now = new Date();
+  const webCard = Platform.OS === 'web' && access.data?.status === 'assinatura' && access.data.provider === 'web';
+  const webStatus = useWebSubscriptionStatus(webCard);
+  const view = access.data ? accessView(access.data, now, timeZone, { web: Platform.OS === 'web', webSubscription: webCard ? webStatus.data : null }) : null;
+  // Voltou do pagamento e o acesso já mudou: o alto da tela dá as boas-vindas, e o aviso da volta sai.
+  const welcomed = returned === 'sucesso' && access.data?.status === 'assinatura';
+  const subscribed = access.data ? ['assinatura', 'familia', 'beneficio', 'cortesia'].includes(access.data.status) : false;
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={T.screenTitle} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
-        {returned ? (
+        {returned && !welcomed ? (
           <Banner tone={returned === 'sucesso' ? 'sucesso' : 'info'} icon={returned === 'sucesso' ? CheckCircle2 : Info}>
             <Txt variant="label">{W.returned[returned]}</Txt>
             {returned === 'sucesso' ? (
@@ -111,15 +121,13 @@ export default function AssinaturaScreen() {
           <ErrorState message={T.loadFailed} onRetry={() => access.refetch()} />
         ) : (
           <>
-            <Card style={{ gap: space[3] }}>
-              <AccessSituation situation={view.situation} />
-              <Txt color={colors.text}>{view.body}</Txt>
-            </Card>
-            {access.data.status === 'assinatura' && access.data.provider === 'web' && Platform.OS === 'web' ? <WebCancelCard /> : null}
+            <SubscriptionHero access={access.data} view={view} now={now} timeZone={timeZone} justPaid={welcomed} canceled={webCard && webStatus.data?.active === false} />
+            {webCard ? <WebCancelCard canceled={webStatus.data?.active === false} /> : null}
             {access.data.status === 'assinatura' && access.data.provider === 'pix' && Platform.OS === 'web' ? (
               <PixRenewCard access={access.data} hidden={returned === 'sucesso'} />
             ) : null}
             {Platform.OS !== 'web' ? <StoreManageCard access={access.data} /> : null}
+            <BenefitsCard subscribed={subscribed} />
             {view.showPlans ? <PlansCard access={access.data} webTest={webTest} subscribeHidden={returned === 'sucesso'} /> : null}
             {view.showPlans ? (
               <Txt variant="caption" color={colors.textSecondary}>

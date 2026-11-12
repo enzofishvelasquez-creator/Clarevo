@@ -54,7 +54,7 @@ import type {
   SeriesInput,
 } from './records';
 import type { LegalAcceptance } from './aceite';
-import type { WebSubscriptionCancel, WebSubscriptionStart } from './assinatura-web/app';
+import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import type { Access } from './plano';
 import type { PlanKind } from './plano-precos';
@@ -920,6 +920,8 @@ export interface RecordsRepository {
   cancelWebSubscription(): Promise<WebSubscriptionCancel>;
   /** "pix": cria o Checkout do Asaas de um mês com Pix (D-093, caminho B) e devolve o link, ou por que não (mês já pago, já assinante...). */
   startPixPayment(plan: PlanKind): Promise<WebSubscriptionStart>;
+  /** "situacao": se a assinatura no cartão ainda está ativa no Asaas (e quando renova) ou foi cancelada; null quando não deu para saber. */
+  getWebSubscriptionStatus(): Promise<WebSubscriptionStatus | null>;
 
   // Assinatura pelas lojas (D-090), pela função do servidor "assinatura-lojas" com a sessão da pessoa. Só no app do iPhone e do Android.
 
