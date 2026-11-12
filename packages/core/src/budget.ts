@@ -928,6 +928,7 @@ export const BUDGET_CELEBRATION_TEXT = {
     categories === 1
       ? 'A categoria com orçamento ficou dentro do valor que você definiu.'
       : `As ${categories} categorias com orçamento ficaram dentro do valor que você definiu.`,
-  open: (month: IsoMonth) => `Ver o orçamento de ${formatMonthBR(month).toLowerCase()}`,
+  // Só o nome do mês: com o ano, o botão passava da largura da tela em 320 px.
+  open: (month: IsoMonth) => `Ver o orçamento de ${formatMonthName(month)}`,
   dismiss: 'Fechar',
 } as const;

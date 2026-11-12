@@ -112,6 +112,8 @@ setInterval(async () => {
         return session.user.email === 'demo@clarevo.app' ? await session.auth.demoRepo : session.repo;
       },
       refresh: () => find().client.invalidateQueries(),
+      // Tira do cache as leituras com o começo de chave pedido (para uma falha simulada não ser coberta por um dado já lido em outra tela).
+      forget: (prefix) => find().client.removeQueries({ queryKey: prefix }),
       // As empresas simuladas (D-056): a equipe Clarevo cadastra a empresa pelo SQL Editor; aqui o roteiro faz o mesmo no hub da memória.
       company: () => find().session.auth.companyHub,
     };
@@ -12011,7 +12013,8 @@ setInterval(async () => {
   await btn('Tentar de novo').click(); await waitText('Pago em outubro de 2026', 12000); await p.waitForTimeout(600);
   ok('Análises erro: "Tentar de novo" traz os dados de volta (as barras de outubro)', (await anBars())?.length === 2 && (await body()).includes('R$ 3.900,00'));
   // Erro numa das outras abas: o mesmo texto e o mesmo botão.
-  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.__origBudget = repo.getMonthBudget; repo.getMonthBudget = () => Promise.reject(new Error('falha simulada')); });
+  // O Resumo já leu o orçamento de setembro (o card do mês dentro do orçamento): sai do cache, para a falha simulada aparecer.
+  await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.__origBudget = repo.getMonthBudget; repo.getMonthBudget = () => Promise.reject(new Error('falha simulada')); window.__e2e.forget(['records', 'budget']); });
   await anMonthStep(-1);
   await anTab('Orçamento').click(); await waitText('Não foi possível carregar as análises.', 15000);
   ok('Análises erro (Orçamento): a aba Orçamento mostra o mesmo erro com "Tentar de novo", e nunca um orçamento zerado', (await visibleCount('button', 'Tentar de novo')) === 1 && !(await body()).includes('Orçado R$ 0,00') && !(await body()).includes('Nenhum orçamento definido'));
@@ -14501,9 +14504,9 @@ setInterval(async () => {
     t = await body(); screenTexts.push(t);
     ok('Orçamento: fechada a comemoração do nível, o card do mês dentro do orçamento aparece, com as categorias e o atalho para setembro',
       t.includes('Orçamento do mês') && t.includes('As 2 categorias com orçamento ficaram dentro do valor que você definiu.') &&
-      (await visibleCount('button', 'Ver o orçamento de setembro de 2026')) === 1 && (await visibleCount('button', 'Fechar')) === 1 && !t.includes('Sua conta chegou ao nível'));
+      (await visibleCount('button', 'Ver o orçamento de setembro')) === 1 && (await visibleCount('button', 'Fechar')) === 1 && !t.includes('Sua conta chegou ao nível'));
     await atWidths(async (w) => { await layoutChecks(`Orçamento, mês dentro ${w}px`); if (w === 390) await shot('622_orcamento_mes_dentro'); });
-    await btn('Ver o orçamento de setembro de 2026').click(); await waitText('Pessoal · Setembro de 2026'); await p.waitForTimeout(400);
+    await btn('Ver o orçamento de setembro').click(); await waitText('Pessoal · Setembro de 2026'); await p.waitForTimeout(400);
     ok('Orçamento: o atalho abre o orçamento de setembro', new URL(p.url()).pathname === '/orcamento');
     await tabByName('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(600);
     ok('Orçamento: depois de abrir, o card não volta para setembro', !(await body()).includes('fechou dentro do orçamento'));

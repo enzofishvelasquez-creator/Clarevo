@@ -55,7 +55,7 @@ export function BudgetCelebrationCard({ contextId, eligible }: { contextId: stri
               close();
               router.push({ pathname: '/orcamento', params: { mes: within.month } });
             }}
-            style={{ flexGrow: 1 }}
+            style={{ flexGrow: 1, maxWidth: '100%' }}
           />
           <LinkButton label={T.dismiss} onPress={close} />
         </View>

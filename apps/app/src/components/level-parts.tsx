@@ -191,7 +191,7 @@ export function LevelUpCard() {
               mark(level);
               router.push('/conta/nivel');
             }}
-            style={{ flexGrow: 1 }}
+            style={{ flexGrow: 1, maxWidth: '100%' }}
           />
           <LinkButton label={T.celebrateDismiss} onPress={() => mark(level)} />
         </View>

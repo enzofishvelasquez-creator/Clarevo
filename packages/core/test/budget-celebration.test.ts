@@ -33,7 +33,7 @@ describe('mês que fechou dentro do orçamento (pedido do Enzo em 12/11/2026)', 
       'Setembro de 2026 fechou dentro do orçamento',
       'A categoria com orçamento ficou dentro do valor que você definiu.',
       'As 3 categorias com orçamento ficaram dentro do valor que você definiu.',
-      'Ver o orçamento de setembro de 2026',
+      'Ver o orçamento de setembro',
       'Fechar',
     ]);
     for (const t of texts) {
