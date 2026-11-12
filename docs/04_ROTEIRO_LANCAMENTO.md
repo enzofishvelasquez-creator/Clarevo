@@ -189,6 +189,9 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [x] Assinatura na web com Pix, além do cartão: Enzo escolheu o caminho B em 11/11/2026 (Pix mês a mês pelo Checkout do Asaas, sem CPF na Clarevo; cada pagamento vale um mês, com aviso perto do fim), pronto no código no mesmo dia (`docs/39`, seção 6; migração 0033)
 - [x] Supabase: migração 0033 aplicada e conferida em 11/11/2026 (`docs/05`, passo 12y; conferência 21u: 1, 2, 2, 1, 102); PR #32 na `main`
 - [ ] **Você (Asaas):** no aviso, marcar também `CHECKOUT_PAID`; no teste do sandbox, pagar um mês com Pix (`docs/39`, seção 4, passos 6 e 7)
+- [x] Tela Assinatura com cor e celebração e a assinatura cancelada no cartão aparecendo como cancelada (D-094, 12/11/2026)
+- [x] Níveis de conta, Bronze a Diamante, e a atualização de visual de Conta, Primeiros passos, Movimentos, Aprender e meta alcançada (D-095, 12/11/2026; `docs/48_NIVEIS.md`)
+- [ ] Supabase (Enzo ou Claude Chrome): migração 0034 dos níveis (`docs/05`, passo 12z, conferência 21v) e a função `assinatura-web` publicada de novo (ação `situacao`)
 - [x] Widget ligado nos perfis `preview` e `production` (`preview-sem-widget` de reserva) e o card de Conta com o passo a passo
 - [ ] Widget: primeiro build com ele e teste no iPhone e no Android (`docs/21`, seção 6; Enzo)
 - [ ] **Você:** teste em aparelho pelo roteiro único `docs/47_TESTE_EM_APARELHO.md` (53 itens numerados: build `preview` no Android agora, iPhone quando houver TestFlight). Ele junta os "Teste em aparelho" deste arquivo, `docs/37` (seção 6), `docs/40` (seção 4), `docs/21` (seção 6) e `docs/46` (seção 2)
