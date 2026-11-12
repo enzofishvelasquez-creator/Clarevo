@@ -187,7 +187,8 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [x] Na web, com a conta do Enzo (11/11/2026, pelo Claude Chrome): a função `indices` respondeu no ar. "Teste CDI" de setembro a outubro de 2026: +1,50%, CDI no mesmo período +2,16%, IPCA "sem dados para todos os meses" (o de outubro ainda não estava no Banco Central), fonte e data da consulta na tela
 - [x] Multa e juros: modo "Fatura do cartão" (era D-089 G): rotativo, mora, multa, IOF estimado e o teto da Lei 14.690/2023; a fatura vencida abre a calculadora nesse modo
 - [x] Assinatura na web com Pix, além do cartão: Enzo escolheu o caminho B em 11/11/2026 (Pix mês a mês pelo Checkout do Asaas, sem CPF na Clarevo; cada pagamento vale um mês, com aviso perto do fim), pronto no código no mesmo dia (`docs/39`, seção 6; migração 0033)
-- [ ] Supabase (Enzo ou Claude Chrome): migração 0033 (`docs/05`, passo 12y, conferência 21u); no aviso do Asaas, marcar também `CHECKOUT_PAID`; no teste do sandbox, pagar um mês com Pix (`docs/39`, seção 4, passos 6 e 7)
+- [x] Supabase: migração 0033 aplicada e conferida em 11/11/2026 (`docs/05`, passo 12y; conferência 21u: 1, 2, 2, 1, 102); PR #32 na `main`
+- [ ] **Você (Asaas):** no aviso, marcar também `CHECKOUT_PAID`; no teste do sandbox, pagar um mês com Pix (`docs/39`, seção 4, passos 6 e 7)
 - [x] Widget ligado nos perfis `preview` e `production` (`preview-sem-widget` de reserva) e o card de Conta com o passo a passo
 - [ ] Widget: primeiro build com ele e teste no iPhone e no Android (`docs/21`, seção 6; Enzo)
 - [ ] **Você:** teste em aparelho pelo roteiro único `docs/47_TESTE_EM_APARELHO.md` (53 itens numerados: build `preview` no Android agora, iPhone quando houver TestFlight). Ele junta os "Teste em aparelho" deste arquivo, `docs/37` (seção 6), `docs/40` (seção 4), `docs/21` (seção 6) e `docs/46` (seção 2)
