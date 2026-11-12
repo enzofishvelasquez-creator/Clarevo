@@ -24,6 +24,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ChartLine, CircleAlert, CircleCheck, Ellipsis, Minus, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { BadgeConfetti } from '@/components/subscription-parts';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
@@ -304,11 +305,17 @@ function GoalBody({
               entering={initiallyReached ? undefined : FadeIn.duration(motion.context).reduceMotion(ReduceMotion.System)}
               style={{ gap: space[2] }}
               accessibilityLiveRegion="polite">
-              <View style={styles.reachedPill} accessible accessibilityLabel={t.reached.badge}>
-                <CircleCheck size={18} color={colors.text} strokeWidth={2.5} aria-hidden />
-                <Txt variant="label" color={colors.text} style={{ fontFamily: fonts.bold }}>
-                  {t.reached.badge}
-                </Txt>
+              {/* A meta alcançada é comemorada (12/11/2026): o selo lima com confetes ao lado. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+                <View style={styles.reachedPill} accessible accessibilityLabel={t.reached.badge}>
+                  <CircleCheck size={18} color={colors.text} strokeWidth={2.5} aria-hidden />
+                  <Txt variant="label" color={colors.text} style={{ fontFamily: fonts.bold }}>
+                    {t.reached.badge}
+                  </Txt>
+                </View>
+                <View style={{ height: 36, justifyContent: 'center', overflow: 'hidden' }}>
+                  <BadgeConfetti inline />
+                </View>
               </View>
               <Txt variant="label" color={colors.textOnBrand}>
                 {t.reached.body}

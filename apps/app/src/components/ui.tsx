@@ -226,6 +226,18 @@ export function TopInset({ color }: { color: string }) {
   return <View style={{ height: insets.top, backgroundColor: color }} />;
 }
 
+/**
+ * O bloco colorido de um ícone (12/11/2026, no estilo da tela Assinatura): fundo azul claro com o ícone azul ou, em `lime`, lima claro
+ * com o ícone escuro. Só decoração: o nome de quem o usa vem escrito ao lado.
+ */
+export function IconBlock({ icon: Icon, lime = false, size = 40 }: { icon: LucideIcon; lime?: boolean; size?: number }) {
+  return (
+    <View style={{ width: size, height: size, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: lime ? colors.accentTint : colors.brandTint }}>
+      <Icon size={Math.round(size / 2)} color={lime ? colors.text : colors.brand} strokeWidth={2.25} aria-hidden />
+    </View>
+  );
+}
+
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.card, style]}>{children}</View>;
 }

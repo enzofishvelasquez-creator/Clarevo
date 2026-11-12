@@ -46,13 +46,16 @@ export function useAccessTimeZone(): string {
 /** Linha "Situação: Teste grátis", lida inteira pelo leitor de tela. */
 export function AccessSituation({ situation }: { situation: string }) {
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3] }} accessible accessibilityLabel={`${T.situation}: ${situation}`}>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space[3] }} accessible accessibilityLabel={`${T.situation}: ${situation}`}>
       <Txt variant="label" color={colors.textSecondary}>
         {T.situation}
       </Txt>
-      <Txt variant="label" style={{ fontFamily: fonts.bold, flexShrink: 1, textAlign: 'right' }}>
-        {situation}
-      </Txt>
+      {/* A situação num selo lima, como no alto da tela Assinatura (12/11/2026). */}
+      <View style={{ flexShrink: 1, backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: space[3], paddingVertical: space[1] }}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold, textAlign: 'right' }}>
+          {situation}
+        </Txt>
+      </View>
     </View>
   );
 }

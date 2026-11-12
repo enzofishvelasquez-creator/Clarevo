@@ -179,8 +179,8 @@ export default function AprenderScreen() {
                   accessibilityLabel={`${CALC_UI_TEXT.learnCardTitle}. ${CALC_UI_TEXT.learnCardCaption}`}
                   onPress={() => router.push('/calcular')}
                   style={(s) => [styles.calc, s.pressed && { opacity: 0.85 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-                  <View style={styles.calcIcon}>
-                    <Calculator size={22} color={colors.brand} strokeWidth={2.25} aria-hidden />
+                  <View style={[styles.calcIcon, { backgroundColor: colors.accentTint }]}>
+                    <Calculator size={22} color={colors.text} strokeWidth={2.25} aria-hidden />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Txt variant="label" style={{ fontFamily: fonts.extrabold, fontSize: 17 }}>

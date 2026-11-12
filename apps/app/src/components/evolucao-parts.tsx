@@ -24,7 +24,7 @@ import { MonthCheckBlock } from '@/components/month-check';
 import { SettingSwitch } from '@/components/setting-switch';
 import { ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
-import { Button, Card, FitMoney, LinkButton, Money, Skeleton, Txt, styles as ui } from '@/components/ui';
+import { Button, Card, FitMoney, IconBlock, LinkButton, Money, Skeleton, Txt, styles as ui } from '@/components/ui';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { useCategoryBreakdown, useEvolutionExplanation, useReceivedBreakdown } from '@/state/data';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -52,7 +52,7 @@ export function EvolutionEntry({ onPress }: { onPress: () => void }) {
       accessibilityLabel={T.rowA11y}
       onPress={onPress}
       style={(s) => [ui.input, styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-      <ChartLine size={20} color={colors.textSecondary} aria-hidden />
+      <IconBlock icon={ChartLine} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
           {T.title}

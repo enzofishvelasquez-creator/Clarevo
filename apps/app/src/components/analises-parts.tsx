@@ -31,7 +31,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { MoneyTxt } from '@/components/money-text';
 import { MonthCheckBlock } from '@/components/month-check';
 import { EmptyState, ErrorState } from '@/components/states';
-import { Button, Card, LinkButton, Money, Skeleton, Txt, clampLines, spaceKeyPress, styles as ui } from '@/components/ui';
+import { Button, Card, IconBlock, LinkButton, Money, Skeleton, Txt, clampLines, spaceKeyPress, styles as ui } from '@/components/ui';
 import { useCategoryViewPref } from '@/lib/category-view';
 import { useHiddenMonths } from '@/lib/evolution-memory';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
@@ -59,7 +59,7 @@ export function AnalysesEntry({ onPress }: { onPress: () => void }) {
       accessibilityLabel={T.rowA11y}
       onPress={onPress}
       style={(s) => [ui.input, styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-      <ChartPie size={20} color={colors.textSecondary} aria-hidden />
+      <IconBlock icon={ChartPie} lime />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
           {T.title}

@@ -37,9 +37,9 @@ export function HeroBackdrop() {
 }
 
 /** Confetes em volta do selo, só na faixa de cima (nunca sobre o título), na comemoração. */
-export function BadgeConfetti() {
+export function BadgeConfetti({ inline = false }: { inline?: boolean }) {
   return (
-    <Svg width={104} height={64} viewBox="0 0 104 64" style={styles.confetti} accessible={false} pointerEvents="none">
+    <Svg width={104} height={64} viewBox="0 0 104 64" style={inline ? undefined : styles.confetti} accessible={false} pointerEvents="none">
       <Circle cx={8} cy={30} r={3.5} fill={colors.accent} />
       <Rect x={18} y={6} width={7} height={7} rx={2} fill={colors.surface} transform="rotate(20 21 9)" />
       <Circle cx={30} cy={52} r={3} fill={colors.illustration} />
