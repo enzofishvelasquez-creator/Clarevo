@@ -181,6 +181,7 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [x] Metas: metas da Família (já existiam desde a Família, D-055: com a Família escolhida, Metas mostra e cria as metas da casa, com a regra de edição de sempre)
 - [x] Metas: prioridade ("Ordenar metas", com duas ou mais metas; migração 0031, `docs/05` passo 12v)
 - [x] Investimentos: aba nova, só no Pessoal, acompanhamento manual com comparação com CDI e IPCA (`docs/45_INVESTIMENTOS.md`)
+- [x] Investimentos, ficha ampliada (D-099): vencimentos, divisão, FGC, imposto estimado, valor pela taxa contratada, resumo para a declaração, comparar rendimentos e lembretes (`docs/45_INVESTIMENTOS.md`, seção 7). Falta: migração 0035 e a função `indices` publicada de novo
 - [x] Supabase (Enzo, 11/11/2026): migrações 0031 e 0032 aplicadas (conferência 21t: 2, 1, 7, 102) e a função `indices` publicada (`docs/05`, passos 12v, 12w e 12x)
 - [x] Supabase (Enzo, 11/11/2026): função `indices` publicada de novo (a versão que confere a sessão), com "Verify JWT with legacy secret" desligado (`docs/05`, passo 12x)
 - [x] PR #30 (D-093) na `main` em 11/11/2026: o app da web publica sozinho

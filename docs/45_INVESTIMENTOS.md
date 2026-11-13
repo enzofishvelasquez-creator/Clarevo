@@ -133,3 +133,29 @@ Em `docs/05_SUPABASE.md`, passos 12v, 12w e 12x, e as conferências 21s e 21t:
    verificação do painel só aceita o segredo antigo e recusaria as sessões assinadas com as chaves novas). Não há segredo: o Banco Central
    é público. Feito em 11/11/2026: a versão que confere a sessão, com a verificação do painel desligada (aba Settings da função).
 3. Aplicar antes de publicar o app novo: a aba nova lê `investment_items` e chama as funções novas.
+4. Ficha ampliada (D-099): rodar a migração 0035 (`20261113000001_investimentos_ficha.sql`) e recarregar o esquema; publicar de novo a função
+   `indices` (agora busca também a Selic do mês, série 4390, e a poupança, série 195), com a verificação de JWT continuando desligada. Aplicar
+   antes do merge: o app novo envia a ficha nas funções novas e lê as colunas novas.
+
+## 7. Ficha ampliada (D-099, 13/11/2026)
+
+Estudo e decisões em `docs/49_ESTUDO_INVESTIMENTOS.md`; regras no núcleo e repetidas no banco.
+
+- **Campos (todos opcionais):** tipo exato dentro do tipo (os títulos públicos com os nomes oficiais do Tesouro Nacional), onde está (texto da
+  pessoa, até 40 caracteres), como rende (% do CDI, Selic mais taxa, IPCA mais taxa, prefixado, regra da poupança ou variável), a taxa (em centésimos
+  de ponto: 11000 é 110% do CDI, 650 é 6,5% ao ano), o vencimento e quando pode resgatar (qualquer dia, alguns dias depois do pedido, a partir de uma
+  data, só no vencimento). Editar grava a ficha inteira. No rendimento recebido, o tipo (juros ou cupom, dividendos, JCP, rendimento de FII, outro).
+- **O que a ficha deduz** (`investment-details.ts`): a regra de imposto (isento, tabela regressiva, come-cotas, sobre a venda, previdência,
+  criptoativos) e a garantia (FGC para poupança, CDB, LC, LCI, LCA e LCD; Tesouro Nacional para os títulos públicos; nenhuma das duas para o resto).
+  A tela sempre diz "Confira no seu extrato ou no contrato".
+- **Imposto estimado** (`investment-tax.ts`): na tabela regressiva, cada aporte é um lote com a própria data; um resgate tira dos mais antigos, na
+  proporção entre o aplicado e o valor do dia; o rendimento de hoje se divide entre os lotes pelo aplicado vezes os dias; IOF antes do imposto nos
+  primeiros 30 dias. As outras regras têm só a explicação. Regras e fontes num lugar só, com revisão a cada 6 meses.
+- **Valor pela taxa contratada** (`investment-insights.ts`): parte do último valor do extrato (ou dos aportes); aportes depois entram, resgates e
+  rendimentos pagos saem; a taxa diária de cada mês sai do índice acumulado no mês e dos dias úteis do mercado (feriados nacionais mais Carnaval,
+  Sexta-feira Santa e Corpus Christi); mês sem índice publicado repete o último. Valor "na curva", bruto. Só é gravado com "Usar este valor".
+- **Na aba:** próximos vencimentos (12 meses, e os vencidos que ainda têm valor), como está dividido (seis jeitos, barras na mesma cor, sem faixa
+  recomendada), soma do FGC por instituição (a grafia não importa: sem acento, sem caixa), rendimentos recebidos no ano, ganho real e poupança no
+  mesmo período no bloco azul.
+- **Telas novas:** `/investimento/declaracao` (resumo para conferir com os informes) e `/investimento/comparar` (até quatro opções, taxas digitadas).
+- **Lembretes** (aparelho): "Vencimentos dos investimentos" (7 dias antes e no dia) e "Atualizar os investimentos" (dia 1, se falta o valor do mês).

@@ -578,6 +578,12 @@ A Clarevo não é consultoria, não é análise, não é distribuidora nem inter
 4. A ordem dos itens 1 a 11 está boa, ou alguma dor pesa mais para o público das empresas?
 5. Importar o arquivo da B3 (item 18) entra no próximo ciclo?
 
+**Respostas do Enzo (13/11/2026, D-099):** seguir as sugestões. (1) A ficha ampliada entra antes do lançamento. (2) Os títulos públicos usam os nomes
+oficiais do Tesouro Nacional; o título para reserva lançado em 11/05/2026 se chama Tesouro Reserva (Ministério da Fazenda). (3) O valor estimado pela taxa
+contratada entra, sempre com "Usar este valor". (4) A importação do arquivo da B3 fica para depois. A ordem dos itens 1 a 11 ficou como proposta; todos
+entraram, e o simulador do item 10 ficou na aba Investir (`/investimento/comparar`), não na lista de calculadoras do site. Os códigos de Bens e Direitos
+vieram de guias de corretoras (a página da Receita não abriu): a tela diz "como costuma aparecer nos guias. Confira no programa da Receita".
+
 Decisões tomadas a partir deste estudo vão para `docs/00_VISAO_E_DECISOES.md`.
 
 ---
