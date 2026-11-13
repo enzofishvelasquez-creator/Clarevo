@@ -521,6 +521,8 @@ export interface DeclarationItem {
   currentCents: Cents | null;
   /** Sem atualização de valor em dezembro do ano: o valor de 31/12 é o último registrado mais aportes e resgates. */
   currentEstimated: boolean;
+  /** Começou no próprio ano: em 31/12 do ano anterior, o valor é zero. */
+  startedInYear: boolean;
 }
 
 export interface DeclarationIncome {
@@ -575,6 +577,7 @@ export function declarationSummary(
       previousCents: costBased ? null : prev,
       currentCents: costBased ? null : cur,
       currentEstimated: !costBased && !list.some((m) => m.kind === 'valor' && m.occurredOn >= decStart && m.occurredOn <= end),
+      startedInYear: firstOn > prevEnd,
     });
     if (i.institution) institutions.set(institutionKey(i.institution), i.institution);
     const regime = taxRegimeOf(i.kind, i.subkind);
@@ -601,8 +604,10 @@ export const DECLARATION_TEXT = {
         ? `Grupo ${it.group}; o código depende do ativo. Confira no programa da Receita.`
         : `Grupo ${it.group}, código ${it.code}, como costuma aparecer nos guias. Confira no programa da Receita.`,
   /** No ano de hoje, o 31/12 ainda não chegou: a segunda parte é o valor de hoje. */
-  values: (it: DeclarationItem, year: number, current = false) =>
-    `Valor registrado em 31/12/${year - 1}: ${it.previousCents === null ? 'sem registro' : formatBRL(it.previousCents)}. ${current ? 'Hoje' : `Em 31/12/${year}`}: ${it.currentCents === null ? 'sem registro' : formatBRL(it.currentCents)}.`,
+  values: (it: DeclarationItem, year: number, current = false) => {
+    const before = it.previousCents !== null ? formatBRL(it.previousCents) : it.startedInYear ? `${formatBRL(0)} (começou em ${year})` : 'sem registro';
+    return `Valor registrado em 31/12/${year - 1}: ${before}. ${current ? 'Hoje' : `Em 31/12/${year}`}: ${it.currentCents === null ? 'sem registro' : formatBRL(it.currentCents)}.`;
+  },
   estimated: (year: number) => `Sem valor atualizado em dezembro de ${year}: o valor de 31/12 é o último registrado mais os aportes e resgates.`,
   costBased: 'A declaração usa o custo de compra, que está no informe da corretora, não o valor de hoje.',
   pgbl: 'PGBL: as contribuições vão em Pagamentos efetuados, não em Bens e Direitos.',

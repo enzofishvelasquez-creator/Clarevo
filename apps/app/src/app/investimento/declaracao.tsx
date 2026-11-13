@@ -52,9 +52,7 @@ export default function DeclaracaoScreen() {
           ) : (
             <>
               <View style={{ gap: space[1] }}>
-                <Txt variant="title" accessibilityRole="header" aria-level={1}>
-                  {T.title(year)}
-                </Txt>
+                <Txt variant="title">{T.title(year)}</Txt>
                 <Txt color={colors.textSecondary}>{T.subtitle(year)}</Txt>
               </View>
               {shownYears.length > 1 ? (

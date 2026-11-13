@@ -586,7 +586,7 @@ export const INVESTMENT_TEXT = {
   lastValue: (d: IsoDate) => `Valor atualizado em ${formatDateBR(d)}`,
   indicesSource: (fetchedOn: IsoDate | null) =>
     `Fonte do CDI, da Selic, do IPCA e da poupança: Banco Central do Brasil, séries ${BCB_SERIES.cdi}, ${BCB_SERIES.selic}, ${BCB_SERIES.ipca} e ${BCB_SERIES.poupanca}${fetchedOn ? `, consulta em ${formatDateBR(fetchedOn)}` : ''}.`,
-  indicesExample: 'Na demonstração, o CDI e o IPCA são valores de exemplo, não os índices reais.',
+  indicesExample: 'Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.',
   indicesError: 'Não foi possível buscar o CDI e o IPCA agora. A sua rentabilidade continua aqui.',
   disclaimer:
     'A rentabilidade é calculada com os valores que você registra, como estão no seu extrato. Não é recomendação de investimento, e o que rendeu no passado não garante o futuro.',

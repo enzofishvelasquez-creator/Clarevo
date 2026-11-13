@@ -14725,16 +14725,16 @@ setInterval(async () => {
       (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Aportado: R$ 15.500,00') && t.includes('Ganho: R$ 455,00') &&
         t.includes('Neste mês, até hoje: +0,10%') && t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,54%.') &&
         t.includes('CDI no mesmo período: +3,65%') && t.includes('IPCA no mesmo período: +1,41%') &&
-        t.includes('Na demonstração, o CDI e o IPCA são valores de exemplo, não os índices reais.'), t.slice(0, 700));
+        t.includes('Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.'), t.slice(0, 700));
     ok('D-093 Investimentos: diz que não é recomendação, que não entra em Pago nem em Recebido e que a Família não vê',
       t.includes('Não é recomendação de investimento') && t.includes('não entram em Pago nem em Recebido') && t.includes('Ninguém da Família nem a empresa que oferece o benefício vê.') &&
         t.includes('A Clarevo não guarda, não movimenta nem indica investimentos.'));
     ok('D-093 Investimentos: os dois cards com nome, tipo e valor no nome acessível',
-      (await visibleCount('button', 'Aplicação do banco, Renda fixa: R$ 10.875,00. Ganho: R$ 375,00.')) === 1 && (await visibleCount('button', 'Previdência, Previdência: R$ 5.080,00. Ganho: R$ 80,00.')) === 1);
+      (await visibleCount('button', 'Aplicação do banco, CDB ou RDB · Banco Exemplo: R$ 10.875,00. Ganho: R$ 375,00.')) === 1 && (await visibleCount('button', 'Previdência, VGBL: R$ 5.080,00. Ganho: R$ 80,00.')) === 1);
     await checkBar('D-093 Investimentos', 'Investir');
     await atWidths(async (w) => { await layoutChecks(`D-093 Investimentos ${w}px`); if (w === 390) await shot('540_investimentos'); });
     // Detalhe.
-    await btn('Aplicação do banco, Renda fixa: R$ 10.875,00. Ganho: R$ 375,00.').click(); await waitText('Valor no fim de cada mês'); await p.waitForTimeout(400);
+    await btn('Aplicação do banco, CDB ou RDB · Banco Exemplo: R$ 10.875,00. Ganho: R$ 375,00.').click(); await waitText('Valor no fim de cada mês'); await p.waitForTimeout(400);
     t = await body(); screenTexts.push(t);
     ok('D-093 Investimento: detalhe com o valor, a última atualização, o fim de cada mês (setembro R$ 10.360,00) e o histórico',
       (await h1Name()) === 'Aplicação do banco' && t.includes('R$ 10.875,00') && t.includes('Valor atualizado em 06/10/2026') && t.includes('Outubro de 2026 (até hoje)') &&
@@ -14786,6 +14786,113 @@ setInterval(async () => {
     await confirmIn('Excluir investimento'); await waitText('Investimento excluído.'); await p.waitForTimeout(400);
     ok('D-093 Excluir: volta para Investimentos sem o investimento excluído', urlPath() === '/investimentos' && !(await body()).includes('Ações da corretora'), urlPath());
     ok('D-093 Investimentos: nada vai à rede na demonstração', writes.length === ivWrites0, writes.slice(ivWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // D-099 Investimentos, ficha ampliada (pedido do Enzo, 13/11/2026): próximos vencimentos, como está dividido, garantia do FGC, ganho
+  // real e poupança no bloco azul; no detalhe, o valor pela taxa contratada com "Usar este valor", o imposto estimado e "Sobre este
+  // investimento"; o bloco "Mais detalhes (opcional)" ao editar e ao criar (com o nome oficial do título público); o tipo do rendimento;
+  // o resumo para a declaração e a comparação de rendimentos líquidos. A demonstração tem um CDB a 105% do CDI que vence em 01/06/2027.
+  // Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const fiWrites0 = writes.length;
+    const into = async (text) => { await p.getByText(text, { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); };
+    await demoHome();
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('D-099 Investir: próximos vencimentos, garantia do FGC, ganho real, poupança e os dois atalhos',
+      t.includes('Aplicação do banco vence em 01/06/2027, daqui a 8 meses.') && t.includes('Banco Exemplo: R$ 10.875,00 em produtos com garantia do FGC.') &&
+        t.includes('Acima da inflação no período: +2,11%') && t.includes('Poupança no mesmo período: +2,42%') && t.includes('Resumo para a declaração') &&
+        t.includes('Comparar rendimentos líquidos') && t.includes('a Clarevo não sabe quais são do mesmo grupo.'), t.slice(0, 1200));
+    ok('D-099 Como está dividido: por tipo, Renda fixa com 68% e Previdência com 32%, e o aviso de que a Clarevo não indica como dividir',
+      t.includes('Como está dividido') && t.includes('68%') && t.includes('32%') && t.includes('A Clarevo não indica como dividir.'));
+    await radio('Por instituição').click(); await p.waitForTimeout(250);
+    t = await body();
+    const div = t.slice(t.indexOf('Como está dividido'));
+    ok('D-099 Como está dividido: por instituição, Banco Exemplo antes de "Sem informação"', div.indexOf('Banco Exemplo') > 0 && div.indexOf('Sem informação') > div.indexOf('Banco Exemplo'), div.slice(0, 400));
+    await radio('Por prazo de resgate').click(); await p.waitForTimeout(250);
+    ok('D-099 Como está dividido: por prazo de resgate, o CDB em "Em até 1 ano"', (await body()).includes('Em até 1 ano'));
+    await radio('Por tipo').click(); await p.waitForTimeout(250);
+    await atWidths(async (w) => { await layoutChecks(`D-099 Investir ${w}px`); if (w === 390) { await into('Como está dividido'); await shot('545_investimentos_divisao'); } });
+    // Detalhe.
+    await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Valor pela taxa contratada'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('D-099 Investimento: valor pela taxa contratada, imposto estimado se resgatasse hoje e a ficha',
+      t.includes('Valor estimado: R$ 10.879,87') && t.includes('Pela taxa que você registrou, a partir do valor de 06/10/2026.') && t.includes('Cerca de R$ 10.790,52 líquidos.') &&
+        t.includes('Imposto de renda estimado: R$ 84,34') && t.includes('IOF estimado: R$ 0,14') && t.includes('Alíquota de 22,5% pelo tempo aplicado.') &&
+        t.includes('Estimativa pela regra em vigor em 13/11/2026') && t.includes('Sobre este investimento') && t.includes('105% do CDI') &&
+        t.includes('01/06/2027, daqui a 8 meses') && t.includes('Resgate só no vencimento') && t.includes('Garantia do FGC.'), t.slice(0, 2500));
+    await checkBar('D-099 detalhe com a ficha', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-099 Investimento ${w}px`); if (w === 390) { await into('Valor pela taxa contratada'); await shot('546_investimento_ficha'); } });
+    await btn('Usar este valor').click(); await waitText('Valor atualizado pela taxa contratada.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-099 "Usar este valor": registra a atualização de hoje (R$ 10.879,87) e o botão some', t.includes('R$ 10.879,87') && t.includes('Valor atualizado em 07/10/2026') && (await visibleCount('button', 'Usar este valor')) === 0, t.slice(0, 600));
+    // Editar: o bloco abre com a ficha; a taxa vazia é recusada no campo; LCI muda a regra de imposto.
+    await btn('Editar').click(); await waitText('Editar investimento'); await p.waitForTimeout(400);
+    ok('D-099 Editar: "Mais detalhes (opcional)" aberto, com a instituição e a taxa', (await field('Onde está').inputValue()) === 'Banco Exemplo' && (await field('Porcentagem do CDI (%)').inputValue()) === '105');
+    await field('Porcentagem do CDI (%)').fill(''); await btn('Salvar investimento').click(); await p.waitForTimeout(300);
+    ok('D-099 Editar: a taxa vazia recusada no campo, com o foco nele', (await body()).includes('Informe a taxa, como está no contrato.') && (await field('Porcentagem do CDI (%)').evaluate((e) => e === document.activeElement)));
+    await field('Porcentagem do CDI (%)').fill('95'); await radio('LCI').click(); await p.waitForTimeout(200);
+    ok('D-099 Editar: com LCI, a regra deduzida muda para isento', (await body()).includes('Imposto de renda: isento para pessoa física.'));
+    await atWidths(async (w) => { await layoutChecks(`D-099 Mais detalhes ${w}px`); if (w === 390) { await into('Qual é o investimento?'); await shot('547_investimento_mais_detalhes'); } });
+    await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-099 Editar: salvo, o detalhe mostra LCI, 95% do CDI e a explicação do isento no lugar do cálculo',
+      t.includes('LCI · Banco Exemplo') && t.includes('95% do CDI') && t.includes('Este tipo não tem imposto de renda para pessoa física.'), t.slice(0, 1500));
+    // Rendimento recebido com tipo.
+    await btn('Registrar rendimento recebido').click(); await waitText('Tipo do rendimento (opcional)'); await p.waitForTimeout(300);
+    await field('Valor').fill('12,50'); await radio('Juros ou cupom').click(); await btn('Registrar rendimento recebido').click(); await waitText('Rendimento registrado.'); await p.waitForTimeout(400);
+    ok('D-099 Rendimento recebido: o histórico mostra o tipo', (await visibleCount('button', 'Rendimento recebido · Juros ou cupom, 07/10/2026, R$ 12,50')) === 1);
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-099 Investir: "Rendimentos recebidos em 2026" com o total e o tipo', t.includes('Rendimentos recebidos em 2026') && t.includes('Juros ou cupom') && t.includes('R$ 12,50'), t.slice(0, 1500));
+    // Resumo para a declaração.
+    await p.getByRole('link', { name: /^Resumo para a declaração/ }).filter({ visible: true }).first().click(); await waitText('Bens e Direitos'); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    ok('D-099 Resumo para a declaração: grupo e código para conferir, discriminação sem CPF, valor zero de quem começou no ano e os rendimentos isentos',
+      (await h1Name()) === 'Resumo para a declaração' && t.includes('Para a declaração de 2027') && t.includes('Grupo 04, código 03, como costuma aparecer nos guias. Confira no programa da Receita.') &&
+        t.includes('LCI na instituição Banco Exemplo, aplicado desde 01/06/2026.') && t.includes('Valor registrado em 31/12/2025: R$ 0,00 (começou em 2026). Hoje: R$ 10.879,87.') &&
+        t.includes('Isentos e não tributáveis: R$ 12,50') && t.includes('Informe de rendimentos de 2026: Banco Exemplo') && t.includes('não a declaração pronta'), t.slice(0, 1500));
+    await checkBar('D-099 Resumo para a declaração', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-099 Declaração ${w}px`); if (w === 390) await shot('548_resumo_declaracao'); });
+    // Comparar rendimentos líquidos.
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
+    await p.getByRole('link', { name: /^Comparar rendimentos líquidos/ }).filter({ visible: true }).first().click(); await waitText('Valor aplicado'); await p.waitForTimeout(400);
+    await btn('Comparar').click(); await p.waitForTimeout(300);
+    t = await body();
+    ok('D-099 Comparar: sem os campos, os erros aparecem e nenhum resultado', t.includes('Informe o valor.') && t.includes('Informe o prazo.') && t.includes('Escolha como rende pelo menos uma opção.') && !t.includes('líquidos.'), t.slice(0, 800));
+    await field('Valor aplicado').fill('10000'); await field('Prazo em dias corridos').fill('365');
+    await p.getByRole('radio', { name: '% do CDI, com imposto', exact: true }).filter({ visible: true }).nth(0).click();
+    await p.getByRole('radio', { name: '% do CDI, isento', exact: true }).filter({ visible: true }).nth(1).click();
+    await field('CDI ao ano, como hipótese (%)').fill('12');
+    await p.getByLabel('Porcentagem do CDI (%), Opção 1', { exact: true }).fill('100');
+    await p.getByLabel('Porcentagem do CDI (%), Opção 2', { exact: true }).fill('90');
+    await btn('Comparar').click(); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    ok('D-099 Comparar: o líquido de cada opção na ordem montada, o equivalente do isento e as hipóteses, sem destacar nenhuma',
+      t.includes('Opção 1, % do CDI, com imposto a 100%: R$ 10.990,00 líquidos.') && t.includes('Opção 2, % do CDI, isento a 90%: R$ 11.073,81 líquidos.') &&
+        t.indexOf('Opção 1, % do CDI') < t.indexOf('Opção 2, % do CDI') && t.includes('Neste prazo, equivale a cerca de 109,09% do CDI com imposto.') &&
+        t.includes('CDI de 12% ao ano durante todo o prazo.') && !/melhor/i.test(t), t.slice(-1500));
+    await checkBar('D-099 Comparar', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-099 Comparar ${w}px`); if (w === 390) { await into('Resultado'); await shot('549_comparar_rendimentos'); } });
+    // Novo investimento com a ficha: o título público com o nome oficial, a forma de render sugerida e a garantia do Tesouro.
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await field('Nome').fill('Reserva no título'); await radio('Títulos públicos').click(); await field('Quanto você aplicou até hoje?').fill('3000');
+    ok('D-099 Novo investimento: "Mais detalhes (opcional)" começa recolhido', (await visibleCount('radio', 'Tesouro Selic')) === 0);
+    await p.getByRole('button', { name: /^Mais detalhes \(opcional\)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await radio('Tesouro Selic').click(); await p.waitForTimeout(200);
+    ok('D-099 Novo investimento: o título escolhido sugere "Selic mais uma taxa" e a garantia do Tesouro',
+      (await radio('Selic mais uma taxa').getAttribute('aria-checked')) === 'true' && (await body()).includes('Garantia do Tesouro Nacional.'));
+    await field('Taxa acima da Selic, ao ano (%)').fill('0');
+    await radio('Qualquer dia').click();
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-099 Novo investimento: o detalhe mostra o nome oficial, Selic e resgate em qualquer dia', t.includes('Tesouro Selic') && t.includes('Resgate em qualquer dia') && t.includes('Garantia do Tesouro Nacional.'), t.slice(0, 1500));
+    await btn('Excluir investimento').click(); await waitText('Excluir Reserva no título?'); await p.waitForTimeout(300);
+    await confirmIn('Excluir investimento'); await waitText('Investimento excluído.'); await p.waitForTimeout(400);
+    ok('D-099 Investimentos: nada vai à rede na demonstração', writes.length === fiWrites0, writes.slice(fiWrites0).join(' | '));
   }
 
   // ==================================================================================================================

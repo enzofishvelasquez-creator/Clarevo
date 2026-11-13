@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DECLARATION_TEXT,
   DETAILS_TEXT,
   EMPTY_DETAILS_DRAFT,
   EMPTY_INVESTMENT_DETAILS,
@@ -397,6 +398,9 @@ describe('resumo para a declaração (D-099, item 9)', () => {
     const prev = declarationSummary(items, movements, 2025);
     expect(prev.items.map((i) => i.investmentId)).toEqual(['cdb']);
     expect(prev.items[0]).toMatchObject({ previousCents: null, currentCents: 1_080_000, currentEstimated: false });
+    expect(prev.items[0]!.startedInYear).toBe(true);
+    expect(DECLARATION_TEXT.values(prev.items[0]!, 2025)).toBe('Valor registrado em 31/12/2024: R$ 0,00 (começou em 2025). Em 31/12/2025: R$ 10.800,00.');
+    expect(DECLARATION_TEXT.values(cdb, 2026, true)).toBe('Valor registrado em 31/12/2025: R$ 10.800,00. Hoje: R$ 11.500,00.');
   });
 
   it('anos oferecidos: o de hoje e os dois anteriores com movimento', () => {
