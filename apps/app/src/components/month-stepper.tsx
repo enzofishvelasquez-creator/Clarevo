@@ -35,7 +35,7 @@ export function MonthStepper({
         hitSlop={4}
         onPress={() => onPrev?.()}
         style={(st) => [styles.btn, !onPrev && { opacity: 0.35 }, onPrev && (st as { focused?: boolean }).focused && styles.focusRing]}>
-        <ChevronLeft size={22} color={colors.brand} />
+        <ChevronLeft size={22} color={colors.brandText} />
       </Pressable>
       <Txt variant="label" style={styles.label} accessibilityLiveRegion="polite">
         {label}
@@ -48,7 +48,7 @@ export function MonthStepper({
         hitSlop={4}
         onPress={() => onNext?.()}
         style={(st) => [styles.btn, !onNext && { opacity: 0.35 }, onNext && (st as { focused?: boolean }).focused && styles.focusRing]}>
-        <ChevronRight size={22} color={colors.brand} />
+        <ChevronRight size={22} color={colors.brandText} />
       </Pressable>
     </View>
   );
@@ -58,5 +58,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   btn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   label: { flex: 1, textAlign: 'center' },
-  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as object,
 });

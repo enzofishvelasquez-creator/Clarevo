@@ -253,8 +253,8 @@ function Segment({ value, onChange }: { value: Breakdown; onChange: (v: Breakdow
             onPress={() => onChange(o.value)}
             {...spaceKeyPress(() => onChange(o.value))}
             style={(st) => [styles.option, selected && styles.optionSelected, (st as { focused?: boolean }).focused && styles.focusRing]}>
-            {selected ? <Check size={16} color={colors.brand} strokeWidth={2.5} /> : null}
-            <Txt variant="label" color={selected ? colors.brand : colors.text} style={{ fontFamily: fonts.bold, fontSize: 15, textAlign: 'center', flexShrink: 1 }}>
+            {selected ? <Check size={16} color={colors.brandText} strokeWidth={2.5} /> : null}
+            <Txt variant="label" color={selected ? colors.brandText : colors.text} style={{ fontFamily: fonts.bold, fontSize: 15, textAlign: 'center', flexShrink: 1 }}>
               {o.label}
             </Txt>
           </Pressable>
@@ -354,13 +354,13 @@ function CategoryCard({
 const styles = StyleSheet.create({
   cellFirst: { marginTop: space[4] },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[1], gap: space[2] },
-  track: { flexDirection: 'row', backgroundColor: '#E6EBF5', borderRadius: radius.md, padding: 4, gap: 4 },
+  track: { flexDirection: 'row', backgroundColor: colors.muted, borderRadius: radius.md, padding: 4, gap: 4 },
   option: { flex: 1, minHeight: 48, borderRadius: radius.sm, flexDirection: 'row', gap: space[1], alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[2] },
   optionSelected: { backgroundColor: colors.surface },
-  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brand, outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brandText, outlineOffset: 2 } as object,
   barHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: space[3], flexWrap: 'wrap' },
   barTrack: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brandTint, overflow: 'hidden' },
-  barFill: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brand },
+  barFill: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brandMark },
   // Categoria com valor, mas abaixo de 0,1%: um traço visível.
   barMin: { width: 4 },
 });

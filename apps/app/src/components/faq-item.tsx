@@ -28,7 +28,7 @@ export function FaqItem({ topic, actions = [], last }: { topic: Topic; actions?:
         <Txt variant="label" style={styles.title}>
           {topic.title}
         </Txt>
-        <Chevron size={20} color={colors.brand} aria-hidden />
+        <Chevron size={20} color={colors.brandText} aria-hidden />
       </Pressable>
       {open ? (
         <Animated.View entering={FadeIn.duration(motion.context).reduceMotion(ReduceMotion.System)} style={styles.answer}>

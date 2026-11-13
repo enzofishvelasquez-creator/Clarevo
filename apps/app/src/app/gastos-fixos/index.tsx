@@ -132,10 +132,10 @@ function SeriesRow({ series: s, today, last }: { series: CommitmentSeries; today
         styles.row,
         !last && styles.divider,
         st.pressed && { opacity: 0.7 },
-        (st as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+        (st as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
       <View style={styles.icon}>
-        <Icon size={18} color={colors.brand} />
+        <Icon size={18} color={colors.brandText} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={stacked ? undefined : 2}>
@@ -178,10 +178,10 @@ function SubscriptionLine({ row, series, today, last }: { row: SubscriptionRowDa
         style={(st) => [
           styles.subMain,
           st.pressed && { opacity: 0.7 },
-          (st as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+          (st as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
         ]}>
         <View style={styles.icon}>
-          <Repeat size={18} color={colors.brand} />
+          <Repeat size={18} color={colors.brandText} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>

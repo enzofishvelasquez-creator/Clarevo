@@ -2,7 +2,7 @@ import { SEARCH_TEXT, isStackedLayout, type CardEntry } from '@clarevo/core';
 import { ChevronRight, CreditCard, Search } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { Money, Txt, clampLines, styles as ui } from '@/components/ui';
+import { IconBlock, Money, Txt, clampLines, styles as ui } from '@/components/ui';
 import { moneyA11y, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -17,7 +17,7 @@ export function SearchEntry({ onPress }: { onPress: () => void }) {
       accessibilityLabel={SEARCH_TEXT.entryA11y}
       onPress={onPress}
       style={(s) => [ui.input, styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-      <Search size={20} color={colors.textSecondary} aria-hidden />
+      <IconBlock icon={Search} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
           {SEARCH_TEXT.entry}
@@ -49,10 +49,10 @@ export function PurchaseRow({ entry, cardName, last, onPress }: { entry: CardEnt
         styles.row,
         !last && styles.divider,
         s.pressed && { opacity: 0.7 },
-        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid' },
+        (s as { focused?: boolean }).focused && { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid' },
       ]}>
       <View style={styles.icon}>
-        <CreditCard size={18} color={colors.brand} aria-hidden />
+        <CreditCard size={18} color={colors.brandText} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }} numberOfLines={clampLines(2)}>

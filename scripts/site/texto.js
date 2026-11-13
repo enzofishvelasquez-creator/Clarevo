@@ -10,7 +10,8 @@ const path = require('node:path');
 const { RAIZ, MARCADORES, MARCADORES_EMAIL } = require('./config');
 const { INTERRUPTORES } = require('./formularios');
 
-const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+// Escapa o texto para HTML e põe um espaço fixo entre "R$" e o valor, para os dois não se separarem na quebra de linha (12/11/2026).
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/R\$ (?=\d)/g, 'R$\u00a0');
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const nfc = (s) => String(s).normalize('NFC');
 

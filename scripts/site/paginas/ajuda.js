@@ -30,7 +30,7 @@ const TEMAS = [
   {
     id: 'organizar',
     titulo: 'Anotar e organizar',
-    descricao: 'Anotar gastos e recebimentos, também pelo Telegram, ler notas, importar extratos, orçamento, metas, simulador e calculadoras.',
+    descricao: 'Anotar gastos e recebimentos, também pelo Telegram, ler notas, importar extratos, orçamento, metas, investimentos, simulador e calculadoras.',
     guias: ['anotar-gasto', 'nota-fiscal', 'comprovante-e-holerite', 'telegram', 'movimentos', 'buscar', 'importar-extrato', 'ultimos-meses', 'evolucao', 'analises', 'orcamento', 'renda-comprometida', 'metas', 'investimentos', 'plano-de-guardar', 'simulador', 'calculadoras', 'antes-de-financiar', 'plano-dividas'],
     topicos: ['sem-registro', 'contei-duas-vezes', 'voltei-depois'],
   },
@@ -66,7 +66,7 @@ const TEMAS = [
     id: 'conta',
     titulo: 'Conta e acesso',
     descricao: 'Assinatura e teste grátis, senha, lembretes, exportar os seus dados e excluir a conta.',
-    guias: ['assinatura', 'lembretes', 'exportar', 'excluir-conta'],
+    guias: ['assinatura', 'nivel-da-conta', 'lembretes', 'exportar', 'excluir-conta'],
     topicos: [],
   },
 ];

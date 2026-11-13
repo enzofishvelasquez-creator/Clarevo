@@ -52,7 +52,7 @@ export function GoalProgress({
 
   const track = (
     <View style={[styles.track, light ? styles.trackLight : styles.trackOnBrand]}>
-      <Animated.View style={[styles.fill, { backgroundColor: light ? colors.brand : colors.accent }, fill]} />
+      <Animated.View style={[styles.fill, { backgroundColor: light ? colors.brandMark : colors.accent }, fill]} />
     </View>
   );
 

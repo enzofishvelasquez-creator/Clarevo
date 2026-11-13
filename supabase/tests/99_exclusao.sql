@@ -1047,7 +1047,7 @@ begin
   -- As 40 chaves estrangeiras para persons: 14 são do que é só da pessoa (apagadas; as 3 das mensagens vêm da 0020, com as tabelas renomeadas na 0022), 26 são autoria e
   -- vínculo (ficam, anônimas).
   -- Uma chave nova obriga a decidir aqui, e em clarevo_erase_person, o que fazer com ela.
-  assert pg_temp.person_fks() = array['billing_checkouts.person_id', 'billing_pix_payments.person_id', 'card_entries.created_by', 'card_entries.deleted_by', 'cards.created_by', 'cards.deleted_by',
+  assert pg_temp.person_fks() = array['account_marks.person_id', 'billing_checkouts.person_id', 'billing_pix_payments.person_id', 'card_entries.created_by', 'card_entries.deleted_by', 'cards.created_by', 'cards.deleted_by',
       'category_budgets.created_by', 'category_budgets.deleted_by', 'chat_link_codes.person_id', 'chat_links.person_id', 'chat_messages.person_id',
       'commitment_limits.created_by', 'commitment_limits.deleted_by', 'commitment_series.created_by', 'commitment_series.deleted_by',
       'commitments.created_by', 'commitments.deleted_by', 'context_activity.person_id', 'context_memberships.person_id', 'family_invites.created_by',
@@ -1057,7 +1057,7 @@ begin
       'investments.created_by', 'legal_acceptances.person_id', 'licenses.person_id',
       'month_checks.updated_by', 'organization_admins.person_id', 'plan_entitlements.person_id', 'record_operations.actor_id',
       'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by', 'signup_sources.person_id'],
-    'as chaves estrangeiras para persons são as 45 que a exclusão da conta trata (com o aceite dos termos, 0024, o Checkout do Asaas, 0026, e os pagamentos por Pix, 0033, que saem em cascata, e os investimentos, 0032, só no Pessoal, que saem com o contexto)';
+    'as chaves estrangeiras para persons são as 46 que a exclusão da conta trata (com o aceite dos termos, 0024, o Checkout do Asaas, 0026, os pagamentos por Pix, 0033, e os marcos dos níveis, 0034, que saem em cascata ou, no ramo anônimo, pelo gatilho persons_forget_anonymous, e os investimentos, 0032, só no Pessoal, que saem com o contexto)';
   -- E as que apontam para financial_contexts (financial_records é restrict: por isso os registros saem antes do contexto).
   assert (select array_agg(c.conrelid::regclass::text || '.' || a.attname || ' ' || c.confdeltype::text order by c.conrelid::regclass::text, a.attname)
             from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
@@ -1094,7 +1094,7 @@ begin
     assert (select prosecdef from pg_proc where oid = ('public.' || f)::regprocedure), 'security definer: ' || f;
   end loop;
   assert (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 102, 'authenticated executa 102 funções (as 7 de investimentos, da 0032, a de ordenar as metas, da 0031, as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo, as 3 do WhatsApp, as 3 do Telegram, as 2 da imagem das metas, a do acesso, my_access, e as 2 do aceite dos termos)';
+           where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) = 103, 'authenticated executa 103 funções (a dos níveis de conta, my_account_marks, da 0034, só leitura, as 7 de investimentos, da 0032, a de ordenar as metas, da 0031, as 80 da 0015, as 2 de conferir o mês, a de responder de onde conheceu o Clarevo, as 3 do WhatsApp, as 3 do Telegram, as 2 da imagem das metas, a do acesso, my_access, e as 2 do aceite dos termos)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
 
@@ -1134,13 +1134,23 @@ begin
               and position('persons p where p.id = v_creator' in d) < position('where id = p_series_id for update' in d)
             from (select pg_get_functiondef('public.clarevo_materialize_series(uuid)'::regprocedure) as d) x),
     'clarevo_materialize_series confere a pessoa que criou a série antes de travar a série';
+  -- Níveis (0034) e Pix (0033, refeito na 0034): a pessoa é conferida com a trava da linha antes de gravar, para uma chamada no meio da
+  -- exclusão da conta esperar e não gravar nada para a pessoa que fica anônima.
+  assert (select position('persons p where p.id = v_me and p.deleted_at is null for key share' in d) > 0
+              and position('persons p where p.id = v_me and p.deleted_at is null for key share' in d) < position('insert into public.account_marks' in d)
+            from (select pg_get_functiondef('public.my_account_marks()'::regprocedure) as d) x),
+    'my_account_marks trava a pessoa antes de guardar os marcos';
+  assert (select position('persons p where p.id = p_person and p.deleted_at is null for key share' in d) > 0
+              and position('persons p where p.id = p_person and p.deleted_at is null for key share' in d) < position('insert into public.billing_pix_payments' in d)
+            from (select pg_get_functiondef('public.billing_pix_apply(text, uuid, text, text, date, timestamp with time zone)'::regprocedure) as d) x),
+    'billing_pix_apply trava a pessoa antes de gravar o pagamento';
   -- Toda função de escrita que o app executa termina gravando a operação (o gatilho acima é o ponto comum). As únicas sem operação:
   -- delete_my_account (a pessoa sai com o rastro), ensure_personal_space (cria a pessoa, sob a trava por pessoa e a guarda de auth.users)
   -- e sync_series_occurrences (a geração, que confere a pessoa que criou a série).
   assert (select array_agg(x.proname::text order by x.proname) from pg_temp.app_functions() x
            where (x.def ~* '(insert into|update|delete from) (public|auth)\.' or x.def ~* 'clarevo_materialize_series') and x.def !~* 'insert into public\.record_operations')
-       = array['delete_my_account', 'ensure_personal_space', 'sync_series_occurrences'],
-    'toda função de escrita grava a operação, menos delete_my_account, ensure_personal_space e sync_series_occurrences';
+       = array['delete_my_account', 'ensure_personal_space', 'my_account_marks', 'sync_series_occurrences'],
+    'toda função de escrita grava a operação, menos delete_my_account, ensure_personal_space, my_account_marks (só guarda os marcos dos níveis, 0034) e sync_series_occurrences';
   assert (select count(*) from pg_temp.app_functions() x where x.def ~* 'insert into public\.record_operations') = 76,
     'as 76 funções de escrita com operação são as que o gatilho de record_operations protege (com set_goal_image, 0021, accept_legal_terms, 0024, e set_goal_order, 0031)';
   -- As do app para WhatsApp e Telegram (0022) só passam o canal às internas, e são elas que gravam a operação.

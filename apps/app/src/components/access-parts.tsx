@@ -1,6 +1,7 @@
 import {
   ACCESS_TEXT,
   PLAN_NAME,
+  SUBSCRIPTION_SCREEN_TEXT,
   STORE_SUBSCRIPTION_TEXT,
   SUBSCRIBE_OPEN,
   WEB_SUBSCRIPTION_TEXT,
@@ -13,6 +14,7 @@ import {
   pixCanPayNext,
   pixNextPaymentFrom,
   planPrice,
+  planPriceAmount,
   todayIn,
   type Access,
   type PlanKind,
@@ -20,14 +22,14 @@ import {
   type WebSubscriptionStart,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Hourglass, Info, LockKeyhole, QrCode, RefreshCw } from 'lucide-react-native';
+import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Hourglass, Info, LockKeyhole, QrCode, RefreshCw, User, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { Platform, View } from 'react-native';
 
 import { Banner, Button, Card, LinkButton, Txt } from '@/components/ui';
 import { SITE_URL, openSitePage } from '@/lib/site';
 import { DEVICE_STORE, STORE_PURCHASES_READY, STORE_TEST, buyPlan, openStoreSubscriptions, restorePurchases } from '@/lib/store-purchases';
-import { useAccess, useReloadAccess } from '@/state/access';
+import { useAccess, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
 import { useSpace } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -44,13 +46,16 @@ export function useAccessTimeZone(): string {
 /** Linha "Situação: Teste grátis", lida inteira pelo leitor de tela. */
 export function AccessSituation({ situation }: { situation: string }) {
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3] }} accessible accessibilityLabel={`${T.situation}: ${situation}`}>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space[3] }} accessible accessibilityLabel={`${T.situation}: ${situation}`}>
       <Txt variant="label" color={colors.textSecondary}>
         {T.situation}
       </Txt>
-      <Txt variant="label" style={{ fontFamily: fonts.bold, flexShrink: 1, textAlign: 'right' }}>
-        {situation}
-      </Txt>
+      {/* A situação num selo lima, como no alto da tela Assinatura (12/11/2026). */}
+      <View style={{ flexShrink: 1, backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: space[3], paddingVertical: space[1] }}>
+        <Txt variant="label" color={colors.textOnAccent} style={{ fontFamily: fonts.bold, textAlign: 'right' }}>
+          {situation}
+        </Txt>
+      </View>
     </View>
   );
 }
@@ -76,7 +81,9 @@ export function AccessBanner() {
 export function AccessCard() {
   const access = useAccess();
   const timeZone = useAccessTimeZone();
-  const view = access.data ? accessView(access.data, new Date(), timeZone, { web: Platform.OS === 'web' }) : null;
+  const webCard = Platform.OS === 'web' && access.data?.status === 'assinatura' && access.data.provider === 'web';
+  const webStatus = useWebSubscriptionStatus(webCard);
+  const view = access.data ? accessView(access.data, new Date(), timeZone, { web: Platform.OS === 'web', webSubscription: webCard ? webStatus.data : null }) : null;
   return (
     <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -465,21 +472,36 @@ export function PlansCard({ access, webTest = false, subscribeHidden = false }: 
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
         {T.plansTitle}
       </Txt>
-      {T.plans.map((p) => (
-        <View key={p.plan} style={{ gap: space[1] }} accessible accessibilityLabel={`Plano ${PLAN_NAME[p.plan]}, ${planPrice(p.plan)}. ${p.who}`}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3] }}>
-            <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-              {PLAN_NAME[p.plan]}
+      {T.plans.map((p) => {
+        // Cada plano num cartão com a cor da marca (pedido do Enzo, 12/11/2026): Individual no azul claro, Família no lima claro.
+        const family = p.plan === 'familiar';
+        const PlanIcon = family ? Users : User;
+        return (
+          <View
+            key={p.plan}
+            style={{ gap: space[2], padding: space[4], borderRadius: 16, backgroundColor: family ? colors.accentTint : colors.brandTint }}
+            accessible
+            accessibilityLabel={`Plano ${PLAN_NAME[p.plan]}, ${planPrice(p.plan)}. ${p.who}`}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: family ? colors.accent : colors.brand }}>
+                <PlanIcon size={20} color={family ? colors.textOnAccent : colors.textOnBrand} aria-hidden />
+              </View>
+              <Txt variant="title" style={{ flex: 1 }}>
+                {PLAN_NAME[p.plan]}
+              </Txt>
+            </View>
+            <Txt variant="amount" color={family ? colors.text : colors.brandTextDeep}>
+              {planPriceAmount(p.plan)}
+              <Txt variant="label" color={colors.textSecondary}>
+                {SUBSCRIPTION_SCREEN_TEXT.perMonth}
+              </Txt>
             </Txt>
-            <Txt variant="label" style={{ fontFamily: fonts.bold, flexShrink: 1, textAlign: 'right' }}>
-              {planPrice(p.plan)}
+            <Txt variant="caption" color={colors.textSecondary}>
+              {p.who}
             </Txt>
           </View>
-          <Txt variant="caption" color={colors.textSecondary}>
-            {p.who}
-          </Txt>
-        </View>
-      ))}
+        );
+      })}
       <Txt variant="caption" color={colors.textSecondary}>
         {T.plansNote}
       </Txt>

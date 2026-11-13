@@ -55,7 +55,7 @@ export default function InvestimentosScreen() {
             </View>
           ) : all.length === 0 ? (
             <Card style={{ gap: space[3] }}>
-              <EmptyState title={T.emptyTitle} art="metas">
+              <EmptyState title={T.emptyTitle} art="investimentos">
                 {T.emptyBody}
               </EmptyState>
               {canWrite ? <Button label={T.newInvestment} icon={Plus} onPress={() => router.push('/investimento/novo')} /> : null}
@@ -175,7 +175,7 @@ function InvestmentCard({ investment: i }: { investment: Investment }) {
 const styles = StyleSheet.create({
   blue: { backgroundColor: colors.brand, borderRadius: radius.lg, padding: space[5], gap: space[2] },
   big: { fontFamily: fonts.extrabold, fontSize: 28, lineHeight: 36 },
-  sep: { height: 1, backgroundColor: 'rgba(255,255,255,0.28)', marginVertical: space[1] },
+  sep: { height: 1, backgroundColor: colors.onBrandLine, marginVertical: space[1] },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   privacy: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2] },
 });

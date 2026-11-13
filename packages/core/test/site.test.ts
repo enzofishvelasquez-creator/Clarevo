@@ -9,7 +9,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { contrastRatio } from '../src/contrast';
 import { formatDateBR } from '../src/dates';
+import { GOALS_TEXT, GOAL_DEADLINE_SHORTCUTS, GOAL_MILESTONES } from '../src/goals';
 import { GUIDE_ENTRIES } from '../src/guide';
+import { INVESTMENT_TEXT } from '../src/investments';
 import { LEARN_SECTIONS, LEARN_UI_TEXT, SEASONAL_CALENDAR, publishedTopics, relatedTopics } from '../src/learn';
 
 /**
@@ -86,16 +88,26 @@ const gerarSite = (opcoes?: GerarOpcoes): Gerado => {
   return geradoDoRepositorio;
 };
 
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+// O mesmo `esc` do gerador (scripts/site/texto.js), com o espaço fixo entre "R$" e o valor (12/11/2026).
+const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/R\$ (?=\d)/g, 'R$\u00a0');
 
 /** Os temas de Aprender que viram página: publicados, não legados, das seções organizar, juros e tempo. */
 const TEMAS_DO_SITE = publishedTopics().filter((t) => !t.legacy && ['organizar', 'juros', 'tempo'].includes(t.section));
 const TEMAS_DA_AJUDA = ['comecar', 'organizar', 'contas', 'familia', 'beneficio', 'privacidade', 'conta'];
-const POSTS = [
+const POSTS_INICIAIS = [
   'novidades/2026-10-23-conheca-a-clarevo.html',
   'novidades/2026-10-23-13o-salario-quando-cai-e-como-se-organizar.html',
   'novidades/2026-10-23-como-a-empresa-oferece-a-clarevo-sem-ver-suas-financas.html',
 ];
+/** O texto de novembro de 2026, com o que chegou ao app (aba Investir, metas, Multa e juros com a fatura e as cinco abas). */
+const POST_DE_NOVEMBRO = 'novidades/2026-11-12-o-que-chegou-ao-app-em-novembro.html';
+const POSTS = [...POSTS_INICIAIS, POST_DE_NOVEMBRO];
+/**
+ * A data de referência dos posts nos testes: a do post mais novo do repositório (nenhum post pode ter data depois dela). Um post novo
+ * pede a data dele aqui; o dia seguinte serve para o caso do post com data futura.
+ */
+const REFERENCIA_DOS_POSTS = '2026-11-12';
+const DIA_SEGUINTE = '2026-11-13';
 const PAGINAS_BASE = [
   'index.html',
   'comece.html',
@@ -277,7 +289,8 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     expect(titulo.length, `${nome}: título longo demais (${titulo})`).toBeLessThanOrEqual(80);
     const descricao = /<meta name="description" content="([^"]+)">/.exec(html)?.[1] ?? '';
     expect(descricao.length, `${nome}: descrição`).toBeGreaterThanOrEqual(40);
-    expect(descricao.length, `${nome}: descrição longa demais`).toBeLessThanOrEqual(200);
+    // Até 160 caracteres, que é o que as buscas costumam mostrar (a de um tema ou de um post maior é cortada no fim de uma palavra).
+    expect(descricao.length, `${nome}: descrição longa demais (${descricao.length})`).toBeLessThanOrEqual(160);
     expect(html, `${nome}: Open Graph`).toContain('<meta property="og:title"');
     expect(html, `${nome}: favicon`).toContain(`<link rel="icon" href="${visto(nome, 'favicon.svg')}" type="image/svg+xml">`);
     expect(html, `${nome}: estilo`).toContain(`<link rel="stylesheet" href="${visto(nome, 'estilo.css')}">`);
@@ -598,7 +611,7 @@ describe('site público: as páginas geradas', () => {
   });
 
   it('com os formulários ligados (D-066), todas as páginas, inclusive as de resposta, passam nas mesmas verificações e só as três páginas com formulário têm <form>', () => {
-    const g = gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: '2026-10-23' });
+    const g = gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: REFERENCIA_DOS_POSTS });
     const respostas = ['contato-enviado.html', 'contato-erro.html', 'novidades/receber.html', 'novidades/receber-enviado.html', 'novidades/receber-confirmado.html', 'novidades/receber-erro.html'];
     for (const nome of respostas) expect(g.arquivos.has(nome), nome).toBe(true);
     verificarPaginas(g.arquivos, 'exemplo.test', [...PAGINAS, ...respostas], { formularios: ['empresas/index.html', 'novidades/index.html', 'novidades/receber.html'] });
@@ -697,7 +710,7 @@ describe('site público: as páginas geradas', () => {
   it('um texto jurídico de exemplo (títulos, listas, tabela, links) gera páginas que passam em todas as verificações', () => {
     const dir = pastaDeExemplo();
     try {
-      const g = gerarSite({ legal: dir, dados: PREENCHIDOS, referencia: '2026-10-23' });
+      const g = gerarSite({ legal: dir, dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
       verificarPaginas(g.arquivos, 'exemplo.test', PAGINAS);
       const h = texto(g.arquivos.get('privacidade.html'));
       expect(h).toContain('href="termos.html#quem-pode-usar"');
@@ -754,13 +767,13 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain(dadoDoSite('E-MAIL DE CONTATO'));
     expect(h).not.toContain(dadoDoSite('E-MAIL DE SUPORTE'));
     // A empresa não vê quando a pessoa abre o app nem o que anota; vê a data do aceite e a do encerramento.
-    expect(h).toContain('a em que você aceitou o convite e a de encerramento');
+    expect(h).toContain('a do aceite do convite e a do encerramento');
     expect(h).toContain('Também não vê quando você abre o app nem o que você anota.');
     expect(h).not.toContain('nem o que você faz no app');
     // De três a quatro recursos com captura e o herói com a tela Resumo, todos com a legenda de demonstração.
     expect(h.match(/<figure class="celular">/g)?.length).toBe(5);
     expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(5);
-    expect(h).toContain('src="imagens/resumo.png"');
+    expect(h).toMatch(/src="imagens\/resumo\.[0-9a-f]{10}\.png"/);
     for (const alvo of ['app/index.html', 'empresas/index.html', 'aprender/index.html', 'ajuda/index.html', 'novidades/index.html', 'seguranca.html']) expect(h, alvo).toContain(`href="${alvo}"`);
     // Sem selos das lojas, preço, depoimento, cliente, prêmio nem número de uso inventado.
     expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
@@ -799,15 +812,15 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toMatch(/<form\b/);
     // O rodapé leva a ela, e ela entra no mapa do site quando há domínio.
     expect(html('index.html')).toContain('<a href="comece.html">Comece aqui</a>');
-    const g = gerarSite({ dados: PREENCHIDOS, referencia: '2026-10-23' });
+    const g = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
     expect(texto(g.arquivos.get('sitemap.xml'))).toContain('<loc>https://exemplo.test/comece</loc>');
   });
 
   it('O app passeia por todos os recursos pedidos, cada um com a captura da demonstração e o texto do guia de uso do app', () => {
     const h = html('app/index.html');
     expect(h).toContain('<h1>A Clarevo por dentro</h1>');
-    for (const titulo of ['Resumo do mês', 'Anotar gasto e recebimento', 'Leitura de nota fiscal', 'Contas a pagar e gastos fixos', 'Cartões e faturas', 'Metas e reserva', 'Família', 'Aprender e calculadoras', 'Lembretes']) expect(h, titulo).toContain(`>${titulo}</h`);
-    for (const id of ['resumo', 'anotar-gasto', 'nota-fiscal', 'contas-a-pagar', 'cartoes', 'metas', 'familia', 'aprender']) {
+    for (const titulo of ['Resumo do mês', 'Anotar gasto e recebimento', 'Leitura de nota fiscal e de comprovante', 'Contas a pagar e gastos fixos', 'Cartões e faturas', 'Metas e reserva', 'Investir', 'Família', 'Aprender e calculadoras', 'Lembretes']) expect(h, titulo).toContain(`>${titulo}</h`);
+    for (const id of ['resumo', 'anotar-gasto', 'nota-fiscal', 'contas-a-pagar', 'cartoes', 'metas', 'investimentos', 'familia', 'aprender']) {
       const e = GUIDE_ENTRIES.find((x) => x.id === id)!;
       expect(h, id).toContain(esc(e.purpose));
     }
@@ -878,7 +891,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toContain('o painel não mostra quem entrou no app');
     expect(h).toContain(dadoDoSite('E-MAIL DE CONTATO'));
     expect(h).toContain('Ainda não há tabela de preços');
-    expect(h).toContain('src="../imagens/empresa-painel.png"');
+    expect(h).toMatch(/src="\.\.\/imagens\/empresa-painel\.[0-9a-f]{10}\.png"/);
     expect(h).toContain('Dados fictícios de demonstração');
     expect(h).not.toMatch(/R\$\s?\d|por vaga|gr[áa]tis|nossos clientes|depoimento|\d+\s*empresas/i);
   });
@@ -987,6 +1000,211 @@ describe('site público: as páginas geradas', () => {
       expect(h, nome).toContain(`<img src="${p}clarevo-logotipo-reverso.svg" alt="Clarevo, página inicial" width="140" height="28" class="logo-tela">`);
       expect(h, nome).toContain(`<img src="${p}clarevo-logotipo.svg" alt="Clarevo, página inicial" width="140" height="28" class="logo-papel">`);
     }
+  });
+});
+
+describe('site público: Investir, metas, segurança, títulos e acabamento (12/11/2026)', () => {
+  const gerado = gerarSite();
+  const html = (nome: string) => texto(gerado.arquivos.get(nome));
+  const recurso = (id: string) => new RegExp(`<article class="recurso" id="${id}"[\\s\\S]*?</article>`).exec(html('app/index.html'))?.[0] ?? '';
+  const descricaoDe = (nome: string) => /<meta name="description" content="([^"]+)">/.exec(html(nome))?.[1] ?? '';
+  const tituloDe = (nome: string) => /<title>([^<]+)<\/title>/.exec(html(nome))?.[1] ?? '';
+
+  it('O app tem a seção Investir, com o texto do guia do app, os três pontos e a captura da demonstração, sem recomendar investimento', () => {
+    const h = html('app/index.html');
+    const secao = recurso('investir');
+    const guia = GUIDE_ENTRIES.find((x) => x.id === 'investimentos')!;
+    expect(INVESTMENT_TEXT.tabLabel).toBe('Investir');
+    expect(secao).toContain('<h3 id="t-investir">Investir</h3>');
+    expect(secao).toContain(`<p>${esc(guia.purpose)}</p>`);
+    for (const ponto of [
+      'Você registra o que aplicou, os aportes, os resgates, os rendimentos e o valor de hoje, como aparecem no seu extrato.',
+      'A rentabilidade dos meses fechados aparece ao lado do CDI e do IPCA do mesmo período, com dados públicos do Banco Central.',
+      'Não é recomendação de investimento, e os investimentos ficam só no seu Pessoal.',
+    ]) expect(secao, ponto).toContain(`<li>${ponto}</li>`);
+    // Os pontos dizem o que o guia do app diz, nos passos dele.
+    const passos = guia.steps.join(' ');
+    expect(passos).toContain('compara os meses fechados com o CDI e o IPCA do mesmo período, com os dados públicos do Banco Central. Não é recomendação de investimento.');
+    expect(passos).toContain('os investimentos ficam só no seu Pessoal');
+    expect(INVESTMENT_TEXT.whoSees).toContain('ficam só no seu Pessoal');
+    // A captura é a da demonstração (a mesma do guia do app), com a legenda, e o passo a passo fica na Ajuda.
+    expect(guia.screenshot).toBe('540_investimentos.png');
+    expect(secao).toMatch(/src="\.\.\/imagens\/investimentos\.[0-9a-f]{10}\.png"/);
+    expect(secao).toContain('Dados fictícios de demonstração');
+    expect(secao).toContain('href="../ajuda/organizar.html#guia-investimentos"');
+    expect([...gerado.arquivos.keys()].some((k) => /^imagens\/investimentos\.[0-9a-f]{10}\.png$/.test(k))).toBe(true);
+    // Vem depois de Metas e antes de Família, na ordem das abas, e a página diz quais são as cinco.
+    expect(h.indexOf('<article class="recurso" id="metas"')).toBeGreaterThan(0);
+    expect(h.indexOf('<article class="recurso" id="investir"')).toBeGreaterThan(h.indexOf('<article class="recurso" id="metas"'));
+    expect(h.indexOf('<article class="recurso" id="familia"')).toBeGreaterThan(h.indexOf('<article class="recurso" id="investir"'));
+    expect(h).toContain('O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender.');
+    // "Quatro abas" só aparece no texto do guia sobre a tela Análises (as abas dela), nunca sobre as abas do app.
+    expect(h.match(/quatro abas/gi) ?? []).toHaveLength(GUIDE_ENTRIES.find((x) => x.id === 'analises')!.purpose.includes('quatro abas') ? 1 : 0);
+    // Nada de recomendar produto financeiro, de preço nem de convite a cadastrar.
+    expect(secao).not.toMatch(/recomendamos|invista|vale a pena|rende mais|gr[áa]tis|cadastre|assine|R\$\s?\d/i);
+  });
+
+  it('Metas, em O app e na página inicial, cita os atalhos de prazo, o ritmo no cartão da meta e os marcos de 25%, 50% e 75%, com os nomes do app', () => {
+    const secao = recurso('metas');
+    expect(GOALS_TEXT.form.deadlineShortcuts).toBe('Atalhos de prazo');
+    expect(GOAL_DEADLINE_SHORTCUTS.map((s) => s.label)).toEqual(['6 meses', '1 ano', '2 anos', '5 anos']);
+    expect(secao).toContain('Os atalhos de prazo (6 meses, 1 ano, 2 anos ou 5 anos) preenchem a data por você.');
+    expect(GOALS_TEXT.pace.onTrack).toBe('No ritmo do plano');
+    expect(secao).toContain('O cartão de cada meta com valor planejado por mês mostra o ritmo: se os aportes acompanham o plano e quanto falta.');
+    expect([...GOAL_MILESTONES]).toEqual([25, 50, 75]);
+    expect(secao).toContain('Ao passar de 25%, 50% e 75% da meta, uma frase curta marca o avanço.');
+    expect(html('index.html')).toContain('com atalhos de prazo, o ritmo do plano no cartão de cada meta e os marcos de 25%, 50% e 75%');
+    // O tom não cobra: o site não repete "meses atrás do plano".
+    expect(`${secao} ${html('index.html')}`).not.toMatch(/atr[áa]s do plano|atrasad/i);
+  });
+
+  it('as áreas do app nas descrições incluem Investir: O app, a Ajuda e "O que é" do kit de imprensa', () => {
+    expect(descricaoDe('app/index.html')).toContain('cinco abas da Clarevo: Resumo, Movimentos, Metas, Investir e Aprender');
+    expect(descricaoDe('ajuda/organizar.html')).toContain('metas, investimentos, simulador e calculadoras');
+    expect(html('ajuda/index.html')).toContain('metas, investimentos, simulador e calculadoras');
+    expect(html('imprensa.html')).toContain('<li><strong>O que é:</strong> um aplicativo e uma versão web para organizar finanças pessoais e da família, em cinco abas (Resumo, Movimentos, Metas, Investir e Aprender), com educação financeira com fonte.</li>');
+    expect(html('index.html')).toContain('acompanhar metas e o que você já investe');
+  });
+
+  it('em O app, "Anotar gasto" e a leitura de nota e de comprovante mostram telas diferentes, cada uma com o seu texto alternativo', () => {
+    const { IMAGENS } = require(join(ROOT, 'scripts', 'site', 'imagens.js')) as { IMAGENS: { id: string; origem: string; alt: string }[] };
+    const anotar = IMAGENS.find((i) => i.id === 'anotar')!;
+    const nota = IMAGENS.find((i) => i.id === 'nota')!;
+    expect(anotar.origem).toMatch(/02_anotar_gasto\.png$/);
+    expect(nota.origem).toMatch(/09_comprovante_lido\.png$/);
+    expect(nota.alt).toBe('Tela Anotar gasto depois de ler um comprovante de Pix: o aviso do que foi lido e a descrição e o valor já preenchidos, para conferir antes de salvar.');
+    expect(nota.alt).not.toBe(anotar.alt);
+    expect(recurso('nota')).toContain(`alt="${esc(nota.alt)}"`);
+    expect(recurso('nota')).toContain('>Leitura de nota fiscal e de comprovante</h3>');
+    expect(recurso('anotar')).toContain(`alt="${esc(anotar.alt)}"`);
+    // As duas capturas não são a mesma imagem (os pixels diferem) e toda captura do site tem origem que existe.
+    const daImagem = (id: string) => gerado.arquivos.get([...gerado.arquivos.keys()].find((k) => k.startsWith(`imagens/${id}.`))!) as Buffer;
+    const a = png.decodificar(daImagem('anotar'));
+    const b = png.decodificar(daImagem('nota'));
+    expect(a.rgb.equals(b.rgb)).toBe(false);
+    for (const i of IMAGENS) expect(existsSync(join(ROOT, i.origem)), i.origem).toBe(true);
+    expect(new Set(IMAGENS.map((i) => i.origem)).size).toBe(IMAGENS.length);
+  });
+
+  it('Segurança e privacidade espelha a política em investimentos, assinatura e pagamento e anotar por mensagem, sem preço nem período de teste', () => {
+    const h = html('seguranca.html');
+    const guardamos = /<h2 id="guardamos">[\s\S]*?<\/section>/.exec(h)?.[0] ?? '';
+    const cartao = (titulo: string) => new RegExp(`<article class="cartao">\\s*<h3>${titulo.replace(/[()]/g, '\\$&')}</h3>\\s*<p>([\\s\\S]*?)</p>`).exec(guardamos)?.[1] ?? '';
+    const politica = readFileSync(join(ROOT, 'docs', 'legal', 'politica-de-privacidade.md'), 'utf8');
+    // Investimentos: o que a seção 3.2 lista, e só no Pessoal (a empresa não vê, seção 7).
+    const investimentos = cartao('Investimentos, só no seu Pessoal');
+    expect(politica).toContain('os investimentos que você registra (o nome que você escolhe, o tipo, os aportes, os resgates, os rendimentos recebidos e os valores do extrato)');
+    expect(investimentos).toContain('o nome que você escolhe, o tipo, os aportes, os resgates, os rendimentos recebidos e os valores do extrato');
+    expect(investimentos).toContain('ficam só no seu Pessoal: ninguém da Família vê, nem a empresa que oferece o benefício');
+    expect(politica).toContain('A empresa não vê valores, categorias, metas, investimentos, contas, cartões');
+    expect(h).toContain('Nunca vê valores, categorias, metas, investimentos, contas, cartões');
+    // Assinatura e pagamento: a seção 3.9, sem o preço nem o período de teste, que o site ainda não comunica.
+    const assinatura = cartao('Assinatura e pagamento');
+    expect(politica).toContain('A situação do seu acesso: o plano (Individual ou Família), até quando ele vale, por onde foi assinado');
+    expect(politica).toContain('Número do cartão, código de segurança, validade, dados do Pix, CPF ou endereço de cobrança. Esses dados ficam com a loja ou com o serviço de pagamento da web, pelas regras de cada um.');
+    expect(assinatura).toContain('A situação do seu acesso: o plano, até quando ele vale, por onde foi assinado e um resumo matemático que identifica a assinatura.');
+    expect(assinatura).toContain('Nunca guardamos número de cartão, código de segurança, validade, dados do Pix, CPF nem endereço de cobrança: esses dados ficam com a loja ou com o serviço de pagamento, pelas regras de cada um.');
+    // Anotar por mensagem: a seção 3.8 (opcional; só resumos; nunca o texto, o nome nem o usuário).
+    const mensagem = cartao('Anotar por mensagem (opcional)');
+    expect(politica).toContain('**Não guardamos o texto das mensagens, o seu nome nem o seu usuário no Telegram.**');
+    expect(politica).toContain('De cada mensagem tratada, por 30 dias, guardamos um resumo');
+    expect(politica).toContain('Ao desligar, o vínculo é apagado na hora');
+    expect(mensagem).toContain('Não guardamos o texto das mensagens, o seu nome nem o seu usuário.');
+    expect(mensagem).toContain('por 30 dias');
+    expect(mensagem).toContain('Ao desligar, o vínculo é apagado na hora.');
+    // A regra vigente do site: nada de preço, "grátis", "14 dias" nem convite a assinar ou cadastrar.
+    expect(h).not.toMatch(/R\$\s?\d|gr[áa]tis|14 dias|teste gratuito|assine|cadastre-se|por m[êe]s/i);
+    expect(guardamos.match(/<article class="cartao">/g)).toHaveLength(8);
+  });
+
+  it('a página inicial diz o que é a Clarevo numa linha acima do título, sem mudar a mensagem central, e a grade de atalhos tem seis cartões em três colunas', () => {
+    const h = html('index.html');
+    expect(h).toContain('<p class="sobretitulo">App de finanças pessoais e da família</p>\n<h1>Cuidar da vida financeira faz parte de cuidar de você.</h1>');
+    expect(html('estilo.css')).toContain('.sobretitulo{');
+    const mais = /<h2 id="mais">[\s\S]*?<\/section>/.exec(h)?.[0] ?? '';
+    expect(mais).toContain('<div class="grade grade-3">');
+    const cartoes = [...mais.matchAll(/<a class="cartao" href="([^"]+)"><span class="titulo-cartao">([^<]+)<\/span>/g)].map((m) => [m[2], m[1]]);
+    expect(cartoes).toEqual([
+      ['Aprender', 'aprender/index.html'],
+      ['Agenda financeira', 'aprender/agenda.html'],
+      ['Calculadoras', 'calculadoras/index.html'],
+      ['Novidades', 'novidades/index.html'],
+      ['Ajuda', 'ajuda/index.html'],
+      ['Segurança e privacidade', 'seguranca.html'],
+    ]);
+    // Seis cartões enchem as linhas em três colunas (computador), em duas (tablet) e em uma (celular): nenhum fica sozinho.
+    expect(cartoes.length % 3).toBe(0);
+    expect(cartoes.length % 2).toBe(0);
+  });
+
+  it('títulos e descrições: O app e Sobre têm assunto no título, e as descrições mais longas foram encurtadas sem perder a mensagem', () => {
+    expect(tituloDe('app/index.html')).toBe('O app por dentro: recursos e telas · Clarevo');
+    expect(tituloDe('sobre.html')).toBe('Sobre a Clarevo: o que nos move e quem está por trás');
+    expect(tituloDe('index.html')).toBe('Clarevo: bem-estar financeiro e mais clareza para decidir');
+    expect(descricaoDe('index.html')).toBe('Cuidar da vida financeira faz parte de cuidar de você. Um app de finanças pessoais e da família para organizar o mês e decidir com mais clareza.');
+    expect(descricaoDe('empresas/index.html')).toBe('Bem-estar financeiro também faz parte do cuidado com sua equipe. A Clarevo entra no programa de bem-estar, e a empresa nunca vê as finanças das pessoas.');
+    expect(descricaoDe('comece.html')).toMatch(/^Cuidar da vida financeira faz parte de cuidar de você\. /);
+    // Um resumo de post maior que 160 caracteres é cortado no fim de uma palavra, com reticências; o resumo inteiro continua na página.
+    const conheca = 'novidades/2026-10-23-conheca-a-clarevo.html';
+    expect(descricaoDe(conheca).length).toBeLessThanOrEqual(160);
+    expect(descricaoDe(conheca)).toMatch(/\S\.\.\.$/);
+    expect(html(conheca)).toContain('<p class="lead">A Clarevo é uma solução de bem-estar financeiro, apoiada por um aplicativo de finanças pessoais e da família. Veja o que ela faz, o que não faz e onde já dá para usar.</p>');
+    // Nenhum título de página se repete.
+    const titulos = [...gerado.arquivos.keys()].filter((k) => k.endsWith('.html')).map(tituloDe);
+    expect(titulos.filter((t, i) => titulos.indexOf(t) !== i)).toEqual([]);
+  });
+
+  it('acabamento: rodapé em duas colunas no celular, área de toque dos links soltos, letras de 14 px e guarda longa das fontes, das capturas e da marca', () => {
+    const css = html('estilo.css');
+    // O rodapé começa em duas colunas (celular) e volta à grade automática a partir de 48rem.
+    expect(css).toContain('.rodape-grade{display:grid;gap:1.5rem 1.25rem;grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:1.5rem}');
+    expect(css).toMatch(/@media \(min-width:48rem\)\{\s*\.rodape-grade\{[^}]*grid-template-columns:repeat\(auto-fit,/);
+    // Migalhas, "Voltar para..." e "Fonte N": 44 px de área de toque sem mudar a altura da linha.
+    expect(css).toContain('.migalha a,.voltar a,.fatos li a{display:inline-block;padding:.65rem .3rem;margin:-.65rem -.3rem}');
+    expect(html('aprender/decimo-terceiro.html')).toContain('<p class="voltar"><a href="index.html">Voltar para Aprender</a></p>');
+    expect(html(POST_DE_NOVEMBRO)).toContain('<p class="voltar"><a href="index.html">Voltar para Novidades</a></p>');
+    // 14 px (era 13 px) nas linhas de apoio dos cartões e nas etiquetas.
+    expect(/\.tema-meta\{[^}]*\}/.exec(css)?.[0]).toContain('font-size:.875rem');
+    expect(/\.etiqueta\{[^}]*\}/.exec(css)?.[0]).toContain('font-size:.875rem');
+    expect(css).not.toContain('font-size:.8125rem');
+    // _headers: o bloco de segurança continua igual, e as fontes, as capturas e a marca ganham guarda longa no navegador.
+    const h = html('_headers');
+    expect(h).toContain('/*\n  Content-Security-Policy: default-src \'none\';');
+    expect(h).toContain('/fontes/*\n  Cache-Control: public, max-age=31536000, immutable\n');
+    expect(h).toContain('/imagens/*\n  Cache-Control: public, max-age=31536000, immutable\n');
+    expect(h).toContain('/marca/*\n  Cache-Control: public, max-age=2592000\n');
+    // O worker continua levando só os cabeçalhos do bloco /* (a guarda longa é dos arquivos estáticos).
+    expect(html('_worker.js')).not.toContain('max-age=2592000');
+    const { servir } = require(join(ROOT, 'scripts', 'site', 'servir.js')) as { servir: unknown };
+    expect(typeof servir).toBe('function');
+    const { lerCabecalhosPorCaminho } = require(join(ROOT, 'scripts', 'site', 'servir.js')) as { lerCabecalhosPorCaminho: (pasta: string) => (caminho: string) => Record<string, string> };
+    const doCaminho = lerCabecalhosPorCaminho(SITE);
+    expect(doCaminho('/fontes/Manrope_500Medium.ttf')).toEqual({ 'Cache-Control': 'public, max-age=31536000, immutable' });
+    expect(doCaminho('/imagens/resumo.1a2b3c4d5e.png')).toEqual({ 'Cache-Control': 'public, max-age=31536000, immutable' });
+    expect(doCaminho('/marca/clarevo-simbolo.svg')).toEqual({ 'Cache-Control': 'public, max-age=2592000' });
+    expect(doCaminho('/estilo.css')).toEqual({});
+    expect(doCaminho('/index.html')).toEqual({});
+  });
+
+  it('o sitemap traz <lastmod> só onde o conteúdo tem data própria (posts e temas de Aprender), e gerar de novo dá o mesmo arquivo', () => {
+    const g = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
+    const sitemap = texto(g.arquivos.get('sitemap.xml'));
+    expect(problemasDeXml(sitemap)).toEqual([]);
+    expect(sitemap).toContain('<url><loc>https://exemplo.test/novidades/2026-11-12-o-que-chegou-ao-app-em-novembro</loc><lastmod>2026-11-12</lastmod></url>');
+    expect(sitemap).toContain('<url><loc>https://exemplo.test/novidades/2026-10-23-conheca-a-clarevo</loc><lastmod>2026-10-23</lastmod></url>');
+    expect(sitemap).toContain('<url><loc>https://exemplo.test/novidades/</loc><lastmod>2026-11-12</lastmod></url>');
+    for (const t of TEMAS_DO_SITE) expect(sitemap, t.slug).toContain(`<url><loc>https://exemplo.test/aprender/${t.slug}</loc><lastmod>${t.reviewedOn}</lastmod></url>`);
+    const maisRecente = TEMAS_DO_SITE.map((t) => t.reviewedOn).sort().pop();
+    expect(sitemap).toContain(`<url><loc>https://exemplo.test/aprender/</loc><lastmod>${maisRecente}</lastmod></url>`);
+    // As páginas sem data própria ficam sem <lastmod> (nunca a data da geração).
+    for (const semData of ['/', '/app/', '/empresas/', '/seguranca', '/calculadoras/', '/ajuda/', '/privacidade']) expect(sitemap, semData).toContain(`<url><loc>https://exemplo.test${semData}</loc></url>`);
+    for (const m of sitemap.matchAll(/<lastmod>([^<]*)<\/lastmod>/g)) {
+      expect(conteudo.dataExiste(m[1]!), m[1]).toBe(true);
+      expect(m[1]! <= REFERENCIA_DOS_POSTS, `lastmod no futuro: ${m[1]}`).toBe(true);
+    }
+    // Estável: outra geração, com a data de hoje como referência, dá o mesmo sitemap.
+    expect(texto(gerarSite({ dados: PREENCHIDOS, referencia: '2030-01-01' }).arquivos.get('sitemap.xml'))).toBe(sitemap);
+    expect(texto(gerador.gerarSite({ dados: PREENCHIDOS }).arquivos.get('sitemap.xml'))).toBe(sitemap);
   });
 });
 
@@ -1158,7 +1376,7 @@ describe('site público: Ajuda, busca e perguntas do suporte', () => {
     expect(b).toContain('o acesso pleno continua por 30 dias. Depois desses 30 dias, vale o acesso da própria pessoa: com assinatura, tudo continua; sem assinatura, a conta fica só para ver e exportar. Nada é apagado.');
     expect(b).not.toMatch(/plano gratuito/i);
     expect(b).toContain('Também não vê quando você abre o app nem o que você anota.');
-    expect(b).toContain('as datas (como a em que você aceitou o convite e a de encerramento)');
+    expect(b).toContain('as datas (como a do aceite do convite e a do encerramento)');
     expect(b).not.toContain('Os e-mails que ela convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas e as contagens');
     expect(b).not.toContain('o que você faz no app');
     expect(h('ajuda/comecar.html')).toContain('anotado por você ou pelas pessoas da sua Família, ou importado de um arquivo');
@@ -1260,7 +1478,7 @@ describe('site público: Novidades, feed e dados estruturados', () => {
 
   it('os três posts iniciais têm data 23/10/2026, autoria "Equipe Clarevo", resumo, fontes e dados estruturados de artigo', () => {
     expect(gerado.posts.map((p) => p.arquivo).sort()).toEqual([...POSTS].sort());
-    for (const nome of POSTS) {
+    for (const nome of POSTS_INICIAIS) {
       const pagina = h(nome);
       expect(pagina, nome).toContain('<time datetime="2026-10-23">23 de outubro de 2026</time> · Equipe Clarevo');
       const fontes = /<h2 id="fontes">Fontes<\/h2>\s*<ol class="fontes">([\s\S]*?)<\/ol>/.exec(pagina)?.[1] ?? '';
@@ -1281,6 +1499,41 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     expect(p).toContain('href="../seguranca.html"');
     expect(p).toContain('href="../empresas/index.html"');
     expect(p).not.toMatch(/R\$\s?\d|gr[áa]tis|milh[õo]es|melhor/i);
+  });
+
+  it('"O que chegou ao app em novembro" conta a aba Investir, as melhorias das metas, a fatura em Multa e juros e as cinco abas, sem preço, sem "grátis" e sem convite a cadastrar', () => {
+    const p = h(POST_DE_NOVEMBRO);
+    expect(p).toContain('<h1>O que chegou ao app em novembro</h1>');
+    expect(p).toContain('<time datetime="2026-11-12">12 de novembro de 2026</time> · Equipe Clarevo');
+    const ld = JSON.parse(/<script type="application\/ld\+json">([^<]*)<\/script>/.exec(p)![1]!);
+    expect(ld).toMatchObject({ '@type': 'Article', datePublished: '2026-11-12', author: { name: 'Equipe Clarevo' } });
+    for (const secao of ['A aba Investir', 'Metas com atalhos de prazo, ritmo e marcos', 'Multa e juros, agora com a fatura do cartão', 'Cinco abas']) expect(p, secao).toContain(`>${secao}</h2>`);
+    // Investir: o que o guia do app diz, sem recomendar investimento.
+    expect(p).toContain('A rentabilidade dos meses fechados aparece ao lado do CDI e do IPCA do mesmo período, com dados públicos do Banco Central.');
+    expect(p).toContain('Não é recomendação de investimento');
+    expect(p).toContain('Os investimentos ficam só no seu Pessoal');
+    // Metas: os nomes e os números do app.
+    expect(p).toContain('6 meses, 1 ano, 2 anos ou 5 anos');
+    expect(p).toContain('Ao passar de 25%, 50% e 75% da meta');
+    // Multa e juros: os dois modos, com o texto e as fontes do tema do catálogo (sem copiar à mão) e o link da calculadora.
+    expect(p).toContain('Em &quot;Fatura do cartão&quot;, ela soma os juros do rotativo, os juros de mora, a multa e o IOF estimado');
+    const tema = publishedTopics().find((t) => t.slug === 'rotativo-cartao')!;
+    expect(p).toContain(`<p>${esc(tema.short)}</p>`);
+    expect(p).toContain('href="../calculadoras/multa-e-juros.html"');
+    expect(p).toContain('href="../aprender/rotativo-cartao.html"');
+    expect(p).not.toMatch(/\{\{/);
+    // As cinco abas, pelo nome.
+    expect(p).toContain('cinco abas: Resumo, Movimentos, Metas, Investir e Aprender');
+    // Fontes: as páginas do site e as fontes do tema.
+    const fontes = /<h2 id="fontes">Fontes<\/h2>\s*<ol class="fontes">([\s\S]*?)<\/ol>/.exec(p)?.[1] ?? '';
+    for (const destino of ['../app/index.html', '../ajuda/organizar.html#guia-investimentos', '../ajuda/organizar.html#guia-metas', '../calculadoras/multa-e-juros.html', '../seguranca.html']) expect(fontes, destino).toContain(`href="${destino}"`);
+    // A regra vigente: nada de preço, "grátis", período de teste, data de lançamento, lojas nem convite a cadastrar, baixar ou assinar.
+    const principal = /<main[\s\S]*<\/main>/.exec(p)![0];
+    expect(principal).not.toMatch(/R\$\s?\d|gr[áa]tis|gratuit|14 dias|teste gr|assin(e|ar|atura)|cadastr|baix(e|ar)|crie (a )?sua conta|comece agora|em breve|App Store|Google Play|milh[õo]es|\bmelhor(es)?\b/i);
+    // O resumo cabe no limite dos posts e aparece no índice.
+    const post = gerado.posts.find((x) => x.arquivo === POST_DE_NOVEMBRO)!;
+    expect(post.data).toBe('2026-11-12');
+    expect(h('novidades/index.html').indexOf('2026-11-12-o-que-chegou-ao-app-em-novembro.html')).toBeLessThan(h('novidades/index.html').indexOf('2026-10-23-conheca-a-clarevo.html'));
   });
 
   it('"13º salário" usa o texto e as fontes do tema decimo-terceiro do catálogo, sem copiar à mão', () => {
@@ -1330,7 +1583,7 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     for (const nome of POSTS) expect(i).toContain(`href="${nome.replace('novidades/', '')}"`);
     expect(i).toContain('href="como-escrevemos.html"');
     // Sem domínio (o caso do repositório hoje) não há feed.xml, nem botão, nem <link rel="alternate"> para ele.
-    const semDominio = gerarSite({ dados: { ...PREENCHIDOS, DOMÍNIO: '' }, referencia: '2026-10-23' });
+    const semDominio = gerarSite({ dados: { ...PREENCHIDOS, DOMÍNIO: '' }, referencia: REFERENCIA_DOS_POSTS });
     expect(semDominio.arquivos.has('novidades/feed.xml')).toBe(false);
     for (const [nome, conteudoDaPagina] of semDominio.arquivos) {
       if (!nome.endsWith('.html')) continue;
@@ -1338,7 +1591,7 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     }
     expect(gerador.linksQuebrados(semDominio.arquivos)).toEqual([]);
     // Com domínio, o botão e o link existem e apontam para o feed.
-    const comDominio = gerarSite({ dados: PREENCHIDOS, referencia: '2026-10-23' });
+    const comDominio = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
     const ic = texto(comDominio.arquivos.get('novidades/index.html'));
     expect(ic).toContain('href="feed.xml">Feed RSS</a>');
     expect(ic).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades da Clarevo" href="feed.xml">');
@@ -1346,12 +1599,16 @@ describe('site público: Novidades, feed e dados estruturados', () => {
   });
 
   it('o feed RSS (só com domínio) é XML bem formado, com um item por post, data, descrição e endereços completos, nunca relativos', () => {
-    const g = gerarSite({ dados: PREENCHIDOS, referencia: '2026-10-23' });
+    const g = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
     const feed = texto(g.arquivos.get('novidades/feed.xml'));
     expect(problemasDeXml(feed)).toEqual([]);
     expect(feed).toContain('<rss version="2.0"');
-    expect((feed.match(/<item>/g) ?? []).length).toBe(3);
+    expect((feed.match(/<item>/g) ?? []).length).toBe(POSTS.length);
     expect((feed.match(/<pubDate>Fri, 23 Oct 2026 12:00:00 -0300<\/pubDate>/g) ?? []).length).toBe(3);
+    expect((feed.match(/<pubDate>Thu, 12 Nov 2026 12:00:00 -0300<\/pubDate>/g) ?? []).length).toBe(1);
+    // O post mais novo vem primeiro e dá a data do feed.
+    expect(feed.indexOf('2026-11-12-o-que-chegou-ao-app-em-novembro')).toBeLessThan(feed.indexOf('2026-10-23-conheca-a-clarevo'));
+    expect(feed).toContain('<lastBuildDate>Thu, 12 Nov 2026 12:00:00 -0300</lastBuildDate>');
     for (const p of g.posts) expect(feed).toContain(`<title>${esc(p.titulo)}</title>`);
     for (const m of feed.matchAll(/<(?:link|guid isPermaLink="true")>([^<]*)<\/(?:link|guid)>/g)) expect(m[1], 'endereço do feed').toMatch(/^https:\/\/exemplo\.test\//);
     expect(feed).not.toContain('isPermaLink="false"');
@@ -1393,9 +1650,10 @@ describe('site público: imagens, tamanho e Open Graph', () => {
       }
     }
     expect(total, 'peso total das capturas').toBeLessThanOrEqual(1024 * 1024);
-    // O site inteiro, sem as fontes de licença aberta, cabe com folga.
+    // O site inteiro, sem as fontes de licença aberta, cabe com folga. Desde 12/11/2026, 5 MB: as capturas originais do kit de imprensa
+    // (só para baixar, nenhuma página as carrega) cresceram com as fotos das metas e as cinco abas; o peso das páginas segue o de antes.
     const tudo = [...gerado.arquivos.values()].reduce((n, c) => n + Buffer.byteLength(c), 0);
-    expect(tudo).toBeLessThanOrEqual(4 * 1024 * 1024);
+    expect(tudo).toBeLessThanOrEqual(5 * 1024 * 1024);
   });
 
   it('a chave do cache das imagens inclui o resumo do código de png.js e de imagens.js: mudar o método invalida o cache sozinho', () => {
@@ -1569,13 +1827,14 @@ describe('site público: gerar-site.js na linha de comando', () => {
       expect(existsSync(saida)).toBe(false);
       // Sem nenhuma pendência, passa e grava as páginas, o feed, o sitemap e a busca na pasta pedida.
       const limpa = pasta(pastas);
-      const r3 = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', limpa, '--referencia', '2026-10-23', '--saida', saida]);
+      const r3 = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', limpa, '--referencia', REFERENCIA_DOS_POSTS, '--saida', saida]);
       expect(r3.status, r3.stderr).toBe(0);
-      for (const nome of [...PAGINAS, 'sitemap.xml', 'robots.txt', 'novidades/feed.xml', 'ajuda/indice.json', 'ajuda/busca.js', 'og/clarevo.png', 'imagens/resumo.png']) expect(existsSync(join(saida, nome)), nome).toBe(true);
+      for (const nome of [...PAGINAS, 'sitemap.xml', 'robots.txt', 'novidades/feed.xml', 'ajuda/indice.json', 'ajuda/busca.js', 'og/clarevo.png']) expect(existsSync(join(saida, nome)), nome).toBe(true);
+      expect(readdirSync(join(saida, 'imagens')).some((n) => /^resumo\.[0-9a-f]{10}\.png$/.test(n)), 'imagens/resumo.<resumo>.png').toBe(true);
       expect(readFileSync(join(saida, 'suporte.html'), 'utf8')).toContain('suporte@exemplo.test');
       expect(r3.stdout).toMatch(/\d+ páginas/);
       // Rodar de novo não muda nada (as capturas são comparadas pelos pixels).
-      const r4 = rodar(['--dados', join(dir, 'cheios.json'), '--legal', limpa, '--referencia', '2026-10-23', '--saida', saida]);
+      const r4 = rodar(['--dados', join(dir, 'cheios.json'), '--legal', limpa, '--referencia', REFERENCIA_DOS_POSTS, '--saida', saida]);
       expect(r4.status, r4.stderr).toBe(0);
       expect(r4.stdout).toContain('0 mudaram');
     } finally {
@@ -1600,10 +1859,10 @@ describe('site público: gerar-site.js na linha de comando', () => {
         ['a expressão proibida', (md) => (md['termos-de-uso.md'] += `\nIsso não faz ${'sentido'}.\n`), ['termos.html: expressão proibida']],
       ];
       // Um exemplo limpo não tem nenhum motivo para o --final recusar.
-      const limpo = gerarSite({ legal: pasta(pastas), dados: PREENCHIDOS, referencia: '2026-10-23' });
+      const limpo = gerarSite({ legal: pasta(pastas), dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
       expect(razoesFinais(limpo)).toEqual([]);
       for (const [nome, ajuste, esperado] of casos) {
-        const g = gerarSite({ legal: pasta(pastas, ajuste), dados: PREENCHIDOS, referencia: '2026-10-23' });
+        const g = gerarSite({ legal: pasta(pastas, ajuste), dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
         const motivos = razoesFinais(g).join('\n');
         expect(motivos.length, `${nome}: o --final deveria recusar`).toBeGreaterThan(0);
         for (const trecho of esperado) expect(motivos, `${nome}: ${trecho}`).toContain(trecho);
@@ -1677,7 +1936,7 @@ describe('site público: gerar-site.js na linha de comando', () => {
     return dir;
   };
   const CABECALHO = (data: string, extra = '', fontes = '\nfontes:\n  - Fonte de teste') => `---\ntitulo: Post de teste\ndata: ${data}\nresumo: Um resumo curto.\nautoria: Equipe Clarevo${fontes}\n---\n${extra || 'Texto do post.\n'}`;
-  const REFERENCIA = '2026-10-23';
+  const REFERENCIA = REFERENCIA_DOS_POSTS;
 
   it('--final recusa cada caso de Novidades (post sem fontes, data inválida ou futura, tema que não existe, nome fora do padrão) e, sem --final, o aviso aparece e o texto não some em silêncio', () => {
     const pastas: string[] = [];
@@ -1692,7 +1951,7 @@ describe('site público: gerar-site.js na linha de comando', () => {
         ['post sem fontes', (a) => (a['2026-10-22-sem-fontes.md'] = CABECALHO('2026-10-22', undefined, '')), ['site-src/novidades/2026-10-22-sem-fontes.md: falta "fontes" no cabeçalho']],
         ['data que não existe no calendário', (a) => (a['2026-02-30-impossivel.md'] = CABECALHO('2026-02-30')), ['2026-02-30-impossivel.md: a data do nome do arquivo (2026-02-30) não existe no calendário']],
         ['data com formato errado no cabeçalho', (a) => (a['2026-10-22-torto.md'] = CABECALHO('22/10/2026')), ['2026-10-22-torto.md: a data do cabeçalho (22/10/2026) não é uma data válida']],
-        ['data futura em relação à referência', (a) => (a['2026-10-24-amanha.md'] = CABECALHO('2026-10-24')), ['2026-10-24-amanha.md: a data (2026-10-24) é depois da data de referência (2026-10-23)']],
+        ['data futura em relação à referência', (a) => (a[`${DIA_SEGUINTE}-amanha.md`] = CABECALHO(DIA_SEGUINTE)), [`${DIA_SEGUINTE}-amanha.md: a data (${DIA_SEGUINTE}) é depois da data de referência (${REFERENCIA})`]],
         ['tema que não existe em {{tema:...}}', (a) => (a['2026-10-22-tema.md'] = CABECALHO('2026-10-22', '{{tema:nao-existe:p1}}\n')), ['2026-10-22-tema.md: {{tema:nao-existe:p1}} não existe no catálogo de Aprender']],
         ['tema que não existe em "tema:" das fontes', (a) => (a['2026-10-22-fonte.md'] = CABECALHO('2026-10-22', undefined, '\nfontes:\n  - tema: nao-existe')), ['2026-10-22-fonte.md: a fonte "tema: nao-existe" não existe no catálogo de Aprender']],
         ['nome fora do padrão', (a) => (a['sem-data.md'] = CABECALHO('2026-10-22')), ['site-src/novidades/sem-data.md: o nome do arquivo precisa ser AAAA-MM-DD-slug.md']],
@@ -1707,9 +1966,11 @@ describe('site público: gerar-site.js na linha de comando', () => {
         }
       }
       // A data de referência é explícita: o mesmo post passa quando a referência chega até a data dele.
-      const amanha = posts(pastas, (a) => (a['2026-10-24-amanha.md'] = CABECALHO('2026-10-24')));
-      expect(razoesFinais(gerar(amanha, '2026-10-24'))).toEqual([]);
-      expect(razoesFinais(gerar(amanha, '2026-10-23')).length).toBeGreaterThan(0);
+      const amanha = posts(pastas, (a) => (a[`${DIA_SEGUINTE}-amanha.md`] = CABECALHO(DIA_SEGUINTE)));
+      expect(razoesFinais(gerar(amanha, DIA_SEGUINTE))).toEqual([]);
+      expect(razoesFinais(gerar(amanha, REFERENCIA)).length).toBeGreaterThan(0);
+      // Os posts do próprio repositório também são conferidos: com a referência do ciclo inicial, o texto de novembro seria futuro.
+      expect(razoesFinais(gerar(posts(pastas), '2026-10-23')).join('\n')).toContain('2026-11-12-o-que-chegou-ao-app-em-novembro.md: a data (2026-11-12) é depois da data de referência (2026-10-23)');
       expect(() => gerar(amanha, '2026-13-40')).toThrow(/data de referência/);
       // O parágrafo de um tema que não existe não some em silêncio: fica na página, destacado como pendente.
       const semTema = gerar(posts(pastas, (a) => (a['2026-10-22-tema.md'] = CABECALHO('2026-10-22', '{{tema:nao-existe:p1}}\n'))));
@@ -1737,7 +1998,7 @@ describe('site público: gerar-site.js na linha de comando', () => {
       writeFileSync(join(dir, 'sem-dominio.json'), JSON.stringify({ ...PREENCHIDOS, DOMÍNIO: '' }));
       const legal = pasta(pastas);
       const ruins = posts(pastas, (a) => {
-        a['2026-10-24-amanha.md'] = CABECALHO('2026-10-24');
+        a[`${DIA_SEGUINTE}-amanha.md`] = CABECALHO(DIA_SEGUINTE);
         a['2026-10-22-sem-fontes.md'] = CABECALHO('2026-10-22', undefined, '');
         a['2026-10-22-tema.md'] = CABECALHO('2026-10-22', '{{tema:nao-existe:p1}}\n');
       });
@@ -1745,7 +2006,7 @@ describe('site público: gerar-site.js na linha de comando', () => {
       const r = rodar(['--final', '--dados', join(dir, 'cheios.json'), '--legal', legal, '--novidades', ruins, '--referencia', REFERENCIA, '--saida', saida]);
       expect(r.status).toBe(1);
       expect(r.stderr).toContain('--final');
-      expect(r.stderr).toContain('2026-10-24-amanha.md: a data (2026-10-24) é depois da data de referência (2026-10-23)');
+      expect(r.stderr).toContain(`${DIA_SEGUINTE}-amanha.md: a data (${DIA_SEGUINTE}) é depois da data de referência (${REFERENCIA})`);
       expect(r.stderr).toContain('2026-10-22-sem-fontes.md: falta "fontes" no cabeçalho');
       expect(r.stderr).toContain('{{tema:nao-existe:p1}} não existe no catálogo de Aprender');
       expect(existsSync(saida)).toBe(false);

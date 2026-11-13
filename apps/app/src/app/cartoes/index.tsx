@@ -55,7 +55,7 @@ export default function CartoesScreen() {
           <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => overview.refetch()} />
         ) : list.length === 0 ? (
           <Card>
-            <EmptyState title={T.emptyTitle} art="compromissos">
+            <EmptyState title={T.emptyTitle} art="cartoes">
               {T.emptyBody}
             </EmptyState>
           </Card>

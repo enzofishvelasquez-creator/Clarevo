@@ -47,7 +47,7 @@ export default function PrimeiraConta() {
       subtitle={`${user?.displayName ? `${user.displayName}, a` : 'A'} conta representa onde o dinheiro entra e sai, como uma conta corrente. Você pode mudar o nome depois.`}
       art={
         <View style={{ alignItems: 'center' }}>
-          <Landmark size={48} color={colors.brand} />
+          <Landmark size={48} color={colors.brandText} />
         </View>
       }>
       <TextField label="Nome da conta" value={name} onChangeText={setName} maxLength={60} error={error} onSubmitEditing={submit} />

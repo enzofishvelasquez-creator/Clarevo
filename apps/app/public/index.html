@@ -5,6 +5,9 @@
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>%WEB_TITLE%</title>
+    <!-- Modo escuro (D-096): a página segue o tema do aparelho, lido ao carregar. O alto do app é o azul da marca nos dois temas, então a cor
+         da barra do navegador é a mesma. -->
+    <meta name="color-scheme" content="light dark" />
     <!-- Instalação na tela de início (iOS e Android): nome, ícone e cor da Clarevo. -->
     <meta name="theme-color" content="#2457F5" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -19,6 +22,17 @@
       html,
       body {
         height: 100%;
+      }
+      /* O fundo antes do app desenhar, nas cores do fundo da tela (theme/palettes.ts): claro e, no modo escuro, o azul-marinho. */
+      html,
+      body {
+        background-color: #F6F8FC;
+      }
+      @media (prefers-color-scheme: dark) {
+        html,
+        body {
+          background-color: #131E3E;
+        }
       }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {

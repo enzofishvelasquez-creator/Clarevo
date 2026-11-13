@@ -74,7 +74,7 @@ async function iniciar(raiz) {
     const titulo = calcTitle(slug, ctx.modo);
     const h1 = document.querySelector('h1');
     if (h1) h1.textContent = titulo;
-    document.title = `${titulo} · Clarevo`;
+    document.title = `Calculadora: ${titulo} · Clarevo`;
   }
 
   // Região viva só para o leitor de tela: o resultado é dito uma vez, depois que a pessoa para de digitar.

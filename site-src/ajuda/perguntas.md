@@ -42,7 +42,7 @@ A empresa envia um link de convite, de uso único. Abra o link, entre ou crie a 
 - tema: beneficio
 - id: empresa-ve
 
-Os e-mails que ela convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas (como a em que você aceitou o convite e a de encerramento) e as contagens de vagas e licenças. A empresa nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, Família nem números somados. Também não vê quando você abre o app nem o que você anota.
+Os e-mails que ela convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada), as datas (como a do aceite do convite e a do encerramento) e as contagens de vagas e licenças. A empresa nunca vê gastos, recebimentos, valores, categorias, metas, contas, cartões, Família nem números somados. Também não vê quando você abre o app nem o que você anota.
 
 ## Onde ficam os meus dados?
 

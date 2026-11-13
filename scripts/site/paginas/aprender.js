@@ -5,7 +5,7 @@
  * do core: nada é copiado à mão. As seções "usar" e "dúvidas" do catálogo vão para a Ajuda.
  */
 const { esc } = require('../texto');
-const { rel, maiuscula, enderecoDaCalculadora, ARQUIVO_CALCULADORAS } = require('../util');
+const { rel, maiuscula, enderecoDaCalculadora, descricaoCurta, ARQUIVO_CALCULADORAS } = require('../util');
 const { montarPagina, colunaTexto, bloco, dominioDe, urlDoSite } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { AUTORIA_PADRAO } = require('../config');
@@ -83,12 +83,14 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
   const pg = montarPagina({
     arquivo,
     titulo: 'Aprender',
-    descricao: 'Educação financeira em textos curtos: organizar o mês, juros e crédito, inflação e Selic, cada tema com fontes, data de revisão e exemplos calculados quando cabem.',
+    descricao: 'Educação financeira em textos curtos: organizar o mês, juros e crédito, inflação e Selic, com fontes, data de revisão e exemplos calculados quando cabem.',
     capa,
     corpo: [calculadoras, ...secoes, rodape].join('\n'),
     fonte: capa,
     valores,
     classeCapa: 'capa-simples',
+    // A revisão mais recente entre os temas listados (para o sitemap).
+    atualizada: temasDoSite().map((t) => t.reviewedOn).sort().pop() ?? null,
   });
   return { arquivo, ...pg };
 }
@@ -137,7 +139,7 @@ ${rel_}
 ${fontesHtml(t)}
 <p class="revisao">${esc(revisao)}</p>
 <div class="aviso-edu"><p>${esc(c.TEXTO.disclaimer)}</p></div>
-<p><a href="${rel(arquivo, 'aprender/index.html')}">Voltar para Aprender</a></p>`,
+<p class="voltar"><a href="${rel(arquivo, 'aprender/index.html')}">Voltar para Aprender</a></p>`,
     'artigo',
   );
   const capa = `<p class="migalha"><a href="${rel(arquivo, 'aprender/index.html')}">Aprender</a> · ${esc(secao.title)}</p>
@@ -160,7 +162,7 @@ ${t.subtitle ? `<p class="lead">${esc(t.subtitle)}</p>` : ''}
   const pg = montarPagina({
     arquivo,
     titulo: t.title,
-    descricao: t.short.length <= 160 ? t.short : `${t.short.slice(0, 157).replace(/\s+\S*$/, '')}...`,
+    descricao: descricaoCurta(t.short),
     capa,
     corpo,
     fonte: capa,
@@ -168,6 +170,7 @@ ${t.subtitle ? `<p class="lead">${esc(t.subtitle)}</p>` : ''}
     classeCapa: 'capa-simples',
     tipoOg: 'article',
     jsonld: [artigo],
+    atualizada: t.reviewedOn,
   });
   return { arquivo, ...pg };
 }
@@ -202,7 +205,8 @@ ${meses.join('\n')}
     ),
     bloco(
       `<div class="aviso-edu"><p>O que depende do ano, como o prazo do Imposto de Renda e as datas e condições do IPVA e do IPTU de cada estado e município, deve ser conferido na fonte oficial do ano. Cada tema traz o link da fonte. ${esc(c.TEXTO.disclaimer)}</p></div>`,
-      { variante: 'azul', rotulo: null },
+      // Sem fundo azul na seção: o aviso já é uma caixa azul, e numa seção da mesma cor ele sumia e o texto saía da coluna dos meses (12/11/2026).
+      { rotulo: null },
     ),
   ].join('\n');
   const pg = montarPagina({

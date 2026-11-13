@@ -3,6 +3,9 @@
  * Segurança e privacidade: a página de confiança, em linguagem simples, coerente com `docs/legal/politica-de-privacidade.md`
  * (as seções citadas são as da política). O que na política ainda depende da revisão jurídica (`[PROPOSTA]` e `[A DEFINIR]`) não é afirmado
  * aqui: a página manda para a política, que faz o `--final` recusar enquanto sobrar pendência.
+ *
+ * Em "O que guardamos", três cartões espelham a política desde 12/11/2026: investimentos (seções 3.2 e 7), assinatura e pagamento (seção
+ * 3.9, sem preço nem período de teste, que o site ainda não comunica) e anotar por mensagem (seção 3.8). Quando a política mudar, mudam juntos.
  */
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular } = require('../modelo');
@@ -46,6 +49,18 @@ function paginaSeguranca({ valores, img }) {
 <article class="cartao">
 <h3>Família e benefício</h3>
 <p>O nome da Família, o seu papel e o que cada pessoa anota nela. No benefício pela empresa, o e-mail que a empresa informou no convite, a situação da licença e as datas.</p>
+</article>
+<article class="cartao">
+<h3>Investimentos, só no seu Pessoal</h3>
+<p>Dos investimentos que você registra, o nome que você escolhe, o tipo, os aportes, os resgates, os rendimentos recebidos e os valores do extrato. Eles ficam só no seu Pessoal: ninguém da Família vê, nem a empresa que oferece o benefício.</p>
+</article>
+<article class="cartao">
+<h3>Assinatura e pagamento</h3>
+<p>A situação do seu acesso: o plano, até quando ele vale, por onde foi assinado e um resumo matemático que identifica a assinatura. Nunca guardamos número de cartão, código de segurança, validade, dados do Pix, CPF nem endereço de cobrança: esses dados ficam com a loja ou com o serviço de pagamento, pelas regras de cada um.</p>
+</article>
+<article class="cartao">
+<h3>Anotar por mensagem (opcional)</h3>
+<p>Quem liga a conta do Telegram à Clarevo pode anotar por mensagem escrita. O que vira registro é guardado como qualquer anotação. Da conta do Telegram, fica só um resumo do identificador, feito com uma chave secreta. De cada mensagem tratada, por 30 dias, ficam um resumo do identificador dela, o resultado e o registro criado, para não anotar duas vezes a mesma mensagem e para você poder desfazer. Não guardamos o texto das mensagens, o seu nome nem o seu usuário. Ao desligar, o vínculo é apagado na hora.</p>
 </article>
 <article class="cartao">
 <h3>Dados técnicos</h3>
@@ -95,7 +110,7 @@ ${celular(img['quem-ve'], ARQUIVO)}
 </article>
 <article class="cartao">
 <h3>A sua empresa</h3>
-<p>Se ela oferecer o benefício, vê só os e-mails que convidou, a situação de cada licença, as datas e as contagens. Nunca vê valores, categorias, metas, contas, cartões, a Família de ninguém, nem números somados, e também não vê quando você abre o app nem o que você anota. <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</p>
+<p>Se ela oferecer o benefício, vê só os e-mails que convidou, a situação de cada licença, as datas e as contagens. Nunca vê valores, categorias, metas, investimentos, contas, cartões, a Família de ninguém, nem números somados, e também não vê quando você abre o app nem o que você anota. <a href="${u('empresas/index.html')}">Veja Para empresas</a>.</p>
 </article>
 <article class="cartao">
 <h3>A equipe da Clarevo</h3>

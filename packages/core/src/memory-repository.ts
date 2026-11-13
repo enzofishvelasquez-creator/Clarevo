@@ -1,5 +1,6 @@
 import type { IsoDate, IsoMonth } from './dates';
-import type { WebSubscriptionCancel, WebSubscriptionStart } from './assinatura-web/app';
+import { ACCOUNT_MARK_KEYS, type AccountMarkKey, type AccountMarks } from './levels';
+import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import { FULL_ACCESS, type Access } from './plano';
 import type { PlanKind } from './plano-precos';
@@ -402,6 +403,8 @@ export class MemoryRepository implements RecordsRepository {
   /** month_checks nos contextos que a pessoa lê (aqui, os dela), por "contexto|mês|tipo"; a linha nunca sai (só com o contexto). */
   private monthChecks = new Map<string, StoredMonthCheck>();
   private incomeRefs = new Map<string, StoredIncomeReference>();
+  /** Níveis de conta (D-095): os marcos já alcançados, como account_marks no banco (o nível nunca desce). */
+  private reachedMarks = new Set<AccountMarkKey>();
   private budgets = new Map<string, StoredBudget>();
   private limits = new Map<string, StoredLimit>();
   private goals = new Map<string, StoredGoal>();
@@ -4753,6 +4756,7 @@ export class MemoryRepository implements RecordsRepository {
       this.goalMovements.clear();
       this.savingsChecks.clear();
       this.goalImages.clear();
+      this.reachedMarks.clear();
       this.signupSource = null;
       this.chatCodes = {};
       this.cards.clear();
@@ -4887,6 +4891,44 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
+  /**
+   * Os marcos do nível da conta (D-095), pelo que há na memória e pelas operações gravadas (as mesmas ações do banco). "Três meses
+   * diferentes" aqui usa o mês dos lançamentos (a memória não guarda quando cada operação foi feita).
+   */
+  async getAccountMarks(): Promise<AccountMarks> {
+    return this.read(() => {
+      // A mesma leitura de my_account_marks (migração 0034): o que a pessoa já fez, pelas operações e pelo que existe; e o que já foi
+      // alcançado fica guardado (reachedMarks), para o nível nunca descer.
+      const acts = new Set<string>([...this.operations.values()].map((o) => o.action));
+      const has = (...actions: string[]) => actions.some((a) => acts.has(a));
+      const recs = [...this.records.values()];
+      const live: AccountMarks = {
+        gasto: recs.some((r) => r.kind === 'despesa') || this.cardEntries.size > 0 || has('criar_compra_cartao', 'pagar_compromisso', 'pagar_fatura'),
+        recebimento: recs.some((r) => r.kind === 'receita'),
+        // A conta de fatura (invoiceCardId) não é gasto fixo cadastrado pela pessoa.
+        gasto_fixo: this.seriesById.size > 0 || [...this.commitments.values()].some((c) => !c.invoiceCardId) || has('criar_serie', 'criar_compromisso'),
+        guardar: this.savingsChecks.size > 0 || has('responder_guardar'),
+        meta: this.goals.size > 0 || has('criar_meta'),
+        // O saldo inicial vem com a meta (criar_meta), não é aporte registrado.
+        aporte: [...this.goalMovements.values()].some((m) => m.kind !== 'saldo_inicial') || has('registrar_movimento_meta'),
+        orcamento: this.budgets.size > 0 || has('definir_orcamento_categoria'),
+        renda: this.incomeRefs.size > 0 || has('definir_renda_referencia'),
+        cartao: this.cards.size > 0 || has('criar_cartao'),
+        investimento: this.investments.size > 0 || has('criar_investimento'),
+        pagou: has('pagar_compromisso', 'pagar_fatura'),
+        tres_meses: new Set(recs.map((r) => r.occurredOn.slice(0, 7))).size >= 3,
+        importou: has('importar_extrato'),
+        telegram: has('ligar_telegram'),
+        familia: has('criar_familia', 'aceitar_convite_familia'),
+        conta: has('criar_conta'),
+        limite: has('definir_limite_comprometimento'),
+        imagem: has('imagem_meta'),
+      };
+      for (const k of ACCOUNT_MARK_KEYS) if (live[k]) this.reachedMarks.add(k);
+      return Object.fromEntries(ACCOUNT_MARK_KEYS.map((k) => [k, this.reachedMarks.has(k)])) as AccountMarks;
+    });
+  }
+
   async getMyAccess(): Promise<Access> {
     return this.read(() => {
       // Benefício da empresa (D-056): vale enquanto a licença está ativa e, depois do fim, até o acesso pleno acabar (30 dias), como o
@@ -4911,6 +4953,10 @@ export class MemoryRepository implements RecordsRepository {
 
   async startPixPayment(_plan: PlanKind): Promise<WebSubscriptionStart> {
     return { result: 'indisponivel' };
+  }
+
+  async getWebSubscriptionStatus(): Promise<WebSubscriptionStatus | null> {
+    return null;
   }
 
   // Assinatura pelas lojas (D-090): só existe com o Supabase, as lojas e o RevenueCat; na demonstração e nos testes, indisponível.

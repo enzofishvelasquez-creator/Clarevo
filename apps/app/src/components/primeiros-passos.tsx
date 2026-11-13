@@ -105,9 +105,22 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
     if (newlyDone.length > 0) rememberSteps(newlyDone);
   }, [newlyDone.join(','), rememberSteps]); // eslint-disable-line react-hooks/exhaustive-deps
   const allDone = done.fixos && done.recebido && done.pago && done.guardar;
+  const doneCount = (Object.keys(done) as Step['key'][]).filter((k) => done[k]).length;
   const { close } = firstSteps;
-  const state: PrimeirosPassosState =
-    firstSteps.status === 'carregando' ? 'carregando' : !eligible ? 'oculto' : !ready ? 'carregando' : allDone ? 'oculto' : 'visivel';
+  // A demonstração com dados nunca mostra o card, e uma leitura que falhou também não: nos dois casos o estado é "oculto", para a fila de
+  // avisos do Resumo não ficar esperando um card que não vai aparecer (revisão independente de 12/11/2026).
+  const failed = eligible && (series.isError || records.isError);
+  const state: PrimeirosPassosState = demoWithData || failed
+    ? 'oculto'
+    : firstSteps.status === 'carregando'
+      ? 'carregando'
+      : !eligible
+        ? 'oculto'
+        : !ready
+          ? 'carregando'
+          : allDone
+            ? 'oculto'
+            : 'visivel';
   useEffect(() => {
     onState?.(state);
   }, [state, onState]);
@@ -127,6 +140,23 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
           </Txt>
           <Txt variant="caption" color={colors.textSecondary}>
             Quatro passos para a Clarevo mostrar o seu mês de verdade.
+          </Txt>
+        </View>
+        {/* O caminho já feito (12/11/2026): a barra e a contagem, para cada passo pronto aparecer como avanço. */}
+        <View style={{ gap: space[1] }}>
+          <View
+            style={styles.track}
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel="Primeiros passos prontos"
+            accessibilityValue={{ min: 0, max: STEPS.length, now: doneCount }}
+            aria-valuemin={0}
+            aria-valuemax={STEPS.length}
+            aria-valuenow={doneCount}>
+            <View style={[styles.fill, { width: `${Math.max(4, (doneCount / STEPS.length) * 100)}%` }]} />
+          </View>
+          <Txt variant="caption" style={{ fontFamily: fonts.bold }}>
+            {doneCount === 1 ? `1 de ${STEPS.length} passos pronto` : `${doneCount} de ${STEPS.length} passos prontos`}
           </Txt>
         </View>
         <View>
@@ -157,7 +187,7 @@ function StepRow({ step, done, last }: { step: Step; done: boolean; last: boolea
         (st as { focused?: boolean }).focused && styles.focusRing,
       ]}>
       <View style={[styles.icon, done && styles.iconDone]}>
-        <Icon size={18} color={done ? colors.success : colors.brand} strokeWidth={done ? 2.75 : 2.25} aria-hidden />
+        <Icon size={18} color={done ? colors.textOnAccent : colors.brandText} strokeWidth={done ? 2.75 : 2.25} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
@@ -177,7 +207,10 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, minHeight: 56 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   icon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
-  iconDone: { backgroundColor: colors.successTint },
+  // Passo pronto: o lima da marca, com o visto escuro (12,4:1).
+  iconDone: { backgroundColor: colors.accent },
+  track: { height: 8, borderRadius: radius.pill, backgroundColor: colors.brandTint, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.brandMark },
   dismiss: { alignSelf: 'flex-start', paddingHorizontal: 0 },
-  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as object,
 });

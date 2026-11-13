@@ -49,16 +49,16 @@ export function ScanLine({ onPress, disabled, variant = 'nota' }: { onPress: () 
       disabled={disabled}
       onPress={onPress}
       style={(s) => [styles.scanLine, (s as { focused?: boolean }).focused && ui.focusRing, s.pressed && { backgroundColor: colors.brandTintPressed }]}>
-      <Icon size={24} color={colors.brand} strokeWidth={2.25} />
+      <Icon size={24} color={colors.brandText} strokeWidth={2.25} />
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold }}>
+        <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold }}>
           {proof ? COMPROVANTE_TEXT.option : NOTA_TEXT.scanButton}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>
           {proof ? (OCR_AVAILABLE ? COMPROVANTE_TEXT.lineHint : COMPROVANTE_TEXT.lineHintPdf) : NOTA_FLOW_TEXT.scanLineHint}
         </Txt>
       </View>
-      <ChevronRight size={20} color={colors.brand} aria-hidden />
+      <ChevronRight size={20} color={colors.brandText} aria-hidden />
     </Pressable>
   );
 }
@@ -443,7 +443,7 @@ export function SefazStatus({ state, message }: { state: 'idle' | 'reading' | 'd
   if (state === 'reading') {
     return (
       <View style={styles.sefazRow} accessibilityLiveRegion="polite" accessible accessibilityLabel={SEFAZ_TEXT.readingA11y}>
-        <ActivityIndicator color={colors.brand} />
+        <ActivityIndicator color={colors.brandText} />
         <Txt variant="label">{SEFAZ_TEXT.reading}</Txt>
       </View>
     );
@@ -470,10 +470,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.brandTint,
   },
-  backdrop: { flex: 1, backgroundColor: 'rgba(23,34,59,0.55)', alignItems: 'center', justifyContent: 'center', padding: space[6] },
+  backdrop: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: space[6] },
   box: { width: '100%', maxWidth: 420, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space[6], gap: space[3] },
   cameraBody: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', padding: space[5], gap: space[4], justifyContent: 'space-between' },
-  preview: { width: '100%', aspectRatio: 4 / 3, maxHeight: 360, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#0E1526' },
+  preview: { width: '100%', aspectRatio: 4 / 3, maxHeight: 360, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.camera },
   // Moldura quadrada ao centro (o QR é quadrado): o app não recorta a imagem, ela só guia a distância.
   frameBox: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   frame: { height: '68%', aspectRatio: 1, borderRadius: radius.md, borderWidth: 3, borderColor: colors.accent },

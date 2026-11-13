@@ -37,7 +37,7 @@ Enzo decidiu, em 11/11/2026, o que entra antes do lançamento (D-093). Isso acre
 | Oito melhorias da aba Metas (`docs/43`, seção 4) | **No ar em 11/11/2026** (PR #30) | Feito: migração 0031 aplicada em 11/11/2026 |
 | Investimentos, aba nova, com CDI e IPCA (`docs/45`) | **No ar em 11/11/2026** (PR #30) | Feito: migração 0032 e função `indices` em 11/11/2026, conferida no ar com uma conta real (CDI e fonte na tela) |
 | Fatura vencida em Multa e juros | **No ar em 11/11/2026** (PR #30) | Nada |
-| Pix na web | **Pronto no código em 11/11/2026** (caminho B, escolhido pelo Enzo: Pix mês a mês pelo Checkout, sem CPF na Clarevo) | A migração 0033 (`docs/05`, passo 12y) e, no teste do sandbox, um mês com Pix (`docs/39`, seção 4) |
+| Pix na web | **Na `main` em 11/11/2026** (PR #32; caminho B, escolhido pelo Enzo: Pix mês a mês pelo Checkout, sem CPF na Clarevo) | Feito: migração 0033. Falta, no teste do sandbox, um mês com Pix (`docs/39`, seção 4) |
 | Widget ligado | **Pronto no código em 11/11/2026** (PR #30) | O próximo build (`preview`, já com o widget) e o teste no iPhone e no Android |
 | Formulário de contato para empresas no site | Pronto desde D-066; ligar leva minutos | A regra de limite e as variáveis do Resend no painel da Cloudflare (`docs/22`, seção 9; a chave nunca passa pelo chat); depois, a equipe liga |
 | Relatório de falhas (Sentry) | **Pronto no código em 11/11/2026** (PR #30) | A conta no Sentry e o endereço do projeto nas variáveis do EAS (`docs/46`, seção 2); pergunta 50 ao advogado |

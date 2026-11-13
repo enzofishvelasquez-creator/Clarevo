@@ -54,8 +54,9 @@ import type {
   SeriesInput,
 } from './records';
 import type { LegalAcceptance } from './aceite';
-import type { WebSubscriptionCancel, WebSubscriptionStart } from './assinatura-web/app';
+import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
+import type { AccountMarks } from './levels';
 import type { Access } from './plano';
 import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
@@ -911,6 +912,8 @@ export interface RecordsRepository {
 
   /** my_access: a situação do acesso da própria pessoa (assinatura, benefício, cortesia, Família, antes do início, teste ou só leitura). */
   getMyAccess(): Promise<Access>;
+  /** my_account_marks (migração 0034): os 18 marcos "já fez alguma vez" da própria pessoa (os alcançados ficam guardados), de onde sai o nível da conta (D-095). */
+  getAccountMarks(): Promise<AccountMarks>;
 
   // Assinatura na web pelo Asaas (D-084), pela função do servidor "assinatura-web" com a sessão da pessoa. Só na web.
 
@@ -920,6 +923,8 @@ export interface RecordsRepository {
   cancelWebSubscription(): Promise<WebSubscriptionCancel>;
   /** "pix": cria o Checkout do Asaas de um mês com Pix (D-093, caminho B) e devolve o link, ou por que não (mês já pago, já assinante...). */
   startPixPayment(plan: PlanKind): Promise<WebSubscriptionStart>;
+  /** "situacao": se a assinatura no cartão ainda está ativa no Asaas (e quando renova) ou foi cancelada; null quando não deu para saber. */
+  getWebSubscriptionStatus(): Promise<WebSubscriptionStatus | null>;
 
   // Assinatura pelas lojas (D-090), pela função do servidor "assinatura-lojas" com a sessão da pessoa. Só no app do iPhone e do Android.
 

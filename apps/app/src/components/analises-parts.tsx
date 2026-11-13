@@ -31,13 +31,13 @@ import Svg, { Circle } from 'react-native-svg';
 import { MoneyTxt } from '@/components/money-text';
 import { MonthCheckBlock } from '@/components/month-check';
 import { EmptyState, ErrorState } from '@/components/states';
-import { Button, Card, LinkButton, Money, Skeleton, Txt, clampLines, spaceKeyPress, styles as ui } from '@/components/ui';
+import { Button, Card, IconBlock, LinkButton, Money, Skeleton, Txt, clampLines, spaceKeyPress, styles as ui } from '@/components/ui';
 import { useCategoryViewPref } from '@/lib/category-view';
 import { useHiddenMonths } from '@/lib/evolution-memory';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { useCategoryAnalysis, useCommittedUpcoming, useMonthBudget, useMonthCheckRow, useMonthsOverview, type CategoryAnalysis } from '@/state/data';
 import { useSession } from '@/state/session';
-import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
+import { colors, colorScheme, fonts, radius, space, tabular } from '@/theme/tokens';
 
 const T = ANALYSES_TEXT;
 
@@ -59,7 +59,7 @@ export function AnalysesEntry({ onPress }: { onPress: () => void }) {
       accessibilityLabel={T.rowA11y}
       onPress={onPress}
       style={(s) => [ui.input, styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-      <ChartPie size={20} color={colors.textSecondary} aria-hidden />
+      <IconBlock icon={ChartPie} lime />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
           {T.title}
@@ -168,8 +168,8 @@ function ViewSegment({ value, onChange }: { value: CategoryView; onChange: (view
             onPress={() => onChange(view)}
             {...spaceKeyPress(() => onChange(view))}
             style={(s) => [styles.option, selected && styles.optionSelected, (s as { focused?: boolean }).focused && ui.focusRing]}>
-            {selected ? <Check size={16} color={colors.brand} strokeWidth={2.5} /> : null}
-            <Txt variant="label" color={selected ? colors.brand : colors.text} style={{ fontFamily: fonts.bold, fontSize: 15, textAlign: 'center', flexShrink: 1 }}>
+            {selected ? <Check size={16} color={colors.brandText} strokeWidth={2.5} /> : null}
+            <Txt variant="label" color={selected ? colors.brandText : colors.text} style={{ fontFamily: fonts.bold, fontSize: 15, textAlign: 'center', flexShrink: 1 }}>
               {T.categories.views[view]}
             </Txt>
           </Pressable>
@@ -204,7 +204,7 @@ function CategoryBars({ shares, selectedKey, onSelect }: { shares: CategoryShare
               style={(s) => [styles.bar, selected && styles.barSelected, s.pressed && { opacity: 0.85 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
               <View style={styles.barHead} {...decorative}>
                 <View style={styles.barName}>
-                  {selected ? <Check size={16} color={colors.brand} strokeWidth={2.5} style={{ flexShrink: 0 }} /> : null}
+                  {selected ? <Check size={16} color={colors.brandText} strokeWidth={2.5} style={{ flexShrink: 0 }} /> : null}
                   <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15, flexShrink: 1 }}>
                     {sh.label}
                   </Txt>
@@ -232,6 +232,12 @@ function CategoryBars({ shares, selectedKey, onSelect }: { shares: CategoryShare
  * no tamanho (`CATEGORY_BUBBLE_TONES`, D-089 D), com o texto na cor que dá contraste. A escolhida fica lima, com contorno escuro mais
  * grosso. As bolhas não mostram valor em reais; o nome acessível, sim (e segue "Ocultar valores").
  */
+/**
+ * Contorno das bolhas dos tons escuros: no claro, o branco da superfície separa as bolhas encostadas; no escuro (D-096), esses tons quase
+ * somem sobre a superfície escura, e o azul claro do texto desenha a forma (WCAG 1.4.11).
+ */
+const darkFillEdge = colorScheme === 'dark' ? colors.brandText : colors.surface;
+
 function CategoryBubbleChart({ shares, selectedKey, onSelect }: { shares: CategoryShare[]; selectedKey: string | null; onSelect: (key: string) => void }) {
   const hidden = useValuesHidden();
   const { fontScale } = useWindowDimensions();
@@ -251,7 +257,7 @@ function CategoryBubbleChart({ shares, selectedKey, onSelect }: { shares: Catego
                   cy={b.cy}
                   r={b.r}
                   fill={selected ? colors.accent : b.tone.fill}
-                  stroke={selected ? colors.text : b.tone.stroke === '#FFFFFF' ? colors.surface : b.tone.stroke}
+                  stroke={selected ? colors.text : b.tone.stroke === '#FFFFFF' ? darkFillEdge : b.tone.stroke}
                   strokeWidth={selected ? 3 : 2}
                 />
               );
@@ -283,7 +289,7 @@ function CategoryBubbleChart({ shares, selectedKey, onSelect }: { shares: Catego
                       key={`${i}-${line}`}
                       allowFontScaling={false}
                       numberOfLines={1}
-                      color={selected ? colors.text : b.tone.text}
+                      color={selected ? colors.textOnAccent : b.tone.text}
                       style={{ fontFamily: fonts.bold, fontSize: b.fontSize, lineHeight: b.lineHeight, textAlign: 'center' }}>
                       {line}
                     </Txt>
@@ -671,15 +677,15 @@ const styles = StyleSheet.create({
   },
   tabSelected: { backgroundColor: colors.brand, borderColor: colors.brand },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space[2], flexWrap: 'wrap' },
-  track: { flexDirection: 'row', backgroundColor: '#E6EBF5', borderRadius: radius.md, padding: 4, gap: 4 },
+  track: { flexDirection: 'row', backgroundColor: colors.muted, borderRadius: radius.md, padding: 4, gap: 4 },
   option: { flex: 1, minHeight: 48, borderRadius: radius.sm, flexDirection: 'row', gap: space[1], alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[2] },
   optionSelected: { backgroundColor: colors.surface },
   bar: { minHeight: 56, gap: space[2], justifyContent: 'center', paddingVertical: space[2], paddingHorizontal: space[3], borderRadius: radius.sm, borderWidth: 1.5, borderColor: 'transparent' },
-  barSelected: { backgroundColor: colors.brandTint, borderColor: colors.brand, borderWidth: 2 },
+  barSelected: { backgroundColor: colors.brandTint, borderColor: colors.brandText, borderWidth: 2 },
   barHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: space[3], flexWrap: 'wrap' },
   barName: { flexDirection: 'row', alignItems: 'center', gap: space[1], flexShrink: 1 },
   barTrack: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brandTint, overflow: 'hidden' },
-  barFill: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brand },
+  barFill: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brandMark },
   // Categoria com valor, mas abaixo de 0,1%: um traço visível.
   barMin: { width: 4 },
   bubble: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },

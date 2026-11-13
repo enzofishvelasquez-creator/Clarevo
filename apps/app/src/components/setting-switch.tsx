@@ -57,7 +57,7 @@ export function SettingSwitch({
         ) : null}
       </View>
       <View style={[styles.track, value && styles.trackOn]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Animated.View style={[styles.knob, value && { borderColor: colors.surface }, knob]} />
+        <Animated.View style={[styles.knob, value && { backgroundColor: colors.surfaceOnBrand, borderColor: colors.surfaceOnBrand }, knob]} />
       </View>
     </Pressable>
   );
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-  trackOn: { borderColor: colors.brand, backgroundColor: colors.brand },
+  trackOn: { borderColor: colors.brandText, backgroundColor: colors.brand },
   knob: {
     width: KNOB,
     height: KNOB,
@@ -86,5 +86,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.borderStrong,
   },
-  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brand, outlineOffset: 2 },
+  focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brandText, outlineOffset: 2 },
 });

@@ -17,15 +17,17 @@ import {
   isLargeText,
   relativeLuminance,
 } from '../src';
+import { darkColors, lightColors } from '../../../apps/app/src/theme/palettes';
 
 const APP_SRC = fileURLToPath(new URL('../../../apps/app/src/', import.meta.url));
 
-/** As cores do tema, lidas do arquivo do app (sem importar o Expo): `nome: '#RRGGBB'` dentro de `export const colors`. */
+/**
+ * As cores do tema claro, lidas do módulo puro das paletas do app (`theme/palettes.ts`, sem React Native), só as de seis dígitos (as
+ * translúcidas, como o véu das janelas, ficam fora da conta). O modo escuro tem o teste dele (`tema-escuro.test.ts`).
+ */
 function themeColors(): Record<string, string> {
-  const text = readFileSync(join(APP_SRC, 'theme', 'tokens.ts'), 'utf8');
-  const block = /export const colors = \{([\s\S]*?)\} as const;/.exec(text)?.[1] ?? '';
   const out: Record<string, string> = {};
-  for (const m of block.matchAll(/^\s*(\w+):\s*'(#[0-9A-Fa-f]{6})'/gm)) out[m[1]!] = m[2]!.toUpperCase();
+  for (const [name, value] of Object.entries(lightColors)) if (/^#[0-9A-Fa-f]{6}$/.test(value)) out[name] = value.toUpperCase();
   return out;
 }
 
@@ -150,7 +152,7 @@ describe('contraste: as cores do tema (D-062 item 5)', () => {
 
   it('cada cor de texto do tema aparece na tabela (texto novo precisa de par conferido)', () => {
     const used = new Set(THEME_CONTRAST_PAIRS.flatMap((p) => [p.fg, p.bg]));
-    for (const name of ['text', 'textSecondary', 'textOnBrand', 'textOnBrandSoft', 'brand', 'error', 'success', 'successText', 'placeholder', 'accent', 'brandPressed', 'brandDeep', 'surface', 'background', 'brandTint', 'accentTint', 'errorTint', 'successTint', 'borderStrong', 'brandSoft']) {
+    for (const name of ['text', 'textSecondary', 'textOnBrand', 'textOnBrandSoft', 'textOnAccent', 'brand', 'brandText', 'brandTextDeep', 'brandMark', 'brandMarkDeep', 'error', 'success', 'successText', 'placeholder', 'accent', 'brandPressed', 'brandDeep', 'surface', 'surfaceOnBrand', 'background', 'brandTint', 'brandTintPressed', 'accentTint', 'errorTint', 'successTint', 'borderStrong', 'brandSoft', 'muted']) {
       expect(used.has(name), name).toBe(true);
     }
   });
@@ -164,16 +166,14 @@ describe('contraste: as cores do tema (D-062 item 5)', () => {
   });
 
   it('o app não usa cor literal fora do tema, a não ser as que a tabela conhece (cor nova entra na tabela antes)', () => {
-    // Cores literais permitidas em apps/app/src: as da tabela de contraste, a tela escura da câmera (sem texto de cor própria)
-    // e os valores do tema repetidos onde o tema ainda não chega (barra de estado).
-    const themeValues = new Set(Object.values(colors).map((c) => c.toUpperCase()));
-    const allowed = new Set(
-      [...THEME_CONTRAST_PAIRS.flatMap((p) => [p.fg, p.bg]).filter((c) => c.startsWith('#')), '#E6EBF5', '#0E1526'].map((c) => c.toUpperCase()),
-    );
+    // Cores literais permitidas em apps/app/src fora das paletas: as da tabela de contraste e os valores das duas paletas repetidos
+    // onde o tema não chega (o widget do iOS, que roda sozinho na extensão).
+    const themeValues = new Set([...Object.values(lightColors), ...Object.values(darkColors)].map((c) => c.toUpperCase()));
+    const allowed = new Set(THEME_CONTRAST_PAIRS.flatMap((p) => [p.fg, p.bg]).filter((c) => c.startsWith('#')).map((c) => c.toUpperCase()));
     const offenders: string[] = [];
     for (const file of sourceFiles(APP_SRC)) {
       const rel = file.slice(APP_SRC.length);
-      if (rel === join('theme', 'tokens.ts') || rel === join('theme', 'logo-paths.ts')) continue;
+      if (rel === join('theme', 'tokens.ts') || rel === join('theme', 'palettes.ts') || rel === join('theme', 'logo-paths.ts')) continue;
       for (const m of readFileSync(file, 'utf8').matchAll(/#[0-9A-Fa-f]{6}\b/g)) {
         const hex = m[0].toUpperCase();
         if (!themeValues.has(hex) && !allowed.has(hex)) offenders.push(`${rel}: ${hex}`);

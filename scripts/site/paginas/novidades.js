@@ -8,7 +8,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { esc, markdownParaHtml, separarTitulo } = require('../texto');
-const { rel, dataPorExtensoIso, dataRfc822, caminhoLimpo } = require('../util');
+const { rel, dataPorExtensoIso, dataRfc822, caminhoLimpo, descricaoCurta } = require('../util');
 const { montarPagina, colunaTexto, bloco, dominioDe, urlDoSite } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { lerPosts, lerCabecalho } = require('../conteudo');
@@ -64,8 +64,11 @@ function fontesDoPost(post) {
         problemas.push(`${post.origem}: a fonte "tema: ${f.slug}" não existe no catálogo de Aprender`);
         continue;
       }
-      itens.push(`<li><a href="${rel(post.arquivo, arquivoDoTema(t.slug))}">Aprender: ${esc(t.title)}</a><span class="fonte-meta">${esc(c.TEXTO.reviewedOn(t.reviewedOn))}. As fontes do tema:</span></li>`);
-      for (const s of t.sources) itens.push(fonteHtml(s, null));
+      // As fontes do tema ficam numa lista dentro do item do tema, e não soltas na numeração do post (12/11/2026).
+      itens.push(`<li><a href="${rel(post.arquivo, arquivoDoTema(t.slug))}">Aprender: ${esc(t.title)}</a><span class="fonte-meta">${esc(c.TEXTO.reviewedOn(t.reviewedOn))}. As fontes do tema:</span>
+<ol class="fontes">
+${t.sources.map((s) => fonteHtml(s, null)).join('\n')}
+</ol></li>`);
     } else if (f.tipo === 'link') {
       if (/^https:\/\//.test(f.destino)) itens.push(`<li><a href="${esc(f.destino)}" rel="noopener noreferrer">${esc(f.rotulo)}</a></li>`);
       else if (/^[a-z]+:/i.test(f.destino)) problemas.push(`${post.origem}: a fonte "${f.rotulo}" tem um endereço que não é https nem uma página do site`);
@@ -90,7 +93,7 @@ ${itens.join('\n')}
 </ol>
 <p class="revisao">Publicado em ${esc(dataPorExtensoIso(post.data))} por ${esc(post.autoria)}. Se encontrarmos um erro, corrigimos neste mesmo texto e registramos a correção aqui. Veja <a href="${rel(arquivo, 'novidades/como-escrevemos.html')}">como escrevemos</a>.</p>
 </section>
-<p><a href="${rel(arquivo, ARQUIVO_INDICE)}">Voltar para Novidades</a></p>`,
+<p class="voltar"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Voltar para Novidades</a></p>`,
     'texto',
   );
   const capa = `<p class="migalha"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Novidades</a></p>
@@ -113,7 +116,8 @@ ${itens.join('\n')}
   const pg = montarPagina({
     arquivo,
     titulo: post.titulo,
-    descricao: post.resumo,
+    // O resumo inteiro (até 220 caracteres) fica na capa, no índice e no feed; a descrição para as buscas cabe em 160.
+    descricao: descricaoCurta(post.resumo),
     capa,
     corpo,
     fonte: post.corpo + capa,
@@ -122,6 +126,7 @@ ${itens.join('\n')}
     tipoOg: 'article',
     jsonld: [artigo],
     cabecalho: linkDoFeed(arquivo, valores),
+    atualizada: post.data,
   });
   return { arquivo, ...pg, avisos: [...faltas, ...problemas] };
 }
@@ -155,6 +160,8 @@ ${cartoes}
     valores,
     classeCapa: 'capa-simples',
     cabecalho: linkDoFeed(arquivo, valores),
+    // O post mais novo (a lista vem do mais novo para o mais antigo), para o sitemap.
+    atualizada: posts.length ? posts[0].data : null,
   });
   return { arquivo, ...pg };
 }

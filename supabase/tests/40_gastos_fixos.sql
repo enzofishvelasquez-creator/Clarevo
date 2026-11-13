@@ -1221,7 +1221,7 @@ do $$ begin
             'delete_investment', 'delete_investment_movement', 'delete_my_account', 'delete_record', 'delete_series', 'end_family',
             'end_license', 'end_series', 'ensure_personal_space', 'goal_photo', 'import_records', 'inform_series_year', 'invite_licenses',
             'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_family', 'mark_subscriptions_reviewed',
-            'month_budget', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_access', 'my_legal_acceptance',
+            'month_budget', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_access', 'my_account_marks', 'my_legal_acceptance',
             'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
             'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_order', 'set_goal_status',

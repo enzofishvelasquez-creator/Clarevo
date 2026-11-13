@@ -6,6 +6,11 @@ import { Pressable, StyleSheet, useWindowDimensions, View, type ScrollView } fro
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, ReduceMotion } from 'react-native-reanimated';
 
 import { AccessBanner } from '@/components/access-parts';
+import { BudgetCelebrationCard } from '@/components/budget-celebration';
+import { BudgetPanel, GoalsPanel } from '@/components/resumo-wide';
+import { LevelUpCard } from '@/components/level-parts';
+import { NoticeClaim, NoticeQueue } from '@/components/notice-queue';
+import { WIDE_CONTENT_MAX, useWideLayout } from '@/lib/layout';
 import { LegalChangeNotice } from '@/components/legal-notice';
 import { Meter, useMoneyMask } from '@/components/committed-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -36,6 +41,7 @@ export default function ResumoScreen() {
   const work = useWork().data;
   const contextId = work?.contextId;
   const canWrite = work?.canWrite ?? true;
+  const wide = useWideLayout();
   const records = useMonthRecords(contextId, month);
   const s = records.summary;
   const monthName = formatMonthBR(month);
@@ -77,7 +83,7 @@ export default function ResumoScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Screen wide scrollRef={scroll}>
-        <AppHeader>
+        <AppHeader wide={wide}>
           <ContextSwitch />
           <MonthSwitcher titleLevel={1} />
 
@@ -143,7 +149,10 @@ export default function ResumoScreen() {
           </Animated.View>
         </AppHeader>
 
-        <Body>
+        <Body style={wide ? { maxWidth: WIDE_CONTENT_MAX } : undefined}>
+          {/* Versão para computador (pedido do Enzo em 12/11/2026): o Resumo vira um painel, com metas e orçamento na coluna da direita. */}
+          <View style={wide ? styles.dashboard : styles.stack}>
+          <View style={wide ? styles.mainCol : styles.stack}>
           {/*
             "Anotar gasto" sempre logo abaixo do cabeçalho azul (D-039), como na tela original aprovada, em qualquer estado.
             Os avisos temporários (Primeiros passos, Seus últimos meses, confirmações) vêm depois dele, um por vez, sem mudar a
@@ -152,12 +161,25 @@ export default function ResumoScreen() {
             Clarevo?" é a última da fila: só em conta real, a partir do dia seguinte ao primeiro dia de uso e quando nenhum dos
             dois está na tela.
           */}
-          {canWrite ? (
+          {canWrite && !wide ? (
             <Button label="Anotar gasto" icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
           ) : null}
           <FlashBanner message={notice} />
+          {/*
+            Fila dos avisos temporários (pedido do Enzo em 12/11/2026, `components/notice-queue.tsx`): um por vez, nesta ordem:
+            "Seus últimos meses", "Primeiros passos", a comemoração do nível, o mês dentro do orçamento e "Como você conheceu a
+            Clarevo?". Os avisos da assinatura e dos termos e o lembrete de valor extra ficam fora da fila e aparecem sempre. A fila
+            espera a faixa e os Primeiros passos carregarem.
+          */}
+          <NoticeQueue hold={band.status === 'pendente' || (band.status === 'oculta' && stepsState === 'carregando')}>
+          <NoticeClaim id="retorno" wants={band.status === 'visivel'} />
+          <NoticeClaim id="passos" wants={band.status === 'oculta' && stepsState === 'visivel'} />
           {/* Assinatura (D-083): nos últimos dias do teste grátis e em só ver e exportar, o aviso com o atalho para os planos. */}
           <AccessBanner />
+          {/* Níveis de conta (D-095): a comemoração da troca de nível, uma vez por nível em cada aparelho. */}
+          <LevelUpCard />
+          {/* O mês que fechou dentro do orçamento, nos primeiros dias do mês seguinte (só no Pessoal, no mês de hoje). */}
+          <BudgetCelebrationCard contextId={contextId} eligible={kind === 'pessoal' && month === currentMonth} />
           {/* Mudança anunciada dos termos e da política (A5): só enquanto a próxima versão não vale. */}
           <LegalChangeNotice />
           {band.status === 'visivel' ? <ReturnBand band={band} onMovedOn={(text) => setNotice(text)} /> : null}
@@ -168,6 +190,7 @@ export default function ResumoScreen() {
           {band.status === 'oculta' ? (
             <ExtraSavingsCard contextId={contextId} month={month} eligible={kind === 'pessoal' && month === currentMonth} records={records.data} onNotice={(text) => setNotice(text)} />
           ) : null}
+          </NoticeQueue>
 
           <>
             <ToPayCard contextId={contextId} canWrite={canWrite} />
@@ -196,17 +219,23 @@ export default function ResumoScreen() {
               </Card>
           </>
 
+          </View>
+          <View style={wide ? styles.sideCol : styles.stack}>
+          {wide ? <GoalsPanel contextId={contextId} /> : null}
+          {wide && kind === 'pessoal' ? <BudgetPanel contextId={contextId} month={month} /> : null}
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push(explanationHref('fatura'))}
             style={(st) => [styles.learn, st.pressed && { opacity: 0.85 }]}>
             <View style={{ flex: 1 }}>
-              <Txt variant="label" style={{ fontFamily: fonts.extrabold, fontSize: 17 }}>
+              <Txt variant="label" color={colors.textOnAccent} style={{ fontFamily: fonts.extrabold, fontSize: 17 }}>
                 Fatura sem contar duas vezes
               </Txt>
-              <Txt variant="caption">Entenda o efeito no seu mês</Txt>
+              <Txt variant="caption" color={colors.textOnAccent}>
+                Entenda o efeito no seu mês
+              </Txt>
             </View>
-            <ArrowRight size={22} color={colors.text} />
+            <ArrowRight size={22} color={colors.textOnAccent} />
           </Pressable>
 
           <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy} hitSlop={8}>
@@ -215,6 +244,8 @@ export default function ResumoScreen() {
               Quem vê estes dados?
             </Txt>
           </Pressable>
+          </View>
+          </View>
         </Body>
       </Screen>
       {/* Tour de boas-vindas (D-049(2)): um modal na primeira entrada, sem mudar a estrutura do Resumo. */}
@@ -422,7 +453,7 @@ function TotalItem({
             accessibilityLabel={`${change > 0 ? 'Mais' : 'Menos'} ${moneyA11y(Math.abs(change), hidden)} em ${label}`}>
             <Txt
               variant="caption"
-              color={colors.text}
+              color={colors.textOnAccent}
               style={{ fontFamily: fonts.bold, fontSize: 12, lineHeight: 16 }}
               accessibilityLabel={hidden ? `${change > 0 ? 'mais' : 'menos'} ${moneyA11y(Math.abs(change), hidden)}` : undefined}>
               {change > 0 ? '+' : '−'} {moneyText(Math.abs(change), hidden)}
@@ -442,6 +473,10 @@ const styles = StyleSheet.create({
   splitItem: { minHeight: 44, justifyContent: 'center' },
   splitValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 },
   totalLabelRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  stack: { gap: space[4] },
+  dashboard: { flexDirection: 'row', alignItems: 'flex-start', gap: space[6] },
+  mainCol: { flex: 3, minWidth: 0, gap: space[4] },
+  sideCol: { flex: 2, minWidth: 0, gap: space[4] },
   changePill: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[2], paddingVertical: 1 },
   focusOnBrand: { outlineWidth: 3, outlineColor: colors.accent, outlineStyle: 'solid', outlineOffset: 2 } as object,
   toPayArea: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], minHeight: 44, borderRadius: radius.sm },
@@ -454,7 +489,7 @@ const styles = StyleSheet.create({
   committedArea: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, paddingVertical: space[1], borderRadius: radius.sm },
   committedHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', columnGap: space[2], flexWrap: 'wrap' },
   committedValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 24 },
-  focusRing: { outlineWidth: 3, outlineColor: colors.brand, outlineStyle: 'solid', outlineOffset: 2 } as object,
+  focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as object,
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space[2], flexWrap: 'wrap' },
   learn: {
     backgroundColor: colors.accent,

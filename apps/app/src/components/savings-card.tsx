@@ -259,7 +259,7 @@ export function SavingsPlanInReserve({ contextId, card, compact }: { contextId: 
         </MoneyTxt>
       ) : null}
       <View style={styles.sideBySide}>
-        <Button label="Ver o plano" tone="soft" compact style={styles.half} onPress={() => router.push('/guardar')} />
+        <Button label="Ver o plano" tone="onBrandSoft" compact style={styles.half} onPress={() => router.push('/guardar')} />
         <Button
           label={SAVINGS_TEXT.changeValue}
           tone="onBrand"
@@ -276,7 +276,7 @@ function Head({ title }: { title: string }) {
   return (
     <View style={styles.head}>
       <View style={styles.icon}>
-        <PiggyBank size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
+        <PiggyBank size={20} color={colors.brandText} strokeWidth={2.25} aria-hidden />
       </View>
       <Txt variant="title" style={{ flex: 1, fontFamily: fonts.bold }} accessibilityRole="header" aria-level={2}>
         {title}
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
   compact: { gap: space[2], paddingVertical: space[4] },
   sideBySide: { flexDirection: 'row', gap: space[2] },
   half: { flex: 1, minWidth: 0 },
-  inReserve: { gap: space[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.28)', paddingTop: space[3] },
+  inReserve: { gap: space[2], borderTopWidth: 1, borderTopColor: colors.onBrandLine, paddingTop: space[3] },
   compactRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[5], rowGap: space[1] },
   later: { alignSelf: 'flex-start', paddingHorizontal: 0 },
 });

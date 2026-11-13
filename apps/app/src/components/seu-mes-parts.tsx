@@ -3,7 +3,7 @@ import { ChevronRight, Timer } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { MoneyTxt } from '@/components/money-text';
-import { Card, LinkButton, Txt, styles as ui } from '@/components/ui';
+import { Card, IconBlock, LinkButton, Txt, styles as ui } from '@/components/ui';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 /**
@@ -17,7 +17,7 @@ export function SeuMesEntry({ onPress }: { onPress: () => void }) {
       accessibilityLabel={SEU_MES_TEXT.rowA11y}
       onPress={onPress}
       style={(s) => [ui.input, styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-      <Timer size={20} color={colors.textSecondary} aria-hidden />
+      <IconBlock icon={Timer} lime />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
           {SEU_MES_TEXT.title}

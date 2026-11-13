@@ -16,6 +16,16 @@ export type WebSubscriptionStart =
 /** O que a função devolve ao app em "cancelar". */
 export type WebSubscriptionCancel = 'cancelada' | 'sem_assinatura' | 'indisponivel' | 'tente_de_novo';
 
+/** "situacao": se ainda há assinatura no cartão ativa no Asaas (e quando renova) ou se foi cancelada. null quando não deu para saber. */
+export type WebSubscriptionStatus = { active: true; nextDueDate: string | null } | { active: false };
+
+export function parseWebSubscriptionStatus(raw: unknown): WebSubscriptionStatus | null {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  if (r?.result === 'ativa') return { active: true, nextDueDate: typeof r.nextDueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.nextDueDate) ? r.nextDueDate : null };
+  if (r?.result === 'sem_assinatura') return { active: false };
+  return null;
+}
+
 /** O que a volta da página do Asaas diz (`/conta/assinatura?pagamento=...`). */
 export type WebPaymentReturn = 'sucesso' | 'cancelado' | 'expirado';
 

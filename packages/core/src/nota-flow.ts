@@ -31,7 +31,7 @@ export const NOTA_FLOW_TEXT = {
   sheetTitle: 'Como você quer ler a nota?',
   /** Antes de pedir a câmera pela primeira vez. */
   cameraIntro: 'A Clarevo usa a câmera só para ler o código da nota. Nenhuma foto é guardada.',
-  cameraAim: 'Aponte para o QR code no rodapé do cupom. Compra on-line: o código de barras do DANFE.',
+  cameraAim: 'Aponte para o QR Code no rodapé do cupom. Compra on-line: o código de barras do DANFE.',
   /** Depois de uns 5 segundos sem ler (D-042): chegar mais perto, até o QR ocupar a moldura. */
   cameraCloser: 'Aproxime até o QR ocupar a moldura.',
   cameraStarting: 'Abrindo a câmera…',
@@ -41,7 +41,7 @@ export const NOTA_FLOW_TEXT = {
   torchOff: 'Desligar a lanterna',
   back: 'Voltar',
   /** Código lido pela câmera que não é de nota (continua procurando). */
-  notReceiptKeepLooking: 'Esse código não é de uma nota fiscal. Aponte para o QR code do cupom ou para o código de barras da chave.',
+  notReceiptKeepLooking: 'Esse código não é de uma nota fiscal. Aponte para o QR Code do cupom ou para o código de barras da chave.',
   pasteTitle: 'Colar o link ou a chave',
   pasteSubmit: 'Ler a nota',
   pdfWorking: 'Lendo o PDF aqui no aparelho…',

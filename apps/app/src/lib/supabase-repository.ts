@@ -143,7 +143,9 @@ import {
   parseAccess,
   parseStoreForget,
   parseStoreSync,
+  parseAccountMarks,
   parseWebSubscriptionCancel,
+  parseWebSubscriptionStatus,
   parseWebSubscriptionStart,
   STORE_SUBSCRIPTION_FUNCTION,
   WEB_SUBSCRIPTION_FUNCTION,
@@ -152,7 +154,9 @@ import {
   type PlanKind,
   type StoreForget,
   type StoreSync,
+  type AccountMarks,
   type WebSubscriptionCancel,
+  type WebSubscriptionStatus,
   type WebSubscriptionStart,
   type LegalAcceptance,
 } from '@clarevo/core';
@@ -3421,6 +3425,13 @@ export class SupabaseRepository implements RecordsRepository {
     return parseLegalAcceptance(data);
   }
 
+  /** Os marcos do nível da conta (my_account_marks, D-095). */
+  async getAccountMarks(): Promise<AccountMarks> {
+    const { data, error } = await this.db.rpc('my_account_marks');
+    if (error) throw repoError(error);
+    return parseAccountMarks(data);
+  }
+
   /** A situação do acesso da própria pessoa (my_access, D-083). */
   async getMyAccess(): Promise<Access> {
     const { data, error } = await this.db.rpc('my_access');
@@ -3441,6 +3452,12 @@ export class SupabaseRepository implements RecordsRepository {
   async cancelWebSubscription(): Promise<WebSubscriptionCancel> {
     const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'cancelar' } });
     return parseWebSubscriptionCancel(error ? await functionErrorBody(error) : data);
+  }
+
+  /** "situacao": a assinatura no cartão ainda ativa no Asaas ou cancelada (o acesso continua até o fim do período pago). */
+  async getWebSubscriptionStatus(): Promise<WebSubscriptionStatus | null> {
+    const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'situacao' } });
+    return error ? null : parseWebSubscriptionStatus(data);
   }
 
   /** "pix": o Checkout do Asaas de um mês com Pix (D-093). As mesmas respostas de "assinar", mais "ja_pago". */

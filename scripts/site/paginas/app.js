@@ -14,7 +14,7 @@ const ARQUIVO = 'app/index.html';
 
 /**
  * Os recursos do passeio, na ordem. `guia`: ids do guia de uso (o primeiro dá o texto principal); `imagem`: id da captura; `itens`:
- * pontos curtos, escritos conferindo o código e o guia.
+ * pontos curtos, escritos conferindo o código e o guia, sem repetir o que o texto do guia já diz logo acima.
  */
 const RECURSOS = [
   {
@@ -41,7 +41,7 @@ const RECURSOS = [
   },
   {
     id: 'nota',
-    titulo: 'Leitura de nota fiscal',
+    titulo: 'Leitura de nota fiscal e de comprovante',
     guia: ['nota-fiscal'],
     imagem: 'nota',
     itens: [
@@ -56,7 +56,6 @@ const RECURSOS = [
     guia: ['contas-a-pagar', 'gastos-fixos', 'contas-do-ano'],
     imagem: 'contas',
     itens: [
-      'Gastos fixos e parcelamentos criam a conta de cada mês. Contas do ano, como IPVA e IPTU, entram dois meses antes de vencer.',
       'O gasto só entra em Pago quando você marca a conta como paga, e dá para desfazer.',
       'Lembretes de vencimento no app para celular, no dia anterior.',
     ],
@@ -78,8 +77,6 @@ const RECURSOS = [
     guia: ['evolucao', 'analises'],
     imagem: 'evolucao',
     itens: [
-      'Recebido e Pago mês a mês, com média e mediana.',
-      'Dá para tirar um mês da comparação sem mexer em nenhum lançamento.',
       'Categorias em barras ou em bolhas e o orçamento por categoria.',
     ],
   },
@@ -89,9 +86,21 @@ const RECURSOS = [
     guia: ['metas', 'plano-de-guardar'],
     imagem: 'metas',
     itens: [
-      'Reserva para imprevistos e metas com prazo, com o valor guardado só pelo que você registra.',
+      'Reserva para imprevistos e metas com prazo, com o valor guardado só pelo que você registra. Os atalhos de prazo (6 meses, 1 ano, 2 anos ou 5 anos) preenchem a data por você.',
+      'O cartão de cada meta com valor planejado por mês mostra o ritmo: se os aportes acompanham o plano e quanto falta. Ao passar de 25%, 50% e 75% da meta, uma frase curta marca o avanço.',
       'Aportes e resgates não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.',
       'O plano de guardar mostra as etapas e o mês previsto, sem contar rendimento.',
+    ],
+  },
+  {
+    id: 'investir',
+    titulo: 'Investir',
+    guia: ['investimentos'],
+    imagem: 'investimentos',
+    itens: [
+      'Você registra o que aplicou, os aportes, os resgates, os rendimentos e o valor de hoje, como aparecem no seu extrato.',
+      'A rentabilidade dos meses fechados aparece ao lado do CDI e do IPCA do mesmo período, com dados públicos do Banco Central.',
+      'Não é recomendação de investimento, e os investimentos ficam só no seu Pessoal.',
     ],
   },
   {
@@ -138,14 +147,14 @@ function paginaApp({ valores, img }) {
       if (!e) throw new Error(`o guia do core não tem a entrada "${id}" (página O app)`);
       return e;
     });
-    const propositos = [principal, ...extras].map((e) => `<p>${esc(e.purpose)}</p>`).join('\n');
+    // O texto do guia de cada entrada a mais leva o nome dela ("Contas do ano. Para contas que vencem..."): sem o título que o app mostra
+    // acima, a frase do guia ficava solta (12/11/2026).
+    const propositos = [`<p>${esc(principal.purpose)}</p>`, ...extras.map((e) => `<p><strong>${esc(e.title)}.</strong> ${esc(e.purpose)}</p>`)].join('\n');
     return `<article class="recurso" id="${r.id}" aria-labelledby="t-${r.id}">
 <div>
 <h3 id="t-${r.id}">${esc(r.titulo)}</h3>
 ${propositos}
-<ul>
-${r.itens.map((i) => `<li>${esc(i)}</li>`).join('\n')}
-</ul>
+${r.itens.length ? `<ul>\n${r.itens.map((i) => `<li>${esc(i)}</li>`).join('\n')}\n</ul>` : ''}
 <p class="pequeno"><a href="${u(`ajuda/${require('./ajuda').temaDoGuia(r.guia[0])}.html#guia-${r.guia[0]}`)}">Como usar, passo a passo</a></p>
 </div>
 ${celular(img[r.imagem], ARQUIVO)}
@@ -192,7 +201,7 @@ ${m.imagem ? celular(img[m.imagem], ARQUIVO) : ''}
     ),
     bloco(
       `<h2 id="recursos">Os recursos</h2>
-<p class="lead-bloco">A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração.</p>
+<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração.</p>
 <div class="recursos">
 ${linhas}
 </div>`,
@@ -218,8 +227,8 @@ ${mais}
   ];
   return montarPagina({
     arquivo: ARQUIVO,
-    titulo: 'O app',
-    descricao: 'Um passeio pelos recursos da Clarevo: Resumo, anotar gasto, contas a pagar, cartões, metas, Família e Aprender, com telas da demonstração.',
+    titulo: 'O app por dentro: recursos e telas',
+    descricao: 'Um passeio pelas cinco abas da Clarevo: Resumo, Movimentos, Metas, Investir e Aprender, com contas a pagar, cartões e Família, em telas da demonstração.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),
     fonte: brutas.join('\n') + capa,

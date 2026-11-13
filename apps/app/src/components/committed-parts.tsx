@@ -89,7 +89,7 @@ export function Meter({
   return (
     <View style={styles.meterRow} {...a11y}>
       <View style={[styles.track, { height, borderRadius: height / 2 }]}>
-        <Animated.View style={[{ height: inner, backgroundColor: colors.brandDeep }, paid]} />
+        <Animated.View style={[{ height: inner, backgroundColor: colors.brandMarkDeep }, paid]} />
         <Animated.View style={[{ height: inner, overflow: 'hidden' }, open, paidPermille > 0 && styles.gap]}>
           <Stripes height={inner} />
         </Animated.View>
@@ -113,7 +113,7 @@ export function GroupBar({ permille, markPermille, markLabel }: { permille: numb
   return (
     <View style={[styles.groupWrap, marked && { marginBottom: 20 }]} {...decorative}>
       <View style={[styles.track, { height: 8, borderRadius: 4 }]}>
-        <Animated.View style={[{ height: 6, backgroundColor: colors.brand }, fill]} />
+        <Animated.View style={[{ height: 6, backgroundColor: colors.brandMark }, fill]} />
       </View>
       {marked ? (
         <>
@@ -132,7 +132,7 @@ export function GroupBar({ permille, markPermille, markLabel }: { permille: numb
 /** Quadradinho da legenda: "Já pago" sólido, "Em aberto" listrado. */
 function Swatch({ kind }: { kind: 'pago' | 'aberto' }) {
   return (
-    <View style={[styles.swatch, kind === 'pago' && { backgroundColor: colors.brandDeep }]} {...decorative}>
+    <View style={[styles.swatch, kind === 'pago' && { backgroundColor: colors.brandMarkDeep }]} {...decorative}>
       {kind === 'aberto' ? <Stripes height={14} /> : null}
     </View>
   );

@@ -24,7 +24,7 @@ import { MonthCheckBlock } from '@/components/month-check';
 import { SettingSwitch } from '@/components/setting-switch';
 import { ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
-import { Button, Card, FitMoney, LinkButton, Money, Skeleton, Txt, styles as ui } from '@/components/ui';
+import { Button, Card, FitMoney, IconBlock, LinkButton, Money, Skeleton, Txt, styles as ui } from '@/components/ui';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { useCategoryBreakdown, useEvolutionExplanation, useReceivedBreakdown } from '@/state/data';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -52,7 +52,7 @@ export function EvolutionEntry({ onPress }: { onPress: () => void }) {
       accessibilityLabel={T.rowA11y}
       onPress={onPress}
       style={(s) => [ui.input, styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-      <ChartLine size={20} color={colors.textSecondary} aria-hidden />
+      <IconBlock icon={ChartLine} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
           {T.title}
@@ -167,7 +167,7 @@ export function EvolutionChart({ view, selected, onSelect }: { view: AnyView; se
             <Line x1={0} y1={PAD_TOP + 0.5} x2={width} y2={PAD_TOP + 0.5} stroke={colors.border} strokeWidth={1} />
             {belowZero ? <Line x1={0} y1={yOf(0)} x2={width} y2={yOf(0)} stroke={colors.text} strokeWidth={1.5} /> : null}
             {runs.map((d) => (
-              <Path key={d} d={d} stroke={colors.brand} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              <Path key={d} d={d} stroke={colors.brandMark} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
             ))}
             {points.map((p, i) => (p.month === selected ? null : <Marker key={p.month} point={p} x={xOf(i)} y={p.hasValue ? yOf(p.cents) : BASE_Y} />))}
             {points.map((p, i) => (p.month === selected ? <Marker key={p.month} point={p} x={xOf(i)} y={p.hasValue ? yOf(p.cents) : BASE_Y} selected /> : null))}
@@ -186,14 +186,14 @@ function Marker({ point, x, y, selected }: { point: EvolutionPointView; x: numbe
     return (
       <>
         <Circle cx={x} cy={y} r={R_SELECTED} fill={colors.accent} stroke={colors.text} strokeWidth={2.5} />
-        {none ? <Line x1={x - 4} y1={y} x2={x + 4} y2={y} stroke={colors.text} strokeWidth={2.5} strokeLinecap="round" /> : null}
-        {!none && !point.included ? <Circle cx={x} cy={y} r={3.5} fill={colors.surface} stroke={colors.text} strokeWidth={2} /> : null}
+        {none ? <Line x1={x - 4} y1={y} x2={x + 4} y2={y} stroke={colors.textOnAccent} strokeWidth={2.5} strokeLinecap="round" /> : null}
+        {!none && !point.included ? <Circle cx={x} cy={y} r={3.5} fill={colors.surfaceOnBrand} stroke={colors.textOnAccent} strokeWidth={2} /> : null}
       </>
     );
   }
   if (none) return <Line x1={x - 6} y1={y} x2={x + 6} y2={y} stroke={colors.textSecondary} strokeWidth={3} strokeLinecap="round" />;
-  if (point.included) return <Circle cx={x} cy={y} r={R_POINT} fill={colors.brand} stroke={colors.surface} strokeWidth={2} />;
-  return <Circle cx={x} cy={y} r={R_POINT} fill={colors.surface} stroke={colors.brand} strokeWidth={3} />;
+  if (point.included) return <Circle cx={x} cy={y} r={R_POINT} fill={colors.brandMark} stroke={colors.surface} strokeWidth={2} />;
+  return <Circle cx={x} cy={y} r={R_POINT} fill={colors.surface} stroke={colors.brandMark} strokeWidth={3} />;
 }
 
 /** A coluna de um mês: o botão (nome completo para o leitor de tela) com o espaço do gráfico e o rótulo do eixo. */
@@ -263,8 +263,8 @@ function Swatch({ kind, icon: Icon }: { kind: 'included' | 'excluded' | 'none' |
   return (
     <View style={styles.swatch} {...decorative}>
       <Svg width={18} height={18} accessible={false}>
-        {kind === 'included' ? <Circle cx={9} cy={9} r={6} fill={colors.brand} /> : null}
-        {kind === 'excluded' ? <Circle cx={9} cy={9} r={5.5} fill={colors.surface} stroke={colors.brand} strokeWidth={2.5} /> : null}
+        {kind === 'included' ? <Circle cx={9} cy={9} r={6} fill={colors.brandMark} /> : null}
+        {kind === 'excluded' ? <Circle cx={9} cy={9} r={5.5} fill={colors.surface} stroke={colors.brandMark} strokeWidth={2.5} /> : null}
         {kind === 'none' ? <Line x1={3} y1={9} x2={15} y2={9} stroke={colors.textSecondary} strokeWidth={3} strokeLinecap="round" /> : null}
         {kind === 'selected' ? <Circle cx={9} cy={9} r={7} fill={colors.accent} stroke={colors.text} strokeWidth={2} /> : null}
       </Svg>
@@ -479,7 +479,7 @@ function StepButton({ label, hint, icon: Icon, disabled, onPress }: { label: str
       disabled={disabled}
       onPress={onPress}
       style={(s) => [styles.step, disabled && { opacity: 0.35 }, !disabled && s.pressed && { opacity: 0.7 }, !disabled && (s as { focused?: boolean }).focused && ui.focusRing]}>
-      <Icon size={22} color={colors.brand} strokeWidth={2.25} aria-hidden />
+      <Icon size={22} color={colors.brandText} strokeWidth={2.25} aria-hidden />
     </Pressable>
   );
 }
@@ -917,7 +917,7 @@ const styles = StyleSheet.create({
   columnSelected: { backgroundColor: colors.brandTint },
   axis: { alignItems: 'center', paddingTop: 2, paddingBottom: space[1], gap: 2, minHeight: 40 },
   axisLabel: { fontSize: 12, lineHeight: 16, textAlign: 'center', color: colors.text },
-  axisLabelSelected: { backgroundColor: colors.accent, borderRadius: 6, paddingHorizontal: 2, overflow: 'hidden' },
+  axisLabelSelected: { backgroundColor: colors.accent, color: colors.textOnAccent, borderRadius: 6, paddingHorizontal: 2, overflow: 'hidden' },
   axisIcon: { height: 16, alignItems: 'center', justifyContent: 'center' },
   chartHead: { gap: space[1], paddingHorizontal: space[3] },
   legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space[4], rowGap: space[1], marginTop: space[1], paddingHorizontal: space[3] },

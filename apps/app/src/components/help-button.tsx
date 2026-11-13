@@ -22,7 +22,7 @@ export function HelpButton({ screen }: { screen: HelpScreen }) {
         accessibilityLabel={HELP_TEXT.button}
         onPress={() => setOpen(true)}
         hitSlop={4}
-        style={(s) => [styles.button, s.pressed && { backgroundColor: 'rgba(255,255,255,0.16)' }, (s as { focused?: boolean }).focused && focusOnBrand]}>
+        style={(s) => [styles.button, s.pressed && { backgroundColor: colors.onBrandPressed }, (s as { focused?: boolean }).focused && focusOnBrand]}>
         <CircleQuestionMark size={24} color={colors.textOnBrand} aria-hidden />
       </Pressable>
       {open ? <HelpSheet entry={guideHelpEntry(screen)} onClose={() => setOpen(false)} /> : null}
@@ -57,7 +57,7 @@ function HelpSheet({ entry, onClose }: { entry: GuideEntry; onClose: () => void 
             {entry.steps.map((step, i) => (
               <View key={step} style={styles.step} accessible accessibilityLabel={GUIDE_TEXT.stepA11y(i + 1, step)}>
                 <View style={styles.number} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-                  <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.extrabold }}>
+                  <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.extrabold }}>
                     {i + 1}
                   </Txt>
                 </View>
@@ -77,7 +77,7 @@ function HelpSheet({ entry, onClose }: { entry: GuideEntry; onClose: () => void 
 
 const styles = StyleSheet.create({
   button: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(23,34,59,0.55)', alignItems: 'center', justifyContent: 'center', padding: space[4] },
+  backdrop: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: space[4] },
   box: { width: '100%', maxWidth: 440, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space[6], gap: space[3] },
   steps: { flexShrink: 1 },
   step: { flexDirection: 'row', gap: space[3], alignItems: 'flex-start' },

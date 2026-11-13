@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, ReduceMotion } from 'react-native-reanimated';
 
+import { useNotice } from '@/components/notice-queue';
 import { codeOf, isUncertain } from '@/components/retorno-acoes';
 import { Card, Chip, LinkButton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
@@ -135,7 +136,9 @@ export function SignupSourceCard({ eligible, blocked, onSaved }: { eligible: boo
     ready &&
     source.isSuccess &&
     shouldAskSignupSource({ answered: source.data !== null, today, device: device.device });
-  if (!show) return null;
+  // A última da fila de avisos do Resumo: só quando nenhum outro aviso temporário está na tela.
+  const allowed = useNotice('origem', show);
+  if (!allowed) return null;
 
   const choose = async (s: SignupSourceOption) => {
     if (await writer.choose(s)) {

@@ -25,7 +25,8 @@ const gerador = require(join(ROOT, 'scripts', 'gerar-site.js')) as {
 const formularios = require(join(ROOT, 'scripts', 'site', 'formularios.js')) as { TAMANHOS: Record<string, number>; FAIXAS: { valor: string; rotulo: string }[]; ISCA: string; CAMPOS: { contato: string[]; newsletter: string[] }; LIMITES: unknown; rotasLigadas: (v: unknown) => { contato: boolean; newsletter: boolean } };
 const { servir } = require(join(ROOT, 'scripts', 'site', 'servir.js')) as { servir: (pasta: string, o?: Record<string, unknown>) => Promise<{ url: string; pedidos: string[]; doWorker: string[]; fechar: () => Promise<void> }> };
 const texto = (v: string | Buffer | undefined): string => (typeof v === 'string' ? v : v ? v.toString('utf8') : '');
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+// O mesmo `esc` do gerador (scripts/site/texto.js), com o espaço fixo entre "R$" e o valor (12/11/2026).
+const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/R\$ (?=\d)/g, 'R$\u00a0');
 
 const PREENCHIDOS: Record<string, string> = {
   'RAZÃO SOCIAL': 'Empresa Exemplo Ltda',
@@ -37,6 +38,9 @@ const PREENCHIDOS: Record<string, string> = {
   DOMÍNIO: 'exemplo.test',
   'DATA DE VIGÊNCIA': '1 de janeiro de 2027',
 };
+
+/** A data de referência dos posts de Novidades nos testes: a do post mais novo do repositório (nenhum post pode ter data depois dela). */
+const REFERENCIA_DOS_POSTS = '2026-11-12';
 
 // ------------------------------------------------------------------------------------------------------------------------------
 // O worker
@@ -51,7 +55,7 @@ let fonteDoWorker: string;
 let fonteLigada: string;
 beforeAll(async () => {
   fonteDoWorker = readFileSync(join(SITE, '_worker.js'), 'utf8');
-  fonteLigada = texto(gerador.gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: '2026-10-23' }).arquivos.get('_worker.js'));
+  fonteLigada = texto(gerador.gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: REFERENCIA_DOS_POSTS }).arquivos.get('_worker.js'));
   worker = await carregarWorker(fonteLigada);
   workerGravado = await carregarWorker(fonteDoWorker);
 }, 60_000);
@@ -613,8 +617,8 @@ describe('site público: _worker.js, o resto cai nos arquivos estáticos', () =>
 // Formulários prontos e desligados
 
 describe('site público: formulários prontos e desligados', () => {
-  const desligado = gerador.gerarSite({ dados: { ...PREENCHIDOS }, referencia: '2026-10-23' });
-  const ligado = gerador.gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: '2026-10-23' });
+  const desligado = gerador.gerarSite({ dados: { ...PREENCHIDOS }, referencia: REFERENCIA_DOS_POSTS });
+  const ligado = gerador.gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: REFERENCIA_DOS_POSTS });
   const h = (g: typeof ligado, nome: string) => texto(g.arquivos.get(nome));
   const PAGINAS_DO_CONTATO = ['contato-enviado.html', 'contato-erro.html'];
   const PAGINAS_DA_NEWSLETTER = ['novidades/receber.html', 'novidades/receber-enviado.html', 'novidades/receber-confirmado.html', 'novidades/receber-erro.html'];
@@ -903,7 +907,7 @@ describe('site público: servir.js entrega ao worker só o que o _routes.json ma
       writeFileSync(join(dir, nome), conteudo);
     };
     // O worker de verdade (com os dois formulários ligados) e as páginas que ele serviria.
-    const g = gerador.gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: '2026-10-23' });
+    const g = gerador.gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: REFERENCIA_DOS_POSTS });
     for (const nome of ['_worker.js', '_routes.json', '_headers', '404.html', 'index.html', 'estilo.css', 'contato-erro-email.html']) copia(nome, g.arquivos.get(nome) as string);
     const servidor = await servir(dir, { env: { RESEND_API_KEY: 'x', CONTATO_DESTINO: 'a@b.cd', CONTATO_REMETENTE: 'a@b.cd' }, hostDoSite: true });
     try {
@@ -945,7 +949,7 @@ describe('site público: as seções 3.6 e 3.7 da política só existem com o fo
     const dir = mkdtempSync(join(tmpdir(), 'clarevo-politica-'));
     try {
       writeFileSync(join(dir, 'politica-de-privacidade.md'), md);
-      return gerador.gerarSite({ legal: dir, dados: { ...PREENCHIDOS, ...dados }, referencia: '2026-10-23' });
+      return gerador.gerarSite({ legal: dir, dados: { ...PREENCHIDOS, ...dados }, referencia: REFERENCIA_DOS_POSTS });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -1002,7 +1006,7 @@ describe('site público: as seções 3.6 e 3.7 da política só existem com o fo
       writeFileSync(join(dir, 'legal', 'politica-de-privacidade.md'), POLITICA);
       const rodar = (dados: Record<string, unknown>) => {
         writeFileSync(join(dir, 'dados.json'), JSON.stringify({ ...PREENCHIDOS, ...dados }));
-        return spawnSync(process.execPath, [join(ROOT, 'scripts', 'gerar-site.js'), '--final', '--legal', join(dir, 'legal'), '--dados', join(dir, 'dados.json'), '--referencia', '2026-10-23', '--saida', join(dir, 'saida')], { encoding: 'utf8' });
+        return spawnSync(process.execPath, [join(ROOT, 'scripts', 'gerar-site.js'), '--final', '--legal', join(dir, 'legal'), '--dados', join(dir, 'dados.json'), '--referencia', REFERENCIA_DOS_POSTS, '--saida', join(dir, 'saida')], { encoding: 'utf8' });
       };
       const desligados = rodar({});
       expect(desligados.status).toBe(1);
@@ -1025,7 +1029,7 @@ describe('site público: as seções 3.6 e 3.7 da política só existem com o fo
     const trechos = readFileSync(join(ROOT, 'docs', 'legal', 'politica-trechos-desligados.md'), 'utf8');
     expect(trechos).toMatch(/^### 3\.6 Contato pelo site$/m);
     expect(trechos).toMatch(/^### 3\.7 Novidades por e-mail$/m);
-    const g = gerador.gerarSite({ dados: { ...PREENCHIDOS }, referencia: '2026-10-23' });
+    const g = gerador.gerarSite({ dados: { ...PREENCHIDOS }, referencia: REFERENCIA_DOS_POSTS });
     expect(texto(g.arquivos.get('privacidade.html'))).not.toContain('A RETIRAR');
     expect(g.problemasFinais.filter((p) => p.startsWith('privacidade.html: a seção') || p.includes('a política não tem a seção'))).toEqual([]);
     expect(texto(readFileSync(join(SITE, 'privacidade.html')))).not.toContain(MARCA_37);

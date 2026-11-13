@@ -49,7 +49,7 @@ export function GoalPresetGrid({
       ))}
       <Tile label={GOAL_PRESET_TEXT.other} role="radio" width={tileWidth} selected={choice === 'outra'} onPress={() => onChoose('outra')}>
         <View style={[styles.thumb, styles.otherThumb]} aria-hidden>
-          <PencilLine size={26} color={colors.brand} strokeWidth={1.75} />
+          <PencilLine size={26} color={colors.brandText} strokeWidth={1.75} />
         </View>
       </Tile>
     </View>
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   // Antes da primeira medida (um quadro): 3 colunas aproximadas, sem esticar.
   tileUnmeasured: { width: '31%' },
-  tileSelected: { borderColor: colors.brand },
+  tileSelected: { borderColor: colors.brandText },
   thumb: { height: 56, borderRadius: radius.sm - 4 },
   otherThumb: { backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
   hint: { gap: space[1], padding: space[3], borderRadius: radius.sm, backgroundColor: colors.brandTint },

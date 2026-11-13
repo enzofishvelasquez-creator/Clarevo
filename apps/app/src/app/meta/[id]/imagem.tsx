@@ -225,6 +225,6 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     alignItems: 'stretch',
   },
-  tileSelected: { borderColor: colors.brand },
+  tileSelected: { borderColor: colors.brandText },
   thumb: { height: 64, borderRadius: radius.sm - 4 },
 });

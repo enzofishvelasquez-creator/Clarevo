@@ -50,7 +50,7 @@ export function TourDialog({ onClose }: { onClose: () => void }) {
         <View style={[styles.box, { maxHeight: Math.max(280, Math.round(height * 0.9)) }]} accessibilityViewIsModal>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <View style={styles.icon}>
-              <Icon size={36} color={colors.text} strokeWidth={2.25} aria-hidden />
+              <Icon size={36} color={colors.textOnAccent} strokeWidth={2.25} aria-hidden />
             </View>
             <View style={styles.progressRow}>
               <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
@@ -117,7 +117,7 @@ export function WelcomeTour({ personal, contextId }: { personal: boolean; contex
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(23,34,59,0.55)', alignItems: 'center', justifyContent: 'center', padding: space[4] },
+  backdrop: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: space[4] },
   box: { width: '100%', maxWidth: 440, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space[6], gap: space[4] },
   content: { gap: space[3] },
   lines: { gap: space[2] },
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   dots: { flexDirection: 'row', gap: space[1] },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
-  dotOn: { backgroundColor: colors.brand, width: 20 },
+  dotOn: { backgroundColor: colors.brandMark, width: 20 },
   title: { fontFamily: fonts.extrabold, fontSize: 22, lineHeight: 30 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2], justifyContent: 'flex-end' },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 120 },

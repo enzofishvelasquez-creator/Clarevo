@@ -251,7 +251,7 @@ function CardBody({
             </Txt>
             {archived ? (
               <View style={styles.statusPill}>
-                <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold }}>
+                <Txt variant="caption" color={colors.textOnAccent} style={{ fontFamily: fonts.bold }}>
                   {T.archivedBadge}
                 </Txt>
               </View>

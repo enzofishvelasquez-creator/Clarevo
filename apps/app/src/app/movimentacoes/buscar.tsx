@@ -188,10 +188,10 @@ export default function BuscarScreen() {
             aria-expanded={showMore}
             onPress={() => setExpanded((e) => !e)}
             style={(s) => [styles.more, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-            <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.bold }}>
+            <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold }}>
               {showMore ? T.lessFilters : T.moreFilters(activeFilters)}
             </Txt>
-            {showMore ? <ChevronUp size={18} color={colors.brand} aria-hidden /> : <ChevronDown size={18} color={colors.brand} aria-hidden />}
+            {showMore ? <ChevronUp size={18} color={colors.brandText} aria-hidden /> : <ChevronDown size={18} color={colors.brandText} aria-hidden />}
           </Pressable>
 
           {showMore ? (

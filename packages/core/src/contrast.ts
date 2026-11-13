@@ -4,8 +4,8 @@
  * A razão é a do WCAG: (L1 + 0,05) / (L2 + 0,05), com L a luminância relativa em sRGB. Cores com transparência (o botão
  * desabilitado fica com 65% de opacidade) são compostas sobre o que está atrás antes da conta.
  * A tabela `THEME_CONTRAST_PAIRS` lista cada par de cor realmente usado nas telas (conferido na demonstração, em todas as
- * telas, e nos estados que a demonstração não mostra: erro, foco, desabilitado, pressionado). O teste lê as cores de
- * `apps/app/src/theme/tokens.ts`, então trocar uma cor do tema sem rever o contraste quebra o teste.
+ * telas, e nos estados que a demonstração não mostra: erro, foco, desabilitado, pressionado). Os testes leem as duas paletas de
+ * `apps/app/src/theme/palettes.ts` (claro e escuro, D-096), então trocar uma cor sem rever o contraste quebra o teste.
  */
 
 export type Rgb = readonly [number, number, number];
@@ -83,10 +83,13 @@ export const THEME_CONTRAST_PAIRS: readonly ContrastPair[] = [
   // Texto sobre fundos claros
   { use: 'Texto principal sobre cartão branco', fg: 'text', bg: 'surface', kind: 'texto' },
   { use: 'Texto principal sobre o fundo da tela', fg: 'text', bg: 'background', kind: 'texto' },
-  { use: 'Texto principal sobre o lima (selo "Demonstração", cartões de Aprender)', fg: 'text', bg: 'accent', kind: 'texto' },
+  { use: 'Texto escuro sobre o lima (selo "Demonstração", pílulas, cartões de Aprender), nos dois temas', fg: 'textOnAccent', bg: 'accent', kind: 'texto' },
   { use: 'Texto principal sobre o fundo do resumo de explicação', fg: 'text', bg: 'accentTint', kind: 'texto' },
   { use: 'Texto principal sobre azul claro (aviso informativo, chip, aba ativa)', fg: 'text', bg: 'brandTint', kind: 'texto' },
-  { use: 'Texto principal sobre o trilho do seletor "Por registro | Por categoria"', fg: 'text', bg: '#E6EBF5', kind: 'texto' },
+  { use: 'Texto principal sobre o trilho do seletor "Por registro | Por categoria"', fg: 'text', bg: 'muted', kind: 'texto' },
+  { use: 'Texto principal sobre o fundo de confirmação', fg: 'text', bg: 'successTint', kind: 'texto' },
+  { use: 'Texto principal sobre o botão suave pressionado', fg: 'text', bg: 'brandTintPressed', kind: 'texto' },
+  { use: 'Texto principal sobre o selo de linha sem importar (divisória)', fg: 'text', bg: 'border', kind: 'texto' },
   { use: 'Texto principal sobre o aviso de erro', fg: 'text', bg: 'errorTint', kind: 'texto' },
   { use: 'Texto secundário sobre cartão branco (legendas, dicas)', fg: 'textSecondary', bg: 'surface', kind: 'texto' },
   { use: 'Texto secundário sobre o fundo da tela', fg: 'textSecondary', bg: 'background', kind: 'texto' },
@@ -95,12 +98,16 @@ export const THEME_CONTRAST_PAIRS: readonly ContrastPair[] = [
   { use: 'Texto secundário sobre o aviso de erro', fg: 'textSecondary', bg: 'errorTint', kind: 'texto' },
   { use: 'Texto de exemplo (placeholder) sobre campo branco', fg: 'placeholder', bg: 'surface', kind: 'texto' },
   { use: 'Texto de exemplo (placeholder) sobre campo com erro', fg: 'placeholder', bg: 'errorTint', kind: 'texto' },
-  // Azul da marca como texto
-  { use: 'Links e botões suaves sobre cartão branco', fg: 'brand', bg: 'surface', kind: 'texto' },
-  { use: 'Links e "Voltar" sobre o fundo da tela', fg: 'brand', bg: 'background', kind: 'texto' },
-  { use: 'Botão suave, chip selecionado e aba ativa (azul sobre azul claro)', fg: 'brand', bg: 'brandTint', kind: 'texto' },
-  { use: 'Azul sobre o fundo do resumo de explicação ("O que é isso?")', fg: 'brand', bg: 'accentTint', kind: 'texto' },
-  { use: 'Azul sobre o botão suave pressionado', fg: 'brand', bg: 'brandTintPressed', kind: 'texto' },
+  // Azul como texto (brandText; no claro, o mesmo azul da marca)
+  { use: 'Links e botões suaves sobre cartão branco', fg: 'brandText', bg: 'surface', kind: 'texto' },
+  { use: 'Links e "Voltar" sobre o fundo da tela', fg: 'brandText', bg: 'background', kind: 'texto' },
+  { use: 'Botão suave, chip selecionado e aba ativa (azul sobre azul claro)', fg: 'brandText', bg: 'brandTint', kind: 'texto' },
+  { use: 'Azul sobre o fundo do resumo de explicação ("O que é isso?")', fg: 'brandText', bg: 'accentTint', kind: 'texto' },
+  { use: 'Azul sobre o botão suave pressionado', fg: 'brandText', bg: 'brandTintPressed', kind: 'texto' },
+  { use: 'Valor do plano Individual sobre o azul claro', fg: 'brandTextDeep', bg: 'brandTint', kind: 'texto grande' },
+  { use: '"Ler a explicação completa" sobre o fundo do resumo de explicação', fg: 'brandTextDeep', bg: 'accentTint', kind: 'texto' },
+  { use: 'Iniciais e espaço (Pessoal ou Família) em azul sobre a pílula branca do cabeçalho', fg: 'brand', bg: 'surfaceOnBrand', kind: 'texto' },
+  { use: 'Azul sobre o botão suave dentro de um cartão azul (reserva, plano de guardar)', fg: 'brand', bg: 'onBrandSoft', kind: 'texto' },
   // Texto sobre o azul
   { use: 'Texto branco sobre o azul (cabeçalho, botão principal)', fg: 'textOnBrand', bg: 'brand', kind: 'texto' },
   { use: 'Texto branco sobre o botão principal pressionado', fg: 'textOnBrand', bg: 'brandPressed', kind: 'texto' },
@@ -114,15 +121,24 @@ export const THEME_CONTRAST_PAIRS: readonly ContrastPair[] = [
   { use: 'Valor recebido (verde) sobre cartão branco', fg: 'success', bg: 'surface', kind: 'texto' },
   { use: 'Aviso de confirmação ("Gasto salvo")', fg: 'successText', bg: 'successTint', kind: 'texto' },
   // Ícones e contornos (3:1)
-  { use: 'Ícone azul sobre o quadrado azul claro (linha de gasto, atalhos)', fg: 'brand', bg: 'brandTint', kind: 'ícone' },
+  { use: 'Ícone azul sobre o quadrado azul claro (linha de gasto, atalhos)', fg: 'brandText', bg: 'brandTint', kind: 'ícone' },
+  { use: 'Ícone escuro sobre o lima (tour, meta alcançada, passo feito)', fg: 'textOnAccent', bg: 'accent', kind: 'ícone' },
+  { use: 'Ícone sobre o lima claro (atalho de calculadora, plano Família)', fg: 'text', bg: 'accentTint', kind: 'ícone' },
+  { use: 'Barra de progresso e linha de gráfico sobre o cartão', fg: 'brandMark', bg: 'surface', kind: 'ícone' },
+  { use: 'Barra de progresso sobre o trilho azul claro', fg: 'brandMark', bg: 'brandTint', kind: 'ícone' },
+  { use: '"Já pago" e "Aportado" (parte sólida) sobre o trilho azul claro', fg: 'brandMarkDeep', bg: 'brandTint', kind: 'ícone' },
+  { use: '"Aportado" (parte sólida) sobre o cartão', fg: 'brandMarkDeep', bg: 'surface', kind: 'ícone' },
   { use: 'Ícone verde sobre o quadrado verde claro (linha de recebimento)', fg: 'success', bg: 'successTint', kind: 'ícone' },
   { use: 'Ícone cinza (setas "›", lupa) sobre cartão branco', fg: 'textSecondary', bg: 'surface', kind: 'ícone' },
   { use: 'Ícone branco sobre o azul (voltar, olho, mês anterior)', fg: 'textOnBrand', bg: 'brand', kind: 'ícone' },
   { use: 'Contorno de campo e de chip sobre cartão branco', fg: 'borderStrong', bg: 'surface', kind: 'contorno' },
   { use: 'Contorno de campo sobre o fundo da tela', fg: 'borderStrong', bg: 'background', kind: 'contorno' },
   { use: 'Contorno de campo com erro sobre o fundo de erro', fg: 'error', bg: 'errorTint', kind: 'contorno' },
-  { use: 'Anel de foco azul sobre cartão branco', fg: 'brand', bg: 'surface', kind: 'contorno' },
-  { use: 'Anel de foco azul sobre o fundo da tela', fg: 'brand', bg: 'background', kind: 'contorno' },
+  { use: 'Anel de foco azul sobre cartão branco', fg: 'brandText', bg: 'surface', kind: 'contorno' },
+  { use: 'Anel de foco azul sobre o fundo da tela', fg: 'brandText', bg: 'background', kind: 'contorno' },
+  { use: 'Anel de foco azul sobre o azul claro (aba ativa)', fg: 'brandText', bg: 'brandTint', kind: 'contorno' },
+  { use: 'Anel de foco azul da marca sobre o lima (cartões de Aprender)', fg: 'brand', bg: 'accent', kind: 'contorno' },
+  { use: 'Contorno azul do chip, da caixa e do interruptor marcados sobre o cartão', fg: 'brandText', bg: 'surface', kind: 'contorno' },
   { use: 'Anel de foco lima sobre o azul (cabeçalho)', fg: 'accent', bg: 'brand', kind: 'contorno' },
   { use: 'Anel de foco lima sobre o trilho do seletor', fg: 'accent', bg: 'brandDeep', kind: 'contorno' },
   { use: 'Campo em foco: contorno escuro sobre cartão branco', fg: 'text', bg: 'surface', kind: 'contorno' },
@@ -138,7 +154,7 @@ export const THEME_CONTRAST_PAIRS: readonly ContrastPair[] = [
   },
   {
     use: 'Botão suave desabilitado (65% de opacidade sobre o cartão)',
-    fg: 'brand',
+    fg: 'brandText',
     bg: 'brandTint',
     kind: 'texto',
     opacity: 0.65,

@@ -159,6 +159,14 @@ A Clarevo é paga por assinatura mensal, com 14 dias grátis no começo (Termos 
 - **Plano Família.** Quem paga é a pessoa titular. As outras pessoas da Família não veem os dados de pagamento da titular, só que a conta delas está coberta pelo Plano Família.
 - **Para quê.** Só para liberar ou travar a escrita conforme a assinatura e para mostrar a situação em Conta. Não usamos esses dados para anúncio nem para montar perfil.
 
+### 3.10 Nível da conta
+
+A conta tem um nível (Bronze, Prata, Ouro ou Diamante) pelo quanto você já usa o app, como já ter anotado um gasto ou criado uma meta.
+
+- **O que guardamos.** Quais desses marcos você já alcançou e quando, para o nível nunca descer. Nenhum valor em dinheiro entra no nível.
+- **Quem vê.** Só você, na tela "Nível da conta". Ninguém da Família nem a empresa que oferece o benefício vê o seu nível, e ele não entra em relatório nenhum.
+- **Por quanto tempo.** Enquanto a conta existir. Ao excluir a conta, os marcos são apagados junto.
+
 ## 4. O que não guardamos?
 
 - Número completo de cartão, código de segurança (CVV) e validade. O app recusa apelidos que pareçam número de cartão.
@@ -203,6 +211,7 @@ A leitura acontece no seu aparelho. A Clarevo não tem servidor que receba esses
 - Contagens de cadastros e de uso, sem identificar ninguém (seção 3.7): [PROPOSTA: legítimo interesse (art. 7º, IX), com dados agregados]. [A DEFINIR: confirmar a base e fazer o teste de legítimo interesse]
 - Anotar pelo Telegram (seção 3.8): [PROPOSTA: execução de contrato, a pedido da pessoa, que liga a conta quando quer (art. 7º, V)]. [A DEFINIR: confirmar a base e o papel do Telegram]
 - Assinatura e pagamento (seção 3.9): [PROPOSTA: execução de contrato (art. 7º, V) e, para o que a lei fiscal exigir, cumprimento de obrigação legal (art. 7º, II)]. [A DEFINIR: confirmar a base]
+- Nível da conta (seção 3.10): [PROPOSTA: execução de contrato (art. 7º, V), por ser parte do serviço que você usa]. [A DEFINIR: confirmar a base (pergunta 52 ao advogado)]
 - Funções do aparelho (câmera, biometria e lembretes): você liga e pode desligar a qualquer momento, e os dados dessas funções não chegam à Clarevo. [A DEFINIR: confirmar se precisam de base própria]
 
 Não tomamos decisões automatizadas sobre você, e a Clarevo não faz análise de crédito.
@@ -252,6 +261,7 @@ Estas informações ficam só no seu aparelho (no armazenamento do app, ou no na
 - a sessão, para você não precisar entrar toda vez;
 - as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, e avisos que você dispensou (inclusive, [PROPOSTA: o dia em que você começou a usar o app neste aparelho e o "Agora não" da pergunta da seção 3.6]);
 - memórias para preencher mais rápido: a descrição e a categoria da última nota de cada loja (a loja é identificada pelo resumo do CNPJ, até 50 lojas), o mesmo para o nome lido de comprovantes (pelo resumo do nome, até 50) e as categorias que você escolheu na importação de extrato (até 300 entradas);
+- o último nível da conta já mostrado neste aparelho, para a comemoração da troca de nível aparecer uma vez só;
 - lembretes de contas a pagar, que são notificações agendadas no aparelho. Na tela bloqueada eles não mostram valor nem descrição, e o app não guarda token de notificação remota;
 - o widget da tela inicial, que está desligado. Se for ligado, o aparelho guardará um resumo para o widget, com os valores ocultos por padrão.
 

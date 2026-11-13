@@ -161,8 +161,8 @@ export default function DetalheRegistro() {
 
               <Card style={{ gap: space[3] }}>
                 <View style={[styles.badge, r.kind === 'receita' && { backgroundColor: colors.successTint }]}>
-                  {r.kind === 'despesa' ? <ArrowUpRight size={16} color={colors.brand} /> : <ArrowDownLeft size={16} color={colors.successText} />}
-                  <Txt variant="label" color={r.kind === 'despesa' ? colors.brand : colors.successText} style={{ fontFamily: fonts.bold }}>
+                  {r.kind === 'despesa' ? <ArrowUpRight size={16} color={colors.brandText} /> : <ArrowDownLeft size={16} color={colors.successText} />}
+                  <Txt variant="label" color={r.kind === 'despesa' ? colors.brandText : colors.successText} style={{ fontFamily: fonts.bold }}>
                     {r.kind === 'despesa' ? 'Gasto pago' : 'Recebido'}
                   </Txt>
                 </View>

@@ -67,7 +67,7 @@ export function ReserveCard({
             {GOALS_TEXT.reserveTitle}
           </Txt>
         </View>
-        <Button label={GOALS_TEXT.reserveCalculate} tone="soft" onPress={() => router.push('/reserva')} />
+        <Button label={GOALS_TEXT.reserveCalculate} tone="onBrandSoft" onPress={() => router.push('/reserva')} />
         <Txt color={colors.textOnBrand}>{GOALS_TEXT.reserveEmpty}</Txt>
         {/* Quem respondeu "consigo" e ainda não tem reserva também vê o plano aqui, depois do botão (que fica à vista). */}
         {planSlot}
@@ -87,7 +87,7 @@ export function ReserveCard({
         </Txt>
         {reserve.status !== 'ativa' ? (
           <View style={styles.pill}>
-            <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold }}>
+            <Txt variant="caption" color={colors.textOnAccent} style={{ fontFamily: fonts.bold }}>
               {GOAL_STATUS_LABEL[reserve.status]}
             </Txt>
           </View>
@@ -103,7 +103,7 @@ export function ReserveCard({
         </Txt>
         {plan.progress.reached ? (
           <View style={styles.pill}>
-            <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold }}>
+            <Txt variant="caption" color={colors.textOnAccent} style={{ fontFamily: fonts.bold }}>
               {GOALS_TEXT.reachedBadge}
             </Txt>
           </View>
@@ -131,7 +131,7 @@ export function ReserveCard({
       <View style={styles.actions}>
         <Button
           label={GOALS_TEXT.addDeposit}
-          tone="soft"
+          tone="onBrandSoft"
           style={styles.action}
           onPress={() => router.push({ pathname: '/meta/[id]/movimento', params: { id: reserve.id, tipo: 'aporte' } })}
         />
@@ -171,7 +171,7 @@ export function GoalCard({ goal, plan, image }: { goal: Goal; plan: GoalPlan; im
       <GoalImageView goal={goal} image={image} height={104} decorative />
       <View style={styles.goalHead}>
         <View style={styles.disc}>
-          <Target size={18} color={colors.text} strokeWidth={2.25} aria-hidden />
+          <Target size={18} color={colors.textOnAccent} strokeWidth={2.25} aria-hidden />
         </View>
         <Txt variant="label" style={{ flex: 1, fontFamily: fonts.bold, fontSize: 16 }}>
           {goal.name}

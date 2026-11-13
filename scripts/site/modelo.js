@@ -63,9 +63,10 @@ ${colunas}
  * conta. `capa`: HTML do herói, com o `h1`; `corpo`: HTML que vai direto em `<main>`, depois da capa.
  * `jsonld`: objetos de dados estruturados. `scripts`: arquivos `.js` do próprio site, com caminho a partir da raiz. `modulos`: o mesmo, como módulo ES
  * (as calculadoras, que importam o núcleo de `js/nucleo/`). `precarga`: módulos ES que a página vai precisar, com `modulepreload` no `<head>`
- * para o navegador pedir todos de uma vez (sem esperar cada `import`). `cabecalho`: HTML a mais no `<head>`.
+ * para o navegador pedir todos de uma vez (sem esperar cada `import`). `cabecalho`: HTML a mais no `<head>`. `atualizada`: a data
+ * ("AAAA-MM-DD") do conteúdo da página, quando ele tem uma (post e tema de Aprender), que vira o `<lastmod>` do sitemap.
  */
-function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], precarga = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false }) {
+function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], precarga = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false, atualizada = null }) {
   const pendencias = pendenciasDoTexto(`${fonte}\n${RODAPE_LEGAL}`, valores);
   const faixa = pendencias.length
     ? `<div class="faixa" role="note"><div class="miolo"><p><strong>Versão preliminar, em revisão.</strong> Este texto ainda não vale como versão final: os trechos destacados serão preenchidos antes da publicação.</p></div></div>\n`
@@ -129,7 +130,7 @@ ${rodapeHtml(arquivo, valores)}
 </body>
 </html>
 `;
-  return { arquivo, html, pendencias, semIndexar };
+  return { arquivo, html, pendencias, semIndexar, atualizada };
 }
 
 /** Uma coluna de texto (páginas de leitura): `<div class="miolo conteudo"><div class="texto">...</div></div>`. */

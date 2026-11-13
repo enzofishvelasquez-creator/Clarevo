@@ -1,4 +1,4 @@
-import { FULL_ACCESS, type Access } from '@clarevo/core';
+import { FULL_ACCESS, accountLevel, type Access, type AccountLevel, type AccountMarks, type WebSubscriptionStatus } from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
@@ -28,8 +28,45 @@ export function useAccessCanWrite(): boolean {
   return (useAccess().data ?? FULL_ACCESS).canWrite;
 }
 
-/** Recarregar a situação do acesso (depois de aceitar um benefício, entrar ou sair de uma Família). */
+/** Recarregar a situação do acesso (depois de aceitar um benefício, entrar ou sair de uma Família) e a da assinatura no cartão. */
 export function useReloadAccess() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ['access'] });
+  return () => Promise.all([qc.invalidateQueries({ queryKey: ['access'] }), qc.invalidateQueries({ queryKey: ['web-subscription'] })]);
+}
+
+/**
+ * A assinatura no cartão feita na web (12/11/2026, teste no sandbox): se ainda está ativa no Asaas, e quando renova, ou se foi cancelada.
+ * Depois de cancelar, o acesso continua até o fim do período pago, então só o Asaas diz que ela não renova. Só na web e só para quem
+ * assinou na web (`enabled`); null quando não deu para saber (a tela segue como antes).
+ */
+export function useWebSubscriptionStatus(enabled: boolean) {
+  const { repo, user } = useSession();
+  return useQuery({
+    queryKey: ['web-subscription', user?.id ?? null],
+    queryFn: (): Promise<WebSubscriptionStatus | null> => repo!.getWebSubscriptionStatus(),
+    enabled: Boolean(enabled && repo && user),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+/**
+ * Os marcos do nível da conta (D-095): `my_account_marks`, uma leitura por pessoa. Quem mostra o nível pede de novo ao voltar para a
+ * tela (`refetch`), porque qualquer anotação pode ter concluído um marco. Falha de leitura não mostra nível nenhum.
+ */
+export function useAccountMarks() {
+  const { repo, user } = useSession();
+  return useQuery({
+    queryKey: ['account-marks', user?.id ?? null],
+    queryFn: (): Promise<AccountMarks> => repo!.getAccountMarks(),
+    enabled: Boolean(repo && user),
+    staleTime: 15_000,
+    retry: false,
+  });
+}
+
+/** O nível da conta, ou nulo enquanto carrega ou se a leitura falhar. */
+export function useAccountLevel(): AccountLevel | null {
+  const marks = useAccountMarks().data;
+  return marks ? accountLevel(marks) : null;
 }

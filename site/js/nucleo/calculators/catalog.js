@@ -10,7 +10,7 @@ export const CALCULATORS = [
     { slug: 'custo-por-ano', title: 'Quanto custa por ano?', subtitle: 'Por ano, por mês e por dia', group: 'compra' },
     { slug: 'custo-da-divida', title: 'Quanto custa uma dívida?', subtitle: 'Rotativo, cheque especial ou empréstimo', group: 'dividas' },
     { slug: 'quitar-antes', title: 'Quitar antes ou adiantar parcelas', subtitle: 'Uma estimativa de quanto dos juros sai da conta', group: 'dividas' },
-    { slug: 'multa-e-juros', title: 'Multa e juros por atraso', subtitle: 'Com os valores do boleto', group: 'dividas' },
+    { slug: 'multa-e-juros', title: 'Multa e juros por atraso', subtitle: 'Boleto, conta ou fatura do cartão', group: 'dividas' },
     { slug: 'plano-dividas', title: 'Em que ordem quitar as dívidas?', subtitle: 'Duas ordens de pagamento, lado a lado', group: 'dividas' },
     { slug: 'reserva', title: 'Quanto guardar para imprevistos?', subtitle: 'Quantos meses seus gastos essenciais cobrem', group: 'guardar' },
     { slug: 'juntar-para-objetivo', title: 'Juntar para um objetivo', subtitle: 'Quanto guardar por mês ou em quanto tempo', group: 'guardar' },

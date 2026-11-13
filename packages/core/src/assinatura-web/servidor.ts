@@ -441,6 +441,7 @@ export interface AssinaturaWebDeps {
 /** As respostas da função ao app. */
 export type AssinaturaWebResult =
   | { result: 'checkout'; url: string }
+  | { result: 'ativa'; nextDueDate: IsoDate | null }
   | {
       result:
         | 'ja_assinante'
@@ -674,12 +675,22 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     }
     const action = payload?.action;
     const plan = payload?.plan;
-    if ((action !== 'assinar' && action !== 'cancelar' && action !== 'pix') || (action !== 'cancelar' && plan !== 'individual' && plan !== 'familiar')) {
+    if (
+      (action !== 'assinar' && action !== 'cancelar' && action !== 'pix' && action !== 'situacao') ||
+      ((action === 'assinar' || action === 'pix') && plan !== 'individual' && plan !== 'familiar')
+    ) {
       return reply(400, { result: 'pedido_invalido' });
     }
     try {
       const personId = await db.userId(auth[1] ?? '');
       if (!personId) return reply(401, { result: 'nao_autenticado' });
+      // "situacao" (12/11/2026, teste no sandbox): se ainda há assinatura no cartão ativa no Asaas e quando renova. O acesso continua até
+      // o fim do período pago depois de cancelar, então só o Asaas diz se ela foi cancelada (a tela esconde o botão e diz que não renova).
+      if (action === 'situacao') {
+        const subs = await activeSubscriptions(asaas, personId);
+        const next = subs.map((s) => s.nextDueDate).filter((d): d is IsoDate => d !== null).sort()[0] ?? null;
+        return reply(200, subs.length > 0 ? { result: 'ativa', nextDueDate: next } : { result: 'sem_assinatura' });
+      }
       if (action === 'cancelar') {
         let removed = 0;
         for (const s of await activeSubscriptions(asaas, personId)) {

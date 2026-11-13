@@ -351,10 +351,10 @@ function DebtBlock({ s, debt }: { s: CommittedSummary; debt: string }) {
             accessibilityHint={LEARN_UI_TEXT.externalLinkHint}
             onPress={openSource}
             style={(st) => [styles.source, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
-            <Txt variant="caption" color={colors.brand} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
+            <Txt variant="caption" color={colors.brandText} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
               {COMMITTED_TEXT.debtReferenceSource}
             </Txt>
-            <ExternalLink size={16} color={colors.brand} aria-hidden />
+            <ExternalLink size={16} color={colors.brandText} aria-hidden />
           </Pressable>
           {linkFailed ? (
             <Banner tone="info">

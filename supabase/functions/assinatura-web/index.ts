@@ -501,13 +501,19 @@ const __mods = [
             }
             const action = payload?.action;
             const plan = payload?.plan;
-            if ((action !== 'assinar' && action !== 'cancelar' && action !== 'pix') || (action !== 'cancelar' && plan !== 'individual' && plan !== 'familiar')) {
+            if ((action !== 'assinar' && action !== 'cancelar' && action !== 'pix' && action !== 'situacao') ||
+                ((action === 'assinar' || action === 'pix') && plan !== 'individual' && plan !== 'familiar')) {
                 return reply(400, { result: 'pedido_invalido' });
             }
             try {
                 const personId = await db.userId(auth[1] ?? '');
                 if (!personId)
                     return reply(401, { result: 'nao_autenticado' });
+                if (action === 'situacao') {
+                    const subs = await activeSubscriptions(asaas, personId);
+                    const next = subs.map((s) => s.nextDueDate).filter((d) => d !== null).sort()[0] ?? null;
+                    return reply(200, subs.length > 0 ? { result: 'ativa', nextDueDate: next } : { result: 'sem_assinatura' });
+                }
                 if (action === 'cancelar') {
                     let removed = 0;
                     for (const s of await activeSubscriptions(asaas, personId)) {

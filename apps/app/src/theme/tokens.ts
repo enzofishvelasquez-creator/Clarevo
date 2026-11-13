@@ -1,33 +1,47 @@
 /**
  * Tokens do Clarevo · direção "Azul vivo e lima" (CL-V001, 07/10/2026).
  * Contrastes verificados em pares opacos: branco/azul 5,59:1; texto/lima 12,36:1; secundário/branco 7,14:1.
- * Tema escuro: ainda não desenhado (não inverter tokens automaticamente).
+ *
+ * Modo escuro (D-096, 12/11/2026): as cores vêm de uma de duas paletas desenhadas (`palettes.ts`, com as mesmas chaves; nada é
+ * invertido automaticamente), escolhida uma vez, quando este módulo é avaliado: na web pelo `prefers-color-scheme` do navegador e no
+ * celular pelo tema do aparelho (`Appearance`). Os componentes continuam importando `colors` e usando em `StyleSheet.create` no nível
+ * do módulo, então o tema não troca com o app aberto: vale na próxima abertura (na web, no próximo carregamento da página; o app nunca
+ * recarrega sozinho, porque a pessoa pode estar digitando). No celular, `_layout.tsx` trava o tema do processo com
+ * `Appearance.setColorScheme(colorScheme)`, para os componentes nativos (teclado, seletores, alertas) combinarem com o app. Regras
+ * para cor nova: o azul `brand` é só fundo cheio com texto branco; azul como texto, ícone ou anel de foco é `brandText` (ou
+ * `brandTextDeep`); azul de gráfico e de barra é `brandMark`; texto sobre o lima, os selos dos níveis e o coral é `textOnAccent`
+ * (sempre escuro); pílula branca sobre o azul é `surfaceOnBrand`. Cor literal fora das paletas quebra o teste de contraste.
  */
-export const colors = {
-  brand: '#2457F5',
-  brandPressed: '#1D47CC',
-  brandDeep: '#1E4BD8', // trilho do seletor sobre o azul
-  brandSoft: '#7FA0F7', // segmento em aberto; 2,5:1 sobre branco, só com rótulo e listras
-  accent: '#D4F05B',
-  accentTint: '#F2FAD0', // fundo do resumo de explicação ("O que é isso?"): texto 14,57:1; brandDeep 6,34:1
-  illustration: '#F56545',
-  text: '#17223B',
-  textSecondary: '#4B5873',
-  textOnBrand: '#FFFFFF',
-  textOnBrandSoft: '#EEF2FF', // 5,0:1 sobre o azul
-  surface: '#FFFFFF',
-  background: '#F6F8FC',
-  brandTint: '#EAF0FF',
-  brandTintPressed: '#DDE7FF', // botão suave pressionado: azul sobre ele 4,51:1 (era #DCE6FF, 4,47:1)
-  border: '#E3E8F2', // divisórias decorativas
-  borderStrong: '#7D8AA6', // contorno de campos e chips: 3,4:1 sobre branco
-  error: '#B42318',
-  errorTint: '#FDECEA',
-  success: '#087E58',
-  successText: '#06704F', // texto sobre successTint: 5,6:1
-  successTint: '#E3F5EE',
-  placeholder: '#616D85', // 5,2:1 sobre branco e 4,55:1 sobre o fundo de erro (era #68748C, 4,11:1 no campo com erro)
-} as const;
+import { levelColors as levels, paletteFor, type ColorScheme, type Palette } from './palettes';
+
+export type { ColorScheme } from './palettes';
+
+/** O tema do aparelho ao abrir o app. Fora do app (testes no Node, sem navegador nem React Native), o claro. */
+function deviceColorScheme(): ColorScheme {
+  try {
+    if (process.env.EXPO_OS === 'web') {
+      return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+    }
+    // Carregado aqui, e não no alto do arquivo, para os testes do núcleo lerem os tokens sem o React Native.
+    const { Appearance } = require('react-native') as typeof import('react-native');
+    return Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
+/** O tema desta abertura do app ('light' ou 'dark'). */
+export const colorScheme: ColorScheme = deviceColorScheme();
+
+export const colors: Palette = paletteFor(colorScheme);
+
+/** Cores dos níveis de conta (D-095): só no selo pequeno do nível, com a medalha em `colors.textOnAccent`. Iguais nos dois temas. */
+export const levelColors = levels;
+
+/** Opacidade da sombra do cartão: no escuro, a superfície mais clara que o fundo já separa o cartão, e a sombra preta só dá volume. */
+export const cardShadowOpacity = colorScheme === 'dark' ? 0.28 : 0.06;
 
 export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 8: 32, 10: 40 } as const;
 

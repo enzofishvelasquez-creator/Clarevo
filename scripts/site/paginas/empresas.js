@@ -151,7 +151,7 @@ ${blocoDeContato(valores, ARQUIVO)}
   return montarPagina({
     arquivo: ARQUIVO,
     titulo: 'Para empresas',
-    descricao: 'Bem-estar financeiro também faz parte do cuidado com sua equipe. A proposta da Clarevo integra o cuidado financeiro ao programa de bem-estar, e a empresa nunca vê as finanças das pessoas.',
+    descricao: 'Bem-estar financeiro também faz parte do cuidado com sua equipe. A Clarevo entra no programa de bem-estar, e a empresa nunca vê as finanças das pessoas.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),
     fonte: brutas.join('\n') + capa,

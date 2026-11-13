@@ -10,6 +10,7 @@ import { HelpButton } from '@/components/help-button';
 import { yearA11yLabel } from '@/components/series-parts';
 import { DemoPill, TopInset, Txt } from '@/components/ui';
 import type { HelpScreen } from '@/lib/guide';
+import { WIDE_CONTENT_MAX, WIDE_TAB_MAX, useWideLayout } from '@/lib/layout';
 import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { canGoForward, useView, type SpaceKind } from '@/state/data';
 import { useFamily } from '@/state/family';
@@ -55,7 +56,7 @@ function HideValuesButton() {
   );
 }
 
-/** Logo reverso, selo de demonstração e acesso à Conta (perfil, segurança e benefício). */
+/** Logo reverso, selo de demonstração e acesso à Conta (perfil, segurança e benefício). O avatar é branco sobre o azul nos dois temas. */
 function BrandRow() {
   const { user, auth } = useSession();
   const { width } = useWindowDimensions();
@@ -86,12 +87,27 @@ function BrandRow() {
  * Cabeçalho das abas: faixa azul de ponta a ponta, conteúdo limitado a 560 px,
  * com logo e avatar em todas as abas (padrão único). `title` aparece abaixo do logo.
  */
-export function AppHeader({ title, context, contextFixed, children }: { title?: string; context?: string; contextFixed?: boolean; children?: ReactNode }) {
+export function AppHeader({
+  title,
+  context,
+  contextFixed,
+  wide,
+  children,
+}: {
+  title?: string;
+  context?: string;
+  contextFixed?: boolean;
+  /** Versão para computador: o conteúdo da faixa acompanha a largura do painel (o Resumo). */
+  wide?: boolean;
+  children?: ReactNode;
+}) {
+  // Na versão para computador, o logotipo, o olho e a Conta ficam na barra lateral; a faixa azul mostra só o título e o mês.
+  const sideNav = useWideLayout();
   return (
     <View style={styles.band}>
       <TopInset color={colors.brand} />
-      <View style={styles.inner}>
-        <BrandRow />
+      <View style={[styles.inner, sideNav && { maxWidth: wide ? WIDE_CONTENT_MAX : WIDE_TAB_MAX }]}>
+        {sideNav ? null : <BrandRow />}
         {title ? (
           <View style={styles.titleRow}>
             <Txt variant="title" color={colors.textOnBrand} style={[styles.title, context ? { marginBottom: 0 } : null]} accessibilityRole="header" aria-level={1}>
@@ -116,11 +132,13 @@ export function AppHeader({ title, context, contextFixed, children }: { title?: 
  * tela (D-063 item 2), e a barra ("Aprender") diz de onde a pessoa veio. Uma tela tem no máximo um título de nível 1.
  */
 export function SubHeader({ title, onBack, right, help, plainTitle }: { title: string; onBack?: () => void; right?: ReactNode; help?: HelpScreen; plainTitle?: boolean }) {
+  // Versão para computador: a faixa acompanha a largura das telas de consulta (760 px).
+  const sideNav = useWideLayout();
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')));
   return (
     <View style={styles.subBand}>
       <TopInset color={colors.brand} />
-      <View style={[styles.inner, styles.subInner]}>
+      <View style={[styles.inner, styles.subInner, sideNav && { maxWidth: WIDE_TAB_MAX }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Voltar"
@@ -162,7 +180,7 @@ export function ContextPill({ label: given, fixed }: { label: string; fixed?: bo
   const text = contextPillText(label, demo);
   return (
     <View style={[styles.pill, demo && styles.pillDemo]} accessible accessibilityLabel={`Espaço: ${text}`}>
-      <Txt variant="caption" color={demo ? colors.text : colors.brand} style={{ fontFamily: fonts.bold }}>
+      <Txt variant="caption" color={demo ? colors.textOnAccent : colors.brand} style={{ fontFamily: fonts.bold }}>
         {text}
       </Txt>
     </View>
@@ -279,7 +297,7 @@ const styles = StyleSheet.create({
   // overflowWrap (web): uma palavra mais larga que a faixa quebra em vez de passar da tela com letra muito grande; no aparelho o texto já quebra.
   title: { fontSize: 24, lineHeight: 32, marginBottom: space[4], overflowWrap: 'anywhere' } as object,
   titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[1], marginBottom: space[4] },
-  avatar: { minWidth: 44, height: 44, paddingHorizontal: 4, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  avatar: { minWidth: 44, height: 44, paddingHorizontal: 4, borderRadius: 22, backgroundColor: colors.surfaceOnBrand, alignItems: 'center', justifyContent: 'center' },
   eye: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   subBand: { backgroundColor: colors.brand },
   subInner: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingTop: space[2], paddingBottom: space[3], paddingHorizontal: space[3] },
@@ -288,12 +306,12 @@ const styles = StyleSheet.create({
   // O título ocupa a largura natural: se não couber numa linha ao lado do contexto, o contexto passa para baixo.
   subTitle: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0, overflowWrap: 'anywhere' } as object,
   // flexShrink: com letra grande, o texto quebra dentro da pílula em vez de passar da largura da tela.
-  pill: { backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1], marginRight: space[3], flexShrink: 1 },
+  pill: { backgroundColor: colors.surfaceOnBrand, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1], marginRight: space[3], flexShrink: 1 },
   pillDemo: { backgroundColor: colors.accent },
   track: { flexDirection: 'row', backgroundColor: colors.brandDeep, borderRadius: radius.md, padding: 4 },
-  indicator: { position: 'absolute', left: 4, top: 4, bottom: 4, borderRadius: 13, backgroundColor: colors.surface },
+  indicator: { position: 'absolute', left: 4, top: 4, bottom: 4, borderRadius: 13, backgroundColor: colors.surfaceOnBrand },
   option: { flex: 1, minHeight: 48, borderRadius: 13, flexDirection: 'row', gap: space[2], alignItems: 'center', justifyContent: 'center' },
-  optionSelected: { backgroundColor: colors.surface },
+  optionSelected: { backgroundColor: colors.surfaceOnBrand },
   month: { flexDirection: 'row', alignItems: 'center', marginTop: space[5] },
   monthBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 });

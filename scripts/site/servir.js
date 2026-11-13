@@ -2,14 +2,15 @@
 /**
  * Servidor local mínimo para o teste de navegador do site (`scripts/e2e-site.js`) e para as capturas: serve a pasta `site/` como o
  * Cloudflare Pages faz (`/x` abre `x.html`, `/pasta/` abre `pasta/index.html`, 404 com `404.html`), aplica os cabeçalhos do
- * `_headers` (a política de segurança inclusive, para o navegador acusar qualquer violação) e, se houver `_worker.js` (modo avançado),
+ * `_headers` (a política de segurança inclusive, para o navegador acusar qualquer violação, e a guarda longa de `/fontes/*`, `/imagens/*` e
+ * `/marca/*` nos arquivos estáticos) e, se houver `_worker.js` (modo avançado),
  * entrega a ele só o que o `_routes.json` manda (`include` menos `exclude`, com `*` no fim ou no meio, como o Pages; sem o arquivo, tudo),
  * com um `env.ASSETS` que devolve os arquivos estáticos. O resto sai direto dos arquivos, sem passar pelo worker. Sem pacote novo: só `node:http`.
  */
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
-const { cabecalhosDoTexto } = require('./util');
+const { cabecalhosDoTexto, blocosDeCabecalhos } = require('./util');
 
 const TIPOS = {
   '.html': 'text/html; charset=utf-8',
@@ -30,6 +31,17 @@ function lerCabecalhos(pasta) {
 }
 
 const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Os cabeçalhos dos outros blocos do `_headers` (como `/fontes/*`, com a guarda longa no navegador) que valem para um caminho, como o
+ * Pages faz com os arquivos estáticos: uma função do caminho para `{ nome: valor }`.
+ */
+function lerCabecalhosPorCaminho(pasta) {
+  const arquivo = path.join(pasta, '_headers');
+  const blocos = fs.existsSync(arquivo) ? blocosDeCabecalhos(fs.readFileSync(arquivo, 'utf8')).filter((b) => b.padrao !== '/*') : [];
+  const regras = blocos.map((b) => ({ re: new RegExp(`^${b.padrao.split('*').map(escRe).join('.*')}$`), cabecalhos: b.cabecalhos }));
+  return (caminho) => Object.assign({}, ...regras.filter((r) => r.re.test(caminho)).map((r) => r.cabecalhos));
+}
 
 /**
  * As rotas do `_routes.json` como uma função: `true` se o caminho vai para o worker. `include` diz o que entra (padrão: tudo), `exclude`
@@ -64,6 +76,7 @@ function resolverArquivo(pasta, caminho) {
  */
 async function servir(pasta, { porta = 0, env = {}, hostDoSite = false, fetchDoWorker } = {}) {
   const cabecalhos = lerCabecalhos(pasta);
+  const cabecalhosDoCaminho = lerCabecalhosPorCaminho(pasta);
   const noWorker = lerRotas(pasta);
   const variaveis = { ...env };
   const arquivoDoWorker = path.join(pasta, '_worker.js');
@@ -93,11 +106,16 @@ async function servir(pasta, { porta = 0, env = {}, hostDoSite = false, fetchDoW
       });
       const requisicao = new Request(url, { method: q.method, headers: q.headers, body: corpo, duplex: 'half' });
       let resposta;
+      // Os blocos por caminho do `_headers` valem só para o que sai direto dos arquivos, e só quando o arquivo existe.
+      let doCaminho = {};
       if (worker && noWorker(url.pathname)) {
         doWorker.push(`${q.method} ${url.pathname}`);
         resposta = await worker.fetch(requisicao, { ...variaveis, ASSETS: { fetch: (req) => Promise.resolve(estatico(new URL(req.url).pathname, req.method)) } });
-      } else resposta = estatico(url.pathname, q.method);
-      const saida = { ...Object.fromEntries(resposta.headers), ...cabecalhos };
+      } else {
+        resposta = estatico(url.pathname, q.method);
+        if (resposta.status === 200) doCaminho = cabecalhosDoCaminho(url.pathname);
+      }
+      const saida = { ...Object.fromEntries(resposta.headers), ...cabecalhos, ...doCaminho };
       r.writeHead(resposta.status, saida);
       r.end(Buffer.from(await resposta.arrayBuffer()));
     } catch (e) {
@@ -119,4 +137,4 @@ async function servir(pasta, { porta = 0, env = {}, hostDoSite = false, fetchDoW
   };
 }
 
-module.exports = { servir, lerCabecalhos, lerRotas, resolverArquivo };
+module.exports = { servir, lerCabecalhos, lerCabecalhosPorCaminho, lerRotas, resolverArquivo };

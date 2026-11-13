@@ -3,7 +3,7 @@ import Animated, { ReduceMotion, ZoomIn } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { LOGO_SYMBOL_C, LOGO_SYMBOL_MOON, LOGOTYPE_DOT, LOGOTYPE_HEIGHT, LOGOTYPE_WIDTH, LOGOTYPE_WORD } from '@/theme/logo-paths';
-import { colors } from '@/theme/tokens';
+import { colors, colorScheme } from '@/theme/tokens';
 
 type Variant = 'cor' | 'reverso' | 'uma-cor';
 
@@ -13,12 +13,15 @@ const PALETTE: Record<Variant, { c: string; moon: string; word: string }> = {
   'uma-cor': { c: colors.text, moon: colors.text, word: colors.text },
 };
 
+/** No modo escuro (D-096), a versão em cor (azul sobre claro) vira a reversa: o azul da marca some sobre o fundo escuro. */
+const paletteOf = (variant: Variant) => PALETTE[variant === 'cor' && colorScheme === 'dark' ? 'reverso' : variant];
+
 /**
  * Símbolo: C aberto com crescente lima (logo aprovado em 07/10/2026).
  * `animated`: o crescente "cresce" como uma fase da lua, uma única vez (300 ms; parado com movimento reduzido).
  */
 export function LogoSymbol({ size = 32, variant = 'cor', animated }: { size?: number; variant?: Variant; animated?: boolean }) {
-  const p = PALETTE[variant];
+  const p = paletteOf(variant);
   const width = size * (322 / 336);
   if (!animated) {
     return (
@@ -49,7 +52,7 @@ export function LogoSymbol({ size = 32, variant = 'cor', animated }: { size?: nu
  * `height` é a altura da caixa do nome (do topo do "l" à linha de base).
  */
 export function Logo({ height = 22, variant = 'cor' }: { height?: number; variant?: Variant }) {
-  const p = PALETTE[variant];
+  const p = paletteOf(variant);
   return (
     <View accessible accessibilityRole="image" accessibilityLabel="Clarevo">
       <Svg width={height * (LOGOTYPE_WIDTH / LOGOTYPE_HEIGHT)} height={height} viewBox={`0 0 ${LOGOTYPE_WIDTH} ${LOGOTYPE_HEIGHT}`}>

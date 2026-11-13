@@ -13,3 +13,12 @@
   Referrer-Policy: same-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Strict-Transport-Security: max-age=31536000
+# Guarda longa no navegador para o que quase nunca muda (12/11/2026). As fontes e as capturas nunca mudam de conteúdo sem mudar de nome
+# (o nome de cada captura leva um resumo do conteúdo): um ano. A marca mantém o nome quando o desenho muda: 30 dias, para chegar a quem já
+# visitou o site. As páginas, o estilo e os scripts ficam fora, com a guarda curta padrão da hospedagem, porque mudam a cada publicação.
+/fontes/*
+  Cache-Control: public, max-age=31536000, immutable
+/imagens/*
+  Cache-Control: public, max-age=31536000, immutable
+/marca/*
+  Cache-Control: public, max-age=2592000

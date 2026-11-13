@@ -82,7 +82,7 @@ export function useOpenedOverForm(): boolean {
 export function CalcDisclaimer() {
   return (
     <View style={styles.disclaimer}>
-      <Info size={18} color={colors.brand} style={{ marginTop: 1 }} aria-hidden />
+      <Info size={18} color={colors.brandText} style={{ marginTop: 1 }} aria-hidden />
       <Txt variant="caption" style={{ flex: 1 }}>
         {CALC_DISCLAIMER}
       </Txt>
@@ -94,7 +94,7 @@ export function CalcDisclaimer() {
 export function CalcNote({ children, label }: { children: ReactNode; label?: string }) {
   return (
     <View style={styles.note}>
-      <Info size={18} color={colors.brand} style={{ marginTop: 1 }} aria-hidden />
+      <Info size={18} color={colors.brandText} style={{ marginTop: 1 }} aria-hidden />
       <View style={{ flex: 1, gap: space[1] }}>
         {typeof children === 'string' ? (
           <Txt variant="label" accessibilityLabel={label}>
@@ -434,8 +434,8 @@ export function CalcChip({ label, selected, onPress, accessibilityLabel }: { lab
           scale.value = reduced ? 1 : withTiming(1, timing);
         }}
         style={(s) => [ui.chip, styles.chip48, selected && ui.chipSelected, (s as { focused?: boolean }).focused && ui.focusRing]}>
-        {selected ? <Check size={16} color={colors.brand} strokeWidth={2.5} style={{ flexShrink: 0 }} /> : null}
-        <Txt variant="label" color={selected ? colors.brand : colors.text} style={{ flexShrink: 1 }}>
+        {selected ? <Check size={16} color={colors.brandText} strokeWidth={2.5} style={{ flexShrink: 0 }} /> : null}
+        <Txt variant="label" color={selected ? colors.brandText : colors.text} style={{ flexShrink: 1 }}>
           {label}
         </Txt>
       </Pressable>
@@ -473,7 +473,7 @@ export function CalcNavRow({
       onPress={onPress}
       style={(st) => [styles.row, !last && styles.divider, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
       <View style={styles.rowIcon}>
-        <Icon size={20} color={colors.brand} strokeWidth={2.25} aria-hidden />
+        <Icon size={20} color={colors.brandText} strokeWidth={2.25} aria-hidden />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>

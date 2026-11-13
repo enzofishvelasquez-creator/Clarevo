@@ -24,7 +24,7 @@ function paginaSobre({ valores }) {
 <p>Cada número do app vem com a explicação de onde sai. O que você recebeu, o que já pagou e o que ainda vai vencer ficam separados, e a diferença do mês nunca é apresentada como saldo.</p>
 </article>
 <article class="cartao">
-<h3>Sem anúncio</h3>
+<h3>Sem anúncios</h3>
 <p>Não há anúncios no app nem neste site, e a Clarevo não ganha nada por mostrar um produto ou uma empresa a você.</p>
 </article>
 <article class="cartao">
@@ -57,7 +57,8 @@ function paginaSobre({ valores }) {
   ];
   return montarPagina({
     arquivo,
-    titulo: 'Sobre',
+    titulo: 'Sobre a Clarevo: o que nos move e quem está por trás',
+    tituloCompleto: true,
     descricao: 'O que move a Clarevo: cuidado com a vida financeira, clareza, sem anúncio, sem venda de dados e sem recomendar produtos financeiros, e quem está por trás.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),

@@ -19,7 +19,7 @@ export function SeasonCardView({ card }: { card: SeasonalCard }) {
     <Card style={{ gap: space[2] }}>
       <View style={styles.head}>
         <View style={styles.icon}>
-          <CalendarDays size={22} color={colors.brand} strokeWidth={2.25} aria-hidden />
+          <CalendarDays size={22} color={colors.brandText} strokeWidth={2.25} aria-hidden />
         </View>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
