@@ -3,6 +3,7 @@ import type { LearnSection, Topic, TopicCalculatorLink, TopicSlug } from '../typ
 import { TOPIC_SLUGS } from '../types';
 import { DUVIDAS_TOPICS } from './duvidas';
 import { EPOCA_TOPICS } from './epoca';
+import { INVESTIMENTOS_TOPICS } from './investimentos';
 import { JUROS_TOPICS } from './juros';
 import { ORGANIZAR_TOPICS } from './organizar';
 import { TEMPO_TOPICS } from './tempo';
@@ -16,6 +17,8 @@ export const TOPICS: readonly Topic[] = [
   ...EPOCA_TOPICS,
   ...JUROS_TOPICS,
   ...TEMPO_TOPICS,
+  // Temas de investimentos (D-093): também da seção "Dinheiro no tempo", logo depois dos outros dessa seção.
+  ...INVESTIMENTOS_TOPICS,
   ...DUVIDAS_TOPICS,
 ];
 

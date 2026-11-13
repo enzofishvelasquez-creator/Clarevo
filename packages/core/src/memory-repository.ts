@@ -168,6 +168,7 @@ import {
   type InvestmentStatus,
   type NewInvestmentInput,
 } from './investments';
+import { EMPTY_INVESTMENT_DETAILS, investmentDetailsError, normalizeInstitution, type InvestmentDetails } from './investment-details';
 import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX, nextMonthAllowed, recordMonth } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import { savingsAnswerError, savingsAskAgainOn } from './savings';
@@ -2197,7 +2198,15 @@ export class MemoryRepository implements RecordsRepository {
     return this.read(() => (this.canRead(contextId) ? this.sortedInvestmentMovements((m) => m.contextId === contextId) : []));
   }
 
-  private newInvestmentMovement(i: StoredInvestment, kind: InvestmentMovementKind, amountCents: Cents, occurredOn: IsoDate, note: string | null, now: string) {
+  private newInvestmentMovement(
+    i: StoredInvestment,
+    kind: InvestmentMovementKind,
+    amountCents: Cents,
+    occurredOn: IsoDate,
+    note: string | null,
+    now: string,
+    incomeKind: InvestmentMovement['incomeKind'] = null,
+  ) {
     const m: InvestmentMovement = {
       id: this.id('movinv'),
       investmentId: i.id,
@@ -2206,6 +2215,7 @@ export class MemoryRepository implements RecordsRepository {
       amountCents,
       occurredOn,
       note,
+      incomeKind,
       createdBy: this.opts.actorId,
       version: 1,
       createdAt: now,
@@ -2222,6 +2232,15 @@ export class MemoryRepository implements RecordsRepository {
     if (day) throw new RepoError('valor_insuficiente', undefined, `dia=${day}`);
   }
 
+  /** Como clarevo_validate_investment_details: a ficha inteira, com a instituição sem espaços sobrando. */
+  private investmentDetails(kind: StoredInvestment['kind'], details: InvestmentDetails | undefined): InvestmentDetails {
+    const d = { ...EMPTY_INVESTMENT_DETAILS, ...(details ?? {}) };
+    const normalized = { ...d, institution: normalizeInstitution(d.institution) };
+    const code = investmentDetailsError(kind, normalized);
+    if (code) throw new RepoError(code);
+    return normalized;
+  }
+
   private checkInvestmentLimit(contextId: string) {
     if ([...this.investments.values()].filter((i) => i.contextId === contextId && i.status === 'ativo').length >= INVESTMENT_ACTIVE_MAX) {
       throw new RepoError('limite_de_investimentos');
@@ -2231,7 +2250,7 @@ export class MemoryRepository implements RecordsRepository {
   /** Como create_investment: só no Pessoal; nome, tipo, valores e datas; limite de 50 ativos. */
   async createInvestment(key: string, contextId: string, input: NewInvestmentInput) {
     return this.write(() => {
-      const payload = [contextId, input.name, input.kind, input.investedCents, input.startOn, input.currentCents];
+      const payload = [contextId, input.name, input.kind, input.investedCents, input.startOn, input.currentCents, input.details ?? null];
       const replayed = this.replay(key, 'criar_investimento', payload);
       if (replayed) return this.investmentResult(replayed.goalId, null);
       if (!this.canRead(contextId)) throw new RepoError('nao_encontrado');
@@ -2239,6 +2258,7 @@ export class MemoryRepository implements RecordsRepository {
       if (this.space?.personalContextId !== contextId) throw new RepoError('contexto_invalido');
       const code = newInvestmentError(input, this.opts.today());
       if (code) throw new RepoError(code);
+      const details = this.investmentDetails(input.kind, input.details);
       this.checkInvestmentLimit(contextId);
       const now = new Date().toISOString();
       const i: StoredInvestment = {
@@ -2246,6 +2266,7 @@ export class MemoryRepository implements RecordsRepository {
         contextId,
         name: normalizeInvestmentName(input.name),
         kind: input.kind,
+        ...details,
         status: 'ativo',
         createdBy: this.opts.actorId,
         version: 1,
@@ -2262,14 +2283,22 @@ export class MemoryRepository implements RecordsRepository {
 
   async updateInvestment(key: string, id: string, expectedVersion: number, input: InvestmentInput) {
     return this.write(() => {
-      const payload = [id, expectedVersion, input.name, input.kind];
+      const payload = [id, expectedVersion, input.name, input.kind, input.details ?? null];
       const replayed = this.replay(key, 'alterar_investimento', payload);
       if (replayed) return this.investmentResult(replayed.goalId, null);
       const i = this.liveInvestment(id);
       if (expectedVersion !== i.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${i.version}`);
       const code = investmentInputError(input);
       if (code) throw new RepoError(code);
-      this.investments.set(id, { ...i, name: normalizeInvestmentName(input.name), kind: input.kind, version: i.version + 1, updatedAt: this.stamp() });
+      // Sem a ficha (versão antiga do app), ela fica como está; com o tipo mudado, só o tipo exato que não pertence ao novo sai (F5).
+      const kept: InvestmentDetails = { subkind: i.subkind, institution: i.institution, indexKind: i.indexKind, rateBp: i.rateBp, maturityOn: i.maturityOn, liquidity: i.liquidity, liquidityOn: i.liquidityOn, liquidityDays: i.liquidityDays };
+      const details =
+        input.details !== undefined
+          ? this.investmentDetails(input.kind, input.details)
+          : investmentDetailsError(input.kind, kept) === null
+            ? kept
+            : this.investmentDetails(input.kind, { ...kept, subkind: null });
+      this.investments.set(id, { ...i, name: normalizeInvestmentName(input.name), kind: input.kind, ...details, version: i.version + 1, updatedAt: this.stamp() });
       this.saveOperation(key, 'alterar_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: id });
       return this.investmentResult(id, null);
     });
@@ -2307,7 +2336,8 @@ export class MemoryRepository implements RecordsRepository {
   async addInvestmentMovement(key: string, investmentId: string, kind: InvestmentMovementKind, input: InvestmentMovementInput) {
     return this.write(() => {
       const note = input.note === null ? null : input.note.trim() || null;
-      const payload = [investmentId, kind, input.amountCents, input.occurredOn, note];
+      const incomeKind = input.incomeKind ?? null;
+      const payload = [investmentId, kind, input.amountCents, input.occurredOn, note, incomeKind];
       const replayed = this.replay(key, 'registrar_movimento_investimento', payload);
       if (replayed) return this.investmentResult(replayed.goalId, replayed.movementId);
       const i = this.liveInvestment(investmentId);
@@ -2315,7 +2345,7 @@ export class MemoryRepository implements RecordsRepository {
       const code = investmentMovementError(kind, { ...input, note }, this.opts.today());
       if (code) throw new RepoError(code);
       this.checkInvestmentBalance(investmentId, { op: 'add', kind, amountCents: input.amountCents, occurredOn: input.occurredOn });
-      const m = this.newInvestmentMovement(i, kind, input.amountCents, input.occurredOn, note, new Date().toISOString());
+      const m = this.newInvestmentMovement(i, kind, input.amountCents, input.occurredOn, note, new Date().toISOString(), incomeKind);
       this.saveOperation(key, 'registrar_movimento_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: i.id, movementId: m.id });
       return this.investmentResult(i.id, m.id);
     });
@@ -2324,7 +2354,8 @@ export class MemoryRepository implements RecordsRepository {
   async updateInvestmentMovement(key: string, movementId: string, expectedVersion: number, input: InvestmentMovementInput) {
     return this.write(() => {
       const note = input.note === null ? null : input.note.trim() || null;
-      const payload = [movementId, expectedVersion, input.amountCents, input.occurredOn, note];
+      // Sem o tipo (undefined, versão antiga do app), ele fica como está; null tira.
+      const payload = [movementId, expectedVersion, input.amountCents, input.occurredOn, note, input.incomeKind === undefined ? 'manter' : input.incomeKind];
       const replayed = this.replay(key, 'alterar_movimento_investimento', payload);
       if (replayed) return this.investmentResult(replayed.goalId, replayed.movementId);
       const m = this.investmentMovements.get(movementId);
@@ -2332,10 +2363,11 @@ export class MemoryRepository implements RecordsRepository {
       const i = this.liveInvestment(m.investmentId);
       if (i.status !== 'ativo') throw new RepoError('investimento_encerrado');
       if (expectedVersion !== m.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${m.version}`);
-      const code = investmentMovementError(m.kind, { ...input, note }, this.opts.today());
+      const incomeKind = input.incomeKind === undefined ? m.incomeKind : input.incomeKind;
+      const code = investmentMovementError(m.kind, { ...input, note, incomeKind }, this.opts.today());
       if (code) throw new RepoError(code);
       this.checkInvestmentBalance(i.id, { op: 'update', id: m.id, amountCents: input.amountCents, occurredOn: input.occurredOn });
-      this.investmentMovements.set(m.id, { ...m, amountCents: input.amountCents, occurredOn: input.occurredOn, note, version: m.version + 1, updatedAt: this.stamp() });
+      this.investmentMovements.set(m.id, { ...m, amountCents: input.amountCents, occurredOn: input.occurredOn, note, incomeKind, version: m.version + 1, updatedAt: this.stamp() });
       this.saveOperation(key, 'alterar_movimento_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: i.id, movementId: m.id });
       return this.investmentResult(i.id, m.id);
     });

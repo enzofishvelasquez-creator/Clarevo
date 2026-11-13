@@ -139,6 +139,13 @@ import {
   type InvestmentWrite,
   type MarketIndices,
   type NewInvestmentInput,
+  type InvestmentDetails,
+  EMPTY_INVESTMENT_DETAILS,
+  INVESTMENT_INCOME_KINDS,
+  INVESTMENT_INDEX_KINDS,
+  INVESTMENT_LIQUIDITIES,
+  INVESTMENT_SUBKINDS,
+  investmentDetailsError,
   isGoalImageKey,
   parseAccess,
   parseStoreForget,
@@ -1132,6 +1139,48 @@ interface InvestmentRow {
   value_cents: number;
   last_value_on: string | null;
   first_movement_on: string | null;
+  /** Ficha ampliada (D-099, migração 0035); ausente num banco sem a migração. */
+  subkind?: string | null;
+  institution?: string | null;
+  index_kind?: string | null;
+  rate_bp?: number | null;
+  maturity_on?: string | null;
+  liquidity?: string | null;
+  liquidity_on?: string | null;
+  liquidity_days?: number | null;
+}
+
+/** A ficha da linha: o que o app não conhece fica vazio (nunca um valor errado na tela). */
+function toInvestmentDetails(r: InvestmentRow): InvestmentDetails {
+  const known = <T extends string>(v: string | null | undefined, list: readonly T[]): T | null => (typeof v === 'string' && (list as readonly string[]).includes(v) ? (v as T) : null);
+  const date = (v: string | null | undefined) => (typeof v === 'string' && ISO_DATE.test(v) ? v : null);
+  const int = (v: number | null | undefined) => (typeof v === 'number' && Number.isSafeInteger(v) ? v : null);
+  const details: InvestmentDetails = {
+    subkind: known(r.subkind, INVESTMENT_SUBKINDS),
+    institution: typeof r.institution === 'string' && r.institution !== '' ? r.institution : null,
+    indexKind: known(r.index_kind, INVESTMENT_INDEX_KINDS),
+    rateBp: int(r.rate_bp),
+    maturityOn: date(r.maturity_on),
+    liquidity: known(r.liquidity, INVESTMENT_LIQUIDITIES),
+    liquidityOn: date(r.liquidity_on),
+    liquidityDays: int(r.liquidity_days),
+  };
+  return investmentDetailsError(r.kind, details) === null ? details : { ...EMPTY_INVESTMENT_DETAILS, institution: details.institution };
+}
+
+/** A ficha como a função do banco recebe (chaves do banco). */
+function detailsPayload(d: InvestmentDetails | undefined): Record<string, unknown> | null {
+  if (!d) return null;
+  return {
+    subkind: d.subkind,
+    institution: d.institution,
+    index_kind: d.indexKind,
+    rate_bp: d.rateBp,
+    maturity_on: d.maturityOn,
+    liquidity: d.liquidity,
+    liquidity_on: d.liquidityOn,
+    liquidity_days: d.liquidityDays,
+  };
 }
 
 /** Linha de investment_movements. */
@@ -1143,6 +1192,7 @@ interface InvestmentMovementRow {
   amount_cents: number;
   occurred_on: string;
   note: string | null;
+  income_kind?: string | null;
   created_by: string;
   version: number;
   created_at: string;
@@ -1178,6 +1228,7 @@ function toInvestment(r: InvestmentRow): Investment {
     valueCents: value,
     lastValueOn: r.last_value_on,
     firstMovementOn: r.first_movement_on,
+    ...toInvestmentDetails(r),
   };
 }
 
@@ -1192,6 +1243,7 @@ function toInvestmentMovement(r: InvestmentMovementRow): InvestmentMovement {
     amountCents: amount,
     occurredOn: r.occurred_on,
     note: r.note,
+    incomeKind: r.kind === 'rendimento' && typeof r.income_kind === 'string' && (INVESTMENT_INCOME_KINDS as readonly string[]).includes(r.income_kind) ? (r.income_kind as InvestmentMovement['incomeKind']) : null,
     createdBy: r.created_by,
     version: whole(r.version),
     createdAt: r.created_at,
@@ -1204,7 +1256,7 @@ function toInvestmentWrite(data: unknown): InvestmentWrite {
   return { investment: d.investment ? toInvestment(d.investment) : null, movement: d.movement ? toInvestmentMovement(d.movement) : null };
 }
 
-const INVESTMENT_MOVEMENT_COLUMNS = 'id, investment_id, context_id, kind, amount_cents, occurred_on, note, created_by, version, created_at, updated_at';
+const INVESTMENT_MOVEMENT_COLUMNS = 'id, investment_id, context_id, kind, amount_cents, occurred_on, note, income_kind, created_by, version, created_at, updated_at';
 /** A função do servidor do CDI e do IPCA (D-093). */
 const INDICES_FUNCTION = 'indices';
 
@@ -2532,13 +2584,21 @@ export class SupabaseRepository implements RecordsRepository {
       p_invested_cents: input.investedCents,
       p_start_on: input.startOn,
       p_current_cents: input.currentCents,
+      p_details: detailsPayload(input.details),
     });
     if (error) throw repoError(error);
     return toInvestmentWrite(data);
   }
 
   async updateInvestment(key: string, id: string, expectedVersion: number, input: InvestmentInput): Promise<InvestmentWrite> {
-    const { data, error } = await this.db.rpc('update_investment', { p_key: key, p_id: id, p_expected_version: expectedVersion, p_name: input.name, p_kind: input.kind });
+    const { data, error } = await this.db.rpc('update_investment', {
+      p_key: key,
+      p_id: id,
+      p_expected_version: expectedVersion,
+      p_name: input.name,
+      p_kind: input.kind,
+      p_details: detailsPayload(input.details),
+    });
     if (error) throw repoError(error);
     return toInvestmentWrite(data);
   }
@@ -2565,6 +2625,7 @@ export class SupabaseRepository implements RecordsRepository {
       p_amount_cents: input.amountCents,
       p_occurred_on: input.occurredOn,
       p_note: input.note,
+      p_income_kind: input.incomeKind ?? null,
     });
     if (error) throw repoError(error);
     return toInvestmentWrite(data);
@@ -2578,6 +2639,8 @@ export class SupabaseRepository implements RecordsRepository {
       p_amount_cents: input.amountCents,
       p_occurred_on: input.occurredOn,
       p_note: input.note,
+      // Sem o campo, o tipo fica como está no banco ('manter', o padrão da função).
+      ...(input.incomeKind === undefined ? {} : { p_income_kind: input.incomeKind }),
     });
     if (error) throw repoError(error);
     return toInvestmentWrite(data);
@@ -2594,7 +2657,7 @@ export class SupabaseRepository implements RecordsRepository {
   async getMarketIndices(fromMonth: IsoMonth): Promise<MarketIndices> {
     const { data, error } = await this.db.functions.invoke(INDICES_FUNCTION, { body: { desde: fromMonth } });
     if (error) throw new RepoError('indices_indisponiveis');
-    const d = (data ?? {}) as { cdi?: unknown; ipca?: unknown; fetchedOn?: unknown };
+    const d = (data ?? {}) as { cdi?: unknown; ipca?: unknown; selic?: unknown; poupanca?: unknown; fetchedOn?: unknown };
     const series = (v: unknown): Record<IsoMonth, number> => {
       const out: Record<IsoMonth, number> = {};
       if (typeof v !== 'object' || v === null) return out;
@@ -2603,7 +2666,14 @@ export class SupabaseRepository implements RecordsRepository {
       }
       return out;
     };
-    return { cdi: series(d.cdi), ipca: series(d.ipca), fetchedOn: typeof d.fetchedOn === 'string' && ISO_DATE.test(d.fetchedOn) ? d.fetchedOn : null, example: false };
+    return {
+      cdi: series(d.cdi),
+      ipca: series(d.ipca),
+      selic: series(d.selic),
+      poupanca: series(d.poupanca),
+      fetchedOn: typeof d.fetchedOn === 'string' && ISO_DATE.test(d.fetchedOn) ? d.fetchedOn : null,
+      example: false,
+    };
   }
 
   /** Movimentos vivos da meta, do mais recente ao mais antigo (data, criação, id). */

@@ -197,13 +197,14 @@ const FUNCTIONS = [
     ],
   },
   {
-    // Só o servidor: as séries públicas do CDI e do IPCA, sem dado de ninguém (D-093).
+    // Só o servidor: as séries públicas do CDI, do IPCA, da Selic do mês e da poupança, sem dado de ninguém (D-093, D-099).
     entry: 'packages/core/src/indices/servidor.ts',
     out: 'supabase/functions/indices/index.ts',
     header: [
       '// GERADO por scripts/gerar-funcoes.js a partir de packages/core/src/indices. Não editar à mão: mude o núcleo e rode `npm run indices`.',
-      '// Clarevo · função do servidor "indices" (Edge Function do Supabase, D-093): busca no Banco Central as séries públicas do CDI (4391) e',
-      '// do IPCA (433) e devolve ao app, para comparar com a rentabilidade dos investimentos que a pessoa registra. Não recebe nem guarda dado',
+      '// Clarevo · função do servidor "indices" (Edge Function do Supabase, D-093 e D-099): busca no Banco Central as séries públicas do CDI',
+      '// (4391), do IPCA (433), da Selic do mês (4390) e da poupança (195) e devolve ao app, para comparar com a rentabilidade dos investimentos',
+      '// que a pessoa registra e estimar o valor pela taxa contratada. Não recebe nem guarda dado',
       '// de ninguém (só o mês de partida). Sem segredos; opcional CLAREVO_APP_URL. Confere a sessão da pessoa no Supabase Auth: publicar com',
       '// a verificação de JWT do painel ("Verify JWT with legacy secret") DESLIGADA.',
     ],

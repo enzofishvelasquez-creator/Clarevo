@@ -7,11 +7,15 @@ import {
   IOF_DAILY_PPM,
   IOF_FIXED_PPM,
   IOF_MAX_DAYS,
+  JCP_WITHHOLDING_BP,
   averageCents,
   compoundTotalCents,
+  dividendWithholdingCents,
   equivalentAnnualBp,
   equivalentAnnualRate,
   equivalentMonthlyBp,
+  fixedIncomeTaxBp,
+  fixedIncomeTaxCents,
   impliedMonthlyRate,
   incomeTaxQuotas,
   installmentCents,
@@ -21,9 +25,11 @@ import {
   monthlyShareCents,
   percentTenths,
   presentValueCents,
+  realRateBp,
   realValueCents,
   roundDivBig,
   sacTotals,
+  shareOfCents,
   sharesCents,
   simpleTotalCents,
   thirteenthCents,
@@ -226,6 +232,33 @@ export const EXAMPLE_NUMBERS: Partial<Record<TopicSlug, () => ExampleNumbers>> =
     const quotas = incomeTaxQuotas(120_000, 8); // oito de 15.000
     return { money: [120_000, quotas[0]!], bp: [] };
   },
+  // Investimentos (D-093, 13/11/2026). As alíquotas de lei (tabela regressiva, IOF, come-cotas, custódia, JCP, dividendos e poupança)
+  // ficam nos `facts` de cada tema, com a fonte; aqui só as contas dos exemplos.
+  'ir-investimentos': () => {
+    const tax400 = fixedIncomeTaxCents(120_000, 400); // 17,5%: 21.000
+    const tax100 = fixedIncomeTaxCents(30_000, 100); // 22,5%: 6.750
+    return { money: [1_000_000, 120_000, tax400, 1_000_000 + 120_000 - tax400, 30_000, tax100], bp: [fixedIncomeTaxBp(400), fixedIncomeTaxBp(100)] };
+  },
+  'titulos-publicos': () => {
+    // Custódia de 0,20% ao ano só sobre o que passa da isenção de 10.000,00 no título pós-fixado: 15.000,00 → 30,00.
+    const taxed = 2_500_000 - 1_000_000;
+    return { money: [2_500_000, 1_000_000, taxed, shareOfCents(taxed, 20)], bp: [20] };
+  },
+  'lci-lca': () => {
+    const tax = fixedIncomeTaxCents(100_000, 400); // 17,5%: 17.500
+    return { money: [100_000, tax, 100_000 - tax], bp: [fixedIncomeTaxBp(400)] };
+  },
+  proventos: () => {
+    const jcp = shareOfCents(100_000, JCP_WITHHOLDING_BP); // 17.500
+    // 60.000,00 passa do limite (retenção de 6.000,00); 40.000,00 não passa (zero).
+    return { money: [6_000_000, 5_000_000, dividendWithholdingCents(6_000_000), 4_000_000, dividendWithholdingCents(4_000_000), 100_000, jcp, 100_000 - jcp], bp: [] };
+  },
+  'declarar-investimentos': () => ({ money: [500_000, 540_000, 540_000 - 500_000, 2_000, 100 * 2_000], bp: [] }),
+  'ganho-real': () => {
+    const savingsYear = equivalentAnnualBp(50); // 0,5% ao mês por 12 meses: 617 (6,17%)
+    return { money: [], bp: [1_000, 450, realRateBp(1_000, 450), 1_000 - 450, savingsYear, realRateBp(savingsYear, 450)] };
+  },
+  'golpes-rentabilidade': () => ({ money: [], bp: [500, equivalentAnnualBp(500), 1_000, equivalentMonthlyBp(1_000)] }),
 };
 
 /** Partes por milhão como percentual, com todas as casas necessárias: 3.800 → "0,38%", 82 → "0,0082%", 33.730 → "3,373%". */

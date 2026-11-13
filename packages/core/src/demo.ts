@@ -232,12 +232,23 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   // própria pessoa; não conta como anotação e não muda nenhum total.
   await repo.setSavingsAnswer(newOperationKey(), ctx, 0, 'consigo', 50_000);
   // Investimentos (D-093), só no Pessoal: não entram em nenhum total do mês, na renda comprometida nem nas metas.
+  // Com a ficha ampliada (D-099): um CDB a 105% do CDI que vence em junho de 2027, numa instituição de nome fictício.
   const aplicacao = await repo.createInvestment(newOperationKey(), ctx, {
     name: 'Aplicação do banco',
     kind: 'renda_fixa',
     investedCents: 1_000_000,
     startOn: '2026-06-01',
     currentCents: null,
+    details: {
+      subkind: 'cdb',
+      institution: 'Banco Exemplo',
+      indexKind: 'cdi',
+      rateBp: 10500,
+      maturityOn: '2027-06-01',
+      liquidity: 'no_vencimento',
+      liquidityOn: null,
+      liquidityDays: null,
+    },
   });
   const move = (id: string, kind: 'aporte' | 'valor', amountCents: number, occurredOn: string) =>
     repo.addInvestmentMovement(newOperationKey(), id, kind, { amountCents, occurredOn, note: null });
@@ -253,6 +264,7 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
     investedCents: 500_000,
     startOn: '2026-08-01',
     currentCents: null,
+    details: { subkind: 'vgbl', institution: null, indexKind: 'variavel', rateBp: null, maturityOn: null, liquidity: null, liquidityOn: null, liquidityDays: null },
   });
   await move(previdencia.investment!.id, 'valor', 504_000, '2026-08-31');
   await move(previdencia.investment!.id, 'valor', 508_000, '2026-09-30');

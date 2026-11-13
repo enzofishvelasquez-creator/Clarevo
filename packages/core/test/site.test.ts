@@ -1093,8 +1093,10 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     const politica = readFileSync(join(ROOT, 'docs', 'legal', 'politica-de-privacidade.md'), 'utf8');
     // Investimentos: o que a seção 3.2 lista, e só no Pessoal (a empresa não vê, seção 7).
     const investimentos = cartao('Investimentos, só no seu Pessoal');
-    expect(politica).toContain('os investimentos que você registra (o nome que você escolhe, o tipo, os aportes, os resgates, os rendimentos recebidos e os valores do extrato)');
-    expect(investimentos).toContain('o nome que você escolhe, o tipo, os aportes, os resgates, os rendimentos recebidos e os valores do extrato');
+    // Com a ficha ampliada (D-099): os campos opcionais e o tipo do rendimento, nas duas.
+    const campos = 'o nome que você escolhe, o tipo e, se você preencher, o tipo exato, o nome da instituição, como rende, a taxa, o vencimento e quando pode resgatar; os aportes, os resgates, os rendimentos recebidos com o tipo de cada um e os valores do extrato';
+    expect(politica).toContain(`os investimentos que você registra (${campos})`);
+    expect(investimentos).toContain(campos);
     expect(investimentos).toContain('ficam só no seu Pessoal: ninguém da Família vê, nem a empresa que oferece o benefício');
     expect(politica).toContain('A empresa não vê valores, categorias, metas, investimentos, contas, cartões');
     expect(h).toContain('Nunca vê valores, categorias, metas, investimentos, contas, cartões');
@@ -1198,9 +1200,12 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(sitemap).toContain(`<url><loc>https://exemplo.test/aprender/</loc><lastmod>${maisRecente}</lastmod></url>`);
     // As páginas sem data própria ficam sem <lastmod> (nunca a data da geração).
     for (const semData of ['/', '/app/', '/empresas/', '/seguranca', '/calculadoras/', '/ajuda/', '/privacidade']) expect(sitemap, semData).toContain(`<url><loc>https://exemplo.test${semData}</loc></url>`);
+    // Nenhum <lastmod> depois do conteúdo mais novo: o post mais novo ou o tema revisado por último (os de investimentos, D-093, são
+    // de 13/11/2026, um dia depois do post de novembro; a data de revisão de um tema nunca passa de hoje, R6).
+    const conteudoMaisNovo = [REFERENCIA_DOS_POSTS, maisRecente!].sort().pop()!;
     for (const m of sitemap.matchAll(/<lastmod>([^<]*)<\/lastmod>/g)) {
       expect(conteudo.dataExiste(m[1]!), m[1]).toBe(true);
-      expect(m[1]! <= REFERENCIA_DOS_POSTS, `lastmod no futuro: ${m[1]}`).toBe(true);
+      expect(m[1]! <= conteudoMaisNovo, `lastmod no futuro: ${m[1]}`).toBe(true);
     }
     // Estável: outra geração, com a data de hoje como referência, dá o mesmo sitemap.
     expect(texto(gerarSite({ dados: PREENCHIDOS, referencia: '2030-01-01' }).arquivos.get('sitemap.xml'))).toBe(sitemap);

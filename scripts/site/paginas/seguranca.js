@@ -52,7 +52,7 @@ function paginaSeguranca({ valores, img }) {
 </article>
 <article class="cartao">
 <h3>Investimentos, só no seu Pessoal</h3>
-<p>Dos investimentos que você registra, o nome que você escolhe, o tipo, os aportes, os resgates, os rendimentos recebidos e os valores do extrato. Eles ficam só no seu Pessoal: ninguém da Família vê, nem a empresa que oferece o benefício.</p>
+<p>Dos investimentos que você registra, o nome que você escolhe, o tipo e, se você preencher, o tipo exato, o nome da instituição, como rende, a taxa, o vencimento e quando pode resgatar; os aportes, os resgates, os rendimentos recebidos com o tipo de cada um e os valores do extrato. Eles ficam só no seu Pessoal: ninguém da Família vê, nem a empresa que oferece o benefício.</p>
 </article>
 <article class="cartao">
 <h3>Assinatura e pagamento</h3>

@@ -1,7 +1,8 @@
 // @ts-nocheck
 // GERADO por scripts/gerar-funcoes.js a partir de packages/core/src/indices. Não editar à mão: mude o núcleo e rode `npm run indices`.
-// Clarevo · função do servidor "indices" (Edge Function do Supabase, D-093): busca no Banco Central as séries públicas do CDI (4391) e
-// do IPCA (433) e devolve ao app, para comparar com a rentabilidade dos investimentos que a pessoa registra. Não recebe nem guarda dado
+// Clarevo · função do servidor "indices" (Edge Function do Supabase, D-093 e D-099): busca no Banco Central as séries públicas do CDI
+// (4391), do IPCA (433), da Selic do mês (4390) e da poupança (195) e devolve ao app, para comparar com a rentabilidade dos investimentos
+// que a pessoa registra e estimar o valor pela taxa contratada. Não recebe nem guarda dado
 // de ninguém (só o mês de partida). Sem segredos; opcional CLAREVO_APP_URL. Confere a sessão da pessoa no Supabase Auth: publicar com
 // a verificação de JWT do painel ("Verify JWT with legacy secret") DESLIGADA.
 
@@ -109,9 +110,9 @@ const __mods = [
             const hit = cache.get(key);
             if (hit && now() - hit.at < CACHE_MS)
                 return { status: 200, body: hit.body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
-            const get = async (code) => {
+            const get = async (code, start = from) => {
                 try {
-                    const r = await deps.fetch((0, investments_1.bcbSeriesUrl)(code, `${from}-01`, today), { timeoutMs: 8000 });
+                    const r = await deps.fetch((0, investments_1.bcbSeriesUrl)(code, `${start}-01`, today), { timeoutMs: 8000 });
                     if (r.status === 404)
                         return { ok: true, series: {} };
                     if (!r.ok) {
@@ -125,10 +126,12 @@ const __mods = [
                     return { ok: false, series: {} };
                 }
             };
-            const [cdi, ipca] = await Promise.all([get(investments_1.BCB_SERIES.cdi), get(investments_1.BCB_SERIES.ipca)]);
+            const current = (0, dates_1.monthOf)(today);
+            const poupancaFrom = (0, dates_1.monthsBetween)(from, current) > 118 ? (0, dates_1.addMonths)(current, -118) : from;
+            const [cdi, ipca, selic, poupanca] = await Promise.all([get(investments_1.BCB_SERIES.cdi), get(investments_1.BCB_SERIES.ipca), get(investments_1.BCB_SERIES.selic), get(investments_1.BCB_SERIES.poupanca, poupancaFrom)]);
             if (!cdi.ok && !ipca.ok)
                 return reply(502, 'indices_indisponiveis');
-            const body = JSON.stringify({ cdi: cdi.series, ipca: ipca.series, fetchedOn: today });
+            const body = JSON.stringify({ cdi: cdi.series, ipca: ipca.series, selic: selic.series, poupanca: poupanca.series, fetchedOn: today });
             if (cdi.ok && ipca.ok)
                 cache.set(key, { at: now(), body });
             return { status: 200, body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
@@ -358,6 +361,7 @@ const __mods = [
         cripto: 'Criptoativos',
         outro: 'Outro',
     };
+    const INCOME_KINDS = ['juros', 'dividendo', 'jcp', 'fii', 'outro'];
     const charCount = (text) => [...text].length;
     function normalizeInvestmentName(name) {
         return name.trim().replace(/\s+/g, ' ');
@@ -396,6 +400,9 @@ const __mods = [
             return 'data_futura';
         if (input.note !== null && (charCount(input.note.trim()) < 1 || charCount(input.note.trim()) > exports.INVESTMENT_NOTE_MAX))
             return 'observacao_invalida';
+        const income = input.incomeKind ?? null;
+        if (income !== null && (kind !== 'rendimento' || !INCOME_KINDS.includes(income)))
+            return 'tipo_rendimento_invalido';
         return null;
     }
     const FLOW_SIGN = { aporte: 1, resgate: -1, rendimento: 0, valor: 0 };
@@ -558,7 +565,7 @@ const __mods = [
             return null;
         return valid.reduce((acc, r) => acc * (1 + r), 1) - 1;
     }
-    exports.BCB_SERIES = { cdi: 4391, ipca: 433 };
+    exports.BCB_SERIES = { cdi: 4391, ipca: 433, selic: 4390, poupanca: 195 };
     function parseBcbSeries(json) {
         const out = {};
         if (!Array.isArray(json))
@@ -597,11 +604,15 @@ const __mods = [
     function exampleIndices() {
         const cdi = {};
         const ipca = {};
+        const selic = {};
+        const poupanca = {};
         for (let m = '2024-01'; (0, dates_1.monthsBetween)(m, '2027-12') >= 0; m = (0, dates_1.addMonths)(m, 1)) {
             cdi[m] = 0.9;
             ipca[m] = 0.35;
+            selic[m] = 0.89;
+            poupanca[m] = 0.6;
         }
-        return { cdi, ipca, fetchedOn: null, example: true };
+        return { cdi, ipca, selic, poupanca, fetchedOn: null, example: true };
     }
     function compareLastClosedMonths(returns, indices, max = 12) {
         const closed = returns.filter((r) => !r.partial);
@@ -692,8 +703,8 @@ const __mods = [
         missingThisMonth: (names) => `Para ter a taxa deste mês, falta atualizar o valor de ${joinNamesBR(names)}.`,
         missingLastMonth: (month, names) => `Falta o valor de ${(0, dates_1.formatMonthName)(month)} para ${joinNamesBR(names)}: em "Atualizar valor", use a data ${(0, dates_1.formatDateBR)((0, dates_1.addDays)(`${(0, dates_1.addMonths)(month, 1)}-01`, -1))}.`,
         lastValue: (d) => `Valor atualizado em ${(0, dates_1.formatDateBR)(d)}`,
-        indicesSource: (fetchedOn) => `Fonte do CDI e do IPCA: Banco Central do Brasil, séries ${exports.BCB_SERIES.cdi} e ${exports.BCB_SERIES.ipca}${fetchedOn ? `, consulta em ${(0, dates_1.formatDateBR)(fetchedOn)}` : ''}.`,
-        indicesExample: 'Na demonstração, o CDI e o IPCA são valores de exemplo, não os índices reais.',
+        indicesSource: (fetchedOn) => `Fonte do CDI, da Selic, do IPCA e da poupança: Banco Central do Brasil, séries ${exports.BCB_SERIES.cdi}, ${exports.BCB_SERIES.selic}, ${exports.BCB_SERIES.ipca} e ${exports.BCB_SERIES.poupanca}${fetchedOn ? `, consulta em ${(0, dates_1.formatDateBR)(fetchedOn)}` : ''}.`,
+        indicesExample: 'Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.',
         indicesError: 'Não foi possível buscar o CDI e o IPCA agora. A sua rentabilidade continua aqui.',
         disclaimer: 'A rentabilidade é calculada com os valores que você registra, como estão no seu extrato. Não é recomendação de investimento, e o que rendeu no passado não garante o futuro.',
         rule: 'Aportes, resgates e rendimentos não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.',
@@ -798,6 +809,8 @@ const __mods = [
                 return E.personalOnly;
             case 'nao_encontrado':
                 return E.notFound;
+            case 'tipo_rendimento_invalido':
+                return 'Escolha o tipo do rendimento.';
             default:
                 return E.save;
         }

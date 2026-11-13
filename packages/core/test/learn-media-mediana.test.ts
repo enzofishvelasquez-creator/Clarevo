@@ -97,8 +97,8 @@ describe('Média e mediana: o tema no catálogo', () => {
     expect(TOPIC_SLUGS[i - 1]).toBe('essenciais');
     expect(TOPIC_SLUGS[i + 1]).toBe('decimo-terceiro');
     expect(TOPICS.map((x) => x.slug)).toEqual([...TOPIC_SLUGS]);
-    expect(TOPIC_SLUGS.length).toBe(47);
-    expect(publishedTopics().length).toBe(45);
+    expect(TOPIC_SLUGS.length).toBe(54);
+    expect(publishedTopics().length).toBe(52);
     expect(topicsBySection()[1]!.topics.map((x) => x.slug)).toContain(SLUG);
     expect(topicsBySection()[1]!.topics.length).toBe(12);
   });
@@ -269,13 +269,13 @@ describe('Média e mediana: a ligação nos dois sentidos', () => {
     expect(steps).toContain('abrir o tema completo, com um exemplo, em Aprender');
   });
 
-  it('docs: a decisão D-062 cita o tema, e docs/09 lista o catálogo de 47 temas e o tema com fontes e prazo', () => {
+  it('docs: a decisão D-062 cita o tema, e docs/09 lista o catálogo de 54 temas e o tema com fontes e prazo', () => {
     const decisions = readFileSync(join(DOCS, '00_VISAO_E_DECISOES.md'), 'utf8');
     expect(decisions).toMatch(/^\| D-062 \|/m);
     expect(decisions).toContain('Média e mediana');
     const learn = readFileSync(join(DOCS, '09_APRENDER.md'), 'utf8');
     expect(learn).toContain(`### \`${SLUG}\``);
-    expect(learn).toContain('47 temas: 45 publicados e 2 rascunhos');
+    expect(learn).toContain('54 temas: 52 publicados e 2 rascunhos');
     expect(learn).toContain('20/10/2027');
     for (const url of ['17870-a-mediana', '17862-media-pagina-inicial']) expect(learn, url).toContain(url);
   });

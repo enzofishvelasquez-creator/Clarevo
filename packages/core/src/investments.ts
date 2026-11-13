@@ -1,5 +1,6 @@
 import type { IsoDate, IsoMonth } from './dates';
 import { addDays, addMonths, daysInMonth, formatDateBR, formatMonthName, formatMonthSpanBR, formatMonthYearBR, isValidIsoDate, monthOf, monthsBetween, parseDateBR } from './dates';
+import type { InvestmentDetails, InvestmentIncomeKind } from './investment-details';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL } from './money';
 
@@ -42,7 +43,8 @@ export const INVESTMENT_KIND_LABEL: Readonly<Record<InvestmentKind, string>> = {
   outro: 'Outro',
 };
 
-export interface Investment {
+/** Com a ficha ampliada (D-099, `investment-details.ts`): os campos dela ficam nulos quando a pessoa não preencheu. */
+export interface Investment extends InvestmentDetails {
   id: string;
   contextId: string;
   name: string;
@@ -72,6 +74,8 @@ export interface InvestmentMovement {
   amountCents: Cents;
   occurredOn: IsoDate;
   note: string | null;
+  /** Só no rendimento recebido (D-099): juros ou cupom, dividendos, JCP, rendimento de FII ou outro; null sem informação. */
+  incomeKind: InvestmentIncomeKind | null;
   createdBy: string;
   version: number;
   createdAt: string;
@@ -81,6 +85,8 @@ export interface InvestmentMovement {
 export interface InvestmentInput {
   name: string;
   kind: InvestmentKind;
+  /** A ficha ampliada inteira (D-099). Sem ela, ao criar, a ficha fica vazia; ao editar, fica como está (versão antiga do app). */
+  details?: InvestmentDetails;
 }
 
 /** Criar: o nome e o tipo, o aportado até hoje (desde a data informada) e, se a pessoa souber, quanto vale hoje. */
@@ -94,7 +100,12 @@ export interface InvestmentMovementInput {
   amountCents: Cents;
   occurredOn: IsoDate;
   note: string | null;
+  /** Só com o rendimento recebido (D-099). Ao alterar, sem o campo (undefined), o tipo fica como está; null tira. */
+  incomeKind?: InvestmentIncomeKind | null;
 }
+
+/** Os tipos de rendimento recebido (iguais a INVESTMENT_INCOME_KINDS de investment-details.ts; aqui sem importar, pela função do servidor). */
+const INCOME_KINDS: readonly string[] = ['juros', 'dividendo', 'jcp', 'fii', 'outro'];
 
 export type InvestmentErrorCode =
   | 'nome_invalido'
@@ -106,7 +117,8 @@ export type InvestmentErrorCode =
   | 'investimento_encerrado'
   | 'valor_insuficiente'
   | 'limite_de_investimentos'
-  | 'contexto_invalido';
+  | 'contexto_invalido'
+  | 'tipo_rendimento_invalido';
 
 /** Caracteres (não unidades UTF-16), como charCount de validation.ts; aqui sem importar o resto (a função do servidor leva só este arquivo). */
 const charCount = (text: string) => [...text].length;
@@ -148,6 +160,8 @@ export function investmentMovementError(kind: InvestmentMovementKind, input: Inv
   if (!isValidIsoDate(input.occurredOn)) return 'data_invalida';
   if (input.occurredOn > today) return 'data_futura';
   if (input.note !== null && (charCount(input.note.trim()) < 1 || charCount(input.note.trim()) > INVESTMENT_NOTE_MAX)) return 'observacao_invalida';
+  const income = input.incomeKind ?? null;
+  if (income !== null && (kind !== 'rendimento' || !INCOME_KINDS.includes(income))) return 'tipo_rendimento_invalido';
   return null;
 }
 
@@ -380,12 +394,18 @@ export function chainRates(rates: readonly (number | null)[]): number | null {
 export interface MarketIndices {
   cdi: Readonly<Record<IsoMonth, number>>;
   ipca: Readonly<Record<IsoMonth, number>>;
+  /** Selic acumulada no mês (4390) e rentabilidade da poupança com aniversário no dia 1 (195), para a ficha ampliada (D-099). */
+  selic?: Readonly<Record<IsoMonth, number>>;
+  poupanca?: Readonly<Record<IsoMonth, number>>;
   fetchedOn: IsoDate | null;
   example: boolean;
 }
 
-/** Códigos do Sistema Gerenciador de Séries do Banco Central: CDI acumulado no mês (4391) e IPCA, variação mensal (433). */
-export const BCB_SERIES = { cdi: 4391, ipca: 433 } as const;
+/**
+ * Códigos do Sistema Gerenciador de Séries do Banco Central: CDI acumulado no mês (4391), IPCA, variação mensal (433), Selic acumulada no
+ * mês (4390) e rentabilidade da poupança pela regra de 04/05/2012, por data de aniversário (195; a leitura guarda o dia 1 de cada mês).
+ */
+export const BCB_SERIES = { cdi: 4391, ipca: 433, selic: 4390, poupanca: 195 } as const;
 
 /**
  * Lê a resposta da API de séries do Banco Central ([{ "data": "01/10/2026", "valor": "0,93" }]): só linhas com data dd/mm/aaaa no
@@ -424,15 +444,19 @@ export function indexOverMonths(series: Readonly<Record<IsoMonth, number>>, mont
   return acc - 1;
 }
 
-/** Valores de exemplo da demonstração (não são os índices reais): CDI de 0,90% e IPCA de 0,35% ao mês, de 2024 a 2027. */
+/** Valores de exemplo da demonstração (não são os índices reais): CDI de 0,90%, Selic de 0,89%, IPCA de 0,35% e poupança de 0,60% ao mês, de 2024 a 2027. */
 export function exampleIndices(): MarketIndices {
   const cdi: Record<IsoMonth, number> = {};
   const ipca: Record<IsoMonth, number> = {};
+  const selic: Record<IsoMonth, number> = {};
+  const poupanca: Record<IsoMonth, number> = {};
   for (let m: IsoMonth = '2024-01'; monthsBetween(m, '2027-12') >= 0; m = addMonths(m, 1)) {
     cdi[m] = 0.9;
     ipca[m] = 0.35;
+    selic[m] = 0.89;
+    poupanca[m] = 0.6;
   }
-  return { cdi, ipca, fetchedOn: null, example: true };
+  return { cdi, ipca, selic, poupanca, fetchedOn: null, example: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -561,8 +585,8 @@ export const INVESTMENT_TEXT = {
     `Falta o valor de ${formatMonthName(month)} para ${joinNamesBR(names)}: em "Atualizar valor", use a data ${formatDateBR(addDays(`${addMonths(month, 1)}-01` as IsoDate, -1))}.`,
   lastValue: (d: IsoDate) => `Valor atualizado em ${formatDateBR(d)}`,
   indicesSource: (fetchedOn: IsoDate | null) =>
-    `Fonte do CDI e do IPCA: Banco Central do Brasil, séries ${BCB_SERIES.cdi} e ${BCB_SERIES.ipca}${fetchedOn ? `, consulta em ${formatDateBR(fetchedOn)}` : ''}.`,
-  indicesExample: 'Na demonstração, o CDI e o IPCA são valores de exemplo, não os índices reais.',
+    `Fonte do CDI, da Selic, do IPCA e da poupança: Banco Central do Brasil, séries ${BCB_SERIES.cdi}, ${BCB_SERIES.selic}, ${BCB_SERIES.ipca} e ${BCB_SERIES.poupanca}${fetchedOn ? `, consulta em ${formatDateBR(fetchedOn)}` : ''}.`,
+  indicesExample: 'Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.',
   indicesError: 'Não foi possível buscar o CDI e o IPCA agora. A sua rentabilidade continua aqui.',
   disclaimer:
     'A rentabilidade é calculada com os valores que você registra, como estão no seu extrato. Não é recomendação de investimento, e o que rendeu no passado não garante o futuro.',
@@ -670,6 +694,8 @@ export function investmentErrorText(code: string, negativeDay: IsoDate | null = 
       return E.personalOnly;
     case 'nao_encontrado':
       return E.notFound;
+    case 'tipo_rendimento_invalido':
+      return 'Escolha o tipo do rendimento.';
     default:
       return E.save;
   }

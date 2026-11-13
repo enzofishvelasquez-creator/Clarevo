@@ -76,9 +76,20 @@ export const MARKET_SOURCE_DOMAINS: Readonly<Record<string, readonly string[]>> 
 
 /**
  * Temas revisados a cada 6 meses (quadro do Anexo A); os demais com fonte externa, a cada 12. A declaração do Imposto de Renda
- * entra na lista (D-053) porque o prazo de cada ano só sai pouco antes de março: a revisão de abril confere o calendário novo.
+ * entra na lista (D-053) porque o prazo de cada ano só sai pouco antes de março: a revisão de abril confere o calendário novo. Os
+ * quatro temas de investimentos com regra de imposto ou de prazo (D-093) também: lei, medida provisória, decreto (IOF) e norma do
+ * CMN mudam essas regras de um ano para outro.
  */
-export const SIX_MONTH_REVIEW: readonly TopicSlug[] = ['iof-credito', 'rotativo-cartao', 'cheque-especial', 'imposto-de-renda'];
+export const SIX_MONTH_REVIEW: readonly TopicSlug[] = [
+  'iof-credito',
+  'rotativo-cartao',
+  'cheque-especial',
+  'imposto-de-renda',
+  'ir-investimentos',
+  'lci-lca',
+  'proventos',
+  'declarar-investimentos',
+];
 
 /** Aviso de revisão (R6): dias antes do prazo. */
 export const REVIEW_WARNING_DAYS = 30;

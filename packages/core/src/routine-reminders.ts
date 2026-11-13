@@ -21,8 +21,11 @@ import { REMINDER_ID_PREFIX } from './reminders';
  * Privacidade (tela bloqueada): nenhuma saída deste módulo leva valor, descrição, categoria ou identificador de registro.
  */
 
-export type RoutineReminderKind = 'gastos' | 'recebimentos' | 'mapa' | 'ausencia' | 'aporte';
-export const ROUTINE_REMINDER_KINDS: readonly RoutineReminderKind[] = ['gastos', 'recebimentos', 'mapa', 'ausencia', 'aporte'];
+export type RoutineReminderKind = 'gastos' | 'recebimentos' | 'mapa' | 'ausencia' | 'aporte' | 'vencimentos' | 'atualizar';
+export const ROUTINE_REMINDER_KINDS: readonly RoutineReminderKind[] = ['gastos', 'recebimentos', 'mapa', 'ausencia', 'aporte', 'vencimentos', 'atualizar'];
+/** Investimentos (D-099): o aviso de vencimento sai 7 dias antes e no dia; o de atualizar os valores, no dia 1. */
+export const INVESTMENT_REMINDER_DAYS_BEFORE = 7;
+export const INVESTMENT_UPDATE_DAY = 1;
 
 /** Horários oferecidos em Conta ("Horário dos lembretes do dia a dia"), separados do horário dos lembretes de vencimento. */
 export const ROUTINE_REMINDER_HOURS = [12, 18, 20, 21] as const;
@@ -53,6 +56,8 @@ export const ROUTINE_REMINDER_ROUTE: Readonly<Record<RoutineReminderKind, string
   mapa: '/analises',
   ausencia: '/',
   aporte: '/metas',
+  vencimentos: '/investimentos',
+  atualizar: '/investimentos',
 };
 
 export const ROUTINE_REMINDER_TEXT = {
@@ -94,12 +99,28 @@ export const ROUTINE_REMINDER_TEXT = {
       title: 'Metas',
       body: 'Dia de guardar para as suas metas. Quando guardar, registre o aporte.',
     },
+    vencimentos: {
+      toggle: 'Vencimentos dos investimentos',
+      caption: '7 dias antes e no dia em que um investimento vence ou pode ser resgatado, pela data da ficha.',
+      title: 'Investimentos',
+      body: 'Um investimento vence em 7 dias. Confira na aba Investir.',
+    },
+    atualizar: {
+      toggle: 'Atualizar os investimentos',
+      caption: 'No dia 1 de cada mês, se algum investimento ainda não tem o valor do extrato no mês.',
+      title: 'Investimentos',
+      body: 'Dia de atualizar o valor dos seus investimentos com o extrato.',
+    },
   } as Readonly<Record<RoutineReminderKind, { toggle: string; caption: string; title: string; body: string }>>,
 } as const;
 
 /** As escolhas da pessoa, uma por aviso (ficam só no aparelho). */
 export type RoutineReminderChoices = Readonly<Record<RoutineReminderKind, boolean>>;
-export const NO_ROUTINE_REMINDERS: RoutineReminderChoices = { gastos: false, recebimentos: false, mapa: false, ausencia: false, aporte: false };
+export const NO_ROUTINE_REMINDERS: RoutineReminderChoices = { gastos: false, recebimentos: false, mapa: false, ausencia: false, aporte: false, vencimentos: false, atualizar: false };
+/** Texto do aviso de vencimento no próprio dia (o de 7 dias antes é o `body` de `vencimentos`) e os do fim da carência. */
+export const INVESTMENT_DUE_TODAY_BODY = 'Um investimento vence hoje. Confira na aba Investir.';
+export const INVESTMENT_RELEASE_SOON_BODY = 'A carência de um investimento termina em 7 dias. Confira na aba Investir.';
+export const INVESTMENT_RELEASE_TODAY_BODY = 'A carência de um investimento termina hoje. Confira na aba Investir.';
 
 export function isRoutineReminderKind(value: unknown): value is RoutineReminderKind {
   return typeof value === 'string' && (ROUTINE_REMINDER_KINDS as readonly string[]).includes(value);
@@ -116,7 +137,15 @@ export function isDepositReminderDay(value: unknown): value is DepositReminderDa
 /** O que foi guardado no aparelho vira escolhas válidas: só `true` liga; o resto (faltando, inválido) fica desligado. */
 export function parseRoutineReminderChoices(value: unknown): RoutineReminderChoices {
   const v = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-  return { gastos: v.gastos === true, recebimentos: v.recebimentos === true, mapa: v.mapa === true, ausencia: v.ausencia === true, aporte: v.aporte === true };
+  return {
+    gastos: v.gastos === true,
+    recebimentos: v.recebimentos === true,
+    mapa: v.mapa === true,
+    ausencia: v.ausencia === true,
+    aporte: v.aporte === true,
+    vencimentos: v.vencimentos === true,
+    atualizar: v.atualizar === true,
+  };
 }
 
 /** Algum lembrete do dia a dia ligado? (Preferências ainda sem o campo, de uma versão anterior do app, contam como nenhum.) */
@@ -152,6 +181,11 @@ export interface RoutineReminderPlanOptions {
    * (lidos à parte, nas metas do Pessoal). Sem isso, o aviso "aporte" não entra.
    */
   deposit?: { day: DepositReminderDay; hasPlannedGoal: boolean; depositThisMonth: boolean };
+  /**
+   * Investimentos (D-099), lidos à parte no Pessoal: as datas de vencimento (`maturities`) e de fim da carência (`releases`) dos ativos, se
+   * há algum ativo (`hasActive`) e se algum ainda não tem valor atualizado no mês (`missingThisMonth`). Sem isso, os dois avisos não entram.
+   */
+  investments?: { maturities: readonly IsoDate[]; releases: readonly IsoDate[]; hasActive: boolean; missingThisMonth: boolean };
 }
 
 function hh(hour: number): string {
@@ -166,7 +200,10 @@ function hh(hour: number): string {
  * - "recebimentos": dia 10 do mês atual (se ainda não passou e o mês não tem recebimento) e do mês seguinte;
  * - "mapa": dia 15 do mês atual (se ainda não passou) e do mês seguinte;
  * - "ausencia": última anotação + 7 dias, se ainda não passou;
- * - "aporte": o dia escolhido do mês atual (se ainda não passou e o mês não tem aporte) e do mês seguinte, só com meta ativa com plano.
+ * - "aporte": o dia escolhido do mês atual (se ainda não passou e o mês não tem aporte) e do mês seguinte, só com meta ativa com plano;
+ * - "vencimentos": 7 dias antes e no dia de cada vencimento e de cada fim de carência de investimento ativo (D-099), com textos próprios e
+ *   sem o nome na tela bloqueada;
+ * - "atualizar": dia 1 do mês atual (se ainda não passou e algum investimento está sem o valor do mês) e do mês seguinte, com algum ativo.
  * Em ordem de data e hora, cortado em `limit`. Escolhas todas desligadas, hoje inválido ou hora fora da lista: nenhum aviso.
  */
 export function routineReminderPlan(
@@ -189,7 +226,7 @@ export function routineReminderPlan(
   const fits = (date: IsoDate) => date > today || (date === today && !todayPassed);
 
   const items: RoutineReminderItem[] = [];
-  const push = (kind: RoutineReminderKind, date: IsoDate, suffix: string) => {
+  const push = (kind: RoutineReminderKind, date: IsoDate, suffix: string, body?: string) => {
     const t = ROUTINE_REMINDER_TEXT.kinds[kind];
     items.push({
       kind,
@@ -198,7 +235,7 @@ export function routineReminderPlan(
       fireAt: `${date}T${hh(hour)}:00`,
       hour,
       title: t.title,
-      body: t.body,
+      body: body ?? t.body,
       route: ROUTINE_REMINDER_ROUTE[kind],
     });
   };
@@ -222,6 +259,20 @@ export function routineReminderPlan(
   if (choices.mapa) monthly('mapa', ROUTINE_MAP_DAY, false);
   const deposit = options.deposit;
   if (choices.aporte && deposit && deposit.hasPlannedGoal && isDepositReminderDay(deposit.day)) monthly('aporte', deposit.day, deposit.depositThisMonth);
+  const inv = options.investments;
+  if (choices.vencimentos && inv) {
+    const both = (dates: readonly IsoDate[], tag: string, soon: string, today_: string) => {
+      for (const due of [...new Set(dates)].filter(isValidIsoDate).sort()) {
+        const before = addDays(due, -INVESTMENT_REMINDER_DAYS_BEFORE);
+        if (fits(before)) push('vencimentos', before, `${due}-${tag}antes`, soon);
+        if (fits(due)) push('vencimentos', due, `${due}-${tag}dia`, today_);
+      }
+    };
+    both(inv.maturities, '', ROUTINE_REMINDER_TEXT.kinds.vencimentos.body, INVESTMENT_DUE_TODAY_BODY);
+    // A carência que termina no mesmo dia do vencimento já tem o aviso do vencimento.
+    both(inv.releases.filter((d) => !inv.maturities.includes(d)), 'carencia-', INVESTMENT_RELEASE_SOON_BODY, INVESTMENT_RELEASE_TODAY_BODY);
+  }
+  if (choices.atualizar && inv && inv.hasActive) monthly('atualizar', INVESTMENT_UPDATE_DAY, !inv.missingThisMonth);
   if (choices.ausencia && activity && isValidIsoDate(activity.lastWriteOn)) {
     const date = addDays(activity.lastWriteOn, ROUTINE_ABSENCE_DAYS);
     if (fits(date)) push('ausencia', date, date);
