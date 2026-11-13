@@ -59,7 +59,7 @@
 | 39 | `simulacao` | Como ler uma simulação | Dinheiro no tempo | tema | publicado | 09/10/2027 | 2 min (307 palavras) | - | - |
 | 40 | `ir-investimentos` | Imposto de renda nos investimentos | Dinheiro no tempo | tema | publicado | 13/05/2027 | 2 min (280 palavras) | - | - |
 | 41 | `titulos-publicos` | Títulos públicos | Dinheiro no tempo | tema | publicado | 13/11/2027 | 2 min (288 palavras) | - | - |
-| 42 | `lci-lca` | LCI, LCA e LCD | Dinheiro no tempo | tema | publicado | 13/05/2027 | 2 min (246 palavras) | - | - |
+| 42 | `lci-lca` | Letras de crédito isentas | Dinheiro no tempo | tema | publicado | 13/05/2027 | 2 min (246 palavras) | - | - |
 | 43 | `proventos` | Dividendos, JCP e rendimentos de FII | Dinheiro no tempo | tema | publicado | 13/05/2027 | 2 min (243 palavras) | - | - |
 | 44 | `declarar-investimentos` | Como declarar investimentos | Dinheiro no tempo | tema | publicado | 13/05/2027 | 2 min (270 palavras) | - | - |
 | 45 | `ganho-real` | Ganho real | Dinheiro no tempo | tema | publicado | 13/11/2027 | 2 min (208 palavras) | - | - |
@@ -622,7 +622,7 @@ Ressalvas e ajustes:
 - A taxa de custódia do Tesouro Reserva não foi confirmada em fonte oficial; o tema não diz se ela vale para ele. A isenção do RendA+ e do Educa+ ligada à renda mensal aparece só como "regras próprias".
 - O Educa+ não foi descrito como corrigido pela inflação (o trecho oficial não trouxe isso); o RendA+ foi (fonte 6).
 
-### `lci-lca` · LCI, LCA e LCD (publicado, D-093)
+### `lci-lca` · Letras de crédito isentas (publicado, D-093; explica LCI, LCA e LCD)
 
 Revisar até 13/05/2027 (6 meses). Consultas de 13/11/2026, por trecho de resultado de busca.
 

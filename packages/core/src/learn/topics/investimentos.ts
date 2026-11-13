@@ -121,7 +121,7 @@ export const INVESTIMENTOS_TOPICS: Topic[] = [
     kind: 'tema',
     status: 'publicado',
     title: 'Títulos públicos',
-    subtitle: 'Os tipos do Tesouro Direto, a marcação a mercado e a custódia',
+    subtitle: 'Os tipos, a marcação a mercado e a custódia',
     question: 'Como funcionam os títulos públicos do Tesouro Direto?',
     short:
       'São títulos do governo federal, garantidos pelo Tesouro Nacional, e não pelo FGC. Cada tipo rende de um jeito, e vender antes do vencimento pode dar mais ou menos que o contratado na compra.',
@@ -192,8 +192,8 @@ export const INVESTIMENTOS_TOPICS: Topic[] = [
     section: 'tempo',
     kind: 'tema',
     status: 'publicado',
-    title: 'LCI, LCA e LCD',
-    subtitle: 'Letras de crédito: isenção de imposto, prazo mínimo e garantia',
+    title: 'Letras de crédito isentas',
+    subtitle: 'Isenção de imposto, prazo mínimo e garantia',
     question: 'O que são LCI e LCA e quando o dinheiro pode ser resgatado?',
     short:
       'Letras emitidas por instituições financeiras para financiar imóveis, o agronegócio e, na LCD, o desenvolvimento. Para pessoa física, o rendimento é isento de imposto de renda, e há prazo mínimo para o resgate.',

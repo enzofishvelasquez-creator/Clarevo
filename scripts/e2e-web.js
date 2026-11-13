@@ -243,6 +243,18 @@ setInterval(async () => {
       'rendimento garantido|retorno garantido|enriquec|' + ['faz(er|endo)?', 'sentido'].join('\\s+') + '|[\\u2013\\u2014]',
     'i',
   );
+  // D-099 (decisão do Enzo, 13/11/2026): a ficha dos investimentos lista os tipos exatos pelos nomes de mercado e os títulos públicos pelos
+  // nomes oficiais, e Aprender tem temas que explicam esses produtos. Só esses nomes, como aparecem nas telas, saem antes da conferência de
+  // FORBIDDEN nas telas da aba Investir e na lista de Aprender; o resto da lista continua valendo nelas.
+  const INVEST_NAMES = new RegExp(
+    [
+      'LCI, LCA e LCD', 'Os tipos do Tesouro Direto, a marcação a mercado e a custódia', 'Garantia do Tesouro Nacional', 'Tesouro Nacional',
+      'Tesouro Prefixado com Juros Semestrais', 'Tesouro IPCA\\+ com Juros Semestrais', 'Tesouro Selic', 'Tesouro Prefixado', 'Tesouro IPCA\\+',
+      'Tesouro RendA\\+', 'Tesouro Educa\\+', 'Tesouro Reserva', 'CDB ou RDB', '\\bLCI\\b', '\\bLCA\\b', '\\bLCD\\b',
+    ].join('|'),
+    'g',
+  );
+  const investTexts = [];
   // Rola até um texto (as telas rolam dentro de uma área própria, e a captura de página inteira mostra só o topo).
   const scrollTo = async (text) => {
     await p.getByText(text, { exact: true }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'start' }));
@@ -2612,6 +2624,21 @@ setInterval(async () => {
     '\\bruim\\b', 'vil[aã]o', 'culpa', 'usu[aá]ri[oa]s?', 'bem-vind[oa]s?', 'preocupad[oa]s?', 'nubank', 'ita[uú]', 'bradesco', 'santander', 'banco do brasil', 'caixa econ[oô]mica', 'picpay',
     'mercado pago', '\\bxp\\b', 'btg', '\\bc6\\b', '\\binter\\b', 'serasa', 'boa vista', '\\bquod\\b', '\\bspc\\b'].join('|'), 'i');
   const VETOED = new RegExp(`\\bf(az|azer|azendo|a[cç]a|ar[aá]|ez|aria)\\s+${'sentido'}`, 'i');
+  // Temas de investimentos (D-099): os nomes de produto que cada tema explica valem só nele (a mesma lista de INVEST_TOPIC_TERMS em
+  // packages/core/test/copy.test.ts), e nas linhas de "Temas relacionados" de outro tema, que mostram o título e o subtítulo dele.
+  const INVEST_TOPIC_TERMS = {
+    'ir-investimentos': /\bcdb\b|\blci\b|\blca\b|poupan[cç]a|deb[eê]ntures incentivadas|fundos (de curto prazo|de a[cç][õo]es|imobili[aá]rios)/gi,
+    'titulos-publicos': /\btesouro\b/gi,
+    'lci-lca': /\blci\b|\blca\b/gi,
+    proventos: /fundos? imobili[aá]rios?/gi,
+    'declarar-investimentos': /poupan[cç]a|\bcdb\b|\blci\b|\blca\b|criptoativos?|fundos imobili[aá]rios/gi,
+    'ganho-real': /poupan[cç]a/gi,
+  };
+  const withoutInvestTerms = (text, slug) => {
+    const [main, related = ''] = text.split('Temas relacionados');
+    const own = INVEST_TOPIC_TERMS[slug] ? main.replace(INVEST_TOPIC_TERMS[slug], '') : main;
+    return own + Object.values(INVEST_TOPIC_TERMS).reduce((acc, re) => acc.replace(re, ''), related);
+  };
   const RETURN_WORDS = /\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b|aus[eê]nci|sem usar|\d+ dias?\b/i;
   const pageProblems = () => p.evaluate(() => {
     const shown = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0; };
@@ -2637,8 +2664,9 @@ setInterval(async () => {
     const text = await body();
     const shownText = text.split('\nFontes\n')[0] + '\n' + (text.split('Revisado em')[1] ?? '');
     // A referência de 30% da renda com parcelas de dívidas é de uma fonte privada identificada (P-024): a Serasa só pode aparecer em "renda-comprometida".
-    const learnChecked = slug === 'renda-comprometida' ? shownText.replace(/Serasa/g, '') : shownText;
-    const bad = shownText.match(FORBIDDEN)?.[0] ?? shownText.match(VETOED)?.[0] ?? learnChecked.match(LEARN_FORBIDDEN)?.[0] ?? (['sem-registro', 'voltei-depois'].includes(slug) ? shownText.match(RETURN_WORDS)?.[0] : null);
+    const investChecked = withoutInvestTerms(shownText, slug);
+    const learnChecked = slug === 'renda-comprometida' ? investChecked.replace(/Serasa/g, '') : investChecked;
+    const bad = investChecked.match(FORBIDDEN)?.[0] ?? shownText.match(VETOED)?.[0] ?? learnChecked.match(LEARN_FORBIDDEN)?.[0] ?? (['sem-registro', 'voltei-depois'].includes(slug) ? shownText.match(RETURN_WORDS)?.[0] : null);
     if (bad || !text.includes('Revisado em')) learnIssues.termos.push(`${slug}: ${bad ?? 'sem "Revisado em"'}`);
     const links = p.getByRole('link').filter({ visible: true });
     const n = await links.count();
@@ -2669,7 +2697,7 @@ setInterval(async () => {
   await p.evaluate(() => { window.open = window.__realOpen; });
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   const externalTopics = [...learnSeen].filter(([, n]) => n > 0).map(([s]) => s);
-  ok('Aprender: 45 temas publicados abrem pela aba (38 nas seções, com os quatro de época e Média e mediana, e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 45 && learnLabels.length === 38 && faqNames.length === 7 &&
+  ok('Aprender: 52 temas publicados abrem pela aba (45 nas seções, com os quatro de época, Média e mediana e os sete de investimentos da D-099, e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 52 && learnLabels.length === 45 && faqNames.length === 7 &&
     learnIssues.titulo.length === 0, `${learnSeen.size} temas, ${learnLabels.length} linhas, ${faqNames.length} dúvidas ${learnIssues.titulo.slice(0, 3).join(' | ')}`);
   ok('temas: nenhum termo vetado nem travessão longo nos textos exibidos', learnIssues.termos.length === 0, learnIssues.termos.slice(0, 3).join(' | '));
   ok('temas: fontes com papel de link, data de consulta e domínio permitido (oficial; FGC só no tema do FGC; Serasa só em renda-comprometida)', externalTopics.length >= 20 && learnIssues.fontes.length === 0,
@@ -8751,7 +8779,7 @@ setInterval(async () => {
   await goResumo();
 
   // ---- 13. Textos e escritas ----
-  const j1Vetoed = j1Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
+  const j1Vetoed = j1Texts.map((x) => x.replace(INVEST_NAMES, '').match(FORBIDDEN)?.[0]).filter(Boolean);
   const j1Brands = j1Texts.map((x) => x.match(/\b(nubank|ita[uú]|bradesco|santander|inter|c6|caixa|sicredi|sicoob|btg|neon|picpay|mercado pago|itaucard|visa|mastercard|hipercard|amex|serasa)\b/i)?.[0]).filter(Boolean);
   const j1Dashes = j1Texts.map((x) => x.match(/[–—]/)?.[0]).filter(Boolean);
   ok('Tutorial telas do guia, do tour e da ajuda: nenhum termo proibido, travessão, expressão vetada nem nome de banco ou de bandeira nos textos da interface', j1Texts.length >= 20 && j1Vetoed.length === 0 && j1Dashes.length === 0 && j1Brands.length === 0, `${j1Texts.length} telas ${j1Vetoed.join(' | ')} ${j1Brands.join(' | ')} ${j1Dashes.join(' | ')}`);
@@ -14720,7 +14748,7 @@ setInterval(async () => {
     const ivWrites0 = writes.length;
     await demoHome();
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
-    t = await body(); screenTexts.push(t);
+    t = await body(); investTexts.push(t);
     ok('D-093 Investimentos: título "Investimentos", contexto Pessoal fixo, total de R$ 15.955,00, aportado, ganho e a rentabilidade com o CDI e o IPCA de exemplo',
       (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Aportado: R$ 15.500,00') && t.includes('Ganho: R$ 455,00') &&
         t.includes('Neste mês, até hoje: +0,10%') && t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,54%.') &&
@@ -14735,7 +14763,7 @@ setInterval(async () => {
     await atWidths(async (w) => { await layoutChecks(`D-093 Investimentos ${w}px`); if (w === 390) await shot('540_investimentos'); });
     // Detalhe.
     await btn('Aplicação do banco, CDB ou RDB · Banco Exemplo: R$ 10.875,00. Ganho: R$ 375,00.').click(); await waitText('Valor no fim de cada mês'); await p.waitForTimeout(400);
-    t = await body(); screenTexts.push(t);
+    t = await body(); investTexts.push(t);
     ok('D-093 Investimento: detalhe com o valor, a última atualização, o fim de cada mês (setembro R$ 10.360,00) e o histórico',
       (await h1Name()) === 'Aplicação do banco' && t.includes('R$ 10.875,00') && t.includes('Valor atualizado em 06/10/2026') && t.includes('Outubro de 2026 (até hoje)') &&
         t.includes('R$ 10.360,00') && (await visibleCount('button', 'Aporte, 06/10/2026, R$ 500,00')) === 1 && (await visibleCount('button', 'Valor atualizado, 30/09/2026, R$ 10.360,00')) === 1, t.slice(0, 700));
@@ -14800,7 +14828,7 @@ setInterval(async () => {
     const into = async (text) => { await p.getByText(text, { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); };
     await demoHome();
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
-    t = await body(); screenTexts.push(t);
+    t = await body(); investTexts.push(t);
     ok('D-099 Investir: próximos vencimentos, garantia do FGC, ganho real, poupança e os dois atalhos',
       t.includes('Aplicação do banco vence em 01/06/2027, daqui a 8 meses.') && t.includes('Banco Exemplo: R$ 10.875,00 em produtos com garantia do FGC.') &&
         t.includes('Acima da inflação no período: +2,11%') && t.includes('Poupança no mesmo período: +2,42%') && t.includes('Resumo para a declaração') &&
@@ -14817,7 +14845,7 @@ setInterval(async () => {
     await atWidths(async (w) => { await layoutChecks(`D-099 Investir ${w}px`); if (w === 390) { await into('Como está dividido'); await shot('545_investimentos_divisao'); } });
     // Detalhe.
     await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Valor pela taxa contratada'); await p.waitForTimeout(500);
-    t = await body(); screenTexts.push(t);
+    t = await body(); investTexts.push(t);
     ok('D-099 Investimento: valor pela taxa contratada, imposto estimado se resgatasse hoje e a ficha',
       t.includes('Valor estimado: R$ 10.879,87') && t.includes('Pela taxa que você registrou, a partir do valor de 06/10/2026.') && t.includes('Cerca de R$ 10.790,52 líquidos.') &&
         t.includes('Imposto de renda estimado: R$ 84,34') && t.includes('IOF estimado: R$ 0,14') && t.includes('Alíquota de 22,5% pelo tempo aplicado.') &&
@@ -14849,7 +14877,7 @@ setInterval(async () => {
     ok('D-099 Investir: "Rendimentos recebidos em 2026" com o total e o tipo', t.includes('Rendimentos recebidos em 2026') && t.includes('Juros ou cupom') && t.includes('R$ 12,50'), t.slice(0, 1500));
     // Resumo para a declaração.
     await p.getByRole('link', { name: /^Resumo para a declaração/ }).filter({ visible: true }).first().click(); await waitText('Bens e Direitos'); await p.waitForTimeout(400);
-    t = await body(); screenTexts.push(t);
+    t = await body(); investTexts.push(t);
     ok('D-099 Resumo para a declaração: grupo e código para conferir, discriminação sem CPF, valor zero de quem começou no ano e os rendimentos isentos',
       (await h1Name()) === 'Resumo para a declaração' && t.includes('Para a declaração de 2027') && t.includes('Grupo 04, código 03, como costuma aparecer nos guias. Confira no programa da Receita.') &&
         t.includes('LCI na instituição Banco Exemplo, aplicado desde 01/06/2026.') && t.includes('Valor registrado em 31/12/2025: R$ 0,00 (começou em 2026). Hoje: R$ 10.879,87.') &&
@@ -14869,7 +14897,7 @@ setInterval(async () => {
     await p.getByLabel('Porcentagem do CDI (%), Opção 1', { exact: true }).fill('100');
     await p.getByLabel('Porcentagem do CDI (%), Opção 2', { exact: true }).fill('90');
     await btn('Comparar').click(); await p.waitForTimeout(400);
-    t = await body(); screenTexts.push(t);
+    t = await body(); investTexts.push(t);
     ok('D-099 Comparar: o líquido de cada opção na ordem montada, o equivalente do isento e as hipóteses, sem destacar nenhuma',
       t.includes('Opção 1, % do CDI, com imposto a 100%: R$ 10.990,00 líquidos.') && t.includes('Opção 2, % do CDI, isento a 90%: R$ 11.073,81 líquidos.') &&
         t.indexOf('Opção 1, % do CDI') < t.indexOf('Opção 2, % do CDI') && t.includes('Neste prazo, equivale a cerca de 109,09% do CDI com imposto.') &&
@@ -15068,6 +15096,8 @@ setInterval(async () => {
   ok('telas da revisão: sem cobrança nem contagem de dias sem anotar', returnTexts.length >= 9 && returnBad.length === 0, `${returnTexts.length} telas ${returnBad.join(' | ')}`);
   const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);
   ok('contas do ano e calculadoras: nenhum termo proibido nem travessão longo nas telas novas', screenTexts.length > 0 && forbidden.length === 0, `${screenTexts.length} telas ${forbidden.join(' | ')}`);
+  const investForbidden = investTexts.map((s) => s.replace(INVEST_NAMES, '').match(FORBIDDEN)?.[0]).filter(Boolean);
+  ok('Investir (D-093 e D-099): fora os nomes da ficha e dos títulos públicos, nenhum termo proibido nem travessão longo', investTexts.length >= 8 && investForbidden.length === 0, `${investTexts.length} telas ${investForbidden.join(' | ')}`);
   // Hierarquia de títulos (D-063 item 2): o resultado da conferência feita em cada leitura de tela do roteiro inteiro (`headingWatch`).
   ok(`Hierarquia de títulos: em todas as telas do roteiro (${headingRule.checks} conferências em ${headingRule.paths.size} endereços) há um título de nível 1 por tela (janela aberta à parte), o primeiro título é de nível 1 e não há salto de nível`,
     headingRule.checks > 500 && headingRule.paths.size > 100 && headingRule.problems.size === 0, [...headingRule.problems].slice(0, 6).map(([k, n]) => `${k} (${n}x)`).join(' | '));
