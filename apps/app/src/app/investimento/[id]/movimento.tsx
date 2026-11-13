@@ -96,7 +96,8 @@ function MovementForm({
     amountText: existing ? centsToInput(existing.amountCents) : '',
     dateText: formatDateBR(existing?.occurredOn ?? today),
     note: existing?.note ?? '',
-    incomeKind: existing?.incomeKind ?? (kind === 'rendimento' && (investment.subkind === 'fii' || investment.subkind === 'fiagro') ? 'fii' : null),
+    // Só no novo: num rendimento já registrado sem tipo, nada é escolhido pela pessoa sem ela ver (revisão independente de 13/11/2026).
+    incomeKind: existing ? existing.incomeKind : kind === 'rendimento' && (investment.subkind === 'fii' || investment.subkind === 'fiagro') ? 'fii' : null,
   };
   const [amountText, setAmountText] = useState(first.amountText);
   const [dateText, setDateText] = useState(first.dateText);

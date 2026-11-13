@@ -85,7 +85,7 @@ export interface InvestmentMovement {
 export interface InvestmentInput {
   name: string;
   kind: InvestmentKind;
-  /** A ficha ampliada inteira (D-099). Sem ela, a ficha fica vazia (ao editar, os campos são apagados). */
+  /** A ficha ampliada inteira (D-099). Sem ela, ao criar, a ficha fica vazia; ao editar, fica como está (versão antiga do app). */
   details?: InvestmentDetails;
 }
 
@@ -100,7 +100,7 @@ export interface InvestmentMovementInput {
   amountCents: Cents;
   occurredOn: IsoDate;
   note: string | null;
-  /** Só com o rendimento recebido (D-099). */
+  /** Só com o rendimento recebido (D-099). Ao alterar, sem o campo (undefined), o tipo fica como está; null tira. */
   incomeKind?: InvestmentIncomeKind | null;
 }
 

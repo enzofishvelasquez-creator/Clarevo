@@ -152,15 +152,14 @@ export function FgcCard({ items }: { items: readonly Investment[] }) {
   );
 }
 
-/** "Rendimentos recebidos em 2026" (D-099, item 5): o total do ano e a divisão por tipo. Some sem nenhum rendimento no ano. */
-export function IncomeCard({ movements, activeIds }: { movements: readonly InvestmentMovement[]; activeIds: ReadonlySet<string> }) {
+/**
+ * "Rendimentos recebidos em 2026" (D-099, item 5): o total do ano e a divisão por tipo, de todos os investimentos (os encerrados no ano
+ * também, como no resumo para a declaração). Some sem nenhum rendimento no ano.
+ */
+export function IncomeCard({ movements }: { movements: readonly InvestmentMovement[] }) {
   const { today } = useSession();
   const year = Number(today.slice(0, 4));
-  const s = incomeSummary(
-    movements.filter((m) => activeIds.has(m.investmentId)),
-    year,
-    today,
-  );
+  const s = incomeSummary(movements, year, today);
   if (s.totalCents <= 0) return null;
   return (
     <Card style={{ gap: space[2] }}>

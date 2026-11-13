@@ -109,7 +109,7 @@ describe('função "indices" (D-093): CDI e IPCA do Banco Central', () => {
     expect((await other(req())).status).toBe(200);
   });
 
-  it('a Selic do mês ou a poupança com falha: 200 com o CDI e o IPCA, sem guardar', async () => {
+  it('a Selic do mês ou a poupança com falha: 200 com o CDI e o IPCA, e a resposta fica guardada (sem quatro consultas a cada abertura)', async () => {
     let calls = 0;
     const handler = createIndicesHandler({
       config: CONFIG,
@@ -124,7 +124,15 @@ describe('função "indices" (D-093): CDI e IPCA do Banco Central', () => {
     expect(r.status).toBe(200);
     expect(JSON.parse(r.body)).toMatchObject({ cdi: { '2026-10': 0.93 }, ipca: { '2026-10': 0.93 }, poupanca: {} });
     await handler(req());
-    expect(calls).toBe(8);
+    expect(calls).toBe(4);
+  });
+
+  it('a poupança (série diária) começa no máximo 118 meses antes: o Banco Central limita a consulta a 10 anos', async () => {
+    const urls: string[] = [];
+    const handler = createIndicesHandler({ config: CONFIG, today: () => TODAY, fetch: withAuth(async (url) => (urls.push(url), { ok: true, status: 200, json: async () => [] })) });
+    await handler(req({ method: 'GET', url: 'https://x/functions/v1/indices?desde=2010-01' }));
+    expect(urls.find((u) => u.includes('sgs.195'))).toContain('dataInicial=01/01/2017');
+    expect(urls.find((u) => u.includes('sgs.4391'))).toContain('dataInicial=01/01/2010');
   });
 
   it('só quem está no app: confere a sessão no Supabase Auth antes de tudo, com qualquer chave de assinatura', async () => {

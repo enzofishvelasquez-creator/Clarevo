@@ -79,7 +79,7 @@ export default function InvestimentosScreen() {
               </View>
               <AllocationCard items={active} />
               <FgcCard items={active} />
-              <IncomeCard movements={movements.data} activeIds={new Set(active.map((i) => i.id))} />
+              <IncomeCard movements={movements.data} />
               <InvestmentLinks />
               {closed.length > 0 ? (
                 <View style={{ gap: space[3] }}>

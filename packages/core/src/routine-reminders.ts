@@ -117,8 +117,10 @@ export const ROUTINE_REMINDER_TEXT = {
 /** As escolhas da pessoa, uma por aviso (ficam só no aparelho). */
 export type RoutineReminderChoices = Readonly<Record<RoutineReminderKind, boolean>>;
 export const NO_ROUTINE_REMINDERS: RoutineReminderChoices = { gastos: false, recebimentos: false, mapa: false, ausencia: false, aporte: false, vencimentos: false, atualizar: false };
-/** Texto do aviso de vencimento no próprio dia (o de 7 dias antes é o `body` de `vencimentos`). */
+/** Texto do aviso de vencimento no próprio dia (o de 7 dias antes é o `body` de `vencimentos`) e os do fim da carência. */
 export const INVESTMENT_DUE_TODAY_BODY = 'Um investimento vence hoje. Confira na aba Investir.';
+export const INVESTMENT_RELEASE_SOON_BODY = 'A carência de um investimento termina em 7 dias. Confira na aba Investir.';
+export const INVESTMENT_RELEASE_TODAY_BODY = 'A carência de um investimento termina hoje. Confira na aba Investir.';
 
 export function isRoutineReminderKind(value: unknown): value is RoutineReminderKind {
   return typeof value === 'string' && (ROUTINE_REMINDER_KINDS as readonly string[]).includes(value);
@@ -180,10 +182,10 @@ export interface RoutineReminderPlanOptions {
    */
   deposit?: { day: DepositReminderDay; hasPlannedGoal: boolean; depositThisMonth: boolean };
   /**
-   * Investimentos (D-099), lidos à parte no Pessoal: as datas de vencimento e de liberação dos ativos (`dates`), se há algum ativo
-   * (`hasActive`) e se algum ainda não tem valor atualizado no mês de hoje (`missingThisMonth`). Sem isso, os dois avisos não entram.
+   * Investimentos (D-099), lidos à parte no Pessoal: as datas de vencimento (`maturities`) e de fim da carência (`releases`) dos ativos, se
+   * há algum ativo (`hasActive`) e se algum ainda não tem valor atualizado no mês (`missingThisMonth`). Sem isso, os dois avisos não entram.
    */
-  investments?: { dates: readonly IsoDate[]; hasActive: boolean; missingThisMonth: boolean };
+  investments?: { maturities: readonly IsoDate[]; releases: readonly IsoDate[]; hasActive: boolean; missingThisMonth: boolean };
 }
 
 function hh(hour: number): string {
@@ -199,7 +201,8 @@ function hh(hour: number): string {
  * - "mapa": dia 15 do mês atual (se ainda não passou) e do mês seguinte;
  * - "ausencia": última anotação + 7 dias, se ainda não passou;
  * - "aporte": o dia escolhido do mês atual (se ainda não passou e o mês não tem aporte) e do mês seguinte, só com meta ativa com plano;
- * - "vencimentos": 7 dias antes e no dia de cada vencimento ou liberação de investimento ativo (D-099), sem o nome na tela bloqueada;
+ * - "vencimentos": 7 dias antes e no dia de cada vencimento e de cada fim de carência de investimento ativo (D-099), com textos próprios e
+ *   sem o nome na tela bloqueada;
  * - "atualizar": dia 1 do mês atual (se ainda não passou e algum investimento está sem o valor do mês) e do mês seguinte, com algum ativo.
  * Em ordem de data e hora, cortado em `limit`. Escolhas todas desligadas, hoje inválido ou hora fora da lista: nenhum aviso.
  */
@@ -258,11 +261,16 @@ export function routineReminderPlan(
   if (choices.aporte && deposit && deposit.hasPlannedGoal && isDepositReminderDay(deposit.day)) monthly('aporte', deposit.day, deposit.depositThisMonth);
   const inv = options.investments;
   if (choices.vencimentos && inv) {
-    for (const due of [...new Set(inv.dates)].filter(isValidIsoDate).sort()) {
-      const before = addDays(due, -INVESTMENT_REMINDER_DAYS_BEFORE);
-      if (fits(before)) push('vencimentos', before, `${due}-antes`);
-      if (fits(due)) push('vencimentos', due, `${due}-dia`, INVESTMENT_DUE_TODAY_BODY);
-    }
+    const both = (dates: readonly IsoDate[], tag: string, soon: string, today_: string) => {
+      for (const due of [...new Set(dates)].filter(isValidIsoDate).sort()) {
+        const before = addDays(due, -INVESTMENT_REMINDER_DAYS_BEFORE);
+        if (fits(before)) push('vencimentos', before, `${due}-${tag}antes`, soon);
+        if (fits(due)) push('vencimentos', due, `${due}-${tag}dia`, today_);
+      }
+    };
+    both(inv.maturities, '', ROUTINE_REMINDER_TEXT.kinds.vencimentos.body, INVESTMENT_DUE_TODAY_BODY);
+    // A carência que termina no mesmo dia do vencimento já tem o aviso do vencimento.
+    both(inv.releases.filter((d) => !inv.maturities.includes(d)), 'carencia-', INVESTMENT_RELEASE_SOON_BODY, INVESTMENT_RELEASE_TODAY_BODY);
   }
   if (choices.atualizar && inv && inv.hasActive) monthly('atualizar', INVESTMENT_UPDATE_DAY, !inv.missingThisMonth);
   if (choices.ausencia && activity && isValidIsoDate(activity.lastWriteOn)) {

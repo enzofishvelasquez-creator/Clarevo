@@ -1,4 +1,5 @@
 import {
+  addDays,
   anyRoutineReminder,
   deviceTimeZone,
   monthOf,
@@ -102,11 +103,17 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
       deposit = { day: job.routine.depositDay, hasPlannedGoal, depositThisMonth };
     }
     // Investimentos (D-099): as datas da ficha dos ativos e se algum está sem o valor do extrato no mês de hoje.
-    let investments: { dates: IsoDate[]; hasActive: boolean; missingThisMonth: boolean } | undefined;
+    let investments: { maturities: IsoDate[]; releases: IsoDate[]; hasActive: boolean; missingThisMonth: boolean } | undefined;
     if (job.routine.choices.vencimentos || job.routine.choices.atualizar) {
       const active = (await job.repo.listInvestments(job.contextId)).filter((i) => i.status === 'ativo');
-      const dates = active.flatMap((i) => [i.maturityOn, i.liquidity === 'a_partir_de' ? i.liquidityOn : null]).filter((d): d is IsoDate => d !== null);
-      investments = { dates, hasActive: active.length > 0, missingThisMonth: active.some((i) => i.lastValueOn === null || monthOf(i.lastValueOn) !== monthOf(today)) };
+      // O valor do último dia do mês passado conta (é a data que a própria aba pede para o mês fechado).
+      const monthEnd = addDays(`${monthOf(today)}-01` as IsoDate, -1);
+      investments = {
+        maturities: active.map((i) => i.maturityOn).filter((d): d is IsoDate => d !== null),
+        releases: active.map((i) => (i.liquidity === 'a_partir_de' ? i.liquidityOn : null)).filter((d): d is IsoDate => d !== null),
+        hasActive: active.length > 0,
+        missingThisMonth: active.some((i) => i.lastValueOn === null || i.lastValueOn < monthEnd),
+      };
     }
     const plan = routineReminderPlan(job.routine.choices, records, activity, today, job.routine.hour, {
       nowMinutes,

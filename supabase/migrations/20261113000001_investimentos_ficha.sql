@@ -12,7 +12,9 @@
 -- F3. Vencimento e liberação entre 01/01/1990 e 31/12/2100 ('vencimento_invalido', 'liquidez_invalida'). "A partir de uma data" pede a
 --     data; "alguns dias depois do pedido" pede de 1 a 1800 dias; as outras não levam nenhum dos dois ('liquidez_invalida').
 -- F4. O tipo do rendimento só existe no movimento 'rendimento' ('tipo_rendimento_invalido').
--- F5. Editar o investimento grava a ficha inteira (sem ficha, os campos ficam vazios), como o app envia.
+-- F5. Editar o investimento grava a ficha inteira, como o app envia. Sem o parâmetro da ficha (versão antiga do app), a ficha fica como
+--     está; se o tipo mudou e o tipo exato não pertence ao novo, só ele sai (revisão independente de 13/11/2026). No movimento, o tipo do
+--     rendimento sem o parâmetro também fica como está.
 --
 -- As quatro funções de escrita que mudam ganham um parâmetro no fim, com valor padrão: as chamadas de antes continuam valendo. As funções
 -- antigas saem (a lista de funções do app continua com 103).
@@ -316,6 +318,7 @@ declare
   v_i public.investments%rowtype;
   v_name text;
   v_d jsonb;
+  v_cur jsonb;
 begin
   if v_uid is null then
     raise exception 'nao_autenticado' using errcode = '42501';
@@ -339,7 +342,17 @@ begin
     raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || v_i.version;
   end if;
   v_name := public.clarevo_validate_investment(p_name, p_kind);
-  v_d := public.clarevo_validate_investment_details(p_kind, p_details);
+  if p_details is null then
+    v_cur := jsonb_build_object('subkind', v_i.subkind, 'institution', v_i.institution, 'index_kind', v_i.index_kind, 'rate_bp', v_i.rate_bp,
+                                'maturity_on', v_i.maturity_on, 'liquidity', v_i.liquidity, 'liquidity_on', v_i.liquidity_on, 'liquidity_days', v_i.liquidity_days);
+    begin
+      v_d := public.clarevo_validate_investment_details(p_kind, v_cur);
+    exception when others then
+      v_d := public.clarevo_validate_investment_details(p_kind, v_cur - 'subkind');
+    end;
+  else
+    v_d := public.clarevo_validate_investment_details(p_kind, p_details);
+  end if;
   update public.investments
      set name = v_name, kind = p_kind, subkind = v_d ->> 'subkind', institution = v_d ->> 'institution', index_kind = v_d ->> 'index_kind',
          rate_bp = (v_d ->> 'rate_bp')::integer, maturity_on = (v_d ->> 'maturity_on')::date, liquidity = v_d ->> 'liquidity',
@@ -416,7 +429,7 @@ create function public.update_investment_movement(
   p_amount_cents bigint,
   p_occurred_on date,
   p_note text default null,
-  p_income_kind text default null
+  p_income_kind text default 'manter'
 )
 returns jsonb
 language plpgsql
@@ -431,6 +444,7 @@ declare
   v_op public.record_operations%rowtype;
   v_m public.investment_movements%rowtype;
   v_i public.investments%rowtype;
+  v_income text;
 begin
   if v_uid is null then
     raise exception 'nao_autenticado' using errcode = '42501';
@@ -466,11 +480,13 @@ begin
     raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || v_m.version;
   end if;
   perform public.clarevo_validate_investment_movement(v_uid, v_m.kind, p_amount_cents, p_occurred_on, v_note);
-  if p_income_kind is not null and (v_m.kind <> 'rendimento' or p_income_kind not in ('juros', 'dividendo', 'jcp', 'fii', 'outro')) then
+  -- 'manter' (o padrão, quando o parâmetro não vem): o tipo do rendimento fica como está.
+  v_income := case when p_income_kind is not distinct from 'manter' then v_m.income_kind else p_income_kind end;
+  if v_income is not null and (v_m.kind <> 'rendimento' or v_income not in ('juros', 'dividendo', 'jcp', 'fii', 'outro')) then
     raise exception 'tipo_rendimento_invalido' using errcode = '22023';
   end if;
   update public.investment_movements
-     set amount_cents = p_amount_cents, occurred_on = p_occurred_on, note = v_note, income_kind = p_income_kind, version = version + 1
+     set amount_cents = p_amount_cents, occurred_on = p_occurred_on, note = v_note, income_kind = v_income, version = version + 1
    where id = v_m.id;
   perform public.clarevo_require_investment_balance(v_i.id);
   insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id, target_id)

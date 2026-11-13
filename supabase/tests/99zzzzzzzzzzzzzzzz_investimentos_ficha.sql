@@ -129,8 +129,14 @@ begin
   assert r #>> '{investment,subkind}' = 'lci' and r #> '{investment,index_kind}' = 'null'::jsonb and r #> '{investment,maturity_on}' = 'null'::jsonb
      and r #>> '{investment,liquidity_on}' = '2027-01-10' and (r #>> '{investment,version}')::int = 2, 'ficha trocada inteira';
   perform pg_temp.expect_code(format($q$select public.update_investment('fi-e-0002', %L, 2, 'X', 'acoes', '{"subkind":"lci"}')$q$, pg_temp.id('cdb')), 'subtipo_invalido', '22023');
+  -- Sem o parâmetro (versão antiga do app): a ficha fica como está; com o tipo mudado, só o tipo exato que não pertence ao novo sai.
   r := public.update_investment('fi-e-0003', pg_temp.id('cdb'), 2, 'CDB do banco', 'renda_fixa');
-  assert r #> '{investment,subkind}' = 'null'::jsonb and r #> '{investment,institution}' = 'null'::jsonb and r #> '{investment,liquidity}' = 'null'::jsonb, 'sem ficha, campos vazios';
+  assert r #>> '{investment,subkind}' = 'lci' and r #>> '{investment,institution}' = 'Banco Azul' and r #>> '{investment,liquidity_on}' = '2027-01-10', 'sem o parâmetro, a ficha fica';
+  r := public.update_investment('fi-e-0004', pg_temp.id('cdb'), 3, 'CDB do banco', 'fundos');
+  assert r #> '{investment,subkind}' = 'null'::jsonb and r #>> '{investment,institution}' = 'Banco Azul' and r #>> '{investment,liquidity}' = 'a_partir_de', 'tipo novo: só o tipo exato sai';
+  -- Com a ficha vazia enviada, os campos ficam vazios.
+  r := public.update_investment('fi-e-0005', pg_temp.id('cdb'), 4, 'CDB do banco', 'renda_fixa', '{}');
+  assert r #> '{investment,institution}' = 'null'::jsonb and r #> '{investment,liquidity}' = 'null'::jsonb, 'ficha vazia, campos vazios';
 
   -- Tipo do rendimento só no rendimento.
   m := public.add_investment_movement('fi-m-0001', pg_temp.id('acoes'), 'rendimento', 1500, '2026-11-13', null, 'jcp');
@@ -144,8 +150,11 @@ begin
     'tipo_rendimento_invalido', '22023');
   m := public.update_investment_movement('fi-u-0001', (m #>> '{movement,id}')::uuid, 1, 1600, '2026-11-13', null, 'dividendo');
   assert m #>> '{movement,income_kind}' = 'dividendo' and (m #>> '{movement,amount_cents}')::bigint = 1600, 'alterado';
+  -- Sem o parâmetro (versão antiga do app): o tipo fica; com nulo enviado, sai.
   m := public.update_investment_movement('fi-u-0002', (m #>> '{movement,id}')::uuid, 2, 1600, '2026-11-13', null);
-  assert m #> '{movement,income_kind}' = 'null'::jsonb, 'sem tipo';
+  assert m #>> '{movement,income_kind}' = 'dividendo', 'sem o parâmetro, o tipo fica';
+  m := public.update_investment_movement('fi-u-0004', (m #>> '{movement,id}')::uuid, 3, 1600, '2026-11-13', null, null);
+  assert m #> '{movement,income_kind}' = 'null'::jsonb, 'com nulo, sem tipo';
   perform pg_temp.expect_code(format($q$select public.update_investment_movement('fi-u-0003', %L, 1, 100, '2026-11-13', null, 'juros')$q$,
     (select id from public.investment_movements where investment_id = pg_temp.id('acoes') and kind = 'aporte')), 'tipo_rendimento_invalido', '22023');
 end $$;

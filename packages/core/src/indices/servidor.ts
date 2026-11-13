@@ -131,9 +131,9 @@ export function createIndicesHandler(deps: { config: IndicesConfig; fetch: Indic
     if (hit && now() - hit.at < CACHE_MS) return { status: 200, body: hit.body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
     // Cada série à parte (revisão de 11/11/2026): o IPCA do mês ainda não publicado (404, ou uma falha só dele) não leva o CDI junto.
     // Só as duas falhando dá 502; resposta com uma série faltando não fica guardada, para a próxima consulta tentar de novo.
-    const get = async (code: number): Promise<{ ok: boolean; series: Record<IsoMonth, number> }> => {
+    const get = async (code: number, start: IsoMonth = from): Promise<{ ok: boolean; series: Record<IsoMonth, number> }> => {
       try {
-        const r = await deps.fetch(bcbSeriesUrl(code, `${from}-01`, today), { timeoutMs: 8000 });
+        const r = await deps.fetch(bcbSeriesUrl(code, `${start}-01`, today), { timeoutMs: 8000 });
         if (r.status === 404) return { ok: true, series: {} };
         if (!r.ok) {
           deps.log?.(`indices: bcb_${code}_${r.status}`);
@@ -145,11 +145,15 @@ export function createIndicesHandler(deps: { config: IndicesConfig; fetch: Indic
         return { ok: false, series: {} };
       }
     };
-    // A Selic do mês e a poupança (D-099) servem ao valor pela taxa contratada: a falta delas não derruba a resposta.
-    const [cdi, ipca, selic, poupanca] = await Promise.all([get(BCB_SERIES.cdi), get(BCB_SERIES.ipca), get(BCB_SERIES.selic), get(BCB_SERIES.poupanca)]);
+    // A Selic do mês e a poupança (D-099) servem ao valor pela taxa contratada: a falta delas não derruba a resposta nem impede guardar
+    // (sem isso, uma série extra fora do ar faria quatro consultas a cada abertura). A poupança é diária no Banco Central, que limita a
+    // consulta a 10 anos: ela começa no máximo 118 meses antes do mês de hoje.
+    const current = monthOf(today);
+    const poupancaFrom = monthsBetween(from, current) > 118 ? addMonths(current, -118) : from;
+    const [cdi, ipca, selic, poupanca] = await Promise.all([get(BCB_SERIES.cdi), get(BCB_SERIES.ipca), get(BCB_SERIES.selic), get(BCB_SERIES.poupanca, poupancaFrom)]);
     if (!cdi.ok && !ipca.ok) return reply(502, 'indices_indisponiveis');
     const body = JSON.stringify({ cdi: cdi.series, ipca: ipca.series, selic: selic.series, poupanca: poupanca.series, fetchedOn: today });
-    if (cdi.ok && ipca.ok && selic.ok && poupanca.ok) cache.set(key, { at: now(), body });
+    if (cdi.ok && ipca.ok) cache.set(key, { at: now(), body });
     return { status: 200, body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
   };
 }

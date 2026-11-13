@@ -5,6 +5,7 @@ import {
   EMPTY_DETAILS_DRAFT,
   EMPTY_INVESTMENT_DETAILS,
   FGC_LIMIT_CENTS,
+  FGC_TEXT,
   INVESTMENT_KINDS,
   INVESTMENT_SUBKINDS,
   INVESTMENT_TAX_RULES,
@@ -211,6 +212,15 @@ describe('imposto estimado (D-099, item 7)', () => {
     expect(e).toMatchObject({ gainCents: 160_000, irCents: 24_000, netCents: 636_000 });
   });
 
+  it('a ordem da lista não muda a conta: no mesmo dia, aporte antes do resgate, e dois resgates do dia somam (revisão de 13/11/2026)', () => {
+    const asc = [mv('aporte', 100_000, '2025-01-02'), mv('aporte', 50_000, '2025-06-02'), mv('resgate', 20_000, '2025-06-02'), mv('valor', 150_000, '2026-11-01')];
+    const a = estimateRegressiveNet(asc, TODAY);
+    expect(estimateRegressiveNet([...asc].reverse(), TODAY)).toEqual(a);
+    const twice = [mv('aporte', 100_000, '2025-01-02'), mv('resgate', 10_000, '2025-06-02'), { ...mv('resgate', 10_000, '2025-06-02'), id: 'r2' }, mv('valor', 100_000, '2026-11-01')];
+    const one = [mv('aporte', 100_000, '2025-01-02'), mv('resgate', 20_000, '2025-06-02'), mv('valor', 100_000, '2026-11-01')];
+    expect(estimateRegressiveNet(twice, TODAY).irCents).toBe(estimateRegressiveNet(one, TODAY).irCents);
+  });
+
   it('dois aportes de idades diferentes dividem o rendimento pelo aplicado vezes os dias', () => {
     const e = estimateRegressiveNet([mv('aporte', 1_000_000, '2024-11-11'), mv('aporte', 1_000_000, '2026-08-13'), mv('valor', 2_300_000, TODAY)], TODAY);
     const daysA = calendarDaysBetween('2024-11-11', TODAY);
@@ -288,6 +298,7 @@ describe('o que a ficha mostra na aba (D-099, itens 1 a 5)', () => {
     expect(f.groups).toHaveLength(1);
     expect(f.groups[0]).toMatchObject({ label: 'Banco Azul', cents: 35_000_000, overCents: 35_000_000 - FGC_LIMIT_CENTS, names: ['CDB do banco', 'LCI'] });
     expect(f.withoutInstitution).toEqual({ cents: 1_500_000, names: ['Poupança', 'CDB antigo'] });
+    expect(FGC_TEXT.over(f.groups[0]!)).toBe('Banco Azul: R$ 350.000,00 em produtos com garantia do FGC. A garantia vai até R$ 250.000,00 por pessoa em cada instituição ou conglomerado.');
     expect(f.totalCents).toBe(36_500_000);
   });
 
@@ -362,6 +373,9 @@ describe('valor pela taxa contratada (D-099, item 8)', () => {
 
   it('poupança: a rentabilidade do mês em cada aniversário completo', () => {
     expect(estimateValueByRate({ indexKind: 'poupanca', rateBp: null }, [mv('aporte', 100_000, '2026-08-15')], indices, '2026-11-14')!.valueCents).toBe(Math.round(100_000 * 1.006 ** 2));
+    // Depósito no dia 31: aniversário no dia 1 (01/09, 01/10 e 01/11).
+    expect(estimateValueByRate({ indexKind: 'poupanca', rateBp: null }, [mv('aporte', 100_000, '2026-07-31')], indices, '2026-10-31')!.valueCents).toBe(Math.round(100_000 * 1.006 ** 2));
+    expect(estimateValueByRate({ indexKind: 'poupanca', rateBp: null }, [mv('aporte', 100_000, '2026-07-31')], indices, '2026-11-01')!.valueCents).toBe(Math.round(100_000 * 1.006 ** 3));
   });
 });
 
@@ -406,5 +420,27 @@ describe('resumo para a declaração (D-099, item 9)', () => {
   it('anos oferecidos: o de hoje e os dois anteriores com movimento', () => {
     expect(declarationYears(movements, TODAY)).toEqual([2026, 2025]);
     expect(declarationYears([], TODAY)).toEqual([2026]);
+  });
+});
+
+describe('repositório da demonstração: a ficha ao editar (D-099, F5)', () => {
+  it('sem a ficha, ela fica como está; com o tipo mudado, só o tipo exato sai; o tipo do rendimento sem o campo também fica', async () => {
+    const { createDemoRepository, newOperationKey } = await import('../src');
+    const repo = await createDemoRepository();
+    const space = (await repo.getSpace())!;
+    const ctx = space.personalContextId;
+    const all = await repo.listInvestments(ctx);
+    const cdb = all.find((i) => i.subkind === 'cdb')!;
+    expect(cdb).toMatchObject({ institution: 'Banco Exemplo', indexKind: 'cdi', rateBp: 10500 });
+    const kept = await repo.updateInvestment(newOperationKey(), cdb.id, cdb.version, { name: 'Outro nome', kind: 'renda_fixa' });
+    expect(kept.investment).toMatchObject({ name: 'Outro nome', subkind: 'cdb', institution: 'Banco Exemplo', rateBp: 10500 });
+    const moved = await repo.updateInvestment(newOperationKey(), cdb.id, kept.investment!.version, { name: 'Outro nome', kind: 'fundos' });
+    expect(moved.investment).toMatchObject({ kind: 'fundos', subkind: null, institution: 'Banco Exemplo', indexKind: 'cdi' });
+    const income = await repo.addInvestmentMovement(newOperationKey(), cdb.id, 'rendimento', { amountCents: 1_000, occurredOn: '2026-10-01', note: null, incomeKind: 'juros' });
+    const m = income.movement!;
+    const same = await repo.updateInvestmentMovement(newOperationKey(), m.id, m.version, { amountCents: 1_200, occurredOn: '2026-10-01', note: null });
+    expect(same.movement).toMatchObject({ amountCents: 1_200, incomeKind: 'juros' });
+    const cleared = await repo.updateInvestmentMovement(newOperationKey(), m.id, same.movement!.version, { amountCents: 1_200, occurredOn: '2026-10-01', note: null, incomeKind: null });
+    expect(cleared.movement!.incomeKind).toBeNull();
   });
 });

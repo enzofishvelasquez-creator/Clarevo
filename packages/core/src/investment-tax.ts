@@ -80,13 +80,26 @@ type Flow = Pick<InvestmentMovement, 'kind' | 'amountCents' | 'occurredOn'> & { 
  */
 export function estimateRegressiveNet(movements: readonly Flow[], today: IsoDate): NetEstimate {
   const live = movements.filter((m) => m.occurredOn <= today);
-  const ordered = [...live].sort((a, b) => (a.occurredOn < b.occurredOn ? -1 : a.occurredOn > b.occurredOn ? 1 : 0));
+  // Data, e no mesmo dia aportes, depois resgates, depois o resto (revisão independente de 13/11/2026: as listas chegam do mais recente
+  // ao mais antigo, e um resgate do dia vinha antes do aporte do mesmo dia). Empate: pela criação, como o banco.
+  const rank: Readonly<Record<Flow['kind'], number>> = { aporte: 0, resgate: 1, rendimento: 2, valor: 3 };
+  const ordered = [...live].sort(
+    (a, b) => (a.occurredOn < b.occurredOn ? -1 : a.occurredOn > b.occurredOn ? 1 : rank[a.kind] - rank[b.kind] || (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || (a.id ?? '').localeCompare(b.id ?? '')),
+  );
   const lots: { on: IsoDate; principal: number }[] = [];
+  let day: IsoDate | null = null;
+  let withdrawnToday = 0;
   for (const m of ordered) {
+    if (m.occurredOn !== day) {
+      day = m.occurredOn;
+      withdrawnToday = 0;
+    }
     if (m.kind === 'aporte') lots.push({ on: m.occurredOn, principal: m.amountCents });
     else if (m.kind === 'resgate') {
-      // Valor antes do resgate: o do dia anterior, mais os aportes do próprio dia.
-      const before = investmentValueOn(live, addDays(m.occurredOn, -1)) + live.filter((x) => x.kind === 'aporte' && x.occurredOn === m.occurredOn).reduce((a, x) => a + x.amountCents, 0);
+      // Valor antes deste resgate: o do dia anterior, mais os aportes do dia, menos os resgates do dia que vieram antes.
+      const before =
+        investmentValueOn(live, addDays(m.occurredOn, -1)) + live.filter((x) => x.kind === 'aporte' && x.occurredOn === m.occurredOn).reduce((a, x) => a + x.amountCents, 0) - withdrawnToday;
+      withdrawnToday += m.amountCents;
       const principal = lots.reduce((a, l) => a + l.principal, 0);
       if (before <= 0 || principal <= 0) continue;
       let take = principal * Math.min(1, m.amountCents / before);

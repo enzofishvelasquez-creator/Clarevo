@@ -110,9 +110,9 @@ const __mods = [
             const hit = cache.get(key);
             if (hit && now() - hit.at < CACHE_MS)
                 return { status: 200, body: hit.body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
-            const get = async (code) => {
+            const get = async (code, start = from) => {
                 try {
-                    const r = await deps.fetch((0, investments_1.bcbSeriesUrl)(code, `${from}-01`, today), { timeoutMs: 8000 });
+                    const r = await deps.fetch((0, investments_1.bcbSeriesUrl)(code, `${start}-01`, today), { timeoutMs: 8000 });
                     if (r.status === 404)
                         return { ok: true, series: {} };
                     if (!r.ok) {
@@ -126,11 +126,13 @@ const __mods = [
                     return { ok: false, series: {} };
                 }
             };
-            const [cdi, ipca, selic, poupanca] = await Promise.all([get(investments_1.BCB_SERIES.cdi), get(investments_1.BCB_SERIES.ipca), get(investments_1.BCB_SERIES.selic), get(investments_1.BCB_SERIES.poupanca)]);
+            const current = (0, dates_1.monthOf)(today);
+            const poupancaFrom = (0, dates_1.monthsBetween)(from, current) > 118 ? (0, dates_1.addMonths)(current, -118) : from;
+            const [cdi, ipca, selic, poupanca] = await Promise.all([get(investments_1.BCB_SERIES.cdi), get(investments_1.BCB_SERIES.ipca), get(investments_1.BCB_SERIES.selic), get(investments_1.BCB_SERIES.poupanca, poupancaFrom)]);
             if (!cdi.ok && !ipca.ok)
                 return reply(502, 'indices_indisponiveis');
             const body = JSON.stringify({ cdi: cdi.series, ipca: ipca.series, selic: selic.series, poupanca: poupanca.series, fetchedOn: today });
-            if (cdi.ok && ipca.ok && selic.ok && poupanca.ok)
+            if (cdi.ok && ipca.ok)
                 cache.set(key, { at: now(), body });
             return { status: 200, body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
         };
@@ -702,7 +704,7 @@ const __mods = [
         missingLastMonth: (month, names) => `Falta o valor de ${(0, dates_1.formatMonthName)(month)} para ${joinNamesBR(names)}: em "Atualizar valor", use a data ${(0, dates_1.formatDateBR)((0, dates_1.addDays)(`${(0, dates_1.addMonths)(month, 1)}-01`, -1))}.`,
         lastValue: (d) => `Valor atualizado em ${(0, dates_1.formatDateBR)(d)}`,
         indicesSource: (fetchedOn) => `Fonte do CDI, da Selic, do IPCA e da poupança: Banco Central do Brasil, séries ${exports.BCB_SERIES.cdi}, ${exports.BCB_SERIES.selic}, ${exports.BCB_SERIES.ipca} e ${exports.BCB_SERIES.poupanca}${fetchedOn ? `, consulta em ${(0, dates_1.formatDateBR)(fetchedOn)}` : ''}.`,
-        indicesExample: 'Na demonstração, o CDI e o IPCA são valores de exemplo, não os índices reais.',
+        indicesExample: 'Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.',
         indicesError: 'Não foi possível buscar o CDI e o IPCA agora. A sua rentabilidade continua aqui.',
         disclaimer: 'A rentabilidade é calculada com os valores que você registra, como estão no seu extrato. Não é recomendação de investimento, e o que rendeu no passado não garante o futuro.',
         rule: 'Aportes, resgates e rendimentos não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.',

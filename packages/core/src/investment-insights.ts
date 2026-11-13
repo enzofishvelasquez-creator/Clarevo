@@ -206,7 +206,7 @@ export function fgcByInstitution(items: readonly Item[]): FgcSummary {
 export const FGC_TEXT = {
   title: 'Garantia do FGC',
   group: (g: FgcGroup) => `${g.label}: ${formatBRL(g.cents)} em produtos com garantia do FGC.`,
-  over: (g: FgcGroup) => `Nesta instituição, ${formatBRL(g.cents)} estão em produtos com garantia do FGC. A garantia vai até ${formatBRL(FGC_LIMIT_CENTS)} por pessoa em cada instituição ou conglomerado.`,
+  over: (g: FgcGroup) => `${g.label}: ${formatBRL(g.cents)} em produtos com garantia do FGC. A garantia vai até ${formatBRL(FGC_LIMIT_CENTS)} por pessoa em cada instituição ou conglomerado.`,
   without: (names: readonly string[]) => `Sem a instituição informada: ${joinNamesBR(names)}. Informe onde está em Editar para somar por instituição.`,
   rules: `A garantia vai até ${formatBRL(FGC_LIMIT_CENTS)} por pessoa em cada instituição ou conglomerado, e até ${formatBRL(FGC_TOTAL_LIMIT_CENTS)} a cada 4 anos. Instituições do mesmo conglomerado somam juntas, e a Clarevo não sabe quais são do mesmo grupo.`,
   estimate: 'Estimativa pelo valor que você registrou. A lista do que tem garantia e das instituições associadas fica no site do FGC.',
@@ -394,10 +394,13 @@ export function estimateValueByRate(inv: Rate, movements: readonly MovementLike[
   if (index === 'poupanca') {
     factorOf = (on) => {
       let f = 1;
+      // Depósito nos dias 29, 30 ou 31: o aniversário é o dia 1 do mês seguinte (regra da poupança).
+      const late = Number(on.slice(8, 10)) > 28;
+      const anniversaryOf = (k: number): IsoDate => (late ? (`${addMonths(monthOf(on), k + 1)}-01` as IsoDate) : addMonthsToDate(on, k));
       for (let k = 1; ; k += 1) {
-        const anniversary = addMonthsToDate(on, k);
+        const anniversary = anniversaryOf(k);
         if (anniversary > today) break;
-        const periodMonth = monthOf(addMonthsToDate(on, k - 1));
+        const periodMonth = monthOf(k === 1 ? on : anniversaryOf(k - 1));
         const mv = monthValue(series!, periodMonth, lastMonth);
         if (!mv) return Number.NaN;
         if (mv.projected) noteProjection(periodMonth);

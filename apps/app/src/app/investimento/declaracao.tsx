@@ -39,10 +39,11 @@ export default function DeclaracaoScreen() {
       <SubHeader title="Resumo para a declaração" onBack={() => (router.canGoBack() ? router.back() : router.replace('/investimentos'))} right={<ContextPill label="Pessoal" fixed />} />
       <Screen>
         <Body>
-          {list.isError || movements.isError ? (
+          {list.isError || movements.isError || space_.isError ? (
             <ErrorState
               message={ERROR_TEXT.carregar_falhou}
               onRetry={() => {
+                space_.refetch();
                 list.refetch();
                 movements.refetch();
               }}
@@ -115,9 +116,9 @@ export default function DeclaracaoScreen() {
                     <MoneyTxt variant="label">{T.exempt(summary.income.exemptCents)}</MoneyTxt>
                     <MoneyTxt variant="label">{T.exclusive(summary.income.exclusiveCents)}</MoneyTxt>
                     {summary.income.otherCents > 0 ? <MoneyTxt variant="label">{T.other(summary.income.otherCents)}</MoneyTxt> : null}
-                    <Txt variant="caption" color={colors.textSecondary}>
+                    <MoneyTxt variant="caption" color={colors.textSecondary}>
                       {`Total: ${formatBRL(summary.income.exemptCents + summary.income.exclusiveCents + summary.income.otherCents)}. Pelo tipo que você escolheu ao registrar cada rendimento.`}
-                    </Txt>
+                    </MoneyTxt>
                   </Card>
                   {summary.institutions.length > 0 ? (
                     <Card style={{ gap: space[2] }}>

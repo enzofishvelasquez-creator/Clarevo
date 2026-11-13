@@ -216,23 +216,23 @@ describe('lembretes do dia a dia (D-087): o plano', () => {
 
 describe('lembretes dos investimentos (D-099)', () => {
   const ONLY = { gastos: false, recebimentos: false, mapa: false, ausencia: false, aporte: false, vencimentos: true, atualizar: true } as const;
-  it('vencimento: 7 dias antes e no dia, sem o nome; atualizar: dia 1, só com algum sem valor no mês', () => {
+  it('vencimento: 7 dias antes e no dia, sem o nome; carência com texto próprio; atualizar: dia 1, só com algum sem valor no mês', () => {
     const plan = routineReminderPlan(ONLY, [], null, '2026-11-06', 20, {
-      investments: { dates: ['2026-11-20', '2026-11-20', '2026-11-08', '2027-03-01'], hasActive: true, missingThisMonth: true },
+      investments: { maturities: ['2026-11-20', '2026-11-20', '2026-11-08'], releases: ['2027-03-01', '2026-11-08'], hasActive: true, missingThisMonth: true },
     });
     expect(plan.map((i) => [i.id, i.date, i.body])).toEqual([
       ['clarevo-lembrete-rotina-vencimentos-2026-11-08-dia', '2026-11-08', 'Um investimento vence hoje. Confira na aba Investir.'],
       ['clarevo-lembrete-rotina-vencimentos-2026-11-20-antes', '2026-11-13', 'Um investimento vence em 7 dias. Confira na aba Investir.'],
       ['clarevo-lembrete-rotina-vencimentos-2026-11-20-dia', '2026-11-20', 'Um investimento vence hoje. Confira na aba Investir.'],
       ['clarevo-lembrete-rotina-atualizar-2026-12', '2026-12-01', 'Dia de atualizar o valor dos seus investimentos com o extrato.'],
-      ['clarevo-lembrete-rotina-vencimentos-2027-03-01-antes', '2027-02-22', 'Um investimento vence em 7 dias. Confira na aba Investir.'],
-      ['clarevo-lembrete-rotina-vencimentos-2027-03-01-dia', '2027-03-01', 'Um investimento vence hoje. Confira na aba Investir.'],
+      ['clarevo-lembrete-rotina-vencimentos-2027-03-01-carencia-antes', '2027-02-22', 'A carência de um investimento termina em 7 dias. Confira na aba Investir.'],
+      ['clarevo-lembrete-rotina-vencimentos-2027-03-01-carencia-dia', '2027-03-01', 'A carência de um investimento termina hoje. Confira na aba Investir.'],
     ]);
     expect(plan.every((i) => i.route === '/investimentos' && i.title === 'Investimentos')).toBe(true);
     // No dia 1, com tudo atualizado no mês: só o do mês seguinte.
-    const d1 = routineReminderPlan({ ...ONLY, vencimentos: false }, [], null, '2026-11-01', 20, { investments: { dates: [], hasActive: true, missingThisMonth: false } });
+    const d1 = routineReminderPlan({ ...ONLY, vencimentos: false }, [], null, '2026-11-01', 20, { investments: { maturities: [], releases: [], hasActive: true, missingThisMonth: false } });
     expect(d1.map((i) => i.date)).toEqual(['2026-12-01']);
-    expect(routineReminderPlan({ ...ONLY, vencimentos: false }, [], null, '2026-11-01', 20, { investments: { dates: [], hasActive: false, missingThisMonth: true } })).toEqual([]);
+    expect(routineReminderPlan({ ...ONLY, vencimentos: false }, [], null, '2026-11-01', 20, { investments: { maturities: [], releases: [], hasActive: false, missingThisMonth: true } })).toEqual([]);
     expect(routineReminderPlan(ONLY, [], null, '2026-11-01', 20, {})).toEqual([]);
   });
 });

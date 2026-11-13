@@ -2639,7 +2639,8 @@ export class SupabaseRepository implements RecordsRepository {
       p_amount_cents: input.amountCents,
       p_occurred_on: input.occurredOn,
       p_note: input.note,
-      p_income_kind: input.incomeKind ?? null,
+      // Sem o campo, o tipo fica como está no banco ('manter', o padrão da função).
+      ...(input.incomeKind === undefined ? {} : { p_income_kind: input.incomeKind }),
     });
     if (error) throw repoError(error);
     return toInvestmentWrite(data);
