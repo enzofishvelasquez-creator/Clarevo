@@ -68,10 +68,10 @@ do $$ begin
      and not has_table_privilege('authenticated', 'public.investment_movements', 'update') and not has_table_privilege('authenticated', 'public.investment_movements', 'delete'),
     'só leitura direta';
   assert not has_table_privilege('anon', 'public.investment_items', 'select'), 'anon não lê';
-  assert has_function_privilege('authenticated', 'public.create_investment(text, uuid, text, text, bigint, date, bigint)', 'execute')
-     and has_function_privilege('authenticated', 'public.add_investment_movement(text, uuid, text, bigint, date, text)', 'execute')
+  assert has_function_privilege('authenticated', 'public.create_investment(text, uuid, text, text, bigint, date, bigint, jsonb)', 'execute')
+     and has_function_privilege('authenticated', 'public.add_investment_movement(text, uuid, text, bigint, date, text, text)', 'execute')
      and has_function_privilege('authenticated', 'public.delete_investment(text, uuid, integer)', 'execute'), 'o app executa as funções';
-  assert not has_function_privilege('anon', 'public.create_investment(text, uuid, text, text, bigint, date, bigint)', 'execute'), 'anon não';
+  assert not has_function_privilege('anon', 'public.create_investment(text, uuid, text, text, bigint, date, bigint, jsonb)', 'execute'), 'anon não';
   assert not has_function_privilege('authenticated', 'public.clarevo_investment_negative_day(uuid)', 'execute')
      and not has_function_privilege('authenticated', 'public.clarevo_lock_investment(uuid)', 'execute')
      and not has_function_privilege('authenticated', 'public.clarevo_investment_result(uuid, uuid)', 'execute'), 'auxiliares fechadas';
