@@ -144,7 +144,8 @@ Estudo e decisões em `docs/49_ESTUDO_INVESTIMENTOS.md`; regras no núcleo e rep
 - **Campos (todos opcionais):** tipo exato dentro do tipo (os títulos públicos com os nomes oficiais do Tesouro Nacional), onde está (texto da
   pessoa, até 40 caracteres), como rende (% do CDI, Selic mais taxa, IPCA mais taxa, prefixado, regra da poupança ou variável), a taxa (em centésimos
   de ponto: 11000 é 110% do CDI, 650 é 6,5% ao ano), o vencimento e quando pode resgatar (qualquer dia, alguns dias depois do pedido, a partir de uma
-  data, só no vencimento). Editar grava a ficha inteira. No rendimento recebido, o tipo (juros ou cupom, dividendos, JCP, rendimento de FII, outro).
+  data, só no vencimento). Editar grava a ficha inteira; sem ela (versão antiga do app), a ficha fica como está, e só o tipo exato sai se o tipo mudou.
+  No rendimento recebido, o tipo (juros ou cupom, dividendos, JCP, rendimento de FII, outro); ao alterar sem ele, o tipo fica como está.
 - **O que a ficha deduz** (`investment-details.ts`): a regra de imposto (isento, tabela regressiva, come-cotas, sobre a venda, previdência,
   criptoativos) e a garantia (FGC para poupança, CDB, LC, LCI, LCA e LCD; Tesouro Nacional para os títulos públicos; nenhuma das duas para o resto).
   A tela sempre diz "Confira no seu extrato ou no contrato".
@@ -158,4 +159,8 @@ Estudo e decisões em `docs/49_ESTUDO_INVESTIMENTOS.md`; regras no núcleo e rep
   recomendada), soma do FGC por instituição (a grafia não importa: sem acento, sem caixa), rendimentos recebidos no ano, ganho real e poupança no
   mesmo período no bloco azul.
 - **Telas novas:** `/investimento/declaracao` (resumo para conferir com os informes) e `/investimento/comparar` (até quatro opções, taxas digitadas).
-- **Lembretes** (aparelho): "Vencimentos dos investimentos" (7 dias antes e no dia) e "Atualizar os investimentos" (dia 1, se falta o valor do mês).
+- **Lembretes** (aparelho): "Vencimentos dos investimentos" (7 dias antes e no dia do vencimento, e do fim da carência com texto próprio) e
+  "Atualizar os investimentos" (dia 1, se algum está sem valor desde o último dia do mês passado).
+- **Revisão independente (13/11/2026):** a ordem do mesmo dia no imposto estimado, o nome da instituição na linha do FGC acima do limite,
+  o total escondido com "Ocultar valores", o tipo do rendimento que não é escolhido sozinho, o texto da carência nos lembretes e a ficha mantida
+  quando uma versão antiga do app edita sem ela. Corrigidos, com testes.
