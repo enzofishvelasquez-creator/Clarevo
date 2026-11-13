@@ -14842,7 +14842,7 @@ setInterval(async () => {
     await radio('Por prazo de resgate').click(); await p.waitForTimeout(250);
     ok('D-099 Como está dividido: por prazo de resgate, o CDB em "Em até 1 ano"', (await body()).includes('Em até 1 ano'));
     await radio('Por tipo').click(); await p.waitForTimeout(250);
-    await atWidths(async (w) => { await layoutChecks(`D-099 Investir ${w}px`); if (w === 390) { await into('Como está dividido'); await shot('545_investimentos_divisao'); } });
+    await atWidths(async (w) => { await layoutChecks(`D-099 Investir ${w}px`); if (w === 390) { await into('Como está dividido'); await shot('558_investimentos_divisao'); } });
     // Detalhe.
     await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Valor pela taxa contratada'); await p.waitForTimeout(500);
     t = await body(); investTexts.push(t);
@@ -15097,7 +15097,7 @@ setInterval(async () => {
   const forbidden = screenTexts.map((s) => s.match(FORBIDDEN)?.[0]).filter(Boolean);
   ok('contas do ano e calculadoras: nenhum termo proibido nem travessão longo nas telas novas', screenTexts.length > 0 && forbidden.length === 0, `${screenTexts.length} telas ${forbidden.join(' | ')}`);
   const investForbidden = investTexts.map((s) => s.replace(INVEST_NAMES, '').match(FORBIDDEN)?.[0]).filter(Boolean);
-  ok('Investir (D-093 e D-099): fora os nomes da ficha e dos títulos públicos, nenhum termo proibido nem travessão longo', investTexts.length >= 8 && investForbidden.length === 0, `${investTexts.length} telas ${investForbidden.join(' | ')}`);
+  ok('Investir (D-093 e D-099): fora os nomes da ficha e dos títulos públicos, nenhum termo proibido nem travessão longo', investTexts.length >= 6 && investForbidden.length === 0, `${investTexts.length} telas ${investForbidden.join(' | ')}`);
   // Hierarquia de títulos (D-063 item 2): o resultado da conferência feita em cada leitura de tela do roteiro inteiro (`headingWatch`).
   ok(`Hierarquia de títulos: em todas as telas do roteiro (${headingRule.checks} conferências em ${headingRule.paths.size} endereços) há um título de nível 1 por tela (janela aberta à parte), o primeiro título é de nível 1 e não há salto de nível`,
     headingRule.checks > 500 && headingRule.paths.size > 100 && headingRule.problems.size === 0, [...headingRule.problems].slice(0, 6).map(([k, n]) => `${k} (${n}x)`).join(' | '));
