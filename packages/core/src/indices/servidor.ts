@@ -145,10 +145,11 @@ export function createIndicesHandler(deps: { config: IndicesConfig; fetch: Indic
         return { ok: false, series: {} };
       }
     };
-    const [cdi, ipca] = await Promise.all([get(BCB_SERIES.cdi), get(BCB_SERIES.ipca)]);
+    // A Selic do mês e a poupança (D-099) servem ao valor pela taxa contratada: a falta delas não derruba a resposta.
+    const [cdi, ipca, selic, poupanca] = await Promise.all([get(BCB_SERIES.cdi), get(BCB_SERIES.ipca), get(BCB_SERIES.selic), get(BCB_SERIES.poupanca)]);
     if (!cdi.ok && !ipca.ok) return reply(502, 'indices_indisponiveis');
-    const body = JSON.stringify({ cdi: cdi.series, ipca: ipca.series, fetchedOn: today });
-    if (cdi.ok && ipca.ok) cache.set(key, { at: now(), body });
+    const body = JSON.stringify({ cdi: cdi.series, ipca: ipca.series, selic: selic.series, poupanca: poupanca.series, fetchedOn: today });
+    if (cdi.ok && ipca.ok && selic.ok && poupanca.ok) cache.set(key, { at: now(), body });
     return { status: 200, body, headers: { ...headers, 'Content-Type': JSON_TYPE } };
   };
 }

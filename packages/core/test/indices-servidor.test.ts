@@ -38,7 +38,7 @@ describe('função "indices" (D-093): CDI e IPCA do Banco Central', () => {
     expect(indicesConfigFrom((n) => ({ ...env, SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_y' })[n]).userApiKey).toBe('sb_publishable_y');
   });
 
-  it('busca as duas séries, devolve só os meses válidos e guarda por 6 horas', async () => {
+  it('busca as quatro séries (CDI, IPCA, Selic do mês e poupança), devolve só os meses válidos e guarda por 6 horas', async () => {
     const urls: string[] = [];
     let clock = 0;
     const handler = createIndicesHandler({
@@ -53,17 +53,19 @@ describe('função "indices" (D-093): CDI e IPCA do Banco Central', () => {
     });
     const r = await handler(req());
     expect(r.status).toBe(200);
-    expect(JSON.parse(r.body)).toEqual({ cdi: { '2026-10': 0.93 }, ipca: { '2026-10': 0.25 }, fetchedOn: TODAY });
+    expect(JSON.parse(r.body)).toEqual({ cdi: { '2026-10': 0.93 }, ipca: { '2026-10': 0.25 }, selic: { '2026-10': 0.25 }, poupanca: { '2026-10': 0.25 }, fetchedOn: TODAY });
     expect(r.headers['Access-Control-Allow-Origin']).toBe('https://app.clarevo.app.br');
     expect(urls.sort()).toEqual([
+      'https://api.bcb.gov.br/dados/serie/bcdata.sgs.195/dados?formato=json&dataInicial=01/11/2025&dataFinal=11/11/2026',
       'https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/11/2025&dataFinal=11/11/2026',
+      'https://api.bcb.gov.br/dados/serie/bcdata.sgs.4390/dados?formato=json&dataInicial=01/11/2025&dataFinal=11/11/2026',
       'https://api.bcb.gov.br/dados/serie/bcdata.sgs.4391/dados?formato=json&dataInicial=01/11/2025&dataFinal=11/11/2026',
     ]);
     await handler(req());
-    expect(urls).toHaveLength(2);
+    expect(urls).toHaveLength(4);
     clock = 6 * 60 * 60 * 1000 + 1;
     await handler(req());
-    expect(urls).toHaveLength(4);
+    expect(urls).toHaveLength(8);
   });
 
   it('o Banco Central fora do ar: 502, sem índice inventado; outra origem não recebe CORS; método errado, 405', async () => {
@@ -97,14 +99,32 @@ describe('função "indices" (D-093): CDI e IPCA do Banco Central', () => {
     });
     const r = await handler(req());
     expect(r.status).toBe(200);
-    expect(JSON.parse(r.body)).toEqual({ cdi: { '2026-10': 0.93 }, ipca: {}, fetchedOn: TODAY });
+    expect(JSON.parse(r.body)).toEqual({ cdi: { '2026-10': 0.93 }, ipca: {}, selic: { '2026-10': 0.93 }, poupanca: { '2026-10': 0.93 }, fetchedOn: TODAY });
     // 404 é "ainda sem dado": a resposta fica guardada.
     await handler(req());
-    expect(calls).toBe(2);
+    expect(calls).toBe(4);
     // Falha só do IPCA: 200 com o CDI, sem guardar (a próxima tenta de novo).
     ipcaStatus = 500;
     const other = createIndicesHandler({ config: { ...CONFIG, appUrl: 'x' }, today: () => TODAY, fetch: withAuth(async (url) => (url.includes('sgs.433') ? { ok: false, status: 500, json: async () => null } : { ok: true, status: 200, json: async () => [] })) });
     expect((await other(req())).status).toBe(200);
+  });
+
+  it('a Selic do mês ou a poupança com falha: 200 com o CDI e o IPCA, sem guardar', async () => {
+    let calls = 0;
+    const handler = createIndicesHandler({
+      config: CONFIG,
+      today: () => TODAY,
+      fetch: withAuth(async (url) => {
+        calls += 1;
+        if (url.includes('sgs.195')) return { ok: false, status: 500, json: async () => null };
+        return { ok: true, status: 200, json: async () => [{ data: '01/10/2026', valor: '0,93' }] };
+      }),
+    });
+    const r = await handler(req());
+    expect(r.status).toBe(200);
+    expect(JSON.parse(r.body)).toMatchObject({ cdi: { '2026-10': 0.93 }, ipca: { '2026-10': 0.93 }, poupanca: {} });
+    await handler(req());
+    expect(calls).toBe(8);
   });
 
   it('só quem está no app: confere a sessão no Supabase Auth antes de tudo, com qualquer chave de assinatura', async () => {
