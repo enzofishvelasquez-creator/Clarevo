@@ -205,8 +205,8 @@ export function IncomeCard({ movements }: { movements: readonly InvestmentMoveme
 export function EvolutionCard({ items, movements }: { items: readonly Investment[]; movements: readonly InvestmentMovement[] }) {
   const { today } = useSession();
   const maskLabel = useMoneyLabelMask();
-  const ids = new Set(items.filter((i) => i.status === 'ativo').map((i) => i.id));
-  const groups = [...ids].map((id) => movements.filter((m) => m.investmentId === id)).filter((g) => g.length > 0);
+  // Todos os investimentos: o encerrado conta até o mês do último movimento dele.
+  const groups = items.map((i) => ({ movements: movements.filter((m) => m.investmentId === i.id), active: i.status === 'ativo' }));
   const points = portfolioEvolution(groups, today, 6);
   if (points.length < 2) return null;
   const max = Math.max(...points.map((p) => p.valueCents), 1);
@@ -239,7 +239,8 @@ export function FiscalCalendarCard({ items }: { items: readonly Investment[] }) 
   const active = items.filter((i) => i.status === 'ativo');
   if (active.length === 0) return null;
   const hasComeCotas = active.some((i) => taxRegimeOf(i.kind, i.subkind) === 'come_cotas' || (i.kind === 'fundos' && i.subkind === null));
-  const sellsShares = active.some((i) => i.kind === 'acoes' || taxRegimeOf(i.kind, i.subkind) === 'venda');
+  // Quem tem ação, BDR, ETF, FII ou Fiagro (no fundo de ações o imposto é retido no resgate, sem DARF).
+  const sellsShares = active.some((i) => i.kind === 'acoes' || (taxRegimeOf(i.kind, i.subkind) === 'venda' && i.subkind !== 'fundo_acoes'));
   const events = fiscalCalendar(today, { hasComeCotas }).slice(0, 4);
   if (events.length === 0) return null;
   return (

@@ -14841,7 +14841,7 @@ setInterval(async () => {
         t.includes('Acima da inflação no período: +2,11%') && t.includes('Poupança no mesmo período: +2,42%') && t.includes('Resumo para a declaração') &&
         t.includes('Comparar rendimentos líquidos') && t.includes('a Clarevo não sabe quais são do mesmo grupo.'), t.slice(0, 1200));
     ok('D-099 Evolução da carteira (P2): os meses de junho a outubro, com o valor e o aportado acumulado',
-      t.includes('Evolução da carteira') && t.includes('Junho de 2026: R$ 10.085,00') && t.includes('Outubro de 2026 (até hoje): R$ 15.955,00') && t.includes('Aportado até aqui: R$ 15.500,00'), t.slice(0, 2500));
+      t.includes('Evolução da carteira') && t.includes('Junho de 2026: R$ 10.085,00') && t.includes('Outubro de 2026 (até hoje): R$ 15.955,00') && t.includes('Aportes menos resgates até aqui: R$ 15.500,00'), t.slice(0, 2500));
     ok('D-099 Datas do ano para quem investe (P2): o 31/12, os informes e a declaração, sem come-cotas (a demonstração não tem fundo)',
       t.includes('Datas do ano para quem investe') && t.includes('31/12/2026') && t.includes('26/02/2027') && t.includes('Março de 2027') && !t.includes('Come-cotas'), t.slice(0, 2500));
     ok('D-099 Como está dividido: por tipo, Renda fixa com 68% e Previdência com 32%, e o aviso de que a Clarevo não indica como dividir',

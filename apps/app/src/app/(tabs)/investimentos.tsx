@@ -78,7 +78,7 @@ export default function InvestimentosScreen() {
                 {canWrite ? <Button label={T.newInvestment} icon={Plus} tone="soft" onPress={() => router.push('/investimento/novo')} /> : null}
               </View>
               <AllocationCard items={active} />
-              <EvolutionCard items={active} movements={movements.data} />
+              <EvolutionCard items={all} movements={movements.data} />
               <FgcCard items={active} />
               <IncomeCard movements={movements.data} />
               <FiscalCalendarCard items={active} />

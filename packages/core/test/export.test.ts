@@ -352,6 +352,7 @@ describe('leitura (D-047)', () => {
     const pdf = buildExportFiles(load.source, 'pdf').files[0]!.content;
     expect(pdf).toContain('<h2>Investimentos</h2>');
     expect(pdf).toContain('<td>Aplicação do banco</td><td>CDB ou RDB</td>');
+    expect(pdf).toContain('<th class="num">Resgatado</th><th class="num">Rendimentos recebidos no período</th>');
     const records = parseCsv(built.files[0]!.content);
     expect(records.slice(1).map((r) => r.slice(0, 2))).toEqual([
       ['01/09/2026', 'Recebimento'],

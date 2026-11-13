@@ -450,15 +450,28 @@ describe('evolução, calendário fiscal e taxa fora do comum (D-099, P2)', () =
     const { portfolioEvolution, PORTFOLIO_EVOLUTION_TEXT } = await import('../src');
     const g1 = [mv('aporte', 100_000, '2026-08-10'), mv('valor', 101_000, '2026-08-31'), mv('aporte', 50_000, '2026-10-05'), mv('resgate', 10_000, '2026-11-02')];
     const g2 = [mv('aporte', 20_000, '2026-09-15')];
-    const ev = portfolioEvolution([g1, g2], TODAY, 6);
+    const ev = portfolioEvolution([{ movements: g1, active: true }, { movements: g2, active: true }], TODAY, 6);
     expect(ev.map((p) => [p.month, p.valueCents, p.investedCents, p.partial])).toEqual([
       ['2026-08', 101_000, 100_000, false],
       ['2026-09', 121_000, 120_000, false],
       ['2026-10', 171_000, 170_000, false],
       ['2026-11', 161_000, 160_000, true],
     ]);
-    expect(portfolioEvolution([g1, g2], TODAY, 2).map((p) => p.month)).toEqual(['2026-10', '2026-11']);
+    expect(portfolioEvolution([{ movements: g1, active: true }, { movements: g2, active: true }], TODAY, 2).map((p) => p.month)).toEqual(['2026-10', '2026-11']);
     expect(PORTFOLIO_EVOLUTION_TEXT.row(ev.at(-1)!)).toBe('Novembro de 2026 (até hoje): R$ 1.610,00');
+    expect(PORTFOLIO_EVOLUTION_TEXT.invested(ev.at(-1)!)).toBe('Aportes menos resgates até aqui: R$ 1.600,00');
+    expect(PORTFOLIO_EVOLUTION_TEXT.invested({ ...ev[0]!, investedCents: -150_000 })).toBe('Os resgates já passaram dos aportes em R$ 1.500,00.');
+    // Encerrar não reescreve os meses passados: o encerrado conta até o mês do último movimento.
+    const closed = [mv('aporte', 100_000, '2026-06-01'), mv('resgate', 100_000, '2026-09-10')];
+    const withClosed = portfolioEvolution([{ movements: closed, active: false }, { movements: g2, active: true }], TODAY, 6);
+    expect(withClosed.map((p) => [p.month, p.valueCents, p.investedCents])).toEqual([
+      ['2026-06', 100_000, 100_000],
+      ['2026-07', 100_000, 100_000],
+      ['2026-08', 100_000, 100_000],
+      ['2026-09', 20_000, 20_000],
+      ['2026-10', 20_000, 20_000],
+      ['2026-11', 20_000, 20_000],
+    ]);
   });
 
   it('calendário: come-cotas só com fundo que tem, informes, declaração e o 31/12, na ordem', async () => {

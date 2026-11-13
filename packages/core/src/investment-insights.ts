@@ -16,7 +16,7 @@ import {
   type InvestmentSubkind,
 } from './investment-details';
 import type { Investment, InvestmentKind, InvestmentMovement, MarketIndices } from './investments';
-import { INVESTMENT_KIND_LABEL, indexOverMonths, investmentValueOn, joinNamesBR } from './investments';
+import { INVESTMENT_KIND_LABEL, investmentValueOn, joinNamesBR } from './investments';
 import type { Cents } from './money';
 import { formatBRL } from './money';
 
@@ -649,27 +649,41 @@ export interface PortfolioPoint {
   partial: boolean;
 }
 
-/** Os últimos `months` meses da carteira: o valor no fim de cada mês e o aportado acumulado (aportes menos resgates). */
-export function portfolioEvolution(groups: readonly (readonly MovementLike[])[], today: IsoDate, months = 6): PortfolioPoint[] {
-  const all = groups.flat().filter((m) => m.occurredOn <= today);
-  if (all.length === 0) return [];
+/**
+ * Os últimos `months` meses da carteira: o valor no fim de cada mês e os aportes menos os resgates acumulados. Um investimento encerrado
+ * conta até o mês do último movimento dele (revisão de 13/11/2026: encerrar não reescreve os meses passados); depois sai das duas contas.
+ */
+export function portfolioEvolution(groups: readonly { movements: readonly MovementLike[]; active: boolean }[], today: IsoDate, months = 6): PortfolioPoint[] {
+  const live = groups.map((g) => ({ movements: g.movements.filter((m) => m.occurredOn <= today), active: g.active })).filter((g) => g.movements.length > 0);
+  if (live.length === 0) return [];
+  const all = live.flatMap((g) => g.movements);
   const first = all.reduce((a, m) => (m.occurredOn < a ? m.occurredOn : a), all[0]!.occurredOn);
   const last = monthOf(today);
+  // Só os últimos meses (o valor e o aportado de cada um já leem os movimentos de antes).
+  const start = monthsBetween(monthOf(first), last) >= months ? addMonths(last, -(months - 1)) : monthOf(first);
   const out: PortfolioPoint[] = [];
-  for (let m = monthOf(first); monthsBetween(m, last) >= 0; m = addMonths(m, 1)) {
+  for (let m = start; monthsBetween(m, last) >= 0; m = addMonths(m, 1)) {
     const partial = m === last;
     const end = partial ? today : addDays(`${addMonths(m, 1)}-01` as IsoDate, -1);
-    const value = groups.reduce((a, g) => a + investmentValueOn(g.filter((x) => x.occurredOn <= today), end), 0);
-    const invested = all.filter((x) => x.occurredOn <= end).reduce((a, x) => a + (x.kind === 'aporte' ? x.amountCents : x.kind === 'resgate' ? -x.amountCents : 0), 0);
+    let value = 0;
+    let invested = 0;
+    for (const g of live) {
+      const lastMonth = monthOf(g.movements.reduce((a, x) => (x.occurredOn > a ? x.occurredOn : a), g.movements[0]!.occurredOn));
+      if (!g.active && monthsBetween(lastMonth, m) > 0) continue;
+      value += investmentValueOn(g.movements, end);
+      invested += g.movements.filter((x) => x.occurredOn <= end).reduce((a, x) => a + (x.kind === 'aporte' ? x.amountCents : x.kind === 'resgate' ? -x.amountCents : 0), 0);
+    }
     out.push({ month: m, valueCents: value, investedCents: invested, partial });
   }
-  return out.slice(-months);
+  return out;
 }
 
 export const PORTFOLIO_EVOLUTION_TEXT = {
   title: 'Evolução da carteira',
   row: (p: PortfolioPoint) => `${formatMonthBR(p.month)}${p.partial ? ' (até hoje)' : ''}: ${formatBRL(p.valueCents)}`,
-  invested: (p: PortfolioPoint) => `Aportado até aqui: ${formatBRL(p.investedCents)}`,
+  /** Aportes menos resgates; quando os resgates passaram dos aportes, diz isso sem sinal de menos. */
+  invested: (p: PortfolioPoint) =>
+    p.investedCents >= 0 ? `Aportes menos resgates até aqui: ${formatBRL(p.investedCents)}` : `Os resgates já passaram dos aportes em ${formatBRL(-p.investedCents)}.`,
   note: 'O valor de cada mês é o último que você registrou até o fim dele, mais os aportes e resgates depois. Meses sem atualização repetem o valor anterior.',
 } as const;
 
@@ -726,7 +740,7 @@ export const FISCAL_TEXT = {
   declaracao: (y: number, base: number) => `De março a maio de ${y}: declaração do Imposto de Renda, ano de ${base}. A Receita divulga as datas de cada ano.`,
   valor3112: 'Último dia do ano: registre o valor de cada investimento, como está no extrato, para o resumo da declaração.',
   date: (e: FiscalEvent) => (e.monthOnly ? formatMonthBR(monthOf(e.on)) : formatDateBR(e.on)),
-  darf: 'Quem vende ações com ganho, acima da isenção do mês, paga o imposto (DARF) até o último dia útil do mês seguinte.',
+  darf: 'Na venda com ganho, o imposto (DARF) vence no último dia útil do mês seguinte. Vendas de ações de até R$ 20.000,00 no mês ficam isentas; em FII, ETF e BDR, não há essa isenção.',
   note: 'Datas de referência pelas regras em vigor. Confira no site da Receita Federal e no informe de cada instituição.',
 } as const;
 

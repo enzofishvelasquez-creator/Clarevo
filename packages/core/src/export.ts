@@ -87,13 +87,13 @@ export const EXPORT_TEXT = {
   formats: { csv: 'Planilha (CSV)', pdf: 'Resumo em PDF' } as Readonly<Record<ExportFormat, string>>,
   formatHints: {
     csv: 'Abre no Excel e no Google Planilhas: datas como 31/12/2026, valores com vírgula e colunas separadas por ponto e vírgula.',
-    pdf: 'Um resumo de cada mês, com Recebido, Pago, Diferença e Por categoria, e a lista de lançamentos.',
+    pdf: 'Um resumo de cada mês, com Recebido, Pago, Diferença e Por categoria, e a lista de lançamentos. No fim, os seus investimentos, se houver.',
   } as Readonly<Record<ExportFormat, string>>,
   contentTitle: 'O que vai no arquivo',
   contentCsv:
     'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga. Os movimentos dos investimentos vão em um terceiro.',
   contentPdf:
-    'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga.',
+    'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga. Os investimentos aparecem no fim, também fora de Pago e de Recebido.',
   notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do espaço Pessoal.',
   valuesNote: 'O arquivo mostra os valores, mesmo com Ocultar valores ligado.',
   sensitiveNote: 'O arquivo tem dados financeiros. Guarde-o e compartilhe só com quem você escolher.',
@@ -154,7 +154,7 @@ export const EXPORT_TEXT = {
     purchasesTotal: (count: number, cents: Cents): string => `${count === 1 ? '1 compra' : `${count} compras`} · ${formatBRL(cents)} no total das compras`,
     investmentsTitle: 'Investimentos',
     investmentsNote: 'O valor de hoje é o último registrado no app, como está no extrato, mais os aportes e resgates depois dele. Aportes, resgates e rendimentos não entram em Pago nem em Recebido.',
-    investmentColumns: { name: 'Investimento', kind: 'Tipo', value: 'Valor de hoje', invested: 'Aportado', income: 'Rendimentos no período' },
+    investmentColumns: { name: 'Investimento', kind: 'Tipo', value: 'Valor de hoje', invested: 'Aportado', withdrawn: 'Resgatado', income: 'Rendimentos recebidos no período' },
     differenceNote: 'A diferença é Recebido menos Pago. Não é saldo da conta nem dinheiro disponível.',
     footer: 'Gerado pela Clarevo neste aparelho, com os valores que você anotou. Este arquivo tem dados financeiros: guarde-o e compartilhe só com quem você escolher.',
     columns: { date: 'Data', type: 'Tipo', description: 'Descrição', category: 'Categoria', account: 'Conta', value: 'Valor', card: 'Cartão', installments: 'Parcelas', total: 'Valor total', share: '%' },
@@ -442,7 +442,7 @@ export interface ExportReport {
   purchases: ExportPurchaseRow[];
   purchasesTotalCents: Cents;
   /** Investimentos ativos e os que tiveram movimento no período (D-099). */
-  investments: { name: string; kind: string; valueCents: Cents; depositsCents: Cents; periodIncomeCents: Cents }[];
+  investments: { name: string; kind: string; valueCents: Cents; depositsCents: Cents; withdrawalsCents: Cents; periodIncomeCents: Cents }[];
 }
 
 /**
@@ -492,6 +492,7 @@ function investmentsOfReport(source: ExportSource): ExportReport['investments'] 
       kind: i.subkind ? SUBKIND_LABEL[i.subkind] : INVESTMENT_KIND_LABEL[i.kind],
       valueCents: i.valueCents,
       depositsCents: i.depositsCents,
+      withdrawalsCents: i.withdrawalsCents,
       periodIncomeCents: moved.filter((m) => m.investmentId === i.id && m.kind === 'rendimento').reduce((a, m) => a + m.amountCents, 0),
     }));
 }
@@ -564,8 +565,11 @@ function investmentsHtml(report: ExportReport): string {
   if (report.investments.length === 0) return '';
   const t = EXPORT_TEXT.pdf;
   const c = t.investmentColumns;
-  return `<section class="month"><h2>${t.investmentsTitle}</h2><p class="note">${t.investmentsNote}</p><table><thead><tr><th>${c.name}</th><th>${c.kind}</th><th class="num">${c.value}</th><th class="num">${c.invested}</th><th class="num">${c.income}</th></tr></thead><tbody>${report.investments
-    .map((i) => `<tr><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.kind)}</td><td class="num">${money(i.valueCents)}</td><td class="num">${money(i.depositsCents)}</td><td class="num">${money(i.periodIncomeCents)}</td></tr>`)
+  return `<section class="month"><h2>${t.investmentsTitle}</h2><p class="note">${t.investmentsNote}</p><table><thead><tr><th>${c.name}</th><th>${c.kind}</th><th class="num">${c.value}</th><th class="num">${c.invested}</th><th class="num">${c.withdrawn}</th><th class="num">${c.income}</th></tr></thead><tbody>${report.investments
+    .map(
+      (i) =>
+        `<tr><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.kind)}</td><td class="num">${money(i.valueCents)}</td><td class="num">${money(i.depositsCents)}</td><td class="num">${money(i.withdrawalsCents)}</td><td class="num">${money(i.periodIncomeCents)}</td></tr>`,
+    )
     .join('')}</tbody></table></section>`;
 }
 
