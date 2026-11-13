@@ -244,11 +244,11 @@ setInterval(async () => {
     'i',
   );
   // D-099 (decisão do Enzo, 13/11/2026): a ficha dos investimentos lista os tipos exatos pelos nomes de mercado e os títulos públicos pelos
-  // nomes oficiais, e Aprender tem temas que explicam esses produtos. Só esses nomes, como aparecem nas telas, saem antes da conferência de
-  // FORBIDDEN nas telas da aba Investir e na lista de Aprender; o resto da lista continua valendo nelas.
+  // nomes oficiais. Só esses nomes, como aparecem nas telas, saem antes da conferência de FORBIDDEN nas telas da aba Investir (investTexts);
+  // o resto da lista continua valendo nelas, e as outras telas seguem com a lista inteira.
   const INVEST_NAMES = new RegExp(
     [
-      'LCI, LCA e LCD', 'Os tipos do Tesouro Direto, a marcação a mercado e a custódia', 'Garantia do Tesouro Nacional', 'Tesouro Nacional',
+      'Garantia do Tesouro Nacional', 'Tesouro Nacional',
       'Tesouro Prefixado com Juros Semestrais', 'Tesouro IPCA\\+ com Juros Semestrais', 'Tesouro Selic', 'Tesouro Prefixado', 'Tesouro IPCA\\+',
       'Tesouro RendA\\+', 'Tesouro Educa\\+', 'Tesouro Reserva', 'CDB ou RDB', '\\bLCI\\b', '\\bLCA\\b', '\\bLCD\\b',
     ].join('|'),
@@ -8779,7 +8779,7 @@ setInterval(async () => {
   await goResumo();
 
   // ---- 13. Textos e escritas ----
-  const j1Vetoed = j1Texts.map((x) => x.replace(INVEST_NAMES, '').match(FORBIDDEN)?.[0]).filter(Boolean);
+  const j1Vetoed = j1Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
   const j1Brands = j1Texts.map((x) => x.match(/\b(nubank|ita[uú]|bradesco|santander|inter|c6|caixa|sicredi|sicoob|btg|neon|picpay|mercado pago|itaucard|visa|mastercard|hipercard|amex|serasa)\b/i)?.[0]).filter(Boolean);
   const j1Dashes = j1Texts.map((x) => x.match(/[–—]/)?.[0]).filter(Boolean);
   ok('Tutorial telas do guia, do tour e da ajuda: nenhum termo proibido, travessão, expressão vetada nem nome de banco ou de bandeira nos textos da interface', j1Texts.length >= 20 && j1Vetoed.length === 0 && j1Dashes.length === 0 && j1Brands.length === 0, `${j1Texts.length} telas ${j1Vetoed.join(' | ')} ${j1Brands.join(' | ')} ${j1Dashes.join(' | ')}`);
