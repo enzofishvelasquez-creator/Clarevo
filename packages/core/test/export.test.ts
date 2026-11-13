@@ -333,15 +333,25 @@ describe('totais por mês iguais aos do Resumo (D-047)', () => {
 });
 
 describe('leitura (D-047)', () => {
-  it('lê o período todo, as compras no cartão, as contas e a origem de gasto fixo, e monta os dois CSV', async () => {
+  it('lê o período todo, as compras no cartão, as contas, a origem de gasto fixo e os investimentos, e monta os três CSV', async () => {
     const repo = await createDemoRepository();
     const ctx = (await repo.getSpace())!.personalContextId;
     const load = await loadExportSource(repo, ctx, '12m', DEMO_TODAY);
     if (!load.ok) throw new Error('esperava ok');
     const built = buildExportFiles(load.source, 'csv');
     expect(built.empty).toBe(false);
-    expect(built.files.map((f) => f.fileName)).toEqual(['clarevo-lancamentos-2026-10-07.csv', 'clarevo-compras-no-cartao-2026-10-07.csv']);
-    expect([built.recordCount, built.purchaseCount]).toEqual([6, 3]);
+    expect(built.files.map((f) => f.fileName)).toEqual(['clarevo-lancamentos-2026-10-07.csv', 'clarevo-compras-no-cartao-2026-10-07.csv', 'clarevo-investimentos-2026-10-07.csv']);
+    expect([built.recordCount, built.purchaseCount, built.investmentCount]).toEqual([6, 3, 11]);
+    // Investimentos (D-099): um movimento por linha, com o tipo exato e a instituição da ficha, do mais antigo ao mais recente.
+    const inv = parseCsv(built.files[2]!.content);
+    expect(inv[0]).toEqual(['Data', 'Investimento', 'Tipo', 'Instituição', 'Movimento', 'Valor (R$)', 'Tipo do rendimento', 'Observação']);
+    expect(inv[1]).toEqual(['01/06/2026', 'Aplicação do banco', 'CDB ou RDB', 'Banco Exemplo', 'Aporte', '10000,00', '', '']);
+    expect(inv.at(-1)![0]).toBe('06/10/2026');
+    expect(inv).toContainEqual(['06/10/2026', 'Previdência', 'VGBL', '', 'Valor atualizado', '5080,00', '', '']);
+    // O resumo em PDF ganha a seção dos investimentos ativos.
+    const pdf = buildExportFiles(load.source, 'pdf').files[0]!.content;
+    expect(pdf).toContain('<h2>Investimentos</h2>');
+    expect(pdf).toContain('<td>Aplicação do banco</td><td>CDB ou RDB</td>');
     const records = parseCsv(built.files[0]!.content);
     expect(records.slice(1).map((r) => r.slice(0, 2))).toEqual([
       ['01/09/2026', 'Recebimento'],
@@ -367,10 +377,11 @@ describe('leitura (D-047)', () => {
     const ctx = (await repo.getSpace())!.personalContextId;
     const load = await loadExportSource(repo, ctx, '12m', DEMO_TODAY);
     if (!load.ok) throw new Error('esperava ok');
-    expect(buildExportFiles(load.source, 'csv').files.map((f) => f.id)).toEqual(['lancamentos']);
+    expect(buildExportFiles(load.source, 'csv').files.map((f) => f.id)).toEqual(['lancamentos', 'investimentos']);
+    expect(buildExportFiles({ ...load.source, investments: undefined }, 'csv').files.map((f) => f.id)).toEqual(['lancamentos']);
     const empty = await loadExportSource(repo, ctx, 'ano_passado', DEMO_TODAY);
     if (!empty.ok) throw new Error('esperava ok');
-    expect(buildExportFiles(empty.source, 'csv')).toMatchObject({ empty: true, files: [], recordCount: 0, purchaseCount: 0 });
+    expect(buildExportFiles(empty.source, 'csv')).toMatchObject({ empty: true, files: [], recordCount: 0, purchaseCount: 0, investmentCount: 0 });
     expect(buildExportFiles(empty.source, 'pdf').empty).toBe(true);
   });
 

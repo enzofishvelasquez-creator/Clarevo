@@ -2,6 +2,11 @@ import {
   ALLOCATION_DIMENSIONS,
   ALLOCATION_DIMENSION_LABEL,
   FGC_TEXT,
+  FISCAL_TEXT,
+  PORTFOLIO_EVOLUTION_TEXT,
+  fiscalCalendar,
+  portfolioEvolution,
+  taxRegimeOf,
   INCOME_TEXT,
   allocationUseful,
   dateEventText,
@@ -189,6 +194,78 @@ export function IncomeCard({ movements }: { movements: readonly InvestmentMoveme
           {INCOME_TEXT.kindHint}
         </Txt>
       ) : null}
+    </Card>
+  );
+}
+
+/**
+ * "Evolução da carteira" (D-099, item 14): o valor no fim de cada um dos últimos 6 meses, em barras da mesma cor, com o aportado
+ * acumulado embaixo. Some com menos de dois meses.
+ */
+export function EvolutionCard({ items, movements }: { items: readonly Investment[]; movements: readonly InvestmentMovement[] }) {
+  const { today } = useSession();
+  const maskLabel = useMoneyLabelMask();
+  const ids = new Set(items.filter((i) => i.status === 'ativo').map((i) => i.id));
+  const groups = [...ids].map((id) => movements.filter((m) => m.investmentId === id)).filter((g) => g.length > 0);
+  const points = portfolioEvolution(groups, today, 6);
+  if (points.length < 2) return null;
+  const max = Math.max(...points.map((p) => p.valueCents), 1);
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {PORTFOLIO_EVOLUTION_TEXT.title}
+      </Txt>
+      {points.map((p) => (
+        <View key={p.month} style={{ gap: space[1] }} accessible accessibilityLabel={maskLabel(`${PORTFOLIO_EVOLUTION_TEXT.row(p)}. ${PORTFOLIO_EVOLUTION_TEXT.invested(p)}`)}>
+          <MoneyTxt variant="label">{PORTFOLIO_EVOLUTION_TEXT.row(p)}</MoneyTxt>
+          <View style={styles.track} aria-hidden>
+            <View style={[styles.bar, { width: `${Math.max(2, Math.round((p.valueCents / max) * 100))}%` }]} />
+          </View>
+          <MoneyTxt variant="caption" color={colors.textSecondary}>
+            {PORTFOLIO_EVOLUTION_TEXT.invested(p)}
+          </MoneyTxt>
+        </View>
+      ))}
+      <Txt variant="caption" color={colors.textSecondary}>
+        {PORTFOLIO_EVOLUTION_TEXT.note}
+      </Txt>
+    </Card>
+  );
+}
+
+/** "Datas do ano para quem investe" (D-099, item 15): as próximas quatro datas de referência e a regra do imposto de quem vende ações. */
+export function FiscalCalendarCard({ items }: { items: readonly Investment[] }) {
+  const { today } = useSession();
+  const active = items.filter((i) => i.status === 'ativo');
+  if (active.length === 0) return null;
+  const hasComeCotas = active.some((i) => taxRegimeOf(i.kind, i.subkind) === 'come_cotas' || (i.kind === 'fundos' && i.subkind === null));
+  const sellsShares = active.some((i) => i.kind === 'acoes' || taxRegimeOf(i.kind, i.subkind) === 'venda');
+  const events = fiscalCalendar(today, { hasComeCotas }).slice(0, 4);
+  if (events.length === 0) return null;
+  return (
+    <Card style={{ gap: space[2] }}>
+      <View style={styles.titleRow}>
+        <CalendarClock size={20} color={colors.brandText} aria-hidden />
+        <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ flex: 1 }}>
+          {FISCAL_TEXT.title}
+        </Txt>
+      </View>
+      {events.map((e) => (
+        <View key={`${e.kind}-${e.on}`} style={{ gap: 2, paddingVertical: space[1] }}>
+          <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+            {FISCAL_TEXT.date(e)}
+          </Txt>
+          <Txt variant="label">{e.text}</Txt>
+        </View>
+      ))}
+      {sellsShares ? (
+        <Txt variant="caption" color={colors.textSecondary}>
+          {FISCAL_TEXT.darf}
+        </Txt>
+      ) : null}
+      <Txt variant="caption" color={colors.textSecondary}>
+        {FISCAL_TEXT.note}
+      </Txt>
     </Card>
   );
 }

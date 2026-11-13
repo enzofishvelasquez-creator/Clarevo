@@ -21,6 +21,9 @@ import {
   relativeDays,
   taxExplanation,
   taxRegimeOf,
+  UNUSUAL_RATE_TEXT,
+  addMonths,
+  unusualRate,
   type Investment,
   type InvestmentMovement,
 } from '@clarevo/core';
@@ -29,6 +32,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { MoneyTxt } from '@/components/money-text';
+import { explanationHref } from '@/lib/learn';
 import { Button, Card, Skeleton, Txt } from '@/components/ui';
 import { useInvalidateInvestments, useMarketIndices } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
@@ -57,6 +61,10 @@ function Line({ label, value }: { label: string; value: string }) {
  */
 export function InvestmentFichaCard({ investment: i }: { investment: Investment }) {
   const { today } = useSession();
+  // O CDI dos últimos 12 meses, para o aviso de taxa fora do comum (o % do CDI não precisa dele).
+  const needsCdi = i.rateBp !== null && (i.indexKind === 'prefixado' || i.indexKind === 'ipca' || i.indexKind === 'selic');
+  const indices = useMarketIndices(needsCdi ? addMonths(monthOf(today), -14) : null);
+  const unusual = i.status === 'ativo' && unusualRate(i, indices.data ?? null);
   const regime = taxRegimeOf(i.kind, i.subkind);
   const guarantee = guaranteeOf(i.kind, i.subkind);
   const rate = rateSummary(i.indexKind, i.rateBp);
@@ -89,6 +97,16 @@ export function InvestmentFichaCard({ investment: i }: { investment: Investment 
           {liquidity ? <Line label="Resgate" value={liquidity} /> : null}
         </>
       )}
+      {unusual ? (
+        <View style={{ gap: space[2] }}>
+          <Txt variant="label">{UNUSUAL_RATE_TEXT}</Txt>
+          <Button
+            label="Ler sobre golpes com promessa de rentabilidade"
+            tone="ghost"
+            onPress={() => router.push(explanationHref('golpes-rentabilidade'))}
+          />
+        </View>
+      ) : null}
       {regime || guarantee ? (
         <View style={{ gap: space[1] }}>
           {guarantee ? (

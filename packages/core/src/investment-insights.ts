@@ -1,5 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
-import { addDays, addMonths, addMonthsToDate, formatDateBR, formatMonthYearBR, monthOf, monthsBetween } from './dates';
+import { addDays, addMonths, addMonthsToDate, formatDateBR, formatMonthBR, formatMonthYearBR, monthOf, monthsBetween } from './dates';
 import { isBusinessDay } from './dia-util';
 import {
   GUARANTEE_LABEL,
@@ -16,7 +16,7 @@ import {
   type InvestmentSubkind,
 } from './investment-details';
 import type { Investment, InvestmentKind, InvestmentMovement, MarketIndices } from './investments';
-import { INVESTMENT_KIND_LABEL, investmentValueOn, joinNamesBR } from './investments';
+import { INVESTMENT_KIND_LABEL, indexOverMonths, investmentValueOn, joinNamesBR } from './investments';
 import type { Cents } from './money';
 import { formatBRL } from './money';
 
@@ -635,3 +635,138 @@ export function declarationYears(movements: readonly MovementLike[], today: IsoD
   }
   return [...years].sort((a, b) => b - a);
 }
+
+// ---------------------------------------------------------------------------
+// 14. Evolução do patrimônio investido (D-099, P2)
+// ---------------------------------------------------------------------------
+
+export interface PortfolioPoint {
+  month: IsoMonth;
+  /** Valor da carteira no fim do mês (ou hoje, no mês em andamento). */
+  valueCents: Cents;
+  /** Aportes menos resgates acumulados até o fim do mês. */
+  investedCents: Cents;
+  partial: boolean;
+}
+
+/** Os últimos `months` meses da carteira: o valor no fim de cada mês e o aportado acumulado (aportes menos resgates). */
+export function portfolioEvolution(groups: readonly (readonly MovementLike[])[], today: IsoDate, months = 6): PortfolioPoint[] {
+  const all = groups.flat().filter((m) => m.occurredOn <= today);
+  if (all.length === 0) return [];
+  const first = all.reduce((a, m) => (m.occurredOn < a ? m.occurredOn : a), all[0]!.occurredOn);
+  const last = monthOf(today);
+  const out: PortfolioPoint[] = [];
+  for (let m = monthOf(first); monthsBetween(m, last) >= 0; m = addMonths(m, 1)) {
+    const partial = m === last;
+    const end = partial ? today : addDays(`${addMonths(m, 1)}-01` as IsoDate, -1);
+    const value = groups.reduce((a, g) => a + investmentValueOn(g.filter((x) => x.occurredOn <= today), end), 0);
+    const invested = all.filter((x) => x.occurredOn <= end).reduce((a, x) => a + (x.kind === 'aporte' ? x.amountCents : x.kind === 'resgate' ? -x.amountCents : 0), 0);
+    out.push({ month: m, valueCents: value, investedCents: invested, partial });
+  }
+  return out.slice(-months);
+}
+
+export const PORTFOLIO_EVOLUTION_TEXT = {
+  title: 'Evolução da carteira',
+  row: (p: PortfolioPoint) => `${formatMonthBR(p.month)}${p.partial ? ' (até hoje)' : ''}: ${formatBRL(p.valueCents)}`,
+  invested: (p: PortfolioPoint) => `Aportado até aqui: ${formatBRL(p.investedCents)}`,
+  note: 'O valor de cada mês é o último que você registrou até o fim dele, mais os aportes e resgates depois. Meses sem atualização repetem o valor anterior.',
+} as const;
+
+// ---------------------------------------------------------------------------
+// 15. Calendário fiscal dos investimentos (D-099, P2)
+// ---------------------------------------------------------------------------
+
+/** Último dia útil do mercado no mês. */
+export function lastMarketBusinessDay(month: IsoMonth): IsoDate {
+  let d = addDays(`${addMonths(month, 1)}-01` as IsoDate, -1);
+  while (!isMarketBusinessDay(d)) d = addDays(d, -1);
+  return d;
+}
+
+export type FiscalEventKind = 'come_cotas' | 'informes' | 'declaracao' | 'valor_31_12';
+
+export interface FiscalEvent {
+  kind: FiscalEventKind;
+  on: IsoDate;
+  /** Só o mês importa (a data exata sai a cada ano). */
+  monthOnly: boolean;
+  text: string;
+}
+
+/**
+ * Datas de referência do ano para quem investe, nos próximos `horizonDays` dias: o come-cotas (último dia útil de maio e de novembro, só
+ * com fundo que tem come-cotas), o prazo dos informes de rendimentos (último dia útil de fevereiro), a declaração (de março a maio; a
+ * Receita divulga as datas de cada ano) e o valor de 31/12. Regras com revisão anual; nada aqui é prazo dito pela Clarevo.
+ */
+export function fiscalCalendar(today: IsoDate, opts: { hasComeCotas: boolean }, horizonDays = 365): FiscalEvent[] {
+  const year = Number(today.slice(0, 4));
+  const out: FiscalEvent[] = [];
+  for (const y of [year, year + 1]) {
+    if (opts.hasComeCotas) {
+      for (const mo of ['05', '11']) out.push({ kind: 'come_cotas', on: lastMarketBusinessDay(`${y}-${mo}` as IsoMonth), monthOnly: false, text: FISCAL_TEXT.comeCotas });
+    }
+    out.push({ kind: 'informes', on: lastMarketBusinessDay(`${y}-02` as IsoMonth), monthOnly: false, text: FISCAL_TEXT.informes(y - 1) });
+    out.push({ kind: 'declaracao', on: `${y}-03-01` as IsoDate, monthOnly: true, text: FISCAL_TEXT.declaracao(y, y - 1) });
+    out.push({ kind: 'valor_31_12', on: `${y}-12-31` as IsoDate, monthOnly: false, text: FISCAL_TEXT.valor3112 });
+  }
+  return out
+    .filter((e) => {
+      // A declaração fica na lista até o fim de maio do ano.
+      const end = e.kind === 'declaracao' ? (`${e.on.slice(0, 4)}-05-31` as IsoDate) : e.on;
+      return end >= today && calendarDaysBetween(today, e.on) <= horizonDays;
+    })
+    .sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0));
+}
+
+export const FISCAL_TEXT = {
+  title: 'Datas do ano para quem investe',
+  comeCotas: 'Come-cotas: nos fundos de renda fixa e multimercado, o imposto sai das cotas neste dia.',
+  informes: (base: number) => `Prazo das instituições para entregar o informe de rendimentos de ${base}.`,
+  declaracao: (y: number, base: number) => `De março a maio de ${y}: declaração do Imposto de Renda, ano de ${base}. A Receita divulga as datas de cada ano.`,
+  valor3112: 'Último dia do ano: registre o valor de cada investimento, como está no extrato, para o resumo da declaração.',
+  date: (e: FiscalEvent) => (e.monthOnly ? formatMonthBR(monthOf(e.on)) : formatDateBR(e.on)),
+  darf: 'Quem vende ações com ganho, acima da isenção do mês, paga o imposto (DARF) até o último dia útil do mês seguinte.',
+  note: 'Datas de referência pelas regras em vigor. Confira no site da Receita Federal e no informe de cada instituição.',
+} as const;
+
+// ---------------------------------------------------------------------------
+// 16. Aviso neutro de taxa fora do comum (D-099, P2)
+// ---------------------------------------------------------------------------
+
+/** O CDI acumulado nos últimos 12 meses publicados (fração), ou null sem 12 meses seguidos. */
+export function cdiLast12(indices: MarketIndices | null): number | null {
+  if (!indices) return null;
+  const months = Object.keys(indices.cdi).sort() as IsoMonth[];
+  if (months.length < 12) return null;
+  return indexOverMonths12(indices.cdi, months.slice(-12));
+}
+
+function indexOverMonths12(series: Readonly<Record<IsoMonth, number>>, months: readonly IsoMonth[]): number | null {
+  for (let i = 1; i < months.length; i += 1) if (monthsBetween(months[i - 1]!, months[i]!) !== 1) return null;
+  return months.reduce((acc, m) => acc * (1 + series[m]! / 100), 1) - 1;
+}
+
+/**
+ * A taxa registrada está muito acima do comum: % do CDI de 200% ou mais; prefixado, IPCA mais taxa ou Selic mais taxa com o equivalente
+ * ao ano igual ou maior que o dobro do CDI dos últimos 12 meses (sem o CDI, só o caso do % do CDI). Só informação, com o tema de golpes;
+ * nunca impede o cadastro.
+ */
+export function unusualRate(inv: Pick<Investment, 'indexKind' | 'rateBp'>, indices: MarketIndices | null): boolean {
+  if (inv.rateBp === null) return false;
+  const r = inv.rateBp / 10000;
+  if (inv.indexKind === 'cdi') return inv.rateBp >= 20000;
+  const cdi = cdiLast12(indices);
+  if (cdi === null || cdi <= 0) return false;
+  if (inv.indexKind === 'prefixado') return r >= 2 * cdi;
+  if (inv.indexKind === 'selic') return cdi + r >= 2 * cdi;
+  if (inv.indexKind === 'ipca') {
+    const months = indices ? (Object.keys(indices.ipca).sort().slice(-12) as IsoMonth[]) : [];
+    const ipca = months.length === 12 ? indexOverMonths12(indices!.ipca, months) : null;
+    return ipca !== null && (1 + ipca) * (1 + r) - 1 >= 2 * cdi;
+  }
+  return false;
+}
+
+export const UNUSUAL_RATE_TEXT =
+  'Taxas muito acima das praticadas no mercado podem ser sinal de golpe. Confira se quem oferece tem registro na CVM ou autorização do Banco Central.';

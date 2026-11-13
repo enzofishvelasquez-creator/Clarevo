@@ -7712,12 +7712,13 @@ setInterval(async () => {
   await checkBar('H3 Exportar meus dados');
   await atWidths(async (w) => { await innerChecks(`H3 Exportar meus dados ${w}px`); if (w === 390) await shot('291_exportar_meus_dados'); if (w === 320) await shot('291_exportar_meus_dados_320px'); });
 
-  // ---- 3. Planilha dos últimos 12 meses: dois arquivos (lançamentos e compras no cartão) ----
+  // ---- 3. Planilha dos últimos 12 meses: três arquivos (lançamentos, compras no cartão e, D-099, investimentos) ----
   await h3Prepare();
   t = await h3Keep();
-  ok('H3 Arquivo pronto: "6 lançamentos e 3 compras no cartão", o período e dois botões de download; nada foi baixado ainda',
-    t.includes('6 lançamentos e 3 compras no cartão') && t.includes('Período: Últimos 12 meses') && t.includes('Cada botão baixa um arquivo.') &&
-    (await visibleCount('button', 'Baixar lançamentos (CSV)')) === 1 && (await visibleCount('button', 'Baixar compras no cartão (CSV)')) === 1, t.slice(0, 900));
+  ok('H3 Arquivo pronto: "6 lançamentos, 3 compras no cartão e 11 movimentos de investimento", o período e três botões de download; nada foi baixado ainda',
+    t.includes('6 lançamentos, 3 compras no cartão e 11 movimentos de investimento') && t.includes('Período: Últimos 12 meses') && t.includes('Cada botão baixa um arquivo.') &&
+    (await visibleCount('button', 'Baixar lançamentos (CSV)')) === 1 && (await visibleCount('button', 'Baixar compras no cartão (CSV)')) === 1 &&
+    (await visibleCount('button', 'Baixar investimentos (CSV)')) === 1, t.slice(0, 900));
   await atWidths(async (w) => { await innerChecks(`H3 Arquivo pronto ${w}px`); await scrollTo('Arquivo pronto'); if (w === 390) await shot('292_exportar_arquivo_pronto'); if (w === 320) await shot('292_exportar_arquivo_pronto_320px'); });
   const h3Lanc = await h3Download('Baixar lançamentos (CSV)');
   const h3Lines = h3Lanc.text.split('\r\n');
@@ -7739,7 +7740,13 @@ setInterval(async () => {
     h3Compras.name === 'clarevo-compras-no-cartao-2026-10-07.csv' && h3Compras.buf[0] === 0xef && h3PLines[0] === '﻿Data da compra;Cartão;Descrição;Categoria;Valor total (R$);Parcelas' && h3PLines.length === 5 &&
     h3PLines.includes('05/10/2026;Cartão Exemplo (final 1234);Notebook;Educação;1500,00;10') && h3PLines.includes('05/10/2026;Cartão Exemplo (final 1234);Tênis de corrida;Lazer;600,00;3') &&
     h3PLines.includes('06/10/2026;Cartão Exemplo (final 1234);Restaurante;Lazer;200,00;1'), h3PLines.join(' | '));
-  ok('H3 os CSV não levam id, chave de nota nem autoria', ![h3Lanc.text, h3Compras.text].some((x) => /pessoa-demo|[0-9a-f]{8}-[0-9a-f]{4}-|[0-9a-f]{64}/i.test(x)));
+  // D-099: os movimentos dos investimentos, com o tipo exato e a instituição da ficha.
+  const h3Inv = await h3Download('Baixar investimentos (CSV)');
+  const h3ILines = h3Inv.text.split('\r\n');
+  ok('H3 CSV de investimentos: nome, BOM, cabeçalho e os 11 movimentos, com o tipo exato e a instituição',
+    h3Inv.name === 'clarevo-investimentos-2026-10-07.csv' && h3Inv.buf[0] === 0xef && h3ILines[0] === '\ufeffData;Investimento;Tipo;Instituição;Movimento;Valor (R$);Tipo do rendimento;Observação' &&
+    h3ILines.length === 13 && h3ILines.includes('01/06/2026;Aplicação do banco;CDB ou RDB;Banco Exemplo;Aporte;10000,00;;'), h3ILines.join(' | '));
+  ok('H3 os CSV não levam id, chave de nota nem autoria', ![h3Lanc.text, h3Compras.text, h3Inv.text].some((x) => /pessoa-demo|[0-9a-f]{8}-[0-9a-f]{4}-|[0-9a-f]{64}/i.test(x)));
 
   // ---- 4. Proteção contra fórmula: descrição começando com = ou + vira texto ----
   await otherDevice(async (repo, ctx) => {
@@ -7764,7 +7771,7 @@ setInterval(async () => {
   await radio('Este mês').click(); await p.waitForTimeout(300);
   await h3Prepare();
   t = await h3Keep();
-  ok('H3 Este mês: 5 lançamentos (os 3 de outubro e os 2 novos) e 3 compras no cartão', t.includes('5 lançamentos e 3 compras no cartão') && t.includes('Período: Este mês'), t.slice(0, 700));
+  ok('H3 Este mês: 5 lançamentos (os 3 de outubro e os 2 novos), 3 compras no cartão e os 3 movimentos de investimento de outubro', t.includes('5 lançamentos, 3 compras no cartão e 3 movimentos de investimento') && t.includes('Período: Este mês'), t.slice(0, 700));
   const h3Mes = await h3Download('Baixar lançamentos (CSV)');
   ok('H3 Este mês: só outubro de 2026 no arquivo', h3Mes.text.split('\r\n').slice(1).filter(Boolean).length === 5 && h3Mes.text.split('\r\n').slice(1).filter(Boolean).every((l) => l.slice(3, 10) === '10/2026'));
   await radio('Ano passado').click(); await p.waitForTimeout(300);
@@ -7775,7 +7782,7 @@ setInterval(async () => {
   await radio('Tudo').click(); await p.waitForTimeout(300);
   await h3Prepare();
   t = await h3Keep();
-  ok('H3 Tudo: lê todos os meses (8 lançamentos e 3 compras no cartão)', t.includes('8 lançamentos e 3 compras no cartão') && t.includes('Período: Tudo'), t.slice(0, 500));
+  ok('H3 Tudo: lê todos os meses (8 lançamentos, 3 compras no cartão e 11 movimentos de investimento)', t.includes('8 lançamentos, 3 compras no cartão e 11 movimentos de investimento') && t.includes('Período: Tudo'), t.slice(0, 500));
 
   // ---- 6. Resumo em PDF: a página de impressão com o mesmo HTML ----
   await radio('Últimos 12 meses').click(); await radio('Resumo em PDF').click(); await p.waitForTimeout(300);
@@ -7784,7 +7791,7 @@ setInterval(async () => {
   await h3Prepare();
   t = await h3Keep();
   ok('H3 PDF pronto: um botão só, "Abrir para imprimir ou salvar em PDF", sem botões de CSV',
-    (await visibleCount('button', 'Abrir para imprimir ou salvar em PDF')) === 1 && (await visibleCount('button', /^Baixar /)) === 0 && t.includes('8 lançamentos e 3 compras no cartão'), t.slice(0, 700));
+    (await visibleCount('button', 'Abrir para imprimir ou salvar em PDF')) === 1 && (await visibleCount('button', /^Baixar /)) === 0 && t.includes('8 lançamentos, 3 compras no cartão e 11 movimentos de investimento'), t.slice(0, 700));
   await atWidths(async (w) => { await innerChecks(`H3 PDF pronto ${w}px`); await scrollTo('Arquivo pronto'); if (w === 390) await shot('293_exportar_pdf_pronto'); if (w === 320) await shot('293_exportar_pdf_pronto_320px'); });
   await p.evaluate(() => {
     const open = window.open.bind(window);
@@ -14833,6 +14840,10 @@ setInterval(async () => {
       t.includes('Aplicação do banco vence em 01/06/2027, daqui a 8 meses.') && t.includes('Banco Exemplo: R$ 10.875,00 em produtos com garantia do FGC.') &&
         t.includes('Acima da inflação no período: +2,11%') && t.includes('Poupança no mesmo período: +2,42%') && t.includes('Resumo para a declaração') &&
         t.includes('Comparar rendimentos líquidos') && t.includes('a Clarevo não sabe quais são do mesmo grupo.'), t.slice(0, 1200));
+    ok('D-099 Evolução da carteira (P2): os meses de junho a outubro, com o valor e o aportado acumulado',
+      t.includes('Evolução da carteira') && t.includes('Junho de 2026: R$ 10.085,00') && t.includes('Outubro de 2026 (até hoje): R$ 15.955,00') && t.includes('Aportado até aqui: R$ 15.500,00'), t.slice(0, 2500));
+    ok('D-099 Datas do ano para quem investe (P2): o 31/12, os informes e a declaração, sem come-cotas (a demonstração não tem fundo)',
+      t.includes('Datas do ano para quem investe') && t.includes('31/12/2026') && t.includes('26/02/2027') && t.includes('Março de 2027') && !t.includes('Come-cotas'), t.slice(0, 2500));
     ok('D-099 Como está dividido: por tipo, Renda fixa com 68% e Previdência com 32%, e o aviso de que a Clarevo não indica como dividir',
       t.includes('Como está dividido') && t.includes('68%') && t.includes('32%') && t.includes('A Clarevo não indica como dividir.'));
     await radio('Por instituição').click(); await p.waitForTimeout(250);

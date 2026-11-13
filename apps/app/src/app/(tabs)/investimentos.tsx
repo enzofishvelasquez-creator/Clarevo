@@ -7,7 +7,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader } from '@/components/header';
 import { investmentCaption } from '@/components/investment-ficha';
 import { InvestmentReturns, InvestmentTotalsLines, groupByInvestment } from '@/components/investment-parts';
-import { AllocationCard, FgcCard, IncomeCard, InvestmentLinks, UpcomingDatesCard } from '@/components/investment-portfolio';
+import { AllocationCard, EvolutionCard, FgcCard, FiscalCalendarCard, IncomeCard, InvestmentLinks, UpcomingDatesCard } from '@/components/investment-portfolio';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
@@ -78,8 +78,10 @@ export default function InvestimentosScreen() {
                 {canWrite ? <Button label={T.newInvestment} icon={Plus} tone="soft" onPress={() => router.push('/investimento/novo')} /> : null}
               </View>
               <AllocationCard items={active} />
+              <EvolutionCard items={active} movements={movements.data} />
               <FgcCard items={active} />
               <IncomeCard movements={movements.data} />
+              <FiscalCalendarCard items={active} />
               <InvestmentLinks />
               {closed.length > 0 ? (
                 <View style={{ gap: space[3] }}>

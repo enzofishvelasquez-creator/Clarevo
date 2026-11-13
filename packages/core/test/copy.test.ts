@@ -196,6 +196,7 @@ import {
   termHistory,
   toPayCaption,
   wholeYearPayment,
+  SUBKIND_LABEL,
 } from '../src';
 import { dueText, nextBusinessDayDueText, type Commitment as DiaUtilCommitment } from '../src';
 import { APP_SCREENS, APP_SEARCH_TEXT, BAR_TEXT, GOALS_NAV_TEXT, PAYABLES_NAV_TEXT, SUMMARY_NAV_TEXT, searchAppScreens } from '../src';
@@ -2138,8 +2139,9 @@ describe('textos das assinaturas (D-046)', () => {
 
 describe('textos de Exportar meus dados (D-047)', () => {
   const GENDERED = /\b(o|a)s? usuári[oa]s?\b|\bobrigad[oa]s?\b|\bbem-vind[oa]s?\b|\bpreocupad[oa]s?\b|\bendividad[oa]s?\b|\bcadastrad[oa]\b/i;
-  // Nenhum banco, produto ou oferta; a LGPD aparece só como referência, sem parecer jurídico nem promessa.
-  const BRAND_OR_PROMISE = /nubank|ita[uú]\b|bradesco|santander|caixa econ|picpay|\bxp\b|btg|poupan[cç]a|investiment|garantid|conforme a lei|em conformidade|certificad/i;
+  // Nenhum banco, produto ou oferta; a LGPD aparece só como referência, sem parecer jurídico nem promessa. "Investimentos" saiu da lista
+  // com a D-099: o arquivo leva os investimentos que a pessoa registrou, como a aba Investir.
+  const BRAND_OR_PROMISE = /nubank|ita[uú]\b|bradesco|santander|caixa econ|picpay|\bxp\b|btg|poupan[cç]a|garantid|conforme a lei|em conformidade|certificad/i;
   const check = (texts: string[]) => {
     expect(texts.length).toBeGreaterThan(0);
     for (const text of texts) {
@@ -2158,8 +2160,8 @@ describe('textos de Exportar meus dados (D-047)', () => {
 
   it('textos montados, em todas as combinações', () => {
     const texts: string[] = [];
-    for (const [r, p] of [[0, 0], [1, 0], [2, 0], [1, 1], [124, 3], [20000, 1]] as const) texts.push(EXPORT_TEXT.readyCounts(r, p));
-    for (const file of ['lancamentos', 'compras', 'resumo'] as const) for (const native of [true, false]) texts.push(EXPORT_TEXT.fileButton(file, native));
+    for (const [r, p, i] of [[0, 0, 0], [1, 0, 0], [2, 0, 0], [1, 1, 0], [124, 3, 0], [20000, 1, 0], [6, 3, 11], [0, 0, 1], [2, 0, 3]] as const) texts.push(EXPORT_TEXT.readyCounts(r, p, i));
+    for (const file of ['lancamentos', 'compras', 'investimentos', 'resumo'] as const) for (const native of [true, false]) texts.push(EXPORT_TEXT.fileButton(file, native));
     texts.push(EXPORT_TEXT.readyPeriod(EXPORT_TEXT.periods['12m']), EXPORT_TEXT.pdf.docTitle('2026-10-11'), EXPORT_TEXT.pdf.generated('2026-10-11'));
     texts.push(EXPORT_TEXT.pdf.period('Últimos 12 meses', 'de novembro de 2025 a outubro de 2026'), EXPORT_TEXT.pdf.purchasesTotal(1, 150_000), EXPORT_TEXT.pdf.purchasesTotal(3, 230_000));
     for (const p of EXPORT_PERIODS) texts.push(EXPORT_TEXT.periods[p]);
@@ -2201,7 +2203,9 @@ describe('textos de Exportar meus dados (D-047)', () => {
     if (!load.ok) throw new Error('esperava ok');
     const pdf = buildExportFiles(load.source, 'pdf').files[0]!.content;
     // O texto do PDF (sem a folha de estilo nem as marcas) segue as mesmas regras.
-    const plain = pdf.replace(/<style>[\s\S]*?<\/style>/g, ' ').replace(/<[^>]+>/g, ' ');
+    // Os tipos da ficha dos investimentos (D-099) são a classificação que a pessoa escolheu, como na aba Investir: saem antes da conferência.
+    const fichaNames = new RegExp(Object.values(SUBKIND_LABEL).sort((a, b) => b.length - a.length).map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+    const plain = pdf.replace(/<style>[\s\S]*?<\/style>/g, ' ').replace(/<[^>]+>/g, ' ').replace(fichaNames, ' ');
     check(plain.split(/\s{2,}/).filter((t) => t.trim() !== ''));
     for (const file of buildExportFiles(load.source, 'csv').files) expect(file.content).not.toMatch(/[–—]/);
   });

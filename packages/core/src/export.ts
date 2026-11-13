@@ -13,6 +13,9 @@ import { searchRange } from './search';
 import type { CategoryShare } from './summary';
 import { categoryBreakdown, summarizeMonth } from './summary';
 import { accountNameOf } from './accounts';
+import type { Investment, InvestmentMovement } from './investments';
+import { INVESTMENT_KIND_LABEL, INVESTMENT_TEXT } from './investments';
+import { INCOME_KIND_LABEL, SUBKIND_LABEL } from './investment-details';
 
 /**
  * Exportar meus dados (D-047, Ciclo H3; docs/08 §5 item 14). A pessoa leva os próprios gastos e recebimentos para uma planilha
@@ -88,7 +91,7 @@ export const EXPORT_TEXT = {
   } as Readonly<Record<ExportFormat, string>>,
   contentTitle: 'O que vai no arquivo',
   contentCsv:
-    'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga.',
+    'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga. Os movimentos dos investimentos vão em um terceiro.',
   contentPdf:
     'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga.',
   notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do espaço Pessoal.',
@@ -108,15 +111,17 @@ export const EXPORT_TEXT = {
     web: 'Cada botão baixa um arquivo. Ele fica na pasta de downloads do navegador, e a Clarevo não guarda cópia.',
     native: 'Cada botão abre o compartilhamento do aparelho. A Clarevo não guarda cópia: o arquivo temporário é apagado na próxima exportação ou quando esta tela é aberta.',
   },
-  readyCounts: (records: number, purchases: number): string => {
-    const r = records === 1 ? '1 lançamento' : `${records} lançamentos`;
-    if (purchases === 0) return r;
-    return `${r} e ${purchases === 1 ? '1 compra no cartão' : `${purchases} compras no cartão`}`;
+  readyCounts: (records: number, purchases: number, investments = 0): string => {
+    const parts = [records === 1 ? '1 lançamento' : `${records} lançamentos`];
+    if (purchases > 0) parts.push(purchases === 1 ? '1 compra no cartão' : `${purchases} compras no cartão`);
+    if (investments > 0) parts.push(investments === 1 ? '1 movimento de investimento' : `${investments} movimentos de investimento`);
+    return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}`;
   },
   readyPeriod: (periodLabel: string): string => `Período: ${periodLabel}`,
   /** Botões do arquivo pronto: na web baixam, no aparelho compartilham. */
   fileButton: (file: ExportFileId, native: boolean): string => {
-    const noun = file === 'lancamentos' ? 'lançamentos (CSV)' : file === 'compras' ? 'compras no cartão (CSV)' : 'resumo em PDF';
+    const noun =
+      file === 'lancamentos' ? 'lançamentos (CSV)' : file === 'compras' ? 'compras no cartão (CSV)' : file === 'investimentos' ? 'investimentos (CSV)' : 'resumo em PDF';
     if (file === 'resumo') return native ? `Compartilhar ${noun}` : 'Abrir para imprimir ou salvar em PDF';
     return `${native ? 'Compartilhar' : 'Baixar'} ${noun}`;
   },
@@ -147,6 +152,9 @@ export const EXPORT_TEXT = {
     purchasesNote:
       'Estas compras não entram em Pago: o dinheiro só sai quando a fatura é paga, e o pagamento da fatura já está nos lançamentos.',
     purchasesTotal: (count: number, cents: Cents): string => `${count === 1 ? '1 compra' : `${count} compras`} · ${formatBRL(cents)} no total das compras`,
+    investmentsTitle: 'Investimentos',
+    investmentsNote: 'O valor de hoje é o último registrado no app, como está no extrato, mais os aportes e resgates depois dele. Aportes, resgates e rendimentos não entram em Pago nem em Recebido.',
+    investmentColumns: { name: 'Investimento', kind: 'Tipo', value: 'Valor de hoje', invested: 'Aportado', income: 'Rendimentos no período' },
     differenceNote: 'A diferença é Recebido menos Pago. Não é saldo da conta nem dinheiro disponível.',
     footer: 'Gerado pela Clarevo neste aparelho, com os valores que você anotou. Este arquivo tem dados financeiros: guarde-o e compartilhe só com quem você escolher.',
     columns: { date: 'Data', type: 'Tipo', description: 'Descrição', category: 'Categoria', account: 'Conta', value: 'Valor', card: 'Cartão', installments: 'Parcelas', total: 'Valor total', share: '%' },
@@ -301,6 +309,8 @@ export const CSV_EOL = '\r\n';
 
 export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Valor (R$)', 'Conta de origem', 'Origem', 'Mês do resumo'];
 export const CSV_PURCHASE_HEADER: readonly string[] = ['Data da compra', 'Cartão', 'Descrição', 'Categoria', 'Valor total (R$)', 'Parcelas'];
+/** Investimentos (D-099): um movimento por linha, com o investimento, a ficha e o tipo do rendimento. */
+export const CSV_INVESTMENT_HEADER: readonly string[] = ['Data', 'Investimento', 'Tipo', 'Instituição', 'Movimento', 'Valor (R$)', 'Tipo do rendimento', 'Observação'];
 
 /**
  * Protege contra injeção de fórmula: texto que começa com =, +, -, @, tabulação, retorno de linha ou quebra de linha, ou que tem
@@ -358,6 +368,42 @@ export function buildPurchasesCsv(rows: readonly ExportPurchaseRow[]): string {
   return CSV_BOM + lines.join(CSV_EOL) + CSV_EOL;
 }
 
+/** Os investimentos e os movimentos do período (D-099). Ficam só no Pessoal: na Família, a lista vem vazia. */
+export interface ExportInvestments {
+  items: readonly Investment[];
+  movements: readonly InvestmentMovement[];
+}
+
+/** Movimentos dos investimentos no período, do mais antigo ao mais recente, para o CSV. */
+export function investmentMovementsInPeriod(inv: ExportInvestments, period: ExportPeriod, today: IsoDate): InvestmentMovement[] {
+  const { from, to } = exportRange(period, today);
+  return inv.movements
+    .filter((m) => (from === null || m.occurredOn >= from) && (to === null || m.occurredOn <= to) && m.occurredOn <= today)
+    .sort((a, b) => (a.occurredOn < b.occurredOn ? -1 : a.occurredOn > b.occurredOn ? 1 : a.createdAt.localeCompare(b.createdAt)));
+}
+
+export function buildInvestmentsCsv(inv: ExportInvestments, movements: readonly InvestmentMovement[]): string {
+  const byId = new Map(inv.items.map((i) => [i.id, i]));
+  const lines = [
+    csvLine(CSV_INVESTMENT_HEADER),
+    ...movements.map((m) => {
+      const i = byId.get(m.investmentId);
+      const kind = i ? (i.subkind ? SUBKIND_LABEL[i.subkind] : INVESTMENT_KIND_LABEL[i.kind]) : '';
+      return csvLine([
+        formatDateBR(m.occurredOn),
+        csvText(i?.name ?? ''),
+        csvText(kind),
+        csvText(i?.institution ?? ''),
+        csvText(INVESTMENT_TEXT.movementLabel[m.kind]),
+        csvAmount(m.amountCents),
+        csvText(m.incomeKind ? INCOME_KIND_LABEL[m.incomeKind] : ''),
+        csvText(m.note ?? ''),
+      ]);
+    }),
+  ];
+  return CSV_BOM + lines.join(CSV_EOL) + CSV_EOL;
+}
+
 // ---------------------------------------------------------------------------
 // Resumo por mês (iguais aos do Resumo) e relatório
 // ---------------------------------------------------------------------------
@@ -373,6 +419,8 @@ export interface ExportSource {
   commitments: ReadonlyMap<string, Pick<Commitment, 'series'>>;
   /** Faturas dos pagamentos de fatura, para dividir Pago por categoria como o Resumo faz (vazio: o gasto fica na categoria dele). */
   invoices: readonly Pick<Invoice, 'cardId' | 'month' | 'mix'>[];
+  /** Investimentos do Pessoal (D-099); ausente ou vazio: o arquivo e a seção não aparecem. */
+  investments?: ExportInvestments;
 }
 
 export interface ExportMonth {
@@ -393,6 +441,8 @@ export interface ExportReport {
   totals: { receivedCents: Cents; paidCents: Cents; differenceCents: Cents };
   purchases: ExportPurchaseRow[];
   purchasesTotalCents: Cents;
+  /** Investimentos ativos e os que tiveram movimento no período (D-099). */
+  investments: { name: string; kind: string; valueCents: Cents; depositsCents: Cents; periodIncomeCents: Cents }[];
 }
 
 /**
@@ -427,7 +477,23 @@ export function buildExportReport(source: ExportSource): ExportReport {
     totals: { receivedCents, paidCents, differenceCents: receivedCents - paidCents },
     purchases,
     purchasesTotalCents: purchases.reduce((acc, p) => acc + p.totalCents, 0),
+    investments: investmentsOfReport(source),
   };
+}
+
+function investmentsOfReport(source: ExportSource): ExportReport['investments'] {
+  const inv = source.investments;
+  if (!inv || inv.items.length === 0) return [];
+  const moved = investmentMovementsInPeriod(inv, source.period, source.today);
+  return inv.items
+    .filter((i) => i.status === 'ativo' || moved.some((m) => m.investmentId === i.id))
+    .map((i) => ({
+      name: i.name,
+      kind: i.subkind ? SUBKIND_LABEL[i.subkind] : INVESTMENT_KIND_LABEL[i.kind],
+      valueCents: i.valueCents,
+      depositsCents: i.depositsCents,
+      periodIncomeCents: moved.filter((m) => m.investmentId === i.id && m.kind === 'rendimento').reduce((a, m) => a + m.amountCents, 0),
+    }));
 }
 
 // ---------------------------------------------------------------------------
@@ -494,6 +560,15 @@ function monthHtml(m: ExportMonth): string {
   return `<section class="month"><h2>${escapeHtml(formatMonthBR(m.month))}</h2>${summaryTable(m.receivedCents, m.paidCents, m.differenceCents)}${categories}${entries}</section>`;
 }
 
+function investmentsHtml(report: ExportReport): string {
+  if (report.investments.length === 0) return '';
+  const t = EXPORT_TEXT.pdf;
+  const c = t.investmentColumns;
+  return `<section class="month"><h2>${t.investmentsTitle}</h2><p class="note">${t.investmentsNote}</p><table><thead><tr><th>${c.name}</th><th>${c.kind}</th><th class="num">${c.value}</th><th class="num">${c.invested}</th><th class="num">${c.income}</th></tr></thead><tbody>${report.investments
+    .map((i) => `<tr><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.kind)}</td><td class="num">${money(i.valueCents)}</td><td class="num">${money(i.depositsCents)}</td><td class="num">${money(i.periodIncomeCents)}</td></tr>`)
+    .join('')}</tbody></table></section>`;
+}
+
 function purchasesHtml(report: ExportReport): string {
   if (report.purchases.length === 0) return '';
   const t = EXPORT_TEXT.pdf;
@@ -530,6 +605,7 @@ export function exportReportHtml(report: ExportReport, options: { logoSvg?: stri
     totals,
     ...report.months.map(monthHtml),
     purchasesHtml(report),
+    investmentsHtml(report),
     `<p class="note">${t.differenceNote}</p>`,
     `<footer>${t.footer}</footer>`,
     '</body></html>',
@@ -540,7 +616,7 @@ export function exportReportHtml(report: ExportReport, options: { logoSvg?: stri
 // Arquivos
 // ---------------------------------------------------------------------------
 
-export type ExportFileId = 'lancamentos' | 'compras' | 'resumo';
+export type ExportFileId = 'lancamentos' | 'compras' | 'investimentos' | 'resumo';
 
 /** O que a entrega do arquivo precisa (CSV baixado ou HTML da página de impressão): o relatório do RH (D-062) usa o mesmo caminho. */
 export type ExportDeliverable = Pick<ExportFile, 'fileName' | 'mime' | 'kind' | 'content'>;
@@ -559,13 +635,15 @@ export interface ExportFiles {
   files: ExportFile[];
   recordCount: number;
   purchaseCount: number;
+  /** Movimentos de investimento no período (D-099). */
+  investmentCount: number;
   periodLabel: string;
-  /** Sem lançamento nem compra no período: nenhum arquivo. */
+  /** Sem lançamento, compra nem movimento de investimento no período: nenhum arquivo. */
   empty: boolean;
 }
 
 export function exportFileName(id: ExportFileId, today: IsoDate): string {
-  const base = id === 'lancamentos' ? 'clarevo-lancamentos' : id === 'compras' ? 'clarevo-compras-no-cartao' : 'clarevo-resumo';
+  const base = id === 'lancamentos' ? 'clarevo-lancamentos' : id === 'compras' ? 'clarevo-compras-no-cartao' : id === 'investimentos' ? 'clarevo-investimentos' : 'clarevo-resumo';
   return `${base}-${today}.${id === 'resumo' ? 'pdf' : 'csv'}`;
 }
 
@@ -577,8 +655,10 @@ export function buildExportFiles(source: ExportSource, format: ExportFormat, opt
   const periodLabel = EXPORT_TEXT.periods[source.period];
   const recordCount = source.records.length;
   const purchaseCount = source.purchases.filter((e) => e.kind === 'compra' && e.purchasedOn !== null).length;
-  const base = { recordCount, purchaseCount, periodLabel };
-  if (recordCount === 0 && purchaseCount === 0) return { ...base, files: [], empty: true };
+  const investmentMovements = source.investments ? investmentMovementsInPeriod(source.investments, source.period, source.today) : [];
+  const investmentCount = investmentMovements.length;
+  const base = { recordCount, purchaseCount, investmentCount, periodLabel };
+  if (recordCount === 0 && purchaseCount === 0 && investmentCount === 0) return { ...base, files: [], empty: true };
   const ctx: ExportContext = { accounts: source.accounts, cards: source.cards, commitments: source.commitments };
   if (format === 'pdf') {
     const html = exportReportHtml(buildExportReport(source), options);
@@ -600,6 +680,14 @@ export function buildExportFiles(source: ExportSource, format: ExportFormat, opt
       mime: 'text/csv;charset=utf-8',
       kind: 'csv',
       content: buildPurchasesCsv(exportPurchaseRows(source.purchases, ctx)),
+    });
+  if (investmentCount > 0 && source.investments)
+    files.push({
+      id: 'investimentos',
+      fileName: exportFileName('investimentos', source.today),
+      mime: 'text/csv;charset=utf-8',
+      kind: 'csv',
+      content: buildInvestmentsCsv(source.investments, investmentMovements),
     });
   return { ...base, empty: false, files };
 }
@@ -666,8 +754,10 @@ export async function loadExportSource(
   }
 
   const invoices = options.withInvoices ? await loadInvoicesOfRecords(repo, records, today) : [];
+  // Investimentos (D-099): só no Pessoal; na Família, as duas leituras voltam vazias.
+  const [items, movements] = await Promise.all([repo.listInvestments(contextId), repo.listContextInvestmentMovements(contextId)]);
   return {
     ok: true,
-    source: { contextId, period, today, records, purchases: bought.items, accounts, cards, commitments, invoices },
+    source: { contextId, period, today, records, purchases: bought.items, accounts, cards, commitments, invoices, investments: { items, movements } },
   };
 }
