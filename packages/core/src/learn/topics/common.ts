@@ -27,6 +27,14 @@ export const EPOCA_CONSULTED_ON: IsoDate = '2026-10-15';
 export const MEDIA_REVIEWED_ON: IsoDate = '2026-10-20';
 export const MEDIA_CONSULTED_ON: IsoDate = '2026-10-20';
 
+/**
+ * Temas de investimentos (D-093, aba Investir): os sete temas da seção "Dinheiro no tempo" escritos e conferidos em 13/11/2026, pelo
+ * mesmo método (trecho de resultado de busca da própria fonte, porque gov.br, planalto.gov.br e bcb.gov.br não abrem a partir do
+ * ambiente de trabalho).
+ */
+export const INVEST_REVIEWED_ON: IsoDate = '2026-11-13';
+export const INVEST_CONSULTED_ON: IsoDate = '2026-11-13';
+
 export const clarevo = (...refs: string[]): LearnSource => ({ kind: 'clarevo', refs });
 
 export const oficial = (publisher: string, title: string, url: string, locator: string | null = null): LearnSource => ({
@@ -56,6 +64,16 @@ export const oficialMedia = (publisher: string, title: string, url: string, loca
   url,
   locator,
   consultedOn: MEDIA_CONSULTED_ON,
+});
+
+/** Fonte oficial de um tema de investimentos (D-093), consultada em 13/11/2026. */
+export const oficialInvest = (publisher: string, title: string, url: string, locator: string | null = null): LearnSource => ({
+  kind: 'oficial',
+  publisher,
+  title,
+  url,
+  locator,
+  consultedOn: INVEST_CONSULTED_ON,
 });
 
 export const mercado = (publisher: string, title: string, url: string, locator: string | null = null): LearnSource => ({

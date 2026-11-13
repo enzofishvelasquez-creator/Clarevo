@@ -1,7 +1,8 @@
 import {
   ERROR_TEXT,
-  INVESTMENT_KIND_LABEL,
+  INCOME_KIND_LABEL,
   INVESTMENT_TEXT,
+  calendarDaysBetween,
   formatBRL,
   formatDateBR,
   formatMonthBR,
@@ -21,6 +22,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
+import { InvestmentEstimateCard, InvestmentFichaCard, InvestmentNetCard, investmentCaption } from '@/components/investment-ficha';
 import { InvestmentReturns, InvestmentTotalsLines } from '@/components/investment-parts';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ErrorState, LoadingState } from '@/components/states';
@@ -35,7 +37,8 @@ const D = T.detail;
 
 /**
  * Detalhe de um investimento (D-093): o valor de hoje, os totais, a rentabilidade com o CDI e o IPCA, as ações (aporte, resgate,
- * rendimento recebido, atualizar valor), o valor no fim de cada mês, o histórico e editar, encerrar ou reabrir e excluir.
+ * rendimento recebido, atualizar valor), o valor no fim de cada mês, o histórico e editar, encerrar ou reabrir e excluir. Com a ficha
+ * ampliada (D-099): "Sobre este investimento", o valor pela taxa contratada (com "Usar este valor") e "Se resgatasse hoje".
  */
 export default function InvestimentoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -128,7 +131,7 @@ function Detail({
       <Screen>
         <View style={styles.hero}>
           <Txt variant="caption" color={colors.textOnBrandSoft}>
-            {`${INVESTMENT_KIND_LABEL[i.kind]}${active ? '' : ' · Encerrado'}`}
+            {`${investmentCaption(i)}${active ? '' : ' · Encerrado'}`}
           </Txt>
           <MoneyTxt color={colors.textOnBrand} style={[tabular, styles.big]}>
             {formatBRL(i.valueCents)}
@@ -156,6 +159,11 @@ function Detail({
               {T.disclaimer}
             </Txt>
           </Card>
+          {active && i.maturityOn && calendarDaysBetween(today, i.maturityOn) < 0 && i.valueCents > 0 ? (
+            <Banner tone="info">
+              <Txt variant="label">{`Este investimento venceu em ${formatDateBR(i.maturityOn)}. Se o dinheiro já voltou para a conta, registre o resgate e encerre o investimento.`}</Txt>
+            </Banner>
+          ) : null}
           {active ? (
             <View style={styles.actions}>
               <Button label={D.updateValue} onPress={() => go('valor')} style={styles.action} />
@@ -166,6 +174,9 @@ function Detail({
           ) : (
             <Button label={D.reopen} tone="soft" busy={busy} onPress={() => setStatus('ativo')} />
           )}
+          <InvestmentEstimateCard investment={i} movements={movements} onNotice={onNotice} />
+          <InvestmentNetCard investment={i} movements={movements} />
+          <InvestmentFichaCard investment={i} />
           {months.length > 0 ? (
             <Card style={{ gap: space[1], paddingVertical: space[3] }}>
               <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -189,7 +200,8 @@ function Detail({
             </Txt>
             {movements.length === 0 ? <Txt color={colors.textSecondary}>{D.historyEmpty}</Txt> : null}
             {movements.map((m, idx) => {
-              const label = `${T.movementLabel[m.kind]}, ${formatDateBR(m.occurredOn)}, ${formatBRL(m.amountCents)}${m.note ? `, ${m.note}` : ''}`;
+              const title = m.incomeKind ? `${T.movementLabel[m.kind]} · ${INCOME_KIND_LABEL[m.incomeKind]}` : T.movementLabel[m.kind];
+              const label = `${title}, ${formatDateBR(m.occurredOn)}, ${formatBRL(m.amountCents)}${m.note ? `, ${m.note}` : ''}`;
               return (
                 <Pressable
                   key={m.id}
@@ -201,7 +213,7 @@ function Detail({
                   style={(st) => [styles.histRow, idx < movements.length - 1 && styles.divider, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Txt variant="label" style={{ fontFamily: fonts.bold }}>
-                      {T.movementLabel[m.kind]}
+                      {title}
                     </Txt>
                     <Txt variant="caption" color={colors.textSecondary}>
                       {m.note ? `${formatDateBR(m.occurredOn)} · ${m.note}` : formatDateBR(m.occurredOn)}

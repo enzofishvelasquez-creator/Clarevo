@@ -440,7 +440,21 @@ export const APP_SCREENS: readonly AppScreen[] = [
     title: 'Investimentos',
     caption: 'O que você já investe: aportes, valor de hoje, rendimento, CDI e IPCA',
     href: '/investimentos',
-    keywords: ['investimento', 'investimentos', 'investir', 'carteira', 'rendimento', 'rentabilidade', 'aporte', 'resgate', 'cdi', 'ipca', 'extrato', 'valor atual'],
+    keywords: ['investimento', 'investimentos', 'investir', 'carteira', 'rendimento', 'rentabilidade', 'aporte', 'resgate', 'cdi', 'ipca', 'extrato', 'valor atual', 'vencimento', 'fgc'],
+  },
+  {
+    id: 'investimentos-declaracao',
+    title: 'Resumo para a declaração',
+    caption: 'Valores em 31/12 e rendimentos do ano dos investimentos, para conferir com os informes',
+    href: '/investimento/declaracao',
+    keywords: ['declaração', 'declaracao', 'imposto de renda', 'irpf', 'bens e direitos', 'informe de rendimentos', 'investimentos'],
+  },
+  {
+    id: 'investimentos-comparar',
+    title: 'Comparar rendimentos líquidos',
+    caption: 'O mesmo valor em até quatro opções, depois do imposto',
+    href: '/investimento/comparar',
+    keywords: ['comparar', 'rendimento líquido', 'isento', 'imposto', 'taxa equivalente', 'investimentos'],
   },
   {
     id: 'renda-comprometida',

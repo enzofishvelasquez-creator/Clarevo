@@ -398,3 +398,59 @@ export function incomeTaxQuotas(taxCents: Cents, quotas: number): Cents[] {
   if (Number(n) > incomeTaxMaxQuotas(taxCents)) throw new RangeError(`quotas demais para o imposto: ${quotas}`);
   return sharesCents(taxCents, Array.from({ length: Number(n) }, () => 1));
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Investimentos (D-093): as contas dos exemplos dos temas de imposto, proventos e ganho real de Aprender, com as regras em vigor
+// em 13/11/2026. O app não calcula o imposto de ninguém: são só os números dos exemplos fictícios.
+// ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Tabela regressiva do imposto de renda sobre o rendimento de renda fixa (Lei 11.033/2004, art. 1º), em pontos-base, pelo prazo
+ * da aplicação em dias corridos: 22,5% até 180 dias, 20% de 181 a 360, 17,5% de 361 a 720 e 15% acima de 720.
+ * fixedIncomeTaxBp(100) = 2.250; fixedIncomeTaxBp(400) = 1.750.
+ */
+export function fixedIncomeTaxBp(days: number): number {
+  const d = int(days, 'dias');
+  if (d <= 180n) return 2_250;
+  if (d <= 360n) return 2_000;
+  if (d <= 720n) return 1_750;
+  return 1_500;
+}
+
+/** Imposto de renda sobre um rendimento de renda fixa, pela tabela regressiva, metade para cima. fixedIncomeTaxCents(120.000, 400) = 21.000. */
+export function fixedIncomeTaxCents(yieldCents: Cents, days: number): Cents {
+  return toNumber(roundDivBig(int(yieldCents, 'rendimento') * BigInt(fixedIncomeTaxBp(days)), BP));
+}
+
+/** Parte de um valor por uma alíquota em pontos-base, metade para cima: shareOfCents(1.500.000, 20) = 3.000 (0,20%). */
+export function shareOfCents(valueCents: Cents, bp: number): Cents {
+  return toNumber(roundDivBig(int(valueCents, 'valor') * int(bp, 'alíquota'), BP));
+}
+
+/** Retenção sobre lucros e dividendos (Lei 15.270/2025): 10% sobre o total do mês, quando passa de R$ 50.000,00. */
+export const DIVIDEND_WITHHOLDING_BP = 1_000;
+export const DIVIDEND_WITHHOLDING_ABOVE_CENTS = 5_000_000;
+
+/**
+ * Imposto retido sobre os dividendos que uma mesma empresa paga a uma mesma pessoa num mês: zero até R$ 50.000,00 e, acima disso,
+ * 10% sobre o total do mês, metade para cima. dividendWithholdingCents(6.000.000) = 600.000; dividendWithholdingCents(4.000.000) = 0.
+ */
+export function dividendWithholdingCents(monthTotalCents: Cents): Cents {
+  const total = int(monthTotalCents, 'total do mês');
+  if (total <= BigInt(DIVIDEND_WITHHOLDING_ABOVE_CENTS)) return 0;
+  return toNumber(roundDivBig(total * BigInt(DIVIDEND_WITHHOLDING_BP), BP));
+}
+
+/** Juros sobre capital próprio: 17,5% de imposto de renda retido na fonte desde 2026 (Lei Complementar 224/2025). */
+export const JCP_WITHHOLDING_BP = 1_750;
+
+/**
+ * Taxa real, em pontos-base: (1 + rentabilidade) ÷ (1 + inflação) - 1, com as duas taxas do mesmo período, arredondada ao
+ * ponto-base mais próximo, metade para cima. Negativa quando a inflação passa da rentabilidade.
+ * realRateBp(1.000, 450) = 526 (5,26%); realRateBp(300, 450) = -144.
+ */
+export function realRateBp(nominalBp: number, inflationBp: number): number {
+  const n = BP + int(nominalBp, 'rentabilidade');
+  const i = BP + int(inflationBp, 'inflação');
+  return toNumber(roundDivBig(n * BP, i) - BP);
+}

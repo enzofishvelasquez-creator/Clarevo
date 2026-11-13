@@ -1,4 +1,6 @@
 import {
+  DETAILS_FIELD_ORDER,
+  EMPTY_DETAILS_DRAFT,
   INVESTMENT_FIELD_ORDER,
   INVESTMENT_KINDS,
   INVESTMENT_KIND_LABEL,
@@ -9,8 +11,14 @@ import {
   isRepoError,
   maskDateBR,
   newOperationKey,
+  detailsEmpty,
+  detailsToDraft,
+  investmentDetailsErrorText,
+  validateDetailsDraft,
   validateInvestmentDraft,
   type Investment,
+  type InvestmentDetailsDraft,
+  type InvestmentDetailsField,
   type InvestmentField,
   type InvestmentKind,
 } from '@clarevo/core';
@@ -20,6 +28,7 @@ import { KeyboardAvoidingView, Platform, StyleSheet, type TextInput } from 'reac
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { FormFooter } from '@/components/form-footer';
+import { InvestmentDetailsSection, type DetailsSectionHandle } from '@/components/investment-details-form';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
 import { ChoiceGroup } from '@/components/series-parts';
@@ -33,7 +42,8 @@ const T = INVESTMENT_TEXT.form;
 
 /**
  * Novo investimento e editar (D-093). Novo: nome, tipo, quanto aplicou até hoje (obrigatório), quanto vale hoje (opcional) e desde
- * quando (opcional, hoje sem ela). Editar: só nome e tipo; os valores mudam pelos movimentos.
+ * quando (opcional, hoje sem ela). Editar: nome e tipo; os valores mudam pelos movimentos. Nos dois, o bloco "Mais detalhes (opcional)"
+ * com a ficha ampliada (D-099), que é gravada inteira.
  */
 export function InvestmentForm({ contextId, investment }: { contextId: string; investment: Investment | null }) {
   const repo = useRepo();
@@ -45,6 +55,10 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
   const [investedText, setInvestedText] = useState('');
   const [currentText, setCurrentText] = useState('');
   const [startText, setStartText] = useState('');
+  const initialDetails = investment ? detailsToDraft(investment) : EMPTY_DETAILS_DRAFT;
+  const [details, setDetails] = useState<InvestmentDetailsDraft>(initialDetails);
+  const [detailErrors, setDetailErrors] = useState<Partial<Record<InvestmentDetailsField, string>>>({});
+  const detailsRef = useRef<DetailsSectionHandle>(null);
   const [errors, setErrors] = useState<Partial<Record<InvestmentField, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -56,7 +70,13 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
     currentText: useRef<TextInput>(null),
     startText: useRef<TextInput>(null),
   };
-  const dirty = name !== (investment?.name ?? '') || kind !== (investment?.kind ?? null) || investedText !== '' || currentText !== '' || startText !== '';
+  const dirty =
+    name !== (investment?.name ?? '') ||
+    kind !== (investment?.kind ?? null) ||
+    investedText !== '' ||
+    currentText !== '' ||
+    startText !== '' ||
+    JSON.stringify(details) !== JSON.stringify(initialDetails);
   const guard = useLeaveGuard(dirty && !busy, editing ? `/investimento/${investment!.id}` : '/investimentos');
 
   const clear = (f: InvestmentField) => {
@@ -66,20 +86,27 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
   async function submit() {
     if (busy) return;
     const v = validateInvestmentDraft({ name, kind, investedText, currentText, startText }, today, editing ? 'editar' : 'criar');
-    if (!v.ok) {
-      setErrors(v.errors);
+    const dv = validateDetailsDraft(kind, details);
+    if (!v.ok || !dv.ok) {
+      setErrors(v.ok ? {} : v.errors);
+      setDetailErrors(dv.ok ? {} : dv.errors);
       setError(null);
-      const first = INVESTMENT_FIELD_ORDER.find((f) => v.errors[f]);
+      const first = v.ok ? undefined : INVESTMENT_FIELD_ORDER.find((f) => v.errors[f]);
       if (first) refs[first].current?.focus();
+      else if (!dv.ok) {
+        const firstDetail = DETAILS_FIELD_ORDER.find((f) => dv.errors[f]);
+        if (firstDetail) detailsRef.current?.focus(firstDetail);
+      }
       return;
     }
     setErrors({});
+    setDetailErrors({});
     setError(null);
     setBusy(true);
     try {
       const w = editing
-        ? await repo.updateInvestment(key, investment!.id, investment!.version, { name: v.input.name, kind: v.input.kind })
-        : await repo.createInvestment(key, contextId, v.input);
+        ? await repo.updateInvestment(key, investment!.id, investment!.version, { name: v.input.name, kind: v.input.kind, details: dv.details })
+        : await repo.createInvestment(key, contextId, { ...v.input, details: dv.details });
       invalidate();
       flash.set(editing ? T.saved : T.created);
       const id = w.investment?.id ?? investment?.id;
@@ -92,7 +119,7 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
       } else if (code === 'chave_reutilizada') {
         invalidate();
         setError('Pode ser que já tenha sido salvo. Confira a lista de investimentos antes de tentar de novo.');
-      } else setError(investmentErrorText(code));
+      } else setError(investmentDetailsErrorText(code) ?? investmentErrorText(code));
     } finally {
       setBusy(false);
     }
@@ -181,6 +208,17 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
             </>
           )}
         </Card>
+        <InvestmentDetailsSection
+          ref={detailsRef}
+          kind={kind}
+          draft={details}
+          onChange={(next) => {
+            setDetails(next);
+            if (Object.keys(detailErrors).length > 0) setDetailErrors({});
+          }}
+          errors={detailErrors}
+          initiallyOpen={investment !== null && !detailsEmpty(investment)}
+        />
         <Txt variant="label" color={colors.textSecondary}>
           {INVESTMENT_TEXT.footer}
         </Txt>

@@ -8,8 +8,8 @@ import type { IsoDate } from '../dates';
 export type LearnSectionId = 'usar' | 'organizar' | 'juros' | 'tempo' | 'duvidas';
 
 /**
- * Os 47 temas do catálogo, na ordem das seções (spec3 §3.3, com os temas dos Ciclos B, C e D, "Média e mediana" do Ciclo W
- * (D-062) e os quatro de época do Ciclo K2, D-053). Um slug nunca é reaproveitado (R1).
+ * Os 54 temas do catálogo, na ordem das seções (spec3 §3.3, com os temas dos Ciclos B, C e D, "Média e mediana" do Ciclo W
+ * (D-062), os quatro de época do Ciclo K2, D-053, e os sete de investimentos de 13/11/2026, D-093). Um slug nunca é reaproveitado (R1).
  */
 export const TOPIC_SLUGS = [
   'diferenca',
@@ -51,6 +51,13 @@ export const TOPIC_SLUGS = [
   'liquidez-risco-retorno',
   'fgc',
   'simulacao',
+  'ir-investimentos',
+  'titulos-publicos',
+  'lci-lca',
+  'proventos',
+  'declarar-investimentos',
+  'ganho-real',
+  'golpes-rentabilidade',
   'quem-ve-meus-dados',
   'empresa-ve',
   'demonstracao',

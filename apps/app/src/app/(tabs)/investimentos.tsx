@@ -1,11 +1,13 @@
-import { ERROR_TEXT, INVESTMENT_KIND_LABEL, INVESTMENT_TEXT, formatBRL, investmentGain, investmentsMissingValue, type Investment, type InvestmentMovement } from '@clarevo/core';
+import { ERROR_TEXT, INVESTMENT_TEXT, formatBRL, investmentGain, investmentsMissingValue, type Investment, type InvestmentMovement } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ChevronRight, Plus, ShieldCheck } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader } from '@/components/header';
+import { investmentCaption } from '@/components/investment-ficha';
 import { InvestmentReturns, InvestmentTotalsLines, groupByInvestment } from '@/components/investment-parts';
+import { AllocationCard, FgcCard, IncomeCard, InvestmentLinks, UpcomingDatesCard } from '@/components/investment-portfolio';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
@@ -17,7 +19,8 @@ const T = INVESTMENT_TEXT;
 
 /**
  * Investimentos (D-093, aba nova, só no Pessoal): o total de hoje, o aportado, o ganho, a rentabilidade da carteira com o CDI e o IPCA,
- * a lista dos investimentos e os encerrados. Tudo vem do que a pessoa registra; nada é recomendado. Mesmo com a Família escolhida no
+ * a lista dos investimentos e os encerrados. Com a ficha ampliada (D-099): próximos vencimentos, como está dividido, a garantia do FGC,
+ * os rendimentos recebidos no ano e os atalhos para o resumo da declaração e a calculadora de rendimentos líquidos. Tudo vem do que a pessoa registra; nada é recomendado. Mesmo com a Família escolhida no
  * seletor, esta aba mostra o Pessoal (investimentos não vão para a Família).
  */
 export default function InvestimentosScreen() {
@@ -64,6 +67,7 @@ export default function InvestimentosScreen() {
             <>
               {/* A carteira é só dos ativos: os encerrados saem do total e da rentabilidade (docs/45, seção 3.2). */}
               <Summary active={active} movements={movements.data} />
+              <UpcomingDatesCard items={active} />
               <View style={{ gap: space[3] }}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>
                   Seus investimentos
@@ -73,6 +77,10 @@ export default function InvestimentosScreen() {
                 ))}
                 {canWrite ? <Button label={T.newInvestment} icon={Plus} tone="soft" onPress={() => router.push('/investimento/novo')} /> : null}
               </View>
+              <AllocationCard items={active} />
+              <FgcCard items={active} />
+              <IncomeCard movements={movements.data} activeIds={new Set(active.map((i) => i.id))} />
+              <InvestmentLinks />
               {closed.length > 0 ? (
                 <View style={{ gap: space[3] }}>
                   <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -144,7 +152,7 @@ function InvestmentCard({ investment: i }: { investment: Investment }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={maskLabel(`${i.name}, ${INVESTMENT_KIND_LABEL[i.kind]}: ${formatBRL(i.valueCents)}. ${T.gain(gain)}.`)}
+      accessibilityLabel={maskLabel(`${i.name}, ${investmentCaption(i)}: ${formatBRL(i.valueCents)}. ${T.gain(gain)}.`)}
       accessibilityHint="Abre o investimento"
       onPress={() => router.push({ pathname: '/investimento/[id]', params: { id: i.id } })}
       style={(st) => [ui.card, { gap: space[1] }, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
@@ -154,7 +162,7 @@ function InvestmentCard({ investment: i }: { investment: Investment }) {
             {i.name}
           </Txt>
           <Txt variant="caption" color={colors.textSecondary}>
-            {INVESTMENT_KIND_LABEL[i.kind]}
+            {investmentCaption(i)}
           </Txt>
         </View>
         <MoneyTxt variant="label" style={[tabular, { fontFamily: fonts.extrabold }]}>

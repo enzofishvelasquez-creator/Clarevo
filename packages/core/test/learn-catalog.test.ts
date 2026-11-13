@@ -18,7 +18,13 @@ import {
   learnReviewWarnings,
   numbersInText,
   canonicalNumber,
+  dividendWithholdingCents,
+  equivalentAnnualBp,
+  fixedIncomeTaxBp,
+  fixedIncomeTaxCents,
   percentTenths,
+  realRateBp,
+  shareOfCents,
   publishedTopics,
   readingMinutes,
   relatedTopics,
@@ -84,12 +90,12 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     expect(learnReviewWarnings(TOPICS, '2027-03-11').map((w) => w.slug)).toContain('rotativo-cartao');
   });
 
-  it('os 47 slugs na ordem; TOPICS e TOPIC_SLUGS iguais', () => {
-    expect(TOPIC_SLUGS.length).toBe(47);
+  it('os 54 slugs na ordem; TOPICS e TOPIC_SLUGS iguais', () => {
+    expect(TOPIC_SLUGS.length).toBe(54);
     expect(TOPICS.map((t) => t.slug)).toEqual([...TOPIC_SLUGS]);
   });
 
-  it('seção, tipo e status de cada tema: 45 publicados e 2 rascunhos', () => {
+  it('seção, tipo e status de cada tema: 52 publicados e 2 rascunhos', () => {
     const table: Record<TopicSlug, string> = {
       diferenca: 'usar tema publicado',
       'realizado-previsto': 'usar tema publicado',
@@ -130,6 +136,13 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
       'liquidez-risco-retorno': 'tempo tema publicado',
       fgc: 'tempo tema publicado',
       simulacao: 'tempo tema publicado',
+      'ir-investimentos': 'tempo tema publicado',
+      'titulos-publicos': 'tempo tema publicado',
+      'lci-lca': 'tempo tema publicado',
+      proventos: 'tempo tema publicado',
+      'declarar-investimentos': 'tempo tema publicado',
+      'ganho-real': 'tempo tema publicado',
+      'golpes-rentabilidade': 'tempo tema publicado',
       'quem-ve-meus-dados': 'duvidas pergunta publicado',
       'empresa-ve': 'duvidas pergunta publicado',
       demonstracao: 'duvidas pergunta publicado',
@@ -140,7 +153,7 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
       'o-que-a-clarevo-nao-faz': 'duvidas pergunta publicado',
     };
     expect(Object.fromEntries(TOPICS.map((t) => [t.slug, `${t.section} ${t.kind} ${t.status}`]))).toEqual(table);
-    expect(publishedTopics().length).toBe(45);
+    expect(publishedTopics().length).toBe(52);
     // Rascunho diz o que falta conferir.
     for (const t of TOPICS.filter((x) => x.status === 'rascunho')) expect(t.pending!.length).toBeGreaterThan(0);
   });
@@ -255,12 +268,15 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     }
   });
 
-  it('R5: toda fonte externa de tema publicado tem endereço permitido e data de consulta 09/10/2026 (os quatro de época, 15/10/2026; Média e mediana, 20/10/2026)', () => {
+  it('R5: toda fonte externa de tema publicado tem endereço permitido e data de consulta 09/10/2026 (os quatro de época, 15/10/2026; Média e mediana, 20/10/2026; os sete de investimentos, 13/11/2026)', () => {
     const epoca: readonly string[] = ['decimo-terceiro', 'ferias', 'volta-as-aulas', 'imposto-de-renda'];
+    const investimentos: readonly string[] = ['ir-investimentos', 'titulos-publicos', 'lci-lca', 'proventos', 'declarar-investimentos', 'ganho-real', 'golpes-rentabilidade'];
+    const consulted = (slug: string) =>
+      epoca.includes(slug) ? '2026-10-15' : slug === 'media-e-mediana' ? '2026-10-20' : investimentos.includes(slug) ? '2026-11-13' : '2026-10-09';
     for (const t of publishedTopics())
       for (const s of t.sources) {
         if (s.kind === 'clarevo') continue;
-        expect(s.consultedOn, `${t.slug}: ${s.title}`).toBe(epoca.includes(t.slug) ? '2026-10-15' : t.slug === 'media-e-mediana' ? '2026-10-20' : '2026-10-09');
+        expect(s.consultedOn, `${t.slug}: ${s.title}`).toBe(consulted(t.slug));
         if (s.kind !== 'obra') expect(isAllowedSourceUrl(s.url, s.kind, t.slug), s.url).toBe(true);
       }
     expect(isAllowedSourceUrl('https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm', 'oficial', 'cet')).toBe(true);
@@ -539,7 +555,137 @@ describe('temas dos Ciclos B, C e D (renda comprometida, renda que muda, aporte,
       'volta-as-aulas',
       'imposto-de-renda',
     ]);
-    expect(topicsBySection()[3]!.topics.map((x) => x.slug)).toEqual(['inflacao-ipca', 'selic', 'liquidez-risco-retorno', 'fgc', 'simulacao']);
+    expect(topicsBySection()[3]!.topics.map((x) => x.slug)).toEqual([
+      'inflacao-ipca',
+      'selic',
+      'liquidez-risco-retorno',
+      'fgc',
+      'simulacao',
+      'ir-investimentos',
+      'titulos-publicos',
+      'lci-lca',
+      'proventos',
+      'declarar-investimentos',
+      'ganho-real',
+      'golpes-rentabilidade',
+    ]);
+  });
+});
+
+describe('temas de investimentos (D-093, 13/11/2026)', () => {
+  const SLUGS: TopicSlug[] = ['ir-investimentos', 'titulos-publicos', 'lci-lca', 'proventos', 'declarar-investimentos', 'ganho-real', 'golpes-rentabilidade'];
+  const SIX_MONTHS: TopicSlug[] = ['ir-investimentos', 'lci-lca', 'proventos', 'declarar-investimentos'];
+  const topic = (slug: TopicSlug) => TOPICS.find((t) => t.slug === slug)!;
+  const withFacts = (slug: TopicSlug) => {
+    const set = expectedExampleNumbers(slug);
+    for (const f of topic(slug).facts) for (const n of numbersInText(f.text)) set.add(canonicalNumber(n)!);
+    return set;
+  };
+  const shown = (slug: TopicSlug) => {
+    const t = topic(slug);
+    return [t.title, t.subtitle ?? '', t.question ?? '', t.short, ...t.paragraphs, t.example ?? '', t.calculation ?? '', t.hypotheses ?? '', ...t.keywords].join(' ');
+  };
+
+  it('publicados em "Dinheiro no tempo", logo depois de simulacao; revisão a cada 6 meses nos de imposto e prazo, a cada 12 nos outros', () => {
+    const i = TOPIC_SLUGS.indexOf('simulacao');
+    expect(TOPIC_SLUGS.slice(i + 1, i + 8)).toEqual(SLUGS);
+    for (const slug of SLUGS) {
+      const t = topic(slug);
+      expect(`${t.section} ${t.kind} ${t.status}`, slug).toBe('tempo tema publicado');
+      expect(t.reviewedOn, slug).toBe('2026-11-13');
+      expect(t.reviewEveryMonths, slug).toBe(SIX_MONTHS.includes(slug) ? 6 : 12);
+      expect(reviewDueOn(t), slug).toBe(SIX_MONTHS.includes(slug) ? '2027-05-13' : '2027-11-13');
+      expect(topicReadingMinutes(t), slug).toBeLessThanOrEqual(2);
+      // Só fontes oficiais, cada uma com o trecho e o aviso de que a página não abriu (spec5_notes §2).
+      for (const src of t.sources) {
+        expect(src.kind, `${slug}: fonte`).toBe('oficial');
+        if (src.kind !== 'oficial') continue;
+        expect(src.consultedOn, src.url).toBe('2026-11-13');
+        expect(src.locator!, src.url).toMatch(/trecho de resultado de busca; (a página|o arquivo) não abriu/);
+      }
+      expect(t.hypotheses, slug).toMatch(/fict[ií]ci/);
+      expect(topicBySlug(slug)?.slug, slug).toBe(slug);
+    }
+    // O aviso de revisão dos de 6 meses começa 30 dias antes (13/04/2027), depois dos de IOF, cheque especial e rotativo.
+    expect(learnReviewWarnings(TOPICS, '2027-04-12').map((w) => w.slug).filter((s) => SLUGS.includes(s as TopicSlug))).toEqual([]);
+    expect(learnReviewWarnings(TOPICS, '2027-04-13').map((w) => w.slug).filter((s) => SLUGS.includes(s as TopicSlug))).toEqual(SIX_MONTHS);
+  });
+
+  it('títulos públicos: os nomes oficiais do Tesouro Nacional, o Tesouro Reserva de 11/05/2026, a garantia do Tesouro (não do FGC) e a custódia', () => {
+    const t = topic('titulos-publicos');
+    const text = t.paragraphs.join(' ');
+    for (const name of ['Tesouro Selic', 'Tesouro Prefixado', 'Tesouro IPCA+', 'Tesouro Prefixado com Juros Semestrais', 'Tesouro IPCA+ com Juros Semestrais', 'Tesouro RendA+', 'Tesouro Educa+'])
+      expect(text, name).toContain(name);
+    expect(text).toContain('Tesouro Reserva, lançado em 11/05/2026');
+    expect(text).toContain('por Pix');
+    expect(text).toContain('marcação a mercado');
+    expect(t.short).toContain('garantidos pelo Tesouro Nacional, e não pelo FGC');
+    expect(t.facts.map((f) => f.text)).toEqual(['100% da Selic', '0,20% ao ano', 'R$ 10.000,00 por CPF']);
+    const set = withFacts('titulos-publicos');
+    for (const n of ['R$ 25.000,00', 'R$ 15.000,00', 'R$ 30,00', '0,20%', 'R$ 10.000,00', '100%']) expect(set.has(canonicalNumber(n)!), n).toBe(true);
+    expect(shareOfCents(1_500_000, 20)).toBe(3_000);
+  });
+
+  it('imposto de renda: a tabela regressiva de learn/math.ts e a conta do exemplo', () => {
+    expect([180, 181, 360, 361, 720, 721].map(fixedIncomeTaxBp)).toEqual([2_250, 2_000, 2_000, 1_750, 1_750, 1_500]);
+    expect(fixedIncomeTaxCents(120_000, 400)).toBe(21_000);
+    expect(fixedIncomeTaxCents(30_000, 100)).toBe(6_750);
+    expect(() => fixedIncomeTaxBp(-1)).toThrow(RangeError);
+    const t = topic('ir-investimentos');
+    expect(t.paragraphs[0]).toContain('22,5% até 180 dias, 20% de 181 a 360 dias, 17,5% de 361 a 720 dias e 15% acima de 720 dias');
+    expect(t.paragraphs[2]).toContain('último dia útil de maio e de novembro');
+    for (const name of ['poupança', 'LCI', 'LCA', 'LCD', 'CRI', 'CRA', 'debêntures incentivadas', 'fundos imobiliários']) expect(t.paragraphs[3], name).toContain(name);
+    const set = withFacts('ir-investimentos');
+    for (const n of ['R$ 10.000,00', 'R$ 1.200,00', 'R$ 210,00', 'R$ 10.990,00', 'R$ 300,00', 'R$ 67,50', '17,5%', '22,5%', '96%']) expect(set.has(canonicalNumber(n)!), n).toBe(true);
+    expect(withFacts('lci-lca').has(canonicalNumber('R$ 825,00')!)).toBe(true);
+  });
+
+  it('proventos: retenção de 10% sobre o total do mês acima de R$ 50.000,00 e JCP com 17,5%', () => {
+    expect(dividendWithholdingCents(5_000_000)).toBe(0);
+    expect(dividendWithholdingCents(5_000_001)).toBe(500_000);
+    expect(dividendWithholdingCents(6_000_000)).toBe(600_000);
+    const set = withFacts('proventos');
+    for (const n of ['R$ 60.000,00', 'R$ 50.000,00', 'R$ 6.000,00', 'R$ 40.000,00', 'R$ 1.000,00', 'R$ 175,00', 'R$ 825,00', '10%', '17,5%', '95%']) expect(set.has(canonicalNumber(n)!), n).toBe(true);
+  });
+
+  it('ganho real: (1 + rentabilidade) ÷ (1 + IPCA) - 1, com a poupança só como referência', () => {
+    expect(realRateBp(1_000, 450)).toBe(526);
+    expect(realRateBp(300, 450)).toBe(-144);
+    expect(equivalentAnnualBp(50)).toBe(617);
+    expect(realRateBp(617, 450)).toBe(160);
+    const t = topic('ganho-real');
+    expect(t.short).toContain('(1 + rentabilidade) ÷ (1 + IPCA) - 1');
+    expect(t.paragraphs[2]).toContain('não diz o que escolher');
+    const set = withFacts('ganho-real');
+    for (const n of ['10%', '4,5%', '5,26%', '5,5%', '6,17%', '1,60%', '8,5%', '0,5%', '70%']) expect(set.has(canonicalNumber(n)!), n).toBe(true);
+  });
+
+  it('golpes: sinais comuns, consulta de registro e alertas da CVM e autorização no Banco Central', () => {
+    const t = topic('golpes-rentabilidade');
+    expect(t.paragraphs[2]).toContain('registro na CVM');
+    expect(t.paragraphs[2]).toContain('página de alertas da CVM');
+    expect(t.paragraphs[2]).toContain('instituições autorizadas a funcionar');
+    expect(equivalentAnnualBp(500)).toBe(7_959);
+    const urls = t.sources.flatMap((x) => (x.kind === 'oficial' ? [x.url] : []));
+    expect(urls).toContain('https://www.gov.br/cvm/pt-br/assuntos/protecao/alertas');
+    expect(urls).toContain('https://www.gov.br/cvm/pt-br/canais_atendimento/consultas-reclamacoes-denuncias/participantes-autorizados');
+  });
+
+  it('declaração: grupo 04 e grupo 08 confirmados; os outros códigos ficam para o programa da Receita; nenhum CPF nos exemplos', () => {
+    const t = topic('declarar-investimentos');
+    expect(t.paragraphs[1]).toContain('grupo 04');
+    expect(t.paragraphs[2]).toContain('grupo 08');
+    expect(t.paragraphs[2]).toContain('no programa da Receita');
+    for (const slug of SLUGS) expect(shown(slug), slug).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/);
+  });
+
+  it('sem recomendação nem julgamento e com linguagem neutra; relacionados nos dois sentidos com os temas que já existiam', () => {
+    for (const slug of SLUGS) expect(shown(slug), slug).not.toMatch(/\bmelhor(es)?\b|\bpior(es)?\b|vale a pena|oportunidade|\b(o|os|um) investidor(es)?\b|\bdeveria\b/i);
+    expect(relatedTopics('inflacao-ipca').map((t) => t.slug)).toContain('ganho-real');
+    expect(relatedTopics('selic').map((t) => t.slug)).toContain('titulos-publicos');
+    expect(relatedTopics('liquidez-risco-retorno').map((t) => t.slug)).toContain('golpes-rentabilidade');
+    expect(relatedTopics('fgc').map((t) => t.slug)).toEqual(['liquidez-risco-retorno', 'lci-lca', 'titulos-publicos']);
+    for (const slug of SLUGS) expect(relatedTopics(slug).length, slug).toBe(3);
   });
 });
 
@@ -573,7 +719,7 @@ describe('consulta ao catálogo', () => {
   it('seções na ordem da tela, com os temas publicados; Comece por aqui publicado', () => {
     const sections = topicsBySection();
     expect(sections.map((s) => s.section.title)).toEqual(['Usar o app da Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']);
-    expect(sections.map((s) => s.topics.length)).toEqual([8, 12, 13, 5, 7]);
+    expect(sections.map((s) => s.topics.length)).toEqual([8, 12, 13, 12, 7]);
     expect(LEARN_SECTIONS.length).toBe(5);
     expect([...START_HERE]).toEqual(['diferenca', 'juros-simples-compostos', 'gasto-fixo']);
     for (const slug of START_HERE) expect(isTopicPublished(slug)).toBe(true);

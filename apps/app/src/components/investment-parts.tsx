@@ -1,6 +1,9 @@
 import {
   INVESTMENT_TEXT,
+  REAL_GAIN_TEXT,
   compareLastClosedMonths,
+  indexOverMonths,
+  realRate,
   monthlyReturns,
   type InvestmentMovement,
   type IsoMonth,
@@ -90,6 +93,16 @@ export function InvestmentReturns({
               <Txt variant="label" color={color}>
                 {T.ipca(comparison.ipca)}
               </Txt>
+              {comparison.rate !== null && comparison.ipca !== null ? (
+                <Txt variant="label" color={color}>
+                  {REAL_GAIN_TEXT.real(realRate(comparison.rate, comparison.ipca))}
+                </Txt>
+              ) : null}
+              {indices.data?.poupanca && Object.keys(indices.data.poupanca).length > 0 ? (
+                <Txt variant="label" color={color}>
+                  {REAL_GAIN_TEXT.poupanca(indexOverMonths(indices.data.poupanca, comparison.months))}
+                </Txt>
+              ) : null}
               <Txt variant="caption" color={soft}>
                 {indices.data?.example ? T.indicesExample : T.indicesSource(indices.data?.fetchedOn ?? null)}
               </Txt>

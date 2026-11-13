@@ -1198,9 +1198,12 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(sitemap).toContain(`<url><loc>https://exemplo.test/aprender/</loc><lastmod>${maisRecente}</lastmod></url>`);
     // As páginas sem data própria ficam sem <lastmod> (nunca a data da geração).
     for (const semData of ['/', '/app/', '/empresas/', '/seguranca', '/calculadoras/', '/ajuda/', '/privacidade']) expect(sitemap, semData).toContain(`<url><loc>https://exemplo.test${semData}</loc></url>`);
+    // Nenhum <lastmod> depois do conteúdo mais novo: o post mais novo ou o tema revisado por último (os de investimentos, D-093, são
+    // de 13/11/2026, um dia depois do post de novembro; a data de revisão de um tema nunca passa de hoje, R6).
+    const conteudoMaisNovo = [REFERENCIA_DOS_POSTS, maisRecente!].sort().pop()!;
     for (const m of sitemap.matchAll(/<lastmod>([^<]*)<\/lastmod>/g)) {
       expect(conteudo.dataExiste(m[1]!), m[1]).toBe(true);
-      expect(m[1]! <= REFERENCIA_DOS_POSTS, `lastmod no futuro: ${m[1]}`).toBe(true);
+      expect(m[1]! <= conteudoMaisNovo, `lastmod no futuro: ${m[1]}`).toBe(true);
     }
     // Estável: outra geração, com a data de hoje como referência, dá o mesmo sitemap.
     expect(texto(gerarSite({ dados: PREENCHIDOS, referencia: '2030-01-01' }).arquivos.get('sitemap.xml'))).toBe(sitemap);

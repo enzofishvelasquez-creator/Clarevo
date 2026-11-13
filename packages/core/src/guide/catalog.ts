@@ -18,6 +18,8 @@ import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOAL_IMAGE_TEXT } from '../goal-images';
 import { GOALS_TEXT } from '../goals';
 import { INVESTMENT_TEXT } from '../investments';
+import { DETAILS_TEXT } from '../investment-details';
+import { ESTIMATE_TEXT } from '../investment-insights';
 import { LEVEL_NAME, LEVEL_TEXT, LEVEL_THRESHOLD } from '../levels';
 import { MONTH_CHECK_TEXT } from '../month-check';
 import { IMPORT_SUGGESTION_TEXT } from '../importar/sugestoes';
@@ -546,16 +548,35 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     where: [TAB.investimentos],
     steps: [
       `Toque em ${q(INVESTMENT_TEXT.newInvestment)}, dê um nome, escolha o tipo e informe quanto você aplicou até hoje e, se souber, quanto vale hoje.`,
-      `Quando colocar ou tirar dinheiro, abra o investimento e use ${q(INVESTMENT_TEXT.detail.addDeposit)} ou ${q(INVESTMENT_TEXT.detail.addWithdrawal)}.`,
+      `Quando colocar ou tirar dinheiro, abra o investimento e use ${q(INVESTMENT_TEXT.detail.addDeposit)} ou ${q(INVESTMENT_TEXT.detail.addWithdrawal)}. O que caiu na sua conta, como dividendos, entra em ${q(INVESTMENT_TEXT.detail.addIncome)}.`,
       `De tempos em tempos, use ${q(INVESTMENT_TEXT.detail.updateValue)} com o valor do extrato. É com ele que a Clarevo calcula quanto rendeu.`,
-      `O que o investimento pagou e caiu na sua conta, como dividendos, entra em ${q(INVESTMENT_TEXT.detail.addIncome)}.`,
-      'A rentabilidade compara os meses fechados com o CDI e o IPCA do mesmo período, com os dados públicos do Banco Central. Não é recomendação de investimento.',
-      'Aportes, resgates e rendimentos não entram em Pago nem em Recebido, e os investimentos ficam só no seu Pessoal.',
+      `Em ${q(DETAILS_TEXT.sectionTitle)}, conte qual é o investimento, onde está, como rende, a taxa, o vencimento e quando pode resgatar. Aparecem os próximos vencimentos, a divisão da carteira, a garantia do FGC e o imposto estimado.`,
+      `Com a taxa preenchida, o investimento mostra o valor pela taxa contratada, e ${q(ESTIMATE_TEXT.use)} registra esse valor só quando você toca. ${q('Resumo para a declaração')} junta os valores em 31/12 e os rendimentos do ano.`,
+      'A rentabilidade compara os meses fechados com o CDI e o IPCA do mesmo período, com os dados públicos do Banco Central. Não é recomendação de investimento. Aportes e resgates não entram em Pago nem em Recebido, e os investimentos ficam só no seu Pessoal.',
     ],
     screenName: TAB.investimentos,
     href: '/investimentos',
-    keywords: ['investimento', 'investimentos', 'investir', 'carteira', 'rendimento', 'rentabilidade', 'cdi', 'ipca', 'aporte', 'resgate', 'extrato', 'valor atual'],
-    routes: ['/investimentos', '/investimento/novo', '/investimento/[id]', '/investimento/[id]/editar', '/investimento/[id]/movimento'],
+    keywords: [
+      'investimento',
+      'investimentos',
+      'investir',
+      'carteira',
+      'rendimento',
+      'rentabilidade',
+      'cdi',
+      'ipca',
+      'aporte',
+      'resgate',
+      'extrato',
+      'valor atual',
+      'vencimento',
+      'fgc',
+      'imposto',
+      'declaração',
+      'proventos',
+      'dividendos',
+    ],
+    routes: ['/investimentos', '/investimento/novo', '/investimento/[id]', '/investimento/[id]/editar', '/investimento/[id]/movimento', '/investimento/declaracao', '/investimento/comparar'],
     screenshot: '540_investimentos.png',
   },
   {

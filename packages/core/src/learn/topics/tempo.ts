@@ -31,7 +31,7 @@ export const TEMPO_TOPICS: Topic[] = [
       { text: 'de 1,5% a 4,5%', source: 3 },
     ],
     keywords: ['inflação', 'preços', 'poder de compra', 'índice de preços', 'meta de inflação'],
-    related: ['selic', 'juros-simples-compostos', 'contas-do-ano'],
+    related: ['selic', 'ganho-real', 'juros-simples-compostos'],
     sources: [
       oficial('IBGE', 'IBGE Explica: Inflação', 'https://www.ibge.gov.br/explica/inflacao.php', 'Definição de inflação; o IPCA é o índice oficial; a inflação pessoal pode ser maior ou menor que o IPCA'),
       oficial(
@@ -81,7 +81,7 @@ export const TEMPO_TOPICS: Topic[] = [
     hypotheses: 'Taxas fictícias, com capitalização mensal; não são a Selic atual nem a taxa de nenhuma instituição.',
     facts: [],
     keywords: ['taxa básica', 'copom', 'juros básicos', 'spread', 'política monetária'],
-    related: ['inflacao-ipca', 'taxa-mes-ano', 'cet'],
+    related: ['inflacao-ipca', 'titulos-publicos', 'taxa-mes-ano'],
     sources: [
       bcb('Relatório de Administração do Selic 2023: Taxa Selic', 'https://www3.bcb.gov.br/rasselic2023/taxa-selic', 'Taxa básica de juros, que influencia outras taxas; principal instrumento de política monetária para controlar a inflação'),
       bcb(
@@ -130,7 +130,7 @@ export const TEMPO_TOPICS: Topic[] = [
     hypotheses: 'Exemplo fictício, sem taxas de venda.',
     facts: [],
     keywords: ['liquidez', 'risco', 'retorno', 'rentabilidade', 'resgate', 'fraude'],
-    related: ['reserva-imprevistos', 'fgc', 'o-que-a-clarevo-nao-faz'],
+    related: ['reserva-imprevistos', 'fgc', 'golpes-rentabilidade'],
     sources: [
       cvm(
         'Liquidez',
@@ -182,7 +182,7 @@ export const TEMPO_TOPICS: Topic[] = [
       { text: 'R$ 1.000.000,00', source: 1 },
     ],
     keywords: ['fundo garantidor', 'garantia', 'liquidação', 'quebra de banco', 'limite da garantia'],
-    related: ['liquidez-risco-retorno', 'selic'],
+    related: ['liquidez-risco-retorno', 'lci-lca', 'titulos-publicos'],
     sources: [
       mercado('FGC', 'Sobre a garantia FGC', 'https://www.fgc.org.br/en/sobre-garantia-fgc', 'R$ 250.000,00 por pessoa, por instituição ou conglomerado; o site lista o que é e o que não é coberto'),
       mercado(

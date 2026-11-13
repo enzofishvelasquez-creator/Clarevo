@@ -262,3 +262,33 @@ export function incomeTaxQuotas(taxCents, quotas) {
         throw new RangeError(`quotas demais para o imposto: ${quotas}`);
     return sharesCents(taxCents, Array.from({ length: Number(n) }, () => 1));
 }
+export function fixedIncomeTaxBp(days) {
+    const d = int(days, 'dias');
+    if (d <= 180n)
+        return 2_250;
+    if (d <= 360n)
+        return 2_000;
+    if (d <= 720n)
+        return 1_750;
+    return 1_500;
+}
+export function fixedIncomeTaxCents(yieldCents, days) {
+    return toNumber(roundDivBig(int(yieldCents, 'rendimento') * BigInt(fixedIncomeTaxBp(days)), BP));
+}
+export function shareOfCents(valueCents, bp) {
+    return toNumber(roundDivBig(int(valueCents, 'valor') * int(bp, 'alíquota'), BP));
+}
+export const DIVIDEND_WITHHOLDING_BP = 1_000;
+export const DIVIDEND_WITHHOLDING_ABOVE_CENTS = 5_000_000;
+export function dividendWithholdingCents(monthTotalCents) {
+    const total = int(monthTotalCents, 'total do mês');
+    if (total <= BigInt(DIVIDEND_WITHHOLDING_ABOVE_CENTS))
+        return 0;
+    return toNumber(roundDivBig(total * BigInt(DIVIDEND_WITHHOLDING_BP), BP));
+}
+export const JCP_WITHHOLDING_BP = 1_750;
+export function realRateBp(nominalBp, inflationBp) {
+    const n = BP + int(nominalBp, 'rentabilidade');
+    const i = BP + int(inflationBp, 'inflação');
+    return toNumber(roundDivBig(n * BP, i) - BP);
+}

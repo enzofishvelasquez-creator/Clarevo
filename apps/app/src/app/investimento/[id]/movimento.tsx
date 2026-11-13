@@ -13,7 +13,11 @@ import {
   parseBRL,
   parseDateBR,
   centsToInput,
+  INCOME_KIND_LABEL,
+  INCOME_TEXT,
+  INVESTMENT_INCOME_KINDS,
   type Investment,
+  type InvestmentIncomeKind,
   type InvestmentMovement,
   type InvestmentMovementKind,
 } from '@clarevo/core';
@@ -27,8 +31,9 @@ import { ConfirmDialog } from '@/components/dialog';
 import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
+import { ChoiceGroup } from '@/components/series-parts';
 import { ErrorState, LoadingState } from '@/components/states';
-import { Button, Card, Screen, TextField, Txt } from '@/components/ui';
+import { Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useInvalidateInvestments, useInvestment, useInvestmentMovements } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
@@ -39,7 +44,8 @@ const KINDS: readonly InvestmentMovementKind[] = ['aporte', 'resgate', 'rendimen
 
 /**
  * Movimento de um investimento (D-093): /investimento/<id>/movimento?tipo=aporte|resgate|rendimento|valor para registrar, ou
- * ?movimento=<id> para alterar ou excluir. Antes de enviar, confere o saldo dia a dia (I1), como o banco.
+ * ?movimento=<id> para alterar ou excluir. Antes de enviar, confere o saldo dia a dia (I1), como o banco. No rendimento recebido, o tipo
+ * (juros ou cupom, dividendos, JCP, rendimento de FII ou outro, D-099) alimenta os proventos e o resumo para a declaração.
  */
 export default function InvestimentoMovimentoScreen() {
   const { id, tipo, movimento } = useLocalSearchParams<{ id: string; tipo?: string; movimento?: string }>();
@@ -90,10 +96,12 @@ function MovementForm({
     amountText: existing ? centsToInput(existing.amountCents) : '',
     dateText: formatDateBR(existing?.occurredOn ?? today),
     note: existing?.note ?? '',
+    incomeKind: existing?.incomeKind ?? (kind === 'rendimento' && (investment.subkind === 'fii' || investment.subkind === 'fiagro') ? 'fii' : null),
   };
   const [amountText, setAmountText] = useState(first.amountText);
   const [dateText, setDateText] = useState(first.dateText);
   const [note, setNote] = useState(first.note);
+  const [incomeKind, setIncomeKind] = useState<InvestmentIncomeKind | null>(first.incomeKind);
   const [errors, setErrors] = useState<{ amountText?: string; dateText?: string; note?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -102,7 +110,7 @@ function MovementForm({
   const [deleteKey] = useState(() => newOperationKey());
   const amountRef = useRef<TextInput>(null);
   const dateRef = useRef<TextInput>(null);
-  const dirty = amountText !== first.amountText || dateText !== first.dateText || note !== first.note;
+  const dirty = amountText !== first.amountText || dateText !== first.dateText || note !== first.note || incomeKind !== first.incomeKind;
   const guard = useLeaveGuard(dirty && !busy, `/investimento/${investment.id}`);
   const closed = investment.status !== 'ativo';
   const back = () => guard.leave(() => (router.canGoBack() ? router.back() : router.replace(`/investimento/${investment.id}`)));
@@ -153,7 +161,7 @@ function MovementForm({
     setErrors({});
     setBusy(true);
     try {
-      const input = { amountCents: amountCents!, occurredOn: occurredOn!, note: trimmed };
+      const input = { amountCents: amountCents!, occurredOn: occurredOn!, note: trimmed, incomeKind: kind === 'rendimento' ? incomeKind : null };
       if (existing) await repo.updateInvestmentMovement(key, existing.id, existing.version, input);
       else await repo.addInvestmentMovement(key, investment.id, kind, input);
       invalidate();
@@ -228,6 +236,18 @@ function MovementForm({
             }}
             error={errors.dateText}
           />
+          {kind === 'rendimento' ? (
+            <ChoiceGroup label="Tipo do rendimento (opcional)" hint={INCOME_TEXT.kindHint}>
+              {INVESTMENT_INCOME_KINDS.map((k) => (
+                <Chip key={k} label={INCOME_KIND_LABEL[k]} selected={incomeKind === k} onPress={() => setIncomeKind(incomeKind === k ? null : k)} />
+              ))}
+            </ChoiceGroup>
+          ) : null}
+          {kind === 'rendimento' && incomeKind === 'jcp' ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {INCOME_TEXT.jcpNote}
+            </Txt>
+          ) : null}
           <TextField label={M.noteLabel} value={note} maxLength={INVESTMENT_NOTE_MAX} onChangeText={setNote} error={errors.note} />
         </Card>
         {existing && !closed ? <Button label={M.delete} icon={Trash2} tone="ghost" onPress={() => setConfirmDelete(true)} /> : null}

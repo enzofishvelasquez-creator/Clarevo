@@ -218,6 +218,27 @@ import { SEU_MES_TEXT, WIDGET_TEXT, buildSeuMes, buildWidgetContent, loadInvoice
 const FORBIDDEN =
   /\b(recomendamos|recomendo|invista|aplique|tesouro|cdb|lci|lca|caixinha|cofrinho)\b|fundo de investimento|rentabilidade garantida|rendimento garantido|retorno garantido|enriquec|faz(er|endo)?\s+sentido|[\u2013\u2014]/i;
 
+/**
+ * Temas de investimentos de Aprender (D-093, aba Investir; os nomes oficiais dos títulos públicos são decisão do Enzo): cada um
+ * explica, sem recomendar, regras públicas de produtos que FORBIDDEN e LEARN_FORBIDDEN proíbem no resto da Clarevo. Só os nomes
+ * listados para o tema deixam de contar, e só nos textos desse tema (e no arquivo learn/topics/investimentos.ts, onde eles moram);
+ * o resto das listas continua valendo para eles. Tema novo de investimentos entra aqui com os nomes que explica.
+ */
+const INVEST_TOPIC_TERMS: Readonly<Record<string, RegExp>> = {
+  'ir-investimentos': /\bcdb\b|\blci\b|\blca\b|poupan[cç]a|deb[eê]ntures incentivadas|fundos (de curto prazo|de a[cç][õo]es|imobili[aá]rios)/gi,
+  'titulos-publicos': /\btesouro\b/gi,
+  'lci-lca': /\blci\b|\blca\b/gi,
+  proventos: /fundos? imobili[aá]rios?/gi,
+  'declarar-investimentos': /poupan[cç]a|\bcdb\b|\blci\b|\blca\b|criptoativos?|fundos imobili[aá]rios/gi,
+  'ganho-real': /poupan[cç]a/gi,
+};
+
+/** Texto de um tema sem os nomes de produto que esse tema pode citar (INVEST_TOPIC_TERMS); outros temas: o texto inteiro. */
+const withoutInvestTerms = (text: string, slug: string): string => {
+  const terms = INVEST_TOPIC_TERMS[slug];
+  return terms ? text.replace(terms, '') : text;
+};
+
 describe('textos do core', () => {
   it('a lista não reprova os avisos obrigatórios e reprova o que deve', () => {
     expect(FORBIDDEN.test('Não é promessa de rendimento nem recomendação de investimento.')).toBe(false);
@@ -526,8 +547,11 @@ describe('textos das calculadoras e de "Achar tudo"', () => {
     expect(files.length).toBeGreaterThan(15);
     for (const slug of ['parcelado-ou-a-vista', 'quitar-antes', 'dividir-contas']) expect(files.some((f) => f.endsWith(`${slug}.ts`))).toBe(true);
     const bad = files.filter((f) => {
-      // Endereços de fontes (learn/topics) não são texto exibido: "cuidados-ao-investir" é parte de uma URL oficial.
-      const text = readFileSync(f, 'utf8').replace(/'https:\/\/[^'\s]+'/g, "''");
+      // Endereços de fontes (learn/topics) não são texto exibido: "cuidados-ao-investir" é parte de uma URL oficial. O slug `lci-lca`
+      // (D-093) também não é texto exibido. No arquivo dos temas de investimentos, os nomes de produto que esses temas podem citar
+      // (INVEST_TOPIC_TERMS) ficam fora, inclusive nos títulos das fontes oficiais ("Tesouro Nacional").
+      let text = readFileSync(f, 'utf8').replace(/'https:\/\/[^'\s]+'/g, "''").replace(/'lci-lca'/g, "''");
+      if (f === join(CORE_SRC, 'learn', 'topics', 'investimentos.ts')) text = text.replace(new RegExp(Object.values(INVEST_TOPIC_TERMS).map((r) => r.source).join('|'), 'gi'), '');
       return FORBIDDEN.test(text) || JUDGMENT.test(text);
     });
     expect(bad.map((f) => f.slice(CORE_SRC.length))).toEqual([]);
@@ -1363,7 +1387,7 @@ describe('textos do app', () => {
     if (existsSync(libTopics)) expect(readFileSync(libTopics, 'utf8')).not.toMatch(FORBIDDEN);
     // O catálogo certo, com os temas do Ciclo A: a conferência não passa por estar vazia.
     for (const slug of ['gasto-fixo', 'estimativa', 'quitar-antes']) expect(TOPICS.map((t) => t.slug)).toContain(slug);
-    for (const t of TOPICS) for (const text of topicFieldTexts(t)) expect(text, `${t.slug}: ${text}`).not.toMatch(FORBIDDEN);
+    for (const t of TOPICS) for (const text of topicFieldTexts(t)) expect(withoutInvestTerms(text, t.slug), `${t.slug}: ${text}`).not.toMatch(FORBIDDEN);
   });
 
   it('telas e componentes', { timeout: 30_000 }, () => {
@@ -1470,9 +1494,24 @@ describe('textos de Aprender', () => {
     const texts = TOPICS.flatMap((t) => topicFieldTexts(t).map((text) => ({ slug: t.slug, text })));
     expect(texts.length).toBeGreaterThan(300);
     const bad = texts.filter(
-      ({ slug, text }) => FORBIDDEN.test(text) || FORBIDDEN_EXPANDED.test(text) || JUDGMENT.test(text) || learnForbiddenMatch(text, slug) !== null,
+      ({ slug, text }) =>
+        FORBIDDEN.test(withoutInvestTerms(text, slug)) || FORBIDDEN_EXPANDED.test(text) || JUDGMENT.test(text) || learnForbiddenMatch(withoutInvestTerms(text, slug), slug) !== null,
     );
     expect(bad).toEqual([]);
+  });
+
+  it('temas de investimentos (D-093): os nomes de produto valem só no tema que os explica, e o resto das listas continua valendo', () => {
+    // Cada tema da lista existe, está publicado e é da seção "Dinheiro no tempo".
+    for (const slug of Object.keys(INVEST_TOPIC_TERMS)) expect(TOPICS.find((t) => t.slug === slug), slug).toMatchObject({ section: 'tempo', status: 'publicado' });
+    expect(FORBIDDEN.test(withoutInvestTerms('Tesouro Selic e Tesouro IPCA+', 'titulos-publicos'))).toBe(false);
+    expect(FORBIDDEN.test(withoutInvestTerms('Tesouro Selic', 'selic'))).toBe(true);
+    expect(FORBIDDEN.test(withoutInvestTerms('Tesouro Selic', 'lci-lca'))).toBe(true);
+    expect(learnForbiddenMatch(withoutInvestTerms('a poupança como referência', 'ganho-real'), 'ganho-real')).toBeNull();
+    expect(learnForbiddenMatch(withoutInvestTerms('a poupança como referência', 'inflacao-ipca'), 'inflacao-ipca')).toBe('poupança');
+    // Nome de produto não abre exceção para o resto: recomendação, marca e julgamento continuam proibidos no tema.
+    expect(FORBIDDEN.test(withoutInvestTerms('Recomendamos o Tesouro Selic', 'titulos-publicos'))).toBe(true);
+    expect(learnForbiddenMatch(withoutInvestTerms('LCI do Itaú', 'lci-lca'), 'lci-lca')).toBe('Itaú');
+    expect(JUDGMENT.test(withoutInvestTerms('vale a pena a poupança', 'ganho-real'))).toBe(true);
   });
 
   it('seções e LEARN_UI_TEXT (strings e funções com entradas de exemplo)', () => {

@@ -32,6 +32,7 @@ export * from './investments';
 export * from './investment-details';
 export * from './investment-tax';
 export * from './investment-insights';
+export * from './investment-compare';
 export * from './levels';
 export * from './savings';
 export * from './signup-source';

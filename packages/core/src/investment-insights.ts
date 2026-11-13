@@ -471,7 +471,8 @@ export const ESTIMATE_TEXT = {
 
 /**
  * Grupo e código de Bens e Direitos pelo tipo exato, para CONFERIR no programa da Receita (as tabelas mudam de um ano para outro e
- * divergem entre guias; revisão anual). Null quando o código depende do caso.
+ * divergem entre guias; revisão anual). Os códigos vêm de guias de corretoras e reportagens (docs/49, fonte 37): a página oficial da
+ * Receita não abriu na pesquisa de 13/11/2026, por isso a tela diz "como costuma aparecer nos guias". Null quando o código depende do caso.
  */
 export const DECLARATION_CODES: Readonly<Partial<Record<InvestmentSubkind, { group: string; code: string | null }>>> = {
   poupanca: { group: '04', code: '01' },
@@ -594,9 +595,14 @@ export const DECLARATION_TEXT = {
   title: (year: number) => `Para a declaração de ${year + 1}`,
   subtitle: (year: number) => `Ano de ${year}. Um resumo para conferir com os informes de rendimentos, não a declaração pronta.`,
   code: (it: DeclarationItem) =>
-    it.group === null ? 'Grupo e código: confira no programa da Receita.' : it.code === null ? `Grupo ${it.group}; o código depende do ativo.` : `Grupo ${it.group}, código ${it.code} (confira no programa da Receita).`,
-  values: (it: DeclarationItem, year: number) =>
-    `Valor registrado em 31/12/${year - 1}: ${it.previousCents === null ? 'sem registro' : formatBRL(it.previousCents)}. Em 31/12/${year}: ${it.currentCents === null ? 'sem registro' : formatBRL(it.currentCents)}.`,
+    it.group === null
+      ? 'Grupo e código: confira no programa da Receita.'
+      : it.code === null
+        ? `Grupo ${it.group}; o código depende do ativo. Confira no programa da Receita.`
+        : `Grupo ${it.group}, código ${it.code}, como costuma aparecer nos guias. Confira no programa da Receita.`,
+  /** No ano de hoje, o 31/12 ainda não chegou: a segunda parte é o valor de hoje. */
+  values: (it: DeclarationItem, year: number, current = false) =>
+    `Valor registrado em 31/12/${year - 1}: ${it.previousCents === null ? 'sem registro' : formatBRL(it.previousCents)}. ${current ? 'Hoje' : `Em 31/12/${year}`}: ${it.currentCents === null ? 'sem registro' : formatBRL(it.currentCents)}.`,
   estimated: (year: number) => `Sem valor atualizado em dezembro de ${year}: o valor de 31/12 é o último registrado mais os aportes e resgates.`,
   costBased: 'A declaração usa o custo de compra, que está no informe da corretora, não o valor de hoje.',
   pgbl: 'PGBL: as contribuições vão em Pagamentos efetuados, não em Bens e Direitos.',
