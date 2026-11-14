@@ -392,19 +392,33 @@ export function estimateValueByRate(inv: Rate, movements: readonly MovementLike[
   const start = flows.reduce((a, f) => (f.on < a ? f.on : a), flows[0]!.on);
   let factorOf: (on: IsoDate) => number;
   if (index === 'poupanca') {
+    // Dia do aniversário: o do depósito; para a base (o valor do extrato), o do primeiro aporte (revisão de 13/11/2026: antes, a base
+    // virava um depósito novo no dia do extrato). Dias 29, 30 e 31 fazem aniversário no dia 1 do mês seguinte (regra da poupança).
+    const firstDeposit = live.filter((m) => m.kind === 'aporte').reduce<IsoDate | null>((a, m) => (a === null || m.occurredOn < a ? m.occurredOn : a), null);
+    const baseDay = Number((firstDeposit ?? base?.occurredOn ?? start).slice(8, 10));
+    /** O k-ésimo aniversário de um depósito feito em `on` (dias 29 a 31: a partir do dia 1 do mês seguinte). */
+    const depositAnniversary = (on: IsoDate, k: number): IsoDate =>
+      Number(on.slice(8, 10)) > 28 ? (`${addMonths(monthOf(on), k + 1)}-01` as IsoDate) : addMonthsToDate(on, k);
+    /** O k-ésimo aniversário depois de `from` para um dinheiro com aniversário no dia `day` (a base do extrato). */
+    const baseAnniversary = (from: IsoDate, day: number, k: number): IsoDate => {
+      const inMonth = (m: IsoMonth): IsoDate => (day > 28 ? (`${m}-01` as IsoDate) : (`${m}-${String(day).padStart(2, '0')}` as IsoDate));
+      let m = monthOf(from);
+      if (inMonth(m) <= from) m = addMonths(m, 1);
+      return inMonth(addMonths(m, k - 1));
+    };
     factorOf = (on) => {
       let f = 1;
-      // Depósito nos dias 29, 30 ou 31: o aniversário é o dia 1 do mês seguinte (regra da poupança).
-      const late = Number(on.slice(8, 10)) > 28;
-      const anniversaryOf = (k: number): IsoDate => (late ? (`${addMonths(monthOf(on), k + 1)}-01` as IsoDate) : addMonthsToDate(on, k));
+      const isBase = base !== null && on === base.occurredOn;
+      let prev: IsoDate = on;
       for (let k = 1; ; k += 1) {
-        const anniversary = anniversaryOf(k);
+        const anniversary = isBase ? baseAnniversary(on, baseDay, k) : depositAnniversary(on, k);
         if (anniversary > today) break;
-        const periodMonth = monthOf(k === 1 ? on : anniversaryOf(k - 1));
+        const periodMonth = monthOf(prev);
         const mv = monthValue(series!, periodMonth, lastMonth);
         if (!mv) return Number.NaN;
         if (mv.projected) noteProjection(periodMonth);
         f *= 1 + mv.v / 100;
+        prev = anniversary;
       }
       return f;
     };

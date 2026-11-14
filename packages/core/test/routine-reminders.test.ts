@@ -31,7 +31,7 @@ import {
 const CTX = 'ctx-pessoal';
 const OTHER = 'ctx-familia';
 const TODAY = '2026-11-06';
-const ALL: RoutineReminderChoices = { gastos: true, recebimentos: true, mapa: true, ausencia: true, aporte: false, vencimentos: false, atualizar: false };
+const ALL: RoutineReminderChoices = { gastos: true, recebimentos: true, mapa: true, ausencia: true, aporte: false, vencimentos: false, atualizar: false, aporte_investimentos: false };
 
 let seq = 0;
 function registro(kind: 'despesa' | 'receita', occurredOn: string, contextId = CTX): FinancialRecord {
@@ -60,8 +60,8 @@ const ids = (choices: RoutineReminderChoices, records: FinancialRecord[] = [], l
   routineReminderPlan(choices, records, lastWriteOn ? { lastWriteOn } : null, TODAY, DEFAULT_ROUTINE_REMINDER_HOUR, { nowMinutes, contextId: CTX }).map((i) => i.id);
 
 describe('lembretes do dia a dia (D-087): escolhas e horários', () => {
-  it('sete avisos (o do aporte é da D-093; vencimentos e atualizar, da D-099), cada um com interruptor, texto e endereço; horários 12h, 18h, 20h e 21h, padrão 20h', () => {
-    expect(ROUTINE_REMINDER_KINDS).toEqual(['gastos', 'recebimentos', 'mapa', 'ausencia', 'aporte', 'vencimentos', 'atualizar']);
+  it('oito avisos (o do aporte é da D-093; vencimentos, atualizar e o aporte nos investimentos, da D-099), cada um com interruptor, texto e endereço; horários 12h, 18h, 20h e 21h, padrão 20h', () => {
+    expect(ROUTINE_REMINDER_KINDS).toEqual(['gastos', 'recebimentos', 'mapa', 'ausencia', 'aporte', 'vencimentos', 'atualizar', 'aporte_investimentos']);
     expect(ROUTINE_REMINDER_HOURS).toEqual([12, 18, 20, 21]);
     expect(DEFAULT_ROUTINE_REMINDER_HOUR).toBe(20);
     expect(isRoutineReminderHour(20)).toBe(true);
@@ -80,7 +80,7 @@ describe('lembretes do dia a dia (D-087): escolhas e horários', () => {
   it('as escolhas guardadas no aparelho: só true liga; faltando, inválido ou lixo fica desligado', () => {
     expect(parseRoutineReminderChoices(undefined)).toEqual(NO_ROUTINE_REMINDERS);
     expect(parseRoutineReminderChoices('gastos')).toEqual(NO_ROUTINE_REMINDERS);
-    expect(parseRoutineReminderChoices({ gastos: true, mapa: 'sim', ausencia: 1, extra: true })).toEqual({ gastos: true, recebimentos: false, mapa: false, ausencia: false, aporte: false, vencimentos: false, atualizar: false });
+    expect(parseRoutineReminderChoices({ gastos: true, mapa: 'sim', ausencia: 1, extra: true })).toEqual({ gastos: true, recebimentos: false, mapa: false, ausencia: false, aporte: false, vencimentos: false, atualizar: false, aporte_investimentos: false });
     expect(anyRoutineReminder(NO_ROUTINE_REMINDERS)).toBe(false);
     expect(anyRoutineReminder({ ...NO_ROUTINE_REMINDERS, ausencia: true })).toBe(true);
   });
@@ -215,7 +215,7 @@ describe('lembretes do dia a dia (D-087): o plano', () => {
 });
 
 describe('lembretes dos investimentos (D-099)', () => {
-  const ONLY = { gastos: false, recebimentos: false, mapa: false, ausencia: false, aporte: false, vencimentos: true, atualizar: true } as const;
+  const ONLY = { gastos: false, recebimentos: false, mapa: false, ausencia: false, aporte: false, vencimentos: true, atualizar: true, aporte_investimentos: false } as const;
   it('vencimento: 7 dias antes e no dia, sem o nome; carência com texto próprio; atualizar: dia 1, só com algum sem valor no mês', () => {
     const plan = routineReminderPlan(ONLY, [], null, '2026-11-06', 20, {
       investments: { maturities: ['2026-11-20', '2026-11-20', '2026-11-08'], releases: ['2027-03-01', '2026-11-08'], hasActive: true, missingThisMonth: true },

@@ -73,6 +73,7 @@ const inv = (p: Partial<Investment> & { id: string }): Investment => ({
   valueCents: 0,
   lastValueOn: null,
   firstMovementOn: null,
+  goalId: null,
   ...EMPTY_INVESTMENT_DETAILS,
   ...p,
 });
@@ -231,6 +232,12 @@ describe('imposto estimado (D-099, item 7)', () => {
     expect(e.rates).toEqual({ min: 0.15, max: 0.225 });
   });
 
+  it('todo o aplicado já saiu e ficou só rendimento: conta pela idade do último aporte', () => {
+    const e = estimateRegressiveNet([mv('aporte', 100_000, '2025-01-02'), mv('valor', 110_000, '2026-01-02'), mv('resgate', 110_000, '2026-01-03'), mv('valor', 2_000, TODAY)], TODAY);
+    // 678 dias desde o aporte: 17,5%.
+    expect(e).toMatchObject({ grossCents: 2_000, gainCents: 2_000, irCents: 350, netCents: 1_650, rates: { min: 0.175, max: 0.175 } });
+  });
+
   it('sem valor atualizado ou com perda: nada a estimar', () => {
     expect(estimateRegressiveNet([mv('aporte', 1_000_000, '2025-01-01')], TODAY)).toMatchObject({ gainCents: 0, irCents: 0, netCents: 1_000_000, rates: null });
     expect(estimateRegressiveNet([mv('aporte', 1_000_000, '2025-01-01'), mv('valor', 900_000, TODAY)], TODAY)).toMatchObject({ irCents: 0, netCents: 900_000 });
@@ -376,6 +383,10 @@ describe('valor pela taxa contratada (D-099, item 8)', () => {
     // Depósito no dia 31: aniversário no dia 1 (01/09, 01/10 e 01/11).
     expect(estimateValueByRate({ indexKind: 'poupanca', rateBp: null }, [mv('aporte', 100_000, '2026-07-31')], indices, '2026-10-31')!.valueCents).toBe(Math.round(100_000 * 1.006 ** 2));
     expect(estimateValueByRate({ indexKind: 'poupanca', rateBp: null }, [mv('aporte', 100_000, '2026-07-31')], indices, '2026-11-01')!.valueCents).toBe(Math.round(100_000 * 1.006 ** 3));
+    // Com o valor do extrato como base, o aniversário segue o dia do primeiro aporte (10), não o dia do extrato (25).
+    const withBase = [mv('aporte', 100_000, '2026-05-10'), mv('valor', 102_000, '2026-08-25')];
+    expect(estimateValueByRate({ indexKind: 'poupanca', rateBp: null }, withBase, indices, '2026-10-12')!.valueCents).toBe(Math.round(102_000 * 1.006 ** 2));
+    expect(estimateValueByRate({ indexKind: 'poupanca', rateBp: null }, withBase, indices, '2026-10-09')!.valueCents).toBe(Math.round(102_000 * 1.006));
   });
 });
 

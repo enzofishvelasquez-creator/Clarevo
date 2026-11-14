@@ -7,11 +7,20 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader } from '@/components/header';
 import { investmentCaption } from '@/components/investment-ficha';
 import { InvestmentReturns, InvestmentTotalsLines, groupByInvestment } from '@/components/investment-parts';
-import { AllocationCard, EvolutionCard, FgcCard, FiscalCalendarCard, IncomeCard, InvestmentLinks, UpcomingDatesCard } from '@/components/investment-portfolio';
+import {
+  AllocationCard,
+  EvolutionCard,
+  FgcCard,
+  FiscalCalendarCard,
+  IncomeCard,
+  InvestmentLinks,
+  InvestmentPlanCard,
+  UpcomingDatesCard,
+} from '@/components/investment-portfolio';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
-import { useContextInvestmentMovements, useInvestments, useSpace, useWorkOf } from '@/state/data';
+import { useContextInvestmentMovements, useInvestmentPlan, useInvestments, useSpace, useWorkOf } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -29,6 +38,8 @@ export default function InvestimentosScreen() {
   const contextId = space_.data?.personalContextId;
   const list = useInvestments(contextId);
   const movements = useContextInvestmentMovements(contextId);
+  // Plano de aportes (D-099, item 12): uma falha ao ler o plano não tira a aba (o card só some).
+  const plan = useInvestmentPlan(contextId);
   const [notice] = useFlash();
   const canWrite = personal.data?.canWrite ?? true;
   const all = list.data ?? [];
@@ -67,6 +78,7 @@ export default function InvestimentosScreen() {
             <>
               {/* A carteira é só dos ativos: os encerrados saem do total e da rentabilidade (docs/45, seção 3.2). */}
               <Summary active={active} movements={movements.data} />
+              <InvestmentPlanCard plan={plan.data ?? null} movements={movements.data} />
               <UpcomingDatesCard items={active} />
               <View style={{ gap: space[3] }}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -82,7 +94,7 @@ export default function InvestimentosScreen() {
               <FgcCard items={active} />
               <IncomeCard movements={movements.data} />
               <FiscalCalendarCard items={active} />
-              <InvestmentLinks />
+              <InvestmentLinks showPlan={canWrite && plan.isSuccess && plan.data === null} />
               {closed.length > 0 ? (
                 <View style={{ gap: space[3] }}>
                   <Txt variant="title" accessibilityRole="header" aria-level={2}>

@@ -126,7 +126,10 @@ function NativeFeatures() {
       if (e.type === 'updated' && e.action.type === 'success') schedule();
     });
     const queries = qc.getQueryCache().subscribe((e) => {
-      if (e.type === 'updated' && e.action.type === 'success' && e.query.queryKey[0] === 'seriesSync') schedule();
+      // As escritas de investimentos vão direto ao repositório: os movimentos da carteira recarregados (depois de um aporte, por exemplo)
+      // reagendam os avisos dos investimentos, como o do aporte do plano (D-099, item 12).
+      const k = e.query.queryKey;
+      if (e.type === 'updated' && e.action.type === 'success' && (k[0] === 'seriesSync' || (k[0] === 'investments' && k[1] === 'context-movements'))) schedule();
     });
     return () => {
       appState.remove();

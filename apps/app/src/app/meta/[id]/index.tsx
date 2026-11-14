@@ -32,6 +32,7 @@ import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { GoalImageView } from '@/components/goal-image';
 import { GoalProgress } from '@/components/goal-progress';
+import { LinkedInvestmentsCard } from '@/components/linked-investments';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ErrorState } from '@/components/states';
@@ -387,6 +388,8 @@ function GoalBody({
             </>
           )}
         </View>
+
+        <LinkedInvestmentsCard goal={goal} />
 
         <Card style={{ gap: space[1] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>

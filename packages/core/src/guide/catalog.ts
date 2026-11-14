@@ -18,6 +18,7 @@ import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOAL_IMAGE_TEXT } from '../goal-images';
 import { GOALS_TEXT } from '../goals';
 import { INVESTMENT_TEXT } from '../investments';
+import { INVESTMENT_PLAN_TEXT } from '../investment-plan';
 import { DETAILS_TEXT } from '../investment-details';
 import { ESTIMATE_TEXT } from '../investment-insights';
 import { LEVEL_NAME, LEVEL_TEXT, LEVEL_THRESHOLD } from '../levels';
@@ -547,11 +548,11 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Acompanha o que você já investe, com o valor que aparece no seu extrato: quanto aplicou, quanto vale, quanto rendeu e a comparação com o CDI e o IPCA.',
     where: [TAB.investimentos],
     steps: [
-      `Toque em ${q(INVESTMENT_TEXT.newInvestment)}, dê um nome, escolha o tipo e informe quanto você aplicou até hoje e, se souber, quanto vale hoje.`,
+      `Toque em ${q(INVESTMENT_TEXT.newInvestment)}, dê um nome, escolha o tipo e informe quanto você aplicou até hoje e, se souber, quanto vale hoje. Se quiser, diga para que é o dinheiro: uma meta ou a reserva, só como informação.`,
       `Quando colocar ou tirar dinheiro, abra o investimento e use ${q(INVESTMENT_TEXT.detail.addDeposit)} ou ${q(INVESTMENT_TEXT.detail.addWithdrawal)}. O que caiu na sua conta, como dividendos, entra em ${q(INVESTMENT_TEXT.detail.addIncome)}.`,
       `De tempos em tempos, use ${q(INVESTMENT_TEXT.detail.updateValue)} com o valor do extrato. É com ele que a Clarevo calcula quanto rendeu.`,
       `Em ${q(DETAILS_TEXT.sectionTitle)}, conte qual é o investimento, onde está, como rende, a taxa, o vencimento e quando pode resgatar. Aparecem os próximos vencimentos, a divisão da carteira, a garantia do FGC e o imposto estimado.`,
-      `Com a taxa preenchida, o investimento mostra o valor pela taxa contratada, e ${q(ESTIMATE_TEXT.use)} registra esse valor só quando você toca. ${q('Resumo para a declaração')} junta os valores em 31/12 e os rendimentos do ano.`,
+      `Com a taxa preenchida, o investimento mostra o valor pela taxa contratada, e ${q(ESTIMATE_TEXT.use)} registra esse valor só quando você toca. ${q(INVESTMENT_PLAN_TEXT.cardTitle)} mostra o aportado do mês ao lado do que você planejou, e ${q('Resumo para a declaração')} junta os valores em 31/12 e os rendimentos do ano.`,
       'A rentabilidade compara os meses fechados com o CDI e o IPCA do mesmo período, com os dados públicos do Banco Central. Não é recomendação de investimento. Aportes e resgates não entram em Pago nem em Recebido, e os investimentos ficam só no seu Pessoal.',
     ],
     screenName: TAB.investimentos,
@@ -575,8 +576,19 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       'declaração',
       'proventos',
       'dividendos',
+      'plano de aportes',
+      'aporte mensal',
     ],
-    routes: ['/investimentos', '/investimento/novo', '/investimento/[id]', '/investimento/[id]/editar', '/investimento/[id]/movimento', '/investimento/declaracao', '/investimento/comparar'],
+    routes: [
+      '/investimentos',
+      '/investimento/novo',
+      '/investimento/[id]',
+      '/investimento/[id]/editar',
+      '/investimento/[id]/movimento',
+      '/investimento/declaracao',
+      '/investimento/comparar',
+      '/investimento/plano',
+    ],
     screenshot: '540_investimentos.png',
   },
   {

@@ -450,6 +450,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     keywords: ['declaração', 'declaracao', 'imposto de renda', 'irpf', 'bens e direitos', 'informe de rendimentos', 'investimentos'],
   },
   {
+    id: 'investimentos-plano',
+    title: 'Plano de aportes',
+    caption: 'Quanto você pretende aportar por mês nos investimentos e o aportado de cada mês',
+    href: '/investimento/plano',
+    keywords: ['plano de aportes', 'aporte mensal', 'aportar por mês', 'quanto aportar', 'investir todo mês', 'investimentos'],
+  },
+  {
     id: 'investimentos-comparar',
     title: 'Comparar rendimentos líquidos',
     caption: 'O mesmo valor em até quatro opções, depois do imposto',

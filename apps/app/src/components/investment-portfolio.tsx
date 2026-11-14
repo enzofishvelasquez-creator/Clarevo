@@ -8,6 +8,7 @@ import {
   portfolioEvolution,
   taxRegimeOf,
   INCOME_TEXT,
+  INVESTMENT_PLAN_TEXT,
   allocationUseful,
   dateEventText,
   fgcByInstitution,
@@ -15,18 +16,20 @@ import {
   incomeSummary,
   investmentAllocation,
   investmentDateEvents,
+  investmentPlanLine,
   type AllocationDimension,
   type Investment,
   type InvestmentMovement,
+  type InvestmentPlan,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, CalendarClock, ChevronRight, FileText, Landmark } from 'lucide-react-native';
+import { Calculator, CalendarClock, ChevronRight, FileText, Landmark, PiggyBank } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ChoiceGroup } from '@/components/series-parts';
-import { Card, Chip, Txt, styles as ui } from '@/components/ui';
+import { Button, Card, Chip, Txt, styles as ui } from '@/components/ui';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -271,8 +274,27 @@ export function FiscalCalendarCard({ items }: { items: readonly Investment[] }) 
   );
 }
 
-/** Atalhos: o resumo para a declaração e a calculadora de rendimentos líquidos. */
-export function InvestmentLinks() {
+/**
+ * Plano de aportes (D-099, item 12): com plano, o aportado do mês ao lado do plano, sem cor e sem cobrança; sem plano, o convite fica na
+ * lista de atalhos (InvestmentLinks).
+ */
+export function InvestmentPlanCard({ plan, movements }: { plan: InvestmentPlan | null; movements: readonly InvestmentMovement[] }) {
+  const { today } = useSession();
+  const line = investmentPlanLine(plan, movements, today);
+  if (!line) return null;
+  return (
+    <Card style={{ gap: space[2] }}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {INVESTMENT_PLAN_TEXT.cardTitle}
+      </Txt>
+      <MoneyTxt>{line}</MoneyTxt>
+      <Button label={INVESTMENT_PLAN_TEXT.editAction} tone="ghost" compact onPress={() => router.push('/investimento/plano')} />
+    </Card>
+  );
+}
+
+/** Atalhos: o convite do plano de aportes (sem plano), o resumo para a declaração e a calculadora de rendimentos líquidos. */
+export function InvestmentLinks({ showPlan = false }: { showPlan?: boolean }) {
   const link = (label: string, hint: string, Icon: typeof FileText, href: Parameters<typeof router.push>[0]) => (
     <Pressable
       accessibilityRole="link"
@@ -295,6 +317,7 @@ export function InvestmentLinks() {
   );
   return (
     <View style={{ gap: space[3] }}>
+      {showPlan ? link(INVESTMENT_PLAN_TEXT.cardTitle, INVESTMENT_PLAN_TEXT.emptyBody, PiggyBank, '/investimento/plano') : null}
       {link('Resumo para a declaração', 'Valores em 31/12 e rendimentos do ano, para conferir com os informes.', FileText, '/investimento/declaracao')}
       {link('Comparar rendimentos líquidos', 'Uma calculadora com o imposto de cada opção que você recebeu.', Calculator, '/investimento/comparar')}
     </View>

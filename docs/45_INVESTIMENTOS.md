@@ -136,6 +136,9 @@ Em `docs/05_SUPABASE.md`, passos 12v, 12w e 12x, e as conferências 21s e 21t:
 4. Ficha ampliada (D-099): rodar a migração 0035 (`20261113000001_investimentos_ficha.sql`) e recarregar o esquema; publicar de novo a função
    `indices` (agora busca também a Selic do mês, série 4390, e a poupança, série 195), com a verificação de JWT continuando desligada. Aplicar
    antes do merge: o app novo envia a ficha nas funções novas e lê as colunas novas.
+5. Plano de aportes e investimento ligado à meta (D-099, P2): rodar a migração 0036 (`20261114000001_investimentos_plano_meta.sql`) e
+   recarregar o esquema (passo 12ab e conferência 21x). A função `indices` não muda. Aplicar antes do merge: o app novo lê `investment_plans`
+   e a coluna `goal_id` da visão (sem a migração, o app segue funcionando sem o plano, e a meta escolhida no formulário é ignorada pelo banco).
 
 ## 7. Ficha ampliada (D-099, 13/11/2026)
 
@@ -169,3 +172,24 @@ Estudo e decisões em `docs/49_ESTUDO_INVESTIMENTOS.md`; regras no núcleo e rep
 - **Revisão independente (13/11/2026):** a ordem do mesmo dia no imposto estimado, o nome da instituição na linha do FGC acima do limite,
   o total escondido com "Ocultar valores", o tipo do rendimento que não é escolhido sozinho, o texto da carência nos lembretes e a ficha mantida
   quando uma versão antiga do app edita sem ela. Corrigidos, com testes.
+
+## 8. Plano de aportes e investimento ligado à meta (D-099, P2, 14/11/2026)
+
+Itens 12 e 13 (fase 1) de `docs/49_ESTUDO_INVESTIMENTOS.md`. Regras em `packages/core/src/investment-plan.ts` e na migração 0036.
+
+- **Plano de aportes (item 12):** um valor por mês, opcional, só no Pessoal (`investment_plans`, uma linha por contexto; `set_investment_plan`,
+  sem valor a linha sai; operações `definir_plano_investimentos` e `excluir_plano_investimentos`, que contam como anotação). É intenção, não
+  cobrança (D-027): o card na aba diz "Aportado em novembro: R$ 300,00. Seu plano: R$ 500,00.", sem cor, sem sequência de dias, sem comparação e
+  sem dizer onde aplicar; acima do plano, o mesmo tom. Conta como aportado do mês todo aporte registrado nos investimentos do Pessoal com data no
+  mês (o aporte inicial de quem cria um investimento com data no mês conta também). Sem plano, o convite fica nos atalhos da aba. A tela
+  `/investimento/plano` tem o valor, "Tirar plano" e os aportes dos últimos seis meses. Lembrete opcional "Aportar nos investimentos", no mesmo
+  dia escolhido do lembrete das metas, só com plano e só se o mês ainda não tem aporte nos investimentos.
+- **Investimento ligado à meta (item 13, fase 1):** no formulário, "Para que é este dinheiro? (opcional)", com "Sem meta" e as metas do Pessoal
+  que não estão arquivadas (a reserva primeiro). A ligação viaja na ficha (`goal_id` no `p_details`); sem a ficha (versão antiga do app), fica
+  se a meta continuar valendo. A chave (`goal_id`, `context_id`) aponta para a meta do mesmo contexto; meta excluída de vez tira a ligação (o
+  guarda dos investimentos aceita só essa mudança sem versão nova); meta com marca de excluída aparece como nenhuma na visão. Na ficha, a linha
+  "Para" com o caminho até a meta; na meta e na reserva, "Investimentos ligados", com o valor de hoje dos ativos ligados e, na reserva, quanto
+  tem resgate em até 1 dia pela ficha. Só informação: a meta continua com o valor que a pessoa registrou nela, e a tela diz de onde vem cada
+  número. Fase 2 (a meta ler o valor do investimento) fica para depois: muda as regras das metas.
+- **Demonstração:** plano de R$ 600,00 por mês e a aplicação ligada à reserva.
+

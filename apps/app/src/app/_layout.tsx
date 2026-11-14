@@ -312,6 +312,7 @@ function Navigation() {
           {/* Resumo para a declaração (D-099): rota estática, com precedência sobre /investimento/[id]. */}
           <Stack.Screen name="investimento/declaracao" />
           <Stack.Screen name="investimento/comparar" />
+          <Stack.Screen name="investimento/plano" />
           <Stack.Screen name="investimento/[id]/index" />
           <Stack.Screen name="investimento/[id]/editar" />
           <Stack.Screen name="investimento/[id]/movimento" />

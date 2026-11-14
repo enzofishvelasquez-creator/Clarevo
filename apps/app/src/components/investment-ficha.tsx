@@ -1,6 +1,7 @@
 import {
   DETAILS_TEXT,
   ESTIMATE_TEXT,
+  INVESTMENT_GOAL_TEXT,
   INVESTMENT_KIND_LABEL,
   INVESTMENT_TAX_RULES,
   SUBKIND_LABEL,
@@ -34,7 +35,7 @@ import { View } from 'react-native';
 import { MoneyTxt } from '@/components/money-text';
 import { explanationHref } from '@/lib/learn';
 import { Button, Card, Skeleton, Txt } from '@/components/ui';
-import { useInvalidateInvestments, useMarketIndices } from '@/state/data';
+import { useGoals, useInvalidateInvestments, useMarketIndices } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
@@ -70,6 +71,9 @@ export function InvestmentFichaCard({ investment: i }: { investment: Investment 
   const rate = rateSummary(i.indexKind, i.rateBp);
   const liquidity = liquiditySummary(i);
   const empty = detailsEmpty(i);
+  // Meta ligada (D-099, item 13): só informação, com o caminho para a meta.
+  const goals = useGoals(i.goalId ? i.contextId : undefined);
+  const goal = i.goalId ? (goals.data ?? []).find((g) => g.id === i.goalId) : undefined;
   const maturity = i.maturityOn
     ? (() => {
         const days = calendarDaysBetween(today, i.maturityOn);
@@ -97,6 +101,17 @@ export function InvestmentFichaCard({ investment: i }: { investment: Investment 
           {liquidity ? <Line label="Resgate" value={liquidity} /> : null}
         </>
       )}
+      {goal ? (
+        <View style={{ gap: space[1] }}>
+          <Line label={INVESTMENT_GOAL_TEXT.fichaLabel} value={goal.name} />
+          <Button
+            label={goal.goalType === 'emergencia' ? INVESTMENT_GOAL_TEXT.openReserve : INVESTMENT_GOAL_TEXT.openGoal}
+            tone="ghost"
+            compact
+            onPress={() => router.push({ pathname: '/meta/[id]', params: { id: goal.id } })}
+          />
+        </View>
+      ) : null}
       {unusual ? (
         <View style={{ gap: space[2] }}>
           <Txt variant="label">{UNUSUAL_RATE_TEXT}</Txt>
