@@ -249,6 +249,8 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
       liquidityOn: null,
       liquidityDays: null,
     },
+    // Ligado à reserva (D-099, item 13): só informação; a reserva continua com o valor registrado nela.
+    goalId: reserva.goal.id,
   });
   const move = (id: string, kind: 'aporte' | 'valor', amountCents: number, occurredOn: string) =>
     repo.addInvestmentMovement(newOperationKey(), id, kind, { amountCents, occurredOn, note: null });
@@ -270,6 +272,8 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   await move(previdencia.investment!.id, 'valor', 508_000, '2026-09-30');
   // O extrato conferido de novo em 06/10, sem mudança: com as duas atualizadas no mês, a carteira tem a taxa de outubro até hoje.
   await move(previdencia.investment!.id, 'valor', 508_000, '2026-10-06');
+  // Plano de aportes (D-099, item 12): R$ 600,00 por mês; outubro tem o aporte de R$ 500,00 na aplicação.
+  await repo.setInvestmentPlan(newOperationKey(), ctx, 60_000);
   // Cartões (D-037): o cartão fechou em 03/10, então as compras de 05 e 06/10 entram na fatura de novembro (vencimento 10/11).
   // cards: false monta a demonstração dos ciclos anteriores (testes das bases A, B e C), sem o cartão e sem as faturas.
   if (opts.cards !== false) {

@@ -5,9 +5,10 @@ import {
   INVESTMENT_KINDS,
   INVESTMENT_KIND_LABEL,
   INVESTMENT_NAME_MAX,
+  INVESTMENT_GOAL_TEXT,
   INVESTMENT_TEXT,
   formatDateBR,
-  investmentErrorText,
+  investmentSaveErrorText,
   isRepoError,
   maskDateBR,
   newOperationKey,
@@ -34,7 +35,7 @@ import { useLeaveGuard } from '@/components/leave-guard';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
-import { useInvalidateInvestments } from '@/state/data';
+import { useGoals, useInvalidateInvestments } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -59,6 +60,15 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
   const [details, setDetails] = useState<InvestmentDetailsDraft>(initialDetails);
   const [detailErrors, setDetailErrors] = useState<Partial<Record<InvestmentDetailsField, string>>>({});
   const detailsRef = useRef<DetailsSectionHandle>(null);
+  // Meta ligada (D-099, item 13): as metas do Pessoal que podem ser escolhidas (sem as arquivadas), a reserva primeiro.
+  const goalsQ = useGoals(contextId);
+  const goalOptions = (goalsQ.data ?? [])
+    .filter((g) => g.status !== 'arquivada')
+    .sort((a, b) => (a.goalType === 'emergencia' ? 0 : 1) - (b.goalType === 'emergencia' ? 0 : 1) || a.name.localeCompare(b.name, 'pt-BR'));
+  const initialGoal = investment?.goalId ?? null;
+  const [goalId, setGoalId] = useState<string | null>(initialGoal);
+  // Meta que deixou de valer (arquivada depois): sai ao salvar.
+  const chosenGoal = goalId !== null && goalOptions.some((g) => g.id === goalId) ? goalId : null;
   const [errors, setErrors] = useState<Partial<Record<InvestmentField, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -76,6 +86,7 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
     investedText !== '' ||
     currentText !== '' ||
     startText !== '' ||
+    goalId !== initialGoal ||
     JSON.stringify(details) !== JSON.stringify(initialDetails);
   const guard = useLeaveGuard(dirty && !busy, editing ? `/investimento/${investment!.id}` : '/investimentos');
 
@@ -105,8 +116,8 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
     setBusy(true);
     try {
       const w = editing
-        ? await repo.updateInvestment(key, investment!.id, investment!.version, { name: v.input.name, kind: v.input.kind, details: dv.details })
-        : await repo.createInvestment(key, contextId, { ...v.input, details: dv.details });
+        ? await repo.updateInvestment(key, investment!.id, investment!.version, { name: v.input.name, kind: v.input.kind, details: dv.details, goalId: chosenGoal })
+        : await repo.createInvestment(key, contextId, { ...v.input, details: dv.details, goalId: chosenGoal });
       invalidate();
       flash.set(editing ? T.saved : T.created);
       const id = w.investment?.id ?? investment?.id;
@@ -119,7 +130,10 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
       } else if (code === 'chave_reutilizada') {
         invalidate();
         setError('Pode ser que já tenha sido salvo. Confira a lista de investimentos antes de tentar de novo.');
-      } else setError(investmentDetailsErrorText(code) ?? investmentErrorText(code));
+      } else {
+        if (code === 'meta_invalida') goalsQ.refetch();
+        setError(investmentDetailsErrorText(code) ?? investmentSaveErrorText(code));
+      }
     } finally {
       setBusy(false);
     }
@@ -207,6 +221,14 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
               />
             </>
           )}
+          {goalOptions.length > 0 ? (
+            <ChoiceGroup label={INVESTMENT_GOAL_TEXT.formLabel} hint={INVESTMENT_GOAL_TEXT.formHint}>
+              <Chip label={INVESTMENT_GOAL_TEXT.noGoal} selected={chosenGoal === null} onPress={() => setGoalId(null)} />
+              {goalOptions.map((g) => (
+                <Chip key={g.id} label={g.name} selected={chosenGoal === g.id} onPress={() => setGoalId(chosenGoal === g.id ? null : g.id)} />
+              ))}
+            </ChoiceGroup>
+          ) : null}
         </Card>
         <InvestmentDetailsSection
           ref={detailsRef}

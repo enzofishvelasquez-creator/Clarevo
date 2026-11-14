@@ -14936,6 +14936,79 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
+  // D-099 P2 (14/11/2026): plano de aportes dos investimentos (item 12) e investimento ligado à reserva ou a uma meta (item 13, fase 1).
+  // A demonstração tem um plano de R$ 600,00 por mês (outubro tem o aporte de R$ 500,00 na aplicação) e a aplicação ligada à reserva.
+  // O card mostra o aportado ao lado do plano, sem cor e sem cobrança; a tela do plano tem o histórico de seis meses; tirar o plano deixa
+  // o convite nos atalhos. A ficha diz "Para", e a reserva e a meta mostram os investimentos ligados, só como informação. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const plWrites0 = writes.length;
+    const planField = () => field('Quanto pretende aportar por mês?');
+    await demoHome();
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
+    t = await body(); investTexts.push(t);
+    ok('D-099 P2 Investir: o card do plano com o aportado de outubro ao lado do plano, sem o convite nos atalhos',
+      t.includes('Plano de aportes') && t.includes('Aportado em outubro: R$ 500,00. Seu plano: R$ 600,00.') && (await visibleCount('link', /^Plano de aportes/)) === 0, t.slice(0, 1200));
+    await btn('Ver plano de aportes').click(); await waitText('Aportes dos últimos meses'); await p.waitForTimeout(400);
+    t = await body(); investTexts.push(t);
+    ok('D-099 P2 Plano: o valor no campo e os seis meses, do mais recente ao mais antigo, com o mês de hoje "até agora"',
+      (await h1Name()) === 'Plano de aportes' && (await planField().inputValue()) === '600,00' && t.includes('Outubro (até agora): R$ 500,00') && t.includes('Setembro: R$ 0,00') &&
+        t.includes('Agosto: R$ 5.000,00') && t.includes('Junho: R$ 10.000,00') && t.includes('Maio: R$ 0,00') && t.indexOf('Outubro (até agora)') < t.indexOf('Junho:') &&
+        !/atrasad|parab[ée]ns|deveria/i.test(t), t.slice(0, 1500));
+    await checkBar('D-099 P2 Plano de aportes', 'Investir');
+    await planField().fill(''); await btn('Salvar plano').click(); await p.waitForTimeout(300);
+    ok('D-099 P2 Plano: vazio é recusado no campo, com o foco nele', (await body()).includes('Informe um valor.') && (await planField().evaluate((e) => e === document.activeElement)));
+    await planField().fill('700');
+    await atWidths(async (w) => { await layoutChecks(`D-099 P2 Plano ${w}px`); if (w === 390) await shot('559_investimentos_plano'); });
+    await btn('Salvar plano').click(); await waitText('Plano de aportes salvo.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-099 P2 Plano: salvo, volta para Investir com o plano novo', urlPath() === '/investimentos' && t.includes('Aportado em outubro: R$ 500,00. Seu plano: R$ 700,00.'), urlPath() + ' ' + t.slice(0, 600));
+    // Tirar o plano: o convite aparece nos atalhos; pelo convite, um plano novo.
+    await btn('Ver plano de aportes').click(); await waitText('Aportes dos últimos meses'); await p.waitForTimeout(300);
+    await btn('Tirar plano').click(); await waitText('Tirar o plano de aportes?'); await p.waitForTimeout(300);
+    ok('D-099 P2 Plano: a confirmação diz que nada muda nos investimentos', (await body()).includes('Os investimentos e os aportes registrados continuam como estão.'));
+    await confirmIn('Tirar plano'); await waitText('Plano de aportes retirado.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-099 P2 Plano: sem plano, o card some e o convite fica nos atalhos', !t.includes('Seu plano:') && (await visibleCount('link', /^Plano de aportes/)) === 1 &&
+      t.includes('Se quiser, defina quanto pretende aportar por mês nos investimentos.'), t.slice(0, 1500));
+    await p.getByRole('link', { name: /^Plano de aportes/ }).filter({ visible: true }).first().click(); await waitText('Aportes dos últimos meses'); await p.waitForTimeout(300);
+    ok('D-099 P2 Plano: pelo convite, o campo vazio e sem "Tirar plano"', (await planField().inputValue()) === '' && (await visibleCount('button', 'Tirar plano')) === 0);
+    await planField().fill('600'); await btn('Salvar plano').click(); await waitText('Plano de aportes salvo.'); await p.waitForTimeout(500);
+    ok('D-099 P2 Plano: o plano volta', (await body()).includes('Seu plano: R$ 600,00.'));
+    // Meta ligada: a ficha da aplicação diz "Para" e leva à reserva, que mostra o investimento ligado.
+    await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Sobre este investimento'); await p.waitForTimeout(500);
+    t = await body(); investTexts.push(t);
+    const para = t.slice(t.indexOf('Sobre este investimento'));
+    ok('D-099 P2 Ficha: "Para" com a reserva e o caminho até ela', para.includes('Para') && para.includes('Reserva para imprevistos') && (await visibleCount('button', 'Ver a reserva')) === 1, para.slice(0, 600));
+    await btn('Ver a reserva').click(); await waitText('Investimentos ligados à reserva'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('D-099 P2 Reserva: os investimentos ligados, o valor de hoje, o resgate em até 1 dia pela ficha e de onde vem cada número',
+      (await h1Name()) === 'Reserva' && t.includes('Reserva para imprevistos') && t.includes('Valor dos investimentos ligados: R$ 10.875,00 (1 investimento).') && t.includes('Com resgate em até 1 dia, pela ficha: R$ 0,00.') &&
+        t.includes('Só informação: o valor guardado é o que você registra aqui.') && t.includes('R$ 3.500,00'), t.slice(0, 1800));
+    await atWidths(async (w) => { await layoutChecks(`D-099 P2 Reserva com investimentos ${w}px`); if (w === 390) { await p.getByText('Investimentos ligados à reserva', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await shot('560_reserva_investimentos'); } });
+    await p.getByRole('link', { name: /^Aplicação do banco, / }).filter({ visible: true }).first().click(); await waitText('Sobre este investimento'); await p.waitForTimeout(300);
+    ok('D-099 P2 Reserva: o investimento ligado abre o detalhe dele', (await h1Name()) === 'Aplicação do banco');
+    // Ligar a previdência à viagem pelo formulário; depois, "Sem meta".
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    await p.getByRole('button', { name: /^Previdência, / }).filter({ visible: true }).first().click(); await waitText('Sobre este investimento'); await p.waitForTimeout(300);
+    await btn('Editar').click(); await waitText('Editar investimento'); await p.waitForTimeout(400);
+    ok('D-099 P2 Editar: "Para que é este dinheiro? (opcional)" com "Sem meta" escolhido, a reserva e a viagem',
+      (await radio('Sem meta').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'Reserva para imprevistos')) === 1 && (await visibleCount('radio', 'Viagem de férias')) === 1 &&
+        (await body()).includes('Ligar a uma meta é só informação: a meta continua com o valor que você registrou nela.'));
+    await radio('Viagem de férias').click(); await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
+    ok('D-099 P2 Editar: salvo, a ficha diz "Para" a viagem', (await body()).includes('Viagem de férias') && (await visibleCount('button', 'Ver a meta')) === 1);
+    await btn('Ver a meta').click(); await waitText('Investimentos ligados à meta'); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    ok('D-099 P2 Meta: a viagem mostra a previdência ligada, sem a linha do resgate (só na reserva)',
+      t.includes('Valor dos investimentos ligados: R$ 5.080,00 (1 investimento).') && !t.includes('Com resgate em até 1 dia'), t.slice(0, 1500));
+    await p.getByRole('link', { name: /^Previdência, / }).filter({ visible: true }).first().click(); await waitText('Sobre este investimento'); await p.waitForTimeout(300);
+    await btn('Editar').click(); await waitText('Editar investimento'); await p.waitForTimeout(400);
+    await radio('Sem meta').click(); await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
+    ok('D-099 P2 Editar: com "Sem meta", a ficha deixa de dizer "Para"', (await visibleCount('button', 'Ver a meta')) === 0 && (await visibleCount('button', 'Ver a reserva')) === 0);
+    ok('D-099 P2: nada vai à rede na demonstração', writes.length === plWrites0, writes.slice(plWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
   // D-078 F: "Guardar quando entrar um valor extra" se salva sozinho (sem valor de reserva) e liga o lembrete no Resumo, que aparece
   // quando o mês tem dinheiro a mais (aqui, R$ 800,00 em Renda extra numa conta nova). "Agora não" esconde até o mês seguinte.
   // ==================================================================================================================

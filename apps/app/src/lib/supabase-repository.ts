@@ -135,6 +135,7 @@ import {
   type InvestmentMovement,
   type InvestmentMovementInput,
   type InvestmentMovementKind,
+  type InvestmentPlan,
   type InvestmentStatus,
   type InvestmentWrite,
   type MarketIndices,
@@ -146,6 +147,7 @@ import {
   INVESTMENT_LIQUIDITIES,
   INVESTMENT_SUBKINDS,
   investmentDetailsError,
+  investmentPlanError,
   isGoalImageKey,
   parseAccess,
   parseStoreForget,
@@ -1148,6 +1150,8 @@ interface InvestmentRow {
   liquidity?: string | null;
   liquidity_on?: string | null;
   liquidity_days?: number | null;
+  /** Meta ligada (D-099, item 13; migração 0036); ausente num banco sem a migração. */
+  goal_id?: string | null;
 }
 
 /** A ficha da linha: o que o app não conhece fica vazio (nunca um valor errado na tela). */
@@ -1168,10 +1172,11 @@ function toInvestmentDetails(r: InvestmentRow): InvestmentDetails {
   return investmentDetailsError(r.kind, details) === null ? details : { ...EMPTY_INVESTMENT_DETAILS, institution: details.institution };
 }
 
-/** A ficha como a função do banco recebe (chaves do banco). */
-function detailsPayload(d: InvestmentDetails | undefined): Record<string, unknown> | null {
+/** A ficha como a função do banco recebe (chaves do banco), com a meta ligada junto (sem a ficha, a meta fica como está). */
+function detailsPayload(d: InvestmentDetails | undefined, goalId?: string | null): Record<string, unknown> | null {
   if (!d) return null;
   return {
+    goal_id: goalId ?? null,
     subkind: d.subkind,
     institution: d.institution,
     index_kind: d.indexKind,
@@ -1228,8 +1233,25 @@ function toInvestment(r: InvestmentRow): Investment {
     valueCents: value,
     lastValueOn: r.last_value_on,
     firstMovementOn: r.first_movement_on,
+    goalId: typeof r.goal_id === 'string' && r.goal_id !== '' ? r.goal_id : null,
     ...toInvestmentDetails(r),
   };
+}
+
+/** Linha de investment_plans (D-099, item 12). */
+interface InvestmentPlanRow {
+  context_id: string;
+  planned_monthly_cents: number;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+function toInvestmentPlan(r: InvestmentPlanRow | null | undefined): InvestmentPlan | null {
+  if (!r) return null;
+  const cents = whole(r.planned_monthly_cents);
+  if (investmentPlanError(cents)) throw new RepoError('desconhecido', 'plano_inconsistente');
+  return { contextId: r.context_id, plannedMonthlyCents: cents, version: whole(r.version), createdAt: r.created_at, updatedAt: r.updated_at };
 }
 
 function toInvestmentMovement(r: InvestmentMovementRow): InvestmentMovement {
@@ -2584,7 +2606,7 @@ export class SupabaseRepository implements RecordsRepository {
       p_invested_cents: input.investedCents,
       p_start_on: input.startOn,
       p_current_cents: input.currentCents,
-      p_details: detailsPayload(input.details),
+      p_details: detailsPayload(input.details, input.goalId),
     });
     if (error) throw repoError(error);
     return toInvestmentWrite(data);
@@ -2597,7 +2619,7 @@ export class SupabaseRepository implements RecordsRepository {
       p_expected_version: expectedVersion,
       p_name: input.name,
       p_kind: input.kind,
-      p_details: detailsPayload(input.details),
+      p_details: detailsPayload(input.details, input.goalId),
     });
     if (error) throw repoError(error);
     return toInvestmentWrite(data);
@@ -2654,6 +2676,24 @@ export class SupabaseRepository implements RecordsRepository {
   }
 
   /** CDI e IPCA pela função "indices" (que busca no Banco Central): sem dado de ninguém no pedido, só o mês de partida. */
+  async getInvestmentPlan(contextId: string): Promise<InvestmentPlan | null> {
+    const { data, error } = await this.db
+      .from('investment_plans')
+      .select('context_id, planned_monthly_cents, version, created_at, updated_at')
+      .eq('context_id', contextId)
+      .maybeSingle();
+    // Banco ainda sem a migração 0036: sem plano (a aba segue funcionando).
+    if (error && (error.code === 'PGRST205' || error.code === '42P01')) return null;
+    if (error) throw repoError(error);
+    return toInvestmentPlan(data as InvestmentPlanRow | null);
+  }
+
+  async setInvestmentPlan(key: string, contextId: string, plannedCents: Cents | null): Promise<InvestmentPlan | null> {
+    const { data, error } = await this.db.rpc('set_investment_plan', { p_key: key, p_context_id: contextId, p_planned_cents: plannedCents });
+    if (error) throw repoError(error);
+    return toInvestmentPlan((data as { plan?: InvestmentPlanRow | null } | null)?.plan);
+  }
+
   async getMarketIndices(fromMonth: IsoMonth): Promise<MarketIndices> {
     const { data, error } = await this.db.functions.invoke(INDICES_FUNCTION, { body: { desde: fromMonth } });
     if (error) throw new RepoError('indices_indisponiveis');

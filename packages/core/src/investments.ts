@@ -63,6 +63,8 @@ export interface Investment extends InvestmentDetails {
   lastValueOn: IsoDate | null;
   /** investment_items: a data do primeiro movimento vivo (null sem movimentos). */
   firstMovementOn: IsoDate | null;
+  /** A meta (ou a reserva) a que o investimento está ligado (D-099, item 13); null sem meta ou com a meta excluída. Só informação. */
+  goalId: string | null;
 }
 
 export interface InvestmentMovement {
@@ -87,7 +89,25 @@ export interface InvestmentInput {
   kind: InvestmentKind;
   /** A ficha ampliada inteira (D-099). Sem ela, ao criar, a ficha fica vazia; ao editar, fica como está (versão antiga do app). */
   details?: InvestmentDetails;
+  /**
+   * A meta ligada (D-099, item 13) viaja com a ficha: com `details`, a meta é esta (sem o campo, nenhuma); sem `details`, a de antes fica
+   * se continuar valendo. A meta precisa ser do mesmo contexto, sem marca de excluída e não arquivada ('meta_invalida').
+   */
+  goalId?: string | null;
 }
+
+/**
+ * Plano de aportes por mês nos investimentos (D-099, item 12; migração 0036): opcional, só no Pessoal. É intenção, não cobrança. As regras
+ * e os textos ficam em investment-plan.ts (este arquivo vai para a função "indices" e não muda com o plano).
+ */
+export interface InvestmentPlan {
+  contextId: string;
+  plannedMonthlyCents: Cents;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 /** Criar: o nome e o tipo, o aportado até hoje (desde a data informada) e, se a pessoa souber, quanto vale hoje. */
 export interface NewInvestmentInput extends InvestmentInput {
@@ -118,7 +138,8 @@ export type InvestmentErrorCode =
   | 'valor_insuficiente'
   | 'limite_de_investimentos'
   | 'contexto_invalido'
-  | 'tipo_rendimento_invalido';
+  | 'tipo_rendimento_invalido'
+  | 'meta_invalida';
 
 /** Caracteres (não unidades UTF-16), como charCount de validation.ts; aqui sem importar o resto (a função do servidor leva só este arquivo). */
 const charCount = (text: string) => [...text].length;

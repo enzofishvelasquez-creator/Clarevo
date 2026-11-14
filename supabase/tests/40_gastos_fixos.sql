@@ -1225,7 +1225,7 @@ do $$ begin
             'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
             'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_order', 'set_goal_status',
-            'set_income_reference', 'set_investment_status', 'set_member_role', 'set_month_check', 'set_savings_answer',
+            'set_income_reference', 'set_investment_plan', 'set_investment_status', 'set_member_role', 'set_month_check', 'set_savings_answer',
             'set_series_subscription', 'set_signup_source', 'skip_series_year', 'sync_series_occurrences', 'transfer_family_ownership',
             'undo_commitment_payment', 'undo_invoice_payment', 'unlink_telegram', 'unlink_whatsapp', 'update_account', 'update_card',
             'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement', 'update_investment',

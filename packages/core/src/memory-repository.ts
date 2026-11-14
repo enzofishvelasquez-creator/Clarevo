@@ -62,6 +62,7 @@ import type {
   GoalOrderAction,
   GoalOrderWrite,
   InvestmentAction,
+  InvestmentPlanAction,
   InvestmentWrite,
   GoalWrite,
   ImportAction,
@@ -165,10 +166,12 @@ import {
   type InvestmentMovementChange,
   type InvestmentMovementInput,
   type InvestmentMovementKind,
+  type InvestmentPlan,
   type InvestmentStatus,
   type NewInvestmentInput,
 } from './investments';
 import { EMPTY_INVESTMENT_DETAILS, investmentDetailsError, normalizeInstitution, type InvestmentDetails } from './investment-details';
+import { investmentPlanError } from './investment-plan';
 import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX, nextMonthAllowed, recordMonth } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import { savingsAnswerError, savingsAskAgainOn } from './savings';
@@ -208,6 +211,7 @@ interface Operation {
     | GoalImageAction
     | GoalOrderAction
     | InvestmentAction
+    | InvestmentPlanAction
     | SavingsAction
     | CardAction
     | AccountAction
@@ -411,6 +415,8 @@ export class MemoryRepository implements RecordsRepository {
   private goals = new Map<string, StoredGoal>();
   private investments = new Map<string, StoredInvestment>();
   private investmentMovements = new Map<string, InvestmentMovement>();
+  /** investment_plans (D-099, item 12): uma linha por contexto, só no Pessoal. */
+  private investmentPlans = new Map<string, InvestmentPlan>();
   private goalMovements = new Map<string, StoredGoalMovement>();
   /** savings_checks da pessoa (só ela usa este repositório), por contexto: uma resposta viva por contexto. */
   private savingsChecks = new Map<string, SavingsCheck>();
@@ -497,6 +503,7 @@ export class MemoryRepository implements RecordsRepository {
       accountsById: new Map(this.accountsById),
       investments: new Map(this.investments),
       investmentMovements: new Map(this.investmentMovements),
+      investmentPlans: new Map(this.investmentPlans),
     };
     let result: T;
     try {
@@ -527,6 +534,7 @@ export class MemoryRepository implements RecordsRepository {
         accountsById: this.accountsById,
         investments: this.investments,
         investmentMovements: this.investmentMovements,
+        investmentPlans: this.investmentPlans,
       } = saved);
       throw e;
     }
@@ -2145,7 +2153,25 @@ export class MemoryRepository implements RecordsRepository {
     const list = [...this.investmentMovements.values()].filter((m) => m.investmentId === i.id);
     const t = investmentTotals(list, '9999-12-31');
     const first = list.map((m) => m.occurredOn).sort()[0] ?? null;
-    return { ...i, depositsCents: t.depositsCents, withdrawalsCents: t.withdrawalsCents, incomeCents: t.incomeCents, valueCents: t.valueCents, lastValueOn: t.lastValueOn, firstMovementOn: first };
+    // Como a visão: meta com marca de excluída aparece como nenhuma (D-099, item 13).
+    const goal = i.goalId ? this.goals.get(i.goalId) : undefined;
+    const goalId = goal && !goal.deletedAt ? goal.id : null;
+    return { ...i, goalId, depositsCents: t.depositsCents, withdrawalsCents: t.withdrawalsCents, incomeCents: t.incomeCents, valueCents: t.valueCents, lastValueOn: t.lastValueOn, firstMovementOn: first };
+  }
+
+  /**
+   * Como clarevo_investment_goal (0036): sem a ficha, a meta de antes (keep) se ela continuar valendo; com a ficha, `goalId` (ausente é
+   * nenhuma), que precisa ser uma meta do contexto, sem marca de excluída e não arquivada.
+   */
+  private investmentGoal(contextId: string, withDetails: boolean, goalId: string | null | undefined, keep: string | null): string | null {
+    const valid = (id: string) => {
+      const g = this.goals.get(id);
+      return !!g && g.contextId === contextId && !g.deletedAt && g.status !== 'arquivada';
+    };
+    if (!withDetails) return keep !== null && valid(keep) ? keep : null;
+    if (goalId === undefined || goalId === null) return null;
+    if (!valid(goalId)) throw new RepoError('meta_invalida');
+    return goalId;
   }
 
   private investmentResult(investmentId: string | null, movementId: string | null): InvestmentWrite {
@@ -2250,7 +2276,7 @@ export class MemoryRepository implements RecordsRepository {
   /** Como create_investment: só no Pessoal; nome, tipo, valores e datas; limite de 50 ativos. */
   async createInvestment(key: string, contextId: string, input: NewInvestmentInput) {
     return this.write(() => {
-      const payload = [contextId, input.name, input.kind, input.investedCents, input.startOn, input.currentCents, input.details ?? null];
+      const payload = [contextId, input.name, input.kind, input.investedCents, input.startOn, input.currentCents, input.details ?? null, input.details ? (input.goalId ?? null) : null];
       const replayed = this.replay(key, 'criar_investimento', payload);
       if (replayed) return this.investmentResult(replayed.goalId, null);
       if (!this.canRead(contextId)) throw new RepoError('nao_encontrado');
@@ -2259,6 +2285,7 @@ export class MemoryRepository implements RecordsRepository {
       const code = newInvestmentError(input, this.opts.today());
       if (code) throw new RepoError(code);
       const details = this.investmentDetails(input.kind, input.details);
+      const goalId = this.investmentGoal(contextId, input.details !== undefined, input.goalId, null);
       this.checkInvestmentLimit(contextId);
       const now = new Date().toISOString();
       const i: StoredInvestment = {
@@ -2267,6 +2294,7 @@ export class MemoryRepository implements RecordsRepository {
         name: normalizeInvestmentName(input.name),
         kind: input.kind,
         ...details,
+        goalId,
         status: 'ativo',
         createdBy: this.opts.actorId,
         version: 1,
@@ -2283,7 +2311,7 @@ export class MemoryRepository implements RecordsRepository {
 
   async updateInvestment(key: string, id: string, expectedVersion: number, input: InvestmentInput) {
     return this.write(() => {
-      const payload = [id, expectedVersion, input.name, input.kind, input.details ?? null];
+      const payload = [id, expectedVersion, input.name, input.kind, input.details ?? null, input.details ? (input.goalId ?? null) : null];
       const replayed = this.replay(key, 'alterar_investimento', payload);
       if (replayed) return this.investmentResult(replayed.goalId, null);
       const i = this.liveInvestment(id);
@@ -2298,7 +2326,8 @@ export class MemoryRepository implements RecordsRepository {
           : investmentDetailsError(input.kind, kept) === null
             ? kept
             : this.investmentDetails(input.kind, { ...kept, subkind: null });
-      this.investments.set(id, { ...i, name: normalizeInvestmentName(input.name), kind: input.kind, ...details, version: i.version + 1, updatedAt: this.stamp() });
+      const goalId = this.investmentGoal(i.contextId, input.details !== undefined, input.goalId, i.goalId);
+      this.investments.set(id, { ...i, name: normalizeInvestmentName(input.name), kind: input.kind, ...details, goalId, version: i.version + 1, updatedAt: this.stamp() });
       this.saveOperation(key, 'alterar_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: id });
       return this.investmentResult(id, null);
     });
@@ -2387,6 +2416,46 @@ export class MemoryRepository implements RecordsRepository {
       this.investmentMovements.delete(m.id);
       this.saveOperation(key, 'excluir_movimento_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: i.id, movementId: m.id });
       return this.investmentResult(i.id, null);
+    });
+  }
+
+  async getInvestmentPlan(contextId: string) {
+    return this.read(() => {
+      const p = this.canRead(contextId) ? this.investmentPlans.get(contextId) : undefined;
+      return p ? { ...p } : null;
+    });
+  }
+
+  /**
+   * Como set_investment_plan (0036). Ordem: repetição (devolve o plano de agora); nao_encontrado (sem leitura); sem_permissao (sem
+   * escrita); contexto_invalido (fora do Pessoal); valor_invalido. Sem valor, a linha sai (e a operação é gravada mesmo sem plano).
+   */
+  async setInvestmentPlan(key: string, contextId: string, plannedCents: Cents | null) {
+    return this.write(() => {
+      const action = plannedCents === null ? 'excluir_plano_investimentos' : 'definir_plano_investimentos';
+      const payload = [contextId, plannedCents];
+      const replayed = this.replay(key, action, payload);
+      if (replayed) {
+        const p = this.investmentPlans.get(replayed.contextId);
+        return p ? { ...p } : null;
+      }
+      if (!this.canRead(contextId)) throw new RepoError('nao_encontrado');
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      if (this.space?.personalContextId !== contextId) throw new RepoError('contexto_invalido');
+      if (investmentPlanError(plannedCents)) throw new RepoError('valor_invalido');
+      const now = this.stamp();
+      const before = this.investmentPlans.get(contextId);
+      if (plannedCents === null) this.investmentPlans.delete(contextId);
+      else
+        this.investmentPlans.set(
+          contextId,
+          before
+            ? { ...before, plannedMonthlyCents: plannedCents, version: before.version + 1, updatedAt: now }
+            : { contextId, plannedMonthlyCents: plannedCents, version: 1, createdAt: now, updatedAt: now },
+        );
+      this.saveOperation(key, action, payload, { contextId, recordId: null, commitmentId: null });
+      const p = this.investmentPlans.get(contextId);
+      return p ? { ...p } : null;
     });
   }
 
@@ -4794,6 +4863,9 @@ export class MemoryRepository implements RecordsRepository {
       this.cards.clear();
       this.cardEntries.clear();
       this.accountsById.clear();
+      this.investments.clear();
+      this.investmentMovements.clear();
+      this.investmentPlans.clear();
       this.space = null;
       this.deleted = true;
     });

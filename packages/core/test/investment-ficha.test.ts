@@ -73,6 +73,7 @@ const inv = (p: Partial<Investment> & { id: string }): Investment => ({
   valueCents: 0,
   lastValueOn: null,
   firstMovementOn: null,
+  goalId: null,
   ...EMPTY_INVESTMENT_DETAILS,
   ...p,
 });

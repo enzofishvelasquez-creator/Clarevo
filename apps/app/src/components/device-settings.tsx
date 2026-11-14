@@ -121,7 +121,7 @@ export function RemindersCard() {
           onChange={(v) => toggle(k, v)}
         />
       ))}
-      {prefs.routineReminders.aporte ? (
+      {prefs.routineReminders.aporte || prefs.routineReminders.aporte_investimentos ? (
         <ChoiceGroup label={ROUTINE_REMINDER_TEXT.depositDayLabel}>
           {DEPOSIT_REMINDER_DAYS.map((d) => (
             <Chip

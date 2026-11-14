@@ -6,6 +6,7 @@ import type {
   InvestmentMovement,
   InvestmentMovementInput,
   InvestmentMovementKind,
+  InvestmentPlan,
   InvestmentStatus,
   MarketIndices,
   NewInvestmentInput,
@@ -147,6 +148,12 @@ export type InvestmentAction =
   | 'registrar_movimento_investimento'
   | 'alterar_movimento_investimento'
   | 'excluir_movimento_investimento';
+
+/**
+ * Plano de aportes dos investimentos (D-099, item 12; migração 0036): set_investment_plan, sem alvo (o contexto fica em context_id). Conta
+ * como anotação na atividade, como os investimentos.
+ */
+export type InvestmentPlanAction = 'definir_plano_investimentos' | 'excluir_plano_investimentos';
 
 /** Resultado das escritas de investimentos: o investimento (com os totais de investment_items) e o movimento envolvido, quando há. */
 export interface InvestmentWrite {
@@ -611,6 +618,10 @@ export interface RecordsRepository {
   addInvestmentMovement(key: string, investmentId: string, kind: InvestmentMovementKind, input: InvestmentMovementInput): Promise<InvestmentWrite>;
   updateInvestmentMovement(key: string, movementId: string, expectedVersion: number, input: InvestmentMovementInput): Promise<InvestmentWrite>;
   deleteInvestmentMovement(key: string, movementId: string, expectedVersion: number): Promise<InvestmentWrite>;
+  /** Plano de aportes por mês (D-099, item 12), ou null sem plano. Só no Pessoal. */
+  getInvestmentPlan(contextId: string): Promise<InvestmentPlan | null>;
+  /** Define (valor) ou tira (null) o plano de aportes. Erros: nao_encontrado, sem_permissao, contexto_invalido (Família), valor_invalido. */
+  setInvestmentPlan(key: string, contextId: string, plannedCents: Cents | null): Promise<InvestmentPlan | null>;
   /** CDI e IPCA mensais desde `fromMonth` (função "indices" no app real; valores de exemplo na demonstração). */
   getMarketIndices(fromMonth: IsoMonth): Promise<MarketIndices>;
   /**
@@ -1071,6 +1082,7 @@ export type RepoErrorCode =
   | 'valor_insuficiente'
   | 'limite_de_investimentos'
   | 'tipo_rendimento_invalido'
+  | 'meta_invalida'
   | 'subtipo_invalido'
   | 'instituicao_invalida'
   | 'rendimento_invalido'

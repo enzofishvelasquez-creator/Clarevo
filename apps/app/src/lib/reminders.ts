@@ -115,6 +115,15 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
         missingThisMonth: active.some((i) => i.lastValueOn === null || i.lastValueOn < monthEnd),
       };
     }
+    // Plano de aportes dos investimentos (D-099, item 12): o aviso deste mês sai se algum investimento já tem aporte no mês.
+    let investmentDeposit: { day: DepositReminderDay; hasPlan: boolean; depositThisMonth: boolean } | undefined;
+    if (job.routine.choices.aporte_investimentos) {
+      const hasPlan = (await job.repo.getInvestmentPlan(job.contextId)) !== null;
+      const depositThisMonth = hasPlan
+        ? (await job.repo.listContextInvestmentMovements(job.contextId)).some((m) => m.kind === 'aporte' && monthOf(m.occurredOn) === monthOf(today))
+        : false;
+      investmentDeposit = { day: job.routine.depositDay, hasPlan, depositThisMonth };
+    }
     const plan = routineReminderPlan(job.routine.choices, records, activity, today, job.routine.hour, {
       nowMinutes,
       contextId: job.contextId,
@@ -122,6 +131,7 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
       cardPurchaseToday,
       deposit,
       investments,
+      investmentDeposit,
     });
     for (const i of plan) {
       items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });

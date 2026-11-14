@@ -1641,6 +1641,11 @@ function useInvalidateGoals() {
     qc.invalidateQueries({ queryKey: ['goals', 'month'] });
     // Toda escrita de metas é anotação: muda a atividade e, com ela, a revisão dos últimos meses.
     qc.invalidateQueries({ queryKey: ['returnReview'] });
+    // A meta excluída deixa de aparecer como a meta de um investimento (D-099, item 13).
+    if (deleted) {
+      qc.invalidateQueries({ queryKey: ['investments', 'list'] });
+      qc.invalidateQueries({ queryKey: ['investments', 'one'] });
+    }
   };
 }
 
@@ -1685,6 +1690,25 @@ export function useMarketIndices(fromMonth: IsoMonth | null) {
     enabled: fromMonth !== null,
     staleTime: 6 * 60 * 60 * 1000,
     retry: false,
+  });
+}
+
+/** Plano de aportes por mês nos investimentos (D-099, item 12), ou null sem plano. */
+export function useInvestmentPlan(contextId: string | undefined) {
+  const repo = useRepo();
+  return useQuery({ queryKey: ['investments', 'plan', contextId], queryFn: () => repo.getInvestmentPlan(contextId!), enabled: Boolean(contextId) });
+}
+
+/** Definir (valor) ou tirar (null) o plano de aportes. É anotação: recarrega também a atividade. */
+export function useSetInvestmentPlan() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; plannedCents: Cents | null }) => repo.setInvestmentPlan(v.key, v.contextId, v.plannedCents),
+    onSuccess: (plan, v) => {
+      qc.setQueryData(['investments', 'plan', v.contextId], plan);
+      qc.invalidateQueries({ queryKey: ['returnReview'] });
+    },
   });
 }
 
