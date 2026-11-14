@@ -161,6 +161,11 @@ Estudo e decisões em `docs/49_ESTUDO_INVESTIMENTOS.md`; regras no núcleo e rep
 - **Telas novas:** `/investimento/declaracao` (resumo para conferir com os informes) e `/investimento/comparar` (até quatro opções, taxas digitadas).
 - **Lembretes** (aparelho): "Vencimentos dos investimentos" (7 dias antes e no dia do vencimento, e do fim da carência com texto próprio) e
   "Atualizar os investimentos" (dia 1, se algum está sem valor desde o último dia do mês passado).
+- **Itens P2 feitos em 13/11/2026 (depois do merge do PR #34):** "Evolução da carteira" (o valor no fim de cada um dos últimos 6 meses e o
+  aportado acumulado, `portfolioEvolution`); "Datas do ano para quem investe" (come-cotas só com fundo que tem, informes de rendimentos,
+  declaração e o 31/12, `fiscalCalendar`; e a regra do DARF para quem tem ações); o aviso neutro de taxa fora do comum na ficha (200% do CDI,
+  ou o dobro do CDI dos últimos 12 meses no prefixado, no IPCA mais taxa e na Selic mais taxa, `unusualRate`, com o tema de golpes); e os
+  investimentos na exportação (terceiro CSV com um movimento por linha e a seção "Investimentos" no PDF). Sem mudança no banco.
 - **Revisão independente (13/11/2026):** a ordem do mesmo dia no imposto estimado, o nome da instituição na linha do FGC acima do limite,
   o total escondido com "Ocultar valores", o tipo do rendimento que não é escolhido sozinho, o texto da carência nos lembretes e a ficha mantida
   quando uma versão antiga do app edita sem ela. Corrigidos, com testes.

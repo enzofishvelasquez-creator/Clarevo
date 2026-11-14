@@ -182,7 +182,7 @@ export default function ExportarScreen() {
               {T.readyTitle}
             </Txt>
             <View style={{ gap: space[1] }} accessibilityLiveRegion="polite">
-              <Txt variant="label">{T.readyCounts(ready.recordCount, ready.purchaseCount)}</Txt>
+              <Txt variant="label">{T.readyCounts(ready.recordCount, ready.purchaseCount, ready.investmentCount)}</Txt>
               <Txt variant="caption" color={colors.textSecondary}>
                 {T.readyPeriod(ready.periodLabel)}
               </Txt>

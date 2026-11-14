@@ -605,6 +605,12 @@ export const styles = StyleSheet.create({
   linkWithIcon: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brandText, outlineOffset: 2 },
   focusRingOnBrand: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.accent, outlineOffset: 2 },
+  /**
+   * Linha de atalho que abre uma tela (Buscar, Seu mês em 30 segundos, Evolução, Análises): com a borda suave dos cartões, não a dos
+   * campos de digitar. Pedido do Enzo, 13/11/2026: no modo escuro, a borda forte chamava atenção demais. O nome, a legenda e a seta já
+   * dizem que é um botão.
+   */
+  entryRow: { borderWidth: 1, borderColor: colors.border },
   input: {
     minHeight: 52,
     borderRadius: radius.sm,

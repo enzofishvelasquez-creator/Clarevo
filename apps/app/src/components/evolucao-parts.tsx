@@ -51,7 +51,7 @@ export function EvolutionEntry({ onPress }: { onPress: () => void }) {
       accessibilityRole="button"
       accessibilityLabel={T.rowA11y}
       onPress={onPress}
-      style={(s) => [ui.input, styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
+      style={(s) => [ui.input, ui.entryRow, styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
       <IconBlock icon={ChartLine} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
