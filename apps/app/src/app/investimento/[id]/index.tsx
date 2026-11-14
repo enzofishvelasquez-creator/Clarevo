@@ -7,6 +7,7 @@ import {
   formatDateBR,
   formatMonthBR,
   investmentGain,
+  isStackedLayout,
   investmentErrorText,
   isRepoError,
   monthlyReturns,
@@ -17,7 +18,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronRight, Pencil, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -82,6 +83,10 @@ function Detail({
   const { today } = useSession();
   const invalidate = useInvalidateInvestments();
   const maskLabel = useMoneyLabelMask();
+  // Tela estreita ou letra grande: valores embaixo do nome e um botão por linha.
+  const { width, fontScale } = useWindowDimensions();
+  const stacked = isStackedLayout(width, fontScale);
+  const action = stacked ? styles.actionStacked : styles.action;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -166,10 +171,10 @@ function Detail({
           ) : null}
           {active ? (
             <View style={styles.actions}>
-              <Button label={D.updateValue} onPress={() => go('valor')} style={styles.action} />
-              <Button label={D.addDeposit} tone="soft" onPress={() => go('aporte')} style={styles.action} />
-              <Button label={D.addWithdrawal} tone="soft" onPress={() => go('resgate')} style={styles.action} />
-              <Button label={D.addIncome} tone="soft" onPress={() => go('rendimento')} style={styles.action} />
+              <Button label={D.updateValue} onPress={() => go('valor')} style={action} />
+              <Button label={D.addDeposit} tone="soft" onPress={() => go('aporte')} style={action} />
+              <Button label={D.addWithdrawal} tone="soft" onPress={() => go('resgate')} style={action} />
+              <Button label={D.addIncome} tone="soft" onPress={() => go('rendimento')} style={action} />
             </View>
           ) : (
             <Button label={D.reopen} tone="soft" busy={busy} onPress={() => setStatus('ativo')} />
@@ -183,8 +188,8 @@ function Detail({
                 {D.monthsTitle}
               </Txt>
               {months.map((m) => (
-                <View key={m.month} style={styles.monthRow}>
-                  <Txt variant="label" style={{ flex: 1 }}>
+                <View key={m.month} style={[styles.monthRow, stacked && styles.rowStacked]}>
+                  <Txt variant="label" style={stacked ? undefined : { flex: 1 }}>
                     {m.partial ? `${formatMonthBR(m.month)} (até hoje)` : formatMonthBR(m.month)}
                   </Txt>
                   <MoneyTxt variant="label" style={tabular}>
@@ -218,10 +223,17 @@ function Detail({
                     <Txt variant="caption" color={colors.textSecondary}>
                       {m.note ? `${formatDateBR(m.occurredOn)} · ${m.note}` : formatDateBR(m.occurredOn)}
                     </Txt>
+                    {stacked ? (
+                      <MoneyTxt variant="label" style={tabular}>
+                        {formatBRL(m.amountCents)}
+                      </MoneyTxt>
+                    ) : null}
                   </View>
-                  <MoneyTxt variant="label" style={tabular}>
-                    {formatBRL(m.amountCents)}
-                  </MoneyTxt>
+                  {stacked ? null : (
+                    <MoneyTxt variant="label" style={tabular}>
+                      {formatBRL(m.amountCents)}
+                    </MoneyTxt>
+                  )}
                   {active ? <ChevronRight size={18} color={colors.textSecondary} aria-hidden /> : null}
                 </Pressable>
               );
@@ -231,9 +243,9 @@ function Detail({
             {T.rule}
           </Txt>
           <View style={styles.actions}>
-            <Button label={D.edit} icon={Pencil} tone="ghost" onPress={() => router.push({ pathname: '/investimento/[id]/editar', params: { id: i.id } })} style={styles.action} />
-            {active ? <Button label={D.close} tone="ghost" busy={busy} onPress={() => setStatus('encerrado')} style={styles.action} /> : null}
-            <Button label={D.delete} icon={Trash2} tone="ghost" onPress={() => setConfirmDelete(true)} style={styles.action} />
+            <Button label={D.edit} icon={Pencil} tone="ghost" onPress={() => router.push({ pathname: '/investimento/[id]/editar', params: { id: i.id } })} style={action} />
+            {active ? <Button label={D.close} tone="ghost" busy={busy} onPress={() => setStatus('encerrado')} style={action} /> : null}
+            <Button label={D.delete} icon={Trash2} tone="ghost" onPress={() => setConfirmDelete(true)} style={action} />
           </View>
         </Body>
       </Screen>
@@ -256,6 +268,8 @@ const styles = StyleSheet.create({
   big: { fontFamily: fonts.extrabold, fontSize: 30, lineHeight: 38 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 150 },
+  actionStacked: { alignSelf: 'auto', flexGrow: 1, flexBasis: '100%' },
+  rowStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: 2, paddingVertical: space[1] },
   monthRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 36 },
   histRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56, paddingVertical: space[2] },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },

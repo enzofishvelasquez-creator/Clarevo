@@ -8063,7 +8063,9 @@ setInterval(async () => {
   ok('I1 CSV: valores com vírgula e milhares lidos; a memória do aparelho traz "Lazer" para a padaria (a regra diria Mercado); regras para o restante', t1.includes('3 linhas · 3 marcadas') && t1.includes('01/10/2026 · Saída · Lazer') && t1.includes('03/10/2026 · Saída · Lazer') && t1.includes('06/10/2026 · Entrada · Reembolso') &&
     t1.includes('RESTAURANTE SABOR, CENTRO') && t1.includes('R$ 15,50') && t1.includes('R$ 62,40') && t1.includes('R$ 250,00'), t1.slice(0, 500));
   await btn('Importar 3 lançamentos').click(); await waitText('Importação concluída', 12000);
-  ok('I1 CSV: "3 lançamentos importados."', (await body()).includes('3 lançamentos importados.'));
+  // O resumo sai no mesmo cartão do título; se faltar, a tela do momento vai junto (falhou uma vez em 14/11/2026 e não se repetiu).
+  t1 = await body();
+  ok('I1 CSV: "3 lançamentos importados."', t1.includes('3 lançamentos importados.'), t1.slice(Math.max(0, t1.indexOf('Importação concluída') - 200), t1.indexOf('Importação concluída') + 400));
   await btn('Ver em Movimentos').click(); await waitText('Registrar recebimento'); await goResumo().catch(() => {});
   await expectTotals('I1 Resumo depois do CSV: R$ 11.250,00 recebidos, R$ 4.155,70 pagos, diferença R$ 7.094,30, e 650 a pagar', 'R$ 11.250,00', 'R$ 4.155,70', 'R$ 7.094,30', 'R$ 650,00');
 
@@ -14145,9 +14147,14 @@ setInterval(async () => {
   const acIds = await p.evaluate(async () => {
     const repo = await window.__e2e.repo(); const sp = await repo.getSpace(); const ctx = sp.personalContextId;
     const recs = await repo.listRecords(ctx, '2026-10'); const com = await repo.listCommitments(ctx, '2026-10'); const ser = await repo.listSeries(ctx);
-    const goals = await repo.listGoals(ctx); const cards = await repo.listCards(ctx); const accounts = await repo.listAccounts(ctx);
-    return { rec: recs[0].id, com: (com.find((c) => c.status !== 'pago') ?? com[0]).id, ser: ser[0].id, goal: goals[0].id, card: cards[0].id, account: accounts[0].id };
+    const goals = await repo.listGoals(ctx); const cards = await repo.listCards(ctx); const accounts = await repo.listAccounts(ctx); const invs = await repo.listInvestments(ctx);
+    return { rec: recs[0].id, com: (com.find((c) => c.status !== 'pago') ?? com[0]).id, ser: ser[0].id, goal: goals[0].id, card: cards[0].id, account: accounts[0].id, inv: invs[0].id };
   });
+  const AC_INVEST = [
+    ['investimento, detalhe', 'investimento/[id]/index', { id: acIds.inv }], ['investimento, editar', 'investimento/[id]/editar', { id: acIds.inv }],
+    ['investimento, rendimento', 'investimento/[id]/movimento', { id: acIds.inv, tipo: 'rendimento' }], ['investimento, novo', 'investimento/novo', {}],
+    ['plano de aportes', 'investimento/plano', {}], ['resumo para a declaração', 'investimento/declaracao', {}], ['comparar rendimentos', 'investimento/comparar', {}],
+  ];
   const AC_ROUTES = [
     ['registro novo, gasto', 'registro/novo', { tipo: 'despesa' }], ['registro novo, recebimento', 'registro/novo', { tipo: 'receita' }],
     ['registro, detalhe', 'registro/[id]/index', { id: acIds.rec }], ['registro, editar', 'registro/[id]/editar', { id: acIds.rec }],
@@ -14169,6 +14176,8 @@ setInterval(async () => {
     ['fatura', 'cartoes/[id]/fatura/[mes]/index', { id: acIds.card, mes: '2026-10' }], ['fatura, compra', 'cartoes/[id]/fatura/[mes]/compra', { id: acIds.card, mes: '2026-10' }],
     ['fatura, encargo', 'cartoes/[id]/fatura/[mes]/encargo', { id: acIds.card, mes: '2026-10' }], ['fatura, estorno', 'cartoes/[id]/fatura/[mes]/estorno', { id: acIds.card, mes: '2026-10' }], ['fatura, pagar', 'cartoes/[id]/fatura/[mes]/pagar', { id: acIds.card, mes: '2026-10' }],
     ['revisão dos últimos meses', 'retomar/index', {}], ['simulador', 'simular', {}],
+    // Investir (14/11/2026): o detalhe, os formulários, o plano de aportes, o resumo para a declaração e a comparação de rendimentos.
+    ...AC_INVEST,
   ];
   const acRouteNames = [];
   for (const [name, route, params] of AC_ROUTES) { await acNav(route, params); await acScan(name); acRouteNames.push(name); }
@@ -14267,6 +14276,8 @@ setInterval(async () => {
     ['meta', null, 'meta/[id]/index', { id: acIds.goal }], ['família', null, 'familia/index', {}], ['evolução', null, 'evolucao', {}],
     ['renda comprometida', null, 'renda-comprometida/index', {}], ['guardar', null, 'guardar/index', {}], ['importar', null, 'importar/index', {}],
     ['calculadora', null, 'calcular/[slug]', { slug: 'multa-e-juros' }], ['exportar', null, 'conta/exportar', {}],
+    // Investir (14/11/2026): com a letra a 200%, os rodapés de rótulo longo empilham e os valores descem para baixo do nome.
+    ...AC_INVEST.map(([name, route, params]) => [name, null, route, params]),
   ];
   let acShotN = 592;
   for (const [scale, width, suffix] of [[1.3, 360, '130'], [2, 359, '200']]) {

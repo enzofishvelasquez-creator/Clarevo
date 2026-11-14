@@ -4,13 +4,14 @@ import {
   COMPARE_OPTION_LABEL,
   COMPARE_TEXT,
   compareNetYields,
+  isStackedLayout,
   type CompareDraft,
   type CompareOptionKind,
 } from '@clarevo/core';
 import { router } from 'expo-router';
 import { Plus, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View, useWindowDimensions, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { SubHeader } from '@/components/header';
@@ -35,6 +36,9 @@ export default function CompararScreen() {
   const usesCdi = draft.options.some((o) => o.kind === 'cdi_tributado' || o.kind === 'cdi_isento');
   const usesIpca = draft.options.some((o) => o.kind === 'ipca_tributado');
   const result = outcome.ok ? outcome.result : null;
+  // Tela estreita ou letra grande: "Tirar a opção" desce para baixo do título.
+  const { width, fontScale } = useWindowDimensions();
+  const stacked = isStackedLayout(width, fontScale);
   // Revisão de 13/11/2026: ao tocar em "Comparar" com erro, o foco vai para o primeiro campo com erro.
   const amountRef = useRef<TextInput>(null);
   const daysRef = useRef<TextInput>(null);
@@ -97,8 +101,8 @@ export default function CompararScreen() {
           </Card>
           {draft.options.map((o, i) => (
             <Card key={i} style={{ gap: space[3] }}>
-              <View style={styles.optionHead}>
-                <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ flex: 1 }}>
+              <View style={[styles.optionHead, stacked && styles.optionHeadStacked]}>
+                <Txt variant="title" accessibilityRole="header" aria-level={2} style={stacked ? undefined : { flex: 1 }}>
                   {T.optionTitle(i + 1)}
                 </Txt>
                 {draft.options.length > 1 ? (
@@ -183,4 +187,5 @@ export default function CompararScreen() {
 
 const styles = StyleSheet.create({
   optionHead: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  optionHeadStacked: { flexDirection: 'column', alignItems: 'flex-start', gap: space[1] },
 });
