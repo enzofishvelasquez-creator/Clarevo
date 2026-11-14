@@ -1,6 +1,8 @@
 import {
   DETAILS_TEXT,
+  FUND_CNPJ_KINDS,
   INDEX_KIND_LABEL,
+  QUANTITY_KINDS,
   INSTITUTION_MAX,
   INVESTMENT_INDEX_KINDS,
   INVESTMENT_LIQUIDITIES,
@@ -53,6 +55,8 @@ export const InvestmentDetailsSection = forwardRef<
     maturityText: useRef<TextInput>(null),
     liquidityOnText: useRef<TextInput>(null),
     liquidityDaysText: useRef<TextInput>(null),
+    quantityText: useRef<TextInput>(null),
+    fundCnpjText: useRef<TextInput>(null),
   };
   useImperativeHandle(ref, () => ({
     focus: (field) => {
@@ -101,6 +105,20 @@ export const InvestmentDetailsSection = forwardRef<
               ))}
             </ChoiceGroup>
           ) : null}
+          {kind !== null && FUND_CNPJ_KINDS.includes(kind) ? (
+            <TextField
+              ref={refs.fundCnpjText}
+              label={T.fundCnpjLabel}
+              hint={T.fundCnpjHint}
+              placeholder="00.000.000/0001-00"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={18}
+              value={draft.fundCnpjText}
+              onChangeText={(t) => set({ fundCnpjText: t })}
+              error={errors.fundCnpjText}
+            />
+          ) : null}
           <TextField
             ref={refs.institutionText}
             label={T.institutionLabel}
@@ -140,6 +158,20 @@ export const InvestmentDetailsSection = forwardRef<
             onChangeText={(t) => set({ maturityText: maskDateBR(t) })}
             error={errors.maturityText}
           />
+          {kind !== null && QUANTITY_KINDS.includes(kind) ? (
+            <TextField
+              ref={refs.quantityText}
+              label={T.quantityLabel(kind)}
+              hint={T.quantityHint(kind)}
+              placeholder="0,00"
+              keyboardType="decimal-pad"
+              inputMode="decimal"
+              maxLength={24}
+              value={draft.quantityText}
+              onChangeText={(t) => set({ quantityText: t })}
+              error={errors.quantityText}
+            />
+          ) : null}
           <ChoiceGroup label={T.liquidityLabel} hint="Toque de novo para desmarcar." error={errors.liquidity}>
             {INVESTMENT_LIQUIDITIES.map((l) => (
               <Chip key={l} label={LIQUIDITY_LABEL[l]} selected={draft.liquidity === l} onPress={() => set({ liquidity: draft.liquidity === l ? null : l })} />

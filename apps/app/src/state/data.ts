@@ -104,6 +104,7 @@ import {
   type GoalMovementKind,
   type GoalPlan,
   type GoalStatus,
+  type GoalValueSource,
   type GoalWrite,
   type ImportDestination,
   type ImportItem,
@@ -1693,6 +1694,22 @@ export function useMarketIndices(fromMonth: IsoMonth | null) {
   });
 }
 
+/**
+ * Preço do dia dos títulos públicos e cota dos fundos (função "precos"; exemplo na demonstração). Guardado por 6 horas; falha não tenta de
+ * novo sozinha (a tela diz que não conseguiu e o valor do extrato continua o que vale).
+ */
+export function usePublicPrices(request: { treasury: boolean; fundos: readonly string[] } | null) {
+  const repo = useRepo();
+  const fundos = request ? [...request.fundos].sort() : [];
+  return useQuery({
+    queryKey: ['investments', 'prices', request?.treasury ?? false, fundos.join(',')],
+    queryFn: () => repo.getPublicPrices({ treasury: request!.treasury, fundos }),
+    enabled: request !== null && (request.treasury || fundos.length > 0),
+    staleTime: 6 * 60 * 60 * 1000,
+    retry: false,
+  });
+}
+
 /** Plano de aportes por mês nos investimentos (D-099, item 12), ou null sem plano. */
 export function useInvestmentPlan(contextId: string | undefined) {
   const repo = useRepo();
@@ -1721,6 +1738,8 @@ export function useInvalidateInvestments() {
     qc.invalidateQueries({ queryKey: ['investments', 'movements'] });
     qc.invalidateQueries({ queryKey: ['investments', 'context-movements'] });
     qc.invalidateQueries({ queryKey: ['returnReview'] });
+    // Meta que lê o valor dos investimentos ligados (D-099, item 13 fase 2): o valor guardado muda junto.
+    qc.invalidateQueries({ queryKey: ['goals'] });
   };
 }
 
@@ -1739,6 +1758,16 @@ export function useUpdateGoal() {
   const invalidate = useInvalidateGoals();
   return useMutation({
     mutationFn: (v: { key: string; id: string; version: number; input: GoalInput }) => repo.updateGoal(v.key, v.id, v.version, v.input),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+/** De onde vem o valor guardado da meta (D-099, item 13 fase 2): dos registros ou dos investimentos ligados. */
+export function useSetGoalValueSource() {
+  const repo = useRepo();
+  const invalidate = useInvalidateGoals();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number; source: GoalValueSource }) => repo.setGoalValueSource(v.key, v.id, v.version, v.source),
     onSuccess: (w) => invalidate(w),
   });
 }

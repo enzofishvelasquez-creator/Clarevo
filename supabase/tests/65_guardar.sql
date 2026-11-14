@@ -507,7 +507,7 @@ begin
     end if;
   end;
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 84, 'a lista vigente tem 84 ações (com as 2 do plano de aportes, testadas em 99zzzzzzzzzzzzzzzzz, com as 7 de investimentos, testadas em 99zzzzzzzzzzz, com a de ordenar as metas, testada em 99zzzzzzzzzz, com a do aceite dos termos, testada em 99zzz, 26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
+           where c.conname = 'record_operations_action_check') = 85, 'a lista vigente tem 85 ações (com a da origem do valor da meta, testada em 99zzzzzzzzzzzzzzzzzz, com as 2 do plano de aportes, testadas em 99zzzzzzzzzzzzzzzzz, com as 7 de investimentos, testadas em 99zzzzzzzzzzz, com a de ordenar as metas, testada em 99zzzzzzzzzz, com a do aceite dos termos, testada em 99zzz, 26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''responder_guardar''::text', 'g') m
            where c.conname = 'record_operations_action_check') = 1, 'responder_guardar na lista de ações';
   -- As 25 anteriores continuam aceitas pela restrição de ação (cada caso desfeito no próprio bloco).
@@ -526,7 +526,7 @@ begin
             'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_investimento', 'excluir_movimento_meta',
             'excluir_orcamento_categoria', 'excluir_plano_investimentos', 'excluir_renda_referencia', 'excluir_serie', 'gerar_codigo_telegram', 'gerar_codigo_whatsapp',
             'imagem_meta', 'importar_extrato', 'informar_ano', 'ligar_telegram', 'ligar_whatsapp', 'marcar_assinatura',
-            'marcar_mes_conferido', 'ordenar_metas', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_investimento',
+            'marcar_mes_conferido', 'ordenar_metas', 'origem_valor_meta', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_investimento',
             'registrar_movimento_meta', 'remover_membro_familia', 'renovar_convite_licenca', 'responder_origem_cadastro',
             'revisar_assinaturas', 'sair_familia', 'situacao_cartao', 'situacao_conta', 'situacao_investimento', 'situacao_meta',
             'tirar_ano', 'transferir_titularidade_familia'],

@@ -25,6 +25,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { InvestmentEstimateCard, InvestmentFichaCard, InvestmentNetCard, investmentCaption } from '@/components/investment-ficha';
 import { InvestmentReturns, InvestmentTotalsLines } from '@/components/investment-parts';
+import { InvestmentPublicPriceCard } from '@/components/investment-public-price';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Banner, Body, Button, Card, Screen, Txt, styles as ui } from '@/components/ui';
@@ -180,6 +181,7 @@ function Detail({
             <Button label={D.reopen} tone="soft" busy={busy} onPress={() => setStatus('ativo')} />
           )}
           <InvestmentEstimateCard investment={i} movements={movements} onNotice={onNotice} />
+          <InvestmentPublicPriceCard investment={i} onNotice={onNotice} />
           <InvestmentNetCard investment={i} movements={movements} />
           <InvestmentFichaCard investment={i} />
           {months.length > 0 ? (

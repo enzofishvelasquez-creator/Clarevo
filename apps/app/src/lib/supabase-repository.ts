@@ -78,6 +78,7 @@ import {
   type GoalMovementInput,
   type GoalMovementKind,
   type GoalStatus,
+  type GoalValueSource,
   type GoalWrite,
   type ImportDestination,
   type ImportItem,
@@ -136,6 +137,10 @@ import {
   type InvestmentMovementInput,
   type InvestmentMovementKind,
   type InvestmentPlan,
+  type PublicPrices,
+  type TreasuryPrice,
+  type TreasuryPrices,
+  type FundQuoteResult,
   type InvestmentStatus,
   type InvestmentWrite,
   type MarketIndices,
@@ -431,6 +436,8 @@ interface GoalRow {
   last_movement_on: string | null;
   /** D-093 (0031); ausente num banco ainda sem a migração. */
   priority?: number | null;
+  /** D-099 (0037): de onde vem o valor guardado; ausente num banco ainda sem a migração ('registros'). */
+  value_source?: string | null;
 }
 
 /** Linha de goal_movements. */
@@ -622,8 +629,11 @@ const KNOWN: RepoErrorCode[] = [
   'situacao_invalida',
   'nome_invalido',
   'lista_invalida',
-  // Meta ligada ao investimento (D-099, 0036).
+  // Meta ligada ao investimento (D-099, 0036), quantidade e CNPJ do fundo e a origem do valor da meta (0037).
   'meta_invalida',
+  'quantidade_invalida',
+  'cnpj_invalido',
+  'origem_invalida',
   // Assinatura paga (D-083): o gatilho de record_operations recusa a escrita em só leitura. Avisa a tela de acesso (accessRefused).
   'assinatura_necessaria',
   // Aceite dos termos (A1): só a versão vigente.
@@ -1154,6 +1164,9 @@ interface InvestmentRow {
   liquidity_days?: number | null;
   /** Meta ligada (D-099, item 13; migração 0036); ausente num banco sem a migração. */
   goal_id?: string | null;
+  /** Quantidade em milionésimos e CNPJ do fundo (D-099, itens 19 e 20; migração 0037); ausentes num banco sem a migração. */
+  quantity_micro?: number | null;
+  fund_cnpj?: string | null;
 }
 
 /** A ficha da linha: o que o app não conhece fica vazio (nunca um valor errado na tela). */
@@ -1170,6 +1183,8 @@ function toInvestmentDetails(r: InvestmentRow): InvestmentDetails {
     liquidity: known(r.liquidity, INVESTMENT_LIQUIDITIES),
     liquidityOn: date(r.liquidity_on),
     liquidityDays: int(r.liquidity_days),
+    quantityMicro: int(r.quantity_micro),
+    fundCnpj: typeof r.fund_cnpj === 'string' && /^[0-9A-Z]{14}$/.test(r.fund_cnpj) ? r.fund_cnpj : null,
   };
   return investmentDetailsError(r.kind, details) === null ? details : { ...EMPTY_INVESTMENT_DETAILS, institution: details.institution };
 }
@@ -1188,6 +1203,9 @@ function detailsPayload(d: InvestmentDetails | undefined, goalId?: string | null
     liquidity: d.liquidity,
     liquidity_on: d.liquidityOn,
     liquidity_days: d.liquidityDays,
+    // Quantidade e CNPJ (0037): sem o campo (ficha de uma versão anterior), a chave não vai e o banco mantém o que tinha.
+    ...(d.quantityMicro !== undefined ? { quantity_micro: d.quantityMicro } : {}),
+    ...(d.fundCnpj !== undefined ? { fund_cnpj: d.fundCnpj } : {}),
   };
 }
 
@@ -1284,6 +1302,35 @@ function toInvestmentWrite(data: unknown): InvestmentWrite {
 const INVESTMENT_MOVEMENT_COLUMNS = 'id, investment_id, context_id, kind, amount_cents, occurred_on, note, income_kind, created_by, version, created_at, updated_at';
 /** A função do servidor do CDI e do IPCA (D-093). */
 const INDICES_FUNCTION = 'indices';
+const PRECOS_FUNCTION = 'precos';
+
+/** A resposta da função "precos", conferida: título, vencimento e preço inteiros e no formato; cota em texto decimal. Nada errado na tela. */
+function toPublicPrices(data: unknown): PublicPrices {
+  const d = (data ?? {}) as { treasury?: unknown; fundos?: unknown; fetchedOn?: unknown };
+  const int = (v: unknown) => (typeof v === 'number' && Number.isSafeInteger(v) ? v : null);
+  let treasury: TreasuryPrices | null = null;
+  const t = d.treasury as { on?: unknown; titles?: unknown } | null | undefined;
+  if (t && typeof t.on === 'string' && ISO_DATE.test(t.on) && Array.isArray(t.titles)) {
+    const titles: TreasuryPrice[] = [];
+    for (const x of t.titles as Record<string, unknown>[]) {
+      const pu = int(x?.puSellCents);
+      if (typeof x?.title !== 'string' || typeof x.maturityOn !== 'string' || !ISO_DATE.test(x.maturityOn) || pu === null || pu <= 0) continue;
+      titles.push({ title: x.title, maturityOn: x.maturityOn, puSellCents: pu, puBuyCents: int(x.puBuyCents), rateSellBp: int(x.rateSellBp), rateBuyBp: int(x.rateBuyBp) });
+    }
+    treasury = { on: t.on, titles };
+  }
+  const fundos: Record<string, FundQuoteResult> = {};
+  if (typeof d.fundos === 'object' && d.fundos !== null) {
+    for (const [cnpj, q] of Object.entries(d.fundos as Record<string, unknown>)) {
+      if (!/^[0-9A-Z]{14}$/.test(cnpj)) continue;
+      const v = q as { on?: unknown; quota?: unknown; subclasses?: unknown } | null;
+      if (v === null) fundos[cnpj] = null;
+      else if (v.subclasses === true) fundos[cnpj] = { subclasses: true };
+      else if (typeof v.on === 'string' && ISO_DATE.test(v.on) && typeof v.quota === 'string' && /^\d+(\.\d{1,12})?$/.test(v.quota)) fundos[cnpj] = { on: v.on, quota: v.quota };
+    }
+  }
+  return { treasury, fundos, fetchedOn: typeof d.fetchedOn === 'string' && ISO_DATE.test(d.fetchedOn) ? d.fetchedOn : '' };
+}
 
 function toGoal(g: GoalRow): Goal {
   const targetCents = whole(g.target_cents);
@@ -1333,6 +1380,7 @@ function toGoal(g: GoalRow): Goal {
     depreciationCents,
     lastMovementOn: g.last_movement_on,
     priority: g.priority === null || g.priority === undefined ? null : whole(g.priority),
+    valueSource: g.value_source === 'investimentos' ? 'investimentos' : 'registros',
   };
 }
 
@@ -2697,6 +2745,13 @@ export class SupabaseRepository implements RecordsRepository {
     return toInvestmentPlan((data as { plan?: InvestmentPlanRow | null } | null)?.plan);
   }
 
+  /** Preço dos títulos públicos e cota dos fundos pela função "precos" (dados abertos): no pedido, só os CNPJs dos fundos. */
+  async getPublicPrices(request: { treasury: boolean; fundos: readonly string[] }): Promise<PublicPrices> {
+    const { data, error } = await this.db.functions.invoke(PRECOS_FUNCTION, { body: { treasury: request.treasury, fundos: request.fundos } });
+    if (error) throw new RepoError('precos_indisponiveis');
+    return toPublicPrices(data);
+  }
+
   /** CDI e IPCA pela função "indices" (que busca no Banco Central): sem dado de ninguém no pedido, só o mês de partida. */
   async getMarketIndices(fromMonth: IsoMonth): Promise<MarketIndices> {
     const { data, error } = await this.db.functions.invoke(INDICES_FUNCTION, { body: { desde: fromMonth } });
@@ -2793,6 +2848,10 @@ export class SupabaseRepository implements RecordsRepository {
       p_expected_version: expectedVersion,
       ...this.goalFields(input),
     });
+  }
+
+  setGoalValueSource(key: string, goalId: string, expectedVersion: number, source: GoalValueSource) {
+    return this.callGoal('set_goal_value_source', { p_key: key, p_goal_id: goalId, p_expected_version: expectedVersion, p_source: source });
   }
 
   setGoalStatus(key: string, goalId: string, expectedVersion: number, status: GoalStatus) {

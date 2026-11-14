@@ -6,6 +6,7 @@ import {
   GOAL_TYPE_LABEL,
   UNCERTAIN_TEXT,
   GOAL_IMAGE_TEXT,
+  INVESTMENT_GOAL_TEXT,
   goalDetailTexts,
   goalPace,
   goalErrorText,
@@ -135,7 +136,7 @@ export default function MetaDetalhe() {
       setMenu(false);
       fn();
     };
-    if (g.status !== 'arquivada') choices.push({ label: D.addIncome, onPress: go(() => open('/meta/[id]/movimento', { tipo: 'rendimento' })) });
+    if (g.status !== 'arquivada' && g.valueSource !== 'investimentos') choices.push({ label: D.addIncome, onPress: go(() => open('/meta/[id]/movimento', { tipo: 'rendimento' })) });
     choices.push({ label: D.edit, onPress: go(() => (g.goalType === 'emergencia' ? router.push('/reserva') : open('/meta/[id]/editar'))) });
     choices.push({ label: GOAL_IMAGE_TEXT.change, onPress: go(() => router.push({ pathname: '/meta/[id]/imagem', params: { id } })) });
     if (g.status === 'ativa' && !reached) choices.push({ label: D.conclude, onPress: go(() => changeStatus(g, 'concluida', D.concluded)) });
@@ -375,15 +376,22 @@ function GoalBody({
           ) : (
             <>
               {reached && goal.status === 'ativa' ? <Button label={D.conclude} icon={CircleCheck} disabled={busy} onPress={onConclude} /> : null}
-              <Button
-                label={D.addDeposit}
-                icon={Plus}
-                tone={reached && goal.status === 'ativa' ? 'soft' : 'brand'}
-                disabled={busy}
-                onPress={() => onOpenMovement('aporte')}
-              />
-              <Button label={D.addWithdrawal} icon={Minus} tone="soft" disabled={busy} onPress={() => onOpenMovement('resgate')} />
-              <Button label={D.updateSaved} icon={RefreshCw} tone="soft" disabled={busy} onPress={() => onOpenMovement('atualizar')} />
+              {/* Com o valor lido dos investimentos ligados (D-099, item 13 fase 2), aportes e resgates ficam na aba Investir. */}
+              {goal.valueSource === 'investimentos' ? (
+                <Button label={INVESTMENT_GOAL_TEXT.source.openInvestments} tone={reached && goal.status === 'ativa' ? 'soft' : 'brand'} onPress={() => router.push('/investimentos')} />
+              ) : (
+                <>
+                  <Button
+                    label={D.addDeposit}
+                    icon={Plus}
+                    tone={reached && goal.status === 'ativa' ? 'soft' : 'brand'}
+                    disabled={busy}
+                    onPress={() => onOpenMovement('aporte')}
+                  />
+                  <Button label={D.addWithdrawal} icon={Minus} tone="soft" disabled={busy} onPress={() => onOpenMovement('resgate')} />
+                  <Button label={D.updateSaved} icon={RefreshCw} tone="soft" disabled={busy} onPress={() => onOpenMovement('atualizar')} />
+                </>
+              )}
               <Button label="Mais ações" icon={Ellipsis} tone="ghost" disabled={busy} onPress={onMenu} />
             </>
           )}
@@ -395,6 +403,11 @@ function GoalBody({
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             {D.historyTitle}
           </Txt>
+          {goal.valueSource === 'investimentos' ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {INVESTMENT_GOAL_TEXT.source.paused}
+            </Txt>
+          ) : null}
           {groups.length === 0 ? (
             <Txt variant="label" color={colors.textSecondary} style={{ paddingVertical: space[2] }}>
               {D.historyEmpty}

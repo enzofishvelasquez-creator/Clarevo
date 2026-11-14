@@ -1,4 +1,5 @@
 import type { IsoDate } from './dates';
+import { cnpjValid, formatCnpj } from './nota';
 import { formatDateBR, isValidIsoDate, parseDateBR } from './dates';
 import type { InvestmentKind } from './investments';
 
@@ -160,6 +161,13 @@ export interface InvestmentDetails {
   liquidityOn: IsoDate | null;
   /** Com liquidity = 'dias': em quantos dias o dinheiro cai depois do pedido (1 a 1800). */
   liquidityDays: number | null;
+  /**
+   * Quantidade de títulos ou de cotas em milionésimos (D-099, itens 19 e 20): 530000 = 0,53 título; 1234567890 = 1.234,56789 cotas. Só em
+   * títulos públicos e fundos; com ela, a Clarevo mostra o valor pelo preço público do título ou pela cota do fundo.
+   */
+  quantityMicro: number | null;
+  /** CNPJ do fundo, só os 14 caracteres (números, ou letras e números no CNPJ alfanumérico), para buscar a cota no Informe Diário da CVM. */
+  fundCnpj: string | null;
 }
 
 export const EMPTY_INVESTMENT_DETAILS: InvestmentDetails = {
@@ -171,9 +179,51 @@ export const EMPTY_INVESTMENT_DETAILS: InvestmentDetails = {
   liquidity: null,
   liquidityOn: null,
   liquidityDays: null,
+  quantityMicro: null,
+  fundCnpj: null,
 };
 
-export type InvestmentDetailsErrorCode = 'subtipo_invalido' | 'instituicao_invalida' | 'rendimento_invalido' | 'taxa_invalida' | 'vencimento_invalido' | 'liquidez_invalida';
+export type InvestmentDetailsErrorCode =
+  | 'subtipo_invalido'
+  | 'instituicao_invalida'
+  | 'rendimento_invalido'
+  | 'taxa_invalida'
+  | 'vencimento_invalido'
+  | 'liquidez_invalida'
+  | 'quantidade_invalida'
+  | 'cnpj_invalido';
+
+/** Tipos com quantidade (títulos públicos e fundos) e com CNPJ do fundo (fundos). O banco confere o mesmo. */
+export const QUANTITY_KINDS: readonly InvestmentKind[] = ['titulos_publicos', 'fundos'];
+export const FUND_CNPJ_KINDS: readonly InvestmentKind[] = ['fundos'];
+/** Até 1 bilhão de títulos ou cotas, em milionésimos (o banco confere o mesmo). */
+export const QUANTITY_MICRO_MAX = 1_000_000_000_000_000;
+
+/** CNPJ válido, numérico ou alfanumérico (a mesma conta da nota fiscal, `cnpjValid` de nota.ts). */
+export const isValidCnpj = cnpjValid;
+
+/** "00.017.024/0001-53" ou "00017024000153" para "00017024000153"; letras em maiúsculas. null se não sobra um CNPJ válido. */
+export function normalizeCnpj(text: string): string | null {
+  const t = text.toUpperCase().replace(/[.\/\s-]/g, '');
+  return isValidCnpj(t) ? t : null;
+}
+
+/** "0,53", "1.234,567891" ou "12" para milionésimos (530000, 1234567891, 12000000). Até 6 casas depois da vírgula; vazio ou zero é null. */
+export function parseQuantityText(text: string): number | null {
+  const t = text.trim().replace(/\s/g, '');
+  if (!/^(\d{1,3}(\.\d{3})+|\d+)(,\d{1,6})?$/.test(t)) return null;
+  const [int, frac = ''] = t.replace(/\./g, '').split(',');
+  const micro = Number(int) * 1_000_000 + Number(frac.padEnd(6, '0'));
+  return Number.isSafeInteger(micro) && micro >= 1 && micro <= QUANTITY_MICRO_MAX ? micro : null;
+}
+
+/** 530000 para "0,53"; 1234567891 para "1.234,567891" (sem zeros sobrando no fim). */
+export function formatQuantity(micro: number): string {
+  const int = Math.floor(micro / 1_000_000);
+  const frac = String(micro % 1_000_000).padStart(6, '0').replace(/0+$/, '');
+  const intText = int.toLocaleString('pt-BR');
+  return frac === '' ? intText : `${intText},${frac}`;
+}
 
 const charCount = (text: string) => [...text].length;
 
@@ -214,6 +264,10 @@ export function investmentDetailsError(kind: InvestmentKind, d: InvestmentDetail
   } else if (d.liquidity === 'dias') {
     if (d.liquidityDays === null || !Number.isSafeInteger(d.liquidityDays) || d.liquidityDays < 1 || d.liquidityDays > LIQUIDITY_DAYS_MAX || d.liquidityOn !== null) return 'liquidez_invalida';
   } else if (d.liquidityOn !== null || d.liquidityDays !== null) return 'liquidez_invalida';
+  const quantity = d.quantityMicro ?? null;
+  if (quantity !== null && (!QUANTITY_KINDS.includes(kind) || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > QUANTITY_MICRO_MAX)) return 'quantidade_invalida';
+  const cnpj = d.fundCnpj ?? null;
+  if (cnpj !== null && (!FUND_CNPJ_KINDS.includes(kind) || !isValidCnpj(cnpj))) return 'cnpj_invalido';
   return null;
 }
 
@@ -374,9 +428,22 @@ export interface InvestmentDetailsDraft {
   liquidity: InvestmentLiquidity | null;
   liquidityOnText: string;
   liquidityDaysText: string;
+  quantityText: string;
+  fundCnpjText: string;
 }
 export type InvestmentDetailsField = keyof InvestmentDetailsDraft;
-export const DETAILS_FIELD_ORDER: InvestmentDetailsField[] = ['subkind', 'institutionText', 'indexKind', 'rateText', 'maturityText', 'liquidity', 'liquidityOnText', 'liquidityDaysText'];
+export const DETAILS_FIELD_ORDER: InvestmentDetailsField[] = [
+  'subkind',
+  'fundCnpjText',
+  'institutionText',
+  'indexKind',
+  'rateText',
+  'maturityText',
+  'quantityText',
+  'liquidity',
+  'liquidityOnText',
+  'liquidityDaysText',
+];
 
 export const EMPTY_DETAILS_DRAFT: InvestmentDetailsDraft = {
   subkind: null,
@@ -387,6 +454,8 @@ export const EMPTY_DETAILS_DRAFT: InvestmentDetailsDraft = {
   liquidity: null,
   liquidityOnText: '',
   liquidityDaysText: '',
+  quantityText: '',
+  fundCnpjText: '',
 };
 
 /** "110" ou "110,5" ou "6,25%" para centésimos de ponto (11000, 11050, 625). Aceita sinal de menos (Selic e IPCA). */
@@ -412,6 +481,8 @@ export function detailsToDraft(d: InvestmentDetails): InvestmentDetailsDraft {
     liquidity: d.liquidity,
     liquidityOnText: d.liquidityOn ? formatDateBR(d.liquidityOn) : '',
     liquidityDaysText: d.liquidityDays === null ? '' : String(d.liquidityDays),
+    quantityText: d.quantityMicro == null ? '' : formatQuantity(d.quantityMicro),
+    fundCnpjText: d.fundCnpj == null ? '' : formatCnpj(d.fundCnpj),
   };
 }
 
@@ -455,8 +526,19 @@ export function validateDetailsDraft(
     else if (!Number.isInteger(n) || n < 1 || n > LIQUIDITY_DAYS_MAX) errors.liquidityDaysText = E.days;
     else liquidityDays = n;
   }
+  // Quantidade e CNPJ (D-099, itens 19 e 20): só nos tipos que os usam; de outro tipo (a pessoa trocou o tipo depois) caem fora sem erro.
+  let quantityMicro: number | null = null;
+  if (kind !== null && QUANTITY_KINDS.includes(kind) && draft.quantityText.trim() !== '') {
+    quantityMicro = parseQuantityText(draft.quantityText);
+    if (quantityMicro === null) errors.quantityText = E.quantity;
+  }
+  let fundCnpj: string | null = null;
+  if (kind !== null && FUND_CNPJ_KINDS.includes(kind) && draft.fundCnpjText.trim() !== '') {
+    fundCnpj = normalizeCnpj(draft.fundCnpjText);
+    if (fundCnpj === null) errors.fundCnpjText = E.cnpj;
+  }
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, details: { subkind, institution, indexKind, rateBp, maturityOn, liquidity, liquidityOn, liquidityDays } };
+  return { ok: true, details: { subkind, institution, indexKind, rateBp, maturityOn, liquidity, liquidityOn, liquidityDays, quantityMicro, fundCnpj } };
 }
 
 // ---------------------------------------------------------------------------
@@ -522,6 +604,13 @@ export const DETAILS_TEXT = {
   liquidityOnLabel: 'Pode resgatar a partir de',
   liquidityDaysLabel: 'Em quantos dias o dinheiro cai',
   liquidityDaysHint: 'Por exemplo 1 para o dia seguinte ao pedido.',
+  quantityLabel: (kind: InvestmentKind) => (kind === 'fundos' ? 'Quantidade de cotas (opcional)' : 'Quantidade de títulos (opcional)'),
+  quantityHint: (kind: InvestmentKind) =>
+    kind === 'fundos'
+      ? 'Como está no extrato, por exemplo 1.234,567891. Com o CNPJ, a Clarevo mostra o valor pela cota publicada pela CVM.'
+      : 'Como está no extrato, por exemplo 0,53. Com o vencimento, a Clarevo mostra o valor pelo preço publicado pelo Tesouro Nacional.',
+  fundCnpjLabel: 'CNPJ do fundo (opcional)',
+  fundCnpjHint: 'Está na lâmina do fundo ou no extrato da corretora, como 00.000.000/0001-00.',
   /** O que a ficha deduz, mostrado no formulário e no detalhe. */
   regimeLine: (regime: TaxRegime) =>
     ({
@@ -542,6 +631,8 @@ export const DETAILS_TEXT = {
     liquidityOnEmpty: 'Informe a partir de quando pode resgatar.',
     daysEmpty: 'Informe em quantos dias o dinheiro cai.',
     days: `Use um número de 1 a ${LIQUIDITY_DAYS_MAX}.`,
+    quantity: 'Informe uma quantidade válida, como 0,53, com até 6 casas depois da vírgula.',
+    cnpj: 'Confira o CNPJ: os números não batem.',
   },
 } as const;
 
@@ -560,6 +651,10 @@ export function investmentDetailsErrorText(code: InvestmentDetailsErrorCode | st
       return E.date;
     case 'liquidez_invalida':
       return 'Confira quando pode resgatar.';
+    case 'quantidade_invalida':
+      return E.quantity;
+    case 'cnpj_invalido':
+      return E.cnpj;
     default:
       return null;
   }

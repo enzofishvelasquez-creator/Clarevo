@@ -31,6 +31,7 @@ import type {
   GoalMovementInput,
   GoalMovementKind,
   GoalStatus,
+  GoalValueSource,
   IncomeReference,
   MonthCheck,
   MonthCheckKind,
@@ -170,8 +171,9 @@ import {
   type InvestmentStatus,
   type NewInvestmentInput,
 } from './investments';
-import { EMPTY_INVESTMENT_DETAILS, investmentDetailsError, normalizeInstitution, type InvestmentDetails } from './investment-details';
+import { EMPTY_INVESTMENT_DETAILS, FUND_CNPJ_KINDS, QUANTITY_KINDS, investmentDetailsError, normalizeInstitution, type InvestmentDetails } from './investment-details';
 import { investmentPlanError } from './investment-plan';
+import { examplePublicPrices, type PublicPrices } from './investment-prices';
 import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX, nextMonthAllowed, recordMonth } from './records';
 import { isLongAbsence, isReviewableMonth, monthsOverview as overviewOf } from './retorno';
 import { savingsAnswerError, savingsAskAgainOn } from './savings';
@@ -1963,6 +1965,7 @@ export class MemoryRepository implements RecordsRepository {
         createdAt: now,
         updatedAt: now,
         priority: null,
+        valueSource: 'registros',
       };
       this.goals.set(goal.id, goal);
       let movementId: string | null = null;
@@ -2119,6 +2122,30 @@ export class MemoryRepository implements RecordsRepository {
    * Como set_goal_order (D-093, migração 0031). Ordem: repetição; nao_encontrado (sem leitura); sem_permissao (sem escrita); lista_invalida
    * (a lista não é exatamente a das metas ativas do contexto, sem a reserva). A prioridade muda sem subir a versão da meta.
    */
+  /**
+   * Como set_goal_value_source (0037). Ordem: repetição; trava (nao_encontrado, sem_permissao); versão; origem_invalida; contexto_invalido
+   * ('investimentos' fora do Pessoal). Sobe a versão da meta e conta como anotação.
+   */
+  async setGoalValueSource(key: string, goalId: string, expectedVersion: number, source: GoalValueSource): Promise<GoalWrite> {
+    return this.write(() => {
+      const payload = [goalId, expectedVersion, source];
+      const replayed = this.replay(key, 'origem_valor_meta', payload);
+      if (replayed) return this.goalResult(replayed.goalId!, null);
+      const current = this.liveGoal(goalId);
+      if (expectedVersion !== current.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current.version}`);
+      if (source !== 'registros' && source !== 'investimentos') throw new RepoError('origem_invalida');
+      if (source === 'investimentos' && this.space?.personalContextId !== current.contextId) throw new RepoError('contexto_invalido');
+      this.goals.set(goalId, { ...current, valueSource: source, version: current.version + 1, updatedAt: this.stamp() });
+      this.saveOperation(key, 'origem_valor_meta', payload, { contextId: current.contextId, recordId: null, commitmentId: null, goalId });
+      return this.goalResult(goalId, null);
+    });
+  }
+
+  /** Na demonstração, preços e cotas de exemplo (nunca os publicados, e nada vai à rede). */
+  async getPublicPrices(request: { treasury: boolean; fundos: readonly string[] }): Promise<PublicPrices> {
+    return this.read(() => examplePublicPrices(request, this.opts.today()));
+  }
+
   async setGoalOrder(key: string, contextId: string, goalIds: readonly string[]): Promise<GoalOrderWrite> {
     return this.write(() => {
       const ids = [...goalIds];
@@ -2319,13 +2346,31 @@ export class MemoryRepository implements RecordsRepository {
       const code = investmentInputError(input);
       if (code) throw new RepoError(code);
       // Sem a ficha (versão antiga do app), ela fica como está; com o tipo mudado, só o tipo exato que não pertence ao novo sai (F5).
-      const kept: InvestmentDetails = { subkind: i.subkind, institution: i.institution, indexKind: i.indexKind, rateBp: i.rateBp, maturityOn: i.maturityOn, liquidity: i.liquidity, liquidityOn: i.liquidityOn, liquidityDays: i.liquidityDays };
+      const kept: InvestmentDetails = {
+        subkind: i.subkind,
+        institution: i.institution,
+        indexKind: i.indexKind,
+        rateBp: i.rateBp,
+        maturityOn: i.maturityOn,
+        liquidity: i.liquidity,
+        liquidityOn: i.liquidityOn,
+        liquidityDays: i.liquidityDays,
+        quantityMicro: i.quantityMicro,
+        fundCnpj: i.fundCnpj,
+      };
+      // A quantidade e o CNPJ (0037) ficam quando a ficha chega sem eles (versão anterior do app), se ainda valem para o tipo; com o tipo
+      // mudado, saem os que não pertencem ao novo (como o tipo exato, F5).
+      const extrasFor = (d: Partial<InvestmentDetails>) => ({
+        quantityMicro: d.quantityMicro !== undefined ? d.quantityMicro : QUANTITY_KINDS.includes(input.kind) ? i.quantityMicro : null,
+        fundCnpj: d.fundCnpj !== undefined ? d.fundCnpj : FUND_CNPJ_KINDS.includes(input.kind) ? i.fundCnpj : null,
+      });
+      const keptForKind: InvestmentDetails = { ...kept, ...extrasFor({}) };
       const details =
         input.details !== undefined
-          ? this.investmentDetails(input.kind, input.details)
-          : investmentDetailsError(input.kind, kept) === null
-            ? kept
-            : this.investmentDetails(input.kind, { ...kept, subkind: null });
+          ? this.investmentDetails(input.kind, { ...input.details, ...extrasFor(input.details) })
+          : investmentDetailsError(input.kind, keptForKind) === null
+            ? keptForKind
+            : this.investmentDetails(input.kind, { ...keptForKind, subkind: null });
       const goalId = this.investmentGoal(i.contextId, input.details !== undefined, input.goalId, i.goalId);
       this.investments.set(id, { ...i, name: normalizeInvestmentName(input.name), kind: input.kind, ...details, goalId, version: i.version + 1, updatedAt: this.stamp() });
       this.saveOperation(key, 'alterar_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: id });
@@ -3820,6 +3865,11 @@ export class MemoryRepository implements RecordsRepository {
   private toGoal(g: StoredGoal): Goal {
     const { deletedAt: _deleted, deletedBy: _by, ...rest } = g;
     const c = goalComposition(this.liveGoalMovements(g.id));
+    // Como goal_items (0037): com 'investimentos', o valor guardado é a soma do valor de hoje dos investimentos ativos ligados.
+    if (g.valueSource === 'investimentos') {
+      const linked = [...this.investments.values()].filter((i) => i.goalId === g.id && i.status === 'ativo' && i.contextId === g.contextId);
+      return { ...rest, ...c, savedCents: linked.reduce((s, i) => s + this.toInvestment(i).valueCents, 0) };
+    }
     return { ...rest, ...c };
   }
 

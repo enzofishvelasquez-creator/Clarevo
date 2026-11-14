@@ -15020,6 +15020,77 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
+  // D-099 P3 (14/11/2026): preço público dos títulos do Tesouro (item 19) e cota dos fundos (item 20), com a quantidade e o CNPJ na ficha,
+  // e a meta que lê o valor dos investimentos ligados (item 13, fase 2). Na demonstração, o preço e a cota são de exemplo (o dia útil
+  // anterior, 06/10/2026, e a cota de 05/10/2026). "Usar este valor" grava a atualização de hoje. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const prWrites0 = writes.length;
+    await demoHome();
+    // Título público com vencimento e quantidade.
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await field('Nome').fill('Selic 2029'); await radio('Títulos públicos').click(); await field('Quanto você aplicou até hoje?').fill('10000');
+    await p.getByRole('button', { name: /^Mais detalhes \(opcional\)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await radio('Tesouro Selic').click(); await p.waitForTimeout(200);
+    await field('Taxa acima da Selic, ao ano (%)').fill('0');
+    await field('Vencimento (opcional)').fill('01/03/2029');
+    ok('D-099 P3 Novo título: "Quantidade de títulos (opcional)" com o exemplo e sem o CNPJ (só em fundos)',
+      (await visibleCount('textbox', 'Quantidade de títulos (opcional)')) === 1 && (await visibleCount('textbox', 'CNPJ do fundo (opcional)')) === 0);
+    await field('Quantidade de títulos (opcional)').fill('0,5');
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await waitText('Valor pelo preço do Tesouro'); await p.waitForTimeout(600);
+    t = await body(); investTexts.push(t);
+    ok('D-099 P3 Título: o valor pelo preço de resgate do dia, a conta, a data, a fonte e o aviso de exemplo',
+      t.includes('Valor estimado: R$ 10.132,18') && t.includes('0,5 títulos × R$ 20.264,35 (preço de resgate de 06/10/2026).') &&
+        t.includes('Na demonstração, o preço e a cota são valores de exemplo, não os publicados.') && t.includes('Fonte: Tesouro Nacional, dados abertos do Tesouro Transparente (licença ODbL).') &&
+        t.includes('O valor do seu extrato é o que vale.'), t.slice(t.indexOf('Valor pelo preço do Tesouro'), t.indexOf('Valor pelo preço do Tesouro') + 600));
+    await atWidths(async (w) => { await layoutChecks(`D-099 P3 Título ${w}px`); if (w === 390) { await p.getByText('Valor pelo preço do Tesouro', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await shot('561_investimento_preco_tesouro'); } });
+    await p.getByRole('button', { name: 'Usar este valor', exact: true }).filter({ visible: true }).last().click(); await waitText('Valor atualizado pelo preço público.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-099 P3 Título: "Usar este valor" grava a atualização de hoje (R$ 10.132,18)', t.includes('R$ 10.132,18') && t.includes('Valor atualizado em 07/10/2026'), t.slice(0, 600));
+    // Fundo com CNPJ e quantidade: o CNPJ errado é recusado no campo.
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await field('Nome').fill('Fundo DI'); await radio('Fundos').click(); await field('Quanto você aplicou até hoje?').fill('30000');
+    await p.getByRole('button', { name: /^Mais detalhes \(opcional\)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await field('CNPJ do fundo (opcional)').fill('00.017.024/0001-54'); await field('Quantidade de cotas (opcional)').fill('1.000');
+    await btn('Criar investimento').click(); await p.waitForTimeout(300);
+    ok('D-099 P3 Fundo: CNPJ com dígitos errados recusado no campo, com o foco nele', (await body()).includes('Confira o CNPJ: os números não batem.') && (await field('CNPJ do fundo (opcional)').evaluate((e) => e === document.activeElement)));
+    await field('CNPJ do fundo (opcional)').fill('00.017.024/0001-53');
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await waitText('Valor pela cota do fundo'); await p.waitForTimeout(600);
+    t = await body(); investTexts.push(t);
+    ok('D-099 P3 Fundo: o valor pela cota de exemplo, com a data e a fonte da CVM',
+      t.includes('Valor estimado: R$ 33.182,14') && t.includes('1.000 cotas × R$ 33,182137 (cota de 05/10/2026).') && t.includes('Fonte: CVM, dados abertos do Informe Diário dos fundos (licença ODbL).'),
+      t.slice(t.indexOf('Valor pela cota do fundo'), t.indexOf('Valor pela cota do fundo') + 500));
+    await atWidths(async (w) => { await layoutChecks(`D-099 P3 Fundo ${w}px`); if (w === 390) { await p.getByText('Valor pela cota do fundo', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await shot('562_investimento_cota_fundo'); } });
+    await btn('Editar').click(); await waitText('Editar investimento'); await p.waitForTimeout(400);
+    ok('D-099 P3 Editar: o CNPJ formatado e a quantidade voltam no formulário', (await field('CNPJ do fundo (opcional)').inputValue()) === '00.017.024/0001-53' && (await field('Quantidade de cotas (opcional)').inputValue()) === '1.000');
+    await btn('Cancelar').click(); await p.waitForTimeout(400);
+    // A reserva lê o valor do investimento ligado (a aplicação do banco).
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Sobre este investimento'); await p.waitForTimeout(400);
+    await btn('Ver a reserva').click(); await waitText('Investimentos ligados à reserva'); await p.waitForTimeout(500);
+    ok('D-099 P3 Reserva: "De onde vem o valor guardado" com "Do que eu registro na meta" escolhido',
+      (await radio('Do que eu registro na meta').getAttribute('aria-checked')) === 'true' && (await radio('Dos investimentos ligados').getAttribute('aria-checked')) === 'false');
+    await radio('Dos investimentos ligados').click(); await waitText('Origem do valor salva.'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('D-099 P3 Reserva pelos investimentos: o valor guardado é o da aplicação, a composição diz de onde vem, e os aportes ficam na aba Investir',
+      t.includes('R$ 10.875,00') && t.includes('de R$ 22.500,00 · 48%') && t.includes('Valor dos investimentos ligados: R$ 10.875,00, pela última atualização de cada um.') &&
+        (await visibleCount('button', 'Ver na aba Investir')) === 1 && (await visibleCount('button', 'Registrar aporte')) === 0 &&
+        t.includes('Os registros desta meta não contam enquanto o valor vem dos investimentos ligados.'), t.slice(0, 1500));
+    await atWidths(async (w) => { await layoutChecks(`D-099 P3 Reserva pelos investimentos ${w}px`); if (w === 390) await shot('563_reserva_pelos_investimentos'); });
+    await tabByName('Metas').click(); await waitText('Viagem de férias'); await p.waitForTimeout(500);
+    ok('D-099 P3 Metas: o card da reserva mostra o valor dos investimentos', (await body()).includes('R$ 10.875,00'));
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Sobre este investimento'); await p.waitForTimeout(400);
+    await btn('Ver a reserva').click(); await waitText('Investimentos ligados à reserva'); await p.waitForTimeout(400);
+    await radio('Do que eu registro na meta').click(); await waitText('Origem do valor salva.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-099 P3 Reserva de volta aos registros: R$ 3.500,00 e os botões de aporte', t.includes('R$ 3.500,00') && t.includes('de R$ 22.500,00 · 15%') && (await visibleCount('button', 'Registrar aporte')) === 1, t.slice(0, 800));
+    ok('D-099 P3: nada vai à rede na demonstração', writes.length === prWrites0, writes.slice(prWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
   // D-078 F: "Guardar quando entrar um valor extra" se salva sozinho (sem valor de reserva) e liga o lembrete no Resumo, que aparece
   // quando o mês tem dinheiro a mais (aqui, R$ 800,00 em Renda extra numa conta nova). "Agora não" esconde até o mês seguinte.
   // ==================================================================================================================

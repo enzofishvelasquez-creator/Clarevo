@@ -31,6 +31,7 @@ import type {
   Goal,
   GoalInput,
   GoalMovement,
+  GoalValueSource,
   GoalMovementInput,
   GoalMovementKind,
   GoalStatus,
@@ -55,6 +56,7 @@ import type {
   SeriesInput,
 } from './records';
 import type { LegalAcceptance } from './aceite';
+import type { PublicPrices } from './investment-prices';
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import type { AccountMarks } from './levels';
@@ -128,7 +130,8 @@ export type GoalAction =
   | 'excluir_meta'
   | 'registrar_movimento_meta'
   | 'alterar_movimento_meta'
-  | 'excluir_movimento_meta';
+  | 'excluir_movimento_meta'
+  | 'origem_valor_meta';
 
 /** Imagem da meta (D-077, migração 0021): set_goal_image, com a meta em target_id. Não conta como anotação na atividade. */
 export type GoalImageAction = 'imagem_meta';
@@ -602,6 +605,13 @@ export interface RecordsRepository {
    * repete meta; sem_permissao para quem só vê.
    */
   setGoalOrder(key: string, contextId: string, goalIds: readonly string[]): Promise<GoalOrderWrite>;
+  /**
+   * De onde vem o valor guardado da meta (D-099, item 13 fase 2): 'registros' ou 'investimentos' (só no Pessoal). Erros: nao_encontrado,
+   * sem_permissao, versao_desatualizada, origem_invalida, contexto_invalido (Família).
+   */
+  setGoalValueSource(key: string, goalId: string, expectedVersion: number, source: GoalValueSource): Promise<GoalWrite>;
+  /** Preço do dia dos títulos do Tesouro e cota dos fundos pedidos (função "precos"; valores de exemplo na demonstração). */
+  getPublicPrices(request: { treasury: boolean; fundos: readonly string[] }): Promise<PublicPrices>;
 
   // Investimentos (D-093): só no Pessoal.
   /** Investimentos do contexto (ativos e encerrados), por criação, com os totais (investment_items). */
@@ -1089,9 +1099,13 @@ export type RepoErrorCode =
   | 'taxa_invalida'
   | 'vencimento_invalido'
   | 'liquidez_invalida'
+  | 'origem_invalida'
+  | 'quantidade_invalida'
+  | 'cnpj_invalido'
   | 'situacao_invalida'
   | 'observacao_invalida'
   | 'indices_indisponiveis'
+  | 'precos_indisponiveis'
   | 'desconhecido';
 
 export class RepoError extends Error {

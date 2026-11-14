@@ -532,7 +532,14 @@ export interface Goal {
   lastMovementOn: IsoDate | null;
   /** Prioridade escolhida pela pessoa (D-093, set_goal_order): 1 é a mais importante; null sem ordem escolhida. */
   priority: number | null;
+  /**
+   * De onde vem o valor guardado (D-099, item 13 fase 2; migração 0037): 'registros' (os movimentos da meta, como sempre) ou 'investimentos'
+   * (a soma do valor de hoje dos investimentos ativos ligados à meta, só no Pessoal). Os movimentos ficam guardados e voltam a contar.
+   */
+  valueSource: GoalValueSource;
 }
+
+export type GoalValueSource = 'registros' | 'investimentos';
 
 /** Movimento de meta (goal_movements). O tipo nunca muda; a versão da meta não sobe com movimentos. */
 export interface GoalMovement {

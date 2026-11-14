@@ -123,6 +123,21 @@ export const INVESTMENT_GOAL_TEXT = {
   note: 'Só informação: o valor guardado é o que você registra aqui. O valor de cada investimento vem da última atualização dele, na aba Investir.',
   invalid: 'Esta meta não pode mais ser escolhida. Escolha outra ou deixe sem meta.',
   archivedNote: 'A meta ligada a este investimento foi arquivada. Ao salvar, a ligação sai.',
+  /** De onde vem o valor guardado da meta (D-099, item 13 fase 2). */
+  source: {
+    title: 'De onde vem o valor guardado',
+    records: 'Do que eu registro na meta',
+    investments: 'Dos investimentos ligados',
+    recordsHint: 'Você registra aportes e resgates aqui na meta.',
+    investmentsHint:
+      'O valor guardado passa a ser a soma do valor de hoje dos investimentos ligados, e os aportes e resgates ficam só na aba Investir. Os registros da meta ficam guardados e voltam a contar se você mudar de novo.',
+    paused: 'Os registros desta meta não contam enquanto o valor vem dos investimentos ligados.',
+    openInvestments: 'Ver na aba Investir',
+    saved: 'Origem do valor salva.',
+    error: 'Não foi possível mudar agora. Tente de novo.',
+    personalOnly: 'Só as metas do seu Pessoal podem ler o valor dos investimentos.',
+    changedElsewhere: 'Esta meta mudou em outro aparelho. Volte e abra de novo.',
+  },
 } as const;
 
 /** Texto do erro ao salvar um investimento, com o da meta ligada (o resto, como investmentErrorText). */

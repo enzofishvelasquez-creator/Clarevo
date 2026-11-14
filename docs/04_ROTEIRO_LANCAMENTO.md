@@ -183,6 +183,7 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [x] Investimentos: aba nova, só no Pessoal, acompanhamento manual com comparação com CDI e IPCA (`docs/45_INVESTIMENTOS.md`)
 - [x] Investimentos, ficha ampliada (D-099): vencimentos, divisão, FGC, imposto estimado, valor pela taxa contratada, resumo para a declaração, comparar rendimentos e lembretes (`docs/45_INVESTIMENTOS.md`, seção 7). Migração 0035 e a função `indices` publicadas (13/11/2026)
 - [x] Investimentos, P2 (D-099, 14/11/2026): plano de aportes por mês e investimento ligado à reserva ou a uma meta (`docs/45_INVESTIMENTOS.md`, seção 8). Migração 0036 aplicada em produção (conferência 21x: 1, 1, 1, 1, 104) e PR #36 na `main`; letra grande a 200% nas telas de Investir no PR #37
+- [x] Investimentos, P3 (D-099, 14/11/2026): preço público dos títulos do Tesouro, cota dos fundos e meta que lê o valor dos investimentos ligados (`docs/45_INVESTIMENTOS.md`, seções 9 e 10). Falta: migração 0037 e a função `precos` publicada (`docs/05`, passos 12ac e 12ad, conferência 21y)
 - [x] Supabase (Enzo, 11/11/2026): migrações 0031 e 0032 aplicadas (conferência 21t: 2, 1, 7, 102) e a função `indices` publicada (`docs/05`, passos 12v, 12w e 12x)
 - [x] Supabase (Enzo, 11/11/2026): função `indices` publicada de novo (a versão que confere a sessão), com "Verify JWT with legacy secret" desligado (`docs/05`, passo 12x)
 - [x] PR #30 (D-093) na `main` em 11/11/2026: o app da web publica sozinho
