@@ -46,12 +46,15 @@ export function LinkedInvestmentsCard({ goal }: { goal: Goal }) {
             accessibilityHint="Abre o investimento"
             onPress={() => router.push({ pathname: '/investimento/[id]', params: { id: i.id } })}
             style={(st) => [styles.row, n > 0 && styles.divider, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
-            <Txt variant="label" style={{ flex: 1, fontFamily: fonts.bold }} numberOfLines={2}>
-              {i.name}
-            </Txt>
-            <MoneyTxt variant="label" style={tabular}>
-              {formatBRL(i.valueCents)}
-            </MoneyTxt>
+            {/* Nome e valor um embaixo do outro: com a letra grande, o valor não passa da largura da tela. */}
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+                {i.name}
+              </Txt>
+              <MoneyTxt variant="label" style={tabular}>
+                {formatBRL(i.valueCents)}
+              </MoneyTxt>
+            </View>
             <ChevronRight size={18} color={colors.textSecondary} aria-hidden />
           </Pressable>
         ))}
