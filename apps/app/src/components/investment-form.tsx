@@ -253,7 +253,7 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
           {INVESTMENT_TEXT.footer}
         </Txt>
       </Screen>
-      <FormFooter error={error} onCancel={guard.requestCancel} submitLabel={editing ? T.save : T.create} busy={busy} onSubmit={submit} />
+      <FormFooter error={error} onCancel={guard.requestCancel} submitLabel={editing ? T.save : T.create} busy={busy} onSubmit={submit} stackWhenNarrow />
       {guard.dialog}
     </KeyboardAvoidingView>
   );

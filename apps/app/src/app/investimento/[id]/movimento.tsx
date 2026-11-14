@@ -253,7 +253,7 @@ function MovementForm({
         </Card>
         {existing && !closed ? <Button label={M.delete} icon={Trash2} tone="ghost" onPress={() => setConfirmDelete(true)} /> : null}
       </Screen>
-      <FormFooter error={error} onCancel={guard.requestCancel} submitLabel={existing ? M.save : texts.title} busy={busy} onSubmit={submit} />
+      <FormFooter error={error} onCancel={guard.requestCancel} submitLabel={existing ? M.save : texts.title} busy={busy} onSubmit={submit} stackWhenNarrow />
       <ConfirmDialog
         visible={confirmDelete}
         title={`${M.delete}?`}
