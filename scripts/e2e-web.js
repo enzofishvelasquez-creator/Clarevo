@@ -8063,7 +8063,9 @@ setInterval(async () => {
   ok('I1 CSV: valores com vírgula e milhares lidos; a memória do aparelho traz "Lazer" para a padaria (a regra diria Mercado); regras para o restante', t1.includes('3 linhas · 3 marcadas') && t1.includes('01/10/2026 · Saída · Lazer') && t1.includes('03/10/2026 · Saída · Lazer') && t1.includes('06/10/2026 · Entrada · Reembolso') &&
     t1.includes('RESTAURANTE SABOR, CENTRO') && t1.includes('R$ 15,50') && t1.includes('R$ 62,40') && t1.includes('R$ 250,00'), t1.slice(0, 500));
   await btn('Importar 3 lançamentos').click(); await waitText('Importação concluída', 12000);
-  ok('I1 CSV: "3 lançamentos importados."', (await body()).includes('3 lançamentos importados.'));
+  // O resumo sai no mesmo cartão do título; se faltar, a tela do momento vai junto (falhou uma vez em 14/11/2026 e não se repetiu).
+  t1 = await body();
+  ok('I1 CSV: "3 lançamentos importados."', t1.includes('3 lançamentos importados.'), t1.slice(Math.max(0, t1.indexOf('Importação concluída') - 200), t1.indexOf('Importação concluída') + 400));
   await btn('Ver em Movimentos').click(); await waitText('Registrar recebimento'); await goResumo().catch(() => {});
   await expectTotals('I1 Resumo depois do CSV: R$ 11.250,00 recebidos, R$ 4.155,70 pagos, diferença R$ 7.094,30, e 650 a pagar', 'R$ 11.250,00', 'R$ 4.155,70', 'R$ 7.094,30', 'R$ 650,00');
 
