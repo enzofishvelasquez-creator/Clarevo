@@ -205,12 +205,14 @@ describe('MemoryRepository: plano de aportes e meta ligada (como a 0036)', () =>
     // Sem a ficha, a meta enviada não vale (como o banco: a meta viaja na ficha).
     expect((await repo.createInvestment('i2', ctx, { name: 'Sem ficha', kind: 'acoes', investedCents: 100, startOn: TODAY, currentCents: null, goalId: viagem.id })).investment!.goalId).toBeNull();
 
-    // Editar com a ficha troca a meta; sem a meta na ficha, a meta sai; sem a ficha, fica.
+    // Editar com a ficha troca a meta; sem a ficha ou sem o campo na ficha (versões anteriores do app), fica; null tira.
     let cur = (await repo.updateInvestment('e1', id, 1, { name: 'Caixinha', kind: 'renda_fixa', details: { ...EMPTY_INVESTMENT_DETAILS, liquidity: 'diaria' }, goalId: viagem.id })).investment!;
     expect(cur.goalId).toBe(viagem.id);
     cur = (await repo.updateInvestment('e2', id, cur.version, { name: 'Caixinha da viagem', kind: 'renda_fixa' })).investment!;
     expect(cur.goalId).toBe(viagem.id);
-    cur = (await repo.updateInvestment('e3', id, cur.version, { name: 'Caixinha', kind: 'renda_fixa', details: EMPTY_INVESTMENT_DETAILS })).investment!;
+    cur = (await repo.updateInvestment('e2b', id, cur.version, { name: 'Caixinha', kind: 'renda_fixa', details: EMPTY_INVESTMENT_DETAILS })).investment!;
+    expect(cur.goalId).toBe(viagem.id);
+    cur = (await repo.updateInvestment('e3', id, cur.version, { name: 'Caixinha', kind: 'renda_fixa', details: EMPTY_INVESTMENT_DETAILS, goalId: null })).investment!;
     expect(cur.goalId).toBeNull();
     cur = (await repo.updateInvestment('e4', id, cur.version, { name: 'Caixinha', kind: 'renda_fixa', details: EMPTY_INVESTMENT_DETAILS, goalId: viagem.id })).investment!;
 

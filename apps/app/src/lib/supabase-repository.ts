@@ -622,6 +622,8 @@ const KNOWN: RepoErrorCode[] = [
   'situacao_invalida',
   'nome_invalido',
   'lista_invalida',
+  // Meta ligada ao investimento (D-099, 0036).
+  'meta_invalida',
   // Assinatura paga (D-083): o gatilho de record_operations recusa a escrita em só leitura. Avisa a tela de acesso (accessRefused).
   'assinatura_necessaria',
   // Aceite dos termos (A1): só a versão vigente.
@@ -1176,7 +1178,8 @@ function toInvestmentDetails(r: InvestmentRow): InvestmentDetails {
 function detailsPayload(d: InvestmentDetails | undefined, goalId?: string | null): Record<string, unknown> | null {
   if (!d) return null;
   return {
-    goal_id: goalId ?? null,
+    // Sem a chave, o banco mantém a meta de antes (é o que a versão anterior do app manda); null tira.
+    ...(goalId !== undefined ? { goal_id: goalId } : {}),
     subkind: d.subkind,
     institution: d.institution,
     index_kind: d.indexKind,
@@ -2675,7 +2678,7 @@ export class SupabaseRepository implements RecordsRepository {
     return { investment: d.investment ? toInvestment(d.investment) : null, movement: null };
   }
 
-  /** CDI e IPCA pela função "indices" (que busca no Banco Central): sem dado de ninguém no pedido, só o mês de partida. */
+  /** Plano de aportes (D-099, item 12), ou null sem plano. */
   async getInvestmentPlan(contextId: string): Promise<InvestmentPlan | null> {
     const { data, error } = await this.db
       .from('investment_plans')
@@ -2694,6 +2697,7 @@ export class SupabaseRepository implements RecordsRepository {
     return toInvestmentPlan((data as { plan?: InvestmentPlanRow | null } | null)?.plan);
   }
 
+  /** CDI e IPCA pela função "indices" (que busca no Banco Central): sem dado de ninguém no pedido, só o mês de partida. */
   async getMarketIndices(fromMonth: IsoMonth): Promise<MarketIndices> {
     const { data, error } = await this.db.functions.invoke(INDICES_FUNCTION, { body: { desde: fromMonth } });
     if (error) throw new RepoError('indices_indisponiveis');

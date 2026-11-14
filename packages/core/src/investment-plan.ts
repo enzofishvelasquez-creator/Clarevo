@@ -122,6 +122,7 @@ export const INVESTMENT_GOAL_TEXT = {
     count === 1 ? '1 investimento ligado está sem a liquidez na ficha.' : `${count} investimentos ligados estão sem a liquidez na ficha.`,
   note: 'Só informação: o valor guardado é o que você registra aqui. O valor de cada investimento vem da última atualização dele, na aba Investir.',
   invalid: 'Esta meta não pode mais ser escolhida. Escolha outra ou deixe sem meta.',
+  archivedNote: 'A meta ligada a este investimento foi arquivada. Ao salvar, a ligação sai.',
 } as const;
 
 /** Texto do erro ao salvar um investimento, com o da meta ligada (o resto, como investmentErrorText). */

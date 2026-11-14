@@ -9,7 +9,8 @@
 --     chave (goal_id, context_id) apontando para goals (id, context_id). Excluir a meta de vez tira a ligação; meta excluída (marca) ou
 --     arquivada não pode ser escolhida ('meta_invalida'). Só informação: a meta continua com o valor que a pessoa registrou nela.
 -- M2. A ligação viaja na ficha ("goal_id" no p_details de create_investment e update_investment, que mudam só por dentro, com a mesma
---     assinatura). Sem a ficha (versão antiga do app), a ligação fica, se a meta continuar valendo.
+--     assinatura). Sem a ficha ou sem a chave nela (versões anteriores do app), a ligação fica, se a meta continuar valendo; "goal_id"
+--     nulo tira a ligação.
 
 -- ---------------------------------------------------------------------------
 -- Plano de aportes
@@ -138,8 +139,9 @@ begin
 end;
 $$;
 
--- A meta da ficha: sem a ficha, a de antes (p_keep) se ela continuar valendo, senão nenhuma; com a ficha, "goal_id" (texto de um uuid ou
--- nulo), que precisa ser uma meta do contexto, sem marca de excluída e não arquivada ('meta_invalida').
+-- A meta da ficha: sem a ficha ou sem a chave "goal_id" nela, a de antes (p_keep) se ela continuar valendo, senão nenhuma; com a chave,
+-- "goal_id" (texto de um uuid ou nulo, que tira a meta), que precisa ser uma meta do contexto, sem marca de excluída e não arquivada
+-- ('meta_invalida').
 create or replace function public.clarevo_investment_goal(p_context_id uuid, p_details jsonb, p_keep uuid)
 returns uuid
 language plpgsql
@@ -151,7 +153,8 @@ declare
   v_goal uuid;
   v_t text;
 begin
-  if p_details is null then
+  -- Sem a ficha, ou com a ficha sem a chave "goal_id" (a versão do app anterior à 0036 manda a ficha sem ela), a meta de antes fica.
+  if p_details is null or not (p_details ? 'goal_id') then
     if p_keep is not null and exists (select 1 from public.goals g where g.id = p_keep and g.context_id = p_context_id
                                         and g.deleted_at is null and g.status <> 'arquivada') then
       return p_keep;

@@ -2160,16 +2160,16 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /**
-   * Como clarevo_investment_goal (0036): sem a ficha, a meta de antes (keep) se ela continuar valendo; com a ficha, `goalId` (ausente é
-   * nenhuma), que precisa ser uma meta do contexto, sem marca de excluída e não arquivada.
+   * Como clarevo_investment_goal (0036): sem a ficha ou sem `goalId` (versões anteriores do app), a meta de antes (keep) se ela continuar
+   * valendo; com a ficha e `goalId`, a meta é esta (null tira), que precisa ser do contexto, sem marca de excluída e não arquivada.
    */
   private investmentGoal(contextId: string, withDetails: boolean, goalId: string | null | undefined, keep: string | null): string | null {
     const valid = (id: string) => {
       const g = this.goals.get(id);
       return !!g && g.contextId === contextId && !g.deletedAt && g.status !== 'arquivada';
     };
-    if (!withDetails) return keep !== null && valid(keep) ? keep : null;
-    if (goalId === undefined || goalId === null) return null;
+    if (!withDetails || goalId === undefined) return keep !== null && valid(keep) ? keep : null;
+    if (goalId === null) return null;
     if (!valid(goalId)) throw new RepoError('meta_invalida');
     return goalId;
   }
@@ -2276,7 +2276,7 @@ export class MemoryRepository implements RecordsRepository {
   /** Como create_investment: só no Pessoal; nome, tipo, valores e datas; limite de 50 ativos. */
   async createInvestment(key: string, contextId: string, input: NewInvestmentInput) {
     return this.write(() => {
-      const payload = [contextId, input.name, input.kind, input.investedCents, input.startOn, input.currentCents, input.details ?? null, input.details ? (input.goalId ?? null) : null];
+      const payload = [contextId, input.name, input.kind, input.investedCents, input.startOn, input.currentCents, input.details ?? null, input.details && input.goalId !== undefined ? input.goalId : 'manter'];
       const replayed = this.replay(key, 'criar_investimento', payload);
       if (replayed) return this.investmentResult(replayed.goalId, null);
       if (!this.canRead(contextId)) throw new RepoError('nao_encontrado');
@@ -2311,7 +2311,7 @@ export class MemoryRepository implements RecordsRepository {
 
   async updateInvestment(key: string, id: string, expectedVersion: number, input: InvestmentInput) {
     return this.write(() => {
-      const payload = [id, expectedVersion, input.name, input.kind, input.details ?? null, input.details ? (input.goalId ?? null) : null];
+      const payload = [id, expectedVersion, input.name, input.kind, input.details ?? null, input.details && input.goalId !== undefined ? input.goalId : 'manter'];
       const replayed = this.replay(key, 'alterar_investimento', payload);
       if (replayed) return this.investmentResult(replayed.goalId, null);
       const i = this.liveInvestment(id);

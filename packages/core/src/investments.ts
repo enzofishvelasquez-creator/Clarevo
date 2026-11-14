@@ -90,8 +90,9 @@ export interface InvestmentInput {
   /** A ficha ampliada inteira (D-099). Sem ela, ao criar, a ficha fica vazia; ao editar, fica como está (versão antiga do app). */
   details?: InvestmentDetails;
   /**
-   * A meta ligada (D-099, item 13) viaja com a ficha: com `details`, a meta é esta (sem o campo, nenhuma); sem `details`, a de antes fica
-   * se continuar valendo. A meta precisa ser do mesmo contexto, sem marca de excluída e não arquivada ('meta_invalida').
+   * A meta ligada (D-099, item 13) viaja com a ficha: com `details`, a meta é esta (null tira); sem `details` ou sem o campo (undefined,
+   * versões anteriores do app), a de antes fica se continuar valendo. A meta precisa ser do mesmo contexto, sem marca de excluída e não
+   * arquivada ('meta_invalida').
    */
   goalId?: string | null;
 }

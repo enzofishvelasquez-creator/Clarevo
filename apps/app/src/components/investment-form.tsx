@@ -67,8 +67,11 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
     .sort((a, b) => (a.goalType === 'emergencia' ? 0 : 1) - (b.goalType === 'emergencia' ? 0 : 1) || a.name.localeCompare(b.name, 'pt-BR'));
   const initialGoal = investment?.goalId ?? null;
   const [goalId, setGoalId] = useState<string | null>(initialGoal);
-  // Meta que deixou de valer (arquivada depois): sai ao salvar.
+  // Meta que deixou de valer (arquivada depois): sai ao salvar, com o aviso. Enquanto a lista não chega (ou falha), a meta não é enviada e o
+  // banco mantém a de antes.
   const chosenGoal = goalId !== null && goalOptions.some((g) => g.id === goalId) ? goalId : null;
+  const goalForSave: string | null | undefined = goalsQ.isSuccess ? chosenGoal : undefined;
+  const goalDropped = goalsQ.isSuccess && initialGoal !== null && goalId === initialGoal && chosenGoal === null;
   const [errors, setErrors] = useState<Partial<Record<InvestmentField, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -116,8 +119,8 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
     setBusy(true);
     try {
       const w = editing
-        ? await repo.updateInvestment(key, investment!.id, investment!.version, { name: v.input.name, kind: v.input.kind, details: dv.details, goalId: chosenGoal })
-        : await repo.createInvestment(key, contextId, { ...v.input, details: dv.details, goalId: chosenGoal });
+        ? await repo.updateInvestment(key, investment!.id, investment!.version, { name: v.input.name, kind: v.input.kind, details: dv.details, goalId: goalForSave })
+        : await repo.createInvestment(key, contextId, { ...v.input, details: dv.details, goalId: goalForSave });
       invalidate();
       flash.set(editing ? T.saved : T.created);
       const id = w.investment?.id ?? investment?.id;
@@ -228,6 +231,11 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
                 <Chip key={g.id} label={g.name} selected={chosenGoal === g.id} onPress={() => setGoalId(chosenGoal === g.id ? null : g.id)} />
               ))}
             </ChoiceGroup>
+          ) : null}
+          {goalDropped ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {INVESTMENT_GOAL_TEXT.archivedNote}
+            </Txt>
           ) : null}
         </Card>
         <InvestmentDetailsSection

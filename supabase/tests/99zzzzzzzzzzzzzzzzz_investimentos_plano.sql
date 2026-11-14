@@ -203,33 +203,35 @@ begin
   insert into ids values ('acoes', (r #>> '{investment,id}')::uuid);
   assert r #> '{investment,goal_id}' = 'null'::jsonb, 'sem meta';
 
-  -- Editar com a ficha troca a meta; sem a chave na ficha, a meta sai.
+  -- Editar com a ficha troca a meta; a ficha sem a chave (versão do app anterior à 0036) mantém; "goal_id" nulo tira.
   r := public.update_investment('pl-e-0001', pg_temp.id('acoes'), 1, 'Ações', 'acoes', jsonb_build_object('goal_id', pg_temp.id('viagem')::text));
   assert (r #>> '{investment,goal_id}')::uuid = pg_temp.id('viagem') and (r #>> '{investment,version}')::int = 2, 'ligado à viagem';
-  r := public.update_investment('pl-e-0002', pg_temp.id('acoes'), 2, 'Ações', 'acoes', '{}');
-  assert r #> '{investment,goal_id}' = 'null'::jsonb, 'ficha sem meta, sem meta';
-  r := public.update_investment('pl-e-0003', pg_temp.id('acoes'), 3, 'Ações', 'acoes', jsonb_build_object('goal_id', pg_temp.id('viagem')::text));
-  perform pg_temp.expect_code(format($q$select public.update_investment('pl-e-0004', %L, 4, 'Ações', 'acoes', %L)$q$,
+  r := public.update_investment('pl-e-0002', pg_temp.id('acoes'), 2, 'Ações', 'acoes', '{"institution":"Corretora"}');
+  assert (r #>> '{investment,goal_id}')::uuid = pg_temp.id('viagem') and r #>> '{investment,institution}' = 'Corretora', 'ficha sem a chave mantém a meta';
+  r := public.update_investment('pl-e-0002b', pg_temp.id('acoes'), 3, 'Ações', 'acoes', '{"goal_id":null}');
+  assert r #> '{investment,goal_id}' = 'null'::jsonb and r #> '{investment,institution}' = 'null'::jsonb, 'goal_id nulo tira a meta';
+  r := public.update_investment('pl-e-0003', pg_temp.id('acoes'), 4, 'Ações', 'acoes', jsonb_build_object('goal_id', pg_temp.id('viagem')::text));
+  perform pg_temp.expect_code(format($q$select public.update_investment('pl-e-0004', %L, 5, 'Ações', 'acoes', %L)$q$,
     pg_temp.id('acoes'), jsonb_build_object('goal_id', pg_temp.id('velha')::text)), 'meta_invalida', '22023');
   assert pg_temp.goal_of('acoes') = pg_temp.id('viagem'), 'a recusa não muda a meta';
   -- Sem a ficha (versão antiga do app): a meta fica, se ela continuar valendo.
-  r := public.update_investment('pl-e-0005', pg_temp.id('acoes'), 4, 'Ações e fundos', 'acoes');
+  r := public.update_investment('pl-e-0005', pg_temp.id('acoes'), 5, 'Ações e fundos', 'acoes');
   assert (r #>> '{investment,goal_id}')::uuid = pg_temp.id('viagem') and r #>> '{investment,name}' = 'Ações e fundos', 'sem a ficha, a meta fica';
   -- A meta foi arquivada depois: sem a ficha, a ligação sai na próxima edição; com a ficha, não pode ser escolhida.
   g := public.set_goal_status('pl-g-0007', pg_temp.id('viagem'), (select version from public.goals where id = pg_temp.id('viagem')), 'arquivada');
-  r := public.update_investment('pl-e-0006', pg_temp.id('acoes'), 5, 'Ações e fundos', 'acoes');
+  r := public.update_investment('pl-e-0006', pg_temp.id('acoes'), 6, 'Ações e fundos', 'acoes');
   assert r #> '{investment,goal_id}' = 'null'::jsonb, 'meta arquivada sai ao editar sem a ficha';
   g := public.set_goal_status('pl-g-0008', pg_temp.id('viagem'), (select version from public.goals where id = pg_temp.id('viagem')), 'ativa');
-  r := public.update_investment('pl-e-0007', pg_temp.id('acoes'), 6, 'Ações e fundos', 'acoes', jsonb_build_object('goal_id', pg_temp.id('viagem')::text));
+  r := public.update_investment('pl-e-0007', pg_temp.id('acoes'), 7, 'Ações e fundos', 'acoes', jsonb_build_object('goal_id', pg_temp.id('viagem')::text));
   assert (r #>> '{investment,goal_id}')::uuid = pg_temp.id('viagem'), 'ligado de novo';
 
   -- Meta com marca de excluída: a visão mostra nenhuma; a linha guarda a ligação até a meta sair de vez.
   perform public.delete_goal('pl-g-0009', pg_temp.id('viagem'), (select version from public.goals where id = pg_temp.id('viagem')));
   assert (select goal_id from public.investment_items where id = pg_temp.id('acoes')) is null, 'meta excluída aparece como nenhuma';
   assert pg_temp.goal_of('acoes') = pg_temp.id('viagem'), 'a ligação fica guardada';
-  r := public.update_investment('pl-e-0008', pg_temp.id('acoes'), 7, 'Ações e fundos', 'acoes');
+  r := public.update_investment('pl-e-0008', pg_temp.id('acoes'), 8, 'Ações e fundos', 'acoes');
   assert r #> '{investment,goal_id}' = 'null'::jsonb and pg_temp.goal_of('acoes') is null, 'editar sem a ficha tira a meta excluída';
-  perform pg_temp.expect_code(format($q$select public.update_investment('pl-e-0009', %L, 8, 'Ações e fundos', 'acoes', %L)$q$,
+  perform pg_temp.expect_code(format($q$select public.update_investment('pl-e-0009', %L, 9, 'Ações e fundos', 'acoes', %L)$q$,
     pg_temp.id('acoes'), jsonb_build_object('goal_id', pg_temp.id('viagem')::text)), 'meta_invalida', '22023');
 end $$;
 

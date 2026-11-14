@@ -274,7 +274,6 @@ export function FiscalCalendarCard({ items }: { items: readonly Investment[] }) 
   );
 }
 
-/** Atalhos: o resumo para a declaração e a calculadora de rendimentos líquidos. */
 /**
  * Plano de aportes (D-099, item 12): com plano, o aportado do mês ao lado do plano, sem cor e sem cobrança; sem plano, o convite fica na
  * lista de atalhos (InvestmentLinks).
@@ -294,6 +293,7 @@ export function InvestmentPlanCard({ plan, movements }: { plan: InvestmentPlan |
   );
 }
 
+/** Atalhos: o convite do plano de aportes (sem plano), o resumo para a declaração e a calculadora de rendimentos líquidos. */
 export function InvestmentLinks({ showPlan = false }: { showPlan?: boolean }) {
   const link = (label: string, hint: string, Icon: typeof FileText, href: Parameters<typeof router.push>[0]) => (
     <Pressable
