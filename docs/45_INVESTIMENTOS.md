@@ -214,7 +214,7 @@ Regras em `packages/core/src/investment-prices.ts`; função do servidor `precos
   mês (a cota sai com alguns dias de atraso); com o arquivo do mês fora do ar, nada do anterior (a cota velha pareceria a de agora): o app
   diz que não conseguiu buscar. Fonte fora do ar não é consultada de novo por 5 minutos. CNPJ com mais de uma subclasse fica sem cota
   (cada subclasse tem a sua).
-- **Valor:** quantidade × preço (ou cota), em centavos, arredondado (conta exata). O card "Valor pelo preço do Tesouro" ou "Valor pela cota do
+- **Valor:** quantidade × preço (ou cota), em centavos, arredondado (conta exata). O card "Valor pelo preço publicado" ou "Valor pela cota do
   fundo" mostra a conta, a data, a fonte e "O valor do seu extrato é o que vale"; o valor só é gravado com "Usar este valor" (uma
   atualização com a data de hoje). Sem o que falta na ficha, o card diz o que falta.
 - **Privacidade:** a função recebe só os CNPJs dos fundos (dado público do fundo) e não guarda nada em banco; a resposta fica 6 horas na

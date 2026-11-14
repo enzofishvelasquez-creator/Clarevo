@@ -356,7 +356,7 @@ export function guaranteeOf(kind: InvestmentKind, subkind: InvestmentSubkind | n
 export const GUARANTEE_LABEL: Readonly<Record<InvestmentGuarantee, string>> = {
   fgc: 'Garantia do FGC',
   tesouro: 'Garantia do Tesouro Nacional',
-  nenhuma: 'Sem garantia do FGC nem do Tesouro',
+  nenhuma: 'Sem garantia do FGC nem do Tesouro Nacional',
 };
 
 /** A forma de render que costuma acompanhar o tipo exato: só preenche o campo vazio, a pessoa troca se quiser. */

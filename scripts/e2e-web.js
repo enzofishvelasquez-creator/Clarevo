@@ -248,7 +248,7 @@ setInterval(async () => {
   // o resto da lista continua valendo nelas, e as outras telas seguem com a lista inteira.
   const INVEST_NAMES = new RegExp(
     [
-      'Garantia do Tesouro Nacional', 'Tesouro Nacional',
+      'Garantia do Tesouro Nacional', 'Tesouro Nacional', 'Tesouro Transparente',
       'Tesouro Prefixado com Juros Semestrais', 'Tesouro IPCA\\+ com Juros Semestrais', 'Tesouro Selic', 'Tesouro Prefixado', 'Tesouro IPCA\\+',
       'Tesouro RendA\\+', 'Tesouro Educa\\+', 'Tesouro Reserva', 'CDB ou RDB', '\\bLCI\\b', '\\bLCA\\b', '\\bLCD\\b',
     ].join('|'),
@@ -15038,13 +15038,13 @@ setInterval(async () => {
     ok('D-099 P3 Novo título: "Quantidade de títulos (opcional)" com o exemplo e sem o CNPJ (só em fundos)',
       (await visibleCount('textbox', 'Quantidade de títulos (opcional)')) === 1 && (await visibleCount('textbox', 'CNPJ do fundo (opcional)')) === 0);
     await field('Quantidade de títulos (opcional)').fill('0,5');
-    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await waitText('Valor pelo preço do Tesouro'); await p.waitForTimeout(600);
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await waitText('Valor pelo preço publicado'); await p.waitForTimeout(600);
     t = await body(); investTexts.push(t);
     ok('D-099 P3 Título: o valor pelo preço de resgate do dia, a conta, a data, a fonte e o aviso de exemplo',
       t.includes('Valor estimado: R$ 10.132,18') && t.includes('0,5 títulos × R$ 20.264,35 (preço de resgate de 06/10/2026).') &&
         t.includes('Na demonstração, o preço e a cota são valores de exemplo, não os publicados.') && t.includes('Fonte: Tesouro Nacional, dados abertos do Tesouro Transparente (licença ODbL).') &&
-        t.includes('O valor do seu extrato é o que vale.'), t.slice(t.indexOf('Valor pelo preço do Tesouro'), t.indexOf('Valor pelo preço do Tesouro') + 600));
-    await atWidths(async (w) => { await layoutChecks(`D-099 P3 Título ${w}px`); if (w === 390) { await p.getByText('Valor pelo preço do Tesouro', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await shot('561_investimento_preco_tesouro'); } });
+        t.includes('O valor do seu extrato é o que vale.'), t.slice(t.indexOf('Valor pelo preço publicado'), t.indexOf('Valor pelo preço publicado') + 600));
+    await atWidths(async (w) => { await layoutChecks(`D-099 P3 Título ${w}px`); if (w === 390) { await p.getByText('Valor pelo preço publicado', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await shot('561_investimento_preco_tesouro'); } });
     await p.getByRole('button', { name: 'Usar este valor', exact: true }).filter({ visible: true }).last().click(); await waitText('Valor atualizado pelo preço público.'); await p.waitForTimeout(500);
     t = await body();
     ok('D-099 P3 Título: "Usar este valor" grava a atualização de hoje (R$ 10.132,18)', t.includes('R$ 10.132,18') && t.includes('Valor atualizado em 07/10/2026'), t.slice(0, 600));

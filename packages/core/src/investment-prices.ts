@@ -301,7 +301,7 @@ export function fundValue(inv: { fundCnpj: string | null; quantityMicro: number 
 // ---------------------------------------------------------------------------
 
 export const PUBLIC_PRICE_TEXT = {
-  treasuryTitle: 'Valor pelo preço do Tesouro',
+  treasuryTitle: 'Valor pelo preço publicado',
   fundTitle: 'Valor pela cota do fundo',
   /** "Valor estimado: R$ 10.132,18" */
   value: (cents: Cents) => `Valor estimado: ${formatBRL(cents)}`,
@@ -323,8 +323,8 @@ export const PUBLIC_PRICE_TEXT = {
     sem_quantidade: (fund: boolean) => `Informe a quantidade de ${fund ? 'cotas' : 'títulos'} em Editar para ver o valor pelo ${fund ? 'preço da cota' : 'preço publicado'}.`,
     sem_vencimento: 'Informe o vencimento do título em Editar para achar o preço publicado.',
     sem_tipo: 'Escolha qual é o título em Editar para achar o preço publicado.',
-    reserva: 'O Tesouro Reserva não tem preço no arquivo de títulos ofertados do Tesouro. Atualize pelo extrato.',
-    fora_da_oferta: (on: IsoDate) => `Este título, com este vencimento, não está entre os ofertados pelo Tesouro em ${formatDateBR(on)}. Confira o vencimento em Editar ou atualize pelo extrato.`,
+    reserva: 'O Tesouro Reserva não tem preço no arquivo de títulos ofertados pelo Tesouro Nacional. Atualize pelo extrato.',
+    fora_da_oferta: (on: IsoDate) => `Este título, com este vencimento, não está entre os ofertados pelo Tesouro Nacional em ${formatDateBR(on)}. Confira o vencimento em Editar ou atualize pelo extrato.`,
     sem_cnpj: 'Informe o CNPJ do fundo em Editar para buscar a cota publicada pela CVM.',
     subclasses: 'Este CNPJ tem mais de uma subclasse, cada uma com a sua cota. Atualize pelo extrato.',
     nao_encontrado: 'Não achamos a cota deste CNPJ no Informe Diário da CVM dos dois últimos meses. Confira o CNPJ em Editar ou atualize pelo extrato.',
