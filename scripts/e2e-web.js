@@ -14900,7 +14900,8 @@ setInterval(async () => {
     await p.getByRole('link', { name: /^Comparar rendimentos líquidos/ }).filter({ visible: true }).first().click(); await waitText('Valor aplicado'); await p.waitForTimeout(400);
     await btn('Comparar').click(); await p.waitForTimeout(300);
     t = await body();
-    ok('D-099 Comparar: sem os campos, os erros aparecem e nenhum resultado', t.includes('Informe o valor.') && t.includes('Informe o prazo.') && t.includes('Escolha como rende pelo menos uma opção.') && !t.includes('líquidos.'), t.slice(0, 800));
+    ok('D-099 Comparar: sem os campos, os erros aparecem, nenhum resultado e o foco vai para o primeiro campo com erro', t.includes('Informe o valor.') && t.includes('Informe o prazo.') && t.includes('Escolha como rende pelo menos uma opção.') && !t.includes('líquidos.') &&
+      (await field('Valor aplicado').evaluate((e) => e === document.activeElement)), t.slice(0, 800));
     await field('Valor aplicado').fill('10000'); await field('Prazo em dias corridos').fill('365');
     await p.getByRole('radio', { name: '% do CDI, com imposto', exact: true }).filter({ visible: true }).nth(0).click();
     await p.getByRole('radio', { name: '% do CDI, isento', exact: true }).filter({ visible: true }).nth(1).click();

@@ -9,8 +9,8 @@ import {
 } from '@clarevo/core';
 import { router } from 'expo-router';
 import { Plus, X } from 'lucide-react-native';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { SubHeader } from '@/components/header';
@@ -35,6 +35,27 @@ export default function CompararScreen() {
   const usesCdi = draft.options.some((o) => o.kind === 'cdi_tributado' || o.kind === 'cdi_isento');
   const usesIpca = draft.options.some((o) => o.kind === 'ipca_tributado');
   const result = outcome.ok ? outcome.result : null;
+  // Revisão de 13/11/2026: ao tocar em "Comparar" com erro, o foco vai para o primeiro campo com erro.
+  const amountRef = useRef<TextInput>(null);
+  const daysRef = useRef<TextInput>(null);
+  const cdiRef = useRef<TextInput>(null);
+  const ipcaRef = useRef<TextInput>(null);
+  const rateRefs = useRef<(TextInput | null)[]>([]);
+  const compare = () => {
+    setTried(true);
+    if (outcome.ok) return;
+    const e = outcome.errors;
+    const target = e.amountText
+      ? amountRef.current
+      : e.daysText
+        ? daysRef.current
+        : e.cdiText
+          ? cdiRef.current
+          : e.ipcaText
+            ? ipcaRef.current
+            : (draft.options.map((o, i) => (e[`option.${i}`] && o.kind ? rateRefs.current[i] : null)).find((r) => r) ?? null);
+    setTimeout(() => target?.focus(), 0);
+  };
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -44,6 +65,7 @@ export default function CompararScreen() {
           <Txt color={colors.textSecondary}>{T.intro}</Txt>
           <Card style={{ gap: space[4] }}>
             <TextField
+              ref={amountRef}
               label={T.amountLabel}
               prefix="R$"
               large
@@ -56,6 +78,7 @@ export default function CompararScreen() {
               error={errors.amountText}
             />
             <TextField
+              ref={daysRef}
               label={T.daysLabel}
               hint={T.daysHint}
               keyboardType="number-pad"
@@ -66,10 +89,10 @@ export default function CompararScreen() {
               error={errors.daysText}
             />
             {usesCdi ? (
-              <TextField label={T.cdiLabel} hint={T.cdiHint} keyboardType="numbers-and-punctuation" inputMode="decimal" maxLength={6} value={draft.cdiText} onChangeText={(t) => set({ cdiText: t })} error={errors.cdiText} />
+              <TextField ref={cdiRef} label={T.cdiLabel} hint={T.cdiHint} keyboardType="numbers-and-punctuation" inputMode="decimal" maxLength={6} value={draft.cdiText} onChangeText={(t) => set({ cdiText: t })} error={errors.cdiText} />
             ) : null}
             {usesIpca ? (
-              <TextField label={T.ipcaLabel} hint={T.ipcaHint} keyboardType="numbers-and-punctuation" inputMode="decimal" maxLength={6} value={draft.ipcaText} onChangeText={(t) => set({ ipcaText: t })} error={errors.ipcaText} />
+              <TextField ref={ipcaRef} label={T.ipcaLabel} hint={T.ipcaHint} keyboardType="numbers-and-punctuation" inputMode="decimal" maxLength={6} value={draft.ipcaText} onChangeText={(t) => set({ ipcaText: t })} error={errors.ipcaText} />
             ) : null}
           </Card>
           {draft.options.map((o, i) => (
@@ -95,6 +118,9 @@ export default function CompararScreen() {
               </ChoiceGroup>
               {o.kind ? (
                 <TextField
+                  ref={(r) => {
+                    rateRefs.current[i] = r;
+                  }}
                   label={T.optionRateLabel(o.kind)}
                   accessibilityLabel={`${T.optionRateLabel(o.kind)}, ${T.optionTitle(i + 1)}`}
                   keyboardType="numbers-and-punctuation"
@@ -110,7 +136,7 @@ export default function CompararScreen() {
           {draft.options.length < COMPARE_MAX_OPTIONS ? (
             <Button label={T.addOption} icon={Plus} tone="soft" onPress={() => setDraft((d) => ({ ...d, options: [...d.options, { kind: null, rateText: '' }] }))} />
           ) : null}
-          <Button label="Comparar" onPress={() => setTried(true)} />
+          <Button label="Comparar" onPress={compare} />
           {tried && result ? (
             <Card style={{ gap: space[3] }}>
               <Txt variant="title" accessibilityRole="header" aria-level={2}>

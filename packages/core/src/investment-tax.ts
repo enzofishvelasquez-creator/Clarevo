@@ -112,10 +112,12 @@ export function estimateRegressiveNet(movements: readonly Flow[], today: IsoDate
     }
   }
   const gross = investmentValueOn(live, today);
-  const open = lots.filter((l) => l.principal > 0.5);
+  let open = lots.filter((l) => l.principal > 0.5);
   const principal = open.reduce((a, l) => a + l.principal, 0);
   const gain = gross - principal;
-  if (gain <= 0 || open.length === 0) return { grossCents: gross, gainCents: Math.round(gain), iofCents: 0, irCents: 0, netCents: gross, rates: null };
+  if (gain <= 0 || lots.length === 0) return { grossCents: gross, gainCents: Math.round(gain), iofCents: 0, irCents: 0, netCents: gross, rates: null };
+  // Todo o aplicado já saiu e ficou só rendimento (revisão de 13/11/2026): ele conta pela idade do aporte mais recente.
+  if (open.length === 0) open = [{ on: lots[lots.length - 1]!.on, principal: 1 }];
   const weights = open.map((l) => l.principal * Math.max(1, calendarDaysBetween(l.on, today)));
   const totalWeight = weights.reduce((a, w) => a + w, 0);
   let iof = 0;
