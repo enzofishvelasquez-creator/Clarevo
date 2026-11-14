@@ -30,6 +30,8 @@ const __mods = [
         return (0, dates_1.todayIn)('America/Sao_Paulo');
     }
     const CACHE_MS = 6 * 60 * 60 * 1000;
+    const FAILURE_MS = 5 * 60 * 1000;
+    const EARLY_MONTH_DAYS = 10;
     const JSON_TYPE = 'application/json; charset=utf-8';
     function cors(origin, appUrl) {
         if (origin === null)
@@ -61,16 +63,22 @@ const __mods = [
     function createPrecosHandler(deps) {
         const now = deps.now ?? (() => Date.now());
         let treasury = null;
+        let treasuryFailedAt = -Infinity;
         const months = new Map();
+        const monthFailedAt = new Map();
+        const monthLocks = new Map();
         const loadTreasury = async () => {
             if (treasury && now() - treasury.at < CACHE_MS)
                 return { ok: true, value: treasury.value };
+            if (now() - treasuryFailedAt < FAILURE_MS)
+                return { ok: false, value: null };
             try {
                 const reader = (0, investment_prices_1.treasuryReader)();
                 const r = await deps.fetchLines(investment_prices_1.TREASURY_PRICES_URL, { timeoutMs: 20000 }, reader.onLine);
                 const value = reader.result();
                 if (!r.ok || value === null) {
                     deps.log?.(`precos: tesouro_${r.status}`);
+                    treasuryFailedAt = now();
                     return { ok: false, value: null };
                 }
                 treasury = { at: now(), value };
@@ -78,32 +86,42 @@ const __mods = [
             }
             catch (e) {
                 deps.log?.(`precos: tesouro_${e instanceof Error ? e.message : 'falha'}`);
+                treasuryFailedAt = now();
                 return { ok: false, value: null };
             }
         };
-        const loadMonth = async (month) => {
-            const hit = months.get(month);
-            if (hit && now() - hit.at < CACHE_MS)
-                return { ok: true, value: hit.value };
+        const loadMonthNow = async (month, cnpjs) => {
+            let entry = months.get(month);
+            if (entry && now() - entry.at >= CACHE_MS) {
+                months.delete(month);
+                entry = undefined;
+            }
+            const need = cnpjs.filter((c) => !entry?.looked.has(c));
+            if (entry && (need.length === 0 || entry.missingFile))
+                return { ok: true, missingFile: entry.missingFile, quotes: entry.quotes };
+            if (now() - (monthFailedAt.get(month) ?? -Infinity) < FAILURE_MS)
+                return { ok: false, missingFile: false, quotes: entry?.quotes ?? new Map() };
+            const keep = entry ?? { at: now(), missingFile: false, quotes: new Map(), looked: new Set() };
+            const fail = (why) => {
+                deps.log?.(`precos: cvm_${month}_${why}`);
+                monthFailedAt.set(month, now());
+                return { ok: false, missingFile: false, quotes: keep.quotes };
+            };
             try {
-                const r = await deps.fetchBytes((0, investment_prices_1.cvmDailyUrl)(month), { timeoutMs: 40000 });
+                const r = await deps.fetchBytes((0, investment_prices_1.cvmDailyUrl)(month), { timeoutMs: 25000 });
                 if (r.status === 404) {
-                    const empty = new Map();
-                    months.set(month, { at: now(), value: empty });
-                    return { ok: true, value: empty };
+                    const empty = { at: now(), missingFile: true, quotes: new Map(), looked: new Set() };
+                    months.set(month, empty);
+                    return { ok: true, missingFile: true, quotes: empty.quotes };
                 }
-                if (!r.ok) {
-                    deps.log?.(`precos: cvm_${month}_${r.status}`);
-                    return { ok: false, value: new Map() };
-                }
-                const entry = (0, investment_prices_1.zipFirstEntry)(await r.bytes());
-                if (!entry || entry.method !== 8) {
-                    deps.log?.(`precos: cvm_${month}_zip`);
-                    return { ok: false, value: new Map() };
-                }
-                const reader = (0, investment_prices_1.cvmReader)();
+                if (!r.ok)
+                    return fail(String(r.status));
+                const zipEntry = (0, investment_prices_1.zipFirstEntry)(await r.bytes());
+                if (!zipEntry || zipEntry.method !== 8)
+                    return fail('zip');
+                const reader = (0, investment_prices_1.cvmReader)(new Set(need));
                 let rest = '';
-                for await (const chunk of deps.inflateRaw(entry.data)) {
+                for await (const chunk of deps.inflateRaw(zipEntry.data)) {
                     const lines = (rest + chunk).split('\n');
                     rest = lines.pop() ?? '';
                     for (const line of lines)
@@ -111,17 +129,25 @@ const __mods = [
                 }
                 if (rest !== '')
                     reader.onLine(rest);
-                const value = reader.result();
+                for (const [c, q] of reader.result())
+                    keep.quotes.set(c, q);
+                for (const c of need)
+                    keep.looked.add(c);
                 for (const k of [...months.keys()])
                     if (k !== month && months.size >= 2)
                         months.delete(k);
-                months.set(month, { at: now(), value });
-                return { ok: true, value };
+                months.set(month, keep);
+                return { ok: true, missingFile: false, quotes: keep.quotes };
             }
             catch (e) {
-                deps.log?.(`precos: cvm_${month}_${e instanceof Error ? e.message : 'falha'}`);
-                return { ok: false, value: new Map() };
+                return fail(e instanceof Error ? e.message : 'falha');
             }
+        };
+        const loadMonth = (month, cnpjs) => {
+            const before = monthLocks.get(month) ?? Promise.resolve();
+            const run = before.then(() => loadMonthNow(month, cnpjs));
+            monthLocks.set(month, run.catch(() => undefined));
+            return run;
         };
         return async (req) => {
             const headers = cors(req.header('origin'), deps.config.appUrl);
@@ -176,17 +202,19 @@ const __mods = [
             const fundos = {};
             if (cnpjs.length > 0) {
                 const current = (0, dates_1.monthOf)(today);
-                const cur = await loadMonth(current);
-                const missing = cnpjs.filter((c) => !cur.value.has(c));
-                const prev = missing.length > 0 ? await loadMonth((0, dates_1.addMonths)(current, -1)) : { ok: true, value: new Map() };
-                if (cur.ok || prev.ok)
+                const cur = await loadMonth(current, cnpjs);
+                if (cur.ok) {
                     anyOk = true;
-                for (const c of cnpjs) {
-                    const q = cur.value.get(c) ?? prev.value.get(c);
-                    if (q)
-                        fundos[c] = q;
-                    else if (cur.ok && prev.ok)
-                        fundos[c] = null;
+                    const missing = cnpjs.filter((c) => !cur.quotes.has(c));
+                    const early = Number(today.slice(8, 10)) <= EARLY_MONTH_DAYS;
+                    const prev = missing.length > 0 && (cur.missingFile || early) ? await loadMonth((0, dates_1.addMonths)(current, -1), missing) : null;
+                    for (const c of cnpjs) {
+                        const q = cur.quotes.get(c) ?? prev?.quotes.get(c);
+                        if (q)
+                            fundos[c] = q;
+                        else if (!prev || prev.ok)
+                            fundos[c] = null;
+                    }
                 }
             }
             if (!anyOk)
@@ -464,15 +492,23 @@ const __mods = [
         };
     }
     const cnpjDigits = (text) => text.toUpperCase().replace(/[.\/\s-]/g, '');
-    function cvmReader() {
+    function cvmReader(wanted) {
         const plain = new Map();
         const subs = new Set();
+        const accept = wanted ? new Set([...wanted].flatMap((c) => [c, formatCnpjDots(c)])) : null;
         return {
             onLine: (line) => {
+                const a = line.indexOf(';');
+                const b = a < 0 ? -1 : line.indexOf(';', a + 1);
+                if (b < 0)
+                    return;
+                const rawCnpj = line.slice(a + 1, b);
+                if (accept && !accept.has(rawCnpj))
+                    return;
                 const p = line.replace(/\r$/, '').split(';');
                 if (p.length < 6)
                     return;
-                const cnpj = cnpjDigits(p[1]);
+                const cnpj = cnpjDigits(rawCnpj);
                 const on = p[3].trim();
                 const quota = p[5].trim();
                 if (!/^[0-9A-Z]{14}$/.test(cnpj) || !(0, dates_1.isValidIsoDate)(on) || !/^\d+(\.\d+)?$/.test(quota) || Number(quota) <= 0)
@@ -494,6 +530,7 @@ const __mods = [
             },
         };
     }
+    const formatCnpjDots = (c) => `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}`;
     function zipFirstEntry(bytes) {
         if (bytes.length < 30)
             return null;

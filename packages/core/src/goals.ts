@@ -253,6 +253,12 @@ export function monthReachedWithPlan(missingCents: Cents, plannedMonthlyCents: C
 }
 
 /** Guardado no mês: aportes − resgates com data no mês (o já guardado ao criar, rendimentos e (des)valorizações ficam fora). */
+/** Os movimentos que contam no "guardado no mês": sem os das metas que leem o valor dos investimentos (D-099, item 13 fase 2). */
+export function countedGoalMovements<M extends Pick<GoalMovement, 'goalId'>>(movements: readonly M[], goals: readonly Pick<Goal, 'id' | 'valueSource'>[]): M[] {
+  const skip = new Set(goals.filter((g) => g.valueSource === 'investimentos').map((g) => g.id));
+  return skip.size === 0 ? [...movements] : movements.filter((m) => !skip.has(m.goalId));
+}
+
 export function savedInMonth(movements: readonly MovementLike[], month: IsoMonth): Cents {
   return movements
     .filter((m) => monthOf(m.occurredOn) === month && (m.kind === 'aporte' || m.kind === 'resgate'))
@@ -282,15 +288,19 @@ export interface GoalPlan {
  * (listGoalMovementsInMonth), porque só decidem P0.
  */
 export function goalPlan(
-  goal: Pick<Goal, 'id' | 'savedCents' | 'targetCents' | 'targetMonth' | 'plannedMonthlyCents'>,
+  goal: Pick<Goal, 'id' | 'savedCents' | 'targetCents' | 'targetMonth' | 'plannedMonthlyCents'> & Partial<Pick<Goal, 'valueSource'>>,
   movements: readonly Pick<GoalMovement, 'goalId' | 'kind' | 'occurredOn'>[],
   today: IsoDate,
 ): GoalPlan {
   const progress = goalProgress(goal.savedCents, goal.targetCents);
-  const p0 = firstProjectedMonth(
-    movements.filter((m) => m.goalId === goal.id),
-    today,
-  );
+  // Com o valor lido dos investimentos (D-099, item 13 fase 2), os registros da meta não contam: a projeção começa no mês de hoje.
+  const p0 =
+    goal.valueSource === 'investimentos'
+      ? monthOf(today)
+      : firstProjectedMonth(
+          movements.filter((m) => m.goalId === goal.id),
+          today,
+        );
   return {
     savedCents: goal.savedCents,
     targetCents: goal.targetCents,

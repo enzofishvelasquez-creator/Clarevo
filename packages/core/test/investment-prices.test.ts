@@ -87,6 +87,11 @@ describe('ficha: quantidade e CNPJ do fundo (D-099, itens 19 e 20)', () => {
     expect(parseQuantityText('0,1234567')).toBeNull();
     expect(parseQuantityText('1,2,3')).toBeNull();
     expect(parseQuantityText('abc')).toBeNull();
+    // Sem vírgula, o ponto é a casa decimal (teclado numérico), menos no milhar bem formado (como no valor em reais).
+    expect(parseQuantityText('0.530')).toBe(530_000);
+    expect(parseQuantityText('12.5')).toBe(12_500_000);
+    expect(parseQuantityText('1.500')).toBe(1_500_000_000);
+    expect(parseQuantityText('1.234567')).toBe(1_234_567);
     expect(formatQuantity(530_000)).toBe('0,53');
     expect(formatQuantity(1_234_567_891)).toBe('1.234,567891');
     expect(formatQuantity(12_000_000)).toBe('12');
@@ -216,7 +221,7 @@ const req = (body: unknown, over: Partial<{ method: string; auth: string | null;
   body: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
 });
 
-function deps(over: { treasury?: 'ok' | 'falha'; months?: Record<string, number | string>; calls?: string[]; now?: () => number } = {}) {
+function deps(over: { treasury?: 'ok' | 'falha'; months?: Record<string, number | string>; calls?: string[]; now?: () => number; today?: string } = {}) {
   const calls = over.calls ?? [];
   const months = over.months ?? { '2026-11': CVM_CSV };
   return {
@@ -250,7 +255,7 @@ function deps(over: { treasury?: 'ok' | 'falha'; months?: Record<string, number 
       const text = inflateRawSync(data).toString('latin1');
       for (let i = 0; i < text.length; i += 50) yield text.slice(i, i + 50);
     },
-    today: () => '2026-11-14',
+    today: () => over.today ?? '2026-11-14',
     now: over.now,
     log: () => {},
   };
@@ -284,8 +289,8 @@ describe('função "precos" (D-099): Tesouro e CVM', () => {
     expect(body.treasury.titles).toHaveLength(3);
     expect(body.fundos).toEqual({ '00017024000153': { on: '2026-11-12', quota: '45.483412400000' }, '00888897000131': { subclasses: true }, '11111111000191': null });
     expect(body.fetchedOn).toBe('2026-11-14');
-    // Não encontrado no mês de hoje: busca o anterior (404 aqui, ainda vale como "não encontrado").
-    expect(calls.filter((c) => c.startsWith('zip'))).toEqual(['zip 2026-11', 'zip 2026-10']);
+    // Não encontrado no mês de hoje, passado o começo do mês: não busca o anterior.
+    expect(calls.filter((c) => c.startsWith('zip'))).toEqual(['zip 2026-11']);
     expect(calls).toContain('lidas 5');
     calls.length = 0;
     const again = await h(req({ treasury: true, fundos: ['00017024000153'] }));
@@ -310,12 +315,42 @@ describe('função "precos" (D-099): Tesouro e CVM', () => {
     expect(body.fundos['00017024000153']).toEqual({ on: '2026-11-12', quota: '45.483412400000' });
     const h3 = createPrecosHandler(deps({ months: { '2026-11': CVM_CSV, '2026-10': 500 } }));
     const b3 = JSON.parse((await h3(req({ fundos: ['00017024000153', '11111111000191'] }))).body);
-    expect(b3.fundos).toEqual({ '00017024000153': { on: '2026-11-12', quota: '45.483412400000' } });
+    expect(b3.fundos).toEqual({ '00017024000153': { on: '2026-11-12', quota: '45.483412400000' }, '11111111000191': null });
     // Depois de 6 horas, busca de novo.
     t = 7 * 60 * 60 * 1000;
     calls.length = 0;
     await h(req({ treasury: true }));
     expect(calls.some((c) => c.startsWith('linhas'))).toBe(true);
+  });
+
+  it('mês de hoje fora do ar: o fundo fica de fora (sem a cota do mês anterior) e a fonte não é consultada de novo por 5 minutos', async () => {
+    let t = 0;
+    const calls: string[] = [];
+    const h = createPrecosHandler(deps({ months: { '2026-11': 500, '2026-10': CVM_CSV }, calls, now: () => t }));
+    const r = JSON.parse((await h(req({ treasury: true, fundos: ['00017024000153'] }))).body);
+    expect(r.fundos).toEqual({});
+    expect(r.treasury.on).toBe('2026-11-13');
+    expect(calls.filter((c) => c.startsWith('zip'))).toEqual(['zip 2026-11']);
+    calls.length = 0;
+    t = 4 * 60 * 1000;
+    await h(req({ fundos: ['00017024000153'] }));
+    expect(calls.filter((c) => c.startsWith('zip'))).toEqual([]);
+    t = 6 * 60 * 1000;
+    await h(req({ fundos: ['00017024000153'] }));
+    expect(calls.filter((c) => c.startsWith('zip'))).toEqual(['zip 2026-11']);
+  });
+
+  it('começo do mês: a cota que falta no arquivo de hoje vem do mês anterior; só os CNPJs pedidos são lidos', async () => {
+    const calls: string[] = [];
+    const lateOct = CVM_CSV.replace(/2026-11-1[12]/g, '2026-10-30');
+    const h = createPrecosHandler(deps({ today: '2026-11-04', months: { '2026-11': CVM_CSV.split('\r\n').slice(0, 2).join('\r\n'), '2026-10': lateOct }, calls }));
+    const body = JSON.parse((await h(req({ fundos: ['00017024000153', '00888897000131'] }))).body);
+    expect(body.fundos['00017024000153']).toEqual({ on: '2026-11-11', quota: '45.360755300000' });
+    expect(body.fundos['00888897000131']).toEqual({ subclasses: true });
+    expect(calls.filter((c) => c.startsWith('zip'))).toEqual(['zip 2026-11', 'zip 2026-10']);
+    const r = cvmReader(new Set(['00017024000153']));
+    for (const l of CVM_CSV.split('\n')) r.onLine(l);
+    expect([...r.result().keys()]).toEqual(['00017024000153']);
   });
 
   it('a função gerada (supabase/functions/precos) está em dia com o núcleo e roda como no Deno, com o zip descomprimido pelo próprio fluxo', async () => {
@@ -431,6 +466,13 @@ describe('MemoryRepository: quantidade e CNPJ, preços de exemplo e meta que lê
     // O texto da composição e o ritmo.
     expect(goalDetailTexts(w.goal, [], TODAY).composition).toEqual(['Valor dos investimentos ligados: R$ 1.080,00, pela última atualização de cada um.']);
     expect(goalPace(w.goal, TODAY)).toBeNull();
+    // A projeção começa no mês de hoje (os registros da meta não contam) e o guardado do mês não leva os registros dela.
+    const { goalPlan, countedGoalMovements, savedInMonth } = await import('../src');
+    const moves = [{ goalId: g.id, kind: 'aporte' as const, amountCents: 9_000, occurredOn: TODAY }];
+    expect(goalPlan(w.goal, moves, TODAY).firstProjectedMonth).toBe('2026-11');
+    expect(goalPlan({ ...w.goal, valueSource: 'registros' }, moves, TODAY).firstProjectedMonth).toBe('2026-12');
+    expect(savedInMonth(countedGoalMovements(moves, [w.goal]), '2026-11')).toBe(0);
+    expect(savedInMonth(countedGoalMovements(moves, [{ ...w.goal, valueSource: 'registros' }]), '2026-11')).toBe(9_000);
     // Um aporte no investimento conta na meta.
     await repo.addInvestmentMovement('m1', a.id, 'aporte', { amountCents: 5_000, occurredOn: TODAY, note: null });
     expect((await repo.getGoal(g.id))!.savedCents).toBe(108_000);

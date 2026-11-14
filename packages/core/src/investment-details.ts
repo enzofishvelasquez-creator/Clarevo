@@ -208,11 +208,18 @@ export function normalizeCnpj(text: string): string | null {
   return isValidCnpj(t) ? t : null;
 }
 
-/** "0,53", "1.234,567891" ou "12" para milionésimos (530000, 1234567891, 12000000). Até 6 casas depois da vírgula; vazio ou zero é null. */
+/**
+ * "0,53", "1.234,567891" ou "12" para milionésimos (530000, 1234567891, 12000000). Até 6 casas depois da vírgula; vazio ou zero é null.
+ * Como o valor em reais (parseBRL): sem vírgula, o ponto é a casa decimal ("0.53", comum nos teclados numéricos), a não ser no milhar
+ * bem formado, que não começa em zero ("1.500" é mil e quinhentos; "0.530" é zero vírgula cinquenta e três).
+ */
 export function parseQuantityText(text: string): number | null {
   const t = text.trim().replace(/\s/g, '');
-  if (!/^(\d{1,3}(\.\d{3})+|\d+)(,\d{1,6})?$/.test(t)) return null;
-  const [int, frac = ''] = t.replace(/\./g, '').split(',');
+  const br = /^([1-9]\d{0,2}(?:\.\d{3})+|\d+)(?:,(\d{1,6}))?$/.exec(t);
+  const dot = /^(\d+)\.(\d{1,6})$/.exec(t);
+  const parts = br ? [br[1]!.replace(/\./g, ''), br[2] ?? ''] : dot ? [dot[1]!, dot[2]!] : null;
+  if (!parts) return null;
+  const [int, frac] = parts as [string, string];
   const micro = Number(int) * 1_000_000 + Number(frac.padEnd(6, '0'));
   return Number.isSafeInteger(micro) && micro >= 1 && micro <= QUANTITY_MICRO_MAX ? micro : null;
 }

@@ -208,9 +208,12 @@ Regras em `packages/core/src/investment-prices.ts`; função do servidor `precos
   diário com o dia mais recente no topo: a função lê só até o fim desse dia. Vale o PU de venda da manhã (o preço de resgate antecipado) do
   título com o mesmo nome e o mesmo vencimento da ficha. Título fora da oferta do dia e o Tesouro Reserva não têm preço nesse arquivo: a tela
   diz isso e pede o extrato.
-- **Fundos:** "Informe Diário" da CVM (dados abertos, licença ODbL), um zip por mês com a cota de cada dia útil (de 4 a 11 MB; o mês cheio
-  leva cerca de 0,7 s de processamento). Vale a cota mais recente da classe do CNPJ; no começo do mês, a do mês anterior. CNPJ com mais de
-  uma subclasse fica sem cota (cada subclasse tem a sua). A cota sai com alguns dias de atraso.
+- **Fundos:** "Informe Diário" da CVM (dados abertos, licença ODbL), um zip por mês com a cota de cada dia útil (de 4 a 11 MB). A função lê
+  por inteiro só as linhas dos CNPJs pedidos (o mês cheio leva cerca de 0,2 s de processamento, dentro do limite das funções do Supabase).
+  Vale a cota mais recente da classe do CNPJ. O mês anterior só é lido quando o arquivo do mês ainda não existe ou nos 10 primeiros dias do
+  mês (a cota sai com alguns dias de atraso); com o arquivo do mês fora do ar, nada do anterior (a cota velha pareceria a de agora): o app
+  diz que não conseguiu buscar. Fonte fora do ar não é consultada de novo por 5 minutos. CNPJ com mais de uma subclasse fica sem cota
+  (cada subclasse tem a sua).
 - **Valor:** quantidade × preço (ou cota), em centavos, arredondado (conta exata). O card "Valor pelo preço do Tesouro" ou "Valor pela cota do
   fundo" mostra a conta, a data, a fonte e "O valor do seu extrato é o que vale"; o valor só é gravado com "Usar este valor" (uma
   atualização com a data de hoje). Sem o que falta na ficha, o card diz o que falta.
@@ -227,5 +230,6 @@ Regras em `packages/core/src/investment-prices.ts`; função do servidor `precos
   a composição diz de onde vem o valor. Os registros da meta ficam guardados e voltam a contar com "Do que eu registro na meta".
 - **Lembrete "Guardar para as metas":** com uma meta planejada que lê os investimentos, um aporte do mês num investimento ligado a ela conta
   como aporte do mês.
-- **Fica como antes:** o "guardado no mês" das metas e a Evolução contam os registros das metas.
+- **"Guardado no mês"** (Metas, Seu mês e o comprometido): os registros da meta que lê os investimentos não contam, como a tela diz; a
+  projeção do plano começa no mês de hoje. A Evolução continua mostrando o histórico dos registros de cada mês.
 

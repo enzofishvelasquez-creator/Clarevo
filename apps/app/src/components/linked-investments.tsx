@@ -1,4 +1,5 @@
 import { INVESTMENT_GOAL_TEXT, formatBRL, isRepoError, linkedInvestmentsSummary, newOperationKey, type Goal, type GoalValueSource } from '@clarevo/core';
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
 import { useState } from 'react';
@@ -26,6 +27,7 @@ export function LinkedInvestmentsCard({ goal }: { goal: Goal }) {
   const list = useInvestments(personal ? goal.contextId : undefined);
   const maskLabel = useMoneyLabelMask();
   const setSource = useSetGoalValueSource();
+  const qc = useQueryClient();
   const [key, setKey] = useState(() => newOperationKey());
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const summary = list.data ? linkedInvestmentsSummary(goal.id, list.data, today) : null;
@@ -43,7 +45,9 @@ export function LinkedInvestmentsCard({ goal }: { goal: Goal }) {
       setMessage({ text: S.saved, error: false });
     } catch (e) {
       const code = isRepoError(e) ? e.code : 'desconhecido';
-      setKey(newOperationKey());
+      // Falha de rede: a mesma chave na nova tentativa (se já tinha gravado, a repetição devolve a meta como ficou). E a meta é lida de novo.
+      if (code !== 'rede') setKey(newOperationKey());
+      qc.invalidateQueries({ queryKey: ['goals'] });
       setMessage({ text: code === 'contexto_invalido' ? S.personalOnly : code === 'versao_desatualizada' ? S.changedElsewhere : S.error, error: true });
     }
   }

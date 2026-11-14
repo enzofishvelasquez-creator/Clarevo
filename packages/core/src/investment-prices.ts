@@ -138,16 +138,28 @@ const cnpjDigits = (text: string) => text.toUpperCase().replace(/[.\/\s-]/g, '')
 
 /**
  * Lê as linhas do Informe Diário da CVM (TP_FUNDO_CLASSE;CNPJ_FUNDO_CLASSE;ID_SUBCLASSE;DT_COMPTC;VL_TOTAL;VL_QUOTA;...) e guarda, para cada
- * CNPJ, a cota mais recente da classe sem subclasse e se ele tem subclasses. Linhas de outro formato são ignoradas.
+ * CNPJ, a cota mais recente da classe sem subclasse e se ele tem subclasses. Com `wanted` (CNPJs de 14 caracteres), só as linhas desses
+ * CNPJs são lidas por inteiro: o arquivo do mês tem meio milhão de linhas, e a função do servidor tem pouco tempo de processamento.
+ * Linhas de outro formato são ignoradas.
  */
-export function cvmReader(): { onLine: (line: string) => void; result: () => Map<string, { on: IsoDate; quota: string } | { subclasses: true }> } {
+export function cvmReader(wanted?: ReadonlySet<string>): {
+  onLine: (line: string) => void;
+  result: () => Map<string, { on: IsoDate; quota: string } | { subclasses: true }>;
+} {
   const plain = new Map<string, { on: IsoDate; quota: string }>();
   const subs = new Set<string>();
+  // O arquivo traz o CNPJ formatado ("00.017.024/0001-53"); a comparação aceita as duas formas.
+  const accept = wanted ? new Set([...wanted].flatMap((c) => [c, formatCnpjDots(c)])) : null;
   return {
     onLine: (line) => {
+      const a = line.indexOf(';');
+      const b = a < 0 ? -1 : line.indexOf(';', a + 1);
+      if (b < 0) return;
+      const rawCnpj = line.slice(a + 1, b);
+      if (accept && !accept.has(rawCnpj)) return;
       const p = line.replace(/\r$/, '').split(';');
       if (p.length < 6) return;
-      const cnpj = cnpjDigits(p[1]!);
+      const cnpj = cnpjDigits(rawCnpj);
       const on = p[3]!.trim();
       const quota = p[5]!.trim();
       if (!/^[0-9A-Z]{14}$/.test(cnpj) || !isValidIsoDate(on) || !/^\d+(\.\d+)?$/.test(quota) || Number(quota) <= 0) return;
@@ -165,6 +177,9 @@ export function cvmReader(): { onLine: (line: string) => void; result: () => Map
     },
   };
 }
+
+/** "00017024000153" para "00.017.024/0001-53" (o formato do arquivo da CVM). */
+const formatCnpjDots = (c: string) => `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}`;
 
 /** O primeiro arquivo de um zip (cabeçalho local): o método (8 = deflate, 0 = sem compressão) e os bytes comprimidos. null se não for zip. */
 export function zipFirstEntry(bytes: Uint8Array): { method: number; data: Uint8Array } | null {

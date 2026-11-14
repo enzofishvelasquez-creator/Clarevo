@@ -51,6 +51,7 @@ import {
   projectCommitted,
   returnWindow,
   savedInMonth,
+  countedGoalMovements,
   savingsCardState,
   savingsEvolutionPoints,
   searchFilterOf,
@@ -1509,7 +1510,7 @@ export function useGoalsOverview(contextId: string | undefined) {
     const inMonth = movements.data!;
     const plans: Record<string, GoalPlan> = {};
     for (const g of list) plans[g.id] = goalPlan(g, inMonth, today);
-    return { goals: list, ...organizeGoals(list), month, monthMovements: inMonth, savedInMonthCents: savedInMonth(inMonth, month), plannedCents: plannedForGoals(list), plans };
+    return { goals: list, ...organizeGoals(list), month, monthMovements: inMonth, savedInMonthCents: savedInMonth(countedGoalMovements(inMonth, list), month), plannedCents: plannedForGoals(list), plans };
   }, [ready, goals.data, movements.data, month, today]);
   return combineParts<GoalsOverview>(parts, value);
 }
@@ -1547,7 +1548,7 @@ export function useCommittedGoalLines(contextId: string | undefined, month: IsoM
     if (!ready) return undefined;
     const s = summary.data!;
     const list = goals.data!;
-    return { summary: s, lines: committedGoalLines(s, savedInMonth(movements.data!, month), plannedForGoals(list)), hasGoals: list.length > 0 };
+    return { summary: s, lines: committedGoalLines(s, savedInMonth(countedGoalMovements(movements.data!, list), month), plannedForGoals(list)), hasGoals: list.length > 0 };
   }, [ready, summary.data, goals.data, movements.data, month]);
   return combineParts<CommittedGoalData>(parts, value);
 }
@@ -1618,7 +1619,7 @@ export function useSeuMes(contextId: string | undefined, month: IsoMonth) {
       previousBreakdown: previous.data,
       toPay,
       budget: budget.summary,
-      goals: { count: goals.data.length, savedInMonthCents: savedInMonth(movements.data, month), plannedCents: plannedForGoals(goals.data) },
+      goals: { count: goals.data.length, savedInMonthCents: savedInMonth(countedGoalMovements(movements.data, goals.data), month), plannedCents: plannedForGoals(goals.data) },
       paidChecked,
     });
   }, [ready, month, today, summary, toPay, breakdown.data, previous.data, budget.summary, goals.data, movements.data, paidChecked]);

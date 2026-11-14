@@ -30,10 +30,13 @@ export function InvestmentPublicPriceCard({ investment: i, onNotice }: { investm
   const invalidate = useInvalidateInvestments();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A mesma chave numa nova tentativa depois de uma falha de rede (a atualização não fica duas vezes); outra depois de gravar.
+  const [key, setKey] = useState(() => newOperationKey());
   const isTreasury = i.kind === 'titulos_publicos';
   const isFund = i.kind === 'fundos';
   // Só busca quando a ficha tem o necessário (o título com vencimento e quantidade; o fundo com CNPJ e quantidade).
-  const canQuery = i.status === 'ativo' && i.quantityMicro !== null && ((isTreasury && i.subkind !== null && i.maturityOn !== null) || (isFund && i.fundCnpj !== null));
+  const canQuery =
+    i.status === 'ativo' && i.quantityMicro !== null && ((isTreasury && i.subkind !== null && i.subkind !== 'tesouro_reserva' && i.maturityOn !== null) || (isFund && i.fundCnpj !== null));
   const prices = usePublicPrices(canQuery ? { treasury: isTreasury, fundos: isFund && i.fundCnpj ? [i.fundCnpj] : [] } : null);
   if (i.status !== 'ativo' || (!isTreasury && !isFund)) return null;
 
@@ -97,12 +100,15 @@ export function InvestmentPublicPriceCard({ investment: i, onNotice }: { investm
     setError(null);
     onNotice(null);
     try {
-      await repo.addInvestmentMovement(newOperationKey(), i.id, 'valor', { amountCents: valueCents, occurredOn: today, note: null });
+      await repo.addInvestmentMovement(key, i.id, 'valor', { amountCents: valueCents, occurredOn: today, note: null });
+      setKey(newOperationKey());
       invalidate();
       onNotice(T.used);
     } catch (e) {
+      const code = isRepoError(e) ? e.code : 'desconhecido';
+      if (code !== 'rede') setKey(newOperationKey());
       invalidate();
-      setError(investmentErrorText(isRepoError(e) ? e.code : 'desconhecido'));
+      setError(investmentErrorText(code));
     } finally {
       setBusy(false);
     }

@@ -72,6 +72,10 @@ export interface PrecosResponse {
 }
 
 const CACHE_MS = 6 * 60 * 60 * 1000;
+/** Uma fonte fora do ar não é consultada de novo por 5 minutos. */
+const FAILURE_MS = 5 * 60 * 1000;
+/** Nos primeiros dias do mês, a cota que falta no arquivo do mês é procurada no anterior. */
+const EARLY_MONTH_DAYS = 10;
 const JSON_TYPE = 'application/json; charset=utf-8';
 
 function cors(origin: string | null, appUrl: string): Record<string, string> {
@@ -101,63 +105,88 @@ export function requestedCnpjs(value: unknown): string[] | null {
 export function createPrecosHandler(deps: PrecosDeps) {
   const now = deps.now ?? (() => Date.now());
   let treasury: { at: number; value: TreasuryPrices } | null = null;
-  const months = new Map<string, { at: number; value: Map<string, Exclude<FundQuoteResult, null>> }>();
+  let treasuryFailedAt = -Infinity;
+  /**
+   * Por mês: as cotas achadas e os CNPJs já procurados (as funções do servidor reiniciam com frequência, então só os CNPJs pedidos são
+   * lidos por inteiro), se o arquivo ainda não existe (404) e quando falhou pela última vez. Uma leitura por mês de cada vez.
+   */
+  const months = new Map<string, { at: number; missingFile: boolean; quotes: Map<string, Exclude<FundQuoteResult, null>>; looked: Set<string> }>();
+  const monthFailedAt = new Map<string, number>();
+  const monthLocks = new Map<string, Promise<unknown>>();
 
   const loadTreasury = async (): Promise<{ ok: boolean; value: TreasuryPrices | null }> => {
     if (treasury && now() - treasury.at < CACHE_MS) return { ok: true, value: treasury.value };
+    // Falha recente: não espera de novo a fonte fora do ar a cada pedido.
+    if (now() - treasuryFailedAt < FAILURE_MS) return { ok: false, value: null };
     try {
       const reader = treasuryReader();
       const r = await deps.fetchLines(TREASURY_PRICES_URL, { timeoutMs: 20000 }, reader.onLine);
       const value = reader.result();
       if (!r.ok || value === null) {
         deps.log?.(`precos: tesouro_${r.status}`);
+        treasuryFailedAt = now();
         return { ok: false, value: null };
       }
       treasury = { at: now(), value };
       return { ok: true, value };
     } catch (e) {
       deps.log?.(`precos: tesouro_${e instanceof Error ? e.message : 'falha'}`);
+      treasuryFailedAt = now();
       return { ok: false, value: null };
     }
   };
 
-  /** As cotas do mês (todas, a mais recente de cada CNPJ); mês ainda sem arquivo (404) vem vazio. */
-  const loadMonth = async (month: string): Promise<{ ok: boolean; value: Map<string, Exclude<FundQuoteResult, null>> }> => {
-    const hit = months.get(month);
-    if (hit && now() - hit.at < CACHE_MS) return { ok: true, value: hit.value };
+  /** Lê o mês para os CNPJs pedidos que ainda não foram procurados nele (os já procurados saem da memória). */
+  const loadMonthNow = async (month: string, cnpjs: readonly string[]): Promise<{ ok: boolean; missingFile: boolean; quotes: Map<string, Exclude<FundQuoteResult, null>> }> => {
+    let entry = months.get(month);
+    if (entry && now() - entry.at >= CACHE_MS) {
+      months.delete(month);
+      entry = undefined;
+    }
+    const need = cnpjs.filter((c) => !entry?.looked.has(c));
+    if (entry && (need.length === 0 || entry.missingFile)) return { ok: true, missingFile: entry.missingFile, quotes: entry.quotes };
+    if (now() - (monthFailedAt.get(month) ?? -Infinity) < FAILURE_MS) return { ok: false, missingFile: false, quotes: entry?.quotes ?? new Map() };
+    const keep = entry ?? { at: now(), missingFile: false, quotes: new Map<string, Exclude<FundQuoteResult, null>>(), looked: new Set<string>() };
+    const fail = (why: string) => {
+      deps.log?.(`precos: cvm_${month}_${why}`);
+      monthFailedAt.set(month, now());
+      return { ok: false, missingFile: false, quotes: keep.quotes };
+    };
     try {
-      const r = await deps.fetchBytes(cvmDailyUrl(month), { timeoutMs: 40000 });
+      const r = await deps.fetchBytes(cvmDailyUrl(month), { timeoutMs: 25000 });
       if (r.status === 404) {
-        const empty = new Map<string, Exclude<FundQuoteResult, null>>();
-        months.set(month, { at: now(), value: empty });
-        return { ok: true, value: empty };
+        const empty = { at: now(), missingFile: true, quotes: new Map<string, Exclude<FundQuoteResult, null>>(), looked: new Set<string>() };
+        months.set(month, empty);
+        return { ok: true, missingFile: true, quotes: empty.quotes };
       }
-      if (!r.ok) {
-        deps.log?.(`precos: cvm_${month}_${r.status}`);
-        return { ok: false, value: new Map() };
-      }
-      const entry = zipFirstEntry(await r.bytes());
-      if (!entry || entry.method !== 8) {
-        deps.log?.(`precos: cvm_${month}_zip`);
-        return { ok: false, value: new Map() };
-      }
-      const reader = cvmReader();
+      if (!r.ok) return fail(String(r.status));
+      const zipEntry = zipFirstEntry(await r.bytes());
+      if (!zipEntry || zipEntry.method !== 8) return fail('zip');
+      const reader = cvmReader(new Set(need));
       let rest = '';
-      for await (const chunk of deps.inflateRaw(entry.data)) {
+      for await (const chunk of deps.inflateRaw(zipEntry.data)) {
         const lines = (rest + chunk).split('\n');
         rest = lines.pop() ?? '';
         for (const line of lines) reader.onLine(line);
       }
       if (rest !== '') reader.onLine(rest);
-      const value = reader.result();
-      // Só um mês por vez na memória (o atual e o anterior entram e saem): os dois juntos passariam de 50 mil fundos.
+      for (const [c, q] of reader.result()) keep.quotes.set(c, q);
+      for (const c of need) keep.looked.add(c);
+      // Só dois meses na memória (o de hoje e o anterior).
       for (const k of [...months.keys()]) if (k !== month && months.size >= 2) months.delete(k);
-      months.set(month, { at: now(), value });
-      return { ok: true, value };
+      months.set(month, keep);
+      return { ok: true, missingFile: false, quotes: keep.quotes };
     } catch (e) {
-      deps.log?.(`precos: cvm_${month}_${e instanceof Error ? e.message : 'falha'}`);
-      return { ok: false, value: new Map() };
+      return fail(e instanceof Error ? e.message : 'falha');
     }
+  };
+
+  /** Um mês de cada vez: dois pedidos ao mesmo tempo não descomprimem o mesmo arquivo duas vezes. */
+  const loadMonth = (month: string, cnpjs: readonly string[]) => {
+    const before = monthLocks.get(month) ?? Promise.resolve();
+    const run = before.then(() => loadMonthNow(month, cnpjs));
+    monthLocks.set(month, run.catch(() => undefined));
+    return run;
   };
 
   return async (req: PrecosRequest): Promise<PrecosResponse> => {
@@ -204,17 +233,20 @@ export function createPrecosHandler(deps: PrecosDeps) {
     }
     const fundos: Record<string, FundQuoteResult> = {};
     if (cnpjs.length > 0) {
-      // O mês de hoje e, para o que faltar (começo do mês, fundo que atrasou), o anterior.
+      // O mês de hoje. O anterior só quando o de hoje ainda não tem arquivo ou nos primeiros dias do mês (a cota sai com atraso); com o
+      // mês de hoje fora do ar, nada do anterior (a cota velha pareceria a de agora): o fundo fica de fora e o app diz que não conseguiu.
       const current = monthOf(today);
-      const cur = await loadMonth(current);
-      const missing = cnpjs.filter((c) => !cur.value.has(c));
-      const prev = missing.length > 0 ? await loadMonth(addMonths(current, -1)) : { ok: true, value: new Map<string, Exclude<FundQuoteResult, null>>() };
-      if (cur.ok || prev.ok) anyOk = true;
-      for (const c of cnpjs) {
-        const q = cur.value.get(c) ?? prev.value.get(c);
-        // Sem a fonte de um dos meses, quem não foi achado fica de fora (não é "não encontrado"): o app diz que não conseguiu buscar.
-        if (q) fundos[c] = q;
-        else if (cur.ok && prev.ok) fundos[c] = null;
+      const cur = await loadMonth(current, cnpjs);
+      if (cur.ok) {
+        anyOk = true;
+        const missing = cnpjs.filter((c) => !cur.quotes.has(c));
+        const early = Number(today.slice(8, 10)) <= EARLY_MONTH_DAYS;
+        const prev = missing.length > 0 && (cur.missingFile || early) ? await loadMonth(addMonths(current, -1), missing) : null;
+        for (const c of cnpjs) {
+          const q = cur.quotes.get(c) ?? prev?.quotes.get(c);
+          if (q) fundos[c] = q;
+          else if (!prev || prev.ok) fundos[c] = null;
+        }
       }
     }
     if (!anyOk) return reply(502, 'precos_indisponiveis');

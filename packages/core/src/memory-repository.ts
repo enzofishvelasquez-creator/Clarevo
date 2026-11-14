@@ -2119,10 +2119,6 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /**
-   * Como set_goal_order (D-093, migração 0031). Ordem: repetição; nao_encontrado (sem leitura); sem_permissao (sem escrita); lista_invalida
-   * (a lista não é exatamente a das metas ativas do contexto, sem a reserva). A prioridade muda sem subir a versão da meta.
-   */
-  /**
    * Como set_goal_value_source (0037). Ordem: repetição; trava (nao_encontrado, sem_permissao); versão; origem_invalida; contexto_invalido
    * ('investimentos' fora do Pessoal). Sobe a versão da meta e conta como anotação.
    */
@@ -2146,6 +2142,10 @@ export class MemoryRepository implements RecordsRepository {
     return this.read(() => examplePublicPrices(request, this.opts.today()));
   }
 
+  /**
+   * Como set_goal_order (D-093, migração 0031). Ordem: repetição; nao_encontrado (sem leitura); sem_permissao (sem escrita); lista_invalida
+   * (a lista não é exatamente a das metas ativas do contexto, sem a reserva). A prioridade muda sem subir a versão da meta.
+   */
   async setGoalOrder(key: string, contextId: string, goalIds: readonly string[]): Promise<GoalOrderWrite> {
     return this.write(() => {
       const ids = [...goalIds];
