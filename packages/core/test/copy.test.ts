@@ -123,6 +123,7 @@ import {
   upcomingCommittedMonths,
   CALCULATORS,
   CALC_DISCLAIMER,
+  calcDisclaimer,
   CALC_ERROR_TEXT,
   CALC_GROUPS,
   CALC_INTRO,
@@ -575,6 +576,7 @@ describe('textos das calculadoras e de "Achar tudo"', () => {
     const quick = QUICK_PAY_TEXT;
     const texts: string[] = [
       CALC_DISCLAIMER,
+      calcDisclaimer('dividir-contas'),
       CALC_INTRO,
       COTA_UNICA_TITLE,
       COTA_UNICA_SUBTITLE,
