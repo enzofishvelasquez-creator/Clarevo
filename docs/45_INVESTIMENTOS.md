@@ -139,6 +139,9 @@ Em `docs/05_SUPABASE.md`, passos 12v, 12w e 12x, e as conferências 21s e 21t:
 5. Plano de aportes e investimento ligado à meta (D-099, P2): rodar a migração 0036 (`20261114000001_investimentos_plano_meta.sql`) e
    recarregar o esquema (passo 12ab e conferência 21x). A função `indices` não muda. Aplicar antes do merge: o app novo lê `investment_plans`
    e a coluna `goal_id` da visão (sem a migração, o app segue funcionando sem o plano, e a meta escolhida no formulário é ignorada pelo banco).
+6. Preço público, cota dos fundos e meta que lê os investimentos (D-099, P3): rodar a migração 0037 (`20261114000002_investimentos_precos.sql`)
+   e recarregar o esquema (passo 12ac e conferência 21y); criar e publicar a função `precos` (passo 12ad), com a verificação de JWT desligada,
+   como a `indices`. Aplicar antes do merge.
 
 ## 7. Ficha ampliada (D-099, 13/11/2026)
 
@@ -192,4 +195,41 @@ Itens 12 e 13 (fase 1) de `docs/49_ESTUDO_INVESTIMENTOS.md`. Regras em `packages
   tem resgate em até 1 dia pela ficha. Só informação: a meta continua com o valor que a pessoa registrou nela, e a tela diz de onde vem cada
   número. Fase 2 (a meta ler o valor do investimento) fica para depois: muda as regras das metas.
 - **Demonstração:** plano de R$ 600,00 por mês e a aplicação ligada à reserva.
+
+## 9. Preço público dos títulos e cota dos fundos (D-099, itens 19 e 20, 14/11/2026)
+
+Regras em `packages/core/src/investment-prices.ts`; função do servidor `precos` (`packages/core/src/precos/servidor.ts`, gerada em
+`supabase/functions/precos/index.ts`); migração 0037.
+
+- **Na ficha (opcionais):** a quantidade de títulos (títulos públicos) ou de cotas (fundos), em milionésimos, até 6 casas depois da vírgula;
+  e o CNPJ do fundo (numérico ou alfanumérico, com os dígitos verificadores conferidos no app e no banco). Sem a chave na ficha (versão
+  anterior do app), ficam como estavam.
+- **Títulos públicos:** "Taxas dos Títulos Ofertados pelo Tesouro Direto", do Tesouro Transparente (dados abertos, licença ODbL), um CSV
+  diário com o dia mais recente no topo: a função lê só até o fim desse dia. Vale o PU de venda da manhã (o preço de resgate antecipado) do
+  título com o mesmo nome e o mesmo vencimento da ficha. Título fora da oferta do dia e o Tesouro Reserva não têm preço nesse arquivo: a tela
+  diz isso e pede o extrato.
+- **Fundos:** "Informe Diário" da CVM (dados abertos, licença ODbL), um zip por mês com a cota de cada dia útil (de 4 a 11 MB). A função lê
+  por inteiro só as linhas dos CNPJs pedidos (o mês cheio leva cerca de 0,2 s de processamento, dentro do limite das funções do Supabase).
+  Vale a cota mais recente da classe do CNPJ. O mês anterior só é lido quando o arquivo do mês ainda não existe ou nos 10 primeiros dias do
+  mês (a cota sai com alguns dias de atraso); com o arquivo do mês fora do ar, nada do anterior (a cota velha pareceria a de agora): o app
+  diz que não conseguiu buscar. Fonte fora do ar não é consultada de novo por 5 minutos. CNPJ com mais de uma subclasse fica sem cota
+  (cada subclasse tem a sua).
+- **Valor:** quantidade × preço (ou cota), em centavos, arredondado (conta exata). O card "Valor pelo preço publicado" ou "Valor pela cota do
+  fundo" mostra a conta, a data, a fonte e "O valor do seu extrato é o que vale"; o valor só é gravado com "Usar este valor" (uma
+  atualização com a data de hoje). Sem o que falta na ficha, o card diz o que falta.
+- **Privacidade:** a função recebe só os CNPJs dos fundos (dado público do fundo) e não guarda nada em banco; a resposta fica 6 horas na
+  memória da função. A licença ODbL pede a atribuição: a fonte aparece no card.
+- **Demonstração:** preços e cotas de exemplo, com aviso; nada vai à rede.
+
+## 10. Meta que lê o valor dos investimentos ligados (D-099, item 13 fase 2, 14/11/2026)
+
+- **A escolha:** no card "Investimentos ligados" da meta ou da reserva, "De onde vem o valor guardado": "Do que eu registro na meta" (como
+  sempre) ou "Dos investimentos ligados" (só no Pessoal; `goals.value_source`, `set_goal_value_source`, operação `origem_valor_meta`).
+- **Com os investimentos:** o valor guardado da meta é a soma do valor de hoje dos investimentos ativos ligados a ela (`goal_items` e o
+  retorno das funções de metas). Os botões de aporte, resgate e atualizar dão lugar a "Ver na aba Investir"; o ritmo pelos registros some;
+  a composição diz de onde vem o valor. Os registros da meta ficam guardados e voltam a contar com "Do que eu registro na meta".
+- **Lembrete "Guardar para as metas":** com uma meta planejada que lê os investimentos, um aporte do mês num investimento ligado a ela conta
+  como aporte do mês.
+- **"Guardado no mês"** (Metas, Seu mês e o comprometido): os registros da meta que lê os investimentos não contam, como a tela diz; a
+  projeção do plano começa no mês de hoje. A Evolução continua mostrando o histórico dos registros de cada mês.
 

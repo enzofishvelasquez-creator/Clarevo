@@ -51,6 +51,7 @@ import {
   projectCommitted,
   returnWindow,
   savedInMonth,
+  countedGoalMovements,
   savingsCardState,
   savingsEvolutionPoints,
   searchFilterOf,
@@ -104,6 +105,7 @@ import {
   type GoalMovementKind,
   type GoalPlan,
   type GoalStatus,
+  type GoalValueSource,
   type GoalWrite,
   type ImportDestination,
   type ImportItem,
@@ -1508,7 +1510,7 @@ export function useGoalsOverview(contextId: string | undefined) {
     const inMonth = movements.data!;
     const plans: Record<string, GoalPlan> = {};
     for (const g of list) plans[g.id] = goalPlan(g, inMonth, today);
-    return { goals: list, ...organizeGoals(list), month, monthMovements: inMonth, savedInMonthCents: savedInMonth(inMonth, month), plannedCents: plannedForGoals(list), plans };
+    return { goals: list, ...organizeGoals(list), month, monthMovements: inMonth, savedInMonthCents: savedInMonth(countedGoalMovements(inMonth, list), month), plannedCents: plannedForGoals(list), plans };
   }, [ready, goals.data, movements.data, month, today]);
   return combineParts<GoalsOverview>(parts, value);
 }
@@ -1546,7 +1548,7 @@ export function useCommittedGoalLines(contextId: string | undefined, month: IsoM
     if (!ready) return undefined;
     const s = summary.data!;
     const list = goals.data!;
-    return { summary: s, lines: committedGoalLines(s, savedInMonth(movements.data!, month), plannedForGoals(list)), hasGoals: list.length > 0 };
+    return { summary: s, lines: committedGoalLines(s, savedInMonth(countedGoalMovements(movements.data!, list), month), plannedForGoals(list)), hasGoals: list.length > 0 };
   }, [ready, summary.data, goals.data, movements.data, month]);
   return combineParts<CommittedGoalData>(parts, value);
 }
@@ -1617,7 +1619,7 @@ export function useSeuMes(contextId: string | undefined, month: IsoMonth) {
       previousBreakdown: previous.data,
       toPay,
       budget: budget.summary,
-      goals: { count: goals.data.length, savedInMonthCents: savedInMonth(movements.data, month), plannedCents: plannedForGoals(goals.data) },
+      goals: { count: goals.data.length, savedInMonthCents: savedInMonth(countedGoalMovements(movements.data, goals.data), month), plannedCents: plannedForGoals(goals.data) },
       paidChecked,
     });
   }, [ready, month, today, summary, toPay, breakdown.data, previous.data, budget.summary, goals.data, movements.data, paidChecked]);
@@ -1693,6 +1695,22 @@ export function useMarketIndices(fromMonth: IsoMonth | null) {
   });
 }
 
+/**
+ * Preço do dia dos títulos públicos e cota dos fundos (função "precos"; exemplo na demonstração). Guardado por 6 horas; falha não tenta de
+ * novo sozinha (a tela diz que não conseguiu e o valor do extrato continua o que vale).
+ */
+export function usePublicPrices(request: { treasury: boolean; fundos: readonly string[] } | null) {
+  const repo = useRepo();
+  const fundos = request ? [...request.fundos].sort() : [];
+  return useQuery({
+    queryKey: ['investments', 'prices', request?.treasury ?? false, fundos.join(',')],
+    queryFn: () => repo.getPublicPrices({ treasury: request!.treasury, fundos }),
+    enabled: request !== null && (request.treasury || fundos.length > 0),
+    staleTime: 6 * 60 * 60 * 1000,
+    retry: false,
+  });
+}
+
 /** Plano de aportes por mês nos investimentos (D-099, item 12), ou null sem plano. */
 export function useInvestmentPlan(contextId: string | undefined) {
   const repo = useRepo();
@@ -1721,6 +1739,8 @@ export function useInvalidateInvestments() {
     qc.invalidateQueries({ queryKey: ['investments', 'movements'] });
     qc.invalidateQueries({ queryKey: ['investments', 'context-movements'] });
     qc.invalidateQueries({ queryKey: ['returnReview'] });
+    // Meta que lê o valor dos investimentos ligados (D-099, item 13 fase 2): o valor guardado muda junto.
+    qc.invalidateQueries({ queryKey: ['goals'] });
   };
 }
 
@@ -1739,6 +1759,16 @@ export function useUpdateGoal() {
   const invalidate = useInvalidateGoals();
   return useMutation({
     mutationFn: (v: { key: string; id: string; version: number; input: GoalInput }) => repo.updateGoal(v.key, v.id, v.version, v.input),
+    onSuccess: (w) => invalidate(w),
+  });
+}
+
+/** De onde vem o valor guardado da meta (D-099, item 13 fase 2): dos registros ou dos investimentos ligados. */
+export function useSetGoalValueSource() {
+  const repo = useRepo();
+  const invalidate = useInvalidateGoals();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number; source: GoalValueSource }) => repo.setGoalValueSource(v.key, v.id, v.version, v.source),
     onSuccess: (w) => invalidate(w),
   });
 }

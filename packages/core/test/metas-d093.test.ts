@@ -23,6 +23,7 @@ import {
 
 /** Uma meta fictícia, criada em 15/08/2026, de R$ 3.000,00, com plano de R$ 300,00 por mês. */
 const meta = (over: Partial<Goal> = {}): Goal => ({
+  valueSource: 'registros',
   id: 'g1',
   contextId: 'ctx',
   goalType: 'objetivo',

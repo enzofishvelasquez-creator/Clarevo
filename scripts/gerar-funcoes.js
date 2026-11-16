@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Gera as funções do servidor, cada uma num arquivo só: supabase/functions/whatsapp/index.ts (D-076), supabase/functions/telegram/index.ts
- * (D-080), supabase/functions/assinatura-web/index.ts (D-084), supabase/functions/assinatura-lojas/index.ts (D-090) e supabase/functions/indices/index.ts (D-093). Cada arquivo leva o código do núcleo (packages/core/src/whatsapp ou
+ * (D-080), supabase/functions/assinatura-web/index.ts (D-084), supabase/functions/assinatura-lojas/index.ts (D-090), supabase/functions/indices/index.ts (D-093) e
+ * supabase/functions/precos/index.ts (D-099). Cada arquivo leva o código do núcleo (packages/core/src/whatsapp ou
  * packages/core/src/telegram/servidor.ts, e o que eles usam), sem tipos, mais a ligação com o Deno do Supabase. Um arquivo só para colar no editor de
  * funções do painel do Supabase, sem instalar nada (docs/05, passos 12j e 12l).
  *
@@ -221,6 +222,67 @@ const FUNCTIONS = [
       '  const res = await handler({',
       '    method: req.method,',
       '    url: req.url,',
+      '    header: (name) => req.headers.get(name),',
+      '    body: () => req.text(),',
+      '  });',
+      '  return new Response(res.status === 204 ? null : res.body, { status: res.status, headers: res.headers });',
+      '});',
+      '',
+    ],
+  },
+  {
+    // Só o servidor: o preço público dos títulos do Tesouro (Tesouro Transparente) e as cotas dos fundos (Informe Diário da CVM), D-099.
+    entry: 'packages/core/src/precos/servidor.ts',
+    out: 'supabase/functions/precos/index.ts',
+    header: [
+      '// GERADO por scripts/gerar-funcoes.js a partir de packages/core/src/precos. Não editar à mão: mude o núcleo e rode `npm run indices`.',
+      '// Clarevo · função do servidor "precos" (Edge Function do Supabase, D-099, itens 19 e 20): busca nos dados abertos o preço do dia dos',
+      '// títulos ofertados pelo Tesouro Direto (Tesouro Transparente) e a cota mais recente dos fundos pedidos (Informe Diário da CVM), e',
+      '// devolve ao app. Recebe só os CNPJs dos fundos (dado público) e não guarda nada em banco (6 horas na memória da função). Sem segredos;',
+      '// opcional CLAREVO_APP_URL. Confere a sessão da pessoa no Supabase Auth: publicar com a verificação de JWT do painel ("Verify JWT',
+      '// with legacy secret") DESLIGADA.',
+    ],
+    serve: [
+      'const precos = __req(0);',
+      'const handler = precos.createPrecosHandler({',
+      '  config: precos.precosConfigFrom((name) => Deno.env.get(name)),',
+      '  fetchJson: (url, init) => fetch(url, { headers: { Accept: "application/json", ...init.headers }, signal: AbortSignal.timeout(init.timeoutMs) }),',
+      '  fetchLines: async (url, init, onLine) => {',
+      '    const res = await fetch(url, { signal: AbortSignal.timeout(init.timeoutMs) });',
+      '    if (!res.ok || !res.body) {',
+      '      await res.body?.cancel();',
+      '      return { ok: false, status: res.status };',
+      '    }',
+      '    const reader = res.body.pipeThrough(new TextDecoderStream("windows-1252")).getReader();',
+      '    let rest = "";',
+      '    for (;;) {',
+      '      const { value, done } = await reader.read();',
+      '      if (done) break;',
+      '      const lines = (rest + value).split("\\n");',
+      '      rest = lines.pop() ?? "";',
+      '      for (const line of lines) {',
+      '        if (!onLine(line)) {',
+      '          await reader.cancel();',
+      '          return { ok: true, status: res.status };',
+      '        }',
+      '      }',
+      '    }',
+      '    if (rest !== "") onLine(rest);',
+      '    return { ok: true, status: res.status };',
+      '  },',
+      '  fetchBytes: async (url, init) => {',
+      '    const res = await fetch(url, { signal: AbortSignal.timeout(init.timeoutMs) });',
+      '    if (!res.ok) await res.body?.cancel();',
+      '    return { ok: res.ok, status: res.status, bytes: async () => new Uint8Array(await res.arrayBuffer()) };',
+      '  },',
+      '  inflateRaw: (data) => new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw")).pipeThrough(new TextDecoderStream("windows-1252")),',
+      '  today: () => precos.brazilToday(),',
+      '  log: (message) => console.error(message),',
+      '});',
+      '',
+      'Deno.serve(async (req) => {',
+      '  const res = await handler({',
+      '    method: req.method,',
       '    header: (name) => req.headers.get(name),',
       '    body: () => req.text(),',
       '  });',

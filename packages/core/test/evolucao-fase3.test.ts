@@ -85,6 +85,7 @@ const reference = (fromMonth: string, amountCents: number): IncomeReference => (
   amountChangedAt: null,
 });
 const goal = (id: string, createdAt: string, over: Partial<Goal> = {}): Goal => ({
+  valueSource: 'registros',
   id,
   contextId: CTX,
   goalType: 'objetivo',

@@ -98,8 +98,19 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
     let deposit: { day: DepositReminderDay; hasPlannedGoal: boolean; depositThisMonth: boolean } | undefined;
     if (job.routine.choices.aporte) {
       const goals = await job.repo.listGoals(job.contextId);
-      const hasPlannedGoal = goals.some((g) => g.status === 'ativa' && (g.plannedMonthlyCents ?? 0) > 0);
-      const depositThisMonth = hasPlannedGoal ? (await job.repo.listGoalMovementsInMonth(job.contextId, monthOf(today))).some((m) => m.kind === 'aporte') : false;
+      const planned = goals.filter((g) => g.status === 'ativa' && (g.plannedMonthlyCents ?? 0) > 0);
+      const hasPlannedGoal = planned.length > 0;
+      let depositThisMonth = hasPlannedGoal ? (await job.repo.listGoalMovementsInMonth(job.contextId, monthOf(today))).some((m) => m.kind === 'aporte') : false;
+      // Meta que lê o valor dos investimentos ligados (D-099, item 13 fase 2): o aporte do mês num investimento ligado a ela também conta.
+      const fromInvestments = new Set(planned.filter((g) => g.valueSource === 'investimentos').map((g) => g.id));
+      if (!depositThisMonth && fromInvestments.size > 0) {
+        const linked = new Set((await job.repo.listInvestments(job.contextId)).filter((i) => i.goalId !== null && fromInvestments.has(i.goalId)).map((i) => i.id));
+        if (linked.size > 0) {
+          depositThisMonth = (await job.repo.listContextInvestmentMovements(job.contextId)).some(
+            (m) => m.kind === 'aporte' && linked.has(m.investmentId) && monthOf(m.occurredOn) === monthOf(today),
+          );
+        }
+      }
       deposit = { day: job.routine.depositDay, hasPlannedGoal, depositThisMonth };
     }
     // Investimentos (D-099): as datas da ficha dos ativos e se algum está sem o valor do extrato no mês de hoje.

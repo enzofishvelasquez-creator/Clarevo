@@ -253,6 +253,12 @@ export function monthReachedWithPlan(missingCents: Cents, plannedMonthlyCents: C
 }
 
 /** Guardado no mês: aportes − resgates com data no mês (o já guardado ao criar, rendimentos e (des)valorizações ficam fora). */
+/** Os movimentos que contam no "guardado no mês": sem os das metas que leem o valor dos investimentos (D-099, item 13 fase 2). */
+export function countedGoalMovements<M extends Pick<GoalMovement, 'goalId'>>(movements: readonly M[], goals: readonly Pick<Goal, 'id' | 'valueSource'>[]): M[] {
+  const skip = new Set(goals.filter((g) => g.valueSource === 'investimentos').map((g) => g.id));
+  return skip.size === 0 ? [...movements] : movements.filter((m) => !skip.has(m.goalId));
+}
+
 export function savedInMonth(movements: readonly MovementLike[], month: IsoMonth): Cents {
   return movements
     .filter((m) => monthOf(m.occurredOn) === month && (m.kind === 'aporte' || m.kind === 'resgate'))
@@ -282,15 +288,19 @@ export interface GoalPlan {
  * (listGoalMovementsInMonth), porque só decidem P0.
  */
 export function goalPlan(
-  goal: Pick<Goal, 'id' | 'savedCents' | 'targetCents' | 'targetMonth' | 'plannedMonthlyCents'>,
+  goal: Pick<Goal, 'id' | 'savedCents' | 'targetCents' | 'targetMonth' | 'plannedMonthlyCents'> & Partial<Pick<Goal, 'valueSource'>>,
   movements: readonly Pick<GoalMovement, 'goalId' | 'kind' | 'occurredOn'>[],
   today: IsoDate,
 ): GoalPlan {
   const progress = goalProgress(goal.savedCents, goal.targetCents);
-  const p0 = firstProjectedMonth(
-    movements.filter((m) => m.goalId === goal.id),
-    today,
-  );
+  // Com o valor lido dos investimentos (D-099, item 13 fase 2), os registros da meta não contam: a projeção começa no mês de hoje.
+  const p0 =
+    goal.valueSource === 'investimentos'
+      ? monthOf(today)
+      : firstProjectedMonth(
+          movements.filter((m) => m.goalId === goal.id),
+          today,
+        );
   return {
     savedCents: goal.savedCents,
     targetCents: goal.targetCents,
@@ -1078,6 +1088,8 @@ export const GOALS_TEXT = {
       `Você planejou guardar ${formatBRL(plannedCents)} por mês. Contando a partir de ${formatMonthYearBR(fromMonth)}, sem rendimentos, chega lá em ${formatMonthYearBR(month)}.`,
     simulate: 'Simular com rendimento',
     compositionInitial: (cents: Cents) => `Já guardado ao criar: ${formatBRL(cents)}`,
+    /** Com o valor lido dos investimentos ligados (D-099, item 13 fase 2). */
+    compositionFromInvestments: (cents: Cents) => `Valor dos investimentos ligados: ${formatBRL(cents)}, pela última atualização de cada um.`,
     compositionDeposits: (cents: Cents) => `Aportes: ${formatBRL(cents)}`,
     compositionWithdrawals: (cents: Cents) => `Resgates: ${formatBRL(cents)}`,
     compositionIncome: (cents: Cents) => `Rendimentos e valorizações: ${formatBRL(cents)}`,
@@ -1275,9 +1287,12 @@ export interface GoalPace {
 }
 
 export function goalPace(
-  goal: Pick<Goal, 'status' | 'createdAt' | 'plannedMonthlyCents' | 'savedCents' | 'targetCents' | 'initialCents' | 'depositsCents' | 'withdrawalsCents'>,
+  goal: Pick<Goal, 'status' | 'createdAt' | 'plannedMonthlyCents' | 'savedCents' | 'targetCents' | 'initialCents' | 'depositsCents' | 'withdrawalsCents'> &
+    Partial<Pick<Goal, 'valueSource'>>,
   today: IsoDate,
 ): GoalPace | null {
+  // Com o valor lido dos investimentos (D-099, item 13 fase 2), os aportes acontecem nos investimentos: o ritmo pelos registros da meta não vale.
+  if (goal.valueSource === 'investimentos') return null;
   const planned = goal.plannedMonthlyCents;
   if (goal.status !== 'ativa' || planned === null || planned <= 0) return null;
   const progress = goalProgress(goal.savedCents, goal.targetCents);
@@ -1363,7 +1378,7 @@ export function goalDetailTexts(goal: Goal, movements: readonly GoalMovement[], 
           : D.deadline(plan.deadline.month, plan.deadline.monthlyCents),
     planned:
       plan.plannedMonthlyCents !== null && plan.reachMonth !== null ? D.planned(plan.plannedMonthlyCents, plan.reachMonth, plan.firstProjectedMonth) : null,
-    composition: [
+    composition: goal.valueSource === 'investimentos' ? [D.compositionFromInvestments(goal.savedCents)] : [
       D.compositionInitial(c.initialCents),
       D.compositionDeposits(c.depositsCents),
       D.compositionWithdrawals(c.withdrawalsCents),

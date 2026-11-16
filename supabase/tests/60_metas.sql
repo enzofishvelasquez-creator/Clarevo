@@ -522,7 +522,7 @@ begin
     = array['appreciation_cents', 'context_id', 'created_at', 'created_by', 'deleted_at', 'deleted_by', 'deposits_cents',
             'depreciation_cents', 'essential_base_cents', 'essential_base_source', 'essential_months', 'goal_type', 'id', 'income_cents',
             'initial_cents', 'last_movement_on', 'name', 'planned_monthly_cents', 'priority', 'saved_cents', 'status', 'target_cents',
-            'target_month', 'updated_at', 'version', 'withdrawals_cents'], 'goal: a linha de goals com as somas de goal_items';
+            'target_month', 'updated_at', 'value_source', 'version', 'withdrawals_cents'], 'goal: a linha de goals com as somas de goal_items (e a origem do valor, 0037)';
   assert (select array_agg(k order by k) from jsonb_object_keys(r1 -> 'movement') k)
     = array['account_id', 'amount_cents', 'context_id', 'created_at', 'created_by', 'deleted_at', 'deleted_by', 'goal_id', 'id', 'kind',
             'note', 'occurred_on', 'updated_at', 'version'], 'movement: a linha de goal_movements (com a conta opcional da 0010)';
@@ -1344,7 +1344,7 @@ begin
             'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_investimento', 'excluir_movimento_meta',
             'excluir_orcamento_categoria', 'excluir_plano_investimentos', 'excluir_renda_referencia', 'excluir_serie', 'gerar_codigo_telegram', 'gerar_codigo_whatsapp',
             'imagem_meta', 'importar_extrato', 'informar_ano', 'ligar_telegram', 'ligar_whatsapp', 'marcar_assinatura',
-            'marcar_mes_conferido', 'ordenar_metas', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_investimento',
+            'marcar_mes_conferido', 'ordenar_metas', 'origem_valor_meta', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_investimento',
             'registrar_movimento_meta', 'remover_membro_familia', 'renovar_convite_licenca', 'responder_guardar',
             'responder_origem_cadastro', 'revisar_assinaturas', 'sair_familia', 'situacao_cartao', 'situacao_conta',
             'situacao_investimento', 'situacao_meta', 'tirar_ano', 'transferir_titularidade_familia'],
@@ -1586,7 +1586,7 @@ do $$ begin
             'month_budget', 'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'my_access', 'my_account_marks', 'my_legal_acceptance',
             'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'preview_family_invite',
             'preview_license_invite', 'remove_family_member', 'renew_license_invite', 'set_account_status', 'set_card_status',
-            'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_order', 'set_goal_status',
+            'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_order', 'set_goal_status', 'set_goal_value_source',
             'set_income_reference', 'set_investment_plan', 'set_investment_status', 'set_member_role', 'set_month_check', 'set_savings_answer',
             'set_series_subscription', 'set_signup_source', 'skip_series_year', 'sync_series_occurrences', 'transfer_family_ownership',
             'undo_commitment_payment', 'undo_invoice_payment', 'unlink_telegram', 'unlink_whatsapp', 'update_account', 'update_card',
@@ -1634,7 +1634,7 @@ do $$ begin
            where attrelid = 'public.goals'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'context_id', 'goal_type', 'name', 'target_cents', 'target_month', 'planned_monthly_cents', 'essential_base_cents',
             'essential_months', 'essential_base_source', 'status', 'created_by', 'version', 'created_at', 'updated_at', 'deleted_at',
-            'deleted_by', 'priority'], 'colunas de goals (priority, D-093)';
+            'deleted_by', 'priority', 'value_source'], 'colunas de goals (priority, D-093; value_source, D-099)';
   assert (select array_agg(attname::text order by attnum) from pg_attribute
            where attrelid = 'public.goal_movements'::regclass and attnum > 0 and not attisdropped)
     = array['id', 'goal_id', 'context_id', 'kind', 'amount_cents', 'occurred_on', 'note', 'created_by', 'version', 'created_at',
@@ -1646,7 +1646,7 @@ do $$ begin
             'status:text', 'created_by:uuid', 'version:integer', 'created_at:timestamp with time zone',
             'updated_at:timestamp with time zone', 'saved_cents:bigint', 'initial_cents:bigint', 'deposits_cents:bigint',
             'withdrawals_cents:bigint', 'income_cents:bigint', 'appreciation_cents:bigint', 'depreciation_cents:bigint',
-            'last_movement_on:date', 'priority:integer'], 'colunas e tipos de goal_items (priority, D-093)';
+            'last_movement_on:date', 'priority:integer', 'value_source:text'], 'colunas e tipos de goal_items (priority, D-093; value_source, D-099)';
   assert (select reloptions from pg_class where oid = 'public.goal_items'::regclass) @> array['security_invoker=true'],
     'goal_items com a RLS de quem consulta';
   assert has_table_privilege('authenticated', 'public.goals', 'select') and has_table_privilege('authenticated', 'public.goal_movements', 'select')

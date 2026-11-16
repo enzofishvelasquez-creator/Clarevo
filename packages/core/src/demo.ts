@@ -248,6 +248,8 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
       liquidity: 'no_vencimento',
       liquidityOn: null,
       liquidityDays: null,
+      quantityMicro: null,
+      fundCnpj: null,
     },
     // Ligado à reserva (D-099, item 13): só informação; a reserva continua com o valor registrado nela.
     goalId: reserva.goal.id,
@@ -266,7 +268,7 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
     investedCents: 500_000,
     startOn: '2026-08-01',
     currentCents: null,
-    details: { subkind: 'vgbl', institution: null, indexKind: 'variavel', rateBp: null, maturityOn: null, liquidity: null, liquidityOn: null, liquidityDays: null },
+    details: { subkind: 'vgbl', institution: null, indexKind: 'variavel', rateBp: null, maturityOn: null, liquidity: null, liquidityOn: null, liquidityDays: null, quantityMicro: null, fundCnpj: null },
   });
   await move(previdencia.investment!.id, 'valor', 504_000, '2026-08-31');
   await move(previdencia.investment!.id, 'valor', 508_000, '2026-09-30');
