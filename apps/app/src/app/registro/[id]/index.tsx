@@ -257,7 +257,7 @@ export default function DetalheRegistro() {
                 busy={remove.isPending}
                 onCancel={() => setConfirming(false)}
                 onConfirm={doDelete}>
-                <MoneyTxt style={{ fontFamily: fonts.bold }}>{`${r.description} · ${formatBRL(r.amountCents)} · Pessoal`}</MoneyTxt>
+                <MoneyTxt style={{ fontFamily: fonts.bold }}>{`${r.description} · ${formatBRL(r.amountCents)} · ${by.contextName}`}</MoneyTxt>
                 <Txt color={colors.textSecondary}>O valor deixa de contar no resumo de {formatMonthBR(recordMonth(r)).toLowerCase()}.</Txt>
                 {r.commitmentId ? <Txt color={colors.textSecondary}>A conta a pagar ligada a este gasto volta para Ainda a pagar.</Txt> : null}
               </ConfirmDialog>

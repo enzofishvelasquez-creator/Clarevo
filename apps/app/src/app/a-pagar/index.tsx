@@ -322,7 +322,7 @@ export default function ContasAPagarScreen() {
         ) : null}
 
         <View style={{ gap: space[1] }}>
-          <PayablesMonthPicker month={month} currentMonth={currentMonth} onChange={setMonth} />
+          <PayablesMonthPicker month={month} currentMonth={currentMonth} onChange={setMonth} context={personal?.contextName ?? 'Pessoal'} />
           <Txt variant="label" color={colors.textSecondary}>
             {isCurrent ? 'Ainda a pagar neste mês' : `Previsto para ${monthName.toLowerCase()}`}
           </Txt>
@@ -493,7 +493,7 @@ export default function ContasAPagarScreen() {
  * Seletor de mês local, na mesma linha de "Pessoal · outubro de 2026" (poupa altura: o primeiro "Já paguei" continua à
  * vista). Fora do mês atual, "Voltar para outubro de 2026". Volta sem limite e avança até 12 meses à frente (core: payablesStep).
  */
-function PayablesMonthPicker({ month, currentMonth, onChange }: { month: IsoMonth; currentMonth: IsoMonth; onChange: (m: IsoMonth) => void }) {
+function PayablesMonthPicker({ month, currentMonth, onChange, context }: { month: IsoMonth; currentMonth: IsoMonth; onChange: (m: IsoMonth) => void; context: string }) {
   const prev = payablesStep(month, currentMonth, -1);
   const next = payablesStep(month, currentMonth, 1);
   return (
@@ -510,7 +510,7 @@ function PayablesMonthPicker({ month, currentMonth, onChange }: { month: IsoMont
           <ChevronLeft size={22} color={colors.brandText} />
         </Pressable>
         <Txt variant="caption" color={colors.textSecondary} style={{ flex: 1, textAlign: 'center' }} accessibilityLiveRegion="polite">
-          Pessoal · {formatMonthBR(month)}
+          {context} · {formatMonthBR(month)}
         </Txt>
         <Pressable
           accessibilityRole="button"

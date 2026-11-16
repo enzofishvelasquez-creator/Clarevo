@@ -580,7 +580,7 @@ export default function DetalheContaAPagar() {
                 onCancel={() => setConfirming(null)}
                 onConfirm={doDelete}>
                 <MoneyTxt style={{ fontFamily: fonts.bold }}>
-                  {`${c.description} · ${formatBRL(c.amountCents)} · vence em ${formatListDate(c.dueOn, today)} · Pessoal`}
+                  {`${c.description} · ${formatBRL(c.amountCents)} · vence em ${formatListDate(c.dueOn, today)} · ${by.contextName}`}
                 </MoneyTxt>
                 {ref ? (
                   <Txt color={colors.textSecondary}>
@@ -664,7 +664,7 @@ export default function DetalheContaAPagar() {
                   onCancel={() => setConfirming(null)}
                   onConfirm={doUndo}>
                   <MoneyTxt style={{ fontFamily: fonts.bold }}>
-                    {`${c.description} · ${formatBRL(paid.amountCents)} pago em ${formatDateBR(paid.paidOn)} · Pessoal`}
+                    {`${c.description} · ${formatBRL(paid.amountCents)} pago em ${formatDateBR(paid.paidOn)} · ${by.contextName}`}
                   </MoneyTxt>
                   <Txt color={colors.textSecondary}>
                     O gasto registrado será excluído e deixa de contar em Pago de {formatMonthBR(monthOf(paid.paidOn)).toLowerCase()}. A conta a

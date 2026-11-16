@@ -153,7 +153,7 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
     <View style={{ gap: space[4] }}>
       <View style={{ gap: space[1] }}>
         <Txt variant="caption" color={colors.textSecondary}>
-          Pessoal · {formatMonthBR(month)}
+          {personal?.contextName ?? 'Pessoal'} · {formatMonthBR(month)}
         </Txt>
         {records.isPending ? (
           <Skeleton width={180} height={40} />
