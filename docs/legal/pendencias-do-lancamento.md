@@ -35,7 +35,7 @@ O advogado confere depois; se o Enzo aprovar, a equipe troca os marcadores pelo 
 | B2 | Fornecedores: papel (operador ou não), país, contrato e transferência internacional (LGPD, art. 33) de Supabase, Cloudflare, Resend, Zoho, Expo, Apple, Google e Telegram | 10 |
 | B3 | Registros de acesso (Marco Civil da Internet, art. 15): o que guardar, onde e por quanto tempo | 2 |
 | B4 | Incidente de segurança (LGPD, art. 48): prazo e forma de comunicar | 1 |
-| B5 | Regra interna de quem da equipe acessa dados e em que situações, com registro desses acessos (hoje não existe) | 2 |
+| B5 | Regra interna de quem da equipe acessa dados e em que situações, com registro desses acessos. **Rascunho em 16/11/2026:** `regra-de-acesso-a-dados.md`, para o advogado conferir | 2 |
 | B6 | Pedido de autoridade: procedimento e aviso à pessoa | 1 |
 | B7 | Pedidos do titular: como confirmar a identidade (proposta: responder ao e-mail cadastrado, sem pedir documento) | 2 |
 | B8 | Cláusula de limitação de responsabilidade compatível com o CDC (termos) | 1 |

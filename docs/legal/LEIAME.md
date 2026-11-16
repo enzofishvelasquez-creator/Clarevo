@@ -14,6 +14,7 @@ Os textos foram escritos a partir do código e das decisões do produto (`docs/0
 | `politica-de-privacidade.md` | Política de Privacidade, em linguagem simples | Sim |
 | `termos-de-uso.md` | Termos de Uso | Sim |
 | `exclusao-de-conta.md` | Página pública de exclusão de conta e dos dados, exigida pelo Google Play | Sim |
+| `regra-de-acesso-a-dados.md` | Regra interna de quem da equipe acessa os dados das pessoas, em que situações e como o acesso fica registrado (16/11/2026, item B5 e pergunta 14) | Não |
 | `empresas-pontos-do-contrato.md` | Cláusulas essenciais para a minuta com as empresas, cada uma com texto proposto curto. Não é contrato completo | Não |
 | `contrato-empresas-minuta.md` | Minuta completa do contrato com empresas privadas (26/10/2026), que desenvolve os pontos acima, com o Anexo I de cada contrato | Não |
 | `plano-de-trabalho-piloto.md` | Rascunho do plano de trabalho do acordo de cooperação técnica para o piloto de 90 dias com órgão público, sem repasse de recursos (26/10/2026) | Não |
