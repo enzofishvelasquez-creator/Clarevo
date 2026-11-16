@@ -139,7 +139,7 @@ export const IMPORT_TEXT = {
   needCard: 'Escolha o cartão.',
   noAccountsHint: 'Antes de importar, cadastre um banco ou carteira em Conta, em Bancos e carteira.',
   /** Quem só lê. */
-  readOnly: 'Você só tem permissão para ver este espaço. Para importar, peça permissão de escrita.',
+  readOnly: 'Com o papel "Só vê", você vê este espaço, mas não importa. Quem é titular da Família pode mudar o seu papel.',
   familyNotice: 'Importar extrato fica no espaço Pessoal por enquanto.',
 } as const;
 
@@ -180,7 +180,7 @@ export const IMPORT_SAVE_ERROR_TEXT: Record<string, string> = {
   cartao_arquivado: 'Este cartão está arquivado. Reative o cartão ou escolha outro.',
   fatura_paga: 'Uma das linhas cai numa fatura que já foi paga. Desmarque a linha ou desfaça o pagamento da fatura.',
   limite_de_lancamentos: 'O cartão chegou ao limite de 5.000 lançamentos.',
-  sem_permissao: 'Você não tem permissão para importar neste espaço.',
+  sem_permissao: 'Com o papel "Só vê", você não importa neste espaço. Quem é titular da Família pode mudar o seu papel.',
   valor_invalido: 'Uma das linhas tem valor inválido.',
   valor_acima_do_limite: 'Uma das linhas passa do valor máximo de R$ 9.999.999,99.',
   descricao_obrigatoria: 'Uma das linhas está sem descrição.',

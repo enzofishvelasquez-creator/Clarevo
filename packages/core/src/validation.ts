@@ -24,7 +24,7 @@ export const ERROR_TEXT = {
   carregar_falhou: 'Não foi possível carregar. Tente de novo.',
   versao_desatualizada: 'Este registro foi alterado em outro aparelho. Confira a versão atual antes de salvar.',
   nao_encontrado: 'Este registro não está mais disponível.',
-  sem_permissao: 'Você não tem permissão para esta ação.',
+  sem_permissao: 'Com o papel "Só vê" na Família, você vê, mas não anota nem muda nada. Quem é titular pode mudar o seu papel.',
   /** Assinatura paga (D-083): depois do teste grátis, sem assinatura, o banco recusa a escrita. */
   assinatura_necessaria: 'A sua conta está só para ver e exportar. Para voltar a anotar, abra Conta e toque em Assinatura.',
 } as const;

@@ -744,7 +744,7 @@ export const COMPANY_ERROR_TEXT = {
   licenca_nao_ativa: 'Esta licença já não está ativa. Atualize a tela.',
   convite_invalido: BENEFIT_TEXT.invalid,
   ja_tem_licenca: BENEFIT_TEXT.alreadyHave,
-  sem_permissao: 'Você não tem permissão para esta ação.',
+  sem_permissao: 'Só quem administra o benefício da empresa pode fazer isto.',
   nao_encontrado: 'Esta empresa ou esta licença não está mais disponível. Atualize a tela.',
   chave_reutilizada: ERROR_TEXT.salvar_falhou,
   rede: 'Sem conexão no momento. Tente de novo.',
