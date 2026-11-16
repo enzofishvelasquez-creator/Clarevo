@@ -152,7 +152,7 @@ export class DemoAuth implements AuthService {
     }
     const acc = this.accounts.get(user.email)!;
     // Conta criada na demonstração: começa no teste grátis (D-083), como uma conta nova de verdade.
-    const trial = demoTrialAccess();
+    const trial = demoTrialAccess(DEMO_TODAY);
     acc.repo ??= new MemoryRepository({
       actorId: user.id,
       displayName: user.displayName,

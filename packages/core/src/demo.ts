@@ -92,7 +92,7 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas'.
   let today: string = DEMO_TODAY;
   // Assinatura (D-083): a demonstração aparece no teste grátis, como uma conta nova.
-  const trial = demoTrialAccess();
+  const trial = demoTrialAccess(DEMO_TODAY);
   const repo = new MemoryRepository({
     actorId: 'pessoa-demo',
     displayName: 'Maria Alves',

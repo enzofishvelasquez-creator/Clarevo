@@ -8,6 +8,7 @@ import {
   accessBanner,
   accessView,
   canSubscribeInStore,
+  demoInstant,
   deviceTimeZone,
   formatDateBR,
   isStoreSubscription,
@@ -43,6 +44,15 @@ export function useAccessTimeZone(): string {
   return useSpace().data?.timeZone ?? deviceTimeZone();
 }
 
+/**
+ * O "agora" da situação do acesso: na demonstração, o dia fixo dela (o mesmo do teste grátis, `demoTrialAccess`); numa conta real, o
+ * relógio do aparelho.
+ */
+export function useAccessNow(): Date {
+  const { auth, today } = useSession();
+  return auth.mode === 'demo' ? demoInstant(today) : new Date();
+}
+
 /** Linha "Situação: Teste grátis", lida inteira pelo leitor de tela. */
 export function AccessSituation({ situation }: { situation: string }) {
   return (
@@ -67,7 +77,8 @@ export function AccessSituation({ situation }: { situation: string }) {
 export function AccessBanner() {
   const access = useAccess().data;
   const timeZone = useAccessTimeZone();
-  const banner = access ? accessBanner(access, new Date(), timeZone, { web: Platform.OS === 'web' }) : null;
+  const now = useAccessNow();
+  const banner = access ? accessBanner(access, now, timeZone, { web: Platform.OS === 'web' }) : null;
   if (!banner) return null;
   return (
     <Banner tone="info" icon={access?.status === 'leitura' ? LockKeyhole : Hourglass} live={false}>
@@ -83,7 +94,8 @@ export function AccessCard() {
   const timeZone = useAccessTimeZone();
   const webCard = Platform.OS === 'web' && access.data?.status === 'assinatura' && access.data.provider === 'web';
   const webStatus = useWebSubscriptionStatus(webCard);
-  const view = access.data ? accessView(access.data, new Date(), timeZone, { web: Platform.OS === 'web', webSubscription: webCard ? webStatus.data : null }) : null;
+  const now = useAccessNow();
+  const view = access.data ? accessView(access.data, now, timeZone, { web: Platform.OS === 'web', webSubscription: webCard ? webStatus.data : null }) : null;
   return (
     <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -241,7 +253,7 @@ export function PixRenewCard({ access, hidden = false }: { access: Access; hidde
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const plan: PlanKind = access.plan ?? 'individual';
-  const now = new Date();
+  const now = useAccessNow();
   const ready = pixCanPayNext(access.until, now);
   const from = pixNextPaymentFrom(access.until);
   const pay = async () => {

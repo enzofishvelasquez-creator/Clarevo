@@ -580,7 +580,7 @@ export class MemoryRepository implements RecordsRepository {
         isDefault: true,
         version: 1,
         createdBy: this.opts.actorId,
-        createdAt: new Date().toISOString(),
+        createdAt: this.stamp(),
       };
       this.accountsById.set(account.id, account);
       this.space = {
@@ -642,7 +642,7 @@ export class MemoryRepository implements RecordsRepository {
         isDefault: !live.some((a) => a.isDefault),
         version: 1,
         createdBy: this.opts.actorId,
-        createdAt: new Date().toISOString(),
+        createdAt: this.stamp(),
       };
       this.accountsById.set(account.id, account);
       this.saveOperation(key, 'criar_conta', payload, { contextId, recordId: null, commitmentId: null, accountId: account.id });
@@ -738,7 +738,7 @@ export class MemoryRepository implements RecordsRepository {
       ) {
         throw new RepoError('conta_com_lancamentos');
       }
-      this.accountsById.set(id, { ...acc, status: 'arquivada', version: acc.version + 1, deletedAt: new Date().toISOString(), deletedBy: this.opts.actorId });
+      this.accountsById.set(id, { ...acc, status: 'arquivada', version: acc.version + 1, deletedAt: this.stamp(), deletedBy: this.opts.actorId });
       this.saveOperation(key, 'excluir_conta', payload, { contextId: acc.contextId, recordId: null, commitmentId: null, accountId: id });
       return stripAccount(this.accountsById.get(id)!);
     });
@@ -832,7 +832,7 @@ export class MemoryRepository implements RecordsRepository {
         if (kind !== 'despesa' || !receiptKeyValid(receipt)) throw new RepoError('chave_de_nota_invalida');
         this.checkReceiptFree(contextId, receipt);
       }
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const record: FinancialRecord = {
         id: this.id('reg'),
         contextId,
@@ -875,7 +875,7 @@ export class MemoryRepository implements RecordsRepository {
           ? current.nextMonth === true && monthOf(norm.occurredOn) === monthOf(current.occurredOn) && nextMonthAllowed(norm.occurredOn)
           : input.nextMonth === true;
       this.validate(current.contextId, current.kind, { ...norm, nextMonth }, current.accountId);
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const next = withNextMonth({ ...current, ...norm, version: current.version + 1, updatedAt: now }, nextMonth);
       this.records.set(id, next);
       // Gasto de conta a pagar: a conta sobe de versão; o valor previsto não muda.
@@ -894,7 +894,7 @@ export class MemoryRepository implements RecordsRepository {
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       // Pagamento de fatura: o caminho é undo_invoice_payment, que também desfaz o saldo anterior.
       if (current.invoice) throw new RepoError('pagamento_de_fatura');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const next = { ...current, version: current.version + 1, updatedAt: now, deletedAt: now };
       this.records.set(id, next);
       // Excluir o gasto de uma conta a pagar desfaz o pagamento: a conta volta a ficar em aberto.
@@ -945,7 +945,7 @@ export class MemoryRepository implements RecordsRepository {
       if (replay) return replay;
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
       this.validateCommitment(norm, true);
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const commitment: StoredCommitment = {
         id: this.id('cp'),
         contextId,
@@ -994,7 +994,7 @@ export class MemoryRepository implements RecordsRepository {
       this.bumpCommitment(
         id,
         { ...norm, amountIsEstimate: estimate ?? current.amountIsEstimate, seriesOverride: current.seriesOverride || current.seriesId !== null },
-        new Date().toISOString(),
+        this.stamp(),
       );
       this.saveOperation(key, 'editar_compromisso', payload, { contextId: current.contextId, recordId: null, commitmentId: id });
       return this.commitmentResult(id, null);
@@ -1010,7 +1010,7 @@ export class MemoryRepository implements RecordsRepository {
       if (current.invoiceCardId) throw new RepoError('conta_de_fatura');
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       if (current.status !== 'aberto') throw new RepoError('compromisso_quitado');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       // Conta de gasto fixo: exclui só este mês, e o número nunca volta a ser criado.
       this.bumpCommitment(id, { deletedAt: now, seriesSkipped: current.seriesId !== null }, now);
       this.saveOperation(key, 'excluir_compromisso', payload, { contextId: current.contextId, recordId: null, commitmentId: id });
@@ -1041,7 +1041,7 @@ export class MemoryRepository implements RecordsRepository {
         category: norm.category,
       };
       this.validate(current.contextId, 'despesa', recordInput);
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const record: FinancialRecord = {
         id: this.id('reg'),
         contextId: current.contextId,
@@ -1075,7 +1075,7 @@ export class MemoryRepository implements RecordsRepository {
       if (current.status !== 'quitado') throw new RepoError('compromisso_aberto');
       // Permissão também sobre o gasto, como clarevo_lock_record.
       const paid = this.liveRecord(this.livePayment(id)?.id ?? '');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       // Exclusão lógica: o gasto mantém commitmentId como rastro.
       this.records.set(paid.id, { ...paid, version: paid.version + 1, updatedAt: now, deletedAt: now });
       this.bumpCommitment(id, { status: 'aberto' }, now);
@@ -1222,7 +1222,7 @@ export class MemoryRepository implements RecordsRepository {
       const plan = affectedByEditFrom(this.liveOccurrences(s.id).map((c) => this.toCommitment(c)), s, fromNumber);
       if (!plan.ok) throw new RepoError(plan.code);
       if (!sameAffected(plan.affected, expectedAffected)) throw new RepoError('versao_desatualizada');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       for (const t of this.terms.values()) {
         if (t.seriesId === s.id && !t.supersededAt && t.fromNumber >= fromNumber) this.terms.set(t.id, { ...t, supersededAt: now });
       }
@@ -1284,7 +1284,7 @@ export class MemoryRepository implements RecordsRepository {
       const plan = affectedByEnd(this.liveOccurrences(s.id).map((c) => this.toCommitment(c)), s, lastNumber);
       if (!plan.ok) throw new RepoError(plan.code);
       if (!sameAffected(plan.affected, expectedAffected)) throw new RepoError('versao_desatualizada');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       // Sem a marca "excluída só neste mês": retomar recria estas contas dentro da janela.
       for (const c of plan.removed) this.bumpCommitment(c.id, { deletedAt: now }, now);
       this.seriesById.set(s.id, { ...s, lastNumber, version: s.version + 1, updatedAt: now });
@@ -1304,7 +1304,7 @@ export class MemoryRepository implements RecordsRepository {
       const plan = affectedByDelete(this.liveOccurrences(s.id).map((c) => this.toCommitment(c)), s);
       if (!plan.ok) throw new RepoError(plan.code);
       if (!sameAffected(plan.affected, expectedAffected)) throw new RepoError('versao_desatualizada');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       for (const c of plan.removed) this.bumpCommitment(c.id, { deletedAt: now }, now);
       this.seriesById.set(s.id, { ...s, version: s.version + 1, updatedAt: now, deletedAt: now });
       this.saveOperation(key, 'excluir_serie', payload, { contextId: s.contextId, recordId: null, commitmentId: null, seriesId: s.id });
@@ -1362,7 +1362,7 @@ export class MemoryRepository implements RecordsRepository {
     );
     const actual = plan.ok ? plan.affected : [];
     if (actual.length === 0 || !sameAffected(actual, expectedAffected)) throw new RepoError('versao_desatualizada');
-    const now = new Date().toISOString();
+    const now = this.stamp();
     for (const c of plan.ok ? plan.changing : []) {
       this.bumpCommitment(
         c.id,
@@ -1398,7 +1398,7 @@ export class MemoryRepository implements RecordsRepository {
           subscriptionReviewedOn: null,
           subscriptionSince: subscription ? (s.subscriptionSince ?? this.opts.today()) : null,
           version: s.version + 1,
-          updatedAt: new Date().toISOString(),
+          updatedAt: this.stamp(),
         });
         changed = 1;
       }
@@ -1422,7 +1422,7 @@ export class MemoryRepository implements RecordsRepository {
       for (const s of this.seriesById.values()) {
         if (s.deletedAt || s.contextId !== contextId || !s.subscription || seriesEnded(s, today)) continue;
         if (s.subscriptionReviewedOn !== null && s.subscriptionReviewedOn >= today) continue;
-        this.seriesById.set(s.id, { ...s, subscriptionReviewedOn: today, updatedAt: new Date().toISOString() });
+        this.seriesById.set(s.id, { ...s, subscriptionReviewedOn: today, updatedAt: this.stamp() });
         changed += 1;
       }
       this.saveOperation(key, 'revisar_assinaturas', payload, { contextId, recordId: null, commitmentId: null });
@@ -1522,7 +1522,7 @@ export class MemoryRepository implements RecordsRepository {
       if (exists) throw new RepoError('ocorrencia_existente');
       const term = termFor(this.toSeries(s).terms, n);
       if (!term) throw new Error('serie_inconsistente');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const skip = mode === 'nao_houve';
       const c: StoredCommitment = {
         id: this.id('cp'),
@@ -1647,9 +1647,10 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /**
-   * Um relógio só para a renda de referência e para a resposta de guardar: o dia de opts.today() (a "data de hoje" do
-   * aparelho ou da demonstração), ao meio-dia UTC, e a cada chamada 1 ms depois da anterior. Assim a ordem entre a resposta
-   * e a mudança da renda vale também no mesmo dia e não depende do relógio real.
+   * O relógio da memória: o dia de opts.today() (a "data de hoje" do aparelho ou da demonstração), ao meio-dia UTC, e a cada chamada
+   * 1 ms depois da anterior. Vale para toda data de criação, alteração e exclusão: a demonstração não mistura o relógio real com o dia
+   * dela (revisão de 16/11/2026: "Anotado em 16/11/2026" num mês de outubro de 2026). A ordem entre duas gravações vale também no
+   * mesmo dia.
    */
   private lastStampMs = Number.NEGATIVE_INFINITY;
   private stamp(): string {
@@ -1948,7 +1949,7 @@ export class MemoryRepository implements RecordsRepository {
       const code = goalInputError(norm, today) ?? initialMovementError(initialCents, initialOn, today);
       if (code) throw new RepoError(code);
       if (norm.goalType === 'emergencia' && this.otherReserve(contextId, null)) throw new RepoError('reserva_ja_existe');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const goal: StoredGoal = {
         id: this.id('meta'),
         contextId,
@@ -1997,7 +1998,7 @@ export class MemoryRepository implements RecordsRepository {
       if (norm.goalType === 'emergencia' && current.status !== 'arquivada' && this.otherReserve(current.contextId, goalId)) {
         throw new RepoError('reserva_ja_existe');
       }
-      const now = new Date().toISOString();
+      const now = this.stamp();
       this.goals.set(goalId, {
         ...current,
         goalType: norm.goalType,
@@ -2029,7 +2030,7 @@ export class MemoryRepository implements RecordsRepository {
       if (current.goalType === 'emergencia' && current.status === 'arquivada' && status !== 'arquivada' && this.otherReserve(current.contextId, goalId)) {
         throw new RepoError('reserva_ja_existe');
       }
-      const now = new Date().toISOString();
+      const now = this.stamp();
       this.goals.set(goalId, { ...current, status, version: current.version + 1, updatedAt: now });
       this.saveOperation(key, 'situacao_meta', payload, { contextId: current.contextId, recordId: null, commitmentId: null, goalId, movementId: null });
       return this.goalResult(goalId, null);
@@ -2044,7 +2045,7 @@ export class MemoryRepository implements RecordsRepository {
       if (replayed) return this.goalResult(replayed.goalId!, null);
       const current = this.liveGoal(goalId);
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       for (const m of this.liveGoalMovements(goalId)) {
         this.goalMovements.set(m.id, { ...m, version: m.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
       }
@@ -2315,7 +2316,7 @@ export class MemoryRepository implements RecordsRepository {
       const details = this.investmentDetails(input.kind, input.details);
       const goalId = this.investmentGoal(contextId, input.details !== undefined, input.goalId, null);
       this.checkInvestmentLimit(contextId);
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const i: StoredInvestment = {
         id: this.id('inv'),
         contextId,
@@ -2420,7 +2421,7 @@ export class MemoryRepository implements RecordsRepository {
       const code = investmentMovementError(kind, { ...input, note }, this.opts.today());
       if (code) throw new RepoError(code);
       this.checkInvestmentBalance(investmentId, { op: 'add', kind, amountCents: input.amountCents, occurredOn: input.occurredOn });
-      const m = this.newInvestmentMovement(i, kind, input.amountCents, input.occurredOn, note, new Date().toISOString(), incomeKind);
+      const m = this.newInvestmentMovement(i, kind, input.amountCents, input.occurredOn, note, this.stamp(), incomeKind);
       this.saveOperation(key, 'registrar_movimento_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: i.id, movementId: m.id });
       return this.investmentResult(i.id, m.id);
     });
@@ -2526,7 +2527,7 @@ export class MemoryRepository implements RecordsRepository {
       if (code) throw new RepoError(code);
       this.checkMovementAccount(goal.contextId, kind, norm.accountId, null);
       this.checkGoalBalance(goalId, { op: 'add', kind, amountCents: norm.amountCents, occurredOn: norm.occurredOn });
-      const m = this.newMovement(goal, kind, norm, new Date().toISOString());
+      const m = this.newMovement(goal, kind, norm, this.stamp());
       this.saveOperation(key, 'registrar_movimento_meta', payload, {
         contextId: goal.contextId,
         recordId: null,
@@ -2558,7 +2559,7 @@ export class MemoryRepository implements RecordsRepository {
       const accountId = keepAccount ? movement.accountId : norm.accountId;
       this.checkMovementAccount(goal.contextId, movement.kind, accountId, movement.accountId);
       this.checkGoalBalance(goal.id, { op: 'update', id: movementId, amountCents: norm.amountCents, occurredOn: norm.occurredOn });
-      const now = new Date().toISOString();
+      const now = this.stamp();
       this.goalMovements.set(movementId, { ...movement, ...norm, accountId, version: movement.version + 1, updatedAt: now });
       this.saveOperation(key, 'alterar_movimento_meta', payload, {
         contextId: goal.contextId,
@@ -2581,7 +2582,7 @@ export class MemoryRepository implements RecordsRepository {
       if (movement.version !== expectedVersion) throw new RepoError('versao_desatualizada');
       if (goal.status === 'arquivada') throw new RepoError('meta_arquivada');
       this.checkGoalBalance(goal.id, { op: 'delete', id: movementId });
-      const now = new Date().toISOString();
+      const now = this.stamp();
       this.goalMovements.set(movementId, { ...movement, version: movement.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
       this.saveOperation(key, 'excluir_movimento_meta', payload, {
         contextId: goal.contextId,
@@ -2807,7 +2808,7 @@ export class MemoryRepository implements RecordsRepository {
       const code = cardInputError(norm);
       if (code) throw new RepoError(code);
       if (this.activeCardCount(contextId, null) >= CARDS_ACTIVE_MAX) throw new RepoError('limite_de_cartoes');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const card: StoredCard = {
         id: this.id('cartao'),
         contextId,
@@ -2842,7 +2843,7 @@ export class MemoryRepository implements RecordsRepository {
         const month = invoiceMonthOf(norm, this.opts.today());
         if (this.invoiceCommitments(id).some((c) => c.status === 'quitado' && c.invoiceMonth! >= month)) throw new RepoError('dias_com_fatura_paga');
       }
-      this.cards.set(id, { ...current, ...norm, version: current.version + 1, updatedAt: new Date().toISOString() });
+      this.cards.set(id, { ...current, ...norm, version: current.version + 1, updatedAt: this.stamp() });
       this.syncInvoices(id);
       this.saveOperation(key, 'alterar_cartao', payload, { contextId: current.contextId, recordId: null, commitmentId: null, cardId: id });
       return this.cardResult(id, null, []);
@@ -2861,7 +2862,7 @@ export class MemoryRepository implements RecordsRepository {
       if (current.status === 'arquivado' && status === 'ativo' && this.activeCardCount(current.contextId, id) >= CARDS_ACTIVE_MAX) {
         throw new RepoError('limite_de_cartoes');
       }
-      this.cards.set(id, { ...current, status, version: current.version + 1, updatedAt: new Date().toISOString() });
+      this.cards.set(id, { ...current, status, version: current.version + 1, updatedAt: this.stamp() });
       this.saveOperation(key, 'situacao_cartao', payload, { contextId: current.contextId, recordId: null, commitmentId: null, cardId: id });
       return this.cardResult(id, null, []);
     });
@@ -2876,7 +2877,7 @@ export class MemoryRepository implements RecordsRepository {
       const current = this.liveCard(id);
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current.version}`);
       if (this.liveEntries(id).length > 0 || this.invoiceCommitments(id).length > 0) throw new RepoError('cartao_com_lancamentos');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       this.cards.set(id, { ...current, version: current.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
       this.saveOperation(key, 'excluir_cartao', payload, { contextId: current.contextId, recordId: null, commitmentId: null, cardId: id });
       return this.cardResult(id, null, []);
@@ -3004,7 +3005,7 @@ export class MemoryRepository implements RecordsRepository {
       if (norm.kind !== entry.kind) throw new RepoError('tipo_invalido');
       if (entry.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${entry.version}`);
       const today = this.opts.today();
-      const now = new Date().toISOString();
+      const now = this.stamp();
       if (norm.kind === 'compra') {
         const code = cardPurchaseError(norm, today, norm.purchasedOn !== entry.purchasedOn);
         if (code) throw new RepoError(code);
@@ -3080,7 +3081,7 @@ export class MemoryRepository implements RecordsRepository {
       const { card, entry } = this.liveEntry(entryId);
       if (entry.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${entry.version}`);
       for (const m of entryMonths(entry)) if (this.invoicePaid(card.id, m)) throw new RepoError('fatura_paga');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       this.cardEntries.set(entryId, { ...entry, version: entry.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
       this.syncInvoices(card.id);
       this.saveOperation(key, 'excluir_lancamento_cartao', payload, { contextId: card.contextId, recordId: null, commitmentId: null, cardId: card.id, entryId });
@@ -3124,7 +3125,7 @@ export class MemoryRepository implements RecordsRepository {
       const left = c.amountCents - amountCents;
       const next = addMonths(month, 1);
       if (left > 0 && this.invoicePaid(cardId, next)) throw new RepoError('fatura_seguinte_paga');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const record: FinancialRecord = {
         id: this.id('reg'),
         contextId: card.contextId,
@@ -3189,7 +3190,7 @@ export class MemoryRepository implements RecordsRepository {
       const next = addMonths(month, 1);
       const balance = this.liveEntries(cardId).find((e) => e.kind === 'saldo_anterior' && e.paymentRecordId === paid.id) ?? null;
       if (balance && this.invoicePaid(cardId, next)) throw new RepoError('fatura_seguinte_paga');
-      const now = new Date().toISOString();
+      const now = this.stamp();
       if (balance) this.cardEntries.set(balance.id, { ...balance, version: balance.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
       this.records.set(paid.id, { ...paid, version: paid.version + 1, updatedAt: now, deletedAt: now });
       this.bumpCommitment(c.id, { status: 'aberto' }, now);
@@ -3280,7 +3281,7 @@ export class MemoryRepository implements RecordsRepository {
           }
           const kinds = destination === 'conta' ? ['despesa', 'receita'] : ['compra', 'estorno'];
           if (!kinds.includes(it.kind)) throw new RepoError('tipo_invalido');
-          const now = new Date().toISOString();
+          const now = this.stamp();
           if (account) {
             this.validate(contextId, it.kind as RecordKind, { accountId: account.id, amountCents: it.amountCents, occurredOn: it.occurredOn, description: it.description, category: it.category });
             const record: StoredRecord = {
@@ -3409,7 +3410,7 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   private newEntry(card: StoredCard, fields: Omit<CardEntry, 'id' | 'contextId' | 'cardId' | 'createdBy' | 'version' | 'createdAt' | 'updatedAt'>) {
-    const now = new Date().toISOString();
+    const now = this.stamp();
     const entry: StoredCardEntry = {
       id: this.id('lanc'),
       contextId: card.contextId,
@@ -3476,7 +3477,7 @@ export class MemoryRepository implements RecordsRepository {
     for (const [m, t] of totals) if (t < 0 && m < start) start = m;
     // O crédito só é levado adiante enquanto houver, na fatura seguinte ou depois dela, um lançamento comum para recebê-lo.
     const lastRegular = lastRegularMonthOf(entries);
-    const now = new Date().toISOString();
+    const now = this.stamp();
     const description = invoiceCommitmentDescription(card.name);
     let guard = 0;
     for (let m = start; m <= last; m = addMonths(m, 1)) {
@@ -4391,7 +4392,7 @@ export class MemoryRepository implements RecordsRepository {
   /** Simula outro aparelho alterando o registro (para testar conflito de versão). */
   simulateRemoteEdit(id: string, changes: Partial<RecordInput>) {
     const r = this.liveRecord(id);
-    const now = new Date().toISOString();
+    const now = this.stamp();
     this.records.set(id, { ...r, ...changes, version: r.version + 1, updatedAt: now });
     if (r.commitmentId) this.bumpCommitment(r.commitmentId, {}, now);
   }
@@ -4400,7 +4401,7 @@ export class MemoryRepository implements RecordsRepository {
   simulateRemoteCommitmentEdit(id: string, changes: Partial<CommitmentInput>) {
     const c = this.liveCommitment(id);
     if (c.status !== 'aberto') throw new RepoError('compromisso_quitado');
-    this.bumpCommitment(id, changes, new Date().toISOString());
+    this.bumpCommitment(id, changes, this.stamp());
   }
 
   /** Repetição: mesma chave, mesma ação e mesmo conteúdo devolve a operação; qualquer diferença é recusada. */
@@ -4575,7 +4576,7 @@ export class MemoryRepository implements RecordsRepository {
     let created = 0;
     let createdOverdue = 0;
     for (const o of occurrencesToMaterialize(this.toSeries(s), live, today)) {
-      const now = new Date().toISOString();
+      const now = this.stamp();
       const c: StoredCommitment = {
         id: this.id('cp'),
         contextId: s.contextId,
@@ -4755,7 +4756,7 @@ export class MemoryRepository implements RecordsRepository {
       isDefault: true,
       version: 1,
       createdBy: this.opts.actorId,
-      createdAt: new Date().toISOString(),
+      createdAt: this.stamp(),
     };
     this.accountsById.set(account.id, account);
   }
@@ -5071,7 +5072,7 @@ export class MemoryRepository implements RecordsRepository {
       if (!key) throw new RepoError('chave_reutilizada');
       if (version !== LEGAL_VERSION) throw new RepoError('versao_invalida');
       const rows = this.legalRows();
-      if (!rows.has(version)) rows.set(version, new Date().toISOString());
+      if (!rows.has(version)) rows.set(version, this.stamp());
       return this.legalResult();
     });
   }
