@@ -116,7 +116,7 @@ export const DELETE_ERROR_TEXT = {
   confirmacao_invalida: 'Digite EXCLUIR para confirmar.',
   transferir_antes: 'Antes de excluir a conta, passe a titularidade da Família para outra pessoa ou remova as outras pessoas dela.',
   rede: 'Sem conexão no momento. Tente de novo: se a conta já tiver sido excluída, você sai dela.',
-  failed: 'Não foi possível excluir a conta agora. Tente novamente.',
+  failed: 'Não foi possível excluir a conta agora. Tente de novo.',
 } as const;
 
 /** Texto de um erro da tela; o que não é conhecido cai em "Não foi possível excluir a conta agora...". */

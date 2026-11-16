@@ -204,6 +204,31 @@ export const COMMITMENT_NOTICE_TEXT = {
   undone: 'Pagamento desfeito.',
 } as const;
 
+/**
+ * Motivo curto de uma falha de "Já paguei" (lista de Contas a pagar e Contas vencidas), depois do nome da conta:
+ * "Luz: a conta mudou em outro aparelho. Confira e tente de novo." `code` é o código da recusa; nulo, "rede" ou "desconhecido" é
+ * resultado incerto (a conexão caiu depois de enviar), com a mesma frase de UNCERTAIN_TEXT.
+ */
+export function payFailureReason(code: string | null | undefined): string {
+  switch (code) {
+    case 'versao_desatualizada':
+      return 'a conta mudou em outro aparelho. Confira e tente de novo.';
+    case 'compromisso_quitado':
+      return 'a conta já foi marcada como paga em outro aparelho.';
+    case 'nao_encontrado':
+      return 'a conta não está mais disponível.';
+    case 'sem_permissao':
+      return 'com o papel "Só vê" na Família, você não marca contas como pagas.';
+    case null:
+    case undefined:
+    case 'rede':
+    case 'desconhecido':
+      return 'não foi possível confirmar se salvou. Confira em Movimentos antes de tentar de novo.';
+    default:
+      return 'não foi possível registrar o pagamento. Tente de novo.';
+  }
+}
+
 /** Textos de "Já paguei" na lista (diálogo e nomes acessíveis). `name` é o nome mostrado na linha. */
 export const QUICK_PAY_TEXT = {
   button: 'Já paguei',

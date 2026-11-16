@@ -91,7 +91,7 @@ export const ACCOUNTS_TEXT = {
   deleteTitle: 'Excluir de Bancos e carteira?',
   deleteBody: 'Só é possível excluir o que ainda não tem lançamentos. Se já tem gastos ou aportes, arquive: o histórico continua.',
   deleteConfirm: 'Excluir',
-  loadFailed: 'Não foi possível carregar bancos e carteira. Tente novamente.',
+  loadFailed: 'Não foi possível carregar bancos e carteira. Tente de novo.',
   loading: 'Carregando bancos e carteira…',
   /** Linha da lista: tipo e, se houver, a marca. */
   rowCaption: (kind: AccountKind, isDefault: boolean, status: AccountStatus): string =>

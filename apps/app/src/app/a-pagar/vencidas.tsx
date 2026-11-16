@@ -14,6 +14,7 @@ import {
   groupAnnualLater,
   isCommitmentOverdue,
   isRepoError,
+  payFailureReason,
   monthOf,
   newOperationKey,
   occurrenceLabel,
@@ -79,15 +80,8 @@ function monthWord(c: Commitment, today: IsoDate): string {
 
 const isUncertain = (e: unknown) => !isRepoError(e) || e.code === 'rede' || e.code === 'desconhecido';
 
-/** Motivo curto de uma recusa, depois do nome da conta: "Aluguel de março: a conta mudou em outro aparelho." */
-function payReason(e: unknown): string {
-  if (isRepoError(e, 'versao_desatualizada')) return 'a conta mudou em outro aparelho.';
-  if (isRepoError(e, 'compromisso_quitado')) return 'a conta já foi marcada como paga em outro aparelho.';
-  if (isRepoError(e, 'nao_encontrado')) return 'a conta não está mais disponível.';
-  if (isRepoError(e, 'sem_permissao')) return 'você não tem permissão para esta ação.';
-  if (!isUncertain(e)) return 'não foi possível registrar o pagamento.';
-  return 'não foi possível confirmar o pagamento. Tente novamente.';
-}
+/** Motivo curto de uma falha, depois do nome da conta (o texto mora no núcleo, igual nas duas listas). */
+const payReason = (e: unknown): string => payFailureReason(isRepoError(e) ? e.code : null);
 
 const contas = (n: number) => (n === 1 ? '1 conta' : `${n} contas`);
 
@@ -326,7 +320,7 @@ export default function ContasVencidas() {
       setPending(null);
       if (isUncertain(e)) {
         // Rede: repetir com a mesma chave é seguro.
-        setResult({ tone: 'erro', text: `Não foi possível tirar as parcelas de ${g.label}. Tente novamente.` });
+        setResult({ tone: 'erro', text: `Não foi possível tirar as parcelas de ${g.label}. Tente de novo.` });
         return;
       }
       skipKeys.current.delete(groupKey);

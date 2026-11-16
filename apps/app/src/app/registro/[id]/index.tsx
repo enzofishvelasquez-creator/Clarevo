@@ -107,7 +107,7 @@ export default function DetalheRegistro() {
         setDeleteError(`${ERROR_TEXT.versao_desatualizada} O registro foi mantido.`);
         record.refetch();
       } else if (isRepoError(e, 'nao_encontrado')) setDeleteError(ERROR_TEXT.nao_encontrado);
-      else setDeleteError('Não foi possível excluir. O registro foi mantido. Tente novamente.');
+      else setDeleteError('Não foi possível excluir. O registro foi mantido. Tente de novo.');
     }
   };
 

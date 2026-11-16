@@ -117,7 +117,7 @@ export default function ContaScreen() {
       });
     } catch (e) {
       if (e instanceof AuthError && e.code === 'aguarde' && e.retryAfterSeconds) setCooldown(e.retryAfterSeconds);
-      else setSecurityMsg({ tone: 'erro', text: 'Não foi possível enviar agora. Tente novamente em instantes.' });
+      else setSecurityMsg({ tone: 'erro', text: 'Não foi possível enviar agora. Tente de novo em instantes.' });
     } finally {
       setBusy(null);
     }
@@ -143,7 +143,7 @@ export default function ContaScreen() {
     } catch {
       setBusy(null);
       setConfirmAll(false);
-      setSecurityMsg({ tone: 'erro', text: 'Não foi possível encerrar as sessões agora. Tente novamente.' });
+      setSecurityMsg({ tone: 'erro', text: 'Não foi possível encerrar as sessões agora. Tente de novo.' });
     }
   };
 

@@ -134,7 +134,7 @@ export const IMPORT_TEXT = {
   /** Falha no meio: o que entrou fica, e repetir é seguro. */
   partial: (done: number, total: number) =>
     `${num(done)} de ${num(total)} ${plural(total, 'lançamento foi importado', 'lançamentos foram importados')} antes da falha. Tente de novo: o que já entrou não é repetido.`,
-  retry: 'Tentar novamente',
+  retry: 'Tentar de novo',
   needAccount: 'Escolha o banco ou a carteira.',
   needCard: 'Escolha o cartão.',
   noAccountsHint: 'Antes de importar, cadastre um banco ou carteira em Conta, em Bancos e carteira.',

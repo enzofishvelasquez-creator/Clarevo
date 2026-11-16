@@ -48,7 +48,7 @@ export const TELEGRAM_DOWNLOAD_TEXT = {
   body: 'O Telegram é gratuito. Baixe, crie a sua conta e volte aqui para ligar à Clarevo.',
   button: 'Baixar o Telegram',
   a11y: 'Baixar o Telegram, abre a loja de aplicativos',
-  failed: 'Não deu para abrir a loja de aplicativos. Procure por Telegram na loja do seu celular.',
+  failed: 'Não foi possível abrir a loja de aplicativos. Procure por Telegram na loja do seu celular.',
 } as const;
 
 /** Textos da tela Conta > Telegram. */
@@ -92,10 +92,10 @@ export const TELEGRAM_TEXT = {
   privacyTitle: 'Privacidade',
   privacy:
     'As mensagens passam pelos servidores do Telegram. A Clarevo guarda só o que você anotou, como qualquer registro do app. O texto das mensagens, o seu nome e o seu usuário no Telegram não ficam guardados: da conta, só um resumo feito com uma chave secreta, para reconhecer quem escreve.',
-  error: 'Não deu para concluir agora. Tente de novo.',
+  error: 'Não foi possível concluir agora. Tente de novo.',
   demo: 'Na demonstração, o Telegram não é ligado.',
   notReady: 'A Clarevo no Telegram ainda está sendo preparada.',
-  openFailed: 'Não deu para abrir o Telegram neste aparelho. Procure a Clarevo no Telegram e mande "Ativar" e o código.',
+  openFailed: 'Não foi possível abrir o Telegram neste aparelho. Procure a Clarevo no Telegram e mande "Ativar" e o código.',
   linkedNow: 'Pronto, o Telegram está ligado.',
   notYet: 'O código ainda não chegou. Confira se tocou em Iniciar no Telegram e tente de novo em alguns segundos.',
 } as const satisfies ChatScreenText;

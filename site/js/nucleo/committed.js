@@ -390,7 +390,7 @@ export const COMMITTED_LINK_TEXT = {
 export const COMMITTED_TEXT = {
     title: 'Renda comprometida',
     planned: 'Previsto',
-    retry: 'Tentar novamente',
+    retry: 'Tentar de novo',
     loadError: 'Não foi possível calcular a renda comprometida.',
     resumoTitle: (month) => `Renda comprometida em ${formatMonthName(month)}`,
     resumoNoReference: 'Veja quanto da sua renda já está comprometido',

@@ -681,7 +681,7 @@ export function limitUsedText(usedCents, limitCents) {
     return limitCents === null ? `Limite usado: ${formatBRL(usedCents)}` : `Limite usado: ${formatBRL(usedCents)} de ${formatBRL(limitCents)}`;
 }
 export function purchaseNotice(invoiceMonth, cardName, today) {
-    return `Esta compra entra na fatura de ${invoiceMonthLabel(invoiceMonth, today)} do ${cardName} e conta em Pago quando a fatura for paga.`;
+    return `Esta compra entra na fatura de ${invoiceMonthLabel(invoiceMonth, today)} do ${cardName} e em Pago quando a fatura for paga.`;
 }
 export function installmentsNotice(installments, perInstallmentCents) {
     if (installments <= 1)
@@ -775,8 +775,8 @@ export const CARD_ERROR_TEXT = {
     tipo_invalido: ERROR_TEXT.salvar_falhou,
     versao_desatualizada: 'Este cartão ou lançamento foi alterado em outro aparelho. Confira a versão atual antes de salvar.',
     nao_encontrado: 'Este cartão ou lançamento foi excluído. Confira a lista atual.',
-    pagar_falhou: 'Não foi possível registrar o pagamento da fatura. Seu preenchimento foi mantido. Tente novamente.',
-    desfazer_falhou: 'Não foi possível desfazer o pagamento da fatura. Tente novamente.',
+    pagar_falhou: 'Não foi possível registrar o pagamento da fatura. Seu preenchimento foi mantido. Tente de novo.',
+    desfazer_falhou: 'Não foi possível desfazer o pagamento da fatura. Tente de novo.',
 };
 export function cardErrorText(code, context = {}) {
     if (code === 'apelido_invalido' && typeof context.nickname === 'string' && looksLikeCardNumber(context.nickname)) {

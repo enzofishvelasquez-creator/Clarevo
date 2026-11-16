@@ -1669,7 +1669,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
                     <Txt variant="label" color={colors.error}>
                       {ERROR_TEXT.carregar_falhou}
                     </Txt>
-                    <Button label="Tentar novamente" tone="soft" onPress={() => cards.refetch()} />
+                    <Button label="Tentar de novo" tone="soft" onPress={() => cards.refetch()} />
                   </Banner>
                 ) : activeCards.length === 0 ? (
                   <Banner tone="info" icon={Info} live={false}>
@@ -1900,7 +1900,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
                 style={styles.save}
               />
               <Button
-                label={banner && !conflict ? 'Tentar novamente' : RETURN_TEXT.save}
+                label={banner && !conflict ? 'Tentar de novo' : RETURN_TEXT.save}
                 busy={busy}
                 busyLabel="Salvando…"
                 onPress={() => submit()}
@@ -1911,7 +1911,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             <View style={styles.footerRow}>
               <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
               <Button
-                label={banner && !conflict ? 'Tentar novamente' : cardPurchase ? CARDS_TEXT.expense.save : copy.save}
+                label={banner && !conflict ? 'Tentar de novo' : cardPurchase ? CARDS_TEXT.expense.save : copy.save}
                 busy={busy}
                 busyLabel="Salvando…"
                 onPress={() => submit()}

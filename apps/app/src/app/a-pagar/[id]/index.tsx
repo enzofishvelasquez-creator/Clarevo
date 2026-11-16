@@ -120,12 +120,12 @@ export default function DetalheContaAPagar() {
   const skip = useSkipSeriesYear();
   const skipKeys = useSeriesOperationKey();
   /**
-   * Tirar com resultado incerto: o plano enviado (para a faixa de sucesso) e o botão "Tentar novamente" na faixa de erro.
+   * Tirar com resultado incerto: o plano enviado (para a faixa de sucesso) e o botão "Tentar de novo" na faixa de erro.
    * O botão não depende do plano atual: se a escrita foi gravada, as listas recarregadas já não têm parcelas do ano em
    * aberto, e o diálogo de confirmação some.
    */
   const skipAttempt = useRef<Extract<YearPlan, { ok: true }> | null>(null);
-  /** Texto da faixa de resultado incerto, com "Tentar novamente" (null: nada pendente). */
+  /** Texto da faixa de resultado incerto, com "Tentar de novo" (null: nada pendente). */
   const [skipFailed, setSkipFailed] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
@@ -225,7 +225,7 @@ export default function DetalheContaAPagar() {
 
   /**
    * "Tirar todas as parcelas de 2027 em aberto" (skip_series_year): saem de uma vez e não voltam. Resultado incerto (rede):
-   * confere na hora com findSeriesOperation se a escrita foi gravada; se a conferência também falhar, "Tentar novamente"
+   * confere na hora com findSeriesOperation se a escrita foi gravada; se a conferência também falhar, "Tentar de novo"
    * confere de novo antes de repetir, e a repetição usa a mesma chave.
    */
   const doSkip = async () => {
@@ -234,7 +234,7 @@ export default function DetalheContaAPagar() {
     const label = current?.year.label ?? skipAttempt.current?.year.label ?? annual?.label ?? '';
     setActionError(null);
     setSkipping(true);
-    const failed = `Não foi possível tirar as parcelas de ${label}. Tente novamente.`;
+    const failed = `Não foi possível tirar as parcelas de ${label}. Tente de novo.`;
     const done = (text: string) => {
       skipKeys.settled();
       skipAttempt.current = null;
@@ -300,7 +300,7 @@ export default function DetalheContaAPagar() {
           }
         } catch {
           // A conferência também falhou: recarregar para não mostrar como aberta uma parcela que pode já ter saído.
-          // "Tentar novamente" confere de novo antes de repetir.
+          // "Tentar de novo" confere de novo antes de repetir.
           reloadAll();
         }
         setSkipFailed(failed);
@@ -388,7 +388,7 @@ export default function DetalheContaAPagar() {
                   <Txt variant="label" color={colors.error} accessibilityLabel={yearA11yLabel(skipFailed)}>
                     {skipFailed}
                   </Txt>
-                  <Button label="Tentar novamente" tone="soft" busy={skipping} busyLabel="Aguarde…" onPress={doSkip} />
+                  <Button label="Tentar de novo" tone="soft" busy={skipping} busyLabel="Aguarde…" onPress={doSkip} />
                 </Banner>
               ) : null}
 

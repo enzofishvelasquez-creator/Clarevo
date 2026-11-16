@@ -35,7 +35,7 @@ export default function PrimeiraConta() {
       qc.setQueryData(['space', user?.id], space);
     } catch (e) {
       if (isRepoError(e, 'nome_da_conta_invalido')) setError('Dê um nome de 1 a 40 caracteres para a conta.');
-      else setBanner('Não foi possível criar a conta agora. O nome foi mantido. Tente novamente.');
+      else setBanner('Não foi possível criar a conta agora. O nome foi mantido. Tente de novo.');
     } finally {
       setBusy(false);
     }

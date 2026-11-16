@@ -623,7 +623,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
             <Button
-              label={retry ? 'Tentar novamente' : 'Confirmar pagamento'}
+              label={retry ? 'Tentar de novo' : 'Confirmar pagamento'}
               busy={busy}
               busyLabel="Salvando…"
               disabled={paidElsewhere}

@@ -350,7 +350,7 @@ export const FAMILY_TEXT = {
   endBlocked: 'Para encerrar, remova antes as outras pessoas ou passe a titularidade.',
   cancel: 'Cancelar',
   loading: 'Carregando a Família…',
-  loadFailed: 'Não foi possível carregar a Família. Tente novamente.',
+  loadFailed: 'Não foi possível carregar a Família. Tente de novo.',
   /** "Quem vê estes dados?" na Família. */
   whoSeesIntro: 'Estas pessoas veem os registros da Família, cada uma conforme o papel que tem.',
   whoSeesNote:
@@ -416,7 +416,7 @@ export const FAMILY_ERROR_TEXT = {
   sem_permissao: 'Só quem é titular da Família pode fazer isto.',
   nao_encontrado: 'Esta Família ou esta pessoa não está mais disponível. Atualize a tela.',
   chave_reutilizada: ERROR_TEXT.salvar_falhou,
-  rede: 'Sem conexão no momento. Tente novamente.',
+  rede: 'Sem conexão no momento. Tente de novo.',
   salvar_falhou: ERROR_TEXT.salvar_falhou,
   carregar_falhou: ERROR_TEXT.carregar_falhou,
 } as const;

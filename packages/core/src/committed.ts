@@ -708,7 +708,7 @@ export const COMMITTED_LINK_TEXT = {
 export const COMMITTED_TEXT = {
   title: 'Renda comprometida',
   planned: 'Previsto',
-  retry: 'Tentar novamente',
+  retry: 'Tentar de novo',
   loadError: 'Não foi possível calcular a renda comprometida.',
 
   // Resumo: linha dentro do card "Ainda a pagar" (sem card novo, D-026(7)).
@@ -899,7 +899,7 @@ export type CommittedLine =
   | { kind: 'sem_referencia'; title: string; a11yLabel: string }
   | { kind: 'percentual'; title: string; value: string; caption: string | null; meter: CommittedMeter; a11yLabel: string };
 
-/** Estado da linha do Resumo. Carregando e erro ficam no app (Skeleton; erro com "Tentar novamente", nunca 0%). */
+/** Estado da linha do Resumo. Carregando e erro ficam no app (Skeleton; erro com "Tentar de novo", nunca 0%). */
 export function committedLine(s: CommittedSummary): CommittedLine {
   if (s.referenceCents === null || s.committedPermille === null || s.meter === null) {
     return { kind: 'sem_referencia', title: COMMITTED_TEXT.resumoNoReference, a11yLabel: COMMITTED_TEXT.resumoNoReferenceA11y };

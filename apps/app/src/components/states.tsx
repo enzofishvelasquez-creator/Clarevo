@@ -165,12 +165,12 @@ export function ErrorState({
   message,
   onRetry,
   onBrand,
-  retryLabel = 'Tentar novamente',
+  retryLabel = 'Tentar de novo',
 }: {
   message: string;
   onRetry: () => void;
   onBrand?: boolean;
-  /** O texto do botão ("Tentar novamente" na maioria das telas). */
+  /** O texto do botão ("Tentar de novo" na maioria das telas). */
   retryLabel?: string;
 }) {
   return (

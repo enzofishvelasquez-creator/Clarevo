@@ -146,11 +146,11 @@ export default function DetalheGastoFixo() {
           return;
         }
         keys.uncertain(key, snapshot);
-        setActionError(`Não foi possível excluir ${theNoun}. Tente novamente.`);
+        setActionError(`Não foi possível excluir ${theNoun}. Tente de novo.`);
       }
     } catch {
       setConfirmDelete(false);
-      setActionError(`Não foi possível excluir ${theNoun}. Tente novamente.`);
+      setActionError(`Não foi possível excluir ${theNoun}. Tente de novo.`);
     } finally {
       setDeleting(false);
     }

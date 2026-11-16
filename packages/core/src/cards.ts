@@ -1329,8 +1329,8 @@ export const CARD_ERROR_TEXT = {
   tipo_invalido: ERROR_TEXT.salvar_falhou,
   versao_desatualizada: 'Este cartão ou lançamento foi alterado em outro aparelho. Confira a versão atual antes de salvar.',
   nao_encontrado: 'Este cartão ou lançamento foi excluído. Confira a lista atual.',
-  pagar_falhou: 'Não foi possível registrar o pagamento da fatura. Seu preenchimento foi mantido. Tente novamente.',
-  desfazer_falhou: 'Não foi possível desfazer o pagamento da fatura. Tente novamente.',
+  pagar_falhou: 'Não foi possível registrar o pagamento da fatura. Seu preenchimento foi mantido. Tente de novo.',
+  desfazer_falhou: 'Não foi possível desfazer o pagamento da fatura. Tente de novo.',
 } as const;
 
 /**

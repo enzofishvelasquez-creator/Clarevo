@@ -9,6 +9,7 @@ import {
   formatMonthBR,
   groupAnnualLater,
   isRepoError,
+  payFailureReason,
   monthOf,
   newOperationKey,
   payablesStartMonth,
@@ -72,15 +73,8 @@ const QUICK_PAY_ANNOUNCE_DELAY = 500;
 
 const isUncertain = (e: unknown) => !isRepoError(e) || e.code === 'rede' || e.code === 'desconhecido';
 
-/** Motivo curto de uma recusa, depois do nome da conta: "Luz: a conta mudou em outro aparelho." */
-function payReason(e: unknown): string {
-  if (isRepoError(e, 'versao_desatualizada')) return 'a conta mudou em outro aparelho. Confira e tente de novo.';
-  if (isRepoError(e, 'compromisso_quitado')) return 'a conta já foi marcada como paga em outro aparelho.';
-  if (isRepoError(e, 'nao_encontrado')) return 'a conta não está mais disponível.';
-  if (isRepoError(e, 'sem_permissao')) return 'você não tem permissão para esta ação.';
-  if (!isUncertain(e)) return 'não foi possível registrar o pagamento.';
-  return 'não foi possível confirmar o pagamento. Tente novamente.';
-}
+/** Motivo curto de uma falha, depois do nome da conta (o texto mora no núcleo, igual nas duas listas). */
+const payReason = (e: unknown): string => payFailureReason(isRepoError(e) ? e.code : null);
 
 /**
  * "Já paguei" na lista: pay_commitment pelo usePayCommitment, com chave própria por conta, guardada entre tentativas

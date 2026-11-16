@@ -639,7 +639,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
             <Button
-              label={retry ? 'Tentar novamente' : 'Salvar conta a pagar'}
+              label={retry ? 'Tentar de novo' : 'Salvar conta a pagar'}
               busy={busy}
               busyLabel="Salvando…"
               onPress={() => submit()}

@@ -777,7 +777,7 @@ export function SeriesEndForm({
           ) : null}
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
-            <Button label={retry ? 'Tentar novamente' : actionLabel} busy={busy} busyLabel="Salvando…" onPress={() => submit()} style={styles.save} />
+            <Button label={retry ? 'Tentar de novo' : actionLabel} busy={busy} busyLabel="Salvando…" onPress={() => submit()} style={styles.save} />
           </View>
         </View>
       </View>

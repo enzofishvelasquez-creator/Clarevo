@@ -111,7 +111,7 @@ export const SIGNUP_SOURCE_TEXT = {
   changedElsewhere: 'Sua resposta mudou em outro aparelho. A tela foi atualizada; escolha de novo se quiser mudar.',
   failed: ERROR_TEXT.salvar_falhou,
   /** Resultado incerto (a conexão caiu): repetir é seguro. */
-  uncertain: 'Não deu para confirmar se salvou. Toque de novo: repetir é seguro.',
+  uncertain: 'Não foi possível confirmar se salvou. Toque de novo: repetir é seguro.',
   /** Códigos de recusa que a tela explica; o resto usa a falha genérica. */
   errors: {
     versao_desatualizada: 'Sua resposta mudou em outro aparelho. A tela foi atualizada; escolha de novo se quiser mudar.',

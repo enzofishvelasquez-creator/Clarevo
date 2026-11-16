@@ -3053,7 +3053,7 @@ setInterval(async () => {
   ok('B Resumo sem referência: o convite "Veja quanto da sua renda já está comprometido" no lugar da linha', t.includes('Veja quanto da sua renda já está comprometido') && !t.includes('Renda comprometida em outubro'));
   await shot('108_resumo_sem_referencia');
 
-  // Falha de carga: erro com "Tentar novamente", nunca 0%.
+  // Falha de carga: erro com "Tentar de novo", nunca 0%.
   await p.evaluate(async () => {
     const repo = await window.__e2e.repo();
     repo.__orig = repo.listIncomeReferences;
@@ -3062,7 +3062,7 @@ setInterval(async () => {
   });
   await waitText('Não foi possível calcular a renda comprometida.');
   t = await body();
-  ok('B falha de carga: erro com "Tentar novamente" no Resumo, sem 0,0% nem o convite', t.includes('Não foi possível calcular a renda comprometida.') && !t.includes('0,0%') && !t.includes('Veja quanto da sua renda'));
+  ok('B falha de carga: erro com "Tentar de novo" no Resumo, sem 0,0% nem o convite', t.includes('Não foi possível calcular a renda comprometida.') && !t.includes('0,0%') && !t.includes('Veja quanto da sua renda'));
   await shot('109_renda_falha');
   await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.listIncomeReferences = repo.__orig; await window.__e2e.refresh(); });
   await waitText('Veja quanto da sua renda já está comprometido');
@@ -4342,9 +4342,9 @@ setInterval(async () => {
   await p.evaluate(() => { window.__sefazMode = 'erro'; });
   const SEFAZ_KEY2 = accessKey('2610', '65', 5151, OTHER_CNPJ);
   await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300);
-  await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY2)); await btn('Ler a nota').click(); await waitText('Não deu para ler a página da Sefaz.', 8000); await p.waitForTimeout(600); t = await body();
-  ok('N página da Sefaz que não abre: "Não deu para ler a página da Sefaz. Confira o valor no cupom.", o valor volta a faltar (a nota nova substitui a anterior) e o formulário segue manual',
-    t.includes('Não deu para ler a página da Sefaz. Confira o valor no cupom.') && t.includes('O valor não vem no código desta nota. Digite o total impresso no cupom.') && (await field('Valor em reais').inputValue()) === '' && (await field('Descrição').inputValue()) === '' &&
+  await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY2)); await btn('Ler a nota').click(); await waitText('Não foi possível ler a página da Sefaz.', 8000); await p.waitForTimeout(600); t = await body();
+  ok('N página da Sefaz que não abre: "Não foi possível ler a página da Sefaz. Confira o valor no cupom.", o valor volta a faltar (a nota nova substitui a anterior) e o formulário segue manual',
+    t.includes('Não foi possível ler a página da Sefaz. Confira o valor no cupom.') && t.includes('O valor não vem no código desta nota. Digite o total impresso no cupom.') && (await field('Valor em reais').inputValue()) === '' && (await field('Descrição').inputValue()) === '' &&
     (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 && t.includes('Nota lida: CNPJ 45.723.174/0001-10 · RJ'), t.slice(0, 500));
   await p.evaluate((html) => { window.__sefazMode = 'ok'; window.__sefazHtml = html; }, sefazHtml(accessKey('2610', '65', 9999, OTHER_CNPJ)));
   await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300);
@@ -4353,10 +4353,10 @@ setInterval(async () => {
   // A página só vale se mostra a chave lida ou o CNPJ do emitente; e a resposta precisa dizer de qual endereço veio.
   const readAgain = async () => { await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300); await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY)); await btn('Ler a nota').click(); await p.waitForTimeout(800); };
   await p.evaluate(() => { window.__sefazMode = 'ok'; window.__sefazHtml = '<div class="txtTopo">LOJA FALSA</div><div>Valor a pagar R$: 9.999,99</div><div>Emissão: 06/10/2026</div>'; });
-  await readAgain(); await waitText('Não deu para ler a página da Sefaz.', 8000);
-  ok('N página que não mostra a chave nem o CNPJ do emitente: nada é aproveitado ("Não deu para ler a página da Sefaz."), valor e nome não vêm da página', (await field('Valor em reais').inputValue()) === '' && !(await body()).includes('LOJA FALSA') && !(await body()).includes('9.999,99'));
+  await readAgain(); await waitText('Não foi possível ler a página da Sefaz.', 8000);
+  ok('N página que não mostra a chave nem o CNPJ do emitente: nada é aproveitado ("Não foi possível ler a página da Sefaz."), valor e nome não vêm da página', (await field('Valor em reais').inputValue()) === '' && !(await body()).includes('LOJA FALSA') && !(await body()).includes('9.999,99'));
   await p.evaluate((html) => { window.__sefazMode = 'semurl'; window.__sefazHtml = html; }, sefazHtml(SEFAZ_KEY));
-  await readAgain(); await waitText('Não deu para ler a página da Sefaz.', 8000);
+  await readAgain(); await waitText('Não foi possível ler a página da Sefaz.', 8000);
   ok('N resposta sem o endereço de onde veio (poderia ser de outro domínio): recusada, nada é aproveitado', (await field('Valor em reais').inputValue()) === '' && !(await body()).includes('Mercado Exemplo Ltda'));
   await p.evaluate(() => { delete window.__clarevoSefazFetch; });
   await leaveForm();
@@ -7548,14 +7548,14 @@ setInterval(async () => {
     t.includes('Gasto fixo salvo.') && t.includes('O gasto fixo foi salvo, mas a marca de assinatura não. Abra o gasto fixo, escolha Editar e tente de novo.') && !t.includes('Assinatura · R$') && !t.includes('Marcado como assinatura.'), t.slice(0, 500));
   await shot('277_marca_falhou');
   ok('H2 a marca falha: o gasto fixo existe e não é assinatura', JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', false, null, 1]]));
-  // Editar só a marca com a falha ainda ativa: o aviso de erro fica na tela, com "Tentar novamente".
+  // Editar só a marca com a falha ainda ativa: o aviso de erro fica na tela, com "Tentar de novo".
   await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
-  await h2Switch().click(); await btn('Salvar alterações').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(400);
-  ok('H2 editar só a marca com falha: o erro aparece junto do botão ("Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo."), que passa a "Tentar novamente", e nada é gravado', (await visibleCount('button', 'Tentar novamente')) === 1 && (await body()).includes('Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.') &&
+  await h2Switch().click(); await btn('Salvar alterações').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(400);
+  ok('H2 editar só a marca com falha: o erro aparece junto do botão ("Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo."), que passa a "Tentar de novo", e nada é gravado', (await visibleCount('button', 'Tentar de novo')) === 1 && (await body()).includes('Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo.') &&
     JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', false, null, 1]]));
   // A falha passa: tentar de novo grava.
   await p.evaluate(async () => { const r = await window.__e2e.repo(); delete r.setSeriesSubscription; });
-  await btn('Tentar novamente').click(); await waitText('Marcado como assinatura.'); await p.waitForTimeout(500);
+  await btn('Tentar de novo').click(); await waitText('Marcado como assinatura.'); await p.waitForTimeout(500);
   ok('H2 tentar de novo: a marca é gravada (a versão sobe uma vez)', JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', true, null, 2]]));
   // Cancelar a edição com a marca mudada pede confirmação (alteração não salva).
   await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
@@ -8639,10 +8639,10 @@ setInterval(async () => {
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
   await field('Descrição').fill('Farmácia CL-03'); await field('Valor em reais').fill('80'); await p.getByRole('radio', { name: 'Saúde' }).filter({ visible: true }).first().click();
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar gasto').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(400);
+  await btn('Salvar gasto').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(400);
   t = await body();
-  ok('CL-03 resultado incerto: "Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.", sem "Não foi possível salvar", e o preenchimento fica',
-    t.includes('Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.') && !t.includes('Não foi possível salvar') && (await field('Descrição').inputValue()) === 'Farmácia CL-03' && ['80', '80,00'].includes(await field('Valor em reais').inputValue()), t.slice(0, 300));
+  ok('CL-03 resultado incerto: "Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo.", sem "Não foi possível salvar", e o preenchimento fica',
+    t.includes('Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo.') && !t.includes('Não foi possível salvar') && (await field('Descrição').inputValue()) === 'Farmácia CL-03' && ['80', '80,00'].includes(await field('Valor em reais').inputValue()), t.slice(0, 300));
   ok('CL-03 resultado incerto: a gravação aconteceu (um registro) apesar da resposta perdida', (await cl03Count()) === 1, String(await cl03Count()));
   await shot('CL03_resultado_incerto');
   await btn('Cancelar').click(); await p.waitForTimeout(300);
@@ -8686,7 +8686,7 @@ setInterval(async () => {
   };
   await fillGasto('Padaria CL-19', '12');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar gasto').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Salvar gasto').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm();
   await fillGasto('Padaria CL-19', '12');
   await btn('Salvar gasto').click(); await waitText('Este gasto já tinha sido salvo. Anotar outro igual?');
@@ -8697,7 +8697,7 @@ setInterval(async () => {
   // O que foi excluído depois nunca conta como salvo: o mesmo gasto, na visita seguinte, é gravado de novo, sem aviso.
   await fillGasto('Cinema CL-02', '30');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar gasto').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Salvar gasto').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm();
   await otherDevice(async (repo, contextId) => {
     for (const r of (await repo.listRecords(contextId, '2026-10')).filter((x) => x.description === 'Cinema CL-02')) await repo.deleteRecord(`e2e-excluir-${Date.now()}`, r.id, r.version);
@@ -8712,7 +8712,7 @@ setInterval(async () => {
   // Achado 1: depois de um resultado incerto, na visita seguinte com OUTRO conteúdo, o formulário grava (chave nova), sem chave_reutilizada.
   await fillGasto('Lanche CL-01', '25');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar gasto').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Salvar gasto').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm();
   await fillGasto('Almoço CL-01', '30');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
@@ -8729,7 +8729,7 @@ setInterval(async () => {
   await openToPay();
   await fillConta('Luz CL-01', '90');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar conta a pagar').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Salvar conta a pagar').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm('Contas em aberto com vencimento até o fim do mês');
   await fillConta('Luz CL-01', '90');
   await btn('Salvar conta a pagar').click(); await waitText('Esta conta a pagar já tinha sido salva. Anotar outra igual?'); await p.waitForTimeout(300);
@@ -8743,7 +8743,7 @@ setInterval(async () => {
   await openToPay();
   await fillConta('Gás CL-01', '40');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar conta a pagar').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Salvar conta a pagar').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm('Contas em aberto com vencimento até o fim do mês');
   await fillConta('Chuveiro CL-01', '60');
   await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva'); await p.waitForTimeout(600);
@@ -8758,7 +8758,7 @@ setInterval(async () => {
   await openRow(/^Internet, vence em 15\/10/); await waitText('Já paguei');
   await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Confirmar pagamento').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Confirmar pagamento').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   ok('CL-03 e CL-19 pagamento com resposta perdida: gravou (um gasto) e o texto manda conferir', (await pagamentos()) === 1 && (await body()).includes('Confira em Movimentos antes de anotar de novo.'));
   await leaveForm('Desfazer pagamento');
   await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?');
@@ -8777,7 +8777,7 @@ setInterval(async () => {
   await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(300);
   await fillMeta();
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Criar meta').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Criar meta').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm('Seu plano de guardar');
   await fillMeta();
   await btn('Criar meta').click(); await waitText('Esta meta já tinha sido salva. Criar outra igual?'); await p.waitForTimeout(300);
@@ -12776,10 +12776,10 @@ setInterval(async () => {
   const mcAnnounced = async () => (await evLive()).filter((x) => x.startsWith('Conferência')).join(' | ');
   const mcAnnounced0 = await mcAnnounced();
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Não deu para confirmar se salvou. Toque de novo: repetir é seguro.'); await p.waitForTimeout(400);
+  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Não foi possível confirmar se salvou. Toque de novo: repetir é seguro.'); await p.waitForTimeout(400);
   t = await mcKeep();
-  ok('Mês conferido, resultado incerto: a tela diz "Não deu para confirmar se salvou. Toque de novo: repetir é seguro.", segue mostrando o que leu ("Você conferiu") e não anuncia nada como feito, embora a gravação tenha acontecido (desligada, versão 4)',
-    t.includes('Não deu para confirmar se salvou. Toque de novo: repetir é seguro.') && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') && (await mcAnnounced()) === mcAnnounced0 && !(await mcAnnounced()).includes('Conferência desfeita') && (await mcRow()) === 'off v4', `${await mcRow()} ${JSON.stringify(await evLive())}`);
+  ok('Mês conferido, resultado incerto: a tela diz "Não foi possível confirmar se salvou. Toque de novo: repetir é seguro.", segue mostrando o que leu ("Você conferiu") e não anuncia nada como feito, embora a gravação tenha acontecido (desligada, versão 4)',
+    t.includes('Não foi possível confirmar se salvou. Toque de novo: repetir é seguro.') && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') && (await mcAnnounced()) === mcAnnounced0 && !(await mcAnnounced()).includes('Conferência desfeita') && (await mcRow()) === 'off v4', `${await mcRow()} ${JSON.stringify(await evLive())}`);
   await mcQuiet(async (repo, ctx) => repo.setMonthCheck('e2e-conferi-outro-aparelho', ctx, '2026-09', 'pagamentos', 4));
   ok('Mês conferido, outro aparelho: marcou de novo (versão 5) sem recarregar esta tela, que segue com o botão de desfazer da versão antiga', (await mcRow()) === 'on v5' && (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1);
   await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Algo mudou em outro aparelho. A tela foi atualizada; confira e tente de novo.'); await p.waitForTimeout(500);

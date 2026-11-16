@@ -356,10 +356,10 @@ describe('CL-03 e CL-19: resultado incerto', () => {
     return { repo, ctx: space.personalContextId, accountId: space.accounts[0]!.id };
   }
 
-  it('o texto de resultado incerto manda conferir antes de anotar de novo (antes: "Não foi possível salvar. Seu preenchimento foi mantido. Tente novamente.")', () => {
-    expect(UNCERTAIN_TEXT.movimentos).toBe('Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.');
+  it('o texto de resultado incerto manda conferir antes de anotar de novo (antes: "Não foi possível salvar. Seu preenchimento foi mantido. Tente de novo.")', () => {
+    expect(UNCERTAIN_TEXT.movimentos).toBe('Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo.');
     for (const [area, text] of Object.entries(UNCERTAIN_TEXT)) {
-      expect(text, area).toMatch(/^Não deu para confirmar se salvou\. Confira em [A-Za-zÀ-ú ]+ antes de (anotar|tentar) de novo\.$/);
+      expect(text, area).toMatch(/^Não foi possível confirmar se salvou\. Confira em [A-Za-zÀ-ú ]+ antes de (anotar|tentar) de novo\.$/);
       expect(text, area).not.toMatch(FORBIDDEN);
       expect(text, area).not.toContain('Não foi possível salvar');
     }
@@ -722,7 +722,7 @@ describe('CL-03 e CL-19, segunda rodada: outro conteúdo, entrada idêntica leg�
     repo.checkInvariants();
   });
 
-  it('a tentativa da MESMA visita continua concluindo sozinha: salvar de novo depois de "Não deu para confirmar" mostra como concluído', async () => {
+  it('a tentativa da MESMA visita continua concluindo sozinha: salvar de novo depois de "Não foi possível confirmar" mostra como concluído', async () => {
     const { repo, ctx, accountId } = await conta();
     const slot = newAttemptSlot();
     const keys = slotKeys(slot, (k) => repo.findOperation(k));

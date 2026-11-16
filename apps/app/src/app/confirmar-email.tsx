@@ -41,7 +41,7 @@ export default function ConfirmarEmail() {
       const code = e instanceof AuthError ? e.code : 'desconhecido';
       if (code === 'email_nao_confirmado') {
         setMessage({ tone: 'info', text: `Ainda não identificamos a confirmação. Abra o link enviado para ${email} e tente de novo.` });
-      } else if (code === 'rede') setMessage({ tone: 'erro', text: 'Sem conexão no momento. Tente novamente.' });
+      } else if (code === 'rede') setMessage({ tone: 'erro', text: 'Sem conexão no momento. Tente de novo.' });
       else router.replace('/entrar');
     } finally {
       setChecking(false);
@@ -58,7 +58,7 @@ export default function ConfirmarEmail() {
       setMessage({ tone: 'info', text: 'Enviamos um novo link.' });
     } catch (e) {
       if (e instanceof AuthError && e.code === 'aguarde' && e.retryAfterSeconds) setCooldown(e.retryAfterSeconds);
-      else setMessage({ tone: 'erro', text: 'Não foi possível reenviar agora. Tente novamente em instantes.' });
+      else setMessage({ tone: 'erro', text: 'Não foi possível reenviar agora. Tente de novo em instantes.' });
     } finally {
       setSending(false);
     }

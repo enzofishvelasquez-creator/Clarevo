@@ -347,7 +347,7 @@ const __mods = [
             valor_invalido: 'O valor precisa ser maior que zero. Por exemplo: mercado 52,30',
             valor_acima_do_limite: `O valor passa do limite de ${(0, money_1.formatBRL)(money_1.MAX_RECORD_CENTS)} por registro.`,
             descricao_invalida: 'A descrição ficou longa demais. Escreva em poucas palavras o que foi e o valor, por exemplo: mercado 52,30',
-            erro: `Não deu para anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${legal_1.SUPPORT_EMAIL}.`,
+            erro: `Não foi possível anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${legal_1.SUPPORT_EMAIL}.`,
             ligado: (space, name) => `Pronto, ${w.whoLinked} está ligado à ${name ? `conta de ${name} na ` : ''}Clarevo, no ${spaceLabel(space)}.\n\n${EXAMPLES}\n\n${words}`,
             sem_permissao: (space) => `Você não anota mais no ${spaceLabel(space)}. ${where.relink}`,
         };

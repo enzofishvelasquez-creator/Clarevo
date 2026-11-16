@@ -230,7 +230,7 @@ export const GOAL_IMAGE_TEXT = {
   saved: 'Imagem salva.',
   tooBig: 'A foto ficou grande demais, mesmo reduzida. Escolha outra.',
   invalid: 'Não foi possível ler essa imagem. Escolha uma foto em JPG, PNG ou WebP.',
-  error: 'Não deu para salvar a imagem agora. Tente de novo.',
+  error: 'Não foi possível salvar a imagem agora. Tente de novo.',
   photoAlt: (goal: string) => `Foto escolhida para a meta ${goal}`,
 } as const;
 

@@ -22,6 +22,7 @@ import {
   type InvestmentDetailsField,
   type InvestmentField,
   type InvestmentKind,
+  UNCERTAIN_TEXT,
 } from '@clarevo/core';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -132,7 +133,7 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
         setError('Este investimento mudou em outro aparelho. Volte e abra de novo para ver a versão atual.');
       } else if (code === 'chave_reutilizada') {
         invalidate();
-        setError('Pode ser que já tenha sido salvo. Confira a lista de investimentos antes de tentar de novo.');
+        setError(UNCERTAIN_TEXT.investimentos);
       } else {
         if (code === 'meta_invalida') goalsQ.refetch();
         setError(investmentDetailsErrorText(code) ?? investmentSaveErrorText(code));

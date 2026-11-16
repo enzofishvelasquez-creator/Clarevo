@@ -776,9 +776,9 @@ describe('rowActions, batchEligible, rowPaymentDraft e looseExpenseFor', () => {
   it('códigos de erro e decisão ao concluir', () => {
     expect(returnErrorText('ocorrencia_existente')).toBe('Esta conta já foi registrada, talvez em outro aparelho. A lista foi atualizada.');
     expect(returnErrorText('versao_desatualizada')).toBe('Algo mudou em outro aparelho. A lista foi atualizada; confira e tente de novo.');
-    expect(returnErrorText('mes_invalido')).toBe('Não foi possível salvar. Seu preenchimento foi mantido. Tente novamente.');
+    expect(returnErrorText('mes_invalido')).toBe('Não foi possível salvar. Seu preenchimento foi mantido. Tente de novo.');
     expect(returnErrorText('data_futura')).toBe('Use uma data até hoje. A conta só é marcada como paga depois do pagamento.');
-    expect(returnErrorText('qualquer')).toBe('Não foi possível salvar. Seu preenchimento foi mantido. Tente novamente.');
+    expect(returnErrorText('qualquer')).toBe('Não foi possível salvar. Seu preenchimento foi mantido. Tente de novo.');
     expect(reviewDecision(true)).toBe('atualizou');
     expect(reviewDecision(false)).toBe('seguiu');
     expect(reviewExpectedVersion(state(null))).toBe(0);

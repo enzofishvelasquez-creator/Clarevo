@@ -730,7 +730,7 @@ export const RETURN_TEXT = {
   moveOn: 'Seguir adiante',
   /** Aviso de sucesso depois de "Seguir adiante". */
   movedOn: 'Combinado. Os meses ficam como estão, e você pode anotar datas passadas quando quiser.',
-  decideFailed: 'Não foi possível salvar sua escolha. Tente novamente.',
+  decideFailed: 'Não foi possível salvar sua escolha. Tente de novo.',
   /** Botão da faixa de contas criadas vencidas em /a-pagar enquanto a faixa do retorno estiver ativa. */
   toPayAction: 'Ver resumo dos últimos meses',
 
@@ -790,7 +790,7 @@ export const RETURN_TEXT = {
   noActiveReview: 'Não há revisão dos últimos meses agora.',
   backToSummary: 'Voltar ao Resumo',
   loadFailed: 'Não foi possível carregar o resumo dos últimos meses.',
-  retry: 'Tentar novamente',
+  retry: 'Tentar de novo',
 
   // /retomar/atualizar · passo a passo.
   /** "Mês 1 de 5" */

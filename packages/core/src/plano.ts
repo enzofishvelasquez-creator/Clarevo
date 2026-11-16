@@ -138,7 +138,7 @@ export const ACCESS_TEXT = {
   notOpenYet: 'A assinatura pelo app abre no lançamento. Até lá, nada é cobrado.',
   readOnlyWhat: 'Em só ver e exportar, os seus dados continuam guardados: você vê tudo, exporta e pode excluir a conta, mas não anota nem muda nada.',
   benefitNote: 'Se a sua empresa oferece a Clarevo como benefício, use o link do convite: com o benefício, nada a pagar.',
-  loadFailed: 'Não foi possível carregar a assinatura. Tente novamente.',
+  loadFailed: 'Não foi possível carregar a assinatura. Tente de novo.',
   /** Recusa do banco ao gravar (assinatura_necessaria). */
   refused: 'A sua conta está só para ver e exportar. Para voltar a anotar, abra Conta e toque em Assinatura.',
   bannerAction: 'Ver os planos',

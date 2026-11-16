@@ -1,5 +1,6 @@
 import {
   ERROR_TEXT,
+  UNCERTAIN_TEXT,
   INVESTMENT_NOTE_MAX,
   INVESTMENT_TEXT,
   applyInvestmentChange,
@@ -125,7 +126,7 @@ function MovementForm({
       return;
     }
     if (code === 'versao_desatualizada' || code === 'chave_reutilizada') invalidate();
-    setError(code === 'chave_reutilizada' ? 'Pode ser que já tenha sido salvo. Confira o histórico antes de tentar de novo.' : investmentErrorText(code));
+    setError(code === 'chave_reutilizada' ? UNCERTAIN_TEXT.investimentos : investmentErrorText(code));
   };
 
   async function submit() {
