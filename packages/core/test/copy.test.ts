@@ -1042,7 +1042,7 @@ describe('textos do plano de guardar (spec7)', () => {
  */
 describe('textos de cartões (Ciclo E)', () => {
   it('o aviso da compra e o texto do pagamento parcial, como na especificação', () => {
-    expect(purchaseNotice('2026-11', 'Nubank', DEMO_TODAY)).toBe('Esta compra entra na fatura de novembro do Nubank e conta em Pago quando a fatura for paga.');
+    expect(purchaseNotice('2026-11', 'Nubank', DEMO_TODAY)).toBe('Esta compra entra na fatura de novembro do Nubank e em Pago quando a fatura for paga.');
     expect(partialPaymentText(30_000, '2026-12', DEMO_TODAY)).toBe(
       'Ficaram R$ 300,00 para a fatura de dezembro. Juros e encargos do banco entram quando você informar a fatura de dezembro.',
     );

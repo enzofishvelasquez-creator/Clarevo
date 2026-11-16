@@ -1182,9 +1182,9 @@ export function limitUsedText(usedCents: Cents, limitCents: Cents | null): strin
   return limitCents === null ? `Limite usado: ${formatBRL(usedCents)}` : `Limite usado: ${formatBRL(usedCents)} de ${formatBRL(limitCents)}`;
 }
 
-/** "Esta compra entra na fatura de novembro do Nubank e conta em Pago quando a fatura for paga." */
+/** "Esta compra entra na fatura de novembro do Nubank e em Pago quando a fatura for paga." */
 export function purchaseNotice(invoiceMonth: IsoMonth, cardName: string, today: IsoDate): string {
-  return `Esta compra entra na fatura de ${invoiceMonthLabel(invoiceMonth, today)} do ${cardName} e conta em Pago quando a fatura for paga.`;
+  return `Esta compra entra na fatura de ${invoiceMonthLabel(invoiceMonth, today)} do ${cardName} e em Pago quando a fatura for paga.`;
 }
 
 /** Complemento do aviso nas compras parceladas: "A parcela 1 de 10 entra nessa fatura; as outras 9 entram nas faturas seguintes." */

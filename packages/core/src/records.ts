@@ -117,10 +117,10 @@ export const NEXT_MONTH_TEXT = {
     // No mês de hoje, o mês seguinte ainda não abre no Resumo: a legenda diz quando ele aparece.
     return today !== undefined && own === monthOf(today) ? `${base} ${firstDayLine(next)}` : base;
   },
-  /** Depois de salvar um recebimento que conta num mês que ainda não começou: "Conta no Recebido de novembro de 2026, que aparece no Resumo a partir de 01/11/2026." */
-  futureNotice: (month: IsoMonth): string => `Conta no Recebido de ${formatMonthYearBR(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
-  /** Na linha da lista, depois da data: "Recebido · 30/10/2026 · conta em novembro". */
-  rowNote: (month: IsoMonth): string => `conta em ${formatMonthYearBR(month).replace(/ de \d{4}$/, '')}`,
+  /** Depois de salvar um recebimento que conta num mês que ainda não começou: "Entra no Recebido de novembro de 2026, que aparece no Resumo a partir de 01/11/2026." */
+  futureNotice: (month: IsoMonth): string => `Entra no Recebido de ${formatMonthYearBR(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
+  /** Na linha da lista, depois da data: "Recebido · 30/10/2026 · entra em novembro". */
+  rowNote: (month: IsoMonth): string => `entra em ${formatMonthYearBR(month).replace(/ de \d{4}$/, '')}`,
   /** No detalhe, depois do mês do resumo: "Novembro de 2026 (mês seguinte)". */
   detailSuffix: ' (mês seguinte)',
 } as const;

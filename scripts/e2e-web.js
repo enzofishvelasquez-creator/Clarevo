@@ -867,7 +867,7 @@ setInterval(async () => {
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('A: o freela de 28/09 marcado conta em outubro → 6.150 / 2.250', 'R$ 6.150,00', 'R$ 3.900,00', 'R$ 2.250,00');
   await p.getByRole('tab', { name: 'Movimentos' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
-  const aRow = p.getByRole('button', { name: /^Freela do fim do mês, Recebido · 28\/09\/2026 · conta em outubro/ }).filter({ visible: true });
+  const aRow = p.getByRole('button', { name: /^Freela do fim do mês, Recebido · 28\/09\/2026 · entra em outubro/ }).filter({ visible: true });
   await aRow.first().waitFor({ timeout: 8000 }).catch(() => {});
   ok('A: em Movimentos de outubro, a linha mantém a data e diz "conta em outubro"', (await aRow.count()) === 1);
   await aRow.first().click(); await waitText('Editar registro');
@@ -1111,7 +1111,7 @@ setInterval(async () => {
   const paidNow = (await sectionRows('Pagas')) ?? [];
   const laterPaid = await sectionRows('Próximos meses');
   ok('conta de novembro paga em outubro aparece em Pagas de outubro e sai de Próximos meses',
-    (await p.getByRole('button', { name: /^Seguro do carro, paga em 07\/10, R\$ 300,00, conta em Pago de outubro de 2026/ }).filter({ visible: true }).count()) === 1 &&
+    (await p.getByRole('button', { name: /^Seguro do carro, paga em 07\/10, R\$ 300,00, entra em Pago de outubro de 2026/ }).filter({ visible: true }).count()) === 1 &&
       paidNow.some((r) => /^Seguro do carro, paga em 07\/10/.test(r)) && laterPaid !== null && !laterPaid.some(isSeguro) &&
       JSON.stringify(laterPaid) === laterExpected && t.includes('R$ 650,00'),
     `Próximos meses: ${(laterPaid ?? []).join(' | ')} || Pagas: ${paidNow.join(' | ')}`);
@@ -1239,7 +1239,7 @@ setInterval(async () => {
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('pagar a Escola de novembro hoje → Pago de outubro 4.800, a pagar 650', 'R$ 6.000,00', 'R$ 4.800,00', 'R$ 1.200,00', 'R$ 650,00');
   await openToPay();
-  await openRow(/^Escola, paga em 07\/10, R\$ 900,00, conta em Pago de outubro de 2026, gasto fixo/); await waitText('Desfazer pagamento');
+  await openRow(/^Escola, paga em 07\/10, R\$ 900,00, entra em Pago de outubro de 2026, gasto fixo/); await waitText('Desfazer pagamento');
   await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?');
   await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
@@ -1580,7 +1580,7 @@ setInterval(async () => {
   await openToPay();
   await waitRows('Próximos meses', (rows) => rows !== null && !rows.some((r) => r.startsWith('Seguro residencial')));
   ok('o grupo sai de Próximos meses e a parcela 1 aparece em Pagas', !((await sectionRows('Próximos meses')) ?? ['Seguro residencial']).some((r) => r.startsWith('Seguro residencial')) &&
-    ((await sectionRows('Pagas')) ?? []).some((r) => /^Seguro residencial, paga em 07\/10, R\$ 433,20, conta em Pago de outubro de 2026/.test(r)));
+    ((await sectionRows('Pagas')) ?? []).some((r) => /^Seguro residencial, paga em 07\/10, R\$ 433,20, entra em Pago de outubro de 2026/.test(r)));
   await openRow(/^Seguro residencial, paga em 07\/10/); await waitText('Desfazer pagamento');
   await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?');
   await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito');
@@ -3707,8 +3707,8 @@ setInterval(async () => {
   ok('E compra no cartão com 49 parcelas: "Informe de 1 a 48 parcelas", nada gravado e o formulário continua', (await body()).includes('Informe de 1 a 48 parcelas, com pelo menos R$ 0,01 em cada.') && (await countEntries(exemploId)) === entriesBefore && urlPath() === '/registro/novo', urlPath());
   await field('Em quantas vezes?').fill('3'); await p.waitForTimeout(500);
   t = await body();
-  ok('E aviso da compra: "Esta compra entra na fatura de novembro do Cartão Exemplo e conta em Pago quando a fatura for paga." e "3 parcelas, a primeira de R$ 100,00"',
-    t.includes('Esta compra entra na fatura de novembro do Cartão Exemplo e conta em Pago quando a fatura for paga.') && t.includes('3 parcelas, a primeira de R$ 100,00. As outras 2 entram nas faturas seguintes.') &&
+  ok('E aviso da compra: "Esta compra entra na fatura de novembro do Cartão Exemplo e em Pago quando a fatura for paga." e "3 parcelas, a primeira de R$ 100,00"',
+    t.includes('Esta compra entra na fatura de novembro do Cartão Exemplo e em Pago quando a fatura for paga.') && t.includes('3 parcelas, a primeira de R$ 100,00. As outras 2 entram nas faturas seguintes.') &&
     t.includes('Compra no cartão não entra em Pago agora: ela entra quando a fatura for paga.'), t.split('\n').filter((l) => /fatura/.test(l)).join(' | '));
   await keepText();
   await innerChecks('anotar compra no cartão 390px');
@@ -4047,7 +4047,7 @@ setInterval(async () => {
   await btn('Salvar cartão').click(); await waitText('Compra no cartão · Nubank · final 5678'); await waitText('Esta compra entra na fatura de novembro do Nubank', 12000).catch(() => {}); await p.waitForTimeout(300);
   t = await body();
   ok('E cartão salvo pelo Anotar gasto: volta ao formulário com o Nubank escolhido, a descrição e o valor mantidos, e o aviso da fatura (novembro: hoje é depois do fechamento do dia 3)', (await h1Name()) === 'Anotar gasto' && t.includes('Compra no cartão · Nubank · final 5678') && (await field('Descrição').inputValue()) === 'Mercado do mês' &&
-    t.includes('Esta compra entra na fatura de novembro do Nubank e conta em Pago quando a fatura for paga.') && (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 1, t.slice(0, 400));
+    t.includes('Esta compra entra na fatura de novembro do Nubank e em Pago quando a fatura for paga.') && (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 1, t.slice(0, 400));
   await btn('Anotar compra no cartão').click(); await waitText('Compra anotada na fatura de novembro.'); await waitInvoice('Fatura de novembro'); t = await body();
   ok('E primeira compra no cartão novo: a fatura de novembro do Nubank (R$ 90,00) e o Resumo da conta nova continua sem Pago', (await heroTotal()) === 'R$ 90,00' && t.includes('Nubank') && (await visibleCount('button', 'Mercado do mês · R$ 90,00')) === 1);
   await goTab('Resumo'); await waitText('Diferença do mês'); t = await body();
