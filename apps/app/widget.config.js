@@ -36,6 +36,12 @@ const DESCRIPTION = 'Mostra quanto ainda falta pagar no mês e a próxima conta 
 /** Plugin local: tira os dois pacotes de `expo.autolinking.exclude` no projeto em que o build do widget roda. */
 const AUTOLINKING_PLUGIN = './plugins/with-widget-autolinking';
 
+/**
+ * Plugin local do Android: põe o `androidx.work:work-runtime-ktx` na mesma versão do WorkManager do react-native-android-widget, para a
+ * montagem não parar com classes repetidas (build de 16/11/2026, docs/21_WIDGET_NATIVO.md).
+ */
+const WORK_PLUGIN = './plugins/with-work-runtime';
+
 /** Os plugins do widget, na ordem em que entram no fim de `plugins`. */
 function widgetPlugins() {
   return [
@@ -87,6 +93,7 @@ function widgetPlugins() {
       },
     ],
     AUTOLINKING_PLUGIN,
+    WORK_PLUGIN,
   ];
 }
 
@@ -126,6 +133,7 @@ module.exports = {
   NAMES,
   DESCRIPTION,
   AUTOLINKING_PLUGIN,
+  WORK_PLUGIN,
   widgetEnabled,
   widgetPlugins,
   withWidget,

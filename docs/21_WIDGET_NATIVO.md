@@ -119,6 +119,8 @@ CLAREVO_WIDGET=1 npx expo prebuild --no-install
 
 Atenção: o plugin local tira `expo-widgets` e `react-native-android-widget` de `expo.autolinking.exclude` no `package.json` da pasta em que o prebuild roda. Em cópia temporária isso não importa; se rodar na pasta do repositório, desfaça depois com `git checkout -- apps/app/package.json`.
 
+**Classes repetidas do WorkManager (16/11/2026):** o primeiro build `preview` com o widget ligado (D-093) parou na montagem do Android, em `checkReleaseDuplicateClasses`: `androidx.work.OneTimeWorkRequestKt` e `PeriodicWorkRequestKt` apareciam no `work-runtime` 2.8.1 (do `react-native-android-widget`) e no `work-runtime-ktx` 2.7.1, que outra biblioteca traz por dependência (provavelmente o Glance, que o `expo-widgets` usa no Android; não conferido, porque o registro do build não mostra a árvore). Da 2.8.0 em diante essas classes ficam no `work-runtime`. O plugin local `plugins/with-work-runtime.js`, que entra junto com os do widget, acrescenta ao `android/app/build.gradle` uma restrição de versão do Gradle (`constraints`) que põe o `work-runtime-ktx` na 2.8.1, a mesma do widget; a restrição não traz biblioteca nenhuma. Conferido sem o SDK do Android: o prebuild escreve o bloco uma vez só, o Gradle 8.14 aceita a sintaxe, e num projeto de teste com módulos falsos o `work-runtime-ktx` 2.7.1 passa a 2.8.1. Um teste do núcleo confere que a versão do plugin é a que o `react-native-android-widget` declara: se a biblioteca mudar de versão, o teste avisa. A prova final é o próximo build no EAS.
+
 **Desligar de novo:** não rodar o perfil `preview-widget` (ou tirar a variável). Nada mais a desfazer.
 
 ## 6. O que o widget mostra e o que conferir no aparelho

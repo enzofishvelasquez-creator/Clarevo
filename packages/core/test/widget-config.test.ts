@@ -23,6 +23,7 @@ const widgetConfig = nodeRequire(raiz('apps/app/widget.config.js')) as {
   NAMES: { ios: string; androidSmall: string; androidMedium: string };
   DESCRIPTION: string;
   AUTOLINKING_PLUGIN: string;
+  WORK_PLUGIN: string;
   widgetEnabled: (env?: Record<string, string | undefined>) => boolean;
   widgetPlugins: () => any[];
   withWidget: (config: any, env?: Record<string, string | undefined>) => any;
@@ -81,13 +82,34 @@ describe('widget: desligado por padrão (a configuração de hoje não muda)', (
     expect(rest).toEqual(restOriginal);
     expect(plugins.slice(0, original.length)).toEqual(original);
     const added = plugins.slice(original.length).map((p: unknown) => (Array.isArray(p) ? p[0] : p));
-    expect(added).toEqual(['expo-widgets', 'react-native-android-widget', widgetConfig.AUTOLINKING_PLUGIN]);
+    expect(added).toEqual(['expo-widgets', 'react-native-android-widget', widgetConfig.AUTOLINKING_PLUGIN, widgetConfig.WORK_PLUGIN]);
   });
 
   it('o plugin local existe e é uma função de plugin', () => {
     expect(existsSync(raiz('apps/app/plugins/with-widget-autolinking.js'))).toBe(true);
     expect(widgetConfig.AUTOLINKING_PLUGIN).toBe('./plugins/with-widget-autolinking');
     expect(ler('apps/app/plugins/with-widget-autolinking.js')).toContain('withDangerousMod');
+  });
+
+  // Build preview de 16/11/2026: o work-runtime 2.8.1 do widget e um work-runtime-ktx 2.7.1 de outra biblioteca repetiam classes.
+  it('o plugin do WorkManager põe o work-runtime-ktx na versão do work-runtime do widget, uma vez só', () => {
+    expect(widgetConfig.WORK_PLUGIN).toBe('./plugins/with-work-runtime');
+    const work = nodeRequire(raiz('apps/app/plugins/with-work-runtime.js')) as {
+      WORK_VERSION: string;
+      MARK: string;
+      addWorkConstraint: (contents: string) => string;
+    };
+    const gradle = readFileSync(nodeRequire.resolve('react-native-android-widget/android/build.gradle', { paths: [raiz('apps/app')] }), 'utf8');
+    const declared = [...gradle.matchAll(/androidx\.work:work-runtime:([\d.]+)/g)].map((m) => m[1]);
+    expect(declared).toEqual([work.WORK_VERSION]);
+    const original = 'android {\n}\n\ndependencies {\n    implementation("com.facebook.react:react-android")\n}\n';
+    const once = work.addWorkConstraint(original);
+    expect(once.startsWith(original)).toBe(true);
+    expect(once).toContain(`implementation("androidx.work:work-runtime-ktx:${work.WORK_VERSION}")`);
+    expect(once).toMatch(/dependencies \{\s*constraints \{/);
+    expect(work.addWorkConstraint(once)).toBe(once);
+    expect(once.split(work.MARK).length).toBe(2);
+    expect(ler('apps/app/plugins/with-work-runtime.js')).toContain('withAppBuildGradle');
   });
 });
 
@@ -307,6 +329,7 @@ describe('widget: nada de chave, segredo ou identificador de conta nos arquivos 
     raiz('apps/app/widget.config.js'),
     raiz('apps/app/app.config.js'),
     raiz('apps/app/plugins/with-widget-autolinking.js'),
+    raiz('apps/app/plugins/with-work-runtime.js'),
     raiz('apps/app/metro.config.js'),
     raiz('apps/app/eas.json'),
     raiz('packages/core/src/widget-sync.ts'),
