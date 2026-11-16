@@ -115,7 +115,8 @@ export default function ResumoScreen() {
                   <Txt variant="caption" color={colors.textOnBrandSoft}>
                     {SUMMARY_NAV_TEXT.differenceCaption(month, today)}
                   </Txt>
-                  {s.differenceCents < 0 ? (
+                  {/* Com valores ocultos, o valor aparece sem sinal (R$ ••••): a frase do negativo também some, para não revelar o sinal. */}
+                  {s.differenceCents < 0 && !hidden ? (
                     <Txt variant="caption" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }}>
                       Pagamentos acima dos recebimentos no período
                     </Txt>
