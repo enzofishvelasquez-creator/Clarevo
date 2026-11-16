@@ -474,7 +474,7 @@ export default function ContasVencidas() {
                         ) : null}
                         <Button
                           label={`Não houve em ${group.label}`}
-                          accessibilityLabel={`Não houve ${group.description} em ${yearA11y(group.label)}`}
+                          accessibilityLabel={`Não houve em ${yearA11y(group.label)}, ${group.description}`}
                           tone="ghost"
                           disabled={busy || !yearPlanFor(group)}
                           style={styles.action}

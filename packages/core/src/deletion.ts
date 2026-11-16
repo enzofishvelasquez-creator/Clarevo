@@ -53,7 +53,8 @@ export const DELETE_TEXT = {
   entry: 'Excluir minha conta',
   entryHint: 'Apaga a sua conta e os seus dados. Antes de confirmar, a próxima tela mostra o que é apagado e o que continua.',
   entryButton: 'Ver o que é apagado',
-  entryA11y: 'Excluir minha conta: ver o que é apagado e o que continua',
+  /** O nome acessível começa pelo texto visível do botão (WCAG 2.5.3). */
+  entryA11y: 'Ver o que é apagado ao excluir minha conta e o que continua',
   /** A tela. */
   title: 'Excluir minha conta',
   intro: 'Ao excluir, você perde o acesso na hora e não é possível desfazer. O seu e-mail fica livre para uma conta nova, que começa vazia.',

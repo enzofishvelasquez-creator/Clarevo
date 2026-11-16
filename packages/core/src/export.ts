@@ -66,7 +66,8 @@ export const EXPORT_TEXT = {
   /** Entrada em Conta. */
   entry: 'Exportar meus dados',
   entryHint: 'Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos',
-  entryA11y: 'Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.',
+  /** O nome acessível começa pelo texto visível do botão (WCAG 2.5.3). */
+  entryA11y: 'Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF',
   entryButton: 'Escolher período e formato',
   /** Tela. */
   title: 'Exportar meus dados',

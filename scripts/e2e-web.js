@@ -1768,13 +1768,13 @@ setInterval(async () => {
   await btn('Revisar vencidas').click(); await waitText('Marque o que você já pagou e tire o que não houve.');
   await waitText('Curso de idiomas de 2026/2027 · 2 parcelas vencidas');
   ok('vencidas: grupo de 2026/2027 com título e botões lidos "2026 a 2027"', (await visibleCount('heading', 'Curso de idiomas de 2026 a 2027 · 2 parcelas vencidas')) === 1 &&
-    (await visibleCount('button', 'Selecionar as 2 parcelas de Curso de idiomas de 2026 a 2027')) === 1 && (await visibleCount('button', 'Não houve Curso de idiomas em 2026 a 2027')) === 1);
+    (await visibleCount('button', 'Selecionar as 2 parcelas de Curso de idiomas de 2026 a 2027')) === 1 && (await visibleCount('button', 'Não houve em 2026 a 2027, Curso de idiomas')) === 1);
   await btn('Selecionar as 2 parcelas de Curso de idiomas de 2026 a 2027').click();
   await waitUntil(async () => (await visibleCount('button', 'Selecionadas: as 2 parcelas de Curso de idiomas de 2026 a 2027')) === 1);
   ok('vencidas: depois de selecionar, o nome falado começa por "Selecionadas", como o texto visível', (await visibleCount('button', 'Selecionadas: as 2 parcelas de Curso de idiomas de 2026 a 2027')) === 1 &&
     (await visibleCount('button', 'Marcar como pagas (2)')) === 1);
   await yearNames('vencidas com grupo de 2026/2027');
-  await btn('Não houve Curso de idiomas em 2026 a 2027').click(); await waitText('Tirar as 6 parcelas de 2026/2027 em aberto?');
+  await btn('Não houve em 2026 a 2027, Curso de idiomas').click(); await waitText('Tirar as 6 parcelas de 2026/2027 em aberto?');
   t = await dialogText();
   ok('"Não houve" nas vencidas: as 6 parcelas que saem de fato, o total e as que ainda não venceram', t.includes('Tirar as 6 parcelas de 2026/2027 em aberto?') &&
     t.includes('Curso de idiomas de 2026/2027 · 6 parcelas · R$ 600,00') && t.includes('Inclui 4 parcelas que ainda não venceram.') &&
@@ -7669,7 +7669,7 @@ setInterval(async () => {
   const h3Storage = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
   const h3OpenExport = async () => {
     await goResumo(); await openConta();
-    await btn('Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.').click();
+    await btn('Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF').click();
     await waitText('O que vai no arquivo'); await p.waitForTimeout(400);
   };
   const h3Checked = async () => p.evaluate(() => [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0 && e.getAttribute('aria-checked') === 'true').map((e) => e.textContent));
@@ -7687,13 +7687,13 @@ setInterval(async () => {
   await openConta();
   t = await h3Keep();
   ok('H3 Conta: o bloco "Exportar meus dados" (nível 2) com a legenda e o botão "Escolher período e formato", depois da assinatura e de Privacidade neste aparelho (D-091)',
-    (await headingShown('Exportar meus dados')) && t.includes('Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos') && (await visibleCount('button', 'Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.')) === 1 &&
+    (await headingShown('Exportar meus dados')) && t.includes('Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos') && (await visibleCount('button', 'Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF')) === 1 &&
     t.indexOf('Ver a assinatura') < t.indexOf('Privacidade neste aparelho') && t.indexOf('Privacidade neste aparelho') < t.indexOf('Exportar meus dados'), t.slice(0, 900));
   // D-064: a seção "Privacidade e termos" só existe com o endereço do site (EXPO_PUBLIC_SITE_URL); a demonstração sobe sem ele e não a mostra.
   ok('H3 Conta (D-064): sem EXPO_PUBLIC_SITE_URL (a demonstração), a seção "Privacidade e termos" e os botões de política, termos e "Excluir conta: como funciona" não aparecem, e "Excluir minha conta" continua',
     !(await headingShown('Privacidade e termos')) && !t.includes('Excluir conta: como funciona') && (await visibleCount('button', 'Política de privacidade')) === 0 && (await visibleCount('button', 'Termos de uso')) === 0 && t.includes('Excluir minha conta'));
   await atWidths(async (w) => { await layoutChecks(`H3 Conta com Exportar ${w}px`); if (w === 390) await shot('290_conta_exportar'); });
-  await btn('Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(500);
+  await btn('Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(500);
 
   // ---- 2. A tela: consulta com barra, período (12 meses) e formato (planilha) marcados, avisos à vista ----
   t = await h3Keep();
@@ -7827,7 +7827,7 @@ setInterval(async () => {
 
   // ---- 7. Valores ocultos: o arquivo mostra os valores, com o aviso em destaque ----
   await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
-  await btn('Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(400);
+  await btn('Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(400);
   t = await h3Keep();
   ok('H3 valores ocultos: o aviso "O arquivo mostra os valores, mesmo com Ocultar valores ligado." aparece em destaque e a tela não mostra nenhum valor em reais',
     t.includes('O arquivo mostra os valores, mesmo com Ocultar valores ligado.') && (await moneyLeaks()).length === 0, (await moneyLeaks()).join(' | '));
@@ -12187,7 +12187,7 @@ setInterval(async () => {
   // Os títulos de card (nível 2) da tela, na ordem.
   const delCards = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
   // De Conta para a tela de exclusão.
-  const delOpen = async () => { await famConta(); await btn('Excluir minha conta: ver o que é apagado e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(500); };
+  const delOpen = async () => { await famConta(); await btn('Ver o que é apagado ao excluir minha conta e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(500); };
   const delType = async (text) => { await field('Digite EXCLUIR para confirmar').fill(text); await p.waitForTimeout(250); };
   // "Excluir minha conta" é também o nome do cabeçalho e do título do card de Conta; o botão final é o único botão com este nome na tela.
   const delFinalEnabled = async () => (await visibleCount('button', 'Excluir minha conta')) === 1 && !(await delFinal().isDisabled());
@@ -12201,7 +12201,7 @@ setInterval(async () => {
   ok('Conta: "Excluir minha conta" é o último card, depois de "Sair da conta"', delContaCards[delContaCards.length - 1] === 'Excluir minha conta' && (await visibleCount('button', 'Sair da conta')) === 1, delContaCards.join(' | '));
   t = await body();
   ok('Conta: o card explica e leva à tela ("Ver o que é apagado"), sem apagar nada ali', t.includes('Apaga a sua conta e os seus dados. Antes de confirmar, a próxima tela mostra o que é apagado e o que continua.') &&
-    (await visibleCount('button', 'Excluir minha conta: ver o que é apagado e o que continua')) === 1 && t.indexOf('Você sai só neste aparelho.') < t.indexOf('Apaga a sua conta e os seus dados.'), t.slice(-700));
+    (await visibleCount('button', 'Ver o que é apagado ao excluir minha conta e o que continua')) === 1 && t.indexOf('Você sai só neste aparelho.') < t.indexOf('Apaga a sua conta e os seus dados.'), t.slice(-700));
   // Sem destaque de alerta vermelho: nem o botão, nem o título, nem o card usam a cor de erro (#B42318) nem o fundo de erro.
   const delRed = await p.evaluate(() => {
     const card = [...document.querySelectorAll('[role=heading][aria-level="2"]')].find((e) => e.textContent === 'Excluir minha conta' && e.getBoundingClientRect().width > 0)?.parentElement;
@@ -12214,7 +12214,7 @@ setInterval(async () => {
   await delShots('461_conta_excluir_item', delScroll('Excluir minha conta'));
 
   // ---- 2. A tela: o que é apagado, o que continua, exportar antes e a confirmação digitada ----
-  await btn('Excluir minha conta: ver o que é apagado e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(500);
+  await btn('Ver o que é apagado ao excluir minha conta e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(500);
   t = await body();
   ok('Excluir: título, introdução (perde o acesso na hora, não é possível desfazer, e-mail livre, conta nova vazia) e as duas listas', (await famH1()) === 'Excluir minha conta' &&
     t.includes('Ao excluir, você perde o acesso na hora e não é possível desfazer. O seu e-mail fica livre para uma conta nova, que começa vazia.') && t.includes('O que é apagado') && t.includes('O que continua') &&
