@@ -2,6 +2,7 @@ import {
   ACCOUNTS_TEXT,
   CATEGORIES,
   COMMITMENT_ERROR_TEXT,
+  COMMITMENT_NOTICE_TEXT,
   MAX_RECORD_CENTS,
   NO_CATEGORY_LABEL,
   PAYMENT_ERROR_TEXT,
@@ -221,7 +222,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
     if (first) refs[first].current?.focus();
   };
 
-  const finish = (saved?: { amountCents: number; occurredOn: string }, text = 'Pagamento registrado') => {
+  const finish = (saved?: { amountCents: number; occurredOn: string }, text: string = COMMITMENT_NOTICE_TEXT.paid) => {
     // Confirmação tátil e efeito em Pago só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (saved) totalChange.set({ total: 'pago', month: monthOf(saved.occurredOn), deltaCents: saved.amountCents });
@@ -265,7 +266,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   /** Depois do pagamento confirmado: com a caixa marcada, tira as outras parcelas e mostra o texto certo. */
   const afterPayment = async (saved: { amountCents: number; occurredOn: string } | undefined, plan: WholeYearPayment | null, notice: string | null = null) => {
     if (!plan) {
-      finish(saved, withNotice('Pagamento registrado', notice));
+      finish(saved, withNotice(COMMITMENT_NOTICE_TEXT.paid, notice));
       return;
     }
     finish(saved, withNotice(await skipOthers(plan), notice));

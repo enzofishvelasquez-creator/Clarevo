@@ -4,6 +4,7 @@ import {
   boletoGaps,
   CATEGORIES,
   COMMITMENT_ERROR_TEXT,
+  COMMITMENT_NOTICE_TEXT,
   COMMITMENT_FIELD_ORDER,
   DESCRIPTION_MAX,
   MAX_RECORD_CENTS,
@@ -217,10 +218,10 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     // Confirmação tátil só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (mode.type === 'nova') {
-      flash.set(withNotice('Conta a pagar salva', notice));
+      flash.set(withNotice(COMMITMENT_NOTICE_TEXT.saved, notice));
       leave(() => router.replace(`/a-pagar/${id}`));
     } else {
-      flash.set(withNotice(informValue ? 'Valor da conta informado' : 'Alterações salvas', notice));
+      flash.set(withNotice(informValue ? COMMITMENT_NOTICE_TEXT.valueInformed : COMMITMENT_NOTICE_TEXT.updated, notice));
       leave(() => (router.canGoBack() ? router.back() : router.replace(`/a-pagar/${id}`)));
     }
   };

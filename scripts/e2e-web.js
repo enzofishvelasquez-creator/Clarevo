@@ -752,21 +752,21 @@ setInterval(async () => {
   await shot('11_resumo_apos_gasto');
 
   // Editar para 95
-  await p.getByRole('button', { name: /Café, Pago · 07\/10\/2026/ }).click(); await waitText('Editar registro');
-  await btn('Editar registro').click(); await waitText('Editar gasto');
+  await p.getByRole('button', { name: /Café, Pago · 07\/10\/2026/ }).click(); await waitText('Editar gasto');
+  await btn('Editar gasto').click(); await waitText('Será salvo em');
   await field('Valor em reais').fill('95,00'); await btn('Salvar gasto').click(); await waitText('Alterações salvas');
   ok('edição mantém o mesmo registro', (await body()).includes('R$ 95,00'));
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('editar para 95 → 3.995 / 2.005', 'R$ 6.000,00', 'R$ 3.995,00', 'R$ 2.005,00');
 
   // Excluir: cancelar e depois confirmar
-  await p.getByRole('button', { name: /Café, Pago · 07\/10\/2026/ }).click(); await waitText('Editar registro');
-  await btn('Excluir registro').click(); await waitText('Excluir registro?');
+  await p.getByRole('button', { name: /Café, Pago · 07\/10\/2026/ }).click(); await waitText('Editar gasto');
+  await btn('Excluir gasto').click(); await waitText('Excluir gasto?');
   ok('confirmação de exclusão mostra descrição, valor e contexto', (await body()).includes('Café · R$ 95,00 · Pessoal'));
   await shot('12_confirmar_exclusao');
   await btn('Cancelar').click(); await p.waitForTimeout(300);
-  await btn('Excluir registro').click(); await waitText('Excluir registro?');
-  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registro excluído');
+  await btn('Excluir gasto').click(); await waitText('Excluir gasto?');
+  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir gasto' }).last().click(); await waitText('Gasto excluído');
   ok('excluir volta para a tela de origem com aviso', (await body()).includes('Diferença do mês'));
   await goResumo();
   await expectTotals('excluir gasto → 3.900 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
@@ -828,15 +828,15 @@ setInterval(async () => {
   await expectTotals('criar recebimento 200 → 6.200 / 2.300', 'R$ 6.200,00', 'R$ 3.900,00', 'R$ 2.300,00');
   await p.getByRole('button', { name: /^Recebido, R\$/ }).filter({ visible: true }).first().click(); await waitText('Recebimentos realizados');
   await shot('14_composicao_recebido');
-  await p.getByRole('button', { name: /<b>Freela<\/b>, Recebido/ }).click(); await waitText('Editar registro');
-  await btn('Editar registro').click(); await waitText('Editar recebimento');
+  await p.getByRole('button', { name: /<b>Freela<\/b>, Recebido/ }).click(); await waitText('Editar recebimento');
+  await btn('Editar recebimento').click(); await waitText('Será salvo em');
   await field('Valor em reais').fill('250,00'); await btn('Salvar recebimento').click(); await waitText('Alterações salvas');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('editar recebimento 250 → 6.250 / 2.350', 'R$ 6.250,00', 'R$ 3.900,00', 'R$ 2.350,00');
   await p.getByRole('tab', { name: 'Movimentos' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
-  await p.getByRole('button', { name: /<b>Freela<\/b>, Recebido/ }).click(); await waitText('Editar registro');
-  await btn('Excluir registro').click(); await waitText('Excluir registro?');
-  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registro excluído');
+  await p.getByRole('button', { name: /<b>Freela<\/b>, Recebido/ }).click(); await waitText('Editar recebimento');
+  await btn('Excluir recebimento').click(); await waitText('Excluir recebimento?');
+  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir recebimento' }).last().click(); await waitText('Recebimento excluído');
   await goResumo();
   await expectTotals('excluir recebimento → 6.000 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
 
@@ -860,7 +860,7 @@ setInterval(async () => {
   await shot('616_recebimento_mes_seguinte');
   await btn('Salvar recebimento').click(); await waitText('Recebimento salvo');
   t = await body();
-  ok('A: o detalhe mantém a data (28/09/2026) e diz "Resumo afetado: Outubro de 2026 (mês seguinte)"', t.includes('28/09/2026') && t.includes('Outubro de 2026 (mês seguinte)'));
+  ok('A: o detalhe mantém a data (28/09/2026) e diz "Entra no mês: Outubro de 2026 (mês seguinte)"', t.includes('28/09/2026') && t.includes('Outubro de 2026 (mês seguinte)'));
   ok('A: o mês seguinte (outubro) já começou: sem o aviso de quando ele aparece, e com "Registrar outro recebimento"',
     !t.includes('que aparece no Resumo a partir de') && (await visibleCount('button', 'Registrar outro recebimento')) === 1);
   await shot('617_recebimento_mes_seguinte_detalhe');
@@ -870,8 +870,8 @@ setInterval(async () => {
   const aRow = p.getByRole('button', { name: /^Freela do fim do mês, Recebido · 28\/09\/2026 · entra em outubro/ }).filter({ visible: true });
   await aRow.first().waitFor({ timeout: 8000 }).catch(() => {});
   ok('A: em Movimentos de outubro, a linha mantém a data e diz "conta em outubro"', (await aRow.count()) === 1);
-  await aRow.first().click(); await waitText('Editar registro');
-  await btn('Editar registro').click(); await waitText('Editar recebimento');
+  await aRow.first().click(); await waitText('Editar recebimento');
+  await btn('Editar recebimento').click(); await waitText('Será salvo em');
   ok('A: ao editar, o ajuste vem ligado', (await aSwitch().count()) === 1 && (await aSwitch().first().getAttribute('aria-checked')) === 'true');
   await field('Data do recebimento').fill('15/09/2026'); await p.waitForTimeout(300);
   t = await body();
@@ -880,10 +880,10 @@ setInterval(async () => {
   await field('Data do recebimento').fill('28/09/2026'); await aSwitch().first().waitFor({ timeout: 8000 }).catch(() => {});
   ok('A: de volta a 28/09, o ajuste volta ligado e sem aviso de mudança de mês',
     (await aSwitch().first().getAttribute('aria-checked')) === 'true' && !(await body()).includes('O registro sai de'));
-  await btn('Voltar').click(); await waitText('Editar registro');
-  await btn('Excluir registro').click(); await waitText('Excluir registro?');
+  await btn('Voltar').click(); await waitText('Editar recebimento');
+  await btn('Excluir recebimento').click(); await waitText('Excluir recebimento?');
   ok('A: excluir avisa que o valor deixa de contar no resumo de outubro', (await body()).includes('O valor deixa de contar no resumo de outubro de 2026.'));
-  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registro excluído');
+  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir recebimento' }).last().click(); await waitText('Recebimento excluído');
   await goResumo();
   await expectTotals('A: excluir o freela marcado → 6.000 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
 
@@ -1068,10 +1068,10 @@ setInterval(async () => {
   await expectTotals('pagar Internet 150 → 4.050 / 1.950', 'R$ 6.000,00', 'R$ 4.050,00', 'R$ 1.950,00', 'R$ 630,00');
 
   await p.getByRole('tab', { name: 'Movimentos' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
-  await openRow(/^Internet, Pago · 07\/10\/2026 · conta a pagar/); await waitText('Excluir registro');
-  await btn('Excluir registro').click(); await waitText('Excluir registro?');
+  await openRow(/^Internet, Pago · 07\/10\/2026 · conta a pagar/); await waitText('Excluir gasto');
+  await btn('Excluir gasto').click(); await waitText('Excluir gasto?');
   ok('excluir o gasto avisa que a conta a pagar reabre', (await body()).includes('A conta a pagar ligada a este gasto volta para Ainda a pagar.'));
-  await confirmIn('Excluir registro'); await waitText('Registro excluído');
+  await confirmIn('Excluir gasto'); await waitText('Gasto excluído');
   await goResumo();
   await expectTotals('excluir gasto da conta → a pagar 780', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 780,00');
 
@@ -2354,8 +2354,8 @@ setInterval(async () => {
   t = await body();
   ok('outubro não inclui o gasto de 30/09', t.includes('R$ 3.900,00') && t.includes('R$ 2.100,00'));
   await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026');
-  await p.getByRole('button', { name: /Farmácia, Pago · 30\/09\/2026/ }).click(); await waitText('Editar registro');
-  await btn('Editar registro').click(); await waitText('Editar gasto');
+  await p.getByRole('button', { name: /Farmácia, Pago · 30\/09\/2026/ }).click(); await waitText('Editar gasto');
+  await btn('Editar gasto').click(); await waitText('Será salvo em');
   await field('Data do pagamento').fill('01/10/2026'); await p.waitForTimeout(200);
   ok('aviso de mudança de mês', (await body()).includes('O registro sai de setembro de 2026 e passa a contar em outubro de 2026.'));
   await btn('Salvar gasto').click(); await waitText('Alterações salvas');
@@ -3836,8 +3836,8 @@ setInterval(async () => {
   await goTab('Movimentos'); await waitText('Registrar recebimento'); t = await body();
   ok('E Movimentos: o pagamento aparece como "Fatura Cartão Exemplo (outubro)", "Pago · 07/10/2026 · Pagamento de fatura", R$ 250,00 (as compras no cartão não aparecem)', t.includes('Fatura Cartão Exemplo (outubro)') && t.includes('Pago · 07/10/2026 · Pagamento de fatura') && !t.includes('Fone de ouvido') && !t.includes('Mercado de setembro'));
   await p.getByRole('button', { name: /^Fatura Cartão Exemplo \(outubro\), Pago/ }).filter({ visible: true }).first().click(); await waitText('Abrir fatura'); await p.waitForTimeout(400); t = await body();
-  ok('E detalhe do pagamento de fatura: origem "Pagamento de fatura", "Abrir fatura" e nada de editar, excluir nem tornar gasto fixo (só se muda pela fatura)', t.includes('Pagamento de fatura') && (await visibleCount('button', 'Abrir fatura')) === 1 && (await visibleCount('button', 'Editar registro')) === 0 &&
-    (await visibleCount('button', 'Excluir registro')) === 0 && (await visibleCount('button', 'Tornar gasto fixo')) === 0 && t.includes('Este gasto é o pagamento de uma fatura. Para mudar ou desfazer o pagamento, abra a fatura.'));
+  ok('E detalhe do pagamento de fatura: origem "Pagamento de fatura", "Abrir fatura" e nada de editar, excluir nem tornar gasto fixo (só se muda pela fatura)', t.includes('Pagamento de fatura') && (await visibleCount('button', 'Abrir fatura')) === 1 && (await visibleCount('button', 'Editar gasto')) === 0 &&
+    (await visibleCount('button', 'Excluir gasto')) === 0 && (await visibleCount('button', 'Tornar gasto fixo')) === 0 && t.includes('Este gasto é o pagamento de uma fatura. Para mudar ou desfazer o pagamento, abra a fatura.'));
   await keepText();
   await shot('139_registro_pagamento_de_fatura');
   await btn('Abrir fatura').click(); await waitInvoice('Paga em parte');
@@ -4259,7 +4259,7 @@ setInterval(async () => {
   const savedId = saved[0].id;
   await keepText();
   await shot('154_nota_salva');
-  await btn('Editar registro').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  await btn('Editar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
   ok('N editar o gasto de uma nota: sem a linha "Escanear nota fiscal" (só em gasto novo)', (await visibleCount('button', /^Escanear nota fiscal\./)) === 0 && (await visibleCount('button', 'Salvar gasto')) === 1);
   await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
   await goTabN('Resumo'); await waitText('Diferença do mês');
@@ -5177,9 +5177,9 @@ setInterval(async () => {
   await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(300);
   await checkNoBar('nav barra: anotar gasto');
   await btn('Voltar').click(); await waitText('Diferença do mês');
-  await p.getByRole('button', { name: /^Mercado, / }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Mercado, / }).filter({ visible: true }).first().click(); await waitText('Editar gasto'); await p.waitForTimeout(400);
   await checkBar('nav barra: detalhe de um gasto', 'Resumo');
-  await btn('Editar registro').click(); await waitText('Salvar alterações').catch(() => {}); await p.waitForTimeout(300);
+  await btn('Editar gasto').click(); await waitText('Salvar alterações').catch(() => {}); await p.waitForTimeout(300);
   await checkNoBar('nav barra: editar registro');
   await btn('Voltar').click(); await p.waitForTimeout(300); await navBackTo('Resumo');
   // Renda comprometida, Metas, meta, simulador e explicação.
@@ -6615,10 +6615,10 @@ setInterval(async () => {
   ok('F2 aviso: categoria sem orçamento (Transporte) não leva aviso nenhum', t.includes('Gasto salvo') && !t.includes('orçamento'), t.slice(0, 300));
   // Editar o gasto de R$ 300,00 para R$ 5,00 e de novo para R$ 400,00: o aviso volta só no cruzamento.
   await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: /Feira grande, Pago · / }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await btn('Editar registro').click(); await waitText('Editar gasto');
+  await p.getByRole('button', { name: /Feira grande, Pago · / }).filter({ visible: true }).first().click(); await waitText('Editar gasto'); await btn('Editar gasto').click(); await waitText('Será salvo em');
   await field('Valor em reais').fill('5'); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(400);
   ok('F2 aviso: editar para baixo (R$ 5,00) não leva aviso', !(await body()).includes('passou do orçamento'));
-  await btn('Editar registro').click(); await waitText('Editar gasto');
+  await btn('Editar gasto').click(); await waitText('Será salvo em');
   await field('Valor em reais').fill('400'); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(400);
   t = await body();
   ok('F2 aviso ao editar: de R$ 5,00 para R$ 400,00 cruza de novo (R$ 1.960,00): "Mercado passou do orçamento de outubro em R$ 160,00."', t.includes('Mercado passou do orçamento de outubro em R$ 160,00.'), t.slice(0, 300));
@@ -6963,7 +6963,7 @@ setInterval(async () => {
   t = await g1Keep();
   ok('G1 Detalhe do recebimento: a linha "Entrou em" mostra a Conta principal', t.includes('Entrou em') && (await g1Records('Freela')) === 'Freela|Conta principal|20000', await g1Records('Freela'));
   await goResumo(); await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: /^Padaria, / }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await btn('Editar registro').click(); await waitText('Salvar gasto'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Padaria, / }).filter({ visible: true }).first().click(); await waitText('Editar gasto'); await btn('Editar gasto').click(); await waitText('Salvar gasto'); await p.waitForTimeout(400);
   ok('G1 Editar gasto: "Saiu de" abre na conta do registro (Carteira)', (await g1Group('Saiu de').count()) === 1 && (await g1Checked('Carteira')));
   await radio('Conta principal').click(); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(500);
   ok('G1 Editar gasto: trocar para a Conta principal grava a nova conta', (await g1Records('Padaria')) === 'Padaria|Conta principal|1200', await g1Records('Padaria'));
@@ -7250,7 +7250,7 @@ setInterval(async () => {
 
   // ---- 7. Abrir uma linha: o detalhe do registro e a fatura da compra no cartão ----
   await h1Pick('Período', 'Tudo');
-  await p.getByRole('button', { name: /^Conta de luz, Pago · 05\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: /^Conta de luz, Pago · 05\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Editar gasto'); await p.waitForTimeout(500);
   ok('H1 Abrir uma linha: o detalhe do registro (/registro/...) com a barra de consulta', /^\/registro\/[^/]+$/.test(urlPath()) && (await body()).includes('Conta de luz'));
   await btn('Voltar').click(); await waitText('O que você procura'); await p.waitForTimeout(500);
   ok('H1 Voltar do detalhe: a busca continua como estava (texto "luz" e período Tudo)', (await field('O que você procura').inputValue()) === 'luz' && (await h1Checked('Período', 'Tudo')) && (await body()).includes('8 gastos · R$ 1.087,90 no período'));
@@ -10268,7 +10268,7 @@ setInterval(async () => {
   await field('Descrição').fill('Padaria da casa'); await field('Valor em reais').fill('50');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
   const famRecordPath = famPath();
-  await btn('Editar registro').click(); await waitText('Será salvo em');
+  await btn('Editar gasto').click(); await waitText('Será salvo em');
   ok('Editar o gasto da Família com o seletor em Família: a pílula e o aviso dizem "Família"', famPath() === `${famRecordPath}/editar` && (await body()).includes('Demonstração · Família') && (await body()).includes('Será salvo em Família, Conta principal.'));
   await famBackToResumo(2);
   await famTab('Ver dados de Pessoal').click(); await waitText('Primeiros passos'); await p.waitForTimeout(400);

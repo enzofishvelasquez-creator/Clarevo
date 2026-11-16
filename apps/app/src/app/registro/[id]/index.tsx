@@ -7,6 +7,7 @@ import {
   NOTA_TEXT,
   NO_CATEGORY_LABEL,
   ACCOUNTS_TEXT,
+  RECORD_TEXT,
   accountDisplayName,
   addMonths,
   deviceTimeZone,
@@ -75,7 +76,7 @@ export default function DetalheRegistro() {
   const remove = useDeleteRecord();
   const [notice] = useFlash();
   /** Acabou de salvar (o aviso pode trazer linhas depois da primeira: orçamento, D-089 E; mês seguinte, D-089 A). */
-  const justSaved = notice?.split('\n')[0] === 'Gasto salvo' || notice?.split('\n')[0] === 'Recebimento salvo';
+  const justSaved = notice?.split('\n')[0] === RECORD_TEXT.saved('despesa') || notice?.split('\n')[0] === RECORD_TEXT.saved('receita');
   const [confirming, setConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
@@ -96,7 +97,7 @@ export default function DetalheRegistro() {
       await remove.mutateAsync({ key: deleteKey.current, id: r.id, version: r.version });
       setConfirming(false);
       // Excluir o gasto de uma conta a pagar reabre a conta na mesma operação do banco (D-021, regra 2).
-      flash.set(r.commitmentId ? 'Registro excluído. A conta a pagar voltou para Ainda a pagar.' : 'Registro excluído');
+      flash.set(r.commitmentId ? RECORD_TEXT.removedReopened : RECORD_TEXT.removed(r.kind));
       totalChange.set({ total: r.kind === 'despesa' ? 'pago' : 'recebido', month: recordMonth(r), deltaCents: -r.amountCents });
       toList();
     } catch (e) {
@@ -178,10 +179,10 @@ export default function DetalheRegistro() {
                   />
                   <Row label="Data" value={formatDateBR(r.occurredOn)} />
                   <Row label="Categoria" value={r.category ?? NO_CATEGORY_LABEL} />
-                  {r.invoice ? <Row label="Origem" value={CARDS_TEXT.paymentOrigin} /> : r.commitmentId ? <Row label="Origem" value="Conta a pagar" /> : null}
+                  {r.invoice ? <Row label="Origem" value={CARDS_TEXT.paymentOrigin} /> : r.commitmentId ? <Row label={RECORD_TEXT.linkedTo} value="Conta a pagar" /> : null}
                   {r.receiptKey ? <Row label={NOTA_FLOW_TEXT.detailRow} value={NOTA_FLOW_TEXT.detailRowValue} /> : null}
                   {/* Recebimento marcado do mês seguinte (D-089 A): conta no mês seguinte ao da data. */}
-                  <Row label="Resumo afetado" value={`${formatMonthBR(recordMonth(r))}${r.nextMonth ? NEXT_MONTH_TEXT.detailSuffix : ''}`} last />
+                  <Row label={RECORD_TEXT.monthRow} value={`${formatMonthBR(recordMonth(r))}${r.nextMonth ? NEXT_MONTH_TEXT.detailSuffix : ''}`} last />
                 </View>
                 <View style={styles.trail} accessible>
                   <Txt variant="caption" color={colors.textSecondary}>
@@ -222,7 +223,7 @@ export default function DetalheRegistro() {
                   <Button label={CARDS_TEXT.openInvoice} onPress={() => router.push(invoiceHref(r.invoice!.cardId, r.invoice!.month))} />
                 </>
               ) : (
-                <Button label="Editar registro" icon={Pencil} tone={justSaved ? 'soft' : 'brand'} onPress={() => router.push(`/registro/${r.id}/editar`)} />
+                <Button label={RECORD_TEXT.edit(r.kind)} icon={Pencil} tone={justSaved ? 'soft' : 'brand'} onPress={() => router.push(`/registro/${r.id}/editar`)} />
               )}
               {/* Gasto anotado sem conta a pagar: pode virar um gasto fixo, que começa no próximo vencimento. */}
               {r.kind === 'despesa' && !r.commitmentId && !r.invoice ? (
@@ -241,7 +242,7 @@ export default function DetalheRegistro() {
                   }}
                 />
               )}
-              {r.invoice ? null : <Button label="Excluir registro" icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />}
+              {r.invoice ? null : <Button label={RECORD_TEXT.remove(r.kind)} icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />}
               <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy}>
                 <ShieldCheck size={18} color={colors.textSecondary} />
                 <Txt variant="label" color={colors.textSecondary}>
@@ -251,9 +252,9 @@ export default function DetalheRegistro() {
 
               <ConfirmDialog
                 visible={confirming}
-                title="Excluir registro?"
+                title={RECORD_TEXT.removeTitle(r.kind)}
                 cancelLabel="Cancelar"
-                confirmLabel="Excluir registro"
+                confirmLabel={RECORD_TEXT.remove(r.kind)}
                 busy={remove.isPending}
                 onCancel={() => setConfirming(false)}
                 onConfirm={doDelete}>

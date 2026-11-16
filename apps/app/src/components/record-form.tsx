@@ -21,6 +21,7 @@ import {
   NOTA_PAYMENT_TEXT,
   NOTA_TEXT,
   NO_CATEGORY_LABEL,
+  RECORD_TEXT,
   RETURN_TEXT,
   canReadSefazPage,
   accountForPaymentForms,
@@ -1091,10 +1092,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     if (mode.type === 'novo') {
       // Só quem tem cartão ativo tem o que lembrar: a escolha vale só neste aparelho.
       if (cardMode && userId && activeCards.length > 0) updatePrefs(userId, { lastPayment: 'dinheiro' }, persistPrefs);
-      flash.set(withNotice(kind === 'despesa' ? 'Gasto salvo' : 'Recebimento salvo', notice));
+      flash.set(withNotice(RECORD_TEXT.saved(kind), notice));
       leave(() => router.replace(`/registro/${recordId}`));
     } else {
-      flash.set(withNotice('Alterações salvas', notice));
+      flash.set(withNotice(RECORD_TEXT.updated, notice));
       leave(goBack);
     }
   };

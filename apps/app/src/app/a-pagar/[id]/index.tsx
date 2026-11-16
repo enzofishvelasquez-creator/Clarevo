@@ -2,8 +2,10 @@ import {
   ACCOUNTS_TEXT,
   CALC_UI_TEXT,
   COMMITMENT_ERROR_TEXT,
+  COMMITMENT_NOTICE_TEXT,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
+  RECORD_TEXT,
   accountDisplayName,
   addMonths,
   affectedByYear,
@@ -162,7 +164,7 @@ export default function DetalheContaAPagar() {
       setConfirming(null);
       flash.set(
         !ref
-          ? 'Conta a pagar excluída'
+          ? COMMITMENT_NOTICE_TEXT.deleted
           : annual
             ? annual.k === 1
               ? `Conta de ${annual.label} excluída. A conta do ano continua nos outros anos.`
@@ -197,7 +199,7 @@ export default function DetalheContaAPagar() {
       // Chave nova: um próximo desfazer (depois de pagar de novo) é outra operação.
       undoKey.current = newOperationKey();
       setConfirming(null);
-      setNotice('Pagamento desfeito');
+      setNotice(COMMITMENT_NOTICE_TEXT.undone);
       totalChange.set({ total: 'pago', month: monthOf(paid.paidOn), deltaCents: -paid.amountCents });
     } catch (e) {
       setConfirming(null);
@@ -449,7 +451,7 @@ export default function DetalheContaAPagar() {
                       <Row label={ACCOUNTS_TEXT.out} value={accountDisplayName(allAccounts.data ?? personal?.accounts ?? [], paid.accountId)} />
                     </>
                   ) : null}
-                  <Row label="Resumo afetado" value={affected} last />
+                  <Row label={RECORD_TEXT.monthRow} value={affected} last />
                 </View>
                 <View style={styles.trail} accessible>
                   <Txt variant="caption" color={colors.textSecondary}>
@@ -542,7 +544,7 @@ export default function DetalheContaAPagar() {
               ) : (
                 <>
                   <Button label="Já paguei" icon={Check} onPress={() => router.push(`/a-pagar/${c.id}/pagar`)} />
-                  {notice === 'Conta a pagar salva' ? (
+                  {notice?.split('\n')[0] === COMMITMENT_NOTICE_TEXT.saved ? (
                     <Button label="Anotar outra conta a pagar" icon={Plus} tone="soft" onPress={() => router.replace('/a-pagar/nova')} />
                   ) : null}
                   <Button

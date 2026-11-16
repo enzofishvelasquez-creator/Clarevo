@@ -125,6 +125,25 @@ export const NEXT_MONTH_TEXT = {
   detailSuffix: ' (mês seguinte)',
 } as const;
 
+/**
+ * Detalhe de um gasto ou recebimento e os avisos depois de salvar ou excluir: cada texto diz o que é ("gasto" ou "recebimento"),
+ * nunca "registro". Os avisos terminam em ponto, como os do núcleo.
+ */
+export const RECORD_TEXT = {
+  saved: (kind: RecordKind): string => (kind === 'despesa' ? 'Gasto salvo.' : 'Recebimento salvo.'),
+  updated: 'Alterações salvas.',
+  edit: (kind: RecordKind): string => (kind === 'despesa' ? 'Editar gasto' : 'Editar recebimento'),
+  remove: (kind: RecordKind): string => (kind === 'despesa' ? 'Excluir gasto' : 'Excluir recebimento'),
+  removeTitle: (kind: RecordKind): string => (kind === 'despesa' ? 'Excluir gasto?' : 'Excluir recebimento?'),
+  removed: (kind: RecordKind): string => (kind === 'despesa' ? 'Gasto excluído.' : 'Recebimento excluído.'),
+  /** Excluir o gasto de uma conta a pagar reabre a conta na mesma operação do banco (D-021, regra 2). */
+  removedReopened: 'Gasto excluído. A conta a pagar voltou para Ainda a pagar.',
+  /** Linha do detalhe: o gasto criado ao pagar uma conta a pagar. */
+  linkedTo: 'Ligado a',
+  /** Linha do detalhe: o mês do Resumo em que o valor entra. */
+  monthRow: 'Entra no mês',
+} as const;
+
 /** Conta a pagar (compromisso previsto). Origem separada; só o gasto gerado ao pagar entra em Pago. */
 export interface Commitment {
   id: string;

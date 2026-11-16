@@ -194,6 +194,16 @@ export function quickPayAction(c: Commitment, today: IsoDate): 'pagar' | 'inform
 /** Vencimento curto do nome acessível: "vence hoje" ou "vence 12/10". */
 const dueShort = (dueOn: IsoDate, today: IsoDate) => (dueOn === today ? 'vence hoje' : `vence ${formatListDate(dueOn, today)}`);
 
+/** Avisos depois de salvar, pagar, desfazer ou excluir uma conta a pagar (terminam em ponto, como os do núcleo). */
+export const COMMITMENT_NOTICE_TEXT = {
+  saved: 'Conta a pagar salva.',
+  updated: 'Alterações salvas.',
+  valueInformed: 'Valor da conta informado.',
+  deleted: 'Conta a pagar excluída.',
+  paid: 'Pagamento registrado.',
+  undone: 'Pagamento desfeito.',
+} as const;
+
 /** Textos de "Já paguei" na lista (diálogo e nomes acessíveis). `name` é o nome mostrado na linha. */
 export const QUICK_PAY_TEXT = {
   button: 'Já paguei',
