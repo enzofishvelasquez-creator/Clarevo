@@ -35,12 +35,11 @@ export const PRIVACY_TEXT = {
   lockConfirmPrompt: 'Confirme para pedir biometria ao abrir',
   lockConfirmFailed: 'Não foi possível confirmar. A biometria continua desligada.',
   /** Oferta logo depois de entrar na conta (pedido do Enzo, 16/11/2026), uma vez por pessoa e aparelho. */
-  offerTitle: 'Entrar com a biometria?',
+  offerTitle: 'Pedir biometria ao abrir o app?',
   offerBody:
     'Ao abrir o app, o aparelho pede a digital, o rosto ou a senha do aparelho antes de mostrar os seus dados. Você pode mudar quando quiser em Conta, Privacidade neste aparelho.',
-  offerAccept: 'Usar a biometria',
+  offerAccept: 'Pedir biometria',
   offerDecline: 'Agora não',
-  offerConfirmPrompt: 'Confirme para entrar com a biometria',
   lockTitle: 'Desbloquear o app da Clarevo',
   lockBody: 'Use a biometria ou a senha do aparelho para ver seus dados.',
   unlock: 'Desbloquear',

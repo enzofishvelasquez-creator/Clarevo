@@ -10,14 +10,22 @@ export const PROFILE_PHOTO_MAX_BYTES = 150 * 1024;
 /** Lado da foto quadrada que o app manda. */
 export const PROFILE_PHOTO_SIDE = 512;
 
-/** A foto, como my_photo devolve. */
+/** A foto em si. */
 export interface ProfilePhoto {
   mime: 'image/jpeg' | 'image/png' | 'image/webp';
   base64: string;
-  version: number;
 }
 
-/** O resultado de set_my_photo: se há foto e a versão (0 sem foto), para a próxima troca. */
+/**
+ * O que my_photo devolve: a versão (0 sem foto nunca posta; depois de remover, a versão segue, para uma troca em outro aparelho nunca
+ * voltar a uma versão já vista) e a foto, ou null.
+ */
+export interface ProfilePhotoRead {
+  version: number;
+  photo: ProfilePhoto | null;
+}
+
+/** O resultado de set_my_photo: se há foto e a versão (0 sem linha), para a próxima troca. */
 export interface ProfilePhotoState {
   hasPhoto: boolean;
   version: number;
@@ -49,23 +57,23 @@ export const PROFILE_PHOTO_TEXT = {
   change: 'Trocar a foto',
   fromGallery: 'Escolher da galeria',
   fromCamera: 'Tirar uma foto',
-  remove: 'Tirar a foto',
-  removeTitle: 'Tirar a foto do perfil?',
+  remove: 'Remover a foto',
+  removeTitle: 'Remover a foto do perfil?',
   removeBody: 'O círculo volta a mostrar as suas iniciais.',
-  removeConfirm: 'Tirar a foto',
+  removeConfirm: 'Remover',
   cancel: 'Cancelar',
   choose: 'De onde vem a foto?',
   note: 'Só você vê a sua foto, neste e nos seus outros aparelhos.',
   saving: 'Salvando a foto',
   saved: 'Foto do perfil salva.',
-  removed: 'Foto do perfil retirada.',
+  removed: 'Foto do perfil removida.',
   cameraDenied: 'Sem acesso à câmera. Você pode liberar nas configurações do aparelho ou escolher uma foto da galeria.',
   galleryDenied: 'Sem acesso às fotos. Você pode liberar nas configurações do aparelho.',
   error: {
     foto_grande: 'A foto ficou grande demais, mesmo reduzida. Tente outra.',
     foto_invalida: 'Esta imagem não pode ser usada. Escolha uma foto JPG, PNG ou WebP.',
-    versao_desatualizada: 'A foto mudou em outro aparelho. Confira e tente de novo.',
-    rede: 'Sem conexão. A foto não foi salva; tente de novo.',
+    versao_desatualizada: 'A foto mudou desde que a tela abriu. Confira a foto atual e tente de novo, se precisar.',
+    rede: 'Sem conexão. Confira a foto quando a conexão voltar e tente de novo, se precisar.',
     desconhecido: 'Não foi possível salvar a foto agora. Tente de novo.',
   },
 } as const;

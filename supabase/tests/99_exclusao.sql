@@ -1061,7 +1061,7 @@ begin
       'investments.created_by', 'legal_acceptances.person_id', 'licenses.person_id',
       'month_checks.updated_by', 'organization_admins.person_id', 'person_photos.person_id', 'plan_entitlements.person_id', 'record_operations.actor_id',
       'return_reviews.person_id', 'savings_checks.person_id', 'series_terms.created_by', 'series_terms.superseded_by', 'signup_sources.person_id'],
-    'as chaves estrangeiras para persons são as 47 que a exclusão da conta trata (com o aceite dos termos, 0024, o Checkout do Asaas, 0026, os pagamentos por Pix, 0033, os marcos dos níveis, 0034, e a foto do perfil, 0038, que saem em cascata ou, no ramo anônimo, pelo gatilho persons_forget_anonymous, e os investimentos, 0032, só no Pessoal, que saem com o contexto)';
+    'as chaves estrangeiras para persons são as 47 que a exclusão da conta trata (com o aceite dos termos, 0024, o Checkout do Asaas, 0026, os pagamentos por Pix, 0033, os marcos dos níveis, 0034, e a foto do perfil, 0038, que saem em cascata ou, no ramo anônimo, pelos gatilhos persons_forget_anonymous e persons_photo_cleanup, e os investimentos, 0032, só no Pessoal, que saem com o contexto)';
   -- E as que apontam para financial_contexts (financial_records é restrict: por isso os registros saem antes do contexto).
   assert (select array_agg(c.conrelid::regclass::text || '.' || a.attname || ' ' || c.confdeltype::text order by c.conrelid::regclass::text, a.attname)
             from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]

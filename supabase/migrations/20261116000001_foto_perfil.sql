@@ -3,13 +3,14 @@
 -- mesmas regras de permissão e de exclusão de todo o resto.
 --
 -- Invariantes:
--- P1. Uma linha por pessoa em person_photos, criada na primeira foto e apagada ao tirar a foto. Sem linha, sem foto.
+-- P1. Uma linha por pessoa em person_photos, criada na primeira foto. Remover a foto deixa a linha sem foto (photo e photo_mime nulos),
+--     para a versão seguir crescendo: assim uma troca feita em outro aparelho nunca volta a uma versão já vista. Sem linha, sem foto.
 -- P2. Foto: JPEG, PNG ou WebP (conferido pelos primeiros bytes, não pelo que o app diz), de 1 byte a 150 KB depois de decodificar o base64.
 --     O app reduz antes de mandar (quadrada, 512 px). O tipo gravado é o que os bytes mostram.
 -- P3. Só a própria pessoa lê e escreve a sua foto: nenhuma leitura direta da tabela (RLS sem política, sem privilégio), escrita só por
 --     set_my_photo e leitura só por my_photo, as duas pela sessão (auth.uid()). Ninguém da Família nem da empresa vê a foto.
--- P4. set_my_photo(p_photo, p_expected_version): p_photo em base64 grava ou troca; nulo tira a foto. Versão crescente (1 na primeira foto,
---     +1 a cada troca); o app manda a versão que leu (0 sem foto) e recebe versao_desatualizada (detalhe versao_atual=n) se outra
+-- P4. set_my_photo(p_photo, p_expected_version): p_photo em base64 grava ou troca; nulo remove a foto. Versão crescente (1 na primeira
+--     foto, +1 a cada troca ou remoção, nunca volta); o app manda a versão que leu (0 sem linha) e recebe versao_desatualizada (detalhe versao_atual=n) se outra
 --     escrita passou na frente. Repetir o mesmo pedido depois de uma falha de rede devolve versao_desatualizada com a versão nova, e o
 --     app lê de novo: nada fica gravado duas vezes. Não passa por record_operations (não é registro financeiro nem anotação, D-030), e
 --     a conta excluída não grava (a pessoa já não existe ou está anônima).
@@ -23,10 +24,11 @@
 -- ---------------------------------------------------------------------------
 create table public.person_photos (
   person_id uuid primary key references public.persons (id) on delete cascade,
-  photo bytea not null check (octet_length(photo) between 1 and 153600),
-  photo_mime text not null check (photo_mime in ('image/jpeg', 'image/png', 'image/webp')),
+  photo bytea check (octet_length(photo) between 1 and 153600),
+  photo_mime text check (photo_mime in ('image/jpeg', 'image/png', 'image/webp')),
   version integer not null default 1 check (version >= 1),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint person_photos_tipo check ((photo is null) = (photo_mime is null))
 );
 comment on table public.person_photos is
   'Foto do perfil (0038): uma linha por pessoa, só para ela. Escrita só por set_my_photo; leitura só por my_photo. Sai com a conta.';
@@ -50,7 +52,7 @@ create trigger persons_photo_cleanup
   when (new.deleted_at is not null and old.deleted_at is null)
   execute function public.clarevo_person_photo_cleanup();
 
--- Resultado de set_my_photo: {has_photo, version, updated_at}; sem foto, versão 0.
+-- Resultado de set_my_photo: {has_photo, version, updated_at}; sem linha, versão 0.
 create or replace function public.clarevo_person_photo_json(p_person uuid)
 returns jsonb
 language sql
@@ -59,14 +61,14 @@ security definer
 set search_path = public
 as $$
   select coalesce(
-    (select jsonb_build_object('has_photo', true, 'version', p.version, 'updated_at', p.updated_at)
+    (select jsonb_build_object('has_photo', p.photo is not null, 'version', p.version, 'updated_at', p.updated_at)
        from public.person_photos p where p.person_id = p_person),
     jsonb_build_object('has_photo', false, 'version', 0, 'updated_at', null));
 $$;
 
 -- Pôr, trocar ou tirar a foto do perfil (P2 a P4). Ordem: sessão; pessoa (conta excluída: nao_encontrado); foto_invalida (base64 que
 -- não decodifica, vazia ou de outro tipo); foto_grande (mais de 150 KB); trava da pessoa; versao_desatualizada (detalhe versao_atual=n;
--- 0 sem foto); escrita.
+-- 0 sem linha); escrita.
 create or replace function public.set_my_photo(p_photo text, p_expected_version integer)
 returns jsonb
 language plpgsql
@@ -118,11 +120,13 @@ begin
     raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || coalesce(v_current, 0);
   end if;
 
-  if p_photo is null then
-    delete from public.person_photos where person_id = v_uid;
-  elsif v_current is null then
-    insert into public.person_photos (person_id, photo, photo_mime) values (v_uid, v_bytes, v_mime);
+  if v_current is null then
+    -- Sem linha: remover não tem o que fazer; a primeira foto cria a linha na versão 1.
+    if p_photo is not null then
+      insert into public.person_photos (person_id, photo, photo_mime) values (v_uid, v_bytes, v_mime);
+    end if;
   else
+    -- Trocar ou remover (v_bytes nulo): a linha fica, e a versão sobe.
     update public.person_photos
        set photo = v_bytes, photo_mime = v_mime, version = version + 1, updated_at = now()
      where person_id = v_uid;
@@ -132,7 +136,8 @@ begin
 end;
 $$;
 
--- A foto do perfil de quem está na sessão: {mime, base64, version}, ou null sem foto. Só leitura.
+-- A foto do perfil de quem está na sessão: {mime, base64, version}, com mime e base64 nulos depois de remover a foto, ou null sem linha.
+-- Só leitura.
 create or replace function public.my_photo()
 returns jsonb
 language sql
@@ -140,7 +145,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select jsonb_build_object('mime', p.photo_mime, 'base64', encode(p.photo, 'base64'), 'version', p.version)
+  select jsonb_build_object('mime', p.photo_mime, 'base64', case when p.photo is null then null else encode(p.photo, 'base64') end, 'version', p.version)
     from public.person_photos p
     join public.persons s on s.id = p.person_id and s.deleted_at is null
    where p.person_id = auth.uid();

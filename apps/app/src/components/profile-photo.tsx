@@ -1,7 +1,7 @@
 import { PROFILE_PHOTO_TEXT as T, initialsOf, isRepoError, profilePhotoErrorText, profilePhotoUri } from '@clarevo/core';
 import { ImagePlus, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Image, View } from 'react-native';
+import { Image, Platform, View } from 'react-native';
 
 import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
@@ -30,8 +30,8 @@ export function ProfileAvatar({
   const { user } = useSession();
   const photo = useMyPhoto();
   const round = { width: size, height: size, borderRadius: size / 2 };
-  if (photo.data) {
-    return <Image source={{ uri: profilePhotoUri(photo.data) }} style={[round, { backgroundColor: background }]} aria-hidden accessibilityIgnoresInvertColors />;
+  if (photo.data?.photo) {
+    return <Image source={{ uri: profilePhotoUri(photo.data.photo) }} style={[round, { backgroundColor: background }]} aria-hidden accessibilityIgnoresInvertColors />;
   }
   return (
     <View style={[round, { alignItems: 'center', justifyContent: 'center', backgroundColor: background }]} aria-hidden>
@@ -53,12 +53,17 @@ export function ProfilePhotoActions() {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
-  const has = Boolean(photo.data);
+  const has = Boolean(photo.data?.photo);
+  // A versão que o app leu: sem a leitura (carregando ou falhou), os botões ficam parados, para não mandar uma versão errada.
   const version = photo.data?.version ?? 0;
+  const ready = photo.data !== undefined;
 
   async function choose(source: PhotoSource) {
+    const fromDialog = choosing;
     setChoosing(false);
     setMessage(null);
+    // No iPhone, o seletor do sistema só abre depois que o diálogo terminou de fechar (como a folha de ler documento, docs/04).
+    if (fromDialog && Platform.OS === 'ios') await new Promise((resolve) => setTimeout(resolve, 450));
     const picked = await pickProfilePhoto(source);
     if (!picked.ok) {
       if (picked.reason === 'cancelado') return;
@@ -97,7 +102,7 @@ export function ProfilePhotoActions() {
         <LinkButton
           label={busy ? T.saving : has ? T.change : T.add}
           icon={ImagePlus}
-          disabled={busy || photo.isPending}
+          disabled={busy || !ready}
           onPress={() => (CAMERA_AVAILABLE ? setChoosing(true) : void choose('galeria'))}
           style={{ paddingHorizontal: 0 }}
         />

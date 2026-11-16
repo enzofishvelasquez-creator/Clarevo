@@ -62,7 +62,7 @@ Tudo o que está nesta lista é digitado, importado ou confirmado por você. A C
 - Cartões de crédito: apelido (até 30 caracteres), os 4 últimos dígitos (opcional), os dias de fechamento e de vencimento e o limite (opcional). Também as compras, as parcelas, os encargos, os estornos e os pagamentos de fatura.
 - Metas, aportes e resgates, os investimentos que você registra (o nome que você escolhe, o tipo e, se você preencher, o tipo exato, o nome da instituição, como rende, a taxa, o vencimento e quando pode resgatar; os aportes, os resgates, os rendimentos recebidos com o tipo de cada um e os valores do extrato), a resposta do plano de guardar, a renda de referência, o orçamento por categoria, o limite pessoal de comprometimento e as assinaturas que você marca.
 - A imagem de cada meta, se você escolher: uma das imagens sugeridas pela Clarevo ou uma foto sua. A foto é reduzida no seu aparelho antes de enviar (até 300 KB), fica guardada com a meta, só para quem vê a meta (na Família, todas as pessoas do espaço), e é apagada quando você troca a imagem, exclui a meta ou exclui a conta. Escolha uma foto que você pode compartilhar; evite fotos com documentos ou com outras pessoas que não querem aparecer.
-- A foto do seu perfil, se você quiser pôr uma, escolhida na galeria ou tirada com a câmera. Ela é recortada quadrada e reduzida no seu aparelho antes de enviar (até 150 KB), fica guardada só para você (ninguém da Família nem da empresa vê) e é apagada quando você tira a foto ou exclui a conta.
+- A foto do seu perfil, se você quiser pôr uma, escolhida na galeria ou tirada com a câmera. Ela é recortada quadrada e reduzida no seu aparelho antes de enviar (até 150 KB), fica guardada só para você (ninguém da Família nem da empresa vê) e é apagada quando você remove a foto ou exclui a conta.
 - Marcas que você faz, como "Conferi este mês" e as escolhas da revisão dos últimos meses.
 - A data da sua última anotação, usada só para oferecer a revisão depois de um tempo sem anotar. Só você lê essa data.
 - Um resumo matemático (SHA-256), calculado no seu aparelho, da chave da nota fiscal e de cada linha de extrato ou fatura importada. Ele serve para avisar quando a mesma nota ou linha aparece de novo. Não guardamos a chave da nota nem o texto do extrato.
@@ -180,7 +180,7 @@ A conta tem um nível (Bronze, Prata, Ouro ou Diamante) pelo quanto você já us
 - Os arquivos que você escolhe ler: PDF de nota, PDF ou imagem de comprovante, holerite, nota de serviço e boleto, extrato e fatura em PDF, OFX ou planilha.
 - O código de um boleto. O app lê dele só o valor e o vencimento para a conta a pagar, e não guarda o código.
 - Saldo por conta.
-- Biometria, localização, contatos, microfone e identificador de publicidade. Da galeria e da câmera, só a foto que você mesmo escolher para uma meta ou para o seu perfil (seção 3.2).
+- Biometria, localização, contatos, microfone e identificador de publicidade. Da galeria, só a foto que você escolher para uma meta ou para o seu perfil; da câmera, só a foto que você tirar para o seu perfil (seção 3.2).
 - O texto das mensagens do Telegram, o seu nome e o seu usuário no Telegram. Da conta, guardamos só um resumo do identificador feito com chave secreta (seção 3.8).
 
 O que você confirma com "Salvar" vira registro e é guardado como descrito na seção 3. Se a descrição de um gasto trouxer o nome de outra pessoa (por exemplo, o nome que veio de um comprovante), esse nome fica guardado como parte da descrição.

@@ -3,6 +3,8 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
+import { deleteCacheFile } from '@/lib/image-pick';
+
 export type PhotoSource = 'galeria' | 'camera';
 export type PickedProfilePhoto = { ok: true; base64: string } | { ok: false; reason: 'cancelado' | 'sem_permissao' | 'foto_grande' | 'falha' };
 
@@ -12,9 +14,11 @@ export const CAMERA_AVAILABLE = Platform.OS !== 'web';
 /**
  * Foto do perfil (pedido do Enzo, 16/11/2026): pela galeria (o seletor do sistema; só a foto escolhida chega ao app) ou pela câmera, com
  * o recorte quadrado do sistema quando o aparelho oferece. O app corta no centro o que sobrar, reduz para 512 × 512 px em JPEG e manda;
- * se passar de 150 KB, tenta com mais compressão. Nada fica guardado no aparelho.
+ * se passar de 150 KB, tenta com mais compressão. As cópias que o seletor, o recorte e a compressão deixam no cache do app são apagadas
+ * logo depois (como em lib/image-pick.ts): só a foto enviada fica, no banco.
  */
 export async function pickProfilePhoto(source: PhotoSource): Promise<PickedProfilePhoto> {
+  const copies: string[] = [];
   try {
     if (source === 'camera') {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -24,6 +28,7 @@ export async function pickProfilePhoto(source: PhotoSource): Promise<PickedProfi
     const res = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     const asset = res.canceled ? null : res.assets[0];
     if (!asset) return { ok: false, reason: 'cancelado' };
+    copies.push(asset.uri);
     const ctx = ImageManipulator.manipulate(asset.uri);
     const w = asset.width ?? 0;
     const h = asset.height ?? 0;
@@ -36,11 +41,14 @@ export async function pickProfilePhoto(source: PhotoSource): Promise<PickedProfi
     const image = await ctx.renderAsync();
     for (const compress of [0.8, 0.6, 0.4]) {
       const out = await image.saveAsync({ compress, format: SaveFormat.JPEG, base64: true });
+      if (out.uri) copies.push(out.uri);
       const b64 = (out.base64 ?? '').replace(/^data:[^,]*,/, '');
       if (b64 && base64Bytes(b64) <= PROFILE_PHOTO_MAX_BYTES) return { ok: true, base64: b64 };
     }
     return { ok: false, reason: 'foto_grande' };
   } catch {
     return { ok: false, reason: 'falha' };
+  } finally {
+    for (const uri of copies) void deleteCacheFile(uri);
   }
 }

@@ -277,6 +277,10 @@ function NativeFeatures() {
   }, []);
   useEffect(() => {
     if (ready && !userId) sawSignedOut.current = true;
+    // Outra pessoa ou sessão encerrada: a oferta de antes não vale mais (a sessão pode cair com o diálogo aberto).
+    setBioOffer(false);
+    setBioMsg(null);
+    if (!userId) bioChecked.current = null;
   }, [ready, userId]);
   useEffect(() => {
     if (demo || !userId || !prefs || !sawSignedOut.current || bioChecked.current === userId) return;
@@ -297,7 +301,11 @@ function NativeFeatures() {
   }, [demo, userId, prefs, status, locked, legalPending]);
 
   const answerBioOffer = async (accept: boolean) => {
-    if (!userId || bioBusy) return;
+    if (bioBusy) return;
+    if (!userId) {
+      setBioOffer(false);
+      return;
+    }
     setBioMsg(null);
     if (!accept) {
       updatePrefs(userId, { biometricOffered: true }, persist);
@@ -305,7 +313,7 @@ function NativeFeatures() {
       return;
     }
     setBioBusy(true);
-    const r = await authenticate(PRIVACY_TEXT.offerConfirmPrompt);
+    const r = await authenticate(PRIVACY_TEXT.lockConfirmPrompt);
     setBioBusy(false);
     if (r === 'ok') {
       updatePrefs(userId, { biometricOffered: true, biometricLock: true }, persist);
@@ -335,7 +343,7 @@ function NativeFeatures() {
         <Txt color={colors.textSecondary}>{offer === 'negada' ? REMINDER_TEXT.denied : offerCaption(prefs?.reminderHour)}</Txt>
       </ConfirmDialog>
       <ConfirmDialog
-        visible={bioOffer && !locked && offer === null}
+        visible={bioOffer && Boolean(userId) && !locked && offer === null}
         title={PRIVACY_TEXT.offerTitle}
         cancelLabel={PRIVACY_TEXT.offerDecline}
         confirmLabel={PRIVACY_TEXT.offerAccept}

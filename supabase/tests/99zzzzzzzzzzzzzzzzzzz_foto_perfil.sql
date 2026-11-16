@@ -1,6 +1,6 @@
 -- Foto do perfil (pedido do Enzo, 16/11/2026; migração 0038): person_photos, set_my_photo e my_photo. Confere: pôr uma foto (JPEG, PNG
 -- ou WebP pelos primeiros bytes; até 150 KB), trocar, tirar; versão crescente e versao_desatualizada; só a própria pessoa lê (nem a
--- Família); sem leitura direta da tabela; a conta excluída perde a foto (cascata e pessoa anônima) e não grava; privilégios.
+-- Família); remover deixa a linha sem foto e a versão segue; sem leitura direta da tabela; a conta excluída perde a foto (cascata e pessoa anônima) e não grava; privilégios.
 -- Pessoas FICTÍCIAS: Ana (Pessoal e Família), Bia (na Família da Ana). Tudo em uma transação desfeita no fim.
 \set ON_ERROR_STOP 1
 \set ana '''00000000-0000-0000-0000-0000000000f1'''
@@ -34,8 +34,8 @@ create function pg_temp.sp(p_photo text, p_version integer) returns text languag
   select format('select public.set_my_photo(%L, %L)', p_photo, p_version)
 $$;
 create function pg_temp.row_of(p_name text) returns text language sql security definer set search_path = public, pg_temp as $$
-  select coalesce((select format('%s|%s|%s', photo_mime, octet_length(photo), version) from public.person_photos
-                    where person_id = pg_temp.id(p_name)), 'sem linha')
+  select coalesce((select case when photo is null then format('sem foto|%s', version) else format('%s|%s|%s', photo_mime, octet_length(photo), version) end
+                     from public.person_photos where person_id = pg_temp.id(p_name)), 'sem linha')
 $$;
 
 insert into ids values ('ana', :ana), ('bia', :bia);
@@ -127,15 +127,22 @@ begin
   perform pg_temp.as_('ana');
   assert (public.my_photo() ->> 'version')::int = 4, 'a da Ana continua';
 
-  -- Tirar: some a linha; tirar de novo (versão 0) não falha.
+  -- Remover: a foto sai, a linha fica e a versão sobe (outro aparelho com a versão 4 não sobrescreve sem ler de novo).
   r := public.set_my_photo(null, 4);
-  assert r = jsonb_build_object('has_photo', false, 'version', 0, 'updated_at', null), 'tirar: ' || r::text;
-  assert public.my_photo() is null and pg_temp.row_of('ana') = 'sem linha', 'sem foto';
-  r := public.set_my_photo(null, 0);
-  assert (r ->> 'version')::int = 0, 'tirar de novo';
-  -- Pôr de novo recomeça em 1.
-  r := public.set_my_photo(pg_temp.b64('ffd8ffe0'), 0);
-  assert (r ->> 'version')::int = 1, 'recomeça em 1';
+  assert r ->> 'has_photo' = 'false' and (r ->> 'version')::int = 5 and r ->> 'updated_at' is not null, 'remover: ' || r::text;
+  assert public.my_photo() = jsonb_build_object('mime', null, 'base64', null, 'version', 5), 'sem foto, com versão: ' || public.my_photo()::text;
+  assert pg_temp.row_of('ana') = 'sem foto|5', 'a linha sem foto: ' || pg_temp.row_of('ana');
+  perform pg_temp.expect_code(pg_temp.sp(pg_temp.b64('ffd8ffe0'), 4), 'versao_desatualizada', 'PT409', 'versao_atual=5');
+  perform pg_temp.expect_code(pg_temp.sp(pg_temp.b64('ffd8ffe0'), 0), 'versao_desatualizada', 'PT409', 'versao_atual=5');
+  -- Pôr de novo segue a versão.
+  r := public.set_my_photo(pg_temp.b64('ffd8ffe0'), 5);
+  assert (r ->> 'version')::int = 6 and r ->> 'has_photo' = 'true', 'segue em 6';
+  -- Quem nunca pôs foto: remover não cria linha.
+  perform pg_temp.as_('bia');
+  r := public.set_my_photo(null, 1);
+  assert (r ->> 'version')::int = 2 and r ->> 'has_photo' = 'false', 'Bia remove a dela';
+  r := public.set_my_photo(pg_temp.b64('ffd8ffe1'), 2);
+  assert (r ->> 'version')::int = 3, 'Bia põe de novo';
 end $$;
 reset role;
 
@@ -143,7 +150,7 @@ reset role;
 -- 3. Conta excluída: a pessoa anônima perde a foto na hora e não grava; a linha de persons que sai leva a foto junto.
 -- ---------------------------------------------------------------------------
 do $$ begin
-  assert pg_temp.row_of('bia') = 'image/jpeg|4|1', 'Bia tem foto';
+  assert pg_temp.row_of('bia') = 'image/jpeg|4|3', 'Bia tem foto';
   update public.persons set display_name = '', deleted_at = now() where id = pg_temp.id('bia');
   assert pg_temp.row_of('bia') = 'sem linha', 'a pessoa anônima perde a foto';
 end $$;
@@ -155,7 +162,7 @@ do $$ begin
 end $$;
 reset role;
 do $$ begin
-  assert pg_temp.row_of('ana') = 'image/jpeg|4|1', 'Ana tem foto';
+  assert pg_temp.row_of('ana') = 'image/jpeg|4|6', 'Ana tem foto';
   delete from public.context_memberships where person_id = pg_temp.id('ana');
   delete from public.persons where id = pg_temp.id('ana');
   assert pg_temp.row_of('ana') = 'sem linha', 'a foto sai com a pessoa';

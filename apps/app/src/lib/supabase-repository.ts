@@ -128,6 +128,7 @@ import {
   type GoalImage,
   type GoalImageChoice,
   type ProfilePhoto,
+  type ProfilePhotoRead,
   type ProfilePhotoState,
   type GoalOrderWrite,
   INVESTMENT_KINDS,
@@ -2582,19 +2583,20 @@ export class SupabaseRepository implements RecordsRepository {
     return { mime: d.mime, base64: d.base64.replace(/\s+/g, ''), version: whole(d.version) };
   }
 
-  /** A foto do perfil pela função my_photo (0038): só a da própria pessoa; sem foto, null. */
-  async getMyPhoto(): Promise<ProfilePhoto | null> {
+  /** A foto do perfil pela função my_photo (0038): só a da própria pessoa; a versão segue depois de remover; sem linha, versão 0. */
+  async getMyPhoto(): Promise<ProfilePhotoRead> {
     const { data, error } = await this.db.rpc('my_photo');
     if (error) throw repoError(error);
-    if (data === null || data === undefined) return null;
+    if (data === null || data === undefined) return { version: 0, photo: null };
     const d = data as { mime?: unknown; base64?: unknown; version?: unknown };
+    if (d.mime === null && d.base64 === null) return { version: whole(d.version), photo: null };
     if (typeof d.mime !== 'string' || !/^image\/(jpeg|png|webp)$/.test(d.mime) || typeof d.base64 !== 'string') {
       throw new RepoError('desconhecido', 'foto_inconsistente');
     }
-    return { mime: d.mime as ProfilePhoto['mime'], base64: d.base64.replace(/\s+/g, ''), version: whole(d.version) };
+    return { version: whole(d.version), photo: { mime: d.mime as ProfilePhoto['mime'], base64: d.base64.replace(/\s+/g, '') } };
   }
 
-  /** set_my_photo (0038): base64 põe ou troca; null tira. */
+  /** set_my_photo (0038): base64 põe ou troca; null remove. */
   async setMyPhoto(base64: string | null, expectedVersion: number): Promise<ProfilePhotoState> {
     const { data, error } = await this.db.rpc('set_my_photo', { p_photo: base64, p_expected_version: expectedVersion });
     if (error) throw repoError(error);

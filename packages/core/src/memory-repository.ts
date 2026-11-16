@@ -180,7 +180,7 @@ import { savingsAnswerError, savingsAskAgainOn } from './savings';
 import { signupSourceError, type SignupSource, type SignupSourceOption } from './signup-source';
 import { WHATSAPP_CODE_ALPHABET, WHATSAPP_CODE_LENGTH } from './whatsapp/mensagem';
 import { GOAL_PHOTO_MAX_BYTES, base64Bytes, goalPhotoMime, type GoalImage, type GoalImageChoice } from './goal-images';
-import { PROFILE_PHOTO_MAX_BYTES, type ProfilePhoto, type ProfilePhotoState } from './profile-photo';
+import { PROFILE_PHOTO_MAX_BYTES, type ProfilePhoto, type ProfilePhotoRead, type ProfilePhotoState } from './profile-photo';
 import { WHATSAPP_CODE_MINUTES } from './whatsapp/respostas';
 import type { ChatCode, ChatLinkState } from './whatsapp/app';
 import type { ChatChannel } from './whatsapp/respostas';
@@ -5014,12 +5014,12 @@ export class MemoryRepository implements RecordsRepository {
     return this.read(() => this.company.myBenefit(this.opts.actorId));
   }
 
-  /** Foto do perfil (person_photos, 0038): só a da pessoa desta memória. */
-  private myPhoto: { mime: ProfilePhoto['mime']; base64: string; version: number; updatedAt: string } | null = null;
+  /** Foto do perfil (person_photos, 0038): só a da pessoa desta memória; a versão segue depois de remover. */
+  private myPhoto: { photo: ProfilePhoto | null; version: number; updatedAt: string } | null = null;
 
   /** Como my_photo. */
-  async getMyPhoto(): Promise<ProfilePhoto | null> {
-    return this.read(() => (this.myPhoto ? { mime: this.myPhoto.mime, base64: this.myPhoto.base64, version: this.myPhoto.version } : null));
+  async getMyPhoto(): Promise<ProfilePhotoRead> {
+    return this.read(() => (this.myPhoto ? { version: this.myPhoto.version, photo: this.myPhoto.photo ? { ...this.myPhoto.photo } : null } : { version: 0, photo: null }));
   }
 
   /** Como set_my_photo. Ordem: foto_invalida; foto_grande; versão (detalhe versao_atual=n). Não passa por operação. */
@@ -5036,12 +5036,11 @@ export class MemoryRepository implements RecordsRepository {
       if (!Number.isSafeInteger(expectedVersion) || expectedVersion !== current) {
         throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current}`);
       }
-      if (photo === null || mime === null) {
-        this.myPhoto = null;
-        return { hasPhoto: false, version: 0, updatedAt: null };
-      }
-      this.myPhoto = { mime, base64: photo, version: current + 1, updatedAt: this.stamp() };
-      return { hasPhoto: true, version: this.myPhoto.version, updatedAt: this.myPhoto.updatedAt };
+      const next = photo !== null && mime !== null ? { mime, base64: photo } : null;
+      // Sem linha, remover não faz nada; com linha, a versão sobe também ao remover.
+      if (!this.myPhoto && !next) return { hasPhoto: false, version: 0, updatedAt: null };
+      this.myPhoto = { photo: next, version: current + 1, updatedAt: this.stamp() };
+      return { hasPhoto: next !== null, version: this.myPhoto.version, updatedAt: this.myPhoto.updatedAt };
     });
   }
 

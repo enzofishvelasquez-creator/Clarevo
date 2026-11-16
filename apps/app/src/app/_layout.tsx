@@ -227,6 +227,11 @@ function Navigation() {
     };
   }, []);
 
+  // Sem sessão, o link do widget não espera um login futuro (o widget sem sessão abre Entrar, que não é retomado).
+  useEffect(() => {
+    if (ready && !user && appLinkTarget) setAppLinkTarget(null);
+  }, [ready, user, appLinkTarget]);
+
   // Endereço pedido ao abrir a versão web (ou o link que abriu o app no celular): depois de entrar (ou de conferir a sessão), a pessoa
   // chega à tela pedida. Roda depois de "carregando" decidir o destino (efeitos do pai rodam depois dos do filho), então prevalece.
   useEffect(() => {

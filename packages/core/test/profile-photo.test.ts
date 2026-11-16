@@ -43,18 +43,22 @@ describe('foto do perfil: regras', () => {
 });
 
 describe('foto do perfil: a memória (demonstração e testes), como set_my_photo e my_photo', () => {
-  it('põe, troca, recusa versão velha e formatos, e tira', async () => {
+  it('põe, troca, recusa versão velha e formatos, remove e a versão nunca volta', async () => {
     const repo = await createDemoRepository();
-    expect(await repo.getMyPhoto()).toBeNull();
+    expect(await repo.getMyPhoto()).toEqual({ version: 0, photo: null });
+    // Remover sem nunca ter posto: nada muda.
+    expect(await repo.setMyPhoto(null, 0)).toEqual({ hasPhoto: false, version: 0, updatedAt: null });
     expect(await repo.setMyPhoto(JPEG, 0)).toMatchObject({ hasPhoto: true, version: 1 });
-    expect(await repo.getMyPhoto()).toEqual({ mime: 'image/jpeg', base64: JPEG, version: 1 });
+    expect(await repo.getMyPhoto()).toEqual({ version: 1, photo: { mime: 'image/jpeg', base64: JPEG } });
     expect(await repo.setMyPhoto(PNG, 1)).toMatchObject({ version: 2 });
     await expect(repo.setMyPhoto(WEBP, 1)).rejects.toMatchObject({ code: 'versao_desatualizada', detail: 'versao_atual=2' });
     await expect(repo.setMyPhoto(b64('474946383961'), 2)).rejects.toBeInstanceOf(RepoError);
     await expect(repo.setMyPhoto(b64('474946383961'), 2)).rejects.toMatchObject({ code: 'foto_invalida' });
-    expect((await repo.getMyPhoto())?.mime).toBe('image/png');
-    expect(await repo.setMyPhoto(null, 2)).toEqual({ hasPhoto: false, version: 0, updatedAt: null });
-    expect(await repo.getMyPhoto()).toBeNull();
-    expect(await repo.setMyPhoto(JPEG, 0)).toMatchObject({ version: 1 });
+    expect((await repo.getMyPhoto()).photo?.mime).toBe('image/png');
+    // Remover: a foto sai e a versão sobe (outro aparelho com a versão 2 não sobrescreve sem ler de novo).
+    expect(await repo.setMyPhoto(null, 2)).toMatchObject({ hasPhoto: false, version: 3 });
+    expect(await repo.getMyPhoto()).toEqual({ version: 3, photo: null });
+    await expect(repo.setMyPhoto(JPEG, 2)).rejects.toMatchObject({ code: 'versao_desatualizada', detail: 'versao_atual=3' });
+    expect(await repo.setMyPhoto(JPEG, 3)).toMatchObject({ hasPhoto: true, version: 4 });
   });
 });
