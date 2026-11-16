@@ -22,6 +22,7 @@ const widgetConfig = nodeRequire(raiz('apps/app/widget.config.js')) as {
   NATIVE_PACKAGES: string[];
   NAMES: { ios: string; androidSmall: string; androidMedium: string };
   DESCRIPTION: string;
+  PREVIEWS: { androidSmall: string; androidMedium: string };
   AUTOLINKING_PLUGIN: string;
   WORK_PLUGIN: string;
   widgetEnabled: (env?: Record<string, string | undefined>) => boolean;
@@ -146,6 +147,23 @@ describe('widget: nomes e textos combinados com o núcleo', () => {
     expect(medium.updatePeriodMillis).toBeGreaterThanOrEqual(30 * 60 * 1000); // o mínimo do Android
     expect(android[1].widgets[0].label).toBe('Anotar gasto');
     expect(medium.label).toBe('Ainda a pagar');
+  });
+
+  it('as prévias da lista de widgets do Android existem: PNG em apps/app/assets/widget, do tamanho de 2 x 2 e 4 x 2 desenhado com densidade 2', () => {
+    const [, android] = widgetConfig.widgetPlugins() as [[string, any], [string, any], string];
+    const [small, medium] = android[1].widgets as { previewImage: string }[];
+    expect(small!.previewImage).toBe(widgetConfig.PREVIEWS.androidSmall);
+    expect(medium!.previewImage).toBe(widgetConfig.PREVIEWS.androidMedium);
+    for (const [preview, width, height] of [
+      [small!.previewImage, 340, 340],
+      [medium!.previewImage, 688, 368],
+    ] as const) {
+      // O plugin da biblioteca copia o arquivo de `apps/app` para res/drawable; o caminho tem de começar por "./" (tipo `ResourcePath`).
+      expect(preview).toMatch(/^\.\/assets\/widget\/[a-z-]+\.png$/);
+      const png = readFileSync(raiz(path.join('apps/app', preview)));
+      expect(png.subarray(1, 4).toString('ascii')).toBe('PNG');
+      expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([width, height]);
+    }
   });
 
   it('o esquema do link e as rotas que o widget abre existem no app', () => {

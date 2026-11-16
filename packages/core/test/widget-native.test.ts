@@ -116,7 +116,7 @@ interface Node {
 }
 
 /** Roda o layout serializado como a extensão roda: sem nada fora dos nomes dela. Qualquer nome fora dela é ReferenceError. */
-function renderLayout(layout: string, props: unknown, family: 'systemSmall' | 'systemMedium'): Node {
+function renderLayout(layout: string, props: unknown, family: 'systemSmall' | 'systemMedium', colorScheme?: 'light' | 'dark'): Node {
   const globals: Record<string, unknown> = {};
   for (const name of [...runtimeNames(SWIFT_UI), ...runtimeNames(path.join(SWIFT_UI, 'modifiers'))]) {
     globals[name] = /^[A-Z]/.test(name)
@@ -138,7 +138,7 @@ function renderLayout(layout: string, props: unknown, family: 'systemSmall' | 's
     },
   );
   const fn = new Function('scope', `with (scope) { return (${layout}); }`)(scope) as (p: unknown, e: unknown) => Node;
-  return fn(props, { widgetFamily: family, date: new Date('2026-10-07T12:00:00Z') });
+  return fn(props, { widgetFamily: family, date: new Date('2026-10-07T12:00:00Z'), colorScheme });
 }
 
 function widgetOfIos() {
@@ -196,7 +196,7 @@ describe('widget do iOS: a função que a extensão executa', () => {
 
   it('só usa nomes que a extensão oferece, e os nomes existem em @expo/ui', () => {
     const names = new Set([...runtimeNames(SWIFT_UI), ...runtimeNames(path.join(SWIFT_UI, 'modifiers'))]);
-    for (const name of ['Text', 'VStack', 'HStack', 'Spacer', 'Image', 'widgetURL', 'containerBackground', 'privacySensitive', 'accessibilityLabel', 'font', 'foregroundStyle'])
+    for (const name of ['Text', 'VStack', 'HStack', 'Spacer', 'Image', 'widgetURL', 'containerBackground', 'privacySensitive', 'accessibilityLabel', 'font', 'foregroundStyle', 'frame', 'background', 'clipShape'])
       expect(names.has(name), name).toBe(true);
     // Se a função usasse um nome que não está em @expo/ui, o ReferenceError aparece aqui.
     const plan = writePlan(planWidgetSync(input({ toPay: null, signedIn: false })));
@@ -297,16 +297,34 @@ describe('widget do iOS: a função que a extensão executa', () => {
     }
   });
 
-  it('as cores são as do tema e têm contraste de texto (4,5:1) sobre o fundo de cada tamanho', () => {
-    const tokens = loadApp(path.join(SRC, 'theme', 'tokens.ts'), { platform: 'ios' }).colors as Record<string, string>;
+  it('as cores são as das duas paletas e têm contraste de texto (4,5:1) sobre o fundo de cada tamanho, no tema claro e no escuro', () => {
+    const { lightColors, darkColors } = loadApp(path.join(SRC, 'theme', 'palettes.ts'), { platform: 'ios' }) as Record<string, Record<string, string>>;
     const used = [...widget.layout.matchAll(/'(#[0-9A-Fa-f]{6})'/g)].map((m) => m[1]!.toUpperCase());
-    const theme = new Set(Object.values(tokens).map((c) => c.toUpperCase()));
+    const theme = new Set([...Object.values(lightColors!), ...Object.values(darkColors!)].map((c) => c.toUpperCase()));
     for (const color of used) expect(theme.has(color), color).toBe(true);
-    expect(contrastRatio(tokens.textOnBrand!, tokens.brand!)).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio(tokens.text!, tokens.surface!)).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio(tokens.textSecondary!, tokens.surface!)).toBeGreaterThanOrEqual(4.5);
-    expect(widget.layout).toContain(`'${tokens.brand}'`);
-    expect(widget.layout).toContain(`'${tokens.surface}'`);
+    for (const p of [lightColors!, darkColors!]) {
+      expect(contrastRatio(p.textOnBrand!, p.brand!)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(p.text!, p.surface!)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(p.textSecondary!, p.surface!)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(p.textOnAccent!, p.accent!)).toBeGreaterThanOrEqual(4.5);
+      expect(widget.layout).toContain(`'${p.surface}'`);
+    }
+    expect(widget.layout).toContain(`'${lightColors!.brand}'`);
+    // O médio segue o tema do aparelho; o pequeno é azul nos dois.
+    const plan = writePlan(planWidgetSync(input({ toPay: summarizeToPay([], 'ctx', '2026-10', DEMO_TODAY) })));
+    const background = (tree: Node) => modifierArgs(tree, 'containerBackground')[0]?.[0];
+    expect(background(renderLayout(widget.layout, plan.snapshot, 'systemMedium', 'light'))).toBe(lightColors!.surface);
+    expect(background(renderLayout(widget.layout, plan.snapshot, 'systemMedium', 'dark'))).toBe(darkColors!.surface);
+    expect(background(renderLayout(widget.layout, plan.snapshot, 'systemSmall', 'dark'))).toBe(lightColors!.brand);
+  });
+
+  it('o "+" lima no pequeno e o visto lima no mês sem nada em aberto, sem texto a mais', () => {
+    const empty = writePlan(planWidgetSync(input({ toPay: summarizeToPay([], 'ctx', '2026-10', DEMO_TODAY) })));
+    const images = (tree: Node) => nodes(tree).filter((n) => n.type === 'Image').map((n) => n.props?.systemName);
+    expect(images(renderLayout(widget.layout, empty.snapshot, 'systemSmall'))).toEqual(['plus']);
+    expect(images(renderLayout(widget.layout, empty.snapshot, 'systemMedium'))).toEqual(['checkmark']);
+    const none = writePlan(planWidgetSync(input({ signedIn: false })));
+    expect(images(renderLayout(widget.layout, none.snapshot, 'systemMedium'))).toEqual([]);
   });
 });
 
@@ -324,14 +342,29 @@ function buildTree(element: any): any {
   let current = element as El;
   while (typeof current.type === 'function' && !(current.type as { __name__?: string }).__name__) current = (current.type as (p: unknown) => El)(current.props);
   const { children, ...props } = current.props;
-  const list = (Array.isArray(children) ? children : children ? [children] : []).filter(Boolean).flat();
+  const list = (Array.isArray(children) ? children : children ? [children] : []).flat(Infinity).filter(Boolean);
   return { type: (current.type as { __name__: string }).__name__, props, children: list.map(buildTree) };
 }
 const treeTexts = (tree: any): string[] => (typeof tree === 'string' ? [tree] : [...(tree.props.text ? [tree.props.text] : []), ...tree.children.flatMap(treeTexts)]);
+/** Todos os blocos de uma árvore, na ordem. */
+const treeNodes = (tree: any): any[] => (typeof tree === 'string' ? [] : [tree, ...tree.children.flatMap(treeNodes)]);
+const svgsOf = (tree: any): string[] => treeNodes(tree).filter((n) => n.type === 'SvgWidget').map((n) => n.props.svg as string);
+/** Os toques dentro do widget, sem contar o widget inteiro. */
+const innerTaps = (tree: any): any[] => treeNodes(tree).filter((n) => n !== tree && n.props.clickAction);
+/**
+ * O que a biblioteca recebe para desenhar: um widget só, ou as versões clara e escura (`{ light, dark }`, que o Android troca com o tema do
+ * aparelho). `single` diz qual das duas formas veio.
+ */
+function drawnVersions(rep: any): { light: any; dark: any; single: boolean } {
+  if (rep && typeof rep === 'object' && 'light' in rep) return { light: buildTree(rep.light), dark: buildTree(rep.dark), single: false };
+  const tree = buildTree(rep);
+  return { light: tree, dark: tree, single: true };
+}
+const PLUS_PATH = 'M5 12h14';
 
-function androidMocks() {
+function androidMocks(size?: { width: number; height: number }, fontScale = 1) {
   const store = new Map<string, string>();
-  const updates: { widgetName: string; tree: any }[] = [];
+  const updates: { widgetName: string; light: any; dark: any; single: boolean }[] = [];
   const widgetFn = (name: string) => Object.assign((props: Record<string, unknown>) => props.children ?? null, { __name__: name });
   const mocks = {
     '@clarevo/core': core,
@@ -342,11 +375,14 @@ function androidMocks() {
         setItem: async (key: string, value: string) => void store.set(key, value),
       },
     },
+    // A letra do aparelho (Tamanho da fonte): 1 é a padrão.
+    'react-native': { PixelRatio: { getFontScale: () => fontScale } },
     'react-native-android-widget': {
       FlexWidget: widgetFn('FlexWidget'),
       TextWidget: widgetFn('TextWidget'),
+      SvgWidget: widgetFn('SvgWidget'),
       requestWidgetUpdate: async ({ widgetName, renderWidget }: { widgetName: string; renderWidget: (info: unknown) => any }) => {
-        updates.push({ widgetName, tree: buildTree(await renderWidget({ widgetName })) });
+        updates.push({ widgetName, ...drawnVersions(await renderWidget({ widgetName, widgetId: 1, ...size })) });
       },
     },
   };
@@ -355,6 +391,11 @@ function androidMocks() {
 
 describe('widgets do Android', () => {
   const file = path.join(SRC, 'widget-native', 'android.tsx');
+  const palettes = loadApp(path.join(SRC, 'theme', 'palettes.ts'), { platform: 'android' }) as {
+    lightColors: Record<string, string>;
+    darkColors: Record<string, string>;
+  };
+  const logo = loadApp(path.join(SRC, 'theme', 'logo-paths.ts'), { platform: 'android' }) as { LOGO_SYMBOL_C: string; LOGO_SYMBOL_MOON: string };
 
   it('"use no memo": o React Compiler não os troca por versões com cache (a biblioteca os chama como funções simples)', () => {
     expect(read(file).trimStart().startsWith("'use no memo'")).toBe(true);
@@ -369,22 +410,40 @@ describe('widgets do Android', () => {
     expect(control).toMatch(/compiler-runtime|useMemoCache/);
   });
 
-  it('gravar o snapshot desenha os dois widgets com o que o núcleo montou, abrindo clarevo://', async () => {
+  it('gravar o snapshot desenha os dois widgets com o que o núcleo montou, com o símbolo da marca e o atalho de anotar gasto', async () => {
     const { mocks, store, updates } = androidMocks();
     const mod = loadApp(file, { platform: 'android', mocks });
     const plan = writePlan(planWidgetSync(input({ toPay: await demoToPay(), showValues: false })));
     await withDemoClock(() => mod.writeAndroidWidgets(plan.json));
     expect(store.get(WIDGET_NATIVE.storageKey)).toBe(plan.json);
     expect(updates.map((u) => u.widgetName)).toEqual([WIDGET_NATIVE.androidSmall, WIDGET_NATIVE.androidMedium]);
-    const [small, medium] = updates.map((u) => u.tree);
-    expect(treeTexts(small)).toEqual(['Anotar gasto']);
-    expect(small.props.clickAction).toBe('OPEN_URI');
-    expect(small.props.clickActionData).toEqual({ uri: 'clarevo://registro/novo?tipo=despesa' });
-    expect(small.props.accessibilityLabel).toBe(plan.snapshot.small.a11y);
-    expect(treeTexts(medium)).toEqual(['Ainda a pagar em outubro', WIDGET_HIDDEN_MONEY, 'Próxima conta · em 8 dias']);
-    expect(medium.props.clickActionData).toEqual({ uri: 'clarevo://a-pagar' });
-    expect(JSON.stringify(medium)).not.toMatch(/\d,\d{2}/);
-    expect(JSON.stringify(medium)).not.toContain('Internet');
+    const [small, medium] = updates;
+    // Pequeno: um desenho só (azul nos dois temas), o rótulo, o símbolo C da marca sem redesenho e o "+".
+    expect(small!.single).toBe(true);
+    expect(treeTexts(small!.light)).toEqual(['Anotar gasto']);
+    expect(small!.light.props.clickAction).toBe('OPEN_URI');
+    expect(small!.light.props.clickActionData).toEqual({ uri: 'clarevo://registro/novo?tipo=despesa' });
+    expect(small!.light.props.accessibilityLabel).toBe(plan.snapshot.small.a11y);
+    expect(small!.light.props.style.backgroundColor).toBe(palettes.lightColors.brand);
+    expect(svgsOf(small!.light).some((s) => s.includes(logo.LOGO_SYMBOL_C) && s.includes(logo.LOGO_SYMBOL_MOON))).toBe(true);
+    expect(svgsOf(small!.light).some((s) => s.includes(PLUS_PATH))).toBe(true);
+    // Médio: as versões clara e escura, com o mesmo conteúdo e o mesmo atalho.
+    expect(medium!.single).toBe(false);
+    expect(medium!.light.props.style.backgroundColor).toBe(palettes.lightColors.surface);
+    expect(medium!.dark.props.style.backgroundColor).toBe(palettes.darkColors.surface);
+    for (const tree of [medium!.light, medium!.dark]) {
+      expect(treeTexts(tree)).toEqual(['Ainda a pagar em outubro', WIDGET_HIDDEN_MONEY, 'Próxima conta · em 8 dias', 'Anotar gasto']);
+      expect(tree.props.clickActionData).toEqual({ uri: 'clarevo://a-pagar' });
+      expect(tree.props.accessibilityLabel).toBe(plan.snapshot.medium.a11y);
+      expect(JSON.stringify(tree)).not.toMatch(/\d,\d{2}/);
+      expect(JSON.stringify(tree)).not.toContain('Internet');
+      expect(svgsOf(tree).some((s) => s.includes(logo.LOGO_SYMBOL_C))).toBe(true);
+      const taps = innerTaps(tree);
+      expect(taps).toHaveLength(1);
+      expect(taps[0].props.clickAction).toBe('OPEN_URI');
+      expect(taps[0].props.clickActionData).toEqual({ uri: widgetUrl(WIDGET_ROUTES.note) });
+      expect(taps[0].props.accessibilityLabel).toBe(plan.snapshot.small.a11y);
+    }
   });
 
   it('a tarefa em segundo plano lê o que está gravado e, em outro dia, mostra "Abra o app da Clarevo para atualizar"', async () => {
@@ -393,21 +452,30 @@ describe('widgets do Android', () => {
     const render = async (action: string, widgetName: string) => {
       const drawn = vi.fn();
       await withDemoClock(() => mod.widgetTaskHandler({ widgetAction: action, widgetInfo: { widgetName }, renderWidget: drawn }));
-      return drawn.mock.calls.map((c) => buildTree(c[0]));
+      return drawn.mock.calls.map((c) => drawnVersions(c[0]).light);
     };
-    // Nada gravado ainda: sem dados.
-    expect(treeTexts((await render('WIDGET_ADDED', WIDGET_NATIVE.androidMedium))[0])).toEqual([WIDGET_TEXT.medium.noData]);
+    const shortcut = 'Anotar gasto';
+    // Nada gravado ainda: sem dados, e o atalho de anotar continua.
+    expect(treeTexts((await render('WIDGET_ADDED', WIDGET_NATIVE.androidMedium))[0])).toEqual([WIDGET_TEXT.medium.noData, shortcut]);
     // Gravado hoje: o conteúdo.
     const today = DEMO_TODAY;
     const fresh = writePlan(planWidgetSync(input({ today, toPay: summarizeToPay([], 'ctx', today.slice(0, 7), today) })));
     store.set(WIDGET_NATIVE.storageKey, fresh.json);
-    expect(treeTexts((await render('WIDGET_UPDATE', WIDGET_NATIVE.androidMedium))[0])).toEqual([fresh.snapshot.medium.title, WIDGET_TEXT.medium.empty]);
+    expect(treeTexts((await render('WIDGET_UPDATE', WIDGET_NATIVE.androidMedium))[0])).toEqual([fresh.snapshot.medium.title, WIDGET_TEXT.medium.empty, shortcut]);
     expect(treeTexts((await render('WIDGET_RESIZED', WIDGET_NATIVE.androidSmall))[0])).toEqual(['Anotar gasto']);
     // Gravado ontem: sem dados, e "Anotar gasto" continua igual.
     const old = writePlan(planWidgetSync(input({ today: addDays(today, -1), toPay: summarizeToPay([], 'ctx', addDays(today, -1).slice(0, 7), addDays(today, -1)) })));
     store.set(WIDGET_NATIVE.storageKey, old.json);
-    expect(treeTexts((await render('WIDGET_UPDATE', WIDGET_NATIVE.androidMedium))[0])).toEqual([WIDGET_TEXT.medium.noData]);
+    expect(treeTexts((await render('WIDGET_UPDATE', WIDGET_NATIVE.androidMedium))[0])).toEqual([WIDGET_TEXT.medium.noData, shortcut]);
     expect(treeTexts((await render('WIDGET_UPDATE', WIDGET_NATIVE.androidSmall))[0])).toEqual(['Anotar gasto']);
+    // Sem sessão: só o recado, sem atalho (o widget inteiro abre Entrar), e o pequeno também abre Entrar.
+    const out = writePlan(planWidgetSync(input({ signedIn: false })));
+    store.set(WIDGET_NATIVE.storageKey, out.json);
+    const [signedOut] = await render('WIDGET_UPDATE', WIDGET_NATIVE.androidMedium);
+    expect(treeTexts(signedOut)).toEqual([WIDGET_TEXT.medium.signedOut]);
+    expect(innerTaps(signedOut)).toEqual([]);
+    expect(signedOut.props.clickActionData).toEqual({ uri: widgetUrl(WIDGET_ROUTES.signIn) });
+    expect((await render('WIDGET_UPDATE', WIDGET_NATIVE.androidSmall))[0].props.clickActionData).toEqual({ uri: widgetUrl(WIDGET_ROUTES.signIn) });
     // Excluir o widget e cliques não desenham nada.
     expect(await render('WIDGET_DELETED', WIDGET_NATIVE.androidMedium)).toEqual([]);
     expect(await render('WIDGET_CLICK', WIDGET_NATIVE.androidMedium)).toEqual([]);
@@ -421,7 +489,150 @@ describe('widgets do Android', () => {
     const mod = loadApp(file, { platform: 'android', mocks });
     const drawn = vi.fn();
     await withDemoClock(() => mod.widgetTaskHandler({ widgetAction: 'WIDGET_UPDATE', widgetInfo: { widgetName: WIDGET_NATIVE.androidMedium }, renderWidget: drawn }));
-    expect(treeTexts(buildTree(drawn.mock.calls[0]![0]))).toEqual([WIDGET_TEXT.medium.noData]);
+    expect(treeTexts(drawnVersions(drawn.mock.calls[0]![0]).light)).toEqual([WIDGET_TEXT.medium.noData, 'Anotar gasto']);
+  });
+
+  it('o layout segue o tamanho que a tela inicial informa: o "+" desce na célula alta do pequeno e vira só o círculo no médio baixo', async () => {
+    const plan = writePlan(planWidgetSync(input({ toPay: await demoToPay(), showValues: true })));
+    const drawFor = async (widgetName: string, size: { width: number; height: number }) => {
+      const { mocks, updates } = androidMocks(size);
+      const mod = loadApp(file, { platform: 'android', mocks });
+      await withDemoClock(() => mod.writeAndroidWidgets(plan.json));
+      return updates.find((u) => u.widgetName === widgetName)!.light;
+    };
+    const plusInTopRow = (tree: any) => svgsOf(tree.children[0]).some((s) => s.includes(PLUS_PATH));
+    expect(plusInTopRow(await drawFor(WIDGET_NATIVE.androidSmall, { width: 170, height: 170 }))).toBe(true);
+    const tall = await drawFor(WIDGET_NATIVE.androidSmall, { width: 170, height: 256 });
+    expect(plusInTopRow(tall)).toBe(false);
+    expect(svgsOf(tall).some((s) => s.includes(PLUS_PATH))).toBe(true);
+    expect(treeTexts(tall)).toEqual(['Anotar gasto']);
+    // Médio baixo: o atalho é só o "+" (48 x 48), com o texto alternativo de anotar gasto; o resto do conteúdo continua.
+    const low = await drawFor(WIDGET_NATIVE.androidMedium, { width: 344, height: 120 });
+    expect(treeTexts(low)).toEqual(['Ainda a pagar em outubro', 'R$ 650,00', 'Internet · 15/10 · R$ 150,00']);
+    const [tap] = innerTaps(low);
+    expect(tap.props.style).toMatchObject({ width: 48, height: 48 });
+    expect(tap.props.accessibilityLabel).toBe(plan.snapshot.small.a11y);
+    // Sem o tamanho (0), o de uma célula comum: o atalho com o rótulo.
+    expect(treeTexts(await drawFor(WIDGET_NATIVE.androidMedium, { width: 0, height: 0 }))).toContain('Anotar gasto');
+  });
+
+  it('com letra grande no aparelho, o médio passa antes para a versão baixa, em vez de cortar o atalho embaixo', async () => {
+    const plan = writePlan(planWidgetSync(input({ toPay: await demoToPay(), showValues: true })));
+    const drawFor = async (size: { width: number; height: number }, fontScale: number) => {
+      const { mocks, updates } = androidMocks(size, fontScale);
+      const mod = loadApp(file, { platform: 'android', mocks });
+      await withDemoClock(() => mod.writeAndroidWidgets(plan.json));
+      return updates.find((u) => u.widgetName === WIDGET_NATIVE.androidMedium)!.light;
+    };
+    const valueSize = (tree: any) => treeNodes(tree).find((n) => n.props.text === 'R$ 650,00')!.props.style.fontSize;
+    // Letra padrão: 184 dp cabem tudo, com o atalho com rótulo; 240 dp, o valor grande.
+    expect(treeTexts(await drawFor({ width: 344, height: 184 }, 1))).toContain('Anotar gasto');
+    expect(valueSize(await drawFor({ width: 344, height: 240 }, 1))).toBe(36);
+    // Letra 1,5 vez maior: em 184 dp, a versão baixa (só o "+"). Letra 2 vezes maior: em 240 dp cabe tudo, mas sem crescer o valor.
+    expect(treeTexts(await drawFor({ width: 344, height: 184 }, 1.5))).not.toContain('Anotar gasto');
+    expect(innerTaps(await drawFor({ width: 344, height: 184 }, 1.5))[0].props.style).toMatchObject({ width: 48, height: 48 });
+    expect(treeTexts(await drawFor({ width: 344, height: 240 }, 2))).toContain('Anotar gasto');
+    expect(valueSize(await drawFor({ width: 344, height: 240 }, 2))).toBe(30);
+    // Letra 2 vezes maior na menor altura: a linha da próxima conta sai, e o valor fica.
+    const tiny = await drawFor({ width: 250, height: 110 }, 2);
+    expect(treeTexts(tiny)).toEqual(['Ainda a pagar em outubro', 'R$ 650,00']);
+  });
+
+  it('em todo tamanho, estado, tema e letra (padrão e 2 vezes maior): texto com limite de linhas, toques de 48 dp, só cores das paletas (nada de vermelho) e contraste de texto de 4,5:1', async () => {
+    const late = {
+      id: 'v',
+      contextId: 'ctx',
+      description: 'Luz',
+      amountCents: 8_000,
+      dueOn: '2026-10-01',
+      currency: 'BRL',
+      category: 'Moradia',
+      status: 'aberto',
+      payment: null,
+      series: null,
+      seriesOverride: false,
+      amountIsEstimate: false,
+      invoice: null,
+      createdBy: 'pessoa',
+      version: 1,
+      createdAt: '2026-09-01T10:00:00Z',
+      updatedAt: '2026-09-01T10:00:00Z',
+    } as unknown as Commitment;
+    const toPay = await demoToPay();
+    const plans = [
+      planWidgetSync(input({ toPay, showValues: true })),
+      planWidgetSync(input({ toPay, showValues: false })),
+      planWidgetSync(input({ toPay: summarizeToPay([late, ...toPay.items], 'ctx', '2026-10', DEMO_TODAY), showValues: false })),
+      planWidgetSync(input({ toPay: summarizeToPay([], 'ctx', '2026-10', DEMO_TODAY) })),
+      planWidgetSync(input({ signedIn: false })),
+    ].map(writePlan);
+    const sizes = {
+      [WIDGET_NATIVE.androidSmall]: [
+        { width: 110, height: 110 },
+        { width: 170, height: 170 },
+        { width: 170, height: 256 },
+        { width: 120, height: 260 },
+      ],
+      [WIDGET_NATIVE.androidMedium]: [
+        { width: 250, height: 110 },
+        { width: 344, height: 120 },
+        { width: 344, height: 184 },
+        { width: 344, height: 240 },
+        { width: 400, height: 300 },
+      ],
+    };
+    const hex = (c: string) => c.toUpperCase();
+    const allowed = new Set([...Object.values(palettes.lightColors), ...Object.values(palettes.darkColors)].filter((c) => c.startsWith('#')).map(hex));
+    const red = new Set([palettes.lightColors.error, palettes.darkColors.error, palettes.lightColors.errorTint, palettes.darkColors.errorTint].map((c) => hex(c!)));
+    const trees: { tree: any; hidden: boolean; name: string }[] = [];
+    for (const [name, list] of Object.entries(sizes)) {
+      for (const size of list.flatMap((sz) => [1, 2].map((fontScale) => ({ ...sz, fontScale })))) {
+        const { mocks, updates } = androidMocks(size, size.fontScale);
+        const mod = loadApp(file, { platform: 'android', mocks });
+        for (const plan of plans) {
+          updates.length = 0;
+          await withDemoClock(() => mod.writeAndroidWidgets(plan.json));
+          const u = updates.find((x) => x.widgetName === name)!;
+          for (const tree of [u.light, u.dark]) {
+            trees.push({ tree, hidden: !plan.snapshot.medium.valuesShown, name: `${name} ${size.width}x${size.height} letra ${size.fontScale}` });
+          }
+        }
+      }
+    }
+    expect(trees.length).toBe((4 + 5) * 2 * plans.length * 2);
+    for (const { tree, hidden, name } of trees) {
+      const walk = (node: any, background: string) => {
+        const style = node.props.style ?? {};
+        const bg = style.backgroundColor ?? background;
+        for (const color of [style.backgroundColor, style.color].filter(Boolean)) {
+          expect(allowed.has(hex(color)), `${name}: ${color}`).toBe(true);
+          expect(red.has(hex(color)), `${name}: ${color}`).toBe(false);
+        }
+        if (node.type === 'TextWidget') {
+          expect(node.props.maxLines, `${name}: ${node.props.text}`).toBeGreaterThanOrEqual(1);
+          expect(node.props.truncate, `${name}: ${node.props.text}`).toBe('END');
+          expect(contrastRatio(style.color, bg), `${name}: ${node.props.text}`).toBeGreaterThanOrEqual(4.5);
+        }
+        if (node.type === 'SvgWidget') {
+          for (const m of (node.props.svg as string).matchAll(/(?:fill|stroke)="(#[0-9A-Fa-f]{6})"/g)) {
+            expect(allowed.has(hex(m[1]!)), `${name}: svg ${m[1]}`).toBe(true);
+            expect(red.has(hex(m[1]!)), `${name}: svg ${m[1]}`).toBe(false);
+          }
+        }
+        if (node !== tree && node.props.clickAction) {
+          // Toque de 48 dp ou mais: largura fixa de 48 ou mais, ou a largura do rótulo que vai dentro (bem mais de 48).
+          expect(style.height, name).toBeGreaterThanOrEqual(48);
+          if (style.width === undefined) expect(treeTexts(node).length, name).toBeGreaterThan(0);
+          else expect(style.width, name).toBeGreaterThanOrEqual(48);
+        }
+        for (const child of node.children) walk(child, bg);
+      };
+      expect(tree.props.style.borderRadius, name).toBe(24);
+      walk(tree, tree.props.style.backgroundColor);
+      if (hidden) {
+        expect(JSON.stringify(tree), name).not.toMatch(/R\$ \d|Internet|Luz/);
+      }
+    }
   });
 });
 

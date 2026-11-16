@@ -42,6 +42,16 @@ const AUTOLINKING_PLUGIN = './plugins/with-widget-autolinking';
  */
 const WORK_PLUGIN = './plugins/with-work-runtime';
 
+/**
+ * Prévias da lista de widgets do Android (o que o Android mostra antes de a pessoa pôr o widget na tela inicial), relativas a `apps/app`.
+ * São desenhadas do próprio widget por `scripts/gerar-widget-previa.js` (visual de 16/11/2026, docs/21_WIDGET_NATIVO.md, seção 9); o
+ * médio aparece com os valores ocultos, o padrão, sem dado de ninguém.
+ */
+const PREVIEWS = {
+  androidSmall: './assets/widget/anotar-gasto-previa.png',
+  androidMedium: './assets/widget/ainda-a-pagar-previa.png',
+};
+
 /** Os plugins do widget, na ordem em que entram no fim de `plugins`. */
 function widgetPlugins() {
   return [
@@ -73,6 +83,7 @@ function widgetPlugins() {
             targetCellWidth: 2,
             targetCellHeight: 2,
             resizeMode: 'none',
+            previewImage: PREVIEWS.androidSmall,
             // Só a tela inicial: a tela de bloqueio do Android (versões novas e tablets) fica de fora até a conferência de docs/21.
             widgetCategory: 'home_screen',
           },
@@ -85,6 +96,7 @@ function widgetPlugins() {
             targetCellWidth: 4,
             targetCellHeight: 2,
             resizeMode: 'horizontal',
+            previewImage: PREVIEWS.androidMedium,
             widgetCategory: 'home_screen',
             // O mínimo do Android: 30 minutos. É o que faz o widget mostrar "Abra o Clarevo para atualizar" depois da virada do dia.
             updatePeriodMillis: 30 * 60 * 1000,
@@ -132,6 +144,7 @@ module.exports = {
   NATIVE_PACKAGES,
   NAMES,
   DESCRIPTION,
+  PREVIEWS,
   AUTOLINKING_PLUGIN,
   WORK_PLUGIN,
   widgetEnabled,
