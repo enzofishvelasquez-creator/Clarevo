@@ -12,16 +12,15 @@ import { DemoPill, TopInset, Txt } from '@/components/ui';
 import type { HelpScreen } from '@/lib/guide';
 import { WIDE_CONTENT_MAX, WIDE_TAB_MAX, useWideLayout } from '@/lib/layout';
 import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
+import { ProfileAvatar } from '@/components/profile-photo';
 import { canGoForward, useView, type SpaceKind } from '@/state/data';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { LOGOTYPE_HEIGHT, LOGOTYPE_WIDTH } from '@/theme/logo-paths';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 
-export function initialsOf(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '')).toUpperCase() || '·';
-}
+/** As iniciais do nome (o mesmo do núcleo, `initialsOf` de profile-photo.ts). */
+export { initialsOf } from '@clarevo/core';
 
 const focusOnBrand = { outlineWidth: 3, outlineColor: colors.accent, outlineStyle: 'solid', outlineOffset: 2 } as const;
 
@@ -74,9 +73,8 @@ function BrandRow() {
           accessibilityLabel="Conta: perfil, assinatura, lembretes, privacidade e segurança"
           onPress={() => router.push('/conta')}
           style={(s) => [styles.avatar, (s as { focused?: boolean }).focused && focusOnBrand]}>
-          <Txt variant="label" color={colors.brand} style={{ fontFamily: fonts.extrabold }} maxFontSizeMultiplier={1.3}>
-            {initialsOf(user?.displayName ?? '')}
-          </Txt>
+          {/* A foto do perfil, se houver, ou as iniciais (pedido do Enzo, 16/11/2026). */}
+          <ProfileAvatar size={40} background={colors.surfaceOnBrand} color={colors.brand} textVariant="label" />
         </Pressable>
       </View>
     </View>

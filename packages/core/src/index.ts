@@ -79,3 +79,4 @@ export * from './assinatura-web';
 export * from './assinatura-lojas';
 export * from './goal-images';
 export * from './goal-presets';
+export * from './profile-photo';

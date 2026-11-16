@@ -68,6 +68,7 @@ import type { ImportDestination, ImportItem, ImportResult } from './importar/tip
 import type { RecordSearchFilter, SearchPage } from './search';
 import type { SignupSource, SignupSourceOption } from './signup-source';
 import type { GoalImage, GoalImageChoice } from './goal-images';
+import type { ProfilePhoto, ProfilePhotoState } from './profile-photo';
 import type { ChatCode, ChatLinkState } from './whatsapp/app';
 import type { ChatChannel } from './whatsapp/respostas';
 
@@ -961,6 +962,14 @@ export interface RecordsRepository {
 
   /** my_legal_acceptance: a versão vigente e a última que a pessoa aceitou. */
   getLegalAcceptance(): Promise<LegalAcceptance>;
+  /** my_photo (0038): a foto do perfil de quem está na sessão (tipo, base64 e versão) ou null sem foto. Só a própria pessoa. */
+  getMyPhoto(): Promise<ProfilePhoto | null>;
+  /**
+   * set_my_photo (0038): base64 põe ou troca a foto; null tira. A versão que o app leu (0 sem foto). Ordem: nao_encontrado (conta
+   * excluída); foto_invalida (não é JPEG, PNG nem WebP); foto_grande (mais de 150 KB); versao_desatualizada (detalhe "versao_atual=N").
+   * Não passa por operação: repetir depois de uma falha de rede devolve versao_desatualizada, e o app lê de novo.
+   */
+  setMyPhoto(base64: string | null, expectedVersion: number): Promise<ProfilePhotoState>;
   /**
    * accept_legal_terms: aceita a versão vigente. Idempotente pela chave; versao_invalida para outra versão; sem_permissao sem o Pessoal.
    * Vale mesmo em só leitura e não conta como anotação.

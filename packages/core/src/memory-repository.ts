@@ -180,6 +180,7 @@ import { savingsAnswerError, savingsAskAgainOn } from './savings';
 import { signupSourceError, type SignupSource, type SignupSourceOption } from './signup-source';
 import { WHATSAPP_CODE_ALPHABET, WHATSAPP_CODE_LENGTH } from './whatsapp/mensagem';
 import { GOAL_PHOTO_MAX_BYTES, base64Bytes, goalPhotoMime, type GoalImage, type GoalImageChoice } from './goal-images';
+import { PROFILE_PHOTO_MAX_BYTES, type ProfilePhoto, type ProfilePhotoState } from './profile-photo';
 import { WHATSAPP_CODE_MINUTES } from './whatsapp/respostas';
 import type { ChatCode, ChatLinkState } from './whatsapp/app';
 import type { ChatChannel } from './whatsapp/respostas';
@@ -5011,6 +5012,37 @@ export class MemoryRepository implements RecordsRepository {
 
   async getMyBenefit(): Promise<Benefit | null> {
     return this.read(() => this.company.myBenefit(this.opts.actorId));
+  }
+
+  /** Foto do perfil (person_photos, 0038): só a da pessoa desta memória. */
+  private myPhoto: { mime: ProfilePhoto['mime']; base64: string; version: number; updatedAt: string } | null = null;
+
+  /** Como my_photo. */
+  async getMyPhoto(): Promise<ProfilePhoto | null> {
+    return this.read(() => (this.myPhoto ? { mime: this.myPhoto.mime, base64: this.myPhoto.base64, version: this.myPhoto.version } : null));
+  }
+
+  /** Como set_my_photo. Ordem: foto_invalida; foto_grande; versão (detalhe versao_atual=n). Não passa por operação. */
+  async setMyPhoto(base64: string | null, expectedVersion: number): Promise<ProfilePhotoState> {
+    return this.read(() => {
+      const photo = base64 === null ? null : base64.replace(/\s+/g, '');
+      let mime: ProfilePhoto['mime'] | null = null;
+      if (photo !== null) {
+        mime = goalPhotoMime(photo);
+        if (base64Bytes(photo) < 1 || mime === null) throw new RepoError('foto_invalida');
+        if (base64Bytes(photo) > PROFILE_PHOTO_MAX_BYTES) throw new RepoError('foto_grande');
+      }
+      const current = this.myPhoto?.version ?? 0;
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion !== current) {
+        throw new RepoError('versao_desatualizada', undefined, `versao_atual=${current}`);
+      }
+      if (photo === null || mime === null) {
+        this.myPhoto = null;
+        return { hasPhoto: false, version: 0, updatedAt: null };
+      }
+      this.myPhoto = { mime, base64: photo, version: current + 1, updatedAt: this.stamp() };
+      return { hasPhoto: true, version: this.myPhoto.version, updatedAt: this.myPhoto.updatedAt };
+    });
   }
 
   /** Aceites dos termos (legal_acceptances), por versão. */
