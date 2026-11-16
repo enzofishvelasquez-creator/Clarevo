@@ -45,7 +45,7 @@ export const PRIVACY_TEXT = {
   unlock: 'Desbloquear',
   unlockFailed: 'Não foi possível confirmar agora. Tente de novo.',
   signOut: 'Sair da conta',
-  signOutCaption: 'Sair encerra a sessão neste aparelho. Seus registros continuam guardados.',
+  signOutCaption: 'Você sai só neste aparelho. Seus registros continuam guardados.',
 } as const;
 
 let hidden = false;

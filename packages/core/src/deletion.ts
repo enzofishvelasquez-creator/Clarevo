@@ -103,7 +103,7 @@ export const DELETE_TEXT = {
   /** Resposta perdida: a sessão terminou depois de pedir a exclusão, sem a confirmação do servidor. */
   unsureTitle: 'Não foi possível confirmar a exclusão',
   unsureBody:
-    'A conexão caiu antes da resposta e a sessão terminou neste aparelho. Entre de novo para conferir: se a conta foi excluída, o seu e-mail está livre; se não, a conta e os seus dados continuam como estavam.',
+    'A conexão caiu antes da resposta e você saiu da conta neste aparelho. Entre de novo para conferir: se a conta foi excluída, o seu e-mail está livre; se não, a conta e os seus dados continuam como estavam.',
   unsureEnter: 'Entrar',
   /** "Quem vê estes dados?". */
   whoSees:

@@ -937,7 +937,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Mostra se a sua empresa oferece a Clarevo como benefício e deixa aceitar o convite por link. A empresa administra só o seu acesso ao plano, nunca os seus registros.',
     where: [ACCOUNT_SCREEN, BENEFIT_TEXT.accountTitle],
     steps: [
-      `Abra o link de convite que o RH enviou. Sem sessão, toque em ${q(BENEFIT_TEXT.enter)} ou ${q(BENEFIT_TEXT.createAccount)} com o e-mail do convite; depois você volta ao convite.`,
+      `Abra o link de convite que o RH enviou. Se ainda não entrou na conta, toque em ${q(BENEFIT_TEXT.enter)} ou ${q(BENEFIT_TEXT.createAccount)} com o e-mail do convite; depois você volta ao convite.`,
       `Confira o nome da empresa e o plano e toque em ${q(BENEFIT_TEXT.accept)}. O link serve uma vez e só com o e-mail do convite.`,
       `Sem o link aberto, em Conta, no card ${q(BENEFIT_TEXT.accountTitle)}, toque em ${q(BENEFIT_TEXT.haveInvite)}, cole o link e toque em ${q(BENEFIT_TEXT.pasteSubmit)}. Antes de ter conta, a tela de entrada tem o mesmo ${q(ENTRY_INVITE_TEXT.open)}.`,
       `Depois de aceitar, o card mostra a empresa, o plano e desde quando vale. No card ${q(ACCESS_TEXT.cardTitle)}, a situação aparece como ${q(BENEFIT_TEXT.planCardSituation)}, sem nada a pagar.`,

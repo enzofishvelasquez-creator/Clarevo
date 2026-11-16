@@ -209,7 +209,7 @@ export default function ContaScreen() {
             busyLabel="Enviando…"
             onPress={changePassword}
           />
-          <Button label="Encerrar sessão em todos os aparelhos" icon={MonitorSmartphone} tone="soft" onPress={() => setConfirmAll(true)} />
+          <Button label="Sair em todos os aparelhos" icon={MonitorSmartphone} tone="soft" onPress={() => setConfirmAll(true)} />
         </Card>
 
         {/* Família (D-055): criar, convidar e administrar; abre a tela Família. */}
@@ -338,7 +338,7 @@ export default function ContaScreen() {
         ) : null}
 
         <Button
-          label="Sair deste aparelho"
+          label="Sair da conta"
           icon={LogOut}
           tone="soft"
           onPress={() => {
@@ -347,7 +347,7 @@ export default function ContaScreen() {
           }}
         />
         <Txt variant="caption" color={colors.textSecondary} style={{ textAlign: 'center' }}>
-          Sair encerra a sessão neste aparelho. Seus registros continuam guardados.
+          Você sai só neste aparelho. Seus registros continuam guardados.
         </Txt>
 
         {/* Excluir minha conta (D-058): o último item de Conta, sem destaque de alerta. A tela seguinte explica o que é apagado. */}
@@ -364,9 +364,9 @@ export default function ContaScreen() {
 
       <ConfirmDialog
         visible={confirmAll}
-        title="Encerrar sessão em todos os aparelhos?"
+        title="Sair em todos os aparelhos?"
         cancelLabel="Cancelar"
-        confirmLabel="Encerrar sessões"
+        confirmLabel="Sair de todos"
         confirmTone="brand"
         busy={busy === 'sessoes'}
         onCancel={() => setConfirmAll(false)}

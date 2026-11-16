@@ -474,7 +474,7 @@ setInterval(async () => {
   ok('Conta: "Ajuda e contato" com o e-mail do suporte por escrito (sem depender do site) e o botão "Escrever para o suporte"', t.includes('Ajuda e contato') &&
     t.includes('Dúvidas sobre o app ou um problema: escreva para suporte@clarevo.app.br. Pedidos sobre os seus dados: privacidade@clarevo.app.br.') && (await visibleCount('button', 'Escrever para o suporte')) === 1);
   await keepText();
-  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
   ok('sair volta para boas-vindas', (await body()).includes('Cuidar da vida financeira'));
   // D-078 E: "Tenho um convite da empresa" nas boas-vindas abre o campo; texto sem convite mostra o erro; o link leva ao convite.
   await btn('Tenho um convite da empresa').click(); await field('Link do convite').waitFor({ timeout: 6000 });
@@ -513,7 +513,7 @@ setInterval(async () => {
   ok('A9: depois de sair e entrar de novo, o "Agora não" foi apagado do aparelho e o card "Primeiros passos" volta, com os passos feitos marcados',
     (await headingShown('Primeiros passos')) && (await ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago, PP.guardar])()) && (await visibleCount('button', 'Anotar gasto')) === 1, JSON.stringify(await ppRows()));
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
-  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
 
   // Primeiros passos numa segunda conta nova: anotar um gasto marca o passo 3; com os três prontos, o card sai de vez.
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
@@ -630,13 +630,13 @@ setInterval(async () => {
   await waitUntil(async () => !(await headingShown('Primeiros passos')), 8000);
   ok('primeiros passos: com os quatro passos prontos ("Não consigo agora" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
-  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
   await field('E-mail').fill('bia@exemplo.com'); await field('Senha').fill('senha1234'); await btn('Entrar').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
   ok('primeiros passos concluídos: o card não volta depois de entrar de novo', !(await headingShown('Primeiros passos')));
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
-  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
   // Na demonstração, as contas criadas existem só na memória da página: recarregar volta às boas-vindas e nada de
   // "Primeiros passos" fica gravado no aparelho (uma conta nova nunca herda o "Agora não" de outra com o mesmo identificador).
   await p.reload(); await waitText('Cuidar da vida financeira');
@@ -1672,7 +1672,7 @@ setInterval(async () => {
     (await p.locator('h1').filter({ hasText: /^Diferença do mês e saldo da conta$/ }).count()) === 1, p.url());
   await btn('Voltar à tarefa').click(); await waitText('Ver a assinatura');
   ok('"Voltar à tarefa" volta para a Conta, com o resumo ainda aberto', new URL(p.url()).pathname === '/conta' && (await saldoHint.getAttribute('aria-expanded')) === 'true', p.url());
-  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await expectTotals('depois de entrar de novo: outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
   await openToPay(); await waitText('Próximos meses');
@@ -10146,7 +10146,7 @@ setInterval(async () => {
     await tab().first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
   };
   const famConta = async () => { await famGoResumo(); await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
-  const famSignOut = async () => { await famConta(); await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira'); };
+  const famSignOut = async () => { await famConta(); await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira'); };
   const famTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
   const famGoFamilia = async () => { await famConta(); await p.getByRole('button', { name: /^(Criar Família|Abrir Família)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(500); };
   const famSelectorCount = () => p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count();
@@ -12198,10 +12198,10 @@ setInterval(async () => {
   await famCreateAccount('Iris Neves', 'iris.exclusao@exemplo.com');
   await famConta();
   const delContaCards = await delCards();
-  ok('Conta: "Excluir minha conta" é o último card, depois de "Sair deste aparelho"', delContaCards[delContaCards.length - 1] === 'Excluir minha conta' && (await visibleCount('button', 'Sair deste aparelho')) === 1, delContaCards.join(' | '));
+  ok('Conta: "Excluir minha conta" é o último card, depois de "Sair da conta"', delContaCards[delContaCards.length - 1] === 'Excluir minha conta' && (await visibleCount('button', 'Sair da conta')) === 1, delContaCards.join(' | '));
   t = await body();
   ok('Conta: o card explica e leva à tela ("Ver o que é apagado"), sem apagar nada ali', t.includes('Apaga a sua conta e os seus dados. Antes de confirmar, a próxima tela mostra o que é apagado e o que continua.') &&
-    (await visibleCount('button', 'Excluir minha conta: ver o que é apagado e o que continua')) === 1 && t.indexOf('Sair encerra a sessão neste aparelho.') < t.indexOf('Apaga a sua conta e os seus dados.'), t.slice(-700));
+    (await visibleCount('button', 'Excluir minha conta: ver o que é apagado e o que continua')) === 1 && t.indexOf('Você sai só neste aparelho.') < t.indexOf('Apaga a sua conta e os seus dados.'), t.slice(-700));
   // Sem destaque de alerta vermelho: nem o botão, nem o título, nem o card usam a cor de erro (#B42318) nem o fundo de erro.
   const delRed = await p.evaluate(() => {
     const card = [...document.querySelectorAll('[role=heading][aria-level="2"]')].find((e) => e.textContent === 'Excluir minha conta' && e.getBoundingClientRect().width > 0)?.parentElement;
@@ -12358,7 +12358,7 @@ setInterval(async () => {
   await p.goto(`http://localhost:${PORT}/conta-excluida?estado=nao-confirmada`); await waitText('Não foi possível confirmar a exclusão'); await p.waitForTimeout(500);
   t = await body();
   ok('Resposta perdida: título, texto (a conexão caiu, entrar de novo para conferir, e-mail livre ou conta como estava) e as duas saídas', (await famH1()) === 'Não foi possível confirmar a exclusão' &&
-    t.includes('A conexão caiu antes da resposta e a sessão terminou neste aparelho. Entre de novo para conferir: se a conta foi excluída, o seu e-mail está livre; se não, a conta e os seus dados continuam como estavam.') &&
+    t.includes('A conexão caiu antes da resposta e você saiu da conta neste aparelho. Entre de novo para conferir: se a conta foi excluída, o seu e-mail está livre; se não, a conta e os seus dados continuam como estavam.') &&
     (await visibleCount('button', 'Entrar')) === 1 && (await visibleCount('button', 'Voltar ao início')) === 1 && !t.includes('Sua conta foi excluída'), t.slice(0, 500));
   ok('Resposta perdida: tela de entrada, sem a barra de abas', (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0);
   await delKeep();

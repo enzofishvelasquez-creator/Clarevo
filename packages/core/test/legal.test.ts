@@ -106,9 +106,9 @@ describe('textos de privacidade e termos no app', () => {
     expect(LEGAL_TEXT.account.deletion).toBe('Excluir conta: como funciona');
     const conta = ler('apps/app/src/app/conta.tsx');
     expect(conta).toMatch(/\{SITE_URL \? \(/);
-    // A seção vem antes de "Sair deste aparelho", e "Excluir minha conta" continua sendo o último item.
-    expect(conta.indexOf('LEGAL_TEXT.account.title')).toBeLessThan(conta.indexOf('label="Sair deste aparelho"'));
-    expect(conta.indexOf('label="Sair deste aparelho"')).toBeLessThan(conta.indexOf('DELETE_TEXT.entry}'));
+    // A seção vem antes de "Sair da conta", e "Excluir minha conta" continua sendo o último item.
+    expect(conta.indexOf('LEGAL_TEXT.account.title')).toBeLessThan(conta.indexOf('label="Sair da conta"'));
+    expect(conta.indexOf('label="Sair da conta"')).toBeLessThan(conta.indexOf('DELETE_TEXT.entry}'));
     expect(conta.lastIndexOf('<Card')).toBeGreaterThan(conta.indexOf('DELETE_TEXT.entry}') - 400);
   });
 
