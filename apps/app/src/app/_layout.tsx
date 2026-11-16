@@ -1,10 +1,11 @@
 // Manrope em subconjunto Latin (português do Brasil), gerado de @expo-google-fonts/manrope por `scripts/gerar-fontes.js`: cinco
 // arquivos de 34 KB no lugar de cinco de 97 KB (D-063 item 2, docs/19). O pacote continua instalado, mas não é importado. Só os
 // pesos usados (`fonts` em theme/tokens.ts). `packages/core/test/fontes.test.ts` confere que todo caractere dos textos está neles.
-import { sessionEndAfterDeletion } from '@clarevo/core';
+import { pathFromAppLink, sessionEndAfterDeletion } from '@clarevo/core';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, useGlobalSearchParams, usePathname, type Href } from 'expo-router';
 import { useFonts } from 'expo-font';
+import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
@@ -57,11 +58,27 @@ const ENTRY_PATH =
 function readEntryTarget(): string | null {
   if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.location) return null;
   const { pathname, search } = window.location;
+  return entryFrom(pathname, search);
+}
+
+/** O destino que pode ser retomado: só as telas de `ENTRY_PATH`, sem parâmetros de links de e-mail. */
+function entryFrom(pathname: string, search: string): string | null {
   if (!ENTRY_PATH.test(pathname)) return null;
   const params = new URLSearchParams(search);
   for (const key of [...params.keys()]) if (/token|code|type|error/i.test(key)) params.delete(key);
   const query = params.toString();
   return query ? `${pathname}?${query}` : pathname;
+}
+
+/**
+ * No celular, o endereço `clarevo://` que abriu o app fechado (o widget "Anotar gasto", item 16 do teste em aparelho de 16/11/2026).
+ * Como na web, enquanto a sessão é conferida as rotas protegidas levam à tela de carregamento e o destino se perderia.
+ */
+function entryFromAppLink(url: string | null): string | null {
+  const path = url ? pathFromAppLink(url) : null;
+  if (!path) return null;
+  const at = path.indexOf('?');
+  return at < 0 ? entryFrom(path, '') : entryFrom(path.slice(0, at), path.slice(at));
 }
 
 /** Lido uma vez, ao carregar o app, antes de a navegação trocar o endereço. */
@@ -194,14 +211,36 @@ function Navigation() {
   const signedOut = ready && !user;
   const inRecovery = Boolean(user && recovery);
 
-  // Endereço pedido ao abrir a versão web: depois de entrar (ou de conferir a sessão), a pessoa chega à tela pedida.
-  // Roda depois de "carregando" decidir o destino (efeitos do pai rodam depois dos do filho), então prevalece.
+  // No celular, o link que abriu o app fechado (widget): lido uma vez e retomado como o endereço da web.
+  const [appLinkTarget, setAppLinkTarget] = useState<string | null>(null);
   useEffect(() => {
-    if (!user || inRecovery || status !== 'pronto' || !hasEntryTarget()) return;
+    if (Platform.OS === 'web') return;
+    let alive = true;
+    Linking.getInitialURL()
+      .then((url) => {
+        const target = entryFromAppLink(url);
+        if (alive && target) setAppLinkTarget(target);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Endereço pedido ao abrir a versão web (ou o link que abriu o app no celular): depois de entrar (ou de conferir a sessão), a pessoa
+  // chega à tela pedida. Roda depois de "carregando" decidir o destino (efeitos do pai rodam depois dos do filho), então prevalece.
+  useEffect(() => {
+    if (!user || inRecovery || status !== 'pronto') return;
+    if (appLinkTarget) {
+      setAppLinkTarget(null);
+      restoreTarget(appLinkTarget);
+      return;
+    }
+    if (!hasEntryTarget()) return;
     const target = takeEntryTarget();
     if (!target) return;
     restoreTarget(target);
-  }, [status, user, inRecovery]);
+  }, [status, user, inRecovery, appLinkTarget]);
 
   return (
     <SpaceStatusContext value={{ status, retry: () => space.refetch() }}>

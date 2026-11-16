@@ -18,6 +18,7 @@ import {
   summarizeToPay,
   widgetContentToday,
   widgetUrl,
+  pathFromAppLink,
   type Commitment,
   type WidgetInput,
   type WidgetSyncPlan,
@@ -253,6 +254,14 @@ describe('widget do iOS: a função que a extensão executa', () => {
     const medium = renderLayout(widget.layout, snapshot, 'systemMedium');
     expect(modifierArgs(medium, 'widgetURL')).toEqual([[widgetUrl(WIDGET_ROUTES.payables)]]);
     expect(widgetUrl(WIDGET_ROUTES.payables)).toBe('clarevo://a-pagar');
+    // O inverso: o caminho que o app retoma quando abre fechado por um widget (item 16 do teste em aparelho).
+    for (const route of Object.values(WIDGET_ROUTES)) expect(pathFromAppLink(widgetUrl(route))).toBe(route);
+    expect(pathFromAppLink('clarevo:///a-pagar')).toBe('/a-pagar');
+    expect(pathFromAppLink('CLAREVO://a-pagar#topo')).toBe('/a-pagar');
+    expect(pathFromAppLink('clarevo://')).toBeNull();
+    expect(pathFromAppLink('clarevo://?x=1')).toBeNull();
+    expect(pathFromAppLink('https://app.clarevo.app.br/a-pagar')).toBeNull();
+    expect(pathFromAppLink('exp+clarevo://expo-development-client/?url=x')).toBeNull();
     const small = renderLayout(widget.layout, snapshot, 'systemSmall');
     expect(texts(small)).toEqual(['Anotar gasto']);
     expect(modifierArgs(small, 'widgetURL')).toEqual([[widgetUrl(WIDGET_ROUTES.note)]]);

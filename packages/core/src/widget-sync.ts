@@ -49,6 +49,19 @@ export function widgetUrl(route: string): string {
   return `${WIDGET_NATIVE.scheme}:/${route.startsWith('/') ? route : `/${route}`}`;
 }
 
+/**
+ * O caminho do app num endereço `clarevo://` (o inverso de `widgetUrl`): "clarevo://registro/novo?tipo=despesa" vira
+ * "/registro/novo?tipo=despesa". Usado ao abrir o app fechado por um widget ou por outro link do app (item 16 do teste em aparelho,
+ * 16/11/2026), quando a sessão ainda está sendo conferida e o destino se perderia. Outro esquema, ou só o esquema, devolve null.
+ */
+export function pathFromAppLink(url: string): string | null {
+  const prefix = `${WIDGET_NATIVE.scheme}:`;
+  if (!url.toLowerCase().startsWith(prefix)) return null;
+  const rest = url.slice(prefix.length).replace(/^\/+/, '');
+  if (!rest || rest.startsWith('?') || rest.startsWith('#')) return null;
+  return `/${rest.split('#')[0]}`;
+}
+
 export type WidgetSyncPlan =
   | {
       /** Nada a gravar: demonstração (dados fictícios) ou contas ainda não lidas. */
