@@ -8630,7 +8630,9 @@ setInterval(async () => {
   });
   await btn('Cancelar').click(); await waitText('Diferença do mês');
   await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(400);
-  ok('CL-11 Metas: o cabeçalho mostra o contexto "Demonstração · Pessoal" e o selo da demonstração', (await p.locator('[aria-label="Espaço: Demonstração · Pessoal"]').filter({ visible: true }).count()) === 1 &&
+  // Nas abas, o selo "Demonstração" fica ao lado do logotipo e a pílula diz só o contexto (revisão de 16/11/2026: sem os dois selos juntos).
+  ok('CL-11 Metas: o cabeçalho mostra o selo da demonstração e o contexto "Pessoal", sem repetir "Demonstração" na pílula', (await p.locator('[aria-label="Espaço: Pessoal"]').filter({ visible: true }).count()) === 1 &&
+    (await p.locator('[aria-label="Espaço: Demonstração · Pessoal"]').filter({ visible: true }).count()) === 0 &&
     (await p.locator('[aria-label^="Demonstração: acesso simulado"]').filter({ visible: true }).count()) === 1);
   await atWidths(async (w) => { await layoutChecks(`CL-11 Metas ${w}px`); if (w === 320) await shot('CL11_metas_demonstracao_320px'); });
   await goResumo();

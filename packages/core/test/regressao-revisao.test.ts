@@ -294,6 +294,9 @@ describe('CL-11: demonstração visível nos formulários e em Metas', () => {
     expect(contextPillText('Importando em Pessoal', true)).toBe('Demonstração · Pessoal');
     expect(contextPillText('Pessoal', true)).toBe('Demonstração · Pessoal');
     expect(contextPillText('Família', true)).toBe('Demonstração · Família');
+    // Nas abas, o selo já está ao lado do logotipo: a pílula diz só o contexto.
+    expect(contextPillText('Pessoal', true, true)).toBe('Pessoal');
+    expect(contextPillText('Família', true, true)).toBe('Família');
     expect(contextPillText('Salvando em Pessoal', false)).toBe('Salvando em Pessoal');
     expect(contextPillText('Pessoal', false)).toBe('Pessoal');
     expect(DEMO_TEXT.saveNote).toBe('Fica só nesta demonstração, com dados fictícios.');
@@ -325,7 +328,7 @@ describe('CL-11: demonstração visível nos formulários e em Metas', () => {
       for (const line of lines) expect(line, `${file}: ${line.trim()}`).toMatch(/ContextPill|^\s*(\/\/|\*|\/\*)/);
     }
     const header = read('apps/app/src/components/header.tsx');
-    expect(header).toContain('contextPillText(label, demo)');
+    expect(header).toContain('contextPillText(label, demo, inTab)');
     expect(header).toContain("auth.mode === 'demo'");
   });
 
