@@ -50,6 +50,8 @@ export const ACCOUNTS_TEXT = {
   manage: 'Gerenciar contas de origem',
   limitNote: 'Você tem 10 contas ativas. Arquive uma para adicionar outra.',
   balanceNote: 'A Clarevo não calcula saldo por conta.',
+  /** Tela "Sua primeira conta": não há campo de saldo (o app não calcula saldo). */
+  firstAccountNote: 'A Clarevo mostra o que entrou e o que saiu no mês. Ela não mostra o saldo do banco.',
   /** Seletores. */
   out: 'Saiu de',
   into: 'Entrou em',

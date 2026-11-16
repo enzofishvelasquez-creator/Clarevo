@@ -1,4 +1,4 @@
-import { deviceTimeZone, isRepoError } from '@clarevo/core';
+import { ACCOUNT_NAME_MAX, ACCOUNTS_TEXT, deviceTimeZone, isRepoError } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Landmark } from 'lucide-react-native';
 import { useState } from 'react';
@@ -23,7 +23,7 @@ export default function PrimeiraConta() {
   const submit = async () => {
     if (busy) return;
     const trimmed = name.trim();
-    if (trimmed.length < 1 || trimmed.length > 40) {
+    if (trimmed.length < 1 || [...trimmed].length > ACCOUNT_NAME_MAX) {
       setError('Dê um nome de 1 a 40 caracteres para a conta.');
       return;
     }
@@ -50,12 +50,9 @@ export default function PrimeiraConta() {
           <Landmark size={48} color={colors.brandText} />
         </View>
       }>
-      <TextField label="Nome da conta" value={name} onChangeText={setName} maxLength={60} error={error} onSubmitEditing={submit} />
+      <TextField label="Nome da conta" value={name} onChangeText={setName} maxLength={ACCOUNT_NAME_MAX} error={error} onSubmitEditing={submit} />
       <Card style={{ backgroundColor: colors.brandTint, gap: space[1] }}>
-        <Txt variant="label">Saldo inicial não é obrigatório.</Txt>
-        <Txt variant="caption" color={colors.textSecondary}>
-          Sem ele, a Clarevo mostra a diferença do mês, mas não calcula o saldo da conta.
-        </Txt>
+        <Txt variant="label">{ACCOUNTS_TEXT.firstAccountNote}</Txt>
       </Card>
       {banner ? (
         <Banner tone="erro" icon={AlertCircle}>
