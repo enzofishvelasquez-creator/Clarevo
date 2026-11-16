@@ -2286,7 +2286,7 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
 
   it('o que a tela promete e o que ela não promete', () => {
     expect(IMPORT_TEXT.rowTitle).toBe('Importar extrato ou fatura');
-    expect(IMPORT_TEXT.rowCaption).toBe('Arquivo OFX ou planilha do banco');
+    expect(IMPORT_TEXT.rowCaption).toBe('Arquivo PDF, OFX ou planilha do banco');
     expect(IMPORT_TEXT.labels.ja_anotado).toBe('Já anotado');
     expect(IMPORT_TEXT.labels.pagamento_fatura).toBe('Parece pagamento de fatura');
     expect(IMPORT_TEXT.labels.transferencia).toBe('Parece transferência');

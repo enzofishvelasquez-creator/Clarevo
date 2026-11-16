@@ -58,7 +58,7 @@ function ConfigMissing() {
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: colors.surface }}>
       <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' }}>Configuração incompleta</Text>
       <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
-        Este aplicativo foi gerado sem a ligação com o servidor. Consulte docs/05_SUPABASE.md.
+        Este aplicativo foi gerado sem a ligação com o servidor. Atualize o app ou fale com o suporte.
       </Text>
     </View>
   );

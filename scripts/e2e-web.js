@@ -790,7 +790,7 @@ setInterval(async () => {
     // D-041: a categoria mais perto do limite (Lazer: parcela do tênis e restaurante, R$ 400,00 de R$ 300,00).
     orcamento: 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00',
     // D-048: Importar extrato ou fatura, com a legenda fixa, entre o Orçamento e as calculadoras.
-    importar: 'Importar extrato ou fatura, Arquivo OFX ou planilha do banco',
+    importar: 'Importar extrato ou fatura, Arquivo PDF, OFX ou planilha do banco',
     calc: 'Calculadoras, Parcelado ou à vista, dívidas, reserva e outras contas',
   };
   await waitText('7 cadastrados, com as contas do ano').catch(() => {});
@@ -800,7 +800,7 @@ setInterval(async () => {
     return { anotar: top('[role=button]', 'Anotar gasto'), organizar: top('[role=heading]', 'Organizar'), totais: top('div[dir="auto"]', 'Pago em outubro') };
   });
   ok('movimentações: "Organizar" com os seis atalhos (Orçamento por categoria e Importar extrato ou fatura entre Cartões e as calculadoras) e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.orcamento, SC.importar, SC.calc]) &&
-    ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Arquivo OFX ou planilha do banco', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
+    ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Arquivo PDF, OFX ou planilha do banco', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
     scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.anotar < scOrder.organizar && scOrder.organizar < scOrder.totais, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
   await layoutChecks('movimentações com atalhos 390px');
   await scrollTo('Organizar');
@@ -7937,7 +7937,7 @@ setInterval(async () => {
   // ---- 1. A porta em Movimentos › Organizar, na busca "No app" e em Conta ----
   await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(500);
   const i1Rows = await sectionRows('Organizar');
-  ok('I1 Organizar: "Importar extrato ou fatura" com a legenda "Arquivo OFX ou planilha do banco" depois do Orçamento e antes das calculadoras', i1Rows !== null && i1Rows.length === 6 && i1Rows[4] === SC.importar && /^Calculadoras, /.test(i1Rows[5]), JSON.stringify(i1Rows));
+  ok('I1 Organizar: "Importar extrato ou fatura" com a legenda "Arquivo PDF, OFX ou planilha do banco" depois do Orçamento e antes das calculadoras', i1Rows !== null && i1Rows.length === 6 && i1Rows[4] === SC.importar && /^Calculadoras, /.test(i1Rows[5]), JSON.stringify(i1Rows));
   await atWidths(async (w) => { await layoutChecks(`I1 Organizar com a linha de importar ${w}px`); if (w === 390) { await scrollTo('Organizar'); await shot('300_importar_organizar'); } if (w === 320) { await scrollTo('Organizar'); await shot('300_importar_organizar_320px'); } });
   await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
   let t1 = await i1Keep();
@@ -7948,7 +7948,7 @@ setInterval(async () => {
   await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
   for (const query of ['importar', 'extrato', 'ofx', 'banco', 'planilha']) {
     await learnSearch().fill(query); await waitText('No app'); await p.waitForTimeout(400);
-    ok(`I1 busca "${query}" em Aprender: o grupo "No app" tem "Importar extrato ou fatura"`, (await p.getByRole('button', { name: /^Importar extrato ou fatura\. Arquivo OFX ou planilha do banco/ }).filter({ visible: true }).count()) === 1);
+    ok(`I1 busca "${query}" em Aprender: o grupo "No app" tem "Importar extrato ou fatura"`, (await p.getByRole('button', { name: /^Importar extrato ou fatura\. Arquivo PDF, OFX ou planilha do banco/ }).filter({ visible: true }).count()) === 1);
   }
   await learnSearch().fill('fatura'); await waitText('No app'); await p.waitForTimeout(400);
   ok('I1 busca "fatura": Cartões continua em primeiro e a importação também aparece', (await p.getByRole('button', { name: /^Cartões\. / }).filter({ visible: true }).count()) === 1 && (await p.getByRole('button', { name: /^Importar extrato ou fatura\. / }).filter({ visible: true }).count()) === 1);
@@ -8149,7 +8149,7 @@ setInterval(async () => {
   // ---- 6. Planilha sem cabeçalho conhecido: escolher as colunas ----
   await i1Open(); await i1Pick(i1NoHeader); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
   t1 = await i1Keep();
-  ok('I1 sem cabeçalho: a tela de colunas, com a primeira linha lida como lançamento (a caixa "A primeira linha tem os nomes das colunas" desmarcada) e as colunas já chutadas', t1.includes('Não reconhecemos os nomes das colunas.') && t1.includes('01/10/2026 | PADARIA | -45,90 | x') &&
+  ok('I1 sem cabeçalho: a tela de colunas, com a primeira linha lida como lançamento (a caixa "A primeira linha tem os nomes das colunas" desmarcada) e as colunas já chutadas', t1.includes('A Clarevo não reconheceu os nomes das colunas.') && t1.includes('01/10/2026 | PADARIA | -45,90 | x') &&
     (await p.getByRole('checkbox', { name: 'A primeira linha tem os nomes das colunas' }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'false' &&
     (await p.getByRole('radio', { name: /^Data, Coluna 1: 01\/10\/2026/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true' && (await p.getByRole('radio', { name: /^Descrição, Coluna 2: PADARIA/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true' &&
     (await p.getByRole('radio', { name: /^Valor, Coluna 3: -45,90/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true', t1.slice(0, 500));
@@ -8200,7 +8200,7 @@ setInterval(async () => {
     ok(`I1 ${name}: a mensagem aparece junto do botão e nada é lido`, x.includes(text) && (await visibleCount('button', 'Escolher o arquivo')) === 1 && (await visibleCount('button', 'Revisar as linhas')) === 0);
   };
   // D-078 A: PDF agora é lido; um PDF quebrado (sem páginas) não abre e a mensagem explica o que fazer.
-  await i1Bad(i1Pdf, 'Não conseguimos abrir este PDF. Se ele tem senha, peça ao banco o extrato sem senha, em OFX ou CSV.', 'PDF que não abre');
+  await i1Bad(i1Pdf, 'A Clarevo não conseguiu abrir este PDF. Se ele tem senha, peça ao banco o extrato sem senha, em OFX ou CSV.', 'PDF que não abre');
   await atWidths(async (w) => { await innerChecks(`I1 arquivo que não serve ${w}px`); if (w === 390) await shot('311_importar_arquivo_invalido'); });
   await i1Bad(i1Big, 'O arquivo passa de 5 MB. Peça ao banco um período menor.', 'arquivo maior que 5 MB');
   await i1Bad(i1Many, 'O arquivo tem mais de 5.000 linhas. Peça ao banco um período menor.', 'arquivo com mais de 5.000 linhas');

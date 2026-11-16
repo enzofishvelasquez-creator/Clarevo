@@ -15,7 +15,7 @@ const num = (n: number) => n.toLocaleString('pt-BR');
 export const IMPORT_TEXT = {
   /** Linha de Movimentos › Organizar, a busca "No app" e o atalho em Conta › Bancos e carteira. */
   rowTitle: 'Importar extrato ou fatura',
-  rowCaption: 'Arquivo OFX ou planilha do banco',
+  rowCaption: 'Arquivo PDF, OFX ou planilha do banco',
   accountsShortcut: 'Importar extrato',
   accountsShortcutHint: 'Traz os gastos e recebimentos de um arquivo do banco.',
   screenTitle: 'Importar extrato ou fatura',
@@ -44,7 +44,7 @@ export const IMPORT_TEXT = {
   continueToReview: 'Revisar as linhas',
   /** Planilha sem cabeçalho conhecido. */
   columnsTitle: 'Quais colunas são quais?',
-  columnsIntro: 'Não reconhecemos os nomes das colunas. Escolha qual é a data, a descrição e o valor.',
+  columnsIntro: 'A Clarevo não reconheceu os nomes das colunas. Escolha qual é a data, a descrição e o valor.',
   columnDate: 'Data',
   columnDescription: 'Descrição',
   columnAmount: 'Valor',
@@ -116,7 +116,7 @@ export const IMPORT_TEXT = {
     `Pode ser a parcela ${num(number)} de ${num(count)} ou só a data ${String(number).padStart(2, '0')}/${String(count).padStart(2, '0')}. Se for a parcela, marque. Se for a data, tire ${String(number).padStart(2, '0')}/${String(count).padStart(2, '0')} da descrição e marque: entra à vista.`,
   /** Rodapé. */
   importButton: (n: number) => (n === 0 ? 'Importar' : `Importar ${num(n)} ${plural(n, 'lançamento', 'lançamentos')}`),
-  importing: (done: number, total: number) => `Importando… lote ${num(done)} de ${num(total)}`,
+  importing: (done: number, total: number) => `Importando… parte ${num(done)} de ${num(total)}`,
   showMore: (n: number, rest: number) => `Mostrar mais ${num(n)} (${num(rest)} ${plural(rest, 'linha restante', 'linhas restantes')})`,
   prepareFailed: 'Não foi possível preparar a revisão agora. Tente de novo.',
   nothingSelected: 'Marque ao menos uma linha para importar.',
@@ -158,17 +158,17 @@ export const IMPORT_ERROR_TEXT: Record<ImportErrorCode, string> = {
   arquivo_vazio: 'O arquivo está vazio.',
   arquivo_grande: 'O arquivo passa de 5 MB. Peça ao banco um período menor.',
   linhas_demais: `O arquivo tem mais de ${IMPORT_MAX_LINES.toLocaleString('pt-BR')} linhas. Peça ao banco um período menor.`,
-  formato_desconhecido: 'Não reconhecemos este arquivo. Use um OFX ou uma planilha CSV do banco.',
+  formato_desconhecido: 'A Clarevo não reconheceu este arquivo. Use um PDF, um OFX ou uma planilha CSV do banco.',
   arquivo_pdf: 'Este arquivo é um PDF, e neste aparelho a Clarevo ainda não lê extrato em PDF. No app ou no site do banco, procure a opção de exportar o extrato em OFX ou CSV.',
   pdf_sem_lancamentos:
-    'Não achamos lançamentos neste PDF. Confira se é o extrato ou a fatura (com data, descrição e valor em cada linha) ou peça ao banco o arquivo em OFX ou CSV.',
-  pdf_ilegivel: 'Não conseguimos abrir este PDF. Se ele tem senha, peça ao banco o extrato sem senha, em OFX ou CSV.',
+    'A Clarevo não achou lançamentos neste PDF. Confira se é o extrato ou a fatura (com data, descrição e valor em cada linha) ou peça ao banco o arquivo em OFX ou CSV.',
+  pdf_ilegivel: 'A Clarevo não conseguiu abrir este PDF. Se ele tem senha, peça ao banco o extrato sem senha, em OFX ou CSV.',
   pdf_paginas_demais: 'O PDF passa de 30 páginas. Peça ao banco o extrato de um período menor, ou em OFX ou CSV.',
   planilha_excel: 'Este arquivo é uma planilha de Excel. Abra a planilha, salve uma cópia no formato CSV e escolha esse arquivo de novo.',
-  sem_lancamentos: 'Não achamos lançamentos neste arquivo.',
+  sem_lancamentos: 'A Clarevo não achou lançamentos neste arquivo.',
   moeda_diferente: 'Este arquivo não está em reais. A Clarevo importa só valores em reais.',
-  ofx_invalido: 'Este arquivo OFX não tem um extrato que possamos ler.',
-  csv_invalido: 'Não conseguimos ler esta planilha. Confira se é um CSV do banco.',
+  ofx_invalido: 'A Clarevo não achou neste arquivo OFX um extrato que consiga ler.',
+  csv_invalido: 'A Clarevo não conseguiu ler esta planilha. Confira se é um CSV do banco.',
 };
 
 /** Erros ao importar (códigos do banco), com a posição da linha quando houver. */
@@ -176,7 +176,7 @@ export const IMPORT_SAVE_ERROR_TEXT: Record<string, string> = {
   itens_invalidos: 'O pedido de importação não está completo. Revise as linhas e tente de novo.',
   destino_invalido: 'Escolha de novo a conta ou o cartão.',
   conta_invalida: 'Este banco ou carteira não está disponível. Escolha outro ativo.',
-  nao_encontrado: 'Não encontramos este cartão. Escolha de novo.',
+  nao_encontrado: 'Este cartão não está mais disponível. Escolha de novo.',
   cartao_arquivado: 'Este cartão está arquivado. Reative o cartão ou escolha outro.',
   fatura_paga: 'Uma das linhas cai numa fatura que já foi paga. Desmarque a linha ou desfaça o pagamento da fatura.',
   limite_de_lancamentos: 'O cartão chegou ao limite de 5.000 lançamentos.',
