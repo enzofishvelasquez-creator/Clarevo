@@ -87,7 +87,7 @@ describe('rascunho do comprovante', () => {
     expect(comprovanteGaps(draftOf({ counterpart: null })).name).toBe('O nome não apareceu no comprovante. Digite uma descrição.');
     // Com a mensagem do comprovante, a descrição tem de onde vir.
     expect(comprovanteGaps(draftOf({ counterpart: null, message: 'Almoço' })).name).toBeNull();
-    expect(comprovanteGaps(draftOf({ directionGuessed: true })).guessed).toBe('O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo.');
+    expect(comprovanteGaps(draftOf({ directionGuessed: true })).guessed).toBe('O comprovante não diz se o dinheiro saiu ou entrou. Vale o tipo desta tela. Confira se está certo.');
   });
 });
 

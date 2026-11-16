@@ -86,7 +86,7 @@ export const SIGNUP_SOURCE_TEXT = {
   /** O título do cartão do Resumo e do card de Conta. */
   title: 'Como você conheceu a Clarevo?',
   /** A linha curta ao lado: o que é, para que serve e que é opcional. */
-  note: 'Opcional. Usamos só para contar, sem identificar ninguém, de onde as pessoas chegam.',
+  note: 'Opcional. A Clarevo usa só para contar, sem identificar ninguém, de onde as pessoas chegam.',
   /** O nome acessível do grupo de opções. */
   groupA11y: 'Como você conheceu a Clarevo? Escolha uma opção. É opcional.',
   /** Fecha o cartão por 30 dias. */

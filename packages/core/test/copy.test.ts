@@ -1232,7 +1232,7 @@ describe('textos de notas fiscais (Ciclo E)', () => {
     }
     // Só o aviso de privacidade fala em CPF, e é para dizer que não guardamos.
     expect(texts.filter((t) => /\bCPF\b/i.test(t))).toEqual([NOTA_TEXT.privacy]);
-    expect(NOTA_TEXT.privacy).toMatch(/Não guardamos CPF/);
+    expect(NOTA_TEXT.privacy).toMatch(/Não guarda CPF/);
     for (const file of ['nota.ts', 'danfe.ts']) {
       const source = readFileSync(join(CORE_SRC, file), 'utf8');
       expect(source, file).not.toMatch(FORBIDDEN);
@@ -1284,7 +1284,7 @@ describe('textos das telas de notas fiscais (Ciclo E, passo 3)', () => {
       expect(t, t).not.toMatch(/\bobrigad[oa]\b|\bbem-vind[oa]\b|\bo usu[áa]rio\b|\ba usu[áa]ria\b|\bcliente\b/i);
     }
     // A privacidade da nota é dita em NOTA_TEXT.privacy (único texto que cita CPF).
-    expect(NOTA_TEXT.privacy).toMatch(/Não guardamos CPF/);
+    expect(NOTA_TEXT.privacy).toMatch(/Não guarda CPF/);
     expect(NOTA_FLOW_TEXT.cameraIntro).toBe('A Clarevo usa a câmera só para ler o código da nota. Nenhuma foto é guardada.');
     for (const file of ['sefaz-page.ts', 'nota-flow.ts']) {
       const source = readFileSync(join(CORE_SRC, file), 'utf8');
@@ -2547,7 +2547,7 @@ describe('textos do comprovante de Pix e de pagamento (D-051)', () => {
     expect(COMPROVANTE_TEXT.lineHintPdf).toBe('Comprovante, holerite ou nota de serviço em PDF, lido aqui no aparelho');
     expect(COMPROVANTE_TEXT.note.privacy).toContain('aqui no aparelho');
     for (const word of ['CPF', 'CNPJ', 'endereço', 'chave da nota']) expect(COMPROVANTE_TEXT.note.privacy, word).toContain(word);
-    expect(COMPROVANTE_TEXT.filled).toBe('Preenchemos o que o comprovante informa. Confira e toque em Salvar.');
+    expect(COMPROVANTE_TEXT.filled).toBe('A Clarevo preencheu o que o comprovante informa. Confira e toque em Salvar.');
     expect(COMPROVANTE_TEXT.looksNotedHint).toBe('Pode ser o mesmo lançamento. Se for outro, é só salvar.');
     expect(COMPROVANTE_TEXT.looksNoted('2026-10-05', 'Padaria', 8500)).toBe('Parece já anotado em 05/10/2026: Padaria, R$ 85,00.');
     expect(COMPROVANTE_TEXT.switchToIncome).toBe('É um recebimento');
@@ -3713,7 +3713,7 @@ describe('"Como você conheceu a Clarevo?" (D-067, item 2)', () => {
 
   it('as frases pedidas, exatamente, e as seis opções na ordem', () => {
     expect(SIGNUP_SOURCE_TEXT.title).toBe('Como você conheceu a Clarevo?');
-    expect(SIGNUP_SOURCE_TEXT.note).toBe('Opcional. Usamos só para contar, sem identificar ninguém, de onde as pessoas chegam.');
+    expect(SIGNUP_SOURCE_TEXT.note).toBe('Opcional. A Clarevo usa só para contar, sem identificar ninguém, de onde as pessoas chegam.');
     expect(SIGNUP_SOURCES.map((s) => SIGNUP_SOURCE_LABEL[s])).toEqual([
       'Instagram',
       'Indicação de alguém',

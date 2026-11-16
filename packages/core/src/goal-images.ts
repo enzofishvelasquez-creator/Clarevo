@@ -90,7 +90,7 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
     contextWords: ['pos', 'mensalidade', 'carreira'],
   },
   { key: 'casamento', label: 'Casamento', alt: 'Duas alianças', words: ['casamento', 'casar', 'noivado', 'noiva', 'noivo', 'aliancas', 'cha de panela'] },
-  { key: 'bebe', label: 'Bebê', alt: 'Sapatinhos de bebê', words: ['bebe', 'filho', 'filha', 'filhos', 'gravidez', 'enxoval', 'maternidade', 'paternidade', 'parto', 'pos parto'] },
+  { key: 'bebe', label: 'Bebê', alt: 'Sapatinhos de bebê', words: ['bebe', 'filho', 'filha', 'filhos', 'filhas', 'crianca', 'criancas', 'gravidez', 'enxoval', 'maternidade', 'paternidade', 'parto', 'pos parto'] },
   {
     key: 'tecnologia',
     label: 'Tecnologia',

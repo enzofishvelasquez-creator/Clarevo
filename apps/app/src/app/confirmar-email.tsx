@@ -55,7 +55,7 @@ export default function ConfirmarEmail() {
     try {
       await auth.resendConfirmation(email);
       setCooldown(RESEND_INTERVAL_SECONDS);
-      setMessage({ tone: 'info', text: 'Enviamos um novo link.' });
+      setMessage({ tone: 'info', text: 'A Clarevo enviou um novo link.' });
     } catch (e) {
       if (e instanceof AuthError && e.code === 'aguarde' && e.retryAfterSeconds) setCooldown(e.retryAfterSeconds);
       else setMessage({ tone: 'erro', text: 'Não foi possível reenviar agora. Tente de novo em instantes.' });

@@ -792,10 +792,10 @@ export const COMMITTED_TEXT = {
   upcomingTitle: 'Próximos meses',
   upcomingLegend: 'Previsto: contas já criadas e repetições programadas. Valores estimados podem mudar.',
   milestonesTitle: 'O que muda',
-  howTitle: 'Como calculamos',
+  howTitle: 'Como a Clarevo calcula',
   /** Critério escrito do mês mostrado. */
   how: (month: IsoMonth) =>
-    `Somamos as contas a pagar com vencimento em ${formatMonthName(month)}: o valor pago das que já foram pagas e o valor previsto das que estão em aberto. ` +
+    `A Clarevo soma as contas a pagar com vencimento em ${formatMonthName(month)}: o valor pago das que já foram pagas e o valor previsto das que estão em aberto. ` +
     'Gastos anotados sem conta a pagar, como mercado, ficam fora. Por isso este número é diferente de Pago e de Ainda a pagar.',
   howLink: 'Como ler este número',
   /** Compras no cartão entram pela fatura (D-037); não é dívida. */
@@ -809,7 +809,7 @@ export const COMMITTED_TEXT = {
   // Tela /renda-comprometida/referencia.
   reference: {
     title: 'Renda de referência',
-    intro: 'Quanto costuma cair na sua conta por mês, já com descontos. Usamos esse valor só para calcular percentuais. Ele não conta como recebido.',
+    intro: 'Quanto costuma cair na sua conta por mês, já com descontos. A Clarevo usa esse valor só para calcular percentuais. Ele não conta como recebido.',
     amountLabel: 'Valor por mês',
     /** "Nos meses com recebimentos anotados, a média foi R$ 6.000,00 (setembro). Reembolsos ficam fora." */
     suggestion: (cents: Cents, months: readonly IsoMonth[]) =>
@@ -819,12 +819,12 @@ export const COMMITTED_TEXT = {
     fromLabel: 'Vale a partir de',
     fixed: 'Minha renda é fixa',
     varies: 'Minha renda varia',
-    variesHint: 'Vamos pedir uma revisão no começo de cada mês.',
+    variesHint: 'A Clarevo pede uma revisão no começo de cada mês.',
     save: 'Salvar renda de referência',
     delete: 'Excluir esta referência',
     /** "Excluir a renda de referência de outubro?" */
     deleteTitle: (fromMonth: IsoMonth) => `Excluir a renda de referência de ${formatMonthName(fromMonth)}?`,
-    deleteBody: 'A referência anterior volta a valer. Sem nenhuma, mostramos só os valores em reais.',
+    deleteBody: 'A referência anterior volta a valer. Sem nenhuma, aparecem só os valores em reais.',
     deleteConfirm: 'Excluir referência',
     cancel: 'Cancelar',
     /** "Renda de referência salva. Ela vale a partir de outubro." */

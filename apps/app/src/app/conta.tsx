@@ -113,7 +113,7 @@ export default function ContaScreen() {
       setCooldown(RESEND_INTERVAL_SECONDS);
       setSecurityMsg({
         tone: 'info',
-        text: auth.mode === 'demo' ? 'Demonstração: nenhum e-mail é enviado.' : `Enviamos um link para ${user.email}. Abra o link para definir a nova senha.`,
+        text: auth.mode === 'demo' ? 'Demonstração: nenhum e-mail é enviado.' : `A Clarevo enviou um link para ${user.email}. Abra o link para definir a nova senha.`,
       });
     } catch (e) {
       if (e instanceof AuthError && e.code === 'aguarde' && e.retryAfterSeconds) setCooldown(e.retryAfterSeconds);

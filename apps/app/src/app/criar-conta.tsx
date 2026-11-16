@@ -27,7 +27,7 @@ export default function CriarConta() {
   const submit = async () => {
     if (busy) return;
     const errs: Errors = {};
-    if (!name.trim()) errs.name = 'Diga como podemos chamar você.';
+    if (!name.trim()) errs.name = 'Diga como a Clarevo pode chamar você.';
     else if (name.trim().length > 80) errs.name = 'Use no máximo 80 caracteres.';
     const e = emailProblem(email);
     if (e) errs.email = e;

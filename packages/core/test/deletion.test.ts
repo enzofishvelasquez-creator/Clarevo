@@ -112,12 +112,12 @@ describe('autoria de quem excluiu a conta (regra 3)', () => {
       member({ personId: 'x', firstName: FAMILY_DEPARTED_NAME, status: 'ex-membro', leftAt: '2026-10-06T00:00:00.000Z' }),
     ];
     expect(authorLabel(members, 'a')).toBe('Ana (você)');
-    expect(authorLabel(members, 'n')).toBe('ex-membro · Nina');
+    expect(authorLabel(members, 'n')).toBe('Nina (saiu da Família)');
     expect(authorLabel(members, 'x')).toBe('Pessoa que saiu');
     expect(FAMILY_TEXT.exMember(FAMILY_DEPARTED_NAME)).toBe('Pessoa que saiu');
-    expect(FAMILY_TEXT.exMember('Nina')).toBe('ex-membro · Nina');
-    expect(FAMILY_TEXT.exMemberA11y(FAMILY_DEPARTED_NAME)).toBe('Ex-membro, pessoa que excluiu a conta');
-    expect(FAMILY_TEXT.exMemberA11y('Nina')).toBe('Ex-membro Nina');
+    expect(FAMILY_TEXT.exMember('Nina')).toBe('Nina (saiu da Família)');
+    expect(FAMILY_TEXT.exMemberA11y(FAMILY_DEPARTED_NAME)).toBe('Pessoa que saiu, excluiu a conta');
+    expect(FAMILY_TEXT.exMemberA11y('Nina')).toBe('Nina, saiu da Família');
     expect(FAMILY_TEXT.notedBy(authorLabel(members, 'x')!)).toBe('Anotado por Pessoa que saiu');
   });
 });

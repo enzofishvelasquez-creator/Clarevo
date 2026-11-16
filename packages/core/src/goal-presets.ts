@@ -75,7 +75,7 @@ export const GOAL_PRESETS: readonly GoalPreset[] = [
   },
   { id: 'estudos', name: 'Estudos', image: 'estudos', hint: 'Conte matrícula, mensalidades e material.' },
   { id: 'casamento', name: 'Casamento', image: 'casamento', hint: 'Conte festa, roupas, documentação e a lua de mel, se houver.' },
-  { id: 'filhos', name: 'Futuro dos filhos', image: 'bebe', hint: 'Pode ser a chegada de um bebê, a escola ou a faculdade.' },
+  { id: 'filhos', name: 'Futuro das crianças', image: 'bebe', hint: 'Pode ser a chegada de um bebê, a escola ou a faculdade.' },
   { id: 'saude', name: 'Saúde', image: 'saude', hint: 'Para um tratamento, um procedimento ou o dentista.' },
   { id: 'festa', name: 'Festa', image: 'festa', hint: 'Aniversário, 15 anos, formatura ou as festas de fim de ano.' },
 ];

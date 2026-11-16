@@ -449,7 +449,7 @@ export const ENTRY_INVITE_TEXT = {
   label: 'Link do convite',
   fieldHint: 'Cole o link que o RH enviou. O convite mostra a empresa e o plano antes de você criar a conta ou entrar.',
   submit: 'Ver convite',
-  invalid: 'Não encontramos um convite neste texto. Confira o link que você recebeu.',
+  invalid: 'Não há um convite neste texto. Confira o link que você recebeu.',
 } as const;
 
 /** Uma pessoa e o link dela. */
@@ -716,7 +716,7 @@ export const BENEFIT_TEXT = {
   pasteLabel: 'Link do convite da empresa',
   pasteHint: 'Cole o link que o RH enviou.',
   pasteSubmit: 'Ver convite',
-  pasteInvalid: 'Não encontramos um convite da empresa neste texto. Confira o link que você recebeu.',
+  pasteInvalid: 'Não há um convite da empresa neste texto. Confira o link que você recebeu.',
   organization: 'Empresa',
   plan: 'Plano',
   since: 'Desde',

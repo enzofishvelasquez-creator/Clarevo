@@ -453,7 +453,7 @@ setInterval(async () => {
   // os Primeiros passos fechados (a vez em que, numa conta real, ela entraria), nem em Conta, e nada dela é gravado no aparelho.
   const origemAusente = async () => {
     const txt = await body();
-    return !txt.includes('Como você conheceu a Clarevo?') && !txt.includes('Usamos só para contar') && !txt.includes('Resposta guardada. Você pode mudar em Conta.') &&
+    return !txt.includes('Como você conheceu a Clarevo?') && !txt.includes('A Clarevo usa só para contar') && !txt.includes('Resposta guardada. Você pode mudar em Conta.') &&
       !(await headingShown('Como você conheceu a Clarevo?')) && (await visibleCount('radio', /Instagram|Indicação de alguém|Empresa onde trabalho|Busca na internet|Prefiro não dizer/)) === 0 &&
       (await visibleCount('radiogroup', /Como você conheceu/)) === 0;
   };
@@ -481,7 +481,7 @@ setInterval(async () => {
   ok('Boas-vindas: "Tenho um convite da empresa" abre o campo "Link do convite", com o estado expandido',
     (await p.getByRole('button', { name: 'Tenho um convite da empresa', exact: true }).filter({ visible: true }).first().getAttribute('aria-expanded')) === 'true');
   await field('Link do convite').fill('não tenho link'); await btn('Ver convite').click(); await p.waitForTimeout(300);
-  ok('Boas-vindas: texto sem convite mostra o erro junto do campo', (await body()).includes('Não encontramos um convite neste texto. Confira o link que você recebeu.'));
+  ok('Boas-vindas: texto sem convite mostra o erro junto do campo', (await body()).includes('Não há um convite neste texto. Confira o link que você recebeu.'));
   await field('Link do convite').fill(`http://localhost:${PORT}/beneficio/${'b'.repeat(32)}`); await btn('Ver convite').click();
   await p.waitForURL((u) => u.pathname.startsWith('/beneficio/'), { timeout: 8000 }).catch(() => {});
   ok('Boas-vindas: o link do convite da empresa abre /beneficio/<código>, antes de criar a conta', new URL(p.url()).pathname === `/beneficio/${'b'.repeat(32)}`, p.url());
@@ -939,7 +939,7 @@ setInterval(async () => {
   ok('Ler boleto: a folha diz que o boleto é lido no aparelho e não é guardado', (await body()).includes('O boleto é lido aqui no aparelho e não é guardado.'));
   await btn('Colar ou digitar a linha digitável').click(); await field('Linha digitável ou código de barras').waitFor({ timeout: 6000 });
   await field('Linha digitável ou código de barras').fill('12345678901234567890123456789012345678901234567'); await btn('Ler o boleto').click(); await p.waitForTimeout(300);
-  ok('Ler boleto: números que não são de boleto mostram o erro junto do campo', (await body()).includes('Não reconhecemos um boleto nestes números.'));
+  ok('Ler boleto: números que não são de boleto mostram o erro junto do campo', (await body()).includes('A Clarevo não reconheceu um boleto nestes números.'));
   await field('Linha digitável ou código de barras').fill('23791.23454 67890.123457 67890.123457 4 16260000123456'); await btn('Ler o boleto').click(); await waitText('Boleto lido:'); await p.waitForTimeout(300);
   t = await body();
   ok('Ler boleto: "Boleto lido: R$ 1.234,56 · vence em 10/11/2026", com o valor e o vencimento nos campos',
@@ -2924,7 +2924,7 @@ setInterval(async () => {
   ok('B tela: contas do mês (Aluguel, Internet, Condomínio)', t.includes('Contas do mês') && t.includes('Aluguel') && t.includes('Internet') && t.includes('Condomínio'));
   ok('B tela: próximos meses (novembro R$ 4.380,00 73,0% e dezembro R$ 3.880,00 64,7%, já com as faturas do cartão, "Previsto") e o marco de outubro de 2029', t.includes('Novembro de 2026 · R$ 4.380,00 · 73,0%') && t.includes('Dezembro de 2026 · R$ 3.880,00 · 64,7%') &&
     t.includes('Previsto: contas já criadas e repetições programadas. Valores estimados podem mudar.') && t.includes('Outubro de 2029: última parcela de Financiamento do carro (R$ 850,00).'));
-  ok('B tela: "Como calculamos", "Como ler este número" e os links', t.includes('Somamos as contas a pagar com vencimento em outubro') && t.includes('Como ler este número') && t.includes('Gastos fixos e parcelamentos') && t.includes('Contas a pagar') && t.includes('Quem vê estes dados?'));
+  ok('B tela: "Como a Clarevo calcula", "Como ler este número" e os links', t.includes('A Clarevo soma as contas a pagar com vencimento em outubro') && t.includes('Como ler este número') && t.includes('Gastos fixos e parcelamentos') && t.includes('Contas a pagar') && t.includes('Quem vê estes dados?'));
   ok('B tela: nenhum termo de alerta, "sobra", "disponível" nem travessão longo', !NO_BALANCE.test(t) && !FORBIDDEN.test(t), (t.match(NO_BALANCE) ?? t.match(FORBIDDEN) ?? [''])[0]);
   const rcMeter = await p.locator('[role=img]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter(Boolean));
   ok('B tela: o medidor tem um rótulo acessível com percentual, já pago e em aberto', rcMeter.includes('52,5% da renda de referência: já pago R$ 2.500,00, em aberto R$ 650,00.'), JSON.stringify(rcMeter.slice(0, 3)));
@@ -2973,7 +2973,7 @@ setInterval(async () => {
   // Excluir a referência de outubro: pede confirmação e a de setembro volta a valer.
   await p.getByRole('button', { name: 'Alterar', exact: true }).filter({ visible: true }).first().click(); await waitText('Valor por mês');
   await btn('Excluir esta referência').click(); await waitText('Excluir a renda de referência de outubro?');
-  ok('B excluir a referência: o diálogo diz que a anterior volta a valer', (await dialogText()).includes('A referência anterior volta a valer. Sem nenhuma, mostramos só os valores em reais.'));
+  ok('B excluir a referência: o diálogo diz que a anterior volta a valer', (await dialogText()).includes('A referência anterior volta a valer. Sem nenhuma, aparecem só os valores em reais.'));
   await shot('104_excluir_referencia');
   await confirmIn('Excluir referência'); await waitText('Renda de referência excluída.'); await waitText('52,5%');
   ok('B excluir a referência de outubro: volta a 52,5% (a de setembro)', (await body()).includes('52,5%') && (await body()).includes('R$ 6.000,00 por mês, desde setembro de 2026'));
@@ -3179,7 +3179,7 @@ setInterval(async () => {
   await innerChecks('aporte 390px');
   await shot('114_aporte');
   // O valor vem preenchido com o planejado por mês da reserva (R$ 500,00), editável (teste de 09/11/2026); apagado, a mensagem de campo.
-  ok('C aporte: o valor planejado por mês (R$ 500,00) já preenchido, com a legenda', (await field('Valor').inputValue()) === '500,00' && t.includes('Preenchemos com o valor planejado por mês. Pode mudar.'));
+  ok('C aporte: o valor planejado por mês (R$ 500,00) já preenchido, com a legenda', (await field('Valor').inputValue()) === '500,00' && t.includes('Já vem com o valor planejado por mês. Pode mudar.'));
   await field('Valor').fill(''); await btn('Registrar aporte').click(); await p.waitForTimeout(300);
   ok('C aporte: sem valor, a mensagem de campo e nada gravado', (await body()).includes('Informe um valor') && (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 2);
   await field('Valor').fill('200'); await btn('Registrar aporte').click(); await waitText('Aporte registrado.'); await p.waitForTimeout(700);
@@ -4184,7 +4184,7 @@ setInterval(async () => {
   // A folha do primeiro toque: câmera só quando há câmera (o navegador do roteiro não tem), PDF e colar sempre; "Cancelar" não faz nada.
   await openScan(); t = await dialogText(); const sheetButtons = await dialogButtons();
   ok('N folha do primeiro toque: título, a frase de privacidade (só um resumo da chave, sem CPF nem link), "Escolher o PDF da nota" antes de "Colar o link ou a chave" (sem câmera no navegador do roteiro, o PDF vem primeiro), "Ler comprovante ou boleto" por último (D-051) e "Cancelar"; "Usar a câmera" só aparece com câmera',
-    t.includes('Como você quer ler a nota?') && t.includes('Guardamos só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guardamos CPF, a chave nem o link.') && JSON.stringify(sheetButtons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante ou boleto', 'Cancelar']) && (sheetButtons.length === 4 || sheetButtons[0] === 'Usar a câmera'), JSON.stringify(sheetButtons));
+    t.includes('Como você quer ler a nota?') && t.includes('A Clarevo guarda só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guarda CPF, a chave nem o link.') && JSON.stringify(sheetButtons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante ou boleto', 'Cancelar']) && (sheetButtons.length === 4 || sheetButtons[0] === 'Usar a câmera'), JSON.stringify(sheetButtons));
   await keepText();
   await shot('151_folha_escanear');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
@@ -4202,7 +4202,7 @@ setInterval(async () => {
   await layoutChecks('colar a nota 320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await field('Colar o link ou a chave da nota').fill('abc'); await btn('Ler a nota').click(); await p.waitForTimeout(300); t = await body();
-  ok('N texto que não é de nota: "Não reconhecemos este código como de uma nota fiscal..." junto do campo, nada preenchido', t.includes('Não reconhecemos este código como de uma nota fiscal.') && !t.includes('Nota lida'));
+  ok('N texto que não é de nota: "A Clarevo não reconheceu este código como de uma nota fiscal..." junto do campo, nada preenchido', t.includes('A Clarevo não reconheceu este código como de uma nota fiscal.') && !t.includes('Nota lida'));
   await field('Colar o link ou a chave da nota').fill('3326 1011 2223 3300 0181 6500 1000 0123 4518 7654 3219'); await btn('Ler a nota').click(); await p.waitForTimeout(300);
   ok('N chave com dígito errado: "A chave não confere. Confira os números ou escaneie de novo."', (await body()).includes('A chave não confere. Confira os números ou escaneie de novo.'));
   // Boleto (Bradesco, 237, linha digitável e código de barras): outro tipo de código, não é chave de nota.
@@ -4220,11 +4220,11 @@ setInterval(async () => {
   // Nota de exemplo (demonstração): rascunho, bloco "Nota lida", foco no valor, mensagens do que falta e nenhuma chamada de rede.
   await openPaste(); await btn('Usar nota de exemplo').click(); await waitText('Nota lida:'); await p.waitForTimeout(800);
   t = await body();
-  ok('N nota de exemplo: bloco "Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026" no lugar da linha, a nota de teste e nada de "Preenchemos o que a nota informa" (falta o valor), sem "Ver a nota no site da Sefaz"',
-    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026') && !t.includes('Preenchemos o que a nota informa.') && t.includes('Esta é uma nota de teste, sem valor fiscal.') &&
+  ok('N nota de exemplo: bloco "Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026" no lugar da linha, a nota de teste e nada de "A Clarevo preencheu o que a nota informa" (falta o valor), sem "Ver a nota no site da Sefaz"',
+    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026') && !t.includes('A Clarevo preencheu o que a nota informa.') && t.includes('Esta é uma nota de teste, sem valor fiscal.') &&
     (await visibleCount('button', /^Escanear nota fiscal\./)) === 0 && (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 0, t.slice(0, 500));
   ok('N o que a nota não traz é dito com clareza: "O valor não vem no código desta nota. Digite o total impresso no cupom.", o dia de hoje usado e o CNPJ sem o nome',
-    t.includes('O valor não vem no código desta nota. Digite o total impresso no cupom.') && t.includes('O dia da compra não vem no código desta nota. Usamos o de hoje. Mude se foi outro dia.') && t.includes('O código traz o CNPJ da loja, não o nome. Digite o nome na descrição.'));
+    t.includes('O valor não vem no código desta nota. Digite o total impresso no cupom.') && t.includes('O dia da compra não vem no código desta nota, então ficou o de hoje. Mude se foi outro dia.') && t.includes('O código traz o CNPJ da loja, não o nome. Digite o nome na descrição.'));
   ok('N foco no primeiro campo que falta (Valor em reais), data de hoje e descrição vazia (nunca "Compra (CNPJ ...)")',
     (await activeLabel()) === 'Valor em reais' && (await field('Data do pagamento').inputValue()) === '07/10/2026' && (await field('Descrição').inputValue()) === '' && !(await body()).includes('Compra (CNPJ') &&
     (await field('Descrição').getAttribute('placeholder')) === 'Ex.: Mercado');
@@ -4254,7 +4254,7 @@ setInterval(async () => {
   const saved = (await recordsOf()).filter((r) => r.d === 'Mercado' && r.c === 8740);
   ok('N salvar a nota lida: gasto de R$ 87,40 em 07/10/2026, categoria Mercado, com a linha "Nota fiscal · Anotada com a leitura da nota"; o link da Sefaz não existe (nota de teste) e o detalhe explica que só o resumo da chave fica',
     /^\/registro\/[^/]+$/.test(urlPathN()) && saved.length === 1 && saved[0].c === 8740 && saved[0].on === '2026-10-07' && saved[0].cat === 'Mercado' && t.includes('Nota fiscal') && t.includes('Anotada com a leitura da nota') &&
-    t.includes('Guardamos só um resumo da chave da nota, não o link.') && (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 0 && (await recordsOf()).length === before.length + 1, JSON.stringify(saved));
+    t.includes('A Clarevo guarda só um resumo da chave da nota, não o link.') && (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 0 && (await recordsOf()).length === before.length + 1, JSON.stringify(saved));
   ok('N o registro leva só o resumo SHA-256 da chave (64 hexadecimais), nunca a chave de 44 dígitos', saved.length === 1 && /^[0-9a-f]{64}$/.test(saved[0].key ?? '') && !String(saved[0].key).includes('33261011'));
   const savedId = saved[0].id;
   await keepText();
@@ -4283,7 +4283,7 @@ setInterval(async () => {
   const noteB = accessKey('2610', '65', 12346);
   await pasteNote(qrContingency(noteB, '06', '45.90')); t = await body();
   ok('N QR com valor e dia: "Nota lida: CNPJ 11.222.333/0001-81 · RJ · R$ 45,90 · 06/10/2026", valor 45,90 e data 06/10/2026, sem mensagem de falta e com o teclado fechado',
-    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · R$ 45,90 · 06/10/2026') && t.includes('Preenchemos o que a nota informa. Confira e toque em Salvar.') && (await field('Valor em reais').inputValue()) === '45,90' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && !t.includes('não vem no código') &&
+    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · R$ 45,90 · 06/10/2026') && t.includes('A Clarevo preencheu o que a nota informa. Confira e toque em Salvar.') && (await field('Valor em reais').inputValue()) === '45,90' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && !t.includes('não vem no código') &&
     (await activeTag()) !== 'INPUT' && (await activeTag()) !== 'TEXTAREA', `${await activeTag()} ${t.slice(0, 300)}`);
   ok('N mesma loja (mesmo CNPJ) já anotada neste aparelho: descrição e categoria da última vez, com a legenda "Como da última vez nesta loja"',
     (await field('Descrição').inputValue()) === 'Mercado' && (await radio('Mercado').getAttribute('aria-checked')) === 'true' && t.includes('Como da última vez nesta loja'));
@@ -4296,7 +4296,7 @@ setInterval(async () => {
   await keepText();
   await toBlock(); await shot('156_nota_com_link');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600); t = await body();
-  ok('N gasto salvo logo depois da leitura: o detalhe tem "Ver a nota no site da Sefaz" (o endereço só vive na sessão; o registro guarda só o resumo da chave)', (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 && t.includes('Anotada com a leitura da nota') && !t.includes('Guardamos só um resumo da chave da nota, não o link.'));
+  ok('N gasto salvo logo depois da leitura: o detalhe tem "Ver a nota no site da Sefaz" (o endereço só vive na sessão; o registro guarda só o resumo da chave)', (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 && t.includes('Anotada com a leitura da nota') && !t.includes('A Clarevo guarda só um resumo da chave da nota, não o link.'));
   await keepText();
   await shot('157_nota_salva_com_link');
 
@@ -4334,7 +4334,7 @@ setInterval(async () => {
   const sefazCalls = await p.evaluate(() => window.__sefazCalls);
   ok('N página da Sefaz lida: "Nota lida: Mercado Exemplo Ltda · RJ · R$ 63,70 · 06/10/2026", valor 63,70, data 06/10/2026 e a descrição com o nome da loja ("Nome da loja lido da nota"), com "Loja, valor e data lidos da página da Sefaz"',
     t.includes('Nota lida: Mercado Exemplo Ltda · RJ · R$ 63,70 · 06/10/2026') && (await field('Valor em reais').inputValue()) === '63,70' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && (await field('Descrição').inputValue()) === 'Mercado Exemplo Ltda' &&
-    t.includes('Nome da loja lido da nota') && t.includes('Loja, valor e data lidos da página da Sefaz. Confira antes de salvar.') && !t.includes('não vem no código') && t.includes('Preenchemos o que a nota informa.'), t.slice(0, 500));
+    t.includes('Nome da loja lido da nota') && t.includes('Loja, valor e data lidos da página da Sefaz. Confira antes de salvar.') && !t.includes('não vem no código') && t.includes('A Clarevo preencheu o que a nota informa.'), t.slice(0, 500));
   ok('N a leitura da página busca só o endereço oficial do QR (uma vez) e o app não mostra CPF nem nome do consumidor (a página os trazia)', sefazCalls.length === 1 && sefazCalls[0] === qrOnline(SEFAZ_KEY) && !/FULANA|123\.456\.789/.test(t) && !t.includes('Neste navegador, a página da Sefaz não pode ser lida'), JSON.stringify(sefazCalls));
   await keepText();
   await toBlock(); await shot('163_pagina_da_sefaz_lida');
@@ -4369,8 +4369,8 @@ setInterval(async () => {
   ok('N arquivo que não é PDF: "Este arquivo não é um PDF." e nada preenchido', (await body()).includes('Este arquivo não é um PDF.') && !(await body()).includes('Nota lida:'));
   await openScan();
   const [chooser2] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]);
-  await chooser2.setFiles(pdfNoKey); await waitText('Não encontramos a chave de acesso neste PDF.', 15000); await p.waitForTimeout(300);
-  ok('N PDF sem a chave de acesso: "Não encontramos a chave de acesso neste PDF. Confira se é o PDF da nota fiscal (o DANFE)."', (await body()).includes('Não encontramos a chave de acesso neste PDF. Confira se é o PDF da nota fiscal (o DANFE).') && !(await body()).includes('Nota lida:'));
+  await chooser2.setFiles(pdfNoKey); await waitText('A chave de acesso não apareceu neste PDF.', 15000); await p.waitForTimeout(300);
+  ok('N PDF sem a chave de acesso: "A chave de acesso não apareceu neste PDF. Confira se é o PDF da nota fiscal (o DANFE)."', (await body()).includes('A chave de acesso não apareceu neste PDF. Confira se é o PDF da nota fiscal (o DANFE).') && !(await body()).includes('Nota lida:'));
   await openScan();
   const [chooser3] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]);
   await chooser3.setFiles(pdfOk); await waitText('Nota lida:', 20000); await p.waitForTimeout(800); t = await body();
@@ -8913,8 +8913,8 @@ setInterval(async () => {
   let i2t = await dialogText(); const i2Buttons = await i2DialogButtons();
   ok('I2 folha de "Escanear nota fiscal": "Ler comprovante ou boleto" vem por último, antes de "Cancelar", e a frase de privacidade do comprovante (lido aqui, nada guardado, sem CPF, CNPJ, chave Pix, conta nem códigos) aparece',
     JSON.stringify(i2Buttons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', I2_OPTION, 'Cancelar']) &&
-    i2t.includes('Comprovante em PDF ou imagem: lido aqui no aparelho e não guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') &&
-    i2t.includes('Guardamos só um resumo da chave de acesso da nota'), JSON.stringify(i2Buttons));
+    i2t.includes('Comprovante em PDF ou imagem: lido aqui no aparelho e não guardado. A Clarevo não guarda CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') &&
+    i2t.includes('A Clarevo guarda só um resumo da chave de acesso da nota'), JSON.stringify(i2Buttons));
   await i2Keep();
   await shot('350_comprovante_folha');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
@@ -8927,9 +8927,9 @@ setInterval(async () => {
   let i2v = await i2Values();
   ok('I2 Pix enviado: "Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32", valor 85,00, data 05/10/2026 e descrição "Pix para Maria Souza Exemplo" (com a legenda de onde veio)',
     i2t.includes('Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2v.amount === '85,00' && i2v.date === '05/10/2026' && i2v.desc === 'Pix para Maria Souza Exemplo' && i2t.includes('Nome lido do comprovante'), JSON.stringify(i2v));
-  ok('I2 Pix enviado: a frase "Preenchemos o que o comprovante informa. Confira e toque em Salvar.", a mensagem do comprovante e a frase de privacidade; teclado fechado (nada falta)',
-    i2t.includes('Preenchemos o que o comprovante informa. Confira e toque em Salvar.') && i2t.includes('Mensagem do comprovante: Almoço de domingo') &&
-    i2t.includes('O arquivo foi lido aqui no aparelho e não é guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') && (await i2ActiveTag()) !== 'INPUT', i2t.slice(0, 500));
+  ok('I2 Pix enviado: a frase "A Clarevo preencheu o que o comprovante informa. Confira e toque em Salvar.", a mensagem do comprovante e a frase de privacidade; teclado fechado (nada falta)',
+    i2t.includes('A Clarevo preencheu o que o comprovante informa. Confira e toque em Salvar.') && i2t.includes('Mensagem do comprovante: Almoço de domingo') &&
+    i2t.includes('O arquivo foi lido aqui no aparelho e não é guardado. A Clarevo não guarda CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') && (await i2ActiveTag()) !== 'INPUT', i2t.slice(0, 500));
   ok('I2 Pix enviado: "Como você pagou?" fica em "Dinheiro, débito ou Pix"', (await radio('Dinheiro, débito ou Pix').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false');
   ok('I2 Pix enviado: nenhum CPF (inteiro ou mascarado), CNPJ, chave Pix, agência, conta, ID da transação nem código de autenticação na tela, nos nomes acessíveis, nos campos nem no armazenamento',
     (await i2Leaks()).length === 0, (await i2Leaks()).join(' | '));
@@ -9001,15 +9001,15 @@ setInterval(async () => {
   ok('I2 Pix recebido em Anotar gasto: "Comprovante lido: Pix recebido · Fulano de Tal Exemplo Ltda · R$ 320,00 · 06/10/2026 às 09:05" com o aviso "Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto." e o botão "É um recebimento"',
     i2t.includes('Comprovante lido: Pix recebido · Fulano de Tal Exemplo Ltda · R$ 320,00 · 06/10/2026 às 09:05') && i2t.includes('Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto.') &&
     (await visibleCount('button', 'É um recebimento')) === 1, i2t.slice(0, 500));
-  ok('I2 Pix recebido em Anotar gasto: nada é preenchido (valor e descrição em branco, data de hoje) e não há "Preenchemos o que o comprovante informa"',
-    i2v.amount === '' && i2v.desc === '' && i2v.date === '07/10/2026' && !i2t.includes('Preenchemos o que o comprovante informa'), JSON.stringify(i2v));
+  ok('I2 Pix recebido em Anotar gasto: nada é preenchido (valor e descrição em branco, data de hoje) e não há "A Clarevo preencheu o que o comprovante informa"',
+    i2v.amount === '' && i2v.desc === '' && i2v.date === '07/10/2026' && !i2t.includes('A Clarevo preencheu o que o comprovante informa'), JSON.stringify(i2v));
   await i2Top();
   await i2Shots('353_comprovante_outro_tipo');
   await btn('É um recebimento').click(); await waitText('Data do recebimento', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
   i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
   ok('I2 trocar: abre Registrar recebimento com o mesmo comprovante, sem pedir o PDF de novo: descrição "Pix de Fulano de Tal Exemplo Ltda", valor 320,00 e data 06/10/2026; sem o aviso de tipo trocado',
     (await h1Name()) === 'Registrar recebimento' && i2v.desc === 'Pix de Fulano de Tal Exemplo Ltda' && i2v.amount === '320,00' && i2v.date === '06/10/2026' && !i2t.includes('Ele entra como') &&
-    i2t.includes('Preenchemos o que o comprovante informa. Confira e toque em Salvar.') && (await visibleCount('button', 'Salvar recebimento')) === 1, JSON.stringify(i2v));
+    i2t.includes('A Clarevo preencheu o que o comprovante informa. Confira e toque em Salvar.') && (await visibleCount('button', 'Salvar recebimento')) === 1, JSON.stringify(i2v));
   ok('I2 trocar: nada do documento da empresa nem da chave na tela', (await i2Leaks()).length === 0);
   await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await p.waitForTimeout(600);
   const i2Income = (await i2Records()).filter((r) => r.k === 'receita' && r.d === 'Pix de Fulano de Tal Exemplo Ltda');
@@ -9045,8 +9045,8 @@ setInterval(async () => {
   await i2NewExpense();
   await i2ReadExpense(i2Neutral);
   i2t = await i2Keep(); i2v = await i2Values();
-  ok('I2 comprovante sem direção, em Anotar gasto: "Comprovante lido: Pix · Maria Souza Exemplo · ..." (sem afirmar "enviado"), o aviso "O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo." e a descrição da última vez com este nome ("Almoço de domingo")',
-    i2t.includes('Comprovante lido: Pix · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2t.includes('O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo.') && i2v.desc === 'Almoço de domingo', JSON.stringify(i2v));
+  ok('I2 comprovante sem direção, em Anotar gasto: "Comprovante lido: Pix · Maria Souza Exemplo · ..." (sem afirmar "enviado"), o aviso "O comprovante não diz se o dinheiro saiu ou entrou. Vale o tipo desta tela. Confira se está certo." e a descrição da última vez com este nome ("Almoço de domingo")',
+    i2t.includes('Comprovante lido: Pix · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2t.includes('O comprovante não diz se o dinheiro saiu ou entrou. Vale o tipo desta tela. Confira se está certo.') && i2v.desc === 'Almoço de domingo', JSON.stringify(i2v));
   ok('I2 comprovante sem direção: não oferece trocar de tela (a tela vale)', (await visibleCount('button', /^É um (gasto|recebimento)$/)) === 0);
   await i2Leave();
   await i2NewIncome();
@@ -9077,8 +9077,8 @@ setInterval(async () => {
   ok('I2 nota de serviço em Registrar recebimento: "Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026", o líquido (não o do serviço nem o zerado), a data de emissão (não a da DPS), "Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda" com a legenda, o lado e a data explicados, a privacidade da nota e "É um gasto"',
     i2t.includes('Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026') && i2v.amount === '4.200,00' && i2v.date === '05/10/2026' &&
     i2v.desc === 'Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda' && i2t.includes('Número e nome lidos da nota') &&
-    i2t.includes('Lemos como um serviço que você prestou: o nome é de quem contratou.') && i2t.includes('A data é a da emissão da nota. Se o pagamento foi em outro dia, troque a data.') &&
-    i2t.includes('A nota foi lida aqui no aparelho e não é guardada. Não guardamos CPF, CNPJ, endereço nem a chave da nota.') && i2t.includes('Preenchemos o que a nota informa. Confira e toque em Salvar.') &&
+    i2t.includes('Lido como um serviço que você prestou: o nome é de quem contratou.') && i2t.includes('A data é a da emissão da nota. Se o pagamento foi em outro dia, troque a data.') &&
+    i2t.includes('A nota foi lida aqui no aparelho e não é guardada. A Clarevo não guarda CPF, CNPJ, endereço nem a chave da nota.') && i2t.includes('A Clarevo preencheu o que a nota informa. Confira e toque em Salvar.') &&
     (await visibleCount('button', 'É um gasto')) === 1, JSON.stringify(i2v));
   i2t = await i2PageText();
   ok('I2 nota de serviço: CNPJ, e-mail, endereço, chave, descrição do serviço e os outros valores não aparecem em lugar nenhum da página',
@@ -9088,7 +9088,7 @@ setInterval(async () => {
   i2t = await i2Keep(); i2v = await i2Values();
   ok('I2 nota de serviço trocada para Anotar gasto: o nome passa a ser o de quem prestou ("Nota fiscal 35 de Alex Exemplo da Silva", sem a raiz do CNPJ), com o mesmo valor e a mesma data, e a troca de volta',
     (await h1Name()) === 'Anotar gasto' && i2t.includes('Nota de serviço lida: Alex Exemplo da Silva · R$ 4.200,00 · 05/10/2026') && i2v.desc === 'Nota fiscal 35 de Alex Exemplo da Silva' &&
-    i2v.amount === '4.200,00' && i2v.date === '05/10/2026' && i2t.includes('Lemos como um serviço que você contratou: o nome é de quem prestou.') &&
+    i2v.amount === '4.200,00' && i2v.date === '05/10/2026' && i2t.includes('Lido como um serviço que você contratou: o nome é de quem prestou.') &&
     (await visibleCount('button', 'É um recebimento')) === 1, JSON.stringify(i2v));
   i2t = await i2PageText();
   ok('I2 nota de serviço em Anotar gasto: nenhum dado da nota além do nome, do valor e da data', I2_NFSE_SECRETS.every((x) => !i2t.includes(x)), I2_NFSE_SECRETS.filter((x) => i2t.includes(x)).join(' | '));
@@ -9161,10 +9161,10 @@ setInterval(async () => {
     const x = await i2Keep(); const v = await i2Values();
     ok(`I2 ${label}: "${message.slice(0, 60)}..." e nada preenchido`, x.includes(message) && !x.includes('Comprovante lido:') && v.amount === '' && v.desc === '', x.slice(0, 300));
   };
-  await i2Bad(i2Photo, 'Não encontramos texto neste PDF. Ele pode ser uma foto do comprovante. Digite os dados à mão.', 'PDF sem texto (foto)');
+  await i2Bad(i2Photo, 'Este PDF não tem texto para ler. Ele pode ser uma foto do comprovante. Digite os dados à mão.', 'PDF sem texto (foto)');
   await i2Shots('356_comprovante_erro', false);
-  await i2Bad(i2Danfe, 'Esta é uma nota fiscal de produto. Para anotar uma compra com nota, use Escanear nota fiscal em Anotar gasto. Aqui lemos comprovantes, holerites e notas de serviço.', 'PDF de nota fiscal de produto (DANFE)');
-  await i2Bad(i2Order, 'Não reconhecemos um comprovante neste PDF. Confira se é o comprovante de um Pix, de uma TED, de um boleto ou de um pagamento.', 'PDF que não é de comprovante');
+  await i2Bad(i2Danfe, 'Esta é uma nota fiscal de produto. Para anotar uma compra com nota, use Escanear nota fiscal em Anotar gasto. Aqui a Clarevo lê comprovantes, holerites e notas de serviço.', 'PDF de nota fiscal de produto (DANFE)');
+  await i2Bad(i2Order, 'A Clarevo não reconheceu um comprovante neste PDF. Confira se é o comprovante de um Pix, de uma TED, de um boleto ou de um pagamento.', 'PDF que não é de comprovante');
   await i2Bad(i2NotPdf, 'Este arquivo não é um PDF.', 'arquivo que não é PDF');
   await i2Leave();
 
@@ -10330,8 +10330,8 @@ setInterval(async () => {
   ok('Mauro (conta nova, sem Família): o Resumo não tem seletor', (await famSelectorCount()) === 0);
   await famGoFamilia();
   await field('Link do convite').fill('isto não é um convite');
-  await btn('Ver convite').click(); await waitText('Não encontramos um convite neste texto.');
-  ok('Tenho um convite: um texto sem link é recusado junto ao campo, sem sair da tela', (await body()).includes('Não encontramos um convite neste texto. Confira o link que você recebeu.') && (await famH1()) === 'Família');
+  await btn('Ver convite').click(); await waitText('Não há um convite neste texto.');
+  ok('Tenho um convite: um texto sem link é recusado junto ao campo, sem sair da tela', (await body()).includes('Não há um convite neste texto. Confira o link que você recebeu.') && (await famH1()) === 'Família');
   await field('Link do convite').fill(`Oi! Entre na nossa Família: ${famLink1}`);
   await btn('Ver convite').click(); await waitText('Aceitar convite'); await p.waitForTimeout(500);
   t = await body();
@@ -10461,7 +10461,7 @@ setInterval(async () => {
   await famShots('415_familia_remover');
   await confirmIn('Remover'); await waitText('Pessoa removida da Família.'); await p.waitForTimeout(500);
   t = await body();
-  ok('Removida: aviso, "Ex-membros" com "ex-membro · Lia" e a nota do histórico, e a vaga volta (4)', t.includes('Pessoa removida da Família.') && t.includes('Ex-membros') && t.includes('ex-membro · Lia') && t.includes('O que essas pessoas anotaram continua na Família, como histórico da casa.') &&
+  ok('Removida: aviso, "Pessoas que saíram" com "Lia (saiu da Família)" e a nota do histórico, e a vaga volta (4)', t.includes('Pessoa removida da Família.') && t.includes('Pessoas que saíram') && t.includes('Lia (saiu da Família)') && t.includes('O que essas pessoas anotaram continua na Família, como histórico da casa.') &&
     t.includes('Cabem mais 4 pessoas, contando os convites pendentes.') && (await visibleCount('button', /^Gerenciar Lia/)) === 0, t.slice(0, 600));
   await famKeep();
   await famShots('416_familia_ex_membro');
@@ -10491,7 +10491,7 @@ setInterval(async () => {
   await famSignIn('mauro.familia@exemplo.com');
   await famGoFamilia();
   t = await body();
-  ok('Novo titular: "Seu papel: Titular", Vera e Lia como ex-membros, sem outras pessoas ativas e "Encerrar a Família" disponível', t.includes('Seu papel: Titular') && t.includes('Mauro (você)') && t.includes('ex-membro · Vera') && t.includes('ex-membro · Lia') && (await visibleCount('button', 'Encerrar a Família')) === 1 && !t.includes('Para encerrar, remova'), t.slice(0, 600));
+  ok('Novo titular: "Seu papel: Titular", Vera e Lia como ex-membros, sem outras pessoas ativas e "Encerrar a Família" disponível', t.includes('Seu papel: Titular') && t.includes('Mauro (você)') && t.includes('Vera (saiu da Família)') && t.includes('Lia (saiu da Família)') && (await visibleCount('button', 'Encerrar a Família')) === 1 && !t.includes('Para encerrar, remova'), t.slice(0, 600));
   await btn('Encerrar a Família').click(); await waitText('Encerrar a Família?'); await p.waitForTimeout(300);
   const endText = await dialogText();
   ok('Encerrar: pede confirmação e explica (deixa de existir para todas as pessoas; o Pessoal de cada pessoa não muda)', endText.includes('Encerrar a Família?') && endText.includes('A Família deixa de existir para todas as pessoas.') && endText.includes('O Pessoal de cada pessoa não muda.'), endText);
@@ -10739,8 +10739,8 @@ setInterval(async () => {
   await famConta(); await waitText('Tenho um convite da empresa'); await p.waitForTimeout(300);
   ok('Bia (sem ser RH): Conta não mostra "Painel da empresa"', (await visibleCount('button', 'Abrir painel da empresa')) === 0 && !(await headingShown('Painel da empresa')));
   await field('Link do convite da empresa').fill('isto não é um convite');
-  await btn('Ver convite').click(); await waitText('Não encontramos um convite da empresa neste texto.');
-  ok('Tenho um convite da empresa: um texto sem link é recusado junto ao campo, sem sair de Conta', (await body()).includes('Não encontramos um convite da empresa neste texto. Confira o link que você recebeu.') && (await famH1()) === 'Conta');
+  await btn('Ver convite').click(); await waitText('Não há um convite da empresa neste texto.');
+  ok('Tenho um convite da empresa: um texto sem link é recusado junto ao campo, sem sair de Conta', (await body()).includes('Não há um convite da empresa neste texto. Confira o link que você recebeu.') && (await famH1()) === 'Conta');
   await field('Link do convite da empresa').fill(empCaio);
   await btn('Ver convite').click(); await waitText('Convite indisponível'); await p.waitForTimeout(400);
   t = await body();
@@ -14678,7 +14678,7 @@ setInterval(async () => {
     await btn('Nova meta').click(); await waitText('O que você quer conquistar?'); await p.waitForTimeout(400);
     let r = await gridRadios();
     ok('D-092 Nova meta: a grade com as metas mais comuns, na ordem das pesquisas, e "Outra meta" no fim; com a reserva já criada, ela não aparece',
-      JSON.stringify((r || []).map((x) => x[0])) === JSON.stringify(['Casa própria', 'Viagem', 'Quitar dívidas', 'Carro', 'Reforma da casa', 'Meu negócio', 'Moto', 'Celular novo', 'Aposentadoria', 'Estudos', 'Casamento', 'Futuro dos filhos', 'Saúde', 'Festa', 'Outra meta']) &&
+      JSON.stringify((r || []).map((x) => x[0])) === JSON.stringify(['Casa própria', 'Viagem', 'Quitar dívidas', 'Carro', 'Reforma da casa', 'Meu negócio', 'Moto', 'Celular novo', 'Aposentadoria', 'Estudos', 'Casamento', 'Futuro das crianças', 'Saúde', 'Festa', 'Outra meta']) &&
         (r || []).every((x) => x[1] === 'false') && (await visibleCount('button', 'Reserva para imprevistos')) === 0, JSON.stringify(r));
     await p.getByRole('radio', { name: 'Moto', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
     t = await body(); screenTexts.push(t);

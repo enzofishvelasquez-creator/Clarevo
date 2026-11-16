@@ -282,13 +282,14 @@ export const FAMILY_TEXT = {
   yourRole: (role: FamilyRole): string => `Seu papel: ${FAMILY_ROLE_LABEL[role]}`,
   peopleTitle: 'Pessoas',
   you: 'você',
-  exMembersTitle: 'Ex-membros',
+  exMembersTitle: 'Pessoas que saíram',
   exMembersNote: 'O que essas pessoas anotaram continua na Família, como histórico da casa. Quem excluiu a conta aparece como "Pessoa que saiu".',
-  exMember: (firstName: string): string => (firstName === FAMILY_DEPARTED_NAME ? FAMILY_DEPARTED_NAME : `ex-membro · ${firstName}`),
+  /** Quem saiu: "Nina (saiu da Família)", também em "Anotado por Nina (saiu da Família) em…". Quem excluiu a conta: "Pessoa que saiu". */
+  exMember: (firstName: string): string => (firstName === FAMILY_DEPARTED_NAME ? FAMILY_DEPARTED_NAME : `${firstName} (saiu da Família)`),
   memberLine: (firstName: string, isMe: boolean): string => (isMe ? `${firstName} (você)` : firstName),
   memberA11y: (firstName: string, role: FamilyRole, isMe: boolean): string =>
     `${isMe ? `${firstName}, você` : firstName}, ${FAMILY_ROLE_LABEL[role]}`,
-  exMemberA11y: (firstName: string): string => (firstName === FAMILY_DEPARTED_NAME ? 'Ex-membro, pessoa que excluiu a conta' : `Ex-membro ${firstName}`),
+  exMemberA11y: (firstName: string): string => (firstName === FAMILY_DEPARTED_NAME ? `${FAMILY_DEPARTED_NAME}, excluiu a conta` : `${firstName}, saiu da Família`),
   /** Ações do titular sobre uma pessoa. */
   manage: 'Gerenciar',
   manageA11y: (firstName: string, role: FamilyRole): string => `Gerenciar ${firstName}, ${FAMILY_ROLE_LABEL[role]}`,
@@ -395,7 +396,7 @@ export const INVITE_TEXT = {
   pasteLabel: 'Link do convite',
   pasteHint: 'Cole o link que você recebeu de quem convidou.',
   pasteSubmit: 'Ver convite',
-  pasteInvalid: 'Não encontramos um convite neste texto. Confira o link que você recebeu.',
+  pasteInvalid: 'Não há um convite neste texto. Confira o link que você recebeu.',
   openFamily: 'Ver a Família',
   goHome: 'Ir para o início',
   retry: 'Tentar de novo',

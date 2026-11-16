@@ -265,7 +265,7 @@ describe('nota de serviço (NFS-e): leitura', () => {
     const danfe = 'DANFE\nDocumento Auxiliar da Nota Fiscal Eletrônica\nCHAVE DE ACESSO\n3326 1011 2223 3300 0181 5500 1000 0000 0110 0000 0000\nVALOR TOTAL DA NOTA 87,40';
     expect(comprovanteFromText(danfe, { defaultDirection: 'entrada' })).toEqual({ ok: false, code: 'nota_fiscal' });
     expect(COMPROVANTE_TEXT.errors.nota_fiscal).toBe(
-      'Esta é uma nota fiscal de produto. Para anotar uma compra com nota, use Escanear nota fiscal em Anotar gasto. Aqui lemos comprovantes, holerites e notas de serviço.',
+      'Esta é uma nota fiscal de produto. Para anotar uma compra com nota, use Escanear nota fiscal em Anotar gasto. Aqui a Clarevo lê comprovantes, holerites e notas de serviço.',
     );
   });
 
@@ -326,14 +326,14 @@ describe('nota de serviço (NFS-e): formulário', () => {
       day: null,
       name: null,
       guessed: null,
-      side: 'Lemos como um serviço que você prestou: o nome é de quem contratou.',
+      side: 'Lido como um serviço que você prestou: o nome é de quem contratou.',
       issued: 'A data é a da emissão da nota. Se o pagamento foi em outro dia, troque a data.',
     });
     const expense = comprovanteDraft(read(NACIONAL, 'saida'), today, 'despesa');
-    expect(comprovanteGaps(expense).side).toBe('Lemos como um serviço que você contratou: o nome é de quem prestou.');
+    expect(comprovanteGaps(expense).side).toBe('Lido como um serviço que você contratou: o nome é de quem prestou.');
     // Sem valor e com data futura.
     const future = comprovanteDraft({ ...read(NACIONAL, 'entrada'), amountCents: null, occurredOn: '2026-11-20' }, today, 'receita');
-    expect(COMPROVANTE_TEXT.note.filled).toBe('Preenchemos o que a nota informa. Confira e toque em Salvar.');
+    expect(COMPROVANTE_TEXT.note.filled).toBe('A Clarevo preencheu o que a nota informa. Confira e toque em Salvar.');
     expect(comprovanteGaps(future)).toMatchObject({ amount: 'O valor não apareceu na nota. Digite o valor.', day: 'A data da nota ainda não chegou. Escolha o dia.', issued: null });
     expect(comprovanteReadLine(comprovanteDraft({ ...read(FOTO, 'entrada'), amountCents: null, occurredOn: null }, today, 'receita'))).toBe('Nota de serviço lida');
   });
