@@ -356,7 +356,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Em Contas a pagar, abra a seção ${q('Vencidas')} e toque em ${q('Revisar vencidas')}.`,
       'Marque as contas que você já pagou.',
       `Com mais de um banco ou carteira cadastrado, escolha de onde o dinheiro saiu em ${q(ACCOUNTS_TEXT.out)}.`,
-      `Toque em ${q('Marcar as selecionadas como pagas no vencimento')} e confirme.`,
+      `Toque em ${q('Marcar como pagas')} e confirme. Cada conta vira um gasto com o valor previsto, na data do vencimento.`,
       `Se uma conta não houve, toque em ${q(RETURN_TEXT.notHappenedButton)}: ela sai da lista e não volta.`,
     ],
     screenName: 'Contas vencidas',

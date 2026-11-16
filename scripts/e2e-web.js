@@ -999,9 +999,9 @@ setInterval(async () => {
   ok('revisar vencidas: cada linha com "Já paguei" e "Não houve"', (await body()).includes('Contas vencidas') &&
     (await Promise.all(['Já paguei Gás de setembro', 'Não houve Gás de setembro', 'Já paguei Água de outubro', 'Não houve Água de outubro'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
   ok('revisar vencidas: caixas nas contas de valor fixo, nenhuma marcada', JSON.stringify(await p.getByRole('checkbox').filter({ visible: true }).evaluateAll((es) => es.map((e) => e.getAttribute('aria-checked')))) === '["false","false"]' &&
-    (await visibleCount('button', 'Marcar as selecionadas como pagas no vencimento')) === 1);
+    (await visibleCount('button', 'Marcar como pagas')) === 1);
   await p.getByRole('checkbox').filter({ visible: true }).first().click();
-  ok('revisar vencidas: marcar uma caixa muda o botão do lote', (await visibleCount('button', 'Marcar a 1 selecionada como paga no vencimento')) === 1);
+  ok('revisar vencidas: marcar uma caixa muda o botão do lote', (await visibleCount('button', 'Marcar como paga (1)')) === 1);
   await btn('Não houve Água de outubro').click(); await waitText('Tirar a conta de outubro?');
   ok('revisar vencidas: "Não houve" pede confirmação', (await dialogText()).includes('Tirar conta'));
   await btn('Cancelar').click(); await p.waitForTimeout(300);
@@ -1165,7 +1165,7 @@ setInterval(async () => {
     ['Todo ano em 20/01 · desde 2027', 'Valor muda: referência de R$ 2.400,00 (estimado)', 'Cada ano entra em Contas a pagar dois meses antes do primeiro vencimento e só entra em Ainda a pagar no mês em que vence.',
       '2027 · previsto · cerca de R$ 2.400,00 · entra em Contas a pagar em novembro de 2026', 'R$ 2.400,00 (estimado) a partir de 2027'].every((x) => t.includes(x)) &&
       (await visibleCount('button', /^Informar o valor de|^Não houve em|^Tirar as parcelas/)) === 0, t.slice(0, 200));
-  ok('IPVA: ações da conta do ano', (await Promise.all(['Mudar valor ou dia a partir de uma conta', 'Mudar a forma de pagamento', 'Encerrar conta do ano', 'Excluir conta do ano'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
+  ok('IPVA: ações da conta do ano', (await Promise.all(['Mudar a partir de uma conta', 'Mudar a forma de pagamento', 'Encerrar conta do ano', 'Excluir conta do ano'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
   await btn('Mudar a forma de pagamento').click(); await waitText('Mudar a forma de pagamento?');
   ok('"Mudar a forma de pagamento": encerrar e cadastrar outra, com o histórico mantido', (await dialogText()).includes('Para passar de cota única para parcelas, mudar o número de parcelas ou o mês, encerre esta conta do ano no último ano com a forma atual e cadastre uma nova. O histórico continua aqui.') &&
     (await dialogText()).includes('Encerrar e cadastrar nova'));
@@ -1772,7 +1772,7 @@ setInterval(async () => {
   await btn('Selecionar as 2 parcelas de Curso de idiomas de 2026 a 2027').click();
   await waitUntil(async () => (await visibleCount('button', 'Selecionadas: as 2 parcelas de Curso de idiomas de 2026 a 2027')) === 1);
   ok('vencidas: depois de selecionar, o nome falado começa por "Selecionadas", como o texto visível', (await visibleCount('button', 'Selecionadas: as 2 parcelas de Curso de idiomas de 2026 a 2027')) === 1 &&
-    (await visibleCount('button', 'Marcar as 2 selecionadas como pagas no vencimento')) === 1);
+    (await visibleCount('button', 'Marcar como pagas (2)')) === 1);
   await yearNames('vencidas com grupo de 2026/2027');
   await btn('Não houve Curso de idiomas em 2026 a 2027').click(); await waitText('Tirar as 6 parcelas de 2026/2027 em aberto?');
   t = await dialogText();
@@ -2751,7 +2751,7 @@ setInterval(async () => {
     if (w === 320) await shot('35_encerrar_parcelamento_320px', true);
     await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
     await btn('Descartar alterações').click(); await waitText('Pagas antes da Clarevo');
-    await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await waitText('Valor da parcela'); await p.waitForTimeout(300);
+    await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await waitText('Valor da parcela'); await p.waitForTimeout(300);
     await innerChecks(`editar parcelamento ${w}px`);
     if (w === 320) await shot('35_editar_parcelamento_320px', true);
     await btn('Cancelar').click(); await waitText('Pagas antes da Clarevo');
@@ -6115,7 +6115,7 @@ setInterval(async () => {
   await btn('Cancelar').click(); await p.waitForTimeout(400); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
   await waitText('Ano a ano');
   // Editar a conta do ano: o texto lembra que, para um ano só, vale "Informar o valor".
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
   ok('D42 editar a conta do ano: lembra que para o valor de um ano só se usa "Informar o valor", em Ano a ano', (await body()).includes('Para mudar o valor de um ano só, use Informar o valor, em Ano a ano. Aqui a mudança vale também para os anos seguintes.'));
   await keepText();
   await btn('Cancelar').click(); await p.waitForTimeout(400); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
@@ -7503,7 +7503,7 @@ setInterval(async () => {
   await h2OpenFixos();
   await btn('Aluguel, R$ 2.500,00, todo dia 5, gasto fixo').click(); await waitText('Histórico de valores'); await p.waitForTimeout(300);
   ok('H2 detalhe de um gasto fixo comum: sem a linha "Assinatura"', !(await body()).includes('Assinatura ·'));
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
   ok('H2 editar gasto fixo mensal: o interruptor está desligado e a legenda aparece', (await visibleCount('switch', 'É uma assinatura?')) === 1 && !(await h2Checked()) && (await body()).includes('Streaming, aplicativo, academia, clube, plano de celular.'));
   await h2Switch().click(); await p.waitForTimeout(300);
   await shot('276_editar_assinatura');
@@ -7514,13 +7514,13 @@ setInterval(async () => {
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
   ok('H2 o Aluguel passa ao grupo Assinaturas (4 assinaturas) e sai de "Gastos fixos"', (await h2Rows('Assinaturas'))?.some((r) => r.startsWith('Aluguel, R$ 2.500,00 por mês')) && !(await h2Rows('Gastos fixos'))?.some((r) => r.startsWith('Aluguel')));
   await btn('Aluguel, R$ 2.500,00 por mês, R$ 30.000,00 por ano, todo dia 5, assinatura').click(); await waitText('Histórico de valores');
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
   ok('H2 editar o Aluguel marcado: o interruptor vem ligado', await h2Checked());
   await h2Switch().click(); await p.waitForTimeout(200);
   await btn('Salvar alterações').click(); await waitText('Assinatura desmarcada.'); await p.waitForTimeout(500);
   ok('H2 desmarcar: "Assinatura desmarcada." e o detalhe sem a linha de assinatura', (await body()).includes('Assinatura desmarcada.') && !(await body()).includes('Assinatura · R$'));
   // Marca e valor juntos: o diálogo "Aplicar a partir de..." vem primeiro, depois a marca.
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
   await h2Switch().click(); await field('Valor por mês').fill('2600,00'); await p.waitForTimeout(200);
   await btn('Salvar alterações').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
   ok('H2 marca e valor juntos: o diálogo de aplicar a partir de um mês aparece (a marca vai depois)', (await p.getByRole('alert').getByRole('button', { name: 'Aplicar' }).count()) >= 1 || (await p.getByRole('dialog').count()) >= 1);
@@ -7530,7 +7530,7 @@ setInterval(async () => {
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
   // Parcelamento e conta do ano: o formulário de edição não tem o interruptor.
   await btn('Financiamento do carro, Parcela 13 de 48, R$ 850,00, termina em outubro de 2029, parcelamento').click(); await waitText('Progresso').catch(() => {}); await p.waitForTimeout(300);
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
   ok('H2 editar parcelamento: sem o interruptor "É uma assinatura?"', (await visibleCount('switch', 'É uma assinatura?')) === 0);
   await btn('Cancelar').click(); await p.waitForTimeout(400);
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
@@ -7549,7 +7549,7 @@ setInterval(async () => {
   await shot('277_marca_falhou');
   ok('H2 a marca falha: o gasto fixo existe e não é assinatura', JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', false, null, 1]]));
   // Editar só a marca com a falha ainda ativa: o aviso de erro fica na tela, com "Tentar de novo".
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
   await h2Switch().click(); await btn('Salvar alterações').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(400);
   ok('H2 editar só a marca com falha: o erro aparece junto do botão ("Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo."), que passa a "Tentar de novo", e nada é gravado', (await visibleCount('button', 'Tentar de novo')) === 1 && (await body()).includes('Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo.') &&
     JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', false, null, 1]]));
@@ -7558,7 +7558,7 @@ setInterval(async () => {
   await btn('Tentar de novo').click(); await waitText('Marcado como assinatura.'); await p.waitForTimeout(500);
   ok('H2 tentar de novo: a marca é gravada (a versão sobe uma vez)', JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', true, null, 2]]));
   // Cancelar a edição com a marca mudada pede confirmação (alteração não salva).
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
   await h2Switch().click(); await p.waitForTimeout(200);
   await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
   ok('H2 sair da edição com a marca mudada e não salva pede confirmação', (await dialogText()).includes('Você tem alterações que ainda não foram salvas em Pessoal.'));
@@ -8998,14 +8998,14 @@ setInterval(async () => {
   await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
   await i2ReadExpense(i2Received);
   i2t = await i2Keep(); i2v = await i2Values();
-  ok('I2 Pix recebido em Anotar gasto: "Comprovante lido: Pix recebido · Fulano de Tal Exemplo Ltda · R$ 320,00 · 06/10/2026 às 09:05" com o aviso "Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto." e o botão "Trocar para Registrar recebimento"',
+  ok('I2 Pix recebido em Anotar gasto: "Comprovante lido: Pix recebido · Fulano de Tal Exemplo Ltda · R$ 320,00 · 06/10/2026 às 09:05" com o aviso "Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto." e o botão "É um recebimento"',
     i2t.includes('Comprovante lido: Pix recebido · Fulano de Tal Exemplo Ltda · R$ 320,00 · 06/10/2026 às 09:05') && i2t.includes('Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto.') &&
-    (await visibleCount('button', 'Trocar para Registrar recebimento')) === 1, i2t.slice(0, 500));
+    (await visibleCount('button', 'É um recebimento')) === 1, i2t.slice(0, 500));
   ok('I2 Pix recebido em Anotar gasto: nada é preenchido (valor e descrição em branco, data de hoje) e não há "Preenchemos o que o comprovante informa"',
     i2v.amount === '' && i2v.desc === '' && i2v.date === '07/10/2026' && !i2t.includes('Preenchemos o que o comprovante informa'), JSON.stringify(i2v));
   await i2Top();
   await i2Shots('353_comprovante_outro_tipo');
-  await btn('Trocar para Registrar recebimento').click(); await waitText('Data do recebimento', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
+  await btn('É um recebimento').click(); await waitText('Data do recebimento', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
   i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
   ok('I2 trocar: abre Registrar recebimento com o mesmo comprovante, sem pedir o PDF de novo: descrição "Pix de Fulano de Tal Exemplo Ltda", valor 320,00 e data 06/10/2026; sem o aviso de tipo trocado',
     (await h1Name()) === 'Registrar recebimento' && i2v.desc === 'Pix de Fulano de Tal Exemplo Ltda' && i2v.amount === '320,00' && i2v.date === '06/10/2026' && !i2t.includes('Ele entra como') &&
@@ -9032,10 +9032,10 @@ setInterval(async () => {
   await i2Shots('355_comprovante_recebimento');
   await i2ReadIncome(i2Sent);
   i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
-  ok('I2 Pix enviado em Registrar recebimento: "Este comprovante é de um Pix enviado. Ele entra como gasto, não como recebimento." com "Trocar para Anotar gasto"; nada é preenchido',
+  ok('I2 Pix enviado em Registrar recebimento: "Este comprovante é de um Pix enviado. Ele entra como gasto, não como recebimento." com "É um gasto"; nada é preenchido',
     i2t.includes('Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2t.includes('Este comprovante é de um Pix enviado. Ele entra como gasto, não como recebimento.') &&
-    (await visibleCount('button', 'Trocar para Anotar gasto')) === 1 && i2v.amount === '' && i2v.desc === '', JSON.stringify(i2v));
-  await btn('Trocar para Anotar gasto').click(); await waitText('Será salvo em', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
+    (await visibleCount('button', 'É um gasto')) === 1 && i2v.amount === '' && i2v.desc === '', JSON.stringify(i2v));
+  await btn('É um gasto').click(); await waitText('Será salvo em', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
   i2v = await i2Values(); await i2Keep();
   ok('I2 trocar para Anotar gasto: o mesmo comprovante preenche o gasto (com a lembrança por nome da vez anterior, "Almoço de domingo", e a categoria Lazer)',
     (await h1Name()) === 'Anotar gasto' && i2v.amount === '85,00' && i2v.date === '05/10/2026' && i2v.desc === 'Almoço de domingo' && (await radio('Lazer').getAttribute('aria-checked')) === 'true', JSON.stringify(i2v));
@@ -9047,7 +9047,7 @@ setInterval(async () => {
   i2t = await i2Keep(); i2v = await i2Values();
   ok('I2 comprovante sem direção, em Anotar gasto: "Comprovante lido: Pix · Maria Souza Exemplo · ..." (sem afirmar "enviado"), o aviso "O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo." e a descrição da última vez com este nome ("Almoço de domingo")',
     i2t.includes('Comprovante lido: Pix · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2t.includes('O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo.') && i2v.desc === 'Almoço de domingo', JSON.stringify(i2v));
-  ok('I2 comprovante sem direção: não oferece trocar de tela (a tela vale)', (await visibleCount('button', /^Trocar para /)) === 0);
+  ok('I2 comprovante sem direção: não oferece trocar de tela (a tela vale)', (await visibleCount('button', /^É um (gasto|recebimento)$/)) === 0);
   await i2Leave();
   await i2NewIncome();
   await i2ReadIncome(i2Neutral);
@@ -9070,26 +9070,26 @@ setInterval(async () => {
   await i2Leave();
 
   // ---- 8b2. Nota fiscal de serviço (NFS-e, D-079) em Registrar recebimento: o líquido, a data de emissão e "Nota fiscal 35 para" quem
-  // contratou; "Trocar para Anotar gasto" põe o nome de quem prestou; no PDF da nota, a nota de serviço aponta a leitura certa ----
+  // contratou; "É um gasto" põe o nome de quem prestou; no PDF da nota, a nota de serviço aponta a leitura certa ----
   await i2NewIncome();
   await i2ReadIncome(i2Nfse, 'Nota de serviço lida:');
   i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
-  ok('I2 nota de serviço em Registrar recebimento: "Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026", o líquido (não o do serviço nem o zerado), a data de emissão (não a da DPS), "Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda" com a legenda, o lado e a data explicados, a privacidade da nota e "Trocar para Anotar gasto"',
+  ok('I2 nota de serviço em Registrar recebimento: "Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026", o líquido (não o do serviço nem o zerado), a data de emissão (não a da DPS), "Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda" com a legenda, o lado e a data explicados, a privacidade da nota e "É um gasto"',
     i2t.includes('Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026') && i2v.amount === '4.200,00' && i2v.date === '05/10/2026' &&
     i2v.desc === 'Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda' && i2t.includes('Número e nome lidos da nota') &&
     i2t.includes('Lemos como um serviço que você prestou: o nome é de quem contratou.') && i2t.includes('A data é a da emissão da nota. Se o pagamento foi em outro dia, troque a data.') &&
     i2t.includes('A nota foi lida aqui no aparelho e não é guardada. Não guardamos CPF, CNPJ, endereço nem a chave da nota.') && i2t.includes('Preenchemos o que a nota informa. Confira e toque em Salvar.') &&
-    (await visibleCount('button', 'Trocar para Anotar gasto')) === 1, JSON.stringify(i2v));
+    (await visibleCount('button', 'É um gasto')) === 1, JSON.stringify(i2v));
   i2t = await i2PageText();
   ok('I2 nota de serviço: CNPJ, e-mail, endereço, chave, descrição do serviço e os outros valores não aparecem em lugar nenhum da página',
     I2_NFSE_SECRETS.every((x) => !i2t.includes(x)), I2_NFSE_SECRETS.filter((x) => i2t.includes(x)).join(' | '));
   await i2Shots('357_nota_servico_recebimento');
-  await btn('Trocar para Anotar gasto').click(); await waitText('Será salvo em', 12000); await waitText('Nota de serviço lida:', 12000); await p.waitForTimeout(900);
+  await btn('É um gasto').click(); await waitText('Será salvo em', 12000); await waitText('Nota de serviço lida:', 12000); await p.waitForTimeout(900);
   i2t = await i2Keep(); i2v = await i2Values();
   ok('I2 nota de serviço trocada para Anotar gasto: o nome passa a ser o de quem prestou ("Nota fiscal 35 de Alex Exemplo da Silva", sem a raiz do CNPJ), com o mesmo valor e a mesma data, e a troca de volta',
     (await h1Name()) === 'Anotar gasto' && i2t.includes('Nota de serviço lida: Alex Exemplo da Silva · R$ 4.200,00 · 05/10/2026') && i2v.desc === 'Nota fiscal 35 de Alex Exemplo da Silva' &&
     i2v.amount === '4.200,00' && i2v.date === '05/10/2026' && i2t.includes('Lemos como um serviço que você contratou: o nome é de quem prestou.') &&
-    (await visibleCount('button', 'Trocar para Registrar recebimento')) === 1, JSON.stringify(i2v));
+    (await visibleCount('button', 'É um recebimento')) === 1, JSON.stringify(i2v));
   i2t = await i2PageText();
   ok('I2 nota de serviço em Anotar gasto: nenhum dado da nota além do nome, do valor e da data', I2_NFSE_SECRETS.every((x) => !i2t.includes(x)), I2_NFSE_SECRETS.filter((x) => i2t.includes(x)).join(' | '));
   await i2Leave();

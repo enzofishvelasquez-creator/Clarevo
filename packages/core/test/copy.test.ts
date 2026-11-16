@@ -2550,8 +2550,8 @@ describe('textos do comprovante de Pix e de pagamento (D-051)', () => {
     expect(COMPROVANTE_TEXT.filled).toBe('Preenchemos o que o comprovante informa. Confira e toque em Salvar.');
     expect(COMPROVANTE_TEXT.looksNotedHint).toBe('Pode ser o mesmo lançamento. Se for outro, é só salvar.');
     expect(COMPROVANTE_TEXT.looksNoted('2026-10-05', 'Padaria', 8500)).toBe('Parece já anotado em 05/10/2026: Padaria, R$ 85,00.');
-    expect(COMPROVANTE_TEXT.switchToIncome).toBe('Trocar para Registrar recebimento');
-    expect(COMPROVANTE_TEXT.switchToExpense).toBe('Trocar para Anotar gasto');
+    expect(COMPROVANTE_TEXT.switchToIncome).toBe('É um recebimento');
+    expect(COMPROVANTE_TEXT.switchToExpense).toBe('É um gasto');
     expect(COMPROVANTE_TEXT.errors.nota_fiscal).toContain('Escanear nota fiscal');
     expect(COMPROVANTE_TEXT.errors.texto_vazio).toContain('foto');
   });

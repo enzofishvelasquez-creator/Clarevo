@@ -350,12 +350,8 @@ export default function ContasVencidas() {
         })()
       : null;
   const batchTotal = chosen.reduce((acc, c) => acc + c.amountCents, 0);
-  const batchLabel =
-    chosen.length === 0
-      ? 'Marcar as selecionadas como pagas no vencimento'
-      : chosen.length === 1
-        ? 'Marcar a 1 selecionada como paga no vencimento'
-        : `Marcar as ${chosen.length} selecionadas como pagas no vencimento`;
+  // Rótulo curto (cabe em 320 px); a regra (valor previsto, na data do vencimento) fica na legenda acima do botão.
+  const batchLabel = chosen.length === 0 ? 'Marcar como pagas' : chosen.length === 1 ? 'Marcar como paga (1)' : `Marcar como pagas (${chosen.length})`;
   const resultBanner = result ? (
     <Banner tone={result.tone} icon={result.tone === 'erro' ? AlertCircle : Check}>
       <MoneyTxt variant="label" color={result.tone === 'erro' ? colors.error : colors.successText} style={{ fontFamily: fonts.bold }}>

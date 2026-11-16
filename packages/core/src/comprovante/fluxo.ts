@@ -90,8 +90,8 @@ export const COMPROVANTE_TEXT = {
     privacy: 'A nota foi lida aqui no aparelho e não é guardada. Não guardamos CPF, CNPJ, endereço nem a chave da nota.',
   },
   /** Tipo trocado: o comprovante é do outro lado. */
-  switchToIncome: 'Trocar para Registrar recebimento',
-  switchToExpense: 'Trocar para Anotar gasto',
+  switchToIncome: 'É um recebimento',
+  switchToExpense: 'É um gasto',
   /** Erros da leitura do PDF, um por causa. */
   errors: {
     texto_vazio: 'Não encontramos texto neste PDF. Ele pode ser uma foto do comprovante. Digite os dados à mão.',

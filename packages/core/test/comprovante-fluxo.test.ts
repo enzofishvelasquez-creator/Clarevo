@@ -95,12 +95,12 @@ describe('tipo trocado', () => {
   it('recebimento em Anotar gasto e gasto em Registrar recebimento oferecem a troca', () => {
     expect(comprovanteMismatch(draftOf({ direction: 'entrada' }), 'despesa')).toEqual({
       text: 'Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto.',
-      action: 'Trocar para Registrar recebimento',
+      action: 'É um recebimento',
       other: 'receita',
     });
     expect(comprovanteMismatch(draftOf({ direction: 'saida' }), 'receita')).toEqual({
       text: 'Este comprovante é de um Pix enviado. Ele entra como gasto, não como recebimento.',
-      action: 'Trocar para Anotar gasto',
+      action: 'É um gasto',
       other: 'despesa',
     });
     expect(comprovanteMismatch(draftOf({ direction: 'saida', kind: 'boleto' }), 'receita')?.text).toBe('Este comprovante é de um boleto pago. Ele entra como gasto, não como recebimento.');
@@ -284,7 +284,7 @@ describe('folha "Escanear nota fiscal" e erros', () => {
     expect(comprovanteReadLine(paid)).toBe('Comprovante lido: Boleto pago · R$ 85,00 · 05/10/2026 às 14:32');
     expect(comprovanteGaps(paid).issued).toBeNull();
     // Em Registrar recebimento, o boleto é do outro lado, e a frase não o chama de pago.
-    expect(comprovanteMismatch(due, 'receita')).toEqual({ text: 'Este comprovante é de um boleto. Ele entra como gasto, não como recebimento.', action: 'Trocar para Anotar gasto', other: 'despesa' });
+    expect(comprovanteMismatch(due, 'receita')).toEqual({ text: 'Este comprovante é de um boleto. Ele entra como gasto, não como recebimento.', action: 'É um gasto', other: 'despesa' });
     expect(comprovanteMismatch(paid, 'receita')?.text).toBe('Este comprovante é de um boleto pago. Ele entra como gasto, não como recebimento.');
     // Conta de consumo: o código não traz o vencimento; a linha diz "Boleto" e o dia pedido é o do pagamento.
     const noDue = draftOf({ kind: 'boleto', amountCents: 18_990, occurredOn: null, time: null, counterpart: 'Companhia Exemplo', dateIsDue: true });
