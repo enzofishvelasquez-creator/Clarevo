@@ -495,7 +495,26 @@ const __mods = [
         }
     }
     function todayIn(timeZone, now = new Date()) {
-        return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+        try {
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                calendar: 'gregory',
+                numberingSystem: 'latn',
+            }).formatToParts(now);
+            const get = (type) => parts.find((p) => p.type === type)?.value ?? '';
+            const iso = `${get('year')}-${get('month').padStart(2, '0')}-${get('day').padStart(2, '0')}`;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && isValidIsoDate(iso))
+                return iso;
+        }
+        catch {
+        }
+        return localIsoDate(now);
+    }
+    function localIsoDate(now) {
+        return `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
     function addDays(date, delta) {
         const [y, m, d] = date.split('-').map(Number);
