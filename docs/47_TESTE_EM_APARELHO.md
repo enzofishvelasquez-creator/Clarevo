@@ -116,11 +116,23 @@ seção 2.
 | --- | --- | --- |
 | 49 | Depois da sessão, abrir Issues no projeto do Sentry | Vazio ou só falhas técnicas, **sem** nome, e-mail, valor, endereço de tela com dados nem IP. Se aparecer qualquer dado pessoal, avisar antes do lançamento |
 
+### J. Investimentos, o que é novo no D-099 (16/11/2026)
+
+Os números seguem depois dos do iPhone para não mudar os anteriores. Excluir os investimentos e as metas de teste no fim.
+
+| # | O que fazer | O esperado |
+| --- | --- | --- |
+| 54 | Investir > "Definir plano de aportes" > valor por mês > "Salvar plano"; depois "Tirar plano" | Teclado de números com vírgula; o card mostra o plano ao lado do aportado no mês; "Tirar plano" pede confirmação e os investimentos ficam como estão |
+| 55 | Com o plano definido e nenhum aporte no mês: Conta > Lembretes do dia a dia > "Aportar nos investimentos" | O aviso chega no dia escolhido para guardar, sem valor, e o toque abre Investir |
+| 56 | Novo investimento ligado à reserva (ou a uma meta) > abrir a meta > "Dos investimentos ligados"; depois "Do que eu registro na meta" | A meta mostra "Investimentos ligados" com o valor de hoje; com "Dos investimentos ligados", o valor guardado vira a soma deles; voltar devolve os registros da meta |
+| 57 | Investimento em título público (tipo, vencimento e quantidade, por exemplo 0,05) > abrir | O card "Valor pelo preço publicado" mostra o valor, o preço e a data; "Usar este valor" atualiza o investimento; a quantidade aceita vírgula |
+| 58 | Investimento em fundo com o CNPJ (14 números) e a quantidade de cotas > abrir; depois um CNPJ com um número errado | "Valor pela cota do fundo" com a cota e a data; o CNPJ errado mostra aviso ao salvar |
+
 ## 2. Só no iPhone (quando houver TestFlight)
 
 | # | O que fazer | O esperado |
 | --- | --- | --- |
-| 50 | Os itens 1 a 49 com o VoiceOver no lugar do TalkBack e o iCloud no lugar do Google Drive | O mesmo esperado |
+| 50 | Os itens 1 a 49 e 54 a 58 com o VoiceOver no lugar do TalkBack e o iCloud no lugar do Google Drive | O mesmo esperado |
 | 51 | Widget: tela Hoje, StandBy e tela bloqueada | Com valores ocultos, nada de valor nem nome; ligados, o iOS pode esconder (conferir) |
 | 52 | Escolher foto, compartilhar e as telas do sistema dentro do app | Em português |
 | 53 | Ler comprovante > "Tirar uma foto" | A câmera abre depois da folha, sem travar |
