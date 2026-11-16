@@ -1,12 +1,16 @@
-import { ERROR_TEXT } from '@clarevo/core';
+import { LOAD_ERROR_TEXT, loadErrorText } from '@clarevo/core';
+import { useIsFetching, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { LogOut } from 'lucide-react-native';
+import { useEffect, useSyncExternalStore } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { LogoSymbol } from '@/components/brand';
+import { FeedbackButton } from '@/components/feedback-button';
 import { ErrorState, LoadingState } from '@/components/states';
+import { Button } from '@/components/ui';
 import { pendingBenefit, pendingInvite } from '@/lib/invite-target';
-import { afterLogin, restoreTarget } from '@/lib/nav';
+import { afterLogin, restoreTarget, signOutIntent } from '@/lib/nav';
 import { useSession } from '@/state/session';
 import { useSpaceStatus } from '@/state/space-status';
 import { colors, space } from '@/theme/tokens';
@@ -14,7 +18,16 @@ import { colors, space } from '@/theme/tokens';
 /** Tela neutra enquanto a sessão e o espaço são conferidos. Decide para onde seguir. */
 export default function Carregando() {
   const { status, retry } = useSpaceStatus();
-  const { user, recovery } = useSession();
+  const { user, recovery, signOut } = useSession();
+  // Falha ao carregar a conta (teste com pessoas, 16/11/2026): o erro da consulta do espaço (`['space', id]`, de app/_layout.tsx) diz se
+  // foi a conexão. Enquanto uma nova tentativa roda, a tela volta a "Preparando seu espaço…"; quando ela termina, o texto é o do último erro.
+  const queryClient = useQueryClient();
+  const spaceError = useSyncExternalStore(
+    (onChange) => queryClient.getQueryCache().subscribe(onChange),
+    () => queryClient.getQueryState(['space', user?.id])?.error ?? null,
+  );
+  const retrying = useIsFetching({ queryKey: ['space', user?.id] }) > 0;
+  const failed = status === 'erro' && !retrying;
 
   useEffect(() => {
     if (recovery && user) router.replace('/nova-senha');
@@ -36,9 +49,20 @@ export default function Carregando() {
   return (
     <View style={styles.wrap}>
       <LogoSymbol size={72} variant="reverso" animated />
-      {status === 'erro' ? (
-        <View style={{ alignSelf: 'stretch' }}>
-          <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={retry} onBrand />
+      {failed ? (
+        // Sem beco sem saída: além de tentar de novo, sair da conta (a entrada volta a aparecer) ou mandar o problema para a equipe.
+        <View style={{ alignSelf: 'stretch', gap: space[3] }}>
+          <ErrorState message={loadErrorText(spaceError)} onRetry={retry} onBrand />
+          <Button
+            label={LOAD_ERROR_TEXT.signOut}
+            icon={LogOut}
+            tone="onBrand"
+            onPress={() => {
+              signOutIntent.mark();
+              signOut().catch(() => {});
+            }}
+          />
+          <FeedbackButton label={LOAD_ERROR_TEXT.report} screen="/carregando" tone="onBrand" onBrand />
         </View>
       ) : (
         <LoadingState label="Preparando seu espaço…" color={colors.textOnBrand} />

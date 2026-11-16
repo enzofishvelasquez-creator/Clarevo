@@ -58,7 +58,11 @@ async function openSiteFile(file: string): Promise<boolean> {
  * dois casos o endereço também aparece escrito no card.
  */
 export async function openSupportEmail(): Promise<boolean> {
-  const url = `mailto:${SUPPORT_EMAIL}`;
+  return openMailto(`mailto:${SUPPORT_EMAIL}`);
+}
+
+/** Abre um endereço `mailto:` como `openSupportEmail` (também o de "Enviar sugestão ou problema", `lib/feedback.ts`). */
+export async function openMailto(url: string): Promise<boolean> {
   try {
     if (Platform.OS === 'web') window.location.href = url;
     else await Linking.openURL(url);

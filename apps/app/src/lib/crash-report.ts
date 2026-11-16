@@ -3,3 +3,6 @@
  * `crash-report.native.ts`.
  */
 export function initCrashReport(): void {}
+
+/** Falha pega pela tela de erro do app inteiro (`components/route-error.tsx`): na web, nada é enviado. */
+export function reportError(_error: unknown, _screen?: string): void {}

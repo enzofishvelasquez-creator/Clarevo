@@ -31,6 +31,10 @@ import { colors, colorScheme, fonts } from '@/theme/tokens';
 // Relatório de falhas (D-093): só no celular e só com o endereço do projeto nas variáveis do EAS; antes de tudo, para pegar falhas do começo.
 initCrashReport();
 
+// Rede de segurança (teste com pessoas, 16/11/2026): uma falha ao desenhar qualquer tela mostra "Algo deu errado nesta tela." com "Tentar
+// de novo", "Voltar ao Resumo" e "Enviar um problema", e vai para o relatório de falhas (components/route-error.tsx).
+export { RouteError as ErrorBoundary } from '@/components/route-error';
+
 SplashScreen.preventAutoHideAsync();
 
 // Modo escuro (D-096): as cores do app foram escolhidas ao abrir (theme/tokens.ts) e só trocam na próxima abertura. No celular, o tema do
