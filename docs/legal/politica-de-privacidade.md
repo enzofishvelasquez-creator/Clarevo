@@ -19,14 +19,14 @@ Esta política explica, em linguagem simples, quais dados pessoais a Clarevo gua
 
 ## 1. Quem somos?
 
-A Clarevo é um aplicativo e um serviço web de organização de finanças pessoais e familiares. Ela é oferecida por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO].
+A Clarevo é um aplicativo e um serviço web de organização de finanças pessoais e familiares. Ela é oferecida por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede no [ENDEREÇO].
 
 Para a LGPD, a [RAZÃO SOCIAL] é a empresa controladora dos dados pessoais tratados na Clarevo, ou seja, quem decide como e para que os dados são tratados.
 
 - Contato sobre privacidade e pedidos sobre seus dados: [E-MAIL DE PRIVACIDADE]
 - Suporte: [E-MAIL DE SUPORTE]
 - Endereço do serviço: [DOMÍNIO]
-- Encarregado pelo tratamento de dados: a Clarevo mantém o canal de comunicação no e-mail de privacidade acima, sob a responsabilidade de [A DEFINIR: nome de quem responde pelo canal], como permite a Resolução CD/ANPD nº 2/2022 aos agentes de tratamento de pequeno porte. [A DEFINIR: o advogado confirma o enquadramento como agente de pequeno porte]
+- Encarregado pelo tratamento de dados: a Clarevo mantém o canal de comunicação no e-mail de privacidade acima, sob a responsabilidade de Enzo Velasquez, como permite a Resolução CD/ANPD nº 2/2022 aos agentes de tratamento de pequeno porte. [A DEFINIR: o advogado confirma o enquadramento como agente de pequeno porte]
 
 ## 2. A quem esta política se aplica?
 

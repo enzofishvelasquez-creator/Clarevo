@@ -6,7 +6,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 
 ## 1. Partes
 
-- **[RAZÃO SOCIAL]**, CNPJ [CNPJ], com sede em [ENDEREÇO], neste plano chamada CLAREVO.
+- **[RAZÃO SOCIAL]**, CNPJ [CNPJ], com sede no [ENDEREÇO], neste plano chamada CLAREVO.
 - **[A DEFINIR: órgão público parceiro]**, neste plano chamado ÓRGÃO.
 
 ## 2. Objeto

@@ -13,6 +13,7 @@ import { GOALS_TEXT, GOAL_DEADLINE_SHORTCUTS, GOAL_MILESTONES } from '../src/goa
 import { GUIDE_ENTRIES } from '../src/guide';
 import { INVESTMENT_TEXT } from '../src/investments';
 import { LEARN_SECTIONS, LEARN_UI_TEXT, SEASONAL_CALENDAR, publishedTopics, relatedTopics } from '../src/learn';
+import { ACCESS_TEXT, PLAN_NAME, SUBSCRIBE_OPEN, SUBSCRIPTION_SCREEN_TEXT, planPriceAmount } from '../src/plano';
 
 /**
  * Site público (D-064 e D-065, `docs/22_SITE.md`): `scripts/gerar-site.js` gera o site em `site/` a partir de `docs/legal/*.md`, do
@@ -775,10 +776,45 @@ describe('site público: as páginas geradas', () => {
     expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(5);
     expect(h).toMatch(/src="imagens\/resumo\.[0-9a-f]{10}\.png"/);
     for (const alvo of ['app/index.html', 'empresas/index.html', 'aprender/index.html', 'ajuda/index.html', 'novidades/index.html', 'seguranca.html']) expect(h, alvo).toContain(`href="${alvo}"`);
-    // Sem selos das lojas, preço, depoimento, cliente, prêmio nem número de uso inventado.
+    // Sem selos das lojas, depoimento, cliente, prêmio nem número de uso inventado. Preço e "grátis" só na seção Planos (16/11/2026).
+    const foraDosPlanos = h.replace(/<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/, '');
+    expect(foraDosPlanos).not.toBe(h);
     expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
-    expect(h).not.toMatch(/R\$\s?\d{2,}[^\w]*\/|gr[áa]tis|depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor|pr[êe]mio|nossos clientes/i);
+    expect(foraDosPlanos).not.toMatch(/R\$\s?\d|gr[áa]tis/i);
+    expect(h).not.toMatch(/depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor|pr[êe]mio|nossos clientes/i);
     expect(h).not.toMatch(/Download on the|App Store badge|Get it on/i);
+  });
+
+  // Planos (16/11/2026, pedido do Enzo): no início, com os nomes, os preços e as frases do núcleo; enquanto a assinatura não abre, a frase
+  // da tela Assinatura diz que nada é cobrado até o lançamento.
+  it('Planos: os dois planos com os textos do núcleo e, com a assinatura fechada, o aviso de que nada é cobrado até o lançamento', () => {
+    const h = html('index.html');
+    expect(h).toContain('<h2 id="planos">');
+    expect(h).toContain(ACCESS_TEXT.notOpenYet);
+    expect(SUBSCRIBE_OPEN).toBe(false);
+    const { conteudoPlanos } = require(join(ROOT, 'scripts', 'site', 'paginas', 'inicio.js')) as {
+      conteudoPlanos: (planos: unknown, u: (d: string) => string) => string;
+    };
+    const { catalogo } = require(join(ROOT, 'scripts', 'site', 'catalogo.js')) as { catalogo: () => { PLANOS: { aberta: boolean } } };
+    const { PLANOS } = catalogo();
+    expect(PLANOS.aberta).toBe(SUBSCRIBE_OPEN);
+    const secao = conteudoPlanos(PLANOS, (d) => d);
+    expect(secao).toContain(`<h2 id="planos">${ACCESS_TEXT.plansTitle}</h2>`);
+    expect(secao.match(/<h3>/g)?.length).toBe(2);
+    for (const plano of ['individual', 'familiar'] as const) {
+      expect(secao).toContain(`<h3>${PLAN_NAME[plano]}</h3>`);
+      // O site junta "R$" e o número com espaço sem quebra (esc), para o preço não partir entre linhas.
+      expect(secao).toContain(`<span class="preco-valor">${planPriceAmount(plano).replace("R$ ", "R$\u00a0")}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
+    }
+    for (const p of ACCESS_TEXT.plans) expect(secao).toContain(p.who);
+    expect(secao).toContain(ACCESS_TEXT.plansNote);
+    // Os Termos sem âncora: o texto jurídico muda com o advogado, e a página de exemplo dos testes não tem o item 12.
+    expect(secao).toContain('href="termos.html"');
+    expect(secao).toContain('href="ajuda/conta.html#guia-assinatura"');
+    expect(html('ajuda/conta.html')).toContain('id="guia-assinatura"');
+    expect(secao).not.toMatch(/[\u2013\u2014]/);
+    // Com a assinatura aberta, o aviso sai.
+    expect(conteudoPlanos({ ...PLANOS, aberta: true }, (d) => d)).not.toContain(ACCESS_TEXT.notOpenYet);
   });
 
   it('Comece aqui (o link da bio, D-067): o que é a Clarevo em duas frases, o estado real do acesso e os seis caminhos, sem espera, sem data, sem script e sem rastreamento', () => {

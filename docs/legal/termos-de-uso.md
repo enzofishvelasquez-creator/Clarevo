@@ -4,7 +4,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 
 Vigência: [DATA DE VIGÊNCIA]
 
-Estes Termos explicam as regras de uso da Clarevo, aplicativo e serviço web oferecidos por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO] (neste texto, "a Clarevo"). Ao criar uma conta, o app mostra, acima do botão "Criar conta", que você confirma ter 18 anos ou mais e concorda com estes Termos e com a Política de Privacidade. A Clarevo guarda a versão destes Termos e da Política que você aceitou e a data. Quando uma mudança pedir novo aceite (seção 8), o app pede de novo antes de você continuar.
+Estes Termos explicam as regras de uso da Clarevo, aplicativo e serviço web oferecidos por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede no [ENDEREÇO] (neste texto, "a Clarevo"). Ao criar uma conta, o app mostra, acima do botão "Criar conta", que você confirma ter 18 anos ou mais e concorda com estes Termos e com a Política de Privacidade. A Clarevo guarda a versão destes Termos e da Política que você aceitou e a data. Quando uma mudança pedir novo aceite (seção 8), o app pede de novo antes de você continuar.
 
 Para saber como tratamos os seus dados pessoais, leia a Política de Privacidade.
 
