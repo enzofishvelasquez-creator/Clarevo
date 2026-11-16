@@ -23,6 +23,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Linking, Platform } from 'react-native';
 import Purchases, { PRODUCT_CATEGORY, PURCHASES_ERROR_CODE, STORE_REPLACEMENT_MODE } from 'react-native-purchases';
 
+import { withExternalScreen } from '@/lib/external-screen';
+
 const RAW_KEY = Platform.OS === 'ios' ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY : Platform.OS === 'android' ? process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY : undefined;
 const KEY = typeof RAW_KEY === 'string' && /^[A-Za-z0-9_]{10,200}$/.test(RAW_KEY.trim()) ? RAW_KEY.trim() : null;
 
@@ -144,7 +146,8 @@ export async function buyPlan(personId: string, plan: PlanKind, current: PlanKin
             replacementMode: plan === 'familiar' ? STORE_REPLACEMENT_MODE.WITH_TIME_PRORATION : STORE_REPLACEMENT_MODE.DEFERRED,
           }
         : null;
-    await Purchases.purchaseStoreProduct(product, change);
+    // A tela de compra da loja é uma tela de fora: pagar pode levar mais de um minuto, e a volta dela não trava o app (lib/external-screen.ts).
+    await withExternalScreen(() => Purchases.purchaseStoreProduct(product, change));
     return 'comprado';
   } catch (e) {
     return purchaseError(e);

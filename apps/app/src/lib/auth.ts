@@ -34,6 +34,12 @@ export interface AuthState {
   user: AuthUser | null;
   /** Sessão aberta por link de recuperação: a pessoa precisa definir a nova senha. */
   recovery: boolean;
+  /**
+   * Sem conexão ao conferir a sessão guardada no aparelho (ao abrir o app). Com `user`, é a pessoa da sessão guardada, ainda não conferida
+   * pelo servidor: as telas mostram a falha ao carregar com "Tentar novamente", nunca a entrada. Sem `user`, não se sabe se a sessão
+   * acabou: nada do aparelho (lembretes, widget) é apagado por isso.
+   */
+  offline?: boolean;
 }
 
 /**
@@ -69,6 +75,22 @@ export function passwordProblem(password: string): string | null {
 export function emailProblem(email: string): string | null {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim()) ? null : 'Confira o e-mail informado.';
 }
+
+/**
+ * Entradas na conta neste uso do app (com e-mail e senha ou pelo link do e-mail). A biometria ao abrir (components/device-features.tsx)
+ * guarda o número de quando começou a contar e trava toda sessão que não veio de uma entrada depois disso: a que já estava no aparelho,
+ * inclusive a que só volta depois de o app abrir sem conexão, e a de quem entrou antes de o Android recriar a tela do app (o voltar na tela
+ * de trava, por exemplo). Só na memória do app.
+ */
+let signIns = 0;
+export const signInMark = {
+  set() {
+    signIns += 1;
+  },
+  count(): number {
+    return signIns;
+  },
+};
 
 /**
  * Credenciais da tentativa em andamento, mantidas só em memória para o botão

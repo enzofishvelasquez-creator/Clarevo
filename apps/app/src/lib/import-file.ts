@@ -2,6 +2,7 @@ import { IMPORT_MAX_BYTES, deviceTimeZone, raceWithTimeout, readImportFile, stat
 import * as DocumentPicker from 'expo-document-picker';
 import { Platform } from 'react-native';
 
+import { withExternalScreen } from '@/lib/external-screen';
 import { PDF_STATEMENT_MAX_PAGES, PdfTooManyPagesError, newPdfReadControl, pdfTextFromBytes } from '@/lib/pdf-text';
 
 /** Tempo máximo para abrir e ler o PDF de um extrato (até 30 páginas). */
@@ -69,7 +70,8 @@ export async function pickImportFile(timeZone?: string): Promise<PickedImport> {
   let picked: DocumentPicker.DocumentPickerResult;
   try {
     // Qualquer tipo: o OFX não tem um tipo comum e o sistema esconderia o arquivo; o conteúdo é que diz o que ele é.
-    picked = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false, base64: false });
+    // O seletor de arquivos (e o Google Drive dentro dele) é uma tela de fora: a volta dele não trava o app (lib/external-screen.ts).
+    picked = await withExternalScreen(() => DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false, base64: false }));
   } catch {
     return { cancelled: false, name: '', read: { kind: 'erro', code: 'csv_invalido' } };
   }

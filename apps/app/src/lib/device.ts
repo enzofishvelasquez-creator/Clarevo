@@ -3,6 +3,8 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as Notifications from 'expo-notifications';
 import { Linking, Platform } from 'react-native';
 
+import { openingExternalScreen, withExternalScreen } from '@/lib/external-screen';
+
 /**
  * Recursos do aparelho do Ciclo A2 (lembretes e bloqueio por biometria), só no celular. A versão web
  * (`device.web.ts`) tem as mesmas funções sem efeito, para os pacotes nativos ficarem fora do site.
@@ -52,8 +54,9 @@ export async function getNotificationPermission(): Promise<NotificationPermissio
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   try {
     await ensureChannel();
+    // O pedido do sistema é uma tela de fora: a volta dele não trava o app (lib/external-screen.ts).
     return toPermission(
-      await Notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowSound: true, allowBadge: false } }),
+      await withExternalScreen(() => Notifications.requestPermissionsAsync({ ios: { allowAlert: true, allowSound: true, allowBadge: false } })),
     );
   } catch {
     return getNotificationPermission();
@@ -127,8 +130,12 @@ export function listenToReminders(onOpen: (route: string) => void): () => void {
   return () => sub.remove();
 }
 
-/** Configurações do app no aparelho (para ligar os avisos depois de uma recusa). */
+/**
+ * Configurações do app no aparelho (para ligar os avisos ou a câmera depois de uma recusa). A volta delas não trava o app pela biometria
+ * (lib/external-screen.ts).
+ */
 export function openDeviceSettings() {
+  openingExternalScreen();
   Linking.openSettings().catch(() => {});
 }
 
@@ -143,15 +150,20 @@ export async function biometricsAvailable(): Promise<boolean> {
 
 export type UnlockResult = 'ok' | 'cancelado' | 'indisponivel' | 'falhou';
 
-/** Pede a biometria; se ela falhar, o próprio sistema oferece a senha do aparelho (disableDeviceFallback: false). */
+/**
+ * Pede a biometria; se ela falhar, o próprio sistema oferece a senha do aparelho (disableDeviceFallback: false). O pedido do sistema é uma
+ * tela de fora (no Android, a senha do aparelho abre outra tela): a volta dele não trava o app (lib/external-screen.ts).
+ */
 export async function authenticate(promptMessage: string): Promise<UnlockResult> {
   try {
-    const r = await LocalAuthentication.authenticateAsync({
-      promptMessage,
-      cancelLabel: 'Cancelar',
-      fallbackLabel: 'Usar a senha do aparelho',
-      disableDeviceFallback: false,
-    });
+    const r = await withExternalScreen(() =>
+      LocalAuthentication.authenticateAsync({
+        promptMessage,
+        cancelLabel: 'Cancelar',
+        fallbackLabel: 'Usar a senha do aparelho',
+        disableDeviceFallback: false,
+      }),
+    );
     if (r.success) return 'ok';
     if (r.error === 'not_enrolled' || r.error === 'passcode_not_set' || r.error === 'not_available') return 'indisponivel';
     if (r.error === 'user_cancel' || r.error === 'system_cancel' || r.error === 'app_cancel') return 'cancelado';

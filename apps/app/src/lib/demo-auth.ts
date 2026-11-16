@@ -11,7 +11,7 @@ import {
   type RecordsRepository,
 } from '@clarevo/core';
 
-import { AuthError, type AuthService, type AuthState, type AuthUser } from './auth';
+import { AuthError, signInMark, type AuthService, type AuthState, type AuthUser } from './auth';
 
 /**
  * Cenário fictício da conta de demonstração, lido uma vez do endereço de entrada na web ("?cenario=retorno", Ciclo A4).
@@ -107,6 +107,7 @@ export class DemoAuth implements AuthService {
     const acc = this.accounts.get(email.trim().toLowerCase());
     if (!acc || acc.password !== password) throw new AuthError('credenciais_invalidas');
     if (!acc.user.emailConfirmed) throw new AuthError('email_nao_confirmado');
+    signInMark.set();
     this.emit({ user: { ...acc.user }, recovery: false });
   }
 
@@ -126,6 +127,7 @@ export class DemoAuth implements AuthService {
   simulateRecoveryLink(email: string) {
     const acc = this.accounts.get(email.trim().toLowerCase());
     if (!acc) return false;
+    signInMark.set();
     this.emit({ user: { ...acc.user }, recovery: true });
     return true;
   }

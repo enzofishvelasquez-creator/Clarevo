@@ -101,12 +101,16 @@ function SessionProviderInner({ auth, children }: { auth: AuthService; children:
 
   useEffect(() => {
     let alive = true;
-    auth.init().then((s) => {
-      if (alive) {
-        setState(s);
-        setReady(true);
-      }
-    });
+    auth
+      .init()
+      // Uma conferência que falhou é tratada como falta de conexão (lib/auth.ts, `offline`): o app segue sem apagar nada do aparelho.
+      .catch((): AuthState => ({ user: null, recovery: false, offline: true }))
+      .then((s) => {
+        if (alive) {
+          setState(s);
+          setReady(true);
+        }
+      });
     const unsubscribe = auth.subscribe((s) => {
       setState((prev) => {
         // Outra pessoa ou sessão encerrada: nada do cache anterior pode aparecer.

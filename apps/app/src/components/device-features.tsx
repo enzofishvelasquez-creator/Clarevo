@@ -3,15 +3,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, usePathname, type Href } from 'expo-router';
 import { LockKeyhole } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Modal, StyleSheet, View } from 'react-native';
+import { AppState, BackHandler, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { useLegalAcceptance } from '@/components/legal-gate';
 import { Banner, Button, Txt } from '@/components/ui';
+import { signInMark } from '@/lib/auth';
 import { authenticate, biometricsAvailable, DEVICE_FEATURES, listenToReminders, openDeviceSettings } from '@/lib/device';
 import { deviceLock } from '@/lib/device-lock';
 import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
+import { externalScreenOpen } from '@/lib/external-screen';
 import { signOutIntent } from '@/lib/nav';
 import { PRIVACY_TEXT, setValuesHidden } from '@/lib/privacy';
 import { enableReminders, queueReminders } from '@/lib/reminders';
@@ -36,6 +38,8 @@ const LOCK_AFTER_MS = 60_000;
  * - oferta de lembretes depois do primeiro gasto fixo salvo no Pessoal (só no aparelho);
  * - biometria ao abrir (só no aparelho), que nunca impede de sair da conta, e a oferta de ligá-la logo depois de entrar na conta, uma vez
  *   por pessoa e aparelho, como na maioria dos apps (pedido do Enzo, 16/11/2026).
+ * Sem conexão ao abrir, a sessão guardada no aparelho continua (lib/supabase.ts): nada de lembretes cancelados nem de widget "sem sessão",
+ * e a biometria é pedida do mesmo jeito.
  */
 export function DeviceFeatures() {
   const { user, auth } = useSession();
@@ -61,7 +65,7 @@ export function DeviceFeatures() {
 }
 
 function NativeFeatures() {
-  const { ready, user, auth, repo } = useSession();
+  const { ready, user, auth, repo, offline } = useSession();
   const { status } = useSpaceStatus();
   const { setSpace, setMonth, currentMonth } = useView();
   const pathname = usePathname();
@@ -82,6 +86,9 @@ function NativeFeatures() {
   const run = () => {
     if (!ready) return;
     if (!userId || !repo) {
+      // Sem conexão para conferir a sessão guardada (e sem conseguir lê-la): não se sabe se ela acabou. Os lembretes e o widget ficam
+      // como estavam; quem sai da conta, ou tem a sessão encerrada pelo servidor, passa pelo caminho de baixo.
+      if (offline) return;
       // Sem sessão neste aparelho: nenhum aviso de conta fica agendado, e o widget deixa de mostrar o que a pessoa viu (na demonstração,
       // nada é gravado, nem o estado sem sessão).
       queueReminders({ enabled: false });
@@ -111,7 +118,7 @@ function NativeFeatures() {
   // Ao abrir, ao entrar e ao mudar uma preferência de lembrete ou um horário (e "Mostrar valores no widget").
   useEffect(() => {
     runRef.current();
-  }, [ready, userId, contextId, status, prefs?.reminders, prefs?.reminderHour, prefs?.routineReminders, prefs?.routineReminderHour, prefs?.depositReminderDay, prefs?.widgetShowValues, demo]);
+  }, [ready, userId, offline, contextId, status, prefs?.reminders, prefs?.reminderHour, prefs?.routineReminders, prefs?.routineReminderHour, prefs?.depositReminderDay, prefs?.widgetShowValues, demo]);
 
   // Ao voltar para o app, depois de qualquer escrita concluída e da geração do dia dos gastos fixos.
   useEffect(() => {
@@ -200,20 +207,27 @@ function NativeFeatures() {
   useEffect(() => deviceLock.set(locked), [locked]);
   const [unlockMsg, setUnlockMsg] = useState<string | null>(null);
   const authenticating = useRef(false);
-  /** Pessoa com sessão quando o app abriu (undefined: sessão ainda sendo conferida). Quem entra depois não é bloqueado. */
-  const startUser = useRef<string | null | undefined>(undefined);
-  const startChecked = useRef(false);
+  /** Entradas na conta até aqui (lib/auth.ts, `signInMark`): só as que vierem depois contam como "acabou de entrar". */
+  const signInsAtStart = useRef(signInMark.count());
+  /**
+   * A sessão já conferida para a trava (a pessoa). Trava toda sessão que não veio de entrar na conta depois de este componente começar: a
+   * que já estava no aparelho ao abrir, a sessão guardada que só volta depois, quando o app abriu sem conexão, e a de antes de o Android
+   * recriar a tela do app. Quem entra agora, com e-mail e senha ou pelo link do e-mail, não é bloqueado.
+   */
+  const lockChecked = useRef<string | null>(null);
   useEffect(() => {
-    if (ready && startUser.current === undefined) startUser.current = userId ?? null;
-  }, [ready, userId]);
-  useEffect(() => {
-    if (startChecked.current || !ready || startUser.current === undefined) return;
-    if (!userId || startUser.current !== userId) {
-      startChecked.current = true;
+    if (!ready) return;
+    if (!userId) {
+      lockChecked.current = null;
+      return;
+    }
+    if (lockChecked.current === userId) return;
+    if (signInMark.count() > signInsAtStart.current) {
+      lockChecked.current = userId;
       return;
     }
     if (!prefs) return;
-    startChecked.current = true;
+    lockChecked.current = userId;
     if (prefs.biometricLock) setLocked(true);
   }, [ready, userId, prefs]);
 
@@ -225,7 +239,9 @@ function NativeFeatures() {
     let awaySince: number | null = null;
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'background') {
-        if (!authenticating.current) awaySince = Date.now();
+        // A câmera, a galeria, o seletor de arquivos, a folha de compartilhar, as configurações e o pedido de biometria do sistema também
+        // deixam o app em segundo plano no Android: essas idas, abertas pelo próprio app, não contam como sair (lib/external-screen.ts).
+        if (!authenticating.current && !externalScreenOpen()) awaySince = Date.now();
       } else if (s === 'active') {
         const away = awaySince === null ? 0 : Date.now() - awaySince;
         awaySince = null;
@@ -259,14 +275,14 @@ function NativeFeatures() {
   }, [locked]);
 
   // ---- Oferta da biometria logo depois de entrar na conta --------------------------------------
-  // Só depois de um login neste uso do app (quem abre o app já com a sessão não é perguntado), com biometria cadastrada no aparelho,
-  // uma vez por pessoa e aparelho, e sem atropelar o aviso dos termos, o tour de boas-vindas nem a tela de trava.
+  // Só depois de um login neste uso do app (`signInMark`; quem abre o app já com a sessão, ou com a sessão guardada que volta depois de
+  // abrir sem conexão, não é perguntado), com biometria cadastrada no aparelho, uma vez por pessoa e aparelho, e sem atropelar o aviso
+  // dos termos, o tour de boas-vindas nem a tela de trava.
   const legal = useLegalAcceptance(status === 'pronto' && !demo);
   const legalPending = !legal.data || legalAcceptanceNeeded(legal.data);
   const [bioOffer, setBioOffer] = useState(false);
   const [bioBusy, setBioBusy] = useState(false);
   const [bioMsg, setBioMsg] = useState<string | null>(null);
-  const sawSignedOut = useRef(false);
   const bioChecked = useRef<string | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
@@ -276,14 +292,13 @@ function NativeFeatures() {
     };
   }, []);
   useEffect(() => {
-    if (ready && !userId) sawSignedOut.current = true;
     // Outra pessoa ou sessão encerrada: a oferta de antes não vale mais (a sessão pode cair com o diálogo aberto).
     setBioOffer(false);
     setBioMsg(null);
     if (!userId) bioChecked.current = null;
   }, [ready, userId]);
   useEffect(() => {
-    if (demo || !userId || !prefs || !sawSignedOut.current || bioChecked.current === userId) return;
+    if (demo || !userId || !prefs || signInMark.count() <= signInsAtStart.current || bioChecked.current === userId) return;
     if (prefs.biometricLock || prefs.biometricOffered) {
       bioChecked.current = userId;
       return;
@@ -313,7 +328,10 @@ function NativeFeatures() {
       return;
     }
     setBioBusy(true);
+    // O pedido do sistema deixa o app em segundo plano no Android: a volta dele não trava o app.
+    authenticating.current = true;
     const r = await authenticate(PRIVACY_TEXT.lockConfirmPrompt);
+    authenticating.current = false;
     setBioBusy(false);
     if (r === 'ok') {
       updatePrefs(userId, { biometricOffered: true, biometricLock: true }, persist);
@@ -350,6 +368,8 @@ function NativeFeatures() {
         confirmTone="brand"
         busy={bioBusy}
         onCancel={() => answerBioOffer(false)}
+        // O voltar do sistema só fecha a oferta agora: diferente de "Agora não", ela pode aparecer de novo numa próxima entrada na conta.
+        onDismiss={() => setBioOffer(false)}
         onConfirm={() => answerBioOffer(true)}>
         <Txt color={colors.textSecondary}>{PRIVACY_TEXT.offerBody}</Txt>
         {bioMsg ? (
@@ -363,13 +383,19 @@ function NativeFeatures() {
   );
 }
 
-/** Tela de desbloqueio: cobre o app inteiro; "Sair da conta" funciona sem a biometria. */
+/**
+ * Tela de desbloqueio: cobre o app inteiro; "Sair da conta" funciona sem a biometria. O voltar do Android sai do app (a trava continua lá
+ * na volta), e com letra grande em tela pequena o conteúdo rola.
+ */
 function LockScreen({ message, onUnlock }: { message: string | null; onUnlock: () => void }) {
   const { signOut } = useSession();
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible animationType="none" onRequestClose={() => {}} statusBarTranslucent>
-      <View style={[styles.lock, { paddingTop: insets.top + space[10], paddingBottom: insets.bottom + space[6] }]} accessibilityViewIsModal>
+    <Modal visible animationType="none" onRequestClose={() => BackHandler.exitApp()} statusBarTranslucent>
+      <ScrollView
+        style={styles.lockScroll}
+        contentContainerStyle={[styles.lock, { paddingTop: insets.top + space[10], paddingBottom: insets.bottom + space[6] }]}
+        accessibilityViewIsModal>
         <View style={styles.box}>
           <View style={styles.icon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <LockKeyhole size={32} color={colors.brandText} />
@@ -398,13 +424,14 @@ function LockScreen({ message, onUnlock }: { message: string | null; onUnlock: (
             {PRIVACY_TEXT.signOutCaption}
           </Txt>
         </View>
-      </View>
+      </ScrollView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  lock: { flex: 1, backgroundColor: colors.background, paddingHorizontal: space[6], alignItems: 'center' },
+  lockScroll: { flex: 1, backgroundColor: colors.background },
+  lock: { flexGrow: 1, paddingHorizontal: space[6], alignItems: 'center' },
   box: { width: '100%', maxWidth: 420, gap: space[4] },
   icon: { alignSelf: 'center', width: 64, height: 64, borderRadius: radius.pill, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
 });

@@ -4,6 +4,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 
+import { withExternalScreen } from '@/lib/external-screen';
+
 /**
  * Entrega do arquivo exportado (D-047) no celular: o CSV é escrito no cache do app e o PDF é gerado pelo expo-print; os dois vão
  * ao compartilhamento do aparelho (expo-sharing). No iOS, a cópia temporária é apagada logo depois, mesmo se o compartilhamento
@@ -59,11 +61,15 @@ export async function deliverExportFile(file: ExportDeliverable, dialogTitle: st
       // O texto já começa com a marca de ordem de bytes; o UTF-8 a leva junto.
       target.write(new TextEncoder().encode(file.content));
     }
-    await Sharing.shareAsync(target.uri, {
-      mimeType: file.kind === 'pdf' ? 'application/pdf' : 'text/csv',
-      UTI: file.kind === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text',
-      dialogTitle,
-    });
+    // A folha de compartilhar (e o app escolhido nela) é uma tela de fora: a volta dela não trava o app (lib/external-screen.ts).
+    const uri = target.uri;
+    await withExternalScreen(() =>
+      Sharing.shareAsync(uri, {
+        mimeType: file.kind === 'pdf' ? 'application/pdf' : 'text/csv',
+        UTI: file.kind === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text',
+        dialogTitle,
+      }),
+    );
     // No Android o app de destino pode ler o arquivo depois que a tela de compartilhar volta: fica até a próxima limpeza.
     keepTarget = ANDROID;
     return 'ok';

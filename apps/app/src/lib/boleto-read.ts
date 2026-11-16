@@ -2,6 +2,7 @@ import { BOLETO_TEXT, boletoFromText, type BoletoReading, type IsoDate } from '@
 import * as DocumentPicker from 'expo-document-picker';
 
 import { imageTooBig, isImageAsset } from '@/lib/comprovante-read';
+import { withExternalScreen } from '@/lib/external-screen';
 import { discardPickedImage, pickImageForReading } from '@/lib/image-pick';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { bytesOf, deleteCachedCopy, readPdfText } from '@/lib/receipt-read';
@@ -17,12 +18,15 @@ export type BoletoRead = { ok: true; reading: BoletoReading } | { ok: false; mes
 export async function pickAndReadBoletoPdf(today: IsoDate, onImage?: () => void): Promise<BoletoRead> {
   let picked: DocumentPicker.DocumentPickerResult;
   try {
-    picked = await DocumentPicker.getDocumentAsync({
-      type: OCR_AVAILABLE ? ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'] : 'application/pdf',
-      copyToCacheDirectory: true,
-      multiple: false,
-      base64: false,
-    });
+    // O seletor de arquivos (e o Google Drive dentro dele) é uma tela de fora: a volta dele não trava o app (lib/external-screen.ts).
+    picked = await withExternalScreen(() =>
+      DocumentPicker.getDocumentAsync({
+        type: OCR_AVAILABLE ? ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'] : 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: false,
+        base64: false,
+      }),
+    );
   } catch {
     return { ok: false, message: BOLETO_TEXT.errors.pdfFailed };
   }

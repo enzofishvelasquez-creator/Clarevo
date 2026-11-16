@@ -1,6 +1,7 @@
 import { COMPROVANTE_TEXT, comprovanteErrorText, comprovanteFromText, type ComprovanteDirection, type ComprovanteReading, type IsoDate, type PdfTextItem } from '@clarevo/core';
 import * as DocumentPicker from 'expo-document-picker';
 
+import { withExternalScreen } from '@/lib/external-screen';
 import type { PdfReadControl } from '@/lib/pdf-text';
 import { discardPickedImage, pickImageForReading } from '@/lib/image-pick';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
@@ -80,12 +81,15 @@ export async function readComprovanteImage(
 export async function pickAndReadComprovantePdf(defaultDirection: ComprovanteDirection, today: IsoDate, onImage?: () => void): Promise<ComprovanteRead> {
   let picked: DocumentPicker.DocumentPickerResult;
   try {
-    picked = await DocumentPicker.getDocumentAsync({
-      type: OCR_AVAILABLE ? ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'] : 'application/pdf',
-      copyToCacheDirectory: true,
-      multiple: false,
-      base64: false,
-    });
+    // O seletor de arquivos (e o Google Drive dentro dele) é uma tela de fora: a volta dele não trava o app (lib/external-screen.ts).
+    picked = await withExternalScreen(() =>
+      DocumentPicker.getDocumentAsync({
+        type: OCR_AVAILABLE ? ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'] : 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: false,
+        base64: false,
+      }),
+    );
   } catch {
     return { ok: false, message: COMPROVANTE_TEXT.pdf.failed };
   }

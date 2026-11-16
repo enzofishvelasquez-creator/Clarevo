@@ -20,6 +20,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import { Platform } from 'react-native';
 
+import { withExternalScreen } from '@/lib/external-screen';
 import { deleteCacheFile } from '@/lib/image-pick';
 import { PDF_MAX_BYTES, hasPdfHeader, newPdfReadControl, pdfTextFromBytes, type PdfReadControl } from '@/lib/pdf-text';
 
@@ -132,7 +133,8 @@ export async function readNotePdfBytes(
 export async function pickAndReadNotePdf(today: IsoDate): Promise<NoteReading> {
   let picked: DocumentPicker.DocumentPickerResult;
   try {
-    picked = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true, multiple: false, base64: false });
+    // O seletor de arquivos (e o Google Drive dentro dele) é uma tela de fora: a volta dele não trava o app (lib/external-screen.ts).
+    picked = await withExternalScreen(() => DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true, multiple: false, base64: false }));
   } catch {
     return { ok: false, message: NOTA_TEXT.pdf.failed, boleto: false };
   }

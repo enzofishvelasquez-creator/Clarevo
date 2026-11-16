@@ -2,6 +2,8 @@ import { GOAL_PHOTO_MAX_BYTES, GOAL_PHOTO_MAX_SIDE, base64Bytes } from '@clarevo
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 
+import { withExternalScreen } from '@/lib/external-screen';
+
 export type PickedGoalPhoto = { ok: true; base64: string } | { ok: false; reason: 'cancelado' | 'foto_grande' | 'falha' };
 
 /**
@@ -11,7 +13,8 @@ export type PickedGoalPhoto = { ok: true; base64: string } | { ok: false; reason
  */
 export async function pickGoalPhoto(): Promise<PickedGoalPhoto> {
   try {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 1 });
+    // A galeria e o recorte do sistema são telas de fora: a volta deles não trava o app (lib/external-screen.ts).
+    const res = await withExternalScreen(() => ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 1 }));
     const asset = res.canceled ? null : res.assets[0];
     if (!asset) return { ok: false, reason: 'cancelado' };
     const landscape = (asset.width ?? 0) >= (asset.height ?? 0);
