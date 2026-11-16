@@ -69,6 +69,10 @@ export const PROFILE_PHOTO_TEXT = {
   removed: 'Foto do perfil removida.',
   cameraDenied: 'Sem acesso à câmera. Você pode liberar nas configurações do aparelho ou escolher uma foto da galeria.',
   galleryDenied: 'Sem acesso às fotos. Você pode liberar nas configurações do aparelho.',
+  /** Botão junto do aviso de câmera sem acesso: abre as configurações do app no aparelho. */
+  openSettings: 'Abrir ajustes',
+  /** A escolha, o recorte ou a redução da foto falharam no aparelho (nada foi enviado): diferente da falha ao salvar. */
+  pickFailed: 'Não foi possível abrir ou preparar esta foto. Tente de novo ou escolha outra.',
   error: {
     foto_grande: 'A foto ficou grande demais, mesmo reduzida. Tente outra.',
     foto_invalida: 'Esta imagem não pode ser usada. Escolha uma foto JPG, PNG ou WebP.',

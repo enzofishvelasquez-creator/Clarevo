@@ -35,6 +35,11 @@ describe('foto do perfil: regras', () => {
     expect(profilePhotoUri({ mime: 'image/png', base64: PNG })).toBe(`data:image/png;base64,${PNG}`);
     expect(profilePhotoErrorText('foto_grande')).toBe(PROFILE_PHOTO_TEXT.error.foto_grande);
     expect(profilePhotoErrorText('qualquer')).toBe(PROFILE_PHOTO_TEXT.error.desconhecido);
+    // A falha ao escolher ou preparar a foto no aparelho (nada foi enviado) tem texto próprio, diferente da falha ao salvar; a câmera sem
+    // acesso ganha o botão que abre as configurações do aparelho.
+    expect(PROFILE_PHOTO_TEXT.pickFailed).not.toBe(PROFILE_PHOTO_TEXT.error.desconhecido);
+    expect(PROFILE_PHOTO_TEXT.pickFailed).not.toMatch(/salvar/i);
+    expect(PROFILE_PHOTO_TEXT.openSettings).toBe('Abrir ajustes');
     // Regras de texto do projeto: sem travessão e sem a expressão proibida.
     const all = JSON.stringify(PROFILE_PHOTO_TEXT);
     expect(all).not.toMatch(/[–—]/);
