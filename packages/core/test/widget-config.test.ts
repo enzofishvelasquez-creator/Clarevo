@@ -111,6 +111,21 @@ describe('widget: desligado por padrão (a configuração de hoje não muda)', (
     expect(once.split(work.MARK).length).toBe(2);
     expect(ler('apps/app/plugins/with-work-runtime.js')).toContain('withAppBuildGradle');
   });
+
+  it('o plugin do WorkManager, rodado como no prebuild, escreve o bloco no build.gradle do app e recusa o Kotlin', async () => {
+    const plugin = nodeRequire(raiz('apps/app/plugins/with-work-runtime.js')) as ((config: any) => any) & { MARK: string };
+    const config = plugin({ name: 'Clarevo', slug: 'clarevo' });
+    const mod = config.mods.android.appBuildGradle as (c: any) => Promise<any>;
+    const request = { platform: 'android', modName: 'appBuildGradle', projectRoot: '/x', platformProjectRoot: '/x/android', introspect: false };
+    const gradle = 'dependencies {\n    implementation("com.facebook.react:react-android")\n}\n';
+    const out = await mod({ name: 'Clarevo', slug: 'clarevo', modRequest: request, modResults: { path: '/x/android/app/build.gradle', language: 'groovy', contents: gradle } });
+    expect(out.modResults.contents.startsWith(gradle)).toBe(true);
+    expect(out.modResults.contents.split(plugin.MARK).length).toBe(2);
+    expect(out.modResults.contents).toContain('androidx.work:work-runtime-ktx:');
+    await expect(
+      mod({ name: 'Clarevo', slug: 'clarevo', modRequest: request, modResults: { path: '/x/android/app/build.gradle.kts', language: 'kt', contents: gradle } }),
+    ).rejects.toThrow('Groovy');
+  });
 });
 
 describe('widget: nomes e textos combinados com o núcleo', () => {
