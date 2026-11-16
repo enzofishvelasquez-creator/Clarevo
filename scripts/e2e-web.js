@@ -551,16 +551,16 @@ setInterval(async () => {
   ok('primeiros passos: com os três primeiros prontos, o card fica até o 4º passo ("Planejar quanto guardar")', await ppIs([ppDone('fixos'), ppDone('recebido'), ppDone('pago'), PP.guardar])(), JSON.stringify(await ppRows()));
   await btn(PP.guardar).click(); await waitText('Você consegue guardar algum valor por mês?'); await p.waitForTimeout(500);
   const askButtons = await cardButtons('Você consegue guardar algum valor por mês?');
-  ok('primeiros passos: o passo 4 abre a aba Metas no card da pergunta, com "Sim, consigo", "Agora não" e "Responder depois"', new URL(p.url()).pathname === '/metas' &&
-    JSON.stringify(askButtons) === JSON.stringify(['Sim, consigo', 'Agora não', 'Responder depois']), `${p.url()} ${JSON.stringify(askButtons)}`);
+  ok('primeiros passos: o passo 4 abre a aba Metas no card da pergunta, com "Sim, consigo", "Não consigo agora" e "Responder depois"', new URL(p.url()).pathname === '/metas' &&
+    JSON.stringify(askButtons) === JSON.stringify(['Sim, consigo', 'Não consigo agora', 'Responder depois']), `${p.url()} ${JSON.stringify(askButtons)}`);
   await logoChecks('Metas (conta nova): logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   await shot('97_metas_pergunta_conta_nova');
-  // "Agora não": texto acolhedor e reserva mínima com valores a partir de R$ 100,00, nenhum pré-marcado. Nada é criado
+  // "Não consigo agora": texto acolhedor e reserva mínima com valores a partir de R$ 100,00, nenhum pré-marcado. Nada é criado
   // até a pessoa escolher e tocar em "Criar reserva mínima".
-  await btn('Agora não').click(); await waitText('Tudo bem. Muita gente começa com valores pequenos'); await p.waitForTimeout(400);
+  await btn('Não consigo agora').click(); await waitText('Tudo bem. Muita gente começa com valores pequenos'); await p.waitForTimeout(400);
   t = await body();
   const minChips = await p.getByRole('radio').filter({ visible: true }).evaluateAll((els) => els.map((e) => [(e.getAttribute('aria-label') || e.textContent).replace(/\u00a0/g, ' '), e.getAttribute('aria-checked')]));
-  ok('"Agora não": texto acolhedor e a pergunta da reserva mínima', new URL(p.url()).pathname === '/guardar/minima' && t.includes('Tudo bem. Muita gente começa com valores pequenos, e qualquer valor guardado ajuda num imprevisto.') && t.includes('Quer começar uma reserva mínima?'), p.url());
+  ok('"Não consigo agora": texto acolhedor e a pergunta da reserva mínima', new URL(p.url()).pathname === '/guardar/minima' && t.includes('Tudo bem. Muita gente começa com valores pequenos, e qualquer valor guardado ajuda num imprevisto.') && t.includes('Quer começar uma reserva mínima?'), p.url());
   ok('reserva mínima: chips R$ 100,00, 300,00, 500,00, 1.000,00 e "Outro valor" (e "1 mês dos seus gastos essenciais" com o que já dá para calcular: aqui, o gasto fixo de R$ 100,00), nenhum pré-marcado',
     JSON.stringify(minChips.slice(0, 4).map((c) => c[0])) === JSON.stringify(['R$ 100,00', 'R$ 300,00', 'R$ 500,00', 'R$ 1.000,00']) && minChips.some((c) => c[0] === 'Outro valor') &&
     minChips.every((c) => c[1] === 'false') && minChips.filter((c) => /gastos essenciais/.test(c[0])).length <= 1, JSON.stringify(minChips));
@@ -579,9 +579,9 @@ setInterval(async () => {
   ok('reserva mínima: "Outro valor" abaixo de R$ 100,00 é recusado', (await body()).includes('Informe um valor a partir de R$ 100,00, como 300,00.'));
   const goalsBefore = await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length);
   ok('reserva mínima: nada criado antes de escolher e criar', goalsBefore === 0, String(goalsBefore));
-  await radio('R$ 100,00').click(); await btn('Criar reserva mínima').click(); await waitText('Reserva mínima criada.'); await p.waitForTimeout(600);
+  await radio('R$ 100,00').click(); await btn('Criar reserva mínima').click(); await waitText('Reserva para imprevistos criada, com o valor mínimo para começar.'); await p.waitForTimeout(600);
   t = await body();
-  ok('reserva mínima criada: Metas mostra "Reserva para imprevistos" com R$ 0,00 de R$ 100,00 (0%) e o convite à pergunta some', new URL(p.url()).pathname === '/metas' && t.includes('Reserva mínima criada.') &&
+  ok('reserva mínima criada: Metas mostra "Reserva para imprevistos" com R$ 0,00 de R$ 100,00 (0%) e o convite à pergunta some', new URL(p.url()).pathname === '/metas' && t.includes('Reserva para imprevistos criada, com o valor mínimo para começar.') &&
     t.includes('R$ 0,00 de R$ 100,00') && !t.includes('Você consegue guardar algum valor por mês?'), t.slice(0, 300));
   await shot('99_metas_reserva_minima');
   // Editar a reserva mínima (R$ 100,00, 1 mês): os R$ 100,00 não viram "gastos essenciais salvos" no formulário e escolher 3 meses
@@ -628,7 +628,7 @@ setInterval(async () => {
   ok('reserva mínima + "consigo": o plano troca a reserva para 3 meses com a base informada (nunca "reserva_minima" com 3 meses)', minGoal !== null && minGoal.months === 3 && minGoal.source !== 'reserva_minima' && minGoal.base > 0 && t.includes('Você planeja guardar R$ 300,00 por mês.'), JSON.stringify(minGoal));
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
   await waitUntil(async () => !(await headingShown('Primeiros passos')), 8000);
-  ok('primeiros passos: com os quatro passos prontos ("Agora não" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
+  ok('primeiros passos: com os quatro passos prontos ("Não consigo agora" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
@@ -5307,7 +5307,7 @@ setInterval(async () => {
     const box = (sel, pred) => { const e = [...document.querySelectorAll(sel)].find((x) => pred(x) && x.getBoundingClientRect().width > 0); return e ? e.getBoundingClientRect() : null; };
     const title = box('[role=heading]', (x) => x.textContent === 'Você consegue guardar algum valor por mês?');
     const yes = box('[role=button]', (x) => x.textContent === 'Sim, consigo');
-    const no = box('[role=button]', (x) => x.textContent === 'Agora não');
+    const no = box('[role=button]', (x) => x.textContent === 'Não consigo agora');
     const later = box('[role=button]', (x) => x.textContent === 'Responder depois');
     const calc = box('[role=button]', (x) => x.textContent === 'Calcular minha reserva');
     const reserve = box('[role=heading]', (x) => x.textContent === 'Reserva para imprevistos');
@@ -5330,7 +5330,7 @@ setInterval(async () => {
     const r = await askLayout();
     // Sem reserva, o texto do card tem uma ou duas linhas e "Calcular minha reserva" vem logo depois: o botão fica à vista, acima
     // da barra, inclusive em 360 × 640 e 320 × 640 (sem rolar).
-    ok(`nav Metas conta nova (${w}×${h}): pergunta compacta (até 230 px), "Sim, consigo" e "Agora não" lado a lado, "Responder depois" abaixo e "Calcular minha reserva" à vista acima da barra`,
+    ok(`nav Metas conta nova (${w}×${h}): pergunta compacta (até 230 px), "Sim, consigo" e "Não consigo agora" lado a lado, "Responder depois" abaixo e "Calcular minha reserva" à vista acima da barra`,
       r.askHeight !== null && r.askHeight <= 230 && r.sameRow === true && r.laterBelow === true && r.calcBottom !== null && r.calcBottom <= r.barTop, JSON.stringify(r));
     await layoutChecks(`nav Metas conta nova ${w}px`);
     if (w === 390) await shot('177_metas_compacta');
@@ -15111,7 +15111,7 @@ setInterval(async () => {
     await goResumo();
     ok('Valor extra: com R$ 800,00 em Renda extra mas sem a escolha, ainda nada de lembrete', !(await body()).includes('Entrou um valor extra'));
     await tabByName('Metas').click(); await waitText('Você consegue guardar algum valor por mês?');
-    await btn('Agora não').click(); await waitText('Tudo bem. Muita gente começa com valores pequenos'); await p.waitForTimeout(400);
+    await btn('Não consigo agora').click(); await waitText('Tudo bem. Muita gente começa com valores pequenos'); await p.waitForTimeout(400);
     ok('Valor extra: a reserva mínima explica que dá para salvar só essa escolha', (await body()).includes('Dá para salvar só essa escolha.') && (await visibleCount('button', 'Criar reserva mínima')) === 1);
     await radio('Guardar quando entrar um valor extra').click(); await p.waitForTimeout(300);
     ok('Valor extra: só "Guardar quando entrar um valor extra" troca o botão para "Lembrar quando entrar um valor extra"', (await visibleCount('button', 'Lembrar quando entrar um valor extra')) === 1 && (await visibleCount('button', 'Criar reserva mínima')) === 0);

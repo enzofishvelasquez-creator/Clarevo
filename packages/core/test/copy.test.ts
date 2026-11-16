@@ -919,7 +919,7 @@ describe('textos do plano de guardar (spec7)', () => {
     const T = SAVINGS_TEXT;
     expect(T.askTitle).toBe('Você consegue guardar algum valor por mês?');
     expect(T.askBody).toBe('Sua resposta ajuda a montar um plano com os seus números. Ela fica só com você.');
-    expect([T.yes, T.notNow, T.later]).toEqual(['Sim, consigo', 'Agora não', 'Responder depois']);
+    expect([T.yes, T.notNow, T.later]).toEqual(['Sim, consigo', 'Não consigo agora', 'Responder depois']);
     expect(T.askAgainTitle).toBe('Sua situação mudou? Você consegue guardar algum valor por mês?');
     expect(T.incomeChangedTitle).toBe('Sua renda de referência mudou. Quer rever quanto guardar por mês?');
     expect(T.changeValue).toBe('Mudar valor');
