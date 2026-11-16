@@ -721,7 +721,7 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.CATEGORIES = exports.NO_CATEGORY_LABEL = exports.MONTH_CHECK_KINDS = exports.INSTALLMENT_NATURES = exports.DEBT_NATURES = exports.PARTS_PER_YEAR_MAX = exports.ANNUAL_LEAD_MONTHS = exports.NEXT_MONTH_TEXT = exports.NEXT_MONTH_WINDOW_DAYS = void 0;
+    exports.CATEGORIES = exports.NO_CATEGORY_LABEL = exports.MONTH_CHECK_KINDS = exports.INSTALLMENT_NATURES = exports.DEBT_NATURES = exports.PARTS_PER_YEAR_MAX = exports.ANNUAL_LEAD_MONTHS = exports.RECORD_TEXT = exports.NEXT_MONTH_TEXT = exports.NEXT_MONTH_WINDOW_DAYS = void 0;
     exports.nextMonthAllowed = nextMonthAllowed;
     exports.recordMonth = recordMonth;
     const dates_1 = __req(3);
@@ -746,9 +746,20 @@ const __mods = [
             const base = `Entra no Recebido de ${(0, dates_1.formatMonthYearBR)(next)}, não no de ${(0, dates_1.formatMonthYearBR)(own)}.`;
             return today !== undefined && own === (0, dates_1.monthOf)(today) ? `${base} ${firstDayLine(next)}` : base;
         },
-        futureNotice: (month) => `Conta no Recebido de ${(0, dates_1.formatMonthYearBR)(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
-        rowNote: (month) => `conta em ${(0, dates_1.formatMonthYearBR)(month).replace(/ de \d{4}$/, '')}`,
+        futureNotice: (month) => `Entra no Recebido de ${(0, dates_1.formatMonthYearBR)(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
+        rowNote: (month) => `entra em ${(0, dates_1.formatMonthYearBR)(month).replace(/ de \d{4}$/, '')}`,
         detailSuffix: ' (mês seguinte)',
+    };
+    exports.RECORD_TEXT = {
+        saved: (kind) => (kind === 'despesa' ? 'Gasto salvo.' : 'Recebimento salvo.'),
+        updated: 'Alterações salvas.',
+        edit: (kind) => (kind === 'despesa' ? 'Editar gasto' : 'Editar recebimento'),
+        remove: (kind) => (kind === 'despesa' ? 'Excluir gasto' : 'Excluir recebimento'),
+        removeTitle: (kind) => (kind === 'despesa' ? 'Excluir gasto?' : 'Excluir recebimento?'),
+        removed: (kind) => (kind === 'despesa' ? 'Gasto excluído.' : 'Recebimento excluído.'),
+        removedReopened: 'Gasto excluído. A conta a pagar voltou para Ainda a pagar.',
+        linkedTo: 'Ligado a',
+        monthRow: 'Entra no mês',
     };
     exports.ANNUAL_LEAD_MONTHS = 2;
     exports.PARTS_PER_YEAR_MAX = 12;

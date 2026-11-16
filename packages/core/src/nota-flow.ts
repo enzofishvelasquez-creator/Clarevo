@@ -36,7 +36,7 @@ export const NOTA_FLOW_TEXT = {
   cameraCloser: 'Aproxime até o QR ocupar a moldura.',
   cameraStarting: 'Abrindo a câmera…',
   cameraUnavailable: 'Não conseguimos usar a câmera neste aparelho. Você pode escolher o PDF da nota ou colar o link ou a chave.',
-  cameraDeniedHelp: 'Para usar a câmera, permita o acesso nos ajustes do aparelho. Você também pode escolher o PDF da nota ou colar o link ou a chave.',
+  cameraDeniedHelp: 'Para usar a câmera, permita o acesso nas configurações do aparelho. Você também pode escolher o PDF da nota ou colar o link ou a chave.',
   torchOn: 'Ligar a lanterna',
   torchOff: 'Desligar a lanterna',
   back: 'Voltar',

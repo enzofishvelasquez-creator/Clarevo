@@ -106,7 +106,7 @@ export const COMPROVANTE_TEXT = {
     imageNoText: 'Não conseguimos ler esta imagem. Confira se está nítida e inteira, ou digite os dados à mão.',
     imageFailed: 'Não foi possível ler esta imagem. Digite os dados à mão.',
     imageTooBig: 'Esta imagem é grande demais para ler aqui. Use um print ou uma foto menor.',
-    cameraDenied: 'Sem acesso à câmera. Permita nos ajustes do aparelho ou escolha uma imagem da galeria.',
+    cameraDenied: 'Sem acesso à câmera. Permita nas configurações do aparelho ou escolha uma imagem da galeria.',
     notSupported: 'Este arquivo não é um PDF nem uma imagem.',
   },
   /** "Parece já anotado em 05/10/2026: Padaria, R$ 85,00." */

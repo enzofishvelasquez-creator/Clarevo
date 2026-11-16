@@ -123,7 +123,7 @@ export const BOLETO_TEXT = {
   cameraAim: 'Aponte a câmera para o código de barras do boleto, com o celular deitado e o código inteiro na tela.',
   cameraIntro: 'A Clarevo usa a câmera só para ler o código do boleto. Nenhuma foto é guardada.',
   cameraCloser: 'Deixe o código de barras inteiro dentro da moldura, sem reflexo.',
-  cameraDenied: 'Para usar a câmera, permita o acesso nos ajustes do aparelho. Você também pode ler o PDF ou colar a linha digitável.',
+  cameraDenied: 'Para usar a câmera, permita o acesso nas configurações do aparelho. Você também pode ler o PDF ou colar a linha digitável.',
   cameraUnavailable: 'Não conseguimos usar a câmera neste aparelho. Você pode ler o PDF ou colar a linha digitável.',
   pasteTitle: 'Linha digitável do boleto',
   pasteLabel: 'Linha digitável ou código de barras',
