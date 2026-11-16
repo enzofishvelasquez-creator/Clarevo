@@ -1041,7 +1041,7 @@ export interface InvoicePaymentDraft {
   dateText: string;
 }
 
-/** "Pagar fatura": total ou "Outro valor", e a data do pagamento. */
+/** "Registrar pagamento" da fatura: total ou "Outro valor", e a data do pagamento. */
 export function validateInvoicePaymentDraft(
   draft: InvoicePaymentDraft,
   invoice: Pick<Invoice, 'totalCents' | 'periodStartOn'>,
@@ -1418,11 +1418,11 @@ export const CARDS_TEXT = {
 
   // Fatura.
   invoice: {
-    payInvoice: 'Pagar fatura',
+    payInvoice: 'Registrar pagamento',
     /** Fatura ainda aberta (ou futura): quando poderá ser paga. */
     payAfterClosing: (closingOn: IsoDate) =>
       `Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em ${formatDateBR(closingOn)}. Se você já pagou antes, use a data em que pagou.`,
-    payTotal: 'Pagar o total',
+    payTotal: 'Paguei o total',
     payOther: 'Outro valor',
     payAmount: 'Valor pago',
     payDate: 'Data do pagamento',
@@ -1522,7 +1522,7 @@ export const CARDS_TEXT = {
     entryDeleteBody: 'O valor sai da fatura e o total dela é recalculado.',
     entryDeletePurchaseBody: 'A compra inteira sai das faturas, com todas as parcelas, e os totais são recalculados.',
     editEntryHint: 'Abre as ações do lançamento',
-    payTitle: 'Pagar fatura',
+    payTitle: 'Pagamento da fatura',
     payMonthNote: 'O valor pago entra em Pago no mês da data do pagamento, e a fatura sai de Ainda a pagar.',
     payAccount: 'Conta de onde saiu o pagamento',
     chargeTitle: 'Informar encargos',

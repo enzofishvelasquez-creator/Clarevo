@@ -102,7 +102,7 @@ export const IMPORT_TEXT = {
   labelHints: {
     ja_anotado: 'Parece igual a um lançamento que já existe. Vem desmarcado.',
     parcela: 'Compra parcelada em andamento: entram esta parcela e as que faltam, nas faturas seguintes, com a numeração da fatura.',
-    pagamento_fatura: 'O pagamento da fatura já é registrado em Pagar fatura. Vem desmarcado.',
+    pagamento_fatura: 'O pagamento da fatura já é registrado na própria fatura, em Registrar pagamento. Vem desmarcado.',
     transferencia: 'Transferência entre as suas contas não é gasto. Vem desmarcada.',
   } satisfies Partial<Record<ReviewLabel, string>>,
   /** D-089 B: a parcela da linha e a fatura em que ela entra. "Parcela 3 de 10: entra na fatura de dezembro de 2026 e as 7 que faltam nas seguintes." */

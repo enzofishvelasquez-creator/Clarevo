@@ -3675,7 +3675,7 @@ setInterval(async () => {
   ok('E fatura: lançamentos (Tênis "parcela 1 de 3", Notebook "parcela 1 de 10" e o Restaurante) e o total formado só por parcelas (R$ 550,00)',
     (await visibleCount('button', 'Tênis de corrida · parcela 1 de 3 · R$ 200,00')) === 1 && (await visibleCount('button', 'Notebook · parcela 1 de 10 · R$ 150,00')) === 1 && (await visibleCount('button', 'Restaurante · R$ 200,00')) === 1 &&
     t.includes('parcela 1 de 3 · compra em 05/10 · Lazer') && /Parcelas de compras\s+R\$ 550,00/.test(t) && /Total da fatura\s+R\$ 550,00/.test(t) && t.includes('Total = parcelas + encargos + saldo anterior - estornos'));
-  ok('E fatura aberta: sem "Pagar fatura" (só depois do fechamento), com "Informar encargos", "Registrar estorno" e a próxima fatura (dezembro); sem "Desfazer pagamento"', (await visibleCount('button', 'Pagar fatura')) === 0 && (await visibleCount('button', 'Informar encargos')) === 1 &&
+  ok('E fatura aberta: sem "Registrar pagamento" (só depois do fechamento), com "Informar encargos", "Registrar estorno" e a próxima fatura (dezembro); sem "Desfazer pagamento"', (await visibleCount('button', 'Registrar pagamento')) === 0 && (await visibleCount('button', 'Informar encargos')) === 1 &&
     (await visibleCount('button', 'Registrar estorno')) === 1 && (await visibleCount('button', 'Desfazer pagamento')) === 0 && (await visibleCount('button', 'Próxima fatura: dezembro')) === 1 && (await visibleCount('button', /^Fatura anterior/)) === 0);
   await keepText();
   await innerChecks('fatura 390px');
@@ -3738,12 +3738,12 @@ setInterval(async () => {
   await btn('Próxima fatura: dezembro').click(); await waitInvoice('Fatura de dezembro'); t = await body();
   ok('E fatura de dezembro: R$ 450,00 (parcela 2 do Tênis, do Notebook e do Fone) com o caminho para a fatura anterior', (await heroTotal()) === 'R$ 450,00' && (await visibleCount('button', 'Tênis de corrida · parcela 2 de 3 · R$ 200,00')) === 1 &&
     (await visibleCount('button', 'Fone de ouvido · parcela 2 de 3 · R$ 100,00')) === 1 && (await visibleCount('button', 'Fatura anterior: novembro')) === 1, `${await heroTotal()}`);
-  ok('E fatura de dezembro (ainda não começou): sem "Pagar fatura" e com a frase de quando poderá ser paga (depois do fechamento, em 03/12/2026); "Informar encargos" segue',
-    (await visibleCount('button', 'Pagar fatura')) === 0 && t.includes('Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/12/2026. Se você já pagou antes, use a data em que pagou.') && (await visibleCount('button', 'Informar encargos')) === 1);
+  ok('E fatura de dezembro (ainda não começou): sem "Registrar pagamento" e com a frase de quando poderá ser paga (depois do fechamento, em 03/12/2026); "Informar encargos" segue',
+    (await visibleCount('button', 'Registrar pagamento')) === 0 && t.includes('Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/12/2026. Se você já pagou antes, use a data em que pagou.') && (await visibleCount('button', 'Informar encargos')) === 1);
   await btn('Fatura anterior: novembro').click(); await waitInvoice('Fatura de novembro');
   t = await body();
-  ok('E fatura de novembro aberta: sem "Pagar fatura", com a frase de quando poderá ser paga (em 03/11/2026) e "Informar encargos" e "Registrar estorno" ainda disponíveis',
-    (await visibleCount('button', 'Pagar fatura')) === 0 && t.includes('Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/11/2026. Se você já pagou antes, use a data em que pagou.') &&
+  ok('E fatura de novembro aberta: sem "Registrar pagamento", com a frase de quando poderá ser paga (em 03/11/2026) e "Informar encargos" e "Registrar estorno" ainda disponíveis',
+    (await visibleCount('button', 'Registrar pagamento')) === 0 && t.includes('Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/11/2026. Se você já pagou antes, use a data em que pagou.') &&
     (await visibleCount('button', 'Informar encargos')) === 1 && (await visibleCount('button', 'Registrar estorno')) === 1, t.slice(0, 500));
   await keepText();
   await shot('135a_fatura_aberta_sem_pagar');
@@ -3767,13 +3767,13 @@ setInterval(async () => {
     JSON.stringify(await sectionRows('Faturas anteriores')) === JSON.stringify(['Fatura de outubro, fechada, R$ 400,00. Fechou em 03/10. Vence terça, 13/10 (próximo dia útil).']) && JSON.stringify(await sectionRows('Fatura atual')) === JSON.stringify(['Fatura de novembro, aberta, R$ 650,00. Fecha em 03/11. Vence em 10/11.']),
     JSON.stringify([await sectionRows('Faturas anteriores'), await sectionRows('Fatura atual')]));
   await openInvoice('outubro'); t = await body();
-  ok('E fatura de outubro fechada: "Fechada", R$ 400,00, "Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)" (10/10 é sábado e 12/10 é feriado), "Pagar fatura" e "Informar encargos", sem a frase da fatura aberta', (await h1Name()) === 'Fatura' && t.includes('Fatura de outubro') && t.includes('Fechada') && (await heroTotal()) === 'R$ 400,00' &&
-    t.includes('Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)') && (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Informar encargos')) === 1 && !t.includes('Esta fatura ainda está aberta') &&
+  ok('E fatura de outubro fechada: "Fechada", R$ 400,00, "Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)" (10/10 é sábado e 12/10 é feriado), "Registrar pagamento" e "Informar encargos", sem a frase da fatura aberta', (await h1Name()) === 'Fatura' && t.includes('Fatura de outubro') && t.includes('Fechada') && (await heroTotal()) === 'R$ 400,00' &&
+    t.includes('Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)') && (await visibleCount('button', 'Registrar pagamento')) === 1 && (await visibleCount('button', 'Informar encargos')) === 1 && !t.includes('Esta fatura ainda está aberta') &&
     (await visibleCount('button', 'Mercado de setembro · R$ 300,00')) === 1 && (await visibleCount('button', 'Cinema · R$ 100,00')) === 1, t.slice(0, 400));
-  await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(500);
+  await btn('Registrar pagamento').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(500);
   t = await body();
-  ok('E Pagar fatura: total R$ 400,00, "Pagar o total" marcado, data de hoje com a janela "De 07/10/2025 até hoje." (começa 1 ano atrás) e "Outro valor" ainda sem campo',
-    (await h1Name()) === 'Pagar fatura' && t.includes('Total da fatura') && t.includes('R$ 400,00') && (await radio('Pagar o total').getAttribute('aria-checked')) === 'true' && (await field('Data do pagamento').inputValue()) === '07/10/2026' &&
+  ok('E Registrar pagamento: total R$ 400,00, "Paguei o total" marcado, data de hoje com a janela "De 07/10/2025 até hoje." (começa 1 ano atrás) e "Outro valor" ainda sem campo',
+    (await h1Name()) === 'Pagamento da fatura' && t.includes('Total da fatura') && t.includes('R$ 400,00') && (await radio('Paguei o total').getAttribute('aria-checked')) === 'true' && (await field('Data do pagamento').inputValue()) === '07/10/2026' &&
     t.includes('De 07/10/2025 até hoje.') && (await visibleCount('textbox', 'Valor pago')) === 0 && t.includes('O pagamento de R$ 400,00 entra em Pago de outubro, saindo da conta Conta principal.') && (await visibleCount('button', 'Confirmar pagamento')) === 1, t.slice(0, 500));
   await keepText();
   await innerChecks('pagar fatura 390px');
@@ -3797,7 +3797,7 @@ setInterval(async () => {
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado.'); await waitInvoice('Paga em parte'); t = await body();
   ok('E fatura paga em parte: "Pago R$ 250,00 em 07/10", o aviso do pagamento, o que ficou (R$ 150,00) com o caminho da calculadora e "Desfazer pagamento"; sem pagar de novo nem mudar valor, data ou parcelas',
     t.includes('Pagamento registrado. R$ 250,00 em Pago de outubro.') && t.includes('Pago R$ 250,00 em 07/10') && t.includes('Ficaram R$ 150,00 para a fatura de novembro.') && (await visibleCount('button', 'Quanto custa pagar só uma parte?')) === 1 &&
-    (await visibleCount('button', 'Desfazer pagamento')) === 1 && (await visibleCount('button', 'Pagar fatura')) === 0 && (await visibleCount('button', 'Informar encargos')) === 0 && (await visibleCount('button', 'Registrar estorno')) === 0 &&
+    (await visibleCount('button', 'Desfazer pagamento')) === 1 && (await visibleCount('button', 'Registrar pagamento')) === 0 && (await visibleCount('button', 'Informar encargos')) === 0 && (await visibleCount('button', 'Registrar estorno')) === 0 &&
     (await visibleCount('button', 'Mercado de setembro · R$ 300,00')) === 1 && (await visibleCount('button', 'Cinema · R$ 100,00')) === 1 && t.includes('Fatura paga: só a descrição e a categoria das compras mudam. Para mudar o resto, desfaça o pagamento.'), t.slice(0, 500));
   // Compra com parcela em fatura paga: o menu só oferece editar a descrição e a categoria (sem excluir), e o formulário só tem esses campos.
   await btn('Cinema · R$ 100,00').click(); await waitText('Editar descrição e categoria'); t = await dialogText();
@@ -3845,7 +3845,7 @@ setInterval(async () => {
   await btn('Desfazer pagamento').click(); await waitText('Desfazer o pagamento desta fatura?'); t = await dialogText();
   ok('E desfazer o pagamento: o diálogo explica (o gasto é apagado, a fatura volta a ficar em aberto e o saldo anterior sai)', t.includes('O gasto do pagamento é apagado e a fatura volta a ficar em aberto. O saldo anterior criado na fatura seguinte também sai.'));
   await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito.'); await waitInvoice('Fechada'); t = await body();
-  ok('E pagamento desfeito: "Fechada" de novo, R$ 400,00, "Pagar fatura" e "Informar encargos" de volta', (await heroTotal()) === 'R$ 400,00' && (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Desfazer pagamento')) === 0 && !t.includes('Ficaram R$ 150,00'));
+  ok('E pagamento desfeito: "Fechada" de novo, R$ 400,00, "Registrar pagamento" e "Informar encargos" de volta', (await heroTotal()) === 'R$ 400,00' && (await visibleCount('button', 'Registrar pagamento')) === 1 && (await visibleCount('button', 'Desfazer pagamento')) === 0 && !t.includes('Ficaram R$ 150,00'));
   await goTab('Resumo'); await waitText('Diferença do mês');
   await expectTotals('E desfazer o pagamento da fatura: o Resumo volta a 6.000 / 3.900 / 2.100 e 1.050 (com a fatura de outubro em aberto)', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 1.050,00');
   await openCardPage(); await p.getByRole('button', { name: /^Fatura de novembro, / }).filter({ visible: true }).first().click(); await waitInvoice('Fatura de novembro');
@@ -3892,7 +3892,7 @@ setInterval(async () => {
   await btn('Informar encargos').click(); await waitText('Tipo do encargo'); await radio('Anuidade').click(); await field('Valor do encargo').fill('30'); await btn('Salvar encargo').click(); await waitText('Encargo anotado na fatura.'); await waitInvoice('R$ 430,00');
   await btn('Registrar estorno').click(); await waitText('Descrição do estorno'); await field('Descrição do estorno').fill('Devolução do ingresso'); await field('Valor do estorno').fill('50'); await radio('Lazer').click(); await btn('Salvar estorno').click(); await waitText('Estorno registrado na fatura.'); await waitInvoice('R$ 380,00'); t = await body();
   ok('E fatura de outubro com a anuidade (R$ 30,00) e o estorno (R$ 50,00): R$ 380,00 (400 + 30 - 50)', (await heroTotal()) === 'R$ 380,00' && (await visibleCount('button', 'Anuidade · R$ 30,00')) === 1 && (await visibleCount('button', 'Devolução do ingresso · − R$ 50,00')) === 1 && /Total da fatura\s+R\$ 380,00/.test(t));
-  await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await btn('Confirmar pagamento').click(); await waitText('Fatura paga. R$ 380,00 em Pago de outubro.'); await waitInvoice('Paga');
+  await btn('Registrar pagamento').click(); await waitText('Confirmar pagamento'); await btn('Confirmar pagamento').click(); await waitText('Fatura paga. R$ 380,00 em Pago de outubro.'); await waitInvoice('Paga');
   t = await body();
   ok('E pagamento total da fatura fechada: "Paga", "Pago R$ 380,00 em 07/10", encargo e estorno travados (só as compras aceitam descrição e categoria), "Desfazer pagamento" e nenhum saldo anterior', t.includes('Pago R$ 380,00 em 07/10') && (await visibleCount('button', 'Anuidade · R$ 30,00')) === 0 && t.includes('Anuidade') &&
     (await visibleCount('button', 'Desfazer pagamento')) === 1 && !t.includes('Ficaram'));
@@ -3956,8 +3956,8 @@ setInterval(async () => {
     soonRows.some((r) => r.startsWith('Fatura Cartão verde, vence em ') && r.includes('09/10') && r.endsWith('R$ 80,00')) && ((await sectionRows('Próximos meses')) ?? []).some((r) => r.startsWith('Fatura Cartão Exemplo, vence em 10/11')), JSON.stringify([dueRows, soonRows]));
   ok('E Contas a pagar: conta de fatura nunca mostra "Já paguei" (só as outras contas a vencer mostram)', (await visibleCount('button', /^Já paguei.*Fatura/)) === 0 && (await visibleCount('button', /^Já paguei/)) >= 2);
   await p.getByRole('button', { name: /^Fatura Cartão verde, vence em / }).filter({ visible: true }).first().click(); await waitInvoice('Fatura de outubro'); t = await body();
-  ok('E tocar na fatura de uma conta a pagar abre a fatura (fechada, vence em 09/10), com "Pagar fatura", e sem "Já paguei" nem "Editar conta" nem "Excluir conta"', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPath()) && t.includes('Fechada') && t.includes('R$ 80,00') && t.includes('Fechou em 01/10 · Vence em 09/10') &&
-    (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Já paguei')) === 0 && (await visibleCount('button', /^Excluir/)) === 0 && t.includes('Fatura fechada: o valor só muda se você informar encargos, estornos ou novos lançamentos.'), `${urlPath()} ${t.slice(0, 300)}`);
+  ok('E tocar na fatura de uma conta a pagar abre a fatura (fechada, vence em 09/10), com "Registrar pagamento", e sem "Já paguei" nem "Editar conta" nem "Excluir conta"', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPath()) && t.includes('Fechada') && t.includes('R$ 80,00') && t.includes('Fechou em 01/10 · Vence em 09/10') &&
+    (await visibleCount('button', 'Registrar pagamento')) === 1 && (await visibleCount('button', 'Já paguei')) === 0 && (await visibleCount('button', /^Excluir/)) === 0 && t.includes('Fatura fechada: o valor só muda se você informar encargos, estornos ou novos lançamentos.'), `${urlPath()} ${t.slice(0, 300)}`);
   await keepText();
   await shot('145_fatura_fechada');
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
@@ -4002,7 +4002,7 @@ setInterval(async () => {
     await repo.addCardPurchase(`e2e-set-${Math.random()}`, id, { description: 'Mercado de setembro', category: 'Mercado', purchasedOn: '2026-09-20', totalCents: 40000, installments: 1 });
   }, await cardIdOf('Cartão Exemplo'));
   await openCardPage(); await openInvoice('outubro');
-  await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await radio('Outro valor').click(); await field('Valor pago').fill('250'); await p.waitForTimeout(500);
+  await btn('Registrar pagamento').click(); await waitText('Confirmar pagamento'); await radio('Outro valor').click(); await field('Valor pago').fill('250'); await p.waitForTimeout(500);
   await hiddenShows('pagar fatura');
   ok('E valores ocultos ao pagar em parte: o aviso do que fica e o resumo do pagamento aparecem como "R$ ••••"', (await body()).includes('Ficaram R$ •••• para a fatura de novembro.') && (await body()).includes('O pagamento de R$ •••• entra em Pago de outubro, saindo da conta Conta principal.'));
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado.'); await waitInvoice('Paga em parte');
@@ -5169,7 +5169,7 @@ setInterval(async () => {
   await p.getByRole('button', { name: /^Fatura de novembro, / }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(400);
   await checkBar('nav barra: uma fatura', 'Movimentos');
   await btn('Informar encargos').click(); await waitText('Tipo do encargo'); await p.waitForTimeout(400);
-  await checkNoBar('nav barra: informar encargos (a fatura aberta não tem Pagar fatura)');
+  await checkNoBar('nav barra: informar encargos (a fatura aberta não tem Registrar pagamento)');
   await btn('Voltar').click(); await p.waitForTimeout(400);
   await navBackTo('Movimentos');
   // Registro: detalhe com barra; novo e editar sem barra.
@@ -6998,12 +6998,12 @@ setInterval(async () => {
     const card = (await repo.listCards(ctx))[0];
     await repo.addCardPurchase(crypto.randomUUID(), card.id, { description: 'Livro de setembro', category: 'Educação', purchasedOn: '2026-09-20', totalCents: 20000, installments: 1 });
   });
-  await g1OpenCard(); await g1OpenInvoice('outubro'); await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(400);
+  await g1OpenCard(); await g1OpenInvoice('outubro'); await btn('Registrar pagamento').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(400);
   t = await g1Keep();
-  ok('G1 Pagar fatura: "Saiu de" com a conta marcada e a Carteira; o texto do mês diz de onde sai', (await g1Group('Saiu de').count()) === 1 && (await visibleCount('radio', 'Carteira')) === 1 && t.includes('saindo da conta'), t.slice(0, 400));
-  await atWidths(async (w) => { await layoutChecks(`G1 Pagar fatura ${w}px`); if (w === 390) await shot('249_pagar_fatura_saiu_de'); });
+  ok('G1 Registrar pagamento: "Saiu de" com a conta marcada e a Carteira; o texto do mês diz de onde sai', (await g1Group('Saiu de').count()) === 1 && (await visibleCount('radio', 'Carteira')) === 1 && t.includes('saindo da conta'), t.slice(0, 400));
+  await atWidths(async (w) => { await layoutChecks(`G1 Registrar pagamento ${w}px`); if (w === 390) await shot('249_pagar_fatura_saiu_de'); });
   await radio('Carteira').click(); await p.waitForTimeout(300);
-  ok('G1 Pagar fatura: escolher a Carteira atualiza o texto ("saindo da conta Carteira")', (await body()).includes('saindo da conta Carteira'));
+  ok('G1 Registrar pagamento: escolher a Carteira atualiza o texto ("saindo da conta Carteira")', (await body()).includes('saindo da conta Carteira'));
   await btn('Confirmar pagamento').click(); await waitText('Fatura paga.'); await p.waitForTimeout(500);
   ok('G1 Fatura paga: o gasto do pagamento saiu da Carteira', (await g1Records('Fatura Cartão Exemplo (outubro)')) === 'Fatura Cartão Exemplo (outubro)|Carteira|20000', await g1Records('Fatura'));
 
@@ -8109,7 +8109,7 @@ setInterval(async () => {
   await i1Open(); await i1Pick(i1CardPay); await waitText('Arquivo lido: fatura-pagamento.csv', 12000);
   await radio('Cartão de crédito').click(); await p.waitForTimeout(300); await i1Review();
   t1 = await i1Keep(); boxes = await i1Boxes();
-  ok('I1 fatura com uma linha de pagamento entre as compras: "Parece pagamento de fatura", desmarcada e com caixa para marcar', t1.includes('4 linhas · 3 marcadas') && t1.includes('Parece pagamento de fatura') && t1.includes('O pagamento da fatura já é registrado em Pagar fatura.') &&
+  ok('I1 fatura com uma linha de pagamento entre as compras: "Parece pagamento de fatura", desmarcada e com caixa para marcar', t1.includes('4 linhas · 3 marcadas') && t1.includes('Parece pagamento de fatura') && t1.includes('O pagamento da fatura já é registrado em Registrar pagamento.') &&
     JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['true', false], ['true', false], ['true', false], ['false', false]]), JSON.stringify(boxes));
   await i1Leave();
   // Compra parcelada já anotada: 3 parcelas de R$ 120,00 (a 1ª na fatura de novembro).

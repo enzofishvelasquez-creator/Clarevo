@@ -1052,7 +1052,7 @@ describe('textos de cartões (Ciclo E)', () => {
     expect(CARDS_TEXT.expense.paymentMethod).toBe('Forma de pagamento');
     expect(CARDS_TEXT.expense.credit).toBe('Cartão de crédito');
     expect(CARDS_TEXT.expense.registerCard).toBe('Cadastrar cartão');
-    expect(CARDS_TEXT.invoice.payInvoice).toBe('Pagar fatura');
+    expect(CARDS_TEXT.invoice.payInvoice).toBe('Registrar pagamento');
     expect(CARDS_TEXT.invoice.payOther).toBe('Outro valor');
     expect(CARDS_TEXT.invoice.addCharges).toBe('Informar encargos');
     expect(CARDS_TEXT.invoice.addRefund).toBe('Registrar estorno');
