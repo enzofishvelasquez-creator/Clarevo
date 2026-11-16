@@ -6,7 +6,7 @@ Rascunho preparado pela equipe da Clarevo para revisão jurídica. Não é parec
 
 ## Partes
 
-De um lado, **[RAZÃO SOCIAL]**, CNPJ [CNPJ], com sede em [ENDEREÇO], neste contrato chamada **CLAREVO**. De outro, a empresa identificada no Anexo I, neste contrato chamada **EMPRESA**. As partes celebram este contrato, que se rege pelas cláusulas a seguir.
+De um lado, **[RAZÃO SOCIAL]**, CNPJ [CNPJ], com sede no [ENDEREÇO], neste contrato chamada **CLAREVO**. De outro, a empresa identificada no Anexo I, neste contrato chamada **EMPRESA**. As partes celebram este contrato, que se rege pelas cláusulas a seguir.
 
 ## Cláusula 1. Definições
 

@@ -39,7 +39,8 @@ import { AccountsCard } from '@/components/accounts-card';
 import { BenefitCard } from '@/components/benefit-card';
 import { PrivacyCard, RemindersCard, WidgetCard } from '@/components/device-settings';
 import { FlashBanner, useFlash } from '@/components/flash';
-import { SubHeader, initialsOf } from '@/components/header';
+import { SubHeader } from '@/components/header';
+import { ProfileAvatar, ProfilePhotoActions } from '@/components/profile-photo';
 import { LevelBadge, LevelCard } from '@/components/level-parts';
 import { SignupSourceAccountCard } from '@/components/signup-source';
 import { TopicLink } from '@/components/topic-link';
@@ -153,10 +154,8 @@ export default function ContaScreen() {
         <FlashBanner message={notice} />
         {/* O perfil, com as iniciais no círculo e, no canto, o selo pequeno do nível da conta (D-095), como no gov.br. */}
         <Card style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space[4] }}>
-          <View style={{ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandTint }} aria-hidden>
-            <Txt variant="title" color={colors.brandText} maxFontSizeMultiplier={1.3}>
-              {initialsOf(user?.displayName ?? '')}
-            </Txt>
+          <View style={{ width: 56, height: 56 }} aria-hidden>
+            <ProfileAvatar size={56} />
             {level ? (
               <View style={{ position: 'absolute', right: -4, bottom: -4, borderRadius: 12, borderWidth: 2, borderColor: colors.surface }}>
                 <LevelBadge level={level} size={20} />
@@ -166,6 +165,7 @@ export default function ContaScreen() {
           <View style={{ flex: 1, minWidth: 0, gap: space[1] }}>
           <Txt variant="title">{user?.displayName}</Txt>
           <Txt color={colors.textSecondary}>{user?.email}</Txt>
+          <ProfilePhotoActions />
           {auth.mode === 'demo' ? (
             <>
               <Txt variant="caption" color={colors.textSecondary}>

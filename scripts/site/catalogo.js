@@ -42,11 +42,11 @@ function carregarTs(ts, entradas) {
   }
 }
 
-/** Carrega (uma vez) `learn`, `guide`, as calculadoras e as datas do core. */
+/** Carrega (uma vez) `learn`, `guide`, as calculadoras, as datas e os planos da assinatura do core. */
 function catalogo() {
   if (guardado) return guardado;
   const ts = carregarTypescript();
-  const [learn, guide, calc, datas] = carregarTs(ts, ['learn/index.ts', 'guide/index.ts', 'calculators/index.ts', 'dates.ts']);
+  const [learn, guide, calc, datas, plano] = carregarTs(ts, ['learn/index.ts', 'guide/index.ts', 'calculators/index.ts', 'dates.ts', 'plano.ts']);
   const publicados = learn.publishedTopics().filter((t) => !t.legacy);
   guardado = {
     SECOES: learn.LEARN_SECTIONS,
@@ -75,6 +75,15 @@ function catalogo() {
     nomeDoMes: (mes) => datas.formatMonthName(`2000-${String(mes).padStart(2, '0')}`),
     dataBR: (iso) => datas.formatDateBR(iso),
     guiaPasso: guide.guideWhere,
+    /** Os planos da assinatura (D-083): nomes, preços e os textos da tela Assinatura do app, para a seção Planos do início dizer o mesmo. */
+    PLANOS: {
+      texto: plano.ACCESS_TEXT,
+      nome: plano.PLAN_NAME,
+      preco: plano.planPriceAmount,
+      porMes: plano.SUBSCRIPTION_SCREEN_TEXT.perMonth,
+      /** A assinatura aberta no app (SUBSCRIBE_OPEN): fechada, a seção Planos diz que nada é cobrado até o lançamento. */
+      aberta: plano.SUBSCRIBE_OPEN === true,
+    },
   };
   return guardado;
 }

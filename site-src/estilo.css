@@ -175,6 +175,8 @@ blockquote>:last-child{margin-bottom:0}
 .cartao{background:var(--superficie);border:1px solid var(--linha);border-radius:20px;padding:1.25rem}
 .bloco-alt .cartao{background:var(--fundo)}
 .cartao h3{margin-top:0}
+.plano .preco{margin:.25rem 0 .5rem;color:var(--texto-2)}
+.plano .preco-valor{display:block;font-size:2rem;font-weight:800;line-height:1.2;color:var(--texto);font-variant-numeric:tabular-nums}
 .cartao p:last-child,.cartao ul:last-child{margin-bottom:0}
 a.cartao{display:block;text-decoration:none;color:inherit}
 a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}

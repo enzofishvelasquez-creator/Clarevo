@@ -39,6 +39,8 @@ export interface DevicePrefs {
   reminderOffered: boolean;
   hideOnOpen: boolean;
   biometricLock: boolean;
+  /** A oferta "Entrar com a biometria?" logo depois de entrar na conta já apareceu (uma vez por pessoa e aparelho, 16/11/2026). */
+  biometricOffered: boolean;
   /**
    * Última forma de pagamento escolhida em Anotar gasto ("dinheiro" ou o identificador de um cartão), só para abrir o formulário
    * já nela. Não é dado financeiro: nada vai para o servidor, e uma escolha que já não existe (cartão arquivado) é ignorada.
@@ -113,6 +115,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   reminderOffered: false,
   hideOnOpen: false,
   biometricLock: false,
+  biometricOffered: false,
   lastPayment: null,
   lastAccount: null,
   subscriptionSnoozedUntil: null,
@@ -148,6 +151,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       reminderOffered: v.reminderOffered === true,
       hideOnOpen: v.hideOnOpen === true,
       biometricLock: v.biometricLock === true,
+      biometricOffered: v.biometricOffered === true,
       lastPayment: typeof v.lastPayment === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v.lastPayment) ? v.lastPayment : null,
       lastAccount: typeof v.lastAccount === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v.lastAccount) ? v.lastAccount : null,
       subscriptionSnoozedUntil:

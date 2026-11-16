@@ -50,6 +50,10 @@ interface World {
   space: PersonalSpace | undefined;
   /** O contexto que a pessoa escolheu no app ("Pessoal | Família"). O widget não depende dele. */
   view: 'pessoal' | 'familia';
+  /** Biometria cadastrada no aparelho (para a oferta logo depois de entrar). */
+  bioAvailable?: boolean;
+  /** O aceite dos termos lido do servidor (undefined: ainda lendo). */
+  legal?: unknown;
 }
 
 async function setup(over: Partial<World> = {}) {
@@ -81,6 +85,8 @@ async function setup(over: Partial<World> = {}) {
   });
   const queueReminders = vi.fn();
   const queries: Record<string, unknown>[] = [];
+  const dialogs = new Map<string, { visible: boolean; onConfirm: () => void; onCancel: () => void }>();
+  const updatePrefs = vi.fn();
   const subscription = () => ({ subscribe: () => () => {} });
   const harness = createHooksHarness();
   const mod = loadApp(path.join(SRC, 'components', 'device-features.tsx'), {
@@ -104,17 +110,24 @@ async function setup(over: Partial<World> = {}) {
         View: () => null,
       },
       'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
-      '@/components/dialog': { ConfirmDialog: () => null },
+      '@/components/dialog': {
+        ConfirmDialog: (props: { title: string; visible: boolean; onConfirm: () => void; onCancel: () => void }) => {
+          dialogs.set(props.title, props);
+          return null;
+        },
+      },
+      '@/components/legal-gate': { useLegalAcceptance: () => ({ data: world.legal }) },
       '@/components/ui': { Banner: () => null, Button: () => null, Txt: () => null },
       '@/lib/device': {
         DEVICE_FEATURES: true,
         authenticate: vi.fn(async () => 'ok'),
+        biometricsAvailable: vi.fn(async () => world.bioAvailable === true),
         listenToReminders: () => () => {},
         openDeviceSettings: vi.fn(),
       },
-      '@/lib/device-prefs': { loadPrefs: async () => ({ hideOnOpen: false, ...world.prefs }), updatePrefs: vi.fn(), useDevicePrefs: () => world.prefs },
+      '@/lib/device-prefs': { loadPrefs: async () => ({ hideOnOpen: false, ...world.prefs }), updatePrefs, useDevicePrefs: () => world.prefs },
       '@/lib/nav': { signOutIntent: { mark: vi.fn() } },
-      '@/lib/privacy': { PRIVACY_TEXT: {}, setValuesHidden: vi.fn() },
+      '@/lib/privacy': { PRIVACY_TEXT: { offerTitle: 'OFERTA DA BIOMETRIA' }, setValuesHidden: vi.fn() },
       '@/lib/reminders': { enableReminders: vi.fn(), queueReminders },
       '@/lib/widget-sync': { queueWidget },
       '@/state/data': { useView: () => ({ space: world.view, setSpace: vi.fn(), setMonth: vi.fn(), currentMonth: '2026-10' }) },
@@ -140,7 +153,7 @@ async function setup(over: Partial<World> = {}) {
     await settle();
   };
   const written = () => writeWidget.mock.calls.map(([plan]) => plan as Extract<WidgetSyncPlan, { write: true }>);
-  return { world, space, repo, listCommitments, writeWidget, queueWidget, queueReminders, queries, jobs, change, written, unmount: app.unmount };
+  return { world, space, repo, listCommitments, writeWidget, queueWidget, queueReminders, queries, jobs, change, written, dialogs, updatePrefs, unmount: app.unmount };
 }
 
 describe('device-features: o widget da tela inicial', () => {
@@ -238,4 +251,46 @@ describe('device-features: o widget da tela inicial', () => {
       t.unmount();
     });
   });
+});
+
+describe('device-features: a oferta da biometria logo depois de entrar (16/11/2026)', () => {
+  const accepted = { version: core.LEGAL_VERSION, current: core.LEGAL_VERSION };
+  const prefsOk = { reminders: false, reminderHour: core.DEFAULT_REMINDER_HOUR, reminderOffered: false, biometricLock: false, biometricOffered: false, hideOnOpen: false, widgetShowValues: false, tourSeen: true };
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const offer = (t: Awaited<ReturnType<typeof setup>>) => t.dialogs.get('OFERTA DA BIOMETRIA');
+
+  it('aparece depois de um login neste uso do app, com biometria no aparelho, e "Agora não" marca que já foi oferecida', async () => {
+    const t = await setup({ user: null, prefs: undefined, bioAvailable: true, legal: accepted });
+    await t.change({ user: { id: 'pessoa-1' }, prefs: prefsOk });
+    await wait(1100);
+    await t.change({});
+    expect(offer(t)?.visible).toBe(true);
+    offer(t)!.onCancel();
+    expect(t.updatePrefs).toHaveBeenCalledWith('pessoa-1', { biometricOffered: true }, true);
+    t.unmount();
+  });
+
+  it('não aparece para quem abre o app já com a sessão, sem biometria no aparelho, com o aceite dos termos pendente ou já oferecida', async () => {
+    const cases: Partial<World>[] = [
+      { bioAvailable: false },
+      { legal: undefined },
+      { prefs: { ...prefsOk, biometricOffered: true } },
+      { prefs: { ...prefsOk, biometricLock: true } },
+      { prefs: { ...prefsOk, tourSeen: false } },
+    ];
+    // Já com a sessão ao abrir: nada a oferecer.
+    const open = await setup({ prefs: prefsOk, bioAvailable: true, legal: accepted });
+    await wait(1100);
+    await open.change({});
+    expect(offer(open)?.visible ?? false).toBe(false);
+    open.unmount();
+    for (const c of cases) {
+      const t = await setup({ user: null, prefs: undefined, bioAvailable: true, legal: accepted });
+      await t.change({ user: { id: 'pessoa-1' }, prefs: prefsOk, ...c });
+      await wait(1100);
+      await t.change({});
+      expect(offer(t)?.visible ?? false, JSON.stringify(c)).toBe(false);
+      t.unmount();
+    }
+  }, 30_000);
 });

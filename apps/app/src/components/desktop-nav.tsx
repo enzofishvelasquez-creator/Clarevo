@@ -4,7 +4,7 @@ import { Eye, EyeOff, MonitorSmartphone, Plus } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Logo } from '@/components/brand';
-import { initialsOf } from '@/components/header';
+import { ProfileAvatar } from '@/components/profile-photo';
 import { TABS, useLastTab } from '@/components/tab-bar';
 import { Button, DemoPill, Txt, styles as ui } from '@/components/ui';
 import { promptInstall, useCanInstall } from '@/lib/install-prompt';
@@ -102,9 +102,7 @@ export function DesktopNav() {
         onPress={() => router.push('/conta')}
         style={(s) => [styles.item, onConta && styles.itemActive, (s as { hovered?: boolean }).hovered && !onConta && styles.itemHover, (s as { focused?: boolean }).focused && ui.focusRing]}>
         <View style={styles.avatar}>
-          <Txt variant="caption" color={colors.brand} style={{ fontFamily: fonts.extrabold }} maxFontSizeMultiplier={1.3}>
-            {initialsOf(user?.displayName ?? '')}
-          </Txt>
+          <ProfileAvatar size={36} background={colors.onBrandSoft} color={colors.brand} textVariant="caption" />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt variant="label" color={onConta ? colors.brandText : colors.text} style={{ fontFamily: onConta ? fonts.bold : fonts.semibold }} numberOfLines={1}>

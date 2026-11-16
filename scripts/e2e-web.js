@@ -13923,7 +13923,7 @@ setInterval(async () => {
   ok('Evolução fase 3: nenhuma escrita direta na rede (a tela só lê; as escritas do roteiro ficam na memória da demonstração)', writes.length === f3Writes0, writes.slice(f3Writes0).join(' | '));
 
   // Acessibilidade (D-062, item 5; Ciclo Y): revisão de acessibilidade e de desempenho em Android simples, com o que foi corrigido.
-  // Conferido aqui, na versão web, em modo demonstração: (1) o pacote: o JavaScript principal fica abaixo de 5,5 MB (só os ícones
+  // Conferido aqui, na versão web, em modo demonstração: (1) o pacote: o JavaScript principal fica abaixo de 5,6 MB (só os ícones
   // usados, `apps/app/src/lib/lucide.ts`) e o leitor de PDF (1,7 MB) é um arquivo à parte que não é pedido ao abrir o app nem nas
   // telas principais; (2) em cerca de 60 telas: contraste de cada texto visível (4,5:1; 3:1 em texto grande e ícones), nome
   // acessível de botões, caixas, rádios e campos, nada clicável sem papel e alvos de toque de 44 x 44 px; (3) títulos da
@@ -14124,7 +14124,9 @@ setInterval(async () => {
   const acJs = fs.readdirSync(acJsDir).filter((f) => f.endsWith('.js')).map((f) => ({ f, size: fs.statSync(path.join(acJsDir, f)).size }));
   const acEntry = acJs.filter((x) => x.f.startsWith('entry-'));
   const acPdf = acJs.filter((x) => x.f.startsWith('pdfjs-'));
-  ok('Acessibilidade, pacote: o JavaScript principal fica abaixo de 5,5 MB (só os 98 ícones usados; o pacote inteiro de ícones o levava a 6,9 MB)', acEntry.length === 1 && acEntry[0].size < 5_500_000, acEntry.map((x) => `${x.f} ${(x.size / 1e6).toFixed(2)} MB`).join(' '));
+  // Limite de 5,6 MB desde 16/11/2026 (era 5,5 MB): a foto do perfil, a oferta da biometria e o link do widget somaram uns 10 KB de código.
+  // O limite existe para pegar o pacote inteiro de ícones (6,9 MB), e segue bem abaixo disso (docs/19, seção 8.1).
+  ok('Acessibilidade, pacote: o JavaScript principal fica abaixo de 5,6 MB (só os 98 ícones usados; o pacote inteiro de ícones o levava a 6,9 MB)', acEntry.length === 1 && acEntry[0].size < 5_600_000, acEntry.map((x) => `${x.f} ${(x.size / 1e6).toFixed(2)} MB`).join(' '));
   ok('Acessibilidade, pacote: o leitor de PDF (pdfjs, mais de 1 MB) é um arquivo à parte do principal', acPdf.length === 1 && acPdf[0].size > 1_000_000 && acEntry[0].size < acPdf[0].size * 4, acPdf.map((x) => `${x.f} ${(x.size / 1e6).toFixed(2)} MB`).join(' '));
   const acPdfReqs = [];
   p.on('request', (r) => { if (/pdfjs/.test(r.url())) acPdfReqs.push(r.url()); });
