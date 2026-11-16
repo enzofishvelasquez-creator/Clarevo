@@ -34,6 +34,7 @@ import { Banner, Button, Card, Screen, Skeleton, TextField, Txt } from '@/compon
 import { UnsavedChangesText } from '@/components/context-text';
 import { announceOnIOS } from '@/lib/a11y';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { isRefusal, useBudgetOperationKey, useCommitmentLimits, useDeleteCommitmentLimit, useSetCommitmentLimit, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -242,7 +243,7 @@ function LimitForm({ contextId }: { contextId: string }) {
   const endedHere = exact !== null && exact.percent === null;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={LIMIT_TEXT.form.title} onBack={requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         <Txt>{LIMIT_TEXT.intro}</Txt>

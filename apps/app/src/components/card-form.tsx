@@ -30,6 +30,7 @@ import { Banner, Button, Card, Screen, TextField, Txt } from '@/components/ui';
 import { cardHref } from '@/lib/cards';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useCardOperationKey, useCreateCard, useUpdateCard } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
@@ -169,7 +170,7 @@ export function CardForm({ mode, contextId }: { mode: CardFormMode; contextId: s
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={card ? T.editTitle : T.newTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
         {savedBefore.banner}

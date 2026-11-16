@@ -49,6 +49,7 @@ import { Banner, Button, Card, Chip, LinkButton, Screen, Txt } from '@/component
 import { getPrefs, updatePrefs } from '@/lib/device-prefs';
 import { flash } from '@/lib/flash';
 import { latestMonthOf, loadImportContext, type ImportContext } from '@/lib/import-context';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { moneyText, useValuesHidden } from '@/lib/privacy';
 import { pickImportFile, type PickedImport } from '@/lib/import-file';
 import { isRefusal, useCards, useImportRecords, useWork, useView } from '@/state/data';
@@ -443,7 +444,7 @@ export function ImportFlow() {
   const visible = lines.slice(0, shown);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={IMPORT_TEXT.screenTitle} onBack={guard.requestCancel} right={<ContextPill label="Importando em Pessoal" />} help="importar" />
       <Screen scrollRef={scroller} contentStyle={styles.body}>
         {step === 'arquivo' ? (

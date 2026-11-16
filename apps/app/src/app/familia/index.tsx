@@ -19,7 +19,7 @@ import {
 import { router } from 'expo-router';
 import { LogOut, Plus, ShieldCheck, Users } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, StyleSheet, View } from 'react-native';
 
 import { openCalc } from '@/components/calc/open';
 import { ChoiceDialog } from '@/components/choice-dialog';
@@ -29,6 +29,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { SubHeader } from '@/components/header';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Banner, Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import {
   attemptFamily,
   useCancelFamilyInvite,
@@ -61,7 +62,7 @@ export default function FamiliaScreen() {
   // a tela de "com Família" para "sem Família", e o aviso precisa sobreviver a essa troca.
   const [notice, setNotice] = useFlash();
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={T.title} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         {family.isPending ? (
@@ -80,7 +81,7 @@ export default function FamiliaScreen() {
           </Txt>
         </Pressable>
       </Screen>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

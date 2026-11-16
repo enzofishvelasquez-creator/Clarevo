@@ -22,6 +22,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { Banner, Button, LinkButton, TextField, Txt, styles as ui } from '@/components/ui';
 import { improveCameraFocus } from '@/lib/camera-focus';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { invoiceHref } from '@/lib/cards';
 import { imageTooBig } from '@/lib/comprovante-read';
@@ -191,7 +192,7 @@ export function PasteModal({
   }
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={KEYBOARD_BEHAVIOR}>
         <View style={styles.backdrop}>
           <View style={styles.box} accessibilityViewIsModal accessibilityRole="alert">
             <Txt variant="title" accessibilityRole="header">

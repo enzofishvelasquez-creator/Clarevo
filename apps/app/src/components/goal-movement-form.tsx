@@ -32,7 +32,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, StyleSheet, View, type TextInput } from 'react-native';
 
 import { AccountPicker } from '@/components/account-picker';
 import { formatMoneyText } from '@/components/calc/parts';
@@ -46,6 +46,7 @@ import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useLastAccount } from '@/lib/last-account';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { useAccounts, useAddGoalMovement, useDeleteGoalMovement, useGoalOperationKey, useUpdateGoalMovement, useWorkFor } from '@/state/data';
@@ -312,7 +313,7 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
         : M[mode.kind].title;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={titleOf(mode)} onBack={guard.requestCancel} right={<ContextPill label={`Salvando em ${itemWork.data?.contextName ?? 'Pessoal'}`} fixed={Boolean(itemWork.data)} />} />
       <Screen contentStyle={styles.body}>
         {savedBefore.banner}

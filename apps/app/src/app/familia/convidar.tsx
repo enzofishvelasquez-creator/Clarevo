@@ -11,6 +11,7 @@ import { ChoiceGroup } from '@/components/series-parts';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Banner, Button, Card, Chip, Screen, Txt } from '@/components/ui';
 import { CAN_COPY, copyInvite, inviteBaseUrl, shareInvite } from '@/lib/invite-share';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { attemptFamily, useCreateFamilyInvite, useFamily, useFamilyKeys } from '@/state/family';
 import { colors, space } from '@/theme/tokens';
 
@@ -108,7 +109,7 @@ export default function ConvidarScreen() {
 
   if (result) {
     return (
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
         {header}
         <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
           <Card style={{ gap: space[3] }}>
@@ -157,7 +158,7 @@ export default function ConvidarScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       {header}
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         <Card style={{ gap: space[4] }}>

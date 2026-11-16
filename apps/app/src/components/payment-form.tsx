@@ -62,6 +62,7 @@ import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
 import { useLastAccount } from '@/lib/last-account';
@@ -446,7 +447,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   const goneText = `As outras parcelas${goneLabel ? ` de ${goneLabel}` : ''} não estão mais em aberto, então a opção Paguei o ano todo foi desmarcada. Confira o valor pago.`;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title="Marcar como paga" onBack={requestCancel} right={<ContextPill label={`Salvando em ${contextName}`} fixed />} />
       <Screen contentStyle={styles.body}>
         {conflict ? (

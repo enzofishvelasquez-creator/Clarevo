@@ -11,7 +11,7 @@ import {
 import { router } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, View, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { ConfirmDialog } from '@/components/dialog';
@@ -22,6 +22,7 @@ import { ErrorState, LoadingState } from '@/components/states';
 import { Body, Button, Card, Screen, TextField, Txt } from '@/components/ui';
 import { DEVICE_FEATURES } from '@/lib/device';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useContextInvestmentMovements, useInvestmentPlan, useSetInvestmentPlan, useSpace, useWorkOf } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -98,7 +99,7 @@ export default function PlanoScreen() {
   const line = movements.data ? investmentPlanLine(plan.data ?? null, movements.data, today) : null;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={T.screenTitle} onBack={guard.requestCancel} right={<ContextPill label="Pessoal" fixed />} />
       <Screen>
         <Body>

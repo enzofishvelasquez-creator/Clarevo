@@ -24,7 +24,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, View, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { ConfirmDialog } from '@/components/dialog';
@@ -35,6 +35,7 @@ import { ChoiceGroup } from '@/components/series-parts';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useInvalidateInvestments, useInvestment, useInvestmentMovements } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
@@ -199,7 +200,7 @@ function MovementForm({
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={existing ? INVESTMENT_TEXT.movementLabel[kind] : texts.title} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" fixed />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         <Txt variant="label" style={{ fontWeight: '700' }}>

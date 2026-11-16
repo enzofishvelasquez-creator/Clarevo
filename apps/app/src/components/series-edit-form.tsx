@@ -66,6 +66,7 @@ import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import {
   useLimitWatch,
   useSeries,
@@ -506,7 +507,7 @@ export function SeriesEditForm({
   const day = /^\d{1,2}$/.test(draft.dueDayText) ? Number(draft.dueDayText) : null;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader
         title={parcelada ? 'Editar parcelamento' : anual ? 'Editar conta do ano' : 'Editar gasto fixo'}
         onBack={requestCancel}

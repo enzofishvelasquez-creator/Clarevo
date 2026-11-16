@@ -63,6 +63,7 @@ import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { explanationHref } from '@/lib/learn';
 import { useAttemptSlot, useCreateCommitment, useLimitWatch, useUpdateCommitment, withNotice, type WorkSpace } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
@@ -430,7 +431,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
   const showTomorrow = !occurrenceMonth || monthOf(tomorrow) === occurrenceMonth;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader
         title={mode.type === 'nova' ? 'Anotar conta a pagar' : informValue ? 'Informar o valor da conta' : 'Editar conta a pagar'}
         onBack={requestCancel}

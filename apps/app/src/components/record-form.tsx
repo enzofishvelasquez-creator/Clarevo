@@ -129,6 +129,7 @@ import { getPrefs, loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-p
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { totalChange } from '@/lib/highlight';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { explanationHref } from '@/lib/learn';
 import { cameraWasUsed, markCameraUsed, payeeMemoryOf, rememberPayee, rememberStore, storeMemoryOf } from '@/lib/note-prefs';
 import { comprovanteHandoff } from '@/lib/comprovante-handoff';
@@ -1484,7 +1485,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader
         title={mode.type === 'novo' ? copy.newTitle : copy.editTitle}
         onBack={requestCancel}

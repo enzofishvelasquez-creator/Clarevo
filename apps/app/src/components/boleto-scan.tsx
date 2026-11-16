@@ -10,6 +10,7 @@ import { cameraIsAvailable } from '@/components/receipt-scan';
 import { Button, TextField, Txt, styles as ui } from '@/components/ui';
 import { pickAndReadBoletoImage, pickAndReadBoletoPdf } from '@/lib/boleto-read';
 import { improveCameraFocus } from '@/lib/camera-focus';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { OCR_AVAILABLE } from '@/lib/ocr';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -145,7 +146,7 @@ function BoletoPaste({ visible, onSubmit, onClose }: { visible: boolean; onSubmi
   const submit = () => setError(onSubmit(text));
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={KEYBOARD_BEHAVIOR}>
         <View style={styles.backdrop}>
           <View style={styles.box} accessibilityViewIsModal accessibilityRole="alert">
             <Txt variant="title" accessibilityRole="header">

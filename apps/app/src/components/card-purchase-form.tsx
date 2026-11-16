@@ -41,6 +41,7 @@ import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components
 import { invoiceHref } from '@/lib/cards';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { openOfficialUrl, receiptLinks } from '@/lib/receipt-link';
 import { useBudgetWatch, useCardOperationKey, useUpdateCardEntry, withNotice } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -172,7 +173,7 @@ export function CardPurchaseForm({ card, month, entry, textOnly = false }: { car
   const sefazUrl = receiptLinks.get(entry.receiptKey);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={S.purchaseEditTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
         <Card style={{ gap: space[4] }}>

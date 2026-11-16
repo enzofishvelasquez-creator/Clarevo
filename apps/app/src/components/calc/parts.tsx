@@ -25,6 +25,7 @@ import { ChoiceGroup } from '@/components/series-parts';
 import { LinkButton, Screen, TextField, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import type { HelpScreen } from '@/lib/guide';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { maskMoneyLabel, maskMoneyText, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -45,7 +46,7 @@ function calcHelp(slug: CalcSlug): HelpScreen | undefined {
 /** Tela de uma calculadora: título, aviso fixo no topo, conteúdo e o caminho para a lista. */
 export function CalcScreen({ slug, modo, children }: { slug: CalcSlug; modo?: string; children: ReactNode }) {
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={calcTitle(slug, modo)} onBack={() => (router.canGoBack() ? router.back() : router.replace('/calcular'))} help={calcHelp(slug)} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <CalcDisclaimer />

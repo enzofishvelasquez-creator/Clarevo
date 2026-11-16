@@ -11,13 +11,14 @@ import {
 import { router } from 'expo-router';
 import { Plus, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View, useWindowDimensions, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, StyleSheet, View, useWindowDimensions, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Body, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { colors, fonts, space } from '@/theme/tokens';
 
 const T = COMPARE_TEXT;
@@ -62,7 +63,7 @@ export default function CompararScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={T.title} onBack={() => (router.canGoBack() ? router.back() : router.replace('/investimentos'))} />
       <Screen>
         <Body>

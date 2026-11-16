@@ -47,6 +47,7 @@ import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useLastAccount } from '@/lib/last-account';
 import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
@@ -268,7 +269,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: WorkSp
   const yesterday = addDays(today, -1);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={RETURN_TEXT.payScreenTitle} onBack={requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
         <Card style={{ gap: space[1] }}>
