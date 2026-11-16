@@ -219,8 +219,10 @@ describe('widget: perfis do EAS', () => {
   it('preview e production ligam o widget (D-093, ligado no lançamento) e nada mais muda neles', () => {
     const { build } = eas();
     // `image: latest` entrou em 06/11/2026 porque o build pelo GitHub exige a imagem declarada (docs/40, seção 2a).
+    // `channel` entrou em 16/11/2026 (EAS Update, docs/50_ATUALIZACOES.md): cada perfil recebe as atualizações do ramo de mesmo nome.
     expect(build.preview).toEqual({
       distribution: 'internal',
+      channel: 'preview',
       environment: 'preview',
       autoIncrement: true,
       env: { CLAREVO_WIDGET: '1' },
@@ -229,6 +231,7 @@ describe('widget: perfis do EAS', () => {
     });
     expect(build.production).toEqual({
       distribution: 'store',
+      channel: 'production',
       environment: 'production',
       autoIncrement: true,
       env: { CLAREVO_WIDGET: '1' },
@@ -240,7 +243,8 @@ describe('widget: perfis do EAS', () => {
 
   it('o perfil preview-sem-widget parte do preview e desliga a variável (reserva, se o build com o widget falhar)', () => {
     const profile = eas().build['preview-sem-widget'];
-    expect(profile).toEqual({ extends: 'preview', env: { CLAREVO_WIDGET: '0' } });
+    // Canal próprio: as atualizações do `main` (ramo `preview`, publicadas com o widget) não vão para um build sem o widget.
+    expect(profile).toEqual({ extends: 'preview', channel: 'preview-sem-widget', env: { CLAREVO_WIDGET: '0' } });
     expect(Object.keys(eas().build).sort()).toEqual(['preview', 'preview-sem-widget', 'production']);
   });
 });

@@ -3,12 +3,18 @@
     "name": "Clarevo",
     "slug": "clarevo",
     "owner": "clarevos-team",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "clarevo",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#2457F5",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f53a6647-ca75-48bb-bf06-50d9b78287e8"
+    },
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "app.clarevo",
