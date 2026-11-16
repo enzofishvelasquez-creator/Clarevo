@@ -1450,7 +1450,7 @@ const LEARN_FORBIDDEN = new RegExp(
 const LEARN_FORBIDDEN_EXCEPTIONS: Record<string, string[]> = { 'renda-comprometida': ['serasa'] };
 
 /** Listas do retorno (A4, spec3 §2.6, teste 8): cobrança e contagem de dias sem anotar. */
-const COLLECTION = /\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b/i;
+const COLLECTION = /\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*|faz (muito )?tempo)\b/i;
 const ABSENCE = /aus[eê]nci|sem usar|\d+\s*dias?\b(?!\.$)|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i;
 
 /** Todos os campos de texto de um tema, menos as fontes. */
@@ -2065,6 +2065,8 @@ describe('textos das assinaturas (D-046)', () => {
       expect(text, text).not.toMatch(GENDERED);
       expect(text, text).not.toMatch(BRANDS);
       expect(text, text).not.toMatch(ORDERS);
+      // Sem cobrança nem contagem de tempo ("Faz tempo que você não revisa" saiu em 16/11/2026).
+      expect(text, text).not.toMatch(COLLECTION);
       expect(text, text).not.toMatch(/\bfaz(er|endo)?\s+sentido\b/i);
       expect(text, text).not.toMatch(/[–—]/);
     }
@@ -2094,8 +2096,8 @@ describe('textos das assinaturas (D-046)', () => {
   });
 
   it('a reprovação da lista pega o que ela deve', () => {
-    for (const bad of ['Cancele já', 'um corte de gastos', 'isso é um desperdício', 'não vale a pena', 'Netflix', 'Assinaturas — todas']) {
-      const caught = [FORBIDDEN, JUDGMENT, BRANDS, ORDERS].some((re) => re.test(bad));
+    for (const bad of ['Cancele já', 'um corte de gastos', 'isso é um desperdício', 'não vale a pena', 'Netflix', 'Assinaturas — todas', 'Faz tempo que você não revisa']) {
+      const caught = [FORBIDDEN, JUDGMENT, BRANDS, ORDERS, COLLECTION].some((re) => re.test(bad));
       expect(caught, bad).toBe(true);
     }
     // Os textos da própria tela passam, inclusive "Encerrar a partir de…" (encerrar não é cancelar) e "Continua".

@@ -7355,8 +7355,8 @@ setInterval(async () => {
   // ==================================================================================================================
   // Ciclo H2 · Assinaturas (D-046), docs/08 §5 item 11. Um gasto fixo mensal marcado como assinatura ("É uma assinatura?",
   // no cadastro e na edição) vai para o grupo "Assinaturas" no topo de Gastos fixos e parcelamentos, com o que custa por mês e
-  // por ano; "Revisar assinaturas" (/gastos-fixos/assinaturas) lista as ativas e só grava a data da revisão; o aviso "Faz tempo
-  // que você não revisa suas assinaturas." aparece dentro do app (cenário ?cenario=assinaturas) e some com "Revisei" ou "Agora
+  // por ano; "Revisar assinaturas" (/gastos-fixos/assinaturas) lista as ativas e só grava a data da revisão; o aviso "Que tal revisar
+  // suas assinaturas?" aparece dentro do app (cenário ?cenario=assinaturas) e some com "Revisei" ou "Agora
   // não". Nada muda Recebido, Pago, Diferença, Ainda a pagar nem a renda comprometida. Cada tela é conferida em 390 e em 320 px.
   // Capturas novas: 270 em diante.
   // ==================================================================================================================
@@ -7398,7 +7398,7 @@ setInterval(async () => {
   ok('H2 as assinaturas não se repetem em "Gastos fixos" e continuam na soma "Por mês" (R$ 3.668,90)',
     JSON.stringify(await h2Rows('Gastos fixos')) === JSON.stringify(['Aluguel, R$ 2.500,00, todo dia 5, gasto fixo', 'Luz, cerca de R$ 180,00, todo dia 12, valor muda, gasto fixo']) &&
     t.includes('Gastos fixos, parcelamentos e assinaturas: R$ 3.668,90 por mês, se os valores não mudarem (inclui R$ 180,00 estimados).'));
-  ok('H2 a demonstração não mostra o aviso de revisão (as assinaturas são de hoje)', !t.includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Agora não')) === 0);
+  ok('H2 a demonstração não mostra o aviso de revisão (as assinaturas são de hoje)', !t.includes('Que tal revisar suas assinaturas?') && (await visibleCount('button', 'Agora não')) === 0);
   await atWidths(async (w) => { await innerChecks(`H2 Gastos fixos com Assinaturas ${w}px`); if (w === 390) await shot('270_gastos_fixos_assinaturas'); if (w === 320) await shot('270_gastos_fixos_assinaturas_320px'); });
 
   // ---- 2. Nada muda nos totais de outubro nem na renda comprometida ----
@@ -7575,31 +7575,31 @@ setInterval(async () => {
   t = await h2Keep();
   const h2ReminderTop = await p.evaluate(() => {
     const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => (e.textContent || '').includes(text) && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
-    return { aviso: top('div[dir="auto"]', 'Faz tempo que você não revisa suas assinaturas.'), intro: top('div[dir="auto"]', 'Contas que se repetem.'), grupo: top('[role=heading]', 'Assinaturas') };
+    return { aviso: top('div[dir="auto"]', 'Que tal revisar suas assinaturas?'), intro: top('div[dir="auto"]', 'Contas que se repetem.'), grupo: top('[role=heading]', 'Assinaturas') };
   });
-  ok('H2 lembrete: "Faz tempo que você não revisa suas assinaturas." no topo de Gastos fixos, com "Revisar agora" e "Agora não", antes do texto da tela e do grupo',
-    t.includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Revisar agora')) === 1 && (await visibleCount('button', 'Agora não')) === 1 &&
+  ok('H2 lembrete: "Que tal revisar suas assinaturas?" no topo de Gastos fixos, com "Revisar agora" e "Agora não", antes do texto da tela e do grupo',
+    t.includes('Que tal revisar suas assinaturas?') && (await visibleCount('button', 'Revisar agora')) === 1 && (await visibleCount('button', 'Agora não')) === 1 &&
     h2ReminderTop.aviso !== null && h2ReminderTop.intro !== null && h2ReminderTop.grupo !== null && h2ReminderTop.aviso < h2ReminderTop.intro && h2ReminderTop.intro < h2ReminderTop.grupo, JSON.stringify(h2ReminderTop));
   await atWidths(async (w) => { await innerChecks(`H2 lembrete ${w}px`); if (w === 390) await shot('278_lembrete_assinaturas'); if (w === 320) await shot('278_lembrete_assinaturas_320px'); });
   // "Agora não" esconde o aviso (30 dias, só neste aparelho) e ele não volta ao sair e voltar.
   await btn('Agora não').click(); await p.waitForTimeout(500);
-  ok('H2 "Agora não": o aviso some', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Revisar agora')) === 0);
+  ok('H2 "Agora não": o aviso some', !(await body()).includes('Que tal revisar suas assinaturas?') && (await visibleCount('button', 'Revisar agora')) === 0);
   await goResumo(); await h2OpenFixos();
-  ok('H2 "Agora não": o aviso não volta ao sair e voltar para Gastos fixos', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
+  ok('H2 "Agora não": o aviso não volta ao sair e voltar para Gastos fixos', !(await body()).includes('Que tal revisar suas assinaturas?'));
   ok('H2 "Agora não" é só do aparelho: nenhuma escrita sai pela rede e a série não muda', writes.slice(h2Writes0).length === 0 && (await h2Series()).filter((s) => s[1]).every((s) => s[2] === null && s[3] === 2));
   // Outra visita (a demonstração recomeça): "Revisar agora" leva à tela e "Revisei" faz o aviso sumir de vez.
   await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   await h2OpenFixos();
-  ok('H2 numa visita nova o aviso volta (na demonstração a escolha fica só em memória)', (await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
+  ok('H2 numa visita nova o aviso volta (na demonstração a escolha fica só em memória)', (await body()).includes('Que tal revisar suas assinaturas?'));
   await btn('Revisar agora').click(); await waitText('Vale olhar de tempos em tempos'); await p.waitForTimeout(400);
   ok('H2 "Revisar agora" abre Revisar assinaturas', (await h1Name()) === 'Revisar assinaturas' && urlPath() === '/gastos-fixos/assinaturas' && (await body()).includes('Você ainda não registrou uma revisão.'));
   await btn('Revisei minhas assinaturas').click(); await waitText('Revisão registrada.'); await p.waitForTimeout(300);
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem'); await p.waitForTimeout(500);
-  ok('H2 depois de "Revisei": o aviso não aparece mais', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Revisar agora')) === 0);
+  ok('H2 depois de "Revisei": o aviso não aparece mais', !(await body()).includes('Que tal revisar suas assinaturas?') && (await visibleCount('button', 'Revisar agora')) === 0);
   await goResumo(); await h2OpenFixos();
-  ok('H2 depois de "Revisei": o aviso continua fora ao sair e voltar', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
+  ok('H2 depois de "Revisei": o aviso continua fora ao sair e voltar', !(await body()).includes('Que tal revisar suas assinaturas?'));
 
   // ---- 11. Valores ocultos ----
   await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
@@ -7645,7 +7645,7 @@ setInterval(async () => {
   await atWidths(async (w) => { await innerChecks(`H2 Revisar assinaturas conta nova ${w}px`); if (w === 390) await shot('281_revisar_assinaturas_conta_nova'); });
   await btn('Ver gastos fixos').click(); await waitText('Nenhum gasto fixo ainda'); await p.waitForTimeout(400);
   t = await h2Keep();
-  ok('H2 conta nova: Gastos fixos sem grupo "Assinaturas" e sem aviso', !(await headingShown('Assinaturas')) && !t.includes('Faz tempo que você não revisa suas assinaturas.') && !t.includes('(exemplo)'));
+  ok('H2 conta nova: Gastos fixos sem grupo "Assinaturas" e sem aviso', !(await headingShown('Assinaturas')) && !t.includes('Que tal revisar suas assinaturas?') && !t.includes('(exemplo)'));
   ok('H2 conta nova: nenhuma série e nenhuma assinatura de exemplo', (await h2Series()).length === 0);
 
   // ---- 14. Textos e escritas ----

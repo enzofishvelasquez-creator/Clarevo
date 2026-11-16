@@ -85,7 +85,7 @@ export const SUBSCRIPTION_TEXT = {
   emptyAction: 'Ver gastos fixos',
   loadFailed: 'Não foi possível carregar suas assinaturas. Tente novamente.',
   /** Lembrete dentro do app, no topo de Gastos fixos e parcelamentos. */
-  reminderTitle: 'Faz tempo que você não revisa suas assinaturas.',
+  reminderTitle: 'Que tal revisar suas assinaturas?',
   reminderReview: 'Revisar agora',
   reminderLater: 'Agora não',
   reminderLaterHint: 'Esconde este aviso por 30 dias, só neste aparelho.',
