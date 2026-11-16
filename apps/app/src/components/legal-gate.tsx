@@ -15,7 +15,7 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
 const T = LEGAL_ACCEPT_TEXT;
 
 /** O aceite da própria pessoa (my_legal_acceptance, A1). */
-function useLegalAcceptance(enabled: boolean) {
+export function useLegalAcceptance(enabled: boolean) {
   const { repo, user } = useSession();
   return useQuery({
     queryKey: ['legal-acceptance', user?.id ?? null],

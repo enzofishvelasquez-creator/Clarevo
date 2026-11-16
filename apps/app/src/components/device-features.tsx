@@ -1,4 +1,4 @@
-import { anyRoutineReminder, REMINDER_ROUTE, REMINDER_TEXT, offerCaption, type PersonalSpace, type SeriesWrite } from '@clarevo/core';
+import { anyRoutineReminder, legalAcceptanceNeeded, REMINDER_ROUTE, REMINDER_TEXT, offerCaption, type PersonalSpace, type SeriesWrite } from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, usePathname, type Href } from 'expo-router';
 import { LockKeyhole } from 'lucide-react-native';
@@ -7,8 +7,9 @@ import { AppState, Modal, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '@/components/dialog';
+import { useLegalAcceptance } from '@/components/legal-gate';
 import { Banner, Button, Txt } from '@/components/ui';
-import { authenticate, DEVICE_FEATURES, listenToReminders, openDeviceSettings } from '@/lib/device';
+import { authenticate, biometricsAvailable, DEVICE_FEATURES, listenToReminders, openDeviceSettings } from '@/lib/device';
 import { deviceLock } from '@/lib/device-lock';
 import { loadPrefs, updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { signOutIntent } from '@/lib/nav';
@@ -33,7 +34,8 @@ const LOCK_AFTER_MS = 60_000;
  * - widget da tela inicial (só no aparelho, só em build com o widget nativo; D-063 item 3): grava o resumo para o widget nos mesmos
  *   momentos dos lembretes, e ao mudar "Mostrar valores no widget" ou entrar e sair da conta (lib/widget-sync.ts);
  * - oferta de lembretes depois do primeiro gasto fixo salvo no Pessoal (só no aparelho);
- * - biometria ao abrir (só no aparelho), que nunca impede de sair da conta.
+ * - biometria ao abrir (só no aparelho), que nunca impede de sair da conta, e a oferta de ligá-la logo depois de entrar na conta, uma vez
+ *   por pessoa e aparelho, como na maioria dos apps (pedido do Enzo, 16/11/2026).
  */
 export function DeviceFeatures() {
   const { user, auth } = useSession();
@@ -256,6 +258,64 @@ function NativeFeatures() {
     if (locked) unlockRef.current();
   }, [locked]);
 
+  // ---- Oferta da biometria logo depois de entrar na conta --------------------------------------
+  // Só depois de um login neste uso do app (quem abre o app já com a sessão não é perguntado), com biometria cadastrada no aparelho,
+  // uma vez por pessoa e aparelho, e sem atropelar o aviso dos termos, o tour de boas-vindas nem a tela de trava.
+  const legal = useLegalAcceptance(status === 'pronto' && !demo);
+  const legalPending = !legal.data || legalAcceptanceNeeded(legal.data);
+  const [bioOffer, setBioOffer] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
+  const [bioMsg, setBioMsg] = useState<string | null>(null);
+  const sawSignedOut = useRef(false);
+  const bioChecked = useRef<string | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (ready && !userId) sawSignedOut.current = true;
+  }, [ready, userId]);
+  useEffect(() => {
+    if (demo || !userId || !prefs || !sawSignedOut.current || bioChecked.current === userId) return;
+    if (prefs.biometricLock || prefs.biometricOffered) {
+      bioChecked.current = userId;
+      return;
+    }
+    if (status !== 'pronto' || locked || legalPending || !prefs.tourSeen) return;
+    bioChecked.current = userId;
+    const forUser = userId;
+    biometricsAvailable().then((ok) => {
+      if (!ok) return;
+      // Depois de a tela de destino aparecer.
+      setTimeout(() => {
+        if (mounted.current && lockState.current.userId === forUser) setBioOffer(true);
+      }, 900);
+    });
+  }, [demo, userId, prefs, status, locked, legalPending]);
+
+  const answerBioOffer = async (accept: boolean) => {
+    if (!userId || bioBusy) return;
+    setBioMsg(null);
+    if (!accept) {
+      updatePrefs(userId, { biometricOffered: true }, persist);
+      setBioOffer(false);
+      return;
+    }
+    setBioBusy(true);
+    const r = await authenticate(PRIVACY_TEXT.offerConfirmPrompt);
+    setBioBusy(false);
+    if (r === 'ok') {
+      updatePrefs(userId, { biometricOffered: true, biometricLock: true }, persist);
+      setBioOffer(false);
+    } else if (r === 'indisponivel') {
+      updatePrefs(userId, { biometricOffered: true }, persist);
+      setBioOffer(false);
+    } else if (r === 'falhou') setBioMsg(PRIVACY_TEXT.lockConfirmFailed);
+  };
+
   return (
     <>
       <ConfirmDialog
@@ -273,6 +333,22 @@ function NativeFeatures() {
           } else acceptOffer();
         }}>
         <Txt color={colors.textSecondary}>{offer === 'negada' ? REMINDER_TEXT.denied : offerCaption(prefs?.reminderHour)}</Txt>
+      </ConfirmDialog>
+      <ConfirmDialog
+        visible={bioOffer && !locked && offer === null}
+        title={PRIVACY_TEXT.offerTitle}
+        cancelLabel={PRIVACY_TEXT.offerDecline}
+        confirmLabel={PRIVACY_TEXT.offerAccept}
+        confirmTone="brand"
+        busy={bioBusy}
+        onCancel={() => answerBioOffer(false)}
+        onConfirm={() => answerBioOffer(true)}>
+        <Txt color={colors.textSecondary}>{PRIVACY_TEXT.offerBody}</Txt>
+        {bioMsg ? (
+          <Banner tone="info">
+            <Txt variant="label">{bioMsg}</Txt>
+          </Banner>
+        ) : null}
       </ConfirmDialog>
       {locked && userId ? <LockScreen message={unlockMsg} onUnlock={unlock} /> : null}
     </>
