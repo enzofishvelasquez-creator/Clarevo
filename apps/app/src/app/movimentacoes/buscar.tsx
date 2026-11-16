@@ -27,6 +27,7 @@ import { ChevronDown, ChevronUp, Search, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { PurchaseRow } from '@/components/search-parts';
 import { RecordRow } from '@/components/record-row';
@@ -60,6 +61,8 @@ function useDebounced<V>(value: V, ms: number): V {
 export default function BuscarScreen() {
   const { today } = useSession();
   const hidden = useValuesHidden();
+  // Aviso de quem volta do detalhe ("Gasto excluído."): mostrado aqui, e não numa tela aberta depois.
+  const [notice] = useFlash();
   const personal = useWork().data;
   const contextId = personal?.contextId;
   const accounts = useAccounts(contextId);
@@ -165,6 +168,7 @@ export default function BuscarScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={T.title} right={<ContextPill label="Pessoal" />} help="buscar" />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
+        <FlashBanner message={notice} />
         <Txt color={colors.textSecondary}>{T.intro}</Txt>
 
         <Card style={{ gap: space[4] }}>

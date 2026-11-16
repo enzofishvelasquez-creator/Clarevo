@@ -1,6 +1,6 @@
 import type { IsoDate } from './dates';
-import { addDays } from './dates';
-import { calendarDaysBetween, type InvestmentSubkind, type TaxRegime } from './investment-details';
+import { addDays, formatDateBR } from './dates';
+import { calendarDaysBetween, type InvestmentDetails, type InvestmentSubkind, type TaxRegime } from './investment-details';
 import type { InvestmentKind, InvestmentMovement } from './investments';
 import { investmentValueOn } from './investments';
 import type { Cents } from './money';
@@ -163,6 +163,11 @@ export function taxExplanation(regime: TaxRegime, kind: InvestmentKind, subkind:
 
 export const TAX_TEXT = {
   title: 'Se resgatasse hoje',
+  /** Resgate só no vencimento (revisão de 16/11/2026): o card não diz "hoje". */
+  maturityTitle: 'No vencimento',
+  atMaturityTitle: (on: IsoDate) => `No vencimento, em ${formatDateBR(on)} (estimativa)`,
+  atMaturityNote: 'Este investimento só pode ser resgatado no vencimento. A conta usa o valor de hoje e a alíquota que vale nessa data.',
+  maturityOnlyNote: 'Este investimento só pode ser resgatado no vencimento. Informe a data do vencimento em Editar para ver a estimativa.',
   /** "Cerca de R$ 10.412,00 líquidos." */
   net: (c: Cents) => `Cerca de ${formatBRL(c)} líquidos.`,
   ir: (c: Cents) => `Imposto de renda estimado: ${formatBRL(c)}`,
@@ -175,3 +180,15 @@ export const TAX_TEXT = {
   rule: (on: IsoDate) => `Estimativa pela regra em vigor em ${on.slice(8, 10)}/${on.slice(5, 7)}/${on.slice(0, 4)}, sem a taxa de custódia. O valor do resgate no seu extrato é o que vale.`,
   noRegime: 'Escolha "Qual é o investimento?" em Editar para ver a regra de imposto.',
 } as const;
+
+/**
+ * De quando é a estimativa do card de resgate. Resgate a qualquer momento (ou ficha sem liquidez): hoje, "Se resgatasse hoje". Só no
+ * vencimento (revisão de 16/11/2026): com a data do vencimento ainda por vir, a estimativa é nessa data (o valor de hoje com a alíquota
+ * daquele dia); sem a data, nenhuma conta, só o aviso. Vencimento já passado: o resgate vale hoje.
+ */
+export function netEstimateWhen(details: Pick<InvestmentDetails, 'liquidity' | 'maturityOn'> | null | undefined, today: IsoDate): { on: IsoDate | null; title: string; note: string | null } {
+  if (details?.liquidity !== 'no_vencimento') return { on: today, title: TAX_TEXT.title, note: null };
+  if (details.maturityOn === null) return { on: null, title: TAX_TEXT.maturityTitle, note: TAX_TEXT.maturityOnlyNote };
+  if (details.maturityOn <= today) return { on: today, title: TAX_TEXT.title, note: null };
+  return { on: details.maturityOn, title: TAX_TEXT.atMaturityTitle(details.maturityOn), note: TAX_TEXT.atMaturityNote };
+}

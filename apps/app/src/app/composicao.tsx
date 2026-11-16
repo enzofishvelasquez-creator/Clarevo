@@ -21,6 +21,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { MonthCheckBlock } from '@/components/month-check';
 import { RecordRow } from '@/components/record-row';
+import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
@@ -66,6 +67,8 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
   const { month } = useView();
   const { today } = useSession();
   const personal = useWork().data;
+  // Aviso de quem volta do detalhe ("Gasto excluído."): mostrado aqui, e não numa tela aberta depois.
+  const [notice] = useFlash();
   const records = useMonthRecords(personal?.contextId, month);
   const s = records.summary;
   // "Conferi este mês" (D-060): num mês já terminado sem registros do tipo, a pessoa confere que não houve; a leitura é a de months_overview.
@@ -151,6 +154,7 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
 
   const header = (
     <View style={{ gap: space[4] }}>
+      <FlashBanner message={notice} />
       <View style={{ gap: space[1] }}>
         <Txt variant="caption" color={colors.textSecondary}>
           {personal?.contextName ?? 'Pessoal'} · {formatMonthBR(month)}

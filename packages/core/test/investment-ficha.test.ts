@@ -32,6 +32,7 @@ import {
   isMarketBusinessDay,
   liquidityBucket,
   liquiditySummary,
+  netEstimateWhen,
   marketBusinessDaysInMonth,
   parseRateText,
   rateSummary,
@@ -253,6 +254,22 @@ describe('imposto estimado (D-099, item 7)', () => {
     }
     noDash(TAX_TEXT.rule(TODAY));
     expect(TAX_TEXT.rule(TODAY)).toContain('11/11/2026');
+  });
+
+  it('resgate só no vencimento: a estimativa é na data do vencimento, nunca "se resgatasse hoje" (revisão de 16/11/2026)', () => {
+    expect(netEstimateWhen({ liquidity: 'diaria', maturityOn: '2027-01-10' }, TODAY)).toEqual({ on: TODAY, title: 'Se resgatasse hoje', note: null });
+    expect(netEstimateWhen(null, TODAY)).toEqual({ on: TODAY, title: 'Se resgatasse hoje', note: null });
+    const later = netEstimateWhen({ liquidity: 'no_vencimento', maturityOn: '2027-01-10' }, TODAY);
+    expect(later).toMatchObject({ on: '2027-01-10', title: 'No vencimento, em 10/01/2027 (estimativa)' });
+    expect(later.note).toContain('só pode ser resgatado no vencimento');
+    // Sem a data do vencimento: nenhuma conta, só o aviso. Vencimento que já passou: o resgate vale hoje.
+    expect(netEstimateWhen({ liquidity: 'no_vencimento', maturityOn: null }, TODAY)).toMatchObject({ on: null, title: 'No vencimento' });
+    expect(netEstimateWhen({ liquidity: 'no_vencimento', maturityOn: '2026-11-01' }, TODAY)).toMatchObject({ on: TODAY, title: 'Se resgatasse hoje' });
+    for (const t of [TAX_TEXT.atMaturityTitle('2027-01-10'), TAX_TEXT.atMaturityNote, TAX_TEXT.maturityOnlyNote]) noDash(t);
+    // Na data do vencimento, a alíquota é a do tempo até lá: um aporte de 100 dias antes de hoje, com vencimento 300 dias depois, paga 17,5%.
+    const flows = [mv('aporte', 1_000_000, '2026-08-03'), mv('valor', 1_100_000, TODAY)];
+    expect(estimateRegressiveNet(flows, TODAY).rates).toEqual({ min: 0.225, max: 0.225 });
+    expect(estimateRegressiveNet(flows, '2027-09-07').rates).toEqual({ min: 0.175, max: 0.175 });
   });
 });
 
