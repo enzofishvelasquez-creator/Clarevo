@@ -100,7 +100,7 @@ export const SUBSCRIPTION_TEXT = {
 export const SUBSCRIPTION_ERROR_TEXT = {
   assinatura_so_gasto_fixo: 'Só um gasto fixo mensal pode ser marcado como assinatura.',
   marca_invalida: ERROR_TEXT.salvar_falhou,
-  versao_desatualizada: 'Este gasto fixo foi alterado em outro aparelho. Abra de novo para conferir a versão atual.',
+  versao_desatualizada: 'Este gasto fixo foi alterado em outro aparelho. Abra de novo para conferir o que mudou.',
   nao_encontrado: 'Este gasto fixo não está mais disponível.',
   sem_permissao: ERROR_TEXT.sem_permissao,
   salvar_falhou: ERROR_TEXT.salvar_falhou,

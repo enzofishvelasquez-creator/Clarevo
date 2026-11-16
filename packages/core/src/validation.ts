@@ -22,7 +22,7 @@ export const ERROR_TEXT = {
   conta_invalida: 'Escolha o banco ou a carteira.',
   salvar_falhou: 'Não foi possível salvar. Seu preenchimento foi mantido. Tente de novo.',
   carregar_falhou: 'Não foi possível carregar. Tente de novo.',
-  versao_desatualizada: 'Este registro foi alterado em outro aparelho. Confira a versão atual antes de salvar.',
+  versao_desatualizada: 'Este registro foi alterado em outro aparelho. Confira o que mudou antes de salvar.',
   nao_encontrado: 'Este registro não está mais disponível.',
   sem_permissao: 'Com o papel "Só vê" na Família, você vê, mas não anota nem muda nada. Quem é titular pode mudar o seu papel.',
   /** Assinatura paga (D-083): depois do teste grátis, sem assinatura, o banco recusa a escrita. */
@@ -79,7 +79,7 @@ export const COMMITMENT_ERROR_TEXT = {
   vencimento_fora_do_intervalo: 'Use um vencimento entre 1 ano atrás e 2 anos à frente.',
   /** Só no app, com o vencimento em branco; o banco recusa como data_invalida. */
   vencimento_obrigatorio: 'Informe a data de vencimento, como 15/10/2026.',
-  versao_desatualizada: 'Esta conta a pagar foi alterada em outro aparelho. Confira a versão atual antes de salvar.',
+  versao_desatualizada: 'Esta conta a pagar foi alterada em outro aparelho. Confira o que mudou antes de salvar.',
   nao_encontrado: 'Esta conta a pagar não está mais disponível.',
   compromisso_quitado: 'Esta conta a pagar já foi paga. Para alterar, desfaça o pagamento.',
   compromisso_aberto: 'Este pagamento já foi desfeito.',

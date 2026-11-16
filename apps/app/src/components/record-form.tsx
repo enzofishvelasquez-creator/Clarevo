@@ -1507,10 +1507,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               {ERROR_TEXT.versao_desatualizada}
             </Txt>
             <MoneyTxt variant="caption">
-              {`Versão atual: ${conflict.description} · ${formatBRL(conflict.amountCents)} · ${formatDateBR(conflict.occurredOn)}`}
+              {`Como está agora: ${conflict.description} · ${formatBRL(conflict.amountCents)} · ${formatDateBR(conflict.occurredOn)}`}
             </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={applyOverConflict} />
+            <Button label="Usar o que preenchi" tone="soft" onPress={applyOverConflict} />
             <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(goBack)} />
           </Banner>
         ) : null}

@@ -490,7 +490,7 @@ export const SAVINGS_ERROR_TEXT = {
   valor_acima_do_limite: GOAL_ERROR_TEXT.valor_acima_do_limite,
   /** Reserva mínima abaixo de R$ 100,00 ou ilegível. */
   minimum_invalido: 'Informe um valor a partir de R$ 100,00, como 300,00.',
-  versao_desatualizada: 'Esta resposta foi alterada em outro aparelho. Confira a versão atual antes de salvar.',
+  versao_desatualizada: 'Esta resposta foi alterada em outro aparelho. Confira o que mudou antes de salvar.',
   salvar_falhou: GOAL_ERROR_TEXT.salvar_falhou,
   sem_permissao: GOAL_ERROR_TEXT.sem_permissao,
 } as const;

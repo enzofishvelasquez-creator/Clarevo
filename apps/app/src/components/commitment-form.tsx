@@ -444,10 +444,10 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
               {COMMITMENT_ERROR_TEXT.versao_desatualizada}
             </Txt>
             <MoneyTxt variant="caption">
-              {`Versão atual: ${conflict.description} · ${formatBRL(conflict.amountCents)} · vence em ${formatListDate(conflict.dueOn, today)}`}
+              {`Como está agora: ${conflict.description} · ${formatBRL(conflict.amountCents)} · vence em ${formatListDate(conflict.dueOn, today)}`}
             </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={applyOverConflict} />
+            <Button label="Usar o que preenchi" tone="soft" onPress={applyOverConflict} />
             <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(goBack)} />
           </Banner>
         ) : null}

@@ -456,10 +456,10 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
               {COMMITMENT_ERROR_TEXT.versao_desatualizada}
             </Txt>
             <MoneyTxt variant="caption">
-              {`Versão atual: ${shown.description} · previsto ${formatBRL(shown.amountCents)} · vence em ${formatListDate(shown.dueOn, today)}`}
+              {`Como está agora: ${shown.description} · previsto ${formatBRL(shown.amountCents)} · vence em ${formatListDate(shown.dueOn, today)}`}
             </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Confirmar pagamento na versão atual" tone="soft" onPress={() => submit()} />
+            <Button label="Confirmar pagamento" tone="soft" onPress={() => submit()} />
           </Banner>
         ) : null}
         {paidElsewhere ? (

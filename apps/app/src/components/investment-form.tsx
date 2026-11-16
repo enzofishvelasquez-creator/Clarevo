@@ -130,7 +130,7 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
       const code = isRepoError(e) ? e.code : 'desconhecido';
       if (code === 'versao_desatualizada') {
         invalidate();
-        setError('Este investimento mudou em outro aparelho. Volte e abra de novo para ver a versão atual.');
+        setError('Este investimento mudou em outro aparelho. Volte e abra de novo para ver o que mudou.');
       } else if (code === 'chave_reutilizada') {
         invalidate();
         setError(UNCERTAIN_TEXT.investimentos);
