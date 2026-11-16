@@ -13,7 +13,7 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 const num = (n: number) => n.toLocaleString('pt-BR');
 
 export const IMPORT_TEXT = {
-  /** Linha de Movimentos › Organizar, a busca "No app" e o atalho em Conta › Contas de origem. */
+  /** Linha de Movimentos › Organizar, a busca "No app" e o atalho em Conta › Bancos e carteira. */
   rowTitle: 'Importar extrato ou fatura',
   rowCaption: 'Arquivo OFX ou planilha do banco',
   accountsShortcut: 'Importar extrato',
@@ -27,15 +27,15 @@ export const IMPORT_TEXT = {
   reading: 'Lendo o arquivo…',
   fileRead: (name: string) => `Arquivo lido: ${name}`,
   linesRead: (n: number) => `${num(n)} ${plural(n, 'linha lida', 'linhas lidas')}`,
-  balanceIgnored: 'O saldo que vem no arquivo é ignorado. A Clarevo não guarda saldo por conta.',
+  balanceIgnored: 'O saldo que vem no arquivo é ignorado. A Clarevo não guarda o saldo do banco.',
   neverSaved: 'O arquivo em si não é guardado. Só as linhas que você confirmar são gravadas.',
   /** Escolha do destino. */
   destinationTitle: 'Para onde vão os lançamentos?',
-  destinationAccount: 'Conta',
+  destinationAccount: 'Banco ou carteira',
   destinationAccountHint: 'Extrato: gastos e recebimentos entram no mês de cada data.',
   destinationCard: 'Cartão de crédito',
   destinationCardHint: 'Fatura: as compras entram na fatura e só viram gasto quando você paga a fatura.',
-  pickAccount: 'Conta de origem',
+  pickAccount: 'Lançamentos em',
   pickCard: 'Cartão de destino',
   noCards: 'Você ainda não cadastrou nenhum cartão.',
   addCard: 'Cadastrar um cartão',
@@ -135,9 +135,9 @@ export const IMPORT_TEXT = {
   partial: (done: number, total: number) =>
     `${num(done)} de ${num(total)} ${plural(total, 'lançamento foi importado', 'lançamentos foram importados')} antes da falha. Tente de novo: o que já entrou não é repetido.`,
   retry: 'Tentar novamente',
-  needAccount: 'Escolha a conta.',
+  needAccount: 'Escolha o banco ou a carteira.',
   needCard: 'Escolha o cartão.',
-  noAccountsHint: 'Cadastre uma conta em Conta antes de importar.',
+  noAccountsHint: 'Antes de importar, cadastre um banco ou carteira em Conta, em Bancos e carteira.',
   /** Quem só lê. */
   readOnly: 'Você só tem permissão para ver este espaço. Para importar, peça permissão de escrita.',
   familyNotice: 'Importar extrato fica no espaço Pessoal por enquanto.',
@@ -175,7 +175,7 @@ export const IMPORT_ERROR_TEXT: Record<ImportErrorCode, string> = {
 export const IMPORT_SAVE_ERROR_TEXT: Record<string, string> = {
   itens_invalidos: 'O pedido de importação não está completo. Revise as linhas e tente de novo.',
   destino_invalido: 'Escolha de novo a conta ou o cartão.',
-  conta_invalida: 'Esta conta não está disponível. Escolha outra conta ativa.',
+  conta_invalida: 'Este banco ou carteira não está disponível. Escolha outro ativo.',
   nao_encontrado: 'Não encontramos este cartão. Escolha de novo.',
   cartao_arquivado: 'Este cartão está arquivado. Reative o cartão ou escolha outro.',
   fatura_paga: 'Uma das linhas cai numa fatura que já foi paga. Desmarque a linha ou desfaça o pagamento da fatura.',

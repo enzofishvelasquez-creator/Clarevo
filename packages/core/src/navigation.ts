@@ -388,10 +388,10 @@ export const APP_SCREENS: readonly AppScreen[] = [
   },
   {
     id: 'contas',
-    title: 'Contas de origem',
+    title: 'Bancos e carteira',
     caption: 'De onde sai o dinheiro dos gastos, pagamentos e aportes',
     href: '/conta?secao=contas',
-    keywords: ['contas', 'suas contas', 'origem do dinheiro', 'saiu de', 'carteira', 'conta principal', 'adicionar conta', 'arquivar conta'],
+    keywords: ['bancos e carteira', 'banco', 'contas', 'suas contas', 'contas de origem', 'origem do dinheiro', 'saiu de', 'carteira', 'conta principal', 'adicionar conta', 'arquivar conta'],
   },
   {
     id: 'quem-ve',

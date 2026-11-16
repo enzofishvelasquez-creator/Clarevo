@@ -1524,7 +1524,7 @@ export const CARDS_TEXT = {
     editEntryHint: 'Abre as ações do lançamento',
     payTitle: 'Pagamento da fatura',
     payMonthNote: 'O valor pago entra em Pago no mês da data do pagamento, e a fatura sai de Ainda a pagar.',
-    payAccount: 'Conta de onde saiu o pagamento',
+    payAccount: 'De onde saiu o pagamento',
     chargeTitle: 'Informar encargos',
     chargeEditTitle: 'Editar encargo',
     chargeSave: 'Salvar encargo',

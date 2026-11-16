@@ -501,7 +501,7 @@ export default function ContasVencidas() {
             {fixed.length > 0 ? (
               <Txt variant="caption" color={colors.textSecondary}>
                 Só contas de valor fixo podem ser marcadas juntas: cada uma vira um gasto com o valor previsto, na data do vencimento
-                {account ? `, da conta ${account.name}` : ''}. Contas estimadas pedem o valor da conta.
+                {account ? `, ${ACCOUNTS_TEXT.leavingFrom(account.name)}` : ''}. Contas estimadas pedem o valor da conta.
               </Txt>
             ) : null}
           </>
@@ -542,7 +542,7 @@ export default function ContasVencidas() {
             },
           ]}>
           <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>
-            {`${formatBRL(target.amountCents)} em ${formatDateBR(target.dueOn)}, da conta ${account.name}.`}
+            {`${formatBRL(target.amountCents)} em ${formatDateBR(target.dueOn)}, ${ACCOUNTS_TEXT.leavingFrom(account.name)}.`}
           </MoneyTxt>
           <Txt color={colors.textSecondary}>
             Um gasto com esse valor entra em Pago de {formatMonthBR(monthOf(target.dueOn)).toLowerCase()}, e a conta sai de Ainda a pagar.
@@ -605,7 +605,7 @@ export default function ContasVencidas() {
           busy={busy}
           onCancel={() => setPending(null)}
           onConfirm={payBatch}>
-          <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{`Total: ${formatBRL(batchTotal)}, da conta ${account.name}.`}</MoneyTxt>
+          <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{`Total: ${formatBRL(batchTotal)}, ${ACCOUNTS_TEXT.leavingFrom(account.name)}.`}</MoneyTxt>
           <Txt color={colors.textSecondary}>
             Cada conta vira um gasto com o valor previsto, na data do vencimento, e entra em Pago do mês dessa data. Se uma falhar, as
             seguintes não são marcadas e as anteriores continuam pagas.

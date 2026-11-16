@@ -91,7 +91,7 @@ export const EXPORT_TEXT = {
   } as Readonly<Record<ExportFormat, string>>,
   contentTitle: 'O que vai no arquivo',
   contentCsv:
-    'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga. Os movimentos dos investimentos vão em um terceiro.',
+    'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Banco ou carteira, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga. Os movimentos dos investimentos vão em um terceiro.',
   contentPdf:
     'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga. Os investimentos aparecem no fim, também fora de Pago e de Recebido.',
   notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do espaço Pessoal.',
@@ -307,7 +307,7 @@ export const CSV_SEPARATOR = ';';
 /** Fim de linha do Excel. */
 export const CSV_EOL = '\r\n';
 
-export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Valor (R$)', 'Conta de origem', 'Origem', 'Mês do resumo'];
+export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Valor (R$)', 'Banco ou carteira', 'Origem', 'Mês do resumo'];
 export const CSV_PURCHASE_HEADER: readonly string[] = ['Data da compra', 'Cartão', 'Descrição', 'Categoria', 'Valor total (R$)', 'Parcelas'];
 /** Investimentos (D-099): um movimento por linha, com o investimento, a ficha e o tipo do rendimento. */
 export const CSV_INVESTMENT_HEADER: readonly string[] = ['Data', 'Investimento', 'Tipo', 'Instituição', 'Movimento', 'Valor (R$)', 'Tipo do rendimento', 'Observação'];

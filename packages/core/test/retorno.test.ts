@@ -719,7 +719,7 @@ describe('rowActions, batchEligible, rowPaymentDraft e looseExpenseFor', () => {
     expect(RETURN_TEXT.paidButtonA11y(rowShortName(luz!))).toBe('Já paguei: Luz de julho');
     expect(RETURN_TEXT.selectA11y(rowShortName(aluguel!), aluguel!.amountCents)).toBe('Selecionar Aluguel de julho, R$ 2.500,00');
     expect(RETURN_TEXT.batchBody([aluguel!, carro!], 'Conta principal')).toBe(
-      'Aluguel: R$ 2.500,00 em 05/07/2026. Financiamento do carro (parcela 10 de 48): R$ 850,00 em 10/07/2026. Saem da conta Conta principal.',
+      'Aluguel: R$ 2.500,00 em 05/07/2026. Financiamento do carro (parcela 10 de 48): R$ 850,00 em 10/07/2026. Saem de Conta principal.',
     );
     expect(RETURN_TEXT.batchTitle(2)).toBe('Marcar 2 contas como pagas?');
     expect(RETURN_TEXT.batchButton(2)).toBe('Marcar as 2 selecionadas como pagas no vencimento');
@@ -727,7 +727,7 @@ describe('rowActions, batchEligible, rowPaymentDraft e looseExpenseFor', () => {
       '1 de 2 marcadas como pagas. Financiamento do carro de julho: algo mudou em outro aparelho. Confira e tente de novo.',
     );
     expect(RETURN_TEXT.payBody(rowShortName(aluguel!), 250_000, '2026-07-05', 'Conta principal')).toBe(
-      'Aluguel de julho: R$ 2.500,00 em 05/07/2026, da conta Conta principal.',
+      'Aluguel de julho: R$ 2.500,00 em 05/07/2026, saindo de Conta principal.',
     );
     expect(notHappenedDialog({ ...aluguel!, description: 'Academia' })).toEqual({
       title: 'Não houve esta conta em julho?',

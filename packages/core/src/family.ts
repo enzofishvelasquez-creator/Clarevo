@@ -354,7 +354,7 @@ export const FAMILY_TEXT = {
   /** "Quem vê estes dados?" na Família. */
   whoSeesIntro: 'Estas pessoas veem os registros da Família, cada uma conforme o papel que tem.',
   whoSeesNote:
-    'Gastos, contas a pagar, gastos fixos, parcelamentos, cartões, metas e contas de origem da Família ficam visíveis para estas pessoas. O que cada pessoa anotou continua na Família, com o primeiro nome dela, mesmo depois de sair. Quem exclui a conta fica como "Pessoa que saiu", sem nome e sem e-mail.',
+    'Gastos, contas a pagar, gastos fixos, parcelamentos, cartões, metas, bancos e carteira da Família ficam visíveis para estas pessoas. O que cada pessoa anotou continua na Família, com o primeiro nome dela, mesmo depois de sair. Quem exclui a conta fica como "Pessoa que saiu", sem nome e sem e-mail.',
   /** Quem anotou, nos detalhes (L-6). */
   notedBy: (label: string): string => `Anotado por ${label}`,
   /** Onde a anotação vai ficar. */

@@ -179,7 +179,7 @@ export default function ContaScreen() {
         <LevelCard />
 
         {/* Ordem de Conta (docs/10 A23): a assinatura, o que é deste aparelho (lembretes, privacidade, widget), a segurança, quem divide
-            o app com você (Família, empresa, Telegram), as contas de origem, exportar e, por fim, ajuda, termos, sair e excluir. */}
+            o app com você (Família, empresa, Telegram), bancos e carteira, exportar e, por fim, ajuda, termos, sair e excluir. */}
         {/* Assinatura (D-083): a situação do acesso (teste, só ver e exportar, plano, benefício ou Família) e a tela com os planos. */}
         <AccessCard />
 

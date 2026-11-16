@@ -115,7 +115,7 @@ export const ACCOUNT_MARK_TEXT: Readonly<Record<AccountMarkKey, { title: string;
   importou: { title: 'Importar um extrato ou uma fatura', href: '/importar' },
   telegram: { title: 'Ligar o Telegram', href: '/conta/telegram' },
   familia: { title: 'Criar ou entrar numa Família', href: '/familia' },
-  conta: { title: 'Cadastrar uma conta de origem', href: '/contas/nova' },
+  conta: { title: 'Cadastrar um banco ou carteira', href: '/contas/nova' },
   limite: { title: 'Definir o seu limite de renda comprometida', href: '/renda-comprometida/limite' },
   imagem: { title: 'Escolher a imagem de uma meta', href: '/metas' },
 };

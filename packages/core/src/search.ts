@@ -142,7 +142,7 @@ export const SEARCH_TEXT = {
   cardsNote: 'O dinheiro só sai quando a fatura é paga. Por isso estas compras não estão somadas em Pago: o pagamento da fatura aparece na lista acima, uma vez só.',
   cardsSummary: (count: number, cents: Cents, partial = false): string =>
     `${count === 1 ? '1 compra' : `${count} compras`} · ${formatBRL(cents)} ${partial ? 'no total das 1.000 compras mais recentes' : 'no total das compras'}`,
-  cardsHiddenByAccount: 'Compras no cartão não têm conta de origem: a conta vem do pagamento da fatura. Limpe o filtro de conta para vê-las.',
+  cardsHiddenByAccount: 'Compras no cartão não saem de um banco ou carteira: isso vem do pagamento da fatura. Limpe o filtro de banco ou carteira para vê-las.',
   cardsLoadFailed: 'Não foi possível carregar as compras no cartão. Tente novamente.',
   retry: 'Tentar de novo',
   purchaseCaption: (purchasedOn: IsoDate, cardName: string | null, installments: number, offset = 0): string =>

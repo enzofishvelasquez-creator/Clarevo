@@ -23,9 +23,9 @@ import { ERROR_TEXT } from './validation';
 export const ACCOUNT_KINDS: readonly AccountKind[] = ['banco', 'dinheiro', 'outra'];
 /** Como o tipo aparece nos chips e nas linhas. */
 export const ACCOUNT_KIND_LABEL: Readonly<Record<AccountKind, string>> = {
-  banco: 'Conta bancária',
+  banco: 'Banco',
   dinheiro: 'Dinheiro',
-  outra: 'Outra',
+  outra: 'Outro',
 };
 export const ACCOUNT_NAME_MAX = 40;
 /** Contas ativas por contexto. */
@@ -40,89 +40,89 @@ export const ACCOUNT_STATUSES: readonly AccountStatus[] = ['ativa', 'arquivada']
 // ---------------------------------------------------------------------------
 
 export const ACCOUNTS_TEXT = {
-  /** Card em Conta. */
-  title: 'Contas de origem',
+  /** Card em Conta (decisão de 16/11/2026: "Bancos e carteira" no lugar de "Contas de origem"). */
+  title: 'Bancos e carteira',
   intro:
-    'Cadastre de onde sai o dinheiro, como a conta do banco ou a carteira, e escolha uma em cada gasto, pagamento e aporte. É só a origem informada: a Clarevo não guarda saldo nem movimenta dinheiro.',
+    'Cadastre de onde sai o dinheiro, como o banco ou a carteira, e escolha de onde saiu em cada gasto, pagamento e aporte. É só a origem informada: a Clarevo não guarda saldo nem movimenta dinheiro.',
   principal: 'Principal',
   archived: 'Arquivada',
-  add: 'Adicionar conta',
-  manage: 'Gerenciar contas de origem',
-  limitNote: 'Você tem 10 contas ativas. Arquive uma para adicionar outra.',
-  balanceNote: 'A Clarevo não calcula saldo por conta.',
+  add: 'Adicionar banco ou carteira',
+  manage: 'Gerenciar bancos e carteira',
+  limitNote: 'Você tem 10 bancos e carteiras ativos. Arquive um para adicionar outro.',
+  balanceNote: 'A Clarevo não calcula o saldo do banco nem da carteira.',
   /** Tela "Sua primeira conta": não há campo de saldo (o app não calcula saldo). */
   firstAccountNote: 'A Clarevo mostra o que entrou e o que saiu no mês. Ela não mostra o saldo do banco.',
   /** Seletores. */
   out: 'Saiu de',
   into: 'Entrou em',
   to: 'Foi para',
-  none: 'Sem conta',
-  notFound: 'Conta não encontrada',
+  none: 'Sem banco ou carteira',
+  notFound: 'Banco ou carteira não encontrado',
   /** Filtro de Movimentos. */
-  filterLabel: 'Conta',
+  filterLabel: 'Banco ou carteira',
   filterAll: 'Todas',
   /** Formulário. */
-  newTitle: 'Nova conta',
-  editTitle: 'Editar conta',
-  nameLabel: 'Nome da conta',
-  nameHint: 'Por exemplo: Carteira ou Conta do banco.',
-  kindLabel: 'Tipo da conta',
-  save: 'Salvar conta',
-  create: 'Adicionar conta',
+  newTitle: 'Adicionar banco ou carteira',
+  editTitle: 'Editar banco ou carteira',
+  nameLabel: 'Nome',
+  nameHint: 'Por exemplo: Carteira ou o nome do banco.',
+  kindLabel: 'Tipo',
+  save: 'Salvar alterações',
+  create: 'Adicionar',
   /** Situação da conta aberta. */
   statusTitle: 'Situação',
   makeDefault: 'Tornar principal',
-  archive: 'Arquivar conta',
-  reactivate: 'Reativar conta',
-  delete: 'Excluir conta',
+  archive: 'Arquivar',
+  reactivate: 'Reativar',
+  delete: 'Excluir',
   /** Avisos depois de gravar. */
-  created: 'Conta adicionada.',
-  saved: 'Conta salva.',
-  defaultSet: 'Conta principal atualizada.',
-  archivedDone: 'Conta arquivada.',
-  reactivated: 'Conta reativada.',
-  deleted: 'Conta excluída.',
+  created: 'Adicionado em Bancos e carteira.',
+  saved: 'Alterações salvas.',
+  defaultSet: 'Marcado como principal.',
+  archivedDone: 'Arquivado.',
+  reactivated: 'Reativado.',
+  deleted: 'Excluído de Bancos e carteira.',
   /** Arquivar a principal: escolher a nova. */
-  chooseDefaultTitle: 'Qual será a conta principal?',
-  chooseDefaultBody: 'A conta principal vem marcada nos gastos, pagamentos e aportes. Escolha outra antes de arquivar esta.',
+  chooseDefaultTitle: 'Qual fica como principal?',
+  chooseDefaultBody: 'A opção principal vem marcada nos gastos, pagamentos e aportes. Escolha outra antes de arquivar esta.',
   chooseDefaultChoice: (name: string): string => `Tornar ${name} a principal e arquivar`,
   cancel: 'Cancelar',
   /** Excluir. */
-  deleteTitle: 'Excluir esta conta?',
-  deleteBody: 'Só é possível excluir uma conta sem lançamentos. Se ela já tem gastos ou aportes, arquive a conta: o histórico continua.',
-  deleteConfirm: 'Excluir conta',
-  loadFailed: 'Não foi possível carregar suas contas. Tente novamente.',
-  loading: 'Carregando suas contas…',
+  deleteTitle: 'Excluir de Bancos e carteira?',
+  deleteBody: 'Só é possível excluir o que ainda não tem lançamentos. Se já tem gastos ou aportes, arquive: o histórico continua.',
+  deleteConfirm: 'Excluir',
+  loadFailed: 'Não foi possível carregar bancos e carteira. Tente novamente.',
+  loading: 'Carregando bancos e carteira…',
   /** Linha da lista: tipo e, se houver, a marca. */
   rowCaption: (kind: AccountKind, isDefault: boolean, status: AccountStatus): string =>
     [ACCOUNT_KIND_LABEL[kind], isDefault ? 'Principal' : null, status === 'arquivada' ? 'Arquivada' : null].filter(Boolean).join(' · '),
   rowA11y: (name: string, kind: AccountKind, isDefault: boolean, status: AccountStatus): string =>
-    `${name}, ${ACCOUNTS_TEXT.rowCaption(kind, isDefault, status)}. Abrir a conta.`,
+    `${name}, ${ACCOUNTS_TEXT.rowCaption(kind, isDefault, status)}. Abrir para editar.`,
   /** Com uma conta só, o seletor mostra o nome como texto, sem chip. */
   single: (label: string, name: string): string => `${label}: ${name}`,
-  /** Com a conta escolhida num resumo: "saindo da conta Carteira". */
-  leavingFrom: (name: string): string => `saindo da conta ${name}`,
+  /** Com a conta escolhida num resumo: "saindo de Carteira" (nunca "conta Conta principal"). */
+  leavingFrom: (name: string): string => `saindo de ${name}`,
   /** Aviso da conta arquivada de um registro antigo. */
   archivedName: (name: string): string => `${name} (arquivada)`,
   /** A nota fiscal escolheu a conta. */
-  fromNote: (name: string): string => `Conta escolhida pela forma de pagamento da nota: ${name}. Mude se saiu de outra.`,
+  fromNote: (name: string): string => `Escolhido pela forma de pagamento da nota: ${name}. Mude se o dinheiro saiu de outro lugar.`,
 } as const;
 
 /** Textos de erro das telas de contas (nomes e regras do banco). */
 export const ACCOUNT_ERROR_TEXT = {
-  nome_da_conta_invalido: 'Dê um nome de 1 a 40 caracteres para a conta.',
-  tipo_da_conta_invalido: 'Escolha o tipo da conta.',
-  nome_da_conta_repetido: 'Você já tem uma conta com este nome. Use outro nome.',
-  limite_de_contas: 'Você pode ter até 10 contas ativas. Arquive uma para adicionar ou reativar outra.',
-  conta_principal: 'A conta principal não pode ser excluída. Torne outra conta principal antes.',
-  ultima_conta_ativa: 'Você precisa de pelo menos uma conta ativa. Adicione outra antes de arquivar esta.',
-  conta_com_lancamentos: 'Esta conta tem lançamentos. Arquive a conta em vez de excluir: o histórico continua.',
-  conta_arquivada: 'Reative a conta antes de torná-la a principal.',
-  conta_invalida: 'Escolha outra conta ativa como principal.',
+  nome_da_conta_invalido: 'Dê um nome de 1 a 40 caracteres.',
+  tipo_da_conta_invalido: 'Escolha o tipo.',
+  nome_da_conta_repetido: 'Você já tem um banco ou carteira com este nome. Use outro nome.',
+  limite_de_contas: 'Você pode ter até 10 bancos e carteiras ativos. Arquive um para adicionar ou reativar outro.',
+  conta_principal: 'A opção principal não pode ser excluída. Torne outra a principal antes.',
+  ultima_conta_ativa: 'É preciso manter pelo menos uma opção ativa em Bancos e carteira. Adicione outra antes de arquivar esta.',
+  conta_com_lancamentos: 'Já há lançamentos aqui. Arquive em vez de excluir: o histórico continua.',
+  conta_arquivada: 'Reative antes de tornar principal.',
+  conta_invalida: 'Escolha outra opção ativa como principal.',
   situacao_invalida: ERROR_TEXT.salvar_falhou,
   campo_nao_se_aplica: ERROR_TEXT.salvar_falhou,
-  versao_desatualizada: 'Esta conta foi alterada em outro aparelho. Confira a versão atual antes de salvar.',
-  nao_encontrado: 'Esta conta não está mais disponível.',
+  versao_desatualizada: 'Isto foi alterado em outro aparelho. Confira o que mudou antes de salvar.',
+  nao_encontrado: 'Este banco ou carteira não está mais disponível.',
   sem_permissao: ERROR_TEXT.sem_permissao,
   salvar_falhou: ERROR_TEXT.salvar_falhou,
   carregar_falhou: ERROR_TEXT.carregar_falhou,

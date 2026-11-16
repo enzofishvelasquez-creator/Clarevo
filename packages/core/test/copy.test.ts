@@ -2309,7 +2309,7 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
     expect(IMPORT_TEXT.balanceIgnored).toContain('ignorado');
     expect(IMPORT_TEXT.intro).toContain('não é guardado');
     expect(IMPORT_TEXT.limits).toBe('Até 5 MB e 5.000 linhas.');
-    expect(IMPORT_TEXT.destinationAccount).toBe('Conta');
+    expect(IMPORT_TEXT.destinationAccount).toBe('Banco ou carteira');
     expect(IMPORT_TEXT.destinationCard).toBe('Cartão de crédito');
     expect(IMPORT_TEXT.cardPurchaseNote).toContain('não somam em Pago');
     expect(importedSummary(18, 4)).toBe('18 lançamentos importados, 4 já estavam anotados.');

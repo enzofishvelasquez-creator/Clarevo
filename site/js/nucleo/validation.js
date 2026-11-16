@@ -12,7 +12,7 @@ export const ERROR_TEXT = {
     data_invalida: 'Confira a data informada.',
     data_futura: 'Use uma data até hoje. Aqui entram só valores já pagos ou recebidos.',
     mes_seguinte_invalido: 'Só um recebimento dos últimos 7 dias do mês pode contar no mês seguinte.',
-    conta_invalida: 'Escolha a conta.',
+    conta_invalida: 'Escolha o banco ou a carteira.',
     salvar_falhou: 'Não foi possível salvar. Seu preenchimento foi mantido. Tente novamente.',
     carregar_falhou: 'Não foi possível carregar. Tente novamente.',
     versao_desatualizada: 'Este registro foi alterado em outro aparelho. Confira a versão atual antes de salvar.',
@@ -60,7 +60,7 @@ export const COMMITMENT_ERROR_TEXT = {
 export const PAYMENT_ERROR_TEXT = {
     ...COMMITMENT_ERROR_TEXT,
     data_futura: 'Use uma data até hoje. A conta só é marcada como paga depois do pagamento.',
-    conta_invalida: 'Escolha a conta usada no pagamento.',
+    conta_invalida: 'Escolha de onde saiu o pagamento.',
 };
 export const SERIES_ERROR_TEXT = {
     ...COMMITMENT_ERROR_TEXT,
