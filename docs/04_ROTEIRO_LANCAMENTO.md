@@ -211,6 +211,17 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [ ] Sentry: conferir no primeiro build `preview` (o nome da variável no registro do build e, depois do teste, o Sentry sem dado pessoal; `docs/47`, item 49)
 - [ ] Leitura de documentos: teste com 5 a 10 documentos reais antes de anunciar nas redes (P-025, P-026)
 
+## Teste com pessoas: atualização pelo ar, versão e sugestões (D-100, 16/11/2026, `docs/50_ATUALIZACOES.md`)
+
+- [x] EAS Update: `expo-updates` instalado, impressão digital nativa, canal por perfil e a publicação a cada merge no `main` para os builds `preview` (`apps/app/.eas/workflows/atualizar-preview.yml`), com o widget ligado e as variáveis do ambiente `preview`
+- [x] A impressão digital igual antes e depois do prebuild, com o widget (`apps/app/fingerprint.config.js`; sem ele, o build pararia)
+- [x] Versão 1.0.1 e a versão em Conta (build e atualização)
+- [x] "Enviar sugestão ou problema" logo abaixo do perfil, tela de erro do app inteiro e a falha ao carregar com "Sair da conta" e "Enviar um problema"
+- [x] Sentry com o perfil do build, o número do build e as marcas de sistema, aparelho, atualização e tela
+- [x] Política (seção 8, Expo): o que vai ao servidor de atualizações
+- [ ] **Você:** juntar o PR, fazer um build `preview` novo e instalar por cima; depois do merge seguinte, conferir a primeira atualização (`docs/50`, seção 2)
+- [ ] Quem testa instala o build novo uma vez; depois, só fecha e abre o app para receber as correções
+
 ## Ciclo B: renda comprometida (D-026)
 
 Última execução registrada pelas frentes de trabalho em 09/10/2026: `npm test` (30 arquivos, 599 testes), `npm run typecheck`, `npm run test:db` (10, 20, 30, 40, 45, 47, 50, 60 e 65), `npm run test:api` (92 testes, com as sequências de B e C) e `npm run test:web`, que passa (item abaixo).
