@@ -28,6 +28,9 @@ export const MODULOS = {
   reserva: { nucleo: () => import('../js/nucleo/calculators/reserva.js'), definicao: () => import('./definicoes/reserva.js') },
   'juntar-para-objetivo': { nucleo: () => import('../js/nucleo/calculators/juntar-para-objetivo.js'), definicao: () => import('./definicoes/juntar-para-objetivo.js') },
   'dividir-contas': { nucleo: () => import('../js/nucleo/calculators/dividir-contas.js'), definicao: () => import('./definicoes/dividir-contas.js') },
+  // As duas que por enquanto só o site mostra (D-106).
+  'juros-compostos': { nucleo: () => import('../js/nucleo/calculators/juros-compostos.js'), definicao: () => import('./definicoes/juros-compostos.js') },
+  'rendimento-cdi': { nucleo: () => import('../js/nucleo/calculators/rendimento-cdi.js'), definicao: () => import('./definicoes/rendimento-cdi.js') },
 };
 
 // --------------------------------------------------------------------------------------------------------------------

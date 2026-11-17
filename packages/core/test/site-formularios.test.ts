@@ -598,7 +598,7 @@ describe('site público: _worker.js, o resto cai nos arquivos estáticos', () =>
     expect(codigo).not.toMatch(/\benv\.[A-Z_]+_KV\b|env\.DB\b/);
     expect(fonteDoWorker).not.toMatch(/faz\w*\s+sentido/i);
     for (const fonte of [fonteDoWorker, fonteLigada]) {
-      expect(fonte).not.toMatch(/\/\*(LIMITES|CABECALHOS|ROTAS)\*\//);
+      expect(fonte).not.toMatch(/\/\*(LIMITES|CABECALHOS|ROTAS|INDICADORES)\*\//);
       expect(fonte).toContain(JSON.stringify(formularios.LIMITES));
       expect(fonte).toContain('export default');
       expect(fonte).not.toMatch(/[–—]/);
@@ -607,9 +607,105 @@ describe('site público: _worker.js, o resto cai nos arquivos estáticos', () =>
     // O worker gravado em site/ é o do repositório (formulários desligados); o outro é o gerado com os dois ligados.
     expect(fonteLigada).toContain('const ROTAS = {"contato":true,"newsletter":true};');
     expect(fonteLigada.replace(/const ROTAS = \{[^}]*\};/, '')).toBe(fonteDoWorker.replace(/const ROTAS = \{[^}]*\};/, ''));
-    // Só as duas rotas e os dois serviços.
-    expect([...fonteDoWorker.matchAll(/https:\/\/[a-z.]+\/[A-Za-z0-9/._-]*/g)].map((m) => m[0]).sort()).toEqual(['https://api.brevo.com/v3/contacts/doubleOptinConfirmation', 'https://api.resend.com/emails']);
+    // Só as duas rotas de formulário, os dois serviços de e-mail e, para /api/indicadores (D-106), a API de séries do Banco Central.
+    expect([...new Set([...fonteDoWorker.matchAll(/https:\/\/[a-z.]+\/[A-Za-z0-9/._-]*/g)].map((m) => m[0]))].sort()).toEqual([
+      'https://api.bcb.gov.br/dados/serie/bcdata.sgs.',
+      'https://api.brevo.com/v3/contacts/doubleOptinConfirmation',
+      'https://api.resend.com/emails',
+    ]);
     expect(readFileSync(join(SITE, '_routes.json'), 'utf8')).toBe('{"version":1,"include":["/api/*"],"exclude":[]}\n');
+  });
+});
+
+// ------------------------------------------------------------------------------------------------------------------------------
+// /api/indicadores (D-106)
+
+describe('site público: _worker.js, /api/indicadores (Banco Central, D-106)', () => {
+  /** Respostas do SGS como o Banco Central devolve, pelo código da série no endereço. */
+  const SGS: Record<string, unknown> = {
+    'bcdata.sgs.432/': [{ data: '17/11/2026', valor: '15.00' }],
+    'bcdata.sgs.12/': [{ data: '14/11/2026', valor: '0.055131' }],
+    'bcdata.sgs.433/': Array.from({ length: 12 }, (_, i) => ({ data: `01/${String(((10 + i) % 12) + 1).padStart(2, '0')}/${i < 2 ? 2025 : 2026}`, valor: '0.40' })),
+    'bcdata.sgs.195/': [{ data: '17/11/2026', datafim: '17/12/2026', valor: '0.6719' }],
+    'bcdata.sgs.1/': [{ data: '14/11/2026', valor: '5.3870' }],
+  };
+  /** Um worker novo a cada caso (a cópia de uma hora fica na memória do módulo): a fonte ganha um comentário diferente. */
+  let n = 0;
+  const workerNovo = async () => carregarWorker(`${fonteDoWorker}\n// caso ${++n}\n`);
+  const bancoSimulado = (falhar = false) => {
+    const chamadas: { url: string; init: RequestInit }[] = [];
+    const f = vi.fn(async (url: string, init: RequestInit) => {
+      chamadas.push({ url: String(url), init });
+      if (falhar) return new Response('fora do ar', { status: 503 });
+      const chave = Object.keys(SGS).find((k) => String(url).includes(k));
+      return new Response(JSON.stringify(chave ? SGS[chave] : []), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', f);
+    return { f, chamadas };
+  };
+  const pedir = (w: Worker, metodo = 'GET', cabecalhos: Record<string, string> = {}) =>
+    w.fetch(new Request('https://clarevo-site.pages.dev/api/indicadores', { method: metodo, headers: cabecalhos }), envCom());
+
+  it('GET consulta as cinco séries no Banco Central e devolve o retrato, o texto de cada número e a fonte, com os cabeçalhos de segurança', async () => {
+    const w = await workerNovo();
+    const { chamadas } = bancoSimulado();
+    const r = await pedir(w);
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    expect(r.headers.get('cache-control')).toBe('public, max-age=900');
+    expect(r.headers.get('content-security-policy')).toContain("connect-src 'self'");
+    expect(r.headers.get('x-frame-options')).toBe('DENY');
+    const corpo = (await r.json()) as { fonte: string; atualizado: string; exibicao: Record<string, { nome: string; numero: string }>; valores: Record<string, unknown> };
+    expect(corpo.fonte).toBe('Fonte: Banco Central do Brasil.');
+    expect(corpo.atualizado).toMatch(/^Atualizado em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}, horário de Brasília\.$/);
+    expect(corpo.exibicao.selic!.numero).toBe('15,00%');
+    expect(corpo.exibicao.cdi!.numero).toBe('14,90%');
+    expect(corpo.exibicao.ptax).toMatchObject({ nome: 'Dólar PTAX (Banco Central)', numero: 'R$ 5,3870' });
+    expect(Object.keys(corpo.valores).sort()).toEqual(['cdi', 'ipca', 'poupanca', 'ptax', 'selic']);
+    expect(chamadas).toHaveLength(5);
+    for (const c of chamadas) expect(c.url).toMatch(/^https:\/\/api\.bcb\.gov\.br\/dados\/serie\/bcdata\.sgs\.(432|12|433|195|1)\/dados\?formato=json&dataInicial=/);
+  });
+
+  it('a cópia vale uma hora: o segundo pedido não consulta o Banco Central de novo', async () => {
+    const w = await workerNovo();
+    const { f } = bancoSimulado();
+    await pedir(w);
+    await pedir(w);
+    await pedir(w, 'HEAD');
+    expect(f).toHaveBeenCalledTimes(5);
+  });
+
+  it('nada de quem visita vai ao Banco Central: só Accept e User-Agent do site, com prazo', async () => {
+    const w = await workerNovo();
+    const { chamadas } = bancoSimulado();
+    await pedir(w, 'GET', { cookie: 'a=1', 'user-agent': 'Navegador de Teste', 'x-forwarded-for': '203.0.113.9', referer: 'https://clarevo.test/indicadores/' });
+    for (const c of chamadas) {
+      expect(c.init.headers).toEqual({ Accept: 'application/json', 'User-Agent': 'clarevo-site' });
+      expect(c.init.signal).toBeInstanceOf(AbortSignal);
+      expect(c.init.method ?? 'GET').toBe('GET');
+      expect(c.init.body).toBeUndefined();
+    }
+  });
+
+  it('a fonte fora do ar dá 503 sem cópia (a página fica com o retrato da geração), sem cache no navegador', async () => {
+    const w = await workerNovo();
+    bancoSimulado(true);
+    const r = await pedir(w);
+    expect(r.status).toBe(503);
+    expect(r.headers.get('cache-control')).toBe('no-store');
+    expect(await r.json()).toEqual({ erro: 'indisponivel' });
+  });
+
+  it('só GET e HEAD (o resto, 405); a rota não depende de interruptor nem de variável', async () => {
+    const w = await workerNovo();
+    const { f } = bancoSimulado();
+    const r = await pedir(w, 'POST');
+    expect(r.status).toBe(405);
+    expect(r.headers.get('allow')).toBe('GET, HEAD');
+    expect(f).not.toHaveBeenCalled();
+    const head = await pedir(w, 'HEAD');
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe('');
   });
 });
 

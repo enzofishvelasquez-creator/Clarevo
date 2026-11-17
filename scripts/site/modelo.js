@@ -40,9 +40,34 @@ function menuHtml(arquivo) {
 </nav>`;
 }
 
-function rodapeHtml(arquivo, valores) {
-  // Com a newsletter ligada (D-066), a coluna "Aprender e ajuda" ganha o caminho para a inscrição.
-  const colunasDoRodape = RODAPE_COLUNAS.map((c) => (c.titulo === 'Aprender e ajuda' && valores && valores.newsletter === true ? { ...c, links: [...c.links, { arquivo: 'novidades/receber.html', rotulo: 'Novidades por e-mail' }] } : c));
+/**
+ * O que o rodapé de todas as páginas mostra além do fixo, decidido uma vez por geração (`configurarRodape`, chamado por `gerarSite`):
+ * `resumoSemanal` liga o link do resumo semanal de notícias, que só existe quando há pelo menos uma edição (D-106).
+ */
+let extrasDoRodape = { resumoSemanal: false };
+function configurarRodape({ resumoSemanal = false } = {}) {
+  extrasDoRodape = { resumoSemanal: Boolean(resumoSemanal) };
+}
+
+/** O aviso do rodapé das páginas de mercado (indicadores, glossário, explicações e resumo semanal, D-106), do núcleo. */
+function avisoDeMercado() {
+  return require('./catalogo').catalogo().INDICADORES.INDICADORES_TEXT.avisoMercado;
+}
+
+function rodapeHtml(arquivo, valores, { aviso = false } = {}) {
+  // Com a newsletter ligada (D-066), a coluna "Aprender e ajuda" ganha o caminho para a inscrição; com edições do resumo semanal (D-106),
+  // o resumo entra depois do glossário.
+  const extras = (c) => {
+    if (c.titulo !== 'Aprender e ajuda') return c;
+    let links = c.links;
+    if (extrasDoRodape.resumoSemanal) {
+      const i = links.findIndex((l) => l.arquivo === 'indicadores/glossario.html');
+      links = [...links.slice(0, i + 1), { arquivo: 'noticias/index.html', rotulo: 'Resumo semanal' }, ...links.slice(i + 1)];
+    }
+    if (valores && valores.newsletter === true) links = [...links, { arquivo: 'novidades/receber.html', rotulo: 'Novidades por e-mail' }];
+    return { ...c, links };
+  };
+  const colunasDoRodape = RODAPE_COLUNAS.map(extras);
   const colunas = colunasDoRodape.map(
     (c) => `<div><h2>${esc(c.titulo)}</h2><ul>${c.links.map((l) => `<li><a href="${rel(arquivo, l.arquivo)}">${esc(l.rotulo)}</a></li>`).join('')}</ul></div>`,
   ).join('\n');
@@ -53,7 +78,7 @@ function rodapeHtml(arquivo, valores) {
 <div class="rodape-marca"><a href="${rel(arquivo, 'index.html')}" aria-label="Clarevo, página inicial"><img src="${rel(arquivo, 'marca/clarevo-logotipo-reverso.svg')}" alt="" width="130" height="26"></a><p>Cuidar da vida financeira faz parte de cuidar de você. Sem anúncios, sem venda de dados e sem recomendar produtos financeiros.</p></div>
 ${colunas}
 </nav>
-<div class="rodape-fim"><p>${legal}</p></div>
+<div class="rodape-fim">${aviso ? `<p class="rodape-aviso">${esc(avisoDeMercado())}</p>` : ''}<p>${legal}</p></div>
 </div>
 </footer>`;
 }
@@ -65,8 +90,10 @@ ${colunas}
  * (as calculadoras, que importam o núcleo de `js/nucleo/`). `precarga`: módulos ES que a página vai precisar, com `modulepreload` no `<head>`
  * para o navegador pedir todos de uma vez (sem esperar cada `import`). `cabecalho`: HTML a mais no `<head>`. `atualizada`: a data
  * ("AAAA-MM-DD") do conteúdo da página, quando ele tem uma (post e tema de Aprender), que vira o `<lastmod>` do sitemap.
+ * `avisoDeMercado`: as páginas de mercado (D-106) levam no rodapé "Conteúdo educativo. Não é recomendação nem análise de valores
+ * mobiliários."
  */
-function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], precarga = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false, atualizada = null }) {
+function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], precarga = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false, atualizada = null, avisoDeMercado: comAviso = false }) {
   const pendencias = pendenciasDoTexto(`${fonte}\n${RODAPE_LEGAL}`, valores);
   const faixa = pendencias.length
     ? `<div class="faixa" role="note"><div class="miolo"><p><strong>Versão preliminar, em revisão.</strong> Este texto ainda não vale como versão final: os trechos destacados serão preenchidos antes da publicação.</p></div></div>\n`
@@ -126,7 +153,7 @@ ${capa}
 </section>
 ${corpo}
 </main>
-${rodapeHtml(arquivo, valores)}
+${rodapeHtml(arquivo, valores, { aviso: comAviso })}
 </body>
 </html>
 `;
@@ -152,4 +179,4 @@ function telaLarga(img, arquivo) {
   return `<figure class="larga"><div class="larga-moldura"><img src="${rel(arquivo, img.caminho)}" alt="${esc(img.alt)}" width="${img.largura}" height="${img.altura}" loading="lazy" decoding="async"></div><figcaption>${LEGENDA_DEMO}</figcaption></figure>`;
 }
 
-module.exports = { montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, dominioDe, urlDoSite };
+module.exports = { montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, dominioDe, urlDoSite, configurarRodape };

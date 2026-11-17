@@ -413,6 +413,27 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .nav-temas a[aria-current="page"]{background:var(--botao);border-color:var(--botao);color:var(--sobre-botao)}
 [hidden]{display:none!important}
 
+/* Indicadores oficiais e páginas de mercado (D-106): o número em destaque, em uma cor só (nada de verde para alta ou vermelho para queda),
+   com a unidade, a data e a fonte por perto. */
+.indicadores-estado{margin:0 0 1rem;color:var(--texto-2);font-size:.9375rem}
+.cartao.indicador{text-decoration:none}
+.cartao.indicador .titulo-cartao{text-decoration:underline;text-underline-offset:.18em}
+.indicador-numero{display:block;margin:.35rem 0 .1rem;color:var(--texto);font-weight:800;font-size:1.75rem;line-height:1.2;font-variant-numeric:tabular-nums}
+.indicador-unidade{color:var(--texto-2);font-weight:700;font-size:1rem}
+.indicador-capa{margin:.25rem 0 0}
+.indicador-capa-numero{margin:0 0 .35rem;font-weight:800;font-size:clamp(2.25rem,8vw,3.25rem);line-height:1.1;font-variant-numeric:tabular-nums}
+.capa .indicador-unidade{color:var(--sobre-topo-suave);font-size:1.125rem}
+.indicador-capa .meta-tema{margin:0 0 .25rem}
+.indicador-capa .meta-tema .tema-sub{display:inline;color:var(--sobre-topo-suave);font-weight:700}
+/* "O que muda na sua vida" abre direto num h3 ("Na renda fixa"): o h3 não soma o respiro dele ao do título (o título ficava mais perto
+   do que vem antes do que do próprio conteúdo). */
+.artigo h2+h3{margin-top:0}
+.termo h2{font-size:1.3rem;margin:1.75rem 0 .4rem}
+.termo-links{font-size:.9375rem}
+.noticia h2{font-size:1.3rem}
+.noticia-fonte{color:var(--texto-2);font-size:.9375rem}
+.rodape-aviso{font-weight:700}
+
 /* Nenhum cartão sozinho na última linha (varredura de 12/11/2026). Com a grade automática, três cartões ficavam dois e um no tablet,
    quatro ficavam três e um, e as listas de número ímpar sobravam com um no fim. Pela quantidade, a grade pula as larguras em que um
    cartão sobraria: três vão de uma coluna direto para três; quatro (cartões, temas ou passos), de uma para duas e depois quatro; os cinco passos de Para empresas,

@@ -11,7 +11,11 @@
  *     de erro dizendo qual campo conferir;
  *   - os formulários, ligados só para este teste (o site é gerado numa pasta temporária com os interruptores `true`), com o `_worker.js`
  *     de verdade (com SITE_HOST) e um `fetch` simulado no lugar do Resend e do Brevo: envio, validação, campo-isca e consentimento, e o
- *     Origin que o navegador manda de verdade num formulário da própria página.
+ *     Origin que o navegador manda de verdade num formulário da própria página;
+ *   - os indicadores oficiais (D-106), com um retrato de teste na geração e o Banco Central simulado no `fetch` do worker: sem JavaScript, o
+ *     retrato; com JavaScript, uma pergunta só ao próprio site (/api/indicadores), que troca os números e a hora e não se repete; a cópia de
+ *     uma hora no servidor; a fonte fora do ar (a página fica com o retrato); nenhum pedido do navegador a outro domínio; a política de
+ *     segurança; o aviso de mercado no rodapé; as duas calculadoras novas; e o resumo semanal com uma edição de teste.
  * Uso: npm run test:site   (gera o site numa pasta temporária, sobe o servidor local e percorre os fluxos; nada é gravado em `site/`)
  * Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  */
@@ -26,6 +30,34 @@ const { catalogo } = require('./site/catalogo');
 
 const RAIZ = path.join(__dirname, '..');
 const HOJE = '2026-10-23';
+/**
+ * O retrato de teste dos indicadores (D-106), gravado na geração: números fictícios, diferentes dos que o Banco Central simulado devolve,
+ * para o teste ver a troca. 13:00 UTC é 10:00 em Brasília.
+ */
+const RETRATO = {
+  consultadoEm: `${HOJE}T13:00:00.000Z`,
+  valores: {
+    selic: { valor: 14.25, data: HOJE },
+    cdi: { valor: 14.15, data: '2026-10-22', dia: 0.052686 },
+    ipca: { valor: 5.1, data: '2026-09-01', mes: 0.5 },
+    poupanca: { valor: 0.6601, data: HOJE, fim: '2026-11-23' },
+    ptax: { valor: 5.4321, data: '2026-10-22' },
+  },
+};
+/** O que o Banco Central simulado devolve (o formato da API de séries do SGS), pelo código da série no endereço. */
+const SGS = {
+  'bcdata.sgs.432/': [{ data: '22/10/2026', valor: '15.00' }, { data: '23/10/2026', valor: '15.00' }],
+  'bcdata.sgs.12/': [{ data: '22/10/2026', valor: '0.055131' }],
+  'bcdata.sgs.433/': Array.from({ length: 12 }, (_, i) => ({ data: `01/${String(((9 + i) % 12) + 1).padStart(2, '0')}/${i < 3 ? 2025 : 2026}`, valor: '0.40' })),
+  'bcdata.sgs.195/': [{ data: '23/10/2026', datafim: '23/11/2026', valor: '0.6719' }],
+  'bcdata.sgs.1/': [{ data: '22/10/2026', valor: '5.3870' }],
+};
+/** Uma edição de teste do resumo semanal (temas permitidos, resumo próprio, link simples). */
+const EDICAO = {
+  itens: [
+    { titulo: 'Copom anuncia a meta da Selic', resumo: 'O comitê do Banco Central anunciou a meta da Selic na reunião da semana.', veiculo: 'Agência de Exemplo', autor: 'Pessoa de Exemplo', data: '2026-10-22', link: 'https://noticias.exemplo.test/copom', tema: 'copom' },
+  ],
+};
 const resultados = [];
 const ok = (nome, condicao, extra = '') => resultados.push([condicao ? 'OK     ' : 'FALHOU', nome, condicao ? '' : extra]);
 
@@ -34,8 +66,15 @@ function gerarSiteLigado() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clarevo-e2e-site-'));
   const dados = JSON.parse(fs.readFileSync(path.join(RAIZ, 'site', 'dados-da-empresa.json'), 'utf8'));
   fs.writeFileSync(path.join(dir, 'dados.json'), JSON.stringify({ ...dados, formulario_contato: true, newsletter: true }));
+  fs.writeFileSync(path.join(dir, 'retrato.json'), JSON.stringify(RETRATO));
+  fs.mkdirSync(path.join(dir, 'noticias'));
+  fs.writeFileSync(path.join(dir, 'noticias', `semana-${HOJE}.json`), JSON.stringify(EDICAO));
   const saida = path.join(dir, 'site');
-  const r = spawnSync(process.execPath, [path.join(__dirname, 'gerar-site.js'), '--dados', path.join(dir, 'dados.json'), '--referencia', HOJE, '--saida', saida], { encoding: 'utf8' });
+  const r = spawnSync(
+    process.execPath,
+    [path.join(__dirname, 'gerar-site.js'), '--dados', path.join(dir, 'dados.json'), '--referencia', HOJE, '--retrato', path.join(dir, 'retrato.json'), '--noticias', path.join(dir, 'noticias'), '--saida', saida],
+    { encoding: 'utf8' },
+  );
   if (r.status !== 0) throw new Error(`o gerador falhou:\n${r.stderr}`);
   return { dir, saida };
 }
@@ -178,6 +217,34 @@ function roteiros(CALC) {
       },
       () => ({ linhas: [linhasDe(CALC.calcDividirContas({ total: '3000', modo: 'renda', pessoas: [{ apelido: '', renda: '4000' }, { apelido: '', renda: '2000' }] }))] }),
     ),
+    // As duas que por enquanto só o site mostra (D-106).
+    r(
+      'juros-compostos',
+      async (p) => {
+        await texto(p, 'inicial', '1000');
+        await texto(p, 'mensal', '500');
+        await texto(p, 'taxaAno', '10');
+        await texto(p, 'meses', '120');
+      },
+      () => {
+        const s = CALC.calcJurosCompostos({ inicial: '1000', mensal: '500', taxaAno: '10', meses: '120' });
+        return { linhas: [linhasDe(s)], tambem: [...s.result.notes, ...s.result.hypotheses] };
+      },
+    ),
+    r(
+      'rendimento-cdi',
+      async (p) => {
+        await texto(p, 'valor', '10000');
+        await texto(p, 'percentual', '110');
+        await texto(p, 'cdiAno', '12');
+        await texto(p, 'meses', '18');
+        await escolha(p, 'imposto', 'regressivo');
+      },
+      () => {
+        const s = CALC.calcRendimentoCdi({ valor: '10000', percentual: '110', cdiAno: '12', meses: '18', imposto: 'regressivo' });
+        return { linhas: [linhasDe(s)], tambem: [...s.result.notes, ...s.result.hypotheses] };
+      },
+    ),
   ];
 }
 
@@ -185,7 +252,15 @@ function roteiros(CALC) {
   const CALC = catalogo().CALC;
   const { dir, saida } = gerarSiteLigado();
   const chamadas = [];
+  // O Banco Central simulado (D-106): o worker consulta as séries do SGS por GET, sem corpo; cada consulta fica em `chamadasBcb`.
+  const chamadasBcb = [];
+  const respostaDoBanco = (url, opcoes) => {
+    chamadasBcb.push({ url: String(url), cabecalhos: opcoes && opcoes.headers });
+    const chave = Object.keys(SGS).find((k) => String(url).includes(k));
+    return new Response(JSON.stringify(chave ? SGS[chave] : []), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
   const fetchSimulado = async (url, opcoes) => {
+    if (String(url).startsWith('https://api.bcb.gov.br/')) return respostaDoBanco(url, opcoes);
     chamadas.push({ url: String(url), cabecalhos: opcoes.headers, corpo: JSON.parse(opcoes.body) });
     return new Response('{}', { status: 200 });
   };
@@ -212,9 +287,10 @@ function roteiros(CALC) {
       return p;
     };
 
-    // 1. As dez calculadoras: o que aparece na tela é o que o core calcula, e cada página carrega só o que usa.
+    // 1. As doze calculadoras (as dez do app e as duas que só o site mostra, D-106): o que aparece na tela é o que o core calcula, e cada
+    // página carrega só o que usa.
     const PESADOS = ['series.js', 'cards.js', 'committed.js', 'simulate.js', 'validation.js', 'dia-util.js'];
-    const LEVES = ['parcelado-ou-a-vista', 'custo-por-ano', 'custo-da-divida', 'quitar-antes', 'multa-e-juros', 'reserva', 'juntar-para-objetivo', 'dividir-contas'];
+    const LEVES = ['parcelado-ou-a-vista', 'custo-por-ano', 'custo-da-divida', 'quitar-antes', 'multa-e-juros', 'reserva', 'juntar-para-objetivo', 'dividir-contas', 'rendimento-cdi'];
     const pesos = {};
     for (const rot of roteiros(CALC)) {
       const p = await pagina();
@@ -432,6 +508,93 @@ function roteiros(CALC) {
       ok('comece aqui: a demonstração é link de texto com noopener, e nenhum link leva parâmetro', demo.href === 'https://demo.clarevo.app.br/' && /noopener/.test(demo.rel) && comParametro.length === 0, JSON.stringify({ demo, comParametro }));
       ok('comece aqui: sem script (só dados estruturados, se houver) e sem formulário', (await p.$$eval('script', (ss) => ss.filter((x) => x.type !== 'application/ld+json').length)) === 0 && (await p.$$('form')).length === 0);
       await p.close();
+    }
+
+    // 7b. Indicadores oficiais (D-106). Vem antes da varredura de espaçamento (que abre todas as páginas e chamaria /api/indicadores muitas
+    // vezes): aqui a contagem de pedidos é limpa.
+    {
+      // O texto como a pessoa lê (innerText respeita os blocos), com o espaço fixo entre "R$" e o valor virando espaço comum.
+      const textoDe = (p, sel) => p.$eval(sel, (e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim());
+      const numerosDe = (p) => p.$$eval('[data-indicador] [data-campo="numero"]', (es) => es.map((e) => e.textContent.replace(/\s+/g, ' ')));
+      // Sem JavaScript: o retrato da geração, com a data, a hora e a fonte, e o aviso de mercado no rodapé.
+      const semJs = await navegador.newContext({ javaScriptEnabled: false });
+      const s0 = await semJs.newPage();
+      await s0.goto(`${origem}/indicadores/`);
+      const estado = await textoDe(s0, '.indicadores-estado');
+      ok('indicadores, sem JavaScript: o retrato da geração, com a hora e "Fonte: Banco Central do Brasil"', estado === 'Retrato de 23/10/2026 às 10:00, horário de Brasília. Fonte: Banco Central do Brasil.', estado);
+      const numeros = await numerosDe(s0);
+      ok('indicadores, sem JavaScript: os cinco números do retrato', JSON.stringify(numeros) === JSON.stringify(['14,25%', '14,15%', '5,10%', '0,6601%', 'R$ 5,4321']), JSON.stringify(numeros));
+      ok('indicadores: o dólar aparece como "Dólar PTAX (Banco Central)", com a data do fechamento', (await textoDe(s0, '[data-indicador="ptax"]')).startsWith('Dólar PTAX (Banco Central) R$ 5,4321 por dólar, na venda Fechamento de 22/10/2026'), await textoDe(s0, '[data-indicador="ptax"]'));
+      ok('indicadores: o aviso de mercado no rodapé', (await textoDe(s0, '.rodape-aviso')) === 'Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.');
+      await s0.goto(`${origem}/indicadores/selic-hoje`);
+      ok('Selic hoje, sem JavaScript: o número do retrato e a data', (await textoDe(s0, '.indicador-capa-numero')) === '14,25% ao ano' && (await textoDe(s0, '.indicador-capa')).includes('Meta em vigor em 23/10/2026'));
+      await semJs.close();
+
+      // Com JavaScript: uma pergunta ao próprio site, que consulta o Banco Central (simulado) no servidor e troca os números e a hora.
+      const p = await pagina();
+      const daApi = [];
+      p.on('request', (q) => q.url().startsWith(`${origem}/api/`) && daApi.push(q.url()));
+      const respostaDaApi = p.waitForResponse((r) => r.url() === `${origem}/api/indicadores`);
+      const antes = chamadasBcb.length;
+      await p.goto(`${origem}/indicadores/`);
+      const resposta = await respostaDaApi;
+      await p.waitForSelector('[data-painel][data-atualizado="sim"]');
+      const atualizados = await numerosDe(p);
+      ok('indicadores, com JavaScript: os números trocam pelos que o servidor buscou no Banco Central', JSON.stringify(atualizados) === JSON.stringify(['15,00%', '14,90%', '4,91%', '0,6719%', 'R$ 5,3870']), JSON.stringify(atualizados));
+      ok('indicadores, com JavaScript: "Atualizado em", com a hora da consulta, e a fonte', /^Atualizado em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}, horário de Brasília\. Fonte: Banco Central do Brasil\.$/.test(await textoDe(p, '.indicadores-estado')), await textoDe(p, '.indicadores-estado'));
+      ok('indicadores: o IPCA traz a linha do último mês', (await textoDe(p, '[data-indicador="ipca"] [data-campo="extra"]')) === 'Setembro de 2026: 0,40% no mês', await textoDe(p, '[data-indicador="ipca"] [data-campo="extra"]'));
+      ok('/api/indicadores: o servidor consultou as cinco séries do SGS, só com Accept e User-Agent do site', chamadasBcb.length - antes === 5 && chamadasBcb.slice(antes).every((c) => /^https:\/\/api\.bcb\.gov\.br\/dados\/serie\/bcdata\.sgs\.(432|12|433|195|1)\/dados\?formato=json/.test(c.url) && JSON.stringify(c.cabecalhos) === JSON.stringify({ Accept: 'application/json', 'User-Agent': 'clarevo-site' })), JSON.stringify(chamadasBcb.slice(antes)));
+      ok('/api/indicadores: JSON, guarda de 15 minutos no navegador e a política de segurança do site', resposta.headers()['content-type'] === 'application/json; charset=utf-8' && resposta.headers()['cache-control'] === 'public, max-age=900' && /connect-src 'self'/.test(resposta.headers()['content-security-policy'] || ''));
+      // Não fica perguntando: duas horas depois (o relógio da página adiantado), continua um pedido só.
+      await p.clock.fastForward('02:00:00');
+      await p.waitForTimeout(300);
+      ok('indicadores: a página pergunta uma vez só, ao abrir, e não repete com o tempo', daApi.length === 1, daApi.join(' | '));
+      const cabecalhosDaPagina = (await p.request.get(`${origem}/indicadores/`)).headers();
+      ok('indicadores: a página é servida com a política de segurança só do próprio site (script e conexão)', /script-src 'self'/.test(cabecalhosDaPagina['content-security-policy'] || '') && /connect-src 'self'/.test(cabecalhosDaPagina['content-security-policy'] || '') && !/https?:/.test(cabecalhosDaPagina['content-security-policy'] || ''));
+      ok('indicadores: sem cookie, armazenamento ou parâmetro na URL', await p.evaluate(() => localStorage.length === 0 && sessionStorage.length === 0 && document.cookie === '' && location.search === ''));
+      // A cópia de uma hora: outro pedido (fora do navegador, sem a guarda dele) não consulta o Banco Central de novo.
+      const depois = chamadasBcb.length;
+      const deNovo = await ctx.request.get(`${origem}/api/indicadores`);
+      ok('/api/indicadores: o segundo pedido sai da cópia, sem consultar o Banco Central', deNovo.status() === 200 && chamadasBcb.length === depois, `${deNovo.status()} ${chamadasBcb.length - depois}`);
+      ok('/api/indicadores: só GET e HEAD', (await ctx.request.post(`${origem}/api/indicadores`, { data: 'x' })).status() === 405);
+      // A página de um indicador também troca o número.
+      await p.goto(`${origem}/indicadores/dolar-ptax-hoje`);
+      await p.waitForSelector('[data-painel][data-atualizado="sim"]');
+      ok('Dólar PTAX hoje: o número troca e o título continua "Dólar PTAX hoje", sem cotação ao vivo', (await textoDe(p, '.indicador-capa-numero')) === 'R$ 5,3870 por dólar, na venda' && (await textoDe(p, 'h1')) === 'Dólar PTAX hoje' && (await textoDe(p, 'main')).includes('Não é cotação ao vivo.'));
+      await p.close();
+
+      // A fonte fora do ar: um servidor novo (worker sem cópia), com o Banco Central respondendo 503. A página fica com o retrato.
+      const foraDoAr = await servir(saida, { hostDoSite: true, fetchDoWorker: async () => new Response('fora do ar', { status: 503 }) });
+      try {
+        const q = await ctx.newPage();
+        const erros = [];
+        q.on('pageerror', (e) => erros.push(e.message));
+        // O navegador anota no console o 503 da própria API (é o esperado aqui); qualquer outra mensagem é problema.
+        q.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && !/status of 503/.test(m.text()) && erros.push(m.text()));
+        const de503 = q.waitForResponse((r) => r.url().endsWith('/api/indicadores'));
+        await q.goto(`${foraDoAr.url}/indicadores/`);
+        const r503 = await de503;
+        await q.waitForTimeout(300);
+        const ficou = await numerosDe(q);
+        ok('indicadores, fonte fora do ar: a API responde 503 e a página fica com o retrato da geração, sem erro', r503.status() === 503 && JSON.stringify(ficou) === JSON.stringify(['14,25%', '14,15%', '5,10%', '0,6601%', 'R$ 5,4321']) && (await q.$('[data-atualizado]')) === null && erros.length === 0, `${r503.status()} ${JSON.stringify(ficou)} ${erros.join(' | ')}`);
+        ok('indicadores, fonte fora do ar: a linha da hora continua dizendo de quando é o retrato', (await textoDe(q, '.indicadores-estado')).startsWith('Retrato de 23/10/2026 às 10:00'));
+        await q.close();
+      } finally {
+        await foraDoAr.fechar();
+      }
+
+      // Glossário, explicações e resumo semanal: o aviso no rodapé, links simples para fora (sem imagem nem script de outro site).
+      const g = await pagina();
+      await g.goto(`${origem}/indicadores/glossario`);
+      const termos = await g.$$eval('.termo h2', (es) => es.map((e) => e.textContent));
+      ok('glossário: os termos pedidos, com link para Aprender', ['CDI', 'Come-cotas', 'FGC', 'IOF', 'IPCA', 'IR regressivo', 'Liquidez', 'Marcação a mercado', 'PTAX', 'Selic'].every((t) => termos.includes(t)) && (await g.$('a[href="../aprender/fgc.html"]')) !== null, termos.join(', '));
+      await g.goto(`${origem}/noticias/semana-${HOJE}`);
+      const noticia = await g.evaluate(() => ({ imagens: document.querySelectorAll('main img').length, scripts: [...document.scripts].filter((x) => x.type !== 'application/ld+json').length, link: [...document.querySelectorAll('main a[href^="https://"]')].map((a) => ({ href: a.href, rel: a.rel })) }));
+      ok('resumo semanal: a edição de teste abre, com link simples para a matéria (noopener), sem imagem nem script', noticia.imagens === 0 && noticia.scripts === 0 && noticia.link.length === 1 && noticia.link[0].href === 'https://noticias.exemplo.test/copom' && /noopener/.test(noticia.link[0].rel), JSON.stringify(noticia));
+      ok('resumo semanal: o aviso de mercado no rodapé e o link no rodapé de todas as páginas', (await textoDe(g, '.rodape-aviso')) === 'Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.' && (await g.$('footer a[href="index.html"]')) !== null);
+      await g.goto(`${origem}/sobre`);
+      ok('resumo semanal: com uma edição, o rodapé ganha "Resumo semanal"', (await g.$('footer a[href="noticias/index.html"]')) !== null);
+      await g.close();
     }
 
     // 8. Espaçamento em todas as páginas (pedido do Enzo em 12/11/2026: "esse é um erro de espaçamento básico, precisamos evitar eles, em

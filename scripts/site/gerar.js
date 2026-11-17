@@ -10,7 +10,7 @@ const path = require('node:path');
 const { RAIZ, SITE_SRC, MARCA, FONTES, PESOS_FONTE, PAGINAS_LEGAIS } = require('./config');
 const { lerDados, avisosDeRedacao, problemasDeTitulos } = require('./texto');
 const { dataExiste } = require('./conteudo');
-const { dominioDe } = require('./modelo');
+const { dominioDe, configurarRodape } = require('./modelo');
 const { imagensDoSite } = require('./imagens');
 const { linksQuebrados, problemasFinaisDaPagina } = require('./verificacoes');
 const { caminhoLimpo, cabecalhosDoTexto } = require('./util');
@@ -23,7 +23,11 @@ const { paginasCalculadoras, scriptsDasCalculadoras } = require('./paginas/calcu
 const { paginaImprensa, arquivosDaImprensa } = require('./paginas/imprensa');
 const { paginasDosFormularios } = require('./paginas/formularios');
 const { LIMITES, rotasLigadas } = require('./formularios');
-const { nucleo } = require('./nucleo');
+const { catalogo: catalogoDoSite } = require('./catalogo');
+const { nucleo, pacoteDoWorker } = require('./nucleo');
+const { lerRetrato, problemasDoRetrato } = require('./indicadores');
+const { paginasIndicadores, SCRIPT_DO_PAINEL } = require('./paginas/indicadores');
+const { paginasNoticias, lerEdicoes } = require('./paginas/noticias');
 const { paginasNovidades } = require('./paginas/novidades');
 const { paginasAjuda, conferirCobertura } = require('./paginas/ajuda');
 const { paginaSeguranca } = require('./paginas/seguranca');
@@ -31,9 +35,10 @@ const { paginaSobre, paginaSuporte, paginaLegal, paginaLicencas, pagina404 } = r
 
 const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê este arquivo e não o publica.
 # Nenhum recurso de fora é permitido: o site não carrega fontes, imagens, scripts nem estilos de outros endereços.
-# script-src e connect-src 'self' valem só para os scripts do próprio site: a busca da Ajuda (ajuda/busca.js, que lê ajuda/indice.json) e as
-# calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada). form-action 'self' vale para os formulários de
-# contato e de novidades, que enviam só para o próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
+# script-src e connect-src 'self' valem só para os scripts do próprio site: a busca da Ajuda (ajuda/busca.js, que lê ajuda/indice.json), as
+# calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada) e o painel de indicadores (indicadores/painel.js,
+# que pergunta uma vez ao próprio site, /api/indicadores; quem consulta o Banco Central é o _worker.js, nunca o navegador). form-action 'self'
+# vale para os formulários de contato e de novidades, que enviam só para o próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
 # Referrer-Policy: same-origin (e não no-referrer): com no-referrer o navegador manda "Origin: null" nos formulários, e o worker recusa o valor null.
 # Nenhum outro site recebe o endereço da página (a política só manda o referenciador para o próprio site).
 # HSTS desde 29/10/2026, com o domínio clarevo.app.br abrindo por HTTPS: sem includeSubDomains e sem preload (docs/07).
@@ -57,17 +62,19 @@ const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê est
 
 /**
  * O `_worker.js`: o modelo de `site-src/worker/worker.js` com os limites dos formulários (`scripts/site/formularios.js`), os cabeçalhos
- * de segurança do `_headers` e as rotas ligadas (os interruptores de `valores`) no lugar dos marcadores. O worker só existe no projeto
- * `clarevo-site`; uma rota desligada responde 404 mesmo com as variáveis configuradas.
+ * de segurança do `_headers`, as rotas ligadas (os interruptores de `valores`) e o pacote do núcleo de `/api/indicadores` (D-106,
+ * `packages/core/src/indicadores/servidor.ts`) no lugar dos marcadores. O worker só existe no projeto `clarevo-site`; uma rota de
+ * formulário desligada responde 404 mesmo com as variáveis configuradas.
  */
 function workerDoSite(valores) {
   const modelo = fs.readFileSync(path.join(SITE_SRC, 'worker', 'worker.js'), 'utf8');
-  const marcadores = ['/*LIMITES*/ {}', '/*CABECALHOS*/ {}', '/*ROTAS*/ {}'];
+  const marcadores = ['/*LIMITES*/ {}', '/*CABECALHOS*/ {}', '/*ROTAS*/ {}', '/*INDICADORES*/ null'];
   for (const marcador of marcadores) if (!modelo.includes(marcador)) throw new Error(`site-src/worker/worker.js perdeu o marcador ${marcador}`);
   return modelo
     .replace('/*LIMITES*/ {}', () => JSON.stringify(LIMITES))
     .replace('/*CABECALHOS*/ {}', () => JSON.stringify(cabecalhosDoTexto(CABECALHOS)))
-    .replace('/*ROTAS*/ {}', () => JSON.stringify(rotasLigadas(valores)));
+    .replace('/*ROTAS*/ {}', () => JSON.stringify(rotasLigadas(valores)))
+    .replace('/*INDICADORES*/ null', () => pacoteDoWorker('indicadores/servidor.ts'));
 }
 
 /** robots.txt: com marcador pendente (versão preliminar) nada é indexado; pronto, tudo é, e o sitemap só existe com domínio. */
@@ -103,8 +110,10 @@ function hojeEmBrasilia() {
  * `referencia` ("AAAA-MM-DD"): a data de referência dos posts de Novidades (nenhum pode ter data depois dela). Sem ela, vale a data de
  * hoje em Brasília; os testes e quem quer um resultado fixo passam a data explicitamente (`--referencia` na linha de comando).
  * `novidades`: outra pasta de posts (padrão: `site-src/novidades`), para os testes.
+ * `retrato` (objeto) ou `arquivoRetrato`: o retrato dos indicadores (padrão: `site-src/indicadores/retrato.json`, D-106).
+ * `noticias`: outra pasta de edições do resumo semanal (padrão: `site-src/noticias`).
  */
-function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dados, arquivoDados, referencia, novidades: pastaDeNovidades } = {}) {
+function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dados, arquivoDados, referencia, novidades: pastaDeNovidades, retrato: retratoDado, arquivoRetrato, noticias: pastaDeNoticias } = {}) {
   if (referencia !== undefined && referencia !== null && !dataExiste(referencia)) throw new Error(`a data de referência "${referencia}" não é uma data válida (AAAA-MM-DD)`);
   referencia = referencia || hojeEmBrasilia();
   const avisos = [];
@@ -121,8 +130,20 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   const problemasDaAjuda = conferirCobertura();
   if (problemasDaAjuda.length) throw new Error(`a Ajuda não cobre o guia e o catálogo do app:\n  ${problemasDaAjuda.join('\n  ')}`);
 
+  // Indicadores oficiais (D-106): o retrato da geração, que as páginas mostram sem JavaScript; sem retrato ou antigo, aviso, e o --final recusa.
+  const lidoRetrato = retratoDado ? { retrato: catalogoDoSite().INDICADORES.retratoDeJson(retratoDado), avisos: [] } : lerRetrato(arquivoRetrato);
+  avisos.push(...lidoRetrato.avisos);
+  const doRetrato = problemasDoRetrato(lidoRetrato.retrato, referencia);
+  avisos.push(...doRetrato.map((p) => `o --final recusaria: ${p}`));
+  problemasFinais.push(...doRetrato);
+  // O resumo semanal de notícias: sem edição, nenhuma página e nada no rodapé nem no mapa do site.
+  const resumo = lerEdicoes(pastaDeNoticias, { referencia });
+  avisos.push(...resumo.problemas);
+  problemasFinais.push(...resumo.problemas);
+  configurarRodape({ resumoSemanal: resumo.edicoes.length > 0 });
+
   const imagens = imagensDoSite();
-  const ctx = { valores, img: imagens.info, referencia, pastaDePosts: pastaDeNovidades };
+  const ctx = { valores, img: imagens.info, referencia, pastaDePosts: pastaDeNovidades, retrato: lidoRetrato.retrato, resumoSemanal: resumo.edicoes.length > 0 };
   const paginas = [];
   const juntar = (pg) => paginas.push(pg);
 
@@ -132,6 +153,8 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   juntar(paginaEmpresas(ctx));
   paginasAprender(ctx).forEach(juntar);
   paginasCalculadoras(ctx).forEach(juntar);
+  paginasIndicadores(ctx).forEach(juntar);
+  paginasNoticias(resumo.edicoes, ctx).forEach(juntar);
   const novidades = paginasNovidades(ctx);
   novidades.paginas.forEach(juntar);
   // Post sem fontes, com data inválida ou futura, ou com {{tema:...}} que não existe: aviso no console e problema que o --final recusa.
@@ -199,11 +222,13 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   // núcleo, o mesmo código do core transpilado para o navegador.
   for (const nome of scriptsDasCalculadoras()) arquivos.set(`calculadoras/${nome}`, fs.readFileSync(path.join(SITE_SRC, 'calculadoras', nome), 'utf8'));
   for (const [nome, texto] of nucleo()) arquivos.set(nome, texto);
+  // O painel de indicadores (D-106): pergunta uma vez ao próprio site e troca os números do retrato.
+  arquivos.set(SCRIPT_DO_PAINEL, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DO_PAINEL), 'utf8'));
   // O kit de imprensa: SVG de docs/marca (sem mudança), os PNG que scripts/gerar-marca-imprensa.js desenha deles e as capturas originais.
   const imprensa = arquivosDaImprensa();
   avisos.push(...imprensa.avisos);
   for (const [nome, bytes] of imprensa.arquivos) arquivos.set(nome, bytes);
-  // O worker do Cloudflare Pages (modo avançado): recebe só /api/contato e /api/newsletter; o resto vai para os arquivos estáticos.
+  // O worker do Cloudflare Pages (modo avançado): recebe só /api/contato, /api/newsletter e /api/indicadores; o resto vai para os arquivos estáticos.
   arquivos.set('_worker.js', workerDoSite(valores));
   arquivos.set('_routes.json', `${JSON.stringify({ version: 1, include: ['/api/*'], exclude: [] })}\n`);
   for (const peso of PESOS_FONTE) arquivos.set(`fontes/Manrope_${peso}.ttf`, ler(FONTES, `Manrope_${peso}.ttf`));
@@ -221,7 +246,7 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   const quebrados = linksQuebrados(arquivos);
   avisos.push(...quebrados);
   problemasFinais.push(...quebrados.map((q) => `link interno quebrado em ${q}`));
-  return { arquivos, avisos, pendencias, problemasFinais, valores, posts: novidades.posts };
+  return { arquivos, avisos, pendencias, problemasFinais, valores, posts: novidades.posts, retrato: lidoRetrato.retrato, edicoes: resumo.edicoes };
 }
 
 module.exports = { gerarSite, CABECALHOS, hojeEmBrasilia, DOMINIO_VALIDO };

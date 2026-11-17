@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { contrastRatio } from '../src/contrast';
 import { formatDateBR } from '../src/dates';
 import { GOALS_TEXT, GOAL_DEADLINE_SHORTCUTS, GOAL_MILESTONES } from '../src/goals';
@@ -14,6 +14,9 @@ import { GUIDE_ENTRIES } from '../src/guide';
 import { INVESTMENT_TEXT } from '../src/investments';
 import { LEARN_SECTIONS, LEARN_UI_TEXT, SEASONAL_CALENDAR, publishedTopics, relatedTopics } from '../src/learn';
 import { ACCESS_TEXT, PLAN_NAME, SUBSCRIBE_OPEN, SUBSCRIPTION_SCREEN_TEXT, planPriceAmount } from '../src/plano';
+import { SITE_CALCULATORS } from '../src/calculators';
+import { INDICADORES_TEXT, INDICADOR_IDS, exibirIndicador, type RetratoIndicadores } from '../src/indicadores';
+import { GLOSSARIO, INDICADORES_REVIEWED_ON, PAGINAS_INDICADORES, explicacoesDeMercado } from '../src/indicadores/conteudo';
 
 /**
  * Site público (D-064 e D-065, `docs/22_SITE.md`): `scripts/gerar-site.js` gera o site em `site/` a partir de `docs/legal/*.md`, do
@@ -46,6 +49,8 @@ interface GerarOpcoes {
   arquivoDados?: string;
   referencia?: string;
   novidades?: string;
+  retrato?: unknown;
+  noticias?: string;
 }
 interface Gerado {
   arquivos: Map<string, string | Buffer>;
@@ -53,6 +58,8 @@ interface Gerado {
   pendencias: Map<string, string[]>;
   problemasFinais: string[];
   posts: { arquivo: string; data: string; titulo: string; autoria: string; fontes: unknown[] }[];
+  retrato: RetratoIndicadores;
+  edicoes: { data: string; arquivo: string }[];
 }
 const gerador = require(SCRIPT) as {
   MARCADORES: string[];
@@ -81,10 +88,32 @@ const png = require(join(ROOT, 'scripts', 'site', 'png.js')) as {
 };
 const { markdownParaHtml, MARCADORES } = gerador;
 
-/** O gerador é puro: o resultado com os dados do repositório é calculado uma vez e vale para todos os grupos de teste. */
+/**
+ * Um retrato dos indicadores (D-106) para os testes que pedem um site sem pendência: números fictícios, do dia da referência dos posts. O
+ * repositório não tem retrato (a rede deste ambiente não alcança o Banco Central), e sem ele o `--final` recusa.
+ */
+const RETRATO_DE_TESTE: RetratoIndicadores = {
+  consultadoEm: '2026-11-12T16:00:00.000Z',
+  valores: {
+    selic: { valor: 12.25, data: '2026-11-12' },
+    cdi: { valor: 12.15, data: '2026-11-11', dia: 0.045877 },
+    ipca: { valor: 4.1, data: '2026-10-01', mes: 0.3 },
+    poupanca: { valor: 0.6512, data: '2026-11-12', fim: '2026-12-12' },
+    ptax: { valor: 5.1234, data: '2026-11-11' },
+  },
+};
+const DIR_DO_RETRATO = mkdtempSync(join(tmpdir(), 'clarevo-retrato-'));
+const ARQUIVO_DO_RETRATO = join(DIR_DO_RETRATO, 'retrato.json');
+writeFileSync(ARQUIVO_DO_RETRATO, JSON.stringify(RETRATO_DE_TESTE));
+afterAll(() => rmSync(DIR_DO_RETRATO, { recursive: true, force: true }));
+
+/**
+ * O gerador é puro: o resultado com os dados do repositório é calculado uma vez e vale para todos os grupos de teste. Com opções (um caso
+ * de teste), entra o retrato de teste, a não ser que o caso traga outro.
+ */
 let geradoDoRepositorio: Gerado | null = null;
 const gerarSite = (opcoes?: GerarOpcoes): Gerado => {
-  if (opcoes) return gerador.gerarSite(opcoes);
+  if (opcoes) return gerador.gerarSite({ retrato: RETRATO_DE_TESTE, ...opcoes });
   geradoDoRepositorio ??= gerador.gerarSite();
   return geradoDoRepositorio;
 };
@@ -130,10 +159,22 @@ const PAGINAS_BASE = [
   'licencas.html',
   '404.html',
 ];
-/** As dez calculadoras do app (D-066), na ordem do catálogo, e o índice delas. */
-const CALCULADORAS = ['antes-de-financiar', 'parcelado-ou-a-vista', 'custo-por-ano', 'custo-da-divida', 'quitar-antes', 'multa-e-juros', 'plano-dividas', 'reserva', 'juntar-para-objetivo', 'dividir-contas'];
+/** As dez calculadoras do app (D-066), na ordem do catálogo, as duas que só o site mostra (D-106) e o índice delas. */
+const CALCULADORAS = ['antes-de-financiar', 'parcelado-ou-a-vista', 'custo-por-ano', 'custo-da-divida', 'quitar-antes', 'multa-e-juros', 'plano-dividas', 'reserva', 'juntar-para-objetivo', 'dividir-contas', 'juros-compostos', 'rendimento-cdi'];
 const PAGINAS_DE_CALCULADORAS = ['calculadoras/index.html', ...CALCULADORAS.map((c) => `calculadoras/${c}.html`)];
-const PAGINAS = [...PAGINAS_BASE, 'imprensa.html', ...PAGINAS_DE_CALCULADORAS, ...TEMAS_DO_SITE.map((t) => `aprender/${t.slug}.html`), ...POSTS];
+/** As páginas de mercado (D-106): o painel, uma por indicador, o glossário e as duas explicações. */
+const PAGINAS_DE_MERCADO = [
+  'indicadores/index.html',
+  'indicadores/selic-hoje.html',
+  'indicadores/cdi-hoje.html',
+  'indicadores/ipca-12-meses.html',
+  'indicadores/rendimento-da-poupanca.html',
+  'indicadores/dolar-ptax-hoje.html',
+  'indicadores/glossario.html',
+  'indicadores/quando-a-selic-muda.html',
+  'indicadores/como-ler-o-ipca.html',
+];
+const PAGINAS = [...PAGINAS_BASE, 'imprensa.html', ...PAGINAS_DE_CALCULADORAS, ...PAGINAS_DE_MERCADO, ...TEMAS_DO_SITE.map((t) => `aprender/${t.slug}.html`), ...POSTS];
 /** As páginas do menu principal (a página atual é marcada com aria-current). */
 const NO_MENU = ['index.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'calculadoras/index.html', 'novidades/index.html', 'ajuda/index.html', 'seguranca.html'];
 
@@ -255,11 +296,14 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     // Sem cookies e sem nada que rastreie: os únicos scripts são os dados estruturados (que não executam), a busca da Ajuda e o módulo das
     // calculadoras (que só faz a conta no navegador, com o núcleo de js/nucleo/).
     const noCalc = /^calculadoras\/[a-z-]+\.html$/.test(nome) && nome !== 'calculadoras/index.html';
+    // D-106: o painel e as páginas de indicador têm o script do painel, que pergunta uma vez ao próprio site (/api/indicadores).
+    const noPainel = /^indicadores\/(index|selic-hoje|cdi-hoje|ipca-12-meses|rendimento-da-poupanca|dolar-ptax-hoje)\.html$/.test(nome);
     for (const m of html.matchAll(/<script\b([^>]*)>/gi)) {
       const ld = /^\s*type="application\/ld\+json"\s*$/.test(m[1]!);
       const busca = noAjuda && /^\s*src="busca\.js"\s+defer\s*$/.test(m[1]!);
       const calculadora = noCalc && /^\s*type="module"\s+src="calculadora\.js"\s*$/.test(m[1]!);
-      expect(ld || busca || calculadora, `${nome}: script não permitido: ${m[0]}`).toBe(true);
+      const painel = noPainel && /^\s*src="painel\.js"\s+defer\s*$/.test(m[1]!);
+      expect(ld || busca || calculadora || painel, `${nome}: script não permitido: ${m[0]}`).toBe(true);
     }
     expect(html, `${nome}: manipulador de evento`).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html, `${nome}: atributo style (a política de segurança não permite)`).not.toMatch(/\sstyle\s*=/i);
@@ -1238,7 +1282,9 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     for (const semData of ['/', '/app/', '/empresas/', '/seguranca', '/calculadoras/', '/ajuda/', '/privacidade']) expect(sitemap, semData).toContain(`<url><loc>https://exemplo.test${semData}</loc></url>`);
     // Nenhum <lastmod> depois do conteúdo mais novo: o post mais novo ou o tema revisado por último (os de investimentos, D-093, são
     // de 13/11/2026, um dia depois do post de novembro; a data de revisão de um tema nunca passa de hoje, R6).
-    const conteudoMaisNovo = [REFERENCIA_DOS_POSTS, maisRecente!].sort().pop()!;
+    // As explicações de mercado (D-106) têm a data de revisão delas (17/11/2026).
+    expect(sitemap).toContain(`<url><loc>https://exemplo.test/indicadores/como-ler-o-ipca</loc><lastmod>${INDICADORES_REVIEWED_ON}</lastmod></url>`);
+    const conteudoMaisNovo = [REFERENCIA_DOS_POSTS, maisRecente!, INDICADORES_REVIEWED_ON].sort().pop()!;
     for (const m of sitemap.matchAll(/<lastmod>([^<]*)<\/lastmod>/g)) {
       expect(conteudo.dataExiste(m[1]!), m[1]).toBe(true);
       expect(m[1]! <= conteudoMaisNovo, `lastmod no futuro: ${m[1]}`).toBe(true);
@@ -1246,7 +1292,8 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     // Estável: outra geração, com a data de hoje como referência, dá o mesmo sitemap.
     expect(texto(gerarSite({ dados: PREENCHIDOS, referencia: '2030-01-01' }).arquivos.get('sitemap.xml'))).toBe(sitemap);
     expect(texto(gerador.gerarSite({ dados: PREENCHIDOS }).arquivos.get('sitemap.xml'))).toBe(sitemap);
-  });
+    // Três gerações do site inteiro: com a máquina ocupada passam dos 5 segundos padrão.
+  }, 60_000);
 });
 
 describe('site público: Aprender (o catálogo do app, uma fonte de verdade)', () => {
@@ -1825,7 +1872,8 @@ describe('site público: contraste das cores (a regra de src/contrast.ts, 4,5:1 
 });
 
 describe('site público: gerar-site.js na linha de comando', () => {
-  const rodar = (args: string[]) => spawnSync(process.execPath, [SCRIPT, ...args], { cwd: ROOT, encoding: 'utf8' });
+  // O retrato de teste dos indicadores (D-106) vai em toda chamada: sem ele, o --final recusaria só por isso.
+  const rodar = (args: string[]) => spawnSync(process.execPath, [SCRIPT, ...args, ...(args.includes('--retrato') ? [] : ['--retrato', ARQUIVO_DO_RETRATO])], { cwd: ROOT, encoding: 'utf8' });
   const LIMPO = EXEMPLO.replace('[A DEFINIR: prazo]', 'cinco anos');
   /** Pasta de exemplo sem nenhuma pendência, com o ajuste do caso (arquivo e texto a somar ou a trocar). */
   const pasta = (pastas: string[], ajuste?: (md: Record<string, string>) => void): string => {
@@ -2088,6 +2136,208 @@ describe('site público: gerar-site.js na linha de comando', () => {
   }, 240_000);
 });
 
+
+describe('site público: indicadores oficiais, páginas de mercado e resumo semanal (D-106)', { timeout: 180_000 }, () => {
+  const repo = gerarSite();
+  const comRetrato = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
+  const h = (g: Gerado, nome: string) => texto(g.arquivos.get(nome));
+  const AVISO = 'Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.';
+  /** Uma pasta de edições do resumo semanal, com os arquivos do caso. */
+  const edicoes = (pastas: string[], arquivos: Record<string, unknown>): string => {
+    const dir = mkdtempSync(join(tmpdir(), 'clarevo-noticias-'));
+    pastas.push(dir);
+    for (const [nome, conteudoDoArquivo] of Object.entries(arquivos)) writeFileSync(join(dir, nome), typeof conteudoDoArquivo === 'string' ? conteudoDoArquivo : JSON.stringify(conteudoDoArquivo));
+    return dir;
+  };
+  const NOTICIA = { titulo: 'Copom decide a meta da Selic na reunião da semana', resumo: 'O comitê do Banco Central anunciou a meta da Selic. A decisão vale a partir do dia seguinte.', veiculo: 'Agência de Exemplo', autor: 'Pessoa de Exemplo', data: '2026-11-11', link: 'https://noticias.exemplo.test/copom', tema: 'copom' };
+
+  it('as páginas de mercado existem, com o aviso no rodapé, e as outras páginas não têm o aviso', () => {
+    for (const nome of PAGINAS_DE_MERCADO) {
+      const pagina = h(repo, nome);
+      const rodape = /<footer class="rodape">([\s\S]*?)<\/footer>/.exec(pagina)?.[1] ?? '';
+      expect(rodape, nome).toContain(`<p class="rodape-aviso">${esc(AVISO)}</p>`);
+    }
+    for (const nome of ['index.html', 'aprender/selic.html', 'calculadoras/rendimento-cdi.html', 'sobre.html']) expect(h(repo, nome), nome).not.toContain('rodape-aviso');
+    expect(INDICADORES_TEXT.avisoMercado).toBe(AVISO);
+  });
+
+  it('o painel mostra os cinco números do retrato com a data, a hora da consulta e "Fonte: Banco Central do Brasil"; o dólar é "Dólar PTAX (Banco Central)"', () => {
+    const painel = h(comRetrato, 'indicadores/index.html');
+    expect(painel).toContain('<h1>Indicadores oficiais</h1>');
+    expect(painel).toContain(`data-painel data-consultado="${RETRATO_DE_TESTE.consultadoEm}"`);
+    expect(painel).toContain(`<span data-campo="hora">${esc(INDICADORES_TEXT.retrato(RETRATO_DE_TESTE.consultadoEm!))}</span> Fonte: Banco Central do Brasil.`);
+    expect(painel).toContain('Retrato de 12/11/2026 às 13:00, horário de Brasília.');
+    for (const id of INDICADOR_IDS) {
+      const ex = exibirIndicador(id, RETRATO_DE_TESTE.valores[id]);
+      expect(painel, id).toContain(`data-indicador="${id}"><span class="titulo-cartao">${esc(ex.nome)}</span><span class="indicador-numero"><span data-campo="numero">${esc(ex.numero)}</span>`);
+      expect(painel, id).toContain(`<span data-campo="data">${esc(ex.data)}</span>`);
+    }
+    expect(painel).toContain('<span class="titulo-cartao">Dólar PTAX (Banco Central)</span>');
+    expect(painel).toContain(esc('R$ 5,1234'));
+    expect(painel).toContain('Não são cotações ao vivo nem previsões.');
+    // Sem calendário do Copom: só o link para a página oficial do Banco Central.
+    expect(painel).toContain('<a href="https://www.bcb.gov.br/controleinflacao/copom" rel="noopener noreferrer">');
+    expect(painel).not.toMatch(/\d{1,2} e \d{1,2} de (janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/);
+    // O script do painel é do próprio site e a página não tem formulário.
+    expect(painel).toContain('<script src="painel.js" defer></script>');
+    expect(painel).not.toMatch(/<form\b/);
+  });
+
+  it('sem retrato (o repositório hoje), as páginas dizem que ainda não há números salvos, e o --final recusa', () => {
+    expect(repo.retrato).toEqual({ consultadoEm: null, valores: {} });
+    const painel = h(repo, 'indicadores/index.html');
+    expect(painel).toContain(esc(INDICADORES_TEXT.semRetrato));
+    expect(painel).toContain('<span data-campo="numero">Sem número</span>');
+    expect(repo.problemasFinais.join('\n')).toContain('indicadores sem retrato');
+    // Com o retrato de teste e tudo preenchido, o retrato não é motivo de recusa; antigo ou incompleto, é.
+    expect(comRetrato.problemasFinais.filter((p) => p.includes('retrato'))).toEqual([]);
+    const antigo = gerarSite({ dados: PREENCHIDOS, referencia: '2026-11-30' });
+    expect(antigo.problemasFinais.join('\n')).toContain('o retrato dos indicadores é de 18 dias antes de 2026-11-30 (o limite é 7)');
+    const incompleto = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS, retrato: { ...RETRATO_DE_TESTE, valores: { selic: RETRATO_DE_TESTE.valores.selic } } });
+    expect(incompleto.problemasFinais.join('\n')).toContain('o retrato dos indicadores não tem CDI, IPCA em 12 meses, Rendimento da poupança, Dólar PTAX (Banco Central)');
+    // Um retrato com número fora das faixas ou sem a hora da consulta não entra.
+    const estranho = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS, retrato: { consultadoEm: 'ontem', valores: RETRATO_DE_TESTE.valores } });
+    expect(estranho.retrato).toEqual({ consultadoEm: null, valores: {} });
+  });
+
+  it('uma página por indicador, com o número, a data, o que é, o que muda na vida da pessoa, a origem e os links para Aprender e as calculadoras', () => {
+    for (const p of PAGINAS_INDICADORES) {
+      const nome = `indicadores/${p.slug}.html`;
+      const pagina = h(comRetrato, nome);
+      const ex = exibirIndicador(p.id, RETRATO_DE_TESTE.valores[p.id]);
+      expect(pagina, nome).toContain(`<h1>${esc(p.titulo)}</h1>`);
+      expect(pagina, nome).toContain(`<p class="indicador-capa-numero"><span data-campo="numero">${esc(ex.numero)}</span>`);
+      expect(pagina, nome).toContain('Fonte: Banco Central do Brasil.');
+      expect(pagina, nome).toContain('<h2 id="o-que-e">O que é</h2>');
+      expect(pagina, nome).toContain('<h2 id="o-que-muda">O que muda na sua vida</h2>');
+      for (const secao of p.oQueMuda) expect(pagina, `${nome}: ${secao.titulo}`).toContain(`<h3>${esc(secao.titulo)}</h3>`);
+      expect(pagina, nome).toContain(esc(p.origem));
+      for (const t of p.temas) expect(pagina, `${nome}: ${t}`).toContain(`href="../aprender/${t}.html"`);
+      for (const c of p.calculadoras) expect(pagina, `${nome}: ${c}`).toContain(`href="../calculadoras/${c}.html"`);
+      // A descrição traz o número do retrato e a fonte.
+      expect(/<meta name="description" content="([^"]+)">/.exec(pagina)?.[1], nome).toContain(esc(ex.numero));
+      expect(pagina, nome).toContain('<script src="painel.js" defer></script>');
+    }
+    expect(h(comRetrato, 'indicadores/dolar-ptax-hoje.html')).toContain('Não é cotação ao vivo.');
+    expect(h(comRetrato, 'indicadores/selic-hoje.html')).toContain('controleinflacao/copom');
+  });
+
+  it('o glossário tem os termos pedidos, com âncora, e aponta para os temas de Aprender e para os indicadores', () => {
+    const pagina = h(repo, 'indicadores/glossario.html');
+    for (const t of GLOSSARIO) {
+      expect(pagina, t.termo).toContain(`<h2 id="${t.id}">${esc(t.termo)}</h2>`);
+      expect(pagina, t.termo).toContain(`<a href="#${t.id}">${esc(t.termo)}</a>`);
+      for (const tema of t.temas) expect(pagina, `${t.termo}: ${tema}`).toContain(`href="../aprender/${tema}.html"`);
+    }
+    for (const termo of ['CDI', 'IPCA', 'Selic', 'FGC', 'Come-cotas', 'Marcação a mercado', 'Liquidez', 'IR regressivo', 'IOF', 'PTAX']) expect(pagina, termo).toContain(`>${esc(termo)}</h2>`);
+  });
+
+  it('as duas explicações permanentes trazem o exemplo calculado pelo núcleo, as hipóteses e as fontes, sem previsão', () => {
+    for (const e of explicacoesDeMercado()) {
+      const pagina = h(repo, `indicadores/${e.slug}.html`);
+      expect(pagina, e.slug).toContain(`<h1>${esc(e.titulo)}</h1>`);
+      expect(pagina, e.slug).toContain(esc(e.exemplo.texto));
+      expect(pagina, e.slug).toContain(esc(e.exemplo.hipoteses));
+      for (const s of e.secoes) expect(pagina, `${e.slug}: ${s.titulo}`).toContain(`>${esc(s.titulo)}</h2>`);
+      expect(pagina, e.slug).toContain('<h2 id="fontes">Fontes</h2>');
+    }
+    expect(h(repo, 'indicadores/quando-a-selic-muda.html')).toContain('A Clarevo não prevê a Selic');
+  });
+
+  it('Indicadores e Glossário estão no rodapé de todas as páginas; nenhuma página de mercado fala de ação, empresa, ranking ou "melhores"', () => {
+    for (const nome of PAGINAS) {
+      const rodape = /<footer class="rodape">([\s\S]*?)<\/footer>/.exec(h(repo, nome))?.[1] ?? '';
+      expect(rodape, nome).toContain(`<a href="${visto(nome, 'indicadores/index.html')}">Indicadores</a>`);
+      expect(rodape, nome).toContain(`<a href="${visto(nome, 'indicadores/glossario.html')}">Glossário</a>`);
+    }
+    for (const nome of PAGINAS_DE_MERCADO) {
+      const t = (/<main[\s\S]*<\/main>/.exec(h(repo, nome))?.[0] ?? '').replace(/<[^>]+>/g, ' ');
+      expect(t, nome).not.toMatch(/\b[A-Z]{4}\d{1,2}\b|Ibovespa|IFIX|ranking|\bmelhores\b|compre agora|preço-alvo/i);
+    }
+  });
+
+  it('as duas calculadoras novas estão no índice, no grupo "Guardar e dividir", e a do CDI liga para "CDI hoje"', () => {
+    const indice = h(repo, 'calculadoras/index.html');
+    for (const c of SITE_CALCULATORS) expect(indice, c.slug).toContain(`<a class="cartao" href="${c.slug}.html"><span class="titulo-cartao">${esc(c.title)}</span>`);
+    expect(indice.indexOf('href="dividir-contas.html"')).toBeLessThan(indice.indexOf('href="juros-compostos.html"'));
+    expect(h(repo, 'calculadoras/rendimento-cdi.html')).toContain('href="../indicadores/cdi-hoje.html">CDI hoje</a>');
+    expect(h(repo, 'index.html')).toContain('12 calculadoras para contas rápidas');
+  });
+
+  it('resumo semanal: sem edição, nenhuma página e nada no rodapé nem no mapa do site', () => {
+    const pastas: string[] = [];
+    try {
+      const sem = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS, noticias: edicoes(pastas, {}) });
+      expect([...sem.arquivos.keys()].filter((k) => k.startsWith('noticias/'))).toEqual([]);
+      expect(h(sem, 'index.html')).not.toContain('Resumo semanal');
+      expect(h(sem, 'sitemap.xml')).not.toContain('/noticias/');
+      expect(repo.edicoes).toEqual([]);
+      expect([...repo.arquivos.keys()].filter((k) => k.startsWith('noticias/'))).toEqual([]);
+    } finally {
+      for (const p of pastas) rmSync(p, { recursive: true, force: true });
+    }
+  });
+
+  it('resumo semanal: com uma edição, o índice e a página dela entram no rodapé e no mapa do site, com links simples, sem imagem nem script', () => {
+    const pastas: string[] = [];
+    try {
+      const pasta = edicoes(pastas, { 'semana-2026-11-12.json': { itens: [NOTICIA] } });
+      const g = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS, noticias: pasta });
+      expect(g.problemasFinais.filter((p) => p.includes('noticias'))).toEqual([]);
+      const edicao = h(g, 'noticias/semana-2026-11-12.html');
+      expect(edicao).toContain('<h1>Resumo da semana: 12 de novembro de 2026</h1>');
+      expect(edicao).toContain(`<h2 id="noticia-1">${esc(NOTICIA.titulo)}</h2>`);
+      expect(edicao).toContain(esc(NOTICIA.resumo));
+      expect(edicao).toContain('Copom e Selic · 11/11/2026 · Agência de Exemplo, por Pessoa de Exemplo.');
+      expect(edicao).toContain('<a href="https://noticias.exemplo.test/copom" rel="noopener noreferrer">Ler a matéria completa no site de Agência de Exemplo</a>');
+      expect(edicao).toContain(`<p class="rodape-aviso">${esc(AVISO)}</p>`);
+      const main = /<main[\s\S]*<\/main>/.exec(edicao)?.[0] ?? '';
+      expect(main).not.toMatch(/<img\b|<script\b|<iframe\b/);
+      expect(h(g, 'noticias/index.html')).toContain('href="semana-2026-11-12.html"');
+      expect(h(g, 'sobre.html')).toContain('<a href="noticias/index.html">Resumo semanal</a>');
+      expect(h(g, 'indicadores/index.html')).toContain('href="../noticias/index.html"');
+      const sitemap = h(g, 'sitemap.xml');
+      expect(sitemap).toContain('<url><loc>https://exemplo.test/noticias/semana-2026-11-12</loc><lastmod>2026-11-12</lastmod></url>');
+      expect(sitemap).toContain('<loc>https://exemplo.test/noticias/</loc>');
+      for (const nome of ['noticias/index.html', 'noticias/semana-2026-11-12.html']) {
+        expect(h(g, nome).match(/<h1[\s>]/g)?.length, nome).toBe(1);
+        expect(gerador.problemasDeTitulos(h(g, nome)), nome).toEqual([]);
+        expect(h(g, nome), nome).not.toMatch(PROIBIDO_TRAVESSAO);
+      }
+      expect(gerador.linksQuebrados(g.arquivos)).toEqual([]);
+    } finally {
+      for (const p of pastas) rmSync(p, { recursive: true, force: true });
+    }
+  });
+
+  it('resumo semanal: o gerador recusa edição com problema (sem --final, aviso; a edição não vira página)', () => {
+    const pastas: string[] = [];
+    try {
+      const casos: [string, Record<string, unknown>, string][] = [
+        ['nome fora do padrão', { 'resumo.json': { itens: [NOTICIA] } }, 'o nome precisa ser semana-AAAA-MM-DD.json'],
+        ['JSON ilegível', { 'semana-2026-11-12.json': '{ itens' }, 'não é um JSON válido'],
+        ['sem notícias', { 'semana-2026-11-12.json': { itens: [] } }, 'pelo menos uma notícia'],
+        ['data depois da referência', { 'semana-2026-11-13.json': { itens: [{ ...NOTICIA, data: '2026-11-13' }] } }, 'é depois da data de referência'],
+        ['campo faltando', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, autor: '' }] } }, 'falta autor'],
+        ['resumo com três frases', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, resumo: 'Uma. Duas. Três.' }] } }, 'mais de duas frases'],
+        ['link sem https', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, link: 'http://noticias.exemplo.test/x' }] } }, 'https://'],
+        ['tema fora da lista', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, tema: 'acoes' }] } }, 'não é um dos permitidos'],
+        ['notícia fora da semana', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, data: '2026-11-01' }] } }, 'não é da semana da edição'],
+        ['código de ação', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, titulo: 'PETR4 sobe' }] } }, 'código de ação'],
+        ['índice de bolsa', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, resumo: 'O Ibovespa fechou em alta.' }] } }, 'índice de bolsa'],
+        ['travessão', { 'semana-2026-11-12.json': { itens: [{ ...NOTICIA, resumo: 'Texto — com travessão.' }] } }, 'travessão'],
+      ];
+      for (const [nome, arquivos, esperado] of casos) {
+        const g = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS, noticias: edicoes(pastas, arquivos) });
+        expect(g.problemasFinais.join('\n'), nome).toContain(esperado);
+        expect(g.avisos.join('\n'), nome).toContain(esperado);
+        expect([...g.arquivos.keys()].filter((k) => k.startsWith('noticias/')), nome).toEqual([]);
+      }
+    } finally {
+      for (const p of pastas) rmSync(p, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('gráfico de recursos do Google Play (scripts/gerar-grafico-loja.js)', () => {
   const arquivo = join(ROOT, 'apps', 'app', 'assets', 'loja', 'grafico-recursos-1024x500.png');
