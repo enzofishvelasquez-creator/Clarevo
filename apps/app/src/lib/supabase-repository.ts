@@ -161,6 +161,8 @@ import {
   parseStoreForget,
   parseStoreSync,
   parseAccountMarks,
+  parseAccountLevelState,
+  levelStateOf,
   parseWebSubscriptionCancel,
   parseWebSubscriptionStatus,
   parseWebSubscriptionStart,
@@ -172,6 +174,7 @@ import {
   type StoreForget,
   type StoreSync,
   type AccountMarks,
+  type AccountLevelState,
   type WebSubscriptionCancel,
   type WebSubscriptionStatus,
   type WebSubscriptionStart,
@@ -3623,11 +3626,22 @@ export class SupabaseRepository implements RecordsRepository {
     return parseLegalAcceptance(data);
   }
 
-  /** Os marcos do nível da conta (my_account_marks, D-095). */
+  /** Os marcos do nível da conta (my_account_marks, D-095), sem começar a contagem do tempo sem anotar. */
   async getAccountMarks(): Promise<AccountMarks> {
     const { data, error } = await this.db.rpc('my_account_marks');
     if (error) throw repoError(error);
     return parseAccountMarks(data);
+  }
+
+  /**
+   * Os marcos e o tempo sem anotar (my_account_marks(true), migração 0041, D-111). Com o banco ainda sem a migração (a função não aceita o
+   * parâmetro: PGRST202), só os marcos, e o nível não desce.
+   */
+  async getAccountLevel(): Promise<AccountLevelState> {
+    const { data, error } = await this.db.rpc('my_account_marks', { p_level_state: true });
+    if (error?.code === 'PGRST202') return levelStateOf(await this.getAccountMarks());
+    if (error) throw repoError(error);
+    return parseAccountLevelState(data);
   }
 
   /** A situação do acesso da própria pessoa (my_access, D-083). */

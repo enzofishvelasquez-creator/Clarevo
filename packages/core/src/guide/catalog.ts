@@ -21,7 +21,7 @@ import { INVESTMENT_TEXT } from '../investments';
 import { INVESTMENT_PLAN_TEXT } from '../investment-plan';
 import { DETAILS_TEXT } from '../investment-details';
 import { ESTIMATE_TEXT } from '../investment-insights';
-import { LEVEL_NAME, LEVEL_TEXT, LEVEL_THRESHOLD } from '../levels';
+import { INVESTING_MARK_KEYS, LEVEL_IDLE_STEP_DAYS, LEVEL_INVESTING_THRESHOLD, LEVEL_NAME, LEVEL_TEXT, LEVEL_THRESHOLD, LEVEL_WARNING_DAYS } from '../levels';
 import { MONTH_CHECK_TEXT } from '../month-check';
 import { IMPORT_SUGGESTION_TEXT } from '../importar/sugestoes';
 import { IMPORT_TEXT } from '../importar/textos';
@@ -856,17 +856,19 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     id: 'nivel-da-conta',
     group: 'conta-e-privacidade',
     title: 'Nível da conta',
-    purpose: `Mostra o nível da sua conta, de ${LEVEL_NAME.bronze} a ${LEVEL_NAME.diamante}, pelo quanto da Clarevo você já usa. Não tem a ver com quanto dinheiro você tem, e nunca desce.`,
+    purpose: `Mostra o nível da sua conta, de ${LEVEL_NAME.bronze} a ${LEVEL_NAME.esmeralda}, pelo quanto da Clarevo você já usa. Não tem a ver com quanto dinheiro você tem. O nível desce um degrau depois de ${LEVEL_IDLE_STEP_DAYS} dias sem anotar nada e volta assim que você voltar a anotar.`,
     where: [ACCOUNT_SCREEN, LEVEL_TEXT.cardTitle],
     steps: [
       `Em Conta, no card ${q(LEVEL_TEXT.cardTitle)}, veja o seu nível e toque em ${q(LEVEL_TEXT.open)}.`,
       `O nível sobe com os marcos, que são coisas que você já fez alguma vez, como anotar um gasto, criar uma meta ou cadastrar um banco ou carteira. Toda conta começa no ${LEVEL_NAME.bronze}; com ${LEVEL_THRESHOLD.prata} marcos, ${LEVEL_NAME.prata}; com ${LEVEL_THRESHOLD.ouro}, ${LEVEL_NAME.ouro}; com ${LEVEL_THRESHOLD.diamante}, ${LEVEL_NAME.diamante}.`,
+      `O ${LEVEL_NAME.esmeralda} pede o ${LEVEL_NAME.diamante} e ${LEVEL_INVESTING_THRESHOLD.esmeralda} dos ${INVESTING_MARK_KEYS.length} marcos de ${q(LEVEL_TEXT.investingTitle)}, como atualizar o valor de um investimento ou criar o plano de aportes. Eles contam pelo uso, nunca pelo valor, e os de investimento só valem no Pessoal.`,
       `Em ${q(LEVEL_TEXT.todoTitle)}, toque num marco para ir à tela dele. Nada ali é obrigatório: use só o que ajudar no seu dia a dia.`,
-      'Quando a conta muda de nível, o Resumo mostra um card de comemoração. Em Conta, um selo pequeno no canto das suas iniciais mostra o nível.',
+      `Depois de ${LEVEL_IDLE_STEP_DAYS} dias sem anotar nenhum gasto ou recebimento, o nível mostrado desce um degrau, e mais um a cada ${LEVEL_IDLE_STEP_DAYS} dias, nunca abaixo do ${LEVEL_NAME.bronze}. ${LEVEL_WARNING_DAYS} dias antes, um aviso aparece em Conta e no Resumo, com ${q(LEVEL_TEXT.warningDismiss)}. Os marcos ficam guardados: ao anotar de novo, o nível volta na hora.`,
+      'Quando a conta muda de nível, o Resumo mostra um card de comemoração, uma vez por nível em cada aparelho. Em Conta, um selo pequeno no canto das suas iniciais mostra o nível.',
     ],
     screenName: LEVEL_TEXT.screenTitle,
     href: '/conta/nivel',
-    keywords: ['nível', 'nivel', 'níveis', 'niveis', 'bronze', 'prata', 'ouro', 'diamante', 'marcos', 'medalha', 'conquista'],
+    keywords: ['nível', 'nivel', 'níveis', 'niveis', 'bronze', 'prata', 'ouro', 'diamante', 'esmeralda', 'marcos', 'medalha', 'conquista', 'nível desceu', 'nivel caiu'],
     routes: ['/conta/nivel'],
     screenshot: '620_nivel_da_conta.png',
   },

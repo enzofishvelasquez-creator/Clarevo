@@ -59,7 +59,7 @@ import type { LegalAcceptance } from './aceite';
 import type { PublicPrices } from './investment-prices';
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
-import type { AccountMarks } from './levels';
+import type { AccountLevelState, AccountMarks } from './levels';
 import type { Access } from './plano';
 import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
@@ -934,8 +934,17 @@ export interface RecordsRepository {
 
   /** my_access: a situação do acesso da própria pessoa (assinatura, benefício, cortesia, Família, antes do início, teste ou só leitura). */
   getMyAccess(): Promise<Access>;
-  /** my_account_marks (migração 0034): os 18 marcos "já fez alguma vez" da própria pessoa (os alcançados ficam guardados), de onde sai o nível da conta (D-095). */
+  /**
+   * my_account_marks (migrações 0034 e 0041): os marcos "já fez alguma vez" da própria pessoa (os 18 do dia a dia e os 6 de investimentos
+   * e reserva; os alcançados ficam guardados), de onde sai o nível da conta (D-095, D-111). Não começa a contar o tempo sem anotar.
+   */
   getAccountMarks(): Promise<AccountMarks>;
+  /**
+   * my_account_marks(true) (migração 0041, D-111): os marcos e o tempo sem anotar (`idleSince`, `lastNoteOn`), de onde sai o nível mostrado.
+   * A primeira leitura começa a contagem da pessoa (quem já estava parado quando a regra chegou tem os 60 dias inteiros). Com o banco sem a
+   * migração, só os marcos (o nível não desce).
+   */
+  getAccountLevel(): Promise<AccountLevelState>;
 
   // Assinatura na web pelo Asaas (D-084), pela função do servidor "assinatura-web" com a sessão da pessoa. Só na web.
 

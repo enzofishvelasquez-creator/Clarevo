@@ -1,5 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
-import { ACCOUNT_MARK_KEYS, type AccountMarkKey, type AccountMarks } from './levels';
+import { ACCOUNT_MARK_KEYS, LEVEL_NOTE_ACTIONS, type AccountLevelState, type AccountMarkKey, type AccountMarks } from './levels';
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import { FULL_ACCESS, type Access } from './plano';
@@ -245,6 +245,8 @@ interface Operation {
   accountId: string | null;
   /** Importação (import_result): quantas linhas viraram lançamento e quantas já existiam. Só em 'importar_extrato'. */
   importResult: ImportResult | null;
+  /** O dia em que a operação foi gravada (o created_at do banco, no dia da pessoa): a última anotação dos níveis (D-111). */
+  on?: IsoDate;
 }
 
 /** Conta (financial_accounts): exclusão lógica (fica arquivada e some da leitura). */
@@ -411,8 +413,14 @@ export class MemoryRepository implements RecordsRepository {
   /** month_checks nos contextos que a pessoa lê (aqui, os dela), por "contexto|mês|tipo"; a linha nunca sai (só com o contexto). */
   private monthChecks = new Map<string, StoredMonthCheck>();
   private incomeRefs = new Map<string, StoredIncomeReference>();
-  /** Níveis de conta (D-095): os marcos já alcançados, como account_marks no banco (o nível nunca desce). */
+  /** Níveis de conta (D-095): os marcos já alcançados, como account_marks no banco (o nível volta a eles ao anotar, D-111). */
   private reachedMarks = new Set<AccountMarkKey>();
+  /**
+   * A contagem do tempo sem anotar (D-111), como account_level_clock no banco: o dia da primeira leitura do nível com a regra e o dia da
+   * última anotação de gasto ou recebimento já vista (guardado, para não voltar atrás se as operações sumirem).
+   */
+  private levelStartedOn: IsoDate | null = null;
+  private levelLastNoteOn: IsoDate | null = null;
   private budgets = new Map<string, StoredBudget>();
   private limits = new Map<string, StoredLimit>();
   private goals = new Map<string, StoredGoal>();
@@ -4459,6 +4467,7 @@ export class MemoryRepository implements RecordsRepository {
       entryId: ids.entryId ?? null,
       accountId: ids.accountId ?? null,
       importResult: ids.importResult ?? null,
+      on: this.opts.today(),
     });
     this.trackActivity(action, ids.contextId);
   }
@@ -4910,6 +4919,8 @@ export class MemoryRepository implements RecordsRepository {
       this.savingsChecks.clear();
       this.goalImages.clear();
       this.reachedMarks.clear();
+      this.levelStartedOn = null;
+      this.levelLastNoteOn = null;
       this.signupSource = null;
       this.chatCodes = {};
       this.cards.clear();
@@ -5078,16 +5089,20 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /**
-   * Os marcos do nível da conta (D-095), pelo que há na memória e pelas operações gravadas (as mesmas ações do banco). "Três meses
-   * diferentes" aqui usa o mês dos lançamentos (a memória não guarda quando cada operação foi feita).
+   * Os marcos do nível da conta (D-095 e D-111), pelo que há na memória e pelas operações gravadas (as mesmas ações do banco). "Três meses
+   * diferentes" aqui usa o mês dos lançamentos (a memória não guarda a hora de cada operação, só o dia).
    */
   async getAccountMarks(): Promise<AccountMarks> {
     return this.read(() => {
-      // A mesma leitura de my_account_marks (migração 0034): o que a pessoa já fez, pelas operações e pelo que existe; e o que já foi
-      // alcançado fica guardado (reachedMarks), para o nível nunca descer.
-      const acts = new Set<string>([...this.operations.values()].map((o) => o.action));
+      // A mesma leitura de my_account_marks (migrações 0034 e 0041): o que a pessoa já fez, pelas operações e pelo que existe; e o que já
+      // foi alcançado fica guardado (reachedMarks), para o nível voltar a ele quando a pessoa volta a anotar.
+      const ops = [...this.operations.values()];
+      const acts = new Set<string>(ops.map((o) => o.action));
       const has = (...actions: string[]) => actions.some((a) => acts.has(a));
       const recs = [...this.records.values()];
+      // Movimento registrado num investimento já criado (o aporte e o valor do cadastro vêm com criar_investimento, não contam).
+      const movement = (kind: string) =>
+        ops.some((o) => o.action === 'registrar_movimento_investimento' && o.movementId !== null && this.investmentMovements.get(o.movementId)?.kind === kind);
       const live: AccountMarks = {
         gasto: recs.some((r) => r.kind === 'despesa') || this.cardEntries.size > 0 || has('criar_compra_cartao', 'pagar_compromisso', 'pagar_fatura'),
         recebimento: recs.some((r) => r.kind === 'receita'),
@@ -5109,10 +5124,44 @@ export class MemoryRepository implements RecordsRepository {
         conta: has('criar_conta'),
         limite: has('definir_limite_comprometimento'),
         imagem: has('imagem_meta'),
+        // Investimentos e reserva (D-111): investimentos só existem no Pessoal; a reserva com plano por mês vale em qualquer contexto.
+        inv_aporte: movement('aporte'),
+        inv_valor: movement('valor'),
+        inv_rendimento: movement('rendimento'),
+        inv_plano: this.investmentPlans.size > 0 || has('definir_plano_investimentos'),
+        inv_meta: [...this.investments.values()].some((i) => i.goalId !== null),
+        reserva_plano: [...this.goals.values()].some(
+          (g) => !g.deletedAt && g.goalType === 'emergencia' && g.status !== 'arquivada' && g.plannedMonthlyCents !== null && g.createdBy === this.opts.actorId,
+        ),
       };
       for (const k of ACCOUNT_MARK_KEYS) if (live[k]) this.reachedMarks.add(k);
       return Object.fromEntries(ACCOUNT_MARK_KEYS.map((k) => [k, this.reachedMarks.has(k)])) as AccountMarks;
     });
+  }
+
+  /**
+   * Os marcos e o tempo sem anotar (D-111), como my_account_marks(true): a primeira leitura começa a contagem (levelStartedOn); a última
+   * anotação de gasto ou recebimento vem das operações gravadas (no Pessoal e na Família) e fica guardada. Os marcos vêm de
+   * `this.getAccountMarks()`, para o teste de telas poder trocar só os marcos.
+   */
+  async getAccountLevel(): Promise<AccountLevelState> {
+    const marks = await this.getAccountMarks();
+    return this.read(() => {
+      let last: IsoDate | null = null;
+      for (const o of this.operations.values()) if (o.on && LEVEL_NOTE_ACTIONS.includes(o.action) && (last === null || o.on > last)) last = o.on;
+      if (last !== null && (this.levelLastNoteOn === null || last > this.levelLastNoteOn)) this.levelLastNoteOn = last;
+      if (this.levelStartedOn === null) this.levelStartedOn = this.opts.today();
+      const since = this.levelLastNoteOn !== null && this.levelLastNoteOn > this.levelStartedOn ? this.levelLastNoteOn : this.levelStartedOn;
+      return { marks, idleSince: since, lastNoteOn: this.levelLastNoteOn };
+    });
+  }
+
+  /**
+   * Só para a demonstração (cenário FICTÍCIO 'nivel', D-111): a regra da queda passa a contar para a pessoa em `day`, como se o app com a
+   * regra tivesse lido o nível nesse dia. Nunca é chamado numa conta de verdade.
+   */
+  startLevelCountForDemo(day: IsoDate) {
+    this.levelStartedOn = day;
   }
 
   async getMyAccess(): Promise<Access> {

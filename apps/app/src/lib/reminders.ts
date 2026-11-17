@@ -8,6 +8,8 @@ import {
   reminderPlan,
   reminderSignature,
   ROUTINE_REMINDER_LIMIT,
+  DEFAULT_ROUTINE_REMINDER_HOUR,
+  levelWarningReminder,
   routineReminderPlan,
   routineReminderSignature,
   todayIn,
@@ -147,6 +149,14 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
     for (const i of plan) {
       items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });
     }
+  }
+  // Aviso de queda do nível (D-111): para quem permitiu lembretes, um lembrete no dia em que o aviso começa (o 45º dia sem anotar), no
+  // horário dos lembretes do dia a dia. Sem a leitura do nível, segue sem ele.
+  try {
+    const level = levelWarningReminder(await job.repo.getAccountLevel(), today, job.routine?.hour ?? DEFAULT_ROUTINE_REMINDER_HOUR, nowMinutes);
+    if (level) items.push({ id: level.id, date: fireDate(level), title: level.title, body: level.body, signature: routineReminderSignature(level), route: level.route, channel: 'rotina' });
+  } catch {
+    // Falha de rede: os outros avisos seguem; o próximo gatilho tenta de novo.
   }
   await syncScheduledReminders(items);
   return 'agendado';

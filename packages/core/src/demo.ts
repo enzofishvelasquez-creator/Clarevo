@@ -54,19 +54,25 @@ export const DEMO_EMAIL = 'demo@clarevo.app';
  * - 'retorno': a montagem FICTÍCIA da sequência R do Ciclo A4 (D-030), anotada em 20/05/2026 e aberta em 07/10/2026;
  * - 'assinaturas': a base de aceite, com as duas assinaturas de exemplo cadastradas em 30/06/2026 e nunca revisadas, o que faz o
  *   lembrete "Que tal revisar suas assinaturas?" (D-046) aparecer em 07/10/2026. Os totais de outubro não mudam.
+ * - 'nivel': a montagem FICTÍCIA do aviso de queda do nível (D-111): os dados do cenário 'retorno' (nada anotado desde 20/05/2026,
+ *   nível Prata pelos marcos) e a regra da queda contando desde 23/08/2026 (como se o app com a regra tivesse lido o nível nesse dia).
+ *   Em 07/10/2026 faz 45 dias da contagem: o Resumo e Conta mostram "Faz 140 dias que nada é anotado. Em 15 dias, o nível passa de
+ *   Prata para Bronze. [...]", com "Agora não"; anotar um gasto ou recebimento tira o aviso.
  * - 'evolucao': a montagem FICTÍCIA do caso de referência da Evolução (D-057, EF §6): de janeiro a junho de 2026, Pago de
  *   R$ 3.200, 3.400, 3.300, 7.800, 3.450 e 3.600 (abril com o "Reparo do carro" de R$ 4.400,00) e Recebido de R$ 5.000, 5.000, sem
  *   registro em março, 5.200, 5.000 e 5.100. Não tem os lançamentos de setembro e outubro da base de aceite (que não vale neste
  *   cenário): na janela de 12 meses, o total é R$ 24.750,00, a média dos 6 meses R$ 4.125,00 e a mediana R$ 3.425,00 (sem abril:
  *   R$ 3.390,00 e R$ 3.400,00).
- * Conta nova nunca recebe nenhum dos quatro.
+ * Conta nova nunca recebe nenhum deles.
  */
-export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao';
-export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao'];
+export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao' | 'nivel';
+export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao', 'nivel'];
 /** Dia em que as assinaturas de exemplo foram cadastradas no cenário 'assinaturas'. */
 export const DEMO_SUBSCRIPTIONS_SETUP_DAY = '2026-06-30';
 /** Dia da montagem do cenário 'retorno' (última anotação antes do tempo sem usar). */
 export const DEMO_RETURN_SETUP_DAY = '2026-05-20';
+/** Cenário 'nivel' (D-111): o dia em que a regra da queda passa a contar (45 dias antes de 07/10/2026, o começo do aviso). */
+export const DEMO_LEVEL_COUNT_DAY = '2026-08-23';
 
 /** Parâmetro "?cenario=retorno" → 'retorno'; ausente ou desconhecido → 'padrao'. */
 export function demoScenarioFrom(param: string | null | undefined): DemoScenario {
@@ -88,6 +94,7 @@ export function createDemoCompanyHub(adminPersonId: string = 'pessoa-demo'): Mem
 
 export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario; cards?: boolean } = {}) {
   if (opts.scenario === 'retorno') return createReturnDemoRepository(opts.latencyMs);
+  if (opts.scenario === 'nivel') return createReturnDemoRepository(opts.latencyMs, DEMO_LEVEL_COUNT_DAY);
   if (opts.scenario === 'evolucao') return createEvolutionDemoRepository(opts.latencyMs);
   // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas'.
   let today: string = DEMO_TODAY;
@@ -329,7 +336,7 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
  * Maio: Recebido R$ 6.000,00, Pago R$ 4.765,30. Ao abrir: faixa "Seus últimos meses" com 4 meses com algo sem
  * registro e 13 contas para conferir.
  */
-async function createReturnDemoRepository(latencyMs?: number) {
+async function createReturnDemoRepository(latencyMs?: number, levelCountFrom?: string) {
   let today = DEMO_RETURN_SETUP_DAY;
   const repo = new MemoryRepository({
     actorId: 'pessoa-demo',
@@ -396,6 +403,8 @@ async function createReturnDemoRepository(latencyMs?: number) {
     category: 'Mercado',
   });
   today = DEMO_TODAY;
+  // Cenário 'nivel' (D-111): a regra da queda conta desde 23/08/2026, então em 07/10/2026 começa o aviso (os marcos dão Prata).
+  if (levelCountFrom) repo.startLevelCountForDemo(levelCountFrom);
   repo.latencyMs = latencyMs ?? 0;
   return repo;
 }
