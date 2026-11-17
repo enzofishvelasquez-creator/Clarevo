@@ -14644,9 +14644,13 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
-  // Níveis de conta (D-095): na demonstração, a conta tem 13 dos 18 marcos (nível Ouro). Conta mostra o card "Nível da conta" com a borda
-  // do nível, e a tela /conta/nivel traz o nível, o caminho até o próximo, os quatro níveis, "Para conhecer" e "Já feitos". A troca de
-  // nível mostra o card de comemoração no Resumo uma vez (aqui, os marcos passam a 14 pela memória). Nada vai à rede.
+  // Níveis de conta (D-095, revisto pela D-111): na demonstração, a conta tem 13 dos 18 marcos do dia a dia (nível Ouro) e 5 dos 6 de
+  // investimentos e reserva. Conta mostra o card "Nível da conta", e a tela /conta/nivel traz o nível, o caminho até o próximo, os cinco
+  // níveis (com a Esmeralda), "Para conhecer", "Investimentos e reserva" e "Já feitos". A troca de nível mostra o card de comemoração no
+  // Resumo uma vez (aqui, os marcos passam a 14 pela memória, sem dois do grupo: Diamante). No fim do bloco, a D-111: a Esmeralda de verdade
+  // (a imagem de uma meta), o aviso de queda (45 dias sem anotar, pela memória) no Resumo, em Conta e na tela do nível, com "Agora não"; o
+  // nível um degrau abaixo (67 dias) sem contar dias fora do aviso; a volta sem comemorar; e o cenário ?cenario=nivel (a faixa "Seus
+  // últimos meses" primeiro, o aviso depois). Nada vai à rede.
   // ==================================================================================================================
   {
     const lvWrites0 = writes.length;
@@ -14654,14 +14658,16 @@ setInterval(async () => {
     t = await body();
     ok('Níveis: sem troca de nível, o Resumo não mostra comemoração', !t.includes('Sua conta chegou ao nível'));
     await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
-    const lvCard = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Nível da conta' && e.getBoundingClientRect().width > 0); return h?.parentElement?.textContent ?? ''; });
+    const lvCardText = () => p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Nível da conta' && e.getBoundingClientRect().width > 0); return h?.parentElement?.textContent ?? ''; });
+    const lvCard = await lvCardText();
     ok('Níveis: o card em Conta com "Nível Ouro", "13 de 18 marcos", o que falta para o Diamante e "Ver meu nível"',
       lvCard.includes('Nível Ouro') && lvCard.includes('13 de 18 marcos') && lvCard.includes('Falta 1 marco para o nível Diamante.') && (await visibleCount('button', 'Ver meu nível')) === 1, lvCard.slice(0, 300));
     await btn('Ver meu nível').click(); await waitText('Para conhecer'); await p.waitForTimeout(500);
     t = await body(); screenTexts.push(t);
-    ok('Níveis: a tela /conta/nivel com o nível, o caminho, o que é o nível, os quatro níveis, "Para conhecer" e "Já feitos"',
+    ok('Níveis: a tela /conta/nivel com o nível, o caminho, o que é o nível (desce depois de 60 dias sem anotar e volta), os cinco níveis, "Para conhecer" e "Já feitos"',
       new URL(p.url()).pathname === '/conta/nivel' && (await h1Name()) === 'Nível da conta' && t.includes('Nível Ouro') && t.includes('13 de 18 marcos') &&
-      t.includes('Não tem a ver com quanto dinheiro você tem, e nunca desce.') && ['Bronze', 'Prata', 'Ouro', 'Diamante'].every((x) => t.includes(x)) &&
+      t.includes('O nível desce um degrau depois de 60 dias sem anotar nada e volta assim que você voltar a anotar.') && !t.includes('nunca desce') &&
+      ['Bronze', 'Prata', 'Ouro', 'Diamante', 'Esmeralda'].every((x) => t.includes(x)) &&
       t.includes('Para conhecer') && t.includes('Nada aqui é obrigatório') && t.includes('Já feitos') && t.includes('Escolher a imagem de uma meta') && t.includes('Anotar um gasto'), t.slice(0, 900));
     ok('Níveis: os marcos por fazer levam à tela deles, e os feitos são lidos como feitos',
       (await visibleCount('button', 'Escolher a imagem de uma meta: ainda não')) === 1 && (await p.locator('[aria-label="Anotar um gasto: feito"]').filter({ visible: true }).count()) === 1 &&
@@ -14669,9 +14675,10 @@ setInterval(async () => {
     await atWidths(async (w) => { await layoutChecks(`Nível da conta ${w}px`); if (w === 390) await shot('620_nivel_da_conta'); });
     await btn('Escolher a imagem de uma meta: ainda não').click(); await waitText('Viagem de férias'); await p.waitForTimeout(300);
     ok('Níveis: "Escolher a imagem de uma meta" abre Metas', new URL(p.url()).pathname === '/metas', p.url());
-    // A troca de nível: os marcos passam a 14 (Diamante). O Resumo comemora uma vez; "Fechar" guarda o nível como visto.
+    // A troca de nível: os marcos do dia a dia passam a 14, com só 3 do grupo de investimentos e reserva (Diamante). O Resumo comemora uma
+    // vez; "Fechar" guarda o nível como visto.
     await tabByName('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
-    await p.evaluate(async () => { const repo = await window.__e2e.repo(); const orig = repo.getAccountMarks.bind(repo); repo.getAccountMarks = async () => ({ ...(await orig()), imagem: true }); await window.__e2e.refresh(); });
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); const orig = repo.getAccountMarks.bind(repo); repo.getAccountMarks = async () => ({ ...(await orig()), imagem: true, inv_plano: false, inv_meta: false }); await window.__e2e.refresh(); });
     await waitText('Sua conta chegou ao nível Diamante!'); await p.waitForTimeout(500);
     t = await body(); screenTexts.push(t);
     ok('Níveis: a troca de nível mostra o card de comemoração no Resumo, com "Ver meu nível" e "Fechar"',
@@ -14680,6 +14687,118 @@ setInterval(async () => {
     await btn('Fechar').click(); await p.waitForTimeout(400);
     await p.evaluate(async () => { await window.__e2e.refresh(); }); await p.waitForTimeout(600);
     ok('Níveis: depois de "Fechar", a comemoração não volta', !(await body()).includes('Sua conta chegou ao nível'));
+
+    // ---- D-111: o grupo "Investimentos e reserva" e a Esmeralda ----
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); delete repo.getAccountMarks; await window.__e2e.refresh(); });
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(300);
+    await btn('Ver meu nível').click(); await waitText('Investimentos e reserva'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('Níveis (D-111): a Esmeralda na lista, com o que ela pede ("A partir do Diamante e de 4 dos 6 marcos de investimentos e reserva")',
+      t.includes('A partir do Diamante e de 4 dos 6 marcos de investimentos e reserva') &&
+      (await p.locator('[aria-label="Esmeralda, a partir do Diamante e de 4 dos 6 marcos de investimentos e reserva"]').filter({ visible: true }).count()) === 1);
+    ok('Níveis (D-111): o grupo "Investimentos e reserva" com o que conta (pelo uso, nunca pelo valor), que investir é só do Pessoal e 5 de 6 feitos',
+      (await headingShown('Investimentos e reserva')) && t.includes('Para o nível Esmeralda: com o Diamante, 4 destes 6 marcos. Eles contam pelo uso, nunca pelo valor.') &&
+      t.includes('Investir fica só no seu Pessoal') && t.includes('5 de 6 marcos de investimentos e reserva') &&
+      (await visibleCount('button', 'Registrar um rendimento recebido: ainda não')) === 1 &&
+      ['Registrar um aporte num investimento', 'Atualizar o valor de um investimento', 'Criar o plano de aportes', 'Ligar um investimento a uma meta', 'Definir quanto guardar por mês na reserva para imprevistos']
+        .every((x) => t.includes(x)) && (await p.locator('[aria-label="Criar o plano de aportes: feito"]').filter({ visible: true }).count()) === 1 &&
+      (await p.locator('[aria-label="Definir quanto guardar por mês na reserva para imprevistos: feito"]').filter({ visible: true }).count()) === 1, t.slice(0, 1200));
+    await btn('Registrar um rendimento recebido: ainda não').click(); await waitText('Investir', 10000).catch(() => {}); await p.waitForTimeout(400);
+    ok('Níveis (D-111): "Registrar um rendimento recebido" abre a aba Investir', new URL(p.url()).pathname === '/investimentos', p.url());
+    // A Esmeralda de verdade: a imagem de uma meta completa os 14 marcos do dia a dia, com 5 do grupo. O aparelho já viu o Diamante: comemora.
+    await p.evaluate(async () => {
+      const repo = await window.__e2e.repo(); const sp = await repo.getSpace();
+      const goal = (await repo.listGoals(sp.personalContextId)).find((g) => g.name === 'Viagem de férias');
+      await repo.setGoalImage(`e2e-nivel-img-${Date.now()}`, goal.id, 0, { kind: 'sugestao', key: 'viagem' }); await window.__e2e.refresh();
+    });
+    await tabByName('Resumo').click(); await waitText('Sua conta chegou ao nível Esmeralda!', 12000); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('Níveis (D-111): com o Diamante e 5 marcos de investimentos e reserva, o Resumo comemora a Esmeralda',
+      t.includes('Além do dia a dia, você acompanha investimentos e reserva por aqui. Que bom ter você aqui.') && (await visibleCount('button', 'Fechar')) === 1);
+    await atWidths(async (w) => { await layoutChecks(`Níveis, Esmeralda ${w}px`); if (w === 390) await shot('623_nivel_esmeralda'); });
+    await btn('Fechar').click(); await p.waitForTimeout(400);
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
+    ok('Níveis (D-111): o card em Conta com "Nível Esmeralda" e "Você chegou ao nível mais alto da Clarevo."',
+      (await lvCardText()).includes('Nível Esmeralda') && (await lvCardText()).includes('Você chegou ao nível mais alto da Clarevo.'));
+
+    // ---- D-111: o aviso de queda. A memória passa a dizer que nada é anotado desde 23/08/2026 (45 dias antes de 07/10/2026). ----
+    const setIdle = (since) => p.evaluate(async (since) => {
+      const repo = await window.__e2e.repo();
+      if (!repo.__origLevel) repo.__origLevel = repo.getAccountLevel.bind(repo);
+      if (since === null) delete repo.getAccountLevel;
+      else repo.getAccountLevel = async () => ({ ...(await repo.__origLevel()), idleSince: since, lastNoteOn: since });
+      await window.__e2e.refresh();
+    }, since);
+    const WARN = 'Faz 45 dias que nada é anotado. Em 15 dias, o nível passa de Esmeralda para Diamante. Anotar um gasto ou recebimento mantém o nível.';
+    await setIdle('2026-08-23');
+    await tabByName('Resumo').click(); await waitText(WARN, 12000); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('Níveis (D-111): no 45º dia sem anotar, o aviso na fila do Resumo, em tom de fato, com "Ver meu nível" e "Agora não"',
+      t.includes(WARN) && (await headingShown('Nível da conta')) && (await visibleCount('button', 'Agora não')) === 1 && (await visibleCount('button', 'Ver meu nível')) === 1);
+    const warnColor = await p.evaluate((w) => {
+      const el = [...document.querySelectorAll('div[dir="auto"], span')].find((e) => e.textContent === w && e.getBoundingClientRect().width > 0);
+      const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Nível da conta' && e.getBoundingClientRect().width > 0);
+      return el && h ? { text: getComputedStyle(el).color, heading: getComputedStyle(h).color } : null;
+    }, WARN);
+    ok('Níveis (D-111): o aviso usa a cor de texto de sempre (nenhuma cor de alerta)', warnColor !== null && warnColor.text === warnColor.heading, JSON.stringify(warnColor));
+    await atWidths(async (w) => { await layoutChecks(`Níveis, aviso no Resumo ${w}px`); if (w === 390) await shot('624_nivel_aviso'); });
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
+    ok('Níveis (D-111): o mesmo aviso no card de Conta, com "Agora não", e o nível ainda Esmeralda',
+      (await lvCardText()).includes(WARN) && (await lvCardText()).includes('Nível Esmeralda') && (await visibleCount('button', 'Agora não')) === 1);
+    await btn('Ver meu nível').click(); await waitText('Investimentos e reserva'); await p.waitForTimeout(400);
+    ok('Níveis (D-111): e na tela do nível', (await body()).includes(WARN) && (await visibleCount('button', 'Agora não')) === 1);
+    await atWidths(async (w) => { await layoutChecks(`Níveis, aviso na tela do nível ${w}px`); });
+    // "Agora não" no Resumo: o aviso some ali, em Conta e na tela do nível, até o próximo marco de tempo.
+    await tabByName('Resumo').click(); await waitText(WARN); await p.waitForTimeout(300);
+    await btn('Agora não').click(); await p.waitForTimeout(500);
+    ok('Níveis (D-111): "Agora não" tira o aviso do Resumo', !(await body()).includes('que nada é anotado'));
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Níveis (D-111): dispensado, o aviso também sai de Conta, e nenhuma contagem de dias sem anotar aparece fora dele',
+      !t.includes('que nada é anotado') && !/\d+ dias? (sem|que)/.test(t) && (await lvCardText()).includes('Nível Esmeralda'));
+
+    // ---- D-111: 67 dias sem anotar (desde 01/08/2026): o nível mostrado desce um degrau, sem contar dias, e volta ao anotar ----
+    await setIdle('2026-08-01');
+    await p.waitForTimeout(600);
+    t = await lvCardText();
+    ok('Níveis (D-111): depois de 60 dias sem anotar, o card mostra "Nível Diamante" e que o nível volta para Esmeralda ao anotar, sem contar dias',
+      t.includes('Nível Diamante') && t.includes('Como nada foi anotado por um tempo, o nível está um degrau abaixo do que os seus marcos dão. Anotar um gasto ou recebimento traz de volta o nível Esmeralda.') &&
+      !/\d+ dias/.test(t) && !t.includes('que nada é anotado'), t.slice(0, 400));
+    await atWidths(async (w) => { await layoutChecks(`Níveis, um degrau abaixo ${w}px`); if (w === 390) await shot('625_nivel_abaixo'); });
+    await tabByName('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(800);
+    t = await body();
+    ok('Níveis (D-111): com o nível abaixo, o Resumo não comemora nem avisa (o próximo aviso é no 105º dia)', !t.includes('Sua conta chegou ao nível') && !t.includes('que nada é anotado'));
+    // A pessoa volta a anotar: o nível volta ao dos marcos, sem comemorar de novo.
+    await setIdle(null); await p.waitForTimeout(800);
+    t = await body();
+    ok('Níveis (D-111): ao voltar a anotar, o nível volta para Esmeralda sem nova comemoração', !t.includes('Sua conta chegou ao nível') && !t.includes('que nada é anotado'));
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
+    ok('Níveis (D-111): e o card de Conta volta a "Nível Esmeralda"', (await lvCardText()).includes('Nível Esmeralda') && !(await lvCardText()).includes('abaixo do que os seus marcos'));
+
+    // ---- D-111: o cenário FICTÍCIO ?cenario=nivel: nada anotado desde 20/05/2026, a regra contando desde 23/08/2026 (Prata pelos marcos) ----
+    await p.goto(`http://localhost:${PORT}/?cenario=nivel`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await p.waitForTimeout(800);
+    const WARN_PRATA = 'Faz 140 dias que nada é anotado. Em 15 dias, o nível passa de Prata para Bronze. Anotar um gasto ou recebimento mantém o nível.';
+    await p.waitForTimeout(600);
+    t = await body();
+    ok('Níveis (D-111, ?cenario=nivel): a faixa "Seus últimos meses" vem primeiro, e o aviso do nível espera (um aviso por vez)',
+      (await bandShown()) && !t.includes('que nada é anotado'), t.slice(0, 500));
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(500);
+    ok('Níveis (D-111, ?cenario=nivel): quem já estava parado quando a regra chegou tem o aviso antes de qualquer queda (em Conta, nível Prata)',
+      (await lvCardText()).includes(WARN_PRATA) && (await lvCardText()).includes('Nível Prata'), (await lvCardText()).slice(0, 400));
+    await tabByName('Resumo').click(); await waitText('Seus últimos meses'); await p.waitForTimeout(400);
+    await btn('Seguir adiante').click(); await waitText(WARN_PRATA, 12000).catch(() => {}); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('Níveis (D-111, ?cenario=nivel): ao seguir adiante, o aviso do nível aparece no Resumo, com "Agora não"',
+      t.includes(WARN_PRATA) && !(await bandShown()) && (await visibleCount('button', 'Agora não')) === 1, t.slice(0, 600));
+    // Anotar um gasto zera a contagem: o aviso não volta, nem em Conta, e o nível segue Prata.
+    await p.evaluate(async () => {
+      const repo = await window.__e2e.repo(); const sp = await repo.getSpace();
+      await repo.createRecord(`e2e-nivel-gasto-${Date.now()}`, sp.personalContextId, 'despesa', { accountId: sp.accounts[0].id, amountCents: 2500, occurredOn: '2026-10-07', description: 'Padaria', category: 'Mercado' });
+      await window.__e2e.refresh();
+    });
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(500);
+    ok('Níveis (D-111, ?cenario=nivel): depois de anotar um gasto, nenhum aviso, e o nível segue Prata', !(await body()).includes('que nada é anotado') && (await lvCardText()).includes('Nível Prata'));
     ok('Níveis: nada vai à rede na demonstração', writes.length === lvWrites0, writes.slice(lvWrites0).join(' | '));
   }
 
@@ -14851,7 +14970,8 @@ setInterval(async () => {
   // Mês dentro do orçamento e fila de avisos do Resumo (pedido do Enzo em 12/11/2026). Hoje é 07/10/2026: setembro fechou. Na
   // demonstração, setembro não tem orçamento (o card não aparece); aqui a memória passa a dizer que setembro teve orçamento em duas
   // categorias, as duas dentro do valor. O Resumo mostra "Setembro de 2026 fechou dentro do orçamento", um aviso temporário por vez
-  // (a comemoração do nível vem antes e o card do orçamento espera), "Fechar" guarda o mês e, com uma categoria acima, nada aparece.
+  // (a comemoração do nível vem antes e o card do orçamento espera), "Fechar" guarda o mês e, com uma categoria acima, nada aparece. Com os
+  // 5 marcos de investimentos e reserva da demonstração (D-111), o 14º marco do dia a dia leva à Esmeralda.
   // ==================================================================================================================
   {
     const bcWrites0 = writes.length;
@@ -14871,12 +14991,12 @@ setInterval(async () => {
       repo.getAccountMarks = async () => ({ ...(await repo.__origMarks()), ...(level ? { imagem: true } : {}) });
       await window.__e2e.refresh();
     }, { over, level });
-    // A comemoração do nível (Diamante) e o mês dentro do orçamento querem aparecer: só o nível, que vem antes na fila.
+    // A comemoração do nível (Esmeralda) e o mês dentro do orçamento querem aparecer: só o nível, que vem antes na fila.
     await setSeptember(false, true);
-    await waitText('Sua conta chegou ao nível Diamante!'); await p.waitForTimeout(600);
+    await waitText('Sua conta chegou ao nível Esmeralda!'); await p.waitForTimeout(600);
     t = await body();
     ok('Fila de avisos: com o nível e o orçamento querendo aparecer, só a comemoração do nível (um aviso temporário por vez)',
-      t.includes('Sua conta chegou ao nível Diamante!') && !t.includes('fechou dentro do orçamento'));
+      t.includes('Sua conta chegou ao nível Esmeralda!') && !t.includes('fechou dentro do orçamento'));
     await btn('Fechar').click();
     await waitText('Setembro de 2026 fechou dentro do orçamento'); await p.waitForTimeout(500);
     t = await body(); screenTexts.push(t);

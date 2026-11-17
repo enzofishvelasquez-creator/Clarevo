@@ -1,51 +1,65 @@
-import { ACCOUNT_MARK_KEYS, ACCOUNT_MARK_TEXT, LEVEL_TEXT, accountLevel, type AccountMarkKey } from '@clarevo/core';
+import {
+  ACCOUNT_MARK_TEXT,
+  BASIC_MARK_KEYS,
+  INVESTING_MARK_KEYS,
+  LEVEL_TEXT,
+  investingMarksDone,
+  type AccountMarkKey,
+} from '@clarevo/core';
 import { router, type Href } from 'expo-router';
 import { Check, ChevronRight } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, ReduceMotion } from 'react-native-reanimated';
 
 import { SubHeader } from '@/components/header';
-import { LevelList, LevelSummary, WEB_IMG } from '@/components/level-parts';
+import { LevelList, LevelSummary, LevelWarningNote, WEB_IMG, useLevelWarning } from '@/components/level-parts';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Card, Screen, Txt, styles as ui } from '@/components/ui';
-import { useAccountMarks } from '@/state/access';
+import { useAccountLevelState, useShownLevel } from '@/state/access';
+import { useView } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
 const T = LEVEL_TEXT;
 
 /**
- * Conta > Nível da conta (D-095, `docs/48_NIVEIS.md`): o nível de agora, com o caminho até o próximo, os quatro níveis, o que ainda dá
- * para conhecer (cada marco leva à tela dele) e o que já foi feito. Em tom discreto, como no gov.br: cartões brancos, a cor do nível só no
- * selo pequeno. O nível mede o quanto da Clarevo a pessoa já usa, nunca dinheiro, e nunca desce. Só consulta: nada aqui grava.
+ * Conta > Nível da conta (D-095 e D-111, `docs/48_NIVEIS.md`): o nível mostrado, com o caminho até o próximo e, a partir do 45º dia sem
+ * anotar, o aviso de queda; os cinco níveis; o que ainda dá para conhecer (cada marco leva à tela dele); o grupo "Investimentos e reserva"
+ * (para a Esmeralda; investir é só do Pessoal, e a tela explica quando a Família está escolhida); e o que já foi feito. Em tom discreto,
+ * como no gov.br: cartões brancos, a cor do nível só no selo pequeno. O nível mede o quanto da Clarevo a pessoa já usa, nunca dinheiro;
+ * desce um degrau depois de 60 dias sem anotar e volta ao anotar. Só consulta: nada aqui grava.
  */
 export default function NivelScreen() {
-  const marks = useAccountMarks();
-  const level = marks.data ? accountLevel(marks.data) : null;
-  const todo = marks.data ? ACCOUNT_MARK_KEYS.filter((k) => !marks.data![k]) : [];
-  const done = marks.data ? ACCOUNT_MARK_KEYS.filter((k) => marks.data![k]) : [];
+  const query = useAccountLevelState();
+  const shown = useShownLevel();
+  const { warning, dismiss } = useLevelWarning(shown);
+  const { space: view } = useView();
+  const marks = query.data?.marks;
+  const todo = marks ? BASIC_MARK_KEYS.filter((k) => !marks[k]) : [];
+  const done = marks ? BASIC_MARK_KEYS.filter((k) => marks[k]) : [];
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={T.screenTitle} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
-        {marks.isPending ? (
+        {query.isPending ? (
           <LoadingState />
-        ) : !marks.data || !level ? (
-          <ErrorState message={T.loadFailed} onRetry={() => marks.refetch()} />
+        ) : !marks || !shown ? (
+          <ErrorState message={T.loadFailed} onRetry={() => query.refetch()} />
         ) : (
           <>
             <Animated.View entering={FadeInDown.duration(320).reduceMotion(ReduceMotion.System)}>
               <Card style={{ gap: space[3] }}>
-                <LevelSummary marks={marks.data} badge={44} />
+                <LevelSummary marks={marks} shown={shown} badge={44} />
                 <Txt variant="caption" color={colors.textSecondary}>
                   {T.what}
                 </Txt>
+                {warning ? <LevelWarningNote warning={warning} onDismiss={dismiss} /> : null}
               </Card>
             </Animated.View>
             <Card style={{ gap: space[1], paddingVertical: space[3] }}>
               <Txt variant="title" accessibilityRole="header" aria-level={2}>
                 {T.levelsTitle}
               </Txt>
-              <LevelList level={level} />
+              <LevelList level={shown.level} />
             </Card>
             {todo.length > 0 ? (
               <Card style={{ gap: space[1], paddingVertical: space[3] }}>
@@ -60,6 +74,23 @@ export default function NivelScreen() {
                 ))}
               </Card>
             ) : null}
+            <Card style={{ gap: space[1], paddingVertical: space[3] }}>
+              <Txt variant="title" accessibilityRole="header" aria-level={2}>
+                {T.investingTitle}
+              </Txt>
+              <Txt variant="caption" color={colors.textSecondary}>
+                {T.investingIntro}
+              </Txt>
+              <Txt variant="caption" color={colors.textSecondary}>
+                {view === 'familia' ? T.investingFamily : T.investingPersonal}
+              </Txt>
+              <Txt variant="label" style={{ marginTop: space[1] }}>
+                {T.investingProgress(investingMarksDone(marks), INVESTING_MARK_KEYS.length)}
+              </Txt>
+              {INVESTING_MARK_KEYS.map((k, i) => (
+                <MarkRow key={k} mark={k} done={marks[k]} last={i === INVESTING_MARK_KEYS.length - 1} />
+              ))}
+            </Card>
             {done.length > 0 ? (
               <Card style={{ gap: space[1], paddingVertical: space[3] }}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>

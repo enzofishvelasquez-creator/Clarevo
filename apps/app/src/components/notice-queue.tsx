@@ -8,7 +8,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
  * de valor extra, que a própria pessoa pediu. Enquanto a faixa e os Primeiros passos ainda carregam (`hold`), nenhum aviso da fila
  * aparece, para nada surgir e sumir logo depois.
  */
-export const RESUMO_NOTICE_ORDER = ['retorno', 'passos', 'nivel', 'orcamento', 'origem'] as const;
+/**
+ * O aviso de queda do nível (D-111, 'nivel_aviso') vem logo depois da faixa "Seus últimos meses", que aparece sempre que quer (ela só
+ * segura a fila): quem volta depois de 45 dias vê a faixa e, ao seguir adiante, o aviso, que tem prazo (15 dias). Ele também fica no card
+ * do nível em Conta, fora da fila.
+ */
+export const RESUMO_NOTICE_ORDER = ['retorno', 'nivel_aviso', 'passos', 'nivel', 'orcamento', 'origem'] as const;
 export type ResumoNoticeId = (typeof RESUMO_NOTICE_ORDER)[number];
 export const RESUMO_NOTICE_LIMIT = 1;
 

@@ -1,4 +1,4 @@
-import { FULL_ACCESS, accountLevel, type Access, type AccountLevel, type AccountMarks, type WebSubscriptionStatus } from '@clarevo/core';
+import { FULL_ACCESS, shownAccountLevel, type Access, type AccountLevel, type AccountLevelState, type ShownAccountLevel, type WebSubscriptionStatus } from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
@@ -51,22 +51,29 @@ export function useWebSubscriptionStatus(enabled: boolean) {
 }
 
 /**
- * Os marcos do nível da conta (D-095): `my_account_marks`, uma leitura por pessoa. Quem mostra o nível pede de novo ao voltar para a
- * tela (`refetch`), porque qualquer anotação pode ter concluído um marco. Falha de leitura não mostra nível nenhum.
+ * Os marcos do nível da conta e o tempo sem anotar (D-095, D-111): `my_account_marks(true)`, uma leitura por pessoa. Quem mostra o nível pede
+ * de novo ao voltar para a tela (`refetch`), porque qualquer anotação pode ter concluído um marco ou zerado o tempo sem anotar. Falha de
+ * leitura não mostra nível nenhum.
  */
-export function useAccountMarks() {
+export function useAccountLevelState() {
   const { repo, user } = useSession();
   return useQuery({
     queryKey: ['account-marks', user?.id ?? null],
-    queryFn: (): Promise<AccountMarks> => repo!.getAccountMarks(),
+    queryFn: (): Promise<AccountLevelState> => repo!.getAccountLevel(),
     enabled: Boolean(repo && user),
     staleTime: 15_000,
     retry: false,
   });
 }
 
-/** O nível da conta, ou nulo enquanto carrega ou se a leitura falhar. */
+/** O nível mostrado hoje (D-111: o dos marcos, menos um degrau a cada 60 dias sem anotar) e o aviso, ou nulo enquanto carrega ou se a leitura falhar. */
+export function useShownLevel(): ShownAccountLevel | null {
+  const { today } = useSession();
+  const state = useAccountLevelState().data;
+  return state ? shownAccountLevel(state, today) : null;
+}
+
+/** O nível mostrado (o selo de Conta), ou nulo enquanto carrega ou se a leitura falhar. */
 export function useAccountLevel(): AccountLevel | null {
-  const marks = useAccountMarks().data;
-  return marks ? accountLevel(marks) : null;
+  return useShownLevel()?.level ?? null;
 }

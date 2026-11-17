@@ -1,6 +1,7 @@
--- Níveis de conta (D-095; migração 0034): my_account_marks devolve os 18 marcos "já fez alguma vez" da pessoa que chama, lidos do
--- registro das operações dela, e guarda os alcançados em account_marks: o nível não desce nem quando o registro perde linhas (a
--- limpeza dos excluídos e a Família apagada). Não vê o que é de outra pessoa, e ninguém lê a tabela direto.
+-- Níveis de conta (D-095; migração 0034, com os 6 marcos de investimentos e reserva da 0041, D-111): my_account_marks devolve os 24
+-- marcos "já fez alguma vez" da pessoa que chama, lidos do registro das operações dela, e guarda os alcançados em account_marks: os
+-- marcos não somem nem quando o registro perde linhas (a limpeza dos excluídos e a Família apagada). Não vê o que é de outra pessoa, e
+-- ninguém lê a tabela direto. A queda por tempo sem anotar (D-111) é testada em 99zzzzzzzzzzzzzzzzzzzz_niveis_queda.sql.
 -- Pessoas FICTÍCIAS: Lia e Rui. Tudo em uma transação desfeita no fim.
 \set ON_ERROR_STOP 1
 \set lia '''00000000-0000-0000-0000-0000000000f1'''
@@ -44,8 +45,8 @@ insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) value
 
 -- 1. Privilégios: só quem está no app chama; sem sessão, recusa.
 do $$ begin
-  assert has_function_privilege('authenticated', 'public.my_account_marks()', 'execute')
-     and not has_function_privilege('anon', 'public.my_account_marks()', 'execute'), 'my_account_marks só para quem está no app';
+  assert has_function_privilege('authenticated', 'public.my_account_marks(boolean)', 'execute')
+     and not has_function_privilege('anon', 'public.my_account_marks(boolean)', 'execute'), 'my_account_marks só para quem está no app';
   assert not has_table_privilege('authenticated', 'public.account_marks', 'select') and not has_table_privilege('anon', 'public.account_marks', 'select')
      and not has_table_privilege('service_role', 'public.account_marks', 'select'), 'ninguém lê account_marks direto';
 end $$;
@@ -63,16 +64,16 @@ declare
   gasto public.financial_records;
   goal uuid;
 begin
-  -- 2. Conta nova: os 18 marcos, todos "não".
+  -- 2. Conta nova: os 24 marcos (os 18 do dia a dia e os 6 de investimentos e reserva, 0041), todos "não".
   m := public.my_account_marks();
-  assert (select count(*) from jsonb_object_keys(m)) = 18 and pg_temp.trues(m) = '{}', 'conta nova: 18 marcos, nenhum feito: ' || m::text;
+  assert (select count(*) from jsonb_object_keys(m)) = 24 and pg_temp.trues(m) = '{}', 'conta nova: 24 marcos, nenhum feito: ' || m::text;
   assert pg_temp.stored(auth.uid()) = 0, 'conta nova: nada guardado';
   -- 3. Um gasto e um recebimento: cada um o seu marco.
   gasto := public.create_record('nv-gasto-01', ctx, acc, 'despesa', 5230, '2026-11-10', 'Mercado');
   assert pg_temp.trues(public.my_account_marks()) = '{gasto}', 'um gasto: ' || public.my_account_marks()::text;
   perform public.create_record('nv-receb-01', ctx, acc, 'receita', 300000, '2026-11-05', 'Salário', 'Salário');
   assert pg_temp.trues(public.my_account_marks()) = '{gasto,recebimento}', 'gasto e recebimento';
-  -- 4. Excluir o gasto não desfaz o marco (o nível nunca desce).
+  -- 4. Excluir o gasto não desfaz o marco (o marco alcançado fica guardado).
   perform public.delete_record('nv-excl-001', gasto.id, gasto.version);
   assert pg_temp.trues(public.my_account_marks()) = '{gasto,recebimento}', 'excluir não desfaz: ' || public.my_account_marks()::text;
   -- 5. Uma meta e um investimento.
@@ -93,7 +94,7 @@ begin
   perform public.set_goal_image(goal, 'casa', null, 0, 'nv-img-0001');
   assert pg_temp.trues(public.my_account_marks()) = '{conta,gasto,imagem,investimento,limite,meta,recebimento,tres_meses}',
     'conta de origem, limite e imagem: ' || public.my_account_marks()::text;
-  -- 6c. O nível nunca desce: os alcançados ficam guardados, mesmo se o registro das operações perder as linhas da pessoa.
+  -- 6c. Os alcançados ficam guardados, mesmo se o registro das operações perder as linhas da pessoa.
   assert pg_temp.stored(auth.uid()) = 8, 'os oito marcos guardados: ' || pg_temp.stored(auth.uid());
   perform pg_temp.lose_ops(auth.uid());
   assert pg_temp.trues(public.my_account_marks()) = '{conta,gasto,imagem,investimento,limite,meta,recebimento,tres_meses}',
