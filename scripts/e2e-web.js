@@ -9618,6 +9618,8 @@ setInterval(async () => {
   t = await k1Keep();
   ok('K1 conta nova: "O que ainda vence" diz "Nada em aberto neste mês" com R$ 0,00 e o último botão é "Concluir"', t.includes('Ainda a pagar\nNada em aberto neste mês\nR$ 0,00') && (await visibleCount('button', 'Concluir')) === 1 && (await k1Progress()) === '3 de 3', t.slice(0, 400));
   await btn('Concluir').click(); await p.waitForTimeout(600);
+  // "Concluir" volta às Análises (revisão das telas, 16/11/2026), que não têm o avatar do cabeçalho: a Conta abre a partir do Resumo.
+  await tabByName('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(300);
 
   // ---- 12. Conta › "Widget na tela inicial": o interruptor "Mostrar valores no widget" (desligado) fica guardado no aparelho ----
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
