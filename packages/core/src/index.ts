@@ -61,6 +61,7 @@ export * from './crash-report';
 export * from './feedback';
 export * from './widget';
 export * from './widget-sync';
+export * from './theme-choice';
 export * from './seu-mes';
 export * from './evolucao';
 export * from './month-check';

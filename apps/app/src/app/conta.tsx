@@ -46,6 +46,7 @@ import { SubHeader } from '@/components/header';
 import { ProfileAvatar, ProfilePhotoActions } from '@/components/profile-photo';
 import { LevelBadge, LevelCard } from '@/components/level-parts';
 import { SignupSourceAccountCard } from '@/components/signup-source';
+import { ThemeCard } from '@/components/theme-card';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
 import { APP_INFO } from '@/lib/app-info';
@@ -207,6 +208,8 @@ export default function ContaScreen() {
           <RemindersCard />
         </View>
         <PrivacyCard />
+        {/* Tema (D-112): Igual ao aparelho, Claro ou Escuro, só neste aparelho. */}
+        <ThemeCard />
         <WidgetCard />
 
         <Card style={{ gap: space[3] }}>
