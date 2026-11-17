@@ -31,6 +31,8 @@ seção 2.
 | 3 | Na biometria, errar de propósito e depois usar a senha do aparelho | Erro sem mostrar dados; com a senha do aparelho, entra |
 | 4 | Conta > "Ocultar valores ao abrir"; fechar e abrir | Os valores viram "R$ ••••" em todas as telas, inclusive Investir e Metas |
 | 5 | Numa conta antiga, se aparecer o aviso dos termos | Aparece uma vez, depois da biometria, e some com "Concordo e continuar" |
+| 5a | Sair; em Entrar, tocar em "Esqueci minha senha", pôr o e-mail e enviar; abrir o e-mail **no mesmo celular** e tocar em "Definir nova senha" | Chega o e-mail "Defina uma nova senha na Clarevo" (de nao-responda@clarevo.app.br; se não chegar em alguns minutos, olhar o spam); o link abre o app na tela "Nova senha" (o celular pode perguntar com qual app abrir: escolher Clarevo); depois de salvar, o app pede para entrar com a senha nova, e ela funciona |
+| 5b | Repetir o 5a pela versão web no computador (pedir e abrir o e-mail no mesmo navegador) | O link abre app.clarevo.app.br na tela "Nova senha" e a senha nova funciona no celular também |
 
 ### B. Lembretes (permitir as notificações quando o celular pedir, e só depois do toque)
 

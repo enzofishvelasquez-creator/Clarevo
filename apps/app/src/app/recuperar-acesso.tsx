@@ -10,6 +10,8 @@ import { useSession } from '@/state/session';
 import { colors } from '@/theme/tokens';
 
 const NEUTRAL = 'Se houver uma conta com esse endereço, você receberá as instruções para recuperar o acesso.';
+/** O link só abre a troca de senha no aparelho e no app ou navegador em que o pedido foi feito (o código do pedido fica guardado ali). */
+const SAME_DEVICE = 'Abra o e-mail e toque no link neste mesmo aparelho, no app ou no navegador em que você fez o pedido.';
 
 export default function RecuperarAcesso() {
   const params = useLocalSearchParams<{ email?: string }>();
@@ -50,7 +52,7 @@ export default function RecuperarAcesso() {
   };
 
   return (
-    <AuthShell back title="Recuperar acesso" subtitle="Informe o e-mail da sua conta. Enviaremos um link para você definir uma nova senha.">
+    <AuthShell back title="Recuperar acesso" subtitle="Informe o e-mail da sua conta. A Clarevo envia um link para você definir uma nova senha.">
       <TextField
         label="E-mail"
         value={email}
@@ -65,6 +67,7 @@ export default function RecuperarAcesso() {
       {sent ? (
         <Banner tone="info" icon={MailCheck}>
           <Txt variant="label">{NEUTRAL}</Txt>
+          <Txt variant="caption">{SAME_DEVICE}</Txt>
           {auth instanceof DemoAuth ? (
             <Button
               label="Demonstração: simular abertura do link"
