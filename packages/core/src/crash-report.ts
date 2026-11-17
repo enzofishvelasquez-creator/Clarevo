@@ -14,6 +14,7 @@ export interface CrashEventLike {
   request?: unknown;
   extra?: unknown;
   server_name?: string;
+  tags?: { [key: string]: unknown };
   breadcrumbs?: CrashBreadcrumbLike[];
   contexts?: Record<string, unknown>;
   exception?: { values?: { type?: string; value?: string }[] };
@@ -66,12 +67,18 @@ export function scrubCrashText(text: string): string {
   return text.replace(UUID, '[id]').replace(EMAIL, '[e-mail]').replace(NUMBER, '#');
 }
 
+/**
+ * Parte do caminho que pode ficar: só letras minúsculas sem acento, hífen, ponto e os parênteses e colchetes das rotas (`multa-e-juros`,
+ * `(tabs)`, `[categoria]`). Número, maiúscula, acento, espaço ou `%` (um nome de categoria, um código) vira `[id]`.
+ */
+const PATH_PART = /^[a-z()[\].-]+$/;
+
 /** Caminho de tela sem os identificadores e sem o que vem depois de "?": /investimento/abc-123/movimento → /investimento/[id]/movimento. */
 export function scrubCrashPath(path: string): string {
   const clean = path.split(/[?#]/)[0] ?? '';
   return clean
     .split('/')
-    .map((part, i) => (i === 0 || part === '' ? part : /\d/.test(part) || part.length > 24 ? '[id]' : part))
+    .map((part, i) => (i === 0 || part === '' ? part : !PATH_PART.test(part) || part.length > 24 ? '[id]' : part))
     .join('/');
 }
 
@@ -97,6 +104,8 @@ export function scrubCrashEvent<E extends CrashEventLike>(event: E): E {
     out.exception = { ...out.exception, values: out.exception.values.map((v) => ({ ...v, ...(typeof v.value === 'string' ? { value: scrubCrashText(v.value) } : {}) })) };
   }
   if (out.breadcrumbs) out.breadcrumbs = out.breadcrumbs.map(scrubBreadcrumb).filter((b): b is CrashBreadcrumbLike => b !== null);
+  // A marca da tela (`tela`, posta pelo app já limpa) passa de novo pela limpeza do caminho.
+  if (out.tags && typeof out.tags.tela === 'string') out.tags = { ...out.tags, tela: scrubCrashPath(out.tags.tela) };
   if (out.contexts) {
     const contexts: Record<string, unknown> = {};
     for (const k of KEPT_CONTEXTS) {

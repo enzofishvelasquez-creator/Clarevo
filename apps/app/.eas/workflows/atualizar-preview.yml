@@ -1,0 +1,34 @@
+# Atualização pelo ar dos builds de teste (EAS Update, docs/50_ATUALIZACOES.md).
+#
+# A cada push no `main` (o merge de um PR no GitHub), publica o JavaScript novo no ramo de atualizações `preview`. Os builds do perfil
+# `preview` (canal `preview`, em eas.json) baixam a atualização ao abrir e passam a usá-la na próxima vez que o app for aberto.
+#
+# Só chega aos builds com a mesma "impressão digital" nativa (runtimeVersion com a política fingerprint, em app.json). Por isso o job
+# carrega as variáveis do ambiente `preview` do expo.dev (EXPO_PUBLIC_*) e liga o widget (CLAREVO_WIDGET=1), como o perfil `preview` faz
+# no build: sem o widget, o pacote sairia sem ele e a impressão digital seria outra (a atualização não chegaria a nenhum build).
+# Mudança nativa (pacote nativo novo, app.json, versão) muda a impressão digital: a atualização fica guardada e só vale para o próximo build.
+#
+# Só Android por enquanto (ainda não há build de iPhone). Quando houver, trocar `platform` por `all`.
+# Sintaxe conferida na documentação do Expo (pre-packaged jobs, "Update"; syntax, `concurrency`), lida em 16/11/2026.
+name: Atualizar o app de teste
+
+on:
+  push:
+    branches: ['main']
+
+# Dois merges seguidos: o segundo espera o primeiro terminar, e a atualização mais nova é sempre a última publicada.
+concurrency:
+  group: atualizar-preview
+
+jobs:
+  atualizar_preview:
+    name: Publicar a atualização no preview
+    type: update
+    environment: preview
+    env:
+      CLAREVO_WIDGET: '1'
+    params:
+      branch: preview
+      platform: android
+      # Sem o envio dos mapas de código ao Sentry (pediria um segredo no EAS; docs/46_RELATORIO_DE_FALHAS.md).
+      upload_sentry_sourcemaps: false

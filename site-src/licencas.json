@@ -471,7 +471,7 @@
  },
  {
   "nome": "@expo/plist",
-  "versao": "0.8.1",
+  "versao": "0.8.2",
   "licenca": "MIT"
  },
  {
@@ -523,6 +523,11 @@
   "nome": "@expo/xcpretty",
   "versao": "4.4.6",
   "licenca": "MIT"
+ },
+ {
+  "nome": "@isaacs/nonrecursive-glob-match",
+  "versao": "1.1.0",
+  "licenca": "BlueOak-1.0.0"
  },
  {
   "nome": "@isaacs/ttlcache",
@@ -1046,6 +1051,11 @@
  },
  {
   "nome": "arg",
+  "versao": "4.1.3",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "arg",
   "versao": "5.0.2",
   "licenca": "MIT"
  },
@@ -1545,6 +1555,11 @@
   "licenca": "MIT"
  },
  {
+  "nome": "expo-eas-client",
+  "versao": "57.0.5",
+  "licenca": "MIT"
+ },
+ {
   "nome": "expo-file-system",
   "versao": "57.0.7",
   "licenca": "MIT"
@@ -1580,6 +1595,11 @@
   "licenca": "MIT"
  },
  {
+  "nome": "expo-json-utils",
+  "versao": "57.0.2",
+  "licenca": "MIT"
+ },
+ {
   "nome": "expo-keep-awake",
   "versao": "57.0.2",
   "licenca": "MIT"
@@ -1592,6 +1612,11 @@
  {
   "nome": "expo-local-authentication",
   "versao": "57.0.3",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "expo-manifests",
+  "versao": "57.0.2",
   "licenca": "MIT"
  },
  {
@@ -1645,6 +1670,11 @@
   "licenca": "MIT"
  },
  {
+  "nome": "expo-structured-headers",
+  "versao": "57.0.1",
+  "licenca": "MIT"
+ },
+ {
   "nome": "expo-symbols",
   "versao": "57.0.3",
   "licenca": "MIT"
@@ -1657,6 +1687,16 @@
  {
   "nome": "expo-text-extractor",
   "versao": "2.0.0",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "expo-updates",
+  "versao": "57.0.28",
+  "licenca": "MIT"
+ },
+ {
+  "nome": "expo-updates-interface",
+  "versao": "57.0.2",
   "licenca": "MIT"
  },
  {
@@ -1762,6 +1802,11 @@
  {
   "nome": "glob",
   "versao": "13.0.6",
+  "licenca": "BlueOak-1.0.0"
+ },
+ {
+  "nome": "glob",
+  "versao": "14.0.6",
   "licenca": "BlueOak-1.0.0"
  },
  {
@@ -2310,6 +2355,11 @@
   "licenca": "BlueOak-1.0.0"
  },
  {
+  "nome": "minimatch",
+  "versao": "11.0.9",
+  "licenca": "BlueOak-1.0.0"
+ },
+ {
   "nome": "minipass",
   "versao": "7.1.3",
   "licenca": "BlueOak-1.0.0"
@@ -2462,6 +2512,11 @@
  {
   "nome": "path-scurry",
   "versao": "2.0.2",
+  "licenca": "BlueOak-1.0.0"
+ },
+ {
+  "nome": "path-scurry",
+  "versao": "3.0.0",
   "licenca": "BlueOak-1.0.0"
  },
  {

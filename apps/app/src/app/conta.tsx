@@ -4,6 +4,7 @@ import {
   EXPORT_TEXT,
   FAMILY_ROLE_LABEL,
   FAMILY_TEXT,
+  FEEDBACK_TEXT,
   LEGAL_TEXT,
   SUPPORT_TEXT,
   TELEGRAM_BOT,
@@ -12,6 +13,7 @@ import {
   WHATSAPP_IN_ACCOUNT,
   WHATSAPP_NUMBER,
   WHATSAPP_TEXT,
+  appVersionLine,
   type SitePage,
 } from '@clarevo/core';
 import {
@@ -37,6 +39,7 @@ import { ConfirmDialog } from '@/components/dialog';
 import { AccessCard } from '@/components/access-parts';
 import { AccountsCard } from '@/components/accounts-card';
 import { BenefitCard } from '@/components/benefit-card';
+import { FeedbackButton } from '@/components/feedback-button';
 import { PrivacyCard, RemindersCard, WidgetCard } from '@/components/device-settings';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { SubHeader } from '@/components/header';
@@ -45,6 +48,7 @@ import { LevelBadge, LevelCard } from '@/components/level-parts';
 import { SignupSourceAccountCard } from '@/components/signup-source';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
+import { APP_INFO } from '@/lib/app-info';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
 import { SITE_URL, openLicensesPage, openSitePage, openSupportEmail } from '@/lib/site';
@@ -175,6 +179,17 @@ export default function ContaScreen() {
             </>
           ) : null}
         </View>
+        </Card>
+        {/* Sugestão ou problema (teste com pessoas, 16/11/2026): logo abaixo do perfil, para quem testa achar sem procurar. O e-mail vai com a
+            versão do app e o aparelho, sem nada da conta (FEEDBACK_TEXT, lib/feedback.ts). */}
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {FEEDBACK_TEXT.title}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {FEEDBACK_TEXT.hint}
+          </Txt>
+          <FeedbackButton label={FEEDBACK_TEXT.button} screen="/conta" />
         </Card>
         <LevelCard />
 
@@ -360,6 +375,10 @@ export default function ContaScreen() {
           </Txt>
           <Button label={DELETE_TEXT.entryButton} icon={Trash2} tone="soft" accessibilityLabel={DELETE_TEXT.entryA11y} onPress={() => router.push('/conta/excluir')} />
         </Card>
+        {/* A versão do app, para quem testa dizer qual está usando (docs/50_ATUALIZACOES.md): no celular, com o build e a atualização. */}
+        <Txt variant="caption" color={colors.textSecondary} style={{ textAlign: 'center' }} selectable>
+          {appVersionLine(APP_INFO, APP_INFO.native)}
+        </Txt>
       </Screen>
 
       <ConfirmDialog

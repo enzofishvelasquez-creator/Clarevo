@@ -84,3 +84,19 @@ describe('relatório de falhas (D-093): limpeza antes do envio', () => {
     expect(native).not.toMatch(/https:\/\/[0-9a-f]{16,}@/);
   });
 });
+
+describe('relatório de falhas: caminho de tela e marca da tela (teste com pessoas, 16/11/2026)', () => {
+  it('parte do caminho com maiúscula, acento, espaço ou % (o nome de uma categoria, um código) vira [id]; as rotas ficam', () => {
+    expect(scrubCrashPath('/orcamento/Presente%20da%20Maria')).toBe('/orcamento/[id]');
+    expect(scrubCrashPath('/orcamento/Alimentação')).toBe('/orcamento/[id]');
+    expect(scrubCrashPath('/orcamento/Presente da Maria')).toBe('/orcamento/[id]');
+    expect(scrubCrashPath('/orcamento/[categoria]')).toBe('/orcamento/[categoria]');
+    expect(scrubCrashPath('/(tabs)/index')).toBe('/(tabs)/index');
+    expect(scrubCrashPath('/aprender/guia')).toBe('/aprender/guia');
+  });
+
+  it('a marca "tela" passa de novo pela limpeza do caminho; as outras marcas ficam como vieram', () => {
+    const out = scrubCrashEvent({ tags: { tela: '/orcamento/Mercado da Maria/3f2b1c4d', sistema: 'Android 14 (API 34)', aparelho: 'samsung SM-A515F' } });
+    expect(out.tags).toEqual({ tela: '/orcamento/[id]/[id]', sistema: 'Android 14 (API 34)', aparelho: 'samsung SM-A515F' });
+  });
+});

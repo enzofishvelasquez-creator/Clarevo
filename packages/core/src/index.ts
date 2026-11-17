@@ -58,6 +58,7 @@ export * from './importar';
 export * from './guide';
 export * from './comprovante';
 export * from './crash-report';
+export * from './feedback';
 export * from './widget';
 export * from './widget-sync';
 export * from './seu-mes';

@@ -22,6 +22,12 @@ financeiro nem pessoal**, com a conta criada pelo Enzo, o trecho na política e 
   desempenho e sem sessões. Os rastros já entram limpos no escopo (`beforeBreadcrumb`), e do contexto do app só ficam nome, versão e build. Sem o plugin de envio de mapas de código (precisaria de um segredo no EAS): a pilha chega com os nomes do
   código compactado; dá para acrescentar depois, se a equipe precisar.
 - **Política de privacidade**, seção 8: o Sentry está em "Estão previstos", com o que recebe e o que não recebe.
+- **Teste com pessoas (16/11/2026, `docs/50_ATUALIZACOES.md`):** `environment` é o perfil do build (o canal do EAS Update, gravado no build:
+  `preview`, `preview-sem-widget` ou `production`; fora de um build do EAS, `desconhecido`), `dist` é o número do build, e as marcas
+  `sistema` ("Android 14 (API 34)"), `aparelho` (fabricante e modelo; no iPhone, só "iPhone") e `atualizacao` (8 caracteres ou "original do
+  build") vão em todo relatório. A tela de erro do app inteiro (`ErrorBoundary` de `app/_layout.tsx`) manda a falha que pegou, que não
+  passaria pelo tratamento global, com a marca `tela` (o caminho da rota, como `/orcamento/[categoria]`); `scrubCrashEvent` limpa essa marca
+  de novo, e o caminho limpo agora troca por `[id]` também a parte com maiúscula, acento, espaço ou `%` (o nome de uma categoria).
 
 ## 2. Passos do Enzo (à mão; nenhum segredo passa pelo chat)
 

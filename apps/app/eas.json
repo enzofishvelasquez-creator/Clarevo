@@ -6,6 +6,7 @@
   "build": {
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "environment": "preview",
       "autoIncrement": true,
       "env": {
@@ -22,12 +23,14 @@
     },
     "preview-sem-widget": {
       "extends": "preview",
+      "channel": "preview-sem-widget",
       "env": {
         "CLAREVO_WIDGET": "0"
       }
     },
     "production": {
       "distribution": "store",
+      "channel": "production",
       "environment": "production",
       "autoIncrement": true,
       "env": {
