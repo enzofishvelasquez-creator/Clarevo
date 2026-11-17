@@ -7,15 +7,18 @@ import {
   SIMULATE_TEXT,
   SIMULATION_FIELD_ORDER,
   SIMULATION_MODES,
+  adjustedTargetCents,
   calcJuntarParaObjetivo,
   createDemoRepository,
   emptySimulationDraft,
   finalValueCents,
+  formatBRL,
   goalPlan,
   monthlyForTarget,
   monthlyNeeded,
   monthlyRate,
   monthlyRateText,
+  monthsForAdjustedTarget,
   monthsForTarget,
   parseRateBp,
   previewHypotheses,
@@ -26,6 +29,10 @@ import {
   simulateValuesFromGoal,
   simulateValuesFromObjetivo,
   simulationGoalPrefill,
+  simulationInflationChoice,
+  simulationInflationChoices,
+  simulationInflationHint,
+  simulationInflationPatch,
   simulationResultLines,
   todayValueCents,
   validateGoalDraft,
@@ -386,10 +393,15 @@ describe('formulário e textos (spec2 §4.7)', () => {
       'Na hipótese informada: R$ 100.728,79 em 120 meses',
       'Total aportado: R$ 60.000,00',
       'Rendimento na hipótese: R$ 40.728,79',
-      'Em dinheiro de hoje, com inflação de 4,5% ao ano: R$ 64.862,05',
+      'Em dinheiro de hoje, com inflação de 4,5% ao ano, o total de R$ 100.728,79 equivale a R$ 64.862,05.',
       'Sem rendimento, seriam R$ 60.000,00.',
     ]);
-    expect(r.hypotheses[3]).toBe('Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para o valor em dinheiro de hoje.');
+    expect(r.hypotheses[3]).toBe('Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para mostrar o valor em dinheiro de hoje.');
+    // Em "Quanto posso ter" não há meta para corrigir: "corrigir" vale como "mostrar".
+    const noTarget = ok({ mode: 'quanto-ter', monthlyText: '500,00', monthsText: '120', rateText: '10', inflationOn: true, adjustTarget: true, inflationText: '4,5' });
+    expect(simulationResultLines(noTarget)).toEqual(simulationResultLines(r));
+    expect(noTarget.input.adjustTarget).toBeUndefined();
+    expect(noTarget.targetAdjustedCents).toBeNull();
     expect(r.hypotheses[4]).toBe('Valores finais arredondados para baixo, no centavo.');
     expect(r.growth!.byYear).toHaveLength(10);
     const withInitial = ok({ mode: 'quanto-ter', initialText: '4.500,00', monthlyText: '1.000,00', monthsText: '14', rateText: '10' });
@@ -420,7 +432,10 @@ describe('formulário e textos (spec2 §4.7)', () => {
     expect(far.texts.highlight).toBe('Com R$ 1.000,00 por mês: 276 meses na hipótese informada; sem rendimento, não alcança em 50 anos.');
     expect(far.growth).toMatchObject({ finalCents: 100_546_651, contributedCents: 27_600_000, todayValueCents: 36_533_638 });
     expect(far.texts.intro).toBe('Para juntar R$ 1.000.000,00:');
-    expect(far.texts.lines).toEqual([T.todayValue(450, far.growth!.todayValueCents!)]);
+    expect(far.texts.lines).toEqual([
+      T.todayValue(450, far.growth!.finalCents, far.growth!.todayValueCents!),
+      'Para manter o poder de compra de R$ 1.000.000,00, escolha "Corrigir a meta pela inflação".',
+    ]);
     expect(far.monthsWithoutYield).toBeNull();
   });
 
@@ -446,6 +461,97 @@ describe('formulário e textos (spec2 §4.7)', () => {
       'Na hipótese informada, o que você já tem chega a R$ 5.029,25 em 14 meses, sem guardar mais nada por mês.',
       'Sem rendimento, seriam R$ 35,72 por mês.',
     ]);
+  });
+
+  it('inflação (retorno de 17/11/2026): "Mostrar em dinheiro de hoje" só informa; "Corrigir a meta pela inflação" sobe a meta e o valor por mês', () => {
+    // O exemplo do retorno: R$ 10.000,00 em 60 meses, 3,4% ao ano (0,28% ao mês, taxa equivalente), aportes no início do mês.
+    const base = { mode: 'quanto-guardar' as const, targetText: '10.000,00', monthsText: '60', rateText: '3,4' };
+    const plain = ok(base);
+    expect([plain.monthlyCents, plain.monthlyWithoutYieldCents, plain.growth!.finalCents]).toEqual([15_292, 16_667, 1_000_063]);
+    // Conferido com Python Decimal (50 dígitos): fator dos aportes no início do mês 65,39779134; 1.000.000 ÷ 65,39779134 = 15.291,04
+    // centavos, para cima no centavo: R$ 152,92. Com os aportes no fim do mês seriam R$ 153,34.
+    const show = ok({ ...base, inflationOn: true, inflationText: '12' });
+    expect(show.monthlyCents).toBe(15_292);
+    expect(show.targetAdjustedCents).toBeNull();
+    expect(show.growth!.todayValueCents).toBe(567_462);
+    expect(simulationResultLines(show)).toEqual([
+      'Para juntar R$ 10.000,00 em 60 meses:',
+      'R$ 152,92 por mês na hipótese informada',
+      'Sem rendimento, seriam R$ 166,67 por mês.',
+      'Em dinheiro de hoje, com inflação de 12% ao ano, o total de R$ 10.000,63 equivale a R$ 5.674,62.',
+      'Para manter o poder de compra de R$ 10.000,00, escolha "Corrigir a meta pela inflação".',
+    ]);
+    expect(show.hypotheses[3]).toBe(
+      'Inflação de 12% ao ano (0,95% ao mês, taxa equivalente), constante no período, só para mostrar o valor em dinheiro de hoje: a meta e o valor por mês não mudam.',
+    );
+    // Corrigindo: meta = R$ 10.000,00 × 1,12^5 = R$ 17.623,4168, no centavo R$ 17.623,42; por mês, 1.762.342 ÷ 65,39779134 = 26.948,03
+    // centavos, para cima: R$ 269,49; sem rendimento, teto(1.762.342 ÷ 60) = R$ 293,73.
+    const adjust = ok({ ...base, inflationOn: true, adjustTarget: true, inflationText: '12' });
+    expect(adjust).toMatchObject({ targetAdjustedCents: 1_762_342, monthlyCents: 26_949, monthlyWithoutYieldCents: 29_373 });
+    expect(adjust.growth).toMatchObject({ finalCents: 1_762_405, todayValueCents: 1_000_035 });
+    expect(simulationResultLines(adjust)).toEqual([
+      'Para juntar o equivalente a R$ 10.000,00 de hoje em 60 meses:',
+      'R$ 269,49 por mês na hipótese informada',
+      'Com inflação de 12% ao ano, a meta corrigida é de R$ 17.623,42 em 60 meses.',
+      'Sem rendimento, seriam R$ 293,73 por mês.',
+      'Em dinheiro de hoje, com inflação de 12% ao ano, o total de R$ 17.624,05 equivale a R$ 10.000,35.',
+    ]);
+    expect(adjust.hypotheses[3]).toBe(
+      'Inflação de 12% ao ano (0,95% ao mês, taxa equivalente), constante no período, para corrigir a meta: a meta de hoje com a inflação de todo o prazo, no centavo.',
+    );
+    expect(adjust.input).toMatchObject({ adjustTarget: true, inflationBp: 1_200 });
+    // "Criar meta com estes valores" leva a meta corrigida e o valor por mês recalculado.
+    expect(simulationGoalPrefill(adjust, DEMO_TODAY)).toMatchObject({ targetText: '17.623,42', plannedText: '269,49' });
+    // Inflação 0 com a correção: a mesma conta sem inflação.
+    const zero = ok({ ...base, inflationOn: true, adjustTarget: true, inflationText: '0' });
+    expect([zero.monthlyCents, zero.targetAdjustedCents]).toEqual([15_292, 1_000_000]);
+  });
+
+  it('inflação em "Em quanto tempo": com a meta corrigida, o prazo é o primeiro mês em que o total alcança a meta corrigida até ele', () => {
+    const base = { mode: 'em-quanto-tempo' as const, targetText: '22.500,00', initialText: '4.500,00', monthlyText: '1.000,00', rateText: '10' };
+    const adjust = ok({ ...base, inflationOn: true, adjustTarget: true, inflationText: '4,5' });
+    const n = adjust.months!;
+    expect(n).toBeGreaterThan(17);
+    expect(adjust.targetAdjustedCents).toBe(adjustedTargetCents(2_250_000, n, 450));
+    expect(finalValueCents(450_000, 100_000, n, 1_000)).toBeGreaterThanOrEqual(adjustedTargetCents(2_250_000, n, 450));
+    expect(finalValueCents(450_000, 100_000, n - 1, 1_000)).toBeLessThan(adjustedTargetCents(2_250_000, n - 1, 450));
+    expect(adjust.texts.intro).toBe('Para juntar o equivalente a R$ 22.500,00 de hoje, começando com R$ 4.500,00:');
+    expect(adjust.texts.lines[0]).toBe(`Com inflação de 4,5% ao ano, a meta corrigida é de ${formatBRL(adjust.targetAdjustedCents!)} em ${n} meses.`);
+    expect(adjust.monthsWithoutYield).toBe(monthsForAdjustedTarget(2_250_000, 450_000, 100_000, 0, 450));
+    // Inflação maior que o que os aportes alcançam: não chega em 50 anos.
+    const never = ok({ mode: 'em-quanto-tempo', targetText: '1.000.000,00', monthlyText: '100,00', rateText: '0', inflationOn: true, adjustTarget: true, inflationText: '30' });
+    expect(never.unreachable).toBe(true);
+    expect(monthsForAdjustedTarget(100_000_000, 0, 10_000, 0, 3_000)).toBeNull();
+    expect(monthsForAdjustedTarget(2_250_000, 450_000, 100_000, 1_000, 0)).toBe(17);
+  });
+
+  it('meta corrigida acima de R$ 9.999.999,99: "o resultado passa do que o simulador mostra"', () => {
+    const out = validateSimulationDraft({ ...emptySimulationDraft('quanto-guardar'), targetText: '9.000.000,00', monthsText: '120', rateText: '10', inflationOn: true, adjustTarget: true, inflationText: '10' });
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.codes).toEqual({ monthsText: 'resultado_alto' });
+    expect(adjustedTargetCents(1_000_000, 12, 1_000)).toBe(1_100_000);
+    expect(adjustedTargetCents(1_000_000, 0, 1_000)).toBe(1_000_000);
+    expect(adjustedTargetCents(1_000_000, 60, 0)).toBe(1_000_000);
+    expect(adjustedTargetCents(1_000_000, 60, 1_200)).toBe(1_762_342);
+  });
+
+  it('as escolhas da inflação na tela: três com meta, duas em "Quanto posso ter"', () => {
+    expect(simulationInflationChoices('quanto-guardar')).toEqual(['nenhuma', 'mostrar', 'corrigir']);
+    expect(simulationInflationChoices('quanto-ter')).toEqual(['nenhuma', 'mostrar']);
+    expect(simulationInflationChoice({ mode: 'quanto-guardar', inflationOn: false, adjustTarget: true })).toBe('nenhuma');
+    expect(simulationInflationChoice({ mode: 'quanto-guardar', inflationOn: true })).toBe('mostrar');
+    expect(simulationInflationChoice({ mode: 'quanto-guardar', inflationOn: true, adjustTarget: true })).toBe('corrigir');
+    expect(simulationInflationChoice({ mode: 'quanto-ter', inflationOn: true, adjustTarget: true })).toBe('mostrar');
+    expect(simulationInflationPatch('corrigir')).toEqual({ inflationOn: true, adjustTarget: true });
+    expect(simulationInflationPatch('mostrar')).toEqual({ inflationOn: true, adjustTarget: false });
+    expect(simulationInflationPatch('nenhuma')).toEqual({ inflationOn: false, adjustTarget: false });
+    expect(T.fields.inflationChoices).toEqual({ nenhuma: 'Sem inflação', mostrar: 'Mostrar em dinheiro de hoje', corrigir: 'Corrigir a meta pela inflação' });
+    expect(simulationInflationHint('quanto-guardar', 'mostrar')).toBe('Só informa: a meta e o valor por mês não mudam. O resultado mostra quanto o total vale em dinheiro de hoje.');
+    expect(simulationInflationHint('quanto-guardar', 'corrigir')).toBe('Para manter o poder de compra: a meta sobe com a inflação até o fim do prazo, e o valor por mês é recalculado.');
+    expect(simulationInflationHint('em-quanto-tempo', 'corrigir')).toBe('Para manter o poder de compra: a meta sobe com a inflação até o fim do prazo, e o prazo é recalculado.');
+    expect(simulationInflationHint('quanto-ter', 'mostrar')).toBe('Só informa: o valor por mês não muda. O resultado mostra quanto o total vale em dinheiro de hoje.');
+    // A prévia das hipóteses acompanha a escolha.
+    expect(previewHypotheses({ mode: 'quanto-guardar', rateText: '3,4', inflationOn: true, adjustTarget: true, inflationText: '12' })[3]).toMatch(/para corrigir a meta/);
   });
 
   it('taxa 0: o resultado é o mesmo sem rendimento, com a hipótese dita', () => {
@@ -645,7 +751,7 @@ describe('hipóteses antes do resultado (tela /simular)', () => {
     expect(previewHypotheses(draft({ ...base, inflationOn: false, inflationText: '4,5' }))[3]).toBe('Sem inflação, salvo se informada.');
     expect(previewHypotheses(draft({ ...base, inflationOn: true, inflationText: '' }))[3]).toBe('Sem inflação, salvo se informada.');
     expect(previewHypotheses(draft({ ...base, inflationOn: true, inflationText: '4,5' }))[3]).toBe(
-      'Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para o valor em dinheiro de hoje.',
+      'Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para mostrar o valor em dinheiro de hoje: a meta e o valor por mês não mudam.',
     );
   });
 

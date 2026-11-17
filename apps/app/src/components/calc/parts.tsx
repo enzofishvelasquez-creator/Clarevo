@@ -122,6 +122,7 @@ export function CalcResult({
   level = 2,
   waiting = CALC_UI_TEXT.waiting,
   maskMoney = false,
+  body,
   children,
 }: {
   texts: CalcTexts | null;
@@ -130,6 +131,11 @@ export function CalcResult({
   waiting?: string;
   /** Com "Ocultar valores" ligado, os valores em reais do resultado aparecem como "R$ ••••" (só para o que vem de dados guardados). */
   maskMoney?: boolean;
+  /**
+   * Corpo próprio do resultado, no lugar das linhas (dentro da mesma região viva): "Em que ordem quitar as dívidas?" mostra a resposta,
+   * a comparação lado a lado e o plano passo a passo. O anúncio no iOS continua sendo o texto de `resultLines`.
+   */
+  body?: ReactNode;
   children?: ReactNode;
 }) {
   const hidden = useValuesHidden() && maskMoney;
@@ -153,7 +159,9 @@ export function CalcResult({
         {title}
       </Txt>
       <View collapsable={false} style={{ gap: space[3] }} accessibilityLiveRegion="polite" aria-live="polite">
-        {shown ? (
+        {shown && body ? (
+          body
+        ) : shown ? (
           <>
             <Txt style={[styles.lead, tabular]} accessibilityLabel={hidden ? maskMoneyLabel(texts.resultLines[0]!, true) : undefined}>
               {lead}
@@ -510,3 +518,6 @@ const styles = StyleSheet.create({
  * do LinkButton).
  */
 export const calcInlineLink = styles.inlineLink;
+
+/** Estilo da linha de destaque do resultado (a primeira), para corpos próprios do resultado. */
+export const calcLeadStyle = styles.lead;

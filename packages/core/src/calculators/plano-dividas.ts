@@ -2,6 +2,7 @@ import { looksLikeCardNumber } from '../cards';
 import type { IsoDate, IsoMonth } from '../dates';
 import { addMonths, formatMonthYearBR, monthOf } from '../dates';
 import { effectiveOverdue } from '../dia-util';
+import { formatInteger } from '../learn/format';
 import { roundDivBig } from '../learn/math';
 import { centsToInput, formatBRL, type Cents } from '../money';
 import type { Commitment, CommitmentSeries } from '../records';
@@ -71,6 +72,12 @@ export const PLANO_RATE_RANGE = { parcelada: { min: 0, max: 9_999 }, saldo: { mi
 export const PLANO_ESTIMATE_TEXT = 'Estimativa. O valor oficial de cada dívida é o que a instituição informar; peça o valor atualizado.';
 
 export const PLANO_TEXT = {
+  /**
+   * Abertura da tela (retorno de 17/11/2026: "a página inteira falha em demonstrar o seu objetivo"): para que serve, em duas frases
+   * simples, antes da lista.
+   */
+  intro:
+    'Monte um plano para quitar as suas dívidas. Informe cada dívida e quanto consegue pôr a mais por mês: a conta mostra por qual começar, quando cada uma acaba e quanto de juros sai da conta, em duas ordens lado a lado.',
   emptyList: 'Acrescente as dívidas que você quer comparar.',
   addDebt: 'Acrescentar dívida',
   maxReached: 'Você chegou a 10 dívidas. Tire alguma da conta para acrescentar outra.',
@@ -86,7 +93,8 @@ export const PLANO_TEXT = {
   typeGroup: (name: string) => `Tipo de dívida, ${name}`,
   loadFailed: 'Não foi possível ler os seus parcelamentos agora. Você pode acrescentar as dívidas à mão.',
   loading: 'Lendo os seus parcelamentos',
-  typeHint: 'Parcelada: financiamento, compra parcelada ou outro parcelamento. Saldo com juros: rotativo do cartão, cheque especial ou outra dívida com saldo.',
+  typeHint:
+    'Parcelada: financiamento, compra parcelada ou outro parcelamento, com parcela fixa até o fim. Saldo com juros: rotativo do cartão, cheque especial ou outra dívida em que os juros entram todo mês sobre o que falta.',
   /** Mostrado junto do campo "Quanto você paga por mês" e entre as notas do resultado. */
   balanceStays: 'Com este pagamento, o saldo não diminui.',
   /** Legenda de "Sem valor a mais" quando há 2 ou mais dívidas e nenhum valor a mais: explica por que as ordens terminam antes. */
@@ -105,24 +113,39 @@ export const PLANO_TEXT = {
     maior_taxa: 'Maior taxa primeiro',
     menor_divida: 'Menor dívida primeiro',
   },
-  /** Teste de 09/11/2026 ("não tem uma indicação clara"): quando as duas ordens terminam no mesmo mês com os mesmos juros, uma frase só. */
-  sameOutcome: 'As duas ordens dão no mesmo',
+  /** As duas ordens como fatos, lado a lado (retorno de 17/11/2026). */
+  comparisonTitle: 'As duas ordens, lado a lado',
+  rows: {
+    start: 'Começa por',
+    first: 'Primeira a acabar',
+    end: 'Tudo termina em',
+    interest: 'Juros estimados',
+  },
+  /** Valores da comparação quando a ordem passa de 50 anos. */
+  rowNever: {
+    first: 'nenhuma em 50 anos',
+    end: 'mais de 50 anos',
+    interest: 'sem estimativa',
+  },
+  /** "Começa por", sem valor a mais, quando todas as dívidas acabam no mesmo mês: nada é passado adiante. */
+  startNone: 'todas acabam juntas',
+  /** O plano prático de cada ordem: com qual dívida começar, onde pôr o valor a mais, quando cada uma acaba e o que fazer depois. */
+  planTitle: 'O plano, passo a passo',
+  /** Teste de 09/11/2026 ("informação demais junta e repetida"): quando as duas ordens dão no mesmo plano, um bloco só. */
   bothTitle: 'As duas ordens',
   bothCaption: 'Maior taxa primeiro e Menor dívida primeiro: com estes números, dão no mesmo.',
-  /** A referência, em relação à ordem que termina antes: o que muda ao passar as parcelas adiante (e ao pôr o valor a mais). */
-  baselineLead: (extra: boolean) => `${extra ? 'Sem o valor a mais e sem' : 'Sem'} passar nada adiante, só com os pagamentos de sempre`,
-  sameInterest: 'As duas ordens têm o mesmo total de juros.',
-  sameFirst: 'A primeira dívida termina no mesmo mês nas duas ordens.',
-  sameEnd: 'Tudo termina no mesmo mês nas duas ordens.',
+  sameOutcome: 'Com estes números, as duas ordens dão no mesmo: o mesmo plano, o mesmo fim e os mesmos juros estimados.',
   hypotheses: {
     fixedRates: 'Taxas fixas, sem novas compras nem atrasos.',
     noFees: 'Sem IOF nem tarifas.',
     endOfMonth: 'Pagamentos no fim de cada mês, a partir do mês seguinte.',
     minimums: 'Cada dívida recebe todo mês a parcela, ou o pagamento que você informou.',
-    snowballWithExtra: 'O valor a mais e as parcelas das dívidas já quitadas vão para a primeira dívida da ordem; o restante passa para a seguinte, no mesmo mês.',
-    snowballNoExtra: 'As parcelas das dívidas já quitadas vão para a primeira dívida da ordem; o restante passa para a seguinte, no mesmo mês.',
+    snowballWithExtra: 'O valor a mais e os pagamentos das dívidas que acabam vão para a primeira dívida da ordem que ainda não acabou; o que sobrar passa para a seguinte, no mesmo mês.',
+    snowballNoExtra: 'Os pagamentos das dívidas que acabam vão para a primeira dívida da ordem que ainda não acabou; o que sobrar passa para a seguinte, no mesmo mês.',
     extraOnly: 'O valor a mais vai para a dívida todo mês, além do pagamento de sempre.',
-    baseline: '"Sem valor a mais" paga cada dívida só com os pagamentos de sempre, sem passar nada adiante.',
+    orders:
+      'Maior taxa primeiro: o que sobra vai antes para a dívida com a maior taxa ao mês. Menor dívida primeiro: vai antes para a dívida com o menor saldo hoje. Empate: a outra regra, depois a ordem da lista.',
+    baseline: 'O ganho é comparado com pagar só o de sempre em cada dívida, sem o valor a mais e sem passar nada adiante.',
     presentValue: 'O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada. A parcela segue a tabela do contrato e o valor a mais abate o saldo.',
     overdueOut: 'Dos seus parcelamentos, entram só as parcelas que vencem de hoje em diante; as já vencidas e em aberto ficam fora desta conta.',
     noRate: (name: string) => `${name}: sem juros informados, conta só as parcelas.`,
@@ -139,7 +162,7 @@ export const PLANO_FIELDS: Record<PlanoCampo | 'extra' | 'dividas', CalcFieldSpe
   },
   apelido: {
     label: 'Apelido',
-    hint: 'Opcional. Até 30 caracteres. Fica só nesta tela.',
+    hint: 'Opcional. Até 30 caracteres. É o nome da dívida no plano e fica só nesta tela.',
     kind: 'texto',
     optional: true,
     errors: {
@@ -156,8 +179,17 @@ export const PLANO_FIELDS: Record<PlanoCampo | 'extra' | 'dividas', CalcFieldSpe
     ],
     errors: { vazio: 'Escolha o tipo da dívida.' },
   },
-  parcela: moneyField('Valor da parcela', 'o valor da parcela', '850,00'),
-  restantes: countField('Parcelas que faltam', 'quantas parcelas faltam', 1, 480, 'Use de 1 a 480 parcelas.', 'De 1 a 480'),
+  parcela: moneyField('Valor da parcela', 'o valor da parcela', '850,00', {
+    hint: 'O que você já paga por mês nesta dívida. Quando ela acaba, este valor passa para a próxima do plano.',
+  }),
+  restantes: countField(
+    'Parcelas que faltam',
+    'quantas parcelas faltam',
+    1,
+    480,
+    'Use de 1 a 480 parcelas.',
+    'De 1 a 480. Diz quando a dívida acaba sem nada a mais.',
+  ),
   taxaParcelada: {
     ...rateField(
       'Taxa de juros ao mês do contrato (%)',
@@ -166,11 +198,13 @@ export const PLANO_FIELDS: Record<PlanoCampo | 'extra' | 'dividas', CalcFieldSpe
       PLANO_RATE_RANGE.parcelada.min,
       PLANO_RATE_RANGE.parcelada.max,
       'Use uma taxa de 0,00% a 99,99% ao mês, ou deixe em branco.',
-      'Opcional. Está no contrato ou no extrato. Em branco: conta só as parcelas.',
+      'Opcional. Está no contrato ou no extrato. Define o lugar da dívida em "Maior taxa primeiro" e quanto de juros o valor a mais evita. Em branco: conta só as parcelas.',
     ),
     optional: true,
   },
-  saldo: moneyField('Saldo hoje', 'o saldo de hoje', '1.000,00'),
+  saldo: moneyField('Saldo hoje', 'o saldo de hoje', '1.000,00', {
+    hint: 'Quanto falta pagar hoje. Define o lugar da dívida em "Menor dívida primeiro".',
+  }),
   taxaSaldo: rateField(
     'Taxa de juros ao mês (%)',
     'a taxa ao mês',
@@ -178,12 +212,14 @@ export const PLANO_FIELDS: Record<PlanoCampo | 'extra' | 'dividas', CalcFieldSpe
     PLANO_RATE_RANGE.saldo.min,
     PLANO_RATE_RANGE.saldo.max,
     'Use uma taxa de 0,01% a 99,99% ao mês.',
-    'Está na fatura, no extrato ou no contrato.',
+    'Está na fatura, no extrato ou no contrato. Define os juros de cada mês e o lugar da dívida em "Maior taxa primeiro".',
   ),
-  pagamento: moneyField('Quanto você paga por mês', 'quanto você paga por mês', '200,00'),
+  pagamento: moneyField('Quanto você paga por mês', 'quanto você paga por mês', '200,00', {
+    hint: 'O que você já paga por mês. Precisa passar dos juros do mês para o saldo diminuir. Quando ela acaba, este valor passa para a próxima.',
+  }),
   extra: {
     label: 'Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?',
-    hint: 'Opcional, como 200,00. Em branco: a conta usa só as parcelas e os pagamentos informados acima.',
+    hint: 'Opcional, como 200,00. Vai todo mês para a dívida por onde o plano começa e encurta o prazo. Em branco: a conta usa só os pagamentos informados acima.',
     kind: 'dinheiro',
     optional: true,
     errors: { invalido: 'Confira o valor, como 200,00.', acima_do_limite: LIMIT_TEXT },
@@ -240,10 +276,41 @@ export interface PlanoScenario {
   summary: string;
   /** "Total pago: R$ ...", "Juros estimados: R$ ...". */
   detailLines: string[];
-  /** "1. Cartão: termina em 5 meses (março de 2027)." */
+  /**
+   * "1. Cartão: termina em 5 meses (março de 2027)." Só em "Sem valor a mais", com 2 ou mais dívidas: nas ordens, quando cada dívida
+   * acaba já está no plano passo a passo (PlanoResult.plans).
+   */
   sequenceLines: string[];
   /** Legenda junto ao título; só em "Sem valor a mais", com 2 ou mais dívidas e nenhum valor a mais. */
   caption: string | null;
+}
+
+/** Uma linha da comparação: o nome do dado e um valor por ordem, na ordem das colunas. */
+export interface PlanoComparisonRow {
+  label: string;
+  values: string[];
+}
+
+/** As duas ordens lado a lado, como fatos: por qual começa, a primeira a acabar, quando tudo termina e os juros estimados. */
+export interface PlanoComparison {
+  /** "Maior taxa primeiro", "Menor dívida primeiro". */
+  columns: string[];
+  rows: PlanoComparisonRow[];
+  /** As mesmas informações em uma frase por ordem (texto corrido, leitor de tela e site). */
+  lines: string[];
+}
+
+/** O plano prático de uma ordem: por qual dívida começar, onde vai o valor a mais e o que fazer quando cada dívida acaba. */
+export interface PlanoPlan {
+  id: PlanoScenarioId | 'ambas';
+  /** "Maior taxa primeiro", "Menor dívida primeiro", "As duas ordens" ou, com uma dívida, "O plano, passo a passo". */
+  title: string;
+  /** Dívida que recebe primeiro o que sobra (o valor a mais desde o mês 1); null quando nada é passado adiante. */
+  startName: string | null;
+  /** "A partir de novembro de 2026 (mês 1): ...", "Abril de 2027 (mês 6): Cartão azul acaba. O pagamento dela ...". */
+  steps: string[];
+  /** "Ganho estimado, em relação a pagar só o de sempre: 12 meses antes e R$ 2.216,64 a menos de juros."; null sem ganho. */
+  gain: string | null;
 }
 
 export interface PlanoResult extends CalcTexts {
@@ -254,8 +321,19 @@ export interface PlanoResult extends CalcTexts {
   /** Soma dos saldos iniciais das dívidas que entram. */
   initialSumCents: Cents;
   scenarios: PlanoScenario[];
-  /** Diferenças entre as duas ordens, em frases neutras (vazia com 1 dívida ou quando uma ordem passa de 600 meses). */
+  /**
+   * A resposta em uma frase, primeiro (retorno de 17/11/2026): o que a pessoa ganha com o valor a mais (ou passando adiante o
+   * pagamento de cada dívida que acaba), em meses e em juros estimados.
+   */
+  headline: string;
+  /** As duas ordens lado a lado; null com 1 dívida ou quando as duas dão exatamente no mesmo. */
+  comparison: PlanoComparison | null;
+  /** Diferenças entre as duas ordens, como fatos neutros (vazia com 1 dívida ou quando uma ordem passa de 600 meses). */
   differences: string[];
+  /** O plano prático de cada ordem (um só quando as duas dão no mesmo plano; com 1 dívida, o plano com o valor a mais). */
+  plans: PlanoPlan[];
+  /** Linhas finais do resultado ("Informe quanto a mais você consegue pôr por mês para ver o efeito."). */
+  tailLines: string[];
   /** As duas ordens terminam no mesmo mês, com os mesmos juros e a primeira dívida no mesmo mês (sempre false com 1 dívida). */
   sameOutcome: boolean;
 }
@@ -398,6 +476,7 @@ function buildScenario(
   included: readonly PlanoDebtInfo[],
   today: IsoDate | undefined,
   caption: string | null = null,
+  withSequence = false,
 ): PlanoScenario {
   const title = PLANO_TEXT.scenario[id];
   if (sim.months === null) {
@@ -432,27 +511,44 @@ function buildScenario(
     sequence,
     summary: `${title}: tudo termina em ${monthsDuration(sim.months)}${endMonth ? `, em ${formatMonthYearBR(endMonth)}` : ''}.`,
     detailLines: [`Total pago: ${formatBRL(sim.totalPaid)}`, `Juros estimados: ${formatBRL(interest)}`],
-    sequenceLines: sequence.map((s, k) => `${k + 1}. ${s.name}: termina em ${monthsCount(s.month)}${s.calendar ? ` (${formatMonthYearBR(s.calendar)})` : ''}.`),
+    sequenceLines: withSequence ? sequence.map((s, k) => `${k + 1}. ${s.name}: termina em ${monthsCount(s.month)}${s.calendar ? ` (${formatMonthYearBR(s.calendar)})` : ''}.`) : [],
     caption,
   };
 }
 
-/** Frases neutras sobre a diferença entre as duas ordens (só quando as duas terminam em até 600 meses). */
+const brl = formatBRL;
+
+/** "8 meses (julho de 2027)"; sem a data de hoje, "8 meses". */
+function whenText(months: number, calendar: IsoMonth | null): string {
+  return `${monthsCount(months)}${calendar ? ` (${formatMonthYearBR(calendar)})` : ''}`;
+}
+
+/** Começo de um passo do plano: "Abril de 2027 (mês 6)"; sem a data de hoje, "Mês 6". */
+function stepWhen(month: number, today: IsoDate | undefined): string {
+  const cal = calendarMonth(today, month);
+  if (!cal) return `Mês ${formatInteger(month)}`;
+  const text = formatMonthYearBR(cal);
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)} (mês ${formatInteger(month)})`;
+}
+
+/** "A", "A e B", "A, B e C". */
+function namesList(names: readonly string[]): string {
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
+}
+
+/** Diferenças entre as duas ordens, como fatos (só as que existem; só quando as duas terminam em até 600 meses). */
 function differences(maior: PlanoScenario, menor: PlanoScenario): string[] {
   if (maior.months === null || menor.months === null) return [];
   const out: string[] = [];
   const interest = menor.interestCents! - maior.interestCents!;
-  if (interest > 0) out.push(`${maior.title}: ${formatBRL(interest)} a menos de juros.`);
-  else if (interest < 0) out.push(`${menor.title}: ${formatBRL(-interest)} a menos de juros.`);
-  else out.push(PLANO_TEXT.sameInterest);
+  if (interest > 0) out.push(`Na ordem ${maior.title}, os juros estimados são ${brl(interest)} menores.`);
+  else if (interest < 0) out.push(`Na ordem ${menor.title}, os juros estimados são ${brl(-interest)} menores.`);
   const first = menor.firstMonth! - maior.firstMonth!;
-  if (first < 0) out.push(`${menor.title}: a primeira dívida termina ${monthsCount(-first)} antes.`);
-  else if (first > 0) out.push(`${maior.title}: a primeira dívida termina ${monthsCount(first)} antes.`);
-  else out.push(PLANO_TEXT.sameFirst);
+  if (first < 0) out.push(`Na ordem ${menor.title}, a primeira dívida acaba ${monthsCount(-first)} antes.`);
+  else if (first > 0) out.push(`Na ordem ${maior.title}, a primeira dívida acaba ${monthsCount(first)} antes.`);
   const end = menor.months - maior.months;
-  if (end < 0) out.push(`${menor.title}: tudo termina ${monthsCount(-end)} antes.`);
-  else if (end > 0) out.push(`${maior.title}: tudo termina ${monthsCount(end)} antes.`);
-  else out.push(PLANO_TEXT.sameEnd);
+  if (end < 0) out.push(`Na ordem ${menor.title}, tudo termina ${monthsCount(-end)} antes.`);
+  else if (end > 0) out.push(`Na ordem ${maior.title}, tudo termina ${monthsCount(end)} antes.`);
   return out;
 }
 
@@ -467,51 +563,156 @@ function sameOutcome(a: PlanoScenario, b: PlanoScenario): boolean {
 }
 
 /**
- * A primeira linha quando as ordens diferem, com as duas no mesmo peso (D-040(2): nenhuma ordem em destaque): "Passando adiante a
- * parcela de cada dívida quitada, tudo termina em 14 meses (1 ano e 2 meses) ou em 15 meses (1 ano e 3 meses), conforme a ordem."
+ * Por qual dívida o plano começa: a que recebe primeiro o que sobra. Com valor a mais, a primeira da ordem (no mês 1 todas estão
+ * abertas); sem ele, nada sobra até a primeira dívida acabar, e quem recebe é a primeira da ordem que ainda não acabou nesse mês.
+ * null quando todas acabam juntas sem valor a mais (nada é passado adiante).
  */
-function ordersLead(maior: PlanoScenario, menor: PlanoScenario, extra: boolean): string {
-  const lead = extra ? 'Com o valor a mais e passando adiante a parcela de cada dívida quitada' : 'Passando adiante a parcela de cada dívida quitada';
-  const when = (s: PlanoScenario) => `${monthsDuration(s.months!)}${s.endMonth ? `, em ${formatMonthYearBR(s.endMonth)}` : ''}`;
-  if (maior.months !== null && menor.months !== null) {
-    if (maior.months === menor.months) return `${lead}, tudo termina em ${when(maior)}, nas duas ordens.`;
-    const [first, second] = maior.months < menor.months ? [maior, menor] : [menor, maior];
-    return `${lead}, tudo termina em ${when(first)} ou em ${when(second)}, conforme a ordem.`;
+function planStart(order: readonly number[], closedAt: readonly number[], included: readonly PlanoDebtInfo[], extraCents: Cents): string | null {
+  if (extraCents > 0) return included[order[0]!]!.name;
+  const first = Math.min(...closedAt);
+  const k = order.find((i) => closedAt[i]! > first);
+  return k === undefined ? null : included[k]!.name;
+}
+
+/**
+ * O plano de uma ordem, passo a passo (retorno de 17/11/2026: "com qual dívida começar, onde colocar o valor a mais, quando cada
+ * dívida acaba e o que fazer quando uma acabar"). O primeiro passo diz onde vai o valor a mais; depois, um passo por mês em que alguma
+ * dívida acaba, dizendo para onde vai o pagamento dela e quanto a dívida seguinte passa a receber além do pagamento de sempre (o valor
+ * a mais somado aos pagamentos das que já acabaram). O ganho é comparado com "Sem valor a mais".
+ */
+function buildPlan(
+  id: PlanoPlan['id'],
+  title: string,
+  order: readonly number[],
+  sim: SimOutcome,
+  included: readonly PlanoDebtInfo[],
+  extraCents: Cents,
+  today: IsoDate | undefined,
+  base: PlanoScenario,
+  scenario: PlanoScenario,
+): PlanoPlan {
+  if (sim.months === null) return { id, title, startName: null, steps: [PLANO_TEXT.noEnd], gain: null };
+  const many = included.length > 1;
+  const startName = planStart(order, sim.closedAt, included, extraCents);
+  const steps: string[] = [];
+  const everyone = many ? 'o pagamento de sempre de cada dívida' : 'o pagamento de sempre';
+  steps.push(
+    `A partir ${today ? `de ${formatMonthYearBR(calendarMonth(today, 1)!)} (mês 1)` : 'do mês 1'}: ${everyone}${
+      extraCents > 0 ? ` e os ${brl(extraCents)} a mais em ${included[order[0]!]!.name}` : ''
+    }.`,
+  );
+  const months = [...new Set(sim.closedAt)].sort((a, b) => a - b);
+  const closed = new Set<number>();
+  for (const m of months) {
+    const group = included.map((_, k) => k).filter((k) => sim.closedAt[k] === m);
+    for (const k of group) closed.add(k);
+    const names = namesList(group.map((k) => included[k]!.name));
+    const verb = group.length === 1 ? 'acaba' : 'acabam';
+    const open = order.filter((k) => !closed.has(k));
+    if (open.length === 0) {
+      steps.push(`${stepWhen(m, today)}: ${names} ${verb}${many ? ', e tudo está quitado' : ''}.`);
+      continue;
+    }
+    const freed = group.reduce((s, k) => s + included[k]!.minimumCents, 0);
+    const receives = extraCents + [...closed].reduce((s, k) => s + included[k]!.minimumCents, 0);
+    const target = included[open[0]!]!.name;
+    const their = group.length === 1 ? `O pagamento dela (${brl(freed)})` : `Os pagamentos delas (${brl(freed)})`;
+    steps.push(
+      `${stepWhen(m, today)}: ${names} ${verb}. ${their} ${group.length === 1 ? 'passa' : 'passam'} para ${target}${
+        receives !== freed ? `, que fica com ${brl(receives)} por mês além do pagamento de sempre` : ''
+      }.`,
+    );
   }
-  const ends = maior.months !== null ? maior : menor;
-  return `${lead}, tudo termina em ${when(ends)} em uma das ordens; na outra, as dívidas não terminam em 50 anos.`;
+  let gain: string | null = null;
+  if (base.months === null) {
+    gain = `Só com o de sempre, ${many ? 'as dívidas não terminariam' : 'a dívida não terminaria'} em 50 anos.`;
+  } else {
+    const earlier = base.months - scenario.months!;
+    const saved = base.interestCents! - scenario.interestCents!;
+    const parts = [...(earlier > 0 ? [`${monthsCount(earlier)} antes`] : []), ...(saved > 0 ? [`${brl(saved)} a menos de juros`] : [])];
+    if (parts.length > 0) gain = `Ganho estimado, em relação a pagar só o de sempre: ${parts.join(' e ')}.`;
+  }
+  return { id, title, startName, steps, gain };
 }
 
-/** Das duas ordens, a que termina antes (empate: menos juros; depois, "Maior taxa primeiro"). */
-function earlierOf(maior: PlanoScenario, menor: PlanoScenario): PlanoScenario {
-  if (maior.months === null) return menor.months === null ? maior : menor;
-  if (menor.months === null) return maior;
-  if (menor.months < maior.months) return menor;
-  if (menor.months === maior.months && menor.interestCents! < maior.interestCents!) return menor;
-  return maior;
+/** As duas ordens lado a lado, com uma frase por ordem. */
+function buildComparison(
+  orders: readonly { scenario: PlanoScenario; start: string | null }[],
+): PlanoComparison {
+  const R = PLANO_TEXT.rows;
+  const N = PLANO_TEXT.rowNever;
+  const firstText = (s: PlanoScenario) => {
+    if (s.months === null) return N.first;
+    const names = namesList(s.sequence.filter((x) => x.month === s.firstMonth).map((x) => x.name));
+    const first = s.sequence[0]!;
+    return `${names}, em ${first.calendar ? formatMonthYearBR(first.calendar) : monthsCount(first.month)}`;
+  };
+  const endText = (s: PlanoScenario) => (s.months === null ? N.end : whenText(s.months, s.endMonth));
+  const interestText = (s: PlanoScenario) => (s.interestCents === null ? N.interest : brl(s.interestCents));
+  const rows: PlanoComparisonRow[] = [
+    { label: R.start, values: orders.map((o) => (o.scenario.months === null ? N.first : (o.start ?? PLANO_TEXT.startNone))) },
+    { label: R.first, values: orders.map((o) => firstText(o.scenario)) },
+    { label: R.end, values: orders.map((o) => endText(o.scenario)) },
+    { label: R.interest, values: orders.map((o) => interestText(o.scenario)) },
+  ];
+  const lines = orders.map(({ scenario: s, start }) => {
+    if (s.months === null) return `${s.title}: ${lowerFirst(PLANO_TEXT.noEnd)}`;
+    const begin = start === null ? 'nada é passado adiante antes de todas acabarem' : `começa por ${start}`;
+    const many = s.sequence.filter((x) => x.month === s.firstMonth).length > 1;
+    return `${s.title}: ${begin}; ${many ? 'as primeiras a acabar são' : 'a primeira a acabar é'} ${firstText(s)}; tudo termina em ${endText(s)}, com ${interestText(s)} de juros estimados.`;
+  });
+  return { columns: orders.map((o) => o.scenario.title), rows, lines };
 }
 
 /**
- * A referência em uma frase, em relação à ordem que termina antes: "Sem passar nada adiante, só com os pagamentos de sempre, tudo
- * terminaria em 60 meses (5 anos), em novembro de 2031: 41 meses depois e R$ 1.495,19 a mais de juros." null quando nada muda.
+ * A resposta em uma frase (retorno de 17/11/2026): o que muda com o valor a mais (ou, sem ele, passando adiante o pagamento de cada
+ * dívida que acaba), em meses e em juros estimados, em relação a pagar só o de sempre. Com as ordens diferentes, os dois números e
+ * "conforme a ordem", sem destacar uma (D-040(2)).
  */
-function baselineLine(base: PlanoScenario, best: PlanoScenario, extra: boolean, same: boolean): string | null {
-  if (best.months === null) return null;
-  const lead = PLANO_TEXT.baselineLead(extra);
-  if (base.months === null) return `${lead}, as dívidas não terminariam em 50 anos.`;
-  const later = base.months - best.months;
-  const more = base.interestCents! - best.interestCents!;
-  if (later <= 0 && more <= 0) return null;
-  // Com ordens diferentes, a comparação é com a que termina antes, sem nomear qual (D-040(2)).
-  const after = same ? 'depois' : 'depois da ordem que termina antes';
-  const tail = later > 0 && more > 0 ? `${monthsCount(later)} ${after} e ${formatBRL(more)} a mais de juros` : later > 0 ? `${monthsCount(later)} ${after}` : `${formatBRL(more)} a mais de juros`;
-  return `${lead}, tudo terminaria em ${monthsDuration(base.months)}${base.endMonth ? `, em ${formatMonthYearBR(base.endMonth)}` : ''}: ${tail}.`;
+function headlineOf(included: readonly PlanoDebtInfo[], extraCents: Cents, base: PlanoScenario, orders: readonly PlanoScenario[]): string {
+  const many = included.length > 1;
+  const when = (s: PlanoScenario) => whenText(s.months!, s.endMonth);
+  const interestClause = (s: PlanoScenario) => (s.interestCents! > 0 ? `, com ${brl(s.interestCents!)} de juros estimados` : '');
+  if (orders.length === 0) {
+    if (base.months === null) return 'Com estes números, a dívida não termina em 50 anos.';
+    return `Só com o pagamento de sempre, ${included[0]!.name} acaba em ${when(base)}${interestClause(base)}.`;
+  }
+  const ends = orders.filter((o) => o.months !== null);
+  if (ends.length === 0) {
+    return many ? 'Com estes números, as dívidas não terminam em 50 anos, em nenhuma das duas ordens.' : 'Com estes números, a dívida não termina em 50 anos, nem com o valor a mais.';
+  }
+  const lead = extraCents > 0 ? `Com ${brl(extraCents)} a mais por mês` : 'Passando adiante o pagamento de cada dívida que acaba';
+  if (ends.length < orders.length) return `${lead}, tudo termina em ${when(ends[0]!)} na ordem ${ends[0]!.title}; na outra, as dívidas não terminam em 50 anos.`;
+  const subject = many ? 'tudo termina' : `${included[0]!.name} acaba`;
+  const sorted = [...orders].sort((a, b) => a.months! - b.months!);
+  const first = sorted[0]!;
+  const last = sorted[sorted.length - 1]!;
+  const monthsDiffer = first.months !== last.months;
+  const endText = monthsDiffer ? `${when(first)} ou ${when(last)}` : when(first);
+  if (base.months === null) {
+    return `${lead}, ${subject} em ${endText}${monthsDiffer ? ', conforme a ordem' : ''}; sem isso, ${many ? 'as dívidas não terminariam' : 'a dívida não terminaria'} em 50 anos.`;
+  }
+  const savings = orders.map((o) => base.interestCents! - o.interestCents!);
+  const low = Math.min(...savings);
+  const high = Math.max(...savings);
+  const earlier = base.months > last.months!;
+  if (!earlier && high <= 0) {
+    return `Só com os pagamentos de sempre, ${subject} em ${when(base)}${interestClause(base)}.`;
+  }
+  const instead = earlier ? `, em vez de ${when(base)}` : '';
+  const saved = high <= 0 ? '' : low === high ? `, com ${brl(high)} a menos de juros estimados` : low <= 0 ? `, com até ${brl(high)} a menos de juros estimados` : `, com ${brl(low)} a ${brl(high)} a menos de juros estimados`;
+  const differ = monthsDiffer || (high > 0 && low !== high);
+  return `${lead}, ${subject} em ${endText}${instead}${saved}${differ ? ', conforme a ordem' : ''}.`;
 }
 
 /**
- * Compara a ordem "Maior taxa primeiro" com "Menor dívida primeiro" e mostra "Sem valor a mais" como referência. Com uma só
- * dívida, mostra "Sem valor a mais" e "Com o valor a mais". `today` (a data de hoje) só serve para dar nome de mês ao fim de
- * cada dívida; sem ele, o resultado fala só em quantos meses.
+ * Compara a ordem "Maior taxa primeiro" com "Menor dívida primeiro", com "Sem valor a mais" como referência do ganho. Com uma só
+ * dívida, mostra "Sem valor a mais" e "Com o valor a mais". `today` (a data de hoje) só serve para dar nome de mês ao fim de cada
+ * dívida; sem ele, o resultado fala só em quantos meses.
+ *
+ * O resultado (retorno de 17/11/2026) vem nesta ordem: a resposta em uma frase (headline), as duas ordens lado a lado (comparison) e
+ * as diferenças como fatos, o plano passo a passo de cada ordem (plans), e só depois as hipóteses e os detalhes de cada ordem.
+ * `resultLines` traz tudo isso em texto corrido, na mesma ordem.
  */
 export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcome<PlanoResult, PlanoField> {
   const r = new FieldReader<PlanoField>();
@@ -588,57 +789,70 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
   const scenarios: PlanoScenario[] = [];
   let diff: string[] = [];
   let same = false;
-  const lines: string[] = [];
+  let headline: string = PLANO_TEXT.noDebtCompared;
+  let comparison: PlanoComparison | null = null;
+  let plans: PlanoPlan[] = [];
+  const tailLines: string[] = [];
   if (included.length > 0) {
     const baseCaption = included.length > 1 && extraCents === 0 ? PLANO_TEXT.baselineCaption : null;
-    const base = buildScenario('sem_extra', simulate(sim, null), included, today, baseCaption);
+    const base = buildScenario('sem_extra', simulate(sim, null), included, today, baseCaption, included.length > 1);
     scenarios.push(base);
-    if (included.length === 1) lines.push(base.summary);
     if (included.length === 1) {
       if (extraCents > 0) {
-        const withExtra = buildScenario('com_extra', simulate(sim, { order: [0], budget }), included, today);
+        const order = [0];
+        const run = simulate(sim, { order, budget });
+        const withExtra = buildScenario('com_extra', run, included, today);
         scenarios.push(withExtra);
-        lines.push(withExtra.summary);
-        if (base.months !== null && withExtra.months !== null) {
-          const saved = base.interestCents! - withExtra.interestCents!;
-          if (saved > 0) lines.push(`Com o valor a mais: ${formatBRL(saved)} a menos de juros.`);
-          const earlier = base.months - withExtra.months;
-          if (earlier > 0) lines.push(`Com o valor a mais: tudo termina ${monthsCount(earlier)} antes.`);
-        }
+        headline = headlineOf(included, extraCents, base, [withExtra]);
+        plans = [buildPlan('com_extra', PLANO_TEXT.planTitle, order, run, included, extraCents, today, base, withExtra)];
       } else {
-        lines.push(PLANO_TEXT.needExtra);
+        headline = headlineOf(included, extraCents, base, []);
+        tailLines.push(PLANO_TEXT.needExtra);
       }
     } else {
       const positions = sim.map((_, k) => k);
       const byRate = [...positions].sort((a, b) => sim[b]!.bp - sim[a]!.bp || sim[a]!.initial - sim[b]!.initial || a - b);
       const bySize = [...positions].sort((a, b) => sim[a]!.initial - sim[b]!.initial || sim[b]!.bp - sim[a]!.bp || a - b);
-      const maior = buildScenario('maior_taxa', simulate(sim, { order: byRate, budget }), included, today);
-      const menor = buildScenario('menor_divida', simulate(sim, { order: bySize, budget }), included, today);
+      const runRate = simulate(sim, { order: byRate, budget });
+      const runSize = simulate(sim, { order: bySize, budget });
+      const maior = buildScenario('maior_taxa', runRate, included, today);
+      const menor = buildScenario('menor_divida', runSize, included, today);
       scenarios.push(maior, menor);
       diff = differences(maior, menor);
       same = sameOutcome(maior, menor);
-      // Primeiro o que as ordens dão (uma frase só quando dão no mesmo), depois a referência: o que muda em relação a só pagar as parcelas.
-      if (same) {
-        lines.push(
-          maior.months === null
-            ? `${PLANO_TEXT.sameOutcome}: ${lowerFirst(PLANO_TEXT.noEnd)}`
-            : `${PLANO_TEXT.sameOutcome}: tudo termina em ${monthsDuration(maior.months)}${maior.endMonth ? `, em ${formatMonthYearBR(maior.endMonth)}` : ''}.`,
-        );
+      headline = headlineOf(included, extraCents, base, [maior, menor]);
+      const planRate = buildPlan('maior_taxa', maior.title, byRate, runRate, included, extraCents, today, base, maior);
+      const planSize = buildPlan('menor_divida', menor.title, bySize, runSize, included, extraCents, today, base, menor);
+      const cmp = buildComparison([
+        { scenario: maior, start: planRate.startName },
+        { scenario: menor, start: planSize.startName },
+      ]);
+      // As duas ordens dão exatamente no mesmo (mesma comparação e mesmo plano): uma frase e um plano só (teste de 09/11/2026).
+      const identical = cmp.rows.every((row) => row.values[0] === row.values[1]) && planRate.steps.join('|') === planSize.steps.join('|');
+      if (identical) {
+        if (maior.months !== null) diff = [PLANO_TEXT.sameOutcome];
+        plans = maior.months === null ? [] : [{ ...planRate, id: 'ambas', title: PLANO_TEXT.bothTitle }];
       } else {
-        lines.push(ordersLead(maior, menor, extraCents > 0), maior.summary, menor.summary, ...diff);
+        comparison = cmp;
+        plans = [planRate, planSize];
       }
-      const ref = baselineLine(base, earlierOf(maior, menor), extraCents > 0, same);
-      if (ref) lines.push(ref);
+      if (extraCents === 0) tailLines.push(PLANO_TEXT.needExtra);
     }
-  } else {
-    lines.push(PLANO_TEXT.noDebtCompared);
   }
+  const planHeading = (p: PlanoPlan) => (p.id === 'com_extra' ? `${p.title}:` : `${p.title}, passo a passo:`);
+  const lines = [
+    headline,
+    ...(comparison ? comparison.lines : []),
+    ...diff,
+    ...plans.flatMap((p) => [planHeading(p), ...p.steps, ...(p.gain ? [p.gain] : [])]),
+    ...tailLines,
+  ];
 
   const H = PLANO_TEXT.hypotheses;
   const hypotheses: string[] = [H.fixedRates, H.noFees, H.endOfMonth, H.minimums];
-  if (included.length > 1) hypotheses.push(extraCents > 0 ? H.snowballWithExtra : H.snowballNoExtra);
+  if (included.length > 1) hypotheses.push(extraCents > 0 ? H.snowballWithExtra : H.snowballNoExtra, H.orders);
   else if (included.length === 1 && extraCents > 0) hypotheses.push(H.extraOnly);
-  if (included.length > 1) hypotheses.push(H.baseline);
+  if (included.length > 1 || extraCents > 0) hypotheses.push(H.baseline);
   if (included.some((d) => d.tipo === 'parcelada' && d.rateBp !== null)) hypotheses.push(H.presentValue);
   for (const d of included) if (d.tipo === 'parcelada' && d.rateBp === null) hypotheses.push(H.noRate(d.name));
 
@@ -652,7 +866,11 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
       included: included.length,
       initialSumCents: initialSum,
       scenarios,
+      headline,
+      comparison,
       differences: diff,
+      plans,
+      tailLines,
       sameOutcome: same,
       resultLines: lines,
       hypotheses,

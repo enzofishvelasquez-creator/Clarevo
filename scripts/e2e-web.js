@@ -3587,15 +3587,19 @@ setInterval(async () => {
   // 120 meses, R$ 500,00 por mês, 10% ao ano e inflação de 4,5%: R$ 100.728,79 (hoje, R$ 64.862,05).
   await field('Quanto já tem (opcional)').fill(''); await field('Em quantos meses').fill('120'); await field('Quanto vai guardar por mês').fill('500');
   ok('D inflação desligada: sem o campo "Inflação ao ano (%)"', (await p.getByLabel('Inflação ao ano (%)', { exact: true }).count()) === 0);
-  await p.getByRole('checkbox', { name: /Descontar inflação/ }).click(); await p.waitForTimeout(200);
+  // Retorno de 17/11/2026: no lugar de "Descontar inflação?", as escolhas "Sem inflação" e "Mostrar em dinheiro de hoje" (em "Quanto posso
+  // ter" não há meta para corrigir).
+  ok('D inflação em "Quanto posso ter": "Sem inflação" marcada e "Mostrar em dinheiro de hoje", sem "Corrigir a meta pela inflação"',
+    (await radio('Sem inflação').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'Mostrar em dinheiro de hoje')) === 1 && (await visibleCount('radio', 'Corrigir a meta pela inflação')) === 0);
+  await radio('Mostrar em dinheiro de hoje').click(); await p.waitForTimeout(200);
   ok('D inflação ligada: o campo vem vazio (nunca sugerido)', (await field('Inflação ao ano (%)').inputValue()) === '');
   await simulate();
   ok('D inflação ligada e vazia: erro "Digite a inflação ao ano que quer testar, de 0% a 30%."', (await body()).includes('Digite a inflação ao ano que quer testar, de 0% a 30%.'));
   await field('Inflação ao ano (%)').fill('4,5'); await simulate(); await waitText('Em dinheiro de hoje'); await p.waitForTimeout(300);
   t = await body();
   ok('D quanto posso ter, 120 meses: R$ 100.728,79 na hipótese, R$ 60.000,00 aportados, R$ 40.728,79 de rendimento e R$ 64.862,05 em dinheiro de hoje (inflação de 4,5% ao ano)', t.includes('Na hipótese informada: R$ 100.728,79 em 120 meses') && t.includes('Total aportado: R$ 60.000,00') &&
-    t.includes('Rendimento na hipótese: R$ 40.728,79') && t.includes('Em dinheiro de hoje, com inflação de 4,5% ao ano: R$ 64.862,05') && t.includes('Sem rendimento, seriam R$ 60.000,00.') &&
-    t.includes('Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para o valor em dinheiro de hoje.'));
+    t.includes('Rendimento na hipótese: R$ 40.728,79') && t.includes('Em dinheiro de hoje, com inflação de 4,5% ao ano, o total de R$ 100.728,79 equivale a R$ 64.862,05.') && t.includes('Sem rendimento, seriam R$ 60.000,00.') &&
+    t.includes('Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para mostrar o valor em dinheiro de hoje.'));
   const simChart = await p.locator('[role="img"]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter((l) => l && l.startsWith('Gráfico')));
   ok('D o gráfico por ano tem um único rótulo acessível (R$ 60.000,00 aportados, total de R$ 100.728,79)', simChart.length === 1 && simChart[0].includes('R$ 60.000,00 aportados') && simChart[0].includes('total de R$ 100.728,79'), JSON.stringify(simChart));
   await keepText();
@@ -5532,10 +5536,12 @@ setInterval(async () => {
   ok('F1 demonstração: o Financiamento do carro vem preenchido (parcela R$ 850,00, 36 parcelas, taxa em branco) e o valor a mais fica vazio',
     t.includes(F1_NAME) && t.includes('Preenchido com os seus parcelamentos em aberto.') && (await f1Value(`Valor da parcela, ${F1_NAME}`)) === '850,00' && (await f1Value(`Parcelas que faltam, ${F1_NAME}`)) === '36' &&
     (await f1Value(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`)) === '' && (await f1Value('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?')) === '', t.slice(0, 400));
-  ok('F1 demonstração: sem a taxa, conta só as parcelas e diz isso; "Sem valor a mais" termina em 36 meses (outubro de 2029) e pede o valor a mais; a dica do plano de guardar não preenche o campo',
-    t.includes('Sem valor a mais: tudo termina em 36 meses (3 anos), em outubro de 2029.') && t.includes('Informe quanto a mais você consegue pôr por mês para ver o efeito.') &&
+  ok('F1 demonstração: sem a taxa, conta só as parcelas e diz isso; só com o pagamento de sempre termina em 36 meses (outubro de 2029) e pede o valor a mais; a dica do plano de guardar não preenche o campo',
+    t.includes('Só com o pagamento de sempre, Financiamento do carro acaba em 36 meses (outubro de 2029).') && t.includes('Informe quanto a mais você consegue pôr por mês para ver o efeito.') &&
     t.includes(`${F1_NAME}: sem juros informados, conta só as parcelas.`) && t.includes('No seu plano de guardar você informou R$ 500,00 por mês.') && t.includes('Total pago: R$ 30.600,00') && t.includes('Juros estimados: R$ 0,00'));
-  ok('F1 só uma dívida: não há ordem a comparar (nenhuma das duas ordens aparece)', !t.includes('Maior taxa primeiro') && !t.includes('Menor dívida primeiro'));
+  // As dicas dos campos citam as ordens (a taxa define o lugar em "Maior taxa primeiro"); o resultado não as compara.
+  ok('F1 só uma dívida: não há ordem a comparar (nem a comparação lado a lado, nem o plano de cada ordem)', !t.includes('As duas ordens, lado a lado') && !t.includes('Maior taxa primeiro, passo a passo') && !t.includes('Na ordem '));
+  ok('F1 no topo, para que serve a tela, em duas frases (retorno de 17/11/2026)', t.includes('Monte um plano para quitar as suas dívidas. Informe cada dívida e quanto consegue pôr a mais por mês: a conta mostra por qual começar, quando cada uma acaba e quanto de juros sai da conta, em duas ordens lado a lado.'));
   ok('F1 o texto fixo da estimativa e as hipóteses visíveis',
     t.includes('Estimativa. O valor oficial de cada dívida é o que a instituição informar; peça o valor atualizado.') && t.includes('Taxas fixas, sem novas compras nem atrasos.') && t.includes('Sem IOF nem tarifas.') && t.includes('Pagamentos no fim de cada mês, a partir do mês seguinte.'));
   ok('F1 com parcelamentos lidos, as hipóteses dizem que as parcelas já vencidas e em aberto ficam fora',
@@ -5557,8 +5563,10 @@ setInterval(async () => {
     t.includes('Total pago: R$ 30.600,00') && t.includes('Juros estimados: R$ 7.088,42') && t.includes('O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada.') && !t.includes('sem juros informados'), t.slice(-900));
   await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '100,00');
   t = await body();
-  ok('F1 com R$ 100,00 a mais: "Com o valor a mais" termina em 32 meses (junho de 2029), R$ 992,59 a menos de juros e 4 meses antes',
-    t.includes('Com o valor a mais: tudo termina em 32 meses (2 anos e 8 meses), em junho de 2029.') && t.includes('Com o valor a mais: R$ 992,59 a menos de juros.') && t.includes('Com o valor a mais: tudo termina 4 meses antes.') &&
+  ok('F1 com R$ 100,00 a mais: a resposta em uma frase (32 meses, junho de 2029, em vez de 36, e R$ 992,59 a menos de juros estimados) e o plano passo a passo',
+    t.includes('Com R$ 100,00 a mais por mês, Financiamento do carro acaba em 32 meses (junho de 2029), em vez de 36 meses (outubro de 2029), com R$ 992,59 a menos de juros estimados.') &&
+    t.includes('O plano, passo a passo') && t.includes('A partir de novembro de 2026 (mês 1): o pagamento de sempre e os R$ 100,00 a mais em Financiamento do carro.') &&
+    t.includes('Junho de 2029 (mês 32): Financiamento do carro acaba.') && t.includes('Ganho estimado, em relação a pagar só o de sempre: 4 meses antes e R$ 992,59 a menos de juros.') &&
     !t.includes('Informe quanto a mais você consegue pôr por mês para ver o efeito.'), t.slice(-1200));
   await atWidths(async (w) => {
     await scrollTo('Resultado');
@@ -5586,17 +5594,17 @@ setInterval(async () => {
   await f1Fill('Taxa de juros ao mês (%), Cartão azul', '1');
   await f1Fill('Quanto você paga por mês, Cartão azul', '300,00');
   t = await body();
-  ok('F1 duas dívidas: "Maior taxa primeiro" e "Menor dívida primeiro" (24 meses, outubro de 2028) lado a lado, e a referência "Sem valor a mais" (36 meses, juros R$ 7.135,09) em uma frase, no fim',
-    t.includes('Com o valor a mais e passando adiante a parcela de cada dívida quitada, tudo termina em 24 meses (2 anos), em outubro de 2028, nas duas ordens.') &&
-    t.includes('Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 36 meses (3 anos), em outubro de 2029: 12 meses depois da ordem que termina antes e R$ 2.216,64 a mais de juros.') &&
-    !t.includes('Sem valor a mais: tudo termina em 36 meses') && t.includes('Juros estimados: R$ 7.135,09') &&
-    t.includes('Maior taxa primeiro: tudo termina em 24 meses (2 anos), em outubro de 2028.') && t.includes('Menor dívida primeiro: tudo termina em 24 meses (2 anos), em outubro de 2028.') &&
-    t.includes('Juros estimados: R$ 4.918,45') && t.includes('Juros estimados: R$ 4.925,13'), t.slice(-1800));
-  ok('F1 as diferenças em linguagem neutra: R$ 6,68 a menos de juros (Maior taxa primeiro), a primeira dívida termina 2 meses antes (Menor dívida primeiro) e o fim no mesmo mês',
-    t.includes('Maior taxa primeiro: R$ 6,68 a menos de juros.') && t.includes('Menor dívida primeiro: a primeira dívida termina 2 meses antes.') && t.includes('Tudo termina no mesmo mês nas duas ordens.'));
-  ok('F1 a sequência de cada ordem, com o mês em que cada dívida termina',
-    t.includes('1. Cartão azul: termina em 6 meses (abril de 2027).') && t.includes(`2. ${F1_NAME}: termina em 24 meses (outubro de 2028).`) && t.includes('1. Cartão azul: termina em 4 meses (fevereiro de 2027).') &&
-    t.includes(`1. Cartão azul: termina em 6 meses (abril de 2027).`) && t.includes('Em que ordem cada dívida termina'));
+  ok('F1 duas dívidas: primeiro a resposta (24 meses, outubro de 2028, em vez de 36, e de R$ 2.209,96 a R$ 2.216,64 a menos de juros estimados, conforme a ordem); nos detalhes, as duas ordens e "Sem valor a mais" (juros R$ 7.135,09)',
+    t.includes('Com R$ 100,00 a mais por mês, tudo termina em 24 meses (outubro de 2028), em vez de 36 meses (outubro de 2029), com R$ 2.209,96 a R$ 2.216,64 a menos de juros estimados, conforme a ordem.') &&
+    t.includes('Juros estimados: R$ 7.135,09') && t.includes('Juros estimados: R$ 4.918,45') && t.includes('Juros estimados: R$ 4.925,13'), t.slice(-1800));
+  ok('F1 as diferenças como fatos neutros: juros R$ 6,68 menores em Maior taxa primeiro e a primeira dívida 2 meses antes em Menor dívida primeiro',
+    t.includes('Na ordem Maior taxa primeiro, os juros estimados são R$ 6,68 menores.') && t.includes('Na ordem Menor dívida primeiro, a primeira dívida acaba 2 meses antes.'));
+  ok('F1 o plano passo a passo de cada ordem: por qual começar, quando o Cartão azul acaba e para onde vai o pagamento dele; em "Sem valor a mais", a ordem em que cada dívida termina',
+    t.includes('A partir de novembro de 2026 (mês 1): o pagamento de sempre de cada dívida e os R$ 100,00 a mais em Cartão azul.') &&
+    t.includes(`Abril de 2027 (mês 6): Cartão azul acaba. O pagamento dela (R$ 300,00) passa para ${F1_NAME}, que fica com R$ 400,00 por mês além do pagamento de sempre.`) &&
+    t.includes(`Fevereiro de 2027 (mês 4): Cartão azul acaba. O pagamento dela (R$ 300,00) passa para ${F1_NAME}, que fica com R$ 400,00 por mês além do pagamento de sempre.`) &&
+    t.includes(`Outubro de 2028 (mês 24): ${F1_NAME} acaba, e tudo está quitado.`) &&
+    t.includes('1. Cartão azul: termina em 6 meses (abril de 2027).') && t.includes(`2. ${F1_NAME}: termina em 36 meses (outubro de 2029).`) && t.includes('Em que ordem cada dívida termina'));
   ok('F1 nenhuma ordem é chamada de "melhor" ou "pior" e não há palavra vetada', !F1_VETOED.test(t), (t.match(F1_VETOED) ?? [])[0]);
   ok('F1 títulos: "Suas dívidas" e "Resultado" em nível 2',
     (await p.evaluate(() => [...document.querySelectorAll('[role=heading]')].filter((e) => e.getBoundingClientRect().width > 0 && ['Suas dívidas', 'Resultado'].includes(e.textContent)).map((e) => `${e.textContent}:${e.getAttribute('aria-level')}`).join('|'))) === 'Suas dívidas:2|Resultado:2');
@@ -5613,7 +5621,8 @@ setInterval(async () => {
   ok('F1 com R$ 100,00 a mais, "Sem valor a mais" não leva a legenda', !(await body()).includes(F1_CAPTION));
   await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '');
   ok('F1 valor a mais vazio e duas dívidas: a legenda "sem passar nada adiante" aparece junto do título de "Sem valor a mais" (uma só vez)',
-    (await body()).split(F1_CAPTION).length === 2 && (await body()).includes('As duas ordens dão no mesmo: tudo termina em 27 meses (2 anos e 3 meses), em janeiro de 2029.') && (await body()).includes('As duas ordens'));
+    (await body()).split(F1_CAPTION).length === 2 && (await body()).includes('Passando adiante o pagamento de cada dívida que acaba, tudo termina em 27 meses (janeiro de 2029), em vez de 36 meses (outubro de 2029), com R$ 1.677,71 a menos de juros estimados.') &&
+    (await body()).includes('Com estes números, as duas ordens dão no mesmo: o mesmo plano, o mesmo fim e os mesmos juros estimados.') && (await body()).includes('As duas ordens'));
   await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '0');
   ok('F1 valor a mais zero e duas dívidas: a legenda continua', (await body()).split(F1_CAPTION).length === 2);
   await atWidths(async (w) => { await scrollTo('Detalhes de cada ordem'); await layoutChecks(`F1 plano legenda ${w}px`); });
@@ -5625,16 +5634,16 @@ setInterval(async () => {
   await f1Fill('Apelido da dívida 2', '4111 1111 1111 1111');
   t = await body();
   ok('F1 apelido que parece número de cartão: recusado com a explicação, e o resultado espera a correção',
-    t.includes('Não use o número do cartão no apelido. Use um nome, como Cartão azul.') && t.includes('Preencha os campos para ver o resultado.') && !t.includes('Maior taxa primeiro: tudo termina'), t.slice(-500));
+    t.includes('Não use o número do cartão no apelido. Use um nome, como Cartão azul.') && t.includes('Preencha os campos para ver o resultado.') && !t.includes('As duas ordens, lado a lado'), t.slice(-500));
   await f1Fill('Apelido da dívida 2', 'a'.repeat(31));
   ok('F1 apelido com 31 caracteres: "Use no máximo 30 caracteres."', (await body()).includes('Use no máximo 30 caracteres.'));
   await f1Fill('Apelido da dívida 2', 'Cartão azul');
-  ok('F1 corrigido o apelido, o resultado volta', (await body()).includes('Maior taxa primeiro: tudo termina em 24 meses'));
+  ok('F1 corrigido o apelido, o resultado volta', (await body()).includes('As duas ordens, lado a lado') && (await body()).includes('tudo termina em 24 meses (outubro de 2028)'));
   await f1Fill('Quanto você paga por mês, Cartão azul', '10,00');
   t = await body();
   ok('F1 pagamento de R$ 10,00 para juros de R$ 15,00: "Com este pagamento, o saldo não diminui." e a dívida fica fora da comparação (só as duas linhas de uma dívida)',
     t.includes('Com este pagamento, o saldo não diminui.') && t.includes('Cartão azul fica fora da comparação até o pagamento ser maior que os juros do primeiro mês (R$ 15,00).') &&
-    !t.includes('Maior taxa primeiro: tudo termina') && t.includes('Com o valor a mais: tudo termina em 32 meses'), t.slice(-1200));
+    !t.includes('As duas ordens, lado a lado') && t.includes(`${F1_NAME} acaba em 32 meses (junho de 2029)`), t.slice(-1200));
   await atWidths(async (w) => {
     await scrollTo('Quanto você paga por mês');
     if (w === 390) await shot('193_plano_dividas_saldo_nao_diminui');
@@ -5648,12 +5657,12 @@ setInterval(async () => {
     t.includes('Preencha os campos para ver o resultado.') && t.includes('Com este pagamento, o saldo não diminui.') && !t.includes('fica fora da comparação'), t.slice(-700));
   await f1Fill(`Parcelas que faltam, ${F1_NAME}`, '36');
   await f1Fill('Quanto você paga por mês, Cartão azul', '300,00');
-  ok('F1 pagamento corrigido: o aviso some e as duas ordens voltam', !(await body()).includes('Com este pagamento, o saldo não diminui.') && (await body()).includes('Maior taxa primeiro: tudo termina em 24 meses'));
+  ok('F1 pagamento corrigido: o aviso some e as duas ordens voltam', !(await body()).includes('Com este pagamento, o saldo não diminui.') && (await body()).includes('As duas ordens, lado a lado') && (await body()).includes('tudo termina em 24 meses (outubro de 2028)'));
 
   // ---- 5. Tirar da conta, limite de 10 e lista vazia ----
   await btn(`Tirar da conta: ${F1_NAME}`).click(); await p.waitForTimeout(400);
   t = await body();
-  ok('F1 "Tirar da conta" tira a dívida só desta tela: sobra o Cartão azul e o resultado se refaz com uma dívida', !t.includes(F1_NAME) && t.includes('Cartão azul') && !t.includes('Maior taxa primeiro: tudo termina') && t.includes('Com o valor a mais: tudo termina em'), t.slice(-600));
+  ok('F1 "Tirar da conta" tira a dívida só desta tela: sobra o Cartão azul e o resultado se refaz com uma dívida', !t.includes(F1_NAME) && t.includes('Cartão azul') && !t.includes('As duas ordens, lado a lado') && t.includes('Com R$ 100,00 a mais por mês, Cartão azul acaba em'), t.slice(-600));
   await btn('Tirar da conta: Cartão azul').click(); await p.waitForTimeout(400);
   t = await body();
   ok('F1 com 0 dívidas: "Acrescente as dívidas que você quer comparar." e o resultado pede o preenchimento', t.includes('Acrescente as dívidas que você quer comparar.') && t.includes('Preencha os campos para ver o resultado.') && (await visibleCount('button', /^Tirar da conta/)) === 0);
@@ -5675,7 +5684,7 @@ setInterval(async () => {
   ok('F1 Renda comprometida de novembro: no grupo de dívidas, o link "Em que ordem quitar? Fazer as contas"', (await visibleCount('button', 'Em que ordem quitar? Fazer as contas')) === 1);
   await atWidths(async (w) => { await layoutChecks(`F1 renda comprometida ${w}px`); });
   await btn('Em que ordem quitar? Fazer as contas').click(); await waitText('Suas dívidas'); await p.waitForTimeout(500);
-  ok('F1 Renda comprometida › link abre a calculadora com o Financiamento do carro, sem nada gravado', urlPath() === '/calcular/plano-dividas' && (await body()).includes(F1_NAME) && (await body()).includes('Sem valor a mais: tudo termina em 36 meses'), p.url());
+  ok('F1 Renda comprometida › link abre a calculadora com o Financiamento do carro, sem nada gravado', urlPath() === '/calcular/plano-dividas' && (await body()).includes(F1_NAME) && (await body()).includes(`Só com o pagamento de sempre, ${F1_NAME} acaba em 36 meses`), p.url());
   await goResumo();
   await tabByName('Metas').click(); await waitText('Fazer as contas'); await p.waitForTimeout(300);
   await p.getByRole('button', { name: /^Calculadoras\./ }).filter({ visible: true }).first().click(); await waitText('Decidir uma compra'); await p.waitForTimeout(400);
@@ -5714,8 +5723,8 @@ setInterval(async () => {
     (await visibleCount('textbox', `Valor da parcela, ${F1_NAME}, valor oculto`)) === 1 && (await visibleCount('button', `Mostrar valores para editar a parcela, ${F1_NAME}`)) === 1 && t.includes('Mostrar valores'));
   ok('F1 valores ocultos: o campo da parcela não se edita e a dica diz como editar', !(await f1Parcela.isEditable()) && t.includes('Valor oculto. Mostre os valores para editar.') && (await f1Value(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`)) === '1,5' && (await f1Value('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?')) === '100,00');
   const f1Leaks = await moneyLeaks();
-  ok('F1 valores ocultos: nenhum valor em reais à vista (texto e nomes acessíveis), com "R$ ••••" no resultado e "valor oculto" nos nomes', f1Leaks.length === 0 && t.includes('Com o valor a mais: R$ •••• a menos de juros.') && t.includes('Total pago: R$ ••••') && t.includes('No seu plano de guardar você informou R$ •••• por mês.') && (await spokenHidden()) > 0, `${f1Leaks.slice(0, 3).join(' | ')} ${t.includes('R$ ••••')}`);
-  ok('F1 valores ocultos: os meses e as ordens continuam (32 meses, junho de 2029)', t.includes('Com o valor a mais: tudo termina em 32 meses (2 anos e 8 meses), em junho de 2029.') && t.includes(`1. ${F1_NAME}: termina em 32 meses (junho de 2029).`));
+  ok('F1 valores ocultos: nenhum valor em reais à vista (texto e nomes acessíveis), com "R$ ••••" no resultado e "valor oculto" nos nomes', f1Leaks.length === 0 && t.includes('com R$ •••• a menos de juros estimados.') && t.includes('Total pago: R$ ••••') && t.includes('No seu plano de guardar você informou R$ •••• por mês.') && (await spokenHidden()) > 0, `${f1Leaks.slice(0, 3).join(' | ')} ${t.includes('R$ ••••')}`);
+  ok('F1 valores ocultos: os meses e o plano continuam (32 meses, junho de 2029)', t.includes(`${F1_NAME} acaba em 32 meses (junho de 2029), em vez de 36 meses (outubro de 2029)`) && t.includes(`Junho de 2029 (mês 32): ${F1_NAME} acaba.`));
   await atWidths(async (w) => {
     await layoutChecks(`F1 plano valores ocultos ${w}px`);
     await scrollTo(F1_NAME).catch(() => {});
@@ -5755,7 +5764,7 @@ setInterval(async () => {
   await f1Fill('Valor da parcela, Dívida 1', '200,00');
   await f1Fill('Parcelas que faltam, Dívida 1', '10');
   t = await body();
-  ok('F1 conta nova: uma dívida parcelada à mão (10 × R$ 200,00, sem taxa) termina em 10 meses', t.includes('Sem valor a mais: tudo termina em 10 meses') && t.includes('Dívida 1: sem juros informados, conta só as parcelas.'), t.slice(-600));
+  ok('F1 conta nova: uma dívida parcelada à mão (10 × R$ 200,00, sem taxa) termina em 10 meses', t.includes('Só com o pagamento de sempre, Dívida 1 acaba em 10 meses') && t.includes('Dívida 1: sem juros informados, conta só as parcelas.'), t.slice(-600));
   ok('F1 conta nova: nada gravado ao digitar (nenhuma escrita, nada no aparelho)', writes.length === f1Writes2 && (await f1Storage()) === f1Store2, `${writes.length - f1Writes2} escritas`);
   await keepText();
   await goResumo().catch(() => {});
@@ -6282,7 +6291,7 @@ setInterval(async () => {
     t.includes('Referência usada pela Serasa: até 30% da renda líquida com parcelas de dívidas. É uma referência geral, não uma regra para você.') &&
     t.includes('Fonte: Serasa, página sobre comprometimento de renda, consultada em 09/10/2026.') && t.includes('Estimativa. As condições oficiais são as da proposta; peça o CET.'));
   ok('D44 hipóteses visíveis: tabela Price com a primeira parcela em 1 mês, só a taxa informada, comprometido do mês atual e "O preço do bem pode mudar enquanto você junta."',
-    t.includes('Hipóteses') && t.includes('Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.') && t.includes('Só a taxa de juros informada, sem tarifas, seguros e IOF.') &&
+    t.includes('Hipóteses') && t.includes('Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.') && t.includes('A conta usa só a taxa informada: com a taxa de juros, ficam de fora tarifas, seguros e IOF; com o CET ao mês, eles já estão dentro.') &&
     t.includes('O comprometido é o do mês atual, com as contas a pagar já criadas; os meses seguintes podem ser diferentes.') && t.includes('O preço do bem pode mudar enquanto você junta.'));
   ok('D44 juntar antes (o que falta para comprar à vista, sem rendimento): guardando R$ 1.041,14 por mês, junta R$ 32.000,00 em 31 meses (2 anos e 7 meses), com a comparação neutra',
     t.includes('Guardando R$ 1.041,14 por mês, sem rendimento, você junta R$ 32.000,00 em 31 meses (2 anos e 7 meses).') &&
@@ -14722,6 +14731,122 @@ setInterval(async () => {
     t = await body();
     ok('Orçamento: com uma categoria acima do valor, nenhum card (e nenhum recado negativo)', !t.includes('fechou dentro do orçamento') && !t.includes('acima do orçamento em setembro'));
     ok('Orçamento: nada vai à rede na demonstração', writes.length === bcWrites0, writes.slice(bcWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Revisão das calculadoras (retorno de 17/11/2026, D-109). (1) "Simular um plano", aberto por "Simular com rendimento" de "Juntar para
+  // um objetivo": no lugar de "Descontar inflação?", as escolhas "Sem inflação", "Mostrar em dinheiro de hoje" (só informa) e "Corrigir
+  // a meta pela inflação" (a meta sobe e o valor por mês é recalculado), com o exemplo do retorno: R$ 10.000,00 em 60 meses, 3,4% ao
+  // ano e inflação de 12% ao ano. (2) "Em que ordem quitar as dívidas?" refeita: para que serve no topo, cada campo diz o que muda, e o
+  // resultado responde primeiro o ganho, depois as duas ordens lado a lado e o plano passo a passo, e só então as hipóteses e os
+  // detalhes. Em 390 e 320 px. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const rvWrites0 = writes.length;
+    await demoHome();
+    await metasTab();
+    await p.getByRole('button', { name: /^Simular um plano\./ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(400);
+    await radio('Quanto guardar por mês').click(); await waitText('Quanto quer juntar'); await p.waitForTimeout(300);
+    t = await body();
+    ok('Revisão: o simulador troca "Descontar inflação?" por três escolhas, com "Sem inflação" marcada e a dica dela',
+      !t.includes('Descontar inflação') && t.includes('Inflação (opcional)') && (await radio('Sem inflação').getAttribute('aria-checked')) === 'true' &&
+      (await visibleCount('radio', 'Mostrar em dinheiro de hoje')) === 1 && (await visibleCount('radio', 'Corrigir a meta pela inflação')) === 1 &&
+      t.includes('Os valores ficam em reais de cada mês, sem inflação.') && (await p.getByLabel('Inflação ao ano (%)', { exact: true }).count()) === 0, t.slice(0, 600));
+    await field('Quanto quer juntar').fill('10000'); await field('Em quantos meses').fill('60'); await simRate().fill('3,4');
+    await radio('Mostrar em dinheiro de hoje').click(); await p.waitForTimeout(200);
+    await field('Inflação ao ano (%)').fill('12'); await simulate(); await waitText('por mês na hipótese informada'); await p.waitForTimeout(300);
+    t = await body();
+    ok('Revisão: "Mostrar em dinheiro de hoje" só informa: R$ 152,92 por mês, sem rendimento R$ 166,67, e o total de R$ 10.000,63 equivale a R$ 5.674,62 de hoje',
+      t.includes('Só informa: a meta e o valor por mês não mudam. O resultado mostra quanto o total vale em dinheiro de hoje.') &&
+      t.includes('R$ 152,92 por mês na hipótese informada') && t.includes('Sem rendimento, seriam R$ 166,67 por mês.') &&
+      t.includes('Em dinheiro de hoje, com inflação de 12% ao ano, o total de R$ 10.000,63 equivale a R$ 5.674,62.') &&
+      t.includes('Para manter o poder de compra de R$ 10.000,00, escolha "Corrigir a meta pela inflação".'), t.slice(-1500));
+    ok('Revisão: as hipóteses dizem a convenção (taxa equivalente de 0,28% ao mês, aportes no início do mês, inflação de 0,95% ao mês só para mostrar e o arredondamento)',
+      t.includes('Taxa de 3,4% ao ano (0,28% ao mês, taxa equivalente), constante no período.') && t.includes('Aportes no início de cada mês, como na Calculadora do Cidadão do Banco Central.') &&
+      t.includes('Inflação de 12% ao ano (0,95% ao mês, taxa equivalente), constante no período, só para mostrar o valor em dinheiro de hoje: a meta e o valor por mês não mudam.') &&
+      t.includes('Valor por mês arredondado para cima, no centavo; valores finais para baixo.'));
+    await keepText();
+    await atWidths(async (w) => { await layoutChecks(`Revisão simulador, mostrar em dinheiro de hoje ${w}px`); if (w === 390) await calcShot('640_simular_mostrar_dinheiro_de_hoje'); });
+    await radio('Corrigir a meta pela inflação').click(); await p.waitForTimeout(250);
+    ok('Revisão: trocar a escolha tira o resultado e mostra a dica de "Corrigir a meta pela inflação"',
+      !(await body()).includes('por mês na hipótese informada') && (await body()).includes('Para manter o poder de compra: a meta sobe com a inflação até o fim do prazo, e o valor por mês é recalculado.') &&
+      (await field('Inflação ao ano (%)').inputValue()) === '12');
+    await simulate(); await waitText('por mês na hipótese informada'); await p.waitForTimeout(300);
+    t = await body();
+    ok('Revisão: "Corrigir a meta pela inflação": meta de R$ 17.623,42, R$ 269,49 por mês (sem rendimento, R$ 293,73) e o total equivale a R$ 10.000,35 de hoje',
+      t.includes('Para juntar o equivalente a R$ 10.000,00 de hoje em 60 meses:') && t.includes('R$ 269,49 por mês na hipótese informada') &&
+      t.includes('Com inflação de 12% ao ano, a meta corrigida é de R$ 17.623,42 em 60 meses.') && t.includes('Sem rendimento, seriam R$ 293,73 por mês.') &&
+      t.includes('Em dinheiro de hoje, com inflação de 12% ao ano, o total de R$ 17.624,05 equivale a R$ 10.000,35.') && !t.includes('escolha "Corrigir a meta pela inflação"') &&
+      t.includes('Inflação de 12% ao ano (0,95% ao mês, taxa equivalente), constante no período, para corrigir a meta: a meta de hoje com a inflação de todo o prazo, no centavo.'), t.slice(-1500));
+    await keepText();
+    await atWidths(async (w) => { await layoutChecks(`Revisão simulador, meta corrigida ${w}px`); if (w === 390) await calcShot('641_simular_meta_corrigida'); if (w === 320) await shot('641_simular_meta_corrigida_320px', true); });
+    // "Quanto posso ter" não tem meta: a escolha volta a "Mostrar em dinheiro de hoje" e "Corrigir" some.
+    await radio('Quanto posso ter').click(); await p.waitForTimeout(300);
+    ok('Revisão: em "Quanto posso ter", só "Sem inflação" e "Mostrar em dinheiro de hoje" (marcada), com a dica sem meta',
+      (await visibleCount('radio', 'Corrigir a meta pela inflação')) === 0 && (await radio('Mostrar em dinheiro de hoje').getAttribute('aria-checked')) === 'true' &&
+      (await body()).includes('Só informa: o valor por mês não muda. O resultado mostra quanto o total vale em dinheiro de hoje.'));
+
+    // "Em que ordem quitar as dívidas?": a demonstração traz o Financiamento do carro; com a taxa, o Cartão azul e R$ 100,00 a mais.
+    await demoHome();
+    await metasTab();
+    await p.getByRole('button', { name: /^Em que ordem quitar as dívidas\? / }).filter({ visible: true }).first().click(); await waitText('Suas dívidas'); await p.waitForTimeout(600);
+    await p.setViewportSize({ width: 360, height: 640 }); await p.waitForTimeout(400);
+    ok('Revisão plano: no topo, à vista sem rolar em 360 px, para que serve a tela', (await inView('Monte um plano para quitar as suas dívidas. Informe cada dívida e quanto consegue pôr a mais por mês: a conta mostra por qual começar, quando cada uma acaba e quanto de juros sai da conta, em duas ordens lado a lado.')) === true);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+    const rvFill = async (label, value) => { const f = field(label); await f.fill(value); await f.blur(); await p.waitForTimeout(200); };
+    await rvFill('Taxa de juros ao mês do contrato (%), Financiamento do carro', '1,5');
+    await btn('Acrescentar dívida').click(); await p.waitForTimeout(300);
+    await radio('Saldo com juros, Dívida 2').click(); await p.waitForTimeout(200);
+    await rvFill('Apelido da dívida 2', 'Cartão azul');
+    await rvFill('Saldo hoje, Cartão azul', '1.500,00');
+    await rvFill('Taxa de juros ao mês (%), Cartão azul', '1');
+    await rvFill('Quanto você paga por mês, Cartão azul', '300,00');
+    await rvFill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '100,00');
+    t = await body();
+    ok('Revisão plano: cada campo diz o que muda na resposta (parcela, taxa, saldo, pagamento e o valor a mais)',
+      t.includes('O que você já paga por mês nesta dívida. Quando ela acaba, este valor passa para a próxima do plano.') &&
+      t.includes('Define o lugar da dívida em "Maior taxa primeiro" e quanto de juros o valor a mais evita.') &&
+      t.includes('Quanto falta pagar hoje. Define o lugar da dívida em "Menor dívida primeiro".') &&
+      t.includes('Precisa passar dos juros do mês para o saldo diminuir.') &&
+      t.includes('Vai todo mês para a dívida por onde o plano começa e encurta o prazo.'), t.slice(0, 1500));
+    // A ordem do resultado: a resposta, as duas ordens lado a lado, as diferenças, o plano, as hipóteses e só depois os detalhes.
+    const rvHead = 'Com R$ 100,00 a mais por mês, tudo termina em 24 meses (outubro de 2028), em vez de 36 meses (outubro de 2029), com R$ 2.209,96 a R$ 2.216,64 a menos de juros estimados, conforme a ordem.';
+    const rvAt = (x) => t.indexOf(x);
+    ok('Revisão plano: a resposta vem primeiro, depois "As duas ordens, lado a lado", "O plano, passo a passo", as hipóteses e os detalhes, nessa ordem',
+      rvAt(rvHead) > 0 && rvAt(rvHead) < rvAt('As duas ordens, lado a lado') && rvAt('As duas ordens, lado a lado') < rvAt('Na ordem Maior taxa primeiro, os juros estimados são R$ 6,68 menores.') &&
+      rvAt('Na ordem Maior taxa primeiro') < rvAt('O plano, passo a passo') && rvAt('O plano, passo a passo') < rvAt('Hipóteses') && rvAt('Hipóteses') < rvAt('Detalhes de cada ordem'), t.slice(-2500));
+    const rvRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label')).filter((l) => l && /^(Começa por|Primeira a acabar|Tudo termina em|Juros estimados):/.test(l)));
+    ok('Revisão plano: a comparação lado a lado, um item por dado com as duas ordens no nome acessível (por qual começa, a primeira a acabar, o fim e os juros)',
+      JSON.stringify(rvRows) === JSON.stringify([
+        'Começa por: Maior taxa primeiro, Financiamento do carro; Menor dívida primeiro, Cartão azul.',
+        'Primeira a acabar: Maior taxa primeiro, Cartão azul, em abril de 2027; Menor dívida primeiro, Cartão azul, em fevereiro de 2027.',
+        'Tudo termina em: Maior taxa primeiro, 24 meses (outubro de 2028); Menor dívida primeiro, 24 meses (outubro de 2028).',
+        'Juros estimados: Maior taxa primeiro, R$ 4.918,45; Menor dívida primeiro, R$ 4.925,13.',
+      ]), JSON.stringify(rvRows));
+    ok('Revisão plano: o plano de cada ordem diz por qual começar, onde vai o valor a mais, quando cada dívida acaba e para onde vai o pagamento dela, com o ganho',
+      t.includes('Maior taxa primeiro') && t.includes('A partir de novembro de 2026 (mês 1): o pagamento de sempre de cada dívida e os R$ 100,00 a mais em Financiamento do carro.') &&
+      t.includes('Abril de 2027 (mês 6): Cartão azul acaba. O pagamento dela (R$ 300,00) passa para Financiamento do carro, que fica com R$ 400,00 por mês além do pagamento de sempre.') &&
+      t.includes('Ganho estimado, em relação a pagar só o de sempre: 12 meses antes e R$ 2.216,64 a menos de juros.') &&
+      t.includes('Ganho estimado, em relação a pagar só o de sempre: 12 meses antes e R$ 2.209,96 a menos de juros.'));
+    const rvLevels = await headingList();
+    ok('Revisão plano: títulos "Resultado" (2), "As duas ordens, lado a lado" e "O plano, passo a passo" (3) e uma ordem por título de nível 4',
+      rvLevels.includes('2:Resultado') && rvLevels.includes('3:As duas ordens, lado a lado') && rvLevels.includes('3:O plano, passo a passo') &&
+      rvLevels.includes('4:Maior taxa primeiro') && rvLevels.includes('4:Menor dívida primeiro'), JSON.stringify(rvLevels));
+    ok('Revisão plano: estimativa rotulada, as duas ordens explicadas nas hipóteses e nenhuma ordem chamada de "melhor"',
+      t.includes('Estimativa. O valor oficial de cada dívida é o que a instituição informar; peça o valor atualizado.') &&
+      t.includes('Maior taxa primeiro: o que sobra vai antes para a dívida com a maior taxa ao mês. Menor dívida primeiro: vai antes para a dívida com o menor saldo hoje.') &&
+      !/\bmelhor(es)?\b|\bpior(es)?\b|portabilidade|empr[eé]stimo para quitar/i.test(t));
+    await keepText();
+    await atWidths(async (w) => {
+      await scrollTo('As duas ordens, lado a lado');
+      await layoutChecks(`Revisão plano, resposta e comparação ${w}px`);
+      if (w === 390) await shot('642_plano_dividas_resposta_e_comparacao');
+      if (w === 320) await shot('642_plano_dividas_resposta_e_comparacao_320px');
+      await scrollTo('O plano, passo a passo');
+      if (w === 390) await shot('643_plano_dividas_plano_passo_a_passo');
+      if (w === 320) await shot('643_plano_dividas_plano_passo_a_passo_320px');
+    });
+    ok('Revisão: nada vai à rede no simulador nem no plano', writes.length === rvWrites0, writes.slice(rvWrites0).join(' | '));
   }
 
   // ==================================================================================================================
