@@ -633,7 +633,7 @@ describe('widgets do Android', () => {
         expect(JSON.stringify(tree), name).not.toMatch(/R\$ \d|Internet|Luz/);
       }
     }
-  });
+  }, 30_000); // Muitos tamanhos, temas e letras: leva de 3 a 6 s com a máquina ocupada, acima dos 5 s padrão.
 });
 
 // ---------------------------------------------------------------------------------------------------------------------------------
