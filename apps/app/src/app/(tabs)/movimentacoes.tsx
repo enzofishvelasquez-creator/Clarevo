@@ -18,7 +18,6 @@ import {
   recordAccountName,
   payablesMonthParams,
   seriesCaptionShort,
-  seuMesParams,
   shortcutA11yLabel,
   sortNewestFirst,
   type DayRow,
@@ -27,7 +26,7 @@ import {
   type BudgetSummary,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, CalendarClock, ChevronRight, CreditCard, FileUp, Minus, Plus, Repeat, Target, type LucideIcon } from 'lucide-react-native';
+import { ArrowDownLeft, Calculator, CalendarClock, ChevronRight, CreditCard, FileUp, Plus, Repeat, Target, type LucideIcon } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
@@ -39,8 +38,6 @@ import { RecordRow } from '@/components/record-row';
 import { RecordsTable } from '@/components/records-table';
 import { SearchEntry } from '@/components/search-parts';
 import { AnalysesEntry } from '@/components/analises-parts';
-import { EvolutionEntry } from '@/components/evolucao-parts';
-import { SeuMesEntry } from '@/components/seu-mes-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, CardSlice, Chip, ListCell, Money, Screen, ScreenList, Skeleton, Txt } from '@/components/ui';
 import { WIDE_CONTENT_MAX, useWideLayout } from '@/lib/layout';
@@ -159,101 +156,97 @@ export default function MovimentacoesScreen() {
   const rows = useMemo(() => (long ? dayRows(groups) : []), [long, groups]);
   const cells: Cell[] = long ? rows : [{ type: 'card', key: 'card', first: true, last: true }];
 
-  /** Buscar, os atalhos de leitura, os botões de anotar e Organizar (no computador, a coluna da esquerda). */
-  const entries = (
-    <>
-        {/* Buscar (D-045): campo no topo que abre a busca em todos os meses; nada é digitado aqui. */}
-        <SearchEntry onPress={() => router.push('/movimentacoes/buscar')} />
+  // Revisão das telas (16/11/2026): o primeiro movimento à vista sem rolar em 390 × 844. No topo, o mês, Recebido e Pago, os dois botões
+  // de anotar, os filtros e "Buscar", logo acima da lista. Depois da lista, "Ver análises do mês" (no lugar de "Seu mês em 30 segundos",
+  // "Evolução" e "Análises": a Evolução é uma aba das Análises e o Seu mês fica logo abaixo do mês delas) e o bloco "Organizar".
 
-        {/* Seu mês em 30 segundos (D-052): logo abaixo de Buscar; abre no mês em exibição. */}
-        <SeuMesEntry onPress={() => router.push({ pathname: '/seu-mes', params: seuMesParams(month, currentMonth) })} />
+  /** Os botões de anotar: "+" em "Anotar gasto", como no Resumo, e a seta de entrada em "Registrar recebimento", como nas linhas. */
+  const actions = canWrite ? (
+    <View style={styles.actions}>
+      <Button
+        label="Anotar gasto"
+        icon={Plus}
+        style={styles.action}
+        onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })}
+      />
+      <Button
+        label="Registrar recebimento"
+        icon={ArrowDownLeft}
+        tone="soft"
+        style={styles.action}
+        onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'receita' } })}
+      />
+    </View>
+  ) : null;
 
-        {/* Evolução (D-057): logo abaixo de "Seu mês em 30 segundos"; sempre abre na janela de 6 meses até o mês atual. */}
-        <EvolutionEntry onPress={() => router.push('/evolucao')} />
+  /** "Ver análises do mês" (D-059): abre no mês em exibição, com Categorias, Evolução, Próximos meses, Orçamento e o Seu mês. */
+  const analyses = <AnalysesEntry onPress={() => router.push({ pathname: '/analises', params: analysesParams(month, currentMonth) })} />;
 
-        {/* Análises (D-059): logo abaixo de "Evolução"; abre no mês em exibição, com Categorias, Evolução, Próximos meses e Orçamento. */}
-        <AnalysesEntry onPress={() => router.push({ pathname: '/analises', params: analysesParams(month, currentMonth) })} />
-
-        {canWrite ? (
-          <View style={styles.actions}>
-            <Button
-              label="Anotar gasto"
-              icon={Minus}
-              style={styles.action}
-              onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })}
-            />
-            <Button
-              label="Registrar recebimento"
-              icon={Plus}
-              tone="soft"
-              style={styles.action}
-              onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'receita' } })}
-            />
-          </View>
-        ) : null}
-
-        <Card style={styles.shortcuts}>
-          <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            {ORGANIZE_TEXT.title}
-          </Txt>
-          <View>
-            {shortcuts.map((sc, i) => (
-              <ShortcutRow key={sc.title} {...sc} last={i === shortcuts.length - 1} />
-            ))}
-          </View>
-        </Card>
-    </>
+  const organize = (
+    <Card style={styles.shortcuts}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {ORGANIZE_TEXT.title}
+      </Txt>
+      <View>
+        {shortcuts.map((sc, i) => (
+          <ShortcutRow key={sc.title} {...sc} last={i === shortcuts.length - 1} />
+        ))}
+      </View>
+    </Card>
   );
 
-  /** Os totais do mês e os filtros da lista (no computador, acima da tabela). */
+  /** Recebido e Pago do mês, que abrem a composição. */
+  const totals = s ? (
+    <View style={styles.totals}>
+      {/* Os totais abrem a composição do mês (docs/10 A10), como o Recebido e o Pago do Resumo. */}
+      {(
+        [
+          { tipo: 'recebido', label: 'Recebido', cents: s.receivedCents, color: colors.success },
+          { tipo: 'pago', label: 'Pago', cents: s.paidCents, color: undefined },
+        ] as const
+      ).map((t) => {
+        const title = `${t.label} em ${formatMonthBR(month).split(' ')[0]!.toLowerCase()}`;
+        return (
+          <Pressable
+            key={t.tipo}
+            accessibilityRole="button"
+            accessibilityLabel={maskMoneyLabel(`${title}, ${formatBRL(t.cents)}. Ver a composição`, hidden)}
+            onPress={() => router.push({ pathname: '/composicao', params: { tipo: t.tipo } })}
+            style={(st) => [styles.totalPress, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
+            <Card style={styles.total}>
+              <View style={styles.totalHead}>
+                <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
+                  {title}
+                </Txt>
+                <ChevronRight size={16} color={colors.textSecondary} />
+              </View>
+              <Money cents={t.cents} variant="label" style={styles.totalValue} color={t.color} />
+            </Card>
+          </Pressable>
+        );
+      })}
+    </View>
+  ) : null;
+
+  /** Os filtros da lista e "Buscar" (D-045), a lupa ao lado dos filtros, logo acima da lista: abre a busca em todos os meses. */
   const listTools = (
     <>
-
-        {s ? (
-          <View style={styles.totals}>
-            {/* Os totais abrem a composição do mês (docs/10 A10), como o Recebido e o Pago do Resumo. */}
-            {(
-              [
-                { tipo: 'recebido', label: 'Recebido', cents: s.receivedCents, color: colors.success },
-                { tipo: 'pago', label: 'Pago', cents: s.paidCents, color: undefined },
-              ] as const
-            ).map((t) => {
-              const title = `${t.label} em ${formatMonthBR(month).split(' ')[0]!.toLowerCase()}`;
-              return (
-                <Pressable
-                  key={t.tipo}
-                  accessibilityRole="button"
-                  accessibilityLabel={maskMoneyLabel(`${title}, ${formatBRL(t.cents)}. Ver a composição`, hidden)}
-                  onPress={() => router.push({ pathname: '/composicao', params: { tipo: t.tipo } })}
-                  style={(st) => [styles.totalPress, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
-                  <Card style={styles.total}>
-                    <View style={styles.totalHead}>
-                      <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
-                        {title}
-                      </Txt>
-                      <ChevronRight size={16} color={colors.textSecondary} />
-                    </View>
-                    <Money cents={t.cents} variant="label" style={styles.totalValue} color={t.color} />
-                  </Card>
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : null}
-
-        <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel="Mostrar">
+      <View style={styles.filterRow}>
+        <View style={[styles.filters, { flex: 1 }]} accessibilityRole="radiogroup" accessibilityLabel="Mostrar">
           {FILTERS.map((f) => (
             <Chip key={f.value} label={f.label} selected={filter === f.value} onPress={() => setFilter(f.value)} />
           ))}
         </View>
+        <SearchEntry onPress={() => router.push('/movimentacoes/buscar')} />
+      </View>
 
-        {accountOptions.length > 0 ? (
-          <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={ACCOUNTS_TEXT.filterLabel}>
-            {accountOptions.map((o) => (
-              <Chip key={o.id ?? 'todas'} label={o.label} selected={accountId === o.id} onPress={() => setAccountFilter(o.id)} />
-            ))}
-          </View>
-        ) : null}
+      {accountOptions.length > 0 ? (
+        <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={ACCOUNTS_TEXT.filterLabel}>
+          {accountOptions.map((o) => (
+            <Chip key={o.id ?? 'todas'} label={o.label} selected={accountId === o.id} onPress={() => setAccountFilter(o.id)} />
+          ))}
+        </View>
+      ) : null}
     </>
   );
 
@@ -265,10 +258,19 @@ export default function MovimentacoesScreen() {
       </AppHeader>
       <Body style={styles.bodyTop}>
         <FlashBanner message={notice} />
-        {entries}
+        {totals}
+        {actions}
         {listTools}
       </Body>
     </>
+  );
+
+  /** Depois da lista: as análises do mês e "Organizar" (Contas a pagar, Gastos fixos, Cartões, Orçamento, Importar e Calculadoras). */
+  const footer = (
+    <ListCell style={styles.footer}>
+      {analyses}
+      {organize}
+    </ListCell>
   );
 
   /** O cartão da lista como sempre foi: carregando, erro, vazio ou todos os grupos (linhas com animação de saída e de lugar). */
@@ -328,7 +330,7 @@ export default function MovimentacoesScreen() {
 
   /** Uma linha da lista: o cartão inteiro (lista curta) ou um pedaço dele (lista longa, só o que está perto da tela). */
   const renderCell = ({ item }: { item: Cell }) => {
-    const spacing = [item.first && styles.cellFirst, item.last && styles.cellLast];
+    const spacing = item.first ? styles.cellFirst : undefined;
     if (item.type === 'card') return <ListCell style={spacing}>{card}</ListCell>;
     return (
       <ListCell style={spacing}>
@@ -350,8 +352,9 @@ export default function MovimentacoesScreen() {
     );
   };
 
-  // Versão para computador (pedido do Enzo em 12/11/2026): duas colunas, com Buscar, os atalhos e Organizar à esquerda e, à direita, os
-  // totais, os filtros e a lista do mês em tabela (todas as linhas: no computador não é preciso montar só as que estão perto da tela).
+  // Versão para computador (pedido do Enzo em 12/11/2026): duas colunas, com os botões de anotar, as análises e Organizar à esquerda e, à
+  // direita, os totais, os filtros, Buscar e a lista do mês em tabela (todas as linhas: no computador não é preciso montar só as que estão
+  // perto da tela).
   if (wide) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -363,8 +366,13 @@ export default function MovimentacoesScreen() {
           <Body style={{ maxWidth: WIDE_CONTENT_MAX }}>
             <FlashBanner message={notice} />
             <View style={styles.wideRow}>
-              <View style={styles.wideSide}>{entries}</View>
+              <View style={styles.wideSide}>
+                {actions}
+                {analyses}
+                {organize}
+              </View>
               <View style={styles.wideMain}>
+                {totals}
                 {listTools}
                 {/* Carregando, erro ou vazio: o mesmo cartão do celular. Com lançamentos, a tabela. */}
                 {records.isPending || records.isError || list.length === 0 ? (
@@ -388,7 +396,15 @@ export default function MovimentacoesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScreenList wide data={cells} keyExtractor={(c) => c.key} renderItem={renderCell} extraData={[accounts.data, today]} header={header} />
+      <ScreenList
+        wide
+        data={cells}
+        keyExtractor={(c) => c.key}
+        renderItem={renderCell}
+        extraData={[accounts.data, today]}
+        header={header}
+        footer={footer}
+      />
     </View>
   );
 }
@@ -424,10 +440,11 @@ function ShortcutRow({ icon: Icon, title, caption, open, last }: Shortcut & { la
 }
 
 const styles = StyleSheet.create({
-  // O topo é um `Body` sem o respiro de baixo: o espaço até a lista é o `cellFirst` (o mesmo vão de 16 px entre cartões).
+  // O topo é um `Body` sem o respiro de baixo: o espaço até a lista é o `cellFirst` (o mesmo vão de 16 px entre cartões). Depois da
+  // lista, o rodapé tem o mesmo vão e o respiro de baixo do `Body`.
   bodyTop: { paddingBottom: 0 },
   cellFirst: { marginTop: space[4] },
-  cellLast: { paddingBottom: space[6] },
+  footer: { marginTop: space[4], paddingBottom: space[6], gap: space[4] },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
   action: { flexGrow: 1, flexBasis: 220, alignSelf: 'auto' },
   totals: { flexDirection: 'row', gap: space[3], flexWrap: 'wrap' },
@@ -436,6 +453,7 @@ const styles = StyleSheet.create({
   totalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] },
   totalValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 },
   filters: { flexDirection: 'row', gap: space[2], flexWrap: 'wrap' },
+  filterRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2] },
   day: { fontFamily: fonts.bold, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: space[2] },
   shortcuts: { gap: space[1], paddingVertical: space[4] },
   shortcut: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, minHeight: 56 },

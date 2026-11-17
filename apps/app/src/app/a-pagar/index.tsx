@@ -5,11 +5,14 @@ import {
   REMINDERS_SETTINGS_HREF,
   QUICK_PAY_TEXT,
   RETURN_TEXT,
+  PAYABLES_LATER_TEXT,
   createdOverdueShown,
   formatMonthBR,
   groupAnnualLater,
+  groupLaterByMonth,
   isRepoError,
   payFailureReason,
+  laterMonthsShown,
   monthOf,
   newOperationKey,
   payablesStartMonth,
@@ -28,7 +31,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { AlertCircle, Bell, CalendarClock, Check, ChevronLeft, ChevronRight, Info, ListChecks, Pencil, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
+import { AlertCircle, Bell, CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, Info, ListChecks, Pencil, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
@@ -389,38 +392,21 @@ export default function ContasAPagarScreen() {
                 {sec.review ? (
                   <LinkButton label="Revisar vencidas" icon={ListChecks} style={styles.inlineLink} onPress={() => router.push('/a-pagar/vencidas')} />
                 ) : null}
-                {sec.grouped
-                  ? sec.grouped.map((g, i) =>
-                      g.type === 'conta' ? (
-                        <Animated.View key={g.commitment.id} exiting={rowExit} layout={rowLayout}>
-                          <CommitmentRow
-                            commitment={g.commitment}
-                            today={today}
-                            last={i === sec.grouped!.length - 1}
-                            onPress={() => openCommitment(g.commitment)}
-                          />
-                        </Animated.View>
-                      ) : (
-                        <Animated.View key={`ano-${g.group.seriesId}-${g.group.index}`} exiting={rowExit} layout={rowLayout}>
-                          <AnnualGroupRow
-                            group={g.group}
-                            last={i === sec.grouped!.length - 1}
-                            onPress={() => router.push(`/gastos-fixos/${g.group.seriesId}`)}
-                          />
-                        </Animated.View>
-                      ),
-                    )
-                  : sec.list.map((c, i) => (
-                      <Animated.View key={c.id} exiting={rowExit} layout={rowLayout}>
-                        <CommitmentRow
-                          commitment={c}
-                          today={today}
-                          last={i === sec.list.length - 1}
-                          onPress={() => openCommitment(c)}
-                          action={sec.quickPay ? actionFor(c) : undefined}
-                        />
-                      </Animated.View>
-                    ))}
+                {sec.grouped ? (
+                  <LaterByMonth grouped={sec.grouped} month={month} today={today} />
+                ) : (
+                  sec.list.map((c, i) => (
+                    <Animated.View key={c.id} exiting={rowExit} layout={rowLayout}>
+                      <CommitmentRow
+                        commitment={c}
+                        today={today}
+                        last={i === sec.list.length - 1}
+                        onPress={() => openCommitment(c)}
+                        action={sec.quickPay ? actionFor(c) : undefined}
+                      />
+                    </Animated.View>
+                  ))
+                )}
                 {sec.lateCost ? (
                   <TopicLink slug="multa-juros-atraso" label="Quanto custa pagar depois do vencimento?" style={styles.inlineLink} />
                 ) : null}
@@ -480,6 +466,64 @@ export default function ContasAPagarScreen() {
         </ChoiceDialog>
       ) : null}
     </View>
+  );
+}
+
+/** Mês da linha de "Próximos meses": o do vencimento; o de um grupo de parcelas, o da primeira (onde o grupo fica). */
+const laterRowMonth = (g: GroupedCommitment): IsoMonth => monthOf(g.type === 'conta' ? g.commitment.dueOn : g.group.firstDueOn);
+
+/**
+ * "Próximos meses" por mês (revisão das telas, 16/11/2026): o título de cada mês ("Novembro de 2026 · 5 contas"), o mês seguinte à vista
+ * e o resto atrás de "Ver os próximos meses". Cada linha tem a legenda de uma linha; o aviso do dia útil fica na tela da conta. A escolha
+ * vale enquanto a tela está aberta.
+ */
+function LaterByMonth({ grouped, month, today }: { grouped: GroupedCommitment[]; month: IsoMonth; today: string }) {
+  const [open, setOpen] = useState(false);
+  const groups = groupLaterByMonth(grouped, laterRowMonth);
+  const shown = open ? groups.length : laterMonthsShown(groups, month);
+  const hidden = groups.slice(shown);
+  const hiddenRows = hidden.reduce((n, g) => n + g.items.length, 0);
+  const caption = hidden.length > 0 ? PAYABLES_LATER_TEXT.showMoreCaption(hiddenRows, hidden[hidden.length - 1]!.month) : null;
+  return (
+    <>
+      {groups.slice(0, shown).map((m) => (
+        <Animated.View key={m.month} layout={rowLayout}>
+          <Txt variant="caption" color={colors.textSecondary} style={styles.laterMonth} accessibilityRole="header" aria-level={3}>
+            {m.title}
+          </Txt>
+          {m.items.map((g, i) =>
+            g.type === 'conta' ? (
+              <Animated.View key={g.commitment.id} exiting={rowExit} layout={rowLayout}>
+                <CommitmentRow commitment={g.commitment} today={today} last={i === m.items.length - 1} compact onPress={() => openCommitment(g.commitment)} />
+              </Animated.View>
+            ) : (
+              <Animated.View key={`ano-${g.group.seriesId}-${g.group.index}`} exiting={rowExit} layout={rowLayout}>
+                <AnnualGroupRow group={g.group} last={i === m.items.length - 1} onPress={() => router.push(`/gastos-fixos/${g.group.seriesId}`)} />
+              </Animated.View>
+            ),
+          )}
+        </Animated.View>
+      ))}
+      {caption ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${PAYABLES_LATER_TEXT.showMore}. ${caption}.`}
+          accessibilityState={{ expanded: false }}
+          aria-expanded={false}
+          onPress={() => setOpen(true)}
+          style={(st) => [styles.showMore, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
+              {PAYABLES_LATER_TEXT.showMore}
+            </Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {caption}
+            </Txt>
+          </View>
+          <ChevronDown size={20} color={colors.brandText} aria-hidden />
+        </Pressable>
+      ) : null}
+    </>
   );
 }
 
@@ -619,6 +663,8 @@ function SeriesLink({ count }: { count: number | null }) {
 
 const styles = StyleSheet.create({
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },
+  laterMonth: { fontFamily: fonts.bold, marginTop: space[3] },
+  showMore: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56, paddingVertical: space[2], marginTop: space[1], borderTopWidth: 1, borderTopColor: colors.border },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   monthRow: { flexDirection: 'row', alignItems: 'center', gap: space[1], marginHorizontal: -space[2] },
   monthBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },

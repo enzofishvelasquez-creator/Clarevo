@@ -461,30 +461,30 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
           </Banner>
         ) : null}
 
-        {mode.type === 'nova' ? (
-          <View style={{ gap: space[2] }}>
-            <BoletoReader today={today} disabled={busy} onRead={applyBoleto} />
-            {boleto ? (
-              <Banner tone="info" icon={Info}>
-                <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }} accessibilityLiveRegion="polite">
-                  {BOLETO_TEXT.readLine(boleto.reading)}
-                </MoneyTxt>
-                {boletoGaps(boleto.reading, today).map((gap) => (
-                  <Txt key={gap} variant="label">
-                    {gap}
-                  </Txt>
-                ))}
-                {boletoGaps(boleto.reading, today).length === 0 ? <Txt variant="label">{BOLETO_TEXT.filled}</Txt> : null}
-                <Txt variant="caption" color={colors.textSecondary}>
-                  {BOLETO_TEXT.privacy}
-                </Txt>
-                <LinkButton label={BOLETO_TEXT.undo} onPress={undoBoleto} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
-              </Banner>
-            ) : null}
-          </View>
-        ) : null}
-
         <Card style={{ gap: space[4] }}>
+          {/* Ler boleto: a primeira linha do cartão, como "Escanear nota fiscal" no gasto (revisão das telas, 16/11/2026). */}
+          {mode.type === 'nova' ? (
+            <View style={{ gap: space[2] }}>
+              <BoletoReader today={today} disabled={busy} onRead={applyBoleto} />
+              {boleto ? (
+                <Banner tone="info" icon={Info}>
+                  <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }} accessibilityLiveRegion="polite">
+                    {BOLETO_TEXT.readLine(boleto.reading)}
+                  </MoneyTxt>
+                  {boletoGaps(boleto.reading, today).map((gap) => (
+                    <Txt key={gap} variant="label">
+                      {gap}
+                    </Txt>
+                  ))}
+                  {boletoGaps(boleto.reading, today).length === 0 ? <Txt variant="label">{BOLETO_TEXT.filled}</Txt> : null}
+                  <Txt variant="caption" color={colors.textSecondary}>
+                    {BOLETO_TEXT.privacy}
+                  </Txt>
+                  <LinkButton label={BOLETO_TEXT.undo} onPress={undoBoleto} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+                </Banner>
+              ) : null}
+            </View>
+          ) : null}
           {mode.type === 'nova' ? (
             <>
               <ChoiceGroup label="Com que frequência?">

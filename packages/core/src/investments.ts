@@ -610,6 +610,11 @@ export const INVESTMENT_TEXT = {
     `Fonte do CDI, da Selic, do IPCA e da poupança: Banco Central do Brasil, séries ${BCB_SERIES.cdi}, ${BCB_SERIES.selic}, ${BCB_SERIES.ipca} e ${BCB_SERIES.poupanca}${fetchedOn ? `, consulta em ${formatDateBR(fetchedOn)}` : ''}.`,
   indicesExample: 'Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.',
   indicesError: 'Não foi possível buscar o CDI e o IPCA agora. A sua rentabilidade continua aqui.',
+  /** Na aba (revisão das telas, 16/11/2026): o CDI, o IPCA, a poupança e o ganho real ficam atrás deste botão. */
+  compare: 'Comparar com CDI, IPCA e poupança',
+  /** O aviso único do fim da aba, no lugar dos quatro parecidos. */
+  closingNote:
+    'A Clarevo não guarda, não movimenta nem indica investimentos. A rentabilidade vem dos valores que você registra, como estão no seu extrato, e não é recomendação de investimento: o que rendeu no passado não garante o futuro. Aportes, resgates e rendimentos não entram em Pago nem em Recebido.',
   disclaimer:
     'A rentabilidade é calculada com os valores que você registra, como estão no seu extrato. Não é recomendação de investimento, e o que rendeu no passado não garante o futuro.',
   rule: 'Aportes, resgates e rendimentos não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.',

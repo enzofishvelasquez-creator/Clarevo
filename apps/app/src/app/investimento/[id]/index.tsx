@@ -84,7 +84,7 @@ function Detail({
   const { today } = useSession();
   const invalidate = useInvalidateInvestments();
   const maskLabel = useMoneyLabelMask();
-  // Tela estreita ou letra grande: valores embaixo do nome e um botão por linha.
+  // Tela estreita ou letra grande: valores embaixo do nome e um botão por linha (Editar, Encerrar e Excluir).
   const { width, fontScale } = useWindowDimensions();
   const stacked = isStackedLayout(width, fontScale);
   const action = stacked ? styles.actionStacked : styles.action;
@@ -170,12 +170,14 @@ function Detail({
               <Txt variant="label">{`Este investimento venceu em ${formatDateBR(i.maturityOn)}. Se o dinheiro já voltou para a conta, registre o resgate e encerre o investimento.`}</Txt>
             </Banner>
           ) : null}
+          {/* Um botão por linha, na largura toda (revisão das telas, 16/11/2026): em duas colunas, "Registrar rendimento recebido"
+              quebrava em linhas de tamanhos diferentes. */}
           {active ? (
-            <View style={styles.actions}>
-              <Button label={D.updateValue} onPress={() => go('valor')} style={action} />
-              <Button label={D.addDeposit} tone="soft" onPress={() => go('aporte')} style={action} />
-              <Button label={D.addWithdrawal} tone="soft" onPress={() => go('resgate')} style={action} />
-              <Button label={D.addIncome} tone="soft" onPress={() => go('rendimento')} style={action} />
+            <View style={styles.mainActions}>
+              <Button label={D.updateValue} onPress={() => go('valor')} />
+              <Button label={D.addDeposit} tone="soft" onPress={() => go('aporte')} />
+              <Button label={D.addWithdrawal} tone="soft" onPress={() => go('resgate')} />
+              <Button label={D.addIncome} tone="soft" onPress={() => go('rendimento')} />
             </View>
           ) : (
             <Button label={D.reopen} tone="soft" busy={busy} onPress={() => setStatus('ativo')} />
@@ -268,6 +270,7 @@ function Detail({
 const styles = StyleSheet.create({
   hero: { backgroundColor: colors.brand, padding: space[5], gap: space[2], borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
   big: { fontFamily: fonts.extrabold, fontSize: 30, lineHeight: 38 },
+  mainActions: { gap: space[2] },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 150 },
   actionStacked: { alignSelf: 'auto', flexGrow: 1, flexBasis: '100%' },

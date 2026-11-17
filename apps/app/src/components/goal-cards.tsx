@@ -16,6 +16,7 @@ import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { GoalImageView } from '@/components/goal-image';
 import { GoalProgress } from '@/components/goal-progress';
+import { UncountedLinkedLine, useUncountedLinkedInvestments } from '@/components/linked-investments';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { Button, Card, LinkButton, Txt, styles as ui } from '@/components/ui';
 import { showsCoverage } from '@/lib/essentials';
@@ -48,6 +49,7 @@ export function ReserveCard({
   compact?: boolean;
 }) {
   const { today } = useSession();
+  const uncounted = useUncountedLinkedInvestments(reserve);
   const planAction = planLink ? (
     <LinkButton
       label="Planejar quanto guardar"
@@ -119,6 +121,7 @@ export function ReserveCard({
           {GOALS_TEXT.pace.line(pace)}
         </MoneyTxt>
       ) : null}
+      {uncounted ? <UncountedLinkedLine summary={uncounted} onBrand onSee={() => openLinked(reserve.id)} /> : null}
       <Txt variant="caption" color={colors.textOnBrandSoft}>
         {t.rounding}
       </Txt>
@@ -132,15 +135,9 @@ export function ReserveCard({
         <Button
           label={GOALS_TEXT.addDeposit}
           tone="onBrandSoft"
-          style={styles.action}
           onPress={() => router.push({ pathname: '/meta/[id]/movimento', params: { id: reserve.id, tipo: 'aporte' } })}
         />
-        <Button
-          label={GOALS_TEXT.seeDetails}
-          tone="onBrand"
-          style={styles.action}
-          onPress={() => router.push({ pathname: '/meta/[id]', params: { id: reserve.id } })}
-        />
+        <Button label={GOALS_TEXT.seeDetails} tone="onBrand" onPress={() => router.push({ pathname: '/meta/[id]', params: { id: reserve.id } })} />
       </View>
       {planAction}
     </View>
@@ -154,19 +151,15 @@ export function ReserveCard({
 export function GoalCard({ goal, plan, image }: { goal: Goal; plan: GoalPlan; image?: GoalImage | null }) {
   const maskLabel = useMoneyLabelMask();
   const { today } = useSession();
+  const uncounted = useUncountedLinkedInvestments(goal);
   const caption = goalCardCaption(plan);
   const pace = goalPace(goal, today);
   const paceLine = pace ? GOALS_TEXT.pace.line(pace) : null;
   const amounts = GOALS_TEXT.savedOfTarget(goal.savedCents, goal.targetCents);
   const percent = GOALS_TEXT.percent(plan.progress.percent);
   const label = maskLabel(`${GOALS_TEXT.progressA11y(goal.name, plan.progress.percent, goal.savedCents, goal.targetCents)}${caption ? ` ${caption}.` : ''}${paceLine ? ` ${paceLine}.` : ''}`);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint="Abre a meta"
-      onPress={() => router.push({ pathname: '/meta/[id]', params: { id: goal.id } })}
-      style={(st) => [ui.card, styles.goal, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
+  const content = (
+    <>
       {/* Imagem da meta (D-077): decorativa aqui, o cartão já diz o nome. */}
       <GoalImageView goal={goal} image={image} height={104} decorative />
       <View style={styles.goalHead}>
@@ -197,9 +190,40 @@ export function GoalCard({ goal, plan, image }: { goal: Goal; plan: GoalPlan; im
           {paceLine}
         </MoneyTxt>
       ) : null}
+    </>
+  );
+  const open = () => router.push({ pathname: '/meta/[id]', params: { id: goal.id } });
+  // Com investimentos ligados fora do guardado, a linha com "Ver" fica no cartão, mas fora da área que abre a meta (nada de botão dentro
+  // de botão): o cartão vira uma caixa com a área tocável e a linha embaixo.
+  if (uncounted) {
+    return (
+      <View style={[ui.card, styles.goal]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityHint="Abre a meta"
+          onPress={open}
+          style={(st) => [styles.goal, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
+          {content}
+        </Pressable>
+        <UncountedLinkedLine summary={uncounted} onSee={() => openLinked(goal.id)} />
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint="Abre a meta"
+      onPress={open}
+      style={(st) => [ui.card, styles.goal, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
+      {content}
     </Pressable>
   );
 }
+
+/** "Ver" dos investimentos ligados: o detalhe da meta, já no card "Investimentos ligados". */
+const openLinked = (id: string) => router.push({ pathname: '/meta/[id]', params: { id, secao: 'investimentos' } });
 
 /** "Concluídas e arquivadas" (recolhida): só aparece com alguma meta nesses estados. */
 export function ClosedGoals({ goals }: { goals: readonly Goal[] }) {
@@ -264,8 +288,8 @@ const styles = StyleSheet.create({
   amounts: { fontFamily: fonts.extrabold, fontSize: 20, lineHeight: 28 },
   percentRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   pill: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: 2 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
-  action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 140 },
+  // Um botão por linha, na largura toda (revisão das telas, 16/11/2026): lado a lado, "Registrar aporte" quebrava em duas linhas.
+  actions: { gap: space[2] },
   goal: { gap: space[2] },
   goalHead: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   goalAmounts: { flexDirection: 'row', alignItems: 'center', gap: space[3] },

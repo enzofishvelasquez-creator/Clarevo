@@ -247,3 +247,58 @@ export const QUICK_PAY_TEXT = {
   /** Faixa depois da confirmação do servidor. */
   done: (name: string) => `${name} marcada como paga.`,
 } as const;
+
+// ---------------------------------------------------------------------------
+// "Próximos meses" em Contas a pagar, por mês (revisão das telas, 16/11/2026)
+// ---------------------------------------------------------------------------
+
+/** Um mês de "Próximos meses": o título ("Novembro de 2026 · 5 contas") e as linhas do mês, na ordem de vencimento. */
+export interface LaterMonthGroup<T> {
+  month: IsoMonth;
+  title: string;
+  items: T[];
+}
+
+/** Textos de "Próximos meses" agrupados por mês. */
+export const PAYABLES_LATER_TEXT = {
+  /** "Novembro de 2026 · 5 contas" (conta as linhas do mês: um grupo de parcelas de uma conta do ano é uma linha). */
+  monthTitle: (month: IsoMonth, count: number) => `${formatMonthBR(month)} · ${count === 1 ? '1 conta' : `${count} contas`}`,
+  showMore: 'Ver os próximos meses',
+  /** "Mais 9 contas, até agosto de 2027" */
+  showMoreCaption: (count: number, lastMonth: IsoMonth) =>
+    `Mais ${count === 1 ? '1 conta' : `${count} contas`}, até ${formatMonthName(lastMonth)} de ${lastMonth.slice(0, 4)}`,
+} as const;
+
+/**
+ * Agrupa as linhas de "Próximos meses" (já em ordem de vencimento) pelo mês do vencimento de cada uma. `monthOfItem` diz o mês da linha
+ * (o de um grupo de parcelas é o da primeira parcela, onde o grupo fica).
+ */
+export function groupLaterByMonth<T>(items: readonly T[], monthOfItem: (item: T) => IsoMonth): LaterMonthGroup<T>[] {
+  const out: LaterMonthGroup<T>[] = [];
+  for (const item of items) {
+    const month = monthOfItem(item);
+    const last = out[out.length - 1];
+    if (last && last.month === month) last.items.push(item);
+    else out.push({ month, title: '', items: [item] });
+  }
+  return out.map((g) => ({ ...g, title: PAYABLES_LATER_TEXT.monthTitle(g.month, g.items.length) }));
+}
+
+/**
+ * Quantos meses de "Próximos meses" ficam à vista de início: os que vão até o mês seguinte ao da tela (o mês atual já está em "A vencer");
+ * sem nenhum, o primeiro mês com conta. O resto fica atrás de "Ver os próximos meses".
+ */
+export function laterMonthsShown(groups: readonly { month: IsoMonth }[], month: IsoMonth): number {
+  const next = addMonths(month, 1);
+  const upToNext = groups.filter((g) => g.month <= next).length;
+  return upToNext > 0 ? upToNext : Math.min(1, groups.length);
+}
+
+/** "Repetir esta conta" no detalhe de uma conta avulsa paga: uma escolha só, no lugar de três botões. */
+export const REPEAT_COMMITMENT_TEXT = {
+  button: 'Repetir esta conta',
+  title: 'Repetir esta conta',
+  nextMonth: 'Só no próximo mês',
+  monthly: 'Todo mês',
+  yearly: 'Todo ano',
+} as const;

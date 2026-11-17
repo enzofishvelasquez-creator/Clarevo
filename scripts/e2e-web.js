@@ -214,11 +214,29 @@ setInterval(async () => {
   const radio = (name) => p.getByRole('radio', { name, exact: true }).filter({ visible: true }).first();
   const visibleCount = (role, name) => p.getByRole(role, { name, exact: typeof name === 'string' }).filter({ visible: true }).count();
   // Seção da tela visível (card com título de nível 2): nomes acessíveis dos botões, na ordem; null se a seção não aparece.
-  const sectionRows = (title) =>
+  const sectionRowsRaw = (title) =>
     p.evaluate((title) => {
       const h = [...document.querySelectorAll('[role=heading][aria-level="2"]')].find((e) => e.textContent === title && e.getBoundingClientRect().width > 0);
       return h ? [...h.parentElement.querySelectorAll('[role=button]')].map((b) => b.getAttribute('aria-label') || b.textContent) : null;
     }, title);
+  // "Próximos meses" em Contas a pagar (revisão das telas, 16/11/2026): o mês seguinte fica à vista e o resto atrás de "Ver os próximos
+  // meses"; para ler a seção inteira, o roteiro abre o resto antes (o botão some depois do toque).
+  // Cartões (revisão das telas, 16/11/2026): sem cartão, "Cadastrar cartão" no topo; com algum cartão, "Adicionar outro cartão" depois da lista.
+  const waitCardsList = () => p.getByRole('button', { name: /^(Cadastrar cartão|Adicionar outro cartão)$/ }).filter({ visible: true }).first().waitFor({ timeout: 8000 });
+  const openLater = async () => {
+    const more = p.getByRole('button', { name: /^Ver os próximos meses\./ }).filter({ visible: true });
+    if (await more.count()) { await more.first().click().catch(() => {}); await p.waitForTimeout(300); }
+  };
+  // Aba Investir (revisão das telas, 16/11/2026): o CDI, o IPCA, a poupança, o ganho real e o mês até hoje ficam atrás de "Comparar com
+  // CDI, IPCA e poupança". Abre só se ainda está fechado (a aba continua montada entre as visitas).
+  const openCompare = async () => {
+    const b = p.getByRole('button', { name: 'Comparar com CDI, IPCA e poupança', exact: true }).filter({ visible: true }).first();
+    if ((await b.count()) && (await b.getAttribute('aria-expanded')) !== 'true') { await b.click(); await p.waitForTimeout(300); }
+  };
+  const sectionRows = async (title) => {
+    if (title === 'Próximos meses') await openLater();
+    return sectionRowsRaw(title);
+  };
   // Espera a lista de uma seção atender à condição; se não atender, a conferência seguinte acusa.
   const waitRows = async (title, pred, timeout = 3000) => { for (const end = Date.now() + timeout; Date.now() < end && !pred(await sectionRows(title));) await p.waitForTimeout(100); };
   // Espera uma condição qualquer (por exemplo, uma linha sair com FadeOut); se não acontecer, a conferência seguinte acusa.
@@ -799,9 +817,19 @@ setInterval(async () => {
     const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => e.textContent === text && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
     return { anotar: top('[role=button]', 'Anotar gasto'), organizar: top('[role=heading]', 'Organizar'), totais: top('div[dir="auto"]', 'Pago em outubro') };
   });
-  ok('movimentações: "Organizar" com os seis atalhos (Orçamento por categoria e Importar extrato ou fatura entre Cartões e as calculadoras) e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.orcamento, SC.importar, SC.calc]) &&
+  // Revisão das telas (16/11/2026): no topo, os totais e depois os botões; "Organizar" vem depois da lista do mês.
+  ok('movimentações: "Organizar" com os seis atalhos (Orçamento por categoria e Importar extrato ou fatura entre Cartões e as calculadoras) e as legendas de outubro, depois dos totais e dos botões (e da lista)', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.orcamento, SC.importar, SC.calc]) &&
     ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Arquivo PDF, OFX ou planilha do banco', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
-    scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.anotar < scOrder.organizar && scOrder.organizar < scOrder.totais, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
+    scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.totais < scOrder.anotar && scOrder.anotar < scOrder.organizar, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
+  // O primeiro movimento à vista sem rolar em 390 × 844 (revisão das telas, 16/11/2026): a linha inteira acima da barra de abas.
+  const movFirst = await p.evaluate(() => {
+    for (const e of document.querySelectorAll('div')) if (e.scrollTop > 0) e.scrollTop = 0;
+    const vis = (e) => e.getBoundingClientRect().width > 0;
+    const bar = [...document.querySelectorAll('[role=tablist]')].find(vis);
+    const row = [...document.querySelectorAll('[role=button]')].find((e) => vis(e) && /, (Pago|Recebido) · \d{2}\/\d{2}\/\d{4}/.test(e.getAttribute('aria-label') || ''));
+    return row && bar ? { row: Math.round(row.getBoundingClientRect().bottom), bar: Math.round(bar.getBoundingClientRect().top), h: window.innerHeight } : null;
+  });
+  ok('movimentações: o primeiro movimento aparece inteiro sem rolar, acima da barra de abas, em 390 × 844', movFirst !== null && movFirst.h === 844 && movFirst.row <= movFirst.bar, JSON.stringify(movFirst));
   await layoutChecks('movimentações com atalhos 390px');
   await scrollTo('Organizar');
   await shot('51_movimentacoes_atalhos');
@@ -903,12 +931,25 @@ setInterval(async () => {
   const laterBase = ['Aluguel, vence em 05/11, R$ 2.500,00, gasto fixo', 'Financiamento do carro, vence em 10/11, R$ 850,00, parcela 13 de 48', 'Seguro do carro, vence em 10/11, R$ 300,00', FAT('10/11/2026', '550,00'),
     'Luz, vence em 12/11, cerca de R$ 180,00, valor estimado, gasto fixo', FAT('10/12/2026', '350,00'), FAT('10/01/2027', '350,00', { next: 'segunda, 11/01/2027', registered: 'domingo, 10/01' }),
     ...['10/02/2027', '10/03/2027', '10/04/2027', '10/05/2027', '10/06/2027', '10/07/2027', '10/08/2027'].map((d) => FAT(d, '150,00', { '10/04/2027': { next: 'segunda, 12/04/2027', registered: 'sábado, 10/04' }, '10/07/2027': { next: 'segunda, 12/07/2027', registered: 'sábado, 10/07' } }[d]))];
+  // Revisão das telas (16/11/2026): de início, só novembro (o mês seguinte), com o título "Novembro de 2026 · 5 contas", e "Ver os
+  // próximos meses" com quantas contas faltam; as linhas têm a legenda de uma linha (o aviso do dia útil fica na tela da conta).
+  const laterNovJson = JSON.stringify([...laterBase.slice(0, 5), 'Ver os próximos meses. Mais 9 contas, até agosto de 2027.']);
+  await waitUntil(async () => JSON.stringify(await sectionRowsRaw('Próximos meses')) === laterNovJson, 10000);
+  const laterHeads = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="3"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+  ok('lista: "Próximos meses" mostra só novembro, com o título do mês e quantas contas, e "Ver os próximos meses" para o resto (9 contas, até agosto de 2027)',
+    JSON.stringify(await sectionRowsRaw('Próximos meses')) === laterNovJson && laterHeads.includes('Novembro de 2026 · 5 contas') && !laterHeads.some((h) => h.startsWith('Dezembro de 2026')) &&
+      (await p.getByRole('button', { name: /^Ver os próximos meses\./ }).filter({ visible: true }).first().getAttribute('aria-expanded')) === 'false', JSON.stringify([await sectionRowsRaw('Próximos meses'), laterHeads]));
+  await shot('19_contas_a_pagar_proximos_meses');
   // Espera a lista completa (e não só a seção): as faturas do cartão chegam na mesma leitura, mas a tela pode estar num instante intermediário.
   const laterBaseJson = JSON.stringify(laterBase);
   await waitUntil(async () => JSON.stringify(await sectionRows('Próximos meses')) === laterBaseJson, 10000);
   const laterNow = await sectionRows('Próximos meses');
   t = await body();
+  const laterHeadsAll = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="3"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
   ok('lista: próximos meses com Aluguel, parcela 13 de 48, Seguro, Luz estimada e as dez faturas do Cartão Exemplo', JSON.stringify(laterNow) === JSON.stringify(laterBase) && ['Vence em 05/11 · Todo mês', 'Vence em 10/11 · Parcela 13 de 48', 'Vence em 12/11 · Todo mês · estimado', '≈ R$ 180,00'].every((x) => t.includes(x)), (laterNow ?? []).join(' | '));
+  ok('lista: depois de "Ver os próximos meses", um título por mês, de novembro de 2026 a agosto de 2027, e o botão sai',
+    ['Novembro de 2026 · 5 contas', 'Dezembro de 2026 · 1 conta', 'Janeiro de 2027 · 1 conta', 'Agosto de 2027 · 1 conta'].every((h) => laterHeadsAll.includes(h)) &&
+      (await visibleCount('button', /^Ver os próximos meses\./)) === 0, JSON.stringify(laterHeadsAll));
   ok('lista: aluguel de outubro pago pelo gasto fixo, em Pagas', JSON.stringify(await sectionRows('Pagas')) === JSON.stringify(['Aluguel, paga em 05/10, R$ 2.500,00, gasto fixo']) && t.includes('Paga em 05/10 · Todo mês'));
   ok('lista: sem valores estimados no total de outubro', !t.includes('em valores estimados'));
   // Ciclo A3: IPVA (20/01/2027) e IPTU (fevereiro a novembro de 2027) só entram dois meses antes do primeiro vencimento.
@@ -934,7 +975,14 @@ setInterval(async () => {
   // D-078 G: "Ler boleto" no topo. A linha digitável colada (números fictícios, dígitos verificadores certos) preenche valor e
   // vencimento; números que não são boleto mostram o erro junto do campo; "Desfazer leitura" volta os campos.
   const boletoLine = 'Ler boleto. Código de barras, linha digitável ou PDF do boleto.';
-  ok('Ler boleto: a linha fica no topo de Anotar conta a pagar', (await visibleCount('button', boletoLine)) === 1);
+  // Revisão das telas (16/11/2026): a linha fica dentro do cartão do formulário, como "Escanear nota fiscal" no gasto (com a margem do cartão).
+  const boletoBox = await p.evaluate((name) => {
+    const line = [...document.querySelectorAll('[role=button]')].find((e) => e.getAttribute('aria-label') === name && e.getBoundingClientRect().width > 0);
+    const freq = [...document.querySelectorAll('div[dir="auto"]')].find((e) => e.textContent === 'Com que frequência?' && e.getBoundingClientRect().width > 0);
+    return line && freq ? { left: Math.round(line.getBoundingClientRect().left), freqLeft: Math.round(freq.getBoundingClientRect().left), top: line.getBoundingClientRect().top, freqTop: freq.getBoundingClientRect().top } : null;
+  }, boletoLine);
+  ok('Ler boleto: a linha fica no topo de Anotar conta a pagar, dentro do cartão do formulário (alinhada a "Com que frequência?")', (await visibleCount('button', boletoLine)) === 1 &&
+    boletoBox !== null && boletoBox.top < boletoBox.freqTop && Math.abs(boletoBox.left - boletoBox.freqLeft) <= 1, JSON.stringify(boletoBox));
   await btn(boletoLine).click(); await waitText('Colar ou digitar a linha digitável');
   ok('Ler boleto: a folha diz que o boleto é lido no aparelho e não é guardado', (await body()).includes('O boleto é lido aqui no aparelho e não é guardado.'));
   await btn('Colar ou digitar a linha digitável').click(); await field('Linha digitável ou código de barras').waitFor({ timeout: 6000 });
@@ -1026,8 +1074,17 @@ setInterval(async () => {
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
   t = await body();
   ok('detalhe da conta paga: pago e previsto', t.includes('Paga') && t.includes('R$ 155,00') && t.includes('Valor previsto') && t.includes('R$ 150,00'));
-  ok('conta avulsa paga: "Repetir todo mês" e "Repetir todo ano"', (await visibleCount('button', 'Repetir todo mês')) === 1 && (await visibleCount('button', 'Repetir todo ano')) === 1);
+  // Revisão das telas (16/11/2026): no lugar de seis botões do mesmo peso, "Ver gasto registrado", "Repetir esta conta" (uma escolha),
+  // "Ver resumo do mês" e "Desfazer pagamento" como link no fim.
+  const paidOrder = await p.evaluate(() => [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !e.closest('[role=tablist]')).map((e) => e.getAttribute('aria-label') || e.textContent).filter((n) => ['Ver gasto registrado', 'Repetir esta conta', 'Ver resumo do mês', 'Desfazer pagamento'].includes(n)));
+  ok('conta avulsa paga: "Ver gasto registrado", "Repetir esta conta", "Ver resumo do mês" e, no fim, "Desfazer pagamento"; sem os botões soltos de repetir', JSON.stringify(paidOrder) === JSON.stringify(['Ver gasto registrado', 'Repetir esta conta', 'Ver resumo do mês', 'Desfazer pagamento']) &&
+    (await visibleCount('button', 'Repetir todo mês')) === 0 && (await visibleCount('button', 'Repetir todo ano')) === 0 && (await visibleCount('button', 'Adicionar a conta do próximo mês')) === 0, JSON.stringify(paidOrder));
   await shot('22_conta_paga');
+  const repeatChoices = () => p.getByRole('alert').filter({ visible: true }).last().getByRole('button').evaluateAll((es) => es.map((e) => e.getAttribute('aria-label') || e.textContent));
+  await btn('Repetir esta conta').click(); await waitText('Só no próximo mês'); await p.waitForTimeout(300);
+  ok('"Repetir esta conta": a escolha "Só no próximo mês", "Todo mês" ou "Todo ano", e "Cancelar"', JSON.stringify(await repeatChoices()) === JSON.stringify(['Só no próximo mês', 'Todo mês', 'Todo ano', 'Cancelar']), JSON.stringify(await repeatChoices()));
+  await shot('22_conta_paga_repetir');
+  await confirmIn('Cancelar'); await p.waitForTimeout(300);
 
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await p.getByText('+ R$ 155,00').filter({ visible: true }).first().waitFor({ timeout: 2500 }).catch(() => {});
@@ -1058,12 +1115,15 @@ setInterval(async () => {
   await openRow(/^Internet, vence em 15\/10/); await waitText('Já paguei');
   await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
-  await btn('Adicionar a conta do próximo mês').click(); await waitText('Demonstração · Pessoal');
+  await btn('Repetir esta conta').click(); await waitText('Só no próximo mês'); await confirmIn('Só no próximo mês'); await waitText('Demonstração · Pessoal');
   ok('conta do próximo mês preenchida', (await field('Descrição').inputValue()) === 'Internet' && (await field('Valor em reais').inputValue()) === '150,00' && (await field('Data de vencimento').inputValue()) === '15/11/2026');
   await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva');
   ok('conta do próximo mês salva', (await body()).includes('Vence segunda, 16/11 (próximo dia útil)'));
   await btn('Voltar').click(); await waitText('A conta a pagar de novembro de 2026 já foi anotada.').catch(() => {});
-  ok('conta paga avisa que a de novembro já foi anotada', (await body()).includes('A conta a pagar de novembro de 2026 já foi anotada.') && (await p.getByRole('button', { name: 'Adicionar a conta do próximo mês', exact: true }).filter({ visible: true }).count()) === 0);
+  await btn('Repetir esta conta').click(); await waitText('Todo ano'); await p.waitForTimeout(300);
+  const repeatAfter = await repeatChoices();
+  await confirmIn('Cancelar'); await p.waitForTimeout(300);
+  ok('conta paga avisa que a de novembro já foi anotada, e "Repetir esta conta" deixa de oferecer "Só no próximo mês"', (await body()).includes('A conta a pagar de novembro de 2026 já foi anotada.') && JSON.stringify(repeatAfter) === JSON.stringify(['Todo mês', 'Todo ano', 'Cancelar']), JSON.stringify(repeatAfter));
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('pagar Internet 150 → 4.050 / 1.950', 'R$ 6.000,00', 'R$ 4.050,00', 'R$ 1.950,00', 'R$ 630,00');
 
@@ -1235,7 +1295,7 @@ setInterval(async () => {
   await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   ok('pagar a Escola: valor previsto e hoje', (await field('Valor pago').inputValue()) === '900,00' && (await field('Data do pagamento').inputValue()) === '07/10/2026');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado');
-  ok('Escola paga: sem "Adicionar a conta do próximo mês" nem "Repetir todo mês"', (await visibleCount('button', 'Adicionar a conta do próximo mês')) === 0 && (await visibleCount('button', 'Repetir todo mês')) === 0 && (await visibleCount('button', 'Repetir todo ano')) === 0 && (await body()).includes('Pago de outubro de 2026'));
+  ok('Escola paga: sem "Repetir esta conta" (a conta de gasto fixo já se repete pela série)', (await visibleCount('button', 'Repetir esta conta')) === 0 && (await visibleCount('button', 'Repetir todo mês')) === 0 && (await body()).includes('Pago de outubro de 2026'));
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('pagar a Escola de novembro hoje → Pago de outubro 4.800, a pagar 650', 'R$ 6.000,00', 'R$ 4.800,00', 'R$ 1.200,00', 'R$ 650,00');
   await openToPay();
@@ -1248,7 +1308,7 @@ setInterval(async () => {
   // "Novembro e os próximos meses" no Aluguel: novembro passa a 2.650; outubro, pago, não muda.
   await openToPay();
   await openRow(/^Aluguel, vence em 05\/11/); await waitText('Parte de: Aluguel · todo mês, dia 5');
-  ok('conta de gasto fixo: "Excluir só a conta de novembro" e sem "Adicionar a conta do próximo mês"', (await visibleCount('button', 'Excluir só a conta de novembro')) === 1 && (await visibleCount('button', 'Adicionar a conta do próximo mês')) === 0);
+  ok('conta de gasto fixo: "Excluir só a conta de novembro" e sem "Repetir esta conta"', (await visibleCount('button', 'Excluir só a conta de novembro')) === 1 && (await visibleCount('button', 'Repetir esta conta')) === 0);
   await btn('Editar conta a pagar').click(); await waitText('O que você quer alterar?');
   ok('editar conta de gasto fixo pergunta o alcance', (await Promise.all(['Só a conta de novembro', 'Novembro e os próximos meses', 'Cancelar'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
   await btn('Novembro e os próximos meses').click(); await waitText('Aplicar a partir de'); await waitText('Valor por mês');
@@ -2406,6 +2466,14 @@ setInterval(async () => {
   ok('Metas da demonstração: plano de guardar com R$ 500,00 por mês, curto no card da reserva (D-093: a frase da etapa fica em "Ver o plano"; "Ver o plano" e "Mudar valor" viram links), e "Seu mês" com a renda comprometida e o guardado em outubro',
     t.includes('Você planeja guardar R$ 500,00 por mês.') && !t.includes('a terceira etapa (R$ 22.500,00, 6 meses dos seus gastos essenciais) chega em dezembro de 2029.') && t.includes('Guardado em outubro: R$ 500,00') &&
     /\d+,\d% da renda de referência já tem destino\./.test(t) && (await visibleCount('button', 'Ver renda comprometida')) === 1 && (await visibleCount('button', 'Ver o plano')) === 1 && (await visibleCount('button', 'Mudar valor')) === 1);
+  // Revisão das telas (16/11/2026): a aplicação da demonstração está ligada à reserva, mas o guardado vem dos registros; o card diz isso
+  // e "Ver" abre o detalhe da reserva já no card "Investimentos ligados à reserva".
+  ok('Metas: o card da reserva diz "Investimentos ligados: R$ 10.875,00, não somados ao guardado", com "Ver" (nome acessível "Ver os investimentos ligados"); a viagem, sem investimento ligado, não',
+    t.includes('Investimentos ligados: R$ 10.875,00, não somados ao guardado') && t.split('não somados ao guardado').length === 2 && (await visibleCount('button', 'Ver os investimentos ligados')) === 1);
+  await btn('Ver os investimentos ligados').click(); await waitText('Investimentos ligados à reserva'); await p.waitForTimeout(900);
+  const linkedTop = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Investimentos ligados à reserva' && e.getBoundingClientRect().width > 0); return h ? Math.round(h.getBoundingClientRect().top) : null; });
+  ok('Metas: "Ver" abre a reserva (/meta/...) com o card "Investimentos ligados à reserva" à vista, sem rolar', new URL(p.url()).pathname.startsWith('/meta/') && linkedTop !== null && linkedTop > 0 && linkedTop < 700, `${p.url()} ${linkedTop}`);
+  await btn('Voltar').click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(400);
   ok('Metas: a pergunta "Você consegue guardar algum valor por mês?" não aparece depois da resposta "consigo"', !t.includes('Você consegue guardar algum valor por mês?') && (await visibleCount('button', 'Responder depois')) === 0);
   ok('Metas: títulos na ordem (Reserva para imprevistos com o plano dentro, Suas metas, Seu mês, Fazer as contas, Aprender e, depois do conteúdo principal, Neste mês; D-039 e D-054)', JSON.stringify((await headingList()).filter((h) => h.startsWith('2:'))) ===
     JSON.stringify(['2:Reserva para imprevistos', '2:Suas metas', '2:Seu mês', '2:Fazer as contas', '2:Aprender', '2:Neste mês']) && (await headingList()).includes('3:Seu plano de guardar'), JSON.stringify(await headingList()));
@@ -3616,7 +3684,7 @@ setInterval(async () => {
   const cardTile = () => p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first();
   const openCardsList = async () => {
     await goTab('Movimentos'); await waitText('Registrar recebimento');
-    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitCardsList(); await p.waitForTimeout(500);
   };
   const openCardPage = async () => { await openCardsList(); await cardTile().click(); await waitText('Fatura atual'); await p.waitForTimeout(400); };
   const openInvoice = async (month = 'novembro') => {
@@ -3630,13 +3698,14 @@ setInterval(async () => {
 
   await freshDemo();
   await goTab('Movimentos');
-  await p.getByRole('button', { name: SC.cartoes, exact: true }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: SC.cartoes, exact: true }).filter({ visible: true }).first().click(); await waitCardsList(); await p.waitForTimeout(500);
   t = await body();
   ok('E Cartões: título, apelido, "final 1234", fatura de novembro aberta de R$ 550,00, fecha em 03/11, vence em 10/11 e o limite usado R$ 2.300,00 de R$ 5.000,00',
     (await h1Name()) === 'Cartões' && ['Cartão Exemplo', 'final 1234', 'Fatura de novembro', 'R$ 550,00', 'Aberta · valor estimado', 'Fecha em 03/11 · Vence em 10/11', 'Limite usado: R$ 2.300,00 de R$ 5.000,00',
       'O limite usado soma as parcelas das faturas que ainda não foram pagas.'].every((x) => t.includes(x)), t.slice(0, 500));
   ok('E Cartões: o cartão é um botão só, com o nome acessível completo (apelido, final, fatura, fechamento, vencimento e limite)',
-    (await visibleCount('button', /^Cartão Exemplo · final 1234\. Fatura de novembro · R\$ 550,00 · Aberta\. Fecha em 03\/11\. Vence em 10\/11\. Limite usado: R\$ 2\.300,00 de R\$ 5\.000,00\.$/)) === 1 && (await visibleCount('button', 'Cadastrar cartão')) === 1);
+    (await visibleCount('button', /^Cartão Exemplo · final 1234\. Fatura de novembro · R\$ 550,00 · Aberta\. Fecha em 03\/11\. Vence em 10\/11\. Limite usado: R\$ 2\.300,00 de R\$ 5\.000,00\.$/)) === 1 && (await visibleCount('button', 'Adicionar outro cartão')) === 1 &&
+      (await visibleCount('button', 'Cadastrar cartão')) === 0 && !t.includes('Cadastre seus cartões para anotar as compras na fatura.'));
   ok('E Cartões: sem cor de alerta nem julgamento (sem "disponível", "estourou", "saldo")', !NO_BALANCE.test(t) && !/estourou|dispon[ií]vel|saldo/i.test(t));
   await keepText();
   await innerChecks('cartões 390px');
@@ -3677,6 +3746,17 @@ setInterval(async () => {
     t.includes('parcela 1 de 3 · compra em 05/10 · Lazer') && /Parcelas de compras\s+R\$ 550,00/.test(t) && /Total da fatura\s+R\$ 550,00/.test(t) && t.includes('Total = parcelas + encargos + saldo anterior - estornos'));
   ok('E fatura aberta: sem "Registrar pagamento" (só depois do fechamento), com "Informar encargos", "Registrar estorno" e a próxima fatura (dezembro); sem "Desfazer pagamento"', (await visibleCount('button', 'Registrar pagamento')) === 0 && (await visibleCount('button', 'Informar encargos')) === 1 &&
     (await visibleCount('button', 'Registrar estorno')) === 1 && (await visibleCount('button', 'Desfazer pagamento')) === 0 && (await visibleCount('button', 'Próxima fatura: dezembro')) === 1 && (await visibleCount('button', /^Fatura anterior/)) === 0);
+  // Revisão das telas (16/11/2026): na fatura aberta, "Anotar compra neste cartão" é a ação principal (botão), e "Informar encargos" e
+  // "Registrar estorno" ficam como links, abaixo dela.
+  const openInvoiceActions = await p.evaluate(() => {
+    const vis = (e) => e.getBoundingClientRect().width > 0;
+    const find = (name) => [...document.querySelectorAll('[role=button]')].find((e) => vis(e) && e.textContent === name);
+    const note = find('Anotar compra neste cartão'); const charges = find('Informar encargos'); const refund = find('Registrar estorno');
+    const bg = (e) => (e ? getComputedStyle(e).backgroundColor : null);
+    return note && charges && refund ? { noteTop: note.getBoundingClientRect().top, chargesTop: charges.getBoundingClientRect().top, refundTop: refund.getBoundingClientRect().top, noteBg: bg(note), chargesBg: bg(charges) } : null;
+  });
+  ok('E fatura aberta: "Anotar compra neste cartão" é o botão principal (com fundo), e "Informar encargos" e "Registrar estorno" vêm depois, como links (sem fundo)', openInvoiceActions !== null &&
+    openInvoiceActions.noteTop < openInvoiceActions.chargesTop && openInvoiceActions.chargesTop < openInvoiceActions.refundTop && openInvoiceActions.noteBg !== 'rgba(0, 0, 0, 0)' && openInvoiceActions.chargesBg === 'rgba(0, 0, 0, 0)', JSON.stringify(openInvoiceActions));
   await keepText();
   await innerChecks('fatura 390px');
   await shot('132_fatura');
@@ -3685,15 +3765,16 @@ setInterval(async () => {
   await shot('132_fatura_320px', true);
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
 
-  // Anotar gasto: "Como você pagou?" logo depois do Valor. Dinheiro, débito ou Pix é o jeito de sempre (já marcado).
+  // Anotar gasto: "Como você pagou?" depois da data, no lugar da origem do dinheiro, como no recebimento (revisão das telas, 16/11/2026:
+  // Descrição, Valor, Data, origem e Categoria nos dois). Dinheiro, débito ou Pix é o jeito de sempre (já marcado).
   await goTab('Resumo'); await waitText('Diferença do mês');
   await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
   const payTops = await p.evaluate(() => {
     const top = (text) => [...document.querySelectorAll('div[dir="auto"]')].find((e) => e.textContent === text && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
-    return { valor: top('Valor em reais'), como: top('Como você pagou?'), data: top('Data do pagamento') };
+    return { descricao: top('Descrição'), valor: top('Valor em reais'), como: top('Como você pagou?'), data: top('Data do pagamento'), categoria: top('Categoria') };
   });
-  ok('E Anotar gasto: "Como você pagou?" vem logo depois do Valor (e antes da data), com "Dinheiro, débito ou Pix" marcado e "Cartão de crédito" desmarcado',
-    payTops.valor !== null && payTops.como !== null && payTops.data !== null && payTops.valor < payTops.como && payTops.como < payTops.data &&
+  ok('E Anotar gasto: Descrição, Valor, Data, "Como você pagou?" (a origem) e Categoria, nessa ordem, com "Dinheiro, débito ou Pix" marcado e "Cartão de crédito" desmarcado',
+    Object.values(payTops).every((v) => v !== null) && payTops.descricao < payTops.valor && payTops.valor < payTops.data && payTops.data < payTops.como && payTops.como < payTops.categoria &&
     (await radio('Dinheiro, débito ou Pix').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && (await visibleCount('textbox', 'Em quantas vezes?')) === 0 && (await visibleCount('button', 'Salvar gasto')) === 1, JSON.stringify(payTops));
   await radio('Cartão de crédito').click(); await p.waitForTimeout(400);
   t = await body();
@@ -3739,11 +3820,11 @@ setInterval(async () => {
   ok('E fatura de dezembro: R$ 450,00 (parcela 2 do Tênis, do Notebook e do Fone) com o caminho para a fatura anterior', (await heroTotal()) === 'R$ 450,00' && (await visibleCount('button', 'Tênis de corrida · parcela 2 de 3 · R$ 200,00')) === 1 &&
     (await visibleCount('button', 'Fone de ouvido · parcela 2 de 3 · R$ 100,00')) === 1 && (await visibleCount('button', 'Fatura anterior: novembro')) === 1, `${await heroTotal()}`);
   ok('E fatura de dezembro (ainda não começou): sem "Registrar pagamento" e com a frase de quando poderá ser paga (depois do fechamento, em 03/12/2026); "Informar encargos" segue',
-    (await visibleCount('button', 'Registrar pagamento')) === 0 && t.includes('Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/12/2026. Se você já pagou antes, use a data em que pagou.') && (await visibleCount('button', 'Informar encargos')) === 1);
+    (await visibleCount('button', 'Registrar pagamento')) === 0 && t.includes('Esta fatura fecha em 03/12/2026. Depois disso, o pagamento pode ser registrado aqui. Se pagar antes, informe a data real do pagamento.') && (await visibleCount('button', 'Informar encargos')) === 1);
   await btn('Fatura anterior: novembro').click(); await waitInvoice('Fatura de novembro');
   t = await body();
   ok('E fatura de novembro aberta: sem "Registrar pagamento", com a frase de quando poderá ser paga (em 03/11/2026) e "Informar encargos" e "Registrar estorno" ainda disponíveis',
-    (await visibleCount('button', 'Registrar pagamento')) === 0 && t.includes('Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/11/2026. Se você já pagou antes, use a data em que pagou.') &&
+    (await visibleCount('button', 'Registrar pagamento')) === 0 && t.includes('Esta fatura fecha em 03/11/2026. Depois disso, o pagamento pode ser registrado aqui. Se pagar antes, informe a data real do pagamento.') &&
     (await visibleCount('button', 'Informar encargos')) === 1 && (await visibleCount('button', 'Registrar estorno')) === 1, t.slice(0, 500));
   await keepText();
   await shot('135a_fatura_aberta_sem_pagar');
@@ -3768,7 +3849,7 @@ setInterval(async () => {
     JSON.stringify([await sectionRows('Faturas anteriores'), await sectionRows('Fatura atual')]));
   await openInvoice('outubro'); t = await body();
   ok('E fatura de outubro fechada: "Fechada", R$ 400,00, "Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)" (10/10 é sábado e 12/10 é feriado), "Registrar pagamento" e "Informar encargos", sem a frase da fatura aberta', (await h1Name()) === 'Fatura' && t.includes('Fatura de outubro') && t.includes('Fechada') && (await heroTotal()) === 'R$ 400,00' &&
-    t.includes('Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)') && (await visibleCount('button', 'Registrar pagamento')) === 1 && (await visibleCount('button', 'Informar encargos')) === 1 && !t.includes('Esta fatura ainda está aberta') &&
+    t.includes('Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)') && (await visibleCount('button', 'Registrar pagamento')) === 1 && (await visibleCount('button', 'Informar encargos')) === 1 && !t.includes('Esta fatura fecha em') &&
     (await visibleCount('button', 'Mercado de setembro · R$ 300,00')) === 1 && (await visibleCount('button', 'Cinema · R$ 100,00')) === 1, t.slice(0, 400));
   await btn('Registrar pagamento').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(500);
   t = await body();
@@ -3987,7 +4068,7 @@ setInterval(async () => {
   await goTab('Movimentos'); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
   await hiddenShows('Movimentos com Cartões');
   ok('E valores ocultos: a linha "Cartões" diz "R$ ••••" na tela e "valor oculto" no nome acessível', (await visibleCount('button', 'Cartões, Cartão Exemplo, fatura de novembro valor oculto')) === 1 && (await body()).includes('Cartão Exemplo · fatura de novembro R$ ••••'), (await sectionRows('Organizar') ?? []).join(' | '));
-  await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitCardsList(); await p.waitForTimeout(500);
   await hiddenShows('lista de cartões');
   ok('E valores ocultos: o cartão fala "valor oculto" (fatura e limite) e a barra do limite continua só desenho', (await visibleCount('button', /^Cartão Exemplo · final 1234\. Fatura de novembro · valor oculto · Aberta\. Fecha em 03\/11\. Vence em 10\/11\. Limite usado: valor oculto\.$/)) === 1 && (await body()).includes('Limite usado: R$ •••• de R$ ••••'));
   await keepText();
@@ -4075,8 +4156,8 @@ setInterval(async () => {
   ok('E reativar cartão: "Cartão reativado." e "Arquivar cartão" de volta', (await visibleCount('button', 'Arquivar cartão')) === 1 && (await visibleCount('button', 'Reativar cartão')) === 0);
   // Cartão sem lançamentos pode ser excluído.
   await goTab('Movimentos'); await waitText('Registrar recebimento');
-  await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão');
-  await btn('Cadastrar cartão').click(); await waitText('Apelido do cartão'); await field('Apelido do cartão').fill('Cartão do mercado'); await field('Dia do fechamento').fill('15'); await field('Dia do vencimento').fill('25');
+  await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitCardsList();
+  await btn('Adicionar outro cartão').click(); await waitText('Apelido do cartão'); await field('Apelido do cartão').fill('Cartão do mercado'); await field('Dia do fechamento').fill('15'); await field('Dia do vencimento').fill('25');
   await btn('Salvar cartão').click(); await waitText('Cartão salvo.'); await p.waitForTimeout(500); t = await body();
   ok('E cartão sem compras: "Nenhuma compra neste cartão ainda.", "Limite usado: R$ 0,00" (sem limite informado) e "Excluir cartão" disponível', t.includes('Nenhuma compra neste cartão ainda.') && t.includes('Limite usado: R$ 0,00') && !t.includes('de R$') && (await visibleCount('button', 'Excluir cartão')) === 1);
   await btn('Excluir cartão').click(); await waitText('Excluir este cartão?');
@@ -5162,7 +5243,7 @@ setInterval(async () => {
   await checkBar('nav barra: detalhe de um gasto fixo', 'Movimentos');
   await navBackTo('Movimentos');
   // Cartões, cartão, fatura e o pagamento da fatura.
-  await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitCardsList(); await p.waitForTimeout(400);
   await checkBar('nav barra: Cartões', 'Movimentos');
   await p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first().click(); await waitText('Fatura atual'); await p.waitForTimeout(400);
   await checkBar('nav barra: um cartão', 'Movimentos');
@@ -5691,7 +5772,7 @@ setInterval(async () => {
   };
   const d42OpenCards = async () => {
     await d42GoTab('Movimentos'); await waitText('Registrar recebimento');
-    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitCardsList(); await p.waitForTimeout(500);
   };
   const d42CardIdOf = (name) => otherDevice(async (repo, ctx, n) => (await repo.listCards(ctx)).find((c) => c.name === n)?.id ?? null, name);
   const d42Count = (cardId) => otherDevice(async (repo, ctx, id) => (await repo.listCardEntries(id)).length, cardId);
@@ -6814,7 +6895,7 @@ setInterval(async () => {
   const g1Keep = async () => { const x = await body(); g1Texts.push(x); screenTexts.push(x); return x; };
   const g1OpenCard = async () => {
     await goResumo(); await tabByName('Movimentos').click(); await waitText('Registrar recebimento');
-    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitCardsList(); await p.waitForTimeout(500);
     await p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first().click(); await waitText('Fatura atual'); await p.waitForTimeout(400);
   };
   const g1OpenInvoice = async (month) => {
@@ -6958,6 +7039,12 @@ setInterval(async () => {
   await btn('Registrar recebimento').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
   t = await g1Keep();
   ok('G1 Registrar recebimento: o grupo se chama "Entrou em" e "Como você pagou?" não existe', (await g1Group('Entrou em').count()) === 1 && (await g1Group('Saiu de').count()) === 0 && !t.includes('Como você pagou?'));
+  const g1IncomeOrder = await p.evaluate(() => {
+    const top = (text) => [...document.querySelectorAll('div[dir="auto"]')].find((e) => e.textContent === text && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
+    return { descricao: top('Descrição'), valor: top('Valor em reais'), data: top('Data do recebimento'), origem: top('Entrou em'), categoria: top('Categoria') };
+  });
+  ok('G1 Registrar recebimento: a mesma ordem do gasto (Descrição, Valor, Data, "Entrou em" e Categoria; revisão das telas, 16/11/2026)', Object.values(g1IncomeOrder).every((v) => v !== null) &&
+    g1IncomeOrder.descricao < g1IncomeOrder.valor && g1IncomeOrder.valor < g1IncomeOrder.data && g1IncomeOrder.data < g1IncomeOrder.origem && g1IncomeOrder.origem < g1IncomeOrder.categoria, JSON.stringify(g1IncomeOrder));
   await radio('Conta principal').click(); await field('Descrição').fill('Freela'); await field('Valor em reais').fill('200');
   await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await p.waitForTimeout(500);
   t = await g1Keep();
@@ -7032,8 +7119,11 @@ setInterval(async () => {
   await shot('251_suas_contas_conta_nova');
   await goResumo(); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
   t = await g1Keep();
-  ok('G1 conta nova: Anotar gasto mostra "Saiu de: Conta principal" como texto, sem chips, e o atalho "Gerenciar bancos e carteira"',
-    t.includes('Saiu de: Conta principal') && (await g1Group('Saiu de').count()) === 0 && (await visibleCount('button', 'Gerenciar bancos e carteira')) === 1 && t.includes('Será salvo em Pessoal, Conta principal.'));
+  // Revisão das telas (16/11/2026): com uma conta só, ela aparece uma vez, em "Será salvo em ...", com o atalho logo abaixo (sem "Saiu de" nem
+  // a conta repetida na legenda do topo).
+  ok('G1 conta nova: Anotar gasto diz a conta uma vez só ("Será salvo em Pessoal, Conta principal."), sem chips nem "Saiu de", e com o atalho "Gerenciar bancos e carteira"',
+    !t.includes('Saiu de: Conta principal') && (await g1Group('Saiu de').count()) === 0 && (await visibleCount('button', 'Gerenciar bancos e carteira')) === 1 && t.includes('Será salvo em Pessoal, Conta principal.') &&
+      t.split('Conta principal').length === 2 && t.includes('Gasto já pago'), t.slice(0, 600));
   await atWidths(async (w) => { await layoutChecks(`G1 conta nova Anotar gasto ${w}px`); if (w === 390) await shot('252_anotar_gasto_conta_unica'); });
   await field('Descrição').fill('Café'); await field('Valor em reais').fill('8'); await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
   ok('G1 conta nova: o detalhe mostra "Saiu de" com a Conta principal', (await body()).includes('Conta principal') && (await g1Records('Café')) === 'Café|Conta principal|800');
@@ -7122,10 +7212,13 @@ setInterval(async () => {
   t = await h1Keep();
   const h1EntryBox = await p.evaluate(() => {
     const y = (re) => { const e = [...document.querySelectorAll('[role=button]')].find((x) => re.test(x.getAttribute('aria-label') || x.textContent || '') && x.getBoundingClientRect().width > 0); return e ? Math.round(e.getBoundingClientRect().top) : null; };
-    return { buscar: y(/^Buscar\./), anotar: y(/^Anotar gasto$/) };
+    const row = [...document.querySelectorAll('[role=button]')].find((x) => /, (Pago|Recebido) · /.test(x.getAttribute('aria-label') || '') && x.getBoundingClientRect().width > 0);
+    return { buscar: y(/^Buscar\./), anotar: y(/^Anotar gasto$/), todos: y(/^Todos$/), lista: row ? Math.round(row.getBoundingClientRect().top) : null };
   });
-  ok('H1 Movimentos: o campo "Buscar" (lupa, "Gastos e recebimentos de todos os meses") é um botão e fica no topo, acima de "Anotar gasto"',
-    (await visibleCount('button', /^Buscar\. Abre a busca em todos os meses\.$/)) === 1 && t.includes('Gastos e recebimentos de todos os meses') && h1EntryBox.buscar !== null && h1EntryBox.anotar !== null && h1EntryBox.buscar < h1EntryBox.anotar, JSON.stringify(h1EntryBox));
+  // Revisão das telas (16/11/2026): a lupa "Buscar" fica ao lado dos filtros, logo acima da lista (abaixo de "Anotar gasto").
+  ok('H1 Movimentos: "Buscar" (a lupa, com o nome acessível que diz que a busca é em todos os meses) é um botão ao lado dos filtros, abaixo de "Anotar gasto" e logo acima da lista',
+    (await visibleCount('button', /^Buscar\. Abre a busca em todos os meses\.$/)) === 1 && h1EntryBox.buscar !== null && h1EntryBox.anotar !== null && h1EntryBox.lista !== null &&
+      h1EntryBox.anotar < h1EntryBox.buscar && h1EntryBox.buscar === h1EntryBox.todos && h1EntryBox.buscar < h1EntryBox.lista, JSON.stringify(h1EntryBox));
   await atWidths(async (w) => { await layoutChecks(`H1 Movimentos com o campo Buscar ${w}px`); if (w === 390) await shot('260_movimentos_buscar_entrada'); });
   // Com Família (D-055) a busca vale para o contexto escolhido: conferido no bloco "Família (D-055)".
 
@@ -8308,28 +8401,46 @@ setInterval(async () => {
   await j1NewAccount('Jo Tutorial', 'jo@exemplo.com');
   await j1Dialog(j1TOUR).first().waitFor({ timeout: 8000 });
   let j1s = await j1TourState();
-  ok('Tutorial tour: a janela tem o nome "Primeiros passos na Clarevo", é modal, mostra o cartão 1 de 5 ("Resumo do mês") com título de nível 2, "Pular" e "Próximo", sem "Começar"',
-    j1s !== null && j1s.modal === 'true' && j1s.title === 'Resumo do mês' && j1s.level === '2' && j1s.text.includes('1 de 5') && j1s.buttons.includes('Pular') && j1s.buttons.includes('Próximo') && !j1s.buttons.includes('Começar') &&
+  ok('Tutorial tour: a janela tem o nome "Primeiros passos na Clarevo", é modal, mostra o cartão 1 de 5 ("Resumo do mês") com título de nível 2, "Pular" e "Próximo", sem "Começar" nem "Voltar"',
+    j1s !== null && j1s.modal === 'true' && j1s.title === 'Resumo do mês' && j1s.level === '2' && j1s.text.includes('1 de 5') && j1s.buttons.includes('Pular') && j1s.buttons.includes('Próximo') && !j1s.buttons.includes('Começar') && !j1s.buttons.includes('Voltar') &&
     j1s.text.includes('Veja o que você recebeu, o que pagou e o que ainda vai vencer no mês.'), JSON.stringify(j1s));
   ok('Tutorial tour: o foco já está dentro da janela e os botões têm 44 px ou mais', j1s !== null && j1s.focusInside && j1s.minH >= 44, JSON.stringify(j1s));
+  // Revisão das telas (16/11/2026): o cartão é uma folha presa ao pé da tela, e o Resumo de cima continua à vista (sem véu escuro).
+  const j1Sheet = await p.evaluate((label) => {
+    const dlg = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getAttribute('aria-label') === label && e.getBoundingClientRect().width > 0);
+    const heading = dlg && [...dlg.querySelectorAll('[role=heading]')].find((e) => e.getBoundingClientRect().width > 0);
+    let sheet = heading; while (sheet && sheet.parentElement && sheet.parentElement !== dlg && Math.round(sheet.getBoundingClientRect().bottom) < window.innerHeight - 1) sheet = sheet.parentElement;
+    const r = sheet ? sheet.getBoundingClientRect() : null;
+    const total = [...document.querySelectorAll('[role=button]')].find((e) => /^Recebido, R\$/.test(e.getAttribute('aria-label') || '') && e.getBoundingClientRect().width > 0);
+    return r ? { top: Math.round(r.top), bottom: Math.round(r.bottom), h: window.innerHeight, totalTop: total ? Math.round(total.getBoundingClientRect().top) : null } : null;
+  }, j1TOUR);
+  ok('Tutorial tour: o cartão fica preso ao pé da tela, e os totais do Resumo aparecem acima dele', j1Sheet !== null && j1Sheet.bottom >= j1Sheet.h - 1 && j1Sheet.top > j1Sheet.h / 3 && j1Sheet.totalTop !== null && j1Sheet.totalTop < j1Sheet.top, JSON.stringify(j1Sheet));
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial tour cartão 1 ${w}px`); await shot(w === 390 ? '340_tour_1_resumo' : '340_tour_1_resumo_320px'); });
   const j1Cards = [
     ['Anotar um gasto', '2 de 5', 'Toque em Anotar gasto para registrar o que você pagou.'],
-    ['Contas a pagar e lembretes', '3 de 5', 'Quando pagar, toque em Já paguei.'],
-    ['Metas e calculadoras', '4 de 5', 'Com um prazo, a Clarevo mostra quanto guardar por mês até lá.'],
-    ['Onde achar ajuda', '5 de 5', 'Em Aprender › Como usar o app da Clarevo, cada função tem o passo a passo.'],
+    ['Movimentos, contas e cartões', '3 de 5', 'Em Movimentos ficam a lista do mês, as contas a pagar e os cartões.'],
+    ['Metas e investimentos', '4 de 5', 'Em Investir, acompanhe o que você já investe e quanto rendeu.'],
+    ['Onde achar ajuda', '5 de 5', 'Algo deu errado ou teve uma ideia? Em Conta, Enviar sugestão ou problema.'],
   ];
   for (const [i, [title, pos, text]] of j1Cards.entries()) {
     await j1Next();
     j1s = await j1TourState();
     const last = i === j1Cards.length - 1;
-    ok(`Tutorial tour: cartão ${pos} "${title}", com a posição, o texto e ${last ? '"Começar" no lugar de "Próximo"' : '"Pular" e "Próximo"'}`,
-      j1s !== null && j1s.title === title && j1s.text.includes(pos) && j1s.text.includes(text) && j1s.buttons.includes('Pular') && (last ? j1s.buttons.includes('Começar') && !j1s.buttons.includes('Próximo') : j1s.buttons.includes('Próximo') && !j1s.buttons.includes('Começar')) && j1s.focusInside,
+    // Do segundo cartão em diante, "Voltar"; no último, "Começar" e sem "Pular" (revisão das telas, 16/11/2026).
+    ok(`Tutorial tour: cartão ${pos} "${title}", com a posição, o texto, "Voltar" e ${last ? '"Começar" no lugar de "Próximo", sem "Pular"' : '"Pular" e "Próximo"'}`,
+      j1s !== null && j1s.title === title && j1s.text.includes(pos) && j1s.text.includes(text) && j1s.buttons.includes('Voltar') &&
+        (last ? j1s.buttons.includes('Começar') && !j1s.buttons.includes('Próximo') && !j1s.buttons.includes('Pular') : j1s.buttons.includes('Pular') && j1s.buttons.includes('Próximo') && !j1s.buttons.includes('Começar')) && j1s.focusInside,
       JSON.stringify(j1s));
     ok(`Tutorial tour: a troca para o cartão ${pos} é anunciada na região viva ("Cartão ${pos}. ${title}.")`, j1s !== null && j1s.live.includes(`Cartão ${pos}. ${title}.`), JSON.stringify(j1s?.live));
     await j1Keep();
     await j1Widths(async (w) => { await layoutChecks(`tutorial tour cartão ${i + 2} ${w}px`); if (w === 390) await shot(`34${i + 1}_tour_${i + 2}_${['anotar', 'contas', 'metas', 'ajuda'][i]}`); if (last && w === 320) await shot('344_tour_5_ajuda_320px'); });
+    if (i === 1) {
+      // "Voltar" mostra o cartão anterior, e "Próximo" volta a este.
+      await j1Dialog(j1TOUR).getByRole('button', { name: 'Voltar', exact: true }).first().click(); await p.waitForTimeout(250);
+      ok('Tutorial tour: "Voltar" no cartão 3 mostra de novo o cartão 2 ("Anotar um gasto")', (await j1TourState())?.title === 'Anotar um gasto' && (await j1TourState())?.text.includes('2 de 5'));
+      await j1Next();
+    }
   }
   await j1Next();
   ok('Tutorial tour: "Começar" fecha a janela', await j1TourGone());
@@ -8434,7 +8545,7 @@ setInterval(async () => {
     JSON.stringify(await j1H2s()) === JSON.stringify(['Para que serve', 'Onde fica', 'Como usar']) && j1e.includes('Movimentos › Organizar › Cartões') && (await p.locator('[aria-label^="Passo "]').filter({ visible: true }).count()) === 6 &&
     j1e.includes('Cadastra seus cartões de crédito para anotar as compras na fatura.') && (await visibleCount('button', 'Abrir Cartões')) === 1, `${j1Path()} ${JSON.stringify(await j1H2s())}`);
   await j1Widths(async (w) => { await layoutChecks(`tutorial guia entrada ${w}px`); await shot(w === 390 ? '322_guia_entrada' : '322_guia_entrada_320px'); });
-  await btn('Abrir Cartões').click(); await waitText('Cadastrar cartão');
+  await btn('Abrir Cartões').click(); await waitCardsList();
   ok('Tutorial guia: "Abrir Cartões" abre a tela de Cartões (/cartoes), com o botão "?"', j1Path() === '/cartoes' && (await h1Name()) === 'Cartões' && (await visibleCount('button', 'Como usar esta tela')) === 1);
   await btn('Voltar').click(); await waitText('Para que serve');
   ok('Tutorial guia: voltar da tela aberta devolve a entrada', j1Path() === '/aprender/guia/cartoes');
@@ -8548,12 +8659,12 @@ setInterval(async () => {
   await j1Demo();
   await j1Tab('Movimentos do mês').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
   // Cartões e Fatura
-  await j1Org('Cartões').click(); await waitText('Cadastrar cartão');
+  await j1Org('Cartões').click(); await waitCardsList();
   await j1Help('Cartões', 'Cartões e faturas', 'Informe o apelido, os 4 últimos dígitos', '324_ajuda_cartoes');
   await p.getByRole('button', { name: 'Como usar esta tela', exact: true }).filter({ visible: true }).first().click();
   await btn('Ver no guia').click(); await waitText('Para que serve');
   ok('Tutorial "?": "Ver no guia" abre a entrada do guia daquela tela (/aprender/guia/cartoes)', j1Path() === '/aprender/guia/cartoes' && (await h1Name()) === 'Cartões e faturas');
-  await btn('Voltar').click(); await waitText('Cadastrar cartão');
+  await btn('Voltar').click(); await waitCardsList();
   await p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first().click(); await waitText('Fatura atual');
   ok('Tutorial "?": o cartão (detalhe) não tem o botão, só Cartões e a fatura', (await visibleCount('button', 'Como usar esta tela')) === 0);
   await p.getByRole('button', { name: /^Fatura de novembro, aberta, R\$ 550,00/ }).filter({ visible: true }).first().click(); await waitText('Informar encargos');
@@ -8569,7 +8680,7 @@ setInterval(async () => {
   await btn('Voltar').click(); await waitText('Registrar recebimento');
   // Buscar
   await p.getByRole('button', { name: /^Buscar\. Abre a busca/ }).filter({ visible: true }).first().click(); await waitText('Nada do que você busca é guardado.');
-  await j1Help('Buscar', 'Buscar em Movimentos', 'Em Movimentos, toque no campo "Buscar"');
+  await j1Help('Buscar', 'Buscar em Movimentos', 'Em Movimentos, toque em "Buscar", a lupa ao lado dos filtros');
   await btn('Voltar').click(); await waitText('Registrar recebimento');
   // Contas do ano: o detalhe e o cadastro (e nenhum "?" no gasto fixo comum nem em Contas a pagar)
   await j1Org('Gastos fixos e parcelamentos').click(); await waitText('Por mês, se os valores não mudarem');
@@ -9239,7 +9350,9 @@ setInterval(async () => {
   const k1Progress = () => p.evaluate(() => { const e = [...document.querySelectorAll('div[dir="auto"], span')].find((x) => /^\d+ de \d+$/.test(x.textContent) && x.getBoundingClientRect().width > 0); return e ? e.textContent : null; });
   const k1H2s = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => h.textContent));
   const k1Live = () => p.evaluate(() => [...document.querySelectorAll('[aria-live="polite"]')].map((e) => e.textContent).filter(Boolean));
-  const k1Open = async () => { await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await k1Row().click(); await waitText('Entrou e saiu'); await p.waitForTimeout(500); };
+  // Revisão das telas (16/11/2026): a linha mora nas Análises, logo abaixo do mês; Movimentos tem "Ver análises do mês", depois da lista.
+  const k1Analyses = async () => { await p.getByRole('button', { name: /^Ver análises do mês\./ }).filter({ visible: true }).first().click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(400); };
+  const k1Open = async () => { await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await k1Analyses(); await k1Row().click(); await waitText('Entrou e saiu'); await p.waitForTimeout(500); };
   const k1Next = async () => { await btn('Próximo').click(); await p.waitForTimeout(550); };
   const k1Prev = async () => { await btn('Anterior').click(); await p.waitForTimeout(550); };
   // Cartões e botões de um estado: o progresso, o título (h2) e os botões do rodapé.
@@ -9270,22 +9383,33 @@ setInterval(async () => {
   const k1ResumoHeadings = JSON.stringify(await headingList());
   ok('K1 Resumo: a estrutura de D-022 não ganhou o Seu mês (a linha mora em Movimentos)', !(await body()).includes('Seu mês em 30 segundos'));
 
-  // ---- 1. Movimentos: a linha "Seu mês em 30 segundos", logo abaixo de Buscar ----
+  // ---- 1. Movimentos: "Ver análises do mês", depois da lista; nas Análises, a linha "Seu mês em 30 segundos", logo abaixo do mês ----
+  // (revisão das telas, 16/11/2026: as linhas "Seu mês em 30 segundos", "Evolução" e "Análises" viraram uma só em Movimentos).
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
   const k1Tops = await p.evaluate(() => {
-    const top = (re) => { const e = [...document.querySelectorAll('[role=button]')].find((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')); return e ? Math.round(e.getBoundingClientRect().top) : null; };
-    return { buscar: top(/^Buscar\./), seuMes: top(/^Seu mês em 30 segundos\./), anotar: top(/^Anotar gasto$/) };
+    const top = (re) => { const e = [...document.querySelectorAll('[role=button]')].filter((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')).pop(); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+    const org = [...document.querySelectorAll('[role=heading]')].find((h) => h.textContent === 'Organizar' && h.getBoundingClientRect().width > 0);
+    return { lastRow: top(/, (Pago|Recebido) · /), analises: top(/^Ver análises do mês\./), organizar: org ? Math.round(org.getBoundingClientRect().top) : null };
   });
   t = await k1Keep();
-  ok('K1 Movimentos: "Seu mês em 30 segundos" vem logo abaixo de "Buscar" e acima de "Anotar gasto", com a legenda e o nome acessível', (await visibleCount('button', 'Seu mês em 30 segundos. O que entrou, saiu e vence, em cartões curtos.')) === 1 &&
-    t.includes('O que entrou, saiu e vence, em cartões curtos') && k1Tops.buscar !== null && k1Tops.seuMes !== null && k1Tops.anotar !== null && k1Tops.buscar < k1Tops.seuMes && k1Tops.seuMes < k1Tops.anotar, JSON.stringify(k1Tops));
+  ok('K1 Movimentos: sem a linha "Seu mês em 30 segundos"; "Ver análises do mês" vem depois da lista e antes de "Organizar"', (await visibleCount('button', 'Seu mês em 30 segundos. O que entrou, saiu e vence, em cartões curtos.')) === 0 &&
+    (await visibleCount('button', 'Ver análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.')) === 1 && k1Tops.lastRow !== null && k1Tops.analises !== null && k1Tops.organizar !== null &&
+    k1Tops.lastRow < k1Tops.analises && k1Tops.analises < k1Tops.organizar, JSON.stringify(k1Tops));
   const k1Organizar = await sectionRows('Organizar');
   ok('K1 Movimentos: a linha não entra em "Organizar" (o bloco segue com as mesmas seis linhas)', k1Organizar.length === 6 && k1Organizar[0] === 'Contas a pagar, R$ 650,00 em aberto neste mês' &&
     k1Organizar[1] === 'Gastos fixos e parcelamentos, 7 cadastrados, com as contas do ano' && !k1Organizar.some((r) => r.includes('Seu mês')), JSON.stringify(k1Organizar));
-  await layoutChecks('K1 Movimentos 390px');
+  await k1Analyses();
+  const k1AnTops = await p.evaluate(() => {
+    const top = (re) => { const e = [...document.querySelectorAll('[role=button],[role=tab]')].find((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+    return { mes: top(/^Mês anterior/), seuMes: top(/^Seu mês em 30 segundos\./), abas: top(/^Categorias$/) };
+  });
+  t = await k1Keep();
+  ok('K1 Análises: "Seu mês em 30 segundos" vem logo abaixo do mês e acima das abas, com a legenda e o nome acessível', (await visibleCount('button', 'Seu mês em 30 segundos. O que entrou, saiu e vence, em cartões curtos.')) === 1 &&
+    t.includes('O que entrou, saiu e vence, em cartões curtos') && k1AnTops.mes !== null && k1AnTops.seuMes !== null && k1AnTops.abas !== null && k1AnTops.mes < k1AnTops.seuMes && k1AnTops.seuMes < k1AnTops.abas, JSON.stringify(k1AnTops));
+  await layoutChecks('K1 Análises com o Seu mês 390px');
   await shot('361_seu_mes_movimentos');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(450);
-  await layoutChecks('K1 Movimentos 320px'); await shot('361_seu_mes_movimentos_320px', true);
+  await layoutChecks('K1 Análises com o Seu mês 320px'); await shot('361_seu_mes_movimentos_320px', true);
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(350);
 
   // ---- 2. A tela: consulta, com a barra (Movimentos marcada), o mês e o primeiro cartão ----
@@ -9330,7 +9454,7 @@ setInterval(async () => {
   await k1Prev();
   ok('K1 "Anterior" volta ao cartão 4 (Orçamento)', (await k1Progress()) === '4 de 5' && JSON.stringify(await k1H2s()) === JSON.stringify(['Orçamento']));
   await k1Next(); await btn('Concluir').click(); await p.waitForTimeout(700);
-  ok('K1 "Concluir" volta à tela de onde veio (Movimentos), sem empilhar outra tela', k1Path() === '/movimentacoes' && (await visibleCount('button', 'Registrar recebimento')) === 1, k1Path());
+  ok('K1 "Concluir" volta à tela de onde veio (Análises), sem empilhar outra tela', k1Path() === '/analises' && (await visibleCount('button', 'Seu mês em 30 segundos. O que entrou, saiu e vence, em cartões curtos.')) === 1, k1Path());
   ok('K1 percorrer os cinco cartões não grava nada no aparelho', (await k1Store()) === k1StoreBefore);
 
   // ---- 4. Deslizar de lado (toque) também troca de cartão, e o que é só do mouse fica nos botões ----
@@ -9403,7 +9527,7 @@ setInterval(async () => {
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento');
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
   await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
-  await k1Row().click(); await waitText('Entrou e saiu'); await p.waitForTimeout(500);
+  await k1Analyses(); await k1Row().click(); await waitText('Entrou e saiu'); await p.waitForTimeout(500);
   await hiddenShows('Seu mês, cartão 1');
   t = await k1Keep();
   ok('K1 valores ocultos, cartão 1: Recebido, Pago e Diferença como R$ ••••, sem nenhum "R$ 6.000,00"', t.includes('Recebido\nR$ ••••') && t.includes('Pago\nR$ ••••') && !t.includes('6.000,00') && !t.includes('3.900,00') && !t.includes('2.100,00') && t.includes('Recebido menos Pago · até 07/10'));
@@ -9471,7 +9595,7 @@ setInterval(async () => {
   await btn('Criar conta').click(); await waitText('Confira seu e-mail');
   await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
   await btn('Começar meu mês').click(); await waitText('Diferença do mês'); await p.waitForTimeout(600);
-  await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await k1Row().click();
+  await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await k1Analyses(); await k1Row().click();
   await waitText('Nada anotado em outubro ainda'); await p.waitForTimeout(400);
   t = await k1Keep();
   ok('K1 conta nova: "Nada anotado em outubro ainda", o convite a anotar e nenhum cartão nem valor de exemplo', t.includes('Nada anotado em outubro ainda') && t.includes('Anote um gasto ou um recebimento e volte aqui para ver o mês em poucos passos.') &&
@@ -9536,8 +9660,8 @@ setInterval(async () => {
   await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   await p.getByRole('button', { name: /^Seu mês em 30 segundos\. Resume o mês/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
   t = await k1Keep();
-  ok('K1 guia: a entrada "Seu mês em 30 segundos" (/aprender/guia/seu-mes) tem as três seções, "Movimentos › Seu mês em 30 segundos", seis passos e o botão "Abrir Seu mês em 30 segundos"', k1Path() === '/aprender/guia/seu-mes' && (await h1Name()) === 'Seu mês em 30 segundos' &&
-    JSON.stringify(await k1H2s()) === JSON.stringify(['Para que serve', 'Onde fica', 'Como usar']) && t.includes('Movimentos › Seu mês em 30 segundos') && (await p.locator('[aria-label^="Passo "]').filter({ visible: true }).count()) === 6 &&
+  ok('K1 guia: a entrada "Seu mês em 30 segundos" (/aprender/guia/seu-mes) tem as três seções, "Movimentos › Análises › Seu mês em 30 segundos", seis passos e o botão "Abrir Seu mês em 30 segundos"', k1Path() === '/aprender/guia/seu-mes' && (await h1Name()) === 'Seu mês em 30 segundos' &&
+    JSON.stringify(await k1H2s()) === JSON.stringify(['Para que serve', 'Onde fica', 'Como usar']) && t.includes('Movimentos › Análises › Seu mês em 30 segundos') && (await p.locator('[aria-label^="Passo "]').filter({ visible: true }).count()) === 6 &&
     (await visibleCount('button', 'Abrir Seu mês em 30 segundos')) === 1, `${k1Path()} ${JSON.stringify(await k1H2s())}`);
   await k1Shots('370_seu_mes_guia', false, false);
   await btn('Abrir Seu mês em 30 segundos').click(); await waitText('Entrou e saiu'); await p.waitForTimeout(500);
@@ -9854,7 +9978,7 @@ setInterval(async () => {
   // Cartões: Movimentos › Organizar › Cartões › o cartão › a fatura do mês.
   const d54OpenInvoice = async (card, month) => {
     await d54Tab('Movimentos').click(); await waitText('Registrar recebimento');
-    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitText('Cadastrar cartão'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitCardsList(); await p.waitForTimeout(500);
     await p.getByRole('button', { name: new RegExp(`^${card}[ .·]`) }).filter({ visible: true }).first().click(); await waitText('Fatura atual'); await p.waitForTimeout(400);
     await p.getByRole('button', { name: new RegExp(`^Fatura de ${month}, `) }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(500);
   };
@@ -10205,7 +10329,7 @@ setInterval(async () => {
   ok('Resumo na Família: começa vazio, sem "Primeiros passos" (só no Pessoal) e com "Anotar gasto"', t.includes('R$ 0,00') && !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1, t.slice(0, 200));
   await btn('Anotar gasto').click(); await p.waitForTimeout(600);
   t = await body();
-  ok('Anotar gasto na Família: a pílula diz onde a anotação fica ("Demonstração · Família") e o gasto sai da conta da Família', t.includes('Demonstração · Família') && t.includes('Saiu de: Conta principal') && t.includes('Será salvo em Família, Conta principal.'), t.slice(0, 120));
+  ok('Anotar gasto na Família: a pílula diz onde a anotação fica ("Demonstração · Família") e o gasto sai da conta da Família', t.includes('Demonstração · Família') && t.includes('Será salvo em Família, Conta principal.'), t.slice(0, 120));
   await field('Descrição').fill('Mercado da casa'); await field('Valor em reais').fill('250');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
   t = await body();
@@ -10901,7 +11025,22 @@ setInterval(async () => {
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
     await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   };
-  const evRow = () => p.getByRole('button', { name: 'Evolução. Recebido e pago mês a mês, com média e mediana.', exact: true }).filter({ visible: true }).first();
+  // Revisão das telas (16/11/2026): a Evolução abre pelas Análises ("Ver análises do mês", depois da lista de Movimentos › aba Evolução ›
+  // "Abrir Evolução"). `evRow().click()` faz esse caminho a partir de Movimentos; `evBack()` volta da Evolução a Movimentos, passando
+  // pelas Análises.
+  const evRow = () => ({
+    click: async () => {
+      await p.getByRole('button', { name: /^Ver análises do mês\./ }).filter({ visible: true }).first().click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(300);
+      await p.getByRole('tab', { name: 'Evolução', exact: true }).filter({ visible: true }).first().click();
+      await p.getByRole('button', { name: 'Abrir Evolução', exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 }); await p.waitForTimeout(300);
+      await btn('Abrir Evolução').click();
+    },
+  });
+  const evBack = async () => {
+    await btn('Voltar').click(); await p.waitForTimeout(500);
+    if (new URL(p.url()).pathname === '/analises') { await btn('Voltar').click(); await p.waitForTimeout(300); }
+    await waitText('Registrar recebimento');
+  };
   const evOpen = async () => {
     await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
     await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
@@ -10992,26 +11131,25 @@ setInterval(async () => {
   const evExplainText = async () => (await evExplainGroup().innerText()).replace(/\u00a0/g, ' ');
   const evExplainBtnIn = (name) => evExplainGroup().getByRole('button', { name, exact: true });
 
-  // ---- 1. Demonstração padrão: o Resumo não muda, e a linha "Evolução" fica em Movimentos, logo abaixo de "Seu mês em 30 segundos" ----
+  // ---- 1. Demonstração padrão: o Resumo não muda, e a Evolução fica nas Análises ("Ver análises do mês", em Movimentos) ----
   await evEnter();
   await expectTotals('Evolução, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 antes da tela', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
   const evResumoHeadings = JSON.stringify(await headingList());
   ok('Evolução Resumo: a estrutura de D-022 não ganhou a Evolução (a linha mora em Movimentos)', !(await body()).includes('Evolução'));
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
-  const evTops = await p.evaluate(() => {
-    const top = (re) => { const e = [...document.querySelectorAll('[role=button]')].find((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')); return e ? Math.round(e.getBoundingClientRect().top) : null; };
-    return { buscar: top(/^Buscar\./), seuMes: top(/^Seu mês em 30 segundos\./), evolucao: top(/^Evolução\./), anotar: top(/^Anotar gasto$/) };
-  });
   t = await evKeep();
-  ok('Evolução Movimentos: a linha "Evolução" vem logo abaixo de "Seu mês em 30 segundos" e acima de "Anotar gasto", com a legenda e o nome acessível', (await visibleCount('button', 'Evolução. Recebido e pago mês a mês, com média e mediana.')) === 1 &&
-    t.includes('Recebido e pago mês a mês, com média e mediana') && evTops.buscar < evTops.seuMes && evTops.seuMes < evTops.evolucao && evTops.evolucao < evTops.anotar, JSON.stringify(evTops));
+  ok('Evolução Movimentos: sem a linha "Evolução" (ela é uma aba das Análises) e com "Ver análises do mês", que diz que a evolução está lá', (await visibleCount('button', 'Evolução. Recebido e pago mês a mês, com média e mediana.')) === 0 &&
+    (await visibleCount('button', /^Ver análises do mês\. Categorias, evolução/)) === 1, t.slice(0, 300));
   const evOrganizar = await sectionRows('Organizar');
   ok('Evolução Movimentos: a linha não entra em "Organizar" (o bloco segue com as seis linhas de sempre)', evOrganizar.length === 6 && !evOrganizar.some((r) => r.includes('Evolução')), JSON.stringify(evOrganizar));
   await evShots('440_evolucao_movimentos', { tab: true });
 
   // ---- 2. Carregando: o esqueleto, sem nenhum valor, e a tela completa depois ----
+  // A tela abre pela busca "No app" de Aprender: pelas Análises, a aba Evolução lê a mesma consulta antes de "Abrir Evolução".
   await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.__orig = repo.monthsOverview; repo.monthsOverview = (...a) => new Promise((r) => setTimeout(r, 10000)).then(() => repo.__orig.apply(repo, a)); });
-  await evRow().click();
+  await tabByName('Aprender').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
+  await p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first().fill('evolução'); await waitText('No app'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Evolução\. Recebido e pago mês a mês/ }).filter({ visible: true }).first().click();
   await p.getByRole('progressbar', { name: 'Carregando a evolução' }).first().waitFor({ timeout: 4000 });
   t = await body();
   ok('Evolução carregando: o esqueleto "Carregando a evolução", com o título, os seletores e nenhum valor nem gráfico', (await visibleCount('progressbar', 'Carregando a evolução')) === 1 && (await h1Name()) === 'Evolução' && t.includes('Valores registrados, pela data do pagamento') && !/R\$ \d/.test(t) && (await evNames()).length === 0, t.slice(0, 200));
@@ -11019,6 +11157,9 @@ setInterval(async () => {
   await waitText('Pago por mês', 20000); await p.waitForTimeout(500);
   await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.monthsOverview = repo.__orig; });
   ok('Evolução carregando: com a resposta, o esqueleto sai e o gráfico aparece', (await visibleCount('progressbar', 'Carregando a evolução')) === 0 && (await evNames()).length === 6);
+  await btn('Voltar').click(); await waitText('Buscar um tema ou uma função'); await p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first().fill('');
+  await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
 
   // ---- 3. T01: seis meses, Pago, sem filtros; o mês em andamento e os meses sem registros à vista e fora da conta ----
   t = await evKeep();
@@ -11108,7 +11249,7 @@ setInterval(async () => {
   names = await evNames();
   t = await body();
   ok('Evolução T26: depois de anotar um gasto de R$ 100,00 em Movimentos, outubro passa a R$ 4.000,00 (3.900 + 100), sem nenhuma recarga, e o total dos meses exibidos a R$ 7.750,00', names[5] === 'Outubro de 2026, R$ 4.000,00, mês em andamento, fora da comparação' && t.includes('Total dos meses exibidos\nR$ 7.750,00'), JSON.stringify(names));
-  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await evBack();
 
   // ---- 7. Aprender: a busca "No app" e a entrada do guia ----
   await j1Tab('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
@@ -11125,8 +11266,8 @@ setInterval(async () => {
   await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   await p.getByRole('button', { name: /^Evolução\. Mostra o Recebido ou o Pago/ }).filter({ visible: true }).first().click(); await waitText('Para que serve'); await p.waitForTimeout(400);
   t = await evKeep();
-  ok('Evolução guia: a entrada "Evolução" (/aprender/guia/evolucao) tem as três seções, "Movimentos › Evolução", seis passos e o botão "Abrir Evolução"', evPath() === '/aprender/guia/evolucao' && (await h1Name()) === 'Evolução' &&
-    JSON.stringify(await evH2s()) === JSON.stringify(['Para que serve', 'Onde fica', 'Como usar']) && t.includes('Movimentos › Evolução') && (await p.locator('[aria-label^="Passo "]').filter({ visible: true }).count()) === 6 &&
+  ok('Evolução guia: a entrada "Evolução" (/aprender/guia/evolucao) tem as três seções, "Movimentos › Análises › Evolução", seis passos e o botão "Abrir Evolução"', evPath() === '/aprender/guia/evolucao' && (await h1Name()) === 'Evolução' &&
+    JSON.stringify(await evH2s()) === JSON.stringify(['Para que serve', 'Onde fica', 'Como usar']) && t.includes('Movimentos › Análises › Evolução') && (await p.locator('[aria-label^="Passo "]').filter({ visible: true }).count()) === 6 &&
     (await visibleCount('button', 'Abrir Evolução')) === 1 && t.includes('"Mostrar este mês na comparação"') && t.includes('"Restaurar todos"'), `${evPath()} ${JSON.stringify(await evH2s())}`);
   await btn('Abrir Evolução').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(500);
   ok('Evolução guia: "Abrir Evolução" abre a tela (/evolucao)', evPath() === '/evolucao' && (await h1Name()) === 'Evolução');
@@ -11478,7 +11619,7 @@ setInterval(async () => {
   // ---- 17. Valores ocultos: pontos sem valor no leitor de tela, eixo sem números, tabela e cartões em R$ •••• ----
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento');
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
-  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evBack(); await p.waitForTimeout(300);
   await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
   await radio('12 meses').click(); await p.waitForTimeout(500);
   await evPick('Abril');
@@ -11609,7 +11750,7 @@ setInterval(async () => {
   t = await evKeep();
   ok('Evolução conta nova com um gasto de setembro: setembro R$ 300,00 na comparação, outubro sem registros, "1 de 1 mês" e total de R$ 300,00', names[4] === 'Setembro de 2026, R$ 300,00, na comparação' && names[5] === 'Outubro de 2026, sem registros, fora da comparação' &&
     t.includes('Média dos meses na comparação\nR$ 300,00\n1 de 1 mês') && t.includes('Total dos meses exibidos\nR$ 300,00'), JSON.stringify(names));
-  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await evBack();
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
   await field('Descrição').fill('Café'); await field('Valor em reais').fill('100'); await field('Data do pagamento').fill('06/10/2026');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
@@ -11637,7 +11778,7 @@ setInterval(async () => {
   ok('Evolução na Família: a pílula diz "Demonstração · Família" e os valores são os da Família (outubro R$ 250,00 em andamento), sem o setembro nem o gasto do Pessoal', t.includes('Demonstração · Família') && names.length === 6 && names[5] === 'Outubro de 2026, R$ 250,00, mês em andamento, fora da comparação' &&
     names[4] === 'Setembro de 2026, sem registros, fora da comparação' && !t.includes('R$ 300,00') && !t.includes('Comparação personalizada'), JSON.stringify(names.slice(4)));
   await evShots('456_evolucao_familia');
-  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await evBack();
   await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
   await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
   names = await evNames();
@@ -11694,7 +11835,8 @@ setInterval(async () => {
     }
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   };
-  const anRow = () => p.getByRole('button', { name: 'Análises. Categorias, Evolução, Próximos meses e Orçamento.', exact: true }).filter({ visible: true }).first();
+  // Revisão das telas (16/11/2026): a linha de Movimentos é "Ver análises do mês", depois da lista.
+  const anRow = () => p.getByRole('button', { name: 'Ver análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.', exact: true }).filter({ visible: true }).first();
   const anTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
   const anOpen = async () => {
     await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
@@ -11766,22 +11908,24 @@ setInterval(async () => {
   const anHeadTop = (title) => p.evaluate((title) => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === title && e.getBoundingClientRect().width > 0); return h ? Math.round(h.getBoundingClientRect().top) : null; }, title);
   const anPercentSum = (names) => names.reduce((sum, n) => { const m = n.match(/, (\d+(?:,\d)?)%, /); return sum + (m ? Math.round(Number(m[1].replace(',', '.')) * 10) : 0); }, 0);
 
-  // ---- 1. Demonstração padrão: o Resumo não muda, e a linha "Análises" fica em Movimentos, logo abaixo de "Evolução" ----
+  // ---- 1. Demonstração padrão: o Resumo não muda, e a linha "Ver análises do mês" fica em Movimentos, depois da lista e antes de "Organizar" ----
   await evEnter();
   await expectTotals('Análises, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 antes da tela', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
   const anResumoHeadings = JSON.stringify(await headingList());
   ok('Análises Resumo: a estrutura de D-022 não ganhou as Análises (a linha mora em Movimentos)', !(await body()).includes('Análises'));
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
   const anTops = await p.evaluate(() => {
-    const top = (re) => { const e = [...document.querySelectorAll('[role=button]')].find((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')); return e ? Math.round(e.getBoundingClientRect().top) : null; };
-    return { buscar: top(/^Buscar\./), seuMes: top(/^Seu mês em 30 segundos\./), evolucao: top(/^Evolução\./), analises: top(/^Análises\./), anotar: top(/^Anotar gasto$/) };
+    const tops = (re) => [...document.querySelectorAll('[role=button]')].filter((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')).map((e) => Math.round(e.getBoundingClientRect().top));
+    const org = [...document.querySelectorAll('[role=heading]')].find((h) => h.textContent === 'Organizar' && h.getBoundingClientRect().width > 0);
+    return { anotar: tops(/^Anotar gasto$/)[0] ?? null, lastRow: tops(/, (Pago|Recebido) · /).pop() ?? null, analises: tops(/^Ver análises do mês\./)[0] ?? null, organizar: org ? Math.round(org.getBoundingClientRect().top) : null };
   });
   t = await anKeep();
-  ok('Análises Movimentos: a linha "Análises" vem logo abaixo de "Evolução" e acima de "Anotar gasto", com a legenda e o nome acessível', (await visibleCount('button', 'Análises. Categorias, Evolução, Próximos meses e Orçamento.')) === 1 &&
-    t.includes('Categorias, Evolução, Próximos meses e Orçamento') && anTops.buscar < anTops.seuMes && anTops.seuMes < anTops.evolucao && anTops.evolucao < anTops.analises && anTops.analises < anTops.anotar, JSON.stringify(anTops));
+  ok('Análises Movimentos: a linha "Ver análises do mês" vem depois da lista do mês e antes de "Organizar", com a legenda e o nome acessível; as linhas "Seu mês em 30 segundos", "Evolução" e "Análises" saíram do topo', (await visibleCount('button', 'Ver análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.')) === 1 &&
+    t.includes('Categorias, evolução, orçamento e o mês em 30 segundos') && anTops.anotar !== null && anTops.lastRow !== null && anTops.analises !== null && anTops.organizar !== null &&
+    anTops.anotar < anTops.lastRow && anTops.lastRow < anTops.analises && anTops.analises < anTops.organizar &&
+    (await visibleCount('button', /^(Seu mês em 30 segundos|Evolução|Análises)\. /)) === 0, JSON.stringify(anTops));
   const anOrganizar = await sectionRows('Organizar');
-  ok('Análises Movimentos: a linha não entra em "Organizar" (o bloco segue com as seis linhas) e a linha "Evolução" segue onde estava, com o caminho direto', anOrganizar.length === 6 && !anOrganizar.some((r) => r.includes('Análises')) &&
-    (await visibleCount('button', 'Evolução. Recebido e pago mês a mês, com média e mediana.')) === 1, JSON.stringify(anOrganizar));
+  ok('Análises Movimentos: a linha não entra em "Organizar" (o bloco segue com as seis linhas)', anOrganizar.length === 6 && !anOrganizar.some((r) => r.includes('Análises')), JSON.stringify(anOrganizar));
   await anShots('480_analises_movimentos', { tab: true });
 
   // ---- 2. A tela: cabeçalho, mês, as quatro abas e Categorias em Barras (o padrão) ----
@@ -11957,7 +12101,7 @@ setInterval(async () => {
   ok('Análises sete categorias, bolha "Moradia": o cartão traz o Aluguel de março (R$ 2.000,00)', anRows.length === 1 && anRows[0].name === 'Aluguel, 05/03/2026, R$ 2.000,00', JSON.stringify(anRows));
   // Os mesmos números de "Por categoria": o Pago de março no Resumo, em "Por categoria", dá os mesmos nomes acessíveis.
   ok('Análises sete categorias: nenhuma escrita (escuta do repositório e rede)', anSpied2 >= 30 && (await evSpyCalls()).length === 0 && writes.length === anWrites0, JSON.stringify(await evSpyCalls()));
-  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evBack(); await p.waitForTimeout(300);
   await tabByName('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
   await p.getByRole('button', { name: /^Pago, R\$ / }).filter({ visible: true }).first().click(); await waitText('Por categoria'); await p.waitForTimeout(400);
   await radio('Por categoria').click(); await p.waitForTimeout(800);
@@ -11979,9 +12123,9 @@ setInterval(async () => {
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
 
   // ---- 9. Valores ocultos: bolhas e barras sem valores em reais, percentuais à vista, "valor oculto" ao leitor de tela ----
-  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evBack(); await p.waitForTimeout(300);
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
-  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evBack(); await p.waitForTimeout(300);
   await anRow().click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(900);
   await radio('Barras').click(); await p.waitForTimeout(500);
   await hiddenShows('Análises, barras');
@@ -12007,7 +12151,7 @@ setInterval(async () => {
   await evEnter();
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
-  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evBack(); await p.waitForTimeout(300);
   await anRow().click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(900);
   await anTab('Próximos meses').click(); await waitText('Abrir Renda comprometida'); await p.waitForTimeout(700);
   await hiddenShows('Análises, Próximos meses');
@@ -12114,14 +12258,14 @@ setInterval(async () => {
   const anStore1 = await evStore();
   await radio('Bolhas').click(); await p.waitForTimeout(700);
   ok('Análises aparelho: "Bolhas" fica só na memória do aparelho (nada no armazenamento do navegador) e nenhuma escrita sai pela rede', (await evStore()) === anStore1 && writes.length === anWrites0, `${writes.slice(anWrites0).join(' | ')}`);
-  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evBack(); await p.waitForTimeout(300);
   await anRow().click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(800);
   ok('Análises aparelho: ao sair da tela e voltar, a escolha "Bolhas" continua (a preferência é da pessoa, neste aparelho)', (await radio('Bolhas').getAttribute('aria-checked')) === 'true' && (await anBubbleInfo()) !== null);
   anInfo = await anBubbleChecks('Análises conta nova, uma bolha', 1);
   ok('Análises uma bolha só: fica no meio da área, grande (a maior), com "Mercado" e "100%" escritos', anInfo.items.length === 1 && Math.abs(anInfo.items[0].x - anInfo.groupW / 2) < 1 && anInfo.items[0].w > 120 && JSON.stringify(anInfo.items[0].texts.map((x) => x.text)) === JSON.stringify(['Mercado', '100%']), JSON.stringify(anInfo.items));
   await anShots('498_analises_uma_bolha', { extra: async (w) => { await anBubbleChecks(`Análises uma bolha ${w}px`, 1); } });
   // Família: os dados da Família, com a pílula "Família" e o mês "Família · ...".
-  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await evBack();
   await famGoFamilia();
   await btn('Criar Família').click(); await waitText('Nome da Família'); await field('Nome da Família').fill('Casa Lima');
   await btn('Criar Família').click(); await waitText('Família criada.'); await p.waitForTimeout(400);
@@ -12142,7 +12286,7 @@ setInterval(async () => {
   await anShots('499_analises_familia', { scroll: evScroll('Categoria selecionada') });
   await anTab('Evolução').click(); await p.waitForTimeout(700);
   ok('Análises Família, Evolução: Pago de outubro da Família (R$ 250,00), sem o gasto do Pessoal', (await body()).includes('R$ 250,00') && !(await body()).includes('R$ 120,00'));
-  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await evBack();
   await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
   await anRow().click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(900);
   await anTab('Categorias').click(); await p.waitForTimeout(700);
@@ -12477,7 +12621,9 @@ setInterval(async () => {
   ok('Dia útil, demonstração, "Próximos meses" (D-061): as faturas de 10/01/2027 (domingo) e 10/04 e 10/07/2027 (sábados) aparecem como "vence segunda, 11/01/2027 (próximo dia útil)" (e 12/04 e 12/07) e levam "não é dia útil, vencimento anotado ..."; as de 10/12/2026, 10/02 e 10/03/2027 (dias úteis), não',
     /não é dia útil, vencimento anotado domingo, 10\/01$/.test(duFaturaGrace('segunda, 11/01/2027')) && /não é dia útil, vencimento anotado sábado, 10\/04$/.test(duFaturaGrace('segunda, 12/04/2027')) && /não é dia útil, vencimento anotado sábado, 10\/07$/.test(duFaturaGrace('segunda, 12/07/2027')) &&
     ['10/11,', '10/12,', '10/02/2027', '10/03/2027'].every((d) => duFatura(d) !== '' && !/dia útil/.test(duFatura(d))) && duFatura('10/01/2027') === '' && duFatura('10/04/2027') === '', JSON.stringify(duDemoNext));
-  ok('Dia útil, demonstração: o sinal aparece escrito ("Não é dia útil · vencimento anotado: domingo, 10/01") e a legenda diz "Vence segunda, 11/01/2027 (próximo dia útil)"', (await body()).includes('Não é dia útil · vencimento anotado: domingo, 10/01') && (await body()).includes('Vence segunda, 11/01/2027 (próximo dia útil)'));
+  // Revisão das telas (16/11/2026): em "Próximos meses", a legenda de uma linha só ("Vence segunda, 11/01/2027 (próximo dia útil)"); o sinal
+  // escrito fica na tela da conta (o nome acessível da linha continua com ele).
+  ok('Dia útil, demonstração: em "Próximos meses", a legenda diz "Vence segunda, 11/01/2027 (próximo dia útil)", sem o sinal escrito embaixo (ele fica na tela da conta)', !(await body()).includes('Não é dia útil · vencimento anotado: domingo, 10/01') && (await body()).includes('Vence segunda, 11/01/2027 (próximo dia útil)'));
   ok('Dia útil, demonstração (D-061): nenhuma conta vencida em outubro (a contagem não muda: sem a palavra "vencida" no Resumo e sem a seção "Vencidas" na lista)', duResumoSemVencida && (await sectionRows('Vencidas')) === null);
   await duKeep();
 
@@ -12929,6 +13075,8 @@ setInterval(async () => {
 
   // ---- 10b. Seu mês: um mês que passou, vazio e conferido troca "Mês sem anotação não quer dizer mês sem gastos" pela frase de mês conferido ----
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  // O Seu mês fica nas Análises, logo abaixo do mês (revisão das telas, 16/11/2026).
+  await p.getByRole('button', { name: /^Ver análises do mês\./ }).filter({ visible: true }).first().click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(400);
   await p.getByRole('button', { name: 'Seu mês em 30 segundos. O que entrou, saiu e vence, em cartões curtos.', exact: true }).filter({ visible: true }).first().click(); await waitText('Nada anotado em outubro ainda'); await p.waitForTimeout(500);
   await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click(); await waitText('Nada anotado em setembro'); await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click(); await waitText('Nada anotado em agosto'); await p.waitForTimeout(500);
   t = await mcKeep();
@@ -13090,7 +13238,7 @@ setInterval(async () => {
   // ---- 5. Valores ocultos: o link e o painel seguem, sem valor nenhum no resumo; o exemplo do tema (fictício) segue à vista ----
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento');
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
-  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evBack(); await p.waitForTimeout(300);
   await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
   await radio('12 meses').click(); await p.waitForTimeout(500);
   await mmHint().first().click(); await waitText('Ler explicação completa'); await p.waitForTimeout(300);
@@ -13142,7 +13290,7 @@ setInterval(async () => {
   t = await mmKeep();
   ok('Média e mediana, conta nova: a Evolução vazia diz "Sem registros nestes meses" e não mostra média, mediana nem "O que é mediana?" (nenhum dado de exemplo)', t.includes('Sem registros nestes meses') && !t.includes('Média dos meses na comparação') && (await mmHint().count()) === 0 && !/R\$ \d/.test(t), t.slice(0, 400));
   await mmShots('566_media_mediana_conta_nova');
-  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await evBack();
   await p.getByRole('tab', { name: 'Aprender e dúvidas', exact: true }).filter({ visible: true }).first().click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
   ok('Média e mediana, conta nova: Aprender mostra a mesma linha "Média e mediana", e a explicação não traz nenhum valor da pessoa', (await topicRows()).includes(mmRowMedia));
   await p.getByRole('button', { name: mmRowMedia, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(400);
@@ -13823,7 +13971,7 @@ setInterval(async () => {
   await f3SeedCommitted();
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento');
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
-  await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
+  await evBack(); await p.waitForTimeout(300);
   await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
   await f3Pick('Guardado em metas');
   await waitText('Guardado em metas por mês', 15000);
@@ -13905,7 +14053,7 @@ setInterval(async () => {
   ok('Evolução fase 3, Família, Guardado em metas: agosto sem registros (a meta da casa foi criada em outubro, e o saldo inicial de agosto não prova meta no mês) e setembro R$ 700,00, média R$ 700,00 em 1 de 1 mês; as metas do Pessoal não entram', names[3] === 'Agosto de 2026, sem registros, fora da comparação' && names[4] === 'Setembro de 2026, R$ 700,00, na comparação' &&
     t.includes('Média dos meses na comparação\nR$ 700,00\n1 de 1 mês') && t.includes('Total dos meses exibidos\nR$ 700,00'), JSON.stringify(names));
   await evSet('Setembro', false);
-  await btn('Voltar').click(); await waitText('Registrar recebimento');
+  await evBack();
   await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
   await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
   await f3Pick('Guardado em metas');
@@ -14333,7 +14481,7 @@ setInterval(async () => {
   const acLongRows = await acRows(/Lançamento fictício/);
   t = await body();
   ok('Acessibilidade, lista longa: Movimentos de setembro monta só as linhas perto da tela (menos de 100 de mais de 500), com o título do dia', acLongRows >= 10 && acLongRows < 100 && (await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="3"]')].filter((e) => e.getBoundingClientRect().width > 0).length)) >= 1, `${acLongRows} linhas`);
-  ok('Acessibilidade, lista longa: os totais do mês (Recebido e Pago de setembro) são os de todos os lançamentos, e o topo da tela segue igual (Buscar, Organizar, filtros)', t.includes(acExpected.recebido) && t.includes(acExpected.pago) && t.includes('Organizar') && t.includes('Buscar') && (await visibleCount('radio', 'Recebidos')) === 1, `${acExpected.recebido} ${acExpected.pago}`);
+  ok('Acessibilidade, lista longa: os totais do mês (Recebido e Pago de setembro) são os de todos os lançamentos, e a tela segue com Buscar e os filtros no topo e Organizar depois da lista', t.includes(acExpected.recebido) && t.includes(acExpected.pago) && t.includes('Organizar') && (await visibleCount('button', /^Buscar\./)) === 1 && (await visibleCount('radio', 'Recebidos')) === 1, `${acExpected.recebido} ${acExpected.pago}`);
   const acDomNodes = await p.evaluate(() => document.querySelectorAll('*').length);
   ok('Acessibilidade, lista longa: a tela tem poucos elementos (menos de 2.500; com as 500 linhas montadas eram mais de 5.000)', acDomNodes < 2500, `${acDomNodes} elementos`);
   await acInstall();
@@ -14770,15 +14918,26 @@ setInterval(async () => {
     const ivWrites0 = writes.length;
     await demoHome();
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
+    t = await body();
+    // Revisão das telas (16/11/2026): no card azul, o valor, o aportado, o ganho e uma linha do período; "Novo investimento" logo abaixo.
+    const ivTops = await p.evaluate(() => {
+      const top = (re) => { const e = [...document.querySelectorAll('[role=button],[role=heading]')].find((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+      return { novo: top(/^Novo investimento$/), lista: top(/^Seus investimentos$/) };
+    });
+    ok('D-093 Investimentos: de início, só uma linha do período no card azul (sem CDI, IPCA nem poupança à vista), "Comparar com CDI, IPCA e poupança" fechado e "Novo investimento" antes da lista',
+      t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,54%.') && !t.includes('CDI no mesmo período') && !t.includes('Neste mês, até hoje') &&
+        (await p.getByRole('button', { name: 'Comparar com CDI, IPCA e poupança', exact: true }).filter({ visible: true }).first().getAttribute('aria-expanded')) === 'false' &&
+        ivTops.novo !== null && ivTops.lista !== null && ivTops.novo < ivTops.lista, JSON.stringify(ivTops));
+    await openCompare();
     t = await body(); investTexts.push(t);
     ok('D-093 Investimentos: título "Investimentos", contexto Pessoal fixo, total de R$ 15.955,00, aportado, ganho e a rentabilidade com o CDI e o IPCA de exemplo',
       (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Aportado: R$ 15.500,00') && t.includes('Ganho: R$ 455,00') &&
         t.includes('Neste mês, até hoje: +0,10%') && t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,54%.') &&
         t.includes('CDI no mesmo período: +3,65%') && t.includes('IPCA no mesmo período: +1,41%') &&
         t.includes('Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.'), t.slice(0, 700));
-    ok('D-093 Investimentos: diz que não é recomendação, que não entra em Pago nem em Recebido e que a Família não vê',
-      t.includes('Não é recomendação de investimento') && t.includes('não entram em Pago nem em Recebido') && t.includes('Ninguém da Família nem a empresa que oferece o benefício vê.') &&
-        t.includes('A Clarevo não guarda, não movimenta nem indica investimentos.'));
+    ok('D-093 Investimentos: diz que não é recomendação, que não entra em Pago nem em Recebido e que a Família não vê, num aviso só no fim (revisão das telas)',
+      t.includes('não é recomendação de investimento') && t.includes('não entram em Pago nem em Recebido') && t.includes('Ninguém da Família nem a empresa que oferece o benefício vê.') &&
+        t.includes('A Clarevo não guarda, não movimenta nem indica investimentos.') && !t.includes('Acompanhe o que você já investe'));
     ok('D-093 Investimentos: os dois cards com nome, tipo e valor no nome acessível',
       (await visibleCount('button', 'Aplicação do banco, CDB ou RDB · Banco Exemplo: R$ 10.875,00. Ganho: R$ 375,00.')) === 1 && (await visibleCount('button', 'Previdência, VGBL: R$ 5.080,00. Ganho: R$ 80,00.')) === 1);
     await checkBar('D-093 Investimentos', 'Investir');
@@ -14821,6 +14980,7 @@ setInterval(async () => {
       t.includes('Atualize o valor com o que aparece no seu extrato para ver quanto rendeu.'), t.slice(0, 500));
     // Com o novo sem valor, a carteira fica sem taxa neste mês, e o card azul diz quem falta atualizar (pedido do Enzo, 11/11/2026).
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
+    await openCompare();
     t = await body();
     ok('D-093 Investimentos: com o novo sem valor, "Neste mês: sem taxa ainda" e o nome de quem falta atualizar no lugar do aviso geral',
       t.includes('Neste mês: sem taxa ainda') && t.includes('Para ter a taxa deste mês, falta atualizar o valor de Ações da corretora.') &&
@@ -14850,6 +15010,7 @@ setInterval(async () => {
     const into = async (text) => { await p.getByText(text, { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); };
     await demoHome();
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
+    await openCompare();
     t = await body(); investTexts.push(t);
     ok('D-099 Investir: próximos vencimentos, garantia do FGC, ganho real, poupança e os dois atalhos',
       t.includes('Aplicação do banco vence em 01/06/2027, daqui a 8 meses.') && t.includes('Banco Exemplo: R$ 10.875,00 em produtos com garantia do FGC.') &&
