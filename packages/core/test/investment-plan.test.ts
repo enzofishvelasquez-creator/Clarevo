@@ -232,8 +232,8 @@ describe('lembrete do aporte nos investimentos (D-099, item 12)', () => {
     expect(ROUTINE_REMINDER_KINDS).toContain('aporte_investimentos');
     const plan = routineReminderPlan(ONLY, [], null, '2026-11-03', 20, { investmentDeposit: { day: 5, hasPlan: true, depositThisMonth: false } });
     expect(plan.map((i) => [i.id, i.date, i.title, i.body, i.route])).toEqual([
-      ['clarevo-lembrete-rotina-aporte_investimentos-2026-11', '2026-11-05', 'Investimentos', ROUTINE_REMINDER_TEXT.kinds.aporte_investimentos.body, '/investimentos'],
-      ['clarevo-lembrete-rotina-aporte_investimentos-2026-12', '2026-12-05', 'Investimentos', ROUTINE_REMINDER_TEXT.kinds.aporte_investimentos.body, '/investimentos'],
+      ['clarevo-lembrete-rotina-aporte_investimentos-2026-11', '2026-11-05', 'Investimentos', ROUTINE_REMINDER_TEXT.kinds.aporte_investimentos.body, '/investimento/lembrete?tipo=aporte_investimentos'],
+      ['clarevo-lembrete-rotina-aporte_investimentos-2026-12', '2026-12-05', 'Investimentos', ROUTINE_REMINDER_TEXT.kinds.aporte_investimentos.body, '/investimento/lembrete?tipo=aporte_investimentos'],
     ]);
     expect(routineReminderPlan(ONLY, [], null, '2026-11-03', 20, { investmentDeposit: { day: 5, hasPlan: true, depositThisMonth: true } }).map((i) => i.date)).toEqual(['2026-12-05']);
     expect(routineReminderPlan(ONLY, [], null, '2026-11-03', 20, { investmentDeposit: { day: 5, hasPlan: false, depositThisMonth: false } })).toEqual([]);

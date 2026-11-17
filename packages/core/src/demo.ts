@@ -40,6 +40,7 @@ import { demoTrialAccess } from './plano';
  * cada mês: R$ 10.085,00, R$ 10.180,00, R$ 10.270,00 e R$ 10.360,00; aporte de R$ 500,00 e valor de R$ 10.875,00 em 06/10) e
  * "Previdência" (R$ 5.000,00 desde 01/08/2026; R$ 5.040,00 e R$ 5.080,00 no fim de agosto e de setembro, e R$ 5.080,00 de novo em 06/10). Hoje: R$ 15.955,00,
  * aportado R$ 15.500,00, ganho de R$ 455,00. Não entram em nenhum total do mês, na renda comprometida nem nas metas.
+ * D-104: a aplicação rende 105% do CDI até 31/03/2027 e 100% depois (hoje a estimativa usa só os 105%); a previdência tem uma descrição.
  * Orçamento por categoria (D-041), a partir de outubro de 2026: Moradia R$ 2.500,00, Mercado R$ 1.800,00 e Lazer R$ 300,00.
  * Usado em outubro (competência): Moradia R$ 2.500,00 (o aluguel pago), Mercado R$ 1.400,00 e Lazer R$ 400,00 (a 1ª parcela do
  * tênis, R$ 200,00, e o restaurante, R$ 200,00; a compra no cartão conta no mês da compra). Limite pessoal de 60% a partir de
@@ -250,6 +251,11 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
       liquidityDays: null,
       quantityMicro: null,
       fundCnpj: null,
+      // Taxa com data de fim (D-104, item 13): 105% do CDI até 31/03/2027, depois 100%. Hoje (07/10/2026) a estimativa usa só os 105%.
+      rateUntil: '2027-03-31',
+      rateAfterBp: 10000,
+      rateCondition: null,
+      description: null,
     },
     // Ligado à reserva (D-099, item 13): só informação; a reserva continua com o valor registrado nela.
     goalId: reserva.goal.id,
@@ -268,7 +274,20 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
     investedCents: 500_000,
     startOn: '2026-08-01',
     currentCents: null,
-    details: { subkind: 'vgbl', institution: null, indexKind: 'variavel', rateBp: null, maturityOn: null, liquidity: null, liquidityOn: null, liquidityDays: null, quantityMicro: null, fundCnpj: null },
+    details: {
+      subkind: 'vgbl',
+      institution: null,
+      indexKind: 'variavel',
+      rateBp: null,
+      maturityOn: null,
+      liquidity: null,
+      liquidityOn: null,
+      liquidityDays: null,
+      quantityMicro: null,
+      fundCnpj: null,
+      // Descrição livre (D-104, item 12).
+      description: 'Plano com contribuição todo mês, para a aposentadoria.',
+    },
   });
   await move(previdencia.investment!.id, 'valor', 504_000, '2026-08-31');
   await move(previdencia.investment!.id, 'valor', 508_000, '2026-09-30');

@@ -171,7 +171,7 @@ import {
   type InvestmentStatus,
   type NewInvestmentInput,
 } from './investments';
-import { EMPTY_INVESTMENT_DETAILS, FUND_CNPJ_KINDS, QUANTITY_KINDS, investmentDetailsError, normalizeInstitution, type InvestmentDetails } from './investment-details';
+import { EMPTY_INVESTMENT_DETAILS, FUND_CNPJ_KINDS, QUANTITY_KINDS, indexNeedsRate, investmentDetailsError, normalizeInstitution, type InvestmentDetails } from './investment-details';
 import { investmentPlanError } from './investment-plan';
 import { examplePublicPrices, type PublicPrices } from './investment-prices';
 import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX, nextMonthAllowed, recordMonth } from './records';
@@ -2290,7 +2290,15 @@ export class MemoryRepository implements RecordsRepository {
   /** Como clarevo_validate_investment_details: a ficha inteira, com a instituição sem espaços sobrando. */
   private investmentDetails(kind: StoredInvestment['kind'], details: InvestmentDetails | undefined): InvestmentDetails {
     const d = { ...EMPTY_INVESTMENT_DETAILS, ...(details ?? {}) };
-    const normalized = { ...d, institution: normalizeInstitution(d.institution) };
+    // Campos da 0039 (D-104) ausentes contam como vazios; a condição e a descrição sem espaços sobrando, como a instituição.
+    const normalized = {
+      ...d,
+      institution: normalizeInstitution(d.institution),
+      rateUntil: d.rateUntil ?? null,
+      rateAfterBp: d.rateAfterBp ?? null,
+      rateCondition: normalizeInstitution(d.rateCondition ?? null),
+      description: normalizeInstitution(d.description ?? null),
+    };
     const code = investmentDetailsError(kind, normalized);
     if (code) throw new RepoError(code);
     return normalized;
@@ -2359,13 +2367,28 @@ export class MemoryRepository implements RecordsRepository {
         liquidityDays: i.liquidityDays,
         quantityMicro: i.quantityMicro,
         fundCnpj: i.fundCnpj,
+        rateUntil: i.rateUntil ?? null,
+        rateAfterBp: i.rateAfterBp ?? null,
+        rateCondition: i.rateCondition ?? null,
+        description: i.description ?? null,
       };
       // A quantidade e o CNPJ (0037) ficam quando a ficha chega sem eles (versão anterior do app), se ainda valem para o tipo; com o tipo
       // mudado, saem os que não pertencem ao novo (como o tipo exato, F5).
-      const extrasFor = (d: Partial<InvestmentDetails>) => ({
-        quantityMicro: d.quantityMicro !== undefined ? d.quantityMicro : QUANTITY_KINDS.includes(input.kind) ? i.quantityMicro : null,
-        fundCnpj: d.fundCnpj !== undefined ? d.fundCnpj : FUND_CNPJ_KINDS.includes(input.kind) ? i.fundCnpj : null,
-      });
+      // A taxa com data de fim e a condição (0039, D-104) ficam quando a ficha chega sem elas, se a forma de render é a mesma e ainda tem
+      // taxa; a descrição fica sempre (como clarevo_investment_rate_step e clarevo_investment_description).
+      const extrasFor = (d: Partial<InvestmentDetails>) => {
+        const index = d.indexKind !== undefined ? d.indexKind : i.indexKind;
+        const sameRate = index === i.indexKind && indexNeedsRate(index);
+        const pairGiven = d.rateUntil !== undefined || d.rateAfterBp !== undefined;
+        return {
+          quantityMicro: d.quantityMicro !== undefined ? d.quantityMicro : QUANTITY_KINDS.includes(input.kind) ? i.quantityMicro : null,
+          fundCnpj: d.fundCnpj !== undefined ? d.fundCnpj : FUND_CNPJ_KINDS.includes(input.kind) ? i.fundCnpj : null,
+          rateUntil: pairGiven ? (d.rateUntil ?? null) : sameRate ? (i.rateUntil ?? null) : null,
+          rateAfterBp: pairGiven ? (d.rateAfterBp ?? null) : sameRate ? (i.rateAfterBp ?? null) : null,
+          rateCondition: d.rateCondition !== undefined ? d.rateCondition : sameRate ? (i.rateCondition ?? null) : null,
+          description: d.description !== undefined ? d.description : (i.description ?? null),
+        };
+      };
       const keptForKind: InvestmentDetails = { ...kept, ...extrasFor({}) };
       const details =
         input.details !== undefined

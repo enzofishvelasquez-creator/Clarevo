@@ -7,6 +7,9 @@ import {
   INVESTMENT_NAME_MAX,
   INVESTMENT_GOAL_TEXT,
   INVESTMENT_TEXT,
+  GOAL_LINK_TEXT,
+  KIND_FORM_HINT,
+  canUseInvestmentsValue,
   formatDateBR,
   investmentSaveErrorText,
   isRepoError,
@@ -33,11 +36,11 @@ import { FormFooter } from '@/components/form-footer';
 import { InvestmentDetailsSection, type DetailsSectionHandle } from '@/components/investment-details-form';
 import { ContextPill, SubHeader } from '@/components/header';
 import { useLeaveGuard } from '@/components/leave-guard';
-import { ChoiceGroup } from '@/components/series-parts';
+import { CheckOption, ChoiceGroup } from '@/components/series-parts';
 import { Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
-import { useGoals, useInvalidateInvestments } from '@/state/data';
+import { useGoals, useInvalidateInvestments, useSetGoalValueSource } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -46,7 +49,9 @@ const T = INVESTMENT_TEXT.form;
 /**
  * Novo investimento e editar (D-093). Novo: nome, tipo, quanto aplicou até hoje (obrigatório), quanto vale hoje (opcional) e desde
  * quando (opcional, hoje sem ela). Editar: nome e tipo; os valores mudam pelos movimentos. Nos dois, o bloco "Mais detalhes (opcional)"
- * com a ficha ampliada (D-099), que é gravada inteira.
+ * com a ficha ampliada (D-099), que é gravada inteira. D-104: uma frase para "Outro" e "Previdência" (item 12) e, com uma meta escolhida
+ * que ainda usa os registros, "Usar o valor dos investimentos nesta meta" (sem vir marcada), gravada depois do investimento pela mesma
+ * função da tela da meta (set_goal_value_source).
  */
 export function InvestmentForm({ contextId, investment }: { contextId: string; investment: Investment | null }) {
   const repo = useRepo();
@@ -74,6 +79,11 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
   const chosenGoal = goalId !== null && goalOptions.some((g) => g.id === goalId) ? goalId : null;
   const goalForSave: string | null | undefined = goalsQ.isSuccess ? chosenGoal : undefined;
   const goalDropped = goalsQ.isSuccess && initialGoal !== null && goalId === initialGoal && chosenGoal === null;
+  // Usar o valor dos investimentos na meta escolhida (retorno de quem testa, 17/11/2026): nunca vem marcada; volta a desmarcar ao trocar a meta.
+  const chosenGoalItem = chosenGoal ? goalOptions.find((g) => g.id === chosenGoal) : undefined;
+  const [useInvestmentsValue, setUseInvestmentsValue] = useState(false);
+  const setSource = useSetGoalValueSource();
+  const [sourceKey] = useState(() => newOperationKey());
   const [errors, setErrors] = useState<Partial<Record<InvestmentField, string>>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -92,6 +102,7 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
     currentText !== '' ||
     startText !== '' ||
     goalId !== initialGoal ||
+    useInvestmentsValue ||
     JSON.stringify(details) !== JSON.stringify(initialDetails);
   const guard = useLeaveGuard(dirty && !busy, editing ? `/investimento/${investment!.id}` : '/investimentos');
 
@@ -124,7 +135,19 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
         ? await repo.updateInvestment(key, investment!.id, investment!.version, { name: v.input.name, kind: v.input.kind, details: dv.details, goalId: goalForSave })
         : await repo.createInvestment(key, contextId, { ...v.input, details: dv.details, goalId: goalForSave });
       invalidate();
-      flash.set(editing ? T.saved : T.created);
+      const first = editing ? T.saved : T.created;
+      let message: string = first;
+      if (useInvestmentsValue && chosenGoalItem && canUseInvestmentsValue(chosenGoalItem)) {
+        try {
+          await setSource.mutateAsync({ key: sourceKey, id: chosenGoalItem.id, version: chosenGoalItem.version, source: 'investimentos' });
+          message = GOAL_LINK_TEXT.savedWithSource(first, chosenGoalItem.name);
+        } catch {
+          // O investimento já foi salvo: a escolha da origem fica para a tela da meta.
+          goalsQ.refetch();
+          message = GOAL_LINK_TEXT.sourceFailed(first, chosenGoalItem.name);
+        }
+      }
+      flash.set(message);
       const id = w.investment?.id ?? investment?.id;
       guard.leave(() => (editing ? (router.canGoBack() ? router.back() : router.replace(`/investimento/${id}`)) : id ? router.replace(`/investimento/${id}`) : router.replace('/investimentos')));
     } catch (e) {
@@ -161,7 +184,7 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
             maxLength={INVESTMENT_NAME_MAX}
             error={errors.name}
           />
-          <ChoiceGroup label={T.kindLabel} error={errors.kind}>
+          <ChoiceGroup label={T.kindLabel} hint={kind ? KIND_FORM_HINT[kind] : undefined} error={errors.kind}>
             {INVESTMENT_KINDS.map((k) => (
               <Chip
                 key={k}
@@ -228,11 +251,40 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
           )}
           {goalOptions.length > 0 ? (
             <ChoiceGroup label={INVESTMENT_GOAL_TEXT.formLabel} hint={INVESTMENT_GOAL_TEXT.formHint}>
-              <Chip label={INVESTMENT_GOAL_TEXT.noGoal} selected={chosenGoal === null} onPress={() => setGoalId(null)} />
+              <Chip
+                label={INVESTMENT_GOAL_TEXT.noGoal}
+                selected={chosenGoal === null}
+                onPress={() => {
+                  setGoalId(null);
+                  setUseInvestmentsValue(false);
+                }}
+              />
               {goalOptions.map((g) => (
-                <Chip key={g.id} label={g.name} selected={chosenGoal === g.id} onPress={() => setGoalId(chosenGoal === g.id ? null : g.id)} />
+                <Chip
+                  key={g.id}
+                  label={g.name}
+                  selected={chosenGoal === g.id}
+                  onPress={() => {
+                    setGoalId(chosenGoal === g.id ? null : g.id);
+                    setUseInvestmentsValue(false);
+                  }}
+                />
               ))}
             </ChoiceGroup>
+          ) : null}
+          {chosenGoalItem ? (
+            canUseInvestmentsValue(chosenGoalItem) ? (
+              <CheckOption
+                label={GOAL_LINK_TEXT.useInvestments}
+                hint={GOAL_LINK_TEXT.useInvestmentsHint}
+                checked={useInvestmentsValue}
+                onPress={() => setUseInvestmentsValue((v) => !v)}
+              />
+            ) : (
+              <Txt variant="caption" color={colors.textSecondary}>
+                {GOAL_LINK_TEXT.alreadyInvestments}
+              </Txt>
+            )
           ) : null}
           {goalDropped ? (
             <Txt variant="caption" color={colors.textSecondary}>

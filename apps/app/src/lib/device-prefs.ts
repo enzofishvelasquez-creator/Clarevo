@@ -13,7 +13,9 @@ import {
   isReminderHour,
   isRoutineReminderHour,
   parseRoutineReminderChoices,
+  parseInvestmentReminderHolds,
   type CategoryView,
+  type InvestmentReminderHolds,
   type ImportMemory,
   type ReminderHour,
   type RoutineReminderChoices,
@@ -107,6 +109,11 @@ export interface DevicePrefs {
    * quando a média muda. Só neste aparelho; nada vai para o servidor.
    */
   reserveRefreshDismissed: number | null;
+  /**
+   * Adiar e pausar os lembretes dos investimentos (D-104, item 6), por tipo: a data até quando cada um está adiado ou pausado. Só neste
+   * aparelho, como os interruptores dos lembretes; não é dado financeiro e nada vai para o servidor. Passa sozinho na data.
+   */
+  investmentReminderHolds: InvestmentReminderHolds;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -131,6 +138,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   routineReminderHour: DEFAULT_ROUTINE_REMINDER_HOUR,
   depositReminderDay: DEFAULT_DEPOSIT_REMINDER_DAY,
   reserveRefreshDismissed: null,
+  investmentReminderHolds: {},
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -171,6 +179,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       depositReminderDay: isDepositReminderDay(v.depositReminderDay) ? v.depositReminderDay : DEFAULT_DEPOSIT_REMINDER_DAY,
       reserveRefreshDismissed:
         typeof v.reserveRefreshDismissed === 'number' && Number.isSafeInteger(v.reserveRefreshDismissed) && v.reserveRefreshDismissed > 0 ? v.reserveRefreshDismissed : null,
+      investmentReminderHolds: parseInvestmentReminderHolds(v.investmentReminderHolds),
     };
   } catch {
     return DEFAULT_PREFS;

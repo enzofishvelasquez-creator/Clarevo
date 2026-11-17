@@ -637,6 +637,10 @@ const KNOWN: RepoErrorCode[] = [
   'quantidade_invalida',
   'cnpj_invalido',
   'origem_invalida',
+  // Taxa com data de fim, condição da taxa e descrição (D-104, 0039).
+  'taxa_condicional_invalida',
+  'condicao_invalida',
+  'descricao_investimento_invalida',
   // Assinatura paga (D-083): o gatilho de record_operations recusa a escrita em só leitura. Avisa a tela de acesso (accessRefused).
   'assinatura_necessaria',
   // Aceite dos termos (A1): só a versão vigente.
@@ -1170,6 +1174,11 @@ interface InvestmentRow {
   /** Quantidade em milionésimos e CNPJ do fundo (D-099, itens 19 e 20; migração 0037); ausentes num banco sem a migração. */
   quantity_micro?: number | null;
   fund_cnpj?: string | null;
+  /** Taxa com data de fim, condição da taxa e descrição (D-104, itens 12 e 13; migração 0039); ausentes num banco sem a migração. */
+  rate_until?: string | null;
+  rate_after_bp?: number | null;
+  rate_condition?: string | null;
+  description?: string | null;
 }
 
 /** A ficha da linha: o que o app não conhece fica vazio (nunca um valor errado na tela). */
@@ -1188,6 +1197,11 @@ function toInvestmentDetails(r: InvestmentRow): InvestmentDetails {
     liquidityDays: int(r.liquidity_days),
     quantityMicro: int(r.quantity_micro),
     fundCnpj: typeof r.fund_cnpj === 'string' && /^[0-9A-Z]{14}$/.test(r.fund_cnpj) ? r.fund_cnpj : null,
+    // 0039 (D-104): sem a coluna (banco ainda sem a migração), nulos.
+    rateUntil: date(r.rate_until),
+    rateAfterBp: int(r.rate_after_bp),
+    rateCondition: typeof r.rate_condition === 'string' && r.rate_condition !== '' ? r.rate_condition : null,
+    description: typeof r.description === 'string' && r.description !== '' ? r.description : null,
   };
   return investmentDetailsError(r.kind, details) === null ? details : { ...EMPTY_INVESTMENT_DETAILS, institution: details.institution };
 }
@@ -1209,6 +1223,11 @@ function detailsPayload(d: InvestmentDetails | undefined, goalId?: string | null
     // Quantidade e CNPJ (0037): sem o campo (ficha de uma versão anterior), a chave não vai e o banco mantém o que tinha.
     ...(d.quantityMicro !== undefined ? { quantity_micro: d.quantityMicro } : {}),
     ...(d.fundCnpj !== undefined ? { fund_cnpj: d.fundCnpj } : {}),
+    // Taxa com data de fim, condição e descrição (0039, D-104): sem o campo, a chave não vai e o banco mantém o que tinha. Um banco sem a
+    // migração ignora as chaves que não conhece (clarevo_validate_investment_details), e o resto da ficha é gravado igual.
+    ...(d.rateUntil !== undefined || d.rateAfterBp !== undefined ? { rate_until: d.rateUntil ?? null, rate_after_bp: d.rateAfterBp ?? null } : {}),
+    ...(d.rateCondition !== undefined ? { rate_condition: d.rateCondition } : {}),
+    ...(d.description !== undefined ? { description: d.description } : {}),
   };
 }
 

@@ -1,4 +1,4 @@
-import { addDays, addMonths, isValidIsoDate, monthOf, type IsoDate, type IsoMonth } from './dates';
+import { addDays, addMonths, formatDateBR, formatMonthName, isValidIsoDate, monthOf, type IsoDate, type IsoMonth } from './dates';
 import type { ContextActivity, FinancialRecord } from './records';
 import { recordMonth } from './records';
 import { REMINDER_ID_PREFIX } from './reminders';
@@ -58,9 +58,10 @@ export const ROUTINE_REMINDER_ROUTE: Readonly<Record<RoutineReminderKind, string
   mapa: '/analises',
   ausencia: '/',
   aporte: '/metas',
-  vencimentos: '/investimentos',
-  atualizar: '/investimentos',
-  aporte_investimentos: '/investimentos',
+  // Os três dos investimentos abrem o lembrete com o fato, os atalhos, adiar e pausar (D-104, item 6).
+  vencimentos: '/investimento/lembrete?tipo=vencimentos',
+  atualizar: '/investimento/lembrete?tipo=atualizar',
+  aporte_investimentos: '/investimento/lembrete?tipo=aporte_investimentos',
 };
 
 export const ROUTINE_REMINDER_TEXT = {
@@ -102,23 +103,24 @@ export const ROUTINE_REMINDER_TEXT = {
       title: 'Metas',
       body: 'Dia de guardar para as suas metas. Quando guardar, registre o aporte.',
     },
+    // Investimentos (D-104, item 6): em tom de fato, com uma pergunta; ao abrir, dá para adiar ou pausar.
     vencimentos: {
       toggle: 'Vencimentos dos investimentos',
-      caption: '7 dias antes e no dia em que um investimento vence ou pode ser resgatado, pela data da ficha.',
+      caption: '7 dias antes e no dia em que um investimento vence ou pode ser resgatado, pela data da ficha. Ao abrir, dá para adiar ou pausar.',
       title: 'Investimentos',
-      body: 'Um investimento vence em 7 dias. Confira na aba Investir.',
+      body: 'Um investimento vence em 7 dias. Quer conferir?',
     },
     atualizar: {
       toggle: 'Atualizar os investimentos',
-      caption: 'No dia 1 de cada mês, se algum investimento ainda não tem o valor do extrato no mês.',
+      caption: 'No dia 1 de cada mês, se algum investimento ainda não tem o valor do extrato do mês passado. Ao abrir, dá para adiar ou pausar.',
       title: 'Investimentos',
-      body: 'Dia de atualizar o valor dos seus investimentos com o extrato.',
+      body: 'Hoje é dia 1. Quer atualizar o valor dos investimentos com o extrato?',
     },
     aporte_investimentos: {
       toggle: 'Aportar nos investimentos',
-      caption: 'No dia escolhido para guardar, se você definiu um plano de aportes e o mês ainda não tem aporte registrado nos investimentos.',
+      caption: 'No dia escolhido para guardar, se você definiu um plano de aportes e o mês ainda não tem aporte registrado nos investimentos. Ao abrir, dá para adiar ou pausar.',
       title: 'Investimentos',
-      body: 'Dia do aporte nos investimentos, pelo seu plano. Quando aportar, registre na aba Investir.',
+      body: 'Hoje é o dia do aporte do seu plano de investimentos. Quer registrar?',
     },
   } as Readonly<Record<RoutineReminderKind, { toggle: string; caption: string; title: string; body: string }>>,
 } as const;
@@ -135,10 +137,15 @@ export const NO_ROUTINE_REMINDERS: RoutineReminderChoices = {
   atualizar: false,
   aporte_investimentos: false,
 };
-/** Texto do aviso de vencimento no próprio dia (o de 7 dias antes é o `body` de `vencimentos`) e os do fim da carência. */
-export const INVESTMENT_DUE_TODAY_BODY = 'Um investimento vence hoje. Confira na aba Investir.';
-export const INVESTMENT_RELEASE_SOON_BODY = 'A carência de um investimento termina em 7 dias. Confira na aba Investir.';
-export const INVESTMENT_RELEASE_TODAY_BODY = 'A carência de um investimento termina hoje. Confira na aba Investir.';
+/**
+ * Textos dos avisos dos investimentos com a data (D-104, item 6): 7 dias antes e no dia do vencimento e do fim da carência, e o do dia 1 com
+ * o mês do extrato. Sem nome, sem valor: a tela bloqueada só mostra o fato e a data.
+ */
+export const INVESTMENT_DUE_SOON_BODY = (due: IsoDate) => `Um investimento vence em 7 dias, em ${formatDateBR(due)}. Quer conferir?`;
+export const INVESTMENT_DUE_TODAY_BODY = 'Um investimento vence hoje. Quer conferir?';
+export const INVESTMENT_RELEASE_SOON_BODY = (due: IsoDate) => `A carência de um investimento termina em 7 dias, em ${formatDateBR(due)}. Quer conferir?`;
+export const INVESTMENT_RELEASE_TODAY_BODY = 'A carência de um investimento termina hoje. Quer conferir?';
+export const INVESTMENT_UPDATE_BODY = (month: IsoMonth) => `Hoje é dia 1. Quer atualizar o valor dos investimentos com o extrato de ${formatMonthName(addMonths(month, -1))}?`;
 
 export function isRoutineReminderKind(value: unknown): value is RoutineReminderKind {
   return typeof value === 'string' && (ROUTINE_REMINDER_KINDS as readonly string[]).includes(value);
@@ -273,12 +280,12 @@ export function routineReminderPlan(
       if (fits(date)) push('gastos', date, date);
     }
   }
-  const monthly = (kind: RoutineReminderKind, day: number, skipThisMonth: boolean) => {
+  const monthly = (kind: RoutineReminderKind, day: number, skipThisMonth: boolean, body?: (month: IsoMonth) => string) => {
     for (let m = 0; m < ROUTINE_MONTHLY_MONTHS; m += 1) {
       const month: IsoMonth = addMonths(thisMonth, m);
       if (m === 0 && skipThisMonth) continue;
       const date: IsoDate = `${month}-${hh(day)}`;
-      if (fits(date)) push(kind, date, month);
+      if (fits(date)) push(kind, date, month, body?.(month));
     }
   };
   if (choices.recebimentos) monthly('recebimentos', ROUTINE_INCOME_DAY, incomeThisMonth);
@@ -287,18 +294,18 @@ export function routineReminderPlan(
   if (choices.aporte && deposit && deposit.hasPlannedGoal && isDepositReminderDay(deposit.day)) monthly('aporte', deposit.day, deposit.depositThisMonth);
   const inv = options.investments;
   if (choices.vencimentos && inv) {
-    const both = (dates: readonly IsoDate[], tag: string, soon: string, today_: string) => {
+    const both = (dates: readonly IsoDate[], tag: string, soon: (due: IsoDate) => string, today_: string) => {
       for (const due of [...new Set(dates)].filter(isValidIsoDate).sort()) {
         const before = addDays(due, -INVESTMENT_REMINDER_DAYS_BEFORE);
-        if (fits(before)) push('vencimentos', before, `${due}-${tag}antes`, soon);
+        if (fits(before)) push('vencimentos', before, `${due}-${tag}antes`, soon(due));
         if (fits(due)) push('vencimentos', due, `${due}-${tag}dia`, today_);
       }
     };
-    both(inv.maturities, '', ROUTINE_REMINDER_TEXT.kinds.vencimentos.body, INVESTMENT_DUE_TODAY_BODY);
+    both(inv.maturities, '', INVESTMENT_DUE_SOON_BODY, INVESTMENT_DUE_TODAY_BODY);
     // A carência que termina no mesmo dia do vencimento já tem o aviso do vencimento.
     both(inv.releases.filter((d) => !inv.maturities.includes(d)), 'carencia-', INVESTMENT_RELEASE_SOON_BODY, INVESTMENT_RELEASE_TODAY_BODY);
   }
-  if (choices.atualizar && inv && inv.hasActive) monthly('atualizar', INVESTMENT_UPDATE_DAY, !inv.missingThisMonth);
+  if (choices.atualizar && inv && inv.hasActive) monthly('atualizar', INVESTMENT_UPDATE_DAY, !inv.missingThisMonth, INVESTMENT_UPDATE_BODY);
   const plan = options.investmentDeposit;
   if (choices.aporte_investimentos && plan && plan.hasPlan && isDepositReminderDay(plan.day)) monthly('aporte_investimentos', plan.day, plan.depositThisMonth);
   if (choices.ausencia && activity && isValidIsoDate(activity.lastWriteOn)) {
