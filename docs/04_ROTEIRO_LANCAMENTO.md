@@ -204,7 +204,7 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [ ] Teste em aparelho: o que o Enzo não conseguiu fazer passa para as pessoas que vão testar (decisão do Enzo, 16/11/2026)
 - [x] Biometria oferecida logo depois de entrar na conta, uma vez por pessoa e aparelho (pedido do Enzo, 16/11/2026)
 - [x] Foto do perfil em Conta, no cabeçalho e na barra lateral (pedido do Enzo, 16/11/2026). Migração 0038 aplicada em produção em 16/11/2026 (`docs/05`, passo 12ae, conferência 21z: 1, 1, 2, 1, 107)
-- [ ] **Você:** teste em aparelho pelo roteiro único `docs/47_TESTE_EM_APARELHO.md` (53 itens numerados: build `preview` no Android agora, iPhone quando houver TestFlight). Ele junta os "Teste em aparelho" deste arquivo, `docs/37` (seção 6), `docs/40` (seção 4), `docs/21` (seção 6) e `docs/46` (seção 2)
+- [ ] **Você:** teste em aparelho pelo roteiro único `docs/47_TESTE_EM_APARELHO.md` (75 itens numerados: build `preview` no Android agora, iPhone quando houver TestFlight). Ele junta os "Teste em aparelho" deste arquivo, `docs/37` (seção 6), `docs/40` (seção 4), `docs/21` (seção 6) e `docs/46` (seção 2)
 - [ ] Site: formulário de contato para empresas ligado (Resend; as Novidades por e-mail continuam desligadas): pronto desde D-066; **aguarda o Enzo** (`docs/22`, seção 9, passos 1 a 3: a regra de limite e as variáveis na Cloudflare); depois, a equipe liga o interruptor e devolve a seção da política
 - [x] Relatório de falhas (Sentry) no app de celular, sem dado financeiro nem pessoal, com o trecho na política e a pergunta 50 ao advogado (`docs/46`)
 - [x] Sentry: conta (região da União Europeia), projeto e `EXPO_PUBLIC_SENTRY_DSN` no EAS, em 11/11/2026 (`docs/46`, seção 2; Enzo)
@@ -221,6 +221,30 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [x] Política (seção 8, Expo): o que vai ao servidor de atualizações
 - [ ] **Você:** juntar o PR, fazer um build `preview` novo e instalar por cima; depois do merge seguinte, conferir a primeira atualização (`docs/50`, seção 2)
 - [ ] Quem testa instala o build novo uma vez; depois, só fecha e abre o app para receber as correções
+
+## Rodada de 17/11/2026: dez frentes juntadas (D-103 a D-112)
+
+Pedido do Enzo ("faça todas as melhorias possíveis"), o estudo "Bolsa no site e aba Investir" e o retorno de quem testa (`docs/34`, seção de 17/11/2026). Pronto no código, no ramo da rodada; falta o merge, que só pode vir depois das migrações.
+
+- [x] Aba Investir com datas, ganho em reais, Desempenho por investimento, divisão por instituição com o FGC, modelos na tela vazia e convite do plano de aportes (D-103, `docs/45_INVESTIMENTOS.md`, seção 11)
+- [x] Detalhe e formulários de cada investimento: taxa que muda numa data, descrição, histórico com saldo, lembretes com adiar e pausar, declaração no formato do informe, "Somar a uma meta?" e a opção da meta no formulário (D-104, `docs/45`, seção 12; migração 0039)
+- [x] Calendário do mês, cartão de atalhos do Resumo, pílula "Análises" em Movimentos, "Separar parte para uma meta?", convite para rever as metas, Evolução de 24 e 36 meses e 5 temas curtos de Aprender (D-105)
+- [x] Site: painel de indicadores do Banco Central, páginas de mercado, glossário, duas calculadoras só do site e a estrutura do resumo semanal (D-106, `docs/22`, seção 16)
+- [x] Gasto ligado à conta a pagar, à parcela ou à fatura que pagou, subcategorias, troca entre gasto e recebimento, rendimento de investimento no recebimento e cadastrar e voltar (D-107; migração 0040)
+- [x] Importar por prints e gasto ou recebimento na importação (D-108)
+- [x] Revisão das calculadoras, fórmula por fórmula, com o plano de dívidas refeito (D-109, `docs/51_FORMULAS_DAS_CALCULADORAS.md`)
+- [x] Paridade entre web, computador e celular: "Ocultar valores" no computador, cantos arredondados e os limites da web explicados (D-110)
+- [x] Níveis: queda com aviso depois de 60 dias sem anotar e o nível Esmeralda (D-111, `docs/48_NIVEIS.md`; migração 0041)
+- [x] Escolha do tema em Conta (D-112)
+- [x] Documentos atualizados: decisões (`docs/00`), passos do Supabase (`docs/05`), regras de escrita (`CLAUDE.md`), investimentos, Aprender, navegação, calculadoras, widget, retorno do teste, teste em aparelho (itens 59 a 75), política de privacidade e resumo para o advogado
+- [ ] **Você (Supabase), antes do merge:** aplicar as migrações 0039, 0040 e 0041, nessa ordem, cada uma seguida de `notify pgrst, 'reload schema';`, e rodar as conferências (`docs/05`, passos 12af a 12ah e conferências 21aa a 21ac: 4, 4, 3, 2, 107; 4, 3, 6, 0, 2, 107; 1, 1, 1, 1, 107). O app novo vai pelo ar a cada merge (D-100) e falha com o banco antigo em subcategoria, troca de tipo, ligação a conta e rendimento; o app antigo funciona com o banco novo
+- [ ] Antes de publicar o site: rodar `node scripts/gerar-site.js --atualizar-indicadores` num computador com acesso ao Banco Central (o retrato dos indicadores ainda está vazio, e o `--final` recusa retrato vazio, incompleto ou com mais de 7 dias)
+- [ ] Teste em aparelho dos itens novos (`docs/47`, seção K, itens 59 a 75)
+- [ ] Exportar meus dados ainda sem a subcategoria (pendência da D-107)
+- [ ] Espaço Negócio: decisão do Enzo, a fazer
+- [ ] Clarevo Plus: preparar agora, lançar depois
+- [ ] Site: vídeos de uso e imagens nas Novidades (a fazer)
+- [ ] Política de privacidade: as mudanças desta rodada (prints, contagem do tempo sem anotar, tema) entram na versão 1, ainda preliminar; a pergunta 61 do resumo para o advogado pergunta se pedem versão nova quando o site for publicado
 
 ## Ciclo B: renda comprometida (D-026)
 

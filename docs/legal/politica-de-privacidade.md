@@ -162,11 +162,11 @@ A Clarevo é paga por assinatura mensal, com 14 dias grátis no começo (Termos 
 
 ### 3.10 Nível da conta
 
-A conta tem um nível (Bronze, Prata, Ouro ou Diamante) pelo quanto você já usa o app, como já ter anotado um gasto ou criado uma meta.
+A conta tem um nível (Bronze, Prata, Ouro, Diamante ou Esmeralda) pelo quanto você já usa o app, como já ter anotado um gasto ou criado uma meta. O nível desce um degrau depois de 60 dias sem anotar nada e volta assim que você voltar a anotar.
 
-- **O que guardamos.** Quais desses marcos você já alcançou e quando, para o nível nunca descer. Nenhum valor em dinheiro entra no nível.
+- **O que guardamos.** Quais desses marcos você já alcançou e quando, e desde quando conta o tempo sem anotar (o dia em que o app passou a contar e o momento da sua última anotação de gasto ou recebimento). Nenhum valor em dinheiro entra no nível.
 - **Quem vê.** Só você, na tela "Nível da conta". Ninguém da Família nem a empresa que oferece o benefício vê o seu nível, e ele não entra em relatório nenhum.
-- **Por quanto tempo.** Enquanto a conta existir. Ao excluir a conta, os marcos são apagados junto.
+- **Por quanto tempo.** Enquanto a conta existir. Ao excluir a conta, os marcos e a contagem do tempo sem anotar são apagados junto.
 
 ## 4. O que não guardamos?
 
@@ -177,7 +177,7 @@ A conta tem um nível (Bronze, Prata, Ouro ou Diamante) pelo quanto você já us
 - Dados do holerite: nome, CPF, empresa, cargo, banco, conta, salário base, descontos (como plano de saúde e empréstimos) e bases de impostos. Da leitura saem só o valor líquido e o mês de competência, que você confere antes de salvar.
 - Dados da nota fiscal de serviço (NFS-e): CPF e CNPJ, inscrição municipal, endereço, telefone, e-mail, chave de acesso, código de verificação, descrição do serviço e tributos. Da leitura saem só o valor líquido, a data de emissão, o número da nota e o nome de quem contratou o serviço (no recebimento) ou de quem prestou (no gasto), que você confere antes de salvar.
 - Fotos e imagens da câmera ou da galeria usadas para ler um documento. A câmera só lê o código da nota ou do boleto, e nenhuma dessas fotos é guardada.
-- Os arquivos que você escolhe ler: PDF de nota, PDF ou imagem de comprovante, holerite, nota de serviço e boleto, extrato e fatura em PDF, OFX ou planilha.
+- Os arquivos que você escolhe ler: PDF de nota, PDF ou imagem de comprovante, holerite, nota de serviço e boleto, extrato e fatura em PDF, OFX ou planilha, e prints da tela do banco para importar extrato ou fatura. Os prints são lidos no aparelho, nada sai dele, e as cópias são apagadas depois da leitura.
 - O código de um boleto. O app lê dele só o valor e o vencimento para a conta a pagar, e não guarda o código.
 - Saldo por conta.
 - Biometria, localização, contatos, microfone e identificador de publicidade. Da galeria, só a foto que você escolher para uma meta ou para o seu perfil; da câmera, só a foto que você tirar para o seu perfil (seção 3.2).
@@ -191,7 +191,7 @@ A leitura acontece no seu aparelho. A Clarevo não tem servidor que receba esses
 
 - A câmera lê o QR Code ou o código de barras da nota e pede a sua permissão antes. O código vira, no aparelho, só o resumo matemático citado na seção 3.2.
 - O PDF de nota, de comprovante, de holerite, de nota de serviço ou de boleto (até 10 MB e 3 páginas) é lido no aparelho, o texto é descartado depois da leitura e a cópia temporária é apagada.
-- Você também pode escolher uma imagem (print ou foto) de comprovante, holerite, nota de serviço ou boleto, ou fotografar a chave da nota. O texto da imagem é reconhecido no próprio aparelho, por um modelo de aprendizado de máquina usado só para ler o texto. No app pelo navegador, quem lê é um programa de código aberto (Tesseract) que o app baixa do próprio endereço da Clarevo; no iPhone, o leitor de texto do próprio sistema (Apple Vision); no Android, componentes do Google incluídos no app (ML Kit, pelo Google Play services). A imagem não vai para nenhum servidor da Clarevo. No Android, assim como na leitura de códigos, esses componentes podem enviar ao Google dados técnicos de uso e do aparelho. [A DEFINIR: confirmar na documentação do fornecedor o que é enviado e para quê]
+- Você também pode escolher uma imagem (print ou foto) de comprovante, holerite, nota de serviço ou boleto, ou prints da tela do banco para importar extrato ou fatura (até 10 por vez), ou fotografar a chave da nota. O texto da imagem é reconhecido no próprio aparelho, por um modelo de aprendizado de máquina usado só para ler o texto. No app pelo navegador, quem lê é um programa de código aberto (Tesseract) que o app baixa do próprio endereço da Clarevo; no iPhone, o leitor de texto do próprio sistema (Apple Vision); no Android, componentes do Google incluídos no app (ML Kit, pelo Google Play services). A imagem não vai para nenhum servidor da Clarevo. No Android, assim como na leitura de códigos, esses componentes podem enviar ao Google dados técnicos de uso e do aparelho. [A DEFINIR: confirmar na documentação do fornecedor o que é enviado e para quê]
 - Depois de importar um extrato, o app pode sugerir gastos fixos (pagamentos que se repetem todo mês) e orçamentos por categoria (a média por mês). A conta é feita no aparelho, com as linhas importadas, e nada muda sem você confirmar.
 - O app só preenche o formulário. Nada é gravado sem você tocar em "Salvar".
 - Se você tocar, no celular, para ler a página oficial de uma nota de NFC-e do Rio de Janeiro, o seu aparelho consulta diretamente o site da Secretaria de Fazenda. Esse site recebe o endereço da nota e o seu IP e segue a política dele. A Clarevo não recebe nem guarda essa consulta.
@@ -262,7 +262,8 @@ Estas informações ficam só no seu aparelho (no armazenamento do app, ou no na
 - a sessão, para você não precisar entrar toda vez;
 - as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, e avisos que você dispensou (inclusive, [PROPOSTA: o dia em que você começou a usar o app neste aparelho e o "Agora não" da pergunta da seção 3.6]);
 - memórias para preencher mais rápido: a descrição e a categoria da última nota de cada loja (a loja é identificada pelo resumo do CNPJ, até 50 lojas), o mesmo para o nome lido de comprovantes (pelo resumo do nome, até 50) e as categorias que você escolheu na importação de extrato (até 300 entradas);
-- o último nível da conta já mostrado neste aparelho, para a comemoração da troca de nível aparecer uma vez só;
+- o último nível da conta já mostrado neste aparelho e o último aviso de queda do nível dispensado, para a comemoração e o aviso não se repetirem;
+- a escolha do tema (claro, escuro ou igual ao aparelho);
 - lembretes de contas a pagar, que são notificações agendadas no aparelho. Na tela bloqueada eles não mostram valor nem descrição, e o app não guarda token de notificação remota;
 - o widget da tela inicial, que está desligado. Se for ligado, o aparelho guardará um resumo para o widget, com os valores ocultos por padrão.
 
