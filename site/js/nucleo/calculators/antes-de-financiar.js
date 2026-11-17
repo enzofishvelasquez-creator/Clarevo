@@ -14,6 +14,7 @@ export const ANTES_EXTRA_ENTRY_PERCENTS = [10, 20];
 const RATE_RANGE_TEXT = 'Use uma taxa de 0% a 99,99% ao mês.';
 const YIELD_RANGE_TEXT = 'Use um rendimento de 0% a 30% ao ano, com até 2 casas.';
 export const ANTES_ESTIMATE_TEXT = 'Estimativa. As condições oficiais são as da proposta; peça o CET.';
+export const ANTES_RATE_HYPOTHESIS = 'A conta usa só a taxa informada: com a taxa de juros, ficam de fora tarifas, seguros e IOF; com o CET ao mês, eles já estão dentro.';
 export const ANTES_FIELDS = {
     preco: moneyField('Preço à vista do bem', 'o preço à vista', '50.000,00'),
     entrada: moneyField('Entrada', 'a entrada', '10.000,00', {
@@ -278,7 +279,7 @@ export function calcAntesDeFinanciar(input, today) {
             ? lastDiffers
                 ? `Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo, e a última (${brl(lastParcela)}) absorve a diferença do arredondamento.`
                 : 'Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo.'
-            : 'Só a taxa de juros informada, sem tarifas, seguros e IOF.',
+            : ANTES_RATE_HYPOTHESIS,
     ];
     if (showImpact && renda !== null)
         hypotheses.push('Percentuais sobre a renda líquida por mês que você informou aqui.');

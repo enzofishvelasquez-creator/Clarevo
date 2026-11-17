@@ -73,6 +73,27 @@ export function todayValueCents(valueCents, months, inflationBp) {
         return valueCents;
     return Math.floor(valueCents / Math.exp(months * logMonthly(inflationBp)));
 }
+export function adjustedTargetCents(targetCents, months, inflationBp) {
+    checkInt(targetCents, 'alvo', 0, Number.MAX_SAFE_INTEGER);
+    checkInt(months, 'prazo', 0, SIMULATE_MONTHS_MAX);
+    checkRate(inflationBp, 'inflação');
+    if (inflationBp === 0 || months === 0)
+        return targetCents;
+    return Math.floor(targetCents * Math.exp(months * logMonthly(inflationBp)) + 0.5);
+}
+export function monthsForAdjustedTarget(target, initial, monthly, rateBp, inflationBp) {
+    checkInt(target, 'alvo', 1, MAX_RECORD_CENTS);
+    checkAmounts(initial, monthly, SIMULATE_MONTHS_MIN, rateBp, SIMULATE_MONTHS_MIN);
+    checkRate(inflationBp, 'inflação');
+    if (initial >= target)
+        return 0;
+    if (inflationBp === 0)
+        return monthsForTarget(target, initial, monthly, rateBp);
+    for (let n = 1; n <= SIMULATE_MONTHS_MAX; n++)
+        if (rawFinal(initial, monthly, n, rateBp) >= adjustedTargetCents(target, n, inflationBp))
+            return n;
+    return null;
+}
 export function simulateGrowth(input) {
     const { initial, monthly, months, rateBp } = input;
     const inflationBp = input.inflationBp ?? null;
@@ -127,6 +148,25 @@ export function monthsForTarget(target, initial, monthly, rateBp) {
             return n;
     return null;
 }
+export function simulationInflationChoices(mode) {
+    return mode === 'quanto-ter' ? ['nenhuma', 'mostrar'] : ['nenhuma', 'mostrar', 'corrigir'];
+}
+export function simulationInflationChoice(draft) {
+    if (!draft.inflationOn)
+        return 'nenhuma';
+    return draft.adjustTarget === true && draft.mode !== 'quanto-ter' ? 'corrigir' : 'mostrar';
+}
+export function simulationInflationHint(mode, choice) {
+    const F = SIMULATE_TEXT.fields;
+    if (choice === 'mostrar' && mode === 'quanto-ter')
+        return F.inflationShowHintTotal;
+    if (choice === 'corrigir' && mode === 'em-quanto-tempo')
+        return F.inflationAdjustHintTime;
+    return F.inflationChoiceHints[choice];
+}
+export function simulationInflationPatch(choice) {
+    return { inflationOn: choice !== 'nenhuma', adjustTarget: choice === 'corrigir' };
+}
 export const SIMULATION_FIELD_ORDER = ['mode', 'targetText', 'initialText', 'monthsText', 'monthlyText', 'rateText', 'inflationText'];
 export const SIMULATION_MODE_FIELDS = {
     'quanto-guardar': ['targetText', 'initialText', 'monthsText', 'rateText', 'inflationText'],
@@ -161,10 +201,20 @@ export function validateSimulationDraft(draft) {
     }
     const rate = read('rateText', parsePercentBp(draft.rateText, { min: 0, max: SIMULATE_RATE_MAX_BP }));
     const inflation = draft.inflationOn ? read('inflationText', parsePercentBp(draft.inflationText, { min: 0, max: SIMULATE_RATE_MAX_BP })) : null;
+    const adjust = draft.inflationOn && draft.adjustTarget === true && mode !== 'quanto-ter';
     if (Object.keys(codes).length > 0 || mode === null || target === undefined || initial === undefined || months === undefined || monthly === undefined || rate === undefined || inflation === undefined) {
         return { ok: false, codes, errors: simulationErrors(codes) };
     }
-    const input = { mode, targetCents: target, initialCents: initial ?? 0, months, monthlyCents: monthly, rateBp: rate, inflationBp: inflation };
+    const input = {
+        mode,
+        targetCents: target,
+        initialCents: initial ?? 0,
+        months,
+        monthlyCents: monthly,
+        rateBp: rate,
+        inflationBp: inflation,
+        ...(adjust ? { adjustTarget: true } : {}),
+    };
     if (resultTooHigh(input)) {
         const field = mode === 'em-quanto-tempo' ? 'monthlyText' : 'monthsText';
         codes[field] = 'resultado_alto';
@@ -173,6 +223,8 @@ export function validateSimulationDraft(draft) {
     return { ok: true, input, result: simulate(input) };
 }
 function resultTooHigh(input) {
+    if (adjusting(input) && input.mode === 'quanto-guardar' && adjustedTargetCents(input.targetCents, input.months, input.inflationBp) > MAX_RECORD_CENTS)
+        return true;
     const plan = planOf(input);
     return plan !== null && rawFinal(input.initialCents, plan.monthly, plan.months, input.rateBp) > SIMULATE_RESULT_MAX_CENTS;
 }
@@ -183,9 +235,20 @@ function planOf(input) {
     if (initialCents >= targetCents)
         return null;
     if (mode === 'quanto-guardar')
-        return { monthly: monthlyForTarget(targetCents, initialCents, input.months, rateBp), months: input.months };
-    const months = monthsForTarget(targetCents, initialCents, input.monthlyCents, rateBp);
+        return { monthly: monthlyForTarget(goalOf(input, input.months), initialCents, input.months, rateBp), months: input.months };
+    const months = monthsOf(input, input.monthlyCents, rateBp);
     return months === null ? null : { monthly: input.monthlyCents, months };
+}
+function adjusting(input) {
+    return input.adjustTarget === true && input.inflationBp !== null && input.mode !== 'quanto-ter';
+}
+function goalOf(input, months) {
+    return adjusting(input) ? adjustedTargetCents(input.targetCents, months, input.inflationBp) : input.targetCents;
+}
+function monthsOf(input, monthly, rateBp) {
+    return adjusting(input)
+        ? monthsForAdjustedTarget(input.targetCents, input.initialCents, monthly, rateBp, input.inflationBp)
+        : monthsForTarget(input.targetCents, input.initialCents, monthly, rateBp);
 }
 export function simulate(input) {
     const { mode, targetCents, initialCents, rateBp, inflationBp } = input;
@@ -200,10 +263,12 @@ export function simulate(input) {
     if (mode !== 'quanto-guardar')
         checkInt(input.monthlyCents ?? -1, 'valor por mês', 0, MAX_RECORD_CENTS);
     const T = SIMULATE_TEXT;
-    const base = { mode, input, hypotheses: T.hypotheses(mode, rateBp, inflationBp), disclaimer: T.disclaimer };
-    const empty = { monthlyWithoutYieldCents: null, monthsWithoutYield: null };
+    const adjust = adjusting(input);
+    const base = { mode, input, hypotheses: T.hypotheses(mode, rateBp, inflationBp, adjust), disclaimer: T.disclaimer };
+    const empty = { monthlyWithoutYieldCents: null, monthsWithoutYield: null, targetAdjustedCents: null };
     const growthOf = (monthly, months) => simulateGrowth({ initial: initialCents, monthly, months, rateBp, inflationBp });
-    const todayLine = (g) => (g.todayValueCents === null || inflationBp === null ? [] : [T.todayValue(inflationBp, g.todayValueCents)]);
+    const todayLine = (g) => (g.todayValueCents === null || inflationBp === null ? [] : [T.todayValue(inflationBp, g.finalCents, g.todayValueCents)]);
+    const showTip = inflationBp !== null && inflationBp > 0 && !adjust && mode !== 'quanto-ter' ? [T.adjustTip(targetCents)] : [];
     if (mode !== 'quanto-ter' && initialCents >= targetCents) {
         return {
             ...base,
@@ -218,8 +283,9 @@ export function simulate(input) {
     }
     if (mode === 'quanto-guardar') {
         const months = input.months;
-        const monthly = monthlyForTarget(targetCents, initialCents, months, rateBp);
-        const withoutYield = monthlyShareCents(targetCents - initialCents, months);
+        const goal = goalOf(input, months);
+        const monthly = monthlyForTarget(goal, initialCents, months, rateBp);
+        const withoutYield = monthlyShareCents(goal - initialCents, months);
         const growth = growthOf(monthly, months);
         return {
             ...base,
@@ -229,19 +295,26 @@ export function simulate(input) {
             monthlyCents: monthly,
             monthlyWithoutYieldCents: withoutYield,
             months,
+            targetAdjustedCents: adjust ? goal : null,
             growth,
             texts: {
-                intro: T.introSave(targetCents, months, initialCents),
+                intro: T.introSave(targetCents, months, initialCents, adjust),
                 highlight: T.monthlyHighlight(monthly),
-                lines: [...(monthly === 0 ? [T.initialAlone(growth.finalCents, months)] : []), T.monthlyWithoutYield(withoutYield), ...todayLine(growth)],
+                lines: [
+                    ...(adjust ? [T.adjustedTarget(inflationBp, goal, months)] : []),
+                    ...(monthly === 0 ? [T.initialAlone(growth.finalCents, months)] : []),
+                    T.monthlyWithoutYield(withoutYield),
+                    ...todayLine(growth),
+                    ...showTip,
+                ],
             },
         };
     }
     if (mode === 'em-quanto-tempo') {
         const monthly = input.monthlyCents;
-        const months = monthsForTarget(targetCents, initialCents, monthly, rateBp);
-        const withoutYield = monthsForTarget(targetCents, initialCents, monthly, 0);
-        const intro = T.introTime(targetCents, initialCents);
+        const months = monthsOf(input, monthly, rateBp);
+        const withoutYield = monthsOf(input, monthly, 0);
+        const intro = T.introTime(targetCents, initialCents, adjust);
         if (months === null) {
             return {
                 ...base,
@@ -251,11 +324,13 @@ export function simulate(input) {
                 monthlyWithoutYieldCents: null,
                 months: null,
                 monthsWithoutYield: withoutYield,
+                targetAdjustedCents: null,
                 growth: null,
                 texts: { intro, highlight: T.unreachable, lines: [] },
             };
         }
         const growth = growthOf(monthly, months);
+        const goal = goalOf(input, months);
         return {
             ...base,
             reached: false,
@@ -264,8 +339,13 @@ export function simulate(input) {
             monthlyWithoutYieldCents: null,
             months,
             monthsWithoutYield: withoutYield,
+            targetAdjustedCents: adjust ? goal : null,
             growth,
-            texts: { intro, highlight: T.timeHighlight(monthly, months, withoutYield), lines: todayLine(growth) },
+            texts: {
+                intro,
+                highlight: T.timeHighlight(monthly, months, withoutYield),
+                lines: [...(adjust ? [T.adjustedTarget(inflationBp, goal, months)] : []), ...todayLine(growth), ...showTip],
+            },
         };
     }
     const months = input.months;
@@ -289,7 +369,8 @@ export function simulate(input) {
 export function previewHypotheses(draft) {
     const rate = parseRateBp(draft.rateText);
     const inflation = draft.inflationOn ? parseRateBp(draft.inflationText) : null;
-    const lines = SIMULATE_TEXT.hypotheses(draft.mode ?? 'quanto-guardar', rate ?? 0, inflation);
+    const adjust = simulationInflationChoice(draft) === 'corrigir';
+    const lines = SIMULATE_TEXT.hypotheses(draft.mode ?? 'quanto-guardar', rate ?? 0, inflation, adjust);
     if (rate === null)
         lines[0] = SIMULATE_TEXT.ratePending;
     if (draft.mode === null)
@@ -314,7 +395,7 @@ function simulationErrors(codes) {
 export function simulationGoalPrefill(result, today) {
     if (result.reached || result.unreachable || result.growth === null || result.months === null)
         return null;
-    const target = result.mode === 'quanto-ter' ? result.growth.finalCents : result.input.targetCents;
+    const target = result.mode === 'quanto-ter' ? result.growth.finalCents : (result.targetAdjustedCents ?? result.input.targetCents);
     const monthly = result.monthlyCents ?? 0;
     return {
         goalType: 'objetivo',
@@ -457,7 +538,19 @@ export const SIMULATE_TEXT = {
         monthly: 'Quanto vai guardar por mês',
         rate: 'Taxa de rendimento ao ano (%)',
         rateHint: 'Você informa a taxa que quer testar. A Clarevo não sugere taxas, produtos nem instituições.',
-        inflationToggle: 'Descontar inflação? (opcional)',
+        inflationLabel: 'Inflação (opcional)',
+        inflationChoices: {
+            nenhuma: 'Sem inflação',
+            mostrar: 'Mostrar em dinheiro de hoje',
+            corrigir: 'Corrigir a meta pela inflação',
+        },
+        inflationChoiceHints: {
+            nenhuma: 'Os valores ficam em reais de cada mês, sem inflação.',
+            mostrar: 'Só informa: a meta e o valor por mês não mudam. O resultado mostra quanto o total vale em dinheiro de hoje.',
+            corrigir: 'Para manter o poder de compra: a meta sobe com a inflação até o fim do prazo, e o valor por mês é recalculado.',
+        },
+        inflationShowHintTotal: 'Só informa: o valor por mês não muda. O resultado mostra quanto o total vale em dinheiro de hoje.',
+        inflationAdjustHintTime: 'Para manter o poder de compra: a meta sobe com a inflação até o fim do prazo, e o prazo é recalculado.',
         inflation: 'Inflação ao ano (%)',
         inflationHint: 'Você informa a inflação que quer testar, de 0% a 30% ao ano.',
     },
@@ -488,8 +581,10 @@ export const SIMULATE_TEXT = {
     calcLink: 'Simular com rendimento',
     learnShortcut: 'Simular um plano',
     learnShortcutHint: 'Quanto guardar por mês, em quanto tempo e quanto você pode ter, com hipóteses suas.',
-    introSave: (targetCents, months, initialCents) => `Para juntar ${brl(targetCents)} em ${monthsCount(months)}${initialCents > 0 ? `, começando com ${brl(initialCents)}` : ''}:`,
-    introTime: (targetCents, initialCents) => `Para juntar ${brl(targetCents)}${initialCents > 0 ? `, começando com ${brl(initialCents)}` : ''}:`,
+    introSave: (targetCents, months, initialCents, adjusted = false) => `Para juntar ${adjusted ? `o equivalente a ${brl(targetCents)} de hoje` : brl(targetCents)} em ${monthsCount(months)}${initialCents > 0 ? `, começando com ${brl(initialCents)}` : ''}:`,
+    introTime: (targetCents, initialCents, adjusted = false) => `Para juntar ${adjusted ? `o equivalente a ${brl(targetCents)} de hoje` : brl(targetCents)}${initialCents > 0 ? `, começando com ${brl(initialCents)}` : ''}:`,
+    adjustedTarget: (inflationBp, cents, months) => `Com inflação de ${formatBpCompact(inflationBp)} ao ano, a meta corrigida é de ${brl(cents)} em ${monthsCount(months)}.`,
+    adjustTip: (targetCents) => `Para manter o poder de compra de ${brl(targetCents)}, escolha "Corrigir a meta pela inflação".`,
     introTotal: (monthlyCents, months, initialCents) => monthlyCents > 0
         ? `Guardando ${brl(monthlyCents)} por mês por ${monthsCount(months)}${initialCents > 0 ? `, começando com ${brl(initialCents)}` : ''}:`
         : `Com ${brl(initialCents)} por ${monthsCount(months)}, sem guardar mais nada por mês:`,
@@ -501,8 +596,8 @@ export const SIMULATE_TEXT = {
     contributed: (cents) => `Total aportado: ${brl(cents)}`,
     earnings: (cents) => `Rendimento na hipótese: ${brl(cents)}`,
     totalWithoutYield: (cents) => `Sem rendimento, seriam ${brl(cents)}.`,
-    todayValue: (inflationBp, cents) => `Em dinheiro de hoje, com inflação de ${formatBpCompact(inflationBp)} ao ano: ${brl(cents)}`,
-    hypotheses: (mode, rateBp, inflationBp) => [
+    todayValue: (inflationBp, finalCents, todayCents) => `Em dinheiro de hoje, com inflação de ${formatBpCompact(inflationBp)} ao ano, o total de ${brl(finalCents)} equivale a ${brl(todayCents)}.`,
+    hypotheses: (mode, rateBp, inflationBp, adjustTarget = false) => [
         rateBp === 0
             ? 'Taxa de 0% ao ano: sem rendimento.'
             : `Taxa de ${formatBpCompact(rateBp)} ao ano (${monthlyRateText(rateBp)} ao mês, taxa equivalente), constante no período.`,
@@ -510,7 +605,9 @@ export const SIMULATE_TEXT = {
         'Valores brutos, sem imposto de renda, IOF ou taxas.',
         inflationBp === null
             ? 'Sem inflação, salvo se informada.'
-            : `Inflação de ${formatBpCompact(inflationBp)} ao ano (${monthlyRateText(inflationBp)} ao mês, taxa equivalente), constante no período, só para o valor em dinheiro de hoje.`,
+            : `Inflação de ${formatBpCompact(inflationBp)} ao ano (${monthlyRateText(inflationBp)} ao mês, taxa equivalente), constante no período, ${adjustTarget && mode !== 'quanto-ter'
+                ? 'para corrigir a meta: a meta de hoje com a inflação de todo o prazo, no centavo.'
+                : `só para mostrar o valor em dinheiro de hoje${mode === 'quanto-ter' ? '' : ': a meta e o valor por mês não mudam'}.`}`,
         mode === 'quanto-guardar'
             ? 'Valor por mês arredondado para cima, no centavo; valores finais para baixo.'
             : mode === 'em-quanto-tempo'

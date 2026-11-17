@@ -56,6 +56,11 @@ export function calcReserva(input) {
     const hypotheses = ['Sem rendimento: o valor guardado não cresce com juros.', 'Gastos essenciais iguais em todos os meses.'];
     if (guardado !== null && guardado > 0 && missing > 0)
         hypotheses.push('Meses cobertos arredondados para baixo, em décimos de mês.');
+    if (monthsToTarget !== null) {
+        hypotheses.push('O mesmo valor guardado todo mês.');
+        if (missing % mensal !== 0)
+            hypotheses.push('Prazo em meses inteiros, para cima: no último mês, falta menos que o valor de cada mês.');
+    }
     return {
         ok: true,
         result: {
