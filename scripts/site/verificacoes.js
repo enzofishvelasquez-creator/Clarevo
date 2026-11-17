@@ -3,15 +3,19 @@
 const path = require('node:path');
 const { problemasDeTitulos } = require('./texto');
 
-/** Todo endereço relativo (`href` e `src`) de uma página, e se o arquivo e a âncora existem entre os arquivos gerados. */
+/**
+ * Todo endereço relativo (`href`, `src` e, desde a D-114, `srcset` das telas escuras e `poster` dos vídeos) de uma página, e se o arquivo e
+ * a âncora existem entre os arquivos gerados.
+ */
 function linksQuebrados(arquivos) {
   const problemas = [];
   const paginas = [...arquivos.keys()].filter((k) => k.endsWith('.html'));
   const idsDe = (html) => new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
   for (const nome of paginas) {
     const html = String(arquivos.get(nome));
-    for (const m of html.matchAll(/\s(?:href|src)="([^"]*)"/g)) {
-      const url = m[1].replace(/&amp;/g, '&');
+    const enderecos = [...html.matchAll(/\s(href|src|srcset|poster)="([^"]*)"/g)].flatMap((m) => (m[1] === 'srcset' ? m[2].split(',').map((x) => x.trim().split(/\s+/)[0]) : [m[2]]));
+    for (const endereco of enderecos) {
+      const url = endereco.replace(/&amp;/g, '&');
       if (/^[a-z][a-z0-9+.-]*:/i.test(url)) continue;
       // O endereço pode trazer parâmetros (`?modo=emprestimo`, como nos temas de Aprender): o arquivo é o que vem antes.
       const [semAncora, ancora] = url.split('#');

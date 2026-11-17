@@ -3,6 +3,7 @@ titulo: 13º salário: quando cai e como se organizar
 data: 2026-10-23
 resumo: As duas parcelas, o proporcional para quem trabalhou parte do ano, os descontos e um jeito de anotar o 13º na Clarevo.
 autoria: Equipe Clarevo
+capa: ilustracao-decimo-terceiro
 fontes:
   - tema: decimo-terceiro
   - tema: contas-do-ano

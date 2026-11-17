@@ -3,6 +3,7 @@ titulo: Conheça a Clarevo
 data: 2026-10-23
 resumo: A Clarevo é uma solução de bem-estar financeiro, apoiada por um aplicativo de finanças pessoais e da família. Veja o que ela faz, o que não faz e onde já dá para usar.
 autoria: Equipe Clarevo
+capa: post-resumo
 fontes:
   - O app, com telas da demonstração | app/index.html
   - Segurança e privacidade | seguranca.html

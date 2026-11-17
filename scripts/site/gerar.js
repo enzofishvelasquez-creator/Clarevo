@@ -12,6 +12,7 @@ const { lerDados, avisosDeRedacao, problemasDeTitulos } = require('./texto');
 const { dataExiste } = require('./conteudo');
 const { dominioDe, configurarRodape } = require('./modelo');
 const { imagensDoSite } = require('./imagens');
+const { videosDoSite } = require('./videos');
 const { linksQuebrados, problemasFinaisDaPagina } = require('./verificacoes');
 const { caminhoLimpo, cabecalhosDoTexto } = require('./util');
 const { paginaInicial } = require('./paginas/inicio');
@@ -34,7 +35,8 @@ const { paginaSeguranca } = require('./paginas/seguranca');
 const { paginaSobre, paginaSuporte, paginaLegal, paginaLicencas, pagina404 } = require('./paginas/outras');
 
 const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê este arquivo e não o publica.
-# Nenhum recurso de fora é permitido: o site não carrega fontes, imagens, scripts nem estilos de outros endereços.
+# Nenhum recurso de fora é permitido: o site não carrega fontes, imagens, vídeos, scripts nem estilos de outros endereços.
+# media-src 'self' (D-114, 17/11/2026): os vídeos de uso do app (videos/*.mp4 e *.webm), que ficam no próprio site, sem serviço de terceiros.
 # script-src e connect-src 'self' valem só para os scripts do próprio site: a busca da Ajuda (ajuda/busca.js, que lê ajuda/indice.json), as
 # calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada) e o painel de indicadores (indicadores/painel.js,
 # que pergunta uma vez ao próprio site, /api/indicadores; quem consulta o Banco Central é o _worker.js, nunca o navegador). form-action 'self'
@@ -43,7 +45,7 @@ const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê est
 # Nenhum outro site recebe o endereço da página (a política só manda o referenciador para o próprio site).
 # HSTS desde 29/10/2026, com o domínio clarevo.app.br abrindo por HTTPS: sem includeSubDomains e sem preload (docs/07).
 /*
-  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; img-src 'self'; media-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: same-origin
@@ -52,9 +54,12 @@ const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê est
 # Guarda longa no navegador para o que quase nunca muda (12/11/2026). As fontes e as capturas nunca mudam de conteúdo sem mudar de nome
 # (o nome de cada captura leva um resumo do conteúdo): um ano. A marca mantém o nome quando o desenho muda: 30 dias, para chegar a quem já
 # visitou o site. As páginas, o estilo e os scripts ficam fora, com a guarda curta padrão da hospedagem, porque mudam a cada publicação.
+# Os vídeos (D-114) também levam o resumo do conteúdo no nome: um ano.
 /fontes/*
   Cache-Control: public, max-age=31536000, immutable
 /imagens/*
+  Cache-Control: public, max-age=31536000, immutable
+/videos/*
   Cache-Control: public, max-age=31536000, immutable
 /marca/*
   Cache-Control: public, max-age=2592000
@@ -143,7 +148,9 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   configurarRodape({ resumoSemanal: resumo.edicoes.length > 0 });
 
   const imagens = imagensDoSite();
-  const ctx = { valores, img: imagens.info, referencia, pastaDePosts: pastaDeNovidades, retrato: lidoRetrato.retrato, resumoSemanal: resumo.edicoes.length > 0 };
+  // Os vídeos de uso do app (D-114): o MP4 e o WebM de cada um, de site-src/videos; a capa vem com as imagens.
+  const videos = videosDoSite();
+  const ctx = { valores, img: imagens.info, videos: videos.info, referencia, pastaDePosts: pastaDeNovidades, retrato: lidoRetrato.retrato, resumoSemanal: resumo.edicoes.length > 0 };
   const paginas = [];
   const juntar = (pg) => paginas.push(pg);
 
@@ -239,6 +246,7 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   arquivos.set('marca/icone-app.png', ler(MARCA, 'icone-app-1024.png'));
   arquivos.set('favicon.svg', ler(MARCA, 'clarevo-simbolo.svg'));
   for (const [nome, bytes] of imagens.arquivos) arquivos.set(nome, bytes);
+  for (const [nome, bytes] of videos.arquivos) arquivos.set(nome, bytes);
   const og = path.join(SITE_SRC, 'imagens', 'og-clarevo-1200x630.png');
   if (fs.existsSync(og)) arquivos.set('og/clarevo.png', fs.readFileSync(og));
   else avisos.push('site-src/imagens/og-clarevo-1200x630.png não existe: rode "node scripts/gerar-og-site.js"');
