@@ -810,7 +810,7 @@ setInterval(async () => {
     // D-041: a categoria mais perto do limite (Lazer: parcela do tênis e restaurante, R$ 400,00 de R$ 300,00).
     orcamento: 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00',
     // D-048: Importar extrato ou fatura, com a legenda fixa, entre o Orçamento e as calculadoras.
-    importar: 'Importar extrato ou fatura, Arquivo PDF, OFX ou planilha do banco',
+    importar: 'Importar extrato ou fatura, Arquivo PDF, OFX, planilha ou print do banco',
     calc: 'Calculadoras, Parcelado ou à vista, dívidas, reserva e outras contas',
   };
   await waitText('7 cadastrados, com as contas do ano').catch(() => {});
@@ -821,7 +821,7 @@ setInterval(async () => {
   });
   // Revisão das telas (16/11/2026): no topo, os totais e depois os botões; "Organizar" vem depois da lista do mês.
   ok('movimentações: "Organizar" com os seis atalhos (Orçamento por categoria e Importar extrato ou fatura entre Cartões e as calculadoras) e as legendas de outubro, depois dos totais e dos botões (e da lista)', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.orcamento, SC.importar, SC.calc]) &&
-    ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Arquivo PDF, OFX ou planilha do banco', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
+    ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Arquivo PDF, OFX, planilha ou print do banco', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
     scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.totais < scOrder.anotar && scOrder.anotar < scOrder.organizar, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
   // O primeiro movimento à vista sem rolar em 390 × 844 (revisão das telas, 16/11/2026): a linha inteira acima da barra de abas.
   const movFirst = await p.evaluate(() => {
@@ -8033,7 +8033,7 @@ setInterval(async () => {
   // ---- 1. A porta em Movimentos › Organizar, na busca "No app" e em Conta ----
   await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(500);
   const i1Rows = await sectionRows('Organizar');
-  ok('I1 Organizar: "Importar extrato ou fatura" com a legenda "Arquivo PDF, OFX ou planilha do banco" depois do Orçamento e antes das calculadoras', i1Rows !== null && i1Rows.length === 6 && i1Rows[4] === SC.importar && /^Calculadoras, /.test(i1Rows[5]), JSON.stringify(i1Rows));
+  ok('I1 Organizar: "Importar extrato ou fatura" com a legenda "Arquivo PDF, OFX, planilha ou print do banco" (D-108) depois do Orçamento e antes das calculadoras', i1Rows !== null && i1Rows.length === 6 && i1Rows[4] === SC.importar && /^Calculadoras, /.test(i1Rows[5]), JSON.stringify(i1Rows));
   await atWidths(async (w) => { await layoutChecks(`I1 Organizar com a linha de importar ${w}px`); if (w === 390) { await scrollTo('Organizar'); await shot('300_importar_organizar'); } if (w === 320) { await scrollTo('Organizar'); await shot('300_importar_organizar_320px'); } });
   await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
   let t1 = await i1Keep();
@@ -8044,7 +8044,7 @@ setInterval(async () => {
   await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
   for (const query of ['importar', 'extrato', 'ofx', 'banco', 'planilha']) {
     await learnSearch().fill(query); await waitText('No app'); await p.waitForTimeout(400);
-    ok(`I1 busca "${query}" em Aprender: o grupo "No app" tem "Importar extrato ou fatura"`, (await p.getByRole('button', { name: /^Importar extrato ou fatura\. Arquivo PDF, OFX ou planilha do banco/ }).filter({ visible: true }).count()) === 1);
+    ok(`I1 busca "${query}" em Aprender: o grupo "No app" tem "Importar extrato ou fatura"`, (await p.getByRole('button', { name: /^Importar extrato ou fatura\. Arquivo PDF, OFX, planilha ou print do banco/ }).filter({ visible: true }).count()) === 1);
   }
   await learnSearch().fill('fatura'); await waitText('No app'); await p.waitForTimeout(400);
   ok('I1 busca "fatura": Cartões continua em primeiro e a importação também aparece', (await p.getByRole('button', { name: /^Cartões\. / }).filter({ visible: true }).count()) === 1 && (await p.getByRole('button', { name: /^Importar extrato ou fatura\. / }).filter({ visible: true }).count()) === 1);
@@ -8277,7 +8277,8 @@ setInterval(async () => {
   await atWidths(async (w) => { await innerChecks(`I1 colunas sem sinal ${w}px`); if (w === 390) await shot('315_importar_colunas_sem_sinal'); });
   await btn('Entendi, usar assim').click(); await waitText('Arquivo lido: sem-sinal.csv', 8000);
   await radio('Banco ou carteira').click(); await i1Review(); t1 = await i1Keep();
-  ok('I1 planilha sem sinal, depois de confirmar: as duas linhas são entradas (a caixa "Entradas e saídas estão trocadas" conserta)', t1.includes('01/10/2026 · Entrada') && t1.includes('02/10/2026 · Entrada'), t1.slice(0, 300));
+  // D-108: sem sinal nem tipo, no extrato da conta a descrição decide: "SALARIO" entra e "PADARIA" sai (cada linha pode trocar em Editar).
+  ok('I1 planilha sem sinal, depois de confirmar: a descrição decide, a padaria é saída e o salário é entrada', t1.includes('01/10/2026 · Saída') && t1.includes('02/10/2026 · Entrada'), t1.slice(0, 300));
   await i1Leave();
   // Valores ocultos: a prévia e as opções de coluna não mostram os valores da planilha.
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Organizar');
@@ -14673,6 +14674,160 @@ setInterval(async () => {
     await p.evaluate(async () => { await window.__e2e.refresh(); }); await p.waitForTimeout(600);
     ok('Níveis: depois de "Fechar", a comemoração não volta', !(await body()).includes('Sua conta chegou ao nível'));
     ok('Níveis: nada vai à rede na demonstração', writes.length === lvWrites0, writes.slice(lvWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Importar por print e gasto ou recebimento (D-108, retorno do teste de 17/11/2026: "além do importar fatura em PDF, a possibilidade de
+  // enviar prints; no caso do mês atual, a fatura ainda não pode ser baixada" e a linha "ENTRADA REND PAGO APLIC AUT APR" de R$ 0,01 que
+  // entrou como gasto). Os prints são imagens geradas aqui (texto fictício), lidas no navegador pelo tesseract.js servido em /ocr, como em
+  // "Ler comprovante": (1) "Importar fatura" na tela do cartão aceita prints, com o aviso de que nada sai do aparelho; (2) dois prints que se
+  // sobrepõem viram uma conferência só, sem a linha repetida, com tudo "Lido de imagem: confira", a parcela "3 de 4" em andamento e as
+  // compras na fatura aberta; (3) o print do extrato da conta: o rendimento sem sinal entra como recebimento, e uma linha troca de gasto
+  // para recebimento antes de importar; (4) o print sem lançamento tem a mensagem própria. Nenhum pedido sai do app.
+  // ==================================================================================================================
+  {
+    const ipWrites0 = writes.length;
+    const ipTexts = [];
+    const ipKeep = async () => { const x = await body(); ipTexts.push(x); screenTexts.push(x); return x; };
+    const ipDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clarevo-prints-'));
+    // Um print da lista do banco: o título, os cabeçalhos de dia e as linhas (descrição à esquerda, valor à direita, uma linha de detalhe).
+    const ipPrint = async (name, title, rows) => {
+      const file = path.join(ipDir, name);
+      const html = rows.map((r) => (typeof r === 'string'
+        ? `<div style="font:bold 20px Arial;color:#555;margin:18px 0 6px">${r}</div>`
+        : `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #ddd"><div><div style="font:22px Arial">${r[0]}</div>${r[2] ? `<div style="font:18px Arial;color:#666">${r[2]}</div>` : ''}</div><div style="font:22px Arial;white-space:nowrap">${r[1]}</div></div>`)).join('');
+      const pg = await ctx.newPage(); await pg.setViewportSize({ width: 420, height: 200 });
+      await pg.setContent(`<body style="margin:0;padding:20px;background:#fff;color:#111"><div style="font:bold 24px Arial;margin-bottom:8px">${title}</div>${html}</body>`);
+      await pg.screenshot({ path: file, fullPage: true }); await pg.close();
+      return file;
+    };
+    const ipFat1 = await ipPrint('fatura-1.png', 'Fatura aberta', ['06 OUT', ['Mercado Exemplo', 'R$ 80,50'], ['Padaria Central', 'R$ 12,30'], '05 OUT', ['Loja de Roupas Exemplo', 'R$ 50,00', 'Parcela 3 de 4']]);
+    // O segundo print, rolando a tela, repete a última linha do primeiro.
+    const ipFat2 = await ipPrint('fatura-2.png', 'Fatura aberta', ['05 OUT', ['Loja de Roupas Exemplo', 'R$ 50,00', 'Parcela 3 de 4'], ['Estorno Cinema Centro', '-R$ 10,00'], '04 OUT', ['Farmácia Central', 'R$ 25,00']]);
+    const ipExt = await ipPrint('extrato.png', 'Extrato', ['06 OUT', ['ENTRADA REND PAGO APLIC AUT APR', 'R$ 0,01'], ['TRANSF MARIA EXEMPLO', '-R$ 50,00'], ['TARIFA PACOTE', '-R$ 30,00'], '05 OUT', ['TED RECEBIDA ANA EXEMPLO', 'R$ 120,00']]);
+    const ipNone = await ipPrint('sem-lancamento.png', 'Saldo disponível', [['Conta corrente', 'R$ 1.234,56'], ['Ver mais', '']]);
+    const ipPick = async (files) => { const [chooser] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher prints').click()]); await chooser.setFiles(files); };
+    const ipBoxes = () => p.getByRole('checkbox').filter({ visible: true }).evaluateAll((els) => els.filter((e) => (e.getAttribute('aria-label') || '').startsWith('Incluir:')).map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-checked'), e.getAttribute('aria-disabled')]));
+    const ipExternal = []; const ipOnRequest = (r) => { const u = r.url(); if (!u.startsWith(`http://localhost:${PORT}`) && !/^(data|blob):/.test(u)) ipExternal.push(u); };
+    p.on('request', ipOnRequest);
+
+    await demoHome();
+    // ---- 1. "Importar fatura" na tela do cartão: o arquivo ou prints, com o aviso de que nada sai do aparelho ----
+    await openCardPage();
+    await btn('Importar fatura').click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
+    let ipT = await ipKeep();
+    ok('Prints (D-108): "Importar fatura" abre a importação com "Escolher o arquivo" e, embaixo, "Ou envie prints da tela do banco", para a fatura do mês atual, com "Escolher prints"',
+      urlPath() === '/importar' && (await visibleCount('button', 'Escolher o arquivo')) === 1 && (await visibleCount('button', 'Escolher prints')) === 1 &&
+      ipT.includes('Ou envie prints da tela do banco') && ipT.includes('Serve para a fatura do mês atual, que o banco ainda não deixa baixar') && ipT.includes('Até 10 prints por vez, com até 10 MB cada.'), ipT.slice(0, 700));
+    ok('Prints: a tela diz que os prints são lidos no aparelho, que nada sai dele e que as cópias são apagadas depois da leitura',
+      ipT.includes('Os prints são lidos aqui no aparelho e nada sai dele. As cópias das imagens são apagadas depois da leitura.'));
+    await atWidths(async (w) => { await innerChecks(`Prints, escolher ${w}px`); if (w === 390) { await scrollTo('Ou envie prints da tela do banco'); await shot('IP01_importar_prints'); } if (w === 320) { await scrollTo('Ou envie prints da tela do banco'); await shot('IP01_importar_prints_320px'); } });
+
+    // ---- 2. Dois prints da fatura aberta que se sobrepõem: uma conferência só, sem a linha repetida ----
+    const ipExt0 = ipExternal.length;
+    await ipPick([ipFat1, ipFat2]); await waitText('2 prints lidos', 90000); await p.waitForTimeout(400);
+    ipT = await ipKeep();
+    ok('Prints da fatura: "2 prints lidos", 5 linhas, a linha que aparecia nos dois prints contada uma vez, e o cartão continua escolhido',
+      ipT.includes('5 linhas lidas') && ipT.includes('1 linha que aparecia em mais de um print foi contada uma vez só.') &&
+      (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'true' && (await radio('Cartão Exemplo').getAttribute('aria-checked')) === 'true' &&
+      ipT.includes('Os prints são lidos aqui no aparelho e nada sai dele.') && (await visibleCount('button', 'Escolher outros prints')) === 1, ipT.slice(0, 700));
+    ok('Prints: a leitura das imagens não faz pedido a nenhum endereço de fora do app', ipExternal.length === ipExt0, ipExternal.slice(ipExt0).join(' | '));
+    await atWidths(async (w) => { await innerChecks(`Prints, destino ${w}px`); if (w === 390) await shot('IP02_importar_prints_destino'); });
+    await btn('Revisar as linhas').click(); await waitText('Marque o que vira lançamento', 12000); await p.waitForTimeout(400);
+    ipT = await ipKeep();
+    let ipB = await ipBoxes();
+    ok('Prints da fatura na conferência: cada linha "Lido de imagem: confira", o aviso para conferir data, descrição, valor e se é compra ou estorno, e 4 de 5 marcadas (o estorno desmarcado)',
+      (ipT.match(/Lido de imagem: confira/g) ?? []).length === 5 && ipT.includes('Estas linhas vieram de prints, e a leitura de imagem pode errar. Confira a data, a descrição, o valor e se é compra ou estorno antes de importar.') &&
+      ipT.includes('5 linhas · 4 marcadas') && JSON.stringify(ipB.map((b) => b[1])) === JSON.stringify(['true', 'true', 'true', 'false', 'true']), `${JSON.stringify(ipB)} ${ipT.slice(0, 500)}`);
+    ok('Prints da fatura: data, descrição e valor de cada linha, a compra parcelada "3 de 4" em andamento (na fatura aberta de novembro e a última na seguinte) e o estorno como crédito',
+      ipB[0][0] === 'Incluir: Mercado Exemplo, R$ 80,50, 06/10/2026' && ipB[1][0] === 'Incluir: Padaria Central, R$ 12,30, 06/10/2026' && ipB[2][0] === 'Incluir: Loja de Roupas Exemplo PARC 3/4, R$ 50,00, 05/10/2026' &&
+      ipB[3][0] === 'Incluir: Estorno Cinema Centro, R$ 10,00, 05/10/2026' && ipB[4][0] === 'Incluir: Farmácia Central, R$ 25,00, 04/10/2026' &&
+      ipT.includes('Parcela em andamento') && ipT.includes('Parcela 3 de 4: entra na fatura de novembro de 2026 e a última na seguinte.') && ipT.includes('05/10/2026 · Estorno · Lazer') && ipT.includes('04/10/2026 · Compra · Saúde'), JSON.stringify(ipB.map((b) => b[0])));
+    await atWidths(async (w) => { await innerChecks(`Prints, conferência da fatura ${w}px`); if (w === 390) await shot('IP03_importar_prints_conferencia'); if (w === 320) await shot('IP03_importar_prints_conferencia_320px'); });
+    // No cartão, a troca é entre compra e estorno: "Compra" vem escolhida no Mercado.
+    await btn('Editar: Mercado Exemplo').click(); await p.waitForTimeout(300);
+    ok('Prints da fatura: em Editar, "Tipo da linha" com "Compra" escolhida e "Estorno ou crédito"',
+      (await radio('Compra').getAttribute('aria-checked')) === 'true' && (await radio('Estorno ou crédito').getAttribute('aria-checked')) === 'false');
+    await btn('Pronto').click(); await p.waitForTimeout(200);
+    await btn('Importar 4 lançamentos').click(); await waitText('Importação concluída', 12000);
+    await waitUntil(async () => (await body()).includes('4 lançamentos importados.'), 8000);
+    ok('Prints da fatura: "4 lançamentos importados."', (await body()).includes('4 lançamentos importados.'));
+    ok('Prints da fatura: a compra "3 de 4" entrou com as 2 parcelas que faltam (a 3 na fatura de novembro, a aberta), e as outras à vista',
+      await otherDevice(async (repo, ctx) => {
+        const card = (await repo.listCards(ctx))[0];
+        const entries = await repo.listCardEntries(card.id);
+        const loja = entries.find((x) => x.description === 'Loja de Roupas Exemplo PARC 3/4');
+        const mercado = entries.find((x) => x.description === 'Mercado Exemplo');
+        const farmacia = entries.find((x) => x.description === 'Farmácia Central');
+        return Boolean(loja && mercado && farmacia) && loja.installments === 2 && loja.installmentOffset === 2 && loja.amountCents === 10000 && loja.invoiceMonth === '2026-11' &&
+          mercado.installments === 1 && mercado.amountCents === 8050 && mercado.invoiceMonth === '2026-11' && farmacia.amountCents === 2500 && !entries.some((x) => x.description === 'Estorno Cinema Centro');
+      }));
+    await btn('Ver o cartão').click(); await waitText('Fatura atual'); await p.waitForTimeout(600);
+    ipT = await body();
+    ok('Prints da fatura: a fatura de novembro soma as compras dos prints (R$ 550,00 + R$ 80,50 + R$ 12,30 + R$ 50,00 + R$ 25,00 = R$ 717,80)', ipT.includes('R$ 717,80'), ipT.slice(0, 400));
+
+    // ---- 3. Print do extrato da conta: o rendimento sem sinal é recebimento; uma linha troca de gasto para recebimento ----
+    await goTab('Movimentos'); await waitText('Organizar'); await p.waitForTimeout(400);
+    await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300);
+    await ipPick([ipExt]); await waitText('1 print lido', 90000); await p.waitForTimeout(400);
+    ipT = await ipKeep();
+    ok('Print do extrato: "1 print lido", 4 linhas, e a conta já vem como destino (os prints parecem o extrato de uma conta)',
+      ipT.includes('4 linhas lidas') && (await radio('Banco ou carteira').getAttribute('aria-checked')) === 'true' && (await radio('Conta principal').getAttribute('aria-checked')) === 'true', ipT.slice(0, 500));
+    await btn('Revisar as linhas').click(); await waitText('Marque o que vira lançamento', 12000); await p.waitForTimeout(400);
+    ipT = await ipKeep(); ipB = await ipBoxes();
+    const ipRow = (start) => p.evaluate((start) => {
+      const box = [...document.querySelectorAll('[role=checkbox]')].find((e) => (e.getAttribute('aria-label') || '').startsWith(`Incluir: ${start}`) && e.getBoundingClientRect().width > 0);
+      return box?.parentElement?.textContent ?? '';
+    }, start);
+    ok('Print do extrato: "ENTRADA REND PAGO APLIC AUT APR" de R$ 0,01 vem como Entrada (recebimento), a TED recebida também, e a transferência e a tarifa com "-" como Saída',
+      ipB.length === 4 && ipB.every((b) => b[1] === 'true') && ipT.includes('gasto ou recebimento antes de importar') &&
+      (await ipRow('ENTRADA REND PAGO APLIC AUT APR, R$ 0,01')).includes('· Entrada ·') && (await ipRow('TED RECEBIDA ANA EXEMPLO')).includes('· Entrada ·') &&
+      (await ipRow('TRANSF MARIA EXEMPLO')).includes('· Saída ·') && (await ipRow('TARIFA PACOTE')).includes('· Saída ·'), `${JSON.stringify(ipB.map((b) => b[0]))} ${await ipRow('ENTRADA REND')}`);
+    // Trocar uma linha: em Editar, "Recebimento (entrada)"; a categoria passa às de recebimento; trocar de volta desfaz.
+    await btn('Editar: TARIFA PACOTE').click(); await p.waitForTimeout(300);
+    ok('Print do extrato: em Editar, "Tipo da linha" com "Gasto (saída)" escolhido e "Recebimento (entrada)"',
+      (await radio('Gasto (saída)').getAttribute('aria-checked')) === 'true' && (await radio('Recebimento (entrada)').getAttribute('aria-checked')) === 'false');
+    await atWidths(async (w) => { await layoutChecks(`Prints, trocar o tipo da linha ${w}px`); if (w === 390) await shot('IP04_importar_trocar_tipo'); });
+    await radio('Recebimento (entrada)').click(); await p.waitForTimeout(400);
+    ok('Print do extrato: trocada, a linha vira Entrada, diz "Você trocou o tipo desta linha." e mostra as categorias de recebimento',
+      (await ipRow('TARIFA PACOTE')).includes('· Entrada ·') && (await body()).includes('Você trocou o tipo desta linha.') &&
+      (await radio('Recebimento (entrada)').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'Salário')) === 1 && (await visibleCount('radio', 'Mercado')) === 0);
+    await radio('Gasto (saída)').click(); await p.waitForTimeout(400);
+    ok('Print do extrato: trocar de volta desfaz (Saída, sem o aviso da troca)', (await ipRow('TARIFA PACOTE')).includes('· Saída ·') && !(await body()).includes('Você trocou o tipo desta linha.'));
+    await btn('Pronto').click(); await p.waitForTimeout(200);
+    // A transferência, que era um valor recebido, troca para recebimento e é importada assim.
+    await btn('Editar: TRANSF MARIA EXEMPLO').click(); await p.waitForTimeout(300);
+    await radio('Recebimento (entrada)').click(); await p.waitForTimeout(400);
+    await btn('Pronto').click(); await p.waitForTimeout(200);
+    ok('Print do extrato: depois da troca, as 4 linhas seguem marcadas', (await body()).includes('4 linhas · 4 marcadas') && (await visibleCount('button', 'Importar 4 lançamentos')) === 1);
+    await btn('Importar 4 lançamentos').click(); await waitText('Importação concluída', 12000);
+    await waitUntil(async () => (await body()).includes('4 lançamentos importados.'), 8000);
+    const ipRecords = await otherDevice(async (repo, ctx) => (await repo.listRecords(ctx, '2026-10'))
+      .filter((r) => ['ENTRADA REND PAGO APLIC AUT APR', 'TRANSF MARIA EXEMPLO', 'TARIFA PACOTE', 'TED RECEBIDA ANA EXEMPLO'].includes(r.description))
+      .map((r) => [r.kind, r.amountCents, r.occurredOn, r.description]).sort((a, b) => a[3].localeCompare(b[3])));
+    ok('Print do extrato: o rendimento de R$ 0,01 gravado como recebimento, a transferência trocada como recebimento, a tarifa como gasto e a TED recebida como recebimento',
+      JSON.stringify(ipRecords) === JSON.stringify([
+        ['receita', 1, '2026-10-06', 'ENTRADA REND PAGO APLIC AUT APR'], ['despesa', 3000, '2026-10-06', 'TARIFA PACOTE'], ['receita', 12000, '2026-10-05', 'TED RECEBIDA ANA EXEMPLO'], ['receita', 5000, '2026-10-06', 'TRANSF MARIA EXEMPLO']]), JSON.stringify(ipRecords));
+    await btn('Ver em Movimentos').click(); await waitText('Registrar recebimento'); await goResumo().catch(() => {});
+    await expectTotals('Prints: Resumo de outubro com os recebimentos (R$ 0,01 + R$ 50,00 + R$ 120,00) e a tarifa (R$ 30,00)', 'R$ 6.170,01', 'R$ 3.930,00', 'R$ 2.240,01', 'R$ 650,00');
+
+    // ---- 4. Print sem lançamento: a mensagem diz o que conferir, junto do botão dos prints ----
+    await goTab('Movimentos'); await waitText('Organizar'); await p.waitForTimeout(400);
+    await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300);
+    await ipPick([ipNone]); await waitText('A Clarevo não achou lançamentos nestes prints.', 90000); await p.waitForTimeout(300);
+    ipT = await ipKeep();
+    ok('Print sem lançamento: "A Clarevo não achou lançamentos nestes prints." com o que conferir, e nada lido', ipT.includes('Confira se a data, a descrição e o valor de cada linha aparecem inteiros na imagem') &&
+      (await visibleCount('button', 'Escolher prints')) === 1 && (await visibleCount('button', 'Revisar as linhas')) === 0);
+    await atWidths(async (w) => { await innerChecks(`Prints, sem lançamento ${w}px`); if (w === 390) await shot('IP05_importar_prints_sem_lancamento'); });
+    await btn('Voltar').click(); await waitText('Organizar');
+
+    // ---- 5. Textos e escritas ----
+    p.off('request', ipOnRequest);
+    const ipVetoed = ipTexts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
+    const ipBrands = ipTexts.map((x) => x.match(/\b(nubank|ita[uú]|bradesco|santander|inter|c6|caixa|sicredi|sicoob|btg|neon|picpay|mercado pago|itaucard|visa|mastercard|hipercard|amex|serasa)\b/i)?.[0]).filter(Boolean);
+    ok('Prints: nenhum termo proibido, travessão, expressão vetada nem nome de banco nos textos das telas', ipTexts.length >= 6 && ipVetoed.length === 0 && ipBrands.length === 0, `${ipVetoed.join(' | ')} ${ipBrands.join(' | ')}`);
+    ok('Prints: nenhuma escrita na rede e nenhum pedido para fora do app (a demonstração grava só em memória)', writes.slice(ipWrites0).length === 0 && ipExternal.length === 0, `${writes.slice(ipWrites0).join(' | ')} ${ipExternal.join(' | ')}`);
+    fs.rmSync(ipDir, { recursive: true, force: true });
   }
 
   // ==================================================================================================================

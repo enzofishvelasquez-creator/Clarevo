@@ -2263,6 +2263,15 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
     importSaveErrorText('fatura_paga'),
     importSaveErrorText('inexistente'),
     reviewLineA11y('Padaria', 4590, '2026-10-02', 'Saída', 'Já anotado'),
+    // D-108: prints.
+    IMPORT_TEXT.readingImages(0, 1),
+    IMPORT_TEXT.readingImages(1, 3),
+    IMPORT_TEXT.printsRead(1),
+    IMPORT_TEXT.printsRead(3),
+    IMPORT_TEXT.repeatedLines(1),
+    IMPORT_TEXT.repeatedLines(4),
+    IMPORT_TEXT.fromImageNote('conta'),
+    IMPORT_TEXT.fromImageNote('cartao'),
   ];
 
   it('IMPORT_TEXT inteiro (rótulos, avisos e mensagens fixas) e os textos montados', () => {
@@ -2272,7 +2281,11 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
   it('erros de leitura e de gravação, um por código', () => {
     check([...Object.values(IMPORT_ERROR_TEXT), ...Object.values(IMPORT_SAVE_ERROR_TEXT)]);
     expect(Object.keys(IMPORT_ERROR_TEXT).sort()).toEqual(
-      ['arquivo_grande', 'arquivo_pdf', 'arquivo_vazio', 'csv_invalido', 'formato_desconhecido', 'linhas_demais', 'moeda_diferente', 'ofx_invalido', 'pdf_ilegivel', 'pdf_paginas_demais', 'pdf_sem_lancamentos', 'planilha_excel', 'sem_lancamentos'].sort(),
+      [
+        'arquivo_grande', 'arquivo_pdf', 'arquivo_vazio', 'csv_invalido', 'formato_desconhecido', 'linhas_demais', 'moeda_diferente', 'ofx_invalido', 'pdf_ilegivel', 'pdf_paginas_demais', 'pdf_sem_lancamentos', 'planilha_excel', 'sem_lancamentos',
+        // D-108: prints da tela do banco.
+        'imagem_grande', 'imagem_ilegivel', 'imagem_indisponivel', 'imagem_sem_lancamentos', 'imagens_demais',
+      ].sort(),
     );
   });
 
@@ -2288,7 +2301,7 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
 
   it('o que a tela promete e o que ela não promete', () => {
     expect(IMPORT_TEXT.rowTitle).toBe('Importar extrato ou fatura');
-    expect(IMPORT_TEXT.rowCaption).toBe('Arquivo PDF, OFX ou planilha do banco');
+    expect(IMPORT_TEXT.rowCaption).toBe('Arquivo PDF, OFX, planilha ou print do banco');
     expect(IMPORT_TEXT.labels.ja_anotado).toBe('Já anotado');
     expect(IMPORT_TEXT.labels.pagamento_fatura).toBe('Parece pagamento de fatura');
     expect(IMPORT_TEXT.labels.transferencia).toBe('Parece transferência');
@@ -2317,12 +2330,31 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
     expect(importedSummary(18, 4)).toBe('18 lançamentos importados, 4 já estavam anotados.');
   });
 
+  it('prints (D-108): nada sai do aparelho, as cópias são apagadas, cada linha pede conferência e pode trocar de tipo', () => {
+    expect(IMPORT_TEXT.pickImages).toBe('Escolher prints');
+    expect(IMPORT_TEXT.printsPrivacy).toContain('nada sai dele');
+    expect(IMPORT_TEXT.printsPrivacy).toContain('apagadas depois da leitura');
+    expect(IMPORT_TEXT.printsIntro).toContain('fatura do mês atual');
+    expect(IMPORT_TEXT.printsLimits).toBe('Até 10 prints por vez, com até 10 MB cada.');
+    expect(IMPORT_TEXT.fromImageLabel).toBe('Lido de imagem: confira');
+    expect(IMPORT_TEXT.fromImageNote('conta')).toContain('gasto ou recebimento');
+    expect(IMPORT_TEXT.fromImageNote('cartao')).toContain('compra ou estorno');
+    expect(IMPORT_TEXT.readingImages(0, 1)).toBe('Lendo o print…');
+    expect(IMPORT_TEXT.readingImages(1, 3)).toBe('Lendo o print 2 de 3…');
+    expect(IMPORT_TEXT.printsRead(2)).toBe('2 prints lidos');
+    expect(IMPORT_TEXT.repeatedLines(1)).toBe('1 linha que aparecia em mais de um print foi contada uma vez só.');
+    expect(IMPORT_TEXT.repeatedLines(3)).toBe('3 linhas que apareciam em mais de um print foram contadas uma vez só.');
+    expect([IMPORT_TEXT.kindChoiceOut, IMPORT_TEXT.kindChoiceIn, IMPORT_TEXT.kindChoicePurchase, IMPORT_TEXT.kindChoiceRefund]).toEqual(['Gasto (saída)', 'Recebimento (entrada)', 'Compra', 'Estorno ou crédito']);
+    expect(IMPORT_TEXT.reviewIntro).toContain('gasto ou recebimento');
+    expect(IMPORT_TEXT.columnsNoSign).toContain('a descrição decide');
+  });
+
   it('a tela no índice "No app" acha por importar, extrato, ofx, banco, fatura e planilha; o pagamento da fatura continua em Cartões', () => {
     const screen = APP_SCREENS.find((s) => s.id === 'importar-extrato')!;
     expect(screen.href).toBe('/importar');
     expect(screen.title).toBe(IMPORT_TEXT.rowTitle);
     check([screen.title, screen.caption, ...screen.keywords]);
-    for (const q of ['importar', 'extrato', 'ofx', 'banco', 'fatura', 'planilha']) {
+    for (const q of ['importar', 'extrato', 'ofx', 'banco', 'fatura', 'planilha', 'print', 'prints']) {
       expect(searchAppScreens(q).map((x) => x.id), q).toContain('importar-extrato');
     }
     expect(searchAppScreens('fatura')[0]!.id).toBe('cartoes');

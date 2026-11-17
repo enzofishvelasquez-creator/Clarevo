@@ -1,11 +1,12 @@
 import { formatDateBR, formatMonthYearBR, type IsoMonth } from '../dates';
 import { formatBRL } from '../money';
-import { IMPORT_BATCH, IMPORT_MAX_LINES, type ImportErrorCode } from './tipos';
+import { IMPORT_MAX_IMAGES } from './imagem';
+import { IMPORT_BATCH, IMPORT_MAX_LINES, type ImportDestination, type ImportErrorCode } from './tipos';
 import type { ReviewLabel } from './revisao';
 
 /**
- * Textos de "Importar extrato ou fatura" (D-048). Português do Brasil, linguagem neutra, sem travessão longo, sem marca de banco
- * ou de serviço e sem cobrança. O arquivo é lido no aparelho e não é guardado; o saldo dele é ignorado.
+ * Textos de "Importar extrato ou fatura" (D-048) e dos prints (D-108). Português do Brasil, linguagem neutra, sem travessão longo,
+ * sem marca de banco ou de serviço e sem cobrança. O arquivo e os prints são lidos no aparelho e não são guardados; o saldo é ignorado.
  */
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
@@ -15,7 +16,7 @@ const num = (n: number) => n.toLocaleString('pt-BR');
 export const IMPORT_TEXT = {
   /** Linha de Movimentos › Organizar, a busca "No app" e o atalho em Conta › Bancos e carteira. */
   rowTitle: 'Importar extrato ou fatura',
-  rowCaption: 'Arquivo PDF, OFX ou planilha do banco',
+  rowCaption: 'Arquivo PDF, OFX, planilha ou print do banco',
   accountsShortcut: 'Importar extrato',
   accountsShortcutHint: 'Traz os gastos e recebimentos de um arquivo do banco.',
   screenTitle: 'Importar extrato ou fatura',
@@ -25,6 +26,20 @@ export const IMPORT_TEXT = {
   pickFile: 'Escolher o arquivo',
   pickFileOther: 'Escolher outro arquivo',
   reading: 'Lendo o arquivo…',
+  /** D-108: prints da tela do banco, lidos no aparelho. */
+  printsTitle: 'Ou envie prints da tela do banco',
+  printsIntro:
+    'Serve para a fatura do mês atual, que o banco ainda não deixa baixar, e para o extrato. Escolha um ou mais prints da lista de lançamentos: a Clarevo lê o texto e monta as linhas para você conferir.',
+  printsPrivacy: 'Os prints são lidos aqui no aparelho e nada sai dele. As cópias das imagens são apagadas depois da leitura.',
+  printsLimits: `Até ${IMPORT_MAX_IMAGES} prints por vez, com até 10 MB cada.`,
+  pickImages: 'Escolher prints',
+  readingImages: (done: number, total: number) => (total <= 1 ? 'Lendo o print…' : `Lendo o print ${num(Math.min(done + 1, total))} de ${num(total)}…`),
+  printsRead: (n: number) => `${num(n)} ${plural(n, 'print lido', 'prints lidos')}`,
+  repeatedLines: (n: number) =>
+    `${num(n)} ${plural(n, 'linha que aparecia em mais de um print foi contada', 'linhas que apareciam em mais de um print foram contadas')} uma vez só.`,
+  fromImageLabel: 'Lido de imagem: confira',
+  fromImageNote: (destination: ImportDestination) =>
+    `Estas linhas vieram de prints, e a leitura de imagem pode errar. Confira a data, a descrição, o valor e se é ${destination === 'cartao' ? 'compra ou estorno' : 'gasto ou recebimento'} antes de importar.`,
   fileRead: (name: string) => `Arquivo lido: ${name}`,
   linesRead: (n: number) => `${num(n)} ${plural(n, 'linha lida', 'linhas lidas')}`,
   balanceIgnored: 'O saldo que vem no arquivo é ignorado. A Clarevo não guarda o saldo do banco.',
@@ -41,6 +56,9 @@ export const IMPORT_TEXT = {
   addCard: 'Cadastrar um cartão',
   fileLooksCard: 'Este arquivo parece uma fatura de cartão.',
   fileLooksAccount: 'Este arquivo parece um extrato de conta.',
+  printsLookCard: 'Os prints parecem a fatura de um cartão.',
+  printsLookAccount: 'Os prints parecem o extrato de uma conta.',
+  pickPrintsOther: 'Escolher outros prints',
   continueToReview: 'Revisar as linhas',
   /** Planilha sem cabeçalho conhecido. */
   columnsTitle: 'Quais colunas são quais?',
@@ -61,18 +79,26 @@ export const IMPORT_TEXT = {
   columnKind: 'Tipo da linha (D ou C)',
   columnKindHint: 'Use se os valores vêm sem sinal e outra coluna diz se é débito ou crédito.',
   columnKindNone: 'Sem coluna de tipo',
-  columnsNoSign: 'Nenhum valor tem sinal nem coluna de tipo. Num extrato de conta, todas as linhas serão lidas como entrada; numa fatura de cartão, como compra. Confira a escolha antes de seguir.',
+  columnsNoSign:
+    'Nenhum valor tem sinal nem coluna de tipo. Num extrato de conta, a descrição decide: palavras como "recebido", "salário" e "rendimento" são entrada, e o resto é saída. Numa fatura de cartão, tudo é compra. Na revisão, dá para trocar cada linha.',
   columnsNoSignConfirm: 'Entendi, usar assim',
   columnsMoreHint: 'Role a lista para ver todas as colunas.',
   /** A revisar. */
   reviewTitle: 'A revisar',
-  reviewIntro: 'Marque o que vira lançamento. Você pode mudar a descrição e a categoria de cada linha.',
+  reviewIntro: 'Marque o que vira lançamento. Em Editar, você muda a descrição, a categoria e se a linha é gasto ou recebimento.',
   counts: (total: number, included: number) => `${num(total)} ${plural(total, 'linha', 'linhas')} · ${num(included)} ${plural(included, 'marcada', 'marcadas')}`,
   ignoredLines: (n: number) => `${num(n)} ${plural(n, 'linha do arquivo foi deixada de lado', 'linhas do arquivo foram deixadas de lado')} (sem data ou valor, saldo ou valor zero).`,
   selectAll: 'Selecionar tudo',
   clearAll: 'Limpar seleção',
   invertSigns: 'Entradas e saídas estão trocadas',
-  invertSignsHint: 'Use se os gastos aparecerem como recebimentos.',
+  invertSignsHint: 'Troca todas as linhas. Para trocar uma linha só, toque em Editar nela.',
+  /** D-108: trocar o tipo de uma linha antes de importar. */
+  kindChoiceLabel: 'Tipo da linha',
+  kindChoiceOut: 'Gasto (saída)',
+  kindChoiceIn: 'Recebimento (entrada)',
+  kindChoicePurchase: 'Compra',
+  kindChoiceRefund: 'Estorno ou crédito',
+  kindFlippedHint: 'Você trocou o tipo desta linha.',
   kindOut: 'Saída',
   kindIn: 'Entrada',
   kindPurchase: 'Compra',
@@ -169,6 +195,12 @@ export const IMPORT_ERROR_TEXT: Record<ImportErrorCode, string> = {
   moeda_diferente: 'Este arquivo não está em reais. A Clarevo importa só valores em reais.',
   ofx_invalido: 'A Clarevo não achou neste arquivo OFX um extrato que consiga ler.',
   csv_invalido: 'A Clarevo não conseguiu ler esta planilha. Confira se é um CSV do banco.',
+  imagem_sem_lancamentos:
+    'A Clarevo não achou lançamentos nestes prints. Confira se a data, a descrição e o valor de cada linha aparecem inteiros na imagem, ou use o arquivo do banco.',
+  imagem_ilegivel: 'A Clarevo não conseguiu ler o texto da imagem. Tente um print mais nítido, com as linhas inteiras, ou use o arquivo do banco.',
+  imagem_grande: 'Uma das imagens passa de 10 MB. Use um print da tela, que é menor.',
+  imagens_demais: `Escolha até ${IMPORT_MAX_IMAGES} prints por vez.`,
+  imagem_indisponivel: 'Neste aparelho, a Clarevo ainda não lê imagens. Atualize o app pela loja ou use o arquivo PDF, OFX ou CSV do banco.',
 };
 
 /** Erros ao importar (códigos do banco), com a posição da linha quando houver. */

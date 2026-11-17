@@ -9,6 +9,7 @@ import {
   bankAttempt,
   buildReview,
   chunkItems,
+  keepReviewEdits,
   failedItemIndex,
   formatDateBR,
   importSaveErrorText,
@@ -22,6 +23,7 @@ import {
   reviewCounts,
   setAll,
   toImportItems,
+  toggleFlipped,
   updateLine,
   type CsvTable,
   type ImportAttempt,
@@ -29,11 +31,12 @@ import {
   type ImportTally,
   type ImportParse,
   type ImportResult,
+  type ReviewInput,
   type ReviewLine,
 } from '@clarevo/core';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { CircleAlert, FileUp, ShieldCheck } from 'lucide-react-native';
+import { CircleAlert, FileUp, ImagePlus, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
@@ -52,6 +55,8 @@ import { latestMonthOf, loadImportContext, type ImportContext } from '@/lib/impo
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { moneyText, useValuesHidden } from '@/lib/privacy';
 import { pickImportFile, type PickedImport } from '@/lib/import-file';
+import { pickPrints } from '@/lib/import-image';
+import { OCR_AVAILABLE } from '@/lib/ocr';
 import { isRefusal, useCards, useImportRecords, useWork, useView } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
@@ -77,9 +82,10 @@ interface Mapping {
 }
 
 /**
- * Importar extrato ou fatura (D-048), em um fluxo só: escolher o arquivo (OFX ou planilha, lido no aparelho), escolher as colunas se a
- * planilha não tem cabeçalho conhecido, escolher o destino (conta ou cartão), revisar as linhas e importar. O arquivo nunca é enviado
- * nem guardado: só as linhas que a pessoa confirma, em lotes de até 500, com o resumo de cada uma. O saldo do arquivo é ignorado.
+ * Importar extrato ou fatura (D-048), em um fluxo só: escolher o arquivo (OFX ou planilha, lido no aparelho) ou prints da tela do
+ * banco (D-108, lidos no aparelho), escolher as colunas se a planilha não tem cabeçalho conhecido, escolher o destino (conta ou
+ * cartão), revisar as linhas (cada uma pode trocar entre gasto e recebimento) e importar. O arquivo e os prints nunca são enviados nem
+ * guardados: só as linhas que a pessoa confirma, em lotes de até 500, com o resumo de cada uma. O saldo do arquivo é ignorado.
  */
 export function ImportFlow() {
   const repo = useRepo();
@@ -104,6 +110,10 @@ export function ImportFlow() {
   const [noSignAsk, setNoSignAsk] = useState(false);
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
+  /** Prints (D-108): quantos foram lidos, o andamento da leitura e o erro, junto do botão dos prints. */
+  const [printCount, setPrintCount] = useState(0);
+  const [printProgress, setPrintProgress] = useState<{ done: number; total: number } | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
   // Aberta da tela de um cartão ("Importar fatura", D-089 B): o destino e o cartão já vêm escolhidos; a pessoa só confirma.
   const params = useLocalSearchParams<{ destino?: string; cartao?: string }>();
   const presetDestination: ImportDestination | null = params.destino === 'cartao' ? 'cartao' : params.destino === 'conta' ? 'conta' : null;
@@ -114,6 +124,8 @@ export function ImportFlow() {
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [ctxData, setCtxData] = useState<ImportContext | null>(null);
   const [invert, setInvert] = useState(false);
+  /** Linhas em que a pessoa trocou gasto por recebimento, ou compra por estorno (D-108). */
+  const [flipped, setFlipped] = useState<Set<string>>(() => new Set());
   const [lines, setLines] = useState<ReviewLine[]>([]);
   const [shown, setShown] = useState(PAGE);
   const [editing, setEditing] = useState<string | null>(null);
@@ -146,13 +158,15 @@ export function ImportFlow() {
   const memory = useCallback(() => (user ? (getPrefs(user.id)?.importCategories ?? {}) : {}), [user]);
 
   // ---- 1. Arquivo -----------------------------------------------------------------------------------------------------------
-  function accept(read: Extract<PickedImport, { cancelled: false }>) {
+  function accept(read: Extract<PickedImport, { cancelled: false }>, prints = 0) {
     setFileName(read.name);
     const r = read.read;
     if (r.kind === 'erro') {
-      setReadError(IMPORT_ERROR_TEXT[r.code]);
+      if (prints > 0) setPrintError(IMPORT_ERROR_TEXT[r.code]);
+      else setReadError(IMPORT_ERROR_TEXT[r.code]);
       return;
     }
+    setPrintCount(r.kind === 'ok' && r.parse.source === 'imagem' ? Math.max(prints, 1) : 0);
     if (r.kind === 'mapear') {
       setTable(r.table);
       // Planilha sem cabeçalho: se a primeira linha já tem uma data, ela é um lançamento, não os nomes das colunas.
@@ -183,14 +197,30 @@ export function ImportFlow() {
   }
 
   async function chooseFile() {
-    if (reading) return;
+    if (reading || printProgress) return;
     setReadError(null);
+    setPrintError(null);
     setReading(true);
     try {
-      const picked = await pickImportFile(timeZone);
+      const picked = await pickImportFile(timeZone, presetDestination, (done, total) => setPrintProgress({ done, total }));
       if (!picked.cancelled) accept(picked);
     } finally {
       setReading(false);
+      setPrintProgress(null);
+    }
+  }
+
+  /** Prints da tela do banco (D-108): um ou mais, lidos no aparelho, com o destino já escolhido ("Importar fatura" no cartão). */
+  async function choosePrints() {
+    if (reading || printProgress) return;
+    setReadError(null);
+    setPrintError(null);
+    setPrintProgress({ done: 0, total: 1 });
+    try {
+      const picked = await pickPrints(timeZone, presetDestination, (done, total) => setPrintProgress({ done, total }));
+      if (!picked.cancelled) accept({ cancelled: false, name: '', read: picked.read }, Math.max(picked.count, 1));
+    } finally {
+      setPrintProgress(null);
     }
   }
 
@@ -226,10 +256,10 @@ export function ImportFlow() {
   }
 
   // ---- 3. Destino e revisão -------------------------------------------------------------------------------------------------
-  /** As linhas da revisão com o que o banco já tem. `keepEdits`: depois de uma recusa no meio do envio, as escolhas da pessoa voltam. */
-  function makeLines(data: ImportContext, invertSigns: boolean, keepEdits: ReviewLine[] | null): ReviewLine[] {
+  /** O que a revisão precisa: o arquivo, o destino, o que o banco já tem e as trocas da pessoa. */
+  function reviewInput(data: ImportContext, invertSigns: boolean, flips: ReadonlySet<string>): ReviewInput {
     const card = destination === 'cartao' ? (cards.data ?? []).find((c) => c.id === target) : undefined;
-    const built = buildReview({
+    return {
       parse: parse!,
       destination: destination!,
       targetId: target!,
@@ -239,15 +269,17 @@ export function ImportFlow() {
       existing: data.existing,
       importedKeys: data.importedKeys,
       card: card ? { days: card, paidMonths: data.paidMonths } : null,
-    });
-    const kept = keepEdits ? new Map(keepEdits.map((l) => [l.id, l])) : null;
-    return kept
-      ? built.map((l) => {
-          const old = kept.get(l.id);
-          // O que já foi importado vem como "Já anotado" (não entra de novo); o resto mantém descrição, categoria e seleção.
-          return old && l.importable ? { ...l, description: old.description, category: old.category, include: old.include } : l;
-        })
-      : built;
+      flipped: flips,
+    };
+  }
+
+  /**
+   * As linhas da revisão com o que o banco já tem. `keepEdits`: depois de uma recusa no meio do envio, as escolhas da pessoa voltam
+   * (o que já foi importado vem como "Já anotado" e não entra de novo).
+   */
+  function makeLines(data: ImportContext, invertSigns: boolean, keepEdits: ReviewLine[] | null, flips: ReadonlySet<string>): ReviewLine[] {
+    const built = buildReview(reviewInput(data, invertSigns, flips));
+    return keepEdits ? keepReviewEdits(built, keepEdits) : built;
   }
 
   async function prepare(keepEdits: ReviewLine[] | null) {
@@ -259,7 +291,10 @@ export function ImportFlow() {
       if (destination === 'cartao' && !card) throw new Error('cartao');
       const data = await loadImportContext(repo, contextId, destination, target, parse, card ?? null);
       setCtxData(data);
-      setLines(makeLines(data, invert, keepEdits));
+      // Revisão nova (do destino): as trocas de tipo recomeçam, como as outras edições.
+      const flips = keepEdits ? flipped : new Set<string>();
+      if (!keepEdits) setFlipped(flips);
+      setLines(makeLines(data, invert, keepEdits, flips));
       setShown(PAGE);
       setEditing(null);
       setStep('revisar');
@@ -270,28 +305,26 @@ export function ImportFlow() {
     }
   }
 
-  /** Trocar entradas e saídas refaz as linhas com o que já foi lido (as edições dessas linhas se perdem). */
+  /** Trocar entradas e saídas refaz as linhas com o que já foi lido (as edições dessas linhas e as trocas de uma linha se perdem). */
   function toggleInvert(next: boolean) {
     if (!ctxData) return;
     setInvert(next);
-    const data = ctxData;
-    const card = destination === 'cartao' ? (cards.data ?? []).find((c) => c.id === target) : undefined;
-    setLines(
-      buildReview({
-        parse: parse!,
-        destination: destination!,
-        targetId: target!,
-        today,
-        invertSigns: next,
-        memory: memory(),
-        existing: data.existing,
-        importedKeys: data.importedKeys,
-        card: card ? { days: card, paidMonths: data.paidMonths } : null,
-      }),
-    );
+    const none = new Set<string>();
+    setFlipped(none);
+    setLines(buildReview(reviewInput(ctxData, next, none)));
     setShown(PAGE);
     setEditing(null);
   }
+
+  /** Trocar gasto por recebimento (ou compra por estorno) numa linha (D-108): refaz a revisão e mantém as escolhas da pessoa. */
+  const flipRef = useRef<(id: string) => void>(() => {});
+  flipRef.current = (id: string) => {
+    if (!ctxData || !parse || !destination || !target) return;
+    const next = toggleFlipped(flipped, id);
+    setFlipped(next);
+    setLines((all) => keepReviewEdits(buildReview(reviewInput(ctxData, invert, next)), all));
+  };
+  const flip = useCallback((id: string) => flipRef.current(id), []);
 
   const toggle = useCallback((id: string) => setLines((all) => updateLine(all, id, { include: !all.find((l) => l.id === id)!.include })), []);
   const change = useCallback(
@@ -428,7 +461,10 @@ export function ImportFlow() {
     setResult(null);
     setFileName('');
     setReadError(null);
+    setPrintError(null);
+    setPrintCount(0);
     setInvert(false);
+    setFlipped(new Set());
     attempt.current = null;
     tally.current = EMPTY_TALLY;
     setNoSignAsk(false);
@@ -463,7 +499,51 @@ export function ImportFlow() {
                 </Txt>
               </Banner>
             ) : null}
-            <Button label={IMPORT_TEXT.pickFile} icon={FileUp} busy={reading} busyLabel={IMPORT_TEXT.reading} onPress={chooseFile} />
+            <Button
+              label={IMPORT_TEXT.pickFile}
+              icon={FileUp}
+              busy={reading}
+              busyLabel={printProgress ? IMPORT_TEXT.readingImages(printProgress.done, printProgress.total) : IMPORT_TEXT.reading}
+              disabled={printProgress !== null && !reading}
+              onPress={chooseFile}
+            />
+          </Card>
+        ) : null}
+
+        {step === 'arquivo' && OCR_AVAILABLE ? (
+          // D-108: prints da tela do banco (a fatura do mês atual ainda não dá para baixar), lidos no aparelho.
+          <Card style={{ gap: space[4] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {IMPORT_TEXT.printsTitle}
+            </Txt>
+            <Txt color={colors.textSecondary}>{IMPORT_TEXT.printsIntro}</Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {IMPORT_TEXT.printsLimits}
+            </Txt>
+            <View style={styles.privacy}>
+              <View style={{ marginTop: 2 }}>
+                <ShieldCheck size={18} color={colors.textSecondary} aria-hidden />
+              </View>
+              <Txt variant="label" color={colors.textSecondary} style={{ flex: 1 }}>
+                {IMPORT_TEXT.printsPrivacy}
+              </Txt>
+            </View>
+            {printError ? (
+              <Banner tone="erro" icon={CircleAlert}>
+                <Txt variant="label" color={colors.error}>
+                  {printError}
+                </Txt>
+              </Banner>
+            ) : null}
+            <Button
+              label={IMPORT_TEXT.pickImages}
+              icon={ImagePlus}
+              tone="soft"
+              busy={printProgress !== null && !reading}
+              busyLabel={printProgress ? IMPORT_TEXT.readingImages(printProgress.done, printProgress.total) : IMPORT_TEXT.readingImages(0, 1)}
+              disabled={reading}
+              onPress={choosePrints}
+            />
           </Card>
         ) : null}
 
@@ -528,9 +608,14 @@ export function ImportFlow() {
           <>
             <Card style={{ gap: space[2] }}>
               <Txt variant="title" accessibilityRole="header" aria-level={2}>
-                {IMPORT_TEXT.fileRead(fileName)}
+                {parse.source === 'imagem' ? IMPORT_TEXT.printsRead(printCount) : IMPORT_TEXT.fileRead(fileName)}
               </Txt>
               <Txt color={colors.textSecondary}>{IMPORT_TEXT.linesRead(parse.lines.length)}</Txt>
+              {parse.repeated ? (
+                <Txt variant="caption" color={colors.textSecondary}>
+                  {IMPORT_TEXT.repeatedLines(parse.repeated)}
+                </Txt>
+              ) : null}
               {parse.ignored > 0 ? (
                 <Txt variant="caption" color={colors.textSecondary}>
                   {IMPORT_TEXT.ignoredLines(parse.ignored)}
@@ -541,7 +626,7 @@ export function ImportFlow() {
                   {IMPORT_TEXT.balanceIgnored}
                 </Txt>
               ) : null}
-              <LinkButton label={IMPORT_TEXT.pickFileOther} style={styles.link} onPress={again} />
+              <LinkButton label={parse.source === 'imagem' ? IMPORT_TEXT.pickPrintsOther : IMPORT_TEXT.pickFileOther} style={styles.link} onPress={again} />
             </Card>
 
             <Card style={{ gap: space[4] }}>
@@ -560,7 +645,13 @@ export function ImportFlow() {
               ) : null}
               {parse.statement && destination && parse.statement !== destination ? (
                 <Txt variant="label" color={colors.textSecondary}>
-                  {parse.statement === 'cartao' ? IMPORT_TEXT.fileLooksCard : IMPORT_TEXT.fileLooksAccount}
+                  {parse.source === 'imagem'
+                    ? parse.statement === 'cartao'
+                      ? IMPORT_TEXT.printsLookCard
+                      : IMPORT_TEXT.printsLookAccount
+                    : parse.statement === 'cartao'
+                      ? IMPORT_TEXT.fileLooksCard
+                      : IMPORT_TEXT.fileLooksAccount}
                 </Txt>
               ) : null}
 
@@ -599,7 +690,7 @@ export function ImportFlow() {
                   <ShieldCheck size={18} color={colors.textSecondary} aria-hidden />
                 </View>
                 <Txt variant="label" color={colors.textSecondary} style={{ flex: 1 }}>
-                  {IMPORT_TEXT.neverSaved}
+                  {parse.source === 'imagem' ? IMPORT_TEXT.printsPrivacy : IMPORT_TEXT.neverSaved}
                 </Txt>
               </View>
             </Card>
@@ -631,6 +722,11 @@ export function ImportFlow() {
                   {IMPORT_TEXT.cardPurchaseNote}
                 </Txt>
               ) : null}
+              {parse.source === 'imagem' && destination ? (
+                <Banner tone="info" icon={ImagePlus} live={false}>
+                  <Txt variant="label">{IMPORT_TEXT.fromImageNote(destination)}</Txt>
+                </Banner>
+              ) : null}
               <CheckOption label={IMPORT_TEXT.invertSigns} hint={IMPORT_TEXT.invertSignsHint} checked={invert} onPress={() => toggleInvert(!invert)} />
               <Button
                 label={allSelected(lines) ? IMPORT_TEXT.clearAll : IMPORT_TEXT.selectAll}
@@ -642,7 +738,7 @@ export function ImportFlow() {
             <Card style={{ paddingVertical: space[2] }}>
               {visible.map((l, i) => (
                 <View key={l.id} onLayout={(e) => onRowLayout(l.id, e.nativeEvent.layout.y)}>
-                  <ReviewRow line={l} editing={editing === l.id} last={i === visible.length - 1} onToggle={toggle} onEdit={setEditing} onChange={change} />
+                  <ReviewRow line={l} editing={editing === l.id} last={i === visible.length - 1} onToggle={toggle} onEdit={setEditing} onChange={change} onFlip={flip} />
                 </View>
               ))}
               {shown < lines.length ? (

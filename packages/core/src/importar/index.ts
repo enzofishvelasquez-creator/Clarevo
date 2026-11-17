@@ -11,3 +11,5 @@ export * from './execucao';
 export * from './textos';
 export * from './sugestoes';
 export * from './pdf';
+export * from './direcao';
+export * from './imagem';

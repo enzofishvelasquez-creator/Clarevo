@@ -31,6 +31,26 @@ export async function pickImageForReading(source: 'galeria' | 'camera'): Promise
 }
 
 /**
+ * Vários prints da galeria de uma vez (D-108, importar extrato ou fatura por print), na ordem em que a pessoa escolheu, até `limit`.
+ * Como na escolha de uma imagem, só as escolhidas chegam ao app, ficam no cache enquanto são lidas e são apagadas depois
+ * (`deleteCacheFile` de cada uma). O seletor do sistema não deixa passar do limite; onde ele não limita, quem chama confere.
+ */
+export type ImagesPick = { kind: 'ok'; images: PickedImage[] } | { kind: 'cancelado' } | { kind: 'falhou' };
+
+export async function pickImagesForReading(limit: number): Promise<ImagesPick> {
+  try {
+    const result = await withExternalScreen(() =>
+      ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, allowsMultipleSelection: true, selectionLimit: limit, orderedSelection: true }),
+    );
+    const assets = result.canceled ? [] : result.assets;
+    if (assets.length === 0) return { kind: 'cancelado' };
+    return { kind: 'ok', images: assets.map((a) => ({ uri: a.uri, size: a.fileSize ?? undefined })) };
+  } catch {
+    return { kind: 'falhou' };
+  }
+}
+
+/**
  * Apaga um arquivo do cache do app (a foto tirada ou a cópia que o seletor faz). Só dentro do cache: nunca apaga a foto original da
  * galeria. Falhar não é erro: o sistema limpa o cache quando precisa.
  */

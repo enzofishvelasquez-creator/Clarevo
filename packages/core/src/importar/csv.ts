@@ -9,7 +9,8 @@ import { cleanDescription, parseAmountCents, parseFileDate } from './valores';
  * reconhecer o cabeçalho, devolve a tabela para a pessoa escolher as colunas. O saldo do arquivo nunca é lido.
  * Sinal: no extrato da conta, negativo = saiu e positivo = entrou. Na fatura do cartão, o banco costuma mostrar a compra como valor
  * positivo; por isso, com destino "cartão", a revisão inverte o sinal de uma planilha de valor único em que a maioria dos valores é
- * positiva (`cardPositive`). A tela deixa inverter de novo.
+ * positiva (`cardPositive`). Sem nenhum sinal e sem coluna de tipo (`unsigned`), no extrato da conta a descrição decide cada linha
+ * (D-108: "recebido", "rendimento", "salário" entram; o resto sai). A tela deixa inverter tudo e trocar cada linha.
  */
 
 export type CsvDelimiter = ';' | ',' | '\t';
@@ -239,6 +240,8 @@ export function applyMapping(table: CsvTable, mapping: CsvMapping): ImportParse 
     ignored,
     balanceIgnored: header.some((h) => /\bsaldo\b/.test(headerKey(h))),
     cardPositive: c.amount >= 0 && !byKind && positives > negatives,
+    // Nenhum valor com sinal, nenhuma coluna de tipo: num extrato de conta, a descrição decide (D-108, na revisão).
+    unsigned: c.amount >= 0 && c.kind < 0 && !hasNegative,
   };
 }
 

@@ -1,8 +1,20 @@
-import { IMPORT_MAX_BYTES, deviceTimeZone, raceWithTimeout, readImportFile, statementFromPdfItems, todayIn, type ImportRead, type PdfTextItem } from '@clarevo/core';
+import {
+  IMPORT_MAX_BYTES,
+  deviceTimeZone,
+  raceWithTimeout,
+  readImportFile,
+  statementFromPdfItems,
+  todayIn,
+  type ImportDestination,
+  type ImportRead,
+  type PdfTextItem,
+} from '@clarevo/core';
 import * as DocumentPicker from 'expo-document-picker';
 import { Platform } from 'react-native';
 
+import { isImageAsset } from '@/lib/comprovante-read';
 import { withExternalScreen } from '@/lib/external-screen';
+import { discardPrint, readPrints } from '@/lib/import-image';
 import { PDF_STATEMENT_MAX_PAGES, PdfTooManyPagesError, newPdfReadControl, pdfTextFromBytes } from '@/lib/pdf-text';
 
 /** Tempo máximo para abrir e ler o PDF de um extrato (até 30 páginas). */
@@ -12,7 +24,8 @@ const PDF_STATEMENT_TIMEOUT_MS = 60_000;
  * Escolher e ler o arquivo de "Importar extrato ou fatura" (D-048), no aparelho. O arquivo (OFX ou planilha CSV) vai do seletor
  * para a memória, é lido pelo core e descartado: nada dele é enviado nem guardado, e a cópia que o seletor faz no cache do app
  * (só no celular) é apagada ao fim. O tamanho é conferido ANTES de ler os bytes (5 MB). `timeZone`: o fuso do espaço, para a data de
- * um OFX que informa a hora e o fuso.
+ * um OFX que informa a hora e o fuso. Uma imagem (PNG, JPEG ou WebP) escolhida aqui é lida como print da tela do banco (D-108,
+ * `readPrints`), com o destino já escolhido em `hint`.
  */
 export type PickedImport = { cancelled: true } | { cancelled: false; name: string; read: ImportRead };
 
@@ -64,9 +77,10 @@ async function readImportPdf(bytes: Uint8Array, timeZone: string | undefined): P
 }
 
 const isPdf = (bytes: Uint8Array) => bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+const isPngOrJpeg = (bytes: Uint8Array) => (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) || (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff);
 
 /** Abre o seletor de arquivos e lê o escolhido. Cancelar não é erro. */
-export async function pickImportFile(timeZone?: string): Promise<PickedImport> {
+export async function pickImportFile(timeZone?: string, hint: ImportDestination | null = null, onImageProgress?: (done: number, total: number) => void): Promise<PickedImport> {
   let picked: DocumentPicker.DocumentPickerResult;
   try {
     // Qualquer tipo: o OFX não tem um tipo comum e o sistema esconderia o arquivo; o conteúdo é que diz o que ele é.
@@ -77,16 +91,22 @@ export async function pickImportFile(timeZone?: string): Promise<PickedImport> {
   }
   const asset = picked.canceled ? null : picked.assets[0];
   if (!asset) return { cancelled: true };
+  const asPrint = () => readPrints([{ image: asset.file ?? asset.uri, size: asset.file?.size ?? asset.size, uri: asset.uri }], timeZone, hint, onImageProgress);
   try {
+    // Print da tela do banco (D-108): o seletor aceita imagem, lida no aparelho como os prints.
+    if (isImageAsset(asset)) return { cancelled: false, name: asset.name, read: await asPrint() };
     if (typeof asset.size === 'number' && asset.size > IMPORT_MAX_BYTES) return { cancelled: false, name: asset.name, read: { kind: 'erro', code: 'arquivo_grande' } };
     const bytes = await bytesOf(asset);
     // A leitura é síncrona e pode levar um tempo num arquivo grande: cede a vez antes, para a tela mostrar "Lendo o arquivo…".
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     if (isPdf(bytes)) return { cancelled: false, name: asset.name, read: await readImportPdf(bytes, timeZone) };
+    // Imagem sem o tipo nem a extensão de imagem: reconhecida pelos primeiros bytes (PNG ou JPEG).
+    if (isPngOrJpeg(bytes)) return { cancelled: false, name: asset.name, read: await asPrint() };
     return { cancelled: false, name: asset.name, read: readImportFile(bytes, asset.name, timeZone) };
   } catch (e) {
     return { cancelled: false, name: asset.name, read: { kind: 'erro', code: e instanceof TooBigError ? 'arquivo_grande' : 'csv_invalido' } };
   } finally {
     await deleteCachedCopy(asset);
+    if (Platform.OS === 'web') await discardPrint(asset.uri);
   }
 }
