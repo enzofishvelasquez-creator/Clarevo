@@ -107,6 +107,12 @@ export interface DevicePrefs {
    * quando a média muda. Só neste aparelho; nada vai para o servidor.
    */
   reserveRefreshDismissed: number | null;
+  /**
+   * Revisão opcional do plano de aportes (D-103, item 14): o dia (AAAA-MM-DD) em que a pessoa abriu a tela do plano por último e o dia do
+   * "Agora não" no convite "Faz 3 meses que você revisou o plano". Só neste aparelho; não é dado financeiro e nada vai para o servidor.
+   */
+  investmentPlanReviewedOn: string | null;
+  investmentPlanReviewDismissedOn: string | null;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -131,6 +137,8 @@ export const DEFAULT_PREFS: DevicePrefs = {
   routineReminderHour: DEFAULT_ROUTINE_REMINDER_HOUR,
   depositReminderDay: DEFAULT_DEPOSIT_REMINDER_DAY,
   reserveRefreshDismissed: null,
+  investmentPlanReviewedOn: null,
+  investmentPlanReviewDismissedOn: null,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -171,11 +179,16 @@ function parse(raw: string | null | undefined): DevicePrefs {
       depositReminderDay: isDepositReminderDay(v.depositReminderDay) ? v.depositReminderDay : DEFAULT_DEPOSIT_REMINDER_DAY,
       reserveRefreshDismissed:
         typeof v.reserveRefreshDismissed === 'number' && Number.isSafeInteger(v.reserveRefreshDismissed) && v.reserveRefreshDismissed > 0 ? v.reserveRefreshDismissed : null,
+      investmentPlanReviewedOn: isDay(v.investmentPlanReviewedOn) ? v.investmentPlanReviewedOn : null,
+      investmentPlanReviewDismissedOn: isDay(v.investmentPlanReviewDismissedOn) ? v.investmentPlanReviewDismissedOn : null,
     };
   } catch {
     return DEFAULT_PREFS;
   }
 }
+
+/** Um dia "AAAA-MM-DD" guardado pelo app. */
+const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** A memória de categorias guardada: só texto curto para texto curto, no máximo 300 entradas. */
 function parseMemory(value: unknown): ImportMemory {

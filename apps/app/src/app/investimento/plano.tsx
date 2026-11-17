@@ -21,6 +21,7 @@ import { MoneyTxt } from '@/components/money-text';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Body, Button, Card, Screen, TextField, Txt } from '@/components/ui';
 import { DEVICE_FEATURES } from '@/lib/device';
+import { updatePrefs } from '@/lib/device-prefs';
 import { flash } from '@/lib/flash';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useContextInvestmentMovements, useInvestmentPlan, useSetInvestmentPlan, useSpace, useWorkOf } from '@/state/data';
@@ -32,9 +33,12 @@ const T = INVESTMENT_PLAN_TEXT;
 /**
  * Plano de aportes dos investimentos (D-099, item 12): quanto a pessoa pretende aportar por mês, o aportado de cada um dos últimos seis
  * meses ao lado, sem cor, sem sequência e sem comparação. Só no Pessoal. Tirar o plano não muda investimento nem aporte.
+ *
+ * D-103: a premissa fica escrita (só aportes, sem rendimento e sem taxa, item 4), e abrir esta tela com um plano conta como revisão
+ * (item 14): o convite "Faz 3 meses que você revisou o plano" da aba só volta 3 meses depois. A data fica só neste aparelho.
  */
 export default function PlanoScreen() {
-  const { today } = useSession();
+  const { today, user, auth } = useSession();
   const space_ = useSpace();
   const personal = useWorkOf('pessoal');
   const contextId = space_.data?.personalContextId;
@@ -53,6 +57,14 @@ export default function PlanoScreen() {
   const amountRef = useRef<TextInput>(null);
   const dirty = text !== null && text !== initialText;
   const guard = useLeaveGuard(dirty && !save.isPending, '/investimentos');
+
+  // Revisão do plano (D-103, item 14): com um plano, a visita a esta tela conta como revisão neste aparelho.
+  const hasPlan = Boolean(plan.data);
+  const userId = user?.id;
+  const persistPrefs = auth.mode !== 'demo';
+  useEffect(() => {
+    if (hasPlan && userId) updatePrefs(userId, { investmentPlanReviewedOn: today }, persistPrefs);
+  }, [hasPlan, userId, today, persistPrefs]);
 
   // Outro valor digitado depois de um salvamento: chave nova (a anterior já tem outro pedido gravado).
   useEffect(() => {
@@ -117,6 +129,9 @@ export default function PlanoScreen() {
           ) : (
             <>
               <Txt color={colors.textSecondary}>{T.intro}</Txt>
+              <Txt variant="label" color={colors.textSecondary}>
+                {T.premise}
+              </Txt>
               {line ? (
                 <Card>
                   <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }}>

@@ -137,6 +137,8 @@ const pct = (f: number) => `${(Math.round(f * 10000) / 100).toFixed(2).replace('
 export const COMPARE_TEXT = {
   title: 'Comparar rendimentos líquidos',
   intro: 'O mesmo valor e o mesmo prazo em até quatro opções, com as taxas que você recebeu ou quer testar. A conta mostra quanto sobra depois do imposto.',
+  /** A premissa da conta (D-103, item 4): inclui o rendimento, pela taxa digitada em cada opção, constante no prazo. */
+  premise: 'A conta inclui o rendimento de cada opção pela taxa que você digitar, e o CDI e o IPCA que você informar ficam constantes no prazo. Nenhuma taxa vem preenchida.',
   amountLabel: 'Valor aplicado',
   daysLabel: 'Prazo em dias corridos',
   daysHint: 'Por exemplo 365 para um ano, ou 730 para dois.',
