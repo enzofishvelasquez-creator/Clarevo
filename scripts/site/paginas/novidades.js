@@ -4,12 +4,18 @@
  * página por post, o feed RSS e "Como escrevemos". Só fatos que já existem no repositório: nada de notícia externa. Um post pode
  * trazer texto do catálogo de Aprender com a linha `{{tema:SLUG:CAMPO}}` (CAMPO: titulo, subtitulo, short, p1 a p5, exemplo,
  * hipoteses), para a mesma frase nunca existir em dois lugares.
+ *
+ * Imagens (D-114): `capa: <id>` no cabeçalho põe a imagem de capa no topo da matéria, à direita do título (no celular, embaixo dele): uma
+ * tela da demonstração no celular ou, na matéria sem tela, uma ilustração da marca. Uma linha sozinha `{{tela:<id>}}` numa seção põe a
+ * tela ao lado do texto dela (no celular, embaixo); a tela larga (o painel da empresa) fica embaixo do texto da seção, na largura dele. As
+ * telas têm a versão do tema escuro, largura, altura, texto alternativo e a legenda "Tela da demonstração, com dados fictícios".
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const { esc, markdownParaHtml, separarTitulo } = require('../texto');
 const { rel, dataPorExtensoIso, dataRfc822, caminhoLimpo, descricaoCurta } = require('../util');
-const { montarPagina, colunaTexto, bloco, dominioDe, urlDoSite } = require('../modelo');
+const { montarPagina, colunaTexto, bloco, dominioDe, urlDoSite, celular, telaLarga } = require('../modelo');
+const { LEGENDA_TELA } = require('../videos');
 const { catalogo } = require('../catalogo');
 const { lerPosts, lerCabecalho } = require('../conteudo');
 const { SITE_SRC } = require('../config');
@@ -52,6 +58,57 @@ function expandirDiretivas(html, onde) {
   return { html: saida, faltas };
 }
 
+/** Uma tela é larga (o painel da empresa no navegador) quando é mais larga que alta. */
+const telaEhLarga = (img) => img.largura > img.altura;
+
+/**
+ * Troca cada parágrafo `{{tela:ID}}` pela tela. A tela de celular vai ao lado do texto da seção dela (do `<h2>` até o próximo): a seção
+ * vira uma grade de duas colunas no computador. A tela larga fica no lugar da linha, na largura do texto. Um id que não existe fica na
+ * página, destacado, e vira aviso (o `--final` recusa).
+ */
+function expandirTelas(html, { img, arquivo, onde }) {
+  const faltas = [];
+  const figura = (id) => {
+    const i = img[id];
+    if (!i || i.ilustracao) return null;
+    return telaEhLarga(i) ? telaLarga(i, arquivo, { textoLegenda: LEGENDA_TELA, classe: 'post-tela' }) : celular(i, arquivo, { textoLegenda: LEGENDA_TELA, classe: 'post-tela' });
+  };
+  // As seções: o que vem antes do primeiro <h2> e cada <h2> com o que vem depois dele.
+  const partes = html.split(/(?=<h2[\s>])/);
+  const saida = partes.map((parte) => {
+    const achados = [...parte.matchAll(/<p>\{\{tela:([a-z0-9-]+)\}\}<\/p>\n?/g)];
+    if (!achados.length) return parte;
+    let ladoALado = null;
+    let texto = parte;
+    for (const [linha, id] of achados) {
+      const fig = figura(id);
+      if (!fig) {
+        faltas.push(`${onde}: {{tela:${id}}} não é uma tela das Novidades (scripts/site/imagens.js)`);
+        texto = texto.replace(linha, `<p><mark class="pendente">Falta a tela "${esc(id)}": ela não existe entre as imagens do site.</mark></p>\n`);
+      } else if (telaEhLarga(img[id])) texto = texto.replace(linha, `${fig}\n`);
+      else {
+        if (ladoALado) faltas.push(`${onde}: a seção já tem uma tela ao lado do texto ({{tela:${id}}} ficou de fora)`);
+        else ladoALado = fig;
+        texto = texto.replace(linha, '');
+      }
+    }
+    return ladoALado ? `<div class="post-secao">\n<div class="post-secao-texto">\n${texto.trim()}\n</div>\n${ladoALado}\n</div>\n` : texto;
+  });
+  return { html: saida.join(''), faltas };
+}
+
+/** A figura da capa: a tela no celular (com a legenda) ou a ilustração. `null` sem capa. */
+function figuraDaCapa(post, img) {
+  if (!post.capa) return { html: null, faltas: [] };
+  const i = img[post.capa];
+  if (!i) return { html: null, faltas: [`${post.origem}: a capa "${post.capa}" não existe entre as imagens do site (scripts/site/imagens.js)`] };
+  if (i.ilustracao) {
+    return { html: `<figure class="capa-ilustracao"><img src="${rel(post.arquivo, i.caminho)}" alt="${esc(i.alt)}" width="${i.largura}" height="${i.altura}" decoding="async"></figure>`, faltas: [] };
+  }
+  if (telaEhLarga(i)) return { html: null, faltas: [`${post.origem}: a capa "${post.capa}" é uma tela larga; a capa precisa ser uma tela de celular ou uma ilustração`] };
+  return { html: celular(i, post.arquivo, { textoLegenda: LEGENDA_TELA, carregamento: 'eager', classe: 'capa-tela' }), faltas: [] };
+}
+
 /** As fontes de um post como itens de lista. */
 function fontesDoPost(post) {
   const c = catalogo();
@@ -78,9 +135,12 @@ ${t.sources.map((s) => fonteHtml(s, null)).join('\n')}
   return { itens, problemas };
 }
 
-function paginaDoPost(post, { valores }) {
+function paginaDoPost(post, { valores, img }) {
   const arquivo = post.arquivo;
-  const { html: corpoHtml, faltas } = expandirDiretivas(markdownParaHtml(post.corpo, { valores, paginaAtual: arquivo }), post.origem);
+  const comTelas = expandirTelas(markdownParaHtml(post.corpo, { valores, paginaAtual: arquivo }), { img, arquivo, onde: post.origem });
+  const { html: corpoHtml, faltas: faltasDoTema } = expandirDiretivas(comTelas.html, post.origem);
+  const daCapa = figuraDaCapa(post, img);
+  const faltas = [...comTelas.faltas, ...faltasDoTema, ...daCapa.faltas];
   const { itens, problemas } = fontesDoPost(post);
   const corpo = colunaTexto(
     `<div class="post-corpo">
@@ -94,12 +154,14 @@ ${itens.join('\n')}
 <p class="revisao">Publicado em ${esc(dataPorExtensoIso(post.data))} por ${esc(post.autoria)}. Se encontrarmos um erro, corrigimos neste mesmo texto e registramos a correção aqui. Veja <a href="${rel(arquivo, 'novidades/como-escrevemos.html')}">como escrevemos</a>.</p>
 </section>
 <p class="voltar"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Voltar para Novidades</a></p>`,
-    'texto',
+    'texto texto-post',
   );
-  const capa = `<p class="migalha"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Novidades</a></p>
+  const cabecalhoDoPost = `<p class="migalha"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Novidades</a></p>
 <h1>${esc(post.titulo)}</h1>
 <p class="lead">${esc(post.resumo)}</p>
 <p class="meta-tema"><time datetime="${post.data}">${esc(dataPorExtensoIso(post.data))}</time> · ${esc(post.autoria)}</p>`;
+  // Com capa, o topo vira duas colunas no computador: o título à esquerda e a imagem à direita, no lugar do disco azul vazio (D-114).
+  const capa = daCapa.html ? `<div class="capa-grade capa-post">\n<div>\n${cabecalhoDoPost}\n</div>\n${daCapa.html}\n</div>` : cabecalhoDoPost;
   const dominio = dominioDe(valores);
   const artigo = {
     '@context': 'https://schema.org',
@@ -122,7 +184,7 @@ ${itens.join('\n')}
     corpo,
     fonte: post.corpo + capa,
     valores,
-    classeCapa: 'capa-simples',
+    classeCapa: daCapa.html ? 'capa-simples capa-com-imagem' : 'capa-simples',
     tipoOg: 'article',
     jsonld: [artigo],
     cabecalho: linkDoFeed(arquivo, valores),

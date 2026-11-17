@@ -1,6 +1,6 @@
 'use strict';
 /**
- * O app: um passeio pelos recursos, cada um com a captura da DEMONSTRAÇÃO (dados fictícios). O "para que serve" de cada recurso vem do
+ * O app: os vídeos de uso (D-114) e um passeio pelos recursos, cada um com a captura da DEMONSTRAÇÃO (dados fictícios). O "para que serve" de cada recurso vem do
  * guia de uso do core (`packages/core/src/guide`), então o site não promete o que o app não faz. Onde está disponível: web hoje;
  * lojas "em breve", sem selos.
  */
@@ -9,6 +9,7 @@ const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular } = require('../modelo');
 const { catalogo } = require('../catalogo');
+const { secaoDeVideos } = require('../videos');
 
 const ARQUIVO = 'app/index.html';
 
@@ -134,7 +135,7 @@ const MAIS = [
   { id: 'beneficio', titulo: 'Benefício pela empresa', guia: 'beneficio-da-empresa', imagem: 'beneficio', texto: 'Quem recebe o convite da empresa aceita pelo link. O app mostra a empresa, o plano e desde quando vale.' },
 ];
 
-function paginaApp({ valores, img }) {
+function paginaApp({ valores, img, videos }) {
   const u = (d) => rel(ARQUIVO, d);
   const c = catalogo();
   const guia = (id) => c.GUIA.find((e) => e.id === id);
@@ -181,6 +182,8 @@ ${m.imagem ? celular(img[m.imagem], ARQUIVO) : ''}
 <p class="lojas">Em breve na App Store e no Google Play.</p>`;
 
   const brutas = [
+    // Os vídeos de uso (D-114) abrem o passeio: o app em movimento, antes das telas paradas.
+    bloco(secaoDeVideos({ videos, img }, ARQUIVO), { variante: 'alt', rotulo: 'em-uso' }),
     bloco(
       `<h2 id="onde">Onde usar</h2>
 <div class="grade">

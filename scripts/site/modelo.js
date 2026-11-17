@@ -167,16 +167,29 @@ const colunaTexto = (html, classe = 'texto') => `<div class="miolo conteudo">\n<
 const bloco = (conteudo, { variante = '', rotulo = null, id = null } = {}) =>
   `<section class="bloco${variante ? ` bloco-${variante}` : ''}"${rotulo ? ` aria-labelledby="${rotulo}"` : ''}${id ? ` id="${id}"` : ''}>\n<div class="miolo">\n${conteudo}\n</div>\n</section>`;
 
-/** O celular com a captura e a legenda de demonstração. `img` vem de `imagensDoSite().info`. */
-function celular(img, arquivo, { legenda = true, carregamento = 'lazy' } = {}) {
-  const { LEGENDA_DEMO } = require('./imagens');
-  return `<figure class="celular"><div class="celular-moldura"><img src="${rel(arquivo, img.caminho)}" alt="${esc(img.alt)}" width="${img.largura}" height="${img.altura}" loading="${carregamento}" decoding="async"></div>${legenda ? `<figcaption>${LEGENDA_DEMO}</figcaption>` : ''}</figure>`;
+/**
+ * A imagem de uma captura. Com a versão do tema escuro (`img.escura`, as telas das Novidades, D-114), um `<picture>`: quem visita no tema
+ * escuro vê a tela escura do app, e a `<img>` (o tema claro) continua com o texto alternativo, a largura e a altura.
+ */
+function imagemDaTela(img, arquivo, carregamento) {
+  const tag = `<img src="${rel(arquivo, img.caminho)}" alt="${esc(img.alt)}" width="${img.largura}" height="${img.altura}" loading="${carregamento}" decoding="async">`;
+  if (!img.escura) return tag;
+  return `<picture><source srcset="${rel(arquivo, img.escura)}" media="(prefers-color-scheme: dark)" width="${img.largura}" height="${img.altura}">${tag}</picture>`;
 }
 
-/** A captura larga (painel no navegador) com a legenda de demonstração. */
-function telaLarga(img, arquivo) {
+/**
+ * O celular com a captura e a legenda de demonstração. `img` vem de `imagensDoSite().info`. `textoLegenda`: outra legenda (as Novidades
+ * usam "Tela da demonstração, com dados fictícios"); `classe`: uma classe a mais na figura.
+ */
+function celular(img, arquivo, { legenda = true, carregamento = 'lazy', textoLegenda = null, classe = '' } = {}) {
   const { LEGENDA_DEMO } = require('./imagens');
-  return `<figure class="larga"><div class="larga-moldura"><img src="${rel(arquivo, img.caminho)}" alt="${esc(img.alt)}" width="${img.largura}" height="${img.altura}" loading="lazy" decoding="async"></div><figcaption>${LEGENDA_DEMO}</figcaption></figure>`;
+  return `<figure class="celular${classe ? ` ${classe}` : ''}"><div class="celular-moldura">${imagemDaTela(img, arquivo, carregamento)}</div>${legenda ? `<figcaption>${esc(textoLegenda || LEGENDA_DEMO)}</figcaption>` : ''}</figure>`;
+}
+
+/** A captura larga (painel no navegador) com a legenda de demonstração (ou `textoLegenda`). */
+function telaLarga(img, arquivo, { textoLegenda = null, classe = '' } = {}) {
+  const { LEGENDA_DEMO } = require('./imagens');
+  return `<figure class="larga${classe ? ` ${classe}` : ''}"><div class="larga-moldura">${imagemDaTela(img, arquivo, 'lazy')}</div><figcaption>${esc(textoLegenda || LEGENDA_DEMO)}</figcaption></figure>`;
 }
 
 module.exports = { montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, dominioDe, urlDoSite, configurarRodape };
