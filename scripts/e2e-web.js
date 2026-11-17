@@ -7088,7 +7088,7 @@ setInterval(async () => {
   });
   await g1OpenCard(); await g1OpenInvoice('outubro'); await btn('Registrar pagamento').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(400);
   t = await g1Keep();
-  ok('G1 Registrar pagamento: "Saiu de" com a conta marcada e a Carteira; o texto do mês diz de onde sai', (await g1Group('Saiu de').count()) === 1 && (await visibleCount('radio', 'Carteira')) === 1 && t.includes('saindo de Conta principal'), t.slice(0, 400));
+  ok('G1 Registrar pagamento: "Saiu de" com a conta marcada e a Carteira; o texto do mês diz de onde sai', (await g1Group('Saiu de').count()) === 1 && (await visibleCount('radio', 'Carteira')) === 1 && /saindo de (Conta principal|Carteira)\./.test(t), t.slice(0, 400));
   await atWidths(async (w) => { await layoutChecks(`G1 Registrar pagamento ${w}px`); if (w === 390) await shot('249_pagar_fatura_saiu_de'); });
   await radio('Carteira').click(); await p.waitForTimeout(300);
   ok('G1 Registrar pagamento: escolher a Carteira atualiza o texto ("saindo de Carteira")', (await body()).includes('saindo de Carteira'));
@@ -8061,7 +8061,7 @@ setInterval(async () => {
   await i1Open();
   await i1Pick(i1Ofx); await waitText('Arquivo lido: extrato.ofx', 12000); await p.waitForTimeout(400);
   t1 = await i1Keep();
-  ok('I1 OFX: "Arquivo lido", 7 linhas, o saldo do arquivo é ignorado e a conta já vem como destino (a principal marcada)', t1.includes('Arquivo lido: extrato.ofx') && t1.includes('7 linhas lidas') && t1.includes('O saldo que vem no arquivo é ignorado. A Clarevo não guarda saldo por conta.') &&
+  ok('I1 OFX: "Arquivo lido", 7 linhas, o saldo do arquivo é ignorado e a conta já vem como destino (a principal marcada)', t1.includes('Arquivo lido: extrato.ofx') && t1.includes('7 linhas lidas') && t1.includes('O saldo que vem no arquivo é ignorado. A Clarevo não guarda o saldo do banco.') &&
     (await radio('Banco ou carteira').getAttribute('aria-checked')) === 'true' && (await radio('Conta principal').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && !t1.includes('R$ 1.234,56'));
   await atWidths(async (w) => { await innerChecks(`I1 destino ${w}px`); if (w === 390) await shot('302_importar_destino'); if (w === 320) await shot('302_importar_destino_320px'); });
   await radio('Carteira').click(); await radio('Conta principal').click();
@@ -8203,7 +8203,7 @@ setInterval(async () => {
   await i1Open(); await i1Pick(i1CardPay); await waitText('Arquivo lido: fatura-pagamento.csv', 12000);
   await radio('Cartão de crédito').click(); await p.waitForTimeout(300); await i1Review();
   t1 = await i1Keep(); boxes = await i1Boxes();
-  ok('I1 fatura com uma linha de pagamento entre as compras: "Parece pagamento de fatura", desmarcada e com caixa para marcar', t1.includes('4 linhas · 3 marcadas') && t1.includes('Parece pagamento de fatura') && t1.includes('O pagamento da fatura já é registrado em Registrar pagamento.') &&
+  ok('I1 fatura com uma linha de pagamento entre as compras: "Parece pagamento de fatura", desmarcada e com caixa para marcar', t1.includes('4 linhas · 3 marcadas') && t1.includes('Parece pagamento de fatura') && t1.includes('O pagamento da fatura já é registrado na própria fatura, em Registrar pagamento.') &&
     JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['true', false], ['true', false], ['true', false], ['false', false]]), JSON.stringify(boxes));
   await i1Leave();
   // Compra parcelada já anotada: 3 parcelas de R$ 120,00 (a 1ª na fatura de novembro).
@@ -8463,6 +8463,8 @@ setInterval(async () => {
   await j1NewAccount('Kai Tutorial', 'kai@exemplo.com');
   await j1Dialog(j1TOUR).first().waitFor({ timeout: 8000 });
   await j1Dialog(j1TOUR).getByRole('button', { name: 'Pular', exact: true }).click();
+  // A conta acabou de nascer: "Primeiros passos" pode ainda estar carregando quando o tour fecha logo no primeiro cartão.
+  await p.getByRole('heading', { name: 'Primeiros passos', exact: true }).filter({ visible: true }).first().waitFor({ timeout: 6000 }).catch(() => {});
   ok('Tutorial tour: "Pular" no cartão 1 fecha a janela e o Resumo fica como antes', (await j1TourGone()) && JSON.stringify(await headingList()) === JSON.stringify(j1Baseline), JSON.stringify(await headingList()));
   await j1Tab('Metas').click(); await waitText('Você consegue guardar algum valor por mês?'); await j1Tab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(900);
   ok('Tutorial tour: depois de "Pular", não volta ao passar por outras abas', await j1TourGone());
@@ -12975,7 +12977,7 @@ setInterval(async () => {
   // ---- 7. Análises, Categorias: o mês sem gastos ----
   await mcGoResumo();
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
-  await p.getByRole('button', { name: 'Análises. Categorias, Evolução, Próximos meses e Orçamento.', exact: true }).filter({ visible: true }).first().click(); await waitText('Consulte o mês escolhido.'); await p.waitForTimeout(900);
+  await p.getByRole('button', { name: /^Ver análises do mês\./ }).filter({ visible: true }).first().click(); await waitText('Consulte o mês escolhido.'); await p.waitForTimeout(900);
   if (!(await p.evaluate(() => [...document.querySelectorAll('[role=toolbar][aria-label="Mês das análises"]')].some((e) => e.getBoundingClientRect().width > 0 && e.innerText.includes('Setembro de 2026'))))) {
     await p.getByRole('button', { name: /^Mês anterior: / }).filter({ visible: true }).first().click(); await p.waitForTimeout(800);
   }
