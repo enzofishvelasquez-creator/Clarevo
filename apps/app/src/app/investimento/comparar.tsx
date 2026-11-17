@@ -68,6 +68,10 @@ export default function CompararScreen() {
       <Screen>
         <Body>
           <Txt color={colors.textSecondary}>{T.intro}</Txt>
+          {/* A premissa da conta (D-103, item 4): inclui o rendimento, pela taxa digitada, sem nenhuma taxa preenchida. */}
+          <Txt variant="label" color={colors.textSecondary}>
+            {T.premise}
+          </Txt>
           <Card style={{ gap: space[4] }}>
             <TextField
               ref={amountRef}

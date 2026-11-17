@@ -35,6 +35,8 @@ export const INVESTMENT_PLAN_TEXT = {
   editAction: 'Ver plano de aportes',
   screenTitle: 'Plano de aportes',
   intro: 'Quanto você pretende aportar por mês nos investimentos. É intenção, não cobrança: a Clarevo mostra o que foi aportado ao lado do plano.',
+  /** A premissa do plano (D-103, item 4): só aportes, sem rendimento e sem taxa. */
+  premise: 'O plano e o aportado contam só o dinheiro que você coloca, sem rendimento e sem taxa nenhuma.',
   amountLabel: 'Quanto pretende aportar por mês?',
   amountHint: 'A soma dos aportes em todos os investimentos do mês.',
   amountEmpty: 'Informe um valor.',

@@ -65,6 +65,8 @@ export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao';
 export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao'];
 /** Dia em que as assinaturas de exemplo foram cadastradas no cenário 'assinaturas'. */
 export const DEMO_SUBSCRIPTIONS_SETUP_DAY = '2026-06-30';
+/** Quando o plano de aportes da demonstração foi definido (D-103, item 14): mais de 3 meses antes de 07/10/2026. */
+export const DEMO_PLAN_SET_AT = '2026-06-15T12:00:00.000Z';
 /** Dia da montagem do cenário 'retorno' (última anotação antes do tempo sem usar). */
 export const DEMO_RETURN_SETUP_DAY = '2026-05-20';
 
@@ -276,6 +278,12 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   await move(previdencia.investment!.id, 'valor', 508_000, '2026-10-06');
   // Plano de aportes (D-099, item 12): R$ 600,00 por mês; outubro tem o aporte de R$ 500,00 na aplicação.
   await repo.setInvestmentPlan(newOperationKey(), ctx, 60_000);
+  // Revisão opcional do plano (D-103, item 14): o plano da demonstração foi definido em 15/06/2026 (FICTÍCIO) e não mudou desde então, então
+  // em 07/10/2026 faz 3 meses e o card do plano mostra o convite "Quer conferir?". Só a data de alteração do plano recua (o relógio da
+  // memória só anda para a frente); nenhum total muda.
+  const plans = repo['investmentPlans'];
+  const plan = plans.get(ctx);
+  if (plan) plans.set(ctx, { ...plan, createdAt: DEMO_PLAN_SET_AT, updatedAt: DEMO_PLAN_SET_AT });
   // Cartões (D-037): o cartão fechou em 03/10, então as compras de 05 e 06/10 entram na fatura de novembro (vencimento 10/11).
   // cards: false monta a demonstração dos ciclos anteriores (testes das bases A, B e C), sem o cartão e sem as faturas.
   if (opts.cards !== false) {

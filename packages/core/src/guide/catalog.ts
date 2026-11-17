@@ -592,6 +592,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       '/investimento/declaracao',
       '/investimento/comparar',
       '/investimento/plano',
+      '/investimento/desempenho',
     ],
     screenshot: '540_investimentos.png',
   },

@@ -229,12 +229,6 @@ setInterval(async () => {
     const more = p.getByRole('button', { name: /^Ver os próximos meses\./ }).filter({ visible: true });
     if (await more.count()) { await more.first().click().catch(() => {}); await p.waitForTimeout(300); }
   };
-  // Aba Investir (revisão das telas, 16/11/2026): o CDI, o IPCA, a poupança, o ganho real e o mês até hoje ficam atrás de "Comparar com
-  // CDI, IPCA e poupança". Abre só se ainda está fechado (a aba continua montada entre as visitas).
-  const openCompare = async () => {
-    const b = p.getByRole('button', { name: 'Comparar com CDI, IPCA e poupança', exact: true }).filter({ visible: true }).first();
-    if ((await b.count()) && (await b.getAttribute('aria-expanded')) !== 'true') { await b.click(); await p.waitForTimeout(300); }
-  };
   const sectionRows = async (title) => {
     if (title === 'Próximos meses') await openLater();
     return sectionRowsRaw(title);
@@ -271,6 +265,8 @@ setInterval(async () => {
       'Garantia do Tesouro Nacional', 'Tesouro Nacional', 'Tesouro Transparente',
       'Tesouro Prefixado com Juros Semestrais', 'Tesouro IPCA\\+ com Juros Semestrais', 'Tesouro Selic', 'Tesouro Prefixado', 'Tesouro IPCA\\+',
       'Tesouro RendA\\+', 'Tesouro Educa\\+', 'Tesouro Reserva', 'CDB ou RDB', '\\bLCI\\b', '\\bLCA\\b', '\\bLCD\\b',
+      // Modelos de registro da tela vazia (D-103, item 5): rótulos de registro, não sugestão de produto.
+      'Título do Tesouro', 'CDB, LCI ou LCA que já tenho',
     ].join('|'),
     'g',
   );
@@ -14927,22 +14923,20 @@ setInterval(async () => {
     await demoHome();
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
     t = await body();
-    // Revisão das telas (16/11/2026): no card azul, o valor, o aportado, o ganho e uma linha do período; "Novo investimento" logo abaixo.
+    // Revisão das telas (16/11/2026): "Novo investimento" logo abaixo do card azul. D-103: no card, o valor, de quando são os valores, o
+    // aportado, o ganho em reais e depois a porcentagem sobre o investido; a comparação com CDI, IPCA e poupança mora no desempenho.
     const ivTops = await p.evaluate(() => {
       const top = (re) => { const e = [...document.querySelectorAll('[role=button],[role=heading]')].find((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')); return e ? Math.round(e.getBoundingClientRect().top) : null; };
       return { novo: top(/^Novo investimento$/), lista: top(/^Seus investimentos$/) };
     });
-    ok('D-093 Investimentos: de início, só uma linha do período no card azul (sem CDI, IPCA nem poupança à vista), "Comparar com CDI, IPCA e poupança" fechado e "Novo investimento" antes da lista',
-      t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,54%.') && !t.includes('CDI no mesmo período') && !t.includes('Neste mês, até hoje') &&
-        (await p.getByRole('button', { name: 'Comparar com CDI, IPCA e poupança', exact: true }).filter({ visible: true }).first().getAttribute('aria-expanded')) === 'false' &&
+    ok('D-093 Investimentos: o card azul sem CDI, IPCA nem poupança (D-103: moram no desempenho), "Ver desempenho" no card e "Novo investimento" antes da lista',
+      !t.includes('CDI no mesmo') && !t.includes('Neste mês, até hoje') && !t.includes('Nos 4 meses fechados') && (await visibleCount('button', 'Comparar com CDI, IPCA e poupança')) === 0 &&
+        (await visibleCount('button', /^R\$ 15\.955,00\. Ganho: R\$ 455,00, \+2,94% sobre o investido\. Ver desempenho$/)) === 1 &&
         ivTops.novo !== null && ivTops.lista !== null && ivTops.novo < ivTops.lista, JSON.stringify(ivTops));
-    await openCompare();
     t = await body(); investTexts.push(t);
-    ok('D-093 Investimentos: título "Investimentos", contexto Pessoal fixo, total de R$ 15.955,00, aportado, ganho e a rentabilidade com o CDI e o IPCA de exemplo',
-      (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Aportado: R$ 15.500,00') && t.includes('Ganho: R$ 455,00') &&
-        t.includes('Neste mês, até hoje: +0,10%') && t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,54%.') &&
-        t.includes('CDI no mesmo período: +3,65%') && t.includes('IPCA no mesmo período: +1,41%') &&
-        t.includes('Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.'), t.slice(0, 700));
+    ok('D-093 Investimentos: título "Investimentos", contexto Pessoal fixo, total de R$ 15.955,00, de quando são os valores, aportado, ganho e a porcentagem sobre o investido',
+      (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Valores de 06/10/2026, como você registrou.') && t.includes('Aportado: R$ 15.500,00') &&
+        t.includes('Ganho: R$ 455,00') && t.indexOf('Ganho: R$ 455,00') < t.indexOf('+2,94% sobre o investido'), t.slice(0, 700));
     ok('D-093 Investimentos: diz que não é recomendação, que não entra em Pago nem em Recebido e que a Família não vê, num aviso só no fim (revisão das telas)',
       t.includes('não é recomendação de investimento') && t.includes('não entram em Pago nem em Recebido') && t.includes('Ninguém da Família nem a empresa que oferece o benefício vê.') &&
         t.includes('A Clarevo não guarda, não movimenta nem indica investimentos.') && !t.includes('Acompanhe o que você já investe'));
@@ -14988,11 +14982,11 @@ setInterval(async () => {
       t.includes('Atualize o valor com o que aparece no seu extrato para ver quanto rendeu.'), t.slice(0, 500));
     // Com o novo sem valor, a carteira fica sem taxa neste mês, e o card azul diz quem falta atualizar (pedido do Enzo, 11/11/2026).
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
-    await openCompare();
     t = await body();
-    ok('D-093 Investimentos: com o novo sem valor, "Neste mês: sem taxa ainda" e o nome de quem falta atualizar no lugar do aviso geral',
-      t.includes('Neste mês: sem taxa ainda') && t.includes('Para ter a taxa deste mês, falta atualizar o valor de Ações da corretora.') &&
-        t.includes('Nos 4 meses fechados, de junho a setembro de 2026') && !t.includes('Para ver quanto rendeu em cada mês'), t.slice(0, 900));
+    // D-103 (item 1): o card azul diz quem está sem atualização no mês, e a linha do novo diz que mostra o que foi aplicado.
+    ok('D-093 Investimentos: com o novo sem valor, o card azul diz o nome de quem está sem atualização no mês e a linha diz que mostra o aplicado',
+      t.includes('Sem atualização neste mês: Ações da corretora.') && t.includes('Sem atualização do extrato: mostra o que foi aplicado.') &&
+        t.includes('Valores de 06/10 a 07/10/2026, como você registrou.'), t.slice(0, 900));
     await p.getByRole('button', { name: /^Ações da corretora, Ações:/ }).filter({ visible: true }).first().click(); await waitText('Encerrar investimento'); await p.waitForTimeout(300);
     // Encerrar, reabrir e excluir.
     await btn('Encerrar investimento').click(); await waitText('Investimento encerrado.'); await p.waitForTimeout(400);
@@ -15018,14 +15012,11 @@ setInterval(async () => {
     const into = async (text) => { await p.getByText(text, { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); };
     await demoHome();
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
-    await openCompare();
     t = await body(); investTexts.push(t);
-    ok('D-099 Investir: próximos vencimentos, garantia do FGC, ganho real, poupança e os dois atalhos',
-      t.includes('Aplicação do banco vence em 01/06/2027, daqui a 8 meses.') && t.includes('Banco Exemplo: R$ 10.875,00 em produtos com garantia do FGC.') &&
-        t.includes('Acima da inflação no período: +2,11%') && t.includes('Poupança no mesmo período: +2,42%') && t.includes('Resumo para a declaração') &&
-        t.includes('Comparar rendimentos líquidos') && t.includes('a Clarevo não sabe quais são do mesmo grupo.'), t.slice(0, 1200));
-    ok('D-099 Evolução da carteira (P2): os meses de junho a outubro, com o valor e o aportado acumulado',
-      t.includes('Evolução da carteira') && t.includes('Junho de 2026: R$ 10.085,00') && t.includes('Outubro de 2026 (até hoje): R$ 15.955,00') && t.includes('Aportes menos resgates até aqui: R$ 15.500,00'), t.slice(0, 2500));
+    // D-103: a garantia do FGC mora em "Por instituição" (conferida abaixo), e o ganho real, a poupança e a evolução, no desempenho (bloco D-103).
+    ok('D-099 Investir: próximos vencimentos e os dois atalhos; a evolução e o card "Garantia do FGC" saíram da aba (D-103)',
+      t.includes('Aplicação do banco vence em 01/06/2027, daqui a 8 meses.') && t.includes('Resumo para a declaração') && t.includes('Comparar rendimentos líquidos') &&
+        !t.includes('Evolução da carteira') && !(await headingShown('Garantia do FGC')), t.slice(0, 1200));
     ok('D-099 Datas do ano para quem investe (P2): o 31/12, os informes e a declaração, sem come-cotas (a demonstração não tem fundo)',
       t.includes('Datas do ano para quem investe') && t.includes('31/12/2026') && t.includes('26/02/2027') && t.includes('Março de 2027') && !t.includes('Come-cotas'), t.slice(0, 2500));
     ok('D-099 Como está dividido: por tipo, Renda fixa com 68% e Previdência com 32%, e o aviso de que a Clarevo não indica como dividir',
@@ -15034,6 +15025,10 @@ setInterval(async () => {
     t = await body();
     const div = t.slice(t.indexOf('Como está dividido'));
     ok('D-099 Como está dividido: por instituição, Banco Exemplo antes de "Sem informação"', div.indexOf('Banco Exemplo') > 0 && div.indexOf('Sem informação') > div.indexOf('Banco Exemplo'), div.slice(0, 400));
+    // D-103 (item 9): em "Por instituição", a soma da garantia do FGC de cada instituição e o limite para comparar, só como informação.
+    ok('D-103 Por instituição: a soma com garantia do FGC embaixo do Banco Exemplo, o limite para comparar e as regras do conglomerado',
+      div.includes('R$ 10.875,00 em produtos com garantia do FGC.') && div.includes('Para comparar: a garantia do FGC vai até R$ 250.000,00 por pessoa em cada instituição ou conglomerado.') &&
+        div.includes('a Clarevo não sabe quais são do mesmo grupo.') && div.indexOf('R$ 10.875,00 em produtos') < div.indexOf('Sem informação'), div.slice(0, 900));
     await radio('Por prazo de resgate').click(); await p.waitForTimeout(250);
     ok('D-099 Como está dividido: por prazo de resgate, o CDB em "Em até 1 ano"', (await body()).includes('Em até 1 ano'));
     await radio('Por tipo').click(); await p.waitForTimeout(250);
@@ -15263,6 +15258,171 @@ setInterval(async () => {
     t = await body();
     ok('D-099 P3 Reserva de volta aos registros: R$ 3.500,00 e os botões de aporte', t.includes('R$ 3.500,00') && t.includes('de R$ 22.500,00 · 15%') && (await visibleCount('button', 'Registrar aporte')) === 1, t.slice(0, 800));
     ok('D-099 P3: nada vai à rede na demonstração', writes.length === prWrites0, writes.slice(prWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // D-103 (estudo da aba Investir): de quando é cada valor (a lista e o intervalo no card azul) e, numa falha ao recarregar, o último valor
+  // conhecido com a data, nunca zero; o ganho em reais antes da porcentagem e a folha "Como a conta é feita"; o desempenho aberto pelo card
+  // (três períodos fixos, cada investimento no próprio período ao lado do CDI, do IPCA e da poupança, selo de estimativa, uma cor só e a
+  // evolução da carteira); a premissa do plano e da comparação; o convite opcional para conferir o plano (a demonstração tem o plano
+  // definido em 15/06/2026) com "Agora não"; "Ocultar valores" na aba, no desempenho, no plano e na comparação; e, numa conta nova, os
+  // modelos de registro da tela vazia. A divisão "Por instituição" com a soma do FGC está no bloco D-099. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const dsWrites0 = writes.length;
+    const reviewLater = 'Agora não: ocultar o convite para conferir o plano de aportes';
+    await demoHome();
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
+    t = await body(); investTexts.push(t);
+    ok('D-103 Investir: cada linha diz de quando é o valor, e o card azul o intervalo das datas',
+      t.split('Atualizado por você em 06/10/2026.').length - 1 === 2 && t.includes('Valores de 06/10/2026, como você registrou.'), t.slice(0, 1500));
+    ok('D-103 Investir: o ganho em reais antes da porcentagem sobre o investido, e "Como a conta é feita" no card',
+      t.indexOf('Ganho: R$ 455,00') >= 0 && t.indexOf('Ganho: R$ 455,00') < t.indexOf('+2,94% sobre o investido') && (await visibleCount('button', 'Como a conta é feita')) === 1);
+    ok('D-103 Plano: o convite discreto para conferir o plano (definido em 15/06/2026), com "Agora não", no card do plano',
+      t.includes('Faz 3 meses que você revisou o plano. Quer conferir?') && (await visibleCount('button', reviewLater)) === 1 && (await visibleCount('button', 'Ver plano de aportes')) === 1, t.slice(0, 1500));
+    await atWidths(async (w) => { await layoutChecks(`D-103 Investir ${w}px`); if (w === 390) await shot('564_investimentos_datas'); });
+    // "Como a conta é feita": cada número do card, com a conta feita e a fórmula de acima da inflação.
+    await btn('Como a conta é feita').click(); await waitText('De quando é cada valor'); await p.waitForTimeout(300);
+    const how = await dialogText();
+    ok('D-103 Como a conta é feita: o valor, o aportado, a conta do ganho, a da porcentagem, as datas e a fórmula de acima da inflação, sem "nós"',
+      how.includes('Valor de hoje: R$ 15.955,00') && how.includes('Aportado: R$ 15.500,00') &&
+        how.includes('R$ 15.955,00 + R$ 0,00 + R$ 0,00 − R$ 15.500,00. Resultado: ganho de R$ 455,00.') && how.includes('O ganho dividido pelo aportado: R$ 455,00 ÷ R$ 15.500,00.') &&
+        how.includes('não uma taxa ao ano nem a do mês') && how.includes('(1 + rendimento) ÷ (1 + IPCA) − 1') && how.includes('A Clarevo faz a conta só com o que você registra.') &&
+        !/\bnós\b|calculamos/i.test(how), how.slice(0, 1500));
+    investTexts.push(how);
+    await atWidths(async (w) => { await layoutChecks(`D-103 Como a conta é feita ${w}px`); if (w === 390) await shot('565_como_a_conta_e_feita'); });
+    await btn('Fechar').click(); await p.waitForTimeout(300);
+    ok('D-103 Como a conta é feita: "Fechar" fecha a folha', (await visibleCount('button', 'Fechar')) === 0);
+    // Desempenho: o card azul abre a comparação; cada investimento no próprio período, com o selo de estimativa.
+    await p.getByRole('button', { name: /\. Ver desempenho$/ }).filter({ visible: true }).first().click(); await waitText('Comparar com CDI, IPCA e poupança'); await p.waitForTimeout(600);
+    t = await body(); investTexts.push(t);
+    ok('D-103 Desempenho: título, selo de estimativa, os três períodos com "Em 12 meses" escolhido, e cada investimento no próprio período com a taxa da ficha, CDI, IPCA e poupança',
+      (await h1Name()) === 'Desempenho' && (await visibleCount('img', /^Estimativa/)) + (await p.getByLabel(/^Estimativa: feita com os valores/).filter({ visible: true }).count()) >= 1 &&
+        (await radio('Em 12 meses').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'No mês')) === 1 && (await visibleCount('radio', 'Desde o início')) === 1 &&
+        t.includes('De 01/06/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +3,75%, cerca de 99% do CDI.') && t.includes('Taxa registrada na ficha: 105% do CDI.') &&
+        t.includes('CDI no mesmo intervalo: +3,78%') && t.includes('IPCA no mesmo intervalo: +1,46%') && t.includes('Poupança no mesmo intervalo: +2,51%') && t.includes('Acima da inflação no período: +2,26%') &&
+        t.includes('De 01/08/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +1,60%, cerca de 83% do CDI.') &&
+        t.includes('Rende de forma variável, sem taxa combinada na ficha.') && t.includes('A Clarevo não junta tudo numa porcentagem só') && t.includes('(1 + rendimento) ÷ (1 + IPCA) − 1') &&
+        t.includes('Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.') && !/melhor|pior|ibovespa|ifix|ranking/i.test(t), t.slice(0, 2500));
+    ok('D-103 Desempenho: a evolução da carteira (saiu da aba) com o valor e o aportado acumulado de junho a outubro',
+      t.includes('Evolução da carteira') && t.includes('Junho de 2026: R$ 10.085,00') && t.includes('Outubro de 2026 (até hoje): R$ 15.955,00') && t.includes('Aportes menos resgates até aqui: R$ 15.500,00'), t.slice(0, 3000));
+    // Uma cor só: o rendimento, os índices e o ganho real na mesma cor (nada de verde para ganho nem vermelho para perda).
+    const dsColors = await p.evaluate(() => {
+      const pick = (re) => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => e.children.length === 0 && e.getBoundingClientRect().width > 0 && re.test(e.textContent || '')).map((e) => getComputedStyle(e).color);
+      return [...new Set([...pick(/^Rendeu /), ...pick(/^(CDI|IPCA|Poupança) no mesmo intervalo/), ...pick(/^(Acima|Abaixo) da inflação/)])];
+    });
+    ok('D-103 Desempenho: o rendimento, os índices e o ganho real numa cor só', dsColors.length === 1, JSON.stringify(dsColors));
+    await checkBar('D-103 Desempenho', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-103 Desempenho ${w}px`); if (w === 390) await shot('566_desempenho'); });
+    await radio('No mês').click(); await p.waitForTimeout(300);
+    t = await body(); investTexts.push(t);
+    ok('D-103 Desempenho no mês: do valor de 30/09 ao de 06/10, sem "% do CDI" (menos de 5 dias úteis), com os índices do mesmo intervalo',
+      t.includes('De 30/09/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +0,14%.') && t.includes('Rendeu 0,00%.') && !/cerca de \d+% do CDI/.test(t) &&
+        t.includes('CDI no mesmo intervalo: +0,17%'), t.slice(0, 2000));
+    await radio('Desde o início').click(); await p.waitForTimeout(300);
+    ok('D-103 Desempenho desde o início: do primeiro aporte de cada um', (await body()).includes('Rendeu +3,75%, cerca de 99% do CDI.') && (await body()).includes('Rendeu +1,60%, cerca de 83% do CDI.'));
+    await atWidths(async (w) => { if (w === 320) { await p.evaluate(() => { document.documentElement.style.fontSize = '130%'; }); await layoutChecks(`D-103 Desempenho letra grande ${w}px`); await p.evaluate(() => { document.documentElement.style.fontSize = ''; }); } });
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    // A premissa da comparação de rendimentos líquidos.
+    await p.getByRole('link', { name: /^Comparar rendimentos líquidos/ }).filter({ visible: true }).first().click(); await waitText('Valor aplicado'); await p.waitForTimeout(300);
+    t = await body(); investTexts.push(t);
+    ok('D-103 Comparar: a premissa diz que a conta inclui o rendimento pela taxa digitada e que nenhuma taxa vem preenchida',
+      t.includes('A conta inclui o rendimento de cada opção pela taxa que você digitar') && t.includes('Nenhuma taxa vem preenchida.'));
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    // "Agora não" oculta o convite (só neste aparelho; na demonstração, só na memória).
+    await btn(reviewLater).click(); await p.waitForTimeout(300);
+    ok('D-103 Plano: "Agora não" oculta o convite e o card continua', !(await body()).includes('Quer conferir?') && (await body()).includes('Seu plano: R$ 600,00.'));
+    // Falha ao recarregar (simulada): a aba continua com o último valor conhecido de cada investimento, com a data, e o aviso; nunca zero.
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.__origInvestments = repo.listInvestments; repo.listInvestments = () => Promise.reject(new Error('falha simulada')); await window.__e2e.refresh(); });
+    await waitText('Não foi possível atualizar agora.', 12000).catch(() => {}); await p.waitForTimeout(300);
+    t = await body();
+    ok('D-103 Falha ao recarregar: o último valor conhecido de cada investimento, com a data, e "Tentar de novo"; nunca zero',
+      t.includes('Não foi possível atualizar agora. Os valores abaixo são os últimos carregados, cada um com a data dele.') && t.includes('R$ 15.955,00') &&
+        t.split('Atualizado por você em 06/10/2026.').length - 1 === 2 && !t.includes('R$ 0,00') && (await visibleCount('button', 'Tentar de novo')) === 1, t.slice(0, 1500));
+    await p.getByText('Não foi possível atualizar agora.', { exact: false }).filter({ visible: true }).first().scrollIntoViewIfNeeded().catch(() => {}); await shot('567_investimentos_falha');
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.listInvestments = repo.__origInvestments; await window.__e2e.refresh(); });
+    await waitGone('Não foi possível atualizar agora.', 5000);
+    ok('D-103 Falha ao recarregar: quando a leitura volta, o aviso some', !(await body()).includes('Não foi possível atualizar agora.'));
+    // Abrir a tela do plano conta como revisão: numa demonstração nova (o convite volta), a premissa no plano e, de volta, sem convite.
+    await demoHome();
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
+    ok('D-103 Plano: numa demonstração nova, o convite está de volta', (await body()).includes('Faz 3 meses que você revisou o plano. Quer conferir?'));
+    await btn('Ver plano de aportes').click(); await waitText('Aportes dos últimos meses'); await p.waitForTimeout(300);
+    t = await body(); investTexts.push(t);
+    ok('D-103 Plano: a premissa (só aportes, sem rendimento e sem taxa)', t.includes('O plano e o aportado contam só o dinheiro que você coloca, sem rendimento e sem taxa nenhuma.'));
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    ok('D-103 Plano: depois de abrir a tela do plano, o convite some (conta como revisão)', !(await body()).includes('Quer conferir?') && (await body()).includes('Seu plano: R$ 600,00.'));
+    // "Ocultar valores" (a chave de Conta e o olho do cabeçalho, que já existiam): nenhum valor em reais na aba, na folha, no desempenho,
+    // no plano nem na comparação.
+    await p.setViewportSize({ width: 600, height: 900 }); await p.waitForTimeout(400);
+    await btn('Ocultar valores').click(); await p.waitForTimeout(400);
+    await hiddenShows('Investir (D-103)');
+    await btn('Como a conta é feita').click(); await waitText('De quando é cada valor'); await p.waitForTimeout(300);
+    ok('D-103 valores ocultos: "Como a conta é feita" sem nenhum valor em reais', (await moneyLeaks()).length === 0 && (await dialogText()).includes('R$ ••••'), (await moneyLeaks()).slice(0, 3).join(' | '));
+    await btn('Fechar').click(); await p.waitForTimeout(300);
+    await p.getByRole('button', { name: /\. Ver desempenho$/ }).filter({ visible: true }).first().click(); await waitText('Comparar com CDI, IPCA e poupança'); await p.waitForTimeout(500);
+    await hiddenShows('Desempenho (D-103)');
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    await btn('Ver plano de aportes').click(); await waitText('Aportes dos últimos meses'); await p.waitForTimeout(300);
+    await hiddenShows('Plano de aportes (D-103)');
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    await p.getByRole('link', { name: /^Comparar rendimentos líquidos/ }).filter({ visible: true }).first().click(); await waitText('Valor aplicado'); await p.waitForTimeout(300);
+    await field('Valor aplicado').fill('10000'); await field('Prazo em dias corridos').fill('365');
+    await p.getByRole('radio', { name: 'Prefixado, com imposto', exact: true }).filter({ visible: true }).nth(0).click();
+    await p.getByLabel('Taxa ao ano (%), Opção 1', { exact: true }).fill('10');
+    await btn('Comparar').click(); await waitText('Resultado'); await p.waitForTimeout(300);
+    await hiddenShows('Comparar rendimentos líquidos (D-103)');
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    await btn('Mostrar valores').click(); await p.waitForTimeout(300);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+    ok('D-103: nada vai à rede na demonstração', writes.length === dsWrites0, writes.slice(dsWrites0).join(' | '));
+    // Tela vazia numa conta nova: os quatro modelos de registro, que abrem o novo investimento com uma parte preenchida.
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
+    await btn('Criar conta').click(); await waitText('Nome de apresentação');
+    await field('Nome de apresentação').fill('Lia Modelos'); await field('E-mail').fill('lia.modelos@exemplo.com'); await field('Senha').fill('senha1234');
+    await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+    await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+    await btn('Começar meu mês').click(); await waitText('Diferença do mês');
+    await tabByName('Investir').click(); await waitText('Nenhum investimento ainda'); await p.waitForTimeout(400);
+    t = await body(); investTexts.push(t);
+    const tplPart = t.slice(t.indexOf('Por onde começar o registro'), t.indexOf('A Clarevo não indica onde investir.') + 40);
+    const tplNames = await p.getByRole('link').filter({ visible: true }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || '').filter((n) => /^(Reserva de emergência|Título do Tesouro|CDB, LCI ou LCA que já tenho|Outro investimento)\./.test(n)).map((n) => n.split('.')[0]));
+    ok('D-103 Tela vazia: os quatro modelos de registro, na ordem, sem destacar nenhum, com o aviso de que a Clarevo não indica onde investir',
+      JSON.stringify(tplNames) === JSON.stringify(['Reserva de emergência', 'Título do Tesouro', 'CDB, LCI ou LCA que já tenho', 'Outro investimento']) &&
+        t.includes('Por onde começar o registro') && t.includes('São só modelos para registrar o que você já tem. A Clarevo não indica onde investir.') &&
+        !/recomend|melhor|sugerimos|sugest/i.test(tplPart), JSON.stringify(tplNames) + ' ' + tplPart);
+    await checkBar('D-103 Investir vazio', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-103 Investir vazio ${w}px`); if (w === 390) { await p.getByText('Por onde começar o registro', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await shot('568_investimentos_modelos'); } });
+    // Cada modelo abre o novo investimento com uma parte preenchida (pelo parâmetro "modelo" da rota); valor e data ficam em branco.
+    const openTemplate = async (label) => {
+      await p.getByRole('link', { name: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.`) }).filter({ visible: true }).first().click();
+      await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(400);
+    };
+    const leaveForm = async () => {
+      await btn('Cancelar').click(); await p.waitForTimeout(300);
+      if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
+      await waitText('Nenhum investimento ainda');
+    };
+    await openTemplate('Título do Tesouro');
+    ok('D-103 Modelo "Título do Tesouro": o novo investimento com "Títulos públicos" escolhido e "Mais detalhes" aberto; nome, valor e data em branco',
+      urlPath() === '/investimento/novo' && new URL(p.url()).searchParams.get('modelo') === 'titulo' && (await radio('Títulos públicos').getAttribute('aria-checked')) === 'true' &&
+        (await visibleCount('radio', 'Tesouro Selic')) === 1 && (await field('Nome').inputValue()) === '' && (await field('Quanto você aplicou até hoje?').inputValue()) === '', p.url());
+    await atWidths(async (w) => { await layoutChecks(`D-103 Modelo título ${w}px`); if (w === 390) await shot('569_novo_pelo_modelo'); });
+    await leaveForm();
+    await openTemplate('CDB, LCI ou LCA que já tenho');
+    ok('D-103 Modelo "CDB, LCI ou LCA": "Renda fixa" e "Porcentagem do CDI" escolhidos, com a taxa em branco para preencher como no contrato',
+      new URL(p.url()).searchParams.get('modelo') === 'banco' && (await radio('Renda fixa').getAttribute('aria-checked')) === 'true' &&
+        (await radio('Porcentagem do CDI').getAttribute('aria-checked')) === 'true' && (await field('Porcentagem do CDI (%)').inputValue()) === '', p.url());
+    await leaveForm();
+    await openTemplate('Reserva de emergência');
+    ok('D-103 Modelo "Reserva de emergência": o nome e "Renda fixa" preenchidos, e o resto em branco',
+      new URL(p.url()).searchParams.get('modelo') === 'reserva' && (await field('Nome').inputValue()) === 'Reserva de emergência' && (await radio('Renda fixa').getAttribute('aria-checked')) === 'true' &&
+        (await field('Quanto você aplicou até hoje?').inputValue()) === '');
+    await leaveForm();
+    await openTemplate('Outro investimento');
+    ok('D-103 Modelo "Outro investimento": o formulário em branco, sem tipo escolhido',
+      (await field('Nome').inputValue()) === '' && (await p.getByRole('radio', { checked: true }).filter({ visible: true }).count()) === 0);
+    await leaveForm();
   }
 
   // ==================================================================================================================

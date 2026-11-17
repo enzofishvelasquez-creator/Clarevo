@@ -361,6 +361,8 @@ function Navigation() {
           {/* Resumo para a declaração (D-099): rota estática, com precedência sobre /investimento/[id]. */}
           <Stack.Screen name="investimento/declaracao" />
           <Stack.Screen name="investimento/comparar" />
+          {/* Desempenho (D-103): aberto pelo card azul da aba Investir. */}
+          <Stack.Screen name="investimento/desempenho" />
           <Stack.Screen name="investimento/plano" />
           <Stack.Screen name="investimento/[id]/index" />
           <Stack.Screen name="investimento/[id]/editar" />

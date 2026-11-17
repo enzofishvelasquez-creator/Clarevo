@@ -457,6 +457,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     keywords: ['plano de aportes', 'aporte mensal', 'aportar por mês', 'quanto aportar', 'investir todo mês', 'investimentos'],
   },
   {
+    id: 'investimentos-desempenho',
+    title: 'Desempenho dos investimentos',
+    caption: 'Cada investimento ao lado do CDI, do IPCA e da poupança, no mês, em 12 meses e desde o início',
+    href: '/investimento/desempenho',
+    keywords: ['desempenho', 'rentabilidade', 'rendimento', '% do cdi', 'cdi', 'ipca', 'poupança', 'evolução', 'comparar', 'investimentos'],
+  },
+  {
     id: 'investimentos-comparar',
     title: 'Comparar rendimentos líquidos',
     caption: 'O mesmo valor em até quatro opções, depois do imposto',
