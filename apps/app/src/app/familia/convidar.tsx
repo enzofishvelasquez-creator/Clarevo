@@ -10,7 +10,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { ChoiceGroup } from '@/components/series-parts';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Banner, Button, Card, Chip, Screen, Txt } from '@/components/ui';
-import { CAN_COPY, copyInvite, inviteBaseUrl, shareInvite } from '@/lib/invite-share';
+import { CAN_COPY, canShareInvite, copyInvite, inviteBaseUrl, shareInvite } from '@/lib/invite-share';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { attemptFamily, useCreateFamilyInvite, useFamily, useFamilyKeys } from '@/state/family';
 import { colors, space } from '@/theme/tokens';
@@ -101,7 +101,7 @@ export default function ConvidarScreen() {
       const link = r.value.code ? inviteLink(r.value.code, inviteBaseUrl()) : null;
       setResult({ write: r.value, link });
       // A folha de compartilhamento abre logo depois de gerar; o link continua à vista para copiar ou reenviar.
-      if (link) void share(link, true);
+      if (link && canShareInvite()) void share(link, true);
     } finally {
       setBusy(false);
     }
@@ -134,8 +134,9 @@ export default function ConvidarScreen() {
                     </Txt>
                   </Banner>
                 ) : null}
-                <Button label={T.share} icon={Share2} onPress={() => share(result.link!)} />
-                {CAN_COPY ? <Button label={T.copy} icon={Copy} tone="soft" onPress={() => copy(result.link!)} /> : null}
+                {/* Navegador sem compartilhamento (vários de computador): só "Copiar link", como botão principal (D-110). */}
+                {canShareInvite() ? <Button label={T.share} icon={Share2} onPress={() => share(result.link!)} /> : null}
+                {CAN_COPY ? <Button label={T.copy} icon={Copy} tone={canShareInvite() ? 'soft' : 'brand'} onPress={() => copy(result.link!)} /> : null}
                 <Txt variant="caption" color={colors.textSecondary}>
                   {T.inviteNote}
                 </Txt>

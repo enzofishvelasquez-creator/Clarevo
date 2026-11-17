@@ -10,6 +10,15 @@ export type { ShareResult };
 
 export const CAN_COPY = true;
 
+/**
+ * O navegador tem o compartilhamento do sistema? Vários navegadores de computador não têm (D-110): ali o botão "Compartilhar" só daria
+ * erro, e o link fica com "Copiar link". Conferido na hora de desenhar, não ao carregar o módulo.
+ */
+export function canShareInvite(): boolean {
+  const nav = globalThis.navigator as Navigator | undefined;
+  return Boolean(nav && typeof nav.share === 'function');
+}
+
 /** Na web, o link aponta para o mesmo endereço em que o app está aberto (o convite abre onde foi gerado). */
 export function inviteBaseUrl(): string {
   const origin = (globalThis as { location?: { origin?: unknown } }).location?.origin;

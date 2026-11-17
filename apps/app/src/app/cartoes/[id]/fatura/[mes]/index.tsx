@@ -31,7 +31,7 @@ import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
 import { DueDayNotice } from '@/components/due-day-notice';
 import { FlashBanner, useFlash } from '@/components/flash';
-import { ContextPill, SubHeader } from '@/components/header';
+import { ContextPill, SubHeader, useHeroCard } from '@/components/header';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ErrorState } from '@/components/states';
 import { Banner, Body, Button, Card, CardSlice, FitMoney, LinkButton, ListCell, Money, ScreenList, Skeleton, Txt, clampLines, styles as ui } from '@/components/ui';
@@ -62,6 +62,8 @@ const editable = (l: InvoiceLine) => l.entryId !== null && l.version !== null &&
  */
 export default function FaturaScreen() {
   const { id, mes } = useLocalSearchParams<{ id: string; mes: string }>();
+  // Versão para computador (D-110): o bloco azul vira um cartão arredondado, na largura das telas de consulta.
+  const heroCard = useHeroCard();
   const month = readInvoiceMonth(mes);
   const { today } = useSession();
   const card = useCard(id);
@@ -231,8 +233,8 @@ export default function FaturaScreen() {
   const extraData = useMemo(() => [invoice, busy, paid], [invoice, busy, paid]);
 
   const header = loading ? (
-    <View style={[styles.hero, { gap: space[3] }]}>
-      <View style={styles.heroInner}>
+    <View style={[styles.hero, { gap: space[3] }, heroCard?.band]}>
+      <View style={[styles.heroInner, heroCard?.inner]}>
         <Skeleton width="50%" height={24} onBrand />
         <Skeleton width="60%" height={40} onBrand />
         <Skeleton width="100%" height={16} onBrand />
@@ -352,6 +354,7 @@ function InvoiceTop({
   onUndo: () => void;
 }) {
   const t = invoiceTexts(invoice, today);
+  const heroCard = useHeroCard();
   // Vencimento em sábado, domingo ou feriado nacional (D-060 item 3): só avisa, o vencimento do cartão não muda.
   const dueNotice = invoiceDueNotice(invoice, today);
   const paid = invoice.situation === 'paga' || invoice.situation === 'paga_em_parte';
@@ -364,8 +367,8 @@ function InvoiceTop({
 
   return (
     <>
-      <View style={styles.hero}>
-        <View style={styles.heroInner}>
+      <View style={[styles.hero, heroCard?.band]}>
+        <View style={[styles.heroInner, heroCard?.inner]}>
           <View style={styles.heroHead}>
             <Txt variant="title" color={colors.textOnBrand} style={{ flex: 1, fontSize: 22, lineHeight: 30 }} accessibilityRole="header" aria-level={2}>
               {t.title}

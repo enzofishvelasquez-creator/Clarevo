@@ -1,11 +1,17 @@
 import { router, useIsFocused } from 'expo-router';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useEffect, useRef, type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
-import { colors, space } from '@/theme/tokens';
+import { colors, radius, space } from '@/theme/tokens';
 
 /** Largura do painel dos formulários na versão para computador. */
 export const FORM_PANEL_WIDTH = 560;
+
+/**
+ * Verdadeiro dentro do painel dos formulários: o cabeçalho compacto (`SubHeader`) fica preso ao alto do painel, que já tem os cantos
+ * arredondados, em vez de virar um cartão próprio como nas telas cheias do computador.
+ */
+export const InPanelContext = createContext(false);
 
 /**
  * O endereço de uma tela a partir do nome da rota e dos parâmetros ("registro/[id]/editar" → "/registro/abc/editar").
@@ -40,6 +46,12 @@ export function isPanelRoute(name: string, params: Record<string, unknown> | und
   return PANEL_PATHS.some((re) => re.test(path));
 }
 
+/** Esc e o toque no fundo fazem o mesmo que o "voltar" da tela; sem tela atrás (endereço aberto direto), voltam ao Resumo. */
+function closePanel() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/');
+}
+
 /** Há uma janela do app aberta (confirmação, escolha) além dos painéis: o Esc é dela. */
 function otherModalOpen(): boolean {
   return Array.from(document.querySelectorAll('[aria-modal="true"]')).some((e) => !e.hasAttribute('data-form-panel'));
@@ -60,7 +72,7 @@ export function FormPanel({ children }: { children: ReactNode }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented || otherModalOpen()) return;
       e.preventDefault();
-      if (router.canGoBack()) router.back();
+      closePanel();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -98,24 +110,30 @@ export function FormPanel({ children }: { children: ReactNode }) {
         accessibilityRole="button"
         accessibilityLabel="Fechar"
         {...({ dataSet: { panelScrim: '' } } as object)}
-        onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+        onPress={closePanel}
       />
       <View ref={panel} style={styles.panel} role="dialog" aria-modal {...({ dataSet: { formPanel: '' }, tabIndex: -1 } as object)}>
-        {children}
+        <InPanelContext value={true}>{children}</InPanelContext>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, flexDirection: 'row' },
-  scrim: { flex: 1, backgroundColor: colors.scrim },
+  // O fundo escurecido cobre também a margem em volta do painel; só a área à esquerda fecha ao tocar.
+  wrap: { flex: 1, flexDirection: 'row', backgroundColor: colors.scrim },
+  scrim: { flex: 1 },
+  // Um cartão com os quatro cantos arredondados, afastado do alto, da direita e do pé da janela (D-110), como o bloco azul das telas.
   panel: {
     width: FORM_PANEL_WIDTH,
     maxWidth: '100%',
+    marginVertical: space[3],
+    marginRight: space[3],
+    borderRadius: radius.lg,
+    overflow: 'hidden',
     backgroundColor: colors.background,
-    borderLeftWidth: 1,
-    borderLeftColor: colors.border,
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowColor: colors.shadow,
     shadowOpacity: 0.18,
     shadowRadius: space[6],

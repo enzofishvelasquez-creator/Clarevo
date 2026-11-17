@@ -19,7 +19,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { GoalImageView, SuggestedImage } from '@/components/goal-image';
 import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
-import { Banner, Button, Card, Screen, Txt, styles as ui } from '@/components/ui';
+import { Banner, Button, Card, Screen, Txt, spaceKeyPress, styles as ui } from '@/components/ui';
 import { pickGoalPhoto } from '@/lib/goal-photo';
 import { useGoalDetail, useGoalImages, useSpace } from '@/state/data';
 import { useRepo } from '@/state/session';
@@ -198,6 +198,8 @@ function Tile({
       aria-checked={selected}
       disabled={disabled}
       onPress={onPress}
+      // Na web, o Espaço também escolhe (como nos outros botões de opção do app); sem isso, só o Enter respondia (D-110).
+      {...(disabled ? {} : spaceKeyPress(onPress))}
       style={(st) => [styles.tile, selected && styles.tileSelected, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
       {children}
       <Txt variant="caption" numberOfLines={2} style={{ fontFamily: selected ? fonts.bold : fonts.medium, textAlign: 'center' }}>

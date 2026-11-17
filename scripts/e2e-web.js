@@ -484,12 +484,12 @@ setInterval(async () => {
   await shot('05_conta');
   await shot('05b_conta_seguranca', true);
   // Ciclo A2 (D-025): na web não há lembretes nem biometria (só no app para celular); "Ocultar valores ao abrir" existe
-  // também na web e é só deste aparelho. Os dois interruptores de Conta na web são esse e "Mostrar valores no widget" (D-052, desligado).
+  // também na web e é só deste aparelho. É o único interruptor de Conta na web: "Mostrar valores no widget" (D-052) fica só no celular (D-110).
   ok('demonstração (D-067): Conta não tem o card "Como você conheceu a Clarevo?", nem as opções', await origemAusente());
   t = await body();
   const contaSwitches = await p.getByRole('switch').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-checked')]));
   ok('Conta na web: "Lembretes estão disponíveis no app para celular.", sem interruptor de lembretes nem de biometria', t.includes('Lembretes') && t.includes('Lembretes estão disponíveis no app para celular.') &&
-    !t.includes('Pedir biometria ao abrir') && !t.includes('Avisar') && JSON.stringify(contaSwitches) === JSON.stringify([['Ocultar valores ao abrir', 'false'], ['Mostrar valores no widget', 'false']]), JSON.stringify(contaSwitches));
+    !t.includes('Pedir biometria ao abrir') && !t.includes('Avisar') && JSON.stringify(contaSwitches) === JSON.stringify([['Ocultar valores ao abrir', 'false']]), JSON.stringify(contaSwitches));
   ok('Conta: "Privacidade neste aparelho" com "Ocultar valores ao abrir" desligado por padrão e a legenda', t.includes('Privacidade neste aparelho') && t.includes('Ao abrir o app, os valores aparecem como R$ ••••. Vale só para este aparelho.'));
   ok('Conta: "Ajuda e contato" com o e-mail do suporte por escrito (sem depender do site) e o botão "Escrever para o suporte"', t.includes('Ajuda e contato') &&
     t.includes('Dúvidas sobre o app ou um problema: escreva para suporte@clarevo.app.br. Pedidos sobre os seus dados: privacidade@clarevo.app.br.') && (await visibleCount('button', 'Escrever para o suporte')) === 1);
@@ -2514,7 +2514,8 @@ setInterval(async () => {
   // Ciclo A6: card "Calculadoras" no topo de Aprender, antes dos temas.
   const learnFirst = await p.evaluate(() => {
     const top = (e) => e.getBoundingClientRect().top;
-    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^Conta:/.test(e.getAttribute('aria-label') || ''));
+    // O avatar da Conta e o olho do cabeçalho (D-110: a 390 px cabe também na demonstração) ficam fora: são do cabeçalho, não de Aprender.
+    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^(Conta:|Ocultar valores$|Mostrar valores$)/.test(e.getAttribute('aria-label') || ''));
     const main = shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b));
     const labels = main.map((e) => e.getAttribute('aria-label') || e.textContent);
     return { jump: labels.filter((x) => /^Ir para /.test(x)), first: labels.filter((x) => !/^Ir para /.test(x)).slice(0, 2), firstOfAll: labels[0] };
@@ -8525,7 +8526,7 @@ setInterval(async () => {
   const j1First = await p.evaluate(() => {
     const top = (e) => e.getBoundingClientRect().top;
     // Os atalhos "Ir para" ficam acima dos cards, logo abaixo da busca (D-091).
-    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^(Conta:|Ir para )/.test(e.getAttribute('aria-label') || ''));
+    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^(Conta:|Ir para |Ocultar valores$|Mostrar valores$)/.test(e.getAttribute('aria-label') || ''));
     return shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b)).slice(0, 2).map((e) => e.getAttribute('aria-label') || e.textContent);
   });
   const j1H2 = await p.evaluate(() => [...document.querySelectorAll('h2, [role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
@@ -9635,31 +9636,23 @@ setInterval(async () => {
   // "Concluir" volta às Análises (revisão das telas, 16/11/2026), que não têm o avatar do cabeçalho: a Conta abre a partir de Movimentos.
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
 
-  // ---- 12. Conta › "Widget na tela inicial": o interruptor "Mostrar valores no widget" (desligado) fica guardado no aparelho ----
+  // ---- 12. Conta › "Widget na tela inicial": na web, só o texto (D-110: o interruptor "Mostrar valores no widget" vale só no celular) ----
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
-  const k1Widget = () => p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).first();
   await scrollTo('Widget na tela inicial');
   t = await k1Keep();
-  ok('K1 Conta: o card "Widget na tela inicial" (título de nível 2) diz, na web, "Disponível no app da Clarevo para celular." (D-093) e tem o interruptor "Mostrar valores no widget" desligado, depois de Privacidade', (await headingShown('Widget na tela inicial')) &&
-    t.includes('Disponível no app da Clarevo para celular.') && t.includes('Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.') &&
-    (await k1Widget().getAttribute('aria-checked')) === 'false' && (await hideSwitch().getAttribute('aria-checked')) === 'false' && t.indexOf('Privacidade neste aparelho') < t.indexOf('Widget na tela inicial'), `${await k1Widget().getAttribute('aria-checked')}`);
-  ok('K1 Conta: o interruptor explica que, desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome, só neste aparelho (D-054)', t.includes('Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.'));
-  await k1Shots('369_conta_widget', false, false);
   const k1StoreW0 = await k1Store();
-  await k1Widget().click(); await p.waitForTimeout(400);
-  ok('K1 Conta: ligar mostra o interruptor ligado e não muda "Ocultar valores ao abrir" (são duas escolhas)', (await k1Widget().getAttribute('aria-checked')) === 'true' && (await hideSwitch().getAttribute('aria-checked')) === 'false', `${await k1Widget().getAttribute('aria-checked')} ${await hideSwitch().getAttribute('aria-checked')}`);
-  ok('K1 Conta: na demonstração e nas contas simuladas a escolha fica só em memória (nada vai para o armazenamento do navegador)', (await k1Store()) === k1StoreW0, await k1Store());
-  await btn('Voltar').click(); await p.waitForTimeout(500);
-  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
-  ok('K1 Conta: a escolha continua ligada ao voltar à tela', (await k1Widget().getAttribute('aria-checked')) === 'true', `${await k1Widget().getAttribute('aria-checked')}`);
-  await k1Widget().click(); await p.waitForTimeout(300);
-  ok('K1 Conta: desligar volta ao padrão', (await k1Widget().getAttribute('aria-checked')) === 'false', `${await k1Widget().getAttribute('aria-checked')}`);
+  ok('K1 Conta: o card "Widget na tela inicial" (título de nível 2) diz, na web, "Disponível no app da Clarevo para celular." (D-093) e o que o widget mostra, depois de Privacidade', (await headingShown('Widget na tela inicial')) &&
+    t.includes('Disponível no app da Clarevo para celular.') && t.includes('Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.') &&
+    (await hideSwitch().getAttribute('aria-checked')) === 'false' && t.indexOf('Privacidade neste aparelho') < t.indexOf('Widget na tela inicial'));
+  ok('K1 Conta na web: sem o interruptor "Mostrar valores no widget" (sem widget no navegador, ele não teria efeito; D-110), como os lembretes',
+    (await visibleCount('switch', 'Mostrar valores no widget')) === 0 && !t.includes('Desligado, o widget mostra R$ ••••'));
+  await k1Shots('369_conta_widget', false, false);
+  ok('K1 Conta: abrir o card não grava nada no armazenamento do navegador', (await k1Store()) === k1StoreW0, await k1Store());
   await btn('Voltar').click(); await waitText('Registrar recebimento');
-  // Na demonstração a escolha fica só em memória (nada no armazenamento do aparelho).
+  // A demonstração mostra o mesmo card (os passos seguintes continuam nela, como antes).
   await demoHome();
-  await openConta(); await scrollTo('Widget na tela inicial'); await k1Widget().click(); await p.waitForTimeout(300);
-  ok('K1 Conta na demonstração: o interruptor liga, também só em memória', (await k1Widget().getAttribute('aria-checked')) === 'true' && (await k1Store()) === k1StoreW0);
-  await k1Widget().click(); await p.waitForTimeout(300);
+  await openConta(); await scrollTo('Widget na tela inicial'); await p.waitForTimeout(300);
+  ok('K1 Conta na demonstração: o mesmo card, sem o interruptor', (await body()).includes('Disponível no app da Clarevo para celular.') && (await visibleCount('switch', 'Mostrar valores no widget')) === 0);
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // ---- 13. Entradas: a busca "No app" e "Como usar" de Aprender e a entrada do guia ----
@@ -10181,12 +10174,13 @@ setInterval(async () => {
   ok('D54 renda comprometida: a tela não ganha nota nem texto novo sobre arredondamento (só os números dos grupos mudam)', !/arredond/i.test(t));
   await d54Shots('397_renda_comprometida_grupos', null, () => scrollTo('Composição'));
 
-  // ---- 6. Widget com valores ocultos (P-027): a legenda do interruptor em Conta ----
+  // ---- 6. Widget com valores ocultos (P-027): o card em Conta (a legenda do interruptor só no celular, D-110) ----
   await j1Demo();
   await openConta(); await scrollTo('Widget na tela inicial'); await p.waitForTimeout(300);
   t = await d54Keep();
-  ok('D54 Conta › Widget na tela inicial: o interruptor "Mostrar valores no widget" (desligado) diz que, desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome',
-    t.includes('Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.') && (await p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'false');
+  // A legenda do interruptor (núcleo, WIDGET_TEXT.showValuesCaption) aparece só no celular: na web o card não tem o interruptor (D-110).
+  ok('D54 Conta › Widget na tela inicial: na web, só "Disponível no app da Clarevo para celular.", sem o interruptor',
+    t.includes('Disponível no app da Clarevo para celular.') && (await p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).count()) === 0);
   await d54Shots('398_conta_widget_oculto', null, () => scrollTo('Widget na tela inicial'));
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
@@ -15060,9 +15054,10 @@ setInterval(async () => {
     ok('Computador: Esc fecha o painel e volta a Movimentos', new URL(p.url()).pathname === '/movimentacoes' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 0);
     // Anotar gasto pela barra lateral: o formulário no painel; tocar no fundo fecha.
     await p.getByRole('navigation').getByRole('button', { name: 'Anotar gasto' }).first().click(); await waitText('Valor'); await p.waitForTimeout(700);
+    // O painel é um cartão arredondado, a 12 px da direita da janela (D-110).
     ok('Computador: Anotar gasto abre no painel à direita, por cima de Movimentos',
       new URL(p.url()).pathname === '/registro/novo' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 1 &&
-      (await p.evaluate(() => { const d = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getBoundingClientRect().width > 0); const r = d.getBoundingClientRect(); return r.width <= 561 && r.right >= window.innerWidth - 1; })));
+      (await p.evaluate(() => { const d = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getBoundingClientRect().width > 0); const r = d.getBoundingClientRect(); return r.width <= 561 && r.right >= window.innerWidth - 16 && r.right <= window.innerWidth - 8; })));
     await layoutChecks('Computador, painel do formulário 1280px'); await shot('632_computador_painel_formulario');
     await p.getByRole('button', { name: 'Fechar', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(800);
     ok('Computador: tocar no fundo fecha o formulário', new URL(p.url()).pathname === '/movimentacoes' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 0);
@@ -15073,6 +15068,127 @@ setInterval(async () => {
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(600);
     ok('Computador: abaixo de 1024 px, as abas de baixo voltam e a barra lateral sai', (await visibleTabs()) === 5 && (await p.getByRole('navigation').filter({ visible: true }).count()) === 0);
     ok('Computador: nada vai à rede na demonstração', writes.length === dkWrites0, writes.slice(dkWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Paridade entre a web, o computador e o celular (D-110). Pedido do Enzo: "o app no pc, não tem a opção de ocultar valores" (estava só
+  // embaixo na barra lateral; no celular, o olho fica no cabeçalho azul) e "corrija as bordas, para que fiquem todas arredondadas".
+  // (1) Em 390 px, também na demonstração (com o selo), o olho fica no cabeçalho, ao lado do avatar, e mostra e oculta na hora. (2) Em
+  // 1280 px, "Ocultar valores" com o texto no alto do bloco azul (no Resumo, acima do mês; nas abas com título, na linha do título), com
+  // o mesmo estado do botão da barra lateral. (3) Em 1280 px, o bloco azul das abas, o cabeçalho das telas cheias e o painel dos
+  // formulários são cartões com os quatro cantos de 20 px, afastados do alto da janela e da barra lateral; o bloco azul alinha com os
+  // cartões de baixo; no celular, a faixa continua presa ao alto, só com os cantos de baixo arredondados. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const pdWrites0 = writes.length;
+    await demoHome();
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(500);
+    const pdBandEye = () => p.locator('[data-band] [role=button][aria-label="Ocultar valores"]').filter({ visible: true });
+    const pdEyeName = () => p.evaluate(() => { const e = [...document.querySelectorAll('[data-band] [role=button]')].find((x) => /^(Ocultar|Mostrar) valores$/.test(x.getAttribute('aria-label') || '') && x.getBoundingClientRect().width > 0); return e ? e.getAttribute('aria-label') : null; });
+    const pdBand = () => p.evaluate(() => {
+      const b = [...document.querySelectorAll('[data-band]')].find((e) => e.getBoundingClientRect().width > 0 && !e.closest('[inert]'));
+      if (!b) return null;
+      const cs = getComputedStyle(b); const r = b.getBoundingClientRect();
+      return { radii: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].join(' '), top: r.top, left: r.left, right: r.right, bg: cs.backgroundColor };
+    });
+    // (1) Celular, 390 px.
+    const pdEye390 = await p.evaluate(() => {
+      const e = [...document.querySelectorAll('[role=button]')].find((x) => x.getAttribute('aria-label') === 'Ocultar valores' && x.getBoundingClientRect().width > 0);
+      const a = [...document.querySelectorAll('[aria-label^="Conta: perfil"]')].find((x) => x.getBoundingClientRect().width > 0);
+      if (!e || !a) return null;
+      const r = e.getBoundingClientRect(), ra = a.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), leftOfAvatar: r.right <= ra.left + 0.5, sameRow: Math.abs((r.top + r.bottom) / 2 - (ra.top + ra.bottom) / 2) < 2 };
+    });
+    ok('Paridade 390 px: na demonstração, o olho "Ocultar valores" fica no cabeçalho azul, logo antes do avatar da Conta, com 44 px', pdEye390 !== null && pdEye390.w >= 44 && pdEye390.h >= 44 && pdEye390.top < 120 && pdEye390.leftOfAvatar && pdEye390.sameRow, JSON.stringify(pdEye390));
+    await layoutChecks('Paridade, Resumo 390px');
+    await btn('Ocultar valores').click(); await p.waitForTimeout(400);
+    t = await body();
+    ok('Paridade 390 px: o olho oculta os valores na hora (R$ ••••) e vira "Mostrar valores"', t.includes('R$ ••••') && !t.includes('R$ 2.100,00') && (await visibleCount('button', 'Mostrar valores')) === 1);
+    await shot('660_paridade_olho_390');
+    await btn('Mostrar valores').click(); await p.waitForTimeout(400);
+    ok('Paridade 390 px: "Mostrar valores" traz os valores de volta', (await body()).includes('R$ 2.100,00') && (await visibleCount('button', 'Ocultar valores')) === 1);
+    const pdBand390 = await pdBand();
+    ok('Paridade 390 px: no celular, a faixa azul continua presa ao alto, com só os cantos de baixo arredondados (28 px)', pdBand390 !== null && pdBand390.radii === '0px 0px 28px 28px' && pdBand390.top <= 0.5 && pdBand390.left <= 0.5, JSON.stringify(pdBand390));
+    // Em 375 px, com o selo da demonstração, o olho não cabe: fica em Conta (como antes).
+    await p.setViewportSize({ width: 375, height: 812 }); await p.waitForTimeout(400);
+    ok('Paridade 375 px: com o selo da demonstração, o olho sai do cabeçalho (cabe a partir de 390 px) e nada passa da largura', (await visibleCount('button', 'Ocultar valores')) === 0 && !(await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)));
+
+    // (2) Computador, 1280 px: "Ocultar valores" no cabeçalho, com o texto, e o mesmo estado da barra lateral.
+    await p.setViewportSize({ width: 1280, height: 860 }); await p.waitForTimeout(700);
+    const pdNavEye = (name) => p.getByRole('navigation').getByRole('button', { name, exact: true }).filter({ visible: true });
+    const pdEye1280 = await p.evaluate(() => {
+      const e = [...document.querySelectorAll('[data-band] [role=button]')].find((x) => x.getAttribute('aria-label') === 'Ocultar valores' && x.getBoundingClientRect().width > 0);
+      const band = e ? e.closest('[data-band]') : null;
+      const month = [...document.querySelectorAll('[role=heading][aria-level="1"]')].find((x) => x.getBoundingClientRect().width > 0 && band && band.contains(x));
+      if (!e || !band || !month) return null;
+      const r = e.getBoundingClientRect(), rb = band.getBoundingClientRect(), rm = month.getBoundingClientRect();
+      return { text: e.textContent, h: Math.round(r.height), aboveMonth: r.bottom <= rm.top + 0.5, atRight: rb.right - r.right < 40, inNav: Boolean(e.closest('[role=navigation]')) };
+    });
+    ok('Paridade 1280 px: no Resumo, "Ocultar valores" com o texto no alto do bloco azul, à direita e acima do mês (fora da barra lateral)',
+      pdEye1280 !== null && pdEye1280.text === 'Ocultar valores' && pdEye1280.h >= 44 && pdEye1280.aboveMonth && pdEye1280.atRight && !pdEye1280.inNav, JSON.stringify(pdEye1280));
+    ok('Paridade 1280 px: a barra lateral mantém o seu "Ocultar valores" (um em cada lugar)', (await pdNavEye('Ocultar valores').count()) === 1 && (await visibleCount('button', 'Ocultar valores')) === 2);
+    await pdBandEye().first().click(); await p.waitForTimeout(400);
+    t = await body();
+    ok('Paridade 1280 px: o botão do cabeçalho oculta os valores, e o da barra lateral passa a "Mostrar valores" junto (um estado só)',
+      t.includes('R$ ••••') && !t.includes('R$ 2.100,00') && (await pdEyeName()) === 'Mostrar valores' && (await pdNavEye('Mostrar valores').count()) === 1 && (await visibleCount('button', 'Ocultar valores')) === 0);
+    await shot('661_paridade_olho_1280');
+    await pdNavEye('Mostrar valores').first().click(); await p.waitForTimeout(400);
+    ok('Paridade 1280 px: "Mostrar valores" na barra lateral traz os valores de volta e o cabeçalho volta a "Ocultar valores"',
+      (await body()).includes('R$ 2.100,00') && (await pdEyeName()) === 'Ocultar valores' && (await pdNavEye('Ocultar valores').count()) === 1);
+
+    // (3) Os cantos: o bloco azul do Resumo, alinhado com os cartões.
+    const pdResumo = await p.evaluate(() => {
+      const nav = [...document.querySelectorAll('[role=navigation]')].find((e) => e.getBoundingClientRect().width > 0);
+      const b = [...document.querySelectorAll('[data-band]')].find((e) => e.getBoundingClientRect().width > 0);
+      const cards = [...document.querySelectorAll('[data-card]')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.parentElement.closest('[data-card]'); });
+      if (!nav || !b || cards.length === 0) return null;
+      const cs = getComputedStyle(b); const r = b.getBoundingClientRect();
+      return { radii: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].join(' '), top: Math.round(r.top), gapNav: Math.round(r.left - nav.getBoundingClientRect().right),
+        dLeft: Math.round(r.left - Math.min(...cards.map((c) => c.getBoundingClientRect().left))), dRight: Math.round(Math.max(...cards.map((c) => c.getBoundingClientRect().right)) - r.right) };
+    });
+    ok('Paridade 1280 px: o bloco azul do Resumo é um cartão com os quatro cantos de 20 px, a 24 px do alto, longe da barra lateral e alinhado com os cartões de baixo',
+      pdResumo !== null && pdResumo.radii === '20px 20px 20px 20px' && pdResumo.top >= 16 && pdResumo.gapNav >= 16 && Math.abs(pdResumo.dLeft) <= 1 && Math.abs(pdResumo.dRight) <= 1, JSON.stringify(pdResumo));
+    await layoutChecks('Paridade, Resumo 1280px');
+    await p.setViewportSize({ width: 1024, height: 768 }); await p.waitForTimeout(500);
+    const pdBand1024 = await pdBand();
+    ok('Paridade 1024 px: o mesmo cartão azul, com os quatro cantos de 20 px', pdBand1024 !== null && pdBand1024.radii === '20px 20px 20px 20px' && pdBand1024.top >= 16, JSON.stringify(pdBand1024));
+    await layoutChecks('Paridade, Resumo 1024px');
+    await p.setViewportSize({ width: 1280, height: 860 }); await p.waitForTimeout(500);
+    // Movimentos: o botão na linha do título, à direita.
+    await p.getByRole('navigation').getByRole('link', { name: 'Movimentos do mês', exact: true }).filter({ visible: true }).first().click(); await waitText('Organizar'); await p.waitForTimeout(600);
+    const pdMov = await p.evaluate(() => {
+      const b = [...document.querySelectorAll('[data-band]')].find((e) => e.getBoundingClientRect().width > 0);
+      const h1 = b ? [...b.querySelectorAll('[role=heading][aria-level="1"]')].find((e) => e.textContent === 'Movimentos') : null;
+      const e = b ? [...b.querySelectorAll('[role=button]')].find((x) => x.getAttribute('aria-label') === 'Ocultar valores') : null;
+      if (!b || !h1 || !e) return null;
+      const cs = getComputedStyle(b); const r = e.getBoundingClientRect(), rh = h1.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      return { radii: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].join(' '), sameRow: r.top < rh.bottom && r.bottom > rh.top, atRight: rb.right - r.right < 40 };
+    });
+    ok('Paridade 1280 px: em Movimentos, "Ocultar valores" na linha do título, à direita, e o bloco azul com os quatro cantos de 20 px', pdMov !== null && pdMov.sameRow && pdMov.atRight && pdMov.radii === '20px 20px 20px 20px', JSON.stringify(pdMov));
+    await layoutChecks('Paridade, Movimentos 1280px'); await shot('662_paridade_movimentos_1280');
+    // O painel dos formulários: cartão arredondado, com o cabeçalho preso ao alto dele.
+    await p.getByRole('navigation').getByRole('button', { name: 'Anotar gasto' }).first().click(); await waitText('Valor'); await p.waitForTimeout(800);
+    const pdPanel = await p.evaluate(() => {
+      const d = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getBoundingClientRect().width > 0);
+      if (!d) return null;
+      const b = [...d.querySelectorAll('[data-band]')].find((e) => e.getBoundingClientRect().width > 0);
+      const cs = getComputedStyle(d); const r = d.getBoundingClientRect();
+      return { radii: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].join(' '), top: Math.round(r.top), right: Math.round(window.innerWidth - r.right),
+        bottom: Math.round(window.innerHeight - r.bottom), overflow: cs.overflow, bandRadius: b ? getComputedStyle(b).borderTopLeftRadius : null, bandTop: b ? Math.round(b.getBoundingClientRect().top - r.top) : null };
+    });
+    ok('Paridade 1280 px: o painel do formulário é um cartão com os quatro cantos de 20 px, a 12 px do alto, da direita e do pé, e o cabeçalho fica preso ao alto dele',
+      pdPanel !== null && pdPanel.radii === '20px 20px 20px 20px' && pdPanel.top === 12 && pdPanel.right === 12 && pdPanel.bottom === 12 && pdPanel.overflow === 'hidden' && pdPanel.bandRadius === '0px' && pdPanel.bandTop !== null && pdPanel.bandTop <= 1, JSON.stringify(pdPanel));
+    await layoutChecks('Paridade, painel 1280px'); await shot('663_paridade_painel_1280');
+    await p.keyboard.press('Escape'); await p.waitForTimeout(800);
+    ok('Paridade 1280 px: Esc fecha o painel', (await p.getByRole('dialog').filter({ visible: true }).count()) === 0);
+    // Uma tela cheia (Conta): o cabeçalho compacto também vira cartão.
+    await p.getByRole('navigation').getByRole('link', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança', exact: true }).first().click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(600);
+    const pdConta = await pdBand();
+    ok('Paridade 1280 px: em Conta, o cabeçalho com "Voltar" é um cartão azul com os quatro cantos de 20 px, afastado do alto e da barra lateral', pdConta !== null && pdConta.radii === '20px 20px 20px 20px' && pdConta.top >= 16 && pdConta.left >= 256 + 16, JSON.stringify(pdConta));
+    await layoutChecks('Paridade, Conta 1280px'); await shot('664_paridade_conta_1280');
+    await p.getByRole('navigation').getByRole('link', { name: 'Resumo', exact: true }).first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(600);
+    ok('Paridade: nada vai à rede na demonstração', writes.length === pdWrites0, writes.slice(pdWrites0).join(' | '));
   }
 
   // ==================================================================================================================
