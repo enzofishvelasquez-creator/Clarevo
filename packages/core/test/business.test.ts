@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  APP_SCREENS,
   BUSINESS_CATEGORIES,
-  BUSINESS_GUIDE_ENTRY,
+  GUIDE_ENTRIES,
   RECORD_KIND_ERROR_TEXT,
   BUSINESS_ERROR_TEXT,
   BUSINESS_TEXT,
@@ -28,8 +29,11 @@ import {
   contextName,
   createDemoRepository,
   demoScenarioFrom,
+  guideEntry,
   isWithdrawal,
   newOperationKey,
+  searchAppScreens,
+  searchGuide,
   suggestMoveCategory,
   summarizeMonth,
   unsavedChangesText,
@@ -238,16 +242,32 @@ describe('Como está o negócio: entrou, saiu e sobrou', () => {
     expect(businessErrorText('qualquer')).toBe(BUSINESS_ERROR_TEXT.salvar_falhou);
     // A mesma frase da retirada travada no detalhe e na recusa do formulário de gasto e recebimento.
     expect(RECORD_KIND_ERROR_TEXT.retirada_ligada).toBe(BUSINESS_TEXT.withdrawalLocked);
-    // A entrada do guia pronta para a junção (fora de GUIDE_ENTRIES enquanto o tema da Ajuda do site não existe).
-    const guideTexts = [BUSINESS_GUIDE_ENTRY.title, BUSINESS_GUIDE_ENTRY.purpose, ...BUSINESS_GUIDE_ENTRY.steps];
+    // A entrada do guia (no grupo "Conta e privacidade", logo depois da Família) e a tela no índice "No app" da busca de Aprender.
+    const entry = guideEntry('negocio')!;
+    const guideTexts = [entry.title, entry.purpose, ...entry.steps];
     for (const g of guideTexts) {
       expect(g).not.toMatch(FORBIDDEN);
       expect(g).not.toMatch(JUDGMENT);
     }
-    expect(BUSINESS_GUIDE_ENTRY.steps.length).toBeGreaterThanOrEqual(3);
-    expect(BUSINESS_GUIDE_ENTRY.steps.length).toBeLessThanOrEqual(6);
-    expect(BUSINESS_GUIDE_ENTRY.routes).toContain('/negocio');
-    expect(BUSINESS_GUIDE_ENTRY.screenshot).toBe('730_negocio_como_esta.png');
+    expect(entry.steps.length).toBeGreaterThanOrEqual(3);
+    expect(entry.steps.length).toBeLessThanOrEqual(6);
+    expect(entry.routes).toContain('/negocio');
+    expect(entry.screenshot).toBe('730_negocio_como_esta.png');
+    expect(entry.group).toBe('conta-e-privacidade');
+    const ids = GUIDE_ENTRIES.map((e) => e.id);
+    expect(ids.indexOf('negocio')).toBe(ids.indexOf('familia') + 1);
+    expect(searchGuide('cnpj').map((e) => e.id)).toContain('negocio');
+    expect(searchGuide('negócio')[0]?.id).toBe('negocio');
+    expect(searchGuide('trabalho por conta').map((e) => e.id)).toEqual(['negocio']);
+    const screen = APP_SCREENS.find((s) => s.id === 'negocio')!;
+    expect(screen.href).toBe('/negocio');
+    expect(screen.title).toBe(BUSINESS_TEXT.accountTitle);
+    for (const t of [screen.title, screen.caption]) {
+      expect(t).not.toMatch(FORBIDDEN);
+      expect(t).not.toMatch(JUDGMENT);
+    }
+    expect(searchAppScreens('cnpj').map((s) => s.id)).toEqual(['negocio']);
+    expect(searchAppScreens('negócio')[0]?.id).toBe('negocio');
     // Quem tem CNPJ ou trabalha por conta: a frase que explica para que serve aparece em Conta e na criação.
     expect(BUSINESS_TEXT.accountHintNone).toContain('CNPJ ou trabalha por conta');
     expect(BUSINESS_TEXT.intro).toContain('CNPJ ou trabalha por conta');

@@ -123,7 +123,7 @@ const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;'
 
 /** Os temas de Aprender que viram página: publicados, não legados, das seções organizar, juros e tempo. */
 const TEMAS_DO_SITE = publishedTopics().filter((t) => !t.legacy && ['organizar', 'juros', 'tempo'].includes(t.section));
-const TEMAS_DA_AJUDA = ['comecar', 'organizar', 'contas', 'familia', 'beneficio', 'privacidade', 'conta'];
+const TEMAS_DA_AJUDA = ['comecar', 'organizar', 'contas', 'familia', 'negocio', 'beneficio', 'privacidade', 'conta'];
 const POSTS_INICIAIS = [
   'novidades/2026-10-23-conheca-a-clarevo.html',
   'novidades/2026-10-23-13o-salario-quando-cai-e-como-se-organizar.html',
@@ -1395,10 +1395,10 @@ describe('site público: Ajuda, busca e perguntas do suporte', () => {
   const perguntasNasPaginas = temas.flatMap((nome) => [...h(nome).matchAll(/<article class="pergunta" id="([^"]+)"><h3>([^<]+)<\/h3>/g)].map((m) => ({ nome, id: m[1]!, pergunta: m[2]! })));
   const indice = JSON.parse(h('ajuda/indice.json')) as { i: string; t: string; a: string; u: string; k: string; x: string }[];
 
-  it('a Ajuda tem os sete temas pedidos, com a lista completa visível sem JavaScript', () => {
+  it('a Ajuda tem os oito temas (os sete pedidos e o Espaço Negócio, D-113), com a lista completa visível sem JavaScript', () => {
     const index = h('ajuda/index.html');
     expect(index).toContain('<h1>Ajuda</h1>');
-    for (const titulo of ['Começar', 'Anotar e organizar', 'Contas e cartões', 'Família', 'Benefício da empresa', 'Privacidade e segurança', 'Conta e acesso']) expect(index, titulo).toContain(titulo);
+    for (const titulo of ['Começar', 'Anotar e organizar', 'Contas e cartões', 'Família', 'Espaço Negócio', 'Benefício da empresa', 'Privacidade e segurança', 'Conta e acesso']) expect(index, titulo).toContain(titulo);
     for (const nome of temas) {
       const pagina = h(nome);
       expect(pagina).toContain('<article class="pergunta"');

@@ -86,11 +86,6 @@ const COVERAGE_EXCEPTIONS: readonly { route: string; reason: string }[] = [
     route: '/conta/whatsapp',
     reason: 'WhatsApp (D-076): a tela só aparece quando o número da Clarevo existir (WHATSAPP_NUMBER); a entrada do guia e a captura entram junto com o número.',
   },
-  {
-    route: '/negocio',
-    reason:
-      'Espaço Negócio (D-113): a entrada do guia já está pronta (BUSINESS_GUIDE_ENTRY, com a captura 730) e entra em GUIDE_ENTRIES junto com o tema da Ajuda do site, que é de outra frente (scripts/site/paginas/ajuda.js).',
-  },
 ];
 
 /** Telas de consulta ou abas que nenhuma entrada cobre e que não estão na lista de exceções. */

@@ -390,6 +390,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     keywords: ['família', 'familia', 'convidar', 'convite', 'link de convite', 'membros', 'titular', 'sair da família', 'anotar junto', 'contas da casa'],
   },
   {
+    id: 'negocio',
+    title: 'Espaço Negócio',
+    caption: 'Separar as contas do negócio das pessoais e ver quanto entrou, saiu e sobrou no mês',
+    href: '/negocio',
+    keywords: ['negócio', 'negocio', 'cnpj', 'mei', 'trabalho por conta', 'autônomo', 'loja', 'vendas', 'retirada', 'pró-labore', 'separar contas', 'contas do negócio'],
+  },
+  {
     id: 'conta',
     title: 'Conta',
     caption: 'Perfil, senha, lembretes, privacidade e sair',
