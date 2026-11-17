@@ -276,13 +276,18 @@ export interface LevelReminderItem {
 
 /**
  * O lembrete local no celular no dia em que o aviso de queda começa (D-111), para quem permitiu lembretes: no horário dos lembretes do dia a
- * dia, com o próprio texto do aviso (sem valor nenhum na tela bloqueada), abrindo a tela do nível. Nulo sem próximo aviso ou quando o
- * horário de hoje já passou (`nowMinutes`, minutos desde a meia-noite). O app reagenda a cada abertura e escrita: anotar tira o lembrete.
+ * dia, abrindo a tela do nível. O texto é neutro, sem contagem de dias e sem nível (`LEVEL_TEXT.reminderBody`): o lembrete é montado no dia
+ * em que é agendado e só é refeito quando o app abre ou grava, e uma anotação pelo WhatsApp ou pelo Telegram conta no banco sem passar pelo
+ * aparelho; a contagem fica só dentro do app, recalculada a cada leitura do nível. Também respeita a tela bloqueada (D-087): nada de valor,
+ * descrição nem nível. Quando o horário de hoje já passou (`nowMinutes`, minutos desde a meia-noite) no dia em que um aviso começa, vale o
+ * marco seguinte (o próximo dia em que um aviso começa). Nulo sem próximo aviso (sem contagem ou já no Bronze) e com hora inválida. O app
+ * reagenda a cada abertura e escrita: anotar tira o lembrete.
  */
 export function levelWarningReminder(state: AccountLevelState, today: IsoDate, hour: number, nowMinutes?: number): LevelReminderItem | null {
-  const next = nextLevelWarning(state, today);
-  if (!next || !Number.isInteger(hour) || hour < 0 || hour > 23) return null;
-  if (next.date === today && nowMinutes !== undefined && nowMinutes >= hour * 60) return null;
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+  let next = nextLevelWarning(state, today);
+  if (next && next.date === today && nowMinutes !== undefined && nowMinutes >= hour * 60) next = nextLevelWarning(state, addDays(today, 1));
+  if (!next) return null;
   const hh = String(hour).padStart(2, '0');
   return {
     id: `${ROUTINE_REMINDER_ID_PREFIX}nivel-${next.date}`,
@@ -290,7 +295,7 @@ export function levelWarningReminder(state: AccountLevelState, today: IsoDate, h
     fireAt: `${next.date}T${hh}:00`,
     hour,
     title: LEVEL_TEXT.reminderTitle,
-    body: LEVEL_TEXT.warning(next.warning),
+    body: LEVEL_TEXT.reminderBody,
     route: '/conta/nivel',
   };
 }
@@ -428,6 +433,11 @@ export const LEVEL_TEXT = {
   /** Com o nível abaixo do que os marcos dão (sem contar dias). */
   below: (stepsDown: number, marksLevel: AccountLevel) =>
     `Como nada foi anotado por um tempo, o nível está ${stepsDown === 1 ? 'um degrau' : `${stepsDown} degraus`} abaixo do que os seus marcos dão. Anotar um gasto ou recebimento traz de volta o nível ${N[marksLevel]}.`,
-  /** Título do lembrete local no celular no dia em que o aviso começa (o corpo é o próprio aviso, sem valor nenhum). */
+  /** Título do lembrete local no celular no dia em que o aviso começa. */
   reminderTitle: 'Nível da conta',
+  /**
+   * O corpo do lembrete local: neutro, sem contagem de dias e sem nível (o lembrete é montado quando é agendado, e uma anotação pelo
+   * WhatsApp ou pelo Telegram pode ter zerado a contagem desde então); a contagem aparece só dentro do app, recalculada.
+   */
+  reminderBody: 'Veja como está o nível da sua conta na Clarevo.',
 } as const;

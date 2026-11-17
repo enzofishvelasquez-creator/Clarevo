@@ -167,7 +167,9 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
     }
   }
   // Aviso de queda do nível (D-111): para quem permitiu lembretes, um lembrete no dia em que o aviso começa (o 45º dia sem anotar), no
-  // horário dos lembretes do dia a dia. Sem a leitura do nível, segue sem ele.
+  // horário dos lembretes do dia a dia, com texto neutro (sem contagem e sem nível: uma anotação pelo WhatsApp ou pelo Telegram conta no
+  // banco sem refazer este lembrete; a contagem fica só dentro do app). Com o horário de hoje já passado, o marco seguinte. Sem a leitura
+  // do nível, segue sem ele.
   try {
     const level = levelWarningReminder(await job.repo.getAccountLevel(), today, job.routine?.hour ?? DEFAULT_ROUTINE_REMINDER_HOUR, nowMinutes);
     if (level) items.push({ id: level.id, date: fireDate(level), title: level.title, body: level.body, signature: routineReminderSignature(level), route: level.route, channel: 'rotina' });

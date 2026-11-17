@@ -208,7 +208,7 @@ describe('níveis de conta (D-111): a queda por tempo sem anotar', () => {
     expect(nextLevelWarning(levelStateOf(ouro), TODAY)).toBeNull();
   });
 
-  it('o lembrete local no celular: no dia em que o aviso começa, no horário dos lembretes, com o texto do aviso e sem valor', () => {
+  it('o lembrete local no celular: no dia em que o aviso começa, no horário dos lembretes, com texto neutro (sem contagem, sem nível, sem valor)', () => {
     const ouro = marks(10);
     const r = levelWarningReminder(state(ouro, daysAgo(10)), TODAY, 20, 9 * 60);
     expect(r).toEqual({
@@ -217,13 +217,32 @@ describe('níveis de conta (D-111): a queda por tempo sem anotar', () => {
       fireAt: `${addDays(TODAY, 35)}T20:00`,
       hour: 20,
       title: 'Nível da conta',
-      body: 'Faz 45 dias que nada é anotado. Em 15 dias, o nível passa de Ouro para Prata. Anotar um gasto ou recebimento mantém o nível.',
+      body: 'Veja como está o nível da sua conta na Clarevo.',
       route: '/conta/nivel',
     });
-    expect(r!.body).not.toMatch(/R\$/);
+    // Revisão de 17/11/2026: o lembrete é montado quando é agendado, e quem anota só pelo WhatsApp ou pelo Telegram zera a contagem no
+    // banco sem o app refazer o lembrete. Por isso o texto não diz quantos dias, nem o nível de agora ou o seguinte.
+    for (const idle of [0, 10, 45, 46, 80]) {
+      const item = levelWarningReminder(state(ouro, daysAgo(idle)), TODAY, 20, 9 * 60);
+      expect(item?.body).toBe(LEVEL_TEXT.reminderBody);
+      expect(item!.body).not.toMatch(/\d|R\$|Bronze|Prata|Ouro|Diamante|Esmeralda|dias?\b/);
+    }
     // Hoje é o 45º dia: entra se o horário ainda não passou.
     expect(levelWarningReminder(state(ouro, daysAgo(45)), TODAY, 20, 19 * 60)?.date).toBe(TODAY);
-    expect(levelWarningReminder(state(ouro, daysAgo(45)), TODAY, 20, 20 * 60)).toBeNull();
+    // Com o horário de hoje já passado, vale o marco seguinte (o 105º dia, quando começa o aviso do degrau seguinte), e não nada.
+    expect(levelWarningReminder(state(ouro, daysAgo(45)), TODAY, 20, 20 * 60)).toEqual({
+      id: `${ROUTINE_REMINDER_ID_PREFIX}nivel-${addDays(TODAY, 60)}`,
+      date: addDays(TODAY, 60),
+      fireAt: `${addDays(TODAY, 60)}T20:00`,
+      hour: 20,
+      title: 'Nível da conta',
+      body: 'Veja como está o nível da sua conta na Clarevo.',
+      route: '/conta/nivel',
+    });
+    expect(levelWarningReminder(state(ouro, daysAgo(105)), TODAY, 8, 9 * 60)).toBeNull();
+    // Sem marco seguinte (o Prata só tem um degrau até o Bronze): com o horário passado, nada.
+    expect(levelWarningReminder(state(marks(5), daysAgo(45)), TODAY, 20, 19 * 60)?.date).toBe(TODAY);
+    expect(levelWarningReminder(state(marks(5), daysAgo(45)), TODAY, 20, 21 * 60)).toBeNull();
     // Sem contagem, no Bronze ou com hora inválida: nada.
     expect(levelWarningReminder(levelStateOf(ouro), TODAY, 20)).toBeNull();
     expect(levelWarningReminder(state(marks(2), daysAgo(10)), TODAY, 20)).toBeNull();
