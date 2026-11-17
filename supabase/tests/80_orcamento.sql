@@ -983,7 +983,7 @@ do $$ begin
   -- As assinaturas das migrações anteriores continuam.
   assert to_regprocedure('public.set_income_reference(text, uuid, date, integer, bigint, boolean)') is not null
      and to_regprocedure('public.month_committed(uuid, date)') is not null
-     and to_regprocedure('public.pay_invoice(text, uuid, date, integer, bigint, date, uuid)') is not null, 'demais assinaturas sem mudança';
+     and to_regprocedure('public.pay_invoice(text, uuid, date, integer, bigint, date, uuid, uuid)') is not null, 'demais assinaturas sem mudança';
 end $$;
 
 -- Vínculos coerentes no fim de tudo.
