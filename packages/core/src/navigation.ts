@@ -89,7 +89,7 @@ export function barModeFor(pathname: string): BarMode {
 
 /** Abas que uma tela de consulta abre quando a pessoa não veio de nenhuma (endereço aberto direto): a do assunto. */
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
-  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes|evolucao|analises)(\/|$)/, '/movimentacoes'],
+  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes|evolucao|analises|calendario)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
   [/^\/investimento(\/|$)/, '/investimentos'],
   [/^\/(explicacao|aprender)(\/|$)/, '/aprender'],
@@ -357,6 +357,14 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Categorias em barras ou bolhas, evolução, próximos meses e orçamento do mês',
     href: '/analises',
     keywords: ['análises', 'análise', 'analisar', 'explorar', 'bolhas', 'barras', 'gráfico de bolhas', 'categorias em bolhas', 'distribuição', 'distribuição dos gastos', 'comparar categorias', 'próximos meses'],
+  },
+  {
+    // O título e a legenda são os de CALENDAR_TEXT (calendar.ts, D-105).
+    id: 'calendario',
+    title: 'Calendário do mês',
+    caption: 'Contas, faturas e datas do mês, num lugar só',
+    href: '/calendario',
+    keywords: ['calendário', 'calendario', 'agenda', 'datas', 'datas do mês', 'quando vence', 'vencimentos do mês', 'informe de rendimentos'],
   },
   {
     id: 'lembretes',

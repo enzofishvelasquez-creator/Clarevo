@@ -233,6 +233,11 @@ const INVEST_TOPIC_TERMS: Readonly<Record<string, RegExp>> = {
   proventos: /fundos? imobili[aá]rios?/gi,
   'declarar-investimentos': /poupan[cç]a|\bcdb\b|\blci\b|\blca\b|criptoativos?|fundos imobili[aá]rios/gi,
   'ganho-real': /poupan[cç]a/gi,
+  // Temas curtos (D-105).
+  'ir-regressivo': /\bcdb\b|\blci\b|\blca\b/gi,
+  'come-cotas': /fundos? (de curto prazo|de a[cç][õo]es|imobili[aá]rios|de renda fixa)/gi,
+  'ipca-mais': /\btesouro\b/gi,
+  'marcacao-a-mercado': /\btesouro\b/gi,
 };
 
 /** Texto de um tema sem os nomes de produto que esse tema pode citar (INVEST_TOPIC_TERMS); outros temas: o texto inteiro. */

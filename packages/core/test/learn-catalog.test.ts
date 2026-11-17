@@ -90,12 +90,12 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
     expect(learnReviewWarnings(TOPICS, '2027-03-11').map((w) => w.slug)).toContain('rotativo-cartao');
   });
 
-  it('os 54 slugs na ordem; TOPICS e TOPIC_SLUGS iguais', () => {
-    expect(TOPIC_SLUGS.length).toBe(54);
+  it('os 59 slugs na ordem; TOPICS e TOPIC_SLUGS iguais', () => {
+    expect(TOPIC_SLUGS.length).toBe(59);
     expect(TOPICS.map((t) => t.slug)).toEqual([...TOPIC_SLUGS]);
   });
 
-  it('seção, tipo e status de cada tema: 52 publicados e 2 rascunhos', () => {
+  it('seção, tipo e status de cada tema: 57 publicados e 2 rascunhos', () => {
     const table: Record<TopicSlug, string> = {
       diferenca: 'usar tema publicado',
       'realizado-previsto': 'usar tema publicado',
@@ -143,6 +143,11 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
       'declarar-investimentos': 'tempo tema publicado',
       'ganho-real': 'tempo tema publicado',
       'golpes-rentabilidade': 'tempo tema publicado',
+      'ir-regressivo': 'tempo tema publicado',
+      'iof-resgate': 'tempo tema publicado',
+      'come-cotas': 'tempo tema publicado',
+      'ipca-mais': 'tempo tema publicado',
+      'marcacao-a-mercado': 'tempo tema publicado',
       'quem-ve-meus-dados': 'duvidas pergunta publicado',
       'empresa-ve': 'duvidas pergunta publicado',
       demonstracao: 'duvidas pergunta publicado',
@@ -153,7 +158,7 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
       'o-que-a-clarevo-nao-faz': 'duvidas pergunta publicado',
     };
     expect(Object.fromEntries(TOPICS.map((t) => [t.slug, `${t.section} ${t.kind} ${t.status}`]))).toEqual(table);
-    expect(publishedTopics().length).toBe(52);
+    expect(publishedTopics().length).toBe(57);
     // Rascunho diz o que falta conferir.
     for (const t of TOPICS.filter((x) => x.status === 'rascunho')) expect(t.pending!.length).toBeGreaterThan(0);
   });
@@ -270,7 +275,8 @@ describe('catálogo de Aprender (spec3 §3.3, com spec5_notes §2)', () => {
 
   it('R5: toda fonte externa de tema publicado tem endereço permitido e data de consulta 09/10/2026 (os quatro de época, 15/10/2026; Média e mediana, 20/10/2026; os sete de investimentos, 13/11/2026)', () => {
     const epoca: readonly string[] = ['decimo-terceiro', 'ferias', 'volta-as-aulas', 'imposto-de-renda'];
-    const investimentos: readonly string[] = ['ir-investimentos', 'titulos-publicos', 'lci-lca', 'proventos', 'declarar-investimentos', 'ganho-real', 'golpes-rentabilidade'];
+    // Os cinco temas curtos (D-105) usam as mesmas fontes dos sete de investimentos, com os trechos conferidos em 13/11/2026.
+    const investimentos: readonly string[] = ['ir-investimentos', 'titulos-publicos', 'lci-lca', 'proventos', 'declarar-investimentos', 'ganho-real', 'golpes-rentabilidade', 'ir-regressivo', 'iof-resgate', 'come-cotas', 'ipca-mais', 'marcacao-a-mercado'];
     const consulted = (slug: string) =>
       epoca.includes(slug) ? '2026-10-15' : slug === 'media-e-mediana' ? '2026-10-20' : investimentos.includes(slug) ? '2026-11-13' : '2026-10-09';
     for (const t of publishedTopics())
@@ -568,6 +574,11 @@ describe('temas dos Ciclos B, C e D (renda comprometida, renda que muda, aporte,
       'declarar-investimentos',
       'ganho-real',
       'golpes-rentabilidade',
+      'ir-regressivo',
+      'iof-resgate',
+      'come-cotas',
+      'ipca-mais',
+      'marcacao-a-mercado',
     ]);
   });
 });
@@ -719,7 +730,7 @@ describe('consulta ao catálogo', () => {
   it('seções na ordem da tela, com os temas publicados; Comece por aqui publicado', () => {
     const sections = topicsBySection();
     expect(sections.map((s) => s.section.title)).toEqual(['Usar o app da Clarevo', 'Organizar o mês', 'Juros e crédito', 'Dinheiro no tempo', 'Dúvidas frequentes']);
-    expect(sections.map((s) => s.topics.length)).toEqual([8, 12, 13, 12, 7]);
+    expect(sections.map((s) => s.topics.length)).toEqual([8, 12, 13, 17, 7]);
     expect(LEARN_SECTIONS.length).toBe(5);
     expect([...START_HERE]).toEqual(['diferenca', 'juros-simples-compostos', 'gasto-fixo']);
     for (const slug of START_HERE) expect(isTopicPublished(slug)).toBe(true);

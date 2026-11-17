@@ -90,6 +90,7 @@ export function AppHeader({
   context,
   contextFixed,
   wide,
+  action,
   children,
 }: {
   title?: string;
@@ -97,6 +98,8 @@ export function AppHeader({
   contextFixed?: boolean;
   /** Versão para computador: o conteúdo da faixa acompanha a largura do painel (o Resumo). */
   wide?: boolean;
+  /** Um atalho à direita do título (D-105: "Análises" em Movimentos), sem aumentar a faixa. */
+  action?: ReactNode;
   children?: ReactNode;
 }) {
   // Na versão para computador, o logotipo, o olho e a Conta ficam na barra lateral; a faixa azul mostra só o título e o mês.
@@ -112,6 +115,7 @@ export function AppHeader({
               {title}
             </Txt>
             {context ? <ContextPill label={context} fixed={contextFixed} inTab /> : null}
+            {action ? <View style={styles.titleAction}>{action}</View> : null}
           </View>
         ) : null}
         {children}
@@ -298,6 +302,8 @@ const styles = StyleSheet.create({
   // A margem de baixo fica só na linha do título (titleRow): com as duas, o título sem pílula ganhava 16 px a mais (Movimentos).
   title: { fontSize: 24, lineHeight: 32, overflowWrap: 'anywhere' } as object,
   titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[1], marginBottom: space[4] },
+  // O atalho do título (44 px de toque) não aumenta a linha de 32 px: as margens negativas compensam a diferença.
+  titleAction: { marginLeft: 'auto', marginVertical: -6 },
   avatar: { minWidth: 44, height: 44, paddingHorizontal: 4, borderRadius: 22, backgroundColor: colors.surfaceOnBrand, alignItems: 'center', justifyContent: 'center' },
   eye: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   subBand: { backgroundColor: colors.brand },

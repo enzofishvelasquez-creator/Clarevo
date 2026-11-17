@@ -10,6 +10,7 @@ import {
   annualCommitmentIds,
   budgetNotice,
   buildSeuMes,
+  buildFinancialCalendar,
   categoryRefunds,
   categoryBreakdown,
   committedEvolutionPoints,
@@ -93,6 +94,8 @@ import {
   type EvolutionExplanation,
   type EvolutionMetric,
   type EvolutionWindow,
+  type FinancialCalendar,
+  type MonthOverview,
   type Phase3Point,
   type ContextKind,
   type FamilyRole,
@@ -348,13 +351,15 @@ export function useMonthCheckRow(contextId: string | undefined, month: IsoMonth)
  * a leitura não termina, ou se ela falha (ou se a série é inconsistente), o gráfico sai sem o aviso. A chave começa por 'returnReview',
  * que toda escrita invalida (a conta paga, criada ou excluída muda o sinal na hora).
  */
-export function useEvolutionGaps(contextId: string | undefined) {
+export function useEvolutionGaps(contextId: string | undefined, windowMonths: EvolutionWindow = 12) {
   const repo = useRepo();
   const { today } = useSession();
   const sync = useSeriesSync(contextId);
+  // Com 24 ou 36 meses (D-105), o aviso cobre a janela inteira; até 12, a mesma leitura (e a mesma chave) de sempre.
+  const span = windowMonths > 12 ? windowMonths : 12;
   const query = useQuery({
-    queryKey: ['returnReview', 'evolucao', contextId, today],
-    queryFn: (): Promise<IsoMonth[]> => loadEvolutionGaps(repo, contextId!, monthOf(today)),
+    queryKey: ['returnReview', 'evolucao', contextId, today, ...(span > 12 ? [span] : [])],
+    queryFn: (): Promise<IsoMonth[]> => loadEvolutionGaps(repo, contextId!, monthOf(today), span),
     enabled: Boolean(contextId) && synced(sync),
   });
   return useMemo((): IsoMonth[] => (query.isError ? [] : (query.data ?? [])), [query.isError, query.data]);
@@ -2322,6 +2327,75 @@ export function useEvolutionWindowMonths(windowMonths: EvolutionWindow): IsoMont
   const { today } = useSession();
   const currentMonth = monthOf(today);
   return useMemo(() => evolutionMonths(currentMonth, windowMonths), [currentMonth, windowMonths]);
+}
+
+/**
+ * `months_overview` em pedaços de até 12 meses (D-105: 24 e 36 meses na Evolução, sem mudar o banco). Cada pedaço usa a chave de
+ * `useMonthsOverview` (o de 12 meses é o mesmo cache de sempre). Sem dado parcial: o gráfico só sai com todos os pedaços lidos, e uma
+ * falha de qualquer um falha tudo (nunca um mês que não veio virando "sem registros").
+ */
+export function useMonthsOverviewChunks(contextId: string | undefined, chunks: readonly { from: IsoMonth; to: IsoMonth }[]) {
+  const repo = useRepo();
+  const results = useQueries({
+    queries: chunks.map((c) => ({
+      queryKey: ['records', 'overview', contextId, c.from, c.to],
+      queryFn: () => repo.monthsOverview(contextId!, c.from, c.to),
+      enabled: Boolean(contextId),
+    })),
+  });
+  const ready = results.length > 0 && results.every((r) => r.isSuccess);
+  const version = stamp(results);
+  const value = useMemo(
+    (): MonthOverview[] | undefined => (ready ? results.flatMap((r) => r.data ?? []) : undefined),
+    [ready, version], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  return combineParts<MonthOverview[]>(results, value);
+}
+
+/**
+ * Calendário financeiro (D-105), só leitura: as contas com vencimento no mês (`listCommitmentsDueBetween`, depois da sincronização do dia,
+ * como "Próximos meses"), os gastos fixos para a previsão, as metas e, só no Pessoal, os investimentos e o plano de aportes. As chaves são
+ * as das outras telas (começam por 'commitments', 'series', 'goals' e 'investments'): toda escrita recarrega. Sem dado parcial.
+ */
+export function useFinancialCalendar(
+  contextId: string | undefined,
+  month: IsoMonth,
+  opts: { personal: boolean; goalDepositDay: number | null; investmentDepositDay: number | null },
+) {
+  const repo = useRepo();
+  const { today } = useSession();
+  const sync = useSeriesSync(contextId);
+  const due = useQuery({
+    queryKey: ['commitments', 'due', contextId, month, month],
+    queryFn: () => repo.listCommitmentsDueBetween(contextId!, month, month),
+    enabled: Boolean(contextId) && synced(sync),
+  });
+  const dueList = afterSync(sync, due);
+  const series = useSeriesList(contextId);
+  const goals = useGoals(contextId);
+  const investments = useInvestments(opts.personal ? contextId : undefined);
+  const plan = useInvestmentPlan(opts.personal ? contextId : undefined);
+  const parts: QueryPart[] = [dueList, series, goals, ...(opts.personal ? [investments, plan] : [])];
+  const ready = parts.every((p) => p.isSuccess);
+  const value = useMemo(
+    (): FinancialCalendar | undefined =>
+      ready
+        ? buildFinancialCalendar({
+            month,
+            today,
+            commitments: dueList.data!,
+            series: series.data!,
+            goals: goals.data!,
+            personal: opts.personal,
+            investments: opts.personal ? investments.data! : null,
+            investmentPlan: opts.personal ? (plan.data ?? null) : null,
+            goalDepositDay: opts.goalDepositDay,
+            investmentDepositDay: opts.investmentDepositDay,
+          })
+        : undefined,
+    [ready, month, today, dueList.data, series.data, goals.data, investments.data, plan.data, opts.personal, opts.goalDepositDay, opts.investmentDepositDay],
+  );
+  return combineParts<FinancialCalendar>(parts, value);
 }
 
 /**

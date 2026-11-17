@@ -107,6 +107,11 @@ export interface DevicePrefs {
    * quando a média muda. Só neste aparelho; nada vai para o servidor.
    */
   reserveRefreshDismissed: number | null;
+  /**
+   * Convite para rever as metas (D-105): a data (AAAA-MM-DD) a partir da qual o convite volta, hoje + 3 meses depois de "Rever metas",
+   * "Agora não" ou "Concluir revisão". Só neste aparelho; nada vai para o servidor. Vazio: vale a data da meta ativa mais antiga.
+   */
+  goalsReviewNextOn: string | null;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -131,6 +136,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   routineReminderHour: DEFAULT_ROUTINE_REMINDER_HOUR,
   depositReminderDay: DEFAULT_DEPOSIT_REMINDER_DAY,
   reserveRefreshDismissed: null,
+  goalsReviewNextOn: null,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -171,6 +177,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       depositReminderDay: isDepositReminderDay(v.depositReminderDay) ? v.depositReminderDay : DEFAULT_DEPOSIT_REMINDER_DAY,
       reserveRefreshDismissed:
         typeof v.reserveRefreshDismissed === 'number' && Number.isSafeInteger(v.reserveRefreshDismissed) && v.reserveRefreshDismissed > 0 ? v.reserveRefreshDismissed : null,
+      goalsReviewNextOn: typeof v.goalsReviewNextOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.goalsReviewNextOn) ? v.goalsReviewNextOn : null,
     };
   } catch {
     return DEFAULT_PREFS;

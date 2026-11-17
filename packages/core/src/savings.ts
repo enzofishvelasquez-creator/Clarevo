@@ -713,3 +713,45 @@ export const EXTRA_SAVINGS_TEXT = {
   deviceOnly: 'O lembrete vale para este aparelho.',
 } as const;
 
+/**
+ * "Separar parte para uma meta?" (D-105), logo depois de salvar um recebimento que não é o de sempre. Estende o lembrete de valor
+ * extra (D-078 F) com a mesma regra, sem duplicar: o recebimento é extra quando está na categoria Renda extra ou quando é ele que faz os
+ * recebimentos do mês passarem da renda de referência (Salário e Reembolso nunca). Vale a parte dele no valor extra do mês, e abaixo de
+ * `EXTRA_SAVINGS_MIN_CENTS` não pergunta. Devolve essa parte (0 = não pergunta).
+ *
+ * A pergunta não sugere valor nem deixa meta marcada: cada meta é um botão que abre o aporte com o valor vazio. Responder (escolher uma
+ * meta ou "Agora não") também esconde o lembrete de valor extra do Resumo até o mês seguinte, para a mesma pergunta não aparecer duas
+ * vezes no mesmo mês.
+ */
+export function extraIncomeOfRecord(
+  record: Pick<FinancialRecord, 'id' | 'kind' | 'amountCents' | 'category' | 'occurredOn' | 'nextMonth'>,
+  monthRecords: readonly Pick<FinancialRecord, 'id' | 'kind' | 'amountCents' | 'category' | 'occurredOn' | 'nextMonth'>[],
+  referenceCents: Cents | null,
+): Cents {
+  if (record.kind !== 'receita' || isReimbursement(record.category)) return 0;
+  const category = (record.category ?? '').trim().toLocaleLowerCase('pt-BR');
+  if (category === 'salário') return 0;
+  if (category === 'renda extra') return record.amountCents >= EXTRA_SAVINGS_MIN_CENTS ? record.amountCents : 0;
+  if (referenceCents === null || referenceCents <= 0) return 0;
+  const month = recordMonth(record);
+  let others = 0;
+  for (const r of monthRecords) {
+    if (r.id === record.id || r.kind !== 'receita' || recordMonth(r) !== month || isReimbursement(r.category)) continue;
+    others += r.amountCents;
+  }
+  // A parte deste recebimento que passa da referência (o que os outros já passaram não é dele).
+  const share = Math.min(record.amountCents, Math.max(0, others + record.amountCents - Math.max(referenceCents, others)));
+  return share >= EXTRA_SAVINGS_MIN_CENTS ? share : 0;
+}
+
+export const EXTRA_INCOME_ASK_TEXT = {
+  title: 'Separar parte para uma meta?',
+  body: 'Este recebimento entrou como valor extra. Se quiser, registre um aporte numa meta: você escolhe a meta e o valor.',
+  basis: EXTRA_SAVINGS_TEXT.basis,
+  /** Nome acessível de cada meta: "Separar parte para Viagem de férias". */
+  goalA11y: (name: string) => `Separar parte para ${name}`,
+  noGoal: 'Criar uma meta',
+  later: 'Agora não',
+  laterA11y: 'Agora não: não separar parte deste recebimento',
+} as const;
+

@@ -29,6 +29,7 @@ import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
+import { ExtraIncomeAsk } from '@/components/extra-income-ask';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { ErrorState } from '@/components/states';
@@ -152,6 +153,8 @@ export default function DetalheRegistro() {
                   />
                 </View>
               ) : null}
+              {/* "Separar parte para uma meta?" (D-105): só logo depois de salvar um recebimento que não é o de sempre. */}
+              {justSaved ? <ExtraIncomeAsk record={r} canWrite={personal?.canWrite ?? true} /> : null}
               {deleteError ? (
                 <Banner tone="erro" icon={AlertCircle}>
                   <Txt variant="label" color={colors.error}>

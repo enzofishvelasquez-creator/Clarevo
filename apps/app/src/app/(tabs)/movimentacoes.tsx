@@ -1,12 +1,14 @@
 import {
   ACCOUNTS_TEXT,
   BUDGET_TEXT,
+  CALENDAR_TEXT,
   CARDS_TEXT,
   ERROR_TEXT,
   IMPORT_TEXT,
   ORGANIZE_TEXT,
   accountFilterOptions,
   analysesParams,
+  calendarMonthParams,
   dayRows,
   filterByAccount,
   formatDayHeader,
@@ -26,7 +28,7 @@ import {
   type BudgetSummary,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { ArrowDownLeft, Calculator, CalendarClock, ChevronRight, CreditCard, FileUp, Plus, Repeat, Target, type LucideIcon } from 'lucide-react-native';
+import { ArrowDownLeft, Calculator, CalendarClock, CalendarDays, ChevronRight, CreditCard, FileUp, Plus, Repeat, Target, type LucideIcon } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
@@ -38,6 +40,7 @@ import { RecordRow } from '@/components/record-row';
 import { RecordsTable } from '@/components/records-table';
 import { SearchEntry } from '@/components/search-parts';
 import { AnalysesEntry } from '@/components/analises-parts';
+import { AnalysesHeaderEntry } from '@/components/analyses-shortcut';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, CardSlice, Chip, ListCell, Money, Screen, ScreenList, Skeleton, Txt } from '@/components/ui';
 import { WIDE_CONTENT_MAX, useWideLayout } from '@/lib/layout';
@@ -59,8 +62,8 @@ type Cell = { type: 'card'; key: string; first: boolean; last: boolean } | DayRo
 type Shortcut = { icon: LucideIcon; title: string; caption: string; open: () => void };
 
 /**
- * Bloco "Organizar" (D-033, D-034, D-037, D-041): Contas a pagar e Gastos fixos e parcelamentos com legendas do mês (a mesma origem
- * do card "Ainda a pagar", D-021(5)), Cartões com a fatura atual, Orçamento por categoria com a categoria mais perto do limite
+ * Bloco "Organizar" (D-033, D-034, D-037, D-041, D-105): Contas a pagar e Gastos fixos e parcelamentos com legendas do mês (a mesma origem
+ * do card "Ainda a pagar", D-021(5)), entre eles o Calendário do mês (D-105, legenda fixa), Cartões com a fatura atual, Orçamento por categoria com a categoria mais perto do limite
  * ("Mercado: R$ 412,30 de R$ 1.200,00"), Importar extrato ou fatura (D-048, legenda fixa) e Calculadoras com a legenda fixa. Enquanto carrega ou com erro, as linhas dinâmicas
  * mostram a legenda fixa (nunca um "0" de uma falha). Nenhuma cor de alerta.
  */
@@ -79,6 +82,13 @@ function organizeShortcuts(
       caption: payables ?? ORGANIZE_TEXT.payables.fallback,
       // A legenda fala do mês em exibição; Contas a pagar abre nesse mesmo mês (seletor local, D-039).
       open: () => router.push({ pathname: '/a-pagar', params: payablesMonthParams(month, currentMonth) }),
+    },
+    {
+      // Calendário financeiro (D-105): contas, faturas, vencimentos e datas do mês em exibição, só leitura.
+      icon: CalendarDays,
+      title: CALENDAR_TEXT.rowTitle,
+      caption: CALENDAR_TEXT.rowCaption,
+      open: () => router.push({ pathname: '/calendario', params: calendarMonthParams(month, currentMonth) }),
     },
     {
       icon: Repeat,
@@ -180,7 +190,10 @@ export default function MovimentacoesScreen() {
   ) : null;
 
   /** "Ver análises do mês" (D-059): abre no mês em exibição, com Categorias, Evolução, Próximos meses, Orçamento e o Seu mês. */
-  const analyses = <AnalysesEntry onPress={() => router.push({ pathname: '/analises', params: analysesParams(month, currentMonth) })} />;
+  const openAnalyses = () => router.push({ pathname: '/analises', params: analysesParams(month, currentMonth) });
+  const analyses = <AnalysesEntry onPress={openAnalyses} />;
+  /** "Análises" no alto, na linha do título (D-105, retorno do teste de 17/11/2026), sem empurrar a lista. */
+  const analysesTop = <AnalysesHeaderEntry onPress={openAnalyses} />;
 
   const organize = (
     <Card style={styles.shortcuts}>
@@ -252,7 +265,7 @@ export default function MovimentacoesScreen() {
 
   const header = (
     <>
-      <AppHeader title="Movimentos">
+      <AppHeader title="Movimentos" action={analysesTop}>
         <ContextSwitch />
         <MonthSwitcher />
       </AppHeader>
@@ -265,7 +278,7 @@ export default function MovimentacoesScreen() {
     </>
   );
 
-  /** Depois da lista: as análises do mês e "Organizar" (Contas a pagar, Gastos fixos, Cartões, Orçamento, Importar e Calculadoras). */
+  /** Depois da lista: as análises do mês e "Organizar" (Contas a pagar, Calendário, Gastos fixos, Cartões, Orçamento, Importar e Calculadoras). */
   const footer = (
     <ListCell style={styles.footer}>
       {analyses}
@@ -359,7 +372,7 @@ export default function MovimentacoesScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Screen wide>
-          <AppHeader title="Movimentos" wide>
+          <AppHeader title="Movimentos" wide action={analysesTop}>
             <ContextSwitch />
             <MonthSwitcher />
           </AppHeader>
