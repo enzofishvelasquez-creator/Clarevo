@@ -26,6 +26,15 @@ describe('5. Reserva para imprevistos (docs/08 §3.2)', () => {
       'Faltam R$ 18.000,00.',
       'Guardando R$ 500,00 por mês, a reserva fica completa em 36 meses (3 anos).',
     ]);
+    // Revisão de 17/11/2026: com o valor por mês, as hipóteses dizem que ele é o mesmo todo mês; R$ 18.000,00 ÷ R$ 500,00 é exato.
+    expect(r.hypotheses).toContain('O mesmo valor guardado todo mês.');
+    expect(r.hypotheses.join(' ')).not.toContain('último mês');
+    // R$ 18.000,00 ÷ R$ 700,00 = 25,7: 26 meses, para cima, e a hipótese diz que o último mês é menor.
+    const up = run({ essenciais: '3.750,00', meses: '6', guardado: '4.500,00', mensal: '700,00' });
+    expect(up.monthsToTarget).toBe(26);
+    expect(up.hypotheses).toContain('Prazo em meses inteiros, para cima: no último mês, falta menos que o valor de cada mês.');
+    // Sem valor por mês, nenhuma das duas.
+    expect(run({ essenciais: '3.750,00', meses: '6', guardado: '4.500,00' }).hypotheses.join(' ')).not.toMatch(/todo mês|último mês/);
   });
 
   it('chips 1, 3, 6 e 12; 1 a 24 meses; 1 mês no singular', () => {

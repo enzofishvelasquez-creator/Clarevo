@@ -1322,13 +1322,17 @@ describe('textos do simulador (Ciclo D)', () => {
       T.contributed(6_000_000),
       T.earnings(3_993_192),
       T.totalWithoutYield(6_000_000),
-      T.todayValue(450, 6_434_892),
+      T.todayValue(450, 9_993_192, 6_434_892),
+      T.introSave(1_000_000, 60, 0, true),
+      T.introTime(2_250_000, 450_000, true),
+      T.adjustedTarget(1_200, 1_762_342, 60),
+      T.adjustTip(1_000_000),
       ...SIMULATION_FIELD_ORDER.flatMap((field) => (['vazio', 'invalido', 'casas_demais', 'fora_da_faixa', 'zero', 'acima_do_limite', 'resultado_alto'] as const).map((code) => simulationErrorText(field, code))),
     ];
     const results: string[][] = [];
     for (const mode of SIMULATION_MODES)
       for (const rateText of ['0', '0,01', '10', '10,5', '30'])
-        for (const inflation of [null, '0', '4,5', '30'])
+        for (const [inflation, adjustTarget] of [[null, false], ['0', false], ['4,5', false], ['30', false], ['4,5', true], ['30', true]] as const)
           for (const [targetText, initialText, monthsText, monthlyText] of [
             ['22.500,00', '4.500,00', '14', '1.000,00'],
             ['22.500,00', '', '1', '0,01'],
@@ -1336,7 +1340,7 @@ describe('textos do simulador (Ciclo D)', () => {
             ['4.500,00', '4.500,00', '12', '500,00'],
             ['5.000,00', '4.500,00', '14', '0'],
           ] as const) {
-            const out = validateSimulationDraft({ mode, targetText, initialText, monthsText, monthlyText, rateText, inflationOn: inflation !== null, inflationText: inflation ?? '' });
+            const out = validateSimulationDraft({ mode, targetText, initialText, monthsText, monthlyText, rateText, inflationOn: inflation !== null, adjustTarget, inflationText: inflation ?? '' });
             if (!out.ok) {
               texts.push(...Object.values(out.errors));
               continue;

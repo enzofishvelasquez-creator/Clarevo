@@ -17,6 +17,10 @@ describe('6. Juntar para um objetivo (docs/08 §3.2)', () => {
     ]);
     expect(r.hypotheses).toContain('Sem rendimento: o valor guardado não cresce com juros.');
     expect(r.hypotheses).toContain('Valor por mês arredondado para cima, no centavo.');
+    // Revisão de 17/11/2026: sem inflação também, dito na hipótese (a meta não sobe com os preços).
+    expect(r.hypotheses).toContain('Sem inflação: o valor que você quer juntar fica o mesmo até o fim do prazo.');
+    // O exemplo do retorno, sem rendimento: R$ 10.000,00 em 60 meses = R$ 166,67 por mês (o "sem rendimento" do simulador).
+    expect(run({ alvo: '10.000,00', modo: 'prazo', meses: '60' }).monthlyCents).toBe(16_667);
   });
 
   it('com R$ 1.000,00 por mês, leva 18 meses', () => {

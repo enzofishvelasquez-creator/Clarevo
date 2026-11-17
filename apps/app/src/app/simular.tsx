@@ -6,6 +6,10 @@ import {
   emptySimulationDraft,
   previewHypotheses,
   simulatePrefill,
+  simulationInflationChoice,
+  simulationInflationChoices,
+  simulationInflationHint,
+  simulationInflationPatch,
   validateSimulationDraft,
   type SimulationDraft,
   type SimulationField,
@@ -20,7 +24,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 import { openCalc } from '@/components/calc/open';
 import { CalcChip, formatMoneyText } from '@/components/calc/parts';
 import { SubHeader } from '@/components/header';
-import { ChoiceGroup, CheckOption } from '@/components/series-parts';
+import { ChoiceGroup } from '@/components/series-parts';
 import { SimResultCard, resultSpoken } from '@/components/sim-result';
 import { TermHint } from '@/components/term-hint';
 import { Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
@@ -58,7 +62,8 @@ const HINT: Partial<Record<TextFieldName, string>> = {
 
 /**
  * Simulador (D-028, Ciclo D; spec2 §4.7). Três modos (quanto guardar por mês, em quanto tempo, quanto posso ter), taxa ao ano
- * sempre digitada (campo vazio, sem valor sugerido), inflação opcional, resultado com o valor sem rendimento ao lado,
+ * sempre digitada (campo vazio, sem valor sugerido), inflação opcional em duas escolhas separadas (retorno de 17/11/2026: "Mostrar em
+ * dinheiro de hoje" só informa; "Corrigir a meta pela inflação" sobe a meta e recalcula), resultado com o valor sem rendimento ao lado,
  * ano a ano com tabela, hipóteses sempre visíveis (aportes no início de cada mês, como na Calculadora do Cidadão do Banco
  * Central) e o aviso fixo no topo, visível sem rolagem em 360 px. Nada é gravado: nem a taxa, nem os valores digitados, nem
  * a simulação. "Criar meta com estes valores" só abre a nova meta preenchida, sem a taxa.
@@ -96,7 +101,7 @@ export default function SimularScreen() {
     setResult(null);
     setErrors((e) => {
       const next = { ...e };
-      for (const key of Object.keys(patch)) delete next[key === 'inflationOn' ? 'inflationText' : (key as SimulationField)];
+      for (const key of Object.keys(patch)) delete next[key === 'inflationOn' || key === 'adjustTarget' ? 'inflationText' : (key as SimulationField)];
       return next;
     });
   };
@@ -182,7 +187,13 @@ export default function SimularScreen() {
         <Card style={{ gap: space[4] }}>
           <ChoiceGroup label={T.modeLabel} error={errors.mode}>
             {SIMULATION_MODES.map((mode) => (
-              <CalcChip key={mode} label={T.modes[mode]} selected={draft.mode === mode} onPress={() => change({ mode })} />
+              <CalcChip
+                key={mode}
+                label={T.modes[mode]}
+                selected={draft.mode === mode}
+                // "Quanto posso ter" não tem meta para corrigir: a escolha volta a "Mostrar em dinheiro de hoje".
+                onPress={() => change(mode === 'quanto-ter' && draft.adjustTarget ? { mode, adjustTarget: false } : { mode })}
+              />
             ))}
           </ChoiceGroup>
 
@@ -196,9 +207,14 @@ export default function SimularScreen() {
               );
             }
             if (name === 'inflationText') {
+              const choice = simulationInflationChoice(draft);
               return (
                 <View key={name} style={{ gap: space[3] }}>
-                  <CheckOption label={T.fields.inflationToggle} checked={draft.inflationOn} onPress={() => change({ inflationOn: !draft.inflationOn })} />
+                  <ChoiceGroup label={T.fields.inflationLabel} hint={simulationInflationHint(draft.mode, choice)}>
+                    {simulationInflationChoices(draft.mode).map((c) => (
+                      <CalcChip key={c} label={T.fields.inflationChoices[c]} selected={choice === c} onPress={() => change(simulationInflationPatch(c))} />
+                    ))}
+                  </ChoiceGroup>
                   {draft.inflationOn ? field(name) : null}
                   <TermHint term="Inflação" slug="inflacao-ipca" />
                 </View>

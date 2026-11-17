@@ -127,6 +127,14 @@ const YIELD_RANGE_TEXT = 'Use um rendimento de 0% a 30% ao ano, com até 2 casas
 
 export const ANTES_ESTIMATE_TEXT = 'Estimativa. As condições oficiais são as da proposta; peça o CET.';
 
+/**
+ * Hipótese da taxa (revisão das fórmulas de 17/11/2026): a dica do campo pede o CET ao mês quando a pessoa o tem, e a hipótese antiga
+ * ("Só a taxa de juros informada, sem tarifas, seguros e IOF.") contradizia isso. A conta usa a taxa que foi digitada: com a taxa de
+ * juros, tarifas, seguros e IOF ficam de fora; com o CET, já estão dentro.
+ */
+export const ANTES_RATE_HYPOTHESIS =
+  'A conta usa só a taxa informada: com a taxa de juros, ficam de fora tarifas, seguros e IOF; com o CET ao mês, eles já estão dentro.';
+
 export const ANTES_FIELDS: Record<AntesField, CalcFieldSpec> = {
   preco: moneyField('Preço à vista do bem', 'o preço à vista', '50.000,00'),
   entrada: moneyField('Entrada', 'a entrada', '10.000,00', {
@@ -438,7 +446,7 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
       ? lastDiffers
         ? `Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo, e a última (${brl(lastParcela)}) absorve a diferença do arredondamento.`
         : 'Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo.'
-      : 'Só a taxa de juros informada, sem tarifas, seguros e IOF.',
+      : ANTES_RATE_HYPOTHESIS,
   ];
   if (showImpact && renda !== null) hypotheses.push('Percentuais sobre a renda líquida por mês que você informou aqui.');
   if (showImpact && committed !== null) hypotheses.push('O comprometido é o do mês atual, com as contas a pagar já criadas; os meses seguintes podem ser diferentes.');
