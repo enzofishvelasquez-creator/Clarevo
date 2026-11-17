@@ -40,7 +40,7 @@ import {
 
 /** Termos que nenhum texto do app usa (o mesmo critério de copy.test.ts). */
 const FORBIDDEN =
-  /\b(recomendamos|recomendo|invista|aplique|tesouro|cdb|lci|lca|caixinha|cofrinho)\b|fundo de investimento|rentabilidade garantida|rendimento garantido|retorno garantido|enriquec|faz(er|endo)?\s+sentido|[–—]/i;
+  /\b(recomendamos|recomendo|invista|aplique|tesouro|cdb|lci|lca|caixinha|cofrinho)\b|fundo de investimento|rentabilidade garantida|rendimento garantido|retorno garantido|enriquec|faz(er|endo)?\s+sentido|[\u2013\u2014]/i;
 /** Julgamento e cobrança: o negócio é mostrado só com fatos. */
 const JUDGMENT = /\b(preju[ií]zo|lucro|cuidado|aten[cç][aã]o|alerta|ruim|bom|ótimo|parab[eé]ns|deveria|precisa)\b/i;
 
