@@ -353,4 +353,124 @@ do $$ begin
   end;
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- 8. DESFAZER pela conversa (revisão de 17/11/2026): um gasto anotado pelo Telegram que virou, no app, o pagamento de uma fatura
+--    (pay_invoice com p_record_id) não é apagado; a conversa recebe o resultado próprio 'pagamento_de_fatura' (antes, delete_record
+--    recusava com pagamento_de_fatura, fora do case, e a função falhava). Desligado da fatura no app, o DESFAZER volta a valer.
+-- ---------------------------------------------------------------------------
+create function pg_temp.th(p_user text) returns text language sql as $$ select encode(sha256(convert_to('telegram:' || p_user, 'UTF8')), 'hex') $$;
+create function pg_temp.tm(p_user text, p_n int) returns text language sql as $$
+  select 'telegram:' || encode(sha256(convert_to(p_user || ':' || p_n, 'UTF8')), 'hex')
+$$;
+create function pg_temp.as_service() returns void language sql as $$
+  select set_config('request.jwt.claim.sub', '', true);
+  select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+$$;
+create function pg_temp.as_bia() returns void language sql as $$
+  select set_config('request.jwt.claims', '', true);
+  select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e7', true);
+$$;
+-- Leituras direto nas tabelas (sem a RLS).
+create function pg_temp.chat_msg(p_id text) returns public.chat_messages language sql security definer set search_path = public, pg_temp as $$
+  select m from public.chat_messages m where m.message_id = p_id
+$$;
+create function pg_temp.rec(p_id uuid) returns public.financial_records language sql security definer set search_path = public, pg_temp as $$
+  select * from public.financial_records where id = p_id
+$$;
+create function pg_temp.bill_status(p_card uuid, p_month date) returns text language sql security definer set search_path = public, pg_temp as $$
+  select status::text from public.commitments where card_id = p_card and invoice_month = p_month and deleted_at is null
+$$;
+
+do $$ begin
+  assert (select pg_get_constraintdef(oid) from pg_constraint where conname = 'chat_messages_outcome_check') like '%pagamento_de_fatura%',
+    'chat_messages aceita o resultado novo';
+  assert pg_get_functiondef('public.clarevo_chat_undo(text, text, text, timestamptz)'::regprocedure) like '%when ''pagamento_de_fatura'' then ''pagamento_de_fatura''%',
+    'clarevo_chat_undo conhece pagamento_de_fatura';
+  assert not has_function_privilege('authenticated', 'public.clarevo_chat_undo(text, text, text, timestamptz)', 'execute')
+     and not has_function_privilege('anon', 'public.clarevo_chat_undo(text, text, text, timestamptz)', 'execute')
+     and not has_function_privilege('service_role', 'public.clarevo_chat_undo(text, text, text, timestamptz)', 'execute'),
+    'clarevo_chat_undo continua interna (ninguém de fora executa)';
+  assert has_function_privilege('service_role', 'public.telegram_undo(text, text, timestamptz)', 'execute')
+     and has_function_privilege('service_role', 'public.whatsapp_undo(text, text, timestamptz)', 'execute')
+     and not has_function_privilege('authenticated', 'public.telegram_undo(text, text, timestamptz)', 'execute'), 'as do servidor, só service_role';
+end $$;
+
+set role authenticated;
+select pg_temp.as_bia();
+do $$ begin
+  perform pg_temp.keep('tgcode', public.create_telegram_code(pg_temp.id('ctx'), 'lc-tg-0001') ->> 'code');
+end $$;
+reset role;
+set role service_role;
+select pg_temp.as_service();
+do $$
+declare
+  r jsonb;
+begin
+  assert public.telegram_link(pg_temp.tm('bia', 1), pg_temp.th('bia'), current_setting('test.tgcode')) ->> 'result' = 'ligado', 'Bia liga o Telegram';
+  r := public.telegram_add_record(pg_temp.tm('bia', 2), pg_temp.th('bia'), now(), 'despesa', 3000, 0, null, 'Fatura do cartão', null);
+  assert r ->> 'result' = 'anotado', 'gasto anotado pelo Telegram: ' || r::text;
+  perform pg_temp.keep('tgrec', (pg_temp.chat_msg(pg_temp.tm('bia', 2))).record_id::text);
+end $$;
+reset role;
+
+-- No app, o gasto vira o pagamento de uma fatura fechada.
+set role authenticated;
+select pg_temp.as_bia();
+do $$
+declare
+  card uuid;
+  res jsonb;
+begin
+  card := (public.create_card('lc-tg-0002', pg_temp.id('ctx'), 'Cartão Conversa', '5678', 3, 10, 500000) #>> '{card,id}')::uuid;
+  perform pg_temp.keep('tgcard', card::text);
+  perform public.add_card_purchase('lc-tg-0003', card, '2026-11-01', 3000, 1, 'Livro', 'Educação', null);
+  res := public.pay_invoice('lc-tg-0004', card, '2026-11-01', (select version from public.commitments where card_id = card and invoice_month = '2026-11-01'),
+                            3000, '2026-11-17', null, pg_temp.id('tgrec'));
+  assert (res #>> '{record,id}')::uuid = pg_temp.id('tgrec') and (res #>> '{record,card_id}')::uuid = card and res #>> '{commitment,status}' = 'quitado',
+    'o gasto do Telegram virou o pagamento da fatura: ' || res::text;
+end $$;
+reset role;
+
+-- DESFAZER pelo Telegram: resposta própria, nada apagado, a mensagem anotada não é marcada como desfeita.
+set role service_role;
+select pg_temp.as_service();
+do $$
+declare
+  r jsonb;
+begin
+  r := public.telegram_undo(pg_temp.tm('bia', 3), pg_temp.th('bia'), now());
+  assert r = '{"result": "pagamento_de_fatura"}', 'resposta própria para o gasto que virou pagamento de fatura: ' || r::text;
+  assert (pg_temp.rec(pg_temp.id('tgrec'))).deleted_at is null and (pg_temp.rec(pg_temp.id('tgrec'))).card_id = pg_temp.id('tgcard'),
+    'o gasto continua, como pagamento da fatura';
+  assert pg_temp.bill_status(pg_temp.id('tgcard'), '2026-11-01') = 'quitado', 'a fatura continua paga';
+  assert (pg_temp.chat_msg(pg_temp.tm('bia', 2))).undone_at is null, 'a anotação não foi marcada como desfeita';
+  assert (pg_temp.chat_msg(pg_temp.tm('bia', 3))).outcome = 'pagamento_de_fatura', 'a mensagem do DESFAZER fica registrada com o resultado';
+  -- A mesma entrega de novo: repetida.
+  assert public.telegram_undo(pg_temp.tm('bia', 3), pg_temp.th('bia'), now()) = '{"result": "repetida"}', 'repetida';
+end $$;
+reset role;
+
+-- Desligado da fatura no app (o gasto fica), o DESFAZER pelo Telegram apaga o gasto como antes.
+set role authenticated;
+select pg_temp.as_bia();
+do $$
+declare
+  card uuid := pg_temp.id('tgcard');
+begin
+  perform public.undo_invoice_payment('lc-tg-0005', card, '2026-11-01', (select version from public.commitments where card_id = card and invoice_month = '2026-11-01'), true);
+end $$;
+reset role;
+set role service_role;
+select pg_temp.as_service();
+do $$
+declare
+  r jsonb;
+begin
+  r := public.telegram_undo(pg_temp.tm('bia', 4), pg_temp.th('bia'), now());
+  assert r ->> 'result' = 'desfeito' and r #>> '{record,description}' = 'Fatura do cartão', 'desligado da fatura, desfaz: ' || r::text;
+  assert (pg_temp.rec(pg_temp.id('tgrec'))).deleted_at is not null and (pg_temp.chat_msg(pg_temp.tm('bia', 2))).undone_at is not null, 'o gasto saiu';
+end $$;
+reset role;
+
 rollback;

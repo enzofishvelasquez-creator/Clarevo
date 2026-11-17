@@ -212,7 +212,7 @@ export const INDICADORES_TEXT = {
   numeroAusente: 'Sem número',
   naoAoVivo: 'São os últimos números que o Banco Central publicou, cada um com a data dele. Não são cotações ao vivo nem previsões.',
   comoAtualiza:
-    'Quando você abre a página, ela pergunta ao próprio site da Clarevo, uma vez só. O servidor do site consulta o Banco Central no máximo uma vez por hora e guarda uma cópia. O seu navegador não fala com nenhum outro site.',
+    'Quando você abre a página, ela pergunta ao próprio site da Clarevo, uma vez só. O servidor do site consulta o Banco Central em geral uma vez por hora (depois de uma falha, de novo em alguns minutos) e guarda uma cópia. O seu navegador não fala com nenhum outro site.',
 } as const;
 
 /** A data de um dado para o texto: "17/11/2026". */

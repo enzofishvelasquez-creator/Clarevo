@@ -201,6 +201,21 @@ describe('valor pela taxa contratada com a mudança de taxa (D-104, item 13) e a
     );
   });
 
+  it('sem movimento até o dia seguinte à data de fim (o primeiro aporte veio depois da troca), a conta é direta pela taxa de depois', () => {
+    // Revisão de 17/11/2026: antes, a primeira parte ficava sem movimentos e a estimativa sumia.
+    const lateOnly = [mv('aporte', 500_000, '2026-10-15'), mv('aporte', 100_000, '2026-10-20')];
+    const e = estimateValueWithRateStep(step, lateOnly, indices, '2026-11-02');
+    const direct = estimateValueByRate({ indexKind: 'cdi', rateBp: 10000 }, lateOnly, indices, '2026-11-02')!;
+    expect(e).not.toBeNull();
+    expect(e).toEqual({ ...direct, stepApplied: true });
+    expect(e!.valueCents).toBeGreaterThan(600_000);
+    // O movimento no próprio dia seguinte à data de fim ainda entra na primeira parte (a conta em duas partes de sempre).
+    const onStepDay = [mv('aporte', 500_000, '2026-10-01')];
+    expect(estimateValueWithRateStep(step, onStepDay, indices, '2026-11-02')).toMatchObject({ stepApplied: true });
+    // Sem movimento nenhum, continua sem estimativa.
+    expect(estimateValueWithRateStep(step, [], indices, '2026-11-02')).toBeNull();
+  });
+
   it('a premissa diz a taxa, até quando o índice foi publicado, desde quando conta e o que fica de fora', () => {
     const e = estimateValueWithRateStep({ ...step, rateUntil: '2027-03-31' }, m, indices, TODAY)!;
     const t = ESTIMATE_PREMISE_TEXT.premise({ ...step, rateUntil: '2027-03-31' }, e);

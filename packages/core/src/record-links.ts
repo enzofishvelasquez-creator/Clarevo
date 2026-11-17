@@ -320,6 +320,13 @@ export const RECORD_LINK_TEXT = {
   linkedNotice: (label: string) => `Ligado a ${label}, que saiu de Ainda a pagar.`,
   linkedInvoiceNotice: (label: string) => `Registrado como o pagamento de ${label}.`,
   unlinkedNotice: 'A conta de antes voltou para Ainda a pagar. Este lançamento continua anotado.',
+  /**
+   * Na edição, desligar a conta de antes vem antes de gravar (a troca de tipo depende disso). Se a gravação falha depois, a faixa de erro
+   * diz também que a conta já voltou para Ainda a pagar (revisão de 17/11/2026).
+   */
+  unlinkedNotSaved: 'A conta de antes já voltou para Ainda a pagar. As outras alterações não foram salvas.',
+  /** O mesmo, quando não deu para confirmar se a gravação aconteceu (falha de rede): sem dizer que as alterações não foram salvas. */
+  unlinkedAlready: 'A conta de antes já voltou para Ainda a pagar.',
   linkFailedAfterSave: (reason: string) => `Não foi ligado à conta: ${reason} Para ligar, abra Editar gasto.`,
   linkFailedAfterUpdate: (reason: string) => `As alterações foram salvas, mas o gasto não foi ligado: ${reason}`,
   linkNotLoaded: 'Não foi possível carregar a conta escolhida. Tente de novo.',
@@ -378,4 +385,15 @@ export const RECORD_KIND_ERROR_TEXT: Readonly<Record<string, string>> = {
 
 export function recordLinkErrorText(code: string): string {
   return RECORD_LINK_ERROR_TEXT[code] ?? 'Não foi possível ligar o gasto à conta. Tente de novo.';
+}
+
+/**
+ * A faixa de erro de salvar na edição (revisão de 17/11/2026): quando a conta de antes já foi desligada (`unlinked`) e a gravação falhou
+ * depois, junta ao motivo que a conta voltou para Ainda a pagar (`unlinkedNotSaved`; com `uncertain`, a falha de rede em que não dá para
+ * saber se gravou, `unlinkedAlready`). Sem motivo (o erro ficou junto de um campo), só esse aviso; sem desligar, o motivo como veio.
+ */
+export function saveErrorAfterUnlink(message: string | null, unlinked: boolean, uncertain = false): string | null {
+  if (!unlinked) return message;
+  const notice = uncertain ? RECORD_LINK_TEXT.unlinkedAlready : RECORD_LINK_TEXT.unlinkedNotSaved;
+  return message ? `${message} ${notice}` : notice;
 }

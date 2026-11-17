@@ -113,6 +113,7 @@ import {
   paymentLinkOptions,
   recordLinkErrorText,
   rememberSubcategory,
+  saveErrorAfterUnlink,
   showPaymentLink,
   type PaymentLinkOption,
 } from '@clarevo/core';
@@ -1398,6 +1399,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     }
   };
 
+  /** A conta de antes desligada por uma tentativa desta edição cuja gravação falhou depois (a chave dela), para o aviso continuar. */
+  const unlinkedEarlier = useRef<string | null>(null);
+
   const submit = async (versionOverride?: number, another = false) => {
     if (busy) return; // envio repetido bloqueado enquanto o anterior não termina
     if (cardPurchase) {
@@ -1437,6 +1441,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     // Ao editar, desligar a conta de antes vem primeiro (o gasto fica, e a troca de tipo passa a valer).
     let unlinkedNotice: string | null = null;
     if (mode.type === 'editar' && steps.unlink && mode.record.commitmentId) {
+      const before = currentLink;
       const kept = await unlinkCurrent(mode.record.commitmentId);
       if ('error' in kept) {
         setBanner(kept.error);
@@ -1445,6 +1450,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       }
       version = kept.version;
       setBaseVersion(kept.version);
+      unlinkedEarlier.current = before;
+      unlinkedNotice = RECORD_LINK_TEXT.unlinkedNotice;
+    } else if (unlinkedEarlier.current !== null && chosenLink?.key !== unlinkedEarlier.current) {
+      // Uma tentativa anterior desta edição já desligou a conta de antes e a gravação falhou depois (o gasto lido de novo já vem sem a
+      // conta): o aviso continua valendo, na faixa de erro e no aviso de salvo. Ligado de novo à mesma conta, não.
       unlinkedNotice = RECORD_LINK_TEXT.unlinkedNotice;
     }
     // Gasto lido de uma nota: leva o resumo da chave (nunca a chave) para o aviso de nota repetida.
@@ -1467,6 +1477,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     const withExtras: RecordInput = { ...base, ...extras };
     const input: RecordInput = note && mode.type === 'novo' ? { ...withExtras, receiptKey: note.reading.draft.receiptKey } : withExtras;
     const snapshot = JSON.stringify([input, version]);
+    /**
+     * A faixa de erro depois de uma falha: com a conta de antes já desligada (acima), diz também que ela voltou para Ainda a pagar. Sem
+     * motivo (o erro ficou junto do campo), só esse aviso, quando houve o desligar. `uncertain`: falha de rede, sem saber se gravou.
+     */
+    const fail = (message: string | null, uncertain = false) => setBanner(saveErrorAfterUnlink(message, unlinkedNotice !== null, uncertain));
     /** Depois de gravar: liga a conta escolhida (se houver) e junta as linhas do aviso. Ao editar, uma ligação recusada deixa o formulário aberto. */
     const afterSave = async (saved: FinancialRecord, budgetNotice: string | null): Promise<string | null | false> => {
       const lines = [budgetNotice, unlinkedNotice];
@@ -1475,7 +1490,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         if ('error' in r) {
           if (mode.type === 'editar') {
             setBaseVersion(saved.version);
-            setBanner(RECORD_LINK_TEXT.linkFailedAfterUpdate(r.error));
+            setBanner([RECORD_LINK_TEXT.linkFailedAfterUpdate(r.error), unlinkedNotice].filter((x): x is string => x !== null).join(' '));
             return false;
           }
           lines.push(RECORD_LINK_TEXT.linkFailedAfterSave(r.error));
@@ -1532,16 +1547,19 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             const errs = { [field]: ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] };
             setErrors(errs);
             focusFirst(errs);
+            fail(null);
             return;
           }
           // D-107: a subcategoria e o investimento têm o erro junto do campo.
           if (e.code === 'subcategoria_invalida') {
             setSubError(RECORD_KIND_ERROR_TEXT.subcategoria_invalida);
+            fail(null);
             return;
           }
           if (e.code === 'investimento_invalido' || e.code === 'investimento_encerrado') {
             setIncomeError(RECORD_KIND_ERROR_TEXT[e.code]);
             qc.invalidateQueries({ queryKey: ['investments'] });
+            fail(null);
             return;
           }
           if (e.code === 'versao_desatualizada' && mode.type === 'editar') {
@@ -1551,22 +1569,23 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               if (current) {
                 qc.setQueryData(['record', current.id], current);
                 setConflict(current);
-              } else setBanner(ERROR_TEXT.nao_encontrado);
+                fail(null);
+              } else fail(ERROR_TEXT.nao_encontrado);
             } catch {
-              setBanner(`${ERROR_TEXT.versao_desatualizada} ${ERROR_TEXT.carregar_falhou}`);
+              fail(`${ERROR_TEXT.versao_desatualizada} ${ERROR_TEXT.carregar_falhou}`);
             }
             return;
           }
-          setBanner(RECORD_KIND_ERROR_TEXT[e.code] ?? (e.code in ERROR_TEXT ? ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] : ERROR_TEXT.salvar_falhou));
+          fail(RECORD_KIND_ERROR_TEXT[e.code] ?? (e.code in ERROR_TEXT ? ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] : ERROR_TEXT.salvar_falhou));
           return;
         }
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
         recordUncertain(attempts, key, snapshot);
-        setBanner(UNCERTAIN_TEXT.movimentos);
+        fail(UNCERTAIN_TEXT.movimentos, true);
       }
     } catch {
       // Não deu para conferir a tentativa anterior: ela continua guardada e é conferida de novo na próxima vez.
-      setBanner(UNCERTAIN_TEXT.movimentos);
+      fail(UNCERTAIN_TEXT.movimentos, true);
     } finally {
       setBusy(false);
     }
@@ -2257,7 +2276,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               }}
               onRegister={() => {
                 registeringInvestments.current = new Set((investments.data ?? []).map((i) => i.id));
-                router.push('/investimento/novo');
+                // origem=registro: depois de criar, o investimento volta para cá (como conta a pagar, cartão e banco ou carteira).
+                router.push({ pathname: '/investimento/novo', params: { origem: 'registro' } });
               }}
               error={incomeError}
               removing={mode.type === 'editar' && (mode.record.investmentId ?? null) !== null}

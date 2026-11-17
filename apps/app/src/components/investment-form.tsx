@@ -8,6 +8,7 @@ import {
   INVESTMENT_GOAL_TEXT,
   INVESTMENT_TEXT,
   GOAL_LINK_TEXT,
+  RECORD_LINK_TEXT,
   KIND_FORM_HINT,
   canUseInvestmentsValue,
   formatDateBR,
@@ -56,8 +57,21 @@ const T = INVESTMENT_TEXT.form;
  *
  * `preset` (D-103, item 5): o modelo de registro escolhido na tela vazia da aba (nome, tipo e parte da ficha), só ao criar. O que veio
  * preenchido é o ponto de partida do formulário: sair sem mudar nada não pede confirmação.
+ *
+ * `backToRecord` (D-107, revisão de 17/11/2026): veio de "Cadastrar investimento" no recebimento com "Rendimento de investimento"
+ * (`?origem=registro`); depois de criar, volta para o lançamento, que continua preenchido e escolhe o investimento novo.
  */
-export function InvestmentForm({ contextId, investment, preset = null }: { contextId: string; investment: Investment | null; preset?: InvestmentTemplatePreset | null }) {
+export function InvestmentForm({
+  contextId,
+  investment,
+  preset = null,
+  backToRecord = false,
+}: {
+  contextId: string;
+  investment: Investment | null;
+  preset?: InvestmentTemplatePreset | null;
+  backToRecord?: boolean;
+}) {
   const repo = useRepo();
   const { today } = useSession();
   const invalidate = useInvalidateInvestments();
@@ -156,7 +170,9 @@ export function InvestmentForm({ contextId, investment, preset = null }: { conte
       }
       flash.set(message);
       const id = w.investment?.id ?? investment?.id;
-      guard.leave(() => (editing ? (router.canGoBack() ? router.back() : router.replace(`/investimento/${id}`)) : id ? router.replace(`/investimento/${id}`) : router.replace('/investimentos')));
+      // Cadastrar e voltar (D-107): de volta ao recebimento, que escolhe o investimento novo em "Qual investimento?".
+      const back = editing || backToRecord;
+      guard.leave(() => (back && router.canGoBack() ? router.back() : router.replace(id ? `/investimento/${id}` : '/investimentos')));
     } catch (e) {
       const code = isRepoError(e) ? e.code : 'desconhecido';
       if (code === 'versao_desatualizada') {
@@ -313,6 +329,11 @@ export function InvestmentForm({ contextId, investment, preset = null }: { conte
         <Txt variant="label" color={colors.textSecondary}>
           {INVESTMENT_TEXT.footer}
         </Txt>
+        {!editing && backToRecord ? (
+          <Txt variant="label" color={colors.textSecondary}>
+            {RECORD_LINK_TEXT.registerBackHint}
+          </Txt>
+        ) : null}
       </Screen>
       <FormFooter error={error} onCancel={guard.requestCancel} submitLabel={editing ? T.save : T.create} busy={busy} onSubmit={submit} stackWhenNarrow />
       {guard.dialog}

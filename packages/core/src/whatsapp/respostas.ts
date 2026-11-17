@@ -62,6 +62,8 @@ export type WhatsAppOutcome =
   | {
       result:
         | 'nada_para_desfazer'
+        /** DESFAZER: a última anotação daqui virou, no app, o pagamento de uma fatura (D-107), e só sai pelo app. */
+        | 'pagamento_de_fatura'
         | 'desligado'
         | 'nao_ligado'
         | 'codigo_invalido'
@@ -190,6 +192,8 @@ function chatReplies(channel: ChatChannel) {
     muitas_tentativas: 'Muitas tentativas com códigos que não valem. Espere uma hora e gere um código novo no app.',
     muitas_mensagens: 'Muitas mensagens em pouco tempo. Espere alguns minutos e mande de novo.',
     nada_para_desfazer: 'Não há anotação recente feita por aqui para desfazer. Para mudar algo mais antigo, use o app.',
+    pagamento_de_fatura:
+      'A última anotação feita por aqui virou o pagamento de uma fatura no app e não sai por aqui. No app, abra o gasto e toque em Desligar da fatura; depois, se quiser, exclua o gasto.',
     desligado: `Pronto, ${w.whoLinked} foi desligado da Clarevo e nada mais será anotado por aqui. Para ligar de novo, use o app.`,
     data_futura: 'A data fica no futuro. Para uma conta que ainda vai vencer, use Contas a pagar no app.',
     valor_invalido: 'O valor precisa ser maior que zero. Por exemplo: mercado 52,30',

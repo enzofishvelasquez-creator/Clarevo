@@ -9,6 +9,7 @@ import {
   RECORD_LINK_TEXT,
   SUBCATEGORIES,
   SUBCATEGORY_MAX,
+  UNCERTAIN_TEXT,
   categoryBreakdown,
   commitmentLinkLabel,
   forgetSubcategory,
@@ -25,6 +26,7 @@ import {
   paymentLinkOptions,
   recordLinkErrorText,
   rememberSubcategory,
+  saveErrorAfterUnlink,
   showPaymentLink,
   subcategoryAllowed,
   subcategoryChoices,
@@ -240,6 +242,24 @@ describe('textos (D-107)', () => {
     }
     expect(RECORD_LINK_TEXT.paidHint).toBe('Ligando o gasto à conta, ela sai de Ainda a pagar e o valor não conta duas vezes.');
     expect(RECORD_LINK_TEXT.optionLine({ label: 'Internet', amountCents: 15000, dueOn: '2026-11-15' })).toBe('Internet · R$ 150,00 · vence em 15/11/2026');
+  });
+
+  it('falha ao salvar depois de desligar a conta de antes: a faixa de erro diz que a conta voltou para Ainda a pagar (revisão de 17/11/2026)', () => {
+    const reason = recordLinkErrorText('versao_desatualizada');
+    expect(saveErrorAfterUnlink(reason, false)).toBe(reason);
+    expect(saveErrorAfterUnlink(null, false)).toBeNull();
+    expect(saveErrorAfterUnlink('Não foi possível salvar. Tente de novo.', true)).toBe(
+      'Não foi possível salvar. Tente de novo. A conta de antes já voltou para Ainda a pagar. As outras alterações não foram salvas.',
+    );
+    // O erro ficou junto de um campo: a faixa traz só o aviso do desligar.
+    expect(saveErrorAfterUnlink(null, true)).toBe(RECORD_LINK_TEXT.unlinkedNotSaved);
+    expect(RECORD_LINK_TEXT.unlinkedNotSaved).toBe('A conta de antes já voltou para Ainda a pagar. As outras alterações não foram salvas.');
+    // Falha de rede: não dá para saber se gravou, então a faixa não diz que as alterações não foram salvas.
+    expect(saveErrorAfterUnlink(UNCERTAIN_TEXT.movimentos, true, true)).toBe(
+      'Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo. A conta de antes já voltou para Ainda a pagar.',
+    );
+    expect(saveErrorAfterUnlink(UNCERTAIN_TEXT.movimentos, false, true)).toBe(UNCERTAIN_TEXT.movimentos);
+    expect(saveErrorAfterUnlink(reason, true)!).not.toMatch(FORBIDDEN);
   });
 
   it('a troca de tipo diz o efeito no mês', () => {

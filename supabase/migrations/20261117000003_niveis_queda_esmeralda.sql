@@ -1,10 +1,12 @@
 -- Clarevo · migração 0041 · Níveis de conta: a queda por tempo sem anotar e o nível Esmeralda (decisão do Enzo em 17/11/2026, D-111,
 -- que substitui partes da D-095; docs/48_NIVEIS.md). Depois de 20261116000001_foto_perfil.sql e das migrações 20261117000001 e
--- 20261117000002 (outras frentes; esta não depende delas).
+-- 20261117000002 (outras frentes). Depende da 20261117000002 só pela coluna financial_records.investment_movement_id (o rendimento
+-- ligado a um recebimento, D-107), lida pelo marco 'inv_rendimento'.
 --
 -- (1) Seis marcos novos, "Investimentos e reserva", todos pelo uso (já fez alguma vez), nunca pelo valor: um aporte, uma atualização de
 --     valor e um rendimento registrados num investimento já criado ('inv_aporte', 'inv_valor', 'inv_rendimento'; o que vem com
---     criar_investimento não conta), o plano de aportes ('inv_plano'), um investimento ligado a uma meta ('inv_meta') e a reserva para
+--     criar_investimento não conta; o rendimento também conta quando entra pelo recebimento ligado ao investimento, D-107, num
+--     recebimento criado pela pessoa), o plano de aportes ('inv_plano'), um investimento ligado a uma meta ('inv_meta') e a reserva para
 --     imprevistos criada pela pessoa com um plano por mês, no Pessoal ou na Família ('reserva_plano'). Investimentos só existem no
 --     Pessoal (0032), então os cinco de investimento só acontecem lá. A Esmeralda (o Diamante e 4 dos 6) fica no app
 --     (packages/core/src/levels.ts); os níveis de baixo continuam contando só os 18 marcos de antes, então nenhum nível muda por eles.
@@ -87,6 +89,11 @@ begin
   inv_moves as materialized (
     select distinct m.kind from ops o join public.investment_movements m on m.id = o.target_id
      where o.action = 'registrar_movimento_investimento'
+    -- O rendimento gravado pelo recebimento ligado ao investimento (D-107, financial_records.investment_movement_id), que entra pela
+    -- ação do recebimento (criar ou editar), não por registrar_movimento_investimento: conta nos recebimentos criados pela pessoa.
+    union
+    select m.kind from public.financial_records r join public.investment_movements m on m.id = r.investment_movement_id
+     where r.created_by = v_me and r.deleted_at is null and r.kind = 'receita' and m.kind = 'rendimento'
   )
   select jsonb_build_object(
     -- Anotou um gasto: um gasto anotado, uma compra no cartão, uma conta ou fatura paga (o pagamento vira gasto) ou um gasto importado.

@@ -15,6 +15,11 @@
 --      investimento (investment_movements, tipo 'rendimento', como add_investment_movement), com o valor, a data e a descrição do
 --      recebimento; editar o recebimento atualiza o rendimento, e excluir o recebimento (delete_record) ou trocar para gasto o tira.
 --      O rendimento continua fora de Recebido e Pago: o valor entra em Recebido uma vez só, pelo recebimento.
+--   5. DESFAZER pelo WhatsApp ou pelo Telegram (clarevo_chat_undo, revisão de 17/11/2026): um gasto anotado por lá pode virar, no app,
+--      o pagamento de uma fatura (item 1); delete_record recusa esse gasto (pagamento_de_fatura), e a conversa passa a responder com o
+--      resultado próprio 'pagamento_de_fatura' (o caminho é desligar da fatura no app), em vez de falhar. Mesma assinatura e privilégios;
+--      chat_messages aceita o resultado novo. As funções do servidor (whatsapp e telegram) conhecem o resultado novo: publicar as duas
+--      geradas deste ramo antes ou junto desta migração.
 -- O guarda de financial_records passa a aceitar a troca do tipo e do vínculo (conta a pagar e fatura) só dentro dessas funções (marca
 -- da transação clarevo.vinculo). A restrição da importação deixa de exigir que o gasto importado fique sem conta a pagar e sem fatura:
 -- o lançamento importado pode ser editado e ligado como qualquer outro.
@@ -944,3 +949,131 @@ grant execute on function public.pay_commitment(text, uuid, integer, uuid, bigin
 grant execute on function public.undo_commitment_payment(text, uuid, integer, boolean) to authenticated;
 grant execute on function public.pay_invoice(text, uuid, date, integer, bigint, date, uuid, uuid) to authenticated;
 grant execute on function public.undo_invoice_payment(text, uuid, date, integer, boolean) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 12. Conversas (revisão de 17/11/2026): o DESFAZER de um gasto anotado pelo WhatsApp ou pelo Telegram que virou, no app, o pagamento de
+--     uma fatura (pay_invoice com p_record_id). delete_record recusa esse gasto com pagamento_de_fatura, que a clarevo_chat_undo de
+--     20261109000001 não conhecia (caía no raise e a conversa recebia erro). Agora a conversa responde 'pagamento_de_fatura', sem apagar
+--     nada nem marcar a mensagem como desfeita. A mesma definição da 20261109000001 com esse caso a mais; mesma assinatura e privilégios.
+-- ---------------------------------------------------------------------------
+alter table public.chat_messages drop constraint chat_messages_outcome_check;
+alter table public.chat_messages add constraint chat_messages_outcome_check check (outcome in (
+  'ligado', 'anotado', 'desfeito', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado', 'muitas_tentativas', 'muitas_mensagens',
+  'nada_para_desfazer', 'sem_permissao', 'sem_conta', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
+  'sem_assinatura', 'ajuda', 'midia', 'nao_entendi', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga',
+  'limite_do_cartao', 'pagamento_de_fatura'));
+
+create or replace function public.clarevo_chat_undo(p_channel text, p_message_id text, p_sender_hash text, p_sent_at timestamptz)
+returns jsonb
+language plpgsql
+volatile
+set search_path = public
+as $$
+declare
+  v_gate jsonb;
+  v_link public.chat_links%rowtype;
+  v_msg public.chat_messages%rowtype;
+  v_record public.financial_records%rowtype;
+  v_entry public.card_entries%rowtype;
+  v_purchase jsonb;
+  v_context uuid;
+  v_today date;
+  v_claims text := coalesce(current_setting('request.jwt.claims', true), '');
+  v_sub text := coalesce(current_setting('request.jwt.claim.sub', true), '');
+  v_error text;
+  v_result text;
+begin
+  v_gate := public.clarevo_chat_gate(p_channel, p_message_id, p_sender_hash);
+  if v_gate is not null then
+    return v_gate;
+  end if;
+
+  v_link := public.clarevo_chat_link_locked(p_channel, p_sender_hash);
+  if v_link.person_id is null then
+    perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, null, 'nao_ligado');
+    return jsonb_build_object('result', 'nao_ligado');
+  end if;
+  v_today := public.clarevo_chat_day(v_link.person_id, p_sent_at);
+
+  -- A última anotação deste canal nas últimas 24 horas que ainda existe (gasto, recebimento ou compra no cartão), feita pela pessoa,
+  -- num espaço em que ela ainda anota.
+  select m.* into v_msg from public.chat_messages m
+   where m.person_id = v_link.person_id and m.channel = p_channel and m.outcome in ('anotado', 'compra_anotada') and m.undone_at is null
+     and m.received_at > now() - interval '24 hours'
+     and ((m.record_id is not null and exists (
+             select 1 from public.financial_records r
+              join public.context_memberships cm on cm.context_id = r.context_id and cm.person_id = v_link.person_id
+                                                 and cm.revoked_at is null and cm.can_write
+             where r.id = m.record_id and r.deleted_at is null and r.created_by = v_link.person_id))
+          or (m.entry_id is not null and exists (
+             select 1 from public.card_entries e
+              join public.context_memberships cm on cm.context_id = e.context_id and cm.person_id = v_link.person_id
+                                                 and cm.revoked_at is null and cm.can_write
+             where e.id = m.entry_id and e.deleted_at is null and e.created_by = v_link.person_id)))
+   order by m.received_at desc, m.message_id desc
+   limit 1
+   for update of m;
+  -- A versão é lida com a linha travada: uma edição no app ao mesmo tempo espera aqui.
+  if found and v_msg.record_id is not null then
+    select * into v_record from public.financial_records where id = v_msg.record_id and deleted_at is null for update;
+  elsif found and v_msg.entry_id is not null then
+    select * into v_entry from public.card_entries where id = v_msg.entry_id and deleted_at is null for update;
+  end if;
+  if v_record.id is null and v_entry.id is null then
+    perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, v_link.person_id, 'nada_para_desfazer');
+    return jsonb_build_object('result', 'nada_para_desfazer');
+  end if;
+  v_context := coalesce(v_record.context_id, v_entry.context_id);
+  if v_entry.id is not null then
+    v_purchase := public.clarevo_chat_purchase(v_entry.id);
+  end if;
+
+  begin
+    perform public.clarevo_chat_as(v_link.person_id);
+    if v_record.id is not null then
+      perform public.delete_record(p_channel || ':' || md5(p_message_id), v_record.id, v_record.version);
+    else
+      perform public.delete_card_entry(p_channel || ':' || md5(p_message_id), v_entry.id, v_entry.version);
+    end if;
+    perform public.clarevo_chat_as(null, v_claims, v_sub);
+  exception when others then
+    get stacked diagnostics v_error = message_text;
+    v_result := case v_error
+      when 'sem_permissao' then 'sem_permissao'
+      when 'nao_encontrado' then 'nada_para_desfazer'
+      when 'versao_desatualizada' then 'nada_para_desfazer'
+      when 'conta_excluida' then 'nao_ligado'
+      when 'assinatura_necessaria' then 'sem_assinatura'
+      when 'fatura_paga' then 'fatura_paga'
+      -- O gasto anotado por aqui virou, no app, o pagamento de uma fatura (pay_invoice com p_record_id): só sai pelo caminho da fatura.
+      when 'pagamento_de_fatura' then 'pagamento_de_fatura'
+    end;
+    if v_result is null then
+      raise;
+    end if;
+    perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash,
+                                    case when v_result = 'nao_ligado' then null else v_link.person_id end, v_result);
+    return case when v_result in ('sem_permissao', 'fatura_paga')
+                then jsonb_build_object('result', v_result, 'space', public.clarevo_chat_space(v_context), 'today', v_today)
+                else jsonb_build_object('result', v_result) end;
+  end;
+
+  update public.chat_messages set undone_at = now() where message_id = v_msg.message_id;
+  if v_record.id is not null then
+    perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, v_link.person_id, 'desfeito', v_record.id);
+    return jsonb_build_object('result', 'desfeito', 'space', public.clarevo_chat_space(v_record.context_id),
+                              'record', public.clarevo_chat_record(v_record.id), 'today', v_today);
+  end if;
+  perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, v_link.person_id, 'compra_desfeita', null, v_entry.id);
+  return jsonb_build_object('result', 'compra_desfeita', 'space', public.clarevo_chat_space(v_entry.context_id),
+                            'purchase', v_purchase, 'today', v_today);
+end;
+$$;
+
+revoke all on function public.clarevo_chat_undo(text, text, text, timestamptz) from public, anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'revoke all on function public.clarevo_chat_undo(text, text, text, timestamptz) from service_role';
+  end if;
+end $$;

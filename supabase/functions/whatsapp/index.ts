@@ -1004,6 +1004,7 @@ const __mods = [
             muitas_tentativas: 'Muitas tentativas com códigos que não valem. Espere uma hora e gere um código novo no app.',
             muitas_mensagens: 'Muitas mensagens em pouco tempo. Espere alguns minutos e mande de novo.',
             nada_para_desfazer: 'Não há anotação recente feita por aqui para desfazer. Para mudar algo mais antigo, use o app.',
+            pagamento_de_fatura: 'A última anotação feita por aqui virou o pagamento de uma fatura no app e não sai por aqui. No app, abra o gasto e toque em Desligar da fatura; depois, se quiser, exclua o gasto.',
             desligado: `Pronto, ${w.whoLinked} foi desligado da Clarevo e nada mais será anotado por aqui. Para ligar de novo, use o app.`,
             data_futura: 'A data fica no futuro. Para uma conta que ainda vai vencer, use Contas a pagar no app.',
             valor_invalido: 'O valor precisa ser maior que zero. Por exemplo: mercado 52,30',
@@ -1336,6 +1337,7 @@ const __mods = [
         'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
         'sem_assinatura', 'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
         'repetida', 'silencio', 'registrada', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga', 'limite_do_cartao',
+        'pagamento_de_fatura',
     ]);
     class WhatsAppFinalError extends Error {
     }

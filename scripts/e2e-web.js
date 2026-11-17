@@ -14676,6 +14676,8 @@ setInterval(async () => {
     const lcLeave = async () => { await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click(); await p.waitForTimeout(400); };
     await demoHome();
     const lc0 = await lcState();
+    const lcIncomeMark = () => otherDevice(async (repo) => (await repo.getAccountMarks()).inv_rendimento);
+    const lcMark0 = await lcIncomeMark();
 
     // ---- 1. "O que este gasto pagou?": aparece com um nome parecido com uma conta em aberto e sempre com "Crédito e parcelas" ----
     await btn('Anotar gasto').click(); await waitText('Será salvo em');
@@ -14752,7 +14754,20 @@ setInterval(async () => {
       t.includes('Qual investimento?') && t.includes('Ao salvar, o valor entra em Recebido uma vez só e fica registrado como rendimento recebido em Aplicação do banco, na mesma data. O valor atual do investimento não muda.') &&
       (await visibleCount('button', 'Cadastrar investimento')) === 1, t.slice(t.indexOf('Categoria'), t.indexOf('Categoria') + 700));
     await atWidths(async (w) => { await layoutChecks(`D-107 Editar: troca de tipo e rendimento de investimento ${w}px`); if (w === 390) await shot('663_editar_tipo_e_investimento'); });
-    await btn('Salvar recebimento').click(); await waitText('Alterações salvas'); await p.waitForTimeout(600);
+    // Revisão de 17/11/2026: desligar a conta de antes vem antes de gravar; se a gravação falha depois (aqui, uma recusa simulada na
+    // primeira tentativa), a faixa de erro diz que a conta já voltou para Ainda a pagar, e o formulário continua aberto.
+    await p.evaluate(async () => {
+      const r = await window.__e2e.repo();
+      const orig = r.updateRecord;
+      r.updateRecord = function (key, id, version, input) { r.updateRecord = orig; return orig.call(r, key, id, version, { ...input, investmentId: '' }); };
+    });
+    await btn('Salvar recebimento').click(); await waitText('A conta de antes já voltou para Ainda a pagar.'); await p.waitForTimeout(400);
+    const lcFail = await lcState();
+    ok('D-107 gravação recusada depois de desligar: a faixa diz que a conta de antes voltou para Ainda a pagar e que as outras alterações não foram salvas',
+      (await body()).includes('A conta de antes já voltou para Ainda a pagar. As outras alterações não foram salvas.') && (await h1Name()) === 'Editar recebimento' &&
+      lcFail.bills.find((c) => c.d === 'Internet').status === 'aberto' && lcFail.records.find((r) => r.id === lcPaid.id).kind === 'despesa' &&
+      lcFail.records.find((r) => r.id === lcPaid.id).cp === null, JSON.stringify(lcFail.records.find((r) => r.id === lcPaid.id)));
+    await btn('Tentar de novo').click(); await waitText('Alterações salvas'); await p.waitForTimeout(600);
     t = await body();
     const lc2 = await lcState();
     const lcNow = lc2.records.find((r) => r.id === lcPaid.id);
@@ -14760,6 +14775,8 @@ setInterval(async () => {
       t.includes('A conta de antes voltou para Ainda a pagar. Este lançamento continua anotado.') && t.includes('Rendimento de\nAplicação do banco') &&
       lcNow.kind === 'receita' && lcNow.cat === 'Renda extra' && lcNow.inv !== null && lcNow.cp === null && lc2.bills.find((c) => c.d === 'Internet').status === 'aberto' &&
       lc2.received === lc0.received + 15000 && lc2.paid === lc0.paid && lc2.income['Aplicação do banco'] === lc0.income['Aplicação do banco'] + 15000, JSON.stringify({ lcNow, r: [lc0.received, lc2.received], inc: lc2.income }));
+    // Revisão de 17/11/2026: o rendimento gravado pelo recebimento ligado também conta para o marco "Registrar um rendimento recebido".
+    ok('D-107 o rendimento pelo recebimento ligado faz o marco "Registrar um rendimento recebido" do nível da conta', lcMark0 === false && (await lcIncomeMark()) === true);
 
     // ---- 4. O lançamento importado editado por inteiro (tipo, categoria, subcategoria, banco ou carteira, data, valor e descrição) ----
     await otherDevice(async (repo, ctx) => {
@@ -14844,11 +14861,16 @@ setInterval(async () => {
     await field('Descrição').fill('Dividendos'); await field('Valor em reais').fill('12,34');
     await p.getByRole('switch', { name: 'Rendimento de investimento' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
     await btn('Cadastrar investimento').click(); await waitText('Novo investimento');
+    ok('D-107 "Cadastrar investimento" abre o cadastro com a origem (?origem=registro) e diz que volta para o lançamento',
+      urlPath() === '/investimento/novo' && new URL(p.url()).searchParams.get('origem') === 'registro' &&
+      (await body()).includes('Depois de salvar, você volta para o lançamento que estava anotando, com o que já preencheu.'));
     await field('Nome').fill('Ações da corretora'); await radio('Ações').click(); await field('Quanto você aplicou até hoje?').fill('1000');
-    await btn('Criar investimento').click(); await p.waitForTimeout(1200);
-    await btn('Voltar').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+    // Revisão de 17/11/2026: depois de criar, volta sozinho ao recebimento (antes, caía no detalhe do investimento).
+    await btn('Criar investimento').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
     await waitUntil(async () => (await visibleCount('radio', 'Ações da corretora')) === 1 && (await lcRadioChecked('Ações da corretora')), 5000);
-    ok('D-107 de volta ao recebimento: descrição e valor guardados e o investimento novo já escolhido', (await field('Descrição').inputValue()) === 'Dividendos' && (await field('Valor em reais').inputValue()) === '12,34' && (await lcRadioChecked('Ações da corretora')));
+    ok('D-107 de volta ao recebimento sozinho, sem passar pelo detalhe do investimento: descrição e valor guardados e o investimento novo já escolhido',
+      urlPath() === '/registro/novo' && (await h1Name()) === 'Registrar recebimento' &&
+      (await field('Descrição').inputValue()) === 'Dividendos' && (await field('Valor em reais').inputValue()) === '12,34' && (await lcRadioChecked('Ações da corretora')));
     await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await p.waitForTimeout(500);
     ok('D-107 o rendimento ficou no investimento novo, e o recebimento mostra "Rendimento de Ações da corretora"', (await lcState()).income['Ações da corretora'] === 1234 && (await body()).includes('Rendimento de\nAções da corretora'));
     await atWidths(async (w) => { await layoutChecks(`D-107 recebimento com rendimento de investimento ${w}px`); if (w === 390) await shot('664_recebimento_rendimento'); });
@@ -16227,10 +16249,10 @@ setInterval(async () => {
     // Desempenho: o card azul abre a comparação; cada investimento no próprio período, com o selo de estimativa.
     await p.getByRole('button', { name: /\. Ver desempenho$/ }).filter({ visible: true }).first().click(); await waitText('Comparar com CDI, IPCA e poupança'); await p.waitForTimeout(600);
     t = await body(); investTexts.push(t);
-    ok('D-103 Desempenho: título, selo de estimativa, os três períodos com "Em 12 meses" escolhido, e cada investimento no próprio período com a taxa da ficha, CDI, IPCA e poupança',
+    ok('D-103 Desempenho: título, selo de estimativa, os três períodos com "Em 12 meses" escolhido, e cada investimento no próprio período com a taxa da ficha (com a data de fim, revisão de 17/11), CDI, IPCA e poupança',
       (await h1Name()) === 'Desempenho' && (await visibleCount('img', /^Estimativa/)) + (await p.getByLabel(/^Estimativa: feita com os valores/).filter({ visible: true }).count()) >= 1 &&
         (await radio('Em 12 meses').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'No mês')) === 1 && (await visibleCount('radio', 'Desde o início')) === 1 &&
-        t.includes('De 01/06/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +3,75%, cerca de 99% do CDI.') && t.includes('Taxa registrada na ficha: 105% do CDI.') &&
+        t.includes('De 01/06/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +3,75%, cerca de 99% do CDI.') && t.includes('Taxa registrada na ficha: 105% do CDI até 31/03/2027, depois 100% do CDI.') &&
         t.includes('CDI no mesmo intervalo: +3,78%') && t.includes('IPCA no mesmo intervalo: +1,46%') && t.includes('Poupança no mesmo intervalo: +2,51%') && t.includes('Acima da inflação no período: +2,26%') &&
         t.includes('De 01/08/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +1,60%, cerca de 83% do CDI.') &&
         t.includes('Rende de forma variável, sem taxa combinada na ficha.') && t.includes('A Clarevo não junta tudo numa porcentagem só') && t.includes('(1 + rendimento) ÷ (1 + IPCA) − 1') &&
