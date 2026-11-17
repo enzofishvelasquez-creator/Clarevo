@@ -14557,7 +14557,8 @@ setInterval(async () => {
   // ---- 8. Demonstração de novo: os totais não mudam; textos e escritas ----
   await evEnter();
   await expectTotals('Acessibilidade, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 (invariantes)', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
-  const acBad = acTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\bbem-vind[oa]\b/i)?.[0]).filter(Boolean);
+  // As telas de Investir entram na lista (AC_INVEST): os nomes da ficha e dos títulos públicos (CDB, Tesouro) valem nelas, como no bloco D-093.
+  const acBad = acTexts.map((x) => x.replace(INVEST_NAMES, '').match(FORBIDDEN)?.[0] ?? x.match(/\bbem-vind[oa]\b/i)?.[0]).filter(Boolean);
   ok('Acessibilidade: nenhum termo proibido, travessão longo nem expressão vetada nas telas com letra grande', acTexts.length >= 2 && acBad.length === 0, `${acTexts.length} telas ${acBad.join(' | ')}`);
   ok('Acessibilidade: nenhuma escrita direta na rede (a demonstração e as 1.000 gravações do roteiro vivem na memória)', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
 
@@ -14660,6 +14661,12 @@ setInterval(async () => {
   // ==================================================================================================================
   {
     const lcWrites0 = writes.length;
+    // A mesma troca de aba do bloco das faturas (goTabN mora lá dentro): volta pelas telas até achar a barra e toca na aba.
+    const goTabN = async (name) => {
+      const tab = () => p.getByRole('tab', { name }).filter({ visible: true });
+      for (let i = 0; i < 8; i++) { await tab().first().waitFor({ timeout: 1500 }).catch(() => {}); if ((await tab().count()) > 0) break; await btn('Voltar').click(); await p.waitForTimeout(400); }
+      await tab().first().click(); await p.waitForTimeout(500);
+    };
     const lcState = () => otherDevice(async (repo, ctx) => {
       const month = await repo.listRecords(ctx, '2026-10');
       const bills = await repo.listCommitments(ctx, '2026-10');
