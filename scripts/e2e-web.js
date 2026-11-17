@@ -15302,6 +15302,118 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
+  // Tema (D-112, complementa a D-096): Conta › "Tema", logo depois de "Privacidade neste aparelho", com "Igual ao aparelho" (o padrão,
+  // marcado de início), "Claro" e "Escuro" e a frase "Por padrão, a Clarevo segue o tema do aparelho.". A escolha fica só neste aparelho
+  // (na web, a chave `clarevo.tema.v1` do localStorage, também lida pelo script de index.html antes de o app desenhar) e não muda as cores
+  // sozinha: "Aplicar agora" recarrega a página (na demonstração, volta às boas-vindas). Num navegador claro, "Escuro" aplicado deixa a
+  // página e o app escuros, e a escolha continua depois de recarregar; num navegador escuro, "Claro" deixa claro; "Igual ao aparelho" volta a
+  // seguir o navegador; sair da conta (esquecer o aparelho) apaga a escolha. Capturas 720 a 723. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const tmWrites0 = writes.length;
+    const TM_KEY = 'clarevo.tema.v1';
+    // Fundo da página e cartão (`background` e `surface` de theme/palettes.ts) de cada tema.
+    const TM_LIGHT = ['rgb(246, 248, 252)', 'rgb(255, 255, 255)']; const TM_DARK = ['rgb(19, 30, 62)', 'rgb(29, 43, 84)'];
+    // O tema da página: a marca do script de index.html, o fundo da página, o que está atrás de um ponto na margem esquerda (o fundo da
+    // tela ou, nas boas-vindas, o cartão) e o que está guardado na chave.
+    const tmLook = () => p.evaluate((key) => {
+      const at = document.elementFromPoint(6, Math.round(innerHeight * 0.6));
+      let tela = null;
+      for (let e = at; e && !tela; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (c !== 'rgba(0, 0, 0, 0)') tela = c; }
+      let stored; try { stored = localStorage.getItem(key); } catch { stored = 'erro'; }
+      return { tema: document.documentElement.getAttribute('data-tema'), body: getComputedStyle(document.body).backgroundColor, tela, stored };
+    }, TM_KEY);
+    const tmIs = (l, [bg, surface]) => l.body === bg && (l.tela === bg || l.tela === surface);
+    const tmRadios = () => p.getByRole('radiogroup', { name: 'Tema', exact: true }).filter({ visible: true }).first().getByRole('radio')
+      .evaluateAll((els) => els.map((e) => `${e.getAttribute('aria-label') || e.textContent}:${e.getAttribute('aria-checked')}`));
+    const tmToCard = async () => { await p.getByRole('heading', { name: 'Tema', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(250); };
+    // Recarregar a demonstração volta às boas-vindas; ao entrar de novo, o app retoma Conta (o endereço da página).
+    const tmBackToConta = async () => {
+      await btn('Ver demonstração com dados fictícios').click(); await p.waitForTimeout(1500);
+      if ((await p.getByText('Privacidade neste aparelho', { exact: true }).filter({ visible: true }).count()) === 0) { await waitText('Diferença do mês', 12000); await openConta(); }
+      await waitText('Privacidade neste aparelho'); await tmToCard();
+    };
+    const tmApply = async () => { await btn('Aplicar agora').click(); await waitText('Cuidar da vida financeira', 15000); await p.waitForTimeout(500); };
+    const tmPicked = (choice) => JSON.stringify(['Igual ao aparelho', 'Claro', 'Escuro'].map((n) => `${n}:${n === choice}`));
+
+    // 1. Navegador claro, sem escolha: o card, o padrão e nada guardado.
+    await demoHome(); await openConta(); await tmToCard();
+    let tl = await tmLook();
+    t = await body(); screenTexts.push(t);
+    const tmCards = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+    ok('Tema (D-112): o card "Tema" (título de nível 2) logo depois de "Privacidade neste aparelho" e antes do widget, com "Por padrão, a Clarevo segue o tema do aparelho."',
+      tmCards.indexOf('Tema') > 0 && tmCards.indexOf('Tema') === tmCards.indexOf('Privacidade neste aparelho') + 1 && tmCards.indexOf('Widget na tela inicial') === tmCards.indexOf('Tema') + 1 &&
+        t.includes('Por padrão, a Clarevo segue o tema do aparelho. A escolha vale só para este aparelho.'), tmCards.join(' | '));
+    ok('Tema: "Igual ao aparelho" marcado de início, depois "Claro" e "Escuro", sem "Aplicar agora", nada guardado e o app claro (navegador claro)',
+      JSON.stringify(await tmRadios()) === tmPicked('Igual ao aparelho') && (await visibleCount('button', 'Aplicar agora')) === 0 && tl.stored === null && tl.tema === null && tmIs(tl, TM_LIGHT),
+      `${JSON.stringify(await tmRadios())} ${JSON.stringify(tl)}`);
+    await atWidths(async (w) => { await tmToCard(); await layoutChecks(`Tema ${w}px`); if (w === 390) await shot('720_tema_conta'); });
+
+    // 2. "Escuro": guardado na hora, mas as cores só mudam com "Aplicar agora".
+    await radio('Escuro').click(); await p.waitForTimeout(400);
+    tl = await tmLook(); t = await body(); screenTexts.push(t);
+    ok('Tema: escolher "Escuro" marca a opção e guarda só "dark" neste navegador, sem recarregar nem mudar as cores sozinho',
+      JSON.stringify(await tmRadios()) === tmPicked('Escuro') && tl.stored === 'dark' && tmIs(tl, TM_LIGHT) && new URL(p.url()).pathname === '/conta', JSON.stringify(tl));
+    ok('Tema: com a escolha nova, o card diz que ela vale na próxima abertura e oferece "Aplicar agora", que recarrega a página (na demonstração, volta ao começo)',
+      t.includes('O tema escolhido vale a partir da próxima vez que você abrir a Clarevo.') && (await visibleCount('button', 'Aplicar agora')) === 1 &&
+        t.includes('Aplicar agora recarrega a página com o novo tema. Na demonstração, recarregar a página volta ao começo, com os dados fictícios de sempre.'),
+      t.slice(t.indexOf('Por padrão'), t.indexOf('Por padrão') + 500));
+    await atWidths(async (w) => { await btn('Aplicar agora').scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await layoutChecks(`Tema com "Aplicar agora" ${w}px`); if (w === 390) await shot('721_tema_escolhido_escuro'); });
+    // Voltar à escolha que vale agora esconde "Aplicar agora" e apaga a chave.
+    await radio('Igual ao aparelho').click(); await p.waitForTimeout(300);
+    ok('Tema: voltar a "Igual ao aparelho" (a escolha que vale agora) esconde "Aplicar agora" e apaga a chave', (await visibleCount('button', 'Aplicar agora')) === 0 && (await tmLook()).stored === null);
+    await radio('Escuro').click(); await p.waitForTimeout(300);
+
+    // 3. Aplicar num navegador claro: a página recarrega já escura (boas-vindas e app), e a escolha continua depois de recarregar.
+    await tmApply();
+    tl = await tmLook();
+    ok('Tema: "Aplicar agora" recarrega a página; num navegador claro, a entrada já vem escura (fundo da página e da tela no azul-marinho)', tl.tema === 'dark' && tmIs(tl, TM_DARK), JSON.stringify(tl));
+    await tmBackToConta();
+    tl = await tmLook();
+    ok('Tema: de volta a Conta, "Escuro" continua marcado, sem "Aplicar agora", e o app está escuro',
+      JSON.stringify(await tmRadios()) === tmPicked('Escuro') && (await visibleCount('button', 'Aplicar agora')) === 0 && tmIs(tl, TM_DARK), JSON.stringify(tl));
+    await layoutChecks('Tema escuro aplicado 390px'); await shot('722_tema_escuro_aplicado');
+    await p.reload(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(500);
+    tl = await tmLook();
+    ok('Tema: depois de recarregar, a escolha continua (a página abre escura num navegador claro)', tl.stored === 'dark' && tl.tema === 'dark' && tmIs(tl, TM_DARK), JSON.stringify(tl));
+
+    // 4. Navegador escuro, "Claro" aplicado: a página e o app ficam claros.
+    await p.emulateMedia({ colorScheme: 'dark' });
+    await tmBackToConta();
+    await radio('Claro').click(); await p.waitForTimeout(300);
+    await tmApply();
+    tl = await tmLook();
+    ok('Tema: "Claro" aplicado num navegador escuro deixa a página clara', tl.stored === 'light' && tl.tema === 'light' && tmIs(tl, TM_LIGHT), JSON.stringify(tl));
+    await tmBackToConta();
+    tl = await tmLook();
+    ok('Tema: no navegador escuro, Conta clara com "Claro" marcado', JSON.stringify(await tmRadios()) === tmPicked('Claro') && tmIs(tl, TM_LIGHT), JSON.stringify(tl));
+    await shot('723_tema_claro_navegador_escuro');
+
+    // 5. "Igual ao aparelho": nada guardado, e a página volta a seguir o navegador (escuro e, depois, claro).
+    await radio('Igual ao aparelho').click(); await p.waitForTimeout(300);
+    ok('Tema: "Igual ao aparelho" apaga a chave e, por ser diferente da escolha que vale agora, oferece "Aplicar agora"', (await tmLook()).stored === null && (await visibleCount('button', 'Aplicar agora')) === 1);
+    await tmApply();
+    tl = await tmLook();
+    ok('Tema: "Igual ao aparelho" aplicado volta ao padrão: num navegador escuro, a página fica escura, sem marca de tema', tl.stored === null && tl.tema === null && tmIs(tl, TM_DARK), JSON.stringify(tl));
+    await p.emulateMedia({ colorScheme: 'light' }); await p.reload(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(500);
+    tl = await tmLook();
+    ok('Tema: com "Igual ao aparelho", o navegador claro abre a página clara', tl.tema === null && tmIs(tl, TM_LIGHT), JSON.stringify(tl));
+
+    // 6. Sair da conta esquece o aparelho: a escolha não fica guardada.
+    await tmBackToConta();
+    await radio('Escuro').click(); await p.waitForTimeout(300);
+    ok('Tema: antes de sair, "Escuro" guardado', (await tmLook()).stored === 'dark');
+    await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
+    const tmLeft = await p.evaluate(() => { try { return Object.keys(localStorage).filter((k) => /tema/.test(k)); } catch { return ['erro']; } });
+    ok('Tema: sair da conta (esquecer este aparelho) apaga a escolha: nenhuma chave de tema fica no navegador', tmLeft.length === 0, tmLeft.join(' | '));
+    await p.reload(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(500);
+    tl = await tmLook();
+    ok('Tema: depois de sair e recarregar, a página segue o navegador (claro), sem marca de tema', tl.stored === null && tl.tema === null && tmIs(tl, TM_LIGHT), JSON.stringify(tl));
+    ok('Tema: nada vai à rede', writes.length === tmWrites0, writes.slice(tmWrites0).join(' | '));
+    await p.emulateMedia({ colorScheme: null });
+  }
+
+  // ==================================================================================================================
   // Modo escuro (D-096): o app segue o tema do aparelho, lido ao abrir (na web, `prefers-color-scheme` ao carregar a página). Num
   // contexto do navegador com o tema escuro, na demonstração: as cinco abas, Conta, Assinatura, Nível da conta, Anotar gasto, uma meta,
   // um cartão, Orçamento, Família e a calculadora de Multa e juros. Em cada tela: o fundo é escuro (azul-marinho, sem área clara grande

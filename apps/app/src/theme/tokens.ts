@@ -3,8 +3,9 @@
  * Contrastes verificados em pares opacos: branco/azul 5,59:1; texto/lima 12,36:1; secundário/branco 7,14:1.
  *
  * Modo escuro (D-096, 12/11/2026): as cores vêm de uma de duas paletas desenhadas (`palettes.ts`, com as mesmas chaves; nada é
- * invertido automaticamente), escolhida uma vez, quando este módulo é avaliado: na web pelo `prefers-color-scheme` do navegador e no
- * celular pelo tema do aparelho (`Appearance`). Os componentes continuam importando `colors` e usando em `StyleSheet.create` no nível
+ * invertido automaticamente), escolhida uma vez, quando este módulo é avaliado: primeiro pela escolha de Conta › Tema (D-112, lida do
+ * aparelho de forma síncrona por `lib/theme-choice.ts`) e, em "Igual ao aparelho" (o padrão), na web pelo `prefers-color-scheme` do
+ * navegador e no celular pelo tema do aparelho (`Appearance`). Os componentes continuam importando `colors` e usando em `StyleSheet.create` no nível
  * do módulo, então o tema não troca com o app aberto: vale na próxima abertura (na web, no próximo carregamento da página; o app nunca
  * recarrega sozinho, porque a pessoa pode estar digitando). No celular, `_layout.tsx` trava o tema do processo com
  * `Appearance.setColorScheme(colorScheme)`, para os componentes nativos (teclado, seletores, alertas) combinarem com o app. Regras
@@ -12,6 +13,8 @@
  * `brandTextDeep`); azul de gráfico e de barra é `brandMark`; texto sobre o lima, os selos dos níveis e o coral é `textOnAccent`
  * (sempre escuro); pílula branca sobre o azul é `surfaceOnBrand`. Cor literal fora das paletas quebra o teste de contraste.
  */
+import { OPENING_THEME_CHOICE } from '@/lib/theme-choice';
+
 import { levelColors as levels, paletteFor, type ColorScheme, type Palette } from './palettes';
 
 export type { ColorScheme } from './palettes';
@@ -32,8 +35,13 @@ function deviceColorScheme(): ColorScheme {
   }
 }
 
+/** O tema desta abertura: o escolhido em Conta › Tema (D-112) ou, em "Igual ao aparelho", o do aparelho. */
+function openingColorScheme(): ColorScheme {
+  return OPENING_THEME_CHOICE === 'system' ? deviceColorScheme() : OPENING_THEME_CHOICE;
+}
+
 /** O tema desta abertura do app ('light' ou 'dark'). */
-export const colorScheme: ColorScheme = deviceColorScheme();
+export const colorScheme: ColorScheme = openingColorScheme();
 
 export const colors: Palette = paletteFor(colorScheme);
 
