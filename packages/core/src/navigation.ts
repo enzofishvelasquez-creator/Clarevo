@@ -417,9 +417,9 @@ export const APP_SCREENS: readonly AppScreen[] = [
   {
     id: 'importar-extrato',
     title: 'Importar extrato ou fatura',
-    caption: 'Arquivo PDF, OFX ou planilha do banco, com revisão das linhas antes de importar',
+    caption: 'Arquivo PDF, OFX, planilha ou print do banco, com revisão das linhas antes de importar',
     href: '/importar',
-    keywords: ['importar', 'importação', 'extrato', 'ofx', 'banco', 'planilha', 'csv', 'arquivo do banco', 'trazer lançamentos', 'extrato do banco'],
+    keywords: ['importar', 'importação', 'extrato', 'ofx', 'banco', 'planilha', 'csv', 'arquivo do banco', 'trazer lançamentos', 'extrato do banco', 'print', 'prints', 'captura de tela'],
   },
   {
     id: 'orcamento',

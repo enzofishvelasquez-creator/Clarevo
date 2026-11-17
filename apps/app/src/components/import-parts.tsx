@@ -1,5 +1,6 @@
 import {
   IMPORT_TEXT,
+  canFlipLine,
   categoriesFor,
   formatDateBR,
   lineProblem,
@@ -30,8 +31,10 @@ export const KIND_LABEL: Record<ReviewKind, string> = {
 
 /**
  * Uma linha da revisão: caixa para incluir, descrição, valor, data, tipo e categoria, a marca ("Já anotado", "Parece pagamento de
- * fatura", "Parece transferência"...) e "Editar" (descrição e categoria). O valor respeita "Ocultar valores". Linha que não pode
- * ser importada (data futura, fatura paga, pagamento da fatura, chave já importada) tem a caixa desligada e a razão escrita.
+ * fatura", "Parece transferência"...), "Lido de imagem: confira" nas linhas de print (D-108) e "Editar" (descrição, categoria e o tipo:
+ * gasto ou recebimento na conta, compra ou estorno no cartão, D-108). O valor respeita "Ocultar valores", em cor única (o tipo vem
+ * escrito). Linha que não pode ser importada (data futura, fatura paga, pagamento da fatura, chave já importada) tem a caixa desligada
+ * e a razão escrita.
  */
 export const ReviewRow = memo(function ReviewRow({
   line,
@@ -40,6 +43,7 @@ export const ReviewRow = memo(function ReviewRow({
   onToggle,
   onEdit,
   onChange,
+  onFlip,
 }: {
   line: ReviewLine;
   editing: boolean;
@@ -47,6 +51,8 @@ export const ReviewRow = memo(function ReviewRow({
   onToggle: (id: string) => void;
   onEdit: (id: string | null) => void;
   onChange: (id: string, patch: { description?: string; category?: string | null }) => void;
+  /** Troca gasto por recebimento (ou compra por estorno) nesta linha. */
+  onFlip?: (id: string) => void;
 }) {
   const hidden = useValuesHidden();
   const problem = lineProblem(line);
@@ -55,6 +61,8 @@ export const ReviewRow = memo(function ReviewRow({
   const toggle = () => line.importable && onToggle(line.id);
   const label = IMPORT_TEXT.labels;
   const hint = line.hint ?? (line.label ? (IMPORT_TEXT.labelHints as Record<string, string>)[line.label] : undefined);
+  const onCard = line.kind === 'compra' || line.kind === 'estorno';
+  const outKind = line.kind === 'despesa' || line.kind === 'compra';
   return (
     <View style={[styles.row, !last && styles.divider]}>
       <View style={styles.head}>
@@ -77,11 +85,18 @@ export const ReviewRow = memo(function ReviewRow({
             <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15, flex: 1, minWidth: 0 }} numberOfLines={clampLines(2)}>
               {line.description || IMPORT_TEXT.noDescription}
             </Txt>
-            <Money cents={line.amountCents} variant="label" style={styles.amount} color={line.kind === 'receita' ? colors.success : colors.text} />
+            <Money cents={line.amountCents} variant="label" style={styles.amount} color={colors.text} />
           </View>
           <Txt variant="caption" color={colors.textSecondary} style={tabular}>
             {maskMoneyText(`${date} · ${kind} · ${line.category ?? IMPORT_TEXT.noCategory}`, hidden)}
           </Txt>
+          {line.fromImage ? (
+            <View style={[styles.badge, styles.badgeImage]}>
+              <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold }}>
+                {IMPORT_TEXT.fromImageLabel}
+              </Txt>
+            </View>
+          ) : null}
           {line.label ? (
             <View style={[styles.badge, line.importable ? styles.badgeSoft : styles.badgeOff]}>
               <Txt variant="caption" color={line.importable ? colors.textOnAccent : colors.text} style={{ fontFamily: fonts.bold }}>
@@ -97,6 +112,11 @@ export const ReviewRow = memo(function ReviewRow({
           {line.keyExists ? (
             <Txt variant="caption" color={colors.textSecondary}>
               {IMPORT_TEXT.alreadyImportedHint}
+            </Txt>
+          ) : null}
+          {line.flipped ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {IMPORT_TEXT.kindFlippedHint}
             </Txt>
           ) : null}
           {problem ? (
@@ -116,6 +136,21 @@ export const ReviewRow = memo(function ReviewRow({
               onChangeText={(t) => onChange(line.id, { description: t })}
               error={problem === 'descricao_obrigatoria' ? IMPORT_TEXT.needDescription : undefined}
             />
+            {onFlip && canFlipLine(line) ? (
+              // D-108: a linha lida como gasto que era recebimento (ou o contrário) troca aqui, antes de importar.
+              <ChoiceGroup label={IMPORT_TEXT.kindChoiceLabel} accessibilityLabel={`${IMPORT_TEXT.kindChoiceLabel}: ${line.description}`}>
+                <Chip
+                  label={onCard ? IMPORT_TEXT.kindChoicePurchase : IMPORT_TEXT.kindChoiceOut}
+                  selected={outKind}
+                  onPress={() => !outKind && onFlip(line.id)}
+                />
+                <Chip
+                  label={onCard ? IMPORT_TEXT.kindChoiceRefund : IMPORT_TEXT.kindChoiceIn}
+                  selected={!outKind}
+                  onPress={() => outKind && onFlip(line.id)}
+                />
+              </ChoiceGroup>
+            ) : null}
             <ChoiceGroup label={IMPORT_TEXT.categoryLabel} accessibilityLabel={`${IMPORT_TEXT.categoryLabel}: ${line.description}`}>
               <Chip label={IMPORT_TEXT.noCategory} selected={line.category === null} onPress={() => onChange(line.id, { category: null })} />
               {categoriesFor(line.kind).map((c) => (
@@ -246,6 +281,7 @@ const styles = StyleSheet.create({
   badge: { alignSelf: 'flex-start', borderRadius: radius.pill, paddingHorizontal: space[2], paddingVertical: 2 },
   badgeSoft: { backgroundColor: colors.accent },
   badgeOff: { backgroundColor: colors.border },
+  badgeImage: { backgroundColor: colors.brandTint, borderWidth: 1, borderColor: colors.borderStrong },
   columnsScroll: { width: '100%', maxHeight: 190 },
   columnsContent: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   editor: { gap: space[3], paddingLeft: 44 + space[1] },
