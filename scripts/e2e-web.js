@@ -14310,6 +14310,8 @@ setInterval(async () => {
     ['investimento, detalhe', 'investimento/[id]/index', { id: acIds.inv }], ['investimento, editar', 'investimento/[id]/editar', { id: acIds.inv }],
     ['investimento, rendimento', 'investimento/[id]/movimento', { id: acIds.inv, tipo: 'rendimento' }], ['investimento, novo', 'investimento/novo', {}],
     ['plano de aportes', 'investimento/plano', {}], ['resumo para a declaração', 'investimento/declaracao', {}], ['comparar rendimentos', 'investimento/comparar', {}],
+    // D-103: o desempenho aberto pelo card azul.
+    ['desempenho dos investimentos', 'investimento/desempenho', {}],
   ];
   const AC_ROUTES = [
     ['registro novo, gasto', 'registro/novo', { tipo: 'despesa' }], ['registro novo, recebimento', 'registro/novo', { tipo: 'receita' }],
@@ -15321,7 +15323,7 @@ setInterval(async () => {
         t.includes('CDI no mesmo intervalo: +0,17%'), t.slice(0, 2000));
     await radio('Desde o início').click(); await p.waitForTimeout(300);
     ok('D-103 Desempenho desde o início: do primeiro aporte de cada um', (await body()).includes('Rendeu +3,75%, cerca de 99% do CDI.') && (await body()).includes('Rendeu +1,60%, cerca de 83% do CDI.'));
-    await atWidths(async (w) => { if (w === 320) { await p.evaluate(() => { document.documentElement.style.fontSize = '130%'; }); await layoutChecks(`D-103 Desempenho letra grande ${w}px`); await p.evaluate(() => { document.documentElement.style.fontSize = ''; }); } });
+    // A letra grande (1,3 e 2 vezes) do desempenho fica no bloco de Acessibilidade (AC_INVEST).
     await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
     // A premissa da comparação de rendimentos líquidos.
     await p.getByRole('link', { name: /^Comparar rendimentos líquidos/ }).filter({ visible: true }).first().click(); await waitText('Valor aplicado'); await p.waitForTimeout(300);
