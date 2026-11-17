@@ -48,6 +48,8 @@ const BASE_Y = PLOT_HEIGHT - 14;
 /** Raio dos pontos: grandes, para ver e para tocar (o alvo de toque é a coluna inteira do mês, com 176 px de altura ou mais). */
 const R_POINT = 7;
 const R_SELECTED = 10;
+/** Largura do rótulo do ano no eixo de 24 e 36 meses. */
+const YEAR_MARK_WIDTH = 40;
 
 /** O ícone que o eixo mostra sob o mês quando ele não entra na comparação (e a legenda repete). */
 const AXIS_ICON: Record<EvolutionPointView['participation'], LucideIcon | null> = {
@@ -78,6 +80,15 @@ export function EvolutionChart({ view, selected, onSelect }: { view: AnyView; se
   const step = width / n;
   // Colunas estreitas (12 meses, letra grande): só a inicial do mês, que o botão e a tabela dizem por extenso.
   const letters = width > 0 && step < 24 * fontScale;
+  // Colunas muito estreitas (24 e 36 meses, D-105): o eixo mostra só o ano, em janeiro; pontos menores e sem os ícones sob o mês (a
+  // legenda, a tabela e o nome de cada botão continuam dizendo tudo).
+  const sparse = width > 0 && step < 14 * fontScale;
+  const rPoint = sparse ? 3.5 : R_POINT;
+  const rSelected = sparse ? 6 : R_SELECTED;
+  const firstJanuary = points.findIndex((p) => p.month.endsWith('-01'));
+  const yearMarks = sparse
+    ? points.flatMap((p, i) => (p.month.endsWith('-01') || (i === 0 && (firstJanuary === -1 || firstJanuary >= 6)) ? [{ i, year: p.month.slice(0, 4) }] : []))
+    : [];
   const usable = BASE_Y - PAD_TOP;
   const xOf = (i: number) => (i + 0.5) * step;
   // A escala vai de minCents (0, ou o menor mês do Guardado em metas) a maxCents; sem mês negativo é a de sempre, que parte do zero.
@@ -129,7 +140,7 @@ export function EvolutionChart({ view, selected, onSelect }: { view: AnyView; se
       <View role="group" accessibilityLabel={T.chart.group} onLayout={(e) => setWidth(Math.floor(e.nativeEvent.layout.width))} style={styles.chart}>
         <View style={styles.columns}>
           {points.map((p) => (
-            <MonthColumn key={p.month} point={p} selected={p.month === selected} letters={letters} hiddenValues={hiddenValues} onPress={() => onSelect(p.month)} />
+            <MonthColumn key={p.month} point={p} selected={p.month === selected} letters={letters} sparse={sparse} hiddenValues={hiddenValues} onPress={() => onSelect(p.month)} />
           ))}
         </View>
         {width > 0 ? (
@@ -140,10 +151,17 @@ export function EvolutionChart({ view, selected, onSelect }: { view: AnyView; se
             {runs.map((d) => (
               <Path key={d} d={d} stroke={colors.brandMark} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
             ))}
-            {points.map((p, i) => (p.month === selected ? null : <Marker key={p.month} point={p} x={xOf(i)} y={p.hasValue ? yOf(p.cents) : BASE_Y} />))}
-            {points.map((p, i) => (p.month === selected ? <Marker key={p.month} point={p} x={xOf(i)} y={p.hasValue ? yOf(p.cents) : BASE_Y} selected /> : null))}
+            {points.map((p, i) => (p.month === selected ? null : <Marker key={p.month} point={p} x={xOf(i)} y={p.hasValue ? yOf(p.cents) : BASE_Y} r={rPoint} rSelected={rSelected} />))}
+            {points.map((p, i) => (p.month === selected ? <Marker key={p.month} point={p} x={xOf(i)} y={p.hasValue ? yOf(p.cents) : BASE_Y} r={rPoint} rSelected={rSelected} selected /> : null))}
           </Svg>
         ) : null}
+        {yearMarks.map((m) => (
+          <View key={m.year} pointerEvents="none" style={[styles.yearMark, { left: Math.max(0, Math.min(width - YEAR_MARK_WIDTH, xOf(m.i) - YEAR_MARK_WIDTH / 2)) }]} {...decorative}>
+            <Txt variant="caption" style={styles.axisLabel} numberOfLines={1}>
+              {m.year}
+            </Txt>
+          </View>
+        ))}
       </View>
       <Legend view={view} />
     </View>
@@ -151,20 +169,21 @@ export function EvolutionChart({ view, selected, onSelect }: { view: AnyView; se
 }
 
 /** O ponto de um mês: azul cheio (na comparação), vazio (fora), traço na base (sem registros) e lima com contorno (escolhido). */
-function Marker({ point, x, y, selected }: { point: EvolutionPointView; x: number; y: number; selected?: boolean }) {
+function Marker({ point, x, y, selected, r = R_POINT, rSelected = R_SELECTED }: { point: EvolutionPointView; x: number; y: number; selected?: boolean; r?: number; rSelected?: number }) {
   const none = !point.hasValue;
   if (selected) {
     return (
       <>
-        <Circle cx={x} cy={y} r={R_SELECTED} fill={colors.accent} stroke={colors.text} strokeWidth={2.5} />
+        <Circle cx={x} cy={y} r={rSelected} fill={colors.accent} stroke={colors.text} strokeWidth={2.5} />
         {none ? <Line x1={x - 4} y1={y} x2={x + 4} y2={y} stroke={colors.textOnAccent} strokeWidth={2.5} strokeLinecap="round" /> : null}
         {!none && !point.included ? <Circle cx={x} cy={y} r={3.5} fill={colors.surfaceOnBrand} stroke={colors.textOnAccent} strokeWidth={2} /> : null}
       </>
     );
   }
-  if (none) return <Line x1={x - 6} y1={y} x2={x + 6} y2={y} stroke={colors.textSecondary} strokeWidth={3} strokeLinecap="round" />;
-  if (point.included) return <Circle cx={x} cy={y} r={R_POINT} fill={colors.brandMark} stroke={colors.surface} strokeWidth={2} />;
-  return <Circle cx={x} cy={y} r={R_POINT} fill={colors.surface} stroke={colors.brandMark} strokeWidth={3} />;
+  const dash = r < R_POINT ? 3 : 6;
+  if (none) return <Line x1={x - dash} y1={y} x2={x + dash} y2={y} stroke={colors.textSecondary} strokeWidth={3} strokeLinecap="round" />;
+  if (point.included) return <Circle cx={x} cy={y} r={r} fill={colors.brandMark} stroke={colors.surface} strokeWidth={r < R_POINT ? 1 : 2} />;
+  return <Circle cx={x} cy={y} r={r} fill={colors.surface} stroke={colors.brandMark} strokeWidth={r < R_POINT ? 2 : 3} />;
 }
 
 /** A coluna de um mês: o botão (nome completo para o leitor de tela) com o espaço do gráfico e o rótulo do eixo. */
@@ -172,12 +191,15 @@ function MonthColumn({
   point,
   selected,
   letters,
+  sparse,
   hiddenValues,
   onPress,
 }: {
   point: EvolutionPointView;
   selected: boolean;
   letters: boolean;
+  /** 24 e 36 meses: sem rótulo nem ícone sob a coluna (o ano vem por cima, em janeiro). */
+  sparse: boolean;
   hiddenValues: boolean;
   onPress: () => void;
 }) {
@@ -194,10 +216,16 @@ function MonthColumn({
       style={(s) => [styles.column, selected && styles.columnSelected, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
       <View style={{ height: PLOT_HEIGHT }} />
       <View style={styles.axis} {...decorative}>
-        <Txt variant="caption" style={[styles.axisLabel, selected && styles.axisLabelSelected, { fontFamily: selected ? fonts.bold : fonts.medium }]} numberOfLines={1}>
-          {label}
-        </Txt>
-        <View style={styles.axisIcon}>{Icon ? <Icon size={14} color={colors.text} strokeWidth={2.25} /> : null}</View>
+        {sparse ? (
+          <View style={[styles.sparseTick, selected && styles.sparseTickSelected]} />
+        ) : (
+          <>
+            <Txt variant="caption" style={[styles.axisLabel, selected && styles.axisLabelSelected, { fontFamily: selected ? fonts.bold : fonts.medium }]} numberOfLines={1}>
+              {label}
+            </Txt>
+            <View style={styles.axisIcon}>{Icon ? <Icon size={14} color={colors.text} strokeWidth={2.25} /> : null}</View>
+          </>
+        )}
       </View>
     </Pressable>
   );
@@ -889,6 +917,10 @@ const styles = StyleSheet.create({
   axisLabel: { fontSize: 12, lineHeight: 16, textAlign: 'center', color: colors.text },
   axisLabelSelected: { backgroundColor: colors.accent, color: colors.textOnAccent, borderRadius: 6, paddingHorizontal: 2, overflow: 'hidden' },
   axisIcon: { height: 16, alignItems: 'center', justifyContent: 'center' },
+  // 24 e 36 meses (D-105): um traço curto sob cada mês (o escolhido, mais largo e lima) e o ano em janeiro, por cima das colunas.
+  sparseTick: { width: 2, height: 6, borderRadius: 1, backgroundColor: colors.borderStrong },
+  sparseTickSelected: { width: 6, height: 8, borderRadius: 3, backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.text },
+  yearMark: { position: 'absolute', top: PLOT_HEIGHT + 14, width: YEAR_MARK_WIDTH, alignItems: 'center' },
   chartHead: { gap: space[1], paddingHorizontal: space[3] },
   legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space[4], rowGap: space[1], marginTop: space[1], paddingHorizontal: space[3] },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: space[1], flexShrink: 1 },

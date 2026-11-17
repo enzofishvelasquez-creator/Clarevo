@@ -196,10 +196,12 @@ describe('buildEvolutionView', () => {
     for (const p of view.points) expect(p.name, p.name).not.toMatch(/R\$ 0,00/);
   });
 
-  it('o convite a olhar mais meses só aparece com menos de 12 meses na janela', () => {
+  it('o convite a olhar mais meses só aparece com menos de 36 meses na janela (D-105: 24 e 36 em Recebido e Pago)', () => {
     expect(EVOLUTION_TEXT.states.olderMonths(3)).toBe('Se há anotações mais antigas, escolha 6 ou 12 meses.');
     expect(EVOLUTION_TEXT.states.olderMonths(6)).toBe('Se há anotações mais antigas, escolha 12 meses.');
-    expect(EVOLUTION_TEXT.states.olderMonths(12)).toBeNull();
+    expect(EVOLUTION_TEXT.states.olderMonths(12)).toBe('Se há anotações mais antigas, escolha 24 ou 36 meses.');
+    expect(EVOLUTION_TEXT.states.olderMonths(24)).toBe('Se há anotações mais antigas, escolha 36 meses.');
+    expect(EVOLUTION_TEXT.states.olderMonths(36)).toBeNull();
   });
 
   it('sem registros em todos os meses e só o mês em andamento são situações à parte', () => {

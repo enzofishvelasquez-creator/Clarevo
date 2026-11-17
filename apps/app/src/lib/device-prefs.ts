@@ -113,6 +113,11 @@ export interface DevicePrefs {
    */
   investmentPlanReviewedOn: string | null;
   investmentPlanReviewDismissedOn: string | null;
+  /**
+   * Convite para rever as metas (D-105): a data (AAAA-MM-DD) a partir da qual o convite volta, hoje + 3 meses depois de "Rever metas",
+   * "Agora não" ou "Concluir revisão". Só neste aparelho; nada vai para o servidor. Vazio: vale a data da meta ativa mais antiga.
+   */
+  goalsReviewNextOn: string | null;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -139,6 +144,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   reserveRefreshDismissed: null,
   investmentPlanReviewedOn: null,
   investmentPlanReviewDismissedOn: null,
+  goalsReviewNextOn: null,
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -181,6 +187,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
         typeof v.reserveRefreshDismissed === 'number' && Number.isSafeInteger(v.reserveRefreshDismissed) && v.reserveRefreshDismissed > 0 ? v.reserveRefreshDismissed : null,
       investmentPlanReviewedOn: isDay(v.investmentPlanReviewedOn) ? v.investmentPlanReviewedOn : null,
       investmentPlanReviewDismissedOn: isDay(v.investmentPlanReviewDismissedOn) ? v.investmentPlanReviewDismissedOn : null,
+      goalsReviewNextOn: typeof v.goalsReviewNextOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.goalsReviewNextOn) ? v.goalsReviewNextOn : null,
     };
   } catch {
     return DEFAULT_PREFS;

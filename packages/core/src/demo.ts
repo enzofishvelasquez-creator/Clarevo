@@ -59,10 +59,17 @@ export const DEMO_EMAIL = 'demo@clarevo.app';
  *   registro em março, 5.200, 5.000 e 5.100. Não tem os lançamentos de setembro e outubro da base de aceite (que não vale neste
  *   cenário): na janela de 12 meses, o total é R$ 24.750,00, a média dos 6 meses R$ 4.125,00 e a mediana R$ 3.425,00 (sem abril:
  *   R$ 3.390,00 e R$ 3.400,00).
- * Conta nova nunca recebe nenhum dos quatro.
+ * - 'metas': a base de aceite, com as duas metas criadas em 01/07/2026 (DEMO_GOALS_SETUP_DAY), para o convite de rever as metas (D-105).
+ * Conta nova nunca recebe nenhum dos cinco.
  */
-export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao';
-export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao'];
+export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao' | 'metas';
+export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao', 'metas'];
+/**
+ * Dia em que as duas metas de exemplo foram criadas no cenário 'metas' (D-105): a base de aceite, com a reserva e a viagem criadas (e o
+ * já guardado ao criar) em 01/07/2026, três meses antes de 07/10/2026, para o convite "Quer rever as suas metas?" aparecer. O aporte de
+ * 06/10 e os totais de outubro não mudam.
+ */
+export const DEMO_GOALS_SETUP_DAY = '2026-07-01';
 /** Dia em que as assinaturas de exemplo foram cadastradas no cenário 'assinaturas'. */
 export const DEMO_SUBSCRIPTIONS_SETUP_DAY = '2026-06-30';
 /** Quando o plano de aportes da demonstração foi definido (D-103, item 14): mais de 3 meses antes de 07/10/2026. */
@@ -91,8 +98,10 @@ export function createDemoCompanyHub(adminPersonId: string = 'pessoa-demo'): Mem
 export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario; cards?: boolean } = {}) {
   if (opts.scenario === 'retorno') return createReturnDemoRepository(opts.latencyMs);
   if (opts.scenario === 'evolucao') return createEvolutionDemoRepository(opts.latencyMs);
-  // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas'.
-  let today: string = DEMO_TODAY;
+  // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas' e, no cenário 'metas', para criar o
+  // espaço e as duas metas em 01/07/2026 (o relógio da memória só anda para a frente: as metas precisam nascer antes dos registros).
+  const goalsSetup = opts.scenario === 'metas';
+  let today: string = goalsSetup ? DEMO_GOALS_SETUP_DAY : DEMO_TODAY;
   // Assinatura (D-083): a demonstração aparece no teste grátis, como uma conta nova.
   const trial = demoTrialAccess(DEMO_TODAY);
   const repo = new MemoryRepository({
@@ -109,6 +118,37 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   const accountId = space.accounts[0]!.id;
   // Contas de origem (D-043): a Carteira é dinheiro; o mercado é pago nela.
   const carteira = await repo.createAccount(newOperationKey(), ctx, { name: 'Carteira', kind: 'dinheiro' });
+  // Metas (D-027), pelas mesmas funções do cadastro. A reserva usa a média de setembro (Moradia e Mercado). No cenário 'metas' (D-105),
+  // as duas nascem aqui, em 01/07/2026, com o já guardado ao criar nesse dia; nos outros, depois do resto, como sempre.
+  const goalsStart = goalsSetup ? DEMO_GOALS_SETUP_DAY : '2026-10-01';
+  const createReserve = () =>
+    repo.createGoal(newOperationKey(), ctx, {
+      goalType: 'emergencia',
+      name: 'Reserva para imprevistos',
+      targetCents: 2_250_000,
+      targetMonth: null,
+      plannedMonthlyCents: 50_000,
+      essentialBaseCents: 375_000,
+      essentialMonths: 6,
+      essentialBaseSource: 'media_gastos',
+      initialCents: 300_000,
+      initialOn: goalsStart,
+    });
+  const createTrip = () =>
+    repo.createGoal(newOperationKey(), ctx, {
+      goalType: 'objetivo',
+      name: 'Viagem de férias',
+      targetCents: 600_000,
+      targetMonth: '2027-07',
+      plannedMonthlyCents: 48_000,
+      essentialBaseCents: null,
+      essentialMonths: null,
+      essentialBaseSource: null,
+      initialCents: 120_000,
+      initialOn: goalsStart,
+    });
+  const early = goalsSetup ? { reserve: await createReserve(), trip: await createTrip() } : null;
+  today = DEMO_TODAY;
   const add = (
     kind: 'receita' | 'despesa',
     description: string,
@@ -199,37 +239,15 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   await repo.setCategoryBudget(newOperationKey(), ctx, 'Lazer', '2026-10', 0, 30_000);
   // Limite pessoal de comprometimento (D-041): 60% da renda de referência a partir de outubro de 2026. Outubro fica em 52,5%.
   await repo.setCommitmentLimit(newOperationKey(), ctx, '2026-10', 0, 60);
-  // Metas (D-027), pelas mesmas funções do cadastro. A reserva usa a média de setembro (Moradia e Mercado).
-  const reserva = await repo.createGoal(newOperationKey(), ctx, {
-    goalType: 'emergencia',
-    name: 'Reserva para imprevistos',
-    targetCents: 2_250_000,
-    targetMonth: null,
-    plannedMonthlyCents: 50_000,
-    essentialBaseCents: 375_000,
-    essentialMonths: 6,
-    essentialBaseSource: 'media_gastos',
-    initialCents: 300_000,
-    initialOn: '2026-10-01',
-  });
+  // Metas (D-027): a reserva, o aporte de 06/10 e a viagem, nessa ordem (no cenário 'metas', as duas já existem).
+  const reserva = early ? early.reserve : await createReserve();
   await repo.addGoalMovement(newOperationKey(), reserva.goal.id, 'aporte', {
     amountCents: 50_000,
     occurredOn: '2026-10-06',
     note: null,
     accountId,
   });
-  await repo.createGoal(newOperationKey(), ctx, {
-    goalType: 'objetivo',
-    name: 'Viagem de férias',
-    targetCents: 600_000,
-    targetMonth: '2027-07',
-    plannedMonthlyCents: 48_000,
-    essentialBaseCents: null,
-    essentialMonths: null,
-    essentialBaseSource: null,
-    initialCents: 120_000,
-    initialOn: '2026-10-01',
-  });
+  if (!early) await createTrip();
   // Plano de guardar (spec7): a pessoa respondeu "consigo" com R$ 500,00 por mês, o mesmo plano da reserva. Só é lida pela
   // própria pessoa; não conta como anotação e não muda nenhum total.
   await repo.setSavingsAnswer(newOperationKey(), ctx, 0, 'consigo', 50_000);

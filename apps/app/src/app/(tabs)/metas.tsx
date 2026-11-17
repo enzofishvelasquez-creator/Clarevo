@@ -8,6 +8,7 @@ import { CalcNavRow } from '@/components/calc/parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ClosedGoals, GoalCard, ReserveCard } from '@/components/goal-cards';
 import { GoalPresetShortcuts } from '@/components/goal-presets';
+import { GoalsReviewInvite } from '@/components/goals-review';
 import { ReserveRefresh } from '@/components/reserve-refresh';
 import { AppHeader, ContextSwitch } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
@@ -73,6 +74,8 @@ export default function MetasScreen() {
               />
               <ReserveRefresh contextId={contextId} reserve={data.reserve} canWrite={personal.data?.canWrite ?? true} />
               <GoalsSection active={data.active} plans={data.plans} images={images.data} canWrite={personal.data?.canWrite ?? true} />
+              {/* Convite para rever as metas (D-105): a cada três meses, opcional, com "Agora não". */}
+              <GoalsReviewInvite goals={data.goals} canWrite={personal.data?.canWrite ?? true} onNotice={setNotice} />
               <MonthCard overview={data} committed={committed} />
             </>
           ) : (

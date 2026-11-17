@@ -52,7 +52,7 @@ const NAV_THEME =
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura|nivel))?|familia(\/(nova|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura|nivel))?|familia(\/(nova|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|calendario|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -300,6 +300,8 @@ function Navigation() {
           <Stack.Screen name="evolucao" />
           {/* Análises (D-059): Categorias (barras ou bolhas), Evolução, Próximos meses e Orçamento; tela de consulta, com a barra inferior. */}
           <Stack.Screen name="analises" />
+          {/* Calendário financeiro (D-105): contas, faturas, vencimentos e datas do mês, só leitura; tela de consulta, com a barra inferior. */}
+          <Stack.Screen name="calendario" />
           {/* Importar extrato ou fatura (D-048): escolher, revisar e importar, com rodapé fixo e sem barra. */}
           <Stack.Screen name="importar/index" />
           <Stack.Screen name="a-pagar/index" />
@@ -357,6 +359,8 @@ function Navigation() {
           <Stack.Screen name="reserva" />
           <Stack.Screen name="meta/nova" />
           <Stack.Screen name="meta/ordenar" />
+          {/* Rever metas (D-105): o convite trimestral leva a esta lista, só leitura; cada meta abre o próprio detalhe. */}
+          <Stack.Screen name="meta/rever" />
           <Stack.Screen name="investimento/novo" />
           {/* Resumo para a declaração (D-099): rota estática, com precedência sobre /investimento/[id]. */}
           <Stack.Screen name="investimento/declaracao" />

@@ -8,15 +8,17 @@ import { CARDS_TEXT } from '../cards';
 import { QUICK_PAY_TEXT } from '../commitments';
 import { COMMITTED_TEXT } from '../committed';
 import { BOLETO_TEXT } from '../boleto';
+import { CALENDAR_TEXT } from '../calendar';
 import { BENEFIT_TEXT, COMPANY_TEXT, ENTRY_INVITE_TEXT } from '../company';
 import { COMPANY_REPORT_TEXT } from '../company-report';
 import { COMPROVANTE_TEXT } from '../comprovante/fluxo';
 import { DELETE_CONFIRMATION_WORD, DELETE_TEXT } from '../deletion';
-import { EVOLUTION_TEXT, EVOLUTION_WINDOWS } from '../evolucao-tela';
+import { EVOLUTION_CASH_WINDOWS, EVOLUTION_TEXT } from '../evolucao-tela';
 import { EXPORT_TEXT } from '../export';
 import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOAL_IMAGE_TEXT } from '../goal-images';
 import { GOALS_TEXT } from '../goals';
+import { GOALS_REVIEW_TEXT } from '../goals-review';
 import { INVESTMENT_TEXT } from '../investments';
 import { INVESTMENT_PLAN_TEXT } from '../investment-plan';
 import { DETAILS_TEXT } from '../investment-details';
@@ -34,6 +36,7 @@ import { INCOME_AVERAGE_TEXT } from '../renda-media';
 import { REMINDER_TEXT } from '../reminders';
 import { ROUTINE_REMINDER_TEXT } from '../routine-reminders';
 import { RETURN_TEXT } from '../retorno';
+import { ANALYSES_ENTRY_TEXT, SUMMARY_SHORTCUTS_TEXT } from '../resumo-atalhos';
 import { EXTRA_SAVINGS_TEXT, SAVINGS_TEXT } from '../savings';
 import { SEARCH_TEXT } from '../search';
 import { SEU_MES_TEXT } from '../seu-mes';
@@ -122,8 +125,8 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Mostra o Recebido ou o Pago de cada mês em um gráfico de linha, com média e mediana, e deixa tirar um mês da comparação sem mexer em nenhum lançamento.',
     where: [TAB.movimentos, ANALYSES_TEXT.title, EVOLUTION_TEXT.title],
     steps: [
-      `Em Movimentos, depois da lista do mês, toque em ${q(ANALYSES_TEXT.rowTitle)}, escolha a aba ${q(ANALYSES_TEXT.tabs.evolucao)} e toque em ${q(ANALYSES_TEXT.evolution.action)}.`,
-      `Escolha ${q(EVOLUTION_TEXT.metrics.recebido)} ou ${q(EVOLUTION_TEXT.metrics.pago)} e ${list(EVOLUTION_WINDOWS.map((n) => EVOLUTION_TEXT.windowLabel[n]), 'ou')}. O gráfico tem um ponto por mês, pela data do pagamento.`,
+      `Em Movimentos, toque em ${q(ANALYSES_ENTRY_TEXT.label)}, no topo, ou em ${q(ANALYSES_TEXT.rowTitle)}, depois da lista do mês; escolha a aba ${q(ANALYSES_TEXT.tabs.evolucao)} e toque em ${q(ANALYSES_TEXT.evolution.action)}.`,
+      `Escolha ${q(EVOLUTION_TEXT.metrics.recebido)} ou ${q(EVOLUTION_TEXT.metrics.pago)} e ${list(EVOLUTION_CASH_WINDOWS.map((n) => EVOLUTION_TEXT.windowLabel[n]), 'ou')}. O gráfico tem um ponto por mês, pela data do pagamento. ${EVOLUTION_TEXT.windowPhase3Note}`,
       `Toque em um mês para ver o valor exato, a variação com o mês anterior na comparação e as 3 maiores categorias do mês. ${q(EVOLUTION_TEXT.explain.title)} mostra as categorias e os lançamentos que mais mudaram entre os dois meses, sem dizer qual é a causa.`,
       `Para tirar um mês da comparação, desligue ${q(EVOLUTION_TEXT.panel.switchLabel)}. Isso não apaga nem muda lançamento, e ${q(EVOLUTION_TEXT.custom.restore)} traz os meses de volta.`,
       `${q(EVOLUTION_TEXT.stats.average)} e ${q(EVOLUTION_TEXT.stats.median)} usam só os meses da comparação. ${q(EVOLUTION_TEXT.stats.total)} soma todos e não muda. Toque em ${q(EVOLUTION_TEXT.stats.whatIsMedian)} para ler a diferença entre média e mediana e abrir o tema completo, com um exemplo, em Aprender.`,
@@ -142,7 +145,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Reúne, em quatro abas, as categorias do Pago em barras ou bolhas, a evolução, os próximos meses e o orçamento do mês escolhido.',
     where: [TAB.movimentos, ANALYSES_TEXT.title],
     steps: [
-      `Em Movimentos, depois da lista do mês, toque em ${q(ANALYSES_TEXT.rowTitle)}. Use as setas ao lado do nome do mês para escolher o mês.`,
+      `Em Movimentos, toque em ${q(ANALYSES_ENTRY_TEXT.label)}, no topo, ou em ${q(ANALYSES_TEXT.rowTitle)}, depois da lista do mês. No Resumo, o atalho ${q(SUMMARY_SHORTCUTS_TEXT.analysesTitle)} abre o mesmo. Use as setas ao lado do nome do mês para escolher o mês.`,
       `Toque em uma aba: ${list(ANALYSES_TABS.map((t) => ANALYSES_TEXT.tabs[t]), 'ou')}.`,
       `Em ${q(ANALYSES_TEXT.tabs.categorias)}, escolha ${q(ANALYSES_TEXT.categories.views.barras)} ou ${q(ANALYSES_TEXT.categories.views.bolhas)}. As barras comparam com mais precisão; as bolhas são uma visão exploratória, com o nome e o percentual escritos em cada uma. A escolha fica só neste aparelho.`,
       `Toque em uma categoria para abrir o cartão ${q(ANALYSES_TEXT.categories.selected.title)}, com o valor, o percentual e os lançamentos do mês nela. Toque em um lançamento para abri-lo.`,
@@ -319,12 +322,12 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Quando pagar, toque em ${q(QUICK_PAY_TEXT.button)} na linha da conta e confirme com ${q(QUICK_PAY_TEXT.confirm)}.`,
       `Para mudar o valor ou a data do pagamento, escolha ${q(QUICK_PAY_TEXT.change)}.`,
       `A conta paga passa a contar em ${q('Pago')}, no mês da data do pagamento.`,
-      'Use as setas ao lado do nome do mês para ver as contas de outros meses.',
+      `Use as setas ao lado do nome do mês para ver as contas de outros meses. Para ver as datas do mês num lugar só (contas, faturas, aportes planejados e o Imposto de Renda), abra ${q(CALENDAR_TEXT.rowTitle)}, em ${q(ORGANIZE_TEXT.title)} ou no Resumo.`,
     ],
     screenName: ORGANIZE_TEXT.payables.title,
     href: '/a-pagar',
-    keywords: ['conta', 'pagar', 'boleto', 'vencimento', 'vencer', 'vencida', 'já paguei', 'marcar como paga', 'ainda a pagar', 'internet', 'condomínio'],
-    routes: ['/a-pagar', '/a-pagar/nova', '/a-pagar/[id]', '/a-pagar/[id]/editar', '/a-pagar/[id]/pagar'],
+    keywords: ['conta', 'pagar', 'boleto', 'vencimento', 'vencer', 'vencida', 'já paguei', 'marcar como paga', 'ainda a pagar', 'internet', 'condomínio', 'calendário'],
+    routes: ['/a-pagar', '/a-pagar/nova', '/a-pagar/[id]', '/a-pagar/[id]/editar', '/a-pagar/[id]/pagar', '/calendario'],
     screenshot: '175_contas_a_pagar_outubro.png',
   },
   {
@@ -529,7 +532,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     where: [TAB.metas],
     steps: [
       `Em ${q(GOALS_TEXT.reserveTitle)}, toque em ${q(GOALS_TEXT.reserveCalculate)} para ver quantos meses de gastos essenciais você quer cobrir.`,
-      `Toque em ${q(GOALS_TEXT.newGoal)}, dê um nome e informe o valor e, se quiser, o prazo.`,
+      `Toque em ${q(GOALS_TEXT.newGoal)}, dê um nome e informe o valor e, se quiser, o prazo. A cada três meses, se quiser, ${q(GOALS_REVIEW_TEXT.cardTitle)} leva a ${q(GOALS_REVIEW_TEXT.screenTitle)}, com o guardado, o prazo e o plano de cada meta; ${q(GOALS_REVIEW_TEXT.later)} esconde o convite.`,
       `Quando guardar dinheiro, abra a meta e use ${q(GOALS_TEXT.detail.addDeposit)}. O valor guardado só anda com o que você registrar.`,
       `Para usar o dinheiro, use ${q(GOALS_TEXT.detail.addWithdrawal)}. Aportes e resgates não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.`,
       `Cada meta mostra uma imagem sugerida pelo nome. Para trocar, abra a meta, toque em "Mais ações" e em ${q(GOAL_IMAGE_TEXT.change)}: escolha outra sugestão ou uma foto sua.`,
@@ -538,7 +541,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     screenName: TAB.metas,
     href: '/metas',
     keywords: ['meta', 'metas', 'guardar', 'poupar', 'economizar', 'reserva', 'imprevistos', 'emergência', 'objetivo', 'aporte', 'resgate', 'imagem', 'foto', 'investimentos ligados'],
-    routes: ['/metas', '/meta/nova', '/meta/ordenar', '/meta/[id]', '/meta/[id]/editar', '/meta/[id]/movimento', '/meta/[id]/imagem', '/reserva'],
+    routes: ['/metas', '/meta/nova', '/meta/ordenar', '/meta/rever', '/meta/[id]', '/meta/[id]/editar', '/meta/[id]/movimento', '/meta/[id]/imagem', '/reserva'],
     screenshot: '16_metas.png',
   },
   {

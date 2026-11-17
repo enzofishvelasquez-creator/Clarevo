@@ -114,6 +114,7 @@ export function AppHeader({
   context,
   contextFixed,
   wide,
+  action,
   children,
 }: {
   title?: string;
@@ -121,6 +122,8 @@ export function AppHeader({
   contextFixed?: boolean;
   /** Versão para computador: o conteúdo da faixa acompanha a largura do painel (o Resumo). */
   wide?: boolean;
+  /** Um atalho à direita do título (D-105: "Análises" em Movimentos), sem aumentar a faixa. */
+  action?: ReactNode;
   children?: ReactNode;
 }) {
   // Na versão para computador, o logotipo e a Conta ficam na barra lateral; a faixa azul mostra o título, o mês e, no alto à direita, onde o
@@ -139,9 +142,10 @@ export function AppHeader({
               {title}
             </Txt>
             {context ? <ContextPill label={context} fixed={contextFixed} inTab /> : null}
-            {sideNav ? (
-              <View style={styles.wideEye}>
-                <HideValuesButton labeled />
+            {action || sideNav ? (
+              <View style={styles.titleEnd}>
+                {action ? <View style={styles.titleAction}>{action}</View> : null}
+                {sideNav ? <HideValuesButton labeled /> : null}
               </View>
             ) : null}
           </View>
@@ -382,13 +386,16 @@ const styles = StyleSheet.create({
   // A margem de baixo fica só na linha do título (titleRow): com as duas, o título sem pílula ganhava 16 px a mais (Movimentos).
   title: { fontSize: 24, lineHeight: 32, overflowWrap: 'anywhere' } as object,
   titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[1], marginBottom: space[4] },
+  // O atalho do título (44 px de toque) não aumenta a linha de 32 px: as margens negativas compensam a diferença.
+  titleAction: { marginVertical: -6 },
+  // Fim da linha do título: o atalho (D-105) e, no computador, "Ocultar valores" (D-110), encostados à direita.
+  titleEnd: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: space[2] },
   avatar: { minWidth: 44, height: 44, paddingHorizontal: 4, borderRadius: 22, backgroundColor: colors.surfaceOnBrand, alignItems: 'center', justifyContent: 'center' },
   eye: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   // Computador: o olho com o texto, numa pílula azul mais escura sobre a faixa (o mesmo azul do trilho do seletor Pessoal e Família).
   eyeLabeled: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 44, paddingHorizontal: space[4], borderRadius: radius.pill, backgroundColor: colors.brandDeep },
   eyeLabeledHover: { backgroundColor: colors.onBrandPressed },
-  // Nas abas com título, o olho fica na mesma linha, encostado à direita; no Resumo (sem título), numa linha só dele, acima do mês.
-  wideEye: { marginLeft: 'auto' },
+  // Nas abas com título, o olho fica na mesma linha, encostado à direita (titleEnd); no Resumo (sem título), numa linha só dele, acima do mês.
   wideTop: { flexDirection: 'row', justifyContent: 'flex-end' },
   subBand: { backgroundColor: colors.brand },
   subInner: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingTop: space[2], paddingBottom: space[3], paddingHorizontal: space[3] },

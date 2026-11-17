@@ -89,6 +89,10 @@ export const SIX_MONTH_REVIEW: readonly TopicSlug[] = [
   'lci-lca',
   'proventos',
   'declarar-investimentos',
+  // Temas curtos de imposto (D-105): a tabela regressiva, o IOF no resgate e o come-cotas.
+  'ir-regressivo',
+  'iof-resgate',
+  'come-cotas',
 ];
 
 /** Aviso de revisão (R6): dias antes do prazo. */
