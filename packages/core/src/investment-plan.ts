@@ -121,6 +121,10 @@ export const INVESTMENT_GOAL_TEXT = {
   unknownLine: (count: number) =>
     count === 1 ? '1 investimento ligado está sem a liquidez na ficha.' : `${count} investimentos ligados estão sem a liquidez na ficha.`,
   note: 'Só informação: o valor guardado é o que você registra aqui. O valor de cada investimento vem da última atualização dele, na aba Investir.',
+  /** Nos cards de Metas e no detalhe, quando o valor guardado vem dos registros: "Investimentos ligados: R$ 10.875,00, não somados ao guardado". */
+  notCounted: (valueCents: Cents) => `Investimentos ligados: ${formatBRL(valueCents)}, não somados ao guardado`,
+  notCountedSee: 'Ver',
+  notCountedSeeA11y: 'Ver os investimentos ligados',
   invalid: 'Esta meta não pode mais ser escolhida. Escolha outra ou deixe sem meta.',
   archivedNote: 'A meta ligada a este investimento foi arquivada. Ao salvar, a ligação sai.',
   /** De onde vem o valor guardado da meta (D-099, item 13 fase 2). */

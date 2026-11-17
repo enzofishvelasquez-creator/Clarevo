@@ -222,9 +222,10 @@ describe('catálogo do guia (D-049)', () => {
     expect(entry.title).toBe('Seu mês em 30 segundos');
     expect(entry.href).toBe('/seu-mes');
     expect(entry.routes).toEqual(['/seu-mes']);
-    expect(guideWhere(entry.where)).toBe('Movimentos › Seu mês em 30 segundos');
+    // Revisão das telas (16/11/2026): a linha "Ver análises do mês", depois da lista, leva às Análises, com o Seu mês logo abaixo do mês.
+    expect(guideWhere(entry.where)).toBe('Movimentos › Análises › Seu mês em 30 segundos');
     const steps = entry.steps.join(' ');
-    for (const name of ['"Buscar"', '"Próximo"', '"Anterior"', '"Concluir"', '"Entrou e saiu"', '"Para onde foi"', '"O que ainda vence"', '"Orçamento"', '"Metas"', '"Diferença do mês"']) {
+    for (const name of ['"Ver análises do mês"', '"Próximo"', '"Anterior"', '"Concluir"', '"Entrou e saiu"', '"Para onde foi"', '"O que ainda vence"', '"Orçamento"', '"Metas"', '"Diferença do mês"']) {
       expect(steps, name).toContain(name);
     }
     for (const query of ['seu mês', '30 segundos', 'revisão do mês']) expect(searchGuide(query).map((e) => e.id), query).toContain('seu-mes');
@@ -242,10 +243,11 @@ describe('catálogo do guia (D-049)', () => {
     expect(entry.title).toBe('Evolução');
     expect(entry.href).toBe('/evolucao');
     expect(entry.routes).toEqual(['/evolucao']);
-    expect(guideWhere(entry.where)).toBe('Movimentos › Evolução');
+    // A Evolução é uma aba das Análises (revisão das telas, 16/11/2026).
+    expect(guideWhere(entry.where)).toBe('Movimentos › Análises › Evolução');
     expect(entry.screenshot).toBe('443_evolucao_abril_fora.png');
     const steps = entry.steps.join(' ');
-    for (const name of ['"Seu mês em 30 segundos"', '"Evolução"', '"Recebido"', '"Pago"', '"3 meses"', '"6 meses"', '"12 meses"', '"Mostrar este mês na comparação"', '"Restaurar todos"', '"Média dos meses na comparação"', '"Mediana dos meses na comparação"', '"Total dos meses exibidos"', '"Ver tabela mês a mês"']) {
+    for (const name of ['"Ver análises do mês"', '"Abrir Evolução"', '"Evolução"', '"Recebido"', '"Pago"', '"3 meses"', '"6 meses"', '"12 meses"', '"Mostrar este mês na comparação"', '"Restaurar todos"', '"Média dos meses na comparação"', '"Mediana dos meses na comparação"', '"Total dos meses exibidos"', '"Ver tabela mês a mês"']) {
       expect(steps, name).toContain(name);
     }
     expect(steps).toContain('não apaga nem muda lançamento');
@@ -522,7 +524,7 @@ describe('tour de boas-vindas (D-049(2))', () => {
   it('cinco cartões, na ordem do spec, cada um com título, texto e ícone', () => {
     expect(TOUR_CARDS).toHaveLength(5);
     expect(TOUR_CARDS.map((c) => c.id)).toEqual(['resumo', 'anotar', 'contas', 'metas', 'ajuda']);
-    expect(TOUR_CARDS.map((c) => c.title)).toEqual(['Resumo do mês', 'Anotar um gasto', 'Contas a pagar e lembretes', 'Metas e calculadoras', 'Onde achar ajuda']);
+    expect(TOUR_CARDS.map((c) => c.title)).toEqual(['Resumo do mês', 'Anotar um gasto', 'Movimentos, contas e cartões', 'Metas e investimentos', 'Onde achar ajuda']);
     expect(new Set(TOUR_CARDS.map((c) => c.icon)).size).toBe(5);
     for (const c of TOUR_CARDS) {
       expect(c.title.trim(), c.id).not.toBe('');
@@ -543,7 +545,14 @@ describe('tour de boas-vindas (D-049(2))', () => {
     expect(TOUR_TEXT.skip).toBe('Pular');
     expect(TOUR_TEXT.next).toBe('Próximo');
     expect(TOUR_TEXT.start).toBe('Começar');
+    expect(TOUR_TEXT.back).toBe('Voltar');
     expect(TOUR_TEXT.progress(2, 5)).toBe('2 de 5');
+    // Revisão das telas (16/11/2026): Movimentos e Investir aparecem, o aviso de vencimento não promete o que o app não faz sozinho
+    // (no celular, a pessoa liga o aviso) e o último cartão diz onde mandar uma sugestão ou um problema.
+    expect(TOUR_CARDS[2]!.lines.join(' ')).toContain('Em Movimentos ficam a lista do mês, as contas a pagar e os cartões.');
+    expect(TOUR_CARDS[2]!.lines.join(' ')).toContain('você pode ligar um aviso no dia anterior ao vencimento');
+    expect(TOUR_CARDS[3]!.lines.join(' ')).toContain('Em Investir');
+    expect(TOUR_CARDS[4]!.lines).toContain('Algo deu errado ou teve uma ideia? Em Conta, Enviar sugestão ou problema.');
   });
 
   it('aparece no Resumo, uma vez por pessoa em cada aparelho', () => {

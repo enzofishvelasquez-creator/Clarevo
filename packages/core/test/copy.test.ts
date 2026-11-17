@@ -1061,7 +1061,7 @@ describe('textos de cartões (Ciclo E)', () => {
     expect(CARDS_TEXT.chargesCategory).toBe('Encargos do cartão');
     expect(invoiceRecordDescription('Nubank', '2026-10', '2026-10-20')).toBe('Fatura Nubank (outubro)');
     expect(CARDS_TEXT.invoice.payAfterClosing('2026-11-03')).toBe(
-      'Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/11/2026. Se você já pagou antes, use a data em que pagou.',
+      'Esta fatura fecha em 03/11/2026. Depois disso, o pagamento pode ser registrado aqui. Se pagar antes, informe a data real do pagamento.',
     );
     expect(cardErrorText('fatura_aberta', { closingOn: '2026-11-03' })).toBe(CARDS_TEXT.invoice.payAfterClosing('2026-11-03'));
     expect(cardErrorText('fatura_aberta')).toBe(CARD_ERROR_TEXT.fatura_aberta);

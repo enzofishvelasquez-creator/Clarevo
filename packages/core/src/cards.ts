@@ -1355,6 +1355,8 @@ export const CARDS_TEXT = {
   organizeRow: 'Cartões',
   organizeHint: 'Faturas, compras no cartão e limite',
   newCard: 'Cadastrar cartão',
+  /** Com algum cartão cadastrado, o botão secundário depois da lista. */
+  addAnotherCard: 'Adicionar outro cartão',
   emptyTitle: 'Nenhum cartão cadastrado',
   emptyBody: 'Cadastre um cartão para anotar as compras na fatura. Elas só contam em Pago quando você pagar a fatura.',
   privacy: 'Guardamos só o apelido e os 4 últimos dígitos. Nunca digite o número completo, o código de segurança nem a validade.',
@@ -1412,6 +1414,8 @@ export const CARDS_TEXT = {
     installments: 'Em quantas vezes?',
     installmentsHint: 'De 1 a 48 parcelas.',
     save: 'Anotar compra no cartão',
+    /** O rótulo visível no rodapé do formulário, que cabe numa linha ao lado de "Cancelar"; o nome acessível continua o de `save`. */
+    saveShort: 'Anotar compra',
     saved: 'Compra anotada no cartão.',
     savedFor: (invoiceMonth: IsoMonth, today: IsoDate) => `Compra anotada na fatura de ${invoiceMonthLabel(invoiceMonth, today)}.`,
   },
@@ -1421,7 +1425,7 @@ export const CARDS_TEXT = {
     payInvoice: 'Pagar fatura',
     /** Fatura ainda aberta (ou futura): quando poderá ser paga. */
     payAfterClosing: (closingOn: IsoDate) =>
-      `Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em ${formatDateBR(closingOn)}. Se você já pagou antes, use a data em que pagou.`,
+      `Esta fatura fecha em ${formatDateBR(closingOn)}. Depois disso, o pagamento pode ser registrado aqui. Se pagar antes, informe a data real do pagamento.`,
     payTotal: 'Pagar o total',
     payOther: 'Outro valor',
     payAmount: 'Valor pago',

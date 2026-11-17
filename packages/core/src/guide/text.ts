@@ -91,24 +91,32 @@ export const TOUR_CARDS: readonly TourCard[] = [
   {
     id: 'contas',
     icon: 'contas',
-    title: 'Contas a pagar e lembretes',
-    lines: ['Anote as contas que ainda vão vencer, como luz e aluguel.', 'Quando pagar, toque em Já paguei.', 'No app para celular, um lembrete avisa um dia antes do vencimento.'],
+    title: 'Movimentos, contas e cartões',
+    lines: [
+      'Em Movimentos ficam a lista do mês, as contas a pagar e os cartões.',
+      'Quando pagar uma conta, toque em Já paguei.',
+      'No app para celular, você pode ligar um aviso no dia anterior ao vencimento.',
+    ],
   },
   {
     id: 'metas',
     icon: 'metas',
-    title: 'Metas e calculadoras',
+    title: 'Metas e investimentos',
     lines: [
       'Em Metas, crie um objetivo, como uma viagem.',
       'Com um prazo, a Clarevo mostra quanto guardar por mês até lá.',
-      'As calculadoras comparam opções, como parcelado ou à vista, sem gravar nada.',
+      'Em Investir, acompanhe o que você já investe e quanto rendeu.',
     ],
   },
   {
     id: 'ajuda',
     icon: 'ajuda',
     title: 'Onde achar ajuda',
-    lines: ['Em Aprender › Como usar o app da Clarevo, cada função tem o passo a passo.', 'Em várias telas, o botão ? no topo explica o que aparece ali.'],
+    lines: [
+      'Em Aprender › Como usar o app da Clarevo, veja o passo a passo.',
+      'Em algumas telas, o botão ? explica o que aparece.',
+      'Algo deu errado ou teve uma ideia? Em Conta, Enviar sugestão ou problema.',
+    ],
   },
 ];
 
@@ -119,6 +127,8 @@ export const TOUR_TEXT = {
   skip: 'Pular',
   skipHint: 'Fecha o tour. Você pode rever em Aprender, em Como usar o app da Clarevo.',
   next: 'Próximo',
+  /** Volta ao cartão anterior (do segundo cartão em diante). */
+  back: 'Voltar',
   start: 'Começar',
   /** "1 de 5", visível e lido com o título do cartão. */
   progress: (index: number, total: number): string => `${index} de ${total}`,

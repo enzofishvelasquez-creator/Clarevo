@@ -100,9 +100,9 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     group: 'dia-a-dia',
     title: SEU_MES_TEXT.title,
     purpose: 'Resume o mês em poucos cartões, lidos um por vez: o que entrou e saiu, para onde foi o dinheiro, o que ainda vence, o orçamento e as metas.',
-    where: [TAB.movimentos, SEU_MES_TEXT.title],
+    where: [TAB.movimentos, ANALYSES_TEXT.title, SEU_MES_TEXT.title],
     steps: [
-      `Em Movimentos, logo abaixo de ${q(SEARCH_TEXT.entry)}, toque em ${q(SEU_MES_TEXT.title)}.`,
+      `Em Movimentos, depois da lista do mês, toque em ${q(ANALYSES_TEXT.rowTitle)} e, logo abaixo do mês, em ${q(SEU_MES_TEXT.title)}.`,
       `Leia um cartão por vez: toque em ${q(SEU_MES_TEXT.next)} (ou deslize para o lado) e use ${q(SEU_MES_TEXT.previous)} para voltar. No último cartão, o botão é ${q(SEU_MES_TEXT.finish)}.`,
       `${q(SEU_MES_TEXT.cards.enteredAndLeft)} mostra ${q(SEU_MES_TEXT.entered.received)}, ${q(SEU_MES_TEXT.entered.paid)} e ${q(SEU_MES_TEXT.entered.difference)}, que não é saldo da conta.`,
       `${q(SEU_MES_TEXT.cards.whereItWent)} traz as três maiores categorias de Pago e, quando o mês anterior tem pagamentos, a diferença para ele. É só um fato, sem nota.`,
@@ -120,9 +120,9 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     group: 'dia-a-dia',
     title: EVOLUTION_TEXT.title,
     purpose: 'Mostra o Recebido ou o Pago de cada mês em um gráfico de linha, com média e mediana, e deixa tirar um mês da comparação sem mexer em nenhum lançamento.',
-    where: [TAB.movimentos, EVOLUTION_TEXT.title],
+    where: [TAB.movimentos, ANALYSES_TEXT.title, EVOLUTION_TEXT.title],
     steps: [
-      `Em Movimentos, logo abaixo de ${q(SEU_MES_TEXT.title)}, toque em ${q(EVOLUTION_TEXT.title)}.`,
+      `Em Movimentos, depois da lista do mês, toque em ${q(ANALYSES_TEXT.rowTitle)}, escolha a aba ${q(ANALYSES_TEXT.tabs.evolucao)} e toque em ${q(ANALYSES_TEXT.evolution.action)}.`,
       `Escolha ${q(EVOLUTION_TEXT.metrics.recebido)} ou ${q(EVOLUTION_TEXT.metrics.pago)} e ${list(EVOLUTION_WINDOWS.map((n) => EVOLUTION_TEXT.windowLabel[n]), 'ou')}. O gráfico tem um ponto por mês, pela data do pagamento.`,
       `Toque em um mês para ver o valor exato, a variação com o mês anterior na comparação e as 3 maiores categorias do mês. ${q(EVOLUTION_TEXT.explain.title)} mostra as categorias e os lançamentos que mais mudaram entre os dois meses, sem dizer qual é a causa.`,
       `Para tirar um mês da comparação, desligue ${q(EVOLUTION_TEXT.panel.switchLabel)}. Isso não apaga nem muda lançamento, e ${q(EVOLUTION_TEXT.custom.restore)} traz os meses de volta.`,
@@ -142,7 +142,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Reúne, em quatro abas, as categorias do Pago em barras ou bolhas, a evolução, os próximos meses e o orçamento do mês escolhido.',
     where: [TAB.movimentos, ANALYSES_TEXT.title],
     steps: [
-      `Em Movimentos, logo abaixo de ${q(EVOLUTION_TEXT.title)}, toque em ${q(ANALYSES_TEXT.title)}. Use as setas ao lado do nome do mês para escolher o mês.`,
+      `Em Movimentos, depois da lista do mês, toque em ${q(ANALYSES_TEXT.rowTitle)}. Use as setas ao lado do nome do mês para escolher o mês.`,
       `Toque em uma aba: ${list(ANALYSES_TABS.map((t) => ANALYSES_TEXT.tabs[t]), 'ou')}.`,
       `Em ${q(ANALYSES_TEXT.tabs.categorias)}, escolha ${q(ANALYSES_TEXT.categories.views.barras)} ou ${q(ANALYSES_TEXT.categories.views.bolhas)}. As barras comparam com mais precisão; as bolhas são uma visão exploratória, com o nome e o percentual escritos em cada uma. A escolha fica só neste aparelho.`,
       `Toque em uma categoria para abrir o cartão ${q(ANALYSES_TEXT.categories.selected.title)}, com o valor, o percentual e os lançamentos do mês nela. Toque em um lançamento para abri-lo.`,
@@ -230,7 +230,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       'Veja os registros do mês, do mais recente para o mais antigo. Use as setas ao lado do nome do mês para mudar de mês.',
       `Filtre por ${list(['Todos', 'Recebidos', 'Pagos'], 'ou')}.`,
       'Toque em um registro para ver o detalhe, editar ou excluir.',
-      `No card ${q(ORGANIZE_TEXT.title)}, abra ${list(
+      `Depois da lista, no card ${q(ORGANIZE_TEXT.title)}, abra ${list(
         [ORGANIZE_TEXT.payables.title, ORGANIZE_TEXT.series.title, CARDS_TEXT.organizeRow, BUDGET_TEXT.organize.title, IMPORT_TEXT.rowTitle, ORGANIZE_TEXT.calculators.title],
         'ou',
       )}.`,
@@ -249,7 +249,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.',
     where: [TAB.movimentos, SEARCH_TEXT.entry],
     steps: [
-      `Em Movimentos, toque no campo ${q(SEARCH_TEXT.entry)}, no topo.`,
+      `Em Movimentos, toque em ${q(SEARCH_TEXT.entry)}, a lupa ao lado dos filtros, logo acima da lista do mês.`,
       `Digite o que procura, como ${q('luz')} ou ${q('mercado')}. Não precisa de acento.`,
       `Escolha o ${q(SEARCH_TEXT.kindLabel)} (${SEARCH_TEXT.kinds.todos}, ${SEARCH_TEXT.kinds.despesa} ou ${SEARCH_TEXT.kinds.receita}) e o ${q(SEARCH_TEXT.periodLabel)}.`,
       `Toque em ${q(SEARCH_TEXT.moreFilters(0))} para limitar por categoria, conta ou valor.`,

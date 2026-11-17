@@ -2,9 +2,10 @@ import { BookOpen, CalendarClock, Flag, House, NotebookPen, type LucideIcon } fr
 import { usePathname } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useReturnBand } from '@/components/retorno-faixa';
-import { Button, Txt } from '@/components/ui';
+import { Button, LinkButton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { TOUR_CARDS, TOUR_TEXT, shouldShowTour, tourOffByHost, type TourIcon } from '@/lib/guide';
@@ -14,14 +15,17 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
 const ICON: Record<TourIcon, LucideIcon> = { resumo: House, anotar: NotebookPen, contas: CalendarClock, metas: Flag, ajuda: BookOpen };
 
 /**
- * Tour de boas-vindas (D-049(2)): cinco cartões num modal, com um ícone simples e texto curto, "Pular" em todos e "Próximo" (no
- * último, "Começar"). Sem animação (também não depende de "reduzir movimento"). O nome acessível da janela é lido ao abrir, o
- * título e a posição ("1 de 5") ficam no próprio cartão, e a troca de cartão é anunciada numa região viva educada (no iOS, pelo
- * anúncio do sistema). Esc e o voltar do sistema pulam. O foco fica preso na janela e volta ao que estava antes (RN Web Modal).
+ * Tour de boas-vindas (D-049(2)): cinco cartões numa folha presa ao pé da tela (revisão das telas, 16/11/2026: o cartão no meio cobria o
+ * que descrevia; a folha deixa a tela de cima à vista). Cada cartão tem um ícone simples e texto curto; "Pular" no topo da folha, menos
+ * no último cartão; "Voltar" do segundo cartão em diante e "Próximo" (no último, "Começar"). Sem animação (também não depende de
+ * "reduzir movimento"). O nome acessível da janela é lido ao abrir, o título e a posição ("1 de 5") ficam no próprio cartão, e a troca de
+ * cartão é anunciada numa região viva educada (no iOS, pelo anúncio do sistema). Esc e o voltar do sistema fecham. O foco fica preso
+ * na janela e volta ao que estava antes (RN Web Modal).
  */
 export function TourDialog({ onClose }: { onClose: () => void }) {
   const [index, setIndex] = useState(0);
   const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const card = TOUR_CARDS[index]!;
   const total = TOUR_CARDS.length;
   const last = index === total - 1;
@@ -47,24 +51,29 @@ export function TourDialog({ onClose }: { onClose: () => void }) {
       // Na web, o Modal vira role="dialog"; o nome vai nele.
       {...({ 'aria-label': TOUR_TEXT.dialogLabel } as object)}>
       <View style={styles.backdrop}>
-        <View style={[styles.box, { maxHeight: Math.max(280, Math.round(height * 0.9)) }]} accessibilityViewIsModal>
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <View style={styles.icon}>
-              <Icon size={36} color={colors.textOnAccent} strokeWidth={2.25} aria-hidden />
+        <View
+          style={[styles.sheet, { maxHeight: Math.max(280, Math.round(height * 0.75)), paddingBottom: Math.max(insets.bottom, space[4]) }]}
+          accessibilityViewIsModal>
+          <View style={styles.head}>
+            <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+              {TOUR_CARDS.map((c, i) => (
+                <View key={c.id} style={[styles.dot, i === index && styles.dotOn]} />
+              ))}
             </View>
-            <View style={styles.progressRow}>
-              <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-                {TOUR_CARDS.map((c, i) => (
-                  <View key={c.id} style={[styles.dot, i === index && styles.dotOn]} />
-                ))}
+            <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold, flex: 1 }}>
+              {TOUR_TEXT.progress(index + 1, total)}
+            </Txt>
+            {last ? null : <LinkButton label={TOUR_TEXT.skip} accessibilityHint={TOUR_TEXT.skipHint} style={styles.skip} onPress={onClose} />}
+          </View>
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <View style={styles.titleRow}>
+              <View style={styles.icon}>
+                <Icon size={24} color={colors.textOnAccent} strokeWidth={2.25} aria-hidden />
               </View>
-              <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
-                {TOUR_TEXT.progress(index + 1, total)}
+              <Txt variant="title" accessibilityRole="header" aria-level={2} style={styles.title}>
+                {card.title}
               </Txt>
             </View>
-            <Txt variant="title" accessibilityRole="header" aria-level={2} style={styles.title}>
-              {card.title}
-            </Txt>
             <View style={styles.lines}>
               {card.lines.map((line) => (
                 <Txt key={line} color={colors.text}>
@@ -80,7 +89,7 @@ export function TourDialog({ onClose }: { onClose: () => void }) {
             </Txt>
           </View>
           <View style={styles.actions}>
-            <Button label={TOUR_TEXT.skip} tone="ghost" accessibilityHint={TOUR_TEXT.skipHint} style={styles.action} onPress={onClose} />
+            {index > 0 ? <Button label={TOUR_TEXT.back} tone="soft" style={styles.action} onPress={() => setIndex(index - 1)} /> : null}
             <Button label={last ? TOUR_TEXT.start : TOUR_TEXT.next} style={styles.action} onPress={() => (last ? onClose() : setIndex(index + 1))} />
           </View>
         </View>
@@ -92,7 +101,7 @@ export function TourDialog({ onClose }: { onClose: () => void }) {
 /**
  * O tour da primeira entrada, montado no Resumo (D-049(2)). Abre uma vez por pessoa em cada aparelho (a preferência local
  * `tourSeen`, só em memória na demonstração), depois de as preferências serem lidas, e nunca sobre a faixa "Seus últimos meses"
- * (D-030) nem sobre formulários: as regras estão em `shouldShowTour` (core). "Pular" e "Começar" marcam como visto.
+ * (D-030) nem sobre formulários: as regras estão em `shouldShowTour` (core). "Pular", Esc e "Começar" marcam como visto.
  * A revisão dos últimos meses só é consultada enquanto o tour ainda pode abrir; depois de visto, nada mais é lido para ele.
  */
 export function WelcomeTour({ personal, contextId }: { personal: boolean; contextId: string | undefined }) {
@@ -117,17 +126,37 @@ export function WelcomeTour({ personal, contextId }: { personal: boolean; contex
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: space[4] },
-  box: { width: '100%', maxWidth: 440, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space[6], gap: space[4] },
+  // Sem véu escuro: a tela de cima continua à vista. A folha tem sombra e borda para se separar do fundo.
+  backdrop: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
+  sheet: {
+    width: '100%',
+    maxWidth: 560,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: colors.border,
+    paddingHorizontal: space[5],
+    paddingTop: space[3],
+    gap: space[3],
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 12,
+  },
+  head: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 },
+  skip: { paddingHorizontal: space[1] },
   content: { gap: space[3] },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   lines: { gap: space[2] },
-  icon: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
+  icon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   dots: { flexDirection: 'row', gap: space[1] },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
   dotOn: { backgroundColor: colors.brandMark, width: 20 },
-  title: { fontFamily: fonts.extrabold, fontSize: 22, lineHeight: 30 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2], justifyContent: 'flex-end' },
+  title: { flex: 1, fontFamily: fonts.extrabold, fontSize: 20, lineHeight: 28 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 120 },
   liveClip: { position: 'absolute', width: 1, height: 1, overflow: 'hidden' },
   liveText: { width: 240 },

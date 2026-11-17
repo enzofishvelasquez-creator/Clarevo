@@ -49,8 +49,8 @@ const decorative = { accessibilityElementsHidden: true, importantForAccessibilit
 // ---------------------------------------------------------------------------------------------------------------------
 
 /**
- * Linha "Análises" em Movimentos (D-059), logo abaixo de "Evolução": parece um campo, mas é um botão que abre a tela de consulta
- * `/analises`. Nada é lido nem guardado aqui.
+ * Linha "Ver análises do mês" em Movimentos (D-059; revisão das telas, 16/11/2026), depois da lista do mês: parece um campo, mas é um
+ * botão que abre a tela de consulta `/analises`. Nada é lido nem guardado aqui.
  */
 export function AnalysesEntry({ onPress }: { onPress: () => void }) {
   return (
@@ -62,7 +62,7 @@ export function AnalysesEntry({ onPress }: { onPress: () => void }) {
       <IconBlock icon={ChartPie} lime />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
-          {T.title}
+          {T.rowTitle}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>
           {T.rowCaption}

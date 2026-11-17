@@ -27,8 +27,8 @@ import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 const T = INVESTMENT_TEXT;
 
 /**
- * Investimentos (D-093, aba nova, só no Pessoal): o total de hoje, o aportado, o ganho, a rentabilidade da carteira com o CDI e o IPCA,
- * a lista dos investimentos e os encerrados. Com a ficha ampliada (D-099): próximos vencimentos, como está dividido, a garantia do FGC,
+ * Investimentos (D-093, aba nova, só no Pessoal): o total de hoje, o aportado, o ganho e a rentabilidade do período (o CDI, o IPCA e a
+ * poupança em "Comparar com CDI, IPCA e poupança"), "Novo investimento", a lista dos investimentos e os encerrados. Com a ficha ampliada (D-099): próximos vencimentos, como está dividido, a garantia do FGC,
  * os rendimentos recebidos no ano e os atalhos para o resumo da declaração e a calculadora de rendimentos líquidos. Tudo vem do que a pessoa registra; nada é recomendado. Mesmo com a Família escolhida no
  * seletor, esta aba mostra o Pessoal (investimentos não vão para a Família).
  */
@@ -78,6 +78,8 @@ export default function InvestimentosScreen() {
             <>
               {/* A carteira é só dos ativos: os encerrados saem do total e da rentabilidade (docs/45, seção 3.2). */}
               <Summary active={active} movements={movements.data} />
+              {/* Revisão das telas (16/11/2026): "Novo investimento" logo abaixo do total, não depois da lista. */}
+              {canWrite ? <Button label={T.newInvestment} icon={Plus} tone="soft" onPress={() => router.push('/investimento/novo')} /> : null}
               <InvestmentPlanCard plan={plan.data ?? null} movements={movements.data} />
               <UpcomingDatesCard items={active} />
               <View style={{ gap: space[3] }}>
@@ -87,7 +89,6 @@ export default function InvestimentosScreen() {
                 {active.map((i) => (
                   <InvestmentCard key={i.id} investment={i} />
                 ))}
-                {canWrite ? <Button label={T.newInvestment} icon={Plus} tone="soft" onPress={() => router.push('/investimento/novo')} /> : null}
               </View>
               <AllocationCard items={active} />
               <EvolutionCard items={all} movements={movements.data} />
@@ -107,14 +108,14 @@ export default function InvestimentosScreen() {
               ) : null}
             </>
           )}
-          <Txt variant="label" color={colors.textSecondary}>
-            {T.intro}
-          </Txt>
+          {/* Sem investimentos, a explicação do que a aba faz; depois, um aviso só no lugar dos quatro parecidos (revisão das telas). */}
+          {list.data && all.length === 0 ? (
+            <Txt variant="label" color={colors.textSecondary}>
+              {T.intro}
+            </Txt>
+          ) : null}
           <Txt variant="caption" color={colors.textSecondary}>
-            {T.disclaimer}
-          </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
-            {T.rule}
+            {T.closingNote}
           </Txt>
           <View style={styles.privacy}>
             <ShieldCheck size={18} color={colors.textSecondary} aria-hidden />
@@ -122,9 +123,6 @@ export default function InvestimentosScreen() {
               {T.whoSees}
             </Txt>
           </View>
-          <Txt variant="caption" color={colors.textSecondary} style={{ textAlign: 'center' }}>
-            {T.footer}
-          </Txt>
         </Body>
       </Screen>
     </View>
@@ -154,7 +152,7 @@ function Summary({ active, movements }: { active: readonly Investment[]; movemen
       </MoneyTxt>
       <InvestmentTotalsLines depositsCents={deposits} withdrawalsCents={withdrawals} incomeCents={income} gainCents={value + withdrawals + income - deposits} onBrand />
       <View style={styles.sep} />
-      <InvestmentReturns groups={groups} hasValue={hasValue} missing={missing} onBrand />
+      <InvestmentReturns groups={groups} hasValue={hasValue} missing={missing} onBrand collapsible />
     </View>
   );
 }

@@ -7,6 +7,7 @@ import {
   analysesTabFrom,
   formatMonthBR,
   monthOf,
+  seuMesParams,
   type AnalysesTab,
   type IsoMonth,
 } from '@clarevo/core';
@@ -18,6 +19,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 import { AnalysesTabs, BudgetTab, CategoriesTab, EvolutionTab, TabError, TabLoading, UpcomingTab } from '@/components/analises-parts';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MonthStepper } from '@/components/month-stepper';
+import { SeuMesEntry } from '@/components/seu-mes-parts';
 import { LinkButton, Screen, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { useView, useWork } from '@/state/data';
@@ -27,7 +29,8 @@ import { colors, space } from '@/theme/tokens';
 const T = ANALYSES_TEXT;
 
 /**
- * Análises (D-059): tela de consulta, com a barra inferior (Movimentos marcada), com quatro abas internas: Categorias (completa, em
+ * Análises (D-059): tela de consulta, com a barra inferior (Movimentos marcada), com a linha "Seu mês em 30 segundos" logo abaixo do
+ * mês e quatro abas internas: Categorias (completa, em
  * barras ou em bolhas), Evolução, Próximos meses e Orçamento (um resumo curto do mês e um botão para a tela completa). O seletor de
  * mês é local, do mais antigo até o mês de hoje (`?mes=AAAA-MM` abre em outro mês; `?aba=` escolhe a aba). Lê o contexto escolhido
  * (Pessoal ou Família) com as permissões do banco, e só lê: nada é gravado. Valores ocultos, leitor de tela e "reduzir movimento" seguem
@@ -110,6 +113,10 @@ export default function AnalisesScreen() {
             <LinkButton label={PAYABLES_NAV_TEXT.backToCurrent(currentMonth)} style={styles.inlineLink} onPress={() => setMonth(currentMonth)} />
           ) : null}
         </View>
+
+        {/* Seu mês em 30 segundos (D-052): logo abaixo do mês, no mesmo mês das análises (revisão das telas, 16/11/2026: a linha saiu de
+            Movimentos, que agora tem só "Ver análises do mês"). */}
+        <SeuMesEntry onPress={() => router.push({ pathname: '/seu-mes', params: seuMesParams(month, currentMonth) })} />
 
         <AnalysesTabs tab={tab} onChange={setTab} />
 

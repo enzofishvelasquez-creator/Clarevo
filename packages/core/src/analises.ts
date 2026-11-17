@@ -486,9 +486,13 @@ export function categoryBubbles(shares: readonly CategoryShare[], width: number,
 export const ANALYSES_TEXT = {
   /** Título da tela, da linha em Movimentos e do guia. */
   title: 'Análises',
-  /** Legenda da linha em Movimentos. */
-  rowCaption: 'Categorias, Evolução, Próximos meses e Orçamento',
-  rowA11y: 'Análises. Categorias, Evolução, Próximos meses e Orçamento.',
+  /**
+   * A linha em Movimentos, depois da lista do mês (revisão das telas, 16/11/2026): uma porta só no lugar de "Seu mês em 30
+   * segundos", "Evolução" e "Análises". A Evolução é uma aba daqui, e "Seu mês em 30 segundos" fica logo abaixo do mês.
+   */
+  rowTitle: 'Ver análises do mês',
+  rowCaption: 'Categorias, evolução, orçamento e o mês em 30 segundos',
+  rowA11y: 'Ver análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.',
   /** Legenda do índice "No app" de Aprender. */
   screenCaption: 'Categorias em barras ou bolhas, evolução, próximos meses e orçamento do mês',
   subtitle: 'Consulte o mês escolhido. Só leitura: nada é gravado.',

@@ -16,6 +16,7 @@ import {
   type StyleProp,
   type TextInputProps,
   type TextProps,
+  type ViewProps,
   type ViewStyle,
 } from 'react-native';
 import Animated, {
@@ -222,10 +223,14 @@ export function CardSlice({ first, last, children, style }: { first?: boolean; l
 }
 
 /** Conteúdo das abas abaixo do cabeçalho de ponta a ponta: limitado a 560 px e centralizado. */
-export function Body({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+export function Body({ children, style, onLayout }: { children: ReactNode; style?: StyleProp<ViewStyle>; onLayout?: ViewProps['onLayout'] }) {
   // Versão para computador: as abas usam mais da largura (o Resumo, em painel, passa o próprio limite em `style`).
   const wide = useWideLayout();
-  return <View style={[styles.body, wide && { maxWidth: WIDE_TAB_MAX, paddingTop: space[8] }, style]}>{children}</View>;
+  return (
+    <View style={[styles.body, wide && { maxWidth: WIDE_TAB_MAX, paddingTop: space[8] }, style]} onLayout={onLayout}>
+      {children}
+    </View>
+  );
 }
 
 export function TopInset({ color }: { color: string }) {

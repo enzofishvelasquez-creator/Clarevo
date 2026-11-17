@@ -169,7 +169,7 @@ function dimensoesPng(arquivo) {
           abrir: async () => {
             await movimentos();
             await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click();
-            await esperar('Cadastrar cartão');
+            await esperar('Adicionar outro cartão');
             await p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first().click();
             await esperar('Fatura atual');
             await p.waitForTimeout(500);
@@ -182,7 +182,12 @@ function dimensoesPng(arquivo) {
           cenario: 'evolucao',
           abrir: async () => {
             await movimentos();
-            await botao('Evolução. Recebido e pago mês a mês, com média e mediana.').click();
+            // A Evolução abre pelas Análises (revisão das telas, 16/11/2026): "Ver análises do mês" › aba Evolução › "Abrir Evolução".
+            await p.getByRole('button', { name: /^Ver análises do mês\./ }).filter({ visible: true }).first().click();
+            await esperar('Consulte o mês escolhido');
+            await p.getByRole('tab', { name: 'Evolução', exact: true }).filter({ visible: true }).first().click();
+            await esperar('Abrir Evolução');
+            await botao('Abrir Evolução').click();
             await esperar('Valores registrados, pela data do pagamento');
             // Seis meses de outubro para trás mostrariam só maio e junho nesse cenário: os 12 meses mostram janeiro a junho.
             await p.getByRole('radio', { name: '12 meses' }).or(botao('12 meses')).filter({ visible: true }).first().click();
@@ -194,7 +199,7 @@ function dimensoesPng(arquivo) {
           id: '06_analises_bolhas',
           abrir: async () => {
             await movimentos();
-            await botao('Análises. Categorias, Evolução, Próximos meses e Orçamento.').click();
+            await botao('Ver análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.').click();
             await esperar('Consulte o mês escolhido');
             await p.getByRole('radio', { name: 'Bolhas', exact: true }).filter({ visible: true }).first().click();
             await p.getByRole('group', { name: 'Pago por categoria, em bolhas' }).filter({ visible: true }).first().waitFor({ timeout: 8000 });

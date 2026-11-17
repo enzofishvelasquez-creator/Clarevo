@@ -1,4 +1,13 @@
-import { INVESTMENT_GOAL_TEXT, formatBRL, isRepoError, linkedInvestmentsSummary, newOperationKey, type Goal, type GoalValueSource } from '@clarevo/core';
+import {
+  INVESTMENT_GOAL_TEXT,
+  formatBRL,
+  isRepoError,
+  linkedInvestmentsSummary,
+  newOperationKey,
+  type Goal,
+  type GoalValueSource,
+  type LinkedInvestmentsSummary,
+} from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { ChevronRight } from 'lucide-react-native';
@@ -7,7 +16,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ChoiceGroup } from '@/components/series-parts';
-import { Card, Chip, Txt, styles as ui } from '@/components/ui';
+import { Card, Chip, LinkButton, Txt, styles as ui } from '@/components/ui';
 import { useInvestments, useSetGoalValueSource, useSpace } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -108,7 +117,44 @@ export function LinkedInvestmentsCard({ goal }: { goal: Goal }) {
   );
 }
 
+/**
+ * Investimentos ligados à meta que não entram no guardado (o valor vem dos registros da meta): o resumo deles, ou null. Fora do Pessoal,
+ * sem investimento ligado ou com o valor lido dos investimentos, null. Usa a mesma leitura do card "Investimentos ligados".
+ */
+export function useUncountedLinkedInvestments(goal: Goal | null): LinkedInvestmentsSummary | null {
+  const { today } = useSession();
+  const space_ = useSpace();
+  const personal = goal !== null && space_.data?.personalContextId === goal.contextId;
+  const list = useInvestments(personal ? goal.contextId : undefined);
+  if (!goal || !personal || !list.data || goal.valueSource === 'investimentos') return null;
+  return linkedInvestmentsSummary(goal.id, list.data, today);
+}
+
+/**
+ * "Investimentos ligados: R$ 10.875,00, não somados ao guardado" e o link "Ver" (revisão das telas, 16/11/2026), nos cards de Metas e no
+ * detalhe: quem ligou um investimento à meta vê que ele não está somado, e o "Ver" leva ao card com a escolha "De onde vem o valor
+ * guardado". O valor segue Ocultar valores.
+ */
+export function UncountedLinkedLine({ summary, onSee, onBrand = false }: { summary: LinkedInvestmentsSummary; onSee: () => void; onBrand?: boolean }) {
+  return (
+    <View style={styles.uncounted}>
+      <MoneyTxt variant="label" color={onBrand ? colors.textOnBrand : colors.textSecondary} style={[tabular, { flexShrink: 1 }]}>
+        {T.notCounted(summary.valueCents)}
+      </MoneyTxt>
+      <LinkButton
+        label={T.notCountedSee}
+        accessibilityLabel={T.notCountedSeeA11y}
+        color={onBrand ? colors.textOnBrand : colors.brandText}
+        style={styles.see}
+        onPress={onSee}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  uncounted: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[2] },
+  see: { paddingHorizontal: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 48, paddingVertical: space[2] },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
 });

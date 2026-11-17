@@ -25,6 +25,7 @@ import {
   canReadSefazPage,
   accountForPaymentForms,
   accountsForPicker,
+  pickerShowsChips,
   centsToInput,
   chooseAccountId,
   comprovanteDraft,
@@ -1457,7 +1458,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   // mesmo arquivada. A conta que a nota escolheu leva uma legenda, até a pessoa escolher outra.
   const pickerAccounts = accountsForPicker(personal.accounts, allAccounts.data, mode.type === 'editar' ? mode.record.accountId : null);
   const accountFromNote = note !== null && note.accountSet !== null && note.accountSet === draft.accountId && !accountPicked;
-  const accountPicker = (
+  // Revisão das telas (16/11/2026): com uma conta só (nada para escolher), o campo some e a conta aparece uma vez, em "Será salvo em ...",
+  // com "Gerenciar" logo abaixo. Com duas ou mais, os chips ficam no lugar da origem (depois da data).
+  const accountField = pickerShowsChips(pickerAccounts, draft.accountId) || Boolean(errors.accountId) || accountFromNote;
+  const accountPicker = !accountField ? null : (
     <View style={{ gap: space[1] }}>
       <AccountPicker
         accounts={pickerAccounts}
@@ -1578,7 +1582,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           {lookalike ? <LookalikeBanner record={lookalike} onOpen={() => router.push(`/registro/${lookalike.id}`)} /> : null}
 
           <Txt variant="caption" color={colors.textSecondary}>
-            {cardPurchase ? `${CARDS_TEXT.screens.purchaseSituation} · ${selectedCard ? cardTitle(selectedCard) : CARDS_TEXT.expense.credit}` : `${copy.situation} · ${account?.name}`}
+            {cardPurchase ? `${CARDS_TEXT.screens.purchaseSituation} · ${selectedCard ? cardTitle(selectedCard) : CARDS_TEXT.expense.credit}` : copy.situation}
           </Txt>
 
           <TextField
@@ -1645,6 +1649,72 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           />
           <SumValues target={refs.amountText} onUse={(t) => set('amountText', t)} />
 
+          {dayMode && dayMonth ? (
+            <View style={{ gap: space[2] }}>
+              <DayField
+                inputRef={refs.dateText}
+                month={dayMonth}
+                kind={kind}
+                value={dayText}
+                onChange={(t) => {
+                  setDayText(t);
+                  if (errors.dateText) setErrors((e) => ({ ...e, dateText: undefined }));
+                }}
+                error={errors.dateText}
+              />
+              <LinkButton
+                label={RETURN_TEXT.otherDate}
+                style={styles.inlineLink}
+                onPress={() => {
+                  // A data do dia já digitado (ou a de hoje) passa para o campo de data comum.
+                  if (day && 'date' in day) set('dateText', formatDateBR(day.date));
+                  setDayMode(false);
+                  setErrors((e) => ({ ...e, dateText: undefined }));
+                }}
+              />
+            </View>
+          ) : (
+            <View style={{ gap: space[2] }}>
+              <TextField
+                ref={refs.dateText}
+                label={cardPurchase ? CARDS_TEXT.screens.purchaseDateLabel : copy.dateLabel}
+                value={draft.dateText}
+                onChangeText={(t) => set('dateText', maskDateBR(t))}
+                placeholder="DD/MM/AAAA"
+                keyboardType="number-pad"
+                inputMode="numeric"
+                maxLength={10}
+                error={errors.dateText}
+                hint="Digite só os números. Só datas até hoje."
+              />
+              <View style={styles.chips}>
+                <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
+                <Chip
+                  label="Ontem"
+                  selected={draft.dateText === formatDateBR(addDays(today, -1))}
+                  onPress={() => set('dateText', formatDateBR(addDays(today, -1)))}
+                />
+              </View>
+              {futureExpense ? (
+                <LinkButton
+                  label={FUTURE_EXPENSE_TEXT.toCommitment}
+                  accessibilityLabel={FUTURE_EXPENSE_TEXT.toCommitmentA11y}
+                  style={styles.inlineLink}
+                  onPress={toCommitment}
+                />
+              ) : null}
+              {nextMonthShown && parsedDate ? (
+                <SettingSwitch
+                  label={NEXT_MONTH_TEXT.toggle}
+                  caption={NEXT_MONTH_TEXT.caption(parsedDate, today)}
+                  value={draft.nextMonth === true}
+                  onChange={(v) => setDraft((d) => ({ ...d, nextMonth: v }))}
+                />
+              ) : null}
+            </View>
+          )}
+
+          {/* A origem do dinheiro depois da data, no gasto e no recebimento (revisão das telas, 16/11/2026). */}
           {cardMode ? (
             <View style={{ gap: space[3] }}>
               <ChoiceGroup label={CARDS_TEXT.screens.payHow}>
@@ -1739,71 +1809,6 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             </View>
           ) : null}
 
-          {dayMode && dayMonth ? (
-            <View style={{ gap: space[2] }}>
-              <DayField
-                inputRef={refs.dateText}
-                month={dayMonth}
-                kind={kind}
-                value={dayText}
-                onChange={(t) => {
-                  setDayText(t);
-                  if (errors.dateText) setErrors((e) => ({ ...e, dateText: undefined }));
-                }}
-                error={errors.dateText}
-              />
-              <LinkButton
-                label={RETURN_TEXT.otherDate}
-                style={styles.inlineLink}
-                onPress={() => {
-                  // A data do dia já digitado (ou a de hoje) passa para o campo de data comum.
-                  if (day && 'date' in day) set('dateText', formatDateBR(day.date));
-                  setDayMode(false);
-                  setErrors((e) => ({ ...e, dateText: undefined }));
-                }}
-              />
-            </View>
-          ) : (
-            <View style={{ gap: space[2] }}>
-              <TextField
-                ref={refs.dateText}
-                label={cardPurchase ? CARDS_TEXT.screens.purchaseDateLabel : copy.dateLabel}
-                value={draft.dateText}
-                onChangeText={(t) => set('dateText', maskDateBR(t))}
-                placeholder="DD/MM/AAAA"
-                keyboardType="number-pad"
-                inputMode="numeric"
-                maxLength={10}
-                error={errors.dateText}
-                hint="Digite só os números. Só datas até hoje."
-              />
-              <View style={styles.chips}>
-                <Chip label="Hoje" selected={draft.dateText === formatDateBR(today)} onPress={() => set('dateText', formatDateBR(today))} />
-                <Chip
-                  label="Ontem"
-                  selected={draft.dateText === formatDateBR(addDays(today, -1))}
-                  onPress={() => set('dateText', formatDateBR(addDays(today, -1)))}
-                />
-              </View>
-              {futureExpense ? (
-                <LinkButton
-                  label={FUTURE_EXPENSE_TEXT.toCommitment}
-                  accessibilityLabel={FUTURE_EXPENSE_TEXT.toCommitmentA11y}
-                  style={styles.inlineLink}
-                  onPress={toCommitment}
-                />
-              ) : null}
-              {nextMonthShown && parsedDate ? (
-                <SettingSwitch
-                  label={NEXT_MONTH_TEXT.toggle}
-                  caption={NEXT_MONTH_TEXT.caption(parsedDate, today)}
-                  value={draft.nextMonth === true}
-                  onChange={(v) => setDraft((d) => ({ ...d, nextMonth: v }))}
-                />
-              ) : null}
-            </View>
-          )}
-
           {!cardMode && !cardPurchase ? accountPicker : null}
 
           <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel="Categoria">
@@ -1859,9 +1864,18 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, na fatura do cartão. {CARDS_TEXT.screens.cardPurchaseNote}
             </Txt>
           ) : (
-            <Txt variant="label" color={colors.textSecondary}>
-              Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, {account?.name}.
-            </Txt>
+            <View style={{ gap: space[1] }}>
+              <Txt variant="label" color={colors.textSecondary}>
+                Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, {account?.name}.
+              </Txt>
+              {accountField ? null : (
+                <LinkButton
+                  label={ACCOUNTS_TEXT.manage}
+                  style={styles.inlineLink}
+                  onPress={() => router.push({ pathname: '/conta', params: { secao: 'contas' } })}
+                />
+              )}
+            </View>
           )}
           {auth.mode === 'demo' ? (
             <Txt variant="label" color={colors.textSecondary}>
@@ -1910,7 +1924,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             <View style={styles.footerRow}>
               <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
               <Button
-                label={banner && !conflict ? 'Tentar novamente' : cardPurchase ? CARDS_TEXT.expense.save : copy.save}
+                label={banner && !conflict ? 'Tentar novamente' : cardPurchase ? CARDS_TEXT.expense.saveShort : copy.save}
+                accessibilityLabel={cardPurchase && !busy && !(banner && !conflict) ? CARDS_TEXT.expense.save : undefined}
                 busy={busy}
                 busyLabel="Salvando…"
                 onPress={() => submit()}

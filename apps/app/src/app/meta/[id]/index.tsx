@@ -23,17 +23,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChartLine, CircleAlert, CircleCheck, Ellipsis, Minus, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, StyleSheet, View, type ScrollView } from 'react-native';
 import { BadgeConfetti } from '@/components/subscription-parts';
-import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
+import Animated, { FadeIn, ReduceMotion, useReducedMotion } from 'react-native-reanimated';
 
 import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { GoalImageView } from '@/components/goal-image';
 import { GoalProgress } from '@/components/goal-progress';
-import { LinkedInvestmentsCard } from '@/components/linked-investments';
+import { LinkedInvestmentsCard, UncountedLinkedLine, useUncountedLinkedInvestments } from '@/components/linked-investments';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ErrorState } from '@/components/states';
@@ -51,7 +51,7 @@ const D = GOALS_TEXT.detail;
 
 /** Detalhe da meta ou da reserva (D-027, spec2 §4.6): faixa azul, plano, composição, ações e histórico de movimentos. */
 export default function MetaDetalhe() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, secao } = useLocalSearchParams<{ id: string; secao?: string }>();
   const { today } = useSession();
   const qc = useQueryClient();
   const detail = useGoalDetail(id);
@@ -68,6 +68,22 @@ export default function MetaDetalhe() {
   const movements = detail.data?.movements ?? [];
   const reserve = goal?.goalType === 'emergencia';
   const images = useGoalImages(goal?.contextId);
+
+  // "Ver" dos investimentos ligados (revisão das telas, 16/11/2026): rola até o card "Investimentos ligados". Vindo dos cards de Metas
+  // (`?secao=investimentos`), rola uma vez, assim que o card tem lugar na tela.
+  const scroll = useRef<ScrollView>(null);
+  const reduced = useReducedMotion();
+  const bodyY = useRef(0);
+  const [linkedY, setLinkedY] = useState<number | null>(null);
+  const scrolled = useRef(false);
+  const scrollToLinked = (animated = !reduced) => {
+    if (linkedY !== null) scroll.current?.scrollTo({ y: Math.max(0, bodyY.current + linkedY - space[4]), animated });
+  };
+  useEffect(() => {
+    if (secao !== 'investimentos' || scrolled.current || linkedY === null) return;
+    scrolled.current = true;
+    scroll.current?.scrollTo({ y: Math.max(0, bodyY.current + linkedY - space[4]), animated: !reduced });
+  }, [secao, linkedY, reduced]);
 
   function haptic() {
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -153,7 +169,7 @@ export default function MetaDetalhe() {
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/metas'))}
         right={<ContextPill label="Pessoal" />}
       />
-      <Screen wide>
+      <Screen wide scrollRef={scroll}>
         {detail.isPending ? (
           <View style={[styles.hero, { gap: space[3] }]}>
             <View style={styles.heroInner}>
@@ -193,6 +209,9 @@ export default function MetaDetalhe() {
             onReactivate={() => changeStatus(goal, 'ativa', D.reactivated)}
             onMenu={() => setMenu(true)}
             onDelete={() => setConfirmDelete(true)}
+            onBodyLayout={(y) => (bodyY.current = y)}
+            onLinkedLayout={setLinkedY}
+            onSeeLinked={() => scrollToLinked()}
           />
           </>
         )}
@@ -237,6 +256,9 @@ function GoalBody({
   onReactivate,
   onMenu,
   onDelete,
+  onBodyLayout,
+  onLinkedLayout,
+  onSeeLinked,
 }: {
   goal: Goal;
   movements: readonly GoalMovement[];
@@ -251,8 +273,15 @@ function GoalBody({
   onReactivate: () => void;
   onMenu: () => void;
   onDelete: () => void;
+  onBodyLayout: (y: number) => void;
+  onLinkedLayout: (y: number) => void;
+  onSeeLinked: () => void;
 }) {
   const maskLabel = useMoneyLabelMask();
+  const uncounted = useUncountedLinkedInvestments(goal);
+  // O tipo da meta só nas duas reservas, como uma pílula pequena (revisão das telas, 16/11/2026): "Objetivo" acima do valor parecia o
+  // valor do objetivo. Sem a pílula quando o nome já é o tipo.
+  const typePill = goal.goalType !== 'objetivo' && GOAL_TYPE_LABEL[goal.goalType] !== goal.name ? GOAL_TYPE_LABEL[goal.goalType] : null;
   const plan = goalPlan(goal, movements, today);
   const t = goalDetailTexts(goal, movements, today);
   const archived = goal.status === 'arquivada';
@@ -287,12 +316,19 @@ function GoalBody({
               </View>
             ) : null}
           </View>
-          {GOAL_TYPE_LABEL[goal.goalType] !== goal.name ? (
-            <Txt variant="caption" color={colors.textOnBrandSoft}>
-              {GOAL_TYPE_LABEL[goal.goalType]}
-            </Txt>
+          {typePill ? (
+            <View style={styles.typePill}>
+              <Txt variant="caption" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }}>
+                {typePill}
+              </Txt>
+            </View>
           ) : null}
-          <FitMoney cents={goal.savedCents} color={colors.textOnBrand} />
+          <View>
+            <Txt variant="label" color={colors.textOnBrandSoft}>
+              {D.savedLabel}
+            </Txt>
+            <FitMoney cents={goal.savedCents} color={colors.textOnBrand} />
+          </View>
           <GoalProgress percent={plan.progress.barPercent} tone="onBrand" label={a11yBar} valueText={a11yValue} />
           <MoneyTxt color={colors.textOnBrand} style={[tabular, { fontFamily: fonts.bold }]}>
             {t.ofTarget}
@@ -302,6 +338,7 @@ function GoalBody({
               {t.missing}
             </MoneyTxt>
           ) : null}
+          {uncounted ? <UncountedLinkedLine summary={uncounted} onBrand onSee={onSeeLinked} /> : null}
           {t.reached ? (
             <Animated.View
               entering={initiallyReached ? undefined : FadeIn.duration(motion.context).reduceMotion(ReduceMotion.System)}
@@ -327,7 +364,7 @@ function GoalBody({
         </View>
       </View>
 
-      <Body>
+      <Body onLayout={(e) => onBodyLayout(e.nativeEvent.layout.y)}>
         <FlashBanner message={notice} />
         {actionError ? (
           <Banner tone="erro" icon={CircleAlert}>
@@ -397,7 +434,9 @@ function GoalBody({
           )}
         </View>
 
-        <LinkedInvestmentsCard goal={goal} />
+        <View onLayout={(e) => onLinkedLayout(e.nativeEvent.layout.y)}>
+          <LinkedInvestmentsCard goal={goal} />
+        </View>
 
         <Card style={{ gap: space[1] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -471,6 +510,7 @@ const styles = StyleSheet.create({
   heroInner: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: space[6], paddingTop: space[2], paddingBottom: space[6], gap: space[3] },
   heroHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },
   statusPill: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: 2 },
+  typePill: { alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.textOnBrandSoft, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: 2 },
   reachedPill: {
     flexDirection: 'row',
     alignItems: 'center',
