@@ -2703,6 +2703,11 @@ setInterval(async () => {
     proventos: /fundos? imobili[aá]rios?/gi,
     'declarar-investimentos': /poupan[cç]a|\bcdb\b|\blci\b|\blca\b|criptoativos?|fundos imobili[aá]rios/gi,
     'ganho-real': /poupan[cç]a/gi,
+    // Temas curtos (D-105).
+    'ir-regressivo': /\bcdb\b|\blci\b|\blca\b/gi,
+    'come-cotas': /fundos? (de curto prazo|de a[cç][õo]es|imobili[aá]rios|de renda fixa)/gi,
+    'ipca-mais': /\btesouro\b/gi,
+    'marcacao-a-mercado': /\btesouro\b/gi,
   };
   const withoutInvestTerms = (text, slug) => {
     const [main, related = ''] = text.split('Temas relacionados');
@@ -2767,7 +2772,7 @@ setInterval(async () => {
   await p.evaluate(() => { window.open = window.__realOpen; });
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   const externalTopics = [...learnSeen].filter(([, n]) => n > 0).map(([s]) => s);
-  ok('Aprender: 52 temas publicados abrem pela aba (45 nas seções, com os quatro de época, Média e mediana e os sete de investimentos da D-099, e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 52 && learnLabels.length === 45 && faqNames.length === 7 &&
+  ok('Aprender: 57 temas publicados abrem pela aba (50 nas seções, com os quatro de época, Média e mediana, os sete de investimentos da D-099 e os cinco curtos da D-105, e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 57 && learnLabels.length === 50 && faqNames.length === 7 &&
     learnIssues.titulo.length === 0, `${learnSeen.size} temas, ${learnLabels.length} linhas, ${faqNames.length} dúvidas ${learnIssues.titulo.slice(0, 3).join(' | ')}`);
   ok('temas: nenhum termo vetado nem travessão longo nos textos exibidos', learnIssues.termos.length === 0, learnIssues.termos.slice(0, 3).join(' | '));
   ok('temas: fontes com papel de link, data de consulta e domínio permitido (oficial; FGC só no tema do FGC; Serasa só em renda-comprometida)', externalTopics.length >= 20 && learnIssues.fontes.length === 0,
