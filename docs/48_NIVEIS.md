@@ -85,8 +85,11 @@ O primeiro investimento já é o marco "Registrar um investimento" do dia a dia.
   três lugares). No Resumo, o aviso vem logo depois da faixa "Seus últimos meses" (que aparece no mesmo período e segura a fila): ao
   seguir adiante na faixa, o aviso aparece. Em Conta ele não espera a fila.
 - **Lembrete no celular.** Para quem permitiu lembretes (algum lembrete ligado e as notificações liberadas), um lembrete local no dia em
-  que o aviso começa, no horário dos lembretes do dia a dia, com o texto do aviso (sem valor nenhum) e abrindo a tela do nível. É
-  reagendado a cada abertura e escrita, como os outros: anotar tira o lembrete.
+  que o aviso começa, no horário dos lembretes do dia a dia, com um texto neutro ("Veja como está o nível da sua conta na Clarevo.", sem
+  contagem, sem nível e sem valor, porque quem anota só pelo WhatsApp ou pelo Telegram pode já ter mantido o nível) e abrindo a tela do
+  nível, onde a contagem é recalculada. Se o horário do dia do aviso já passou, vai para o marco seguinte. É reagendado a cada abertura e
+  escrita, como os outros: anotar tira o lembrete. O rendimento gravado por um recebimento ligado a um investimento (D-107) também conta
+  para o marco "Registrar um rendimento recebido".
 - **Com o nível abaixo**, o card diz: "Como nada foi anotado por um tempo, o nível está um degrau abaixo do que os seus marcos dão.
   Anotar um gasto ou recebimento traz de volta o nível Ouro." Sem contar dias.
 - **Ninguém cai sem aviso.** Os 60 dias contam da última anotação ou, se for depois, do dia em que o app com a regra leu o nível da
