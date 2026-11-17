@@ -12604,7 +12604,7 @@ setInterval(async () => {
   const duRowLabel = async (description) => (await duRow(description).count()) === 0 ? null : await duRow(description).getAttribute('aria-label');
   const duNotices = () => p.evaluate(() => [...document.querySelectorAll('div,span')].filter((e) => e.children.length === 0 && /^Não é dia útil/.test(e.textContent) && e.getBoundingClientRect().width > 0).map((e) => e.textContent));
   const duMoreButton = () => p.getByRole('button', { name: 'Saiba mais sobre vencimento em dia que não é útil', exact: true }).filter({ visible: true });
-  const duOpenList = async () => { await p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$ / }).filter({ visible: true }).first().click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(400); };
+  const duOpenList = async () => { await p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$ / }).filter({ visible: true }).first().click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(400); await openLater(); };
   // Do Resumo, por Movimentos, para um atalho de "Organizar".
   const duShortcut = async (name) => { await duTab('Movimentos'); await waitText('Registrar recebimento'); await p.getByRole('button', { name }).filter({ visible: true }).first().click(); await p.waitForTimeout(600); };
   const DU_ADVICE = 'Confira com quem cobra se o pagamento pode ser feito no próximo dia útil.';
@@ -12697,7 +12697,7 @@ setInterval(async () => {
   await duShots('528_dia_util_saiba_mais_lei_7089', duScroll('A Lei nº 7.089/1983 proíbe bancos e instituições financeiras de cobrar juros de mora sobre título que vence em sábado, domingo ou feriado, desde que seja quitado no primeiro dia subsequente, que o STJ lê como o primeiro dia útil seguinte. A multa e as regras de cada cobrança podem variar, e a Clarevo não sabe qual vale para a sua conta. Por isso, confira com quem cobra antes de escolher a data do pagamento.'));
   await duMoreButton().first().click(); await p.waitForTimeout(400);
   ok('Dia útil, "Saiba mais": tocar de novo recolhe a explicação', !(await body()).includes('Contam só os feriados nacionais de data fixa definidos em lei federal') && (await duMoreButton().first().getAttribute('aria-expanded')) === 'false');
-  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300); await openLater();
 
   // ---- 4. Feriado em dia de semana: o aviso diz qual ----
   await duRow('Oficina (exemplo)').click(); await waitText('Vencimento'); await p.waitForTimeout(500);
@@ -12706,19 +12706,19 @@ setInterval(async () => {
     t.includes(DU_NOTICE_HOLIDAY) && t.includes('Vence terça, 13/10 (próximo dia útil)') && t.includes(DU_ADVICE) && /Vencimento\n?\s*12\/10\/2026/.test(t), t.slice(0, 700));
   await duKeep();
   await duShots('523_dia_util_conta_feriado', duScroll(DU_NOTICE_HOLIDAY));
-  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300); await openLater();
 
   // ---- 5. Dia útil e conta vencida: sem aviso no detalhe ----
   await duRow('Taxa do clube (exemplo)').click(); await waitText('Vencimento'); await p.waitForTimeout(400);
   t = await body();
   ok('Dia útil, detalhe de uma conta em dia útil (quarta, 14/10): sem aviso e sem "Saiba mais"', !t.includes('que não é dia útil') && !t.includes(DU_ADVICE) && (await duMoreButton().count()) === 0, t.slice(0, 400));
-  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300); await openLater();
   await duRow('Conta antiga (exemplo)').click(); await waitText('Vencimento'); await p.waitForTimeout(400);
   t = await body();
   ok('Dia útil, detalhe de uma conta já vencida (sábado 03/10, o próximo dia útil, segunda 05/10, já terminou): "Venceu em 03/10", sem aviso', t.includes('Venceu em 03/10') && !t.includes('que não é dia útil') && !t.includes('(próximo dia útil)') && (await duMoreButton().count()) === 0, t.slice(0, 400));
   await duKeep();
   await duShots('532_dia_util_conta_vencida', duScroll('Venceu em 03/10'));
-  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300); await openLater();
 
   // ---- 6. Conta paga: o aviso e o sinal somem ----
   await btn('Já paguei Seguro da casa (exemplo), vence 17/10').click(); await waitText('Confirmar pagamento'); await confirmIn('Confirmar pagamento'); await waitText('marcada como paga'); await p.waitForTimeout(700);
@@ -12747,7 +12747,7 @@ setInterval(async () => {
   await otherDevice((repo, ctx) => repo.createSeries(`e2e-du-ano-${Date.now()}`, ctx, { kind: 'anual', nature: 'conta', description: 'Seguro do ano (exemplo)', category: 'Transporte', amountCents: 120000, amountMode: 'variavel', dueDay: 25, firstDueMonth: '2026-12', firstNumber: 1, installmentTotal: null, partsPerYear: 1, lastMonth: null }));
   await p.waitForTimeout(700);
   await btn('Voltar').click(); await p.waitForTimeout(500);
-  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês').catch(() => {}); await p.waitForTimeout(400);
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês').catch(() => {}); await p.waitForTimeout(400); await openLater();
   await duShortcut(/^Gastos fixos e parcelamentos, /); await waitText('Contas do ano'); await p.waitForTimeout(500);
   await p.getByRole('button', { name: /^Seguro do ano \(exemplo\), / }).filter({ visible: true }).first().click(); await waitText('Ano a ano'); await p.waitForTimeout(700);
   t = await body();
@@ -12778,11 +12778,11 @@ setInterval(async () => {
   await duKeep();
   await duShots('526_dia_util_fatura', duScroll(DU_NOTICE_FATURA));
   await duShots('531_dia_util_fatura_proximo_dia_util', duScroll(DU_NOTICE_FATURA));
-  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(400);
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(400); await openLater();
   await p.getByRole('button', { name: /^Fatura Cartão Exemplo, vence em 10\/11/ }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await waitText('Fatura de novembro'); await p.waitForTimeout(700);
   t = await body();
   ok('Dia útil, fatura de novembro (vence em 10/11, terça): sem aviso e sem "Saiba mais"', t.includes('Vence em 10/11') && !t.includes('que não é dia útil') && (await duMoreButton().count()) === 0, t.slice(0, 500));
-  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300);
+  await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês'); await p.waitForTimeout(300); await openLater();
 
   // ---- 10. Textos e escritas ----
   const duBad = duTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|cuidado|atenção|perigo|urgente|atrasad[oa]s?|sem (multa|juros|encargos?)|garantid[oa])\b/i)?.[0]).filter(Boolean);
