@@ -231,8 +231,8 @@ export function PrivacyCard() {
 
 /**
  * Conta › "Widget na tela inicial" (D-052; ligado no lançamento, D-093): no celular com o widget, como pô-lo na tela inicial; na web, que
- * ele existe no app de celular; num build sem ele, que vem numa próxima versão. A escolha de mostrar ou não os valores fica só neste
- * aparelho. Desligada de início: o widget mostra
+ * ele existe no app de celular, sem o interruptor (D-110); num build sem ele, que vem numa próxima versão. A escolha de mostrar ou não os
+ * valores fica só neste aparelho. Desligada de início: o widget mostra
  * R$ •••• no lugar dos valores. Não depende de "Ocultar valores ao abrir" e não muda nada no app.
  */
 export function WidgetCard() {
@@ -245,12 +245,15 @@ export function WidgetCard() {
         {Platform.OS === 'web' ? WIDGET_TEXT.availabilityWeb : widgetAvailable() ? WIDGET_TEXT.howTo[Platform.OS === 'ios' ? 'ios' : 'android'] : WIDGET_TEXT.availabilityLater}
       </Txt>
       <Txt color={colors.textSecondary}>{WIDGET_TEXT.explain}</Txt>
-      <SettingSwitch
-        label={WIDGET_TEXT.showValues}
-        caption={WIDGET_TEXT.showValuesCaption}
-        value={prefs.widgetShowValues}
-        onChange={(v) => updatePrefs(userId, { widgetShowValues: v }, persist)}
-      />
+      {/* Na web não há widget: o interruptor, que vale só para o aparelho, ficaria sem efeito (D-110). Como os lembretes, só o texto. */}
+      {Platform.OS !== 'web' ? (
+        <SettingSwitch
+          label={WIDGET_TEXT.showValues}
+          caption={WIDGET_TEXT.showValuesCaption}
+          value={prefs.widgetShowValues}
+          onChange={(v) => updatePrefs(userId, { widgetShowValues: v }, persist)}
+        />
+      ) : null}
     </Card>
   );
 }

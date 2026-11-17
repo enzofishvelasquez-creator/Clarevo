@@ -34,7 +34,8 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { GoalImageView } from '@/components/goal-image';
 import { GoalProgress } from '@/components/goal-progress';
 import { LinkedInvestmentsCard, UncountedLinkedLine, useUncountedLinkedInvestments } from '@/components/linked-investments';
-import { ContextPill, SubHeader } from '@/components/header';
+import { ContextPill, SubHeader, useHeroCard } from '@/components/header';
+import { WIDE_TAB_MAX } from '@/lib/layout';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
@@ -52,6 +53,8 @@ const D = GOALS_TEXT.detail;
 /** Detalhe da meta ou da reserva (D-027, spec2 §4.6): faixa azul, plano, composição, ações e histórico de movimentos. */
 export default function MetaDetalhe() {
   const { id, secao } = useLocalSearchParams<{ id: string; secao?: string }>();
+  // Versão para computador (D-110): o bloco azul vira um cartão arredondado, na largura das telas de consulta.
+  const heroCard = useHeroCard();
   const { today } = useSession();
   const qc = useQueryClient();
   const detail = useGoalDetail(id);
@@ -171,8 +174,8 @@ export default function MetaDetalhe() {
       />
       <Screen wide scrollRef={scroll}>
         {detail.isPending ? (
-          <View style={[styles.hero, { gap: space[3] }]}>
-            <View style={styles.heroInner}>
+          <View style={[styles.hero, { gap: space[3] }, heroCard?.band]}>
+            <View style={[styles.heroInner, heroCard?.inner]}>
               <Skeleton width="50%" height={24} onBrand />
               <Skeleton width="60%" height={40} onBrand />
               <Skeleton width="100%" height={12} onBrand />
@@ -192,7 +195,7 @@ export default function MetaDetalhe() {
         ) : (
           <>
           {/* Imagem da meta (D-077): a foto, a sugestão escolhida ou a automática. Trocar em "Mais ações". */}
-          <View style={{ paddingHorizontal: space[5], paddingTop: space[4] }}>
+          <View style={[{ paddingHorizontal: space[5], paddingTop: space[4] }, heroCard ? styles.imageWide : null]}>
             <GoalImageView goal={goal} image={images.data?.find((i) => i.goalId === goal.id) ?? null} height={168} />
           </View>
           <GoalBody
@@ -278,6 +281,7 @@ function GoalBody({
   onSeeLinked: () => void;
 }) {
   const maskLabel = useMoneyLabelMask();
+  const heroCard = useHeroCard();
   const uncounted = useUncountedLinkedInvestments(goal);
   // O tipo da meta só nas duas reservas, como uma pílula pequena (revisão das telas, 16/11/2026): "Objetivo" acima do valor parecia o
   // valor do objetivo. Sem a pílula quando o nome já é o tipo.
@@ -302,8 +306,8 @@ function GoalBody({
 
   return (
     <>
-      <View style={styles.hero}>
-        <View style={styles.heroInner}>
+      <View style={[styles.hero, heroCard?.band]}>
+        <View style={[styles.heroInner, heroCard?.inner]}>
           <View style={styles.heroHead}>
             <Txt variant="title" color={colors.textOnBrand} style={{ flex: 1, fontSize: 22, lineHeight: 30 }} accessibilityRole="header" aria-level={2}>
               {goal.name}
@@ -508,6 +512,8 @@ function GoalBody({
 const styles = StyleSheet.create({
   hero: { backgroundColor: colors.brand, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl },
   heroInner: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: space[6], paddingTop: space[2], paddingBottom: space[6], gap: space[3] },
+  // Versão para computador: a imagem na mesma largura do cartão azul (sem isso, ia de um lado ao outro da tela).
+  imageWide: { width: '100%', maxWidth: WIDE_TAB_MAX, alignSelf: 'center' },
   heroHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },
   statusPill: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: 2 },
   typePill: { alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.textOnBrandSoft, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: 2 },

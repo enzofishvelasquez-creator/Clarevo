@@ -1,11 +1,12 @@
 import { DEMO_PILL_MAX_FONT_SCALE, SUMMARY_NAV_TEXT, addMonths, contextLabelFor, contextPillText, formatMonthBR } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Users } from 'lucide-react-native';
-import { useEffect, useState, type ReactNode } from 'react';
-import { PixelRatio, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useContext, useEffect, useState, type ReactNode } from 'react';
+import { PixelRatio, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Logo } from '@/components/brand';
+import { InPanelContext } from '@/components/form-panel';
 import { HelpButton } from '@/components/help-button';
 import { yearA11yLabel } from '@/components/series-parts';
 import { DemoPill, TopInset, Txt } from '@/components/ui';
@@ -24,33 +25,55 @@ export { initialsOf } from '@clarevo/core';
 
 const focusOnBrand = { outlineWidth: 3, outlineColor: colors.accent, outlineStyle: 'solid', outlineOffset: 2 } as const;
 
+/** Marca do bloco azul do alto na web (`data-band`): o teste de telas confere os cantos dele na versão para computador. */
+const BAND_MARK = { dataSet: { band: '1' } } as object;
+
 /** "Demonstração" em Manrope Bold 12 px (85,4 px) mais a margem interna do selo. */
 const DEMO_PILL_WIDTH = 102;
 
 /**
  * Olho do cabeçalho (ocultar valores, A2): ação secundária ao lado do avatar, só quando cabe sem apertar o logotipo.
  * Largura da faixa: até 560 px menos as margens; logotipo, selo de demonstração (se houver), olho e avatar com os
- * espaços entre eles. Sem a demonstração, cabe a partir de 320 px; com o selo, só em telas mais largas. Quando não
- * cabe, ocultar e mostrar valores ficam em Conta.
+ * espaços entre eles. Sem a demonstração, cabe a partir de 320 px. Com o selo, os três da direita se aproximam (8 px em vez de 12) quando
+ * só assim cabem: o olho aparece a partir de 390 px, a largura do iPhone mais comum (D-110). Devolve o espaço entre os três da direita, ou
+ * null quando o olho não cabe: aí ocultar e mostrar valores ficam em Conta.
  */
-function eyeFits(windowWidth: number, narrow: boolean, demo: boolean): boolean {
+function eyeFits(windowWidth: number, narrow: boolean, demo: boolean, fontScale = 1): number | null {
   const gap = narrow ? space[2] : space[3];
   const row = Math.min(windowWidth, 560) - 2 * space[6];
   const logo = (narrow ? 20 : 24) * (LOGOTYPE_WIDTH / LOGOTYPE_HEIGHT);
-  const pill = demo ? DEMO_PILL_WIDTH * Math.min(DEMO_PILL_MAX_FONT_SCALE, Math.max(1, PixelRatio.getFontScale())) + gap : 0;
-  return logo + gap + pill + 44 + gap + 44 <= row;
+  const pill = demo ? DEMO_PILL_WIDTH * Math.min(DEMO_PILL_MAX_FONT_SCALE, Math.max(1, fontScale)) : 0;
+  for (const inner of demo && gap > space[2] ? [gap, space[2]] : [gap]) {
+    if (logo + gap + (demo ? pill + inner : 0) + 44 + inner + 44 <= row) return inner;
+  }
+  return null;
 }
 
-/** Mostrar ou ocultar os valores nesta sessão (a preferência "Ocultar valores ao abrir" fica em Conta). */
-function HideValuesButton() {
+/**
+ * Mostrar ou ocultar os valores nesta sessão (a preferência "Ocultar valores ao abrir" fica em Conta). Um estado só (`setValuesHidden`),
+ * o mesmo do interruptor de Conta e da barra lateral do computador. `labeled`: na versão para computador, o olho vem com o texto ao lado,
+ * no alto da faixa azul, onde o celular mostra o olho (D-110: no computador, a pessoa procurava o olho no cabeçalho e não achava).
+ */
+function HideValuesButton({ labeled = false }: { labeled?: boolean }) {
   const hidden = useValuesHidden();
+  const label = hidden ? PRIVACY_TEXT.showNow : PRIVACY_TEXT.hideNow;
+  const Icon = hidden ? Eye : EyeOff;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={hidden ? PRIVACY_TEXT.showNow : PRIVACY_TEXT.hideNow}
+      accessibilityLabel={label}
       onPress={() => setValuesHidden(!hidden)}
-      style={(s) => [styles.eye, (s as { focused?: boolean }).focused && focusOnBrand]}>
-      {hidden ? <Eye size={24} color={colors.textOnBrand} /> : <EyeOff size={24} color={colors.textOnBrand} />}
+      style={(s) => [
+        labeled ? styles.eyeLabeled : styles.eye,
+        labeled && ((s as { hovered?: boolean }).hovered || s.pressed) && styles.eyeLabeledHover,
+        (s as { focused?: boolean }).focused && focusOnBrand,
+      ]}>
+      <Icon size={labeled ? 20 : 24} color={colors.textOnBrand} aria-hidden />
+      {labeled ? (
+        <Txt variant="label" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }} numberOfLines={1}>
+          {label}
+        </Txt>
+      ) : null}
     </Pressable>
   );
 }
@@ -62,12 +85,13 @@ function BrandRow() {
   // Abaixo de 360 px, logotipo, selo de demonstração e avatar não cabem lado a lado no tamanho normal.
   const narrow = width < 360;
   const demo = auth.mode === 'demo';
+  const eyeGap = eyeFits(width, narrow, demo, PixelRatio.getFontScale());
   return (
     <View style={[styles.top, narrow && { gap: space[2] }]}>
       <Logo height={narrow ? 20 : 24} variant="reverso" />
-      <View style={[styles.topRight, narrow && { gap: space[2] }]}>
+      <View style={[styles.topRight, { gap: eyeGap ?? (narrow ? space[2] : space[3]) }]}>
         {demo ? <DemoPill /> : null}
-        {eyeFits(width, narrow, demo) ? <HideValuesButton /> : null}
+        {eyeGap !== null ? <HideValuesButton /> : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Conta: perfil, assinatura, lembretes, privacidade e segurança"
@@ -99,12 +123,15 @@ export function AppHeader({
   wide?: boolean;
   children?: ReactNode;
 }) {
-  // Na versão para computador, o logotipo, o olho e a Conta ficam na barra lateral; a faixa azul mostra só o título e o mês.
+  // Na versão para computador, o logotipo e a Conta ficam na barra lateral; a faixa azul mostra o título, o mês e, no alto à direita, onde o
+  // celular mostra o olho, "Ocultar valores" com o texto (D-110). A barra lateral mantém o mesmo botão, para as telas sem esta faixa.
+  // A faixa vira um cartão azul com os quatro cantos arredondados, afastado do alto da janela e da barra lateral e alinhado com os cartões
+  // de baixo (pedido do Enzo, 17/11/2026: "corrija as bordas, para que fiquem todas arredondadas").
   const sideNav = useWideLayout();
-  return (
-    <View style={styles.band}>
-      <TopInset color={colors.brand} />
-      <View style={[styles.inner, sideNav && { maxWidth: wide ? WIDE_CONTENT_MAX : WIDE_TAB_MAX }]}>
+  const band = (
+    <View style={[styles.band, sideNav && styles.bandCard]} {...BAND_MARK}>
+      {sideNav ? null : <TopInset color={colors.brand} />}
+      <View style={[styles.inner, sideNav && styles.innerCard]}>
         {sideNav ? null : <BrandRow />}
         {title ? (
           <View style={styles.titleRow}>
@@ -112,12 +139,40 @@ export function AppHeader({
               {title}
             </Txt>
             {context ? <ContextPill label={context} fixed={contextFixed} inTab /> : null}
+            {sideNav ? (
+              <View style={styles.wideEye}>
+                <HideValuesButton labeled />
+              </View>
+            ) : null}
+          </View>
+        ) : sideNav ? (
+          <View style={styles.wideTop}>
+            <HideValuesButton labeled />
           </View>
         ) : null}
         {children}
       </View>
     </View>
   );
+  if (!sideNav) return band;
+  return (
+    <View style={[styles.cardWrap, { maxWidth: wide ? WIDE_CONTENT_MAX : WIDE_TAB_MAX, paddingHorizontal: space[6], paddingTop: space[6] }]}>
+      <TopInset color={colors.background} />
+      {band}
+    </View>
+  );
+}
+
+/**
+ * Versão para computador, numa tela cheia (fora do painel dos formulários): o cabeçalho compacto e o bloco azul de destaque logo abaixo
+ * dele (meta, fatura, investimento) viram cartões com os quatro cantos arredondados, na largura das telas de consulta. Dentro do painel e
+ * no celular, nada muda (null). Use em `hero` (o bloco azul) e `heroInner` (o conteúdo dele) das telas de detalhe:
+ * `const card = useHeroCard();` e `style={[styles.hero, card?.band]}`, `style={[styles.heroInner, card?.inner]}`.
+ */
+export function useHeroCard(): { band: ViewStyle; inner: ViewStyle } | null {
+  const sideNav = useWideLayout();
+  const inPanel = useContext(InPanelContext);
+  return sideNav && !inPanel ? { band: styles.heroCard, inner: styles.heroCardInner } : null;
 }
 
 /**
@@ -130,13 +185,17 @@ export function AppHeader({
  * tela (D-063 item 2), e a barra ("Aprender") diz de onde a pessoa veio. Uma tela tem no máximo um título de nível 1.
  */
 export function SubHeader({ title, onBack, right, help, plainTitle }: { title: string; onBack?: () => void; right?: ReactNode; help?: HelpScreen; plainTitle?: boolean }) {
-  // Versão para computador: a faixa acompanha a largura das telas de consulta (760 px).
+  // Versão para computador: a faixa acompanha a largura das telas de consulta (760 px). Numa tela cheia, ela vira um cartão azul com os
+  // quatro cantos arredondados, afastado do alto da janela e da barra lateral (D-110); no painel dos formulários, fica presa ao alto do
+  // painel, que já tem os cantos arredondados.
   const sideNav = useWideLayout();
+  const inPanel = useContext(InPanelContext);
+  const card = sideNav && !inPanel;
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')));
-  return (
-    <View style={styles.subBand}>
-      <TopInset color={colors.brand} />
-      <View style={[styles.inner, styles.subInner, sideNav && { maxWidth: WIDE_TAB_MAX }]}>
+  const bar = (
+    <View style={[styles.subBand, card && styles.subCard]} {...BAND_MARK}>
+      {card ? null : <TopInset color={colors.brand} />}
+      <View style={[styles.inner, styles.subInner, sideNav && { maxWidth: card ? '100%' : WIDE_TAB_MAX }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Voltar"
@@ -159,6 +218,13 @@ export function SubHeader({ title, onBack, right, help, plainTitle }: { title: s
         </View>
         {help ? <HelpButton screen={help} /> : null}
       </View>
+    </View>
+  );
+  if (!card) return bar;
+  return (
+    <View style={[styles.cardWrap, { maxWidth: WIDE_TAB_MAX, paddingHorizontal: space[5], paddingTop: space[5] }]}>
+      <TopInset color={colors.background} />
+      {bar}
     </View>
   );
 }
@@ -291,6 +357,24 @@ export function MonthSwitcher({ color = colors.textOnBrand, titleLevel = 2 }: { 
 
 const styles = StyleSheet.create({
   band: { backgroundColor: colors.brand, borderBottomLeftRadius: radius.xl, borderBottomRightRadius: radius.xl },
+  // Versão para computador: o bloco azul como cartão (o raio dos cartões grandes, `Card`), dentro de uma faixa com a largura do conteúdo.
+  cardWrap: { width: '100%', alignSelf: 'center' },
+  // Os quatro cantos um a um: o raio de baixo da faixa do celular (`band`) venceria um `borderRadius` geral.
+  bandCard: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
+  innerCard: { maxWidth: '100%', paddingTop: space[5] },
+  subCard: { borderRadius: radius.lg },
+  heroCard: {
+    width: '100%',
+    maxWidth: WIDE_TAB_MAX - 2 * space[5],
+    alignSelf: 'center',
+    marginTop: space[5],
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    borderBottomLeftRadius: radius.lg,
+    borderBottomRightRadius: radius.lg,
+    overflow: 'hidden',
+  },
+  heroCardInner: { maxWidth: '100%', paddingTop: space[5] },
   inner: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: space[6], paddingTop: space[4], paddingBottom: space[6] },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[5], gap: space[3] },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
@@ -300,6 +384,12 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[1], marginBottom: space[4] },
   avatar: { minWidth: 44, height: 44, paddingHorizontal: 4, borderRadius: 22, backgroundColor: colors.surfaceOnBrand, alignItems: 'center', justifyContent: 'center' },
   eye: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  // Computador: o olho com o texto, numa pílula azul mais escura sobre a faixa (o mesmo azul do trilho do seletor Pessoal e Família).
+  eyeLabeled: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 44, paddingHorizontal: space[4], borderRadius: radius.pill, backgroundColor: colors.brandDeep },
+  eyeLabeledHover: { backgroundColor: colors.onBrandPressed },
+  // Nas abas com título, o olho fica na mesma linha, encostado à direita; no Resumo (sem título), numa linha só dele, acima do mês.
+  wideEye: { marginLeft: 'auto' },
+  wideTop: { flexDirection: 'row', justifyContent: 'flex-end' },
   subBand: { backgroundColor: colors.brand },
   subInner: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingTop: space[2], paddingBottom: space[3], paddingHorizontal: space[3] },
   backBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
