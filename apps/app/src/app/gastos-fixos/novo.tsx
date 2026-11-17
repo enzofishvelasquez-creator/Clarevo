@@ -18,7 +18,8 @@ import { useWork } from '@/state/data';
  * Parâmetros da rota (todos opcionais): tipo=mensal|parcelada|anual, descricao, valor (centavos), categoria,
  * dia (1 a 31), inicio (AAAA-MM), vencimento (AAAA-MM-DD, vira dia e primeiro mês quando dia e inicio faltam)
  * gasto (AAAA-MM-DD, data do gasto anotado em "Tornar gasto fixo") e origem=digitado (o preenchimento veio do que a
- * pessoa digitou em "Anotar conta a pagar": sair sem salvar pede confirmação).
+ * pessoa digitou em "Anotar conta a pagar": sair sem salvar pede confirmação) ou origem=registro (veio de "Cadastrar parcelamento" em
+ * Anotar gasto, D-107: depois de salvar, volta para lá).
  * Conta do ano: parcelas (1 a 12; 1 = cota única), mes (1 a 12), ano (primeiro ano, AAAA), modo=fixo|variavel,
  * apos (rótulo do último ano da conta do ano encerrada em "Mudar a forma de pagamento") e inicio-minimo (AAAA-MM, o mês
  * seguinte ao último vencimento dela: a nova não começa antes).
@@ -95,7 +96,8 @@ export default function NovoGastoFixo() {
     <SeriesForm
       kind={params.tipo === 'parcelada' ? 'parcelada' : params.tipo === 'anual' ? 'anual' : 'mensal'}
       prefill={prefill}
-      typed={params.origem === 'digitado' && prefill !== undefined}
+      typed={(params.origem === 'digitado' || params.origem === 'registro') && prefill !== undefined}
+      backToRecord={params.origem === 'registro'}
       space={space}
     />
   );

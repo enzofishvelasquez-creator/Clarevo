@@ -8,7 +8,11 @@ import {
   NO_CATEGORY_LABEL,
   ACCOUNTS_TEXT,
   RECORD_TEXT,
+  RECORD_LINK_TEXT,
   accountDisplayName,
+  commitmentLinkLabel,
+  invoiceLinkLabel,
+  recordLinkErrorText,
   addMonths,
   deviceTimeZone,
   firstMonthBounds,
@@ -24,7 +28,7 @@ import {
   type IsoDate,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ArrowDownLeft, ArrowUpRight, Pencil, Plus, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { AlertCircle, ArrowDownLeft, ArrowUpRight, Check, Pencil, Plus, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -39,7 +43,7 @@ import { totalChange } from '@/lib/highlight';
 import { invoiceHref } from '@/lib/cards';
 import { openOfficialUrl, receiptLinks } from '@/lib/receipt-link';
 import { openSummary } from '@/lib/nav';
-import { useAccounts, useDeleteRecord, useRecord, useWork, useView } from '@/state/data';
+import { useAccounts, useCards, useCommitment, useDeleteRecord, useInvestment, useRecord, useRecordLinks, useWork, useView } from '@/state/data';
 import { useAuthorship } from '@/components/family-parts';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -80,6 +84,12 @@ export default function DetalheRegistro() {
   const [confirming, setConfirming] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
+  // D-107: o que o gasto pagou (a conta ou a fatura) e de qual investimento é o rendimento, pelo nome.
+  const links = useRecordLinks();
+  const [unlinking, setUnlinking] = useState(false);
+  const [unlinkBusy, setUnlinkBusy] = useState(false);
+  const [unlinked, setUnlinked] = useState(false);
+  const unlinkKey = useRef(newOperationKey());
 
   const toList = () => (router.canGoBack() ? router.back() : router.replace('/movimentacoes'));
 
@@ -89,6 +99,37 @@ export default function DetalheRegistro() {
   const accounts = useAccounts(r?.contextId);
   const accountList = accounts.data ?? personal?.accounts ?? [];
   const accountName = accountDisplayName(accountList, r?.accountId);
+  const paidBill = useCommitment(r?.commitmentId ?? undefined);
+  const cards = useCards(r?.invoice ? r.contextId : undefined);
+  const investment = useInvestment(r?.investmentId ?? undefined);
+  const paidLabel = r?.invoice
+    ? invoiceLinkLabel(cards.data?.find((c) => c.id === r.invoice!.cardId)?.name ?? 'do cartão', r.invoice.month, today)
+    : paidBill.data
+      ? commitmentLinkLabel(paidBill.data)
+      : null;
+
+  /** "Desligar da fatura" (D-107): o gasto que foi ligado depois continua, e a fatura volta a ficar em aberto. */
+  const doUnlinkInvoice = async () => {
+    if (!r?.invoice || !paidBill.data) return;
+    setUnlinkBusy(true);
+    setDeleteError(null);
+    try {
+      await links.unlinkInvoice(unlinkKey.current, r.invoice.cardId, r.invoice.month, paidBill.data.version);
+      unlinkKey.current = newOperationKey();
+      setUnlinking(false);
+      setUnlinked(true);
+      record.refetch();
+    } catch (e) {
+      setUnlinking(false);
+      if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
+        unlinkKey.current = newOperationKey();
+        setDeleteError(recordLinkErrorText(e.code));
+        paidBill.refetch();
+      } else setDeleteError('Não foi possível confirmar se desligou. Confira a fatura antes de tentar de novo.');
+    } finally {
+      setUnlinkBusy(false);
+    }
+  };
 
   const doDelete = async () => {
     if (!r) return;
@@ -152,6 +193,13 @@ export default function DetalheRegistro() {
                   />
                 </View>
               ) : null}
+              {unlinked ? (
+                <Banner tone="sucesso" icon={Check}>
+                  <Txt variant="label" color={colors.successText}>
+                    {RECORD_LINK_TEXT.unlinkedInvoice}
+                  </Txt>
+                </Banner>
+              ) : null}
               {deleteError ? (
                 <Banner tone="erro" icon={AlertCircle}>
                   <Txt variant="label" color={colors.error}>
@@ -179,7 +227,10 @@ export default function DetalheRegistro() {
                   />
                   <Row label="Data" value={formatDateBR(r.occurredOn)} />
                   <Row label="Categoria" value={r.category ?? NO_CATEGORY_LABEL} />
-                  {r.invoice ? <Row label="Origem" value={CARDS_TEXT.paymentOrigin} /> : r.commitmentId ? <Row label={RECORD_TEXT.linkedTo} value="Conta a pagar" /> : null}
+                  {r.subcategory ? <Row label={RECORD_LINK_TEXT.subcategoryRow} value={r.subcategory} /> : null}
+                  {r.invoice ? <Row label="Origem" value={CARDS_TEXT.paymentOrigin} /> : null}
+                  {r.commitmentId ? <Row label={RECORD_LINK_TEXT.linkedRow} value={paidLabel ?? 'Conta a pagar'} /> : null}
+                  {r.investmentId ? <Row label={RECORD_LINK_TEXT.incomeRow} value={investment.data?.name ?? 'Investimento'} /> : null}
                   {r.receiptKey ? <Row label={NOTA_FLOW_TEXT.detailRow} value={NOTA_FLOW_TEXT.detailRowValue} /> : null}
                   {/* Recebimento marcado do mês seguinte (D-089 A): conta no mês seguinte ao da data. */}
                   <Row label={RECORD_TEXT.monthRow} value={`${formatMonthBR(recordMonth(r))}${r.nextMonth ? NEXT_MONTH_TEXT.detailSuffix : ''}`} last />
@@ -214,13 +265,17 @@ export default function DetalheRegistro() {
                 )
               ) : null}
 
-              {/* Pagamento de fatura (D-037): só se muda ou se desfaz pela fatura. */}
+              {/* Pagamento de fatura (D-037): só se muda ou se desfaz pela fatura. O gasto anotado antes e ligado depois (D-107) também
+                  pode ser desligado aqui, e continua. */}
               {r.invoice ? (
                 <>
                   <Txt variant="label" color={colors.textSecondary}>
-                    {CARDS_TEXT.screens.paymentRecordNote}
+                    {r.linkedPayment ? RECORD_LINK_TEXT.linkedInvoiceDetail : CARDS_TEXT.screens.paymentRecordNote}
                   </Txt>
                   <Button label={CARDS_TEXT.openInvoice} onPress={() => router.push(invoiceHref(r.invoice!.cardId, r.invoice!.month))} />
+                  {r.linkedPayment ? (
+                    <Button label={RECORD_LINK_TEXT.unlinkInvoice} tone="soft" disabled={!paidBill.data} onPress={() => setUnlinking(true)} />
+                  ) : null}
                 </>
               ) : (
                 <Button label={RECORD_TEXT.edit(r.kind)} icon={Pencil} tone={justSaved ? 'soft' : 'brand'} onPress={() => router.push(`/registro/${r.id}/editar`)} />
@@ -231,6 +286,9 @@ export default function DetalheRegistro() {
               ) : null}
               {r.commitmentId && !r.invoice ? (
                 <Button label="Ver conta a pagar" tone="soft" onPress={() => router.push(`/a-pagar/${r.commitmentId}`)} />
+              ) : null}
+              {r.investmentId ? (
+                <Button label="Ver investimento" tone="soft" onPress={() => router.push(`/investimento/${r.investmentId}`)} />
               ) : null}
               {justSaved ? null : (
                 <Button
@@ -251,6 +309,17 @@ export default function DetalheRegistro() {
               </Pressable>
 
               <ConfirmDialog
+                visible={unlinking}
+                title={RECORD_LINK_TEXT.unlinkInvoiceTitle}
+                cancelLabel="Cancelar"
+                confirmLabel={RECORD_LINK_TEXT.unlinkInvoice}
+                busy={unlinkBusy}
+                onCancel={() => setUnlinking(false)}
+                onConfirm={doUnlinkInvoice}>
+                <Txt color={colors.textSecondary}>{RECORD_LINK_TEXT.unlinkInvoiceBody}</Txt>
+              </ConfirmDialog>
+
+              <ConfirmDialog
                 visible={confirming}
                 title={RECORD_TEXT.removeTitle(r.kind)}
                 cancelLabel="Cancelar"
@@ -261,6 +330,7 @@ export default function DetalheRegistro() {
                 <MoneyTxt style={{ fontFamily: fonts.bold }}>{`${r.description} · ${formatBRL(r.amountCents)} · ${by.contextName}`}</MoneyTxt>
                 <Txt color={colors.textSecondary}>O valor deixa de contar no resumo de {formatMonthBR(recordMonth(r)).toLowerCase()}.</Txt>
                 {r.commitmentId ? <Txt color={colors.textSecondary}>A conta a pagar ligada a este gasto volta para Ainda a pagar.</Txt> : null}
+                {r.investmentId ? <Txt color={colors.textSecondary}>{RECORD_LINK_TEXT.incomeRemovedOnDelete}</Txt> : null}
               </ConfirmDialog>
             </>
           )}

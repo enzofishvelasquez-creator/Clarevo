@@ -5,7 +5,7 @@ import { CommitmentForm } from '@/components/commitment-form';
 import { LoadingState } from '@/components/states';
 import { useWork } from '@/state/data';
 
-type Params = { descricao?: string; valor?: string; vencimento?: string; categoria?: string };
+type Params = { descricao?: string; valor?: string; vencimento?: string; categoria?: string; origem?: string };
 
 /** Preenchimento opcional pela rota ("Adicionar a conta do próximo mês"): só entram valores válidos, campo a campo. */
 function prefillFrom(p: Params): Partial<CommitmentInput> | undefined {
@@ -25,5 +25,6 @@ export default function NovaContaAPagar() {
   const params = useLocalSearchParams<Params>();
   const space = useWork().data;
   if (!space) return <LoadingState />;
-  return <CommitmentForm mode={{ type: 'nova', prefill: prefillFrom(params) }} space={space} />;
+  // origem=registro (D-107): veio de "Cadastrar conta a pagar" em Anotar gasto; depois de salvar, volta para lá.
+  return <CommitmentForm mode={{ type: 'nova', prefill: prefillFrom(params), backToRecord: params.origem === 'registro' }} space={space} />;
 }

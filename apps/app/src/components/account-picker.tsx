@@ -23,6 +23,7 @@ export function AccountPicker({
   error,
   allowNone = false,
   hideManage = false,
+  onManage,
 }: {
   /** As contas ativas (PersonalSpace.accounts). */
   accounts: readonly FinancialAccount[];
@@ -33,6 +34,8 @@ export function AccountPicker({
   error?: string;
   allowNone?: boolean;
   hideManage?: boolean;
+  /** Quem abre o formulário cuida de "Gerenciar" (ex.: escolher a conta cadastrada ao voltar, D-107); sem ele, só abre Conta. */
+  onManage?: () => void;
 }) {
   // Chips sempre que há o que escolher (mais de uma conta, "Sem conta" ou um valor que não é a primeira conta); senão, o nome como
   // texto, e o texto mostra a conta escolhida (value), não a primeira da lista.
@@ -63,7 +66,7 @@ export function AccountPicker({
         <LinkButton
           label={ACCOUNTS_TEXT.manage}
           style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
-          onPress={() => router.push({ pathname: '/conta', params: { secao: 'contas' } })}
+          onPress={onManage ?? (() => router.push({ pathname: '/conta', params: { secao: 'contas' } }))}
         />
       )}
     </View>

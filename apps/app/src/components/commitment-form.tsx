@@ -43,6 +43,7 @@ import {
   type DraftField,
   type FieldErrors,
   type PendingAttempt,
+  RECORD_LINK_TEXT,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useNavigation } from 'expo-router';
@@ -71,7 +72,7 @@ import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
 export type CommitmentFormMode =
-  | { type: 'nova'; prefill?: Partial<CommitmentInput> }
+  | { type: 'nova'; prefill?: Partial<CommitmentInput>; /** Veio de Anotar gasto ("Cadastrar conta a pagar", D-107): depois de salvar, volta para lá. */ backToRecord?: boolean }
   /** informValue: "Informar o valor da conta" numa conta estimada (valor vazio com foco; envia amountIsEstimate: false). */
   | { type: 'editar'; commitment: Commitment; informValue?: boolean };
 
@@ -220,7 +221,9 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (mode.type === 'nova') {
       flash.set(withNotice(COMMITMENT_NOTICE_TEXT.saved, notice));
-      leave(() => router.replace(`/a-pagar/${id}`));
+      // Cadastrar e voltar (D-107): de volta ao gasto, que escolhe a conta nova em "O que este gasto pagou?".
+      if (mode.backToRecord && router.canGoBack()) leave(() => router.back());
+      else leave(() => router.replace(`/a-pagar/${id}`));
     } else {
       flash.set(withNotice(informValue ? COMMITMENT_NOTICE_TEXT.valueInformed : COMMITMENT_NOTICE_TEXT.updated, notice));
       leave(() => (router.canGoBack() ? router.back() : router.replace(`/a-pagar/${id}`)));
@@ -619,6 +622,11 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
         <Txt variant="label" color={colors.textSecondary}>
           Será salva em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt> como conta a pagar prevista.
         </Txt>
+        {mode.type === 'nova' && mode.backToRecord ? (
+          <Txt variant="label" color={colors.textSecondary}>
+            {RECORD_LINK_TEXT.registerBackHint}
+          </Txt>
+        ) : null}
         <LinkButton
           label="Como uma conta a pagar entra no mês?"
           color={colors.textSecondary}

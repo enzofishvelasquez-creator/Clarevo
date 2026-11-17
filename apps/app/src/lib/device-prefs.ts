@@ -13,12 +13,14 @@ import {
   isReminderHour,
   isRoutineReminderHour,
   parseRoutineReminderChoices,
+  parseSubcategoryMemory,
   type CategoryView,
   type ImportMemory,
   type ReminderHour,
   type RoutineReminderChoices,
   type RoutineReminderHour,
   type DepositReminderDay,
+  type SubcategoryMemory,
 } from '@clarevo/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
@@ -107,6 +109,11 @@ export interface DevicePrefs {
    * quando a média muda. Só neste aparelho; nada vai para o servidor.
    */
   reserveRefreshDismissed: number | null;
+  /**
+   * Subcategorias próprias (D-107), as escritas em "Outra" em Anotar gasto, por categoria (até 8 cada): voltam como opção nas próximas
+   * vezes. Só neste aparelho, como a memória das categorias; não é dado financeiro e nada vai para o servidor.
+   */
+  subcategories: SubcategoryMemory;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -131,6 +138,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   routineReminderHour: DEFAULT_ROUTINE_REMINDER_HOUR,
   depositReminderDay: DEFAULT_DEPOSIT_REMINDER_DAY,
   reserveRefreshDismissed: null,
+  subcategories: {},
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -171,6 +179,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       depositReminderDay: isDepositReminderDay(v.depositReminderDay) ? v.depositReminderDay : DEFAULT_DEPOSIT_REMINDER_DAY,
       reserveRefreshDismissed:
         typeof v.reserveRefreshDismissed === 'number' && Number.isSafeInteger(v.reserveRefreshDismissed) && v.reserveRefreshDismissed > 0 ? v.reserveRefreshDismissed : null,
+      subcategories: parseSubcategoryMemory(v.subcategories),
     };
   } catch {
     return DEFAULT_PREFS;

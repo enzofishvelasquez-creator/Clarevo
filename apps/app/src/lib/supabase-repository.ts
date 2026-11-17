@@ -86,6 +86,7 @@ import {
   type IncomeReference,
   type InvoiceItem,
   type InvoicePaymentWrite,
+  type LinkableRecord,
   type IsoDate,
   type IsoMonth,
   type License,
@@ -221,6 +222,11 @@ interface RecordRow {
   receipt_key: string | null;
   /** Recebimento que conta no mês seguinte (D-089 A, migração 0030); ausente antes da 0030. */
   next_month?: boolean | null;
+  /** Subcategoria, gasto ligado depois e rendimento de investimento (D-107, migração 20261117000002); ausentes antes dela. */
+  subcategory?: string | null;
+  linked_payment?: boolean | null;
+  investment_id?: string | null;
+  investment_movement_id?: string | null;
   created_by: string;
   version: number;
   created_at: string;
@@ -625,6 +631,12 @@ const GOAL_MOVEMENT_ACTIONS: readonly GoalAction[] = ['registrar_movimento_meta'
 
 const KNOWN: RepoErrorCode[] = [
   'versao_desatualizada',
+  // Gasto ligado, subcategoria, troca de tipo e rendimento de investimento (D-107, 20261117000002).
+  'subcategoria_invalida',
+  'tipo_nao_muda',
+  'investimento_invalido',
+  'registro_invalido',
+  'registro_ja_ligado',
   // Investimentos (D-093, 0032).
   'investimento_encerrado',
   'valor_insuficiente',
@@ -840,6 +852,10 @@ function toRecord(r: RecordRow): FinancialRecord {
     receiptKey,
     // Só quando ligado, como o repositório em memória: o registro sem a marca fica como antes.
     ...(r.next_month === true ? { nextMonth: true } : {}),
+    // D-107: só quando existem, como o repositório em memória.
+    ...(r.subcategory ? { subcategory: r.subcategory } : {}),
+    ...(r.linked_payment === true ? { linkedPayment: true } : {}),
+    ...(r.investment_id && r.investment_movement_id ? { investmentId: r.investment_id, investmentMovementId: r.investment_movement_id } : {}),
     createdBy: r.created_by,
     version: r.version,
     createdAt: r.created_at,
@@ -1975,6 +1991,9 @@ export class SupabaseRepository implements RecordsRepository {
       ...(input.receiptKey != null ? { p_receipt_key: input.receiptKey } : {}),
       // Só quando ligado (D-089 A): sem a marca, a chamada é a de antes.
       ...(input.nextMonth === true ? { p_next_month: true } : {}),
+      // Subcategoria e rendimento de investimento (D-107): só quando vêm.
+      ...(input.subcategory ? { p_subcategory: input.subcategory } : {}),
+      ...(input.investmentId ? { p_investment_id: input.investmentId } : {}),
     });
   }
 
@@ -1990,6 +2009,14 @@ export class SupabaseRepository implements RecordsRepository {
       p_category: input.category,
       // Ausente mantém a marca do mês seguinte enquanto a data cabe (D-089 A); o formulário de recebimento manda true ou false.
       ...(input.nextMonth !== undefined ? { p_next_month: input.nextMonth } : {}),
+      // D-107: o tipo novo; a subcategoria ('' tira); o investimento (null desliga, um id liga). Ausentes: a chamada é a de antes.
+      ...(input.kind !== undefined ? { p_kind: input.kind } : {}),
+      ...(input.subcategory !== undefined ? { p_subcategory: input.subcategory ?? '' } : {}),
+      ...(input.investmentId !== undefined
+        ? input.investmentId === null
+          ? { p_link_investment: false }
+          : { p_link_investment: true, p_investment_id: input.investmentId }
+        : {}),
     });
   }
 
@@ -2061,11 +2088,27 @@ export class SupabaseRepository implements RecordsRepository {
     });
   }
 
-  undoCommitmentPayment(key: string, id: string, expectedVersion: number) {
+  undoCommitmentPayment(key: string, id: string, expectedVersion: number, keepRecord = false) {
     return this.callPayment('undo_commitment_payment', {
       p_idempotency_key: key,
       p_commitment_id: id,
       p_expected_version: expectedVersion,
+      // D-107: só quando pedido, para a chamada de antes continuar igual.
+      ...(keepRecord ? { p_keep_record: true } : {}),
+    });
+  }
+
+  /** D-107: pay_commitment com p_record_id (o gasto que já existe vira o pagamento); a categoria fica a do gasto. */
+  linkRecordToCommitment(key: string, commitmentId: string, expectedVersion: number, record: LinkableRecord) {
+    return this.callPayment('pay_commitment', {
+      p_idempotency_key: key,
+      p_commitment_id: commitmentId,
+      p_expected_version: expectedVersion,
+      p_account_id: record.accountId,
+      p_amount_cents: record.amountCents,
+      p_paid_on: record.occurredOn,
+      p_category: null,
+      p_record_id: record.id,
     });
   }
 
@@ -3281,12 +3324,27 @@ export class SupabaseRepository implements RecordsRepository {
     });
   }
 
-  undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number) {
+  undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number, keepRecord = false) {
     return this.writeInvoicePayment('undo_invoice_payment', {
       p_idempotency_key: key,
       p_card_id: cardId,
       p_month: `${month}-01`,
       p_expected_version: expectedVersion,
+      // D-107: só quando pedido, para a chamada de antes continuar igual.
+      ...(keepRecord ? { p_keep_record: true } : {}),
+    });
+  }
+
+  /** D-107: pay_invoice com p_record_id (o gasto que já existe vira o pagamento, na conta dele). */
+  linkRecordToInvoice(key: string, cardId: string, month: IsoMonth, expectedVersion: number, record: LinkableRecord) {
+    return this.writeInvoicePayment('pay_invoice', {
+      p_idempotency_key: key,
+      p_card_id: cardId,
+      p_month: `${month}-01`,
+      p_expected_version: expectedVersion,
+      p_paid_cents: record.amountCents,
+      p_paid_on: record.occurredOn,
+      p_record_id: record.id,
     });
   }
 
