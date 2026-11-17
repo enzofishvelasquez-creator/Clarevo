@@ -14747,7 +14747,20 @@ setInterval(async () => {
       t.includes('Qual investimento?') && t.includes('Ao salvar, o valor entra em Recebido uma vez só e fica registrado como rendimento recebido em Aplicação do banco, na mesma data. O valor atual do investimento não muda.') &&
       (await visibleCount('button', 'Cadastrar investimento')) === 1, t.slice(t.indexOf('Categoria'), t.indexOf('Categoria') + 700));
     await atWidths(async (w) => { await layoutChecks(`D-107 Editar: troca de tipo e rendimento de investimento ${w}px`); if (w === 390) await shot('663_editar_tipo_e_investimento'); });
-    await btn('Salvar recebimento').click(); await waitText('Alterações salvas'); await p.waitForTimeout(600);
+    // Revisão de 17/11/2026: desligar a conta de antes vem antes de gravar; se a gravação falha depois (aqui, uma recusa simulada na
+    // primeira tentativa), a faixa de erro diz que a conta já voltou para Ainda a pagar, e o formulário continua aberto.
+    await p.evaluate(async () => {
+      const r = await window.__e2e.repo();
+      const orig = r.updateRecord;
+      r.updateRecord = function (key, id, version, input) { r.updateRecord = orig; return orig.call(r, key, id, version, { ...input, investmentId: '' }); };
+    });
+    await btn('Salvar recebimento').click(); await waitText('A conta de antes já voltou para Ainda a pagar.'); await p.waitForTimeout(400);
+    const lcFail = await lcState();
+    ok('D-107 gravação recusada depois de desligar: a faixa diz que a conta de antes voltou para Ainda a pagar e que as outras alterações não foram salvas',
+      (await body()).includes('A conta de antes já voltou para Ainda a pagar. As outras alterações não foram salvas.') && (await h1Name()) === 'Editar recebimento' &&
+      lcFail.bills.find((c) => c.d === 'Internet').status === 'aberto' && lcFail.records.find((r) => r.id === lcPaid.id).kind === 'despesa' &&
+      lcFail.records.find((r) => r.id === lcPaid.id).cp === null, JSON.stringify(lcFail.records.find((r) => r.id === lcPaid.id)));
+    await btn('Tentar de novo').click(); await waitText('Alterações salvas'); await p.waitForTimeout(600);
     t = await body();
     const lc2 = await lcState();
     const lcNow = lc2.records.find((r) => r.id === lcPaid.id);
