@@ -5,6 +5,9 @@
 // Duas rotas recebem formulários e NÃO gravam nada (sem KV, D1, R2 nem log): cada envio vira uma chamada a um serviço de e-mail e acabou.
 //   POST /api/contato     envia a mensagem do formulário de "Para empresas" ao e-mail de contato, pelo Resend.
 //   POST /api/newsletter  cadastra o e-mail, com consentimento, no Brevo, pela API de dupla confirmação.
+// Uma rota só lê dados públicos (D-106), sem variável, sem chave e sem gravar nada fora da memória:
+//   GET /api/indicadores  busca no Banco Central a Selic (meta), o CDI, o IPCA, a poupança e o dólar PTAX, guarda uma cópia na memória por
+//                         uma hora e devolve ao site. O navegador de quem visita só fala com o próprio site; o Banco Central não vê ninguém.
 // Qualquer outra rota cai nos arquivos estáticos (env.ASSETS.fetch).
 //
 // Uma rota só existe se o interruptor dela estiver ligado em site/dados-da-empresa.json NA GERAÇÃO (`ROTAS`, abaixo): desligada, responde
@@ -22,6 +25,9 @@ const LIMITES = /*LIMITES*/ {};
 const CABECALHOS = /*CABECALHOS*/ {};
 // Quais rotas existem: os interruptores `formulario_contato` e `newsletter` de site/dados-da-empresa.json, lidos pelo gerador.
 const ROTAS = /*ROTAS*/ {};
+// O núcleo de /api/indicadores (packages/core/src/indicadores/servidor.ts e o que ele usa), num pacote só, montado pelo gerador: os códigos
+// das séries, a leitura das respostas, as contas e a cópia de uma hora são os mesmos do gerador do site e dos testes do núcleo.
+const NUCLEO_INDICADORES = /*INDICADORES*/ null;
 
 const LIMITE_DO_CORPO = 20 * 1024;
 /** Os serviços de e-mail pedem que quem chama diga quem é (o Resend recusa o pedido sem `User-Agent`). */
@@ -299,6 +305,25 @@ async function newsletter(request, env, url) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// Indicadores oficiais (Banco Central, D-106)
+
+/**
+ * O atendimento de /api/indicadores, criado uma vez por instância do worker: a cópia de uma hora fica na memória dele. Cada consulta ao
+ * Banco Central tem prazo e leva só `Accept` e `User-Agent`: nada de quem visita (IP, navegador, cabeçalhos) vai junto.
+ */
+const atenderIndicadores = NUCLEO_INDICADORES.createIndicadoresHandler({
+  fetch: async (url, init) => {
+    const r = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': AGENTE }, signal: AbortSignal.timeout(init.timeoutMs) });
+    return { ok: r.ok, status: r.status, json: () => r.json() };
+  },
+});
+
+async function indicadores(request) {
+  const r = await atenderIndicadores({ method: request.method });
+  return new Response(request.method === 'HEAD' ? null : r.body, { status: r.status, headers: { ...CABECALHOS, 'X-Content-Type-Options': 'nosniff', ...r.headers } });
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 /** O arquivo estático de sempre, com os cabeçalhos de segurança do site (sem trocar os que o Pages já pôs). */
 async function estatico(request, env) {
@@ -313,6 +338,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === '/api/contato') return contato(request, env, url);
     if (url.pathname === '/api/newsletter') return newsletter(request, env, url);
+    if (url.pathname === '/api/indicadores') return indicadores(request);
     return estatico(request, env);
   },
 };

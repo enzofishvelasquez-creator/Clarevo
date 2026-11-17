@@ -7,7 +7,7 @@ import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import * as core from '../src/calculators';
-import { CALCULATORS, CALC_GROUPS, CALC_UI_TEXT, calcDisclaimer, MULTA_CARD_TEXT, MULTA_FATURA_FIELDS, MULTA_FATURA_TEXT, MULTA_FIELDS, calcErrorText, calcFields, calcMultaEJuros, calcPrefill, calcTitle, type CalcErrorCode, type CalcSlug } from '../src/calculators';
+import { CALCULATORS, CALC_ERROR_TEXT, CALC_GROUPS, CALC_UI_TEXT, calcDisclaimer, MULTA_CARD_TEXT, MULTA_FATURA_FIELDS, MULTA_FATURA_TEXT, MULTA_FIELDS, SITE_CALCULATORS, SITE_CALC_FIELDS, calcErrorText, calcFields, calcMultaEJuros, calcPrefill, calcTitle, isSiteCalcSlug, type CalcErrorCode, type CalcSlug, type SiteCalcSlug } from '../src/calculators';
 import { publishedTopics, topicCalculator } from '../src/learn';
 
 /**
@@ -23,8 +23,9 @@ const SITE = join(ROOT, 'site');
 const require = createRequire(import.meta.url);
 const gerador = require(join(ROOT, 'scripts', 'gerar-site.js')) as { gerarSite: (o?: Record<string, unknown>) => { arquivos: Map<string, string | Buffer> } };
 const { nucleo, fechoDe, ENTRADAS } = require(join(ROOT, 'scripts', 'site', 'nucleo.js')) as { nucleo: () => Map<string, string>; fechoDe: (raizes: string[]) => string[]; ENTRADAS: string[] };
-const { exemploDa, EXEMPLOS, TAMBEM_FAZ, precargaDaCalculadora } = require(join(ROOT, 'scripts', 'site', 'paginas', 'calculadoras.js')) as {
+const { exemploDa, EXEMPLOS, TAMBEM_FAZ, TEMAS_DAS_DO_SITE, precargaDaCalculadora } = require(join(ROOT, 'scripts', 'site', 'paginas', 'calculadoras.js')) as {
   precargaDaCalculadora: (slug: string) => string[];
+  TEMAS_DAS_DO_SITE: Record<string, string[]>;
   TAMBEM_FAZ: Record<string, string | undefined>;
   exemploDa: (slug: string) => Exemplo & { tambem: (Exemplo & { titulo: string })[] };
   EXEMPLOS: Record<string, unknown>;
@@ -39,6 +40,14 @@ const texto = (v: string | Buffer | undefined): string => (typeof v === 'string'
 // O mesmo `esc` do gerador (scripts/site/texto.js), com o espaço fixo entre "R$" e o valor (12/11/2026).
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/R\$ (?=\d)/g, 'R$\u00a0');
 const HOJE = '2026-10-23';
+/** As doze calculadoras do site: as dez do app e as duas que por enquanto só o site mostra (D-106). */
+const TODAS = [...CALCULATORS, ...SITE_CALCULATORS];
+type SlugDoSite = CalcSlug | SiteCalcSlug;
+/** Os campos do core de qualquer calculadora do site (as do app por `calcFields`, as só do site por `SITE_CALC_FIELDS`). */
+const camposDoCore = (slug: SlugDoSite, modo?: string) => (isSiteCalcSlug(slug) ? SITE_CALC_FIELDS[slug] : calcFields(slug, modo));
+/** A mensagem de erro do core, como `calcErrorText` (que só conhece as do app). */
+const erroDoCore = (slug: SlugDoSite, campo: string, codigo: CalcErrorCode, modo?: string) =>
+  isSiteCalcSlug(slug) ? (SITE_CALC_FIELDS[slug][campo.replace(/\.\d+$/, '')]?.errors?.[codigo] ?? CALC_ERROR_TEXT[codigo]) : calcErrorText(slug, campo, codigo, modo);
 const gerado = gerador.gerarSite();
 const pagina = (nome: string) => texto(gerado.arquivos.get(nome));
 
@@ -79,7 +88,7 @@ describe('site público: núcleo das calculadoras (o código do core no navegado
     const segunda = gerador.gerarSite();
     for (const [nome] of arquivos) expect(segunda.arquivos.get(nome), nome).toBe(gerado.arquivos.get(nome));
     // Os scripts das calculadoras (o que inicia a página, as peças comuns e uma definição por calculadora) saem de site-src sem mudança.
-    const scripts = ['calculadora.js', 'base.js', ...CALCULATORS.map((c) => `definicoes/${c.slug}.js`)];
+    const scripts = ['calculadora.js', 'base.js', ...TODAS.map((c) => `definicoes/${c.slug}.js`)];
     for (const arq of scripts) {
       expect(gerado.arquivos.get(`calculadoras/${arq}`), arq).toBe(readFileSync(join(ROOT, 'site-src', 'calculadoras', arq), 'utf8'));
       expect(readFileSync(join(SITE, 'calculadoras', arq), 'utf8'), `site/calculadoras/${arq} está desatualizado: rode node scripts/gerar-site.js`).toBe(gerado.arquivos.get(`calculadoras/${arq}`));
@@ -141,6 +150,13 @@ describe('site público: núcleo das calculadoras (o código do core no navegado
     { modulo: 'dividir-contas', funcao: 'calcDividirContas', args: [{ total: '3.000,00', modo: 'iguais', pessoas: [{}, {}, { apelido: 'Terceira' }] }] },
     { modulo: 'dividir-contas', funcao: 'calcDividirContas', args: [{ total: '3.000,00', modo: 'renda', pessoas: [{ renda: '4.000,00' }, { renda: '2.000,00' }] }] },
     { modulo: 'dividir-contas', funcao: 'calcDividirContas', args: [{ total: '10,00', modo: 'renda', pessoas: [{ apelido: 'um nome muito comprido para o campo', renda: '' }] }] },
+    // As duas que por enquanto só o site mostra (D-106).
+    { modulo: 'juros-compostos', funcao: 'calcJurosCompostos', args: [{ inicial: '1.000,00', mensal: '500,00', taxaAno: '10', meses: '120' }] },
+    { modulo: 'juros-compostos', funcao: 'calcJurosCompostos', args: [{ inicial: '', mensal: '0', taxaAno: '30,5', meses: '0' }] },
+    { modulo: 'juros-compostos', funcao: 'calcJurosCompostos', args: [{ inicial: '9.999.999,99', mensal: '9.999.999,99', taxaAno: '30', meses: '600' }] },
+    { modulo: 'rendimento-cdi', funcao: 'calcRendimentoCdi', args: [{ valor: '10.000,00', percentual: '110', cdiAno: '12', meses: '6', imposto: 'regressivo' }] },
+    { modulo: 'rendimento-cdi', funcao: 'calcRendimentoCdi', args: [{ valor: '10.000,00', percentual: '100', cdiAno: '11', meses: '12', imposto: 'isento' }] },
+    { modulo: 'rendimento-cdi', funcao: 'calcRendimentoCdi', args: [{ valor: '', percentual: '0', cdiAno: 'abc', meses: '700', imposto: null }] },
   ];
 
   it('para cada calculadora, os módulos gerados (importados no Node, como o navegador os importa) dão exatamente o mesmo resultado, os mesmos erros e os mesmos textos que o core', () => {
@@ -213,8 +229,8 @@ process.stdout.write(JSON.stringify(saidas));
       });
       // O JSON de um lado e do outro: `undefined` some nos dois.
       consultas.forEach((c, i) => expect(doNucleo[i], `${c.tipo} ${JSON.stringify(c).slice(0, 140)}`).toEqual(JSON.parse(JSON.stringify(doCore[i]))));
-      // Os casos de exemplo cobrem resultado e erro de cada uma das dez.
-      for (const c of CALCULATORS) {
+      // Os casos de exemplo cobrem resultado e erro de cada uma das doze.
+      for (const c of TODAS) {
         const deles = CASOS.map((x, i) => ({ x, saida: doNucleo[i] as { ok: boolean } })).filter((y) => y.x.modulo === c.slug);
         expect(deles.some((y) => y.saida.ok), `${c.slug}: nenhum caso calcula`).toBe(true);
         expect(deles.some((y) => !y.saida.ok), `${c.slug}: nenhum caso dá erro`).toBe(true);
@@ -239,7 +255,8 @@ describe('site público: páginas das calculadoras', () => {
     }
     expect(CALCULATORS.length).toBe(10);
     let posicao = 0;
-    for (const c of CALCULATORS) {
+    // As do app na ordem do catálogo; as que só o site mostra (D-106) no fim do grupo delas ("Guardar e dividir", o último).
+    for (const c of TODAS) {
       const trecho = `<a class="cartao" href="${c.slug}.html"><span class="titulo-cartao">${esc(c.title)}</span><span class="tema-sub">${esc(c.subtitle)}</span></a>`;
       const i = h.indexOf(trecho);
       expect(i, c.slug).toBeGreaterThan(posicao);
@@ -300,9 +317,34 @@ describe('site público: páginas das calculadoras', () => {
     });
   }
 
+  for (const c of SITE_CALCULATORS) {
+    it(`${c.slug} (só no site, D-106): título, grupo, o aviso do simulador, campos sem JavaScript, exemplo calculado pelo core e ligação com Aprender`, () => {
+      const h = pagina(`calculadoras/${c.slug}.html`);
+      expect(h).toContain(`<title>Calculadora: ${esc(c.title)} · Clarevo</title>`);
+      expect(h).toContain(`<h1>${esc(c.title)}</h1>`);
+      expect(h).toContain(`<p class="migalha"><a href="index.html">Calculadoras</a> · ${esc(CALC_GROUPS.find((g) => g.id === c.group)!.title)}</p>`);
+      expect(h).toContain(esc(c.disclaimer));
+      expect(h).toContain('não garantem resultado');
+      expect(h).toContain(`<div class="calc" data-calculadora="${c.slug}">`);
+      expect(h).toContain('<script type="module" src="calculadora.js"></script>');
+      expect(h).toContain('Por enquanto, esta calculadora está só aqui no site.');
+      const sem = /<noscript>([\s\S]*?)<\/noscript>/.exec(h)?.[1] ?? '';
+      for (const spec of Object.values(SITE_CALC_FIELDS[c.slug])) expect(sem, `${c.slug}: ${spec.label}`).toContain(`<strong>${esc(spec.label)}.</strong>`);
+      const ex = exemploDa(c.slug);
+      for (const l of [...ex.resultado.resultLines, ...ex.resultado.hypotheses]) expect(h, l).toContain(`<li>${esc(l)}</li>`);
+      // O resultado é sempre marcado como estimativa, com as premissas escritas.
+      expect(ex.resultado.resultLines[0]).toMatch(/^Estimativa: /);
+      expect(ex.resultado.hypotheses.length).toBeGreaterThanOrEqual(3);
+      for (const t of TEMAS_DAS_DO_SITE[c.slug]!) expect(h, `tema ${t}`).toContain(`href="../aprender/${t}.html"`);
+      const descricao = /<meta name="description" content="([^"]+)">/.exec(h)?.[1] ?? '';
+      expect(descricao.length).toBeLessThanOrEqual(160);
+      expect(h).not.toMatch(/<form\b|<iframe\b/i);
+    });
+  }
+
   it('os exemplos usam números fictícios e a função do core de cada calculadora', () => {
-    expect(Object.keys(EXEMPLOS).sort()).toEqual(CALCULATORS.map((c) => c.slug).sort());
-    for (const c of CALCULATORS) {
+    expect(Object.keys(EXEMPLOS).sort()).toEqual(TODAS.map((c) => c.slug).sort());
+    for (const c of TODAS) {
       const ex = exemploDa(c.slug);
       expect(ex.linhas.length, c.slug).toBeGreaterThan(0);
     }
@@ -520,7 +562,7 @@ process.stdout.write(JSON.stringify({ conta, resultadoDaConta, fatura, modoDepoi
   });
 
   it('os scripts das calculadoras só montam a tela: nada de envio, armazenamento, cookie, HTML solto nem escrita na URL', () => {
-    const nomes = ['calculadora.js', 'base.js', ...CALCULATORS.map((c) => `definicoes/${c.slug}.js`)];
+    const nomes = ['calculadora.js', 'base.js', ...TODAS.map((c) => `definicoes/${c.slug}.js`)];
     for (const arq of nomes) {
       const js = readFileSync(join(ROOT, 'site-src', 'calculadoras', arq), 'utf8');
       expect(js, arq).not.toMatch(/https?:|\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|localStorage|sessionStorage|indexedDB|document\.cookie|eval\s*\(|new Function|innerHTML|outerHTML|insertAdjacentHTML|document\.write|history\.|location\.(href|search|hash|assign|replace)\s*=/);
@@ -550,9 +592,10 @@ describe('site público: cada página de calculadora carrega só o que usa', () 
   const ENTRADA = lerScript('calculadora.js');
   const BASE = lerScript('base.js');
   const nome = (slug: string) => `calculadoras/${slug}.html`;
-  const slugs = CALCULATORS.map((c) => c.slug);
+  const slugs: SlugDoSite[] = TODAS.map((c) => c.slug);
   const PESADOS = ['series', 'cards', 'committed', 'simulate', 'validation', 'dia-util'].map((m) => `js/nucleo/${m}.js`);
-  const COM_PESADOS = ['antes-de-financiar', 'plano-dividas'];
+  // "Juros compostos" (D-106) usa a conta do simulador do app (simulate.js), que é um dos módulos pesados.
+  const COM_PESADOS = ['antes-de-financiar', 'plano-dividas', 'juros-compostos'];
   const importsDe = (fonte: string) => [...fonte.matchAll(/^import\s[^;]*?from\s+'([^']+)';/gm)].map((m) => m[1]!);
   const doNucleo = (caminhos: string[], de: string) => caminhos.map((c) => posix.join(posix.dirname(de), c)).filter((c) => c.startsWith('js/nucleo/'));
   const tamanho = (arquivos: string[]) => arquivos.reduce((n, a) => n + Buffer.byteLength(gerado.arquivos.get(a) as string), 0);
@@ -580,7 +623,7 @@ describe('site público: cada página de calculadora carrega só o que usa', () 
     expect(dinamicos.filter((d) => !d.startsWith('./definicoes/') && !/calculators\/(?!links)/.test(d))).toEqual(['../js/nucleo/calculators/links.js']);
     // O links.js (que traz as séries e os cartões) só é pedido quando o endereço traz ?modo=: sem parâmetro o prefill do core é vazio.
     expect(ENTRADA).toMatch(/modoDoEndereco \? import\('\.\.\/js\/nucleo\/calculators\/links\.js'\)/);
-    for (const slug of slugs) expect(calcPrefill(slug, {}), slug).toEqual({});
+    for (const slug of slugs) if (!isSiteCalcSlug(slug)) expect(calcPrefill(slug, {}), slug).toEqual({});
     // Se o módulo não carregar, a página diz isso em vez de ficar parada em "carregando".
     expect(ENTRADA).toContain('Não foi possível carregar a calculadora.');
   });
@@ -595,7 +638,7 @@ describe('site público: cada página de calculadora carrega só o que usa', () 
       // O módulo do núcleo da calculadora chega por parâmetro (é o import() da página): a definição não o importa de novo.
       expect(fonte, slug).not.toContain(`calculators/${slug}.js`);
     }
-    expect(slugs).toHaveLength(10);
+    expect(slugs).toHaveLength(12);
   });
 
   it('cada página tem o modulepreload dos scripts dela, do módulo do núcleo da calculadora e de tudo o que eles importam, e nada além disso', () => {
@@ -624,7 +667,7 @@ describe('site público: cada página de calculadora carrega só o que usa', () 
     expect(pagina('calculadoras/index.html')).not.toContain('modulepreload');
   });
 
-  it('as calculadoras leves não carregam séries, cartões, lançamentos nem simulação; as duas que usam isso carregam, e cada página pesa bem menos que antes', () => {
+  it('as calculadoras leves não carregam séries, cartões, lançamentos nem simulação; as três que usam isso carregam, e cada página pesa bem menos que antes', () => {
     // Antes da divisão, toda página carregava o núcleo inteiro (26 arquivos) e o script único de todas as calculadoras: 336.928 bytes.
     const ANTES = 336_928;
     const pesos: Record<string, number> = {};
@@ -642,7 +685,7 @@ describe('site público: cada página de calculadora carrega só o que usa', () 
     }
   });
 
-  it('os campos e as mensagens de erro que o script monta, sem o fields.js do core, são exatamente os do core, para as dez calculadoras', () => {
+  it('os campos e as mensagens de erro que o script monta, sem o fields.js do core, são exatamente os do core, para as doze calculadoras', () => {
     const dir = mkdtempSync(join(tmpdir(), 'clarevo-campos-'));
     try {
       for (const [arq, fonte] of nucleo()) {
@@ -660,7 +703,7 @@ describe('site público: cada página de calculadora carrega só o que usa', () 
         ...(slug === 'parcelado-ou-a-vista' ? [{ slug, modo: 'cota-unica' }] : []),
         ...(slug === 'multa-e-juros' ? [{ slug, modo: 'fatura' }] : []),
       ]);
-      const erros = slugs.flatMap((slug) => [...Object.keys(calcFields(slug)), 'renda.1', 'apelido.0', 'tipo.2', 'campo-que-nao-existe'].flatMap((campo) => CODIGOS.map((codigo) => ({ slug, campo, codigo }))));
+      const erros = slugs.flatMap((slug) => [...Object.keys(camposDoCore(slug)), 'renda.1', 'apelido.0', 'tipo.2', 'campo-que-nao-existe'].flatMap((campo) => CODIGOS.map((codigo) => ({ slug, campo, codigo }))));
       writeFileSync(join(dir, 'consultas.json'), JSON.stringify({ consultas, erros }));
       writeFileSync(
         join(dir, 'rodar.mjs'),
@@ -691,8 +734,8 @@ process.stdout.write(JSON.stringify({
       const saida = JSON.parse(r.stdout) as { slugs: string[]; nomes: string[]; campos: unknown[]; erros: string[]; errosCotaUnica: string; errosFatura: string[] };
       expect([...saida.slugs].sort()).toEqual([...slugs].sort());
       expect([...saida.nomes].sort()).toEqual([...slugs].sort());
-      consultas.forEach((c, i) => expect(saida.campos[i], `${c.slug} ${c.modo ?? ''}`).toEqual(JSON.parse(JSON.stringify(calcFields(c.slug, c.modo)))));
-      erros.forEach((e, i) => expect(saida.erros[i], `${e.slug} ${e.campo} ${e.codigo}`).toBe(calcErrorText(e.slug, e.campo, e.codigo)));
+      consultas.forEach((c, i) => expect(saida.campos[i], `${c.slug} ${c.modo ?? ''}`).toEqual(JSON.parse(JSON.stringify(camposDoCore(c.slug, c.modo)))));
+      erros.forEach((e, i) => expect(saida.erros[i], `${e.slug} ${e.campo} ${e.codigo}`).toBe(erroDoCore(e.slug, e.campo, e.codigo)));
       expect(saida.errosCotaUnica).toBe(calcErrorText('parcelado-ou-a-vista', 'aVista', 'vazio', 'cota-unica'));
       expect(saida.errosFatura).toEqual(['valor', 'rotativoPct', 'moraPct', 'multaPct', 'dias'].map((campo) => calcErrorText('multa-e-juros', campo, campo === 'valor' ? 'vazio' : 'fora_da_faixa', 'fatura')));
     } finally {

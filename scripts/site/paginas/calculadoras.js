@@ -1,6 +1,7 @@
 'use strict';
 /**
- * Calculadoras (D-066): o índice, agrupado como no app, e uma página por calculadora (as dez de `packages/core/src/calculators`).
+ * Calculadoras (D-066): o índice, agrupado como no app, e uma página por calculadora (as dez de `packages/core/src/calculators` e, desde
+ * D-106, as duas que por enquanto só o site mostra, `SITE_CALCULATORS`: juros compostos e quanto rende a um percentual do CDI).
  *
  * Uma só fonte de verdade: os títulos, os grupos, os campos, as regras de validação, os resultados e as hipóteses vêm do core. A conta
  * roda no navegador com o MESMO código, transpilado em `site/js/nucleo/` (`scripts/site/nucleo.js`), e o script da página
@@ -82,6 +83,19 @@ const O_QUE_FAZ = {
   reserva: 'Calcula o tamanho da reserva para imprevistos, quantos meses o que você já tem guardado cobre e em quanto tempo ela fica completa.',
   'juntar-para-objetivo': 'Mostra quanto guardar por mês para chegar a um valor em um prazo, ou em quanto tempo você chega guardando um valor por mês.',
   'dividir-contas': 'Divide o total das contas da casa entre 2 e 6 pessoas, em partes iguais ou pela renda de cada uma.',
+  // As duas que por enquanto só o site mostra (D-106).
+  'juros-compostos':
+    'Estima quanto um valor inicial e um valor guardado por mês podem virar, a uma taxa ao ano que você informa, com juros sobre juros. É a mesma conta do simulador do app, com o valor de cada mês guardado no início do mês.',
+  'rendimento-cdi':
+    'Estima quanto rende uma aplicação que paga um percentual do CDI, com o CDI que você informa: o valor bruto, o Imposto de Renda pela tabela regressiva (ou sem imposto, nas aplicações isentas) e o valor líquido.',
+};
+/**
+ * Os temas de Aprender de cada calculadora que só o site mostra (D-106): as do app vêm do catálogo de Aprender (`calculator` do tema),
+ * que só conhece as calculadoras do app.
+ */
+const TEMAS_DAS_DO_SITE = {
+  'juros-compostos': ['juros-simples-compostos', 'taxa-mes-ano', 'simulacao'],
+  'rendimento-cdi': ['ir-investimentos', 'liquidez-risco-retorno', 'fgc'],
 };
 /**
  * Uma frase a mais na capa e na descrição da página, para a calculadora cujo subtítulo do catálogo não conta tudo o que ela faz hoje.
@@ -166,12 +180,22 @@ const EXEMPLOS = {
     mostrar: ['total', 'modo'],
     itens: ['Pessoa 1: renda de R$ 4.000,00.', 'Pessoa 2: renda de R$ 2.000,00.'],
   },
+  'juros-compostos': {
+    funcao: 'calcJurosCompostos',
+    entrada: { inicial: '1.000,00', mensal: '500,00', taxaAno: '10', meses: '120' },
+    mostrar: ['inicial', 'mensal', 'taxaAno', 'meses'],
+  },
+  'rendimento-cdi': {
+    funcao: 'calcRendimentoCdi',
+    entrada: { valor: '10.000,00', percentual: '100', cdiAno: '10', meses: '24', imposto: 'regressivo' },
+    mostrar: ['valor', 'percentual', 'cdiAno', 'meses', 'imposto'],
+  },
 };
 
 /** Um exemplo calculado: as entradas para mostrar (com os rótulos do modo do exemplo) e o resultado que o core devolve. */
 function calcularExemplo(slug, ex) {
   const c = catalogo();
-  const campos = c.CALC.calcFields(slug, ex.modoDosCampos);
+  const campos = c.camposDaCalculadora(slug, ex.modoDosCampos);
   const saida = c.CALC[ex.funcao](ex.entrada);
   if (!saida.ok) throw new Error(`o exemplo de ${slug} não calcula: ${JSON.stringify(saida.errors)}`);
   const valorDe = (chave) => {
@@ -198,7 +222,7 @@ function exemploDa(slug) {
 
 /** Os campos de uma calculadora, na ordem da tela, para quem está sem JavaScript. */
 function listaDeCampos(slug) {
-  const campos = catalogo().CALC.calcFields(slug);
+  const campos = catalogo().camposDaCalculadora(slug);
   const fora = FORA_DA_LISTA[slug] ?? [];
   return Object.entries(campos)
     .filter(([chave]) => !fora.includes(chave))
@@ -216,8 +240,20 @@ function oQueFaz(slug) {
   return O_QUE_FAZ[slug];
 }
 
-/** Os temas de Aprender do site que apontam para esta calculadora no catálogo (o mesmo ligamento que o app usa). */
-const temasDaCalculadora = (slug) => catalogo().publicados.filter((t) => t.calculator && t.calculator.slug === slug && SECOES_DO_SITE.includes(t.section));
+/**
+ * Os temas de Aprender do site que apontam para esta calculadora no catálogo (o mesmo ligamento que o app usa); para as que só o site
+ * mostra, os de `TEMAS_DAS_DO_SITE`.
+ */
+const temasDaCalculadora = (slug) =>
+  TEMAS_DAS_DO_SITE[slug]
+    ? TEMAS_DAS_DO_SITE[slug].map((t) => catalogo().tema(t) ?? (() => { throw new Error(`calculadoras: o tema "${t}" não está publicado`); })())
+    : catalogo().publicados.filter((t) => t.calculator && t.calculator.slug === slug && SECOES_DO_SITE.includes(t.section));
+
+/** Uma nota a mais logo abaixo do aviso, para a calculadora que pede um número que o site mostra em outra página (D-106). */
+const NOTA_DO_NUMERO = {
+  'rendimento-cdi': (u) =>
+    `<p class="nota">O CDI de hoje, com a data e a fonte, está em <a href="${u('indicadores/cdi-hoje.html')}">CDI hoje</a>. A calculadora não usa esse número sozinha: você digita o CDI que quer testar, porque ele muda com a Selic.</p>`,
+};
 
 const AVISO_EXTRA = 'Os resultados são estimativas feitas com os números que você digita e não garantem resultado.';
 
@@ -272,7 +308,8 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
   const corpo = [
     bloco(
       `<h2 id="calcular">Faça a conta</h2>
-<div class="aviso-edu calc-aviso"><p>${esc(c.CALC.calcDisclaimer(info.slug))} ${esc(AVISO_EXTRA)}</p></div>
+<div class="aviso-edu calc-aviso"><p>${esc(c.avisoDaCalculadora(info.slug))} ${esc(AVISO_EXTRA)}</p></div>
+${NOTA_DO_NUMERO[info.slug] ? `${NOTA_DO_NUMERO[info.slug](u)}\n` : ''}
 <div class="calc" data-calculadora="${esc(info.slug)}">
 <p class="calc-carregando">Carregando a calculadora. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site. Você também pode usar a <a href="${esc(URL_APP)}" rel="noopener noreferrer">versão web</a> da Clarevo.</p>
 </div>
@@ -283,7 +320,11 @@ ${sem}`,
       `<h2 id="o-que-faz">O que ela faz</h2>
 <p class="lead-bloco">${esc(oQueFaz(info.slug))}</p>
 ${exemplo}
-<p class="nota">Tudo é calculado no seu navegador, com o mesmo código do app, e nada é enviado nem guardado. No app, algumas calculadoras também oferecem atalhos para guardar o que você calculou, como anotar um parcelamento ou criar uma meta. <a href="${u(ARQUIVO_CALCULADORAS)}">Ver todas as calculadoras</a>.</p>`,
+${
+  c.soNoSite(info.slug)
+    ? `<p class="nota">Tudo é calculado no seu navegador, com o mesmo código de contas do app, e nada é enviado nem guardado. Por enquanto, esta calculadora está só aqui no site. <a href="${u(ARQUIVO_CALCULADORAS)}">Ver todas as calculadoras</a>.</p>`
+    : `<p class="nota">Tudo é calculado no seu navegador, com o mesmo código do app, e nada é enviado nem guardado. No app, algumas calculadoras também oferecem atalhos para guardar o que você calculou, como anotar um parcelamento ou criar uma meta. <a href="${u(ARQUIVO_CALCULADORAS)}">Ver todas as calculadoras</a>.</p>`
+}`,
       { variante: 'alt', rotulo: 'o-que-faz' },
     ),
     bloco(aprender, { rotulo: 'aprender' }),
@@ -343,7 +384,7 @@ ${itens
   const pg = montarPagina({
     arquivo,
     titulo: c.CALC_UI.screenTitle,
-    descricao: 'Dez calculadoras para o dia a dia: parcelado ou à vista, dívidas, multa e juros, reserva e contas da casa. A conta é feita no navegador, sem enviar nada.',
+    descricao: `${c.CALCULADORAS.length} calculadoras para o dia a dia: parcelado ou à vista, dívidas, reserva, juros compostos e rendimento a um percentual do CDI. Feitas no navegador.`,
     capa,
     corpo: [...grupos, rodape].join('\n'),
     fonte: capa,
@@ -353,9 +394,9 @@ ${itens
   return { arquivo, ...pg };
 }
 
-/** Todas as páginas de Calculadoras: o índice e uma por calculadora, na ordem do app. */
+/** Todas as páginas de Calculadoras: o índice e uma por calculadora, na ordem do app (as que só o site mostra no fim do grupo delas). */
 function paginasCalculadoras(ctx) {
   return [paginaIndice(ctx), ...catalogo().CALCULADORAS.map((info) => paginaDaCalculadora(info, ctx))];
 }
 
-module.exports = { paginasCalculadoras, exemploDa, precargaDaCalculadora, scriptsDasCalculadoras, EXEMPLOS, SCRIPT_DAS_CALCULADORAS, O_QUE_FAZ, TAMBEM_FAZ, DO_GUIA };
+module.exports = { paginasCalculadoras, exemploDa, precargaDaCalculadora, scriptsDasCalculadoras, EXEMPLOS, SCRIPT_DAS_CALCULADORAS, O_QUE_FAZ, TAMBEM_FAZ, DO_GUIA, TEMAS_DAS_DO_SITE };

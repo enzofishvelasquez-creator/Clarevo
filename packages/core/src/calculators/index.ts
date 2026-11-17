@@ -14,3 +14,7 @@ export * from './reserva';
 export * from './juntar-para-objetivo';
 export * from './dividir-contas';
 export * from './links';
+// Calculadoras que, por enquanto, só o site mostra (D-106): fora de CALCULATORS, a lista da tela do app.
+export * from './juros-compostos';
+export * from './rendimento-cdi';
+export * from './site-calculators';

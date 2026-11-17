@@ -36,6 +36,9 @@ const ENTRADAS = [
   'calculators/reserva.ts',
   'calculators/juntar-para-objetivo.ts',
   'calculators/dividir-contas.ts',
+  // As duas que por enquanto só o site mostra (D-106).
+  'calculators/juros-compostos.ts',
+  'calculators/rendimento-cdi.ts',
   'dates.ts',
 ];
 
@@ -125,4 +128,48 @@ function fechoDe(raizes) {
   return [...visto].sort();
 }
 
-module.exports = { nucleo, fechoDe, ENTRADAS, PASTA };
+/**
+ * O código do núcleo que o `_worker.js` usa (D-106: `/api/indicadores`, de `packages/core/src/indicadores/servidor.ts`), num pacote só,
+ * sem import, porque o worker é um arquivo único: cada módulo do fecho vira uma função CommonJS numa lista (`__mods`), e cada import
+ * relativo vira `__req(n)`, como `scripts/gerar-funcoes.js` faz com as funções do Supabase. Sem comentários, sem tipos e sem nada que
+ * leia o relógio ou o ambiente na hora de gerar: gerar duas vezes dá os mesmos bytes. O código não é reindentado (um texto de várias linhas
+ * mudaria). Devolve uma expressão que vale o módulo da entrada.
+ */
+function pacoteDoWorker(entrada) {
+  const ts = carregarTypescript();
+  const ids = new Map();
+  const modulos = [];
+  const juntar = (arquivo) => {
+    if (ids.has(arquivo)) return ids.get(arquivo);
+    const id = ids.size;
+    ids.set(arquivo, id);
+    const { outputText } = ts.transpileModule(fs.readFileSync(arquivo, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, removeComments: true },
+      fileName: arquivo,
+    });
+    const codigo = outputText.replace(/require\("([^"]+)"\)/g, (_, especificador) => {
+      if (!especificador.startsWith('.')) throw new Error(`nucleo: ${path.relative(CORE_SRC, arquivo)} importa "${especificador}", que não cabe no worker`);
+      return `__req(${juntar(resolver(arquivo, especificador).arquivo)})`;
+    });
+    modulos[id] = { relativo: path.relative(CORE_SRC, arquivo).split(path.sep).join('/'), codigo };
+    return id;
+  };
+  juntar(path.join(CORE_SRC, entrada));
+  const corpo = modulos.map((m) => `  // packages/core/src/${m.relativo}\n  function (module, exports, __req) {\n${m.codigo.trim()}\n  }`).join(',\n');
+  return `(() => {
+const __mods = [
+${corpo}
+];
+const __cache = [];
+function __req(i) {
+  if (__cache[i]) return __cache[i].exports;
+  const module = { exports: {} };
+  __cache[i] = module;
+  __mods[i](module, module.exports, __req);
+  return module.exports;
+}
+return __req(0);
+})()`;
+}
+
+module.exports = { nucleo, fechoDe, pacoteDoWorker, ENTRADAS, PASTA };

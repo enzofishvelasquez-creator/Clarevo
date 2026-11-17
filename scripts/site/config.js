@@ -76,6 +76,9 @@ const RODAPE_COLUNAS = [
       { arquivo: 'aprender/index.html', rotulo: 'Aprender' },
       { arquivo: 'aprender/agenda.html', rotulo: 'Agenda financeira' },
       { arquivo: 'calculadoras/index.html', rotulo: 'Calculadoras' },
+      // Indicadores oficiais e glossário (D-106). O resumo semanal entra logo depois, só quando há edição (modelo.js).
+      { arquivo: 'indicadores/index.html', rotulo: 'Indicadores' },
+      { arquivo: 'indicadores/glossario.html', rotulo: 'Glossário' },
       { arquivo: 'novidades/index.html', rotulo: 'Novidades' },
       { arquivo: 'ajuda/index.html', rotulo: 'Ajuda' },
       { arquivo: 'suporte.html', rotulo: 'Suporte' },

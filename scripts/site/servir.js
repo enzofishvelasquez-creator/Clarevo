@@ -68,10 +68,14 @@ function resolverArquivo(pasta, caminho) {
   return null;
 }
 
+/** Quantos servidores este processo já subiu (para cada um carregar uma instância nova do worker). */
+let servidores = 0;
+
 /**
  * Sobe o servidor. `env`: as variáveis que o `_worker.js` recebe (nada, por padrão: as rotas de envio respondem 503). `hostDoSite`: põe em
  * `env.SITE_HOST` o endereço deste servidor (`127.0.0.1:porta`, que só se sabe depois de subir), para o worker aceitar os pedidos dele.
- * `fetchDoWorker`: o `fetch` que o worker usa para falar com Resend e Brevo (um simulado nos testes; vale no processo todo até `fechar`).
+ * `fetchDoWorker`: o `fetch` que o worker usa para falar com Resend, Brevo e o Banco Central (um simulado nos testes; vale no processo todo
+ * até `fechar`; com dois servidores de pé, feche na ordem inversa).
  * Devolve `{ url, fechar, pedidos, doWorker }`: `pedidos` são todos os pedidos (`GET /x`) e `doWorker`, só os que passaram pelo worker.
  */
 async function servir(pasta, { porta = 0, env = {}, hostDoSite = false, fetchDoWorker } = {}) {
@@ -80,8 +84,12 @@ async function servir(pasta, { porta = 0, env = {}, hostDoSite = false, fetchDoW
   const noWorker = lerRotas(pasta);
   const variaveis = { ...env };
   const arquivoDoWorker = path.join(pasta, '_worker.js');
-  // O worker é um módulo ES sem importações: entra por um endereço `data:`, sem o aviso do Node sobre pasta sem "type".
-  const worker = fs.existsSync(arquivoDoWorker) ? (await import(`data:text/javascript;base64,${fs.readFileSync(arquivoDoWorker).toString('base64')}`)).default : null;
+  // O worker é um módulo ES sem importações: entra por um endereço `data:`, sem o aviso do Node sobre pasta sem "type". Cada servidor
+  // carrega o seu, como uma instância nova do worker na Cloudflare: o comentário com o número do servidor muda o endereço, e o Node não
+  // reaproveita o módulo (nem a cópia de /api/indicadores que fica na memória dele) de um servidor anterior.
+  servidores += 1;
+  const fonteDoWorker = fs.existsSync(arquivoDoWorker) ? `${fs.readFileSync(arquivoDoWorker, 'utf8')}\n// servidor local ${servidores}\n` : null;
+  const worker = fonteDoWorker ? (await import(`data:text/javascript;base64,${Buffer.from(fonteDoWorker).toString('base64')}`)).default : null;
   const pedidos = [];
   const doWorker = [];
   const estatico = (caminho, metodo) => {
