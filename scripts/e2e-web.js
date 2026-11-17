@@ -200,7 +200,9 @@ setInterval(async () => {
   const field = (name) => p.getByLabel(name, { exact: true }).filter({ visible: true }).first();
   // Espera as transições terminarem antes de capturar.
   const shot = async (n, full=false) => { await p.waitForTimeout(450); await p.screenshot({ path: `${OUT}/${n}.png`, fullPage: full }); };
-  const waitText = (t, timeout=8000) => p.getByText(t, { exact: false }).filter({ visible: true }).first().waitFor({ timeout });
+  // "Diferença do mês" sozinho é o título do card do Resumo, que só aparece com os números carregados; sem cartão, o cartão de Aprender
+  // do fim do Resumo diz "Diferença do mês e saldo da conta" (revisão das telas, 16/11/2026) e não deve contar como o Resumo pronto.
+  const waitText = (t, timeout=8000) => p.getByText(t, { exact: t === 'Diferença do mês' }).filter({ visible: true }).first().waitFor({ timeout });
   // Texto da tela no primeiro instante em que um texto aparece (leitura contínua, sem o intervalo de espera do Playwright):
   // mostra o que a tela exibe junto com uma faixa, antes de qualquer nova leitura de dados terminar.
   const firstBodyWith = async (text, timeout = 8000) => {
@@ -5100,7 +5102,7 @@ setInterval(async () => {
   };
   // O nome acessível da aba "Movimentos" contém o rótulo visível (WCAG 2.5.3): "Movimentos do mês".
   const MOV_TAB = 'Movimentos do mês';
-  const tabLabel = (name) => (name === 'Movimentos' ? MOV_TAB : name);
+  const tabLabel = (name) => (name === 'Movimentos' ? MOV_TAB : name === 'Aprender' ? 'Aprender e dúvidas' : name);
   const tabByName = (name) => p.getByRole('tab', { name: tabLabel(name), exact: true }).filter({ visible: true }).first();
   // Estado da barra inferior: as cinco abas visíveis (D-093: Investir entre Metas e Aprender), onde terminam e qual está marcada.
   const barState = () => p.evaluate(() => {
@@ -10360,7 +10362,8 @@ setInterval(async () => {
   await famTab('Metas').click(); await waitUntil(async () => (await famSelectorCount()) === 2, 8000); await p.waitForTimeout(600);
   ok('Metas: o seletor também aparece (a pílula do contexto acompanha a escolha)', (await famSelectorCount()) === 2);
   await famTab('Ver dados de Família').click(); await p.waitForTimeout(500);
-  ok('Metas na Família: a pílula diz "Demonstração · Família"', (await body()).includes('Demonstração · Família'));
+  // Nas abas, o selo "Demonstração" fica no cabeçalho e a pílula diz só o contexto (revisão das telas, 16/11/2026).
+  ok('Metas na Família: a pílula diz "Família" (o selo "Demonstração" fica no cabeçalho)', (await p.locator('[aria-label="Espaço: Família"]').filter({ visible: true }).count()) === 1 && !(await body()).includes('Demonstração · Família'));
   await famTab('Resumo').click(); await waitText('Diferença do mês'); await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(400);
 
   // ---- 3b. Um item da Família aberto com o seletor em Pessoal usa as contas e o "Salvando em" DO ITEM ----
