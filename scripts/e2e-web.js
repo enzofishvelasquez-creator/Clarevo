@@ -825,7 +825,8 @@ setInterval(async () => {
   const movFirst = await p.evaluate(() => {
     for (const e of document.querySelectorAll('div')) if (e.scrollTop > 0) e.scrollTop = 0;
     const vis = (e) => e.getBoundingClientRect().width > 0;
-    const bar = [...document.querySelectorAll('[role=tablist]')].find(vis);
+    // A barra de abas na web não tem o papel tablist: o topo das abas (role=tab) marca onde ela começa.
+    const bar = [...document.querySelectorAll('[role=tab]')].find(vis);
     const row = [...document.querySelectorAll('[role=button]')].find((e) => vis(e) && /, (Pago|Recebido) · \d{2}\/\d{2}\/\d{4}/.test(e.getAttribute('aria-label') || ''));
     return row && bar ? { row: Math.round(row.getBoundingClientRect().bottom), bar: Math.round(bar.getBoundingClientRect().top), h: window.innerHeight } : null;
   });
@@ -1699,10 +1700,10 @@ setInterval(async () => {
   t = await body();
   ok('vencidas: as 2 parcelas sob o cabeçalho do ano, com "Selecionar as 2" e "Não houve em 2026"',
     (await visibleCount('heading', 'Material escolar de 2026 · 2 parcelas vencidas')) === 1 && (await visibleCount('button', 'Selecionar as 2 parcelas de Material escolar de 2026')) === 1 &&
-      (await visibleCount('button', 'Não houve Material escolar em 2026')) === 1 && t.includes('Venceu em 05/09 · Parcela 1 de 2 de 2026 · R$ 150,00') && t.includes('Venceu em 05/10 · Parcela 2 de 2 de 2026 · R$ 150,00'));
+      (await visibleCount('button', 'Não houve em 2026, Material escolar')) === 1 && t.includes('Venceu em 05/09 · Parcela 1 de 2 de 2026 · R$ 150,00') && t.includes('Venceu em 05/10 · Parcela 2 de 2 de 2026 · R$ 150,00'));
   await shot('48_vencidas_conta_do_ano');
   await widthChecks('vencidas com grupo do ano', '48_vencidas_conta_do_ano_320px');
-  await btn('Não houve Material escolar em 2026').click(); await waitText('Tirar as 2 parcelas de 2026?');
+  await btn('Não houve em 2026, Material escolar').click(); await waitText('Tirar as 2 parcelas de 2026?');
   t = await dialogText();
   ok('"Não houve em 2026" nas vencidas: as 2 parcelas, o total e o que continua', t.includes('Material escolar de 2026 · 2 parcelas · R$ 300,00') && t.includes('Elas saem de Contas a pagar e não voltam a ser criadas. A conta do ano continua em 2027.'));
   await confirmIn('Tirar parcelas'); await waitText('2 parcelas de 2026 saíram de Contas a pagar.');
