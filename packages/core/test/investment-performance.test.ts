@@ -14,6 +14,7 @@ import {
   ownWindow,
   performanceIndicesFrom,
   performancePeriodStart,
+  performanceRateLine,
   windowReturn,
   type InvestmentMovementKind,
   type MarketIndices,
@@ -184,5 +185,21 @@ describe('D-103 item 8: textos', () => {
       expect(t, t).not.toMatch(new RegExp(['faz(er|endo)?', 'sentido'].join('\\s+'), 'i'));
       expect(t, t).not.toMatch(/\b(nós|calculamos|melhor|pior|ibovespa|ifix|ranking|recomend)/i);
     }
+  });
+});
+
+describe('Desempenho: a taxa da ficha como referência (revisão de 17/11/2026)', () => {
+  it('com a taxa que muda numa data, o texto da ficha com a taxa que vale hoje (antes, só a taxa contratada)', () => {
+    const step = { indexKind: 'cdi' as const, rateBp: 12000, rateUntil: '2027-03-31', rateAfterBp: 10000 };
+    expect(performanceRateLine(step, TODAY)).toBe('Taxa registrada na ficha: 120% do CDI até 31/03/2027, depois 100% do CDI.');
+    expect(performanceRateLine(step, '2027-04-01')).toBe('Taxa registrada na ficha: 100% do CDI desde 01/04/2027 (antes, 120% do CDI até 31/03/2027).');
+    expect(performanceRateLine({ ...step, rateUntil: '2026-09-30' }, TODAY)).toContain('100% do CDI desde 01/10/2026');
+  });
+
+  it('sem data de fim, a taxa de sempre; variável diz que não há taxa; sem taxa, nada', () => {
+    expect(performanceRateLine({ indexKind: 'cdi', rateBp: 11000, rateUntil: null, rateAfterBp: null }, TODAY)).toBe('Taxa registrada na ficha: 110% do CDI.');
+    expect(performanceRateLine({ indexKind: 'variavel', rateBp: null, rateUntil: null, rateAfterBp: null }, TODAY)).toBe(PERFORMANCE_TEXT.variable);
+    expect(performanceRateLine({ indexKind: null, rateBp: null, rateUntil: null, rateAfterBp: null }, TODAY)).toBeNull();
+    expect(performanceRateLine({ indexKind: 'cdi', rateBp: null, rateUntil: null, rateAfterBp: null }, TODAY)).toBeNull();
   });
 });

@@ -16222,10 +16222,10 @@ setInterval(async () => {
     // Desempenho: o card azul abre a comparação; cada investimento no próprio período, com o selo de estimativa.
     await p.getByRole('button', { name: /\. Ver desempenho$/ }).filter({ visible: true }).first().click(); await waitText('Comparar com CDI, IPCA e poupança'); await p.waitForTimeout(600);
     t = await body(); investTexts.push(t);
-    ok('D-103 Desempenho: título, selo de estimativa, os três períodos com "Em 12 meses" escolhido, e cada investimento no próprio período com a taxa da ficha, CDI, IPCA e poupança',
+    ok('D-103 Desempenho: título, selo de estimativa, os três períodos com "Em 12 meses" escolhido, e cada investimento no próprio período com a taxa da ficha (com a data de fim, revisão de 17/11), CDI, IPCA e poupança',
       (await h1Name()) === 'Desempenho' && (await visibleCount('img', /^Estimativa/)) + (await p.getByLabel(/^Estimativa: feita com os valores/).filter({ visible: true }).count()) >= 1 &&
         (await radio('Em 12 meses').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'No mês')) === 1 && (await visibleCount('radio', 'Desde o início')) === 1 &&
-        t.includes('De 01/06/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +3,75%, cerca de 99% do CDI.') && t.includes('Taxa registrada na ficha: 105% do CDI.') &&
+        t.includes('De 01/06/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +3,75%, cerca de 99% do CDI.') && t.includes('Taxa registrada na ficha: 105% do CDI até 31/03/2027, depois 100% do CDI.') &&
         t.includes('CDI no mesmo intervalo: +3,78%') && t.includes('IPCA no mesmo intervalo: +1,46%') && t.includes('Poupança no mesmo intervalo: +2,51%') && t.includes('Acima da inflação no período: +2,26%') &&
         t.includes('De 01/08/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +1,60%, cerca de 83% do CDI.') &&
         t.includes('Rende de forma variável, sem taxa combinada na ficha.') && t.includes('A Clarevo não junta tudo numa porcentagem só') && t.includes('(1 + rendimento) ÷ (1 + IPCA) − 1') &&

@@ -6,7 +6,7 @@ import {
   PERFORMANCE_TEXT,
   compareInvestment,
   performanceIndicesFrom,
-  rateSummary,
+  performanceRateLine,
   type Investment,
   type InvestmentMovement,
   type MarketIndices,
@@ -144,9 +144,8 @@ function ComparisonBlock({
 }) {
   const { today } = useSession();
   const c = compareInvestment(movements, period, indices, today);
-  // A taxa da ficha como referência; "variável" não tem taxa e diz isso.
-  const summary = rateSummary(i.indexKind, i.rateBp);
-  const contracted = i.indexKind === 'variavel' ? T.variable : summary ? T.contracted(summary) : null;
+  // A taxa da ficha como referência, com a taxa que muda numa data (a que vale hoje); "variável" não tem taxa e diz isso.
+  const contracted = performanceRateLine(i, today);
   return (
     <View style={[styles.block, !first && styles.divider]}>
       <Txt variant="label" accessibilityRole="header" aria-level={3} style={{ fontFamily: fonts.bold, fontSize: 16 }}>

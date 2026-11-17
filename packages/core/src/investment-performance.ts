@@ -1,5 +1,6 @@
 import type { IsoDate, IsoMonth } from './dates';
 import { addDays, addMonths, addMonthsToDate, daysBetween, formatDateBR, formatMonthYearBR, monthOf, monthsBetween } from './dates';
+import { rateSummaryWithStep, type InvestmentDetails } from './investment-details';
 import { REAL_GAIN_TEXT, isMarketBusinessDay, marketBusinessDaysInMonth, realRate } from './investment-insights';
 import type { InvestmentMovement, MarketIndices } from './investments';
 import { BCB_SERIES, INVESTMENT_TEXT, investmentValueOn } from './investments';
@@ -171,6 +172,16 @@ export function performanceIndicesFrom(groups: readonly (readonly MovementLike[]
 }
 
 const pct = (fraction: number) => INVESTMENT_TEXT.percent(fraction);
+
+/**
+ * A linha da taxa da ficha em cada investimento do Desempenho, como referência: "variável" diz que não há taxa; com a taxa que muda numa
+ * data (D-104, item 13), o mesmo texto da ficha (`rateSummaryWithStep`), com a taxa que vale hoje; sem taxa registrada, nada (null).
+ */
+export function performanceRateLine(inv: Pick<InvestmentDetails, 'indexKind' | 'rateBp' | 'rateUntil' | 'rateAfterBp'>, today: IsoDate): string | null {
+  if (inv.indexKind === 'variavel') return PERFORMANCE_TEXT.variable;
+  const summary = rateSummaryWithStep(inv, today);
+  return summary ? PERFORMANCE_TEXT.contracted(summary) : null;
+}
 
 export const PERFORMANCE_TEXT = {
   title: 'Desempenho',
