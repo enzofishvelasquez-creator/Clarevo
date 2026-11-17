@@ -7139,7 +7139,9 @@ setInterval(async () => {
   ok('G1 nada de exemplo na conta nova: nenhuma conta além da criada agora e nenhum gasto na Carteira', (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-');
 
   const g1Vetoed = g1Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
-  ok('G1 telas das contas: nenhum termo proibido, travessão, "fazer sentido" nem nome de banco ou produto', g1Texts.length >= 12 && g1Vetoed.length === 0 && g1Texts.every((x) => !/[–—]/.test(x) && !/nubank|ita[uú]\b|bradesco|santander|caixa econ|picpay|\bxp\b|btg|poupan[cç]a|investiment/i.test(x)), `${g1Texts.length} telas ${g1Vetoed.join(' | ')}`);
+  // D-107: Registrar recebimento traz a opção "Rendimento de investimento" (ligar ao investimento cadastrado), que não é nome de produto.
+  const g1Own = (x) => x.replace(/Rendimento de investimento|Liga este recebimento a um investimento cadastrado no espaço Pessoal\./g, '');
+  ok('G1 telas das contas: nenhum termo proibido, travessão, "fazer sentido" nem nome de banco ou produto', g1Texts.length >= 12 && g1Vetoed.length === 0 && g1Texts.every((x) => !/[–—]/.test(x) && !/nubank|ita[uú]\b|bradesco|santander|caixa econ|picpay|\bxp\b|btg|poupan[cç]a|investiment/i.test(g1Own(x))), `${g1Texts.length} telas ${g1Vetoed.join(' | ')}`);
   ok('G1 nenhuma escrita direta na rede: as contas gravam só pelas funções (nenhum PATCH, PUT ou DELETE de rede em contas)', !writes.slice(g1WritesBefore).some((w) => /financial_accounts/.test(w)));
   await goResumo().catch(() => {});
 
