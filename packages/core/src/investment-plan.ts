@@ -105,7 +105,8 @@ export function validateInvestmentPlanText(text: string): { ok: true; cents: Cen
 
 export const INVESTMENT_GOAL_TEXT = {
   formLabel: 'Para que é este dinheiro? (opcional)',
-  formHint: 'Ligar a uma meta é só informação: a meta continua com o valor que você registrou nela.',
+  /** Desde a origem do valor da meta (D-099, item 13 fase 2), a meta pode usar o valor dos investimentos ligados (D-104, 17/11/2026). */
+  formHint: 'O investimento aparece na meta. Na meta, você escolhe de onde vem o valor guardado: do que registra nela ou do valor dos investimentos ligados.',
   noGoal: 'Sem meta',
   /** Linha da ficha: "Para: Viagem". */
   fichaLine: (goalName: string) => `Para: ${goalName}`,

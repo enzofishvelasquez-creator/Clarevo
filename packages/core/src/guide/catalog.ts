@@ -593,6 +593,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       '/investimento/[id]/editar',
       '/investimento/[id]/movimento',
       '/investimento/declaracao',
+      '/investimento/lembrete',
       '/investimento/comparar',
       '/investimento/plano',
       '/investimento/desempenho',

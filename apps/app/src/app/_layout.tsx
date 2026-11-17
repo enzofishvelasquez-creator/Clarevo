@@ -364,6 +364,8 @@ function Navigation() {
           <Stack.Screen name="investimento/novo" />
           {/* Resumo para a declaração (D-099): rota estática, com precedência sobre /investimento/[id]. */}
           <Stack.Screen name="investimento/declaracao" />
+          {/* Lembrete dos investimentos (D-104, item 6): aberto pelo aviso do celular; rota estática, como a declaração. */}
+          <Stack.Screen name="investimento/lembrete" />
           <Stack.Screen name="investimento/comparar" />
           {/* Desempenho (D-103): aberto pelo card azul da aba Investir. */}
           <Stack.Screen name="investimento/desempenho" />

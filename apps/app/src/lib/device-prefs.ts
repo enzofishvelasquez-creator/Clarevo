@@ -13,7 +13,9 @@ import {
   isReminderHour,
   isRoutineReminderHour,
   parseRoutineReminderChoices,
+  parseInvestmentReminderHolds,
   type CategoryView,
+  type InvestmentReminderHolds,
   type ImportMemory,
   type ReminderHour,
   type RoutineReminderChoices,
@@ -118,6 +120,11 @@ export interface DevicePrefs {
    * "Agora não" ou "Concluir revisão". Só neste aparelho; nada vai para o servidor. Vazio: vale a data da meta ativa mais antiga.
    */
   goalsReviewNextOn: string | null;
+  /**
+   * Adiar e pausar os lembretes dos investimentos (D-104, item 6), por tipo: a data até quando cada um está adiado ou pausado. Só neste
+   * aparelho, como os interruptores dos lembretes; não é dado financeiro e nada vai para o servidor. Passa sozinho na data.
+   */
+  investmentReminderHolds: InvestmentReminderHolds;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -145,6 +152,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   investmentPlanReviewedOn: null,
   investmentPlanReviewDismissedOn: null,
   goalsReviewNextOn: null,
+  investmentReminderHolds: {},
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -188,6 +196,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       investmentPlanReviewedOn: isDay(v.investmentPlanReviewedOn) ? v.investmentPlanReviewedOn : null,
       investmentPlanReviewDismissedOn: isDay(v.investmentPlanReviewDismissedOn) ? v.investmentPlanReviewDismissedOn : null,
       goalsReviewNextOn: typeof v.goalsReviewNextOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.goalsReviewNextOn) ? v.goalsReviewNextOn : null,
+      investmentReminderHolds: parseInvestmentReminderHolds(v.investmentReminderHolds),
     };
   } catch {
     return DEFAULT_PREFS;

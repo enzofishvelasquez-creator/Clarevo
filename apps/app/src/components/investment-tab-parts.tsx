@@ -3,7 +3,7 @@ import {
   INVESTMENT_TEMPLATES,
   INVESTMENT_TEMPLATE_TEXT,
   PERFORMANCE_TEXT,
-  VALUE_DATE_TEXT,
+  TAB_VALUE_DATE_TEXT,
   howCalculatedLines,
   type InvestmentTemplate,
   type PortfolioTotals,
@@ -110,8 +110,8 @@ export function InvestmentTemplates() {
 export function StaleValuesNotice({ partial, onRetry }: { partial: boolean; onRetry: () => void }) {
   return (
     <Banner tone="info">
-      <Txt variant="label">{partial ? VALUE_DATE_TEXT.partial : VALUE_DATE_TEXT.stale}</Txt>
-      <Button label={VALUE_DATE_TEXT.retry} tone="ghost" compact onPress={onRetry} />
+      <Txt variant="label">{partial ? TAB_VALUE_DATE_TEXT.partial : TAB_VALUE_DATE_TEXT.stale}</Txt>
+      <Button label={TAB_VALUE_DATE_TEXT.retry} tone="ghost" compact onPress={onRetry} />
     </Banner>
   );
 }

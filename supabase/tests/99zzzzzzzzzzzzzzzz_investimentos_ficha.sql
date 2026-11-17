@@ -32,7 +32,9 @@ do $$ begin
   assert (select array_agg(attname order by attnum) from pg_attribute where attrelid = 'public.investment_items'::regclass and attnum > 0 and not attisdropped)
        = array['id', 'context_id', 'name', 'kind', 'status', 'created_by', 'version', 'created_at', 'updated_at', 'deposits_cents', 'withdrawals_cents',
                'income_cents', 'value_cents', 'last_value_on', 'first_movement_on', 'subkind', 'institution', 'index_kind', 'rate_bp', 'maturity_on',
-               'liquidity', 'liquidity_on', 'liquidity_days', 'goal_id', 'quantity_micro', 'fund_cnpj']::name[], 'a visão com a ficha no fim (e a meta ligada, 0036, a quantidade e o CNPJ, 0037)';
+               'liquidity', 'liquidity_on', 'liquidity_days', 'goal_id', 'quantity_micro', 'fund_cnpj',
+               'rate_until', 'rate_after_bp', 'rate_condition', 'description']::name[],
+    'a visão com a ficha no fim (e a meta ligada, 0036, a quantidade e o CNPJ, 0037, a taxa com data de fim, a condição e a descrição, 0039)';
   assert (select reloptions from pg_class where oid = 'public.investment_items'::regclass) @> array['security_invoker=true'], 'a visão com a RLS de quem consulta';
   assert has_table_privilege('authenticated', 'public.investment_items', 'select') and not has_table_privilege('anon', 'public.investment_items', 'select'), 'leitura';
   assert has_function_privilege('authenticated', 'public.create_investment(text, uuid, text, text, bigint, date, bigint, jsonb)', 'execute')

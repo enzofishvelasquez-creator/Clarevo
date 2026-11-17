@@ -6,9 +6,13 @@ import {
   ROUTINE_REMINDER_KINDS,
   ROUTINE_REMINDER_TEXT,
   WIDGET_TEXT,
+  INVESTMENT_REMINDER_TEXT,
   anyRoutineReminder,
+  isInvestmentReminderKind,
+  reminderHoldState,
   reminderHourA11y,
   reminderHourLabel,
+  resumeReminder,
 } from '@clarevo/core';
 import { BellOff, Settings } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -51,6 +55,7 @@ function SectionTitle({ children }: { children: string }) {
  */
 export function RemindersCard() {
   const { userId, persist, prefs, demo } = useDeviceSettings();
+  const { today } = useSession();
   const [permission, setPermission] = useState<NotificationPermission | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -111,16 +116,35 @@ export function RemindersCard() {
         </Txt>
         <Txt color={colors.textSecondary}>{ROUTINE_REMINDER_TEXT.intro}</Txt>
       </View>
-      {ROUTINE_REMINDER_KINDS.map((k) => (
-        <SettingSwitch
-          key={k}
-          label={ROUTINE_REMINDER_TEXT.kinds[k].toggle}
-          caption={ROUTINE_REMINDER_TEXT.kinds[k].caption}
-          value={prefs.routineReminders[k]}
-          disabled={busy}
-          onChange={(v) => toggle(k, v)}
-        />
-      ))}
+      {ROUTINE_REMINDER_KINDS.map((k) => {
+        // Investimentos (D-104, item 6): adiado ou pausado pela tela do lembrete, com o caminho para retomar.
+        const hold = isInvestmentReminderKind(k) && prefs.routineReminders[k] ? reminderHoldState(prefs.investmentReminderHolds, k, today) : null;
+        const holdLine = hold ? INVESTMENT_REMINDER_TEXT.settingsState(hold) : null;
+        return (
+          <View key={k} style={{ gap: space[1] }}>
+            <SettingSwitch
+              label={ROUTINE_REMINDER_TEXT.kinds[k].toggle}
+              caption={ROUTINE_REMINDER_TEXT.kinds[k].caption}
+              value={prefs.routineReminders[k]}
+              disabled={busy}
+              onChange={(v) => toggle(k, v)}
+            />
+            {holdLine && isInvestmentReminderKind(k) ? (
+              <View style={{ gap: space[1] }}>
+                <Txt variant="caption" color={colors.textSecondary}>
+                  {holdLine}
+                </Txt>
+                <Button
+                  label={INVESTMENT_REMINDER_TEXT.resume}
+                  tone="ghost"
+                  compact
+                  onPress={() => updatePrefs(userId, { investmentReminderHolds: resumeReminder(prefs.investmentReminderHolds, k) }, persist)}
+                />
+              </View>
+            ) : null}
+          </View>
+        );
+      })}
       {prefs.routineReminders.aporte || prefs.routineReminders.aporte_investimentos ? (
         <ChoiceGroup label={ROUTINE_REMINDER_TEXT.depositDayLabel}>
           {DEPOSIT_REMINDER_DAYS.map((d) => (

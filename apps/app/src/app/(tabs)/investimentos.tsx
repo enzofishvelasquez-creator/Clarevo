@@ -3,7 +3,7 @@ import {
   HOW_CALC_TEXT,
   INVESTMENT_TEXT,
   PERFORMANCE_TEXT,
-  VALUE_DATE_TEXT,
+  TAB_VALUE_DATE_TEXT,
   formatBRL,
   gainOverInvested,
   investmentGain,
@@ -179,7 +179,7 @@ function Summary({ active, onHow }: { active: readonly Investment[]; onHow: () =
           {formatBRL(t.valueCents)}
         </MoneyTxt>
         <Txt variant="caption" color={colors.textOnBrandSoft}>
-          {VALUE_DATE_TEXT.card(dates)}
+          {TAB_VALUE_DATE_TEXT.card(dates)}
         </Txt>
         <InvestmentTotalsLines depositsCents={t.depositsCents} withdrawalsCents={t.withdrawalsCents} incomeCents={t.incomeCents} gainCents={t.gainCents} onBrand />
         {shareText ? (
@@ -196,7 +196,7 @@ function Summary({ active, onHow }: { active: readonly Investment[]; onHow: () =
       </Pressable>
       {dates.notThisMonth.length > 0 ? (
         <Txt variant="caption" color={colors.textOnBrandSoft}>
-          {VALUE_DATE_TEXT.notThisMonth(dates.notThisMonth)}
+          {TAB_VALUE_DATE_TEXT.notThisMonth(dates.notThisMonth)}
         </Txt>
       ) : null}
       <View style={styles.sep} />
@@ -242,7 +242,7 @@ function InvestmentCard({ investment: i, movements }: { investment: Investment; 
         {T.gain(gain)}
       </MoneyTxt>
       <Txt variant="caption" color={colors.textSecondary}>
-        {VALUE_DATE_TEXT.row(stamp)}
+        {TAB_VALUE_DATE_TEXT.row(stamp)}
       </Txt>
     </Pressable>
   );

@@ -17,6 +17,8 @@ import {
   INCOME_KIND_LABEL,
   INCOME_TEXT,
   INVESTMENT_INCOME_KINDS,
+  MOVEMENT_GOAL_TEXT,
+  asksGoalOnMovement,
   type Investment,
   type InvestmentIncomeKind,
   type InvestmentMovement,
@@ -37,7 +39,7 @@ import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
-import { useInvalidateInvestments, useInvestment, useInvestmentMovements } from '@/state/data';
+import { useAddGoalMovement, useGoals, useInvalidateInvestments, useInvestment, useInvestmentMovements } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -47,7 +49,9 @@ const KINDS: readonly InvestmentMovementKind[] = ['aporte', 'resgate', 'rendimen
 /**
  * Movimento de um investimento (D-093): /investimento/<id>/movimento?tipo=aporte|resgate|rendimento|valor para registrar, ou
  * ?movimento=<id> para alterar ou excluir. Antes de enviar, confere o saldo dia a dia (I1), como o banco. No rendimento recebido, o tipo
- * (juros ou cupom, dividendos, JCP, rendimento de FII ou outro, D-099) alimenta os proventos e o resumo para a declaração.
+ * (juros ou cupom, dividendos, JCP, rendimento de FII ou outro, D-099) alimenta os proventos e o resumo para a declaração. D-104, item 10:
+ * no rendimento novo e no resgate novo com data no vencimento ou depois, "Somar a uma meta?", sem nada marcado; com uma meta escolhida, o
+ * aporte na meta sai pelo mesmo caminho dos aportes de meta (add_goal_movement), depois do movimento do investimento.
  */
 export default function InvestimentoMovimentoScreen() {
   const { id, tipo, movimento } = useLocalSearchParams<{ id: string; tipo?: string; movimento?: string }>();
@@ -113,7 +117,16 @@ function MovementForm({
   const [deleteKey] = useState(() => newOperationKey());
   const amountRef = useRef<TextInput>(null);
   const dateRef = useRef<TextInput>(null);
-  const dirty = amountText !== first.amountText || dateText !== first.dateText || note !== first.note || incomeKind !== first.incomeKind;
+  // "Somar a uma meta?" (D-104, item 10): só as metas ativas do Pessoal que guardam pelos registros (a que lê o valor dos investimentos não
+  // conta aportes); nenhuma vem marcada.
+  const goalsQ = useGoals(investment.contextId);
+  const addGoalMovement = useAddGoalMovement();
+  const [goalKey] = useState(() => newOperationKey());
+  const [goalId, setGoalId] = useState<string | null>(null);
+  const goalOptions = (goalsQ.data ?? []).filter((g) => g.status === 'ativa' && g.valueSource !== 'investimentos');
+  const asksGoal = asksGoalOnMovement(kind, existing !== null, investment.maturityOn, parseDateBR(dateText)) && goalOptions.length > 0;
+  const chosenGoal = asksGoal && goalId ? (goalOptions.find((g) => g.id === goalId) ?? null) : null;
+  const dirty = amountText !== first.amountText || dateText !== first.dateText || note !== first.note || incomeKind !== first.incomeKind || goalId !== null;
   const guard = useLeaveGuard(dirty && !busy, `/investimento/${investment.id}`);
   const closed = investment.status !== 'ativo';
   const back = () => guard.leave(() => (router.canGoBack() ? router.back() : router.replace(`/investimento/${investment.id}`)));
@@ -168,7 +181,22 @@ function MovementForm({
       if (existing) await repo.updateInvestmentMovement(key, existing.id, existing.version, input);
       else await repo.addInvestmentMovement(key, investment.id, kind, input);
       invalidate();
-      flash.set(existing ? M.updated : texts.saved);
+      let message: string = existing ? M.updated : texts.saved;
+      if (chosenGoal && (kind === 'rendimento' || kind === 'resgate')) {
+        try {
+          await addGoalMovement.mutateAsync({
+            key: goalKey,
+            goalId: chosenGoal.id,
+            kind: 'aporte',
+            input: { amountCents: amountCents!, occurredOn: occurredOn!, note: MOVEMENT_GOAL_TEXT.note(kind, investment.name) },
+          });
+          message = MOVEMENT_GOAL_TEXT.saved(message, amountCents!, chosenGoal.name);
+        } catch {
+          // O movimento do investimento já foi gravado: o aporte na meta fica para a tela da meta.
+          message = MOVEMENT_GOAL_TEXT.failed(message, chosenGoal.name);
+        }
+      }
+      flash.set(message);
       back();
     } catch (e) {
       fail(e);
@@ -252,6 +280,13 @@ function MovementForm({
             </Txt>
           ) : null}
           <TextField label={M.noteLabel} value={note} maxLength={INVESTMENT_NOTE_MAX} onChangeText={setNote} error={errors.note} />
+          {asksGoal ? (
+            <ChoiceGroup label={MOVEMENT_GOAL_TEXT.label} hint={MOVEMENT_GOAL_TEXT.hint}>
+              {goalOptions.map((g) => (
+                <Chip key={g.id} label={g.name} selected={goalId === g.id} onPress={() => setGoalId(goalId === g.id ? null : g.id)} />
+              ))}
+            </ChoiceGroup>
+          ) : null}
         </Card>
         {existing && !closed ? <Button label={M.delete} icon={Trash2} tone="ghost" onPress={() => setConfirmDelete(true)} /> : null}
       </Screen>

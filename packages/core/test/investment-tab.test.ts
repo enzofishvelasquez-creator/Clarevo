@@ -12,7 +12,7 @@ import {
   PLAN_REVIEW_MONTHS,
   PLAN_REVIEW_TEXT,
   TAB_ALLOCATION_ORDER,
-  VALUE_DATE_TEXT,
+  TAB_VALUE_DATE_TEXT,
   VALUE_SOURCE_NOTE,
   createDemoRepository,
   fgcByInstitutionKey,
@@ -70,14 +70,14 @@ const checkCopy = (t: string) => {
 
 describe('D-103 item 1: de quando é cada valor', () => {
   it('a observação de "Usar este valor" diz a origem; qualquer outra (ou nenhuma) conta como digitada', () => {
-    expect(VALUE_SOURCE_NOTE.treasury('2026-11-14')).toBe('Preço do Tesouro Nacional de 14/11/2026');
-    expect(VALUE_SOURCE_NOTE.fund('2026-11-13')).toBe('Cota do fundo de 13/11/2026');
+    expect(VALUE_SOURCE_NOTE.treasury('2026-11-14')).toBe('Pelo preço do Tesouro Nacional de 14/11/2026');
+    expect(VALUE_SOURCE_NOTE.fund('2026-11-13')).toBe('Pela cota do fundo de 13/11/2026');
     expect(valueSourceFromNote(VALUE_SOURCE_NOTE.treasury('2026-11-14'))).toEqual({ kind: 'tesouro', on: '2026-11-14' });
     expect(valueSourceFromNote(` ${VALUE_SOURCE_NOTE.fund('2026-11-13')} `)).toEqual({ kind: 'cota', on: '2026-11-13' });
-    expect(valueSourceFromNote(VALUE_SOURCE_NOTE.rate)).toEqual({ kind: 'taxa' });
-    for (const other of [null, undefined, '', 'Extrato do banco', 'Preço do Tesouro Nacional de 31/02/2026', 'Cota do fundo de ontem'])
+    expect(valueSourceFromNote(VALUE_SOURCE_NOTE.rate())).toEqual({ kind: 'taxa' });
+    for (const other of [null, undefined, '', 'Extrato do banco', 'Pelo preço do Tesouro Nacional de 31/02/2026', 'Pela cota do fundo de ontem'])
       expect(valueSourceFromNote(other), String(other)).toEqual({ kind: 'extrato' });
-    for (const note of [VALUE_SOURCE_NOTE.treasury('2026-11-14'), VALUE_SOURCE_NOTE.fund('2026-11-13'), VALUE_SOURCE_NOTE.rate]) expect(note.length).toBeLessThanOrEqual(80);
+    for (const note of [VALUE_SOURCE_NOTE.treasury('2026-11-14'), VALUE_SOURCE_NOTE.fund('2026-11-13'), VALUE_SOURCE_NOTE.rate()]) expect(note.length).toBeLessThanOrEqual(80);
   });
 
   it('a última atualização até hoje (no mesmo dia, a criada por último), e os aportes e resgates depois dela', () => {
@@ -96,16 +96,16 @@ describe('D-103 item 1: de quando é cada valor', () => {
 
   it('linha da lista: atualizado por você, pelo preço do título, pela cota ou pela taxa, com o que veio depois', () => {
     const base = { on: '2026-11-12', source: { kind: 'extrato' as const }, depositsAfter: false, withdrawalsAfter: false };
-    expect(VALUE_DATE_TEXT.row({ ...base, on: null })).toBe('Sem atualização do extrato: mostra o que foi aplicado.');
-    expect(VALUE_DATE_TEXT.row(base)).toBe('Atualizado por você em 12/11/2026.');
-    expect(VALUE_DATE_TEXT.row({ ...base, depositsAfter: true })).toBe('Atualizado por você em 12/11/2026, mais os aportes depois dessa data.');
-    expect(VALUE_DATE_TEXT.row({ ...base, withdrawalsAfter: true })).toBe('Atualizado por você em 12/11/2026, menos os resgates depois dessa data.');
-    expect(VALUE_DATE_TEXT.row({ ...base, depositsAfter: true, withdrawalsAfter: true })).toBe(
+    expect(TAB_VALUE_DATE_TEXT.row({ ...base, on: null })).toBe('Sem atualização do extrato: mostra o que foi aplicado.');
+    expect(TAB_VALUE_DATE_TEXT.row(base)).toBe('Atualizado por você em 12/11/2026.');
+    expect(TAB_VALUE_DATE_TEXT.row({ ...base, depositsAfter: true })).toBe('Atualizado por você em 12/11/2026, mais os aportes depois dessa data.');
+    expect(TAB_VALUE_DATE_TEXT.row({ ...base, withdrawalsAfter: true })).toBe('Atualizado por você em 12/11/2026, menos os resgates depois dessa data.');
+    expect(TAB_VALUE_DATE_TEXT.row({ ...base, depositsAfter: true, withdrawalsAfter: true })).toBe(
       'Atualizado por você em 12/11/2026, mais os aportes e menos os resgates depois dessa data.',
     );
-    expect(VALUE_DATE_TEXT.row({ ...base, source: { kind: 'tesouro', on: '2026-11-11' } })).toBe('Valor de 12/11/2026, pelo preço do Tesouro Nacional de 11/11/2026.');
-    expect(VALUE_DATE_TEXT.row({ ...base, source: { kind: 'cota', on: '2026-11-10' } })).toBe('Valor de 12/11/2026, pela cota do fundo de 10/11/2026.');
-    expect(VALUE_DATE_TEXT.row({ ...base, source: { kind: 'taxa' } })).toBe('Valor de 12/11/2026, pela taxa contratada.');
+    expect(TAB_VALUE_DATE_TEXT.row({ ...base, source: { kind: 'tesouro', on: '2026-11-11' } })).toBe('Valor de 12/11/2026, pelo preço do Tesouro Nacional de 11/11/2026.');
+    expect(TAB_VALUE_DATE_TEXT.row({ ...base, source: { kind: 'cota', on: '2026-11-10' } })).toBe('Valor de 12/11/2026, pela cota do fundo de 10/11/2026.');
+    expect(TAB_VALUE_DATE_TEXT.row({ ...base, source: { kind: 'taxa' } })).toBe('Valor de 12/11/2026, pela taxa contratada.');
   });
 
   it('card azul: o intervalo das datas dos ativos e quem não tem atualização no mês de hoje', () => {
@@ -117,11 +117,11 @@ describe('D-103 item 1: de quando é cada valor', () => {
     ];
     const d = portfolioValueDates(items, TODAY);
     expect(d).toEqual({ from: '2026-10-31', to: '2026-11-12', notThisMonth: ['Previdência', 'Ações'] });
-    expect(VALUE_DATE_TEXT.card(d)).toBe('Valores de 31/10 a 12/11/2026, como você registrou.');
-    expect(VALUE_DATE_TEXT.notThisMonth(d.notThisMonth)).toBe('Sem atualização neste mês: Previdência e Ações.');
-    expect(VALUE_DATE_TEXT.card({ from: '2025-12-30', to: '2026-01-05', notThisMonth: [] })).toBe('Valores de 30/12/2025 a 05/01/2026, como você registrou.');
-    expect(VALUE_DATE_TEXT.card({ from: '2026-11-12', to: '2026-11-12', notThisMonth: [] })).toBe('Valores de 12/11/2026, como você registrou.');
-    expect(VALUE_DATE_TEXT.card(portfolioValueDates([inv({ id: 'x' })], TODAY))).toBe('Nenhum valor atualizado ainda: o total é o que foi aplicado.');
+    expect(TAB_VALUE_DATE_TEXT.card(d)).toBe('Valores de 31/10 a 12/11/2026, como você registrou.');
+    expect(TAB_VALUE_DATE_TEXT.notThisMonth(d.notThisMonth)).toBe('Sem atualização neste mês: Previdência e Ações.');
+    expect(TAB_VALUE_DATE_TEXT.card({ from: '2025-12-30', to: '2026-01-05', notThisMonth: [] })).toBe('Valores de 30/12/2025 a 05/01/2026, como você registrou.');
+    expect(TAB_VALUE_DATE_TEXT.card({ from: '2026-11-12', to: '2026-11-12', notThisMonth: [] })).toBe('Valores de 12/11/2026, como você registrou.');
+    expect(TAB_VALUE_DATE_TEXT.card(portfolioValueDates([inv({ id: 'x' })], TODAY))).toBe('Nenhum valor atualizado ainda: o total é o que foi aplicado.');
   });
 
   it('na demonstração: as duas atualizadas por você em 06/10/2026', async () => {
@@ -129,8 +129,8 @@ describe('D-103 item 1: de quando é cada valor', () => {
     const ctx = (await repo.getSpace())!.personalContextId;
     const list = await repo.listInvestments(ctx);
     const movements = await repo.listContextInvestmentMovements(ctx);
-    for (const i of list) expect(VALUE_DATE_TEXT.row(investmentValueStamp(movements.filter((m) => m.investmentId === i.id), DEMO_TODAY))).toBe('Atualizado por você em 06/10/2026.');
-    expect(VALUE_DATE_TEXT.card(portfolioValueDates(list, DEMO_TODAY))).toBe('Valores de 06/10/2026, como você registrou.');
+    for (const i of list) expect(TAB_VALUE_DATE_TEXT.row(investmentValueStamp(movements.filter((m) => m.investmentId === i.id), DEMO_TODAY))).toBe('Atualizado por você em 06/10/2026.');
+    expect(TAB_VALUE_DATE_TEXT.card(portfolioValueDates(list, DEMO_TODAY))).toBe('Valores de 06/10/2026, como você registrou.');
     expect(portfolioValueDates(list, DEMO_TODAY).notThisMonth).toEqual([]);
   });
 });
@@ -288,6 +288,6 @@ describe('D-103 item 4: o plano e a comparação dizem a premissa', () => {
 
 describe('D-103: os textos novos da aba', () => {
   it('sem travessão, sem a expressão vetada e sem julgamento', () => {
-    for (const t of [...allTexts(VALUE_DATE_TEXT), VALUE_DATE_TEXT.notThisMonth(['A', 'B'])]) if (typeof t === 'string') checkCopy(t);
+    for (const t of [...allTexts(TAB_VALUE_DATE_TEXT), TAB_VALUE_DATE_TEXT.notThisMonth(['A', 'B'])]) if (typeof t === 'string') checkCopy(t);
   });
 });

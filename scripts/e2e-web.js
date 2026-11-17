@@ -15362,8 +15362,9 @@ setInterval(async () => {
     await btn('Aplicação do banco, CDB ou RDB · Banco Exemplo: R$ 10.875,00. Ganho: R$ 375,00.').click(); await waitText('Valor no fim de cada mês'); await p.waitForTimeout(400);
     t = await body(); investTexts.push(t);
     ok('D-093 Investimento: detalhe com o valor, a última atualização, o fim de cada mês (setembro R$ 10.360,00) e o histórico',
-      (await h1Name()) === 'Aplicação do banco' && t.includes('R$ 10.875,00') && t.includes('Valor atualizado em 06/10/2026') && t.includes('Outubro de 2026 (até hoje)') &&
-        t.includes('R$ 10.360,00') && (await visibleCount('button', 'Aporte, 06/10/2026, R$ 500,00')) === 1 && (await visibleCount('button', 'Valor atualizado, 30/09/2026, R$ 10.360,00')) === 1, t.slice(0, 700));
+      (await h1Name()) === 'Aplicação do banco' && t.includes('R$ 10.875,00') && t.includes('Atualizado por você em 06/10/2026.') && t.includes('Outubro de 2026 (até hoje)') &&
+        t.includes('R$ 10.360,00') && (await visibleCount('button', 'Aporte, 06/10/2026, R$ 500,00, saldo depois R$ 10.860,00')) === 1 &&
+        (await visibleCount('button', 'Valor atualizado, 30/09/2026, R$ 10.360,00, saldo depois R$ 10.360,00')) === 1, t.slice(0, 700));
     await checkBar('D-093 detalhe do investimento (consulta)', 'Investir');
     await atWidths(async (w) => { await layoutChecks(`D-093 Investimento ${w}px`); if (w === 390) await shot('541_investimento_detalhe'); });
     // Resgate maior que o valor: recusado antes de enviar, com a data.
@@ -15379,7 +15380,7 @@ setInterval(async () => {
     ok('D-093 Atualizar valor: data de hoje preenchida e o contexto Pessoal fixo', (await field('Data').inputValue()) === '07/10/2026' && (await body()).includes('Demonstração · Pessoal'), await field('Data').inputValue());
     await field('Valor no extrato').fill('10900'); await btn('Atualizar valor').click(); await waitText('Valor atualizado.'); await p.waitForTimeout(400);
     t = await body();
-    ok('D-093 Atualizar valor: o detalhe passa a R$ 10.900,00, ganho de R$ 400,00, atualizado em 07/10/2026', t.includes('R$ 10.900,00') && t.includes('Ganho: R$ 400,00') && t.includes('Valor atualizado em 07/10/2026'), t.slice(0, 500));
+    ok('D-093 Atualizar valor: o detalhe passa a R$ 10.900,00, ganho de R$ 400,00, atualizado em 07/10/2026', t.includes('R$ 10.900,00') && t.includes('Ganho: R$ 400,00') && t.includes('Atualizado por você em 07/10/2026.'), t.slice(0, 500));
     // Novo investimento.
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
     ok('D-093 Investimentos: o total segue o valor novo (R$ 15.980,00)', (await body()).includes('R$ 15.980,00'));
@@ -15450,18 +15451,20 @@ setInterval(async () => {
     // Detalhe.
     await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Valor pela taxa contratada'); await p.waitForTimeout(500);
     t = await body(); investTexts.push(t);
-    // Resgate só no vencimento (revisão das telas, 16/11/2026): a estimativa é no vencimento, com a alíquota dessa data (sem IOF).
+    // Resgate só no vencimento (revisão das telas, 16/11/2026): a estimativa é no vencimento, com a alíquota dessa data (sem IOF). D-104: a premissa
+    // fica junto dos números, e o imposto vem em três linhas (rendimento bruto, IR e IOF estimados, rendimento líquido estimado).
     ok('D-099 Investimento: valor pela taxa contratada, imposto estimado no vencimento (resgate só no vencimento) e a ficha',
-      t.includes('Valor estimado: R$ 10.879,87') && t.includes('Pela taxa que você registrou, a partir do valor de 06/10/2026.') && t.includes('No vencimento, em 01/06/2027 (estimativa)') &&
-        t.includes('Este investimento só pode ser resgatado no vencimento. A conta usa o valor de hoje e a alíquota que vale nessa data.') && !t.includes('Se resgatasse hoje') &&
-        t.includes('Cerca de R$ 10.809,08 líquidos.') && t.includes('Imposto de renda estimado: R$ 65,92') && !t.includes('IOF estimado') && t.includes('Alíquotas de 17,5% a 20%, pelo tempo de cada aporte.') &&
+      t.includes('Valor estimado: R$ 10.879,87') && t.includes('Conta o rendimento desde o valor de 06/10/2026, sem imposto e sem taxas.') && t.includes('No vencimento, em 01/06/2027 (estimativa)') &&
+        t.includes('Este investimento só pode ser resgatado no vencimento.') && t.includes('Premissa: o valor de hoje, sem o rendimento que ainda pode entrar até 01/06/2027') && !t.includes('Se resgatasse hoje') &&
+        t.includes('Cerca de R$ 10.809,08 líquidos.') && /IR e IOF estimados\s+−R\$ 65,92/.test(t) && t.includes('Alíquotas de 17,5% a 20%, pelo tempo de cada aporte.') &&
         t.includes('Estimativa pela regra em vigor em 13/11/2026') && t.includes('Sobre este investimento') && t.includes('105% do CDI') &&
         t.includes('01/06/2027, daqui a 8 meses') && t.includes('Resgate só no vencimento') && t.includes('Garantia do FGC.'), t.slice(0, 2500));
     await checkBar('D-099 detalhe com a ficha', 'Investir');
     await atWidths(async (w) => { await layoutChecks(`D-099 Investimento ${w}px`); if (w === 390) { await into('Valor pela taxa contratada'); await shot('546_investimento_ficha'); } });
     await btn('Usar este valor').click(); await waitText('Valor atualizado pela taxa contratada.'); await p.waitForTimeout(500);
     t = await body();
-    ok('D-099 "Usar este valor": registra a atualização de hoje (R$ 10.879,87) e o botão some', t.includes('R$ 10.879,87') && t.includes('Valor atualizado em 07/10/2026') && (await visibleCount('button', 'Usar este valor')) === 0, t.slice(0, 600));
+    ok('D-099 "Usar este valor": registra a atualização de hoje (R$ 10.879,87), com a data e de onde veio (D-104), e o botão some',
+      t.includes('R$ 10.879,87') && t.includes('Atualizado em 07/10/2026, pela taxa contratada (estimativa).') && (await visibleCount('button', 'Usar este valor')) === 0, t.slice(0, 600));
     // Editar: o bloco abre com a ficha; a taxa vazia é recusada no campo; LCI muda a regra de imposto.
     await btn('Editar').click(); await waitText('Editar investimento'); await p.waitForTimeout(400);
     ok('D-099 Editar: "Mais detalhes (opcional)" aberto, com a instituição e a taxa', (await field('Onde está').inputValue()) === 'Banco Exemplo' && (await field('Porcentagem do CDI (%)').inputValue()) === '105');
@@ -15472,22 +15475,24 @@ setInterval(async () => {
     await atWidths(async (w) => { await layoutChecks(`D-099 Mais detalhes ${w}px`); if (w === 390) { await into('Qual é o investimento?'); await shot('547_investimento_mais_detalhes'); } });
     await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
     t = await body();
-    ok('D-099 Editar: salvo, o detalhe mostra LCI, 95% do CDI e a explicação do isento no lugar do cálculo',
-      t.includes('LCI · Banco Exemplo') && t.includes('95% do CDI') && t.includes('Este tipo não tem imposto de renda para pessoa física.'), t.slice(0, 1500));
+    // D-104: no isento, as três linhas também (o IOF só nos primeiros 30 dias; aqui, zero) e a frase do isento.
+    ok('D-099 Editar: salvo, o detalhe mostra LCI, 95% do CDI e o isento (sem IR, com o IOF estimado em zero)',
+      t.includes('LCI · Banco Exemplo') && t.includes('95% do CDI') && /IOF estimado \(isento de IR\)\s+R\$ 0,00/.test(t) && t.includes('Este tipo é isento para pessoa física'), t.slice(0, 1500));
     // Rendimento recebido com tipo.
     await btn('Registrar rendimento recebido').click(); await waitText('Tipo do rendimento (opcional)'); await p.waitForTimeout(300);
     await field('Valor').fill('12,50'); await radio('Juros ou cupom').click(); await btn('Registrar rendimento recebido').click(); await waitText('Rendimento registrado.'); await p.waitForTimeout(400);
-    ok('D-099 Rendimento recebido: o histórico mostra o tipo', (await visibleCount('button', 'Rendimento recebido · Juros ou cupom, 07/10/2026, R$ 12,50')) === 1);
+    ok('D-099 Rendimento recebido: o histórico mostra o tipo (e, D-104, o saldo, que o rendimento não muda)', (await visibleCount('button', 'Rendimento recebido · Juros ou cupom, 07/10/2026, R$ 12,50, saldo depois R$ 10.875,00')) === 1);
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
     t = await body();
     ok('D-099 Investir: "Rendimentos recebidos em 2026" com o total e o tipo', t.includes('Rendimentos recebidos em 2026') && t.includes('Juros ou cupom') && t.includes('R$ 12,50'), t.slice(0, 1500));
     // Resumo para a declaração.
     await p.getByRole('link', { name: /^Resumo para a declaração/ }).filter({ visible: true }).first().click(); await waitText('Bens e Direitos'); await p.waitForTimeout(400);
     t = await body(); investTexts.push(t);
+    // D-104: no formato do informe, o rendimento isento vem na parte "Rendimentos isentos e não tributáveis", por investimento.
     ok('D-099 Resumo para a declaração: grupo e código para conferir, discriminação sem CPF, valor zero de quem começou no ano e os rendimentos isentos',
       (await h1Name()) === 'Resumo para a declaração' && t.includes('Para a declaração de 2027') && t.includes('Grupo 04, código 03, como costuma aparecer nos guias. Confira no programa da Receita.') &&
         t.includes('LCI na instituição Banco Exemplo, aplicado desde 01/06/2026.') && t.includes('Valor registrado em 31/12/2025: R$ 0,00 (começou em 2026). Hoje: R$ 10.879,87.') &&
-        t.includes('Isentos e não tributáveis: R$ 12,50') && t.includes('Informe de rendimentos de 2026: Banco Exemplo') && t.includes('não a declaração pronta'), t.slice(0, 1500));
+        /Rendimentos isentos e não tributáveis\s+Aplicação do banco · LCI · Banco Exemplo: R\$ 12,50/.test(t) && t.includes('Informe de rendimentos de 2026: Banco Exemplo') && t.includes('não a declaração pronta'), t.slice(0, 1500));
     await checkBar('D-099 Resumo para a declaração', 'Investir');
     await atWidths(async (w) => { await layoutChecks(`D-099 Declaração ${w}px`); if (w === 390) await shot('548_resumo_declaracao'); });
     // Comparar rendimentos líquidos.
@@ -15589,7 +15594,7 @@ setInterval(async () => {
     await btn('Editar').click(); await waitText('Editar investimento'); await p.waitForTimeout(400);
     ok('D-099 P2 Editar: "Para que é este dinheiro? (opcional)" com "Sem meta" escolhido, a reserva e a viagem',
       (await radio('Sem meta').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'Reserva para imprevistos')) === 1 && (await visibleCount('radio', 'Viagem de férias')) === 1 &&
-        (await body()).includes('Ligar a uma meta é só informação: a meta continua com o valor que você registrou nela.'));
+        (await body()).includes('O investimento aparece na meta. Na meta, você escolhe de onde vem o valor guardado: do que registra nela ou do valor dos investimentos ligados.'));
     await radio('Viagem de férias').click(); await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
     ok('D-099 P2 Editar: salvo, a ficha diz "Para" a viagem', (await body()).includes('Viagem de férias') && (await visibleCount('button', 'Ver a meta')) === 1);
     await btn('Ver a meta').click(); await waitText('Investimentos ligados à meta'); await p.waitForTimeout(400);
@@ -15601,6 +15606,186 @@ setInterval(async () => {
     await radio('Sem meta').click(); await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
     ok('D-099 P2 Editar: com "Sem meta", a ficha deixa de dizer "Para"', (await visibleCount('button', 'Ver a meta')) === 0 && (await visibleCount('button', 'Ver a reserva')) === 0);
     ok('D-099 P2: nada vai à rede na demonstração', writes.length === plWrites0, writes.slice(plWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // D-104 (17/11/2026): detalhe e formulários de cada investimento. A data de cada valor ("Atualizado por você em"), as três linhas do
+  // imposto estimado (rendimento bruto, IR e IOF, líquido) com a data e a premissa, e as frases curtas de imposto, liquidez e FGC com o
+  // tema de Aprender; a taxa com data de fim (a aplicação da demonstração rende 105% do CDI até 31/03/2027, depois 100%) e a condição da
+  // taxa; o histórico com o saldo linha a linha; "Somar a uma meta?" no rendimento e no resgate do vencimento; "Outro investimento" com
+  // descrição; "Usar o valor dos investimentos nesta meta" no formulário; o lembrete no detalhe e a tela do lembrete, com adiar e pausar
+  // sem cobrança; o resumo da declaração no formato do informe; e "Ocultar valores" sem nenhum valor em reais à vista. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const fhWrites0 = writes.length;
+    const into = async (text) => { await p.getByText(text, { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); };
+    const openCdb = async () => {
+      await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Sobre este investimento'); await p.waitForTimeout(500);
+    };
+    const toInvest = async () => { await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400); };
+    const checkbox = (re) => p.getByRole('checkbox', { name: re }).filter({ visible: true }).first();
+    await demoHome();
+    await toInvest();
+    await openCdb();
+    t = await body(); investTexts.push(t);
+    ok('D-104 Detalhe: a data do valor de hoje, a estimativa com a data e a premissa, e a taxa com data de fim na ficha',
+      t.includes('Atualizado por você em 06/10/2026.') && t.includes('Estimativa para hoje, 07/10/2026.') &&
+        t.includes('Premissa: 105% do CDI até 31/03/2027 e 100% do CDI depois, com o CDI de exemplo da demonstração. Conta o rendimento desde o valor de 06/10/2026, sem imposto e sem taxas.') &&
+        t.includes('105% do CDI até 31/03/2027, depois 100% do CDI'), t.slice(0, 1800));
+    const fhNet = t.slice(t.indexOf('No vencimento, em 01/06/2027 (estimativa)'));
+    ok('D-104 Imposto estimado: rendimento bruto, IR e IOF e rendimento líquido em três linhas, com a data e a premissa por perto',
+      fhNet.includes('Estimativa para 01/06/2027.') && /Rendimento bruto\s+R\$ 375,00\s+IR e IOF estimados\s+−R\$ 65,92\s+Rendimento líquido estimado\s+R\$ 309,08/.test(fhNet) &&
+        fhNet.includes('Cerca de R$ 10.809,08 líquidos.') && fhNet.includes('Premissa: o valor de hoje, sem o rendimento que ainda pode entrar até 01/06/2027, com a alíquota que vale nessa data.'),
+      fhNet.slice(0, 900));
+    // As três linhas alinhadas: o valor de cada uma termina na mesma margem direita.
+    const fhRight = await p.evaluate(() => ['R$ 375,00', '−R$ 65,92', 'R$ 309,08'].map((s) => {
+      const e = [...document.querySelectorAll('div[dir="auto"]')].find((x) => (x.textContent || '').replace(/\u00a0/g, ' ') === s && x.getBoundingClientRect().width > 0);
+      return e ? Math.round(e.getBoundingClientRect().right) : null;
+    }));
+    ok('D-104 Imposto estimado: os três valores alinhados à direita', fhRight.every((r) => r !== null) && Math.max(...fhRight) - Math.min(...fhRight) <= 2, JSON.stringify(fhRight));
+    ok('D-104 Frases curtas de imposto, liquidez e FGC, cada uma com o tema de Aprender',
+      t.includes('Imposto de renda é o que a Receita fica do rendimento, nunca do valor aplicado.') && t.includes('Liquidez é a facilidade de transformar o investimento em dinheiro na conta') &&
+        t.includes('O FGC é uma garantia privada que devolve até R$ 250 mil por pessoa em cada instituição') &&
+        (await visibleCount('button', 'Saber mais sobre o imposto nos investimentos')) === 1 && (await visibleCount('button', 'Saber mais sobre liquidez')) === 1 &&
+        (await visibleCount('button', 'Saber mais sobre o FGC')) === 1);
+    ok('D-104 Histórico: o saldo depois de cada linha e, na atualização, a diferença para o saldo anterior',
+      (await visibleCount('button', 'Aporte, 06/10/2026, R$ 500,00, saldo depois R$ 10.860,00')) === 1 && (await visibleCount('button', 'Valor atualizado, 06/10/2026, R$ 10.875,00, saldo depois R$ 10.875,00')) === 1 &&
+        t.includes('Saldo depois: R$ 10.860,00') && t.includes('R$ 15,00 a mais que o saldo anterior') && t.includes('com o saldo depois de cada um. O valor de hoje fica no alto da tela.'));
+    await atWidths(async (w) => { await layoutChecks(`D-104 Investimento ${w}px`); if (w === 390) { await into('Rendimento bruto'); await shot('564_investimento_imposto_tres_linhas'); } });
+    await btn('Saber mais sobre o FGC').click(); await p.waitForTimeout(900);
+    ok('D-104 "Saber mais sobre o FGC" abre o tema de Aprender', urlPath() === '/explicacao/fgc', urlPath());
+    await p.goBack(); await waitText('Sobre este investimento'); await p.waitForTimeout(400);
+    // Rendimento recebido: "Somar a uma meta?" sem nada marcado; com a viagem, o aporte entra na meta.
+    await btn('Registrar rendimento recebido').click(); await waitText('Tipo do rendimento (opcional)'); await p.waitForTimeout(300);
+    ok('D-104 Rendimento: "Somar a uma meta?" com a reserva e a viagem, sem nada marcado',
+      (await body()).includes('Somar a uma meta? (opcional)') && (await radio('Reserva para imprevistos').getAttribute('aria-checked')) === 'false' &&
+        (await radio('Viagem de férias').getAttribute('aria-checked')) === 'false');
+    await field('Valor').fill('12,50'); await radio('Juros ou cupom').click(); await radio('Viagem de férias').click(); await p.waitForTimeout(200);
+    await atWidths(async (w) => { await layoutChecks(`D-104 Rendimento com meta ${w}px`); if (w === 390) { await into('Somar a uma meta? (opcional)'); await shot('565_rendimento_somar_meta'); } });
+    await btn('Registrar rendimento recebido').click(); await waitText('Rendimento registrado.'); await p.waitForTimeout(500);
+    ok('D-104 Rendimento somado à meta: o aviso diz o aporte na viagem', (await body()).includes('Rendimento registrado. Aporte de R$ 12,50 registrado na meta Viagem de férias.'));
+    await tabByName('Metas').click(); await waitText('Viagem de férias'); await p.waitForTimeout(500);
+    ok('D-104 Metas: a viagem passa a R$ 1.212,50, com o aporte do rendimento', (await body()).includes('R$ 1.212,50'));
+    // Resumo da declaração no formato do informe (o rendimento de juros do CDB é de tributação exclusiva).
+    await toInvest();
+    await p.getByRole('link', { name: /^Resumo para a declaração/ }).filter({ visible: true }).first().click(); await waitText('Bens e Direitos'); await p.waitForTimeout(400);
+    t = await body(); investTexts.push(t);
+    const fhOrder = ['Resumo estimado. Confira com o informe da instituição.', 'Ano-calendário', 'Posição em 2026, até hoje', 'Rendimentos isentos e não tributáveis', 'Rendimentos sujeitos à tributação exclusiva', 'Bens e Direitos'].map((s) => t.indexOf(s));
+    ok('D-104 Declaração no formato do informe: o selo, o ano, a posição, os isentos, a tributação exclusiva e Bens e Direitos, nessa ordem',
+      fhOrder.every((x, k) => x >= 0 && (k === 0 || x > fhOrder[k - 1])) && t.includes('Total registrado em 31/12/2025: R$ 0,00. Hoje: R$ 15.955,00.') &&
+        t.includes('Aplicação do banco · CDB ou RDB · Banco Exemplo: R$ 12,50') && t.includes('VGBL, aplicado desde 01/08/2026. Plano com contribuição todo mês, para a aposentadoria.'),
+      `${JSON.stringify(fhOrder)} ${t.slice(0, 1500)}`);
+    await checkBar('D-104 Declaração no formato do informe', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-104 Declaração ${w}px`); if (w === 390) await shot('566_declaracao_informe'); });
+    await radio('2025').click(); await p.waitForTimeout(300);
+    ok('D-104 Declaração: escolher o ano (2025, sem investimentos)', (await body()).includes('Nenhum investimento registrado em 2025.') && (await body()).includes('Resumo estimado. Confira com o informe da instituição.'));
+    // Editar: a taxa com data de fim, a condição e "Usar o valor dos investimentos nesta meta".
+    await toInvest();
+    await openCdb();
+    await btn('Editar').click(); await waitText('Editar investimento'); await p.waitForTimeout(400);
+    ok('D-104 Editar: "A taxa muda numa data" marcada, com a data de fim e a taxa de depois',
+      (await checkbox(/^A taxa muda numa data/).getAttribute('aria-checked')) === 'true' && (await field('Esta taxa vale até').inputValue()) === '31/03/2027' &&
+        (await field('Porcentagem do CDI depois dessa data (%)').inputValue()) === '100');
+    await field('Esta taxa vale até').fill(''); await btn('Salvar investimento').click(); await p.waitForTimeout(300);
+    ok('D-104 Editar: sem a data de fim, recusado no campo, com o foco nele', (await body()).includes('Informe até quando vale esta taxa.') && (await field('Esta taxa vale até').evaluate((e) => e === document.activeElement)));
+    await field('Esta taxa vale até').fill('31/03/2027'); await field('Condição da taxa (opcional)').fill('com aporte todo mês');
+    t = await body();
+    ok('D-104 Editar: a meta ligada explica que a meta pode usar o valor dos investimentos, com a opção sem vir marcada',
+      t.includes('O investimento aparece na meta. Na meta, você escolhe de onde vem o valor guardado: do que registra nela ou do valor dos investimentos ligados.') &&
+        !t.includes('Ligar a uma meta é só informação') && (await checkbox(/^Usar o valor dos investimentos nesta meta/).getAttribute('aria-checked')) === 'false');
+    await checkbox(/^Usar o valor dos investimentos nesta meta/).click(); await p.waitForTimeout(200);
+    await atWidths(async (w) => { await layoutChecks(`D-104 Editar com a taxa de depois ${w}px`); if (w === 390) { await into('Esta taxa vale até'); await shot('567_investimento_taxa_com_data'); } });
+    await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-104 Editar: salvo, a meta passa a usar o valor dos investimentos, e a ficha mostra a condição da taxa',
+      t.includes('Investimento salvo. A meta Reserva para imprevistos passa a usar o valor dos investimentos ligados.') && t.includes('Condição da taxa') && t.includes('com aporte todo mês'), t.slice(0, 1500));
+    await btn('Ver a reserva').click(); await waitText('Investimentos ligados à reserva'); await p.waitForTimeout(500);
+    ok('D-104 Reserva: "Dos investimentos ligados" escolhido pelo formulário do investimento', (await radio('Dos investimentos ligados').getAttribute('aria-checked')) === 'true');
+    // "Outro investimento": nome, tipo, descrição e valor atualizado à mão.
+    await toInvest();
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await field('Nome').fill('Consórcio do carro'); await radio('Outro').click(); await p.waitForTimeout(200);
+    ok('D-104 Novo "Outro": a frase diz para dar nome, descrever e atualizar o valor pelo extrato',
+      (await body()).includes('Para o que não está na lista. Dê um nome, diga o que é na descrição (em "Mais detalhes") e atualize o valor pelo extrato quando quiser.'));
+    await field('Quanto você aplicou até hoje?').fill('5000'); await field('Quanto vale hoje? (opcional)').fill('5200'); await field('Desde quando? (opcional)').fill('01/08/2026');
+    await p.getByRole('button', { name: /^Mais detalhes \(opcional\)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await field('Descrição (opcional)').fill('Carta de crédito, parcelas todo mês');
+    await atWidths(async (w) => { await layoutChecks(`D-104 Novo investimento Outro ${w}px`); if (w === 390) { await into('Descrição (opcional)'); await shot('568_outro_investimento'); } });
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await p.waitForTimeout(500);
+    t = await body(); investTexts.push(t);
+    ok('D-104 "Outro": o detalhe com a descrição, o valor atualizado à mão com a data e o imposto sem estimativa',
+      (await h1Name()) === 'Consórcio do carro' && t.includes('Carta de crédito, parcelas todo mês') && t.includes('R$ 5.200,00') && t.includes('Atualizado por você em 07/10/2026.') &&
+        t.includes('Para um investimento do tipo Outro, a Clarevo não estima o imposto'), t.slice(0, 1500));
+    // Lembrete no detalhe: um título vencido e sem valor do extrato desde o primeiro aporte.
+    await toInvest();
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await field('Nome').fill('Título vencido'); await radio('Renda fixa').click(); await field('Quanto você aplicou até hoje?').fill('2000'); await field('Desde quando? (opcional)').fill('01/08/2026');
+    await p.getByRole('button', { name: /^Mais detalhes \(opcional\)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await field('Vencimento (opcional)').fill('01/10/2026'); await radio('Só no vencimento').click();
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await p.waitForTimeout(500);
+    t = await body(); investTexts.push(t);
+    ok('D-104 Lembrete no detalhe: o vencimento passado, em tom de fato, com registrar o resgate, adiar e pausar; o valor com a data, nunca zero',
+      t.includes('Este investimento venceu em 01/10/2026. Se o dinheiro já voltou para a conta, quer registrar o resgate?') && (await visibleCount('button', 'Registrar o resgate')) === 1 &&
+        (await visibleCount('button', 'Lembrar de novo em 3 dias')) === 1 && (await visibleCount('button', 'Pausar este lembrete por 30 dias')) === 1 &&
+        t.includes('Sem valor do extrato ainda: é o aplicado menos o resgatado, desde 01/08/2026.') && !/atrasad|deveria|esqueceu/i.test(t), t.slice(0, 1500));
+    await atWidths(async (w) => { await layoutChecks(`D-104 Lembrete no detalhe ${w}px`); if (w === 390) { await into('Vencimento'); await shot('569_investimento_lembrete'); } });
+    await btn('Registrar o resgate').click(); await waitText('O dinheiro que você tirou do investimento.'); await p.waitForTimeout(300);
+    ok('D-104 Resgate no vencimento: "Somar a uma meta?" com a viagem, sem nada marcado (a reserva agora lê os investimentos)',
+      (await body()).includes('Somar a uma meta? (opcional)') && (await radio('Viagem de férias').getAttribute('aria-checked')) === 'false' && (await visibleCount('radio', 'Reserva para imprevistos')) === 0);
+    await btn('Cancelar').click(); await p.waitForTimeout(300);
+    if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
+    await waitText('Sobre este investimento');
+    await btn('Pausar este lembrete por 30 dias').click(); await waitText('Lembrete pausado até 06/11/2026. Dá para retomar quando quiser.'); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-104 Vencimento pausado: o cartão passa ao valor sem atualização desde o primeiro aporte',
+      t.includes('Este investimento está sem valor do extrato desde o primeiro aporte, em 01/08/2026. Quer atualizar?') && (await visibleCount('button', 'Atualizar com o extrato')) === 1 &&
+        !t.includes('Este investimento venceu em 01/10/2026.'), t.slice(0, 1200));
+    await btn('Lembrar de novo em 3 dias').click(); await waitText('Combinado: este lembrete volta em 10/10/2026.'); await p.waitForTimeout(400);
+    ok('D-104 Adiado: o cartão de lembrete some do detalhe', (await visibleCount('button', 'Lembrar de novo em 3 dias')) === 0 && (await visibleCount('button', 'Atualizar com o extrato')) === 0);
+    ok('D-104 Detalhe e formulários: nada vai à rede na demonstração', writes.length === fhWrites0, writes.slice(fhWrites0).join(' | '));
+    // A tela do lembrete, como o toque no aviso do celular a abre (na web, pelo endereço).
+    await p.goto(`http://localhost:${PORT}/investimento/lembrete?tipo=aporte_investimentos`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Lembrete dos investimentos', 12000); await p.waitForTimeout(800);
+    t = await body(); investTexts.push(t);
+    ok('D-104 Tela do lembrete: o fato com o plano e o que já foi aportado, os atalhos de cada investimento, adiar e pausar, sem cobrança',
+      (await h1Name()) === 'Lembrete dos investimentos' && t.includes('O seu plano de investimentos é de R$ 600,00 por mês, com o lembrete no dia 5. Quer registrar um aporte?') &&
+        t.includes('Em outubro, os aportes registrados somam R$ 500,00.') && (await visibleCount('button', 'Registrar aporte em Aplicação do banco')) === 1 &&
+        (await visibleCount('button', 'Registrar aporte em Previdência')) === 1 && (await visibleCount('button', 'Lembrar de novo em 3 dias')) === 1 &&
+        (await visibleCount('button', 'Pausar este lembrete por 30 dias')) === 1 && t.includes('É só um lembrete: você decide se e quando registrar.') && !/atrasad|deveria|esqueceu/i.test(t), t.slice(0, 1200));
+    // Aberta pelo endereço (ou pelo aviso), a barra marca a aba de onde se veio.
+    await checkBar('D-104 Lembrete dos investimentos');
+    await atWidths(async (w) => { await layoutChecks(`D-104 Lembrete dos investimentos ${w}px`); if (w === 390) await shot('570_lembrete_investimentos'); });
+    await btn('Pausar este lembrete por 30 dias').click(); await waitText('Lembrete pausado até 06/11/2026. Dá para retomar quando quiser.'); await p.waitForTimeout(300);
+    ok('D-104 Lembrete pausado: diz até quando e oferece retomar', (await body()).includes('Este lembrete está pausado até 06/11/2026.') && (await visibleCount('button', 'Retomar este lembrete')) === 1 &&
+      (await visibleCount('button', 'Lembrar de novo em 3 dias')) === 0);
+    await btn('Retomar este lembrete').click(); await waitText('Lembrete retomado.'); await p.waitForTimeout(300);
+    await btn('Registrar aporte em Aplicação do banco').click(); await waitText('O dinheiro que você colocou no investimento.'); await p.waitForTimeout(300);
+    ok('D-104 Lembrete: o atalho abre o aporte da aplicação', (await body()).includes('Aplicação do banco') && (await visibleCount('button', 'Registrar aporte')) >= 1);
+    // Ocultar valores: nenhum valor em reais à vista no detalhe, no rendimento, no fundo (a cota tem mais de duas casas) e na declaração.
+    await demoHome();
+    await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Diferença do mês');
+    const fhHidden = async (name, masked = true) => {
+      await p.waitForTimeout(300);
+      const leaks = await moneyLeaks();
+      ok(`D-104 Ocultar valores, ${name}: nenhum valor em reais à vista (texto e nomes acessíveis)`, leaks.length === 0 && (!masked || (await body()).includes('R$ ••••')), leaks.slice(0, 4).join(' | '));
+    };
+    await toInvest();
+    await openCdb();
+    await fhHidden('detalhe da aplicação');
+    await btn('Registrar rendimento recebido').click(); await waitText('Tipo do rendimento (opcional)');
+    await fhHidden('rendimento com "Somar a uma meta?"', false);
+    await btn('Cancelar').click(); await p.waitForTimeout(300);
+    await toInvest();
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await field('Nome').fill('Fundo DI'); await radio('Fundos').click(); await field('Quanto você aplicou até hoje?').fill('30000');
+    await p.getByRole('button', { name: /^Mais detalhes \(opcional\)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await field('CNPJ do fundo (opcional)').fill('00.017.024/0001-53'); await field('Quantidade de cotas (opcional)').fill('1.000');
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await waitText('Valor pela cota do fundo'); await p.waitForTimeout(600);
+    await fhHidden('fundo com a cota do dia');
+    ok('D-104 Fundo: a data da cota embaixo do valor', (await body()).includes('Cota de 05/10/2026.'));
+    await toInvest();
+    await p.getByRole('link', { name: /^Resumo para a declaração/ }).filter({ visible: true }).first().click(); await waitText('Bens e Direitos'); await p.waitForTimeout(400);
+    await fhHidden('resumo da declaração');
   }
 
   // ==================================================================================================================
@@ -15631,7 +15816,7 @@ setInterval(async () => {
     await atWidths(async (w) => { await layoutChecks(`D-099 P3 Título ${w}px`); if (w === 390) { await p.getByText('Valor pelo preço publicado', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await shot('561_investimento_preco_tesouro'); } });
     await p.getByRole('button', { name: 'Usar este valor', exact: true }).filter({ visible: true }).last().click(); await waitText('Valor atualizado pelo preço público.'); await p.waitForTimeout(500);
     t = await body();
-    ok('D-099 P3 Título: "Usar este valor" grava a atualização de hoje (R$ 10.132,18)', t.includes('R$ 10.132,18') && t.includes('Valor atualizado em 07/10/2026'), t.slice(0, 600));
+    ok('D-099 P3 Título: "Usar este valor" grava a atualização de hoje (R$ 10.132,18), com a data do preço (D-104)', t.includes('R$ 10.132,18') && t.includes('Atualizado em 07/10/2026, pelo preço do Tesouro Nacional de 06/10/2026.'), t.slice(0, 600));
     // Fundo com CNPJ e quantidade: o CNPJ errado é recusado no campo.
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
     await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);

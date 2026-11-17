@@ -1,5 +1,6 @@
 import type { IsoDate } from './dates';
 import { addMonthsToDate, formatDateBR, formatDayMonth, isValidIsoDate, monthOf } from './dates';
+import { VALUE_SOURCE_NOTE } from './investment-detail';
 import type { InvestmentDetailsDraft } from './investment-details';
 import { guaranteeOf, institutionKey } from './investment-details';
 import type { AllocationDimension } from './investment-insights';
@@ -29,14 +30,6 @@ type MovementLike = Pick<InvestmentMovement, 'kind' | 'amountCents' | 'occurredO
  */
 export type ValueSource = { kind: 'extrato' } | { kind: 'tesouro'; on: IsoDate } | { kind: 'cota'; on: IsoDate } | { kind: 'taxa' };
 
-/** Observações gravadas na atualização de valor feita por "Usar este valor" (até 80 caracteres, como toda observação). */
-export const VALUE_SOURCE_NOTE = {
-  /** "Preço do Tesouro Nacional de 06/10/2026" */
-  treasury: (on: IsoDate) => `Preço do Tesouro Nacional de ${formatDateBR(on)}`,
-  /** "Cota do fundo de 05/10/2026" */
-  fund: (on: IsoDate) => `Cota do fundo de ${formatDateBR(on)}`,
-  rate: 'Pela taxa contratada',
-} as const;
 
 const brDateToIso = (d: string): IsoDate | null => {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d);
@@ -48,11 +41,11 @@ const brDateToIso = (d: string): IsoDate | null => {
 /** A origem pela observação da atualização (exatamente como VALUE_SOURCE_NOTE grava); qualquer outra observação: o extrato. */
 export function valueSourceFromNote(note: string | null | undefined): ValueSource {
   const text = (note ?? '').trim();
-  if (text === VALUE_SOURCE_NOTE.rate) return { kind: 'taxa' };
-  const treasury = /^Preço do Tesouro Nacional de (\d{2}\/\d{2}\/\d{4})$/.exec(text);
+  if (text === VALUE_SOURCE_NOTE.rate()) return { kind: 'taxa' };
+  const treasury = /^Pelo preço do Tesouro Nacional de (\d{2}\/\d{2}\/\d{4})$/.exec(text);
   const treasuryOn = treasury ? brDateToIso(treasury[1]!) : null;
   if (treasuryOn) return { kind: 'tesouro', on: treasuryOn };
-  const fund = /^Cota do fundo de (\d{2}\/\d{2}\/\d{4})$/.exec(text);
+  const fund = /^Pela cota do fundo de (\d{2}\/\d{2}\/\d{4})$/.exec(text);
   const fundOn = fund ? brDateToIso(fund[1]!) : null;
   if (fundOn) return { kind: 'cota', on: fundOn };
   return { kind: 'extrato' };
@@ -116,7 +109,7 @@ const afterText = (s: ValueStamp) =>
         ? ', menos os resgates depois dessa data'
         : '';
 
-export const VALUE_DATE_TEXT = {
+export const TAB_VALUE_DATE_TEXT = {
   /** Linha de cada investimento na lista. */
   row: (s: ValueStamp): string => {
     if (s.on === null) return 'Sem atualização do extrato: mostra o que foi aplicado.';

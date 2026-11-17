@@ -79,6 +79,14 @@ type Flow = Pick<InvestmentMovement, 'kind' | 'amountCents' | 'occurredOn'> & { 
  * é o aplicado), não há rendimento para estimar.
  */
 export function estimateRegressiveNet(movements: readonly Flow[], today: IsoDate): NetEstimate {
+  return estimateLotsNet(movements, today, regressiveRate, true);
+}
+
+/**
+ * A conta por lotes de `estimateRegressiveNet`, com a alíquota do IR pelo número de dias (`irRate`) e com ou sem o IOF dos primeiros 30
+ * dias. Nos isentos de IR (D-104, item 3), `irRate` é zero e o IOF continua (a poupança não tem nenhum dos dois).
+ */
+function estimateLotsNet(movements: readonly Flow[], today: IsoDate, irRate: (days: number) => number, withIof: boolean): NetEstimate {
   const live = movements.filter((m) => m.occurredOn <= today);
   // Data, e no mesmo dia aportes, depois resgates, depois o resto (revisão independente de 13/11/2026: as listas chegam do mais recente
   // ao mais antigo, e um resgate do dia vinha antes do aporte do mesmo dia). Empate: pela criação, como o banco.
@@ -126,9 +134,9 @@ export function estimateRegressiveNet(movements: readonly Flow[], today: IsoDate
   open.forEach((l, i) => {
     const days = calendarDaysBetween(l.on, today);
     const g = (gain * weights[i]!) / totalWeight;
-    const iofPart = g * iofRate(days);
+    const iofPart = withIof ? g * iofRate(days) : 0;
     iof += iofPart;
-    const rate = regressiveRate(days);
+    const rate = irRate(days);
     rates.push(rate);
     ir += (g - iofPart) * rate;
   });
@@ -136,6 +144,49 @@ export function estimateRegressiveNet(movements: readonly Flow[], today: IsoDate
   const irCents = Math.round(ir);
   return { grossCents: gross, gainCents: Math.round(gain), iofCents, irCents, netCents: gross - iofCents - irCents, rates: { min: Math.min(...rates), max: Math.max(...rates) } };
 }
+
+/**
+ * Rendimento bruto, IR e IOF estimados e rendimento líquido estimado (D-104, item 3), nas regras que a Clarevo calcula: a tabela regressiva
+ * (IR e IOF) e os isentos de IR (só o IOF dos primeiros 30 dias; a poupança, sem nenhum dos dois). Nas outras regras, null: a tela explica
+ * sem calcular. Os rendimentos recebidos já saíram (com o imposto na fonte) e não entram.
+ */
+export function estimateNetIncome(regime: TaxRegime | null, subkind: InvestmentSubkind | null, movements: readonly Flow[], on: IsoDate): NetEstimate | null {
+  if (regime === 'regressiva') return estimateRegressiveNet(movements, on);
+  if (regime === 'isento') return estimateLotsNet(movements, on, () => 0, subkind !== 'poupanca');
+  return null;
+}
+
+/** As três linhas do detalhe (D-104, item 3), alinhadas: rótulo e valor. */
+export interface NetIncomeLine {
+  label: string;
+  cents: Cents;
+  /** O IR e o IOF saem do rendimento: o valor vem com o sinal de menos. */
+  minus: boolean;
+}
+
+export function netIncomeLines(e: Pick<NetEstimate, 'gainCents' | 'irCents' | 'iofCents'>, regime: TaxRegime): NetIncomeLine[] {
+  const tax = e.irCents + e.iofCents;
+  return [
+    { label: NET_INCOME_TEXT.gross, cents: Math.max(0, e.gainCents), minus: false },
+    { label: regime === 'isento' ? NET_INCOME_TEXT.taxExempt : NET_INCOME_TEXT.tax, cents: tax, minus: tax > 0 },
+    { label: NET_INCOME_TEXT.net, cents: Math.max(0, e.gainCents - tax), minus: false },
+  ];
+}
+
+export const NET_INCOME_TEXT = {
+  gross: 'Rendimento bruto',
+  tax: 'IR e IOF estimados',
+  taxExempt: 'IOF estimado (isento de IR)',
+  net: 'Rendimento líquido estimado',
+  /** "R$ 65,92" ou "−R$ 65,92" (o sinal e a palavra no rótulo; nunca uma cor). */
+  value: (l: NetIncomeLine) => (l.minus ? `\u2212${formatBRL(l.cents)}` : formatBRL(l.cents)),
+  /** Nome acessível da linha: "IR e IOF estimados: menos R$ 65,92". */
+  a11y: (l: NetIncomeLine) => `${l.label}: ${l.minus ? 'menos ' : ''}${formatBRL(l.cents)}`,
+  /** O rendimento é o valor de hoje menos o que continua aplicado. */
+  grossNote: 'O rendimento bruto é o valor de hoje menos o que continua aplicado. Rendimentos que já caíram na conta não entram.',
+  /** Regras que a Clarevo não calcula: só o rendimento bruto, e a explicação. */
+  grossOnly: (c: Cents) => `Rendimento bruto até hoje: ${formatBRL(c)}`,
+} as const;
 
 /** O que a tela mostra no lugar do cálculo, para as regras que a Clarevo explica sem calcular. */
 export function taxExplanation(regime: TaxRegime, kind: InvestmentKind, subkind: InvestmentSubkind | null): string {
@@ -166,7 +217,8 @@ export const TAX_TEXT = {
   /** Resgate só no vencimento (revisão de 16/11/2026): o card não diz "hoje". */
   maturityTitle: 'No vencimento',
   atMaturityTitle: (on: IsoDate) => `No vencimento, em ${formatDateBR(on)} (estimativa)`,
-  atMaturityNote: 'Este investimento só pode ser resgatado no vencimento. A conta usa o valor de hoje e a alíquota que vale nessa data.',
+  /** A premissa da conta fica junto dos números (D-104, item 4: ESTIMATE_PREMISE_TEXT.maturityPremise). */
+  atMaturityNote: 'Este investimento só pode ser resgatado no vencimento.',
   maturityOnlyNote: 'Este investimento só pode ser resgatado no vencimento. Informe a data do vencimento em Editar para ver a estimativa.',
   /** "Cerca de R$ 10.412,00 líquidos." */
   net: (c: Cents) => `Cerca de ${formatBRL(c)} líquidos.`,
@@ -179,6 +231,8 @@ export const TAX_TEXT = {
   noGain: 'Sem rendimento registrado, não há imposto para estimar. Atualize o valor com o que aparece no extrato.',
   rule: (on: IsoDate) => `Estimativa pela regra em vigor em ${on.slice(8, 10)}/${on.slice(5, 7)}/${on.slice(0, 4)}, sem a taxa de custódia. O valor do resgate no seu extrato é o que vale.`,
   noRegime: 'Escolha "Qual é o investimento?" em Editar para ver a regra de imposto.',
+  /** Tipo "Outro" (D-104, item 12): não há tipo exato para escolher. */
+  noRegimeOther: 'Para um investimento do tipo Outro, a Clarevo não estima o imposto: a regra depende do que ele é. O informe da instituição mostra o que vale.',
 } as const;
 
 /**
