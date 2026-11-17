@@ -2,7 +2,8 @@ import type { IsoDate, IsoMonth } from './dates';
 import { addMonths, daysInMonth, formatMonthYearBR, monthOf } from './dates';
 import type { Cents } from './money';
 
-export type ContextKind = 'pessoal' | 'familia';
+/** Pessoal (um por pessoa), Família (D-055) e Negócio (D-113, Espaço Negócio). */
+export type ContextKind = 'pessoal' | 'familia' | 'negocio';
 export type RecordKind = 'receita' | 'despesa';
 
 /** Tipo da conta de origem do dinheiro (D-043): informativo; não existe saldo por conta (P-018). */
@@ -95,6 +96,12 @@ export interface FinancialRecord {
    */
   investmentId?: string | null;
   investmentMovementId?: string | null;
+  /**
+   * Retirada para o Pessoal (D-113): o lançamento do outro lado. O gasto "Retirada para o Pessoal" no negócio e o recebimento "Retirada do
+   * negócio" no Pessoal apontam um para o outro e só mudam ou saem juntos (create_business_withdrawal e delete_business_withdrawal).
+   * Ausente ou null nos demais.
+   */
+  pairedRecordId?: string | null;
   createdBy: string;
   version: number;
   createdAt: string;

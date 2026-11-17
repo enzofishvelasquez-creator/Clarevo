@@ -62,8 +62,8 @@ export const LIMIT_MONTHS_AHEAD = BUDGET_MONTHS_AHEAD;
 /** O aviso do limite aparece quando o comprometido chega a 5 pontos dele (50 décimos) ou passa. */
 export const LIMIT_NEAR_TENTHS = 50;
 
-export function isBudgetCategory(category: unknown): category is string {
-  return typeof category === 'string' && BUDGET_CATEGORIES.includes(category);
+export function isBudgetCategory(category: unknown, categories: readonly string[] = BUDGET_CATEGORIES): category is string {
+  return typeof category === 'string' && categories.includes(category);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,11 +146,14 @@ function installmentInMonth(e: BudgetUsageSource['entries'][number], month: IsoM
   return installmentAmounts(e.amountCents, e.installments)[k - 1]!;
 }
 
-/** Usado no mês por categoria (as de BUDGET_CATEGORIES), em centavos. Regra no cabeçalho do arquivo; o banco a repete em month_budget. */
-export function categoryUsage(month: IsoMonth, source: BudgetUsageSource): Record<string, Cents> {
+/**
+ * Usado no mês por categoria (as de BUDGET_CATEGORIES ou, no negócio, as de gasto do negócio, D-113), em centavos. Regra no cabeçalho do
+ * arquivo; o banco a repete em month_budget.
+ */
+export function categoryUsage(month: IsoMonth, source: BudgetUsageSource, categories: readonly string[] = BUDGET_CATEGORIES): Record<string, Cents> {
   const spent = new Map<string, Cents>();
   const add = (category: string | null, cents: Cents) => {
-    if (category !== null && isBudgetCategory(category)) spent.set(category, (spent.get(category) ?? 0) + cents);
+    if (category !== null && isBudgetCategory(category, categories)) spent.set(category, (spent.get(category) ?? 0) + cents);
   };
   for (const r of source.records) {
     if (r.kind === 'despesa' && !r.invoice && monthOf(r.occurredOn) === month) add(r.category, r.amountCents);
@@ -160,21 +163,21 @@ export function categoryUsage(month: IsoMonth, source: BudgetUsageSource): Recor
     // Estorno informado pela pessoa (o automático não tem categoria): desconta no mês da fatura em que foi informado.
     else if (e.kind === 'estorno' && e.sourceMonth === null && e.invoiceMonth === month) add(e.category, -e.amountCents);
   }
-  return Object.fromEntries(BUDGET_CATEGORIES.map((c) => [c, Math.max(0, spent.get(c) ?? 0)]));
+  return Object.fromEntries(categories.map((c) => [c, Math.max(0, spent.get(c) ?? 0)]));
 }
 
 /**
  * Estornos informados com categoria numa fatura do mês (o que o usado do mês desconta), por categoria: as seis, em centavos. Só
  * explica o usado (D-054, E1): a regra de `categoryUsage` não muda. Estorno automático (crédito levado) não tem categoria e fica fora.
  */
-export function categoryRefunds(month: IsoMonth, entries: BudgetUsageSource['entries']): Record<string, Cents> {
+export function categoryRefunds(month: IsoMonth, entries: BudgetUsageSource['entries'], categories: readonly string[] = BUDGET_CATEGORIES): Record<string, Cents> {
   const refunds = new Map<string, Cents>();
   for (const e of entries) {
-    if (e.kind === 'estorno' && e.sourceMonth === null && e.invoiceMonth === month && e.category !== null && isBudgetCategory(e.category)) {
+    if (e.kind === 'estorno' && e.sourceMonth === null && e.invoiceMonth === month && e.category !== null && isBudgetCategory(e.category, categories)) {
       refunds.set(e.category, (refunds.get(e.category) ?? 0) + e.amountCents);
     }
   }
-  return Object.fromEntries(BUDGET_CATEGORIES.map((c) => [c, refunds.get(c) ?? 0]));
+  return Object.fromEntries(categories.map((c) => [c, refunds.get(c) ?? 0]));
 }
 
 /** Uma linha de month_budget: a categoria, o orçamento vigente (null: nenhum ou encerrado) e o usado no mês. */
@@ -196,11 +199,16 @@ export interface MonthBudgetRead {
 }
 
 /** month_budget calculado no core: as linhas de orçamento do contexto (qualquer mês) e o que foi gasto. */
-export function readMonthBudget(month: IsoMonth, budgets: readonly CategoryBudget[], source: BudgetUsageSource): MonthBudgetRead {
-  const used = categoryUsage(month, source);
+export function readMonthBudget(
+  month: IsoMonth,
+  budgets: readonly CategoryBudget[],
+  source: BudgetUsageSource,
+  categories: readonly string[] = BUDGET_CATEGORIES,
+): MonthBudgetRead {
+  const used = categoryUsage(month, source, categories);
   return {
     month,
-    lines: BUDGET_CATEGORIES.map((category) => {
+    lines: categories.map((category) => {
       const row = budgetRowFor(budgets, category, month);
       return {
         category,

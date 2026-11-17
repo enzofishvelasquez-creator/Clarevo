@@ -463,35 +463,39 @@ export function authorLabel(members: readonly FamilyMember[], personId: string):
 
 /**
  * O contexto a que um item (conta a pagar, registro) pertence, pelo identificador do contexto dele: "pessoal" se é o Pessoal da
- * pessoa, "familia" se é a Família dela, null se não é nenhum dos dois (ainda não carregou, ou a pessoa não lê esse contexto). As
- * telas de pagar e editar usam as contas e o rótulo "Salvando em" DESTE contexto, e não o do seletor: abrir de novo (recarregar a
- * página) o endereço de uma conta da Família com o seletor em Pessoal não pode oferecer as contas do Pessoal.
+ * pessoa, "familia" se é a Família dela, "negocio" se é o negócio dela (D-113), null se não é nenhum deles (ainda não carregou, ou a
+ * pessoa não lê esse contexto). As telas de pagar e editar usam as contas e o rótulo "Salvando em" DESTE contexto, e não o do seletor:
+ * abrir de novo (recarregar a página) o endereço de uma conta da Família com o seletor em Pessoal não pode oferecer as contas do Pessoal.
  */
 export function contextKindOfItem(
   contextId: string | null | undefined,
   personalContextId: string | null | undefined,
   familyContextId: string | null | undefined,
+  businessContextId?: string | null,
 ): ContextKind | null {
   if (!contextId) return null;
   if (contextId === personalContextId) return 'pessoal';
   if (contextId === familyContextId) return 'familia';
+  if (businessContextId && contextId === businessContextId) return 'negocio';
   return null;
 }
 
-/** O nome do contexto nas pílulas e nos avisos: "Pessoal" ou "Família". */
-export function contextName(kind: ContextKind): string {
+/** O nome do contexto nas pílulas e nos avisos: "Pessoal", "Família" ou o nome do negócio ("Negócio" enquanto o nome não chega). */
+export function contextName(kind: ContextKind, businessName?: string | null): string {
+  if (kind === 'negocio') return businessName && businessName.trim() !== '' ? businessName : 'Negócio';
   return kind === 'familia' ? FAMILY_TEXT.context : 'Pessoal';
 }
 
 /**
  * Pílula de formulário e de detalhe: onde a anotação vai ficar. Os textos das telas dizem "Pessoal" ("Salvando em Pessoal",
- * "Importando em Pessoal", "Pessoal"); com a Família escolhida, o último "Pessoal" vira "Família".
+ * "Importando em Pessoal", "Pessoal"); com a Família escolhida, o último "Pessoal" vira "Família"; com o negócio, o nome dele.
  */
-export function contextLabelFor(label: string, kind: ContextKind): string {
-  return kind === 'familia' ? label.replace(/Pessoal$/, FAMILY_TEXT.context) : label;
+export function contextLabelFor(label: string, kind: ContextKind, businessName?: string | null): string {
+  if (kind === 'pessoal') return label;
+  return label.replace(/Pessoal$/, contextName(kind, businessName));
 }
 
-/** "Você tem alterações que ainda não foram salvas em Pessoal." / "…em Família." */
-export function unsavedChangesText(kind: ContextKind): string {
-  return `Você tem alterações que ainda não foram salvas em ${contextName(kind)}.`;
+/** "Você tem alterações que ainda não foram salvas em Pessoal." / "…em Família." / "…em Sacolé da Mãe." */
+export function unsavedChangesText(kind: ContextKind, businessName?: string | null): string {
+  return `Você tem alterações que ainda não foram salvas em ${contextName(kind, businessName)}.`;
 }
