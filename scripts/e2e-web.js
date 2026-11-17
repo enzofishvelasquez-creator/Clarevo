@@ -16649,6 +16649,247 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
+  // Espaço Negócio (D-113, retorno de quem testa, decidido pelo Enzo em 17/11/2026): para quem tem CNPJ ou trabalha por conta, um espaço
+  // separado do Pessoal, incluído no plano (um negócio por pessoa). (1) Na demonstração padrão, nada muda (sem seletor de espaço e os totais
+  // de sempre), e Conta tem o card "Espaço Negócio" com a frase de para quem serve; criar um negócio (só na memória) põe o nome dele no
+  // seletor. (2) No cenário "negocio" (o negócio de exemplo "Sacolé da Maria", fictício), o seletor mostra Pessoal e o negócio; o Pessoal
+  // continua com os totais de sempre; o Resumo do negócio traz o card "Como está o negócio". (3) "Como está o negócio": entrou, saiu e sobrou
+  // numa cor só, a frase de fato, os últimos meses e as maiores saídas; os valores ocultos viram R$ ••••. (4) A retirada para o Pessoal: sai
+  // do negócio (não entra em Saiu) e entra no Pessoal como recebimento, ligada nos dois lados, sem editar; excluir tira os dois. (5) Mover um
+  // gasto do Pessoal para o negócio e de volta. (6) Os formulários do negócio usam as categorias do negócio; Metas e Investir explicam que
+  // ficam no Pessoal. (7) Mudar o nome e encerrar. (8) Letra grande e modo escuro em "Como está o negócio". Capturas 730 a 739. Nada vai à
+  // rede (tudo na memória da demonstração).
+  // ==================================================================================================================
+  {
+    const ngWrites0 = writes.length;
+    const ngTexts = [];
+    const ngKeep = async () => { const t = await body(); ngTexts.push(t); screenTexts.push(t); return t; };
+    const NG = 'Sacolé da Maria';
+    const NG_TAB = `Ver dados do negócio ${NG}`;
+    const ngTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
+    const ngSpaceTabs = () => p.getByRole('tab', { name: /^Ver dados d/ }).filter({ visible: true }).evaluateAll((els) => els.map((e) => `${e.getAttribute('aria-label')}:${e.getAttribute('aria-selected')}`));
+    const NG_OUT = ['Sem categoria', 'Material e mercadoria', 'Peças e ferramentas', 'Combustível e transporte', 'Funcionários e ajudantes', 'Impostos e DAS',
+      'Aluguel do ponto', 'Contas do ponto', 'Taxas e maquininha', 'Outras saídas'];
+    const ngChips = (group) => p.evaluate((g) => [...document.querySelectorAll(`[role=radiogroup][aria-label="${g}"] [role=radio]`)].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || e.textContent), group);
+    const ngEnter = async () => {
+      await p.goto(`http://localhost:${PORT}/?cenario=negocio`); await waitText('Cuidar da vida financeira');
+      await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+      await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(600);
+    };
+    // As telas empilhadas escondem a barra de abas: goResumo volta até ela aparecer e abre o Resumo.
+    const ngToResumo = async () => { await goResumo(); await p.waitForTimeout(500); };
+
+    // 1. Demonstração padrão: sem seletor e os totais de sempre; o card em Conta; criar um negócio na memória.
+    await demoHome();
+    ok('Negócio (D-113), demonstração padrão: sem negócio de exemplo, o Resumo continua sem o seletor de espaço', (await ngSpaceTabs()).length === 0, JSON.stringify(await ngSpaceTabs()));
+    await expectTotals('Negócio, demonstração padrão: outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+    await openConta();
+    await p.getByRole('heading', { name: 'Espaço Negócio', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(300);
+    let t = await ngKeep();
+    ok('Negócio: em Conta, o card "Espaço Negócio" (título de nível 2) diz para quem serve (CNPJ ou trabalho por conta), que está no plano, e oferece "Criar o espaço Negócio"',
+      (await p.getByRole('heading', { name: 'Espaço Negócio', level: 2 }).filter({ visible: true }).count()) === 1 &&
+        t.includes('Para quem tem CNPJ ou trabalha por conta: anote o que entra e o que sai do negócio num espaço separado do Pessoal e veja quanto sobrou no mês. Incluído no plano, um negócio por pessoa.') &&
+        (await visibleCount('button', 'Criar o espaço Negócio')) === 1, t.slice(t.indexOf('Espaço Negócio'), t.indexOf('Espaço Negócio') + 300));
+    await atWidths(async (w) => { await p.getByRole('heading', { name: 'Espaço Negócio', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await layoutChecks(`Negócio, card em Conta ${w}px`); if (w === 390) await shot('736_negocio_card_conta'); });
+    await btn('Criar o espaço Negócio').click(); await waitText('Nome do negócio'); await p.waitForTimeout(400);
+    t = await ngKeep();
+    ok('Negócio: "Criar o espaço Negócio" abre o formulário com a frase de para quem serve, o exemplo "Sacolé da Mãe" e o aviso de que na demonstração ele fica só nesta visita',
+      (await h1Name()) === 'Espaço Negócio' && t.includes('Para quem tem CNPJ ou trabalha por conta, como uma loja de conserto ou quem vende sacolé.') && t.includes('Por exemplo: Sacolé da Mãe.') &&
+        t.includes('É leve: não é contabilidade e não substitui quem cuida dos impostos do negócio.') && t.includes('Na demonstração, o negócio criado fica só nesta visita'), t.slice(0, 600));
+    await atWidths(async (w) => { await innerChecks(`Negócio, criar ${w}px`); if (w === 390) await shot('737_negocio_criar'); });
+    await btn('Criar o espaço Negócio').click(); await p.waitForTimeout(400);
+    ok('Negócio, criar: sem nome, o erro fica no campo e nada é criado', (await body()).includes('Dê um nome de 1 a 60 caracteres para o negócio.') && (await h1Name()) === 'Espaço Negócio');
+    await field('Nome do negócio').fill('Conserto de ar-condicionado');
+    await btn('Criar o espaço Negócio').click(); await waitText('Espaço Negócio criado', 8000); await p.waitForTimeout(600);
+    t = await ngKeep();
+    ok('Negócio, criar: volta para "Como está o negócio", com o aviso, o mês sem anotações e o seletor já no negócio',
+      (await h1Name()) === 'Como está o negócio' && t.includes('Espaço Negócio criado. Toque no nome dele, no alto da tela, para anotar no negócio.') &&
+        t.includes('Nada anotado neste mês. Anote uma venda, um serviço ou um gasto do negócio em Movimentos.'), t.slice(0, 500));
+    await btn('Voltar').click(); await p.waitForTimeout(500);
+    await ngToResumo();
+    ok('Negócio criado: o seletor mostra Pessoal e o nome do negócio (marcado), e o Resumo do negócio começa em zero',
+      JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:false', 'Ver dados do negócio Conserto de ar-condicionado:true']) && (await body()).includes('Como está o negócio'),
+      JSON.stringify(await ngSpaceTabs()));
+    await ngTab('Ver dados de Pessoal').click(); await p.waitForTimeout(600);
+    await expectTotals('Negócio criado: no Pessoal, outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+
+    // 2. Cenário "negocio": o seletor, o Pessoal de sempre e o Resumo do negócio.
+    await ngEnter();
+    ok('Negócio, cenário "negocio": o seletor com Pessoal (marcado) e "Sacolé da Maria"', JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:true', `${NG_TAB}:false`]), JSON.stringify(await ngSpaceTabs()));
+    await expectTotals('Negócio, cenário "negocio": o Pessoal segue 6.000 / 3.900 / 2.100 e 650 (o negócio de exemplo não muda nenhum total do Pessoal)', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+    await ngTab(NG_TAB).click(); await p.waitForTimeout(700);
+    await expectTotals('Negócio: o Resumo do negócio em outubro, com Recebido R$ 760,00, Pago R$ 418,00 e Diferença R$ 342,00, sem contas a pagar', 'R$ 760,00', 'R$ 418,00', 'R$ 342,00', 'R$ 0,00');
+    t = await ngKeep();
+    ok('Negócio: no Resumo do negócio, o card "Como está o negócio" com a frase do mês, "Ver como está o negócio" e "Retirada para o Pessoal"',
+      t.includes('Como está o negócio') && t.includes('Neste mês, entrou R$ 342,00 a mais do que saiu.') && (await visibleCount('button', 'Ver como está o negócio')) === 1 &&
+        (await visibleCount('button', 'Retirada para o Pessoal')) === 1 && !t.includes('Primeiros passos'), t.slice(0, 800));
+    await atWidths(async (w) => { await layoutChecks(`Negócio, Resumo do negócio ${w}px`); await shot(w === 390 ? '731_negocio_resumo' : '731_negocio_resumo_320px'); });
+
+    // 3. Como está o negócio.
+    await btn('Ver como está o negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(700);
+    t = await ngKeep();
+    ok('Negócio, "Como está o negócio": entrou R$ 760,00, saiu R$ 418,00 e sobrou R$ 342,00 em outubro, com a frase de fato',
+      (await h1Name()) === 'Como está o negócio' && t.includes('Entrou') && t.includes('R$ 760,00') && t.includes('Saiu') && t.includes('R$ 418,00') && t.includes('Sobrou') && t.includes('R$ 342,00') &&
+        t.includes('Neste mês, entrou R$ 342,00 a mais do que saiu.') && t.includes('Demonstração · Sacolé da Maria'), t.slice(0, 900));
+    ok('Negócio, "Como está o negócio": os últimos meses (de maio a outubro) com a frase do período e as maiores saídas de outubro, Material e mercadoria primeiro',
+      t.includes('Últimos meses') && t.includes('De maio a outubro de 2026, entrou mais do que saiu em 2 dos 2 meses com anotações. Somando, entrou R$ 1.501,00 a mais do que saiu.') &&
+        t.includes('Maiores saídas do mês') && t.indexOf('Material e mercadoria') < t.indexOf('Funcionários e ajudantes') && t.indexOf('Funcionários e ajudantes') < t.indexOf('Taxas e maquininha') &&
+        t.includes('Os valores são os que você anotou. A Clarevo não faz contabilidade nem cálculo de impostos.'), t.slice(t.indexOf('Últimos meses'), t.indexOf('Últimos meses') + 700));
+    // Sem cor de alerta: Entrou, Saiu e Sobrou na mesma cor de texto.
+    const ngColors = await p.evaluate(() => {
+      const val = (label) => { const g = [...document.querySelectorAll('[aria-label]')].find((e) => e.getBoundingClientRect().width > 0 && (e.getAttribute('aria-label') || '').startsWith(`${label}: R$`)); const v = g && [...g.querySelectorAll('div[dir="auto"]')].find((x) => /R\$/.test(x.textContent || '')); return v ? getComputedStyle(v).color : null; };
+      return [val('Entrou'), val('Saiu'), val('Sobrou')];
+    });
+    ok('Negócio: Entrou, Saiu e Sobrou numa cor só (sem verde nem vermelho)', ngColors.every((c) => c !== null && c === ngColors[0]), JSON.stringify(ngColors));
+    await atWidths(async (w) => { await innerChecks(`Negócio, como está ${w}px`); await shot(w === 390 ? '730_negocio_como_esta' : '730_negocio_como_esta_320px'); });
+    await p.getByRole('button', { name: 'Mês anterior: setembro de 2026' }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026'); await p.waitForTimeout(600);
+    t = await ngKeep();
+    ok('Negócio: em setembro, entrou R$ 1.760,00, saiu R$ 601,00 e sobrou R$ 1.159,00', t.includes('R$ 1.760,00') && t.includes('R$ 601,00') && t.includes('Neste mês, entrou R$ 1.159,00 a mais do que saiu.'), t.slice(0, 600));
+    await btn('Voltar para outubro de 2026').click(); await p.waitForTimeout(500);
+    // Valores ocultos: o olho do Resumo esconde os valores também aqui.
+    await btn('Voltar').click(); await ngToResumo();
+    await btn('Ocultar valores').click(); await p.waitForTimeout(300);
+    await btn('Ver como está o negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(600);
+    t = await body();
+    const ngHiddenLabels = await p.evaluate(() => [...document.querySelectorAll('[aria-label]')].filter((e) => e.getBoundingClientRect().width > 0 && /R\$ \d/.test(e.getAttribute('aria-label') || '')).map((e) => e.getAttribute('aria-label')).slice(0, 3));
+    ok('Negócio, valores ocultos: nenhum valor em reais à vista nem nos nomes acessíveis (R$ ••••)', !/R\$ \d/.test(t) && t.includes('R$ ••••') && ngHiddenLabels.length === 0, `${ngHiddenLabels.join(' | ')} ${t.slice(0, 300)}`);
+    await btn('Voltar').click(); await ngToResumo();
+    await btn('Mostrar valores').click(); await p.waitForTimeout(300);
+
+    // 4. Retirada para o Pessoal.
+    await btn('Retirada para o Pessoal').click(); await waitText('Sai de (conta do negócio)'); await p.waitForTimeout(500);
+    t = await ngKeep();
+    ok('Negócio, retirada: o formulário diz o que é, com o valor, a data, a conta do negócio, a conta do Pessoal e a descrição opcional',
+      (await h1Name()) === 'Retirada para o Pessoal' && t.includes('Para quando você leva dinheiro do negócio para o Pessoal. Sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.') &&
+        t.includes('Sai de (conta do negócio): Conta do negócio') && JSON.stringify(await ngChips('Entra em (conta do Pessoal)')) === JSON.stringify(['Conta principal', 'Carteira']) &&
+        t.includes('Sem descrição, fica "Retirada para o Pessoal" no negócio e "Retirada de Sacolé da Maria" no Pessoal.'), t.slice(0, 900));
+    await atWidths(async (w) => { await innerChecks(`Negócio, retirada ${w}px`); if (w === 390) await shot('732_negocio_retirada'); });
+    await btn('Salvar retirada').click(); await p.waitForTimeout(400);
+    ok('Negócio, retirada: sem valor, o erro fica no campo e nada é salvo', (await body()).includes('Informe um valor maior que zero, como 80,00.') && (await h1Name()) === 'Retirada para o Pessoal');
+    await field('Valor em reais').fill('300');
+    await btn('Salvar retirada').click(); await waitText('Retirada salva', 8000); await p.waitForTimeout(700);
+    t = await ngKeep();
+    ok('Negócio, retirada salva: em "Como está o negócio", Saiu continua R$ 418,00, a retirada fica à parte e o que ficou no negócio aparece',
+      (await h1Name()) === 'Como está o negócio' && t.includes('Retirada salva: saiu do negócio e entrou no Pessoal.') && t.includes('R$ 418,00') &&
+        t.includes('Retiradas para o Pessoal: R$ 300,00. Não entram em Saiu: é o dinheiro do negócio que foi para o Pessoal.') && t.includes('Ficou no negócio, depois das retiradas: R$ 42,00.'), t.slice(0, 1000));
+    await layoutChecks('Negócio, com retirada 390px'); await shot('733_negocio_com_retirada');
+    await btn('Voltar').click(); await ngToResumo();
+    await expectTotals('Negócio, retirada: no Resumo do negócio, o dinheiro saiu (Pago R$ 718,00, Diferença R$ 42,00)', 'R$ 760,00', 'R$ 718,00', 'R$ 42,00', 'R$ 0,00');
+    await ngTab('Ver dados de Pessoal').click(); await p.waitForTimeout(600);
+    await expectTotals('Negócio, retirada: no Pessoal, entrou uma vez como recebimento (Recebido R$ 6.300,00)', 'R$ 6.300,00', 'R$ 3.900,00', 'R$ 2.400,00', 'R$ 650,00');
+    await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Retirada de Sacolé da Maria, / }).filter({ visible: true }).first().click(); await waitText('Retirada do negócio'); await p.waitForTimeout(500);
+    t = await ngKeep();
+    ok('Negócio, retirada no Pessoal: o recebimento "Retirada do negócio", ligado ao negócio, sem "Editar" nem "Mover", com "Ver em Sacolé da Maria" e "Excluir a retirada"',
+      t.includes('Retirada de Sacolé da Maria') && t.includes('Retirada do negócio: este valor saiu de Sacolé da Maria e entrou no Pessoal.') &&
+        t.includes('Uma retirada fica ligada nos dois espaços. Para mudar o valor ou a data, exclua a retirada e anote de novo.') && (await visibleCount('button', 'Editar recebimento')) === 0 &&
+        (await visibleCount('button', 'Mover para o espaço Negócio')) === 0 && (await visibleCount('button', `Ver em ${NG}`)) === 1 && (await visibleCount('button', 'Excluir a retirada')) === 1, t.slice(0, 900));
+    await atWidths(async (w) => { await innerChecks(`Negócio, retirada no Pessoal ${w}px`); if (w === 390) await shot('734_negocio_retirada_no_pessoal'); });
+    await btn(`Ver em ${NG}`).click(); await waitText('Retirada para o Pessoal: este valor saiu do negócio'); await p.waitForTimeout(400);
+    ok('Negócio, retirada: "Ver em Sacolé da Maria" abre o outro lado, o gasto "Retirada para o Pessoal" do negócio', (await body()).includes(`Espaço\n${NG}`) || (await body()).includes(NG), (await body()).slice(0, 400));
+    await btn('Excluir a retirada').click(); await p.waitForTimeout(300);
+    ok('Negócio, excluir a retirada: a confirmação diz que sai dos dois espaços', (await body()).includes('A retirada sai do negócio e do Pessoal, junto.'));
+    await confirmIn('Excluir a retirada'); await waitText('Retirada excluída do negócio e do Pessoal.', 8000); await p.waitForTimeout(500);
+    await ngToResumo();
+    await ngTab('Ver dados de Pessoal').click(); await p.waitForTimeout(600);
+    await expectTotals('Negócio, retirada excluída: o Pessoal volta a 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+
+    // 5. Mover um gasto do Pessoal para o negócio e de volta.
+    await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Mercado, Pago · 06\/10\/2026 · Carteira, / }).filter({ visible: true }).first().click(); await waitText('Gasto pago'); await p.waitForTimeout(500);
+    await btn('Mover para o espaço Negócio').click(); await waitText('Categoria no outro espaço'); await p.waitForTimeout(500);
+    t = await ngKeep();
+    ok('Negócio, mover: o lançamento, as categorias do negócio e a conta do negócio, para quem anotou no lugar errado',
+      (await h1Name()) === 'Mover para o espaço Negócio' && t.includes('Para o que foi anotado no lugar errado.') && t.includes('Mover para Sacolé da Maria') && t.includes('Categoria aqui: Mercado') &&
+        JSON.stringify(await ngChips('Categoria no outro espaço')) === JSON.stringify(NG_OUT) && t.includes('Banco ou carteira no outro espaço: Conta do negócio'), t.slice(0, 900));
+    await atWidths(async (w) => { await innerChecks(`Negócio, mover ${w}px`); if (w === 390) await shot('735_negocio_mover'); });
+    await radio('Material e mercadoria').click();
+    await btn('Mover').click(); await waitText('Lançamento movido para Sacolé da Maria.', 8000); await p.waitForTimeout(500);
+    t = await ngKeep();
+    ok('Negócio, mover: o gasto agora é do negócio, na Conta do negócio e em Material e mercadoria, com "Mover para o Pessoal"',
+      t.includes(`Espaço\n${NG}`) && t.includes('Conta do negócio') && t.includes('Material e mercadoria') && (await visibleCount('button', 'Mover para o Pessoal')) === 1, t.slice(0, 700));
+    await btn('Mover para o Pessoal').click(); await waitText('Categoria no outro espaço'); await p.waitForTimeout(400);
+    await radio('Mercado').click(); await radio('Carteira').click();
+    await btn('Mover').click(); await waitText('Lançamento movido para Pessoal.', 8000); await p.waitForTimeout(500);
+    await ngToResumo();
+    await ngTab('Ver dados de Pessoal').click(); await p.waitForTimeout(600);
+    await expectTotals('Negócio, mover e voltar: o Pessoal segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+
+    // 6. Formulários e abas no negócio.
+    await ngTab(NG_TAB).click(); await p.waitForTimeout(600);
+    await btn('Anotar gasto').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
+    t = await ngKeep();
+    ok('Negócio: "Anotar gasto" no negócio salva no negócio, com as categorias de saída do negócio e sem subcategoria',
+      t.includes('Demonstração · Sacolé da Maria') && JSON.stringify(await ngChips('Categoria')) === JSON.stringify(NG_OUT), JSON.stringify(await ngChips('Categoria')));
+    await btn('Cancelar').click(); await p.waitForTimeout(400);
+    await tabByName('Metas').click(); await waitText('Ir para o Pessoal'); await p.waitForTimeout(400);
+    t = await ngKeep();
+    ok('Negócio: Metas, no negócio, explica que metas ficam no Pessoal e na Família, com "Ir para o Pessoal"',
+      t.includes('Metas ficam no Pessoal e na Família. O espaço Negócio é só para o que entra e sai do negócio.') && !t.includes('Viagem de férias'), t.slice(0, 400));
+    await layoutChecks('Negócio, Metas 390px');
+    await tabByName('Investir').click(); await waitText('Investimentos ficam no Pessoal'); await p.waitForTimeout(400);
+    t = await ngKeep();
+    ok('Negócio: Investir, no negócio, explica que investimentos ficam no Pessoal', t.includes('Investimentos ficam no Pessoal. O espaço Negócio é só para o que entra e sai do negócio.') && !t.includes('Seus investimentos hoje'), t.slice(0, 400));
+    await btn('Ir para o Pessoal').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
+    ok('Negócio: "Ir para o Pessoal" troca o espaço e mostra os investimentos do Pessoal', (await body()).includes('Seus investimentos hoje'));
+    await ngToResumo();
+    ok('Negócio: depois de "Ir para o Pessoal", o seletor está no Pessoal', JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:true', `${NG_TAB}:false`]), JSON.stringify(await ngSpaceTabs()));
+
+    // 7. Mudar o nome e encerrar.
+    await ngTab(NG_TAB).click(); await p.waitForTimeout(500);
+    await btn('Ver como está o negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    await btn('Mudar o nome').click(); await waitText('Nome do negócio'); await p.waitForTimeout(300);
+    await field('Nome do negócio').fill('Sacolés e Geladinhos da Maria');
+    await btn('Salvar o nome').click(); await waitText('Nome do negócio atualizado.', 8000); await p.waitForTimeout(500);
+    ok('Negócio: o nome novo aparece em "Como está o negócio"', (await body()).includes('Demonstração · Sacolés e Geladinhos da Maria'));
+    await btn('Encerrar o espaço Negócio').click(); await p.waitForTimeout(300);
+    t = await body();
+    ok('Negócio, encerrar: a confirmação diz o que acontece (sai do app, fica guardado sem leitura por 6 meses, as retiradas continuam no Pessoal)',
+      t.includes('Encerrar o espaço Negócio?') && t.includes('O espaço sai do app. Os lançamentos dele ficam guardados, sem leitura, e são apagados de vez depois de 6 meses.'), t.slice(0, 500));
+    await confirmIn('Encerrar'); await waitText('Espaço Negócio encerrado.', 8000); await p.waitForTimeout(500);
+    ok('Negócio encerrado: Conta volta a oferecer "Criar o espaço Negócio"', (await visibleCount('button', 'Criar o espaço Negócio')) === 1);
+    await btn('Voltar').click().catch(() => {}); await p.waitForTimeout(400);
+    await ngToResumo().catch(() => {});
+    ok('Negócio encerrado: o seletor de espaço sai do Resumo', (await ngSpaceTabs()).length === 0, JSON.stringify(await ngSpaceTabs()));
+    await expectTotals('Negócio encerrado: o Pessoal segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+
+    // 8. Letra grande (1,3 vez, 360 px) e modo escuro em "Como está o negócio".
+    await ngEnter();
+    await ngTab(NG_TAB).click(); await p.waitForTimeout(500);
+    await btn('Ver como está o negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(500);
+    await p.setViewportSize({ width: 360, height: 800 }); await p.waitForTimeout(400);
+    await p.evaluate(AC_SRC); await p.evaluate(() => window.__acc.scale(1.3)); await p.waitForTimeout(600);
+    const ngBig = await p.evaluate(() => ({ o: window.__acc.overflow(), cut: window.__acc.cut(), ov: window.__acc.overlap(), t: window.__acc.targets().small }));
+    ok('Negócio, letra grande (1,3 vez, 360 px): nada fora da tela, cortado ou por cima de outro texto, e alvos de 44 px', ngBig.o.length === 0 && ngBig.cut.length === 0 && ngBig.ov.length === 0 && ngBig.t.length === 0,
+      [...ngBig.o, ...ngBig.cut, ...ngBig.ov, ...ngBig.t].slice(0, 4).join(' | '));
+    await shot('738_negocio_letra_grande');
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+    {
+      const ngDark = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
+      await ngDark.addInitScript(() => { window.__clarevoSemTour = true; });
+      const dp = await ngDark.newPage();
+      const dpErrors = []; dp.on('pageerror', (e) => dpErrors.push(e.message));
+      const dpWrites = []; dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dpWrites.push(r.url()));
+      await dp.goto(`http://localhost:${PORT}/?cenario=negocio`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
+      await dp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dp.getByRole('tab', { name: NG_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
+      await dp.getByRole('button', { name: 'Ver como está o negócio', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Últimos meses').filter({ visible: true }).first().waitFor({ timeout: 10000 });
+      await dp.waitForTimeout(800);
+      await dp.evaluate(AC_SRC);
+      const dc = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow(), bg: getComputedStyle(document.body).backgroundColor }));
+      ok(`Negócio, modo escuro: "Como está o negócio" no fundo azul-marinho, com contraste de 4,5:1 em cada texto (${dc.c.n} textos) e nada fora da tela`,
+        dc.bg === 'rgb(19, 30, 62)' && dc.c.n > 20 && dc.c.bad.length === 0 && dc.o.length === 0 && dpErrors.length === 0 && dpWrites.length === 0, `${dc.bg} ${[...dc.c.bad, ...dc.o, ...dpErrors].slice(0, 4).join(' | ')}`);
+      await dp.screenshot({ path: `${OUT}/739_escuro_negocio.png` });
+      await ngDark.close();
+    }
+
+    // Textos e escritas.
+    const ngBad = ngTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(preju[ií]zo|lucro|cuidado|aten[cç][aã]o|ruim|parab[eé]ns|deveria)\b/i)?.[0]).filter(Boolean);
+    ok('Negócio: nas telas do espaço Negócio, nenhum termo proibido, travessão longo nem palavra de julgamento', ngTexts.length >= 12 && ngBad.length === 0, `${ngTexts.length} telas ${ngBad.join(' | ')}`);
+    ok('Negócio: nada vai à rede (a demonstração grava só na memória)', writes.length === ngWrites0, writes.slice(ngWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
   // Tema (D-112, complementa a D-096): Conta › "Tema", logo depois de "Privacidade neste aparelho", com "Igual ao aparelho" (o padrão,
   // marcado de início), "Claro" e "Escuro" e a frase "Por padrão, a Clarevo segue o tema do aparelho.". A escolha fica só neste aparelho
   // (na web, a chave `clarevo.tema.v1` do localStorage, também lida pelo script de index.html antes de o app desenhar) e não muda as cores

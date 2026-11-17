@@ -47,7 +47,10 @@ export default function MoverRegistroScreen() {
   const targetId = toBusiness ? business.data?.id : fromBusiness ? personal.data?.personalContextId : undefined;
   const otherAccounts = useAccounts(toBusiness ? business.data?.id : undefined);
   const back = () => (router.canGoBack() ? router.back() : router.replace(`/registro/${id}`));
-  const header = <SubHeader title={toBusiness ? T.moveToBusiness : T.moveToPersonal} onBack={back} right={<ContextPill label={T.context} fixed />} />;
+  // A pílula diz de onde o lançamento sai: o Pessoal ou o negócio.
+  const header = (
+    <SubHeader title={toBusiness ? T.moveToBusiness : T.moveToPersonal} onBack={back} right={<ContextPill label={fromBusiness ? (business.data?.name ?? T.context) : 'Pessoal'} fixed />} />
+  );
 
   const loading = record.isPending || business.isPending || personal.isPending || (toBusiness && otherAccounts.isPending);
   const failed = record.isError || business.isError || personal.isError || (toBusiness && otherAccounts.isError);

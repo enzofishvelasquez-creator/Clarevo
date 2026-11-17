@@ -25,6 +25,7 @@ import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { MonthStepper } from '@/components/month-stepper';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { flash } from '@/lib/flash';
 import { useAccessCanWrite } from '@/state/access';
 import { useBusiness, useEndBusiness } from '@/state/business';
 import { useBusinessOverview, useView } from '@/state/data';
@@ -118,7 +119,7 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
     setConfirmEnd(false);
     if (r.ok) {
       setSpace('pessoal');
-      setNotice(T.ended);
+      flash.set(T.ended);
       router.replace('/conta');
       return;
     }

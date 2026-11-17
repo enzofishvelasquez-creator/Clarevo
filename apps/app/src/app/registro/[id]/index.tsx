@@ -156,7 +156,8 @@ export default function DetalheRegistro() {
       await removeWithdrawal.mutateAsync({ key: withdrawalKey.current, recordId: r.id, version: r.version });
       setConfirmingWithdrawal(false);
       flash.set(BUSINESS_TEXT.withdrawalDeleted);
-      toList();
+      // Os dois lados saíram: o detalhe do outro lado, se ficou na pilha, também não existe mais.
+      router.replace('/movimentacoes');
     } catch (e) {
       setConfirmingWithdrawal(false);
       if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {

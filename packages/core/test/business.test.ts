@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUSINESS_CATEGORIES,
+  BUSINESS_GUIDE_ENTRY,
+  RECORD_KIND_ERROR_TEXT,
   BUSINESS_ERROR_TEXT,
   BUSINESS_TEXT,
   CATEGORIES,
@@ -234,6 +236,18 @@ describe('Como está o negócio: entrou, saiu e sobrou', () => {
     }
     expect(businessErrorText('ja_tem_negocio')).toBe('Você já tem um espaço Negócio. O plano inclui um negócio por pessoa.');
     expect(businessErrorText('qualquer')).toBe(BUSINESS_ERROR_TEXT.salvar_falhou);
+    // A mesma frase da retirada travada no detalhe e na recusa do formulário de gasto e recebimento.
+    expect(RECORD_KIND_ERROR_TEXT.retirada_ligada).toBe(BUSINESS_TEXT.withdrawalLocked);
+    // A entrada do guia pronta para a junção (fora de GUIDE_ENTRIES enquanto o tema da Ajuda do site não existe).
+    const guideTexts = [BUSINESS_GUIDE_ENTRY.title, BUSINESS_GUIDE_ENTRY.purpose, ...BUSINESS_GUIDE_ENTRY.steps];
+    for (const g of guideTexts) {
+      expect(g).not.toMatch(FORBIDDEN);
+      expect(g).not.toMatch(JUDGMENT);
+    }
+    expect(BUSINESS_GUIDE_ENTRY.steps.length).toBeGreaterThanOrEqual(3);
+    expect(BUSINESS_GUIDE_ENTRY.steps.length).toBeLessThanOrEqual(6);
+    expect(BUSINESS_GUIDE_ENTRY.routes).toContain('/negocio');
+    expect(BUSINESS_GUIDE_ENTRY.screenshot).toBe('730_negocio_como_esta.png');
     // Quem tem CNPJ ou trabalha por conta: a frase que explica para que serve aparece em Conta e na criação.
     expect(BUSINESS_TEXT.accountHintNone).toContain('CNPJ ou trabalha por conta');
     expect(BUSINESS_TEXT.intro).toContain('CNPJ ou trabalha por conta');
