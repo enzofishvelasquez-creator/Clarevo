@@ -8225,6 +8225,8 @@ setInterval(async () => {
   // O resumo diz quantas linhas já estavam anotadas (a parcela por semelhança e o mercado pela chave) e quantas foram importadas: o café
   // e a parcela em andamento (que entra com as 3 parcelas da papelaria, de novembro a janeiro).
   await btn('Importar 2 lançamentos').click(); await waitText('Importação concluída', 12000);
+  // A frase vem num aviso com entrada animada, que aparece um instante depois do título (como no fim do bloco, na conta nova).
+  await waitUntil(async () => (await body()).includes('2 lançamentos importados, 2 já estavam anotados.'), 8000);
   ok('I1 resumo da fatura: "2 lançamentos importados, 2 já estavam anotados."', (await body()).includes('2 lançamentos importados, 2 já estavam anotados.'), (await body()).slice(0, 300));
   ok('I1 a parcela em andamento virou compra parcelada no cartão: 3 parcelas de R$ 50,00, a 1ª na fatura de novembro, numeradas de 1 a 3',
     await otherDevice(async (repo, ctx) => {
@@ -14710,10 +14712,20 @@ setInterval(async () => {
     const ipBoxes = () => p.getByRole('checkbox').filter({ visible: true }).evaluateAll((els) => els.filter((e) => (e.getAttribute('aria-label') || '').startsWith('Incluir:')).map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-checked'), e.getAttribute('aria-disabled')]));
     const ipExternal = []; const ipOnRequest = (r) => { const u = r.url(); if (!u.startsWith(`http://localhost:${PORT}`) && !/^(data|blob):/.test(u)) ipExternal.push(u); };
     p.on('request', ipOnRequest);
+    // Volta até a barra de abas e abre Movimentos (as telas da pilha escondem a barra).
+    const ipMovements = async () => {
+      for (let i = 0; i < 6 && (await tabByName('Movimentos').count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
+      await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(400);
+    };
+    const ipOpenCard = async () => {
+      await ipMovements();
+      await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitCardsList(); await p.waitForTimeout(500);
+      await p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first().click(); await waitText('Fatura atual'); await p.waitForTimeout(400);
+    };
 
     await demoHome();
     // ---- 1. "Importar fatura" na tela do cartão: o arquivo ou prints, com o aviso de que nada sai do aparelho ----
-    await openCardPage();
+    await ipOpenCard();
     await btn('Importar fatura').click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
     let ipT = await ipKeep();
     ok('Prints (D-108): "Importar fatura" abre a importação com "Escolher o arquivo" e, embaixo, "Ou envie prints da tela do banco", para a fatura do mês atual, com "Escolher prints"',
@@ -14767,7 +14779,7 @@ setInterval(async () => {
     ok('Prints da fatura: a fatura de novembro soma as compras dos prints (R$ 550,00 + R$ 80,50 + R$ 12,30 + R$ 50,00 + R$ 25,00 = R$ 717,80)', ipT.includes('R$ 717,80'), ipT.slice(0, 400));
 
     // ---- 3. Print do extrato da conta: o rendimento sem sinal é recebimento; uma linha troca de gasto para recebimento ----
-    await goTab('Movimentos'); await waitText('Organizar'); await p.waitForTimeout(400);
+    await ipMovements();
     await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300);
     await ipPick([ipExt]); await waitText('1 print lido', 90000); await p.waitForTimeout(400);
     ipT = await ipKeep();
@@ -14812,7 +14824,7 @@ setInterval(async () => {
     await expectTotals('Prints: Resumo de outubro com os recebimentos (R$ 0,01 + R$ 50,00 + R$ 120,00) e a tarifa (R$ 30,00)', 'R$ 6.170,01', 'R$ 3.930,00', 'R$ 2.240,01', 'R$ 650,00');
 
     // ---- 4. Print sem lançamento: a mensagem diz o que conferir, junto do botão dos prints ----
-    await goTab('Movimentos'); await waitText('Organizar'); await p.waitForTimeout(400);
+    await ipMovements();
     await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300);
     await ipPick([ipNone]); await waitText('A Clarevo não achou lançamentos nestes prints.', 90000); await p.waitForTimeout(300);
     ipT = await ipKeep();
