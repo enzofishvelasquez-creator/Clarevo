@@ -439,6 +439,9 @@ describe('lembretes dos investimentos com adiar e pausar (D-104, item 6)', () =>
     const rp = detailReminder(past, TODAY, {});
     expect(rp?.kind === 'vencimentos' && INVESTMENT_REMINDER_TEXT.card.due(rp.due)).toBe('Este investimento venceu em 10/11/2026. Se o dinheiro já voltou para a conta, quer registrar o resgate?');
     expect(detailReminder(far, TODAY, {})).toBeNull();
+    expect([r, rp, detailReminder(stale, TODAY, {})].map((x) => INVESTMENT_REMINDER_TEXT.card.title(x!))).toEqual(['Vencimento', 'Vencimento', 'Valor sem atualização']);
+    const rel = detailReminder(inv({ id: 'i', liquidity: 'a_partir_de', liquidityOn: '2026-11-20', valueCents: 100, firstMovementOn: '2026-11-01' }), TODAY, {});
+    expect(rel && INVESTMENT_REMINDER_TEXT.card.title(rel)).toBe('Fim da carência');
     expect(detailReminder({ ...soon, status: 'encerrado' }, TODAY, {})).toBeNull();
   });
 

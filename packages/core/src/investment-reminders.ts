@@ -253,6 +253,7 @@ export const INVESTMENT_REMINDER_TEXT = {
   },
   /** Cartão do detalhe. */
   card: {
+    title: (r: DetailReminder) => (r.kind === 'atualizar' ? 'Valor sem atualização' : r.due.release ? 'Fim da carência' : 'Vencimento'),
     due: (d: DueItem) =>
       d.days < 0
         ? `Este investimento venceu em ${formatDateBR(d.on)}. Se o dinheiro já voltou para a conta, quer registrar o resgate?`

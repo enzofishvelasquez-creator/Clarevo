@@ -15319,7 +15319,7 @@ setInterval(async () => {
       t.includes('Este investimento venceu em 01/10/2026. Se o dinheiro já voltou para a conta, quer registrar o resgate?') && (await visibleCount('button', 'Registrar o resgate')) === 1 &&
         (await visibleCount('button', 'Lembrar de novo em 3 dias')) === 1 && (await visibleCount('button', 'Pausar este lembrete por 30 dias')) === 1 &&
         t.includes('Sem valor do extrato ainda: é o aplicado menos o resgatado, desde 01/08/2026.') && !/atrasad|deveria|esqueceu/i.test(t), t.slice(0, 1500));
-    await atWidths(async (w) => { await layoutChecks(`D-104 Lembrete no detalhe ${w}px`); if (w === 390) { await into('Vencimentos'); await shot('569_investimento_lembrete'); } });
+    await atWidths(async (w) => { await layoutChecks(`D-104 Lembrete no detalhe ${w}px`); if (w === 390) { await into('Vencimento'); await shot('569_investimento_lembrete'); } });
     await btn('Registrar o resgate').click(); await waitText('O dinheiro que você tirou do investimento.'); await p.waitForTimeout(300);
     ok('D-104 Resgate no vencimento: "Somar a uma meta?" com a viagem, sem nada marcado (a reserva agora lê os investimentos)',
       (await body()).includes('Somar a uma meta? (opcional)') && (await radio('Viagem de férias').getAttribute('aria-checked')) === 'false' && (await visibleCount('radio', 'Reserva para imprevistos')) === 0);

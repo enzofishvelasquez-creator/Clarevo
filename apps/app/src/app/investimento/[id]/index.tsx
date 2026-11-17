@@ -313,7 +313,7 @@ function ReminderCard({ reminder, onAction, onHold }: { reminder: DetailReminder
   return (
     <Card style={{ gap: space[2] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
-        {R.kindTitle[reminder.kind]}
+        {R.card.title(reminder)}
       </Txt>
       <Txt>{reminder.kind === 'vencimentos' ? R.card.due(reminder.due) : R.card.stale(reminder.lastValueOn, reminder.since)}</Txt>
       {reminder.kind === 'atualizar' || (reminder.due.days < 0 && !reminder.due.release) ? (
