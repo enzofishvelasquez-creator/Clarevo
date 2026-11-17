@@ -14766,7 +14766,7 @@ setInterval(async () => {
       t.includes('Inflação de 12% ao ano (0,95% ao mês, taxa equivalente), constante no período, só para mostrar o valor em dinheiro de hoje: a meta e o valor por mês não mudam.') &&
       t.includes('Valor por mês arredondado para cima, no centavo; valores finais para baixo.'));
     await keepText();
-    await atWidths(async (w) => { await layoutChecks(`Revisão simulador, mostrar em dinheiro de hoje ${w}px`); if (w === 390) await calcShot('640_simular_mostrar_dinheiro_de_hoje'); });
+    await atWidths(async (w) => { await layoutChecks(`Revisão simulador, mostrar em dinheiro de hoje ${w}px`); if (w === 390) await calcShot('690_simular_mostrar_dinheiro_de_hoje'); });
     await radio('Corrigir a meta pela inflação').click(); await p.waitForTimeout(250);
     ok('Revisão: trocar a escolha tira o resultado e mostra a dica de "Corrigir a meta pela inflação"',
       !(await body()).includes('por mês na hipótese informada') && (await body()).includes('Para manter o poder de compra: a meta sobe com a inflação até o fim do prazo, e o valor por mês é recalculado.') &&
@@ -14779,7 +14779,7 @@ setInterval(async () => {
       t.includes('Em dinheiro de hoje, com inflação de 12% ao ano, o total de R$ 17.624,05 equivale a R$ 10.000,35.') && !t.includes('escolha "Corrigir a meta pela inflação"') &&
       t.includes('Inflação de 12% ao ano (0,95% ao mês, taxa equivalente), constante no período, para corrigir a meta: a meta de hoje com a inflação de todo o prazo, no centavo.'), t.slice(-1500));
     await keepText();
-    await atWidths(async (w) => { await layoutChecks(`Revisão simulador, meta corrigida ${w}px`); if (w === 390) await calcShot('641_simular_meta_corrigida'); if (w === 320) await shot('641_simular_meta_corrigida_320px', true); });
+    await atWidths(async (w) => { await layoutChecks(`Revisão simulador, meta corrigida ${w}px`); if (w === 390) await calcShot('691_simular_meta_corrigida'); if (w === 320) await shot('691_simular_meta_corrigida_320px', true); });
     // "Quanto posso ter" não tem meta: a escolha volta a "Mostrar em dinheiro de hoje" e "Corrigir" some.
     await radio('Quanto posso ter').click(); await p.waitForTimeout(300);
     ok('Revisão: em "Quanto posso ter", só "Sem inflação" e "Mostrar em dinheiro de hoje" (marcada), com a dica sem meta',
@@ -14840,11 +14840,11 @@ setInterval(async () => {
     await atWidths(async (w) => {
       await scrollTo('As duas ordens, lado a lado');
       await layoutChecks(`Revisão plano, resposta e comparação ${w}px`);
-      if (w === 390) await shot('642_plano_dividas_resposta_e_comparacao');
-      if (w === 320) await shot('642_plano_dividas_resposta_e_comparacao_320px');
+      if (w === 390) await shot('692_plano_dividas_resposta_e_comparacao');
+      if (w === 320) await shot('692_plano_dividas_resposta_e_comparacao_320px');
       await scrollTo('O plano, passo a passo');
-      if (w === 390) await shot('643_plano_dividas_plano_passo_a_passo');
-      if (w === 320) await shot('643_plano_dividas_plano_passo_a_passo_320px');
+      if (w === 390) await shot('693_plano_dividas_plano_passo_a_passo');
+      if (w === 320) await shot('693_plano_dividas_plano_passo_a_passo_320px');
     });
     ok('Revisão: nada vai à rede no simulador nem no plano', writes.length === rvWrites0, writes.slice(rvWrites0).join(' | '));
   }
