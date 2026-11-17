@@ -10,7 +10,8 @@ import type { InvestmentMovement, MarketIndices } from './investments';
  * E1. Sem data de fim, ou com a data ainda por vir: a estimativa de sempre (`estimateValueByRate`), pela taxa contratada.
  * E2. Com a data de fim já passada: até a data (inclusive), a taxa contratada; do dia seguinte até hoje, a taxa de depois. A conta é feita
  *     em duas partes: o valor estimado no dia seguinte à data de fim (com os aportes, resgates e rendimentos até esse dia) vira a base da
- *     segunda parte, como um valor do extrato. Se o último valor do extrato já é de depois da data de fim, só a taxa de depois conta.
+ *     segunda parte, como um valor do extrato. Se o último valor do extrato já é de depois da data de fim, ou se nenhum movimento é de até o
+ *     dia seguinte a ela, só a taxa de depois conta.
  * E3. Como a estimativa de sempre: valor bruto, sem imposto, sem taxas e sem a oscilação de mercado; nunca gravado sozinho.
  */
 
@@ -40,7 +41,14 @@ export function estimateValueWithRateStep(inv: RateFields, movements: readonly M
     return e ? { ...e, stepApplied: true } : null;
   }
   const stepDay = addDays(until, 1);
-  const first = estimateValueByRate(inv, live.filter((m) => m.occurredOn <= stepDay), indices, stepDay);
+  const upToStep = live.filter((m) => m.occurredOn <= stepDay);
+  // Nenhum movimento até o dia seguinte à data de fim (o primeiro aporte veio depois da troca): a taxa contratada não chegou a valer, e a
+  // conta é direta, com a taxa de depois, sobre todos os movimentos.
+  if (upToStep.length === 0) {
+    const e = estimateValueByRate(second, live, indices, today);
+    return e ? { ...e, stepApplied: true } : null;
+  }
+  const first = estimateValueByRate(inv, upToStep, indices, stepDay);
   if (!first) return null;
   // A base da segunda parte vem depois de qualquer movimento do dia (o valor estimado já inclui os do dia seguinte à data de fim).
   const rest = live.filter((m) => m.occurredOn > stepDay);
