@@ -73,6 +73,8 @@ export function UpcomingDatesCard({ items }: { items: readonly Investment[] }) {
           {`E mais ${events.length - shown.length} nos próximos 12 meses.`}
         </Txt>
       ) : null}
+      {/* D-105: os vencimentos também aparecem no Calendário do mês, junto das contas e dos aportes. */}
+      <LinkButton label="Ver no calendário" icon={CalendarClock} onPress={() => router.push('/calendario')} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
     </Card>
   );
 }

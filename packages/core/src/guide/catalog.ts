@@ -89,7 +89,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       'Use as setas ao lado do nome do mês para ver outros meses.',
       `Em ${q('Ainda a pagar neste mês')} fica o que ainda vai vencer. Toque em ${q(SUMMARY_NAV_TEXT.viewPayables)} para abrir Contas a pagar.`,
       `${q('Pagamentos do mês')} lista os últimos gastos, e ${q('Ver todos')} abre a lista completa, com a divisão por categoria.`,
-      `Logo abaixo do cabeçalho fica o botão ${q('Anotar gasto')}.`,
+      `Logo abaixo do cabeçalho fica o botão ${q('Anotar gasto')}. No computador, ele fica no topo da barra lateral, à vista em todas as telas.`,
       `Em conta nova, o card ${q('Primeiros passos')} leva aos primeiros cadastros.`,
     ],
     screenName: TAB.resumo,
@@ -169,7 +169,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       [TAB.movimentos, 'Registrar recebimento'],
     ],
     steps: [
-      `Toque em ${q('Anotar gasto')}, logo abaixo do cabeçalho do Resumo, ou em ${q('Registrar recebimento')}, em Movimentos.`,
+      `Toque em ${q('Anotar gasto')}, logo abaixo do cabeçalho do Resumo (no computador, no topo da barra lateral), ou em ${q('Registrar recebimento')}, em Movimentos.`,
       `Digite a descrição e o ${q('Valor em reais')}.`,
       `Escolha a data (${q('Hoje')}, ${q('Ontem')} ou outra) e a categoria.`,
       `Se pagou no cartão de crédito, escolha o cartão em ${q(CARDS_TEXT.screens.payHow)}. Com mais de um banco ou carteira cadastrado, escolha de onde o dinheiro saiu em ${q(ACCOUNTS_TEXT.out)}.`,
@@ -466,7 +466,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Cadastra de onde sai o dinheiro, como o banco e a carteira, para escolher de onde saiu em cada gasto, pagamento e aporte. É só a origem: a Clarevo não guarda saldo.',
     where: [ACCOUNT_SCREEN, ACCOUNTS_TEXT.title],
     steps: [
-      'Toque no círculo com as suas iniciais, no canto do cabeçalho, para abrir Conta.',
+      'Toque no círculo com as suas iniciais, no canto do cabeçalho (no computador, embaixo na barra lateral), para abrir Conta.',
       `Em ${q(ACCOUNTS_TEXT.title)}, toque em ${q(ACCOUNTS_TEXT.add)}, dê um nome e escolha o tipo: banco, dinheiro ou outro.`,
       `Nos gastos, pagamentos e aportes, escolha de onde saiu em ${q(ACCOUNTS_TEXT.out)}, ${q(ACCOUNTS_TEXT.into)} ou ${q(ACCOUNTS_TEXT.to)}. A principal já vem marcada.`,
       `Toque em um banco ou carteira para renomear, usar ${q(ACCOUNTS_TEXT.makeDefault)}, arquivar ou excluir.`,
@@ -785,7 +785,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     where: [ACCOUNT_SCREEN, PRIVACY_SECTION],
     alsoWhere: [[ACCOUNT_SCREEN, WIDGET_TEXT.section]],
     steps: [
-      `Toque no olho, no cabeçalho, para ${q('Ocultar valores')} ou ${q('Mostrar valores')} na hora. Os valores aparecem como R$ ••••.`,
+      `Toque no olho, no cabeçalho, para ${q('Ocultar valores')} ou ${q('Mostrar valores')} na hora (no computador, o botão com o texto fica no bloco azul e na barra lateral). Os valores aparecem como R$ ••••.`,
       `Em telas estreitas, o olho não aparece. Ligue ${q('Ocultar valores ao abrir')}, em Conta: os valores ficam ocultos agora e sempre que você abrir o app.`,
       `No celular com biometria configurada, ligue ${q('Pedir biometria ao abrir')}. Sair da conta nunca depende dela.`,
       `O arquivo de ${q(EXPORT_TEXT.entry)} mostra os valores, mesmo com a ocultação ligada.`,

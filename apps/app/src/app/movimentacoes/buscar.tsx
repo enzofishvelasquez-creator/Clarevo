@@ -25,7 +25,7 @@ import {
 import { router } from 'expo-router';
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
@@ -34,6 +34,7 @@ import { RecordRow } from '@/components/record-row';
 import { ChoiceGroup } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, Chip, Screen, Skeleton, TextField, Txt, styles as ui } from '@/components/ui';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { useAccounts, useCards, useRecordSearch, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -165,7 +166,8 @@ export default function BuscarScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    // Android: o teclado não cobre "Valor mínimo" e "Valor máximo" (D-110), como nos outros formulários.
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={T.title} right={<ContextPill label="Pessoal" />} help="buscar" />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
@@ -344,7 +346,7 @@ export default function BuscarScreen() {
           </>
         )}
       </Screen>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
