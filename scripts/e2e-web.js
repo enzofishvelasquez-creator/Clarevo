@@ -15041,9 +15041,11 @@ setInterval(async () => {
     // Detalhe.
     await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Valor pela taxa contratada'); await p.waitForTimeout(500);
     t = await body(); investTexts.push(t);
-    ok('D-099 Investimento: valor pela taxa contratada, imposto estimado se resgatasse hoje e a ficha',
-      t.includes('Valor estimado: R$ 10.879,87') && t.includes('Pela taxa que você registrou, a partir do valor de 06/10/2026.') && t.includes('Cerca de R$ 10.790,52 líquidos.') &&
-        t.includes('Imposto de renda estimado: R$ 84,34') && t.includes('IOF estimado: R$ 0,14') && t.includes('Alíquota de 22,5% pelo tempo aplicado.') &&
+    // Resgate só no vencimento (revisão das telas, 16/11/2026): a estimativa é no vencimento, com a alíquota dessa data (sem IOF).
+    ok('D-099 Investimento: valor pela taxa contratada, imposto estimado no vencimento (resgate só no vencimento) e a ficha',
+      t.includes('Valor estimado: R$ 10.879,87') && t.includes('Pela taxa que você registrou, a partir do valor de 06/10/2026.') && t.includes('No vencimento, em 01/06/2027 (estimativa)') &&
+        t.includes('Este investimento só pode ser resgatado no vencimento. A conta usa o valor de hoje e a alíquota que vale nessa data.') && !t.includes('Se resgatasse hoje') &&
+        t.includes('Cerca de R$ 10.809,08 líquidos.') && t.includes('Imposto de renda estimado: R$ 65,92') && !t.includes('IOF estimado') && t.includes('Alíquotas de 17,5% a 20%, pelo tempo de cada aporte.') &&
         t.includes('Estimativa pela regra em vigor em 13/11/2026') && t.includes('Sobre este investimento') && t.includes('105% do CDI') &&
         t.includes('01/06/2027, daqui a 8 meses') && t.includes('Resgate só no vencimento') && t.includes('Garantia do FGC.'), t.slice(0, 2500));
     await checkBar('D-099 detalhe com a ficha', 'Investir');

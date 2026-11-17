@@ -154,7 +154,8 @@ export function UncountedLinkedLine({ summary, onSee, onBrand = false }: { summa
 
 const styles = StyleSheet.create({
   uncounted: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[2] },
-  see: { paddingHorizontal: 0 },
+  // "Ver" é curto: a largura mínima mantém a área de toque de 44 px (o teste de acessibilidade mede 44 x 44).
+  see: { minWidth: 44, paddingHorizontal: space[2] },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 48, paddingVertical: space[2] },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
 });
