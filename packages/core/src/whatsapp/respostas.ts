@@ -195,7 +195,7 @@ function chatReplies(channel: ChatChannel) {
     valor_invalido: 'O valor precisa ser maior que zero. Por exemplo: mercado 52,30',
     valor_acima_do_limite: `O valor passa do limite de ${formatBRL(MAX_RECORD_CENTS)} por registro.`,
     descricao_invalida: 'A descrição ficou longa demais. Escreva em poucas palavras o que foi e o valor, por exemplo: mercado 52,30',
-    erro: `Não deu para anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${SUPPORT_EMAIL}.`,
+    erro: `Não foi possível anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${SUPPORT_EMAIL}.`,
     ligado: (space: WhatsAppSpace, name?: string | null) =>
       `Pronto, ${w.whoLinked} está ligado à ${name ? `conta de ${name} na ` : ''}Clarevo, no ${spaceLabel(space)}.\n\n${EXAMPLES}\n\n${words}`,
     sem_permissao: (space: WhatsAppSpace) => `Você não anota mais no ${spaceLabel(space)}. ${where.relink}`,
@@ -264,14 +264,14 @@ export function whatsappOutcomeReply(outcome: WhatsAppOutcome, messageDay: IsoDa
     case 'sem_permissao':
       return r.sem_permissao(outcome.space);
     case 'sem_conta':
-      return `O ${spaceLabel(outcome.space)} está sem conta de origem principal. No app, abra Conta e escolha a principal em Contas de origem.`;
+      return `O ${spaceLabel(outcome.space)} está sem banco ou carteira principal. No app, abra Conta e escolha a opção principal em Bancos e carteira.`;
     case 'compra_anotada':
       return `Anotado no ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
     case 'compra_desfeita':
       return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}`;
     case 'sem_cartao':
       return outcome.space.kind === 'pessoal'
-        ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Conta e Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
+        ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Movimentos, Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
         : `Compras no cartão entram só no espaço Pessoal, e ${CHANNEL_WORDS[channel].whoLinked} está ligado ao ${spaceLabel(outcome.space)}. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.`;
     case 'qual_cartao':
       return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${withoutCardWord(outcome.cards[0] ?? 'azul').toLowerCase()}".`;

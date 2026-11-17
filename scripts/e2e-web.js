@@ -453,7 +453,7 @@ setInterval(async () => {
   // os Primeiros passos fechados (a vez em que, numa conta real, ela entraria), nem em Conta, e nada dela é gravado no aparelho.
   const origemAusente = async () => {
     const txt = await body();
-    return !txt.includes('Como você conheceu a Clarevo?') && !txt.includes('Usamos só para contar') && !txt.includes('Resposta guardada. Você pode mudar em Conta.') &&
+    return !txt.includes('Como você conheceu a Clarevo?') && !txt.includes('A Clarevo usa só para contar') && !txt.includes('Resposta guardada. Você pode mudar em Conta.') &&
       !(await headingShown('Como você conheceu a Clarevo?')) && (await visibleCount('radio', /Instagram|Indicação de alguém|Empresa onde trabalho|Busca na internet|Prefiro não dizer/)) === 0 &&
       (await visibleCount('radiogroup', /Como você conheceu/)) === 0;
   };
@@ -474,14 +474,14 @@ setInterval(async () => {
   ok('Conta: "Ajuda e contato" com o e-mail do suporte por escrito (sem depender do site) e o botão "Escrever para o suporte"', t.includes('Ajuda e contato') &&
     t.includes('Dúvidas sobre o app ou um problema: escreva para suporte@clarevo.app.br. Pedidos sobre os seus dados: privacidade@clarevo.app.br.') && (await visibleCount('button', 'Escrever para o suporte')) === 1);
   await keepText();
-  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
   ok('sair volta para boas-vindas', (await body()).includes('Cuidar da vida financeira'));
   // D-078 E: "Tenho um convite da empresa" nas boas-vindas abre o campo; texto sem convite mostra o erro; o link leva ao convite.
   await btn('Tenho um convite da empresa').click(); await field('Link do convite').waitFor({ timeout: 6000 });
   ok('Boas-vindas: "Tenho um convite da empresa" abre o campo "Link do convite", com o estado expandido',
     (await p.getByRole('button', { name: 'Tenho um convite da empresa', exact: true }).filter({ visible: true }).first().getAttribute('aria-expanded')) === 'true');
   await field('Link do convite').fill('não tenho link'); await btn('Ver convite').click(); await p.waitForTimeout(300);
-  ok('Boas-vindas: texto sem convite mostra o erro junto do campo', (await body()).includes('Não encontramos um convite neste texto. Confira o link que você recebeu.'));
+  ok('Boas-vindas: texto sem convite mostra o erro junto do campo', (await body()).includes('Não há um convite neste texto. Confira o link que você recebeu.'));
   await field('Link do convite').fill(`http://localhost:${PORT}/beneficio/${'b'.repeat(32)}`); await btn('Ver convite').click();
   await p.waitForURL((u) => u.pathname.startsWith('/beneficio/'), { timeout: 8000 }).catch(() => {});
   ok('Boas-vindas: o link do convite da empresa abre /beneficio/<código>, antes de criar a conta', new URL(p.url()).pathname === `/beneficio/${'b'.repeat(32)}`, p.url());
@@ -513,7 +513,7 @@ setInterval(async () => {
   ok('A9: depois de sair e entrar de novo, o "Agora não" foi apagado do aparelho e o card "Primeiros passos" volta, com os passos feitos marcados',
     (await headingShown('Primeiros passos')) && (await ppIs([ppDone('fixos'), ppDone('recebido'), PP.pago, PP.guardar])()) && (await visibleCount('button', 'Anotar gasto')) === 1, JSON.stringify(await ppRows()));
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
-  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
 
   // Primeiros passos numa segunda conta nova: anotar um gasto marca o passo 3; com os três prontos, o card sai de vez.
   await btn('Criar conta').click(); await waitText('Nome de apresentação');
@@ -551,16 +551,16 @@ setInterval(async () => {
   ok('primeiros passos: com os três primeiros prontos, o card fica até o 4º passo ("Planejar quanto guardar")', await ppIs([ppDone('fixos'), ppDone('recebido'), ppDone('pago'), PP.guardar])(), JSON.stringify(await ppRows()));
   await btn(PP.guardar).click(); await waitText('Você consegue guardar algum valor por mês?'); await p.waitForTimeout(500);
   const askButtons = await cardButtons('Você consegue guardar algum valor por mês?');
-  ok('primeiros passos: o passo 4 abre a aba Metas no card da pergunta, com "Sim, consigo", "Agora não" e "Responder depois"', new URL(p.url()).pathname === '/metas' &&
-    JSON.stringify(askButtons) === JSON.stringify(['Sim, consigo', 'Agora não', 'Responder depois']), `${p.url()} ${JSON.stringify(askButtons)}`);
+  ok('primeiros passos: o passo 4 abre a aba Metas no card da pergunta, com "Sim, consigo", "Não consigo agora" e "Responder depois"', new URL(p.url()).pathname === '/metas' &&
+    JSON.stringify(askButtons) === JSON.stringify(['Sim, consigo', 'Não consigo agora', 'Responder depois']), `${p.url()} ${JSON.stringify(askButtons)}`);
   await logoChecks('Metas (conta nova): logotipo "clarevo." no cabeçalho azul, sem o símbolo C');
   await shot('97_metas_pergunta_conta_nova');
-  // "Agora não": texto acolhedor e reserva mínima com valores a partir de R$ 100,00, nenhum pré-marcado. Nada é criado
+  // "Não consigo agora": texto acolhedor e reserva mínima com valores a partir de R$ 100,00, nenhum pré-marcado. Nada é criado
   // até a pessoa escolher e tocar em "Criar reserva mínima".
-  await btn('Agora não').click(); await waitText('Tudo bem. Muita gente começa com valores pequenos'); await p.waitForTimeout(400);
+  await btn('Não consigo agora').click(); await waitText('Tudo bem. Muita gente começa com valores pequenos'); await p.waitForTimeout(400);
   t = await body();
   const minChips = await p.getByRole('radio').filter({ visible: true }).evaluateAll((els) => els.map((e) => [(e.getAttribute('aria-label') || e.textContent).replace(/\u00a0/g, ' '), e.getAttribute('aria-checked')]));
-  ok('"Agora não": texto acolhedor e a pergunta da reserva mínima', new URL(p.url()).pathname === '/guardar/minima' && t.includes('Tudo bem. Muita gente começa com valores pequenos, e qualquer valor guardado ajuda num imprevisto.') && t.includes('Quer começar uma reserva mínima?'), p.url());
+  ok('"Não consigo agora": texto acolhedor e a pergunta da reserva mínima', new URL(p.url()).pathname === '/guardar/minima' && t.includes('Tudo bem. Muita gente começa com valores pequenos, e qualquer valor guardado ajuda num imprevisto.') && t.includes('Quer começar uma reserva mínima?'), p.url());
   ok('reserva mínima: chips R$ 100,00, 300,00, 500,00, 1.000,00 e "Outro valor" (e "1 mês dos seus gastos essenciais" com o que já dá para calcular: aqui, o gasto fixo de R$ 100,00), nenhum pré-marcado',
     JSON.stringify(minChips.slice(0, 4).map((c) => c[0])) === JSON.stringify(['R$ 100,00', 'R$ 300,00', 'R$ 500,00', 'R$ 1.000,00']) && minChips.some((c) => c[0] === 'Outro valor') &&
     minChips.every((c) => c[1] === 'false') && minChips.filter((c) => /gastos essenciais/.test(c[0])).length <= 1, JSON.stringify(minChips));
@@ -579,9 +579,9 @@ setInterval(async () => {
   ok('reserva mínima: "Outro valor" abaixo de R$ 100,00 é recusado', (await body()).includes('Informe um valor a partir de R$ 100,00, como 300,00.'));
   const goalsBefore = await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length);
   ok('reserva mínima: nada criado antes de escolher e criar', goalsBefore === 0, String(goalsBefore));
-  await radio('R$ 100,00').click(); await btn('Criar reserva mínima').click(); await waitText('Reserva mínima criada.'); await p.waitForTimeout(600);
+  await radio('R$ 100,00').click(); await btn('Criar reserva mínima').click(); await waitText('Reserva para imprevistos criada, com o valor mínimo para começar.'); await p.waitForTimeout(600);
   t = await body();
-  ok('reserva mínima criada: Metas mostra "Reserva para imprevistos" com R$ 0,00 de R$ 100,00 (0%) e o convite à pergunta some', new URL(p.url()).pathname === '/metas' && t.includes('Reserva mínima criada.') &&
+  ok('reserva mínima criada: Metas mostra "Reserva para imprevistos" com R$ 0,00 de R$ 100,00 (0%) e o convite à pergunta some', new URL(p.url()).pathname === '/metas' && t.includes('Reserva para imprevistos criada, com o valor mínimo para começar.') &&
     t.includes('R$ 0,00 de R$ 100,00') && !t.includes('Você consegue guardar algum valor por mês?'), t.slice(0, 300));
   await shot('99_metas_reserva_minima');
   // Editar a reserva mínima (R$ 100,00, 1 mês): os R$ 100,00 não viram "gastos essenciais salvos" no formulário e escolher 3 meses
@@ -628,15 +628,15 @@ setInterval(async () => {
   ok('reserva mínima + "consigo": o plano troca a reserva para 3 meses com a base informada (nunca "reserva_minima" com 3 meses)', minGoal !== null && minGoal.months === 3 && minGoal.source !== 'reserva_minima' && minGoal.base > 0 && t.includes('Você planeja guardar R$ 300,00 por mês.'), JSON.stringify(minGoal));
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().click(); await waitText('Diferença do mês');
   await waitUntil(async () => !(await headingShown('Primeiros passos')), 8000);
-  ok('primeiros passos: com os quatro passos prontos ("Agora não" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
+  ok('primeiros passos: com os quatro passos prontos ("Não consigo agora" conta como resposta), o card sai', !(await headingShown('Primeiros passos')) && (await visibleCount('button', 'Anotar gasto')) === 1);
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
-  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
   await btn('Entrar').click(); await waitText('Esqueci minha senha');
   await field('E-mail').fill('bia@exemplo.com'); await field('Senha').fill('senha1234'); await btn('Entrar').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês'); await p.waitForTimeout(800);
   ok('primeiros passos concluídos: o card não volta depois de entrar de novo', !(await headingShown('Primeiros passos')));
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
-  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
   // Na demonstração, as contas criadas existem só na memória da página: recarregar volta às boas-vindas e nada de
   // "Primeiros passos" fica gravado no aparelho (uma conta nova nunca herda o "Agora não" de outra com o mesmo identificador).
   await p.reload(); await waitText('Cuidar da vida financeira');
@@ -752,21 +752,21 @@ setInterval(async () => {
   await shot('11_resumo_apos_gasto');
 
   // Editar para 95
-  await p.getByRole('button', { name: /Café, Pago · 07\/10\/2026/ }).click(); await waitText('Editar registro');
-  await btn('Editar registro').click(); await waitText('Editar gasto');
+  await p.getByRole('button', { name: /Café, Pago · 07\/10\/2026/ }).click(); await waitText('Editar gasto');
+  await btn('Editar gasto').click(); await waitText('Será salvo em');
   await field('Valor em reais').fill('95,00'); await btn('Salvar gasto').click(); await waitText('Alterações salvas');
   ok('edição mantém o mesmo registro', (await body()).includes('R$ 95,00'));
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('editar para 95 → 3.995 / 2.005', 'R$ 6.000,00', 'R$ 3.995,00', 'R$ 2.005,00');
 
   // Excluir: cancelar e depois confirmar
-  await p.getByRole('button', { name: /Café, Pago · 07\/10\/2026/ }).click(); await waitText('Editar registro');
-  await btn('Excluir registro').click(); await waitText('Excluir registro?');
+  await p.getByRole('button', { name: /Café, Pago · 07\/10\/2026/ }).click(); await waitText('Editar gasto');
+  await btn('Excluir gasto').click(); await waitText('Excluir gasto?');
   ok('confirmação de exclusão mostra descrição, valor e contexto', (await body()).includes('Café · R$ 95,00 · Pessoal'));
   await shot('12_confirmar_exclusao');
   await btn('Cancelar').click(); await p.waitForTimeout(300);
-  await btn('Excluir registro').click(); await waitText('Excluir registro?');
-  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registro excluído');
+  await btn('Excluir gasto').click(); await waitText('Excluir gasto?');
+  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir gasto' }).last().click(); await waitText('Gasto excluído');
   ok('excluir volta para a tela de origem com aviso', (await body()).includes('Diferença do mês'));
   await goResumo();
   await expectTotals('excluir gasto → 3.900 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
@@ -790,7 +790,7 @@ setInterval(async () => {
     // D-041: a categoria mais perto do limite (Lazer: parcela do tênis e restaurante, R$ 400,00 de R$ 300,00).
     orcamento: 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00',
     // D-048: Importar extrato ou fatura, com a legenda fixa, entre o Orçamento e as calculadoras.
-    importar: 'Importar extrato ou fatura, Arquivo OFX ou planilha do banco',
+    importar: 'Importar extrato ou fatura, Arquivo PDF, OFX ou planilha do banco',
     calc: 'Calculadoras, Parcelado ou à vista, dívidas, reserva e outras contas',
   };
   await waitText('7 cadastrados, com as contas do ano').catch(() => {});
@@ -800,7 +800,7 @@ setInterval(async () => {
     return { anotar: top('[role=button]', 'Anotar gasto'), organizar: top('[role=heading]', 'Organizar'), totais: top('div[dir="auto"]', 'Pago em outubro') };
   });
   ok('movimentações: "Organizar" com os seis atalhos (Orçamento por categoria e Importar extrato ou fatura entre Cartões e as calculadoras) e as legendas de outubro, entre os botões e os totais do mês', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.orcamento, SC.importar, SC.calc]) &&
-    ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Arquivo OFX ou planilha do banco', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
+    ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Arquivo PDF, OFX ou planilha do banco', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
     scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.anotar < scOrder.organizar && scOrder.organizar < scOrder.totais, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
   await layoutChecks('movimentações com atalhos 390px');
   await scrollTo('Organizar');
@@ -828,15 +828,15 @@ setInterval(async () => {
   await expectTotals('criar recebimento 200 → 6.200 / 2.300', 'R$ 6.200,00', 'R$ 3.900,00', 'R$ 2.300,00');
   await p.getByRole('button', { name: /^Recebido, R\$/ }).filter({ visible: true }).first().click(); await waitText('Recebimentos realizados');
   await shot('14_composicao_recebido');
-  await p.getByRole('button', { name: /<b>Freela<\/b>, Recebido/ }).click(); await waitText('Editar registro');
-  await btn('Editar registro').click(); await waitText('Editar recebimento');
+  await p.getByRole('button', { name: /<b>Freela<\/b>, Recebido/ }).click(); await waitText('Editar recebimento');
+  await btn('Editar recebimento').click(); await waitText('Será salvo em');
   await field('Valor em reais').fill('250,00'); await btn('Salvar recebimento').click(); await waitText('Alterações salvas');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('editar recebimento 250 → 6.250 / 2.350', 'R$ 6.250,00', 'R$ 3.900,00', 'R$ 2.350,00');
   await p.getByRole('tab', { name: 'Movimentos' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
-  await p.getByRole('button', { name: /<b>Freela<\/b>, Recebido/ }).click(); await waitText('Editar registro');
-  await btn('Excluir registro').click(); await waitText('Excluir registro?');
-  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registro excluído');
+  await p.getByRole('button', { name: /<b>Freela<\/b>, Recebido/ }).click(); await waitText('Editar recebimento');
+  await btn('Excluir recebimento').click(); await waitText('Excluir recebimento?');
+  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir recebimento' }).last().click(); await waitText('Recebimento excluído');
   await goResumo();
   await expectTotals('excluir recebimento → 6.000 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
 
@@ -860,18 +860,18 @@ setInterval(async () => {
   await shot('616_recebimento_mes_seguinte');
   await btn('Salvar recebimento').click(); await waitText('Recebimento salvo');
   t = await body();
-  ok('A: o detalhe mantém a data (28/09/2026) e diz "Resumo afetado: Outubro de 2026 (mês seguinte)"', t.includes('28/09/2026') && t.includes('Outubro de 2026 (mês seguinte)'));
+  ok('A: o detalhe mantém a data (28/09/2026) e diz "Entra no mês: Outubro de 2026 (mês seguinte)"', t.includes('28/09/2026') && t.includes('Outubro de 2026 (mês seguinte)'));
   ok('A: o mês seguinte (outubro) já começou: sem o aviso de quando ele aparece, e com "Registrar outro recebimento"',
     !t.includes('que aparece no Resumo a partir de') && (await visibleCount('button', 'Registrar outro recebimento')) === 1);
   await shot('617_recebimento_mes_seguinte_detalhe');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('A: o freela de 28/09 marcado conta em outubro → 6.150 / 2.250', 'R$ 6.150,00', 'R$ 3.900,00', 'R$ 2.250,00');
   await p.getByRole('tab', { name: 'Movimentos' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
-  const aRow = p.getByRole('button', { name: /^Freela do fim do mês, Recebido · 28\/09\/2026 · conta em outubro/ }).filter({ visible: true });
+  const aRow = p.getByRole('button', { name: /^Freela do fim do mês, Recebido · 28\/09\/2026 · entra em outubro/ }).filter({ visible: true });
   await aRow.first().waitFor({ timeout: 8000 }).catch(() => {});
   ok('A: em Movimentos de outubro, a linha mantém a data e diz "conta em outubro"', (await aRow.count()) === 1);
-  await aRow.first().click(); await waitText('Editar registro');
-  await btn('Editar registro').click(); await waitText('Editar recebimento');
+  await aRow.first().click(); await waitText('Editar recebimento');
+  await btn('Editar recebimento').click(); await waitText('Será salvo em');
   ok('A: ao editar, o ajuste vem ligado', (await aSwitch().count()) === 1 && (await aSwitch().first().getAttribute('aria-checked')) === 'true');
   await field('Data do recebimento').fill('15/09/2026'); await p.waitForTimeout(300);
   t = await body();
@@ -880,10 +880,10 @@ setInterval(async () => {
   await field('Data do recebimento').fill('28/09/2026'); await aSwitch().first().waitFor({ timeout: 8000 }).catch(() => {});
   ok('A: de volta a 28/09, o ajuste volta ligado e sem aviso de mudança de mês',
     (await aSwitch().first().getAttribute('aria-checked')) === 'true' && !(await body()).includes('O registro sai de'));
-  await btn('Voltar').click(); await waitText('Editar registro');
-  await btn('Excluir registro').click(); await waitText('Excluir registro?');
+  await btn('Voltar').click(); await waitText('Editar recebimento');
+  await btn('Excluir recebimento').click(); await waitText('Excluir recebimento?');
   ok('A: excluir avisa que o valor deixa de contar no resumo de outubro', (await body()).includes('O valor deixa de contar no resumo de outubro de 2026.'));
-  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir registro' }).last().click(); await waitText('Registro excluído');
+  await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Excluir recebimento' }).last().click(); await waitText('Recebimento excluído');
   await goResumo();
   await expectTotals('A: excluir o freela marcado → 6.000 / 2.100', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00');
 
@@ -939,7 +939,7 @@ setInterval(async () => {
   ok('Ler boleto: a folha diz que o boleto é lido no aparelho e não é guardado', (await body()).includes('O boleto é lido aqui no aparelho e não é guardado.'));
   await btn('Colar ou digitar a linha digitável').click(); await field('Linha digitável ou código de barras').waitFor({ timeout: 6000 });
   await field('Linha digitável ou código de barras').fill('12345678901234567890123456789012345678901234567'); await btn('Ler o boleto').click(); await p.waitForTimeout(300);
-  ok('Ler boleto: números que não são de boleto mostram o erro junto do campo', (await body()).includes('Não reconhecemos um boleto nestes números.'));
+  ok('Ler boleto: números que não são de boleto mostram o erro junto do campo', (await body()).includes('A Clarevo não reconheceu um boleto nestes números.'));
   await field('Linha digitável ou código de barras').fill('23791.23454 67890.123457 67890.123457 4 16260000123456'); await btn('Ler o boleto').click(); await waitText('Boleto lido:'); await p.waitForTimeout(300);
   t = await body();
   ok('Ler boleto: "Boleto lido: R$ 1.234,56 · vence em 10/11/2026", com o valor e o vencimento nos campos',
@@ -999,9 +999,9 @@ setInterval(async () => {
   ok('revisar vencidas: cada linha com "Já paguei" e "Não houve"', (await body()).includes('Contas vencidas') &&
     (await Promise.all(['Já paguei Gás de setembro', 'Não houve Gás de setembro', 'Já paguei Água de outubro', 'Não houve Água de outubro'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
   ok('revisar vencidas: caixas nas contas de valor fixo, nenhuma marcada', JSON.stringify(await p.getByRole('checkbox').filter({ visible: true }).evaluateAll((es) => es.map((e) => e.getAttribute('aria-checked')))) === '["false","false"]' &&
-    (await visibleCount('button', 'Marcar as selecionadas como pagas no vencimento')) === 1);
+    (await visibleCount('button', 'Marcar como pagas')) === 1);
   await p.getByRole('checkbox').filter({ visible: true }).first().click();
-  ok('revisar vencidas: marcar uma caixa muda o botão do lote', (await visibleCount('button', 'Marcar a 1 selecionada como paga no vencimento')) === 1);
+  ok('revisar vencidas: marcar uma caixa muda o botão do lote', (await visibleCount('button', 'Marcar como paga (1)')) === 1);
   await btn('Não houve Água de outubro').click(); await waitText('Tirar a conta de outubro?');
   ok('revisar vencidas: "Não houve" pede confirmação', (await dialogText()).includes('Tirar conta'));
   await btn('Cancelar').click(); await p.waitForTimeout(300);
@@ -1068,10 +1068,10 @@ setInterval(async () => {
   await expectTotals('pagar Internet 150 → 4.050 / 1.950', 'R$ 6.000,00', 'R$ 4.050,00', 'R$ 1.950,00', 'R$ 630,00');
 
   await p.getByRole('tab', { name: 'Movimentos' }).filter({ visible: true }).first().click(); await waitText('Registrar recebimento');
-  await openRow(/^Internet, Pago · 07\/10\/2026 · conta a pagar/); await waitText('Excluir registro');
-  await btn('Excluir registro').click(); await waitText('Excluir registro?');
+  await openRow(/^Internet, Pago · 07\/10\/2026 · conta a pagar/); await waitText('Excluir gasto');
+  await btn('Excluir gasto').click(); await waitText('Excluir gasto?');
   ok('excluir o gasto avisa que a conta a pagar reabre', (await body()).includes('A conta a pagar ligada a este gasto volta para Ainda a pagar.'));
-  await confirmIn('Excluir registro'); await waitText('Registro excluído');
+  await confirmIn('Excluir gasto'); await waitText('Gasto excluído');
   await goResumo();
   await expectTotals('excluir gasto da conta → a pagar 780', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 780,00');
 
@@ -1111,7 +1111,7 @@ setInterval(async () => {
   const paidNow = (await sectionRows('Pagas')) ?? [];
   const laterPaid = await sectionRows('Próximos meses');
   ok('conta de novembro paga em outubro aparece em Pagas de outubro e sai de Próximos meses',
-    (await p.getByRole('button', { name: /^Seguro do carro, paga em 07\/10, R\$ 300,00, conta em Pago de outubro de 2026/ }).filter({ visible: true }).count()) === 1 &&
+    (await p.getByRole('button', { name: /^Seguro do carro, paga em 07\/10, R\$ 300,00, entra em Pago de outubro de 2026/ }).filter({ visible: true }).count()) === 1 &&
       paidNow.some((r) => /^Seguro do carro, paga em 07\/10/.test(r)) && laterPaid !== null && !laterPaid.some(isSeguro) &&
       JSON.stringify(laterPaid) === laterExpected && t.includes('R$ 650,00'),
     `Próximos meses: ${(laterPaid ?? []).join(' | ')} || Pagas: ${paidNow.join(' | ')}`);
@@ -1165,7 +1165,7 @@ setInterval(async () => {
     ['Todo ano em 20/01 · desde 2027', 'Valor muda: referência de R$ 2.400,00 (estimado)', 'Cada ano entra em Contas a pagar dois meses antes do primeiro vencimento e só entra em Ainda a pagar no mês em que vence.',
       '2027 · previsto · cerca de R$ 2.400,00 · entra em Contas a pagar em novembro de 2026', 'R$ 2.400,00 (estimado) a partir de 2027'].every((x) => t.includes(x)) &&
       (await visibleCount('button', /^Informar o valor de|^Não houve em|^Tirar as parcelas/)) === 0, t.slice(0, 200));
-  ok('IPVA: ações da conta do ano', (await Promise.all(['Mudar valor ou dia a partir de uma conta', 'Mudar a forma de pagamento', 'Encerrar conta do ano', 'Excluir conta do ano'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
+  ok('IPVA: ações da conta do ano', (await Promise.all(['Mudar a partir de uma conta', 'Mudar a forma de pagamento', 'Encerrar conta do ano', 'Excluir conta do ano'].map((n) => visibleCount('button', n)))).every((n) => n === 1));
   await btn('Mudar a forma de pagamento').click(); await waitText('Mudar a forma de pagamento?');
   ok('"Mudar a forma de pagamento": encerrar e cadastrar outra, com o histórico mantido', (await dialogText()).includes('Para passar de cota única para parcelas, mudar o número de parcelas ou o mês, encerre esta conta do ano no último ano com a forma atual e cadastre uma nova. O histórico continua aqui.') &&
     (await dialogText()).includes('Encerrar e cadastrar nova'));
@@ -1239,7 +1239,7 @@ setInterval(async () => {
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
   await expectTotals('pagar a Escola de novembro hoje → Pago de outubro 4.800, a pagar 650', 'R$ 6.000,00', 'R$ 4.800,00', 'R$ 1.200,00', 'R$ 650,00');
   await openToPay();
-  await openRow(/^Escola, paga em 07\/10, R\$ 900,00, conta em Pago de outubro de 2026, gasto fixo/); await waitText('Desfazer pagamento');
+  await openRow(/^Escola, paga em 07\/10, R\$ 900,00, entra em Pago de outubro de 2026, gasto fixo/); await waitText('Desfazer pagamento');
   await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?');
   await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito');
   await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
@@ -1580,7 +1580,7 @@ setInterval(async () => {
   await openToPay();
   await waitRows('Próximos meses', (rows) => rows !== null && !rows.some((r) => r.startsWith('Seguro residencial')));
   ok('o grupo sai de Próximos meses e a parcela 1 aparece em Pagas', !((await sectionRows('Próximos meses')) ?? ['Seguro residencial']).some((r) => r.startsWith('Seguro residencial')) &&
-    ((await sectionRows('Pagas')) ?? []).some((r) => /^Seguro residencial, paga em 07\/10, R\$ 433,20, conta em Pago de outubro de 2026/.test(r)));
+    ((await sectionRows('Pagas')) ?? []).some((r) => /^Seguro residencial, paga em 07\/10, R\$ 433,20, entra em Pago de outubro de 2026/.test(r)));
   await openRow(/^Seguro residencial, paga em 07\/10/); await waitText('Desfazer pagamento');
   await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?');
   await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito');
@@ -1659,7 +1659,7 @@ setInterval(async () => {
   const saldoHint = p.getByRole('button', { name: 'O que é isso? Saldo inicial', exact: true }).filter({ visible: true }).first();
   await saldoHint.waitFor({ timeout: 8000 }).catch(() => {});
   ok('/conta: "O que é isso?" de "Saldo inicial", fechado, com alvo de 44 px', (await saldoHint.getAttribute('aria-expanded')) === 'false' && ((await saldoHint.boundingBox())?.height ?? 0) >= 43.5 &&
-    (await body()).includes('A Clarevo não calcula saldo por conta.'));
+    (await body()).includes('A Clarevo não calcula o saldo do banco nem da carteira.'));
   await saldoHint.click(); await waitText('Ler explicação completa');
   ok('/conta: o resumo abre no lugar, sem sair da tela', (await saldoHint.getAttribute('aria-expanded')) === 'true' && new URL(p.url()).pathname === '/conta');
   await saldoHint.evaluate((e) => e.scrollIntoView({ block: 'center' }));
@@ -1672,7 +1672,7 @@ setInterval(async () => {
     (await p.locator('h1').filter({ hasText: /^Diferença do mês e saldo da conta$/ }).count()) === 1, p.url());
   await btn('Voltar à tarefa').click(); await waitText('Ver a assinatura');
   ok('"Voltar à tarefa" volta para a Conta, com o resumo ainda aberto', new URL(p.url()).pathname === '/conta' && (await saldoHint.getAttribute('aria-expanded')) === 'true', p.url());
-  await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira');
+  await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await expectTotals('depois de entrar de novo: outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
   await openToPay(); await waitText('Próximos meses');
@@ -1768,13 +1768,13 @@ setInterval(async () => {
   await btn('Revisar vencidas').click(); await waitText('Marque o que você já pagou e tire o que não houve.');
   await waitText('Curso de idiomas de 2026/2027 · 2 parcelas vencidas');
   ok('vencidas: grupo de 2026/2027 com título e botões lidos "2026 a 2027"', (await visibleCount('heading', 'Curso de idiomas de 2026 a 2027 · 2 parcelas vencidas')) === 1 &&
-    (await visibleCount('button', 'Selecionar as 2 parcelas de Curso de idiomas de 2026 a 2027')) === 1 && (await visibleCount('button', 'Não houve Curso de idiomas em 2026 a 2027')) === 1);
+    (await visibleCount('button', 'Selecionar as 2 parcelas de Curso de idiomas de 2026 a 2027')) === 1 && (await visibleCount('button', 'Não houve em 2026 a 2027, Curso de idiomas')) === 1);
   await btn('Selecionar as 2 parcelas de Curso de idiomas de 2026 a 2027').click();
   await waitUntil(async () => (await visibleCount('button', 'Selecionadas: as 2 parcelas de Curso de idiomas de 2026 a 2027')) === 1);
   ok('vencidas: depois de selecionar, o nome falado começa por "Selecionadas", como o texto visível', (await visibleCount('button', 'Selecionadas: as 2 parcelas de Curso de idiomas de 2026 a 2027')) === 1 &&
-    (await visibleCount('button', 'Marcar as 2 selecionadas como pagas no vencimento')) === 1);
+    (await visibleCount('button', 'Marcar como pagas (2)')) === 1);
   await yearNames('vencidas com grupo de 2026/2027');
-  await btn('Não houve Curso de idiomas em 2026 a 2027').click(); await waitText('Tirar as 6 parcelas de 2026/2027 em aberto?');
+  await btn('Não houve em 2026 a 2027, Curso de idiomas').click(); await waitText('Tirar as 6 parcelas de 2026/2027 em aberto?');
   t = await dialogText();
   ok('"Não houve" nas vencidas: as 6 parcelas que saem de fato, o total e as que ainda não venceram', t.includes('Tirar as 6 parcelas de 2026/2027 em aberto?') &&
     t.includes('Curso de idiomas de 2026/2027 · 6 parcelas · R$ 600,00') && t.includes('Inclui 4 parcelas que ainda não venceram.') &&
@@ -2354,8 +2354,8 @@ setInterval(async () => {
   t = await body();
   ok('outubro não inclui o gasto de 30/09', t.includes('R$ 3.900,00') && t.includes('R$ 2.100,00'));
   await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026');
-  await p.getByRole('button', { name: /Farmácia, Pago · 30\/09\/2026/ }).click(); await waitText('Editar registro');
-  await btn('Editar registro').click(); await waitText('Editar gasto');
+  await p.getByRole('button', { name: /Farmácia, Pago · 30\/09\/2026/ }).click(); await waitText('Editar gasto');
+  await btn('Editar gasto').click(); await waitText('Será salvo em');
   await field('Data do pagamento').fill('01/10/2026'); await p.waitForTimeout(200);
   ok('aviso de mudança de mês', (await body()).includes('O registro sai de setembro de 2026 e passa a contar em outubro de 2026.'));
   await btn('Salvar gasto').click(); await waitText('Alterações salvas');
@@ -2751,7 +2751,7 @@ setInterval(async () => {
     if (w === 320) await shot('35_encerrar_parcelamento_320px', true);
     await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
     await btn('Descartar alterações').click(); await waitText('Pagas antes da Clarevo');
-    await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await waitText('Valor da parcela'); await p.waitForTimeout(300);
+    await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await waitText('Valor da parcela'); await p.waitForTimeout(300);
     await innerChecks(`editar parcelamento ${w}px`);
     if (w === 320) await shot('35_editar_parcelamento_320px', true);
     await btn('Cancelar').click(); await waitText('Pagas antes da Clarevo');
@@ -2924,7 +2924,7 @@ setInterval(async () => {
   ok('B tela: contas do mês (Aluguel, Internet, Condomínio)', t.includes('Contas do mês') && t.includes('Aluguel') && t.includes('Internet') && t.includes('Condomínio'));
   ok('B tela: próximos meses (novembro R$ 4.380,00 73,0% e dezembro R$ 3.880,00 64,7%, já com as faturas do cartão, "Previsto") e o marco de outubro de 2029', t.includes('Novembro de 2026 · R$ 4.380,00 · 73,0%') && t.includes('Dezembro de 2026 · R$ 3.880,00 · 64,7%') &&
     t.includes('Previsto: contas já criadas e repetições programadas. Valores estimados podem mudar.') && t.includes('Outubro de 2029: última parcela de Financiamento do carro (R$ 850,00).'));
-  ok('B tela: "Como calculamos", "Como ler este número" e os links', t.includes('Somamos as contas a pagar com vencimento em outubro') && t.includes('Como ler este número') && t.includes('Gastos fixos e parcelamentos') && t.includes('Contas a pagar') && t.includes('Quem vê estes dados?'));
+  ok('B tela: "Como a Clarevo calcula", "Como ler este número" e os links', t.includes('A Clarevo soma as contas a pagar com vencimento em outubro') && t.includes('Como ler este número') && t.includes('Gastos fixos e parcelamentos') && t.includes('Contas a pagar') && t.includes('Quem vê estes dados?'));
   ok('B tela: nenhum termo de alerta, "sobra", "disponível" nem travessão longo', !NO_BALANCE.test(t) && !FORBIDDEN.test(t), (t.match(NO_BALANCE) ?? t.match(FORBIDDEN) ?? [''])[0]);
   const rcMeter = await p.locator('[role=img]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter(Boolean));
   ok('B tela: o medidor tem um rótulo acessível com percentual, já pago e em aberto', rcMeter.includes('52,5% da renda de referência: já pago R$ 2.500,00, em aberto R$ 650,00.'), JSON.stringify(rcMeter.slice(0, 3)));
@@ -2973,7 +2973,7 @@ setInterval(async () => {
   // Excluir a referência de outubro: pede confirmação e a de setembro volta a valer.
   await p.getByRole('button', { name: 'Alterar', exact: true }).filter({ visible: true }).first().click(); await waitText('Valor por mês');
   await btn('Excluir esta referência').click(); await waitText('Excluir a renda de referência de outubro?');
-  ok('B excluir a referência: o diálogo diz que a anterior volta a valer', (await dialogText()).includes('A referência anterior volta a valer. Sem nenhuma, mostramos só os valores em reais.'));
+  ok('B excluir a referência: o diálogo diz que a anterior volta a valer', (await dialogText()).includes('A referência anterior volta a valer. Sem nenhuma, aparecem só os valores em reais.'));
   await shot('104_excluir_referencia');
   await confirmIn('Excluir referência'); await waitText('Renda de referência excluída.'); await waitText('52,5%');
   ok('B excluir a referência de outubro: volta a 52,5% (a de setembro)', (await body()).includes('52,5%') && (await body()).includes('R$ 6.000,00 por mês, desde setembro de 2026'));
@@ -3053,7 +3053,7 @@ setInterval(async () => {
   ok('B Resumo sem referência: o convite "Veja quanto da sua renda já está comprometido" no lugar da linha', t.includes('Veja quanto da sua renda já está comprometido') && !t.includes('Renda comprometida em outubro'));
   await shot('108_resumo_sem_referencia');
 
-  // Falha de carga: erro com "Tentar novamente", nunca 0%.
+  // Falha de carga: erro com "Tentar de novo", nunca 0%.
   await p.evaluate(async () => {
     const repo = await window.__e2e.repo();
     repo.__orig = repo.listIncomeReferences;
@@ -3062,7 +3062,7 @@ setInterval(async () => {
   });
   await waitText('Não foi possível calcular a renda comprometida.');
   t = await body();
-  ok('B falha de carga: erro com "Tentar novamente" no Resumo, sem 0,0% nem o convite', t.includes('Não foi possível calcular a renda comprometida.') && !t.includes('0,0%') && !t.includes('Veja quanto da sua renda'));
+  ok('B falha de carga: erro com "Tentar de novo" no Resumo, sem 0,0% nem o convite', t.includes('Não foi possível calcular a renda comprometida.') && !t.includes('0,0%') && !t.includes('Veja quanto da sua renda'));
   await shot('109_renda_falha');
   await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.listIncomeReferences = repo.__orig; await window.__e2e.refresh(); });
   await waitText('Veja quanto da sua renda já está comprometido');
@@ -3179,7 +3179,7 @@ setInterval(async () => {
   await innerChecks('aporte 390px');
   await shot('114_aporte');
   // O valor vem preenchido com o planejado por mês da reserva (R$ 500,00), editável (teste de 09/11/2026); apagado, a mensagem de campo.
-  ok('C aporte: o valor planejado por mês (R$ 500,00) já preenchido, com a legenda', (await field('Valor').inputValue()) === '500,00' && t.includes('Preenchemos com o valor planejado por mês. Pode mudar.'));
+  ok('C aporte: o valor planejado por mês (R$ 500,00) já preenchido, com a legenda', (await field('Valor').inputValue()) === '500,00' && t.includes('Já vem com o valor planejado por mês. Pode mudar.'));
   await field('Valor').fill(''); await btn('Registrar aporte').click(); await p.waitForTimeout(300);
   ok('C aporte: sem valor, a mensagem de campo e nada gravado', (await body()).includes('Informe um valor') && (await otherDevice(async (repo, ctx) => (await repo.listGoals(ctx)).length)) === 2);
   await field('Valor').fill('200'); await btn('Registrar aporte').click(); await waitText('Aporte registrado.'); await p.waitForTimeout(700);
@@ -3675,7 +3675,7 @@ setInterval(async () => {
   ok('E fatura: lançamentos (Tênis "parcela 1 de 3", Notebook "parcela 1 de 10" e o Restaurante) e o total formado só por parcelas (R$ 550,00)',
     (await visibleCount('button', 'Tênis de corrida · parcela 1 de 3 · R$ 200,00')) === 1 && (await visibleCount('button', 'Notebook · parcela 1 de 10 · R$ 150,00')) === 1 && (await visibleCount('button', 'Restaurante · R$ 200,00')) === 1 &&
     t.includes('parcela 1 de 3 · compra em 05/10 · Lazer') && /Parcelas de compras\s+R\$ 550,00/.test(t) && /Total da fatura\s+R\$ 550,00/.test(t) && t.includes('Total = parcelas + encargos + saldo anterior - estornos'));
-  ok('E fatura aberta: sem "Pagar fatura" (só depois do fechamento), com "Informar encargos", "Registrar estorno" e a próxima fatura (dezembro); sem "Desfazer pagamento"', (await visibleCount('button', 'Pagar fatura')) === 0 && (await visibleCount('button', 'Informar encargos')) === 1 &&
+  ok('E fatura aberta: sem "Registrar pagamento" (só depois do fechamento), com "Informar encargos", "Registrar estorno" e a próxima fatura (dezembro); sem "Desfazer pagamento"', (await visibleCount('button', 'Registrar pagamento')) === 0 && (await visibleCount('button', 'Informar encargos')) === 1 &&
     (await visibleCount('button', 'Registrar estorno')) === 1 && (await visibleCount('button', 'Desfazer pagamento')) === 0 && (await visibleCount('button', 'Próxima fatura: dezembro')) === 1 && (await visibleCount('button', /^Fatura anterior/)) === 0);
   await keepText();
   await innerChecks('fatura 390px');
@@ -3699,7 +3699,7 @@ setInterval(async () => {
   t = await body();
   ok('E Anotar gasto com cartão: escolhe o único cartão, pede "Em quantas vezes?" (1 a 48), troca para "Data da compra" e o botão vira "Anotar compra no cartão"',
     t.includes('Compra no cartão · Cartão Exemplo · final 1234') && (await field('Em quantas vezes?').inputValue()) === '1' && t.includes('De 1 a 48 parcelas.') && t.includes('Data da compra') && !t.includes('Data do pagamento') &&
-    (await visibleCount('button', 'Anotar compra no cartão')) === 1 && (await visibleCount('button', 'Salvar gasto')) === 0 && (await visibleCount('radiogroup', 'Conta')) === 0);
+    (await visibleCount('button', 'Anotar compra no cartão')) === 1 && (await visibleCount('button', 'Salvar gasto')) === 0 && (await visibleCount('radiogroup', 'Banco ou carteira')) === 0);
   await field('Descrição').fill('Fone de ouvido'); await field('Valor em reais').fill('300'); await field('Em quantas vezes?').fill('49'); await p.waitForTimeout(300);
   const exemploId = await cardIdOf('Cartão Exemplo');
   const entriesBefore = await countEntries(exemploId);
@@ -3707,8 +3707,8 @@ setInterval(async () => {
   ok('E compra no cartão com 49 parcelas: "Informe de 1 a 48 parcelas", nada gravado e o formulário continua', (await body()).includes('Informe de 1 a 48 parcelas, com pelo menos R$ 0,01 em cada.') && (await countEntries(exemploId)) === entriesBefore && urlPath() === '/registro/novo', urlPath());
   await field('Em quantas vezes?').fill('3'); await p.waitForTimeout(500);
   t = await body();
-  ok('E aviso da compra: "Esta compra entra na fatura de novembro do Cartão Exemplo e conta em Pago quando a fatura for paga." e "3 parcelas, a primeira de R$ 100,00"',
-    t.includes('Esta compra entra na fatura de novembro do Cartão Exemplo e conta em Pago quando a fatura for paga.') && t.includes('3 parcelas, a primeira de R$ 100,00. As outras 2 entram nas faturas seguintes.') &&
+  ok('E aviso da compra: "Esta compra entra na fatura de novembro do Cartão Exemplo e em Pago quando a fatura for paga." e "3 parcelas, a primeira de R$ 100,00"',
+    t.includes('Esta compra entra na fatura de novembro do Cartão Exemplo e em Pago quando a fatura for paga.') && t.includes('3 parcelas, a primeira de R$ 100,00. As outras 2 entram nas faturas seguintes.') &&
     t.includes('Compra no cartão não entra em Pago agora: ela entra quando a fatura for paga.'), t.split('\n').filter((l) => /fatura/.test(l)).join(' | '));
   await keepText();
   await innerChecks('anotar compra no cartão 390px');
@@ -3738,12 +3738,12 @@ setInterval(async () => {
   await btn('Próxima fatura: dezembro').click(); await waitInvoice('Fatura de dezembro'); t = await body();
   ok('E fatura de dezembro: R$ 450,00 (parcela 2 do Tênis, do Notebook e do Fone) com o caminho para a fatura anterior', (await heroTotal()) === 'R$ 450,00' && (await visibleCount('button', 'Tênis de corrida · parcela 2 de 3 · R$ 200,00')) === 1 &&
     (await visibleCount('button', 'Fone de ouvido · parcela 2 de 3 · R$ 100,00')) === 1 && (await visibleCount('button', 'Fatura anterior: novembro')) === 1, `${await heroTotal()}`);
-  ok('E fatura de dezembro (ainda não começou): sem "Pagar fatura" e com a frase de quando poderá ser paga (depois do fechamento, em 03/12/2026); "Informar encargos" segue',
-    (await visibleCount('button', 'Pagar fatura')) === 0 && t.includes('Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/12/2026. Se você já pagou antes, use a data em que pagou.') && (await visibleCount('button', 'Informar encargos')) === 1);
+  ok('E fatura de dezembro (ainda não começou): sem "Registrar pagamento" e com a frase de quando poderá ser paga (depois do fechamento, em 03/12/2026); "Informar encargos" segue',
+    (await visibleCount('button', 'Registrar pagamento')) === 0 && t.includes('Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/12/2026. Se você já pagou antes, use a data em que pagou.') && (await visibleCount('button', 'Informar encargos')) === 1);
   await btn('Fatura anterior: novembro').click(); await waitInvoice('Fatura de novembro');
   t = await body();
-  ok('E fatura de novembro aberta: sem "Pagar fatura", com a frase de quando poderá ser paga (em 03/11/2026) e "Informar encargos" e "Registrar estorno" ainda disponíveis',
-    (await visibleCount('button', 'Pagar fatura')) === 0 && t.includes('Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/11/2026. Se você já pagou antes, use a data em que pagou.') &&
+  ok('E fatura de novembro aberta: sem "Registrar pagamento", com a frase de quando poderá ser paga (em 03/11/2026) e "Informar encargos" e "Registrar estorno" ainda disponíveis',
+    (await visibleCount('button', 'Registrar pagamento')) === 0 && t.includes('Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em 03/11/2026. Se você já pagou antes, use a data em que pagou.') &&
     (await visibleCount('button', 'Informar encargos')) === 1 && (await visibleCount('button', 'Registrar estorno')) === 1, t.slice(0, 500));
   await keepText();
   await shot('135a_fatura_aberta_sem_pagar');
@@ -3767,14 +3767,14 @@ setInterval(async () => {
     JSON.stringify(await sectionRows('Faturas anteriores')) === JSON.stringify(['Fatura de outubro, fechada, R$ 400,00. Fechou em 03/10. Vence terça, 13/10 (próximo dia útil).']) && JSON.stringify(await sectionRows('Fatura atual')) === JSON.stringify(['Fatura de novembro, aberta, R$ 650,00. Fecha em 03/11. Vence em 10/11.']),
     JSON.stringify([await sectionRows('Faturas anteriores'), await sectionRows('Fatura atual')]));
   await openInvoice('outubro'); t = await body();
-  ok('E fatura de outubro fechada: "Fechada", R$ 400,00, "Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)" (10/10 é sábado e 12/10 é feriado), "Pagar fatura" e "Informar encargos", sem a frase da fatura aberta', (await h1Name()) === 'Fatura' && t.includes('Fatura de outubro') && t.includes('Fechada') && (await heroTotal()) === 'R$ 400,00' &&
-    t.includes('Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)') && (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Informar encargos')) === 1 && !t.includes('Esta fatura ainda está aberta') &&
+  ok('E fatura de outubro fechada: "Fechada", R$ 400,00, "Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)" (10/10 é sábado e 12/10 é feriado), "Registrar pagamento" e "Informar encargos", sem a frase da fatura aberta', (await h1Name()) === 'Fatura' && t.includes('Fatura de outubro') && t.includes('Fechada') && (await heroTotal()) === 'R$ 400,00' &&
+    t.includes('Fechou em 03/10 · Vence terça, 13/10 (próximo dia útil)') && (await visibleCount('button', 'Registrar pagamento')) === 1 && (await visibleCount('button', 'Informar encargos')) === 1 && !t.includes('Esta fatura ainda está aberta') &&
     (await visibleCount('button', 'Mercado de setembro · R$ 300,00')) === 1 && (await visibleCount('button', 'Cinema · R$ 100,00')) === 1, t.slice(0, 400));
-  await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(500);
+  await btn('Registrar pagamento').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(500);
   t = await body();
-  ok('E Pagar fatura: total R$ 400,00, "Pagar o total" marcado, data de hoje com a janela "De 07/10/2025 até hoje." (começa 1 ano atrás) e "Outro valor" ainda sem campo',
-    (await h1Name()) === 'Pagar fatura' && t.includes('Total da fatura') && t.includes('R$ 400,00') && (await radio('Pagar o total').getAttribute('aria-checked')) === 'true' && (await field('Data do pagamento').inputValue()) === '07/10/2026' &&
-    t.includes('De 07/10/2025 até hoje.') && (await visibleCount('textbox', 'Valor pago')) === 0 && t.includes('O pagamento de R$ 400,00 entra em Pago de outubro, saindo da conta Conta principal.') && (await visibleCount('button', 'Confirmar pagamento')) === 1, t.slice(0, 500));
+  ok('E Registrar pagamento: total R$ 400,00, "Paguei o total" marcado, data de hoje com a janela "De 07/10/2025 até hoje." (começa 1 ano atrás) e "Outro valor" ainda sem campo',
+    (await h1Name()) === 'Pagamento da fatura' && t.includes('Total da fatura') && t.includes('R$ 400,00') && (await radio('Paguei o total').getAttribute('aria-checked')) === 'true' && (await field('Data do pagamento').inputValue()) === '07/10/2026' &&
+    t.includes('De 07/10/2025 até hoje.') && (await visibleCount('textbox', 'Valor pago')) === 0 && t.includes('O pagamento de R$ 400,00 entra em Pago de outubro, saindo de Conta principal.') && (await visibleCount('button', 'Confirmar pagamento')) === 1, t.slice(0, 500));
   await keepText();
   await innerChecks('pagar fatura 390px');
   await shot('135_pagar_fatura');
@@ -3791,13 +3791,13 @@ setInterval(async () => {
   t = await body();
   ok('E pagamento parcial de R$ 250,00: a prévia diz "Ficaram R$ 150,00 para a fatura de novembro. Juros e encargos do banco entram quando você informar a fatura de novembro." e oferece "Quanto custa pagar só uma parte?"',
     t.includes('Ficaram R$ 150,00 para a fatura de novembro. Juros e encargos do banco entram quando você informar a fatura de novembro.') && (await visibleCount('button', 'Quanto custa pagar só uma parte?')) === 1 &&
-    t.includes('O pagamento de R$ 250,00 entra em Pago de outubro, saindo da conta Conta principal.'));
+    t.includes('O pagamento de R$ 250,00 entra em Pago de outubro, saindo de Conta principal.'));
   await keepText();
   await shot('136_pagar_parcial');
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado.'); await waitInvoice('Paga em parte'); t = await body();
   ok('E fatura paga em parte: "Pago R$ 250,00 em 07/10", o aviso do pagamento, o que ficou (R$ 150,00) com o caminho da calculadora e "Desfazer pagamento"; sem pagar de novo nem mudar valor, data ou parcelas',
     t.includes('Pagamento registrado. R$ 250,00 em Pago de outubro.') && t.includes('Pago R$ 250,00 em 07/10') && t.includes('Ficaram R$ 150,00 para a fatura de novembro.') && (await visibleCount('button', 'Quanto custa pagar só uma parte?')) === 1 &&
-    (await visibleCount('button', 'Desfazer pagamento')) === 1 && (await visibleCount('button', 'Pagar fatura')) === 0 && (await visibleCount('button', 'Informar encargos')) === 0 && (await visibleCount('button', 'Registrar estorno')) === 0 &&
+    (await visibleCount('button', 'Desfazer pagamento')) === 1 && (await visibleCount('button', 'Registrar pagamento')) === 0 && (await visibleCount('button', 'Informar encargos')) === 0 && (await visibleCount('button', 'Registrar estorno')) === 0 &&
     (await visibleCount('button', 'Mercado de setembro · R$ 300,00')) === 1 && (await visibleCount('button', 'Cinema · R$ 100,00')) === 1 && t.includes('Fatura paga: só a descrição e a categoria das compras mudam. Para mudar o resto, desfaça o pagamento.'), t.slice(0, 500));
   // Compra com parcela em fatura paga: o menu só oferece editar a descrição e a categoria (sem excluir), e o formulário só tem esses campos.
   await btn('Cinema · R$ 100,00').click(); await waitText('Editar descrição e categoria'); t = await dialogText();
@@ -3836,8 +3836,8 @@ setInterval(async () => {
   await goTab('Movimentos'); await waitText('Registrar recebimento'); t = await body();
   ok('E Movimentos: o pagamento aparece como "Fatura Cartão Exemplo (outubro)", "Pago · 07/10/2026 · Pagamento de fatura", R$ 250,00 (as compras no cartão não aparecem)', t.includes('Fatura Cartão Exemplo (outubro)') && t.includes('Pago · 07/10/2026 · Pagamento de fatura') && !t.includes('Fone de ouvido') && !t.includes('Mercado de setembro'));
   await p.getByRole('button', { name: /^Fatura Cartão Exemplo \(outubro\), Pago/ }).filter({ visible: true }).first().click(); await waitText('Abrir fatura'); await p.waitForTimeout(400); t = await body();
-  ok('E detalhe do pagamento de fatura: origem "Pagamento de fatura", "Abrir fatura" e nada de editar, excluir nem tornar gasto fixo (só se muda pela fatura)', t.includes('Pagamento de fatura') && (await visibleCount('button', 'Abrir fatura')) === 1 && (await visibleCount('button', 'Editar registro')) === 0 &&
-    (await visibleCount('button', 'Excluir registro')) === 0 && (await visibleCount('button', 'Tornar gasto fixo')) === 0 && t.includes('Este gasto é o pagamento de uma fatura. Para mudar ou desfazer o pagamento, abra a fatura.'));
+  ok('E detalhe do pagamento de fatura: origem "Pagamento de fatura", "Abrir fatura" e nada de editar, excluir nem tornar gasto fixo (só se muda pela fatura)', t.includes('Pagamento de fatura') && (await visibleCount('button', 'Abrir fatura')) === 1 && (await visibleCount('button', 'Editar gasto')) === 0 &&
+    (await visibleCount('button', 'Excluir gasto')) === 0 && (await visibleCount('button', 'Tornar gasto fixo')) === 0 && t.includes('Este gasto é o pagamento de uma fatura. Para mudar ou desfazer o pagamento, abra a fatura.'));
   await keepText();
   await shot('139_registro_pagamento_de_fatura');
   await btn('Abrir fatura').click(); await waitInvoice('Paga em parte');
@@ -3845,7 +3845,7 @@ setInterval(async () => {
   await btn('Desfazer pagamento').click(); await waitText('Desfazer o pagamento desta fatura?'); t = await dialogText();
   ok('E desfazer o pagamento: o diálogo explica (o gasto é apagado, a fatura volta a ficar em aberto e o saldo anterior sai)', t.includes('O gasto do pagamento é apagado e a fatura volta a ficar em aberto. O saldo anterior criado na fatura seguinte também sai.'));
   await confirmIn('Desfazer pagamento'); await waitText('Pagamento desfeito.'); await waitInvoice('Fechada'); t = await body();
-  ok('E pagamento desfeito: "Fechada" de novo, R$ 400,00, "Pagar fatura" e "Informar encargos" de volta', (await heroTotal()) === 'R$ 400,00' && (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Desfazer pagamento')) === 0 && !t.includes('Ficaram R$ 150,00'));
+  ok('E pagamento desfeito: "Fechada" de novo, R$ 400,00, "Registrar pagamento" e "Informar encargos" de volta', (await heroTotal()) === 'R$ 400,00' && (await visibleCount('button', 'Registrar pagamento')) === 1 && (await visibleCount('button', 'Desfazer pagamento')) === 0 && !t.includes('Ficaram R$ 150,00'));
   await goTab('Resumo'); await waitText('Diferença do mês');
   await expectTotals('E desfazer o pagamento da fatura: o Resumo volta a 6.000 / 3.900 / 2.100 e 1.050 (com a fatura de outubro em aberto)', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 1.050,00');
   await openCardPage(); await p.getByRole('button', { name: /^Fatura de novembro, / }).filter({ visible: true }).first().click(); await waitInvoice('Fatura de novembro');
@@ -3892,7 +3892,7 @@ setInterval(async () => {
   await btn('Informar encargos').click(); await waitText('Tipo do encargo'); await radio('Anuidade').click(); await field('Valor do encargo').fill('30'); await btn('Salvar encargo').click(); await waitText('Encargo anotado na fatura.'); await waitInvoice('R$ 430,00');
   await btn('Registrar estorno').click(); await waitText('Descrição do estorno'); await field('Descrição do estorno').fill('Devolução do ingresso'); await field('Valor do estorno').fill('50'); await radio('Lazer').click(); await btn('Salvar estorno').click(); await waitText('Estorno registrado na fatura.'); await waitInvoice('R$ 380,00'); t = await body();
   ok('E fatura de outubro com a anuidade (R$ 30,00) e o estorno (R$ 50,00): R$ 380,00 (400 + 30 - 50)', (await heroTotal()) === 'R$ 380,00' && (await visibleCount('button', 'Anuidade · R$ 30,00')) === 1 && (await visibleCount('button', 'Devolução do ingresso · − R$ 50,00')) === 1 && /Total da fatura\s+R\$ 380,00/.test(t));
-  await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await btn('Confirmar pagamento').click(); await waitText('Fatura paga. R$ 380,00 em Pago de outubro.'); await waitInvoice('Paga');
+  await btn('Registrar pagamento').click(); await waitText('Confirmar pagamento'); await btn('Confirmar pagamento').click(); await waitText('Fatura paga. R$ 380,00 em Pago de outubro.'); await waitInvoice('Paga');
   t = await body();
   ok('E pagamento total da fatura fechada: "Paga", "Pago R$ 380,00 em 07/10", encargo e estorno travados (só as compras aceitam descrição e categoria), "Desfazer pagamento" e nenhum saldo anterior', t.includes('Pago R$ 380,00 em 07/10') && (await visibleCount('button', 'Anuidade · R$ 30,00')) === 0 && t.includes('Anuidade') &&
     (await visibleCount('button', 'Desfazer pagamento')) === 1 && !t.includes('Ficaram'));
@@ -3956,8 +3956,8 @@ setInterval(async () => {
     soonRows.some((r) => r.startsWith('Fatura Cartão verde, vence em ') && r.includes('09/10') && r.endsWith('R$ 80,00')) && ((await sectionRows('Próximos meses')) ?? []).some((r) => r.startsWith('Fatura Cartão Exemplo, vence em 10/11')), JSON.stringify([dueRows, soonRows]));
   ok('E Contas a pagar: conta de fatura nunca mostra "Já paguei" (só as outras contas a vencer mostram)', (await visibleCount('button', /^Já paguei.*Fatura/)) === 0 && (await visibleCount('button', /^Já paguei/)) >= 2);
   await p.getByRole('button', { name: /^Fatura Cartão verde, vence em / }).filter({ visible: true }).first().click(); await waitInvoice('Fatura de outubro'); t = await body();
-  ok('E tocar na fatura de uma conta a pagar abre a fatura (fechada, vence em 09/10), com "Pagar fatura", e sem "Já paguei" nem "Editar conta" nem "Excluir conta"', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPath()) && t.includes('Fechada') && t.includes('R$ 80,00') && t.includes('Fechou em 01/10 · Vence em 09/10') &&
-    (await visibleCount('button', 'Pagar fatura')) === 1 && (await visibleCount('button', 'Já paguei')) === 0 && (await visibleCount('button', /^Excluir/)) === 0 && t.includes('Fatura fechada: o valor só muda se você informar encargos, estornos ou novos lançamentos.'), `${urlPath()} ${t.slice(0, 300)}`);
+  ok('E tocar na fatura de uma conta a pagar abre a fatura (fechada, vence em 09/10), com "Registrar pagamento", e sem "Já paguei" nem "Editar conta" nem "Excluir conta"', /^\/cartoes\/[^/]+\/fatura\/2026-10$/.test(urlPath()) && t.includes('Fechada') && t.includes('R$ 80,00') && t.includes('Fechou em 01/10 · Vence em 09/10') &&
+    (await visibleCount('button', 'Registrar pagamento')) === 1 && (await visibleCount('button', 'Já paguei')) === 0 && (await visibleCount('button', /^Excluir/)) === 0 && t.includes('Fatura fechada: o valor só muda se você informar encargos, estornos ou novos lançamentos.'), `${urlPath()} ${t.slice(0, 300)}`);
   await keepText();
   await shot('145_fatura_fechada');
   await btn('Voltar').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
@@ -4002,9 +4002,9 @@ setInterval(async () => {
     await repo.addCardPurchase(`e2e-set-${Math.random()}`, id, { description: 'Mercado de setembro', category: 'Mercado', purchasedOn: '2026-09-20', totalCents: 40000, installments: 1 });
   }, await cardIdOf('Cartão Exemplo'));
   await openCardPage(); await openInvoice('outubro');
-  await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await radio('Outro valor').click(); await field('Valor pago').fill('250'); await p.waitForTimeout(500);
+  await btn('Registrar pagamento').click(); await waitText('Confirmar pagamento'); await radio('Outro valor').click(); await field('Valor pago').fill('250'); await p.waitForTimeout(500);
   await hiddenShows('pagar fatura');
-  ok('E valores ocultos ao pagar em parte: o aviso do que fica e o resumo do pagamento aparecem como "R$ ••••"', (await body()).includes('Ficaram R$ •••• para a fatura de novembro.') && (await body()).includes('O pagamento de R$ •••• entra em Pago de outubro, saindo da conta Conta principal.'));
+  ok('E valores ocultos ao pagar em parte: o aviso do que fica e o resumo do pagamento aparecem como "R$ ••••"', (await body()).includes('Ficaram R$ •••• para a fatura de novembro.') && (await body()).includes('O pagamento de R$ •••• entra em Pago de outubro, saindo de Conta principal.'));
   await btn('Confirmar pagamento').click(); await waitText('Pagamento registrado.'); await waitInvoice('Paga em parte');
   await hiddenShows('fatura paga em parte');
   ok('E valores ocultos depois de pagar: "Pagamento registrado. R$ •••• em Pago de outubro." e "Pago R$ •••• em 07/10"', (await body()).includes('Pagamento registrado. R$ •••• em Pago de outubro.') && (await body()).includes('Pago R$ •••• em 07/10'));
@@ -4047,7 +4047,7 @@ setInterval(async () => {
   await btn('Salvar cartão').click(); await waitText('Compra no cartão · Nubank · final 5678'); await waitText('Esta compra entra na fatura de novembro do Nubank', 12000).catch(() => {}); await p.waitForTimeout(300);
   t = await body();
   ok('E cartão salvo pelo Anotar gasto: volta ao formulário com o Nubank escolhido, a descrição e o valor mantidos, e o aviso da fatura (novembro: hoje é depois do fechamento do dia 3)', (await h1Name()) === 'Anotar gasto' && t.includes('Compra no cartão · Nubank · final 5678') && (await field('Descrição').inputValue()) === 'Mercado do mês' &&
-    t.includes('Esta compra entra na fatura de novembro do Nubank e conta em Pago quando a fatura for paga.') && (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 1, t.slice(0, 400));
+    t.includes('Esta compra entra na fatura de novembro do Nubank e em Pago quando a fatura for paga.') && (await otherDevice(async (repo, ctx) => (await repo.listCards(ctx)).length)) === 1, t.slice(0, 400));
   await btn('Anotar compra no cartão').click(); await waitText('Compra anotada na fatura de novembro.'); await waitInvoice('Fatura de novembro'); t = await body();
   ok('E primeira compra no cartão novo: a fatura de novembro do Nubank (R$ 90,00) e o Resumo da conta nova continua sem Pago', (await heroTotal()) === 'R$ 90,00' && t.includes('Nubank') && (await visibleCount('button', 'Mercado do mês · R$ 90,00')) === 1);
   await goTab('Resumo'); await waitText('Diferença do mês'); t = await body();
@@ -4184,7 +4184,7 @@ setInterval(async () => {
   // A folha do primeiro toque: câmera só quando há câmera (o navegador do roteiro não tem), PDF e colar sempre; "Cancelar" não faz nada.
   await openScan(); t = await dialogText(); const sheetButtons = await dialogButtons();
   ok('N folha do primeiro toque: título, a frase de privacidade (só um resumo da chave, sem CPF nem link), "Escolher o PDF da nota" antes de "Colar o link ou a chave" (sem câmera no navegador do roteiro, o PDF vem primeiro), "Ler comprovante ou boleto" por último (D-051) e "Cancelar"; "Usar a câmera" só aparece com câmera',
-    t.includes('Como você quer ler a nota?') && t.includes('Guardamos só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guardamos CPF, a chave nem o link.') && JSON.stringify(sheetButtons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante ou boleto', 'Cancelar']) && (sheetButtons.length === 4 || sheetButtons[0] === 'Usar a câmera'), JSON.stringify(sheetButtons));
+    t.includes('Como você quer ler a nota?') && t.includes('A Clarevo guarda só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guarda CPF, a chave nem o link.') && JSON.stringify(sheetButtons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', 'Ler comprovante ou boleto', 'Cancelar']) && (sheetButtons.length === 4 || sheetButtons[0] === 'Usar a câmera'), JSON.stringify(sheetButtons));
   await keepText();
   await shot('151_folha_escanear');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
@@ -4202,7 +4202,7 @@ setInterval(async () => {
   await layoutChecks('colar a nota 320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await field('Colar o link ou a chave da nota').fill('abc'); await btn('Ler a nota').click(); await p.waitForTimeout(300); t = await body();
-  ok('N texto que não é de nota: "Não reconhecemos este código como de uma nota fiscal..." junto do campo, nada preenchido', t.includes('Não reconhecemos este código como de uma nota fiscal.') && !t.includes('Nota lida'));
+  ok('N texto que não é de nota: "A Clarevo não reconheceu este código como de uma nota fiscal..." junto do campo, nada preenchido', t.includes('A Clarevo não reconheceu este código como de uma nota fiscal.') && !t.includes('Nota lida'));
   await field('Colar o link ou a chave da nota').fill('3326 1011 2223 3300 0181 6500 1000 0123 4518 7654 3219'); await btn('Ler a nota').click(); await p.waitForTimeout(300);
   ok('N chave com dígito errado: "A chave não confere. Confira os números ou escaneie de novo."', (await body()).includes('A chave não confere. Confira os números ou escaneie de novo.'));
   // Boleto (Bradesco, 237, linha digitável e código de barras): outro tipo de código, não é chave de nota.
@@ -4220,11 +4220,11 @@ setInterval(async () => {
   // Nota de exemplo (demonstração): rascunho, bloco "Nota lida", foco no valor, mensagens do que falta e nenhuma chamada de rede.
   await openPaste(); await btn('Usar nota de exemplo').click(); await waitText('Nota lida:'); await p.waitForTimeout(800);
   t = await body();
-  ok('N nota de exemplo: bloco "Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026" no lugar da linha, a nota de teste e nada de "Preenchemos o que a nota informa" (falta o valor), sem "Ver a nota no site da Sefaz"',
-    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026') && !t.includes('Preenchemos o que a nota informa.') && t.includes('Esta é uma nota de teste, sem valor fiscal.') &&
+  ok('N nota de exemplo: bloco "Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026" no lugar da linha, a nota de teste e nada de "A Clarevo preencheu o que a nota informa" (falta o valor), sem "Ver a nota no site da Sefaz"',
+    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · outubro de 2026') && !t.includes('A Clarevo preencheu o que a nota informa.') && t.includes('Esta é uma nota de teste, sem valor fiscal.') &&
     (await visibleCount('button', /^Escanear nota fiscal\./)) === 0 && (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 0, t.slice(0, 500));
   ok('N o que a nota não traz é dito com clareza: "O valor não vem no código desta nota. Digite o total impresso no cupom.", o dia de hoje usado e o CNPJ sem o nome',
-    t.includes('O valor não vem no código desta nota. Digite o total impresso no cupom.') && t.includes('O dia da compra não vem no código desta nota. Usamos o de hoje. Mude se foi outro dia.') && t.includes('O código traz o CNPJ da loja, não o nome. Digite o nome na descrição.'));
+    t.includes('O valor não vem no código desta nota. Digite o total impresso no cupom.') && t.includes('O dia da compra não vem no código desta nota, então ficou o de hoje. Mude se foi outro dia.') && t.includes('O código traz o CNPJ da loja, não o nome. Digite o nome na descrição.'));
   ok('N foco no primeiro campo que falta (Valor em reais), data de hoje e descrição vazia (nunca "Compra (CNPJ ...)")',
     (await activeLabel()) === 'Valor em reais' && (await field('Data do pagamento').inputValue()) === '07/10/2026' && (await field('Descrição').inputValue()) === '' && !(await body()).includes('Compra (CNPJ') &&
     (await field('Descrição').getAttribute('placeholder')) === 'Ex.: Mercado');
@@ -4254,12 +4254,12 @@ setInterval(async () => {
   const saved = (await recordsOf()).filter((r) => r.d === 'Mercado' && r.c === 8740);
   ok('N salvar a nota lida: gasto de R$ 87,40 em 07/10/2026, categoria Mercado, com a linha "Nota fiscal · Anotada com a leitura da nota"; o link da Sefaz não existe (nota de teste) e o detalhe explica que só o resumo da chave fica',
     /^\/registro\/[^/]+$/.test(urlPathN()) && saved.length === 1 && saved[0].c === 8740 && saved[0].on === '2026-10-07' && saved[0].cat === 'Mercado' && t.includes('Nota fiscal') && t.includes('Anotada com a leitura da nota') &&
-    t.includes('Guardamos só um resumo da chave da nota, não o link.') && (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 0 && (await recordsOf()).length === before.length + 1, JSON.stringify(saved));
+    t.includes('A Clarevo guarda só um resumo da chave da nota, não o link.') && (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 0 && (await recordsOf()).length === before.length + 1, JSON.stringify(saved));
   ok('N o registro leva só o resumo SHA-256 da chave (64 hexadecimais), nunca a chave de 44 dígitos', saved.length === 1 && /^[0-9a-f]{64}$/.test(saved[0].key ?? '') && !String(saved[0].key).includes('33261011'));
   const savedId = saved[0].id;
   await keepText();
   await shot('154_nota_salva');
-  await btn('Editar registro').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
+  await btn('Editar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
   ok('N editar o gasto de uma nota: sem a linha "Escanear nota fiscal" (só em gasto novo)', (await visibleCount('button', /^Escanear nota fiscal\./)) === 0 && (await visibleCount('button', 'Salvar gasto')) === 1);
   await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
   await goTabN('Resumo'); await waitText('Diferença do mês');
@@ -4283,7 +4283,7 @@ setInterval(async () => {
   const noteB = accessKey('2610', '65', 12346);
   await pasteNote(qrContingency(noteB, '06', '45.90')); t = await body();
   ok('N QR com valor e dia: "Nota lida: CNPJ 11.222.333/0001-81 · RJ · R$ 45,90 · 06/10/2026", valor 45,90 e data 06/10/2026, sem mensagem de falta e com o teclado fechado',
-    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · R$ 45,90 · 06/10/2026') && t.includes('Preenchemos o que a nota informa. Confira e toque em Salvar.') && (await field('Valor em reais').inputValue()) === '45,90' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && !t.includes('não vem no código') &&
+    t.includes('Nota lida: CNPJ 11.222.333/0001-81 · RJ · R$ 45,90 · 06/10/2026') && t.includes('A Clarevo preencheu o que a nota informa. Confira e toque em Salvar.') && (await field('Valor em reais').inputValue()) === '45,90' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && !t.includes('não vem no código') &&
     (await activeTag()) !== 'INPUT' && (await activeTag()) !== 'TEXTAREA', `${await activeTag()} ${t.slice(0, 300)}`);
   ok('N mesma loja (mesmo CNPJ) já anotada neste aparelho: descrição e categoria da última vez, com a legenda "Como da última vez nesta loja"',
     (await field('Descrição').inputValue()) === 'Mercado' && (await radio('Mercado').getAttribute('aria-checked')) === 'true' && t.includes('Como da última vez nesta loja'));
@@ -4296,7 +4296,7 @@ setInterval(async () => {
   await keepText();
   await toBlock(); await shot('156_nota_com_link');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600); t = await body();
-  ok('N gasto salvo logo depois da leitura: o detalhe tem "Ver a nota no site da Sefaz" (o endereço só vive na sessão; o registro guarda só o resumo da chave)', (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 && t.includes('Anotada com a leitura da nota') && !t.includes('Guardamos só um resumo da chave da nota, não o link.'));
+  ok('N gasto salvo logo depois da leitura: o detalhe tem "Ver a nota no site da Sefaz" (o endereço só vive na sessão; o registro guarda só o resumo da chave)', (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 && t.includes('Anotada com a leitura da nota') && !t.includes('A Clarevo guarda só um resumo da chave da nota, não o link.'));
   await keepText();
   await shot('157_nota_salva_com_link');
 
@@ -4334,7 +4334,7 @@ setInterval(async () => {
   const sefazCalls = await p.evaluate(() => window.__sefazCalls);
   ok('N página da Sefaz lida: "Nota lida: Mercado Exemplo Ltda · RJ · R$ 63,70 · 06/10/2026", valor 63,70, data 06/10/2026 e a descrição com o nome da loja ("Nome da loja lido da nota"), com "Loja, valor e data lidos da página da Sefaz"',
     t.includes('Nota lida: Mercado Exemplo Ltda · RJ · R$ 63,70 · 06/10/2026') && (await field('Valor em reais').inputValue()) === '63,70' && (await field('Data do pagamento').inputValue()) === '06/10/2026' && (await field('Descrição').inputValue()) === 'Mercado Exemplo Ltda' &&
-    t.includes('Nome da loja lido da nota') && t.includes('Loja, valor e data lidos da página da Sefaz. Confira antes de salvar.') && !t.includes('não vem no código') && t.includes('Preenchemos o que a nota informa.'), t.slice(0, 500));
+    t.includes('Nome da loja lido da nota') && t.includes('Loja, valor e data lidos da página da Sefaz. Confira antes de salvar.') && !t.includes('não vem no código') && t.includes('A Clarevo preencheu o que a nota informa.'), t.slice(0, 500));
   ok('N a leitura da página busca só o endereço oficial do QR (uma vez) e o app não mostra CPF nem nome do consumidor (a página os trazia)', sefazCalls.length === 1 && sefazCalls[0] === qrOnline(SEFAZ_KEY) && !/FULANA|123\.456\.789/.test(t) && !t.includes('Neste navegador, a página da Sefaz não pode ser lida'), JSON.stringify(sefazCalls));
   await keepText();
   await toBlock(); await shot('163_pagina_da_sefaz_lida');
@@ -4342,9 +4342,9 @@ setInterval(async () => {
   await p.evaluate(() => { window.__sefazMode = 'erro'; });
   const SEFAZ_KEY2 = accessKey('2610', '65', 5151, OTHER_CNPJ);
   await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300);
-  await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY2)); await btn('Ler a nota').click(); await waitText('Não deu para ler a página da Sefaz.', 8000); await p.waitForTimeout(600); t = await body();
-  ok('N página da Sefaz que não abre: "Não deu para ler a página da Sefaz. Confira o valor no cupom.", o valor volta a faltar (a nota nova substitui a anterior) e o formulário segue manual',
-    t.includes('Não deu para ler a página da Sefaz. Confira o valor no cupom.') && t.includes('O valor não vem no código desta nota. Digite o total impresso no cupom.') && (await field('Valor em reais').inputValue()) === '' && (await field('Descrição').inputValue()) === '' &&
+  await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY2)); await btn('Ler a nota').click(); await waitText('Não foi possível ler a página da Sefaz.', 8000); await p.waitForTimeout(600); t = await body();
+  ok('N página da Sefaz que não abre: "Não foi possível ler a página da Sefaz. Confira o valor no cupom.", o valor volta a faltar (a nota nova substitui a anterior) e o formulário segue manual',
+    t.includes('Não foi possível ler a página da Sefaz. Confira o valor no cupom.') && t.includes('O valor não vem no código desta nota. Digite o total impresso no cupom.') && (await field('Valor em reais').inputValue()) === '' && (await field('Descrição').inputValue()) === '' &&
     (await visibleCount('button', 'Ver a nota no site da Sefaz')) === 1 && t.includes('Nota lida: CNPJ 45.723.174/0001-10 · RJ'), t.slice(0, 500));
   await p.evaluate((html) => { window.__sefazMode = 'ok'; window.__sefazHtml = html; }, sefazHtml(accessKey('2610', '65', 9999, OTHER_CNPJ)));
   await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300);
@@ -4353,10 +4353,10 @@ setInterval(async () => {
   // A página só vale se mostra a chave lida ou o CNPJ do emitente; e a resposta precisa dizer de qual endereço veio.
   const readAgain = async () => { await btn('Ler outra nota').click(); await waitText('Como você quer ler a nota?'); await btn('Colar o link ou a chave').click(); await waitText('Colar o link ou a chave da nota'); await p.waitForTimeout(300); await field('Colar o link ou a chave da nota').fill(qrOnline(SEFAZ_KEY)); await btn('Ler a nota').click(); await p.waitForTimeout(800); };
   await p.evaluate(() => { window.__sefazMode = 'ok'; window.__sefazHtml = '<div class="txtTopo">LOJA FALSA</div><div>Valor a pagar R$: 9.999,99</div><div>Emissão: 06/10/2026</div>'; });
-  await readAgain(); await waitText('Não deu para ler a página da Sefaz.', 8000);
-  ok('N página que não mostra a chave nem o CNPJ do emitente: nada é aproveitado ("Não deu para ler a página da Sefaz."), valor e nome não vêm da página', (await field('Valor em reais').inputValue()) === '' && !(await body()).includes('LOJA FALSA') && !(await body()).includes('9.999,99'));
+  await readAgain(); await waitText('Não foi possível ler a página da Sefaz.', 8000);
+  ok('N página que não mostra a chave nem o CNPJ do emitente: nada é aproveitado ("Não foi possível ler a página da Sefaz."), valor e nome não vêm da página', (await field('Valor em reais').inputValue()) === '' && !(await body()).includes('LOJA FALSA') && !(await body()).includes('9.999,99'));
   await p.evaluate((html) => { window.__sefazMode = 'semurl'; window.__sefazHtml = html; }, sefazHtml(SEFAZ_KEY));
-  await readAgain(); await waitText('Não deu para ler a página da Sefaz.', 8000);
+  await readAgain(); await waitText('Não foi possível ler a página da Sefaz.', 8000);
   ok('N resposta sem o endereço de onde veio (poderia ser de outro domínio): recusada, nada é aproveitado', (await field('Valor em reais').inputValue()) === '' && !(await body()).includes('Mercado Exemplo Ltda'));
   await p.evaluate(() => { delete window.__clarevoSefazFetch; });
   await leaveForm();
@@ -4369,8 +4369,8 @@ setInterval(async () => {
   ok('N arquivo que não é PDF: "Este arquivo não é um PDF." e nada preenchido', (await body()).includes('Este arquivo não é um PDF.') && !(await body()).includes('Nota lida:'));
   await openScan();
   const [chooser2] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]);
-  await chooser2.setFiles(pdfNoKey); await waitText('Não encontramos a chave de acesso neste PDF.', 15000); await p.waitForTimeout(300);
-  ok('N PDF sem a chave de acesso: "Não encontramos a chave de acesso neste PDF. Confira se é o PDF da nota fiscal (o DANFE)."', (await body()).includes('Não encontramos a chave de acesso neste PDF. Confira se é o PDF da nota fiscal (o DANFE).') && !(await body()).includes('Nota lida:'));
+  await chooser2.setFiles(pdfNoKey); await waitText('A chave de acesso não apareceu neste PDF.', 15000); await p.waitForTimeout(300);
+  ok('N PDF sem a chave de acesso: "A chave de acesso não apareceu neste PDF. Confira se é o PDF da nota fiscal (o DANFE)."', (await body()).includes('A chave de acesso não apareceu neste PDF. Confira se é o PDF da nota fiscal (o DANFE).') && !(await body()).includes('Nota lida:'));
   await openScan();
   const [chooser3] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher o PDF da nota').click()]);
   await chooser3.setFiles(pdfOk); await waitText('Nota lida:', 20000); await p.waitForTimeout(800); t = await body();
@@ -4597,7 +4597,7 @@ setInterval(async () => {
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await btn('Marcar as 2 selecionadas como pagas no vencimento').click(); await waitText('Marcar 2 contas como pagas?');
   t = await dialogText();
-  ok('lote: diálogo com cada conta, o valor, o vencimento e a conta de saída', t.includes('Aluguel: R$ 2.500,00 em 05/06/2026. Financiamento do carro (parcela 9 de 48): R$ 850,00 em 10/06/2026. Saem da conta Conta principal.'), t);
+  ok('lote: diálogo com cada conta, o valor, o vencimento e a conta de saída', t.includes('Aluguel: R$ 2.500,00 em 05/06/2026. Financiamento do carro (parcela 9 de 48): R$ 850,00 em 10/06/2026. Saem de Conta principal.'), t);
   await shot('75_lote_dialogo');
   await confirmIn('Marcar como pagas'); await waitText('Paga em 10/06 · R$ 850,00');
   t = await body();
@@ -4702,7 +4702,7 @@ setInterval(async () => {
     t.includes('R$ 2.500,00 · venceu em 05/10 · em aberto') && !t.includes('Recebimentos e gastos') && !t.includes('Luz') && (await visibleCount('button', 'Concluir')) === 1 && (await visibleCount('button', 'Concluir agora')) === 0, t.slice(0, 400));
   ok('trocar de passo tira o aviso do passo anterior ("Anotado: Salário" de setembro)', !t.includes('Anotado: Salário'));
   await btn('Já paguei: Aluguel de outubro').click(); await waitText('Marcar como paga?');
-  ok('"Já paguei" de valor fixo: confirmação com o valor, o vencimento e a conta', (await dialogText()).includes('Aluguel de outubro: R$ 2.500,00 em 05/10/2026, da conta Conta principal.') &&
+  ok('"Já paguei" de valor fixo: confirmação com o valor, o vencimento e a conta', (await dialogText()).includes('Aluguel de outubro: R$ 2.500,00 em 05/10/2026, saindo de Conta principal.') &&
     (await p.getByRole('dialog').or(p.getByRole('alert')).getByRole('button', { name: 'Mudar valor ou data', exact: true }).count()) === 1);
   await confirmIn('Confirmar'); await waitText('Paga em 05/10 · R$ 2.500,00');
   await keepReturnText();
@@ -5169,7 +5169,7 @@ setInterval(async () => {
   await p.getByRole('button', { name: /^Fatura de novembro, / }).filter({ visible: true }).first().click(); await waitText('Lançamentos'); await p.waitForTimeout(400);
   await checkBar('nav barra: uma fatura', 'Movimentos');
   await btn('Informar encargos').click(); await waitText('Tipo do encargo'); await p.waitForTimeout(400);
-  await checkNoBar('nav barra: informar encargos (a fatura aberta não tem Pagar fatura)');
+  await checkNoBar('nav barra: informar encargos (a fatura aberta não tem Registrar pagamento)');
   await btn('Voltar').click(); await p.waitForTimeout(400);
   await navBackTo('Movimentos');
   // Registro: detalhe com barra; novo e editar sem barra.
@@ -5177,9 +5177,9 @@ setInterval(async () => {
   await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(300);
   await checkNoBar('nav barra: anotar gasto');
   await btn('Voltar').click(); await waitText('Diferença do mês');
-  await p.getByRole('button', { name: /^Mercado, / }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Mercado, / }).filter({ visible: true }).first().click(); await waitText('Editar gasto'); await p.waitForTimeout(400);
   await checkBar('nav barra: detalhe de um gasto', 'Resumo');
-  await btn('Editar registro').click(); await waitText('Salvar alterações').catch(() => {}); await p.waitForTimeout(300);
+  await btn('Editar gasto').click(); await waitText('Salvar alterações').catch(() => {}); await p.waitForTimeout(300);
   await checkNoBar('nav barra: editar registro');
   await btn('Voltar').click(); await p.waitForTimeout(300); await navBackTo('Resumo');
   // Renda comprometida, Metas, meta, simulador e explicação.
@@ -5307,7 +5307,7 @@ setInterval(async () => {
     const box = (sel, pred) => { const e = [...document.querySelectorAll(sel)].find((x) => pred(x) && x.getBoundingClientRect().width > 0); return e ? e.getBoundingClientRect() : null; };
     const title = box('[role=heading]', (x) => x.textContent === 'Você consegue guardar algum valor por mês?');
     const yes = box('[role=button]', (x) => x.textContent === 'Sim, consigo');
-    const no = box('[role=button]', (x) => x.textContent === 'Agora não');
+    const no = box('[role=button]', (x) => x.textContent === 'Não consigo agora');
     const later = box('[role=button]', (x) => x.textContent === 'Responder depois');
     const calc = box('[role=button]', (x) => x.textContent === 'Calcular minha reserva');
     const reserve = box('[role=heading]', (x) => x.textContent === 'Reserva para imprevistos');
@@ -5330,7 +5330,7 @@ setInterval(async () => {
     const r = await askLayout();
     // Sem reserva, o texto do card tem uma ou duas linhas e "Calcular minha reserva" vem logo depois: o botão fica à vista, acima
     // da barra, inclusive em 360 × 640 e 320 × 640 (sem rolar).
-    ok(`nav Metas conta nova (${w}×${h}): pergunta compacta (até 230 px), "Sim, consigo" e "Agora não" lado a lado, "Responder depois" abaixo e "Calcular minha reserva" à vista acima da barra`,
+    ok(`nav Metas conta nova (${w}×${h}): pergunta compacta (até 230 px), "Sim, consigo" e "Não consigo agora" lado a lado, "Responder depois" abaixo e "Calcular minha reserva" à vista acima da barra`,
       r.askHeight !== null && r.askHeight <= 230 && r.sameRow === true && r.laterBelow === true && r.calcBottom !== null && r.calcBottom <= r.barTop, JSON.stringify(r));
     await layoutChecks(`nav Metas conta nova ${w}px`);
     if (w === 390) await shot('177_metas_compacta');
@@ -6115,7 +6115,7 @@ setInterval(async () => {
   await btn('Cancelar').click(); await p.waitForTimeout(400); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
   await waitText('Ano a ano');
   // Editar a conta do ano: o texto lembra que, para um ano só, vale "Informar o valor".
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
   ok('D42 editar a conta do ano: lembra que para o valor de um ano só se usa "Informar o valor", em Ano a ano', (await body()).includes('Para mudar o valor de um ano só, use Informar o valor, em Ano a ano. Aqui a mudança vale também para os anos seguintes.'));
   await keepText();
   await btn('Cancelar').click(); await p.waitForTimeout(400); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
@@ -6615,10 +6615,10 @@ setInterval(async () => {
   ok('F2 aviso: categoria sem orçamento (Transporte) não leva aviso nenhum', t.includes('Gasto salvo') && !t.includes('orçamento'), t.slice(0, 300));
   // Editar o gasto de R$ 300,00 para R$ 5,00 e de novo para R$ 400,00: o aviso volta só no cruzamento.
   await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: /Feira grande, Pago · / }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await btn('Editar registro').click(); await waitText('Editar gasto');
+  await p.getByRole('button', { name: /Feira grande, Pago · / }).filter({ visible: true }).first().click(); await waitText('Editar gasto'); await btn('Editar gasto').click(); await waitText('Será salvo em');
   await field('Valor em reais').fill('5'); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(400);
   ok('F2 aviso: editar para baixo (R$ 5,00) não leva aviso', !(await body()).includes('passou do orçamento'));
-  await btn('Editar registro').click(); await waitText('Editar gasto');
+  await btn('Editar gasto').click(); await waitText('Será salvo em');
   await field('Valor em reais').fill('400'); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(400);
   t = await body();
   ok('F2 aviso ao editar: de R$ 5,00 para R$ 400,00 cruza de novo (R$ 1.960,00): "Mercado passou do orçamento de outubro em R$ 160,00."', t.includes('Mercado passou do orçamento de outubro em R$ 160,00.'), t.slice(0, 300));
@@ -6803,7 +6803,7 @@ setInterval(async () => {
   await goResumo().catch(() => {});
 
   // ==================================================================================================================
-  // Ciclo G1 · Contas de origem do dinheiro (D-043, docs/08 §5 item 16). "Contas de origem" em Conta (lista, nova conta, editar,
+  // Ciclo G1 · Bancos e carteira do dinheiro (D-043, docs/08 §5 item 16). "Bancos e carteira" em Conta (lista, nova conta, editar,
   // principal, arquivar, reativar, excluir), o seletor "Saiu de" / "Entrou em" / "Foi para" em Anotar gasto, recebimento,
   // editar registro, pagar conta, pagar fatura e aporte e resgate de meta, a conta nas linhas e no detalhe de Movimentos e o
   // filtro por conta. A conta só informa a origem: não existe saldo por conta e os totais de outubro seguem 6.000 / 3.900 /
@@ -6822,10 +6822,10 @@ setInterval(async () => {
   };
   const g1OpenConta = async () => {
     await goResumo();
-    await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Contas de origem'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Bancos e carteira'); await p.waitForTimeout(400);
   };
-  const g1Rows = async () => ((await sectionRows('Contas de origem')) ?? []).filter((x) => / Abrir a conta\.$/.test(x));
-  const g1Row = (name) => p.getByRole('button', { name: new RegExp(`^${name}, .*Abrir a conta\\.$`) }).filter({ visible: true }).first();
+  const g1Rows = async () => ((await sectionRows('Bancos e carteira')) ?? []).filter((x) => / Abrir para editar\.$/.test(x));
+  const g1Row = (name) => p.getByRole('button', { name: new RegExp(`^${name}, .*Abrir para editar\\.$`) }).filter({ visible: true }).first();
   const g1Group = (name) => p.getByRole('radiogroup', { name, exact: true }).filter({ visible: true });
   const g1Checked = async (name) => (await radio(name).count()) === 1 && (await radio(name).getAttribute('aria-checked')) === 'true';
   const g1Records = (desc) => otherDevice(async (repo, ctx, d) => {
@@ -6856,77 +6856,77 @@ setInterval(async () => {
   await g1OpenConta();
   t = await g1Keep();
   const g1Initial = await g1Rows();
-  ok('G1 Conta: "Contas de origem" lista a Conta principal (Conta bancária, Principal) e a Carteira (Dinheiro), nessa ordem',
-    JSON.stringify(g1Initial) === JSON.stringify(['Conta principal, Conta bancária · Principal. Abrir a conta.', 'Carteira, Dinheiro. Abrir a conta.']), JSON.stringify(g1Initial));
+  ok('G1 Conta: "Bancos e carteira" lista a Conta principal (Banco, Principal) e a Carteira (Dinheiro), nessa ordem',
+    JSON.stringify(g1Initial) === JSON.stringify(['Conta principal, Banco · Principal. Abrir para editar.', 'Carteira, Dinheiro. Abrir para editar.']), JSON.stringify(g1Initial));
   ok('G1 Conta: o card diz que é só a origem (sem saldo) e que a Clarevo não calcula saldo por conta; o antigo "Nome da conta" saiu',
-    t.includes('É só a origem informada: a Clarevo não guarda saldo nem movimenta dinheiro.') && t.includes('A Clarevo não calcula saldo por conta.') &&
-    (await visibleCount('textbox', 'Nome da conta')) === 0 && (await visibleCount('button', 'Salvar nome')) === 0 && (await visibleCount('button', 'Adicionar conta')) === 1);
+    t.includes('É só a origem informada: a Clarevo não guarda saldo nem movimenta dinheiro.') && t.includes('A Clarevo não calcula o saldo do banco nem da carteira.') &&
+    (await visibleCount('textbox', 'Nome da conta')) === 0 && (await visibleCount('button', 'Salvar nome')) === 0 && (await visibleCount('button', 'Adicionar banco ou carteira')) === 1);
   ok('G1 Conta: a demonstração guarda a Carteira como dinheiro e o mercado pago nela (Mercado de setembro e de outubro)',
     (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-' && (await g1Records('Mercado')) === 'Mercado|Carteira|125000;Mercado|Carteira|140000', await g1Records('Mercado'));
-  await atWidths(async (w) => { await layoutChecks(`G1 Conta (Contas de origem) ${w}px`); if (w === 390) await shot('240_suas_contas'); if (w === 320) await shot('240_suas_contas_320px'); });
+  await atWidths(async (w) => { await layoutChecks(`G1 Conta (Bancos e carteira) ${w}px`); if (w === 390) await shot('240_suas_contas'); if (w === 320) await shot('240_suas_contas_320px'); });
 
   // ---- 2. Nova conta: validação, nome repetido e cadastro ----
-  await btn('Adicionar conta').click(); await waitText('Tipo da conta'); await p.waitForTimeout(400);
+  await btn('Adicionar banco ou carteira').click(); await waitText('Por exemplo: Carteira ou o nome do banco.'); await p.waitForTimeout(400);
   t = await g1Keep();
-  ok('G1 Nova conta: título, nome, tipo (Conta bancária marcada), a nota do saldo e o rodapé fixo',
-    (await h1Name()) === 'Nova conta' && urlPath() === '/contas/nova' && (await visibleCount('textbox', 'Nome da conta')) === 1 && (await g1Checked('Conta bancária')) && (await visibleCount('radio', /^(Dinheiro|Outra)$/)) === 2 &&
-    t.includes('Por exemplo: Carteira ou Conta do banco.') && t.includes('A Clarevo não calcula saldo por conta.') && (await visibleCount('button', 'Adicionar conta')) === 1 && (await visibleCount('button', 'Excluir conta')) === 0);
+  ok('G1 Nova conta: título, nome, tipo (Banco marcado), a nota do saldo e o rodapé fixo',
+    (await h1Name()) === 'Adicionar banco ou carteira' && urlPath() === '/contas/nova' && (await visibleCount('textbox', 'Nome')) === 1 && (await g1Checked('Banco')) && (await visibleCount('radio', /^(Dinheiro|Outro)$/)) === 2 &&
+    t.includes('Por exemplo: Carteira ou o nome do banco.') && t.includes('A Clarevo não calcula o saldo do banco nem da carteira.') && (await visibleCount('button', 'Adicionar')) === 1 && (await visibleCount('button', 'Excluir')) === 0);
   await atWidths(async (w) => { await innerChecks(`G1 Nova conta ${w}px`); if (w === 390) await shot('241_nova_conta'); });
-  await g1Save('Adicionar conta');
-  ok('G1 Nova conta sem nome: "Dê um nome de 1 a 40 caracteres para a conta." e nada gravado', (await body()).includes('Dê um nome de 1 a 40 caracteres para a conta.') && urlPath() === '/contas/nova' && (await g1Accounts()).split(';').length === 2);
-  await field('Nome da conta').fill('carteira'); await g1Save('Adicionar conta');
-  ok('G1 Nova conta com o nome de outra (sem diferenciar maiúsculas): "Você já tem uma conta com este nome. Use outro nome."', (await body()).includes('Você já tem uma conta com este nome. Use outro nome.') && urlPath() === '/contas/nova');
-  await field('Nome da conta').fill('Reserva da casa'); await radio('Outra').click(); await g1Save('Adicionar conta'); await waitText('Conta adicionada.'); await p.waitForTimeout(500);
+  await g1Save('Adicionar');
+  ok('G1 Nova conta sem nome: "Dê um nome de 1 a 40 caracteres." e nada gravado', (await body()).includes('Dê um nome de 1 a 40 caracteres.') && urlPath() === '/contas/nova' && (await g1Accounts()).split(';').length === 2);
+  await field('Nome').fill('carteira'); await g1Save('Adicionar');
+  ok('G1 Nova conta com o nome de outra (sem diferenciar maiúsculas): "Você já tem um banco ou carteira com este nome. Use outro nome."', (await body()).includes('Você já tem um banco ou carteira com este nome. Use outro nome.') && urlPath() === '/contas/nova');
+  await field('Nome').fill('Reserva da casa'); await radio('Outro').click(); await g1Save('Adicionar'); await waitText('Adicionado em Bancos e carteira.'); await p.waitForTimeout(500);
   const g1Added = await g1Rows();
-  ok('G1 Nova conta salva: aviso "Conta adicionada.", de volta a Conta com a terceira conta (Outra) e nenhuma principal nova',
-    urlPath() === '/conta' && g1Added.length === 3 && g1Added[2] === 'Reserva da casa, Outra. Abrir a conta.' && (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-;Reserva da casa|outra|ativa|-', JSON.stringify(g1Added));
+  ok('G1 Nova conta salva: aviso "Adicionado em Bancos e carteira.", de volta a Conta com a terceira conta (Outra) e nenhuma principal nova',
+    urlPath() === '/conta' && g1Added.length === 3 && g1Added[2] === 'Reserva da casa, Outro. Abrir para editar.' && (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-;Reserva da casa|outra|ativa|-', JSON.stringify(g1Added));
   await shot('242_conta_adicionada');
 
   // ---- 3. Editar: renomear, tornar principal, arquivar a principal escolhendo outra, reativar, excluir ----
   await g1Row('Reserva da casa').click(); await waitText('Situação'); await p.waitForTimeout(400);
   t = await g1Keep();
   ok('G1 Editar conta: título, nome e tipo preenchidos, a situação ("Outra") e as ações (Tornar principal, Arquivar conta, Excluir conta)',
-    (await h1Name()) === 'Editar conta' && (await field('Nome da conta').inputValue()) === 'Reserva da casa' && (await g1Checked('Outra')) && t.includes('Situação') &&
-    (await visibleCount('button', 'Tornar principal')) === 1 && (await visibleCount('button', 'Arquivar conta')) === 1 && (await visibleCount('button', 'Excluir conta')) === 1 && (await visibleCount('button', 'Reativar conta')) === 0, t.slice(0, 300));
+    (await h1Name()) === 'Editar banco ou carteira' && (await field('Nome').inputValue()) === 'Reserva da casa' && (await g1Checked('Outro')) && t.includes('Situação') &&
+    (await visibleCount('button', 'Tornar principal')) === 1 && (await visibleCount('button', 'Arquivar')) === 1 && (await visibleCount('button', 'Excluir')) === 1 && (await visibleCount('button', 'Reativar')) === 0, t.slice(0, 300));
   await atWidths(async (w) => { await innerChecks(`G1 Editar conta ${w}px`); if (w === 390) await shot('243_editar_conta'); });
-  await field('Nome da conta').fill('Cofre'); await g1Save('Salvar conta'); await waitText('Conta salva.'); await p.waitForTimeout(400);
-  ok('G1 Editar: renomear para "Cofre" salva e volta a Conta com o aviso', urlPath() === '/conta' && (await g1Rows())[2] === 'Cofre, Outra. Abrir a conta.' && (await g1Accounts()).includes('Cofre|outra|ativa|-'));
-  await g1Row('Cofre').click(); await waitText('Situação'); await btn('Tornar principal').click(); await waitText('Conta principal atualizada.'); await p.waitForTimeout(500);
+  await field('Nome').fill('Cofre'); await g1Save('Salvar alterações'); await waitText('Alterações salvas.'); await p.waitForTimeout(400);
+  ok('G1 Editar: renomear para "Cofre" salva e volta a Conta com o aviso', urlPath() === '/conta' && (await g1Rows())[2] === 'Cofre, Outro. Abrir para editar.' && (await g1Accounts()).includes('Cofre|outra|ativa|-'));
+  await g1Row('Cofre').click(); await waitText('Situação'); await btn('Tornar principal').click(); await waitText('Marcado como principal.'); await p.waitForTimeout(500);
   ok('G1 Tornar principal: aviso na própria tela, o botão some e a principal anterior deixa de ser principal',
     (await visibleCount('button', 'Tornar principal')) === 0 && (await g1Accounts()) === 'Cofre|outra|ativa|principal;Conta principal|banco|ativa|-;Carteira|dinheiro|ativa|-'.replace('Cofre|outra|ativa|principal;Conta principal|banco|ativa|-;Carteira|dinheiro|ativa|-', (await g1Accounts())) && (await g1Accounts()).split(';').filter((x) => x.endsWith('|principal')).length === 1 && (await g1Accounts()).includes('Cofre|outra|ativa|principal'));
-  await btn('Arquivar conta').click(); await waitText('Qual será a conta principal?'); await p.waitForTimeout(400);
+  await btn('Arquivar').click(); await waitText('Qual fica como principal?'); await p.waitForTimeout(400);
   t = await dialogText();
   ok('G1 Arquivar a principal: o diálogo pede a nova principal (uma escolha por conta ativa) e nada foi gravado',
     t.includes('Escolha outra antes de arquivar esta.') && (await p.getByRole('button', { name: 'Tornar Conta principal a principal e arquivar' }).filter({ visible: true }).count()) === 1 &&
     (await p.getByRole('button', { name: 'Tornar Carteira a principal e arquivar' }).filter({ visible: true }).count()) === 1 && (await g1Accounts()).includes('Cofre|outra|ativa|principal'));
   await shot('244_arquivar_principal');
-  await p.getByRole('button', { name: 'Tornar Conta principal a principal e arquivar' }).filter({ visible: true }).first().click(); await waitText('Conta arquivada.'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: 'Tornar Conta principal a principal e arquivar' }).filter({ visible: true }).first().click(); await waitText('Arquivado.'); await p.waitForTimeout(500);
   ok('G1 Arquivar a principal escolhendo outra: o Cofre fica arquivado e a Conta principal volta a ser a principal',
-    (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-;Cofre|outra|arquivada|-' && (await visibleCount('button', 'Reativar conta')) === 1 && (await visibleCount('button', 'Arquivar conta')) === 0, await g1Accounts());
-  await btn('Reativar conta').click(); await waitText('Conta reativada.'); await p.waitForTimeout(500);
+    (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-;Cofre|outra|arquivada|-' && (await visibleCount('button', 'Reativar')) === 1 && (await visibleCount('button', 'Arquivar')) === 0, await g1Accounts());
+  await btn('Reativar').click(); await waitText('Reativado.'); await p.waitForTimeout(500);
   ok('G1 Reativar: o Cofre volta como conta ativa comum', (await g1Accounts()).includes('Cofre|outra|ativa|-'));
-  await btn('Excluir conta').click(); await waitText('Excluir esta conta?'); await p.waitForTimeout(300);
-  ok('G1 Excluir: o diálogo explica que só se exclui conta sem lançamentos', (await dialogText()).includes('Só é possível excluir uma conta sem lançamentos. Se ela já tem gastos ou aportes, arquive a conta: o histórico continua.'));
-  await confirmIn('Excluir conta'); await waitText('Conta excluída.'); await p.waitForTimeout(500);
+  await btn('Excluir').click(); await waitText('Excluir de Bancos e carteira?'); await p.waitForTimeout(300);
+  ok('G1 Excluir: o diálogo explica que só se exclui conta sem lançamentos', (await dialogText()).includes('Só é possível excluir o que ainda não tem lançamentos. Se já tem gastos ou aportes, arquive: o histórico continua.'));
+  await confirmIn('Excluir'); await waitText('Excluído de Bancos e carteira.'); await p.waitForTimeout(500);
   ok('G1 Excluir conta sem lançamentos: aviso, de volta a Conta e só a Conta principal e a Carteira na lista',
     urlPath() === '/conta' && JSON.stringify(await g1Rows()) === JSON.stringify(g1Initial) && (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-', JSON.stringify(await g1Rows()));
   // A Carteira tem o mercado pago nela: excluir é recusado ("arquive"); a principal nunca se exclui nem se arquiva sozinha.
-  await g1Row('Carteira').click(); await waitText('Situação'); await btn('Excluir conta').click(); await waitText('Excluir esta conta?'); await confirmIn('Excluir conta'); await p.waitForTimeout(600);
+  await g1Row('Carteira').click(); await waitText('Situação'); await btn('Excluir').click(); await waitText('Excluir de Bancos e carteira?'); await confirmIn('Excluir'); await p.waitForTimeout(600);
   t = await g1Keep();
-  ok('G1 Excluir a Carteira (com gastos): "Esta conta tem lançamentos. Arquive a conta em vez de excluir: o histórico continua." e nada muda',
-    t.includes('Esta conta tem lançamentos. Arquive a conta em vez de excluir: o histórico continua.') && (await g1Accounts()).includes('Carteira|dinheiro|ativa|-'));
-  await btn('Voltar').click(); await waitText('Contas de origem'); await p.waitForTimeout(400);
+  ok('G1 Excluir a Carteira (com gastos): "Já há lançamentos aqui. Arquive em vez de excluir: o histórico continua." e nada muda',
+    t.includes('Já há lançamentos aqui. Arquive em vez de excluir: o histórico continua.') && (await g1Accounts()).includes('Carteira|dinheiro|ativa|-'));
+  await btn('Voltar').click(); await waitText('Bancos e carteira'); await p.waitForTimeout(400);
   await g1Row('Conta principal').click(); await waitText('Situação'); await p.waitForTimeout(300);
   t = await body();
   ok('G1 Conta principal: sem "Excluir conta" (a principal nunca se exclui), com a explicação, e "Tornar principal" não aparece',
-    (await visibleCount('button', 'Excluir conta')) === 0 && t.includes('A conta principal não pode ser excluída. Torne outra conta principal antes.') && (await visibleCount('button', 'Tornar principal')) === 0);
-  await btn('Voltar').click(); await waitText('Contas de origem'); await p.waitForTimeout(300);
+    (await visibleCount('button', 'Excluir')) === 0 && t.includes('A opção principal não pode ser excluída. Torne outra a principal antes.') && (await visibleCount('button', 'Tornar principal')) === 0);
+  await btn('Voltar').click(); await waitText('Bancos e carteira'); await p.waitForTimeout(300);
 
   // ---- 4. Anotar gasto: "Saiu de" abaixo de "Dinheiro, débito ou Pix"; a primeira (principal) vem marcada ----
   await goResumo(); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
   t = await g1Keep();
   ok('G1 Anotar gasto: "Como você pagou?" ganha o grupo "Saiu de" com a Conta principal marcada e a Carteira, e o rodapé diz a conta',
-    (await g1Group('Saiu de').count()) === 1 && (await g1Checked('Conta principal')) && !(await g1Checked('Carteira')) && t.includes('Será salvo em Pessoal, Conta principal.') && (await visibleCount('button', 'Gerenciar contas de origem')) === 1, t.slice(0, 400));
+    (await g1Group('Saiu de').count()) === 1 && (await g1Checked('Conta principal')) && !(await g1Checked('Carteira')) && t.includes('Será salvo em Pessoal, Conta principal.') && (await visibleCount('button', 'Gerenciar bancos e carteira')) === 1, t.slice(0, 400));
   const g1Order = await p.evaluate(() => {
     const y = (re) => [...document.querySelectorAll('[role=radiogroup],[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0 && re.test(e.getAttribute('aria-label') || e.textContent || '')).map((e) => e.getBoundingClientRect().top)[0];
     return { pay: y(/^Dinheiro, débito ou Pix$/), from: y(/^Saiu de$/), date: y(/^Data do pagamento$|^Hoje$/) };
@@ -6937,8 +6937,8 @@ setInterval(async () => {
   await p.waitForTimeout(500);
   ok('G1 Anotar gasto com Cartão de crédito: sem "Saiu de" (a compra no cartão não sai de uma conta até a fatura ser paga)', (await g1Group('Saiu de').count()) === 0 && !(await body()).includes('Será salvo em Pessoal, Conta principal.'));
   await radio('Dinheiro, débito ou Pix').click(); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: 'Gerenciar contas de origem' }).filter({ visible: true }).first().click(); await waitText('Contas de origem'); await p.waitForTimeout(500);
-  ok('G1 "Gerenciar contas de origem" nos seletores leva a Contas de origem em Conta', urlPath() === '/conta' && (await visibleCount('button', 'Adicionar conta')) === 1);
+  await p.getByRole('button', { name: 'Gerenciar bancos e carteira' }).filter({ visible: true }).first().click(); await waitText('Bancos e carteira'); await p.waitForTimeout(500);
+  ok('G1 "Gerenciar bancos e carteira" nos seletores leva a Bancos e carteira em Conta', urlPath() === '/conta' && (await visibleCount('button', 'Adicionar banco ou carteira')) === 1);
   await btn('Voltar').click(); await waitText('Será salvo em'); await p.waitForTimeout(300);
   await radio('Carteira').click(); await p.waitForTimeout(300);
   ok('G1 Anotar gasto: escolher a Carteira troca a marca e o rodapé ("Será salvo em Pessoal, Carteira.")', (await g1Checked('Carteira')) && !(await g1Checked('Conta principal')) && (await body()).includes('Será salvo em Pessoal, Carteira.'));
@@ -6963,7 +6963,7 @@ setInterval(async () => {
   t = await g1Keep();
   ok('G1 Detalhe do recebimento: a linha "Entrou em" mostra a Conta principal', t.includes('Entrou em') && (await g1Records('Freela')) === 'Freela|Conta principal|20000', await g1Records('Freela'));
   await goResumo(); await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
-  await p.getByRole('button', { name: /^Padaria, / }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await btn('Editar registro').click(); await waitText('Salvar gasto'); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /^Padaria, / }).filter({ visible: true }).first().click(); await waitText('Editar gasto'); await btn('Editar gasto').click(); await waitText('Salvar gasto'); await p.waitForTimeout(400);
   ok('G1 Editar gasto: "Saiu de" abre na conta do registro (Carteira)', (await g1Group('Saiu de').count()) === 1 && (await g1Checked('Carteira')));
   await radio('Conta principal').click(); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(500);
   ok('G1 Editar gasto: trocar para a Conta principal grava a nova conta', (await g1Records('Padaria')) === 'Padaria|Conta principal|1200', await g1Records('Padaria'));
@@ -6974,7 +6974,7 @@ setInterval(async () => {
   ok('G1 Movimentos: a linha mostra a conta quando há mais de uma ("Pago · 06/10/2026 · Carteira" no mercado; "Pago · 05/10/2026 · conta a pagar · Conta principal" no aluguel)',
     (await visibleCount('button', /^Mercado, Pago · 06\/10\/2026 · Carteira,/)) === 1 && (await visibleCount('button', /^Aluguel, Pago · 05\/10\/2026 · conta a pagar · Conta principal,/)) === 1, t.slice(0, 500));
   ok('G1 Movimentos: o filtro por conta tem "Todas", "Conta principal" e "Carteira" (Todas marcada)',
-    (await g1Group('Conta').count()) === 1 && (await g1Checked('Todas')) && (await visibleCount('radio', 'Conta principal')) === 1 && (await visibleCount('radio', 'Carteira')) === 1);
+    (await g1Group('Banco ou carteira').count()) === 1 && (await g1Checked('Todas')) && (await visibleCount('radio', 'Conta principal')) === 1 && (await visibleCount('radio', 'Carteira')) === 1);
   await atWidths(async (w) => { await layoutChecks(`G1 Movimentos com filtro por conta ${w}px`); if (w === 390) await shot('247_movimentos_filtro_conta'); });
   await radio('Carteira').click(); await p.waitForTimeout(500);
   t = await body();
@@ -6998,12 +6998,12 @@ setInterval(async () => {
     const card = (await repo.listCards(ctx))[0];
     await repo.addCardPurchase(crypto.randomUUID(), card.id, { description: 'Livro de setembro', category: 'Educação', purchasedOn: '2026-09-20', totalCents: 20000, installments: 1 });
   });
-  await g1OpenCard(); await g1OpenInvoice('outubro'); await btn('Pagar fatura').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(400);
+  await g1OpenCard(); await g1OpenInvoice('outubro'); await btn('Registrar pagamento').click(); await waitText('Confirmar pagamento'); await p.waitForTimeout(400);
   t = await g1Keep();
-  ok('G1 Pagar fatura: "Saiu de" com a conta marcada e a Carteira; o texto do mês diz de onde sai', (await g1Group('Saiu de').count()) === 1 && (await visibleCount('radio', 'Carteira')) === 1 && t.includes('saindo da conta'), t.slice(0, 400));
-  await atWidths(async (w) => { await layoutChecks(`G1 Pagar fatura ${w}px`); if (w === 390) await shot('249_pagar_fatura_saiu_de'); });
+  ok('G1 Registrar pagamento: "Saiu de" com a conta marcada e a Carteira; o texto do mês diz de onde sai', (await g1Group('Saiu de').count()) === 1 && (await visibleCount('radio', 'Carteira')) === 1 && t.includes('saindo da conta'), t.slice(0, 400));
+  await atWidths(async (w) => { await layoutChecks(`G1 Registrar pagamento ${w}px`); if (w === 390) await shot('249_pagar_fatura_saiu_de'); });
   await radio('Carteira').click(); await p.waitForTimeout(300);
-  ok('G1 Pagar fatura: escolher a Carteira atualiza o texto ("saindo da conta Carteira")', (await body()).includes('saindo da conta Carteira'));
+  ok('G1 Registrar pagamento: escolher a Carteira atualiza o texto ("saindo de Carteira")', (await body()).includes('saindo de Carteira'));
   await btn('Confirmar pagamento').click(); await waitText('Fatura paga.'); await p.waitForTimeout(500);
   ok('G1 Fatura paga: o gasto do pagamento saiu da Carteira', (await g1Records('Fatura Cartão Exemplo (outubro)')) === 'Fatura Cartão Exemplo (outubro)|Carteira|20000', await g1Records('Fatura'));
 
@@ -7027,19 +7027,19 @@ setInterval(async () => {
   await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).first().waitFor({ timeout: 15000 }); await p.waitForTimeout(500);
   await g1OpenConta();
   t = await g1Keep();
-  ok('G1 conta nova: Contas de origem tem só a "Conta principal" (Conta bancária, Principal); nenhuma conta de exemplo',
-    JSON.stringify(await g1Rows()) === JSON.stringify(['Conta principal, Conta bancária · Principal. Abrir a conta.']) && (await g1Accounts()) === 'Conta principal|banco|ativa|principal');
+  ok('G1 conta nova: Bancos e carteira tem só a "Conta principal" (Banco, Principal); nenhuma conta de exemplo',
+    JSON.stringify(await g1Rows()) === JSON.stringify(['Conta principal, Banco · Principal. Abrir para editar.']) && (await g1Accounts()) === 'Conta principal|banco|ativa|principal');
   await shot('251_suas_contas_conta_nova');
   await goResumo(); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(400);
   t = await g1Keep();
-  ok('G1 conta nova: Anotar gasto mostra "Saiu de: Conta principal" como texto, sem chips, e o atalho "Gerenciar contas de origem"',
-    t.includes('Saiu de: Conta principal') && (await g1Group('Saiu de').count()) === 0 && (await visibleCount('button', 'Gerenciar contas de origem')) === 1 && t.includes('Será salvo em Pessoal, Conta principal.'));
+  ok('G1 conta nova: Anotar gasto mostra "Saiu de: Conta principal" como texto, sem chips, e o atalho "Gerenciar bancos e carteira"',
+    t.includes('Saiu de: Conta principal') && (await g1Group('Saiu de').count()) === 0 && (await visibleCount('button', 'Gerenciar bancos e carteira')) === 1 && t.includes('Será salvo em Pessoal, Conta principal.'));
   await atWidths(async (w) => { await layoutChecks(`G1 conta nova Anotar gasto ${w}px`); if (w === 390) await shot('252_anotar_gasto_conta_unica'); });
   await field('Descrição').fill('Café'); await field('Valor em reais').fill('8'); await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
   ok('G1 conta nova: o detalhe mostra "Saiu de" com a Conta principal', (await body()).includes('Conta principal') && (await g1Records('Café')) === 'Café|Conta principal|800');
   await goResumo(); await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
   t = await body();
-  ok('G1 conta nova: Movimentos sem filtro por conta e sem a conta na linha ("Pago · 07/10/2026" sem o nome da conta)', (await g1Group('Conta').count()) === 0 && (await visibleCount('button', /^Café, Pago · 07\/10\/2026,/)) === 1 && !t.includes('· Conta principal'), t.slice(0, 300));
+  ok('G1 conta nova: Movimentos sem filtro por conta e sem a conta na linha ("Pago · 07/10/2026" sem o nome da conta)', (await g1Group('Banco ou carteira').count()) === 0 && (await visibleCount('button', /^Café, Pago · 07\/10\/2026,/)) === 1 && !t.includes('· Conta principal'), t.slice(0, 300));
   // Uma segunda conta na conta nova faz os chips, o filtro e a conta nas linhas aparecerem.
   await otherDevice(async (repo, ctx) => { await repo.createAccount(crypto.randomUUID(), ctx, { name: 'Carteira', kind: 'dinheiro' }); });
   await p.waitForTimeout(500);
@@ -7200,7 +7200,7 @@ setInterval(async () => {
   t = await h1Keep();
   ok('H1 Mais filtros aberto: Categoria (Todas, as sete de gasto, as três de recebimento e Sem categoria), Conta (Todas, Conta principal, Carteira) e os dois valores com "R$"',
     JSON.stringify(await h1Group('Categoria').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent))) === JSON.stringify(['Todas', 'Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas', 'Salário', 'Renda extra', 'Reembolso', 'Sem categoria']) &&
-    JSON.stringify(await h1Group('Conta').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent))) === JSON.stringify(['Todas', 'Conta principal', 'Carteira']) &&
+    JSON.stringify(await h1Group('Banco ou carteira').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent))) === JSON.stringify(['Todas', 'Conta principal', 'Carteira']) &&
     (await visibleCount('textbox', 'Valor de')) === 1 && (await visibleCount('textbox', 'Valor até')) === 1 && (await visibleCount('button', 'Menos filtros')) === 1 && t.includes('Opcional. Deixe em branco para qualquer valor.'));
   await atWidths(async (w) => { await innerChecks(`H1 Buscar com Mais filtros ${w}px`); if (w === 390) await shot('264_buscar_mais_filtros'); });
   // Categoria: Moradia tira a compra do cartão (Educação) e fica com os 7 gastos de luz.
@@ -7224,7 +7224,7 @@ setInterval(async () => {
   ok('H1 Conta Carteira: Mercado de outubro, a Padaria e o Mercado de setembro (3 gastos, R$ 2.662,00, média de R$ 1.331,00), sem compras no cartão e com o aviso',
     JSON.stringify(await h1Rows()) === JSON.stringify(['Mercado, Pago · 06/10/2026 · Carteira', 'Padaria, Pago · 03/10/2026 · Carteira', 'Mercado, Pago · 12/09/2026 · Carteira']) &&
     t.includes('3 gastos · R$ 2.662,00 no período') && t.includes('média de R$ 1.331,00 por mês com gasto') && !(await headingShown('Compras no cartão')) &&
-    t.includes('Compras no cartão não têm conta de origem: a conta vem do pagamento da fatura. Limpe o filtro de conta para vê-las.'), JSON.stringify(await h1Rows()));
+    t.includes('Compras no cartão não saem de um banco ou carteira: isso vem do pagamento da fatura. Limpe o filtro de banco ou carteira para vê-las.'), JSON.stringify(await h1Rows()));
   await h1Pick('Conta', 'Todas');
   // Valor.
   await h1Type('luz');
@@ -7250,7 +7250,7 @@ setInterval(async () => {
 
   // ---- 7. Abrir uma linha: o detalhe do registro e a fatura da compra no cartão ----
   await h1Pick('Período', 'Tudo');
-  await p.getByRole('button', { name: /^Conta de luz, Pago · 05\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Editar registro'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: /^Conta de luz, Pago · 05\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Editar gasto'); await p.waitForTimeout(500);
   ok('H1 Abrir uma linha: o detalhe do registro (/registro/...) com a barra de consulta', /^\/registro\/[^/]+$/.test(urlPath()) && (await body()).includes('Conta de luz'));
   await btn('Voltar').click(); await waitText('O que você procura'); await p.waitForTimeout(500);
   ok('H1 Voltar do detalhe: a busca continua como estava (texto "luz" e período Tudo)', (await field('O que você procura').inputValue()) === 'luz' && (await h1Checked('Período', 'Tudo')) && (await body()).includes('8 gastos · R$ 1.087,90 no período'));
@@ -7334,7 +7334,7 @@ setInterval(async () => {
   t = await h1Keep();
   ok('H1 conta nova: a busca abre sem registros ("Nada encontrado"), sem soma e sem nenhum dado de exemplo', t.includes('Nada encontrado') && !t.includes('no período') && (await h1Rows()).length === 0 && (await h1Purchases()).length === 0 && !(await headingShown('Compras no cartão')));
   await h1More();
-  ok('H1 conta nova: Mais filtros tem Categoria mas não tem Conta (uma conta só), e os dois valores', (await h1Group('Categoria').count()) === 1 && (await h1Group('Conta').count()) === 0 && (await visibleCount('textbox', 'Valor de')) === 1);
+  ok('H1 conta nova: Mais filtros tem Categoria mas não tem Conta (uma conta só), e os dois valores', (await h1Group('Categoria').count()) === 1 && (await h1Group('Banco ou carteira').count()) === 0 && (await visibleCount('textbox', 'Valor de')) === 1);
   await atWidths(async (w) => { await innerChecks(`H1 Buscar conta nova ${w}px`); if (w === 390) await shot('268_buscar_conta_nova'); });
   await h1Type('luz');
   ok('H1 conta nova, com texto: continua sem resultado, com o botão "Limpar busca"', (await body()).includes('Nada encontrado') && (await visibleCount('button', 'Limpar busca')) === 1, JSON.stringify([(await body()).includes('Nada encontrado'), await visibleCount('button', 'Limpar busca')]) + (await body()).slice(0, 400));
@@ -7355,8 +7355,8 @@ setInterval(async () => {
   // ==================================================================================================================
   // Ciclo H2 · Assinaturas (D-046), docs/08 §5 item 11. Um gasto fixo mensal marcado como assinatura ("É uma assinatura?",
   // no cadastro e na edição) vai para o grupo "Assinaturas" no topo de Gastos fixos e parcelamentos, com o que custa por mês e
-  // por ano; "Revisar assinaturas" (/gastos-fixos/assinaturas) lista as ativas e só grava a data da revisão; o aviso "Faz tempo
-  // que você não revisa suas assinaturas." aparece dentro do app (cenário ?cenario=assinaturas) e some com "Revisei" ou "Agora
+  // por ano; "Revisar assinaturas" (/gastos-fixos/assinaturas) lista as ativas e só grava a data da revisão; o aviso "Que tal revisar
+  // suas assinaturas?" aparece dentro do app (cenário ?cenario=assinaturas) e some com "Revisei" ou "Agora
   // não". Nada muda Recebido, Pago, Diferença, Ainda a pagar nem a renda comprometida. Cada tela é conferida em 390 e em 320 px.
   // Capturas novas: 270 em diante.
   // ==================================================================================================================
@@ -7398,7 +7398,7 @@ setInterval(async () => {
   ok('H2 as assinaturas não se repetem em "Gastos fixos" e continuam na soma "Por mês" (R$ 3.668,90)',
     JSON.stringify(await h2Rows('Gastos fixos')) === JSON.stringify(['Aluguel, R$ 2.500,00, todo dia 5, gasto fixo', 'Luz, cerca de R$ 180,00, todo dia 12, valor muda, gasto fixo']) &&
     t.includes('Gastos fixos, parcelamentos e assinaturas: R$ 3.668,90 por mês, se os valores não mudarem (inclui R$ 180,00 estimados).'));
-  ok('H2 a demonstração não mostra o aviso de revisão (as assinaturas são de hoje)', !t.includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Agora não')) === 0);
+  ok('H2 a demonstração não mostra o aviso de revisão (as assinaturas são de hoje)', !t.includes('Que tal revisar suas assinaturas?') && (await visibleCount('button', 'Agora não')) === 0);
   await atWidths(async (w) => { await innerChecks(`H2 Gastos fixos com Assinaturas ${w}px`); if (w === 390) await shot('270_gastos_fixos_assinaturas'); if (w === 320) await shot('270_gastos_fixos_assinaturas_320px'); });
 
   // ---- 2. Nada muda nos totais de outubro nem na renda comprometida ----
@@ -7503,7 +7503,7 @@ setInterval(async () => {
   await h2OpenFixos();
   await btn('Aluguel, R$ 2.500,00, todo dia 5, gasto fixo').click(); await waitText('Histórico de valores'); await p.waitForTimeout(300);
   ok('H2 detalhe de um gasto fixo comum: sem a linha "Assinatura"', !(await body()).includes('Assinatura ·'));
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
   ok('H2 editar gasto fixo mensal: o interruptor está desligado e a legenda aparece', (await visibleCount('switch', 'É uma assinatura?')) === 1 && !(await h2Checked()) && (await body()).includes('Streaming, aplicativo, academia, clube, plano de celular.'));
   await h2Switch().click(); await p.waitForTimeout(300);
   await shot('276_editar_assinatura');
@@ -7514,13 +7514,13 @@ setInterval(async () => {
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
   ok('H2 o Aluguel passa ao grupo Assinaturas (4 assinaturas) e sai de "Gastos fixos"', (await h2Rows('Assinaturas'))?.some((r) => r.startsWith('Aluguel, R$ 2.500,00 por mês')) && !(await h2Rows('Gastos fixos'))?.some((r) => r.startsWith('Aluguel')));
   await btn('Aluguel, R$ 2.500,00 por mês, R$ 30.000,00 por ano, todo dia 5, assinatura').click(); await waitText('Histórico de valores');
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
   ok('H2 editar o Aluguel marcado: o interruptor vem ligado', await h2Checked());
   await h2Switch().click(); await p.waitForTimeout(200);
   await btn('Salvar alterações').click(); await waitText('Assinatura desmarcada.'); await p.waitForTimeout(500);
   ok('H2 desmarcar: "Assinatura desmarcada." e o detalhe sem a linha de assinatura', (await body()).includes('Assinatura desmarcada.') && !(await body()).includes('Assinatura · R$'));
   // Marca e valor juntos: o diálogo "Aplicar a partir de..." vem primeiro, depois a marca.
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
   await h2Switch().click(); await field('Valor por mês').fill('2600,00'); await p.waitForTimeout(200);
   await btn('Salvar alterações').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(400);
   ok('H2 marca e valor juntos: o diálogo de aplicar a partir de um mês aparece (a marca vai depois)', (await p.getByRole('alert').getByRole('button', { name: 'Aplicar' }).count()) >= 1 || (await p.getByRole('dialog').count()) >= 1);
@@ -7530,7 +7530,7 @@ setInterval(async () => {
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
   // Parcelamento e conta do ano: o formulário de edição não tem o interruptor.
   await btn('Financiamento do carro, Parcela 13 de 48, R$ 850,00, termina em outubro de 2029, parcelamento').click(); await waitText('Progresso').catch(() => {}); await p.waitForTimeout(300);
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
   ok('H2 editar parcelamento: sem o interruptor "É uma assinatura?"', (await visibleCount('switch', 'É uma assinatura?')) === 0);
   await btn('Cancelar').click(); await p.waitForTimeout(400);
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
@@ -7548,17 +7548,17 @@ setInterval(async () => {
     t.includes('Gasto fixo salvo.') && t.includes('O gasto fixo foi salvo, mas a marca de assinatura não. Abra o gasto fixo, escolha Editar e tente de novo.') && !t.includes('Assinatura · R$') && !t.includes('Marcado como assinatura.'), t.slice(0, 500));
   await shot('277_marca_falhou');
   ok('H2 a marca falha: o gasto fixo existe e não é assinatura', JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', false, null, 1]]));
-  // Editar só a marca com a falha ainda ativa: o aviso de erro fica na tela, com "Tentar novamente".
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
-  await h2Switch().click(); await btn('Salvar alterações').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(400);
-  ok('H2 editar só a marca com falha: o erro aparece junto do botão ("Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo."), que passa a "Tentar novamente", e nada é gravado', (await visibleCount('button', 'Tentar novamente')) === 1 && (await body()).includes('Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.') &&
+  // Editar só a marca com a falha ainda ativa: o aviso de erro fica na tela, com "Tentar de novo".
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await h2Switch().click(); await btn('Salvar alterações').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(400);
+  ok('H2 editar só a marca com falha: o erro aparece junto do botão ("Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo."), que passa a "Tentar de novo", e nada é gravado', (await visibleCount('button', 'Tentar de novo')) === 1 && (await body()).includes('Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo.') &&
     JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', false, null, 1]]));
   // A falha passa: tentar de novo grava.
   await p.evaluate(async () => { const r = await window.__e2e.repo(); delete r.setSeriesSubscription; });
-  await btn('Tentar novamente').click(); await waitText('Marcado como assinatura.'); await p.waitForTimeout(500);
+  await btn('Tentar de novo').click(); await waitText('Marcado como assinatura.'); await p.waitForTimeout(500);
   ok('H2 tentar de novo: a marca é gravada (a versão sobe uma vez)', JSON.stringify((await h2Series()).filter((s) => s[0] === 'Clube (exemplo)')) === JSON.stringify([['Clube (exemplo)', true, null, 2]]));
   // Cancelar a edição com a marca mudada pede confirmação (alteração não salva).
-  await btn('Mudar valor ou dia a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
+  await btn('Mudar a partir de uma conta').click(); await waitText('Aplicar a partir de'); await p.waitForTimeout(300);
   await h2Switch().click(); await p.waitForTimeout(200);
   await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
   ok('H2 sair da edição com a marca mudada e não salva pede confirmação', (await dialogText()).includes('Você tem alterações que ainda não foram salvas em Pessoal.'));
@@ -7575,31 +7575,31 @@ setInterval(async () => {
   t = await h2Keep();
   const h2ReminderTop = await p.evaluate(() => {
     const top = (sel, text) => [...document.querySelectorAll(sel)].find((e) => (e.textContent || '').includes(text) && e.getBoundingClientRect().width > 0)?.getBoundingClientRect().top ?? null;
-    return { aviso: top('div[dir="auto"]', 'Faz tempo que você não revisa suas assinaturas.'), intro: top('div[dir="auto"]', 'Contas que se repetem.'), grupo: top('[role=heading]', 'Assinaturas') };
+    return { aviso: top('div[dir="auto"]', 'Que tal revisar suas assinaturas?'), intro: top('div[dir="auto"]', 'Contas que se repetem.'), grupo: top('[role=heading]', 'Assinaturas') };
   });
-  ok('H2 lembrete: "Faz tempo que você não revisa suas assinaturas." no topo de Gastos fixos, com "Revisar agora" e "Agora não", antes do texto da tela e do grupo',
-    t.includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Revisar agora')) === 1 && (await visibleCount('button', 'Agora não')) === 1 &&
+  ok('H2 lembrete: "Que tal revisar suas assinaturas?" no topo de Gastos fixos, com "Revisar agora" e "Agora não", antes do texto da tela e do grupo',
+    t.includes('Que tal revisar suas assinaturas?') && (await visibleCount('button', 'Revisar agora')) === 1 && (await visibleCount('button', 'Agora não')) === 1 &&
     h2ReminderTop.aviso !== null && h2ReminderTop.intro !== null && h2ReminderTop.grupo !== null && h2ReminderTop.aviso < h2ReminderTop.intro && h2ReminderTop.intro < h2ReminderTop.grupo, JSON.stringify(h2ReminderTop));
   await atWidths(async (w) => { await innerChecks(`H2 lembrete ${w}px`); if (w === 390) await shot('278_lembrete_assinaturas'); if (w === 320) await shot('278_lembrete_assinaturas_320px'); });
   // "Agora não" esconde o aviso (30 dias, só neste aparelho) e ele não volta ao sair e voltar.
   await btn('Agora não').click(); await p.waitForTimeout(500);
-  ok('H2 "Agora não": o aviso some', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Revisar agora')) === 0);
+  ok('H2 "Agora não": o aviso some', !(await body()).includes('Que tal revisar suas assinaturas?') && (await visibleCount('button', 'Revisar agora')) === 0);
   await goResumo(); await h2OpenFixos();
-  ok('H2 "Agora não": o aviso não volta ao sair e voltar para Gastos fixos', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
+  ok('H2 "Agora não": o aviso não volta ao sair e voltar para Gastos fixos', !(await body()).includes('Que tal revisar suas assinaturas?'));
   ok('H2 "Agora não" é só do aparelho: nenhuma escrita sai pela rede e a série não muda', writes.slice(h2Writes0).length === 0 && (await h2Series()).filter((s) => s[1]).every((s) => s[2] === null && s[3] === 2));
   // Outra visita (a demonstração recomeça): "Revisar agora" leva à tela e "Revisei" faz o aviso sumir de vez.
   await p.goto(`http://localhost:${PORT}/?cenario=assinaturas`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
   await h2OpenFixos();
-  ok('H2 numa visita nova o aviso volta (na demonstração a escolha fica só em memória)', (await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
+  ok('H2 numa visita nova o aviso volta (na demonstração a escolha fica só em memória)', (await body()).includes('Que tal revisar suas assinaturas?'));
   await btn('Revisar agora').click(); await waitText('Vale olhar de tempos em tempos'); await p.waitForTimeout(400);
   ok('H2 "Revisar agora" abre Revisar assinaturas', (await h1Name()) === 'Revisar assinaturas' && urlPath() === '/gastos-fixos/assinaturas' && (await body()).includes('Você ainda não registrou uma revisão.'));
   await btn('Revisei minhas assinaturas').click(); await waitText('Revisão registrada.'); await p.waitForTimeout(300);
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem'); await p.waitForTimeout(500);
-  ok('H2 depois de "Revisei": o aviso não aparece mais', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.') && (await visibleCount('button', 'Revisar agora')) === 0);
+  ok('H2 depois de "Revisei": o aviso não aparece mais', !(await body()).includes('Que tal revisar suas assinaturas?') && (await visibleCount('button', 'Revisar agora')) === 0);
   await goResumo(); await h2OpenFixos();
-  ok('H2 depois de "Revisei": o aviso continua fora ao sair e voltar', !(await body()).includes('Faz tempo que você não revisa suas assinaturas.'));
+  ok('H2 depois de "Revisei": o aviso continua fora ao sair e voltar', !(await body()).includes('Que tal revisar suas assinaturas?'));
 
   // ---- 11. Valores ocultos ----
   await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
@@ -7645,7 +7645,7 @@ setInterval(async () => {
   await atWidths(async (w) => { await innerChecks(`H2 Revisar assinaturas conta nova ${w}px`); if (w === 390) await shot('281_revisar_assinaturas_conta_nova'); });
   await btn('Ver gastos fixos').click(); await waitText('Nenhum gasto fixo ainda'); await p.waitForTimeout(400);
   t = await h2Keep();
-  ok('H2 conta nova: Gastos fixos sem grupo "Assinaturas" e sem aviso', !(await headingShown('Assinaturas')) && !t.includes('Faz tempo que você não revisa suas assinaturas.') && !t.includes('(exemplo)'));
+  ok('H2 conta nova: Gastos fixos sem grupo "Assinaturas" e sem aviso', !(await headingShown('Assinaturas')) && !t.includes('Que tal revisar suas assinaturas?') && !t.includes('(exemplo)'));
   ok('H2 conta nova: nenhuma série e nenhuma assinatura de exemplo', (await h2Series()).length === 0);
 
   // ---- 14. Textos e escritas ----
@@ -7669,7 +7669,7 @@ setInterval(async () => {
   const h3Storage = () => p.evaluate(() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)]));
   const h3OpenExport = async () => {
     await goResumo(); await openConta();
-    await btn('Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.').click();
+    await btn('Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF').click();
     await waitText('O que vai no arquivo'); await p.waitForTimeout(400);
   };
   const h3Checked = async () => p.evaluate(() => [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0 && e.getAttribute('aria-checked') === 'true').map((e) => e.textContent));
@@ -7687,13 +7687,13 @@ setInterval(async () => {
   await openConta();
   t = await h3Keep();
   ok('H3 Conta: o bloco "Exportar meus dados" (nível 2) com a legenda e o botão "Escolher período e formato", depois da assinatura e de Privacidade neste aparelho (D-091)',
-    (await headingShown('Exportar meus dados')) && t.includes('Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos') && (await visibleCount('button', 'Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.')) === 1 &&
+    (await headingShown('Exportar meus dados')) && t.includes('Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos') && (await visibleCount('button', 'Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF')) === 1 &&
     t.indexOf('Ver a assinatura') < t.indexOf('Privacidade neste aparelho') && t.indexOf('Privacidade neste aparelho') < t.indexOf('Exportar meus dados'), t.slice(0, 900));
   // D-064: a seção "Privacidade e termos" só existe com o endereço do site (EXPO_PUBLIC_SITE_URL); a demonstração sobe sem ele e não a mostra.
   ok('H3 Conta (D-064): sem EXPO_PUBLIC_SITE_URL (a demonstração), a seção "Privacidade e termos" e os botões de política, termos e "Excluir conta: como funciona" não aparecem, e "Excluir minha conta" continua',
     !(await headingShown('Privacidade e termos')) && !t.includes('Excluir conta: como funciona') && (await visibleCount('button', 'Política de privacidade')) === 0 && (await visibleCount('button', 'Termos de uso')) === 0 && t.includes('Excluir minha conta'));
   await atWidths(async (w) => { await layoutChecks(`H3 Conta com Exportar ${w}px`); if (w === 390) await shot('290_conta_exportar'); });
-  await btn('Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(500);
+  await btn('Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(500);
 
   // ---- 2. A tela: consulta com barra, período (12 meses) e formato (planilha) marcados, avisos à vista ----
   t = await h3Keep();
@@ -7705,7 +7705,7 @@ setInterval(async () => {
       JSON.stringify(['Este mês', 'Últimos 3 meses', 'Últimos 6 meses', 'Últimos 12 meses', 'Este ano', 'Ano passado', 'Tudo', 'Planilha (CSV)', 'Resumo em PDF']) &&
     JSON.stringify(await h3Checked()) === JSON.stringify(['Últimos 12 meses', 'Planilha (CSV)']), JSON.stringify(await h3Checked()));
   ok('H3 formato Planilha (CSV): explica as colunas, o segundo arquivo das compras no cartão e o que fica de fora (chave da nota, número do cartão, códigos internos)',
-    t.includes('Abre no Excel e no Google Planilhas') && t.includes('Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem, Origem e Mês do resumo (o mês em que o lançamento conta)') && t.includes('segundo arquivo') &&
+    t.includes('Abre no Excel e no Google Planilhas') && t.includes('Data, Tipo, Descrição, Categoria, Valor (R$), Banco ou carteira, Origem e Mês do resumo (o mês em que o lançamento conta)') && t.includes('segundo arquivo') &&
     t.includes('Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo.'));
   ok('H3 o aviso dos valores: "O arquivo mostra os valores, mesmo com Ocultar valores ligado." e o de dados financeiros', t.includes('O arquivo mostra os valores, mesmo com Ocultar valores ligado.') && t.includes('O arquivo tem dados financeiros.'));
   ok('H3 nenhum arquivo antes de pedir: sem "Arquivo pronto" e com o botão "Preparar arquivo"', !t.includes('Arquivo pronto') && (await visibleCount('button', 'Preparar arquivo')) === 1);
@@ -7725,7 +7725,7 @@ setInterval(async () => {
   ok('H3 CSV de lançamentos: nome clarevo-lancamentos-2026-10-07.csv e UTF-8 com BOM (EF BB BF)',
     h3Lanc.name === 'clarevo-lancamentos-2026-10-07.csv' && h3Lanc.buf[0] === 0xef && h3Lanc.buf[1] === 0xbb && h3Lanc.buf[2] === 0xbf, `${h3Lanc.name} ${[...h3Lanc.buf.slice(0, 4)].join(',')}`);
   ok('H3 CSV de lançamentos: cabeçalho separado por ponto e vírgula e uma linha por lançamento (6), terminando em CRLF',
-    h3Lines[0] === '﻿Data;Tipo;Descrição;Categoria;Valor (R$);Conta de origem;Origem;Mês do resumo' && h3Lines.length === 8 && h3Lines[7] === '', JSON.stringify(h3Lines.slice(0, 3)));
+    h3Lines[0] === '﻿Data;Tipo;Descrição;Categoria;Valor (R$);Banco ou carteira;Origem;Mês do resumo' && h3Lines.length === 8 && h3Lines[7] === '', JSON.stringify(h3Lines.slice(0, 3)));
   ok('H3 CSV de lançamentos: um gasto anotado em outra conta (Mercado, Carteira), valor com vírgula e data dd/mm/aaaa',
     h3Lines.includes('06/10/2026;Gasto;Mercado;Mercado;1400,00;Carteira;Anotado;10/2026'), h3Lines.join(' | '));
   ok('H3 CSV de lançamentos: o gasto fixo pago (Aluguel) com a origem "Gasto fixo", e o recebimento como "Recebimento"',
@@ -7827,7 +7827,7 @@ setInterval(async () => {
 
   // ---- 7. Valores ocultos: o arquivo mostra os valores, com o aviso em destaque ----
   await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
-  await btn('Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(400);
+  await btn('Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(400);
   t = await h3Keep();
   ok('H3 valores ocultos: o aviso "O arquivo mostra os valores, mesmo com Ocultar valores ligado." aparece em destaque e a tela não mostra nenhum valor em reais',
     t.includes('O arquivo mostra os valores, mesmo com Ocultar valores ligado.') && (await moneyLeaks()).length === 0, (await moneyLeaks()).join(' | '));
@@ -7873,7 +7873,7 @@ setInterval(async () => {
   await goResumo().catch(() => {});
 
   // ---- Importar extrato (D-048): arquivos OFX e planilhas CSV sintéticos (sem dados reais), lidos no aparelho ----
-  // Ciclo I1: Movimentos › Organizar, Conta › Contas de origem e a busca "No app" levam a /importar; o arquivo é lido no
+  // Ciclo I1: Movimentos › Organizar, Conta › Bancos e carteira e a busca "No app" levam a /importar; o arquivo é lido no
   // aparelho (nada dele é enviado nem guardado), o saldo do arquivo é ignorado, a pessoa escolhe a conta ou o cartão, revisa as
   // linhas ("Já anotado", "Parece pagamento de fatura", "Parece transferência") e só as linhas confirmadas viram lançamentos.
   const i1Dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clarevo-importar-'));
@@ -7937,7 +7937,7 @@ setInterval(async () => {
   // ---- 1. A porta em Movimentos › Organizar, na busca "No app" e em Conta ----
   await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(500);
   const i1Rows = await sectionRows('Organizar');
-  ok('I1 Organizar: "Importar extrato ou fatura" com a legenda "Arquivo OFX ou planilha do banco" depois do Orçamento e antes das calculadoras', i1Rows !== null && i1Rows.length === 6 && i1Rows[4] === SC.importar && /^Calculadoras, /.test(i1Rows[5]), JSON.stringify(i1Rows));
+  ok('I1 Organizar: "Importar extrato ou fatura" com a legenda "Arquivo PDF, OFX ou planilha do banco" depois do Orçamento e antes das calculadoras', i1Rows !== null && i1Rows.length === 6 && i1Rows[4] === SC.importar && /^Calculadoras, /.test(i1Rows[5]), JSON.stringify(i1Rows));
   await atWidths(async (w) => { await layoutChecks(`I1 Organizar com a linha de importar ${w}px`); if (w === 390) { await scrollTo('Organizar'); await shot('300_importar_organizar'); } if (w === 320) { await scrollTo('Organizar'); await shot('300_importar_organizar_320px'); } });
   await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
   let t1 = await i1Keep();
@@ -7948,7 +7948,7 @@ setInterval(async () => {
   await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
   for (const query of ['importar', 'extrato', 'ofx', 'banco', 'planilha']) {
     await learnSearch().fill(query); await waitText('No app'); await p.waitForTimeout(400);
-    ok(`I1 busca "${query}" em Aprender: o grupo "No app" tem "Importar extrato ou fatura"`, (await p.getByRole('button', { name: /^Importar extrato ou fatura\. Arquivo OFX ou planilha do banco/ }).filter({ visible: true }).count()) === 1);
+    ok(`I1 busca "${query}" em Aprender: o grupo "No app" tem "Importar extrato ou fatura"`, (await p.getByRole('button', { name: /^Importar extrato ou fatura\. Arquivo PDF, OFX ou planilha do banco/ }).filter({ visible: true }).count()) === 1);
   }
   await learnSearch().fill('fatura'); await waitText('No app'); await p.waitForTimeout(400);
   ok('I1 busca "fatura": Cartões continua em primeiro e a importação também aparece', (await p.getByRole('button', { name: /^Cartões\. / }).filter({ visible: true }).count()) === 1 && (await p.getByRole('button', { name: /^Importar extrato ou fatura\. / }).filter({ visible: true }).count()) === 1);
@@ -7956,11 +7956,11 @@ setInterval(async () => {
   await p.getByRole('button', { name: /^Importar extrato ou fatura\. / }).filter({ visible: true }).first().click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300);
   ok('I1 tocar na busca "No app" abre a importação', urlPath() === '/importar' && (await h1Name()) === 'Importar extrato ou fatura');
   await btn('Voltar').click(); await waitText('No app');
-  await openConta(); await waitText('Contas de origem'); await p.waitForTimeout(300);
-  ok('I1 Conta › Contas de origem tem o atalho "Importar extrato"', (await visibleCount('button', 'Importar extrato')) === 1);
+  await openConta(); await waitText('Bancos e carteira'); await p.waitForTimeout(300);
+  ok('I1 Conta › Bancos e carteira tem o atalho "Importar extrato"', (await visibleCount('button', 'Importar extrato')) === 1);
   await btn('Importar extrato').click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300);
   ok('I1 o atalho de Conta abre a importação', urlPath() === '/importar');
-  await btn('Voltar').click(); await waitText('Contas de origem'); await btn('Voltar').click(); await waitText('No app');
+  await btn('Voltar').click(); await waitText('Bancos e carteira'); await btn('Voltar').click(); await waitText('No app');
   await tabByName('Movimentos').click(); await waitText('Organizar');
 
   // ---- 2. OFX do extrato da conta (SGML 1.x, Windows-1252) ----
@@ -7968,7 +7968,7 @@ setInterval(async () => {
   await i1Pick(i1Ofx); await waitText('Arquivo lido: extrato.ofx', 12000); await p.waitForTimeout(400);
   t1 = await i1Keep();
   ok('I1 OFX: "Arquivo lido", 7 linhas, o saldo do arquivo é ignorado e a conta já vem como destino (a principal marcada)', t1.includes('Arquivo lido: extrato.ofx') && t1.includes('7 linhas lidas') && t1.includes('O saldo que vem no arquivo é ignorado. A Clarevo não guarda saldo por conta.') &&
-    (await radio('Conta').getAttribute('aria-checked')) === 'true' && (await radio('Conta principal').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && !t1.includes('R$ 1.234,56'));
+    (await radio('Banco ou carteira').getAttribute('aria-checked')) === 'true' && (await radio('Conta principal').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && !t1.includes('R$ 1.234,56'));
   await atWidths(async (w) => { await innerChecks(`I1 destino ${w}px`); if (w === 390) await shot('302_importar_destino'); if (w === 320) await shot('302_importar_destino_320px'); });
   await radio('Carteira').click(); await radio('Conta principal').click();
   await i1Review();
@@ -8055,9 +8055,9 @@ setInterval(async () => {
   await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await i1Pick(i1Csv); await waitText('Arquivo lido: extrato.csv', 12000); await p.waitForTimeout(300);
   t1 = await i1Keep();
   ok('I1 CSV: 3 linhas lidas, a linha de saldo fica de lado (dita na tela), o saldo é ignorado e nenhum destino vem escolhido', t1.includes('3 linhas lidas') && t1.includes('1 linha do arquivo foi deixada de lado (sem data ou valor, saldo ou valor zero).') && t1.includes('O saldo que vem no arquivo é ignorado.') &&
-    (await radio('Conta').getAttribute('aria-checked')) === 'false' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && (await p.getByRole('button', { name: 'Revisar as linhas', exact: true }).filter({ visible: true }).first().getAttribute('aria-disabled')) === 'true');
-  await radio('Conta').click(); await p.waitForTimeout(300);
-  ok('I1 CSV: com a conta escolhida, "Conta de origem" mostra as contas ativas, a principal marcada', (await radio('Conta principal').getAttribute('aria-checked')) === 'true');
+    (await radio('Banco ou carteira').getAttribute('aria-checked')) === 'false' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false' && (await p.getByRole('button', { name: 'Revisar as linhas', exact: true }).filter({ visible: true }).first().getAttribute('aria-disabled')) === 'true');
+  await radio('Banco ou carteira').click(); await p.waitForTimeout(300);
+  ok('I1 CSV: com a conta escolhida, "Lançamentos em" mostra as contas ativas, a principal marcada', (await radio('Conta principal').getAttribute('aria-checked')) === 'true');
   await i1Review();
   t1 = await i1Keep();
   ok('I1 CSV: valores com vírgula e milhares lidos; a memória do aparelho traz "Lazer" para a padaria (a regra diria Mercado); regras para o restante', t1.includes('3 linhas · 3 marcadas') && t1.includes('01/10/2026 · Saída · Lazer') && t1.includes('03/10/2026 · Saída · Lazer') && t1.includes('06/10/2026 · Entrada · Reembolso') &&
@@ -8109,7 +8109,7 @@ setInterval(async () => {
   await i1Open(); await i1Pick(i1CardPay); await waitText('Arquivo lido: fatura-pagamento.csv', 12000);
   await radio('Cartão de crédito').click(); await p.waitForTimeout(300); await i1Review();
   t1 = await i1Keep(); boxes = await i1Boxes();
-  ok('I1 fatura com uma linha de pagamento entre as compras: "Parece pagamento de fatura", desmarcada e com caixa para marcar', t1.includes('4 linhas · 3 marcadas') && t1.includes('Parece pagamento de fatura') && t1.includes('O pagamento da fatura já é registrado em Pagar fatura.') &&
+  ok('I1 fatura com uma linha de pagamento entre as compras: "Parece pagamento de fatura", desmarcada e com caixa para marcar', t1.includes('4 linhas · 3 marcadas') && t1.includes('Parece pagamento de fatura') && t1.includes('O pagamento da fatura já é registrado em Registrar pagamento.') &&
     JSON.stringify(boxes.map((b) => [b[1], b[2] === 'true'])) === JSON.stringify([['true', false], ['true', false], ['true', false], ['false', false]]), JSON.stringify(boxes));
   await i1Leave();
   // Compra parcelada já anotada: 3 parcelas de R$ 120,00 (a 1ª na fatura de novembro).
@@ -8149,7 +8149,7 @@ setInterval(async () => {
   // ---- 6. Planilha sem cabeçalho conhecido: escolher as colunas ----
   await i1Open(); await i1Pick(i1NoHeader); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
   t1 = await i1Keep();
-  ok('I1 sem cabeçalho: a tela de colunas, com a primeira linha lida como lançamento (a caixa "A primeira linha tem os nomes das colunas" desmarcada) e as colunas já chutadas', t1.includes('Não reconhecemos os nomes das colunas.') && t1.includes('01/10/2026 | PADARIA | -45,90 | x') &&
+  ok('I1 sem cabeçalho: a tela de colunas, com a primeira linha lida como lançamento (a caixa "A primeira linha tem os nomes das colunas" desmarcada) e as colunas já chutadas', t1.includes('A Clarevo não reconheceu os nomes das colunas.') && t1.includes('01/10/2026 | PADARIA | -45,90 | x') &&
     (await p.getByRole('checkbox', { name: 'A primeira linha tem os nomes das colunas' }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'false' &&
     (await p.getByRole('radio', { name: /^Data, Coluna 1: 01\/10\/2026/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true' && (await p.getByRole('radio', { name: /^Descrição, Coluna 2: PADARIA/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true' &&
     (await p.getByRole('radio', { name: /^Valor, Coluna 3: -45,90/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true', t1.slice(0, 500));
@@ -8165,13 +8165,13 @@ setInterval(async () => {
   await p.getByRole('radio', { name: /^Crédito \(entrada\), Coluna 4: 4321,00/ }).filter({ visible: true }).first().click();
   await atWidths(async (w) => { await innerChecks(`I1 colunas de débito e crédito ${w}px`); if (w === 390) await shot('314_importar_colunas_debito_credito'); });
   await btn('Usar estas colunas').click(); await waitText('Arquivo lido: debito-credito.csv', 8000);
-  await radio('Conta').click(); await i1Review(); t1 = await i1Keep();
+  await radio('Banco ou carteira').click(); await i1Review(); t1 = await i1Keep();
   ok('I1 débito e crédito em colunas separadas: a coluna de débito é saída e a de crédito é entrada', t1.includes('2 linhas · 2 marcadas') && t1.includes('01/10/2026 · Saída') && t1.includes('02/10/2026 · Entrada'), t1.slice(0, 300));
   await i1Leave();
   await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await i1Pick(i1Kind); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
   await p.getByRole('radio', { name: /^Tipo da linha \(D ou C\), Coluna 4: D/ }).filter({ visible: true }).first().click();
   await btn('Usar estas colunas').click(); await waitText('Arquivo lido: com-tipo.csv', 8000);
-  await radio('Conta').click(); await i1Review(); t1 = await i1Keep();
+  await radio('Banco ou carteira').click(); await i1Review(); t1 = await i1Keep();
   ok('I1 coluna de tipo (D ou C): D é saída e C é entrada, sem sinal nos valores', t1.includes('01/10/2026 · Saída') && t1.includes('02/10/2026 · Entrada'), t1.slice(0, 300));
   await i1Leave();
   await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await i1Pick(i1NoSign); await waitText('Quais colunas são quais?', 12000); await p.waitForTimeout(300);
@@ -8180,7 +8180,7 @@ setInterval(async () => {
   ok('I1 planilha sem sinal nem tipo: avisa que todas as linhas serão lidas como entrada e pede a confirmação antes de seguir', t1.includes('Quais colunas são quais?') && (await visibleCount('button', 'Entendi, usar assim')) === 1 && !t1.includes('Arquivo lido: sem-sinal.csv'), t1.slice(0, 300));
   await atWidths(async (w) => { await innerChecks(`I1 colunas sem sinal ${w}px`); if (w === 390) await shot('315_importar_colunas_sem_sinal'); });
   await btn('Entendi, usar assim').click(); await waitText('Arquivo lido: sem-sinal.csv', 8000);
-  await radio('Conta').click(); await i1Review(); t1 = await i1Keep();
+  await radio('Banco ou carteira').click(); await i1Review(); t1 = await i1Keep();
   ok('I1 planilha sem sinal, depois de confirmar: as duas linhas são entradas (a caixa "Entradas e saídas estão trocadas" conserta)', t1.includes('01/10/2026 · Entrada') && t1.includes('02/10/2026 · Entrada'), t1.slice(0, 300));
   await i1Leave();
   // Valores ocultos: a prévia e as opções de coluna não mostram os valores da planilha.
@@ -8200,14 +8200,14 @@ setInterval(async () => {
     ok(`I1 ${name}: a mensagem aparece junto do botão e nada é lido`, x.includes(text) && (await visibleCount('button', 'Escolher o arquivo')) === 1 && (await visibleCount('button', 'Revisar as linhas')) === 0);
   };
   // D-078 A: PDF agora é lido; um PDF quebrado (sem páginas) não abre e a mensagem explica o que fazer.
-  await i1Bad(i1Pdf, 'Não conseguimos abrir este PDF. Se ele tem senha, peça ao banco o extrato sem senha, em OFX ou CSV.', 'PDF que não abre');
+  await i1Bad(i1Pdf, 'A Clarevo não conseguiu abrir este PDF. Se ele tem senha, peça ao banco o extrato sem senha, em OFX ou CSV.', 'PDF que não abre');
   await atWidths(async (w) => { await innerChecks(`I1 arquivo que não serve ${w}px`); if (w === 390) await shot('311_importar_arquivo_invalido'); });
   await i1Bad(i1Big, 'O arquivo passa de 5 MB. Peça ao banco um período menor.', 'arquivo maior que 5 MB');
   await i1Bad(i1Many, 'O arquivo tem mais de 5.000 linhas. Peça ao banco um período menor.', 'arquivo com mais de 5.000 linhas');
 
   // ---- 8. Um arquivo com 1.200 linhas: a lista mostra 100 por vez e a importação vai em três lotes ----
   await i1Pick(i1Lots); await waitText('Arquivo lido: lote.csv', 15000);
-  await radio('Conta').click(); await i1Review();
+  await radio('Banco ou carteira').click(); await i1Review();
   t1 = await i1Keep();
   ok('I1 1.200 linhas: "1.200 linhas · 1.200 marcadas", 100 caixas à vista e "Mostrar mais 100 (1.100 linhas restantes)"', t1.includes('1.200 linhas · 1.200 marcadas') && (await i1Boxes()).length === 100 && (await visibleCount('button', 'Mostrar mais 100 (1.100 linhas restantes)')) === 1 && (await visibleCount('button', 'Importar 1.200 lançamentos')) === 1);
   await btn('Mostrar mais 100 (1.100 linhas restantes)').click(); await p.waitForTimeout(400);
@@ -8228,8 +8228,8 @@ setInterval(async () => {
   t1 = await i1Keep();
   ok('I1 conta nova: sem cartão, o destino diz "Você ainda não cadastrou nenhum cartão." e leva a cadastrar', t1.includes('Você ainda não cadastrou nenhum cartão.') && (await visibleCount('button', 'Cadastrar um cartão')) === 1 && (await p.getByRole('button', { name: 'Revisar as linhas', exact: true }).filter({ visible: true }).first().getAttribute('aria-disabled')) === 'true');
   await atWidths(async (w) => { await layoutChecks(`I1 conta nova sem cartão ${w}px`); if (w === 390) await shot('312_importar_conta_nova_sem_cartao'); });
-  await radio('Conta').click(); await p.waitForTimeout(300);
-  ok('I1 conta nova: com uma conta só, o destino mostra o nome como texto', (await body()).includes('Conta de origem: Conta principal'));
+  await radio('Banco ou carteira').click(); await p.waitForTimeout(300);
+  ok('I1 conta nova: com uma conta só, o destino mostra o nome como texto', (await body()).includes('Lançamentos em: Conta principal'));
   await i1Review();
   t1 = await i1Keep();
   ok('I1 conta nova: a revisão não tem "Já anotado" por semelhança (nada anotado ainda), e a memória do aparelho é de outra pessoa (a padaria volta a "Mercado")', t1.includes('7 linhas · 5 marcadas') && t1.includes('02/10/2026 · Saída · Mercado') && !t1.includes('Já anotado'));
@@ -8461,7 +8461,7 @@ setInterval(async () => {
     await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   }
   await j1Entry('Importar extrato ou fatura').click(); await waitText('Também em');
-  ok('Tutorial guia: "Importar extrato ou fatura" tem "Também em: Conta › Contas de origem › Importar extrato"', (await body()).includes('Conta › Contas de origem › Importar extrato'));
+  ok('Tutorial guia: "Importar extrato ou fatura" tem "Também em: Conta › Bancos e carteira › Importar extrato"', (await body()).includes('Conta › Bancos e carteira › Importar extrato'));
   await btn('Voltar').click(); await waitText('Ver o tour de novo');
 
   // As calculadoras, cada uma em uma linha, e a lista abre a calculadora.
@@ -8603,11 +8603,11 @@ setInterval(async () => {
   await p.getByRole('button', { name: /^Renda comprometida em / }).filter({ visible: true }).first().click(); await waitText('Seu limite');
   await j1Help('Renda comprometida', 'Renda comprometida e limite pessoal', 'Toque em "Informar renda de referência"');
   await btn('Voltar').click(); await waitText('Diferença do mês');
-  // Contas de origem: Conta › Adicionar conta
+  // Bancos e carteira: Conta › Adicionar banco ou carteira
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
   await j1Keep(); await scrollTo('Lembretes'); await shot('329_conta_privacidade');
-  await btn('Adicionar conta').click(); await waitText('Nome da conta');
-  await j1Help('Contas de origem', 'Contas de origem', 'Toque no círculo com as suas iniciais', '327_ajuda_contas_de_origem');
+  await btn('Adicionar banco ou carteira').click(); await waitText('Por exemplo: Carteira ou o nome do banco.');
+  await j1Help('Bancos e carteira', 'Bancos e carteira', 'Toque no círculo com as suas iniciais', '327_ajuda_contas_de_origem');
   await btn('Voltar').click(); await waitText('Privacidade neste aparelho'); await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // ---- 12. "Quem vê estes dados?" (captura do manual), o Resumo sem o tour na demonstração com a marca do roteiro ----
@@ -8630,7 +8630,9 @@ setInterval(async () => {
   });
   await btn('Cancelar').click(); await waitText('Diferença do mês');
   await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(400);
-  ok('CL-11 Metas: o cabeçalho mostra o contexto "Demonstração · Pessoal" e o selo da demonstração', (await p.locator('[aria-label="Espaço: Demonstração · Pessoal"]').filter({ visible: true }).count()) === 1 &&
+  // Nas abas, o selo "Demonstração" fica ao lado do logotipo e a pílula diz só o contexto (revisão de 16/11/2026: sem os dois selos juntos).
+  ok('CL-11 Metas: o cabeçalho mostra o selo da demonstração e o contexto "Pessoal", sem repetir "Demonstração" na pílula', (await p.locator('[aria-label="Espaço: Pessoal"]').filter({ visible: true }).count()) === 1 &&
+    (await p.locator('[aria-label="Espaço: Demonstração · Pessoal"]').filter({ visible: true }).count()) === 0 &&
     (await p.locator('[aria-label^="Demonstração: acesso simulado"]').filter({ visible: true }).count()) === 1);
   await atWidths(async (w) => { await layoutChecks(`CL-11 Metas ${w}px`); if (w === 320) await shot('CL11_metas_demonstracao_320px'); });
   await goResumo();
@@ -8639,10 +8641,10 @@ setInterval(async () => {
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
   await field('Descrição').fill('Farmácia CL-03'); await field('Valor em reais').fill('80'); await p.getByRole('radio', { name: 'Saúde' }).filter({ visible: true }).first().click();
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar gasto').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(400);
+  await btn('Salvar gasto').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(400);
   t = await body();
-  ok('CL-03 resultado incerto: "Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.", sem "Não foi possível salvar", e o preenchimento fica',
-    t.includes('Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.') && !t.includes('Não foi possível salvar') && (await field('Descrição').inputValue()) === 'Farmácia CL-03' && ['80', '80,00'].includes(await field('Valor em reais').inputValue()), t.slice(0, 300));
+  ok('CL-03 resultado incerto: "Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo.", sem "Não foi possível salvar", e o preenchimento fica',
+    t.includes('Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo.') && !t.includes('Não foi possível salvar') && (await field('Descrição').inputValue()) === 'Farmácia CL-03' && ['80', '80,00'].includes(await field('Valor em reais').inputValue()), t.slice(0, 300));
   ok('CL-03 resultado incerto: a gravação aconteceu (um registro) apesar da resposta perdida', (await cl03Count()) === 1, String(await cl03Count()));
   await shot('CL03_resultado_incerto');
   await btn('Cancelar').click(); await p.waitForTimeout(300);
@@ -8686,7 +8688,7 @@ setInterval(async () => {
   };
   await fillGasto('Padaria CL-19', '12');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar gasto').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Salvar gasto').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm();
   await fillGasto('Padaria CL-19', '12');
   await btn('Salvar gasto').click(); await waitText('Este gasto já tinha sido salvo. Anotar outro igual?');
@@ -8697,7 +8699,7 @@ setInterval(async () => {
   // O que foi excluído depois nunca conta como salvo: o mesmo gasto, na visita seguinte, é gravado de novo, sem aviso.
   await fillGasto('Cinema CL-02', '30');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar gasto').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Salvar gasto').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm();
   await otherDevice(async (repo, contextId) => {
     for (const r of (await repo.listRecords(contextId, '2026-10')).filter((x) => x.description === 'Cinema CL-02')) await repo.deleteRecord(`e2e-excluir-${Date.now()}`, r.id, r.version);
@@ -8712,7 +8714,7 @@ setInterval(async () => {
   // Achado 1: depois de um resultado incerto, na visita seguinte com OUTRO conteúdo, o formulário grava (chave nova), sem chave_reutilizada.
   await fillGasto('Lanche CL-01', '25');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar gasto').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Salvar gasto').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm();
   await fillGasto('Almoço CL-01', '30');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
@@ -8729,7 +8731,7 @@ setInterval(async () => {
   await openToPay();
   await fillConta('Luz CL-01', '90');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar conta a pagar').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Salvar conta a pagar').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm('Contas em aberto com vencimento até o fim do mês');
   await fillConta('Luz CL-01', '90');
   await btn('Salvar conta a pagar').click(); await waitText('Esta conta a pagar já tinha sido salva. Anotar outra igual?'); await p.waitForTimeout(300);
@@ -8743,7 +8745,7 @@ setInterval(async () => {
   await openToPay();
   await fillConta('Gás CL-01', '40');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Salvar conta a pagar').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Salvar conta a pagar').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm('Contas em aberto com vencimento até o fim do mês');
   await fillConta('Chuveiro CL-01', '60');
   await btn('Salvar conta a pagar').click(); await waitText('Conta a pagar salva'); await p.waitForTimeout(600);
@@ -8758,7 +8760,7 @@ setInterval(async () => {
   await openRow(/^Internet, vence em 15\/10/); await waitText('Já paguei');
   await btn('Já paguei').click(); await waitText('Confirmar pagamento');
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Confirmar pagamento').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Confirmar pagamento').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   ok('CL-03 e CL-19 pagamento com resposta perdida: gravou (um gasto) e o texto manda conferir', (await pagamentos()) === 1 && (await body()).includes('Confira em Movimentos antes de anotar de novo.'));
   await leaveForm('Desfazer pagamento');
   await btn('Desfazer pagamento').click(); await waitText('Desfazer pagamento?');
@@ -8777,7 +8779,7 @@ setInterval(async () => {
   await p.getByRole('tab', { name: 'Metas' }).filter({ visible: true }).first().click(); await waitText('Seu plano de guardar'); await p.waitForTimeout(300);
   await fillMeta();
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Criar meta').click(); await waitText('Não deu para confirmar se salvou'); await p.waitForTimeout(300);
+  await btn('Criar meta').click(); await waitText('Não foi possível confirmar se salvou'); await p.waitForTimeout(300);
   await leaveForm('Seu plano de guardar');
   await fillMeta();
   await btn('Criar meta').click(); await waitText('Esta meta já tinha sido salva. Criar outra igual?'); await p.waitForTimeout(300);
@@ -8913,8 +8915,8 @@ setInterval(async () => {
   let i2t = await dialogText(); const i2Buttons = await i2DialogButtons();
   ok('I2 folha de "Escanear nota fiscal": "Ler comprovante ou boleto" vem por último, antes de "Cancelar", e a frase de privacidade do comprovante (lido aqui, nada guardado, sem CPF, CNPJ, chave Pix, conta nem códigos) aparece',
     JSON.stringify(i2Buttons.filter((x) => x !== 'Usar a câmera')) === JSON.stringify(['Escolher o PDF da nota', 'Colar o link ou a chave', I2_OPTION, 'Cancelar']) &&
-    i2t.includes('Comprovante em PDF ou imagem: lido aqui no aparelho e não guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') &&
-    i2t.includes('Guardamos só um resumo da chave de acesso da nota'), JSON.stringify(i2Buttons));
+    i2t.includes('Comprovante em PDF ou imagem: lido aqui no aparelho e não guardado. A Clarevo não guarda CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') &&
+    i2t.includes('A Clarevo guarda só um resumo da chave de acesso da nota'), JSON.stringify(i2Buttons));
   await i2Keep();
   await shot('350_comprovante_folha');
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
@@ -8927,9 +8929,9 @@ setInterval(async () => {
   let i2v = await i2Values();
   ok('I2 Pix enviado: "Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32", valor 85,00, data 05/10/2026 e descrição "Pix para Maria Souza Exemplo" (com a legenda de onde veio)',
     i2t.includes('Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2v.amount === '85,00' && i2v.date === '05/10/2026' && i2v.desc === 'Pix para Maria Souza Exemplo' && i2t.includes('Nome lido do comprovante'), JSON.stringify(i2v));
-  ok('I2 Pix enviado: a frase "Preenchemos o que o comprovante informa. Confira e toque em Salvar.", a mensagem do comprovante e a frase de privacidade; teclado fechado (nada falta)',
-    i2t.includes('Preenchemos o que o comprovante informa. Confira e toque em Salvar.') && i2t.includes('Mensagem do comprovante: Almoço de domingo') &&
-    i2t.includes('O arquivo foi lido aqui no aparelho e não é guardado. Não guardamos CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') && (await i2ActiveTag()) !== 'INPUT', i2t.slice(0, 500));
+  ok('I2 Pix enviado: a frase "A Clarevo preencheu o que o comprovante informa. Confira e toque em Salvar.", a mensagem do comprovante e a frase de privacidade; teclado fechado (nada falta)',
+    i2t.includes('A Clarevo preencheu o que o comprovante informa. Confira e toque em Salvar.') && i2t.includes('Mensagem do comprovante: Almoço de domingo') &&
+    i2t.includes('O arquivo foi lido aqui no aparelho e não é guardado. A Clarevo não guarda CPF, CNPJ, chave Pix, conta nem códigos do comprovante.') && (await i2ActiveTag()) !== 'INPUT', i2t.slice(0, 500));
   ok('I2 Pix enviado: "Como você pagou?" fica em "Dinheiro, débito ou Pix"', (await radio('Dinheiro, débito ou Pix').getAttribute('aria-checked')) === 'true' && (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'false');
   ok('I2 Pix enviado: nenhum CPF (inteiro ou mascarado), CNPJ, chave Pix, agência, conta, ID da transação nem código de autenticação na tela, nos nomes acessíveis, nos campos nem no armazenamento',
     (await i2Leaks()).length === 0, (await i2Leaks()).join(' | '));
@@ -8998,18 +9000,18 @@ setInterval(async () => {
   await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
   await i2ReadExpense(i2Received);
   i2t = await i2Keep(); i2v = await i2Values();
-  ok('I2 Pix recebido em Anotar gasto: "Comprovante lido: Pix recebido · Fulano de Tal Exemplo Ltda · R$ 320,00 · 06/10/2026 às 09:05" com o aviso "Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto." e o botão "Trocar para Registrar recebimento"',
+  ok('I2 Pix recebido em Anotar gasto: "Comprovante lido: Pix recebido · Fulano de Tal Exemplo Ltda · R$ 320,00 · 06/10/2026 às 09:05" com o aviso "Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto." e o botão "É um recebimento"',
     i2t.includes('Comprovante lido: Pix recebido · Fulano de Tal Exemplo Ltda · R$ 320,00 · 06/10/2026 às 09:05') && i2t.includes('Este comprovante é de um Pix recebido. Ele entra como recebimento, não como gasto.') &&
-    (await visibleCount('button', 'Trocar para Registrar recebimento')) === 1, i2t.slice(0, 500));
-  ok('I2 Pix recebido em Anotar gasto: nada é preenchido (valor e descrição em branco, data de hoje) e não há "Preenchemos o que o comprovante informa"',
-    i2v.amount === '' && i2v.desc === '' && i2v.date === '07/10/2026' && !i2t.includes('Preenchemos o que o comprovante informa'), JSON.stringify(i2v));
+    (await visibleCount('button', 'É um recebimento')) === 1, i2t.slice(0, 500));
+  ok('I2 Pix recebido em Anotar gasto: nada é preenchido (valor e descrição em branco, data de hoje) e não há "A Clarevo preencheu o que o comprovante informa"',
+    i2v.amount === '' && i2v.desc === '' && i2v.date === '07/10/2026' && !i2t.includes('A Clarevo preencheu o que o comprovante informa'), JSON.stringify(i2v));
   await i2Top();
   await i2Shots('353_comprovante_outro_tipo');
-  await btn('Trocar para Registrar recebimento').click(); await waitText('Data do recebimento', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
+  await btn('É um recebimento').click(); await waitText('Data do recebimento', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
   i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
   ok('I2 trocar: abre Registrar recebimento com o mesmo comprovante, sem pedir o PDF de novo: descrição "Pix de Fulano de Tal Exemplo Ltda", valor 320,00 e data 06/10/2026; sem o aviso de tipo trocado',
     (await h1Name()) === 'Registrar recebimento' && i2v.desc === 'Pix de Fulano de Tal Exemplo Ltda' && i2v.amount === '320,00' && i2v.date === '06/10/2026' && !i2t.includes('Ele entra como') &&
-    i2t.includes('Preenchemos o que o comprovante informa. Confira e toque em Salvar.') && (await visibleCount('button', 'Salvar recebimento')) === 1, JSON.stringify(i2v));
+    i2t.includes('A Clarevo preencheu o que o comprovante informa. Confira e toque em Salvar.') && (await visibleCount('button', 'Salvar recebimento')) === 1, JSON.stringify(i2v));
   ok('I2 trocar: nada do documento da empresa nem da chave na tela', (await i2Leaks()).length === 0);
   await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await p.waitForTimeout(600);
   const i2Income = (await i2Records()).filter((r) => r.k === 'receita' && r.d === 'Pix de Fulano de Tal Exemplo Ltda');
@@ -9032,10 +9034,10 @@ setInterval(async () => {
   await i2Shots('355_comprovante_recebimento');
   await i2ReadIncome(i2Sent);
   i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
-  ok('I2 Pix enviado em Registrar recebimento: "Este comprovante é de um Pix enviado. Ele entra como gasto, não como recebimento." com "Trocar para Anotar gasto"; nada é preenchido',
+  ok('I2 Pix enviado em Registrar recebimento: "Este comprovante é de um Pix enviado. Ele entra como gasto, não como recebimento." com "É um gasto"; nada é preenchido',
     i2t.includes('Comprovante lido: Pix enviado · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2t.includes('Este comprovante é de um Pix enviado. Ele entra como gasto, não como recebimento.') &&
-    (await visibleCount('button', 'Trocar para Anotar gasto')) === 1 && i2v.amount === '' && i2v.desc === '', JSON.stringify(i2v));
-  await btn('Trocar para Anotar gasto').click(); await waitText('Será salvo em', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
+    (await visibleCount('button', 'É um gasto')) === 1 && i2v.amount === '' && i2v.desc === '', JSON.stringify(i2v));
+  await btn('É um gasto').click(); await waitText('Será salvo em', 12000); await waitText('Comprovante lido:', 12000); await p.waitForTimeout(900);
   i2v = await i2Values(); await i2Keep();
   ok('I2 trocar para Anotar gasto: o mesmo comprovante preenche o gasto (com a lembrança por nome da vez anterior, "Almoço de domingo", e a categoria Lazer)',
     (await h1Name()) === 'Anotar gasto' && i2v.amount === '85,00' && i2v.date === '05/10/2026' && i2v.desc === 'Almoço de domingo' && (await radio('Lazer').getAttribute('aria-checked')) === 'true', JSON.stringify(i2v));
@@ -9045,9 +9047,9 @@ setInterval(async () => {
   await i2NewExpense();
   await i2ReadExpense(i2Neutral);
   i2t = await i2Keep(); i2v = await i2Values();
-  ok('I2 comprovante sem direção, em Anotar gasto: "Comprovante lido: Pix · Maria Souza Exemplo · ..." (sem afirmar "enviado"), o aviso "O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo." e a descrição da última vez com este nome ("Almoço de domingo")',
-    i2t.includes('Comprovante lido: Pix · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2t.includes('O comprovante não diz se o dinheiro saiu ou entrou. Usamos o tipo desta tela. Confira se está certo.') && i2v.desc === 'Almoço de domingo', JSON.stringify(i2v));
-  ok('I2 comprovante sem direção: não oferece trocar de tela (a tela vale)', (await visibleCount('button', /^Trocar para /)) === 0);
+  ok('I2 comprovante sem direção, em Anotar gasto: "Comprovante lido: Pix · Maria Souza Exemplo · ..." (sem afirmar "enviado"), o aviso "O comprovante não diz se o dinheiro saiu ou entrou. Vale o tipo desta tela. Confira se está certo." e a descrição da última vez com este nome ("Almoço de domingo")',
+    i2t.includes('Comprovante lido: Pix · Maria Souza Exemplo · R$ 85,00 · 05/10/2026 às 14:32') && i2t.includes('O comprovante não diz se o dinheiro saiu ou entrou. Vale o tipo desta tela. Confira se está certo.') && i2v.desc === 'Almoço de domingo', JSON.stringify(i2v));
+  ok('I2 comprovante sem direção: não oferece trocar de tela (a tela vale)', (await visibleCount('button', /^É um (gasto|recebimento)$/)) === 0);
   await i2Leave();
   await i2NewIncome();
   await i2ReadIncome(i2Neutral);
@@ -9070,26 +9072,26 @@ setInterval(async () => {
   await i2Leave();
 
   // ---- 8b2. Nota fiscal de serviço (NFS-e, D-079) em Registrar recebimento: o líquido, a data de emissão e "Nota fiscal 35 para" quem
-  // contratou; "Trocar para Anotar gasto" põe o nome de quem prestou; no PDF da nota, a nota de serviço aponta a leitura certa ----
+  // contratou; "É um gasto" põe o nome de quem prestou; no PDF da nota, a nota de serviço aponta a leitura certa ----
   await i2NewIncome();
   await i2ReadIncome(i2Nfse, 'Nota de serviço lida:');
   i2t = await i2Keep(); i2v = await i2Values('Data do recebimento');
-  ok('I2 nota de serviço em Registrar recebimento: "Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026", o líquido (não o do serviço nem o zerado), a data de emissão (não a da DPS), "Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda" com a legenda, o lado e a data explicados, a privacidade da nota e "Trocar para Anotar gasto"',
+  ok('I2 nota de serviço em Registrar recebimento: "Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026", o líquido (não o do serviço nem o zerado), a data de emissão (não a da DPS), "Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda" com a legenda, o lado e a data explicados, a privacidade da nota e "É um gasto"',
     i2t.includes('Nota de serviço lida: Empresa Exemplo de Tecnologia Ltda · R$ 4.200,00 · 05/10/2026') && i2v.amount === '4.200,00' && i2v.date === '05/10/2026' &&
     i2v.desc === 'Nota fiscal 35 para Empresa Exemplo de Tecnologia Ltda' && i2t.includes('Número e nome lidos da nota') &&
-    i2t.includes('Lemos como um serviço que você prestou: o nome é de quem contratou.') && i2t.includes('A data é a da emissão da nota. Se o pagamento foi em outro dia, troque a data.') &&
-    i2t.includes('A nota foi lida aqui no aparelho e não é guardada. Não guardamos CPF, CNPJ, endereço nem a chave da nota.') && i2t.includes('Preenchemos o que a nota informa. Confira e toque em Salvar.') &&
-    (await visibleCount('button', 'Trocar para Anotar gasto')) === 1, JSON.stringify(i2v));
+    i2t.includes('Lido como um serviço que você prestou: o nome é de quem contratou.') && i2t.includes('A data é a da emissão da nota. Se o pagamento foi em outro dia, troque a data.') &&
+    i2t.includes('A nota foi lida aqui no aparelho e não é guardada. A Clarevo não guarda CPF, CNPJ, endereço nem a chave da nota.') && i2t.includes('A Clarevo preencheu o que a nota informa. Confira e toque em Salvar.') &&
+    (await visibleCount('button', 'É um gasto')) === 1, JSON.stringify(i2v));
   i2t = await i2PageText();
   ok('I2 nota de serviço: CNPJ, e-mail, endereço, chave, descrição do serviço e os outros valores não aparecem em lugar nenhum da página',
     I2_NFSE_SECRETS.every((x) => !i2t.includes(x)), I2_NFSE_SECRETS.filter((x) => i2t.includes(x)).join(' | '));
   await i2Shots('357_nota_servico_recebimento');
-  await btn('Trocar para Anotar gasto').click(); await waitText('Será salvo em', 12000); await waitText('Nota de serviço lida:', 12000); await p.waitForTimeout(900);
+  await btn('É um gasto').click(); await waitText('Será salvo em', 12000); await waitText('Nota de serviço lida:', 12000); await p.waitForTimeout(900);
   i2t = await i2Keep(); i2v = await i2Values();
   ok('I2 nota de serviço trocada para Anotar gasto: o nome passa a ser o de quem prestou ("Nota fiscal 35 de Alex Exemplo da Silva", sem a raiz do CNPJ), com o mesmo valor e a mesma data, e a troca de volta',
     (await h1Name()) === 'Anotar gasto' && i2t.includes('Nota de serviço lida: Alex Exemplo da Silva · R$ 4.200,00 · 05/10/2026') && i2v.desc === 'Nota fiscal 35 de Alex Exemplo da Silva' &&
-    i2v.amount === '4.200,00' && i2v.date === '05/10/2026' && i2t.includes('Lemos como um serviço que você contratou: o nome é de quem prestou.') &&
-    (await visibleCount('button', 'Trocar para Registrar recebimento')) === 1, JSON.stringify(i2v));
+    i2v.amount === '4.200,00' && i2v.date === '05/10/2026' && i2t.includes('Lido como um serviço que você contratou: o nome é de quem prestou.') &&
+    (await visibleCount('button', 'É um recebimento')) === 1, JSON.stringify(i2v));
   i2t = await i2PageText();
   ok('I2 nota de serviço em Anotar gasto: nenhum dado da nota além do nome, do valor e da data', I2_NFSE_SECRETS.every((x) => !i2t.includes(x)), I2_NFSE_SECRETS.filter((x) => i2t.includes(x)).join(' | '));
   await i2Leave();
@@ -9161,10 +9163,10 @@ setInterval(async () => {
     const x = await i2Keep(); const v = await i2Values();
     ok(`I2 ${label}: "${message.slice(0, 60)}..." e nada preenchido`, x.includes(message) && !x.includes('Comprovante lido:') && v.amount === '' && v.desc === '', x.slice(0, 300));
   };
-  await i2Bad(i2Photo, 'Não encontramos texto neste PDF. Ele pode ser uma foto do comprovante. Digite os dados à mão.', 'PDF sem texto (foto)');
+  await i2Bad(i2Photo, 'Este PDF não tem texto para ler. Ele pode ser uma foto do comprovante. Digite os dados à mão.', 'PDF sem texto (foto)');
   await i2Shots('356_comprovante_erro', false);
-  await i2Bad(i2Danfe, 'Esta é uma nota fiscal de produto. Para anotar uma compra com nota, use Escanear nota fiscal em Anotar gasto. Aqui lemos comprovantes, holerites e notas de serviço.', 'PDF de nota fiscal de produto (DANFE)');
-  await i2Bad(i2Order, 'Não reconhecemos um comprovante neste PDF. Confira se é o comprovante de um Pix, de uma TED, de um boleto ou de um pagamento.', 'PDF que não é de comprovante');
+  await i2Bad(i2Danfe, 'Esta é uma nota fiscal de produto. Para anotar uma compra com nota, use Escanear nota fiscal em Anotar gasto. Aqui a Clarevo lê comprovantes, holerites e notas de serviço.', 'PDF de nota fiscal de produto (DANFE)');
+  await i2Bad(i2Order, 'A Clarevo não reconheceu um comprovante neste PDF. Confira se é o comprovante de um Pix, de uma TED, de um boleto ou de um pagamento.', 'PDF que não é de comprovante');
   await i2Bad(i2NotPdf, 'Este arquivo não é um PDF.', 'arquivo que não é PDF');
   await i2Leave();
 
@@ -10146,7 +10148,7 @@ setInterval(async () => {
     await tab().first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
   };
   const famConta = async () => { await famGoResumo(); await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); };
-  const famSignOut = async () => { await famConta(); await btn('Sair deste aparelho').click(); await waitText('Cuidar da vida financeira'); };
+  const famSignOut = async () => { await famConta(); await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira'); };
   const famTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
   const famGoFamilia = async () => { await famConta(); await p.getByRole('button', { name: /^(Criar Família|Abrir Família)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(500); };
   const famSelectorCount = () => p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count();
@@ -10268,7 +10270,7 @@ setInterval(async () => {
   await field('Descrição').fill('Padaria da casa'); await field('Valor em reais').fill('50');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
   const famRecordPath = famPath();
-  await btn('Editar registro').click(); await waitText('Será salvo em');
+  await btn('Editar gasto').click(); await waitText('Será salvo em');
   ok('Editar o gasto da Família com o seletor em Família: a pílula e o aviso dizem "Família"', famPath() === `${famRecordPath}/editar` && (await body()).includes('Demonstração · Família') && (await body()).includes('Será salvo em Família, Conta principal.'));
   await famBackToResumo(2);
   await famTab('Ver dados de Pessoal').click(); await waitText('Primeiros passos'); await p.waitForTimeout(400);
@@ -10330,8 +10332,8 @@ setInterval(async () => {
   ok('Mauro (conta nova, sem Família): o Resumo não tem seletor', (await famSelectorCount()) === 0);
   await famGoFamilia();
   await field('Link do convite').fill('isto não é um convite');
-  await btn('Ver convite').click(); await waitText('Não encontramos um convite neste texto.');
-  ok('Tenho um convite: um texto sem link é recusado junto ao campo, sem sair da tela', (await body()).includes('Não encontramos um convite neste texto. Confira o link que você recebeu.') && (await famH1()) === 'Família');
+  await btn('Ver convite').click(); await waitText('Não há um convite neste texto.');
+  ok('Tenho um convite: um texto sem link é recusado junto ao campo, sem sair da tela', (await body()).includes('Não há um convite neste texto. Confira o link que você recebeu.') && (await famH1()) === 'Família');
   await field('Link do convite').fill(`Oi! Entre na nossa Família: ${famLink1}`);
   await btn('Ver convite').click(); await waitText('Aceitar convite'); await p.waitForTimeout(500);
   t = await body();
@@ -10359,7 +10361,7 @@ setInterval(async () => {
   ok('Membro na Família: pode anotar (o papel "Anota e vê")', (await visibleCount('button', 'Anotar gasto')) === 1);
   await famConta();
   t = await body();
-  ok('Membro na Família: Conta mostra "Contas de origem" da Família (pílula "Demonstração · Família", "Conta principal", "Adicionar conta" disponível)', t.includes('Contas de origem') && t.includes('Demonstração · Família') && t.includes('Conta principal') && (await visibleCount('button', 'Adicionar conta')) === 1, t.slice(0, 300));
+  ok('Membro na Família: Conta mostra "Bancos e carteira" da Família (pílula "Demonstração · Família", "Conta principal", "Adicionar banco ou carteira" disponível)', t.includes('Bancos e carteira') && t.includes('Demonstração · Família') && t.includes('Conta principal') && (await visibleCount('button', 'Adicionar banco ou carteira')) === 1, t.slice(0, 300));
   await famGoResumo();
   await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(300);
   // O mesmo link não serve duas vezes: a prévia de um convite usado diz o mesmo que a de um inexistente.
@@ -10412,7 +10414,7 @@ setInterval(async () => {
   ok('Leitora na Família: Movimentos também sem botões de anotar', (await visibleCount('button', /^Anotar/)) === 0 && (await visibleCount('button', 'Registrar recebimento')) === 0, (await body()).slice(0, 200));
   await famConta();
   t = await body();
-  ok('Leitora na Família: Conta mostra "Contas de origem" da Família (pílula "Demonstração · Família"), sem "Adicionar conta" nem importar', t.includes('Contas de origem') && t.includes('Demonstração · Família') && (await visibleCount('button', 'Adicionar conta')) === 0 && !t.includes('Importar extrato'), t.slice(0, 300));
+  ok('Leitora na Família: Conta mostra "Bancos e carteira" da Família (pílula "Demonstração · Família"), sem "Adicionar banco ou carteira" nem importar', t.includes('Bancos e carteira') && t.includes('Demonstração · Família') && (await visibleCount('button', 'Adicionar banco ou carteira')) === 0 && !t.includes('Importar extrato'), t.slice(0, 300));
   await famGoResumo();
   await famTab('Resumo').click(); await waitText('Diferença do mês'); await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
   ok('Leitora no Pessoal: continua anotando no Pessoal (o papel vale só na Família)', (await visibleCount('button', 'Anotar gasto')) === 1);
@@ -10461,7 +10463,7 @@ setInterval(async () => {
   await famShots('415_familia_remover');
   await confirmIn('Remover'); await waitText('Pessoa removida da Família.'); await p.waitForTimeout(500);
   t = await body();
-  ok('Removida: aviso, "Ex-membros" com "ex-membro · Lia" e a nota do histórico, e a vaga volta (4)', t.includes('Pessoa removida da Família.') && t.includes('Ex-membros') && t.includes('ex-membro · Lia') && t.includes('O que essas pessoas anotaram continua na Família, como histórico da casa.') &&
+  ok('Removida: aviso, "Pessoas que saíram" com "Lia (saiu da Família)" e a nota do histórico, e a vaga volta (4)', t.includes('Pessoa removida da Família.') && t.includes('Pessoas que saíram') && t.includes('Lia (saiu da Família)') && t.includes('O que essas pessoas anotaram continua na Família, como histórico da casa.') &&
     t.includes('Cabem mais 4 pessoas, contando os convites pendentes.') && (await visibleCount('button', /^Gerenciar Lia/)) === 0, t.slice(0, 600));
   await famKeep();
   await famShots('416_familia_ex_membro');
@@ -10491,7 +10493,7 @@ setInterval(async () => {
   await famSignIn('mauro.familia@exemplo.com');
   await famGoFamilia();
   t = await body();
-  ok('Novo titular: "Seu papel: Titular", Vera e Lia como ex-membros, sem outras pessoas ativas e "Encerrar a Família" disponível', t.includes('Seu papel: Titular') && t.includes('Mauro (você)') && t.includes('ex-membro · Vera') && t.includes('ex-membro · Lia') && (await visibleCount('button', 'Encerrar a Família')) === 1 && !t.includes('Para encerrar, remova'), t.slice(0, 600));
+  ok('Novo titular: "Seu papel: Titular", Vera e Lia como ex-membros, sem outras pessoas ativas e "Encerrar a Família" disponível', t.includes('Seu papel: Titular') && t.includes('Mauro (você)') && t.includes('Vera (saiu da Família)') && t.includes('Lia (saiu da Família)') && (await visibleCount('button', 'Encerrar a Família')) === 1 && !t.includes('Para encerrar, remova'), t.slice(0, 600));
   await btn('Encerrar a Família').click(); await waitText('Encerrar a Família?'); await p.waitForTimeout(300);
   const endText = await dialogText();
   ok('Encerrar: pede confirmação e explica (deixa de existir para todas as pessoas; o Pessoal de cada pessoa não muda)', endText.includes('Encerrar a Família?') && endText.includes('A Família deixa de existir para todas as pessoas.') && endText.includes('O Pessoal de cada pessoa não muda.'), endText);
@@ -10739,8 +10741,8 @@ setInterval(async () => {
   await famConta(); await waitText('Tenho um convite da empresa'); await p.waitForTimeout(300);
   ok('Bia (sem ser RH): Conta não mostra "Painel da empresa"', (await visibleCount('button', 'Abrir painel da empresa')) === 0 && !(await headingShown('Painel da empresa')));
   await field('Link do convite da empresa').fill('isto não é um convite');
-  await btn('Ver convite').click(); await waitText('Não encontramos um convite da empresa neste texto.');
-  ok('Tenho um convite da empresa: um texto sem link é recusado junto ao campo, sem sair de Conta', (await body()).includes('Não encontramos um convite da empresa neste texto. Confira o link que você recebeu.') && (await famH1()) === 'Conta');
+  await btn('Ver convite').click(); await waitText('Não há um convite da empresa neste texto.');
+  ok('Tenho um convite da empresa: um texto sem link é recusado junto ao campo, sem sair de Conta', (await body()).includes('Não há um convite da empresa neste texto. Confira o link que você recebeu.') && (await famH1()) === 'Conta');
   await field('Link do convite da empresa').fill(empCaio);
   await btn('Ver convite').click(); await waitText('Convite indisponível'); await p.waitForTimeout(400);
   t = await body();
@@ -12187,7 +12189,7 @@ setInterval(async () => {
   // Os títulos de card (nível 2) da tela, na ordem.
   const delCards = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
   // De Conta para a tela de exclusão.
-  const delOpen = async () => { await famConta(); await btn('Excluir minha conta: ver o que é apagado e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(500); };
+  const delOpen = async () => { await famConta(); await btn('Ver o que é apagado ao excluir minha conta e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(500); };
   const delType = async (text) => { await field('Digite EXCLUIR para confirmar').fill(text); await p.waitForTimeout(250); };
   // "Excluir minha conta" é também o nome do cabeçalho e do título do card de Conta; o botão final é o único botão com este nome na tela.
   const delFinalEnabled = async () => (await visibleCount('button', 'Excluir minha conta')) === 1 && !(await delFinal().isDisabled());
@@ -12198,10 +12200,10 @@ setInterval(async () => {
   await famCreateAccount('Iris Neves', 'iris.exclusao@exemplo.com');
   await famConta();
   const delContaCards = await delCards();
-  ok('Conta: "Excluir minha conta" é o último card, depois de "Sair deste aparelho"', delContaCards[delContaCards.length - 1] === 'Excluir minha conta' && (await visibleCount('button', 'Sair deste aparelho')) === 1, delContaCards.join(' | '));
+  ok('Conta: "Excluir minha conta" é o último card, depois de "Sair da conta"', delContaCards[delContaCards.length - 1] === 'Excluir minha conta' && (await visibleCount('button', 'Sair da conta')) === 1, delContaCards.join(' | '));
   t = await body();
   ok('Conta: o card explica e leva à tela ("Ver o que é apagado"), sem apagar nada ali', t.includes('Apaga a sua conta e os seus dados. Antes de confirmar, a próxima tela mostra o que é apagado e o que continua.') &&
-    (await visibleCount('button', 'Excluir minha conta: ver o que é apagado e o que continua')) === 1 && t.indexOf('Sair encerra a sessão neste aparelho.') < t.indexOf('Apaga a sua conta e os seus dados.'), t.slice(-700));
+    (await visibleCount('button', 'Ver o que é apagado ao excluir minha conta e o que continua')) === 1 && t.indexOf('Você sai só neste aparelho.') < t.indexOf('Apaga a sua conta e os seus dados.'), t.slice(-700));
   // Sem destaque de alerta vermelho: nem o botão, nem o título, nem o card usam a cor de erro (#B42318) nem o fundo de erro.
   const delRed = await p.evaluate(() => {
     const card = [...document.querySelectorAll('[role=heading][aria-level="2"]')].find((e) => e.textContent === 'Excluir minha conta' && e.getBoundingClientRect().width > 0)?.parentElement;
@@ -12214,7 +12216,7 @@ setInterval(async () => {
   await delShots('461_conta_excluir_item', delScroll('Excluir minha conta'));
 
   // ---- 2. A tela: o que é apagado, o que continua, exportar antes e a confirmação digitada ----
-  await btn('Excluir minha conta: ver o que é apagado e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(500);
+  await btn('Ver o que é apagado ao excluir minha conta e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(500);
   t = await body();
   ok('Excluir: título, introdução (perde o acesso na hora, não é possível desfazer, e-mail livre, conta nova vazia) e as duas listas', (await famH1()) === 'Excluir minha conta' &&
     t.includes('Ao excluir, você perde o acesso na hora e não é possível desfazer. O seu e-mail fica livre para uma conta nova, que começa vazia.') && t.includes('O que é apagado') && t.includes('O que continua') &&
@@ -12358,7 +12360,7 @@ setInterval(async () => {
   await p.goto(`http://localhost:${PORT}/conta-excluida?estado=nao-confirmada`); await waitText('Não foi possível confirmar a exclusão'); await p.waitForTimeout(500);
   t = await body();
   ok('Resposta perdida: título, texto (a conexão caiu, entrar de novo para conferir, e-mail livre ou conta como estava) e as duas saídas', (await famH1()) === 'Não foi possível confirmar a exclusão' &&
-    t.includes('A conexão caiu antes da resposta e a sessão terminou neste aparelho. Entre de novo para conferir: se a conta foi excluída, o seu e-mail está livre; se não, a conta e os seus dados continuam como estavam.') &&
+    t.includes('A conexão caiu antes da resposta e você saiu da conta neste aparelho. Entre de novo para conferir: se a conta foi excluída, o seu e-mail está livre; se não, a conta e os seus dados continuam como estavam.') &&
     (await visibleCount('button', 'Entrar')) === 1 && (await visibleCount('button', 'Voltar ao início')) === 1 && !t.includes('Sua conta foi excluída'), t.slice(0, 500));
   ok('Resposta perdida: tela de entrada, sem a barra de abas', (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0);
   await delKeep();
@@ -12776,10 +12778,10 @@ setInterval(async () => {
   const mcAnnounced = async () => (await evLive()).filter((x) => x.startsWith('Conferência')).join(' | ');
   const mcAnnounced0 = await mcAnnounced();
   await p.evaluate(async () => { (await window.__e2e.repo()).failNextWrite = 'depois'; });
-  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Não deu para confirmar se salvou. Toque de novo: repetir é seguro.'); await p.waitForTimeout(400);
+  await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Não foi possível confirmar se salvou. Toque de novo: repetir é seguro.'); await p.waitForTimeout(400);
   t = await mcKeep();
-  ok('Mês conferido, resultado incerto: a tela diz "Não deu para confirmar se salvou. Toque de novo: repetir é seguro.", segue mostrando o que leu ("Você conferiu") e não anuncia nada como feito, embora a gravação tenha acontecido (desligada, versão 4)',
-    t.includes('Não deu para confirmar se salvou. Toque de novo: repetir é seguro.') && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') && (await mcAnnounced()) === mcAnnounced0 && !(await mcAnnounced()).includes('Conferência desfeita') && (await mcRow()) === 'off v4', `${await mcRow()} ${JSON.stringify(await evLive())}`);
+  ok('Mês conferido, resultado incerto: a tela diz "Não foi possível confirmar se salvou. Toque de novo: repetir é seguro.", segue mostrando o que leu ("Você conferiu") e não anuncia nada como feito, embora a gravação tenha acontecido (desligada, versão 4)',
+    t.includes('Não foi possível confirmar se salvou. Toque de novo: repetir é seguro.') && t.includes('Você conferiu: não houve pagamentos em setembro de 2026.') && (await mcAnnounced()) === mcAnnounced0 && !(await mcAnnounced()).includes('Conferência desfeita') && (await mcRow()) === 'off v4', `${await mcRow()} ${JSON.stringify(await evLive())}`);
   await mcQuiet(async (repo, ctx) => repo.setMonthCheck('e2e-conferi-outro-aparelho', ctx, '2026-09', 'pagamentos', 4));
   ok('Mês conferido, outro aparelho: marcou de novo (versão 5) sem recarregar esta tela, que segue com o botão de desfazer da versão antiga', (await mcRow()) === 'on v5' && (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1);
   await btn('Desfazer a conferência: não houve pagamentos em setembro de 2026').click(); await waitText('Algo mudou em outro aparelho. A tela foi atualizada; confira e tente de novo.'); await p.waitForTimeout(500);
@@ -14678,7 +14680,7 @@ setInterval(async () => {
     await btn('Nova meta').click(); await waitText('O que você quer conquistar?'); await p.waitForTimeout(400);
     let r = await gridRadios();
     ok('D-092 Nova meta: a grade com as metas mais comuns, na ordem das pesquisas, e "Outra meta" no fim; com a reserva já criada, ela não aparece',
-      JSON.stringify((r || []).map((x) => x[0])) === JSON.stringify(['Casa própria', 'Viagem', 'Quitar dívidas', 'Carro', 'Reforma da casa', 'Meu negócio', 'Moto', 'Celular novo', 'Aposentadoria', 'Estudos', 'Casamento', 'Futuro dos filhos', 'Saúde', 'Festa', 'Outra meta']) &&
+      JSON.stringify((r || []).map((x) => x[0])) === JSON.stringify(['Casa própria', 'Viagem', 'Quitar dívidas', 'Carro', 'Reforma da casa', 'Meu negócio', 'Moto', 'Celular novo', 'Aposentadoria', 'Estudos', 'Casamento', 'Futuro das crianças', 'Saúde', 'Festa', 'Outra meta']) &&
         (r || []).every((x) => x[1] === 'false') && (await visibleCount('button', 'Reserva para imprevistos')) === 0, JSON.stringify(r));
     await p.getByRole('radio', { name: 'Moto', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(400);
     t = await body(); screenTexts.push(t);
@@ -15111,7 +15113,7 @@ setInterval(async () => {
     await goResumo();
     ok('Valor extra: com R$ 800,00 em Renda extra mas sem a escolha, ainda nada de lembrete', !(await body()).includes('Entrou um valor extra'));
     await tabByName('Metas').click(); await waitText('Você consegue guardar algum valor por mês?');
-    await btn('Agora não').click(); await waitText('Tudo bem. Muita gente começa com valores pequenos'); await p.waitForTimeout(400);
+    await btn('Não consigo agora').click(); await waitText('Tudo bem. Muita gente começa com valores pequenos'); await p.waitForTimeout(400);
     ok('Valor extra: a reserva mínima explica que dá para salvar só essa escolha', (await body()).includes('Dá para salvar só essa escolha.') && (await visibleCount('button', 'Criar reserva mínima')) === 1);
     await radio('Guardar quando entrar um valor extra').click(); await p.waitForTimeout(300);
     ok('Valor extra: só "Guardar quando entrar um valor extra" troca o botão para "Lembrar quando entrar um valor extra"', (await visibleCount('button', 'Lembrar quando entrar um valor extra')) === 1 && (await visibleCount('button', 'Criar reserva mínima')) === 0);

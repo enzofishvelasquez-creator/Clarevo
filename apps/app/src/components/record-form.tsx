@@ -21,6 +21,7 @@ import {
   NOTA_PAYMENT_TEXT,
   NOTA_TEXT,
   NO_CATEGORY_LABEL,
+  RECORD_TEXT,
   RETURN_TEXT,
   canReadSefazPage,
   accountForPaymentForms,
@@ -1092,10 +1093,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     if (mode.type === 'novo') {
       // Só quem tem cartão ativo tem o que lembrar: a escolha vale só neste aparelho.
       if (cardMode && userId && activeCards.length > 0) updatePrefs(userId, { lastPayment: 'dinheiro' }, persistPrefs);
-      flash.set(withNotice(kind === 'despesa' ? 'Gasto salvo' : 'Recebimento salvo', notice));
+      flash.set(withNotice(RECORD_TEXT.saved(kind), notice));
       leave(() => router.replace(`/registro/${recordId}`));
     } else {
-      flash.set(withNotice('Alterações salvas', notice));
+      flash.set(withNotice(RECORD_TEXT.updated, notice));
       leave(goBack);
     }
   };
@@ -1507,10 +1508,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               {ERROR_TEXT.versao_desatualizada}
             </Txt>
             <MoneyTxt variant="caption">
-              {`Versão atual: ${conflict.description} · ${formatBRL(conflict.amountCents)} · ${formatDateBR(conflict.occurredOn)}`}
+              {`Como está agora: ${conflict.description} · ${formatBRL(conflict.amountCents)} · ${formatDateBR(conflict.occurredOn)}`}
             </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={applyOverConflict} />
+            <Button label="Usar o que preenchi" tone="soft" onPress={applyOverConflict} />
             <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(goBack)} />
           </Banner>
         ) : null}
@@ -1669,7 +1670,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
                     <Txt variant="label" color={colors.error}>
                       {ERROR_TEXT.carregar_falhou}
                     </Txt>
-                    <Button label="Tentar novamente" tone="soft" onPress={() => cards.refetch()} />
+                    <Button label="Tentar de novo" tone="soft" onPress={() => cards.refetch()} />
                   </Banner>
                 ) : activeCards.length === 0 ? (
                   <Banner tone="info" icon={Info} live={false}>
@@ -1900,7 +1901,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
                 style={styles.save}
               />
               <Button
-                label={banner && !conflict ? 'Tentar novamente' : RETURN_TEXT.save}
+                label={banner && !conflict ? 'Tentar de novo' : RETURN_TEXT.save}
                 busy={busy}
                 busyLabel="Salvando…"
                 onPress={() => submit()}
@@ -1911,7 +1912,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             <View style={styles.footerRow}>
               <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
               <Button
-                label={banner && !conflict ? 'Tentar novamente' : cardPurchase ? CARDS_TEXT.expense.save : copy.save}
+                label={banner && !conflict ? 'Tentar de novo' : cardPurchase ? CARDS_TEXT.expense.save : copy.save}
                 busy={busy}
                 busyLabel="Salvando…"
                 onPress={() => submit()}

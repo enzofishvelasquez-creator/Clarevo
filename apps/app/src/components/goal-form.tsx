@@ -333,9 +333,9 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
             <Txt variant="label" color={colors.error}>
               {GOAL_ERROR_TEXT.versao_desatualizada}
             </Txt>
-            <MoneyTxt variant="caption">{`Versão atual: ${goal.name} · ${formatBRL(goal.targetCents)}`}</MoneyTxt>
+            <MoneyTxt variant="caption">{`Como está agora: ${goal.name} · ${formatBRL(goal.targetCents)}`}</MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={submit} />
+            <Button label="Usar o que preenchi" tone="soft" onPress={submit} />
             <Button label="Descartar minhas alterações" tone="ghost" onPress={() => guard.leave(() => (router.canGoBack() ? router.back() : router.replace(`/meta/${goal.id}`)))} />
           </Banner>
         ) : null}

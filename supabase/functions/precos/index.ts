@@ -671,7 +671,7 @@ const __mods = [
             fora_da_oferta: (on) => `Este título, com este vencimento, não está entre os ofertados pelo Tesouro Nacional em ${(0, dates_1.formatDateBR)(on)}. Confira o vencimento em Editar ou atualize pelo extrato.`,
             sem_cnpj: 'Informe o CNPJ do fundo em Editar para buscar a cota publicada pela CVM.',
             subclasses: 'Este CNPJ tem mais de uma subclasse, cada uma com a sua cota. Atualize pelo extrato.',
-            nao_encontrado: 'Não achamos a cota deste CNPJ no Informe Diário da CVM dos dois últimos meses. Confira o CNPJ em Editar ou atualize pelo extrato.',
+            nao_encontrado: 'A Clarevo não achou a cota deste CNPJ no Informe Diário da CVM dos dois últimos meses. Confira o CNPJ em Editar ou atualize pelo extrato.',
         },
     };
   },

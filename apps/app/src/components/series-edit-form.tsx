@@ -666,7 +666,7 @@ export function SeriesEditForm({
           ) : null}
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
-            <Button label={retry ? 'Tentar novamente' : 'Salvar alterações'} busy={busy} busyLabel="Salvando…" onPress={submit} style={styles.save} />
+            <Button label={retry ? 'Tentar de novo' : 'Salvar alterações'} busy={busy} busyLabel="Salvando…" onPress={submit} style={styles.save} />
           </View>
         </View>
       </View>

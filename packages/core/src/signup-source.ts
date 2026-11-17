@@ -86,7 +86,7 @@ export const SIGNUP_SOURCE_TEXT = {
   /** O título do cartão do Resumo e do card de Conta. */
   title: 'Como você conheceu a Clarevo?',
   /** A linha curta ao lado: o que é, para que serve e que é opcional. */
-  note: 'Opcional. Usamos só para contar, sem identificar ninguém, de onde as pessoas chegam.',
+  note: 'Opcional. A Clarevo usa só para contar, sem identificar ninguém, de onde as pessoas chegam.',
   /** O nome acessível do grupo de opções. */
   groupA11y: 'Como você conheceu a Clarevo? Escolha uma opção. É opcional.',
   /** Fecha o cartão por 30 dias. */
@@ -111,7 +111,7 @@ export const SIGNUP_SOURCE_TEXT = {
   changedElsewhere: 'Sua resposta mudou em outro aparelho. A tela foi atualizada; escolha de novo se quiser mudar.',
   failed: ERROR_TEXT.salvar_falhou,
   /** Resultado incerto (a conexão caiu): repetir é seguro. */
-  uncertain: 'Não deu para confirmar se salvou. Toque de novo: repetir é seguro.',
+  uncertain: 'Não foi possível confirmar se salvou. Toque de novo: repetir é seguro.',
   /** Códigos de recusa que a tela explica; o resto usa a falha genérica. */
   errors: {
     versao_desatualizada: 'Sua resposta mudou em outro aparelho. A tela foi atualizada; escolha de novo se quiser mudar.',

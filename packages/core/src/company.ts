@@ -449,7 +449,7 @@ export const ENTRY_INVITE_TEXT = {
   label: 'Link do convite',
   fieldHint: 'Cole o link que o RH enviou. O convite mostra a empresa e o plano antes de você criar a conta ou entrar.',
   submit: 'Ver convite',
-  invalid: 'Não encontramos um convite neste texto. Confira o link que você recebeu.',
+  invalid: 'Não há um convite neste texto. Confira o link que você recebeu.',
 } as const;
 
 /** Uma pessoa e o link dela. */
@@ -515,7 +515,7 @@ export const COMPANY_TEXT = {
   webOnly: 'O painel da empresa está disponível só na web. Abra o app da Clarevo no navegador para usá-lo.',
   notAdmin: `Esta área é para quem administra o benefício de uma empresa. Se a sua empresa contratou a Clarevo e você administra o benefício, escreva para ${SUPPORT_EMAIL}.`,
   loading: 'Carregando o painel…',
-  loadFailed: 'Não foi possível carregar o painel. Tente novamente.',
+  loadFailed: 'Não foi possível carregar o painel. Tente de novo.',
   demoBadge: 'Demonstração: empresa e pessoas fictícias. Nada é gravado fora deste aparelho.',
   demoOrganization: 'Empresa Exemplo (demonstração)',
   organizationChoose: 'Empresa',
@@ -716,7 +716,7 @@ export const BENEFIT_TEXT = {
   pasteLabel: 'Link do convite da empresa',
   pasteHint: 'Cole o link que o RH enviou.',
   pasteSubmit: 'Ver convite',
-  pasteInvalid: 'Não encontramos um convite da empresa neste texto. Confira o link que você recebeu.',
+  pasteInvalid: 'Não há um convite da empresa neste texto. Confira o link que você recebeu.',
   organization: 'Empresa',
   plan: 'Plano',
   since: 'Desde',
@@ -744,10 +744,10 @@ export const COMPANY_ERROR_TEXT = {
   licenca_nao_ativa: 'Esta licença já não está ativa. Atualize a tela.',
   convite_invalido: BENEFIT_TEXT.invalid,
   ja_tem_licenca: BENEFIT_TEXT.alreadyHave,
-  sem_permissao: 'Você não tem permissão para esta ação.',
+  sem_permissao: 'Só quem administra o benefício da empresa pode fazer isto.',
   nao_encontrado: 'Esta empresa ou esta licença não está mais disponível. Atualize a tela.',
   chave_reutilizada: ERROR_TEXT.salvar_falhou,
-  rede: 'Sem conexão no momento. Tente novamente.',
+  rede: 'Sem conexão no momento. Tente de novo.',
   salvar_falhou: ERROR_TEXT.salvar_falhou,
   carregar_falhou: ERROR_TEXT.carregar_falhou,
 } as const;

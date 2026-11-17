@@ -1,5 +1,6 @@
 import {
   ERROR_TEXT,
+  UNCERTAIN_TEXT,
   INVESTMENT_NOTE_MAX,
   INVESTMENT_TEXT,
   applyInvestmentChange,
@@ -68,7 +69,7 @@ export default function InvestimentoMovimentoScreen() {
         ) : one.isSuccess && movements.isSuccess ? (
           <Card style={{ gap: space[3] }}>
             <Txt>{INVESTMENT_TEXT.errors.notFound}</Txt>
-            <Button label="Ir para Investimentos" onPress={() => router.replace('/investimentos')} />
+            <Button label="Ir para Investir" onPress={() => router.replace('/investimentos')} />
           </Card>
         ) : (
           <LoadingState />
@@ -126,7 +127,7 @@ function MovementForm({
       return;
     }
     if (code === 'versao_desatualizada' || code === 'chave_reutilizada') invalidate();
-    setError(code === 'chave_reutilizada' ? 'Pode ser que já tenha sido salvo. Confira o histórico antes de tentar de novo.' : investmentErrorText(code));
+    setError(code === 'chave_reutilizada' ? UNCERTAIN_TEXT.investimentos : investmentErrorText(code));
   };
 
   async function submit() {

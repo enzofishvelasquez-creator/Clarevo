@@ -45,7 +45,7 @@ export function ProfileAvatar({
 
 /**
  * Em Conta, embaixo do nome: "Pôr uma foto" (ou "Trocar a foto") abre a escolha entre a galeria e a câmera (só no celular) e, com foto,
- * "Tirar a foto". Na demonstração, a foto fica só na memória do app aberto, como o resto.
+ * "Remover a foto". Na demonstração, a foto fica só na memória do app aberto, como o resto.
  */
 export function ProfilePhotoActions() {
   const photo = useMyPhoto();

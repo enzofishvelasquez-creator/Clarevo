@@ -2,6 +2,7 @@ import {
   ACCOUNTS_TEXT,
   CATEGORIES,
   COMMITMENT_ERROR_TEXT,
+  COMMITMENT_NOTICE_TEXT,
   MAX_RECORD_CENTS,
   NO_CATEGORY_LABEL,
   PAYMENT_ERROR_TEXT,
@@ -222,7 +223,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
     if (first) refs[first].current?.focus();
   };
 
-  const finish = (saved?: { amountCents: number; occurredOn: string }, text = 'Pagamento registrado') => {
+  const finish = (saved?: { amountCents: number; occurredOn: string }, text: string = COMMITMENT_NOTICE_TEXT.paid) => {
     // Confirmação tátil e efeito em Pago só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (saved) totalChange.set({ total: 'pago', month: monthOf(saved.occurredOn), deltaCents: saved.amountCents });
@@ -266,7 +267,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
   /** Depois do pagamento confirmado: com a caixa marcada, tira as outras parcelas e mostra o texto certo. */
   const afterPayment = async (saved: { amountCents: number; occurredOn: string } | undefined, plan: WholeYearPayment | null, notice: string | null = null) => {
     if (!plan) {
-      finish(saved, withNotice('Pagamento registrado', notice));
+      finish(saved, withNotice(COMMITMENT_NOTICE_TEXT.paid, notice));
       return;
     }
     finish(saved, withNotice(await skipOthers(plan), notice));
@@ -456,10 +457,10 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
               {COMMITMENT_ERROR_TEXT.versao_desatualizada}
             </Txt>
             <MoneyTxt variant="caption">
-              {`Versão atual: ${shown.description} · previsto ${formatBRL(shown.amountCents)} · vence em ${formatListDate(shown.dueOn, today)}`}
+              {`Como está agora: ${shown.description} · previsto ${formatBRL(shown.amountCents)} · vence em ${formatListDate(shown.dueOn, today)}`}
             </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Confirmar pagamento na versão atual" tone="soft" onPress={() => submit()} />
+            <Button label="Confirmar pagamento" tone="soft" onPress={() => submit()} />
           </Banner>
         ) : null}
         {paidElsewhere ? (
@@ -623,7 +624,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
             <Button
-              label={retry ? 'Tentar novamente' : 'Confirmar pagamento'}
+              label={retry ? 'Tentar de novo' : 'Confirmar pagamento'}
               busy={busy}
               busyLabel="Salvando…"
               disabled={paidElsewhere}

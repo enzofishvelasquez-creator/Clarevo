@@ -27,7 +27,7 @@ export function useLegalAcceptance(enabled: boolean) {
 
 /**
  * Aceite dos termos e da política (A1): por cima do app, uma vez, para quem ainda não aceitou a versão vigente (contas criadas antes
- * do registro do aceite, ou uma versão nova que peça novo aceite, A5). "Concordo e continuar" ou "Sair da conta"; quem não concorda pode
+ * do registro do aceite, ou uma versão nova que peça novo aceite, A5). "Concordar e continuar" ou "Sair da conta"; quem não concorda pode
  * exportar os dados e excluir a conta (Termos, seção 8), e nessas duas telas o aviso sai da frente. Os links abrem as páginas do site
  * (quando há endereço do site). Espera o app destravar (biometria). Se a leitura do aceite falhar, nada aparece: o aceite não pode
  * travar o app por uma falha de rede.

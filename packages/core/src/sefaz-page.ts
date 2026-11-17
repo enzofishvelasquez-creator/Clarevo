@@ -434,7 +434,7 @@ export const SEFAZ_TEXT = {
   reading: 'Lendo a página da Sefaz…',
   readingA11y: 'Lendo a página da Sefaz para trazer loja, valor e data',
   done: 'Loja, valor e data lidos da página da Sefaz. Confira antes de salvar.',
-  failed: 'Não deu para ler a página da Sefaz. Confira o valor no cupom.',
+  failed: 'Não foi possível ler a página da Sefaz. Confira o valor no cupom.',
   differentNote: 'A página da Sefaz é de outra nota. Confira o valor no cupom.',
   notFound: 'A Sefaz ainda não mostra esta nota. Confira o valor no cupom.',
   webOnlyLink: 'Neste navegador, a página da Sefaz não pode ser lida pela Clarevo. Abra a nota no site da Sefaz e digite o total.',

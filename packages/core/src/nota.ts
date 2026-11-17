@@ -807,13 +807,13 @@ export function exampleReceiptQr(month: IsoMonth): string {
 
 export const NOTA_ERROR_TEXT: Record<ReceiptErrorCode, string> = {
   vazio: 'Cole o link do QR da nota ou a chave de acesso, com 44 caracteres.',
-  codigo_nao_reconhecido: 'Não reconhecemos este código como de uma nota fiscal. Escaneie o QR da nota ou o código de barras da chave, ou cole o link ou a chave.',
+  codigo_nao_reconhecido: 'A Clarevo não reconheceu este código como de uma nota fiscal. Escaneie o QR da nota ou o código de barras da chave, ou cole o link ou a chave.',
   chave_invalida: 'A chave de acesso tem 44 caracteres. Confira se não faltou ou sobrou algum.',
   digito_invalido: 'A chave não confere. Confira os números ou escaneie de novo.',
   uf_invalida: 'Esta chave não parece ser de uma nota fiscal. Confira os números ou escaneie de novo.',
   data_invalida: 'Esta chave não parece ser de uma nota fiscal. Confira os números ou escaneie de novo.',
   cnpj_invalido: 'Esta chave não parece ser de uma nota fiscal. Confira os números ou escaneie de novo.',
-  modelo_nao_suportado: 'Esta chave é de outro tipo de documento. Por enquanto lemos NF-e e NFC-e.',
+  modelo_nao_suportado: 'Esta chave é de outro tipo de documento. Por enquanto, a Clarevo lê NF-e e NFC-e.',
 };
 
 /** Mensagem do erro de leitura (código desconhecido cai no texto genérico). */
@@ -835,7 +835,7 @@ export const NOTA_TEXT = {
   keyPhoto: 'Ler a chave numa foto',
   keyPhotoHint: 'Tire uma foto só da chave de acesso (os 44 números da nota), bem de perto e sem reflexo.',
   keyPhotoWorking: 'Lendo a foto aqui no aparelho. Pode levar alguns segundos…',
-  keyPhotoNone: 'Não achamos a chave de acesso nesta foto. Tente mais de perto, só a linha dos números, ou digite a chave.',
+  keyPhotoNone: 'A chave de acesso não apareceu nesta foto. Tente mais de perto, só a linha dos números, ou digite a chave.',
   pasteAction: 'Usar',
   pdfButton: 'Ler o PDF da nota',
   pdfHint: 'Escolha o PDF da nota fiscal (o DANFE que a loja enviou). A leitura é feita aqui no aparelho e o arquivo não sai dele.',
@@ -853,8 +853,8 @@ export const NOTA_TEXT = {
   /** Nota de exemplo fictícia, só na demonstração e no e2e. */
   example: { button: 'Usar nota de exemplo', note: 'Nota de exemplo fictícia, só para conhecer o recurso.' },
   chooseDay: 'Escolha o dia da compra',
-  filled: 'Preenchemos o que a nota informa. Confira e toque em Salvar.',
-  privacy: 'Guardamos só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guardamos CPF, a chave nem o link.',
+  filled: 'A Clarevo preencheu o que a nota informa. Confira e toque em Salvar.',
+  privacy: 'A Clarevo guarda só um resumo da chave de acesso da nota, para avisar se ela for lida de novo. Não guarda CPF, a chave nem o link.',
   testNote: 'Esta é uma nota de teste, sem valor fiscal.',
   futureMonth: 'Esta chave é de um mês que ainda não chegou. Confira os números.',
   summary: (uf: string, when: string): string => `Nota fiscal do ${uf}, emitida em ${when}`,
@@ -864,8 +864,8 @@ export const NOTA_TEXT = {
   alreadyNotedCard: (date: IsoDate, description: string, cents: Cents, cardName: string): string =>
     `Esta nota já foi anotada em ${formatDateBR(date)} no cartão ${cardName}: ${description}, ${formatBRL(cents)}.`,
   pdf: {
-    noText: 'Não encontramos texto neste PDF. Ele pode ser uma foto da nota. Tente escanear o código de barras da chave ou colar a chave.',
-    noKey: 'Não encontramos a chave de acesso neste PDF. Confira se é o PDF da nota fiscal (o DANFE).',
+    noText: 'Este PDF não tem texto para ler. Ele pode ser uma foto da nota. Tente escanear o código de barras da chave ou colar a chave.',
+    noKey: 'A chave de acesso não apareceu neste PDF. Confira se é o PDF da nota fiscal (o DANFE).',
     /** NFS-e (D-079): lida por Ler comprovante de Pix ou pagamento, na mesma lista. */
     serviceNote: 'Esta é uma nota de serviço. Para lê-la, use Ler comprovante ou boleto, nesta mesma lista.',
     tooBig: 'Este PDF é grande demais para ler aqui. Tente escanear o código de barras da chave ou colar a chave.',

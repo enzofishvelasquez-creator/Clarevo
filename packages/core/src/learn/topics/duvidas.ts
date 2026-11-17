@@ -108,7 +108,7 @@ export const DUVIDAS_TOPICS: Topic[] = [
     short:
       'Se você anotou um gasto e também marcou a conta a pagar como paga, o valor entrou duas vezes em Pago. Exclua o gasto anotado à parte e mantenha o da conta.',
     paragraphs: [
-      'O gasto criado pela conta paga mostra Origem: Conta a pagar. O outro pode ser excluído no detalhe dele, em Excluir registro.',
+      'O gasto criado pela conta paga mostra Ligado a: Conta a pagar. O outro pode ser excluído no detalhe dele, em Excluir gasto.',
       'Se você anotou o pagamento como gasto e a conta ficou em aberto, exclua a conta a pagar (num gasto fixo, só a conta daquele mês).',
       'Com cartão, anote as compras ou a fatura, nunca as duas.',
     ],

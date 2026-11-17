@@ -28,8 +28,10 @@ const CONTEXT_LEAD = /^(Salvando|Importando) em /;
 
 /**
  * Texto da pílula de contexto do cabeçalho compacto. Fora da demonstração, o texto recebido. Na demonstração, "Demonstração · " e o
- * contexto ("Salvando em Pessoal" e "Pessoal" viram "Demonstração · Pessoal"; "Família", "Demonstração · Família").
+ * contexto ("Salvando em Pessoal" e "Pessoal" viram "Demonstração · Pessoal"; "Família", "Demonstração · Família"). Nas abas (`inTab`),
+ * o selo "Demonstração" já fica ao lado do logotipo (ou na barra lateral): a pílula diz só o contexto, sem repetir o selo (revisão de
+ * 16/11/2026: Metas e Investir mostravam "Demonstração" e "Demonstração · Pessoal" juntos).
  */
-export function contextPillText(label: string, demo: boolean): string {
-  return demo ? DEMO_TEXT.pill(label.replace(CONTEXT_LEAD, '')) : label;
+export function contextPillText(label: string, demo: boolean, inTab = false): string {
+  return demo && !inTab ? DEMO_TEXT.pill(label.replace(CONTEXT_LEAD, '')) : label;
 }

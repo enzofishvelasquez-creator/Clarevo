@@ -264,7 +264,7 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
             <Button
-              label={retry ? 'Tentar novamente' : 'Informar valor'}
+              label={retry ? 'Tentar de novo' : 'Informar valor'}
               busy={busy}
               busyLabel="Salvando…"
               disabled={!plan || (!plan.ok && !retry)}

@@ -156,7 +156,7 @@ describe('CSV de lançamentos (D-047)', () => {
     const csv = buildRecordsCsv(rows);
     expect(csv.charCodeAt(0)).toBe(0xfeff);
     expect(new TextEncoder().encode(csv).slice(0, 3)).toEqual(new Uint8Array([0xef, 0xbb, 0xbf]));
-    expect(csv.slice(1).split(CSV_EOL)[0]).toBe('Data;Tipo;Descrição;Categoria;Valor (R$);Conta de origem;Origem;Mês do resumo');
+    expect(csv.slice(1).split(CSV_EOL)[0]).toBe('Data;Tipo;Descrição;Categoria;Valor (R$);Banco ou carteira;Origem;Mês do resumo');
     expect(CSV_RECORD_HEADER).toHaveLength(8);
     expect(csv.endsWith(CSV_EOL)).toBe(true);
     expect(csv.split(CSV_EOL)).toHaveLength(rows.length + 2);

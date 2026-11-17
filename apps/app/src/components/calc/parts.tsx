@@ -1,5 +1,6 @@
 import {
   CALC_DISCLAIMER,
+  calcDisclaimer,
   CALC_UI_TEXT,
   MAX_RECORD_CENTS,
   calcErrorText,
@@ -49,7 +50,7 @@ export function CalcScreen({ slug, modo, children }: { slug: CalcSlug; modo?: st
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={calcTitle(slug, modo)} onBack={() => (router.canGoBack() ? router.back() : router.replace('/calcular'))} help={calcHelp(slug)} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
-        <CalcDisclaimer />
+        <CalcDisclaimer slug={slug} />
         {children}
         {/* Aberta por um link de contexto ou pelo endereço: a lista fica a um toque (volta para ela se já estiver na pilha). */}
         <LinkButton label={CALC_UI_TEXT.seeAll} style={styles.link48} onPress={() => router.dismissTo('/calcular')} />
@@ -79,13 +80,13 @@ export function useOpenedOverForm(): boolean {
   return over;
 }
 
-/** Aviso fixo (CALC_DISCLAIMER), sem animação nem anúncio a cada mudança: é parte da tela. */
-export function CalcDisclaimer() {
+/** Aviso fixo (CALC_DISCLAIMER, ou o da calculadora: calcDisclaimer), sem animação nem anúncio a cada mudança: é parte da tela. */
+export function CalcDisclaimer({ slug }: { slug?: CalcSlug } = {}) {
   return (
     <View style={styles.disclaimer}>
       <Info size={18} color={colors.brandText} style={{ marginTop: 1 }} aria-hidden />
       <Txt variant="caption" style={{ flex: 1 }}>
-        {CALC_DISCLAIMER}
+        {slug ? calcDisclaimer(slug) : CALC_DISCLAIMER}
       </Txt>
     </View>
   );

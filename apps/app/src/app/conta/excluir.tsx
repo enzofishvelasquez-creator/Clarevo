@@ -144,7 +144,7 @@ export default function ExcluirContaScreen() {
           ) : family.isError ? (
             <>
               <Txt color={colors.textSecondary}>{FAMILY_TEXT.loadFailed}</Txt>
-              <LinkButton label="Tentar novamente" onPress={() => family.refetch()} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+              <LinkButton label="Tentar de novo" onPress={() => family.refetch()} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
             </>
           ) : (
             <>

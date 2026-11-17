@@ -62,7 +62,7 @@ export default function NovaSenha() {
     } catch (e) {
       if (e instanceof AuthError && e.code === 'senha_fraca') setError(PASSWORD_RULE);
       else if (e instanceof AuthError && e.code === 'sem_sessao') setBanner('O link expirou ou já foi usado.');
-      else setBanner('Não foi possível salvar a nova senha. Tente novamente.');
+      else setBanner('Não foi possível salvar a nova senha. Tente de novo.');
     } finally {
       setBusy(false);
     }

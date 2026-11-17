@@ -2,8 +2,10 @@ import {
   ACCOUNTS_TEXT,
   CALC_UI_TEXT,
   COMMITMENT_ERROR_TEXT,
+  COMMITMENT_NOTICE_TEXT,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
+  RECORD_TEXT,
   accountDisplayName,
   addMonths,
   affectedByYear,
@@ -118,12 +120,12 @@ export default function DetalheContaAPagar() {
   const skip = useSkipSeriesYear();
   const skipKeys = useSeriesOperationKey();
   /**
-   * Tirar com resultado incerto: o plano enviado (para a faixa de sucesso) e o botão "Tentar novamente" na faixa de erro.
+   * Tirar com resultado incerto: o plano enviado (para a faixa de sucesso) e o botão "Tentar de novo" na faixa de erro.
    * O botão não depende do plano atual: se a escrita foi gravada, as listas recarregadas já não têm parcelas do ano em
    * aberto, e o diálogo de confirmação some.
    */
   const skipAttempt = useRef<Extract<YearPlan, { ok: true }> | null>(null);
-  /** Texto da faixa de resultado incerto, com "Tentar novamente" (null: nada pendente). */
+  /** Texto da faixa de resultado incerto, com "Tentar de novo" (null: nada pendente). */
   const [skipFailed, setSkipFailed] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
@@ -162,7 +164,7 @@ export default function DetalheContaAPagar() {
       setConfirming(null);
       flash.set(
         !ref
-          ? 'Conta a pagar excluída'
+          ? COMMITMENT_NOTICE_TEXT.deleted
           : annual
             ? annual.k === 1
               ? `Conta de ${annual.label} excluída. A conta do ano continua nos outros anos.`
@@ -197,7 +199,7 @@ export default function DetalheContaAPagar() {
       // Chave nova: um próximo desfazer (depois de pagar de novo) é outra operação.
       undoKey.current = newOperationKey();
       setConfirming(null);
-      setNotice('Pagamento desfeito');
+      setNotice(COMMITMENT_NOTICE_TEXT.undone);
       totalChange.set({ total: 'pago', month: monthOf(paid.paidOn), deltaCents: -paid.amountCents });
     } catch (e) {
       setConfirming(null);
@@ -223,7 +225,7 @@ export default function DetalheContaAPagar() {
 
   /**
    * "Tirar todas as parcelas de 2027 em aberto" (skip_series_year): saem de uma vez e não voltam. Resultado incerto (rede):
-   * confere na hora com findSeriesOperation se a escrita foi gravada; se a conferência também falhar, "Tentar novamente"
+   * confere na hora com findSeriesOperation se a escrita foi gravada; se a conferência também falhar, "Tentar de novo"
    * confere de novo antes de repetir, e a repetição usa a mesma chave.
    */
   const doSkip = async () => {
@@ -232,7 +234,7 @@ export default function DetalheContaAPagar() {
     const label = current?.year.label ?? skipAttempt.current?.year.label ?? annual?.label ?? '';
     setActionError(null);
     setSkipping(true);
-    const failed = `Não foi possível tirar as parcelas de ${label}. Tente novamente.`;
+    const failed = `Não foi possível tirar as parcelas de ${label}. Tente de novo.`;
     const done = (text: string) => {
       skipKeys.settled();
       skipAttempt.current = null;
@@ -298,7 +300,7 @@ export default function DetalheContaAPagar() {
           }
         } catch {
           // A conferência também falhou: recarregar para não mostrar como aberta uma parcela que pode já ter saído.
-          // "Tentar novamente" confere de novo antes de repetir.
+          // "Tentar de novo" confere de novo antes de repetir.
           reloadAll();
         }
         setSkipFailed(failed);
@@ -386,7 +388,7 @@ export default function DetalheContaAPagar() {
                   <Txt variant="label" color={colors.error} accessibilityLabel={yearA11yLabel(skipFailed)}>
                     {skipFailed}
                   </Txt>
-                  <Button label="Tentar novamente" tone="soft" busy={skipping} busyLabel="Aguarde…" onPress={doSkip} />
+                  <Button label="Tentar de novo" tone="soft" busy={skipping} busyLabel="Aguarde…" onPress={doSkip} />
                 </Banner>
               ) : null}
 
@@ -449,7 +451,7 @@ export default function DetalheContaAPagar() {
                       <Row label={ACCOUNTS_TEXT.out} value={accountDisplayName(allAccounts.data ?? personal?.accounts ?? [], paid.accountId)} />
                     </>
                   ) : null}
-                  <Row label="Resumo afetado" value={affected} last />
+                  <Row label={RECORD_TEXT.monthRow} value={affected} last />
                 </View>
                 <View style={styles.trail} accessible>
                   <Txt variant="caption" color={colors.textSecondary}>
@@ -542,7 +544,7 @@ export default function DetalheContaAPagar() {
               ) : (
                 <>
                   <Button label="Já paguei" icon={Check} onPress={() => router.push(`/a-pagar/${c.id}/pagar`)} />
-                  {notice === 'Conta a pagar salva' ? (
+                  {notice?.split('\n')[0] === COMMITMENT_NOTICE_TEXT.saved ? (
                     <Button label="Anotar outra conta a pagar" icon={Plus} tone="soft" onPress={() => router.replace('/a-pagar/nova')} />
                   ) : null}
                   <Button
@@ -580,7 +582,7 @@ export default function DetalheContaAPagar() {
                 onCancel={() => setConfirming(null)}
                 onConfirm={doDelete}>
                 <MoneyTxt style={{ fontFamily: fonts.bold }}>
-                  {`${c.description} · ${formatBRL(c.amountCents)} · vence em ${formatListDate(c.dueOn, today)} · Pessoal`}
+                  {`${c.description} · ${formatBRL(c.amountCents)} · vence em ${formatListDate(c.dueOn, today)} · ${by.contextName}`}
                 </MoneyTxt>
                 {ref ? (
                   <Txt color={colors.textSecondary}>
@@ -664,7 +666,7 @@ export default function DetalheContaAPagar() {
                   onCancel={() => setConfirming(null)}
                   onConfirm={doUndo}>
                   <MoneyTxt style={{ fontFamily: fonts.bold }}>
-                    {`${c.description} · ${formatBRL(paid.amountCents)} pago em ${formatDateBR(paid.paidOn)} · Pessoal`}
+                    {`${c.description} · ${formatBRL(paid.amountCents)} pago em ${formatDateBR(paid.paidOn)} · ${by.contextName}`}
                   </MoneyTxt>
                   <Txt color={colors.textSecondary}>
                     O gasto registrado será excluído e deixa de contar em Pago de {formatMonthBR(monthOf(paid.paidOn)).toLowerCase()}. A conta a

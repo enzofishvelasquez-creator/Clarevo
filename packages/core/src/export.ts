@@ -66,7 +66,8 @@ export const EXPORT_TEXT = {
   /** Entrada em Conta. */
   entry: 'Exportar meus dados',
   entryHint: 'Planilha (CSV) ou resumo em PDF dos seus gastos e recebimentos',
-  entryA11y: 'Exportar meus dados. Abre a tela para gerar uma planilha ou um resumo em PDF.',
+  /** O nome acessível começa pelo texto visível do botão (WCAG 2.5.3). */
+  entryA11y: 'Escolher período e formato para exportar meus dados, em planilha ou resumo em PDF',
   entryButton: 'Escolher período e formato',
   /** Tela. */
   title: 'Exportar meus dados',
@@ -91,7 +92,7 @@ export const EXPORT_TEXT = {
   } as Readonly<Record<ExportFormat, string>>,
   contentTitle: 'O que vai no arquivo',
   contentCsv:
-    'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Conta de origem, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga. Os movimentos dos investimentos vão em um terceiro.',
+    'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Banco ou carteira, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga. Os movimentos dos investimentos vão em um terceiro.',
   contentPdf:
     'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga. Os investimentos aparecem no fim, também fora de Pago e de Recebido.',
   notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do espaço Pessoal.',
@@ -102,7 +103,7 @@ export const EXPORT_TEXT = {
   biometricPrompt: 'Confirme para exportar seus dados',
   biometricCancelled: 'Exportação cancelada. Nada foi gerado.',
   biometricFailed: 'Não foi possível confirmar agora. Nada foi gerado.',
-  loadFailed: 'Não foi possível ler seus registros agora. Tente novamente.',
+  loadFailed: 'Não foi possível ler seus registros agora. Tente de novo.',
   tooMany: 'Este período tem mais de 20.000 linhas. Escolha um período menor.',
   emptyTitle: 'Nada para exportar',
   emptyBody: 'Não há gasto, recebimento nem compra no cartão neste período. Escolha outro período.',
@@ -130,7 +131,7 @@ export const EXPORT_TEXT = {
     native: 'Pronto. O arquivo temporário é apagado na próxima exportação ou quando esta tela é aberta.',
   },
   pdfOpened: 'A página de impressão foi aberta. Escolha "Salvar como PDF" ou imprima.',
-  shareFailed: 'Não foi possível compartilhar o arquivo. Tente novamente.',
+  shareFailed: 'Não foi possível compartilhar o arquivo. Tente de novo.',
   shareUnavailable: 'Este aparelho não consegue compartilhar arquivos.',
   popupBlocked: 'O navegador bloqueou a janela de impressão. Permita janelas para este site e tente de novo.',
   newFile: 'Escolher outro período ou formato',
@@ -307,7 +308,7 @@ export const CSV_SEPARATOR = ';';
 /** Fim de linha do Excel. */
 export const CSV_EOL = '\r\n';
 
-export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Valor (R$)', 'Conta de origem', 'Origem', 'Mês do resumo'];
+export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Valor (R$)', 'Banco ou carteira', 'Origem', 'Mês do resumo'];
 export const CSV_PURCHASE_HEADER: readonly string[] = ['Data da compra', 'Cartão', 'Descrição', 'Categoria', 'Valor total (R$)', 'Parcelas'];
 /** Investimentos (D-099): um movimento por linha, com o investimento, a ficha e o tipo do rendimento. */
 export const CSV_INVESTMENT_HEADER: readonly string[] = ['Data', 'Investimento', 'Tipo', 'Instituição', 'Movimento', 'Valor (R$)', 'Tipo do rendimento', 'Observação'];

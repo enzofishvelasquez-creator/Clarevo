@@ -86,7 +86,7 @@ export const COMPANY_REPORT_TEXT = {
   pdfButton: 'Baixar relatório em PDF',
   csvDone: 'Relatório baixado. Confira a pasta de downloads.',
   pdfOpened: 'A página de impressão foi aberta. Escolha "Salvar como PDF" ou imprima.',
-  failed: 'Não foi possível baixar o relatório. Tente novamente.',
+  failed: 'Não foi possível baixar o relatório. Tente de novo.',
   popupBlocked: 'O navegador bloqueou a janela de impressão. Permita janelas para este site e tente de novo.',
   usageLoading: 'Carregando as contagens do painel…',
   usageFailed: 'Não foi possível carregar as contagens. Atualize o painel para baixar o relatório.',

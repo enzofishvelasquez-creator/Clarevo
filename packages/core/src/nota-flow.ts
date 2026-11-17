@@ -35,8 +35,8 @@ export const NOTA_FLOW_TEXT = {
   /** Depois de uns 5 segundos sem ler (D-042): chegar mais perto, até o QR ocupar a moldura. */
   cameraCloser: 'Aproxime até o QR ocupar a moldura.',
   cameraStarting: 'Abrindo a câmera…',
-  cameraUnavailable: 'Não conseguimos usar a câmera neste aparelho. Você pode escolher o PDF da nota ou colar o link ou a chave.',
-  cameraDeniedHelp: 'Para usar a câmera, permita o acesso nos ajustes do aparelho. Você também pode escolher o PDF da nota ou colar o link ou a chave.',
+  cameraUnavailable: 'Não foi possível usar a câmera neste aparelho. Você pode escolher o PDF da nota ou colar o link ou a chave.',
+  cameraDeniedHelp: 'Para usar a câmera, permita o acesso nas configurações do aparelho. Você também pode escolher o PDF da nota ou colar o link ou a chave.',
   torchOn: 'Ligar a lanterna',
   torchOff: 'Desligar a lanterna',
   back: 'Voltar',
@@ -56,7 +56,7 @@ export const NOTA_FLOW_TEXT = {
   /** Valor ou dia que o código não traz (a leitura não falhou). */
   missingValue: 'O valor não vem no código desta nota. Digite o total impresso no cupom.',
   missingDay: (month: IsoMonth): string => `O dia da compra não vem no código desta nota. Escolha o dia em ${formatMonthYearBR(month)}.`,
-  dayAssumed: 'O dia da compra não vem no código desta nota. Usamos o de hoje. Mude se foi outro dia.',
+  dayAssumed: 'O dia da compra não vem no código desta nota, então ficou o de hoje. Mude se foi outro dia.',
   otherMonth: (month: IsoMonth): string => `A nota é de ${formatMonthYearBR(month)}. A data escolhida é de outro mês.`,
   /** NF-e (modelo 55) sem dados da loja além do CNPJ. */
   cnpjOnly: 'O código traz o CNPJ da loja, não o nome. Digite o nome na descrição.',
@@ -70,7 +70,7 @@ export const NOTA_FLOW_TEXT = {
   /** O link para a Sefaz não fica guardado (privacidade): só vale logo depois da leitura e do salvamento. */
   detailRow: 'Nota fiscal',
   detailRowValue: 'Anotada com a leitura da nota',
-  detailNoLink: 'Guardamos só um resumo da chave da nota, não o link. O botão para ver a nota no site da Sefaz aparece logo depois de anotar uma nota lida pelo QR.',
+  detailNoLink: 'A Clarevo guarda só um resumo da chave da nota, não o link. O botão para ver a nota no site da Sefaz aparece logo depois de anotar uma nota lida pelo QR.',
   /** Dica de tela larga/computador. */
   webPdfFirst: 'No computador, o PDF da nota costuma ser o caminho mais fácil.',
   /** Mensagens de carregamento e falha do PDF e da câmera, em voz de aviso (sem alerta). */

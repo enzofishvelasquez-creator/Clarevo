@@ -849,7 +849,7 @@ export const GOAL_ERROR_TEXT = {
   valor_acima_do_limite: 'O valor passa do limite de R$ 9.999.999,99.',
   data_futura: 'Use uma data até hoje. Registre o movimento depois que ele acontecer.',
   observacao_longa: 'Use no máximo 80 caracteres.',
-  versao_desatualizada: 'Esta meta foi alterada em outro aparelho. Confira a versão atual antes de salvar.',
+  versao_desatualizada: 'Esta meta foi alterada em outro aparelho. Confira o que mudou antes de salvar.',
   // Sem "disponível" nos textos de metas (para não confundir com saldo).
   nao_encontrado: 'Esta meta ou este movimento foi excluído. Confira a lista atual.',
   reserva_ja_existe: 'Você já tem uma reserva para imprevistos. Abra a reserva para alterar o valor.',
@@ -1127,7 +1127,7 @@ export const GOALS_TEXT = {
       futureDate: 'Use uma data até hoje. Registre o aporte depois de guardar.',
       saved: 'Aporte registrado.',
       /** O campo vem com o valor planejado por mês da meta (teste de 09/11/2026: "é mais prático eu concordar com o que defini"). */
-      planned: 'Preenchemos com o valor planejado por mês. Pode mudar.',
+      planned: 'Já vem com o valor planejado por mês. Pode mudar.',
     },
     resgate: {
       title: 'Registrar resgate',

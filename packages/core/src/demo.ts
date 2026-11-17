@@ -53,7 +53,7 @@ export const DEMO_EMAIL = 'demo@clarevo.app';
  * - 'padrao': a base de aceite de outubro de 2026 (tudo anotado em 07/10/2026, sem faixa de retorno);
  * - 'retorno': a montagem FICTÍCIA da sequência R do Ciclo A4 (D-030), anotada em 20/05/2026 e aberta em 07/10/2026;
  * - 'assinaturas': a base de aceite, com as duas assinaturas de exemplo cadastradas em 30/06/2026 e nunca revisadas, o que faz o
- *   lembrete "Faz tempo que você não revisa suas assinaturas" (D-046) aparecer em 07/10/2026. Os totais de outubro não mudam.
+ *   lembrete "Que tal revisar suas assinaturas?" (D-046) aparecer em 07/10/2026. Os totais de outubro não mudam.
  * - 'evolucao': a montagem FICTÍCIA do caso de referência da Evolução (D-057, EF §6): de janeiro a junho de 2026, Pago de
  *   R$ 3.200, 3.400, 3.300, 7.800, 3.450 e 3.600 (abril com o "Reparo do carro" de R$ 4.400,00) e Recebido de R$ 5.000, 5.000, sem
  *   registro em março, 5.200, 5.000 e 5.100. Não tem os lançamentos de setembro e outubro da base de aceite (que não vale neste
@@ -92,7 +92,7 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas'.
   let today: string = DEMO_TODAY;
   // Assinatura (D-083): a demonstração aparece no teste grátis, como uma conta nova.
-  const trial = demoTrialAccess();
+  const trial = demoTrialAccess(DEMO_TODAY);
   const repo = new MemoryRepository({
     actorId: 'pessoa-demo',
     displayName: 'Maria Alves',

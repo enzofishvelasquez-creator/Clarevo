@@ -117,12 +117,31 @@ export const NEXT_MONTH_TEXT = {
     // No mês de hoje, o mês seguinte ainda não abre no Resumo: a legenda diz quando ele aparece.
     return today !== undefined && own === monthOf(today) ? `${base} ${firstDayLine(next)}` : base;
   },
-  /** Depois de salvar um recebimento que conta num mês que ainda não começou: "Conta no Recebido de novembro de 2026, que aparece no Resumo a partir de 01/11/2026." */
-  futureNotice: (month: IsoMonth): string => `Conta no Recebido de ${formatMonthYearBR(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
-  /** Na linha da lista, depois da data: "Recebido · 30/10/2026 · conta em novembro". */
-  rowNote: (month: IsoMonth): string => `conta em ${formatMonthYearBR(month).replace(/ de \d{4}$/, '')}`,
+  /** Depois de salvar um recebimento que conta num mês que ainda não começou: "Entra no Recebido de novembro de 2026, que aparece no Resumo a partir de 01/11/2026." */
+  futureNotice: (month: IsoMonth): string => `Entra no Recebido de ${formatMonthYearBR(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
+  /** Na linha da lista, depois da data: "Recebido · 30/10/2026 · entra em novembro". */
+  rowNote: (month: IsoMonth): string => `entra em ${formatMonthYearBR(month).replace(/ de \d{4}$/, '')}`,
   /** No detalhe, depois do mês do resumo: "Novembro de 2026 (mês seguinte)". */
   detailSuffix: ' (mês seguinte)',
+} as const;
+
+/**
+ * Detalhe de um gasto ou recebimento e os avisos depois de salvar ou excluir: cada texto diz o que é ("gasto" ou "recebimento"),
+ * nunca "registro". Os avisos terminam em ponto, como os do núcleo.
+ */
+export const RECORD_TEXT = {
+  saved: (kind: RecordKind): string => (kind === 'despesa' ? 'Gasto salvo.' : 'Recebimento salvo.'),
+  updated: 'Alterações salvas.',
+  edit: (kind: RecordKind): string => (kind === 'despesa' ? 'Editar gasto' : 'Editar recebimento'),
+  remove: (kind: RecordKind): string => (kind === 'despesa' ? 'Excluir gasto' : 'Excluir recebimento'),
+  removeTitle: (kind: RecordKind): string => (kind === 'despesa' ? 'Excluir gasto?' : 'Excluir recebimento?'),
+  removed: (kind: RecordKind): string => (kind === 'despesa' ? 'Gasto excluído.' : 'Recebimento excluído.'),
+  /** Excluir o gasto de uma conta a pagar reabre a conta na mesma operação do banco (D-021, regra 2). */
+  removedReopened: 'Gasto excluído. A conta a pagar voltou para Ainda a pagar.',
+  /** Linha do detalhe: o gasto criado ao pagar uma conta a pagar. */
+  linkedTo: 'Ligado a',
+  /** Linha do detalhe: o mês do Resumo em que o valor entra. */
+  monthRow: 'Entra no mês',
 } as const;
 
 /** Conta a pagar (compromisso previsto). Origem separada; só o gasto gerado ao pagar entra em Pago. */

@@ -42,8 +42,8 @@ export default function RecuperarAcesso() {
       if (err instanceof AuthError && err.code === 'aguarde' && err.retryAfterSeconds) {
         setSent(true);
         setCooldown(err.retryAfterSeconds);
-      } else if (err instanceof AuthError && err.code === 'rede') setBanner('Sem conexão no momento. Seu e-mail foi mantido. Tente novamente.');
-      else setBanner('Não foi possível enviar agora. Tente novamente em instantes.');
+      } else if (err instanceof AuthError && err.code === 'rede') setBanner('Sem conexão no momento. Seu e-mail foi mantido. Tente de novo.');
+      else setBanner('Não foi possível enviar agora. Tente de novo em instantes.');
     } finally {
       setBusy(false);
     }

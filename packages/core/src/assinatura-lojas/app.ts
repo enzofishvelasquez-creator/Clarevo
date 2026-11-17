@@ -95,7 +95,7 @@ export const STORE_SUBSCRIPTION_TEXT = {
   deleteNote: (store: StoreName) =>
     `A sua assinatura é pela ${STORE_LABEL[store]}. Excluir a conta não cancela a cobrança da loja: antes de excluir, cancele a assinatura nos ajustes da ${STORE_LABEL[store]}.`,
   errors: {
-    nao_permitido: 'Compras estão bloqueadas neste aparelho, por exemplo pelo controle dos pais. Libere nos ajustes do aparelho e tente de novo.',
+    nao_permitido: 'Compras estão bloqueadas neste aparelho, por exemplo pelo controle dos pais. Libere nas configurações do aparelho e tente de novo.',
     ja_assinante_loja: 'Esta conta da loja já tem uma assinatura da Clarevo. Toque em Restaurar compras para ligá-la a esta conta.',
     rede: 'Sem conexão com a loja. Confira a internet e tente de novo.',
     indisponivel: 'A assinatura pela loja não está disponível agora. Tente de novo mais tarde.',

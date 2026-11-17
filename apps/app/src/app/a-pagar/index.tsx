@@ -9,6 +9,7 @@ import {
   formatMonthBR,
   groupAnnualLater,
   isRepoError,
+  payFailureReason,
   monthOf,
   newOperationKey,
   payablesStartMonth,
@@ -72,15 +73,8 @@ const QUICK_PAY_ANNOUNCE_DELAY = 500;
 
 const isUncertain = (e: unknown) => !isRepoError(e) || e.code === 'rede' || e.code === 'desconhecido';
 
-/** Motivo curto de uma recusa, depois do nome da conta: "Luz: a conta mudou em outro aparelho." */
-function payReason(e: unknown): string {
-  if (isRepoError(e, 'versao_desatualizada')) return 'a conta mudou em outro aparelho. Confira e tente de novo.';
-  if (isRepoError(e, 'compromisso_quitado')) return 'a conta já foi marcada como paga em outro aparelho.';
-  if (isRepoError(e, 'nao_encontrado')) return 'a conta não está mais disponível.';
-  if (isRepoError(e, 'sem_permissao')) return 'você não tem permissão para esta ação.';
-  if (!isUncertain(e)) return 'não foi possível registrar o pagamento.';
-  return 'não foi possível confirmar o pagamento. Tente novamente.';
-}
+/** Motivo curto de uma falha, depois do nome da conta (o texto mora no núcleo, igual nas duas listas). */
+const payReason = (e: unknown): string => payFailureReason(isRepoError(e) ? e.code : null);
 
 /**
  * "Já paguei" na lista: pay_commitment pelo usePayCommitment, com chave própria por conta, guardada entre tentativas
@@ -322,7 +316,7 @@ export default function ContasAPagarScreen() {
         ) : null}
 
         <View style={{ gap: space[1] }}>
-          <PayablesMonthPicker month={month} currentMonth={currentMonth} onChange={setMonth} />
+          <PayablesMonthPicker month={month} currentMonth={currentMonth} onChange={setMonth} context={personal?.contextName ?? 'Pessoal'} />
           <Txt variant="label" color={colors.textSecondary}>
             {isCurrent ? 'Ainda a pagar neste mês' : `Previsto para ${monthName.toLowerCase()}`}
           </Txt>
@@ -493,7 +487,7 @@ export default function ContasAPagarScreen() {
  * Seletor de mês local, na mesma linha de "Pessoal · outubro de 2026" (poupa altura: o primeiro "Já paguei" continua à
  * vista). Fora do mês atual, "Voltar para outubro de 2026". Volta sem limite e avança até 12 meses à frente (core: payablesStep).
  */
-function PayablesMonthPicker({ month, currentMonth, onChange }: { month: IsoMonth; currentMonth: IsoMonth; onChange: (m: IsoMonth) => void }) {
+function PayablesMonthPicker({ month, currentMonth, onChange, context }: { month: IsoMonth; currentMonth: IsoMonth; onChange: (m: IsoMonth) => void; context: string }) {
   const prev = payablesStep(month, currentMonth, -1);
   const next = payablesStep(month, currentMonth, 1);
   return (
@@ -510,7 +504,7 @@ function PayablesMonthPicker({ month, currentMonth, onChange }: { month: IsoMont
           <ChevronLeft size={22} color={colors.brandText} />
         </Pressable>
         <Txt variant="caption" color={colors.textSecondary} style={{ flex: 1, textAlign: 'center' }} accessibilityLiveRegion="polite">
-          Pessoal · {formatMonthBR(month)}
+          {context} · {formatMonthBR(month)}
         </Txt>
         <Pressable
           accessibilityRole="button"

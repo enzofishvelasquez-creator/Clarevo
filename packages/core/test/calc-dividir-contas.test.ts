@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcDividirContas, calcErrorText, type DividirInput } from '../src';
+import { CALC_DISCLAIMER, calcDisclaimer, calcDividirContas, calcErrorText, type DividirInput } from '../src';
 
 const run = (input: DividirInput) => {
   const out = calcDividirContas(input);
@@ -49,5 +49,13 @@ describe('7. Dividir as contas da casa (docs/08 §3.2)', () => {
 
   it('nada é gravado: o aviso diz isso', () => {
     expect(run({ total: '10', modo: 'iguais', pessoas: [{}, {}] }).notes).toEqual(['Os apelidos ficam só nesta tela e não são gravados.']);
+  });
+});
+
+describe('Dividir as contas da casa: o aviso fixo (revisão de 16/11/2026)', () => {
+  it('não fala de taxas nem de crédito, que não existem nesta calculadora; as outras continuam com o aviso de sempre', () => {
+    expect(calcDisclaimer('dividir-contas')).not.toMatch(/taxa|crédito|produto financeiro/i);
+    expect(calcDisclaimer('dividir-contas')).toContain('combinado entre as pessoas da casa');
+    expect(calcDisclaimer('parcelado-ou-a-vista')).toBe(CALC_DISCLAIMER);
   });
 });

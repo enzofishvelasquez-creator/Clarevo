@@ -40,7 +40,7 @@ describe('metas com imagem (D-077): sugestão pelo nome e pelo tipo', () => {
       'Aposentadoria',
       'Estudos',
       'Casamento',
-      'Futuro dos filhos',
+      'Futuro das crianças',
       'Saúde',
       'Festa',
     ]);

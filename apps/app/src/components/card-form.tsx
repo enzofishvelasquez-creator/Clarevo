@@ -180,10 +180,10 @@ export function CardForm({ mode, contextId }: { mode: CardFormMode; contextId: s
               {cardErrorText('versao_desatualizada')}
             </Txt>
             <MoneyTxt variant="caption">
-              {`Versão atual: ${card.name} · fecha dia ${card.closingDay} · vence dia ${card.dueDay}${card.limitCents != null ? ` · limite ${formatBRL(card.limitCents)}` : ''}`}
+              {`Como está agora: ${card.name} · fecha dia ${card.closingDay} · vence dia ${card.dueDay}${card.limitCents != null ? ` · limite ${formatBRL(card.limitCents)}` : ''}`}
             </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={submit} />
+            <Button label="Usar o que preenchi" tone="soft" onPress={submit} />
             <Button
               label="Descartar minhas alterações"
               tone="ghost"

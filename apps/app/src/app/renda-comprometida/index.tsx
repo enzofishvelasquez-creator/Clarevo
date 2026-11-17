@@ -50,7 +50,7 @@ import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
  * Renda comprometida de um mês (D-026): quanto das contas a pagar com vencimento no mês cabe na renda de referência.
  * Ordem da spec2 §4.5: destaque e medidor, composição (com a linha de dívidas), "Fora dos compromissos", metas (Ciclo C,
  * fora do percentual), renda de referência, contas do mês, próximos meses, critério escrito e links. Cor nunca julga e
- * "Fora dos compromissos" nunca é chamado de saldo. Falha de carga: erro com "Tentar novamente", nunca 0%.
+ * "Fora dos compromissos" nunca é chamado de saldo. Falha de carga: erro com "Tentar de novo", nunca 0%.
  * `?mes=AAAA-MM` escolhe o mês (sem ele, o mês do Resumo). Os valores em reais seguem "Ocultar valores" (A2).
  */
 export default function RendaComprometidaScreen() {

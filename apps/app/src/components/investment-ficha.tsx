@@ -6,6 +6,7 @@ import {
   INVESTMENT_TAX_RULES,
   SUBKIND_LABEL,
   TAX_TEXT,
+  netEstimateWhen,
   addDays,
   calendarDaysBetween,
   detailsEmpty,
@@ -144,19 +145,27 @@ export function InvestmentFichaCard({ investment: i }: { investment: Investment 
 }
 
 /**
- * "Se resgatasse hoje" (D-099, item 7): na tabela regressiva, o imposto e o IOF estimados por aporte; nas outras regras, a explicação, sem
+ * "Se resgatasse hoje" (D-099, item 7; "No vencimento, em 10/01/2027 (estimativa)" quando o resgate só vale no vencimento): na tabela regressiva, o imposto e o IOF estimados por aporte; nas outras regras, a explicação, sem
  * cálculo. Sempre "estimativa pela regra em vigor".
  */
 export function InvestmentNetCard({ investment: i, movements }: { investment: Investment; movements: readonly InvestmentMovement[] }) {
   const { today } = useSession();
   const regime = taxRegimeOf(i.kind, i.subkind);
   if (i.status !== 'ativo' || i.valueCents <= 0) return null;
-  const estimate = regime === 'regressiva' ? estimateRegressiveNet(movements, today) : null;
+  // Resgate só no vencimento: a estimativa é na data do vencimento (com o que já aconteceu até hoje), nunca "se resgatasse hoje".
+  const when = netEstimateWhen(i, today);
+  const estimate =
+    regime === 'regressiva' && when.on !== null ? estimateRegressiveNet(movements.filter((m) => m.occurredOn <= today), when.on) : null;
   return (
     <Card style={{ gap: space[2] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
-        {TAX_TEXT.title}
+        {when.title}
       </Txt>
+      {when.note ? (
+        <Txt variant="caption" color={colors.textSecondary}>
+          {when.note}
+        </Txt>
+      ) : null}
       {regime === null ? (
         <Txt color={colors.textSecondary}>{TAX_TEXT.noRegime}</Txt>
       ) : estimate === null ? (

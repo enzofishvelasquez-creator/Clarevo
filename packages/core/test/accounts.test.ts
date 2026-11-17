@@ -208,13 +208,14 @@ describe('regras puras das contas (D-043)', () => {
   });
 
   it('textos das contas montados', () => {
-    expect(ACCOUNTS_TEXT.rowCaption('banco', true, 'ativa')).toBe('Conta bancária · Principal');
+    expect(ACCOUNTS_TEXT.rowCaption('banco', true, 'ativa')).toBe('Banco · Principal');
     expect(ACCOUNTS_TEXT.rowCaption('dinheiro', false, 'ativa')).toBe('Dinheiro');
-    expect(ACCOUNTS_TEXT.rowCaption('outra', false, 'arquivada')).toBe('Outra · Arquivada');
+    expect(ACCOUNTS_TEXT.rowCaption('outra', false, 'arquivada')).toBe('Outro · Arquivada');
     expect(ACCOUNTS_TEXT.single(ACCOUNTS_TEXT.out, 'Conta principal')).toBe('Saiu de: Conta principal');
-    expect(ACCOUNTS_TEXT.leavingFrom('Carteira')).toBe('saindo da conta Carteira');
+    expect(ACCOUNTS_TEXT.leavingFrom('Carteira')).toBe('saindo de Carteira');
     // Nenhum saldo por conta: o aviso não sugere que há saldo inicial a informar.
-    expect(ACCOUNTS_TEXT.balanceNote).toBe('A Clarevo não calcula saldo por conta.');
+    expect(ACCOUNTS_TEXT.balanceNote).toBe('A Clarevo não calcula o saldo do banco nem da carteira.');
+    expect(ACCOUNTS_TEXT.leavingFrom('Conta principal')).not.toContain('conta Conta');
     expect(accountErrorText('conta_com_lancamentos')).toBe(ACCOUNT_ERROR_TEXT.conta_com_lancamentos);
     expect(accountErrorText('qualquer_coisa')).toBe(ACCOUNT_ERROR_TEXT.salvar_falhou);
   });

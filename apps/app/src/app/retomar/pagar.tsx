@@ -346,7 +346,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: WorkSp
             // Prévia que muda a cada tecla: sem região viva.
             <Banner tone="info" icon={Info} live={false}>
               <MoneyTxt variant="label">
-                {`Um gasto de ${formatBRL(amount)} será registrado em Pago de ${formatMonthBR(monthOf(paidOn)).toLowerCase()}, da conta ${account?.name}.`}
+                {`Um gasto de ${formatBRL(amount)} será registrado em Pago de ${formatMonthBR(monthOf(paidOn)).toLowerCase()}, ${ACCOUNTS_TEXT.leavingFrom(account?.name ?? '')}.`}
               </MoneyTxt>
             </Banner>
           ) : null}

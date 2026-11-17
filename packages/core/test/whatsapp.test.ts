@@ -230,7 +230,7 @@ describe('WhatsApp: respostas', () => {
       'Desfeito. Saiu do espaço Pessoal:\nCompra no cartão Azul: Farmácia, R$ 41,00\nCategoria: Sem categoria\nData da compra: hoje, 30/10\nFatura de janeiro de 2027',
     );
     expect(whatsappOutcomeReply({ result: 'sem_cartao', space }, TODAY)).toBe(
-      'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Conta e Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.',
+      'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Movimentos, Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.',
     );
     expect(whatsappOutcomeReply({ result: 'sem_cartao', space: { kind: 'familia', name: 'Família Souza' } }, TODAY, 'telegram')).toBe(
       'Compras no cartão entram só no espaço Pessoal, e este Telegram está ligado ao espaço Família Souza. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.',

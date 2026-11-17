@@ -123,6 +123,7 @@ import {
   upcomingCommittedMonths,
   CALCULATORS,
   CALC_DISCLAIMER,
+  calcDisclaimer,
   CALC_ERROR_TEXT,
   CALC_GROUPS,
   CALC_INTRO,
@@ -575,6 +576,7 @@ describe('textos das calculadoras e de "Achar tudo"', () => {
     const quick = QUICK_PAY_TEXT;
     const texts: string[] = [
       CALC_DISCLAIMER,
+      calcDisclaimer('dividir-contas'),
       CALC_INTRO,
       COTA_UNICA_TITLE,
       COTA_UNICA_SUBTITLE,
@@ -919,7 +921,7 @@ describe('textos do plano de guardar (spec7)', () => {
     const T = SAVINGS_TEXT;
     expect(T.askTitle).toBe('Você consegue guardar algum valor por mês?');
     expect(T.askBody).toBe('Sua resposta ajuda a montar um plano com os seus números. Ela fica só com você.');
-    expect([T.yes, T.notNow, T.later]).toEqual(['Sim, consigo', 'Agora não', 'Responder depois']);
+    expect([T.yes, T.notNow, T.later]).toEqual(['Sim, consigo', 'Não consigo agora', 'Responder depois']);
     expect(T.askAgainTitle).toBe('Sua situação mudou? Você consegue guardar algum valor por mês?');
     expect(T.incomeChangedTitle).toBe('Sua renda de referência mudou. Quer rever quanto guardar por mês?');
     expect(T.changeValue).toBe('Mudar valor');
@@ -1042,7 +1044,7 @@ describe('textos do plano de guardar (spec7)', () => {
  */
 describe('textos de cartões (Ciclo E)', () => {
   it('o aviso da compra e o texto do pagamento parcial, como na especificação', () => {
-    expect(purchaseNotice('2026-11', 'Nubank', DEMO_TODAY)).toBe('Esta compra entra na fatura de novembro do Nubank e conta em Pago quando a fatura for paga.');
+    expect(purchaseNotice('2026-11', 'Nubank', DEMO_TODAY)).toBe('Esta compra entra na fatura de novembro do Nubank e em Pago quando a fatura for paga.');
     expect(partialPaymentText(30_000, '2026-12', DEMO_TODAY)).toBe(
       'Ficaram R$ 300,00 para a fatura de dezembro. Juros e encargos do banco entram quando você informar a fatura de dezembro.',
     );
@@ -1052,7 +1054,7 @@ describe('textos de cartões (Ciclo E)', () => {
     expect(CARDS_TEXT.expense.paymentMethod).toBe('Forma de pagamento');
     expect(CARDS_TEXT.expense.credit).toBe('Cartão de crédito');
     expect(CARDS_TEXT.expense.registerCard).toBe('Cadastrar cartão');
-    expect(CARDS_TEXT.invoice.payInvoice).toBe('Pagar fatura');
+    expect(CARDS_TEXT.invoice.payInvoice).toBe('Registrar pagamento');
     expect(CARDS_TEXT.invoice.payOther).toBe('Outro valor');
     expect(CARDS_TEXT.invoice.addCharges).toBe('Informar encargos');
     expect(CARDS_TEXT.invoice.addRefund).toBe('Registrar estorno');
@@ -1232,7 +1234,7 @@ describe('textos de notas fiscais (Ciclo E)', () => {
     }
     // Só o aviso de privacidade fala em CPF, e é para dizer que não guardamos.
     expect(texts.filter((t) => /\bCPF\b/i.test(t))).toEqual([NOTA_TEXT.privacy]);
-    expect(NOTA_TEXT.privacy).toMatch(/Não guardamos CPF/);
+    expect(NOTA_TEXT.privacy).toMatch(/Não guarda CPF/);
     for (const file of ['nota.ts', 'danfe.ts']) {
       const source = readFileSync(join(CORE_SRC, file), 'utf8');
       expect(source, file).not.toMatch(FORBIDDEN);
@@ -1284,7 +1286,7 @@ describe('textos das telas de notas fiscais (Ciclo E, passo 3)', () => {
       expect(t, t).not.toMatch(/\bobrigad[oa]\b|\bbem-vind[oa]\b|\bo usu[áa]rio\b|\ba usu[áa]ria\b|\bcliente\b/i);
     }
     // A privacidade da nota é dita em NOTA_TEXT.privacy (único texto que cita CPF).
-    expect(NOTA_TEXT.privacy).toMatch(/Não guardamos CPF/);
+    expect(NOTA_TEXT.privacy).toMatch(/Não guarda CPF/);
     expect(NOTA_FLOW_TEXT.cameraIntro).toBe('A Clarevo usa a câmera só para ler o código da nota. Nenhuma foto é guardada.');
     for (const file of ['sefaz-page.ts', 'nota-flow.ts']) {
       const source = readFileSync(join(CORE_SRC, file), 'utf8');
@@ -1450,7 +1452,7 @@ const LEARN_FORBIDDEN = new RegExp(
 const LEARN_FORBIDDEN_EXCEPTIONS: Record<string, string[]> = { 'renda-comprometida': ['serasa'] };
 
 /** Listas do retorno (A4, spec3 §2.6, teste 8): cobrança e contagem de dias sem anotar. */
-const COLLECTION = /\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*)\b/i;
+const COLLECTION = /\b(sumiu|sumid\w*|abandon\w*|atrasad\w*|esquec\w*|deveria|culpa|bagun\w*|pend[eê]nci\w*|faz (muito )?tempo)\b/i;
 const ABSENCE = /aus[eê]nci|sem usar|\d+\s*dias?\b(?!\.$)|\bvoc[eê] (n[aã]o )?(anotou|usou) (nada|o app)/i;
 
 /** Todos os campos de texto de um tema, menos as fontes. */
@@ -2065,6 +2067,8 @@ describe('textos das assinaturas (D-046)', () => {
       expect(text, text).not.toMatch(GENDERED);
       expect(text, text).not.toMatch(BRANDS);
       expect(text, text).not.toMatch(ORDERS);
+      // Sem cobrança nem contagem de tempo ("Faz tempo que você não revisa" saiu em 16/11/2026).
+      expect(text, text).not.toMatch(COLLECTION);
       expect(text, text).not.toMatch(/\bfaz(er|endo)?\s+sentido\b/i);
       expect(text, text).not.toMatch(/[–—]/);
     }
@@ -2094,8 +2098,8 @@ describe('textos das assinaturas (D-046)', () => {
   });
 
   it('a reprovação da lista pega o que ela deve', () => {
-    for (const bad of ['Cancele já', 'um corte de gastos', 'isso é um desperdício', 'não vale a pena', 'Netflix', 'Assinaturas — todas']) {
-      const caught = [FORBIDDEN, JUDGMENT, BRANDS, ORDERS].some((re) => re.test(bad));
+    for (const bad of ['Cancele já', 'um corte de gastos', 'isso é um desperdício', 'não vale a pena', 'Netflix', 'Assinaturas — todas', 'Faz tempo que você não revisa']) {
+      const caught = [FORBIDDEN, JUDGMENT, BRANDS, ORDERS, COLLECTION].some((re) => re.test(bad));
       expect(caught, bad).toBe(true);
     }
     // Os textos da própria tela passam, inclusive "Encerrar a partir de…" (encerrar não é cancelar) e "Continua".
@@ -2284,7 +2288,7 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
 
   it('o que a tela promete e o que ela não promete', () => {
     expect(IMPORT_TEXT.rowTitle).toBe('Importar extrato ou fatura');
-    expect(IMPORT_TEXT.rowCaption).toBe('Arquivo OFX ou planilha do banco');
+    expect(IMPORT_TEXT.rowCaption).toBe('Arquivo PDF, OFX ou planilha do banco');
     expect(IMPORT_TEXT.labels.ja_anotado).toBe('Já anotado');
     expect(IMPORT_TEXT.labels.pagamento_fatura).toBe('Parece pagamento de fatura');
     expect(IMPORT_TEXT.labels.transferencia).toBe('Parece transferência');
@@ -2307,7 +2311,7 @@ describe('textos de importar extrato ou fatura (D-048)', () => {
     expect(IMPORT_TEXT.balanceIgnored).toContain('ignorado');
     expect(IMPORT_TEXT.intro).toContain('não é guardado');
     expect(IMPORT_TEXT.limits).toBe('Até 5 MB e 5.000 linhas.');
-    expect(IMPORT_TEXT.destinationAccount).toBe('Conta');
+    expect(IMPORT_TEXT.destinationAccount).toBe('Banco ou carteira');
     expect(IMPORT_TEXT.destinationCard).toBe('Cartão de crédito');
     expect(IMPORT_TEXT.cardPurchaseNote).toContain('não somam em Pago');
     expect(importedSummary(18, 4)).toBe('18 lançamentos importados, 4 já estavam anotados.');
@@ -2545,11 +2549,11 @@ describe('textos do comprovante de Pix e de pagamento (D-051)', () => {
     expect(COMPROVANTE_TEXT.lineHintPdf).toBe('Comprovante, holerite ou nota de serviço em PDF, lido aqui no aparelho');
     expect(COMPROVANTE_TEXT.note.privacy).toContain('aqui no aparelho');
     for (const word of ['CPF', 'CNPJ', 'endereço', 'chave da nota']) expect(COMPROVANTE_TEXT.note.privacy, word).toContain(word);
-    expect(COMPROVANTE_TEXT.filled).toBe('Preenchemos o que o comprovante informa. Confira e toque em Salvar.');
+    expect(COMPROVANTE_TEXT.filled).toBe('A Clarevo preencheu o que o comprovante informa. Confira e toque em Salvar.');
     expect(COMPROVANTE_TEXT.looksNotedHint).toBe('Pode ser o mesmo lançamento. Se for outro, é só salvar.');
     expect(COMPROVANTE_TEXT.looksNoted('2026-10-05', 'Padaria', 8500)).toBe('Parece já anotado em 05/10/2026: Padaria, R$ 85,00.');
-    expect(COMPROVANTE_TEXT.switchToIncome).toBe('Trocar para Registrar recebimento');
-    expect(COMPROVANTE_TEXT.switchToExpense).toBe('Trocar para Anotar gasto');
+    expect(COMPROVANTE_TEXT.switchToIncome).toBe('É um recebimento');
+    expect(COMPROVANTE_TEXT.switchToExpense).toBe('É um gasto');
     expect(COMPROVANTE_TEXT.errors.nota_fiscal).toContain('Escanear nota fiscal');
     expect(COMPROVANTE_TEXT.errors.texto_vazio).toContain('foto');
   });
@@ -3711,7 +3715,7 @@ describe('"Como você conheceu a Clarevo?" (D-067, item 2)', () => {
 
   it('as frases pedidas, exatamente, e as seis opções na ordem', () => {
     expect(SIGNUP_SOURCE_TEXT.title).toBe('Como você conheceu a Clarevo?');
-    expect(SIGNUP_SOURCE_TEXT.note).toBe('Opcional. Usamos só para contar, sem identificar ninguém, de onde as pessoas chegam.');
+    expect(SIGNUP_SOURCE_TEXT.note).toBe('Opcional. A Clarevo usa só para contar, sem identificar ninguém, de onde as pessoas chegam.');
     expect(SIGNUP_SOURCES.map((s) => SIGNUP_SOURCE_LABEL[s])).toEqual([
       'Instagram',
       'Indicação de alguém',

@@ -3,7 +3,7 @@ import type { GuideGroup } from './types';
 /** Os cinco grupos do guia, na ordem da tela (D-049(1)). */
 export const GUIDE_GROUPS: readonly GuideGroup[] = [
   { id: 'dia-a-dia', title: 'Dia a dia', caption: 'Resumo, anotações, notas fiscais, busca e importação.' },
-  { id: 'contas-e-cartoes', title: 'Contas e cartões', caption: 'Contas a pagar, gastos fixos, assinaturas, cartões e contas de origem.' },
+  { id: 'contas-e-cartoes', title: 'Contas e cartões', caption: 'Contas a pagar, gastos fixos, assinaturas, cartões, bancos e carteira.' },
   { id: 'planejar', title: 'Planejar', caption: 'Orçamento, renda comprometida, metas, simulador e calculadoras.' },
   { id: 'aprender-e-ajuda', title: 'Aprender e ajuda', caption: 'Temas curtos, o guia, o botão ? e o tour.' },
   { id: 'conta-e-privacidade', title: 'Conta e privacidade', caption: 'Lembretes, ocultar valores, exportar e quem vê os dados.' },

@@ -5,8 +5,8 @@
 | Nome | O que é | Não usar |
 |---|---|---|
 | **Movimentos** | A aba e a tela com os registros do mês: gastos, recebimentos, contas a pagar, gastos fixos e o card Organizar. O endereço continua `/movimentacoes`. | Movimentações |
-| **Contas de origem** | De onde o dinheiro sai ou para onde entra: conta do banco, carteira. Sem saldo por conta. Card em Conta, escolhida em "Saiu de", "Entrou em" e "Foi para". | Suas contas, Conta de destino, "Gerenciar contas" sem "de origem" |
-| **Contas a pagar** | Contas com vencimento (boleto, aluguel, fatura). Não confundir com conta de origem. | |
+| **Bancos e carteira** | De onde o dinheiro sai ou para onde entra: o banco, a carteira. Sem saldo. Card em Conta ("Adicionar banco ou carteira", "Gerenciar bancos e carteira"), escolhido em "Saiu de", "Entrou em" e "Foi para". O item que nasce com a conta continua "Conta principal"; nunca "conta Conta principal" (por exemplo: "saindo de Conta principal"). Decisão de Enzo em 16/11/2026. | Contas de origem, conta de origem, Suas contas, Conta de destino, "Gerenciar contas" |
+| **Contas a pagar** | Contas com vencimento (boleto, aluguel, fatura). Não confundir com bancos e carteira. | |
 | **Espaço** | Onde cada registro fica: Pessoal ou Família. É o que a pílula do cabeçalho e o seletor mostram. | contexto (o termo técnico fica só no código e nos documentos de arquitetura) |
 | **Ocultar** | Tirar da tela: "Ocultar valores", "Ocultar tabela", "Ocultar as parcelas". | Esconder |
 | **Histórico da meta** | A lista de aportes, resgates e rendimentos de uma meta. | Movimentos (é o nome da aba) |

@@ -59,7 +59,7 @@ export default function InvestimentoScreen() {
         ) : one.isSuccess && movements.isSuccess ? (
           <Card style={{ gap: space[3] }}>
             <Txt>{T.errors.notFound}</Txt>
-            <Button label="Ir para Investimentos" onPress={() => router.replace('/investimentos')} />
+            <Button label="Ir para Investir" onPress={() => router.replace('/investimentos')} />
           </Card>
         ) : (
           <LoadingState />

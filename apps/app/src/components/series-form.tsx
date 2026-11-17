@@ -1190,7 +1190,7 @@ export function SeriesForm({
           ) : null}
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
-            <Button label={retry ? 'Tentar novamente' : saveLabel} busy={busy} busyLabel="Salvando…" onPress={() => submit()} style={styles.save} />
+            <Button label={retry ? 'Tentar de novo' : saveLabel} busy={busy} busyLabel="Salvando…" onPress={() => submit()} style={styles.save} />
           </View>
         </View>
       </View>

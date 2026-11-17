@@ -87,8 +87,8 @@ describe('a janela dos últimos 7 dias e o mês em que conta', () => {
       'Entra no Recebido de novembro de 2026, não no de outubro de 2026. Novembro aparece no Resumo a partir de 01/11/2026.',
     );
     expect(NEXT_MONTH_TEXT.caption('2026-09-28', '2026-10-07')).toBe('Entra no Recebido de outubro de 2026, não no de setembro de 2026.');
-    expect(NEXT_MONTH_TEXT.futureNotice('2026-11')).toBe('Conta no Recebido de novembro de 2026, que aparece no Resumo a partir de 01/11/2026.');
-    expect(NEXT_MONTH_TEXT.rowNote('2026-11')).toBe('conta em novembro');
+    expect(NEXT_MONTH_TEXT.futureNotice('2026-11')).toBe('Entra no Recebido de novembro de 2026, que aparece no Resumo a partir de 01/11/2026.');
+    expect(NEXT_MONTH_TEXT.rowNote('2026-11')).toBe('entra em novembro');
     expect(NEXT_MONTH_TEXT.detailSuffix).toBe(' (mês seguinte)');
   });
 });

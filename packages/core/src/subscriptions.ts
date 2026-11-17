@@ -83,9 +83,9 @@ export const SUBSCRIPTION_TEXT = {
     reviewedOn === null ? 'Você ainda não registrou uma revisão.' : `Última revisão: ${formatDateBR(reviewedOn)}.`,
   empty: 'Nenhuma assinatura ativa. Marque um gasto fixo mensal como assinatura ao cadastrar ou editar.',
   emptyAction: 'Ver gastos fixos',
-  loadFailed: 'Não foi possível carregar suas assinaturas. Tente novamente.',
+  loadFailed: 'Não foi possível carregar suas assinaturas. Tente de novo.',
   /** Lembrete dentro do app, no topo de Gastos fixos e parcelamentos. */
-  reminderTitle: 'Faz tempo que você não revisa suas assinaturas.',
+  reminderTitle: 'Que tal revisar suas assinaturas?',
   reminderReview: 'Revisar agora',
   reminderLater: 'Agora não',
   reminderLaterHint: 'Esconde este aviso por 30 dias, só neste aparelho.',
@@ -100,12 +100,12 @@ export const SUBSCRIPTION_TEXT = {
 export const SUBSCRIPTION_ERROR_TEXT = {
   assinatura_so_gasto_fixo: 'Só um gasto fixo mensal pode ser marcado como assinatura.',
   marca_invalida: ERROR_TEXT.salvar_falhou,
-  versao_desatualizada: 'Este gasto fixo foi alterado em outro aparelho. Abra de novo para conferir a versão atual.',
+  versao_desatualizada: 'Este gasto fixo foi alterado em outro aparelho. Abra de novo para conferir o que mudou.',
   nao_encontrado: 'Este gasto fixo não está mais disponível.',
   sem_permissao: ERROR_TEXT.sem_permissao,
   salvar_falhou: ERROR_TEXT.salvar_falhou,
   carregar_falhou: ERROR_TEXT.carregar_falhou,
-  review_failed: 'Não foi possível registrar a revisão. Tente novamente.',
+  review_failed: 'Não foi possível registrar a revisão. Tente de novo.',
 } as const;
 
 /** Texto de um erro das telas de assinatura; o que não é conhecido cai em "Não foi possível salvar...". */
