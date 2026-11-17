@@ -1,5 +1,6 @@
 import {
   ERROR_TEXT,
+  UNCERTAIN_TEXT,
   INVESTMENT_NOTE_MAX,
   INVESTMENT_TEXT,
   applyInvestmentChange,
@@ -24,7 +25,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, View, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { ConfirmDialog } from '@/components/dialog';
@@ -35,6 +36,7 @@ import { ChoiceGroup } from '@/components/series-parts';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useInvalidateInvestments, useInvestment, useInvestmentMovements } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
@@ -67,7 +69,7 @@ export default function InvestimentoMovimentoScreen() {
         ) : one.isSuccess && movements.isSuccess ? (
           <Card style={{ gap: space[3] }}>
             <Txt>{INVESTMENT_TEXT.errors.notFound}</Txt>
-            <Button label="Ir para Investimentos" onPress={() => router.replace('/investimentos')} />
+            <Button label="Ir para Investir" onPress={() => router.replace('/investimentos')} />
           </Card>
         ) : (
           <LoadingState />
@@ -125,7 +127,7 @@ function MovementForm({
       return;
     }
     if (code === 'versao_desatualizada' || code === 'chave_reutilizada') invalidate();
-    setError(code === 'chave_reutilizada' ? 'Pode ser que já tenha sido salvo. Confira o histórico antes de tentar de novo.' : investmentErrorText(code));
+    setError(code === 'chave_reutilizada' ? UNCERTAIN_TEXT.investimentos : investmentErrorText(code));
   };
 
   async function submit() {
@@ -199,7 +201,7 @@ function MovementForm({
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={existing ? INVESTMENT_TEXT.movementLabel[kind] : texts.title} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" fixed />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         <Txt variant="label" style={{ fontWeight: '700' }}>

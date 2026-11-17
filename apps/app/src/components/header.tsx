@@ -108,10 +108,10 @@ export function AppHeader({
         {sideNav ? null : <BrandRow />}
         {title ? (
           <View style={styles.titleRow}>
-            <Txt variant="title" color={colors.textOnBrand} style={[styles.title, context ? { marginBottom: 0 } : null]} accessibilityRole="header" aria-level={1}>
+            <Txt variant="title" color={colors.textOnBrand} style={styles.title} accessibilityRole="header" aria-level={1}>
               {title}
             </Txt>
-            {context ? <ContextPill label={context} fixed={contextFixed} /> : null}
+            {context ? <ContextPill label={context} fixed={contextFixed} inTab /> : null}
           </View>
         ) : null}
         {children}
@@ -170,15 +170,17 @@ export function SubHeader({ title, onBack, right, help, plainTitle }: { title: s
  * ficar: "Salvando em Família". `fixed`: a pílula não muda, porque a tela é só do Pessoal (exportar) ou porque o rótulo já traz o
  * contexto do item aberto (pagar e editar uma conta ou um registro de outro contexto que o do seletor).
  */
-export function ContextPill({ label: given, fixed }: { label: string; fixed?: boolean }) {
+export function ContextPill({ label: given, fixed, inTab }: { label: string; fixed?: boolean; inTab?: boolean }) {
   const { auth } = useSession();
   const { space: kind } = useView();
   const demo = auth.mode === 'demo';
   const label = fixed ? given : contextLabelFor(given, kind);
-  const text = contextPillText(label, demo);
+  // Nas abas, o selo "Demonstração" já está no cabeçalho: a pílula fica branca e diz só o contexto.
+  const text = contextPillText(label, demo, inTab);
+  const lime = demo && !inTab;
   return (
-    <View style={[styles.pill, demo && styles.pillDemo]} accessible accessibilityLabel={`Espaço: ${text}`}>
-      <Txt variant="caption" color={demo ? colors.textOnAccent : colors.brand} style={{ fontFamily: fonts.bold }}>
+    <View style={[styles.pill, lime && styles.pillDemo]} accessible accessibilityLabel={`Espaço: ${text}`}>
+      <Txt variant="caption" color={lime ? colors.textOnAccent : colors.brand} style={{ fontFamily: fonts.bold }}>
         {text}
       </Txt>
     </View>
@@ -293,7 +295,8 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space[5], gap: space[3] },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   // overflowWrap (web): uma palavra mais larga que a faixa quebra em vez de passar da tela com letra muito grande; no aparelho o texto já quebra.
-  title: { fontSize: 24, lineHeight: 32, marginBottom: space[4], overflowWrap: 'anywhere' } as object,
+  // A margem de baixo fica só na linha do título (titleRow): com as duas, o título sem pílula ganhava 16 px a mais (Movimentos).
+  title: { fontSize: 24, lineHeight: 32, overflowWrap: 'anywhere' } as object,
   titleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[1], marginBottom: space[4] },
   avatar: { minWidth: 44, height: 44, paddingHorizontal: 4, borderRadius: 22, backgroundColor: colors.surfaceOnBrand, alignItems: 'center', justifyContent: 'center' },
   eye: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },

@@ -505,15 +505,16 @@ describe('Seu mês, o app lê o core (D-052)', () => {
     expect(entry.test('/seu-mes/outra')).toBe(false);
   });
 
-  it('em Movimentos, a linha vem logo depois de Buscar e antes de "Anotar gasto"', () => {
-    const text = read('app/(tabs)/movimentacoes.tsx');
-    const search = text.indexOf('<SearchEntry');
+  it('a linha fica nas Análises, logo abaixo do mês e antes das abas (revisão das telas, 16/11/2026: saiu do topo de Movimentos)', () => {
+    const text = read('app/analises.tsx');
+    const month = text.indexOf('<MonthStepper');
     const row = text.indexOf('<SeuMesEntry');
-    const action = text.indexOf('label="Anotar gasto"');
-    expect(search).toBeGreaterThan(0);
-    expect(row).toBeGreaterThan(search);
-    expect(action).toBeGreaterThan(row);
-    // Abre no mês em exibição, com o mês no endereço só quando não é o de hoje.
+    const tabs = text.indexOf('<AnalysesTabs');
+    expect(month).toBeGreaterThan(0);
+    expect(row).toBeGreaterThan(month);
+    expect(tabs).toBeGreaterThan(row);
+    expect(read('app/(tabs)/movimentacoes.tsx')).not.toContain('<SeuMesEntry');
+    // Abre no mês das Análises, com o mês no endereço só quando não é o de hoje.
     expect(text).toContain("pathname: '/seu-mes', params: seuMesParams(month, currentMonth)");
   });
 

@@ -491,7 +491,7 @@ function instantesDosSinais(nome, esperados, achados) {
         await esperar('Registrar recebimento');
         await pausa(800);
         await tocar(p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first());
-        await esperar('Cadastrar cartão');
+        await esperar('Adicionar outro cartão');
         await pausa(1700);
         await tocar(p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first());
         await esperar('Fatura atual');
@@ -511,7 +511,7 @@ function instantesDosSinais(nome, esperados, achados) {
         await esperar('Registrar recebimento');
         await rolarPara(0, 800);
         await pausa(2200);
-        await tocar(botao('Análises. Categorias, Evolução, Próximos meses e Orçamento.'));
+        await tocar(botao('Ver análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.'));
         await esperar('Consulte o mês escolhido');
         await legenda(LEGENDAS.analises);
         await pausa(1200);

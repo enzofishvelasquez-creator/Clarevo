@@ -58,7 +58,7 @@ export const SEU_MES_TEXT = {
   monthGroup: 'Mês do resumo',
   loading: 'Carregando o seu mês',
   loadError: 'Não foi possível carregar o seu mês.',
-  retry: 'Tentar novamente',
+  retry: 'Tentar de novo',
   cards: {
     enteredAndLeft: 'Entrou e saiu',
     whereItWent: 'Para onde foi',

@@ -23,7 +23,7 @@ import {
 } from '@clarevo/core';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { CircleAlert, Plus, Receipt, Undo2, Wallet } from 'lucide-react-native';
+import { CircleAlert, Plus, Receipt, RotateCcw, Undo2, Wallet } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -360,6 +360,7 @@ function InvoiceTop({
   const canUndo = paid && invoice.commitmentVersion !== null;
   const calc = invoice.situation === 'paga_em_parte' ? partialPaymentCalcLink(invoice.remainingCents) : null;
   const sub = (m: string) => ({ pathname: '/cartoes/[id]/fatura/[mes]/pagar' as const, params: { id: cardId, mes: m } });
+  const noteOnCard = () => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa', cartao: cardId } });
 
   return (
     <>
@@ -433,33 +434,32 @@ function InvoiceTop({
             {t.payHint}
           </Txt>
         ) : null}
+        {/* Revisão das telas (16/11/2026): uma ação principal por situação. Fechada, "Pagar fatura"; aberta ou futura, "Anotar compra neste
+            cartão"; paga, "Desfazer pagamento". Encargos e estorno ficam como links, abaixo. */}
         <View style={{ gap: space[3] }}>
           {canPay ? <Button label={I.payInvoice} icon={Wallet} disabled={busy} onPress={() => router.push(sub(invoice.month))} /> : null}
           {canUndo ? <Button label={I.undoPayment} icon={Undo2} tone="soft" disabled={busy} onPress={onUndo} /> : null}
+          {cardActive && !paid && !canPay ? (
+            <Button label={S.noteOnCard} icon={Plus} disabled={busy} onPress={noteOnCard} />
+          ) : null}
           {!paid ? (
-            <>
-              <Button
+            <View style={styles.links}>
+              {cardActive && canPay ? <LinkButton label={S.noteOnCard} icon={Plus} style={styles.inlineLink} onPress={noteOnCard} /> : null}
+              <LinkButton
                 label={I.addCharges}
                 icon={Receipt}
-                tone="soft"
                 disabled={busy}
+                style={styles.inlineLink}
                 onPress={() => router.push({ pathname: '/cartoes/[id]/fatura/[mes]/encargo', params: { id: cardId, mes: invoice.month } })}
               />
-              <Button
+              <LinkButton
                 label={I.addRefund}
-                icon={Plus}
-                tone="soft"
+                icon={RotateCcw}
                 disabled={busy}
+                style={styles.inlineLink}
                 onPress={() => router.push({ pathname: '/cartoes/[id]/fatura/[mes]/estorno', params: { id: cardId, mes: invoice.month } })}
               />
-            </>
-          ) : null}
-          {cardActive && !paid ? (
-            <LinkButton
-              label={S.noteOnCard}
-              onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa', cartao: cardId } })}
-              style={{ alignSelf: 'center' }}
-            />
+            </View>
           ) : null}
         </View>
         {paid ? (
@@ -645,6 +645,7 @@ const styles = StyleSheet.create({
   heroHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },
   statusPill: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: 2 },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  links: { gap: space[1] },
   // O topo e o fim são um `Body` cada um, sem o respiro entre eles: o vão de 16 px até a lista é do `cellFirst`, e o do fim é do `bodyBottom`.
   bodyTop: { paddingBottom: 0 },
   cellFirst: { marginTop: space[4] },

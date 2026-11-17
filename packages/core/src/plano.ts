@@ -56,12 +56,18 @@ const PROVIDERS: readonly AccessProvider[] = ['apple', 'google', 'web', 'pix', '
 /** Acesso pleno, sem prazo: o que o app assume enquanto não sabe (o banco trava a escrita de qualquer forma). */
 export const FULL_ACCESS: Access = { status: 'pre_lancamento', plan: null, until: null, canWrite: true, provider: null };
 
+/** O instante que a demonstração usa como "agora": meio-dia UTC do dia dela (o mesmo relógio do repositório em memória). */
+export function demoInstant(day: IsoDate): Date {
+  return new Date(`${day}T12:00:00.000Z`);
+}
+
 /**
- * O acesso da demonstração (dados fictícios): o teste grátis começando agora, para a demonstração mostrar a assinatura como uma conta
- * nova a vê. Conta a partir do relógio real, e não do dia fixo da demonstração, para o prazo não aparecer vencido.
+ * O acesso da demonstração (dados fictícios): o teste grátis começando no dia da demonstração, para ela mostrar a assinatura como uma
+ * conta nova a vê. As telas da assinatura, na demonstração, contam o prazo a partir do mesmo dia (`demoInstant`), e não do relógio real
+ * (revisão de 16/11/2026: o prazo do teste e as datas da demonstração vinham de relógios diferentes).
  */
-export function demoTrialAccess(now: number = Date.now()): Access {
-  return { status: 'teste', plan: null, until: new Date(now + TRIAL_DAYS * 86_400_000).toISOString(), canWrite: true, provider: null };
+export function demoTrialAccess(day: IsoDate): Access {
+  return { status: 'teste', plan: null, until: new Date(demoInstant(day).getTime() + TRIAL_DAYS * 86_400_000).toISOString(), canWrite: true, provider: null };
 }
 
 /** Lê a resposta de `my_access`. Resposta fora do formato vira erro: a tela mostra a falha, sem inventar situação. */
@@ -138,7 +144,7 @@ export const ACCESS_TEXT = {
   notOpenYet: 'A assinatura pelo app abre no lançamento. Até lá, nada é cobrado.',
   readOnlyWhat: 'Em só ver e exportar, os seus dados continuam guardados: você vê tudo, exporta e pode excluir a conta, mas não anota nem muda nada.',
   benefitNote: 'Se a sua empresa oferece a Clarevo como benefício, use o link do convite: com o benefício, nada a pagar.',
-  loadFailed: 'Não foi possível carregar a assinatura. Tente novamente.',
+  loadFailed: 'Não foi possível carregar a assinatura. Tente de novo.',
   /** Recusa do banco ao gravar (assinatura_necessaria). */
   refused: 'A sua conta está só para ver e exportar. Para voltar a anotar, abra Conta e toque em Assinatura.',
   bannerAction: 'Ver os planos',

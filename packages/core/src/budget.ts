@@ -759,7 +759,7 @@ export const BUDGET_TEXT = {
   rule: `${BUDGET_CARD_RULE} ${BUDGET_PAID_RULE}`,
   /** Orçamento é do usado no mês; Pago por categoria é do que foi pago. */
   versusPaid: 'O orçamento conta o usado no mês. Pago por categoria mostra o que foi pago, e a compra no cartão entra em Pago quando a fatura é paga.',
-  retry: 'Tentar novamente',
+  retry: 'Tentar de novo',
   loadError: 'Não foi possível carregar o orçamento.',
   withBudgetTitle: 'Com orçamento',
   withoutTitle: 'Definir orçamento',

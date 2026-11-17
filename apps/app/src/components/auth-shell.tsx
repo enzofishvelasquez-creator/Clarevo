@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, StyleSheet, View } from 'react-native';
 
 import { Logo } from '@/components/brand';
 import { DemoPill, Screen, TopInset, Txt } from '@/components/ui';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -27,7 +28,7 @@ export function AuthShell({
 }) {
   const { auth } = useSession();
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.surface }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.surface }} behavior={KEYBOARD_BEHAVIOR}>
       <TopInset color={colors.brand} />
       <View style={styles.band}>
         <View style={styles.bandInner}>

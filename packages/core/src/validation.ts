@@ -19,12 +19,12 @@ export const ERROR_TEXT = {
   data_invalida: 'Confira a data informada.',
   data_futura: 'Use uma data até hoje. Aqui entram só valores já pagos ou recebidos.',
   mes_seguinte_invalido: 'Só um recebimento dos últimos 7 dias do mês pode contar no mês seguinte.',
-  conta_invalida: 'Escolha a conta.',
-  salvar_falhou: 'Não foi possível salvar. Seu preenchimento foi mantido. Tente novamente.',
-  carregar_falhou: 'Não foi possível carregar. Tente novamente.',
-  versao_desatualizada: 'Este registro foi alterado em outro aparelho. Confira a versão atual antes de salvar.',
+  conta_invalida: 'Escolha o banco ou a carteira.',
+  salvar_falhou: 'Não foi possível salvar. Seu preenchimento foi mantido. Tente de novo.',
+  carregar_falhou: 'Não foi possível carregar. Tente de novo.',
+  versao_desatualizada: 'Este registro foi alterado em outro aparelho. Confira o que mudou antes de salvar.',
   nao_encontrado: 'Este registro não está mais disponível.',
-  sem_permissao: 'Você não tem permissão para esta ação.',
+  sem_permissao: 'Com o papel "Só vê" na Família, você vê, mas não anota nem muda nada. Quem é titular pode mudar o seu papel.',
   /** Assinatura paga (D-083): depois do teste grátis, sem assinatura, o banco recusa a escrita. */
   assinatura_necessaria: 'A sua conta está só para ver e exportar. Para voltar a anotar, abra Conta e toque em Assinatura.',
 } as const;
@@ -39,12 +39,13 @@ export type ErrorCode = keyof typeof ERROR_TEXT;
  */
 export const UNCERTAIN_TEXT = {
   /** Gasto, recebimento, conta a pagar, pagamento, gasto fixo, conta do ano e fatura. */
-  movimentos: 'Não deu para confirmar se salvou. Confira em Movimentos antes de anotar de novo.',
-  metas: 'Não deu para confirmar se salvou. Confira em Metas antes de tentar de novo.',
-  cartoes: 'Não deu para confirmar se salvou. Confira em Cartões antes de tentar de novo.',
-  conta: 'Não deu para confirmar se salvou. Confira em Conta antes de tentar de novo.',
-  orcamento: 'Não deu para confirmar se salvou. Confira em Orçamento por categoria antes de tentar de novo.',
-  renda: 'Não deu para confirmar se salvou. Confira em Renda comprometida antes de tentar de novo.',
+  movimentos: 'Não foi possível confirmar se salvou. Confira em Movimentos antes de anotar de novo.',
+  metas: 'Não foi possível confirmar se salvou. Confira em Metas antes de tentar de novo.',
+  cartoes: 'Não foi possível confirmar se salvou. Confira em Cartões antes de tentar de novo.',
+  conta: 'Não foi possível confirmar se salvou. Confira em Conta antes de tentar de novo.',
+  orcamento: 'Não foi possível confirmar se salvou. Confira em Orçamento por categoria antes de tentar de novo.',
+  renda: 'Não foi possível confirmar se salvou. Confira em Renda comprometida antes de tentar de novo.',
+  investimentos: 'Não foi possível confirmar se salvou. Confira em Investir antes de tentar de novo.',
 } as const;
 
 /** No fim de Anotar gasto e de Registrar recebimento (docs/10 A4): trocar de tipo levando o que foi digitado. */
@@ -78,14 +79,14 @@ export const COMMITMENT_ERROR_TEXT = {
   vencimento_fora_do_intervalo: 'Use um vencimento entre 1 ano atrás e 2 anos à frente.',
   /** Só no app, com o vencimento em branco; o banco recusa como data_invalida. */
   vencimento_obrigatorio: 'Informe a data de vencimento, como 15/10/2026.',
-  versao_desatualizada: 'Esta conta a pagar foi alterada em outro aparelho. Confira a versão atual antes de salvar.',
+  versao_desatualizada: 'Esta conta a pagar foi alterada em outro aparelho. Confira o que mudou antes de salvar.',
   nao_encontrado: 'Esta conta a pagar não está mais disponível.',
   compromisso_quitado: 'Esta conta a pagar já foi paga. Para alterar, desfaça o pagamento.',
   compromisso_aberto: 'Este pagamento já foi desfeito.',
   ja_paga_em_outro_aparelho: 'Esta conta a pagar já foi marcada como paga em outro aparelho.',
-  pagar_falhou: 'Não foi possível registrar o pagamento. Seu preenchimento foi mantido. Tente novamente.',
-  desfazer_falhou: 'Não foi possível desfazer o pagamento. Tente novamente.',
-  excluir_falhou: 'Não foi possível excluir a conta a pagar. Tente novamente.',
+  pagar_falhou: 'Não foi possível registrar o pagamento. Seu preenchimento foi mantido. Tente de novo.',
+  desfazer_falhou: 'Não foi possível desfazer o pagamento. Tente de novo.',
+  excluir_falhou: 'Não foi possível excluir a conta a pagar. Tente de novo.',
   vencimento_fora_do_mes:
     'Numa conta de gasto fixo, o vencimento fica no mesmo mês. Para mudar o dia de todos os meses, edite o gasto fixo.',
   estimativa_invalida: ERROR_TEXT.salvar_falhou,
@@ -95,7 +96,7 @@ export const COMMITMENT_ERROR_TEXT = {
 export const PAYMENT_ERROR_TEXT = {
   ...COMMITMENT_ERROR_TEXT,
   data_futura: 'Use uma data até hoje. A conta só é marcada como paga depois do pagamento.',
-  conta_invalida: 'Escolha a conta usada no pagamento.',
+  conta_invalida: 'Escolha de onde saiu o pagamento.',
 } as const;
 
 /** Textos de gasto fixo e parcelamento (seção 3.1 e 4.3 da especificação). */

@@ -25,10 +25,10 @@ import { ExtraSavingsCard } from '@/components/extra-savings';
 import { WelcomeTour } from '@/components/tour';
 import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange, type TotalChange } from '@/lib/highlight';
-import { explanationHref } from '@/lib/learn';
+import { explanationHref, topicBySlug } from '@/lib/learn';
 import { summaryTop } from '@/lib/nav';
 import { maskMoneyLabel, moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
-import { useCommitments, useCommittedSummary, useMonthRecords, useWork, useView, type SpaceKind } from '@/state/data';
+import { useCards, useCommitments, useCommittedSummary, useMonthRecords, useSpace, useWork, useView, type SpaceKind } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
@@ -115,7 +115,8 @@ export default function ResumoScreen() {
                   <Txt variant="caption" color={colors.textOnBrandSoft}>
                     {SUMMARY_NAV_TEXT.differenceCaption(month, today)}
                   </Txt>
-                  {s.differenceCents < 0 ? (
+                  {/* Com valores ocultos, o valor aparece sem sinal (R$ ••••): a frase do negativo também some, para não revelar o sinal. */}
+                  {s.differenceCents < 0 && !hidden ? (
                     <Txt variant="caption" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }}>
                       Pagamentos acima dos recebimentos no período
                     </Txt>
@@ -223,20 +224,7 @@ export default function ResumoScreen() {
           <View style={wide ? styles.sideCol : styles.stack}>
           {wide ? <GoalsPanel contextId={contextId} /> : null}
           {wide && kind === 'pessoal' ? <BudgetPanel contextId={contextId} month={month} /> : null}
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push(explanationHref('fatura'))}
-            style={(st) => [styles.learn, st.pressed && { opacity: 0.85 }]}>
-            <View style={{ flex: 1 }}>
-              <Txt variant="label" color={colors.textOnAccent} style={{ fontFamily: fonts.extrabold, fontSize: 17 }}>
-                Fatura sem contar duas vezes
-              </Txt>
-              <Txt variant="caption" color={colors.textOnAccent}>
-                Entenda o efeito no seu mês
-              </Txt>
-            </View>
-            <ArrowRight size={22} color={colors.textOnAccent} />
-          </Pressable>
+          <LearnCard />
 
           <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy} hitSlop={8}>
             <ShieldCheck size={18} color={colors.textSecondary} />
@@ -251,6 +239,34 @@ export default function ResumoScreen() {
       {/* Tour de boas-vindas (D-049(2)): um modal na primeira entrada, sem mudar a estrutura do Resumo. */}
       <WelcomeTour personal={kind === 'pessoal'} contextId={contextId} />
     </View>
+  );
+}
+
+/**
+ * O cartão lima do fim do Resumo: o tema de Aprender que mais ajuda agora (revisão das telas, 16/11/2026). Com cartão de crédito, "Fatura
+ * sem contar duas vezes"; sem cartão, "Diferença do mês e saldo da conta". O título e a legenda são os do próprio tema. Enquanto os
+ * cartões carregam, fica o da fatura, como era antes.
+ */
+function LearnCard() {
+  const space = useSpace();
+  const cards = useCards(space.data?.personalContextId);
+  const slug = cards.isSuccess && !cards.data.some((c) => c.status === 'ativo') ? 'saldo' : 'fatura';
+  const topic = topicBySlug(slug);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.push(explanationHref(slug))}
+      style={(st) => [styles.learn, st.pressed && { opacity: 0.85 }]}>
+      <View style={{ flex: 1 }}>
+        <Txt variant="label" color={colors.textOnAccent} style={{ fontFamily: fonts.extrabold, fontSize: 17 }}>
+          {topic?.title}
+        </Txt>
+        <Txt variant="caption" color={colors.textOnAccent}>
+          {topic?.subtitle}
+        </Txt>
+      </View>
+      <ArrowRight size={22} color={colors.textOnAccent} />
+    </Pressable>
   );
 }
 
@@ -356,7 +372,7 @@ function ToPayCard({ contextId, canWrite }: { contextId: string | undefined; can
 /**
  * "Renda comprometida" (D-026(7)): linha dentro do card "Ainda a pagar", irmã do resumo tocável e do link "Anotar conta a
  * pagar" (nunca dentro de um deles), com área tocável própria que abre /renda-comprometida no mês em exibição. Sem
- * referência de renda: só o convite. Mês sem contas: "0,0%" com a explicação. Falha de carga: erro com "Tentar novamente",
+ * referência de renda: só o convite. Mês sem contas: "0,0%" com a explicação. Falha de carga: erro com "Tentar de novo",
  * nunca 0%. Os valores em reais do nome acessível seguem "Ocultar valores".
  */
 function CommittedRow({ contextId }: { contextId: string | undefined }) {

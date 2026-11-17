@@ -347,7 +347,7 @@ const __mods = [
             valor_invalido: 'O valor precisa ser maior que zero. Por exemplo: mercado 52,30',
             valor_acima_do_limite: `O valor passa do limite de ${(0, money_1.formatBRL)(money_1.MAX_RECORD_CENTS)} por registro.`,
             descricao_invalida: 'A descrição ficou longa demais. Escreva em poucas palavras o que foi e o valor, por exemplo: mercado 52,30',
-            erro: `Não deu para anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${legal_1.SUPPORT_EMAIL}.`,
+            erro: `Não foi possível anotar agora. Tente de novo em alguns minutos. Se continuar, escreva para ${legal_1.SUPPORT_EMAIL}.`,
             ligado: (space, name) => `Pronto, ${w.whoLinked} está ligado à ${name ? `conta de ${name} na ` : ''}Clarevo, no ${spaceLabel(space)}.\n\n${EXAMPLES}\n\n${words}`,
             sem_permissao: (space) => `Você não anota mais no ${spaceLabel(space)}. ${where.relink}`,
         };
@@ -398,14 +398,14 @@ const __mods = [
             case 'sem_permissao':
                 return r.sem_permissao(outcome.space);
             case 'sem_conta':
-                return `O ${spaceLabel(outcome.space)} está sem conta de origem principal. No app, abra Conta e escolha a principal em Contas de origem.`;
+                return `O ${spaceLabel(outcome.space)} está sem banco ou carteira principal. No app, abra Conta e escolha a opção principal em Bancos e carteira.`;
             case 'compra_anotada':
                 return `Anotado no ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}\n\nSe algo ficou errado, responda DESFAZER.`;
             case 'compra_desfeita':
                 return `Desfeito. Saiu do ${spaceLabel(outcome.space)}:\n${purchaseLines(outcome.purchase, today)}`;
             case 'sem_cartao':
                 return outcome.space.kind === 'pessoal'
-                    ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Conta e Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
+                    ? 'O espaço Pessoal não tem cartão de crédito cadastrado. Para anotar no cartão, cadastre um no app, em Movimentos, Cartões. Para anotar como gasto já pago, mande sem a palavra cartão.'
                     : `Compras no cartão entram só no espaço Pessoal, e ${CHANNEL_WORDS[channel].whoLinked} está ligado ao ${spaceLabel(outcome.space)}. Mande sem a palavra cartão para anotar como gasto, ou ligue de novo escolhendo o Pessoal.`;
             case 'qual_cartao':
                 return `Qual cartão? Você tem: ${listNames(outcome.cards)}. Mande de novo com o nome depois da palavra cartão, como "farmácia 41 cartão ${withoutCardWord(outcome.cards[0] ?? 'azul').toLowerCase()}".`;
@@ -495,7 +495,26 @@ const __mods = [
         }
     }
     function todayIn(timeZone, now = new Date()) {
-        return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+        try {
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                calendar: 'gregory',
+                numberingSystem: 'latn',
+            }).formatToParts(now);
+            const get = (type) => parts.find((p) => p.type === type)?.value ?? '';
+            const iso = `${get('year')}-${get('month').padStart(2, '0')}-${get('day').padStart(2, '0')}`;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && isValidIsoDate(iso))
+                return iso;
+        }
+        catch {
+        }
+        return localIsoDate(now);
+    }
+    function localIsoDate(now) {
+        return `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
     function addDays(date, delta) {
         const [y, m, d] = date.split('-').map(Number);
@@ -721,7 +740,7 @@ const __mods = [
   function (module, exports, __req) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.CATEGORIES = exports.NO_CATEGORY_LABEL = exports.MONTH_CHECK_KINDS = exports.INSTALLMENT_NATURES = exports.DEBT_NATURES = exports.PARTS_PER_YEAR_MAX = exports.ANNUAL_LEAD_MONTHS = exports.NEXT_MONTH_TEXT = exports.NEXT_MONTH_WINDOW_DAYS = void 0;
+    exports.CATEGORIES = exports.NO_CATEGORY_LABEL = exports.MONTH_CHECK_KINDS = exports.INSTALLMENT_NATURES = exports.DEBT_NATURES = exports.PARTS_PER_YEAR_MAX = exports.ANNUAL_LEAD_MONTHS = exports.RECORD_TEXT = exports.NEXT_MONTH_TEXT = exports.NEXT_MONTH_WINDOW_DAYS = void 0;
     exports.nextMonthAllowed = nextMonthAllowed;
     exports.recordMonth = recordMonth;
     const dates_1 = __req(3);
@@ -746,9 +765,20 @@ const __mods = [
             const base = `Entra no Recebido de ${(0, dates_1.formatMonthYearBR)(next)}, não no de ${(0, dates_1.formatMonthYearBR)(own)}.`;
             return today !== undefined && own === (0, dates_1.monthOf)(today) ? `${base} ${firstDayLine(next)}` : base;
         },
-        futureNotice: (month) => `Conta no Recebido de ${(0, dates_1.formatMonthYearBR)(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
-        rowNote: (month) => `conta em ${(0, dates_1.formatMonthYearBR)(month).replace(/ de \d{4}$/, '')}`,
+        futureNotice: (month) => `Entra no Recebido de ${(0, dates_1.formatMonthYearBR)(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
+        rowNote: (month) => `entra em ${(0, dates_1.formatMonthYearBR)(month).replace(/ de \d{4}$/, '')}`,
         detailSuffix: ' (mês seguinte)',
+    };
+    exports.RECORD_TEXT = {
+        saved: (kind) => (kind === 'despesa' ? 'Gasto salvo.' : 'Recebimento salvo.'),
+        updated: 'Alterações salvas.',
+        edit: (kind) => (kind === 'despesa' ? 'Editar gasto' : 'Editar recebimento'),
+        remove: (kind) => (kind === 'despesa' ? 'Excluir gasto' : 'Excluir recebimento'),
+        removeTitle: (kind) => (kind === 'despesa' ? 'Excluir gasto?' : 'Excluir recebimento?'),
+        removed: (kind) => (kind === 'despesa' ? 'Gasto excluído.' : 'Recebimento excluído.'),
+        removedReopened: 'Gasto excluído. A conta a pagar voltou para Ainda a pagar.',
+        linkedTo: 'Ligado a',
+        monthRow: 'Entra no mês',
     };
     exports.ANNUAL_LEAD_MONTHS = 2;
     exports.PARTS_PER_YEAR_MAX = 12;

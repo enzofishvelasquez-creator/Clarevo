@@ -208,7 +208,7 @@ describe('Família: vagas, papéis e ações possíveis', () => {
     expect(canEndFamily([me, member({ personId: 'p2', firstName: 'Mauro' })])).toBe(false);
   });
 
-  it('quem anotou: o primeiro nome, "você" para quem consulta e "ex-membro · Nome" para quem saiu', () => {
+  it('quem anotou: o primeiro nome, "você" para quem consulta e "Nome (saiu da Família)" para quem saiu', () => {
     const members = [
       me,
       member({ personId: 'p2', firstName: 'Mauro' }),
@@ -216,7 +216,7 @@ describe('Família: vagas, papéis e ações possíveis', () => {
     ];
     expect(authorLabel(members, 'p1')).toBe('Vera (você)');
     expect(authorLabel(members, 'p2')).toBe('Mauro');
-    expect(authorLabel(members, 'p3')).toBe('ex-membro · Nina');
+    expect(authorLabel(members, 'p3')).toBe('Nina (saiu da Família)');
     expect(authorLabel(members, 'p9')).toBeNull();
   });
 });
@@ -276,7 +276,7 @@ describe('Família: textos', () => {
       FAMILY_TEXT.manageTitle('Mauro'),
       FAMILY_TEXT.manageA11y('Mauro', 'leitor'),
       FAMILY_TEXT.shareMessage('Casa Lima', link),
-      FAMILY_TEXT.notedBy('ex-membro · Nina'),
+      FAMILY_TEXT.notedBy('Nina (saiu da Família)'),
       FAMILY_TEXT.switchTo('Família'),
       INVITE_TEXT.invitedBy('Vera'),
       INVITE_TEXT.validUntil(day),
@@ -320,7 +320,7 @@ describe('Família: textos', () => {
   });
 
   it('linhas e avisos montados', () => {
-    expect(FAMILY_TEXT.exMember('Nina')).toBe('ex-membro · Nina');
+    expect(FAMILY_TEXT.exMember('Nina')).toBe('Nina (saiu da Família)');
     expect(FAMILY_TEXT.memberLine('Vera', true)).toBe('Vera (você)');
     expect(FAMILY_TEXT.memberLine('Mauro', false)).toBe('Mauro');
     expect(FAMILY_TEXT.inviteRow('membro', '2026-10-14')).toBe('Anota e vê · vale até 14/10');
@@ -336,7 +336,7 @@ describe('Família: textos', () => {
     expect(FAMILY_TEXT.cancelInviteA11y('leitor', '2026-10-14')).toBe('Cancelar convite para Só vê, que vale até 14/10/2026');
     expect(FAMILY_TEXT.manageTitle('Mauro')).toBe('Ações para Mauro');
     expect(FAMILY_TEXT.manageA11y('Mauro', 'membro')).toBe('Gerenciar Mauro, Anota e vê');
-    expect(FAMILY_TEXT.notedBy('ex-membro · Nina')).toBe('Anotado por ex-membro · Nina');
+    expect(FAMILY_TEXT.notedBy('Nina (saiu da Família)')).toBe('Anotado por Nina (saiu da Família)');
     expect(INVITE_TEXT.roleLine('membro')).toBe('Você poderá ver e anotar.');
     expect(INVITE_TEXT.roleLine('leitor')).toBe('Você poderá só ver.');
     expect(INVITE_TEXT.validUntil('2026-10-14')).toBe('Vale até 14/10/2026.');

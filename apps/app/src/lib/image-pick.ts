@@ -1,6 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
+import { withExternalScreen } from '@/lib/external-screen';
+
 /**
  * Imagem para ler um documento no app de celular (D-078 B): um print ou foto da galeria (o seletor do sistema; só a imagem escolhida
  * chega ao app) ou uma foto tirada na hora. A imagem fica só no cache do app enquanto é lida e é apagada logo depois
@@ -12,12 +14,13 @@ export type ImagePick = { kind: 'ok'; image: PickedImage } | { kind: 'cancelado'
 export async function pickImageForReading(source: 'galeria' | 'camera'): Promise<ImagePick> {
   try {
     let result: ImagePicker.ImagePickerResult;
+    // O pedido da câmera, a câmera e a galeria são telas de fora: a volta delas não trava o app (lib/external-screen.ts).
     if (source === 'camera') {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      const permission = await withExternalScreen(() => ImagePicker.requestCameraPermissionsAsync());
       if (!permission.granted) return { kind: 'sem_permissao' };
-      result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 });
+      result = await withExternalScreen(() => ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 }));
     } else {
-      result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+      result = await withExternalScreen(() => ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 }));
     }
     const asset = result.canceled ? null : result.assets[0];
     if (!asset) return { kind: 'cancelado' };

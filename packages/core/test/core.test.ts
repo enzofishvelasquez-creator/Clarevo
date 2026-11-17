@@ -487,7 +487,7 @@ describe('contas a pagar', () => {
       if (!v.ok) {
         expect(v.errors.dateText).toBe('Use uma data até hoje. A conta só é marcada como paga depois do pagamento.');
         expect(v.errors.amountText).toBe(PAYMENT_ERROR_TEXT.valor_invalido);
-        expect(v.errors.accountId).toBe('Escolha a conta usada no pagamento.');
+        expect(v.errors.accountId).toBe('Escolha de onde saiu o pagamento.');
       }
       const antiga = validatePaymentDraft(draft({ dateText: '30/02/2026' }), DEMO_TODAY);
       expect(antiga.ok ? null : antiga.errors.dateText).toBe('Confira a data informada.');

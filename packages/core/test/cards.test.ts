@@ -1679,8 +1679,8 @@ describe('alinhamento com o banco', () => {
 
 describe('textos de cartões', () => {
   it('aviso da compra, pagamento parcial e link da calculadora', () => {
-    expect(purchaseNotice(NOV, 'Nubank', TODAY)).toBe('Esta compra entra na fatura de novembro do Nubank e conta em Pago quando a fatura for paga.');
-    expect(purchaseNotice('2027-01', 'Nubank', TODAY)).toBe('Esta compra entra na fatura de janeiro de 2027 do Nubank e conta em Pago quando a fatura for paga.');
+    expect(purchaseNotice(NOV, 'Nubank', TODAY)).toBe('Esta compra entra na fatura de novembro do Nubank e em Pago quando a fatura for paga.');
+    expect(purchaseNotice('2027-01', 'Nubank', TODAY)).toBe('Esta compra entra na fatura de janeiro de 2027 do Nubank e em Pago quando a fatura for paga.');
     expect(partialPaymentText(30_000, DEC, TODAY)).toBe(
       'Ficaram R$ 300,00 para a fatura de dezembro. Juros e encargos do banco entram quando você informar a fatura de dezembro.',
     );

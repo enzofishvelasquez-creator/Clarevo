@@ -1,5 +1,6 @@
 import {
   ACCOUNTS_TEXT,
+  COMMITMENT_NOTICE_TEXT,
   RETURN_TEXT,
   monthCheckPlan,
   monthOf,
@@ -532,7 +533,7 @@ export default function AtualizarMeses() {
             const reopened = await writer.undoPaid(o.commitment);
             setOutcomes(({ [row.key]: _gone, ...rest }) => rest);
             setRowData((cur) => ({ ...cur, [row.key]: openRowFrom(view(row), reopened) }));
-            setResult({ tone: 'sucesso', text: 'Pagamento desfeito' });
+            setResult({ tone: 'sucesso', text: COMMITMENT_NOTICE_TEXT.undone });
           } catch (e) {
             warn(row, isUncertain(e) ? RETURN_TEXT.saveFailed : returnErrorText(codeOf(e)));
           }

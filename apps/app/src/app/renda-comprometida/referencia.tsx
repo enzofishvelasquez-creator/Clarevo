@@ -42,6 +42,7 @@ import { Banner, Button, Card, Chip, Screen, Skeleton, TextField, Txt } from '@/
 import { UnsavedChangesText } from '@/components/context-text';
 import { announceOnIOS } from '@/lib/a11y';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import {
   isRefusal,
   useDeleteIncomeReference,
@@ -283,7 +284,7 @@ function ReferenceForm({ contextId }: { contextId: string }) {
   const chosen = suggestion.data;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={COMMITTED_TEXT.reference.title} onBack={requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         <Txt>{COMMITTED_TEXT.reference.intro}</Txt>

@@ -44,8 +44,8 @@ export default function Entrar() {
         router.replace({ pathname: '/confirmar-email', params: { email: email.trim() } });
         return;
       }
-      if (code === 'rede') setBanner('Sem conexão no momento. Seu e-mail foi mantido. Tente novamente.');
-      else if (code === 'muitas_tentativas' || code === 'aguarde') setBanner('Muitas tentativas seguidas. Aguarde alguns minutos e tente novamente.');
+      if (code === 'rede') setBanner('Sem conexão no momento. Seu e-mail foi mantido. Tente de novo.');
+      else if (code === 'muitas_tentativas' || code === 'aguarde') setBanner('Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.');
       else setBanner('Não foi possível entrar. Confira e-mail e senha.');
       setPassword('');
     } finally {

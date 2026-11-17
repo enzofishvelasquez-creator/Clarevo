@@ -49,7 +49,8 @@ export default function OrcamentoScreen() {
   useEffect(() => {
     setMonth(payablesStartMonth(params.mes, currentMonth));
   }, [params.mes, currentMonth]);
-  const contextId = useWork().data?.contextId;
+  const work = useWork().data;
+  const contextId = work?.contextId;
   const [notice] = useFlash();
   const budget = useMonthBudget(contextId, month);
   const { refunds } = useMonthRefunds(contextId, month);
@@ -65,7 +66,7 @@ export default function OrcamentoScreen() {
         <View style={{ gap: space[1] }}>
           <MonthStepper
             groupLabel="Mês do orçamento"
-            label={`Pessoal · ${formatMonthBR(month)}`}
+            label={`${work?.contextName ?? 'Pessoal'} · ${formatMonthBR(month)}`}
             prevLabel={prev ? PAYABLES_NAV_TEXT.previous(prev) : 'Mês anterior'}
             nextLabel={next ? PAYABLES_NAV_TEXT.next(next) : 'Próximo mês'}
             onPrev={prev ? () => setMonth(prev) : null}

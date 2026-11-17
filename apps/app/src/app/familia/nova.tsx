@@ -1,7 +1,7 @@
 import { FAMILY_NAME_MAX, FAMILY_TEXT, familyErrorText, familyNameError, normalizeFamilyName } from '@clarevo/core';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, View, type TextInput } from 'react-native';
 
 import { useIsSeededDemo } from '@/components/family-parts';
 import { FormFooter } from '@/components/form-footer';
@@ -10,6 +10,7 @@ import { useLeaveGuard } from '@/components/leave-guard';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { attemptFamily, useCreateFamily, useFamily, useFamilyKeys } from '@/state/family';
 import { colors, space } from '@/theme/tokens';
 
@@ -97,7 +98,7 @@ export default function NovaFamiliaScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       {header}
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         <Txt color={colors.textSecondary}>{T.intro}</Txt>

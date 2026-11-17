@@ -32,6 +32,7 @@ import { ChoiceGroup } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import {
   useAccountOperationKey,
   useCreateAccount,
@@ -212,7 +213,7 @@ export function AccountForm({ mode, contextId, accounts }: { mode: AccountFormMo
   const deleteBlock = account ? accountBlock(accounts, account, 'delete') : null;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={account ? T.editTitle : T.newTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} help="contas-de-origem" />
       <Screen contentStyle={styles.body}>
         {savedBefore.banner}

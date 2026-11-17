@@ -776,7 +776,7 @@ describe('Análises: textos do núcleo e ligações com o resto do app', () => {
     const steps = entry.steps.join(' ');
     for (const name of [
       '"Evolução"',
-      '"Análises"',
+      '"Ver análises do mês"',
       '"Categorias"',
       '"Próximos meses"',
       '"Orçamento"',
@@ -796,10 +796,16 @@ describe('Análises: textos do núcleo e ligações com o resto do app', () => {
     expect(searchGuide('cartão').map((e) => e.id)).toEqual(['cartoes']);
   });
 
-  it('o app: a linha em Movimentos fica logo abaixo de "Evolução", a rota existe e abre direto pelo endereço, e a escolha fica só no aparelho', () => {
+  it('o app: a linha "Ver análises do mês" em Movimentos fica depois da lista (no rodapé, com "Organizar"), a rota existe e abre direto pelo endereço, e a escolha fica só no aparelho', () => {
     const movimentos = read('app/(tabs)/movimentacoes.tsx');
-    expect(movimentos.indexOf('<AnalysesEntry')).toBeGreaterThan(movimentos.indexOf('<EvolutionEntry'));
-    expect(movimentos.indexOf('<AnalysesEntry')).toBeLessThan(movimentos.indexOf('Anotar gasto'));
+    // Revisão das telas (16/11/2026): uma linha só no lugar de "Seu mês em 30 segundos", "Evolução" e "Análises", depois da lista.
+    expect(movimentos).not.toContain('<EvolutionEntry');
+    expect(movimentos).not.toContain('<SeuMesEntry');
+    expect(movimentos.indexOf('label="Anotar gasto"')).toBeLessThan(movimentos.indexOf('<AnalysesEntry'));
+    const footer = movimentos.slice(movimentos.indexOf('const footer = ('));
+    expect(footer.indexOf('{analyses}')).toBeGreaterThan(0);
+    expect(footer.indexOf('{analyses}')).toBeLessThan(footer.indexOf('{organize}'));
+    expect(movimentos).toContain('footer={footer}');
     expect(movimentos).toContain("pathname: '/analises'");
     expect(read('app/_layout.tsx')).toContain('<Stack.Screen name="analises" />');
     expect(read('app/_layout.tsx')).toMatch(/seu-mes\|evolucao\|analises\|metas/);

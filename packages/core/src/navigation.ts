@@ -388,10 +388,10 @@ export const APP_SCREENS: readonly AppScreen[] = [
   },
   {
     id: 'contas',
-    title: 'Contas de origem',
+    title: 'Bancos e carteira',
     caption: 'De onde sai o dinheiro dos gastos, pagamentos e aportes',
     href: '/conta?secao=contas',
-    keywords: ['contas', 'suas contas', 'origem do dinheiro', 'saiu de', 'carteira', 'conta principal', 'adicionar conta', 'arquivar conta'],
+    keywords: ['bancos e carteira', 'banco', 'contas', 'suas contas', 'contas de origem', 'origem do dinheiro', 'saiu de', 'carteira', 'conta principal', 'adicionar conta', 'arquivar conta'],
   },
   {
     id: 'quem-ve',
@@ -417,7 +417,7 @@ export const APP_SCREENS: readonly AppScreen[] = [
   {
     id: 'importar-extrato',
     title: 'Importar extrato ou fatura',
-    caption: 'Arquivo OFX ou planilha do banco, com revisão das linhas antes de importar',
+    caption: 'Arquivo PDF, OFX ou planilha do banco, com revisão das linhas antes de importar',
     href: '/importar',
     keywords: ['importar', 'importação', 'extrato', 'ofx', 'banco', 'planilha', 'csv', 'arquivo do banco', 'trazer lançamentos', 'extrato do banco'],
   },

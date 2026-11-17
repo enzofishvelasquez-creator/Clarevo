@@ -3,6 +3,7 @@ import { ChevronRight, Timer } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { MoneyTxt } from '@/components/money-text';
+import { useValuesHidden } from '@/lib/privacy';
 import { Card, IconBlock, LinkButton, Txt, styles as ui } from '@/components/ui';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
@@ -38,6 +39,9 @@ export function SeuMesEntry({ onPress }: { onPress: () => void }) {
 function RowView({ row }: { row: SeuMesRow }) {
   const { width, fontScale } = useWindowDimensions();
   const stacked = isStackedLayout(width, fontScale);
+  // Com valores ocultos, a diferença aparece sem sinal (R$ ••••): "Pagamentos acima dos recebimentos" revelaria que ela é negativa.
+  const hidden = useValuesHidden();
+  const details = hidden ? row.details.filter((d) => d !== SEU_MES_TEXT.entered.paidAbove) : row.details;
   const value = row.value ? (
     <MoneyTxt variant="label" style={[tabular, styles.value, row.strong && styles.valueStrong, stacked ? null : { flexShrink: 0 }]}>
       {row.value}
@@ -49,7 +53,7 @@ function RowView({ row }: { row: SeuMesRow }) {
         <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
           {row.label}
         </Txt>
-        {row.details.map((detail, n) => (
+        {details.map((detail, n) => (
           <MoneyTxt key={`${n}-${detail}`} variant="caption" color={colors.textSecondary}>
             {detail}
           </MoneyTxt>

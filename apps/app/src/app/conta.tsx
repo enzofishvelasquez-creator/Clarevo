@@ -4,6 +4,7 @@ import {
   EXPORT_TEXT,
   FAMILY_ROLE_LABEL,
   FAMILY_TEXT,
+  FEEDBACK_TEXT,
   LEGAL_TEXT,
   SUPPORT_TEXT,
   TELEGRAM_BOT,
@@ -12,6 +13,7 @@ import {
   WHATSAPP_IN_ACCOUNT,
   WHATSAPP_NUMBER,
   WHATSAPP_TEXT,
+  appVersionLine,
   type SitePage,
 } from '@clarevo/core';
 import {
@@ -37,6 +39,7 @@ import { ConfirmDialog } from '@/components/dialog';
 import { AccessCard } from '@/components/access-parts';
 import { AccountsCard } from '@/components/accounts-card';
 import { BenefitCard } from '@/components/benefit-card';
+import { FeedbackButton } from '@/components/feedback-button';
 import { PrivacyCard, RemindersCard, WidgetCard } from '@/components/device-settings';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { SubHeader } from '@/components/header';
@@ -45,6 +48,7 @@ import { LevelBadge, LevelCard } from '@/components/level-parts';
 import { SignupSourceAccountCard } from '@/components/signup-source';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
+import { APP_INFO } from '@/lib/app-info';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
 import { SITE_URL, openLicensesPage, openSitePage, openSupportEmail } from '@/lib/site';
@@ -113,11 +117,11 @@ export default function ContaScreen() {
       setCooldown(RESEND_INTERVAL_SECONDS);
       setSecurityMsg({
         tone: 'info',
-        text: auth.mode === 'demo' ? 'Demonstração: nenhum e-mail é enviado.' : `Enviamos um link para ${user.email}. Abra o link para definir a nova senha.`,
+        text: auth.mode === 'demo' ? 'Demonstração: nenhum e-mail é enviado.' : `A Clarevo enviou um link para ${user.email}. Abra o link para definir a nova senha.`,
       });
     } catch (e) {
       if (e instanceof AuthError && e.code === 'aguarde' && e.retryAfterSeconds) setCooldown(e.retryAfterSeconds);
-      else setSecurityMsg({ tone: 'erro', text: 'Não foi possível enviar agora. Tente novamente em instantes.' });
+      else setSecurityMsg({ tone: 'erro', text: 'Não foi possível enviar agora. Tente de novo em instantes.' });
     } finally {
       setBusy(null);
     }
@@ -141,9 +145,11 @@ export default function ContaScreen() {
     try {
       await signOut('global');
     } catch {
+      // A saída não aconteceu: a marca de "saída pedida" não pode valer para um fim de sessão futuro.
+      signOutIntent.consume();
       setBusy(null);
       setConfirmAll(false);
-      setSecurityMsg({ tone: 'erro', text: 'Não foi possível encerrar as sessões agora. Tente novamente.' });
+      setSecurityMsg({ tone: 'erro', text: 'Não foi possível sair em todos os aparelhos agora. Confira a internet e tente de novo.' });
     }
   };
 
@@ -176,10 +182,21 @@ export default function ContaScreen() {
           ) : null}
         </View>
         </Card>
+        {/* Sugestão ou problema (teste com pessoas, 16/11/2026): logo abaixo do perfil, para quem testa achar sem procurar. O e-mail vai com a
+            versão do app e o aparelho, sem nada da conta (FEEDBACK_TEXT, lib/feedback.ts). */}
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {FEEDBACK_TEXT.title}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {FEEDBACK_TEXT.hint}
+          </Txt>
+          <FeedbackButton label={FEEDBACK_TEXT.button} screen="/conta" />
+        </Card>
         <LevelCard />
 
         {/* Ordem de Conta (docs/10 A23): a assinatura, o que é deste aparelho (lembretes, privacidade, widget), a segurança, quem divide
-            o app com você (Família, empresa, Telegram), as contas de origem, exportar e, por fim, ajuda, termos, sair e excluir. */}
+            o app com você (Família, empresa, Telegram), bancos e carteira, exportar e, por fim, ajuda, termos, sair e excluir. */}
         {/* Assinatura (D-083): a situação do acesso (teste, só ver e exportar, plano, benefício ou Família) e a tela com os planos. */}
         <AccessCard />
 
@@ -209,7 +226,7 @@ export default function ContaScreen() {
             busyLabel="Enviando…"
             onPress={changePassword}
           />
-          <Button label="Encerrar sessão em todos os aparelhos" icon={MonitorSmartphone} tone="soft" onPress={() => setConfirmAll(true)} />
+          <Button label="Sair em todos os aparelhos" icon={MonitorSmartphone} tone="soft" onPress={() => setConfirmAll(true)} />
         </Card>
 
         {/* Família (D-055): criar, convidar e administrar; abre a tela Família. */}
@@ -338,7 +355,7 @@ export default function ContaScreen() {
         ) : null}
 
         <Button
-          label="Sair deste aparelho"
+          label="Sair da conta"
           icon={LogOut}
           tone="soft"
           onPress={() => {
@@ -347,7 +364,7 @@ export default function ContaScreen() {
           }}
         />
         <Txt variant="caption" color={colors.textSecondary} style={{ textAlign: 'center' }}>
-          Sair encerra a sessão neste aparelho. Seus registros continuam guardados.
+          Você sai só neste aparelho. Seus registros continuam guardados.
         </Txt>
 
         {/* Excluir minha conta (D-058): o último item de Conta, sem destaque de alerta. A tela seguinte explica o que é apagado. */}
@@ -360,13 +377,17 @@ export default function ContaScreen() {
           </Txt>
           <Button label={DELETE_TEXT.entryButton} icon={Trash2} tone="soft" accessibilityLabel={DELETE_TEXT.entryA11y} onPress={() => router.push('/conta/excluir')} />
         </Card>
+        {/* A versão do app, para quem testa dizer qual está usando (docs/50_ATUALIZACOES.md): no celular, com o build e a atualização. */}
+        <Txt variant="caption" color={colors.textSecondary} style={{ textAlign: 'center' }} selectable>
+          {appVersionLine(APP_INFO, APP_INFO.native)}
+        </Txt>
       </Screen>
 
       <ConfirmDialog
         visible={confirmAll}
-        title="Encerrar sessão em todos os aparelhos?"
+        title="Sair em todos os aparelhos?"
         cancelLabel="Cancelar"
-        confirmLabel="Encerrar sessões"
+        confirmLabel="Sair de todos"
         confirmTone="brand"
         busy={busy === 'sessoes'}
         onCancel={() => setConfirmAll(false)}

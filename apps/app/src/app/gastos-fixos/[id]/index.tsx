@@ -146,11 +146,11 @@ export default function DetalheGastoFixo() {
           return;
         }
         keys.uncertain(key, snapshot);
-        setActionError(`Não foi possível excluir ${theNoun}. Tente novamente.`);
+        setActionError(`Não foi possível excluir ${theNoun}. Tente de novo.`);
       }
     } catch {
       setConfirmDelete(false);
-      setActionError(`Não foi possível excluir ${theNoun}. Tente novamente.`);
+      setActionError(`Não foi possível excluir ${theNoun}. Tente de novo.`);
     } finally {
       setDeleting(false);
     }
@@ -621,7 +621,7 @@ function Actions({
           <>
             <View style={{ gap: space[1] }}>
               <Button
-                label="Mudar valor ou dia a partir de uma conta"
+                label="Mudar a partir de uma conta"
                 icon={Pencil}
                 tone="soft"
                 accessibilityHint="O mês do vencimento não muda aqui."
@@ -647,7 +647,7 @@ function Actions({
     <View style={{ gap: space[3] }}>
       {!ended ? (
         <>
-          <Button label="Mudar valor ou dia a partir de uma conta" icon={Pencil} tone="soft" onPress={() => router.push(`/gastos-fixos/${s.id}/editar`)} />
+          <Button label="Mudar a partir de uma conta" icon={Pencil} tone="soft" onPress={() => router.push(`/gastos-fixos/${s.id}/editar`)} />
           <Button
             label={parcelada ? 'Encerrar parcelamento' : 'Encerrar gasto fixo'}
             icon={CalendarX}

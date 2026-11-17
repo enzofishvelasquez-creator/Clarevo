@@ -50,7 +50,7 @@ export const LEGAL_ACCEPT_TEXT = {
     'Os termos de uso e a política de privacidade mudaram. Leia o que mudou e confirme que concorda para continuar usando a Clarevo.',
   terms: 'Ler os termos de uso',
   privacy: 'Ler a política de privacidade',
-  accept: 'Concordo e continuar',
+  accept: 'Concordar e continuar',
   signOut: 'Sair da conta',
   /** Quem não concorda (Termos, seção 8). */
   disagree: 'Se não concordar, você pode exportar os seus dados e excluir a conta.',

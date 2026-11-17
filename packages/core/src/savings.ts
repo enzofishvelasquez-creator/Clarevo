@@ -490,7 +490,7 @@ export const SAVINGS_ERROR_TEXT = {
   valor_acima_do_limite: GOAL_ERROR_TEXT.valor_acima_do_limite,
   /** Reserva mínima abaixo de R$ 100,00 ou ilegível. */
   minimum_invalido: 'Informe um valor a partir de R$ 100,00, como 300,00.',
-  versao_desatualizada: 'Esta resposta foi alterada em outro aparelho. Confira a versão atual antes de salvar.',
+  versao_desatualizada: 'Esta resposta foi alterada em outro aparelho. Confira o que mudou antes de salvar.',
   salvar_falhou: GOAL_ERROR_TEXT.salvar_falhou,
   sem_permissao: GOAL_ERROR_TEXT.sem_permissao,
 } as const;
@@ -504,17 +504,17 @@ export function savingsErrorText(code: string): string {
 const ORDINAL: Readonly<Record<number, string>> = { 1: 'primeira', 2: 'segunda', 3: 'terceira' };
 const capitalize = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 
-/** Textos do plano de guardar (spec7): pergunta, "Sim, consigo", "Agora não", reserva mínima e passos pequenos. */
+/** Textos do plano de guardar (spec7): pergunta, "Sim, consigo", "Não consigo", reserva mínima e passos pequenos. */
 export const SAVINGS_TEXT = {
   // Pergunta (card no topo da aba Metas, antes de "Seu mês" e da reserva).
   askTitle: 'Você consegue guardar algum valor por mês?',
   askBody: 'Sua resposta ajuda a montar um plano com os seus números. Ela fica só com você.',
-  /** Quando "Agora não" vence (30 dias). */
+  /** Quando "Não consigo" vence (30 dias). */
   askAgainTitle: 'Sua situação mudou? Você consegue guardar algum valor por mês?',
   /** Quando a renda de referência mudou depois de "Sim, consigo". */
   incomeChangedTitle: 'Sua renda de referência mudou. Quer rever quanto guardar por mês?',
   yes: 'Sim, consigo',
-  notNow: 'Agora não',
+  notNow: 'Não consigo',
   later: 'Responder depois',
   changeValue: 'Mudar valor',
   keepValue: 'Manter o valor',
@@ -560,7 +560,7 @@ export const SAVINGS_TEXT = {
   stageBeyond: 'Passa de 50 anos',
   stageReached: 'Alcançada',
 
-  // "Agora não".
+  // "Não consigo".
   notNowBody: 'Tudo bem. Muita gente começa com valores pequenos, e qualquer valor guardado ajuda num imprevisto.',
   minimumTitle: 'Quer começar uma reserva mínima?',
   minimumEssentials: '1 mês dos seus gastos essenciais',
@@ -568,7 +568,7 @@ export const SAVINGS_TEXT = {
   minimumOtherLabel: 'Valor da reserva mínima',
   minimumOtherHint: 'A partir de R$ 100,00.',
   minimumCreate: 'Criar reserva mínima',
-  minimumCreated: 'Reserva mínima criada.',
+  minimumCreated: 'Reserva para imprevistos criada, com o valor mínimo para começar.',
   smallStepsTitle: 'Passos pequenos',
   smallStepsHint: 'Se escolher um valor por mês, ele vira o plano da sua reserva mínima.',
   /** "Guardar R$ 10,00 por semana" */

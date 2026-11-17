@@ -59,6 +59,18 @@ export function calculatorsInGroup(group: CalcGroup): CalcInfo[] {
 export const CALC_DISCLAIMER =
   'Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.';
 
+/**
+ * Aviso fixo de "Dividir as contas da casa": ali não há taxa nem crédito, e o aviso das outras calculadoras não se aplica (revisão de
+ * 16/11/2026).
+ */
+export const DIVIDIR_DISCLAIMER =
+  'Cálculo com os valores que você informou. A divisão é uma referência: o que vale é o combinado entre as pessoas da casa.';
+
+/** O aviso fixo de cada calculadora (a lista "Calculadoras" usa CALC_DISCLAIMER). */
+export function calcDisclaimer(slug: CalcSlug): string {
+  return slug === 'dividir-contas' ? DIVIDIR_DISCLAIMER : CALC_DISCLAIMER;
+}
+
 /** Texto de abertura da tela "Calculadoras". */
 export const CALC_INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
 

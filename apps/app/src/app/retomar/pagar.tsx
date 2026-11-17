@@ -47,6 +47,7 @@ import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useLastAccount } from '@/lib/last-account';
 import { explanationHref } from '@/lib/learn';
 import { totalChange } from '@/lib/highlight';
@@ -268,7 +269,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: WorkSp
   const yesterday = addDays(today, -1);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={RETURN_TEXT.payScreenTitle} onBack={requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
         <Card style={{ gap: space[1] }}>
@@ -345,7 +346,7 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: WorkSp
             // Prévia que muda a cada tecla: sem região viva.
             <Banner tone="info" icon={Info} live={false}>
               <MoneyTxt variant="label">
-                {`Um gasto de ${formatBRL(amount)} será registrado em Pago de ${formatMonthBR(monthOf(paidOn)).toLowerCase()}, da conta ${account?.name}.`}
+                {`Um gasto de ${formatBRL(amount)} será registrado em Pago de ${formatMonthBR(monthOf(paidOn)).toLowerCase()}, ${ACCOUNTS_TEXT.leavingFrom(account?.name ?? '')}.`}
               </MoneyTxt>
             </Banner>
           ) : null}

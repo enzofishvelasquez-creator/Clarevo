@@ -3,9 +3,11 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
+import { withExternalScreen } from '@/lib/external-screen';
 import { deleteCacheFile } from '@/lib/image-pick';
 
 export type PhotoSource = 'galeria' | 'camera';
+/** `falha`: a escolha, o recorte ou a redução da foto não deram certo no aparelho (nada foi enviado). */
 export type PickedProfilePhoto = { ok: true; base64: string } | { ok: false; reason: 'cancelado' | 'sem_permissao' | 'foto_grande' | 'falha' };
 
 /** A câmera só no celular; na web, a galeria (o seletor de arquivos do navegador). */
@@ -20,12 +22,13 @@ export const CAMERA_AVAILABLE = Platform.OS !== 'web';
 export async function pickProfilePhoto(source: PhotoSource): Promise<PickedProfilePhoto> {
   const copies: string[] = [];
   try {
+    // O pedido da câmera, a câmera, a galeria e o recorte do sistema são telas de fora: a volta deles não trava o app (lib/external-screen.ts).
     if (source === 'camera') {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      const permission = await withExternalScreen(() => ImagePicker.requestCameraPermissionsAsync());
       if (!permission.granted) return { ok: false, reason: 'sem_permissao' };
     }
     const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 };
-    const res = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+    const res = await withExternalScreen(() => (source === 'camera' ? ImagePicker.launchCameraAsync(options) : ImagePicker.launchImageLibraryAsync(options)));
     const asset = res.canceled ? null : res.assets[0];
     if (!asset) return { ok: false, reason: 'cancelado' };
     copies.push(asset.uri);

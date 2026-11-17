@@ -180,7 +180,8 @@ describe('configuração de publicação', () => {
 
   it('app.json: nome, versão, identificadores, orientação, esquema e fundo da marca', () => {
     expect(app.name).toBe('Clarevo');
-    expect(app.version).toBe('1.0.0');
+    // 1.0.1 (16/11/2026): a primeira versão com atualização pelo ar (EAS Update) e a versão em Conta.
+    expect(app.version).toBe('1.0.1');
     expect(app.orientation).toBe('portrait');
     expect(app.scheme).toBe('clarevo');
     expect(app.backgroundColor).toBe('#2457F5');
@@ -277,7 +278,7 @@ describe('configuração de publicação', () => {
   it('eas.json: perfis preview e production (sem development, porque expo-dev-client não está instalado), com o widget ligado (D-093), e o preview-sem-widget de reserva; AAB e versões remotas somadas sozinhas, APK no preview; sem identificadores de conta', () => {
     expect(Object.keys(eas.build)).toEqual(['preview', 'preview-sem-widget', 'production']);
     // D-093: o widget entra no preview e no production; o preview-sem-widget parte do preview e só desliga (o resto está em widget-config.test.ts).
-    expect(eas.build['preview-sem-widget']).toEqual({ extends: 'preview', env: { CLAREVO_WIDGET: '0' } });
+    expect(eas.build['preview-sem-widget']).toEqual({ extends: 'preview', channel: 'preview-sem-widget', env: { CLAREVO_WIDGET: '0' } });
     expect(eas.cli.appVersionSource).toBe('remote');
     expect(JSON.stringify(eas)).not.toContain('developmentClient');
     // O preview gera build de loja no iOS (TestFlight) com versão remota: sem autoIncrement, o segundo envio repetiria o número de build.

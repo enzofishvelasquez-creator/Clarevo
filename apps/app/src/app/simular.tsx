@@ -14,7 +14,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChartLine, HandCoins, Info } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet, View, type ScrollView, type TextInput } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, StyleSheet, View, type ScrollView, type TextInput } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import { openCalc } from '@/components/calc/open';
@@ -25,6 +25,7 @@ import { SimResultCard, resultSpoken } from '@/components/sim-result';
 import { TermHint } from '@/components/term-hint';
 import { Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useSession } from '@/state/session';
 import { colors, radius, space } from '@/theme/tokens';
 
@@ -165,7 +166,7 @@ export default function SimularScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       {/* Sem pílula de contexto: nada aqui é gravado. */}
       <SubHeader title={T.title} onBack={() => (router.canGoBack() ? router.back() : router.replace('/metas'))} />
       <Screen scrollRef={scrollRef} contentStyle={{ padding: space[5], gap: space[4] }}>

@@ -33,7 +33,7 @@ import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { ExternalLink } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, StyleSheet, View, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { EssentialsBlock } from '@/components/essentials-block';
@@ -48,6 +48,7 @@ import { Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui'
 import { essentialSourceFor, type SavedEssentials } from '@/lib/essentials';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useCreateGoal, useGoalOperationKey, useUpdateGoal } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -268,7 +269,7 @@ export function ReserveForm({
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={R.title} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
         {savedBefore.banner}

@@ -50,6 +50,8 @@ Nada aqui é segredo além da senha da conta, que fica no Bitwarden. O Claude Ch
 
 Se algo falhar, mandar à equipe o link da página do build (`expo.dev/accounts/<owner>/projects/clarevo/builds/...`): o registro não tem segredo, e as variáveis "Plain text" aparecem nele de propósito.
 
+**Atualização pelo ar (16/11/2026, D-100):** a partir do build `preview` com a versão 1.0.1, cada merge no `main` chega aos celulares de teste sem outro APK (fechar e abrir o app). O passo a passo, o que ainda pede build novo e como ver a versão em Conta estão em `docs/50_ATUALIZACOES.md`.
+
 O endereço do site (`EXPO_PUBLIC_SITE_URL`) **não** entra neste primeiro build: só depois de o site final estar publicado com os textos revisados pelo advogado. Sem ele, os links "Termos de uso", "Política de privacidade" e "Privacidade e termos" não aparecem no app; o aviso de aceite dos termos aparece, sem os links.
 
 ## 3. iPhone (quando a Apple aprovar a conta)

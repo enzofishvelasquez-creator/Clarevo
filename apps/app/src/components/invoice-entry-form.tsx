@@ -37,6 +37,7 @@ import { Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui'
 import { invoiceHref } from '@/lib/cards';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useAddCardCharge, useAddCardRefund, useCardEntries, useCardInvoices, useCardOperationKey, useUpdateCardEntry } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
@@ -186,7 +187,7 @@ export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind
   const submitLabel = charge ? S.chargeSave : S.refundSave;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={title} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
         {savedBefore.banner}

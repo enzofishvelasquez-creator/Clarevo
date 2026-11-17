@@ -7,7 +7,7 @@ import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import * as core from '../src/calculators';
-import { CALCULATORS, CALC_GROUPS, CALC_UI_TEXT, MULTA_CARD_TEXT, MULTA_FATURA_FIELDS, MULTA_FATURA_TEXT, MULTA_FIELDS, calcErrorText, calcFields, calcMultaEJuros, calcPrefill, calcTitle, type CalcErrorCode, type CalcSlug } from '../src/calculators';
+import { CALCULATORS, CALC_GROUPS, CALC_UI_TEXT, calcDisclaimer, MULTA_CARD_TEXT, MULTA_FATURA_FIELDS, MULTA_FATURA_TEXT, MULTA_FIELDS, calcErrorText, calcFields, calcMultaEJuros, calcPrefill, calcTitle, type CalcErrorCode, type CalcSlug } from '../src/calculators';
 import { publishedTopics, topicCalculator } from '../src/learn';
 
 /**
@@ -265,7 +265,7 @@ describe('site público: páginas das calculadoras', () => {
       expect(h).toContain(esc(c.subtitle));
       expect(h).toContain(`<p class="migalha"><a href="index.html">Calculadoras</a> · ${esc(CALC_GROUPS.find((g) => g.id === c.group)!.title)}</p>`);
       // O aviso do app, mais a frase sobre estimativa; o ponto de montagem do script e o módulo, que é do próprio site.
-      expect(h).toContain(esc(CALC_UI_TEXT.disclaimer));
+      expect(h).toContain(esc(calcDisclaimer(c.slug)));
       expect(h).toContain('não garantem resultado');
       expect(h).toContain(`<div class="calc" data-calculadora="${c.slug}">`);
       expect(h).toContain('<script type="module" src="calculadora.js"></script>');

@@ -27,6 +27,10 @@ export function calculatorsInGroup(group) {
     return CALCULATORS.filter((c) => c.group === group);
 }
 export const CALC_DISCLAIMER = 'Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.';
+export const DIVIDIR_DISCLAIMER = 'Cálculo com os valores que você informou. A divisão é uma referência: o que vale é o combinado entre as pessoas da casa.';
+export function calcDisclaimer(slug) {
+    return slug === 'dividir-contas' ? DIVIDIR_DISCLAIMER : CALC_DISCLAIMER;
+}
 export const CALC_INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
 export const COTA_UNICA_TITLE = 'Cota única ou parcelado?';
 export const COTA_UNICA_SUBTITLE = 'Descubra os juros embutidos no parcelamento da conta do ano';

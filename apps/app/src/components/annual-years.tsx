@@ -116,7 +116,7 @@ export function AnnualYears({
     if (!confirm || busy) return;
     const { plan, number } = confirm;
     const snapshot = JSON.stringify([s.id, number, plan.affected]);
-    const failed = `Não foi possível tirar ${k === 1 ? 'a conta' : 'as parcelas'} de ${plan.year.label}. Tente novamente.`;
+    const failed = `Não foi possível tirar ${k === 1 ? 'a conta' : 'as parcelas'} de ${plan.year.label}. Tente de novo.`;
     setBusy(true);
     try {
       if (skipKeys.hasPending()) {

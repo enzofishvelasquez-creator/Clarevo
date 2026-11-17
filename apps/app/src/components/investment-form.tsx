@@ -22,10 +22,11 @@ import {
   type InvestmentDetailsField,
   type InvestmentField,
   type InvestmentKind,
+  UNCERTAIN_TEXT,
 } from '@clarevo/core';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, StyleSheet, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { FormFooter } from '@/components/form-footer';
@@ -35,6 +36,7 @@ import { useLeaveGuard } from '@/components/leave-guard';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Card, Chip, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useGoals, useInvalidateInvestments } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
@@ -129,10 +131,10 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
       const code = isRepoError(e) ? e.code : 'desconhecido';
       if (code === 'versao_desatualizada') {
         invalidate();
-        setError('Este investimento mudou em outro aparelho. Volte e abra de novo para ver a versão atual.');
+        setError('Este investimento mudou em outro aparelho. Volte e abra de novo para ver o que mudou.');
       } else if (code === 'chave_reutilizada') {
         invalidate();
-        setError('Pode ser que já tenha sido salvo. Confira a lista de investimentos antes de tentar de novo.');
+        setError(UNCERTAIN_TEXT.investimentos);
       } else {
         if (code === 'meta_invalida') goalsQ.refetch();
         setError(investmentDetailsErrorText(code) ?? investmentSaveErrorText(code));
@@ -143,7 +145,7 @@ export function InvestmentForm({ contextId, investment }: { contextId: string; i
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={editing ? T.editTitle : T.newTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" fixed />} />
       <Screen contentStyle={styles.body}>
         <Card style={{ gap: space[4] }}>

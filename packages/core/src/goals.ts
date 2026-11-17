@@ -849,7 +849,7 @@ export const GOAL_ERROR_TEXT = {
   valor_acima_do_limite: 'O valor passa do limite de R$ 9.999.999,99.',
   data_futura: 'Use uma data até hoje. Registre o movimento depois que ele acontecer.',
   observacao_longa: 'Use no máximo 80 caracteres.',
-  versao_desatualizada: 'Esta meta foi alterada em outro aparelho. Confira a versão atual antes de salvar.',
+  versao_desatualizada: 'Esta meta foi alterada em outro aparelho. Confira o que mudou antes de salvar.',
   // Sem "disponível" nos textos de metas (para não confundir com saldo).
   nao_encontrado: 'Esta meta ou este movimento foi excluído. Confira a lista atual.',
   reserva_ja_existe: 'Você já tem uma reserva para imprevistos. Abra a reserva para alterar o valor.',
@@ -1071,6 +1071,8 @@ export const GOALS_TEXT = {
 
   // Detalhe (/meta/[id]).
   detail: {
+    /** Rótulo do valor grande do detalhe (o objetivo da meta vem logo abaixo, em "de R$ 6.000,00 · 20%"). */
+    savedLabel: 'Guardado',
     /** "de R$ 22.500,00 · 20%" */
     ofTarget: (targetCents: Cents, percent: number) => `de ${formatBRL(targetCents)} · ${pct(percent)}`,
     /** "Faltam R$ 18.000,00" */
@@ -1127,7 +1129,7 @@ export const GOALS_TEXT = {
       futureDate: 'Use uma data até hoje. Registre o aporte depois de guardar.',
       saved: 'Aporte registrado.',
       /** O campo vem com o valor planejado por mês da meta (teste de 09/11/2026: "é mais prático eu concordar com o que defini"). */
-      planned: 'Preenchemos com o valor planejado por mês. Pode mudar.',
+      planned: 'Já vem com o valor planejado por mês. Pode mudar.',
     },
     resgate: {
       title: 'Registrar resgate',
@@ -1361,6 +1363,16 @@ export interface GoalDetailTexts {
   rounding: string | null;
 }
 
+/** O prazo pede por mês o mesmo valor do plano (e a linha do prazo aparece): dizer o plano de novo seria repetir. */
+function samePlanAsDeadline(plan: GoalPlan): boolean {
+  return (
+    !plan.progress.reached &&
+    plan.deadline !== null &&
+    plan.deadline.monthlyCents !== null &&
+    plan.deadline.monthlyCents === plan.plannedMonthlyCents
+  );
+}
+
 export function goalDetailTexts(goal: Goal, movements: readonly GoalMovement[], today: IsoDate): GoalDetailTexts {
   const plan = goalPlan(goal, movements, today);
   const D = GOALS_TEXT.detail;
@@ -1376,8 +1388,11 @@ export function goalDetailTexts(goal: Goal, movements: readonly GoalMovement[], 
         : plan.deadline.monthlyCents === null
           ? D.deadlinePassed(plan.deadline.month)
           : D.deadline(plan.deadline.month, plan.deadline.monthlyCents),
+    // O plano dito uma vez só (revisão das telas, 16/11/2026): com prazo e com um plano do mesmo valor por mês, a linha do prazo já diz tudo.
     planned:
-      plan.plannedMonthlyCents !== null && plan.reachMonth !== null ? D.planned(plan.plannedMonthlyCents, plan.reachMonth, plan.firstProjectedMonth) : null,
+      plan.plannedMonthlyCents !== null && plan.reachMonth !== null && !samePlanAsDeadline(plan)
+        ? D.planned(plan.plannedMonthlyCents, plan.reachMonth, plan.firstProjectedMonth)
+        : null,
     composition: goal.valueSource === 'investimentos' ? [D.compositionFromInvestments(goal.savedCents)] : [
       D.compositionInitial(c.initialCents),
       D.compositionDeposits(c.depositsCents),

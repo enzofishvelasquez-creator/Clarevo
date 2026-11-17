@@ -61,10 +61,34 @@ export function deviceTimeZone(): string {
   }
 }
 
-/** Dia atual no fuso da pessoa (ex.: America/Sao_Paulo), como data civil. */
+/**
+ * Dia atual no fuso da pessoa (ex.: America/Sao_Paulo), como data civil. Monta a data pelas partes (ano, mês e dia), como
+ * `formatDateTimeBR`, em vez de confiar no texto formatado: o Hermes de alguns Android não formata 'en-CA' como AAAA-MM-DD. Calendário
+ * gregoriano e algarismos latinos pedidos à parte. Se o resultado não for uma data AAAA-MM-DD válida (ou o fuso for desconhecido), vale a
+ * data do relógio do aparelho.
+ */
 export function todayIn(timeZone: string, now: Date = new Date()): IsoDate {
-  // en-CA formata como AAAA-MM-DD.
-  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      calendar: 'gregory',
+      numberingSystem: 'latn',
+    }).formatToParts(now);
+    const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+    const iso = `${get('year')}-${get('month').padStart(2, '0')}-${get('day').padStart(2, '0')}`;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && isValidIsoDate(iso)) return iso;
+  } catch {
+    // Fuso desconhecido ou Intl incompleto: a data do aparelho.
+  }
+  return localIsoDate(now);
+}
+
+/** A data civil do relógio do aparelho (fuso local), AAAA-MM-DD. */
+function localIsoDate(now: Date): IsoDate {
+  return `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 /** Soma dias a uma data civil sem passar pelo fuso local. */

@@ -115,7 +115,7 @@ export const ACCOUNT_MARK_TEXT: Readonly<Record<AccountMarkKey, { title: string;
   importou: { title: 'Importar um extrato ou uma fatura', href: '/importar' },
   telegram: { title: 'Ligar o Telegram', href: '/conta/telegram' },
   familia: { title: 'Criar ou entrar numa Família', href: '/familia' },
-  conta: { title: 'Cadastrar uma conta de origem', href: '/contas/nova' },
+  conta: { title: 'Cadastrar um banco ou carteira', href: '/contas/nova' },
   limite: { title: 'Definir o seu limite de renda comprometida', href: '/renda-comprometida/limite' },
   imagem: { title: 'Escolher a imagem de uma meta', href: '/metas' },
 };
@@ -144,7 +144,7 @@ export const LEVEL_TEXT = {
   levelRowLabel: (name: string, n: number, current: boolean) =>
     `${name}, ${n === 0 ? 'toda conta começa aqui' : `a partir de ${n} marcos`}${current ? ', seu nível' : ''}`,
   yourLevel: 'Seu nível',
-  loadFailed: 'Não foi possível carregar o nível da conta. Tente novamente.',
+  loadFailed: 'Não foi possível carregar o nível da conta. Tente de novo.',
   /** O card de comemoração da troca de nível (Resumo). */
   celebrateEyebrow: 'Novo nível',
   celebrateTitle: (level: AccountLevel) => `Sua conta chegou ao nível ${LEVEL_NAME[level]}!`,

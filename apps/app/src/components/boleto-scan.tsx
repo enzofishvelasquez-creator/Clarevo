@@ -2,14 +2,19 @@ import { BOLETO_TEXT, NOTA_CAMERA, NOTA_FLOW_TEXT, NOTA_TEXT, readBoleto, readRe
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Barcode, ChevronRight, Flashlight, FlashlightOff } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
+import { dialogStyles, useDialogFrame } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
 import { cameraIsAvailable } from '@/components/receipt-scan';
 import { Button, TextField, Txt, styles as ui } from '@/components/ui';
 import { pickAndReadBoletoImage, pickAndReadBoletoPdf } from '@/lib/boleto-read';
 import { improveCameraFocus } from '@/lib/camera-focus';
+import { openDeviceSettings } from '@/lib/device';
+import { withExternalScreen } from '@/lib/external-screen';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { OCR_AVAILABLE } from '@/lib/ocr';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -136,6 +141,7 @@ export function BoletoReader({ today, disabled, onRead }: { today: IsoDate; disa
 function BoletoPaste({ visible, onSubmit, onClose }: { visible: boolean; onSubmit: (text: string) => string | null; onClose: () => void }) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const frame = useDialogFrame();
   useEffect(() => {
     if (visible) {
       setText('');
@@ -145,33 +151,36 @@ function BoletoPaste({ visible, onSubmit, onClose }: { visible: boolean; onSubmi
   const submit = () => setError(onSubmit(text));
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.backdrop}>
-          <View style={styles.box} accessibilityViewIsModal accessibilityRole="alert">
-            <Txt variant="title" accessibilityRole="header">
-              {BOLETO_TEXT.pasteTitle}
-            </Txt>
-            <TextField
-              label={BOLETO_TEXT.pasteLabel}
-              hint={BOLETO_TEXT.pasteHint}
-              value={text}
-              onChangeText={(t) => {
-                setText(t);
-                if (error) setError(null);
-              }}
-              autoFocus
-              keyboardType="number-pad"
-              inputMode="numeric"
-              autoCorrect={false}
-              spellCheck={false}
-              returnKeyType="go"
-              onSubmitEditing={submit}
-              error={error ?? undefined}
-            />
-            <View style={{ gap: space[2], marginTop: space[1] }}>
-              <Button label={BOLETO_TEXT.pasteSubmit} onPress={submit} />
-              <Button label="Cancelar" tone="ghost" onPress={onClose} />
-            </View>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={KEYBOARD_BEHAVIOR}>
+        {/* Com o teclado aberto e letra grande, o que não couber rola dentro da caixa (como no ConfirmDialog). */}
+        <View style={[dialogStyles.backdrop, frame.backdrop]}>
+          <View style={[dialogStyles.box, frame.box]} accessibilityViewIsModal accessibilityRole="alert">
+            <ScrollView contentContainerStyle={dialogStyles.content} keyboardShouldPersistTaps="handled">
+              <Txt variant="title" accessibilityRole="header">
+                {BOLETO_TEXT.pasteTitle}
+              </Txt>
+              <TextField
+                label={BOLETO_TEXT.pasteLabel}
+                hint={BOLETO_TEXT.pasteHint}
+                value={text}
+                onChangeText={(t) => {
+                  setText(t);
+                  if (error) setError(null);
+                }}
+                autoFocus
+                keyboardType="number-pad"
+                inputMode="numeric"
+                autoCorrect={false}
+                spellCheck={false}
+                returnKeyType="go"
+                onSubmitEditing={submit}
+                error={error ?? undefined}
+              />
+              <View style={{ gap: space[2], marginTop: space[1] }}>
+                <Button label={BOLETO_TEXT.pasteSubmit} onPress={submit} />
+                <Button label="Cancelar" tone="ghost" onPress={onClose} />
+              </View>
+            </ScrollView>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -197,6 +206,7 @@ function BoletoCamera({
   onClose: () => void;
 }) {
   const [permission, requestPermission] = useCameraPermissions();
+  const insets = useSafeAreaInsets();
   const [torch, setTorch] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -248,16 +258,18 @@ function BoletoCamera({
     <Modal visible={visible} animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <SubHeader title={BOLETO_TEXT.cameraTitle} onBack={onClose} />
-        <View style={styles.cameraBody}>
+        {/* Rola com letra grande em tela pequena; a barra de navegação do Android fica fora dos botões de baixo. */}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.cameraBody, { paddingBottom: insets.bottom + space[5] }]}>
           {permission === null ? (
             <Txt color={colors.textSecondary}>{NOTA_FLOW_TEXT.cameraStarting}</Txt>
           ) : !granted ? (
             <View style={{ gap: space[3] }}>
               <Txt>{canAsk ? BOLETO_TEXT.cameraIntro : BOLETO_TEXT.cameraDenied}</Txt>
               {canAsk ? (
-                <Button label={NOTA_TEXT.cameraAllow} onPress={() => requestPermission()} />
+                // O pedido do sistema é uma tela de fora: a volta dele não trava o app (lib/external-screen.ts).
+                <Button label={NOTA_TEXT.cameraAllow} onPress={() => void withExternalScreen(requestPermission)} />
               ) : Platform.OS !== 'web' ? (
-                <Button label="Abrir ajustes" tone="soft" onPress={() => Linking.openSettings().catch(() => {})} />
+                <Button label="Abrir ajustes" tone="soft" onPress={openDeviceSettings} />
               ) : null}
             </View>
           ) : mountError ? (
@@ -308,7 +320,7 @@ function BoletoCamera({
             <Button label={BOLETO_TEXT.paste} tone="soft" onPress={onPaste} />
             <Button label={NOTA_FLOW_TEXT.back} tone="ghost" onPress={onClose} />
           </View>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -325,9 +337,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.brandTint,
   },
-  backdrop: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: space[6] },
-  box: { width: '100%', maxWidth: 420, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space[6], gap: space[3] },
-  cameraBody: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', padding: space[5], gap: space[4], justifyContent: 'space-between' },
+  cameraBody: { flexGrow: 1, width: '100%', maxWidth: 560, alignSelf: 'center', padding: space[5], gap: space[4], justifyContent: 'space-between' },
   preview: { width: '100%', aspectRatio: 4 / 3, maxHeight: 360, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.camera },
   frameBox: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   // Moldura larga e baixa, do formato do código de barras do boleto.

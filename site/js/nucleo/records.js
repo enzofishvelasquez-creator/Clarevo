@@ -21,9 +21,20 @@ export const NEXT_MONTH_TEXT = {
         const base = `Entra no Recebido de ${formatMonthYearBR(next)}, não no de ${formatMonthYearBR(own)}.`;
         return today !== undefined && own === monthOf(today) ? `${base} ${firstDayLine(next)}` : base;
     },
-    futureNotice: (month) => `Conta no Recebido de ${formatMonthYearBR(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
-    rowNote: (month) => `conta em ${formatMonthYearBR(month).replace(/ de \d{4}$/, '')}`,
+    futureNotice: (month) => `Entra no Recebido de ${formatMonthYearBR(month)}, que aparece no Resumo a partir de 01/${month.slice(5, 7)}/${month.slice(0, 4)}.`,
+    rowNote: (month) => `entra em ${formatMonthYearBR(month).replace(/ de \d{4}$/, '')}`,
     detailSuffix: ' (mês seguinte)',
+};
+export const RECORD_TEXT = {
+    saved: (kind) => (kind === 'despesa' ? 'Gasto salvo.' : 'Recebimento salvo.'),
+    updated: 'Alterações salvas.',
+    edit: (kind) => (kind === 'despesa' ? 'Editar gasto' : 'Editar recebimento'),
+    remove: (kind) => (kind === 'despesa' ? 'Excluir gasto' : 'Excluir recebimento'),
+    removeTitle: (kind) => (kind === 'despesa' ? 'Excluir gasto?' : 'Excluir recebimento?'),
+    removed: (kind) => (kind === 'despesa' ? 'Gasto excluído.' : 'Recebimento excluído.'),
+    removedReopened: 'Gasto excluído. A conta a pagar voltou para Ainda a pagar.',
+    linkedTo: 'Ligado a',
+    monthRow: 'Entra no mês',
 };
 export const ANNUAL_LEAD_MONTHS = 2;
 export const PARTS_PER_YEAR_MAX = 12;

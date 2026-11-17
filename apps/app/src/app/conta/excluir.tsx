@@ -12,11 +12,12 @@ import {
 import { router } from 'expo-router';
 import { AlertCircle, ExternalLink, FileDown, Info, Users } from 'lucide-react-native';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { KeyboardAvoidingView, View } from 'react-native';
 
 import { SubHeader } from '@/components/header';
 import { Banner, Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { forgetDevice } from '@/lib/device-forget';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { signOutIntent } from '@/lib/nav';
 import { DEVICE_STORE, openStoreSubscriptions, storeUsedHere } from '@/lib/store-purchases';
 import { useAccess } from '@/state/access';
@@ -101,7 +102,7 @@ export default function ExcluirContaScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={T.title} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <Txt color={colors.textSecondary}>{T.intro}</Txt>
@@ -143,7 +144,7 @@ export default function ExcluirContaScreen() {
           ) : family.isError ? (
             <>
               <Txt color={colors.textSecondary}>{FAMILY_TEXT.loadFailed}</Txt>
-              <LinkButton label="Tentar novamente" onPress={() => family.refetch()} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+              <LinkButton label="Tentar de novo" onPress={() => family.refetch()} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
             </>
           ) : (
             <>
@@ -200,6 +201,6 @@ export default function ExcluirContaScreen() {
           <Button label={T.cancel} tone="ghost" disabled={busy} onPress={() => (router.canGoBack() ? router.back() : router.replace('/conta'))} />
         </Card>
       </Screen>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

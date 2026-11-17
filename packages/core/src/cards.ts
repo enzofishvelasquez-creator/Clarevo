@@ -1041,7 +1041,7 @@ export interface InvoicePaymentDraft {
   dateText: string;
 }
 
-/** "Pagar fatura": total ou "Outro valor", e a data do pagamento. */
+/** "Registrar pagamento" da fatura: total ou "Outro valor", e a data do pagamento. */
 export function validateInvoicePaymentDraft(
   draft: InvoicePaymentDraft,
   invoice: Pick<Invoice, 'totalCents' | 'periodStartOn'>,
@@ -1182,9 +1182,9 @@ export function limitUsedText(usedCents: Cents, limitCents: Cents | null): strin
   return limitCents === null ? `Limite usado: ${formatBRL(usedCents)}` : `Limite usado: ${formatBRL(usedCents)} de ${formatBRL(limitCents)}`;
 }
 
-/** "Esta compra entra na fatura de novembro do Nubank e conta em Pago quando a fatura for paga." */
+/** "Esta compra entra na fatura de novembro do Nubank e em Pago quando a fatura for paga." */
 export function purchaseNotice(invoiceMonth: IsoMonth, cardName: string, today: IsoDate): string {
-  return `Esta compra entra na fatura de ${invoiceMonthLabel(invoiceMonth, today)} do ${cardName} e conta em Pago quando a fatura for paga.`;
+  return `Esta compra entra na fatura de ${invoiceMonthLabel(invoiceMonth, today)} do ${cardName} e em Pago quando a fatura for paga.`;
 }
 
 /** Complemento do aviso nas compras parceladas: "A parcela 1 de 10 entra nessa fatura; as outras 9 entram nas faturas seguintes." */
@@ -1327,10 +1327,10 @@ export const CARD_ERROR_TEXT = {
   lancamento_automatico: 'O saldo anterior vem do pagamento parcial da fatura anterior. Para mudar, desfaça esse pagamento.',
   situacao_invalida: ERROR_TEXT.salvar_falhou,
   tipo_invalido: ERROR_TEXT.salvar_falhou,
-  versao_desatualizada: 'Este cartão ou lançamento foi alterado em outro aparelho. Confira a versão atual antes de salvar.',
+  versao_desatualizada: 'Este cartão ou lançamento foi alterado em outro aparelho. Confira o que mudou antes de salvar.',
   nao_encontrado: 'Este cartão ou lançamento foi excluído. Confira a lista atual.',
-  pagar_falhou: 'Não foi possível registrar o pagamento da fatura. Seu preenchimento foi mantido. Tente novamente.',
-  desfazer_falhou: 'Não foi possível desfazer o pagamento da fatura. Tente novamente.',
+  pagar_falhou: 'Não foi possível registrar o pagamento da fatura. Seu preenchimento foi mantido. Tente de novo.',
+  desfazer_falhou: 'Não foi possível desfazer o pagamento da fatura. Tente de novo.',
 } as const;
 
 /**
@@ -1355,6 +1355,8 @@ export const CARDS_TEXT = {
   organizeRow: 'Cartões',
   organizeHint: 'Faturas, compras no cartão e limite',
   newCard: 'Cadastrar cartão',
+  /** Com algum cartão cadastrado, o botão secundário depois da lista. */
+  addAnotherCard: 'Adicionar outro cartão',
   emptyTitle: 'Nenhum cartão cadastrado',
   emptyBody: 'Cadastre um cartão para anotar as compras na fatura. Elas só contam em Pago quando você pagar a fatura.',
   privacy: 'Guardamos só o apelido e os 4 últimos dígitos. Nunca digite o número completo, o código de segurança nem a validade.',
@@ -1412,17 +1414,19 @@ export const CARDS_TEXT = {
     installments: 'Em quantas vezes?',
     installmentsHint: 'De 1 a 48 parcelas.',
     save: 'Anotar compra no cartão',
+    /** O rótulo visível no rodapé do formulário, que cabe numa linha ao lado de "Cancelar"; o nome acessível continua o de `save`. */
+    saveShort: 'Anotar compra',
     saved: 'Compra anotada no cartão.',
     savedFor: (invoiceMonth: IsoMonth, today: IsoDate) => `Compra anotada na fatura de ${invoiceMonthLabel(invoiceMonth, today)}.`,
   },
 
   // Fatura.
   invoice: {
-    payInvoice: 'Pagar fatura',
+    payInvoice: 'Registrar pagamento',
     /** Fatura ainda aberta (ou futura): quando poderá ser paga. */
     payAfterClosing: (closingOn: IsoDate) =>
-      `Esta fatura ainda está aberta. Registre o pagamento depois do fechamento, em ${formatDateBR(closingOn)}. Se você já pagou antes, use a data em que pagou.`,
-    payTotal: 'Pagar o total',
+      `Esta fatura fecha em ${formatDateBR(closingOn)}. Depois disso, o pagamento pode ser registrado aqui. Se pagar antes, informe a data real do pagamento.`,
+    payTotal: 'Paguei o total',
     payOther: 'Outro valor',
     payAmount: 'Valor pago',
     payDate: 'Data do pagamento',
@@ -1522,9 +1526,9 @@ export const CARDS_TEXT = {
     entryDeleteBody: 'O valor sai da fatura e o total dela é recalculado.',
     entryDeletePurchaseBody: 'A compra inteira sai das faturas, com todas as parcelas, e os totais são recalculados.',
     editEntryHint: 'Abre as ações do lançamento',
-    payTitle: 'Pagar fatura',
+    payTitle: 'Pagamento da fatura',
     payMonthNote: 'O valor pago entra em Pago no mês da data do pagamento, e a fatura sai de Ainda a pagar.',
-    payAccount: 'Conta de onde saiu o pagamento',
+    payAccount: 'De onde saiu o pagamento',
     chargeTitle: 'Informar encargos',
     chargeEditTitle: 'Editar encargo',
     chargeSave: 'Salvar encargo',

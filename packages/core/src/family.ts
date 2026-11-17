@@ -282,13 +282,14 @@ export const FAMILY_TEXT = {
   yourRole: (role: FamilyRole): string => `Seu papel: ${FAMILY_ROLE_LABEL[role]}`,
   peopleTitle: 'Pessoas',
   you: 'você',
-  exMembersTitle: 'Ex-membros',
+  exMembersTitle: 'Pessoas que saíram',
   exMembersNote: 'O que essas pessoas anotaram continua na Família, como histórico da casa. Quem excluiu a conta aparece como "Pessoa que saiu".',
-  exMember: (firstName: string): string => (firstName === FAMILY_DEPARTED_NAME ? FAMILY_DEPARTED_NAME : `ex-membro · ${firstName}`),
+  /** Quem saiu: "Nina (saiu da Família)", também em "Anotado por Nina (saiu da Família) em…". Quem excluiu a conta: "Pessoa que saiu". */
+  exMember: (firstName: string): string => (firstName === FAMILY_DEPARTED_NAME ? FAMILY_DEPARTED_NAME : `${firstName} (saiu da Família)`),
   memberLine: (firstName: string, isMe: boolean): string => (isMe ? `${firstName} (você)` : firstName),
   memberA11y: (firstName: string, role: FamilyRole, isMe: boolean): string =>
     `${isMe ? `${firstName}, você` : firstName}, ${FAMILY_ROLE_LABEL[role]}`,
-  exMemberA11y: (firstName: string): string => (firstName === FAMILY_DEPARTED_NAME ? 'Ex-membro, pessoa que excluiu a conta' : `Ex-membro ${firstName}`),
+  exMemberA11y: (firstName: string): string => (firstName === FAMILY_DEPARTED_NAME ? `${FAMILY_DEPARTED_NAME}, excluiu a conta` : `${firstName}, saiu da Família`),
   /** Ações do titular sobre uma pessoa. */
   manage: 'Gerenciar',
   manageA11y: (firstName: string, role: FamilyRole): string => `Gerenciar ${firstName}, ${FAMILY_ROLE_LABEL[role]}`,
@@ -350,11 +351,11 @@ export const FAMILY_TEXT = {
   endBlocked: 'Para encerrar, remova antes as outras pessoas ou passe a titularidade.',
   cancel: 'Cancelar',
   loading: 'Carregando a Família…',
-  loadFailed: 'Não foi possível carregar a Família. Tente novamente.',
+  loadFailed: 'Não foi possível carregar a Família. Tente de novo.',
   /** "Quem vê estes dados?" na Família. */
   whoSeesIntro: 'Estas pessoas veem os registros da Família, cada uma conforme o papel que tem.',
   whoSeesNote:
-    'Gastos, contas a pagar, gastos fixos, parcelamentos, cartões, metas e contas de origem da Família ficam visíveis para estas pessoas. O que cada pessoa anotou continua na Família, com o primeiro nome dela, mesmo depois de sair. Quem exclui a conta fica como "Pessoa que saiu", sem nome e sem e-mail.',
+    'Gastos, contas a pagar, gastos fixos, parcelamentos, cartões, metas, bancos e carteira da Família ficam visíveis para estas pessoas. O que cada pessoa anotou continua na Família, com o primeiro nome dela, mesmo depois de sair. Quem exclui a conta fica como "Pessoa que saiu", sem nome e sem e-mail.',
   /** Quem anotou, nos detalhes (L-6). */
   notedBy: (label: string): string => `Anotado por ${label}`,
   /** Onde a anotação vai ficar. */
@@ -395,7 +396,7 @@ export const INVITE_TEXT = {
   pasteLabel: 'Link do convite',
   pasteHint: 'Cole o link que você recebeu de quem convidou.',
   pasteSubmit: 'Ver convite',
-  pasteInvalid: 'Não encontramos um convite neste texto. Confira o link que você recebeu.',
+  pasteInvalid: 'Não há um convite neste texto. Confira o link que você recebeu.',
   openFamily: 'Ver a Família',
   goHome: 'Ir para o início',
   retry: 'Tentar de novo',
@@ -416,7 +417,7 @@ export const FAMILY_ERROR_TEXT = {
   sem_permissao: 'Só quem é titular da Família pode fazer isto.',
   nao_encontrado: 'Esta Família ou esta pessoa não está mais disponível. Atualize a tela.',
   chave_reutilizada: ERROR_TEXT.salvar_falhou,
-  rede: 'Sem conexão no momento. Tente novamente.',
+  rede: 'Sem conexão no momento. Tente de novo.',
   salvar_falhou: ERROR_TEXT.salvar_falhou,
   carregar_falhou: ERROR_TEXT.carregar_falhou,
 } as const;

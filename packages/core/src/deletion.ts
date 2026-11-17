@@ -53,7 +53,8 @@ export const DELETE_TEXT = {
   entry: 'Excluir minha conta',
   entryHint: 'Apaga a sua conta e os seus dados. Antes de confirmar, a próxima tela mostra o que é apagado e o que continua.',
   entryButton: 'Ver o que é apagado',
-  entryA11y: 'Excluir minha conta: ver o que é apagado e o que continua',
+  /** O nome acessível começa pelo texto visível do botão (WCAG 2.5.3). */
+  entryA11y: 'Ver o que é apagado ao excluir minha conta e o que continua',
   /** A tela. */
   title: 'Excluir minha conta',
   intro: 'Ao excluir, você perde o acesso na hora e não é possível desfazer. O seu e-mail fica livre para uma conta nova, que começa vazia.',
@@ -61,7 +62,7 @@ export const DELETE_TEXT = {
   erased: [
     'Tudo o que você anotou no seu Pessoal, como gastos, recebimentos, contas a pagar, gastos fixos, parcelamentos e contas do ano. Os dados são apagados de verdade, não ficam só escondidos.',
     'As metas e o que você guardou ou retirou delas, e os investimentos e o que você registrou neles. Também os cartões, as compras e as faturas, as notas fiscais, o orçamento, o limite e a renda de referência.',
-    'As contas de origem, as assinaturas, as importações e a revisão dos últimos meses. Também o que você respondeu sobre guardar dinheiro por mês e em "Como você conheceu a Clarevo?".',
+    'Bancos e carteira, as assinaturas, as importações e a revisão dos últimos meses. Também o que você respondeu sobre guardar dinheiro por mês e em "Como você conheceu a Clarevo?".',
     'O histórico de operações e de uso da sua conta.',
     'Se você usa a Clarevo como benefício da empresa, o benefício termina na hora. A empresa vê só que a licença terminou.',
   ],
@@ -103,7 +104,7 @@ export const DELETE_TEXT = {
   /** Resposta perdida: a sessão terminou depois de pedir a exclusão, sem a confirmação do servidor. */
   unsureTitle: 'Não foi possível confirmar a exclusão',
   unsureBody:
-    'A conexão caiu antes da resposta e a sessão terminou neste aparelho. Entre de novo para conferir: se a conta foi excluída, o seu e-mail está livre; se não, a conta e os seus dados continuam como estavam.',
+    'A conexão caiu antes da resposta e você saiu da conta neste aparelho. Entre de novo para conferir: se a conta foi excluída, o seu e-mail está livre; se não, a conta e os seus dados continuam como estavam.',
   unsureEnter: 'Entrar',
   /** "Quem vê estes dados?". */
   whoSees:
@@ -116,7 +117,7 @@ export const DELETE_ERROR_TEXT = {
   confirmacao_invalida: 'Digite EXCLUIR para confirmar.',
   transferir_antes: 'Antes de excluir a conta, passe a titularidade da Família para outra pessoa ou remova as outras pessoas dela.',
   rede: 'Sem conexão no momento. Tente de novo: se a conta já tiver sido excluída, você sai dela.',
-  failed: 'Não foi possível excluir a conta agora. Tente novamente.',
+  failed: 'Não foi possível excluir a conta agora. Tente de novo.',
 } as const;
 
 /** Texto de um erro da tela; o que não é conhecido cai em "Não foi possível excluir a conta agora...". */

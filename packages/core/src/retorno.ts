@@ -730,7 +730,7 @@ export const RETURN_TEXT = {
   moveOn: 'Seguir adiante',
   /** Aviso de sucesso depois de "Seguir adiante". */
   movedOn: 'Combinado. Os meses ficam como estão, e você pode anotar datas passadas quando quiser.',
-  decideFailed: 'Não foi possível salvar sua escolha. Tente novamente.',
+  decideFailed: 'Não foi possível salvar sua escolha. Tente de novo.',
   /** Botão da faixa de contas criadas vencidas em /a-pagar enquanto a faixa do retorno estiver ativa. */
   toPayAction: 'Ver resumo dos últimos meses',
 
@@ -790,7 +790,7 @@ export const RETURN_TEXT = {
   noActiveReview: 'Não há revisão dos últimos meses agora.',
   backToSummary: 'Voltar ao Resumo',
   loadFailed: 'Não foi possível carregar o resumo dos últimos meses.',
-  retry: 'Tentar novamente',
+  retry: 'Tentar de novo',
 
   // /retomar/atualizar · passo a passo.
   /** "Mês 1 de 5" */
@@ -818,15 +818,15 @@ export const RETURN_TEXT = {
   /** "Marcar as 2 selecionadas como pagas no vencimento" */
   batchButton: (n: number) => (n === 1 ? 'Marcar a selecionada como paga no vencimento' : `Marcar as ${n} selecionadas como pagas no vencimento`),
   batchTitle: (n: number) => (n === 1 ? 'Marcar 1 conta como paga?' : `Marcar ${n} contas como pagas?`),
-  /** "Aluguel: R$ 2.500,00 em 05/07/2026. … Saem da conta Conta principal." (accountName null: várias contas, com chips) */
+  /** "Aluguel: R$ 2.500,00 em 05/07/2026. … Saem de Conta principal." (accountName null: várias contas, com chips) */
   batchBody: (rows: readonly Pick<ReviewRow, 'description' | 'series' | 'dueOn' | 'amountCents'>[], accountName: string | null) =>
     [
       ...rows.map((r) => `${rowName(r)}: ${formatBRL(r.amountCents)} em ${formatDateBR(r.dueOn)}.`),
-      accountName === null ? null : `${rows.length === 1 ? 'Sai' : 'Saem'} da conta ${accountName}.`,
+      accountName === null ? null : `${rows.length === 1 ? 'Sai' : 'Saem'} de ${accountName}.`,
     ]
       .filter(Boolean)
       .join(' '),
-  batchAccountLabel: 'Conta de saída',
+  batchAccountLabel: 'Saem de',
   back: 'Voltar',
   batchConfirm: (n: number) => (n === 1 ? 'Marcar como paga' : 'Marcar como pagas'),
   /** "1 de 2 marcadas como pagas. Financiamento do carro de julho: algo mudou em outro aparelho. Confira e tente de novo." */
@@ -837,9 +837,9 @@ export const RETURN_TEXT = {
   /** Anúncio do lote (uma vez, só o resultado final). */
   batchDone: (n: number) => (n === 1 ? '1 conta marcada como paga' : `${n} contas marcadas como pagas`),
   payTitle: 'Marcar como paga?',
-  /** "Aluguel de julho: R$ 2.500,00 em 05/07/2026, da conta Conta principal." */
+  /** "Aluguel de julho: R$ 2.500,00 em 05/07/2026, saindo de Conta principal." */
   payBody: (shortName: string, amountCents: Cents, paidOn: IsoDate, accountName: string) =>
-    `${shortName}: ${formatBRL(amountCents)} em ${formatDateBR(paidOn)}, da conta ${accountName}.`,
+    `${shortName}: ${formatBRL(amountCents)} em ${formatDateBR(paidOn)}, saindo de ${accountName}.`,
   payChange: 'Mudar valor ou data',
   confirm: 'Confirmar',
   /** Linha em negrito do diálogo "Não houve": "Aluguel · R$ 2.500,00" ou "Luz · cerca de R$ 180,00 (estimado)". */

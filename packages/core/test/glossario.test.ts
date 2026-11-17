@@ -14,11 +14,16 @@ const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const FORA = '(?![\\p{L}\\p{N}_])';
 const DENTRO = '(?<![\\p{L}\\p{N}_])';
 
-const APOSENTADOS: readonly { nome: RegExp; usar: string }[] = [
+const APOSENTADOS: readonly { nome: RegExp; usar: string; exceto?: RegExp }[] = [
   { nome: new RegExp(`${DENTRO}[Mm]ovimentações${FORA}`, 'u'), usar: 'Movimentos' },
-  { nome: /Suas contas/u, usar: 'Contas de origem' },
-  { nome: /Gerenciar contas(?! de origem)/u, usar: 'Gerenciar contas de origem' },
-  { nome: /[Cc]onta de destino/u, usar: 'Conta de origem' },
+  { nome: /Suas contas/u, usar: 'Bancos e carteira' },
+  { nome: /Gerenciar contas/u, usar: 'Gerenciar bancos e carteira' },
+  { nome: /[Cc]onta de destino/u, usar: 'Banco ou carteira' },
+  // Decisão de 16/11/2026: de onde sai o dinheiro é "Bancos e carteira" ("conta" ficava parecido com "conta a pagar").
+  // A política de privacidade e a exclusão de conta (docs/legal, revisadas com o advogado) ainda dizem "conta de origem": mudam
+  // só numa nova versão dos documentos.
+  { nome: /[Cc]ontas? de origem/u, usar: 'Bancos e carteira', exceto: /^site\/(privacidade|excluir-conta)\.html$/ },
+  { nome: /\b[Cc]onta Conta principal/u, usar: 'Conta principal, sem repetir "conta"' },
   { nome: new RegExp(`${DENTRO}[Cc]ontextos?${FORA}`, 'u'), usar: 'espaço (Pessoal ou Família)' },
   { nome: new RegExp(`${DENTRO}[Ee]sconder${FORA}`, 'u'), usar: 'Ocultar' },
 ];
@@ -48,7 +53,8 @@ function achados(): string[] {
       .split('\n')
       .forEach((linha, i) => {
         if (ehComentario(linha) || /keywords\s*:/.test(linha)) return;
-        for (const { nome, usar } of APOSENTADOS) {
+        for (const { nome, usar, exceto } of APOSENTADOS) {
+          if (exceto?.test(rel)) continue;
           const m = nome.exec(linha);
           if (m) saida.push(`${rel}:${i + 1}: "${m[0]}" (use ${usar})`);
         }
@@ -66,8 +72,11 @@ describe('glossário: um nome só para cada coisa (D-072)', () => {
     const pega = (texto: string) => APOSENTADOS.filter(({ nome }) => nome.test(texto)).map((a) => a.usar);
     expect(pega('Ir para Movimentações')).toEqual(['Movimentos']);
     expect(pega('Ir para Movimentos')).toEqual([]);
-    expect(pega('Gerenciar contas')).toEqual(['Gerenciar contas de origem']);
-    expect(pega('Gerenciar contas de origem')).toEqual([]);
+    expect(pega('Gerenciar contas')).toEqual(['Gerenciar bancos e carteira']);
+    expect(pega('Gerenciar contas de origem')).toEqual(['Gerenciar bancos e carteira', 'Bancos e carteira']);
+    expect(pega('Gerenciar bancos e carteira')).toEqual([]);
+    expect(pega('saindo da conta Conta principal')).toEqual(['Conta principal, sem repetir "conta"']);
+    expect(pega('saindo de Conta principal')).toEqual([]);
     expect(pega('o contexto Pessoal')).toEqual(['espaço (Pessoal ou Família)']);
     expect(pega("'contexto_invalido'")).toEqual([]);
     expect(pega('Esconder as parcelas')).toEqual(['Ocultar']);

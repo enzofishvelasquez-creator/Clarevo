@@ -13,7 +13,7 @@ import {
   type IsoMonth,
   type Phase3Panel,
 } from '@clarevo/core';
-import { Ban, Check, ChartLine, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, CircleOff, Hourglass, Minus, RotateCcw, type LucideIcon } from 'lucide-react-native';
+import { Ban, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, CircleOff, Hourglass, Minus, RotateCcw, type LucideIcon } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useState, type Ref } from 'react';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
@@ -24,7 +24,7 @@ import { MonthCheckBlock } from '@/components/month-check';
 import { SettingSwitch } from '@/components/setting-switch';
 import { ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
-import { Button, Card, FitMoney, IconBlock, LinkButton, Money, Skeleton, Txt, styles as ui } from '@/components/ui';
+import { Button, Card, FitMoney, LinkButton, Money, Skeleton, Txt, styles as ui } from '@/components/ui';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { useCategoryBreakdown, useEvolutionExplanation, useReceivedBreakdown } from '@/state/data';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -36,35 +36,6 @@ type AnyView = EvolutionView<EvolutionSelectionMetric>;
 
 /** Esconde de leitores de tela o que só desenha (o botão de cada mês, a tabela e os textos já dizem tudo). */
 const decorative = { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants', 'aria-hidden': true } as const;
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Entrada em Movimentos
-// ---------------------------------------------------------------------------------------------------------------------
-
-/**
- * Linha "Evolução" em Movimentos (D-057), logo abaixo de "Seu mês em 30 segundos": parece um campo, mas é um botão que abre a tela de
- * consulta `/evolucao`. Nada é lido nem guardado aqui.
- */
-export function EvolutionEntry({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={T.rowA11y}
-      onPress={onPress}
-      style={(s) => [ui.input, ui.entryRow, styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-      <IconBlock icon={ChartLine} />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
-          {T.title}
-        </Txt>
-        <Txt variant="caption" color={colors.textSecondary}>
-          {T.rowCaption}
-        </Txt>
-      </View>
-      <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
-    </Pressable>
-  );
-}
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Gráfico de linha
@@ -909,7 +880,6 @@ function TableField({ name, value }: { name: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  entry: { gap: space[3], paddingVertical: space[2] },
   chart: { position: 'relative' },
   columns: { flexDirection: 'row' },
   plot: { position: 'absolute', top: 0, left: 0 },

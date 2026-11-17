@@ -38,6 +38,7 @@ import { announceOnIOS } from '@/lib/a11y';
 import { essentialSourceFor, savingsInitialStage, savingsNeedsStageChoice, type SavedEssentials } from '@/lib/essentials';
 import { flash } from '@/lib/flash';
 import { guardedWrite, type WriteResult } from '@/lib/guarded-write';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import {
   useCreateGoal,
   useGoalOperationKey,
@@ -219,7 +220,7 @@ export function SavingsPlanForm({
     : null;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={SAVINGS_TEXT.planTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
         <Card style={{ gap: space[4] }}>

@@ -45,6 +45,8 @@ export interface RowAction {
  * ícone, discreto, e a data de vencimento não muda. Conta do ano não ganha o próximo dia útil: a legenda é a de sempre e o sinal manda
  * conferir a data no carnê ou no site do órgão.
  * action: botão secundário pequeno logo abaixo, irmão da linha (nunca dentro dela), alinhado ao texto.
+ * compact (revisão das telas, 16/11/2026): só a legenda de uma linha, sem o sinal do dia útil embaixo; o aviso completo fica na tela
+ * da conta (usado em "Próximos meses", que lista contas de muitos meses). O nome acessível continua com o sinal.
  */
 export function CommitmentRow({
   commitment: c,
@@ -52,12 +54,14 @@ export function CommitmentRow({
   onPress,
   last,
   action,
+  compact,
 }: {
   commitment: Commitment;
   today: IsoDate;
   onPress: () => void;
   last?: boolean;
   action?: RowAction;
+  compact?: boolean;
 }) {
   const { width, fontScale } = useWindowDimensions();
   const hidden = useValuesHidden();
@@ -73,14 +77,14 @@ export function CommitmentRow({
   // Paga em outro mês: o gasto conta em Pago do mês da data do pagamento, não do vencimento.
   const paidMonth = paid && monthOf(paid.paidOn) !== monthOf(c.dueOn) ? formatMonthBR(monthOf(paid.paidOn)).toLowerCase() : null;
   const seriesLabel = occurrenceLabel(c);
-  const caption = [due, paidMonth ? `conta em Pago de ${paidMonth}` : null, seriesLabel, estimate ? 'estimado' : null].filter(Boolean).join(' · ');
+  const caption = [due, paidMonth ? `entra em Pago de ${paidMonth}` : null, seriesLabel, estimate ? 'estimado' : null].filter(Boolean).join(' · ');
   const showsPlanned = Boolean(paid && paid.amountCents !== c.amountCents);
   const previsto = showsPlanned ? `Previsto ${moneyText(c.amountCents, hidden)}` : null;
   // A descrição e o vencimento abrem o nome acessível (as buscas por linha dependem desse começo).
   const label =
     `${c.description}, ${due.charAt(0).toLowerCase()}${due.slice(1)}, ` +
     (estimate ? `cerca de ${moneyA11y(cents, hidden)}, valor estimado` : moneyA11y(cents, hidden)) +
-    (paidMonth ? `, conta em Pago de ${paidMonth}` : '') +
+    (paidMonth ? `, entra em Pago de ${paidMonth}` : '') +
     (showsPlanned ? `, previsto ${moneyA11y(c.amountCents, hidden)}`.toLowerCase() : '') +
     (c.series ? seriesA11y(c.series.kind, seriesLabel!) : '') +
     (dueNotice ? `, ${dueNotice.signA11y}` : '');
@@ -123,7 +127,7 @@ export function CommitmentRow({
           style={situation === 'vence_hoje' ? { fontFamily: fonts.bold } : undefined}>
           {caption}
         </Txt>
-        {dueNotice ? <DueDaySign notice={dueNotice} /> : null}
+        {dueNotice && !compact ? <DueDaySign notice={dueNotice} /> : null}
         {stacked ? amount : null}
       </View>
       {stacked ? null : amount}

@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle2, Info } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 
-import { PixRenewCard, PlansCard, StoreManageCard, useAccessTimeZone } from '@/components/access-parts';
+import { PixRenewCard, PlansCard, StoreManageCard, useAccessNow, useAccessTimeZone } from '@/components/access-parts';
 import { ConfirmDialog } from '@/components/dialog';
 import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
@@ -96,7 +96,7 @@ export default function AssinaturaScreen() {
   useEffect(() => {
     if (returned) void refetch();
   }, [returned, refetch]);
-  const now = new Date();
+  const now = useAccessNow();
   const webCard = Platform.OS === 'web' && access.data?.status === 'assinatura' && access.data.provider === 'web';
   const webStatus = useWebSubscriptionStatus(webCard);
   const view = access.data ? accessView(access.data, now, timeZone, { web: Platform.OS === 'web', webSubscription: webCard ? webStatus.data : null }) : null;

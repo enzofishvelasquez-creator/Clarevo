@@ -12,7 +12,9 @@ import {
   TRIAL_DAYS,
   accessBanner,
   accessView,
+  demoInstant,
   demoTrialAccess,
+  DEMO_TODAY,
   guideEntry,
   parseAccess,
   pixPaidThrough,
@@ -173,11 +175,11 @@ describe('repositório em memória e demonstração', () => {
     expect(await new MemoryRepository({ ...base, access: () => readOnly }).getMyAccess()).toEqual(readOnly);
   });
 
-  it('a demonstração fica no teste grátis, contado do relógio real', () => {
-    const now = NOW.getTime();
-    const demo = demoTrialAccess(now);
-    expect(demo).toEqual({ status: 'teste', plan: null, until: '2026-11-18T13:00:00.000Z', canWrite: true, provider: null });
-    expect(trialDaysLeft(demo, NOW, TZ)).toBe(14);
+  it('a demonstração fica no teste grátis, contado do dia dela (o mesmo relógio das telas na demonstração)', () => {
+    const demo = demoTrialAccess(DEMO_TODAY);
+    expect(demo).toEqual({ status: 'teste', plan: null, until: '2026-10-21T12:00:00.000Z', canWrite: true, provider: null });
+    expect(demoInstant(DEMO_TODAY).toISOString()).toBe('2026-10-07T12:00:00.000Z');
+    expect(trialDaysLeft(demo, demoInstant(DEMO_TODAY), TZ)).toBe(14);
   });
 });
 

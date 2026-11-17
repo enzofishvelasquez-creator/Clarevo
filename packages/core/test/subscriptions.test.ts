@@ -276,7 +276,7 @@ describe('assinaturas: textos (D-046)', () => {
     expect(SUBSCRIPTION_TEXT.endFrom).toBe('Encerrar a partir de…');
     expect(SUBSCRIPTION_TEXT.keeps).toBe('Continua');
     expect(SUBSCRIPTION_TEXT.reviewedButton).toBe('Revisei minhas assinaturas');
-    expect(SUBSCRIPTION_TEXT.reminderTitle).toBe('Faz tempo que você não revisa suas assinaturas.');
+    expect(SUBSCRIPTION_TEXT.reminderTitle).toBe('Que tal revisar suas assinaturas?');
     expect(SUBSCRIPTION_TEXT.reminderReview).toBe('Revisar agora');
     expect(SUBSCRIPTION_TEXT.reminderLater).toBe('Agora não');
     expect(SUBSCRIPTION_TEXT.lastReview(null)).toBe('Você ainda não registrou uma revisão.');

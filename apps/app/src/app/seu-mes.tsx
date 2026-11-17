@@ -51,7 +51,8 @@ export default function SeuMesScreen() {
     setStep({ month: seuMesStartMonth(params.mes, currentMonth), index: 0, direction: 1 });
   }, [params.mes, currentMonth]);
   const { month, index, direction } = step;
-  const contextId = useWork().data?.contextId;
+  const work = useWork().data;
+  const contextId = work?.contextId;
   const view = useSeuMes(contextId, month);
   const prev = seuMesStep(month, currentMonth, -1);
   const next = seuMesStep(month, currentMonth, 1);
@@ -70,7 +71,7 @@ export default function SeuMesScreen() {
         <View style={{ gap: space[1] }}>
           <MonthStepper
             groupLabel={SEU_MES_TEXT.monthGroup}
-            label={`Pessoal · ${formatMonthBR(month)}`}
+            label={`${work?.contextName ?? 'Pessoal'} · ${formatMonthBR(month)}`}
             prevLabel={prev ? PAYABLES_NAV_TEXT.previous(prev) : 'Mês anterior'}
             nextLabel={next ? PAYABLES_NAV_TEXT.next(next) : 'Próximo mês'}
             onPrev={prev ? () => goMonth(prev) : null}

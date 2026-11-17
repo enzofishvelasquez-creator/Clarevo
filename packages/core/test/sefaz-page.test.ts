@@ -271,7 +271,7 @@ describe('readSefazPage (fetch injetado)', () => {
     expect(sefazReadErrorText('sem_conexao')).toBe(SEFAZ_TEXT.failed);
     expect(sefazReadErrorText('nota_diferente')).toBe(SEFAZ_TEXT.differentNote);
     expect(sefazReadErrorText('nota_nao_encontrada')).toBe(SEFAZ_TEXT.notFound);
-    expect(SEFAZ_TEXT.failed).toBe('Não deu para ler a página da Sefaz. Confira o valor no cupom.');
+    expect(SEFAZ_TEXT.failed).toBe('Não foi possível ler a página da Sefaz. Confira o valor no cupom.');
   });
 });
 

@@ -1,14 +1,15 @@
 import { SEARCH_TEXT, isStackedLayout, type CardEntry } from '@clarevo/core';
-import { ChevronRight, CreditCard, Search } from 'lucide-react-native';
+import { CreditCard, Search } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { IconBlock, Money, Txt, clampLines, styles as ui } from '@/components/ui';
+import { Money, Txt, clampLines, styles as ui } from '@/components/ui';
 import { moneyA11y, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 /**
- * Entrada da busca em Movimentos (D-045): parece um campo "Buscar" com a lupa, mas é um botão que abre a tela de consulta
- * (`/movimentacoes/buscar`). Nada é digitado nem guardado aqui.
+ * Entrada da busca em Movimentos (D-045): a lupa, num botão redondo do tamanho dos filtros, ao lado deles e logo acima da lista do mês
+ * (revisão das telas, 16/11/2026: antes era um campo no topo da tela). Abre a tela de consulta (`/movimentacoes/buscar`); nada é
+ * digitado nem guardado aqui. O nome acessível diz "Buscar" e que a busca é em todos os meses.
  */
 export function SearchEntry({ onPress }: { onPress: () => void }) {
   return (
@@ -16,17 +17,8 @@ export function SearchEntry({ onPress }: { onPress: () => void }) {
       accessibilityRole="button"
       accessibilityLabel={SEARCH_TEXT.entryA11y}
       onPress={onPress}
-      style={(s) => [ui.input, ui.entryRow, styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-      <IconBlock icon={Search} />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Txt variant="label" style={{ fontFamily: fonts.bold, fontSize: 15 }}>
-          {SEARCH_TEXT.entry}
-        </Txt>
-        <Txt variant="caption" color={colors.textSecondary}>
-          {SEARCH_TEXT.entryHint}
-        </Txt>
-      </View>
-      <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
+      style={(s) => [styles.entry, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
+      <Search size={20} color={colors.text} strokeWidth={2.25} aria-hidden />
     </Pressable>
   );
 }
@@ -69,7 +61,16 @@ export function PurchaseRow({ entry, cardName, last, onPress }: { entry: CardEnt
 }
 
 const styles = StyleSheet.create({
-  entry: { gap: space[3], paddingVertical: space[2] },
+  entry: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: space[3], minHeight: 56 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   amount: { fontFamily: fonts.bold, fontSize: 15 },

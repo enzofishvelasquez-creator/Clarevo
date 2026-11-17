@@ -194,6 +194,41 @@ export function quickPayAction(c: Commitment, today: IsoDate): 'pagar' | 'inform
 /** Vencimento curto do nome acessível: "vence hoje" ou "vence 12/10". */
 const dueShort = (dueOn: IsoDate, today: IsoDate) => (dueOn === today ? 'vence hoje' : `vence ${formatListDate(dueOn, today)}`);
 
+/** Avisos depois de salvar, pagar, desfazer ou excluir uma conta a pagar (terminam em ponto, como os do núcleo). */
+export const COMMITMENT_NOTICE_TEXT = {
+  saved: 'Conta a pagar salva.',
+  updated: 'Alterações salvas.',
+  valueInformed: 'Valor da conta informado.',
+  deleted: 'Conta a pagar excluída.',
+  paid: 'Pagamento registrado.',
+  undone: 'Pagamento desfeito.',
+} as const;
+
+/**
+ * Motivo curto de uma falha de "Já paguei" (lista de Contas a pagar e Contas vencidas), depois do nome da conta:
+ * "Luz: a conta mudou em outro aparelho. Confira e tente de novo." `code` é o código da recusa; nulo, "rede" ou "desconhecido" é
+ * resultado incerto (a conexão caiu depois de enviar), com a mesma frase de UNCERTAIN_TEXT.
+ */
+export function payFailureReason(code: string | null | undefined): string {
+  switch (code) {
+    case 'versao_desatualizada':
+      return 'a conta mudou em outro aparelho. Confira e tente de novo.';
+    case 'compromisso_quitado':
+      return 'a conta já foi marcada como paga em outro aparelho.';
+    case 'nao_encontrado':
+      return 'a conta não está mais disponível.';
+    case 'sem_permissao':
+      return 'com o papel "Só vê" na Família, você não marca contas como pagas.';
+    case null:
+    case undefined:
+    case 'rede':
+    case 'desconhecido':
+      return 'não foi possível confirmar se salvou. Confira em Movimentos antes de tentar de novo.';
+    default:
+      return 'não foi possível registrar o pagamento. Tente de novo.';
+  }
+}
+
 /** Textos de "Já paguei" na lista (diálogo e nomes acessíveis). `name` é o nome mostrado na linha. */
 export const QUICK_PAY_TEXT = {
   button: 'Já paguei',
@@ -211,4 +246,59 @@ export const QUICK_PAY_TEXT = {
   estimateA11y: (name: string, dueOn: IsoDate, today: IsoDate) => `Informar valor e pagar ${name}, ${dueShort(dueOn, today)}`,
   /** Faixa depois da confirmação do servidor. */
   done: (name: string) => `${name} marcada como paga.`,
+} as const;
+
+// ---------------------------------------------------------------------------
+// "Próximos meses" em Contas a pagar, por mês (revisão das telas, 16/11/2026)
+// ---------------------------------------------------------------------------
+
+/** Um mês de "Próximos meses": o título ("Novembro de 2026 · 5 contas") e as linhas do mês, na ordem de vencimento. */
+export interface LaterMonthGroup<T> {
+  month: IsoMonth;
+  title: string;
+  items: T[];
+}
+
+/** Textos de "Próximos meses" agrupados por mês. */
+export const PAYABLES_LATER_TEXT = {
+  /** "Novembro de 2026 · 5 contas" (conta as linhas do mês: um grupo de parcelas de uma conta do ano é uma linha). */
+  monthTitle: (month: IsoMonth, count: number) => `${formatMonthBR(month)} · ${count === 1 ? '1 conta' : `${count} contas`}`,
+  showMore: 'Ver os próximos meses',
+  /** "Mais 9 contas, até agosto de 2027" */
+  showMoreCaption: (count: number, lastMonth: IsoMonth) =>
+    `Mais ${count === 1 ? '1 conta' : `${count} contas`}, até ${formatMonthName(lastMonth)} de ${lastMonth.slice(0, 4)}`,
+} as const;
+
+/**
+ * Agrupa as linhas de "Próximos meses" (já em ordem de vencimento) pelo mês do vencimento de cada uma. `monthOfItem` diz o mês da linha
+ * (o de um grupo de parcelas é o da primeira parcela, onde o grupo fica).
+ */
+export function groupLaterByMonth<T>(items: readonly T[], monthOfItem: (item: T) => IsoMonth): LaterMonthGroup<T>[] {
+  const out: LaterMonthGroup<T>[] = [];
+  for (const item of items) {
+    const month = monthOfItem(item);
+    const last = out[out.length - 1];
+    if (last && last.month === month) last.items.push(item);
+    else out.push({ month, title: '', items: [item] });
+  }
+  return out.map((g) => ({ ...g, title: PAYABLES_LATER_TEXT.monthTitle(g.month, g.items.length) }));
+}
+
+/**
+ * Quantos meses de "Próximos meses" ficam à vista de início: os que vão até o mês seguinte ao da tela (o mês atual já está em "A vencer");
+ * sem nenhum, o primeiro mês com conta. O resto fica atrás de "Ver os próximos meses".
+ */
+export function laterMonthsShown(groups: readonly { month: IsoMonth }[], month: IsoMonth): number {
+  const next = addMonths(month, 1);
+  const upToNext = groups.filter((g) => g.month <= next).length;
+  return upToNext > 0 ? upToNext : Math.min(1, groups.length);
+}
+
+/** "Repetir esta conta" no detalhe de uma conta avulsa paga: uma escolha só, no lugar de três botões. */
+export const REPEAT_COMMITMENT_TEXT = {
+  button: 'Repetir esta conta',
+  title: 'Repetir esta conta',
+  nextMonth: 'Só no próximo mês',
+  monthly: 'Todo mês',
+  yearly: 'Todo ano',
 } as const;

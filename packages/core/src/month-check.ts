@@ -108,7 +108,7 @@ export const MONTH_CHECK_TEXT = {
   },
   failed: ERROR_TEXT.salvar_falhou,
   /** Resultado incerto (a conexão caiu): repetir com a mesma chave é seguro. */
-  uncertain: 'Não deu para confirmar se salvou. Toque de novo: repetir é seguro.',
+  uncertain: 'Não foi possível confirmar se salvou. Toque de novo: repetir é seguro.',
 } as const;
 
 /** Texto de erro de uma escrita da marca: o código conhecido, ou a falha genérica. */

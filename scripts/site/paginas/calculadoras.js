@@ -272,7 +272,7 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
   const corpo = [
     bloco(
       `<h2 id="calcular">Faça a conta</h2>
-<div class="aviso-edu calc-aviso"><p>${esc(c.CALC_UI.disclaimer)} ${esc(AVISO_EXTRA)}</p></div>
+<div class="aviso-edu calc-aviso"><p>${esc(c.CALC.calcDisclaimer(info.slug))} ${esc(AVISO_EXTRA)}</p></div>
 <div class="calc" data-calculadora="${esc(info.slug)}">
 <p class="calc-carregando">Carregando a calculadora. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site. Você também pode usar a <a href="${esc(URL_APP)}" rel="noopener noreferrer">versão web</a> da Clarevo.</p>
 </div>

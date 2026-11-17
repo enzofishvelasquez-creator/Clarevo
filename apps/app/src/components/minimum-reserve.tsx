@@ -19,7 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { ChartPie, CircleAlert, Gauge } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, StyleSheet, View, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { FormFooter } from '@/components/form-footer';
@@ -32,6 +32,7 @@ import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '
 import { flash } from '@/lib/flash';
 import { updatePrefs } from '@/lib/device-prefs';
 import { guardedWrite } from '@/lib/guarded-write';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useCreateGoal, useGoalOperationKey, useSavingsOperationKey, useSetSavingsAnswer, type SavingsPlanInputs } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -156,7 +157,7 @@ export function MinimumReserve({ contextId, check, inputs }: { contextId: string
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title="Reserva mínima" onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
         <Card style={{ gap: space[2] }}>

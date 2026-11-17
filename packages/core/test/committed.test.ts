@@ -293,7 +293,7 @@ describe('demonstração (renda de referência R$ 6.000,00 desde setembro)', () 
     expect(t.annualShareNote).toBe('Não entra no percentual.');
     expect([t.debt, t.estimated, t.overdueBefore, t.overReference, t.review, t.noReference, t.empty]).toEqual([null, null, null, null, null, null, null]);
     expect(t.how).toBe(
-      'Somamos as contas a pagar com vencimento em outubro: o valor pago das que já foram pagas e o valor previsto das que estão em aberto. ' +
+      'A Clarevo soma as contas a pagar com vencimento em outubro: o valor pago das que já foram pagas e o valor previsto das que estão em aberto. ' +
         'Gastos anotados sem conta a pagar, como mercado, ficam fora. Por isso este número é diferente de Pago e de Ainda a pagar.',
     );
     expect(committedLine(s)).toEqual({

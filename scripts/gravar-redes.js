@@ -1377,6 +1377,9 @@ async function gravarCapturas(browser, servidor, saida, manifesto, problemas) {
   // Seu mês em 30 segundos (P10): a revisão do mês, em cartões curtos.
   await f.tocar(f.aba(/^Movimentos/), { antes: 0 });
   await f.esperar('Registrar recebimento');
+  // O Seu mês fica nas Análises, logo abaixo do mês (revisão das telas, 16/11/2026).
+  await f.tocar(f.botao(/^Ver análises do mês\./), { antes: 0 });
+  await f.esperar('Consulte o mês escolhido');
   await f.tocar(f.botao(/^Seu mês em 30 segundos/), { antes: 0 });
   await f.esperar('Entrou e saiu');
   await p.waitForTimeout(600);

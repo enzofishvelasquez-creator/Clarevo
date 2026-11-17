@@ -4,6 +4,7 @@ import {
   boletoGaps,
   CATEGORIES,
   COMMITMENT_ERROR_TEXT,
+  COMMITMENT_NOTICE_TEXT,
   COMMITMENT_FIELD_ORDER,
   DESCRIPTION_MAX,
   MAX_RECORD_CENTS,
@@ -63,6 +64,7 @@ import { TermHint } from '@/components/term-hint';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { explanationHref } from '@/lib/learn';
 import { useAttemptSlot, useCreateCommitment, useLimitWatch, useUpdateCommitment, withNotice, type WorkSpace } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
@@ -217,10 +219,10 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
     // Confirmação tátil só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (mode.type === 'nova') {
-      flash.set(withNotice('Conta a pagar salva', notice));
+      flash.set(withNotice(COMMITMENT_NOTICE_TEXT.saved, notice));
       leave(() => router.replace(`/a-pagar/${id}`));
     } else {
-      flash.set(withNotice(informValue ? 'Valor da conta informado' : 'Alterações salvas', notice));
+      flash.set(withNotice(informValue ? COMMITMENT_NOTICE_TEXT.valueInformed : COMMITMENT_NOTICE_TEXT.updated, notice));
       leave(() => (router.canGoBack() ? router.back() : router.replace(`/a-pagar/${id}`)));
     }
   };
@@ -430,7 +432,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
   const showTomorrow = !occurrenceMonth || monthOf(tomorrow) === occurrenceMonth;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader
         title={mode.type === 'nova' ? 'Anotar conta a pagar' : informValue ? 'Informar o valor da conta' : 'Editar conta a pagar'}
         onBack={requestCancel}
@@ -443,10 +445,10 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
               {COMMITMENT_ERROR_TEXT.versao_desatualizada}
             </Txt>
             <MoneyTxt variant="caption">
-              {`Versão atual: ${conflict.description} · ${formatBRL(conflict.amountCents)} · vence em ${formatListDate(conflict.dueOn, today)}`}
+              {`Como está agora: ${conflict.description} · ${formatBRL(conflict.amountCents)} · vence em ${formatListDate(conflict.dueOn, today)}`}
             </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={applyOverConflict} />
+            <Button label="Usar o que preenchi" tone="soft" onPress={applyOverConflict} />
             <Button label="Descartar minhas alterações" tone="ghost" onPress={() => leave(goBack)} />
           </Banner>
         ) : null}
@@ -459,30 +461,30 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
           </Banner>
         ) : null}
 
-        {mode.type === 'nova' ? (
-          <View style={{ gap: space[2] }}>
-            <BoletoReader today={today} disabled={busy} onRead={applyBoleto} />
-            {boleto ? (
-              <Banner tone="info" icon={Info}>
-                <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }} accessibilityLiveRegion="polite">
-                  {BOLETO_TEXT.readLine(boleto.reading)}
-                </MoneyTxt>
-                {boletoGaps(boleto.reading, today).map((gap) => (
-                  <Txt key={gap} variant="label">
-                    {gap}
-                  </Txt>
-                ))}
-                {boletoGaps(boleto.reading, today).length === 0 ? <Txt variant="label">{BOLETO_TEXT.filled}</Txt> : null}
-                <Txt variant="caption" color={colors.textSecondary}>
-                  {BOLETO_TEXT.privacy}
-                </Txt>
-                <LinkButton label={BOLETO_TEXT.undo} onPress={undoBoleto} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
-              </Banner>
-            ) : null}
-          </View>
-        ) : null}
-
         <Card style={{ gap: space[4] }}>
+          {/* Ler boleto: a primeira linha do cartão, como "Escanear nota fiscal" no gasto (revisão das telas, 16/11/2026). */}
+          {mode.type === 'nova' ? (
+            <View style={{ gap: space[2] }}>
+              <BoletoReader today={today} disabled={busy} onRead={applyBoleto} />
+              {boleto ? (
+                <Banner tone="info" icon={Info}>
+                  <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }} accessibilityLiveRegion="polite">
+                    {BOLETO_TEXT.readLine(boleto.reading)}
+                  </MoneyTxt>
+                  {boletoGaps(boleto.reading, today).map((gap) => (
+                    <Txt key={gap} variant="label">
+                      {gap}
+                    </Txt>
+                  ))}
+                  {boletoGaps(boleto.reading, today).length === 0 ? <Txt variant="label">{BOLETO_TEXT.filled}</Txt> : null}
+                  <Txt variant="caption" color={colors.textSecondary}>
+                    {BOLETO_TEXT.privacy}
+                  </Txt>
+                  <LinkButton label={BOLETO_TEXT.undo} onPress={undoBoleto} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+                </Banner>
+              ) : null}
+            </View>
+          ) : null}
           {mode.type === 'nova' ? (
             <>
               <ChoiceGroup label="Com que frequência?">
@@ -638,7 +640,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
             <Button
-              label={retry ? 'Tentar novamente' : 'Salvar conta a pagar'}
+              label={retry ? 'Tentar de novo' : 'Salvar conta a pagar'}
               busy={busy}
               busyLabel="Salvando…"
               onPress={() => submit()}

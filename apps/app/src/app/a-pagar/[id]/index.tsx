@@ -2,8 +2,11 @@ import {
   ACCOUNTS_TEXT,
   CALC_UI_TEXT,
   COMMITMENT_ERROR_TEXT,
+  COMMITMENT_NOTICE_TEXT,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
+  RECORD_TEXT,
+  REPEAT_COMMITMENT_TEXT,
   accountDisplayName,
   addMonths,
   affectedByYear,
@@ -36,7 +39,7 @@ import {
   type YearPlan,
 } from '@clarevo/core';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, Calculator, CalendarSync, Check, Info, Pencil, Plus, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react-native';
+import { AlertCircle, Calculator, Check, Info, Pencil, Plus, Repeat, ShieldCheck, Trash2, Undo2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -99,7 +102,8 @@ function startAfter(date: IsoDate, today: IsoDate): IsoMonth {
  * "Excluir só a conta de novembro" (não volta a ser criada) e, se estimada, "Informar o valor da conta".
  * Conta do ano (D-029): "Parte de: IPTU · parcela 3 de 10 de 2027", "Informar o valor de 2027" e, com parcelas,
  * "Excluir só esta parcela" ou "Tirar todas as parcelas de 2027 em aberto".
- * "Adicionar a conta do próximo mês", "Repetir todo mês" e "Repetir todo ano" só em conta avulsa paga.
+ * "Repetir esta conta" (só no próximo mês, todo mês ou todo ano) só em conta avulsa paga; "Desfazer pagamento" é um link no fim
+ * (revisão das telas, 16/11/2026: eram seis botões do mesmo peso).
  */
 export default function DetalheContaAPagar() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -118,12 +122,12 @@ export default function DetalheContaAPagar() {
   const skip = useSkipSeriesYear();
   const skipKeys = useSeriesOperationKey();
   /**
-   * Tirar com resultado incerto: o plano enviado (para a faixa de sucesso) e o botão "Tentar novamente" na faixa de erro.
+   * Tirar com resultado incerto: o plano enviado (para a faixa de sucesso) e o botão "Tentar de novo" na faixa de erro.
    * O botão não depende do plano atual: se a escrita foi gravada, as listas recarregadas já não têm parcelas do ano em
    * aberto, e o diálogo de confirmação some.
    */
   const skipAttempt = useRef<Extract<YearPlan, { ok: true }> | null>(null);
-  /** Texto da faixa de resultado incerto, com "Tentar novamente" (null: nada pendente). */
+  /** Texto da faixa de resultado incerto, com "Tentar de novo" (null: nada pendente). */
   const [skipFailed, setSkipFailed] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const deleteKey = useRef(newOperationKey());
@@ -162,7 +166,7 @@ export default function DetalheContaAPagar() {
       setConfirming(null);
       flash.set(
         !ref
-          ? 'Conta a pagar excluída'
+          ? COMMITMENT_NOTICE_TEXT.deleted
           : annual
             ? annual.k === 1
               ? `Conta de ${annual.label} excluída. A conta do ano continua nos outros anos.`
@@ -197,7 +201,7 @@ export default function DetalheContaAPagar() {
       // Chave nova: um próximo desfazer (depois de pagar de novo) é outra operação.
       undoKey.current = newOperationKey();
       setConfirming(null);
-      setNotice('Pagamento desfeito');
+      setNotice(COMMITMENT_NOTICE_TEXT.undone);
       totalChange.set({ total: 'pago', month: monthOf(paid.paidOn), deltaCents: -paid.amountCents });
     } catch (e) {
       setConfirming(null);
@@ -223,7 +227,7 @@ export default function DetalheContaAPagar() {
 
   /**
    * "Tirar todas as parcelas de 2027 em aberto" (skip_series_year): saem de uma vez e não voltam. Resultado incerto (rede):
-   * confere na hora com findSeriesOperation se a escrita foi gravada; se a conferência também falhar, "Tentar novamente"
+   * confere na hora com findSeriesOperation se a escrita foi gravada; se a conferência também falhar, "Tentar de novo"
    * confere de novo antes de repetir, e a repetição usa a mesma chave.
    */
   const doSkip = async () => {
@@ -232,7 +236,7 @@ export default function DetalheContaAPagar() {
     const label = current?.year.label ?? skipAttempt.current?.year.label ?? annual?.label ?? '';
     setActionError(null);
     setSkipping(true);
-    const failed = `Não foi possível tirar as parcelas de ${label}. Tente novamente.`;
+    const failed = `Não foi possível tirar as parcelas de ${label}. Tente de novo.`;
     const done = (text: string) => {
       skipKeys.settled();
       skipAttempt.current = null;
@@ -298,7 +302,7 @@ export default function DetalheContaAPagar() {
           }
         } catch {
           // A conferência também falhou: recarregar para não mostrar como aberta uma parcela que pode já ter saído.
-          // "Tentar novamente" confere de novo antes de repetir.
+          // "Tentar de novo" confere de novo antes de repetir.
           reloadAll();
         }
         setSkipFailed(failed);
@@ -386,7 +390,7 @@ export default function DetalheContaAPagar() {
                   <Txt variant="label" color={colors.error} accessibilityLabel={yearA11yLabel(skipFailed)}>
                     {skipFailed}
                   </Txt>
-                  <Button label="Tentar novamente" tone="soft" busy={skipping} busyLabel="Aguarde…" onPress={doSkip} />
+                  <Button label="Tentar de novo" tone="soft" busy={skipping} busyLabel="Aguarde…" onPress={doSkip} />
                 </Banner>
               ) : null}
 
@@ -449,7 +453,7 @@ export default function DetalheContaAPagar() {
                       <Row label={ACCOUNTS_TEXT.out} value={accountDisplayName(allAccounts.data ?? personal?.accounts ?? [], paid.accountId)} />
                     </>
                   ) : null}
-                  <Row label="Resumo afetado" value={affected} last />
+                  <Row label={RECORD_TEXT.monthRow} value={affected} last />
                 </View>
                 <View style={styles.trail} accessible>
                   <Txt variant="caption" color={colors.textSecondary}>
@@ -489,60 +493,13 @@ export default function DetalheContaAPagar() {
               {paid ? (
                 <>
                   <Button label="Ver gasto registrado" tone="soft" onPress={() => router.push(`/registro/${paid.recordId}`)} />
-                  <Button label="Desfazer pagamento" icon={Undo2} tone="danger" onPress={() => setConfirming('desfazer')} />
                   {/* Conta de gasto fixo: a do próximo mês é criada pela série (D-024, regra 10). */}
-                  {ref ? null : (
-                    <>
-                      <NextMonth commitment={c} />
-                      <Button
-                        label="Repetir todo mês"
-                        icon={Repeat}
-                        tone="soft"
-                        onPress={() =>
-                          router.push({
-                            pathname: '/gastos-fixos/novo',
-                            params: {
-                              tipo: 'mensal',
-                              descricao: c.description,
-                              valor: String(c.amountCents),
-                              dia: String(Number(c.dueOn.slice(8, 10))),
-                              inicio: startAfter(c.dueOn, today),
-                              ...(c.category ? { categoria: c.category } : {}),
-                            },
-                          })
-                        }
-                      />
-                      {/* Conta do ano a partir do ano seguinte ao vencimento, no mesmo mês e dia (cota única). */}
-                      <Button
-                        label="Repetir todo ano"
-                        icon={CalendarSync}
-                        tone="soft"
-                        onPress={() =>
-                          router.push({
-                            pathname: '/gastos-fixos/novo',
-                            params: {
-                              tipo: 'anual',
-                              descricao: c.description,
-                              valor: String(c.amountCents),
-                              dia: String(Number(c.dueOn.slice(8, 10))),
-                              mes: String(Number(c.dueOn.slice(5, 7))),
-                              ano: String(Number(c.dueOn.slice(0, 4)) + 1),
-                              parcelas: '1',
-                              ...(c.category ? { categoria: c.category } : {}),
-                            },
-                          })
-                        }
-                      />
-                    </>
-                  )}
-                  <Txt variant="caption" color={colors.textSecondary}>
-                    Para alterar esta conta a pagar, desfaça o pagamento. O gasto registrado pode ser editado em Movimentos.
-                  </Txt>
+                  {ref ? null : <RepeatCommitment commitment={c} today={today} />}
                 </>
               ) : (
                 <>
                   <Button label="Já paguei" icon={Check} onPress={() => router.push(`/a-pagar/${c.id}/pagar`)} />
-                  {notice === 'Conta a pagar salva' ? (
+                  {notice?.split('\n')[0] === COMMITMENT_NOTICE_TEXT.saved ? (
                     <Button label="Anotar outra conta a pagar" icon={Plus} tone="soft" onPress={() => router.replace('/a-pagar/nova')} />
                   ) : null}
                   <Button
@@ -564,6 +521,14 @@ export default function DetalheContaAPagar() {
                 </>
               )}
               <Button label="Ver resumo do mês" tone="soft" onPress={showSummary} />
+              {paid ? (
+                <View style={{ gap: space[1] }}>
+                  <Txt variant="caption" color={colors.textSecondary}>
+                    Para alterar esta conta a pagar, desfaça o pagamento. O gasto registrado pode ser editado em Movimentos.
+                  </Txt>
+                  <LinkButton label="Desfazer pagamento" icon={Undo2} color={colors.error} style={styles.inlineLink} onPress={() => setConfirming('desfazer')} />
+                </View>
+              ) : null}
               <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy}>
                 <ShieldCheck size={18} color={colors.textSecondary} />
                 <Txt variant="label" color={colors.textSecondary}>
@@ -580,7 +545,7 @@ export default function DetalheContaAPagar() {
                 onCancel={() => setConfirming(null)}
                 onConfirm={doDelete}>
                 <MoneyTxt style={{ fontFamily: fonts.bold }}>
-                  {`${c.description} · ${formatBRL(c.amountCents)} · vence em ${formatListDate(c.dueOn, today)} · Pessoal`}
+                  {`${c.description} · ${formatBRL(c.amountCents)} · vence em ${formatListDate(c.dueOn, today)} · ${by.contextName}`}
                 </MoneyTxt>
                 {ref ? (
                   <Txt color={colors.textSecondary}>
@@ -664,7 +629,7 @@ export default function DetalheContaAPagar() {
                   onCancel={() => setConfirming(null)}
                   onConfirm={doUndo}>
                   <MoneyTxt style={{ fontFamily: fonts.bold }}>
-                    {`${c.description} · ${formatBRL(paid.amountCents)} pago em ${formatDateBR(paid.paidOn)} · Pessoal`}
+                    {`${c.description} · ${formatBRL(paid.amountCents)} pago em ${formatDateBR(paid.paidOn)} · ${by.contextName}`}
                   </MoneyTxt>
                   <Txt color={colors.textSecondary}>
                     O gasto registrado será excluído e deixa de contar em Pago de {formatMonthBR(monthOf(paid.paidOn)).toLowerCase()}. A conta a
@@ -681,47 +646,94 @@ export default function DetalheContaAPagar() {
 }
 
 /**
- * Atalho "Adicionar a conta do próximo mês" (sem recorrência neste ciclo). Consulta o mês do vencimento seguinte,
- * que traz a conta dele em aberto ou já paga. Só aparece com a consulta confirmada: enquanto carrega ou se falhar,
- * nada aparece, para não arriscar uma conta duplicada.
+ * "Repetir esta conta" (conta avulsa paga): um botão que abre a escolha "Só no próximo mês", "Todo mês" ou "Todo ano".
+ * - Só no próximo mês: abre "Anotar conta a pagar" com a descrição, o valor, a categoria e o vencimento do mês seguinte (sem recorrência).
+ *   Consulta o mês do vencimento seguinte: a escolha só aparece com a consulta confirmada e sem a conta desse mês, para não arriscar uma
+ *   conta duplicada. Se ela já foi anotada, a tela diz isso, com o link para abri-la.
+ * - Todo mês: abre o cadastro de gasto fixo a partir do mês seguinte ao vencimento.
+ * - Todo ano: abre o cadastro da conta do ano a partir do ano seguinte, no mesmo mês e dia (cota única).
  */
-function NextMonth({ commitment: c }: { commitment: Commitment }) {
+function RepeatCommitment({ commitment: c, today }: { commitment: Commitment; today: IsoDate }) {
+  const [open, setOpen] = useState(false);
   const prefill = nextMonthPrefill(c);
   const month = monthOf(prefill.dueOn);
   const list = useCommitments(c.contextId, month);
-  if (!list.isSuccess) return null;
-  const existing = findNextMonthCommitment(list.data, c);
-  if (existing) {
-    return (
-      <View style={{ gap: space[1] }}>
-        <Txt variant="label" color={colors.textSecondary}>
-          A conta a pagar de {formatMonthBR(month).toLowerCase()} já foi anotada.
-        </Txt>
-        <LinkButton
-          label={`Ver conta a pagar de ${formatMonthName(month)}`}
-          style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
-          onPress={() => router.push(`/a-pagar/${existing.id}`)}
-        />
-      </View>
-    );
-  }
-  return (
-    <Button
-      label="Adicionar a conta do próximo mês"
-      icon={Plus}
-      tone="soft"
-      onPress={() =>
-        router.push({
-          pathname: '/a-pagar/nova',
-          params: {
-            descricao: prefill.description,
-            valor: String(prefill.amountCents),
-            vencimento: prefill.dueOn,
-            ...(prefill.category ? { categoria: prefill.category } : {}),
+  const existing = list.isSuccess ? findNextMonthCommitment(list.data, c) : null;
+  const go = (fn: () => void) => () => {
+    setOpen(false);
+    fn();
+  };
+  const choices = [
+    ...(list.isSuccess && !existing
+      ? [
+          {
+            label: REPEAT_COMMITMENT_TEXT.nextMonth,
+            onPress: go(() =>
+              router.push({
+                pathname: '/a-pagar/nova',
+                params: {
+                  descricao: prefill.description,
+                  valor: String(prefill.amountCents),
+                  vencimento: prefill.dueOn,
+                  ...(prefill.category ? { categoria: prefill.category } : {}),
+                },
+              }),
+            ),
           },
-        })
-      }
-    />
+        ]
+      : []),
+    {
+      label: REPEAT_COMMITMENT_TEXT.monthly,
+      onPress: go(() =>
+        router.push({
+          pathname: '/gastos-fixos/novo',
+          params: {
+            tipo: 'mensal',
+            descricao: c.description,
+            valor: String(c.amountCents),
+            dia: String(Number(c.dueOn.slice(8, 10))),
+            inicio: startAfter(c.dueOn, today),
+            ...(c.category ? { categoria: c.category } : {}),
+          },
+        }),
+      ),
+    },
+    {
+      label: REPEAT_COMMITMENT_TEXT.yearly,
+      onPress: go(() =>
+        router.push({
+          pathname: '/gastos-fixos/novo',
+          params: {
+            tipo: 'anual',
+            descricao: c.description,
+            valor: String(c.amountCents),
+            dia: String(Number(c.dueOn.slice(8, 10))),
+            mes: String(Number(c.dueOn.slice(5, 7))),
+            ano: String(Number(c.dueOn.slice(0, 4)) + 1),
+            parcelas: '1',
+            ...(c.category ? { categoria: c.category } : {}),
+          },
+        }),
+      ),
+    },
+  ];
+  return (
+    <>
+      <Button label={REPEAT_COMMITMENT_TEXT.button} icon={Repeat} tone="soft" onPress={() => setOpen(true)} />
+      {existing ? (
+        <View style={{ gap: space[1] }}>
+          <Txt variant="label" color={colors.textSecondary}>
+            A conta a pagar de {formatMonthBR(month).toLowerCase()} já foi anotada.
+          </Txt>
+          <LinkButton
+            label={`Ver conta a pagar de ${formatMonthName(month)}`}
+            style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+            onPress={() => router.push(`/a-pagar/${existing.id}`)}
+          />
+        </View>
+      ) : null}
+      <ChoiceDialog visible={open} title={REPEAT_COMMITMENT_TEXT.title} onCancel={() => setOpen(false)} choices={choices} />
+    </>
   );
 }
 

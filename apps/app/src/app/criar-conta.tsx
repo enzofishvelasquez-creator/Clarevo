@@ -27,7 +27,7 @@ export default function CriarConta() {
   const submit = async () => {
     if (busy) return;
     const errs: Errors = {};
-    if (!name.trim()) errs.name = 'Diga como podemos chamar você.';
+    if (!name.trim()) errs.name = 'Diga como a Clarevo pode chamar você.';
     else if (name.trim().length > 80) errs.name = 'Use no máximo 80 caracteres.';
     const e = emailProblem(email);
     if (e) errs.email = e;
@@ -48,8 +48,8 @@ export default function CriarConta() {
     } catch (err) {
       const code = err instanceof AuthError ? err.code : 'desconhecido';
       if (code === 'senha_fraca') setErrors({ password: PASSWORD_RULE });
-      else if (code === 'aguarde' || code === 'muitas_tentativas') setBanner('Muitas tentativas seguidas. Aguarde alguns minutos e tente novamente.');
-      else setBanner('Não foi possível criar a conta agora. Seus dados foram mantidos. Tente novamente.');
+      else if (code === 'aguarde' || code === 'muitas_tentativas') setBanner('Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.');
+      else setBanner('Não foi possível criar a conta agora. Seus dados foram mantidos. Tente de novo.');
     } finally {
       setBusy(false);
     }

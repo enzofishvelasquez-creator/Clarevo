@@ -30,6 +30,7 @@ import { Banner, Button, Card, Screen, TextField, Txt } from '@/components/ui';
 import { cardHref } from '@/lib/cards';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useCardOperationKey, useCreateCard, useUpdateCard } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
@@ -169,7 +170,7 @@ export function CardForm({ mode, contextId }: { mode: CardFormMode; contextId: s
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={card ? T.editTitle : T.newTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
         {savedBefore.banner}
@@ -179,10 +180,10 @@ export function CardForm({ mode, contextId }: { mode: CardFormMode; contextId: s
               {cardErrorText('versao_desatualizada')}
             </Txt>
             <MoneyTxt variant="caption">
-              {`Versão atual: ${card.name} · fecha dia ${card.closingDay} · vence dia ${card.dueDay}${card.limitCents != null ? ` · limite ${formatBRL(card.limitCents)}` : ''}`}
+              {`Como está agora: ${card.name} · fecha dia ${card.closingDay} · vence dia ${card.dueDay}${card.limitCents != null ? ` · limite ${formatBRL(card.limitCents)}` : ''}`}
             </MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={submit} />
+            <Button label="Usar o que preenchi" tone="soft" onPress={submit} />
             <Button
               label="Descartar minhas alterações"
               tone="ghost"

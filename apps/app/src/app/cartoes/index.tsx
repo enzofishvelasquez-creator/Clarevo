@@ -30,6 +30,10 @@ export default function CartoesScreen() {
   const list = overview.data ?? [];
   const active = list.filter((o) => o.card.status === 'ativo');
   const archived = list.filter((o) => o.card.status === 'arquivado');
+  const canWrite = personal?.canWrite !== false;
+  // Sem cartão (ou sem conseguir ler a lista): a explicação e o botão principal no topo. Enquanto carrega, nenhum dos dois, para a tela
+  // não trocar de botão quando a lista chega.
+  const firstCard = overview.isError || (overview.isSuccess && list.length === 0);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -44,8 +48,14 @@ export default function CartoesScreen() {
             onInformIncome={() => router.push({ pathname: '/renda-comprometida/referencia', params: { mes: month } })}
           />
         ) : null}
-        <Txt color={colors.textSecondary}>{T.screens.listIntro}</Txt>
-        {personal?.canWrite === false ? null : <Button label={T.newCard} icon={Plus} onPress={() => router.push('/cartoes/novo')} />}
+        {/* Sem cartão: a explicação e o botão principal no topo. Com algum cartão, a lista vem primeiro e "Adicionar outro cartão" fica
+            depois dela, como botão secundário (revisão das telas, 16/11/2026). */}
+        {firstCard ? (
+          <>
+            <Txt color={colors.textSecondary}>{T.screens.listIntro}</Txt>
+            {canWrite ? <Button label={T.newCard} icon={Plus} onPress={() => router.push('/cartoes/novo')} /> : null}
+          </>
+        ) : null}
 
         {overview.isPending ? (
           <View style={{ gap: space[3] }} accessibilityRole="progressbar" accessibilityLabel="Carregando cartões">
@@ -69,6 +79,7 @@ export default function CartoesScreen() {
                 {T.limitNote}
               </Txt>
             ) : null}
+            {canWrite ? <Button label={T.addAnotherCard} icon={Plus} tone="soft" onPress={() => router.push('/cartoes/novo')} /> : null}
             {archived.length > 0 ? (
               <View style={{ gap: space[3] }}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>

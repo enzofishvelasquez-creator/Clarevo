@@ -33,7 +33,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { CircleAlert } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View, type TextInput } from 'react-native';
+import { KeyboardAvoidingView, StyleSheet, View, type TextInput } from 'react-native';
 
 import { formatMoneyText } from '@/components/calc/parts';
 import { FormFooter } from '@/components/form-footer';
@@ -47,6 +47,7 @@ import { ChoiceGroup } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useCreateGoal, useGoalOperationKey, useGoals, useUpdateGoal } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -323,7 +324,7 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
   const previewKey = mode.type === 'nova' && name.trim() !== '' ? suggestGoalImage(name, goalType) : null;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={goal ? T.editTitle : T.newTitle} onBack={guard.requestCancel} right={<ContextPill label="Salvando em Pessoal" />} />
       <Screen contentStyle={styles.body}>
         {savedBefore.banner}
@@ -332,9 +333,9 @@ export function GoalForm({ mode, contextId }: { mode: Mode; contextId: string })
             <Txt variant="label" color={colors.error}>
               {GOAL_ERROR_TEXT.versao_desatualizada}
             </Txt>
-            <MoneyTxt variant="caption">{`Versão atual: ${goal.name} · ${formatBRL(goal.targetCents)}`}</MoneyTxt>
+            <MoneyTxt variant="caption">{`Como está agora: ${goal.name} · ${formatBRL(goal.targetCents)}`}</MoneyTxt>
             <Txt variant="caption">Seu preenchimento foi mantido abaixo.</Txt>
-            <Button label="Aplicar minhas alterações na versão atual" tone="soft" onPress={submit} />
+            <Button label="Usar o que preenchi" tone="soft" onPress={submit} />
             <Button label="Descartar minhas alterações" tone="ghost" onPress={() => guard.leave(() => (router.canGoBack() ? router.back() : router.replace(`/meta/${goal.id}`)))} />
           </Banner>
         ) : null}

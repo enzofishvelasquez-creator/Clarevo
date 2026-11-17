@@ -23,13 +23,17 @@ import { initCrashReport } from '@/lib/crash-report';
 import { useWideLayout } from '@/lib/layout';
 import { forgetDevice } from '@/lib/device-forget';
 import { afterLogin, deletedAccountIntent, restoreTarget, signOutIntent } from '@/lib/nav';
-import { SessionProvider, useSession } from '@/state/session';
+import { SessionProvider, takeInitialLink, useSession } from '@/state/session';
 import { SpaceStatusContext, type SpaceStatus } from '@/state/space-status';
 import { ViewProvider } from '@/state/view';
 import { colors, colorScheme, fonts } from '@/theme/tokens';
 
 // Relatório de falhas (D-093): só no celular e só com o endereço do projeto nas variáveis do EAS; antes de tudo, para pegar falhas do começo.
 initCrashReport();
+
+// Rede de segurança (teste com pessoas, 16/11/2026): uma falha ao desenhar qualquer tela mostra "Algo deu errado nesta tela." com "Tentar
+// de novo", "Voltar ao Resumo" e "Enviar um problema", e vai para o relatório de falhas (components/route-error.tsx).
+export { RouteError as ErrorBoundary } from '@/components/route-error';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -214,7 +218,8 @@ function Navigation() {
   // No celular, o link que abriu o app fechado (widget): lido uma vez e retomado como o endereço da web.
   const [appLinkTarget, setAppLinkTarget] = useState<string | null>(null);
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    // Uma vez por abertura: "Tentar de novo" na tela de erro desenha o layout de novo, e o Android ainda devolveria o link do widget.
+    if (Platform.OS === 'web' || !takeInitialLink('layout')) return;
     let alive = true;
     Linking.getInitialURL()
       .then((url) => {

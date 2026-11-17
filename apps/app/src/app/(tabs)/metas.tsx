@@ -133,7 +133,7 @@ export default function MetasScreen() {
 /**
  * "Seu mês": fora dos compromissos e o percentual da renda de referência (renda comprometida, Ciclo B) e o guardado no mês
  * (aportes menos resgates). O cálculo da renda comprometida carrega à parte: se falhar, o resto continua e a falha tem
- * "Tentar novamente"; nunca um valor ou um percentual de mentira.
+ * "Tentar de novo"; nunca um valor ou um percentual de mentira.
  */
 function MonthCard({ overview, committed }: { overview: GoalsOverview; committed: ReturnType<typeof useCommittedSummary> }) {
   const summary = committed.data ?? null;

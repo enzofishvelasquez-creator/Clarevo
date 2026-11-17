@@ -80,6 +80,7 @@ import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { UnsavedChangesText } from '@/components/context-text';
 import { flash } from '@/lib/flash';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { explanationHref } from '@/lib/learn';
 import {
   useCommitments,
@@ -943,7 +944,7 @@ export function SeriesForm({
   );
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
       <SubHeader title={title} onBack={requestCancel} right={<ContextPill label={`Salvando em ${contextName}`} />} help={anual ? 'conta-do-ano' : undefined} />
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         {prefill?.endedYear ? (
@@ -1189,7 +1190,7 @@ export function SeriesForm({
           ) : null}
           <View style={styles.footerRow}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
-            <Button label={retry ? 'Tentar novamente' : saveLabel} busy={busy} busyLabel="Salvando…" onPress={() => submit()} style={styles.save} />
+            <Button label={retry ? 'Tentar de novo' : saveLabel} busy={busy} busyLabel="Salvando…" onPress={() => submit()} style={styles.save} />
           </View>
         </View>
       </View>

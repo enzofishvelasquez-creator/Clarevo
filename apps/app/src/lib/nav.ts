@@ -62,7 +62,8 @@ export const summaryTop = {
   },
 };
 
-const TAB_TARGET = /^\/(movimentacoes|metas|aprender)\/?(\?|$)/;
+/** As abas, menos o Resumo (que é o início): Movimentos, Metas, Investir (D-093) e Aprender. */
+const TAB_TARGET = /^\/(movimentacoes|metas|investimentos|aprender)\/?(\?|$)/;
 
 /**
  * Abre uma tela pedida (endereço da versão web ou destino depois de entrar de novo). Abas substituem a pilha;

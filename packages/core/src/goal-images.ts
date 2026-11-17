@@ -90,7 +90,7 @@ export const GOAL_IMAGES: readonly GoalImageSuggestion[] = [
     contextWords: ['pos', 'mensalidade', 'carreira'],
   },
   { key: 'casamento', label: 'Casamento', alt: 'Duas alianças', words: ['casamento', 'casar', 'noivado', 'noiva', 'noivo', 'aliancas', 'cha de panela'] },
-  { key: 'bebe', label: 'Bebê', alt: 'Sapatinhos de bebê', words: ['bebe', 'filho', 'filha', 'filhos', 'gravidez', 'enxoval', 'maternidade', 'paternidade', 'parto', 'pos parto'] },
+  { key: 'bebe', label: 'Bebê', alt: 'Sapatinhos de bebê', words: ['bebe', 'filho', 'filha', 'filhos', 'filhas', 'crianca', 'criancas', 'gravidez', 'enxoval', 'maternidade', 'paternidade', 'parto', 'pos parto'] },
   {
     key: 'tecnologia',
     label: 'Tecnologia',
@@ -223,14 +223,14 @@ export const GOAL_IMAGE_TEXT = {
   photoTitle: 'Sua foto',
   pickPhoto: 'Escolher uma foto',
   replacePhoto: 'Escolher outra foto',
-  removePhoto: 'Tirar a foto',
+  removePhoto: 'Remover a foto',
   photoHint: 'A foto é reduzida antes de enviar e fica guardada na Clarevo, só para quem vê esta meta. Escolha uma foto que você pode compartilhar.',
   familyHint: 'Na Família, todas as pessoas do espaço veem a imagem da meta.',
   saving: 'Salvando…',
   saved: 'Imagem salva.',
   tooBig: 'A foto ficou grande demais, mesmo reduzida. Escolha outra.',
-  invalid: 'Não deu para ler essa imagem. Escolha uma foto em JPEG, PNG ou WebP.',
-  error: 'Não deu para salvar a imagem agora. Tente de novo.',
+  invalid: 'Não foi possível ler essa imagem. Escolha uma foto em JPG, PNG ou WebP.',
+  error: 'Não foi possível salvar a imagem agora. Tente de novo.',
   photoAlt: (goal: string) => `Foto escolhida para a meta ${goal}`,
 } as const;
 

@@ -14,6 +14,7 @@ import {
   groupAnnualLater,
   isCommitmentOverdue,
   isRepoError,
+  payFailureReason,
   monthOf,
   newOperationKey,
   occurrenceLabel,
@@ -79,15 +80,8 @@ function monthWord(c: Commitment, today: IsoDate): string {
 
 const isUncertain = (e: unknown) => !isRepoError(e) || e.code === 'rede' || e.code === 'desconhecido';
 
-/** Motivo curto de uma recusa, depois do nome da conta: "Aluguel de março: a conta mudou em outro aparelho." */
-function payReason(e: unknown): string {
-  if (isRepoError(e, 'versao_desatualizada')) return 'a conta mudou em outro aparelho.';
-  if (isRepoError(e, 'compromisso_quitado')) return 'a conta já foi marcada como paga em outro aparelho.';
-  if (isRepoError(e, 'nao_encontrado')) return 'a conta não está mais disponível.';
-  if (isRepoError(e, 'sem_permissao')) return 'você não tem permissão para esta ação.';
-  if (!isUncertain(e)) return 'não foi possível registrar o pagamento.';
-  return 'não foi possível confirmar o pagamento. Tente novamente.';
-}
+/** Motivo curto de uma falha, depois do nome da conta (o texto mora no núcleo, igual nas duas listas). */
+const payReason = (e: unknown): string => payFailureReason(isRepoError(e) ? e.code : null);
 
 const contas = (n: number) => (n === 1 ? '1 conta' : `${n} contas`);
 
@@ -326,7 +320,7 @@ export default function ContasVencidas() {
       setPending(null);
       if (isUncertain(e)) {
         // Rede: repetir com a mesma chave é seguro.
-        setResult({ tone: 'erro', text: `Não foi possível tirar as parcelas de ${g.label}. Tente novamente.` });
+        setResult({ tone: 'erro', text: `Não foi possível tirar as parcelas de ${g.label}. Tente de novo.` });
         return;
       }
       skipKeys.current.delete(groupKey);
@@ -356,12 +350,8 @@ export default function ContasVencidas() {
         })()
       : null;
   const batchTotal = chosen.reduce((acc, c) => acc + c.amountCents, 0);
-  const batchLabel =
-    chosen.length === 0
-      ? 'Marcar as selecionadas como pagas no vencimento'
-      : chosen.length === 1
-        ? 'Marcar a 1 selecionada como paga no vencimento'
-        : `Marcar as ${chosen.length} selecionadas como pagas no vencimento`;
+  // Rótulo curto (cabe em 320 px); a regra (valor previsto, na data do vencimento) fica na legenda acima do botão.
+  const batchLabel = chosen.length === 0 ? 'Marcar como pagas' : chosen.length === 1 ? 'Marcar como paga (1)' : `Marcar como pagas (${chosen.length})`;
   const resultBanner = result ? (
     <Banner tone={result.tone} icon={result.tone === 'erro' ? AlertCircle : Check}>
       <MoneyTxt variant="label" color={result.tone === 'erro' ? colors.error : colors.successText} style={{ fontFamily: fonts.bold }}>
@@ -484,7 +474,7 @@ export default function ContasVencidas() {
                         ) : null}
                         <Button
                           label={`Não houve em ${group.label}`}
-                          accessibilityLabel={`Não houve ${group.description} em ${yearA11y(group.label)}`}
+                          accessibilityLabel={`Não houve em ${yearA11y(group.label)}, ${group.description}`}
                           tone="ghost"
                           disabled={busy || !yearPlanFor(group)}
                           style={styles.action}
@@ -501,7 +491,7 @@ export default function ContasVencidas() {
             {fixed.length > 0 ? (
               <Txt variant="caption" color={colors.textSecondary}>
                 Só contas de valor fixo podem ser marcadas juntas: cada uma vira um gasto com o valor previsto, na data do vencimento
-                {account ? `, da conta ${account.name}` : ''}. Contas estimadas pedem o valor da conta.
+                {account ? `, ${ACCOUNTS_TEXT.leavingFrom(account.name)}` : ''}. Contas estimadas pedem o valor da conta.
               </Txt>
             ) : null}
           </>
@@ -542,7 +532,7 @@ export default function ContasVencidas() {
             },
           ]}>
           <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>
-            {`${formatBRL(target.amountCents)} em ${formatDateBR(target.dueOn)}, da conta ${account.name}.`}
+            {`${formatBRL(target.amountCents)} em ${formatDateBR(target.dueOn)}, ${ACCOUNTS_TEXT.leavingFrom(account.name)}.`}
           </MoneyTxt>
           <Txt color={colors.textSecondary}>
             Um gasto com esse valor entra em Pago de {formatMonthBR(monthOf(target.dueOn)).toLowerCase()}, e a conta sai de Ainda a pagar.
@@ -605,7 +595,7 @@ export default function ContasVencidas() {
           busy={busy}
           onCancel={() => setPending(null)}
           onConfirm={payBatch}>
-          <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{`Total: ${formatBRL(batchTotal)}, da conta ${account.name}.`}</MoneyTxt>
+          <MoneyTxt style={[{ fontFamily: fonts.bold }, tabular]}>{`Total: ${formatBRL(batchTotal)}, ${ACCOUNTS_TEXT.leavingFrom(account.name)}.`}</MoneyTxt>
           <Txt color={colors.textSecondary}>
             Cada conta vira um gasto com o valor previsto, na data do vencimento, e entra em Pago do mês dessa data. Se uma falhar, as
             seguintes não são marcadas e as anteriores continuam pagas.

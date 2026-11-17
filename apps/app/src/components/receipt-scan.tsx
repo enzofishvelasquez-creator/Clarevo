@@ -15,13 +15,18 @@ import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import { Camera, ChevronRight, FileText, Flashlight, FlashlightOff, Info, QrCode } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChoiceDialog, type DialogChoice } from '@/components/choice-dialog';
+import { dialogStyles, useDialogFrame } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { Banner, Button, LinkButton, TextField, Txt, styles as ui } from '@/components/ui';
 import { improveCameraFocus } from '@/lib/camera-focus';
+import { openDeviceSettings } from '@/lib/device';
+import { withExternalScreen } from '@/lib/external-screen';
+import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { OCR_AVAILABLE, textFromImage } from '@/lib/ocr';
 import { invoiceHref } from '@/lib/cards';
 import { imageTooBig } from '@/lib/comprovante-read';
@@ -126,6 +131,7 @@ export function PasteModal({
   onClose: () => void;
 }) {
   const [text, setText] = useState('');
+  const frame = useDialogFrame();
   // "Ler a chave numa foto" (D-078 B): a foto é lida no aparelho e só a chave achada vai para o campo.
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -191,56 +197,59 @@ export function PasteModal({
   }
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.backdrop}>
-          <View style={styles.box} accessibilityViewIsModal accessibilityRole="alert">
-            <Txt variant="title" accessibilityRole="header">
-              {NOTA_FLOW_TEXT.pasteTitle}
-            </Txt>
-            <TextField
-              label={NOTA_TEXT.pasteLabel}
-              hint={NOTA_TEXT.pasteHint}
-              value={text}
-              onChangeText={setText}
-              autoFocus
-              autoCapitalize="none"
-              autoCorrect={false}
-              spellCheck={false}
-              returnKeyType="go"
-              onSubmitEditing={() => onSubmit(text)}
-              error={boleto ? undefined : (message ?? undefined)}
-            />
-            {boleto ? (
-              <Banner tone="info" icon={Info}>
-                <Txt variant="label">{NOTA_FLOW_TEXT.boleto}</Txt>
-                <Button label={NOTA_FLOW_TEXT.boletoAction} tone="soft" onPress={onBoleto} />
-              </Banner>
-            ) : null}
-            {OCR_AVAILABLE ? (
-              <View style={{ gap: space[1] }}>
-                <Button label={photoBusy ? NOTA_TEXT.keyPhotoWorking : NOTA_TEXT.keyPhoto} icon={Camera} tone="soft" disabled={photoBusy} onPress={() => void keyFromPhoto()} />
-                <Txt variant="caption" color={colors.textSecondary}>
-                  {NOTA_TEXT.keyPhotoHint}
-                </Txt>
-                {photoError ? (
-                  <Txt variant="label" color={colors.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
-                    {photoError}
-                  </Txt>
-                ) : null}
-              </View>
-            ) : null}
-            <View style={{ gap: space[2], marginTop: space[1] }}>
-              <Button label={NOTA_FLOW_TEXT.pasteSubmit} onPress={() => onSubmit(text)} />
-              {demo ? (
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={KEYBOARD_BEHAVIOR}>
+        {/* Com o teclado aberto e letra grande, o que não couber rola dentro da caixa (como no ConfirmDialog). */}
+        <View style={[dialogStyles.backdrop, frame.backdrop]}>
+          <View style={[dialogStyles.box, frame.box]} accessibilityViewIsModal accessibilityRole="alert">
+            <ScrollView contentContainerStyle={dialogStyles.content} keyboardShouldPersistTaps="handled">
+              <Txt variant="title" accessibilityRole="header">
+                {NOTA_FLOW_TEXT.pasteTitle}
+              </Txt>
+              <TextField
+                label={NOTA_TEXT.pasteLabel}
+                hint={NOTA_TEXT.pasteHint}
+                value={text}
+                onChangeText={setText}
+                autoFocus
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+                returnKeyType="go"
+                onSubmitEditing={() => onSubmit(text)}
+                error={boleto ? undefined : (message ?? undefined)}
+              />
+              {boleto ? (
+                <Banner tone="info" icon={Info}>
+                  <Txt variant="label">{NOTA_FLOW_TEXT.boleto}</Txt>
+                  <Button label={NOTA_FLOW_TEXT.boletoAction} tone="soft" onPress={onBoleto} />
+                </Banner>
+              ) : null}
+              {OCR_AVAILABLE ? (
                 <View style={{ gap: space[1] }}>
-                  <Button label={NOTA_TEXT.example.button} tone="soft" onPress={onExample} />
+                  <Button label={photoBusy ? NOTA_TEXT.keyPhotoWorking : NOTA_TEXT.keyPhoto} icon={Camera} tone="soft" disabled={photoBusy} onPress={() => void keyFromPhoto()} />
                   <Txt variant="caption" color={colors.textSecondary}>
-                    {NOTA_TEXT.example.note}
+                    {NOTA_TEXT.keyPhotoHint}
                   </Txt>
+                  {photoError ? (
+                    <Txt variant="label" color={colors.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
+                      {photoError}
+                    </Txt>
+                  ) : null}
                 </View>
               ) : null}
-              <Button label="Cancelar" tone="ghost" onPress={onClose} />
-            </View>
+              <View style={{ gap: space[2], marginTop: space[1] }}>
+                <Button label={NOTA_FLOW_TEXT.pasteSubmit} onPress={() => onSubmit(text)} />
+                {demo ? (
+                  <View style={{ gap: space[1] }}>
+                    <Button label={NOTA_TEXT.example.button} tone="soft" onPress={onExample} />
+                    <Txt variant="caption" color={colors.textSecondary}>
+                      {NOTA_TEXT.example.note}
+                    </Txt>
+                  </View>
+                ) : null}
+                <Button label="Cancelar" tone="ghost" onPress={onClose} />
+              </View>
+            </ScrollView>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -271,6 +280,7 @@ export function CameraModal({
   onClose: () => void;
 }) {
   const [permission, requestPermission] = useCameraPermissions();
+  const insets = useSafeAreaInsets();
   const [torch, setTorch] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   /** 0: nenhuma dica; 1: "Aproxime..." (5 s); 2: também a da lanterna (10 s). */
@@ -331,16 +341,18 @@ export function CameraModal({
     <Modal visible={visible} animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <SubHeader title={NOTA_TEXT.scanTitle} onBack={onClose} right={<ContextPill label="Salvando em Pessoal" />} />
-        <View style={styles.cameraBody}>
+        {/* Rola com letra grande em tela pequena; a barra de navegação do Android fica fora dos botões de baixo. */}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.cameraBody, { paddingBottom: insets.bottom + space[5] }]}>
           {permission === null ? (
             <Txt color={colors.textSecondary}>{NOTA_FLOW_TEXT.cameraStarting}</Txt>
           ) : !granted ? (
             <View style={{ gap: space[3] }}>
               <Txt>{canAsk ? NOTA_FLOW_TEXT.cameraIntro : NOTA_FLOW_TEXT.cameraDeniedHelp}</Txt>
               {canAsk ? (
-                <Button label={NOTA_TEXT.cameraAllow} onPress={() => requestPermission()} />
+                // O pedido do sistema é uma tela de fora: a volta dele não trava o app (lib/external-screen.ts).
+                <Button label={NOTA_TEXT.cameraAllow} onPress={() => void withExternalScreen(requestPermission)} />
               ) : Platform.OS !== 'web' ? (
-                <Button label="Abrir ajustes" tone="soft" onPress={() => Linking.openSettings().catch(() => {})} />
+                <Button label="Abrir ajustes" tone="soft" onPress={openDeviceSettings} />
               ) : null}
             </View>
           ) : mountError ? (
@@ -398,7 +410,7 @@ export function CameraModal({
             <Button label={COMPROVANTE_TEXT.optionExpense} tone="soft" onPress={onProof} />
             <Button label={NOTA_FLOW_TEXT.back} tone="ghost" onPress={onClose} />
           </View>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -470,9 +482,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.brandTint,
   },
-  backdrop: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: space[6] },
-  box: { width: '100%', maxWidth: 420, backgroundColor: colors.surface, borderRadius: radius.lg, padding: space[6], gap: space[3] },
-  cameraBody: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', padding: space[5], gap: space[4], justifyContent: 'space-between' },
+  cameraBody: { flexGrow: 1, width: '100%', maxWidth: 560, alignSelf: 'center', padding: space[5], gap: space[4], justifyContent: 'space-between' },
   preview: { width: '100%', aspectRatio: 4 / 3, maxHeight: 360, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.camera },
   // Moldura quadrada ao centro (o QR é quadrado): o app não recorta a imagem, ela só guia a distância.
   frameBox: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },

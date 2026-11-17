@@ -215,7 +215,26 @@ const __mods = [
         }
     }
     function todayIn(timeZone, now = new Date()) {
-        return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+        try {
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                calendar: 'gregory',
+                numberingSystem: 'latn',
+            }).formatToParts(now);
+            const get = (type) => parts.find((p) => p.type === type)?.value ?? '';
+            const iso = `${get('year')}-${get('month').padStart(2, '0')}-${get('day').padStart(2, '0')}`;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && isValidIsoDate(iso))
+                return iso;
+        }
+        catch {
+        }
+        return localIsoDate(now);
+    }
+    function localIsoDate(now) {
+        return `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
     function addDays(date, delta) {
         const [y, m, d] = date.split('-').map(Number);
@@ -706,6 +725,8 @@ const __mods = [
         indicesSource: (fetchedOn) => `Fonte do CDI, da Selic, do IPCA e da poupança: Banco Central do Brasil, séries ${exports.BCB_SERIES.cdi}, ${exports.BCB_SERIES.selic}, ${exports.BCB_SERIES.ipca} e ${exports.BCB_SERIES.poupanca}${fetchedOn ? `, consulta em ${(0, dates_1.formatDateBR)(fetchedOn)}` : ''}.`,
         indicesExample: 'Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.',
         indicesError: 'Não foi possível buscar o CDI e o IPCA agora. A sua rentabilidade continua aqui.',
+        compare: 'Comparar com CDI, IPCA e poupança',
+        closingNote: 'A Clarevo não guarda, não movimenta nem indica investimentos. A rentabilidade vem dos valores que você registra, como estão no seu extrato, e não é recomendação de investimento: o que rendeu no passado não garante o futuro. Aportes, resgates e rendimentos não entram em Pago nem em Recebido.',
         disclaimer: 'A rentabilidade é calculada com os valores que você registra, como estão no seu extrato. Não é recomendação de investimento, e o que rendeu no passado não garante o futuro.',
         rule: 'Aportes, resgates e rendimentos não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.',
         footer: 'A Clarevo não guarda, não movimenta nem indica investimentos. Os valores mostram só o que você registrou.',
