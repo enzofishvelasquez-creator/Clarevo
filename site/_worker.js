@@ -1038,7 +1038,7 @@ exports.INDICADORES_TEXT = {
     semRetrato: 'Ainda não há um retrato salvo destes números. Com o JavaScript ligado, a página busca os números do Banco Central quando abre.',
     numeroAusente: 'Sem número',
     naoAoVivo: 'São os últimos números que o Banco Central publicou, cada um com a data dele. Não são cotações ao vivo nem previsões.',
-    comoAtualiza: 'Quando você abre a página, ela pergunta ao próprio site da Clarevo, uma vez só. O servidor do site consulta o Banco Central no máximo uma vez por hora e guarda uma cópia. O seu navegador não fala com nenhum outro site.',
+    comoAtualiza: 'Quando você abre a página, ela pergunta ao próprio site da Clarevo, uma vez só. O servidor do site consulta o Banco Central em geral uma vez por hora (depois de uma falha, de novo em alguns minutos) e guarda uma cópia. O seu navegador não fala com nenhum outro site.',
 };
 const dataBR = (iso) => (0, dates_1.formatDateBR)(iso);
 const maiuscula = (s) => s.charAt(0).toUpperCase() + s.slice(1);

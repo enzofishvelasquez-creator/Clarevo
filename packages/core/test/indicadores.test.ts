@@ -141,6 +141,14 @@ describe('indicadores: o texto de cada número', () => {
   it('a hora da consulta em Brasília, a fonte e o aviso das páginas de mercado', () => {
     expect(INDICADORES_TEXT.retrato('2026-11-17T16:12:00.000Z')).toBe('Retrato de 17/11/2026 às 13:12, horário de Brasília.');
     expect(INDICADORES_TEXT.atualizado('2026-11-17T16:12:00.000Z')).toBe('Atualizado em 17/11/2026 às 13:12, horário de Brasília.');
+    // Revisão de 17/11/2026: a cópia do servidor vale uma hora, mas, depois de uma falha, a consulta volta em minutos (e cada instância
+    // do servidor tem a sua cópia): o texto não promete "no máximo uma vez por hora".
+    expect(INDICADORES_TEXT.comoAtualiza).toBe(
+      'Quando você abre a página, ela pergunta ao próprio site da Clarevo, uma vez só. O servidor do site consulta o Banco Central em geral uma vez por hora (depois de uma falha, de novo em alguns minutos) e guarda uma cópia. O seu navegador não fala com nenhum outro site.',
+    );
+    expect(INDICADORES_TEXT.comoAtualiza).not.toMatch(/no máximo/);
+    expect(INDICADORES_CACHE_MS).toBe(60 * 60 * 1000);
+    expect(INDICADORES_FALHA_MS).toBeLessThan(INDICADORES_CACHE_MS);
     expect(INDICADORES_TEXT.fonte).toBe('Fonte: Banco Central do Brasil.');
     expect(INDICADORES_TEXT.avisoMercado).toBe('Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.');
     expect(AVISO_DE_MERCADO).toBe(INDICADORES_TEXT.avisoMercado);
