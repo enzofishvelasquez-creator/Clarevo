@@ -41,6 +41,7 @@ import { demoTrialAccess } from './plano';
  * "Previdência" (R$ 5.000,00 desde 01/08/2026; R$ 5.040,00 e R$ 5.080,00 no fim de agosto e de setembro, e R$ 5.080,00 de novo em 06/10). Hoje: R$ 15.955,00,
  * aportado R$ 15.500,00, ganho de R$ 455,00. Não entram em nenhum total do mês, na renda comprometida nem nas metas.
  * D-104: a aplicação rende 105% do CDI até 31/03/2027 e 100% depois (hoje a estimativa usa só os 105%); a previdência tem uma descrição.
+ * Subcategoria (D-107): o aluguel de setembro (R$ 2.500,00, Moradia) tem a subcategoria "Aluguel"; nenhum total muda.
  * Orçamento por categoria (D-041), a partir de outubro de 2026: Moradia R$ 2.500,00, Mercado R$ 1.800,00 e Lazer R$ 300,00.
  * Usado em outubro (competência): Moradia R$ 2.500,00 (o aluguel pago), Mercado R$ 1.400,00 e Lazer R$ 400,00 (a 1ª parcela do
  * tênis, R$ 200,00, e o restaurante, R$ 200,00; a compra no cartão conta no mês da compra). Limite pessoal de 60% a partir de
@@ -168,7 +169,15 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   ) => repo.createRecord(newOperationKey(), ctx, kind, { accountId: from, amountCents: reais * 100, occurredOn, description, category });
 
   await add('receita', 'Salário', 6000, '2026-09-01', 'Salário');
-  await add('despesa', 'Aluguel', 2500, '2026-09-05', 'Moradia');
+  // Subcategoria (D-107): o aluguel de setembro mostra "Moradia › Aluguel" no detalhe, na lista e na composição de setembro.
+  await repo.createRecord(newOperationKey(), ctx, 'despesa', {
+    accountId,
+    amountCents: 250_000,
+    occurredOn: '2026-09-05',
+    description: 'Aluguel',
+    category: 'Moradia',
+    subcategory: 'Aluguel',
+  });
   await add('despesa', 'Mercado', 1250, '2026-09-12', 'Mercado', carteira.id);
   await add('receita', 'Salário', 6000, '2026-10-01', 'Salário');
   await add('despesa', 'Mercado', 1400, '2026-10-06', 'Mercado', carteira.id);

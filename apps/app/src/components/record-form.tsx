@@ -100,6 +100,21 @@ import {
   nextMonthAllowed,
   recordMonth,
   KIND_SWITCH_TEXT,
+  RECORD_KIND_ERROR_TEXT,
+  RECORD_LINK_TEXT,
+  SUBCATEGORIES,
+  commitmentLinkLabel,
+  forgetSubcategory,
+  incomeInvestmentOptions,
+  kindSwitchNotice,
+  linkSteps,
+  linkedOptionKey,
+  normalizeSubcategory,
+  paymentLinkOptions,
+  recordLinkErrorText,
+  rememberSubcategory,
+  showPaymentLink,
+  type PaymentLinkOption,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -121,6 +136,7 @@ import { ChoiceDialog } from '@/components/choice-dialog';
 import { AlreadyNotedBanner, CameraModal, PasteModal, ScanLine, ScanSheet, cameraIsAvailable } from '@/components/receipt-scan';
 import { returnSession } from '@/components/retorno-acoes';
 import { ChoiceGroup } from '@/components/series-parts';
+import { InvestmentIncomeBlock, KindChoice, PaymentLinkBlock, SubcategoryPicker, categoryOfKind } from '@/components/record-link';
 import { useSavedBefore } from '@/components/saved-before';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt, styles as ui } from '@/components/ui';
@@ -149,8 +165,11 @@ import {
   useCardInvoices,
   useCardOperationKey,
   useCards,
+  useCommitment,
   useCommitments,
   useCreateRecord,
+  useInvestments,
+  useRecordLinks,
   useReceiptMatch,
   useRecordsNear,
   useReturnReview,
@@ -162,6 +181,20 @@ import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
 type Mode = { type: 'novo'; kind: RecordKind } | { type: 'editar'; record: FinancialRecord };
+
+/**
+ * O preenchimento do formulário (D-107): o rascunho de sempre, o tipo (que muda só ao editar), a subcategoria (uma da lista ou "Outra",
+ * com o texto em `subcategory`), o rendimento de investimento (no recebimento) e a conta a pagar ou fatura que o gasto pagou (a chave da
+ * opção de "O que este gasto pagou?"; null = "Nenhuma destas"). Tudo junto, para "sair sem salvar" conferir o que mudou.
+ */
+type FormDraft = RecordDraft & {
+  kind: RecordKind;
+  subcategory: string | null;
+  subOther: boolean;
+  incomeOn: boolean;
+  investmentId: string | null;
+  linkKey: string | null;
+};
 
 /** Valores dos campos que a leitura de uma nota preencheu (ou o que havia antes), para desfazer sem perder o que a pessoa digitou. */
 interface NoteFields {
@@ -253,13 +286,13 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   // Aviso dentro do app (D-041): se o gasto fez a categoria chegar a 80% ou passar do orçamento do mês, a mensagem de sucesso ganha uma linha.
   const budgetWatch = useBudgetWatch();
 
-  const kind = mode.type === 'novo' ? mode.kind : mode.record.kind;
-  const copy = COPY[kind];
+  /** O tipo com que o formulário abriu; ao editar, a pessoa pode trocar (draft.kind, D-107). */
+  const baseKind = mode.type === 'novo' ? mode.kind : mode.record.kind;
   const contextId = mode.type === 'novo' ? personal.contextId : mode.record.contextId;
 
   // Como você pagou? (D-037): só em gasto novo, fora do modo "Dia". Dinheiro, débito ou Pix é o jeito de sempre; cartão de
   // crédito anota a compra na fatura (ela só entra em Pago quando a fatura for paga).
-  const cardMode = mode.type === 'novo' && kind === 'despesa' && dayMonth === null;
+  const cardMode = mode.type === 'novo' && baseKind === 'despesa' && dayMonth === null;
   const cards = useCards(cardMode ? contextId : undefined);
   const activeCards = (cards.data ?? []).filter((c) => c.status === 'ativo');
   const userId = user?.id;
@@ -325,7 +358,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const receiptMatch = useReceiptMatch(scanMode && note ? contextId : undefined, note?.reading.draft.receiptKey);
   const match: ReceiptMatch | null = note ? (forcedMatch ?? receiptMatch.data ?? null) : null;
 
-  const [initial, setInitial] = useState<RecordDraft>(() =>
+  const [initial, setInitial] = useState<FormDraft>(() =>
       mode.type === 'novo'
         ? {
             accountId: chooseAccountId(personal.accounts),
@@ -335,6 +368,12 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             dateText: formatDateBR(today),
             // "Este valor é do mês seguinte" (D-089 A): só no recebimento.
             ...(mode.kind === 'receita' ? { nextMonth: false } : {}),
+            kind: mode.kind,
+            subcategory: null,
+            subOther: false,
+            incomeOn: false,
+            investmentId: null,
+            linkKey: null,
           }
         : {
             accountId: mode.record.accountId,
@@ -343,6 +382,14 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             category: mode.record.category,
             dateText: formatDateBR(mode.record.occurredOn),
             ...(mode.record.kind === 'receita' ? { nextMonth: mode.record.nextMonth === true } : {}),
+            kind: mode.record.kind,
+            subcategory: mode.record.subcategory ?? null,
+            // Uma subcategoria fora das sugestões da categoria abre em "Outra", com o texto.
+            subOther:
+              (mode.record.subcategory ?? null) !== null && !(SUBCATEGORIES[mode.record.category ?? ''] ?? []).includes(mode.record.subcategory!),
+            incomeOn: (mode.record.investmentId ?? null) !== null,
+            investmentId: mode.record.investmentId ?? null,
+            linkKey: linkedOptionKey(mode.record),
           },
   );
   const [dayMode, setDayMode] = useState(dayMonth !== null);
@@ -351,8 +398,25 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   /** "Anotado: Salário, R$ 6.000,00 em 01/06/2026." depois de "Salvar e anotar outro". */
   const [noted, setNoted] = useState<string | null>(null);
 
-  const [draft, setDraft] = useState<RecordDraft>(initial);
-  const draftRef = useRef<RecordDraft>(draft);
+  const [draft, setDraft] = useState<FormDraft>(initial);
+  const draftRef = useRef<FormDraft>(draft);
+  // O tipo de agora (ao editar, a pessoa pode trocar) e os textos dele.
+  const kind = draft.kind;
+  const copy = COPY[kind];
+  const [subError, setSubError] = useState<string | undefined>();
+  const [incomeError, setIncomeError] = useState<string | undefined>();
+  const [editingSubs, setEditingSubs] = useState(false);
+  const subRef = useRef<TextInput>(null);
+  const links = useRecordLinks();
+  /** Chave de cada passo de ligar ou desligar, guardada entre tentativas com o mesmo conteúdo (a repetição não duplica). */
+  const linkKeys = useRef(new Map<string, string>());
+  const linkKeyFor = (content: string) => {
+    const found = linkKeys.current.get(content);
+    if (found) return found;
+    const key = newOperationKey();
+    linkKeys.current.set(content, key);
+    return key;
+  };
   const [errors, setErrors] = useState<FieldErrors>({});
   const [banner, setBanner] = useState<string | null>(null);
   const [conflict, setConflict] = useState<FinancialRecord | null>(null);
@@ -499,7 +563,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     busy,
   );
 
-  const set = <K extends keyof RecordDraft>(k: K, v: RecordDraft[K]) => {
+  const set = <K extends keyof FormDraft>(k: K, v: FormDraft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
     if (k in errors) setErrors((e) => ({ ...e, [k]: undefined }));
   };
@@ -1047,6 +1111,15 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     if (!current) return;
     updatePrefs(userId, { importCategories: rememberCategories(current.importCategories, [{ description: description.trim(), category, kind }]) }, persistPrefs);
   };
+  /** A subcategoria escrita em "Outra" (D-107) volta como opção nas próximas vezes, só neste aparelho. */
+  const rememberSub = () => {
+    const d = draftRef.current;
+    const sub = normalizeSubcategory(d.subcategory);
+    if (!userId || !d.subOther || sub === null || d.category === null || d.kind !== 'despesa') return;
+    const current = getPrefs(userId);
+    if (!current) return;
+    updatePrefs(userId, { subcategories: rememberSubcategory(current.subcategories, d.category, sub) }, persistPrefs);
+  };
   /** A sugestão de categoria para o nome digitado, só com a categoria em "Sem categoria" (D-086). */
   const categorySuggestion =
     draft.category === null && draft.description.trim().length >= 3 ? suggestCategory(draft.description, kind, prefs?.importCategories ?? {}).category : null;
@@ -1056,6 +1129,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (userId && input.accountId) updatePrefs(userId, { lastAccount: input.accountId }, persistPrefs);
     rememberCategory(input.description, input.category);
+    rememberSub();
     if (fromReview) returnSession.noteAction();
     const text = RETURN_TEXT.noted(input);
     if (!another) {
@@ -1063,7 +1137,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       leave(goBack);
       return;
     }
-    const next: RecordDraft = { ...draft, description: '', amountText: '', category: null };
+    const next: FormDraft = { ...draft, description: '', amountText: '', category: null, subcategory: null, subOther: false };
     setInitial(next);
     setDraft(next);
     setInitialDay(dayText);
@@ -1089,6 +1163,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     if (counted !== null) notice = notice === null ? counted : `${notice}\n${counted}`;
     afterNoteSaved();
     rememberCategory(draftRef.current.description, draftRef.current.category);
+    rememberSub();
     // A última conta usada vale só neste aparelho (D-043): abre o próximo formulário já nela.
     if (userId && !cardPurchase && draftRef.current.accountId) updatePrefs(userId, { lastAccount: draftRef.current.accountId }, persistPrefs);
     if (mode.type === 'novo') {
@@ -1283,6 +1358,46 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     leave(() => router.replace({ pathname: '/a-pagar/nova', params }));
   };
 
+  /**
+   * Liga o gasto gravado à conta a pagar ou à fatura escolhida (D-107), pelo caminho de "Já paguei" e de "Registrar pagamento"
+   * (pay_commitment e pay_invoice com o gasto): nenhum gasto a mais. A chave se repete numa nova tentativa com o mesmo conteúdo.
+   */
+  const linkTo = async (option: PaymentLinkOption, r: FinancialRecord): Promise<{ notice: string } | { error: string }> => {
+    const content = JSON.stringify(['ligar', option.key, option.version, r.id, r.amountCents, r.occurredOn, r.accountId]);
+    try {
+      if (option.type === 'conta') await links.linkCommitment(linkKeyFor(content), option.commitmentId, option.version, r);
+      else await links.linkInvoice(linkKeyFor(content), option.cardId, option.month, option.version, r);
+      linkKeys.current.delete(content);
+      return { notice: option.type === 'conta' ? RECORD_LINK_TEXT.linkedNotice(option.label) : RECORD_LINK_TEXT.linkedInvoiceNotice(option.label) };
+    } catch (e) {
+      if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
+        linkKeys.current.delete(content);
+        return { error: recordLinkErrorText(e.code) };
+      }
+      return { error: UNCERTAIN_TEXT.movimentos };
+    }
+  };
+
+  /** "Nenhuma destas" (ou outra conta) ao editar: a conta de antes volta a ficar em aberto e o gasto continua (devolve a versão dele). */
+  const unlinkCurrent = async (commitmentId: string): Promise<{ version: number } | { error: string }> => {
+    try {
+      const c = await repo.getCommitment(commitmentId);
+      if (!c) return { error: recordLinkErrorText('nao_encontrado') };
+      // Uma tentativa anterior já desligou: segue com a versão de agora do gasto.
+      if (c.status === 'aberto' || c.payment?.recordId !== (mode.type === 'editar' ? mode.record.id : '')) {
+        const now = mode.type === 'editar' ? await repo.getRecord(mode.record.id) : null;
+        return now && now.commitmentId === null ? { version: now.version } : { error: recordLinkErrorText('versao_desatualizada') };
+      }
+      const content = JSON.stringify(['desligar', c.id, c.version]);
+      const kept = await links.unlinkCommitment(linkKeyFor(content), c.id, c.version);
+      linkKeys.current.delete(content);
+      return { version: kept.version };
+    } catch (e) {
+      if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') return { error: recordLinkErrorText(e.code) };
+      return { error: UNCERTAIN_TEXT.movimentos };
+    }
+  };
+
   const submit = async (versionOverride?: number, another = false) => {
     if (busy) return; // envio repetido bloqueado enquanto o anterior não termina
     if (cardPurchase) {
@@ -1293,21 +1408,82 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     const dayError = day && 'error' in day ? dayErrorText(day.error, dayMonth!) : null;
     const effective = day ? { ...draft, dateText: 'date' in day ? formatDateBR(day.date) : '' } : draft;
     const v = validateRecordDraft(effective, today);
-    if (!v.ok || dayError) {
+    // Subcategoria (D-107): "Outra" pede o nome; rendimento de investimento ligado pede o investimento.
+    const sub = kind === 'despesa' && effective.category !== null ? normalizeSubcategory(draft.subcategory) : null;
+    const subMissing = kind === 'despesa' && effective.category !== null && draft.subOther && sub === null;
+    const incomeMissing = incomeShown && draft.incomeOn && draft.investmentId === null;
+    if (!v.ok || dayError || subMissing || incomeMissing) {
       const errs = { ...(v.ok ? {} : v.errors), ...(dayError ? { dateText: dayError } : {}) };
       setErrors(errs);
-      focusFirst(errs);
+      setSubError(subMissing ? RECORD_LINK_TEXT.subcategoryOtherEmpty : undefined);
+      setIncomeError(incomeMissing ? RECORD_LINK_TEXT.incomeChooseError : undefined);
+      if (Object.keys(errs).length > 0) focusFirst(errs);
+      else if (subMissing) subRef.current?.focus();
+      return;
+    }
+    // O que este gasto pagou? (D-107): a opção escolhida precisa estar carregada (a ligação de agora pode ficar como está).
+    const steps = draft.linkKey === currentLink ? { unlink: false, link: null } : linkSteps(currentLink, chosenLink);
+    if (draft.linkKey !== null && draft.linkKey !== currentLink && !chosenLink) {
+      setBanner(RECORD_LINK_TEXT.linkNotLoaded);
       return;
     }
     setErrors({});
+    setSubError(undefined);
+    setIncomeError(undefined);
     setBanner(null);
     setNoted(null);
     setBusy(true);
-    const version = versionOverride ?? baseVersion;
+    let version = versionOverride ?? baseVersion;
+    // Ao editar, desligar a conta de antes vem primeiro (o gasto fica, e a troca de tipo passa a valer).
+    let unlinkedNotice: string | null = null;
+    if (mode.type === 'editar' && steps.unlink && mode.record.commitmentId) {
+      const kept = await unlinkCurrent(mode.record.commitmentId);
+      if ('error' in kept) {
+        setBanner(kept.error);
+        setBusy(false);
+        return;
+      }
+      version = kept.version;
+      setBaseVersion(kept.version);
+      unlinkedNotice = RECORD_LINK_TEXT.unlinkedNotice;
+    }
     // Gasto lido de uma nota: leva o resumo da chave (nunca a chave) para o aviso de nota repetida.
     const base: RecordInput = kind === 'receita' ? { ...v.input, nextMonth: v.input.nextMonth === true } : v.input;
-    const input: RecordInput = note && mode.type === 'novo' ? { ...base, receiptKey: note.reading.draft.receiptKey } : base;
+    // D-107: subcategoria, tipo e rendimento de investimento entram só quando valem (o app antigo manda o de antes).
+    const extras: Partial<RecordInput> =
+      mode.type === 'novo'
+        ? { ...(sub !== null ? { subcategory: sub } : {}), ...(incomeShown && draft.incomeOn && draft.investmentId ? { investmentId: draft.investmentId } : {}) }
+        : (() => {
+            // Só o que muda vai na chamada (sem mudança, a mesma chamada de antes): a subcategoria, quando difere do que o banco
+            // manteria sozinho; o investimento, quando a ligação muda.
+            const kept = kind === mode.record.kind && (effective.category ?? null) === (mode.record.category ?? null) ? (mode.record.subcategory ?? null) : null;
+            const wantedInvestment = incomeShown && draft.incomeOn ? draft.investmentId : null;
+            return {
+              ...(kind !== mode.record.kind ? { kind } : {}),
+              ...(sub !== kept ? { subcategory: sub } : {}),
+              ...(kind === 'receita' && wantedInvestment !== (mode.record.investmentId ?? null) ? { investmentId: wantedInvestment } : {}),
+            };
+          })();
+    const withExtras: RecordInput = { ...base, ...extras };
+    const input: RecordInput = note && mode.type === 'novo' ? { ...withExtras, receiptKey: note.reading.draft.receiptKey } : withExtras;
     const snapshot = JSON.stringify([input, version]);
+    /** Depois de gravar: liga a conta escolhida (se houver) e junta as linhas do aviso. Ao editar, uma ligação recusada deixa o formulário aberto. */
+    const afterSave = async (saved: FinancialRecord, budgetNotice: string | null): Promise<string | null | false> => {
+      const lines = [budgetNotice, unlinkedNotice];
+      if (steps.link) {
+        const r = await linkTo(steps.link, saved);
+        if ('error' in r) {
+          if (mode.type === 'editar') {
+            setBaseVersion(saved.version);
+            setBanner(RECORD_LINK_TEXT.linkFailedAfterUpdate(r.error));
+            return false;
+          }
+          lines.push(RECORD_LINK_TEXT.linkFailedAfterSave(r.error));
+        } else lines.push(r.notice);
+      }
+      const joined = lines.filter((x): x is string => x !== null).join('\n');
+      return joined === '' ? null : joined;
+    };
     try {
       if (relevantAttempts(attempts, snapshot).length > 0) {
         const found = await reconcile(input, snapshot);
@@ -1319,7 +1495,12 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         if (found) {
           const saved = found.record;
           if (dayMode || fromReview) finishDay(v.input, another);
-          else finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn, nextMonth: saved.nextMonth } : undefined);
+          else {
+            const full = steps.link ? await repo.getRecord(saved.id) : null;
+            const notice = full ? await afterSave(full, null) : unlinkedNotice;
+            if (notice === false) return;
+            finish(saved.id, saved.amountCents !== undefined && saved.occurredOn ? { amountCents: saved.amountCents, occurredOn: saved.occurredOn, nextMonth: saved.nextMonth } : undefined, notice);
+          }
           return;
         }
       }
@@ -1333,7 +1514,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         settleSlot(attempts);
         // Vindo da revisão, sempre volta a ela e anota a ação, também depois de "Usar outra data".
         if (dayMode || fromReview) finishDay(v.input, another);
-        else finish(saved.id, saved, await budgetWatch.after(budgetBefore));
+        else {
+          const notice = await afterSave(saved, await budgetWatch.after(budgetBefore));
+          if (notice === false) return;
+          finish(saved.id, saved, notice);
+        }
       } catch (e) {
         if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
           refuseKey(attempts);
@@ -1349,6 +1534,16 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             focusFirst(errs);
             return;
           }
+          // D-107: a subcategoria e o investimento têm o erro junto do campo.
+          if (e.code === 'subcategoria_invalida') {
+            setSubError(RECORD_KIND_ERROR_TEXT.subcategoria_invalida);
+            return;
+          }
+          if (e.code === 'investimento_invalido' || e.code === 'investimento_encerrado') {
+            setIncomeError(RECORD_KIND_ERROR_TEXT[e.code]);
+            qc.invalidateQueries({ queryKey: ['investments'] });
+            return;
+          }
           if (e.code === 'versao_desatualizada' && mode.type === 'editar') {
             try {
               const current = await repo.getRecord(mode.record.id);
@@ -1362,7 +1557,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             }
             return;
           }
-          setBanner(e.code in ERROR_TEXT ? ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] : ERROR_TEXT.salvar_falhou);
+          setBanner(RECORD_KIND_ERROR_TEXT[e.code] ?? (e.code in ERROR_TEXT ? ERROR_TEXT[e.code as keyof typeof ERROR_TEXT] : ERROR_TEXT.salvar_falhou));
           return;
         }
         // Falha de rede: a gravação pode ou não ter acontecido. Guardar a tentativa para reconciliar.
@@ -1393,7 +1588,139 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   // "Este valor é do mês seguinte" (D-089 A): só no recebimento, fora do modo "Dia", com a data nos últimos 7 dias do mês.
   const nextMonthShown = kind === 'receita' && !dayMode && parsedDate !== null && nextMonthAllowed(parsedDate);
   const countedMonth = parsedDate ? recordMonth({ occurredOn: parsedDate, nextMonth: nextMonthShown && draft.nextMonth === true }) : null;
-  const movesMonth = mode.type === 'editar' && countedMonth !== null && countedMonth !== recordMonth(mode.record);
+  const movesMonth = mode.type === 'editar' && countedMonth !== null && countedMonth !== recordMonth(mode.record) && kind === mode.record.kind;
+
+  // ---------------------------------------------------------------------------------------------------------------------------
+  // D-107 (retorno de 17/11/2026): "O que este gasto pagou?", rendimento de investimento, subcategoria, troca de tipo e o caminho
+  // de cadastrar e voltar com o preenchimento guardado.
+  // ---------------------------------------------------------------------------------------------------------------------------
+  const typedCents = parseBRL(draft.amountText);
+  /** O vínculo que o gasto tem agora (só ao editar; a fatura não chega aqui: a edição dela é pela fatura). */
+  const currentLink = mode.type === 'editar' ? linkedOptionKey(mode.record) : null;
+  const linkAllowed = kind === 'despesa' && !cardPurchase && dayMonth === null;
+  const openBills = useCommitments(linkAllowed ? contextId : undefined, monthOf(today));
+  const linkCards = useCards(linkAllowed ? contextId : undefined);
+  // A conta já ligada (paga por este gasto) não está entre as abertas: entra na lista para aparecer marcada.
+  const linkedBill = useCommitment(mode.type === 'editar' && mode.record.commitmentId && !mode.record.invoice ? mode.record.commitmentId : undefined);
+  const openOptions = linkAllowed && openBills.data ? paymentLinkOptions(openBills.data, linkCards.data ?? [], today, typedCents) : [];
+  const linkOptions: PaymentLinkOption[] =
+    linkedBill.data && currentLink && !openOptions.some((o) => o.key === currentLink)
+      ? [
+          {
+            type: 'conta',
+            key: currentLink,
+            commitmentId: linkedBill.data.id,
+            version: linkedBill.data.version,
+            label: commitmentLinkLabel(linkedBill.data),
+            amountCents: linkedBill.data.amountCents,
+            dueOn: linkedBill.data.dueOn,
+          },
+          ...openOptions,
+        ]
+      : openOptions;
+  const chosenLink = draft.linkKey === null ? null : (linkOptions.find((o) => o.key === draft.linkKey) ?? null);
+  const showLink =
+    linkAllowed && (draft.linkKey !== null || showPaymentLink(draft.category, linkOptions, draft.description, typedCents, currentLink, parsedDate));
+  /** Cadastrar conta a pagar ou parcelamento: as opções de agora, para escolher a nova quando a pessoa voltar. */
+  const registeringBills = useRef<Set<string> | null>(null);
+  const optionKeys = linkOptions.map((o) => o.key).join(',');
+  useEffect(() => {
+    const before = registeringBills.current;
+    if (!before || !openBills.isSuccess) return;
+    const fresh = linkOptions.filter((o) => o.type === 'conta' && !before.has(o.key));
+    if (fresh.length === 0) return;
+    registeringBills.current = null;
+    if (fresh.length === 1) setDraft((d) => ({ ...d, linkKey: fresh[0]!.key }));
+  }, [optionKeys]); // eslint-disable-line react-hooks/exhaustive-deps
+  const registerBill = (what: 'conta' | 'parcelamento') => {
+    registeringBills.current = new Set(linkOptions.map((o) => o.key));
+    const params: Record<string, string> = { origem: 'registro' };
+    if (draft.description.trim()) params.descricao = draft.description.trim().slice(0, DESCRIPTION_MAX);
+    if (typedCents !== null && typedCents >= 1 && typedCents <= MAX_RECORD_CENTS) params.valor = String(typedCents);
+    if (draft.category && CATEGORIES.despesa.includes(draft.category)) params.categoria = draft.category;
+    if (what === 'conta') {
+      if (parsedDate) params.vencimento = parsedDate;
+      router.push({ pathname: '/a-pagar/nova', params });
+    } else router.push({ pathname: '/gastos-fixos/novo', params: { ...params, tipo: 'parcelada' } });
+  };
+
+  // Rendimento de investimento: só no recebimento do espaço Pessoal (investimentos ficam no Pessoal).
+  const incomeShown = kind === 'receita' && personal.contextKind === 'pessoal' && dayMonth === null;
+  const investments = useInvestments(incomeShown ? contextId : undefined);
+  const investmentChoices = incomeInvestmentOptions(investments.data ?? [], mode.type === 'editar' ? (mode.record.investmentId ?? null) : null);
+  const registeringInvestments = useRef<Set<string> | null>(null);
+  const investmentIds = (investments.data ?? []).map((i) => i.id).join(',');
+  useEffect(() => {
+    const before = registeringInvestments.current;
+    if (!before) return;
+    const created = (investments.data ?? []).find((i) => !before.has(i.id) && i.status === 'ativo');
+    if (!created) return;
+    registeringInvestments.current = null;
+    setDraft((d) => ({ ...d, incomeOn: true, investmentId: created.id }));
+    setIncomeError(undefined);
+  }, [investmentIds]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Bancos e carteira: a conta cadastrada em "Gerenciar bancos e carteira" vem escolhida ao voltar.
+  const registeringAccounts = useRef<Set<string> | null>(null);
+  const accountIds = (allAccounts.data ?? personal.accounts).map((a) => a.id).join(',');
+  useEffect(() => {
+    const before = registeringAccounts.current;
+    if (!before) return;
+    const created = (allAccounts.data ?? personal.accounts).find((a) => !before.has(a.id) && a.status === 'ativa');
+    if (!created) return;
+    registeringAccounts.current = null;
+    accountPickedRef.current = true;
+    setAccountPicked(true);
+    setDraft((d) => ({ ...d, accountId: created.id }));
+  }, [accountIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  const manageAccounts = () => {
+    registeringAccounts.current = new Set((allAccounts.data ?? personal.accounts).map((a) => a.id));
+    router.push({ pathname: '/conta', params: { secao: 'contas' } });
+  };
+  // "Cadastrar banco ou carteira": o cadastro volta sozinho para cá depois de salvar.
+  const registerAccount = () => {
+    registeringAccounts.current = new Set((allAccounts.data ?? personal.accounts).map((a) => a.id));
+    router.push('/contas/nova');
+  };
+
+  // A subcategoria some quando a categoria muda (inclusive pela leitura de uma nota ou de um comprovante).
+  const lastCategory = useRef(draft.category);
+  useEffect(() => {
+    if (lastCategory.current === draft.category) return;
+    lastCategory.current = draft.category;
+    setDraft((d) => (d.subcategory === null && !d.subOther ? d : { ...d, subcategory: null, subOther: false }));
+    setSubError(undefined);
+  }, [draft.category]);
+  const subMemory = prefs?.subcategories ?? {};
+
+  /** Trocar o tipo ao editar: as categorias passam a ser as do outro tipo; o que só vale num tipo (conta paga, rendimento, mês seguinte) sai. */
+  const pickKind = (next: RecordKind) => {
+    setDraft((d) => {
+      if (d.kind === next) return d;
+      const { nextMonth: _nm, ...rest } = d;
+      return {
+        ...rest,
+        ...(next === 'receita' ? { nextMonth: false } : {}),
+        kind: next,
+        category: categoryOfKind(next, d.category),
+        subcategory: null,
+        subOther: false,
+        incomeOn: next === 'receita' ? d.incomeOn : false,
+        investmentId: next === 'receita' ? d.investmentId : null,
+        linkKey: next === 'despesa' ? d.linkKey : null,
+      };
+    });
+    setSubError(undefined);
+    setIncomeError(undefined);
+  };
+  const kindLocked =
+    mode.type !== 'editar'
+      ? null
+      : mode.record.receiptKey
+        ? RECORD_LINK_TEXT.kindLockedReceipt
+        : mode.record.commitmentId && draft.linkKey === currentLink
+          ? RECORD_LINK_TEXT.kindLocked
+          : null;
 
   // "Parece já anotado" (D-051): o comprovante não deixa chave no registro, então a duplicidade só se avisa por semelhança (mesmo tipo,
   // mesmo valor e data a até um dia de um registro que já existe). Vale para o que está nos campos agora, e nunca bloqueia o Salvar.
@@ -1470,12 +1797,14 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         value={draft.accountId}
         label={kind === 'despesa' ? ACCOUNTS_TEXT.out : ACCOUNTS_TEXT.into}
         error={errors.accountId}
+        onManage={manageAccounts}
         onChange={(id) => {
           accountPickedRef.current = true;
           setAccountPicked(true);
           set('accountId', id ?? '');
         }}
       />
+      <LinkButton label={RECORD_LINK_TEXT.registerAccount} style={styles.inlineLink} onPress={registerAccount} />
       {accountFromNote ? (
         <Txt variant="caption" color={colors.textSecondary}>
           {ACCOUNTS_TEXT.fromNote(pickerAccounts.find((a) => a.id === draft.accountId)?.name ?? '')}
@@ -1520,7 +1849,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           </Banner>
         ) : null}
 
-        {mode.type === 'editar' && mode.record.commitmentId ? (
+        {mode.type === 'editar' && mode.record.commitmentId && draft.linkKey === currentLink ? (
           <Banner tone="info" icon={Info}>
             <Txt variant="label">
               Este gasto é o pagamento de uma conta a pagar. Mudar valor, data ou conta altera Pago; o valor previsto da conta a pagar não muda.
@@ -1587,6 +1916,16 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             {cardPurchase ? `${CARDS_TEXT.screens.purchaseSituation} · ${selectedCard ? cardTitle(selectedCard) : CARDS_TEXT.expense.credit}` : copy.situation}
           </Txt>
 
+          {/* Trocar entre gasto e recebimento ao editar (D-107, item 3), com o efeito no mês. */}
+          {mode.type === 'editar' ? (
+            <KindChoice
+              value={kind}
+              onChange={pickKind}
+              locked={kindLocked}
+              notice={kindSwitchNotice(mode.record.kind, kind, { occurredOn: parsedDate ?? mode.record.occurredOn, nextMonth: draft.nextMonth === true })}
+            />
+          ) : null}
+
           <TextField
             ref={refs.description}
             label="Descrição"
@@ -1607,7 +1946,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             onSubmitEditing={() => refs.amountText.current?.focus()}
           />
 
-          {openSeriesBill ? (
+          {openSeriesBill && !showLink ? (
             <Banner tone="info" icon={Info}>
               <Txt variant="label">
                 Você tem a conta {openSeriesBill.description} de {billMonth} em aberto. Se este gasto é o pagamento dela, marque a conta como paga
@@ -1780,6 +2119,15 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
                         ))}
                       </ChoiceGroup>
                     ) : null}
+                    {/* Cadastrar e voltar (D-107): o cartão novo vem escolhido ao voltar, com o preenchimento guardado. */}
+                    <LinkButton
+                      label={RECORD_LINK_TEXT.registerAnotherCard}
+                      style={styles.inlineLink}
+                      onPress={() => {
+                        registering.current = activeCards.map((c) => c.id);
+                        router.push({ pathname: '/cartoes/novo', params: { origem: 'gasto' } });
+                      }}
+                    />
                     <TextField
                       ref={installmentsRef}
                       label={CARDS_TEXT.expense.installments}
@@ -1846,6 +2194,76 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             />
           ) : null}
 
+          {/* Subcategoria opcional (D-107, item 2): só no gasto com categoria (a compra no cartão fica sem). */}
+          {kind === 'despesa' && draft.category !== null && !cardPurchase ? (
+            <View style={{ gap: space[1] }}>
+              <SubcategoryPicker
+                ref={subRef}
+                category={draft.category}
+                value={draft.subcategory}
+                other={draft.subOther}
+                memory={subMemory}
+                editing={editingSubs}
+                error={subError}
+                onPick={(value, other) => {
+                  setDraft((d) => ({ ...d, subcategory: value, subOther: other }));
+                  setSubError(undefined);
+                  if (other) setTimeout(() => subRef.current?.focus(), 50);
+                }}
+                onOtherText={(t) => {
+                  setDraft((d) => ({ ...d, subcategory: t }));
+                  setSubError(undefined);
+                }}
+                onToggleEdit={() => setEditingSubs((e) => !e)}
+                onForget={(name) => {
+                  if (!userId || draft.category === null) return;
+                  const current = getPrefs(userId);
+                  if (current) updatePrefs(userId, { subcategories: forgetSubcategory(current.subcategories, draft.category, name) }, persistPrefs);
+                  if (!draft.subOther && draft.subcategory === name) setDraft((d) => ({ ...d, subcategory: name, subOther: true }));
+                }}
+              />
+              <Txt variant="caption" color={colors.textSecondary}>
+                {RECORD_LINK_TEXT.categoryFixedNote}
+              </Txt>
+            </View>
+          ) : null}
+
+          {/* O que este gasto pagou? (D-107, item 1): com "Crédito e parcelas" ou quando alguma conta em aberto parece com o gasto. */}
+          {showLink ? (
+            <PaymentLinkBlock
+              options={linkOptions}
+              value={draft.linkKey}
+              onChange={(key) => setDraft((d) => ({ ...d, linkKey: key }))}
+              loading={openBills.isPending}
+              linkedNow={currentLink}
+              onRegisterCommitment={() => registerBill('conta')}
+              onRegisterInstallment={() => registerBill('parcelamento')}
+            />
+          ) : null}
+
+          {/* Rendimento de investimento (D-107, item 4): só no recebimento do espaço Pessoal. */}
+          {incomeShown ? (
+            <InvestmentIncomeBlock
+              on={draft.incomeOn}
+              onToggle={(next) => {
+                setDraft((d) => ({ ...d, incomeOn: next, investmentId: next ? (d.investmentId ?? (investmentChoices.length === 1 ? investmentChoices[0]!.id : null)) : null }));
+                setIncomeError(undefined);
+              }}
+              investments={investmentChoices}
+              value={draft.investmentId}
+              onChange={(id) => {
+                setDraft((d) => ({ ...d, investmentId: id }));
+                setIncomeError(undefined);
+              }}
+              onRegister={() => {
+                registeringInvestments.current = new Set((investments.data ?? []).map((i) => i.id));
+                router.push('/investimento/novo');
+              }}
+              error={incomeError}
+              removing={mode.type === 'editar' && (mode.record.investmentId ?? null) !== null}
+            />
+          ) : null}
+
           {note && dateOutsideNoteMonth(parsedDate, note.reading.draft.month) ? (
             <Txt variant="label" color={colors.textSecondary}>
               {dateOutsideNoteMonth(parsedDate, note.reading.draft.month)}
@@ -1871,11 +2289,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
                 Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, {account?.name}.
               </Txt>
               {accountField ? null : (
-                <LinkButton
-                  label={ACCOUNTS_TEXT.manage}
-                  style={styles.inlineLink}
-                  onPress={() => router.push({ pathname: '/conta', params: { secao: 'contas' } })}
-                />
+                <View>
+                  <LinkButton label={ACCOUNTS_TEXT.manage} style={styles.inlineLink} onPress={manageAccounts} />
+                  <LinkButton label={RECORD_LINK_TEXT.registerAccount} style={styles.inlineLink} onPress={registerAccount} />
+                </View>
               )}
             </View>
           )}

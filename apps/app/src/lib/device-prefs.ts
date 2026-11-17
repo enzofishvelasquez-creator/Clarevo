@@ -14,6 +14,7 @@ import {
   isRoutineReminderHour,
   parseRoutineReminderChoices,
   parseInvestmentReminderHolds,
+  parseSubcategoryMemory,
   type CategoryView,
   type InvestmentReminderHolds,
   type ImportMemory,
@@ -21,6 +22,7 @@ import {
   type RoutineReminderChoices,
   type RoutineReminderHour,
   type DepositReminderDay,
+  type SubcategoryMemory,
 } from '@clarevo/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
@@ -125,6 +127,11 @@ export interface DevicePrefs {
    * aparelho, como os interruptores dos lembretes; não é dado financeiro e nada vai para o servidor. Passa sozinho na data.
    */
   investmentReminderHolds: InvestmentReminderHolds;
+  /**
+   * Subcategorias próprias (D-107), as escritas em "Outra" em Anotar gasto, por categoria (até 8 cada): voltam como opção nas próximas
+   * vezes. Só neste aparelho, como a memória das categorias; não é dado financeiro e nada vai para o servidor.
+   */
+  subcategories: SubcategoryMemory;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -153,6 +160,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   investmentPlanReviewDismissedOn: null,
   goalsReviewNextOn: null,
   investmentReminderHolds: {},
+  subcategories: {},
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -197,6 +205,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
       investmentPlanReviewDismissedOn: isDay(v.investmentPlanReviewDismissedOn) ? v.investmentPlanReviewDismissedOn : null,
       goalsReviewNextOn: typeof v.goalsReviewNextOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.goalsReviewNextOn) ? v.goalsReviewNextOn : null,
       investmentReminderHolds: parseInvestmentReminderHolds(v.investmentReminderHolds),
+      subcategories: parseSubcategoryMemory(v.subcategories),
     };
   } catch {
     return DEFAULT_PREFS;

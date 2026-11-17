@@ -3,6 +3,7 @@ import {
   CARDS_TEXT,
   ERROR_TEXT,
   MONTH_CHECK_TEXT,
+  RECORD_LINK_TEXT,
   formatBRL,
   formatMonthBR,
   isLongList,
@@ -311,7 +312,10 @@ function CategoryCard({
             <View
               key={sh.label}
               accessible
-              accessibilityLabel={maskMoneyLabel(budgets.has(sh.label) ? BUDGET_TEXT.budgetedA11y(sh.a11yLabel, budgets.get(sh.label)!) : sh.a11yLabel, hidden)}
+              accessibilityLabel={maskMoneyLabel(
+                [budgets.has(sh.label) ? BUDGET_TEXT.budgetedA11y(sh.a11yLabel, budgets.get(sh.label)!) : sh.a11yLabel, ...(sh.subcategories ?? []).map((x) => RECORD_LINK_TEXT.subcategoryLine(x.label, x.cents))].join('. '),
+                hidden,
+              )}
               style={{ gap: space[2] }}
               {...itemRole}>
               <View style={styles.barHead}>
@@ -329,6 +333,16 @@ function CategoryCard({
                 <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
                   {BUDGET_TEXT.budgeted(budgets.get(sh.label)!)}
                 </MoneyTxt>
+              ) : null}
+              {/* Subcategorias (D-107): quanto foi para cada uma dentro da categoria. O orçamento continua por categoria. */}
+              {sh.subcategories ? (
+                <View style={styles.subList}>
+                  {sh.subcategories.map((x) => (
+                    <MoneyTxt key={x.label} variant="caption" color={colors.textSecondary} style={tabular}>
+                      {RECORD_LINK_TEXT.subcategoryLine(x.label, x.cents)}
+                    </MoneyTxt>
+                  ))}
+                </View>
               ) : null}
             </View>
           ))}
@@ -367,4 +381,5 @@ const styles = StyleSheet.create({
   barFill: { height: 12, borderRadius: radius.pill, backgroundColor: colors.brandMark },
   // Categoria com valor, mas abaixo de 0,1%: um traço visível.
   barMin: { width: 4 },
+  subList: { gap: 2, paddingLeft: space[3], borderLeftWidth: 2, borderLeftColor: colors.border },
 });

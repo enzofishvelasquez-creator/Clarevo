@@ -92,3 +92,4 @@ export * from './profile-photo';
 export * from './calendar';
 export * from './goals-review';
 export * from './resumo-atalhos';
+export * from './record-links';

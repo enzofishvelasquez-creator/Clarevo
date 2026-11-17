@@ -120,6 +120,7 @@ import {
   type IsoDate,
   type IsoMonth,
   type LimitWatchMonth,
+  type LinkableRecord,
   type MonthBudgetLine,
   type NewGoalInput,
   type MonthCheckKind,
@@ -570,6 +571,35 @@ export function useUndoCommitmentPayment() {
     mutationFn: (v: { key: string; id: string; version: number }) => repo.undoCommitmentPayment(v.key, v.id, v.version),
     onSuccess: (w) => invalidate(w),
   });
+}
+
+/**
+ * Gasto ligado ao que pagou (D-107): ligar um gasto que já existe a uma conta a pagar ou à fatura de um cartão, e desligar mantendo o
+ * gasto. Todo dado que o vínculo muda é lido de novo: o gasto, as contas a pagar, as séries, os cartões e as faturas e a revisão.
+ */
+export function useRecordLinks() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  const after = (record: FinancialRecord) => {
+    qc.setQueryData(['record', record.id], record);
+    qc.invalidateQueries({ queryKey: ['records'] });
+    qc.invalidateQueries({ queryKey: ['commitments'] });
+    qc.invalidateQueries({ queryKey: ['commitment'] });
+    qc.invalidateQueries({ queryKey: ['series'] });
+    qc.invalidateQueries({ queryKey: ['cards'] });
+    qc.invalidateQueries({ queryKey: BUDGET_MONTH_KEY });
+    qc.invalidateQueries({ queryKey: ['returnReview'] });
+    return record;
+  };
+  return {
+    linkCommitment: async (key: string, commitmentId: string, version: number, record: LinkableRecord) =>
+      after((await repo.linkRecordToCommitment(key, commitmentId, version, record)).record),
+    linkInvoice: async (key: string, cardId: string, month: IsoMonth, version: number, record: LinkableRecord) =>
+      after((await repo.linkRecordToInvoice(key, cardId, month, version, record)).record),
+    unlinkCommitment: async (key: string, commitmentId: string, version: number) => after((await repo.undoCommitmentPayment(key, commitmentId, version, true)).record),
+    unlinkInvoice: async (key: string, cardId: string, month: IsoMonth, version: number) =>
+      after((await repo.undoInvoicePayment(key, cardId, month, version, true)).record),
+  };
 }
 
 // ---------------------------------------------------------------------------
