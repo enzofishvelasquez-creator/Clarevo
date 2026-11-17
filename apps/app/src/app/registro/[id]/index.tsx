@@ -103,7 +103,7 @@ export default function DetalheRegistro() {
   const cards = useCards(r?.invoice ? r.contextId : undefined);
   const investment = useInvestment(r?.investmentId ?? undefined);
   const paidLabel = r?.invoice
-    ? invoiceLinkLabel(cards.data?.find((c) => c.id === r.invoice!.cardId)?.name ?? 'do cartão', r.invoice.month, today)
+    ? invoiceLinkLabel(cards.data?.find((c) => c.id === r.invoice!.cardId)?.name ?? RECORD_LINK_TEXT.cardFallback, r.invoice.month, today)
     : paidBill.data
       ? commitmentLinkLabel(paidBill.data)
       : null;
@@ -125,7 +125,7 @@ export default function DetalheRegistro() {
         unlinkKey.current = newOperationKey();
         setDeleteError(recordLinkErrorText(e.code));
         paidBill.refetch();
-      } else setDeleteError('Não foi possível confirmar se desligou. Confira a fatura antes de tentar de novo.');
+      } else setDeleteError(RECORD_LINK_TEXT.unlinkUncertain);
     } finally {
       setUnlinkBusy(false);
     }
@@ -173,7 +173,7 @@ export default function DetalheRegistro() {
             </Card>
           ) : (
             <>
-              <FlashBanner message={notice} />
+              <FlashBanner message={unlinked ? null : notice} />
               {/* Logo depois de salvar (docs/10 A3): o próximo passo à vista, antes do card. "Ver resumo do mês" é o botão principal e
                   "Anotar outro" vem logo abaixo; o aviso pode trazer linhas depois da primeira (orçamento, D-089 E; mês seguinte, D-089 A). */}
               {justSaved ? (
@@ -229,8 +229,8 @@ export default function DetalheRegistro() {
                   <Row label="Categoria" value={r.category ?? NO_CATEGORY_LABEL} />
                   {r.subcategory ? <Row label={RECORD_LINK_TEXT.subcategoryRow} value={r.subcategory} /> : null}
                   {r.invoice ? <Row label="Origem" value={CARDS_TEXT.paymentOrigin} /> : null}
-                  {r.commitmentId ? <Row label={RECORD_LINK_TEXT.linkedRow} value={paidLabel ?? 'Conta a pagar'} /> : null}
-                  {r.investmentId ? <Row label={RECORD_LINK_TEXT.incomeRow} value={investment.data?.name ?? 'Investimento'} /> : null}
+                  {r.commitmentId ? <Row label={RECORD_LINK_TEXT.linkedRow} value={paidLabel ?? RECORD_LINK_TEXT.paidFallback} /> : null}
+                  {r.investmentId ? <Row label={RECORD_LINK_TEXT.incomeRow} value={investment.data?.name ?? RECORD_LINK_TEXT.incomeFallback} /> : null}
                   {r.receiptKey ? <Row label={NOTA_FLOW_TEXT.detailRow} value={NOTA_FLOW_TEXT.detailRowValue} /> : null}
                   {/* Recebimento marcado do mês seguinte (D-089 A): conta no mês seguinte ao da data. */}
                   <Row label={RECORD_TEXT.monthRow} value={`${formatMonthBR(recordMonth(r))}${r.nextMonth ? NEXT_MONTH_TEXT.detailSuffix : ''}`} last />
@@ -288,7 +288,7 @@ export default function DetalheRegistro() {
                 <Button label="Ver conta a pagar" tone="soft" onPress={() => router.push(`/a-pagar/${r.commitmentId}`)} />
               ) : null}
               {r.investmentId ? (
-                <Button label="Ver investimento" tone="soft" onPress={() => router.push(`/investimento/${r.investmentId}`)} />
+                <Button label={RECORD_LINK_TEXT.seeInvestment} tone="soft" onPress={() => router.push(`/investimento/${r.investmentId}`)} />
               ) : null}
               {justSaved ? null : (
                 <Button

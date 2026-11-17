@@ -297,13 +297,20 @@ export const RECORD_LINK_TEXT = {
   paidInvoiceNote:
     'Na fatura, o gasto vira o pagamento dela, com este valor e esta data, como em Registrar pagamento. Se o valor for menor que a fatura, o restante vai para a fatura seguinte.',
   paidLinkedNow: 'Ligado agora.',
+  paidLoading: 'Carregando as contas…',
+  paidFallback: 'Conta a pagar',
+  cardFallback: 'do cartão',
+  incomeFallback: 'Investimento',
+  seeInvestment: 'Ver investimento',
+  unlinkUncertain: 'Não foi possível confirmar se desligou. Confira a fatura antes de tentar de novo.',
   optionDue: (dueOn: IsoDate) => `vence em ${formatDateBR(dueOn)}`,
   optionLine: (o: Pick<PaymentLinkOption, 'label' | 'amountCents' | 'dueOn'>) => `${o.label} · ${formatBRL(o.amountCents)} · vence em ${formatDateBR(o.dueOn)}`,
+  showMoreOptions: (n: number) => (n === 1 ? 'Ver mais 1 conta' : `Ver mais ${n} contas`),
   registerCommitment: 'Cadastrar conta a pagar',
   registerInstallment: 'Cadastrar parcelamento',
   registerBackHint: 'Depois de salvar, você volta para o lançamento que estava anotando, com o que já preencheu.',
   linkedRow: 'Pagou',
-  linkedInvoiceDetail: 'Este gasto foi anotado antes e ligado a esta fatura. Para que ele deixe de ser o pagamento dela, desligue aqui: o gasto continua.',
+  linkedInvoiceDetail: 'Este gasto foi ligado a esta fatura como o pagamento dela. Se não era, desligue aqui: o gasto continua anotado.',
   unlinkInvoice: 'Desligar da fatura',
   unlinkInvoiceTitle: 'Desligar este gasto da fatura?',
   unlinkInvoiceBody:
@@ -312,7 +319,7 @@ export const RECORD_LINK_TEXT = {
   /** Linha a mais no aviso de salvo: "Ligado a Acordo (parcela 18 de 21), que saiu de Ainda a pagar." */
   linkedNotice: (label: string) => `Ligado a ${label}, que saiu de Ainda a pagar.`,
   linkedInvoiceNotice: (label: string) => `Registrado como o pagamento de ${label}.`,
-  unlinkedNotice: 'A conta de antes voltou para Ainda a pagar, e o gasto continua.',
+  unlinkedNotice: 'A conta de antes voltou para Ainda a pagar. Este lançamento continua anotado.',
   linkFailedAfterSave: (reason: string) => `Não foi ligado à conta: ${reason} Para ligar, abra Editar gasto.`,
   linkFailedAfterUpdate: (reason: string) => `As alterações foram salvas, mas o gasto não foi ligado: ${reason}`,
   linkNotLoaded: 'Não foi possível carregar a conta escolhida. Tente de novo.',
@@ -341,6 +348,7 @@ export const RECORD_LINK_TEXT = {
   incomeRemovedOnDelete: 'O rendimento ligado a este recebimento sai do investimento.',
   // Cadastrar e voltar
   registerAnotherCard: 'Cadastrar outro cartão',
+  registerAccount: 'Cadastrar banco ou carteira',
 } as const;
 
 /** Recusas ao ligar ou desligar um gasto (pay_commitment, pay_invoice e os desfazer com o gasto), em uma frase. */

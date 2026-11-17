@@ -14636,6 +14636,211 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
+  // Gasto e recebimento (D-107, retorno de 17/11/2026): "O que este gasto pagou?" liga o gasto à conta a pagar, à parcela ou à fatura
+  // que ele pagou (sem outro gasto: a conta sai de Ainda a pagar e nada conta duas vezes); subcategorias por categoria (com "Outra" e as
+  // próprias guardadas no aparelho), no detalhe, na lista e na composição; trocar entre gasto e recebimento ao editar, também no
+  // lançamento importado, editado por inteiro; "Rendimento de investimento" no recebimento do Pessoal; e os caminhos de cadastrar e voltar
+  // (conta a pagar, investimento, cartão, banco ou carteira) com o preenchimento guardado. Nada vai à rede na demonstração.
+  // ==================================================================================================================
+  {
+    const lcWrites0 = writes.length;
+    const lcState = () => otherDevice(async (repo, ctx) => {
+      const month = await repo.listRecords(ctx, '2026-10');
+      const bills = await repo.listCommitments(ctx, '2026-10');
+      const invs = await repo.listInvestments(ctx);
+      return {
+        received: month.filter((r) => r.kind === 'receita').reduce((a, r) => a + r.amountCents, 0),
+        paid: month.filter((r) => r.kind === 'despesa').reduce((a, r) => a + r.amountCents, 0),
+        records: month.map((r) => ({ id: r.id, d: r.description, kind: r.kind, c: r.amountCents, cat: r.category, sub: r.subcategory ?? null, acc: r.accountId, on: r.occurredOn, cp: r.commitmentId, inv: r.investmentId ?? null, inv2: r.invoice ? `${r.invoice.cardId}:${r.invoice.month}` : null })),
+        bills: bills.map((c) => ({ id: c.id, d: c.description, status: c.status, paid: c.payment?.recordId ?? null })),
+        income: Object.fromEntries(invs.map((i) => [i.name, i.incomeCents])),
+        accounts: (await repo.listAccounts(ctx)).map((a) => ({ id: a.id, name: a.name })),
+      };
+    });
+    const lcRadioChecked = async (name) => (await p.getByRole('radio', { name }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true';
+    const lcLeave = async () => { await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click(); await p.waitForTimeout(400); };
+    await demoHome();
+    const lc0 = await lcState();
+
+    // ---- 1. "O que este gasto pagou?": aparece com um nome parecido com uma conta em aberto e sempre com "Crédito e parcelas" ----
+    await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await field('Descrição').fill('Café'); await field('Valor em reais').fill('8,00'); await p.waitForTimeout(400);
+    ok('D-107 Anotar gasto comum ("Café", R$ 8,00, sem categoria): sem "O que este gasto pagou?"', !(await body()).includes('O que este gasto pagou?'));
+    await field('Descrição').fill('Pagamento da internet'); await field('Valor em reais').fill('150,00'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    const lcInternet = () => p.getByRole('radio', { name: /^Internet, R\$ 150,00 · vence em 15\/10\/2026/ }).filter({ visible: true }).first();
+    ok('D-107 "Pagamento da internet" (R$ 150,00): "O que este gasto pagou?" com a frase do efeito, as contas em aberto (a de valor igual primeiro), "Nenhuma destas" marcado e os cadastros',
+      t.includes('O que este gasto pagou?') && t.includes('Ligando o gasto à conta, ela sai de Ainda a pagar e o valor não conta duas vezes.') &&
+      (await lcInternet().count()) === 1 && (await lcRadioChecked('Nenhuma destas')) && (await visibleCount('button', 'Cadastrar conta a pagar')) === 1 &&
+      (await visibleCount('button', 'Cadastrar parcelamento')) === 1 && (await headingShown('O que este gasto pagou?')), t.slice(t.indexOf('Categoria'), t.indexOf('Categoria') + 600));
+    // Subcategoria: com Moradia, a lista curta da categoria e "Outra".
+    await radio('Moradia').click(); await p.waitForTimeout(300);
+    const lcSubs = await p.getByRole('radiogroup', { name: 'Subcategoria (opcional), Moradia' }).filter({ visible: true }).first().getByRole('radio').evaluateAll((es) => es.map((e) => e.textContent));
+    ok('D-107 Subcategoria com Moradia: Nenhuma, Aluguel, Condomínio, Conta de luz, Conta de água, Gás, Internet, IPTU, Manutenção da casa e Outra (Nenhuma marcada)',
+      JSON.stringify(lcSubs) === JSON.stringify(['Nenhuma', 'Aluguel', 'Condomínio', 'Conta de luz', 'Conta de água', 'Gás', 'Internet', 'IPTU', 'Manutenção da casa', 'Outra']) && (await lcRadioChecked('Nenhuma')) &&
+      (await body()).includes('As categorias são as mesmas do orçamento. Para um nome seu, use a subcategoria Outra.'), JSON.stringify(lcSubs));
+    await radio('Internet').click(); await lcInternet().click(); await p.waitForTimeout(300);
+    ok('D-107 escolher a conta Internet marca a linha (e o nome acessível começa pelo texto visível)', (await lcInternet().getAttribute('aria-checked')) === 'true' && !(await lcRadioChecked('Nenhuma destas')));
+    await atWidths(async (w) => { await layoutChecks(`D-107 Anotar gasto com subcategoria e "O que este gasto pagou?" ${w}px`); if (w === 390) await shot('660_lancamento_o_que_pagou'); if (w === 320) await shot('660_lancamento_o_que_pagou_320px'); });
+    await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
+    t = await body(); screenTexts.push(t);
+    const lc1 = await lcState();
+    const lcPaid = lc1.records.find((r) => r.d === 'Pagamento da internet');
+    const lcBill = lc1.bills.find((c) => c.d === 'Internet');
+    ok('D-107 salvo e ligado: "Gasto salvo." com "Ligado a Internet, que saiu de Ainda a pagar.", e o detalhe com Subcategoria e Pagou',
+      t.includes('Gasto salvo.') && t.includes('Ligado a Internet, que saiu de Ainda a pagar.') && t.includes('Subcategoria\nInternet') && t.includes('Pagou\nInternet') && (await visibleCount('button', 'Ver conta a pagar')) === 1, t.slice(0, 700));
+    ok('D-107 um gasto só: a conta Internet ficou paga por ele, e Pago subiu R$ 150,00 uma vez', lcPaid && lcBill && lcBill.status === 'quitado' && lcBill.paid === lcPaid.id && lcPaid.cp === lcBill.id && lcPaid.sub === 'Internet' &&
+      lc1.paid === lc0.paid + 15000 && lc1.records.length === lc0.records.length + 1, JSON.stringify({ lcPaid, lcBill, paid: [lc0.paid, lc1.paid] }));
+    await atWidths(async (w) => { await layoutChecks(`D-107 detalhe do gasto ligado ${w}px`); if (w === 390) await shot('661_lancamento_detalhe_ligado'); });
+
+    // ---- 2. Composição: quanto foi para cada subcategoria dentro da categoria ----
+    await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
+    await p.getByRole('button', { name: /^Pago, R\$ 4\.050,00/ }).filter({ visible: true }).first().click(); await waitText('Gastos pagos com data de pagamento neste mês.');
+    await radio('Por categoria').click(); await waitUntil(async () => (await p.locator('[role=listitem][aria-label*=" do pago"]').count()) > 0);
+    const lcBars = await p.locator('[role=listitem][aria-label*=" do pago"]').filter({ visible: true }).evaluateAll((es) => es.map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')));
+    t = await body();
+    ok('D-107 Pago por categoria: Moradia mostra "Internet: R$ 150,00" e "Sem subcategoria: R$ 2.500,00" (no texto e no nome acessível); o orçamento segue por categoria',
+      t.includes('Internet: R$ 150,00') && t.includes('Sem subcategoria: R$ 2.500,00') && lcBars.some((l) => l.startsWith('Moradia, R$ 2.650,00') && l.includes('Internet: R$ 150,00') && l.includes('Sem subcategoria: R$ 2.500,00')), JSON.stringify(lcBars));
+    await atWidths(async (w) => { await layoutChecks(`D-107 composição com subcategorias ${w}px`); if (w === 390) await shot('662_composicao_subcategorias'); });
+    await btn('Voltar').click(); await waitText('Diferença do mês');
+
+    // ---- 2b. Ocultar valores: o valor de cada conta em "O que este gasto pagou?" vira "R$ ••••" (no texto e no nome acessível) ----
+    await p.setViewportSize({ width: 600, height: 900 }); await p.waitForTimeout(500); await btn('Ocultar valores').click(); await p.waitForTimeout(300);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+    await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await field('Descrição').fill('Pagamento do condomínio'); await p.waitForTimeout(400);
+    const lcHidden = await p.getByRole('radio', { name: /^Condomínio, / }).filter({ visible: true }).first().getAttribute('aria-label');
+    ok('D-107 com valores ocultos, a conta aparece com "R$ ••••" e o leitor de tela ouve "valor oculto"', (await body()).includes('R$ •••• · vence em 20/10/2026') && /^Condomínio, valor oculto · vence em 20\/10\/2026$/.test(lcHidden ?? ''), lcHidden);
+    await lcLeave();
+    await p.setViewportSize({ width: 600, height: 900 }); await p.waitForTimeout(500); await btn('Mostrar valores').click(); await p.waitForTimeout(300);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+
+    // ---- 3. Editar: trocar de tipo depois de "Nenhuma destas" e ligar o recebimento ao investimento ----
+    await goTabN('Movimentos'); await p.getByRole('button', { name: /^Pagamento da internet, Pago · 07\/10\/2026 · Internet · conta a pagar/ }).filter({ visible: true }).first().click(); await waitText('Editar gasto');
+    await btn('Editar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-107 Editar o gasto ligado: a conta aparece marcada ("Ligado agora."), e o tipo só troca depois de "Nenhuma destas"',
+      t.includes('Ligado agora.') && t.includes('Este gasto é o pagamento de uma conta. Para trocar o tipo, escolha Nenhuma destas em O que este gasto pagou?') &&
+      (await visibleCount('radiogroup', 'Tipo')) === 0 && (await lcInternet().getAttribute('aria-checked')) === 'true', t.slice(0, 600));
+    await radio('Nenhuma destas').click(); await p.waitForTimeout(300);
+    ok('D-107 com "Nenhuma destas", o grupo "Tipo" (Gasto marcado) aparece', (await visibleCount('radiogroup', 'Tipo')) === 1 && (await lcRadioChecked('Gasto')) && !(await lcRadioChecked('Recebimento')));
+    await radio('Recebimento').click(); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-107 trocar para Recebimento: a frase do efeito no mês, as categorias de recebimento e o título "Editar recebimento"',
+      t.includes('Ao salvar, este valor sai de Pago e entra em Recebido de outubro de 2026. A categoria passa a ser uma de recebimento.') && (await visibleCount('radio', 'Salário')) === 1 &&
+      (await visibleCount('radio', 'Moradia')) === 0 && (await h1Name()) === 'Editar recebimento' && (await visibleCount('button', 'Salvar recebimento')) === 1 && !t.includes('O que este gasto pagou?'), t.slice(0, 500));
+    await radio('Renda extra').click();
+    await p.getByRole('switch', { name: 'Rendimento de investimento' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await radio('Aplicação do banco').click(); await p.waitForTimeout(300);
+    t = await body();
+    ok('D-107 Rendimento de investimento: a escolha do investimento, a frase do que acontece e "Cadastrar investimento"',
+      t.includes('Qual investimento?') && t.includes('Ao salvar, o valor entra em Recebido uma vez só e fica registrado como rendimento recebido em Aplicação do banco, na mesma data. O valor atual do investimento não muda.') &&
+      (await visibleCount('button', 'Cadastrar investimento')) === 1, t.slice(t.indexOf('Categoria'), t.indexOf('Categoria') + 700));
+    await atWidths(async (w) => { await layoutChecks(`D-107 Editar: troca de tipo e rendimento de investimento ${w}px`); if (w === 390) await shot('663_editar_tipo_e_investimento'); });
+    await btn('Salvar recebimento').click(); await waitText('Alterações salvas'); await p.waitForTimeout(600);
+    t = await body();
+    const lc2 = await lcState();
+    const lcNow = lc2.records.find((r) => r.id === lcPaid.id);
+    ok('D-107 salvo: a conta Internet voltou a Ainda a pagar, o lançamento virou recebimento ligado ao investimento, sem contar duas vezes',
+      t.includes('A conta de antes voltou para Ainda a pagar. Este lançamento continua anotado.') && t.includes('Rendimento de\nAplicação do banco') &&
+      lcNow.kind === 'receita' && lcNow.cat === 'Renda extra' && lcNow.inv !== null && lcNow.cp === null && lc2.bills.find((c) => c.d === 'Internet').status === 'aberto' &&
+      lc2.received === lc0.received + 15000 && lc2.paid === lc0.paid && lc2.income['Aplicação do banco'] === lc0.income['Aplicação do banco'] + 15000, JSON.stringify({ lcNow, r: [lc0.received, lc2.received], inc: lc2.income }));
+
+    // ---- 4. O lançamento importado editado por inteiro (tipo, categoria, subcategoria, banco ou carteira, data, valor e descrição) ----
+    await otherDevice(async (repo, ctx) => {
+      const acc = (await repo.getSpace()).accounts[0].id;
+      await repo.importRecords('lc-e2e-importar', ctx, 'conta', acc, [{ importKey: 'b'.repeat(64), kind: 'despesa', amountCents: 1, occurredOn: '2026-10-06', description: 'ENTRADA REND PAGO APLIC AUT APR', category: null }]);
+    });
+    await goTabN('Movimentos'); await p.getByRole('button', { name: /^ENTRADA REND PAGO APLIC AUT APR, Pago · 06\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Editar gasto');
+    await btn('Editar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+    await radio('Recebimento').click(); await radio('Renda extra').click(); await radio('Carteira').click();
+    await field('Descrição').fill('Rendimento da aplicação'); await field('Valor em reais').fill('0,02'); await field('Data do recebimento').fill('05/10/2026');
+    await btn('Salvar recebimento').click(); await waitText('Alterações salvas'); await p.waitForTimeout(600);
+    const lc3 = await lcState();
+    const lcImp = lc3.records.find((r) => r.d === 'Rendimento da aplicação');
+    const lcCarteira = lc3.accounts.find((a) => a.name === 'Carteira');
+    ok('D-107 importado: de gasto para recebimento, com categoria, carteira, data, valor e descrição trocados numa edição só',
+      lcImp && lcImp.kind === 'receita' && lcImp.cat === 'Renda extra' && lcImp.acc === lcCarteira.id && lcImp.on === '2026-10-05' && lcImp.c === 2 && lc3.received === lc2.received + 2 && lc3.paid === lc2.paid, JSON.stringify(lcImp));
+    await btn('Editar recebimento').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+    await radio('Gasto').click(); await p.waitForTimeout(300);
+    ok('D-107 importado de volta a gasto: a frase do efeito ("sai de Recebido e entra em Pago")', (await body()).includes('Ao salvar, este valor sai de Recebido e entra em Pago de outubro de 2026.'));
+    await radio('Moradia').click(); await radio('Outra').click(); await p.waitForTimeout(300);
+    await btn('Salvar gasto').click(); await p.waitForTimeout(400);
+    ok('D-107 "Outra" sem nome: o erro junto do campo e nada salvo', (await body()).includes('Escreva o nome da subcategoria ou escolha uma da lista.') && (await visibleCount('button', 'Salvar gasto')) === 1);
+    await field('Nome da subcategoria').fill('Tarifa da conta'); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(600);
+    const lc4 = await lcState();
+    ok('D-107 importado de volta a gasto, com a subcategoria própria ("Tarifa da conta")', lc4.records.find((r) => r.id === lcImp.id)?.kind === 'despesa' && lc4.records.find((r) => r.id === lcImp.id)?.sub === 'Tarifa da conta' && (await body()).includes('Subcategoria\nTarifa da conta'));
+
+    // ---- 5. A subcategoria própria volta como opção (só neste aparelho) e se tira sem sair do formulário ----
+    await goTabN('Resumo'); await waitText('Diferença do mês'); await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await radio('Moradia').click(); await p.waitForTimeout(300);
+    ok('D-107 a subcategoria própria aparece em Moradia, com "Editar minhas subcategorias"', (await visibleCount('radio', 'Tarifa da conta')) === 1 && (await visibleCount('button', 'Editar minhas subcategorias')) === 1);
+    await btn('Editar minhas subcategorias').click(); await btn('Tirar Tarifa da conta').click(); await p.waitForTimeout(300);
+    ok('D-107 "Tirar Tarifa da conta" tira a opção da lista (o lançamento continua com ela)', (await visibleCount('radio', 'Tarifa da conta')) === 0 && (await lcState()).records.find((r) => r.id === lcImp.id)?.sub === 'Tarifa da conta');
+
+    // ---- 6. Cadastrar conta a pagar e voltar com o preenchimento guardado; a conta nova vem escolhida e é paga por este gasto ----
+    await field('Descrição').fill('Acordo'); await field('Valor em reais').fill('265,00'); await radio('Crédito e parcelas').click(); await p.waitForTimeout(400);
+    await btn('Cadastrar conta a pagar').click(); await waitText('Anotar conta a pagar'); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-107 "Cadastrar conta a pagar" abre o cadastro com o que foi digitado e diz que volta para o lançamento',
+      (await field('Descrição').inputValue()) === 'Acordo' && (await field('Valor em reais').inputValue()) === '265,00' && (await field('Data de vencimento').inputValue()) === '07/10/2026' &&
+      t.includes('Depois de salvar, você volta para o lançamento que estava anotando, com o que já preencheu.'), t.slice(0, 400));
+    await btn('Salvar conta a pagar').click(); await waitText('O que este gasto pagou?'); await p.waitForTimeout(600);
+    await waitUntil(async () => (await p.getByRole('radio', { name: /^Acordo, R\$ 265,00/ }).filter({ visible: true }).first().getAttribute('aria-checked').catch(() => null)) === 'true', 5000);
+    ok('D-107 de volta ao gasto: descrição e valor guardados e a conta nova (Acordo) já escolhida',
+      (await field('Descrição').inputValue()) === 'Acordo' && (await field('Valor em reais').inputValue()) === '265,00' &&
+      (await p.getByRole('radio', { name: /^Acordo, R\$ 265,00/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true');
+    await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
+    const lc5 = await lcState();
+    ok('D-107 a conta Acordo foi paga por este gasto (nenhum gasto a mais)', lc5.bills.find((c) => c.d === 'Acordo')?.status === 'quitado' && lc5.records.filter((r) => r.d === 'Acordo').length === 1 && lc5.paid === lc4.paid + 26500);
+
+    // ---- 7. Fatura fechada: o gasto vira o pagamento dela, e "Desligar da fatura" mantém o gasto ----
+    await otherDevice(async (repo, ctx) => {
+      const card = (await repo.listCards(ctx))[0];
+      await repo.addCardPurchase('lc-e2e-compra', card.id, { description: 'Farmácia', category: 'Saúde', purchasedOn: '2026-10-02', totalCents: 10000, installments: 1 });
+    });
+    await goTabN('Resumo'); await waitText('Diferença do mês'); await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await field('Descrição').fill('PAGAMENTO DE PIX QR CREDITO'); await field('Valor em reais').fill('100,00'); await radio('Crédito e parcelas').click(); await p.waitForTimeout(500);
+    await p.getByRole('radio', { name: /^Fatura Cartão Exemplo \(outubro\), R\$ 100,00/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    ok('D-107 a fatura fechada de outubro aparece e, escolhida, explica o pagamento ("como em Registrar pagamento")', (await body()).includes('Na fatura, o gasto vira o pagamento dela, com este valor e esta data, como em Registrar pagamento.'));
+    await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
+    t = await body();
+    ok('D-107 salvo como pagamento da fatura, com "Desligar da fatura"', t.includes('Registrado como o pagamento de Fatura Cartão Exemplo (outubro).') && t.includes('Pagamento de fatura') && (await visibleCount('button', 'Desligar da fatura')) === 1, t.slice(0, 600));
+    await btn('Desligar da fatura').click(); await waitText('Desligar este gasto da fatura?');
+    await confirmIn('Desligar da fatura'); await waitText('Gasto desligado da fatura.'); await p.waitForTimeout(400);
+    const lc6 = await lcState();
+    ok('D-107 desligado: o gasto continua (sem fatura) e a fatura de outubro volta a ficar em aberto', lc6.records.find((r) => r.d === 'PAGAMENTO DE PIX QR CREDITO')?.inv2 === null && lc6.paid === lc5.paid + 10000 &&
+      (await visibleCount('button', 'Editar gasto')) === 1);
+
+    // ---- 8. Cadastrar e voltar: cartão e banco ou carteira ----
+    await goTabN('Resumo'); await waitText('Diferença do mês'); await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await field('Descrição').fill('Livro'); await radio('Cartão de crédito').click(); await p.waitForTimeout(400);
+    ok('D-107 com cartão cadastrado, "Cadastrar outro cartão"', (await visibleCount('button', 'Cadastrar outro cartão')) === 1);
+    await radio('Dinheiro, débito ou Pix').click(); await p.waitForTimeout(300);
+    ok('D-107 banco ou carteira: "Gerenciar bancos e carteira" e "Cadastrar banco ou carteira" junto do seletor', (await visibleCount('button', 'Gerenciar bancos e carteira')) === 1 && (await visibleCount('button', 'Cadastrar banco ou carteira')) === 1);
+    await btn('Cadastrar banco ou carteira').click(); await waitText('Por exemplo: Carteira ou o nome do banco.');
+    await field('Nome').fill('Banco Exemplo'); await btn('Adicionar').click(); await waitText('Será salvo em'); await p.waitForTimeout(600);
+    await waitUntil(async () => (await body()).includes('Será salvo em Pessoal, Banco Exemplo.'), 5000);
+    ok('D-107 de volta ao gasto depois de cadastrar: a descrição guardada e o banco novo já escolhido', (await field('Descrição').inputValue()) === 'Livro' && (await lcRadioChecked('Banco Exemplo')) && (await body()).includes('Será salvo em Pessoal, Banco Exemplo.'));
+    await lcLeave();
+
+    // ---- 9. Rendimento de investimento: cadastrar um investimento novo e voltar ----
+    await goTabN('Movimentos'); await btn('Registrar recebimento').click(); await waitText('Será salvo em');
+    await field('Descrição').fill('Dividendos'); await field('Valor em reais').fill('12,34');
+    await p.getByRole('switch', { name: 'Rendimento de investimento' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await btn('Cadastrar investimento').click(); await waitText('Novo investimento');
+    await field('Nome').fill('Ações da corretora'); await radio('Ações').click(); await field('Quanto você aplicou até hoje?').fill('1000');
+    await btn('Criar investimento').click(); await p.waitForTimeout(1200);
+    await btn('Voltar').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+    await waitUntil(async () => (await visibleCount('radio', 'Ações da corretora')) === 1 && (await lcRadioChecked('Ações da corretora')), 5000);
+    ok('D-107 de volta ao recebimento: descrição e valor guardados e o investimento novo já escolhido', (await field('Descrição').inputValue()) === 'Dividendos' && (await field('Valor em reais').inputValue()) === '12,34' && (await lcRadioChecked('Ações da corretora')));
+    await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await p.waitForTimeout(500);
+    ok('D-107 o rendimento ficou no investimento novo, e o recebimento mostra "Rendimento de Ações da corretora"', (await lcState()).income['Ações da corretora'] === 1234 && (await body()).includes('Rendimento de\nAções da corretora'));
+    await atWidths(async (w) => { await layoutChecks(`D-107 recebimento com rendimento de investimento ${w}px`); if (w === 390) await shot('664_recebimento_rendimento'); });
+    ok('D-107 nada vai à rede na demonstração', writes.length === lcWrites0, writes.slice(lcWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
   // Níveis de conta (D-095): na demonstração, a conta tem 13 dos 18 marcos (nível Ouro). Conta mostra o card "Nível da conta" com a borda
   // do nível, e a tela /conta/nivel traz o nível, o caminho até o próximo, os quatro níveis, "Para conhecer" e "Já feitos". A troca de
   // nível mostra o card de comemoração no Resumo uma vez (aqui, os marcos passam a 14 pela memória). Nada vai à rede.

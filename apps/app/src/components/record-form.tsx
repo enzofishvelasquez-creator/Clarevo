@@ -1453,11 +1453,17 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     const extras: Partial<RecordInput> =
       mode.type === 'novo'
         ? { ...(sub !== null ? { subcategory: sub } : {}), ...(incomeShown && draft.incomeOn && draft.investmentId ? { investmentId: draft.investmentId } : {}) }
-        : {
-            ...(kind !== mode.record.kind ? { kind } : {}),
-            subcategory: sub,
-            ...(incomeShown ? { investmentId: draft.incomeOn ? draft.investmentId : null } : {}),
-          };
+        : (() => {
+            // Só o que muda vai na chamada (sem mudança, a mesma chamada de antes): a subcategoria, quando difere do que o banco
+            // manteria sozinho; o investimento, quando a ligação muda.
+            const kept = kind === mode.record.kind && (effective.category ?? null) === (mode.record.category ?? null) ? (mode.record.subcategory ?? null) : null;
+            const wantedInvestment = incomeShown && draft.incomeOn ? draft.investmentId : null;
+            return {
+              ...(kind !== mode.record.kind ? { kind } : {}),
+              ...(sub !== kept ? { subcategory: sub } : {}),
+              ...(kind === 'receita' && wantedInvestment !== (mode.record.investmentId ?? null) ? { investmentId: wantedInvestment } : {}),
+            };
+          })();
     const withExtras: RecordInput = { ...base, ...extras };
     const input: RecordInput = note && mode.type === 'novo' ? { ...withExtras, receiptKey: note.reading.draft.receiptKey } : withExtras;
     const snapshot = JSON.stringify([input, version]);
@@ -1671,6 +1677,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     registeringAccounts.current = new Set((allAccounts.data ?? personal.accounts).map((a) => a.id));
     router.push({ pathname: '/conta', params: { secao: 'contas' } });
   };
+  // "Cadastrar banco ou carteira": o cadastro volta sozinho para cá depois de salvar.
+  const registerAccount = () => {
+    registeringAccounts.current = new Set((allAccounts.data ?? personal.accounts).map((a) => a.id));
+    router.push('/contas/nova');
+  };
 
   // A subcategoria some quando a categoria muda (inclusive pela leitura de uma nota ou de um comprovante).
   const lastCategory = useRef(draft.category);
@@ -1793,6 +1804,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           set('accountId', id ?? '');
         }}
       />
+      <LinkButton label={RECORD_LINK_TEXT.registerAccount} style={styles.inlineLink} onPress={registerAccount} />
       {accountFromNote ? (
         <Txt variant="caption" color={colors.textSecondary}>
           {ACCOUNTS_TEXT.fromNote(pickerAccounts.find((a) => a.id === draft.accountId)?.name ?? '')}
@@ -1837,7 +1849,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           </Banner>
         ) : null}
 
-        {mode.type === 'editar' && mode.record.commitmentId ? (
+        {mode.type === 'editar' && mode.record.commitmentId && draft.linkKey === currentLink ? (
           <Banner tone="info" icon={Info}>
             <Txt variant="label">
               Este gasto é o pagamento de uma conta a pagar. Mudar valor, data ou conta altera Pago; o valor previsto da conta a pagar não muda.
@@ -2277,7 +2289,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
                 Será salvo em <Txt variant="label" style={{ fontFamily: fonts.bold }}>{contextName}</Txt>, {account?.name}.
               </Txt>
               {accountField ? null : (
-                <LinkButton label={ACCOUNTS_TEXT.manage} style={styles.inlineLink} onPress={manageAccounts} />
+                <View>
+                  <LinkButton label={ACCOUNTS_TEXT.manage} style={styles.inlineLink} onPress={manageAccounts} />
+                  <LinkButton label={RECORD_LINK_TEXT.registerAccount} style={styles.inlineLink} onPress={registerAccount} />
+                </View>
               )}
             </View>
           )}

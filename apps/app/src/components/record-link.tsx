@@ -3,14 +3,13 @@ import {
   RECORD_LINK_TEXT,
   SUBCATEGORY_MAX,
   formatBRL,
-  formatDateBR,
   subcategoryChoices,
   type PaymentLinkOption,
   type RecordKind,
   type SubcategoryMemory,
 } from '@clarevo/core';
 import { Check, Info, X } from 'lucide-react-native';
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { MoneyTxt } from '@/components/money-text';
@@ -24,6 +23,9 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
  * Partes do formulário de gasto e recebimento do retorno de 17/11/2026 (D-107): "O que este gasto pagou?", a subcategoria, o
  * rendimento de investimento e a troca de tipo ao editar. Os textos ficam no núcleo (RECORD_LINK_TEXT).
  */
+
+/** Quantas contas aparecem de início em "O que este gasto pagou?". */
+const LINK_OPTIONS_SHOWN = 5;
 
 /** Uma linha de escolha (rádio) com o nome, uma legenda e, opcional, um valor em reais (escondido com "Ocultar valores"). */
 function OptionRow({ title, caption, selected, onPress }: { title: string; caption?: string; selected: boolean; onPress: () => void }) {
@@ -77,6 +79,9 @@ export function PaymentLinkBlock({
   onRegisterInstallment: () => void;
 }) {
   const chosen = options.find((o) => o.key === value) ?? null;
+  // Muitas contas em aberto: as primeiras (as de valor igual vêm antes) e a escolhida; o resto num toque.
+  const [all, setAll] = useState(false);
+  const shown = all || options.length <= LINK_OPTIONS_SHOWN ? options : options.filter((o, i) => i < LINK_OPTIONS_SHOWN || o.key === value);
   return (
     <View style={styles.block}>
       <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={2}>
@@ -87,11 +92,11 @@ export function PaymentLinkBlock({
       </Txt>
       {loading ? (
         <Txt variant="caption" color={colors.textSecondary}>
-          Carregando as contas…
+          {RECORD_LINK_TEXT.paidLoading}
         </Txt>
       ) : (
         <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel={RECORD_LINK_TEXT.paidTitle}>
-          {options.map((o) => (
+          {shown.map((o) => (
             <OptionRow
               key={o.key}
               title={o.label}
@@ -100,6 +105,9 @@ export function PaymentLinkBlock({
               onPress={() => onChange(o.key)}
             />
           ))}
+          {shown.length < options.length ? (
+            <LinkButton label={RECORD_LINK_TEXT.showMoreOptions(options.length - shown.length)} style={styles.inlineLink} onPress={() => setAll(true)} />
+          ) : null}
           <OptionRow title={RECORD_LINK_TEXT.paidNone} selected={value === null} onPress={() => onChange(null)} />
           {options.length === 0 ? (
             <Txt variant="caption" color={colors.textSecondary}>
@@ -289,11 +297,6 @@ export function KindChoice({
 /** As categorias do tipo, para conferir uma categoria trazida de outro tipo (troca de tipo). */
 export function categoryOfKind(kind: RecordKind, category: string | null): string | null {
   return category !== null && CATEGORIES[kind].includes(category) ? category : null;
-}
-
-/** "Internet · R$ 150,00 · vence em 15/11/2026" para o detalhe e a lista (sem esconder o valor: quem chama passa por MoneyTxt). */
-export function optionText(o: Pick<PaymentLinkOption, 'label' | 'amountCents' | 'dueOn'>): string {
-  return `${o.label} · ${formatBRL(o.amountCents)} · vence em ${formatDateBR(o.dueOn)}`;
 }
 
 const styles = StyleSheet.create({
