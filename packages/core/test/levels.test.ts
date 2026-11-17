@@ -347,6 +347,25 @@ describe('níveis de conta: o repositório em memória (demonstração e testes)
     expect(Object.keys(m).sort()).toEqual([...ACCOUNT_MARK_KEYS].sort());
   });
 
+  it('o rendimento gravado pelo recebimento ligado ao investimento (D-107) também conta para "Registrar um rendimento recebido" (revisão de 17/11/2026)', async () => {
+    const repo = await createDemoRepository();
+    const space = (await repo.getSpace())!;
+    const ctx = space.personalContextId;
+    const inv = (await repo.listInvestments(ctx)).find((i) => i.name === 'Aplicação do banco')!;
+    expect((await repo.getAccountMarks()).inv_rendimento).toBe(false);
+    // Um recebimento comum não conta.
+    await repo.createRecord(newOperationKey(), ctx, 'receita', { accountId: space.accounts[0]!.id, amountCents: 1000, occurredOn: DEMO_TODAY, description: 'Freela', category: 'Renda extra' });
+    expect((await repo.getAccountMarks()).inv_rendimento).toBe(false);
+    // O recebimento ligado grava o rendimento pela ação "criar" (sem registrar_movimento_investimento) e conta.
+    const saved = await repo.createRecord(newOperationKey(), ctx, 'receita', {
+      accountId: space.accounts[0]!.id, amountCents: 1234, occurredOn: DEMO_TODAY, description: 'Dividendos', category: 'Renda extra', investmentId: inv.id,
+    });
+    expect(saved.investmentMovementId).toBeTruthy();
+    const m = await repo.getAccountMarks();
+    expect(m.inv_rendimento).toBe(true);
+    expect(investingMarksDone(m)).toBe(6);
+  });
+
   it('escolher a imagem de uma meta leva a demonstração do Ouro à Esmeralda (14 do dia a dia e 5 do grupo)', async () => {
     const repo = await createDemoRepository();
     const space = (await repo.getSpace())!;

@@ -6,6 +6,8 @@
 \set ON_ERROR_STOP 1
 \set ana '''00000000-0000-0000-0000-0000000001a1'''
 \set bento '''00000000-0000-0000-0000-0000000001b2'''
+\set carla '''00000000-0000-0000-0000-0000000001c3'''
+\set davi '''00000000-0000-0000-0000-0000000001d4'''
 
 begin;
 
@@ -47,6 +49,10 @@ begin
 end $$;
 create function pg_temp.clocks(p_person uuid) returns bigint language sql security definer set search_path = public, pg_temp as $$
   select count(*) from public.account_level_clock where person_id = p_person
+$$;
+-- Quantas operações de uma ação a pessoa tem (o app não lê o registro das operações).
+create function pg_temp.ops_count(p_person uuid, p_action text) returns bigint language sql security definer set search_path = public, pg_temp as $$
+  select count(*) from public.record_operations where actor_id = p_person and action = p_action
 $$;
 create temp table ids (name text primary key, id uuid not null);
 grant all on ids to authenticated;
@@ -187,6 +193,53 @@ begin
   -- Nenhum valor entra: a resposta só tem sim ou não.
   assert not exists (select 1 from jsonb_each(m) e where jsonb_typeof(e.value) <> 'boolean'), 'só sim ou não';
 end $$;
+
+-- 6b. Revisão de 17/11/2026: o rendimento gravado pelo recebimento ligado ao investimento (D-107, financial_records.investment_movement_id)
+-- entra pela ação do recebimento (criar ou editar), não por registrar_movimento_investimento, e também conta para 'inv_rendimento'. Carla
+-- liga ao criar o recebimento; Davi, ao editar um recebimento que já existia. Pessoas FICTÍCIAS.
+reset role;
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  (:carla, 'carla.queda@exemplo.test', now(), '{"display_name":"Carla"}'),
+  (:davi, 'davi.queda@exemplo.test', now(), '{"display_name":"Davi"}');
+set role authenticated;
+select pg_temp.as_(:carla);
+do $$
+declare
+  space jsonb := public.ensure_personal_space('Conta principal');
+  ctx uuid := (space ->> 'context_id')::uuid;
+  acc uuid := (space #>> '{account,id}')::uuid;
+  inv_id uuid;
+  r public.financial_records;
+begin
+  inv_id := (public.create_investment('qd-car-0001', ctx, 'Aplicação', 'renda_fixa', 100000, '2026-11-01') #>> '{investment,id}')::uuid;
+  perform public.create_record('qd-car-0002', ctx, acc, 'receita', 1000, '2026-11-10', 'Salário', 'Salário');
+  assert not (public.my_account_marks() ->> 'inv_rendimento')::boolean, 'recebimento sem investimento não conta';
+  r := public.create_record('qd-car-0003', ctx, acc, 'receita', 1234, '2026-11-12', 'Dividendos', 'Renda extra', null, false, null, inv_id);
+  assert r.investment_movement_id is not null, 'o rendimento ligado foi gravado';
+  assert pg_temp.ops_count(auth.uid(), 'registrar_movimento_investimento') = 0, 'nenhum movimento pela ficha do investimento';
+  assert (public.my_account_marks() ->> 'inv_rendimento')::boolean, 'o rendimento pelo recebimento ligado conta';
+  assert not (pg_temp.trues(public.my_account_marks()) && array['inv_aporte', 'inv_valor']), 'só o rendimento, nada de aporte nem valor';
+end $$;
+select pg_temp.as_(:davi);
+do $$
+declare
+  space jsonb := public.ensure_personal_space('Conta principal');
+  ctx uuid := (space ->> 'context_id')::uuid;
+  acc uuid := (space #>> '{account,id}')::uuid;
+  inv_id uuid;
+  r public.financial_records;
+begin
+  inv_id := (public.create_investment('qd-dav-0001', ctx, 'Aplicação', 'renda_fixa', 100000, '2026-11-01') #>> '{investment,id}')::uuid;
+  r := public.create_record('qd-dav-0002', ctx, acc, 'receita', 800, '2026-11-12', 'Juros', 'Renda extra');
+  assert not (public.my_account_marks() ->> 'inv_rendimento')::boolean, 'antes de ligar, não conta';
+  r := public.update_record('qd-dav-0003', r.id, r.version, acc, 800, '2026-11-12', 'Juros', 'Renda extra', null, null, null, inv_id, true);
+  assert r.investment_movement_id is not null and pg_temp.ops_count(auth.uid(), 'registrar_movimento_investimento') = 0, 'ligado na edição';
+  assert (public.my_account_marks() ->> 'inv_rendimento')::boolean, 'o rendimento ligado na edição conta';
+  -- Desligar depois não desfaz o marco (fica guardado).
+  r := public.update_record('qd-dav-0004', r.id, r.version, acc, 800, '2026-11-12', 'Juros', 'Renda extra', null, null, null, null, false);
+  assert r.investment_movement_id is null and (public.my_account_marks() ->> 'inv_rendimento')::boolean, 'desligar não desfaz o marco';
+end $$;
+select pg_temp.as_(:ana);
 
 -- 7. Cada pessoa só vê o seu; quem já estava parado quando a regra chegou tem os 60 dias inteiros a partir da primeira leitura.
 select pg_temp.as_(:bento);

@@ -14671,6 +14671,8 @@ setInterval(async () => {
     const lcLeave = async () => { await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click(); await p.waitForTimeout(400); };
     await demoHome();
     const lc0 = await lcState();
+    const lcIncomeMark = () => otherDevice(async (repo) => (await repo.getAccountMarks()).inv_rendimento);
+    const lcMark0 = await lcIncomeMark();
 
     // ---- 1. "O que este gasto pagou?": aparece com um nome parecido com uma conta em aberto e sempre com "Crédito e parcelas" ----
     await btn('Anotar gasto').click(); await waitText('Será salvo em');
@@ -14768,6 +14770,8 @@ setInterval(async () => {
       t.includes('A conta de antes voltou para Ainda a pagar. Este lançamento continua anotado.') && t.includes('Rendimento de\nAplicação do banco') &&
       lcNow.kind === 'receita' && lcNow.cat === 'Renda extra' && lcNow.inv !== null && lcNow.cp === null && lc2.bills.find((c) => c.d === 'Internet').status === 'aberto' &&
       lc2.received === lc0.received + 15000 && lc2.paid === lc0.paid && lc2.income['Aplicação do banco'] === lc0.income['Aplicação do banco'] + 15000, JSON.stringify({ lcNow, r: [lc0.received, lc2.received], inc: lc2.income }));
+    // Revisão de 17/11/2026: o rendimento gravado pelo recebimento ligado também conta para o marco "Registrar um rendimento recebido".
+    ok('D-107 o rendimento pelo recebimento ligado faz o marco "Registrar um rendimento recebido" do nível da conta', lcMark0 === false && (await lcIncomeMark()) === true);
 
     // ---- 4. O lançamento importado editado por inteiro (tipo, categoria, subcategoria, banco ou carteira, data, valor e descrição) ----
     await otherDevice(async (repo, ctx) => {

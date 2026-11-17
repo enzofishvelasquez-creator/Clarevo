@@ -5281,6 +5281,16 @@ export class MemoryRepository implements RecordsRepository {
       // Movimento registrado num investimento já criado (o aporte e o valor do cadastro vêm com criar_investimento, não contam).
       const movement = (kind: string) =>
         ops.some((o) => o.action === 'registrar_movimento_investimento' && o.movementId !== null && this.investmentMovements.get(o.movementId)?.kind === kind);
+      // O rendimento gravado pelo recebimento ligado ao investimento (D-107), que entra pela ação do recebimento (criar ou editar): conta
+      // nos recebimentos criados pela pessoa, como no banco (revisão de 17/11/2026).
+      const linkedIncome = recs.some(
+        (r) =>
+          !r.deletedAt &&
+          r.kind === 'receita' &&
+          r.createdBy === this.opts.actorId &&
+          !!r.investmentMovementId &&
+          this.investmentMovements.get(r.investmentMovementId)?.kind === 'rendimento',
+      );
       const live: AccountMarks = {
         gasto: recs.some((r) => r.kind === 'despesa') || this.cardEntries.size > 0 || has('criar_compra_cartao', 'pagar_compromisso', 'pagar_fatura'),
         recebimento: recs.some((r) => r.kind === 'receita'),
@@ -5305,7 +5315,7 @@ export class MemoryRepository implements RecordsRepository {
         // Investimentos e reserva (D-111): investimentos só existem no Pessoal; a reserva com plano por mês vale em qualquer contexto.
         inv_aporte: movement('aporte'),
         inv_valor: movement('valor'),
-        inv_rendimento: movement('rendimento'),
+        inv_rendimento: movement('rendimento') || linkedIncome,
         inv_plano: this.investmentPlans.size > 0 || has('definir_plano_investimentos'),
         inv_meta: [...this.investments.values()].some((i) => i.goalId !== null),
         reserva_plano: [...this.goals.values()].some(
