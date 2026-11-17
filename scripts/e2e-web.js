@@ -14106,7 +14106,8 @@ setInterval(async () => {
   // =====================================================================================================================
   const acWrites0 = writes.length;
   const acTexts = [];
-  const acKeep = async () => { const x = await body(); acTexts.push(x); screenTexts.push(x); return x; };
+  // A última tela da letra grande pode ser de Investir (AC_INVEST): os nomes da ficha e dos títulos públicos valem nela (INVEST_NAMES).
+  const acKeep = async () => { const x = await body(); acTexts.push(x); screenTexts.push(x.replace(INVEST_NAMES, '')); return x; };
   // Funções que rodam na página (refeitas depois de cada carregamento da página): contraste calculado com as camadas de fundo e as
   // opacidades de cada elemento, alvos de toque, elementos clicáveis sem papel, texto cortado, texto por cima de texto e a letra grande.
   const AC_SRC = `
