@@ -270,6 +270,7 @@ export function ImportFlow() {
       importedKeys: data.importedKeys,
       card: card ? { days: card, paidMonths: data.paidMonths } : null,
       flipped: flips,
+      context: personal.data?.contextKind ?? 'pessoal',
     };
   }
 
@@ -279,7 +280,7 @@ export function ImportFlow() {
    */
   function makeLines(data: ImportContext, invertSigns: boolean, keepEdits: ReviewLine[] | null, flips: ReadonlySet<string>): ReviewLine[] {
     const built = buildReview(reviewInput(data, invertSigns, flips));
-    return keepEdits ? keepReviewEdits(built, keepEdits) : built;
+    return keepEdits ? keepReviewEdits(built, keepEdits, personal.data?.contextKind ?? 'pessoal') : built;
   }
 
   async function prepare(keepEdits: ReviewLine[] | null) {
@@ -322,7 +323,7 @@ export function ImportFlow() {
     if (!ctxData || !parse || !destination || !target) return;
     const next = toggleFlipped(flipped, id);
     setFlipped(next);
-    setLines((all) => keepReviewEdits(buildReview(reviewInput(ctxData, invert, next)), all));
+    setLines((all) => keepReviewEdits(buildReview(reviewInput(ctxData, invert, next)), all, personal.data?.contextKind ?? 'pessoal'));
   };
   const flip = useCallback((id: string) => flipRef.current(id), []);
 
@@ -371,7 +372,7 @@ export function ImportFlow() {
       setSaveError(lineProblem(bad) === 'descricao_obrigatoria' ? IMPORT_TEXT.needDescription : IMPORT_TEXT.descriptionTooLong);
       return;
     }
-    const items = toImportItems(lines);
+    const items = toImportItems(lines, personal.data?.contextKind ?? 'pessoal');
     const chunks = chunkItems(items);
     const snapshot = attemptSnapshot(destination, target, items);
     const total = items.length;
@@ -738,7 +739,7 @@ export function ImportFlow() {
             <Card style={{ paddingVertical: space[2] }}>
               {visible.map((l, i) => (
                 <View key={l.id} onLayout={(e) => onRowLayout(l.id, e.nativeEvent.layout.y)}>
-                  <ReviewRow line={l} editing={editing === l.id} last={i === visible.length - 1} onToggle={toggle} onEdit={setEditing} onChange={change} onFlip={flip} />
+                  <ReviewRow line={l} editing={editing === l.id} last={i === visible.length - 1} onToggle={toggle} onEdit={setEditing} onChange={change} onFlip={flip} context={personal.data?.contextKind ?? 'pessoal'} />
                 </View>
               ))}
               {shown < lines.length ? (

@@ -97,6 +97,8 @@ import {
   type FinancialCalendar,
   type MonthOverview,
   type Phase3Point,
+  type BusinessMonth,
+  type BusinessOutLine,
   type ContextKind,
   type FamilyRole,
   type FinancialRecord,
@@ -146,6 +148,9 @@ import {
   type SeriesInput,
   type SeriesWrite,
   nextMonthAllowed,
+  businessMonth,
+  businessMonths,
+  businessTopOut,
 } from '@clarevo/core';
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { createContext, use, useEffect, useMemo, useRef } from 'react';
@@ -154,6 +159,7 @@ import { AppState } from 'react-native';
 import { pendingAttempts } from '@/lib/pending-attempts';
 import { valuesHidden } from '@/lib/privacy';
 import { useAccessCanWrite } from '@/state/access';
+import { useBusiness } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useRepo, useSession } from '@/state/session';
 
@@ -172,11 +178,13 @@ export function useSpace() {
 export interface WorkSpace extends PersonalSpace {
   contextId: string;
   contextKind: ContextKind;
-  /** "Pessoal" ou "Família": o nome do contexto nas pílulas e nos avisos dos formulários. */
+  /** "Pessoal", "Família" ou o nome do negócio (D-113): o nome do contexto nas pílulas e nos avisos dos formulários. */
   contextName: string;
-  /** O nome que a Família recebeu ("Casa Lima"); nulo no Pessoal. */
+  /** O nome que a Família recebeu ("Casa Lima"); nulo no Pessoal e no negócio. */
   familyName: string | null;
-  /** Papel no contexto: titular no Pessoal; titular, membro ou leitor na Família. */
+  /** O nome do negócio ("Sacolé da Mãe", D-113); nulo no Pessoal e na Família. */
+  businessName: string | null;
+  /** Papel no contexto: titular no Pessoal e no negócio; titular, membro ou leitor na Família. */
   role: FamilyRole;
   /** Quem só lê a Família (leitor) não anota, nem quem está em só ver e exportar (assinatura paga, D-083). */
   canWrite: boolean;
@@ -200,25 +208,44 @@ export interface WorkResult {
 export function useWorkOf(kind: SpaceKind): WorkResult {
   const space = useSpace();
   const family = useFamily();
+  const business = useBusiness();
   const familyId = kind === 'familia' ? family.data?.context.id : undefined;
-  const accounts = useAccounts(familyId);
+  const businessId = kind === 'negocio' ? business.data?.id : undefined;
+  const accounts = useAccounts(familyId ?? businessId);
   const personal = space.data;
   const fam = family.data;
-  const famAccounts = accounts.data;
+  const biz = business.data;
+  const otherAccounts = accounts.data;
   const accessCanWrite = useAccessCanWrite();
   const data = useMemo((): WorkSpace | undefined => {
     if (!personal) return undefined;
     if (kind === 'familia' && fam) {
-      if (!famAccounts) return undefined;
+      if (!otherAccounts) return undefined;
       return {
         ...personal,
-        accounts: activeAccounts(famAccounts),
+        accounts: activeAccounts(otherAccounts),
         contextId: fam.context.id,
         contextKind: 'familia',
         contextName: contextName('familia'),
         familyName: fam.context.name,
+        businessName: null,
         role: fam.role,
         canWrite: fam.role !== 'leitor' && accessCanWrite,
+      };
+    }
+    // Espaço Negócio (D-113): só a própria pessoa participa (titular).
+    if (kind === 'negocio' && biz) {
+      if (!otherAccounts) return undefined;
+      return {
+        ...personal,
+        accounts: activeAccounts(otherAccounts),
+        contextId: biz.id,
+        contextKind: 'negocio',
+        contextName: contextName('negocio', biz.name),
+        familyName: null,
+        businessName: biz.name,
+        role: 'titular',
+        canWrite: accessCanWrite,
       };
     }
     return {
@@ -227,19 +254,21 @@ export function useWorkOf(kind: SpaceKind): WorkResult {
       contextKind: 'pessoal',
       contextName: contextName('pessoal'),
       familyName: null,
+      businessName: null,
       role: 'titular',
       canWrite: accessCanWrite,
     };
-  }, [personal, kind, fam, famAccounts, accessCanWrite]);
-  const loadingFamily = kind === 'familia' && Boolean(fam) && accounts.isPending;
-  const failed = space.isError || (kind === 'familia' && Boolean(fam) && accounts.isError);
+  }, [personal, kind, fam, biz, otherAccounts, accessCanWrite]);
+  const other = (kind === 'familia' && Boolean(fam)) || (kind === 'negocio' && Boolean(biz));
+  const loadingOther = other && accounts.isPending;
+  const failed = space.isError || (other && accounts.isError);
   return {
     data,
-    isPending: space.isPending || loadingFamily,
+    isPending: space.isPending || loadingOther,
     isError: failed,
     isSuccess: data !== undefined,
     error: (space.error ?? accounts.error) as Error | null,
-    refetch: () => (space.isError ? space.refetch() : kind === 'familia' && accounts.isError ? accounts.refetch() : space.refetch()),
+    refetch: () => (space.isError ? space.refetch() : other && accounts.isError ? accounts.refetch() : space.refetch()),
   };
 }
 
@@ -263,10 +292,11 @@ export function useWorkFor(contextId: string | undefined): WorkResult {
   const selected = useWork();
   const space = useSpace();
   const family = useFamily();
-  const kind = contextKindOfItem(contextId, space.data?.personalContextId, family.data?.context.id);
+  const business = useBusiness();
+  const kind = contextKindOfItem(contextId, space.data?.personalContextId, family.data?.context.id, business.data?.id);
   const ofItem = useWorkOf(kind ?? 'pessoal');
   if (kind) return ofItem;
-  if (contextId && family.isPending && family.fetchStatus !== 'idle') {
+  if (contextId && ((family.isPending && family.fetchStatus !== 'idle') || (business.isPending && business.fetchStatus !== 'idle'))) {
     return { ...selected, data: undefined, isPending: true, isSuccess: false };
   }
   return selected;
@@ -1025,6 +1055,28 @@ function useRecordsOfMonths(contextId: string | undefined, months: readonly IsoM
   });
 }
 
+/** Como está o negócio (D-113): o mês escolhido, os últimos meses e as maiores saídas, pelos lançamentos do negócio. */
+export interface BusinessOverviewData {
+  current: BusinessMonth;
+  months: BusinessMonth[];
+  topOut: BusinessOutLine[];
+}
+
+/** Os lançamentos dos últimos `count` meses até `month` (as chaves de useMonthRecords), resumidos para "Como está o negócio". */
+export function useBusinessOverview(contextId: string | undefined, month: IsoMonth, count = 6) {
+  const months = useMemo(() => Array.from({ length: count }, (_, i) => addMonths(month, i - count + 1)), [month, count]);
+  const results = useRecordsOfMonths(contextId, months);
+  const ready = results.every((q) => q.isSuccess);
+  const failed = results.some((q) => q.isError);
+  const version = results.map((q) => q.dataUpdatedAt).join('|');
+  const data = useMemo((): BusinessOverviewData | undefined => {
+    if (!ready || !contextId) return undefined;
+    const all = results.flatMap((q) => q.data ?? []);
+    return { current: businessMonth(all, contextId, month), months: businessMonths(all, contextId, month, count), topOut: businessTopOut(all, contextId, month) };
+  }, [ready, contextId, month, count, version]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { data, isPending: !ready && !failed, isError: failed, refetch: () => Promise.all(results.map((q) => q.refetch())) };
+}
+
 // ---------------------------------------------------------------------------
 // Chaves de operação (padrão de useSeriesOperationKey, para renda de referência, metas e plano de guardar)
 // ---------------------------------------------------------------------------
@@ -1286,7 +1338,7 @@ export function useMonthBudget(contextId: string | undefined, month: IsoMonth) {
  * de `month_budget`. `refunds` é null enquanto carrega ou se alguma leitura falhou: nesse caso a tela não mostra a explicação, nunca um
  * valor de mentira.
  */
-export function useMonthRefunds(contextId: string | undefined, month: IsoMonth) {
+export function useMonthRefunds(contextId: string | undefined, month: IsoMonth, categories?: readonly string[]) {
   const repo = useRepo();
   const cards = useCards(contextId);
   const list = cards.data ?? [];
@@ -1297,7 +1349,7 @@ export function useMonthRefunds(contextId: string | undefined, month: IsoMonth) 
     })),
   });
   const ready = cards.isSuccess && entries.every((q) => q.isSuccess);
-  const refunds = ready ? categoryRefunds(month, entries.flatMap((q) => q.data ?? [])) : null;
+  const refunds = ready ? categoryRefunds(month, entries.flatMap((q) => q.data ?? []), categories) : null;
   return { refunds };
 }
 
@@ -1879,9 +1931,9 @@ export function useAccountOperationKey(scope?: string) {
       if (found.action !== 'criar_conta') return true;
       const space = await repo.getSpace();
       if (!space) return false;
-      // A conta pode ter sido criada no Pessoal ou na Família da pessoa.
-      const family = await repo.getFamily();
-      const contexts = family ? [space.personalContextId, family.context.id] : [space.personalContextId];
+      // A conta pode ter sido criada no Pessoal, na Família ou no negócio da pessoa (D-113).
+      const [family, business] = await Promise.all([repo.getFamily(), repo.getBusiness()]);
+      const contexts = [space.personalContextId, ...(family ? [family.context.id] : []), ...(business ? [business.id] : [])];
       for (const ctx of contexts) if ((await repo.listAccounts(ctx)).some((a) => a.id === found.accountId)) return true;
       return false;
     },
@@ -2645,10 +2697,10 @@ export function useCardOperationKey(scope?: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Contexto ativo (Pessoal/Família) e mês em exibição
+// Contexto ativo (Pessoal, Família ou Negócio) e mês em exibição
 // ---------------------------------------------------------------------------
 
-export type SpaceKind = 'pessoal' | 'familia';
+export type SpaceKind = 'pessoal' | 'familia' | 'negocio';
 
 export interface ViewState {
   space: SpaceKind;

@@ -1,11 +1,11 @@
 import type { IsoMonth } from './dates';
-import { addMonths, formatMonthName, formatMonthSpanBR, formatMonthYearBR } from './dates';
+import { addMonths, formatMonthName, formatMonthSpanBR, formatMonthYearBR, parseDateBR, type IsoDate } from './dates';
 import type { Cents } from './money';
-import { formatBRL } from './money';
+import { MAX_RECORD_CENTS, formatBRL, parseBRL } from './money';
 import type { ContextKind, FinancialRecord, RecordKind } from './records';
 import { CATEGORIES, NO_CATEGORY_LABEL, recordMonth } from './records';
 import type { RepoErrorCode } from './repository';
-import { charCount, ERROR_TEXT } from './validation';
+import { charCount, DESCRIPTION_MAX, ERROR_TEXT } from './validation';
 
 /**
  * Espaço Negócio (D-113, 17/11/2026; docs/52_ESPACO_NEGOCIO.md). Para quem tem CNPJ ou trabalha por conta (a loja de conserto de
@@ -57,6 +57,14 @@ export const WITHDRAWAL_PERSONAL_CATEGORY = 'Retirada do negócio';
 /** As categorias de escolha de um tipo de lançamento no contexto: as do negócio no negócio; as de sempre no Pessoal e na Família. */
 export function contextCategories(context: ContextKind, kind: RecordKind): readonly string[] {
   return context === 'negocio' ? BUSINESS_CATEGORIES[kind] : CATEGORIES[kind];
+}
+
+/**
+ * A categoria é uma das de gasto de escolha, de qualquer espaço (para os atalhos que levam a categoria de um formulário a outro, como
+ * "Cadastrar como conta a pagar"; o formulário de destino é do mesmo espaço).
+ */
+export function isChoosableExpenseCategory(category: string | null | undefined): category is string {
+  return typeof category === 'string' && (CATEGORIES.despesa.includes(category) || BUSINESS_CATEGORIES.despesa.includes(category));
 }
 
 /** As categorias do orçamento no contexto (as de gasto). */
@@ -113,6 +121,41 @@ export function withdrawalDescriptions(businessName: string, description: string
   const own = typeof description === 'string' ? description.trim() : '';
   if (own !== '') return { business: own, personal: own };
   return { business: 'Retirada para o Pessoal', personal: [...`Retirada de ${businessName}`].slice(0, 80).join('') };
+}
+
+/** O preenchimento da retirada (texto como a pessoa digita). */
+export interface WithdrawalDraft {
+  amountText: string;
+  dateText: string;
+  description: string;
+  businessAccountId: string;
+  personalAccountId: string;
+}
+
+export type WithdrawalField = 'amountText' | 'dateText' | 'description' | 'businessAccountId' | 'personalAccountId';
+export type WithdrawalValidation = { ok: true; input: BusinessWithdrawalInput } | { ok: false; errors: Partial<Record<WithdrawalField, string>> };
+
+/** Ordem dos campos na tela: o foco vai para o primeiro erro. */
+export const WITHDRAWAL_FIELD_ORDER: readonly WithdrawalField[] = ['amountText', 'dateText', 'businessAccountId', 'personalAccountId', 'description'];
+
+/** As mesmas regras de createRecord nos dois lados: valor de R$ 0,01 a R$ 9.999.999,99, data até hoje, as duas contas e descrição até 80. */
+export function validateWithdrawalDraft(d: WithdrawalDraft, today: IsoDate): WithdrawalValidation {
+  const errors: Partial<Record<WithdrawalField, string>> = {};
+  const amount = parseBRL(d.amountText);
+  if (amount === null || amount <= 0) errors.amountText = ERROR_TEXT.valor_invalido;
+  else if (amount > MAX_RECORD_CENTS) errors.amountText = ERROR_TEXT.valor_acima_do_limite;
+  const occurredOn = parseDateBR(d.dateText);
+  if (occurredOn === null) errors.dateText = ERROR_TEXT.data_invalida;
+  else if (occurredOn > today) errors.dateText = ERROR_TEXT.data_futura;
+  if (d.businessAccountId.trim() === '') errors.businessAccountId = ERROR_TEXT.conta_invalida;
+  if (d.personalAccountId.trim() === '') errors.personalAccountId = ERROR_TEXT.conta_invalida;
+  const description = d.description.trim();
+  if (charCount(description) > DESCRIPTION_MAX) errors.description = ERROR_TEXT.descricao_longa;
+  if (Object.keys(errors).length > 0 || amount === null || occurredOn === null) return { ok: false, errors };
+  return {
+    ok: true,
+    input: { businessAccountId: d.businessAccountId, personalAccountId: d.personalAccountId, amountCents: amount, occurredOn, description: description === '' ? null : description },
+  };
 }
 
 /** Nome do negócio sem os espaços das pontas. */
@@ -283,7 +326,7 @@ export const BUSINESS_TEXT = {
   created: 'Espaço Negócio criado. Toque no nome dele, no alto da tela, para anotar no negócio.',
   privacy: 'Só você vê e anota no espaço Negócio. O Pessoal continua separado: nada passa de um para o outro sem você pedir.',
   included: 'O plano inclui um negócio por pessoa, sem custo a mais.',
-  demoOnly: 'Na demonstração, o negócio de exemplo já existe. Para criar o seu, entre com uma conta sua.',
+  demoOnly: 'Na demonstração, o negócio criado fica só nesta visita: recarregar a página volta a demonstração ao começo, com os dados fictícios de sempre.',
   loading: 'Carregando o espaço Negócio…',
   loadFailed: 'Não foi possível carregar o espaço Negócio. Tente de novo.',
   /** Como está o negócio. */

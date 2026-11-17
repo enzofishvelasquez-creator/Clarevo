@@ -1,7 +1,6 @@
 import {
   ANNUAL_HELP_TEXT,
   ANNUAL_SERIES_ERROR_TEXT,
-  CATEGORIES,
   DESCRIPTION_MAX,
   INSTALLMENT_NATURES,
   MAX_RECORD_CENTS,
@@ -77,6 +76,7 @@ import {
   useUpdateSeriesFrom,
   withNotice,
 } from '@/state/data';
+import { useContextCategories } from '@/state/business';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -161,6 +161,7 @@ export function SeriesEditForm({
   const repo = useRepo();
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
+  const categories = useContextCategories(contextId);
   const navigation = useNavigation();
   const update = useUpdateSeriesFrom();
   const markSubscription = useSetSeriesSubscription();
@@ -643,7 +644,7 @@ export function SeriesEditForm({
 
           <ChoiceGroup label="Categoria">
             <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-            {CATEGORIES.despesa.map((c) => (
+            {categories.map((c) => (
               <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
             ))}
           </ChoiceGroup>

@@ -1,5 +1,4 @@
 import {
-  CATEGORIES,
   RECORD_LINK_TEXT,
   SUBCATEGORY_MAX,
   formatBRL,
@@ -7,6 +6,8 @@ import {
   type PaymentLinkOption,
   type RecordKind,
   type SubcategoryMemory,
+  contextCategories,
+  type ContextKind,
 } from '@clarevo/core';
 import { Check, Info, X } from 'lucide-react-native';
 import { forwardRef, useState } from 'react';
@@ -294,9 +295,9 @@ export function KindChoice({
   );
 }
 
-/** As categorias do tipo, para conferir uma categoria trazida de outro tipo (troca de tipo). */
-export function categoryOfKind(kind: RecordKind, category: string | null): string | null {
-  return category !== null && CATEGORIES[kind].includes(category) ? category : null;
+/** As categorias do tipo no espaço (as do negócio no negócio, D-113), para conferir uma categoria trazida de outro tipo (troca de tipo). */
+export function categoryOfKind(kind: RecordKind, category: string | null, context: ContextKind = 'pessoal'): string | null {
+  return category !== null && contextCategories(context, kind).includes(category) ? category : null;
 }
 
 const styles = StyleSheet.create({

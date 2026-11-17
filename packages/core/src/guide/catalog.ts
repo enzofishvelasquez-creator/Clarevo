@@ -1,6 +1,7 @@
 import { ACCOUNTS_TEXT } from '../accounts';
 import { ANALYSES_TABS, ANALYSES_TEXT } from '../analises';
 import { BUDGET_TEXT, LIMIT_TEXT } from '../budget';
+import { BUSINESS_TEXT } from '../business';
 import { ANTES_FIELDS, ANTES_TEXT } from '../calculators/antes-de-financiar';
 import { CALCULATORS, CALC_GROUPS, CALC_UI_TEXT } from '../calculators/catalog';
 import { PLANO_FIELDS, PLANO_TEXT } from '../calculators/plano-dividas';
@@ -916,6 +917,27 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     keywords: ['família', 'familia', 'casa', 'convidar', 'convite', 'link de convite', 'pessoas', 'membros', 'titular', 'dividir contas da casa', 'anotar junto', 'compartilhar contas'],
     routes: ['/familia'],
     screenshot: '400_familia_criar.png',
+  },
+  {
+    id: 'negocio',
+    group: 'conta-e-privacidade',
+    title: BUSINESS_TEXT.accountTitle,
+    purpose:
+      'Para quem tem CNPJ ou trabalha por conta: separa as contas do negócio das pessoais. Você anota o que entrou e o que saiu do negócio e vê quanto sobrou no mês, sem virar contabilidade.',
+    where: [ACCOUNT_SCREEN, BUSINESS_TEXT.accountTitle],
+    steps: [
+      `Em Conta, no card ${q(BUSINESS_TEXT.accountTitle)}, toque em ${q(BUSINESS_TEXT.accountCreate)}, dê o nome do negócio e confirme. O plano inclui um negócio por pessoa.`,
+      `O nome do negócio aparece no seletor do topo das abas, ao lado de ${q('Pessoal')}: com ele escolhido, os gastos, recebimentos, contas a pagar, cartões e bancos e carteira são do negócio, com as categorias do negócio.`,
+      `Em ${q(BUSINESS_TEXT.overviewTitle)}, veja quanto entrou, saiu e sobrou no mês e nos últimos meses, e as maiores saídas.`,
+      `Quando levar dinheiro do negócio para casa, use ${q(BUSINESS_TEXT.withdraw)}: o valor sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.`,
+      `Anotou no lugar errado? No detalhe do lançamento, toque em ${q(BUSINESS_TEXT.moveToBusiness)} ou ${q(BUSINESS_TEXT.moveToPersonal)}.`,
+      'Metas e investimentos ficam no Pessoal. Pelo WhatsApp e pelo Telegram, as anotações vão para o Pessoal.',
+    ],
+    screenName: BUSINESS_TEXT.overviewTitle,
+    href: '/negocio',
+    keywords: ['negócio', 'negocio', 'cnpj', 'mei', 'empresa própria', 'trabalho por conta', 'autônomo', 'loja', 'vendas', 'serviços', 'retirada', 'pró-labore', 'separar contas', 'contas do negócio'],
+    routes: ['/negocio', '/negocio/novo', '/negocio/retirada', '/negocio/nome', '/registro/[id]/mover'],
+    screenshot: '730_negocio_como_esta.png',
   },
   {
     id: 'painel-da-empresa',

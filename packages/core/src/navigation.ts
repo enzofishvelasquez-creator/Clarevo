@@ -30,8 +30,8 @@ const MONTH = '\\d{4}-\\d{2}';
  * a barra, de modo que uma tela nova nunca perde a barra por esquecimento.
  */
 const FORM_PATHS: readonly RegExp[] = [
-  // Registro de gasto ou recebimento (novo e editar).
-  new RegExp(`^/registro/(novo|${ID}/editar)$`),
+  // Registro de gasto ou recebimento (novo, editar e mover para o espaço Negócio ou para o Pessoal, D-113).
+  new RegExp(`^/registro/(novo|${ID}/(editar|mover))$`),
   // Contas a pagar: nova, editar, pagar e a revisão de vencidas (rodapé fixo com o pagamento em lote).
   new RegExp(`^/a-pagar/(nova|vencidas|${ID}/(editar|pagar))$`),
   // Gastos fixos, parcelamentos e contas do ano.
@@ -54,6 +54,8 @@ const FORM_PATHS: readonly RegExp[] = [
   /^\/importar$/,
   // Família (D-055): criar e convidar são formulários com rodapé fixo. A lista da Família (/familia) é de consulta.
   /^\/familia\/(nova|convidar)$/,
+  // Espaço Negócio (D-113): criar, a retirada para o Pessoal e o nome são formulários. "Como está o negócio" (/negocio) é de consulta.
+  /^\/negocio\/(novo|retirada|nome)$/,
   // Convite para a Família: abre antes de entrar e depois de entrar, como as telas de entrada, sem barra.
   new RegExp(`^/convite/${ID}$`),
   // Convite da empresa (D-056): o mesmo caminho do convite da Família, aberto pelo link do RH, sem barra.
@@ -89,7 +91,7 @@ export function barModeFor(pathname: string): BarMode {
 
 /** Abas que uma tela de consulta abre quando a pessoa não veio de nenhuma (endereço aberto direto): a do assunto. */
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
-  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes|evolucao|analises|calendario)(\/|$)/, '/movimentacoes'],
+  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes|evolucao|analises|calendario|negocio)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
   [/^\/investimento(\/|$)/, '/investimentos'],
   [/^\/(explicacao|aprender)(\/|$)/, '/aprender'],
@@ -386,6 +388,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Criar a Família, convidar por link e ver as pessoas e o papel de cada uma',
     href: '/familia',
     keywords: ['família', 'familia', 'convidar', 'convite', 'link de convite', 'membros', 'titular', 'sair da família', 'anotar junto', 'contas da casa'],
+  },
+  {
+    id: 'negocio',
+    title: 'Espaço Negócio',
+    caption: 'Separar o negócio do Pessoal: o que entrou, o que saiu e quanto sobrou',
+    href: '/negocio',
+    keywords: ['negócio', 'negocio', 'empresa própria', 'cnpj', 'mei', 'trabalho por conta', 'autônomo', 'loja', 'vendas', 'retirada', 'pró-labore', 'separar contas'],
   },
   {
     id: 'conta',

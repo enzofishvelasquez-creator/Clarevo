@@ -2,7 +2,6 @@ import {
   CARDS_TEXT,
   CARD_CHARGE_LABEL,
   CARD_CHARGE_TYPES,
-  CATEGORIES,
   DESCRIPTION_MAX,
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
@@ -39,6 +38,7 @@ import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { useAddCardCharge, useAddCardRefund, useCardEntries, useCardInvoices, useCardOperationKey, useUpdateCardEntry } from '@/state/data';
+import { useContextCategories } from '@/state/business';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -55,6 +55,7 @@ export type EntryKind = 'encargo' | 'estorno';
 export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind; card: CardData; month: IsoMonth; entry?: CardEntry | null }) {
   const { today } = useSession();
   const qc = useQueryClient();
+  const categories = useContextCategories(card.contextId);
   const addCharge = useAddCardCharge();
   const addRefund = useAddCardRefund();
   const updateEntry = useUpdateCardEntry();
@@ -238,7 +239,7 @@ export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind
           {charge ? null : (
             <ChoiceGroup label={I.refundCategory}>
               <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-              {CATEGORIES.despesa.map((c) => (
+              {categories.map((c) => (
                 <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
               ))}
             </ChoiceGroup>

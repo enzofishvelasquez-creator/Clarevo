@@ -1,6 +1,10 @@
 import {
+  BUSINESS_TEXT,
   CARDS_TEXT,
-  CATEGORIES,
+  businessErrorText,
+  canMoveRecord,
+  isChoosableExpenseCategory,
+  isWithdrawal,
   ERROR_TEXT,
   NOTA_FLOW_TEXT,
   NEXT_MONTH_TEXT,
@@ -28,7 +32,7 @@ import {
   type IsoDate,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ArrowDownLeft, ArrowUpRight, Check, Pencil, Plus, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { AlertCircle, ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Check, HandCoins, Pencil, Plus, Repeat, ShieldCheck, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -46,6 +50,7 @@ import { openOfficialUrl, receiptLinks } from '@/lib/receipt-link';
 import { openSummary } from '@/lib/nav';
 import { useAccounts, useCards, useCommitment, useDeleteRecord, useInvestment, useRecord, useRecordLinks, useWork, useView } from '@/state/data';
 import { useAuthorship } from '@/components/family-parts';
+import { useBusiness, useDeleteWithdrawal } from '@/state/business';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -66,7 +71,7 @@ function openAsSeries(r: FinancialRecord, today: IsoDate) {
       dia: String(Number(r.occurredOn.slice(8, 10))),
       inicio,
       gasto: r.occurredOn,
-      ...(r.category && CATEGORIES.despesa.includes(r.category) ? { categoria: r.category } : {}),
+      ...(isChoosableExpenseCategory(r.category) ? { categoria: r.category } : {}),
     },
   });
 }
@@ -91,6 +96,11 @@ export default function DetalheRegistro() {
   const [unlinkBusy, setUnlinkBusy] = useState(false);
   const [unlinked, setUnlinked] = useState(false);
   const unlinkKey = useRef(newOperationKey());
+  // Espaço Negócio (D-113): a retirada (os dois lados juntos) e o mover entre o Pessoal e o negócio.
+  const business = useBusiness().data;
+  const removeWithdrawal = useDeleteWithdrawal();
+  const [confirmingWithdrawal, setConfirmingWithdrawal] = useState(false);
+  const withdrawalKey = useRef(newOperationKey());
 
   const toList = () => (router.canGoBack() ? router.back() : router.replace('/movimentacoes'));
 
@@ -108,6 +118,12 @@ export default function DetalheRegistro() {
     : paidBill.data
       ? commitmentLinkLabel(paidBill.data)
       : null;
+
+  const withdrawal = r ? isWithdrawal(r) : false;
+  const inBusiness = Boolean(business && r && r.contextId === business.id);
+  const inPersonal = Boolean(personal && r && r.contextId === personal.personalContextId);
+  // Mover (D-113): o lançamento comum, entre o Pessoal e o negócio da pessoa, para quem anotou no lugar errado.
+  const movable = Boolean(r && business && (inBusiness || inPersonal) && canMoveRecord(r) && (personal?.canWrite ?? true));
 
   /** "Desligar da fatura" (D-107): o gasto que foi ligado depois continua, e a fatura volta a ficar em aberto. */
   const doUnlinkInvoice = async () => {
@@ -129,6 +145,25 @@ export default function DetalheRegistro() {
       } else setDeleteError(RECORD_LINK_TEXT.unlinkUncertain);
     } finally {
       setUnlinkBusy(false);
+    }
+  };
+
+  /** Excluir a retirada (D-113): os dois lados, no negócio e no Pessoal, saem juntos. */
+  const doDeleteWithdrawal = async () => {
+    if (!r) return;
+    setDeleteError(null);
+    try {
+      await removeWithdrawal.mutateAsync({ key: withdrawalKey.current, recordId: r.id, version: r.version });
+      setConfirmingWithdrawal(false);
+      flash.set(BUSINESS_TEXT.withdrawalDeleted);
+      toList();
+    } catch (e) {
+      setConfirmingWithdrawal(false);
+      if (isRepoError(e) && e.code !== 'rede' && e.code !== 'desconhecido') {
+        withdrawalKey.current = newOperationKey();
+        setDeleteError(businessErrorText(e.code));
+        record.refetch();
+      } else setDeleteError(businessErrorText('rede'));
     }
   };
 
@@ -195,7 +230,7 @@ export default function DetalheRegistro() {
                 </View>
               ) : null}
               {/* "Separar parte para uma meta?" (D-105): só logo depois de salvar um recebimento que não é o de sempre. */}
-              {justSaved ? <ExtraIncomeAsk record={r} canWrite={personal?.canWrite ?? true} /> : null}
+              {justSaved && !inBusiness ? <ExtraIncomeAsk record={r} canWrite={personal?.canWrite ?? true} /> : null}
               {unlinked ? (
                 <Banner tone="sucesso" icon={Check}>
                   <Txt variant="label" color={colors.successText}>
@@ -280,11 +315,36 @@ export default function DetalheRegistro() {
                     <Button label={RECORD_LINK_TEXT.unlinkInvoice} tone="soft" disabled={!paidBill.data} onPress={() => setUnlinking(true)} />
                   ) : null}
                 </>
+              ) : withdrawal ? (
+                // Retirada para o Pessoal (D-113): ligada nos dois espaços; muda só excluindo e anotando de novo.
+                <>
+                  <Banner tone="info" icon={HandCoins}>
+                    <Txt variant="label">
+                      {r.kind === 'despesa' ? BUSINESS_TEXT.withdrawalBusinessNote : BUSINESS_TEXT.withdrawalPersonalNote(business?.name ?? null)}
+                    </Txt>
+                  </Banner>
+                  <Txt variant="caption" color={colors.textSecondary}>
+                    {BUSINESS_TEXT.withdrawalLocked}
+                  </Txt>
+                  <Button
+                    label={BUSINESS_TEXT.seeOtherSide(r.kind === 'despesa' ? 'Pessoal' : (business?.name ?? BUSINESS_TEXT.context))}
+                    tone="soft"
+                    onPress={() => router.push(`/registro/${r.pairedRecordId}`)}
+                  />
+                </>
               ) : (
                 <Button label={RECORD_TEXT.edit(r.kind)} icon={Pencil} tone={justSaved ? 'soft' : 'brand'} onPress={() => router.push(`/registro/${r.id}/editar`)} />
               )}
+              {movable ? (
+                <Button
+                  label={inBusiness ? BUSINESS_TEXT.moveToPersonal : BUSINESS_TEXT.moveToBusiness}
+                  icon={ArrowLeftRight}
+                  tone="soft"
+                  onPress={() => router.push(`/registro/${r.id}/mover`)}
+                />
+              ) : null}
               {/* Gasto anotado sem conta a pagar: pode virar um gasto fixo, que começa no próximo vencimento. */}
-              {r.kind === 'despesa' && !r.commitmentId && !r.invoice ? (
+              {r.kind === 'despesa' && !r.commitmentId && !r.invoice && !withdrawal ? (
                 <Button label="Tornar gasto fixo" icon={Repeat} tone="soft" onPress={() => openAsSeries(r, today)} />
               ) : null}
               {r.commitmentId && !r.invoice ? (
@@ -303,7 +363,11 @@ export default function DetalheRegistro() {
                   }}
                 />
               )}
-              {r.invoice ? null : <Button label={RECORD_TEXT.remove(r.kind)} icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />}
+              {r.invoice ? null : withdrawal ? (
+                <Button label={BUSINESS_TEXT.deleteWithdrawal} icon={Trash2} tone="danger" onPress={() => setConfirmingWithdrawal(true)} />
+              ) : (
+                <Button label={RECORD_TEXT.remove(r.kind)} icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />
+              )}
               <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy}>
                 <ShieldCheck size={18} color={colors.textSecondary} />
                 <Txt variant="label" color={colors.textSecondary}>
@@ -320,6 +384,18 @@ export default function DetalheRegistro() {
                 onCancel={() => setUnlinking(false)}
                 onConfirm={doUnlinkInvoice}>
                 <Txt color={colors.textSecondary}>{RECORD_LINK_TEXT.unlinkInvoiceBody}</Txt>
+              </ConfirmDialog>
+
+              <ConfirmDialog
+                visible={confirmingWithdrawal}
+                title={BUSINESS_TEXT.deleteWithdrawalTitle}
+                cancelLabel="Cancelar"
+                confirmLabel={BUSINESS_TEXT.deleteWithdrawal}
+                busy={removeWithdrawal.isPending}
+                onCancel={() => setConfirmingWithdrawal(false)}
+                onConfirm={doDeleteWithdrawal}>
+                <MoneyTxt style={{ fontFamily: fonts.bold }}>{`${r.description} · ${formatBRL(r.amountCents)}`}</MoneyTxt>
+                <Txt color={colors.textSecondary}>{BUSINESS_TEXT.deleteWithdrawalBody}</Txt>
               </ConfirmDialog>
 
               <ConfirmDialog

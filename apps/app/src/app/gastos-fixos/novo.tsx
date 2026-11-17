@@ -1,5 +1,5 @@
 import {
-  CATEGORIES,
+  isChoosableExpenseCategory,
   DESCRIPTION_MAX,
   INSTALLMENT_NATURES,
   MAX_RECORD_CENTS,
@@ -57,7 +57,7 @@ function prefillFrom(p: Params): SeriesPrefill | undefined {
     const cents = Number(p.valor);
     if (cents >= 1 && cents <= MAX_RECORD_CENTS) out.amountCents = cents;
   }
-  if (typeof p.categoria === 'string' && CATEGORIES.despesa.includes(p.categoria)) out.category = p.categoria;
+  if (isChoosableExpenseCategory(p.categoria)) out.category = p.categoria;
   if (typeof p.vencimento === 'string' && isValidIsoDate(p.vencimento)) {
     out.dueDay = Number(p.vencimento.slice(8, 10));
     out.firstMonth = monthOf(p.vencimento);

@@ -551,9 +551,9 @@ export function validateBudgetDraft(draft: BudgetDraft, today: IsoDate): BudgetV
 }
 
 /** O que o endereço /orcamento/{categoria} aceita: o nome exato (sem acento ou caixa, o endereço é o nome codificado). */
-export function budgetCategoryFromParam(param: string | string[] | undefined): string | null {
+export function budgetCategoryFromParam(param: string | string[] | undefined, categories: readonly string[] = BUDGET_CATEGORIES): string | null {
   const value = Array.isArray(param) ? param[0] : param;
-  return typeof value === 'string' && isBudgetCategory(value) ? value : null;
+  return typeof value === 'string' && isBudgetCategory(value, categories) ? value : null;
 }
 
 // ---------------------------------------------------------------------------

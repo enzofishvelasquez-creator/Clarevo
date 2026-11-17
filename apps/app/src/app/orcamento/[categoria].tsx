@@ -4,6 +4,7 @@ import {
   ERROR_TEXT,
   UNCERTAIN_TEXT,
   addMonths,
+  budgetCategoriesFor,
   budgetCategoryFromParam,
   budgetMonthBounds,
   budgetMonthError,
@@ -52,8 +53,10 @@ import { colors, fonts, space } from '@/theme/tokens';
  */
 export default function OrcamentoCategoriaScreen() {
   const params = useLocalSearchParams<{ categoria?: string; mes?: string; valor?: string }>();
-  const category = budgetCategoryFromParam(params.categoria);
-  const contextId = useWork().data?.contextId;
+  const work = useWork().data;
+  // As categorias do espaço (as de gasto do negócio no negócio, D-113).
+  const category = budgetCategoryFromParam(params.categoria, budgetCategoriesFor(work?.contextKind ?? 'pessoal'));
+  const contextId = work?.contextId;
   if (!category) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>

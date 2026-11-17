@@ -1,4 +1,4 @@
-import { BENEFIT_TEXT, DELETE_TEXT, FAMILY_ROLE_HELP, FAMILY_TEXT, GOALS_TEXT, LEGAL_TEXT, RETURN_TEXT, SAVINGS_TEXT } from '@clarevo/core';
+import { BENEFIT_TEXT, BUSINESS_TEXT, DELETE_TEXT, FAMILY_ROLE_HELP, FAMILY_TEXT, GOALS_TEXT, LEGAL_TEXT, RETURN_TEXT, SAVINGS_TEXT } from '@clarevo/core';
 import { router } from 'expo-router';
 import { User } from 'lucide-react-native';
 import { View } from 'react-native';
@@ -8,6 +8,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { TopicLink } from '@/components/topic-link';
 import { Button, Card, LinkButton, Screen, Txt } from '@/components/ui';
 import { useView } from '@/state/data';
+import { useBusiness } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
@@ -18,9 +19,11 @@ export default function QuemVeScreen() {
   const { space: kind } = useView();
   const family = useFamily().data;
   const inFamily = kind === 'familia' && family;
+  const business = useBusiness().data;
+  const inBusiness = kind === 'negocio' && business;
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-    <SubHeader title="Quem vê estes dados?" right={<ContextPill label={kind === 'pessoal' ? 'Pessoal' : 'Família'} />} />
+    <SubHeader title="Quem vê estes dados?" right={<ContextPill label={kind === 'pessoal' ? 'Pessoal' : kind === 'familia' ? 'Família' : (business?.name ?? BUSINESS_TEXT.context)} fixed />} />
     <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
       {kind === 'pessoal' ? (
         <Card style={{ flexDirection: 'row', gap: space[3], alignItems: 'center' }}>
@@ -29,6 +32,18 @@ export default function QuemVeScreen() {
             <Txt variant="label">{user?.displayName} (você)</Txt>
             <Txt variant="caption" color={colors.textSecondary}>
               {LEGAL_TEXT.whoSees.personal}
+            </Txt>
+          </View>
+        </Card>
+      ) : null}
+      {/* Espaço Negócio (D-113): só a própria pessoa vê e anota. */}
+      {inBusiness ? (
+        <Card style={{ flexDirection: 'row', gap: space[3], alignItems: 'center' }}>
+          <User size={22} color={colors.brandText} />
+          <View style={{ flex: 1 }}>
+            <Txt variant="label">{user?.displayName} (você)</Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {BUSINESS_TEXT.whoSees}
             </Txt>
           </View>
         </Card>

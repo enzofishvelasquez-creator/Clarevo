@@ -25,11 +25,13 @@ import {
   contextLabelFor,
   contextName,
   createDemoRepository,
+  demoScenarioFrom,
   isWithdrawal,
   newOperationKey,
   suggestMoveCategory,
   summarizeMonth,
   unsavedChangesText,
+  validateWithdrawalDraft,
   withdrawalDescriptions,
   type FinancialRecord,
 } from '../src';
@@ -113,6 +115,26 @@ describe('Espaço Negócio: categorias e regras puras (D-113)', () => {
     expect(withdrawalDescriptions('Sacolé da Mãe', null)).toEqual({ business: 'Retirada para o Pessoal', personal: 'Retirada de Sacolé da Mãe' });
     expect(withdrawalDescriptions('Sacolé da Mãe', '  Pró-labore ')).toEqual({ business: 'Pró-labore', personal: 'Pró-labore' });
     expect([...withdrawalDescriptions('x'.repeat(60), '').personal].length).toBeLessThanOrEqual(80);
+  });
+
+  it('o preenchimento da retirada', () => {
+    const base = { amountText: '500,00', dateText: '15/11/2026', description: '', businessAccountId: 'b', personalAccountId: 'p' };
+    expect(validateWithdrawalDraft(base, '2026-11-17')).toEqual({
+      ok: true,
+      input: { businessAccountId: 'b', personalAccountId: 'p', amountCents: 50_000, occurredOn: '2026-11-15', description: null },
+    });
+    const bad = validateWithdrawalDraft({ ...base, amountText: '0', dateText: '18/11/2026', personalAccountId: '', description: 'x'.repeat(81) }, '2026-11-17');
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) {
+      expect(bad.errors).toEqual({
+        amountText: 'Informe um valor maior que zero, como 80,00.',
+        dateText: 'Use uma data até hoje. Aqui entram só valores já pagos ou recebidos.',
+        personalAccountId: 'Escolha o banco ou a carteira.',
+        description: 'Use no máximo 80 caracteres.',
+      });
+    }
+    const ok = validateWithdrawalDraft({ ...base, description: '  Pró-labore ' }, '2026-11-17');
+    expect(ok.ok && ok.input.description).toBe('Pró-labore');
   });
 
   it('o que pode mudar de espaço e a categoria sugerida', () => {
@@ -415,8 +437,20 @@ describe('Espaço Negócio na memória (as mesmas regras da migração 0042)', (
 });
 
 describe('demonstração: o negócio de exemplo não muda o Pessoal', () => {
-  it('"Sacolé da Maria" com setembro e outubro, e o Pessoal com os totais de sempre', async () => {
+  it('a demonstração padrão não tem negócio, mas deixa criar um, só na memória', async () => {
     const repo = await createDemoRepository();
+    expect(await repo.getBusiness()).toBeNull();
+    const b = await repo.createBusiness(newOperationKey(), 'Brigadeiros da Maria');
+    expect((await repo.getBusiness())!.name).toBe('Brigadeiros da Maria');
+    const space = (await repo.getSpace())!;
+    const s = summarizeMonth(await repo.listRecords(space.personalContextId, '2026-10'), space.personalContextId, '2026-10');
+    expect([s.receivedCents, s.paidCents]).toEqual([600_000, 390_000]);
+    expect(await repo.listRecords(b.id, '2026-10')).toEqual([]);
+  });
+
+  it('cenário "negocio": "Sacolé da Maria" com setembro e outubro, e o Pessoal com os totais de sempre', async () => {
+    expect(demoScenarioFrom('negocio')).toBe('negocio');
+    const repo = await createDemoRepository({ scenario: 'negocio' });
     const b = (await repo.getBusiness())!;
     expect(b.name).toBe(DEMO_BUSINESS_NAME);
     expect(DEMO_BUSINESS_NAME).toBe('Sacolé da Maria');

@@ -2,6 +2,7 @@ import {
   ACCOUNT_KINDS,
   ACCOUNT_NAME_MAX,
   BUDGET_CATEGORIES,
+  BUSINESS_CATEGORIES,
   BUDGET_MAX_CENTS,
   BUDGET_MIN_CENTS,
   ESSENTIAL_BASE_SOURCES,
@@ -180,6 +181,9 @@ import {
   type WebSubscriptionStatus,
   type WebSubscriptionStart,
   type LegalAcceptance,
+  type BusinessContext,
+  type BusinessWithdrawal,
+  type BusinessWithdrawalInput,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -230,6 +234,8 @@ interface RecordRow {
   linked_payment?: boolean | null;
   investment_id?: string | null;
   investment_movement_id?: string | null;
+  /** Retirada para o Pessoal (D-113, migração 0042): o lançamento do outro lado; ausente antes dela. */
+  paired_record_id?: string | null;
   created_by: string;
   version: number;
   created_at: string;
@@ -634,6 +640,13 @@ const GOAL_MOVEMENT_ACTIONS: readonly GoalAction[] = ['registrar_movimento_meta'
 
 const KNOWN: RepoErrorCode[] = [
   'versao_desatualizada',
+  // Espaço Negócio (D-113, 20261117000004).
+  'nome_do_negocio_invalido',
+  'ja_tem_negocio',
+  'negocio_com_membros',
+  'retirada_ligada',
+  'nao_e_retirada',
+  'lancamento_ligado',
   // Gasto ligado, subcategoria, troca de tipo e rendimento de investimento (D-107, 20261117000002).
   'subcategoria_invalida',
   'tipo_nao_muda',
@@ -863,6 +876,8 @@ function toRecord(r: RecordRow): FinancialRecord {
     ...(r.subcategory ? { subcategory: r.subcategory } : {}),
     ...(r.linked_payment === true ? { linkedPayment: true } : {}),
     ...(r.investment_id && r.investment_movement_id ? { investmentId: r.investment_id, investmentMovementId: r.investment_movement_id } : {}),
+    // D-113: só quando existe, como o repositório em memória.
+    ...(r.paired_record_id ? { pairedRecordId: r.paired_record_id } : {}),
     createdBy: r.created_by,
     version: r.version,
     createdAt: r.created_at,
@@ -1066,12 +1081,23 @@ function toIncomeReference(r: IncomeReferenceRow): IncomeReference {
   };
 }
 
-/** Orçamento de uma categoria: categoria entre as de BUDGET_CATEGORIES, mês no dia 1, valor nulo ou de R$ 1,00 a R$ 9.999.999,99 e versão a partir de 1. */
+/** As listas de categorias do orçamento: a do Pessoal e da Família e a do negócio (D-113). */
+const BUDGET_LISTS: readonly (readonly string[])[] = [BUDGET_CATEGORIES, BUSINESS_CATEGORIES.despesa];
+/** A ordem de uma categoria na lista dela (as do negócio nunca se misturam com as do Pessoal num mesmo contexto). */
+const budgetOrder = (category: string): number => {
+  for (const list of BUDGET_LISTS) if (list.includes(category)) return list.indexOf(category);
+  return 99;
+};
+
+/**
+ * Orçamento de uma categoria: categoria entre as de BUDGET_CATEGORIES ou as do negócio, mês no dia 1, valor nulo ou de R$ 1,00 a
+ * R$ 9.999.999,99 e versão a partir de 1.
+ */
 function toCategoryBudget(r: CategoryBudgetRow): CategoryBudget {
   const amountCents = wholeOrNull(r.amount_cents);
   const version = whole(r.version);
   const consistent =
-    BUDGET_CATEGORIES.includes(r.category) &&
+    BUDGET_LISTS.some((list) => list.includes(r.category)) &&
     FIRST_DAY.test(r.from_month) &&
     (amountCents === null || (amountCents >= BUDGET_MIN_CENTS && amountCents <= BUDGET_MAX_CENTS)) &&
     version >= 1;
@@ -1107,11 +1133,12 @@ function toCommitmentLimit(r: CommitmentLimitRow): CommitmentLimit {
 }
 
 /**
- * month_budget: sempre as categorias de BUDGET_CATEGORIES (sete), na ordem delas; orçamento (id, versão, mês e valor) e usado coerentes.
- * Uma lista incompleta ou fora de ordem nunca aparece como um orçamento zerado.
+ * month_budget: sempre as categorias de BUDGET_CATEGORIES (sete) ou, no negócio (D-113), as nove de gasto do negócio, na ordem delas;
+ * orçamento (id, versão, mês e valor) e usado coerentes. Uma lista incompleta ou fora de ordem nunca aparece como um orçamento zerado.
  */
 function toMonthBudget(month: IsoMonth, rows: readonly MonthBudgetRow[]): MonthBudgetRead {
-  if (rows.length !== BUDGET_CATEGORIES.length) throw new RepoError('desconhecido', 'orcamento_inconsistente');
+  const list = BUDGET_LISTS.find((l) => l.length === rows.length && l[0] === rows[0]?.category);
+  if (!list) throw new RepoError('desconhecido', 'orcamento_inconsistente');
   return {
     month,
     lines: rows.map((r, i) => {
@@ -1120,7 +1147,7 @@ function toMonthBudget(month: IsoMonth, rows: readonly MonthBudgetRow[]): MonthB
       const usedCents = whole(r.used_cents);
       const hasRow = r.budget_id !== null;
       const consistent =
-        r.category === BUDGET_CATEGORIES[i] &&
+        r.category === list[i] &&
         usedCents >= 0 &&
         hasRow === (r.budget_from !== null) &&
         hasRow === (budgetVersion !== null) &&
@@ -2535,7 +2562,7 @@ export class SupabaseRepository implements RecordsRepository {
     // A ordem das categorias é a do app, não a alfabética do banco.
     return rows
       .map(toCategoryBudget)
-      .sort((a, b) => BUDGET_CATEGORIES.indexOf(a.category) - BUDGET_CATEGORIES.indexOf(b.category) || a.fromMonth.localeCompare(b.fromMonth) || a.id.localeCompare(b.id));
+      .sort((a, b) => budgetOrder(a.category) - budgetOrder(b.category) || a.fromMonth.localeCompare(b.fromMonth) || a.id.localeCompare(b.id));
   }
 
   /** As funções de orçamento e de limite devolvem jsonb (a linha): sem .single(). */
@@ -3572,6 +3599,75 @@ export class SupabaseRepository implements RecordsRepository {
   }
 
   // -------------------------------------------------------------------------
+  // Espaço Negócio (D-113): as seis funções da migração 0042 e a leitura de financial_contexts (kind 'negocio')
+  // -------------------------------------------------------------------------
+
+  /** O negócio ativo da pessoa: a RLS só deixa ler quem tem vínculo ativo, e negócio encerrado ninguém lê. */
+  async getBusiness(): Promise<BusinessContext | null> {
+    const { data, error } = await this.db
+      .from('financial_contexts')
+      .select('id, name, created_at')
+      .eq('kind', 'negocio')
+      .is('ended_at', null)
+      .order('created_at')
+      .order('id')
+      .limit(1);
+    if (error) throw repoError(error);
+    const row = (data ?? [])[0] as { id: string; name: string; created_at: string } | undefined;
+    return row ? { id: row.id, name: row.name, createdAt: row.created_at } : null;
+  }
+
+  async createBusiness(key: string, name: string): Promise<BusinessContext> {
+    const { data, error } = await this.db.rpc('create_business', { p_name: name, p_key: key });
+    if (error) throw repoError(error);
+    return toBusiness(data);
+  }
+
+  async renameBusiness(key: string, contextId: string, name: string): Promise<BusinessContext> {
+    const { data, error } = await this.db.rpc('rename_business', { p_context: contextId, p_name: name, p_key: key });
+    if (error) throw repoError(error);
+    return toBusiness(data);
+  }
+
+  async endBusiness(key: string, contextId: string): Promise<void> {
+    const { error } = await this.db.rpc('end_business', { p_context: contextId, p_key: key });
+    if (error) throw repoError(error);
+  }
+
+  async createBusinessWithdrawal(key: string, businessContextId: string, input: BusinessWithdrawalInput): Promise<BusinessWithdrawal> {
+    const { data, error } = await this.db.rpc('create_business_withdrawal', {
+      p_key: key,
+      p_business: businessContextId,
+      p_business_account: input.businessAccountId,
+      p_personal_account: input.personalAccountId,
+      p_amount_cents: input.amountCents,
+      p_occurred_on: input.occurredOn,
+      p_description: input.description,
+    });
+    if (error) throw repoError(error);
+    return toWithdrawal(data);
+  }
+
+  async deleteBusinessWithdrawal(key: string, recordId: string, expectedVersion: number): Promise<BusinessWithdrawal> {
+    const { data, error } = await this.db.rpc('delete_business_withdrawal', { p_key: key, p_record: recordId, p_expected_version: expectedVersion });
+    if (error) throw repoError(error);
+    return toWithdrawal(data);
+  }
+
+  async moveRecord(key: string, recordId: string, expectedVersion: number, targetContextId: string, accountId: string, category: string | null): Promise<FinancialRecord> {
+    const { data, error } = await this.db.rpc('move_record', {
+      p_key: key,
+      p_record: recordId,
+      p_expected_version: expectedVersion,
+      p_target_context: targetContextId,
+      p_account: accountId,
+      p_category: category,
+    });
+    if (error) throw repoError(error);
+    return toRecord(data as RecordRow);
+  }
+
+  // -------------------------------------------------------------------------
   // Excluir a conta (D-058): delete_my_account, da migração 0015
   // -------------------------------------------------------------------------
 
@@ -3948,6 +4044,20 @@ function toInvite(r: InviteRow | null | undefined): FamilyInvite {
 }
 
 /** {context: {id, name, created_at}, role, invited_by?} de create_family e accept_family_invite. */
+/** {context: {id, name, created_at}} de create_business e rename_business. */
+function toBusiness(data: unknown): BusinessContext {
+  const c = (data as { context?: { id?: unknown; name?: unknown; created_at?: unknown } } | null)?.context;
+  if (!c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.created_at !== 'string') throw new RepoError('desconhecido', 'negocio_inconsistente');
+  return { id: c.id, name: c.name, createdAt: c.created_at };
+}
+
+/** {business_record, personal_record} da retirada: os dois lados, ligados um ao outro. */
+function toWithdrawal(data: unknown): BusinessWithdrawal {
+  const r = data as { business_record?: RecordRow | null; personal_record?: RecordRow | null } | null;
+  if (!r || !r.business_record || !r.personal_record) throw new RepoError('desconhecido', 'retirada_inconsistente');
+  return { businessRecord: toRecord(r.business_record), personalRecord: toRecord(r.personal_record) };
+}
+
 function toFamilyJoin(data: unknown): FamilyJoin {
   const r = data as { context?: { id?: unknown; name?: unknown; created_at?: unknown }; role?: unknown; invited_by?: unknown } | null;
   const c = r?.context;

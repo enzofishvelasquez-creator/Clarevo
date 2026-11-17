@@ -96,6 +96,10 @@ export const EXPORT_TEXT = {
   contentPdf:
     'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga. Os investimentos aparecem no fim, também fora de Pago e de Recebido.',
   notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do espaço Pessoal.',
+  /** Espaço Negócio (D-113): quem tem um negócio escolhe o espaço do arquivo. */
+  spaceLabel: 'Espaço',
+  notIncludedBusiness: (name: string): string =>
+    `Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os registros do espaço Negócio, ${name}.`,
   valuesNote: 'O arquivo mostra os valores, mesmo com Ocultar valores ligado.',
   sensitiveNote: 'O arquivo tem dados financeiros. Guarde-o e compartilhe só com quem você escolher.',
   prepare: 'Preparar arquivo',
