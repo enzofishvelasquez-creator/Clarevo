@@ -24,7 +24,7 @@ Para desfazer uma atualização com problema: fazer o revert do PR no GitHub e j
 ## 3. O que precisa de build novo (não vai pelo ar)
 
 - Pacote nativo novo ou atualizado (um módulo novo do Expo, câmera, biometria, notificações, widget).
-- Mudança em `apps/app/app.json`, nos plugins (`apps/app/plugins`), em `widget.config.js` ou nas variáveis que mudam a configuração do app (`CLAREVO_WIDGET`).
+- Mudança em `apps/app/app.json`, em `apps/app/eas.json` (um perfil novo, as opções de envio às lojas), em `apps/app/.gitignore`, nos `scripts` do `package.json` do app, nos plugins (`apps/app/plugins`), em `widget.config.js` ou nas variáveis que mudam a configuração do app (`CLAREVO_WIDGET`). Todos entram na impressão digital do build (`@expo/fingerprint`): mudar um deles faz as atualizações pararem de chegar aos builds instalados até o próximo build (conferido na revisão independente de 17/11/2026).
 - **Nova versão do app** (`version` em `app.json`, o número que as lojas mostram), ícone, tela de abertura, nome e permissões.
 
 Vai pelo ar: telas, textos, regras do núcleo (`packages/core`) e correções do JavaScript do app.

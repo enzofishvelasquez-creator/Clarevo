@@ -53,7 +53,7 @@ export const SCREEN_ERROR_TEXT = {
 
 /** A falha ao carregar a conta (`apps/app/src/app/carregando.tsx`). */
 export const LOAD_ERROR_TEXT = {
-  offline: 'Sem conexão no momento. Confira a internet do aparelho e tente novamente.',
+  offline: 'Sem conexão no momento. Confira a internet do aparelho e tente de novo. Se a internet já voltou, espere um minuto antes de tentar.',
   failed: ERROR_TEXT.carregar_falhou,
   signOut: 'Sair da conta',
   report: FEEDBACK_TEXT.report,

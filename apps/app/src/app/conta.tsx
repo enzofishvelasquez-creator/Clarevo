@@ -145,9 +145,11 @@ export default function ContaScreen() {
     try {
       await signOut('global');
     } catch {
+      // A saída não aconteceu: a marca de "saída pedida" não pode valer para um fim de sessão futuro.
+      signOutIntent.consume();
       setBusy(null);
       setConfirmAll(false);
-      setSecurityMsg({ tone: 'erro', text: 'Não foi possível encerrar as sessões agora. Tente de novo.' });
+      setSecurityMsg({ tone: 'erro', text: 'Não foi possível sair em todos os aparelhos agora. Confira a internet e tente de novo.' });
     }
   };
 

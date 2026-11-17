@@ -155,7 +155,11 @@ export class SupabaseAuth implements AuthService {
     }
   }
 
+  /** Quem ouve a sessão (session.tsx), para avisar o fim quando a saída neste aparelho é feita sem o servidor. */
+  private listeners = new Set<(s: AuthState) => void>();
+
   subscribe(listener: (s: AuthState) => void) {
+    this.listeners.add(listener);
     const { data } = this.client.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') this.setRecovery(true);
       if (event === 'SIGNED_OUT') this.setRecovery(false);
@@ -164,7 +168,10 @@ export class SupabaseAuth implements AuthService {
       // Evita chamar o Supabase dentro do callback (recomendação da biblioteca): agenda a notificação.
       setTimeout(() => listener({ user: session ? toUser(session.user) : null, recovery: this.recovery }), 0);
     });
-    return () => data.subscription.unsubscribe();
+    return () => {
+      this.listeners.delete(listener);
+      data.subscription.unsubscribe();
+    };
   }
 
   async signUp({ displayName, email, password }: { displayName: string; email: string; password: string }) {
@@ -212,7 +219,27 @@ export class SupabaseAuth implements AuthService {
   async signOut(scope: 'local' | 'global' = 'local') {
     this.setRecovery(false);
     // 'local': encerra a sessão neste aparelho e apaga o que ela guardou aqui; 'global': também nos outros aparelhos.
-    await this.client.auth.signOut({ scope });
+    const { error } = await this.client.auth.signOut({ scope });
+    if (!error) return;
+    // Nos outros aparelhos depende do servidor: a tela diz que não foi possível.
+    if (scope === 'global') throw authError(error);
+    // Neste aparelho, sair não depende do servidor. Sem conexão (token vencido), a biblioteca devolve o erro da renovação sem apagar a sessão
+    // guardada nem avisar o fim: apagamos aqui e avisamos quem ouve, para a pessoa sair de verdade (revisão independente, 17/11/2026).
+    await this.forgetStoredSession();
+  }
+
+  /** Apaga a sessão guardada pelo cliente neste aparelho e avisa os ouvintes que a sessão terminou. */
+  private async forgetStoredSession() {
+    const key = sessionStorageKey(this.client);
+    const keys = [key, `${key}-user`, `${key}-code-verifier`];
+    try {
+      if (Platform.OS === 'web') for (const k of keys) globalThis.localStorage?.removeItem(k);
+      else await AsyncStorage.multiRemove(keys);
+    } catch {
+      // Sem armazenamento: o fim avisado abaixo vale enquanto o app estiver aberto.
+    }
+    sessionExpected = false;
+    for (const listener of this.listeners) setTimeout(() => listener({ user: null, recovery: this.recovery }), 0);
   }
 
   async handleLink(link: string) {

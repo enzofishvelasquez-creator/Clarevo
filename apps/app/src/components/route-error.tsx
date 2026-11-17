@@ -1,11 +1,13 @@
 import { SCREEN_ERROR_TEXT, screenFromSegments } from '@clarevo/core';
 import { House, RotateCcw } from 'lucide-react-native';
 import { useSegments, type ErrorBoundaryProps } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import { FeedbackButton } from '@/components/feedback-button';
 import { Button, Txt } from '@/components/ui';
+import { APP_INFO } from '@/lib/app-info';
 import { reportError } from '@/lib/crash-report';
 import { colors, space } from '@/theme/tokens';
 
@@ -22,12 +24,23 @@ import { colors, space } from '@/theme/tokens';
  * então o app recomeça do início: confere a sessão em "carregando" e segue para o Resumo. Nada de `router.replace` daqui: com a navegação
  * desmontada, o pedido iria para fora de qualquer tela de erro e fecharia o app.
  */
+/** Quando o app abriu (o módulo carrega com o layout raiz). */
+const STARTED_AT = Date.now();
+/** Uma falha nos primeiros segundos de uma atualização pelo ar baixada: o app fecha para o expo-updates voltar à versão anterior. */
+const UPDATE_ROLLBACK_MS = 10_000;
+
 export function RouteError({ error, retry }: ErrorBoundaryProps) {
   const segments = useSegments();
   const [screen] = useState(() => screenFromSegments(segments));
 
   useEffect(() => {
     reportError(error, screen);
+    // A falha no primeiro desenho deixaria a tela de abertura na frente desta (o expo-router só a esconde em falhas não tratadas).
+    void SplashScreen.hideAsync().catch(() => {});
+    // Uma atualização pelo ar que falha logo ao abrir: a falha segue como fatal, para o expo-updates voltar à versão que funcionava (com a
+    // tela de erro, ele não perceberia). Só no celular, só com uma atualização baixada e só nos primeiros segundos.
+    const g = globalThis as { ErrorUtils?: { getGlobalHandler?: () => (e: unknown, fatal?: boolean) => void } };
+    if (APP_INFO.native && APP_INFO.embedded === false && Date.now() - STARTED_AT < UPDATE_ROLLBACK_MS) g.ErrorUtils?.getGlobalHandler?.()(error, true);
   }, [error, screen]);
 
   const again = () => {

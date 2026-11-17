@@ -33,7 +33,7 @@ import { router, useLocalSearchParams, type Href } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { AlertCircle, Bell, CalendarClock, Check, ChevronDown, ChevronLeft, ChevronRight, Info, ListChecks, Pencil, Plus, Repeat, ShieldCheck } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, View, findNodeHandle } from 'react-native';
 import Animated, { FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { AccountPicker } from '@/components/account-picker';
@@ -480,17 +480,30 @@ const laterRowMonth = (g: GroupedCommitment): IsoMonth => monthOf(g.type === 'co
 function LaterByMonth({ grouped, month, today }: { grouped: GroupedCommitment[]; month: IsoMonth; today: string }) {
   const [open, setOpen] = useState(false);
   const groups = groupLaterByMonth(grouped, laterRowMonth);
-  const shown = open ? groups.length : laterMonthsShown(groups, month);
+  const firstShown = laterMonthsShown(groups, month);
+  const shown = open ? groups.length : firstShown;
+  // O botão some ao abrir: o foco do leitor de tela vai para o primeiro mês que apareceu, e não se perde (revisão independente, 17/11/2026).
+  const firstNewHeader = useRef<View>(null);
+  useEffect(() => {
+    if (!open || Platform.OS === 'web') return;
+    const t = setTimeout(() => {
+      const node = firstNewHeader.current ? findNodeHandle(firstNewHeader.current) : null;
+      if (node) AccessibilityInfo.setAccessibilityFocus(node);
+    }, 150);
+    return () => clearTimeout(t);
+  }, [open]);
   const hidden = groups.slice(shown);
   const hiddenRows = hidden.reduce((n, g) => n + g.items.length, 0);
   const caption = hidden.length > 0 ? PAYABLES_LATER_TEXT.showMoreCaption(hiddenRows, hidden[hidden.length - 1]!.month) : null;
   return (
     <>
-      {groups.slice(0, shown).map((m) => (
+      {groups.slice(0, shown).map((m, mi) => (
         <Animated.View key={m.month} layout={rowLayout}>
-          <Txt variant="caption" color={colors.textSecondary} style={styles.laterMonth} accessibilityRole="header" aria-level={3}>
-            {m.title}
-          </Txt>
+          <View ref={open && mi === firstShown ? firstNewHeader : undefined} accessible accessibilityRole="header" aria-level={3} accessibilityLabel={m.title}>
+            <Txt variant="caption" color={colors.textSecondary} style={styles.laterMonth}>
+              {m.title}
+            </Txt>
+          </View>
           {m.items.map((g, i) =>
             g.type === 'conta' ? (
               <Animated.View key={g.commitment.id} exiting={rowExit} layout={rowLayout}>

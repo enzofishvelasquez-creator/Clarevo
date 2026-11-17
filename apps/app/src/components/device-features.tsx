@@ -27,6 +27,8 @@ import { colors, radius, space } from '@/theme/tokens';
 const RESCHEDULE_DELAY_MS = 800;
 /** Fora do app por pelo menos 1 minuto: ao voltar, pede a biometria de novo (se ligada). */
 const LOCK_AFTER_MS = 60_000;
+/** Numa tela aberta pelo próprio app (câmera, arquivos, compartilhar, configurações), a trava vem depois de 10 minutos fora. */
+const LOCK_AFTER_EXTERNAL_MS = 10 * 60_000;
 
 /**
  * Recursos do Ciclo A2 montados no layout (fora de state/data.ts):
@@ -237,15 +239,23 @@ function NativeFeatures() {
   });
   useEffect(() => {
     let awaySince: number | null = null;
+    // Ida para uma tela aberta pelo próprio app: conta só depois de um tempo maior (quem compartilha um convite e fica uma hora no outro app
+    // volta com a trava; quem tira uma foto ou escolhe um arquivo, não). Revisão independente, 17/11/2026.
+    let externalSince: number | null = null;
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'background') {
         // A câmera, a galeria, o seletor de arquivos, a folha de compartilhar, as configurações e o pedido de biometria do sistema também
         // deixam o app em segundo plano no Android: essas idas, abertas pelo próprio app, não contam como sair (lib/external-screen.ts).
-        if (!authenticating.current && !externalScreenOpen()) awaySince = Date.now();
+        if (authenticating.current) return;
+        if (externalScreenOpen()) externalSince = Date.now();
+        else awaySince = Date.now();
       } else if (s === 'active') {
         const away = awaySince === null ? 0 : Date.now() - awaySince;
+        const external = externalSince === null ? 0 : Date.now() - externalSince;
         awaySince = null;
-        if (away >= LOCK_AFTER_MS && lockState.current.enabled && lockState.current.userId && !authenticating.current) setLocked(true);
+        externalSince = null;
+        const lock = away >= LOCK_AFTER_MS || external >= LOCK_AFTER_EXTERNAL_MS;
+        if (lock && lockState.current.enabled && lockState.current.userId && !authenticating.current) setLocked(true);
       }
     });
     return () => sub.remove();

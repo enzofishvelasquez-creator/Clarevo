@@ -48,6 +48,17 @@ interface SessionValue extends AuthState {
 
 const SessionContext = createContext<SessionValue | null>(null);
 
+/**
+ * O link que abriu o app é lido uma vez por abertura, por quem o trata (a sessão e o layout). Fica fora dos componentes de propósito (o React
+ * Compiler trataria uma variável do módulo como constante dentro de um efeito).
+ */
+const initialLinkTaken = new Set<string>();
+export function takeInitialLink(who: 'sessao' | 'layout'): boolean {
+  if (initialLinkTaken.has(who)) return false;
+  initialLinkTaken.add(who);
+  return true;
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   if (!auth) return <ConfigMissing />;
   return <SessionProviderInner auth={auth}>{children}</SessionProviderInner>;
@@ -127,13 +138,14 @@ function SessionProviderInner({ auth, children }: { auth: AuthService; children:
     };
   }, [queryClient, auth]);
 
-  // Links de confirmação e recuperação abertos a partir do e-mail.
+  // Links de confirmação e recuperação abertos a partir do e-mail. O link que abriu o app é tratado uma vez por abertura: ao desenhar o
+  // layout de novo (a tela de erro, "Tentar de novo"), trocar o mesmo código outra vez falharia e desfaria a recuperação de senha.
   useEffect(() => {
     const handle = (url: string | null) => {
       if (!url) return;
       auth.handleLink(url).then((r) => r === 'invalido' && setLinkProblem(true));
     };
-    Linking.getInitialURL().then(handle);
+    if (takeInitialLink('sessao')) Linking.getInitialURL().then(handle);
     const sub = Linking.addEventListener('url', (e) => handle(e.url));
     return () => sub.remove();
   }, [auth]);
@@ -146,8 +158,11 @@ function SessionProviderInner({ auth, children }: { auth: AuthService; children:
     // Sair da conta apaga do aparelho as preferências e memórias da pessoa e cancela os lembretes (A9, aprovada em 04/11/2026), como ao
     // excluir a conta. A sessão que termina sozinha (por tempo) não passa por aqui, e a saída depois de trocar a senha pede para manter:
     // o que está guardado fica para a mesma pessoa entrar de novo.
-    if (state.user && !options?.keepDevice) await forgetDevice(state.user.id);
+    const userId = state.user?.id;
+    // Primeiro sair (a saída nos outros aparelhos pode falhar e a tela avisa); só depois esquecer o aparelho, para uma saída que não
+    // aconteceu nunca apagar a trava da biometria nem os lembretes de quem continua na conta.
     await auth.signOut(scope);
+    if (userId && !options?.keepDevice) await forgetDevice(userId);
     queryClient.clear();
     clearReceiptMemory();
   }, [queryClient, auth, state.user]);
