@@ -15513,6 +15513,20 @@ setInterval(async () => {
     t = await body();
     ok('D-105 Aprender: "Marcação a mercado" abre com o exemplo fictício, as hipóteses e as fontes', new URL(p.url()).pathname === '/explicacao/marcacao-a-mercado' && t.includes('Marcação a mercado') && t.includes('R$ 970,00') && t.includes('Exemplo fictício') && /CVM|Portal do Investidor/.test(t), t.slice(0, 600));
     await atWidths(async (w) => { await layoutChecks(`D-105 tema Marcação a mercado ${w}px`); if (w === 390) await shot('808_d105_marcacao_a_mercado'); });
+    // ---- 11. Computador (D-098): as Análises à vista sem rolar no Resumo (o cartão de atalhos abre a coluna da direita) e em Movimentos ----
+    await p.setViewportSize({ width: 1280, height: 860 }); await p.waitForTimeout(500);
+    await demoHome(); await p.waitForTimeout(600);
+    const d5Desk = () => p.evaluate(() => {
+      const b = [...document.querySelectorAll('[role=button]')].find((e) => e.getBoundingClientRect().width > 0 && /^Análises do mês[,.] /.test(e.getAttribute('aria-label') || ''));
+      return b ? { top: Math.round(b.getBoundingClientRect().top), bottom: Math.round(b.getBoundingClientRect().bottom), left: Math.round(b.getBoundingClientRect().left), h: innerHeight, w: innerWidth } : null;
+    });
+    const d5DeskResumo = await d5Desk();
+    ok('D-105 Computador, Resumo: "Análises do mês" à vista sem rolar, no alto da coluna da direita', d5DeskResumo !== null && d5DeskResumo.bottom <= d5DeskResumo.h && d5DeskResumo.left > d5DeskResumo.w / 2, JSON.stringify(d5DeskResumo));
+    await p.getByRole('navigation').getByRole('link', { name: 'Movimentos do mês', exact: true }).filter({ visible: true }).first().click(); await waitText('Organizar'); await p.waitForTimeout(600);
+    const d5DeskMov = await d5Desk();
+    ok('D-105 Computador, Movimentos: a pílula "Análises" na faixa azul, no topo', d5DeskMov !== null && d5DeskMov.top < 120, JSON.stringify(d5DeskMov));
+    await layoutChecks('D-105 Computador, Movimentos com a pílula Análises 1280px'); await shot('810_d105_computador_movimentos');
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(500);
     ok('D-105: nada vai à rede na demonstração', writes.length === d5Writes0, writes.slice(d5Writes0).join(' | '));
   }
 
@@ -15639,6 +15653,9 @@ setInterval(async () => {
       ['Multa e juros', 'calcular/[slug]', { slug: 'multa-e-juros' }, 'Multa e juros', '714_escuro_multa_e_juros'],
       // "A vencer" e "Vence hoje" ficavam ilegíveis no escuro (revisão independente de 12/11/2026).
       ['conta a pagar', 'a-pagar/[id]/index', { id: dkIds.com }, 'Internet', '715_escuro_conta_a_pagar'],
+      // D-105: o Calendário do mês e a lista de rever metas.
+      ['Calendário', 'calendario', {}, 'Previsto em contas e faturas', '716_escuro_calendario'],
+      ['Rever metas', 'meta/rever', {}, 'Três perguntas para cada meta', '717_escuro_rever_metas'],
     ];
     for (const [name, route, params, text, shotName] of DK_ROUTES) { await dkNav(route, params); await dkWait(text).catch(() => {}); await dkScan(name, shotName); }
     ok(`Modo escuro, ${dkScreens} telas: o fundo de cada tela é escuro (azul-marinho, luminância abaixo de 0,05)`, dkScreens >= 15 && dkFound.fundo.length === 0, dkFound.fundo.slice(0, 4).join(' | '));

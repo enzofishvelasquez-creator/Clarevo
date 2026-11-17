@@ -219,12 +219,14 @@ export default function ResumoScreen() {
                     .map((r, i, arr) => <RecordRow key={r.id} record={r} last={i === arr.length - 1} onPress={() => router.push(`/registro/${r.id}`)} />)
                 )}
               </Card>
-              {/* Atalhos (D-105): o calendário do mês e, no Pessoal, Investir em um toque. Sem título: os blocos aprovados seguem na ordem. */}
-              <SummaryShortcuts contextId={contextId} month={month} currentMonth={currentMonth} personal={kind === 'pessoal'} />
+              {/* Atalhos (D-105): as Análises e o calendário do mês e, no Pessoal, Investir em um toque. Sem título: os blocos aprovados seguem
+                  na ordem. No computador, o cartão abre a coluna da direita, à vista sem rolar. */}
+              {wide ? null : <SummaryShortcuts contextId={contextId} month={month} currentMonth={currentMonth} personal={kind === 'pessoal'} />}
           </>
 
           </View>
           <View style={wide ? styles.sideCol : styles.stack}>
+          {wide ? <SummaryShortcuts contextId={contextId} month={month} currentMonth={currentMonth} personal={kind === 'pessoal'} /> : null}
           {wide ? <GoalsPanel contextId={contextId} /> : null}
           {wide && kind === 'pessoal' ? <BudgetPanel contextId={contextId} month={month} /> : null}
           <LearnCard />
