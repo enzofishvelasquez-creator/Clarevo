@@ -2276,7 +2276,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               }}
               onRegister={() => {
                 registeringInvestments.current = new Set((investments.data ?? []).map((i) => i.id));
-                router.push('/investimento/novo');
+                // origem=registro: depois de criar, o investimento volta para cá (como conta a pagar, cartão e banco ou carteira).
+                router.push({ pathname: '/investimento/novo', params: { origem: 'registro' } });
               }}
               error={incomeError}
               removing={mode.type === 'editar' && (mode.record.investmentId ?? null) !== null}

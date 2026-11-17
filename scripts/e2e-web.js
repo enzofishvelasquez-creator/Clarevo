@@ -14852,11 +14852,16 @@ setInterval(async () => {
     await field('Descrição').fill('Dividendos'); await field('Valor em reais').fill('12,34');
     await p.getByRole('switch', { name: 'Rendimento de investimento' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
     await btn('Cadastrar investimento').click(); await waitText('Novo investimento');
+    ok('D-107 "Cadastrar investimento" abre o cadastro com a origem (?origem=registro) e diz que volta para o lançamento',
+      urlPath() === '/investimento/novo' && new URL(p.url()).searchParams.get('origem') === 'registro' &&
+      (await body()).includes('Depois de salvar, você volta para o lançamento que estava anotando, com o que já preencheu.'));
     await field('Nome').fill('Ações da corretora'); await radio('Ações').click(); await field('Quanto você aplicou até hoje?').fill('1000');
-    await btn('Criar investimento').click(); await p.waitForTimeout(1200);
-    await btn('Voltar').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+    // Revisão de 17/11/2026: depois de criar, volta sozinho ao recebimento (antes, caía no detalhe do investimento).
+    await btn('Criar investimento').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
     await waitUntil(async () => (await visibleCount('radio', 'Ações da corretora')) === 1 && (await lcRadioChecked('Ações da corretora')), 5000);
-    ok('D-107 de volta ao recebimento: descrição e valor guardados e o investimento novo já escolhido', (await field('Descrição').inputValue()) === 'Dividendos' && (await field('Valor em reais').inputValue()) === '12,34' && (await lcRadioChecked('Ações da corretora')));
+    ok('D-107 de volta ao recebimento sozinho, sem passar pelo detalhe do investimento: descrição e valor guardados e o investimento novo já escolhido',
+      urlPath() === '/registro/novo' && (await h1Name()) === 'Registrar recebimento' &&
+      (await field('Descrição').inputValue()) === 'Dividendos' && (await field('Valor em reais').inputValue()) === '12,34' && (await lcRadioChecked('Ações da corretora')));
     await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await p.waitForTimeout(500);
     ok('D-107 o rendimento ficou no investimento novo, e o recebimento mostra "Rendimento de Ações da corretora"', (await lcState()).income['Ações da corretora'] === 1234 && (await body()).includes('Rendimento de\nAções da corretora'));
     await atWidths(async (w) => { await layoutChecks(`D-107 recebimento com rendimento de investimento ${w}px`); if (w === 390) await shot('664_recebimento_rendimento'); });

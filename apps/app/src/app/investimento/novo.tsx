@@ -11,13 +11,15 @@ import { colors } from '@/theme/tokens';
 /**
  * Novo investimento (D-093), sempre no Pessoal. D-103 (item 5): "?modelo=reserva|titulo|banco|outro", vindo dos modelos de registro da
  * tela vazia da aba, preenche parte do formulário (investmentTemplatePreset); outro valor ou nenhum abre o formulário em branco.
+ * "?origem=registro" (D-107): veio de "Cadastrar investimento" no recebimento e, depois de criar, volta para lá.
  */
 export default function NovoInvestimentoScreen() {
   const space = useSpace();
   const contextId = space.data?.personalContextId;
-  const { modelo } = useLocalSearchParams<{ modelo?: string | string[] }>();
+  const { modelo, origem } = useLocalSearchParams<{ modelo?: string | string[]; origem?: string | string[] }>();
   const template = investmentTemplateFrom(modelo);
-  if (contextId) return <InvestmentForm contextId={contextId} investment={null} preset={template ? investmentTemplatePreset(template) : null} />;
+  if (contextId)
+    return <InvestmentForm contextId={contextId} investment={null} preset={template ? investmentTemplatePreset(template) : null} backToRecord={origem === 'registro'} />;
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={INVESTMENT_TEXT.form.newTitle} right={<ContextPill label="Salvando em Pessoal" fixed />} />
