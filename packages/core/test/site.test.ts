@@ -2304,12 +2304,16 @@ describe('site público: indicadores oficiais, páginas de mercado e resumo sema
     expect(painel).not.toMatch(/<form\b/);
   });
 
-  it('sem retrato (o repositório hoje), as páginas dizem que ainda não há números salvos, e o --final recusa', () => {
-    expect(repo.retrato).toEqual({ consultadoEm: null, valores: {} });
-    const painel = h(repo, 'indicadores/index.html');
+  it('sem retrato, as páginas dizem que ainda não há números salvos, e o --final recusa', () => {
+    // O repositório tem retrato desde 18/11/2026; o caso vazio é montado aqui.
+    const semRetrato = gerarSite({ retrato: { consultadoEm: null, valores: {} } });
+    expect(semRetrato.retrato).toEqual({ consultadoEm: null, valores: {} });
+    const painel = h(semRetrato, 'indicadores/index.html');
     expect(painel).toContain(esc(INDICADORES_TEXT.semRetrato));
     expect(painel).toContain('<span data-campo="numero">Sem número</span>');
-    expect(repo.problemasFinais.join('\n')).toContain('indicadores sem retrato');
+    expect(semRetrato.problemasFinais.join('\n')).toContain('indicadores sem retrato');
+    // O retrato gravado no repositório passa na leitura, com os cinco números.
+    expect(Object.keys(repo.retrato.valores).sort()).toEqual(['cdi', 'ipca', 'poupanca', 'ptax', 'selic']);
     // Com o retrato de teste e tudo preenchido, o retrato não é motivo de recusa; antigo ou incompleto, é.
     expect(comRetrato.problemasFinais.filter((p) => p.includes('retrato'))).toEqual([]);
     const antigo = gerarSite({ dados: PREENCHIDOS, referencia: '2026-11-30' });
