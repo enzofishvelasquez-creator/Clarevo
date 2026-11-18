@@ -138,8 +138,8 @@ describe('totais e leituras por mês', () => {
     const rows = exportRows(records, ctx);
     expect(rows.find((r) => r.date === '2026-10-30')!.month).toBe('2026-11');
     const csv = buildRecordsCsv(rows).split('\r\n');
-    expect(csv).toContain('30/10/2026;Recebimento;Salário;Salário;6000,00;Conta principal;Anotado;11/2026');
-    expect(csv).toContain('10/10/2026;Recebimento;Freela;Renda extra;200,00;Conta principal;Anotado;10/2026');
+    expect(csv).toContain('30/10/2026;Recebimento;Salário;Salário;;6000,00;Conta principal;Anotado;11/2026');
+    expect(csv).toContain('10/10/2026;Recebimento;Freela;Renda extra;;200,00;Conta principal;Anotado;10/2026');
     expect(exportMonths('tudo', '2026-11-09', records)).toEqual(['2026-10', '2026-11']);
     const report = buildExportReport({
       contextId: 'c1', period: 'tudo', today: '2026-11-09', records, purchases: [], accounts: [], cards: [], commitments: new Map(), invoices: [],
