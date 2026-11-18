@@ -388,6 +388,14 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .calc-cenario{display:grid;gap:.25rem;padding-top:.5rem;border-top:1px solid var(--linha)}
 .calc-exemplo-resultado{font-variant-numeric:tabular-nums}
 .cartao-calculadoras{max-width:42rem}
+.grade-atalhos .cartao-calculadoras{max-width:none}
+/* O endereço do feed RSS com "Copiar o endereço" (D-115): o campo só de leitura e o botão lado a lado; no celular, um embaixo do outro. */
+.copiar{margin:1.25rem 0 1rem;display:grid;gap:.4rem}
+.copiar label{font-weight:800}
+.copiar-linha{display:flex;flex-wrap:wrap;gap:.6rem}
+.copiar input{flex:1 1 16rem;min-width:0;min-height:52px;padding:0 1rem;border:2px solid var(--contorno);border-radius:14px;background:var(--superficie);color:var(--texto);font:inherit;font-size:1rem}
+.copiar input:focus-visible{outline:3px solid var(--foco);outline-offset:2px;border-color:var(--foco)}
+.copiar-estado{margin:0;min-height:1.5em;color:var(--texto-2);font-size:.9375rem}
 .so-leitor{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* Formulários (contato para empresas e Novidades por e-mail): prontos e desligados; o envio é um POST comum, sem JavaScript */
@@ -504,6 +512,13 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 /* Indicadores oficiais e páginas de mercado (D-106): o número em destaque, em uma cor só (nada de verde para alta ou vermelho para queda),
    com a unidade, a data e a fonte por perto. */
 .indicadores-estado{margin:0 0 1rem;color:var(--texto-2);font-size:.9375rem}
+/* "Indicadores de hoje" na página inicial (D-115): os cinco cartões do painel, mais compactos, numa linha no computador; no tablet, o
+   primeiro ocupa a linha toda e os outros ficam dois a dois (nenhum sozinho); no celular, um embaixo do outro. */
+.indicadores-inicio .temas{grid-template-columns:minmax(0,1fr)}
+@media (min-width:40rem){.indicadores-inicio .temas{grid-template-columns:repeat(2,minmax(0,1fr))}.indicadores-inicio .temas>:first-child{grid-column:span 2}}
+@media (min-width:64rem){.indicadores-inicio .temas{grid-template-columns:repeat(5,minmax(0,1fr))}.indicadores-inicio .temas>:first-child{grid-column:auto}}
+.indicadores-inicio .indicador-numero{font-size:1.5rem}
+.indicadores-inicio+.nota{margin-top:1rem}
 .cartao.indicador{text-decoration:none}
 .cartao.indicador .titulo-cartao{text-decoration:underline;text-underline-offset:.18em}
 .indicador-numero{display:block;margin:.35rem 0 .1rem;color:var(--texto);font-weight:800;font-size:1.75rem;line-height:1.2;font-variant-numeric:tabular-nums}

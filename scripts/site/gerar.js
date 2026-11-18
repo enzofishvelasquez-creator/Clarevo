@@ -29,7 +29,7 @@ const { nucleo, pacoteDoWorker } = require('./nucleo');
 const { lerRetrato, problemasDoRetrato } = require('./indicadores');
 const { paginasIndicadores, SCRIPT_DO_PAINEL } = require('./paginas/indicadores');
 const { paginasNoticias, lerEdicoes } = require('./paginas/noticias');
-const { paginasNovidades } = require('./paginas/novidades');
+const { paginasNovidades, SCRIPT_DE_COPIAR } = require('./paginas/novidades');
 const { paginasAjuda, conferirCobertura } = require('./paginas/ajuda');
 const { paginaSeguranca } = require('./paginas/seguranca');
 const { paginaPlanos } = require('./paginas/planos');
@@ -43,7 +43,7 @@ const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê est
 # script-src e connect-src 'self' valem só para os scripts do próprio site: a busca da Ajuda (ajuda/busca.js, que lê ajuda/indice.json), as
 # calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada), o painel de indicadores (indicadores/painel.js,
 # que pergunta uma vez ao próprio site, /api/indicadores; quem consulta o Banco Central é o _worker.js, nunca o navegador) e os vídeos
-# (js/videos.js, que não pede nada a ninguém). form-action 'self' vale para os formulários de contato e de novidades, que enviam só para o
+# (js/videos.js, que não pede nada a ninguém) e o botão de copiar o endereço do feed (js/copiar.js). form-action 'self' vale para os formulários de contato e de novidades, que enviam só para o
 # próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
 # Referrer-Policy: same-origin (e não no-referrer): com no-referrer o navegador manda "Origin: null" nos formulários, e o worker recusa o valor null.
 # Nenhum outro site recebe o endereço da página (a política só manda o referenciador para o próprio site).
@@ -238,6 +238,8 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   arquivos.set(SCRIPT_DO_PAINEL, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DO_PAINEL), 'utf8'));
   // Os vídeos de uso do app (D-115): toca o vídeo que aparece na tela, pausa o que sai e põe o botão de pausar e tocar em cada um.
   arquivos.set(SCRIPT_DOS_VIDEOS, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DOS_VIDEOS), 'utf8'));
+  // O botão "Copiar o endereço" da página do feed RSS (D-115).
+  arquivos.set(SCRIPT_DE_COPIAR, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DE_COPIAR), 'utf8'));
   // O kit de imprensa: SVG de docs/marca (sem mudança), os PNG que scripts/gerar-marca-imprensa.js desenha deles e as capturas originais.
   const imprensa = arquivosDaImprensa();
   avisos.push(...imprensa.avisos);

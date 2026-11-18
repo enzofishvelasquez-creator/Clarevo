@@ -13,6 +13,7 @@ const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
 const { ANCORA_DOS_PLANOS } = require('./planos');
+const { secaoIndicadoresDeHoje, SCRIPT_DO_PAINEL } = require('./indicadores');
 
 const ARQUIVO = 'index.html';
 /** A mensagem central (Manual v2.2, seção 19) e a frase de apoio: as mesmas de `docs/lojas/ficha.md` e das imagens de compartilhamento. */
@@ -52,7 +53,7 @@ ${cartoes}
 ${aindaNao}<p class="nota">${esc(PLANOS.texto.plansNote)} Depois do teste, sem assinatura, a conta fica só para ver e exportar: os seus dados continuam guardados. Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u('ajuda/conta.html')}#guia-assinatura">Ajuda</a>.</p>`;
 }
 
-function paginaInicial({ valores, img, videos }) {
+function paginaInicial({ valores, img, videos, retrato }) {
   const u = (d) => rel(ARQUIVO, d);
   const temas = catalogo().publicados.filter((t) => ['organizar', 'juros', 'tempo'].includes(t.section)).length;
   const calculadoras = catalogo().CALCULADORAS.length;
@@ -121,6 +122,8 @@ ${mini}
 <p class="acoes"><a class="botao botao-principal" href="${u('app/index.html')}">Ver o app por dentro</a></p>`,
       'telas',
     ),
+    // Os indicadores oficiais (D-106) também na página inicial (D-115), com o mesmo retrato e o mesmo script do painel.
+    secao(secaoIndicadoresDeHoje(ARQUIVO, retrato), 'indicadores'),
     secao(
       `<h2 id="para-quem">Para quem é</h2>
 <div class="grade">
@@ -196,7 +199,7 @@ ${mini}
     fonte,
     valores,
     jsonld: [organizacao],
-    scripts: [SCRIPT_DOS_VIDEOS],
+    scripts: [SCRIPT_DOS_VIDEOS, SCRIPT_DO_PAINEL],
     // A capa do vídeo do Resumo é a primeira imagem grande da página: o navegador pede logo no começo (D-115).
     cabecalho: `<link rel="preload" as="image" href="${u(img['video-resumo-do-mes'].caminho)}" fetchpriority="high">`,
   });

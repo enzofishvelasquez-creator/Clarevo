@@ -21,10 +21,15 @@ const { lerPosts, lerCabecalho } = require('../conteudo');
 const { SITE_SRC } = require('../config');
 const { arquivoDoTema } = require('./aprender');
 const { blocoDaNewsletterEmNovidades } = require('./formularios');
+const { cartaoDosIndicadores } = require('./indicadores');
 
 const PASTA_POSTS = path.join(SITE_SRC, 'novidades');
 const ARQUIVO_INDICE = 'novidades/index.html';
 const ARQUIVO_FEED = 'novidades/feed.xml';
+/** A página que explica o RSS e mostra o endereço do feed (D-115): o botão "Feed RSS" leva a ela, e não ao XML cru. */
+const ARQUIVO_RSS = 'novidades/rss.html';
+/** O script do botão "Copiar o endereço" (`site-src/js/copiar.js`). */
+const SCRIPT_DE_COPIAR = 'js/copiar.js';
 
 /** O feed só existe com domínio (feedRss): sem ele, não há link para ele nas páginas. */
 const linkDoFeed = (arquivo, valores) =>
@@ -239,7 +244,7 @@ function paginaIndice(posts, { valores }) {
 <p class="lead">Textos curtos da Equipe Clarevo, com data e fonte. Só publicamos o que já existe e pode ser conferido.</p>
 <div class="acoes">
 <a class="botao botao-principal" href="${rel(arquivo, 'novidades/como-escrevemos.html')}">Como escrevemos</a>
-${dominioDe(valores) ? `<a class="botao botao-suave" href="${rel(arquivo, ARQUIVO_FEED)}">Feed RSS</a>\n` : ''}</div>`;
+${dominioDe(valores) ? `<a class="botao botao-suave" href="${rel(arquivo, ARQUIVO_RSS)}">Feed RSS</a>\n` : ''}</div>`;
   const corpo = bloco(
     `<h2 id="textos">Textos publicados</h2>
 <ul class="posts">
@@ -247,12 +252,14 @@ ${cartoes}
 </ul>`,
     { rotulo: 'textos' },
   );
+  // Os indicadores oficiais (D-106) também a partir das Novidades (D-115: o Enzo não achava as informações de mercado).
+  const indicadores = bloco(cartaoDosIndicadores(arquivo), { rotulo: null });
   const pg = montarPagina({
     arquivo,
     titulo: 'Novidades',
     descricao: 'Textos curtos da Equipe Clarevo sobre o app, a empresa como benefício e educação financeira, cada um com data e fontes.',
     capa,
-    corpo: [corpo, blocoDaNewsletterEmNovidades(valores, arquivo)].filter(Boolean).join('\n'),
+    corpo: [corpo, indicadores, blocoDaNewsletterEmNovidades(valores, arquivo)].filter(Boolean).join('\n'),
     fonte: capa,
     valores,
     classeCapa: 'capa-simples',
@@ -300,6 +307,53 @@ ${itens}
 `;
 }
 
+/** O endereço completo do feed, com o mesmo domínio e o mesmo caminho que o próprio feed usa (`null` sem domínio). */
+const enderecoDoFeed = (valores) => urlDoSite(valores, ARQUIVO_FEED);
+
+/**
+ * "Acompanhar as Novidades por RSS" (D-115): o que é RSS em poucas frases, o endereço do feed num campo só de leitura com "Copiar o
+ * endereço" (o botão aparece só com JavaScript, pelo script do próprio site, `js/copiar.js`) e o link para o arquivo do feed. Existe só
+ * com domínio, como o feed. O botão "Feed RSS" das Novidades leva para cá: aberto direto no navegador, o XML aparece sem formatação (a
+ * política de segurança não deixa o navegador aplicar o estilo do visualizador de XML).
+ */
+function paginaRss({ valores }) {
+  const endereco = enderecoDoFeed(valores);
+  if (!endereco) return null;
+  const arquivo = ARQUIVO_RSS;
+  const capa = `<p class="migalha"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Novidades</a></p>
+<h1>Acompanhar as Novidades por RSS</h1>
+<p class="lead">Receba os textos novos da Equipe Clarevo no seu leitor de RSS, sem cadastro.</p>`;
+  const corpo = colunaTexto(
+    `<p>RSS é um jeito de acompanhar sites sem precisar visitar cada um. Você escolhe um leitor de RSS, um aplicativo ou site feito para isso, cola nele o endereço do feed, e ele mostra cada texto novo com o título, a data e o resumo.</p>
+<p>Para acompanhar as Novidades da Clarevo, copie o endereço abaixo e cole no seu leitor. Não precisa de conta nem de e-mail.</p>
+<div class="copiar">
+<label for="rss-endereco">Endereço do feed das Novidades</label>
+<div class="copiar-linha">
+<input id="rss-endereco" type="text" readonly value="${esc(endereco)}" spellcheck="false" autocomplete="off">
+<button type="button" class="botao botao-principal" data-copiar="rss-endereco" data-estado="rss-estado" hidden>Copiar o endereço</button>
+</div>
+<p class="copiar-estado" id="rss-estado" role="status"></p>
+</div>
+<p class="acoes"><a class="botao botao-suave" href="${rel(arquivo, ARQUIVO_FEED)}">Abrir o arquivo do feed</a></p>
+<p class="nota">O arquivo do feed é feito para o leitor de RSS: aberto direto no navegador, ele aparece como texto, sem formatação.</p>
+<p class="voltar"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Voltar para Novidades</a></p>`,
+    'texto',
+  );
+  const pg = montarPagina({
+    arquivo,
+    titulo: 'Acompanhar as Novidades por RSS',
+    descricao: 'O endereço do feed RSS das Novidades da Clarevo, para copiar e colar no seu leitor de RSS, e o que é RSS em poucas frases.',
+    capa,
+    corpo,
+    fonte: capa,
+    valores,
+    classeCapa: 'capa-simples',
+    scripts: [SCRIPT_DE_COPIAR],
+    cabecalho: linkDoFeed(arquivo, valores),
+  });
+  return { arquivo, ...pg };
+}
+
 /** "Como escrevemos": as regras editoriais, de `site-src/paginas/como-escrevemos.md`. */
 function paginaComoEscrevemos({ valores }) {
   const arquivo = 'novidades/como-escrevemos.html';
@@ -326,9 +380,9 @@ function paginaComoEscrevemos({ valores }) {
 /** `ctx.referencia`: a data de hoje (ou a de `--referencia`), para recusar post com data futura. */
 function paginasNovidades(ctx) {
   const { posts, problemas } = lerPosts(ctx.pastaDePosts || PASTA_POSTS, { referencia: ctx.referencia });
-  const paginas = [paginaIndice(posts, ctx), paginaComoEscrevemos(ctx), ...posts.map((p) => paginaDoPost(p, ctx))];
+  const paginas = [paginaIndice(posts, ctx), paginaComoEscrevemos(ctx), paginaRss(ctx), ...posts.map((p) => paginaDoPost(p, ctx))].filter(Boolean);
   const avisos = [...problemas, ...paginas.flatMap((p) => p.avisos || [])];
   return { paginas, posts, feed: feedRss(posts, ctx.valores), avisos };
 }
 
-module.exports = { paginasNovidades, feedRss, campoDoTema };
+module.exports = { paginasNovidades, feedRss, campoDoTema, SCRIPT_DE_COPIAR, ARQUIVO_RSS };

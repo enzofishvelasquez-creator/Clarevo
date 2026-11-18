@@ -26,6 +26,7 @@
 <link rel="preload" as="image" href="imagens/video-resumo-do-mes.30ce93c72a.png" fetchpriority="high">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Clarevo","description":"Cuidar da vida financeira faz parte de cuidar de você. A Clarevo ajuda a organizar o mês e acompanhar decisões financeiras pessoais e familiares, respeitando sua realidade. Mais clareza para decidir.","legalName":"CLAREVO INOVA SIMPLES (I.S.)","url":"https://clarevo.app.br/","logo":"https://clarevo.app.br/marca/icone-app.png"}</script>
 <script src="js/videos.js" defer></script>
+<script src="indicadores/painel.js" defer></script>
 </head>
 <body>
 <a class="pular" href="#conteudo">Pular para o conteúdo</a>
@@ -128,7 +129,25 @@
 <p class="acoes"><a class="botao botao-principal" href="app/index.html">Ver o app por dentro</a></p>
 </div>
 </section>
-<section class="bloco" aria-labelledby="para-quem">
+<section class="bloco" aria-labelledby="indicadores">
+<div class="miolo">
+<h2 id="indicadores">Indicadores de hoje</h2>
+<p class="lead-bloco">Os números oficiais que aparecem nas contas do dia a dia e nos investimentos, com a data de cada um.</p>
+<div class="indicadores-inicio" data-painel data-consultado="2026-11-18T14:38:47.670Z">
+<p class="indicadores-estado"><span data-campo="hora">Retrato de 18/11/2026 às 11:38, horário de Brasília.</span> Fonte: Banco Central do Brasil.</p>
+<ul class="temas">
+<li><a class="cartao indicador" href="indicadores/selic-hoje.html" data-indicador="selic"><span class="titulo-cartao">Selic (meta)</span><span class="indicador-numero"><span data-campo="numero">13,75%</span> <span class="indicador-unidade" data-campo="unidade">ao ano</span></span><span class="tema-meta"><span data-campo="data">Meta em vigor em 18/11/2026</span></span><span class="tema-sub" data-campo="extra" hidden></span></a></li>
+<li><a class="cartao indicador" href="indicadores/cdi-hoje.html" data-indicador="cdi"><span class="titulo-cartao">CDI</span><span class="indicador-numero"><span data-campo="numero">13,65%</span> <span class="indicador-unidade" data-campo="unidade">ao ano</span></span><span class="tema-meta"><span data-campo="data">Taxa de 17/11/2026, em 252 dias úteis</span></span><span class="tema-sub" data-campo="extra" hidden></span></a></li>
+<li><a class="cartao indicador" href="indicadores/ipca-12-meses.html" data-indicador="ipca"><span class="titulo-cartao">IPCA em 12 meses</span><span class="indicador-numero"><span data-campo="numero">4,63%</span> <span class="indicador-unidade" data-campo="unidade">em 12 meses</span></span><span class="tema-meta"><span data-campo="data">Acumulado de novembro de 2025 a outubro de 2026</span></span><span class="tema-sub" data-campo="extra">Outubro de 2026: 0,14% no mês</span></a></li>
+<li><a class="cartao indicador" href="indicadores/rendimento-da-poupanca.html" data-indicador="poupanca"><span class="titulo-cartao">Rendimento da poupança</span><span class="indicador-numero"><span data-campo="numero">0,6701%</span> <span class="indicador-unidade" data-campo="unidade">no mês</span></span><span class="tema-meta"><span data-campo="data">De 17/11/2026 a 17/12/2026, para depósitos com aniversário no dia 17</span></span><span class="tema-sub" data-campo="extra" hidden></span></a></li>
+<li><a class="cartao indicador" href="indicadores/dolar-ptax-hoje.html" data-indicador="ptax"><span class="titulo-cartao">Dólar PTAX (Banco Central)</span><span class="indicador-numero"><span data-campo="numero">R$ 5,7851</span> <span class="indicador-unidade" data-campo="unidade">por dólar, na venda</span></span><span class="tema-meta"><span data-campo="data">Fechamento de 17/11/2026</span></span><span class="tema-sub" data-campo="extra" hidden></span></a></li>
+</ul>
+</div>
+<p class="nota">Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.</p>
+<p class="acoes"><a class="botao botao-principal" href="indicadores/index.html">Ver os indicadores e o glossário</a></p>
+</div>
+</section>
+<section class="bloco bloco-alt" aria-labelledby="para-quem">
 <div class="miolo">
 <h2 id="para-quem">Para quem é</h2>
 <div class="grade">
@@ -150,7 +169,7 @@
 </div>
 </div>
 </section>
-<section class="bloco bloco-alt" aria-labelledby="planos">
+<section class="bloco" aria-labelledby="planos">
 <div class="miolo">
 <h2 id="planos">Planos</h2>
 <div class="grade">
@@ -171,7 +190,7 @@
 <p class="nota">Os dois planos têm tudo o que a Clarevo oferece. Toda conta começa com 14 dias grátis, sem cartão. Cancele quando quiser. Depois do teste, sem assinatura, a conta fica só para ver e exportar: os seus dados continuam guardados. Os detalhes estão nos <a href="termos.html">Termos de uso</a> e na <a href="ajuda/conta.html#guia-assinatura">Ajuda</a>.</p>
 </div>
 </section>
-<section class="bloco" aria-labelledby="empresa-nao-ve">
+<section class="bloco bloco-alt" aria-labelledby="empresa-nao-ve">
 <div class="miolo">
 <div class="destaque">
 <h2 id="empresa-nao-ve">A empresa nunca vê suas finanças</h2>
@@ -181,7 +200,7 @@
 </div>
 </div>
 </section>
-<section class="bloco bloco-alt" aria-labelledby="mais">
+<section class="bloco" aria-labelledby="mais">
 <div class="miolo">
 <h2 id="mais">Aprender, calcular, ficar por dentro e tirar dúvidas</h2>
 <div class="grade grade-3">
@@ -194,7 +213,7 @@
 </div>
 </div>
 </section>
-<section class="bloco" aria-labelledby="dados">
+<section class="bloco bloco-alt" aria-labelledby="dados">
 <div class="miolo">
 <h2 id="dados">Seus dados</h2>
 <p>Sem anúncios, sem venda de dados e sem rastreamento para publicidade. A conexão é protegida. Você exclui a sua conta e os seus dados quando quiser, dentro do app, em Conta. Se não conseguir entrar no app, peça pela página <a href="excluir-conta.html">Excluir conta</a>. Os detalhes estão na <a href="privacidade.html">Política de privacidade</a>.</p>

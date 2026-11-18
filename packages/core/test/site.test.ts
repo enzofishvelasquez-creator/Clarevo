@@ -307,7 +307,10 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
       const calculadora = noCalc && /^\s*type="module"\s+src="calculadora\.js"\s*$/.test(m[1]!);
       const painel = noPainel && /^\s*src="painel\.js"\s+defer\s*$/.test(m[1]!);
       const videos = comVideos && /^\s*src="(\.\.\/)?js\/videos\.js"\s+defer\s*$/.test(m[1]!);
-      expect(ld || busca || calculadora || painel || videos, `${nome}: script não permitido: ${m[0]}`).toBe(true);
+      // D-115: "Indicadores de hoje" na página inicial usa o script do painel; a página do feed RSS, o botão de copiar o endereço.
+      const painelNoInicio = nome === 'index.html' && /^\s*src="indicadores\/painel\.js"\s+defer\s*$/.test(m[1]!);
+      const copiar = nome === 'novidades/rss.html' && /^\s*src="\.\.\/js\/copiar\.js"\s+defer\s*$/.test(m[1]!);
+      expect(ld || busca || calculadora || painel || videos || painelNoInicio || copiar, `${nome}: script não permitido: ${m[0]}`).toBe(true);
     }
     expect(html, `${nome}: manipulador de evento`).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html, `${nome}: atributo style (a política de segurança não permite)`).not.toMatch(/\sstyle\s*=/i);
@@ -325,7 +328,8 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     } else expect(html, `${nome}: formulário`).not.toMatch(/<form\b/i);
     for (const m of html.matchAll(/<input\b[^>]*>/gi)) {
       const campoDeFormulario = opcoes.formularios?.includes(nome) && /type="(text|email|checkbox)"/.test(m[0]);
-      expect(campoDeFormulario || (noAjuda && /type="search"/.test(m[0])), `${nome}: campo que não é a busca da Ajuda nem de um formulário ligado: ${m[0]}`).toBe(true);
+      const enderecoDoFeed = nome === 'novidades/rss.html' && /^<input id="rss-endereco" type="text" readonly /.test(m[0]);
+      expect(campoDeFormulario || enderecoDoFeed || (noAjuda && /type="search"/.test(m[0])), `${nome}: campo que não é a busca da Ajuda nem de um formulário ligado: ${m[0]}`).toBe(true);
     }
     // Recursos (src, link, preload) só locais; links de texto só para o app, as fontes citadas no catálogo, o domínio da empresa e as páginas oficiais.
     for (const m of html.matchAll(/<(?:img|link|source|script)\b[^>]*\s(?:src|href)="(https?:)?\/\/[^"]*"/gi)) {
@@ -600,7 +604,9 @@ describe('site público: as páginas geradas', () => {
     expect(gerado.arquivos.has('novidades/feed.xml'), 'feed.xml só com domínio').toBe(dominio !== '');
     for (const extra of ['estilo.css', '_headers', 'robots.txt', 'ajuda/indice.json', 'ajuda/busca.js', 'favicon.svg', 'og/clarevo.png', 'marca/clarevo-logotipo-reverso.svg', 'calculadoras/calculadora.js', 'js/nucleo/calculators/catalog.js', '_worker.js', '_routes.json', 'imprensa/clarevo-logotipo.svg', 'imprensa/clarevo-logotipo.png']) expect(gerado.arquivos.has(extra), extra).toBe(true);
     const htmls = [...gerado.arquivos.keys()].filter((k) => k.endsWith('.html'));
-    expect(htmls.filter((n) => !PAGINAS.includes(n))).toEqual([]);
+    // A página do feed RSS (D-115) existe só com domínio, como o feed.
+    expect(gerado.arquivos.has('novidades/rss.html'), 'rss.html só com domínio').toBe(dominio !== '');
+    expect(htmls.filter((n) => !PAGINAS.includes(n) && n !== 'novidades/rss.html')).toEqual([]);
   });
 
   it('as páginas e os arquivos gravados em site/ estão em dia com o gerador e o conteúdo (rode: node scripts/gerar-site.js)', () => {
@@ -663,14 +669,14 @@ describe('site público: as páginas geradas', () => {
   });
 
   it('nenhuma página tem travessão, a expressão proibida, script além do permitido, atributo de evento ou endereço de fora além do permitido; um h1, títulos sem pular nível, rodapé e links internos', () => {
-    verificarPaginas(gerado.arquivos, dominio, PAGINAS);
+    verificarPaginas(gerado.arquivos, dominio, [...PAGINAS, ...(dominio ? ['novidades/rss.html'] : [])]);
   });
 
   it('com os formulários ligados (D-066), todas as páginas, inclusive as de resposta, passam nas mesmas verificações e só as três páginas com formulário têm <form>', () => {
     const g = gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: REFERENCIA_DOS_POSTS });
     const respostas = ['contato-enviado.html', 'contato-erro.html', 'novidades/receber.html', 'novidades/receber-enviado.html', 'novidades/receber-confirmado.html', 'novidades/receber-erro.html'];
     for (const nome of respostas) expect(g.arquivos.has(nome), nome).toBe(true);
-    verificarPaginas(g.arquivos, 'exemplo.test', [...PAGINAS, ...respostas], { formularios: ['empresas/index.html', 'novidades/index.html', 'novidades/receber.html'] });
+    verificarPaginas(g.arquivos, 'exemplo.test', [...PAGINAS, 'novidades/rss.html', ...respostas], { formularios: ['empresas/index.html', 'novidades/index.html', 'novidades/receber.html'] });
     // As páginas de resposta não são indexadas nem entram no sitemap; a página da inscrição, sim.
     const sitemap = texto(g.arquivos.get('sitemap.xml'));
     for (const nome of ['contato-enviado', 'contato-erro', 'novidades/receber-enviado', 'novidades/receber-confirmado', 'novidades/receber-erro']) {
@@ -748,7 +754,9 @@ describe('site público: as páginas geradas', () => {
       expect(sitemap).toContain('<loc>https://exemplo.test/app/</loc>');
       expect(sitemap).toContain('<loc>https://exemplo.test/aprender/decimo-terceiro</loc>');
       expect(sitemap).not.toContain('404');
-      expect((sitemap.match(/<loc>/g) ?? []).length).toBe(PAGINAS.length - 1);
+      // Sem a 404 e com a página do feed RSS (D-115), que só existe com domínio.
+      expect((sitemap.match(/<loc>/g) ?? []).length).toBe(PAGINAS.length);
+      expect(sitemap).toContain('<loc>https://exemplo.test/novidades/rss</loc>');
       const robots = texto(g.arquivos.get('robots.txt'));
       expect(robots).toContain('Allow: /');
       expect(robots).toContain('Sitemap: https://exemplo.test/sitemap.xml');
@@ -767,7 +775,7 @@ describe('site público: as páginas geradas', () => {
     const dir = pastaDeExemplo();
     try {
       const g = gerarSite({ legal: dir, dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
-      verificarPaginas(g.arquivos, 'exemplo.test', PAGINAS);
+      verificarPaginas(g.arquivos, 'exemplo.test', [...PAGINAS, 'novidades/rss.html']);
       const h = texto(g.arquivos.get('privacidade.html'));
       expect(h).toContain('href="termos.html#quem-pode-usar"');
       expect(h).toContain('href="excluir-conta.html"');
@@ -845,8 +853,11 @@ describe('site público: as páginas geradas', () => {
     expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(4);
     for (const alvo of ['app/index.html', 'empresas/index.html', 'aprender/index.html', 'ajuda/index.html', 'novidades/index.html', 'seguranca.html']) expect(h, alvo).toContain(`href="${alvo}"`);
     // Sem selos das lojas, depoimento, cliente, prêmio nem número de uso inventado. Preço e "grátis" só na seção Planos (16/11/2026).
-    const foraDosPlanos = h.replace(/<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/, '');
-    expect(foraDosPlanos).not.toBe(h);
+    // D-115: o dólar PTAX de "Indicadores de hoje" vem do núcleo com "R$" ("R$ 5,7851"): só o cartão dele fica de fora da regra.
+    const semPtax = h.replace(/<a class="cartao indicador" href="indicadores\/dolar-ptax-hoje\.html" data-indicador="ptax">[\s\S]*?<\/a>/, '');
+    expect(semPtax).not.toBe(h);
+    const foraDosPlanos = semPtax.replace(/<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/, '');
+    expect(foraDosPlanos).not.toBe(semPtax);
     expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
     expect(foraDosPlanos).not.toMatch(/R\$\s?\d|gr[áa]tis/i);
     expect(h).not.toMatch(/depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor|pr[êe]mio|nossos clientes/i);
@@ -912,6 +923,28 @@ describe('site público: as páginas geradas', () => {
     expect(paraQuem).toContain('<a href="app/index.html#negocio">Veja o Espaço Negócio</a>');
     // A frase de docs/52 sobre o plano, na página Planos.
     expect(html('planos.html')).toContain('O plano Individual inclui um negócio por pessoa, sem custo a mais.');
+  });
+
+  // Indicadores mais fáceis de achar (D-115): "Indicadores de hoje" na página inicial, com o retrato e o script do painel, e o cartão dos
+  // indicadores em Aprender e em Novidades. O menu principal não ganhou "Indicadores": não cabe sem quebrar a linha a partir de 1120 px.
+  it('Indicadores de hoje na página inicial (os cinco números, a hora e a fonte, o aviso e o caminho para o painel) e o cartão em Aprender e em Novidades', () => {
+    const inicio = html('index.html');
+    const secao = /<section[^>]*aria-labelledby="indicadores"[\s\S]*?<\/section>/.exec(inicio)?.[0] ?? '';
+    expect(secao).toContain('<h2 id="indicadores">Indicadores de hoje</h2>');
+    expect(secao).toMatch(/<div class="indicadores-inicio" data-painel data-consultado="[^"]*">/);
+    for (const id of ['selic', 'cdi', 'ipca', 'poupanca', 'ptax']) expect(secao, id).toContain(`data-indicador="${id}"`);
+    expect(secao).toContain('Fonte: Banco Central do Brasil.');
+    expect(secao).toContain('<p class="nota">Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.</p>');
+    expect(secao).toContain('<a class="botao botao-principal" href="indicadores/index.html">Ver os indicadores e o glossário</a>');
+    // Logo depois de "O que o app faz".
+    expect(inicio.indexOf('id="indicadores"')).toBeGreaterThan(inicio.indexOf('id="telas"'));
+    expect(inicio.indexOf('id="indicadores"')).toBeLessThan(inicio.indexOf('id="para-quem"'));
+    expect(inicio).toContain('<script src="indicadores/painel.js" defer></script>');
+    for (const [pagina, alvo] of [['aprender/index.html', '../indicadores/index.html'], ['novidades/index.html', '../indicadores/index.html']] as const) {
+      expect(html(pagina), pagina).toContain(`<a class="cartao cartao-calculadoras" href="${alvo}"><span class="titulo-cartao">Indicadores oficiais</span>`);
+    }
+    const cabecalho = /<header class="topo">([\s\S]*?)<\/header>/.exec(inicio)![1]!;
+    expect(cabecalho).not.toContain('Indicadores');
   });
 
   // Planos (D-115, 18/11/2026): os cartões da página inicial levam à página Planos, que diz o que muda entre os dois, o que os dois
@@ -1799,7 +1832,15 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     // Com domínio, o botão e o link existem e apontam para o feed.
     const comDominio = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
     const ic = texto(comDominio.arquivos.get('novidades/index.html'));
-    expect(ic).toContain('href="feed.xml">Feed RSS</a>');
+    // D-115: o botão "Feed RSS" leva à página que explica o RSS e mostra o endereço; o <link rel="alternate"> continua no XML.
+    expect(ic).toContain('href="rss.html">Feed RSS</a>');
+    const rss = texto(comDominio.arquivos.get('novidades/rss.html'));
+    expect(rss).toContain('<h1>Acompanhar as Novidades por RSS</h1>');
+    expect(rss).toContain('<input id="rss-endereco" type="text" readonly value="https://exemplo.test/novidades/feed.xml"');
+    expect(rss).toContain('<button type="button" class="botao botao-principal" data-copiar="rss-endereco" data-estado="rss-estado" hidden>Copiar o endereço</button>');
+    expect(rss).toContain('<a class="botao botao-suave" href="feed.xml">Abrir o arquivo do feed</a>');
+    expect(rss).not.toMatch(/xsl|stylesheet[^"]*feed/i);
+    expect(semDominio.arquivos.has('novidades/rss.html')).toBe(false);
     expect(ic).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades da Clarevo" href="feed.xml">');
     for (const nome of POSTS) expect(texto(comDominio.arquivos.get(nome)), nome).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades da Clarevo" href="feed.xml">');
   });

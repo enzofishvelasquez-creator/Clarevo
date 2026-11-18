@@ -724,11 +724,12 @@ describe('site público: formulários prontos e desligados', () => {
     expect(dados.formulario_contato).toBe(false);
     expect(dados.newsletter).toBe(false);
     for (const nome of [...PAGINAS_DO_CONTATO, ...PAGINAS_DA_NEWSLETTER]) expect(desligado.arquivos.has(nome), nome).toBe(false);
-    // (A busca da Ajuda é um campo `type="search"` sem formulário e sem envio: só ela pode ter `<input>`.)
+    // (A busca da Ajuda é um campo `type="search"` sem formulário e sem envio: só ela e o endereço do feed, só de leitura, têm `<input>`.)
     for (const [nome, v] of desligado.arquivos) {
       if (!nome.endsWith('.html')) continue;
       expect(texto(v), nome).not.toMatch(/<form\b|<textarea\b|<select\b|\/api\/(contato|newsletter)/);
-      for (const m of texto(v).matchAll(/<input\b[^>]*>/g)) expect(m[0], nome).toContain('type="search"');
+      // D-115: a página do feed RSS tem o endereço num campo só de leitura, sem formulário e sem envio.
+      for (const m of texto(v).matchAll(/<input\b[^>]*>/g)) expect(nome === 'novidades/rss.html' ? /type="text" readonly/.test(m[0]) : m[0].includes('type="search"'), `${nome}: ${m[0]}`).toBe(true);
     }
     expect(h(desligado, 'empresas/index.html')).toContain('escreva para <a href="mailto:contato@exemplo.test">contato@exemplo.test</a>');
     expect(h(desligado, 'novidades/index.html')).not.toContain('Receber as Novidades por e-mail');

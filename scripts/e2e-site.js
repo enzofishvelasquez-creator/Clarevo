@@ -985,6 +985,70 @@ function varrerPagina() {
       await p.close();
     }
 
+    // 7c6. O feed RSS (D-115): o botão "Feed RSS" das Novidades abre a página que explica o RSS, com o endereço completo do feed num campo
+    // só de leitura e "Copiar o endereço" (que copia de verdade), e "Abrir o arquivo do feed"; o feed é XML bem formado, com um item por
+    // matéria, e o link de cada item abre a matéria no endereço sem ".html", como no Cloudflare Pages. Sem JavaScript, o botão não aparece.
+    {
+      const copiando = await navegador.newContext({ viewport: { width: 390, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
+      const p = await copiando.newPage();
+      const erros = [];
+      p.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && erros.push(m.text()));
+      p.on('pageerror', (e) => erros.push(e.message));
+      await p.goto(`${origem}/novidades/`);
+      await p.click('a.botao:text-is("Feed RSS")');
+      await p.waitForURL(/\/novidades\/rss(\.html)?$/);
+      const pagina = await p.evaluate(() => {
+        const campo = document.getElementById('rss-endereco');
+        const botao = document.querySelector('button[data-copiar]');
+        return { titulo: document.querySelector('h1').textContent, valor: campo.value, soLeitura: campo.readOnly, rotulo: document.querySelector('label[for="rss-endereco"]').textContent, botao: botao && !botao.hidden ? botao.textContent : null, abrir: document.querySelector('a.botao[href="feed.xml"]') ? document.querySelector('a.botao[href="feed.xml"]').textContent : null, alternativo: document.querySelector('link[rel="alternate"][type="application/rss+xml"]') !== null };
+      });
+      ok('rss: o botão "Feed RSS" abre "Acompanhar as Novidades por RSS", com o endereço completo do feed só de leitura, "Copiar o endereço" e "Abrir o arquivo do feed"',
+        pagina.titulo === 'Acompanhar as Novidades por RSS' && /^https:\/\/[a-z0-9.-]+\/novidades\/feed\.xml$/.test(pagina.valor) && pagina.soLeitura && pagina.rotulo === 'Endereço do feed das Novidades' && pagina.botao === 'Copiar o endereço' && pagina.abrir === 'Abrir o arquivo do feed' && pagina.alternativo, JSON.stringify(pagina));
+      await p.focus('button[data-copiar]');
+      await p.keyboard.press('Enter');
+      await p.waitForFunction(() => document.getElementById('rss-estado').textContent.length > 0, null, { timeout: 5000 }).catch(() => {});
+      const copiado = { estado: await p.textContent('#rss-estado'), area: await p.evaluate(() => navigator.clipboard.readText()) };
+      ok('rss: "Copiar o endereço" (pelo teclado) copia o endereço do feed e avisa "Endereço copiado."', copiado.estado === 'Endereço copiado.' && copiado.area === pagina.valor && erros.length === 0, JSON.stringify({ copiado, erros }));
+      const xml = await (await copiando.request.get(`${origem}/novidades/feed.xml`)).text();
+      const lido = await p.evaluate((texto) => {
+        const doc = new DOMParser().parseFromString(texto, 'application/xml');
+        return { erro: doc.getElementsByTagName('parsererror').length, itens: [...doc.querySelectorAll('item')].map((i) => ({ titulo: i.querySelector('title').textContent, link: i.querySelector('link').textContent })) };
+      }, xml);
+      const abrem = [];
+      for (const i of lido.itens) {
+        const caminho = new URL(i.link).pathname;
+        const r = await copiando.request.get(`${origem}${caminho}`);
+        abrem.push(r.ok() && !/\.html$/.test(caminho) && (await r.text()).includes(`<h1>${i.titulo.replace(/&/g, '&amp;')}</h1>`));
+      }
+      ok(`rss: o feed é XML bem formado, com as ${POSTS.length} matérias, e o link de cada item abre a matéria no endereço sem ".html"`, lido.erro === 0 && lido.itens.length === POSTS.length && abrem.every(Boolean), JSON.stringify({ erro: lido.erro, n: lido.itens.length, abrem }));
+      await copiando.close();
+      const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 } });
+      const q = await semJs.newPage();
+      await q.goto(`${origem}/novidades/rss`);
+      ok('rss sem JavaScript: o campo com o endereço continua, e o botão de copiar não aparece', await q.evaluate(() => document.getElementById('rss-endereco').value.endsWith('/novidades/feed.xml') && !document.querySelector('button[data-copiar]').checkVisibility()));
+      await semJs.close();
+    }
+
+    // 7c7. Indicadores mais fáceis de achar (D-115): "Indicadores de hoje" na página inicial, com o retrato e a troca pelo painel.js (uma
+    // pergunta ao próprio site), o caminho para o painel e o glossário, e o cartão dos indicadores em Aprender e em Novidades.
+    {
+      const p = await pagina();
+      await p.goto(`${origem}/`);
+      await p.waitForFunction(() => document.querySelector('.indicadores-inicio').getAttribute('data-atualizado') === 'sim', null, { timeout: 8000 }).catch(() => {});
+      const inicio = await p.evaluate(() => {
+        const s = document.querySelector('.indicadores-inicio');
+        return { atualizado: s.getAttribute('data-atualizado'), cartoes: [...s.querySelectorAll('[data-indicador]')].map((c) => c.getAttribute('data-indicador')), selic: s.querySelector('[data-indicador="selic"] [data-campo="numero"]').textContent, fonte: /Fonte: Banco Central do Brasil\./.test(s.textContent), aviso: /Conteúdo educativo\. Não é recomendação nem análise de valores mobiliários\./.test(s.parentElement.textContent), botao: document.querySelector('a.botao[href="indicadores/index.html"]') ? document.querySelector('a.botao[href="indicadores/index.html"]').textContent : null };
+      });
+      ok('indicadores no início: os cinco números, trocados pelo painel.js (Selic 15,00%), com a fonte, o aviso e "Ver os indicadores e o glossário"', inicio.atualizado === 'sim' && JSON.stringify(inicio.cartoes) === JSON.stringify(['selic', 'cdi', 'ipca', 'poupanca', 'ptax']) && inicio.selic === '15,00%' && inicio.fonte && inicio.aviso && inicio.botao === 'Ver os indicadores e o glossário', JSON.stringify(inicio));
+      const atalhos = [];
+      for (const c of ['aprender/', 'novidades/']) {
+        await p.goto(`${origem}/${c}`);
+        atalhos.push(await p.evaluate(() => { const a = document.querySelector('main a.cartao[href="../indicadores/index.html"]'); return a ? a.querySelector('.titulo-cartao').textContent : null; }));
+      }
+      ok('indicadores: o cartão "Indicadores oficiais" em Aprender e em Novidades', atalhos.every((t) => t === 'Indicadores oficiais'), JSON.stringify(atalhos));
+      await p.close();
+    }
+
     // 7d. Imagens das matérias de Novidades (D-114): capa e telas ao lado das seções, do próprio site, com largura, altura e texto
     // alternativo; a tela larga (o painel da empresa) embaixo do texto; no tema claro, a versão clara das telas.
     {
