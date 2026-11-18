@@ -574,7 +574,8 @@ const pctText = (fraction: number) => {
 };
 
 export const INVESTMENT_TEXT = {
-  tabTitle: 'Investimentos',
+  /** O título da aba é o nome dela na barra (auditoria de 18/11/2026: a aba "Investir" abria com o título "Investimentos"). */
+  tabTitle: 'Investir',
   tabLabel: 'Investir',
   intro: 'Acompanhe o que você já investe: registre aportes, resgates e o valor que aparece no seu extrato. A Clarevo calcula quanto rendeu.',
   totalTitle: 'Seus investimentos hoje',
@@ -612,11 +613,13 @@ export const INVESTMENT_TEXT = {
   indicesError: 'Não foi possível buscar o CDI e o IPCA agora. A sua rentabilidade continua aqui.',
   /** Na aba (revisão das telas, 16/11/2026): o CDI, o IPCA, a poupança e o ganho real ficam atrás deste botão. */
   compare: 'Comparar com CDI, IPCA e poupança',
-  /** O aviso único do fim da aba, no lugar dos quatro parecidos. */
-  closingNote:
-    'A Clarevo não guarda, não movimenta nem indica investimentos. A rentabilidade vem dos valores que você registra, como estão no seu extrato, e não é recomendação de investimento: o que rendeu no passado não garante o futuro. Aportes, resgates e rendimentos não entram em Pago nem em Recebido.',
-  disclaimer:
-    'A rentabilidade é calculada com os valores que você registra, como estão no seu extrato. Não é recomendação de investimento, e o que rendeu no passado não garante o futuro.',
+  /**
+   * O aviso único do fim da aba, numa frase curta (auditoria de 18/11/2026: o parágrafo de seis linhas repetia o detalhe e o Desempenho).
+   * Que aportes e resgates não entram em Pago nem em Recebido fica no detalhe do investimento (`rule`) e no guia.
+   */
+  closingNote: 'Os valores são os que você registra, e a Clarevo não indica investimentos.',
+  /** No detalhe e no Desempenho, uma frase: de onde vem a rentabilidade e que o passado não garante o futuro. */
+  disclaimer: 'A rentabilidade vem dos valores que você registra; o que rendeu antes não garante o futuro.',
   rule: 'Aportes, resgates e rendimentos não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.',
   footer: 'A Clarevo não guarda, não movimenta nem indica investimentos. Os valores mostram só o que você registrou.',
   emptyTitle: 'Nenhum investimento ainda',

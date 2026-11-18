@@ -243,7 +243,8 @@ describe('investimentos: validação e textos', () => {
       expect(t).not.toMatch(/\bo Clarevo\b/);
       expect(t).not.toMatch(/recomendamos|invista|aplique já|garantid[oa]/i);
     }
-    expect(INVESTMENT_TEXT.disclaimer).toMatch(/Não é recomendação de investimento/);
+    // Uma frase (auditoria de 18/11/2026): de onde vem a rentabilidade e que o passado não garante o futuro.
+    expect(INVESTMENT_TEXT.disclaimer).toMatch(/o que rendeu antes não garante o futuro/);
   });
 });
 
