@@ -19,7 +19,7 @@ const { LEGENDA_TELA } = require('../videos');
 const { catalogo } = require('../catalogo');
 const { lerPosts, lerCabecalho } = require('../conteudo');
 const { SITE_SRC } = require('../config');
-const { fonteHtml, arquivoDoTema } = require('./aprender');
+const { arquivoDoTema } = require('./aprender');
 const { blocoDaNewsletterEmNovidades } = require('./formularios');
 
 const PASTA_POSTS = path.join(SITE_SRC, 'novidades');
@@ -109,11 +109,31 @@ function figuraDaCapa(post, img) {
   return { html: celular(i, post.arquivo, { textoLegenda: LEGENDA_TELA, carregamento: 'eager', classe: 'capa-tela' }), faltas: [] };
 }
 
-/** As fontes de um post como itens de lista. */
+/** "Revisado em 15/10/2026" vira "revisado em 15/10/2026", para ir no fim da linha, depois do link. */
+const minuscula = (t) => t.charAt(0).toLowerCase() + t.slice(1);
+
+/**
+ * As fontes de um post em dois grupos, para ler de relance (pedido do Enzo, 18/11/2026, D-115), sem listas numeradas dentro de listas:
+ *   - "Na Clarevo": as páginas do próprio site que o post cita (O app, Ajuda, calculadoras) e os temas de Aprender, uma linha cada, o tema
+ *     com a data de revisão em letra menor na mesma linha;
+ *   - "Fontes oficiais": as fontes de fora citadas pelo post e pelos temas dele, sem repetir o mesmo endereço, uma por linha, com a
+ *     organização em negrito, o título como link e "consultada em" em letra menor. Se entrar uma fonte que não é oficial (uma referência de
+ *     mercado ou um texto sem link), o grupo passa a se chamar "Fontes externas" e a linha diz "referência de mercado".
+ * As fontes "Regra da própria Clarevo" dos temas (sem link: dizem como o app funciona) viram uma nota curta no fim, e não itens da lista.
+ * Devolve o HTML dos grupos e os problemas (tema que não existe, endereço que não é https nem página do site).
+ */
 function fontesDoPost(post) {
   const c = catalogo();
-  const itens = [];
+  const daClarevo = [];
+  const externas = new Map();
+  let todasOficiais = true;
+  let temRegra = false;
   const problemas = [];
+  const externa = (chave, item) => {
+    const antes = externas.get(chave);
+    // A mesma página em dois temas: uma linha só, com a consulta mais recente.
+    if (!antes || (item.data && (!antes.data || item.data > antes.data))) externas.set(chave, item);
+  };
   for (const f of post.fontes) {
     if (f.tipo === 'tema') {
       const t = c.tema(f.slug);
@@ -121,18 +141,35 @@ function fontesDoPost(post) {
         problemas.push(`${post.origem}: a fonte "tema: ${f.slug}" não existe no catálogo de Aprender`);
         continue;
       }
-      // As fontes do tema ficam numa lista dentro do item do tema, e não soltas na numeração do post (12/11/2026).
-      itens.push(`<li><a href="${rel(post.arquivo, arquivoDoTema(t.slug))}">Aprender: ${esc(t.title)}</a><span class="fonte-meta">${esc(c.TEXTO.reviewedOn(t.reviewedOn))}. As fontes do tema:</span>
-<ol class="fontes">
-${t.sources.map((s) => fonteHtml(s, null)).join('\n')}
-</ol></li>`);
+      daClarevo.push(`<li><a href="${rel(post.arquivo, arquivoDoTema(t.slug))}">Aprender: ${esc(t.title)}</a> <span class="fonte-data">${esc(minuscula(c.TEXTO.reviewedOn(t.reviewedOn)))}</span></li>`);
+      for (const s of t.sources) {
+        if (s.kind === 'clarevo') temRegra = true;
+        else if (s.kind === 'obra') {
+          todasOficiais = false;
+          externa(`obra:${c.TEXTO.sourceLine(s)}`, { html: esc(c.TEXTO.sourceLine(s)), data: s.consultedOn });
+        } else {
+          if (s.kind !== 'oficial') todasOficiais = false;
+          externa(s.url, { html: `<strong>${esc(s.publisher)}</strong>: <a href="${esc(s.url)}" rel="noopener noreferrer">${esc(s.title)}</a>`, data: s.consultedOn, mercado: s.kind === 'mercado' });
+        }
+      }
     } else if (f.tipo === 'link') {
-      if (/^https:\/\//.test(f.destino)) itens.push(`<li><a href="${esc(f.destino)}" rel="noopener noreferrer">${esc(f.rotulo)}</a></li>`);
+      if (/^https:\/\//.test(f.destino)) externa(f.destino, { html: `<a href="${esc(f.destino)}" rel="noopener noreferrer">${esc(f.rotulo)}</a>`, data: null });
       else if (/^[a-z]+:/i.test(f.destino)) problemas.push(`${post.origem}: a fonte "${f.rotulo}" tem um endereço que não é https nem uma página do site`);
-      else itens.push(`<li><a href="${rel(post.arquivo, f.destino)}">${esc(f.rotulo)}</a></li>`);
-    } else itens.push(`<li>${esc(f.rotulo)}</li>`);
+      else daClarevo.push(`<li><a href="${rel(post.arquivo, f.destino)}">${esc(f.rotulo)}</a></li>`);
+    } else {
+      todasOficiais = false;
+      externa(`texto:${f.rotulo}`, { html: esc(f.rotulo), data: null });
+    }
   }
-  return { itens, problemas };
+  const linhaExterna = (x) => {
+    const meta = [x.mercado ? minuscula(c.TEXTO.marketLabel) : null, x.data ? minuscula(c.TEXTO.consultedOn(x.data)) : null].filter(Boolean);
+    return `<li>${x.html}${meta.length ? ` <span class="fonte-data">${esc(meta.join(' · '))}</span>` : ''}</li>`;
+  };
+  const grupos = [];
+  if (daClarevo.length) grupos.push(`<h3 id="fontes-clarevo">Na Clarevo</h3>\n<ul class="fontes-lista">\n${daClarevo.join('\n')}\n</ul>`);
+  if (externas.size) grupos.push(`<h3 id="fontes-externas">${todasOficiais ? 'Fontes oficiais' : 'Fontes externas'}</h3>\n<ul class="fontes-lista">\n${[...externas.values()].map(linhaExterna).join('\n')}\n</ul>`);
+  if (temRegra) grupos.push(`<p class="fontes-nota">Os temas também se apoiam em regras da própria Clarevo, que dizem como o app funciona e por isso não têm link.</p>`);
+  return { html: grupos.join('\n'), problemas };
 }
 
 function paginaDoPost(post, { valores, img }) {
@@ -141,16 +178,14 @@ function paginaDoPost(post, { valores, img }) {
   const { html: corpoHtml, faltas: faltasDoTema } = expandirDiretivas(comTelas.html, post.origem);
   const daCapa = figuraDaCapa(post, img);
   const faltas = [...comTelas.faltas, ...faltasDoTema, ...daCapa.faltas];
-  const { itens, problemas } = fontesDoPost(post);
+  const { html: fontes, problemas } = fontesDoPost(post);
   const corpo = colunaTexto(
     `<div class="post-corpo">
 ${corpoHtml}
 </div>
 <section class="post-fontes" aria-labelledby="fontes">
 <h2 id="fontes">Fontes</h2>
-<ol class="fontes">
-${itens.join('\n')}
-</ol>
+${fontes}
 <p class="revisao">Publicado em ${esc(dataPorExtensoIso(post.data))} por ${esc(post.autoria)}. Se encontrarmos um erro, corrigimos neste mesmo texto e registramos a correção aqui. Veja <a href="${rel(arquivo, 'novidades/como-escrevemos.html')}">como escrevemos</a>.</p>
 </section>
 <p class="voltar"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Voltar para Novidades</a></p>`,

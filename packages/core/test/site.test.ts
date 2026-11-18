@@ -1586,8 +1586,11 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     for (const nome of POSTS_INICIAIS) {
       const pagina = h(nome);
       expect(pagina, nome).toContain('<time datetime="2026-10-23">23 de outubro de 2026</time> · Equipe Clarevo');
-      const fontes = /<h2 id="fontes">Fontes<\/h2>\s*<ol class="fontes">([\s\S]*?)<\/ol>/.exec(pagina)?.[1] ?? '';
+      // D-115: as fontes em grupos ("Na Clarevo" e "Fontes oficiais"), sem numeração e sem lista dentro de lista.
+      const fontes = /<h2 id="fontes">Fontes<\/h2>([\s\S]*?)<p class="revisao">/.exec(pagina)?.[1] ?? '';
       expect((fontes.match(/<li/g) ?? []).length, `${nome}: fontes`).toBeGreaterThanOrEqual(2);
+      expect(fontes, nome).not.toMatch(/<ol\b|<li>(?:(?!<\/li>)[\s\S])*<(ul|ol)\b/);
+      expect(fontes, nome).toMatch(/^\n<h3 id="fontes-clarevo">Na Clarevo<\/h3>\n<ul class="fontes-lista">/);
       const ld = JSON.parse(/<script type="application\/ld\+json">([^<]*)<\/script>/.exec(pagina)![1]!);
       expect(ld).toMatchObject({ '@type': 'Article', datePublished: '2026-10-23', author: { name: 'Equipe Clarevo' } });
       expect(ld.headline.length).toBeGreaterThan(10);
@@ -1630,8 +1633,17 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     // As cinco abas, pelo nome.
     expect(p).toContain('cinco abas: Resumo, Movimentos, Metas, Investir e Aprender');
     // Fontes: as páginas do site e as fontes do tema.
-    const fontes = /<h2 id="fontes">Fontes<\/h2>\s*<ol class="fontes">([\s\S]*?)<\/ol>/.exec(p)?.[1] ?? '';
-    for (const destino of ['../app/index.html', '../ajuda/organizar.html#guia-investimentos', '../ajuda/organizar.html#guia-metas', '../calculadoras/multa-e-juros.html', '../seguranca.html']) expect(fontes, destino).toContain(`href="${destino}"`);
+    const fontes = /<h3 id="fontes-clarevo">Na Clarevo<\/h3>\n<ul class="fontes-lista">([\s\S]*?)<\/ul>/.exec(p)?.[1] ?? '';
+    for (const destino of ['../app/index.html', '../ajuda/organizar.html#guia-investimentos', '../ajuda/organizar.html#guia-metas', '../calculadoras/multa-e-juros.html', '../seguranca.html', '../aprender/rotativo-cartao.html']) expect(fontes, destino).toContain(`href="${destino}"`);
+    // O tema de Aprender com a data de revisão na mesma linha, e as fontes oficiais dele no outro grupo, cada uma com a organização em
+    // negrito, o título como link e a data de consulta.
+    expect(fontes).toContain(`Aprender: ${esc(tema.title)}</a> <span class="fonte-data">revisado em ${tema.reviewedOn.split('-').reverse().join('/')}</span></li>`);
+    const oficiais = /<h3 id="fontes-externas">Fontes oficiais<\/h3>\n<ul class="fontes-lista">([\s\S]*?)<\/ul>/.exec(p)?.[1] ?? '';
+    for (const s of tema.sources) {
+      if (s.kind !== 'oficial') continue;
+      expect(oficiais, s.url).toContain(`<li><strong>${esc(s.publisher)}</strong>: <a href="${esc(s.url)}" rel="noopener noreferrer">${esc(s.title)}</a> <span class="fonte-data">consultada em ${s.consultedOn!.split('-').reverse().join('/')}</span></li>`);
+    }
+    expect(p).toContain('<p class="fontes-nota">Os temas também se apoiam em regras da própria Clarevo, que dizem como o app funciona e por isso não têm link.</p>');
     // A regra vigente: nada de preço, "grátis", período de teste, data de lançamento, lojas nem convite a cadastrar, baixar ou assinar.
     const principal = /<main[\s\S]*<\/main>/.exec(p)![0];
     expect(principal).not.toMatch(/R\$\s?\d|gr[áa]tis|gratuit|14 dias|teste gr|assin(e|ar|atura)|cadastr|baix(e|ar)|crie (a )?sua conta|comece agora|em breve|App Store|Google Play|milh[õo]es|\bmelhor(es)?\b/i);
@@ -1648,13 +1660,18 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     for (const par of t.paragraphs) expect(p).toContain(`<p>${esc(par)}</p>`);
     expect(p).toContain(`<p>${esc(t.example!)}</p>`);
     expect(p).toContain(`<p>${esc(t.hypotheses!)}</p>`);
+    // As fontes dos dois temas, sem repetir endereço, cada uma numa linha com a organização em negrito e o título como link (D-115); as
+    // regras da própria Clarevo viram a nota do fim, sem os códigos internos.
     for (const s of t.sources) {
       if (s.kind === 'clarevo') {
-        expect(p).toContain('Regra da própria Clarevo');
+        expect(p).toContain('regras da própria Clarevo, que dizem como o app funciona');
         expect(p).not.toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
-      } else expect(p).toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
-      if (s.kind === 'oficial') expect(p).toContain(`href="${esc(s.url)}"`);
+      } else if (s.kind === 'oficial') {
+        expect(p).toContain(`<strong>${esc(s.publisher)}</strong>: <a href="${esc(s.url)}" rel="noopener noreferrer">${esc(s.title)}</a>`);
+        expect(p.split(`href="${esc(s.url)}"`).length - 1, s.url).toBe(1);
+      }
     }
+    expect(p).not.toMatch(/<ol class="fontes">/);
     expect(p).toContain('href="../aprender/decimo-terceiro.html"');
     expect(p).not.toMatch(/\{\{/);
     // Nada sobra de diretiva: toda "{{tema:...}}" dos posts existe no catálogo.

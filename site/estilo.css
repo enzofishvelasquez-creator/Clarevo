@@ -388,6 +388,15 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .post-corpo{max-width:46rem}
 .post-fontes{margin-top:2rem;padding-top:1rem;border-top:1px solid var(--linha)}
 .post-fontes h2{font-size:1.2rem;margin:0 0 .5rem}
+/* As fontes de um post em dois grupos (18/11/2026, D-115): "Na Clarevo" e "Fontes oficiais", uma linha por fonte, sem numeração, com a data
+   em letra menor no fim da linha e a nota das regras da própria Clarevo embaixo. */
+.post-fontes h3{margin:1.25rem 0 .35rem;font-size:1rem;color:var(--texto-2)}
+.post-fontes h2+h3{margin-top:.75rem}
+.fontes-lista{list-style:none;padding:0;margin:0 0 .5rem}
+.fontes-lista li{margin:.45rem 0;line-height:1.5}
+.fonte-data{color:var(--texto-2);font-size:.875rem;white-space:nowrap}
+.fontes-nota{margin:.75rem 0 0;color:var(--texto-2);font-size:.9375rem}
+.post-fontes .revisao{margin-top:1rem}
 /* Imagens nas matérias (D-114, 17/11/2026). A capa fica no topo, à direita do título, no lugar do disco azul vazio (no celular, embaixo
    do título e menor). As telas ficam ao lado do texto da seção que fala delas a partir de 64 rem (no celular, embaixo dele); a tela larga
    (o painel da empresa) fica embaixo do texto, na largura dele. O texto da matéria continua com até 46 rem. */

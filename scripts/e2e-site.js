@@ -829,6 +829,34 @@ function varrerPagina() {
       await q.close();
     }
 
+    // 7c2. As fontes das matérias (D-115): "Na Clarevo" e, quando há fonte de fora, "Fontes oficiais", em listas sem numeração e sem lista
+    // dentro de lista; cada link com texto; títulos em ordem (h2 Fontes, h3 de cada grupo); a linha da publicação e "Voltar para Novidades".
+    {
+      const p = await pagina();
+      const achados = [];
+      for (const post of POSTS) {
+        await p.goto(`${origem}/${post}`);
+        const f = await p.evaluate(() => {
+          const s = document.querySelector('.post-fontes');
+          return {
+            titulos: [...s.querySelectorAll('h2, h3')].map((h) => `${h.tagName}:${h.textContent}`),
+            aninhadas: s.querySelectorAll('li ul, li ol, ol').length,
+            semTexto: [...s.querySelectorAll('a')].filter((a) => a.textContent.trim().length < 3).length,
+            externasSemOrganizacao: [...s.querySelectorAll('#fontes-externas + ul > li')].filter((li) => !li.querySelector('strong') || !li.querySelector('a[href^="https://"]') || !/consultada em \d{2}\/\d{2}\/\d{4}$/.test(li.textContent.trim())).length,
+            temas: [...s.querySelectorAll('#fontes-clarevo + ul > li')].filter((li) => /Aprender:/.test(li.textContent)).map((li) => /revisado em \d{2}\/\d{2}\/\d{4}$/.test(li.textContent.trim())),
+            revisao: Boolean(s.querySelector('.revisao')) && /corrigimos neste mesmo texto/.test(s.querySelector('.revisao').textContent),
+            voltar: Boolean(document.querySelector('.voltar a[href="index.html"]')),
+          };
+        });
+        const comExternas = /13o-salario|novembro/.test(post);
+        const esperado = ['H2:Fontes', 'H3:Na Clarevo', ...(comExternas ? ['H3:Fontes oficiais'] : [])];
+        if (JSON.stringify(f.titulos) !== JSON.stringify(esperado)) achados.push(`${post}: títulos ${JSON.stringify(f.titulos)}`);
+        if (f.aninhadas || f.semTexto || f.externasSemOrganizacao || !f.temas.every(Boolean) || !f.revisao || !f.voltar) achados.push(`${post}: ${JSON.stringify(f)}`);
+      }
+      ok(`novidades: em ${POSTS.length} matérias, as Fontes em "Na Clarevo" e "Fontes oficiais", sem numeração nem lista dentro de lista, com a organização, o título e a data de cada fonte`, achados.length === 0, achados.join(' | '));
+      await p.close();
+    }
+
     // 7d. Imagens das matérias de Novidades (D-114): capa e telas ao lado das seções, do próprio site, com largura, altura e texto
     // alternativo; a tela larga (o painel da empresa) embaixo do texto; no tema claro, a versão clara das telas.
     {
