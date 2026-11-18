@@ -265,8 +265,8 @@ Estão previstos, mas ainda não ligados:
 Estas informações ficam só no seu aparelho (no armazenamento do app, ou no navegador, na versão web) e não vão para a Clarevo:
 
 - a sessão, para você não precisar entrar toda vez;
-- as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, e avisos que você dispensou (inclusive, [PROPOSTA: o dia em que você começou a usar o app neste aparelho e o "Agora não" da pergunta da seção 3.6]);
-- memórias para preencher mais rápido: a descrição e a categoria da última nota de cada loja (a loja é identificada pelo resumo do CNPJ, até 50 lojas), o mesmo para o nome lido de comprovantes (pelo resumo do nome, até 50) e as categorias que você escolheu na importação de extrato (até 300 entradas);
+- as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, avisos que você dispensou (inclusive, [PROPOSTA: o dia em que você começou a usar o app neste aparelho e o "Agora não" da pergunta da seção 3.6]), o adiamento ou a pausa dos lembretes de investimentos e as datas dos convites para rever o plano de aportes e as metas;
+- memórias para preencher mais rápido: a descrição e a categoria da última nota de cada loja (a loja é identificada pelo resumo do CNPJ, até 50 lojas), o mesmo para o nome lido de comprovantes (pelo resumo do nome, até 50) as categorias que você escolheu na importação de extrato (até 300 entradas) e os nomes de subcategoria que você escreveu em "Outra", para aparecerem nas opções deste aparelho;
 - o último nível da conta já mostrado neste aparelho e o último aviso de queda do nível dispensado, para a comemoração e o aviso não se repetirem;
 - a escolha do tema (claro, escuro ou igual ao aparelho);
 - lembretes de contas a pagar, que são notificações agendadas no aparelho. Na tela bloqueada eles não mostram valor nem descrição, e o app não guarda token de notificação remota;
