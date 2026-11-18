@@ -246,7 +246,7 @@ Pedido do Enzo ("faça todas as melhorias possíveis"), o estudo "Bolsa no site 
 - [x] Exportar meus dados com a subcategoria: a planilha de lançamentos ganhou a coluna Subcategoria, logo depois de Categoria, vazia quando o lançamento não tem (pendência da D-107), feito em 18/11/2026
 - [ ] Espaço Negócio, para depois (`docs/52`, seção 4): anotar no negócio pelo WhatsApp e pelo Telegram, editar a retirada, sugestões de orçamento depois de importar no negócio e ver o negócio encerrado
 - [ ] **Você:** definir o Clarevo Plus (preço, por pessoa ou por negócio, limites, teste grátis; perguntas em `docs/52`, seção 5) antes de qualquer coisa aparecer no app ou no site
-- [ ] Política de privacidade: as mudanças desta rodada (prints, contagem do tempo sem anotar, tema e o espaço Negócio, seção 3.3a) entram na versão 1, ainda preliminar, sem mudar a versão dos termos; as perguntas 61 e 62 do resumo para o advogado perguntam se pedem versão nova quando o site for publicado (a 62 também pergunta se o tratamento de dados de pessoa jurídica muda algo)
+- [ ] Política de privacidade: as mudanças desta rodada (prints, contagem do tempo sem anotar, tema, o espaço Negócio, seção 3.3a, e, na seção 3.2, a subcategoria do gasto, a ligação do gasto ao que ele pagou e do recebimento ao investimento, a descrição livre e a taxa que muda numa data dos investimentos) entram na versão 1, ainda preliminar, sem mudar a versão dos termos; as perguntas 61 e 62 do resumo para o advogado perguntam se pedem versão nova quando o site for publicado (a 62 também pergunta se o tratamento de dados de pessoa jurídica muda algo)
 
 ## Ciclo B: renda comprometida (D-026)
 
