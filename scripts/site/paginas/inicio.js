@@ -108,8 +108,10 @@ ${celularComVideo('resumo-do-mes', { videos, img }, ARQUIVO)}
   const brutas = [
     secao(
       `<h2 id="bem-estar">Bem-estar financeiro, com apoio prático</h2>
+<div class="duas-colunas">
 <p class="lead-bloco">Contas para lembrar, compras para decidir, planos para organizar: o dinheiro participa da rotina. A Clarevo trata a vida financeira como parte do cuidado com o bem-estar e oferece um app para organizar o mês, sem julgamento.</p>
-<p class="texto-bloco">Um app para anotar o que entra e o que sai, ver o que ainda vai vencer, acompanhar metas e o que você já investe e aprender o essencial sobre contas e juros, com fonte e data de revisão. Ele parte do que você registra e respeita a sua realidade: renda, trabalho, saúde e responsabilidades da família também limitam as escolhas, e dificuldade financeira não é falta de disciplina.</p>`,
+<p class="texto-bloco">Um app para anotar o que entra e o que sai, ver o que ainda vai vencer, acompanhar metas e o que você já investe e aprender o essencial sobre contas e juros, com fonte e data de revisão. Ele parte do que você registra e respeita a sua realidade: renda, trabalho, saúde e responsabilidades da família também limitam as escolhas, e dificuldade financeira não é falta de disciplina.</p>
+</div>`,
       'bem-estar',
     ),
     secao(
@@ -130,6 +132,7 @@ ${mini}
 <h3>Para pessoas</h3>
 <p>Use o app da Clarevo para entender para onde o dinheiro do mês foi e o que ainda vai vencer. Tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família. No seu Pessoal, só você anota e decide o que registrar.</p>
 <p>Dá para criar uma Família de até 6 pessoas, com convite por link, e sair ou encerrar quando quiser.</p>
+<p><a href="${u('app/index.html')}">Veja o app por dentro</a>.</p>
 </article>
 <article class="cartao">
 <h3>Para empresas</h3>
@@ -138,7 +141,7 @@ ${mini}
 </article>
 <article class="cartao">
 <h3>Para quem tem um negócio</h3>
-<p>Quem tem CNPJ ou trabalha por conta separa as contas do negócio das pessoais no Espaço Negócio e vê quanto entrou, quanto saiu e quanto sobrou no mês. O plano Individual inclui um negócio por pessoa.</p>
+<p>Quem tem CNPJ ou trabalha por conta separa as contas do negócio das pessoais no Espaço Negócio e vê quanto entrou, quanto saiu e quanto sobrou no mês. Incluído na assinatura: um negócio por pessoa, sem custo a mais.</p>
 <p><a href="${u('app/index.html')}#negocio">Veja o Espaço Negócio</a>.</p>
 </article>
 </div>`,

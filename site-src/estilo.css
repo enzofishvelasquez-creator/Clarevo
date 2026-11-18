@@ -143,6 +143,8 @@ main:focus{outline:none}
 .confianca a:hover .confianca-item{text-decoration:underline;text-underline-offset:.2em}
 .confianca-item{display:inline-flex;align-items:center;gap:.4rem}
 .confianca svg{flex:none;color:var(--lima)}
+.confianca-mais{display:inline-flex;align-items:center;gap:.3rem;color:var(--sobre-topo);font-weight:700;text-decoration:underline;text-underline-offset:.2em}
+.confianca-mais svg{color:currentColor}
 
 /* Capa (herói) */
 .capa{background:var(--topo);color:var(--sobre-topo);padding:1.5rem 0 3.25rem;border-radius:0 0 32px 32px;position:relative;overflow:hidden}
@@ -208,6 +210,13 @@ blockquote>:last-child{margin-bottom:0}
 .nota{color:var(--texto-2)}
 /* Um parágrafo de texto logo depois do lead de uma seção, na mesma largura (D-115: no lugar de um cartão sozinho). */
 .texto-bloco{max-width:42rem}
+/* Dois parágrafos lado a lado a partir de 56 rem (D-115, revisão: a primeira seção da página inicial ocupava só a metade da esquerda). */
+.duas-colunas{display:grid;gap:0 3rem}
+.duas-colunas>p{margin:0 0 1rem}
+.duas-colunas>p:last-child{margin-bottom:0}
+@media (min-width:56rem){.duas-colunas{grid-template-columns:repeat(2,minmax(0,1fr))}.duas-colunas>p{margin-bottom:0}}
+/* As ressalvas de Para empresas numa nota curta depois de "Como funciona" (revisão de 18/11/2026), e não em cartões antes dele. */
+.nota-ressalvas{max-width:52rem;font-size:.9375rem}
 /* O aviso de saúde no fim da página inicial (D-115): uma nota curta e discreta, separada do contato por uma linha. */
 .aviso-final{max-width:46rem;margin:2rem 0 0;padding-top:1rem;border-top:1px solid var(--linha);color:var(--texto-2);font-size:.875rem}
 .pequeno{font-size:.9375rem}
@@ -232,10 +241,14 @@ blockquote>:last-child{margin-bottom:0}
 .plano-link .ver-plano a:focus-visible{outline:none}
 @media (prefers-reduced-motion:reduce){.plano-link{transition:none}}
 /* A página Planos: os dois cartões com o que muda, os recursos em grupos e as perguntas. */
-.plano-detalhe{scroll-margin-top:1rem}
+.plano-detalhe{scroll-margin-top:1rem;display:flex;flex-direction:column}
+.plano-detalhe>:last-child{margin-top:auto}
 .plano-detalhe:target{border-color:var(--link);border-width:2px}
 .plano-detalhe ul{margin:.25rem 0 1rem}
-.grupos-recursos{display:grid;gap:1rem 2.5rem;grid-template-columns:repeat(auto-fit,minmax(min(20rem,100%),1fr))}
+/* Os grupos de recursos em duas colunas equilibradas a partir de 46 rem (em vez de três colunas com uma vazia), sem partir um grupo. */
+.grupos-recursos{columns:2 21rem;column-gap:2.5rem}
+.recursos-plano{break-inside:avoid;margin:0 0 1.25rem}
+.recursos-plano:last-child{margin-bottom:0}
 .recursos-plano h3{margin:0 0 .4rem}
 .recursos-plano ul{margin:0;padding-left:1.2rem}
 .recursos-plano li{margin:.45rem 0}
@@ -297,6 +310,7 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
    cada linha têm a mesma altura (a grade estica os dois). */
 .com-celular{display:grid;gap:1.5rem 3rem;align-items:center}
 .com-celular>.celular{justify-self:center}
+.com-celular+p{margin-top:1.25rem}
 .com-celular .grade{grid-template-columns:minmax(0,1fr)}
 @media (min-width:40rem){.com-celular .grade{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (min-width:64rem){.com-celular{grid-template-columns:minmax(0,1fr) 15.5rem}}
@@ -309,7 +323,7 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .ve-nao-ve{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(20rem,100%),1fr))}
 .ve-nao-ve .cartao{border-width:2px}
 .ve-nao-ve h3{margin-top:0}
-.lista-nao-faz{border-width:2px;max-width:52rem;margin:0 0 1rem}
+.lista-nao-faz{border-width:2px;margin:0 0 1rem}
 .lista-nao-faz ul{list-style:none;padding:0;margin:0}
 .lista-nao-faz li{position:relative;padding-left:1.5rem}
 .lista-nao-faz li::before{content:"";position:absolute;left:0;top:.62em;width:.6rem;height:.6rem;background:var(--texto);transform:rotate(45deg);border-radius:2px}
@@ -510,18 +524,21 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 }
 
 /* Vídeos de uso do app (D-114 e D-115, 18/11/2026): cada vídeo fica na moldura de celular do bloco que ele mostra, no lugar da captura, e
-   toca sozinho, sem som, enquanto aparece (js/videos.js). O botão redondo do canto pausa e toca (44 px, foco em dois tons, que aparece
-   sobre a tela clara ou escura do vídeo e sobre o topo azul). Sem JavaScript, não há botão: fica a capa. */
+   toca sozinho, sem som, enquanto aparece (js/videos.js). O botão "Pausar" ou "Tocar" fica embaixo da legenda, fora da tela do celular
+   (44 px de altura, o foco de sempre). Sem JavaScript, não há botão: fica a capa. */
 .celular-moldura{position:relative}
 .celular video{display:block;width:100%;height:auto;border-radius:30px;background:#F7F9FD;object-fit:cover}
-.video-botao{position:absolute;right:16px;bottom:16px;display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:2px solid #FFFFFF;border-radius:50%;background:rgba(11,19,48,.78);color:#FFFFFF;cursor:pointer;box-shadow:0 4px 12px rgba(6,16,64,.35)}
-.video-botao::before,.video-botao::after{content:"";display:block;box-sizing:border-box}
-.video-botao[data-estado="tocando"]::before,.video-botao[data-estado="tocando"]::after{width:5px;height:16px;margin:0 2px;border-radius:2px;background:currentColor}
-.video-botao[data-estado="parado"]::before{width:0;height:0;margin-left:4px;border-style:solid;border-width:9px 0 9px 15px;border-color:transparent transparent transparent currentColor}
-.video-botao[data-estado="parado"]::after{display:none}
-.video-botao:hover{background:rgba(11,19,48,.92)}
-.video-botao:focus-visible,.capa .video-botao:focus-visible{outline:3px solid #17223B;outline-offset:0;box-shadow:0 0 0 6px #FFFFFF}
-.mini .video-botao{right:12px;bottom:12px}
+.video-botao{display:flex;align-items:center;justify-content:center;gap:.45rem;min-height:44px;margin:.35rem auto 0;padding:0 1rem;border:1px solid var(--contorno);border-radius:999px;background:transparent;color:var(--texto);font:inherit;font-size:.875rem;font-weight:700;line-height:1;cursor:pointer}
+.video-botao:hover{border-color:var(--link)}
+.video-botao-icone{display:inline-flex;align-items:center;gap:3px}
+.video-botao-icone::before,.video-botao-icone::after{content:"";display:block}
+.video-botao[data-estado="tocando"] .video-botao-icone::before,.video-botao[data-estado="tocando"] .video-botao-icone::after{width:4px;height:12px;border-radius:1px;background:currentColor}
+.video-botao[data-estado="parado"] .video-botao-icone::before{width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;border-color:transparent transparent transparent currentColor}
+.video-botao[data-estado="parado"] .video-botao-icone::after{display:none}
+.capa .video-botao{border-color:var(--sobre-topo);color:var(--sobre-topo)}
+/* Numa linha de cartões com vídeo e com captura, a captura reserva embaixo da legenda o lugar do botão, para as molduras ficarem na mesma
+   altura (o script marca o <html> com data-videos quando põe os botões; sem JavaScript, não há botão nem reserva). */
+:root[data-videos] :is(.mini,.grade):has(.celular-video) .cartao>.celular:not(.celular-video)>figcaption::after{content:"";display:block;height:calc(44px + .35rem)}
 
 /* Ajuda */
 .busca{margin:0 0 1.5rem}

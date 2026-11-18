@@ -44,17 +44,6 @@ function paginaEmpresas({ valores, img }) {
 <li>A Clarevo não substitui as ações sobre a organização do trabalho, como sobrecarga e assédio, nem o gerenciamento de riscos da empresa.</li>
 <li>O endividamento pessoal não deve ser classificado automaticamente como risco ocupacional: a avaliação considera as condições e a organização do trabalho e não equivale a uma avaliação clínica individual.</li>
 </ul>
-<div class="grade">
-<article class="cartao">
-<h3>O que não está incluído</h3>
-<p>Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje. Se um deles entrar em uma proposta, só será anunciado com escopo e contratação confirmados.</p>
-</article>
-<article class="cartao">
-<h3>O que a Clarevo não promete</h3>
-<p>A Clarevo não promete redução de absenteísmo, de estresse nem de adoecimento, e não oferece à empresa acesso a transações, dívidas ou relatos individuais.</p>
-<p>${esc(AVISO_DE_SAUDE)}</p>
-</article>
-</div>
 <p class="nota">A Clarevo não se apresenta como aplicativo certificado, não promete adequação da empresa à norma e não oferece laudos, PGR nem painéis de risco. Prazos, fiscalização e sanções mudam: confira a página oficial antes de decidir. Fonte: <a href="${esc(URL_NR1)}" rel="noopener noreferrer">Ministério do Trabalho e Emprego, NR-1</a> (capítulo 1.5, na redação da Portaria MTE nº 1.419/2024), consultada em 24/10/2026.</p>`,
       { variante: 'alt', rotulo: 'nr-1' },
     ),
@@ -67,7 +56,8 @@ function paginaEmpresas({ valores, img }) {
 <li><h3>Convite por link</h3><p>Quem administra cola os e-mails, de 1 a 500 por vez, e o painel gera um link de uso único para cada e-mail. A empresa envia o link pelo canal interno dela: a Clarevo não envia e-mail de convite.</p></li>
 <li><h3>A pessoa aceita</h3><p>Para aceitar, a pessoa precisa ter conta na Clarevo com o mesmo e-mail do convite, já confirmado. Quem ativa a licença é a pessoa, ao aceitar. A empresa não escolhe quem aceita.</p></li>
 <li><h3>Acompanhamento</h3><p>No painel, a empresa vê as vagas, os convites e as licenças. Pode reenviar ou cancelar um convite pendente (o link anterior deixa de valer) e encerrar uma licença.</p></li>
-</ol>`,
+</ol>
+<p class="nota nota-ressalvas"><strong>O que fica de fora.</strong> Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje. Se um deles entrar em uma proposta, só será anunciado com escopo e contratação confirmados. A Clarevo não promete redução de absenteísmo, de estresse nem de adoecimento, e não oferece à empresa acesso a transações, dívidas ou relatos individuais. ${esc(AVISO_DE_SAUDE)}</p>`,
       { rotulo: 'como-funciona' },
     ),
     bloco(

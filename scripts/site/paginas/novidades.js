@@ -252,8 +252,19 @@ ${cartoes}
 </ul>`,
     { rotulo: 'textos' },
   );
-  // Os indicadores oficiais (D-106) também a partir das Novidades (D-115: o Enzo não achava as informações de mercado).
-  const indicadores = bloco(cartaoDosIndicadores(arquivo), { rotulo: null });
+  // Os indicadores oficiais (D-106) também a partir das Novidades (D-115: o Enzo não achava as informações de mercado), numa seção com
+  // título, ao lado do caminho para acompanhar por RSS (que só existe com domínio).
+  const rss = dominioDe(valores)
+    ? `<a class="cartao cartao-calculadoras" href="${rel(arquivo, ARQUIVO_RSS)}"><span class="titulo-cartao">Acompanhar por RSS</span><span class="tema-sub">O endereço do feed das Novidades, para copiar e colar no seu leitor de RSS.</span></a>`
+    : '';
+  const indicadores = bloco(
+    `<h2 id="acompanhar">Para acompanhar</h2>
+<div class="grade grade-atalhos">
+${cartaoDosIndicadores(arquivo)}
+${rss}
+</div>`.replace('\n\n</div>', '\n</div>'),
+    { rotulo: 'acompanhar' },
+  );
   const pg = montarPagina({
     arquivo,
     titulo: 'Novidades',
@@ -334,8 +345,7 @@ function paginaRss({ valores }) {
 </div>
 <p class="copiar-estado" id="rss-estado" role="status"></p>
 </div>
-<p class="acoes"><a class="botao botao-suave" href="${rel(arquivo, ARQUIVO_FEED)}">Abrir o arquivo do feed</a></p>
-<p class="nota">O arquivo do feed é feito para o leitor de RSS: aberto direto no navegador, ele aparece como texto, sem formatação.</p>
+<p class="nota">O arquivo do feed é feito para o leitor de RSS: aberto direto no navegador, ele aparece como texto, sem formatação. Se precisar dele, <a href="${rel(arquivo, ARQUIVO_FEED)}">abrir o arquivo do feed</a>.</p>
 <p class="voltar"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Voltar para Novidades</a></p>`,
     'texto',
   );

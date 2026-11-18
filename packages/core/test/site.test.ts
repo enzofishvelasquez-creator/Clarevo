@@ -848,12 +848,12 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('Também não vê quando você abre o app nem o que você anota.');
     expect(h).not.toContain('nem o que você faz no app');
     // D-115: o herói com o vídeo do Resumo e três cartões com o vídeo do que mostram (anotar, contas e cartões, metas); Aprender continua
-    // com a captura. Cada figura tem a legenda de demonstração.
+    // com a captura. Toda tela, captura ou vídeo, tem a mesma legenda (revisão de 18/11/2026).
     expect(h.match(/<figure class="celular">/g)?.length).toBe(1);
-    expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(1);
+    expect(h).not.toContain('Dados fictícios de demonstração');
     expect(h).toMatch(/src="imagens\/aprender\.[0-9a-f]{10}\.png"/);
     expect(h.match(/<figure class="celular celular-video" data-video /g)?.length).toBe(4);
-    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(4);
+    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(5);
     for (const alvo of ['app/index.html', 'empresas/index.html', 'aprender/index.html', 'ajuda/index.html', 'novidades/index.html', 'seguranca.html']) expect(h, alvo).toContain(`href="${alvo}"`);
     // Sem selos das lojas, depoimento, cliente, prêmio nem número de uso inventado. Preço e "grátis" só na seção Planos (16/11/2026).
     // D-115: o dólar PTAX de "Indicadores de hoje" vem do núcleo com "R$" ("R$ 5,7851"): só o cartão dele fica de fora da regra.
@@ -907,11 +907,16 @@ describe('site público: as páginas geradas', () => {
     const guia = GUIDE_ENTRIES.find((x) => x.id === 'negocio')!;
     expect(recurso).toContain('<h3 id="t-negocio">Espaço Negócio</h3>');
     expect(recurso).toContain(`<p>${esc(guia.purpose)}</p>`);
-    expect(recurso).toContain('<li>Incluído no plano Individual: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.</li>');
+    // Revisão de 18/11/2026: o Espaço Negócio não é diferença entre os planos (o app não limita por plano), com o mesmo texto neutro em
+    // O app, na página inicial e em Planos.
+    expect(recurso).toContain('<li>Incluído na assinatura: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.</li>');
     expect(recurso).toContain('Retirada para o Pessoal');
     expect(recurso).toContain('Em Seu negócio, quanto entrou, quanto saiu e quanto sobrou');
     expect(recurso).toContain('href="../ajuda/negocio.html#guia-negocio"');
-    expect(recurso).toMatch(/<picture><source srcset="\.\.\/imagens\/negocio-escura\.[0-9a-f]{10}\.png" media="\(prefers-color-scheme: dark\)"[^>]*><img src="\.\.\/imagens\/negocio\.[0-9a-f]{10}\.png" alt="Tela Seu negócio do Sacolé da Maria/);
+    // Só no tema claro, como as outras telas de O app (revisão: um celular escuro entre os claros parecia defeito).
+    expect(recurso).toMatch(/<img src="\.\.\/imagens\/negocio\.[0-9a-f]{10}\.png" alt="Tela Seu negócio do Sacolé da Maria/);
+    expect(recurso).not.toContain('<picture>');
+    expect([...gerado.arquivos.keys()].some((k) => k.startsWith('imagens/negocio-escura.'))).toBe(false);
     // Depois de Família.
     expect(app.indexOf('id="t-negocio"')).toBeGreaterThan(app.indexOf('id="t-familia"'));
     // A Ajuda tem a entrada e a busca acha.
@@ -924,8 +929,9 @@ describe('site público: as páginas geradas', () => {
     expect(paraQuem.match(/<article class="cartao">/g)?.length).toBe(3);
     expect(paraQuem).toContain('<h3>Para quem tem um negócio</h3>');
     expect(paraQuem).toContain('<a href="app/index.html#negocio">Veja o Espaço Negócio</a>');
-    // A frase de docs/52 sobre o plano, na página Planos.
-    expect(html('planos.html')).toContain('O plano Individual inclui um negócio por pessoa, sem custo a mais.');
+    expect(paraQuem).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
+    expect(html('planos.html')).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
+    for (const p of ['index.html', 'app/index.html', 'planos.html']) expect(html(p), p).not.toMatch(/plano Individual inclui um negócio|Inclui o Espaço Negócio|Incluído no plano Individual/);
   });
 
   // O aviso de saúde (revisado no pacote do advogado, seção j) sem mudar o texto, mas fora do começo das páginas (D-115, retorno de quem
@@ -943,8 +949,13 @@ describe('site público: as páginas geradas', () => {
     const empresas = html('empresas/index.html');
     const primeira = /<section[^>]*aria-labelledby="bem-estar"[\s\S]*?<\/section>/.exec(empresas)![0];
     expect(primeira).not.toMatch(/não promete|não está incluído|não fazem parte/);
+    // Revisão de 18/11/2026: as ressalvas ficam numa nota curta depois de "Como funciona", e não em cartões no bloco da NR-1.
     const nr1 = /<section[^>]*aria-labelledby="nr-1"[\s\S]*?<\/section>/.exec(empresas)![0];
-    for (const t of ['<h3>O que não está incluído</h3>', '<h3>O que a Clarevo não promete</h3>', 'não promete redução de absenteísmo, de estresse nem de adoecimento', esc(AVISO_DE_SAUDE)]) expect(nr1, t).toContain(t);
+    expect(nr1).not.toMatch(/<h3>O que não está incluído<\/h3>|não é atendimento de saúde/);
+    const comoFunciona = /<section[^>]*aria-labelledby="como-funciona"[\s\S]*?<\/section>/.exec(empresas)![0];
+    const nota = /<p class="nota nota-ressalvas">[\s\S]*?<\/p>/.exec(comoFunciona)?.[0] ?? '';
+    for (const t of ['Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje.', 'não promete redução de absenteísmo, de estresse nem de adoecimento', esc(AVISO_DE_SAUDE)]) expect(nota, t).toContain(t);
+    expect(comoFunciona.indexOf('nota-ressalvas')).toBeGreaterThan(comoFunciona.indexOf('</ol>'));
     const sobre = html('sobre.html');
     expect(sobre).toContain(`<p class="aviso-final">${esc(AVISO_DE_SAUDE)}</p>`);
     expect(sobre.indexOf('class="aviso-final"')).toBeGreaterThan(sobre.indexOf('id="quem"'));
@@ -991,10 +1002,14 @@ describe('site público: as páginas geradas', () => {
     for (const id of ['comparar', 'recursos', 'como-funciona', 'perguntas']) expect(h, id).toContain(`<h2 id="${id}">`);
     // Os textos da assinatura são os do núcleo.
     for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.howToPay, ACCESS_TEXT.benefitNote, ACCESS_TEXT.notOpenYet, ...ACCESS_TEXT.plans.map((p) => p.who)]) expect(h, t).toContain(esc(t));
-    // O plano Família é pago pela pessoa titular (D-083); o Espaço Negócio, como diz docs/52: incluído no plano Individual, um negócio por pessoa.
+    // O plano Família é pago pela pessoa titular (D-083); o Espaço Negócio não é diferença entre os planos (revisão de 18/11/2026).
     expect(h).toContain('Uma assinatura só, paga pela pessoa titular.');
-    expect(h).toContain('Inclui o Espaço Negócio: um negócio por pessoa, sem custo a mais.');
-    expect(readFileSync(join(ROOT, 'docs', '52_ESPACO_NEGOCIO.md'), 'utf8')).toContain('**incluído no plano Individual** (um negócio por pessoa, sem custo a');
+    expect(/<article class="cartao plano plano-detalhe" id="individual"[\s\S]*?<\/article>/.exec(h)![0]).not.toContain('Negócio');
+    expect(h).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
+    // As perguntas não repetem "Como funciona" e respondem direto.
+    const perguntas = /<h2 id="perguntas">[\s\S]*?<\/section>/.exec(h)![0];
+    expect(perguntas).toContain('<p>Não. O teste de 14 dias começa sem pedir cartão.</p>');
+    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.benefitNote]) expect(perguntas, t).not.toContain(esc(t));
     // Cada recurso com um link interno que existe (a Ajuda ou O app), e os links de "Como usar" das entradas do guia que existem.
     const recursos = /<h2 id="recursos">[\s\S]*?<\/section>\n<\/div>/.exec(h)![0];
     const links = [...recursos.matchAll(/<li><a href="([^"]+)">([^<]+)<\/a>: /g)].map((m): [string, string] => [m[1]!, m[2]!]);
@@ -1061,8 +1076,13 @@ describe('site público: as páginas geradas', () => {
     // D-115: seis recursos e o cartão do tema com o vídeo do que mostram; os outros (com o Espaço Negócio) com a captura da demonstração.
     const figuras = h.match(/<figure class="celular">/g)?.length ?? 0;
     expect(figuras).toBe(7);
-    expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(figuras);
+    expect(h).not.toContain('Dados fictícios de demonstração');
     expect(h.match(/<figure class="celular celular-video" data-video /g)?.length).toBe(7);
+    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(figuras + 7);
+    // "E mais": os Lembretes, sem tela, num cartão só de texto na largura toda; os três cartões com celular numa linha só.
+    const mais = /<h2 id="mais">E mais<\/h2>[\s\S]*?<\/section>/.exec(h)![0];
+    expect(mais).toMatch(/^<h2 id="mais">E mais<\/h2>\n<div class="grade grade-texto">\n<article class="cartao sem-captura">\n<h3>Lembretes<\/h3>/);
+    expect(/<div class="mini">[\s\S]*?\n<\/div>/.exec(mais)![0].match(/<article class="cartao">/g)?.length).toBe(3);
     expect(h).toContain('Na web, hoje');
     // "Cada texto vem do guia" não é verdade (os pontos são do site): só a explicação de abertura vem do guia do app.
     expect(h).not.toContain('Cada texto vem do guia');
@@ -1130,7 +1150,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain(dadoDoSite('E-MAIL DE CONTATO'));
     expect(h).toContain('Ainda não há tabela de preços');
     expect(h).toMatch(/src="\.\.\/imagens\/empresa-painel\.[0-9a-f]{10}\.png"/);
-    expect(h).toContain('Dados fictícios de demonstração');
+    expect(h).toContain('Tela da demonstração, com dados fictícios');
     expect(h).not.toMatch(/R\$\s?\d|por vaga|gr[áa]tis|nossos clientes|depoimento|\d+\s*empresas/i);
   });
 
@@ -1864,7 +1884,9 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     expect(rss).toContain('<h1>Acompanhar as Novidades por RSS</h1>');
     expect(rss).toContain('<input id="rss-endereco" type="text" readonly value="https://exemplo.test/novidades/feed.xml"');
     expect(rss).toContain('<button type="button" class="botao botao-principal" data-copiar="rss-endereco" data-estado="rss-estado" hidden>Copiar o endereço</button>');
-    expect(rss).toContain('<a class="botao botao-suave" href="feed.xml">Abrir o arquivo do feed</a>');
+    // O arquivo do feed como link de texto, dentro da nota (revisão: não um botão em destaque).
+    expect(rss).toContain('<a href="feed.xml">abrir o arquivo do feed</a>.</p>');
+    expect(rss).not.toMatch(/class="botao[^"]*" href="feed\.xml"/);
     expect(rss).not.toMatch(/xsl|stylesheet[^"]*feed/i);
     expect(semDominio.arquivos.has('novidades/rss.html')).toBe(false);
     expect(ic).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades da Clarevo" href="feed.xml">');
@@ -2061,7 +2083,7 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
       expect(item).toContain(`aria-labelledby="video-${id}-nome" aria-describedby="video-${id}-descricao"`);
       // WebM primeiro (mais leve), depois o MP4, e um link para o MP4 se o navegador não tocar nenhum dos dois.
       expect(item).toMatch(new RegExp(`<source src="[^"]*videos/${id}\\.[0-9a-f]{10}\\.webm" type="video/webm">\\s*<source src="[^"]*videos/${id}\\.[0-9a-f]{10}\\.mp4" type="video/mp4">\\s*<a href="[^"]*videos/${id}\\.[0-9a-f]{10}\\.mp4">`));
-      expect(item).toMatch(new RegExp(`<p class="so-leitor"><span id="video-${id}-nome">Vídeo: ${esc(v.titulo)}</span>, \\d+ segundos, sem som\\. <span id="video-${id}-descricao">`));
+      expect(item).toMatch(new RegExp(`<p class="video-texto" hidden><span id="video-${id}-nome">Vídeo: ${esc(v.titulo)}</span>, \\d+ segundos, sem som\\. <span id="video-${id}-descricao">`));
       expect(item).toContain(`<span id="video-${id}-descricao">${esc(v.descricao)}</span>`);
       expect(item).toContain(`<figcaption>${videos.LEGENDA_TELA}</figcaption>`);
       expect(item).not.toMatch(/\s(controls|autoplay)\b|<details/);

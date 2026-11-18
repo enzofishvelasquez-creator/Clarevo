@@ -8,7 +8,8 @@
  * Desde 12/11/2026, o nome do arquivo leva um resumo do conteúdo (`imagens/resumo.1a2b3c4d5e.png`): uma captura nova ganha outro nome,
  * e o navegador pode guardar cada imagem por um ano (`_headers`) sem mostrar a antiga a quem já visitou o site.
  *
- * Todas as legendas das capturas de O app e da página inicial dizem "Dados fictícios de demonstração" (`LEGENDA_DEMO`).
+ * Desde 18/11/2026 (D-115, revisão), toda tela da demonstração no site, captura ou vídeo, tem a mesma legenda: "Tela da demonstração, com
+ * dados fictícios" (`LEGENDA_DEMO`, igual a `LEGENDA_TELA` de `videos.js`; antes as capturas diziam "Dados fictícios de demonstração").
  *
  * D-114 (17/11/2026): as telas das matérias de Novidades (`TELAS_DAS_NOVIDADES`, gravadas da demonstração por
  * `scripts/gravar-videos-site.js --capturas` em `site-src/imagens/telas/`) têm uma versão no tema claro e outra no escuro (`escura`): a
@@ -33,8 +34,8 @@ const RESUMO_DO_CODIGO = crypto
   .digest('hex')
   .slice(0, 12);
 
-const LEGENDA_DEMO = 'Dados fictícios de demonstração';
 const { LEGENDA_TELA, VIDEOS } = require('./videos');
+const LEGENDA_DEMO = LEGENDA_TELA;
 const LOJA = 'docs/lojas/capturas/apple-iphone-6-3pol-1206x2622';
 const TELAS = 'docs/telas';
 const NOVIDADES = 'site-src/imagens/telas';
@@ -58,8 +59,9 @@ const IMAGENS = [
   { id: 'quem-ve', origem: `${TELAS}/330_quem_ve.png`, largura: LARGURA_CELULAR, alt: 'Tela Quem vê estes dados, que mostra quem tem acesso aos registros.' },
   { id: 'empresa-painel', origem: `${TELAS}/421_empresa_painel_1280px.png`, largura: LARGURA_LARGA, alt: 'Painel da empresa no navegador, com o contrato, as vagas contratadas, as vagas em uso e as datas.' },
   // O Espaço Negócio (D-113) em O app (D-115): a tela Seu negócio do cenário "negocio" da demonstração, gravada por
-  // `scripts/gravar-videos-site.js --capturas --telas negocio`, nos temas claro e escuro.
-  { id: 'negocio', origem: `${NOVIDADES}/negocio.png`, escura: `${NOVIDADES}/negocio-escuro.png`, largura: LARGURA_CELULAR, alt: 'Tela Seu negócio do Sacolé da Maria, da demonstração: quanto entrou, quanto saiu e quanto sobrou em outubro, a frase do mês, Retirada para o Pessoal e os botões para anotar entrada e saída.' },
+  // `scripts/gravar-videos-site.js --capturas --telas negocio`, só no tema claro, como as outras telas de O app (com uma versão escura
+  // só nela, o tema escuro mostrava um celular escuro entre os claros).
+  { id: 'negocio', origem: `${NOVIDADES}/negocio.png`, largura: LARGURA_CELULAR, alt: 'Tela Seu negócio do Sacolé da Maria, da demonstração: quanto entrou, quanto saiu e quanto sobrou em outubro, a frase do mês, Retirada para o Pessoal e os botões para anotar entrada e saída.' },
   { id: 'empresa-licencas', origem: `${TELAS}/424_empresa_licencas.png`, largura: LARGURA_CELULAR, alt: 'Painel da empresa, lista de licenças com o e-mail convidado, a situação e a data de cada uma.' },
 ];
 

@@ -1,8 +1,8 @@
 /*
  * Vídeos de uso do app no site (D-115, docs/22_SITE.md, seção 17). Cada vídeo fica na moldura de celular do bloco que ele mostra
  * (`celularComVideo` em scripts/site/videos.js) e toca sozinho, sem som e em repetição, só enquanto pelo menos metade dele aparece na
- * tela; ao sair da tela, pausa. Em cada moldura, um botão redondo pausa e toca o vídeo (WCAG 2.2.2: movimento que começa sozinho precisa
- * de um jeito de parar). Com movimento reduzido (prefers-reduced-motion) ou economia de dados (navigator.connection.saveData), nada toca
+ * tela; ao sair da tela, pausa. Embaixo da legenda de cada vídeo, fora da tela do celular, um botão "Pausar" ou "Tocar" (WCAG 2.2.2:
+ * movimento que começa sozinho precisa de um jeito de parar), com o nome completo para o leitor de tela ("Pausar o vídeo: título"). Com movimento reduzido (prefers-reduced-motion) ou economia de dados (navigator.connection.saveData), nada toca
  * sozinho: fica a capa, e o mesmo botão toca o vídeo a pedido. Sem JavaScript, fica a capa e nada quebra.
  * Este script não envia nada, não grava nada no navegador e não lê cookie.
  */
@@ -24,6 +24,7 @@
     var tocando = !e.video.paused && !e.video.ended;
     e.botao.setAttribute('aria-label', (tocando ? 'Pausar o vídeo: ' : 'Tocar o vídeo: ') + e.titulo);
     e.botao.setAttribute('data-estado', tocando ? 'tocando' : 'parado');
+    e.texto.textContent = tocando ? 'Pausar' : 'Tocar';
     e.figura.setAttribute('data-estado', tocando ? 'tocando' : 'parado');
   }
 
@@ -42,13 +43,20 @@
 
   Array.prototype.forEach.call(figuras, function (figura) {
     var video = figura.querySelector('video');
-    var moldura = figura.querySelector('.celular-moldura');
-    if (!video || !moldura) return;
+    var legenda = figura.querySelector('figcaption');
+    if (!video || !legenda) return;
     video.muted = true;
+    // O botão fica embaixo da legenda, fora da tela do celular: nada cobre a tela do app.
     var botao = document.createElement('button');
     botao.type = 'button';
     botao.className = 'video-botao';
-    var e = { figura: figura, video: video, botao: botao, titulo: figura.getAttribute('data-titulo') || 'demonstração', visivel: false, pausadoPelaPessoa: false, pedidoPelaPessoa: false };
+    var icone = document.createElement('span');
+    icone.className = 'video-botao-icone';
+    icone.setAttribute('aria-hidden', 'true');
+    var texto = document.createElement('span');
+    botao.appendChild(icone);
+    botao.appendChild(texto);
+    var e = { figura: figura, video: video, botao: botao, texto: texto, titulo: figura.getAttribute('data-titulo') || 'demonstração', visivel: false, pausadoPelaPessoa: false, pedidoPelaPessoa: false };
     botao.addEventListener('click', function () {
       if (!video.paused && !video.ended) {
         e.pausadoPelaPessoa = true;
@@ -62,11 +70,13 @@
     });
     video.addEventListener('play', function () { rotular(e); });
     video.addEventListener('pause', function () { rotular(e); });
-    moldura.appendChild(botao);
+    legenda.appendChild(botao);
     rotular(e);
     estados.push(e);
   });
 
+  // Com os botões postos, as capturas das mesmas linhas reservam o lugar do botão (estilo.css), para as molduras ficarem alinhadas.
+  if (estados.length) document.documentElement.setAttribute('data-videos', 'sim');
   if (!('IntersectionObserver' in window)) return;
   var observador = new IntersectionObserver(function (entradas) {
     entradas.forEach(function (entrada) {

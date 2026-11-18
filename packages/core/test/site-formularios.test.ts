@@ -1270,7 +1270,8 @@ describe('site público: kit de imprensa', () => {
       expect((g.arquivos.get(`imprensa/capturas/${nome}.png`) as Buffer).equals(original), nome).toBe(true);
       expect(h).toContain(`href="imprensa/capturas/${nome}.png" download>Baixar em tamanho original (1206 x 2622 px,`);
     });
-    expect([...h.matchAll(/<figcaption>Dados fictícios de demonstração<\/figcaption>/g)]).toHaveLength(capturas.length);
+    // Desde 18/11/2026 (D-115), a mesma legenda de toda tela da demonstração no site.
+    expect([...h.matchAll(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)]).toHaveLength(capturas.length);
     expect(h).toContain('a etiqueta "Demonstração" aparece no próprio app');
     for (const m of h.matchAll(/<img\b[^>]*src="imagens\/[^"]+"[^>]*>/g)) expect(m[0]).toMatch(/\salt="[^"]{20,}"/);
   });

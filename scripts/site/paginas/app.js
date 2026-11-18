@@ -41,7 +41,7 @@ const RECURSOS = [
     itens: [
       'Poucos toques, com o rascunho guardado e um aviso antes de descartar.',
       'Escolha como pagou (dinheiro, débito ou Pix, ou cartão de crédito) e de onde o dinheiro saiu.',
-      'Importe extrato ou fatura de um arquivo (OFX ou CSV) e confira linha por linha antes de gravar.',
+      'Importe extrato ou fatura de um arquivo do banco (PDF, OFX ou planilha) ou de prints da tela do banco e confira linha por linha antes de gravar.',
     ],
   },
   {
@@ -131,10 +131,10 @@ const RECURSOS = [
     guia: ['negocio'],
     imagem: 'negocio',
     itens: [
-      'Categorias próprias do negócio, como Vendas, Serviços, Material e mercadoria, Taxas e maquininha e Impostos e DAS.',
+      'Categorias próprias do negócio, como "Vendas", "Serviços", "Material e mercadoria", "Taxas e maquininha" e "Impostos e DAS".',
       'Em Seu negócio, quanto entrou, quanto saiu e quanto sobrou no mês e nos últimos 6 meses, numa cor só, e as maiores saídas.',
       'A Retirada para o Pessoal leva dinheiro do negócio para casa: sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.',
-      'Incluído no plano Individual: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.',
+      'Incluído na assinatura: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.',
     ],
   },
   {
@@ -189,7 +189,7 @@ ${r.video ? celularComVideo(r.video, { videos, img }, ARQUIVO) : celular(img[r.i
 </article>`;
   }).join('\n');
 
-  const mais = MAIS.map((m) => {
+  const cartaoMais = (m) => {
     let comoUsar = m.ajuda;
     if (m.guia) {
       if (!guia(m.guia)) throw new Error(`o guia do core não tem a entrada "${m.guia}" (página O app)`);
@@ -202,7 +202,12 @@ ${r.video ? celularComVideo(r.video, { videos, img }, ARQUIVO) : celular(img[r.i
 ${figura}
 <p class="pequeno"><a href="${u(comoUsar)}">Como usar</a></p>
 </article>`;
-  }).join('\n');
+  };
+  // Os recursos sem tela (os Lembretes, que só existem no app para celular) ficam num cartão só de texto, na largura toda, em cima dos
+  // cartões com celular, que ficam numa linha só, todos com tela (revisão de 18/11/2026: um cartão sem tela numa linha de quatro).
+  const semTela = MAIS.filter((m) => !m.video && !m.imagem).map(cartaoMais).join('\n');
+  const comTela = MAIS.filter((m) => m.video || m.imagem).map(cartaoMais).join('\n');
+  const mais = `${semTela ? `<div class="grade grade-texto">\n${semTela}\n</div>\n` : ''}<div class="mini">\n${comTela}\n</div>`;
 
   const capa = `<h1>A Clarevo por dentro</h1>
 <p class="lead">Um passeio pelos recursos do app, com telas da demonstração. Os dados nas telas são fictícios, e uma conta nova começa vazia.</p>
@@ -242,9 +247,7 @@ ${linhas}
     ),
     bloco(
       `<h2 id="mais">E mais</h2>
-<div class="mini mini-par">
-${mais}
-</div>`,
+${mais}`,
       { rotulo: 'mais' },
     ),
   ];

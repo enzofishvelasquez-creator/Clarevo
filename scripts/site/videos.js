@@ -8,7 +8,8 @@
  * D-115 (18/11/2026, pedido do Enzo, "como no seox.com.br"): cada vídeo fica no próprio lugar, ao lado do texto do que ele mostra, no lugar
  * da captura parada, e toca sozinho, sem som e em repetição, só enquanto aparece na tela. Não há controles de player (`controls`): quem
  * começa e pausa é o script do próprio site, `js/videos.js` (`site-src/js/videos.js`), que toca o vídeo quando pelo menos metade dele
- * aparece, pausa quando ele sai da tela e põe em cada moldura um botão redondo de pausar e tocar (WCAG 2.2.2). Com movimento reduzido ou
+ * aparece, pausa quando ele sai da tela e põe embaixo da legenda de cada vídeo um botão "Pausar" ou "Tocar", fora da tela do celular
+ * (WCAG 2.2.2). Com movimento reduzido ou
  * economia de dados, nada toca sozinho: fica a capa, e o mesmo botão toca o vídeo a pedido. Sem JavaScript, fica a capa. O vídeo não tem
  * `autoplay` (quem decide é o script) e tem `preload="none"`: nada de vídeo baixa antes de ele aparecer na tela.
  *
@@ -36,7 +37,7 @@ const VIDEOS = [
   {
     id: 'anotar-gasto',
     titulo: 'Anotar um gasto',
-    descricao: 'No Resumo de outubro, a pessoa toca em Anotar gasto, escreve Farmácia, digita o valor, escolhe a categoria Saúde e salva. O app mostra o gasto salvo, com a data, a categoria e de onde saiu o dinheiro, e, de volta ao Resumo, o Pago e a Diferença do mês já contam o gasto.',
+    descricao: 'Na tela Anotar gasto, a pessoa escreve Farmácia, digita o valor, escolhe a categoria Saúde e salva. O app mostra o gasto salvo, com a data, a categoria e de onde saiu o dinheiro, e, de volta ao Resumo, o Pago e a Diferença do mês já contam o gasto.',
   },
   {
     id: 'resumo-do-mes',
@@ -61,12 +62,12 @@ const VIDEOS = [
   {
     id: 'calendario-do-mes',
     titulo: 'O Calendário do mês',
-    descricao: 'Pelo atalho do Resumo, o Calendário de outubro mostra o previsto em contas e faturas, separado do que já foi pago, um título por dia com as contas e, no fim, os aportes planejados sem dia marcado. Em novembro, aparece a fatura do cartão no dia do vencimento.',
+    descricao: 'O Calendário de outubro mostra o previsto em contas e faturas, separado do que já foi pago, um título por dia com as contas e, no fim, os aportes planejados sem dia marcado. Em novembro, aparece a fatura do cartão no dia do vencimento.',
   },
   {
     id: 'tema-escuro-claro',
     titulo: 'Do tema escuro ao claro',
-    descricao: 'Com o aparelho no tema escuro, o app aparece escuro. Em Conta, no card Tema, a pessoa escolhe Claro e toca em Aplicar agora. O app passa para o tema claro, com uma transição suave no lugar da recarga da página, e o Resumo aparece claro.',
+    descricao: 'Com o aparelho no tema escuro, a tela Conta aparece escura. Mais abaixo, no card Tema, a pessoa escolhe Claro e toca em Aplicar agora. O app passa para o tema claro, com uma transição suave no lugar da recarga da página, e o Resumo aparece claro.',
   },
 ];
 
@@ -115,8 +116,9 @@ const SCRIPT_DOS_VIDEOS = 'js/videos.js';
  * demonstração. `videos` e `img` vêm de `videosDoSite().info` e `imagensDoSite().info`; `arquivo` é a página, para os caminhos relativos.
  *
  * O vídeo tem `muted`, `loop`, `playsinline` e `preload="none"`, sem `controls` e sem `autoplay`: quem toca e pausa é `js/videos.js`, que
- * acha a figura pelo `data-video` e lê o título em `data-titulo` (o nome do botão de pausar e tocar). O nome acessível do vídeo e a
- * descrição em texto ficam num parágrafo escondido da tela e ligado ao vídeo por `aria-labelledby` e `aria-describedby`. Dentro do vídeo,
+ * acha a figura pelo `data-video` e lê o título em `data-titulo` (o nome do botão de pausar e tocar, que ele põe embaixo da legenda, fora
+ * da tela do celular). O nome acessível do vídeo e a descrição em texto ficam num parágrafo `hidden`, ligado ao vídeo por `aria-labelledby`
+ * e `aria-describedby`: o leitor de tela ouve os dois uma vez, pelo vídeo, e não de novo na leitura corrida da página. Dentro do vídeo,
  * para o navegador que não toca nenhum dos dois formatos, um link para o MP4. `capa`: outra imagem de capa (id de `imagensDoSite`);
  * `classe`: uma classe a mais na figura.
  */
@@ -131,7 +133,7 @@ function celularComVideo(id, { videos, img }, arquivo, { capa: idDaCapa = null, 
 <source src="${rel(arquivo, i.mp4)}" type="video/mp4">
 <a href="${rel(arquivo, i.mp4)}">Baixar o vídeo ${esc(v.titulo)} (MP4)</a>
 </video></div>
-<p class="so-leitor"><span id="${base}-nome">Vídeo: ${esc(v.titulo)}</span>, ${duracaoPorExtenso(i.duracao)}, sem som. <span id="${base}-descricao">${esc(v.descricao)}</span></p>
+<p class="video-texto" hidden><span id="${base}-nome">Vídeo: ${esc(v.titulo)}</span>, ${duracaoPorExtenso(i.duracao)}, sem som. <span id="${base}-descricao">${esc(v.descricao)}</span></p>
 <figcaption>${LEGENDA_TELA}</figcaption></figure>`;
 }
 

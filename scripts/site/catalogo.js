@@ -98,6 +98,8 @@ function catalogo() {
       nome: plano.PLAN_NAME,
       preco: plano.planPriceAmount,
       porMes: plano.SUBSCRIPTION_SCREEN_TEXT.perMonth,
+      /** Os dias do teste grátis (TRIAL_DAYS), para a pergunta da página Planos. */
+      diasDeTeste: plano.TRIAL_DAYS,
       /** A assinatura aberta no app (SUBSCRIBE_OPEN): fechada, a seção Planos diz que nada é cobrado até o lançamento. */
       aberta: plano.SUBSCRIBE_OPEN === true,
     },

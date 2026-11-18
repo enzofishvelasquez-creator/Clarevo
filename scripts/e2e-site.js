@@ -719,7 +719,7 @@ function varrerPagina() {
         fontes: [...v.querySelectorAll('source')].map((f) => [f.src, f.type]), reserva: v.querySelector('a') ? v.querySelector('a').href : '',
         nome: document.getElementById(v.getAttribute('aria-labelledby'))?.textContent || '',
         descricao: document.getElementById(v.getAttribute('aria-describedby'))?.textContent || '',
-        legenda: v.closest('figure').querySelector('figcaption')?.textContent || '',
+        legenda: v.closest('figure').querySelector('figcaption')?.firstChild?.textContent || '',
         botao: v.closest('figure').querySelector('button.video-botao')?.getAttribute('aria-label') || '',
       })));
       for (const caminho of ['/', '/app/']) {
@@ -767,6 +767,13 @@ function varrerPagina() {
       await p.locator(cartao).evaluate((v) => v.scrollIntoView({ block: 'center' }));
       await p.waitForTimeout(900);
       const continuaPausado = await p.locator(cartao).evaluate((v) => v.paused);
+      const foraDaTela = await p.$$eval('figure[data-video]', (fs) => fs.map((f) => {
+        const m = f.querySelector('.celular-moldura').getBoundingClientRect();
+        const b = f.querySelector('button.video-botao').getBoundingClientRect();
+        const legenda = f.querySelector('figcaption');
+        return { titulo: f.dataset.titulo, fora: b.top >= m.bottom, naLegenda: legenda.contains(f.querySelector('button.video-botao')), texto: f.querySelector('button.video-botao').textContent };
+      }));
+      ok('vídeos: o botão "Pausar" ou "Tocar" fica embaixo da legenda, fora da tela do celular, nunca por cima do app', foraDaTela.length === 4 && foraDaTela.every((x) => x.fora && x.naLegenda && /^(Pausar|Tocar)$/.test(x.texto)), JSON.stringify(foraDaTela));
       ok('vídeos: o botão "Pausar o vídeo: Metas" (44 px) pausa, passa a "Tocar o vídeo: Metas" e a pausa continua depois de rolar para longe e voltar',
         antes.nome === 'Pausar o vídeo: Metas' && antes.caixa && antes.caixa.width >= 44 && antes.caixa.height >= 44 && pausado.paused && pausado.nome === 'Tocar o vídeo: Metas' && continuaPausado, JSON.stringify({ antes, pausado, continuaPausado }));
       // Pelo teclado: Tab chega ao botão, com foco visível, e Espaço toca de novo.
@@ -944,7 +951,7 @@ function varrerPagina() {
         }));
       }
       ok('faixa de confiança: na capa do início e de O app, três frases num link só para Segurança (#nao-faz), com nome em frase para leitor de tela, e sem as seções antigas',
-        faixas.every((f) => f.links === 1 && /seguranca\.html#nao-faz$/.test(f.href) && JSON.stringify(f.itens) === JSON.stringify(['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) && /cartão\. Veja o que a Clarevo não faz, em Segurança e privacidade\.$/.test(f.nome) && f.antigas === 0), JSON.stringify(faixas));
+        faixas.every((f) => f.links === 1 && /seguranca\.html#nao-faz$/.test(f.href) && JSON.stringify(f.itens) === JSON.stringify(['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) && /cartão\. Ver o que a Clarevo não faz, em Segurança e privacidade\.$/.test(f.nome) && f.antigas === 0), JSON.stringify(faixas));
       await p.click('.capa .confianca a');
       await p.waitForURL(/\/seguranca(\.html)?#nao-faz$/);
       ok('faixa de confiança: o link abre o bloco "O que a Clarevo não faz" de Segurança', (await p.textContent('#nao-faz')) === 'O que a Clarevo não faz' && (await p.$$eval('#nao-faz ~ .lista-nao-faz li', (l) => l.length)) === 5);
@@ -972,11 +979,11 @@ function varrerPagina() {
       const recurso = await p.evaluate(() => {
         const a = document.querySelector('#negocio');
         const img = a.querySelector('figure.celular img');
-        return { titulo: a.querySelector('h3').textContent, ajuda: a.querySelector('a[href="../ajuda/negocio.html#guia-negocio"]') !== null, img: img ? { ok: img.complete && img.naturalWidth > 0, alt: img.alt } : null, plano: /Incluído no plano Individual: um negócio por pessoa/.test(a.textContent) };
+        return { titulo: a.querySelector('h3').textContent, ajuda: a.querySelector('a[href="../ajuda/negocio.html#guia-negocio"]') !== null, img: img ? { ok: img.complete && img.naturalWidth > 0, alt: img.alt } : null, plano: /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(a.textContent) };
       });
-      ok('Espaço Negócio: o cartão "Para quem tem um negócio" do início leva ao recurso em O app, com a tela Seu negócio, o link da Ajuda e o plano Individual', recurso.titulo === 'Espaço Negócio' && recurso.ajuda && recurso.plano && recurso.img && /^Tela Seu negócio/.test(recurso.img.alt), JSON.stringify(recurso));
+      ok('Espaço Negócio: o cartão "Para quem tem um negócio" do início leva ao recurso em O app, com a tela Seu negócio, o link da Ajuda e "Incluído na assinatura"', recurso.titulo === 'Espaço Negócio' && recurso.ajuda && recurso.plano && recurso.img && /^Tela Seu negócio/.test(recurso.img.alt), JSON.stringify(recurso));
       await p.goto(`${origem}/planos`);
-      ok('Espaço Negócio: a página Planos diz que o plano Individual inclui um negócio por pessoa', /Inclui o Espaço Negócio: um negócio por pessoa, sem custo a mais\./.test(await p.textContent('#individual')) && (await p.$('a[href="ajuda/negocio.html#guia-negocio"]')) !== null);
+      ok('Espaço Negócio: em Planos, "Incluído na assinatura: um negócio por pessoa", fora das diferenças entre os planos', !/Negócio/.test(await p.textContent('#individual')) && /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(await p.textContent('#recursos ~ .grupos-recursos')) && (await p.$('a[href="ajuda/negocio.html#guia-negocio"]')) !== null);
       await p.goto(`${origem}/ajuda/`);
       const naAjuda = (await p.$('a[href="negocio.html"]')) !== null;
       await p.fill('input[type="search"]', 'negócio');
@@ -1001,10 +1008,10 @@ function varrerPagina() {
       const pagina = await p.evaluate(() => {
         const campo = document.getElementById('rss-endereco');
         const botao = document.querySelector('button[data-copiar]');
-        return { titulo: document.querySelector('h1').textContent, valor: campo.value, soLeitura: campo.readOnly, rotulo: document.querySelector('label[for="rss-endereco"]').textContent, botao: botao && !botao.hidden ? botao.textContent : null, abrir: document.querySelector('a.botao[href="feed.xml"]') ? document.querySelector('a.botao[href="feed.xml"]').textContent : null, alternativo: document.querySelector('link[rel="alternate"][type="application/rss+xml"]') !== null };
+        return { titulo: document.querySelector('h1').textContent, valor: campo.value, soLeitura: campo.readOnly, rotulo: document.querySelector('label[for="rss-endereco"]').textContent, botao: botao && !botao.hidden ? botao.textContent : null, abrir: document.querySelector('main a[href="feed.xml"]') && !document.querySelector('main a.botao[href="feed.xml"]') ? document.querySelector('main a[href="feed.xml"]').textContent : null, alternativo: document.querySelector('link[rel="alternate"][type="application/rss+xml"]') !== null };
       });
-      ok('rss: o botão "Feed RSS" abre "Acompanhar as Novidades por RSS", com o endereço completo do feed só de leitura, "Copiar o endereço" e "Abrir o arquivo do feed"',
-        pagina.titulo === 'Acompanhar as Novidades por RSS' && /^https:\/\/[a-z0-9.-]+\/novidades\/feed\.xml$/.test(pagina.valor) && pagina.soLeitura && pagina.rotulo === 'Endereço do feed das Novidades' && pagina.botao === 'Copiar o endereço' && pagina.abrir === 'Abrir o arquivo do feed' && pagina.alternativo, JSON.stringify(pagina));
+      ok('rss: o botão "Feed RSS" abre "Acompanhar as Novidades por RSS", com o endereço completo do feed só de leitura, "Copiar o endereço" e o link de texto para o arquivo do feed',
+        pagina.titulo === 'Acompanhar as Novidades por RSS' && /^https:\/\/[a-z0-9.-]+\/novidades\/feed\.xml$/.test(pagina.valor) && pagina.soLeitura && pagina.rotulo === 'Endereço do feed das Novidades' && pagina.botao === 'Copiar o endereço' && pagina.abrir === 'abrir o arquivo do feed' && pagina.alternativo, JSON.stringify(pagina));
       await p.focus('button[data-copiar]');
       await p.keyboard.press('Enter');
       await p.waitForFunction(() => document.getElementById('rss-estado').textContent.length > 0, null, { timeout: 5000 }).catch(() => {});
@@ -1114,7 +1121,7 @@ function varrerPagina() {
       }
       ok('tema: em 320, 390, 768, 1024, 1120 e 1280 px, nada passa da largura da tela, o cabeçalho fica numa linha e as três opções numa linha só', largas.length === 0, largas.join(' | '));
       await temaCtx.close();
-      // Armazenamento bloqueado: o site segue o aparelho, a escolha vale na página e nada dá erro.
+      // Armazenamento bloqueado: o site segue o aparelho, o grupo não aparece (a escolha não passaria para a página seguinte) e nada dá erro.
       const bloqueado = await navegador.newContext({ viewport: { width: 390, height: 900 }, colorScheme: 'dark' });
       await bloqueado.addInitScript(() => Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new DOMException('bloqueado', 'SecurityError'); } }));
       const q = await bloqueado.newPage();
@@ -1122,10 +1129,15 @@ function varrerPagina() {
       q.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && errosQ.push(m.text()));
       q.on('pageerror', (e) => errosQ.push(e.message));
       await q.goto(`${origem}/`);
-      const antes = await q.evaluate(() => ({ tema: document.documentElement.dataset.tema, fundo: getComputedStyle(document.body).backgroundColor }));
-      await q.getByRole('radio', { name: 'Claro', exact: true }).check();
-      const depois = await q.evaluate(() => ({ tema: document.documentElement.dataset.tema, fundo: getComputedStyle(document.body).backgroundColor }));
-      ok('tema com o armazenamento bloqueado: segue o aparelho, a escolha vale na página e nada dá erro', antes.tema === 'aparelho' && antes.fundo === FUNDO_ESCURO && depois.tema === 'claro' && depois.fundo === FUNDO_CLARO && errosQ.length === 0, JSON.stringify({ antes, depois, errosQ }));
+      const antes = await q.evaluate(() => ({ tema: document.documentElement.dataset.tema, fundo: getComputedStyle(document.body).backgroundColor, grupo: document.querySelector('fieldset.tema-site').hidden }));
+      ok('tema com o armazenamento bloqueado: segue o aparelho, o grupo não aparece e nada dá erro', antes.tema === 'aparelho' && antes.fundo === FUNDO_ESCURO && antes.grupo === true && errosQ.length === 0, JSON.stringify({ antes, errosQ }));
+      // O <meta name="color-scheme"> segue a escolha (o fundo antes do estilo).
+      const meta = await navegador.newContext({ viewport: { width: 390, height: 900 }, colorScheme: 'dark' });
+      await meta.addInitScript(() => { try { localStorage.setItem('clarevo.site.tema.v1', 'claro'); } catch (e) { /* nada */ } });
+      const m = await meta.newPage();
+      await m.goto(`${origem}/`);
+      ok('tema: com "Claro" escolhido e o aparelho escuro, o <meta name="color-scheme"> diz "light"', (await m.getAttribute('meta[name="color-scheme"]', 'content')) === 'light' && (await m.evaluate(() => getComputedStyle(document.body).backgroundColor)) === FUNDO_CLARO);
+      await meta.close();
       await bloqueado.close();
       // Sem JavaScript: sem o grupo, e o site segue o aparelho.
       const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 }, colorScheme: 'dark' });

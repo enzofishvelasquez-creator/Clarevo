@@ -2,12 +2,13 @@
 /**
  * Planos da Clarevo (`planos.html`, pedido do Enzo de 18/11/2026, D-115): os cartões da seção Planos da página inicial levam para cá
  * (`#individual` e `#familia`). O que muda entre os dois planos, os recursos que os dois incluem (cada um com uma frase e o link para a
- * Ajuda ou para O app), como funciona o teste, a assinatura e o pagamento e algumas perguntas.
+ * Ajuda ou para O app), como funciona o teste, a assinatura e o pagamento e duas perguntas que não repetem o que vem antes (revisão de
+ * 18/11/2026: as outras repetiam "Como funciona" palavra por palavra).
  *
  * Os nomes, os preços, o "por mês" e as frases da assinatura vêm do núcleo (`catalogo().PLANOS`, de `packages/core/src/plano.ts`), para o
  * site e o app dizerem o mesmo; o resto foi conferido no guia de uso do app (`packages/core/src/guide`), nas decisões de `docs/00` (D-083
  * para o plano Família pago pela pessoa titular, D-093 para o Pix mês a mês, D-105 para o calendário, D-113 e `docs/52` para o Espaço
- * Negócio, que `docs/52` diz incluído no plano Individual, um negócio por pessoa) e na página O app. Nenhum recurso é prometido sem estar
+ * Negócio, incluído na assinatura, um negócio por pessoa, sem diferença entre os planos) e na página O app. Nenhum recurso é prometido sem estar
  * no app hoje. Preço ("R$" e número) só aparece nos dois cartões do começo (o teste do site confere).
  */
 const { esc } = require('../texto');
@@ -68,7 +69,7 @@ function gruposDeRecursos() {
       titulo: 'Do seu jeito',
       itens: [
         ['Anotar pelo Telegram', ajudaDoGuia('telegram'), 'Anote um gasto ou um recebimento mandando uma mensagem escrita para a Clarevo no Telegram.'],
-        ['Espaço Negócio', ajudaDoGuia('negocio'), 'Para quem tem CNPJ ou trabalha por conta: as contas do negócio num espaço separado do Pessoal, com quanto entrou, saiu e sobrou no mês. O plano Individual inclui um negócio por pessoa, sem custo a mais.'],
+        ['Espaço Negócio', ajudaDoGuia('negocio'), 'Para quem tem CNPJ ou trabalha por conta: as contas do negócio num espaço separado do Pessoal, com quanto entrou, saiu e sobrou no mês. Incluído na assinatura: um negócio por pessoa, sem custo a mais.'],
         ['Tema claro ou escuro', 'ajuda/conta.html#p-tema', 'O app segue o tema do aparelho, e em Conta dá para escolher Claro ou Escuro.'],
         ['Ocultar valores', ajudaDoGuia('ocultar-valores'), 'Esconde os valores em reais da tela e, no celular, pode pedir biometria ao abrir o app.'],
         ['Exportar meus dados', ajudaDoGuia('exportar'), 'Leve os seus gastos e recebimentos para uma planilha (CSV) ou um resumo em PDF, montado no próprio aparelho.'],
@@ -77,11 +78,14 @@ function gruposDeRecursos() {
   ];
 }
 
-/** O que muda em cada plano, além do que os dois têm: conferido em D-083, D-113, `docs/52` e no guia da Família. */
+/**
+ * O que muda em cada plano, além do que os dois têm: conferido em D-083 e no guia da Família. O Espaço Negócio não é uma diferença entre os
+ * planos (revisão de 18/11/2026): o app não limita o espaço por plano (`create_business` só recusa um segundo negócio por pessoa) e diz
+ * "Incluído no plano, um negócio por pessoa"; até o Enzo decidir outra coisa, o site diz "Incluído na assinatura", sem citar um plano só.
+ */
 const O_QUE_MUDA = {
   individual: [
     'Para uma pessoa, com o seu Pessoal, que só você vê.',
-    'Inclui o Espaço Negócio: um negócio por pessoa, sem custo a mais.',
   ],
   familiar: [
     'Uma assinatura só, paga pela pessoa titular. Quem recebe o convite para a Família não paga.',
@@ -162,19 +166,11 @@ ${grupos}
 <div class="perguntas-planos">
 <article class="pergunta" aria-labelledby="q-cartao">
 <h3 id="q-cartao">Preciso de cartão para testar?</h3>
-<p>Não. ${esc(t.plansNote)}</p>
-</article>
-<article class="pergunta" aria-labelledby="q-depois">
-<h3 id="q-depois">O que acontece se eu não assinar depois do teste?</h3>
-<p>A conta fica só para ver e exportar. ${esc(t.readOnlyWhat)}</p>
+<p>Não. O teste de ${PLANOS.diasDeTeste} dias começa sem pedir cartão.</p>
 </article>
 <article class="pergunta" aria-labelledby="q-familia">
 <h3 id="q-familia">Quem está na Família também paga?</h3>
 <p>Não. No plano Família, a pessoa titular paga a assinatura, e as pessoas convidadas para a Família usam a Clarevo sem pagar.</p>
-</article>
-<article class="pergunta" aria-labelledby="q-empresa">
-<h3 id="q-empresa">Recebi a Clarevo da minha empresa. Preciso assinar?</h3>
-<p>${esc(t.benefitNote)}</p>
 </article>
 </div>`,
       { variante: 'alt', rotulo: 'perguntas' },
