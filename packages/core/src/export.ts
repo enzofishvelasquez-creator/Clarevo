@@ -92,7 +92,7 @@ export const EXPORT_TEXT = {
   } as Readonly<Record<ExportFormat, string>>,
   contentTitle: 'O que vai no arquivo',
   contentCsv:
-    'Lançamentos: Data, Tipo, Descrição, Categoria, Valor (R$), Banco ou carteira, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga. Os movimentos dos investimentos vão em um terceiro.',
+    'Lançamentos: Data, Tipo, Descrição, Categoria, Subcategoria, Valor (R$), Banco ou carteira, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga. Os movimentos dos investimentos vão em um terceiro.',
   contentPdf:
     'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga. Os investimentos aparecem no fim, também fora de Pago e de Recebido.',
   notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do espaço Pessoal.',
@@ -220,6 +220,8 @@ export interface ExportRow {
   description: string;
   /** "Sem categoria" quando não há. */
   category: string;
+  /** Subcategoria do gasto (D-107); vazio quando não há. */
+  subcategory: string;
   amountCents: Cents;
   /** Nome da conta de origem; vazio se a conta não é conhecida. */
   account: string;
@@ -279,6 +281,7 @@ export function exportRows(records: readonly FinancialRecord[], ctx: ExportConte
     kind: recordKindOf(r),
     description: r.description,
     category: r.category ?? NO_CATEGORY_LABEL,
+    subcategory: r.subcategory ?? '',
     amountCents: r.amountCents,
     account: accountNameOf(ctx.accounts, r.accountId) ?? '',
     origin: recordOriginOf(r, ctx.commitments),
@@ -312,7 +315,8 @@ export const CSV_SEPARATOR = ';';
 /** Fim de linha do Excel. */
 export const CSV_EOL = '\r\n';
 
-export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Valor (R$)', 'Banco ou carteira', 'Origem', 'Mês do resumo'];
+/** Lançamentos: a Subcategoria (D-107) vem logo depois da Categoria, vazia quando o lançamento não tem. */
+export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Subcategoria', 'Valor (R$)', 'Banco ou carteira', 'Origem', 'Mês do resumo'];
 export const CSV_PURCHASE_HEADER: readonly string[] = ['Data da compra', 'Cartão', 'Descrição', 'Categoria', 'Valor total (R$)', 'Parcelas'];
 /** Investimentos (D-099): um movimento por linha, com o investimento, a ficha e o tipo do rendimento. */
 export const CSV_INVESTMENT_HEADER: readonly string[] = ['Data', 'Investimento', 'Tipo', 'Instituição', 'Movimento', 'Valor (R$)', 'Tipo do rendimento', 'Observação'];
@@ -352,6 +356,7 @@ export function buildRecordsCsv(rows: readonly ExportRow[]): string {
         EXPORT_KIND_LABEL[r.kind],
         csvText(r.description),
         csvText(r.category),
+        csvText(r.subcategory),
         csvAmount(r.amountCents),
         csvText(r.account),
         EXPORT_ORIGIN_LABEL[r.origin],

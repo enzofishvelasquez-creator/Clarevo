@@ -7816,7 +7816,7 @@ setInterval(async () => {
       JSON.stringify(['Este mês', 'Últimos 3 meses', 'Últimos 6 meses', 'Últimos 12 meses', 'Este ano', 'Ano passado', 'Tudo', 'Planilha (CSV)', 'Resumo em PDF']) &&
     JSON.stringify(await h3Checked()) === JSON.stringify(['Últimos 12 meses', 'Planilha (CSV)']), JSON.stringify(await h3Checked()));
   ok('H3 formato Planilha (CSV): explica as colunas, o segundo arquivo das compras no cartão e o que fica de fora (chave da nota, número do cartão, códigos internos)',
-    t.includes('Abre no Excel e no Google Planilhas') && t.includes('Data, Tipo, Descrição, Categoria, Valor (R$), Banco ou carteira, Origem e Mês do resumo (o mês em que o lançamento conta)') && t.includes('segundo arquivo') &&
+    t.includes('Abre no Excel e no Google Planilhas') && t.includes('Data, Tipo, Descrição, Categoria, Subcategoria, Valor (R$), Banco ou carteira, Origem e Mês do resumo (o mês em que o lançamento conta)') && t.includes('segundo arquivo') &&
     t.includes('Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo.'));
   ok('H3 o aviso dos valores: "O arquivo mostra os valores, mesmo com Ocultar valores ligado." e o de dados financeiros', t.includes('O arquivo mostra os valores, mesmo com Ocultar valores ligado.') && t.includes('O arquivo tem dados financeiros.'));
   ok('H3 nenhum arquivo antes de pedir: sem "Arquivo pronto" e com o botão "Preparar arquivo"', !t.includes('Arquivo pronto') && (await visibleCount('button', 'Preparar arquivo')) === 1);
@@ -7836,11 +7836,13 @@ setInterval(async () => {
   ok('H3 CSV de lançamentos: nome clarevo-lancamentos-2026-10-07.csv e UTF-8 com BOM (EF BB BF)',
     h3Lanc.name === 'clarevo-lancamentos-2026-10-07.csv' && h3Lanc.buf[0] === 0xef && h3Lanc.buf[1] === 0xbb && h3Lanc.buf[2] === 0xbf, `${h3Lanc.name} ${[...h3Lanc.buf.slice(0, 4)].join(',')}`);
   ok('H3 CSV de lançamentos: cabeçalho separado por ponto e vírgula e uma linha por lançamento (6), terminando em CRLF',
-    h3Lines[0] === '﻿Data;Tipo;Descrição;Categoria;Valor (R$);Banco ou carteira;Origem;Mês do resumo' && h3Lines.length === 8 && h3Lines[7] === '', JSON.stringify(h3Lines.slice(0, 3)));
+    h3Lines[0] === '﻿Data;Tipo;Descrição;Categoria;Subcategoria;Valor (R$);Banco ou carteira;Origem;Mês do resumo' && h3Lines.length === 8 && h3Lines[7] === '', JSON.stringify(h3Lines.slice(0, 3)));
   ok('H3 CSV de lançamentos: um gasto anotado em outra conta (Mercado, Carteira), valor com vírgula e data dd/mm/aaaa',
-    h3Lines.includes('06/10/2026;Gasto;Mercado;Mercado;1400,00;Carteira;Anotado;10/2026'), h3Lines.join(' | '));
+    h3Lines.includes('06/10/2026;Gasto;Mercado;Mercado;;1400,00;Carteira;Anotado;10/2026'), h3Lines.join(' | '));
   ok('H3 CSV de lançamentos: o gasto fixo pago (Aluguel) com a origem "Gasto fixo", e o recebimento como "Recebimento"',
-    h3Lines.includes('05/10/2026;Gasto;Aluguel;Moradia;2500,00;Conta principal;Gasto fixo;10/2026') && h3Lines.includes('01/10/2026;Recebimento;Salário;Salário;6000,00;Conta principal;Anotado;10/2026'));
+    h3Lines.includes('05/10/2026;Gasto;Aluguel;Moradia;;2500,00;Conta principal;Gasto fixo;10/2026') && h3Lines.includes('01/10/2026;Recebimento;Salário;Salário;;6000,00;Conta principal;Anotado;10/2026'));
+  ok('H3 CSV de lançamentos: a coluna Subcategoria (D-107) logo depois da Categoria, com "Aluguel" no aluguel de setembro e vazia onde não há',
+    h3Lines.includes('05/09/2026;Gasto;Aluguel;Moradia;Aluguel;2500,00;Conta principal;Anotado;09/2026'), h3Lines.join(' | '));
   ok('H3 CSV de lançamentos: sem sinal de menos, sem "R$" nem ponto de milhar nos valores, e sem as compras no cartão',
     h3Lines.slice(1, 7).every((l) => /;\d+,\d{2};/.test(l)) && !h3Lanc.text.includes('Notebook'));
   await waitText('Pronto. Confira o arquivo na pasta de downloads.').catch(() => {});
@@ -7871,9 +7873,9 @@ setInterval(async () => {
   await h3Prepare();
   const h3Esc = await h3Download('Baixar lançamentos (CSV)');
   const h3EscLines = h3Esc.text.split('\r\n');
-  ok('H3 fórmula: "=SOMA(1+1)" sai como \'=SOMA(1+1) (texto), "Sem categoria" onde não há categoria', h3EscLines.includes("07/10/2026;Gasto;'=SOMA(1+1);Sem categoria;19,90;Conta principal;Anotado;10/2026"), h3EscLines.join(' | '));
+  ok('H3 fórmula: "=SOMA(1+1)" sai como \'=SOMA(1+1) (texto), "Sem categoria" onde não há categoria', h3EscLines.includes("07/10/2026;Gasto;'=SOMA(1+1);Sem categoria;;19,90;Conta principal;Anotado;10/2026"), h3EscLines.join(' | '));
   ok('H3 fórmula: "+55…" ganha o apóstrofo e, por ter ponto e vírgula e aspas, vai entre aspas com as aspas dobradas',
-    h3EscLines.includes('07/10/2026;Gasto;"\'+55 11 99999; ""teste""";Lazer;5,00;Conta principal;Anotado;10/2026'), h3EscLines.join(' | '));
+    h3EscLines.includes('07/10/2026;Gasto;"\'+55 11 99999; ""teste""";Lazer;;5,00;Conta principal;Anotado;10/2026'), h3EscLines.join(' | '));
   ok('H3 fórmula: nenhuma célula do arquivo começa com =, +, - ou @', h3EscLines.slice(1).filter(Boolean).every((l) => !/(^|;)[=+\-@]/.test(l.replace(/"[^"]*(""[^"]*)*"/g, 'x'))), h3EscLines.join(' | '));
   const h3Compras2 = await h3Download('Baixar compras no cartão (CSV)');
   ok('H3 as compras no cartão continuam as mesmas (3) depois dos novos gastos', h3Compras2.text.split('\r\n').length === 5);

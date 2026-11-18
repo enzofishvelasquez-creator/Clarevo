@@ -1179,8 +1179,8 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     const politica = readFileSync(join(ROOT, 'docs', 'legal', 'politica-de-privacidade.md'), 'utf8');
     // Investimentos: o que a seção 3.2 lista, e só no Pessoal (a empresa não vê, seção 7).
     const investimentos = cartao('Investimentos, só no seu Pessoal');
-    // Com a ficha ampliada (D-099): os campos opcionais e o tipo do rendimento, nas duas.
-    const campos = 'o nome que você escolhe, o tipo e, se você preencher, o tipo exato, o nome da instituição, como rende, a taxa, o vencimento e quando pode resgatar; os aportes, os resgates, os rendimentos recebidos com o tipo de cada um e os valores do extrato';
+    // Com a ficha ampliada (D-099): os campos opcionais e o tipo do rendimento, nas duas. Com D-104: a descrição livre, a condição da taxa e a taxa que muda numa data.
+    const campos = 'o nome que você escolhe, o tipo e, se você preencher, o tipo exato, uma descrição livre, o nome da instituição, como rende, a taxa e a condição dela, a data em que a taxa muda e a taxa de depois, como em "120% do CDI até 31/03/2027, depois 100%", o vencimento e quando pode resgatar; os aportes, os resgates, os rendimentos recebidos com o tipo de cada um e os valores do extrato';
     expect(politica).toContain(`os investimentos que você registra (${campos})`);
     expect(investimentos).toContain(campos);
     expect(investimentos).toContain('ficam só no seu Pessoal: ninguém da Família vê, nem a empresa que oferece o benefício');
