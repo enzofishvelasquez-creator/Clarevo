@@ -61,7 +61,19 @@ import { useBusiness } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { useAccountLevel } from '@/state/access';
-import { colors, space } from '@/theme/tokens';
+import { colors, fonts, space } from '@/theme/tokens';
+
+/** Os títulos das seções de Conta (auditoria visual de 18/11/2026): só texto, sem papel de título (os cards seguem no nível 2). */
+const ACCOUNT_SECTIONS = { plan: 'Plano e espaços', device: 'Este aparelho', data: 'Dados e segurança', help: 'Ajuda e conta' } as const;
+
+/** Título curto de uma seção de Conta, acima dos cards dela. */
+function SectionTitle({ children }: { children: string }) {
+  return (
+    <Txt variant="label" color={colors.textSecondary} style={{ fontFamily: fonts.bold, marginTop: space[3], marginBottom: -space[1], letterSpacing: 0.3 }}>
+      {children}
+    </Txt>
+  );
+}
 
 /** O botão da página de licenças (D5). O texto fica aqui, e não em LEGAL_TEXT, porque core/legal.ts vai nas funções do servidor. */
 const LICENSES_LABEL = 'Licenças de código aberto';
@@ -200,21 +212,75 @@ export default function ContaScreen() {
         </Card>
         <LevelCard />
 
-        {/* Ordem de Conta (docs/10 A23): a assinatura, o que é deste aparelho (lembretes, privacidade, widget), a segurança, quem divide
-            o app com você (Família, empresa, Telegram), bancos e carteira, exportar e, por fim, ajuda, termos, sair e excluir. */}
+        {/* Ordem de Conta (docs/10 A23; auditoria visual de 18/11/2026: 17 cards numa coluna só), em seções com títulos curtos: o perfil,
+            "Enviar sugestão ou problema" e o nível; "Plano e espaços" (a assinatura e, logo depois dela, o Espaço Negócio e a Família, D-113b,
+            o benefício e o painel da empresa); "Este aparelho" (lembretes, privacidade, tema e, só no celular, o widget); "Dados e segurança"
+            (segurança, Telegram e WhatsApp, bancos e carteira, exportar e a origem do cadastro); e "Ajuda e conta" (ajuda, termos, sair e
+            excluir). */}
+        <SectionTitle>{ACCOUNT_SECTIONS.plan}</SectionTitle>
         {/* Assinatura (D-083): a situação do acesso (teste, só ver e exportar, plano, benefício ou Família) e a tela com os planos. */}
         <AccessCard />
+
+        {/* Espaço Negócio (D-113): para quem tem CNPJ ou trabalha por conta; criar, ver o negócio (Seu negócio), mudar o nome e encerrar. */}
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {BUSINESS_TEXT.accountTitle}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {business.data ? BUSINESS_TEXT.accountHintIn(business.data.name) : BUSINESS_TEXT.accountHintNone}
+          </Txt>
+          <Button
+            label={business.data ? BUSINESS_TEXT.accountOpen : BUSINESS_TEXT.accountCreate}
+            icon={Store}
+            tone="soft"
+            accessibilityLabel={business.data ? `${BUSINESS_TEXT.accountOpen}, ${business.data.name}` : undefined}
+            onPress={() => router.push(business.data ? '/negocio' : '/negocio/novo')}
+          />
+        </Card>
+
+        {/* Família (D-055): criar, convidar e administrar; abre a tela Família. */}
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {FAMILY_TEXT.accountTitle}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {family.data ? FAMILY_TEXT.accountHintIn(family.data.context.name, family.data.role) : FAMILY_TEXT.accountHintNone}
+          </Txt>
+          <Button
+            label={family.data ? FAMILY_TEXT.accountOpen : FAMILY_TEXT.accountCreate}
+            icon={Users}
+            tone="soft"
+            accessibilityLabel={family.data ? `${FAMILY_TEXT.accountOpen}, ${FAMILY_ROLE_LABEL[family.data.role]}` : undefined}
+            onPress={() => router.push('/familia')}
+          />
+        </Card>
 
         {/* Benefício pela empresa (D-056): o que a empresa oferece, ou onde colar o link do convite. */}
         <BenefitCard />
 
+        {/* Painel da empresa (D-056): só na web e só para quem administra uma organização; no celular nada aparece. */}
+        {Platform.OS === 'web' && (companies.data?.length ?? 0) > 0 ? (
+          <Card style={{ gap: space[3] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {COMPANY_TEXT.accountTitle}
+            </Txt>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {COMPANY_TEXT.accountHint}
+            </Txt>
+            <Button label={COMPANY_TEXT.accountOpen} icon={Building2} tone="soft" onPress={() => router.push('/empresa')} />
+          </Card>
+        ) : null}
+
+        <SectionTitle>{ACCOUNT_SECTIONS.device}</SectionTitle>
         <View onLayout={(e) => setRemindersY(e.nativeEvent.layout.y)}>
           <RemindersCard />
         </View>
         <PrivacyCard />
         {/* Tema (D-112): Igual ao aparelho, Claro ou Escuro, só neste aparelho. */}
         <ThemeCard />
-        <WidgetCard />
+        {/* Sem widget no navegador: o card só aparece no app para celular (auditoria de 18/11/2026). */}
+        {Platform.OS === 'web' ? null : <WidgetCard />}
+        <SectionTitle>{ACCOUNT_SECTIONS.data}</SectionTitle>
 
         <Card style={{ gap: space[3] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -235,53 +301,6 @@ export default function ContaScreen() {
           />
           <Button label="Sair em todos os aparelhos" icon={MonitorSmartphone} tone="soft" onPress={() => setConfirmAll(true)} />
         </Card>
-
-        {/* Família (D-055): criar, convidar e administrar; abre a tela Família. */}
-        <Card style={{ gap: space[3] }}>
-          <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            {FAMILY_TEXT.accountTitle}
-          </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
-            {family.data ? FAMILY_TEXT.accountHintIn(family.data.context.name, family.data.role) : FAMILY_TEXT.accountHintNone}
-          </Txt>
-          <Button
-            label={family.data ? FAMILY_TEXT.accountOpen : FAMILY_TEXT.accountCreate}
-            icon={Users}
-            tone="soft"
-            accessibilityLabel={family.data ? `${FAMILY_TEXT.accountOpen}, ${FAMILY_ROLE_LABEL[family.data.role]}` : undefined}
-            onPress={() => router.push('/familia')}
-          />
-        </Card>
-
-        {/* Espaço Negócio (D-113): para quem tem CNPJ ou trabalha por conta; criar, ver como está o negócio, mudar o nome e encerrar. */}
-        <Card style={{ gap: space[3] }}>
-          <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            {BUSINESS_TEXT.accountTitle}
-          </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
-            {business.data ? BUSINESS_TEXT.accountHintIn(business.data.name) : BUSINESS_TEXT.accountHintNone}
-          </Txt>
-          <Button
-            label={business.data ? BUSINESS_TEXT.accountOpen : BUSINESS_TEXT.accountCreate}
-            icon={Store}
-            tone="soft"
-            accessibilityLabel={business.data ? `${BUSINESS_TEXT.accountOpen}, ${business.data.name}` : undefined}
-            onPress={() => router.push(business.data ? '/negocio' : '/negocio/novo')}
-          />
-        </Card>
-
-        {/* Painel da empresa (D-056): só na web e só para quem administra uma organização; no celular nada aparece. */}
-        {Platform.OS === 'web' && (companies.data?.length ?? 0) > 0 ? (
-          <Card style={{ gap: space[3] }}>
-            <Txt variant="title" accessibilityRole="header" aria-level={2}>
-              {COMPANY_TEXT.accountTitle}
-            </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
-              {COMPANY_TEXT.accountHint}
-            </Txt>
-            <Button label={COMPANY_TEXT.accountOpen} icon={Building2} tone="soft" onPress={() => router.push('/empresa')} />
-          </Card>
-        ) : null}
 
         {/* Telegram (D-080): o mesmo, com o bot da Clarevo. Só em conta real, com o bot, e só depois do piloto fechado (no piloto, a tela
             abre pelo link /conta/telegram). */}
@@ -328,6 +347,7 @@ export default function ContaScreen() {
         {/* "Como você conheceu o Clarevo?" (D-067): opcional, só em conta real; a pessoa vê e muda a resposta. */}
         <SignupSourceAccountCard />
 
+        <SectionTitle>{ACCOUNT_SECTIONS.help}</SectionTitle>
         {/* Ajuda e contato: o canal para dúvidas, problemas e pedidos sobre os dados, com ou sem o site publicado. */}
         <Card style={{ gap: space[3] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
