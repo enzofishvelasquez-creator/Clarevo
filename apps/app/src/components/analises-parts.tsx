@@ -1,4 +1,5 @@
 import {
+  BUSINESS_WORDS,
   ANALYSES_TABS,
   ANALYSES_TEXT,
   CATEGORY_VIEWS,
@@ -36,7 +37,7 @@ import { Button, Card, IconBlock, LinkButton, Money, Skeleton, Txt, clampLines, 
 import { useCategoryViewPref } from '@/lib/category-view';
 import { useHiddenMonths } from '@/lib/evolution-memory';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
-import { useCategoryAnalysis, useCommittedUpcoming, useMonthBudget, useMonthCheckRow, useMonthsOverview, type CategoryAnalysis } from '@/state/data';
+import { useCategoryAnalysis, useCommittedUpcoming, useMonthBudget, useMonthCheckRow, useMonthsOverview, useView, type CategoryAnalysis } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, colorScheme, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -496,6 +497,8 @@ function CategoriesBody({
   useLayoutEffect(() => {
     onCardLayout(null);
   }, [view, onCardLayout]);
+  // No espaço Negócio, "Saiu em outubro de 2026" (auditoria de 18/11/2026: um vocabulário por espaço).
+  const inBusiness = useView().space === 'negocio';
   if (data.shares.length === 0) {
     return (
       <Card>
@@ -521,7 +524,7 @@ function CategoriesBody({
       <Card style={{ gap: space[3] }}>
         <View style={styles.cardHead}>
           <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ flexShrink: 1 }}>
-            {T.categories.title(month)}
+            {inBusiness ? BUSINESS_WORDS.outMonthYear(month) : T.categories.title(month)}
           </Txt>
           <Money cents={data.paidCents} variant="title" />
         </View>
@@ -571,6 +574,7 @@ export function EvolutionTab({ contextId, month, currentMonth, onOpen }: { conte
   const overview = useMonthsOverview(contextId, from, to);
   const scope = EvolutionSelectionStore.scope(user?.id, contextId);
   const hiddenMonths = useHiddenMonths(scope, 'pago');
+  const inBusiness = useView().space === 'negocio';
   const result = useMemo(() => {
     if (!overview.data) return null;
     try {
@@ -587,7 +591,7 @@ export function EvolutionTab({ contextId, month, currentMonth, onOpen }: { conte
   if (overview.isPending || !result) return <TabLoading />;
   const s = result.summary;
   return (
-    <SummaryCard title={T.evolution.title(month)} actionLabel={T.evolution.action} actionHint={T.evolution.actionHint} onAction={onOpen}>
+    <SummaryCard title={inBusiness ? BUSINESS_WORDS.outMonthYear(month) : T.evolution.title(month)} actionLabel={T.evolution.action} actionHint={T.evolution.actionHint} onAction={onOpen}>
       {s ? (
         <View style={{ gap: space[1] }}>
           {s.valueText !== null ? <Money cents={s.cents} /> : null}

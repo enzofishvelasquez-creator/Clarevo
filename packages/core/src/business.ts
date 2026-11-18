@@ -448,6 +448,8 @@ export const BUSINESS_WORDS = {
   /** "Entrou em outubro" e "Saiu em outubro", nos totais de Movimentos. */
   inMonth: (month: IsoMonth): string => `Entrou em ${formatMonthName(month)}`,
   outMonth: (month: IsoMonth): string => `Saiu em ${formatMonthName(month)}`,
+  /** "Saiu em outubro de 2026", nas Análises do negócio. */
+  outMonthYear: (month: IsoMonth): string => `Saiu em ${formatMonthYearBR(month)}`,
   emptyList: 'Entradas e saídas já feitas aparecem aqui, da mais recente para a mais antiga.',
   /** Exemplos de "Gastos fixos e parcelamentos" em Organizar, no negócio. */
   seriesExamples: 'Aluguel do ponto, DAS, maquininha e fornecedor',
