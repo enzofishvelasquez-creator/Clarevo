@@ -1,7 +1,7 @@
-import { BENEFIT_TEXT, BUSINESS_TEXT, DELETE_TEXT, FAMILY_ROLE_HELP, FAMILY_TEXT, GOALS_TEXT, LEGAL_TEXT, RETURN_TEXT, SAVINGS_TEXT } from '@clarevo/core';
+import { BUSINESS_TEXT, DELETE_TEXT, FAMILY_ROLE_HELP, FAMILY_TEXT, WHO_SEES_TEXT } from '@clarevo/core';
 import { router } from 'expo-router';
-import { User } from 'lucide-react-native';
-import { View } from 'react-native';
+import { Building2, ShieldCheck, User, Users, type LucideIcon } from 'lucide-react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { MemberLine } from '@/components/family-parts';
 import { ContextPill, SubHeader } from '@/components/header';
@@ -11,9 +11,15 @@ import { useView } from '@/state/data';
 import { useBusiness } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
-import { colors, space } from '@/theme/tokens';
+import { colors, fonts, space } from '@/theme/tokens';
 
-/** Nomes e permissões reais do contexto, sem selo genérico. */
+const T = WHO_SEES_TEXT;
+
+/**
+ * Nomes e permissões reais do contexto, sem selo genérico. Em duas listas curtas, "Quem vê" e "Quem não vê" (auditoria visual de
+ * 18/11/2026: eram nove parágrafos, com "a empresa não vê" repetido quatro vezes), com os mesmos fatos (WHO_SEES_TEXT). Na Família, as
+ * pessoas e o papel de cada uma; no espaço Negócio, só a própria pessoa. Depois, o que acontece ao excluir a conta.
+ */
 export default function QuemVeScreen() {
   const { user } = useSession();
   const { space: kind } = useView();
@@ -21,81 +27,63 @@ export default function QuemVeScreen() {
   const inFamily = kind === 'familia' && family;
   const business = useBusiness().data;
   const inBusiness = kind === 'negocio' && business;
+  const name = user?.displayName ?? '';
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
     <SubHeader title="Quem vê estes dados?" right={<ContextPill label={kind === 'pessoal' ? 'Pessoal' : kind === 'familia' ? 'Família' : (business?.name ?? BUSINESS_TEXT.context)} fixed />} />
     <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
-      {kind === 'pessoal' ? (
-        <Card style={{ flexDirection: 'row', gap: space[3], alignItems: 'center' }}>
-          <User size={22} color={colors.brandText} />
-          <View style={{ flex: 1 }}>
-            <Txt variant="label">{user?.displayName} (você)</Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
-              {LEGAL_TEXT.whoSees.personal}
-            </Txt>
-          </View>
-        </Card>
-      ) : null}
-      {/* Espaço Negócio (D-113): só a própria pessoa vê e anota. */}
-      {inBusiness ? (
-        <Card style={{ flexDirection: 'row', gap: space[3], alignItems: 'center' }}>
-          <User size={22} color={colors.brandText} />
-          <View style={{ flex: 1 }}>
-            <Txt variant="label">{user?.displayName} (você)</Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
-              {BUSINESS_TEXT.whoSees}
-            </Txt>
-          </View>
-        </Card>
-      ) : null}
-      {inFamily ? (
-        <>
-          <Card style={{ gap: space[1] }}>
-            <Txt variant="title" accessibilityRole="header" aria-level={2}>
-              {family.context.name}
-            </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
-              {FAMILY_TEXT.whoSeesIntro}
-            </Txt>
-            {family.members
-              .filter((m) => m.status === 'ativo')
-              .map((m) => (
-                <View key={m.personId} style={{ gap: 0 }}>
-                  <MemberLine member={m} />
-                  <Txt variant="caption" color={colors.textSecondary} style={{ marginLeft: 36 + space[3], marginTop: -space[1] }}>
-                    {FAMILY_ROLE_HELP[m.role]}
-                  </Txt>
-                </View>
-              ))}
-          </Card>
-          <Txt color={colors.textSecondary}>{FAMILY_TEXT.whoSeesNote}</Txt>
-          <Txt color={colors.textSecondary}>{FAMILY_TEXT.privacy}</Txt>
-        </>
-      ) : null}
-      <Txt color={colors.textSecondary}>
-        Se uma empresa oferecer a Clarevo como benefício, ela administra seu acesso ao plano. Seus registros financeiros têm permissões
-        próprias e não ficam visíveis para a empresa.
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {T.seesTitle}
       </Txt>
-      {/* O que a empresa vê (D-056): e-mails que convidou, situação e datas das licenças; nunca finanças nem o uso do app. */}
-      <Txt color={colors.textSecondary}>{BENEFIT_TEXT.whoSees}</Txt>
-      {kind === 'pessoal' ? (
-        <>
-          {family ? <Txt color={colors.textSecondary}>{FAMILY_TEXT.privacy}</Txt> : null}
-          <Txt color={colors.textSecondary}>
-            Gastos fixos e parcelamentos também ficam só no seu Pessoal, sem nenhuma outra pessoa do app ver. A empresa que oferece o benefício não
-            vê nada disso, nem em números somados aos de outras pessoas. Contas do ano, como IPVA, IPTU e matrícula, seguem a mesma regra.
+      {inFamily ? (
+        <Card style={{ gap: space[1] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={3}>
+            {family.context.name}
           </Txt>
-          {/* Revisão dos últimos meses (D-030(9)): só datas, lidas só pela própria pessoa. */}
-          <Txt color={colors.textSecondary}>{RETURN_TEXT.privacy}</Txt>
-          {/* Ciclos B, C e D: renda de referência, renda comprometida, metas e simulações. */}
-          <Txt color={colors.textSecondary}>{GOALS_TEXT.whoSeesGoals}</Txt>
-          {/* Plano de guardar (D-036): a resposta, o valor por mês e as datas de volta. */}
-          <Txt color={colors.textSecondary}>{SAVINGS_TEXT.privacy}</Txt>
-        </>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {FAMILY_TEXT.whoSeesIntro}
+          </Txt>
+          {family.members
+            .filter((m) => m.status === 'ativo')
+            .map((m) => (
+              <View key={m.personId} style={{ gap: 0 }}>
+                <MemberLine member={m} />
+                <Txt variant="caption" color={colors.textSecondary} style={{ marginLeft: 36 + space[3], marginTop: -space[1] }}>
+                  {FAMILY_ROLE_HELP[m.role]}
+                </Txt>
+              </View>
+            ))}
+          <Txt variant="caption" color={colors.textSecondary} style={{ marginTop: space[2] }}>
+            {FAMILY_TEXT.whoSeesNote}
+          </Txt>
+        </Card>
       ) : null}
-      {/* A equipe do Clarevo (D-064, política seção 7, pergunta 14 ao advogado): a redação que a política propõe, sem marcador. */}
-      <Txt color={colors.textSecondary}>{LEGAL_TEXT.whoSees.team}</Txt>
+      <Card style={styles.list}>
+        {inFamily ? null : <Item icon={User} label={T.you(name)} text={inBusiness ? BUSINESS_TEXT.whoSees : T.personalYou} />}
+        {/* O que a empresa vê (D-056): administra o acesso, os e-mails que convidou, a situação e as datas das licenças. */}
+        <Item icon={Building2} label={T.companyLabel} text={T.companySees} />
+        {/* A equipe da Clarevo (D-064, política seção 7, pergunta 14 ao advogado): a redação que a política propõe. */}
+        <Item icon={ShieldCheck} label={T.teamLabel} text={T.team} />
+      </Card>
+
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {T.notSeesTitle}
+      </Txt>
+      <Card style={styles.list}>
+        {/* O Pessoal (D-030(9), D-036, ciclos B, C e D): só a própria pessoa; com Família, o Pessoal de cada pessoa continua só dela. */}
+        <Item
+          icon={Users}
+          label={T.othersLabel}
+          text={inFamily ? FAMILY_TEXT.privacy : inBusiness ? T.othersBusiness : family ? `${T.othersPersonal} ${FAMILY_TEXT.privacy}` : T.othersPersonal}
+        />
+        {/* A empresa nunca vê finanças, nem somadas, nem o uso do app (D-056). */}
+        <Item icon={Building2} label={T.companyLabel.replace(/, se houver$/, '')} text={T.companyNotSees} />
+      </Card>
+
       {/* Excluir a conta (D-058): o Pessoal é apagado de verdade, e o que foi anotado na Família continua sem nome. */}
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {T.deletionTitle}
+      </Txt>
       <Txt color={colors.textSecondary}>{DELETE_TEXT.whoSees}</Txt>
       <LinkButton label={DELETE_TEXT.whoSeesLink} onPress={() => router.push('/conta/excluir')} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
       <TopicLink slug="empresa-ve" label="A empresa vê meus gastos?" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
@@ -104,3 +92,25 @@ export default function QuemVeScreen() {
     </View>
   );
 }
+
+/** Uma linha das listas: o ícone, quem (em negrito) e o que vê ou não vê. */
+function Item({ icon: Icon, label, text }: { icon: LucideIcon; label: string; text: string }) {
+  return (
+    <View style={styles.item}>
+      <Icon size={20} color={colors.brandText} style={{ marginTop: 2 }} aria-hidden />
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+          {label}
+        </Txt>
+        <Txt variant="caption" color={colors.textSecondary}>
+          {text}
+        </Txt>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  list: { gap: space[4] },
+  item: { flexDirection: 'row', gap: space[3], alignItems: 'flex-start' },
+});
