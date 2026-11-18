@@ -928,7 +928,8 @@ function lerLinhasSgs(json) {
         const valor = typeof r.valor === 'number' ? r.valor : typeof r.valor === 'string' && /^-?\d+(?:[.,]\d+)?$/.test(r.valor.trim()) ? Number(r.valor.trim().replace(',', '.')) : NaN;
         if (!data || !Number.isFinite(valor))
             continue;
-        const fim = typeof r.datafim === 'string' ? (0, dates_1.parseDateBR)(r.datafim) : null;
+        const fimBruto = typeof r.dataFim === 'string' ? r.dataFim : r.datafim;
+        const fim = typeof fimBruto === 'string' ? (0, dates_1.parseDateBR)(fimBruto) : null;
         linhas.push({ data, valor, fim });
     }
     return linhas.sort((a, b) => a.data.localeCompare(b.data));

@@ -44,7 +44,7 @@ const SGS = {
     const m = mes > 12 ? mes - 12 : mes;
     return { data: `01/${String(m).padStart(2, '0')}/${ano}`, valor: '0.40' };
   }),
-  poupanca: [{ data: '16/11/2026', datafim: '16/12/2026', valor: '0.6721' }, { data: '17/11/2026', datafim: '17/12/2026', valor: '0.6719' }],
+  poupanca: [{ data: '16/11/2026', dataFim: '16/12/2026', valor: '0.6721' }, { data: '17/11/2026', dataFim: '17/12/2026', valor: '0.6719' }],
   ptax: [{ data: '13/11/2026', valor: '5.3911' }, { data: '14/11/2026', valor: '5.3870' }],
 };
 
@@ -82,6 +82,12 @@ describe('indicadores: séries e leitura', () => {
       { data: '2026-01-02', valor: 1.5, fim: null },
     ]);
     expect(lerLinhasSgs({ erro: 'x' })).toEqual([]);
+  });
+
+  it('poupança: lê o fim do período em "dataFim", como a API devolve, e também em "datafim"', () => {
+    expect(lerLinhasSgs([{ data: '17/11/2026', dataFim: '17/12/2026', valor: '0.6701' }])).toEqual([{ data: '2026-11-17', valor: 0.6701, fim: '2026-12-17' }]);
+    expect(lerLinhasSgs([{ data: '17/11/2026', datafim: '17/12/2026', valor: '0.6701' }])).toEqual([{ data: '2026-11-17', valor: 0.6701, fim: '2026-12-17' }]);
+    expect(lerIndicador('poupanca', [{ data: '17/11/2026', dataFim: '17/12/2026', valor: '0.6701' }], '2026-11-18')).toEqual({ valor: 0.6701, data: '2026-11-17', fim: '2026-12-17' });
   });
 
   it('CDI: a taxa ao dia vira taxa ao ano em 252 dias úteis', () => {
