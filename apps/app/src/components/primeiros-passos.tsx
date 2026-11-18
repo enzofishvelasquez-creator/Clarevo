@@ -1,12 +1,13 @@
-import { DEMO_EMAIL, SAVINGS_TEXT } from '@clarevo/core';
+import { BUSINESS_TEXT, DEMO_EMAIL, SAVINGS_TEXT } from '@clarevo/core';
 import { router } from 'expo-router';
-import { ArrowDownLeft, ArrowUpRight, Check, ChevronRight, PiggyBank, Repeat, type LucideIcon } from 'lucide-react-native';
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronRight, PiggyBank, Repeat, Store, type LucideIcon } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, ReduceMotion } from 'react-native-reanimated';
 
 import { Card, LinkButton, Txt } from '@/components/ui';
 import { useDoneSteps, useFirstSteps } from '@/lib/onboarding';
+import { useBusiness } from '@/state/business';
 import { useMonthRecords, useSavingsStepDone, useSeriesList, useView } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
@@ -85,6 +86,9 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
   const records = useMonthRecords(eligible ? contextId : undefined, currentMonth);
   const savings = useSavingsStepDone(eligible ? contextId : undefined);
   const summary = records.summary;
+  // "Tem um negócio?" (D-113b): só para quem, com certeza, ainda não tem um espaço Negócio.
+  const business = useBusiness();
+  const noBusiness = business.isSuccess && business.data === null;
   const ready = eligible && series.isSuccess && records.isSuccess && summary !== null && remembered.steps !== null;
   const live: Record<Step['key'], boolean> = {
     fixos: Boolean(series.data && series.data.length > 0),
@@ -166,6 +170,11 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
         </View>
         {/* Quem não tem gastos fixos conclui o primeiro passo sem cadastrar nada (docs/10 A25). */}
         {done.fixos ? null : <LinkButton label="Não tenho gastos fixos" style={styles.dismiss} onPress={() => rememberSteps(['fixos'])} />}
+        {/* O espaço Negócio (D-113b): uma linha a mais, que não conta como passo, para quem tem CNPJ ou trabalha por conta achar o espaço
+            logo no começo (o "+" do seletor, no alto, também cria). Some quando a pessoa cria o negócio e junto com o card. */}
+        {noBusiness ? (
+          <LinkButton label={BUSINESS_TEXT.firstStepsTip} icon={Store} trailing={ChevronRight} style={styles.dismiss} onPress={() => router.push('/negocio/novo')} />
+        ) : null}
         <LinkButton label="Agora não" style={styles.dismiss} onPress={() => close('dispensado')} />
       </Card>
     </Animated.View>

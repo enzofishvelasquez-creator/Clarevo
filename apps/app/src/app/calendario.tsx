@@ -89,7 +89,7 @@ export default function CalendarioScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={T.title} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title={T.title} right={<ContextPill label="Pessoal" switchable />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <Txt color={colors.textSecondary}>{T.intro}</Txt>
         <View style={{ gap: space[1] }}>
