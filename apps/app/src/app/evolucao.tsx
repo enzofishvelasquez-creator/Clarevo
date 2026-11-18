@@ -1,6 +1,7 @@
 import {
   EVOLUTION_DEFAULT_METRIC,
   EVOLUTION_DEFAULT_WINDOW,
+  evolutionStartWindow,
   EVOLUTION_METRICS,
   EVOLUTION_TEXT,
   EvolutionSelectionStore,
@@ -28,18 +29,18 @@ import {
 import { router, type Href } from 'expo-router';
 import { Minus, Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { CustomComparisonNotice, EvolutionChart, MonthPanelCard, Phase3PanelCard, StatsSection, ValuesTable } from '@/components/evolucao-parts';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
-import { Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
+import { Button, Card, Screen, Skeleton, Txt, spaceKeyPress } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { evolutionSelection, useHiddenMonths } from '@/lib/evolution-memory';
 import { useEvolutionCommitted, useEvolutionGaps, useEvolutionSavings, useEvolutionWindowMonths, useMonthsOverviewChunks, useView, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
-import { colors, space } from '@/theme/tokens';
+import { colors, fonts, radius, space } from '@/theme/tokens';
 
 const T = EVOLUTION_TEXT;
 
@@ -59,6 +60,37 @@ const T = EVOLUTION_TEXT;
  * referência é "sem base", e mês sem registros fica fora das médias: nunca viram zero. Cada valor tem a própria seleção de meses fora da
  * comparação (T13). "Entender o que mudou" segue só em Recebido e Pago.
  */
+/**
+ * Controle segmentado (o desenho de "Barras | Bolhas" das Análises): um trilho com as opções lado a lado, a escolhida em branco. Rádios num
+ * grupo com nome; com `columns`, as opções quebram em linhas de N.
+ */
+function Segmented({ label, options, columns }: { label: string; options: { key: string; label: string; selected: boolean; onPress: () => void }[]; columns?: number }) {
+  return (
+    <View style={styles.segTrack} accessibilityRole="radiogroup" accessibilityLabel={label}>
+      {options.map((o) => (
+        <Pressable
+          key={o.key}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: o.selected }}
+          aria-checked={o.selected}
+          onPress={o.onPress}
+          {...spaceKeyPress(o.onPress)}
+          style={(st) => [
+            styles.segOption,
+            columns ? { flexBasis: `${Math.floor(100 / columns) - 3}%`, flexGrow: 1 } : { flex: 1 },
+            o.selected && styles.segSelected,
+            st.pressed && { opacity: 0.85 },
+            (st as { focused?: boolean }).focused && styles.segFocus,
+          ]}>
+          <Txt variant="label" color={o.selected ? colors.brandText : colors.text} style={{ fontFamily: fonts.bold, textAlign: 'center' }}>
+            {o.label}
+          </Txt>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 export default function EvolucaoScreen() {
   const { today, user } = useSession();
   const currentMonth = monthOf(today);
@@ -67,14 +99,24 @@ export default function EvolucaoScreen() {
   const contextId = work.data?.contextId;
   const canWrite = work.data?.canWrite ?? true;
   const [metric, setMetric] = useState<EvolutionSelectionMetric>(EVOLUTION_DEFAULT_METRIC);
-  const [chosenWindow, setWindowMonths] = useState<EvolutionWindow>(EVOLUTION_DEFAULT_WINDOW);
+  // Sem escolha da pessoa, a janela de abertura sai dos dados (auditoria de 18/11/2026: com histórico curto e recente, 3 meses, para a tela
+  // não abrir num gráfico quase vazio); depois de uma escolha, vale a escolha.
+  const [chosenWindow, setWindowMonths] = useState<EvolutionWindow | null>(null);
+  const [startOverview, setStartOverview] = useState<EvolutionWindow | null>(null);
   // Recebido e Pago vão até 36 meses (D-105); Renda comprometida e Guardado em metas, até 12 (com 24 ou 36 escolhidos, mostram 12).
-  const windowMonths = evolutionWindowFor(metric, chosenWindow);
+  const windowMonths = evolutionWindowFor(metric, chosenWindow ?? startOverview ?? EVOLUTION_DEFAULT_WINDOW);
   const [chosen, setChosen] = useState<IsoMonth | null>(null);
   // months_overview em pedaços de até 12 meses: até 12, a leitura de sempre; com 24 ou 36, dois ou três pedaços (D-105).
   const phase3 = isPhase3Metric(metric);
   const chunks = useMemo(() => evolutionFetchChunks(currentMonth, phase3 ? 12 : windowMonths), [currentMonth, phase3, windowMonths]);
   const overview = useMonthsOverviewChunks(contextId, chunks);
+  // A janela de abertura, uma vez por espaço, com a primeira leitura (as janelas de 3 e 6 meses usam a mesma leitura de 12 meses).
+  const startFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!contextId || !overview.data || startFor.current === contextId) return;
+    startFor.current = contextId;
+    setStartOverview(evolutionStartWindow(overview.data, currentMonth));
+  }, [contextId, overview.data, currentMonth]);
   const scope = EvolutionSelectionStore.scope(user?.id, contextId);
   const hidden = useHiddenMonths(scope, metric);
   const gapMonths = useEvolutionGaps(contextId, phase3 ? 12 : windowMonths);
@@ -173,7 +215,7 @@ export default function EvolucaoScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={T.title} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title={T.title} right={<ContextPill label="Pessoal" switchable />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <View style={{ gap: space[1] }}>
           <Txt color={colors.textSecondary}>{subtitle.base}</Txt>
@@ -185,16 +227,17 @@ export default function EvolucaoScreen() {
         </View>
 
         <View style={{ gap: space[3] }}>
-          <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={T.metricGroup}>
-            {EVOLUTION_METRICS.map((m) => (
-              <Chip key={m} label={T.metrics[m]} selected={metric === m} onPress={() => pickMetric(m)} />
-            ))}
-          </View>
-          <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={T.windowGroup}>
-            {evolutionWindowsFor(metric).map((w) => (
-              <Chip key={w} label={T.windowLabel[w]} selected={windowMonths === w} onPress={() => pickWindow(w)} />
-            ))}
-          </View>
+          {/* Dois controles segmentados (auditoria de 18/11/2026: eram 9 chips em 4 linhas): o valor, em duas linhas de dois, e o período,
+              numa linha. Os mesmos rádios, com os mesmos nomes. */}
+          <Segmented
+            label={T.metricGroup}
+            options={EVOLUTION_METRICS.map((m) => ({ key: m, label: T.metrics[m], selected: metric === m, onPress: () => pickMetric(m) }))}
+            columns={2}
+          />
+          <Segmented
+            label={T.windowGroup}
+            options={evolutionWindowsFor(metric).map((w) => ({ key: String(w), label: T.windowLabel[w], selected: windowMonths === w, onPress: () => pickWindow(w) }))}
+          />
           {phase3 ? (
             <Txt variant="caption" color={colors.textSecondary}>
               {T.windowPhase3Note}
@@ -290,6 +333,10 @@ function Phase3EmptyCard({ view, canWrite, context, referenceFrom }: { view: Evo
 
 const styles = StyleSheet.create({
   filters: { flexDirection: 'row', gap: space[2], flexWrap: 'wrap' },
+  segTrack: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.muted, borderRadius: radius.md, padding: 4, gap: 4 },
+  segOption: { minHeight: 44, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[1], paddingVertical: space[1] },
+  segSelected: { backgroundColor: colors.surface },
+  segFocus: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 1 } as object,
   chartCard: { paddingHorizontal: space[1], paddingVertical: space[4] },
   liveClip: { position: 'absolute', width: 1, height: 1, overflow: 'hidden' },
   liveText: { width: 240 },

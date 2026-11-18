@@ -28,6 +28,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
+import { BudgetBar } from '@/components/budget-bar';
 import { MoneyTxt } from '@/components/money-text';
 import { MonthCheckBlock } from '@/components/month-check';
 import { EmptyState, ErrorState } from '@/components/states';
@@ -574,7 +575,9 @@ export function EvolutionTab({ contextId, month, currentMonth, onOpen }: { conte
     if (!overview.data) return null;
     try {
       const view = buildEvolutionView({ overview: overview.data, metric: 'pago', windowMonths: 12, currentMonth, hiddenMonths });
-      return { summary: analysesEvolutionSummary(view, month), from: view.from };
+      // A prévia (auditoria de 18/11/2026): o Pago dos últimos 6 meses até o escolhido, na mesma escala, sem cor de ranking.
+      const recent = view.points.filter((pt) => pt.month <= month).slice(-6);
+      return { summary: analysesEvolutionSummary(view, month), from: view.from, recent };
     } catch {
       // Linha que o banco nunca devolveria: erro, nunca um resumo com dado parcial.
       return 'erro' as const;
@@ -602,7 +605,44 @@ export function EvolutionTab({ contextId, month, currentMonth, onOpen }: { conte
       ) : (
         <Txt color={colors.textSecondary}>{T.evolution.outside(result.from)}</Txt>
       )}
+      {result.recent.length > 1 ? <RecentMonths points={result.recent} /> : null}
     </SummaryCard>
+  );
+}
+
+/**
+ * Os últimos meses da Evolução numa lista curta (auditoria de 18/11/2026): o mês, o valor (ou "Sem registros", nunca R$ 0,00 sem a
+ * conferência) e uma barra na escala do maior mês da lista, numa cor só. O gráfico completo, a média e a mediana ficam em "Abrir Evolução".
+ */
+function RecentMonths({ points }: { points: readonly { month: IsoMonth; cents: number; title: string; valueText: string | null; hasValue: boolean }[] }) {
+  const max = Math.max(1, ...points.map((pt) => (pt.hasValue ? pt.cents : 0)));
+  return (
+    <View style={{ gap: space[2] }}>
+      <Txt variant="label" accessibilityRole="header" aria-level={3} style={{ fontFamily: fonts.bold }}>
+        {T.evolution.recentTitle}
+      </Txt>
+      {points.map((pt) => (
+        <View key={pt.month} style={{ gap: 4 }}>
+          <View style={styles.recentRow}>
+            <Txt variant="caption" style={{ flex: 1 }}>
+              {pt.title}
+            </Txt>
+            {pt.valueText !== null ? (
+              <MoneyTxt variant="caption" style={[tabular, { fontFamily: fonts.bold }]}>
+                {pt.valueText}
+              </MoneyTxt>
+            ) : (
+              <Txt variant="caption" color={colors.textSecondary}>
+                {T.evolution.noRecords}
+              </Txt>
+            )}
+          </View>
+          <View style={styles.recentTrack} {...decorative}>
+            {pt.hasValue ? <View style={[styles.recentFill, { width: `${Math.max(2, Math.round((pt.cents / max) * 100))}%` }]} /> : null}
+          </View>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -635,6 +675,8 @@ export function UpcomingTab({ contextId, month, onOpen }: { contextId: string | 
 /** Orçamento: o total orçado e usado do mês e a categoria com o maior percentual. O botão abre o Orçamento no mesmo mês. */
 export function BudgetTab({ contextId, month, onOpen }: { contextId: string | undefined; month: IsoMonth; onOpen: () => void }) {
   const budget = useMonthBudget(contextId, month);
+  const hidden = useValuesHidden();
+  const maskLabel = (label: string) => maskMoneyLabel(label, hidden);
   if (budget.isError) return <TabError onRetry={() => budget.refetch()} />;
   if (budget.isPending || !budget.summary) return <TabLoading />;
   const s = analysesBudgetSummary(budget.summary);
@@ -654,6 +696,24 @@ export function BudgetTab({ contextId, month, onOpen }: { contextId: string | un
           ) : null}
         </View>
       )}
+      {/* A prévia (auditoria de 18/11/2026): cada categoria com orçamento, na ordem de sempre (sem ranking), com a barra do Orçamento. */}
+      {budget.summary.rows.length > 0 ? (
+        <View style={{ gap: space[3] }}>
+          {budget.summary.rows.map((r) => (
+            <View key={r.category} style={{ gap: 4 }} accessible accessibilityLabel={maskLabel(r.a11yLabel)}>
+              <View style={styles.recentRow}>
+                <Txt variant="caption" style={{ flex: 1, fontFamily: fonts.bold }}>
+                  {r.category}
+                </Txt>
+                <MoneyTxt variant="caption" style={tabular}>
+                  {r.amountLine}
+                </MoneyTxt>
+              </View>
+              <BudgetBar solidTenths={r.solidTenths} stripedTenths={r.stripedTenths} minimal />
+            </View>
+          ))}
+        </View>
+      ) : null}
     </SummaryCard>
   );
 }
@@ -676,6 +736,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   tabSelected: { backgroundColor: colors.brand, borderColor: colors.brand },
+  recentRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  recentTrack: { height: 8, borderRadius: radius.pill, backgroundColor: colors.brandTint, overflow: 'hidden' },
+  recentFill: { height: 8, borderRadius: radius.pill, backgroundColor: colors.brandMark },
   cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space[2], flexWrap: 'wrap' },
   track: { flexDirection: 'row', backgroundColor: colors.muted, borderRadius: radius.md, padding: 4, gap: 4 },
   option: { flex: 1, minHeight: 48, borderRadius: radius.sm, flexDirection: 'row', gap: space[1], alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[2] },
