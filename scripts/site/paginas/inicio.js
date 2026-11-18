@@ -11,6 +11,7 @@ const { montarPagina, marcadoresEmHtml, bloco, celular, dominioDe } = require('.
 const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
+const { ANCORA_DOS_PLANOS } = require('./planos');
 
 const ARQUIVO = 'index.html';
 /** A mensagem central (Manual v2.2, seção 19) e a frase de apoio: as mesmas de `docs/lojas/ficha.md` e das imagens de compartilhamento. */
@@ -25,17 +26,19 @@ const DESCRICAO_CURTA = `${MENSAGEM_CENTRAL} Um app de finanças pessoais e da f
 
 /**
  * A seção Planos (pedido do Enzo, 16/11/2026): os dois planos com os nomes, os preços e as frases da tela Assinatura do app, lidos do
- * núcleo (`catalogo().PLANOS`), para o site e o app dizerem o mesmo. Enquanto a assinatura não abre (`PLANOS.aberta`, o SUBSCRIBE_OPEN
+ * núcleo (`catalogo().PLANOS`), para o site e o app dizerem o mesmo. Desde 18/11/2026 (D-115), cada cartão leva à página Planos
+ * (`planos.html#individual` e `#familia`) por um link só, que cobre o cartão inteiro (sem elemento interativo dentro de outro). Enquanto a assinatura não abre (`PLANOS.aberta`, o SUBSCRIBE_OPEN
  * do app), a seção diz, com a frase da tela Assinatura, que a assinatura abre no lançamento e que nada é cobrado até lá.
  * `u` monta o caminho relativo de um link interno.
  */
 function conteudoPlanos(PLANOS, u) {
   const cartoes = PLANOS.texto.plans
     .map(
-      (p) => `<article class="cartao plano">
+      (p) => `<article class="cartao plano plano-link">
 <h3>${esc(PLANOS.nome[p.plan])}</h3>
 <p class="preco"><span class="preco-valor">${esc(PLANOS.preco(p.plan))}</span>${esc(PLANOS.porMes)}</p>
 <p>${esc(p.who)}</p>
+<p class="ver-plano"><a href="${u(`planos.html#${ANCORA_DOS_PLANOS[p.plan]}`)}">Ver o que o plano ${esc(PLANOS.nome[p.plan])} inclui</a></p>
 </article>`,
     )
     .join('\n');

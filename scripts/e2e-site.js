@@ -857,6 +857,41 @@ function varrerPagina() {
       await p.close();
     }
 
+    // 7c3. Planos (D-115): cada cartão da página inicial leva à página Planos, no plano dele; a página tem os dois planos, os recursos com
+    // links que abrem, como funciona e as perguntas; nada passa da largura da tela.
+    {
+      const p = await pagina();
+      await p.goto(`${origem}/`);
+      const cartoes = await p.$$eval('section[aria-labelledby="planos"] article.plano-link', (as) => as.map((a) => ({ links: a.querySelectorAll('a, button, input').length, nome: a.querySelector('a').textContent, href: a.querySelector('a').getAttribute('href') })));
+      ok('planos: os dois cartões da página inicial com um link só cada, com nome claro, para planos.html#individual e #familia', JSON.stringify(cartoes) === JSON.stringify([{ links: 1, nome: 'Ver o que o plano Individual inclui', href: 'planos.html#individual' }, { links: 1, nome: 'Ver o que o plano Família inclui', href: 'planos.html#familia' }]), JSON.stringify(cartoes));
+      // Clicar no cartão (fora do texto do link) abre o plano na página Planos.
+      const familia = p.locator('section[aria-labelledby="planos"] article.plano-link').nth(1);
+      const caixa = await familia.boundingBox();
+      await p.mouse.click(caixa.x + caixa.width - 20, caixa.y + 20);
+      await p.waitForURL(/\/planos(\.html)?#familia$/);
+      const alvo = await p.evaluate(() => { const a = document.querySelector('#familia'); const r = a.getBoundingClientRect(); return { titulo: a.querySelector('h3').textContent, visivel: r.top >= 0 && r.top < window.innerHeight, alvo: a.matches(':target') }; });
+      ok('planos: clicar em qualquer ponto do cartão Família abre a página Planos no plano Família', alvo.titulo === 'Família' && alvo.visivel && alvo.alvo, JSON.stringify(alvo));
+      const secoes = await p.$$eval('main h2', (hs) => hs.map((h) => h.id));
+      const links = await p.$$eval('#recursos ~ .grupos-recursos a, #recursos + p + .grupos-recursos a', (as) => as.map((a) => a.href));
+      const quebrados = [];
+      for (const l of links) {
+        const [endereco, ancora] = l.split('#');
+        const r = await ctx.request.get(endereco);
+        if (!r.ok() || (ancora && !(await r.text()).includes(`id="${ancora}"`))) quebrados.push(l);
+      }
+      ok('planos: a página tem os dois planos, os recursos, como funciona e as perguntas, e os 14 links dos recursos abrem no lugar certo', JSON.stringify(secoes) === JSON.stringify(['comparar', 'recursos', 'como-funciona', 'perguntas']) && links.length === 14 && quebrados.length === 0, `${secoes} ${links.length} ${quebrados.join(' | ')}`);
+      const largas = [];
+      for (const largura of [320, 390, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        for (const c of ['', 'planos']) {
+          await p.goto(`${origem}/${c}`);
+          if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${c || 'início'} em ${largura} px`);
+        }
+      }
+      ok('planos: nada passa da largura da tela em 320, 390 e 1280 px (início e Planos)', largas.length === 0, largas.join(' | '));
+      await p.close();
+    }
+
     // 7d. Imagens das matérias de Novidades (D-114): capa e telas ao lado das seções, do próprio site, com largura, altura e texto
     // alternativo; a tela larga (o painel da empresa) embaixo do texto; no tema claro, a versão clara das telas.
     {

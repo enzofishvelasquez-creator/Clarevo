@@ -142,6 +142,7 @@ const PAGINAS_BASE = [
   'index.html',
   'comece.html',
   'app/index.html',
+  'planos.html',
   'empresas/index.html',
   'aprender/index.html',
   'aprender/agenda.html',
@@ -364,7 +365,7 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     else if (/^(aprender|calculadoras|novidades|ajuda)\//.test(nome)) expect(cabecalho.match(/class="secao-atual"/g)?.length, `${nome}: seção atual`).toBe(2);
     // Rodapé em todas: todas as seções, as páginas legais e "[RAZÃO SOCIAL] · CNPJ [CNPJ]" (com os valores, quando houver).
     const rodape = /<footer class="rodape">([\s\S]*?)<\/footer>/.exec(html)?.[1] ?? '';
-    for (const p of ['index.html', 'comece.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'imprensa.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
+    for (const p of ['index.html', 'comece.html', 'app/index.html', 'planos.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'imprensa.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
       expect(rodape, `${nome}: rodapé sem ${p}`).toContain(`<a href="${visto(nome, p)}">`);
     }
     expect(rodape, `${nome}: rodapé`).toMatch(/·\s*CNPJ\s/);
@@ -872,6 +873,48 @@ describe('site público: as páginas geradas', () => {
     expect(secao).not.toMatch(/[\u2013\u2014]/);
     // Com a assinatura aberta, o aviso sai.
     expect(conteudoPlanos({ ...PLANOS, aberta: true }, (d) => d)).not.toContain(ACCESS_TEXT.notOpenYet);
+  });
+
+  // Planos (D-115, 18/11/2026): os cartões da página inicial levam à página Planos, que diz o que muda entre os dois, o que os dois
+  // incluem (cada recurso com link para a Ajuda ou O app), como funciona e algumas perguntas, com os textos do núcleo.
+  it('Planos: cada cartão da página inicial leva à página Planos, com um link só; a página tem os dois planos, os recursos, como funciona e as perguntas', () => {
+    const inicio = html('index.html');
+    const secao = /<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/.exec(inicio)![0];
+    for (const [plano, ancora] of [['individual', 'individual'], ['familiar', 'familia']] as const) {
+      const cartao = new RegExp(`<article class="cartao plano plano-link">\\n<h3>${PLAN_NAME[plano]}</h3>[\\s\\S]*?</article>`).exec(secao)?.[0] ?? '';
+      expect(cartao, plano).toContain(`<a href="planos.html#${ancora}">Ver o que o plano ${PLAN_NAME[plano]} inclui</a>`);
+      expect(cartao.match(/<a\b/g)?.length, plano).toBe(1);
+    }
+    const h = html('planos.html');
+    expect(h).toContain('<h1>Planos da Clarevo</h1>');
+    for (const [plano, ancora] of [['individual', 'individual'], ['familiar', 'familia']] as const) {
+      expect(h).toContain(`<article class="cartao plano plano-detalhe" id="${ancora}" aria-labelledby="t-${ancora}">\n<h3 id="t-${ancora}">${PLAN_NAME[plano]}</h3>`);
+      expect(h).toContain(`<span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
+    }
+    for (const id of ['comparar', 'recursos', 'como-funciona', 'perguntas']) expect(h, id).toContain(`<h2 id="${id}">`);
+    // Os textos da assinatura são os do núcleo.
+    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.howToPay, ACCESS_TEXT.benefitNote, ACCESS_TEXT.notOpenYet, ...ACCESS_TEXT.plans.map((p) => p.who)]) expect(h, t).toContain(esc(t));
+    // O plano Família é pago pela pessoa titular (D-083); o Espaço Negócio, como diz docs/52: incluído no plano Individual, um negócio por pessoa.
+    expect(h).toContain('Uma assinatura só, paga pela pessoa titular.');
+    expect(h).toContain('Inclui o Espaço Negócio: um negócio por pessoa, sem custo a mais.');
+    expect(readFileSync(join(ROOT, 'docs', '52_ESPACO_NEGOCIO.md'), 'utf8')).toContain('**incluído no plano Individual** (um negócio por pessoa, sem custo a');
+    // Cada recurso com um link interno que existe (a Ajuda ou O app), e os links de "Como usar" das entradas do guia que existem.
+    const recursos = /<h2 id="recursos">[\s\S]*?<\/section>\n<\/div>/.exec(h)![0];
+    const links = [...recursos.matchAll(/<li><a href="([^"]+)">([^<]+)<\/a>: /g)].map((m) => [m[1]!, m[2]!]);
+    expect(links.map(([, n]) => n)).toEqual(['Anotar e Resumo', 'Contas a pagar', 'Cartões e faturas', 'Calendário do mês', 'Importar extrato e fatura', 'Ler nota, comprovante e boleto', 'Metas e reserva', 'Investir', 'Aprender, simulador e calculadoras', 'Anotar pelo Telegram', 'Espaço Negócio', 'Tema claro ou escuro', 'Ocultar valores', 'Exportar meus dados']);
+    for (const [destino] of links) {
+      const [arquivo, ancora] = destino.split('#');
+      const alvo = html(arquivo!);
+      expect(alvo, destino).toBeTruthy();
+      if (ancora) expect(alvo, destino).toContain(`id="${ancora}"`);
+    }
+    // Preço só nos dois cartões do começo; fora deles, nenhum "R$" com número.
+    const foraDosCartoes = h.replace(/<section[^>]*aria-labelledby="comparar"[\s\S]*?<\/section>/, '');
+    expect(foraDosCartoes).not.toBe(h);
+    expect(foraDosCartoes).not.toMatch(/R\$\s?\d/);
+    expect(h).not.toMatch(/[\u2013\u2014]|faz\w*\s+sentido|melhor|depoimento|milh[õo]es/i);
+    // No rodapé de todas as páginas.
+    expect(html('sobre.html')).toContain('<a href="planos.html">Planos</a>');
   });
 
   it('Comece aqui (o link da bio, D-067): o que é a Clarevo em duas frases, o estado real do acesso e os seis caminhos, sem espera, sem data, sem script e sem rastreamento', () => {

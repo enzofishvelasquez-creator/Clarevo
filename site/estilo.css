@@ -177,6 +177,25 @@ blockquote>:last-child{margin-bottom:0}
 .cartao h3{margin-top:0}
 .plano .preco{margin:.25rem 0 .5rem;color:var(--texto-2)}
 .plano .preco-valor{display:block;font-size:2rem;font-weight:800;line-height:1.2;color:var(--texto);font-variant-numeric:tabular-nums}
+/* Os cartões dos planos na página inicial levam à página Planos (D-115): o link do fim cobre o cartão inteiro (um link só por cartão). */
+.plano-link{position:relative;transition:border-color .15s}
+.plano-link .ver-plano a{font-weight:800}
+.plano-link .ver-plano a::after{content:"";position:absolute;inset:0;border-radius:20px}
+.plano-link:hover{border-color:var(--link)}
+.plano-link:has(a:focus-visible){outline:3px solid var(--foco);outline-offset:3px}
+.plano-link .ver-plano a:focus-visible{outline:none}
+@media (prefers-reduced-motion:reduce){.plano-link{transition:none}}
+/* A página Planos: os dois cartões com o que muda, os recursos em grupos e as perguntas. */
+.plano-detalhe{scroll-margin-top:1rem}
+.plano-detalhe:target{border-color:var(--link);border-width:2px}
+.plano-detalhe ul{margin:.25rem 0 1rem}
+.grupos-recursos{display:grid;gap:1rem 2.5rem;grid-template-columns:repeat(auto-fit,minmax(min(20rem,100%),1fr))}
+.recursos-plano h3{margin:0 0 .4rem}
+.recursos-plano ul{margin:0;padding-left:1.2rem}
+.recursos-plano li{margin:.45rem 0}
+.perguntas-planos{max-width:46rem}
+.como-funciona{max-width:46rem}
+.como-funciona li{margin:.6rem 0}
 .cartao p:last-child,.cartao ul:last-child{margin-bottom:0}
 a.cartao{display:block;text-decoration:none;color:inherit}
 a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
