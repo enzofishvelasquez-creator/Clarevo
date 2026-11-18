@@ -8,7 +8,7 @@ import { colors, fonts, space } from '@/theme/tokens';
 
 /**
  * Link de texto para a explicação de um tema (spec3 §3.7), como "Quanto custa pagar depois do vencimento?".
- * Tema em rascunho não desenha nada (R12). Aberto de uma tarefa, a explicação termina em "Voltar à tarefa".
+ * Tema em rascunho não desenha nada (R12). Aberto de uma tarefa, a explicação termina em "Voltar para a tarefa".
  */
 export function TopicLink({
   slug,
@@ -76,6 +76,37 @@ export function TopicRow({
           {LEARN_UI_TEXT.minutesShort(minutes)}
         </Txt>
         <ChevronRight size={20} color={onAccent ? colors.textOnAccent : colors.textSecondary} aria-hidden />
+      </View>
+    </Pressable>
+  );
+}
+
+/**
+ * Uma linha no desenho de TopicRow para o que não é tema (a calculadora do card "Neste mês", auditoria de 18/11/2026): o título, a legenda
+ * e, à direita, um rótulo curto no lugar do tempo de leitura ("Calculadora") e a seta.
+ */
+export function PlainRow({ title, caption, tag, accessibilityLabel, onPress, last }: { title: string; caption?: string | null; tag: string; accessibilityLabel: string; onPress: () => void; last?: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      style={(s) => [styles.row, !last && styles.divider, s.pressed && { opacity: 0.7 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
+      <View style={styles.texts}>
+        <Txt variant="label" style={styles.title}>
+          {title}
+        </Txt>
+        {caption ? (
+          <Txt variant="caption" color={colors.textSecondary}>
+            {caption}
+          </Txt>
+        ) : null}
+      </View>
+      <View style={styles.end}>
+        <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.semibold }} maxFontSizeMultiplier={1.6}>
+          {tag}
+        </Txt>
+        <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
       </View>
     </Pressable>
   );

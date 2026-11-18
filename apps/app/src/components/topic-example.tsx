@@ -58,6 +58,9 @@ export function TopicExample({ topic }: { topic: Topic }) {
         ) : null}
       </View>
     ) : null;
+  // Só "Exemplo fictício." como hipótese: vira uma legenda do exemplo (sem exemplo, não aparece), sem um card quase vazio (auditoria de
+  // 18/11/2026).
+  const onlyFictional = Boolean(topic.hypotheses && /^Exemplo fictício\.?$/.test(topic.hypotheses.trim()));
   return (
     <>
       {topic.example ? (
@@ -66,10 +69,15 @@ export function TopicExample({ topic }: { topic: Topic }) {
             {LEARN_UI_TEXT.example}
           </Txt>
           <Txt>{topic.example}</Txt>
+          {onlyFictional ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {topic.hypotheses}
+            </Txt>
+          ) : null}
           {calculation}
         </Card>
       ) : null}
-      {topic.hypotheses ? (
+      {topic.hypotheses && !onlyFictional ? (
         <Card style={styles.card}>
           <Txt variant="label" color={colors.textSecondary} style={{ fontFamily: fonts.bold }}>
             {LEARN_UI_TEXT.hypotheses}

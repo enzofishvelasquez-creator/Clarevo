@@ -1,3 +1,4 @@
+import type { IsoDate } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ExternalLink } from 'lucide-react-native';
 import { useState } from 'react';
@@ -27,7 +28,7 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
 
 /**
  * Explicação de um tema (spec3 §3.8), aberta por cima da tarefa ou da aba Aprender: voltar mantém o preenchimento
- * do formulário. `?origem=aprender` troca "Voltar à tarefa" por "Voltar para Aprender". Apelido abre o tema novo;
+ * do formulário. `?origem=aprender` troca "Voltar para a tarefa" por "Voltar para Aprender". Apelido abre o tema novo;
  * rascunho ou endereço desconhecido mostram "Este conteúdo não está disponível." (R12). Nada é gravado nem enviado
  * sobre o tema aberto (R11).
  */
@@ -43,7 +44,7 @@ export default function ExplicacaoScreen() {
   );
 }
 
-/** Fechamento: "Voltar à tarefa" volta um passo na pilha; "Voltar para Aprender" volta para a aba. */
+/** Fechamento: "Voltar para a tarefa" volta um passo na pilha; "Voltar para Aprender" volta para a aba. */
 function goBack(origem: LearnOrigin) {
   if (router.canGoBack()) router.back();
   else router.navigate(origem === 'aprender' ? '/aprender' : '/');
@@ -55,8 +56,11 @@ function TopicBody({ topic, origem }: { topic: Topic; origem: LearnOrigin }) {
   const minutes = topicReadingMinutes(topic);
   const actions = topicActions(topic.slug, topicCalculator(topic.slug), LEARN_UI_TEXT.calculatorAction);
   const related = relatedTopics(topic.slug);
+  // As fontes internas (as decisões do projeto) viram uma linha só, "Como o app da Clarevo funciona", sem os códigos (auditoria de 18/11/2026).
+  // Só com fontes internas, a linha leva a data de revisão, que então não se repete embaixo.
   const external = topic.sources.filter((s) => s.kind !== 'clarevo');
-  const internal = topic.sources.filter((s) => s.kind === 'clarevo');
+  const hasInternal = topic.sources.some((s) => s.kind === 'clarevo');
+  const onlyInternal = hasInternal && external.length === 0;
 
   const openSource = (url: string) => {
     setLinkFailed(false);
@@ -108,7 +112,7 @@ function TopicBody({ topic, origem }: { topic: Topic; origem: LearnOrigin }) {
           </Txt>
           <Card style={{ paddingVertical: space[1] }}>
             {related.map((r, i) => (
-              // Relacionado troca a explicação no lugar: "Voltar à tarefa" continua a um passo da tarefa.
+              // Relacionado troca a explicação no lugar: "Voltar para a tarefa" continua a um passo da tarefa.
               <TopicRow key={r.slug} topic={r} last={i === related.length - 1} onPress={() => router.replace(explanationHref(r.slug, origem))} />
             ))}
           </Card>
@@ -125,16 +129,19 @@ function TopicBody({ topic, origem }: { topic: Topic; origem: LearnOrigin }) {
           </Banner>
         ) : null}
         <Card style={{ paddingVertical: space[2] }}>
-          {[...external, ...internal].map((s, i, all) => (
-            <SourceLine key={`${i}-${LEARN_UI_TEXT.sourceLine(s)}`} source={s} last={i === all.length - 1} onOpen={openSource} />
+          {external.map((s, i) => (
+            <SourceLine key={`${i}-${LEARN_UI_TEXT.sourceLine(s)}`} source={s} last={i === external.length - 1 && !hasInternal} onOpen={openSource} />
           ))}
+          {hasInternal ? <InternalSourceLine reviewedOn={onlyInternal ? topic.reviewedOn : null} /> : null}
         </Card>
       </View>
 
       <View style={{ gap: space[2] }}>
-        <Txt variant="caption" color={colors.textSecondary}>
-          {LEARN_UI_TEXT.reviewedOn(topic.reviewedOn)}
-        </Txt>
+        {onlyInternal ? null : (
+          <Txt variant="caption" color={colors.textSecondary}>
+            {LEARN_UI_TEXT.reviewedOn(topic.reviewedOn)}
+          </Txt>
+        )}
         {LEARN_DISCLAIMER_SECTIONS.includes(topic.section) ? (
           <Txt variant="caption" color={colors.textSecondary}>
             {LEARN_UI_TEXT.disclaimer}
@@ -149,7 +156,7 @@ function TopicBody({ topic, origem }: { topic: Topic; origem: LearnOrigin }) {
 
 /**
  * Uma fonte. Oficial ou de mercado: link para o site (papel link, ícone e dica "Abre o site fora do app"), com a data
- * de consulta; mercado leva o rótulo "Referência de mercado". Obra e decisões do Clarevo: só texto, sem link.
+ * de consulta; mercado leva o rótulo "Referência de mercado". Obra: só texto, sem link. As decisões internas ficam em InternalSourceLine.
  */
 function SourceLine({ source, last, onOpen }: { source: LearnSource; last: boolean; onOpen: (url: string) => void }) {
   const line = LEARN_UI_TEXT.sourceLine(source);
@@ -183,6 +190,24 @@ function SourceLine({ source, last, onOpen }: { source: LearnSource; last: boole
     );
   }
   return <View style={[styles.source, !last && styles.divider]}>{texts}</View>;
+}
+
+/** A fonte interna, sem os códigos das decisões: "Como o app da Clarevo funciona" e, quando é a única fonte, a data de revisão. */
+function InternalSourceLine({ reviewedOn }: { reviewedOn: IsoDate | null }) {
+  return (
+    <View style={styles.source}>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+          {LEARN_UI_TEXT.internalSource}
+        </Txt>
+        {reviewedOn ? (
+          <Txt variant="caption" color={colors.textSecondary}>
+            {LEARN_UI_TEXT.reviewedOn(reviewedOn)}
+          </Txt>
+        ) : null}
+      </View>
+    </View>
+  );
 }
 
 function Unavailable() {

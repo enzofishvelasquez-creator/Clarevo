@@ -4,6 +4,9 @@ import type { LearnSource } from './types';
 
 const minutes = (n: number) => (n === 1 ? '1 minuto' : `${n} minutos`);
 
+/** A fonte interna das explicações, sem os códigos das decisões. */
+const INTERNAL_SOURCE = 'Como o app da Clarevo funciona';
+
 /**
  * Textos da aba Aprender e da explicação (spec3 §3.8, com spec5_notes §2), cobertos pelo teste de textos.
  * As seções (título e descrição) ficam em LEARN_SECTIONS; o card "Calculadoras" usa CALC_UI_TEXT.learnCardTitle e
@@ -45,10 +48,16 @@ export const LEARN_UI_TEXT = {
   calculatorAction: 'Fazer a conta com os seus números',
   related: 'Temas relacionados',
   sources: 'Fontes',
-  /** Fonte oficial ou de mercado: "{Instituição}: {título}"; obra: "{autores}. {título}. {editora}, {ano}.". */
+  /**
+   * A fonte interna (as decisões do projeto, `kind: 'clarevo'`): uma linha só, sem os códigos das decisões, que não dizem nada a quem usa o
+   * app (auditoria visual de 18/11/2026: "Clarevo: D-020, D-021" aparecia como fonte). Os códigos continuam no catálogo, para os testes e a
+   * documentação.
+   */
+  internalSource: INTERNAL_SOURCE,
+  /** Fonte oficial ou de mercado: "{Instituição}: {título}"; obra: "{autores}. {título}. {editora}, {ano}."; interna: a linha sem códigos. */
   sourceLine: (s: LearnSource) => {
     if (s.kind === 'obra') return `${s.authors}. ${s.title}. ${s.publisher}, ${s.year}.`;
-    if (s.kind === 'clarevo') return `Clarevo: ${s.refs.join(', ')}`;
+    if (s.kind === 'clarevo') return INTERNAL_SOURCE;
     return `${s.publisher}: ${s.title}`;
   },
   consultedOn: (date: IsoDate) => `Consultada em ${formatDateBR(date)}`,
@@ -56,7 +65,8 @@ export const LEARN_UI_TEXT = {
   externalLinkHint: 'Abre o site fora do app',
   reviewedOn: (date: IsoDate) => `Revisado em ${formatDateBR(date)}`,
   disclaimer: 'Conteúdo educativo e geral. Não é recomendação de produto financeiro nem oferta de crédito.',
-  backToTask: 'Voltar à tarefa',
+  /** Um padrão para os dois (auditoria de 18/11/2026): "Voltar para a tarefa" e "Voltar para Aprender". */
+  backToTask: 'Voltar para a tarefa',
   backToLearn: 'Voltar para Aprender',
   linkFailed: 'Não foi possível abrir o site agora. Tente de novo mais tarde.',
   unavailable: 'Este conteúdo não está disponível.',
@@ -74,6 +84,8 @@ export const SEASONAL_TEXT = {
   title: 'Neste mês',
   /** "Temas para outubro". */
   caption: (monthName: string) => `Temas para ${monthName}`,
+  /** No lugar do tempo de leitura, na linha de uma calculadora (auditoria de 18/11/2026: todas as linhas do card no mesmo desenho). */
+  calculatorTag: 'Calculadora',
 } as const;
 
 /** Todos os textos de LEARN_UI_TEXT e das seções, com as funções chamadas com entradas de exemplo (teste de textos). */

@@ -1,16 +1,17 @@
+import { calcRowA11yLabel } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, CalendarDays } from 'lucide-react-native';
+import { CalendarDays } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 
-import { CalcNavRow } from '@/components/calc/parts';
-import { TopicRow } from '@/components/topic-link';
+import { PlainRow, TopicRow } from '@/components/topic-link';
 import { Card, Txt } from '@/components/ui';
 import { SEASONAL_TEXT, calculatorHref, explanationHref, type SeasonalCard } from '@/lib/learn';
 import { colors, radius, space } from '@/theme/tokens';
 
 /**
  * Card "Neste mês" (D-053): título de nível 2 com a legenda "Temas para outubro", uma linha para cada tema do mês (as mesmas
- * linhas das seções, com o tempo de leitura) e, quando um tema liga uma calculadora, a linha dela ("Cota única ou parcelado?").
+ * linhas das seções, com o tempo de leitura) e, quando um tema liga uma calculadora, a linha dela ("Cota única ou parcelado?"), no mesmo
+ * desenho, com "Calculadora" no lugar do tempo de leitura (auditoria de 18/11/2026: a linha da calculadora tinha ícone e as outras não).
  * Em Aprender (D-053) e, depois do conteúdo principal, em Metas (D-054, P-028), com os mesmos temas e os mesmos links: a explicação
  * abre como se fosse de Aprender. Só lê a data de hoje (`seasonalCard`): sem gravação, sem requisição e sem notificação.
  */
@@ -40,11 +41,12 @@ export function SeasonCardView({ card }: { card: SeasonalCard }) {
           />
         ))}
         {card.calculators.map((c, i) => (
-          <CalcNavRow
+          <PlainRow
             key={`${c.slug}-${c.params.modo ?? ''}`}
-            icon={Calculator}
             title={c.title}
             caption={c.caption}
+            tag={SEASONAL_TEXT.calculatorTag}
+            accessibilityLabel={calcRowA11yLabel(c.title, c.caption)}
             last={i === card.calculators.length - 1}
             onPress={() => router.push(calculatorHref(c))}
           />
