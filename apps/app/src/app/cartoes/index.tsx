@@ -37,13 +37,14 @@ export default function CartoesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={T.title} right={<ContextPill label="Pessoal" />} help="cartoes" />
+      <SubHeader title={T.title} right={<ContextPill label="Pessoal" switchable />} help="cartoes" />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
         {monthTotal && list.length > 0 ? (
           <CardMonthSummary
             data={monthTotal}
             incomeKnown={refs.isSuccess}
+            committed={personal?.contextKind !== 'negocio'}
             onSeeCommitted={() => router.push({ pathname: '/renda-comprometida', params: { mes: month } })}
             onInformIncome={() => router.push({ pathname: '/renda-comprometida/referencia', params: { mes: month } })}
           />

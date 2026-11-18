@@ -1,13 +1,22 @@
-import { CARDS_TEXT, NEXT_MONTH_TEXT, RECORD_LINK_TEXT, formatDateBR, isStackedLayout, recordMonth, type FinancialRecord } from '@clarevo/core';
+import { BUSINESS_WORDS, CARDS_TEXT, NEXT_MONTH_TEXT, RECORD_LINK_TEXT, formatDateBR, isStackedLayout, recordMonth, type FinancialRecord } from '@clarevo/core';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Money, Txt, clampLines } from '@/components/ui';
 import { moneyA11y, useValuesHidden } from '@/lib/privacy';
+import { useBusiness } from '@/state/business';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
-export function kindLabel(r: Pick<FinancialRecord, 'kind'>) {
+/** "Pago" ou "Recebido"; no espaço Negócio, "Saída" ou "Entrada" (auditoria de 18/11/2026: um vocabulário por espaço). */
+export function kindLabel(r: Pick<FinancialRecord, 'kind'>, business = false) {
+  if (business) return r.kind === 'despesa' ? BUSINESS_WORDS.outRow : BUSINESS_WORDS.inRow;
   return r.kind === 'despesa' ? 'Pago' : 'Recebido';
+}
+
+/** O lançamento é do espaço Negócio da pessoa (para o vocabulário de entradas e saídas). */
+export function useIsBusinessRecord(r: Pick<FinancialRecord, 'contextId'>): boolean {
+  const business = useBusiness();
+  return Boolean(business.data && business.data.id === r.contextId);
 }
 
 /**
@@ -37,7 +46,8 @@ export function RecordRow({
   // Subcategoria (D-107) e rendimento de investimento: na legenda, depois da data.
   const sub = record.subcategory ? ` · ${record.subcategory}` : '';
   const income = record.investmentId ? ` · ${RECORD_LINK_TEXT.rowIncome}` : '';
-  const when = `${kindLabel(record)} · ${formatDateBR(record.occurredOn)}${counted}${sub}${income}${origin}${accountName ? ` · ${accountName}` : ''}`;
+  const inBusiness = useIsBusinessRecord(record);
+  const when = `${kindLabel(record, inBusiness)} · ${formatDateBR(record.occurredOn)}${counted}${sub}${income}${origin}${accountName ? ` · ${accountName}` : ''}`;
   return (
     <Pressable
       onPress={onPress}
@@ -62,11 +72,11 @@ export function RecordRow({
           {when}
         </Txt>
         {stacked ? (
-          <Money cents={record.amountCents} variant="label" style={styles.amount} color={isIn ? colors.success : colors.text} />
+          <Money cents={record.amountCents} variant="label" style={styles.amount} color={colors.text} />
         ) : null}
       </View>
       {stacked ? null : (
-        <Money cents={record.amountCents} variant="label" style={[styles.amount, { flexShrink: 0 }]} color={isIn ? colors.success : colors.text} />
+        <Money cents={record.amountCents} variant="label" style={[styles.amount, { flexShrink: 0 }]} color={colors.text} />
       )}
     </Pressable>
   );

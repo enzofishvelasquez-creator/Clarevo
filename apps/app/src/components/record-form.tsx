@@ -1,4 +1,5 @@
 import {
+  BUSINESS_WORDS,
   ACCOUNTS_TEXT,
   CARDS_TEXT,
   isChoosableExpenseCategory,
@@ -266,6 +267,12 @@ const COPY = {
   },
 } as const;
 
+/** No espaço Negócio, entradas e saídas (auditoria de 18/11/2026: um vocabulário por espaço). */
+const BUSINESS_COPY = {
+  despesa: { newTitle: BUSINESS_WORDS.addOut, editTitle: BUSINESS_WORDS.editOut, situation: BUSINESS_WORDS.outDone, dateLabel: BUSINESS_WORDS.outDate, save: BUSINESS_WORDS.saveOut },
+  receita: { newTitle: BUSINESS_WORDS.addIn, editTitle: BUSINESS_WORDS.editIn, situation: BUSINESS_WORDS.inDone, dateLabel: BUSINESS_WORDS.inDate, save: BUSINESS_WORDS.saveIn },
+} as const;
+
 /**
  * Formulário único de criar e editar (CL C002, C003, C005).
  * Modo "Dia" (D-030, revisão dos últimos meses): /registro/novo?tipo=…&mes=AAAA-MM&origem=retomar abre com um mês
@@ -404,7 +411,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const draftRef = useRef<FormDraft>(draft);
   // O tipo de agora (ao editar, a pessoa pode trocar) e os textos dele.
   const kind = draft.kind;
-  const copy = COPY[kind];
+  const copy = personal.contextKind === 'negocio' ? BUSINESS_COPY[kind] : COPY[kind];
   const [subError, setSubError] = useState<string | undefined>();
   const [incomeError, setIncomeError] = useState<string | undefined>();
   const [editingSubs, setEditingSubs] = useState(false);

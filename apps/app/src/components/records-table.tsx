@@ -3,6 +3,7 @@ import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { kindLabel } from '@/components/record-row';
+import { useBusiness } from '@/state/business';
 import { Money, Txt } from '@/components/ui';
 import { moneyA11y, useValuesHidden } from '@/lib/privacy';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -23,6 +24,7 @@ export function RecordsTable({
   onOpen: (r: FinancialRecord) => void;
 }) {
   const hidden = useValuesHidden();
+  const businessId = useBusiness().data?.id ?? null;
   const showAccount = accountName !== null;
   return (
     <View>
@@ -51,8 +53,9 @@ export function RecordsTable({
         const origin = r.invoice ? CARDS_TEXT.paymentOrigin : r.commitmentId ? 'conta a pagar' : null;
         const counted = r.nextMonth ? NEXT_MONTH_TEXT.rowNote(recordMonth(r)) : null;
         const account = accountName ? accountName(r) : null;
-        const note = [kindLabel(r), counted, origin].filter(Boolean).join(' · ');
-        const when = `${kindLabel(r)} · ${formatDateBR(r.occurredOn)}${counted ? ` · ${counted}` : ''}${origin ? ` · ${origin}` : ''}${account ? ` · ${account}` : ''}`;
+        const kind = kindLabel(r, r.contextId === businessId);
+        const note = [kind, counted, origin].filter(Boolean).join(' · ');
+        const when = `${kind} · ${formatDateBR(r.occurredOn)}${counted ? ` · ${counted}` : ''}${origin ? ` · ${origin}` : ''}${account ? ` · ${account}` : ''}`;
         return (
           <Pressable
             key={r.id}
@@ -83,16 +86,17 @@ export function RecordsTable({
                 </Txt>
               </View>
             </View>
-            <Txt variant="label" color={r.category ? colors.text : colors.textSecondary} style={styles.cat} numberOfLines={1}>
+            {/* Categoria e conta em até duas linhas (auditoria de 18/11/2026: "Taxas e maquinin…" e "Conta princi…" no computador). */}
+            <Txt variant="label" color={r.category ? colors.text : colors.textSecondary} style={styles.cat} numberOfLines={2}>
               {r.category ?? 'Sem categoria'}
             </Txt>
             {showAccount ? (
-              <Txt variant="label" color={colors.textSecondary} style={styles.acc} numberOfLines={1}>
+              <Txt variant="label" color={colors.textSecondary} style={styles.acc} numberOfLines={2}>
                 {account ?? ''}
               </Txt>
             ) : null}
             <View style={styles.value}>
-              <Money cents={r.amountCents} variant="label" style={{ fontFamily: fonts.bold, textAlign: 'right' }} color={isIn ? colors.success : colors.text} />
+              <Money cents={r.amountCents} variant="label" style={{ fontFamily: fonts.bold, textAlign: 'right' }} color={colors.text} />
             </View>
           </Pressable>
         );
@@ -107,10 +111,11 @@ const styles = StyleSheet.create({
   headText: { fontFamily: fonts.bold, textTransform: 'uppercase', letterSpacing: 0.2 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border, borderRadius: 0 },
   date: { width: 52 },
-  desc: { flex: 2, minWidth: 0 },
+  desc: { flex: 1.6, minWidth: 0 },
   descCell: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
-  cat: { flex: 1.2, minWidth: 96 },
-  acc: { flex: 1.2, minWidth: 96 },
+  // Largura mínima para "Conta principal" numa linha e as categorias do negócio em duas ("Taxas e / maquininha").
+  cat: { flex: 1.2, minWidth: 112 },
+  acc: { flex: 1, minWidth: 112 },
   value: { width: 124, alignItems: 'flex-end' },
   icon: { width: 32, height: 32, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
   focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: -3 } as object,

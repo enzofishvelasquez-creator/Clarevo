@@ -162,8 +162,11 @@ export function CardMonthSummary({
   incomeKnown = true,
   onSeeCommitted,
   onInformIncome,
+  committed = true,
 }: {
   data: CardInvoicesMonth;
+  /** A renda comprometida é do Pessoal e da Família: no espaço Negócio, o card não fala dela (auditoria de 18/11/2026). */
+  committed?: boolean;
   /** A renda de referência não carregou: nem o percentual nem o convite para informá-la aparecem. */
   incomeKnown?: boolean;
   onSeeCommitted: () => void;
@@ -179,7 +182,7 @@ export function CardMonthSummary({
       ) : (
         <>
           <FitMoney cents={data.totalCents} maxSize={32} minSize={24} />
-          {!incomeKnown ? null : data.percentText ? (
+          {!incomeKnown || !committed ? null : data.percentText ? (
             <Txt variant="label" style={{ fontFamily: fonts.bold }}>
               {CARD_MONTH_TEXT.percent(data.percentText)}
             </Txt>
@@ -204,16 +207,20 @@ export function CardMonthSummary({
           {CARD_MONTH_TEXT.upcoming(data.upcoming)}
         </MoneyTxt>
       ) : null}
-      <Txt variant="caption" color={colors.textSecondary}>
-        {CARD_MONTH_TEXT.inCommitted}
-      </Txt>
-      <LinkButton
-        label={CARD_MONTH_TEXT.seeCommitted}
-        accessibilityLabel={CARD_MONTH_TEXT.seeCommittedA11y}
-        trailing={ChevronRight}
-        style={styles.monthLink}
-        onPress={onSeeCommitted}
-      />
+      {committed ? (
+        <>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {CARD_MONTH_TEXT.inCommitted}
+          </Txt>
+          <LinkButton
+            label={CARD_MONTH_TEXT.seeCommitted}
+            accessibilityLabel={CARD_MONTH_TEXT.seeCommittedA11y}
+            trailing={ChevronRight}
+            style={styles.monthLink}
+            onPress={onSeeCommitted}
+          />
+        </>
+      ) : null}
     </Card>
   );
 }
