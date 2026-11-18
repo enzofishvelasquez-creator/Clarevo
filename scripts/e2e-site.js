@@ -1135,6 +1135,30 @@ function varrerPagina() {
       await semJs.close();
     }
 
+    // 7c9. Nada de advertência na primeira tela (D-115): no início, em O app, em Planos, em Para empresas e em Sobre, nada que diga "não
+    // promete" aparece na primeira tela (390 x 844 e 1280 x 900); o aviso de saúde fica na nota do fim da página inicial e de Sobre.
+    {
+      const p = await pagina();
+      const achados = [];
+      for (const [largura, altura] of [[390, 844], [1280, 900]]) {
+        await p.setViewportSize({ width: largura, height: altura });
+        for (const c of ['', 'app/', 'planos', 'empresas/', 'sobre']) {
+          await p.goto(`${origem}/${c}`);
+          const visiveis = await p.evaluate(() => [...document.querySelectorAll('main p, main h2, main h3, main li')].filter((e) => { const r = e.getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0 && /não promete|não está incluído|não fazem parte/i.test(e.textContent); }).map((e) => e.textContent.slice(0, 60)));
+          if (visiveis.length) achados.push(`${c || 'início'} em ${largura} px: ${visiveis.join(' / ')}`);
+        }
+      }
+      ok('primeira tela: nenhuma advertência na primeira tela do início, de O app, de Planos, de Para empresas e de Sobre', achados.length === 0, achados.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
+      const fim = [];
+      for (const c of ['', 'sobre']) {
+        await p.goto(`${origem}/${c}`);
+        fim.push(await p.evaluate(() => { const a = document.querySelector('main .aviso-final'); return Boolean(a) && /não é atendimento de saúde/.test(a.textContent) && a.getBoundingClientRect().top > document.documentElement.scrollHeight * 0.6; }));
+      }
+      ok('primeira tela: o aviso de saúde fica numa nota no fim do início e de Sobre', fim.every(Boolean), JSON.stringify(fim));
+      await p.close();
+    }
+
     // 7d. Imagens das matérias de Novidades (D-114): capa e telas ao lado das seções, do próprio site, com largura, altura e texto
     // alternativo; a tela larga (o painel da empresa) embaixo do texto; no tema claro, a versão clara das telas.
     {

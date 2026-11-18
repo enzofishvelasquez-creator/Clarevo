@@ -206,6 +206,10 @@ blockquote>:last-child{margin-bottom:0}
 .texto{max-width:46rem}
 .texto-largo{max-width:52rem}
 .nota{color:var(--texto-2)}
+/* Um parágrafo de texto logo depois do lead de uma seção, na mesma largura (D-115: no lugar de um cartão sozinho). */
+.texto-bloco{max-width:42rem}
+/* O aviso de saúde no fim da página inicial (D-115): uma nota curta e discreta, separada do contato por uma linha. */
+.aviso-final{max-width:46rem;margin:2rem 0 0;padding-top:1rem;border-top:1px solid var(--linha);color:var(--texto-2);font-size:.875rem}
 .pequeno{font-size:.9375rem}
 
 /* Cartões e grades */

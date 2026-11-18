@@ -13,6 +13,8 @@ const { URL_NR1 } = require('../config');
 const { montarPagina, marcadoresEmHtml, bloco, celular, telaLarga } = require('../modelo');
 const { blocoDeContato } = require('./formularios');
 
+const { AVISO_DE_SAUDE } = require('./inicio');
+
 const ARQUIVO = 'empresas/index.html';
 
 function paginaEmpresas({ valores, img }) {
@@ -29,17 +31,7 @@ function paginaEmpresas({ valores, img }) {
     bloco(
       `<h2 id="bem-estar">O cuidado financeiro dentro do programa de bem-estar</h2>
 <p class="lead-bloco">A empresa oferece a Clarevo a quem trabalha com ela e acompanha só as vagas, os convites e as licenças. Cada pessoa usa o app para organizar o mês e acompanhar decisões financeiras pessoais e familiares, e mantém a privacidade das próprias finanças.</p>
-<div class="grade">
-<article class="cartao">
-<h3>O que a proposta inclui hoje</h3>
-<p>Uma licença da Clarevo para cada pessoa convidada, o painel de convites e licenças e o relatório de adesão, só com contagens. Escopo, implantação, privacidade e condições comerciais são combinados na apresentação.</p>
-</article>
-<article class="cartao">
-<h3>O que não está incluído</h3>
-<p>Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje. Se um deles entrar em uma proposta, só será anunciado com escopo e contratação confirmados.</p>
-</article>
-</div>
-<p class="nota">A Clarevo não promete redução de absenteísmo, de estresse nem de adoecimento, e não oferece à empresa acesso a transações, dívidas ou relatos individuais.</p>`,
+<p class="texto-bloco"><strong>O que a proposta inclui hoje:</strong> uma licença da Clarevo para cada pessoa convidada, o painel de convites e licenças e o relatório de adesão, só com contagens. Escopo, implantação, privacidade e condições comerciais são combinados na apresentação.</p>`,
       { rotulo: 'bem-estar' },
     ),
     bloco(
@@ -52,6 +44,17 @@ function paginaEmpresas({ valores, img }) {
 <li>A Clarevo não substitui as ações sobre a organização do trabalho, como sobrecarga e assédio, nem o gerenciamento de riscos da empresa.</li>
 <li>O endividamento pessoal não deve ser classificado automaticamente como risco ocupacional: a avaliação considera as condições e a organização do trabalho e não equivale a uma avaliação clínica individual.</li>
 </ul>
+<div class="grade">
+<article class="cartao">
+<h3>O que não está incluído</h3>
+<p>Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje. Se um deles entrar em uma proposta, só será anunciado com escopo e contratação confirmados.</p>
+</article>
+<article class="cartao">
+<h3>O que a Clarevo não promete</h3>
+<p>A Clarevo não promete redução de absenteísmo, de estresse nem de adoecimento, e não oferece à empresa acesso a transações, dívidas ou relatos individuais.</p>
+<p>${esc(AVISO_DE_SAUDE)}</p>
+</article>
+</div>
 <p class="nota">A Clarevo não se apresenta como aplicativo certificado, não promete adequação da empresa à norma e não oferece laudos, PGR nem painéis de risco. Prazos, fiscalização e sanções mudam: confira a página oficial antes de decidir. Fonte: <a href="${esc(URL_NR1)}" rel="noopener noreferrer">Ministério do Trabalho e Emprego, NR-1</a> (capítulo 1.5, na redação da Portaria MTE nº 1.419/2024), consultada em 24/10/2026.</p>`,
       { variante: 'alt', rotulo: 'nr-1' },
     ),

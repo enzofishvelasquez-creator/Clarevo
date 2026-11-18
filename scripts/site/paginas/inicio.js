@@ -21,6 +21,14 @@ const MENSAGEM_CENTRAL = 'Cuidar da vida financeira faz parte de cuidar de você
 const FRASE_DE_APOIO = 'Mais clareza para decidir';
 const SUBTEXTO = 'A Clarevo ajuda a organizar o mês e acompanhar decisões financeiras pessoais e familiares, respeitando sua realidade.';
 const DESCRICAO = `${MENSAGEM_CENTRAL} ${SUBTEXTO} ${FRASE_DE_APOIO}.`;
+/**
+ * O aviso de saúde, revisado no pacote do advogado (`docs/legal/resumo-para-advogado.md`, seção j, "Saúde"): o texto não muda. Desde
+ * 18/11/2026 (D-115, retorno de quem testa: "O negativo não deveria estar logo no começo da página. Isso é advertência, não propaganda.")
+ * ele sai do cartão ao lado de "O que a Clarevo oferece", no começo da página, e fica numa nota discreta no fim da página inicial, perto
+ * do bloco da NR-1 em Para empresas e em Sobre.
+ */
+const AVISO_DE_SAUDE = 'A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada.';
+
 /** A linha curta acima do título, que diz o que a Clarevo é antes da mensagem central (12/11/2026). */
 const O_QUE_E = 'App de finanças pessoais e da família';
 /** A descrição da página para as buscas e o compartilhamento: a mensagem central e o que é, em até 160 caracteres (a completa, `DESCRICAO`, fica nos dados estruturados). */
@@ -101,16 +109,7 @@ ${celularComVideo('resumo-do-mes', { videos, img }, ARQUIVO)}
     secao(
       `<h2 id="bem-estar">Bem-estar financeiro, com apoio prático</h2>
 <p class="lead-bloco">Contas para lembrar, compras para decidir, planos para organizar: o dinheiro participa da rotina. A Clarevo trata a vida financeira como parte do cuidado com o bem-estar e oferece um app para organizar o mês, sem julgamento.</p>
-<div class="grade">
-<article class="cartao">
-<h3>O que a Clarevo oferece</h3>
-<p>Um app para anotar o que entra e o que sai, ver o que ainda vai vencer, acompanhar metas e o que você já investe e aprender o essencial sobre contas e juros, com fonte e data de revisão. Ele parte do que você registra e respeita a sua realidade: renda, trabalho, saúde e responsabilidades da família também limitam as escolhas, e dificuldade financeira não é falta de disciplina.</p>
-</article>
-<article class="cartao">
-<h3>O que a Clarevo não promete</h3>
-<p>A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada.</p>
-</article>
-</div>`,
+<p class="texto-bloco">Um app para anotar o que entra e o que sai, ver o que ainda vai vencer, acompanhar metas e o que você já investe e aprender o essencial sobre contas e juros, com fonte e data de revisão. Ele parte do que você registra e respeita a sua realidade: renda, trabalho, saúde e responsabilidades da família também limitam as escolhas, e dificuldade financeira não é falta de disciplina.</p>`,
       'bem-estar',
     ),
     secao(
@@ -171,7 +170,8 @@ ${mini}
       `<h2 id="dados">Seus dados</h2>
 <p>Sem anúncios, sem venda de dados e sem rastreamento para publicidade. A conexão é protegida. Você exclui a sua conta e os seus dados quando quiser, dentro do app, em Conta. Se não conseguir entrar no app, peça pela página <a href="${u('excluir-conta.html')}">Excluir conta</a>. Os detalhes estão na <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>
 <h2 id="contato">Contato</h2>
-<p>Para falar com a equipe, inclusive sobre o benefício para empresas: [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e a página de <a href="${u('suporte.html')}">Suporte</a>.</p>`,
+<p>Para falar com a equipe, inclusive sobre o benefício para empresas: [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e a página de <a href="${u('suporte.html')}">Suporte</a>.</p>
+<p class="aviso-final">${AVISO_DE_SAUDE}</p>`,
       'dados',
     ),
   ];
@@ -205,4 +205,4 @@ ${mini}
   });
 }
 
-module.exports = { paginaInicial, conteudoPlanos, DESCRICAO_INICIO: DESCRICAO, MENSAGEM_CENTRAL, FRASE_DE_APOIO };
+module.exports = { paginaInicial, conteudoPlanos, DESCRICAO_INICIO: DESCRICAO, MENSAGEM_CENTRAL, FRASE_DE_APOIO, AVISO_DE_SAUDE };

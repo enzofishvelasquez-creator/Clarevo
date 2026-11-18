@@ -928,6 +928,28 @@ describe('site público: as páginas geradas', () => {
     expect(html('planos.html')).toContain('O plano Individual inclui um negócio por pessoa, sem custo a mais.');
   });
 
+  // O aviso de saúde (revisado no pacote do advogado, seção j) sem mudar o texto, mas fora do começo das páginas (D-115, retorno de quem
+  // testa: "O negativo não deveria estar logo no começo da página. Isso é advertência, não propaganda.").
+  it('o aviso de saúde, com o mesmo texto, fica numa nota no fim da página inicial, no bloco da NR-1 de Para empresas e no fim de Sobre, e não no começo', () => {
+    const { AVISO_DE_SAUDE } = require(join(ROOT, 'scripts', 'site', 'paginas', 'inicio.js')) as { AVISO_DE_SAUDE: string };
+    expect(AVISO_DE_SAUDE).toBe('A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada.');
+    expect(readFileSync(join(ROOT, 'docs', 'legal', 'resumo-para-advogado.md'), 'utf8')).toContain('"A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade."');
+    const inicio = html('index.html');
+    const bemEstar = /<section[^>]*aria-labelledby="bem-estar"[\s\S]*?<\/section>/.exec(inicio)![0];
+    expect(bemEstar).not.toMatch(/não promete|O que a Clarevo não/);
+    expect(bemEstar).toContain('<p class="texto-bloco">Um app para anotar o que entra e o que sai');
+    expect(inicio).toContain(`<p class="aviso-final">${AVISO_DE_SAUDE}</p>`);
+    expect(inicio.indexOf('class="aviso-final"')).toBeGreaterThan(inicio.indexOf('id="contato"'));
+    const empresas = html('empresas/index.html');
+    const primeira = /<section[^>]*aria-labelledby="bem-estar"[\s\S]*?<\/section>/.exec(empresas)![0];
+    expect(primeira).not.toMatch(/não promete|não está incluído|não fazem parte/);
+    const nr1 = /<section[^>]*aria-labelledby="nr-1"[\s\S]*?<\/section>/.exec(empresas)![0];
+    for (const t of ['<h3>O que não está incluído</h3>', '<h3>O que a Clarevo não promete</h3>', 'não promete redução de absenteísmo, de estresse nem de adoecimento', esc(AVISO_DE_SAUDE)]) expect(nr1, t).toContain(t);
+    const sobre = html('sobre.html');
+    expect(sobre).toContain(`<p class="aviso-final">${esc(AVISO_DE_SAUDE)}</p>`);
+    expect(sobre.indexOf('class="aviso-final"')).toBeGreaterThan(sobre.indexOf('id="quem"'));
+  });
+
   // Indicadores mais fáceis de achar (D-115): "Indicadores de hoje" na página inicial, com o retrato e o script do painel, e o cartão dos
   // indicadores em Aprender e em Novidades. O menu principal não ganhou "Indicadores": não cabe sem quebrar a linha a partir de 1120 px.
   it('Indicadores de hoje na página inicial (os cinco números, a hora e a fonte, o aviso e o caminho para o painel) e o cartão em Aprender e em Novidades', () => {
