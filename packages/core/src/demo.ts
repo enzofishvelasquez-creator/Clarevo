@@ -40,6 +40,8 @@ import { demoTrialAccess } from './plano';
  * cada mês: R$ 10.085,00, R$ 10.180,00, R$ 10.270,00 e R$ 10.360,00; aporte de R$ 500,00 e valor de R$ 10.875,00 em 06/10) e
  * "Previdência" (R$ 5.000,00 desde 01/08/2026; R$ 5.040,00 e R$ 5.080,00 no fim de agosto e de setembro, e R$ 5.080,00 de novo em 06/10). Hoje: R$ 15.955,00,
  * aportado R$ 15.500,00, ganho de R$ 455,00. Não entram em nenhum total do mês, na renda comprometida nem nas metas.
+ * D-104: a aplicação rende 105% do CDI até 31/03/2027 e 100% depois (hoje a estimativa usa só os 105%); a previdência tem uma descrição.
+ * Subcategoria (D-107): o aluguel de setembro (R$ 2.500,00, Moradia) tem a subcategoria "Aluguel"; nenhum total muda.
  * Orçamento por categoria (D-041), a partir de outubro de 2026: Moradia R$ 2.500,00, Mercado R$ 1.800,00 e Lazer R$ 300,00.
  * Usado em outubro (competência): Moradia R$ 2.500,00 (o aluguel pago), Mercado R$ 1.400,00 e Lazer R$ 400,00 (a 1ª parcela do
  * tênis, R$ 200,00, e o restaurante, R$ 200,00; a compra no cartão conta no mês da compra). Limite pessoal de 60% a partir de
@@ -54,19 +56,35 @@ export const DEMO_EMAIL = 'demo@clarevo.app';
  * - 'retorno': a montagem FICTÍCIA da sequência R do Ciclo A4 (D-030), anotada em 20/05/2026 e aberta em 07/10/2026;
  * - 'assinaturas': a base de aceite, com as duas assinaturas de exemplo cadastradas em 30/06/2026 e nunca revisadas, o que faz o
  *   lembrete "Que tal revisar suas assinaturas?" (D-046) aparecer em 07/10/2026. Os totais de outubro não mudam.
+ * - 'nivel': a montagem FICTÍCIA do aviso de queda do nível (D-111): os dados do cenário 'retorno' (nada anotado desde 20/05/2026,
+ *   nível Prata pelos marcos) e a regra da queda contando desde 23/08/2026 (como se o app com a regra tivesse lido o nível nesse dia).
+ *   Em 07/10/2026 faz 45 dias da contagem: o Resumo e Conta mostram "Faz 140 dias que nada é anotado. Em 15 dias, o nível passa de
+ *   Prata para Bronze. [...]", com "Agora não"; anotar um gasto ou recebimento tira o aviso.
  * - 'evolucao': a montagem FICTÍCIA do caso de referência da Evolução (D-057, EF §6): de janeiro a junho de 2026, Pago de
  *   R$ 3.200, 3.400, 3.300, 7.800, 3.450 e 3.600 (abril com o "Reparo do carro" de R$ 4.400,00) e Recebido de R$ 5.000, 5.000, sem
  *   registro em março, 5.200, 5.000 e 5.100. Não tem os lançamentos de setembro e outubro da base de aceite (que não vale neste
  *   cenário): na janela de 12 meses, o total é R$ 24.750,00, a média dos 6 meses R$ 4.125,00 e a mediana R$ 3.425,00 (sem abril:
  *   R$ 3.390,00 e R$ 3.400,00).
- * Conta nova nunca recebe nenhum dos quatro.
+ * - 'metas': a base de aceite, com as duas metas criadas em 01/07/2026 (DEMO_GOALS_SETUP_DAY), para o convite de rever as metas (D-105).
+ * - 'nivel': o cenário 'retorno' com a regra da queda do nível contando desde DEMO_LEVEL_COUNT_DAY, para o aviso de queda (D-111).
+ * Conta nova nunca recebe nenhum deles.
  */
-export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao';
-export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao'];
+export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao' | 'metas' | 'nivel';
+export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao', 'metas', 'nivel'];
+/**
+ * Dia em que as duas metas de exemplo foram criadas no cenário 'metas' (D-105): a base de aceite, com a reserva e a viagem criadas (e o
+ * já guardado ao criar) em 01/07/2026, três meses antes de 07/10/2026, para o convite "Quer rever as suas metas?" aparecer. O aporte de
+ * 06/10 e os totais de outubro não mudam.
+ */
+export const DEMO_GOALS_SETUP_DAY = '2026-07-01';
 /** Dia em que as assinaturas de exemplo foram cadastradas no cenário 'assinaturas'. */
 export const DEMO_SUBSCRIPTIONS_SETUP_DAY = '2026-06-30';
+/** Quando o plano de aportes da demonstração foi definido (D-103, item 14): mais de 3 meses antes de 07/10/2026. */
+export const DEMO_PLAN_SET_AT = '2026-06-15T12:00:00.000Z';
 /** Dia da montagem do cenário 'retorno' (última anotação antes do tempo sem usar). */
 export const DEMO_RETURN_SETUP_DAY = '2026-05-20';
+/** Cenário 'nivel' (D-111): o dia em que a regra da queda passa a contar (45 dias antes de 07/10/2026, o começo do aviso). */
+export const DEMO_LEVEL_COUNT_DAY = '2026-08-23';
 
 /** Parâmetro "?cenario=retorno" → 'retorno'; ausente ou desconhecido → 'padrao'. */
 export function demoScenarioFrom(param: string | null | undefined): DemoScenario {
@@ -88,9 +106,12 @@ export function createDemoCompanyHub(adminPersonId: string = 'pessoa-demo'): Mem
 
 export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario; cards?: boolean } = {}) {
   if (opts.scenario === 'retorno') return createReturnDemoRepository(opts.latencyMs);
+  if (opts.scenario === 'nivel') return createReturnDemoRepository(opts.latencyMs, DEMO_LEVEL_COUNT_DAY);
   if (opts.scenario === 'evolucao') return createEvolutionDemoRepository(opts.latencyMs);
-  // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas'.
-  let today: string = DEMO_TODAY;
+  // O dia só muda, por um instante, para cadastrar as assinaturas de exemplo no cenário 'assinaturas' e, no cenário 'metas', para criar o
+  // espaço e as duas metas em 01/07/2026 (o relógio da memória só anda para a frente: as metas precisam nascer antes dos registros).
+  const goalsSetup = opts.scenario === 'metas';
+  let today: string = goalsSetup ? DEMO_GOALS_SETUP_DAY : DEMO_TODAY;
   // Assinatura (D-083): a demonstração aparece no teste grátis, como uma conta nova.
   const trial = demoTrialAccess(DEMO_TODAY);
   const repo = new MemoryRepository({
@@ -107,6 +128,37 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   const accountId = space.accounts[0]!.id;
   // Contas de origem (D-043): a Carteira é dinheiro; o mercado é pago nela.
   const carteira = await repo.createAccount(newOperationKey(), ctx, { name: 'Carteira', kind: 'dinheiro' });
+  // Metas (D-027), pelas mesmas funções do cadastro. A reserva usa a média de setembro (Moradia e Mercado). No cenário 'metas' (D-105),
+  // as duas nascem aqui, em 01/07/2026, com o já guardado ao criar nesse dia; nos outros, depois do resto, como sempre.
+  const goalsStart = goalsSetup ? DEMO_GOALS_SETUP_DAY : '2026-10-01';
+  const createReserve = () =>
+    repo.createGoal(newOperationKey(), ctx, {
+      goalType: 'emergencia',
+      name: 'Reserva para imprevistos',
+      targetCents: 2_250_000,
+      targetMonth: null,
+      plannedMonthlyCents: 50_000,
+      essentialBaseCents: 375_000,
+      essentialMonths: 6,
+      essentialBaseSource: 'media_gastos',
+      initialCents: 300_000,
+      initialOn: goalsStart,
+    });
+  const createTrip = () =>
+    repo.createGoal(newOperationKey(), ctx, {
+      goalType: 'objetivo',
+      name: 'Viagem de férias',
+      targetCents: 600_000,
+      targetMonth: '2027-07',
+      plannedMonthlyCents: 48_000,
+      essentialBaseCents: null,
+      essentialMonths: null,
+      essentialBaseSource: null,
+      initialCents: 120_000,
+      initialOn: goalsStart,
+    });
+  const early = goalsSetup ? { reserve: await createReserve(), trip: await createTrip() } : null;
+  today = DEMO_TODAY;
   const add = (
     kind: 'receita' | 'despesa',
     description: string,
@@ -117,7 +169,15 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   ) => repo.createRecord(newOperationKey(), ctx, kind, { accountId: from, amountCents: reais * 100, occurredOn, description, category });
 
   await add('receita', 'Salário', 6000, '2026-09-01', 'Salário');
-  await add('despesa', 'Aluguel', 2500, '2026-09-05', 'Moradia');
+  // Subcategoria (D-107): o aluguel de setembro mostra "Moradia › Aluguel" no detalhe, na lista e na composição de setembro.
+  await repo.createRecord(newOperationKey(), ctx, 'despesa', {
+    accountId,
+    amountCents: 250_000,
+    occurredOn: '2026-09-05',
+    description: 'Aluguel',
+    category: 'Moradia',
+    subcategory: 'Aluguel',
+  });
   await add('despesa', 'Mercado', 1250, '2026-09-12', 'Mercado', carteira.id);
   await add('receita', 'Salário', 6000, '2026-10-01', 'Salário');
   await add('despesa', 'Mercado', 1400, '2026-10-06', 'Mercado', carteira.id);
@@ -197,37 +257,15 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   await repo.setCategoryBudget(newOperationKey(), ctx, 'Lazer', '2026-10', 0, 30_000);
   // Limite pessoal de comprometimento (D-041): 60% da renda de referência a partir de outubro de 2026. Outubro fica em 52,5%.
   await repo.setCommitmentLimit(newOperationKey(), ctx, '2026-10', 0, 60);
-  // Metas (D-027), pelas mesmas funções do cadastro. A reserva usa a média de setembro (Moradia e Mercado).
-  const reserva = await repo.createGoal(newOperationKey(), ctx, {
-    goalType: 'emergencia',
-    name: 'Reserva para imprevistos',
-    targetCents: 2_250_000,
-    targetMonth: null,
-    plannedMonthlyCents: 50_000,
-    essentialBaseCents: 375_000,
-    essentialMonths: 6,
-    essentialBaseSource: 'media_gastos',
-    initialCents: 300_000,
-    initialOn: '2026-10-01',
-  });
+  // Metas (D-027): a reserva, o aporte de 06/10 e a viagem, nessa ordem (no cenário 'metas', as duas já existem).
+  const reserva = early ? early.reserve : await createReserve();
   await repo.addGoalMovement(newOperationKey(), reserva.goal.id, 'aporte', {
     amountCents: 50_000,
     occurredOn: '2026-10-06',
     note: null,
     accountId,
   });
-  await repo.createGoal(newOperationKey(), ctx, {
-    goalType: 'objetivo',
-    name: 'Viagem de férias',
-    targetCents: 600_000,
-    targetMonth: '2027-07',
-    plannedMonthlyCents: 48_000,
-    essentialBaseCents: null,
-    essentialMonths: null,
-    essentialBaseSource: null,
-    initialCents: 120_000,
-    initialOn: '2026-10-01',
-  });
+  if (!early) await createTrip();
   // Plano de guardar (spec7): a pessoa respondeu "consigo" com R$ 500,00 por mês, o mesmo plano da reserva. Só é lida pela
   // própria pessoa; não conta como anotação e não muda nenhum total.
   await repo.setSavingsAnswer(newOperationKey(), ctx, 0, 'consigo', 50_000);
@@ -250,6 +288,11 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
       liquidityDays: null,
       quantityMicro: null,
       fundCnpj: null,
+      // Taxa com data de fim (D-104, item 13): 105% do CDI até 31/03/2027, depois 100%. Hoje (07/10/2026) a estimativa usa só os 105%.
+      rateUntil: '2027-03-31',
+      rateAfterBp: 10000,
+      rateCondition: null,
+      description: null,
     },
     // Ligado à reserva (D-099, item 13): só informação; a reserva continua com o valor registrado nela.
     goalId: reserva.goal.id,
@@ -268,7 +311,20 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
     investedCents: 500_000,
     startOn: '2026-08-01',
     currentCents: null,
-    details: { subkind: 'vgbl', institution: null, indexKind: 'variavel', rateBp: null, maturityOn: null, liquidity: null, liquidityOn: null, liquidityDays: null, quantityMicro: null, fundCnpj: null },
+    details: {
+      subkind: 'vgbl',
+      institution: null,
+      indexKind: 'variavel',
+      rateBp: null,
+      maturityOn: null,
+      liquidity: null,
+      liquidityOn: null,
+      liquidityDays: null,
+      quantityMicro: null,
+      fundCnpj: null,
+      // Descrição livre (D-104, item 12).
+      description: 'Plano com contribuição todo mês, para a aposentadoria.',
+    },
   });
   await move(previdencia.investment!.id, 'valor', 504_000, '2026-08-31');
   await move(previdencia.investment!.id, 'valor', 508_000, '2026-09-30');
@@ -276,6 +332,12 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   await move(previdencia.investment!.id, 'valor', 508_000, '2026-10-06');
   // Plano de aportes (D-099, item 12): R$ 600,00 por mês; outubro tem o aporte de R$ 500,00 na aplicação.
   await repo.setInvestmentPlan(newOperationKey(), ctx, 60_000);
+  // Revisão opcional do plano (D-103, item 14): o plano da demonstração foi definido em 15/06/2026 (FICTÍCIO) e não mudou desde então, então
+  // em 07/10/2026 faz 3 meses e o card do plano mostra o convite "Quer conferir?". Só a data de alteração do plano recua (o relógio da
+  // memória só anda para a frente); nenhum total muda.
+  const plans = repo['investmentPlans'];
+  const plan = plans.get(ctx);
+  if (plan) plans.set(ctx, { ...plan, createdAt: DEMO_PLAN_SET_AT, updatedAt: DEMO_PLAN_SET_AT });
   // Cartões (D-037): o cartão fechou em 03/10, então as compras de 05 e 06/10 entram na fatura de novembro (vencimento 10/11).
   // cards: false monta a demonstração dos ciclos anteriores (testes das bases A, B e C), sem o cartão e sem as faturas.
   if (opts.cards !== false) {
@@ -329,7 +391,7 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
  * Maio: Recebido R$ 6.000,00, Pago R$ 4.765,30. Ao abrir: faixa "Seus últimos meses" com 4 meses com algo sem
  * registro e 13 contas para conferir.
  */
-async function createReturnDemoRepository(latencyMs?: number) {
+async function createReturnDemoRepository(latencyMs?: number, levelCountFrom?: string) {
   let today = DEMO_RETURN_SETUP_DAY;
   const repo = new MemoryRepository({
     actorId: 'pessoa-demo',
@@ -396,6 +458,8 @@ async function createReturnDemoRepository(latencyMs?: number) {
     category: 'Mercado',
   });
   today = DEMO_TODAY;
+  // Cenário 'nivel' (D-111): a regra da queda conta desde 23/08/2026, então em 07/10/2026 começa o aviso (os marcos dão Prata).
+  if (levelCountFrom) repo.startLevelCountForDemo(levelCountFrom);
   repo.latencyMs = latencyMs ?? 0;
   return repo;
 }

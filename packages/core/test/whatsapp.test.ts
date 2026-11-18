@@ -6,6 +6,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 import {
+  RECORD_LINK_TEXT,
+  TELEGRAM_REPLY,
   WHATSAPP_CODE_ALPHABET,
   WHATSAPP_REPLY,
   WHATSAPP_TEXT,
@@ -250,6 +252,15 @@ describe('WhatsApp: respostas', () => {
     expect(WHATSAPP_REPLY.ajuda).toContain('farmácia 41 cartão');
   });
 
+  it('DESFAZER de um gasto que virou o pagamento de uma fatura no app (D-107, revisão de 17/11/2026): a resposta diz o caminho no app', () => {
+    expect(whatsappOutcomeReply({ result: 'pagamento_de_fatura' }, TODAY)).toBe(
+      'A última anotação feita por aqui virou o pagamento de uma fatura no app e não sai por aqui. No app, abra o gasto e toque em Desligar da fatura; depois, se quiser, exclua o gasto.',
+    );
+    expect(whatsappOutcomeReply({ result: 'pagamento_de_fatura' }, TODAY, 'telegram')).toBe(TELEGRAM_REPLY.pagamento_de_fatura);
+    // O botão citado é o do detalhe do gasto ligado à fatura.
+    expect(WHATSAPP_REPLY.pagamento_de_fatura).toContain(RECORD_LINK_TEXT.unlinkInvoice);
+  });
+
   it('repetida não responde; as demais têm texto', () => {
     expect(whatsappOutcomeReply({ result: 'repetida' }, TODAY)).toBeNull();
     const all: WhatsAppOutcome[] = [
@@ -260,7 +271,7 @@ describe('WhatsApp: respostas', () => {
       { result: 'sem_cartao', space },
       { result: 'fatura_paga', space },
       { result: 'qual_cartao', space, cards: ['Azul'] },
-      ...(['nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'muitas_tentativas', 'muitas_mensagens', 'data_futura',
+      ...(['nada_para_desfazer', 'pagamento_de_fatura', 'desligado', 'nao_ligado', 'codigo_invalido', 'muitas_tentativas', 'muitas_mensagens', 'data_futura',
         'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida', 'erro'] as const).map((result) => ({ result }) as WhatsAppOutcome),
     ];
     for (const o of all) expect(whatsappOutcomeReply(o, TODAY), o.result).toMatch(/\S/);
@@ -591,6 +602,18 @@ describe('WhatsApp: servidor', () => {
       const { t, sig } = signed(payload([text('wamid.D', 'mercado 10')]));
       expect((await h(request('POST', 'https://f/whatsapp', t, sig))).status).toBe(200);
       expect(net.sent.map((s) => s.url)).toEqual(['https://projeto.supabase.co/rest/v1/rpc/whatsapp_add_record']);
+    });
+
+    it('DESFAZER de um gasto que virou pagamento de fatura (revisão de 17/11/2026): o servidor aceita o resultado e responde o caminho no app', async () => {
+      const net = fakeNet(200, { result: 'pagamento_de_fatura' });
+      const logs: string[] = [];
+      const h = createWhatsAppHandler({ config, fetch: net.fetcher, log: (m) => logs.push(m) });
+      const { t, sig } = signed(payload([text('wamid.U', 'desfazer')]));
+      expect((await h(request('POST', 'https://f/whatsapp', t, sig))).status).toBe(200);
+      expect(net.sent[0]!.url).toBe('https://projeto.supabase.co/rest/v1/rpc/whatsapp_undo');
+      const replies = net.sent.filter((s) => s.url.includes('graph.facebook.com')).map((s) => (s.body as { text: { body: string } }).text.body);
+      expect(replies).toEqual([WHATSAPP_REPLY.pagamento_de_fatura]);
+      expect(logs).toEqual([]);
     });
 
     it('no máximo 100 mensagens por entrega, com aviso no log', async () => {

@@ -9,6 +9,9 @@ import { signOutIntent } from '@/lib/nav';
 import { useSession } from '@/state/session';
 import { colors } from '@/theme/tokens';
 
+/** O link de recuperação vale uma vez, por pouco tempo e só no aparelho e no app ou navegador em que o pedido foi feito. */
+const LINK_INVALID = 'O link expirou, já foi usado ou foi aberto em outro aparelho. Peça um novo link e abra o e-mail no mesmo aparelho em que fez o pedido.';
+
 /** Aberta pelo link de recuperação. Sem sessão de recuperação válida, o link expirou ou já foi usado. */
 export default function NovaSenha() {
   const { user, recovery, auth, signOut } = useSession();
@@ -37,7 +40,7 @@ export default function NovaSenha() {
       <AuthShell title="Nova senha">
         <Banner tone="erro" icon={AlertCircle}>
           <Txt variant="label" color={colors.error}>
-            O link expirou ou já foi usado.
+            {LINK_INVALID}
           </Txt>
         </Banner>
         <Button label="Pedir novo link" onPress={() => router.replace('/recuperar-acesso')} />
@@ -61,7 +64,7 @@ export default function NovaSenha() {
       await signOut('local', { keepDevice: true });
     } catch (e) {
       if (e instanceof AuthError && e.code === 'senha_fraca') setError(PASSWORD_RULE);
-      else if (e instanceof AuthError && e.code === 'sem_sessao') setBanner('O link expirou ou já foi usado.');
+      else if (e instanceof AuthError && e.code === 'sem_sessao') setBanner(LINK_INVALID);
       else setBanner('Não foi possível salvar a nova senha. Tente de novo.');
     } finally {
       setBusy(false);

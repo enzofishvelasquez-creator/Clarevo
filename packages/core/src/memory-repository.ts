@@ -1,5 +1,5 @@
 import type { IsoDate, IsoMonth } from './dates';
-import { ACCOUNT_MARK_KEYS, type AccountMarkKey, type AccountMarks } from './levels';
+import { ACCOUNT_MARK_KEYS, LEVEL_NOTE_ACTIONS, type AccountLevelState, type AccountMarkKey, type AccountMarks } from './levels';
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import { FULL_ACCESS, type Access } from './plano';
@@ -81,6 +81,8 @@ import type {
   SubscriptionReviewWrite,
 } from './repository';
 import { RepoError } from './repository';
+import type { LinkableRecord } from './repository';
+import { normalizeSubcategory, subcategoryAllowed } from './record-links';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import { IMPORT_BATCH } from './importar/tipos';
 import type { FamilyAction, FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
@@ -171,7 +173,7 @@ import {
   type InvestmentStatus,
   type NewInvestmentInput,
 } from './investments';
-import { EMPTY_INVESTMENT_DETAILS, FUND_CNPJ_KINDS, QUANTITY_KINDS, investmentDetailsError, normalizeInstitution, type InvestmentDetails } from './investment-details';
+import { EMPTY_INVESTMENT_DETAILS, FUND_CNPJ_KINDS, QUANTITY_KINDS, indexNeedsRate, investmentDetailsError, normalizeInstitution, type InvestmentDetails } from './investment-details';
 import { investmentPlanError } from './investment-plan';
 import { examplePublicPrices, type PublicPrices } from './investment-prices';
 import { MONTH_CHECK_KINDS, PARTS_PER_YEAR_MAX, nextMonthAllowed, recordMonth } from './records';
@@ -245,6 +247,8 @@ interface Operation {
   accountId: string | null;
   /** Importação (import_result): quantas linhas viraram lançamento e quantas já existiam. Só em 'importar_extrato'. */
   importResult: ImportResult | null;
+  /** O dia em que a operação foi gravada (o created_at do banco, no dia da pessoa): a última anotação dos níveis (D-111). */
+  on?: IsoDate;
 }
 
 /** Conta (financial_accounts): exclusão lógica (fica arquivada e some da leitura). */
@@ -411,8 +415,14 @@ export class MemoryRepository implements RecordsRepository {
   /** month_checks nos contextos que a pessoa lê (aqui, os dela), por "contexto|mês|tipo"; a linha nunca sai (só com o contexto). */
   private monthChecks = new Map<string, StoredMonthCheck>();
   private incomeRefs = new Map<string, StoredIncomeReference>();
-  /** Níveis de conta (D-095): os marcos já alcançados, como account_marks no banco (o nível nunca desce). */
+  /** Níveis de conta (D-095): os marcos já alcançados, como account_marks no banco (o nível volta a eles ao anotar, D-111). */
   private reachedMarks = new Set<AccountMarkKey>();
+  /**
+   * A contagem do tempo sem anotar (D-111), como account_level_clock no banco: o dia da primeira leitura do nível com a regra e o dia da
+   * última anotação de gasto ou recebimento já vista (guardado, para não voltar atrás se as operações sumirem).
+   */
+  private levelStartedOn: IsoDate | null = null;
+  private levelLastNoteOn: IsoDate | null = null;
   private budgets = new Map<string, StoredBudget>();
   private limits = new Map<string, StoredLimit>();
   private goals = new Map<string, StoredGoal>();
@@ -822,33 +832,48 @@ export class MemoryRepository implements RecordsRepository {
       // conteúdo só quando ligado, como no banco (false e ausente são o mesmo conteúdo de antes).
       const receipt = input.receiptKey?.trim() ? input.receiptKey.trim() : null;
       const nextMonth = input.nextMonth === true;
-      const body = nextMonth ? { ...norm, nextMonth: true } : norm;
+      // Subcategoria e rendimento de investimento (D-107) entram no conteúdo só quando vêm, como no banco.
+      const subcategory = normalizeSubcategory(input.subcategory);
+      const investmentId = input.investmentId ?? null;
+      const body = {
+        ...norm,
+        ...(nextMonth ? { nextMonth: true } : {}),
+        ...(subcategory !== null ? { subcategory } : {}),
+        ...(investmentId !== null ? { investmentId } : {}),
+      };
       const payload = receipt === null ? [contextId, kind, body] : [contextId, kind, body, receipt];
       const replay = this.replayRecord(key, 'criar', payload);
       if (replay) return replay;
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
       this.validate(contextId, kind, { ...norm, nextMonth });
+      if (!subcategoryAllowed(kind, norm.category, subcategory)) throw new RepoError('subcategoria_invalida');
       if (receipt !== null) {
         if (kind !== 'despesa' || !receiptKeyValid(receipt)) throw new RepoError('chave_de_nota_invalida');
         this.checkReceiptFree(contextId, receipt);
       }
+      if (investmentId !== null && kind !== 'receita') throw new RepoError('investimento_invalido');
+      const investment = investmentId !== null ? this.incomeInvestment(investmentId, contextId) : null;
       const now = this.stamp();
-      const record: FinancialRecord = {
-        id: this.id('reg'),
-        contextId,
-        kind,
-        status: 'realizado',
-        currency: 'BRL',
-        ...norm,
-        commitmentId: null,
-        invoice: null,
-        receiptKey: receipt,
-        ...(nextMonth ? { nextMonth: true } : {}),
-        createdBy: this.opts.actorId,
-        version: 1,
-        createdAt: now,
-        updatedAt: now,
-      };
+      const movement = investment ? this.newInvestmentMovement(investment, 'rendimento', norm.amountCents, norm.occurredOn, norm.description, now) : null;
+      const record: FinancialRecord = withRecordExtras(
+        {
+          id: this.id('reg'),
+          contextId,
+          kind,
+          status: 'realizado',
+          currency: 'BRL',
+          ...norm,
+          commitmentId: null,
+          invoice: null,
+          receiptKey: receipt,
+          ...(nextMonth ? { nextMonth: true } : {}),
+          createdBy: this.opts.actorId,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        },
+        { subcategory, investmentId: investment?.id ?? null, investmentMovementId: movement?.id ?? null },
+      );
       this.records.set(record.id, record);
       this.saveOperation(key, 'criar', payload, { contextId, recordId: record.id, commitmentId: null });
       return record;
@@ -860,23 +885,77 @@ export class MemoryRepository implements RecordsRepository {
       const norm = normalize(input);
       // Mês seguinte (D-089 A): ausente mantém a marca enquanto a data nova cabe (como p_next_month nulo no banco); entra no conteúdo
       // só quando veio.
-      const payload = input.nextMonth === undefined ? [id, expectedVersion, norm] : [id, expectedVersion, { ...norm, nextMonth: input.nextMonth === true }];
+      // Os campos novos (D-107) entram no conteúdo só quando vêm, como no banco.
+      const extras = {
+        ...(input.kind !== undefined ? { kind: input.kind } : {}),
+        ...(input.subcategory !== undefined ? { subcategory: input.subcategory === null ? '' : input.subcategory.trim() } : {}),
+        ...(input.investmentId !== undefined ? { investmentId: input.investmentId } : {}),
+      };
+      const base = input.nextMonth === undefined ? norm : { ...norm, nextMonth: input.nextMonth === true };
+      const payload = Object.keys(extras).length === 0 ? [id, expectedVersion, base] : [id, expectedVersion, { ...base, ...extras }];
       const replay = this.replayRecord(key, 'editar', payload);
       if (replay) return replay;
       const current = this.liveRecord(id);
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      const kind = input.kind ?? current.kind;
+      // Subcategoria: ausente mantém a de antes se o tipo e a categoria não mudam; null ou '' tira; um texto troca.
+      const subcategory =
+        input.subcategory === undefined
+          ? kind === current.kind && norm.category === current.category
+            ? (current.subcategory ?? null)
+            : null
+          : normalizeSubcategory(input.subcategory);
       // Gasto de pagamento de fatura: valor, descrição e categoria vêm da fatura; só a conta de saída e a data mudam.
-      if (current.invoice && (norm.amountCents !== current.amountCents || norm.description !== current.description || norm.category !== current.category)) {
+      if (
+        current.invoice &&
+        (norm.amountCents !== current.amountCents ||
+          norm.description !== current.description ||
+          norm.category !== current.category ||
+          subcategory !== (current.subcategory ?? null) ||
+          kind !== current.kind)
+      ) {
         throw new RepoError('pagamento_de_fatura');
       }
-      // Ausente (o app antigo) mantém a marca só se a data nova continua no mesmo mês e na janela.
+      // Trocar o tipo (D-107): só sem conta a pagar, sem fatura e sem nota fiscal.
+      if (kind !== current.kind && (current.commitmentId || current.receiptKey)) throw new RepoError('tipo_nao_muda');
+      // Ausente (o app antigo) mantém a marca só no recebimento, se a data nova continua no mesmo mês e na janela.
       const nextMonth =
         input.nextMonth === undefined
-          ? current.nextMonth === true && monthOf(norm.occurredOn) === monthOf(current.occurredOn) && nextMonthAllowed(norm.occurredOn)
+          ? kind === 'receita' && current.nextMonth === true && monthOf(norm.occurredOn) === monthOf(current.occurredOn) && nextMonthAllowed(norm.occurredOn)
           : input.nextMonth === true;
-      this.validate(current.contextId, current.kind, { ...norm, nextMonth }, current.accountId);
+      this.validate(current.contextId, kind, { ...norm, nextMonth }, current.accountId);
+      if (!subcategoryAllowed(kind, norm.category, subcategory)) throw new RepoError('subcategoria_invalida');
+      // Rendimento de investimento (D-107): o de antes (se ainda existe) muda junto, sai ou dá lugar a outro.
+      const oldMovement = current.investmentMovementId ? (this.investmentMovements.get(current.investmentMovementId) ?? null) : null;
+      const oldInvestment = oldMovement ? (current.investmentId ?? null) : null;
+      if (input.investmentId === '') throw new RepoError('investimento_invalido');
+      const wanted = kind === 'despesa' || input.investmentId === null ? null : input.investmentId === undefined ? oldInvestment : input.investmentId;
       const now = this.stamp();
-      const next = withNextMonth({ ...current, ...norm, version: current.version + 1, updatedAt: now }, nextMonth);
+      let movementId: string | null = oldMovement?.id ?? null;
+      if (oldMovement && wanted !== oldInvestment) {
+        this.investmentMovements.delete(oldMovement.id);
+        movementId = null;
+      }
+      if (wanted !== null && movementId === null) {
+        const investment = this.incomeInvestment(wanted, current.contextId);
+        movementId = this.newInvestmentMovement(investment, 'rendimento', norm.amountCents, norm.occurredOn, norm.description, now).id;
+      } else if (movementId !== null && oldMovement) {
+        if (oldMovement.amountCents !== norm.amountCents || oldMovement.occurredOn !== norm.occurredOn || oldMovement.note !== norm.description) {
+          this.investmentMovements.set(oldMovement.id, {
+            ...oldMovement,
+            amountCents: norm.amountCents,
+            occurredOn: norm.occurredOn,
+            note: norm.description,
+            version: oldMovement.version + 1,
+            updatedAt: now,
+          });
+        }
+      }
+      const next = withRecordExtras(withNextMonth({ ...current, ...norm, kind, version: current.version + 1, updatedAt: now }, nextMonth), {
+        subcategory,
+        investmentId: movementId !== null ? wanted : null,
+        investmentMovementId: movementId,
+      });
       this.records.set(id, next);
       // Gasto de conta a pagar: a conta sobe de versão; o valor previsto não muda.
       if (current.commitmentId) this.bumpCommitment(current.commitmentId, {}, now);
@@ -895,6 +974,8 @@ export class MemoryRepository implements RecordsRepository {
       // Pagamento de fatura: o caminho é undo_invoice_payment, que também desfaz o saldo anterior.
       if (current.invoice) throw new RepoError('pagamento_de_fatura');
       const now = this.stamp();
+      // Rendimento de investimento (D-107): o rendimento gravado com o recebimento sai junto.
+      if (current.investmentMovementId) this.investmentMovements.delete(current.investmentMovementId);
       const next = { ...current, version: current.version + 1, updatedAt: now, deletedAt: now };
       this.records.set(id, next);
       // Excluir o gasto de uma conta a pagar desfaz o pagamento: a conta volta a ficar em aberto.
@@ -1064,9 +1145,9 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
-  async undoCommitmentPayment(key: string, id: string, expectedVersion: number) {
+  async undoCommitmentPayment(key: string, id: string, expectedVersion: number, keepRecord = false) {
     return this.write(() => {
-      const payload = [id, expectedVersion];
+      const payload = keepRecord ? [id, expectedVersion, 'manter_gasto'] : [id, expectedVersion];
       const replay = this.replayCommitment(key, 'desfazer_pagamento', payload);
       if (replay) return withRecord(replay);
       const current = this.liveCommitment(id);
@@ -1076,12 +1157,55 @@ export class MemoryRepository implements RecordsRepository {
       // Permissão também sobre o gasto, como clarevo_lock_record.
       const paid = this.liveRecord(this.livePayment(id)?.id ?? '');
       const now = this.stamp();
-      // Exclusão lógica: o gasto mantém commitmentId como rastro.
-      this.records.set(paid.id, { ...paid, version: paid.version + 1, updatedAt: now, deletedAt: now });
+      // Desfazer mantendo o gasto (D-107): ele continua em Pago e só deixa de ser o pagamento. Sem isso, exclusão lógica: o gasto mantém
+      // commitmentId como rastro.
+      if (keepRecord) this.records.set(paid.id, withLinkedPayment({ ...paid, commitmentId: null, version: paid.version + 1, updatedAt: now }, false));
+      else this.records.set(paid.id, { ...paid, version: paid.version + 1, updatedAt: now, deletedAt: now });
       this.bumpCommitment(id, { status: 'aberto' }, now);
       this.saveOperation(key, 'desfazer_pagamento', payload, { contextId: current.contextId, recordId: paid.id, commitmentId: id });
       return withRecord(this.commitmentResult(id, paid.id));
     });
+  }
+
+  async linkRecordToCommitment(key: string, commitmentId: string, expectedVersion: number, seen: LinkableRecord) {
+    return this.write(() => {
+      const payload = [commitmentId, expectedVersion, seen.accountId, seen.amountCents, seen.occurredOn, null, seen.id];
+      const replay = this.replayCommitment(key, 'pagar_compromisso', payload);
+      if (replay) return withRecord(replay);
+      const current = this.liveCommitment(commitmentId);
+      if (current.invoiceCardId) throw new RepoError('conta_de_fatura');
+      if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      if (current.status !== 'aberto') throw new RepoError('compromisso_quitado');
+      const r = this.liveRecord(seen.id);
+      if (r.contextId !== current.contextId || r.kind !== 'despesa') throw new RepoError('registro_invalido');
+      if (r.commitmentId || r.invoice) throw new RepoError('registro_ja_ligado');
+      if (r.amountCents !== seen.amountCents || r.occurredOn !== seen.occurredOn || (seen.accountId && r.accountId !== seen.accountId)) {
+        throw new RepoError('versao_desatualizada', undefined, 'registro');
+      }
+      const now = this.stamp();
+      this.records.set(r.id, withLinkedPayment({ ...r, commitmentId, version: r.version + 1, updatedAt: now }, true));
+      this.bumpCommitment(commitmentId, { status: 'quitado' }, now);
+      this.saveOperation(key, 'pagar_compromisso', payload, { contextId: current.contextId, recordId: r.id, commitmentId });
+      return withRecord(this.commitmentResult(commitmentId, r.id));
+    });
+  }
+
+  /** Investimento ativo do contexto que recebe o rendimento (clarevo_income_investment). */
+  private incomeInvestment(id: string, contextId: string): StoredInvestment {
+    const i = this.investments.get(id);
+    if (!i || !this.canRead(i.contextId) || i.contextId !== contextId) throw new RepoError('investimento_invalido');
+    if (!this.canWrite(i.contextId)) throw new RepoError('sem_permissao');
+    if (i.status !== 'ativo') throw new RepoError('investimento_encerrado');
+    return i;
+  }
+
+  /** O rendimento apagado pela ficha do investimento só desfaz a ligação do recebimento (on delete set null). */
+  private unlinkIncome(movementIds: readonly string[]) {
+    if (movementIds.length === 0) return;
+    const gone = new Set(movementIds);
+    for (const r of this.records.values()) {
+      if (r.investmentMovementId && gone.has(r.investmentMovementId)) this.records.set(r.id, withRecordExtras(r, { subcategory: r.subcategory ?? null, investmentId: null, investmentMovementId: null }));
+    }
   }
 
   async listSeries(contextId: string) {
@@ -2290,7 +2414,15 @@ export class MemoryRepository implements RecordsRepository {
   /** Como clarevo_validate_investment_details: a ficha inteira, com a instituição sem espaços sobrando. */
   private investmentDetails(kind: StoredInvestment['kind'], details: InvestmentDetails | undefined): InvestmentDetails {
     const d = { ...EMPTY_INVESTMENT_DETAILS, ...(details ?? {}) };
-    const normalized = { ...d, institution: normalizeInstitution(d.institution) };
+    // Campos da 0039 (D-104) ausentes contam como vazios; a condição e a descrição sem espaços sobrando, como a instituição.
+    const normalized = {
+      ...d,
+      institution: normalizeInstitution(d.institution),
+      rateUntil: d.rateUntil ?? null,
+      rateAfterBp: d.rateAfterBp ?? null,
+      rateCondition: normalizeInstitution(d.rateCondition ?? null),
+      description: normalizeInstitution(d.description ?? null),
+    };
     const code = investmentDetailsError(kind, normalized);
     if (code) throw new RepoError(code);
     return normalized;
@@ -2359,13 +2491,28 @@ export class MemoryRepository implements RecordsRepository {
         liquidityDays: i.liquidityDays,
         quantityMicro: i.quantityMicro,
         fundCnpj: i.fundCnpj,
+        rateUntil: i.rateUntil ?? null,
+        rateAfterBp: i.rateAfterBp ?? null,
+        rateCondition: i.rateCondition ?? null,
+        description: i.description ?? null,
       };
       // A quantidade e o CNPJ (0037) ficam quando a ficha chega sem eles (versão anterior do app), se ainda valem para o tipo; com o tipo
       // mudado, saem os que não pertencem ao novo (como o tipo exato, F5).
-      const extrasFor = (d: Partial<InvestmentDetails>) => ({
-        quantityMicro: d.quantityMicro !== undefined ? d.quantityMicro : QUANTITY_KINDS.includes(input.kind) ? i.quantityMicro : null,
-        fundCnpj: d.fundCnpj !== undefined ? d.fundCnpj : FUND_CNPJ_KINDS.includes(input.kind) ? i.fundCnpj : null,
-      });
+      // A taxa com data de fim e a condição (0039, D-104) ficam quando a ficha chega sem elas, se a forma de render é a mesma e ainda tem
+      // taxa; a descrição fica sempre (como clarevo_investment_rate_step e clarevo_investment_description).
+      const extrasFor = (d: Partial<InvestmentDetails>) => {
+        const index = d.indexKind !== undefined ? d.indexKind : i.indexKind;
+        const sameRate = index === i.indexKind && indexNeedsRate(index);
+        const pairGiven = d.rateUntil !== undefined || d.rateAfterBp !== undefined;
+        return {
+          quantityMicro: d.quantityMicro !== undefined ? d.quantityMicro : QUANTITY_KINDS.includes(input.kind) ? i.quantityMicro : null,
+          fundCnpj: d.fundCnpj !== undefined ? d.fundCnpj : FUND_CNPJ_KINDS.includes(input.kind) ? i.fundCnpj : null,
+          rateUntil: pairGiven ? (d.rateUntil ?? null) : sameRate ? (i.rateUntil ?? null) : null,
+          rateAfterBp: pairGiven ? (d.rateAfterBp ?? null) : sameRate ? (i.rateAfterBp ?? null) : null,
+          rateCondition: d.rateCondition !== undefined ? d.rateCondition : sameRate ? (i.rateCondition ?? null) : null,
+          description: d.description !== undefined ? d.description : (i.description ?? null),
+        };
+      };
       const keptForKind: InvestmentDetails = { ...kept, ...extrasFor({}) };
       const details =
         input.details !== undefined
@@ -2402,7 +2549,14 @@ export class MemoryRepository implements RecordsRepository {
       if (replayed) return { deleted: true as const, id: replayed.goalId! };
       const i = this.liveInvestment(id);
       if (expectedVersion !== i.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${i.version}`);
-      for (const m of [...this.investmentMovements.values()]) if (m.investmentId === id) this.investmentMovements.delete(m.id);
+      const gone: string[] = [];
+      for (const m of [...this.investmentMovements.values()]) {
+        if (m.investmentId === id) {
+          this.investmentMovements.delete(m.id);
+          gone.push(m.id);
+        }
+      }
+      this.unlinkIncome(gone);
       this.investments.delete(id);
       this.saveOperation(key, 'excluir_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: id });
       return { deleted: true as const, id };
@@ -2461,6 +2615,7 @@ export class MemoryRepository implements RecordsRepository {
       if (expectedVersion !== m.version) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${m.version}`);
       this.checkInvestmentBalance(i.id, { op: 'delete', id: m.id });
       this.investmentMovements.delete(m.id);
+      this.unlinkIncome([m.id]);
       this.saveOperation(key, 'excluir_movimento_investimento', payload, { contextId: i.contextId, recordId: null, commitmentId: null, goalId: i.id, movementId: m.id });
       return this.investmentResult(i.id, null);
     });
@@ -3097,8 +3252,26 @@ export class MemoryRepository implements RecordsRepository {
    * principal do contexto) e, no pagamento parcial, o saldo anterior na fatura seguinte.
    */
   async payInvoice(key: string, cardId: string, month: IsoMonth, expectedVersion: number, amountCents: Cents, paidOn: IsoDate, accountId: string | null = null) {
+    return this.payOrLinkInvoice(key, cardId, month, expectedVersion, amountCents, paidOn, accountId, null);
+  }
+
+  /** D-107: o gasto que já existe vira o pagamento da fatura (pay_invoice com p_record_id). */
+  async linkRecordToInvoice(key: string, cardId: string, month: IsoMonth, expectedVersion: number, seen: LinkableRecord) {
+    return this.payOrLinkInvoice(key, cardId, month, expectedVersion, seen.amountCents, seen.occurredOn, null, seen.id);
+  }
+
+  private async payOrLinkInvoice(
+    key: string,
+    cardId: string,
+    month: IsoMonth,
+    expectedVersion: number,
+    amountCents: Cents,
+    paidOn: IsoDate,
+    accountId: string | null,
+    recordId: string | null,
+  ) {
     return this.write(() => {
-      const payload = [cardId, month, expectedVersion, amountCents, paidOn, ...(accountId ? [accountId] : [])];
+      const payload = [cardId, month, expectedVersion, amountCents, paidOn, ...(accountId ? [accountId] : []), ...(recordId ? ['gasto', recordId] : [])];
       const replayed = this.replay(key, 'pagar_fatura', payload);
       if (replayed) return this.paymentResult(replayed, month);
       const card = this.liveCard(cardId);
@@ -3110,6 +3283,13 @@ export class MemoryRepository implements RecordsRepository {
       const today = this.opts.today();
       // Só se paga fatura fechada: aberta (hoje até o dia do fechamento gravado na conta) ou futura é recusada.
       if (today <= c.cardClosingOn!) throw new RepoError('fatura_aberta');
+      // Ligar (D-107): o gasto que já existe, com o valor, a data e a conta dele (a tela manda os que viu).
+      const linked = recordId !== null ? this.liveRecord(recordId) : null;
+      if (linked) {
+        if (linked.contextId !== card.contextId || linked.kind !== 'despesa' || linked.receiptKey) throw new RepoError('registro_invalido');
+        if (linked.commitmentId || linked.invoice) throw new RepoError('registro_ja_ligado');
+        if (linked.amountCents !== amountCents || linked.occurredOn !== paidOn) throw new RepoError('versao_desatualizada', undefined, 'registro');
+      }
       if (!Number.isSafeInteger(amountCents) || amountCents < 1) throw new RepoError('valor_invalido');
       if (amountCents > c.amountCents) throw new RepoError('valor_acima_da_fatura');
       // Não antes do menor entre 1 ano atrás e o início do período da fatura (fatura antiga paga na data real).
@@ -3117,16 +3297,20 @@ export class MemoryRepository implements RecordsRepository {
       const periodStart = invoicePeriod(card, month).startOn;
       if (typeof paidOn !== 'string' || !isValidIsoDate(paidOn) || paidOn < (periodStart < oneYearAgo ? periodStart : oneYearAgo)) throw new RepoError('data_invalida');
       if (paidOn > today) throw new RepoError('data_futura');
-      // Sem a conta, a principal do contexto (A9; antes, a mais antiga).
-      const account = accountId
-        ? this.liveAccounts().find((a) => a.id === accountId && a.contextId === card.contextId && a.status === 'ativa')
-        : activeAccounts(this.liveAccounts().filter((a) => a.contextId === card.contextId))[0];
+      // Sem a conta, a principal do contexto (A9; antes, a mais antiga). O gasto ligado fica na conta dele (também arquivada).
+      const account = linked
+        ? this.accountsById.get(linked.accountId)
+        : accountId
+          ? this.liveAccounts().find((a) => a.id === accountId && a.contextId === card.contextId && a.status === 'ativa')
+          : activeAccounts(this.liveAccounts().filter((a) => a.contextId === card.contextId))[0];
       if (!account) throw new RepoError('conta_invalida');
       const left = c.amountCents - amountCents;
       const next = addMonths(month, 1);
       if (left > 0 && this.invoicePaid(cardId, next)) throw new RepoError('fatura_seguinte_paga');
       const now = this.stamp();
-      const record: FinancialRecord = {
+      const record: FinancialRecord = linked
+        ? withLinkedPayment({ ...linked, commitmentId: c.id, invoice: { cardId, month }, version: linked.version + 1, updatedAt: now }, true)
+        : {
         id: this.id('reg'),
         contextId: card.contextId,
         accountId: account.id,
@@ -3174,9 +3358,9 @@ export class MemoryRepository implements RecordsRepository {
    * fatura_seguinte_paga (há saldo anterior e a fatura seguinte já foi paga). Apaga o gasto, reabre a conta e apaga o saldo
    * anterior criado pelo pagamento.
    */
-  async undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number) {
+  async undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number, keepRecord = false) {
     return this.write(() => {
-      const payload = [cardId, month, expectedVersion];
+      const payload = keepRecord ? [cardId, month, expectedVersion, 'manter_gasto'] : [cardId, month, expectedVersion];
       const replayed = this.replay(key, 'desfazer_pagamento_fatura', payload);
       if (replayed) return this.paymentResult(replayed, month);
       const card = this.liveCard(cardId);
@@ -3192,7 +3376,9 @@ export class MemoryRepository implements RecordsRepository {
       if (balance && this.invoicePaid(cardId, next)) throw new RepoError('fatura_seguinte_paga');
       const now = this.stamp();
       if (balance) this.cardEntries.set(balance.id, { ...balance, version: balance.version + 1, updatedAt: now, deletedAt: now, deletedBy: this.opts.actorId });
-      this.records.set(paid.id, { ...paid, version: paid.version + 1, updatedAt: now, deletedAt: now });
+      // Desligar mantendo o gasto (D-107): ele continua em Pago; senão, exclusão lógica.
+      if (keepRecord) this.records.set(paid.id, withLinkedPayment({ ...paid, commitmentId: null, invoice: null, version: paid.version + 1, updatedAt: now }, false));
+      else this.records.set(paid.id, { ...paid, version: paid.version + 1, updatedAt: now, deletedAt: now });
       this.bumpCommitment(c.id, { status: 'aberto' }, now);
       this.syncInvoices(cardId, month, next);
       this.saveOperation(key, 'desfazer_pagamento_fatura', payload, {
@@ -4459,6 +4645,7 @@ export class MemoryRepository implements RecordsRepository {
       entryId: ids.entryId ?? null,
       accountId: ids.accountId ?? null,
       importResult: ids.importResult ?? null,
+      on: this.opts.today(),
     });
     this.trackActivity(action, ids.contextId);
   }
@@ -4910,6 +5097,8 @@ export class MemoryRepository implements RecordsRepository {
       this.savingsChecks.clear();
       this.goalImages.clear();
       this.reachedMarks.clear();
+      this.levelStartedOn = null;
+      this.levelLastNoteOn = null;
       this.signupSource = null;
       this.chatCodes = {};
       this.cards.clear();
@@ -5078,16 +5267,30 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /**
-   * Os marcos do nível da conta (D-095), pelo que há na memória e pelas operações gravadas (as mesmas ações do banco). "Três meses
-   * diferentes" aqui usa o mês dos lançamentos (a memória não guarda quando cada operação foi feita).
+   * Os marcos do nível da conta (D-095 e D-111), pelo que há na memória e pelas operações gravadas (as mesmas ações do banco). "Três meses
+   * diferentes" aqui usa o mês dos lançamentos (a memória não guarda a hora de cada operação, só o dia).
    */
   async getAccountMarks(): Promise<AccountMarks> {
     return this.read(() => {
-      // A mesma leitura de my_account_marks (migração 0034): o que a pessoa já fez, pelas operações e pelo que existe; e o que já foi
-      // alcançado fica guardado (reachedMarks), para o nível nunca descer.
-      const acts = new Set<string>([...this.operations.values()].map((o) => o.action));
+      // A mesma leitura de my_account_marks (migrações 0034 e 0041): o que a pessoa já fez, pelas operações e pelo que existe; e o que já
+      // foi alcançado fica guardado (reachedMarks), para o nível voltar a ele quando a pessoa volta a anotar.
+      const ops = [...this.operations.values()];
+      const acts = new Set<string>(ops.map((o) => o.action));
       const has = (...actions: string[]) => actions.some((a) => acts.has(a));
       const recs = [...this.records.values()];
+      // Movimento registrado num investimento já criado (o aporte e o valor do cadastro vêm com criar_investimento, não contam).
+      const movement = (kind: string) =>
+        ops.some((o) => o.action === 'registrar_movimento_investimento' && o.movementId !== null && this.investmentMovements.get(o.movementId)?.kind === kind);
+      // O rendimento gravado pelo recebimento ligado ao investimento (D-107), que entra pela ação do recebimento (criar ou editar): conta
+      // nos recebimentos criados pela pessoa, como no banco (revisão de 17/11/2026).
+      const linkedIncome = recs.some(
+        (r) =>
+          !r.deletedAt &&
+          r.kind === 'receita' &&
+          r.createdBy === this.opts.actorId &&
+          !!r.investmentMovementId &&
+          this.investmentMovements.get(r.investmentMovementId)?.kind === 'rendimento',
+      );
       const live: AccountMarks = {
         gasto: recs.some((r) => r.kind === 'despesa') || this.cardEntries.size > 0 || has('criar_compra_cartao', 'pagar_compromisso', 'pagar_fatura'),
         recebimento: recs.some((r) => r.kind === 'receita'),
@@ -5109,10 +5312,44 @@ export class MemoryRepository implements RecordsRepository {
         conta: has('criar_conta'),
         limite: has('definir_limite_comprometimento'),
         imagem: has('imagem_meta'),
+        // Investimentos e reserva (D-111): investimentos só existem no Pessoal; a reserva com plano por mês vale em qualquer contexto.
+        inv_aporte: movement('aporte'),
+        inv_valor: movement('valor'),
+        inv_rendimento: movement('rendimento') || linkedIncome,
+        inv_plano: this.investmentPlans.size > 0 || has('definir_plano_investimentos'),
+        inv_meta: [...this.investments.values()].some((i) => i.goalId !== null),
+        reserva_plano: [...this.goals.values()].some(
+          (g) => !g.deletedAt && g.goalType === 'emergencia' && g.status !== 'arquivada' && g.plannedMonthlyCents !== null && g.createdBy === this.opts.actorId,
+        ),
       };
       for (const k of ACCOUNT_MARK_KEYS) if (live[k]) this.reachedMarks.add(k);
       return Object.fromEntries(ACCOUNT_MARK_KEYS.map((k) => [k, this.reachedMarks.has(k)])) as AccountMarks;
     });
+  }
+
+  /**
+   * Os marcos e o tempo sem anotar (D-111), como my_account_marks(true): a primeira leitura começa a contagem (levelStartedOn); a última
+   * anotação de gasto ou recebimento vem das operações gravadas (no Pessoal e na Família) e fica guardada. Os marcos vêm de
+   * `this.getAccountMarks()`, para o teste de telas poder trocar só os marcos.
+   */
+  async getAccountLevel(): Promise<AccountLevelState> {
+    const marks = await this.getAccountMarks();
+    return this.read(() => {
+      let last: IsoDate | null = null;
+      for (const o of this.operations.values()) if (o.on && LEVEL_NOTE_ACTIONS.includes(o.action) && (last === null || o.on > last)) last = o.on;
+      if (last !== null && (this.levelLastNoteOn === null || last > this.levelLastNoteOn)) this.levelLastNoteOn = last;
+      if (this.levelStartedOn === null) this.levelStartedOn = this.opts.today();
+      const since = this.levelLastNoteOn !== null && this.levelLastNoteOn > this.levelStartedOn ? this.levelLastNoteOn : this.levelStartedOn;
+      return { marks, idleSince: since, lastNoteOn: this.levelLastNoteOn };
+    });
+  }
+
+  /**
+   * Só para a demonstração (cenário FICTÍCIO 'nivel', D-111): a regra da queda passa a contar para a pessoa em `day`, como se o app com a
+   * regra tivesse lido o nível nesse dia. Nunca é chamado numa conta de verdade.
+   */
+  startLevelCountForDemo(day: IsoDate) {
+    this.levelStartedOn = day;
   }
 
   async getMyAccess(): Promise<Access> {
@@ -5237,6 +5474,34 @@ function normalize(input: RecordInput): RecordInput {
 function withNextMonth<T extends object>(record: T, nextMonth: boolean): T & { nextMonth?: boolean } {
   const { nextMonth: _old, ...rest } = record as T & { nextMonth?: boolean };
   return (nextMonth ? { ...rest, nextMonth: true } : rest) as T & { nextMonth?: boolean };
+}
+
+/**
+ * Subcategoria e rendimento de investimento (D-107) guardados só quando existem: o registro sem eles fica como antes (sem as
+ * propriedades), igual ao que `toRecord` lê do banco.
+ */
+function withRecordExtras<T extends object>(
+  record: T,
+  extras: { subcategory: string | null; investmentId: string | null; investmentMovementId: string | null },
+): T {
+  const { subcategory: _s, investmentId: _i, investmentMovementId: _m, ...rest } = record as T & {
+    subcategory?: string | null;
+    investmentId?: string | null;
+    investmentMovementId?: string | null;
+  };
+  return {
+    ...rest,
+    ...(extras.subcategory !== null ? { subcategory: extras.subcategory } : {}),
+    ...(extras.investmentId !== null && extras.investmentMovementId !== null
+      ? { investmentId: extras.investmentId, investmentMovementId: extras.investmentMovementId }
+      : {}),
+  } as T;
+}
+
+/** A marca "ligado depois" (D-107) só quando verdadeira. */
+function withLinkedPayment<T extends object>(record: T, linked: boolean): T {
+  const { linkedPayment: _old, ...rest } = record as T & { linkedPayment?: boolean };
+  return (linked ? { ...rest, linkedPayment: true } : rest) as T;
 }
 
 function normalizeCommitment(input: CommitmentInput): CommitmentInput {

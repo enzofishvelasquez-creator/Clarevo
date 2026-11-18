@@ -2,6 +2,7 @@ import type { PdfTextItem } from '../comprovante/tipos';
 import { fold } from '../comprovante/texto';
 import { isValidIsoDate, type IsoDate } from '../dates';
 import { MAX_RECORD_CENTS } from '../money';
+import { lineDirection, signedByDirection, unmarkedDirection, type AmountMark } from './direcao';
 import { IMPORT_MAX_LINES, type ImportDestination, type ImportParse, type ParsedLine } from './tipos';
 
 /**
@@ -12,9 +13,10 @@ import { IMPORT_MAX_LINES, type ImportDestination, type ImportParse, type Parsed
  * 2. Uma linha é lançamento quando começa por uma data (DD/MM ou DD/MM/AAAA) e tem um valor (1.234,56). Sem data no começo, vale a
  *    data da linha anterior (extratos que mostram a data uma vez por dia), depois do primeiro lançamento.
  * 3. O valor é o primeiro número de dinheiro depois da descrição; um segundo, mais à direita, costuma ser o saldo, e é ignorado.
- * 4. O sinal, no extrato da conta, vem do próprio valor ("-1.234,56", "1.234,56-", "1.234,56 D" saiu; "C" entrou); sem marca, de
- *    palavras da descrição ("recebido", "salário", "depósito", "estorno" entraram); sem nada, saiu. Na fatura do cartão é o contrário:
- *    a compra vem sem sinal e o crédito ("-", "C", "estorno", "pagamento") entrou.
+ * 4. O sinal, no extrato da conta, vem do próprio valor ("-1.234,56", "1.234,56-", "1.234,56 D" saiu; "C" entrou); sem marca, das
+ *    palavras da descrição ("entrada", "rend pago", "recebido", "salário", "estorno" entraram; "pagamento", "tarifa" saíram) e, sem
+ *    elas, do costume do arquivo (num extrato em que as saídas trazem "-", o valor sem marca é entrada); sem nada, saiu (D-108,
+ *    `lineDirection`). Na fatura do cartão é o contrário: a compra vem sem sinal e o crédito ("-", "C", "estorno", "pagamento") entrou.
  * 5. Linhas de saldo, total e cabeçalho ficam de fora. O ano, quando a data não traz, é o mais comum entre as datas completas do
  *    arquivo (ou o de hoje), e uma data que cairia no futuro volta um ano.
  *
@@ -28,10 +30,6 @@ const MONEY = /(?<![\d.,])(-\s?)?(?:R\$\s*)?(\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}
 const MONEY_ALL = new RegExp(MONEY.source, 'g');
 const DATE_START = /^(\d{2})\/(\d{2})(?:\/(\d{2}|\d{4}))?(?!\d)/;
 const SKIP = /\b(saldo|total|subtotal|limite|resumo|periodo|pagina|lancamentos futuros)\b/;
-const OUT_WORDS = /\b(enviad[oa]|pagamento|pagto|pag\b|compra|tarifa|saque|debito|deb\b|transferencia enviada|pix env|boleto|juros|iof|anuidade|fatura)\b/;
-const IN_WORDS = /\b(recebid[oa]|salario|deposito|estorno|credito|rendimento|reembolso|pix rec|ted rec|transferencia recebida)\b/;
-/** Na fatura: o que é crédito (entra). */
-const CARD_IN_WORDS = /\b(estorno|pagamento|pagto|credito|reembolso|devolucao|cashback|ajuste a credito)\b/;
 
 interface Row {
   page: number;
@@ -85,7 +83,7 @@ export function statementFromPdfItems(items: readonly PdfTextItem[], today: IsoD
   // pagamento da fatura do cartão numa linha).
   const top = fold(rows.slice(0, 12).map((r) => r.items.map((i) => i.str).join(' ')).join(' '));
   const statement: ImportDestination = /\bfatura\b/.test(folded) && /\bcartao\b/.test(folded) && !/\bextrato\b/.test(top) ? 'cartao' : 'conta';
-  const lines: ParsedLine[] = [];
+  const found: { date: IsoDate; description: string; value: number; mark: AmountMark }[] = [];
   let ignored = 0;
   let balanceIgnored = false;
   let currentDate: IsoDate | null = null;
@@ -104,7 +102,7 @@ export function statementFromPdfItems(items: readonly PdfTextItem[], today: IsoD
       if (!iso) continue;
       currentDate = iso;
       rest = text.slice(dateMatch[0].length).trim();
-    } else if (currentDate === null || lines.length === 0) {
+    } else if (currentDate === null || found.length === 0) {
       continue;
     }
     const money = MONEY.exec(rest);
@@ -130,21 +128,19 @@ export function statementFromPdfItems(items: readonly PdfTextItem[], today: IsoD
     }
     // Um segundo valor na linha, mais à direita, é o saldo do dia: ignorado.
     if ([...rest.slice(money.index + money[0].length).matchAll(MONEY_ALL)].length > 0) balanceIgnored = true;
-    const minus = Boolean(money[1] || money[3]);
-    let out: boolean;
-    if (statement === 'cartao') {
-      // Fatura: compra sem sinal; "-", "C" ou as palavras de crédito são crédito (estorno, pagamento da fatura).
-      if (money[4] === 'D') out = true;
-      else if (minus || money[4] === 'C' || CARD_IN_WORDS.test(foldedDesc)) out = false;
-      else out = true;
-    } else if (minus || money[4] === 'D') out = true;
-    else if (money[4] === 'C') out = false;
-    else if (IN_WORDS.test(foldedDesc)) out = false;
-    else if (OUT_WORDS.test(foldedDesc)) out = true;
-    else out = true;
-    lines.push({ ordinal: lines.length + 1, date: currentDate!, description: description.slice(0, 80), amountCents: out ? -value : value, fitId: null });
-    if (lines.length >= IMPORT_MAX_LINES) break;
+    const mark: AmountMark = money[1] || money[3] ? 'menos' : money[4] === 'D' ? 'D' : money[4] === 'C' ? 'C' : null;
+    found.push({ date: currentDate!, description: description.slice(0, 80), value, mark });
+    if (found.length >= IMPORT_MAX_LINES) break;
   }
+  // O costume do arquivo (só as saídas com "-", por exemplo) decide o valor sem marca quando as palavras não decidem.
+  const unmarked = statement === 'conta' ? unmarkedDirection(found.map((f) => f.mark)) : null;
+  const lines: ParsedLine[] = found.map((f, i) => ({
+    ordinal: i + 1,
+    date: f.date,
+    description: f.description,
+    amountCents: signedByDirection(f.value, lineDirection(statement, f.mark, f.description, unmarked)),
+    fitId: null,
+  }));
   if (lines.length === 0) return null;
   // O sinal já sai certo para cada tipo de arquivo (nada a inverter na revisão).
   return { source: 'pdf', statement, lines, ignored, balanceIgnored, cardPositive: false };

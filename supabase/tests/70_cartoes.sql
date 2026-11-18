@@ -2856,12 +2856,12 @@ do $$ begin
        = 'p_idempotency_key text, p_card_id uuid, p_invoice_month date, p_charge_kind text, p_amount_cents bigint'
      and pg_get_function_arguments('public.add_card_refund(text, uuid, date, bigint, text, text)'::regprocedure)
        = 'p_idempotency_key text, p_card_id uuid, p_invoice_month date, p_amount_cents bigint, p_description text, p_category text DEFAULT NULL::text'
-     and pg_get_function_arguments('public.pay_invoice(text, uuid, date, integer, bigint, date, uuid)'::regprocedure)
-       = 'p_idempotency_key text, p_card_id uuid, p_month date, p_expected_version integer, p_paid_cents bigint, p_paid_on date, p_account_id uuid DEFAULT NULL::uuid'
-     and pg_get_function_arguments('public.undo_invoice_payment(text, uuid, date, integer)'::regprocedure)
-       = 'p_idempotency_key text, p_card_id uuid, p_month date, p_expected_version integer'
-     and pg_get_function_arguments('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean)'::regprocedure)
-       = 'p_idempotency_key text, p_context_id uuid, p_account_id uuid, p_kind record_kind, p_amount_cents bigint, p_occurred_on date, p_description text, p_category text DEFAULT NULL::text, p_receipt_key text DEFAULT NULL::text, p_next_month boolean DEFAULT false'
+     and pg_get_function_arguments('public.pay_invoice(text, uuid, date, integer, bigint, date, uuid, uuid)'::regprocedure)
+       = 'p_idempotency_key text, p_card_id uuid, p_month date, p_expected_version integer, p_paid_cents bigint, p_paid_on date, p_account_id uuid DEFAULT NULL::uuid, p_record_id uuid DEFAULT NULL::uuid'
+     and pg_get_function_arguments('public.undo_invoice_payment(text, uuid, date, integer, boolean)'::regprocedure)
+       = 'p_idempotency_key text, p_card_id uuid, p_month date, p_expected_version integer, p_keep_record boolean DEFAULT false'
+     and pg_get_function_arguments('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid)'::regprocedure)
+       = 'p_idempotency_key text, p_context_id uuid, p_account_id uuid, p_kind record_kind, p_amount_cents bigint, p_occurred_on date, p_description text, p_category text DEFAULT NULL::text, p_receipt_key text DEFAULT NULL::text, p_next_month boolean DEFAULT false, p_subcategory text DEFAULT NULL::text, p_investment_id uuid DEFAULT NULL::uuid'
      and pg_get_function_arguments('public.invoice_closing_on(integer, integer, date)'::regprocedure) = 'p_closing_day integer, p_due_day integer, p_month date'
      and pg_get_function_arguments('public.invoice_due_on(integer, date)'::regprocedure) = 'p_due_day integer, p_month date'
      and pg_get_function_arguments('public.invoice_month_for(integer, integer, date)'::regprocedure) = 'p_closing_day integer, p_due_day integer, p_date date',
@@ -2875,8 +2875,8 @@ do $$ begin
               'public.update_card_entry(text, uuid, integer, text, bigint, date, text, text, integer, date, text)'::regprocedure,
               'public.delete_card_entry(text, uuid, integer)'::regprocedure, 'public.add_card_charge(text, uuid, date, text, bigint)'::regprocedure,
               'public.add_card_refund(text, uuid, date, bigint, text, text)'::regprocedure,
-              'public.pay_invoice(text, uuid, date, integer, bigint, date, uuid)'::regprocedure,
-              'public.undo_invoice_payment(text, uuid, date, integer)'::regprocedure)), 'retorno jsonb; definer; volatile';
+              'public.pay_invoice(text, uuid, date, integer, bigint, date, uuid, uuid)'::regprocedure,
+              'public.undo_invoice_payment(text, uuid, date, integer, boolean)'::regprocedure)), 'retorno jsonb; definer; volatile';
   assert (select bool_and(p.prosecdef and p.provolatile = case p.proname when 'my_today' then 's' else 'i' end)
             from pg_proc p where p.oid in ('public.my_today()'::regprocedure, 'public.invoice_closing_on(integer, integer, date)'::regprocedure,
               'public.invoice_due_on(integer, date)'::regprocedure, 'public.invoice_month_for(integer, integer, date)'::regprocedure)),
@@ -2960,10 +2960,10 @@ do $$ begin
   assert (select count(*) from pg_trigger t where not t.tgisinternal and t.tgname in ('cards_guard', 'card_entries_guard', 'commitments_guard', 'financial_records_guard')
             and t.tgenabled = 'O') = 4, 'guardas ligadas';
   -- As assinaturas das migrações anteriores continuam (create_record mudou de forma compatível, testado acima).
-  assert to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean)') is not null
+  assert to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean)') is not null
      and to_regprocedure('public.delete_record(text, uuid, integer)') is not null
-     and to_regprocedure('public.pay_commitment(text, uuid, integer, uuid, bigint, date, text)') is not null
-     and to_regprocedure('public.undo_commitment_payment(text, uuid, integer)') is not null
+     and to_regprocedure('public.pay_commitment(text, uuid, integer, uuid, bigint, date, text, uuid)') is not null
+     and to_regprocedure('public.undo_commitment_payment(text, uuid, integer, boolean)') is not null
      and to_regprocedure('public.update_commitment(text, uuid, integer, bigint, date, text, text, boolean)') is not null
      and to_regprocedure('public.delete_commitment(text, uuid, integer)') is not null
      and to_regprocedure('public.month_committed(uuid, date)') is not null and to_regprocedure('public.month_to_pay(uuid, date)') is not null

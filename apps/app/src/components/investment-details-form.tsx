@@ -4,7 +4,9 @@ import {
   INDEX_KIND_LABEL,
   QUANTITY_KINDS,
   INSTITUTION_MAX,
+  INVESTMENT_DESCRIPTION_MAX,
   INVESTMENT_INDEX_KINDS,
+  INVESTMENT_RATE_CONDITION_MAX,
   INVESTMENT_LIQUIDITIES,
   LIQUIDITY_LABEL,
   SUBKINDS_BY_KIND,
@@ -22,7 +24,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, type TextInput } from 'react-native';
 
-import { ChoiceGroup } from '@/components/series-parts';
+import { CheckOption, ChoiceGroup } from '@/components/series-parts';
 import { Card, Chip, TextField, Txt, styles as ui } from '@/components/ui';
 import { colors, fonts, space } from '@/theme/tokens';
 
@@ -36,7 +38,8 @@ export interface DetailsSectionHandle {
 /**
  * Bloco "Mais detalhes (opcional)" do formulário de investimento (D-099, ficha ampliada). Recolhido por padrão; aberto quando a ficha já
  * tem algo. Tudo opcional: tipo exato (os títulos públicos com os nomes oficiais, decisão do Enzo), onde está, como rende, a taxa,
- * o vencimento e quando pode resgatar. Embaixo, o que a ficha deduz (imposto e garantia), sempre com "confira".
+ * o vencimento e quando pode resgatar. Embaixo, o que a ficha deduz (imposto e garantia), sempre com "confira". D-104: a descrição livre
+ * (item 12, logo depois do tipo exato) e, com a taxa, "A taxa muda numa data" (a data de fim e a taxa de depois) e a condição (item 13).
  */
 export const InvestmentDetailsSection = forwardRef<
   DetailsSectionHandle,
@@ -57,6 +60,10 @@ export const InvestmentDetailsSection = forwardRef<
     liquidityDaysText: useRef<TextInput>(null),
     quantityText: useRef<TextInput>(null),
     fundCnpjText: useRef<TextInput>(null),
+    descriptionText: useRef<TextInput>(null),
+    rateUntilText: useRef<TextInput>(null),
+    rateAfterText: useRef<TextInput>(null),
+    rateConditionText: useRef<TextInput>(null),
   };
   useImperativeHandle(ref, () => ({
     focus: (field) => {
@@ -105,6 +112,15 @@ export const InvestmentDetailsSection = forwardRef<
               ))}
             </ChoiceGroup>
           ) : null}
+          <TextField
+            ref={refs.descriptionText}
+            label={T.descriptionLabel}
+            hint={T.descriptionHint(kind)}
+            value={draft.descriptionText}
+            onChangeText={(t) => set({ descriptionText: t })}
+            maxLength={INVESTMENT_DESCRIPTION_MAX}
+            error={errors.descriptionText}
+          />
           {kind !== null && FUND_CNPJ_KINDS.includes(kind) ? (
             <TextField
               ref={refs.fundCnpjText}
@@ -145,6 +161,46 @@ export const InvestmentDetailsSection = forwardRef<
               onChangeText={(t) => set({ rateText: t })}
               error={errors.rateText}
             />
+          ) : null}
+          {draft.indexKind && indexNeedsRate(draft.indexKind) ? (
+            <>
+              <CheckOption label={T.rateStepLabel} hint={T.rateStepHint} checked={draft.rateStep} onPress={() => set({ rateStep: !draft.rateStep })} />
+              {draft.rateStep ? (
+                <>
+                  <TextField
+                    ref={refs.rateUntilText}
+                    label={T.rateUntilLabel}
+                    placeholder="dd/mm/aaaa"
+                    keyboardType="number-pad"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={draft.rateUntilText}
+                    onChangeText={(t) => set({ rateUntilText: maskDateBR(t) })}
+                    error={errors.rateUntilText}
+                  />
+                  <TextField
+                    ref={refs.rateAfterText}
+                    label={`${T.rateAfterLabel(draft.indexKind)} (%)`}
+                    hint={T.rateAfterHint}
+                    keyboardType="numbers-and-punctuation"
+                    inputMode="decimal"
+                    maxLength={8}
+                    value={draft.rateAfterText}
+                    onChangeText={(t) => set({ rateAfterText: t })}
+                    error={errors.rateAfterText}
+                  />
+                </>
+              ) : null}
+              <TextField
+                ref={refs.rateConditionText}
+                label={T.rateConditionLabel}
+                hint={T.rateConditionHint}
+                value={draft.rateConditionText}
+                onChangeText={(t) => set({ rateConditionText: t })}
+                maxLength={INVESTMENT_RATE_CONDITION_MAX}
+                error={errors.rateConditionText}
+              />
+            </>
           ) : null}
           <TextField
             ref={refs.maturityText}

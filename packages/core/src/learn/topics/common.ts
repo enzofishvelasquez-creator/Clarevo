@@ -34,6 +34,11 @@ export const MEDIA_CONSULTED_ON: IsoDate = '2026-10-20';
  */
 export const INVEST_REVIEWED_ON: IsoDate = '2026-11-13';
 export const INVEST_CONSULTED_ON: IsoDate = '2026-11-13';
+/**
+ * Temas curtos de investimentos (D-105): cinco temas escritos e revisados em 17/11/2026, um por campo do detalhe do investimento, com as
+ * mesmas fontes dos temas de 13/11/2026 (o trecho de cada uma foi conferido naquela data; `consultedOn` fica 13/11/2026).
+ */
+export const INVEST_SHORT_REVIEWED_ON: IsoDate = '2026-11-17';
 
 export const clarevo = (...refs: string[]): LearnSource => ({ kind: 'clarevo', refs });
 

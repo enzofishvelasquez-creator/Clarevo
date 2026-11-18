@@ -54,7 +54,8 @@ import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
 
 export type MovementMode =
-  | { type: 'novo'; kind: 'aporte' | 'resgate' | 'rendimento' }
+  /** emptyAmount: o aporte abre com o valor vazio, sem o planejado (D-105: "Separar parte para uma meta?" não sugere valor). */
+  | { type: 'novo'; kind: 'aporte' | 'resgate' | 'rendimento'; emptyAmount?: boolean }
   /** "Atualizar valor guardado": a diferença vira valorização ou desvalorização. */
   | { type: 'atualizar' }
   | { type: 'editar'; movement: GoalMovement };
@@ -104,7 +105,8 @@ export function GoalMovementForm({ goal, movements, mode }: { goal: Goal; moveme
       };
     }
     // Aporte novo em meta ativa com plano por mês: o valor planejado já preenchido, editável (teste de 09/11/2026).
-    const planned = mode.type === 'novo' && mode.kind === 'aporte' && goal.status === 'ativa' && goal.plannedMonthlyCents ? centsToInput(goal.plannedMonthlyCents) : '';
+    const planned =
+      mode.type === 'novo' && mode.kind === 'aporte' && !mode.emptyAmount && goal.status === 'ativa' && goal.plannedMonthlyCents ? centsToInput(goal.plannedMonthlyCents) : '';
     return { amountText: planned, dateText: formatDateBR(today), note: '', savedText: '', accountId: chooseAccountId(activeAccounts, lastAccount.last) || null };
   })();
   const plannedPrefilled = initial.amountText !== '' && !editing;

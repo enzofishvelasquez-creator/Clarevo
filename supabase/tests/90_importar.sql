@@ -207,11 +207,11 @@ do $$ begin
   assert to_regprocedure('public.import_records(text, uuid, text, uuid, jsonb)') is not null, 'a assinatura de import_records';
   assert (select prosecdef from pg_proc where oid = 'public.import_records(text, uuid, text, uuid, jsonb)'::regprocedure), 'import_records é definer';
   -- As assinaturas existentes não mudaram (o app publicado antes da 0012 segue funcionando).
-  assert to_regprocedure('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean)') is not null
+  assert to_regprocedure('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid)') is not null
      and to_regprocedure('public.add_card_purchase(text, uuid, date, bigint, integer, text, text, text)') is not null
      and to_regprocedure('public.add_card_refund(text, uuid, date, bigint, text, text)') is not null
-     and to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean)') is not null
-     and to_regprocedure('public.pay_invoice(text, uuid, date, integer, bigint, date, uuid)') is not null, 'assinaturas anteriores intactas';
+     and to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean)') is not null
+     and to_regprocedure('public.pay_invoice(text, uuid, date, integer, bigint, date, uuid, uuid)') is not null, 'assinaturas anteriores intactas';
   -- record_operations: import_result só na importação, e sempre nela.
   assert (select count(*) from pg_constraint where conname = 'record_operations_import_check') = 1, 'restrição de import_result';
   perform pg_temp.expect_error(format($f$insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, import_result)

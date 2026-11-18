@@ -34,6 +34,15 @@
           background-color: #131E3E;
         }
       }
+      /* Tema escolhido em Conta (D-112): vale no lugar do tema do aparelho, marcado pelo script abaixo antes de o app desenhar. */
+      html[data-tema="light"],
+      html[data-tema="light"] body {
+        background-color: #F6F8FC;
+      }
+      html[data-tema="dark"],
+      html[data-tema="dark"] body {
+        background-color: #131E3E;
+      }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
@@ -45,6 +54,18 @@
         flex: 1;
       }
     </style>
+    <!-- Tema (D-112): a escolha "Claro" ou "Escuro" de Conta fica só neste navegador (localStorage, chave clarevo.tema.v1, a mesma de
+         THEME_STORAGE_KEY no núcleo). Lida aqui para o fundo e os controles do navegador já virem no tema escolhido; sem escolha, vale o
+         tema do aparelho. O app lê a mesma chave antes de escolher as cores (apps/app/src/lib/theme-choice.web.ts). -->
+    <script>
+      try {
+        var tema = localStorage.getItem('clarevo.tema.v1');
+        if (tema === 'light' || tema === 'dark') {
+          document.documentElement.setAttribute('data-tema', tema);
+          document.documentElement.style.colorScheme = tema;
+        }
+      } catch (e) {}
+    </script>
   </head>
 
   <body>

@@ -259,6 +259,26 @@ export const EXAMPLE_NUMBERS: Partial<Record<TopicSlug, () => ExampleNumbers>> =
     return { money: [], bp: [1_000, 450, realRateBp(1_000, 450), 1_000 - 450, savingsYear, realRateBp(savingsYear, 450)] };
   },
   'golpes-rentabilidade': () => ({ money: [], bp: [500, equivalentAnnualBp(500), 1_000, equivalentMonthlyBp(1_000)] }),
+  // Temas curtos de investimentos (D-105).
+  'ir-regressivo': () => {
+    const tax = fixedIncomeTaxCents(20_000, 200); // 20%: 4.000
+    return { money: [200_000, 20_000, tax, 20_000 - tax], bp: [fixedIncomeTaxBp(200)] };
+  },
+  'iof-resgate': () => {
+    // 3º dia da tabela do IOF: 90% do rendimento.
+    const iof = shareOfCents(600, 9_000); // 540
+    return { money: [500_000, 600, iof, 600 - iof], bp: [9_000] };
+  },
+  'come-cotas': () => {
+    const tax = shareOfCents(40_000, 1_500); // 6.000
+    return { money: [40_000, tax, 40_000 - tax], bp: [1_500] };
+  },
+  'ipca-mais': () => {
+    // (1 + 4%) × (1 + 6%) − 1 = 10,24%, não 10%.
+    const year = Number(roundDivBig(10_400n * 10_600n - 10_000n * 10_000n, 10_000n));
+    return { money: [1_000_000, shareOfCents(1_000_000, 10_000 + year)], bp: [400, 600, year, 400 + 600] };
+  },
+  'marcacao-a-mercado': () => ({ money: [100_000, 97_000, 100_000 - 97_000], bp: [] }),
 };
 
 /** Partes por milhão como percentual, com todas as casas necessárias: 3.800 → "0,38%", 82 → "0,0082%", 33.730 → "3,373%". */

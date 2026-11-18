@@ -13,12 +13,16 @@ import {
   isReminderHour,
   isRoutineReminderHour,
   parseRoutineReminderChoices,
+  parseInvestmentReminderHolds,
+  parseSubcategoryMemory,
   type CategoryView,
+  type InvestmentReminderHolds,
   type ImportMemory,
   type ReminderHour,
   type RoutineReminderChoices,
   type RoutineReminderHour,
   type DepositReminderDay,
+  type SubcategoryMemory,
 } from '@clarevo/core';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
@@ -107,6 +111,27 @@ export interface DevicePrefs {
    * quando a média muda. Só neste aparelho; nada vai para o servidor.
    */
   reserveRefreshDismissed: number | null;
+  /**
+   * Revisão opcional do plano de aportes (D-103, item 14): o dia (AAAA-MM-DD) em que a pessoa abriu a tela do plano por último e o dia do
+   * "Agora não" no convite "Faz 3 meses que você revisou o plano". Só neste aparelho; não é dado financeiro e nada vai para o servidor.
+   */
+  investmentPlanReviewedOn: string | null;
+  investmentPlanReviewDismissedOn: string | null;
+  /**
+   * Convite para rever as metas (D-105): a data (AAAA-MM-DD) a partir da qual o convite volta, hoje + 3 meses depois de "Rever metas",
+   * "Agora não" ou "Concluir revisão". Só neste aparelho; nada vai para o servidor. Vazio: vale a data da meta ativa mais antiga.
+   */
+  goalsReviewNextOn: string | null;
+  /**
+   * Adiar e pausar os lembretes dos investimentos (D-104, item 6), por tipo: a data até quando cada um está adiado ou pausado. Só neste
+   * aparelho, como os interruptores dos lembretes; não é dado financeiro e nada vai para o servidor. Passa sozinho na data.
+   */
+  investmentReminderHolds: InvestmentReminderHolds;
+  /**
+   * Subcategorias próprias (D-107), as escritas em "Outra" em Anotar gasto, por categoria (até 8 cada): voltam como opção nas próximas
+   * vezes. Só neste aparelho, como a memória das categorias; não é dado financeiro e nada vai para o servidor.
+   */
+  subcategories: SubcategoryMemory;
 }
 
 export const DEFAULT_PREFS: DevicePrefs = {
@@ -131,6 +156,11 @@ export const DEFAULT_PREFS: DevicePrefs = {
   routineReminderHour: DEFAULT_ROUTINE_REMINDER_HOUR,
   depositReminderDay: DEFAULT_DEPOSIT_REMINDER_DAY,
   reserveRefreshDismissed: null,
+  investmentPlanReviewedOn: null,
+  investmentPlanReviewDismissedOn: null,
+  goalsReviewNextOn: null,
+  investmentReminderHolds: {},
+  subcategories: {},
 };
 
 const PREFIX = 'clarevo.aparelho.v1.';
@@ -171,11 +201,19 @@ function parse(raw: string | null | undefined): DevicePrefs {
       depositReminderDay: isDepositReminderDay(v.depositReminderDay) ? v.depositReminderDay : DEFAULT_DEPOSIT_REMINDER_DAY,
       reserveRefreshDismissed:
         typeof v.reserveRefreshDismissed === 'number' && Number.isSafeInteger(v.reserveRefreshDismissed) && v.reserveRefreshDismissed > 0 ? v.reserveRefreshDismissed : null,
+      investmentPlanReviewedOn: isDay(v.investmentPlanReviewedOn) ? v.investmentPlanReviewedOn : null,
+      investmentPlanReviewDismissedOn: isDay(v.investmentPlanReviewDismissedOn) ? v.investmentPlanReviewDismissedOn : null,
+      goalsReviewNextOn: typeof v.goalsReviewNextOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.goalsReviewNextOn) ? v.goalsReviewNextOn : null,
+      investmentReminderHolds: parseInvestmentReminderHolds(v.investmentReminderHolds),
+      subcategories: parseSubcategoryMemory(v.subcategories),
     };
   } catch {
     return DEFAULT_PREFS;
   }
 }
+
+/** Um dia "AAAA-MM-DD" guardado pelo app. */
+const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** A memória de categorias guardada: só texto curto para texto curto, no máximo 300 entradas. */
 function parseMemory(value: unknown): ImportMemory {

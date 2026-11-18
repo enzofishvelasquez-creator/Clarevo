@@ -11,10 +11,12 @@
  * O que sai em `site/`:
  *   index.html, app/, empresas/, aprender/ (um tema por página, vindo do catálogo do app), novidades/ (posts e, só com domínio, feed.xml), ajuda/
  *   (por tema, com indice.json e busca.js), seguranca.html, sobre.html, suporte.html, 404.html
- *   calculadoras/ (o índice e as dez calculadoras do app), js/nucleo/ (o código do core que as calculadoras rodam no navegador, transpilado
- *   por `scripts/site/nucleo.js`), imprensa.html e imprensa/ (kit de imprensa)
+ *   calculadoras/ (o índice, as dez calculadoras do app e as duas que por enquanto só o site mostra), js/nucleo/ (o código do core que as
+ *   calculadoras rodam no navegador, transpilado por `scripts/site/nucleo.js`), imprensa.html e imprensa/ (kit de imprensa)
+ *   indicadores/ (D-106: o painel de indicadores oficiais, uma página por indicador, o glossário, as duas explicações e painel.js, que
+ *   pergunta uma vez ao próprio site) e, só com pelo menos uma edição em site-src/noticias, noticias/ (o resumo semanal de notícias)
  *   privacidade.html, termos.html, excluir-conta.html   convertidos de `docs/legal/*.md`
- *   estilo.css, _headers, _worker.js e _routes.json (o worker do Cloudflare Pages que recebe /api/contato e /api/newsletter), robots.txt,
+ *   estilo.css, _headers, _worker.js e _routes.json (o worker do Cloudflare Pages que recebe /api/contato, /api/newsletter e /api/indicadores), robots.txt,
  *   sitemap.xml (só com domínio), imagens/, og/, fontes/, marca/, favicon.svg
  *   contato-enviado.html, contato-erro.html, novidades/receber*.html   só com os interruptores `formulario_contato` e `newsletter` em
  *                                              `site/dados-da-empresa.json` ligados (`true`); desligados, o site não tem formulário
@@ -48,6 +50,10 @@
  *   --legal <pasta>   lê os Markdown de outra pasta (padrão: docs/legal)
  *   --saida <pasta>   grava o site em outra pasta (padrão: site)
  *   --dados <arquivo> lê os valores dos marcadores de outro JSON (padrão: site/dados-da-empresa.json)
+ *   --retrato <arquivo>  lê o retrato dos indicadores de outro JSON (padrão: site-src/indicadores/retrato.json)
+ *   --noticias <pasta>   lê as edições do resumo semanal de outra pasta (padrão: site-src/noticias)
+ *   --atualizar-indicadores  antes de gerar, consulta o Banco Central (o mesmo código do worker) e grava o retrato dos indicadores; sem
+ *                        rede, avisa e gera com o retrato anterior. O `--final` recusa retrato vazio, incompleto ou com mais de 7 dias
  * A imagem de compartilhamento (`site-src/imagens/og-clarevo-1200x630.png`) é feita à parte, por `node scripts/gerar-og-site.js`.
  * Navegador do `--pdf`: Chromium do Playwright, ou CHROMIUM_PATH.
  */
@@ -62,6 +68,8 @@ const { linksQuebrados } = require('./site/verificacoes');
 const { montarPacote, gerarPdf } = require('./site/pdf');
 const png = require('./site/png');
 const { hostsDeFontes } = require('./site/catalogo');
+const { atualizarRetrato, ARQUIVO_RETRATO } = require('./site/indicadores');
+const { lerEdicoes, hostsDasEdicoes } = require('./site/paginas/noticias');
 
 const { RAIZ, SITE, LEGAL } = config;
 
@@ -139,8 +147,28 @@ async function principal(argv) {
   const arquivoDados = opcao('--dados');
   const referencia = opcao('--referencia');
   const novidades = opcao('--novidades');
+  const arquivoRetrato = path.resolve(opcao('--retrato') || ARQUIVO_RETRATO);
+  const noticias = opcao('--noticias');
 
-  const resultado = gerarSite({ legal, arquivoDados: arquivoDados ? path.resolve(arquivoDados) : undefined, referencia: referencia || undefined, novidades: novidades ? path.resolve(novidades) : undefined });
+  // D-106: o retrato dos indicadores só é refeito quando se pede (gerar sem rede dá sempre o mesmo site).
+  if (argv.includes('--atualizar-indicadores')) {
+    try {
+      const r = await atualizarRetrato({ arquivo: arquivoRetrato });
+      if (r.gravado) console.log(`retrato dos indicadores gravado (${Object.keys(r.retrato.valores).length} de 5)${r.falhas.length ? `; sem resposta do Banco Central para: ${r.falhas.join(', ')} (ficou o número anterior, se havia)` : ''}`);
+      else console.warn('aviso: o Banco Central não respondeu nenhuma das cinco séries; o retrato anterior continua');
+    } catch (e) {
+      console.warn(`aviso: não foi possível consultar o Banco Central (${e.message}); o retrato anterior continua`);
+    }
+  }
+
+  const resultado = gerarSite({
+    legal,
+    arquivoDados: arquivoDados ? path.resolve(arquivoDados) : undefined,
+    referencia: referencia || undefined,
+    novidades: novidades ? path.resolve(novidades) : undefined,
+    arquivoRetrato,
+    noticias: noticias ? path.resolve(noticias) : undefined,
+  });
   for (const aviso of resultado.avisos) console.warn(`aviso: ${aviso}`);
 
   const faltas = [];
@@ -184,9 +212,12 @@ module.exports = {
   MARCADORES: config.MARCADORES,
   PAGINAS_LEGAIS: config.PAGINAS_LEGAIS,
   DOCUMENTOS_DO_PACOTE: config.DOCUMENTOS_DO_PACOTE,
-  /** Hosts de links de texto permitidos: o app, as páginas oficiais dos textos jurídicos e as fontes citadas no catálogo de Aprender. */
+  /**
+   * Hosts de links de texto permitidos: o app, as páginas oficiais dos textos jurídicos, as fontes citadas no catálogo de Aprender e nas
+   * páginas de mercado, e os veículos das edições do resumo semanal (D-106).
+   */
   get HOSTS_DE_LINK_PERMITIDOS() {
-    return [...config.HOSTS_BASE, ...hostsDeFontes()];
+    return [...config.HOSTS_BASE, ...hostsDeFontes(), ...hostsDasEdicoes(lerEdicoes().edicoes)];
   },
   markdownParaHtml: texto.markdownParaHtml,
   titulosDoMarkdown: texto.titulosDoMarkdown,

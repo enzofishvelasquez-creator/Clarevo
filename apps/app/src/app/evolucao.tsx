@@ -3,15 +3,16 @@ import {
   EVOLUTION_DEFAULT_WINDOW,
   EVOLUTION_METRICS,
   EVOLUTION_TEXT,
-  EVOLUTION_WINDOWS,
   EvolutionSelectionStore,
   buildEvolutionView,
   buildPhase3View,
   evolutionAnnouncement,
-  evolutionFetchRange,
+  evolutionFetchChunks,
   evolutionPanel,
   evolutionSelectedMonth,
   evolutionSubtitle,
+  evolutionWindowFor,
+  evolutionWindowsFor,
   isPhase3Metric,
   monthOf,
   phase3ClosedMonths,
@@ -35,7 +36,7 @@ import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
 import { evolutionSelection, useHiddenMonths } from '@/lib/evolution-memory';
-import { useEvolutionCommitted, useEvolutionGaps, useEvolutionSavings, useEvolutionWindowMonths, useMonthsOverview, useView, useWork } from '@/state/data';
+import { useEvolutionCommitted, useEvolutionGaps, useEvolutionSavings, useEvolutionWindowMonths, useMonthsOverviewChunks, useView, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -46,7 +47,8 @@ const T = EVOLUTION_TEXT;
  * meses exibidos, e o painel do mês escolhido (com a seção recolhida "Entender o que mudou", que só lê quando aberta). A pessoa pode tirar um mês da comparação sem apagar nem mudar nenhum lançamento: isso
  * só muda a média, a mediana e o desenho, vale só enquanto o app está aberto (por pessoa, contexto e valor mostrado) e nada é
  * gravado nem enviado (D03). Tela de consulta, com a barra inferior (Movimentos marcada). Lê `months_overview` de uma vez (12 meses
- * até o mês atual) no contexto escolhido; erro nunca mostra dado parcial. O aviso de lacuna em mês fechado de Pago (D04) vem de outra
+ * até o mês atual) no contexto escolhido; com 24 ou 36 meses (D-105, só Recebido e Pago), em dois ou três pedaços de 12; erro nunca
+ * mostra dado parcial. O aviso de lacuna em mês fechado de Pago (D04) vem de outra
  * leitura (`useEvolutionGaps`) que a tela não espera: se ela falha, o gráfico sai sem o aviso.
  *
  * Fase 3 (D-062 item 4): depois de Recebido e Pago, o seletor tem "Renda comprometida" (o percentual da renda de referência ligado a contas
@@ -64,16 +66,19 @@ export default function EvolucaoScreen() {
   const contextId = work.data?.contextId;
   const canWrite = work.data?.canWrite ?? true;
   const [metric, setMetric] = useState<EvolutionSelectionMetric>(EVOLUTION_DEFAULT_METRIC);
-  const [windowMonths, setWindowMonths] = useState<EvolutionWindow>(EVOLUTION_DEFAULT_WINDOW);
+  const [chosenWindow, setWindowMonths] = useState<EvolutionWindow>(EVOLUTION_DEFAULT_WINDOW);
+  // Recebido e Pago vão até 36 meses (D-105); Renda comprometida e Guardado em metas, até 12 (com 24 ou 36 escolhidos, mostram 12).
+  const windowMonths = evolutionWindowFor(metric, chosenWindow);
   const [chosen, setChosen] = useState<IsoMonth | null>(null);
-  const { from, to } = evolutionFetchRange(currentMonth);
-  const overview = useMonthsOverview(contextId, from, to);
+  // months_overview em pedaços de até 12 meses: até 12, a leitura de sempre; com 24 ou 36, dois ou três pedaços (D-105).
+  const phase3 = isPhase3Metric(metric);
+  const chunks = useMemo(() => evolutionFetchChunks(currentMonth, phase3 ? 12 : windowMonths), [currentMonth, phase3, windowMonths]);
+  const overview = useMonthsOverviewChunks(contextId, chunks);
   const scope = EvolutionSelectionStore.scope(user?.id, contextId);
   const hidden = useHiddenMonths(scope, metric);
-  const gapMonths = useEvolutionGaps(contextId);
+  const gapMonths = useEvolutionGaps(contextId, phase3 ? 12 : windowMonths);
 
   // Recebido e Pago leem months_overview; Renda comprometida e Guardado em metas leem só o que o valor escolhido pede (nada é lido antes).
-  const phase3 = isPhase3Metric(metric);
   const windowMonthsList = useEvolutionWindowMonths(windowMonths);
   const committed = useEvolutionCommitted(contextId, windowMonthsList, metric === 'comprometida');
   const savings = useEvolutionSavings(contextId, windowMonthsList, metric === 'guardado');
@@ -185,10 +190,15 @@ export default function EvolucaoScreen() {
             ))}
           </View>
           <View style={styles.filters} accessibilityRole="radiogroup" accessibilityLabel={T.windowGroup}>
-            {EVOLUTION_WINDOWS.map((w) => (
+            {evolutionWindowsFor(metric).map((w) => (
               <Chip key={w} label={T.windowLabel[w]} selected={windowMonths === w} onPress={() => pickWindow(w)} />
             ))}
           </View>
+          {phase3 ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {T.windowPhase3Note}
+            </Txt>
+          ) : null}
         </View>
 
         {loading ? (

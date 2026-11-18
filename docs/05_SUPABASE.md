@@ -75,6 +75,11 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
 12ac. **Por último (preço do Tesouro, cota dos fundos e meta que lê os investimentos, D-099, `docs/45_INVESTIMENTOS.md`, seções 9 e 10)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261114000002_investimentos_precos.sql` (migração 0037) e rode. Ela acrescenta aos investimentos a quantidade de títulos ou de cotas e o CNPJ do fundo (com a visão `investment_items` e as funções `create_investment` e `update_investment`, que mudam só por dentro, com os mesmos parâmetros), acrescenta às metas a origem do valor guardado (com a visão `goal_items`) e cria a função `set_goal_value_source`. Não muda nenhum dado existente. O SQL Editor pode avisar "Potential issue detected" por causa das linhas `drop constraint`: é esperado, confirme. Depois, recarregue o esquema (`notify pgrst, 'reload schema';`), confira (21y) e publique a função `precos` (passo 12ad). Aplicar antes do merge do pull request que traz o preço público.
 12ad. **Função do servidor dos preços públicos (D-099), sem segredo.** Em Edge Functions, criar a função `precos` pelo editor, colar todo o conteúdo de `supabase/functions/precos/index.ts`, publicar e deixar a verificação de JWT do painel (**"Verify JWT with legacy secret"**) **desligada**, como a `indices`: a própria função confere a sessão da pessoa no Supabase Auth. Ela busca nos dados abertos o preço do dia dos títulos do Tesouro Direto (Tesouro Transparente) e a cota mais recente dos fundos (Informe Diário da CVM, um arquivo por mês, de 4 a 11 MB), e recebe só os CNPJs dos fundos (dado público do fundo). Não guarda nada em banco: a resposta fica 6 horas na memória da função. Não há segredo a cadastrar; `CLAREVO_APP_URL` é opcional. Sem a função, o detalhe do investimento diz que não conseguiu buscar o preço publicado, e o resto funciona.
 12ae. **Por último (foto do perfil, pedido do Enzo em 16/11/2026)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261116000001_foto_perfil.sql` (migração 0038) e rode. Ela cria a tabela `person_photos` (uma foto por pessoa, até 150 KB, só para ela), o gatilho que apaga a foto quando a conta é excluída e as funções `set_my_photo` e `my_photo`. Não muda nenhum dado existente nem mexe em funções antigas. Depois, recarregue o esquema (`notify pgrst, 'reload schema';`) e confira (21z). Aplicar antes do merge do pull request que traz a foto do perfil: sem a migração, o app mostra as iniciais e "Não foi possível salvar a foto agora" ao tentar pôr uma.
+12af. **Por último, rodada de 17/11/2026, primeiro (taxa com data de fim e descrição dos investimentos, D-104, `docs/45_INVESTIMENTOS.md`, seção 12)**, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261117000001_investimentos_taxa_descricao.sql` (migração 0039) e rode. Ela acrescenta aos investimentos quatro colunas opcionais (`rate_until`, a data de fim da taxa; `rate_after_bp`, a taxa de depois; `rate_condition`, a condição da taxa; e `description`, a descrição livre), com as três regras delas, põe as quatro colunas no fim da visão `investment_items` e cria duas funções auxiliares fechadas para o app (`clarevo_investment_rate_step` e `clarevo_investment_description`); `create_investment` e `update_investment` mudam só por dentro, com os mesmos parâmetros. Não muda nenhum dado existente. Depois, recarregue o esquema (`notify pgrst, 'reload schema';`) e confira (21aa).
+12ag. **Por último, rodada de 17/11/2026, segundo (gasto e recebimento ligados, subcategorias e troca de tipo, D-107)**, só depois da 0039, numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261117000002_lancamentos_vinculos.sql` (migração 0040) e rode. Ela acrescenta a `financial_records` a subcategoria (`subcategory`), a marca do gasto ligado depois a uma conta ou fatura (`linked_payment`) e a ligação do recebimento a um investimento e ao rendimento gravado nele (`investment_id` e `investment_movement_id`), com as três regras; deixa o lançamento importado ser ligado e editado como qualquer outro (a restrição da importação passa a conferir só o formato da chave); recria o guarda de `financial_records` (o tipo e a ligação só mudam dentro das funções de vínculo); e troca seis funções do app por versões com os parâmetros novos no fim, com valor padrão: `create_record` (`p_subcategory`, `p_investment_id`), `update_record` (`p_kind`, `p_subcategory`, `p_investment_id`, `p_link_investment`), `pay_commitment` e `pay_invoice` (`p_record_id`, o gasto que já existe vira o pagamento) e `undo_commitment_payment` e `undo_invoice_payment` (`p_keep_record`, desfaz mantendo o gasto). `delete_record` muda só por dentro (o rendimento ligado sai junto), e as duas auxiliares novas (`clarevo_check_subcategory` e `clarevo_income_investment`) ficam fechadas para o app. Ela também recria `clarevo_chat_undo` (o "desfazer" pelo WhatsApp e pelo Telegram de um gasto que virou pagamento de fatura no app responde o caminho no app, sem apagar nada) e aceita esse resultado novo na restrição de `chat_messages`; publique as funções `whatsapp` e `telegram` deste ramo antes ou junto desta migração (com a função antiga e o banco novo, esse caso raro fica sem resposta, mas nada quebra). As assinaturas antigas saem para não haver chamada ambígua; o app anterior continua funcionando, porque chama sem os parâmetros novos. Nenhum dado existente muda. O SQL Editor avisa "Potential issue detected" por causa das linhas `drop function` e `drop constraint`: é esperado, confirme. Depois, recarregue o esquema (`notify pgrst, 'reload schema';`) e confira (21ab).
+12ah. **Por último, rodada de 17/11/2026, terceiro (níveis: queda com aviso e Esmeralda, D-111, `docs/48_NIVEIS.md`)**, depois da 0040 (ela usa a coluna `investment_movement_id` que a 0040 cria: o rendimento gravado por um recebimento ligado também conta para o marco), numa nova consulta, cole todo o conteúdo de `supabase/migrations/20261117000003_niveis_queda_esmeralda.sql` (migração 0041) e rode. Ela acrescenta os 6 marcos de "Investimentos e reserva" à lista de `account_marks`, cria a tabela `account_level_clock` (desde quando conta o tempo sem anotar de cada pessoa: a primeira leitura do nível pelo app com a regra e a última anotação de gasto ou recebimento; nenhum valor, com RLS e sem leitura direta, apagada com a pessoa) e troca `my_account_marks()` por `my_account_marks(p_level_state boolean default false)`, que continua aceitando a chamada sem parâmetro do app anterior; o gatilho de quem fica anônimo ao excluir a conta apaga também a contagem. Nenhum dado existente muda. O SQL Editor pode avisar "Potential issue detected" por causa das linhas `drop function`, `drop constraint` e `delete`: é esperado, confirme. Depois, recarregue o esquema (`notify pgrst, 'reload schema';`) e confira (21ac).
+
+**Antes do merge, sem exceção (12af, 12ag e 12ah).** As três migrações precisam estar aplicadas em produção (`clarevo-producao`), na ordem 0039, 0040 e 0041, cada uma numa consulta nova e seguida de `notify pgrst, 'reload schema';`, **antes** do merge do pull request da rodada de 17/11/2026 (D-103 a D-112). O motivo: o workflow "Atualizar o app de teste" publica o app novo pelo ar a cada merge no `main` (D-100, `docs/50_ATUALIZACOES.md`), e a web também é publicada sozinha. O app novo com o banco antigo falha ao salvar um gasto com subcategoria, ao trocar entre gasto e recebimento, ao ligar um gasto a uma conta a pagar, a uma parcela ou a uma fatura e ao registrar um recebimento como rendimento de investimento (as funções com os parâmetros novos não existem); sem a 0039, a taxa com data de fim e a descrição do investimento são ignoradas pelo banco, e sem a 0041 o nível não desce. O contrário é seguro: o app antigo funciona com o banco novo (os parâmetros novos vêm no fim, com valor padrão, e `my_account_marks` sem parâmetro devolve os marcos como antes).
 
 12x. **Função do servidor dos índices (D-093), sem segredo.** Em Edge Functions, criar a função `indices` pelo editor, colar todo o conteúdo de `supabase/functions/indices/index.ts`, publicar e deixar a verificação de JWT do painel (**"Verify JWT with legacy secret"**) **desligada**, como nas outras funções: só quem está no app consulta, porque a própria função confere a sessão da pessoa no Supabase Auth (a verificação do painel só aceita tokens assinados com o segredo antigo e recusaria as sessões assinadas com as chaves novas). Ela busca o CDI e o IPCA no Banco Central (dados públicos) e não recebe nem guarda dado de ninguém. Não há segredo a cadastrar (`SUPABASE_URL` e a chave pública o Supabase fornece); `CLAREVO_APP_URL` é opcional (padrão `https://app.clarevo.app.br`). Publicada em 11/11/2026 e publicada de novo no mesmo dia com a versão que confere a sessão, com a verificação do painel desligada (na aba Settings da própria função). Sem a função, a aba Investir funciona e diz que não conseguiu buscar os índices.
 
@@ -770,6 +775,76 @@ Não consegui abrir a documentação do Supabase deste ambiente (acesso bloquead
    ```
 
    O resultado esperado é `tabela_0038 = 1`, `rls_0038 = 1`, `funcoes_0038 = 2`, `gatilho_0038 = 1` e `funcoes_do_app = 107` (eram 105 depois da 0037). Depois, recarregar o esquema (`notify pgrst, 'reload schema';`). **Aplicada em produção (`clarevo-producao`) em 16/11/2026** pelo Claude Chrome, com a confirmação do Enzo: "Success. No rows returned", a conferência devolveu 1, 1, 2, 1 e 107, e o esquema foi recarregado.
+
+21aa. Para conferir a 0039 (taxa com data de fim e descrição dos investimentos, D-104), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'investments'
+            and column_name in ('rate_until', 'rate_after_bp', 'rate_condition', 'description')) as colunas_0039,
+          (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'investment_items'
+            and column_name in ('rate_until', 'rate_after_bp', 'rate_condition', 'description')) as visao_0039,
+          (select count(*) from pg_constraint where conrelid = 'public.investments'::regclass
+            and conname in ('investments_rate_step_rule', 'investments_rate_condition_rule', 'investments_description_rule')) as restricoes_0039,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('clarevo_investment_rate_step', 'clarevo_investment_description')
+              and not has_function_privilege('authenticated', p.oid, 'execute')) as auxiliares_0039,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `colunas_0039 = 4`, `visao_0039 = 4`, `restricoes_0039 = 3`, `auxiliares_0039 = 2` e `funcoes_do_app = 107` (como depois da 0038: as duas auxiliares não são do app). Depois, recarregar o esquema (`notify pgrst, 'reload schema';`).
+
+21ab. Para conferir a 0040 (gasto e recebimento ligados, subcategorias e troca de tipo, D-107), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'financial_records'
+            and column_name in ('subcategory', 'linked_payment', 'investment_id', 'investment_movement_id')) as colunas_0040,
+          (select count(*) from pg_constraint where conrelid = 'public.financial_records'::regclass
+            and conname in ('financial_records_subcategoria', 'financial_records_vinculo_pagamento', 'financial_records_investimento')) as restricoes_0040,
+          (select count(*) from unnest(array[
+             'public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid)',
+             'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean)',
+             'public.pay_commitment(text, uuid, integer, uuid, bigint, date, text, uuid)',
+             'public.undo_commitment_payment(text, uuid, integer, boolean)',
+             'public.pay_invoice(text, uuid, date, integer, bigint, date, uuid, uuid)',
+             'public.undo_invoice_payment(text, uuid, date, integer, boolean)']) f
+            where has_function_privilege('authenticated', to_regprocedure(f)::oid, 'execute')
+              and not has_function_privilege('anon', to_regprocedure(f)::oid, 'execute')) as funcoes_0040,
+          (select count(*) from unnest(array[
+             'public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean)',
+             'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean)',
+             'public.pay_commitment(text, uuid, integer, uuid, bigint, date, text)',
+             'public.undo_commitment_payment(text, uuid, integer)',
+             'public.pay_invoice(text, uuid, date, integer, bigint, date, uuid)',
+             'public.undo_invoice_payment(text, uuid, date, integer)']) f
+            where to_regprocedure(f) is not null) as assinaturas_antigas_0040,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname in ('clarevo_check_subcategory', 'clarevo_income_investment')
+              and not has_function_privilege('authenticated', p.oid, 'execute')) as auxiliares_0040,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `colunas_0040 = 4`, `restricoes_0040 = 3`, `funcoes_0040 = 6`, `assinaturas_antigas_0040 = 0`, `auxiliares_0040 = 2` e `funcoes_do_app = 107` (as seis funções trocadas continuam sendo seis; as auxiliares não são do app). Depois, recarregar o esquema (`notify pgrst, 'reload schema';`).
+
+21ac. Para conferir a 0041 (níveis: queda com aviso e Esmeralda, D-111), rode em outra consulta (só leitura):
+
+   ```sql
+   select (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = 'my_account_marks'
+              and pg_get_function_identity_arguments(p.oid) = 'p_level_state boolean'
+              and has_function_privilege('authenticated', p.oid, 'execute') and not has_function_privilege('anon', p.oid, 'execute')) as funcao_0041,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = 'my_account_marks') as versoes_0041,
+          (select count(*) from pg_class c where c.oid = to_regclass('public.account_level_clock') and c.relrowsecurity
+            and not has_table_privilege('authenticated', c.oid, 'select')) as tabela_0041,
+          (select count(*) from pg_constraint where conrelid = 'public.account_marks'::regclass and conname = 'account_marks_mark_check'
+            and pg_get_constraintdef(oid) like '%reserva_plano%') as marcos_0041,
+          (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and has_function_privilege('authenticated', p.oid, 'execute')) as funcoes_do_app;
+   ```
+
+   O resultado esperado é `funcao_0041 = 1`, `versoes_0041 = 1` (a versão sem parâmetro saiu), `tabela_0041 = 1`, `marcos_0041 = 1` e `funcoes_do_app = 107` (a função trocada continua sendo uma). Depois, recarregar o esquema (`notify pgrst, 'reload schema';`). As três conferências foram rodadas num banco descartável com todas as migrações em 17/11/2026 e devolveram exatamente esses números; em produção, ainda não aplicadas.
 22. Se o app mostrar erro ao abrir as contas a pagar, os gastos fixos, as contas do ano, as metas, os cartões, a renda comprometida, o orçamento, as contas de origem, as assinaturas, a importação de extrato, a Família, o painel da empresa, a exclusão da conta, a Evolução, a conferência de um mês ou o Resumo logo depois, a API ainda não leu o esquema novo: no SQL Editor, rode `notify pgrst, 'reload schema';`. Faça isso depois de colar a 0016, antes de abrir o app (a 0016 recria `months_overview`, e a API precisa ler a função nova), e de novo depois de colar a 0018 (função nova, `set_signup_source`). A 0019 não cria função nem tabela: não precisa. A 0020, a 0021, a 0022, a 0023 e a 0024 criam funções novas (WhatsApp, imagem das metas, Telegram, assinatura e aceite dos termos): rode depois de colar cada uma.
 23. O consultor de segurança do Supabase (**Advisors**) pode apontar a visão `series_items` como visão com os privilégios de quem a criou (a migração de contas do ano a recria com as mesmas opções). É intencional: ela precisa ler as contas excluídas só em um mês, filtra a permissão de leitura de forma explícita e usa `security_barrier` (ver `docs/01_ARQUITETURA.md`). O mesmo vale para as outras sete visões e para o restante do que o verificador aponta: ver "Verificador do Supabase: o que é esperado", logo antes de "Custos".
 

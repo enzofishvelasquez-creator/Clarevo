@@ -188,12 +188,15 @@ export function SeriesForm({
   kind: initialKind,
   prefill,
   typed = false,
+  backToRecord = false,
   space: personal,
 }: {
   kind: SeriesKind;
   prefill?: SeriesPrefill;
   /** O preenchimento veio do que a pessoa digitou em "Anotar conta a pagar": sair sem salvar pede confirmação. */
   typed?: boolean;
+  /** Veio de Anotar gasto ("Cadastrar parcelamento", D-107): depois de salvar, volta para lá. */
+  backToRecord?: boolean;
   space: WorkSpace;
 }) {
   const { today, auth } = useSession();
@@ -448,7 +451,9 @@ export function SeriesForm({
     // Confirmação tátil só depois da gravação confirmada.
     if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     flash.set(withNotice(savedTextFor(w, input, today), notice));
-    leave(() => router.replace(`/gastos-fixos/${w.series.id}`));
+    // Cadastrar e voltar (D-107): de volta ao gasto, que escolhe a parcela nova em "O que este gasto pagou?".
+    if (backToRecord && router.canGoBack()) leave(() => router.back());
+    else leave(() => router.replace(`/gastos-fixos/${w.series.id}`));
   };
 
   /**

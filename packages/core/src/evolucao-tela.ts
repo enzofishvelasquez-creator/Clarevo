@@ -39,12 +39,20 @@ import type { CategoryShare } from './summary';
 
 export const EVOLUTION_ROUTE = '/evolucao';
 
-/** As janelas da tela, em meses, sempre terminando no mês atual da sessão. */
+/**
+ * As janelas da tela, em meses, sempre terminando no mês atual da sessão. Recebido e Pago oferecem também 24 e 36 meses (D-105: o
+ * histórico de gastos de até três anos), lidos em pedaços de 12 meses de `months_overview`, sem mudar o banco. A Renda comprometida e o
+ * Guardado em metas ficam em até 12 meses: cada mês fechado deles é uma leitura (no máximo 11 por janela).
+ */
 export const EVOLUTION_WINDOWS = [3, 6, 12] as const;
-export type EvolutionWindow = (typeof EVOLUTION_WINDOWS)[number];
+/** As janelas de Recebido e Pago, com 24 e 36 meses. */
+export const EVOLUTION_CASH_WINDOWS = [3, 6, 12, 24, 36] as const;
+export type EvolutionWindow = (typeof EVOLUTION_CASH_WINDOWS)[number];
 export const EVOLUTION_DEFAULT_WINDOW: EvolutionWindow = 6;
 /** Quantos meses `months_overview` entrega por chamada (o banco recusa mais que 12). */
 export const EVOLUTION_MAX_MONTHS = 12;
+/** A maior janela da tela (36 meses: três leituras de 12). */
+export const EVOLUTION_LONGEST_WINDOW = 36;
 /** O seletor: Recebido e Pago (pela data do pagamento) e, depois deles, os dois valores da fase 3 (D-062 item 4). */
 export const EVOLUTION_METRICS: readonly EvolutionSelectionMetric[] = ['recebido', 'pago', 'comprometida', 'guardado'];
 export const EVOLUTION_DEFAULT_METRIC: EvolutionMetric = 'pago';
@@ -52,12 +60,35 @@ export const EVOLUTION_DEFAULT_METRIC: EvolutionMetric = 'pago';
 export const EVOLUTION_TOP_CATEGORIES = 3;
 
 export function isEvolutionWindow(value: unknown): value is EvolutionWindow {
-  return (EVOLUTION_WINDOWS as readonly unknown[]).includes(value);
+  return (EVOLUTION_CASH_WINDOWS as readonly unknown[]).includes(value);
+}
+
+/** As janelas oferecidas para o valor mostrado: Recebido e Pago com 24 e 36 meses; os da fase 3 até 12. */
+export function evolutionWindowsFor(metric: EvolutionSelectionMetric): readonly EvolutionWindow[] {
+  return isPhase3Metric(metric) ? EVOLUTION_WINDOWS : EVOLUTION_CASH_WINDOWS;
+}
+
+/** A janela que vale para o valor mostrado: trocar para um valor da fase 3 com 24 ou 36 meses escolhidos mostra 12. */
+export function evolutionWindowFor(metric: EvolutionSelectionMetric, windowMonths: EvolutionWindow): EvolutionWindow {
+  return evolutionWindowsFor(metric).includes(windowMonths) ? windowMonths : EVOLUTION_MAX_MONTHS;
 }
 
 /** Os 12 meses lidos de uma vez, terminando no mês atual; as janelas de 3 e 6 meses saem deles, sem nova leitura. */
 export function evolutionFetchRange(currentMonth: IsoMonth): { from: IsoMonth; to: IsoMonth } {
   return { from: addMonths(currentMonth, -(EVOLUTION_MAX_MONTHS - 1)), to: currentMonth };
+}
+
+/**
+ * As leituras de `months_overview` de uma janela, do pedaço mais antigo ao mais recente, cada uma com até 12 meses. Até 12 meses, a de
+ * sempre (`evolutionFetchRange`, a mesma chave de cache); com 24 e 36, os 12 anteriores a cada pedaço. A tela só monta o gráfico com
+ * todas lidas: um mês que não veio nunca vira "sem registros".
+ */
+export function evolutionFetchChunks(currentMonth: IsoMonth, windowMonths: EvolutionWindow): { from: IsoMonth; to: IsoMonth }[] {
+  const chunks = Math.max(1, Math.ceil(windowMonths / EVOLUTION_MAX_MONTHS));
+  return Array.from({ length: chunks }, (_, i) => {
+    const to = addMonths(currentMonth, -EVOLUTION_MAX_MONTHS * (chunks - 1 - i));
+    return { from: addMonths(to, -(EVOLUTION_MAX_MONTHS - 1)), to };
+  });
 }
 
 /** Os meses de uma janela, do mais antigo ao mês atual. */
@@ -110,7 +141,9 @@ export const EVOLUTION_TEXT = {
   metricGroup: 'Valor mostrado',
   metrics: METRIC_LABEL,
   windowGroup: 'Meses mostrados',
-  windowLabel: { 3: '3 meses', 6: '6 meses', 12: '12 meses' } as Record<EvolutionWindow, string>,
+  windowLabel: { 3: '3 meses', 6: '6 meses', 12: '12 meses', 24: '24 meses', 36: '36 meses' } as Record<EvolutionWindow, string>,
+  /** Na Renda comprometida e no Guardado em metas, as janelas vão até 12 meses. */
+  windowPhase3Note: 'Renda comprometida e Guardado em metas mostram até 12 meses.',
   loading: 'Carregando a evolução',
   loadError: 'Não foi possível carregar a evolução.',
   retry: 'Tentar de novo',
@@ -188,9 +221,17 @@ export const EVOLUTION_TEXT = {
     noRecordsBody: (metric: EvolutionMetric): string =>
       `Mês sem anotação não quer dizer mês sem ${THINGS[metric]}: aqui aparece só o que está registrado na Clarevo.`,
     noRecordsAction: { recebido: 'Registrar recebimento', pago: 'Anotar gasto' } as Record<EvolutionMetric, string>,
-    /** Com menos de 12 meses na janela: o convite a olhar mais meses (null com 12). */
+    /** Com menos de 36 meses na janela: o convite a olhar mais meses (null com 36). */
     olderMonths: (windowMonths: EvolutionWindow): string | null =>
-      windowMonths === 3 ? 'Se há anotações mais antigas, escolha 6 ou 12 meses.' : windowMonths === 6 ? 'Se há anotações mais antigas, escolha 12 meses.' : null,
+      windowMonths === 3
+        ? 'Se há anotações mais antigas, escolha 6 ou 12 meses.'
+        : windowMonths === 6
+          ? 'Se há anotações mais antigas, escolha 12 meses.'
+          : windowMonths === 12
+            ? 'Se há anotações mais antigas, escolha 24 ou 36 meses.'
+            : windowMonths === 24
+              ? 'Se há anotações mais antigas, escolha 36 meses.'
+              : null,
     /** Só o mês em andamento tem lançamentos: nada fechado para comparar. */
     noClosedTitle: 'Ainda não há mês fechado para comparar',
     noClosedBody: 'A comparação usa meses que já terminaram e têm registros. O mês em andamento aparece no gráfico e fica fora das contas.',
@@ -1027,8 +1068,10 @@ export async function loadEvolutionGaps(
   repo: Pick<RecordsRepository, 'listSeries' | 'listCommitmentsDueBetween'>,
   contextId: string,
   currentMonth: IsoMonth,
+  windowMonths: EvolutionWindow = EVOLUTION_MAX_MONTHS,
 ): Promise<IsoMonth[]> {
-  const from = evolutionFetchRange(currentMonth).from;
+  // Com 24 ou 36 meses, o aviso cobre a janela inteira (D-105); até 12, os 12 de sempre.
+  const from = windowMonths > EVOLUTION_MAX_MONTHS ? addMonths(currentMonth, -(windowMonths - 1)) : evolutionFetchRange(currentMonth).from;
   const to = addMonths(currentMonth, -1);
   const [series, commitments] = await Promise.all([repo.listSeries(contextId), repo.listCommitmentsDueBetween(contextId, from, to)]);
   return evolutionGapMonths(series, commitments, from, to);

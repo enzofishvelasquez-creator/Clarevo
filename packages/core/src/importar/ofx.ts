@@ -1,6 +1,7 @@
 import { todayIn } from '../dates';
 import { MAX_RECORD_CENTS } from '../money';
 import { decodeImportBytes } from './decode';
+import { lineDirection, signedByDirection } from './direcao';
 import type { ImportFileResult, ParsedLine } from './tipos';
 import { IMPORT_MAX_LINES } from './tipos';
 import { cleanDescription, parseFileDate } from './valores';
@@ -9,8 +10,15 @@ import { cleanDescription, parseFileDate } from './valores';
  * Leitor de OFX (Open Financial Exchange) para extrato de conta (BANKMSGSRSV1) e fatura de cartão (CREDITCARDMSGSRSV1), nas duas
  * formas: SGML 1.x (valores sem tag de fechamento) e XML 2.x. Lê só o que importa: STMTTRN com DTPOSTED, TRNAMT, FITID, NAME e
  * MEMO. O saldo (LEDGERBAL, AVAILBAL), o número da conta, o banco e o cabeçalho são ignorados e não saem daqui.
- * Sinal: TRNAMT negativo = dinheiro que saiu (compra no cartão, gasto na conta); positivo = entrou.
+ * Sinal: TRNAMT negativo = dinheiro que saiu (compra no cartão, gasto na conta); positivo = entrou. Extrato de conta em que nenhum
+ * TRNAMT é negativo, mas TRNTYPE diz que há débitos (o banco escreveu os valores sem sinal, D-108): o TRNTYPE decide (DEBIT, PAYMENT,
+ * FEE e parecidos saem; CREDIT, DEP, INT e DIV entram) e, nos outros tipos, a descrição (`lineDirection`). Fatura sem nenhum valor
+ * negativo: a compra é o valor positivo (`cardPositive`), como na planilha.
  */
+
+/** TRNTYPE de débito (o dinheiro saiu) e de crédito (entrou), pela especificação do OFX. */
+const OFX_DEBIT_TYPES = new Set(['DEBIT', 'PAYMENT', 'CHECK', 'ATM', 'POS', 'FEE', 'SRVCHG', 'DIRECTDEBIT', 'CASH', 'REPEATPMT']);
+const OFX_CREDIT_TYPES = new Set(['CREDIT', 'DEP', 'INT', 'DIV', 'DIRECTDEP']);
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
@@ -163,6 +171,7 @@ export function parseOfxText(text: string, timeZone: string = OFX_DEFAULT_TIME_Z
   if (!hasCard && !hasBank && raws.length === 0) return { ok: false, code: 'ofx_invalido' };
   if (currency !== null && currency !== 'BRL' && currency !== '') return { ok: false, code: 'moeda_diferente' };
   const lines: ParsedLine[] = [];
+  const types: string[] = [];
   let ignored = 0;
   for (const r of raws) {
     const date = ofxDate(r.posted, timeZone);
@@ -172,6 +181,7 @@ export function parseOfxText(text: string, timeZone: string = OFX_DEFAULT_TIME_Z
       continue;
     }
     const fit = r.fitId ? cleanFitId(decodeEntities(r.fitId)) : '';
+    types.push((r.type ?? '').trim().toUpperCase());
     lines.push({
       ordinal: lines.length + 1,
       date,
@@ -181,9 +191,18 @@ export function parseOfxText(text: string, timeZone: string = OFX_DEFAULT_TIME_Z
     });
   }
   if (lines.length === 0) return { ok: false, code: 'sem_lancamentos' };
+  const statement = hasCard && !hasBank ? 'cartao' : hasBank && !hasCard ? 'conta' : null;
+  const noNegative = lines.every((l) => l.amountCents > 0);
+  if (noNegative && statement === 'conta' && types.some((t) => OFX_DEBIT_TYPES.has(t))) {
+    lines.forEach((l, i) => {
+      const t = types[i]!;
+      const direction = OFX_DEBIT_TYPES.has(t) ? 'saida' : OFX_CREDIT_TYPES.has(t) ? 'entrada' : lineDirection('conta', null, l.description);
+      l.amountCents = signedByDirection(l.amountCents, direction);
+    });
+  }
   return {
     ok: true,
-    parse: { source: 'ofx', statement: hasCard && !hasBank ? 'cartao' : hasBank && !hasCard ? 'conta' : null, lines, ignored, balanceIgnored: balance, cardPositive: false },
+    parse: { source: 'ofx', statement, lines, ignored, balanceIgnored: balance, cardPositive: noNegative && statement !== 'conta' },
   };
 }
 

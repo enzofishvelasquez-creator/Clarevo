@@ -86,6 +86,7 @@ import {
   type IncomeReference,
   type InvoiceItem,
   type InvoicePaymentWrite,
+  type LinkableRecord,
   type IsoDate,
   type IsoMonth,
   type License,
@@ -161,6 +162,8 @@ import {
   parseStoreForget,
   parseStoreSync,
   parseAccountMarks,
+  parseAccountLevelState,
+  levelStateOf,
   parseWebSubscriptionCancel,
   parseWebSubscriptionStatus,
   parseWebSubscriptionStart,
@@ -172,6 +175,7 @@ import {
   type StoreForget,
   type StoreSync,
   type AccountMarks,
+  type AccountLevelState,
   type WebSubscriptionCancel,
   type WebSubscriptionStatus,
   type WebSubscriptionStart,
@@ -221,6 +225,11 @@ interface RecordRow {
   receipt_key: string | null;
   /** Recebimento que conta no mês seguinte (D-089 A, migração 0030); ausente antes da 0030. */
   next_month?: boolean | null;
+  /** Subcategoria, gasto ligado depois e rendimento de investimento (D-107, migração 20261117000002); ausentes antes dela. */
+  subcategory?: string | null;
+  linked_payment?: boolean | null;
+  investment_id?: string | null;
+  investment_movement_id?: string | null;
   created_by: string;
   version: number;
   created_at: string;
@@ -625,6 +634,12 @@ const GOAL_MOVEMENT_ACTIONS: readonly GoalAction[] = ['registrar_movimento_meta'
 
 const KNOWN: RepoErrorCode[] = [
   'versao_desatualizada',
+  // Gasto ligado, subcategoria, troca de tipo e rendimento de investimento (D-107, 20261117000002).
+  'subcategoria_invalida',
+  'tipo_nao_muda',
+  'investimento_invalido',
+  'registro_invalido',
+  'registro_ja_ligado',
   // Investimentos (D-093, 0032).
   'investimento_encerrado',
   'valor_insuficiente',
@@ -637,6 +652,10 @@ const KNOWN: RepoErrorCode[] = [
   'quantidade_invalida',
   'cnpj_invalido',
   'origem_invalida',
+  // Taxa com data de fim, condição da taxa e descrição (D-104, 0039).
+  'taxa_condicional_invalida',
+  'condicao_invalida',
+  'descricao_investimento_invalida',
   // Assinatura paga (D-083): o gatilho de record_operations recusa a escrita em só leitura. Avisa a tela de acesso (accessRefused).
   'assinatura_necessaria',
   // Aceite dos termos (A1): só a versão vigente.
@@ -840,6 +859,10 @@ function toRecord(r: RecordRow): FinancialRecord {
     receiptKey,
     // Só quando ligado, como o repositório em memória: o registro sem a marca fica como antes.
     ...(r.next_month === true ? { nextMonth: true } : {}),
+    // D-107: só quando existem, como o repositório em memória.
+    ...(r.subcategory ? { subcategory: r.subcategory } : {}),
+    ...(r.linked_payment === true ? { linkedPayment: true } : {}),
+    ...(r.investment_id && r.investment_movement_id ? { investmentId: r.investment_id, investmentMovementId: r.investment_movement_id } : {}),
     createdBy: r.created_by,
     version: r.version,
     createdAt: r.created_at,
@@ -1170,6 +1193,11 @@ interface InvestmentRow {
   /** Quantidade em milionésimos e CNPJ do fundo (D-099, itens 19 e 20; migração 0037); ausentes num banco sem a migração. */
   quantity_micro?: number | null;
   fund_cnpj?: string | null;
+  /** Taxa com data de fim, condição da taxa e descrição (D-104, itens 12 e 13; migração 0039); ausentes num banco sem a migração. */
+  rate_until?: string | null;
+  rate_after_bp?: number | null;
+  rate_condition?: string | null;
+  description?: string | null;
 }
 
 /** A ficha da linha: o que o app não conhece fica vazio (nunca um valor errado na tela). */
@@ -1188,6 +1216,11 @@ function toInvestmentDetails(r: InvestmentRow): InvestmentDetails {
     liquidityDays: int(r.liquidity_days),
     quantityMicro: int(r.quantity_micro),
     fundCnpj: typeof r.fund_cnpj === 'string' && /^[0-9A-Z]{14}$/.test(r.fund_cnpj) ? r.fund_cnpj : null,
+    // 0039 (D-104): sem a coluna (banco ainda sem a migração), nulos.
+    rateUntil: date(r.rate_until),
+    rateAfterBp: int(r.rate_after_bp),
+    rateCondition: typeof r.rate_condition === 'string' && r.rate_condition !== '' ? r.rate_condition : null,
+    description: typeof r.description === 'string' && r.description !== '' ? r.description : null,
   };
   return investmentDetailsError(r.kind, details) === null ? details : { ...EMPTY_INVESTMENT_DETAILS, institution: details.institution };
 }
@@ -1209,6 +1242,11 @@ function detailsPayload(d: InvestmentDetails | undefined, goalId?: string | null
     // Quantidade e CNPJ (0037): sem o campo (ficha de uma versão anterior), a chave não vai e o banco mantém o que tinha.
     ...(d.quantityMicro !== undefined ? { quantity_micro: d.quantityMicro } : {}),
     ...(d.fundCnpj !== undefined ? { fund_cnpj: d.fundCnpj } : {}),
+    // Taxa com data de fim, condição e descrição (0039, D-104): sem o campo, a chave não vai e o banco mantém o que tinha. Um banco sem a
+    // migração ignora as chaves que não conhece (clarevo_validate_investment_details), e o resto da ficha é gravado igual.
+    ...(d.rateUntil !== undefined || d.rateAfterBp !== undefined ? { rate_until: d.rateUntil ?? null, rate_after_bp: d.rateAfterBp ?? null } : {}),
+    ...(d.rateCondition !== undefined ? { rate_condition: d.rateCondition } : {}),
+    ...(d.description !== undefined ? { description: d.description } : {}),
   };
 }
 
@@ -1975,6 +2013,9 @@ export class SupabaseRepository implements RecordsRepository {
       ...(input.receiptKey != null ? { p_receipt_key: input.receiptKey } : {}),
       // Só quando ligado (D-089 A): sem a marca, a chamada é a de antes.
       ...(input.nextMonth === true ? { p_next_month: true } : {}),
+      // Subcategoria e rendimento de investimento (D-107): só quando vêm.
+      ...(input.subcategory ? { p_subcategory: input.subcategory } : {}),
+      ...(input.investmentId ? { p_investment_id: input.investmentId } : {}),
     });
   }
 
@@ -1990,6 +2031,14 @@ export class SupabaseRepository implements RecordsRepository {
       p_category: input.category,
       // Ausente mantém a marca do mês seguinte enquanto a data cabe (D-089 A); o formulário de recebimento manda true ou false.
       ...(input.nextMonth !== undefined ? { p_next_month: input.nextMonth } : {}),
+      // D-107: o tipo novo; a subcategoria ('' tira); o investimento (null desliga, um id liga). Ausentes: a chamada é a de antes.
+      ...(input.kind !== undefined ? { p_kind: input.kind } : {}),
+      ...(input.subcategory !== undefined ? { p_subcategory: input.subcategory ?? '' } : {}),
+      ...(input.investmentId !== undefined
+        ? input.investmentId === null
+          ? { p_link_investment: false }
+          : { p_link_investment: true, p_investment_id: input.investmentId }
+        : {}),
     });
   }
 
@@ -2061,11 +2110,27 @@ export class SupabaseRepository implements RecordsRepository {
     });
   }
 
-  undoCommitmentPayment(key: string, id: string, expectedVersion: number) {
+  undoCommitmentPayment(key: string, id: string, expectedVersion: number, keepRecord = false) {
     return this.callPayment('undo_commitment_payment', {
       p_idempotency_key: key,
       p_commitment_id: id,
       p_expected_version: expectedVersion,
+      // D-107: só quando pedido, para a chamada de antes continuar igual.
+      ...(keepRecord ? { p_keep_record: true } : {}),
+    });
+  }
+
+  /** D-107: pay_commitment com p_record_id (o gasto que já existe vira o pagamento); a categoria fica a do gasto. */
+  linkRecordToCommitment(key: string, commitmentId: string, expectedVersion: number, record: LinkableRecord) {
+    return this.callPayment('pay_commitment', {
+      p_idempotency_key: key,
+      p_commitment_id: commitmentId,
+      p_expected_version: expectedVersion,
+      p_account_id: record.accountId,
+      p_amount_cents: record.amountCents,
+      p_paid_on: record.occurredOn,
+      p_category: null,
+      p_record_id: record.id,
     });
   }
 
@@ -3281,12 +3346,27 @@ export class SupabaseRepository implements RecordsRepository {
     });
   }
 
-  undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number) {
+  undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number, keepRecord = false) {
     return this.writeInvoicePayment('undo_invoice_payment', {
       p_idempotency_key: key,
       p_card_id: cardId,
       p_month: `${month}-01`,
       p_expected_version: expectedVersion,
+      // D-107: só quando pedido, para a chamada de antes continuar igual.
+      ...(keepRecord ? { p_keep_record: true } : {}),
+    });
+  }
+
+  /** D-107: pay_invoice com p_record_id (o gasto que já existe vira o pagamento, na conta dele). */
+  linkRecordToInvoice(key: string, cardId: string, month: IsoMonth, expectedVersion: number, record: LinkableRecord) {
+    return this.writeInvoicePayment('pay_invoice', {
+      p_idempotency_key: key,
+      p_card_id: cardId,
+      p_month: `${month}-01`,
+      p_expected_version: expectedVersion,
+      p_paid_cents: record.amountCents,
+      p_paid_on: record.occurredOn,
+      p_record_id: record.id,
     });
   }
 
@@ -3623,11 +3703,22 @@ export class SupabaseRepository implements RecordsRepository {
     return parseLegalAcceptance(data);
   }
 
-  /** Os marcos do nível da conta (my_account_marks, D-095). */
+  /** Os marcos do nível da conta (my_account_marks, D-095), sem começar a contagem do tempo sem anotar. */
   async getAccountMarks(): Promise<AccountMarks> {
     const { data, error } = await this.db.rpc('my_account_marks');
     if (error) throw repoError(error);
     return parseAccountMarks(data);
+  }
+
+  /**
+   * Os marcos e o tempo sem anotar (my_account_marks(true), migração 0041, D-111). Com o banco ainda sem a migração (a função não aceita o
+   * parâmetro: PGRST202), só os marcos, e o nível não desce.
+   */
+  async getAccountLevel(): Promise<AccountLevelState> {
+    const { data, error } = await this.db.rpc('my_account_marks', { p_level_state: true });
+    if (error?.code === 'PGRST202') return levelStateOf(await this.getAccountMarks());
+    if (error) throw repoError(error);
+    return parseAccountLevelState(data);
   }
 
   /** A situação do acesso da própria pessoa (my_access, D-083). */

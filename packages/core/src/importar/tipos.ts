@@ -30,7 +30,12 @@ export type ImportErrorCode =
   | 'sem_lancamentos'
   | 'moeda_diferente'
   | 'ofx_invalido'
-  | 'csv_invalido';
+  | 'csv_invalido'
+  | 'imagem_sem_lancamentos'
+  | 'imagem_ilegivel'
+  | 'imagem_grande'
+  | 'imagens_demais'
+  | 'imagem_indisponivel';
 
 /**
  * Uma linha lida do arquivo, antes de escolher o destino. `amountCents` é inteiro com sinal na convenção do dinheiro que mexe:
@@ -49,7 +54,8 @@ export interface ParsedLine {
 
 /** O arquivo lido: as linhas e o que foi deixado de lado. O saldo do arquivo é sempre ignorado (não existe saldo por conta, P-018). */
 export interface ImportParse {
-  source: 'ofx' | 'csv' | 'pdf';
+  /** 'imagem': prints da tela do banco, lidos no aparelho (D-108); cada linha pede conferência. */
+  source: 'ofx' | 'csv' | 'pdf' | 'imagem';
   /** O arquivo diz que é extrato de conta ou fatura de cartão (OFX); null quando não dá para saber (planilha). */
   statement: ImportDestination | null;
   lines: ParsedLine[];
@@ -63,6 +69,13 @@ export interface ImportParse {
    * ou com coluna de tipo.
    */
   cardPositive: boolean;
+  /**
+   * Planilha com o valor numa coluna só, sem coluna de tipo e sem nenhum valor com sinal (D-108): num extrato de conta, a descrição
+   * decide se é gasto ou recebimento (`lineDirection`), na revisão, sem mudar o valor guardado na linha (a chave continua a mesma).
+   */
+  unsigned?: boolean;
+  /** Prints (D-108): quantas linhas apareciam em mais de um print e foram contadas uma vez só. */
+  repeated?: number;
 }
 
 export type ImportFileResult = { ok: true; parse: ImportParse } | { ok: false; code: ImportErrorCode };

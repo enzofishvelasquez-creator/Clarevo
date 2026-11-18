@@ -112,15 +112,17 @@ export const darkColors: Palette = {
 };
 
 /**
- * Cores dos níveis de conta (D-095), em tom suave (pedido do Enzo, 12/11/2026, no jeito do gov.br): só no selo pequeno do nível, nunca em
- * borda de cartão nem em fundo. Iguais nas duas paletas (os tons claros se veem sobre a superfície escura). A medalha por cima é
- * `textOnAccent` (#17223B): 6,63:1 no bronze, 8,26:1 na prata, 8,12:1 no ouro e 8,51:1 no diamante.
+ * Cores dos níveis de conta (D-095 e D-111), em tom suave (pedido do Enzo, 12/11/2026, no jeito do gov.br): só no selo pequeno do nível,
+ * nunca em borda de cartão nem em fundo. Iguais nas duas paletas (os tons claros se veem sobre a superfície escura). A medalha por cima é
+ * `textOnAccent` (#17223B): 6,63:1 no bronze, 8,26:1 na prata, 8,12:1 no ouro, 8,51:1 no diamante e 7,63:1 na esmeralda (verde suave,
+ * só como a cor da pedra: nada de verde como sinal de ganho).
  */
 export const levelColors = {
   bronze: '#C9A07E',
   prata: '#B4BCC9',
   ouro: '#D9B65A',
   diamante: '#8CC7DB',
+  esmeralda: '#6FC59B',
 } as const;
 
 export function paletteFor(scheme: ColorScheme): Palette {

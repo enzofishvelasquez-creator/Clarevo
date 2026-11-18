@@ -1,5 +1,5 @@
 import type { Topic } from '../types';
-import { INVEST_REVIEWED_ON, oficialInvest } from './common';
+import { INVEST_REVIEWED_ON, INVEST_SHORT_REVIEWED_ON, oficialInvest } from './common';
 
 /**
  * Temas de investimentos da seção "Dinheiro no tempo" (D-093, aba Investir; `docs/49_ESTUDO_INVESTIMENTOS.md`, item 11), escritos e
@@ -493,6 +493,179 @@ export const INVESTIMENTOS_TOPICS: Topic[] = [
       ),
     ],
     reviewedOn: INVEST_REVIEWED_ON,
+    reviewEveryMonths: 12,
+  },
+
+  // -------------------------------------------------------------------------------------------------------------------
+  // Temas curtos (D-105, 17/11/2026): uma explicação por campo do detalhe do investimento (tabela regressiva, IOF no resgate,
+  // come-cotas, IPCA+ e marcação a mercado), para a tela do investimento e o site apontarem direto. Liquidez e FGC já têm tema
+  // (`liquidez-risco-retorno` e `fgc`). As fontes são as mesmas dos temas de 13/11/2026, com os mesmos trechos.
+  // -------------------------------------------------------------------------------------------------------------------
+  {
+    slug: 'ir-regressivo',
+    section: 'tempo',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'Tabela regressiva do imposto de renda',
+    subtitle: 'Quanto mais tempo aplicado, menor a alíquota',
+    question: 'Como a alíquota do imposto muda com o prazo da aplicação?',
+    short: 'Na renda fixa tributada, o imposto incide só sobre o rendimento, e a alíquota cai conforme o tempo em que o dinheiro ficou aplicado, de 22,5% até 180 dias a 15% acima de 720 dias.',
+    paragraphs: [
+      'Em CDB, títulos públicos e outras aplicações de renda fixa tributadas, o imposto de renda incide só sobre o rendimento, nunca sobre o valor aplicado. Ele é retido no resgate ou no vencimento, e o prazo conta da data de cada aplicação: cada aporte tem o próprio prazo.',
+      'A alíquota depende do tempo aplicado: 22,5% até 180 dias, 20% de 181 a 360 dias, 17,5% de 361 a 720 dias e 15% acima de 720 dias.',
+      'Na Clarevo, o imposto aparece sempre como estimativa: o valor oficial é o do informe de rendimentos da instituição. LCI, LCA e outras aplicações isentas para pessoa física não entram nessa tabela.',
+    ],
+    example:
+      'Uma aplicação fictícia de R$ 2.000,00 rendeu R$ 200,00 e foi resgatada com 200 dias. A alíquota é de 20%: o imposto fica em R$ 40,00, e o rendimento líquido, em R$ 160,00.',
+    calculation: '200 dias → 20% · 200,00 × 20% = 40,00 · 200,00 - 40,00 = 160,00.',
+    hypotheses: 'Exemplo fictício: aplicação tributada de renda fixa, resgatada depois de 30 dias (sem IOF), sem taxas, com a tabela da Lei 11.033/2004 em vigor em 17/11/2026.',
+    facts: [
+      { text: '22,5% até 180 dias', source: 0 },
+      { text: '20% de 181 a 360 dias', source: 0 },
+      { text: '17,5% de 361 a 720 dias', source: 0 },
+      { text: '15% acima de 720 dias', source: 0 },
+    ],
+    keywords: ['tabela regressiva', 'alíquota', 'imposto na renda fixa', 'prazo da aplicação', 'rendimento líquido'],
+    related: ['ir-investimentos', 'iof-resgate', 'come-cotas'],
+    sources: [
+      LEI_11033('Art. 1º: imposto de renda na fonte sobre rendimentos de aplicações de renda fixa, a 22,5% em aplicações de até 180 dias, 20% de 181 a 360 dias, 17,5% de 361 a 720 dias e 15% acima de 720 dias'),
+      RESERVA_LANCAMENTO('Imposto de renda apenas sobre os rendimentos, no resgate ou no vencimento, com alíquotas regressivas; para aplicações resgatadas em até 30 dias, pode haver cobrança de IOF'),
+      MIR_RENDIMENTOS('Rendimentos de cadernetas de poupança, letras hipotecárias, LCA, LCI, CRA e CRI são isentos e não tributáveis'),
+    ],
+    reviewedOn: INVEST_SHORT_REVIEWED_ON,
+    reviewEveryMonths: 6,
+  },
+  {
+    slug: 'iof-resgate',
+    section: 'tempo',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'IOF no resgate antes de 30 dias',
+    subtitle: 'Uma parte do rendimento que diminui a cada dia aplicado',
+    question: 'Por que o resgate nos primeiros dias paga IOF?',
+    short: 'Resgatar uma aplicação de renda fixa nos primeiros 30 dias pode pagar IOF. Ele incide só sobre o rendimento e diminui a cada dia: no 1º dia, fica com 96% do rendimento.',
+    paragraphs: [
+      'O IOF é um imposto federal. Em aplicações de renda fixa, ele aparece quando o resgate acontece nos primeiros 30 dias e incide só sobre o rendimento, nunca sobre o valor aplicado.',
+      'A parte do rendimento que fica com o IOF cai a cada dia, pela tabela do Decreto 6.306/2007: 96% no 1º dia, 93% no 2º e 90% no 3º, até chegar a zero no 30º dia. A partir daí, o resgate não tem IOF.',
+      'O imposto de renda vem depois, sobre o rendimento já sem o IOF, pela tabela regressiva. A tabela do IOF muda por decreto: confira a data de revisão e as fontes.',
+    ],
+    example:
+      'Uma aplicação fictícia de R$ 5.000,00 rendeu R$ 6,00 e foi resgatada no 3º dia. O IOF fica com 90% do rendimento, R$ 5,40, e o rendimento antes do imposto de renda passa a R$ 0,60.',
+    calculation: '3º dia → 90% · 6,00 × 90% = 5,40 · 6,00 - 5,40 = 0,60.',
+    hypotheses: 'Exemplo fictício: aplicação de renda fixa, sem taxas, com a tabela do Decreto 6.306/2007 em vigor em 17/11/2026.',
+    facts: [{ text: '96% no 1º dia, 93% no 2º e 90% no 3º', source: 0 }],
+    keywords: ['IOF', 'imposto sobre operações financeiras', 'resgate antecipado', '30 dias', 'renda fixa', 'tabela do IOF'],
+    related: ['ir-regressivo', 'ir-investimentos', 'liquidez-risco-retorno'],
+    sources: [
+      oficialInvest(
+        CAMARA,
+        'Decreto nº 6.306/2007 (Regulamento do IOF), norma atualizada',
+        'https://www2.camara.leg.br/legin/fed/decret/2007/decreto-6306-14-dezembro-2007-566561-normaatualizada-pe.html',
+        `Art. 32: IOF de um por cento ao dia sobre o valor do resgate, limitado ao rendimento da operação, em função do prazo, conforme a tabela do Anexo (96% do rendimento no 1º dia, 93% no 2º, 90% no 3º); ${TRECHO}`,
+      ),
+      RESERVA_LANCAMENTO('Imposto de renda apenas sobre os rendimentos, no resgate ou no vencimento, com alíquotas regressivas; para aplicações resgatadas em até 30 dias, pode haver cobrança de IOF'),
+    ],
+    reviewedOn: INVEST_SHORT_REVIEWED_ON,
+    reviewEveryMonths: 6,
+  },
+  {
+    slug: 'come-cotas',
+    section: 'tempo',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'Come-cotas',
+    subtitle: 'O imposto que os fundos abertos recolhem em maio e em novembro',
+    question: 'O que é o come-cotas dos fundos?',
+    short: 'Em fundos abertos, como os de renda fixa, o imposto sobre o rendimento é recolhido duas vezes por ano, no último dia útil de maio e de novembro, com menos cotas para quem investe.',
+    paragraphs: [
+      'Nos fundos abertos com tributação periódica, como os de renda fixa, o imposto de renda não espera o resgate. No último dia útil de maio e de novembro, o fundo recolhe o imposto sobre o rendimento do período e diminui a quantidade de cotas de cada pessoa: é o come-cotas.',
+      'A alíquota é de 15% ou, nos fundos de curto prazo, de 20%. No resgate, entra só a diferença até a alíquota do prazo, pela tabela regressiva. Fundos de ações e fundos imobiliários seguem regras próprias.',
+      'O valor de cada cota não muda com o come-cotas: muda o número de cotas. Por isso o saldo do fundo diminui um pouco nesses dois meses, mesmo sem resgate.',
+    ],
+    example:
+      'Num fundo fictício de renda fixa, o rendimento do semestre foi de R$ 400,00. No come-cotas, a 15%, saem R$ 60,00 em cotas, e o rendimento que continua aplicado é de R$ 340,00.',
+    calculation: '400,00 × 15% = 60,00 · 400,00 - 60,00 = 340,00.',
+    hypotheses: 'Exemplo fictício: fundo aberto do regime geral, sem taxas, com a alíquota da Lei 14.754/2023 em vigor em 17/11/2026.',
+    facts: [{ text: 'de 15% ou, nos fundos de curto prazo, de 20%', source: 0 }],
+    keywords: ['come-cotas', 'fundo de renda fixa', 'tributação periódica', 'maio e novembro', 'cotas', 'imposto do fundo'],
+    related: ['ir-regressivo', 'ir-investimentos', 'declarar-investimentos'],
+    sources: [
+      LEI_14754('Art. 17: tributação periódica no último dia útil dos meses de maio e de novembro, à alíquota de 15% no regime geral e de 20% nos fundos de curto prazo, com alíquota complementar no resgate'),
+      oficialInvest(
+        RECEITA,
+        'Nova legislação sobre Fundos de Investimento',
+        'https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/manuais/orientacao-tributaria/fundosdeinvestimento',
+        `Fundos regidos por norma geral de curto prazo têm incidência semestral do imposto de renda à alíquota de 20%; ${TRECHO}`,
+      ),
+    ],
+    reviewedOn: INVEST_SHORT_REVIEWED_ON,
+    reviewEveryMonths: 6,
+  },
+  {
+    slug: 'ipca-mais',
+    section: 'tempo',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'IPCA mais uma taxa (IPCA+)',
+    subtitle: 'Como rende uma aplicação que acompanha a inflação',
+    question: 'O que quer dizer IPCA+ num investimento?',
+    short: 'Uma aplicação IPCA+ paga a inflação medida pelo IPCA mais uma taxa fixada na contratação. A parte da inflação muda todo mês; a taxa fica a mesma até o vencimento.',
+    paragraphs: [
+      'Num investimento IPCA+, como o Tesouro IPCA+, o rendimento tem duas partes: a variação do IPCA, a inflação oficial calculada pelo IBGE, e uma taxa fixada no dia da compra, que não muda até o vencimento.',
+      'As duas partes se multiplicam, não se somam: com IPCA de 4% e taxa de 6% no ano, o rendimento do ano fica em 10,24%, e não em 10%. Como a inflação dos próximos meses não é conhecida, o rendimento total só se sabe no fim.',
+      'Antes do vencimento, o preço desses títulos muda todo dia com os juros do mercado, pela marcação a mercado: quem vende antes pode receber mais ou menos que o contratado. A Clarevo não indica investimentos.',
+    ],
+    example: 'Um valor fictício de R$ 10.000,00 aplicado a IPCA mais 6% ao ano, num ano com IPCA de 4%, chega ao fim do ano em R$ 11.024,00, antes de impostos e taxas.',
+    calculation: '1,04 × 1,06 = 1,1024 → 10,24% · 10.000,00 × 1,1024 = 11.024,00.',
+    hypotheses: 'Exemplo fictício: IPCA de 4% e taxa de 6% no ano, sem imposto, sem taxas e sem venda antes do vencimento.',
+    facts: [],
+    keywords: ['IPCA+', 'inflação mais taxa', 'título atrelado à inflação', 'taxa real', 'IPCA', 'proteção contra a inflação'],
+    related: ['inflacao-ipca', 'titulos-publicos', 'marcacao-a-mercado'],
+    sources: [
+      oficialInvest(
+        CVM_PORTAL,
+        'Títulos Públicos',
+        'https://www.gov.br/investidor/pt-br/investir/tipos-de-investimentos/titulos-publicos',
+        `Principais títulos: Tesouro Selic, Tesouro Prefixado e Tesouro IPCA+; marcação a mercado é o ajuste diário do preço conforme as condições da economia e os juros, e o valor pode ficar maior ou menor que o esperado antes do vencimento; ${TRECHO}`,
+      ),
+      oficialInvest('IBGE', 'IBGE Explica: Inflação', 'https://www.ibge.gov.br/explica/inflacao.php', `Definição de inflação; o IPCA é o índice oficial de inflação; ${TRECHO}`),
+    ],
+    reviewedOn: INVEST_SHORT_REVIEWED_ON,
+    reviewEveryMonths: 12,
+  },
+  {
+    slug: 'marcacao-a-mercado',
+    section: 'tempo',
+    kind: 'tema',
+    status: 'publicado',
+    title: 'Marcação a mercado',
+    subtitle: 'Por que o valor de um título muda antes do vencimento',
+    question: 'O que é marcação a mercado?',
+    short: 'É o ajuste diário do preço de um título pelos juros do mercado. Quem fica até o vencimento recebe o contratado; quem vende antes recebe o preço do dia, que pode ser maior ou menor.',
+    paragraphs: [
+      'Títulos com taxa definida na compra, como o Tesouro Prefixado e o Tesouro IPCA+, têm o preço recalculado todo dia conforme os juros e as condições da economia. Esse ajuste é a marcação a mercado.',
+      'Quando os juros do mercado sobem, o preço dos títulos já emitidos cai, porque os novos pagam mais; quando os juros caem, o preço sobe. Por isso o valor no extrato pode ficar abaixo do aplicado por um tempo, mesmo para quem pretende ficar até o vencimento.',
+      'Quem mantém o título até o vencimento recebe a taxa contratada; quem vende antes recebe o preço do dia. O Tesouro Selic oscila pouco no dia a dia, e o Tesouro Reserva não tem marcação a mercado.',
+    ],
+    example:
+      'Um título fictício comprado por R$ 1.000,00 aparece no extrato por R$ 970,00 depois de uma alta dos juros. Vendido nesse dia, daria R$ 30,00 a menos que o aplicado; mantido até o vencimento, paga a taxa contratada.',
+    calculation: '1.000,00 - 970,00 = 30,00.',
+    hypotheses: 'Exemplo fictício: preço do dia ilustrativo, sem impostos e sem taxas.',
+    facts: [],
+    keywords: ['marcação a mercado', 'preço do título', 'venda antecipada', 'oscilação', 'juros do mercado', 'valor no extrato'],
+    related: ['titulos-publicos', 'ipca-mais', 'liquidez-risco-retorno'],
+    sources: [
+      oficialInvest(
+        CVM_PORTAL,
+        'Títulos Públicos',
+        'https://www.gov.br/investidor/pt-br/investir/tipos-de-investimentos/titulos-publicos',
+        `O preço do Tesouro Selic oscila pouco no dia a dia; marcação a mercado é o ajuste diário do preço conforme as condições da economia e os juros, e o valor pode ficar maior ou menor que o esperado antes do vencimento; ${TRECHO}`,
+      ),
+      RESERVA_LANCAMENTO(
+        'Lançamento na segunda-feira, dia 11 (maio de 2026), do Tesouro Reserva, título do Programa Tesouro Direto com rendimento indexado à Selic; ao contrário do Tesouro Selic, não tem marcação a mercado',
+      ),
+    ],
+    reviewedOn: INVEST_SHORT_REVIEWED_ON,
     reviewEveryMonths: 12,
   },
 ];

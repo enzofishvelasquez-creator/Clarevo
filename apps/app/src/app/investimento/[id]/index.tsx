@@ -1,17 +1,23 @@
 import {
   ERROR_TEXT,
+  HISTORY_TEXT,
   INCOME_KIND_LABEL,
+  INVESTMENT_REMINDER_TEXT,
   INVESTMENT_TEXT,
-  calendarDaysBetween,
+  VALUE_DATE_TEXT,
+  detailReminder,
   formatBRL,
   formatDateBR,
   formatMonthBR,
   investmentGain,
+  investmentHistory,
   isStackedLayout,
   investmentErrorText,
   isRepoError,
   monthlyReturns,
   newOperationKey,
+  valueDateCaption,
+  type DetailReminder,
   type Investment,
   type InvestmentMovement,
 } from '@clarevo/core';
@@ -22,7 +28,7 @@ import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
-import { ContextPill, SubHeader } from '@/components/header';
+import { ContextPill, SubHeader, useHeroCard } from '@/components/header';
 import { InvestmentEstimateCard, InvestmentFichaCard, InvestmentNetCard, investmentCaption } from '@/components/investment-ficha';
 import { InvestmentReturns, InvestmentTotalsLines } from '@/components/investment-parts';
 import { InvestmentPublicPriceCard } from '@/components/investment-public-price';
@@ -30,6 +36,7 @@ import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ErrorState, LoadingState } from '@/components/states';
 import { Banner, Body, Button, Card, Screen, Txt, styles as ui } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { useInvestmentReminderHolds } from '@/lib/investment-reminder-holds';
 import { useInvalidateInvestments, useInvestment, useInvestmentMovements } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
@@ -41,14 +48,17 @@ const D = T.detail;
  * Detalhe de um investimento (D-093): o valor de hoje, os totais, a rentabilidade com o CDI e o IPCA, as ações (aporte, resgate,
  * rendimento recebido, atualizar valor), o valor no fim de cada mês, o histórico e editar, encerrar ou reabrir e excluir. Com a ficha
  * ampliada (D-099): "Sobre este investimento", o valor pela taxa contratada (com "Usar este valor") e "Se resgatasse hoje".
+ * D-104: a data de cada valor (item 1; numa falha ao recarregar, os últimos valores carregados com a data, nunca zero), o lembrete com adiar
+ * e pausar (item 6) e o histórico com o saldo depois de cada linha (item 16).
  */
 export default function InvestimentoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const one = useInvestment(id);
   const movements = useInvestmentMovements(id);
   const [notice, setNotice] = useFlash();
-  if (one.isSuccess && one.data && movements.isSuccess) {
-    return <Detail investment={one.data} movements={movements.data} notice={notice} onNotice={setNotice} />;
+  // Com dados já carregados, uma falha ao recarregar mantém o detalhe (com o aviso): nunca troca os valores por zero nem pelo erro.
+  if (one.data && movements.data) {
+    return <Detail investment={one.data} movements={movements.data} notice={notice} onNotice={setNotice} stale={one.isError || movements.isError} />;
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -74,11 +84,13 @@ function Detail({
   movements,
   notice,
   onNotice,
+  stale,
 }: {
   investment: Investment;
   movements: readonly InvestmentMovement[];
   notice: string | null;
   onNotice: (m: string | null) => void;
+  stale: boolean;
 }) {
   const repo = useRepo();
   const { today } = useSession();
@@ -93,6 +105,11 @@ function Detail({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const active = i.status === 'ativo';
   const months = monthlyReturns([movements], today).slice(-12).reverse();
+  const history = investmentHistory(movements);
+  const holds = useInvestmentReminderHolds();
+  // Computador (D-110): o bloco azul vira um cartão alinhado com o cabeçalho, com os quatro cantos arredondados.
+  const heroCard = useHeroCard();
+  const reminder = holds.ready ? detailReminder(i, today, holds.holds) : null;
   const go = (tipo: string) => router.push({ pathname: '/investimento/[id]/movimento', params: { id: i.id, tipo } });
 
   async function setStatus(status: 'ativo' | 'encerrado') {
@@ -135,7 +152,7 @@ function Detail({
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={i.name} right={<ContextPill label="Pessoal" fixed />} />
       <Screen>
-        <View style={styles.hero}>
+        <View style={[styles.hero, heroCard?.band]}>
           <Txt variant="caption" color={colors.textOnBrandSoft}>
             {`${investmentCaption(i)}${active ? '' : ' · Encerrado'}`}
           </Txt>
@@ -144,11 +161,16 @@ function Detail({
           </MoneyTxt>
           <InvestmentTotalsLines depositsCents={i.depositsCents} withdrawalsCents={i.withdrawalsCents} incomeCents={i.incomeCents} gainCents={investmentGain(i)} onBrand />
           <Txt variant="caption" color={colors.textOnBrandSoft}>
-            {i.lastValueOn ? T.lastValue(i.lastValueOn) : T.noValueYet}
+            {valueDateCaption(movements)}
           </Txt>
         </View>
         <Body>
           <FlashBanner message={notice} />
+          {stale ? (
+            <Banner tone="info">
+              <Txt variant="label">{VALUE_DATE_TEXT.staleLoad}</Txt>
+            </Banner>
+          ) : null}
           {error ? (
             <Banner tone="erro">
               <Txt variant="label" color={colors.error}>
@@ -165,10 +187,12 @@ function Detail({
               {T.disclaimer}
             </Txt>
           </Card>
-          {active && i.maturityOn && calendarDaysBetween(today, i.maturityOn) < 0 && i.valueCents > 0 ? (
-            <Banner tone="info">
-              <Txt variant="label">{`Este investimento venceu em ${formatDateBR(i.maturityOn)}. Se o dinheiro já voltou para a conta, registre o resgate e encerre o investimento.`}</Txt>
-            </Banner>
+          {reminder ? (
+            <ReminderCard
+              reminder={reminder}
+              onAction={() => go(reminder.kind === 'atualizar' ? 'valor' : 'resgate')}
+              onHold={(how) => onNotice(how === 'snooze' ? holds.snooze(reminder.kind) : holds.pause(reminder.kind))}
+            />
           ) : null}
           {/* Um botão por linha, na largura toda (revisão das telas, 16/11/2026): em duas colunas, "Registrar rendimento recebido"
               quebrava em linhas de tamanhos diferentes. */}
@@ -183,7 +207,7 @@ function Detail({
             <Button label={D.reopen} tone="soft" busy={busy} onPress={() => setStatus('ativo')} />
           )}
           <InvestmentEstimateCard investment={i} movements={movements} onNotice={onNotice} />
-          <InvestmentPublicPriceCard investment={i} onNotice={onNotice} />
+          <InvestmentPublicPriceCard investment={i} movements={movements} onNotice={onNotice} />
           <InvestmentNetCard investment={i} movements={movements} />
           <InvestmentFichaCard investment={i} />
           {months.length > 0 ? (
@@ -205,12 +229,19 @@ function Detail({
           ) : null}
           <Card style={{ gap: space[1], paddingVertical: space[3] }}>
             <Txt variant="title" accessibilityRole="header" aria-level={2}>
-              {D.historyTitle}
+              {HISTORY_TEXT.title}
             </Txt>
-            {movements.length === 0 ? <Txt color={colors.textSecondary}>{D.historyEmpty}</Txt> : null}
-            {movements.map((m, idx) => {
+            {history.length === 0 ? (
+              <Txt color={colors.textSecondary}>{D.historyEmpty}</Txt>
+            ) : (
+              <Txt variant="caption" color={colors.textSecondary}>
+                {HISTORY_TEXT.intro}
+              </Txt>
+            )}
+            {history.map(({ movement: m, balanceAfterCents, changeCents }, idx) => {
               const title = m.incomeKind ? `${T.movementLabel[m.kind]} · ${INCOME_KIND_LABEL[m.incomeKind]}` : T.movementLabel[m.kind];
-              const label = `${title}, ${formatDateBR(m.occurredOn)}, ${formatBRL(m.amountCents)}${m.note ? `, ${m.note}` : ''}`;
+              const label = `${title}, ${formatDateBR(m.occurredOn)}, ${formatBRL(m.amountCents)}${m.note ? `, ${m.note}` : ''}, ${HISTORY_TEXT.balanceA11y(balanceAfterCents)}`;
+              const detail = m.kind === 'rendimento' ? HISTORY_TEXT.income : changeCents !== null ? HISTORY_TEXT.change(changeCents) : null;
               return (
                 <Pressable
                   key={m.id}
@@ -219,8 +250,8 @@ function Detail({
                   accessibilityHint={active ? 'Abre para alterar ou excluir' : undefined}
                   disabled={!active}
                   onPress={() => router.push({ pathname: '/investimento/[id]/movimento', params: { id: i.id, movimento: m.id } })}
-                  style={(st) => [styles.histRow, idx < movements.length - 1 && styles.divider, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
+                  style={(st) => [styles.histRow, idx < history.length - 1 && styles.divider, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <Txt variant="label" style={{ fontFamily: fonts.bold }}>
                       {title}
                     </Txt>
@@ -230,6 +261,14 @@ function Detail({
                     {stacked ? (
                       <MoneyTxt variant="label" style={tabular}>
                         {formatBRL(m.amountCents)}
+                      </MoneyTxt>
+                    ) : null}
+                    <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
+                      {HISTORY_TEXT.balance(balanceAfterCents)}
+                    </MoneyTxt>
+                    {detail ? (
+                      <MoneyTxt variant="caption" color={colors.textSecondary}>
+                        {detail}
                       </MoneyTxt>
                     ) : null}
                   </View>
@@ -264,6 +303,30 @@ function Detail({
         <Txt color={colors.textSecondary}>{D.deleteBody}</Txt>
       </ConfirmDialog>
     </View>
+  );
+}
+
+/**
+ * O lembrete do detalhe (D-104, item 6), em tom de fato: o vencimento de até 7 dias ou já passado, ou o valor sem o extrato do mês passado.
+ * "Lembrar de novo em 3 dias" e "Pausar este lembrete por 30 dias" valem para o tipo (também para o aviso no celular), só neste aparelho.
+ */
+function ReminderCard({ reminder, onAction, onHold }: { reminder: DetailReminder; onAction: () => void; onHold: (how: 'snooze' | 'pause') => void }) {
+  const R = INVESTMENT_REMINDER_TEXT;
+  return (
+    <Card style={{ gap: space[2] }}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {R.card.title(reminder)}
+      </Txt>
+      <Txt>{reminder.kind === 'vencimentos' ? R.card.due(reminder.due) : R.card.stale(reminder.lastValueOn, reminder.since)}</Txt>
+      {reminder.kind === 'atualizar' || (reminder.due.days < 0 && !reminder.due.release) ? (
+        <Button label={reminder.kind === 'atualizar' ? R.card.update : R.card.resgate} tone="soft" onPress={onAction} />
+      ) : null}
+      <Button label={R.snooze} tone="ghost" onPress={() => onHold('snooze')} />
+      <Button label={R.pause} tone="ghost" onPress={() => onHold('pause')} />
+      <Txt variant="caption" color={colors.textSecondary}>
+        {R.note}
+      </Txt>
+    </Card>
   );
 }
 

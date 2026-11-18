@@ -1285,8 +1285,8 @@ do $$ begin
   assert to_regprocedure('public.inform_series_year(text, uuid, integer, jsonb, bigint)') is not null
      and to_regprocedure('public.skip_series_year(text, uuid, integer, jsonb)') is not null, 'funções novas';
   assert to_regprocedure('public.month_to_pay(uuid, date)') is not null
-     and to_regprocedure('public.pay_commitment(text, uuid, integer, uuid, bigint, date, text)') is not null
-     and to_regprocedure('public.undo_commitment_payment(text, uuid, integer)') is not null
+     and to_regprocedure('public.pay_commitment(text, uuid, integer, uuid, bigint, date, text, uuid)') is not null
+     and to_regprocedure('public.undo_commitment_payment(text, uuid, integer, boolean)') is not null
      and to_regprocedure('public.update_commitment(text, uuid, integer, bigint, date, text, text, boolean)') is not null
      and to_regprocedure('public.update_series_from(text, uuid, integer, integer, jsonb, text, text, text, bigint, text, integer)') is not null
      and to_regprocedure('public.end_series(text, uuid, integer, integer, jsonb)') is not null, 'demais assinaturas sem mudança';

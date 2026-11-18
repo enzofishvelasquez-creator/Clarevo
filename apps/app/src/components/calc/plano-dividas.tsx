@@ -17,18 +17,32 @@ import { CircleMinus, Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { CalcChip, CalcNote, CalcResult, CalcScreen, CalcTextField, calcInlineLink, formatMoneyText, showError, useCalcForm, type CalcForm } from '@/components/calc/parts';
+import {
+  CalcChip,
+  CalcNote,
+  CalcResult,
+  CalcScreen,
+  CalcTextField,
+  calcInlineLink,
+  calcLeadStyle,
+  formatMoneyText,
+  showError,
+  useCalcForm,
+  type CalcForm,
+} from '@/components/calc/parts';
 import { MoneyTxt } from '@/components/money-text';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Button, Card, LinkButton, Skeleton, Txt } from '@/components/ui';
-import { HIDDEN_MONEY_A11Y, setValuesHidden, useValuesHidden } from '@/lib/privacy';
+import { HIDDEN_MONEY_A11Y, maskMoneyLabel, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { useSavingsCheck, useSeriesDebts, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
-import { colors, fonts, space } from '@/theme/tokens';
+import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 /**
- * 9. Em que ordem quitar as dívidas? (D-040): duas ordens lado a lado e a referência "Sem valor a mais". Nada é gravado, nem
- * no aparelho; a taxa é sempre digitada. As dívidas vêm preenchidas com os parcelamentos ativos (leitura, sem alterar nada
+ * 9. Em que ordem quitar as dívidas? (D-040; refeita pelo retorno de 17/11/2026): no topo, para que serve; cada campo diz o que muda
+ * na resposta; o resultado responde primeiro o que a pessoa ganha (em meses e em juros estimados), depois as duas ordens lado a lado
+ * e o plano passo a passo de cada uma (por qual dívida começar, onde vai o valor a mais, quando cada dívida acaba e para onde vai o
+ * pagamento dela), e só depois as hipóteses e os detalhes. Nada é gravado, nem no aparelho; a taxa é sempre digitada. As dívidas vêm preenchidas com os parcelamentos ativos (leitura, sem alterar nada
  * neles) e a pessoa pode tirar qualquer uma da conta ou acrescentar outras à mão. Com "Ocultar valores" ligado, a parcela que
  * veio preenchida e os valores do resultado aparecem como "R$ ••••" (o que a pessoa digita continua à vista).
  */
@@ -97,6 +111,7 @@ export function PlanoDividasCalc() {
 
   return (
     <CalcScreen slug="plano-dividas">
+      <Txt color={colors.textSecondary}>{PLANO_TEXT.intro}</Txt>
       <Card style={{ gap: space[4] }}>
         <View style={{ gap: space[1] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -163,7 +178,7 @@ export function PlanoDividasCalc() {
         ) : null}
       </Card>
 
-      <CalcResult texts={result} maskMoney>
+      <CalcResult texts={result} maskMoney body={result ? <Answer result={result} /> : undefined}>
         {result && result.scenarios.length > 0 ? <Details result={result} /> : null}
       </CalcResult>
     </CalcScreen>
@@ -292,7 +307,103 @@ function DebtCard({
 }
 
 /**
- * Total pago e juros de cada ordem e a sequência em que as dívidas terminam; o resumo e as diferenças ficam no resultado. Quando as
+ * A resposta (retorno de 17/11/2026), de cima para baixo: o ganho em uma frase, as duas ordens lado a lado (um item por dado, com as
+ * duas ordens no mesmo item para o leitor de tela), as diferenças como fatos e o plano passo a passo de cada ordem. Valores em reais
+ * passam por MoneyTxt ("Ocultar valores").
+ */
+function Answer({ result }: { result: PlanoResult }) {
+  const hidden = useValuesHidden();
+  const { comparison, plans } = result;
+  return (
+    <View style={{ gap: space[3] }}>
+      <MoneyTxt style={[calcLeadStyle, tabular]}>{result.headline}</MoneyTxt>
+      {comparison ? (
+        <View style={{ gap: space[2] }}>
+          <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={3}>
+            {PLANO_TEXT.comparisonTitle}
+          </Txt>
+          <View style={styles.table}>
+            {/* Os nomes das ordens, no alto de cada coluna; o leitor de tela ouve o nome junto de cada valor. */}
+            <View style={styles.tableRow} aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              {comparison.columns.map((c) => (
+                <Txt key={c} variant="label" style={[styles.cell, { fontFamily: fonts.bold }]}>
+                  {c}
+                </Txt>
+              ))}
+            </View>
+            <View role="list">
+              {comparison.rows.map((row) => (
+                <View
+                  key={row.label}
+                  role="listitem"
+                  accessible
+                  focusable={false}
+                  accessibilityLabel={maskMoneyLabel(`${row.label}: ${comparison.columns.map((c, i) => `${c}, ${row.values[i]}`).join('; ')}.`, hidden)}
+                  style={styles.tableItem}>
+                  <Txt variant="caption" color={colors.textSecondary}>
+                    {row.label}
+                  </Txt>
+                  <View style={styles.tableRow}>
+                    {row.values.map((v, i) => (
+                      <MoneyTxt key={`${i}-${v}`} variant="label" style={[styles.cell, tabular]}>
+                        {v}
+                      </MoneyTxt>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      ) : null}
+      {result.differences.map((line) => (
+        <MoneyTxt key={line} style={tabular}>
+          {line}
+        </MoneyTxt>
+      ))}
+      {plans.length > 0 ? (
+        <View style={{ gap: space[2] }}>
+          <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={3}>
+            {PLANO_TEXT.planTitle}
+          </Txt>
+          {plans.map((plan) => (
+            <View key={plan.id} style={{ gap: space[1] }}>
+              {plan.id !== 'com_extra' ? (
+                <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={4}>
+                  {plan.title}
+                </Txt>
+              ) : null}
+              <View role="list" style={{ gap: space[1] }}>
+                {plan.steps.map((step, i) => (
+                  <View key={`${i}-${step}`} role="listitem" style={styles.step}>
+                    <Txt variant="label" color={colors.textSecondary} aria-hidden accessibilityElementsHidden importantForAccessibility="no" style={tabular}>
+                      {`${i + 1}.`}
+                    </Txt>
+                    <MoneyTxt variant="label" style={[{ flex: 1 }, tabular]}>
+                      {step}
+                    </MoneyTxt>
+                  </View>
+                ))}
+              </View>
+              {plan.gain ? (
+                <MoneyTxt variant="caption" color={colors.textSecondary} style={tabular}>
+                  {plan.gain}
+                </MoneyTxt>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {result.tailLines.map((line) => (
+        <Txt key={line}>{line}</Txt>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Total pago e juros de cada ordem e, em "Sem valor a mais", a sequência em que as dívidas terminam; a resposta, a comparação e o plano
+ * ficam no resultado. Quando as
  * duas ordens dão no mesmo, um bloco só para elas (teste de 09/11/2026: "informação demais junta e repetida").
  */
 function Details({ result }: { result: PlanoResult }) {
@@ -343,4 +454,9 @@ const styles = StyleSheet.create({
   debt: { gap: space[3] },
   divider: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[4] },
   scenario: { gap: space[1], paddingTop: space[2] },
+  table: { gap: space[2], padding: space[3], borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border },
+  tableRow: { flexDirection: 'row', gap: space[3] },
+  tableItem: { gap: 2, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space[2] },
+  cell: { flex: 1, minWidth: 0 },
+  step: { flexDirection: 'row', gap: space[2], alignItems: 'flex-start' },
 });

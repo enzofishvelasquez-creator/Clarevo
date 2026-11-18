@@ -8,7 +8,8 @@ import { MAX_RECORD_CENTS, centsToInput, parseBRL } from '../js/nucleo/money.js'
 
 /**
  * O nome com que o módulo de cada calculadora exporta os campos dela (rótulo, dica, tipo, faixa e mensagens), o que `calcFields` do core
- * (`calculators/fields.ts`) faz com o mapa `CALC_FIELDS`. O teste confere que são os mesmos campos que o core entrega, para as dez.
+ * (`calculators/fields.ts`) faz com o mapa `CALC_FIELDS` (e `SITE_CALC_FIELDS`, para as duas que só o site mostra). O teste confere que são
+ * os mesmos campos que o core entrega, para as doze.
  */
 export const NOMES_DOS_CAMPOS = {
   'antes-de-financiar': { campos: 'ANTES_FIELDS' },
@@ -21,6 +22,9 @@ export const NOMES_DOS_CAMPOS = {
   reserva: { campos: 'RESERVA_FIELDS' },
   'juntar-para-objetivo': { campos: 'OBJETIVO_FIELDS' },
   'dividir-contas': { campos: 'DIVIDIR_FIELDS' },
+  // As duas que por enquanto só o site mostra (D-106): os campos ficam em SITE_CALC_FIELDS, no core.
+  'juros-compostos': { campos: 'JUROS_COMPOSTOS_FIELDS' },
+  'rendimento-cdi': { campos: 'RENDIMENTO_CDI_FIELDS' },
 };
 
 /** O módulo do núcleo da calculadora desta página, depois de carregado (uma página, uma calculadora). */

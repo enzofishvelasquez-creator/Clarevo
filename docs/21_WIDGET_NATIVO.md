@@ -1,5 +1,7 @@
 # Clarevo · Widget nativo da tela inicial (ligado no lançamento, D-093)
 
+> **Situação em 17/11/2026:** na web, Conta › Widget na tela inicial mostra só o texto, sem o interruptor (D-110).
+
 > **Visual novo em 16/11/2026 (seção 9):** os dois widgets do Android foram redesenhados depois das capturas de tela do Enzo ("estão feios, parecem inacabados e não combinam com a tela inicial, não tem logo"): símbolo C da marca, "+" lima de anotar gasto, atalho "+ Anotar gasto" no médio, tema escuro, layout que segue o tamanho da célula e prévia na lista de widgets. Falta ver num Android de verdade.
 
 > **Situação em 11/11/2026 (D-093):** Enzo decidiu ligar o widget no lançamento. Os perfis `preview` e `production` de `apps/app/eas.json` passam a ter `CLAREVO_WIDGET=1`; o `preview-widget` virou `preview-sem-widget` (`CLAREVO_WIDGET=0`), de reserva, se o build com o widget falhar. O card "Widget na tela inicial" em Conta diz como pôr o widget na tela inicial (iPhone e Android); na web, que ele existe no app de celular; num build sem ele, que vem numa próxima versão. **Falta, com o Enzo:** o primeiro build com o widget (o próximo `preview`) e o teste em aparelho da seção 6. As seções abaixo são de 21/10/2026: onde dizem `preview-widget`, leia o `preview` de agora.

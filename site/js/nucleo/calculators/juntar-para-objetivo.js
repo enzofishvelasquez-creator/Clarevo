@@ -3,6 +3,7 @@ import { monthlyShareCents, monthsToReach } from '../learn/math.js';
 import { formatBRL } from '../money.js';
 import { FieldReader, countField, monthsDuration, moneyField } from './common.js';
 import { parseCount, parseMoney, parseOptionalMoney } from './inputs.js';
+export const OBJETIVO_NO_INFLATION = 'Sem inflação: o valor que você quer juntar fica o mesmo até o fim do prazo.';
 export const OBJETIVO_FIELDS = {
     alvo: moneyField('Quanto quer juntar', 'quanto quer juntar', '22.500,00'),
     jaTem: moneyField('Quanto já tem', 'quanto já tem', '4.500,00', { optional: true }),
@@ -31,7 +32,7 @@ export function calcJuntarParaObjetivo(input) {
     const has = jaTem ?? 0;
     const missing = Math.max(0, alvo - has);
     const base = { modo, alvoCents: alvo, jaTemCents: has, missingCents: missing };
-    const hypotheses = ['Sem rendimento: o valor guardado não cresce com juros.', 'O mesmo valor guardado todo mês.'];
+    const hypotheses = ['Sem rendimento: o valor guardado não cresce com juros.', 'O mesmo valor guardado todo mês.', OBJETIVO_NO_INFLATION];
     if (missing === 0) {
         return {
             ok: true,

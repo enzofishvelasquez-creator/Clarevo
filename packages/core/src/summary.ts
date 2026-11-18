@@ -8,6 +8,7 @@ import { sharesCents } from './learn/math';
 import { formatBRL } from './money';
 import type { Commitment, FinancialRecord } from './records';
 import { NO_CATEGORY_LABEL, recordMonth } from './records';
+import { RECORD_LINK_TEXT, type SubcategoryShare } from './record-links';
 
 /**
  * Resumo do mês de um contexto (CL C004).
@@ -143,6 +144,11 @@ export interface CategoryShare {
   percentText: string;
   /** "Mercado, R$ 412,30, 23,4% do pago" (em Recebido, "do recebido") */
   a11yLabel: string;
+  /**
+   * Quanto foi para cada subcategoria dentro da categoria (D-107), do maior para o menor, com "Sem subcategoria" por último; a soma é a
+   * da categoria. Só em Pago e só quando algum gasto da categoria tem subcategoria (ausente nos demais casos).
+   */
+  subcategories?: SubcategoryShare[];
 }
 
 /**
@@ -203,8 +209,33 @@ function rankedShares(parts: readonly CategoryPart[], noun: 'pago' | 'recebido')
   const tenths = sharesCents(1000, rows.map((r) => r.cents));
   return rows.map((r, i) => {
     const percentText = formatTenths(tenths[i]!);
-    return { ...r, tenths: tenths[i]!, percentText, a11yLabel: `${r.label}, ${formatBRL(r.cents)}, ${percentText} do ${noun}` };
+    const subcategories = noun === 'pago' ? subcategoryShares(parts.filter((p) => p.category === r.category)) : null;
+    return {
+      ...r,
+      tenths: tenths[i]!,
+      percentText,
+      a11yLabel: `${r.label}, ${formatBRL(r.cents)}, ${percentText} do ${noun}`,
+      ...(subcategories ? { subcategories } : {}),
+    };
   });
+}
+
+/**
+ * As subcategorias de uma categoria (D-107): o gasto inteiro na subcategoria dele; a parte de um pagamento de fatura e o gasto sem
+ * subcategoria em "Sem subcategoria". null quando nenhum gasto da categoria tem subcategoria.
+ */
+function subcategoryShares(parts: readonly CategoryPart[]): SubcategoryShare[] | null {
+  const sub = (p: CategoryPart) => (p.part || p.record.invoice ? null : (p.record.subcategory ?? null));
+  if (!parts.some((p) => sub(p) !== null)) return null;
+  const bySub = new Map<string | null, Cents>();
+  for (const p of parts) bySub.set(sub(p), (bySub.get(sub(p)) ?? 0) + p.cents);
+  return [...bySub.entries()]
+    .map(([subcategory, cents]) => ({ subcategory, label: subcategory ?? RECORD_LINK_TEXT.noSubcategory, cents }))
+    .filter((x) => x.cents !== 0)
+    .sort((a, b) => {
+      if ((a.subcategory === null) !== (b.subcategory === null)) return a.subcategory === null ? 1 : -1;
+      return b.cents - a.cents || a.label.localeCompare(b.label, 'pt-BR');
+    });
 }
 
 /**

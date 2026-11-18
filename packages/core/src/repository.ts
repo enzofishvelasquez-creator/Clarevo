@@ -59,7 +59,7 @@ import type { LegalAcceptance } from './aceite';
 import type { PublicPrices } from './investment-prices';
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
-import type { AccountMarks } from './levels';
+import type { AccountLevelState, AccountMarks } from './levels';
 import type { Access } from './plano';
 import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
@@ -222,6 +222,9 @@ export interface InvoicePaymentWrite extends CardWrite {
   record: FinancialRecord;
 }
 
+/** O gasto que se liga a uma conta ou fatura (D-107): o valor, a data e a conta que a tela viu. */
+export type LinkableRecord = Pick<FinancialRecord, 'id' | 'accountId' | 'amountCents' | 'occurredOn'>;
+
 /** Resultado das escritas de conta a pagar: a conta no estado atual e, quando houver, o gasto envolvido. */
 export interface CommitmentWrite {
   commitment: Commitment;
@@ -378,8 +381,18 @@ export interface RecordsRepository {
    * sem principal ativa, conta_invalida.
    */
   payCommitment(key: string, id: string, expectedVersion: number, input: PaymentRequest): Promise<CommitmentWrite & { record: FinancialRecord }>;
-  /** Atômico: exclui o gasto e reabre a conta. record = gasto excluído. */
-  undoCommitmentPayment(key: string, id: string, expectedVersion: number): Promise<CommitmentWrite & { record: FinancialRecord }>;
+  /**
+   * Atômico: exclui o gasto e reabre a conta. record = gasto excluído. keepRecord (D-107, p_keep_record): o gasto continua (em Pago, na
+   * data dele) e só deixa de ser o pagamento; record = o gasto mantido.
+   */
+  undoCommitmentPayment(key: string, id: string, expectedVersion: number, keepRecord?: boolean): Promise<CommitmentWrite & { record: FinancialRecord }>;
+  /**
+   * D-107 (pay_commitment com p_record_id): o gasto que já existe vira o pagamento da conta, sem criar outro gasto. O valor, a data e a
+   * conta são os do gasto, e `record` traz os que a tela viu (outros: versao_desatualizada). Ordem: repetição; trava da conta;
+   * conta_de_fatura; versão; compromisso_quitado; trava do gasto (nao_encontrado, sem_permissao); registro_invalido (outro contexto ou
+   * recebimento); registro_ja_ligado (já paga outra conta ou fatura); versao_desatualizada (o gasto mudou). record = o gasto ligado.
+   */
+  linkRecordToCommitment(key: string, commitmentId: string, expectedVersion: number, record: LinkableRecord): Promise<CommitmentWrite & { record: FinancialRecord }>;
   /** Reconciliação de conta a pagar: a operação com esta chave já foi concluída? */
   findCommitmentOperation(key: string): Promise<{ action: CommitmentAction; commitmentId: string; recordId: string | null } | null>;
 
@@ -809,7 +822,14 @@ export interface RecordsRepository {
    * sem_permissao; mes_invalido; nao_encontrado (sem conta); versao_desatualizada; compromisso_aberto (a conta não está paga);
    * fatura_seguinte_paga (há saldo anterior e a fatura seguinte já foi paga).
    */
-  undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number): Promise<InvoicePaymentWrite>;
+  undoInvoicePayment(key: string, cardId: string, month: IsoMonth, expectedVersion: number, keepRecord?: boolean): Promise<InvoicePaymentWrite>;
+  /**
+   * D-107 (pay_invoice com p_record_id): o gasto que já existe vira o pagamento da fatura (fechada), com o valor, a data e a conta dele,
+   * pelas mesmas regras de payInvoice (inclusive o pagamento parcial, que leva o restante à fatura seguinte). O gasto guarda a descrição
+   * e a categoria dele. Recusa também registro_invalido (outro contexto, recebimento ou gasto com nota fiscal), registro_ja_ligado e
+   * versao_desatualizada (o gasto mudou). undoInvoicePayment com keepRecord desliga mantendo o gasto.
+   */
+  linkRecordToInvoice(key: string, cardId: string, month: IsoMonth, expectedVersion: number, record: LinkableRecord): Promise<InvoicePaymentWrite>;
   // Importar extrato ou fatura (D-048, Ciclo I1). O arquivo é lido no aparelho (packages/core/src/importar); aqui chegam só as
   // linhas confirmadas, em lotes de até 500, e o resumo SHA-256 de cada uma (importKey). Nada do arquivo é guardado.
 
@@ -934,8 +954,17 @@ export interface RecordsRepository {
 
   /** my_access: a situação do acesso da própria pessoa (assinatura, benefício, cortesia, Família, antes do início, teste ou só leitura). */
   getMyAccess(): Promise<Access>;
-  /** my_account_marks (migração 0034): os 18 marcos "já fez alguma vez" da própria pessoa (os alcançados ficam guardados), de onde sai o nível da conta (D-095). */
+  /**
+   * my_account_marks (migrações 0034 e 0041): os marcos "já fez alguma vez" da própria pessoa (os 18 do dia a dia e os 6 de investimentos
+   * e reserva; os alcançados ficam guardados), de onde sai o nível da conta (D-095, D-111). Não começa a contar o tempo sem anotar.
+   */
   getAccountMarks(): Promise<AccountMarks>;
+  /**
+   * my_account_marks(true) (migração 0041, D-111): os marcos e o tempo sem anotar (`idleSince`, `lastNoteOn`), de onde sai o nível mostrado.
+   * A primeira leitura começa a contagem da pessoa (quem já estava parado quando a regra chegou tem os 60 dias inteiros). Com o banco sem a
+   * migração, só os marcos (o nível não desce).
+   */
+  getAccountLevel(): Promise<AccountLevelState>;
 
   // Assinatura na web pelo Asaas (D-084), pela função do servidor "assinatura-web" com a sessão da pessoa. Só na web.
 
@@ -994,6 +1023,11 @@ export type RepoErrorCode =
   | 'data_invalida'
   | 'data_futura'
   | 'mes_seguinte_invalido'
+  | 'subcategoria_invalida'
+  | 'tipo_nao_muda'
+  | 'investimento_invalido'
+  | 'registro_invalido'
+  | 'registro_ja_ligado'
   | 'conta_invalida'
   | 'categoria_invalida'
   | 'nome_da_conta_invalido'
@@ -1111,6 +1145,9 @@ export type RepoErrorCode =
   | 'origem_invalida'
   | 'quantidade_invalida'
   | 'cnpj_invalido'
+  | 'taxa_condicional_invalida'
+  | 'condicao_invalida'
+  | 'descricao_investimento_invalida'
   | 'situacao_invalida'
   | 'observacao_invalida'
   | 'indices_indisponiveis'

@@ -89,7 +89,7 @@ export function barModeFor(pathname: string): BarMode {
 
 /** Abas que uma tela de consulta abre quando a pessoa não veio de nenhuma (endereço aberto direto): a do assunto. */
 const TAB_OF_TOPIC: readonly [RegExp, TabRoute][] = [
-  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes|evolucao|analises)(\/|$)/, '/movimentacoes'],
+  [/^\/(a-pagar|gastos-fixos|cartoes|registro|orcamento|movimentacoes|importar|seu-mes|evolucao|analises|calendario)(\/|$)/, '/movimentacoes'],
   [/^\/(meta|reserva|guardar|simular|renda-comprometida)(\/|$)/, '/metas'],
   [/^\/investimento(\/|$)/, '/investimentos'],
   [/^\/(explicacao|aprender)(\/|$)/, '/aprender'],
@@ -359,6 +359,14 @@ export const APP_SCREENS: readonly AppScreen[] = [
     keywords: ['análises', 'análise', 'analisar', 'explorar', 'bolhas', 'barras', 'gráfico de bolhas', 'categorias em bolhas', 'distribuição', 'distribuição dos gastos', 'comparar categorias', 'próximos meses'],
   },
   {
+    // O título e a legenda são os de CALENDAR_TEXT (calendar.ts, D-105).
+    id: 'calendario',
+    title: 'Calendário do mês',
+    caption: 'Contas, faturas e datas do mês, num lugar só',
+    href: '/calendario',
+    keywords: ['calendário', 'calendario', 'agenda', 'datas', 'datas do mês', 'quando vence', 'vencimentos do mês', 'informe de rendimentos'],
+  },
+  {
     id: 'lembretes',
     title: 'Lembretes de vencimento',
     caption: 'Um aviso no dia anterior, ligado em Conta (no app para celular)',
@@ -417,9 +425,9 @@ export const APP_SCREENS: readonly AppScreen[] = [
   {
     id: 'importar-extrato',
     title: 'Importar extrato ou fatura',
-    caption: 'Arquivo PDF, OFX ou planilha do banco, com revisão das linhas antes de importar',
+    caption: 'Arquivo PDF, OFX, planilha ou print do banco, com revisão das linhas antes de importar',
     href: '/importar',
-    keywords: ['importar', 'importação', 'extrato', 'ofx', 'banco', 'planilha', 'csv', 'arquivo do banco', 'trazer lançamentos', 'extrato do banco'],
+    keywords: ['importar', 'importação', 'extrato', 'ofx', 'banco', 'planilha', 'csv', 'arquivo do banco', 'trazer lançamentos', 'extrato do banco', 'print', 'prints', 'captura de tela'],
   },
   {
     id: 'orcamento',
@@ -455,6 +463,13 @@ export const APP_SCREENS: readonly AppScreen[] = [
     caption: 'Quanto você pretende aportar por mês nos investimentos e o aportado de cada mês',
     href: '/investimento/plano',
     keywords: ['plano de aportes', 'aporte mensal', 'aportar por mês', 'quanto aportar', 'investir todo mês', 'investimentos'],
+  },
+  {
+    id: 'investimentos-desempenho',
+    title: 'Desempenho dos investimentos',
+    caption: 'Cada investimento ao lado do CDI, do IPCA e da poupança, no mês, em 12 meses e desde o início',
+    href: '/investimento/desempenho',
+    keywords: ['desempenho', 'rentabilidade', 'rendimento', '% do cdi', 'cdi', 'ipca', 'poupança', 'evolução', 'comparar', 'investimentos'],
   },
   {
     id: 'investimentos-comparar',

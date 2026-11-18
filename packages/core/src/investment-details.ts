@@ -168,6 +168,17 @@ export interface InvestmentDetails {
   quantityMicro: number | null;
   /** CNPJ do fundo, só os 14 caracteres (números, ou letras e números no CNPJ alfanumérico), para buscar a cota no Informe Diário da CVM. */
   fundCnpj: string | null;
+  /**
+   * Taxa com data de fim (D-104, item 13; migração 0039): até `rateUntil` (inclusive) vale `rateBp`; depois, `rateAfterBp`, com a mesma
+   * forma de render e os mesmos limites. Os dois juntos ou nenhum, só com forma de render que tem taxa. Opcionais no tipo: uma ficha de
+   * versão anterior (ou de um banco sem a 0039) chega sem eles, e o banco mantém o que tinha.
+   */
+  rateUntil?: IsoDate | null;
+  rateAfterBp?: number | null;
+  /** A condição da taxa, como está no contrato ou na oferta (até 60 caracteres). Só com forma de render que tem taxa. */
+  rateCondition?: string | null;
+  /** Descrição livre do investimento (D-104, item 12), até 120 caracteres: o que é, do jeito da pessoa. Qualquer tipo. */
+  description?: string | null;
 }
 
 export const EMPTY_INVESTMENT_DETAILS: InvestmentDetails = {
@@ -181,6 +192,10 @@ export const EMPTY_INVESTMENT_DETAILS: InvestmentDetails = {
   liquidityDays: null,
   quantityMicro: null,
   fundCnpj: null,
+  rateUntil: null,
+  rateAfterBp: null,
+  rateCondition: null,
+  description: null,
 };
 
 export type InvestmentDetailsErrorCode =
@@ -191,7 +206,14 @@ export type InvestmentDetailsErrorCode =
   | 'vencimento_invalido'
   | 'liquidez_invalida'
   | 'quantidade_invalida'
-  | 'cnpj_invalido';
+  | 'cnpj_invalido'
+  | 'taxa_condicional_invalida'
+  | 'condicao_invalida'
+  | 'descricao_investimento_invalida';
+
+/** Limites da condição da taxa e da descrição (D-104; o banco confere os mesmos). */
+export const INVESTMENT_RATE_CONDITION_MAX = 60;
+export const INVESTMENT_DESCRIPTION_MAX = 120;
 
 /** Tipos com quantidade (títulos públicos e fundos) e com CNPJ do fundo (fundos). O banco confere o mesmo. */
 export const QUANTITY_KINDS: readonly InvestmentKind[] = ['titulos_publicos', 'fundos'];
@@ -240,6 +262,9 @@ export function normalizeInstitution(text: string | null): string | null {
   return t === '' ? null : t;
 }
 
+/** Texto curto da ficha (condição da taxa, descrição): sem espaços nas pontas nem repetidos; vazio é null (a mesma regra da instituição). */
+export const normalizeFichaText = normalizeInstitution;
+
 /** Chave para somar a mesma instituição escrita de jeitos diferentes: sem acento, sem caixa, sem pontuação e sem espaços repetidos. */
 export function institutionKey(text: string): string {
   return text
@@ -275,12 +300,34 @@ export function investmentDetailsError(kind: InvestmentKind, d: InvestmentDetail
   if (quantity !== null && (!QUANTITY_KINDS.includes(kind) || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > QUANTITY_MICRO_MAX)) return 'quantidade_invalida';
   const cnpj = d.fundCnpj ?? null;
   if (cnpj !== null && (!FUND_CNPJ_KINDS.includes(kind) || !isValidCnpj(cnpj))) return 'cnpj_invalido';
+  // Taxa com data de fim e condição (D-104, item 13): só com forma de render que tem taxa; a data e a taxa de depois vêm juntas.
+  const until = d.rateUntil ?? null;
+  const after = d.rateAfterBp ?? null;
+  if (until !== null || after !== null) {
+    if (!limits || until === null || after === null || !validDate(until) || !Number.isSafeInteger(after) || after < limits.min || after > limits.max) return 'taxa_condicional_invalida';
+  }
+  const condition = d.rateCondition ?? null;
+  if (condition !== null && (!limits || normalizeFichaText(condition) !== condition || charCount(condition) > INVESTMENT_RATE_CONDITION_MAX)) return 'condicao_invalida';
+  const description = d.description ?? null;
+  if (description !== null && (normalizeFichaText(description) !== description || charCount(description) > INVESTMENT_DESCRIPTION_MAX)) return 'descricao_investimento_invalida';
   return null;
 }
 
-/** A ficha sem nada preenchido. */
+/** A ficha sem nada preenchido (campo ausente, de uma ficha de versão anterior, conta como vazio). */
 export function detailsEmpty(d: InvestmentDetails): boolean {
-  return Object.values(d).every((v) => v === null);
+  return Object.values(d).every((v) => v === null || v === undefined);
+}
+
+/** A taxa que vale no dia (D-104): a de depois da data de fim, se a data já passou; senão a contratada. */
+export function currentRateBp(d: Pick<InvestmentDetails, 'rateBp' | 'rateUntil' | 'rateAfterBp'>, today: IsoDate): number | null {
+  const until = d.rateUntil ?? null;
+  const after = d.rateAfterBp ?? null;
+  return until !== null && after !== null && today > until ? after : d.rateBp;
+}
+
+/** Tem taxa com data de fim (os dois campos preenchidos)? */
+export function hasRateStep(d: Pick<InvestmentDetails, 'rateUntil' | 'rateAfterBp'>): boolean {
+  return (d.rateUntil ?? null) !== null && (d.rateAfterBp ?? null) !== null;
 }
 
 // ---------------------------------------------------------------------------
@@ -437,14 +484,25 @@ export interface InvestmentDetailsDraft {
   liquidityDaysText: string;
   quantityText: string;
   fundCnpjText: string;
+  /** D-104: a taxa muda numa data (mostra os dois campos de baixo). */
+  rateStep: boolean;
+  rateUntilText: string;
+  rateAfterText: string;
+  rateConditionText: string;
+  descriptionText: string;
 }
 export type InvestmentDetailsField = keyof InvestmentDetailsDraft;
 export const DETAILS_FIELD_ORDER: InvestmentDetailsField[] = [
   'subkind',
+  'descriptionText',
   'fundCnpjText',
   'institutionText',
   'indexKind',
   'rateText',
+  'rateStep',
+  'rateUntilText',
+  'rateAfterText',
+  'rateConditionText',
   'maturityText',
   'quantityText',
   'liquidity',
@@ -463,6 +521,11 @@ export const EMPTY_DETAILS_DRAFT: InvestmentDetailsDraft = {
   liquidityDaysText: '',
   quantityText: '',
   fundCnpjText: '',
+  rateStep: false,
+  rateUntilText: '',
+  rateAfterText: '',
+  rateConditionText: '',
+  descriptionText: '',
 };
 
 /** "110" ou "110,5" ou "6,25%" para centésimos de ponto (11000, 11050, 625). Aceita sinal de menos (Selic e IPCA). */
@@ -490,6 +553,11 @@ export function detailsToDraft(d: InvestmentDetails): InvestmentDetailsDraft {
     liquidityDaysText: d.liquidityDays === null ? '' : String(d.liquidityDays),
     quantityText: d.quantityMicro == null ? '' : formatQuantity(d.quantityMicro),
     fundCnpjText: d.fundCnpj == null ? '' : formatCnpj(d.fundCnpj),
+    rateStep: hasRateStep(d),
+    rateUntilText: d.rateUntil ? formatDateBR(d.rateUntil) : '',
+    rateAfterText: d.rateAfterBp == null ? '' : formatRateInput(d.rateAfterBp),
+    rateConditionText: d.rateCondition ?? '',
+    descriptionText: d.description ?? '',
   };
 }
 
@@ -544,8 +612,31 @@ export function validateDetailsDraft(
     fundCnpj = normalizeCnpj(draft.fundCnpjText);
     if (fundCnpj === null) errors.fundCnpjText = E.cnpj;
   }
+  // Taxa com data de fim e condição (D-104, item 13): só com forma de render que tem taxa; de outra forma (a pessoa trocou depois), caem fora.
+  let rateUntil: IsoDate | null = null;
+  let rateAfterBp: number | null = null;
+  let rateCondition: string | null = null;
+  if (limits && draft.rateStep) {
+    const d = parseDateBR(draft.rateUntilText);
+    if (draft.rateUntilText.trim() === '') errors.rateUntilText = E.rateUntilEmpty;
+    else if (!d || d < DETAILS_DATE_MIN || d > DETAILS_DATE_MAX) errors.rateUntilText = E.date;
+    else rateUntil = d;
+    const r = parseRateText(draft.rateAfterText);
+    if (draft.rateAfterText.trim() === '') errors.rateAfterText = E.rateAfterEmpty;
+    else if (r === null || r < limits.min || r > limits.max) errors.rateAfterText = E.rate;
+    else rateAfterBp = r;
+  }
+  if (limits) {
+    rateCondition = normalizeFichaText(draft.rateConditionText);
+    if (rateCondition !== null && charCount(rateCondition) > INVESTMENT_RATE_CONDITION_MAX) errors.rateConditionText = E.condition;
+  }
+  const description = normalizeFichaText(draft.descriptionText);
+  if (description !== null && charCount(description) > INVESTMENT_DESCRIPTION_MAX) errors.descriptionText = E.description;
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, details: { subkind, institution, indexKind, rateBp, maturityOn, liquidity, liquidityOn, liquidityDays, quantityMicro, fundCnpj } };
+  return {
+    ok: true,
+    details: { subkind, institution, indexKind, rateBp, maturityOn, liquidity, liquidityOn, liquidityDays, quantityMicro, fundCnpj, rateUntil, rateAfterBp, rateCondition, description },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -573,6 +664,25 @@ export function rateSummary(index: InvestmentIndexKind | null, rateBp: number | 
       return null;
   }
 }
+
+/**
+ * A taxa com a data de fim (D-104, item 13), como fato: "120% do CDI até 31/03/2027, depois 100% do CDI"; com a data já passada, "100% do CDI
+ * desde 01/04/2027 (antes, 120% do CDI até 31/03/2027)". Sem data de fim, o mesmo que `rateSummary`.
+ */
+export function rateSummaryWithStep(d: Pick<InvestmentDetails, 'indexKind' | 'rateBp' | 'rateUntil' | 'rateAfterBp'>, today: IsoDate): string | null {
+  const base = rateSummary(d.indexKind, d.rateBp);
+  const until = d.rateUntil ?? null;
+  const after = d.rateAfterBp ?? null;
+  if (base === null || until === null || after === null) return base;
+  const next = rateSummary(d.indexKind, after);
+  if (next === null) return base;
+  return today > until ? `${next} desde ${formatDateBR(addOneDay(until))} (antes, ${base} até ${formatDateBR(until)})` : `${base} até ${formatDateBR(until)}, depois ${next}`;
+}
+
+const addOneDay = (d: IsoDate): IsoDate => {
+  const t = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10) + 1));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+};
 
 export function liquiditySummary(d: Pick<InvestmentDetails, 'liquidity' | 'liquidityOn' | 'liquidityDays'>): string | null {
   switch (d.liquidity) {
@@ -618,6 +728,21 @@ export const DETAILS_TEXT = {
       : 'Como está no extrato, por exemplo 0,53. Com o vencimento, a Clarevo mostra o valor pelo preço publicado pelo Tesouro Nacional.',
   fundCnpjLabel: 'CNPJ do fundo (opcional)',
   fundCnpjHint: 'Está na lâmina do fundo ou no extrato da corretora, como 00.000.000/0001-00.',
+  /** Taxa com data de fim e condição (D-104, item 13). */
+  rateStepLabel: 'A taxa muda numa data',
+  rateStepHint: 'Quando a taxa contratada vale só até um dia e depois passa a ser outra.',
+  rateUntilLabel: 'Esta taxa vale até',
+  rateAfterLabel: (index: InvestmentIndexKind) =>
+    index === 'cdi' ? 'Porcentagem do CDI depois dessa data' : index === 'prefixado' ? 'Taxa ao ano depois dessa data' : index === 'selic' ? 'Taxa acima da Selic depois dessa data' : 'Taxa acima do IPCA depois dessa data',
+  rateAfterHint: 'Como está no contrato ou na oferta, por exemplo 100 para 100% do CDI.',
+  rateConditionLabel: 'Condição da taxa (opcional)',
+  rateConditionHint: `Se a taxa vale com alguma condição, escreva como está no contrato ou na oferta, até ${INVESTMENT_RATE_CONDITION_MAX} caracteres.`,
+  /** Descrição livre (D-104, item 12). */
+  descriptionLabel: 'Descrição (opcional)',
+  descriptionHint: (kind: InvestmentKind | null) =>
+    kind === 'outro'
+      ? `O que é este investimento, do seu jeito, até ${INVESTMENT_DESCRIPTION_MAX} caracteres. O valor você atualiza pelo extrato, quando quiser.`
+      : `Uma frase sua sobre este investimento, até ${INVESTMENT_DESCRIPTION_MAX} caracteres.`,
   /** O que a ficha deduz, mostrado no formulário e no detalhe. */
   regimeLine: (regime: TaxRegime) =>
     ({
@@ -640,6 +765,11 @@ export const DETAILS_TEXT = {
     days: `Use um número de 1 a ${LIQUIDITY_DAYS_MAX}.`,
     quantity: 'Informe uma quantidade válida, como 0,53, com até 6 casas depois da vírgula.',
     cnpj: 'Confira o CNPJ: os números não batem.',
+    rateUntilEmpty: 'Informe até quando vale esta taxa.',
+    rateAfterEmpty: 'Informe a taxa depois dessa data.',
+    rateStep: 'Confira a data e a taxa de depois.',
+    condition: `Use até ${INVESTMENT_RATE_CONDITION_MAX} caracteres.`,
+    description: `Use até ${INVESTMENT_DESCRIPTION_MAX} caracteres.`,
   },
 } as const;
 
@@ -662,6 +792,12 @@ export function investmentDetailsErrorText(code: InvestmentDetailsErrorCode | st
       return E.quantity;
     case 'cnpj_invalido':
       return E.cnpj;
+    case 'taxa_condicional_invalida':
+      return E.rateStep;
+    case 'condicao_invalida':
+      return E.condition;
+    case 'descricao_investimento_invalida':
+      return E.description;
     default:
       return null;
   }

@@ -1,8 +1,8 @@
 /**
  * Leitura de texto em imagem no app de celular (D-078 B), no próprio aparelho e sem custo: no iPhone, o leitor de texto do sistema
  * (Apple Vision); no Android, o ML Kit do Google, pelo Google Play services. O módulo é o `expo-text-extractor`. A imagem não vai a
- * servidor nenhum da Clarevo; o texto lido vai direto para os leitores do core (comprovante, holerite, boleto, chave da nota) e é
- * descartado. A versão web (`ocr.web.ts`) usa o tesseract.js servido pelo próprio app.
+ * servidor nenhum da Clarevo; o texto lido vai direto para os leitores do core (comprovante, holerite, boleto, chave da nota, prints
+ * da tela do banco para importar) e é descartado. A versão web (`ocr.web.ts`) usa o tesseract.js servido pelo próprio app.
  *
  * O módulo é nativo: num build antigo, sem ele, `require` falha e a leitura de imagem simplesmente não aparece (OCR_AVAILABLE falso),
  * sem derrubar o app.
@@ -24,4 +24,14 @@ export async function textFromImage(image: Blob | string, _onProgress?: (fractio
   if (!extractor || typeof image !== 'string') throw new Error('leitura de imagem indisponível neste aparelho');
   const blocks = await extractor.extractTextFromImage(image);
   return blocks.join('\n');
+}
+
+/** Prints da tela do banco para importar (D-108): uma imagem por vez, na ordem. `onProgress(feitas, total)` avisa antes de cada uma. */
+export async function textsFromImages(images: readonly (Blob | string)[], onProgress?: (done: number, total: number) => void): Promise<string[]> {
+  const out: string[] = [];
+  for (let i = 0; i < images.length; i++) {
+    onProgress?.(i, images.length);
+    out.push(await textFromImage(images[i]!));
+  }
+  return out;
 }

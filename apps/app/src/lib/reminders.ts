@@ -8,6 +8,8 @@ import {
   reminderPlan,
   reminderSignature,
   ROUTINE_REMINDER_LIMIT,
+  DEFAULT_ROUTINE_REMINDER_HOUR,
+  levelWarningReminder,
   routineReminderPlan,
   routineReminderSignature,
   todayIn,
@@ -19,7 +21,10 @@ import {
   type RoutineReminderHour,
   type RoutineReminderKind,
   type DepositReminderDay,
+  type InvestmentReminderFacts,
+  type InvestmentReminderHolds,
   NO_ROUTINE_REMINDERS,
+  applyInvestmentReminderHolds,
 } from '@clarevo/core';
 
 import {
@@ -58,7 +63,7 @@ export type ReminderJob =
       /** Horário dos lembretes de vencimento; nulo com "Lembretes de contas a pagar" desligado. */
       due: ReminderHour | null;
       /** Os lembretes do dia a dia ligados e o horário deles; nulo com todos desligados. */
-      routine: { hour: RoutineReminderHour; choices: RoutineReminderChoices; depositDay: DepositReminderDay } | null;
+      routine: { hour: RoutineReminderHour; choices: RoutineReminderChoices; depositDay: DepositReminderDay; holds?: InvestmentReminderHolds } | null;
     };
 
 export type ReminderOutcome = 'agendado' | 'desligado' | 'sem-permissao' | 'indisponivel';
@@ -135,18 +140,41 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
         : false;
       investmentDeposit = { day: job.routine.depositDay, hasPlan, depositThisMonth };
     }
-    const plan = routineReminderPlan(job.routine.choices, records, activity, today, job.routine.hour, {
+    const base = routineReminderPlan(job.routine.choices, records, activity, today, job.routine.hour, {
       nowMinutes,
       contextId: job.contextId,
-      limit: ROUTINE_REMINDER_LIMIT,
+      // Folga para os avisos adiados dos investimentos; o corte final vem depois de aplicar adiar e pausar.
+      limit: ROUTINE_REMINDER_LIMIT + 3,
       cardPurchaseToday,
       deposit,
       investments,
       investmentDeposit,
     });
+    // Adiar e pausar dos investimentos (D-104, item 6): o aviso adiado só sai se o fato ainda vale.
+    const holds = job.routine.holds ?? {};
+    let facts: InvestmentReminderFacts = {};
+    if (Object.keys(holds).length > 0) {
+      const dueDates = [...(investments?.maturities ?? []).map((on) => ({ on, release: false })), ...(investments?.releases ?? []).map((on) => ({ on, release: true }))];
+      facts = {
+        depositDue: investmentDeposit ? investmentDeposit.hasPlan && !investmentDeposit.depositThisMonth : false,
+        updateDue: investments ? investments.hasActive && investments.missingThisMonth : false,
+        dueDates,
+      };
+    }
+    const plan = applyInvestmentReminderHolds(base, holds, today, facts, job.routine.choices, job.routine.hour, nowMinutes).slice(0, ROUTINE_REMINDER_LIMIT);
     for (const i of plan) {
       items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });
     }
+  }
+  // Aviso de queda do nível (D-111): para quem permitiu lembretes, um lembrete no dia em que o aviso começa (o 45º dia sem anotar), no
+  // horário dos lembretes do dia a dia, com texto neutro (sem contagem e sem nível: uma anotação pelo WhatsApp ou pelo Telegram conta no
+  // banco sem refazer este lembrete; a contagem fica só dentro do app). Com o horário de hoje já passado, o marco seguinte. Sem a leitura
+  // do nível, segue sem ele.
+  try {
+    const level = levelWarningReminder(await job.repo.getAccountLevel(), today, job.routine?.hour ?? DEFAULT_ROUTINE_REMINDER_HOUR, nowMinutes);
+    if (level) items.push({ id: level.id, date: fireDate(level), title: level.title, body: level.body, signature: routineReminderSignature(level), route: level.route, channel: 'rotina' });
+  } catch {
+    // Falha de rede: os outros avisos seguem; o próximo gatilho tenta de novo.
   }
   await syncScheduledReminders(items);
   return 'agendado';

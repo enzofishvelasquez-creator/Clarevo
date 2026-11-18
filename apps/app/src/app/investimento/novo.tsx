@@ -1,4 +1,5 @@
-import { INVESTMENT_TEXT } from '@clarevo/core';
+import { INVESTMENT_TEXT, investmentTemplateFrom, investmentTemplatePreset } from '@clarevo/core';
+import { useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 
 import { ContextPill, SubHeader } from '@/components/header';
@@ -7,11 +8,18 @@ import { LoadingState } from '@/components/states';
 import { useSpace } from '@/state/data';
 import { colors } from '@/theme/tokens';
 
-/** Novo investimento (D-093), sempre no Pessoal. */
+/**
+ * Novo investimento (D-093), sempre no Pessoal. D-103 (item 5): "?modelo=reserva|titulo|banco|outro", vindo dos modelos de registro da
+ * tela vazia da aba, preenche parte do formulário (investmentTemplatePreset); outro valor ou nenhum abre o formulário em branco.
+ * "?origem=registro" (D-107): veio de "Cadastrar investimento" no recebimento e, depois de criar, volta para lá.
+ */
 export default function NovoInvestimentoScreen() {
   const space = useSpace();
   const contextId = space.data?.personalContextId;
-  if (contextId) return <InvestmentForm contextId={contextId} investment={null} />;
+  const { modelo, origem } = useLocalSearchParams<{ modelo?: string | string[]; origem?: string | string[] }>();
+  const template = investmentTemplateFrom(modelo);
+  if (contextId)
+    return <InvestmentForm contextId={contextId} investment={null} preset={template ? investmentTemplatePreset(template) : null} backToRecord={origem === 'registro'} />;
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={INVESTMENT_TEXT.form.newTitle} right={<ContextPill label="Salvando em Pessoal" fixed />} />

@@ -79,6 +79,22 @@ export interface FinancialRecord {
    * (`recordMonth`). Gravado por create_record e update_record (`p_next_month`).
    */
   nextMonth?: boolean;
+  /**
+   * Subcategoria opcional do gasto (D-107): uma das sugestões da categoria (`SUBCATEGORIES`) ou um texto curto da pessoa, até 30
+   * caracteres. Só em gasto com categoria; ausente ou null nos demais. O orçamento continua por categoria.
+   */
+  subcategory?: string | null;
+  /**
+   * O gasto já existia e foi ligado depois à conta a pagar ou à fatura que pagou (D-107, linkRecordToCommitment e linkRecordToInvoice).
+   * Só quando verdadeiro. Desligar (desfazer mantendo o gasto) devolve o gasto como estava.
+   */
+  linkedPayment?: boolean;
+  /**
+   * Recebimento que é rendimento de um investimento (D-107), só no Pessoal: o investimento e o rendimento recebido gravado nele junto com
+   * o recebimento (que muda e sai com ele). Ausentes ou null nos demais.
+   */
+  investmentId?: string | null;
+  investmentMovementId?: string | null;
   createdBy: string;
   version: number;
   createdAt: string;
@@ -263,6 +279,18 @@ export interface RecordInput {
   receiptKey?: string | null;
   /** Recebimento que conta no mês seguinte (D-089 A): só com a data nos últimos 7 dias do mês; ausente = false. */
   nextMonth?: boolean;
+  /**
+   * Subcategoria do gasto (D-107). Ao criar: ausente ou null = nenhuma. Ao editar: ausente (o app antigo) mantém a de antes se o tipo e
+   * a categoria não mudam (senão, tira); null ou '' tira; um texto troca.
+   */
+  subcategory?: string | null;
+  /** Só ao editar (D-107): o tipo novo (gasto ou recebimento). Ausente mantém. */
+  kind?: RecordKind;
+  /**
+   * Rendimento de investimento (D-107), só em recebimento. Ao criar: o investimento ativo do contexto, ou ausente. Ao editar: ausente
+   * mantém a ligação de antes; null desliga (o rendimento sai do investimento); um id liga (ou troca de investimento).
+   */
+  investmentId?: string | null;
 }
 
 /** Gasto fixo (todo mês), parcelamento ou conta do ano (todo ano, D-029). */

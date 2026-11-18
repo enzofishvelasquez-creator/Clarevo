@@ -71,6 +71,28 @@ Enzo aprovou as sete em 09/11/2026 ("Aprovo", D-089), na ordem E, D, C, B, A, F 
 | F | Vídeo em formato de reels (1080 por 1920) gravado na web com os dados de demonstração: salvar uma compra de mercado e abrir o orçamento | Fazer depois do pacote 1 | meio período | pronto (vídeo enviado a Enzo; docs/24, seção 2.4b) |
 | G | Modo "Fatura de cartão depois do vencimento" em Multa e juros: rotativo, mora, multa e IOF estimado | Depois do lançamento (antecipado pela D-093) | meio dia | pronto em 11/11/2026 (modo "Fatura do cartão", com o teto da Lei 14.690/2023) |
 
+## Retorno de 17/11/2026 (rodada de testes com pessoas)
+
+Retorno de quem testa (17/11/2026) e pedidos do Enzo no mesmo dia. Mesmas situações da primeira tabela. Tudo foi feito na
+rodada de 17/11/2026 (D-103 a D-112). Os itens que mudam o banco dependem das migrações 0039, 0040 e 0041, que precisam estar aplicadas
+antes do merge (`docs/05`, passos 12af a 12ah).
+
+| # | O que a pessoa disse | O que foi feito | Situação |
+|---|---|---|---|
+| 1 | "Além do importar fatura em PDF, a possibilidade de enviar prints; no caso do mês atual, a fatura ainda não pode ser baixada" | Em Importar extrato ou fatura, "Escolher prints": até 10 imagens por vez, lidas no aparelho; as linhas vão para a mesma conferência do PDF, com "Lido de imagem: confira", e a linha repetida entre prints entra uma vez; vindas de "Importar fatura", as compras entram na fatura aberta (D-108) | pronto |
+| 2 | A linha "ENTRADA REND PAGO APLIC AUT APR" do extrato foi importada como gasto, e era rendimento | Gasto ou recebimento pela marca do valor e pelas palavras ("entrada", "rend pago", "rendimento", "estorno", "salário"...), e "Tipo da linha" em Editar, na conferência, para trocar (D-108) | pronto |
+| 3 | Ligar um gasto já anotado à conta a pagar, à parcela ou à fatura que ele pagou, sem contar duas vezes | "O que este gasto pagou?" no gasto: contas a pagar e parcelas em aberto e faturas fechadas sem pagamento; o gasto que já existe vira o pagamento, e "Nenhuma destas" ou "Desligar da fatura" desligam mantendo o gasto (D-107) | pronto (com a migração 0040) |
+| 4 | Subcategorias dentro das categorias de gasto | Subcategoria opcional por categoria, com uma lista curta e "Outra" (até 30 caracteres), no detalhe, na lista e na composição de Pago; o orçamento continua por categoria (D-107) | pronto (com a migração 0040) |
+| 5 | Trocar um lançamento de gasto para recebimento e editar por inteiro o lançamento importado | Na edição, trocar entre gasto e recebimento, com as categorias do novo tipo; o lançamento importado se edita como qualquer outro (D-107) | pronto (com a migração 0040) |
+| 6 | Registrar o rendimento de um investimento ao anotar o recebimento | "Rendimento de investimento" no recebimento do Pessoal: liga a um investimento e grava nele o rendimento recebido, que acompanha o recebimento; o valor entra em Recebido uma vez só (D-107) | pronto (com a migração 0040) |
+| 7 | Cadastrar o que falta no meio de um formulário e voltar sem perder o que foi preenchido | Cadastrar e voltar com o preenchimento guardado e o item novo já escolhido: conta a pagar, parcelamento, banco ou carteira, cartão, investimento e subcategoria (D-107) | pronto |
+| 8 | Calculadoras e o plano de dívidas confusos (capturas do plano das dívidas e do simulador) | Revisão fórmula por fórmula (`docs/51_FORMULAS_DAS_CALCULADORAS.md`): nenhuma conta estava errada; o plano de dívidas foi refeito (a resposta em uma frase, as duas ordens lado a lado e o plano passo a passo), o simulador ganhou três escolhas para a inflação e as hipóteses foram corrigidas (D-109) | pronto |
+| 9 | "Não estou mais achando as análises" | Pílula "Análises" na faixa azul de Movimentos e um cartão de atalhos no Resumo, com "Análises do mês", "Calendário do mês" e "Investir" (D-105) | pronto |
+| 10 | "O app no pc, não tem a opção de ocultar valores" e "corrija as bordas, para que fiquem todas arredondadas" (Enzo) | No computador, "Ocultar valores" no bloco azul das abas e na barra lateral, e os blocos azuis e painéis com os quatro cantos arredondados (D-110) | pronto |
+| 11 | Seguir o tema do aparelho é bom, "mas precisa ter uma opção nas configurações de alterar. Informando isso." | Card "Tema" em Conta: "Igual ao aparelho", "Claro" e "Escuro", só neste aparelho, com "Aplicar agora" (D-112) | pronto |
+| 12 | "Se a pessoa chega num nível e nunca sai, o valor entregue é só uma vez; não tem mais conquistas" | O nível desce um degrau depois de 60 dias sem anotar, com aviso a partir do 45º dia, e volta ao anotar de novo; quinto nível, Esmeralda, pelos marcos de investimentos e reserva (D-111, `docs/48_NIVEIS.md`) | pronto (com a migração 0041) |
+| 13 | O texto sobre a meta no formulário do investimento (de onde vem o valor guardado da meta) | O formulário diz que, na meta, a pessoa escolhe de onde vem o valor guardado e oferece "Usar o valor dos investimentos nesta meta", sem vir marcada (D-104) | pronto |
+
 ## Rascunho para as redes (item 25)
 
 Publicar só depois que a leitura de boleto, de print e de holerite estiver no app publicado (depois do PR e da publicação), e conferir as telas antes de gravar. Textos sem nome de banco, de loja nem de produto financeiro.

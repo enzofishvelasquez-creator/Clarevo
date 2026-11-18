@@ -8,20 +8,22 @@ import { CARDS_TEXT } from '../cards';
 import { QUICK_PAY_TEXT } from '../commitments';
 import { COMMITTED_TEXT } from '../committed';
 import { BOLETO_TEXT } from '../boleto';
+import { CALENDAR_TEXT } from '../calendar';
 import { BENEFIT_TEXT, COMPANY_TEXT, ENTRY_INVITE_TEXT } from '../company';
 import { COMPANY_REPORT_TEXT } from '../company-report';
 import { COMPROVANTE_TEXT } from '../comprovante/fluxo';
 import { DELETE_CONFIRMATION_WORD, DELETE_TEXT } from '../deletion';
-import { EVOLUTION_TEXT, EVOLUTION_WINDOWS } from '../evolucao-tela';
+import { EVOLUTION_CASH_WINDOWS, EVOLUTION_TEXT } from '../evolucao-tela';
 import { EXPORT_TEXT } from '../export';
 import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, INVITE_TEXT } from '../family';
 import { GOAL_IMAGE_TEXT } from '../goal-images';
 import { GOALS_TEXT } from '../goals';
+import { GOALS_REVIEW_TEXT } from '../goals-review';
 import { INVESTMENT_TEXT } from '../investments';
 import { INVESTMENT_PLAN_TEXT } from '../investment-plan';
 import { DETAILS_TEXT } from '../investment-details';
 import { ESTIMATE_TEXT } from '../investment-insights';
-import { LEVEL_NAME, LEVEL_TEXT, LEVEL_THRESHOLD } from '../levels';
+import { INVESTING_MARK_KEYS, LEVEL_IDLE_STEP_DAYS, LEVEL_INVESTING_THRESHOLD, LEVEL_NAME, LEVEL_TEXT, LEVEL_THRESHOLD, LEVEL_WARNING_DAYS } from '../levels';
 import { MONTH_CHECK_TEXT } from '../month-check';
 import { IMPORT_SUGGESTION_TEXT } from '../importar/sugestoes';
 import { IMPORT_TEXT } from '../importar/textos';
@@ -34,6 +36,7 @@ import { INCOME_AVERAGE_TEXT } from '../renda-media';
 import { REMINDER_TEXT } from '../reminders';
 import { ROUTINE_REMINDER_TEXT } from '../routine-reminders';
 import { RETURN_TEXT } from '../retorno';
+import { ANALYSES_ENTRY_TEXT, SUMMARY_SHORTCUTS_TEXT } from '../resumo-atalhos';
 import { EXTRA_SAVINGS_TEXT, SAVINGS_TEXT } from '../savings';
 import { SEARCH_TEXT } from '../search';
 import { SEU_MES_TEXT } from '../seu-mes';
@@ -86,7 +89,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       'Use as setas ao lado do nome do mês para ver outros meses.',
       `Em ${q('Ainda a pagar neste mês')} fica o que ainda vai vencer. Toque em ${q(SUMMARY_NAV_TEXT.viewPayables)} para abrir Contas a pagar.`,
       `${q('Pagamentos do mês')} lista os últimos gastos, e ${q('Ver todos')} abre a lista completa, com a divisão por categoria.`,
-      `Logo abaixo do cabeçalho fica o botão ${q('Anotar gasto')}.`,
+      `Logo abaixo do cabeçalho fica o botão ${q('Anotar gasto')}. No computador, ele fica no topo da barra lateral, à vista em todas as telas.`,
       `Em conta nova, o card ${q('Primeiros passos')} leva aos primeiros cadastros.`,
     ],
     screenName: TAB.resumo,
@@ -122,8 +125,8 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Mostra o Recebido ou o Pago de cada mês em um gráfico de linha, com média e mediana, e deixa tirar um mês da comparação sem mexer em nenhum lançamento.',
     where: [TAB.movimentos, ANALYSES_TEXT.title, EVOLUTION_TEXT.title],
     steps: [
-      `Em Movimentos, depois da lista do mês, toque em ${q(ANALYSES_TEXT.rowTitle)}, escolha a aba ${q(ANALYSES_TEXT.tabs.evolucao)} e toque em ${q(ANALYSES_TEXT.evolution.action)}.`,
-      `Escolha ${q(EVOLUTION_TEXT.metrics.recebido)} ou ${q(EVOLUTION_TEXT.metrics.pago)} e ${list(EVOLUTION_WINDOWS.map((n) => EVOLUTION_TEXT.windowLabel[n]), 'ou')}. O gráfico tem um ponto por mês, pela data do pagamento.`,
+      `Em Movimentos, toque em ${q(ANALYSES_ENTRY_TEXT.label)}, no topo, ou em ${q(ANALYSES_TEXT.rowTitle)}, depois da lista do mês; escolha a aba ${q(ANALYSES_TEXT.tabs.evolucao)} e toque em ${q(ANALYSES_TEXT.evolution.action)}.`,
+      `Escolha ${q(EVOLUTION_TEXT.metrics.recebido)} ou ${q(EVOLUTION_TEXT.metrics.pago)} e ${list(EVOLUTION_CASH_WINDOWS.map((n) => EVOLUTION_TEXT.windowLabel[n]), 'ou')}. O gráfico tem um ponto por mês, pela data do pagamento. ${EVOLUTION_TEXT.windowPhase3Note}`,
       `Toque em um mês para ver o valor exato, a variação com o mês anterior na comparação e as 3 maiores categorias do mês. ${q(EVOLUTION_TEXT.explain.title)} mostra as categorias e os lançamentos que mais mudaram entre os dois meses, sem dizer qual é a causa.`,
       `Para tirar um mês da comparação, desligue ${q(EVOLUTION_TEXT.panel.switchLabel)}. Isso não apaga nem muda lançamento, e ${q(EVOLUTION_TEXT.custom.restore)} traz os meses de volta.`,
       `${q(EVOLUTION_TEXT.stats.average)} e ${q(EVOLUTION_TEXT.stats.median)} usam só os meses da comparação. ${q(EVOLUTION_TEXT.stats.total)} soma todos e não muda. Toque em ${q(EVOLUTION_TEXT.stats.whatIsMedian)} para ler a diferença entre média e mediana e abrir o tema completo, com um exemplo, em Aprender.`,
@@ -142,7 +145,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Reúne, em quatro abas, as categorias do Pago em barras ou bolhas, a evolução, os próximos meses e o orçamento do mês escolhido.',
     where: [TAB.movimentos, ANALYSES_TEXT.title],
     steps: [
-      `Em Movimentos, depois da lista do mês, toque em ${q(ANALYSES_TEXT.rowTitle)}. Use as setas ao lado do nome do mês para escolher o mês.`,
+      `Em Movimentos, toque em ${q(ANALYSES_ENTRY_TEXT.label)}, no topo, ou em ${q(ANALYSES_TEXT.rowTitle)}, depois da lista do mês. No Resumo, o atalho ${q(SUMMARY_SHORTCUTS_TEXT.analysesTitle)} abre o mesmo. Use as setas ao lado do nome do mês para escolher o mês.`,
       `Toque em uma aba: ${list(ANALYSES_TABS.map((t) => ANALYSES_TEXT.tabs[t]), 'ou')}.`,
       `Em ${q(ANALYSES_TEXT.tabs.categorias)}, escolha ${q(ANALYSES_TEXT.categories.views.barras)} ou ${q(ANALYSES_TEXT.categories.views.bolhas)}. As barras comparam com mais precisão; as bolhas são uma visão exploratória, com o nome e o percentual escritos em cada uma. A escolha fica só neste aparelho.`,
       `Toque em uma categoria para abrir o cartão ${q(ANALYSES_TEXT.categories.selected.title)}, com o valor, o percentual e os lançamentos do mês nela. Toque em um lançamento para abri-lo.`,
@@ -166,7 +169,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       [TAB.movimentos, 'Registrar recebimento'],
     ],
     steps: [
-      `Toque em ${q('Anotar gasto')}, logo abaixo do cabeçalho do Resumo, ou em ${q('Registrar recebimento')}, em Movimentos.`,
+      `Toque em ${q('Anotar gasto')}, logo abaixo do cabeçalho do Resumo (no computador, no topo da barra lateral), ou em ${q('Registrar recebimento')}, em Movimentos.`,
       `Digite a descrição e o ${q('Valor em reais')}.`,
       `Escolha a data (${q('Hoje')}, ${q('Ontem')} ou outra) e a categoria.`,
       `Se pagou no cartão de crédito, escolha o cartão em ${q(CARDS_TEXT.screens.payHow)}. Com mais de um banco ou carteira cadastrado, escolha de onde o dinheiro saiu em ${q(ACCOUNTS_TEXT.out)}.`,
@@ -266,20 +269,20 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     id: 'importar-extrato',
     group: 'dia-a-dia',
     title: 'Importar extrato ou fatura',
-    purpose: 'Traz gastos, recebimentos e compras no cartão de um arquivo do banco (PDF, OFX ou planilha CSV), com revisão de cada linha antes de importar.',
+    purpose: 'Traz gastos, recebimentos e compras no cartão de um arquivo do banco (PDF, OFX ou planilha CSV) ou de prints da tela do banco, com revisão de cada linha antes de importar.',
     where: organizar(IMPORT_TEXT.rowTitle),
     alsoWhere: [[ACCOUNT_SCREEN, ACCOUNTS_TEXT.title, IMPORT_TEXT.accountsShortcut]],
     steps: [
-      `Toque em ${q(IMPORT_TEXT.pickFile)} e escolha o PDF, o arquivo OFX ou a planilha CSV que o banco gera. Ele é lido neste aparelho e não é guardado.`,
+      `Toque em ${q(IMPORT_TEXT.pickFile)} e escolha o PDF, o arquivo OFX ou a planilha CSV que o banco gera. Para a fatura do mês atual, que ainda não dá para baixar, toque em ${q(IMPORT_TEXT.pickImages)} e escolha um ou mais prints da tela do banco. Tudo é lido neste aparelho e não é guardado.`,
       `Diga para onde vão os lançamentos: ${q(IMPORT_TEXT.destinationAccount)} (extrato) ou ${q(IMPORT_TEXT.destinationCard)} (fatura), e escolha a conta ou o cartão. Compras no cartão só contam em Pago quando a fatura é paga.`,
       `Se a Clarevo não reconhecer as colunas, escolha qual é a data, a descrição e o valor e toque em ${q(IMPORT_TEXT.columnsApply)}.`,
-      `Toque em ${q(IMPORT_TEXT.continueToReview)}. Marque o que vira lançamento e mude a descrição ou a categoria de uma linha, se quiser.`,
+      `Toque em ${q(IMPORT_TEXT.continueToReview)}. Marque o que vira lançamento e, em ${q(IMPORT_TEXT.editLine)}, mude a descrição, a categoria ou se a linha é gasto ou recebimento.`,
       `Linhas com ${list([IMPORT_TEXT.labels.ja_anotado, IMPORT_TEXT.labels.parcela, IMPORT_TEXT.labels.pagamento_fatura], 'ou')} vêm desmarcadas, para nada entrar duas vezes.`,
       `Toque no botão de importar, que mostra quantos lançamentos entram. No fim, ${q(IMPORT_SUGGESTION_TEXT.title)} propõe gasto fixo para o que se repete todo mês e orçamento pela média de cada categoria, sempre com o cadastro preenchido para você conferir.`,
     ],
     screenName: IMPORT_TEXT.rowTitle,
     href: '/importar',
-    keywords: ['importar', 'importação', 'extrato', 'ofx', 'pdf', 'banco', 'planilha', 'csv', 'arquivo do banco', 'trazer lançamentos', 'fatura', 'sugestões', 'conta recorrente'],
+    keywords: ['importar', 'importação', 'extrato', 'ofx', 'pdf', 'banco', 'planilha', 'csv', 'arquivo do banco', 'trazer lançamentos', 'fatura', 'sugestões', 'conta recorrente', 'print', 'prints'],
     routes: ['/importar'],
     help: ['importar'],
     screenshot: '303_importar_revisar.png',
@@ -319,12 +322,12 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Quando pagar, toque em ${q(QUICK_PAY_TEXT.button)} na linha da conta e confirme com ${q(QUICK_PAY_TEXT.confirm)}.`,
       `Para mudar o valor ou a data do pagamento, escolha ${q(QUICK_PAY_TEXT.change)}.`,
       `A conta paga passa a contar em ${q('Pago')}, no mês da data do pagamento.`,
-      'Use as setas ao lado do nome do mês para ver as contas de outros meses.',
+      `Use as setas ao lado do nome do mês para ver as contas de outros meses. Para ver as datas do mês num lugar só (contas, faturas, aportes planejados e o Imposto de Renda), abra ${q(CALENDAR_TEXT.rowTitle)}, em ${q(ORGANIZE_TEXT.title)} ou no Resumo.`,
     ],
     screenName: ORGANIZE_TEXT.payables.title,
     href: '/a-pagar',
-    keywords: ['conta', 'pagar', 'boleto', 'vencimento', 'vencer', 'vencida', 'já paguei', 'marcar como paga', 'ainda a pagar', 'internet', 'condomínio'],
-    routes: ['/a-pagar', '/a-pagar/nova', '/a-pagar/[id]', '/a-pagar/[id]/editar', '/a-pagar/[id]/pagar'],
+    keywords: ['conta', 'pagar', 'boleto', 'vencimento', 'vencer', 'vencida', 'já paguei', 'marcar como paga', 'ainda a pagar', 'internet', 'condomínio', 'calendário'],
+    routes: ['/a-pagar', '/a-pagar/nova', '/a-pagar/[id]', '/a-pagar/[id]/editar', '/a-pagar/[id]/pagar', '/calendario'],
     screenshot: '175_contas_a_pagar_outubro.png',
   },
   {
@@ -463,7 +466,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Cadastra de onde sai o dinheiro, como o banco e a carteira, para escolher de onde saiu em cada gasto, pagamento e aporte. É só a origem: a Clarevo não guarda saldo.',
     where: [ACCOUNT_SCREEN, ACCOUNTS_TEXT.title],
     steps: [
-      'Toque no círculo com as suas iniciais, no canto do cabeçalho, para abrir Conta.',
+      'Toque no círculo com as suas iniciais, no canto do cabeçalho (no computador, embaixo na barra lateral), para abrir Conta.',
       `Em ${q(ACCOUNTS_TEXT.title)}, toque em ${q(ACCOUNTS_TEXT.add)}, dê um nome e escolha o tipo: banco, dinheiro ou outro.`,
       `Nos gastos, pagamentos e aportes, escolha de onde saiu em ${q(ACCOUNTS_TEXT.out)}, ${q(ACCOUNTS_TEXT.into)} ou ${q(ACCOUNTS_TEXT.to)}. A principal já vem marcada.`,
       `Toque em um banco ou carteira para renomear, usar ${q(ACCOUNTS_TEXT.makeDefault)}, arquivar ou excluir.`,
@@ -529,7 +532,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     where: [TAB.metas],
     steps: [
       `Em ${q(GOALS_TEXT.reserveTitle)}, toque em ${q(GOALS_TEXT.reserveCalculate)} para ver quantos meses de gastos essenciais você quer cobrir.`,
-      `Toque em ${q(GOALS_TEXT.newGoal)}, dê um nome e informe o valor e, se quiser, o prazo.`,
+      `Toque em ${q(GOALS_TEXT.newGoal)}, dê um nome e informe o valor e, se quiser, o prazo. A cada três meses, se quiser, ${q(GOALS_REVIEW_TEXT.cardTitle)} leva a ${q(GOALS_REVIEW_TEXT.screenTitle)}, com o guardado, o prazo e o plano de cada meta; ${q(GOALS_REVIEW_TEXT.later)} esconde o convite.`,
       `Quando guardar dinheiro, abra a meta e use ${q(GOALS_TEXT.detail.addDeposit)}. O valor guardado só anda com o que você registrar.`,
       `Para usar o dinheiro, use ${q(GOALS_TEXT.detail.addWithdrawal)}. Aportes e resgates não entram em Pago nem em Recebido: o dinheiro continua seu, só mudou de lugar.`,
       `Cada meta mostra uma imagem sugerida pelo nome. Para trocar, abra a meta, toque em "Mais ações" e em ${q(GOAL_IMAGE_TEXT.change)}: escolha outra sugestão ou uma foto sua.`,
@@ -538,7 +541,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     screenName: TAB.metas,
     href: '/metas',
     keywords: ['meta', 'metas', 'guardar', 'poupar', 'economizar', 'reserva', 'imprevistos', 'emergência', 'objetivo', 'aporte', 'resgate', 'imagem', 'foto', 'investimentos ligados'],
-    routes: ['/metas', '/meta/nova', '/meta/ordenar', '/meta/[id]', '/meta/[id]/editar', '/meta/[id]/movimento', '/meta/[id]/imagem', '/reserva'],
+    routes: ['/metas', '/meta/nova', '/meta/ordenar', '/meta/rever', '/meta/[id]', '/meta/[id]/editar', '/meta/[id]/movimento', '/meta/[id]/imagem', '/reserva'],
     screenshot: '16_metas.png',
   },
   {
@@ -590,8 +593,10 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       '/investimento/[id]/editar',
       '/investimento/[id]/movimento',
       '/investimento/declaracao',
+      '/investimento/lembrete',
       '/investimento/comparar',
       '/investimento/plano',
+      '/investimento/desempenho',
     ],
     screenshot: '540_investimentos.png',
   },
@@ -626,7 +631,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Em ${q(SIMULATE_TEXT.modeLabel)}, escolha ${list([SIMULATE_TEXT.modes['quanto-guardar'], SIMULATE_TEXT.modes['em-quanto-tempo'], SIMULATE_TEXT.modes['quanto-ter']], 'ou')}.`,
       'Preencha os campos. A taxa de rendimento é a que você quer testar: a Clarevo não sugere taxas.',
       `Toque em ${q(SIMULATE_TEXT.simulateButton)} e veja o resultado, as hipóteses e a tabela ${q(SIMULATE_TEXT.chart.title)}.`,
-      `Marque ${q(SIMULATE_TEXT.fields.inflationToggle)} para ver o valor em dinheiro de hoje.`,
+      `Em ${q(SIMULATE_TEXT.fields.inflationLabel)}, escolha ${q(SIMULATE_TEXT.fields.inflationChoices.mostrar)} para ver quanto o total vale hoje, ou ${q(SIMULATE_TEXT.fields.inflationChoices.corrigir)} para a meta subir com a inflação e manter o poder de compra.`,
       `Para guardar o resultado, toque em ${q(SIMULATE_TEXT.createGoal)}.`,
       'É uma simulação com as hipóteses que você informou, não uma promessa de rendimento.',
     ],
@@ -695,7 +700,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Escolha o tipo: ${q('Parcelada')} ou ${q('Saldo com juros')}.`,
       'Preencha o valor da parcela, as parcelas que faltam e a taxa ao mês, ou o saldo de hoje, a taxa e quanto você paga por mês. As taxas são as do seu contrato.',
       `Em ${q(PLANO_FIELDS.extra.label)}, informe um valor extra, se houver.`,
-      `Compare ${q(PLANO_TEXT.scenario.maior_taxa)} e ${q(PLANO_TEXT.scenario.menor_divida)}: juros totais, mês em que cada dívida termina e os detalhes de cada ordem.`,
+      `Veja primeiro o que o valor a mais muda, em meses e em juros estimados. Depois, ${q(PLANO_TEXT.scenario.maior_taxa)} e ${q(PLANO_TEXT.scenario.menor_divida)} lado a lado e o plano passo a passo de cada ordem: por qual dívida começar e para onde vai o pagamento de cada dívida que acaba.`,
       'A Clarevo não diz qual ordem escolher e não oferece crédito.',
     ],
     screenName: calcTitle('plano-dividas'),
@@ -780,7 +785,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     where: [ACCOUNT_SCREEN, PRIVACY_SECTION],
     alsoWhere: [[ACCOUNT_SCREEN, WIDGET_TEXT.section]],
     steps: [
-      `Toque no olho, no cabeçalho, para ${q('Ocultar valores')} ou ${q('Mostrar valores')} na hora. Os valores aparecem como R$ ••••.`,
+      `Toque no olho, no cabeçalho, para ${q('Ocultar valores')} ou ${q('Mostrar valores')} na hora (no computador, o botão com o texto fica no bloco azul e na barra lateral). Os valores aparecem como R$ ••••.`,
       `Em telas estreitas, o olho não aparece. Ligue ${q('Ocultar valores ao abrir')}, em Conta: os valores ficam ocultos agora e sempre que você abrir o app.`,
       `No celular com biometria configurada, ligue ${q('Pedir biometria ao abrir')}. Sair da conta nunca depende dela.`,
       `O arquivo de ${q(EXPORT_TEXT.entry)} mostra os valores, mesmo com a ocultação ligada.`,
@@ -856,17 +861,19 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     id: 'nivel-da-conta',
     group: 'conta-e-privacidade',
     title: 'Nível da conta',
-    purpose: `Mostra o nível da sua conta, de ${LEVEL_NAME.bronze} a ${LEVEL_NAME.diamante}, pelo quanto da Clarevo você já usa. Não tem a ver com quanto dinheiro você tem, e nunca desce.`,
+    purpose: `Mostra o nível da sua conta, de ${LEVEL_NAME.bronze} a ${LEVEL_NAME.esmeralda}, pelo quanto da Clarevo você já usa. Não tem a ver com quanto dinheiro você tem. O nível desce um degrau depois de ${LEVEL_IDLE_STEP_DAYS} dias sem anotar nada e volta assim que você voltar a anotar.`,
     where: [ACCOUNT_SCREEN, LEVEL_TEXT.cardTitle],
     steps: [
       `Em Conta, no card ${q(LEVEL_TEXT.cardTitle)}, veja o seu nível e toque em ${q(LEVEL_TEXT.open)}.`,
       `O nível sobe com os marcos, que são coisas que você já fez alguma vez, como anotar um gasto, criar uma meta ou cadastrar um banco ou carteira. Toda conta começa no ${LEVEL_NAME.bronze}; com ${LEVEL_THRESHOLD.prata} marcos, ${LEVEL_NAME.prata}; com ${LEVEL_THRESHOLD.ouro}, ${LEVEL_NAME.ouro}; com ${LEVEL_THRESHOLD.diamante}, ${LEVEL_NAME.diamante}.`,
+      `O ${LEVEL_NAME.esmeralda} pede o ${LEVEL_NAME.diamante} e ${LEVEL_INVESTING_THRESHOLD.esmeralda} dos ${INVESTING_MARK_KEYS.length} marcos de ${q(LEVEL_TEXT.investingTitle)}, como atualizar o valor de um investimento ou criar o plano de aportes. Eles contam pelo uso, nunca pelo valor, e os de investimento só valem no Pessoal.`,
       `Em ${q(LEVEL_TEXT.todoTitle)}, toque num marco para ir à tela dele. Nada ali é obrigatório: use só o que ajudar no seu dia a dia.`,
-      'Quando a conta muda de nível, o Resumo mostra um card de comemoração. Em Conta, um selo pequeno no canto das suas iniciais mostra o nível.',
+      `Depois de ${LEVEL_IDLE_STEP_DAYS} dias sem anotar nenhum gasto ou recebimento, o nível mostrado desce um degrau, e mais um a cada ${LEVEL_IDLE_STEP_DAYS} dias, nunca abaixo do ${LEVEL_NAME.bronze}. ${LEVEL_WARNING_DAYS} dias antes, um aviso aparece em Conta e no Resumo, com ${q(LEVEL_TEXT.warningDismiss)}. Os marcos ficam guardados: ao anotar de novo, o nível volta na hora.`,
+      'Quando a conta muda de nível, o Resumo mostra um card de comemoração, uma vez por nível em cada aparelho. Em Conta, um selo pequeno no canto das suas iniciais mostra o nível.',
     ],
     screenName: LEVEL_TEXT.screenTitle,
     href: '/conta/nivel',
-    keywords: ['nível', 'nivel', 'níveis', 'niveis', 'bronze', 'prata', 'ouro', 'diamante', 'marcos', 'medalha', 'conquista'],
+    keywords: ['nível', 'nivel', 'níveis', 'niveis', 'bronze', 'prata', 'ouro', 'diamante', 'esmeralda', 'marcos', 'medalha', 'conquista', 'nível desceu', 'nivel caiu'],
     routes: ['/conta/nivel'],
     screenshot: '620_nivel_da_conta.png',
   },

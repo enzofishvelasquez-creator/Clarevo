@@ -42,11 +42,19 @@ function carregarTs(ts, entradas) {
   }
 }
 
-/** Carrega (uma vez) `learn`, `guide`, as calculadoras, as datas e os planos da assinatura do core. */
+/** Carrega (uma vez) `learn`, `guide`, as calculadoras, as datas, os planos da assinatura e os indicadores do core. */
 function catalogo() {
   if (guardado) return guardado;
   const ts = carregarTypescript();
-  const [learn, guide, calc, datas, plano] = carregarTs(ts, ['learn/index.ts', 'guide/index.ts', 'calculators/index.ts', 'dates.ts', 'plano.ts']);
+  const [learn, guide, calc, datas, plano, indicadores, mercado] = carregarTs(ts, [
+    'learn/index.ts',
+    'guide/index.ts',
+    'calculators/index.ts',
+    'dates.ts',
+    'plano.ts',
+    'indicadores/index.ts',
+    'indicadores/conteudo.ts',
+  ]);
   const publicados = learn.publishedTopics().filter((t) => !t.legacy);
   guardado = {
     SECOES: learn.LEARN_SECTIONS,
@@ -65,10 +73,19 @@ function catalogo() {
       return { slug: l.slug, params: { ...l.params }, titulo: calc.calcTitle(l.slug, l.params.modo) };
     },
     tituloDoCalculador: calc.calcTitle,
-    /** O catálogo das calculadoras (grupos, lista, textos fixos): a mesma fonte do app. */
+    /**
+     * O catálogo das calculadoras (grupos, lista, textos fixos): a mesma fonte do app, mais as que por enquanto só o site mostra
+     * (`SITE_CALCULATORS`, D-106), cada uma no grupo dela, depois das do app.
+     */
     CALC_GRUPOS: calc.CALC_GROUPS,
-    CALCULADORAS: calc.CALCULATORS,
-    calculadoraPorSlug: calc.calculatorBySlug,
+    CALCULADORAS: calc.CALC_GROUPS.flatMap((g) => [...calc.CALCULATORS, ...calc.SITE_CALCULATORS].filter((x) => x.group === g.id)),
+    calculadoraPorSlug: (slug) => calc.calculatorBySlug(slug) ?? calc.SITE_CALCULATORS.find((x) => x.slug === slug) ?? null,
+    /** Só o site mostra (fora da tela do app)? */
+    soNoSite: (slug) => calc.isSiteCalcSlug(slug),
+    /** Os campos de uma calculadora, do app (`calcFields`) ou só do site (`SITE_CALC_FIELDS`). */
+    camposDaCalculadora: (slug, modo) => (calc.isSiteCalcSlug(slug) ? calc.SITE_CALC_FIELDS[slug] : calc.calcFields(slug, modo)),
+    /** O aviso fixo de uma calculadora: o do app (`calcDisclaimer`) ou o da calculadora só do site. */
+    avisoDaCalculadora: (slug) => (calc.isSiteCalcSlug(slug) ? calc.SITE_CALCULATORS.find((x) => x.slug === slug).disclaimer : calc.calcDisclaimer(slug)),
     /** Todo o módulo das calculadoras do core (funções de cálculo, campos e textos), para os exemplos calculados na geração. */
     CALC: calc,
     CALC_UI: calc.CALC_UI_TEXT,
@@ -84,16 +101,23 @@ function catalogo() {
       /** A assinatura aberta no app (SUBSCRIBE_OPEN): fechada, a seção Planos diz que nada é cobrado até o lançamento. */
       aberta: plano.SUBSCRIBE_OPEN === true,
     },
+    /** Indicadores oficiais e páginas de mercado (D-106): os códigos, as contas e os textos de cada número, e o texto das páginas. */
+    INDICADORES: indicadores,
+    MERCADO: mercado,
   };
   return guardado;
 }
 
-/** Os endereços (só o host) das fontes de todos os temas publicados: os únicos links externos que o site pode ter além dos de base. */
+/**
+ * Os endereços (só o host) das fontes de todos os temas publicados e das páginas de mercado (indicadores, glossário e explicações,
+ * D-106): os únicos links externos que o site pode ter além dos de base.
+ */
 function hostsDeFontes() {
   const c = catalogo();
   const hosts = new Set();
   for (const t of c.publicados) for (const s of t.sources) if (s.url) hosts.add(new URL(s.url).host);
+  for (const s of c.MERCADO.fontesDasPaginasDeMercado()) if (s.url) hosts.add(new URL(s.url).host);
   return [...hosts].sort();
 }
 
-module.exports = { catalogo, hostsDeFontes, carregarTypescript, CORE_SRC };
+module.exports = { catalogo, hostsDeFontes, carregarTypescript, carregarTs, CORE_SRC };

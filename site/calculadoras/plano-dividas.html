@@ -67,6 +67,7 @@
 <div class="miolo">
 <h2 id="calcular">Faça a conta</h2>
 <div class="aviso-edu calc-aviso"><p>Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito. Os resultados são estimativas feitas com os números que você digita e não garantem resultado.</p></div>
+
 <div class="calc" data-calculadora="plano-dividas">
 <p class="calc-carregando">Carregando a calculadora. Se ela não aparecer, o seu navegador pode estar bloqueando o JavaScript deste site. Você também pode usar a <a href="https://app.clarevo.app.br" rel="noopener noreferrer">versão web</a> da Clarevo.</p>
 </div>
@@ -75,15 +76,15 @@
 <p><strong>Esta calculadora precisa de JavaScript</strong> para fazer a conta no seu navegador, sem enviar nada. Sem ele, veja o exemplo mais abaixo e a lista do que ela pede, ou use a <a href="https://app.clarevo.app.br" rel="noopener noreferrer">versão web</a> da Clarevo.</p>
 <h3>O que ela pede</h3>
 <ul>
-<li><strong>Apelido.</strong> Opcional. Até 30 caracteres. Fica só nesta tela. Pode ficar em branco.</li>
+<li><strong>Apelido.</strong> Opcional. Até 30 caracteres. É o nome da dívida no plano e fica só nesta tela. Pode ficar em branco.</li>
 <li><strong>Tipo de dívida.</strong> Opções: Parcelada, Saldo com juros.</li>
-<li><strong>Valor da parcela.</strong></li>
-<li><strong>Parcelas que faltam.</strong> De 1 a 480.</li>
-<li><strong>Taxa de juros ao mês do contrato (%).</strong> Opcional. Está no contrato ou no extrato. Em branco: conta só as parcelas. Pode ficar em branco.</li>
-<li><strong>Saldo hoje.</strong></li>
-<li><strong>Taxa de juros ao mês (%).</strong> Está na fatura, no extrato ou no contrato.</li>
-<li><strong>Quanto você paga por mês.</strong></li>
-<li><strong>Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?.</strong> Opcional, como 200,00. Em branco: a conta usa só as parcelas e os pagamentos informados acima. Pode ficar em branco.</li>
+<li><strong>Valor da parcela.</strong> O que você já paga por mês nesta dívida. Quando ela acaba, este valor passa para a próxima do plano.</li>
+<li><strong>Parcelas que faltam.</strong> De 1 a 480. Diz quando a dívida acaba sem nada a mais.</li>
+<li><strong>Taxa de juros ao mês do contrato (%).</strong> Opcional. Está no contrato ou no extrato. Define o lugar da dívida em &quot;Maior taxa primeiro&quot; e quanto de juros o valor a mais evita. Em branco: conta só as parcelas. Pode ficar em branco.</li>
+<li><strong>Saldo hoje.</strong> Quanto falta pagar hoje. Define o lugar da dívida em &quot;Menor dívida primeiro&quot;.</li>
+<li><strong>Taxa de juros ao mês (%).</strong> Está na fatura, no extrato ou no contrato. Define os juros de cada mês e o lugar da dívida em &quot;Maior taxa primeiro&quot;.</li>
+<li><strong>Quanto você paga por mês.</strong> O que você já paga por mês. Precisa passar dos juros do mês para o saldo diminuir. Quando ela acaba, este valor passa para a próxima.</li>
+<li><strong>Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?.</strong> Opcional, como 200,00. Vai todo mês para a dívida por onde o plano começa e encurta o prazo. Em branco: a conta usa só os pagamentos informados acima. Pode ficar em branco.</li>
 </ul>
 </div>
 </noscript>
@@ -103,8 +104,13 @@
 </ul>
 <p>A calculadora mostra:</p>
 <ul class="calc-exemplo-resultado">
-<li>As duas ordens dão no mesmo: tudo termina em 17 meses (1 ano e 5 meses).</li>
-<li>Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 24 meses (2 anos): 7 meses depois e R$ 1.098,75 a mais de juros.</li>
+<li>Com R$ 200,00 a mais por mês, tudo termina em 17 meses, em vez de 24 meses, com R$ 1.098,75 a menos de juros estimados.</li>
+<li>Com estes números, as duas ordens dão no mesmo: o mesmo plano, o mesmo fim e os mesmos juros estimados.</li>
+<li>As duas ordens, passo a passo:</li>
+<li>A partir do mês 1: o pagamento de sempre de cada dívida e os R$ 200,00 a mais em Cartão.</li>
+<li>Mês 3: Cartão acaba. O pagamento dela (R$ 200,00) passa para Financiamento, que fica com R$ 400,00 por mês além do pagamento de sempre.</li>
+<li>Mês 17: Financiamento acaba, e tudo está quitado.</li>
+<li>Ganho estimado, em relação a pagar só o de sempre: 7 meses antes e R$ 1.098,75 a menos de juros.</li>
 </ul>
 <p class="calc-nota">Estimativa. O valor oficial de cada dívida é o que a instituição informar; peça o valor atualizado.</p>
 <h4>Hipóteses</h4>
@@ -113,8 +119,9 @@
 <li>Sem IOF nem tarifas.</li>
 <li>Pagamentos no fim de cada mês, a partir do mês seguinte.</li>
 <li>Cada dívida recebe todo mês a parcela, ou o pagamento que você informou.</li>
-<li>O valor a mais e as parcelas das dívidas já quitadas vão para a primeira dívida da ordem; o restante passa para a seguinte, no mesmo mês.</li>
-<li>&quot;Sem valor a mais&quot; paga cada dívida só com os pagamentos de sempre, sem passar nada adiante.</li>
+<li>O valor a mais e os pagamentos das dívidas que acabam vão para a primeira dívida da ordem que ainda não acabou; o que sobrar passa para a seguinte, no mesmo mês.</li>
+<li>Maior taxa primeiro: o que sobra vai antes para a dívida com a maior taxa ao mês. Menor dívida primeiro: vai antes para a dívida com o menor saldo hoje. Empate: a outra regra, depois a ordem da lista.</li>
+<li>O ganho é comparado com pagar só o de sempre em cada dívida, sem o valor a mais e sem passar nada adiante.</li>
 <li>O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada. A parcela segue a tabela do contrato e o valor a mais abate o saldo.</li>
 </ul>
 </section>
@@ -133,7 +140,7 @@
 <nav class="rodape-grade" aria-label="Rodapé">
 <div class="rodape-marca"><a href="../index.html" aria-label="Clarevo, página inicial"><img src="../marca/clarevo-logotipo-reverso.svg" alt="" width="130" height="26"></a><p>Cuidar da vida financeira faz parte de cuidar de você. Sem anúncios, sem venda de dados e sem recomendar produtos financeiros.</p></div>
 <div><h2>Clarevo</h2><ul><li><a href="../index.html">Início</a></li><li><a href="../comece.html">Comece aqui</a></li><li><a href="../app/index.html">O app</a></li><li><a href="../empresas/index.html">Para empresas</a></li><li><a href="../sobre.html">Sobre</a></li><li><a href="../imprensa.html">Imprensa</a></li></ul></div>
-<div><h2>Aprender e ajuda</h2><ul><li><a href="../aprender/index.html">Aprender</a></li><li><a href="../aprender/agenda.html">Agenda financeira</a></li><li><a href="index.html">Calculadoras</a></li><li><a href="../novidades/index.html">Novidades</a></li><li><a href="../ajuda/index.html">Ajuda</a></li><li><a href="../suporte.html">Suporte</a></li></ul></div>
+<div><h2>Aprender e ajuda</h2><ul><li><a href="../aprender/index.html">Aprender</a></li><li><a href="../aprender/agenda.html">Agenda financeira</a></li><li><a href="index.html">Calculadoras</a></li><li><a href="../indicadores/index.html">Indicadores</a></li><li><a href="../indicadores/glossario.html">Glossário</a></li><li><a href="../novidades/index.html">Novidades</a></li><li><a href="../ajuda/index.html">Ajuda</a></li><li><a href="../suporte.html">Suporte</a></li></ul></div>
 <div><h2>Confiança e regras</h2><ul><li><a href="../seguranca.html">Segurança e privacidade</a></li><li><a href="../privacidade.html">Privacidade</a></li><li><a href="../termos.html">Termos</a></li><li><a href="../excluir-conta.html">Excluir conta</a></li><li><a href="../versoes.html">Versões dos textos</a></li><li><a href="../licencas.html">Licenças de código aberto</a></li><li><a href="../novidades/como-escrevemos.html">Como escrevemos</a></li></ul></div>
 </nav>
 <div class="rodape-fim"><p>CLAREVO INOVA SIMPLES (I.S.) · CNPJ 69.771.864/0001-03</p></div>

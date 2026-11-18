@@ -229,12 +229,6 @@ setInterval(async () => {
     const more = p.getByRole('button', { name: /^Ver os próximos meses\./ }).filter({ visible: true });
     if (await more.count()) { await more.first().click().catch(() => {}); await p.waitForTimeout(300); }
   };
-  // Aba Investir (revisão das telas, 16/11/2026): o CDI, o IPCA, a poupança, o ganho real e o mês até hoje ficam atrás de "Comparar com
-  // CDI, IPCA e poupança". Abre só se ainda está fechado (a aba continua montada entre as visitas).
-  const openCompare = async () => {
-    const b = p.getByRole('button', { name: 'Comparar com CDI, IPCA e poupança', exact: true }).filter({ visible: true }).first();
-    if ((await b.count()) && (await b.getAttribute('aria-expanded')) !== 'true') { await b.click(); await p.waitForTimeout(300); }
-  };
   const sectionRows = async (title) => {
     if (title === 'Próximos meses') await openLater();
     return sectionRowsRaw(title);
@@ -271,6 +265,8 @@ setInterval(async () => {
       'Garantia do Tesouro Nacional', 'Tesouro Nacional', 'Tesouro Transparente',
       'Tesouro Prefixado com Juros Semestrais', 'Tesouro IPCA\\+ com Juros Semestrais', 'Tesouro Selic', 'Tesouro Prefixado', 'Tesouro IPCA\\+',
       'Tesouro RendA\\+', 'Tesouro Educa\\+', 'Tesouro Reserva', 'CDB ou RDB', '\\bLCI\\b', '\\bLCA\\b', '\\bLCD\\b',
+      // Modelos de registro da tela vazia (D-103, item 5): rótulos de registro, não sugestão de produto.
+      'Título do Tesouro', 'CDB, LCI ou LCA que já tenho',
     ].join('|'),
     'g',
   );
@@ -484,12 +480,12 @@ setInterval(async () => {
   await shot('05_conta');
   await shot('05b_conta_seguranca', true);
   // Ciclo A2 (D-025): na web não há lembretes nem biometria (só no app para celular); "Ocultar valores ao abrir" existe
-  // também na web e é só deste aparelho. Os dois interruptores de Conta na web são esse e "Mostrar valores no widget" (D-052, desligado).
+  // também na web e é só deste aparelho. É o único interruptor de Conta na web: "Mostrar valores no widget" (D-052) fica só no celular (D-110).
   ok('demonstração (D-067): Conta não tem o card "Como você conheceu a Clarevo?", nem as opções', await origemAusente());
   t = await body();
   const contaSwitches = await p.getByRole('switch').filter({ visible: true }).evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-checked')]));
   ok('Conta na web: "Lembretes estão disponíveis no app para celular.", sem interruptor de lembretes nem de biometria', t.includes('Lembretes') && t.includes('Lembretes estão disponíveis no app para celular.') &&
-    !t.includes('Pedir biometria ao abrir') && !t.includes('Avisar') && JSON.stringify(contaSwitches) === JSON.stringify([['Ocultar valores ao abrir', 'false'], ['Mostrar valores no widget', 'false']]), JSON.stringify(contaSwitches));
+    !t.includes('Pedir biometria ao abrir') && !t.includes('Avisar') && JSON.stringify(contaSwitches) === JSON.stringify([['Ocultar valores ao abrir', 'false']]), JSON.stringify(contaSwitches));
   ok('Conta: "Privacidade neste aparelho" com "Ocultar valores ao abrir" desligado por padrão e a legenda', t.includes('Privacidade neste aparelho') && t.includes('Ao abrir o app, os valores aparecem como R$ ••••. Vale só para este aparelho.'));
   ok('Conta: "Ajuda e contato" com o e-mail do suporte por escrito (sem depender do site) e o botão "Escrever para o suporte"', t.includes('Ajuda e contato') &&
     t.includes('Dúvidas sobre o app ou um problema: escreva para suporte@clarevo.app.br. Pedidos sobre os seus dados: privacidade@clarevo.app.br.') && (await visibleCount('button', 'Escrever para o suporte')) === 1);
@@ -804,13 +800,15 @@ setInterval(async () => {
   // As duas primeiras legendas vêm dos dados (a mesma origem do card "Ainda a pagar"); o nome acessível junta título e legenda.
   const SC = {
     pagar: 'Contas a pagar, R$ 650,00 em aberto neste mês',
+    // D-105: o Calendário do mês, com a legenda fixa, logo depois de Contas a pagar.
+    calendario: 'Calendário do mês, Contas, faturas e datas do mês, num lugar só',
     fixos: 'Gastos fixos e parcelamentos, 7 cadastrados, com as contas do ano',
     // D-037: a demonstração tem o "Cartão Exemplo"; a legenda traz a fatura atual (fecha dia 3, vence dia 10).
     cartoes: 'Cartões, Cartão Exemplo, fatura de novembro R$ 550,00',
     // D-041: a categoria mais perto do limite (Lazer: parcela do tênis e restaurante, R$ 400,00 de R$ 300,00).
     orcamento: 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00',
     // D-048: Importar extrato ou fatura, com a legenda fixa, entre o Orçamento e as calculadoras.
-    importar: 'Importar extrato ou fatura, Arquivo PDF, OFX ou planilha do banco',
+    importar: 'Importar extrato ou fatura, Arquivo PDF, OFX, planilha ou print do banco',
     calc: 'Calculadoras, Parcelado ou à vista, dívidas, reserva e outras contas',
   };
   await waitText('7 cadastrados, com as contas do ano').catch(() => {});
@@ -820,8 +818,8 @@ setInterval(async () => {
     return { anotar: top('[role=button]', 'Anotar gasto'), organizar: top('[role=heading]', 'Organizar'), totais: top('div[dir="auto"]', 'Pago em outubro') };
   });
   // Revisão das telas (16/11/2026): no topo, os totais e depois os botões; "Organizar" vem depois da lista do mês.
-  ok('movimentações: "Organizar" com os seis atalhos (Orçamento por categoria e Importar extrato ou fatura entre Cartões e as calculadoras) e as legendas de outubro, depois dos totais e dos botões (e da lista)', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.fixos, SC.cartoes, SC.orcamento, SC.importar, SC.calc]) &&
-    ['R$ 650,00 em aberto neste mês', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Arquivo PDF, OFX ou planilha do banco', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
+  ok('movimentações: "Organizar" com os sete atalhos (o Calendário do mês depois de Contas a pagar, D-105; Orçamento por categoria e Importar extrato ou fatura entre Cartões e as calculadoras) e as legendas de outubro, depois dos totais e dos botões (e da lista)', JSON.stringify(await sectionRows('Organizar')) === JSON.stringify([SC.pagar, SC.calendario, SC.fixos, SC.cartoes, SC.orcamento, SC.importar, SC.calc]) &&
+    ['R$ 650,00 em aberto neste mês', 'Contas, faturas e datas do mês, num lugar só', '7 cadastrados, com as contas do ano', 'Cartão Exemplo · fatura de novembro R$ 550,00', 'Lazer: R$ 400,00 de R$ 300,00', 'Arquivo PDF, OFX, planilha ou print do banco', 'Parcelado ou à vista, dívidas, reserva e outras contas'].every((x) => t.includes(x)) &&
     scOrder.anotar !== null && scOrder.organizar !== null && scOrder.totais !== null && scOrder.totais < scOrder.anotar && scOrder.anotar < scOrder.organizar, `${JSON.stringify(await sectionRows('Organizar'))} ${JSON.stringify(scOrder)}`);
   // O primeiro movimento à vista sem rolar em 390 × 844 (revisão das telas, 16/11/2026): a linha inteira acima da barra de abas.
   const movFirst = await p.evaluate(() => {
@@ -2514,7 +2512,8 @@ setInterval(async () => {
   // Ciclo A6: card "Calculadoras" no topo de Aprender, antes dos temas.
   const learnFirst = await p.evaluate(() => {
     const top = (e) => e.getBoundingClientRect().top;
-    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^Conta:/.test(e.getAttribute('aria-label') || ''));
+    // O avatar da Conta e o olho do cabeçalho (D-110: a 390 px cabe também na demonstração) ficam fora: são do cabeçalho, não de Aprender.
+    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^(Conta:|Ocultar valores$|Mostrar valores$)/.test(e.getAttribute('aria-label') || ''));
     const main = shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b));
     const labels = main.map((e) => e.getAttribute('aria-label') || e.textContent);
     return { jump: labels.filter((x) => /^Ir para /.test(x)), first: labels.filter((x) => !/^Ir para /.test(x)).slice(0, 2), firstOfAll: labels[0] };
@@ -2704,6 +2703,11 @@ setInterval(async () => {
     proventos: /fundos? imobili[aá]rios?/gi,
     'declarar-investimentos': /poupan[cç]a|\bcdb\b|\blci\b|\blca\b|criptoativos?|fundos imobili[aá]rios/gi,
     'ganho-real': /poupan[cç]a/gi,
+    // Temas curtos (D-105).
+    'ir-regressivo': /\bcdb\b|\blci\b|\blca\b/gi,
+    'come-cotas': /fundos? (de curto prazo|de a[cç][õo]es|imobili[aá]rios|de renda fixa)/gi,
+    'ipca-mais': /\btesouro\b/gi,
+    'marcacao-a-mercado': /\btesouro\b/gi,
   };
   const withoutInvestTerms = (text, slug) => {
     const [main, related = ''] = text.split('Temas relacionados');
@@ -2768,7 +2772,7 @@ setInterval(async () => {
   await p.evaluate(() => { window.open = window.__realOpen; });
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   const externalTopics = [...learnSeen].filter(([, n]) => n > 0).map(([s]) => s);
-  ok('Aprender: 52 temas publicados abrem pela aba (45 nas seções, com os quatro de época, Média e mediana e os sete de investimentos da D-099, e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 52 && learnLabels.length === 45 && faqNames.length === 7 &&
+  ok('Aprender: 57 temas publicados abrem pela aba (50 nas seções, com os quatro de época, Média e mediana, os sete de investimentos da D-099 e os cinco curtos da D-105, e 7 dúvidas), cada um com o título como cabeçalho de nível 1', learnSeen.size === 57 && learnLabels.length === 50 && faqNames.length === 7 &&
     learnIssues.titulo.length === 0, `${learnSeen.size} temas, ${learnLabels.length} linhas, ${faqNames.length} dúvidas ${learnIssues.titulo.slice(0, 3).join(' | ')}`);
   ok('temas: nenhum termo vetado nem travessão longo nos textos exibidos', learnIssues.termos.length === 0, learnIssues.termos.slice(0, 3).join(' | '));
   ok('temas: fontes com papel de link, data de consulta e domínio permitido (oficial; FGC só no tema do FGC; Serasa só em renda-comprometida)', externalTopics.length >= 20 && learnIssues.fontes.length === 0,
@@ -3587,15 +3591,19 @@ setInterval(async () => {
   // 120 meses, R$ 500,00 por mês, 10% ao ano e inflação de 4,5%: R$ 100.728,79 (hoje, R$ 64.862,05).
   await field('Quanto já tem (opcional)').fill(''); await field('Em quantos meses').fill('120'); await field('Quanto vai guardar por mês').fill('500');
   ok('D inflação desligada: sem o campo "Inflação ao ano (%)"', (await p.getByLabel('Inflação ao ano (%)', { exact: true }).count()) === 0);
-  await p.getByRole('checkbox', { name: /Descontar inflação/ }).click(); await p.waitForTimeout(200);
+  // Retorno de 17/11/2026: no lugar de "Descontar inflação?", as escolhas "Sem inflação" e "Mostrar em dinheiro de hoje" (em "Quanto posso
+  // ter" não há meta para corrigir).
+  ok('D inflação em "Quanto posso ter": "Sem inflação" marcada e "Mostrar em dinheiro de hoje", sem "Corrigir a meta pela inflação"',
+    (await radio('Sem inflação').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'Mostrar em dinheiro de hoje')) === 1 && (await visibleCount('radio', 'Corrigir a meta pela inflação')) === 0);
+  await radio('Mostrar em dinheiro de hoje').click(); await p.waitForTimeout(200);
   ok('D inflação ligada: o campo vem vazio (nunca sugerido)', (await field('Inflação ao ano (%)').inputValue()) === '');
   await simulate();
   ok('D inflação ligada e vazia: erro "Digite a inflação ao ano que quer testar, de 0% a 30%."', (await body()).includes('Digite a inflação ao ano que quer testar, de 0% a 30%.'));
   await field('Inflação ao ano (%)').fill('4,5'); await simulate(); await waitText('Em dinheiro de hoje'); await p.waitForTimeout(300);
   t = await body();
   ok('D quanto posso ter, 120 meses: R$ 100.728,79 na hipótese, R$ 60.000,00 aportados, R$ 40.728,79 de rendimento e R$ 64.862,05 em dinheiro de hoje (inflação de 4,5% ao ano)', t.includes('Na hipótese informada: R$ 100.728,79 em 120 meses') && t.includes('Total aportado: R$ 60.000,00') &&
-    t.includes('Rendimento na hipótese: R$ 40.728,79') && t.includes('Em dinheiro de hoje, com inflação de 4,5% ao ano: R$ 64.862,05') && t.includes('Sem rendimento, seriam R$ 60.000,00.') &&
-    t.includes('Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para o valor em dinheiro de hoje.'));
+    t.includes('Rendimento na hipótese: R$ 40.728,79') && t.includes('Em dinheiro de hoje, com inflação de 4,5% ao ano, o total de R$ 100.728,79 equivale a R$ 64.862,05.') && t.includes('Sem rendimento, seriam R$ 60.000,00.') &&
+    t.includes('Inflação de 4,5% ao ano (0,37% ao mês, taxa equivalente), constante no período, só para mostrar o valor em dinheiro de hoje.'));
   const simChart = await p.locator('[role="img"]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter((l) => l && l.startsWith('Gráfico')));
   ok('D o gráfico por ano tem um único rótulo acessível (R$ 60.000,00 aportados, total de R$ 100.728,79)', simChart.length === 1 && simChart[0].includes('R$ 60.000,00 aportados') && simChart[0].includes('total de R$ 100.728,79'), JSON.stringify(simChart));
   await keepText();
@@ -5532,10 +5540,12 @@ setInterval(async () => {
   ok('F1 demonstração: o Financiamento do carro vem preenchido (parcela R$ 850,00, 36 parcelas, taxa em branco) e o valor a mais fica vazio',
     t.includes(F1_NAME) && t.includes('Preenchido com os seus parcelamentos em aberto.') && (await f1Value(`Valor da parcela, ${F1_NAME}`)) === '850,00' && (await f1Value(`Parcelas que faltam, ${F1_NAME}`)) === '36' &&
     (await f1Value(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`)) === '' && (await f1Value('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?')) === '', t.slice(0, 400));
-  ok('F1 demonstração: sem a taxa, conta só as parcelas e diz isso; "Sem valor a mais" termina em 36 meses (outubro de 2029) e pede o valor a mais; a dica do plano de guardar não preenche o campo',
-    t.includes('Sem valor a mais: tudo termina em 36 meses (3 anos), em outubro de 2029.') && t.includes('Informe quanto a mais você consegue pôr por mês para ver o efeito.') &&
+  ok('F1 demonstração: sem a taxa, conta só as parcelas e diz isso; só com o pagamento de sempre termina em 36 meses (outubro de 2029) e pede o valor a mais; a dica do plano de guardar não preenche o campo',
+    t.includes('Só com o pagamento de sempre, Financiamento do carro acaba em 36 meses (outubro de 2029).') && t.includes('Informe quanto a mais você consegue pôr por mês para ver o efeito.') &&
     t.includes(`${F1_NAME}: sem juros informados, conta só as parcelas.`) && t.includes('No seu plano de guardar você informou R$ 500,00 por mês.') && t.includes('Total pago: R$ 30.600,00') && t.includes('Juros estimados: R$ 0,00'));
-  ok('F1 só uma dívida: não há ordem a comparar (nenhuma das duas ordens aparece)', !t.includes('Maior taxa primeiro') && !t.includes('Menor dívida primeiro'));
+  // As dicas dos campos citam as ordens (a taxa define o lugar em "Maior taxa primeiro"); o resultado não as compara.
+  ok('F1 só uma dívida: não há ordem a comparar (nem a comparação lado a lado, nem o plano de cada ordem)', !t.includes('As duas ordens, lado a lado') && !t.includes('Maior taxa primeiro, passo a passo') && !t.includes('Na ordem '));
+  ok('F1 no topo, para que serve a tela, em duas frases (retorno de 17/11/2026)', t.includes('Monte um plano para quitar as suas dívidas. Informe cada dívida e quanto consegue pôr a mais por mês: a conta mostra por qual começar, quando cada uma acaba e quanto de juros sai da conta, em duas ordens lado a lado.'));
   ok('F1 o texto fixo da estimativa e as hipóteses visíveis',
     t.includes('Estimativa. O valor oficial de cada dívida é o que a instituição informar; peça o valor atualizado.') && t.includes('Taxas fixas, sem novas compras nem atrasos.') && t.includes('Sem IOF nem tarifas.') && t.includes('Pagamentos no fim de cada mês, a partir do mês seguinte.'));
   ok('F1 com parcelamentos lidos, as hipóteses dizem que as parcelas já vencidas e em aberto ficam fora',
@@ -5557,8 +5567,10 @@ setInterval(async () => {
     t.includes('Total pago: R$ 30.600,00') && t.includes('Juros estimados: R$ 7.088,42') && t.includes('O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada.') && !t.includes('sem juros informados'), t.slice(-900));
   await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '100,00');
   t = await body();
-  ok('F1 com R$ 100,00 a mais: "Com o valor a mais" termina em 32 meses (junho de 2029), R$ 992,59 a menos de juros e 4 meses antes',
-    t.includes('Com o valor a mais: tudo termina em 32 meses (2 anos e 8 meses), em junho de 2029.') && t.includes('Com o valor a mais: R$ 992,59 a menos de juros.') && t.includes('Com o valor a mais: tudo termina 4 meses antes.') &&
+  ok('F1 com R$ 100,00 a mais: a resposta em uma frase (32 meses, junho de 2029, em vez de 36, e R$ 992,59 a menos de juros estimados) e o plano passo a passo',
+    t.includes('Com R$ 100,00 a mais por mês, Financiamento do carro acaba em 32 meses (junho de 2029), em vez de 36 meses (outubro de 2029), com R$ 992,59 a menos de juros estimados.') &&
+    t.includes('O plano, passo a passo') && t.includes('A partir de novembro de 2026 (mês 1): o pagamento de sempre e os R$ 100,00 a mais em Financiamento do carro.') &&
+    t.includes('Junho de 2029 (mês 32): Financiamento do carro acaba.') && t.includes('Ganho estimado, em relação a pagar só o de sempre: 4 meses antes e R$ 992,59 a menos de juros.') &&
     !t.includes('Informe quanto a mais você consegue pôr por mês para ver o efeito.'), t.slice(-1200));
   await atWidths(async (w) => {
     await scrollTo('Resultado');
@@ -5586,17 +5598,17 @@ setInterval(async () => {
   await f1Fill('Taxa de juros ao mês (%), Cartão azul', '1');
   await f1Fill('Quanto você paga por mês, Cartão azul', '300,00');
   t = await body();
-  ok('F1 duas dívidas: "Maior taxa primeiro" e "Menor dívida primeiro" (24 meses, outubro de 2028) lado a lado, e a referência "Sem valor a mais" (36 meses, juros R$ 7.135,09) em uma frase, no fim',
-    t.includes('Com o valor a mais e passando adiante a parcela de cada dívida quitada, tudo termina em 24 meses (2 anos), em outubro de 2028, nas duas ordens.') &&
-    t.includes('Sem o valor a mais e sem passar nada adiante, só com os pagamentos de sempre, tudo terminaria em 36 meses (3 anos), em outubro de 2029: 12 meses depois da ordem que termina antes e R$ 2.216,64 a mais de juros.') &&
-    !t.includes('Sem valor a mais: tudo termina em 36 meses') && t.includes('Juros estimados: R$ 7.135,09') &&
-    t.includes('Maior taxa primeiro: tudo termina em 24 meses (2 anos), em outubro de 2028.') && t.includes('Menor dívida primeiro: tudo termina em 24 meses (2 anos), em outubro de 2028.') &&
-    t.includes('Juros estimados: R$ 4.918,45') && t.includes('Juros estimados: R$ 4.925,13'), t.slice(-1800));
-  ok('F1 as diferenças em linguagem neutra: R$ 6,68 a menos de juros (Maior taxa primeiro), a primeira dívida termina 2 meses antes (Menor dívida primeiro) e o fim no mesmo mês',
-    t.includes('Maior taxa primeiro: R$ 6,68 a menos de juros.') && t.includes('Menor dívida primeiro: a primeira dívida termina 2 meses antes.') && t.includes('Tudo termina no mesmo mês nas duas ordens.'));
-  ok('F1 a sequência de cada ordem, com o mês em que cada dívida termina',
-    t.includes('1. Cartão azul: termina em 6 meses (abril de 2027).') && t.includes(`2. ${F1_NAME}: termina em 24 meses (outubro de 2028).`) && t.includes('1. Cartão azul: termina em 4 meses (fevereiro de 2027).') &&
-    t.includes(`1. Cartão azul: termina em 6 meses (abril de 2027).`) && t.includes('Em que ordem cada dívida termina'));
+  ok('F1 duas dívidas: primeiro a resposta (24 meses, outubro de 2028, em vez de 36, e de R$ 2.209,96 a R$ 2.216,64 a menos de juros estimados, conforme a ordem); nos detalhes, as duas ordens e "Sem valor a mais" (juros R$ 7.135,09)',
+    t.includes('Com R$ 100,00 a mais por mês, tudo termina em 24 meses (outubro de 2028), em vez de 36 meses (outubro de 2029), com R$ 2.209,96 a R$ 2.216,64 a menos de juros estimados, conforme a ordem.') &&
+    t.includes('Juros estimados: R$ 7.135,09') && t.includes('Juros estimados: R$ 4.918,45') && t.includes('Juros estimados: R$ 4.925,13'), t.slice(-1800));
+  ok('F1 as diferenças como fatos neutros: juros R$ 6,68 menores em Maior taxa primeiro e a primeira dívida 2 meses antes em Menor dívida primeiro',
+    t.includes('Na ordem Maior taxa primeiro, os juros estimados são R$ 6,68 menores.') && t.includes('Na ordem Menor dívida primeiro, a primeira dívida acaba 2 meses antes.'));
+  ok('F1 o plano passo a passo de cada ordem: por qual começar, quando o Cartão azul acaba e para onde vai o pagamento dele; em "Sem valor a mais", a ordem em que cada dívida termina',
+    t.includes('A partir de novembro de 2026 (mês 1): o pagamento de sempre de cada dívida e os R$ 100,00 a mais em Cartão azul.') &&
+    t.includes(`Abril de 2027 (mês 6): Cartão azul acaba. O pagamento dela (R$ 300,00) passa para ${F1_NAME}, que fica com R$ 400,00 por mês além do pagamento de sempre.`) &&
+    t.includes(`Fevereiro de 2027 (mês 4): Cartão azul acaba. O pagamento dela (R$ 300,00) passa para ${F1_NAME}, que fica com R$ 400,00 por mês além do pagamento de sempre.`) &&
+    t.includes(`Outubro de 2028 (mês 24): ${F1_NAME} acaba, e tudo está quitado.`) &&
+    t.includes('1. Cartão azul: termina em 6 meses (abril de 2027).') && t.includes(`2. ${F1_NAME}: termina em 36 meses (outubro de 2029).`) && t.includes('Em que ordem cada dívida termina'));
   ok('F1 nenhuma ordem é chamada de "melhor" ou "pior" e não há palavra vetada', !F1_VETOED.test(t), (t.match(F1_VETOED) ?? [])[0]);
   ok('F1 títulos: "Suas dívidas" e "Resultado" em nível 2',
     (await p.evaluate(() => [...document.querySelectorAll('[role=heading]')].filter((e) => e.getBoundingClientRect().width > 0 && ['Suas dívidas', 'Resultado'].includes(e.textContent)).map((e) => `${e.textContent}:${e.getAttribute('aria-level')}`).join('|'))) === 'Suas dívidas:2|Resultado:2');
@@ -5613,7 +5625,8 @@ setInterval(async () => {
   ok('F1 com R$ 100,00 a mais, "Sem valor a mais" não leva a legenda', !(await body()).includes(F1_CAPTION));
   await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '');
   ok('F1 valor a mais vazio e duas dívidas: a legenda "sem passar nada adiante" aparece junto do título de "Sem valor a mais" (uma só vez)',
-    (await body()).split(F1_CAPTION).length === 2 && (await body()).includes('As duas ordens dão no mesmo: tudo termina em 27 meses (2 anos e 3 meses), em janeiro de 2029.') && (await body()).includes('As duas ordens'));
+    (await body()).split(F1_CAPTION).length === 2 && (await body()).includes('Passando adiante o pagamento de cada dívida que acaba, tudo termina em 27 meses (janeiro de 2029), em vez de 36 meses (outubro de 2029), com R$ 1.677,71 a menos de juros estimados.') &&
+    (await body()).includes('Com estes números, as duas ordens dão no mesmo: o mesmo plano, o mesmo fim e os mesmos juros estimados.') && (await body()).includes('As duas ordens'));
   await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '0');
   ok('F1 valor a mais zero e duas dívidas: a legenda continua', (await body()).split(F1_CAPTION).length === 2);
   await atWidths(async (w) => { await scrollTo('Detalhes de cada ordem'); await layoutChecks(`F1 plano legenda ${w}px`); });
@@ -5625,16 +5638,16 @@ setInterval(async () => {
   await f1Fill('Apelido da dívida 2', '4111 1111 1111 1111');
   t = await body();
   ok('F1 apelido que parece número de cartão: recusado com a explicação, e o resultado espera a correção',
-    t.includes('Não use o número do cartão no apelido. Use um nome, como Cartão azul.') && t.includes('Preencha os campos para ver o resultado.') && !t.includes('Maior taxa primeiro: tudo termina'), t.slice(-500));
+    t.includes('Não use o número do cartão no apelido. Use um nome, como Cartão azul.') && t.includes('Preencha os campos para ver o resultado.') && !t.includes('As duas ordens, lado a lado'), t.slice(-500));
   await f1Fill('Apelido da dívida 2', 'a'.repeat(31));
   ok('F1 apelido com 31 caracteres: "Use no máximo 30 caracteres."', (await body()).includes('Use no máximo 30 caracteres.'));
   await f1Fill('Apelido da dívida 2', 'Cartão azul');
-  ok('F1 corrigido o apelido, o resultado volta', (await body()).includes('Maior taxa primeiro: tudo termina em 24 meses'));
+  ok('F1 corrigido o apelido, o resultado volta', (await body()).includes('As duas ordens, lado a lado') && (await body()).includes('tudo termina em 24 meses (outubro de 2028)'));
   await f1Fill('Quanto você paga por mês, Cartão azul', '10,00');
   t = await body();
   ok('F1 pagamento de R$ 10,00 para juros de R$ 15,00: "Com este pagamento, o saldo não diminui." e a dívida fica fora da comparação (só as duas linhas de uma dívida)',
     t.includes('Com este pagamento, o saldo não diminui.') && t.includes('Cartão azul fica fora da comparação até o pagamento ser maior que os juros do primeiro mês (R$ 15,00).') &&
-    !t.includes('Maior taxa primeiro: tudo termina') && t.includes('Com o valor a mais: tudo termina em 32 meses'), t.slice(-1200));
+    !t.includes('As duas ordens, lado a lado') && t.includes(`${F1_NAME} acaba em 32 meses (junho de 2029)`), t.slice(-1200));
   await atWidths(async (w) => {
     await scrollTo('Quanto você paga por mês');
     if (w === 390) await shot('193_plano_dividas_saldo_nao_diminui');
@@ -5648,12 +5661,12 @@ setInterval(async () => {
     t.includes('Preencha os campos para ver o resultado.') && t.includes('Com este pagamento, o saldo não diminui.') && !t.includes('fica fora da comparação'), t.slice(-700));
   await f1Fill(`Parcelas que faltam, ${F1_NAME}`, '36');
   await f1Fill('Quanto você paga por mês, Cartão azul', '300,00');
-  ok('F1 pagamento corrigido: o aviso some e as duas ordens voltam', !(await body()).includes('Com este pagamento, o saldo não diminui.') && (await body()).includes('Maior taxa primeiro: tudo termina em 24 meses'));
+  ok('F1 pagamento corrigido: o aviso some e as duas ordens voltam', !(await body()).includes('Com este pagamento, o saldo não diminui.') && (await body()).includes('As duas ordens, lado a lado') && (await body()).includes('tudo termina em 24 meses (outubro de 2028)'));
 
   // ---- 5. Tirar da conta, limite de 10 e lista vazia ----
   await btn(`Tirar da conta: ${F1_NAME}`).click(); await p.waitForTimeout(400);
   t = await body();
-  ok('F1 "Tirar da conta" tira a dívida só desta tela: sobra o Cartão azul e o resultado se refaz com uma dívida', !t.includes(F1_NAME) && t.includes('Cartão azul') && !t.includes('Maior taxa primeiro: tudo termina') && t.includes('Com o valor a mais: tudo termina em'), t.slice(-600));
+  ok('F1 "Tirar da conta" tira a dívida só desta tela: sobra o Cartão azul e o resultado se refaz com uma dívida', !t.includes(F1_NAME) && t.includes('Cartão azul') && !t.includes('As duas ordens, lado a lado') && t.includes('Com R$ 100,00 a mais por mês, Cartão azul acaba em'), t.slice(-600));
   await btn('Tirar da conta: Cartão azul').click(); await p.waitForTimeout(400);
   t = await body();
   ok('F1 com 0 dívidas: "Acrescente as dívidas que você quer comparar." e o resultado pede o preenchimento', t.includes('Acrescente as dívidas que você quer comparar.') && t.includes('Preencha os campos para ver o resultado.') && (await visibleCount('button', /^Tirar da conta/)) === 0);
@@ -5675,7 +5688,7 @@ setInterval(async () => {
   ok('F1 Renda comprometida de novembro: no grupo de dívidas, o link "Em que ordem quitar? Fazer as contas"', (await visibleCount('button', 'Em que ordem quitar? Fazer as contas')) === 1);
   await atWidths(async (w) => { await layoutChecks(`F1 renda comprometida ${w}px`); });
   await btn('Em que ordem quitar? Fazer as contas').click(); await waitText('Suas dívidas'); await p.waitForTimeout(500);
-  ok('F1 Renda comprometida › link abre a calculadora com o Financiamento do carro, sem nada gravado', urlPath() === '/calcular/plano-dividas' && (await body()).includes(F1_NAME) && (await body()).includes('Sem valor a mais: tudo termina em 36 meses'), p.url());
+  ok('F1 Renda comprometida › link abre a calculadora com o Financiamento do carro, sem nada gravado', urlPath() === '/calcular/plano-dividas' && (await body()).includes(F1_NAME) && (await body()).includes(`Só com o pagamento de sempre, ${F1_NAME} acaba em 36 meses`), p.url());
   await goResumo();
   await tabByName('Metas').click(); await waitText('Fazer as contas'); await p.waitForTimeout(300);
   await p.getByRole('button', { name: /^Calculadoras\./ }).filter({ visible: true }).first().click(); await waitText('Decidir uma compra'); await p.waitForTimeout(400);
@@ -5714,8 +5727,8 @@ setInterval(async () => {
     (await visibleCount('textbox', `Valor da parcela, ${F1_NAME}, valor oculto`)) === 1 && (await visibleCount('button', `Mostrar valores para editar a parcela, ${F1_NAME}`)) === 1 && t.includes('Mostrar valores'));
   ok('F1 valores ocultos: o campo da parcela não se edita e a dica diz como editar', !(await f1Parcela.isEditable()) && t.includes('Valor oculto. Mostre os valores para editar.') && (await f1Value(`Taxa de juros ao mês do contrato (%), ${F1_NAME}`)) === '1,5' && (await f1Value('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?')) === '100,00');
   const f1Leaks = await moneyLeaks();
-  ok('F1 valores ocultos: nenhum valor em reais à vista (texto e nomes acessíveis), com "R$ ••••" no resultado e "valor oculto" nos nomes', f1Leaks.length === 0 && t.includes('Com o valor a mais: R$ •••• a menos de juros.') && t.includes('Total pago: R$ ••••') && t.includes('No seu plano de guardar você informou R$ •••• por mês.') && (await spokenHidden()) > 0, `${f1Leaks.slice(0, 3).join(' | ')} ${t.includes('R$ ••••')}`);
-  ok('F1 valores ocultos: os meses e as ordens continuam (32 meses, junho de 2029)', t.includes('Com o valor a mais: tudo termina em 32 meses (2 anos e 8 meses), em junho de 2029.') && t.includes(`1. ${F1_NAME}: termina em 32 meses (junho de 2029).`));
+  ok('F1 valores ocultos: nenhum valor em reais à vista (texto e nomes acessíveis), com "R$ ••••" no resultado e "valor oculto" nos nomes', f1Leaks.length === 0 && t.includes('com R$ •••• a menos de juros estimados.') && t.includes('Total pago: R$ ••••') && t.includes('No seu plano de guardar você informou R$ •••• por mês.') && (await spokenHidden()) > 0, `${f1Leaks.slice(0, 3).join(' | ')} ${t.includes('R$ ••••')}`);
+  ok('F1 valores ocultos: os meses e o plano continuam (32 meses, junho de 2029)', t.includes(`${F1_NAME} acaba em 32 meses (junho de 2029), em vez de 36 meses (outubro de 2029)`) && t.includes(`Junho de 2029 (mês 32): ${F1_NAME} acaba.`));
   await atWidths(async (w) => {
     await layoutChecks(`F1 plano valores ocultos ${w}px`);
     await scrollTo(F1_NAME).catch(() => {});
@@ -5755,7 +5768,7 @@ setInterval(async () => {
   await f1Fill('Valor da parcela, Dívida 1', '200,00');
   await f1Fill('Parcelas que faltam, Dívida 1', '10');
   t = await body();
-  ok('F1 conta nova: uma dívida parcelada à mão (10 × R$ 200,00, sem taxa) termina em 10 meses', t.includes('Sem valor a mais: tudo termina em 10 meses') && t.includes('Dívida 1: sem juros informados, conta só as parcelas.'), t.slice(-600));
+  ok('F1 conta nova: uma dívida parcelada à mão (10 × R$ 200,00, sem taxa) termina em 10 meses', t.includes('Só com o pagamento de sempre, Dívida 1 acaba em 10 meses') && t.includes('Dívida 1: sem juros informados, conta só as parcelas.'), t.slice(-600));
   ok('F1 conta nova: nada gravado ao digitar (nenhuma escrita, nada no aparelho)', writes.length === f1Writes2 && (await f1Storage()) === f1Store2, `${writes.length - f1Writes2} escritas`);
   await keepText();
   await goResumo().catch(() => {});
@@ -6282,7 +6295,7 @@ setInterval(async () => {
     t.includes('Referência usada pela Serasa: até 30% da renda líquida com parcelas de dívidas. É uma referência geral, não uma regra para você.') &&
     t.includes('Fonte: Serasa, página sobre comprometimento de renda, consultada em 09/10/2026.') && t.includes('Estimativa. As condições oficiais são as da proposta; peça o CET.'));
   ok('D44 hipóteses visíveis: tabela Price com a primeira parcela em 1 mês, só a taxa informada, comprometido do mês atual e "O preço do bem pode mudar enquanto você junta."',
-    t.includes('Hipóteses') && t.includes('Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.') && t.includes('Só a taxa de juros informada, sem tarifas, seguros e IOF.') &&
+    t.includes('Hipóteses') && t.includes('Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.') && t.includes('A conta usa só a taxa informada: com a taxa de juros, ficam de fora tarifas, seguros e IOF; com o CET ao mês, eles já estão dentro.') &&
     t.includes('O comprometido é o do mês atual, com as contas a pagar já criadas; os meses seguintes podem ser diferentes.') && t.includes('O preço do bem pode mudar enquanto você junta.'));
   ok('D44 juntar antes (o que falta para comprar à vista, sem rendimento): guardando R$ 1.041,14 por mês, junta R$ 32.000,00 em 31 meses (2 anos e 7 meses), com a comparação neutra',
     t.includes('Guardando R$ 1.041,14 por mês, sem rendimento, você junta R$ 32.000,00 em 31 meses (2 anos e 7 meses).') &&
@@ -6527,8 +6540,8 @@ setInterval(async () => {
   // ---- 1. Movimentos › Organizar: a linha nova, com a categoria mais perto do limite ----
   await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(500);
   let f2Rows = await sectionRows('Organizar');
-  ok('F2 Organizar: seis linhas, com "Orçamento por categoria" depois de Cartões e antes de "Importar extrato ou fatura" (D-048) e de Calculadoras, e a legenda da categoria mais perto do limite (Lazer)',
-    f2Rows !== null && f2Rows.length === 6 && f2Rows[3] === 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00' && /^Cartões, /.test(f2Rows[2]) && /^Importar extrato ou fatura, /.test(f2Rows[4]) && /^Calculadoras, /.test(f2Rows[5]), JSON.stringify(f2Rows));
+  ok('F2 Organizar: sete linhas (com o Calendário do mês, D-105), com "Orçamento por categoria" depois de Cartões e antes de "Importar extrato ou fatura" (D-048) e de Calculadoras, e a legenda da categoria mais perto do limite (Lazer)',
+    f2Rows !== null && f2Rows.length === 7 && f2Rows[4] === 'Orçamento por categoria, Lazer: R$ 400,00 de R$ 300,00' && /^Cartões, /.test(f2Rows[3]) && /^Importar extrato ou fatura, /.test(f2Rows[5]) && /^Calculadoras, /.test(f2Rows[6]), JSON.stringify(f2Rows));
   await atWidths(async (w) => {
     await layoutChecks(`F2 Organizar ${w}px`);
     if (w === 390) await shot('200_organizar_orcamento');
@@ -7139,7 +7152,9 @@ setInterval(async () => {
   ok('G1 nada de exemplo na conta nova: nenhuma conta além da criada agora e nenhum gasto na Carteira', (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-');
 
   const g1Vetoed = g1Texts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
-  ok('G1 telas das contas: nenhum termo proibido, travessão, "fazer sentido" nem nome de banco ou produto', g1Texts.length >= 12 && g1Vetoed.length === 0 && g1Texts.every((x) => !/[–—]/.test(x) && !/nubank|ita[uú]\b|bradesco|santander|caixa econ|picpay|\bxp\b|btg|poupan[cç]a|investiment/i.test(x)), `${g1Texts.length} telas ${g1Vetoed.join(' | ')}`);
+  // D-107: Registrar recebimento traz a opção "Rendimento de investimento" (ligar ao investimento cadastrado), que não é nome de produto.
+  const g1Own = (x) => x.replace(/Rendimento de investimento|Liga este recebimento a um investimento cadastrado no espaço Pessoal\./g, '');
+  ok('G1 telas das contas: nenhum termo proibido, travessão, "fazer sentido" nem nome de banco ou produto', g1Texts.length >= 12 && g1Vetoed.length === 0 && g1Texts.every((x) => !/[–—]/.test(x) && !/nubank|ita[uú]\b|bradesco|santander|caixa econ|picpay|\bxp\b|btg|poupan[cç]a|investiment/i.test(g1Own(x))), `${g1Texts.length} telas ${g1Vetoed.join(' | ')}`);
   ok('G1 nenhuma escrita direta na rede: as contas gravam só pelas funções (nenhum PATCH, PUT ou DELETE de rede em contas)', !writes.slice(g1WritesBefore).some((w) => /financial_accounts/.test(w)));
   await goResumo().catch(() => {});
 
@@ -8033,7 +8048,7 @@ setInterval(async () => {
   // ---- 1. A porta em Movimentos › Organizar, na busca "No app" e em Conta ----
   await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(500);
   const i1Rows = await sectionRows('Organizar');
-  ok('I1 Organizar: "Importar extrato ou fatura" com a legenda "Arquivo PDF, OFX ou planilha do banco" depois do Orçamento e antes das calculadoras', i1Rows !== null && i1Rows.length === 6 && i1Rows[4] === SC.importar && /^Calculadoras, /.test(i1Rows[5]), JSON.stringify(i1Rows));
+  ok('I1 Organizar: "Importar extrato ou fatura" com a legenda "Arquivo PDF, OFX, planilha ou print do banco" (D-108) depois do Orçamento e antes das calculadoras', i1Rows !== null && i1Rows.length === 7 && i1Rows[5] === SC.importar && /^Calculadoras, /.test(i1Rows[6]), JSON.stringify(i1Rows));
   await atWidths(async (w) => { await layoutChecks(`I1 Organizar com a linha de importar ${w}px`); if (w === 390) { await scrollTo('Organizar'); await shot('300_importar_organizar'); } if (w === 320) { await scrollTo('Organizar'); await shot('300_importar_organizar_320px'); } });
   await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
   let t1 = await i1Keep();
@@ -8044,7 +8059,7 @@ setInterval(async () => {
   await tabByName('Aprender e dúvidas').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
   for (const query of ['importar', 'extrato', 'ofx', 'banco', 'planilha']) {
     await learnSearch().fill(query); await waitText('No app'); await p.waitForTimeout(400);
-    ok(`I1 busca "${query}" em Aprender: o grupo "No app" tem "Importar extrato ou fatura"`, (await p.getByRole('button', { name: /^Importar extrato ou fatura\. Arquivo PDF, OFX ou planilha do banco/ }).filter({ visible: true }).count()) === 1);
+    ok(`I1 busca "${query}" em Aprender: o grupo "No app" tem "Importar extrato ou fatura"`, (await p.getByRole('button', { name: /^Importar extrato ou fatura\. Arquivo PDF, OFX, planilha ou print do banco/ }).filter({ visible: true }).count()) === 1);
   }
   await learnSearch().fill('fatura'); await waitText('No app'); await p.waitForTimeout(400);
   ok('I1 busca "fatura": Cartões continua em primeiro e a importação também aparece', (await p.getByRole('button', { name: /^Cartões\. / }).filter({ visible: true }).count()) === 1 && (await p.getByRole('button', { name: /^Importar extrato ou fatura\. / }).filter({ visible: true }).count()) === 1);
@@ -8225,6 +8240,8 @@ setInterval(async () => {
   // O resumo diz quantas linhas já estavam anotadas (a parcela por semelhança e o mercado pela chave) e quantas foram importadas: o café
   // e a parcela em andamento (que entra com as 3 parcelas da papelaria, de novembro a janeiro).
   await btn('Importar 2 lançamentos').click(); await waitText('Importação concluída', 12000);
+  // A frase vem num aviso com entrada animada, que aparece um instante depois do título (como no fim do bloco, na conta nova).
+  await waitUntil(async () => (await body()).includes('2 lançamentos importados, 2 já estavam anotados.'), 8000);
   ok('I1 resumo da fatura: "2 lançamentos importados, 2 já estavam anotados."', (await body()).includes('2 lançamentos importados, 2 já estavam anotados.'), (await body()).slice(0, 300));
   ok('I1 a parcela em andamento virou compra parcelada no cartão: 3 parcelas de R$ 50,00, a 1ª na fatura de novembro, numeradas de 1 a 3',
     await otherDevice(async (repo, ctx) => {
@@ -8277,7 +8294,8 @@ setInterval(async () => {
   await atWidths(async (w) => { await innerChecks(`I1 colunas sem sinal ${w}px`); if (w === 390) await shot('315_importar_colunas_sem_sinal'); });
   await btn('Entendi, usar assim').click(); await waitText('Arquivo lido: sem-sinal.csv', 8000);
   await radio('Banco ou carteira').click(); await i1Review(); t1 = await i1Keep();
-  ok('I1 planilha sem sinal, depois de confirmar: as duas linhas são entradas (a caixa "Entradas e saídas estão trocadas" conserta)', t1.includes('01/10/2026 · Entrada') && t1.includes('02/10/2026 · Entrada'), t1.slice(0, 300));
+  // D-108: sem sinal nem tipo, no extrato da conta a descrição decide: "SALARIO" entra e "PADARIA" sai (cada linha pode trocar em Editar).
+  ok('I1 planilha sem sinal, depois de confirmar: a descrição decide, a padaria é saída e o salário é entrada', t1.includes('01/10/2026 · Saída') && t1.includes('02/10/2026 · Entrada'), t1.slice(0, 300));
   await i1Leave();
   // Valores ocultos: a prévia e as opções de coluna não mostram os valores da planilha.
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Organizar');
@@ -8513,7 +8531,7 @@ setInterval(async () => {
   const j1First = await p.evaluate(() => {
     const top = (e) => e.getBoundingClientRect().top;
     // Os atalhos "Ir para" ficam acima dos cards, logo abaixo da busca (D-091).
-    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^(Conta:|Ir para )/.test(e.getAttribute('aria-label') || ''));
+    const shown = [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^(Conta:|Ir para |Ocultar valores$|Mostrar valores$)/.test(e.getAttribute('aria-label') || ''));
     return shown.filter((e) => !e.closest('[role=tablist]')).sort((a, b) => top(a) - top(b)).slice(0, 2).map((e) => e.getAttribute('aria-label') || e.textContent);
   });
   const j1H2 = await p.evaluate(() => [...document.querySelectorAll('h2, [role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
@@ -9401,8 +9419,8 @@ setInterval(async () => {
     (await visibleCount('button', 'Ver análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.')) === 1 && k1Tops.lastRow !== null && k1Tops.analises !== null && k1Tops.organizar !== null &&
     k1Tops.lastRow < k1Tops.analises && k1Tops.analises < k1Tops.organizar, JSON.stringify(k1Tops));
   const k1Organizar = await sectionRows('Organizar');
-  ok('K1 Movimentos: a linha não entra em "Organizar" (o bloco segue com as mesmas seis linhas)', k1Organizar.length === 6 && k1Organizar[0] === 'Contas a pagar, R$ 650,00 em aberto neste mês' &&
-    k1Organizar[1] === 'Gastos fixos e parcelamentos, 7 cadastrados, com as contas do ano' && !k1Organizar.some((r) => r.includes('Seu mês')), JSON.stringify(k1Organizar));
+  ok('K1 Movimentos: a linha não entra em "Organizar" (o bloco segue com as mesmas sete linhas, com o Calendário do mês da D-105)', k1Organizar.length === 7 && k1Organizar[0] === 'Contas a pagar, R$ 650,00 em aberto neste mês' &&
+    k1Organizar[2] === 'Gastos fixos e parcelamentos, 7 cadastrados, com as contas do ano' && !k1Organizar.some((r) => r.includes('Seu mês')), JSON.stringify(k1Organizar));
   await k1Analyses();
   const k1AnTops = await p.evaluate(() => {
     const top = (re) => { const e = [...document.querySelectorAll('[role=button],[role=tab]')].find((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')); return e ? Math.round(e.getBoundingClientRect().top) : null; };
@@ -9623,31 +9641,23 @@ setInterval(async () => {
   // "Concluir" volta às Análises (revisão das telas, 16/11/2026), que não têm o avatar do cabeçalho: a Conta abre a partir de Movimentos.
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
 
-  // ---- 12. Conta › "Widget na tela inicial": o interruptor "Mostrar valores no widget" (desligado) fica guardado no aparelho ----
+  // ---- 12. Conta › "Widget na tela inicial": na web, só o texto (D-110: o interruptor "Mostrar valores no widget" vale só no celular) ----
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
-  const k1Widget = () => p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).first();
   await scrollTo('Widget na tela inicial');
   t = await k1Keep();
-  ok('K1 Conta: o card "Widget na tela inicial" (título de nível 2) diz, na web, "Disponível no app da Clarevo para celular." (D-093) e tem o interruptor "Mostrar valores no widget" desligado, depois de Privacidade', (await headingShown('Widget na tela inicial')) &&
-    t.includes('Disponível no app da Clarevo para celular.') && t.includes('Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.') &&
-    (await k1Widget().getAttribute('aria-checked')) === 'false' && (await hideSwitch().getAttribute('aria-checked')) === 'false' && t.indexOf('Privacidade neste aparelho') < t.indexOf('Widget na tela inicial'), `${await k1Widget().getAttribute('aria-checked')}`);
-  ok('K1 Conta: o interruptor explica que, desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome, só neste aparelho (D-054)', t.includes('Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.'));
-  await k1Shots('369_conta_widget', false, false);
   const k1StoreW0 = await k1Store();
-  await k1Widget().click(); await p.waitForTimeout(400);
-  ok('K1 Conta: ligar mostra o interruptor ligado e não muda "Ocultar valores ao abrir" (são duas escolhas)', (await k1Widget().getAttribute('aria-checked')) === 'true' && (await hideSwitch().getAttribute('aria-checked')) === 'false', `${await k1Widget().getAttribute('aria-checked')} ${await hideSwitch().getAttribute('aria-checked')}`);
-  ok('K1 Conta: na demonstração e nas contas simuladas a escolha fica só em memória (nada vai para o armazenamento do navegador)', (await k1Store()) === k1StoreW0, await k1Store());
-  await btn('Voltar').click(); await p.waitForTimeout(500);
-  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
-  ok('K1 Conta: a escolha continua ligada ao voltar à tela', (await k1Widget().getAttribute('aria-checked')) === 'true', `${await k1Widget().getAttribute('aria-checked')}`);
-  await k1Widget().click(); await p.waitForTimeout(300);
-  ok('K1 Conta: desligar volta ao padrão', (await k1Widget().getAttribute('aria-checked')) === 'false', `${await k1Widget().getAttribute('aria-checked')}`);
+  ok('K1 Conta: o card "Widget na tela inicial" (título de nível 2) diz, na web, "Disponível no app da Clarevo para celular." (D-093) e o que o widget mostra, depois de Privacidade', (await headingShown('Widget na tela inicial')) &&
+    t.includes('Disponível no app da Clarevo para celular.') && t.includes('Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.') &&
+    (await hideSwitch().getAttribute('aria-checked')) === 'false' && t.indexOf('Privacidade neste aparelho') < t.indexOf('Widget na tela inicial'));
+  ok('K1 Conta na web: sem o interruptor "Mostrar valores no widget" (sem widget no navegador, ele não teria efeito; D-110), como os lembretes',
+    (await visibleCount('switch', 'Mostrar valores no widget')) === 0 && !t.includes('Desligado, o widget mostra R$ ••••'));
+  await k1Shots('369_conta_widget', false, false);
+  ok('K1 Conta: abrir o card não grava nada no armazenamento do navegador', (await k1Store()) === k1StoreW0, await k1Store());
   await btn('Voltar').click(); await waitText('Registrar recebimento');
-  // Na demonstração a escolha fica só em memória (nada no armazenamento do aparelho).
+  // A demonstração mostra o mesmo card (os passos seguintes continuam nela, como antes).
   await demoHome();
-  await openConta(); await scrollTo('Widget na tela inicial'); await k1Widget().click(); await p.waitForTimeout(300);
-  ok('K1 Conta na demonstração: o interruptor liga, também só em memória', (await k1Widget().getAttribute('aria-checked')) === 'true' && (await k1Store()) === k1StoreW0);
-  await k1Widget().click(); await p.waitForTimeout(300);
+  await openConta(); await scrollTo('Widget na tela inicial'); await p.waitForTimeout(300);
+  ok('K1 Conta na demonstração: o mesmo card, sem o interruptor', (await body()).includes('Disponível no app da Clarevo para celular.') && (await visibleCount('switch', 'Mostrar valores no widget')) === 0);
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // ---- 13. Entradas: a busca "No app" e "Como usar" de Aprender e a entrada do guia ----
@@ -10169,12 +10179,13 @@ setInterval(async () => {
   ok('D54 renda comprometida: a tela não ganha nota nem texto novo sobre arredondamento (só os números dos grupos mudam)', !/arredond/i.test(t));
   await d54Shots('397_renda_comprometida_grupos', null, () => scrollTo('Composição'));
 
-  // ---- 6. Widget com valores ocultos (P-027): a legenda do interruptor em Conta ----
+  // ---- 6. Widget com valores ocultos (P-027): o card em Conta (a legenda do interruptor só no celular, D-110) ----
   await j1Demo();
   await openConta(); await scrollTo('Widget na tela inicial'); await p.waitForTimeout(300);
   t = await d54Keep();
-  ok('D54 Conta › Widget na tela inicial: o interruptor "Mostrar valores no widget" (desligado) diz que, desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome',
-    t.includes('Desligado, o widget mostra R$ •••• no lugar dos valores e, na próxima conta, só o prazo, sem o nome. Vale só para este aparelho.') && (await p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'false');
+  // A legenda do interruptor (núcleo, WIDGET_TEXT.showValuesCaption) aparece só no celular: na web o card não tem o interruptor (D-110).
+  ok('D54 Conta › Widget na tela inicial: na web, só "Disponível no app da Clarevo para celular.", sem o interruptor',
+    t.includes('Disponível no app da Clarevo para celular.') && (await p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).count()) === 0);
   await d54Shots('398_conta_widget_oculto', null, () => scrollTo('Widget na tela inicial'));
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
@@ -11149,7 +11160,7 @@ setInterval(async () => {
   ok('Evolução Movimentos: sem a linha "Evolução" (ela é uma aba das Análises) e com "Ver análises do mês", que diz que a evolução está lá', (await visibleCount('button', 'Evolução. Recebido e pago mês a mês, com média e mediana.')) === 0 &&
     (await visibleCount('button', /^Ver análises do mês\. Categorias, evolução/)) === 1, t.slice(0, 300));
   const evOrganizar = await sectionRows('Organizar');
-  ok('Evolução Movimentos: a linha não entra em "Organizar" (o bloco segue com as seis linhas de sempre)', evOrganizar.length === 6 && !evOrganizar.some((r) => r.includes('Evolução')), JSON.stringify(evOrganizar));
+  ok('Evolução Movimentos: a linha não entra em "Organizar" (o bloco segue com as sete linhas, com o Calendário do mês da D-105)', evOrganizar.length === 7 && !evOrganizar.some((r) => r.includes('Evolução')), JSON.stringify(evOrganizar));
   await evShots('440_evolucao_movimentos', { tab: true });
 
   // ---- 2. Carregando: o esqueleto, sem nenhum valor, e a tela completa depois ----
@@ -11920,7 +11931,9 @@ setInterval(async () => {
   await evEnter();
   await expectTotals('Análises, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 antes da tela', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
   const anResumoHeadings = JSON.stringify(await headingList());
-  ok('Análises Resumo: a estrutura de D-022 não ganhou as Análises (a linha mora em Movimentos)', !(await body()).includes('Análises'));
+  // D-105 (retorno do teste de 17/11/2026: "não estou mais achando as análises"): o Resumo ganhou o atalho "Análises do mês" no cartão de atalhos, sem título novo.
+  ok('Análises Resumo: as Análises entram só como o atalho "Análises do mês" do cartão de atalhos (D-105), sem título novo', (await visibleCount('button', 'Análises do mês, Categorias, evolução, orçamento e o mês em 30 segundos')) === 1 &&
+    !(await headingList()).some((h) => h.includes('Análises')));
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
   const anTops = await p.evaluate(() => {
     const tops = (re) => [...document.querySelectorAll('[role=button]')].filter((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')).map((e) => Math.round(e.getBoundingClientRect().top));
@@ -11928,12 +11941,12 @@ setInterval(async () => {
     return { anotar: tops(/^Anotar gasto$/)[0] ?? null, lastRow: tops(/, (Pago|Recebido) · /).pop() ?? null, analises: tops(/^Ver análises do mês\./)[0] ?? null, organizar: org ? Math.round(org.getBoundingClientRect().top) : null };
   });
   t = await anKeep();
-  ok('Análises Movimentos: a linha "Ver análises do mês" vem depois da lista do mês e antes de "Organizar", com a legenda e o nome acessível; as linhas "Seu mês em 30 segundos", "Evolução" e "Análises" saíram do topo', (await visibleCount('button', 'Ver análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.')) === 1 &&
+  ok('Análises Movimentos: a linha "Ver análises do mês" vem depois da lista do mês e antes de "Organizar", com a legenda e o nome acessível; as linhas "Seu mês em 30 segundos", "Evolução" e "Análises" saíram do topo (no alto fica só a pílula "Análises" da faixa azul, D-105)', (await visibleCount('button', 'Ver análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.')) === 1 &&
     t.includes('Categorias, evolução, orçamento e o mês em 30 segundos') && anTops.anotar !== null && anTops.lastRow !== null && anTops.analises !== null && anTops.organizar !== null &&
     anTops.anotar < anTops.lastRow && anTops.lastRow < anTops.analises && anTops.analises < anTops.organizar &&
     (await visibleCount('button', /^(Seu mês em 30 segundos|Evolução|Análises)\. /)) === 0, JSON.stringify(anTops));
   const anOrganizar = await sectionRows('Organizar');
-  ok('Análises Movimentos: a linha não entra em "Organizar" (o bloco segue com as seis linhas)', anOrganizar.length === 6 && !anOrganizar.some((r) => r.includes('Análises')), JSON.stringify(anOrganizar));
+  ok('Análises Movimentos: a linha não entra em "Organizar" (o bloco segue com as sete linhas, com o Calendário do mês da D-105)', anOrganizar.length === 7 && !anOrganizar.some((r) => r.includes('Análises')), JSON.stringify(anOrganizar));
   await anShots('480_analises_movimentos', { tab: true });
 
   // ---- 2. A tela: cabeçalho, mês, as quatro abas e Categorias em Barras (o padrão) ----
@@ -12305,7 +12318,7 @@ setInterval(async () => {
   // ---- 13. Textos e escritas ----
   await evEnter();
   await expectTotals('Análises, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 depois da tela', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
-  ok('Análises Resumo: os títulos e os blocos são os mesmos de antes das Análises (D-022)', JSON.stringify(await headingList()) === anResumoHeadings && !(await body()).includes('Análises'), JSON.stringify(await headingList()));
+  ok('Análises Resumo: os títulos e os blocos são os mesmos de antes das Análises (D-022), com o atalho "Análises do mês" (D-105)', JSON.stringify(await headingList()) === anResumoHeadings && (await visibleCount('button', 'Análises do mês, Categorias, evolução, orçamento e o mês em 30 segundos')) === 1, JSON.stringify(await headingList()));
   const anBad = anTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(demais|alt[oa]s?|baix[oa]s?|gastou|aumentou|diminuiu|despencou|disparou|cuidado|estour\w*|exagero|usuári[oa]s?|bem-vind[oa]s?)\b/i)?.[0]).filter(Boolean);
   ok('Análises: nenhum termo proibido, travessão longo, expressão vetada, palavra de julgamento nem palavra com gênero nas telas novas', anTexts.length >= 20 && anBad.length === 0, `${anTexts.length} telas ${anBad.join(' | ')}`);
   ok('Análises: nenhuma escrita direta na rede (a tela só lê; a escolha Barras | Bolhas fica no aparelho)', writes.length === anWrites0, writes.slice(anWrites0).join(' | '));
@@ -14081,7 +14094,7 @@ setInterval(async () => {
   ok('Evolução fase 3: nenhuma escrita direta na rede (a tela só lê; as escritas do roteiro ficam na memória da demonstração)', writes.length === f3Writes0, writes.slice(f3Writes0).join(' | '));
 
   // Acessibilidade (D-062, item 5; Ciclo Y): revisão de acessibilidade e de desempenho em Android simples, com o que foi corrigido.
-  // Conferido aqui, na versão web, em modo demonstração: (1) o pacote: o JavaScript principal fica abaixo de 5,6 MB (só os ícones
+  // Conferido aqui, na versão web, em modo demonstração: (1) o pacote: o JavaScript principal fica abaixo de 6,0 MB (só os ícones
   // usados, `apps/app/src/lib/lucide.ts`) e o leitor de PDF (1,7 MB) é um arquivo à parte que não é pedido ao abrir o app nem nas
   // telas principais; (2) em cerca de 60 telas: contraste de cada texto visível (4,5:1; 3:1 em texto grande e ícones), nome
   // acessível de botões, caixas, rádios e campos, nada clicável sem papel e alvos de toque de 44 x 44 px; (3) títulos da
@@ -14093,7 +14106,8 @@ setInterval(async () => {
   // =====================================================================================================================
   const acWrites0 = writes.length;
   const acTexts = [];
-  const acKeep = async () => { const x = await body(); acTexts.push(x); screenTexts.push(x); return x; };
+  // A última tela da letra grande pode ser de Investir (AC_INVEST): os nomes da ficha e dos títulos públicos valem nela (INVEST_NAMES).
+  const acKeep = async () => { const x = await body(); acTexts.push(x); screenTexts.push(x.replace(INVEST_NAMES, '')); return x; };
   // Funções que rodam na página (refeitas depois de cada carregamento da página): contraste calculado com as camadas de fundo e as
   // opacidades de cada elemento, alvos de toque, elementos clicáveis sem papel, texto cortado, texto por cima de texto e a letra grande.
   const AC_SRC = `
@@ -14282,9 +14296,10 @@ setInterval(async () => {
   const acJs = fs.readdirSync(acJsDir).filter((f) => f.endsWith('.js')).map((f) => ({ f, size: fs.statSync(path.join(acJsDir, f)).size }));
   const acEntry = acJs.filter((x) => x.f.startsWith('entry-'));
   const acPdf = acJs.filter((x) => x.f.startsWith('pdfjs-'));
-  // Limite de 5,6 MB desde 16/11/2026 (era 5,5 MB): a foto do perfil, a oferta da biometria e o link do widget somaram uns 10 KB de código.
-  // O limite existe para pegar o pacote inteiro de ícones (6,9 MB), e segue bem abaixo disso (docs/19, seção 8.1).
-  ok('Acessibilidade, pacote: o JavaScript principal fica abaixo de 5,6 MB (só os 98 ícones usados; o pacote inteiro de ícones o levava a 6,9 MB)', acEntry.length === 1 && acEntry[0].size < 5_600_000, acEntry.map((x) => `${x.f} ${(x.size / 1e6).toFixed(2)} MB`).join(' '));
+  // Limite de 6,0 MB desde 17/11/2026 (era 5,6 MB desde 16/11 e 5,5 MB antes): as dez frentes de 17/11 (calendário, desempenho, ficha do
+  // investimento, lançamentos ligados, importação por print, níveis, tema e outras) levaram a entrada a 5,79 MB. O limite existe para pegar
+  // o pacote inteiro de ícones, que somaria cerca de 1,4 MB a mais (docs/19, seção 8.1).
+  ok('Acessibilidade, pacote: o JavaScript principal fica abaixo de 6,0 MB (só os ícones usados; o pacote inteiro de ícones somaria cerca de 1,4 MB)', acEntry.length === 1 && acEntry[0].size < 6_000_000, acEntry.map((x) => `${x.f} ${(x.size / 1e6).toFixed(2)} MB`).join(' '));
   ok('Acessibilidade, pacote: o leitor de PDF (pdfjs, mais de 1 MB) é um arquivo à parte do principal', acPdf.length === 1 && acPdf[0].size > 1_000_000 && acEntry[0].size < acPdf[0].size * 4, acPdf.map((x) => `${x.f} ${(x.size / 1e6).toFixed(2)} MB`).join(' '));
   const acPdfReqs = [];
   p.on('request', (r) => { if (/pdfjs/.test(r.url())) acPdfReqs.push(r.url()); });
@@ -14314,6 +14329,8 @@ setInterval(async () => {
     ['investimento, detalhe', 'investimento/[id]/index', { id: acIds.inv }], ['investimento, editar', 'investimento/[id]/editar', { id: acIds.inv }],
     ['investimento, rendimento', 'investimento/[id]/movimento', { id: acIds.inv, tipo: 'rendimento' }], ['investimento, novo', 'investimento/novo', {}],
     ['plano de aportes', 'investimento/plano', {}], ['resumo para a declaração', 'investimento/declaracao', {}], ['comparar rendimentos', 'investimento/comparar', {}],
+    // D-103: o desempenho aberto pelo card azul.
+    ['desempenho dos investimentos', 'investimento/desempenho', {}],
   ];
   const AC_ROUTES = [
     ['registro novo, gasto', 'registro/novo', { tipo: 'despesa' }], ['registro novo, recebimento', 'registro/novo', { tipo: 'receita' }],
@@ -14541,7 +14558,8 @@ setInterval(async () => {
   // ---- 8. Demonstração de novo: os totais não mudam; textos e escritas ----
   await evEnter();
   await expectTotals('Acessibilidade, demonstração: outubro segue 6.000 / 3.900 / 2.100 e 650 (invariantes)', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
-  const acBad = acTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\bbem-vind[oa]\b/i)?.[0]).filter(Boolean);
+  // As telas de Investir entram na lista (AC_INVEST): os nomes da ficha e dos títulos públicos (CDB, Tesouro) valem nelas, como no bloco D-093.
+  const acBad = acTexts.map((x) => x.replace(INVEST_NAMES, '').match(FORBIDDEN)?.[0] ?? x.match(/\bbem-vind[oa]\b/i)?.[0]).filter(Boolean);
   ok('Acessibilidade: nenhum termo proibido, travessão longo nem expressão vetada nas telas com letra grande', acTexts.length >= 2 && acBad.length === 0, `${acTexts.length} telas ${acBad.join(' | ')}`);
   ok('Acessibilidade: nenhuma escrita direta na rede (a demonstração e as 1.000 gravações do roteiro vivem na memória)', writes.length === acWrites0, writes.slice(acWrites0).join(' | '));
 
@@ -14636,9 +14654,246 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
-  // Níveis de conta (D-095): na demonstração, a conta tem 13 dos 18 marcos (nível Ouro). Conta mostra o card "Nível da conta" com a borda
-  // do nível, e a tela /conta/nivel traz o nível, o caminho até o próximo, os quatro níveis, "Para conhecer" e "Já feitos". A troca de
-  // nível mostra o card de comemoração no Resumo uma vez (aqui, os marcos passam a 14 pela memória). Nada vai à rede.
+  // Gasto e recebimento (D-107, retorno de 17/11/2026): "O que este gasto pagou?" liga o gasto à conta a pagar, à parcela ou à fatura
+  // que ele pagou (sem outro gasto: a conta sai de Ainda a pagar e nada conta duas vezes); subcategorias por categoria (com "Outra" e as
+  // próprias guardadas no aparelho), no detalhe, na lista e na composição; trocar entre gasto e recebimento ao editar, também no
+  // lançamento importado, editado por inteiro; "Rendimento de investimento" no recebimento do Pessoal; e os caminhos de cadastrar e voltar
+  // (conta a pagar, investimento, cartão, banco ou carteira) com o preenchimento guardado. Nada vai à rede na demonstração.
+  // ==================================================================================================================
+  {
+    const lcWrites0 = writes.length;
+    // A mesma troca de aba do bloco das faturas (goTabN mora lá dentro): volta pelas telas até achar a barra e toca na aba.
+    const goTabN = async (name) => {
+      const tab = () => p.getByRole('tab', { name }).filter({ visible: true });
+      for (let i = 0; i < 8; i++) { await tab().first().waitFor({ timeout: 1500 }).catch(() => {}); if ((await tab().count()) > 0) break; await btn('Voltar').click(); await p.waitForTimeout(400); }
+      await tab().first().click(); await p.waitForTimeout(500);
+    };
+    const lcState = () => otherDevice(async (repo, ctx) => {
+      const month = await repo.listRecords(ctx, '2026-10');
+      const bills = await repo.listCommitments(ctx, '2026-10');
+      const invs = await repo.listInvestments(ctx);
+      return {
+        received: month.filter((r) => r.kind === 'receita').reduce((a, r) => a + r.amountCents, 0),
+        paid: month.filter((r) => r.kind === 'despesa').reduce((a, r) => a + r.amountCents, 0),
+        records: month.map((r) => ({ id: r.id, d: r.description, kind: r.kind, c: r.amountCents, cat: r.category, sub: r.subcategory ?? null, acc: r.accountId, on: r.occurredOn, cp: r.commitmentId, inv: r.investmentId ?? null, inv2: r.invoice ? `${r.invoice.cardId}:${r.invoice.month}` : null })),
+        bills: bills.map((c) => ({ id: c.id, d: c.description, status: c.status, paid: c.payment?.recordId ?? null })),
+        income: Object.fromEntries(invs.map((i) => [i.name, i.incomeCents])),
+        accounts: (await repo.listAccounts(ctx)).map((a) => ({ id: a.id, name: a.name })),
+      };
+    });
+    const lcRadioChecked = async (name) => (await p.getByRole('radio', { name }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true';
+    const lcLeave = async () => { await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click(); await p.waitForTimeout(400); };
+    await demoHome();
+    const lc0 = await lcState();
+    const lcIncomeMark = () => otherDevice(async (repo) => (await repo.getAccountMarks()).inv_rendimento);
+    const lcMark0 = await lcIncomeMark();
+
+    // ---- 1. "O que este gasto pagou?": aparece com um nome parecido com uma conta em aberto e sempre com "Crédito e parcelas" ----
+    await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await field('Descrição').fill('Café'); await field('Valor em reais').fill('8,00'); await p.waitForTimeout(400);
+    ok('D-107 Anotar gasto comum ("Café", R$ 8,00, sem categoria): sem "O que este gasto pagou?"', !(await body()).includes('O que este gasto pagou?'));
+    await field('Descrição').fill('Pagamento da internet'); await field('Valor em reais').fill('150,00'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    const lcInternet = () => p.getByRole('radio', { name: /^Internet, R\$ 150,00 · vence em 15\/10\/2026/ }).filter({ visible: true }).first();
+    ok('D-107 "Pagamento da internet" (R$ 150,00): "O que este gasto pagou?" com a frase do efeito, as contas em aberto (a de valor igual primeiro), "Nenhuma destas" marcado e os cadastros',
+      t.includes('O que este gasto pagou?') && t.includes('Ligando o gasto à conta, ela sai de Ainda a pagar e o valor não conta duas vezes.') &&
+      (await lcInternet().count()) === 1 && (await lcRadioChecked('Nenhuma destas')) && (await visibleCount('button', 'Cadastrar conta a pagar')) === 1 &&
+      (await visibleCount('button', 'Cadastrar parcelamento')) === 1 && (await headingShown('O que este gasto pagou?')), t.slice(t.indexOf('Categoria'), t.indexOf('Categoria') + 600));
+    // Subcategoria: com Moradia, a lista curta da categoria e "Outra".
+    await radio('Moradia').click(); await p.waitForTimeout(300);
+    const lcSubs = await p.getByRole('radiogroup', { name: 'Subcategoria (opcional), Moradia' }).filter({ visible: true }).first().getByRole('radio').evaluateAll((es) => es.map((e) => e.textContent));
+    ok('D-107 Subcategoria com Moradia: Nenhuma, Aluguel, Condomínio, Conta de luz, Conta de água, Gás, Internet, IPTU, Manutenção da casa e Outra (Nenhuma marcada)',
+      JSON.stringify(lcSubs) === JSON.stringify(['Nenhuma', 'Aluguel', 'Condomínio', 'Conta de luz', 'Conta de água', 'Gás', 'Internet', 'IPTU', 'Manutenção da casa', 'Outra']) && (await lcRadioChecked('Nenhuma')) &&
+      (await body()).includes('As categorias são as mesmas do orçamento. Para um nome seu, use a subcategoria Outra.'), JSON.stringify(lcSubs));
+    await radio('Internet').click(); await lcInternet().click(); await p.waitForTimeout(300);
+    ok('D-107 escolher a conta Internet marca a linha (e o nome acessível começa pelo texto visível)', (await lcInternet().getAttribute('aria-checked')) === 'true' && !(await lcRadioChecked('Nenhuma destas')));
+    await atWidths(async (w) => { await layoutChecks(`D-107 Anotar gasto com subcategoria e "O que este gasto pagou?" ${w}px`); if (w === 390) await shot('660_lancamento_o_que_pagou'); if (w === 320) await shot('660_lancamento_o_que_pagou_320px'); });
+    await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
+    t = await body(); screenTexts.push(t);
+    const lc1 = await lcState();
+    const lcPaid = lc1.records.find((r) => r.d === 'Pagamento da internet');
+    const lcBill = lc1.bills.find((c) => c.d === 'Internet');
+    ok('D-107 salvo e ligado: "Gasto salvo." com "Ligado a Internet, que saiu de Ainda a pagar.", e o detalhe com Subcategoria e Pagou',
+      t.includes('Gasto salvo.') && t.includes('Ligado a Internet, que saiu de Ainda a pagar.') && t.includes('Subcategoria\nInternet') && t.includes('Pagou\nInternet') && (await visibleCount('button', 'Ver conta a pagar')) === 1, t.slice(0, 700));
+    ok('D-107 um gasto só: a conta Internet ficou paga por ele, e Pago subiu R$ 150,00 uma vez', lcPaid && lcBill && lcBill.status === 'quitado' && lcBill.paid === lcPaid.id && lcPaid.cp === lcBill.id && lcPaid.sub === 'Internet' &&
+      lc1.paid === lc0.paid + 15000 && lc1.records.length === lc0.records.length + 1, JSON.stringify({ lcPaid, lcBill, paid: [lc0.paid, lc1.paid] }));
+    await atWidths(async (w) => { await layoutChecks(`D-107 detalhe do gasto ligado ${w}px`); if (w === 390) await shot('661_lancamento_detalhe_ligado'); });
+
+    // ---- 2. Composição: quanto foi para cada subcategoria dentro da categoria ----
+    await btn('Ver resumo do mês').click(); await waitText('Diferença do mês');
+    await p.getByRole('button', { name: /^Pago, R\$ 4\.050,00/ }).filter({ visible: true }).first().click(); await waitText('Gastos pagos com data de pagamento neste mês.');
+    await radio('Por categoria').click(); await waitUntil(async () => (await p.locator('[role=listitem][aria-label*=" do pago"]').count()) > 0);
+    const lcBars = await p.locator('[role=listitem][aria-label*=" do pago"]').filter({ visible: true }).evaluateAll((es) => es.map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')));
+    t = await body();
+    ok('D-107 Pago por categoria: Moradia mostra "Internet: R$ 150,00" e "Sem subcategoria: R$ 2.500,00" (no texto e no nome acessível); o orçamento segue por categoria',
+      t.includes('Internet: R$ 150,00') && t.includes('Sem subcategoria: R$ 2.500,00') && lcBars.some((l) => l.startsWith('Moradia, R$ 2.650,00') && l.includes('Internet: R$ 150,00') && l.includes('Sem subcategoria: R$ 2.500,00')), JSON.stringify(lcBars));
+    await atWidths(async (w) => { await layoutChecks(`D-107 composição com subcategorias ${w}px`); if (w === 390) await shot('662_composicao_subcategorias'); });
+    await btn('Voltar').click(); await waitText('Diferença do mês');
+
+    // ---- 2b. Ocultar valores: o valor de cada conta em "O que este gasto pagou?" vira "R$ ••••" (no texto e no nome acessível) ----
+    await p.setViewportSize({ width: 600, height: 900 }); await p.waitForTimeout(500); await btn('Ocultar valores').click(); await p.waitForTimeout(300);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+    await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await field('Descrição').fill('Pagamento do condomínio'); await p.waitForTimeout(400);
+    const lcHidden = await p.getByRole('radio', { name: /^Condomínio, / }).filter({ visible: true }).first().getAttribute('aria-label');
+    ok('D-107 com valores ocultos, a conta aparece com "R$ ••••" e o leitor de tela ouve "valor oculto"', (await body()).includes('R$ •••• · vence em 20/10/2026') && /^Condomínio, valor oculto · vence em 20\/10\/2026$/.test(lcHidden ?? ''), lcHidden);
+    await lcLeave();
+    await p.setViewportSize({ width: 600, height: 900 }); await p.waitForTimeout(500); await btn('Mostrar valores').click(); await p.waitForTimeout(300);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+
+    // ---- 3. Editar: trocar de tipo depois de "Nenhuma destas" e ligar o recebimento ao investimento ----
+    await goTabN('Movimentos'); await p.getByRole('button', { name: /^Pagamento da internet, Pago · 07\/10\/2026 · Internet · conta a pagar/ }).filter({ visible: true }).first().click(); await waitText('Editar gasto');
+    await btn('Editar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-107 Editar o gasto ligado: a conta aparece marcada ("Ligado agora."), e o tipo só troca depois de "Nenhuma destas"',
+      t.includes('Ligado agora.') && t.includes('Este gasto é o pagamento de uma conta. Para trocar o tipo, escolha Nenhuma destas em O que este gasto pagou?') &&
+      (await visibleCount('radiogroup', 'Tipo')) === 0 && (await lcInternet().getAttribute('aria-checked')) === 'true', t.slice(0, 600));
+    await radio('Nenhuma destas').click(); await p.waitForTimeout(300);
+    ok('D-107 com "Nenhuma destas", o grupo "Tipo" (Gasto marcado) aparece', (await visibleCount('radiogroup', 'Tipo')) === 1 && (await lcRadioChecked('Gasto')) && !(await lcRadioChecked('Recebimento')));
+    await radio('Recebimento').click(); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-107 trocar para Recebimento: a frase do efeito no mês, as categorias de recebimento e o título "Editar recebimento"',
+      t.includes('Ao salvar, este valor sai de Pago e entra em Recebido de outubro de 2026. A categoria passa a ser uma de recebimento.') && (await visibleCount('radio', 'Salário')) === 1 &&
+      (await visibleCount('radio', 'Moradia')) === 0 && (await h1Name()) === 'Editar recebimento' && (await visibleCount('button', 'Salvar recebimento')) === 1 && !t.includes('O que este gasto pagou?'), t.slice(0, 500));
+    await radio('Renda extra').click();
+    await p.getByRole('switch', { name: 'Rendimento de investimento' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await radio('Aplicação do banco').click(); await p.waitForTimeout(300);
+    t = await body();
+    ok('D-107 Rendimento de investimento: a escolha do investimento, a frase do que acontece e "Cadastrar investimento"',
+      t.includes('Qual investimento?') && t.includes('Ao salvar, o valor entra em Recebido uma vez só e fica registrado como rendimento recebido em Aplicação do banco, na mesma data. O valor atual do investimento não muda.') &&
+      (await visibleCount('button', 'Cadastrar investimento')) === 1, t.slice(t.indexOf('Categoria'), t.indexOf('Categoria') + 700));
+    await atWidths(async (w) => { await layoutChecks(`D-107 Editar: troca de tipo e rendimento de investimento ${w}px`); if (w === 390) await shot('663_editar_tipo_e_investimento'); });
+    // Revisão de 17/11/2026: desligar a conta de antes vem antes de gravar; se a gravação falha depois (aqui, uma recusa simulada na
+    // primeira tentativa), a faixa de erro diz que a conta já voltou para Ainda a pagar, e o formulário continua aberto.
+    await p.evaluate(async () => {
+      const r = await window.__e2e.repo();
+      const orig = r.updateRecord;
+      r.updateRecord = function (key, id, version, input) { r.updateRecord = orig; return orig.call(r, key, id, version, { ...input, investmentId: '' }); };
+    });
+    await btn('Salvar recebimento').click(); await waitText('A conta de antes já voltou para Ainda a pagar.'); await p.waitForTimeout(400);
+    const lcFail = await lcState();
+    ok('D-107 gravação recusada depois de desligar: a faixa diz que a conta de antes voltou para Ainda a pagar e que as outras alterações não foram salvas',
+      (await body()).includes('A conta de antes já voltou para Ainda a pagar. As outras alterações não foram salvas.') && (await h1Name()) === 'Editar recebimento' &&
+      lcFail.bills.find((c) => c.d === 'Internet').status === 'aberto' && lcFail.records.find((r) => r.id === lcPaid.id).kind === 'despesa' &&
+      lcFail.records.find((r) => r.id === lcPaid.id).cp === null, JSON.stringify(lcFail.records.find((r) => r.id === lcPaid.id)));
+    await btn('Tentar de novo').click(); await waitText('Alterações salvas'); await p.waitForTimeout(600);
+    t = await body();
+    const lc2 = await lcState();
+    const lcNow = lc2.records.find((r) => r.id === lcPaid.id);
+    ok('D-107 salvo: a conta Internet voltou a Ainda a pagar, o lançamento virou recebimento ligado ao investimento, sem contar duas vezes',
+      t.includes('A conta de antes voltou para Ainda a pagar. Este lançamento continua anotado.') && t.includes('Rendimento de\nAplicação do banco') &&
+      lcNow.kind === 'receita' && lcNow.cat === 'Renda extra' && lcNow.inv !== null && lcNow.cp === null && lc2.bills.find((c) => c.d === 'Internet').status === 'aberto' &&
+      lc2.received === lc0.received + 15000 && lc2.paid === lc0.paid && lc2.income['Aplicação do banco'] === lc0.income['Aplicação do banco'] + 15000, JSON.stringify({ lcNow, r: [lc0.received, lc2.received], inc: lc2.income }));
+    // Revisão de 17/11/2026: o rendimento gravado pelo recebimento ligado também conta para o marco "Registrar um rendimento recebido".
+    ok('D-107 o rendimento pelo recebimento ligado faz o marco "Registrar um rendimento recebido" do nível da conta', lcMark0 === false && (await lcIncomeMark()) === true);
+
+    // ---- 4. O lançamento importado editado por inteiro (tipo, categoria, subcategoria, banco ou carteira, data, valor e descrição) ----
+    await otherDevice(async (repo, ctx) => {
+      const acc = (await repo.getSpace()).accounts[0].id;
+      await repo.importRecords('lc-e2e-importar', ctx, 'conta', acc, [{ importKey: 'b'.repeat(64), kind: 'despesa', amountCents: 1, occurredOn: '2026-10-06', description: 'ENTRADA REND PAGO APLIC AUT APR', category: null }]);
+    });
+    await goTabN('Movimentos'); await p.getByRole('button', { name: /^ENTRADA REND PAGO APLIC AUT APR, Pago · 06\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Editar gasto');
+    await btn('Editar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+    await radio('Recebimento').click(); await radio('Renda extra').click(); await radio('Carteira').click();
+    await field('Descrição').fill('Rendimento da aplicação'); await field('Valor em reais').fill('0,02'); await field('Data do recebimento').fill('05/10/2026');
+    await btn('Salvar recebimento').click(); await waitText('Alterações salvas'); await p.waitForTimeout(600);
+    const lc3 = await lcState();
+    const lcImp = lc3.records.find((r) => r.d === 'Rendimento da aplicação');
+    const lcCarteira = lc3.accounts.find((a) => a.name === 'Carteira');
+    ok('D-107 importado: de gasto para recebimento, com categoria, carteira, data, valor e descrição trocados numa edição só',
+      lcImp && lcImp.kind === 'receita' && lcImp.cat === 'Renda extra' && lcImp.acc === lcCarteira.id && lcImp.on === '2026-10-05' && lcImp.c === 2 && lc3.received === lc2.received + 2 && lc3.paid === lc2.paid, JSON.stringify(lcImp));
+    await btn('Editar recebimento').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+    await radio('Gasto').click(); await p.waitForTimeout(300);
+    ok('D-107 importado de volta a gasto: a frase do efeito ("sai de Recebido e entra em Pago")', (await body()).includes('Ao salvar, este valor sai de Recebido e entra em Pago de outubro de 2026.'));
+    await radio('Moradia').click(); await radio('Outra').click(); await p.waitForTimeout(300);
+    await btn('Salvar gasto').click(); await p.waitForTimeout(400);
+    ok('D-107 "Outra" sem nome: o erro junto do campo e nada salvo', (await body()).includes('Escreva o nome da subcategoria ou escolha uma da lista.') && (await visibleCount('button', 'Salvar gasto')) === 1);
+    await field('Nome da subcategoria').fill('Tarifa da conta'); await btn('Salvar gasto').click(); await waitText('Alterações salvas'); await p.waitForTimeout(600);
+    const lc4 = await lcState();
+    ok('D-107 importado de volta a gasto, com a subcategoria própria ("Tarifa da conta")', lc4.records.find((r) => r.id === lcImp.id)?.kind === 'despesa' && lc4.records.find((r) => r.id === lcImp.id)?.sub === 'Tarifa da conta' && (await body()).includes('Subcategoria\nTarifa da conta'));
+
+    // ---- 5. A subcategoria própria volta como opção (só neste aparelho) e se tira sem sair do formulário ----
+    await goTabN('Resumo'); await waitText('Diferença do mês'); await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await radio('Moradia').click(); await p.waitForTimeout(300);
+    ok('D-107 a subcategoria própria aparece em Moradia, com "Editar minhas subcategorias"', (await visibleCount('radio', 'Tarifa da conta')) === 1 && (await visibleCount('button', 'Editar minhas subcategorias')) === 1);
+    await btn('Editar minhas subcategorias').click(); await btn('Tirar Tarifa da conta').click(); await p.waitForTimeout(300);
+    ok('D-107 "Tirar Tarifa da conta" tira a opção da lista (o lançamento continua com ela)', (await visibleCount('radio', 'Tarifa da conta')) === 0 && (await lcState()).records.find((r) => r.id === lcImp.id)?.sub === 'Tarifa da conta');
+
+    // ---- 6. Cadastrar conta a pagar e voltar com o preenchimento guardado; a conta nova vem escolhida e é paga por este gasto ----
+    await field('Descrição').fill('Acordo'); await field('Valor em reais').fill('265,00'); await radio('Crédito e parcelas').click(); await p.waitForTimeout(400);
+    await btn('Cadastrar conta a pagar').click(); await waitText('Anotar conta a pagar'); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-107 "Cadastrar conta a pagar" abre o cadastro com o que foi digitado e diz que volta para o lançamento',
+      (await field('Descrição').inputValue()) === 'Acordo' && (await field('Valor em reais').inputValue()) === '265,00' && (await field('Data de vencimento').inputValue()) === '07/10/2026' &&
+      t.includes('Depois de salvar, você volta para o lançamento que estava anotando, com o que já preencheu.'), t.slice(0, 400));
+    await btn('Salvar conta a pagar').click(); await waitText('O que este gasto pagou?'); await p.waitForTimeout(600);
+    await waitUntil(async () => (await p.getByRole('radio', { name: /^Acordo, R\$ 265,00/ }).filter({ visible: true }).first().getAttribute('aria-checked').catch(() => null)) === 'true', 5000);
+    ok('D-107 de volta ao gasto: descrição e valor guardados e a conta nova (Acordo) já escolhida',
+      (await field('Descrição').inputValue()) === 'Acordo' && (await field('Valor em reais').inputValue()) === '265,00' &&
+      (await p.getByRole('radio', { name: /^Acordo, R\$ 265,00/ }).filter({ visible: true }).first().getAttribute('aria-checked')) === 'true');
+    await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
+    const lc5 = await lcState();
+    ok('D-107 a conta Acordo foi paga por este gasto (nenhum gasto a mais)', lc5.bills.find((c) => c.d === 'Acordo')?.status === 'quitado' && lc5.records.filter((r) => r.d === 'Acordo').length === 1 && lc5.paid === lc4.paid + 26500);
+
+    // ---- 7. Fatura fechada: o gasto vira o pagamento dela, e "Desligar da fatura" mantém o gasto ----
+    await otherDevice(async (repo, ctx) => {
+      const card = (await repo.listCards(ctx))[0];
+      await repo.addCardPurchase('lc-e2e-compra', card.id, { description: 'Farmácia', category: 'Saúde', purchasedOn: '2026-10-02', totalCents: 10000, installments: 1 });
+    });
+    await goTabN('Resumo'); await waitText('Diferença do mês'); await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await field('Descrição').fill('PAGAMENTO DE PIX QR CREDITO'); await field('Valor em reais').fill('100,00'); await radio('Crédito e parcelas').click(); await p.waitForTimeout(500);
+    await p.getByRole('radio', { name: /^Fatura Cartão Exemplo \(outubro\), R\$ 100,00/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    ok('D-107 a fatura fechada de outubro aparece e, escolhida, explica o pagamento ("como em Registrar pagamento")', (await body()).includes('Na fatura, o gasto vira o pagamento dela, com este valor e esta data, como em Registrar pagamento.'));
+    await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(600);
+    t = await body();
+    ok('D-107 salvo como pagamento da fatura, com "Desligar da fatura"', t.includes('Registrado como o pagamento de Fatura Cartão Exemplo (outubro).') && t.includes('Pagamento de fatura') && (await visibleCount('button', 'Desligar da fatura')) === 1, t.slice(0, 600));
+    await btn('Desligar da fatura').click(); await waitText('Desligar este gasto da fatura?');
+    await confirmIn('Desligar da fatura'); await waitText('Gasto desligado da fatura.'); await p.waitForTimeout(400);
+    const lc6 = await lcState();
+    ok('D-107 desligado: o gasto continua (sem fatura) e a fatura de outubro volta a ficar em aberto', lc6.records.find((r) => r.d === 'PAGAMENTO DE PIX QR CREDITO')?.inv2 === null && lc6.paid === lc5.paid + 10000 &&
+      (await visibleCount('button', 'Editar gasto')) === 1);
+
+    // ---- 8. Cadastrar e voltar: cartão e banco ou carteira ----
+    await goTabN('Resumo'); await waitText('Diferença do mês'); await btn('Anotar gasto').click(); await waitText('Será salvo em');
+    await field('Descrição').fill('Livro'); await radio('Cartão de crédito').click(); await p.waitForTimeout(400);
+    ok('D-107 com cartão cadastrado, "Cadastrar outro cartão"', (await visibleCount('button', 'Cadastrar outro cartão')) === 1);
+    await radio('Dinheiro, débito ou Pix').click(); await p.waitForTimeout(300);
+    ok('D-107 banco ou carteira: "Gerenciar bancos e carteira" e "Cadastrar banco ou carteira" junto do seletor', (await visibleCount('button', 'Gerenciar bancos e carteira')) === 1 && (await visibleCount('button', 'Cadastrar banco ou carteira')) === 1);
+    await btn('Cadastrar banco ou carteira').click(); await waitText('Por exemplo: Carteira ou o nome do banco.');
+    await field('Nome').fill('Banco Exemplo'); await btn('Adicionar').click(); await waitText('Será salvo em'); await p.waitForTimeout(600);
+    await waitUntil(async () => (await body()).includes('Será salvo em Pessoal, Banco Exemplo.'), 5000);
+    ok('D-107 de volta ao gasto depois de cadastrar: a descrição guardada e o banco novo já escolhido', (await field('Descrição').inputValue()) === 'Livro' && (await lcRadioChecked('Banco Exemplo')) && (await body()).includes('Será salvo em Pessoal, Banco Exemplo.'));
+    await lcLeave();
+
+    // ---- 9. Rendimento de investimento: cadastrar um investimento novo e voltar ----
+    await goTabN('Movimentos'); await btn('Registrar recebimento').click(); await waitText('Será salvo em');
+    await field('Descrição').fill('Dividendos'); await field('Valor em reais').fill('12,34');
+    await p.getByRole('switch', { name: 'Rendimento de investimento' }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await btn('Cadastrar investimento').click(); await waitText('Novo investimento');
+    ok('D-107 "Cadastrar investimento" abre o cadastro com a origem (?origem=registro) e diz que volta para o lançamento',
+      urlPath() === '/investimento/novo' && new URL(p.url()).searchParams.get('origem') === 'registro' &&
+      (await body()).includes('Depois de salvar, você volta para o lançamento que estava anotando, com o que já preencheu.'));
+    await field('Nome').fill('Ações da corretora'); await radio('Ações').click(); await field('Quanto você aplicou até hoje?').fill('1000');
+    // Revisão de 17/11/2026: depois de criar, volta sozinho ao recebimento (antes, caía no detalhe do investimento).
+    await btn('Criar investimento').click(); await waitText('Será salvo em'); await p.waitForTimeout(500);
+    await waitUntil(async () => (await visibleCount('radio', 'Ações da corretora')) === 1 && (await lcRadioChecked('Ações da corretora')), 5000);
+    ok('D-107 de volta ao recebimento sozinho, sem passar pelo detalhe do investimento: descrição e valor guardados e o investimento novo já escolhido',
+      urlPath() === '/registro/novo' && (await h1Name()) === 'Registrar recebimento' &&
+      (await field('Descrição').inputValue()) === 'Dividendos' && (await field('Valor em reais').inputValue()) === '12,34' && (await lcRadioChecked('Ações da corretora')));
+    await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await p.waitForTimeout(500);
+    ok('D-107 o rendimento ficou no investimento novo, e o recebimento mostra "Rendimento de Ações da corretora"', (await lcState()).income['Ações da corretora'] === 1234 && (await body()).includes('Rendimento de\nAções da corretora'));
+    await atWidths(async (w) => { await layoutChecks(`D-107 recebimento com rendimento de investimento ${w}px`); if (w === 390) await shot('664_recebimento_rendimento'); });
+    ok('D-107 nada vai à rede na demonstração', writes.length === lcWrites0, writes.slice(lcWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Níveis de conta (D-095, revisto pela D-111): na demonstração, a conta tem 13 dos 18 marcos do dia a dia (nível Ouro) e 5 dos 6 de
+  // investimentos e reserva. Conta mostra o card "Nível da conta", e a tela /conta/nivel traz o nível, o caminho até o próximo, os cinco
+  // níveis (com a Esmeralda), "Para conhecer", "Investimentos e reserva" e "Já feitos". A troca de nível mostra o card de comemoração no
+  // Resumo uma vez (aqui, os marcos passam a 14 pela memória, sem dois do grupo: Diamante). No fim do bloco, a D-111: a Esmeralda de verdade
+  // (a imagem de uma meta), o aviso de queda (45 dias sem anotar, pela memória) no Resumo, em Conta e na tela do nível, com "Agora não"; o
+  // nível um degrau abaixo (67 dias) sem contar dias fora do aviso; a volta sem comemorar; e o cenário ?cenario=nivel (a faixa "Seus
+  // últimos meses" primeiro, o aviso depois). Nada vai à rede.
   // ==================================================================================================================
   {
     const lvWrites0 = writes.length;
@@ -14646,14 +14901,16 @@ setInterval(async () => {
     t = await body();
     ok('Níveis: sem troca de nível, o Resumo não mostra comemoração', !t.includes('Sua conta chegou ao nível'));
     await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
-    const lvCard = await p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Nível da conta' && e.getBoundingClientRect().width > 0); return h?.parentElement?.textContent ?? ''; });
+    const lvCardText = () => p.evaluate(() => { const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Nível da conta' && e.getBoundingClientRect().width > 0); return h?.parentElement?.textContent ?? ''; });
+    const lvCard = await lvCardText();
     ok('Níveis: o card em Conta com "Nível Ouro", "13 de 18 marcos", o que falta para o Diamante e "Ver meu nível"',
       lvCard.includes('Nível Ouro') && lvCard.includes('13 de 18 marcos') && lvCard.includes('Falta 1 marco para o nível Diamante.') && (await visibleCount('button', 'Ver meu nível')) === 1, lvCard.slice(0, 300));
     await btn('Ver meu nível').click(); await waitText('Para conhecer'); await p.waitForTimeout(500);
     t = await body(); screenTexts.push(t);
-    ok('Níveis: a tela /conta/nivel com o nível, o caminho, o que é o nível, os quatro níveis, "Para conhecer" e "Já feitos"',
+    ok('Níveis: a tela /conta/nivel com o nível, o caminho, o que é o nível (desce depois de 60 dias sem anotar e volta), os cinco níveis, "Para conhecer" e "Já feitos"',
       new URL(p.url()).pathname === '/conta/nivel' && (await h1Name()) === 'Nível da conta' && t.includes('Nível Ouro') && t.includes('13 de 18 marcos') &&
-      t.includes('Não tem a ver com quanto dinheiro você tem, e nunca desce.') && ['Bronze', 'Prata', 'Ouro', 'Diamante'].every((x) => t.includes(x)) &&
+      t.includes('O nível desce um degrau depois de 60 dias sem anotar nada e volta assim que você voltar a anotar.') && !t.includes('nunca desce') &&
+      ['Bronze', 'Prata', 'Ouro', 'Diamante', 'Esmeralda'].every((x) => t.includes(x)) &&
       t.includes('Para conhecer') && t.includes('Nada aqui é obrigatório') && t.includes('Já feitos') && t.includes('Escolher a imagem de uma meta') && t.includes('Anotar um gasto'), t.slice(0, 900));
     ok('Níveis: os marcos por fazer levam à tela deles, e os feitos são lidos como feitos',
       (await visibleCount('button', 'Escolher a imagem de uma meta: ainda não')) === 1 && (await p.locator('[aria-label="Anotar um gasto: feito"]').filter({ visible: true }).count()) === 1 &&
@@ -14661,9 +14918,10 @@ setInterval(async () => {
     await atWidths(async (w) => { await layoutChecks(`Nível da conta ${w}px`); if (w === 390) await shot('620_nivel_da_conta'); });
     await btn('Escolher a imagem de uma meta: ainda não').click(); await waitText('Viagem de férias'); await p.waitForTimeout(300);
     ok('Níveis: "Escolher a imagem de uma meta" abre Metas', new URL(p.url()).pathname === '/metas', p.url());
-    // A troca de nível: os marcos passam a 14 (Diamante). O Resumo comemora uma vez; "Fechar" guarda o nível como visto.
+    // A troca de nível: os marcos do dia a dia passam a 14, com só 3 do grupo de investimentos e reserva (Diamante). O Resumo comemora uma
+    // vez; "Fechar" guarda o nível como visto.
     await tabByName('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
-    await p.evaluate(async () => { const repo = await window.__e2e.repo(); const orig = repo.getAccountMarks.bind(repo); repo.getAccountMarks = async () => ({ ...(await orig()), imagem: true }); await window.__e2e.refresh(); });
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); const orig = repo.getAccountMarks.bind(repo); repo.getAccountMarks = async () => ({ ...(await orig()), imagem: true, inv_plano: false, inv_meta: false }); await window.__e2e.refresh(); });
     await waitText('Sua conta chegou ao nível Diamante!'); await p.waitForTimeout(500);
     t = await body(); screenTexts.push(t);
     ok('Níveis: a troca de nível mostra o card de comemoração no Resumo, com "Ver meu nível" e "Fechar"',
@@ -14672,14 +14930,291 @@ setInterval(async () => {
     await btn('Fechar').click(); await p.waitForTimeout(400);
     await p.evaluate(async () => { await window.__e2e.refresh(); }); await p.waitForTimeout(600);
     ok('Níveis: depois de "Fechar", a comemoração não volta', !(await body()).includes('Sua conta chegou ao nível'));
+
+    // ---- D-111: o grupo "Investimentos e reserva" e a Esmeralda ----
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); delete repo.getAccountMarks; await window.__e2e.refresh(); });
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(300);
+    await btn('Ver meu nível').click(); await waitText('Investimentos e reserva'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('Níveis (D-111): a Esmeralda na lista, com o que ela pede ("A partir do Diamante e de 4 dos 6 marcos de investimentos e reserva")',
+      t.includes('A partir do Diamante e de 4 dos 6 marcos de investimentos e reserva') &&
+      (await p.locator('[aria-label="Esmeralda, a partir do Diamante e de 4 dos 6 marcos de investimentos e reserva"]').filter({ visible: true }).count()) === 1);
+    ok('Níveis (D-111): o grupo "Investimentos e reserva" com o que conta (pelo uso, nunca pelo valor), que investir é só do Pessoal e 5 de 6 feitos',
+      (await headingShown('Investimentos e reserva')) && t.includes('Para o nível Esmeralda: com o Diamante, 4 destes 6 marcos. Eles contam pelo uso, nunca pelo valor.') &&
+      t.includes('Investir fica só no seu Pessoal') && t.includes('5 de 6 marcos de investimentos e reserva') &&
+      (await visibleCount('button', 'Registrar um rendimento recebido: ainda não')) === 1 &&
+      ['Registrar um aporte num investimento', 'Atualizar o valor de um investimento', 'Criar o plano de aportes', 'Ligar um investimento a uma meta', 'Definir quanto guardar por mês na reserva para imprevistos']
+        .every((x) => t.includes(x)) && (await p.locator('[aria-label="Criar o plano de aportes: feito"]').filter({ visible: true }).count()) === 1 &&
+      (await p.locator('[aria-label="Definir quanto guardar por mês na reserva para imprevistos: feito"]').filter({ visible: true }).count()) === 1, t.slice(0, 1200));
+    await btn('Registrar um rendimento recebido: ainda não').click(); await waitText('Investir', 10000).catch(() => {}); await p.waitForTimeout(400);
+    ok('Níveis (D-111): "Registrar um rendimento recebido" abre a aba Investir', new URL(p.url()).pathname === '/investimentos', p.url());
+    // A Esmeralda de verdade: a imagem de uma meta completa os 14 marcos do dia a dia, com 5 do grupo. O aparelho já viu o Diamante: comemora.
+    await p.evaluate(async () => {
+      const repo = await window.__e2e.repo(); const sp = await repo.getSpace();
+      const goal = (await repo.listGoals(sp.personalContextId)).find((g) => g.name === 'Viagem de férias');
+      await repo.setGoalImage(`e2e-nivel-img-${Date.now()}`, goal.id, 0, { kind: 'sugestao', key: 'viagem' }); await window.__e2e.refresh();
+    });
+    await tabByName('Resumo').click(); await waitText('Sua conta chegou ao nível Esmeralda!', 12000); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('Níveis (D-111): com o Diamante e 5 marcos de investimentos e reserva, o Resumo comemora a Esmeralda',
+      t.includes('Além do dia a dia, você acompanha investimentos e reserva por aqui. Que bom ter você aqui.') && (await visibleCount('button', 'Fechar')) === 1);
+    await atWidths(async (w) => { await layoutChecks(`Níveis, Esmeralda ${w}px`); if (w === 390) await shot('623_nivel_esmeralda'); });
+    await btn('Fechar').click(); await p.waitForTimeout(400);
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
+    ok('Níveis (D-111): o card em Conta com "Nível Esmeralda" e "Você chegou ao nível mais alto da Clarevo."',
+      (await lvCardText()).includes('Nível Esmeralda') && (await lvCardText()).includes('Você chegou ao nível mais alto da Clarevo.'));
+
+    // ---- D-111: o aviso de queda. A memória passa a dizer que nada é anotado desde 23/08/2026 (45 dias antes de 07/10/2026). ----
+    const setIdle = (since) => p.evaluate(async (since) => {
+      const repo = await window.__e2e.repo();
+      if (!repo.__origLevel) repo.__origLevel = repo.getAccountLevel.bind(repo);
+      if (since === null) delete repo.getAccountLevel;
+      else repo.getAccountLevel = async () => ({ ...(await repo.__origLevel()), idleSince: since, lastNoteOn: since });
+      await window.__e2e.refresh();
+    }, since);
+    const WARN = 'Faz 45 dias que nada é anotado. Em 15 dias, o nível passa de Esmeralda para Diamante. Anotar um gasto ou recebimento mantém o nível.';
+    await setIdle('2026-08-23');
+    await tabByName('Resumo').click(); await waitText(WARN, 12000); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('Níveis (D-111): no 45º dia sem anotar, o aviso na fila do Resumo, em tom de fato, com "Ver meu nível" e "Agora não"',
+      t.includes(WARN) && (await headingShown('Nível da conta')) && (await visibleCount('button', 'Agora não')) === 1 && (await visibleCount('button', 'Ver meu nível')) === 1);
+    const warnColor = await p.evaluate((w) => {
+      const el = [...document.querySelectorAll('div[dir="auto"], span')].find((e) => e.textContent === w && e.getBoundingClientRect().width > 0);
+      const h = [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === 'Nível da conta' && e.getBoundingClientRect().width > 0);
+      return el && h ? { text: getComputedStyle(el).color, heading: getComputedStyle(h).color } : null;
+    }, WARN);
+    ok('Níveis (D-111): o aviso usa a cor de texto de sempre (nenhuma cor de alerta)', warnColor !== null && warnColor.text === warnColor.heading, JSON.stringify(warnColor));
+    await atWidths(async (w) => { await layoutChecks(`Níveis, aviso no Resumo ${w}px`); if (w === 390) await shot('624_nivel_aviso'); });
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
+    ok('Níveis (D-111): o mesmo aviso no card de Conta, com "Agora não", e o nível ainda Esmeralda',
+      (await lvCardText()).includes(WARN) && (await lvCardText()).includes('Nível Esmeralda') && (await visibleCount('button', 'Agora não')) === 1);
+    await btn('Ver meu nível').click(); await waitText('Investimentos e reserva'); await p.waitForTimeout(400);
+    ok('Níveis (D-111): e na tela do nível', (await body()).includes(WARN) && (await visibleCount('button', 'Agora não')) === 1);
+    await atWidths(async (w) => { await layoutChecks(`Níveis, aviso na tela do nível ${w}px`); });
+    // "Agora não" no Resumo: o aviso some ali, em Conta e na tela do nível, até o próximo marco de tempo.
+    await tabByName('Resumo').click(); await waitText(WARN); await p.waitForTimeout(300);
+    await btn('Agora não').click(); await p.waitForTimeout(500);
+    ok('Níveis (D-111): "Agora não" tira o aviso do Resumo', !(await body()).includes('que nada é anotado'));
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Níveis (D-111): dispensado, o aviso também sai de Conta, e nenhuma contagem de dias sem anotar aparece fora dele',
+      !t.includes('que nada é anotado') && !/\d+ dias? (sem|que)/.test(t) && (await lvCardText()).includes('Nível Esmeralda'));
+
+    // ---- D-111: 67 dias sem anotar (desde 01/08/2026): o nível mostrado desce um degrau, sem contar dias, e volta ao anotar ----
+    await setIdle('2026-08-01');
+    await p.waitForTimeout(600);
+    t = await lvCardText();
+    ok('Níveis (D-111): depois de 60 dias sem anotar, o card mostra "Nível Diamante" e que o nível volta para Esmeralda ao anotar, sem contar dias',
+      t.includes('Nível Diamante') && t.includes('Como nada foi anotado por um tempo, o nível está um degrau abaixo do que os seus marcos dão. Anotar um gasto ou recebimento traz de volta o nível Esmeralda.') &&
+      !/\d+ dias/.test(t) && !t.includes('que nada é anotado'), t.slice(0, 400));
+    await atWidths(async (w) => { await layoutChecks(`Níveis, um degrau abaixo ${w}px`); if (w === 390) await shot('625_nivel_abaixo'); });
+    await tabByName('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(800);
+    t = await body();
+    ok('Níveis (D-111): com o nível abaixo, o Resumo não comemora nem avisa (o próximo aviso é no 105º dia)', !t.includes('Sua conta chegou ao nível') && !t.includes('que nada é anotado'));
+    // A pessoa volta a anotar: o nível volta ao dos marcos, sem comemorar de novo.
+    await setIdle(null); await p.waitForTimeout(800);
+    t = await body();
+    ok('Níveis (D-111): ao voltar a anotar, o nível volta para Esmeralda sem nova comemoração', !t.includes('Sua conta chegou ao nível') && !t.includes('que nada é anotado'));
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(400);
+    ok('Níveis (D-111): e o card de Conta volta a "Nível Esmeralda"', (await lvCardText()).includes('Nível Esmeralda') && !(await lvCardText()).includes('abaixo do que os seus marcos'));
+
+    // ---- D-111: o cenário FICTÍCIO ?cenario=nivel: nada anotado desde 20/05/2026, a regra contando desde 23/08/2026 (Prata pelos marcos) ----
+    await p.goto(`http://localhost:${PORT}/?cenario=nivel`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await p.waitForTimeout(800);
+    const WARN_PRATA = 'Faz 140 dias que nada é anotado. Em 15 dias, o nível passa de Prata para Bronze. Anotar um gasto ou recebimento mantém o nível.';
+    await p.waitForTimeout(600);
+    t = await body();
+    ok('Níveis (D-111, ?cenario=nivel): a faixa "Seus últimos meses" vem primeiro, e o aviso do nível espera (um aviso por vez)',
+      (await bandShown()) && !t.includes('que nada é anotado'), t.slice(0, 500));
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(500);
+    ok('Níveis (D-111, ?cenario=nivel): quem já estava parado quando a regra chegou tem o aviso antes de qualquer queda (em Conta, nível Prata)',
+      (await lvCardText()).includes(WARN_PRATA) && (await lvCardText()).includes('Nível Prata'), (await lvCardText()).slice(0, 400));
+    await tabByName('Resumo').click(); await waitText('Seus últimos meses'); await p.waitForTimeout(400);
+    await btn('Seguir adiante').click(); await waitText(WARN_PRATA, 12000).catch(() => {}); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('Níveis (D-111, ?cenario=nivel): ao seguir adiante, o aviso do nível aparece no Resumo, com "Agora não"',
+      t.includes(WARN_PRATA) && !(await bandShown()) && (await visibleCount('button', 'Agora não')) === 1, t.slice(0, 600));
+    // Anotar um gasto zera a contagem: o aviso não volta, nem em Conta, e o nível segue Prata.
+    await p.evaluate(async () => {
+      const repo = await window.__e2e.repo(); const sp = await repo.getSpace();
+      await repo.createRecord(`e2e-nivel-gasto-${Date.now()}`, sp.personalContextId, 'despesa', { accountId: sp.accounts[0].id, amountCents: 2500, occurredOn: '2026-10-07', description: 'Padaria', category: 'Mercado' });
+      await window.__e2e.refresh();
+    });
+    await openConta(); await waitText('Nível da conta'); await p.waitForTimeout(500);
+    ok('Níveis (D-111, ?cenario=nivel): depois de anotar um gasto, nenhum aviso, e o nível segue Prata', !(await body()).includes('que nada é anotado') && (await lvCardText()).includes('Nível Prata'));
     ok('Níveis: nada vai à rede na demonstração', writes.length === lvWrites0, writes.slice(lvWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Importar por print e gasto ou recebimento (D-108, retorno do teste de 17/11/2026: "além do importar fatura em PDF, a possibilidade de
+  // enviar prints; no caso do mês atual, a fatura ainda não pode ser baixada" e a linha "ENTRADA REND PAGO APLIC AUT APR" de R$ 0,01 que
+  // entrou como gasto). Os prints são imagens geradas aqui (texto fictício), lidas no navegador pelo tesseract.js servido em /ocr, como em
+  // "Ler comprovante": (1) "Importar fatura" na tela do cartão aceita prints, com o aviso de que nada sai do aparelho; (2) dois prints que se
+  // sobrepõem viram uma conferência só, sem a linha repetida, com tudo "Lido de imagem: confira", a parcela "3 de 4" em andamento e as
+  // compras na fatura aberta; (3) o print do extrato da conta: o rendimento sem sinal entra como recebimento, e uma linha troca de gasto
+  // para recebimento antes de importar; (4) o print sem lançamento tem a mensagem própria. Nenhum pedido sai do app.
+  // ==================================================================================================================
+  {
+    const ipWrites0 = writes.length;
+    const ipTexts = [];
+    const ipKeep = async () => { const x = await body(); ipTexts.push(x); screenTexts.push(x); return x; };
+    const ipDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clarevo-prints-'));
+    // Um print da lista do banco: o título, os cabeçalhos de dia e as linhas (descrição à esquerda, valor à direita, uma linha de detalhe).
+    const ipPrint = async (name, title, rows) => {
+      const file = path.join(ipDir, name);
+      const html = rows.map((r) => (typeof r === 'string'
+        ? `<div style="font:bold 20px Arial;color:#555;margin:18px 0 6px">${r}</div>`
+        : `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #ddd"><div><div style="font:22px Arial">${r[0]}</div>${r[2] ? `<div style="font:18px Arial;color:#666">${r[2]}</div>` : ''}</div><div style="font:22px Arial;white-space:nowrap">${r[1]}</div></div>`)).join('');
+      const pg = await ctx.newPage(); await pg.setViewportSize({ width: 420, height: 200 });
+      await pg.setContent(`<body style="margin:0;padding:20px;background:#fff;color:#111"><div style="font:bold 24px Arial;margin-bottom:8px">${title}</div>${html}</body>`);
+      await pg.screenshot({ path: file, fullPage: true }); await pg.close();
+      return file;
+    };
+    const ipFat1 = await ipPrint('fatura-1.png', 'Fatura aberta', ['06 OUT', ['Mercado Exemplo', 'R$ 80,50'], ['Padaria Central', 'R$ 12,30'], '05 OUT', ['Loja de Roupas Exemplo', 'R$ 50,00', 'Parcela 3 de 4']]);
+    // O segundo print, rolando a tela, repete a última linha do primeiro.
+    const ipFat2 = await ipPrint('fatura-2.png', 'Fatura aberta', ['05 OUT', ['Loja de Roupas Exemplo', 'R$ 50,00', 'Parcela 3 de 4'], ['Estorno Cinema Centro', '-R$ 10,00'], '04 OUT', ['Farmácia Central', 'R$ 25,00']]);
+    const ipExt = await ipPrint('extrato.png', 'Extrato', ['06 OUT', ['ENTRADA REND PAGO APLIC AUT APR', 'R$ 0,01'], ['TRANSF MARIA EXEMPLO', '-R$ 50,00'], ['TARIFA PACOTE', '-R$ 30,00'], '05 OUT', ['TED RECEBIDA ANA EXEMPLO', 'R$ 120,00']]);
+    const ipNone = await ipPrint('sem-lancamento.png', 'Saldo disponível', [['Conta corrente', 'R$ 1.234,56'], ['Ver mais', '']]);
+    const ipPick = async (files) => { const [chooser] = await Promise.all([p.waitForEvent('filechooser'), btn('Escolher prints').click()]); await chooser.setFiles(files); };
+    const ipBoxes = () => p.getByRole('checkbox').filter({ visible: true }).evaluateAll((els) => els.filter((e) => (e.getAttribute('aria-label') || '').startsWith('Incluir:')).map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-checked'), e.getAttribute('aria-disabled')]));
+    const ipExternal = []; const ipOnRequest = (r) => { const u = r.url(); if (!u.startsWith(`http://localhost:${PORT}`) && !/^(data|blob):/.test(u)) ipExternal.push(u); };
+    p.on('request', ipOnRequest);
+    // Volta até a barra de abas e abre Movimentos (as telas da pilha escondem a barra).
+    const ipMovements = async () => {
+      for (let i = 0; i < 6 && (await tabByName('Movimentos').count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
+      await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(400);
+    };
+    const ipOpenCard = async () => {
+      await ipMovements();
+      await p.getByRole('button', { name: /^Cartões, / }).filter({ visible: true }).first().click(); await waitCardsList(); await p.waitForTimeout(500);
+      await p.getByRole('button', { name: /^Cartão Exemplo · final 1234\./ }).filter({ visible: true }).first().click(); await waitText('Fatura atual'); await p.waitForTimeout(400);
+    };
+
+    await demoHome();
+    // ---- 1. "Importar fatura" na tela do cartão: o arquivo ou prints, com o aviso de que nada sai do aparelho ----
+    await ipOpenCard();
+    await btn('Importar fatura').click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(400);
+    let ipT = await ipKeep();
+    ok('Prints (D-108): "Importar fatura" abre a importação com "Escolher o arquivo" e, embaixo, "Ou envie prints da tela do banco", para a fatura do mês atual, com "Escolher prints"',
+      urlPath() === '/importar' && (await visibleCount('button', 'Escolher o arquivo')) === 1 && (await visibleCount('button', 'Escolher prints')) === 1 &&
+      ipT.includes('Ou envie prints da tela do banco') && ipT.includes('Serve para a fatura do mês atual, que o banco ainda não deixa baixar') && ipT.includes('Até 10 prints por vez, com até 10 MB cada.'), ipT.slice(0, 700));
+    ok('Prints: a tela diz que os prints são lidos no aparelho, que nada sai dele e que as cópias são apagadas depois da leitura',
+      ipT.includes('Os prints são lidos aqui no aparelho e nada sai dele. As cópias das imagens são apagadas depois da leitura.'));
+    await atWidths(async (w) => { await innerChecks(`Prints, escolher ${w}px`); if (w === 390) { await scrollTo('Ou envie prints da tela do banco'); await shot('IP01_importar_prints'); } if (w === 320) { await scrollTo('Ou envie prints da tela do banco'); await shot('IP01_importar_prints_320px'); } });
+
+    // ---- 2. Dois prints da fatura aberta que se sobrepõem: uma conferência só, sem a linha repetida ----
+    const ipExt0 = ipExternal.length;
+    await ipPick([ipFat1, ipFat2]); await waitText('2 prints lidos', 90000); await p.waitForTimeout(400);
+    ipT = await ipKeep();
+    ok('Prints da fatura: "2 prints lidos", 5 linhas, a linha que aparecia nos dois prints contada uma vez, e o cartão continua escolhido',
+      ipT.includes('5 linhas lidas') && ipT.includes('1 linha que aparecia em mais de um print foi contada uma vez só.') &&
+      (await radio('Cartão de crédito').getAttribute('aria-checked')) === 'true' && (await radio('Cartão Exemplo').getAttribute('aria-checked')) === 'true' &&
+      ipT.includes('Os prints são lidos aqui no aparelho e nada sai dele.') && (await visibleCount('button', 'Escolher outros prints')) === 1, ipT.slice(0, 700));
+    ok('Prints: a leitura das imagens não faz pedido a nenhum endereço de fora do app', ipExternal.length === ipExt0, ipExternal.slice(ipExt0).join(' | '));
+    await atWidths(async (w) => { await innerChecks(`Prints, destino ${w}px`); if (w === 390) await shot('IP02_importar_prints_destino'); });
+    await btn('Revisar as linhas').click(); await waitText('Marque o que vira lançamento', 12000); await p.waitForTimeout(400);
+    ipT = await ipKeep();
+    let ipB = await ipBoxes();
+    ok('Prints da fatura na conferência: cada linha "Lido de imagem: confira", o aviso para conferir data, descrição, valor e se é compra ou estorno, e 4 de 5 marcadas (o estorno desmarcado)',
+      (ipT.match(/Lido de imagem: confira/g) ?? []).length === 5 && ipT.includes('Estas linhas vieram de prints, e a leitura de imagem pode errar. Confira a data, a descrição, o valor e se é compra ou estorno antes de importar.') &&
+      ipT.includes('5 linhas · 4 marcadas') && JSON.stringify(ipB.map((b) => b[1])) === JSON.stringify(['true', 'true', 'true', 'false', 'true']), `${JSON.stringify(ipB)} ${ipT.slice(0, 500)}`);
+    ok('Prints da fatura: data, descrição e valor de cada linha, a compra parcelada "3 de 4" em andamento (na fatura aberta de novembro e a última na seguinte) e o estorno como crédito',
+      ipB[0][0] === 'Incluir: Mercado Exemplo, R$ 80,50, 06/10/2026' && ipB[1][0] === 'Incluir: Padaria Central, R$ 12,30, 06/10/2026' && ipB[2][0] === 'Incluir: Loja de Roupas Exemplo PARC 3/4, R$ 50,00, 05/10/2026' &&
+      ipB[3][0] === 'Incluir: Estorno Cinema Centro, R$ 10,00, 05/10/2026' && ipB[4][0] === 'Incluir: Farmácia Central, R$ 25,00, 04/10/2026' &&
+      ipT.includes('Parcela em andamento') && ipT.includes('Parcela 3 de 4: entra na fatura de novembro de 2026 e a última na seguinte.') && ipT.includes('05/10/2026 · Estorno · Lazer') && ipT.includes('04/10/2026 · Compra · Saúde'), JSON.stringify(ipB.map((b) => b[0])));
+    await atWidths(async (w) => { await innerChecks(`Prints, conferência da fatura ${w}px`); if (w === 390) await shot('IP03_importar_prints_conferencia'); if (w === 320) await shot('IP03_importar_prints_conferencia_320px'); });
+    // No cartão, a troca é entre compra e estorno: "Compra" vem escolhida no Mercado.
+    await btn('Editar: Mercado Exemplo').click(); await p.waitForTimeout(300);
+    ok('Prints da fatura: em Editar, "Tipo da linha" com "Compra" escolhida e "Estorno ou crédito"',
+      (await radio('Compra').getAttribute('aria-checked')) === 'true' && (await radio('Estorno ou crédito').getAttribute('aria-checked')) === 'false');
+    await btn('Pronto').click(); await p.waitForTimeout(200);
+    await btn('Importar 4 lançamentos').click(); await waitText('Importação concluída', 12000);
+    await waitUntil(async () => (await body()).includes('4 lançamentos importados.'), 8000);
+    ok('Prints da fatura: "4 lançamentos importados."', (await body()).includes('4 lançamentos importados.'));
+    ok('Prints da fatura: a compra "3 de 4" entrou com as 2 parcelas que faltam (a 3 na fatura de novembro, a aberta), e as outras à vista',
+      await otherDevice(async (repo, ctx) => {
+        const card = (await repo.listCards(ctx))[0];
+        const entries = await repo.listCardEntries(card.id);
+        const loja = entries.find((x) => x.description === 'Loja de Roupas Exemplo PARC 3/4');
+        const mercado = entries.find((x) => x.description === 'Mercado Exemplo');
+        const farmacia = entries.find((x) => x.description === 'Farmácia Central');
+        return Boolean(loja && mercado && farmacia) && loja.installments === 2 && loja.installmentOffset === 2 && loja.amountCents === 10000 && loja.invoiceMonth === '2026-11' &&
+          mercado.installments === 1 && mercado.amountCents === 8050 && mercado.invoiceMonth === '2026-11' && farmacia.amountCents === 2500 && !entries.some((x) => x.description === 'Estorno Cinema Centro');
+      }));
+    await btn('Ver o cartão').click(); await waitText('Fatura atual'); await p.waitForTimeout(600);
+    ipT = await body();
+    ok('Prints da fatura: a fatura de novembro soma as compras dos prints (R$ 550,00 + R$ 80,50 + R$ 12,30 + R$ 50,00 + R$ 25,00 = R$ 717,80)', ipT.includes('R$ 717,80'), ipT.slice(0, 400));
+
+    // ---- 3. Print do extrato da conta: o rendimento sem sinal é recebimento; uma linha troca de gasto para recebimento ----
+    await ipMovements();
+    await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300);
+    await ipPick([ipExt]); await waitText('1 print lido', 90000); await p.waitForTimeout(400);
+    ipT = await ipKeep();
+    ok('Print do extrato: "1 print lido", 4 linhas, e a conta já vem como destino (os prints parecem o extrato de uma conta)',
+      ipT.includes('4 linhas lidas') && (await radio('Banco ou carteira').getAttribute('aria-checked')) === 'true' && (await radio('Conta principal').getAttribute('aria-checked')) === 'true', ipT.slice(0, 500));
+    await btn('Revisar as linhas').click(); await waitText('Marque o que vira lançamento', 12000); await p.waitForTimeout(400);
+    ipT = await ipKeep(); ipB = await ipBoxes();
+    const ipRow = (start) => p.evaluate((start) => {
+      const box = [...document.querySelectorAll('[role=checkbox]')].find((e) => (e.getAttribute('aria-label') || '').startsWith(`Incluir: ${start}`) && e.getBoundingClientRect().width > 0);
+      return box?.parentElement?.textContent ?? '';
+    }, start);
+    ok('Print do extrato: "ENTRADA REND PAGO APLIC AUT APR" de R$ 0,01 vem como Entrada (recebimento), a TED recebida também, e a transferência e a tarifa com "-" como Saída',
+      ipB.length === 4 && ipB.every((b) => b[1] === 'true') && ipT.includes('gasto ou recebimento antes de importar') &&
+      (await ipRow('ENTRADA REND PAGO APLIC AUT APR, R$ 0,01')).includes('· Entrada ·') && (await ipRow('TED RECEBIDA ANA EXEMPLO')).includes('· Entrada ·') &&
+      (await ipRow('TRANSF MARIA EXEMPLO')).includes('· Saída ·') && (await ipRow('TARIFA PACOTE')).includes('· Saída ·'), `${JSON.stringify(ipB.map((b) => b[0]))} ${await ipRow('ENTRADA REND')}`);
+    // Trocar uma linha: em Editar, "Recebimento (entrada)"; a categoria passa às de recebimento; trocar de volta desfaz.
+    await btn('Editar: TARIFA PACOTE').click(); await p.waitForTimeout(300);
+    ok('Print do extrato: em Editar, "Tipo da linha" com "Gasto (saída)" escolhido e "Recebimento (entrada)"',
+      (await radio('Gasto (saída)').getAttribute('aria-checked')) === 'true' && (await radio('Recebimento (entrada)').getAttribute('aria-checked')) === 'false');
+    await atWidths(async (w) => { await layoutChecks(`Prints, trocar o tipo da linha ${w}px`); if (w === 390) await shot('IP04_importar_trocar_tipo'); });
+    await radio('Recebimento (entrada)').click(); await p.waitForTimeout(400);
+    ok('Print do extrato: trocada, a linha vira Entrada, diz "Você trocou o tipo desta linha." e mostra as categorias de recebimento',
+      (await ipRow('TARIFA PACOTE')).includes('· Entrada ·') && (await body()).includes('Você trocou o tipo desta linha.') &&
+      (await radio('Recebimento (entrada)').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'Salário')) === 1 && (await visibleCount('radio', 'Mercado')) === 0);
+    await radio('Gasto (saída)').click(); await p.waitForTimeout(400);
+    ok('Print do extrato: trocar de volta desfaz (Saída, sem o aviso da troca)', (await ipRow('TARIFA PACOTE')).includes('· Saída ·') && !(await body()).includes('Você trocou o tipo desta linha.'));
+    await btn('Pronto').click(); await p.waitForTimeout(200);
+    // A transferência, que era um valor recebido, troca para recebimento e é importada assim.
+    await btn('Editar: TRANSF MARIA EXEMPLO').click(); await p.waitForTimeout(300);
+    await radio('Recebimento (entrada)').click(); await p.waitForTimeout(400);
+    await btn('Pronto').click(); await p.waitForTimeout(200);
+    ok('Print do extrato: depois da troca, as 4 linhas seguem marcadas', (await body()).includes('4 linhas · 4 marcadas') && (await visibleCount('button', 'Importar 4 lançamentos')) === 1);
+    await btn('Importar 4 lançamentos').click(); await waitText('Importação concluída', 12000);
+    await waitUntil(async () => (await body()).includes('4 lançamentos importados.'), 8000);
+    const ipRecords = await otherDevice(async (repo, ctx) => (await repo.listRecords(ctx, '2026-10'))
+      .filter((r) => ['ENTRADA REND PAGO APLIC AUT APR', 'TRANSF MARIA EXEMPLO', 'TARIFA PACOTE', 'TED RECEBIDA ANA EXEMPLO'].includes(r.description))
+      .map((r) => [r.kind, r.amountCents, r.occurredOn, r.description]).sort((a, b) => a[3].localeCompare(b[3])));
+    ok('Print do extrato: o rendimento de R$ 0,01 gravado como recebimento, a transferência trocada como recebimento, a tarifa como gasto e a TED recebida como recebimento',
+      JSON.stringify(ipRecords) === JSON.stringify([
+        ['receita', 1, '2026-10-06', 'ENTRADA REND PAGO APLIC AUT APR'], ['despesa', 3000, '2026-10-06', 'TARIFA PACOTE'], ['receita', 12000, '2026-10-05', 'TED RECEBIDA ANA EXEMPLO'], ['receita', 5000, '2026-10-06', 'TRANSF MARIA EXEMPLO']]), JSON.stringify(ipRecords));
+    await btn('Ver em Movimentos').click(); await waitText('Registrar recebimento'); await goResumo().catch(() => {});
+    await expectTotals('Prints: Resumo de outubro com os recebimentos (R$ 0,01 + R$ 50,00 + R$ 120,00) e a tarifa (R$ 30,00)', 'R$ 6.170,01', 'R$ 3.930,00', 'R$ 2.240,01', 'R$ 650,00');
+
+    // ---- 4. Print sem lançamento: a mensagem diz o que conferir, junto do botão dos prints ----
+    await ipMovements();
+    await btn(SC.importar).click(); await waitText('Escolha o arquivo'); await p.waitForTimeout(300);
+    await ipPick([ipNone]); await waitText('A Clarevo não achou lançamentos nestes prints.', 90000); await p.waitForTimeout(300);
+    ipT = await ipKeep();
+    ok('Print sem lançamento: "A Clarevo não achou lançamentos nestes prints." com o que conferir, e nada lido', ipT.includes('Confira se a data, a descrição e o valor de cada linha aparecem inteiros na imagem') &&
+      (await visibleCount('button', 'Escolher prints')) === 1 && (await visibleCount('button', 'Revisar as linhas')) === 0);
+    await atWidths(async (w) => { await innerChecks(`Prints, sem lançamento ${w}px`); if (w === 390) await shot('IP05_importar_prints_sem_lancamento'); });
+    await btn('Voltar').click(); await waitText('Organizar');
+
+    // ---- 5. Textos e escritas ----
+    p.off('request', ipOnRequest);
+    const ipVetoed = ipTexts.map((x) => x.match(FORBIDDEN)?.[0]).filter(Boolean);
+    const ipBrands = ipTexts.map((x) => x.match(/\b(nubank|ita[uú]|bradesco|santander|inter|c6|caixa|sicredi|sicoob|btg|neon|picpay|mercado pago|itaucard|visa|mastercard|hipercard|amex|serasa)\b/i)?.[0]).filter(Boolean);
+    ok('Prints: nenhum termo proibido, travessão, expressão vetada nem nome de banco nos textos das telas', ipTexts.length >= 6 && ipVetoed.length === 0 && ipBrands.length === 0, `${ipVetoed.join(' | ')} ${ipBrands.join(' | ')}`);
+    ok('Prints: nenhuma escrita na rede e nenhum pedido para fora do app (a demonstração grava só em memória)', writes.slice(ipWrites0).length === 0 && ipExternal.length === 0, `${writes.slice(ipWrites0).join(' | ')} ${ipExternal.join(' | ')}`);
+    fs.rmSync(ipDir, { recursive: true, force: true });
   }
 
   // ==================================================================================================================
   // Mês dentro do orçamento e fila de avisos do Resumo (pedido do Enzo em 12/11/2026). Hoje é 07/10/2026: setembro fechou. Na
   // demonstração, setembro não tem orçamento (o card não aparece); aqui a memória passa a dizer que setembro teve orçamento em duas
   // categorias, as duas dentro do valor. O Resumo mostra "Setembro de 2026 fechou dentro do orçamento", um aviso temporário por vez
-  // (a comemoração do nível vem antes e o card do orçamento espera), "Fechar" guarda o mês e, com uma categoria acima, nada aparece.
+  // (a comemoração do nível vem antes e o card do orçamento espera), "Fechar" guarda o mês e, com uma categoria acima, nada aparece. Com os
+  // 5 marcos de investimentos e reserva da demonstração (D-111), o 14º marco do dia a dia leva à Esmeralda.
   // ==================================================================================================================
   {
     const bcWrites0 = writes.length;
@@ -14699,12 +15234,12 @@ setInterval(async () => {
       repo.getAccountMarks = async () => ({ ...(await repo.__origMarks()), ...(level ? { imagem: true } : {}) });
       await window.__e2e.refresh();
     }, { over, level });
-    // A comemoração do nível (Diamante) e o mês dentro do orçamento querem aparecer: só o nível, que vem antes na fila.
+    // A comemoração do nível (Esmeralda) e o mês dentro do orçamento querem aparecer: só o nível, que vem antes na fila.
     await setSeptember(false, true);
-    await waitText('Sua conta chegou ao nível Diamante!'); await p.waitForTimeout(600);
+    await waitText('Sua conta chegou ao nível Esmeralda!'); await p.waitForTimeout(600);
     t = await body();
     ok('Fila de avisos: com o nível e o orçamento querendo aparecer, só a comemoração do nível (um aviso temporário por vez)',
-      t.includes('Sua conta chegou ao nível Diamante!') && !t.includes('fechou dentro do orçamento'));
+      t.includes('Sua conta chegou ao nível Esmeralda!') && !t.includes('fechou dentro do orçamento'));
     await btn('Fechar').click();
     await waitText('Setembro de 2026 fechou dentro do orçamento'); await p.waitForTimeout(500);
     t = await body(); screenTexts.push(t);
@@ -14722,6 +15257,122 @@ setInterval(async () => {
     t = await body();
     ok('Orçamento: com uma categoria acima do valor, nenhum card (e nenhum recado negativo)', !t.includes('fechou dentro do orçamento') && !t.includes('acima do orçamento em setembro'));
     ok('Orçamento: nada vai à rede na demonstração', writes.length === bcWrites0, writes.slice(bcWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Revisão das calculadoras (retorno de 17/11/2026, D-109). (1) "Simular um plano", aberto por "Simular com rendimento" de "Juntar para
+  // um objetivo": no lugar de "Descontar inflação?", as escolhas "Sem inflação", "Mostrar em dinheiro de hoje" (só informa) e "Corrigir
+  // a meta pela inflação" (a meta sobe e o valor por mês é recalculado), com o exemplo do retorno: R$ 10.000,00 em 60 meses, 3,4% ao
+  // ano e inflação de 12% ao ano. (2) "Em que ordem quitar as dívidas?" refeita: para que serve no topo, cada campo diz o que muda, e o
+  // resultado responde primeiro o ganho, depois as duas ordens lado a lado e o plano passo a passo, e só então as hipóteses e os
+  // detalhes. Em 390 e 320 px. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const rvWrites0 = writes.length;
+    await demoHome();
+    await metasTab();
+    await p.getByRole('button', { name: /^Simular um plano\./ }).filter({ visible: true }).first().click(); await waitText('Faça contas com hipóteses suas'); await p.waitForTimeout(400);
+    await radio('Quanto guardar por mês').click(); await waitText('Quanto quer juntar'); await p.waitForTimeout(300);
+    t = await body();
+    ok('Revisão: o simulador troca "Descontar inflação?" por três escolhas, com "Sem inflação" marcada e a dica dela',
+      !t.includes('Descontar inflação') && t.includes('Inflação (opcional)') && (await radio('Sem inflação').getAttribute('aria-checked')) === 'true' &&
+      (await visibleCount('radio', 'Mostrar em dinheiro de hoje')) === 1 && (await visibleCount('radio', 'Corrigir a meta pela inflação')) === 1 &&
+      t.includes('Os valores ficam em reais de cada mês, sem inflação.') && (await p.getByLabel('Inflação ao ano (%)', { exact: true }).count()) === 0, t.slice(0, 600));
+    await field('Quanto quer juntar').fill('10000'); await field('Em quantos meses').fill('60'); await simRate().fill('3,4');
+    await radio('Mostrar em dinheiro de hoje').click(); await p.waitForTimeout(200);
+    await field('Inflação ao ano (%)').fill('12'); await simulate(); await waitText('por mês na hipótese informada'); await p.waitForTimeout(300);
+    t = await body();
+    ok('Revisão: "Mostrar em dinheiro de hoje" só informa: R$ 152,92 por mês, sem rendimento R$ 166,67, e o total de R$ 10.000,63 equivale a R$ 5.674,62 de hoje',
+      t.includes('Só informa: a meta e o valor por mês não mudam. O resultado mostra quanto o total vale em dinheiro de hoje.') &&
+      t.includes('R$ 152,92 por mês na hipótese informada') && t.includes('Sem rendimento, seriam R$ 166,67 por mês.') &&
+      t.includes('Em dinheiro de hoje, com inflação de 12% ao ano, o total de R$ 10.000,63 equivale a R$ 5.674,62.') &&
+      t.includes('Para manter o poder de compra de R$ 10.000,00, escolha "Corrigir a meta pela inflação".'), t.slice(-1500));
+    ok('Revisão: as hipóteses dizem a convenção (taxa equivalente de 0,28% ao mês, aportes no início do mês, inflação de 0,95% ao mês só para mostrar e o arredondamento)',
+      t.includes('Taxa de 3,4% ao ano (0,28% ao mês, taxa equivalente), constante no período.') && t.includes('Aportes no início de cada mês, como na Calculadora do Cidadão do Banco Central.') &&
+      t.includes('Inflação de 12% ao ano (0,95% ao mês, taxa equivalente), constante no período, só para mostrar o valor em dinheiro de hoje: a meta e o valor por mês não mudam.') &&
+      t.includes('Valor por mês arredondado para cima, no centavo; valores finais para baixo.'));
+    await keepText();
+    await atWidths(async (w) => { await layoutChecks(`Revisão simulador, mostrar em dinheiro de hoje ${w}px`); if (w === 390) await calcShot('690_simular_mostrar_dinheiro_de_hoje'); });
+    await radio('Corrigir a meta pela inflação').click(); await p.waitForTimeout(250);
+    ok('Revisão: trocar a escolha tira o resultado e mostra a dica de "Corrigir a meta pela inflação"',
+      !(await body()).includes('por mês na hipótese informada') && (await body()).includes('Para manter o poder de compra: a meta sobe com a inflação até o fim do prazo, e o valor por mês é recalculado.') &&
+      (await field('Inflação ao ano (%)').inputValue()) === '12');
+    await simulate(); await waitText('por mês na hipótese informada'); await p.waitForTimeout(300);
+    t = await body();
+    ok('Revisão: "Corrigir a meta pela inflação": meta de R$ 17.623,42, R$ 269,49 por mês (sem rendimento, R$ 293,73) e o total equivale a R$ 10.000,35 de hoje',
+      t.includes('Para juntar o equivalente a R$ 10.000,00 de hoje em 60 meses:') && t.includes('R$ 269,49 por mês na hipótese informada') &&
+      t.includes('Com inflação de 12% ao ano, a meta corrigida é de R$ 17.623,42 em 60 meses.') && t.includes('Sem rendimento, seriam R$ 293,73 por mês.') &&
+      t.includes('Em dinheiro de hoje, com inflação de 12% ao ano, o total de R$ 17.624,05 equivale a R$ 10.000,35.') && !t.includes('escolha "Corrigir a meta pela inflação"') &&
+      t.includes('Inflação de 12% ao ano (0,95% ao mês, taxa equivalente), constante no período, para corrigir a meta: a meta de hoje com a inflação de todo o prazo, no centavo.'), t.slice(-1500));
+    await keepText();
+    await atWidths(async (w) => { await layoutChecks(`Revisão simulador, meta corrigida ${w}px`); if (w === 390) await calcShot('691_simular_meta_corrigida'); if (w === 320) await shot('691_simular_meta_corrigida_320px', true); });
+    // "Quanto posso ter" não tem meta: a escolha volta a "Mostrar em dinheiro de hoje" e "Corrigir" some.
+    await radio('Quanto posso ter').click(); await p.waitForTimeout(300);
+    ok('Revisão: em "Quanto posso ter", só "Sem inflação" e "Mostrar em dinheiro de hoje" (marcada), com a dica sem meta',
+      (await visibleCount('radio', 'Corrigir a meta pela inflação')) === 0 && (await radio('Mostrar em dinheiro de hoje').getAttribute('aria-checked')) === 'true' &&
+      (await body()).includes('Só informa: o valor por mês não muda. O resultado mostra quanto o total vale em dinheiro de hoje.'));
+
+    // "Em que ordem quitar as dívidas?": a demonstração traz o Financiamento do carro; com a taxa, o Cartão azul e R$ 100,00 a mais.
+    await demoHome();
+    await metasTab();
+    await p.getByRole('button', { name: /^Em que ordem quitar as dívidas\? / }).filter({ visible: true }).first().click(); await waitText('Suas dívidas'); await p.waitForTimeout(600);
+    await p.setViewportSize({ width: 360, height: 640 }); await p.waitForTimeout(400);
+    ok('Revisão plano: no topo, à vista sem rolar em 360 px, para que serve a tela', (await inView('Monte um plano para quitar as suas dívidas. Informe cada dívida e quanto consegue pôr a mais por mês: a conta mostra por qual começar, quando cada uma acaba e quanto de juros sai da conta, em duas ordens lado a lado.')) === true);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+    const rvFill = async (label, value) => { const f = field(label); await f.fill(value); await f.blur(); await p.waitForTimeout(200); };
+    await rvFill('Taxa de juros ao mês do contrato (%), Financiamento do carro', '1,5');
+    await btn('Acrescentar dívida').click(); await p.waitForTimeout(300);
+    await radio('Saldo com juros, Dívida 2').click(); await p.waitForTimeout(200);
+    await rvFill('Apelido da dívida 2', 'Cartão azul');
+    await rvFill('Saldo hoje, Cartão azul', '1.500,00');
+    await rvFill('Taxa de juros ao mês (%), Cartão azul', '1');
+    await rvFill('Quanto você paga por mês, Cartão azul', '300,00');
+    await rvFill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '100,00');
+    t = await body();
+    ok('Revisão plano: cada campo diz o que muda na resposta (parcela, taxa, saldo, pagamento e o valor a mais)',
+      t.includes('O que você já paga por mês nesta dívida. Quando ela acaba, este valor passa para a próxima do plano.') &&
+      t.includes('Define o lugar da dívida em "Maior taxa primeiro" e quanto de juros o valor a mais evita.') &&
+      t.includes('Quanto falta pagar hoje. Define o lugar da dívida em "Menor dívida primeiro".') &&
+      t.includes('Precisa passar dos juros do mês para o saldo diminuir.') &&
+      t.includes('Vai todo mês para a dívida por onde o plano começa e encurta o prazo.'), t.slice(0, 1500));
+    // A ordem do resultado: a resposta, as duas ordens lado a lado, as diferenças, o plano, as hipóteses e só depois os detalhes.
+    const rvHead = 'Com R$ 100,00 a mais por mês, tudo termina em 24 meses (outubro de 2028), em vez de 36 meses (outubro de 2029), com R$ 2.209,96 a R$ 2.216,64 a menos de juros estimados, conforme a ordem.';
+    const rvAt = (x) => t.indexOf(x);
+    ok('Revisão plano: a resposta vem primeiro, depois "As duas ordens, lado a lado", "O plano, passo a passo", as hipóteses e os detalhes, nessa ordem',
+      rvAt(rvHead) > 0 && rvAt(rvHead) < rvAt('As duas ordens, lado a lado') && rvAt('As duas ordens, lado a lado') < rvAt('Na ordem Maior taxa primeiro, os juros estimados são R$ 6,68 menores.') &&
+      rvAt('Na ordem Maior taxa primeiro') < rvAt('O plano, passo a passo') && rvAt('O plano, passo a passo') < rvAt('Hipóteses') && rvAt('Hipóteses') < rvAt('Detalhes de cada ordem'), t.slice(-2500));
+    const rvRows = await p.evaluate(() => [...document.querySelectorAll('[role=listitem]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label')).filter((l) => l && /^(Começa por|Primeira a acabar|Tudo termina em|Juros estimados):/.test(l)));
+    ok('Revisão plano: a comparação lado a lado, um item por dado com as duas ordens no nome acessível (por qual começa, a primeira a acabar, o fim e os juros)',
+      JSON.stringify(rvRows) === JSON.stringify([
+        'Começa por: Maior taxa primeiro, Financiamento do carro; Menor dívida primeiro, Cartão azul.',
+        'Primeira a acabar: Maior taxa primeiro, Cartão azul, em abril de 2027; Menor dívida primeiro, Cartão azul, em fevereiro de 2027.',
+        'Tudo termina em: Maior taxa primeiro, 24 meses (outubro de 2028); Menor dívida primeiro, 24 meses (outubro de 2028).',
+        'Juros estimados: Maior taxa primeiro, R$ 4.918,45; Menor dívida primeiro, R$ 4.925,13.',
+      ]), JSON.stringify(rvRows));
+    ok('Revisão plano: o plano de cada ordem diz por qual começar, onde vai o valor a mais, quando cada dívida acaba e para onde vai o pagamento dela, com o ganho',
+      t.includes('Maior taxa primeiro') && t.includes('A partir de novembro de 2026 (mês 1): o pagamento de sempre de cada dívida e os R$ 100,00 a mais em Financiamento do carro.') &&
+      t.includes('Abril de 2027 (mês 6): Cartão azul acaba. O pagamento dela (R$ 300,00) passa para Financiamento do carro, que fica com R$ 400,00 por mês além do pagamento de sempre.') &&
+      t.includes('Ganho estimado, em relação a pagar só o de sempre: 12 meses antes e R$ 2.216,64 a menos de juros.') &&
+      t.includes('Ganho estimado, em relação a pagar só o de sempre: 12 meses antes e R$ 2.209,96 a menos de juros.'));
+    const rvLevels = await headingList();
+    ok('Revisão plano: títulos "Resultado" (2), "As duas ordens, lado a lado" e "O plano, passo a passo" (3) e uma ordem por título de nível 4',
+      rvLevels.includes('2:Resultado') && rvLevels.includes('3:As duas ordens, lado a lado') && rvLevels.includes('3:O plano, passo a passo') &&
+      rvLevels.includes('4:Maior taxa primeiro') && rvLevels.includes('4:Menor dívida primeiro'), JSON.stringify(rvLevels));
+    ok('Revisão plano: estimativa rotulada, as duas ordens explicadas nas hipóteses e nenhuma ordem chamada de "melhor"',
+      t.includes('Estimativa. O valor oficial de cada dívida é o que a instituição informar; peça o valor atualizado.') &&
+      t.includes('Maior taxa primeiro: o que sobra vai antes para a dívida com a maior taxa ao mês. Menor dívida primeiro: vai antes para a dívida com o menor saldo hoje.') &&
+      !/\bmelhor(es)?\b|\bpior(es)?\b|portabilidade|empr[eé]stimo para quitar/i.test(t));
+    await keepText();
+    await atWidths(async (w) => {
+      await scrollTo('As duas ordens, lado a lado');
+      await layoutChecks(`Revisão plano, resposta e comparação ${w}px`);
+      if (w === 390) await shot('692_plano_dividas_resposta_e_comparacao');
+      if (w === 320) await shot('692_plano_dividas_resposta_e_comparacao_320px');
+      await scrollTo('O plano, passo a passo');
+      if (w === 390) await shot('693_plano_dividas_plano_passo_a_passo');
+      if (w === 320) await shot('693_plano_dividas_plano_passo_a_passo_320px');
+    });
+    ok('Revisão: nada vai à rede no simulador nem no plano', writes.length === rvWrites0, writes.slice(rvWrites0).join(' | '));
   }
 
   // ==================================================================================================================
@@ -14768,9 +15419,10 @@ setInterval(async () => {
     ok('Computador: Esc fecha o painel e volta a Movimentos', new URL(p.url()).pathname === '/movimentacoes' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 0);
     // Anotar gasto pela barra lateral: o formulário no painel; tocar no fundo fecha.
     await p.getByRole('navigation').getByRole('button', { name: 'Anotar gasto' }).first().click(); await waitText('Valor'); await p.waitForTimeout(700);
+    // O painel é um cartão arredondado, a 12 px da direita da janela (D-110).
     ok('Computador: Anotar gasto abre no painel à direita, por cima de Movimentos',
       new URL(p.url()).pathname === '/registro/novo' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 1 &&
-      (await p.evaluate(() => { const d = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getBoundingClientRect().width > 0); const r = d.getBoundingClientRect(); return r.width <= 561 && r.right >= window.innerWidth - 1; })));
+      (await p.evaluate(() => { const d = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getBoundingClientRect().width > 0); const r = d.getBoundingClientRect(); return r.width <= 561 && r.right >= window.innerWidth - 16 && r.right <= window.innerWidth - 8; })));
     await layoutChecks('Computador, painel do formulário 1280px'); await shot('632_computador_painel_formulario');
     await p.getByRole('button', { name: 'Fechar', exact: true }).filter({ visible: true }).first().click(); await p.waitForTimeout(800);
     ok('Computador: tocar no fundo fecha o formulário', new URL(p.url()).pathname === '/movimentacoes' && (await p.getByRole('dialog').filter({ visible: true }).count()) === 0);
@@ -14781,6 +15433,127 @@ setInterval(async () => {
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(600);
     ok('Computador: abaixo de 1024 px, as abas de baixo voltam e a barra lateral sai', (await visibleTabs()) === 5 && (await p.getByRole('navigation').filter({ visible: true }).count()) === 0);
     ok('Computador: nada vai à rede na demonstração', writes.length === dkWrites0, writes.slice(dkWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Paridade entre a web, o computador e o celular (D-110). Pedido do Enzo: "o app no pc, não tem a opção de ocultar valores" (estava só
+  // embaixo na barra lateral; no celular, o olho fica no cabeçalho azul) e "corrija as bordas, para que fiquem todas arredondadas".
+  // (1) Em 390 px, também na demonstração (com o selo), o olho fica no cabeçalho, ao lado do avatar, e mostra e oculta na hora. (2) Em
+  // 1280 px, "Ocultar valores" com o texto no alto do bloco azul (no Resumo, acima do mês; nas abas com título, na linha do título), com
+  // o mesmo estado do botão da barra lateral. (3) Em 1280 px, o bloco azul das abas, o cabeçalho das telas cheias e o painel dos
+  // formulários são cartões com os quatro cantos de 20 px, afastados do alto da janela e da barra lateral; o bloco azul alinha com os
+  // cartões de baixo; no celular, a faixa continua presa ao alto, só com os cantos de baixo arredondados. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const pdWrites0 = writes.length;
+    await demoHome();
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(500);
+    const pdBandEye = () => p.locator('[data-band] [role=button][aria-label="Ocultar valores"]').filter({ visible: true });
+    const pdEyeName = () => p.evaluate(() => { const e = [...document.querySelectorAll('[data-band] [role=button]')].find((x) => /^(Ocultar|Mostrar) valores$/.test(x.getAttribute('aria-label') || '') && x.getBoundingClientRect().width > 0); return e ? e.getAttribute('aria-label') : null; });
+    const pdBand = () => p.evaluate(() => {
+      const b = [...document.querySelectorAll('[data-band]')].find((e) => e.getBoundingClientRect().width > 0 && !e.closest('[inert]'));
+      if (!b) return null;
+      const cs = getComputedStyle(b); const r = b.getBoundingClientRect();
+      return { radii: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].join(' '), top: r.top, left: r.left, right: r.right, bg: cs.backgroundColor };
+    });
+    // (1) Celular, 390 px.
+    const pdEye390 = await p.evaluate(() => {
+      const e = [...document.querySelectorAll('[role=button]')].find((x) => x.getAttribute('aria-label') === 'Ocultar valores' && x.getBoundingClientRect().width > 0);
+      const a = [...document.querySelectorAll('[aria-label^="Conta: perfil"]')].find((x) => x.getBoundingClientRect().width > 0);
+      if (!e || !a) return null;
+      const r = e.getBoundingClientRect(), ra = a.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top), leftOfAvatar: r.right <= ra.left + 0.5, sameRow: Math.abs((r.top + r.bottom) / 2 - (ra.top + ra.bottom) / 2) < 2 };
+    });
+    ok('Paridade 390 px: na demonstração, o olho "Ocultar valores" fica no cabeçalho azul, logo antes do avatar da Conta, com 44 px', pdEye390 !== null && pdEye390.w >= 44 && pdEye390.h >= 44 && pdEye390.top < 120 && pdEye390.leftOfAvatar && pdEye390.sameRow, JSON.stringify(pdEye390));
+    await layoutChecks('Paridade, Resumo 390px');
+    await btn('Ocultar valores').click(); await p.waitForTimeout(400);
+    t = await body();
+    ok('Paridade 390 px: o olho oculta os valores na hora (R$ ••••) e vira "Mostrar valores"', t.includes('R$ ••••') && !t.includes('R$ 2.100,00') && (await visibleCount('button', 'Mostrar valores')) === 1);
+    await shot('660_paridade_olho_390');
+    await btn('Mostrar valores').click(); await p.waitForTimeout(400);
+    ok('Paridade 390 px: "Mostrar valores" traz os valores de volta', (await body()).includes('R$ 2.100,00') && (await visibleCount('button', 'Ocultar valores')) === 1);
+    const pdBand390 = await pdBand();
+    ok('Paridade 390 px: no celular, a faixa azul continua presa ao alto, com só os cantos de baixo arredondados (28 px)', pdBand390 !== null && pdBand390.radii === '0px 0px 28px 28px' && pdBand390.top <= 0.5 && pdBand390.left <= 0.5, JSON.stringify(pdBand390));
+    // Em 375 px, com o selo da demonstração, o olho não cabe: fica em Conta (como antes).
+    await p.setViewportSize({ width: 375, height: 812 }); await p.waitForTimeout(400);
+    ok('Paridade 375 px: com o selo da demonstração, o olho sai do cabeçalho (cabe a partir de 390 px) e nada passa da largura', (await visibleCount('button', 'Ocultar valores')) === 0 && !(await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)));
+
+    // (2) Computador, 1280 px: "Ocultar valores" no cabeçalho, com o texto, e o mesmo estado da barra lateral.
+    await p.setViewportSize({ width: 1280, height: 860 }); await p.waitForTimeout(700);
+    const pdNavEye = (name) => p.getByRole('navigation').getByRole('button', { name, exact: true }).filter({ visible: true });
+    const pdEye1280 = await p.evaluate(() => {
+      const e = [...document.querySelectorAll('[data-band] [role=button]')].find((x) => x.getAttribute('aria-label') === 'Ocultar valores' && x.getBoundingClientRect().width > 0);
+      const band = e ? e.closest('[data-band]') : null;
+      const month = [...document.querySelectorAll('[role=heading][aria-level="1"]')].find((x) => x.getBoundingClientRect().width > 0 && band && band.contains(x));
+      if (!e || !band || !month) return null;
+      const r = e.getBoundingClientRect(), rb = band.getBoundingClientRect(), rm = month.getBoundingClientRect();
+      return { text: e.textContent, h: Math.round(r.height), aboveMonth: r.bottom <= rm.top + 0.5, atRight: rb.right - r.right < 40, inNav: Boolean(e.closest('[role=navigation]')) };
+    });
+    ok('Paridade 1280 px: no Resumo, "Ocultar valores" com o texto no alto do bloco azul, à direita e acima do mês (fora da barra lateral)',
+      pdEye1280 !== null && pdEye1280.text === 'Ocultar valores' && pdEye1280.h >= 44 && pdEye1280.aboveMonth && pdEye1280.atRight && !pdEye1280.inNav, JSON.stringify(pdEye1280));
+    ok('Paridade 1280 px: a barra lateral mantém o seu "Ocultar valores" (um em cada lugar)', (await pdNavEye('Ocultar valores').count()) === 1 && (await visibleCount('button', 'Ocultar valores')) === 2);
+    await pdBandEye().first().click(); await p.waitForTimeout(400);
+    t = await body();
+    ok('Paridade 1280 px: o botão do cabeçalho oculta os valores, e o da barra lateral passa a "Mostrar valores" junto (um estado só)',
+      t.includes('R$ ••••') && !t.includes('R$ 2.100,00') && (await pdEyeName()) === 'Mostrar valores' && (await pdNavEye('Mostrar valores').count()) === 1 && (await visibleCount('button', 'Ocultar valores')) === 0);
+    await shot('661_paridade_olho_1280');
+    await pdNavEye('Mostrar valores').first().click(); await p.waitForTimeout(400);
+    ok('Paridade 1280 px: "Mostrar valores" na barra lateral traz os valores de volta e o cabeçalho volta a "Ocultar valores"',
+      (await body()).includes('R$ 2.100,00') && (await pdEyeName()) === 'Ocultar valores' && (await pdNavEye('Ocultar valores').count()) === 1);
+
+    // (3) Os cantos: o bloco azul do Resumo, alinhado com os cartões.
+    const pdResumo = await p.evaluate(() => {
+      const nav = [...document.querySelectorAll('[role=navigation]')].find((e) => e.getBoundingClientRect().width > 0);
+      const b = [...document.querySelectorAll('[data-band]')].find((e) => e.getBoundingClientRect().width > 0);
+      const cards = [...document.querySelectorAll('[data-card]')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.parentElement.closest('[data-card]'); });
+      if (!nav || !b || cards.length === 0) return null;
+      const cs = getComputedStyle(b); const r = b.getBoundingClientRect();
+      return { radii: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].join(' '), top: Math.round(r.top), gapNav: Math.round(r.left - nav.getBoundingClientRect().right),
+        dLeft: Math.round(r.left - Math.min(...cards.map((c) => c.getBoundingClientRect().left))), dRight: Math.round(Math.max(...cards.map((c) => c.getBoundingClientRect().right)) - r.right) };
+    });
+    ok('Paridade 1280 px: o bloco azul do Resumo é um cartão com os quatro cantos de 20 px, a 24 px do alto, longe da barra lateral e alinhado com os cartões de baixo',
+      pdResumo !== null && pdResumo.radii === '20px 20px 20px 20px' && pdResumo.top >= 16 && pdResumo.gapNav >= 16 && Math.abs(pdResumo.dLeft) <= 1 && Math.abs(pdResumo.dRight) <= 1, JSON.stringify(pdResumo));
+    await layoutChecks('Paridade, Resumo 1280px');
+    await p.setViewportSize({ width: 1024, height: 768 }); await p.waitForTimeout(500);
+    const pdBand1024 = await pdBand();
+    ok('Paridade 1024 px: o mesmo cartão azul, com os quatro cantos de 20 px', pdBand1024 !== null && pdBand1024.radii === '20px 20px 20px 20px' && pdBand1024.top >= 16, JSON.stringify(pdBand1024));
+    await layoutChecks('Paridade, Resumo 1024px');
+    await p.setViewportSize({ width: 1280, height: 860 }); await p.waitForTimeout(500);
+    // Movimentos: o botão na linha do título, à direita.
+    await p.getByRole('navigation').getByRole('link', { name: 'Movimentos do mês', exact: true }).filter({ visible: true }).first().click(); await waitText('Organizar'); await p.waitForTimeout(600);
+    const pdMov = await p.evaluate(() => {
+      const b = [...document.querySelectorAll('[data-band]')].find((e) => e.getBoundingClientRect().width > 0);
+      const h1 = b ? [...b.querySelectorAll('[role=heading][aria-level="1"]')].find((e) => e.textContent === 'Movimentos') : null;
+      const e = b ? [...b.querySelectorAll('[role=button]')].find((x) => x.getAttribute('aria-label') === 'Ocultar valores') : null;
+      if (!b || !h1 || !e) return null;
+      const cs = getComputedStyle(b); const r = e.getBoundingClientRect(), rh = h1.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      return { radii: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].join(' '), sameRow: r.top < rh.bottom && r.bottom > rh.top, atRight: rb.right - r.right < 40 };
+    });
+    ok('Paridade 1280 px: em Movimentos, "Ocultar valores" na linha do título, à direita, e o bloco azul com os quatro cantos de 20 px', pdMov !== null && pdMov.sameRow && pdMov.atRight && pdMov.radii === '20px 20px 20px 20px', JSON.stringify(pdMov));
+    await layoutChecks('Paridade, Movimentos 1280px'); await shot('662_paridade_movimentos_1280');
+    // O painel dos formulários: cartão arredondado, com o cabeçalho preso ao alto dele.
+    await p.getByRole('navigation').getByRole('button', { name: 'Anotar gasto' }).first().click(); await waitText('Valor'); await p.waitForTimeout(800);
+    const pdPanel = await p.evaluate(() => {
+      const d = [...document.querySelectorAll('[role=dialog]')].find((e) => e.getBoundingClientRect().width > 0);
+      if (!d) return null;
+      const b = [...d.querySelectorAll('[data-band]')].find((e) => e.getBoundingClientRect().width > 0);
+      const cs = getComputedStyle(d); const r = d.getBoundingClientRect();
+      return { radii: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].join(' '), top: Math.round(r.top), right: Math.round(window.innerWidth - r.right),
+        bottom: Math.round(window.innerHeight - r.bottom), overflow: cs.overflow, bandRadius: b ? getComputedStyle(b).borderTopLeftRadius : null, bandTop: b ? Math.round(b.getBoundingClientRect().top - r.top) : null };
+    });
+    ok('Paridade 1280 px: o painel do formulário é um cartão com os quatro cantos de 20 px, a 12 px do alto, da direita e do pé, e o cabeçalho fica preso ao alto dele',
+      pdPanel !== null && pdPanel.radii === '20px 20px 20px 20px' && pdPanel.top === 12 && pdPanel.right === 12 && pdPanel.bottom === 12 && pdPanel.overflow === 'hidden' && pdPanel.bandRadius === '0px' && pdPanel.bandTop !== null && pdPanel.bandTop <= 1, JSON.stringify(pdPanel));
+    await layoutChecks('Paridade, painel 1280px'); await shot('663_paridade_painel_1280');
+    await p.keyboard.press('Escape'); await p.waitForTimeout(800);
+    ok('Paridade 1280 px: Esc fecha o painel', (await p.getByRole('dialog').filter({ visible: true }).count()) === 0);
+    // Uma tela cheia (Conta): o cabeçalho compacto também vira cartão.
+    await p.getByRole('navigation').getByRole('link', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança', exact: true }).first().click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(600);
+    const pdConta = await pdBand();
+    ok('Paridade 1280 px: em Conta, o cabeçalho com "Voltar" é um cartão azul com os quatro cantos de 20 px, afastado do alto e da barra lateral', pdConta !== null && pdConta.radii === '20px 20px 20px 20px' && pdConta.top >= 16 && pdConta.left >= 256 + 16, JSON.stringify(pdConta));
+    await layoutChecks('Paridade, Conta 1280px'); await shot('664_paridade_conta_1280');
+    await p.getByRole('navigation').getByRole('link', { name: 'Resumo', exact: true }).first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(600);
+    ok('Paridade: nada vai à rede na demonstração', writes.length === pdWrites0, writes.slice(pdWrites0).join(' | '));
   }
 
   // ==================================================================================================================
@@ -14927,22 +15700,20 @@ setInterval(async () => {
     await demoHome();
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
     t = await body();
-    // Revisão das telas (16/11/2026): no card azul, o valor, o aportado, o ganho e uma linha do período; "Novo investimento" logo abaixo.
+    // Revisão das telas (16/11/2026): "Novo investimento" logo abaixo do card azul. D-103: no card, o valor, de quando são os valores, o
+    // aportado, o ganho em reais e depois a porcentagem sobre o investido; a comparação com CDI, IPCA e poupança mora no desempenho.
     const ivTops = await p.evaluate(() => {
       const top = (re) => { const e = [...document.querySelectorAll('[role=button],[role=heading]')].find((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')); return e ? Math.round(e.getBoundingClientRect().top) : null; };
       return { novo: top(/^Novo investimento$/), lista: top(/^Seus investimentos$/) };
     });
-    ok('D-093 Investimentos: de início, só uma linha do período no card azul (sem CDI, IPCA nem poupança à vista), "Comparar com CDI, IPCA e poupança" fechado e "Novo investimento" antes da lista',
-      t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,54%.') && !t.includes('CDI no mesmo período') && !t.includes('Neste mês, até hoje') &&
-        (await p.getByRole('button', { name: 'Comparar com CDI, IPCA e poupança', exact: true }).filter({ visible: true }).first().getAttribute('aria-expanded')) === 'false' &&
+    ok('D-093 Investimentos: o card azul sem CDI, IPCA nem poupança (D-103: moram no desempenho), "Ver desempenho" no card e "Novo investimento" antes da lista',
+      !t.includes('CDI no mesmo') && !t.includes('Neste mês, até hoje') && !t.includes('Nos 4 meses fechados') && (await visibleCount('button', 'Comparar com CDI, IPCA e poupança')) === 0 &&
+        (await visibleCount('button', /^R\$ 15\.955,00\. Ganho: R\$ 455,00, \+2,94% sobre o investido\. Ver desempenho$/)) === 1 &&
         ivTops.novo !== null && ivTops.lista !== null && ivTops.novo < ivTops.lista, JSON.stringify(ivTops));
-    await openCompare();
     t = await body(); investTexts.push(t);
-    ok('D-093 Investimentos: título "Investimentos", contexto Pessoal fixo, total de R$ 15.955,00, aportado, ganho e a rentabilidade com o CDI e o IPCA de exemplo',
-      (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Aportado: R$ 15.500,00') && t.includes('Ganho: R$ 455,00') &&
-        t.includes('Neste mês, até hoje: +0,10%') && t.includes('Nos 4 meses fechados, de junho a setembro de 2026: +3,54%.') &&
-        t.includes('CDI no mesmo período: +3,65%') && t.includes('IPCA no mesmo período: +1,41%') &&
-        t.includes('Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.'), t.slice(0, 700));
+    ok('D-093 Investimentos: título "Investimentos", contexto Pessoal fixo, total de R$ 15.955,00, de quando são os valores, aportado, ganho e a porcentagem sobre o investido',
+      (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Valores de 06/10/2026, como você registrou.') && t.includes('Aportado: R$ 15.500,00') &&
+        t.includes('Ganho: R$ 455,00') && t.indexOf('Ganho: R$ 455,00') < t.indexOf('+2,94% sobre o investido'), t.slice(0, 700));
     ok('D-093 Investimentos: diz que não é recomendação, que não entra em Pago nem em Recebido e que a Família não vê, num aviso só no fim (revisão das telas)',
       t.includes('não é recomendação de investimento') && t.includes('não entram em Pago nem em Recebido') && t.includes('Ninguém da Família nem a empresa que oferece o benefício vê.') &&
         t.includes('A Clarevo não guarda, não movimenta nem indica investimentos.') && !t.includes('Acompanhe o que você já investe'));
@@ -14954,8 +15725,9 @@ setInterval(async () => {
     await btn('Aplicação do banco, CDB ou RDB · Banco Exemplo: R$ 10.875,00. Ganho: R$ 375,00.').click(); await waitText('Valor no fim de cada mês'); await p.waitForTimeout(400);
     t = await body(); investTexts.push(t);
     ok('D-093 Investimento: detalhe com o valor, a última atualização, o fim de cada mês (setembro R$ 10.360,00) e o histórico',
-      (await h1Name()) === 'Aplicação do banco' && t.includes('R$ 10.875,00') && t.includes('Valor atualizado em 06/10/2026') && t.includes('Outubro de 2026 (até hoje)') &&
-        t.includes('R$ 10.360,00') && (await visibleCount('button', 'Aporte, 06/10/2026, R$ 500,00')) === 1 && (await visibleCount('button', 'Valor atualizado, 30/09/2026, R$ 10.360,00')) === 1, t.slice(0, 700));
+      (await h1Name()) === 'Aplicação do banco' && t.includes('R$ 10.875,00') && t.includes('Atualizado por você em 06/10/2026.') && t.includes('Outubro de 2026 (até hoje)') &&
+        t.includes('R$ 10.360,00') && (await visibleCount('button', 'Aporte, 06/10/2026, R$ 500,00, saldo depois R$ 10.860,00')) === 1 &&
+        (await visibleCount('button', 'Valor atualizado, 30/09/2026, R$ 10.360,00, saldo depois R$ 10.360,00')) === 1, t.slice(0, 700));
     await checkBar('D-093 detalhe do investimento (consulta)', 'Investir');
     await atWidths(async (w) => { await layoutChecks(`D-093 Investimento ${w}px`); if (w === 390) await shot('541_investimento_detalhe'); });
     // Resgate maior que o valor: recusado antes de enviar, com a data.
@@ -14971,7 +15743,7 @@ setInterval(async () => {
     ok('D-093 Atualizar valor: data de hoje preenchida e o contexto Pessoal fixo', (await field('Data').inputValue()) === '07/10/2026' && (await body()).includes('Demonstração · Pessoal'), await field('Data').inputValue());
     await field('Valor no extrato').fill('10900'); await btn('Atualizar valor').click(); await waitText('Valor atualizado.'); await p.waitForTimeout(400);
     t = await body();
-    ok('D-093 Atualizar valor: o detalhe passa a R$ 10.900,00, ganho de R$ 400,00, atualizado em 07/10/2026', t.includes('R$ 10.900,00') && t.includes('Ganho: R$ 400,00') && t.includes('Valor atualizado em 07/10/2026'), t.slice(0, 500));
+    ok('D-093 Atualizar valor: o detalhe passa a R$ 10.900,00, ganho de R$ 400,00, atualizado em 07/10/2026', t.includes('R$ 10.900,00') && t.includes('Ganho: R$ 400,00') && t.includes('Atualizado por você em 07/10/2026.'), t.slice(0, 500));
     // Novo investimento.
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
     ok('D-093 Investimentos: o total segue o valor novo (R$ 15.980,00)', (await body()).includes('R$ 15.980,00'));
@@ -14988,11 +15760,11 @@ setInterval(async () => {
       t.includes('Atualize o valor com o que aparece no seu extrato para ver quanto rendeu.'), t.slice(0, 500));
     // Com o novo sem valor, a carteira fica sem taxa neste mês, e o card azul diz quem falta atualizar (pedido do Enzo, 11/11/2026).
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
-    await openCompare();
     t = await body();
-    ok('D-093 Investimentos: com o novo sem valor, "Neste mês: sem taxa ainda" e o nome de quem falta atualizar no lugar do aviso geral',
-      t.includes('Neste mês: sem taxa ainda') && t.includes('Para ter a taxa deste mês, falta atualizar o valor de Ações da corretora.') &&
-        t.includes('Nos 4 meses fechados, de junho a setembro de 2026') && !t.includes('Para ver quanto rendeu em cada mês'), t.slice(0, 900));
+    // D-103 (item 1): o card azul diz quem está sem atualização no mês, e a linha do novo diz que mostra o que foi aplicado.
+    ok('D-093 Investimentos: com o novo sem valor, o card azul diz o nome de quem está sem atualização no mês e a linha diz que mostra o aplicado',
+      t.includes('Sem atualização neste mês: Ações da corretora.') && t.includes('Sem atualização do extrato: mostra o que foi aplicado.') &&
+        t.includes('Valores de 06/10 a 07/10/2026, como você registrou.'), t.slice(0, 900));
     await p.getByRole('button', { name: /^Ações da corretora, Ações:/ }).filter({ visible: true }).first().click(); await waitText('Encerrar investimento'); await p.waitForTimeout(300);
     // Encerrar, reabrir e excluir.
     await btn('Encerrar investimento').click(); await waitText('Investimento encerrado.'); await p.waitForTimeout(400);
@@ -15018,14 +15790,11 @@ setInterval(async () => {
     const into = async (text) => { await p.getByText(text, { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); };
     await demoHome();
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
-    await openCompare();
     t = await body(); investTexts.push(t);
-    ok('D-099 Investir: próximos vencimentos, garantia do FGC, ganho real, poupança e os dois atalhos',
-      t.includes('Aplicação do banco vence em 01/06/2027, daqui a 8 meses.') && t.includes('Banco Exemplo: R$ 10.875,00 em produtos com garantia do FGC.') &&
-        t.includes('Acima da inflação no período: +2,11%') && t.includes('Poupança no mesmo período: +2,42%') && t.includes('Resumo para a declaração') &&
-        t.includes('Comparar rendimentos líquidos') && t.includes('a Clarevo não sabe quais são do mesmo grupo.'), t.slice(0, 1200));
-    ok('D-099 Evolução da carteira (P2): os meses de junho a outubro, com o valor e o aportado acumulado',
-      t.includes('Evolução da carteira') && t.includes('Junho de 2026: R$ 10.085,00') && t.includes('Outubro de 2026 (até hoje): R$ 15.955,00') && t.includes('Aportes menos resgates até aqui: R$ 15.500,00'), t.slice(0, 2500));
+    // D-103: a garantia do FGC mora em "Por instituição" (conferida abaixo), e o ganho real, a poupança e a evolução, no desempenho (bloco D-103).
+    ok('D-099 Investir: próximos vencimentos e os dois atalhos; a evolução e o card "Garantia do FGC" saíram da aba (D-103)',
+      t.includes('Aplicação do banco vence em 01/06/2027, daqui a 8 meses.') && t.includes('Resumo para a declaração') && t.includes('Comparar rendimentos líquidos') &&
+        !t.includes('Evolução da carteira') && !(await headingShown('Garantia do FGC')), t.slice(0, 1200));
     ok('D-099 Datas do ano para quem investe (P2): o 31/12, os informes e a declaração, sem come-cotas (a demonstração não tem fundo)',
       t.includes('Datas do ano para quem investe') && t.includes('31/12/2026') && t.includes('26/02/2027') && t.includes('Março de 2027') && !t.includes('Come-cotas'), t.slice(0, 2500));
     ok('D-099 Como está dividido: por tipo, Renda fixa com 68% e Previdência com 32%, e o aviso de que a Clarevo não indica como dividir',
@@ -15034,6 +15803,10 @@ setInterval(async () => {
     t = await body();
     const div = t.slice(t.indexOf('Como está dividido'));
     ok('D-099 Como está dividido: por instituição, Banco Exemplo antes de "Sem informação"', div.indexOf('Banco Exemplo') > 0 && div.indexOf('Sem informação') > div.indexOf('Banco Exemplo'), div.slice(0, 400));
+    // D-103 (item 9): em "Por instituição", a soma da garantia do FGC de cada instituição e o limite para comparar, só como informação.
+    ok('D-103 Por instituição: a soma com garantia do FGC embaixo do Banco Exemplo, o limite para comparar e as regras do conglomerado',
+      div.includes('R$ 10.875,00 em produtos com garantia do FGC.') && div.includes('Para comparar: a garantia do FGC vai até R$ 250.000,00 por pessoa em cada instituição ou conglomerado.') &&
+        div.includes('a Clarevo não sabe quais são do mesmo grupo.') && div.indexOf('R$ 10.875,00 em produtos') < div.indexOf('Sem informação'), div.slice(0, 900));
     await radio('Por prazo de resgate').click(); await p.waitForTimeout(250);
     ok('D-099 Como está dividido: por prazo de resgate, o CDB em "Em até 1 ano"', (await body()).includes('Em até 1 ano'));
     await radio('Por tipo').click(); await p.waitForTimeout(250);
@@ -15041,18 +15814,20 @@ setInterval(async () => {
     // Detalhe.
     await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Valor pela taxa contratada'); await p.waitForTimeout(500);
     t = await body(); investTexts.push(t);
-    // Resgate só no vencimento (revisão das telas, 16/11/2026): a estimativa é no vencimento, com a alíquota dessa data (sem IOF).
+    // Resgate só no vencimento (revisão das telas, 16/11/2026): a estimativa é no vencimento, com a alíquota dessa data (sem IOF). D-104: a premissa
+    // fica junto dos números, e o imposto vem em três linhas (rendimento bruto, IR e IOF estimados, rendimento líquido estimado).
     ok('D-099 Investimento: valor pela taxa contratada, imposto estimado no vencimento (resgate só no vencimento) e a ficha',
-      t.includes('Valor estimado: R$ 10.879,87') && t.includes('Pela taxa que você registrou, a partir do valor de 06/10/2026.') && t.includes('No vencimento, em 01/06/2027 (estimativa)') &&
-        t.includes('Este investimento só pode ser resgatado no vencimento. A conta usa o valor de hoje e a alíquota que vale nessa data.') && !t.includes('Se resgatasse hoje') &&
-        t.includes('Cerca de R$ 10.809,08 líquidos.') && t.includes('Imposto de renda estimado: R$ 65,92') && !t.includes('IOF estimado') && t.includes('Alíquotas de 17,5% a 20%, pelo tempo de cada aporte.') &&
+      t.includes('Valor estimado: R$ 10.879,87') && t.includes('Conta o rendimento desde o valor de 06/10/2026, sem imposto e sem taxas.') && t.includes('No vencimento, em 01/06/2027 (estimativa)') &&
+        t.includes('Este investimento só pode ser resgatado no vencimento.') && t.includes('Premissa: o valor de hoje, sem o rendimento que ainda pode entrar até 01/06/2027') && !t.includes('Se resgatasse hoje') &&
+        t.includes('Cerca de R$ 10.809,08 líquidos.') && /IR e IOF estimados\s+−R\$ 65,92/.test(t) && t.includes('Alíquotas de 17,5% a 20%, pelo tempo de cada aporte.') &&
         t.includes('Estimativa pela regra em vigor em 13/11/2026') && t.includes('Sobre este investimento') && t.includes('105% do CDI') &&
         t.includes('01/06/2027, daqui a 8 meses') && t.includes('Resgate só no vencimento') && t.includes('Garantia do FGC.'), t.slice(0, 2500));
     await checkBar('D-099 detalhe com a ficha', 'Investir');
     await atWidths(async (w) => { await layoutChecks(`D-099 Investimento ${w}px`); if (w === 390) { await into('Valor pela taxa contratada'); await shot('546_investimento_ficha'); } });
     await btn('Usar este valor').click(); await waitText('Valor atualizado pela taxa contratada.'); await p.waitForTimeout(500);
     t = await body();
-    ok('D-099 "Usar este valor": registra a atualização de hoje (R$ 10.879,87) e o botão some', t.includes('R$ 10.879,87') && t.includes('Valor atualizado em 07/10/2026') && (await visibleCount('button', 'Usar este valor')) === 0, t.slice(0, 600));
+    ok('D-099 "Usar este valor": registra a atualização de hoje (R$ 10.879,87), com a data e de onde veio (D-104), e o botão some',
+      t.includes('R$ 10.879,87') && t.includes('Atualizado em 07/10/2026, pela taxa contratada (estimativa).') && (await visibleCount('button', 'Usar este valor')) === 0, t.slice(0, 600));
     // Editar: o bloco abre com a ficha; a taxa vazia é recusada no campo; LCI muda a regra de imposto.
     await btn('Editar').click(); await waitText('Editar investimento'); await p.waitForTimeout(400);
     ok('D-099 Editar: "Mais detalhes (opcional)" aberto, com a instituição e a taxa', (await field('Onde está').inputValue()) === 'Banco Exemplo' && (await field('Porcentagem do CDI (%)').inputValue()) === '105');
@@ -15063,22 +15838,24 @@ setInterval(async () => {
     await atWidths(async (w) => { await layoutChecks(`D-099 Mais detalhes ${w}px`); if (w === 390) { await into('Qual é o investimento?'); await shot('547_investimento_mais_detalhes'); } });
     await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
     t = await body();
-    ok('D-099 Editar: salvo, o detalhe mostra LCI, 95% do CDI e a explicação do isento no lugar do cálculo',
-      t.includes('LCI · Banco Exemplo') && t.includes('95% do CDI') && t.includes('Este tipo não tem imposto de renda para pessoa física.'), t.slice(0, 1500));
+    // D-104: no isento, as três linhas também (o IOF só nos primeiros 30 dias; aqui, zero) e a frase do isento.
+    ok('D-099 Editar: salvo, o detalhe mostra LCI, 95% do CDI e o isento (sem IR, com o IOF estimado em zero)',
+      t.includes('LCI · Banco Exemplo') && t.includes('95% do CDI') && /IOF estimado \(isento de IR\)\s+R\$ 0,00/.test(t) && t.includes('Este tipo é isento para pessoa física'), t.slice(0, 1500));
     // Rendimento recebido com tipo.
     await btn('Registrar rendimento recebido').click(); await waitText('Tipo do rendimento (opcional)'); await p.waitForTimeout(300);
     await field('Valor').fill('12,50'); await radio('Juros ou cupom').click(); await btn('Registrar rendimento recebido').click(); await waitText('Rendimento registrado.'); await p.waitForTimeout(400);
-    ok('D-099 Rendimento recebido: o histórico mostra o tipo', (await visibleCount('button', 'Rendimento recebido · Juros ou cupom, 07/10/2026, R$ 12,50')) === 1);
+    ok('D-099 Rendimento recebido: o histórico mostra o tipo (e, D-104, o saldo, que o rendimento não muda)', (await visibleCount('button', 'Rendimento recebido · Juros ou cupom, 07/10/2026, R$ 12,50, saldo depois R$ 10.875,00')) === 1);
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
     t = await body();
     ok('D-099 Investir: "Rendimentos recebidos em 2026" com o total e o tipo', t.includes('Rendimentos recebidos em 2026') && t.includes('Juros ou cupom') && t.includes('R$ 12,50'), t.slice(0, 1500));
     // Resumo para a declaração.
     await p.getByRole('link', { name: /^Resumo para a declaração/ }).filter({ visible: true }).first().click(); await waitText('Bens e Direitos'); await p.waitForTimeout(400);
     t = await body(); investTexts.push(t);
+    // D-104: no formato do informe, o rendimento isento vem na parte "Rendimentos isentos e não tributáveis", por investimento.
     ok('D-099 Resumo para a declaração: grupo e código para conferir, discriminação sem CPF, valor zero de quem começou no ano e os rendimentos isentos',
       (await h1Name()) === 'Resumo para a declaração' && t.includes('Para a declaração de 2027') && t.includes('Grupo 04, código 03, como costuma aparecer nos guias. Confira no programa da Receita.') &&
         t.includes('LCI na instituição Banco Exemplo, aplicado desde 01/06/2026.') && t.includes('Valor registrado em 31/12/2025: R$ 0,00 (começou em 2026). Hoje: R$ 10.879,87.') &&
-        t.includes('Isentos e não tributáveis: R$ 12,50') && t.includes('Informe de rendimentos de 2026: Banco Exemplo') && t.includes('não a declaração pronta'), t.slice(0, 1500));
+        /Rendimentos isentos e não tributáveis\s+Aplicação do banco · LCI · Banco Exemplo: R\$ 12,50/.test(t) && t.includes('Informe de rendimentos de 2026: Banco Exemplo') && t.includes('não a declaração pronta'), t.slice(0, 1500));
     await checkBar('D-099 Resumo para a declaração', 'Investir');
     await atWidths(async (w) => { await layoutChecks(`D-099 Declaração ${w}px`); if (w === 390) await shot('548_resumo_declaracao'); });
     // Comparar rendimentos líquidos.
@@ -15180,7 +15957,7 @@ setInterval(async () => {
     await btn('Editar').click(); await waitText('Editar investimento'); await p.waitForTimeout(400);
     ok('D-099 P2 Editar: "Para que é este dinheiro? (opcional)" com "Sem meta" escolhido, a reserva e a viagem',
       (await radio('Sem meta').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'Reserva para imprevistos')) === 1 && (await visibleCount('radio', 'Viagem de férias')) === 1 &&
-        (await body()).includes('Ligar a uma meta é só informação: a meta continua com o valor que você registrou nela.'));
+        (await body()).includes('O investimento aparece na meta. Na meta, você escolhe de onde vem o valor guardado: do que registra nela ou do valor dos investimentos ligados.'));
     await radio('Viagem de férias').click(); await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
     ok('D-099 P2 Editar: salvo, a ficha diz "Para" a viagem', (await body()).includes('Viagem de férias') && (await visibleCount('button', 'Ver a meta')) === 1);
     await btn('Ver a meta').click(); await waitText('Investimentos ligados à meta'); await p.waitForTimeout(400);
@@ -15192,6 +15969,186 @@ setInterval(async () => {
     await radio('Sem meta').click(); await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
     ok('D-099 P2 Editar: com "Sem meta", a ficha deixa de dizer "Para"', (await visibleCount('button', 'Ver a meta')) === 0 && (await visibleCount('button', 'Ver a reserva')) === 0);
     ok('D-099 P2: nada vai à rede na demonstração', writes.length === plWrites0, writes.slice(plWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // D-104 (17/11/2026): detalhe e formulários de cada investimento. A data de cada valor ("Atualizado por você em"), as três linhas do
+  // imposto estimado (rendimento bruto, IR e IOF, líquido) com a data e a premissa, e as frases curtas de imposto, liquidez e FGC com o
+  // tema de Aprender; a taxa com data de fim (a aplicação da demonstração rende 105% do CDI até 31/03/2027, depois 100%) e a condição da
+  // taxa; o histórico com o saldo linha a linha; "Somar a uma meta?" no rendimento e no resgate do vencimento; "Outro investimento" com
+  // descrição; "Usar o valor dos investimentos nesta meta" no formulário; o lembrete no detalhe e a tela do lembrete, com adiar e pausar
+  // sem cobrança; o resumo da declaração no formato do informe; e "Ocultar valores" sem nenhum valor em reais à vista. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const fhWrites0 = writes.length;
+    const into = async (text) => { await p.getByText(text, { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); };
+    const openCdb = async () => {
+      await p.getByRole('button', { name: /^Aplicação do banco, CDB ou RDB · Banco Exemplo:/ }).filter({ visible: true }).first().click(); await waitText('Sobre este investimento'); await p.waitForTimeout(500);
+    };
+    const toInvest = async () => { await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400); };
+    const checkbox = (re) => p.getByRole('checkbox', { name: re }).filter({ visible: true }).first();
+    await demoHome();
+    await toInvest();
+    await openCdb();
+    t = await body(); investTexts.push(t);
+    ok('D-104 Detalhe: a data do valor de hoje, a estimativa com a data e a premissa, e a taxa com data de fim na ficha',
+      t.includes('Atualizado por você em 06/10/2026.') && t.includes('Estimativa para hoje, 07/10/2026.') &&
+        t.includes('Premissa: 105% do CDI até 31/03/2027 e 100% do CDI depois, com o CDI de exemplo da demonstração. Conta o rendimento desde o valor de 06/10/2026, sem imposto e sem taxas.') &&
+        t.includes('105% do CDI até 31/03/2027, depois 100% do CDI'), t.slice(0, 1800));
+    const fhNet = t.slice(t.indexOf('No vencimento, em 01/06/2027 (estimativa)'));
+    ok('D-104 Imposto estimado: rendimento bruto, IR e IOF e rendimento líquido em três linhas, com a data e a premissa por perto',
+      fhNet.includes('Estimativa para 01/06/2027.') && /Rendimento bruto\s+R\$ 375,00\s+IR e IOF estimados\s+−R\$ 65,92\s+Rendimento líquido estimado\s+R\$ 309,08/.test(fhNet) &&
+        fhNet.includes('Cerca de R$ 10.809,08 líquidos.') && fhNet.includes('Premissa: o valor de hoje, sem o rendimento que ainda pode entrar até 01/06/2027, com a alíquota que vale nessa data.'),
+      fhNet.slice(0, 900));
+    // As três linhas alinhadas: o valor de cada uma termina na mesma margem direita.
+    const fhRight = await p.evaluate(() => ['R$ 375,00', '−R$ 65,92', 'R$ 309,08'].map((s) => {
+      const e = [...document.querySelectorAll('div[dir="auto"]')].find((x) => (x.textContent || '').replace(/\u00a0/g, ' ') === s && x.getBoundingClientRect().width > 0);
+      return e ? Math.round(e.getBoundingClientRect().right) : null;
+    }));
+    ok('D-104 Imposto estimado: os três valores alinhados à direita', fhRight.every((r) => r !== null) && Math.max(...fhRight) - Math.min(...fhRight) <= 2, JSON.stringify(fhRight));
+    ok('D-104 Frases curtas de imposto, liquidez e FGC, cada uma com o tema de Aprender',
+      t.includes('Imposto de renda é o que a Receita fica do rendimento, nunca do valor aplicado.') && t.includes('Liquidez é a facilidade de transformar o investimento em dinheiro na conta') &&
+        t.includes('O FGC é uma garantia privada que devolve até R$ 250 mil por pessoa em cada instituição') &&
+        (await visibleCount('button', 'Saber mais sobre o imposto nos investimentos')) === 1 && (await visibleCount('button', 'Saber mais sobre liquidez')) === 1 &&
+        (await visibleCount('button', 'Saber mais sobre o FGC')) === 1);
+    ok('D-104 Histórico: o saldo depois de cada linha e, na atualização, a diferença para o saldo anterior',
+      (await visibleCount('button', 'Aporte, 06/10/2026, R$ 500,00, saldo depois R$ 10.860,00')) === 1 && (await visibleCount('button', 'Valor atualizado, 06/10/2026, R$ 10.875,00, saldo depois R$ 10.875,00')) === 1 &&
+        t.includes('Saldo depois: R$ 10.860,00') && t.includes('R$ 15,00 a mais que o saldo anterior') && t.includes('com o saldo depois de cada um. O valor de hoje fica no alto da tela.'));
+    await atWidths(async (w) => { await layoutChecks(`D-104 Investimento ${w}px`); if (w === 390) { await into('Rendimento bruto'); await shot('564_investimento_imposto_tres_linhas'); } });
+    await btn('Saber mais sobre o FGC').click(); await p.waitForTimeout(900);
+    ok('D-104 "Saber mais sobre o FGC" abre o tema de Aprender', urlPath() === '/explicacao/fgc', urlPath());
+    await p.goBack(); await waitText('Sobre este investimento'); await p.waitForTimeout(400);
+    // Rendimento recebido: "Somar a uma meta?" sem nada marcado; com a viagem, o aporte entra na meta.
+    await btn('Registrar rendimento recebido').click(); await waitText('Tipo do rendimento (opcional)'); await p.waitForTimeout(300);
+    ok('D-104 Rendimento: "Somar a uma meta?" com a reserva e a viagem, sem nada marcado',
+      (await body()).includes('Somar a uma meta? (opcional)') && (await radio('Reserva para imprevistos').getAttribute('aria-checked')) === 'false' &&
+        (await radio('Viagem de férias').getAttribute('aria-checked')) === 'false');
+    await field('Valor').fill('12,50'); await radio('Juros ou cupom').click(); await radio('Viagem de férias').click(); await p.waitForTimeout(200);
+    await atWidths(async (w) => { await layoutChecks(`D-104 Rendimento com meta ${w}px`); if (w === 390) { await into('Somar a uma meta? (opcional)'); await shot('565_rendimento_somar_meta'); } });
+    await btn('Registrar rendimento recebido').click(); await waitText('Rendimento registrado.'); await p.waitForTimeout(500);
+    ok('D-104 Rendimento somado à meta: o aviso diz o aporte na viagem', (await body()).includes('Rendimento registrado. Aporte de R$ 12,50 registrado na meta Viagem de férias.'));
+    await tabByName('Metas').click(); await waitText('Viagem de férias'); await p.waitForTimeout(500);
+    ok('D-104 Metas: a viagem passa a R$ 1.212,50, com o aporte do rendimento', (await body()).includes('R$ 1.212,50'));
+    // Resumo da declaração no formato do informe (o rendimento de juros do CDB é de tributação exclusiva).
+    await toInvest();
+    await p.getByRole('link', { name: /^Resumo para a declaração/ }).filter({ visible: true }).first().click(); await waitText('Bens e Direitos'); await p.waitForTimeout(400);
+    t = await body(); investTexts.push(t);
+    const fhOrder = ['Resumo estimado. Confira com o informe da instituição.', 'Ano-calendário', 'Posição em 2026, até hoje', 'Rendimentos isentos e não tributáveis', 'Rendimentos sujeitos à tributação exclusiva', 'Bens e Direitos'].map((s) => t.indexOf(s));
+    ok('D-104 Declaração no formato do informe: o selo, o ano, a posição, os isentos, a tributação exclusiva e Bens e Direitos, nessa ordem',
+      fhOrder.every((x, k) => x >= 0 && (k === 0 || x > fhOrder[k - 1])) && t.includes('Total registrado em 31/12/2025: R$ 0,00. Hoje: R$ 15.955,00.') &&
+        t.includes('Aplicação do banco · CDB ou RDB · Banco Exemplo: R$ 12,50') && t.includes('VGBL, aplicado desde 01/08/2026. Plano com contribuição todo mês, para a aposentadoria.'),
+      `${JSON.stringify(fhOrder)} ${t.slice(0, 1500)}`);
+    await checkBar('D-104 Declaração no formato do informe', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-104 Declaração ${w}px`); if (w === 390) await shot('566_declaracao_informe'); });
+    await radio('2025').click(); await p.waitForTimeout(300);
+    ok('D-104 Declaração: escolher o ano (2025, sem investimentos)', (await body()).includes('Nenhum investimento registrado em 2025.') && (await body()).includes('Resumo estimado. Confira com o informe da instituição.'));
+    // Editar: a taxa com data de fim, a condição e "Usar o valor dos investimentos nesta meta".
+    await toInvest();
+    await openCdb();
+    await btn('Editar').click(); await waitText('Editar investimento'); await p.waitForTimeout(400);
+    ok('D-104 Editar: "A taxa muda numa data" marcada, com a data de fim e a taxa de depois',
+      (await checkbox(/^A taxa muda numa data/).getAttribute('aria-checked')) === 'true' && (await field('Esta taxa vale até').inputValue()) === '31/03/2027' &&
+        (await field('Porcentagem do CDI depois dessa data (%)').inputValue()) === '100');
+    await field('Esta taxa vale até').fill(''); await btn('Salvar investimento').click(); await p.waitForTimeout(300);
+    ok('D-104 Editar: sem a data de fim, recusado no campo, com o foco nele', (await body()).includes('Informe até quando vale esta taxa.') && (await field('Esta taxa vale até').evaluate((e) => e === document.activeElement)));
+    await field('Esta taxa vale até').fill('31/03/2027'); await field('Condição da taxa (opcional)').fill('com aporte todo mês');
+    t = await body();
+    ok('D-104 Editar: a meta ligada explica que a meta pode usar o valor dos investimentos, com a opção sem vir marcada',
+      t.includes('O investimento aparece na meta. Na meta, você escolhe de onde vem o valor guardado: do que registra nela ou do valor dos investimentos ligados.') &&
+        !t.includes('Ligar a uma meta é só informação') && (await checkbox(/^Usar o valor dos investimentos nesta meta/).getAttribute('aria-checked')) === 'false');
+    await checkbox(/^Usar o valor dos investimentos nesta meta/).click(); await p.waitForTimeout(200);
+    await atWidths(async (w) => { await layoutChecks(`D-104 Editar com a taxa de depois ${w}px`); if (w === 390) { await into('Esta taxa vale até'); await shot('567_investimento_taxa_com_data'); } });
+    await btn('Salvar investimento').click(); await waitText('Investimento salvo.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-104 Editar: salvo, a meta passa a usar o valor dos investimentos, e a ficha mostra a condição da taxa',
+      t.includes('Investimento salvo. A meta Reserva para imprevistos passa a usar o valor dos investimentos ligados.') && t.includes('Condição da taxa') && t.includes('com aporte todo mês'), t.slice(0, 1500));
+    await btn('Ver a reserva').click(); await waitText('Investimentos ligados à reserva'); await p.waitForTimeout(500);
+    ok('D-104 Reserva: "Dos investimentos ligados" escolhido pelo formulário do investimento', (await radio('Dos investimentos ligados').getAttribute('aria-checked')) === 'true');
+    // "Outro investimento": nome, tipo, descrição e valor atualizado à mão.
+    await toInvest();
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await field('Nome').fill('Consórcio do carro'); await radio('Outro').click(); await p.waitForTimeout(200);
+    ok('D-104 Novo "Outro": a frase diz para dar nome, descrever e atualizar o valor pelo extrato',
+      (await body()).includes('Para o que não está na lista. Dê um nome, diga o que é na descrição (em "Mais detalhes") e atualize o valor pelo extrato quando quiser.'));
+    await field('Quanto você aplicou até hoje?').fill('5000'); await field('Quanto vale hoje? (opcional)').fill('5200'); await field('Desde quando? (opcional)').fill('01/08/2026');
+    await p.getByRole('button', { name: /^Mais detalhes \(opcional\)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await field('Descrição (opcional)').fill('Carta de crédito, parcelas todo mês');
+    await atWidths(async (w) => { await layoutChecks(`D-104 Novo investimento Outro ${w}px`); if (w === 390) { await into('Descrição (opcional)'); await shot('568_outro_investimento'); } });
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await p.waitForTimeout(500);
+    t = await body(); investTexts.push(t);
+    ok('D-104 "Outro": o detalhe com a descrição, o valor atualizado à mão com a data e o imposto sem estimativa',
+      (await h1Name()) === 'Consórcio do carro' && t.includes('Carta de crédito, parcelas todo mês') && t.includes('R$ 5.200,00') && t.includes('Atualizado por você em 07/10/2026.') &&
+        t.includes('Para um investimento do tipo Outro, a Clarevo não estima o imposto'), t.slice(0, 1500));
+    // Lembrete no detalhe: um título vencido e sem valor do extrato desde o primeiro aporte.
+    await toInvest();
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await field('Nome').fill('Título vencido'); await radio('Renda fixa').click(); await field('Quanto você aplicou até hoje?').fill('2000'); await field('Desde quando? (opcional)').fill('01/08/2026');
+    await p.getByRole('button', { name: /^Mais detalhes \(opcional\)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await field('Vencimento (opcional)').fill('01/10/2026'); await radio('Só no vencimento').click();
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await p.waitForTimeout(500);
+    t = await body(); investTexts.push(t);
+    ok('D-104 Lembrete no detalhe: o vencimento passado, em tom de fato, com registrar o resgate, adiar e pausar; o valor com a data, nunca zero',
+      t.includes('Este investimento venceu em 01/10/2026. Se o dinheiro já voltou para a conta, quer registrar o resgate?') && (await visibleCount('button', 'Registrar o resgate')) === 1 &&
+        (await visibleCount('button', 'Lembrar de novo em 3 dias')) === 1 && (await visibleCount('button', 'Pausar este lembrete por 30 dias')) === 1 &&
+        t.includes('Sem valor do extrato ainda: é o aplicado menos o resgatado, desde 01/08/2026.') && !/atrasad|deveria|esqueceu/i.test(t), t.slice(0, 1500));
+    await atWidths(async (w) => { await layoutChecks(`D-104 Lembrete no detalhe ${w}px`); if (w === 390) { await into('Vencimento'); await shot('569_investimento_lembrete'); } });
+    await btn('Registrar o resgate').click(); await waitText('O dinheiro que você tirou do investimento.'); await p.waitForTimeout(300);
+    ok('D-104 Resgate no vencimento: "Somar a uma meta?" com a viagem, sem nada marcado (a reserva agora lê os investimentos)',
+      (await body()).includes('Somar a uma meta? (opcional)') && (await radio('Viagem de férias').getAttribute('aria-checked')) === 'false' && (await visibleCount('radio', 'Reserva para imprevistos')) === 0);
+    await btn('Cancelar').click(); await p.waitForTimeout(300);
+    if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
+    await waitText('Sobre este investimento');
+    await btn('Pausar este lembrete por 30 dias').click(); await waitText('Lembrete pausado até 06/11/2026. Dá para retomar quando quiser.'); await p.waitForTimeout(400);
+    t = await body();
+    ok('D-104 Vencimento pausado: o cartão passa ao valor sem atualização desde o primeiro aporte',
+      t.includes('Este investimento está sem valor do extrato desde o primeiro aporte, em 01/08/2026. Quer atualizar?') && (await visibleCount('button', 'Atualizar com o extrato')) === 1 &&
+        !t.includes('Este investimento venceu em 01/10/2026.'), t.slice(0, 1200));
+    await btn('Lembrar de novo em 3 dias').click(); await waitText('Combinado: este lembrete volta em 10/10/2026.'); await p.waitForTimeout(400);
+    ok('D-104 Adiado: o cartão de lembrete some do detalhe', (await visibleCount('button', 'Lembrar de novo em 3 dias')) === 0 && (await visibleCount('button', 'Atualizar com o extrato')) === 0);
+    ok('D-104 Detalhe e formulários: nada vai à rede na demonstração', writes.length === fhWrites0, writes.slice(fhWrites0).join(' | '));
+    // A tela do lembrete, como o toque no aviso do celular a abre (na web, pelo endereço).
+    await p.goto(`http://localhost:${PORT}/investimento/lembrete?tipo=aporte_investimentos`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Lembrete dos investimentos', 12000); await p.waitForTimeout(800);
+    t = await body(); investTexts.push(t);
+    ok('D-104 Tela do lembrete: o fato com o plano e o que já foi aportado, os atalhos de cada investimento, adiar e pausar, sem cobrança',
+      (await h1Name()) === 'Lembrete dos investimentos' && t.includes('O seu plano de investimentos é de R$ 600,00 por mês, com o lembrete no dia 5. Quer registrar um aporte?') &&
+        t.includes('Em outubro, os aportes registrados somam R$ 500,00.') && (await visibleCount('button', 'Registrar aporte em Aplicação do banco')) === 1 &&
+        (await visibleCount('button', 'Registrar aporte em Previdência')) === 1 && (await visibleCount('button', 'Lembrar de novo em 3 dias')) === 1 &&
+        (await visibleCount('button', 'Pausar este lembrete por 30 dias')) === 1 && t.includes('É só um lembrete: você decide se e quando registrar.') && !/atrasad|deveria|esqueceu/i.test(t), t.slice(0, 1200));
+    // Aberta pelo endereço (ou pelo aviso), a barra marca a aba de onde se veio.
+    await checkBar('D-104 Lembrete dos investimentos');
+    await atWidths(async (w) => { await layoutChecks(`D-104 Lembrete dos investimentos ${w}px`); if (w === 390) await shot('570_lembrete_investimentos'); });
+    await btn('Pausar este lembrete por 30 dias').click(); await waitText('Lembrete pausado até 06/11/2026. Dá para retomar quando quiser.'); await p.waitForTimeout(300);
+    ok('D-104 Lembrete pausado: diz até quando e oferece retomar', (await body()).includes('Este lembrete está pausado até 06/11/2026.') && (await visibleCount('button', 'Retomar este lembrete')) === 1 &&
+      (await visibleCount('button', 'Lembrar de novo em 3 dias')) === 0);
+    await btn('Retomar este lembrete').click(); await waitText('Lembrete retomado.'); await p.waitForTimeout(300);
+    await btn('Registrar aporte em Aplicação do banco').click(); await waitText('O dinheiro que você colocou no investimento.'); await p.waitForTimeout(300);
+    ok('D-104 Lembrete: o atalho abre o aporte da aplicação', (await body()).includes('Aplicação do banco') && (await visibleCount('button', 'Registrar aporte')) >= 1);
+    // Ocultar valores: nenhum valor em reais à vista no detalhe, no rendimento, no fundo (a cota tem mais de duas casas) e na declaração.
+    await demoHome();
+    await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Diferença do mês');
+    const fhHidden = async (name, masked = true) => {
+      await p.waitForTimeout(300);
+      const leaks = await moneyLeaks();
+      ok(`D-104 Ocultar valores, ${name}: nenhum valor em reais à vista (texto e nomes acessíveis)`, leaks.length === 0 && (!masked || (await body()).includes('R$ ••••')), leaks.slice(0, 4).join(' | '));
+    };
+    await toInvest();
+    await openCdb();
+    await fhHidden('detalhe da aplicação');
+    await btn('Registrar rendimento recebido').click(); await waitText('Tipo do rendimento (opcional)');
+    await fhHidden('rendimento com "Somar a uma meta?"', false);
+    await btn('Cancelar').click(); await p.waitForTimeout(300);
+    await toInvest();
+    await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
+    await field('Nome').fill('Fundo DI'); await radio('Fundos').click(); await field('Quanto você aplicou até hoje?').fill('30000');
+    await p.getByRole('button', { name: /^Mais detalhes \(opcional\)/ }).filter({ visible: true }).first().click(); await p.waitForTimeout(300);
+    await field('CNPJ do fundo (opcional)').fill('00.017.024/0001-53'); await field('Quantidade de cotas (opcional)').fill('1.000');
+    await btn('Criar investimento').click(); await waitText('Investimento criado.'); await waitText('Valor pela cota do fundo'); await p.waitForTimeout(600);
+    await fhHidden('fundo com a cota do dia');
+    ok('D-104 Fundo: a data da cota embaixo do valor', (await body()).includes('Cota de 05/10/2026.'));
+    await toInvest();
+    await p.getByRole('link', { name: /^Resumo para a declaração/ }).filter({ visible: true }).first().click(); await waitText('Bens e Direitos'); await p.waitForTimeout(400);
+    await fhHidden('resumo da declaração');
   }
 
   // ==================================================================================================================
@@ -15222,7 +16179,7 @@ setInterval(async () => {
     await atWidths(async (w) => { await layoutChecks(`D-099 P3 Título ${w}px`); if (w === 390) { await p.getByText('Valor pelo preço publicado', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await shot('561_investimento_preco_tesouro'); } });
     await p.getByRole('button', { name: 'Usar este valor', exact: true }).filter({ visible: true }).last().click(); await waitText('Valor atualizado pelo preço público.'); await p.waitForTimeout(500);
     t = await body();
-    ok('D-099 P3 Título: "Usar este valor" grava a atualização de hoje (R$ 10.132,18)', t.includes('R$ 10.132,18') && t.includes('Valor atualizado em 07/10/2026'), t.slice(0, 600));
+    ok('D-099 P3 Título: "Usar este valor" grava a atualização de hoje (R$ 10.132,18), com a data do preço (D-104)', t.includes('R$ 10.132,18') && t.includes('Atualizado em 07/10/2026, pelo preço do Tesouro Nacional de 06/10/2026.'), t.slice(0, 600));
     // Fundo com CNPJ e quantidade: o CNPJ errado é recusado no campo.
     await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
     await btn('Novo investimento').click(); await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(300);
@@ -15266,6 +16223,171 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
+  // D-103 (estudo da aba Investir): de quando é cada valor (a lista e o intervalo no card azul) e, numa falha ao recarregar, o último valor
+  // conhecido com a data, nunca zero; o ganho em reais antes da porcentagem e a folha "Como a conta é feita"; o desempenho aberto pelo card
+  // (três períodos fixos, cada investimento no próprio período ao lado do CDI, do IPCA e da poupança, selo de estimativa, uma cor só e a
+  // evolução da carteira); a premissa do plano e da comparação; o convite opcional para conferir o plano (a demonstração tem o plano
+  // definido em 15/06/2026) com "Agora não"; "Ocultar valores" na aba, no desempenho, no plano e na comparação; e, numa conta nova, os
+  // modelos de registro da tela vazia. A divisão "Por instituição" com a soma do FGC está no bloco D-099. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const dsWrites0 = writes.length;
+    const reviewLater = 'Agora não: ocultar o convite para conferir o plano de aportes';
+    await demoHome();
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
+    t = await body(); investTexts.push(t);
+    ok('D-103 Investir: cada linha diz de quando é o valor, e o card azul o intervalo das datas',
+      t.split('Atualizado por você em 06/10/2026.').length - 1 === 2 && t.includes('Valores de 06/10/2026, como você registrou.'), t.slice(0, 1500));
+    ok('D-103 Investir: o ganho em reais antes da porcentagem sobre o investido, e "Como a conta é feita" no card',
+      t.indexOf('Ganho: R$ 455,00') >= 0 && t.indexOf('Ganho: R$ 455,00') < t.indexOf('+2,94% sobre o investido') && (await visibleCount('button', 'Como a conta é feita')) === 1);
+    ok('D-103 Plano: o convite discreto para conferir o plano (definido em 15/06/2026), com "Agora não", no card do plano',
+      t.includes('Faz 3 meses que você revisou o plano. Quer conferir?') && (await visibleCount('button', reviewLater)) === 1 && (await visibleCount('button', 'Ver plano de aportes')) === 1, t.slice(0, 1500));
+    await atWidths(async (w) => { await layoutChecks(`D-103 Investir ${w}px`); if (w === 390) await shot('564_investimentos_datas'); });
+    // "Como a conta é feita": cada número do card, com a conta feita e a fórmula de acima da inflação.
+    await btn('Como a conta é feita').click(); await waitText('De quando é cada valor'); await p.waitForTimeout(300);
+    const how = await dialogText();
+    ok('D-103 Como a conta é feita: o valor, o aportado, a conta do ganho, a da porcentagem, as datas e a fórmula de acima da inflação, sem "nós"',
+      how.includes('Valor de hoje: R$ 15.955,00') && how.includes('Aportado: R$ 15.500,00') &&
+        how.includes('R$ 15.955,00 + R$ 0,00 + R$ 0,00 − R$ 15.500,00. Resultado: ganho de R$ 455,00.') && how.includes('O ganho dividido pelo aportado: R$ 455,00 ÷ R$ 15.500,00.') &&
+        how.includes('não uma taxa ao ano nem a do mês') && how.includes('(1 + rendimento) ÷ (1 + IPCA) − 1') && how.includes('A Clarevo faz a conta só com o que você registra.') &&
+        !/\bnós\b|calculamos/i.test(how), how.slice(0, 1500));
+    investTexts.push(how);
+    await atWidths(async (w) => { await layoutChecks(`D-103 Como a conta é feita ${w}px`); if (w === 390) await shot('565_como_a_conta_e_feita'); });
+    await btn('Fechar').click(); await p.waitForTimeout(300);
+    ok('D-103 Como a conta é feita: "Fechar" fecha a folha', (await visibleCount('button', 'Fechar')) === 0);
+    // Desempenho: o card azul abre a comparação; cada investimento no próprio período, com o selo de estimativa.
+    await p.getByRole('button', { name: /\. Ver desempenho$/ }).filter({ visible: true }).first().click(); await waitText('Comparar com CDI, IPCA e poupança'); await p.waitForTimeout(600);
+    t = await body(); investTexts.push(t);
+    ok('D-103 Desempenho: título, selo de estimativa, os três períodos com "Em 12 meses" escolhido, e cada investimento no próprio período com a taxa da ficha (com a data de fim, revisão de 17/11), CDI, IPCA e poupança',
+      (await h1Name()) === 'Desempenho' && (await visibleCount('img', /^Estimativa/)) + (await p.getByLabel(/^Estimativa: feita com os valores/).filter({ visible: true }).count()) >= 1 &&
+        (await radio('Em 12 meses').getAttribute('aria-checked')) === 'true' && (await visibleCount('radio', 'No mês')) === 1 && (await visibleCount('radio', 'Desde o início')) === 1 &&
+        t.includes('De 01/06/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +3,75%, cerca de 99% do CDI.') && t.includes('Taxa registrada na ficha: 105% do CDI até 31/03/2027, depois 100% do CDI.') &&
+        t.includes('CDI no mesmo intervalo: +3,78%') && t.includes('IPCA no mesmo intervalo: +1,46%') && t.includes('Poupança no mesmo intervalo: +2,51%') && t.includes('Acima da inflação no período: +2,26%') &&
+        t.includes('De 01/08/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +1,60%, cerca de 83% do CDI.') &&
+        t.includes('Rende de forma variável, sem taxa combinada na ficha.') && t.includes('A Clarevo não junta tudo numa porcentagem só') && t.includes('(1 + rendimento) ÷ (1 + IPCA) − 1') &&
+        t.includes('Na demonstração, o CDI, o IPCA e a poupança são valores de exemplo, não os índices reais.') && !/melhor|pior|ibovespa|ifix|ranking/i.test(t), t.slice(0, 2500));
+    ok('D-103 Desempenho: a evolução da carteira (saiu da aba) com o valor e o aportado acumulado de junho a outubro',
+      t.includes('Evolução da carteira') && t.includes('Junho de 2026: R$ 10.085,00') && t.includes('Outubro de 2026 (até hoje): R$ 15.955,00') && t.includes('Aportes menos resgates até aqui: R$ 15.500,00'), t.slice(0, 3000));
+    // Uma cor só: o rendimento, os índices e o ganho real na mesma cor (nada de verde para ganho nem vermelho para perda).
+    const dsColors = await p.evaluate(() => {
+      const pick = (re) => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => e.children.length === 0 && e.getBoundingClientRect().width > 0 && re.test(e.textContent || '')).map((e) => getComputedStyle(e).color);
+      return [...new Set([...pick(/^Rendeu /), ...pick(/^(CDI|IPCA|Poupança) no mesmo intervalo/), ...pick(/^(Acima|Abaixo) da inflação/)])];
+    });
+    ok('D-103 Desempenho: o rendimento, os índices e o ganho real numa cor só', dsColors.length === 1, JSON.stringify(dsColors));
+    await checkBar('D-103 Desempenho', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-103 Desempenho ${w}px`); if (w === 390) await shot('566_desempenho'); });
+    await radio('No mês').click(); await p.waitForTimeout(300);
+    t = await body(); investTexts.push(t);
+    ok('D-103 Desempenho no mês: do valor de 30/09 ao de 06/10, sem "% do CDI" (menos de 5 dias úteis), com os índices do mesmo intervalo',
+      t.includes('De 30/09/2026 a 06/10/2026, pelos valores que você registrou.') && t.includes('Rendeu +0,14%.') && t.includes('Rendeu 0,00%.') && !/cerca de \d+% do CDI/.test(t) &&
+        t.includes('CDI no mesmo intervalo: +0,17%'), t.slice(0, 2000));
+    await radio('Desde o início').click(); await p.waitForTimeout(300);
+    ok('D-103 Desempenho desde o início: do primeiro aporte de cada um', (await body()).includes('Rendeu +3,75%, cerca de 99% do CDI.') && (await body()).includes('Rendeu +1,60%, cerca de 83% do CDI.'));
+    // A letra grande (1,3 e 2 vezes) do desempenho fica no bloco de Acessibilidade (AC_INVEST).
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    // A premissa da comparação de rendimentos líquidos.
+    await p.getByRole('link', { name: /^Comparar rendimentos líquidos/ }).filter({ visible: true }).first().click(); await waitText('Valor aplicado'); await p.waitForTimeout(300);
+    t = await body(); investTexts.push(t);
+    ok('D-103 Comparar: a premissa diz que a conta inclui o rendimento pela taxa digitada e que nenhuma taxa vem preenchida',
+      t.includes('A conta inclui o rendimento de cada opção pela taxa que você digitar') && t.includes('Nenhuma taxa vem preenchida.'));
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    // "Agora não" oculta o convite (só neste aparelho; na demonstração, só na memória).
+    await btn(reviewLater).click(); await p.waitForTimeout(300);
+    ok('D-103 Plano: "Agora não" oculta o convite e o card continua', !(await body()).includes('Quer conferir?') && (await body()).includes('Seu plano: R$ 600,00.'));
+    // Falha ao recarregar (simulada): a aba continua com o último valor conhecido de cada investimento, com a data, e o aviso; nunca zero.
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.__origInvestments = repo.listInvestments; repo.listInvestments = () => Promise.reject(new Error('falha simulada')); await window.__e2e.refresh(); });
+    await waitText('Não foi possível atualizar agora.', 12000).catch(() => {}); await p.waitForTimeout(300);
+    t = await body();
+    ok('D-103 Falha ao recarregar: o último valor conhecido de cada investimento, com a data, e "Tentar de novo"; nunca zero',
+      t.includes('Não foi possível atualizar agora. Os valores abaixo são os últimos carregados, cada um com a data dele.') && t.includes('R$ 15.955,00') &&
+        t.split('Atualizado por você em 06/10/2026.').length - 1 === 2 && !t.includes('R$ 0,00') && (await visibleCount('button', 'Tentar de novo')) === 1, t.slice(0, 1500));
+    await p.getByText('Não foi possível atualizar agora.', { exact: false }).filter({ visible: true }).first().scrollIntoViewIfNeeded().catch(() => {}); await shot('567_investimentos_falha');
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.listInvestments = repo.__origInvestments; await window.__e2e.refresh(); });
+    await waitGone('Não foi possível atualizar agora.', 5000);
+    ok('D-103 Falha ao recarregar: quando a leitura volta, o aviso some', !(await body()).includes('Não foi possível atualizar agora.'));
+    // Abrir a tela do plano conta como revisão: numa demonstração nova (o convite volta), a premissa no plano e, de volta, sem convite.
+    await demoHome();
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(400);
+    ok('D-103 Plano: numa demonstração nova, o convite está de volta', (await body()).includes('Faz 3 meses que você revisou o plano. Quer conferir?'));
+    await btn('Ver plano de aportes').click(); await waitText('Aportes dos últimos meses'); await p.waitForTimeout(300);
+    t = await body(); investTexts.push(t);
+    ok('D-103 Plano: a premissa (só aportes, sem rendimento e sem taxa)', t.includes('O plano e o aportado contam só o dinheiro que você coloca, sem rendimento e sem taxa nenhuma.'));
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    ok('D-103 Plano: depois de abrir a tela do plano, o convite some (conta como revisão)', !(await body()).includes('Quer conferir?') && (await body()).includes('Seu plano: R$ 600,00.'));
+    // "Ocultar valores" (a chave de Conta e o olho do cabeçalho, que já existiam): nenhum valor em reais na aba, na folha, no desempenho,
+    // no plano nem na comparação.
+    await p.setViewportSize({ width: 600, height: 900 }); await p.waitForTimeout(400);
+    await btn('Ocultar valores').click(); await p.waitForTimeout(400);
+    await hiddenShows('Investir (D-103)');
+    await btn('Como a conta é feita').click(); await waitText('De quando é cada valor'); await p.waitForTimeout(300);
+    ok('D-103 valores ocultos: "Como a conta é feita" sem nenhum valor em reais', (await moneyLeaks()).length === 0 && (await dialogText()).includes('R$ ••••'), (await moneyLeaks()).slice(0, 3).join(' | '));
+    await btn('Fechar').click(); await p.waitForTimeout(300);
+    await p.getByRole('button', { name: /\. Ver desempenho$/ }).filter({ visible: true }).first().click(); await waitText('Comparar com CDI, IPCA e poupança'); await p.waitForTimeout(500);
+    await hiddenShows('Desempenho (D-103)');
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    await btn('Ver plano de aportes').click(); await waitText('Aportes dos últimos meses'); await p.waitForTimeout(300);
+    await hiddenShows('Plano de aportes (D-103)');
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    await p.getByRole('link', { name: /^Comparar rendimentos líquidos/ }).filter({ visible: true }).first().click(); await waitText('Valor aplicado'); await p.waitForTimeout(300);
+    await field('Valor aplicado').fill('10000'); await field('Prazo em dias corridos').fill('365');
+    await p.getByRole('radio', { name: 'Prefixado, com imposto', exact: true }).filter({ visible: true }).nth(0).click();
+    await p.getByLabel('Taxa ao ano (%), Opção 1', { exact: true }).fill('10');
+    await btn('Comparar').click(); await waitText('Resultado'); await p.waitForTimeout(300);
+    await hiddenShows('Comparar rendimentos líquidos (D-103)');
+    await btn('Voltar').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(300);
+    await btn('Mostrar valores').click(); await p.waitForTimeout(300);
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+    ok('D-103: nada vai à rede na demonstração', writes.length === dsWrites0, writes.slice(dsWrites0).join(' | '));
+    // Tela vazia numa conta nova: os quatro modelos de registro, que abrem o novo investimento com uma parte preenchida.
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
+    await btn('Criar conta').click(); await waitText('Nome de apresentação');
+    await field('Nome de apresentação').fill('Lia Modelos'); await field('E-mail').fill('lia.modelos@exemplo.com'); await field('Senha').fill('senha1234');
+    await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+    await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+    await btn('Começar meu mês').click(); await waitText('Diferença do mês');
+    await tabByName('Investir').click(); await waitText('Nenhum investimento ainda'); await p.waitForTimeout(400);
+    t = await body(); investTexts.push(t);
+    const tplPart = t.slice(t.indexOf('Por onde começar o registro'), t.indexOf('A Clarevo não indica onde investir.') + 40);
+    const tplNames = await p.getByRole('link').filter({ visible: true }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || '').filter((n) => /^(Reserva de emergência|Título do Tesouro|CDB, LCI ou LCA que já tenho|Outro investimento)\./.test(n)).map((n) => n.split('.')[0]));
+    ok('D-103 Tela vazia: os quatro modelos de registro, na ordem, sem destacar nenhum, com o aviso de que a Clarevo não indica onde investir',
+      JSON.stringify(tplNames) === JSON.stringify(['Reserva de emergência', 'Título do Tesouro', 'CDB, LCI ou LCA que já tenho', 'Outro investimento']) &&
+        t.includes('Por onde começar o registro') && t.includes('São só modelos para registrar o que você já tem. A Clarevo não indica onde investir.') &&
+        !/recomend|melhor|sugerimos|sugest/i.test(tplPart), JSON.stringify(tplNames) + ' ' + tplPart);
+    await checkBar('D-103 Investir vazio', 'Investir');
+    await atWidths(async (w) => { await layoutChecks(`D-103 Investir vazio ${w}px`); if (w === 390) { await p.getByText('Por onde começar o registro', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await shot('568_investimentos_modelos'); } });
+    // Cada modelo abre o novo investimento com uma parte preenchida (pelo parâmetro "modelo" da rota); valor e data ficam em branco.
+    const openTemplate = async (label) => {
+      await p.getByRole('link', { name: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.`) }).filter({ visible: true }).first().click();
+      await waitText('Quanto você aplicou até hoje?'); await p.waitForTimeout(400);
+    };
+    const leaveForm = async () => {
+      await btn('Cancelar').click(); await p.waitForTimeout(300);
+      if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(300); }
+      await waitText('Nenhum investimento ainda');
+    };
+    await openTemplate('Título do Tesouro');
+    ok('D-103 Modelo "Título do Tesouro": o novo investimento com "Títulos públicos" escolhido e "Mais detalhes" aberto; nome, valor e data em branco',
+      urlPath() === '/investimento/novo' && new URL(p.url()).searchParams.get('modelo') === 'titulo' && (await radio('Títulos públicos').getAttribute('aria-checked')) === 'true' &&
+        (await visibleCount('radio', 'Tesouro Selic')) === 1 && (await field('Nome').inputValue()) === '' && (await field('Quanto você aplicou até hoje?').inputValue()) === '', p.url());
+    await atWidths(async (w) => { await layoutChecks(`D-103 Modelo título ${w}px`); if (w === 390) await shot('569_novo_pelo_modelo'); });
+    await leaveForm();
+    await openTemplate('CDB, LCI ou LCA que já tenho');
+    ok('D-103 Modelo "CDB, LCI ou LCA": "Renda fixa" e "Porcentagem do CDI" escolhidos, com a taxa em branco para preencher como no contrato',
+      new URL(p.url()).searchParams.get('modelo') === 'banco' && (await radio('Renda fixa').getAttribute('aria-checked')) === 'true' &&
+        (await radio('Porcentagem do CDI').getAttribute('aria-checked')) === 'true' && (await field('Porcentagem do CDI (%)').inputValue()) === '', p.url());
+    await leaveForm();
+    await openTemplate('Reserva de emergência');
+    ok('D-103 Modelo "Reserva de emergência": o nome e "Renda fixa" preenchidos, e o resto em branco',
+      new URL(p.url()).searchParams.get('modelo') === 'reserva' && (await field('Nome').inputValue()) === 'Reserva de emergência' && (await radio('Renda fixa').getAttribute('aria-checked')) === 'true' &&
+        (await field('Quanto você aplicou até hoje?').inputValue()) === '');
+    await leaveForm();
+    await openTemplate('Outro investimento');
+    ok('D-103 Modelo "Outro investimento": o formulário em branco, sem tipo escolhido',
+      (await field('Nome').inputValue()) === '' && (await p.getByRole('radio', { checked: true }).filter({ visible: true }).count()) === 0);
+    await leaveForm();
+  }
+
+  // ==================================================================================================================
   // D-078 F: "Guardar quando entrar um valor extra" se salva sozinho (sem valor de reserva) e liga o lembrete no Resumo, que aparece
   // quando o mês tem dinheiro a mais (aqui, R$ 800,00 em Renda extra numa conta nova). "Agora não" esconde até o mês seguinte.
   // ==================================================================================================================
@@ -15299,6 +16421,343 @@ setInterval(async () => {
     await atWidths(async (w) => { await layoutChecks(`lembrete de valor extra ${w}px`); if (w === 390) await shot('531_lembrete_valor_extra'); });
     await btn('Agora não: ocultar o lembrete de valor extra até o mês que vem').click(); await p.waitForTimeout(400);
     ok('Valor extra: "Agora não" esconde o lembrete neste mês', !(await body()).includes('Entrou um valor extra'));
+  }
+
+  // ==================================================================================================================
+  // D-105: as ideias do estudo fora da aba Investir. (1) Calendário do mês (/calendario), só leitura: contas e faturas do mês, previsão
+  // dos gastos fixos, aportes planejados das metas e do plano de aportes, vencimento do investimento e a temporada do Imposto de Renda,
+  // com o previsto separado do pago; entradas no Resumo e em Movimentos › Organizar. (2) Resumo: o cartão de atalhos sem título, com
+  // "Investir" (valor de hoje e a data das atualizações) e "Ocultar valores". (3) "Separar parte para uma meta?" depois de salvar um
+  // recebimento extra, sem valor sugerido (o aporte abre vazio). (4) Evolução com 24 e 36 meses em Recebido e Pago. (5) Metas: o convite
+  // trimestral para rever as metas (cenário "metas" da demonstração), com "Rever metas", "Concluir revisão" e "Agora não". (6) Aprender:
+  // os cinco temas curtos de investimentos. Capturas 800 a 816. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const d5Writes0 = writes.length;
+    const d5Btn = (name) => p.getByRole('button', { name }).filter({ visible: true }).first();
+    await demoHome();
+    // ---- 1. Resumo: o cartão de atalhos, sem título, entre "Pagamentos do mês" e o cartão de Aprender ----
+    const d5An = 'Análises do mês, Categorias, evolução, orçamento e o mês em 30 segundos';
+    const d5Cal = 'Calendário do mês, Contas, faturas e datas de outubro de 2026';
+    const d5Inv = 'Investir, R$ 15.955,00, valores de 06/10/2026';
+    await waitText('valores de 06/10/2026', 12000).catch(() => {});
+    t = await body(); screenTexts.push(t);
+    const d5Order = ['Pagamentos do mês', 'Análises do mês', 'Calendário do mês', 'valores de 06/10/2026', 'Fatura sem contar duas vezes', 'Quem vê estes dados?'].map((x) => t.indexOf(x));
+    ok('D-105 Resumo: o cartão de atalhos com "Análises do mês", "Calendário do mês" e "Investir" (R$ 15.955,00, valores de 06/10/2026), sem título novo e sem mudar a ordem dos blocos',
+      (await visibleCount('button', d5An)) === 1 && (await visibleCount('button', d5Cal)) === 1 && (await visibleCount('button', d5Inv)) === 1 && JSON.stringify(await headingList()) === JSON.stringify(['1:Outubro de 2026', '2:Pagamentos do mês']) &&
+        d5Order.every((v, i, a) => v >= 0 && (i === 0 || v > a[i - 1])), `${JSON.stringify(d5Order)} ${JSON.stringify(await headingList())}`);
+    await atWidths(async (w) => { await layoutChecks(`D-105 Resumo com atalhos ${w}px`); await p.getByText('Calendário do mês', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await shot(w === 390 ? '800_d105_resumo_atalhos' : '800_d105_resumo_atalhos_320px'); });
+    await btn(d5An).click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(400);
+    ok('D-105 Resumo: "Análises do mês" abre as Análises de outubro', new URL(p.url()).pathname === '/analises' && (await h1Name()) === 'Análises', `${p.url()} ${await h1Name()}`);
+    await goResumo();
+    await btn(d5Inv).click();
+    await p.getByRole('tab', { name: 'Investir', selected: true }).filter({ visible: true }).first().waitFor({ timeout: 8000 }).catch(() => {});
+    ok('D-105 Resumo: "Investir" leva à aba Investir em um toque', (await p.getByRole('tab', { name: 'Investir', selected: true }).filter({ visible: true }).count()) === 1);
+    await goResumo();
+    // ---- 2. O calendário pelo Resumo: outubro, com o previsto separado do pago ----
+    await btn(d5Cal).click(); await waitText('Previsto em contas e faturas'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    const d5Heads = (await headingList()).filter((h) => h.startsWith('2:'));
+    ok('D-105 Calendário: abre em /calendario, com o título "Calendário" (h1), a pílula de contexto e outubro de 2026', new URL(p.url()).pathname === '/calendario' && (await h1Name()) === 'Calendário' && t.includes('Pessoal · Outubro de 2026'), `${p.url()} ${await h1Name()}`);
+    ok('D-105 Calendário outubro: "Previsto em contas e faturas" R$ 650,00 (as 2 em aberto), "Já pago" à parte (R$ 2.500,00) e os aportes planejados das metas (R$ 980,00, previsto)',
+      t.includes('Previsto em contas e faturas') && t.includes('R$ 650,00') && t.includes('2 contas em aberto ou previstas. Valores previstos, separados do que já foi pago.') &&
+        t.includes('Já pago: R$ 2.500,00 em 1 conta.') && t.includes('Aportes planejados nas metas: R$ 980,00, previsto.') && t.includes('Planos de guardar são intenção: não entram em Pago nem nas contas.'), t.slice(0, 900));
+    ok('D-105 Calendário outubro: um título por dia (5, 15 e 20 de outubro) e "No mês, sem dia marcado" para os aportes sem lembrete',
+      JSON.stringify(d5Heads) === JSON.stringify(['2:No mês', '2:Segunda, 5 de outubro', '2:Quinta, 15 de outubro', '2:Terça, 20 de outubro', '2:No mês, sem dia marcado']), JSON.stringify(d5Heads));
+    ok('D-105 Calendário outubro: cada item é um botão com nome, valor, situação e dia (a conta paga diz "Paga em", a em aberto "Conta a pagar · em aberto")',
+      (await visibleCount('button', 'Aluguel, R$ 2.500,00. Paga em 05/10/2026. 5 de outubro.')) === 1 && (await visibleCount('button', 'Internet, R$ 150,00. Conta a pagar · em aberto. 15 de outubro.')) === 1 &&
+        (await visibleCount('button', 'Plano de aportes, R$ 600,00. Aporte planejado nos investimentos. No mês, sem dia marcado.')) === 1 &&
+        (await visibleCount('button', 'Viagem de férias, R$ 480,00. Aporte planejado para a meta. No mês, sem dia marcado.')) === 1 &&
+        (await visibleCount('button', 'Reserva para imprevistos, R$ 500,00. Aporte planejado para a reserva. No mês, sem dia marcado.')) === 1);
+    ok('D-105 Calendário: só leitura (sem botão de pagar, editar ou anotar) e sem cor de alerta nas legendas', t.includes('O calendário só mostra: para pagar, editar ou registrar, abra o item.') &&
+      (await visibleCount('button', /^(Já paguei|Editar|Anotar|Excluir)/)) === 0);
+    await atWidths(async (w) => { await innerChecks(`D-105 Calendário outubro ${w}px`); await shot(w === 390 ? '801_d105_calendario_outubro' : '801_d105_calendario_outubro_320px'); });
+    // Tocar num item abre a tela dele.
+    await d5Btn('Internet, R$ 150,00. Conta a pagar · em aberto. 15 de outubro.').click(); await p.waitForTimeout(700);
+    ok('D-105 Calendário: a conta abre o detalhe da conta a pagar', /^\/a-pagar\/[^/]+$/.test(new URL(p.url()).pathname) && (await body()).includes('Internet'), p.url());
+    await btn('Voltar').click(); await waitText('Previsto em contas e faturas'); await p.waitForTimeout(300);
+    await d5Btn('Plano de aportes, R$ 600,00. Aporte planejado nos investimentos. No mês, sem dia marcado.').click(); await p.waitForTimeout(700);
+    ok('D-105 Calendário: o plano de aportes abre a tela do plano', new URL(p.url()).pathname === '/investimento/plano' && (await h1Name()) === 'Plano de aportes', `${p.url()} ${await h1Name()}`);
+    await btn('Voltar').click(); await waitText('Previsto em contas e faturas'); await p.waitForTimeout(300);
+    await d5Btn('Viagem de férias, R$ 480,00. Aporte planejado para a meta. No mês, sem dia marcado.').click(); await p.waitForTimeout(700);
+    ok('D-105 Calendário: o aporte planejado abre a meta', /^\/meta\/[^/]+$/.test(new URL(p.url()).pathname) && (await body()).includes('Viagem de férias'), p.url());
+    await btn('Voltar').click(); await waitText('Previsto em contas e faturas'); await p.waitForTimeout(300);
+    // ---- 3. Novembro: a fatura do cartão e as contas que mudam de valor ----
+    await btn('Próximo mês: novembro de 2026').click(); await waitText('Pessoal · Novembro de 2026'); await p.waitForTimeout(600);
+    t = await body(); screenTexts.push(t);
+    ok('D-105 Calendário novembro: a fatura do Cartão Exemplo no dia 10, a Luz estimada no dia 12 e o previsto de R$ 4.380,00 com a parte estimada',
+      t.includes('R$ 4.380,00') && /Inclui R\$ [\d.,]+ em valores estimados\./.test(t) && (await visibleCount('button', /^Fatura Cartão Exemplo, R\$ 550,00(, valor estimado)?\. Fatura de cartão · em aberto\. 10 de novembro\.$/)) === 1 &&
+        (await visibleCount('button', 'Luz, R$ 180,00, valor estimado. Conta a pagar · em aberto. 12 de novembro.')) === 1 && t.includes('previsto, valor estimado') && t.includes('Voltar para outubro de 2026'), t.slice(0, 900));
+    await shot('802_d105_calendario_novembro');
+    await d5Btn(/^Fatura Cartão Exemplo, R\$ 550,00/).click(); await p.waitForTimeout(800);
+    ok('D-105 Calendário: a fatura abre a fatura do cartão', /^\/cartoes\/[^/]+\/fatura\/2026-11$/.test(new URL(p.url()).pathname), p.url());
+    await btn('Voltar').click(); await waitText('Previsto em contas e faturas'); await p.waitForTimeout(300);
+    // ---- 4. Fevereiro, março e junho de 2027: o informe de rendimentos, a declaração sem data inventada e o vencimento do investimento ----
+    for (let i = 0; i < 3; i++) { await d5Btn(/^Próximo mês: /).click(); await p.waitForTimeout(350); }
+    await waitText('Pessoal · Fevereiro de 2027'); await p.waitForTimeout(500);
+    ok('D-105 Calendário fevereiro de 2027: "Informes de rendimentos" no último dia útil (sexta, 26 de fevereiro)', (await headingList()).includes('2:Sexta, 26 de fevereiro') &&
+      (await visibleCount('button', 'Informes de rendimentos. Bancos, corretoras e quem pagou você entregam os informes até o último dia útil de fevereiro. 26 de fevereiro.')) === 1, JSON.stringify(await headingList()));
+    await shot('803_d105_calendario_fevereiro');
+    await d5Btn(/^Próximo mês: /).click(); await waitText('Pessoal · Março de 2027'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('D-105 Calendário março de 2027: "Declaração do Imposto de Renda" no mês, sem data, mandando conferir a data oficial', (await visibleCount('button', 'Declaração do Imposto de Renda. A Receita Federal define o prazo de cada ano. Confira a data oficial no site da Receita. No mês, sem dia marcado.')) === 1);
+    await d5Btn(/^Declaração do Imposto de Renda\. /).click(); await p.waitForTimeout(700);
+    ok('D-105 Calendário: a declaração abre o tema de Aprender do Imposto de Renda', new URL(p.url()).pathname === '/explicacao/imposto-de-renda' && (await body()).includes('Declaração do Imposto de Renda'), p.url());
+    await btn('Voltar').click(); await waitText('Previsto em contas e faturas'); await p.waitForTimeout(300);
+    for (let i = 0; i < 3; i++) { await d5Btn(/^Próximo mês: /).click(); await p.waitForTimeout(350); }
+    await waitText('Pessoal · Junho de 2027'); await p.waitForTimeout(500);
+    ok('D-105 Calendário junho de 2027: o vencimento da Aplicação do banco (1º de junho) e os gastos fixos como previsão, com o toque no gasto fixo',
+      (await visibleCount('button', 'Aplicação do banco. Vencimento do investimento. 1 de junho.')) === 1 && (await visibleCount('button', /^Aluguel, R\$ 2\.500,00\. Gasto fixo · previsto\. 5 de junho\.$/)) === 1 &&
+        (await visibleCount('button', /^Financiamento do carro, R\$ 850,00\. Parcela 20 de 48 · prevista\. 10 de junho\.$/)) === 1);
+    await d5Btn('Aplicação do banco. Vencimento do investimento. 1 de junho.').click(); await p.waitForTimeout(700);
+    ok('D-105 Calendário: o vencimento abre o investimento', /^\/investimento\/[^/]+$/.test(new URL(p.url()).pathname), p.url());
+    await btn('Voltar').click(); await waitText('Previsto em contas e faturas'); await p.waitForTimeout(300);
+    await btn('Voltar para outubro de 2026').click(); await waitText('Pessoal · Outubro de 2026');
+    // ---- 5. Ocultar valores: o calendário e a linha de Investir sem nenhum valor em reais ----
+    await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Diferença do mês'); await p.waitForTimeout(300);
+    t = await body();
+    ok('D-105 Resumo com valores ocultos: a linha de Investir diz "R$ ••••" na tela e "valor oculto" no nome acessível', (await visibleCount('button', 'Investir, valor oculto, valores de 06/10/2026')) === 1 && t.includes('R$ •••• · valores de 06/10/2026'));
+    await btn(d5Cal).click(); await waitText('Previsto em contas e faturas'); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-105 Calendário com valores ocultos: nenhum valor em reais à vista e "valor oculto" no nome dos itens', !/R\$ \d/.test(t) && (await visibleCount('button', 'Internet, valor oculto. Conta a pagar · em aberto. 15 de outubro.')) === 1, t.slice(0, 600));
+    await goResumo(); await openConta(); await hideSwitch().click(); await p.waitForTimeout(300); await btn('Voltar').click(); await waitText('Diferença do mês');
+    // ---- 6. Movimentos: a pílula "Análises" no alto (retorno do teste de 17/11/2026) e Organizar › Calendário do mês ----
+    await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(400);
+    const d5AnTop = 'Análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.';
+    const d5MovTops = await p.evaluate(() => {
+      for (const e of document.querySelectorAll('div')) if (e.scrollTop > 0) e.scrollTop = 0;
+      const vis = (e) => e.getBoundingClientRect().width > 0;
+      const top = (re) => { const e = [...document.querySelectorAll('[role=button]')].find((x) => vis(x) && re.test(x.getAttribute('aria-label') || '')); return e ? e.getBoundingClientRect() : null; };
+      const pill = top(/^Análises do mês\. /), row = top(/, (Pago|Recebido) · \d{2}\/\d{2}\/\d{4}/);
+      const title = [...document.querySelectorAll('[role=heading][aria-level="1"]')].find((h) => vis(h) && h.textContent === 'Movimentos');
+      const bar = [...document.querySelectorAll('[role=tab]')].find(vis);
+      return pill && row && title && bar ? { pill: Math.round(pill.top), pillH: Math.round(pill.height), titleTop: Math.round(title.getBoundingClientRect().top), row: Math.round(row.bottom), bar: Math.round(bar.getBoundingClientRect().top) } : null;
+    });
+    ok('D-105 Movimentos: a pílula "Análises" fica na linha do título, acima da lista, com 44 px, e o primeiro movimento continua à vista sem rolar em 390 × 844',
+      d5MovTops !== null && d5MovTops.pillH >= 44 && Math.abs(d5MovTops.pill - d5MovTops.titleTop) < 20 && d5MovTops.row <= d5MovTops.bar && (await visibleCount('button', d5AnTop)) === 1 &&
+        (await visibleCount('button', 'Ver análises do mês. Categorias, evolução, orçamento e o mês em 30 segundos.')) === 1, JSON.stringify(d5MovTops));
+    await atWidths(async (w) => { await layoutChecks(`D-105 Movimentos com a pílula Análises ${w}px`); await shot(w === 390 ? '809_d105_movimentos_analises' : '809_d105_movimentos_analises_320px'); });
+    await btn(d5AnTop).click(); await waitText('Consulte o mês escolhido'); await p.waitForTimeout(400);
+    ok('D-105 Movimentos: a pílula "Análises" abre as Análises do mês em exibição', new URL(p.url()).pathname === '/analises' && (await body()).includes('Outubro de 2026'));
+    await btn('Voltar').click(); await waitText('Organizar'); await p.waitForTimeout(300);
+    await btn('Calendário do mês, Contas, faturas e datas do mês, num lugar só').click(); await waitText('Previsto em contas e faturas'); await p.waitForTimeout(400);
+    ok('D-105 Movimentos › Organizar: "Calendário do mês" abre o calendário de outubro', new URL(p.url()).pathname === '/calendario' && (await body()).includes('Pessoal · Outubro de 2026'));
+    await btn('Voltar').click(); await waitText('Organizar');
+    // ---- 7. "Separar parte para uma meta?" depois de salvar um recebimento extra ----
+    await btn('Registrar recebimento').click(); await waitText('Data do recebimento');
+    await field('Descrição').fill('Freela de outubro'); await field('Valor em reais').fill('800'); await radio('Renda extra').click();
+    await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await waitText('Separar parte para uma meta?', 8000).catch(() => {}); await p.waitForTimeout(400);
+    t = await body(); screenTexts.push(t);
+    ok('D-105 Valor extra: depois de salvar R$ 800,00 em Renda extra, "Separar parte para uma meta?" com uma opção por meta, nenhuma marcada, e "Agora não"',
+      t.includes('Separar parte para uma meta?') && t.includes('Este recebimento entrou como valor extra. Se quiser, registre um aporte numa meta: você escolhe a meta e o valor.') &&
+        (await visibleCount('button', 'Separar parte para Reserva para imprevistos')) === 1 && (await visibleCount('button', 'Separar parte para Viagem de férias')) === 1 &&
+        (await visibleCount('radio', /.*/)) === 0 && (await visibleCount('button', 'Agora não: não separar parte deste recebimento')) === 1, t.slice(0, 900));
+    await atWidths(async (w) => { await layoutChecks(`D-105 Separar parte para uma meta ${w}px`); await p.getByText('Separar parte para uma meta?', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await shot(w === 390 ? '804_d105_separar_parte' : '804_d105_separar_parte_320px'); });
+    await btn('Separar parte para Viagem de férias').click(); await waitText('Registrar aporte'); await p.waitForTimeout(500);
+    ok('D-105 Valor extra: a meta escolhida abre "Registrar aporte" com o valor vazio (sem o planejado de R$ 480,00)', (await h1Name()) === 'Registrar aporte' && (await field('Valor').inputValue()) === '' && !(await body()).includes('Já vem com o valor planejado por mês.'), await field('Valor').inputValue());
+    await btn('Voltar').click(); await p.waitForTimeout(500);
+    if (await visibleCount('button', 'Descartar alterações')) { await btn('Descartar alterações').click(); await p.waitForTimeout(400); }
+    ok('D-105 Valor extra: depois de responder, a pergunta some do recebimento', !(await body()).includes('Separar parte para uma meta?'));
+    await goResumo(); await tabByName('Movimentos').click(); await waitText('Organizar');
+    await btn('Registrar recebimento').click(); await waitText('Data do recebimento');
+    await field('Descrição').fill('Salário complementar'); await field('Valor em reais').fill('500'); await radio('Salário').click();
+    await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await p.waitForTimeout(900);
+    ok('D-105 Valor extra: um recebimento na categoria Salário não pergunta', !(await body()).includes('Separar parte para uma meta?'));
+    await goResumo(); await tabByName('Movimentos').click(); await waitText('Organizar');
+    await btn('Registrar recebimento').click(); await waitText('Data do recebimento');
+    await field('Descrição').fill('Venda de um móvel'); await field('Valor em reais').fill('300');
+    await btn('Salvar recebimento').click(); await waitText('Recebimento salvo'); await waitText('Separar parte para uma meta?', 8000).catch(() => {}); await p.waitForTimeout(300);
+    ok('D-105 Valor extra: sem categoria, o que passa da renda de referência (R$ 6.000,00) também pergunta', (await body()).includes('Separar parte para uma meta?'));
+    await btn('Agora não: não separar parte deste recebimento').click(); await p.waitForTimeout(400);
+    ok('D-105 Valor extra: "Agora não" esconde a pergunta, sem gravar nada', !(await body()).includes('Separar parte para uma meta?'));
+    await goResumo();
+    // ---- 8. Evolução com 24 e 36 meses (Recebido e Pago) ----
+    await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(800);
+    ok('D-105 Evolução: "24 meses" e "36 meses" entre as janelas de Pago', (await visibleCount('radio', '24 meses')) === 1 && (await visibleCount('radio', '36 meses')) === 1);
+    await radio('36 meses').click(); await p.waitForTimeout(900);
+    const d5Cols = () => p.evaluate(() => [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] [role=button], [role=group][aria-label^="Meses do gráfico"] button')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || ''));
+    let d5Names = await d5Cols();
+    t = await body(); screenTexts.push(t);
+    ok('D-105 Evolução 36 meses: 36 colunas, de novembro de 2023 a outubro de 2026, com o ano no eixo e o total dos 36 meses (setembro e outubro)',
+      d5Names.length === 36 && d5Names[0].startsWith('Novembro de 2023') && d5Names[35].startsWith('Outubro de 2026') && t.includes('Meses: de novembro de 2023 a outubro de 2026') &&
+        ['2024', '2025', '2026'].every((y) => t.includes(y)) && t.includes('R$ 7.650,00'), `${d5Names.length} ${d5Names[0]} ${t.slice(0, 500)}`);
+    await atWidths(async (w) => { await layoutChecks(`D-105 Evolução 36 meses ${w}px`); await shot(w === 390 ? '805_d105_evolucao_36_meses' : '805_d105_evolucao_36_meses_320px'); });
+    await radio('24 meses').click(); await p.waitForTimeout(700);
+    d5Names = await d5Cols();
+    ok('D-105 Evolução 24 meses: 24 colunas, de novembro de 2024 a outubro de 2026', d5Names.length === 24 && d5Names[0].startsWith('Novembro de 2024'), `${d5Names.length} ${d5Names[0]}`);
+    await radio('Renda comprometida').click(); await p.waitForTimeout(900);
+    ok('D-105 Evolução: na Renda comprometida, as janelas vão até 12 meses (marcada), com a frase que explica', (await visibleCount('radio', '36 meses')) === 0 && (await visibleCount('radio', '24 meses')) === 0 &&
+      (await radio('12 meses').getAttribute('aria-checked')) === 'true' && (await body()).includes('Renda comprometida e Guardado em metas mostram até 12 meses.'));
+    await radio('Pago').click(); await p.waitForTimeout(700);
+    ok('D-105 Evolução: de volta ao Pago, a janela de 24 meses escolhida volta', (await radio('24 meses').getAttribute('aria-checked')) === 'true');
+    // ---- 9. Metas: o convite trimestral para rever as metas (cenário "metas": as metas nasceram em 01/07/2026) ----
+    await demoHome(); await tabByName('Metas').click(); await waitText('Viagem de férias'); await p.waitForTimeout(500);
+    ok('D-105 Metas na demonstração padrão (metas criadas hoje): sem o convite para rever', !(await body()).includes('Quer rever as suas metas?'));
+    await p.goto(`http://localhost:${PORT}/?cenario=metas`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await tabByName('Metas').click(); await waitText('Quer rever as suas metas?', 8000).catch(() => {}); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('D-105 Metas (cenário "metas"): o convite "Quer rever as suas metas?" depois das metas, opcional, com "Rever metas" e "Agora não"',
+      t.includes('Quer rever as suas metas?') && t.includes('Faz três meses. Valores, prazos e planos podem ter mudado. Rever é opcional e leva um minuto.') &&
+        (await visibleCount('button', 'Rever metas')) === 1 && (await visibleCount('button', 'Agora não: o convite para rever as metas volta em três meses')) === 1 &&
+        t.indexOf('Suas metas') < t.indexOf('Quer rever as suas metas?') && t.indexOf('Quer rever as suas metas?') < t.indexOf('Seu mês'), t.slice(0, 1200));
+    await atWidths(async (w) => { await layoutChecks(`D-105 convite para rever as metas ${w}px`); await p.getByText('Quer rever as suas metas?', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await shot(w === 390 ? '806_d105_convite_rever_metas' : '806_d105_convite_rever_metas_320px'); });
+    await btn('Rever metas').click(); await waitText('Três perguntas para cada meta'); await p.waitForTimeout(500);
+    t = await body(); screenTexts.push(t);
+    ok('D-105 Rever metas: a lista com o guardado, o prazo e o plano (sem contar rendimentos) e as três perguntas',
+      (await h1Name()) === 'Rever metas' && t.includes('O valor da meta ainda é esse?') && t.includes('Guardado: R$ 3.500,00 de R$ 22.500,00') && t.includes('Prazo: julho de 2027') && t.includes('Plano: R$ 480,00 por mês, sem contar rendimentos') &&
+        (await visibleCount('button', 'Abrir a meta Viagem de férias. Guardado: R$ 1.200,00 de R$ 6.000,00. Prazo: julho de 2027. Plano: R$ 480,00 por mês, sem contar rendimentos.')) === 1, t.slice(0, 1000));
+    await atWidths(async (w) => { await innerChecks(`D-105 Rever metas ${w}px`); await shot(w === 390 ? '807_d105_rever_metas' : '807_d105_rever_metas_320px'); });
+    await d5Btn(/^Abrir a meta Viagem de férias\./).click(); await p.waitForTimeout(700);
+    ok('D-105 Rever metas: cada meta abre o próprio detalhe', /^\/meta\/[^/]+$/.test(new URL(p.url()).pathname), p.url());
+    await btn('Voltar').click(); await waitText('Três perguntas para cada meta');
+    await btn('Concluir revisão').click(); await waitText('Revisão concluída. O próximo convite vem em três meses.'); await p.waitForTimeout(400);
+    ok('D-105 Rever metas: "Concluir revisão" volta para Metas com o aviso, e o convite some', !(await body()).includes('Quer rever as suas metas?'));
+    await p.goto(`http://localhost:${PORT}/?cenario=metas`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+    await tabByName('Metas').click(); await waitText('Quer rever as suas metas?', 8000).catch(() => {}); await p.waitForTimeout(400);
+    await btn('Agora não: o convite para rever as metas volta em três meses').click(); await waitText('Combinado. O convite volta em três meses.'); await p.waitForTimeout(300);
+    ok('D-105 Metas: "Agora não" esconde o convite por três meses, sem cobrança', !(await body()).includes('Quer rever as suas metas?'));
+    // ---- 10. Aprender: os cinco temas curtos de investimentos em "Dinheiro no tempo" ----
+    await tabByName('Aprender').click(); await waitText('Comece por aqui'); await p.waitForTimeout(400);
+    const d5Topics = ['Tabela regressiva do imposto de renda. Quanto mais tempo aplicado, menor a alíquota. Leitura de 1 minuto.', 'IOF no resgate antes de 30 dias. Uma parte do rendimento que diminui a cada dia aplicado. Leitura de 1 minuto.',
+      'Come-cotas. O imposto que os fundos abertos recolhem em maio e em novembro. Leitura de 1 minuto.', 'IPCA mais uma taxa (IPCA+). Como rende uma aplicação que acompanha a inflação. Leitura de 1 minuto.',
+      'Marcação a mercado. Por que o valor de um título muda antes do vencimento. Leitura de 1 minuto.'];
+    const d5Found = [];
+    for (const name of d5Topics) d5Found.push(await visibleCount('button', name));
+    ok('D-105 Aprender: os cinco temas curtos em "Dinheiro no tempo" (tabela regressiva, IOF no resgate, come-cotas, IPCA+ e marcação a mercado)', d5Found.every((n) => n === 1), JSON.stringify(d5Found));
+    await btn(d5Topics[4]).scrollIntoViewIfNeeded(); await btn(d5Topics[4]).click(); await waitText('Exemplo fictício', 8000).catch(() => {}); await p.waitForTimeout(500);
+    t = await body();
+    ok('D-105 Aprender: "Marcação a mercado" abre com o exemplo fictício, as hipóteses e as fontes', new URL(p.url()).pathname === '/explicacao/marcacao-a-mercado' && t.includes('Marcação a mercado') && t.includes('R$ 970,00') && t.includes('Exemplo fictício') && /CVM|Portal do Investidor/.test(t), t.slice(0, 600));
+    await atWidths(async (w) => { await layoutChecks(`D-105 tema Marcação a mercado ${w}px`); if (w === 390) await shot('808_d105_marcacao_a_mercado'); });
+    // ---- 11. Computador (D-098): as Análises à vista sem rolar no Resumo (o cartão de atalhos abre a coluna da direita) e em Movimentos ----
+    await p.setViewportSize({ width: 1280, height: 860 }); await p.waitForTimeout(500);
+    await demoHome(); await p.waitForTimeout(600);
+    const d5Desk = () => p.evaluate(() => {
+      const b = [...document.querySelectorAll('[role=button]')].find((e) => e.getBoundingClientRect().width > 0 && /^Análises do mês[,.] /.test(e.getAttribute('aria-label') || ''));
+      return b ? { top: Math.round(b.getBoundingClientRect().top), bottom: Math.round(b.getBoundingClientRect().bottom), left: Math.round(b.getBoundingClientRect().left), h: innerHeight, w: innerWidth } : null;
+    });
+    const d5DeskResumo = await d5Desk();
+    ok('D-105 Computador, Resumo: "Análises do mês" à vista sem rolar, no alto da coluna da direita', d5DeskResumo !== null && d5DeskResumo.bottom <= d5DeskResumo.h && d5DeskResumo.left > d5DeskResumo.w / 2, JSON.stringify(d5DeskResumo));
+    await p.getByRole('navigation').getByRole('link', { name: 'Movimentos do mês', exact: true }).filter({ visible: true }).first().click(); await waitText('Organizar'); await p.waitForTimeout(600);
+    const d5DeskMov = await d5Desk();
+    ok('D-105 Computador, Movimentos: a pílula "Análises" na faixa azul, no topo', d5DeskMov !== null && d5DeskMov.top < 120, JSON.stringify(d5DeskMov));
+    await layoutChecks('D-105 Computador, Movimentos com a pílula Análises 1280px'); await shot('810_d105_computador_movimentos');
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(500);
+    ok('D-105: nada vai à rede na demonstração', writes.length === d5Writes0, writes.slice(d5Writes0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Tema (D-112, complementa a D-096): Conta › "Tema", logo depois de "Privacidade neste aparelho", com "Igual ao aparelho" (o padrão,
+  // marcado de início), "Claro" e "Escuro" e a frase "Por padrão, a Clarevo segue o tema do aparelho.". A escolha fica só neste aparelho
+  // (na web, a chave `clarevo.tema.v1` do localStorage, também lida pelo script de index.html antes de o app desenhar) e não muda as cores
+  // sozinha: "Aplicar agora" recarrega a página (na demonstração, volta às boas-vindas). Num navegador claro, "Escuro" aplicado deixa a
+  // página e o app escuros, e a escolha continua depois de recarregar; num navegador escuro, "Claro" deixa claro; "Igual ao aparelho" volta a
+  // seguir o navegador; sair da conta (esquecer o aparelho) apaga a escolha. Capturas 720 a 723. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const tmWrites0 = writes.length;
+    const TM_KEY = 'clarevo.tema.v1';
+    // Fundo da página e cartão (`background` e `surface` de theme/palettes.ts) de cada tema.
+    const TM_LIGHT = ['rgb(246, 248, 252)', 'rgb(255, 255, 255)']; const TM_DARK = ['rgb(19, 30, 62)', 'rgb(29, 43, 84)'];
+    // O tema da página: a marca do script de index.html, o fundo da página, o que está atrás de um ponto na margem esquerda (o fundo da
+    // tela ou, nas boas-vindas, o cartão) e o que está guardado na chave.
+    const tmLook = () => p.evaluate((key) => {
+      const at = document.elementFromPoint(6, Math.round(innerHeight * 0.6));
+      let tela = null;
+      for (let e = at; e && !tela; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (c !== 'rgba(0, 0, 0, 0)') tela = c; }
+      let stored; try { stored = localStorage.getItem(key); } catch { stored = 'erro'; }
+      return { tema: document.documentElement.getAttribute('data-tema'), body: getComputedStyle(document.body).backgroundColor, tela, stored };
+    }, TM_KEY);
+    const tmIs = (l, [bg, surface]) => l.body === bg && (l.tela === bg || l.tela === surface);
+    const tmRadios = () => p.getByRole('radiogroup', { name: 'Tema', exact: true }).filter({ visible: true }).first().getByRole('radio')
+      .evaluateAll((els) => els.map((e) => `${e.getAttribute('aria-label') || e.textContent}:${e.getAttribute('aria-checked')}`));
+    const tmToCard = async () => { await p.getByRole('heading', { name: 'Tema', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(250); };
+    // Recarregar a demonstração volta às boas-vindas; ao entrar de novo, o app retoma Conta (o endereço da página).
+    const tmBackToConta = async () => {
+      await btn('Ver demonstração com dados fictícios').click(); await p.waitForTimeout(1500);
+      if ((await p.getByText('Privacidade neste aparelho', { exact: true }).filter({ visible: true }).count()) === 0) { await waitText('Diferença do mês', 12000); await openConta(); }
+      await waitText('Privacidade neste aparelho'); await tmToCard();
+    };
+    const tmApply = async () => { await btn('Aplicar agora').click(); await waitText('Cuidar da vida financeira', 15000); await p.waitForTimeout(500); };
+    const tmPicked = (choice) => JSON.stringify(['Igual ao aparelho', 'Claro', 'Escuro'].map((n) => `${n}:${n === choice}`));
+
+    // 1. Navegador claro, sem escolha: o card, o padrão e nada guardado.
+    await demoHome(); await openConta(); await tmToCard();
+    let tl = await tmLook();
+    t = await body(); screenTexts.push(t);
+    const tmCards = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+    ok('Tema (D-112): o card "Tema" (título de nível 2) logo depois de "Privacidade neste aparelho" e antes do widget, com "Por padrão, a Clarevo segue o tema do aparelho."',
+      tmCards.indexOf('Tema') > 0 && tmCards.indexOf('Tema') === tmCards.indexOf('Privacidade neste aparelho') + 1 && tmCards.indexOf('Widget na tela inicial') === tmCards.indexOf('Tema') + 1 &&
+        t.includes('Por padrão, a Clarevo segue o tema do aparelho. A escolha vale só para este aparelho.'), tmCards.join(' | '));
+    ok('Tema: "Igual ao aparelho" marcado de início, depois "Claro" e "Escuro", sem "Aplicar agora", nada guardado e o app claro (navegador claro)',
+      JSON.stringify(await tmRadios()) === tmPicked('Igual ao aparelho') && (await visibleCount('button', 'Aplicar agora')) === 0 && tl.stored === null && tl.tema === null && tmIs(tl, TM_LIGHT),
+      `${JSON.stringify(await tmRadios())} ${JSON.stringify(tl)}`);
+    await atWidths(async (w) => { await tmToCard(); await layoutChecks(`Tema ${w}px`); if (w === 390) await shot('720_tema_conta'); });
+
+    // 2. "Escuro": guardado na hora, mas as cores só mudam com "Aplicar agora".
+    await radio('Escuro').click(); await p.waitForTimeout(400);
+    tl = await tmLook(); t = await body(); screenTexts.push(t);
+    ok('Tema: escolher "Escuro" marca a opção e guarda só "dark" neste navegador, sem recarregar nem mudar as cores sozinho',
+      JSON.stringify(await tmRadios()) === tmPicked('Escuro') && tl.stored === 'dark' && tmIs(tl, TM_LIGHT) && new URL(p.url()).pathname === '/conta', JSON.stringify(tl));
+    ok('Tema: com a escolha nova, o card diz que ela vale na próxima abertura e oferece "Aplicar agora", que recarrega a página (na demonstração, volta ao começo)',
+      t.includes('O tema escolhido vale a partir da próxima vez que você abrir a Clarevo.') && (await visibleCount('button', 'Aplicar agora')) === 1 &&
+        t.includes('Aplicar agora recarrega a página com o novo tema. Na demonstração, recarregar a página volta ao começo, com os dados fictícios de sempre.'),
+      t.slice(t.indexOf('Por padrão'), t.indexOf('Por padrão') + 500));
+    await atWidths(async (w) => { await btn('Aplicar agora').scrollIntoViewIfNeeded(); await p.waitForTimeout(200); await layoutChecks(`Tema com "Aplicar agora" ${w}px`); if (w === 390) await shot('721_tema_escolhido_escuro'); });
+    // Voltar à escolha que vale agora esconde "Aplicar agora" e apaga a chave.
+    await radio('Igual ao aparelho').click(); await p.waitForTimeout(300);
+    ok('Tema: voltar a "Igual ao aparelho" (a escolha que vale agora) esconde "Aplicar agora" e apaga a chave', (await visibleCount('button', 'Aplicar agora')) === 0 && (await tmLook()).stored === null);
+    await radio('Escuro').click(); await p.waitForTimeout(300);
+
+    // 3. Aplicar num navegador claro: a página recarrega já escura (boas-vindas e app), e a escolha continua depois de recarregar.
+    await tmApply();
+    tl = await tmLook();
+    ok('Tema: "Aplicar agora" recarrega a página; num navegador claro, a entrada já vem escura (fundo da página e da tela no azul-marinho)', tl.tema === 'dark' && tmIs(tl, TM_DARK), JSON.stringify(tl));
+    await tmBackToConta();
+    tl = await tmLook();
+    ok('Tema: de volta a Conta, "Escuro" continua marcado, sem "Aplicar agora", e o app está escuro',
+      JSON.stringify(await tmRadios()) === tmPicked('Escuro') && (await visibleCount('button', 'Aplicar agora')) === 0 && tmIs(tl, TM_DARK), JSON.stringify(tl));
+    await layoutChecks('Tema escuro aplicado 390px'); await shot('722_tema_escuro_aplicado');
+    await p.reload(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(500);
+    tl = await tmLook();
+    ok('Tema: depois de recarregar, a escolha continua (a página abre escura num navegador claro)', tl.stored === 'dark' && tl.tema === 'dark' && tmIs(tl, TM_DARK), JSON.stringify(tl));
+
+    // 4. Navegador escuro, "Claro" aplicado: a página e o app ficam claros.
+    await p.emulateMedia({ colorScheme: 'dark' });
+    await tmBackToConta();
+    await radio('Claro').click(); await p.waitForTimeout(300);
+    await tmApply();
+    tl = await tmLook();
+    ok('Tema: "Claro" aplicado num navegador escuro deixa a página clara', tl.stored === 'light' && tl.tema === 'light' && tmIs(tl, TM_LIGHT), JSON.stringify(tl));
+    await tmBackToConta();
+    tl = await tmLook();
+    ok('Tema: no navegador escuro, Conta clara com "Claro" marcado', JSON.stringify(await tmRadios()) === tmPicked('Claro') && tmIs(tl, TM_LIGHT), JSON.stringify(tl));
+    await shot('723_tema_claro_navegador_escuro');
+
+    // 5. "Igual ao aparelho": nada guardado, e a página volta a seguir o navegador (escuro e, depois, claro).
+    await radio('Igual ao aparelho').click(); await p.waitForTimeout(300);
+    ok('Tema: "Igual ao aparelho" apaga a chave e, por ser diferente da escolha que vale agora, oferece "Aplicar agora"', (await tmLook()).stored === null && (await visibleCount('button', 'Aplicar agora')) === 1);
+    await tmApply();
+    tl = await tmLook();
+    ok('Tema: "Igual ao aparelho" aplicado volta ao padrão: num navegador escuro, a página fica escura, sem marca de tema', tl.stored === null && tl.tema === null && tmIs(tl, TM_DARK), JSON.stringify(tl));
+    await p.emulateMedia({ colorScheme: 'light' }); await p.reload(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(500);
+    tl = await tmLook();
+    ok('Tema: com "Igual ao aparelho", o navegador claro abre a página clara', tl.tema === null && tmIs(tl, TM_LIGHT), JSON.stringify(tl));
+
+    // 6. Sair da conta esquece o aparelho: a escolha não fica guardada.
+    await tmBackToConta();
+    await radio('Escuro').click(); await p.waitForTimeout(300);
+    ok('Tema: antes de sair, "Escuro" guardado', (await tmLook()).stored === 'dark');
+    await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
+    const tmLeft = await p.evaluate(() => { try { return Object.keys(localStorage).filter((k) => /tema/.test(k)); } catch { return ['erro']; } });
+    ok('Tema: sair da conta (esquecer este aparelho) apaga a escolha: nenhuma chave de tema fica no navegador', tmLeft.length === 0, tmLeft.join(' | '));
+    await p.reload(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(500);
+    tl = await tmLook();
+    ok('Tema: depois de sair e recarregar, a página segue o navegador (claro), sem marca de tema', tl.stored === null && tl.tema === null && tmIs(tl, TM_LIGHT), JSON.stringify(tl));
+    ok('Tema: nada vai à rede', writes.length === tmWrites0, writes.slice(tmWrites0).join(' | '));
+    await p.emulateMedia({ colorScheme: null });
   }
 
   // ==================================================================================================================
@@ -15424,6 +16883,9 @@ setInterval(async () => {
       ['Multa e juros', 'calcular/[slug]', { slug: 'multa-e-juros' }, 'Multa e juros', '714_escuro_multa_e_juros'],
       // "A vencer" e "Vence hoje" ficavam ilegíveis no escuro (revisão independente de 12/11/2026).
       ['conta a pagar', 'a-pagar/[id]/index', { id: dkIds.com }, 'Internet', '715_escuro_conta_a_pagar'],
+      // D-105: o Calendário do mês e a lista de rever metas.
+      ['Calendário', 'calendario', {}, 'Previsto em contas e faturas', '716_escuro_calendario'],
+      ['Rever metas', 'meta/rever', {}, 'Três perguntas para cada meta', '717_escuro_rever_metas'],
     ];
     for (const [name, route, params, text, shotName] of DK_ROUTES) { await dkNav(route, params); await dkWait(text).catch(() => {}); await dkScan(name, shotName); }
     ok(`Modo escuro, ${dkScreens} telas: o fundo de cada tela é escuro (azul-marinho, luminância abaixo de 0,05)`, dkScreens >= 15 && dkFound.fundo.length === 0, dkFound.fundo.slice(0, 4).join(' | '));

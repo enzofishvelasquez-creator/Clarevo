@@ -5,6 +5,7 @@ import {
   ANTES_ESTIMATE_TEXT,
   ANTES_EXTRA_ENTRY_PERCENTS,
   ANTES_FIELDS,
+  ANTES_RATE_HYPOTHESIS,
   ANTES_TEXT,
   CALC_ERROR_TEXT,
   CALC_UI_TEXT,
@@ -61,6 +62,11 @@ describe('10. Antes de financiar (D-044)', () => {
     expect(r.notes).toEqual([ANTES_ESTIMATE_TEXT]);
     expect(ANTES_ESTIMATE_TEXT).toBe('Estimativa. As condições oficiais são as da proposta; peça o CET.');
     expect(r.hypotheses[0]).toBe('Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.');
+    // Revisão de 17/11/2026: a dica do campo pede o CET ao mês, se a pessoa tiver; a hipótese diz o que fica dentro e fora em cada caso
+    // (antes dizia "Só a taxa de juros informada, sem tarifas, seguros e IOF.", o que contradizia a dica).
+    expect(ANTES_FIELDS.taxaMes!.hint).toContain('Use o CET ao mês, se tiver.');
+    expect(r.hypotheses[1]).toBe(ANTES_RATE_HYPOTHESIS);
+    expect(ANTES_RATE_HYPOTHESIS).toBe('A conta usa só a taxa informada: com a taxa de juros, ficam de fora tarifas, seguros e IOF; com o CET ao mês, eles já estão dentro.');
   });
 
   it('com a data de hoje, diz até quando: primeira em novembro de 2026, 12 parcelas, a última em outubro de 2027', () => {

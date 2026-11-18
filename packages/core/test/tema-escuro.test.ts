@@ -128,7 +128,9 @@ describe('modo escuro: o app segue o tema do aparelho, lido ao abrir', () => {
   it('tokens.ts escolhe a paleta uma vez: prefers-color-scheme na web e Appearance no celular, e exporta o tema', () => {
     expect(tokens).toContain("window.matchMedia('(prefers-color-scheme: dark)')");
     expect(tokens).toContain('Appearance.getColorScheme()');
-    expect(tokens).toMatch(/export const colorScheme: ColorScheme = deviceColorScheme\(\);/);
+    // Desde a D-112, a escolha de Conta › Tema vale por cima do aparelho; "Igual ao aparelho" (o padrão) é o que está aqui (tema-escolha.test.ts).
+    expect(tokens).toMatch(/export const colorScheme: ColorScheme = openingColorScheme\(\);/);
+    expect(tokens).toContain("OPENING_THEME_CHOICE === 'system' ? deviceColorScheme() : OPENING_THEME_CHOICE");
     expect(tokens).toMatch(/export const colors: Palette = paletteFor\(colorScheme\);/);
     // Nada de ouvir a troca com o app aberto, nem recarregar a página sozinho.
     expect(tokens).not.toMatch(/addChangeListener|addEventListener|location\.reload/);

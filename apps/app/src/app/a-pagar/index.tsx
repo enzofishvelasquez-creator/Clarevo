@@ -485,8 +485,13 @@ function LaterByMonth({ grouped, month, today }: { grouped: GroupedCommitment[];
   // O botão some ao abrir: o foco do leitor de tela vai para o primeiro mês que apareceu, e não se perde (revisão independente, 17/11/2026).
   const firstNewHeader = useRef<View>(null);
   useEffect(() => {
-    if (!open || Platform.OS === 'web') return;
+    if (!open) return;
     const t = setTimeout(() => {
+      // Na web, o foco do teclado também ia para o começo da página quando o botão sumia (D-110): vai para o mesmo título.
+      if (Platform.OS === 'web') {
+        (firstNewHeader.current as unknown as { focus?: (o?: { preventScroll?: boolean }) => void } | null)?.focus?.({ preventScroll: true });
+        return;
+      }
       const node = firstNewHeader.current ? findNodeHandle(firstNewHeader.current) : null;
       if (node) AccessibilityInfo.setAccessibilityFocus(node);
     }, 150);
@@ -499,7 +504,13 @@ function LaterByMonth({ grouped, month, today }: { grouped: GroupedCommitment[];
     <>
       {groups.slice(0, shown).map((m, mi) => (
         <Animated.View key={m.month} layout={rowLayout}>
-          <View ref={open && mi === firstShown ? firstNewHeader : undefined} accessible accessibilityRole="header" aria-level={3} accessibilityLabel={m.title}>
+          <View
+            ref={open && mi === firstShown ? firstNewHeader : undefined}
+            tabIndex={open && mi === firstShown ? -1 : undefined}
+            accessible
+            accessibilityRole="header"
+            aria-level={3}
+            accessibilityLabel={m.title}>
             <Txt variant="caption" color={colors.textSecondary} style={styles.laterMonth}>
               {m.title}
             </Txt>

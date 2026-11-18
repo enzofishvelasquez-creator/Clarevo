@@ -5,8 +5,9 @@ import { DESCRIPTION_MAX } from '../validation';
 import { invoiceMonthOf, type CardDays } from '../cards';
 import { suggestCategory, type ImportMemory } from './categorias';
 import { DUPLICATE_WINDOW_DAYS, findLookalikes, importKeys, installmentMark, normalizeDescription, type ExistingEntry, type InstallmentMark } from './dedupe';
+import { lineDirection, signedByDirection } from './direcao';
 import { IMPORT_TEXT } from './textos';
-import { IMPORT_BATCH, type ImportDestination, type ImportItem, type ImportParse } from './tipos';
+import { IMPORT_BATCH, type ImportDestination, type ImportItem, type ImportParse, type ParsedLine } from './tipos';
 import { cleanDescription } from './valores';
 
 /**
@@ -56,6 +57,10 @@ export interface ReviewLine {
   /** A linha pode ser importada (não tem marca que a impede). */
   importable: boolean;
   include: boolean;
+  /** Lida de um print (imagem) no aparelho (D-108): a linha mostra "Lido de imagem: confira". */
+  fromImage: boolean;
+  /** A pessoa trocou gasto por recebimento (ou compra por estorno) nesta linha (D-108). */
+  flipped: boolean;
 }
 
 export interface ReviewInput {
@@ -73,6 +78,8 @@ export interface ReviewInput {
   importedKeys: ReadonlySet<string>;
   /** Cartão de destino: os dias e as faturas já pagas (mês do vencimento). */
   card?: { days: CardDays; paidMonths: ReadonlySet<IsoMonth> } | null;
+  /** Linhas (pelo `id`, "l" e a posição) em que a pessoa trocou gasto por recebimento, ou compra por estorno (D-108). */
+  flipped?: ReadonlySet<string>;
 }
 
 const PAYS_INVOICE = /\b(pagamento|pagto|pgto|pag|liquidacao)\b.*\bfatura\b|\bfatura\b.*\bcartao\b|\bpag\w*\b.*\bcartao de credito\b|\bcartao de credito\b.*\bpag\w*\b/;
@@ -99,9 +106,23 @@ export function oldestCardDate(today: IsoDate): IsoDate {
   return `${addMonths(monthOf(today), -48)}-01`;
 }
 
-function sign(input: ReviewInput): 1 | -1 {
-  const flip = input.parse.cardPositive && input.destination === 'cartao';
-  return flip !== input.invertSigns ? -1 : 1;
+/** Id da linha na revisão. */
+export function reviewLineId(ordinal: number): string {
+  return `l${ordinal}`;
+}
+
+/**
+ * Valor com sinal da linha no destino escolhido. Planilha sem nenhum sinal (`unsigned`) no extrato da conta: a descrição decide
+ * (D-108, `lineDirection`). Planilha de fatura com a compra positiva (`cardPositive`) no cartão: o sinal é invertido. Depois, a caixa
+ * "Entradas e saídas estão trocadas" inverte tudo, e a troca da pessoa na linha (`flipped`) inverte só ela.
+ */
+function signedCents(input: ReviewInput, l: ParsedLine): number {
+  let v = l.amountCents;
+  if (input.parse.unsigned && input.destination === 'conta') v = signedByDirection(v, lineDirection('conta', null, l.description));
+  else if (input.parse.cardPositive && input.destination === 'cartao') v = -v;
+  if (input.invertSigns) v = -v;
+  if (input.flipped?.has(reviewLineId(l.ordinal))) v = -v;
+  return v;
 }
 
 /** Tipo da linha no destino: conta (saída = despesa, entrada = receita) e cartão (saída = compra; entrada = estorno ou pagamento da fatura). */
@@ -147,11 +168,10 @@ export function markLooksLikeDate(mark: InstallmentMark, lineDate: IsoDate): boo
 
 export function buildReview(input: ReviewInput): ReviewLine[] {
   const { parse, destination, today } = input;
-  const s = sign(input);
   const oldest = oldestCardDate(today);
   const keys = importKeys(input.targetId, parse.lines);
   const partial = parse.lines.map((l, i) => {
-    const signed = l.amountCents * s;
+    const signed = signedCents(input, l);
     const kind = kindOf(destination, signed, l.description);
     const amount = Math.abs(signed);
     return { l, kind, amount, key: keys[i]! };
@@ -214,7 +234,7 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
       else if (looksLikeOwnTransfer(l.description)) label = 'transferencia';
     }
     return {
-      id: `l${l.ordinal}`,
+      id: reviewLineId(l.ordinal),
       ordinal: l.ordinal,
       date: l.date,
       description: l.description,
@@ -231,6 +251,8 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
       importable,
       // A marca que pode ser só a data (markLooksLikeDate) vem desmarcada: um clique não cria parcelas que não existem.
       include: importable && (label === null || (label === 'parcela' && !maybeDate)) && kind !== 'estorno',
+      fromImage: parse.source === 'imagem',
+      flipped: input.flipped?.has(reviewLineId(l.ordinal)) ?? false,
     };
   });
 }
@@ -269,6 +291,44 @@ export function allSelected(lines: readonly ReviewLine[]): boolean {
 
 export function updateLine(lines: readonly ReviewLine[], id: string, patch: Partial<Pick<ReviewLine, 'description' | 'category' | 'include'>>): ReviewLine[] {
   return lines.map((l) => (l.id === id ? { ...l, ...patch, include: patch.include === undefined ? l.include : patch.include && l.importable } : l));
+}
+
+/**
+ * Troca gasto por recebimento (conta) ou compra por estorno (cartão) numa linha (D-108): devolve o conjunto de linhas trocadas com
+ * esta acrescentada ou tirada. A tela refaz a revisão com ele (`buildReview`) e mantém as escolhas da pessoa (`keepReviewEdits`).
+ */
+export function toggleFlipped(flipped: ReadonlySet<string>, id: string): Set<string> {
+  const next = new Set(flipped);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+/** A linha aceita a troca de tipo: pode ser importada e não é o pagamento da fatura dentro da própria fatura. */
+export function canFlipLine(line: Pick<ReviewLine, 'importable' | 'kind'>): boolean {
+  return line.importable && line.kind !== 'pagamento';
+}
+
+/**
+ * A revisão refeita (depois de trocar o tipo de uma linha, ou de uma recusa no meio do envio) com o que a pessoa já tinha escolhido em
+ * cada linha que ainda pode entrar: a descrição, a categoria (se ainda serve ao tipo; senão, a sugerida para o tipo novo) e a seleção
+ * (a linha que mudou de tipo fica marcada se estava marcada ou se vem marcada). Linha que deixou de poder entrar volta como veio.
+ */
+export function keepReviewEdits(built: readonly ReviewLine[], previous: readonly ReviewLine[]): ReviewLine[] {
+  const old = new Map(previous.map((l) => [l.id, l]));
+  return built.map((l) => {
+    const p = old.get(l.id);
+    if (!p || !l.importable) return l;
+    const sameKind = p.kind === l.kind;
+    const keepCategory = sameKind || (p.category !== null && categoriesFor(l.kind).includes(p.category));
+    return {
+      ...l,
+      description: p.description,
+      category: keepCategory ? p.category : l.category,
+      categorySource: keepCategory ? p.categorySource : l.categorySource,
+      include: sameKind ? p.include : p.include || l.include,
+    };
+  });
 }
 
 /** As linhas escolhidas viram itens para o banco: descrição aparada (1 a 80) e categoria do app ou null. */

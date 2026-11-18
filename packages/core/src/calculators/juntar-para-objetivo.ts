@@ -5,7 +5,7 @@ import { parseCount, parseMoney, parseOptionalMoney } from './inputs';
 
 /**
  * 7. Juntar para um objetivo (docs/08 §3.2). falta = alvo − já tem; por mês = teto(falta ÷ meses);
- * prazo = teto(falta ÷ por mês). Sem rendimento, dito na hipótese.
+ * prazo = teto(falta ÷ por mês). Sem rendimento e sem inflação, ditos nas hipóteses (com rendimento e inflação: o simulador).
  */
 export type ObjetivoModo = 'prazo' | 'mensal';
 export type ObjetivoField = 'alvo' | 'jaTem' | 'modo' | 'meses' | 'mensal';
@@ -34,6 +34,9 @@ export interface ObjetivoResult extends CalcTexts {
   /** Meses (informado no modo 'prazo', calculado no modo 'mensal'); null quando já tem o valor. */
   months: number | null;
 }
+
+/** Hipótese da inflação: a calculadora não corrige a meta (em "Simular com rendimento", dá para mostrar em dinheiro de hoje ou corrigir). */
+export const OBJETIVO_NO_INFLATION = 'Sem inflação: o valor que você quer juntar fica o mesmo até o fim do prazo.';
 
 export const OBJETIVO_FIELDS: Record<ObjetivoField, CalcFieldSpec> = {
   alvo: moneyField('Quanto quer juntar', 'quanto quer juntar', '22.500,00'),
@@ -64,7 +67,8 @@ export function calcJuntarParaObjetivo(input: ObjetivoInput): CalcOutcome<Objeti
   const has = jaTem ?? 0;
   const missing = Math.max(0, alvo - has);
   const base = { modo, alvoCents: alvo, jaTemCents: has, missingCents: missing };
-  const hypotheses = ['Sem rendimento: o valor guardado não cresce com juros.', 'O mesmo valor guardado todo mês.'];
+  // Revisão de 17/11/2026: sem inflação também (a meta não sobe com os preços), dito na hipótese; o simulador tem as duas escolhas.
+  const hypotheses = ['Sem rendimento: o valor guardado não cresce com juros.', 'O mesmo valor guardado todo mês.', OBJETIVO_NO_INFLATION];
 
   if (missing === 0) {
     return {

@@ -10,6 +10,11 @@ import { openingExternalScreen } from '@/lib/external-screen';
  */
 export const CAN_COPY = false;
 
+/** No celular a folha de compartilhamento do aparelho sempre existe. */
+export function canShareInvite(): boolean {
+  return true;
+}
+
 /** Endereço do app que o link do convite usa: no celular, o do site publicado. */
 export function inviteBaseUrl(): string {
   return INVITE_BASE_URL;

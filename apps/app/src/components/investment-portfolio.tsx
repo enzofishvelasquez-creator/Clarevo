@@ -1,7 +1,8 @@
 import {
-  ALLOCATION_DIMENSIONS,
   ALLOCATION_DIMENSION_LABEL,
   FGC_TEXT,
+  INSTITUTION_FGC_TEXT,
+  PLAN_REVIEW_TEXT,
   FISCAL_TEXT,
   PORTFOLIO_EVOLUTION_TEXT,
   fiscalCalendar,
@@ -9,27 +10,29 @@ import {
   taxRegimeOf,
   INCOME_TEXT,
   INVESTMENT_PLAN_TEXT,
-  allocationUseful,
   dateEventText,
-  fgcByInstitution,
+  fgcByInstitutionKey,
   formatBRL,
   incomeSummary,
   investmentAllocation,
   investmentDateEvents,
   investmentPlanLine,
+  planReviewDue,
+  tabAllocationDimensions,
   type AllocationDimension,
   type Investment,
   type InvestmentMovement,
   type InvestmentPlan,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, CalendarClock, ChevronRight, FileText, Landmark, PiggyBank } from 'lucide-react-native';
+import { Calculator, CalendarClock, ChevronRight, FileText, PiggyBank } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { ChoiceGroup } from '@/components/series-parts';
-import { Button, Card, Chip, Txt, styles as ui } from '@/components/ui';
+import { Button, Card, Chip, LinkButton, Txt, styles as ui } from '@/components/ui';
+import { updatePrefs, useDevicePrefs } from '@/lib/device-prefs';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -70,6 +73,8 @@ export function UpcomingDatesCard({ items }: { items: readonly Investment[] }) {
           {`E mais ${events.length - shown.length} nos próximos 12 meses.`}
         </Txt>
       ) : null}
+      {/* D-105: os vencimentos também aparecem no Calendário do mês, junto das contas e dos aportes. */}
+      <LinkButton label="Ver no calendário" icon={CalendarClock} onPress={() => router.push('/calendario')} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
     </Card>
   );
 }
@@ -77,15 +82,20 @@ export function UpcomingDatesCard({ items }: { items: readonly Investment[] }) {
 /**
  * "Como está dividido" (D-099, item 1): barras simples com o valor e a porcentagem de cada fatia, numa dimensão escolhida. Só as dimensões
  * que dizem algo aparecem. Sem faixa recomendada, sem meta e sem cor de alerta: todas as barras na mesma cor.
+ *
+ * D-103 (item 9): "Por instituição" fica logo depois de "Por tipo" e aparece mesmo com uma instituição só; nela, cada instituição mostra
+ * a soma dos produtos com garantia do FGC e o limite vem escrito para comparar, só como informação (a soma da garantia saiu do card
+ * separado "Garantia do FGC" e mora aqui).
  */
 export function AllocationCard({ items }: { items: readonly Investment[] }) {
   const { today } = useSession();
   const maskLabel = useMoneyLabelMask();
-  const dims = ALLOCATION_DIMENSIONS.filter((d) => allocationUseful(investmentAllocation(items, d, today)));
+  const dims = tabAllocationDimensions(items, today);
   const [chosen, setChosen] = useState<AllocationDimension>('kind');
   if (dims.length === 0) return null;
   const dim = dims.includes(chosen) ? chosen : dims[0]!;
   const slices = investmentAllocation(items, dim, today);
+  const fgc = dim === 'institution' ? fgcByInstitutionKey(items) : null;
   return (
     <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -99,62 +109,54 @@ export function AllocationCard({ items }: { items: readonly Investment[] }) {
         </ChoiceGroup>
       ) : null}
       <View style={{ gap: space[3] }}>
-        {slices.map((s) => (
-          <View key={s.key} style={{ gap: space[1] }} accessible accessibilityLabel={maskLabel(`${s.label}: ${formatBRL(s.cents)}, ${pct(s.share)} do total`)}>
-            <View style={styles.sliceHead}>
-              <Txt variant="label" style={{ flex: 1, minWidth: 0 }}>
-                {s.label}
-              </Txt>
-              <MoneyTxt variant="label" style={tabular}>
-                {formatBRL(s.cents)}
-              </MoneyTxt>
-              <Txt variant="label" style={[tabular, styles.pct]}>
-                {pct(s.share)}
-              </Txt>
+        {slices.map((s) => {
+          const guaranteed = fgc?.byKey.get(s.key) ?? 0;
+          const fgcLine = guaranteed > 0 ? INSTITUTION_FGC_TEXT.slice(guaranteed) : null;
+          return (
+            <View key={s.key} style={{ gap: space[1] }} accessible accessibilityLabel={maskLabel(`${s.label}: ${formatBRL(s.cents)}, ${pct(s.share)} do total${fgcLine ? `. ${fgcLine}` : ''}`)}>
+              <View style={styles.sliceHead}>
+                <Txt variant="label" style={{ flex: 1, minWidth: 0 }}>
+                  {s.label}
+                </Txt>
+                <MoneyTxt variant="label" style={tabular}>
+                  {formatBRL(s.cents)}
+                </MoneyTxt>
+                <Txt variant="label" style={[tabular, styles.pct]}>
+                  {pct(s.share)}
+                </Txt>
+              </View>
+              <View style={styles.track} aria-hidden>
+                <View style={[styles.bar, { width: `${Math.max(2, Math.round(s.share * 100))}%` }]} />
+              </View>
+              {fgcLine ? (
+                <MoneyTxt variant="caption" color={colors.textSecondary}>
+                  {fgcLine}
+                </MoneyTxt>
+              ) : null}
             </View>
-            <View style={styles.track} aria-hidden>
-              <View style={[styles.bar, { width: `${Math.max(2, Math.round(s.share * 100))}%` }]} />
-            </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
-      <Txt variant="caption" color={colors.textSecondary}>
-        Pelo valor de hoje dos investimentos ativos, como você registrou. A Clarevo não indica como dividir.
-      </Txt>
-    </Card>
-  );
-}
-
-/**
- * "Garantia do FGC" (D-099, item 3): a soma por instituição dos produtos com a garantia, com o limite escrito de forma neutra. Some sem
- * nenhum produto com a garantia.
- */
-export function FgcCard({ items }: { items: readonly Investment[] }) {
-  const f = fgcByInstitution(items);
-  if (f.totalCents <= 0) return null;
-  return (
-    <Card style={{ gap: space[2] }}>
-      <View style={styles.titleRow}>
-        <Landmark size={20} color={colors.brandText} aria-hidden />
-        <Txt variant="title" accessibilityRole="header" aria-level={2} style={{ flex: 1 }}>
-          {FGC_TEXT.title}
-        </Txt>
-      </View>
-      {f.groups.map((g) => (
-        <MoneyTxt key={g.key} variant="label">
-          {g.overCents > 0 ? FGC_TEXT.over(g) : FGC_TEXT.group(g)}
-        </MoneyTxt>
-      ))}
-      {f.withoutInstitution.names.length > 0 ? (
-        <Txt variant="caption" color={colors.textSecondary}>
-          {FGC_TEXT.without(f.withoutInstitution.names)}
-        </Txt>
+      {fgc && fgc.totalCents > 0 ? (
+        <>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {INSTITUTION_FGC_TEXT.limit}
+          </Txt>
+          {fgc.withoutInstitution.length > 0 ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {FGC_TEXT.without(fgc.withoutInstitution)}
+            </Txt>
+          ) : null}
+          <Txt variant="caption" color={colors.textSecondary}>
+            {FGC_TEXT.rules}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {FGC_TEXT.estimate}
+          </Txt>
+        </>
       ) : null}
       <Txt variant="caption" color={colors.textSecondary}>
-        {FGC_TEXT.rules}
-      </Txt>
-      <Txt variant="caption" color={colors.textSecondary}>
-        {FGC_TEXT.estimate}
+        Pelo valor de hoje dos investimentos ativos, como você registrou. A Clarevo não indica como dividir.
       </Txt>
     </Card>
   );
@@ -277,17 +279,37 @@ export function FiscalCalendarCard({ items }: { items: readonly Investment[] }) 
 /**
  * Plano de aportes (D-099, item 12): com plano, o aportado do mês ao lado do plano, sem cor e sem cobrança; sem plano, o convite fica na
  * lista de atalhos (InvestmentLinks).
+ *
+ * D-103 (item 14): depois de 3 meses sem revisar o plano (sem mudança nele nem visita à tela dele neste aparelho), um convite discreto,
+ * "Faz 3 meses que você revisou o plano. Quer conferir?", com "Agora não", que oculta o convite por mais 3 meses. O "Agora não" e a visita ficam só
+ * neste aparelho (lib/device-prefs.ts).
  */
 export function InvestmentPlanCard({ plan, movements }: { plan: InvestmentPlan | null; movements: readonly InvestmentMovement[] }) {
-  const { today } = useSession();
+  const { today, user, auth } = useSession();
+  const prefs = useDevicePrefs(user?.id);
   const line = investmentPlanLine(plan, movements, today);
   if (!line) return null;
+  // Enquanto as preferências do aparelho não chegam, sem convite (ele não pisca antes do "Agora não" guardado).
+  const review = prefs ? planReviewDue(plan, { reviewedOn: prefs.investmentPlanReviewedOn, dismissedOn: prefs.investmentPlanReviewDismissedOn }, today) : null;
   return (
     <Card style={{ gap: space[2] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
         {INVESTMENT_PLAN_TEXT.cardTitle}
       </Txt>
       <MoneyTxt>{line}</MoneyTxt>
+      {review !== null && user ? (
+        <View style={{ gap: space[1] }}>
+          <Txt variant="label" color={colors.textSecondary}>
+            {PLAN_REVIEW_TEXT.invite(review)}
+          </Txt>
+          <LinkButton
+            label={PLAN_REVIEW_TEXT.later}
+            accessibilityLabel={PLAN_REVIEW_TEXT.laterA11y}
+            onPress={() => updatePrefs(user.id, { investmentPlanReviewDismissedOn: today }, auth.mode !== 'demo')}
+            style={{ alignSelf: 'flex-start' }}
+          />
+        </View>
+      ) : null}
       <Button label={INVESTMENT_PLAN_TEXT.editAction} tone="ghost" compact onPress={() => router.push('/investimento/plano')} />
     </Card>
   );

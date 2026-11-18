@@ -272,6 +272,7 @@ const RESULTS = new Set([
   'ligado', 'anotado', 'desfeito', 'sem_permissao', 'sem_conta', 'nada_para_desfazer', 'desligado', 'nao_ligado', 'codigo_invalido', 'ja_ligado',
   'sem_assinatura', 'muitas_tentativas', 'muitas_mensagens', 'data_futura', 'valor_invalido', 'valor_acima_do_limite', 'descricao_invalida',
   'repetida', 'silencio', 'registrada', 'compra_anotada', 'compra_desfeita', 'sem_cartao', 'qual_cartao', 'fatura_paga', 'limite_do_cartao',
+  'pagamento_de_fatura',
 ]);
 
 /** Recusa do banco que se repetiria a cada nova entrega (pedido inválido, 4xx): não adianta o canal mandar de novo. */

@@ -11,10 +11,11 @@ import { colors, space } from '@/theme/tokens';
 
 /**
  * Movimento de uma meta (D-027): /meta/<id>/movimento?tipo=aporte|resgate|rendimento|atualizar para registrar, ou
- * ?movimento=<id do movimento> para editar ou excluir um que já existe. Sem tipo válido, aporte.
+ * ?movimento=<id do movimento> para editar ou excluir um que já existe. Sem tipo válido, aporte. Com &origem=valor-extra (D-105), o aporte
+ * abre com o valor vazio.
  */
 export default function MovimentoScreen() {
-  const { id, tipo, movimento } = useLocalSearchParams<{ id: string; tipo?: string; movimento?: string }>();
+  const { id, tipo, movimento, origem } = useLocalSearchParams<{ id: string; tipo?: string; movimento?: string; origem?: string }>();
   const detail = useGoalDetail(id);
 
   if (detail.isSuccess && detail.data.goal) {
@@ -26,7 +27,8 @@ export default function MovimentoScreen() {
         : null
       : tipo === 'atualizar'
         ? { type: 'atualizar' }
-        : { type: 'novo', kind: tipo === 'resgate' ? 'resgate' : tipo === 'rendimento' ? 'rendimento' : 'aporte' };
+        : // Vindo de "Separar parte para uma meta?" (D-105, origem=valor-extra), o aporte abre sem valor sugerido.
+          { type: 'novo', kind: tipo === 'resgate' ? 'resgate' : tipo === 'rendimento' ? 'rendimento' : 'aporte', emptyAmount: origem === 'valor-extra' };
     if (mode) {
       return (
         <View style={{ flex: 1, backgroundColor: colors.background }}>

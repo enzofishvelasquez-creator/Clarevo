@@ -30,6 +30,8 @@ Fica de fora, de propósito:
 | Detalhe | `/investimento/<id>` | Valor, totais, última atualização, rentabilidade, "Atualizar valor", "Registrar aporte", "Registrar resgate", "Registrar rendimento recebido", o valor no fim de cada mês (até 12), o histórico, editar, encerrar ou reabrir e excluir |
 | Editar | `/investimento/<id>/editar` | Só nome e tipo; os valores mudam pelos movimentos |
 | Movimento | `/investimento/<id>/movimento?tipo=aporte\|resgate\|rendimento\|valor` ou `?movimento=<id>` | Valor, data (hoje preenchida, sem data futura) e observação (até 80 caracteres); alterar e excluir um movimento |
+| Desempenho (D-103) | `/investimento/desempenho` | Cada investimento comparado no próprio período com o CDI, o IPCA e a poupança, em três períodos fixos (seção 11) |
+| Lembrete (D-104) | `/investimento/lembrete` | O fato do lembrete, "Lembrar de novo em 3 dias", "Pausar este lembrete por 30 dias" e "Retomar este lembrete" (seção 12) |
 
 Formulários sem a barra inferior; a aba e o detalhe com a barra (regra de navegação de `docs/10`). O selo do contexto fica fixo em
 "Pessoal" em todas as telas de investimento. Capturas: `docs/telas/540_investimentos.png`, `541_investimento_detalhe.png` e
@@ -142,6 +144,9 @@ Em `docs/05_SUPABASE.md`, passos 12v, 12w e 12x, e as conferências 21s e 21t:
 6. Preço público, cota dos fundos e meta que lê os investimentos (D-099, P3): rodar a migração 0037 (`20261114000002_investimentos_precos.sql`)
    e recarregar o esquema (passo 12ac e conferência 21y); criar e publicar a função `precos` (passo 12ad), com a verificação de JWT desligada,
    como a `indices`. Aplicar antes do merge.
+7. Taxa com data de fim e descrição (D-104): rodar a migração 0039 (`20261117000001_investimentos_taxa_descricao.sql`), recarregar o
+   esquema e conferir (passo 12af e conferência 21aa), junto com a 0040 e a 0041 da mesma rodada e **antes do merge** (o app novo é
+   publicado pelo ar a cada merge, D-100). As funções `indices` e `precos` não mudam.
 
 ## 7. Ficha ampliada (D-099, 13/11/2026)
 
@@ -233,3 +238,88 @@ Regras em `packages/core/src/investment-prices.ts`; função do servidor `precos
 - **"Guardado no mês"** (Metas, Seu mês e o comprometido): os registros da meta que lê os investimentos não contam, como a tela diz; a
   projeção do plano começa no mês de hoje. A Evolução continua mostrando o histórico dos registros de cada mês.
 
+## 11. A aba com datas, ganho em reais e desempenho (D-103, 17/11/2026)
+
+Estudo "Bolsa no site e aba Investir" (seção "Dezesseis melhorias para Investir"), pedido do Enzo "faça todas as melhorias possíveis". Regras
+em `packages/core/src/investment-tab.ts` e `investment-performance.ts`; telas em `apps/app/src/app/(tabs)/investimentos.tsx`,
+`components/investment-tab-parts.tsx`, `components/investment-portfolio.tsx` e `app/investimento/desempenho.tsx`. Sem mudança no banco.
+
+- **De quando é cada valor:** cada linha da lista diz a data e a origem do valor ("Atualizado por você em 06/10/2026.", "Valor de
+  06/10/2026, pelo preço do Tesouro Nacional de 03/10/2026.", pela cota do fundo ou pela taxa contratada). A origem vem da observação que
+  "Usar este valor" grava no detalhe (`VALUE_SOURCE_NOTE`, seção 12); qualquer outra observação conta como valor digitado. Sem atualização,
+  "Sem atualização do extrato: mostra o que foi aplicado.". No card azul, o intervalo das datas ("Valores de 30/09 a 06/10/2026, como você
+  registrou.") e quem está sem atualização no mês. Numa falha ao recarregar, fica o último valor conhecido, cada um com a data dele, nunca
+  zero, com "Tentar de novo".
+- **Ganho em reais primeiro:** o card mostra o ganho em reais e, abaixo, a porcentagem sobre o investido (ganho ÷ aportado, desde o
+  primeiro aporte: "+2,94% sobre o investido"), com a folha "Como a conta é feita", que explica cada número do card com os valores dele
+  (resgatado e rendimentos só quando existem) e termina em "A Clarevo faz a conta só com o que você registra. O extrato de cada instituição
+  é o que vale."
+- **Desempenho por investimento** (`/investimento/desempenho`, aberto ao tocar no total do card): três períodos fixos ("No mês", "Em 12
+  meses", "Desde o início"). Como os valores são digitados em datas diferentes, **não há porcentagem única da carteira**: cada investimento
+  é comparado no próprio período, do primeiro ao último valor conhecido dentro do período escolhido (o valor de antes vale se for de até
+  10 dias antes do começo), pelo Dietz modificado, com o CDI, o IPCA e a poupança do mesmo intervalo (mês sem índice publicado repete o
+  último, com a data). "% do CDI" só com rendimento de zero ou mais, CDI acima de zero e pelo menos 5 dias úteis. A taxa da ficha aparece
+  como referência, com selo de estimativa e uma cor só. Sem atualização depois do começo, a tela diz o que falta.
+- **Modelos na tela vazia:** "Por onde começar o registro", com quatro modelos ("Reserva de emergência", "Título do Tesouro", "CDB, LCI ou
+  LCA que já tenho" e "Outro investimento"), que abrem `/investimento/novo?modelo=reserva|titulo|banco|outro` com parte do formulário
+  preenchida (`investmentTemplatePreset`: o tipo e, no título de banco, "Porcentagem do CDI"; valor, data e taxa sempre em branco). A tela
+  diz "São só modelos para registrar o que você já tem. A Clarevo não indica onde investir."
+- **Por instituição, com o FGC:** a divisão "Por instituição" vem logo depois de "Por tipo" e aparece sempre que algum ativo com valor tem a
+  instituição na ficha. Embaixo de cada instituição, a soma dos produtos com garantia do FGC ("R$ 10.875,00 em produtos com garantia do
+  FGC.") e, para comparar, o limite ("a garantia do FGC vai até R$ 250.000,00 por pessoa em cada instituição ou conglomerado"), só como
+  informação, sem alerta. O card separado do FGC saiu.
+- **Convite do plano de aportes:** com plano, depois de 3 meses sem revisão (a última mudança do plano ou a última vez que a tela do plano
+  foi aberta neste aparelho), "Faz 3 meses que você revisou o plano. Quer conferir?", com "Agora não" por mais 3 meses. As datas ficam só
+  no aparelho. O plano e a comparação de rendimentos dizem a premissa.
+- **Calendário do mês** (D-105): o card dos próximos vencimentos termina em "Ver no calendário", que abre `/calendario`, onde os
+  vencimentos aparecem junto das contas e dos aportes planejados.
+- **Demonstração:** o plano de aportes fictício foi definido mais de 3 meses antes do dia da demonstração, para o convite aparecer.
+
+## 12. Detalhe e formulários de cada investimento (D-104, 17/11/2026)
+
+Regras em `packages/core/src/investment-detail.ts`, `investment-estimate.ts`, `investment-history.ts`, `investment-reminders.ts` e
+`investment-informe.ts`; telas em `apps/app/src/app/investimento/[id]/`, `investimento/lembrete.tsx`, `investimento/declaracao.tsx` e
+`components/investment-form.tsx`. Banco: migração 0039 (`20261117000001_investimentos_taxa_descricao.sql`), testes em
+`supabase/tests/99zzzzzzzzzzzzzzzzzzzz_investimentos_taxa.sql`.
+
+- **Colunas novas da 0039 (todas opcionais):** `rate_until` (data de fim da taxa) e `rate_after_bp` (a taxa de depois, em centésimos de
+  ponto, com os mesmos limites da taxa da ficha), os dois juntos ou nenhum, só com forma de render que tem taxa (CDI, Selic, IPCA ou
+  prefixado), data entre 01/01/1990 e 31/12/2100 (`taxa_condicional_invalida`); `rate_condition`, a condição da taxa, de 1 a 60 caracteres
+  (`condicao_invalida`); e `description`, o que é o investimento, de 1 a 120 caracteres, em qualquer tipo (`descricao_investimento_invalida`;
+  serve para o tipo "Outro" e para previdência). Viajam na ficha (`p_details`) de `create_investment` e `update_investment`, que mudam só
+  por dentro, com a mesma assinatura: sem a chave (versão anterior do app), ficam como estavam (a taxa e a condição, se a forma de render
+  continua a mesma). A visão `investment_items` ganha as quatro colunas no fim. Compatível nos dois sentidos: o app novo lê as colunas que
+  existirem, e um banco sem a 0039 ignora as chaves novas.
+- **Taxa que muda numa data:** "120% do CDI até 31/03/2027, depois 100% do CDI", com a condição ao lado, se houver. A estimativa pela taxa
+  contratada muda de taxa na data (E1 a E3 de `investment-estimate.ts`): antes da data, a estimativa de sempre; depois dela, a taxa
+  contratada até a data (inclusive) e a de depois do dia seguinte até hoje, com o valor estimado no dia seguinte como base da segunda
+  parte. Bruta, sem imposto, sem taxas e sem oscilação de mercado; nunca gravada sozinha.
+- **Data e origem de cada valor:** "atualizado por você em", a cota de, o preço do Tesouro Nacional de. "Usar este valor" grava a
+  atualização com a observação de onde veio ("Pelo preço do Tesouro Nacional de 05/10/2026", "Pela cota do fundo de 05/10/2026" ou "Pela
+  taxa contratada (estimativa)"), que a aba lê (seção 11). Uma falha de carga mostra o último valor conhecido com a data, nunca zero.
+- **Imposto, liquidez e garantia:** o imposto estimado em três linhas alinhadas (rendimento bruto, IR e IOF estimados, rendimento líquido
+  estimado), também nos isentos de IR; cada um dos três tem uma frase curta com o tema de Aprender (`ir-investimentos`,
+  `liquidez-risco-retorno`, `fgc` e `titulos-publicos`, `docs/09_APRENDER.md`). Cada estimativa mostra a premissa ao lado.
+- **Histórico com saldo:** cada aporte, atualização de valor, resgate e rendimento, do mais recente ao mais antigo, com "Saldo depois:
+  R$ ..." (H1 a H3 de `investment-history.ts`): a atualização troca o saldo pelo valor informado e mostra quanto rendeu desde a linha de
+  antes; o aporte soma; o resgate tira; o rendimento recebido não muda o saldo. A ordem do mesmo dia é a do banco.
+- **Lembretes com adiar e pausar** (L1 a L3 de `investment-reminders.ts`): o aporte do plano, os vencimentos (e o fim da carência) e o
+  valor sem atualização, em tom de fato, sem valor nem nome na tela bloqueada (D-087). O toque abre `/investimento/lembrete`, com o fato,
+  "Lembrar de novo em 3 dias", "Pausar este lembrete por 30 dias" e, depois de escolher, "Retomar este lembrete". A escolha vale por tipo,
+  para os avisos e para os cartões do detalhe, fica só no aparelho e passa sozinha na data. Adiado, um aviso só na data, se o fato ainda
+  vale; pausado, nenhum aviso do tipo nem o cartão no detalhe até a data. Só no Pessoal.
+- **Declaração no formato do informe** (`/investimento/declaracao`, R1 a R3 de `investment-informe.ts`): na ordem do informe de rendimentos
+  das instituições, a posição em 31/12 (do ano anterior e do ano; os de custo de compra ficam sem valor), os rendimentos recebidos no ano
+  separados em isentos, tributação exclusiva e "para conferir", e Bens e Direitos com grupo, código e a discriminação sugerida (com a
+  descrição da pessoa, se houver). Sempre com o selo "Resumo estimado. Confira com o informe da instituição."
+- **"Somar a uma meta? (opcional)":** ao registrar um rendimento recebido novo ou um resgate novo com data no vencimento ou depois, o
+  formulário pergunta, sem nada marcado. Com uma meta escolhida, o aporte entra pelo caminho dos aportes de meta (`add_goal_movement`), com
+  o mesmo valor e a mesma data e a observação "Rendimento de ..." ou "Resgate de ..."; se o aporte falhar, o movimento do investimento fica
+  e a tela diz para registrar pela meta.
+- **Opção da meta no formulário:** em "Para que é este dinheiro? (opcional)", o formulário diz que, na meta, a pessoa escolhe de onde vem
+  o valor guardado (do que registra nela ou do valor dos investimentos ligados) e oferece "Usar o valor dos investimentos nesta meta", sem
+  vir marcada (retorno de quem testa); com ela, depois de salvar, a meta passa a usar os investimentos ligados (`set_goal_value_source`,
+  seção 10). Meta que já usa os investimentos mostra "Esta meta já usa o valor dos investimentos ligados."
+- **"Outro investimento" e previdência:** dica própria no formulário (o nome, a descrição em "Mais detalhes" e o valor pelo extrato).
+- **Demonstração:** a aplicação rende 105% do CDI até 31/03/2027 e 100% depois, e a previdência tem uma descrição (fictícias).
+- Sem nota, ranking, recomendação nem cor de alerta.
