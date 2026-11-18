@@ -1,6 +1,6 @@
 import {
   ACCOUNTS_TEXT,
-  CATEGORIES,
+  contextCategories,
   COMMITMENT_ERROR_TEXT,
   COMMITMENT_NOTICE_TEXT,
   MAX_RECORD_CENTS,
@@ -580,7 +580,7 @@ export function PaymentForm({ commitment: c, space: personal, paidOnDue }: { com
             </Txt>
             <View style={styles.chips}>
               <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-              {CATEGORIES.despesa.map((cat) => (
+              {contextCategories(personal.contextKind, 'despesa').map((cat) => (
                 <Chip key={cat} label={cat} selected={draft.category === cat} onPress={() => set('category', cat)} />
               ))}
             </View>

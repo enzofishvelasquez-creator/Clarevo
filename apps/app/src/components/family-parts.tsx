@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { Txt } from '@/components/ui';
+import { useBusiness } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -66,6 +67,7 @@ export function useNowMs(): number {
  */
 export function useAuthorship(contextId: string, createdBy: string): { kind: ContextKind; contextName: string; by: string } {
   const family = useFamily().data;
+  const business = useBusiness().data;
   const { user } = useSession();
   if (family && family.context.id === contextId) {
     return {
@@ -73,6 +75,10 @@ export function useAuthorship(contextId: string, createdBy: string): { kind: Con
       contextName: contextName('familia'),
       by: authorLabel(family.members, createdBy) ?? 'outra pessoa da Família',
     };
+  }
+  // Espaço Negócio (D-113): só a própria pessoa anota.
+  if (business && business.id === contextId) {
+    return { kind: 'negocio', contextName: contextName('negocio', business.name), by: createdBy === user?.id ? 'você' : 'outra pessoa' };
   }
   return { kind: 'pessoal', contextName: contextName('pessoal'), by: createdBy === user?.id ? 'você' : 'outra pessoa' };
 }

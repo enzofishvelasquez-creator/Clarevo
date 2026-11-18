@@ -52,7 +52,7 @@ const NAV_THEME =
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/editar)?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura|nivel))?|familia(\/(nova|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|calendario|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/(editar|mover))?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura|nivel))?|familia(\/(nova|convidar))?|negocio(\/(novo|retirada|nome))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|calendario|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -292,6 +292,8 @@ function Navigation() {
           <Stack.Screen name="registro/novo" />
           <Stack.Screen name="registro/[id]/index" />
           <Stack.Screen name="registro/[id]/editar" />
+          {/* Mover para o espaço Negócio ou para o Pessoal (D-113). */}
+          <Stack.Screen name="registro/[id]/mover" />
           {/* Buscar em Movimentos (D-045): tela de consulta, com a barra inferior. */}
           <Stack.Screen name="movimentacoes/buscar" />
           {/* Seu mês em 30 segundos (D-052): cartões curtos do mês; tela de consulta, com a barra inferior. */}
@@ -326,6 +328,11 @@ function Navigation() {
           <Stack.Screen name="familia/index" />
           <Stack.Screen name="familia/nova" />
           <Stack.Screen name="familia/convidar" />
+          {/* Espaço Negócio (D-113): como está o negócio, criar, a retirada para o Pessoal e o nome. */}
+          <Stack.Screen name="negocio/index" />
+          <Stack.Screen name="negocio/novo" />
+          <Stack.Screen name="negocio/retirada" />
+          <Stack.Screen name="negocio/nome" />
           {/* Painel da empresa (D-056): só na web, para quem administra o benefício; a tela de consulta tem a barra inferior. */}
           <Stack.Screen name="empresa/index" />
           {/* Exportar meus dados (D-047): planilha (CSV) ou resumo em PDF, montado no aparelho. */}

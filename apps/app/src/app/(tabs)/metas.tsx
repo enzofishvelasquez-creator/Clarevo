@@ -1,8 +1,9 @@
-import { CALC_UI_TEXT, COMMITTED_TEXT, calculatorBySlug, ERROR_TEXT, GOALS_NAV_TEXT, GOALS_TEXT, goalsMonthTexts, monthOf, type Goal, type GoalImage } from '@clarevo/core';
+import { BUSINESS_TEXT, CALC_UI_TEXT, COMMITTED_TEXT, calculatorBySlug, ERROR_TEXT, GOALS_NAV_TEXT, GOALS_TEXT, goalsMonthTexts, monthOf, type Goal, type GoalImage } from '@clarevo/core';
 import { router } from 'expo-router';
 import { ArrowUpDown, Calculator, ChartLine, ListOrdered, Plus, ShieldCheck } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { NotInBusinessCard } from '@/components/business-parts';
 import { openCalc } from '@/components/calc/open';
 import { CalcNavRow } from '@/components/calc/parts';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -33,7 +34,9 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
 export default function MetasScreen() {
   const { today } = useSession();
   const personal = useWork();
-  const contextId = personal.data?.contextId;
+  const business = personal.data?.contextKind === 'negocio';
+  // No negócio (D-113) nada de metas é lido: a aba só explica.
+  const contextId = business ? undefined : personal.data?.contextId;
   const overview = useGoalsOverview(contextId);
   const committed = useCommittedSummary(contextId, monthOf(today));
   const savings = useSavingsCard(contextId);
@@ -50,6 +53,11 @@ export default function MetasScreen() {
           <ContextSwitch />
         </AppHeader>
         <Body>
+          {business ? (
+            // Espaço Negócio (D-113): metas ficam no Pessoal e na Família; o negócio é só o que entra e sai.
+            <NotInBusinessCard text={BUSINESS_TEXT.goalsHidden} />
+          ) : (
+          <>
           <FlashBanner message={notice} />
           <SavingsCard contextId={contextId} card={savings} onNotice={setNotice} planInReserve={overview.isPending || Boolean(data)} />
 
@@ -127,6 +135,8 @@ export default function MetasScreen() {
           <Txt variant="caption" color={colors.textSecondary} style={{ textAlign: 'center' }}>
             {GOALS_TEXT.footer}
           </Txt>
+          </>
+          )}
         </Body>
       </Screen>
     </View>

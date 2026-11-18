@@ -1,6 +1,7 @@
 import { addDays, addMonths, isValidIsoDate, monthOf, type IsoDate, type IsoMonth } from '../dates';
 import { MAX_RECORD_CENTS } from '../money';
-import { CATEGORIES, nextMonthAllowed } from '../records';
+import { nextMonthAllowed, type ContextKind } from '../records';
+import { contextCategories } from '../business';
 import { DESCRIPTION_MAX } from '../validation';
 import { invoiceMonthOf, type CardDays } from '../cards';
 import { suggestCategory, type ImportMemory } from './categorias';
@@ -80,6 +81,8 @@ export interface ReviewInput {
   card?: { days: CardDays; paidMonths: ReadonlySet<IsoMonth> } | null;
   /** Linhas (pelo `id`, "l" e a posição) em que a pessoa trocou gasto por recebimento, ou compra por estorno (D-108). */
   flipped?: ReadonlySet<string>;
+  /** O espaço de destino (D-113): no negócio, as categorias são as do negócio (sugestão fora delas fica sem categoria). */
+  context?: ContextKind;
 }
 
 const PAYS_INVOICE = /\b(pagamento|pagto|pgto|pag|liquidacao)\b.*\bfatura\b|\bfatura\b.*\bcartao\b|\bpag\w*\b.*\bcartao de credito\b|\bcartao de credito\b.*\bpag\w*\b/;
@@ -195,7 +198,10 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
   return partial.map((p, i): ReviewLine => {
     const { l, kind, amount, key } = p;
     const keyExists = input.importedKeys.has(key);
-    const suggestion = kind === 'pagamento' ? { category: null, source: null } : suggestCategory(l.description, recordKind(kind), input.memory);
+    const suggested = kind === 'pagamento' ? { category: null, source: null } : suggestCategory(l.description, recordKind(kind), input.memory);
+    // A sugestão só vale se a categoria é do espaço de destino (as do negócio no negócio, D-113).
+    const suggestion =
+      suggested.category !== null && !categoriesFor(kind, input.context).includes(suggested.category) ? { category: null, source: null } : suggested;
     let label: ReviewLabel | null = null;
     let importable = true;
     // A primeira marca que impede a importação é a que aparece.
@@ -261,9 +267,9 @@ export function buildReview(input: ReviewInput): ReviewLine[] {
 // Edição da lista
 // ---------------------------------------------------------------------------
 
-/** Categorias que a linha aceita: as de gasto (também para compra e estorno) ou as de recebimento. */
-export function categoriesFor(kind: ReviewKind): readonly string[] {
-  return kind === 'receita' ? CATEGORIES.receita : kind === 'pagamento' ? [] : CATEGORIES.despesa;
+/** Categorias que a linha aceita: as de gasto (também para compra e estorno) ou as de recebimento, do espaço (as do negócio no negócio). */
+export function categoriesFor(kind: ReviewKind, context: ContextKind = 'pessoal'): readonly string[] {
+  return kind === 'receita' ? contextCategories(context, 'receita') : kind === 'pagamento' ? [] : contextCategories(context, 'despesa');
 }
 
 /** A linha tem problema que impede importar? ('descricao' vazia ou longa demais.) Linha fora da seleção nunca bloqueia. */
@@ -314,13 +320,13 @@ export function canFlipLine(line: Pick<ReviewLine, 'importable' | 'kind'>): bool
  * cada linha que ainda pode entrar: a descrição, a categoria (se ainda serve ao tipo; senão, a sugerida para o tipo novo) e a seleção
  * (a linha que mudou de tipo fica marcada se estava marcada ou se vem marcada). Linha que deixou de poder entrar volta como veio.
  */
-export function keepReviewEdits(built: readonly ReviewLine[], previous: readonly ReviewLine[]): ReviewLine[] {
+export function keepReviewEdits(built: readonly ReviewLine[], previous: readonly ReviewLine[], context: ContextKind = 'pessoal'): ReviewLine[] {
   const old = new Map(previous.map((l) => [l.id, l]));
   return built.map((l) => {
     const p = old.get(l.id);
     if (!p || !l.importable) return l;
     const sameKind = p.kind === l.kind;
-    const keepCategory = sameKind || (p.category !== null && categoriesFor(l.kind).includes(p.category));
+    const keepCategory = sameKind || (p.category !== null && categoriesFor(l.kind, context).includes(p.category));
     return {
       ...l,
       description: p.description,
@@ -332,14 +338,14 @@ export function keepReviewEdits(built: readonly ReviewLine[], previous: readonly
 }
 
 /** As linhas escolhidas viram itens para o banco: descrição aparada (1 a 80) e categoria do app ou null. */
-export function toImportItems(lines: readonly ReviewLine[]): ImportItem[] {
+export function toImportItems(lines: readonly ReviewLine[], context: ContextKind = 'pessoal'): ImportItem[] {
   return includedLines(lines).map((l) => ({
     importKey: l.key,
     kind: l.kind as ImportItem['kind'],
     amountCents: l.amountCents,
     occurredOn: l.date,
     description: cleanDescription(l.description) || l.description.trim(),
-    category: l.category !== null && categoriesFor(l.kind).includes(l.category) ? l.category : null,
+    category: l.category !== null && categoriesFor(l.kind, context).includes(l.category) ? l.category : null,
     // A parcela vai junto enquanto a descrição (talvez editada) ainda tem a marca: tirar "01/11" da descrição importa à vista.
     ...(l.kind === 'compra' && l.installment && installmentMark(l.description, l.date) !== null
       ? { installment: { number: l.installment.number, count: l.installment.count } }

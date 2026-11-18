@@ -86,6 +86,8 @@ describe('barra inferior (D-039)', () => {
       '/familia',
       // Painel da empresa (D-056): só na web, tela de consulta, com a barra.
       '/empresa',
+      // Como está o negócio (D-113): tela de consulta, com a barra.
+      '/negocio',
     ])
       expect(barModeFor(path), path).toBe('consulta');
   });
@@ -148,7 +150,8 @@ describe('barra inferior (D-039)', () => {
   it('toda tela do app é classificada: o que se chama novo, editar ou pagar não tem barra, e o resto tem', () => {
     const routes = appRoutes();
     expect(routes.length).toBeGreaterThan(50);
-    const formName = /\/(novo|nova|editar|ordenar|pagar|encargo|estorno|compra|encerrar|informar|movimento|atualizar|vencidas|referencia|limite|minima|reserva|guardar|importar|convidar|excluir)$/;
+    // Espaço Negócio (D-113): mover um lançamento, a retirada para o Pessoal e o nome do negócio também são formulários.
+    const formName = /\/(novo|nova|editar|ordenar|pagar|encargo|estorno|compra|encerrar|informar|movimento|atualizar|vencidas|referencia|limite|minima|reserva|guardar|importar|convidar|excluir|mover|retirada|nome)$/;
     // O formulário do orçamento de uma categoria é a rota dinâmica /orcamento/[categoria].
     const budgetForm = /^\/orcamento\/\[categoria\]$/;
     const entry = /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado|conta-excluida|convite\/\[codigo\]|beneficio\/\[codigo\])$/;

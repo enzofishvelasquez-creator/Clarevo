@@ -1,6 +1,5 @@
 import {
   ACCOUNTS_TEXT,
-  CATEGORIES,
   MAX_RECORD_CENTS,
   NO_CATEGORY_LABEL,
   PAYMENT_FIELD_ORDER,
@@ -8,6 +7,7 @@ import {
   addDays,
   centsToInput,
   chooseAccountId,
+  contextCategories,
   fieldForErrorCode,
   formatBRL,
   formatDateBR,
@@ -336,7 +336,8 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: WorkSp
             </Txt>
             <View style={styles.chips}>
               <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-              {CATEGORIES.despesa.map((cat) => (
+              {/* As categorias de gasto do espaço (D-113a: no negócio, as do negócio). */}
+              {contextCategories(personal.contextKind, 'despesa').map((cat) => (
                 <Chip key={cat} label={cat} selected={draft.category === cat} onPress={() => set('category', cat)} />
               ))}
             </View>

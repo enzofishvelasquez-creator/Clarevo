@@ -1,7 +1,8 @@
 import {
   ACCOUNTS_TEXT,
   CARDS_TEXT,
-  CATEGORIES,
+  isChoosableExpenseCategory,
+  contextCategories,
   COMPROVANTE_TEXT,
   DEMO_EMAIL,
   DESCRIPTION_MAX,
@@ -504,6 +505,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const day = dayMode && dayMonth ? dayInMonthDate(dayMonth, dayText) : null;
   const account = (allAccounts.data ?? personal.accounts).find((a) => a.id === draft.accountId) ?? personal.accounts[0];
   const contextName = personal.contextName;
+  // As categorias do espaço (D-113): as do negócio no negócio, as de sempre no Pessoal e na Família.
+  const business = personal.contextKind === 'negocio';
+  const categoryList = contextCategories(personal.contextKind, kind);
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
   usePreventRemove(dirty && !leaveTo, ({ data }) => {
@@ -746,7 +750,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       if (sug.description !== '' && (cur.description.trim() === '' || cur.description === prevFilled?.description)) next.description = sug.description;
       else if (sug.description === '' && prevFilled && cur.description === prevFilled.description) next.description = '';
     }
-    if (sug.category && (cur.category === null || cur.category === prevFilled?.category)) next.category = sug.category;
+    // A categoria sugerida pela nota só entra se for do espaço (D-113: no negócio, "Mercado" não existe).
+    if (sug.category && categoryList.includes(sug.category) && (cur.category === null || cur.category === prevFilled?.category)) next.category = sug.category;
     const filled: NoteFields = { description: next.description, amountText: next.amountText, dateText: next.dateText, category: next.category };
     draftRef.current = next;
     setDraft(next);
@@ -923,7 +928,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       // Descrição e categoria: só onde a pessoa não digitou.
       if (sug.description !== '' && (cur.description.trim() === '' || cur.description === prevFilled?.description)) next.description = sug.description;
       else if (sug.description === '' && prevFilled && cur.description === prevFilled.description) next.description = '';
-      if (sug.category && (cur.category === null || cur.category === prevFilled?.category)) next.category = sug.category;
+      // A categoria sugerida pelo comprovante, holerite ou nota de serviço só entra se for do espaço (D-113: no negócio, "Salário" não existe).
+      if (sug.category && categoryList.includes(sug.category) && (cur.category === null || cur.category === prevFilled?.category)) next.category = sug.category;
     }
     // Uma nota lida antes sai de cena: a conta que ela escolheu volta, se a pessoa não escolheu outra.
     if (prevNote?.accountSet && !accountPickedRef.current && next.accountId === prevNote.accountSet) next = { ...next, accountId: prevNote.accountBefore };
@@ -1065,7 +1071,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         tipo: 'parcelada',
         natureza: 'compra_parcelada',
         ...(name ? { descricao: name.slice(0, DESCRIPTION_MAX), origem: 'digitado' } : {}),
-        ...(draft.category && CATEGORIES.despesa.includes(draft.category) ? { categoria: draft.category } : {}),
+        ...(isChoosableExpenseCategory(draft.category) ? { categoria: draft.category } : {}),
       },
     });
   };
@@ -1122,8 +1128,10 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     updatePrefs(userId, { subcategories: rememberSubcategory(current.subcategories, d.category, sub) }, persistPrefs);
   };
   /** A sugestão de categoria para o nome digitado, só com a categoria em "Sem categoria" (D-086). */
-  const categorySuggestion =
+  const suggested =
     draft.category === null && draft.description.trim().length >= 3 ? suggestCategory(draft.description, kind, prefs?.importCategories ?? {}).category : null;
+  // No negócio (D-113), só uma categoria do negócio é sugerida.
+  const categorySuggestion = suggested !== null && categoryList.includes(suggested) ? suggested : null;
 
   /** Modo "Dia": gravação confirmada. another: "Salvar e anotar outro" (o formulário fica, limpo); senão volta à revisão. */
   const finishDay = (input: RecordInput, another: boolean) => {
@@ -1656,7 +1664,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     const params: Record<string, string> = { origem: 'registro' };
     if (draft.description.trim()) params.descricao = draft.description.trim().slice(0, DESCRIPTION_MAX);
     if (typedCents !== null && typedCents >= 1 && typedCents <= MAX_RECORD_CENTS) params.valor = String(typedCents);
-    if (draft.category && CATEGORIES.despesa.includes(draft.category)) params.categoria = draft.category;
+    if (isChoosableExpenseCategory(draft.category)) params.categoria = draft.category;
     if (what === 'conta') {
       if (parsedDate) params.vencimento = parsedDate;
       router.push({ pathname: '/a-pagar/nova', params });
@@ -1721,7 +1729,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         ...rest,
         ...(next === 'receita' ? { nextMonth: false } : {}),
         kind: next,
-        category: categoryOfKind(next, d.category),
+        category: categoryOfKind(next, d.category, personal.contextKind),
         subcategory: null,
         subOther: false,
         incomeOn: next === 'receita' ? d.incomeOn : false,
@@ -2186,7 +2194,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             </Txt>
             <View style={styles.chips}>
               <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-              {CATEGORIES[kind].map((c) => (
+              {categoryList.map((c) => (
                 <Chip
                   key={c}
                   label={c}
@@ -2214,7 +2222,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           ) : null}
 
           {/* Subcategoria opcional (D-107, item 2): só no gasto com categoria (a compra no cartão fica sem). */}
-          {kind === 'despesa' && draft.category !== null && !cardPurchase ? (
+          {kind === 'despesa' && draft.category !== null && !cardPurchase && !business ? (
             <View style={{ gap: space[1] }}>
               <SubcategoryPicker
                 ref={subRef}

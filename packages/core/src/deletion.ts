@@ -60,7 +60,7 @@ export const DELETE_TEXT = {
   intro: 'Ao excluir, você perde o acesso na hora e não é possível desfazer. O seu e-mail fica livre para uma conta nova, que começa vazia.',
   erasedTitle: 'O que é apagado',
   erased: [
-    'Tudo o que você anotou no seu Pessoal, como gastos, recebimentos, contas a pagar, gastos fixos, parcelamentos e contas do ano. Os dados são apagados de verdade, não ficam só escondidos.',
+    'Tudo o que você anotou no seu Pessoal e no seu espaço Negócio, se tiver um, como gastos, recebimentos, contas a pagar, gastos fixos, parcelamentos e contas do ano. Os dados são apagados de verdade, não ficam só escondidos.',
     'As metas e o que você guardou ou retirou delas, e os investimentos e o que você registrou neles. Também os cartões, as compras e as faturas, as notas fiscais, o orçamento, o limite e a renda de referência.',
     'Bancos e carteira, as assinaturas, as importações e a revisão dos últimos meses. Também o que você respondeu sobre guardar dinheiro por mês e em "Como você conheceu a Clarevo?".',
     'O histórico de operações e de uso da sua conta.',

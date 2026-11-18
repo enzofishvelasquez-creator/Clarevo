@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" role="img" aria-labelledby="titulo">
+  <title id="titulo">Ilustração da Clarevo: uma folha de calendário com 13º em destaque e uma pilha de moedas.</title>
+  <!-- Ilustração simples da marca para a matéria do 13º salário (D-114), feita no repositório, sem banco de imagens. Cores da identidade:
+       azul #2457F5, lima #D4F05B, texto #17223B e branco. Fica sobre o topo azul da matéria, igual nos temas claro e escuro. -->
+  <circle cx="200" cy="205" r="168" fill="#FFFFFF" fill-opacity="0.1"/>
+  <!-- A folha do calendário, com a faixa lima no alto e os dois aros. -->
+  <g transform="rotate(-4 200 200)">
+    <rect x="84" y="78" width="232" height="250" rx="30" fill="#17223B" fill-opacity="0.18" transform="translate(6 10)"/>
+    <rect x="84" y="78" width="232" height="250" rx="30" fill="#FFFFFF"/>
+    <path d="M114 78h172a30 30 0 0 1 30 30v34H84v-34a30 30 0 0 1 30-30z" fill="#D4F05B"/>
+    <rect x="136" y="60" width="18" height="44" rx="9" fill="#17223B"/>
+    <rect x="246" y="60" width="18" height="44" rx="9" fill="#17223B"/>
+    <!-- "13º" desenhado em traços arredondados (sem depender de fonte). -->
+    <g fill="none" stroke="#17223B" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M137 190 L161 172 L161 292"/>
+      <path d="M197 186 C204 172 216 167 228 167 C246 167 257 179 257 195 C257 213 243 225 224 226 C247 227 262 241 262 261 C262 282 246 296 227 296 C212 296 200 289 193 278"/>
+    </g>
+    <g fill="none" stroke="#2457F5" stroke-width="8" stroke-linecap="round">
+      <circle cx="289" cy="178" r="11"/>
+      <path d="M276 203 H302"/>
+    </g>
+  </g>
+  <!-- A pilha de moedas, em lima com contorno escuro. -->
+  <g stroke="#17223B" stroke-width="6" transform="translate(16 14)">
+    <ellipse cx="300" cy="332" rx="52" ry="18" fill="#C2DD48"/>
+    <rect x="248" y="306" width="104" height="26" fill="#C2DD48" stroke="none"/>
+    <path d="M248 306 V332 M352 306 V332" fill="none"/>
+    <ellipse cx="300" cy="306" rx="52" ry="18" fill="#D4F05B"/>
+    <ellipse cx="300" cy="280" rx="52" ry="18" fill="#C2DD48"/>
+    <rect x="248" y="254" width="104" height="26" fill="#C2DD48" stroke="none"/>
+    <path d="M248 254 V280 M352 254 V280" fill="none"/>
+    <ellipse cx="300" cy="254" rx="52" ry="18" fill="#D4F05B"/>
+  </g>
+  <!-- Um brilho, em branco. -->
+  <path d="M86 300 l7 17 l17 7 l-17 7 l-7 17 l-7 -17 l-17 -7 l17 -7 z" fill="#FFFFFF"/>
+  <path d="M338 92 l5 12 l12 5 l-12 5 l-5 12 l-5 -12 l-12 -5 l12 -5 z" fill="#D4F05B"/>
+</svg>

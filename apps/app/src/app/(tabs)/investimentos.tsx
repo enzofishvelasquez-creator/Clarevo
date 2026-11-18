@@ -1,4 +1,5 @@
 import {
+  BUSINESS_TEXT,
   ERROR_TEXT,
   HOW_CALC_TEXT,
   INVESTMENT_TEXT,
@@ -18,6 +19,7 @@ import { ChevronRight, CircleQuestionMark, Plus, ShieldCheck } from 'lucide-reac
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { NotInBusinessCard } from '@/components/business-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader } from '@/components/header';
 import { investmentCaption } from '@/components/investment-ficha';
@@ -27,7 +29,7 @@ import { HowCalculatedSheet, InvestmentTemplates, StaleValuesNotice } from '@/co
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
-import { useContextInvestmentMovements, useInvestmentPlan, useInvestments, useSpace, useWorkOf } from '@/state/data';
+import { useContextInvestmentMovements, useInvestmentPlan, useInvestments, useSpace, useView, useWorkOf } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -48,6 +50,7 @@ const T = INVESTMENT_TEXT;
 export default function InvestimentosScreen() {
   const space_ = useSpace();
   const personal = useWorkOf('pessoal');
+  const inBusiness = useView().space === 'negocio';
   const contextId = space_.data?.personalContextId;
   const list = useInvestments(contextId);
   const movements = useContextInvestmentMovements(contextId);
@@ -76,7 +79,10 @@ export default function InvestimentosScreen() {
         <AppHeader title={T.tabTitle} context="Pessoal" contextFixed />
         <Body>
           <FlashBanner message={notice} />
-          {failedEmpty ? (
+          {inBusiness ? (
+            // Espaço Negócio (D-113): investimentos ficam no Pessoal; a aba só explica e leva ao Pessoal.
+            <NotInBusinessCard text={BUSINESS_TEXT.investHidden} />
+          ) : failedEmpty ? (
             <Card>
               <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={retry} />
             </Card>

@@ -3,6 +3,7 @@ titulo: Como a empresa oferece a Clarevo sem ver suas finanças
 data: 2026-10-23
 resumo: O que o painel da empresa mostra, o que ele nunca mostra, como funciona o convite por link e o que acontece quando o benefício termina.
 autoria: Equipe Clarevo
+capa: post-quem-ve
 fontes:
   - Para empresas | empresas/index.html
   - Política de privacidade, em "Quem vê os seus dados" | privacidade.html
@@ -18,6 +19,8 @@ Uma empresa pode oferecer a Clarevo como benefício a quem trabalha nela. Neste 
 - as datas dessas situações: a do convite, a de quando a pessoa aceitou e a do encerramento;
 - as contagens de vagas contratadas, convites pendentes, licenças ativas e encerradas;
 - os dados do contrato: plano, vagas, início e fim.
+
+{{tela:post-empresa-painel}}
 
 ## O que a empresa nunca vê
 

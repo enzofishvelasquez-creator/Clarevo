@@ -2,7 +2,7 @@ import {
   ANNUAL_SERIES_ERROR_TEXT,
   BOLETO_TEXT,
   boletoGaps,
-  CATEGORIES,
+  contextCategories,
   COMMITMENT_ERROR_TEXT,
   COMMITMENT_NOTICE_TEXT,
   COMMITMENT_FIELD_ORDER,
@@ -599,7 +599,7 @@ export function CommitmentForm({ mode, space: personal }: { mode: CommitmentForm
             </Txt>
             <View style={styles.chips}>
               <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-              {CATEGORIES.despesa.map((c) => (
+              {contextCategories(personal.contextKind, 'despesa').map((c) => (
                 <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
               ))}
             </View>

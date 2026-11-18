@@ -27,6 +27,7 @@ import { WelcomeTour } from '@/components/tour';
 import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange, type TotalChange } from '@/lib/highlight';
 import { explanationHref, topicBySlug } from '@/lib/learn';
+import { BusinessSummaryCard } from '@/components/business-parts';
 import { summaryTop } from '@/lib/nav';
 import { maskMoneyLabel, moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useCards, useCommitments, useCommittedSummary, useMonthRecords, useSpace, useWork, useView, type SpaceKind } from '@/state/data';
@@ -195,6 +196,8 @@ export default function ResumoScreen() {
           </NoticeQueue>
 
           <>
+            {/* Espaço Negócio (D-113): só com o negócio escolhido; o Resumo do Pessoal e da Família não muda. */}
+            {kind === 'negocio' && contextId ? <BusinessSummaryCard contextId={contextId} month={month} records={records.data} canWrite={canWrite} /> : null}
             <ToPayCard contextId={contextId} canWrite={canWrite} />
 
               <Card>
@@ -227,7 +230,7 @@ export default function ResumoScreen() {
           </View>
           <View style={wide ? styles.sideCol : styles.stack}>
           {wide ? <SummaryShortcuts contextId={contextId} month={month} currentMonth={currentMonth} personal={kind === 'pessoal'} /> : null}
-          {wide ? <GoalsPanel contextId={contextId} /> : null}
+          {wide && kind !== 'negocio' ? <GoalsPanel contextId={contextId} /> : null}
           {wide && kind === 'pessoal' ? <BudgetPanel contextId={contextId} month={month} /> : null}
           <LearnCard />
 
