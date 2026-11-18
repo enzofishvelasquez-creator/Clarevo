@@ -997,7 +997,7 @@ describe('site público: as páginas geradas', () => {
     expect(readFileSync(join(ROOT, 'docs', '52_ESPACO_NEGOCIO.md'), 'utf8')).toContain('**incluído no plano Individual** (um negócio por pessoa, sem custo a');
     // Cada recurso com um link interno que existe (a Ajuda ou O app), e os links de "Como usar" das entradas do guia que existem.
     const recursos = /<h2 id="recursos">[\s\S]*?<\/section>\n<\/div>/.exec(h)![0];
-    const links = [...recursos.matchAll(/<li><a href="([^"]+)">([^<]+)<\/a>: /g)].map((m) => [m[1]!, m[2]!]);
+    const links = [...recursos.matchAll(/<li><a href="([^"]+)">([^<]+)<\/a>: /g)].map((m): [string, string] => [m[1]!, m[2]!]);
     expect(links.map(([, n]) => n)).toEqual(['Anotar e Resumo', 'Contas a pagar', 'Cartões e faturas', 'Calendário do mês', 'Importar extrato e fatura', 'Ler nota, comprovante e boleto', 'Metas e reserva', 'Investir', 'Aprender, simulador e calculadoras', 'Anotar pelo Telegram', 'Espaço Negócio', 'Tema claro ou escuro', 'Ocultar valores', 'Exportar meus dados']);
     for (const [destino] of links) {
       const [arquivo, ancora] = destino.split('#');
