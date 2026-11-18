@@ -86,7 +86,7 @@ describe('barra inferior (D-039)', () => {
       '/familia',
       // Painel da empresa (D-056): só na web, tela de consulta, com a barra.
       '/empresa',
-      // Como está o negócio (D-113): tela de consulta, com a barra.
+      // Seu negócio (D-113): tela de consulta, com a barra.
       '/negocio',
     ])
       expect(barModeFor(path), path).toBe('consulta');

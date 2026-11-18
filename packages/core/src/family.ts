@@ -369,6 +369,8 @@ export const FAMILY_TEXT = {
   accountHintIn: (name: string, role: FamilyRole): string => `${name} · ${FAMILY_ROLE_LABEL[role]}`,
   accountOpen: 'Abrir Família',
   accountCreate: 'Criar Família',
+  /** A linha da Família na folha "Criar um espaço" (D-113b). */
+  spaceHint: 'Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.',
 } as const;
 
 /** Textos da tela do convite (rota /convite/[código], na web e no app). */
