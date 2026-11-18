@@ -58,7 +58,7 @@ export const FAIXAS_INDICADORES: Readonly<Record<IndicadorId | 'cdiDia' | 'ipcaM
 
 const dentro = (faixa: readonly [number, number], v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= faixa[0] && v <= faixa[1];
 
-/** Uma linha do SGS: `{ "data": "17/11/2026", "valor": "15.00" }` (a poupança traz também `"datafim"`). */
+/** Uma linha do SGS: `{ "data": "17/11/2026", "valor": "15.00" }` (a poupança traz também `"dataFim"`; aceita também `"datafim"`). */
 export interface LinhaSgs {
   data: IsoDate;
   valor: number;
@@ -71,11 +71,12 @@ export function lerLinhasSgs(json: unknown): LinhaSgs[] {
   const linhas: LinhaSgs[] = [];
   for (const row of json) {
     if (typeof row !== 'object' || row === null) continue;
-    const r = row as { data?: unknown; valor?: unknown; datafim?: unknown };
+    const r = row as { data?: unknown; valor?: unknown; dataFim?: unknown; datafim?: unknown };
     const data = typeof r.data === 'string' ? parseDateBR(r.data) : null;
     const valor = typeof r.valor === 'number' ? r.valor : typeof r.valor === 'string' && /^-?\d+(?:[.,]\d+)?$/.test(r.valor.trim()) ? Number(r.valor.trim().replace(',', '.')) : NaN;
     if (!data || !Number.isFinite(valor)) continue;
-    const fim = typeof r.datafim === 'string' ? parseDateBR(r.datafim) : null;
+    const fimBruto = typeof r.dataFim === 'string' ? r.dataFim : r.datafim;
+    const fim = typeof fimBruto === 'string' ? parseDateBR(fimBruto) : null;
     linhas.push({ data, valor, fim });
   }
   return linhas.sort((a, b) => a.data.localeCompare(b.data));

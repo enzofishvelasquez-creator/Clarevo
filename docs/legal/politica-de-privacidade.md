@@ -56,11 +56,12 @@ Usamos esses dados para criar e proteger a conta, permitir que você entre, recu
 
 Tudo o que está nesta lista é digitado, importado ou confirmado por você. A Clarevo não busca esses dados em bancos.
 
-- Gastos e recebimentos: valor, data, descrição (até 80 caracteres), categoria e a conta de origem.
+- Gastos e recebimentos: valor, data, descrição (até 80 caracteres), categoria, a subcategoria do gasto, se você escolher uma (da lista ou escrita por você, até 30 caracteres), e a conta de origem.
 - Contas a pagar, gastos fixos, parcelamentos e contas do ano: descrição, valor, vencimento e categoria.
 - Contas de origem do dinheiro: só o nome que você escolhe e o tipo (conta bancária, dinheiro ou outra). Não há número de conta, agência nem saldo.
 - Cartões de crédito: apelido (até 30 caracteres), os 4 últimos dígitos (opcional), os dias de fechamento e de vencimento e o limite (opcional). Também as compras, as parcelas, os encargos, os estornos e os pagamentos de fatura.
-- Metas, aportes e resgates, os investimentos que você registra (o nome que você escolhe, o tipo e, se você preencher, o tipo exato, o nome da instituição, como rende, a taxa, o vencimento e quando pode resgatar; os aportes, os resgates, os rendimentos recebidos com o tipo de cada um e os valores do extrato), a resposta do plano de guardar, a renda de referência, o orçamento por categoria, o limite pessoal de comprometimento e as assinaturas que você marca.
+- As ligações que você faz: o gasto ligado à conta a pagar, à parcela ou à fatura que ele pagou, e o recebimento ligado ao investimento que rendeu o valor.
+- Metas, aportes e resgates, os investimentos que você registra (o nome que você escolhe, o tipo e, se você preencher, o tipo exato, uma descrição livre, o nome da instituição, como rende, a taxa e a condição dela, a data em que a taxa muda e a taxa de depois, como em "120% do CDI até 31/03/2027, depois 100%", o vencimento e quando pode resgatar; os aportes, os resgates, os rendimentos recebidos com o tipo de cada um e os valores do extrato), a resposta do plano de guardar, a renda de referência, o orçamento por categoria, o limite pessoal de comprometimento e as assinaturas que você marca.
 - A imagem de cada meta, se você escolher: uma das imagens sugeridas pela Clarevo ou uma foto sua. A foto é reduzida no seu aparelho antes de enviar (até 300 KB), fica guardada com a meta, só para quem vê a meta (na Família, todas as pessoas do espaço), e é apagada quando você troca a imagem, exclui a meta ou exclui a conta. Escolha uma foto que você pode compartilhar; evite fotos com documentos ou com outras pessoas que não querem aparecer.
 - A foto do seu perfil, se você quiser pôr uma, escolhida na galeria ou tirada com a câmera. Ela é recortada quadrada e reduzida no seu aparelho antes de enviar (até 150 KB), fica guardada só para você (ninguém da Família nem da empresa vê) e é apagada quando você remove a foto ou exclui a conta.
 - Marcas que você faz, como "Conferi este mês" e as escolhas da revisão dos últimos meses.
@@ -71,7 +72,7 @@ Usamos esses dados para mostrar o seu mês (Recebido, Pago, o que ainda vai venc
 
 Descrições, apelidos e nomes são campos livres. Não escreva neles o que você não quer guardar, como senhas. Se anotar o nome de outra pessoa, como em "Pix para Maria", anote só o necessário.
 
-A Clarevo não pede dados pessoais sensíveis (como saúde, religião ou biometria). Mas categorias como "Saúde" e as descrições livres podem, por escolha sua, indicar esse tipo de informação. [A DEFINIR: confirmar o enquadramento de categoria e descrição livre frente aos dados pessoais sensíveis da LGPD]
+A Clarevo não pede dados pessoais sensíveis (como saúde, religião ou biometria). Mas categorias como "Saúde", as subcategorias e as descrições livres podem, por escolha sua, indicar esse tipo de informação. [A DEFINIR: confirmar o enquadramento de categoria, subcategoria e descrição livre frente aos dados pessoais sensíveis da LGPD]
 
 ### 3.3 Família
 
@@ -264,8 +265,8 @@ Estão previstos, mas ainda não ligados:
 Estas informações ficam só no seu aparelho (no armazenamento do app, ou no navegador, na versão web) e não vão para a Clarevo:
 
 - a sessão, para você não precisar entrar toda vez;
-- as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, e avisos que você dispensou (inclusive, [PROPOSTA: o dia em que você começou a usar o app neste aparelho e o "Agora não" da pergunta da seção 3.6]);
-- memórias para preencher mais rápido: a descrição e a categoria da última nota de cada loja (a loja é identificada pelo resumo do CNPJ, até 50 lojas), o mesmo para o nome lido de comprovantes (pelo resumo do nome, até 50) e as categorias que você escolheu na importação de extrato (até 300 entradas);
+- as suas preferências: lembretes e horário, ocultar valores, biometria ao abrir, forma de apresentação das categorias, "Primeiros passos", a última forma de pagamento e a última conta usadas, avisos que você dispensou (inclusive, [PROPOSTA: o dia em que você começou a usar o app neste aparelho e o "Agora não" da pergunta da seção 3.6]), o adiamento ou a pausa dos lembretes de investimentos, o dia em que você abriu o plano de aportes por último e as datas dos convites para rever o plano e para rever as metas;
+- memórias para preencher mais rápido: a descrição e a categoria da última nota de cada loja (a loja é identificada pelo resumo do CNPJ, até 50 lojas), o mesmo para o nome lido de comprovantes (pelo resumo do nome, até 50), as categorias que você escolheu na importação de extrato (até 300 entradas) e a lista dos nomes de subcategoria que você escreveu em "Outra", para aparecerem nas opções deste aparelho (a subcategoria de cada gasto vai com o gasto, seção 3.2);
 - o último nível da conta já mostrado neste aparelho e o último aviso de queda do nível dispensado, para a comemoração e o aviso não se repetirem;
 - a escolha do tema (claro, escuro ou igual ao aparelho);
 - lembretes de contas a pagar, que são notificações agendadas no aparelho. Na tela bloqueada eles não mostram valor nem descrição, e o app não guarda token de notificação remota;

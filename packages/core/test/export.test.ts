@@ -148,6 +148,7 @@ describe('CSV de lançamentos (D-047)', () => {
       rec({ id: 'r1', occurredOn: '2026-09-01', description: 'Salário', kind: 'receita', category: 'Salário', amountCents: 600_000 }),
       rec({ id: 'r3', occurredOn: '2026-10-06', description: '=CMD()', category: null, amountCents: 5 }),
       rec({ id: 'r4', occurredOn: '2026-10-07', description: 'Fatura Cartão Exemplo (novembro)', amountCents: 55_000, invoice: { cardId: 'k1', month: '2026-11' }, commitmentId: 'cm-fatura' }),
+      rec({ id: 'r5', occurredOn: '2026-10-08', description: 'Aluguel', category: 'Moradia', subcategory: 'Aluguel', amountCents: 250_000 }),
     ],
     CTX,
   );
@@ -156,8 +157,8 @@ describe('CSV de lançamentos (D-047)', () => {
     const csv = buildRecordsCsv(rows);
     expect(csv.charCodeAt(0)).toBe(0xfeff);
     expect(new TextEncoder().encode(csv).slice(0, 3)).toEqual(new Uint8Array([0xef, 0xbb, 0xbf]));
-    expect(csv.slice(1).split(CSV_EOL)[0]).toBe('Data;Tipo;Descrição;Categoria;Valor (R$);Banco ou carteira;Origem;Mês do resumo');
-    expect(CSV_RECORD_HEADER).toHaveLength(8);
+    expect(csv.slice(1).split(CSV_EOL)[0]).toBe('Data;Tipo;Descrição;Categoria;Subcategoria;Valor (R$);Banco ou carteira;Origem;Mês do resumo');
+    expect(CSV_RECORD_HEADER).toHaveLength(9);
     expect(csv.endsWith(CSV_EOL)).toBe(true);
     expect(csv.split(CSV_EOL)).toHaveLength(rows.length + 2);
     // Nenhum caractere de controle solto, nem separador de linha no meio do texto.
@@ -166,14 +167,34 @@ describe('CSV de lançamentos (D-047)', () => {
 
   it('uma linha por lançamento, do mais antigo ao mais novo, com data dd/mm/aaaa, valor positivo e rótulos em português', () => {
     const parsed = parseCsv(buildRecordsCsv(rows));
-    expect(parsed).toHaveLength(5);
-    expect(parsed[1]).toEqual(['01/09/2026', 'Recebimento', 'Salário', 'Salário', '6000,00', 'Conta principal', 'Anotado', '09/2026']);
-    expect(parsed[2]).toEqual(['06/10/2026', 'Gasto', 'Mercado; feira "boa"', 'Moradia', '1400,00', 'Conta principal', 'Anotado', '10/2026']);
-    expect(parsed[3]).toEqual(['06/10/2026', 'Gasto', "'=CMD()", 'Sem categoria', '0,05', 'Conta principal', 'Anotado', '10/2026']);
-    expect(parsed[4]).toEqual(['07/10/2026', 'Pagamento de fatura', 'Fatura Cartão Exemplo (novembro)', 'Moradia', '550,00', 'Conta principal', 'Fatura', '10/2026']);
-    for (const line of parsed.slice(1)) expect(line).toHaveLength(8);
+    expect(parsed).toHaveLength(6);
+    expect(parsed[1]).toEqual(['01/09/2026', 'Recebimento', 'Salário', 'Salário', '', '6000,00', 'Conta principal', 'Anotado', '09/2026']);
+    expect(parsed[2]).toEqual(['06/10/2026', 'Gasto', 'Mercado; feira "boa"', 'Moradia', '', '1400,00', 'Conta principal', 'Anotado', '10/2026']);
+    expect(parsed[3]).toEqual(['06/10/2026', 'Gasto', "'=CMD()", 'Sem categoria', '', '0,05', 'Conta principal', 'Anotado', '10/2026']);
+    expect(parsed[4]).toEqual(['07/10/2026', 'Pagamento de fatura', 'Fatura Cartão Exemplo (novembro)', 'Moradia', '', '550,00', 'Conta principal', 'Fatura', '10/2026']);
+    expect(parsed[5]).toEqual(['08/10/2026', 'Gasto', 'Aluguel', 'Moradia', 'Aluguel', '2500,00', 'Conta principal', 'Anotado', '10/2026']);
+    for (const line of parsed.slice(1)) expect(line).toHaveLength(9);
     // Nenhum valor negativo: o tipo diz se é gasto ou recebimento.
-    for (const line of parsed.slice(1)) expect(line[4]).not.toMatch(/^-/);
+    for (const line of parsed.slice(1)) expect(line[5]).not.toMatch(/^-/);
+  });
+
+  it('a subcategoria (D-107) vem logo depois da categoria, vazia quando não há, com a mesma proteção do resto do texto da pessoa', () => {
+    expect(CSV_RECORD_HEADER.indexOf('Subcategoria')).toBe(CSV_RECORD_HEADER.indexOf('Categoria') + 1);
+    const own = exportRows(
+      [
+        rec({ id: 's1', occurredOn: '2026-10-01', category: 'Mercado', subcategory: 'Feira' }),
+        rec({ id: 's2', occurredOn: '2026-10-02', category: 'Lazer', subcategory: '=1+1' }),
+        rec({ id: 's3', occurredOn: '2026-10-03', category: 'Lazer', subcategory: 'Bar; "happy"' }),
+        rec({ id: 's4', occurredOn: '2026-10-04', category: 'Lazer', subcategory: null }),
+        rec({ id: 's5', occurredOn: '2026-10-05', category: 'Lazer' }),
+      ],
+      CTX,
+    );
+    expect(own.map((r) => r.subcategory)).toEqual(['Feira', '=1+1', 'Bar; "happy"', '', '']);
+    const csv = buildRecordsCsv(own);
+    expect(csv.split(CSV_EOL)).toContain('01/10/2026;Gasto;Luz;Mercado;Feira;10,00;Conta principal;Anotado;10/2026');
+    expect(csv.split(CSV_EOL)).toContain('04/10/2026;Gasto;Luz;Lazer;;10,00;Conta principal;Anotado;10/2026');
+    expect(parseCsv(csv).slice(1).map((line) => line[4])).toEqual(['Feira', "'=1+1", 'Bar; "happy"', '', '']);
   });
 
   it('o CSV nunca leva id, autoria nem chave de nota', () => {
@@ -364,8 +385,10 @@ describe('leitura (D-047)', () => {
     ]);
     expect(records).toHaveLength(7);
     const aluguel = records.find((r) => r[0] === '05/10/2026')!;
-    expect(aluguel).toEqual(['05/10/2026', 'Gasto', 'Aluguel', 'Moradia', '2500,00', 'Conta principal', 'Gasto fixo', '10/2026']);
-    expect(records.find((r) => r[0] === '06/10/2026')).toEqual(['06/10/2026', 'Gasto', 'Mercado', 'Mercado', '1400,00', 'Carteira', 'Anotado', '10/2026']);
+    expect(aluguel).toEqual(['05/10/2026', 'Gasto', 'Aluguel', 'Moradia', '', '2500,00', 'Conta principal', 'Gasto fixo', '10/2026']);
+    expect(records.find((r) => r[0] === '06/10/2026')).toEqual(['06/10/2026', 'Gasto', 'Mercado', 'Mercado', '', '1400,00', 'Carteira', 'Anotado', '10/2026']);
+    // Subcategoria (D-107): o aluguel de setembro da demonstração tem "Aluguel" em Moradia.
+    expect(records.find((r) => r[0] === '05/09/2026')).toEqual(['05/09/2026', 'Gasto', 'Aluguel', 'Moradia', 'Aluguel', '2500,00', 'Conta principal', 'Anotado', '09/2026']);
     const purchases = parseCsv(built.files[1]!.content);
     expect(purchases).toHaveLength(4);
     expect(purchases.find((r) => r[2] === 'Notebook')).toEqual(['05/10/2026', 'Cartão Exemplo (final 1234)', 'Notebook', 'Educação', '1500,00', '10']);

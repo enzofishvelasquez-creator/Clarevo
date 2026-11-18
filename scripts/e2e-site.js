@@ -67,7 +67,7 @@ const SGS = {
   'bcdata.sgs.432/': [{ data: '22/10/2026', valor: '15.00' }, { data: '23/10/2026', valor: '15.00' }],
   'bcdata.sgs.12/': [{ data: '22/10/2026', valor: '0.055131' }],
   'bcdata.sgs.433/': Array.from({ length: 12 }, (_, i) => ({ data: `01/${String(((9 + i) % 12) + 1).padStart(2, '0')}/${i < 3 ? 2025 : 2026}`, valor: '0.40' })),
-  'bcdata.sgs.195/': [{ data: '23/10/2026', datafim: '23/11/2026', valor: '0.6719' }],
+  'bcdata.sgs.195/': [{ data: '23/10/2026', dataFim: '23/11/2026', valor: '0.6719' }],
   'bcdata.sgs.1/': [{ data: '22/10/2026', valor: '5.3870' }],
 };
 /** Uma edição de teste do resumo semanal (temas permitidos, resumo próprio, link simples). */

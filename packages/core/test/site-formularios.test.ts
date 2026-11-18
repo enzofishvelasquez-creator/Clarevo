@@ -626,7 +626,7 @@ describe('site público: _worker.js, /api/indicadores (Banco Central, D-106)', (
     'bcdata.sgs.432/': [{ data: '17/11/2026', valor: '15.00' }],
     'bcdata.sgs.12/': [{ data: '14/11/2026', valor: '0.055131' }],
     'bcdata.sgs.433/': Array.from({ length: 12 }, (_, i) => ({ data: `01/${String(((10 + i) % 12) + 1).padStart(2, '0')}/${i < 2 ? 2025 : 2026}`, valor: '0.40' })),
-    'bcdata.sgs.195/': [{ data: '17/11/2026', datafim: '17/12/2026', valor: '0.6719' }],
+    'bcdata.sgs.195/': [{ data: '17/11/2026', dataFim: '17/12/2026', valor: '0.6719' }],
     'bcdata.sgs.1/': [{ data: '14/11/2026', valor: '5.3870' }],
   };
   /** Um worker novo a cada caso (a cópia de uma hora fica na memória do módulo): a fonte ganha um comentário diferente. */

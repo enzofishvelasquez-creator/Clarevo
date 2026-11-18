@@ -1,4 +1,28 @@
 {
-  "consultadoEm": null,
-  "valores": {}
+  "consultadoEm": "2026-11-18T14:38:47.670Z",
+  "valores": {
+    "selic": {
+      "valor": 13.75,
+      "data": "2026-11-18"
+    },
+    "cdi": {
+      "valor": 13.65,
+      "data": "2026-11-17",
+      "dia": 0.050788
+    },
+    "ipca": {
+      "valor": 4.63,
+      "data": "2026-10-01",
+      "mes": 0.14
+    },
+    "ptax": {
+      "valor": 5.7851,
+      "data": "2026-11-17"
+    },
+    "poupanca": {
+      "valor": 0.6701,
+      "data": "2026-11-17",
+      "fim": "2026-12-17"
+    }
+  }
 }
