@@ -930,7 +930,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Em ${q(BUSINESS_TEXT.overviewTitle)}, veja quanto entrou, saiu e sobrou no mês e nos últimos meses, e as maiores saídas.`,
       `Quando levar dinheiro do negócio para casa, use ${q(BUSINESS_TEXT.withdraw)}: o valor sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.`,
       `Anotou no lugar errado? No detalhe do lançamento, toque em ${q(BUSINESS_TEXT.moveToBusiness)} ou ${q(BUSINESS_TEXT.moveToPersonal)}.`,
-      'Metas e investimentos ficam no Pessoal. Pelo WhatsApp e pelo Telegram, as anotações vão para o Pessoal.',
+      `Metas e investimentos ficam no Pessoal. ${BUSINESS_TEXT.chatNote}`,
     ],
     screenName: BUSINESS_TEXT.overviewTitle,
     href: '/negocio',

@@ -66,6 +66,8 @@ export default function BuscarScreen() {
   const [notice] = useFlash();
   const personal = useWork().data;
   const contextId = personal?.contextId;
+  // As categorias do espaço (D-113a): no negócio, as do negócio.
+  const contextKind = personal?.contextKind ?? 'pessoal';
   const accounts = useAccounts(contextId);
   const cards = useCards(contextId);
 
@@ -87,17 +89,17 @@ export default function BuscarScreen() {
   // O rascunho lido só muda com os campos que valem (o texto e os valores, depois do instante parado): `params` é o mesmo objeto
   // enquanto nada disso muda, e é ele que a conferência e a soma abaixo usam como chave.
   const parsed = useMemo(
-    () => searchFromDraft({ text, min, max, kind: draft.kind, period: draft.period, category: draft.category, accountId: draft.accountId }),
-    [text, min, max, draft.kind, draft.period, draft.category, draft.accountId],
+    () => searchFromDraft({ text, min, max, kind: draft.kind, period: draft.period, category: draft.category, accountId: draft.accountId }, contextKind),
+    [text, min, max, draft.kind, draft.period, draft.category, draft.accountId, contextKind],
   );
   const params = parsed.ok ? parsed.params : null;
   const errors = parsed.ok ? {} : parsed.errors;
   const search = useRecordSearch(contextId, params);
 
-  const category = effectiveSearchCategory(draft.kind, draft.category);
+  const category = effectiveSearchCategory(draft.kind, draft.category, contextKind);
   const accountOptions = accounts.data ? searchAccountOptions(accounts.data) : [];
   const accountId = accountOptions.some((o) => o.id === draft.accountId) ? draft.accountId : null;
-  const activeFilters = moreFiltersActive({ ...draft, accountId });
+  const activeFilters = moreFiltersActive({ ...draft, accountId }, contextKind);
   const showMore = expanded || Boolean(errors.min) || Boolean(errors.max);
 
   // A conferência do texto nas até 1.000 linhas e a soma só se refazem quando o resultado ou os filtros valem de novo (não a cada tecla
@@ -204,7 +206,7 @@ export default function BuscarScreen() {
             <View style={{ gap: space[4] }}>
               <ChoiceGroup label={T.categoryLabel}>
                 <Chip label={T.categoryAll} selected={category === null} onPress={() => update({ category: null })} />
-                {searchCategoryOptions(draft.kind).map((c) => (
+                {searchCategoryOptions(draft.kind, contextKind).map((c) => (
                   <Chip key={c} label={c} selected={category === c} onPress={() => update({ category: c })} />
                 ))}
               </ChoiceGroup>

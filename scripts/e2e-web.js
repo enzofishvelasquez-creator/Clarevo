@@ -8541,17 +8541,17 @@ setInterval(async () => {
   await j1Keep();
   await j1Widths(async (w) => { await layoutChecks(`tutorial aprender com o guia ${w}px`); await shot(w === 390 ? '320_aprender_como_usar' : '320_aprender_como_usar_320px'); });
 
-  // ---- 7. A lista do guia: cinco grupos, trinta e nove entradas ("Assinatura e teste grátis", D-083, 28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Análises", D-059, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, "Excluir minha conta", D-058, "Ler comprovante, holerite ou nota de serviço" e "Ler boleto", D-078 e D-079, e "Anotar pelo Telegram", D-081) ----
+  // ---- 7. A lista do guia: cinco grupos, quarenta e duas entradas ("Espaço Negócio", D-113, "Assinatura e teste grátis", D-083, 28 do D-049, "Seu mês em 30 segundos", D-052, "Evolução", D-057, "Análises", D-059, "Família", D-055, "Painel da empresa" e "Benefício pela empresa", D-056, "Excluir minha conta", D-058, "Ler comprovante, holerite ou nota de serviço" e "Ler boleto", D-078 e D-079, e "Anotar pelo Telegram", D-081) ----
   await p.getByRole('button', { name: 'Como usar o app da Clarevo. Onde fica cada função e como usar, passo a passo.', exact: true }).filter({ visible: true }).first().click(); await waitText('Ver o tour de novo');
   const j1Groups = () => p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((h) => h.getBoundingClientRect().width > 0).map((h) => ({
     title: h.textContent, rows: [...h.parentElement.parentElement.querySelectorAll('[role=button]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('aria-label') || b.textContent) })));
   const j1G = await j1Groups();
   ok('Tutorial guia: /aprender/guia com o título "Como usar o app da Clarevo", a barra inferior (Aprender marcada) e o botão "Ver o tour de novo"', j1Path() === '/aprender/guia' && (await h1Name()) === 'Como usar o app da Clarevo' &&
     (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await visibleCount('button', 'Ver o tour de novo')) === 1);
-  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 9, 2 e 11 entradas (Conta e privacidade ganhou "Nível da conta", Planejar ganhou "Investimentos", Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa", "Anotar pelo Telegram" e "Assinatura e teste grátis")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
-    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 9, 2, 11]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
+  ok('Tutorial guia: cinco grupos nesta ordem (Dia a dia, Contas e cartões, Planejar, Aprender e ajuda, Conta e privacidade), com 11, 8, 9, 2 e 12 entradas (Conta e privacidade ganhou "Espaço Negócio", D-113, e "Nível da conta", Planejar ganhou "Investimentos", Dia a dia ganhou "Seu mês em 30 segundos", "Evolução", "Análises" e "Ler comprovante, holerite ou nota de serviço", Contas e cartões ganhou "Ler boleto" e Conta e privacidade ganhou "Família", "Painel da empresa", "Benefício pela empresa", "Anotar pelo Telegram" e "Assinatura e teste grátis")', JSON.stringify(j1G.map((g) => g.title)) === JSON.stringify(['Dia a dia', 'Contas e cartões', 'Planejar', 'Aprender e ajuda', 'Conta e privacidade']) &&
+    JSON.stringify(j1G.map((g) => g.rows.length)) === JSON.stringify([11, 8, 9, 2, 12]), JSON.stringify(j1G.map((g) => [g.title, g.rows.length])));
   const j1Rows = j1G.flatMap((g) => g.rows);
-  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 41 &&
+  ok('Tutorial guia: cada linha tem o nome acessível "{título}. {para que serve}" (as funções novas: Buscar, Exportar e Importar)', j1Rows.length === 42 &&
     j1Rows.includes('Buscar em Movimentos. Acha um gasto ou recebimento em todos os meses e mostra quanto deu no período.') &&
     j1Rows.includes('Exportar meus dados. Leva seus gastos e recebimentos para uma planilha (CSV) ou para um resumo em PDF, montado neste aparelho.') &&
     j1Rows.some((r) => r.startsWith('Importar extrato ou fatura. Traz gastos, recebimentos e compras no cartão de um arquivo do banco')) &&
@@ -16753,7 +16753,13 @@ setInterval(async () => {
     t = await body();
     const ngHiddenLabels = await p.evaluate(() => [...document.querySelectorAll('[aria-label]')].filter((e) => e.getBoundingClientRect().width > 0 && /R\$ \d/.test(e.getAttribute('aria-label') || '')).map((e) => e.getAttribute('aria-label')).slice(0, 3));
     ok('Negócio, valores ocultos: nenhum valor em reais à vista nem nos nomes acessíveis (R$ ••••)', !/R\$ \d/.test(t) && t.includes('R$ ••••') && ngHiddenLabels.length === 0, `${ngHiddenLabels.join(' | ')} ${t.slice(0, 300)}`);
+    // D-113a: com os valores ocultos, nada diz se entrou ou saiu a mais (a frase do mês e a do período somem; o nome acessível sem "menos").
+    const ngHiddenDir = await p.evaluate(() => [...document.querySelectorAll('[aria-label]')].filter((e) => e.getBoundingClientRect().width > 0 && /\bmenos\b|a mais do que/.test(e.getAttribute('aria-label') || '')).map((e) => e.getAttribute('aria-label')).slice(0, 3));
+    ok('Negócio, valores ocultos (D-113a): nenhuma frase diz se entrou ou saiu a mais, nem no período, nem nos nomes acessíveis',
+      !t.includes('a mais do que') && !t.includes('entrou mais do que saiu') && !t.includes('saiu mais do que entrou') && ngHiddenDir.length === 0 && t.includes('Últimos meses'), `${ngHiddenDir.join(' | ')} ${t.slice(0, 400)}`);
     await btn('Voltar').click(); await ngToResumo();
+    t = await body();
+    ok('Negócio, valores ocultos (D-113a): o card do Resumo do negócio fica sem a frase do mês', t.includes('Como está o negócio') && !t.includes('a mais do que'), t.slice(0, 500));
     await btn('Mostrar valores').click(); await p.waitForTimeout(300);
 
     // 4. Retirada para o Pessoal.
@@ -16834,6 +16840,39 @@ setInterval(async () => {
     ok('Negócio: "Ir para o Pessoal" troca o espaço e mostra os investimentos do Pessoal', (await body()).includes('Seus investimentos hoje'));
     await ngToResumo();
     ok('Negócio: depois de "Ir para o Pessoal", o seletor está no Pessoal', JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:true', `${NG_TAB}:false`]), JSON.stringify(await ngSpaceTabs()));
+
+    // 6a. Correções da revisão (D-113a): no negócio, a busca oferece as categorias do negócio, a Evolução não oferece "Criar meta" (o
+    // banco recusa meta no negócio) e "Descartar o preenchimento?" diz o nome do negócio.
+    await ngTab(NG_TAB).click(); await p.waitForTimeout(500);
+    await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(500);
+    await h1More();
+    const ngSearchCats = await h1Group('Categoria').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent));
+    ok('Negócio (D-113a): a busca no negócio oferece as categorias do negócio (as nove de saída e as três de entrada), sem as do Pessoal',
+      JSON.stringify(ngSearchCats) === JSON.stringify(['Todas', ...NG_OUT.slice(1), 'Vendas', 'Serviços', 'Outras entradas', 'Sem categoria']), JSON.stringify(ngSearchCats));
+    await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+    await evOpen(); await f3Pick('Guardado em metas');
+    t = await ngKeep();
+    ok('Negócio (D-113a): na Evolução do negócio, "Guardado em metas" explica que as metas ficam no Pessoal e na Família, sem "Criar meta"',
+      t.includes('Metas ficam no Pessoal e na Família. O espaço Negócio é só para o que entra e sai do negócio.') && (await visibleCount('button', 'Criar meta')) === 0, t.slice(0, 700));
+    await evBack();
+    await ngToResumo();
+    await btn('Anotar gasto').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
+    await field('Valor em reais').fill('12');
+    await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
+    ok('Negócio (D-113a): "Descartar o preenchimento?" no negócio diz o nome do negócio', (await dialogText()).includes(`Você tem alterações que ainda não foram salvas em ${NG}.`), await dialogText());
+    await btn('Descartar alterações').click(); await p.waitForTimeout(400);
+    // Ler um holerite no negócio: o valor e a descrição entram, mas a categoria "Salário" (do Pessoal) não.
+    await i2NewIncome();
+    await i2ReadIncome(i2Holerite);
+    const ngHol = await i2Values('Data do recebimento');
+    const ngHolChecked = await p.evaluate(() => [...document.querySelectorAll('[role=radiogroup][aria-label="Categoria"] [role=radio][aria-checked="true"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || e.textContent));
+    ok('Negócio (D-113a): ler um holerite no negócio preenche o valor líquido, mas não escolhe "Salário", que não é categoria do negócio',
+      ngHol.amount === '2.345,67' && (await radio('Salário').count()) === 0 && ngHolChecked.every((c) => c === 'Sem categoria') && (await body()).includes(`Demonstração · ${NG}`),
+      `${JSON.stringify(ngHol)} ${JSON.stringify(ngHolChecked)}`);
+    await i2Leave();
+    await ngToResumo();
+    await ngTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
 
     // 7. Mudar o nome e encerrar.
     await ngTab(NG_TAB).click(); await p.waitForTimeout(500);

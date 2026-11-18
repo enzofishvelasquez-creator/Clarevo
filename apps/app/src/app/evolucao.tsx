@@ -18,6 +18,7 @@ import {
   phase3ClosedMonths,
   phase3Empty,
   phase3Panel,
+  type ContextKind,
   type EvolutionPhase3Metric,
   type EvolutionSelectionMetric,
   type EvolutionView,
@@ -212,7 +213,7 @@ export default function EvolucaoScreen() {
             <ErrorState message={T.loadError} retryLabel={T.retry} onRetry={retry} />
           </Card>
         ) : phase3View && view.situation === 'sem_registros' ? (
-          <Phase3EmptyCard view={phase3View} canWrite={canWrite} referenceFrom={phase3ClosedMonths(windowMonthsList, currentMonth)[0] ?? currentMonth} />
+          <Phase3EmptyCard view={phase3View} canWrite={canWrite} context={work.data?.contextKind ?? 'pessoal'} referenceFrom={phase3ClosedMonths(windowMonthsList, currentMonth)[0] ?? currentMonth} />
         ) : !phase3View && view.situation === 'sem_registros' && (metric === 'recebido' || metric === 'pago') ? (
           <Card>
             <EmptyState
@@ -270,8 +271,9 @@ export default function EvolucaoScreen() {
  * renda de referência" abre o formulário com o mês fechado mais antigo da janela (`referenceFrom`) como início, para a referência cobrir os
  * meses do gráfico (sem ele, o formulário começaria no mês atual e a Evolução seguiria sem base).
  */
-function Phase3EmptyCard({ view, canWrite, referenceFrom }: { view: EvolutionView<EvolutionPhase3Metric>; canWrite: boolean; referenceFrom: IsoMonth }) {
-  const empty = phase3Empty(view, canWrite);
+function Phase3EmptyCard({ view, canWrite, context, referenceFrom }: { view: EvolutionView<EvolutionPhase3Metric>; canWrite: boolean; context: ContextKind; referenceFrom: IsoMonth }) {
+  // No negócio, o Guardado em metas não oferece "Criar uma meta" (metas ficam no Pessoal e na Família, D-113a).
+  const empty = phase3Empty(view, canWrite, context);
   const go = (kind: 'referencia' | 'conta' | 'meta') => {
     if (kind === 'referencia') router.push({ pathname: '/renda-comprometida/referencia', params: { mes: referenceFrom } });
     else if (kind === 'conta') router.push('/a-pagar/nova');

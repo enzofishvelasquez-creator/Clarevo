@@ -39,6 +39,12 @@ import {
   unsavedChangesText,
   validateWithdrawalDraft,
   withdrawalDescriptions,
+  effectiveSearchCategory,
+  moreFiltersActive,
+  NO_CATEGORY_LABEL,
+  searchCategoryOptions,
+  searchFromDraft,
+  type BusinessMonth,
   type FinancialRecord,
 } from '../src';
 
@@ -503,5 +509,60 @@ describe('demonstração: o negócio de exemplo não muda o Pessoal', () => {
     // Os cenários de retorno e da Evolução não têm negócio.
     expect(await (await createDemoRepository({ scenario: 'retorno' })).getBusiness()).toBeNull();
     expect(await (await createDemoRepository({ scenario: 'evolucao' })).getBusiness()).toBeNull();
+  });
+});
+
+describe('correções da revisão independente (D-113a)', () => {
+  const month = (leftCents: number): BusinessMonth => ({
+    month: '2026-10',
+    inCents: 10_000,
+    outCents: 10_000 - leftCents,
+    leftCents,
+    withdrawnCents: 0,
+    keptCents: leftCents,
+    recordCount: 2,
+  });
+
+  it('valores ocultos: o nome acessível da linha do mês não diz "menos" (o valor vira "valor oculto" na tela)', () => {
+    expect(BUSINESS_TEXT.monthRowA11y(month(-30_000))).toBe('outubro de 2026: entrou R$ 100,00, saiu R$ 400,00, sobrou menos R$ 300,00');
+    const hidden = BUSINESS_TEXT.monthRowA11y(month(-30_000), true);
+    expect(hidden).not.toContain('menos');
+    expect(hidden).toBe('outubro de 2026: entrou R$ 100,00, saiu R$ 400,00, sobrou R$ 300,00');
+    expect(BUSINESS_TEXT.monthRowA11y(month(5_000), true)).toBe(BUSINESS_TEXT.monthRowA11y(month(5_000)));
+  });
+
+  it('a busca no negócio oferece as categorias do negócio, e uma categoria do Pessoal não vale lá', () => {
+    expect(searchCategoryOptions('despesa', 'negocio')).toEqual([...BUSINESS_CATEGORIES.despesa, NO_CATEGORY_LABEL]);
+    expect(searchCategoryOptions('receita', 'negocio')).toEqual([...BUSINESS_CATEGORIES.receita, NO_CATEGORY_LABEL]);
+    expect(searchCategoryOptions('todos', 'negocio')).toEqual([...BUSINESS_CATEGORIES.despesa, ...BUSINESS_CATEGORIES.receita, NO_CATEGORY_LABEL]);
+    expect(searchCategoryOptions('despesa', 'familia')).toEqual(searchCategoryOptions('despesa'));
+    expect(effectiveSearchCategory('despesa', 'Mercado', 'negocio')).toBeNull();
+    expect(effectiveSearchCategory('despesa', 'Impostos e DAS', 'negocio')).toBe('Impostos e DAS');
+    expect(effectiveSearchCategory('despesa', 'Impostos e DAS')).toBeNull();
+    const draft = { text: '', kind: 'despesa' as const, period: '3m' as const, category: 'Impostos e DAS', accountId: null, min: '', max: '' };
+    const inBusiness = searchFromDraft(draft, 'negocio');
+    expect(inBusiness.ok && inBusiness.params.category).toBe('Impostos e DAS');
+    const inPersonal = searchFromDraft(draft);
+    expect(inPersonal.ok && inPersonal.params.category).toBeNull();
+    expect(moreFiltersActive(draft, 'negocio')).toBe(1);
+    expect(moreFiltersActive(draft)).toBe(0);
+  });
+
+  it('"Descartar o preenchimento?" no negócio diz o nome do negócio', () => {
+    expect(unsavedChangesText('negocio', 'Sacolé da Mãe')).toBe('Você tem alterações que ainda não foram salvas em Sacolé da Mãe.');
+    expect(unsavedChangesText('negocio', null)).toBe('Você tem alterações que ainda não foram salvas em Negócio.');
+    expect(unsavedChangesText('pessoal')).toBe('Você tem alterações que ainda não foram salvas em Pessoal.');
+  });
+
+  it('WhatsApp e Telegram: a frase diz que não anotam no negócio (o canal pode estar ligado à Família), e o código de ligar recusa o negócio', async () => {
+    expect(BUSINESS_TEXT.chatNote).toBe('O WhatsApp e o Telegram não anotam no espaço Negócio.');
+    const entry = guideEntry('negocio')!;
+    expect(entry.steps.at(-1)).toContain(BUSINESS_TEXT.chatNote);
+    for (const t of [BUSINESS_TEXT.chatNote, ...entry.steps]) expect(t).not.toContain('vão para o Pessoal');
+    const { repo, personal } = await person();
+    const b = await repo.createBusiness(newOperationKey(), 'Sacolé da Bia');
+    expect(await code(repo.createChatCode('telegram', newOperationKey(), b.id))).toBe('contexto_invalido');
+    expect(await code(repo.createChatCode('whatsapp', newOperationKey(), b.id))).toBe('contexto_invalido');
+    expect((await repo.createChatCode('telegram', newOperationKey(), personal)).contextId).toBe(personal);
   });
 });

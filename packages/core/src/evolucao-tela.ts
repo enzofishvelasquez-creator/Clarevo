@@ -1,3 +1,4 @@
+import { BUSINESS_TEXT } from './business';
 import { formatPermille } from './committed';
 import { addMonths, formatDateBR, formatMonthBR, formatMonthName, formatMonthSpanBR, formatMonthYearBR, monthOf, type IsoDate, type IsoMonth } from './dates';
 import {
@@ -21,7 +22,7 @@ import { formatTenths } from './learn/format';
 import { MONTH_CHECK_TEXT, monthCheckPlan, type MonthCheckPlan } from './month-check';
 import type { Cents } from './money';
 import { formatBRL } from './money';
-import type { Commitment, CommitmentSeries, MonthCheckKind, MonthOverview } from './records';
+import type { Commitment, CommitmentSeries, ContextKind, MonthCheckKind, MonthOverview } from './records';
 import type { RecordsRepository } from './repository';
 import { seriesGapsInRange } from './retorno';
 import type { CategoryShare } from './summary';
@@ -1269,11 +1270,13 @@ export interface Phase3Empty {
 /**
  * Tela sem mês fechado com valor (situação 'sem_registros' da fase 3). Na Renda comprometida, "Sem base" quando nenhum mês fechado tem
  * renda de referência, e "Sem registros" quando há renda mas nenhuma conta anotada. No Guardado em metas, "Sem registros" (nenhuma meta
- * ativa anotada). `canWrite`: quem só lê (Família) não recebe o botão.
+ * ativa anotada). `canWrite`: quem só lê (Família) não recebe o botão. `context`: no espaço Negócio (D-113a), o Guardado em metas diz que
+ * as metas ficam no Pessoal e na Família e não oferece "Criar uma meta" (o banco recusa meta no negócio).
  */
-export function phase3Empty(view: EvolutionView<EvolutionPhase3Metric>, canWrite: boolean): Phase3Empty {
+export function phase3Empty(view: EvolutionView<EvolutionPhase3Metric>, canWrite: boolean, context: ContextKind = 'pessoal'): Phase3Empty {
   const T = EVOLUTION_TEXT.phase3.empty;
   if (view.metric === 'guardado') {
+    if (context === 'negocio') return { title: T.noRecordsTitle, body: BUSINESS_TEXT.goalsHidden, action: null };
     return { title: T.noRecordsTitle, body: T.savingsBody, action: canWrite ? { kind: 'meta', label: T.savingsAction } : null };
   }
   const closed = view.points.filter((p) => p.month < view.currentMonth);

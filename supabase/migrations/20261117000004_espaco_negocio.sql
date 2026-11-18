@@ -37,6 +37,8 @@
 --      A retirada apagada de um lado só desfaz o vínculo do outro (on delete set null).
 --   7. A atividade não conta criar, renomear nem encerrar o negócio como anotação; encerrar vale mesmo em só ver e exportar (como
 --      encerrar a Família).
+--   8. (Revisão, D-113a) A retirada e o mover tomam a mesma trava de end_business antes de conferir (um negócio encerrado ao mesmo
+--      tempo não recebe nem perde lançamentos), e o código de ligar o WhatsApp ou o Telegram recusa o negócio (contexto_invalido).
 -- Compatibilidade: o app anterior lê só os contextos 'pessoal' e 'familia' (filtro por kind), então nunca vê o negócio; as funções que
 -- ele chama mantêm as assinaturas. O recebimento "Retirada do negócio" aparece no Pessoal como um recebimento comum; editar ou excluir
 -- por lá recebe retirada_ligada (o app anterior mostra "Não foi possível salvar"). Nenhum dado existente muda.
@@ -447,6 +449,9 @@ begin
     return public.clarevo_withdrawal_json(v_op.record_id, v_op.target_id);
   end if;
 
+  -- A mesma trava de end_business (e de rename_business), antes das conferências: um negócio encerrado ao mesmo tempo não recebe uma
+  -- retirada depois de encerrado (com a trava, as conferências abaixo já veem o encerramento).
+  perform pg_advisory_xact_lock(hashtext('familia:c:' || coalesce(p_business::text, '')));
   if p_business is null or not public.context_permission(p_business, 'read') then
     raise exception 'nao_encontrado' using errcode = 'P0002';
   end if;
@@ -582,6 +587,7 @@ declare
   v_r public.financial_records%rowtype;
   v_new public.financial_records%rowtype;
   v_personal uuid;
+  v_source uuid;
   v_acc public.financial_accounts%rowtype;
 begin
   if v_uid is null then
@@ -601,6 +607,16 @@ begin
     end if;
     select * into v_new from public.financial_records where id = v_op.record_id;
     return v_new;
+  end if;
+
+  -- A trava de end_business no negócio envolvido (o destino ou, voltando para o Pessoal, a origem), antes de travar o lançamento e de
+  -- conferir: um negócio encerrado ao mesmo tempo não recebe nem perde um lançamento depois de encerrado. O espaço de um lançamento não
+  -- muda (mover grava um lançamento novo), então ler a origem sem trava basta para escolher a trava.
+  select r.context_id into v_source from public.financial_records r where r.id = p_record;
+  if public.clarevo_is_business(p_target_context) then
+    perform pg_advisory_xact_lock(hashtext('familia:c:' || p_target_context::text));
+  elsif v_source is not null and public.clarevo_is_business(v_source) then
+    perform pg_advisory_xact_lock(hashtext('familia:c:' || v_source::text));
   end if;
 
   v_r := public.clarevo_lock_record(p_record);
@@ -1071,6 +1087,145 @@ begin
     'operacoes_resumidas', n_operations, 'pessoas_anonimas', n_persons);
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 15a. WhatsApp e Telegram fora do negócio (D-113a, revisão): gerar o código de ligar recusa o espaço Negócio (contexto_invalido, depois
+-- de sem_permissao, para quem é de fora não saber que é um negócio), e ligar com um código do negócio responde como sem permissão
+-- (apaga o código). As duas funções da 0022 (20261101000001_telegram.sql), com só essa mudança; os privilégios ficam os mesmos.
+-- ---------------------------------------------------------------------------
+create or replace function public.clarevo_chat_create_code(p_channel text, p_context_id uuid, p_key text)
+returns jsonb
+language plpgsql
+volatile
+set search_path = public, extensions
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_action text := 'gerar_codigo_' || p_channel;
+  v_hash text;
+  v_op public.record_operations%rowtype;
+  v_alphabet constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  v_bytes bytea;
+  v_code text := '';
+  v_expires timestamptz := now() + interval '15 minutes';
+  i integer;
+begin
+  perform public.clarevo_chat_check_channel(p_channel);
+  if v_uid is null then
+    raise exception 'nao_autenticado' using errcode = '42501';
+  end if;
+  perform public.clarevo_check_key(p_key);
+  v_hash := md5(jsonb_build_array(v_action, p_context_id)::text);
+  perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_key));
+
+  select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_key;
+  if found then
+    if v_op.action <> v_action or v_op.request_hash <> v_hash then
+      raise exception 'chave_reutilizada' using errcode = 'PT409';
+    end if;
+    return jsonb_build_object('code', null, 'context_id', v_op.context_id,
+                              'expires_at', (select c.expires_at from public.chat_link_codes c where c.person_id = v_uid and c.channel = p_channel));
+  end if;
+
+  if p_context_id is null or not public.context_permission(p_context_id, 'write') then
+    raise exception 'sem_permissao' using errcode = '42501';
+  end if;
+  -- D-113a: o WhatsApp e o Telegram não anotam no espaço Negócio (o app só oferece o Pessoal e a Família).
+  if public.clarevo_is_business(p_context_id) then
+    raise exception 'contexto_invalido' using errcode = '22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtext('chat:p:' || v_uid::text));
+
+  -- 8 bytes aleatórios, cada um em um dos 32 símbolos (256 é múltiplo de 32: sem viés).
+  v_bytes := gen_random_bytes(8);
+  for i in 0..7 loop
+    v_code := v_code || substr(v_alphabet, (get_byte(v_bytes, i) % 32) + 1, 1);
+  end loop;
+  insert into public.chat_link_codes as c (person_id, channel, code_hash, context_id, expires_at)
+  values (v_uid, p_channel, encode(sha256(convert_to(v_code, 'UTF8')), 'hex'), p_context_id, v_expires)
+  on conflict (person_id, channel) do update
+    set code_hash = excluded.code_hash, context_id = excluded.context_id, expires_at = excluded.expires_at, created_at = now();
+
+  insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id, target_id)
+  values (v_uid, p_key, v_action, p_context_id, v_hash, null, null, null);
+
+  return jsonb_build_object('code', v_code, 'expires_at', v_expires, 'context_id', p_context_id);
+end;
+$$;
+
+create or replace function public.clarevo_chat_link(p_channel text, p_message_id text, p_sender_hash text, p_code text)
+returns jsonb
+language plpgsql
+volatile
+set search_path = public
+as $$
+declare
+  v_gate jsonb;
+  v_code text := upper(regexp_replace(coalesce(p_code, ''), '[\s-]+', '', 'g'));
+  v_code_hash text;
+  v_person uuid;
+  v_c public.chat_link_codes%rowtype;
+  v_claims text := coalesce(current_setting('request.jwt.claims', true), '');
+  v_sub text := coalesce(current_setting('request.jwt.claim.sub', true), '');
+  v_ok boolean;
+begin
+  v_gate := public.clarevo_chat_gate(p_channel, p_message_id, p_sender_hash);
+  if v_gate is not null then
+    return v_gate;
+  end if;
+
+  if (select count(*) from public.chat_messages
+       where sender_hash = p_sender_hash and outcome = 'codigo_invalido' and received_at > now() - interval '1 hour') >= 5 then
+    perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, null, 'muitas_tentativas');
+    return jsonb_build_object('result', 'muitas_tentativas');
+  end if;
+
+  v_code_hash := encode(sha256(convert_to(v_code, 'UTF8')), 'hex');
+  -- A trava da pessoa vem antes da trava da linha do código (mesma ordem de create_*_code, unlink_* e da exclusão).
+  select person_id into v_person from public.chat_link_codes where code_hash = v_code_hash and channel = p_channel;
+  if v_person is not null then
+    perform pg_advisory_xact_lock(hashtext('chat:p:' || v_person::text));
+  end if;
+  select * into v_c from public.chat_link_codes
+   where code_hash = v_code_hash and channel = p_channel and expires_at > now() for update;
+  if not found or v_c.person_id is distinct from v_person then
+    perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, null, 'codigo_invalido');
+    return jsonb_build_object('result', 'codigo_invalido');
+  end if;
+
+  -- T2: quem escreve já está ligado a outra pessoa. Não passa sozinho a quem mandou o código: desliga antes, pela própria conversa.
+  if exists (select 1 from public.chat_links where sender_hash = p_sender_hash and person_id <> v_c.person_id) then
+    perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, null, 'ja_ligado');
+    return jsonb_build_object('result', 'ja_ligado');
+  end if;
+
+  -- Ainda anota no espaço do código (pode ter saído da Família depois de gerar o código).
+  perform public.clarevo_chat_as(v_c.person_id);
+  -- D-113a: um código do espaço Negócio não liga (create_*_code já recusa; aqui, por garantia, como quem perdeu a escrita).
+  v_ok := public.context_permission(v_c.context_id, 'write') and not public.clarevo_is_business(v_c.context_id);
+  perform public.clarevo_chat_as(null, v_claims, v_sub);
+  if not v_ok then
+    delete from public.chat_link_codes where person_id = v_c.person_id and channel = p_channel;
+    perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, v_c.person_id, 'sem_permissao');
+    return jsonb_build_object('result', 'sem_permissao', 'space', public.clarevo_chat_space(v_c.context_id));
+  end if;
+
+  insert into public.chat_links as l (person_id, channel, sender_hash, context_id)
+  values (v_c.person_id, p_channel, p_sender_hash, v_c.context_id)
+  on conflict (person_id, channel) do update set sender_hash = excluded.sender_hash, context_id = excluded.context_id, linked_at = now();
+  delete from public.chat_link_codes where person_id = v_c.person_id and channel = p_channel;
+
+  insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id, target_id)
+  values (v_c.person_id, p_channel || ':' || md5(p_message_id), 'ligar_' || p_channel, v_c.context_id,
+          md5(jsonb_build_array('ligar_' || p_channel, p_message_id)::text), null, null, null);
+  perform public.clarevo_chat_log(p_channel, p_message_id, p_sender_hash, v_c.person_id, 'ligado');
+  return jsonb_build_object('result', 'ligado', 'space', public.clarevo_chat_space(v_c.context_id),
+                            'name', (select nullif(p.display_name, '') from public.persons p where p.id = v_c.person_id));
+end;
+$$;
+
+revoke all on function public.clarevo_chat_create_code(text, uuid, text) from public, anon, authenticated;
+revoke all on function public.clarevo_chat_link(text, text, text, text) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 16. Privilégios: as seis funções do app só para authenticated; auxiliares e gatilhos para ninguém com sessão.

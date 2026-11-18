@@ -750,7 +750,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       if (sug.description !== '' && (cur.description.trim() === '' || cur.description === prevFilled?.description)) next.description = sug.description;
       else if (sug.description === '' && prevFilled && cur.description === prevFilled.description) next.description = '';
     }
-    if (sug.category && (cur.category === null || cur.category === prevFilled?.category)) next.category = sug.category;
+    // A categoria sugerida pela nota só entra se for do espaço (D-113: no negócio, "Mercado" não existe).
+    if (sug.category && categoryList.includes(sug.category) && (cur.category === null || cur.category === prevFilled?.category)) next.category = sug.category;
     const filled: NoteFields = { description: next.description, amountText: next.amountText, dateText: next.dateText, category: next.category };
     draftRef.current = next;
     setDraft(next);
@@ -927,7 +928,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
       // Descrição e categoria: só onde a pessoa não digitou.
       if (sug.description !== '' && (cur.description.trim() === '' || cur.description === prevFilled?.description)) next.description = sug.description;
       else if (sug.description === '' && prevFilled && cur.description === prevFilled.description) next.description = '';
-      if (sug.category && (cur.category === null || cur.category === prevFilled?.category)) next.category = sug.category;
+      // A categoria sugerida pelo comprovante, holerite ou nota de serviço só entra se for do espaço (D-113: no negócio, "Salário" não existe).
+      if (sug.category && categoryList.includes(sug.category) && (cur.category === null || cur.category === prevFilled?.category)) next.category = sug.category;
     }
     // Uma nota lida antes sai de cena: a conta que ela escolheu volta, se a pessoa não escolheu outra.
     if (prevNote?.accountSet && !accountPickedRef.current && next.accountId === prevNote.accountSet) next = { ...next, accountId: prevNote.accountBefore };

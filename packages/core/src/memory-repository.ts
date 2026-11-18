@@ -2875,7 +2875,10 @@ export class MemoryRepository implements RecordsRepository {
     return this.read(() => this.chatState(channel));
   }
 
-  /** Como create_<canal>_code. Ordem: repetição (code nulo); sem_permissao (anotar no espaço); código novo no lugar do anterior do canal. */
+  /**
+   * Como create_<canal>_code. Ordem: repetição (code nulo); sem_permissao (anotar no espaço); contexto_invalido (o espaço Negócio, D-113a:
+   * o WhatsApp e o Telegram não anotam no negócio); código novo no lugar do anterior do canal.
+   */
   async createChatCode(channel: ChatChannel, key: string, contextId: string): Promise<ChatCode> {
     return this.write(() => {
       const payload = [contextId];
@@ -2883,6 +2886,7 @@ export class MemoryRepository implements RecordsRepository {
       const replayed = this.replay(key, action, payload);
       if (replayed) return { code: null, contextId: replayed.contextId, expiresAt: this.chatCodes[channel]?.expiresAt ?? null };
       if (!this.space || !this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      if (this.businesses.has(contextId)) throw new RepoError('contexto_invalido');
       let code = '';
       for (let i = 0; i < WHATSAPP_CODE_LENGTH; i++) code += WHATSAPP_CODE_ALPHABET[Math.floor(Math.random() * WHATSAPP_CODE_ALPHABET.length)];
       const expiresAt = new Date(Date.parse(this.stamp()) + WHATSAPP_CODE_MINUTES * 60_000).toISOString();

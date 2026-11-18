@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import { MoneyTxt } from '@/components/money-text';
 import { Button, Card, LinkButton, Txt } from '@/components/ui';
+import { useValuesHidden } from '@/lib/privacy';
 import { useView } from '@/state/data';
 import { colors, space } from '@/theme/tokens';
 
@@ -16,6 +17,8 @@ const T = BUSINESS_TEXT;
  */
 export function BusinessSummaryCard({ contextId, month, records, canWrite }: { contextId: string; month: IsoMonth; records: readonly FinancialRecord[] | undefined; canWrite: boolean }) {
   const m = records ? businessMonth(records, contextId, month) : null;
+  // Com valores ocultos, a frase do mês some (como a do negativo no Resumo): "entrou a mais" ou "saiu a mais" revelaria o sinal.
+  const hidden = useValuesHidden();
   return (
     <Card style={{ gap: space[3] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
@@ -24,7 +27,7 @@ export function BusinessSummaryCard({ contextId, month, records, canWrite }: { c
           {T.overviewTitle}
         </Txt>
       </View>
-      {m ? <MoneyTxt>{businessResultText(m)}</MoneyTxt> : null}
+      {m && !hidden ? <MoneyTxt>{businessResultText(m)}</MoneyTxt> : null}
       <Txt variant="caption" color={colors.textSecondary}>
         {T.overviewLinkHint}
       </Txt>

@@ -12,9 +12,9 @@ import {
   type BusinessContext,
   type BusinessMonth,
 } from '@clarevo/core';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ArrowDownLeft, ArrowUpRight, HandCoins, Pencil, Plus, ShieldCheck, Store, Trash2 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
@@ -26,6 +26,7 @@ import { MonthStepper } from '@/components/month-stepper';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
+import { useValuesHidden } from '@/lib/privacy';
 import { useAccessCanWrite } from '@/state/access';
 import { useBusiness, useEndBusiness } from '@/state/business';
 import { useBusinessOverview, useView } from '@/state/data';
@@ -104,10 +105,15 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Abrir "Como está o negócio" escolhe o negócio no seletor: anotar daqui vai para o negócio.
-  useEffect(() => {
-    if (active !== 'negocio') setSpace('negocio');
-  }, [active, setSpace]);
+  // Abrir (ou voltar a) "Como está o negócio" escolhe o negócio no seletor: anotar daqui vai para o negócio. Só ao ganhar o foco
+  // (D-113a): com esta tela embaixo na pilha, mover um lançamento para o Pessoal troca o seletor, e a troca precisa ficar.
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  useFocusEffect(
+    useCallback(() => {
+      if (activeRef.current !== 'negocio') setSpace('negocio');
+    }, [setSpace]),
+  );
 
   const prev = addMonths(month, -1);
   const next = month < currentMonth ? addMonths(month, 1) : null;
@@ -222,6 +228,8 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
 
 /** O mês: entrou, saiu e sobrou numa cor só, a frase de fato e, se houver, as retiradas à parte. */
 function MonthCard({ m }: { m: BusinessMonth }) {
+  // Com valores ocultos, as frases que dizem se entrou ou saiu a mais somem (D-113a): o valor fica R$ ••••, e a direção não aparece.
+  const hidden = useValuesHidden();
   return (
     <Card style={{ gap: space[3] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
@@ -239,15 +247,17 @@ function MonthCard({ m }: { m: BusinessMonth }) {
             <Figure label={T.outLabel} caption={T.outCaption} cents={m.outCents} />
             <Figure label={T.leftLabel} cents={m.leftCents} strong />
           </View>
-          <MoneyTxt>{businessResultText(m)}</MoneyTxt>
+          {hidden ? null : <MoneyTxt>{businessResultText(m)}</MoneyTxt>}
           {m.withdrawnCents > 0 ? (
             <View style={{ gap: space[1] }}>
               <MoneyTxt variant="label" color={colors.textSecondary}>
                 {T.withdrawnLine(m.withdrawnCents)}
               </MoneyTxt>
-              <MoneyTxt variant="label" color={colors.textSecondary}>
-                {T.keptLine(m.keptCents)}
-              </MoneyTxt>
+              {hidden ? null : (
+                <MoneyTxt variant="label" color={colors.textSecondary}>
+                  {T.keptLine(m.keptCents)}
+                </MoneyTxt>
+              )}
             </View>
           ) : null}
         </>
@@ -277,7 +287,9 @@ function Figure({ label, caption, cents, strong }: { label: string; caption?: st
 
 /** Os últimos meses: entrou, saiu e sobrou de cada um, sem as retiradas, e a frase do período. */
 function LastMonthsCard({ months }: { months: BusinessMonth[] }) {
-  const period = businessPeriodText(months);
+  const hidden = useValuesHidden();
+  // Com valores ocultos, a frase do período (em quantos meses entrou mais do que saiu) some, como as frases do mês (D-113a).
+  const period = hidden ? null : businessPeriodText(months);
   const mask = useMoneyLabelMask();
   return (
     <Card style={{ gap: space[3] }}>
@@ -289,7 +301,7 @@ function LastMonthsCard({ months }: { months: BusinessMonth[] }) {
       </Txt>
       <View>
         {months.map((m, i) => (
-          <View key={m.month} style={[styles.monthRow, i < months.length - 1 && styles.rowLine]} accessible accessibilityLabel={mask(T.monthRowA11y(m))}>
+          <View key={m.month} style={[styles.monthRow, i < months.length - 1 && styles.rowLine]} accessible accessibilityLabel={mask(T.monthRowA11y(m, hidden))}>
             <Txt variant="label" style={{ fontFamily: fonts.bold, minWidth: 44 }} accessibilityLabel={formatMonthYearBR(m.month)}>
               {businessMonthShort(m.month)}
             </Txt>

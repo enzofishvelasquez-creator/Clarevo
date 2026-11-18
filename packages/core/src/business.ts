@@ -345,8 +345,9 @@ export const BUSINESS_TEXT = {
     cents >= 0 ? `Ficou no negócio, depois das retiradas: ${formatBRL(cents)}.` : `Depois das retiradas, saiu ${formatBRL(-cents)} a mais do que entrou.`,
   lastMonthsTitle: 'Últimos meses',
   lastMonthsNote: 'Entrou, saiu e sobrou em cada mês, sem as retiradas.',
-  monthRowA11y: (m: BusinessMonth): string =>
-    `${formatMonthYearBR(m.month)}: entrou ${formatBRL(m.inCents)}, saiu ${formatBRL(m.outCents)}, sobrou ${m.leftCents < 0 ? `menos ${formatBRL(-m.leftCents)}` : formatBRL(m.leftCents)}`,
+  /** Com valores ocultos (`hidden`), sem o "menos": o nome acessível não revela se o mês ficou negativo (D-113a). */
+  monthRowA11y: (m: BusinessMonth, hidden = false): string =>
+    `${formatMonthYearBR(m.month)}: entrou ${formatBRL(m.inCents)}, saiu ${formatBRL(m.outCents)}, sobrou ${m.leftCents < 0 && !hidden ? `menos ${formatBRL(-m.leftCents)}` : formatBRL(Math.abs(m.leftCents))}`,
   topOutTitle: 'Maiores saídas do mês',
   noOut: 'Nenhuma saída anotada neste mês.',
   topOutA11y: (line: BusinessOutLine): string => `${line.category}: ${formatBRL(line.cents)}, ${Math.round(line.share * 100)}% das saídas`,
@@ -398,7 +399,8 @@ export const BUSINESS_TEXT = {
   ended: 'Espaço Negócio encerrado.',
   /** Quem vê e conversas. */
   whoSees: 'Só você vê e anota no espaço Negócio. O Pessoal e a Família, se houver, continuam separados.',
-  chatNote: 'Pelo WhatsApp e pelo Telegram, as anotações vão para o Pessoal.',
+  /** O canal pode estar ligado ao Pessoal ou à Família (D-113a): a frase diz só que o negócio fica de fora. */
+  chatNote: 'O WhatsApp e o Telegram não anotam no espaço Negócio.',
 } as const;
 
 /** Textos de erro das telas do negócio (nomes e regras do banco). */

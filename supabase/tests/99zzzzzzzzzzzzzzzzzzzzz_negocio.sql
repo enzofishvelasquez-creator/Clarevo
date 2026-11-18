@@ -205,6 +205,51 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- 4a. WhatsApp e Telegram fora do negócio (D-113a): o código de ligar recusa o negócio (contexto_invalido, depois de sem_permissao para
+-- quem é de fora); o Pessoal continua ligando; um código do negócio (gravado à força) não liga e é apagado.
+-- ---------------------------------------------------------------------------
+select pg_temp.as_('caio');
+select pg_temp.expect_code(format('select public.create_telegram_code(%L, %L)', pg_temp.id('biz'), 'ng-tg-0000'), 'sem_permissao', '42501');
+select pg_temp.as_('bia');
+do $$
+declare
+  biz uuid := pg_temp.id('biz');
+  r jsonb;
+begin
+  perform pg_temp.expect_code(format('select public.create_telegram_code(%L, %L)', biz, 'ng-tg-0001'), 'contexto_invalido', '22023');
+  perform pg_temp.expect_code(format('select public.create_whatsapp_code(%L, %L)', biz, 'ng-wa-0001'), 'contexto_invalido', '22023');
+  r := public.create_telegram_code(pg_temp.id('pes'), 'ng-tg-0002');
+  assert r ->> 'code' is not null and (r ->> 'context_id')::uuid = pg_temp.id('pes'), 'o código do Pessoal continua saindo';
+end $$;
+reset role;
+insert into public.chat_link_codes as c (person_id, channel, code_hash, context_id, expires_at)
+values (:bia, 'telegram', encode(sha256(convert_to('NEGOCIO2', 'UTF8')), 'hex'), (select id from ids where name = 'biz'), now() + interval '15 minutes')
+on conflict (person_id, channel) do update set code_hash = excluded.code_hash, context_id = excluded.context_id, expires_at = excluded.expires_at;
+set role service_role;
+select set_config('request.jwt.claim.sub', '', true), set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  r jsonb;
+begin
+  r := public.telegram_link('telegram:' || encode(sha256(convert_to('bia:negocio:1', 'UTF8')), 'hex'),
+                            encode(sha256(convert_to('telegram:bia-negocio', 'UTF8')), 'hex'), 'NEGOCIO2');
+  assert r ->> 'result' = 'sem_permissao', 'o código do negócio não liga: ' || r::text;
+end $$;
+reset role;
+do $$
+begin
+  assert not exists (select 1 from public.chat_links where person_id = pg_temp.id('bia')), 'nenhum canal ligado ao negócio';
+  assert not exists (select 1 from public.chat_link_codes where person_id = pg_temp.id('bia') and channel = 'telegram'), 'o código do negócio foi apagado';
+  -- A retirada e o mover tomam a trava de end_business (familia:c:<negócio>) antes de conferir, como rename_business.
+  assert (select prosrc from pg_proc where oid = 'public.create_business_withdrawal(text, uuid, uuid, uuid, bigint, date, text)'::regprocedure)
+         ~ 'familia:c:.*context_permission\(p_business', 'a retirada trava o negócio antes de conferir';
+  assert (select prosrc from pg_proc where oid = 'public.move_record(text, uuid, integer, uuid, uuid, text)'::regprocedure)
+         ~ 'familia:c:.*clarevo_lock_record', 'o mover trava o negócio antes de travar o lançamento';
+end $$;
+set role authenticated;
+select pg_temp.as_('bia');
+
+-- ---------------------------------------------------------------------------
 -- 5. Retirada para o Pessoal
 -- ---------------------------------------------------------------------------
 do $$
