@@ -37,8 +37,8 @@ Migração: `supabase/migrations/20261117000004_espaco_negocio.sql` (0042). Núc
 - **Mover.** No detalhe de um lançamento comum: "Mover para o espaço Negócio" (no Pessoal) ou "Mover para o Pessoal" (no negócio), para
   quem anotou no lugar errado, com a categoria e a conta do outro espaço. Lançamento ligado (conta a pagar, fatura, rendimento de
   investimento ou retirada) não muda de espaço.
-- **Fora do negócio.** Metas e Investir mostram, no negócio, uma explicação curta e "Ir para o Pessoal". WhatsApp e Telegram continuam
-  anotando no Pessoal (dito na tela do negócio). Exportar meus dados ganha a escolha do espaço (Pessoal ou o negócio).
+- **Fora do negócio.** Metas e Investir mostram, no negócio, uma explicação curta e "Ir para o Pessoal". WhatsApp e Telegram não anotam
+  no negócio (continuam no espaço ligado, Pessoal ou Família; dito na tela do negócio, e o banco recusa ligar um canal ao negócio, D-113a). Exportar meus dados ganha a escolha do espaço (Pessoal ou o negócio).
 - **Nome e encerrar.** "Mudar o nome" e "Encerrar o espaço Negócio" ficam em "Como está o negócio". Encerrar tira o espaço do app; os
   lançamentos ficam guardados, sem leitura, e são apagados de vez depois de 6 meses (como a Família encerrada); as retiradas que já estão
   no Pessoal continuam lá, como recebimentos comuns. Depois de encerrar, pode criar outro.
@@ -67,7 +67,11 @@ Migração: `supabase/migrations/20261117000004_espaco_negocio.sql` (0042). Núc
    renomear, anotar e retirar seguem a trava da assinatura (`assinatura_necessaria`).
 8. Exclusão da conta: o negócio é da pessoa (`owner_person_id`) e já entrava em `clarevo_erase_person`, como o Pessoal. A limpeza dos 6
    meses (`clarevo_purge_deleted`) apaga o negócio encerrado inteiro (`negocios` na resposta).
-9. Compatibilidade: o app anterior lê só os contextos `pessoal` e `familia` (filtro por `kind`), então nunca vê o negócio, e as funções
+9. Revisão independente (D-113a): `create_business_withdrawal` e `move_record` (do lado que for negócio) tomam a trava de `end_business`
+   (`familia:c:<negócio>`) antes de conferir, para um negócio encerrado ao mesmo tempo não receber nem perder lançamentos; e a migração
+   recria `clarevo_chat_create_code` (o código de ligar o WhatsApp ou o Telegram recusa o negócio com `contexto_invalido`) e
+   `clarevo_chat_link` (um código do negócio não liga e é apagado).
+10. Compatibilidade: o app anterior lê só os contextos `pessoal` e `familia` (filtro por `kind`), então nunca vê o negócio, e as funções
    que ele chama mantêm as assinaturas. O recebimento "Retirada do negócio" aparece no Pessoal dele como um recebimento comum; editar ou
    excluir por lá recebe `retirada_ligada` ("Não foi possível salvar"). O app novo precisa da 0042 (lê `kind = 'negocio'` e chama as
    funções novas): aplicar antes do merge.
@@ -83,19 +87,15 @@ posições que dezenas de verificações de telas conferem (a barra de abas, o p
 
 ## 4. O que ficou para depois
 
-- **Guia e Ajuda.** A entrada do guia está pronta em `packages/core/src/guide/catalog.ts` (`BUSINESS_GUIDE_ENTRY`, captura 730), fora de
-  `GUIDE_ENTRIES`: o site gera a Ajuda a partir do guia e recusa uma entrada sem tema (`scripts/site/paginas/ajuda.js`, `TEMAS`), e o site
-  é de outra frente. Na junção: pôr a entrada em `GUIDE_ENTRIES` (depois da Família), criar o tema da Ajuda (sugestão: `{ id: 'negocio',
-  titulo: 'Espaço Negócio', descricao: 'Separar as contas do negócio das pessoais: criar, anotar, ver quanto sobrou, retirada para o
-  Pessoal e mover.', guias: ['negocio'], topicos: [] }`), tirar `/negocio` das exceções de `test/guide.test.ts`, pôr a entrada "No app"
-  (navegação) e gerar o site e o manual (`npm run manual`).
-- **Política de privacidade.** O negócio traz um dado novo: o nome que a pessoa dá ao negócio (os lançamentos são do mesmo tipo da seção
-  3.2). A política não foi editada nesta frente porque o site gera a página da política a partir de `docs/legal/politica-de-privacidade.md`
-  (mudar o arquivo sem gerar o site reprova o teste do site). Texto proposto para a seção 3, depois da 3.3 (Família): "**3.3a Espaço
-  Negócio (opcional).** Se você criar um espaço Negócio, guardamos o nome que você der a ele e o que você anotar nele, como na seção 3.2.
-  Só você vê. Não pedimos CNPJ nem dados da empresa. Encerrar o espaço tira ele do app; os lançamentos ficam guardados, sem leitura, e são
-  apagados de vez depois de 6 meses. Excluir a conta apaga o espaço Negócio junto." Decidir com o advogado se muda a versão dos termos
-  (`LEGAL_VERSION`).
+- **Guia e Ajuda (feito na junção da segunda rodada).** A entrada do guia (`id: 'negocio'`, captura 730) está em `GUIDE_ENTRIES`, no
+  grupo "Conta e privacidade", logo depois da Família; a tela `/negocio` está no índice "No app" da busca de Aprender (`APP_SCREENS`,
+  `packages/core/src/navigation.ts`); a Ajuda do site tem o tema "Espaço Negócio" (`ajuda/negocio.html`, `TEMAS` em
+  `scripts/site/paginas/ajuda.js`); `/negocio` saiu das exceções de cobertura de `test/guide.test.ts`; o site e o manual foram gerados de
+  novo.
+- **Política de privacidade (feito na junção da segunda rodada).** A seção 3.3a ("Espaço Negócio (opcional)") entrou com o texto
+  proposto (o nome que a pessoa dá ao negócio e o que ela anota nele, como na seção 3.2; só ela vê; sem CNPJ nem dados da empresa;
+  encerrar e excluir a conta), e a seção 11 ganhou a linha do espaço encerrado. A versão dos termos (`LEGAL_VERSION` = 1) não mudou: a
+  pergunta 62 do resumo para o advogado pergunta se o espaço pede versão nova e se o tratamento de dados de pessoa jurídica muda algo.
 - **WhatsApp e Telegram no negócio.** Hoje anotam só no Pessoal. Para escolher o negócio, o caminho simples seria uma palavra no começo
   da mensagem ("negócio 50 frutas"), lida pelas regras de `packages/core/src/whatsapp` e `telegram`, com `clarevo_chat_note` aceitando o
   contexto do negócio da pessoa; ficou para depois.

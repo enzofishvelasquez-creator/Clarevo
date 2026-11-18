@@ -156,11 +156,25 @@ lançamentos, as contas, os investimentos e as metas de teste no fim e voltar o 
 | 74 | Investir > o investimento de teste > "Registrar rendimento recebido" > "Somar a uma meta?" > uma meta | Nada vem marcado; com a meta escolhida, a meta ganha um aporte com o mesmo valor e a mesma data |
 | 75 | Conta > card do nível > "Ver meu nível" | O texto diz que o nível desce um degrau depois de 60 dias sem anotar nada e volta ao anotar de novo, e a escada mostra a Esmeralda acima do Diamante; nenhum texto diz que o nível nunca desce. O aviso de queda só aparece com o cenário da demonstração na web (`?cenario=nivel`, `docs/48_NIVEIS.md`): no aparelho, conferir só o texto |
 
+### L. Espaço Negócio (D-113, 17/11/2026)
+
+Os números seguem depois dos da seção K. Precisa da migração 0042 aplicada (`docs/05`, passo 12ai). No fim, encerrar o negócio de teste
+(Como está o negócio > "Encerrar o espaço Negócio") e excluir a retirada e os lançamentos de teste do Pessoal.
+
+| # | O que fazer | O esperado |
+| --- | --- | --- |
+| 76 | Conta > card "Espaço Negócio" > "Criar o espaço Negócio" > nome "Negócio de teste" > "Criar o espaço Negócio" | O card explica para quem é (CNPJ ou trabalho por conta) e que o plano inclui um negócio por pessoa; depois de criar, o nome aparece no seletor do topo do Resumo, de Movimentos e de Metas, ao lado de "Pessoal" |
+| 77 | Escolher o negócio no seletor > Movimentos > "Registrar recebimento" de R$ 200,00 em "Vendas"; depois "Anotar gasto" de R$ 50,00 em "Material e mercadoria" | A pílula diz "Salvando em Negócio de teste"; as categorias são as do negócio (sem subcategoria); o Resumo do negócio mostra os dois lançamentos, e o Resumo do Pessoal não muda |
+| 78 | No negócio, Resumo > card "Como está o negócio" | Entrou R$ 200,00, Saiu R$ 50,00 e Sobrou R$ 150,00, numa cor só, com a frase de fato ("Neste mês, entrou R$ 150,00 a mais do que saiu."), os últimos meses, as maiores saídas e o lembrete de que a Clarevo não faz contabilidade nem cálculo de impostos; com "Ocultar valores", tudo vira R$ •••• |
+| 79 | Em "Como está o negócio" > "Retirada para o Pessoal" > R$ 100,00 > "Salvar retirada"; depois, no Pessoal, abrir o recebimento "Retirada de Negócio de teste" e excluir a retirada | O negócio mostra a retirada à parte ("Não entram em Saiu") e Saiu continua R$ 50,00; o Pessoal ganha um recebimento de R$ 100,00 que não se edita; excluir pede confirmação e tira os dois lados juntos |
+| 80 | No Pessoal, um gasto comum de teste > detalhe > "Mover para o espaço Negócio" > categoria e conta do negócio > "Mover"; depois, no negócio, "Mover para o Pessoal" | O lançamento sai do Pessoal e aparece no negócio com a categoria escolhida (e volta); um pagamento de conta a pagar ou de fatura não oferece mover |
+| 81 | Com o negócio escolhido, abrir Metas e Investir; mandar "15 café" pelo Telegram (se ligado) | Metas e Investir explicam que ficam no Pessoal, com "Ir para o Pessoal"; a anotação do Telegram vai para o espaço ligado ao canal (Pessoal ou Família), nunca para o negócio, e Conta › Telegram não oferece o negócio |
+
 ## 2. Só no iPhone (quando houver TestFlight)
 
 | # | O que fazer | O esperado |
 | --- | --- | --- |
-| 50 | Os itens 1 a 49 e 54 a 75 com o VoiceOver no lugar do TalkBack e o iCloud no lugar do Google Drive | O mesmo esperado |
+| 50 | Os itens 1 a 49 e 54 a 81 com o VoiceOver no lugar do TalkBack e o iCloud no lugar do Google Drive | O mesmo esperado |
 | 51 | Widget: tela Hoje, StandBy e tela bloqueada | Com valores ocultos, nada de valor nem nome; ligados, o iOS pode esconder (conferir) |
 | 52 | Escolher foto, compartilhar e as telas do sistema dentro do app | Em português |
 | 53 | Ler comprovante > "Tirar uma foto" | A câmera abre depois da folha, sem travar |

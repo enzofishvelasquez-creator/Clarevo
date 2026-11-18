@@ -222,9 +222,9 @@ Decidido por Enzo em 11/11/2026 ("Vamos definir tudo em relação ao app e suas 
 - [ ] **Você:** juntar o PR, fazer um build `preview` novo e instalar por cima; depois do merge seguinte, conferir a primeira atualização (`docs/50`, seção 2)
 - [ ] Quem testa instala o build novo uma vez; depois, só fecha e abre o app para receber as correções
 
-## Rodada de 17/11/2026: dez frentes juntadas (D-103 a D-112)
+## Rodada de 17/11/2026: dez frentes e a segunda rodada juntadas (D-103 a D-114)
 
-Pedido do Enzo ("faça todas as melhorias possíveis"), o estudo "Bolsa no site e aba Investir" e o retorno de quem testa (`docs/34`, seção de 17/11/2026). Pronto no código, no ramo da rodada; falta o merge, que só pode vir depois das migrações.
+Pedido do Enzo ("faça todas as melhorias possíveis"), o estudo "Bolsa no site e aba Investir" e o retorno de quem testa (`docs/34`, seção de 17/11/2026). Na segunda rodada, o espaço Negócio (D-113) e os vídeos e imagens do site (D-114). Pronto no código, no ramo da rodada; falta o merge, que só pode vir depois das migrações.
 
 - [x] Aba Investir com datas, ganho em reais, Desempenho por investimento, divisão por instituição com o FGC, modelos na tela vazia e convite do plano de aportes (D-103, `docs/45_INVESTIMENTOS.md`, seção 11)
 - [x] Detalhe e formulários de cada investimento: taxa que muda numa data, descrição, histórico com saldo, lembretes com adiar e pausar, declaração no formato do informe, "Somar a uma meta?" e a opção da meta no formulário (D-104, `docs/45`, seção 12; migração 0039)
@@ -236,15 +236,17 @@ Pedido do Enzo ("faça todas as melhorias possíveis"), o estudo "Bolsa no site 
 - [x] Paridade entre web, computador e celular: "Ocultar valores" no computador, cantos arredondados e os limites da web explicados (D-110)
 - [x] Níveis: queda com aviso depois de 60 dias sem anotar e o nível Esmeralda (D-111, `docs/48_NIVEIS.md`; migração 0041)
 - [x] Escolha do tema em Conta (D-112)
-- [x] Documentos atualizados: decisões (`docs/00`), passos do Supabase (`docs/05`), regras de escrita (`CLAUDE.md`), investimentos, Aprender, navegação, calculadoras, widget, retorno do teste, teste em aparelho (itens 59 a 75), política de privacidade e resumo para o advogado
-- [ ] **Você (Supabase), antes do merge:** aplicar as migrações 0039, 0040 e 0041, nessa ordem, cada uma seguida de `notify pgrst, 'reload schema';`, e rodar as conferências (`docs/05`, passos 12af a 12ah e conferências 21aa a 21ac: 4, 4, 3, 2, 107; 4, 3, 6, 0, 2, 107; 1, 1, 1, 1, 107). O app novo vai pelo ar a cada merge (D-100) e falha com o banco antigo em subcategoria, troca de tipo, ligação a conta e rendimento; o app antigo funciona com o banco novo
+- [x] Espaço Negócio: criar só com o nome, as telas de sempre no negócio com as categorias dele, "Como está o negócio", "Retirada para o Pessoal", mover um lançamento entre o Pessoal e o negócio, encerrar; no guia de uso, na busca "No app" e na Ajuda do site (D-113, `docs/52_ESPACO_NEGOCIO.md`; migração 0042)
+- [x] Clarevo Plus preparado e não lançado: o modelo aceita vários negócios, sócios e ajudantes com papéis e a exportação para o contador; nada aparece no app nem no site (D-113, `docs/52`, seção 5)
+- [x] Site: sete vídeos de uso na página inicial e em O app e imagens nas matérias de Novidades, nos temas claro e escuro (D-114, `docs/22`, seção 17)
+- [x] Documentos atualizados: decisões (`docs/00`), passos do Supabase (`docs/05`), regras de escrita (`CLAUDE.md`), investimentos, Aprender, navegação, calculadoras, widget, retorno do teste, teste em aparelho (itens 59 a 81), política de privacidade e resumo para o advogado; na segunda rodada, o espaço Negócio (`docs/52`) e os vídeos e imagens do site (`docs/22`, seção 17)
+- [ ] **Você (Supabase), antes do merge:** aplicar as migrações 0039, 0040, 0041 e 0042, nessa ordem, cada uma seguida de `notify pgrst, 'reload schema';`, e rodar as conferências (`docs/05`, passos 12af a 12ai e conferências 21aa a 21ad: 4, 4, 3, 2, 107; 4, 3, 6, 0, 2, 107; 1, 1, 1, 1, 107; 1, 1, 2, 6, 9, 91, 113). Na 0042, o SQL Editor avisa "Potential issue detected" por causa das linhas `drop constraint`: confirme. O app novo vai pelo ar a cada merge (D-100) e falha com o banco antigo em subcategoria, troca de tipo, ligação a conta, rendimento e no espaço Negócio; o app antigo funciona com o banco novo
 - [ ] Antes de publicar o site: rodar `node scripts/gerar-site.js --atualizar-indicadores` num computador com acesso ao Banco Central (o retrato dos indicadores ainda está vazio, e o `--final` recusa retrato vazio, incompleto ou com mais de 7 dias)
-- [ ] Teste em aparelho dos itens novos (`docs/47`, seção K, itens 59 a 75)
+- [ ] Teste em aparelho dos itens novos (`docs/47`, seção K, itens 59 a 75, e seção L, do espaço Negócio, itens 76 a 81)
 - [ ] Exportar meus dados ainda sem a subcategoria (pendência da D-107)
-- [ ] Espaço Negócio: decisão do Enzo, a fazer
-- [ ] Clarevo Plus: preparar agora, lançar depois
-- [ ] Site: vídeos de uso e imagens nas Novidades (a fazer)
-- [ ] Política de privacidade: as mudanças desta rodada (prints, contagem do tempo sem anotar, tema) entram na versão 1, ainda preliminar; a pergunta 61 do resumo para o advogado pergunta se pedem versão nova quando o site for publicado
+- [ ] Espaço Negócio, para depois (`docs/52`, seção 4): anotar no negócio pelo WhatsApp e pelo Telegram, editar a retirada, sugestões de orçamento depois de importar no negócio e ver o negócio encerrado
+- [ ] **Você:** definir o Clarevo Plus (preço, por pessoa ou por negócio, limites, teste grátis; perguntas em `docs/52`, seção 5) antes de qualquer coisa aparecer no app ou no site
+- [ ] Política de privacidade: as mudanças desta rodada (prints, contagem do tempo sem anotar, tema e o espaço Negócio, seção 3.3a) entram na versão 1, ainda preliminar, sem mudar a versão dos termos; as perguntas 61 e 62 do resumo para o advogado perguntam se pedem versão nova quando o site for publicado (a 62 também pergunta se o tratamento de dados de pessoa jurídica muda algo)
 
 ## Ciclo B: renda comprometida (D-026)
 
