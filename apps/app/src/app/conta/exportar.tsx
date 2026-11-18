@@ -25,6 +25,7 @@ import { EXPORT_LOGO_SVG } from '@/lib/export-logo';
 import { cleanupExportFiles, deliverExportFile, EXPORT_NATIVE, type DeliverResult } from '@/lib/export-share';
 import { useValuesHidden } from '@/lib/privacy';
 import { useSpace } from '@/state/data';
+import { useBusiness } from '@/state/business';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -41,7 +42,12 @@ type Msg = { tone: 'erro' | 'sucesso' | 'info'; text: string } | null;
 export default function ExportarScreen() {
   const { user, auth, today } = useSession();
   const repo = useRepo();
-  const contextId = useSpace().data?.personalContextId;
+  const personalId = useSpace().data?.personalContextId;
+  // Espaço Negócio (D-113): quem tem um negócio escolhe o espaço do arquivo (o Pessoal, como sempre, ou o negócio).
+  const business = useBusiness().data;
+  const [scope, setScope] = useState<'pessoal' | 'negocio'>('pessoal');
+  const onBusiness = scope === 'negocio' && Boolean(business);
+  const contextId = onBusiness ? business!.id : personalId;
   const hidden = useValuesHidden();
   const userId = user?.id;
   const persist = auth.mode !== 'demo';
@@ -65,10 +71,11 @@ export default function ExportarScreen() {
   }, [userId, persist]);
 
   // O arquivo pronto vale para o período e o formato escolhidos: mudar um deles tira o arquivo e os avisos.
-  const choose = (patch: { period?: ExportPeriod; format?: ExportFormat }) => {
+  const choose = (patch: { period?: ExportPeriod; format?: ExportFormat; scope?: 'pessoal' | 'negocio' }) => {
     if (busy) return;
     if (patch.period) setPeriod(patch.period);
     if (patch.format) setFormat(patch.format);
+    if (patch.scope) setScope(patch.scope);
     setReady(null);
     setMsg(null);
     setDone(null);
@@ -124,7 +131,7 @@ export default function ExportarScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={T.title} right={<ContextPill label="Pessoal" fixed />} />
+      <SubHeader title={T.title} right={<ContextPill label={onBusiness ? business!.name : 'Pessoal'} fixed />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <Txt color={colors.textSecondary}>{T.intro}</Txt>
         <Txt variant="caption" color={colors.textSecondary}>
@@ -132,6 +139,12 @@ export default function ExportarScreen() {
         </Txt>
 
         <Card style={{ gap: space[4] }}>
+          {business ? (
+            <ChoiceGroup label={T.spaceLabel}>
+              <Chip label="Pessoal" selected={!onBusiness} onPress={() => choose({ scope: 'pessoal' })} />
+              <Chip label={business.name} selected={onBusiness} onPress={() => choose({ scope: 'negocio' })} />
+            </ChoiceGroup>
+          ) : null}
           <ChoiceGroup label={T.periodLabel}>
             {EXPORT_PERIODS.map((p) => (
               <Chip key={p} label={T.periods[p]} selected={period === p} onPress={() => choose({ period: p })} />
@@ -150,7 +163,7 @@ export default function ExportarScreen() {
           </Txt>
           <Txt color={colors.textSecondary}>{format === 'csv' ? T.contentCsv : T.contentPdf}</Txt>
           <Txt variant="caption" color={colors.textSecondary}>
-            {T.notIncluded}
+            {onBusiness ? T.notIncludedBusiness(business!.name) : T.notIncluded}
           </Txt>
           {hidden ? (
             <Banner tone="info" icon={Info} live={false}>

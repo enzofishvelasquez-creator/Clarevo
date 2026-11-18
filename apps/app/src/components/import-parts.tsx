@@ -10,6 +10,7 @@ import {
   type CsvTable,
   type ReviewKind,
   type ReviewLine,
+  type ContextKind,
 } from '@clarevo/core';
 import { Check } from 'lucide-react-native';
 import { memo } from 'react';
@@ -44,6 +45,7 @@ export const ReviewRow = memo(function ReviewRow({
   onEdit,
   onChange,
   onFlip,
+  context = 'pessoal',
 }: {
   line: ReviewLine;
   editing: boolean;
@@ -53,6 +55,8 @@ export const ReviewRow = memo(function ReviewRow({
   onChange: (id: string, patch: { description?: string; category?: string | null }) => void;
   /** Troca gasto por recebimento (ou compra por estorno) nesta linha. */
   onFlip?: (id: string) => void;
+  /** O espaço de destino (D-113): no negócio, as categorias do negócio. */
+  context?: ContextKind;
 }) {
   const hidden = useValuesHidden();
   const problem = lineProblem(line);
@@ -153,7 +157,7 @@ export const ReviewRow = memo(function ReviewRow({
             ) : null}
             <ChoiceGroup label={IMPORT_TEXT.categoryLabel} accessibilityLabel={`${IMPORT_TEXT.categoryLabel}: ${line.description}`}>
               <Chip label={IMPORT_TEXT.noCategory} selected={line.category === null} onPress={() => onChange(line.id, { category: null })} />
-              {categoriesFor(line.kind).map((c) => (
+              {categoriesFor(line.kind, context).map((c) => (
                 <Chip key={c} label={c} selected={line.category === c} onPress={() => onChange(line.id, { category: c })} />
               ))}
             </ChoiceGroup>

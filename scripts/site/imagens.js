@@ -8,7 +8,14 @@
  * Desde 12/11/2026, o nome do arquivo leva um resumo do conteúdo (`imagens/resumo.1a2b3c4d5e.png`): uma captura nova ganha outro nome,
  * e o navegador pode guardar cada imagem por um ano (`_headers`) sem mostrar a antiga a quem já visitou o site.
  *
- * Todas as legendas dizem "Dados fictícios de demonstração" (`LEGENDA_DEMO`).
+ * Todas as legendas das capturas de O app e da página inicial dizem "Dados fictícios de demonstração" (`LEGENDA_DEMO`).
+ *
+ * D-114 (17/11/2026): as telas das matérias de Novidades (`TELAS_DAS_NOVIDADES`, gravadas da demonstração por
+ * `scripts/gravar-videos-site.js --capturas` em `site-src/imagens/telas/`) têm uma versão no tema claro e outra no escuro (`escura`): a
+ * página mostra a do tema de quem visita (`<picture>` com `prefers-color-scheme`), e as duas têm a mesma largura e altura. A legenda delas,
+ * e a dos vídeos, é "Tela da demonstração, com dados fictícios" (`LEGENDA_TELA`, de `videos.js`). As capas dos vídeos (`video-<id>`) entram
+ * aqui também, reduzidas como as capturas. A matéria sem tela (13º salário) tem uma ilustração da marca feita no repositório
+ * (`ILUSTRACOES`, SVG copiado sem mudança, com o resumo do conteúdo no nome).
  */
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -27,8 +34,10 @@ const RESUMO_DO_CODIGO = crypto
   .slice(0, 12);
 
 const LEGENDA_DEMO = 'Dados fictícios de demonstração';
+const { LEGENDA_TELA, VIDEOS } = require('./videos');
 const LOJA = 'docs/lojas/capturas/apple-iphone-6-3pol-1206x2622';
 const TELAS = 'docs/telas';
+const NOVIDADES = 'site-src/imagens/telas';
 /** Largura dos celulares (a página mostra a imagem com até 280 px de largura) e do painel largo. */
 const LARGURA_CELULAR = 480;
 const LARGURA_LARGA = 960;
@@ -50,6 +59,28 @@ const IMAGENS = [
   { id: 'quem-ve', origem: `${TELAS}/330_quem_ve.png`, largura: LARGURA_CELULAR, alt: 'Tela Quem vê estes dados, que mostra quem tem acesso aos registros.' },
   { id: 'empresa-painel', origem: `${TELAS}/421_empresa_painel_1280px.png`, largura: LARGURA_LARGA, alt: 'Painel da empresa no navegador, com o contrato, as vagas contratadas, as vagas em uso e as datas.' },
   { id: 'empresa-licencas', origem: `${TELAS}/424_empresa_licencas.png`, largura: LARGURA_CELULAR, alt: 'Painel da empresa, lista de licenças com o e-mail convidado, a situação e a data de cada uma.' },
+];
+
+/**
+ * As telas das matérias de Novidades (D-114): capa e capturas ao lado das seções, cada uma com a versão escura (`escura`). O id é o que o
+ * post usa (`capa: post-investir` no cabeçalho e `{{tela:post-desempenho}}` no corpo).
+ */
+const TELAS_DAS_NOVIDADES = [
+  { id: 'post-resumo', origem: `${NOVIDADES}/resumo.png`, escura: `${NOVIDADES}/resumo-escuro.png`, largura: LARGURA_CELULAR, alt: 'Tela Resumo de outubro, com a diferença do mês, o recebido, o pago, o que ainda falta pagar, a renda comprometida e as cinco abas embaixo: Resumo, Movimentos, Metas, Investir e Aprender.' },
+  { id: 'post-investir', origem: `${NOVIDADES}/investir.png`, escura: `${NOVIDADES}/investir-escuro.png`, largura: LARGURA_CELULAR, alt: 'Aba Investir, com o card Seus investimentos hoje: o valor de hoje, o aportado, o ganho em reais e a porcentagem sobre o investido, e o link Ver desempenho.' },
+  { id: 'post-desempenho', origem: `${NOVIDADES}/desempenho.png`, escura: `${NOVIDADES}/desempenho-escuro.png`, largura: LARGURA_CELULAR, alt: 'Tela Desempenho, com o selo de estimativa, os períodos no mês, em 12 meses e desde o início, e quanto um investimento rendeu ao lado do CDI, do IPCA e da poupança no mesmo intervalo.' },
+  { id: 'post-metas', origem: `${NOVIDADES}/metas-prazo.png`, escura: `${NOVIDADES}/metas-prazo-escuro.png`, largura: LARGURA_CELULAR, alt: 'Tela Nova meta, com o atalho de prazo de 1 ano marcado, o prazo outubro de 2027 preenchido e quanto guardar por mês para chegar lá, sem contar rendimentos.' },
+  { id: 'post-multa-fatura', origem: `${NOVIDADES}/multa-fatura.png`, escura: `${NOVIDADES}/multa-fatura-escuro.png`, largura: LARGURA_CELULAR, alt: 'Calculadora Multa e juros por atraso no modo da fatura do cartão: o valor que ficou sem pagar, 30 dias depois do vencimento, e o resultado, com os juros do rotativo, os juros de mora, a multa, o IOF estimado e o total da fatura.' },
+  { id: 'post-quem-ve', origem: `${NOVIDADES}/quem-ve.png`, escura: `${NOVIDADES}/quem-ve-escuro.png`, largura: LARGURA_CELULAR, alt: 'Tela Quem vê estes dados?, com a pessoa como única que vê os registros do Pessoal e a explicação do que a empresa que oferece o benefício vê e não vê.' },
+  { id: 'post-empresa-painel', origem: `${NOVIDADES}/empresa-painel.png`, escura: `${NOVIDADES}/empresa-painel-escuro.png`, largura: LARGURA_LARGA, alt: 'Painel da empresa, com o aviso de demonstração, o nome da empresa e o contrato: plano, vagas, vagas em uso, vagas livres, início, fim e situação. Nenhum dado financeiro.' },
+];
+
+/** As capas dos vídeos de uso (D-114), do momento que melhor resume cada vídeo. Não têm texto alternativo: a capa é do vídeo, que tem nome e descrição. */
+const CAPAS_DOS_VIDEOS = VIDEOS.map((v) => ({ id: `video-${v.id}`, origem: `site-src/videos/${v.id}-capa.png`, largura: LARGURA_CELULAR, alt: '' }));
+
+/** Ilustrações da marca feitas no repositório (SVG), para a matéria sem tela. Largura e altura são as do desenho (`viewBox`). */
+const ILUSTRACOES = [
+  { id: 'ilustracao-decimo-terceiro', origem: 'site-src/imagens/ilustracoes/decimo-terceiro.svg', alt: 'Ilustração da Clarevo: uma folha de calendário com 13º em destaque e uma pilha de moedas.' },
 ];
 
 const memoria = new Map();
@@ -93,14 +124,33 @@ function processar(def) {
 function imagensDoSite() {
   const arquivos = new Map();
   const info = {};
-  for (const def of IMAGENS) {
+  for (const def of [...IMAGENS, ...TELAS_DAS_NOVIDADES, ...CAPAS_DOS_VIDEOS]) {
     const bytes = processar(def);
     const { largura, altura } = png.dimensoes(bytes);
     const caminho = `imagens/${def.id}.${resumoDoConteudo(bytes)}.png`;
     arquivos.set(caminho, bytes);
     info[def.id] = { caminho, largura, altura, alt: def.alt };
+    if (def.escura) {
+      // A versão do tema escuro: a mesma tela, com a mesma largura e altura (a página declara um tamanho só).
+      const escura = processar({ ...def, id: `${def.id}-escura`, origem: def.escura });
+      const d = png.dimensoes(escura);
+      if (d.largura !== largura || d.altura !== altura) throw new Error(`a versão escura de "${def.id}" (${def.escura}) tem ${d.largura} x ${d.altura}, e a clara ${largura} x ${altura}: grave as duas de novo`);
+      const caminhoEscuro = `imagens/${def.id}-escura.${resumoDoConteudo(escura)}.png`;
+      arquivos.set(caminhoEscuro, escura);
+      info[def.id].escura = caminhoEscuro;
+    }
+  }
+  for (const def of ILUSTRACOES) {
+    const arquivo = path.join(RAIZ, def.origem);
+    if (!fs.existsSync(arquivo)) throw new Error(`a ilustração ${def.origem} não existe (imagem "${def.id}" do site)`);
+    const bytes = fs.readFileSync(arquivo);
+    const caixa = /viewBox="0 0 (\d+) (\d+)"/.exec(bytes.toString('utf8'));
+    if (!caixa) throw new Error(`a ilustração ${def.origem} precisa de viewBox="0 0 largura altura"`);
+    const caminho = `imagens/${def.id}.${resumoDoConteudo(bytes)}.svg`;
+    arquivos.set(caminho, bytes);
+    info[def.id] = { caminho, largura: Number(caixa[1]), altura: Number(caixa[2]), alt: def.alt, ilustracao: true };
   }
   return { arquivos, info };
 }
 
-module.exports = { imagensDoSite, IMAGENS, LEGENDA_DEMO, RESUMO_DO_CODIGO, chaveDoCache, resumoDoConteudo };
+module.exports = { imagensDoSite, IMAGENS, TELAS_DAS_NOVIDADES, CAPAS_DOS_VIDEOS, ILUSTRACOES, LEGENDA_DEMO, LEGENDA_TELA, RESUMO_DO_CODIGO, chaveDoCache, resumoDoConteudo };

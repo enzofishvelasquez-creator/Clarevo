@@ -49,6 +49,13 @@ const TEMAS = [
     topicos: [],
   },
   {
+    id: 'negocio',
+    titulo: 'Espaço Negócio',
+    descricao: 'Separar as contas do negócio das pessoais: criar, anotar, ver quanto sobrou, retirada para o Pessoal e mover.',
+    guias: ['negocio'],
+    topicos: [],
+  },
+  {
     id: 'beneficio',
     titulo: 'Benefício da empresa',
     descricao: 'Aceitar o convite da empresa, o que a empresa vê e o painel de quem administra o benefício.',

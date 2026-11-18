@@ -8,6 +8,7 @@ import {
   payablesStep,
   type BudgetRow,
   type IsoMonth,
+  budgetCategoriesFor,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronRight, PieChart } from 'lucide-react-native';
@@ -53,7 +54,7 @@ export default function OrcamentoScreen() {
   const contextId = work?.contextId;
   const [notice] = useFlash();
   const budget = useMonthBudget(contextId, month);
-  const { refunds } = useMonthRefunds(contextId, month);
+  const { refunds } = useMonthRefunds(contextId, month, budgetCategoriesFor(work?.contextKind ?? 'pessoal'));
   const s = budget.summary;
   const prev = payablesStep(month, currentMonth, -1);
   const next = payablesStep(month, currentMonth, 1);

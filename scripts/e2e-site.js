@@ -15,7 +15,14 @@
  *   - os indicadores oficiais (D-106), com um retrato de teste na geração e o Banco Central simulado no `fetch` do worker: sem JavaScript, o
  *     retrato; com JavaScript, uma pergunta só ao próprio site (/api/indicadores), que troca os números e a hora e não se repete; a cópia de
  *     uma hora no servidor; a fonte fora do ar (a página fica com o retrato); nenhum pedido do navegador a outro domínio; a política de
- *     segurança; o aviso de mercado no rodapé; as duas calculadoras novas; e o resumo semanal com uma edição de teste.
+ *     segurança; o aviso de mercado no rodapé; as duas calculadoras novas; e o resumo semanal com uma edição de teste;
+ *   - os vídeos de uso do app (D-114) na página inicial e em O app: os sete, do próprio site, com controles, `preload="none"` (nenhum
+ *     byte de vídeo antes do toque), sem tocar sozinhos (nem com movimento reduzido), com a capa, o nome, a frase, a legenda e a descrição;
+ *     um toque toca o vídeo, e o servidor responde pedaços (206) com o tipo certo;
+ *   - as imagens das matérias de Novidades (D-114): capa e telas com largura, altura e texto alternativo, carregando do próprio site, e a
+ *     versão escura no tema escuro;
+ *   - a varredura de espaçamento e largura em todas as páginas (360, 768, 900 e 1280 px) e, no tema escuro, nas páginas com vídeos e imagens
+ *     novas (360 e 1280 px).
  * Uso: npm run test:site   (gera o site numa pasta temporária, sobe o servidor local e percorre os fluxos; nada é gravado em `site/`)
  * Navegador: Chromium do Playwright, ou CHROMIUM_PATH.
  */
@@ -30,6 +37,17 @@ const { catalogo } = require('./site/catalogo');
 
 const RAIZ = path.join(__dirname, '..');
 const HOJE = '2026-10-23';
+/** A data de referência dos posts: a do mais novo (a mesma de REFERENCIA_DOS_POSTS no teste do núcleo), para todas as matérias saírem. */
+const REFERENCIA_DOS_POSTS = '2026-11-12';
+/** As matérias de Novidades, todas com imagem de capa (D-114). */
+const POSTS = [
+  'novidades/2026-10-23-conheca-a-clarevo',
+  'novidades/2026-10-23-13o-salario-quando-cai-e-como-se-organizar',
+  'novidades/2026-10-23-como-a-empresa-oferece-a-clarevo-sem-ver-suas-financas',
+  'novidades/2026-11-12-o-que-chegou-ao-app-em-novembro',
+];
+/** As páginas com vídeos ou imagens novas (D-114), que a varredura do tema escuro percorre. */
+const PAGINAS_D114 = ['', 'app/', ...POSTS];
 /**
  * O retrato de teste dos indicadores (D-106), gravado na geração: números fictícios, diferentes dos que o Banco Central simulado devolve,
  * para o teste ver a troca. 13:00 UTC é 10:00 em Brasília.
@@ -72,7 +90,7 @@ function gerarSiteLigado() {
   const saida = path.join(dir, 'site');
   const r = spawnSync(
     process.execPath,
-    [path.join(__dirname, 'gerar-site.js'), '--dados', path.join(dir, 'dados.json'), '--referencia', HOJE, '--retrato', path.join(dir, 'retrato.json'), '--noticias', path.join(dir, 'noticias'), '--saida', saida],
+    [path.join(__dirname, 'gerar-site.js'), '--dados', path.join(dir, 'dados.json'), '--referencia', REFERENCIA_DOS_POSTS, '--retrato', path.join(dir, 'retrato.json'), '--noticias', path.join(dir, 'noticias'), '--saida', saida],
     { encoding: 'utf8' },
   );
   if (r.status !== 0) throw new Error(`o gerador falhou:\n${r.stderr}`);
@@ -246,6 +264,89 @@ function roteiros(CALC) {
       },
     ),
   ];
+}
+
+/**
+ * A varredura de espaçamento e largura de uma página (pedido do Enzo em 12/11/2026), que roda no navegador: caixas encostadas, rolagem
+ * lateral, cartão sozinho na última linha, título colado, texto colado numa caixa, margem somada ao respiro e seções com o respiro em
+ * dobro. Serve à varredura de todas as páginas (bloco 8) e à do tema escuro (bloco 8b, D-114).
+ */
+function varrerPagina() {
+  const caixas = [...document.querySelectorAll('main *, footer *')].filter((e) => {
+    const cs = getComputedStyle(e); const b = e.getBoundingClientRect();
+    if (b.width < 120 || b.height < 56 || cs.visibility === 'hidden' || cs.display === 'none') return false;
+    if ((parseFloat(cs.borderTopLeftRadius) || 0) < 8) return false;
+    const borda = parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none';
+    const fundo = cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent';
+    return borda || fundo || cs.boxShadow !== 'none';
+  });
+  const nome = (e) => `${e.tagName.toLowerCase()}${e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : ''} "${(e.textContent || '').trim().slice(0, 30)}"`;
+  const achados = [];
+  for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
+    const a = caixas[i], b = caixas[j];
+    if (a.contains(b) || b.contains(a)) continue;
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    const gx = Math.max(rb.left - ra.right, ra.left - rb.right), gy = Math.max(rb.top - ra.bottom, ra.top - rb.bottom);
+    if (gx < 8 && gy < 8) achados.push(`${nome(a)} e ${nome(b)} (${Math.round(Math.max(gx, gy))} px)`);
+  }
+  // Varredura de 12/11/2026. Uma "caixa" é o mesmo que acima (fundo, borda ou sombra, com cantos arredondados), sem os campos.
+  const vis = (e) => { const cs = getComputedStyle(e); const b = e.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0; };
+  const caixa = (e) => caixas.includes(e) && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.tagName);
+  const noFluxo = (e) => vis(e) && getComputedStyle(e).position !== 'absolute';
+  const antes = (e) => { let x = e.previousElementSibling; while (x && !noFluxo(x)) x = x.previousElementSibling; return x; };
+  const depois = (e) => { let x = e.nextElementSibling; while (x && !noFluxo(x)) x = x.nextElementSibling; return x; };
+  const cartao = (f) => caixa(f) || (f.children.length === 1 && caixa(f.children[0]));
+  const gradeDeCartoes = (g) => getComputedStyle(g).display === 'grid' && g.children.length > 1 && [...g.children].filter(vis).every(cartao);
+  const sozinhos = [], titulos = [], colados = [], margens = [], dobrados = [];
+  for (const g of document.querySelectorAll('main *')) {
+    if (!vis(g) || !gradeDeCartoes(g)) continue;
+    const filhos = [...g.children].filter(vis);
+    if (filhos.length < 3) continue;
+    const linhas = new Map();
+    for (const f of filhos) { const t = Math.round(f.getBoundingClientRect().top); linhas.set(t, [...(linhas.get(t) || []), f]); }
+    const ultima = [...linhas.entries()].sort((a, b) => a[0] - b[0]).pop()[1];
+    if (linhas.size > 1 && ultima.length === 1 && ultima[0].getBoundingClientRect().width < g.getBoundingClientRect().width * 0.9) sozinhos.push(`${nome(g)} (${filhos.length} cartões)`);
+  }
+  // O rodapé não tem cartões, mas uma coluna de links sozinha na última linha é o mesmo erro (revisão de 12/11/2026).
+  for (const g of document.querySelectorAll('.rodape-grade')) {
+    const filhos = [...g.children].filter(vis);
+    const linhas = new Map();
+    for (const f of filhos) { const t = Math.round(f.getBoundingClientRect().top); linhas.set(t, [...(linhas.get(t) || []), f]); }
+    const ultima = [...linhas.entries()].sort((a, b) => a[0] - b[0]).pop()?.[1] || [];
+    if (linhas.size > 1 && ultima.length === 1 && ultima[0].getBoundingClientRect().width < g.getBoundingClientRect().width * 0.9) sozinhos.push(`rodapé (${filhos.length} colunas)`);
+  }
+  for (const h of document.querySelectorAll('main h2')) {
+    const a = vis(h) && antes(h), d = vis(h) && depois(h);
+    if (!a || !d) continue;
+    const r = h.getBoundingClientRect();
+    const acima = r.top - a.getBoundingClientRect().bottom, abaixo = d.getBoundingClientRect().top - r.bottom;
+    if (acima < 24 || acima < abaixo * 1.5) titulos.push(`${nome(h)} (${Math.round(acima)} px acima, ${Math.round(abaixo)} px até o conteúdo)`);
+  }
+  for (const e of document.querySelectorAll('main *')) {
+    if (!caixa(e) && !(vis(e) && gradeDeCartoes(e))) continue;
+    for (const [x, lado] of [[depois(e), 'depois'], [antes(e), 'antes']]) {
+      if (!x || caixa(x) || gradeDeCartoes(x) || (lado === 'antes' && /^H[1-6]$/.test(x.tagName))) continue;
+      const a = e.getBoundingClientRect(), b = x.getBoundingClientRect();
+      const gy = lado === 'depois' ? b.top - a.bottom : a.top - b.bottom;
+      if (gy < 8 && Math.max(b.left - a.right, a.left - b.right) < 8) colados.push(`${nome(e)} e ${nome(x)} (${Math.round(gy)} px)`);
+    }
+  }
+  for (const c of caixas) {
+    const cs = getComputedStyle(c);
+    if (!caixa(c) || c.tagName === 'A' || cs.display.startsWith('inline') || parseFloat(cs.paddingTop) < 4) continue;
+    const filhos = [...c.children].filter(noFluxo);
+    if (!filhos.length) continue;
+    const mt = parseFloat(getComputedStyle(filhos[0]).marginTop), mb = parseFloat(getComputedStyle(filhos[filhos.length - 1]).marginBottom);
+    if (mt > 2 || mb > 2) margens.push(`${nome(c)} (${mt} px em cima, ${mb} px embaixo)`);
+  }
+  for (const s of document.querySelectorAll('main > section:not(.capa)')) {
+    const p = depois(s);
+    if (!p || p.tagName !== 'SECTION') continue;
+    const a = getComputedStyle(s), b = getComputedStyle(p);
+    if (a.backgroundColor === b.backgroundColor && !(parseFloat(a.borderBottomWidth) > 0) && !(parseFloat(b.borderTopWidth) > 0) && parseFloat(a.paddingBottom) > 0 && parseFloat(b.paddingTop) > 0) dobrados.push(`${nome(s)} e ${nome(p)}`);
+  }
+  const tres = (l) => l.slice(0, 3);
+  return { achados: achados.slice(0, 3), largo: document.documentElement.scrollWidth > window.innerWidth + 1, sozinhos: tres(sozinhos), titulos: tres(titulos), colados: tres(colados), margens: tres(margens), dobrados: tres(dobrados) };
 }
 
 (async () => {
@@ -597,6 +698,105 @@ function roteiros(CALC) {
       await g.close();
     }
 
+    // 7c. Vídeos de uso do app (D-114): na página inicial e em O app, os sete vídeos do próprio site, com controles, sem baixar nada antes do
+    // toque (preload="none") e sem tocar sozinhos; a capa, o nome, a frase, a legenda e a descrição de cada um; um toque toca o vídeo.
+    {
+      const p = await pagina();
+      const deVideo = [];
+      p.on('request', (q) => /\/videos\//.test(q.url()) && deVideo.push(q.url()));
+      const lerVideos = () => p.$$eval('#em-uso ~ ul.videos video', (vs) => vs.map((v) => ({
+        controls: v.controls, preload: v.getAttribute('preload'), autoplay: v.hasAttribute('autoplay'), loop: v.hasAttribute('loop'), muted: v.muted,
+        paused: v.paused, tempo: v.currentTime, poster: v.poster, largura: v.getAttribute('width'), altura: v.getAttribute('height'),
+        fontes: [...v.querySelectorAll('source')].map((f) => [f.src, f.type]),
+        nome: document.getElementById(v.getAttribute('aria-labelledby'))?.textContent || '',
+        descricao: document.getElementById(v.getAttribute('aria-describedby'))?.textContent || '',
+        legenda: v.closest('figure')?.querySelector('.legenda')?.textContent || '',
+        frase: v.closest('figure')?.querySelector('figcaption > p:not(.legenda)')?.textContent || '',
+      })));
+      for (const caminho of ['/', '/app/']) {
+        await p.goto(`${origem}${caminho}`);
+        await p.waitForTimeout(1500);
+        const vs = await lerVideos();
+        ok(`vídeos (${caminho}): a seção "Veja o app em uso" com os sete vídeos`, vs.length === 7 && (await p.textContent('#em-uso')) === 'Veja o app em uso', `${vs.length}`);
+        ok(`vídeos (${caminho}): todos com controles, preload="none", sem autoplay nem repetição, parados no começo`, vs.every((v) => v.controls && v.preload === 'none' && !v.autoplay && !v.loop && v.paused && v.tempo === 0), JSON.stringify(vs.map((v) => [v.controls, v.preload, v.autoplay, v.paused, v.tempo])));
+        ok(`vídeos (${caminho}): nenhum byte de vídeo baixado antes de alguém tocar`, deVideo.length === 0, deVideo.join(' | '));
+        ok(`vídeos (${caminho}): capa, WebM e MP4 do próprio site, com largura e altura`, vs.every((v) => v.poster.startsWith(`${origem}/imagens/video-`) && v.largura === '720' && v.altura === '1560' &&
+          v.fontes.length === 2 && v.fontes[0][1] === 'video/webm' && v.fontes[1][1] === 'video/mp4' && v.fontes.every(([u]) => u.startsWith(`${origem}/videos/`))), JSON.stringify(vs[0]));
+        ok(`vídeos (${caminho}): cada um com nome, frase, a legenda "Tela da demonstração, com dados fictícios" e a descrição em texto para leitor de tela`,
+          vs.every((v) => v.nome.length > 3 && v.frase.length > 20 && v.legenda.startsWith('Tela da demonstração, com dados fictícios. ') && /\d+ segundos, sem som\.$/.test(v.legenda) && v.descricao.length > 120), JSON.stringify(vs.map((v) => [v.nome, v.legenda, v.descricao.length])));
+        const capas = await Promise.all(vs.map((v) => ctx.request.get(v.poster)));
+        ok(`vídeos (${caminho}): as capas carregam (PNG, guardadas por um ano)`, capas.every((r) => r.ok() && r.headers()['content-type'] === 'image/png' && /immutable/.test(r.headers()['cache-control'] || '')));
+      }
+      // Um toque toca o vídeo (o WebM, que o Chromium do teste toca), e só ele.
+      const primeiro = p.locator('#em-uso ~ ul.videos video').first();
+      await primeiro.scrollIntoViewIfNeeded();
+      await primeiro.click();
+      await p.waitForTimeout(600);
+      if (await primeiro.evaluate((v) => v.paused)) await primeiro.evaluate((v) => v.play());
+      await p.waitForFunction(() => document.querySelector('#em-uso ~ ul.videos video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
+      const tocando = await p.$$eval('#em-uso ~ ul.videos video', (vs) => vs.map((v) => ({ paused: v.paused, tempo: v.currentTime, src: v.currentSrc, erro: v.error && v.error.code })));
+      ok('vídeos: um toque toca o primeiro vídeo (WebM do próprio site), e os outros continuam parados', tocando[0].tempo > 0.5 && !tocando[0].erro && tocando[0].src.startsWith(`${origem}/videos/anotar-gasto.`) && tocando[0].src.endsWith('.webm') && tocando.slice(1).every((v) => v.paused && v.tempo === 0), JSON.stringify(tocando.slice(0, 2)));
+      ok('vídeos: o que foi baixado veio só do próprio site', deVideo.length > 0 && deVideo.every((u) => u.startsWith(`${origem}/videos/`)), deVideo.slice(0, 3).join(' | '));
+      await p.close();
+      // O MP4 (para os navegadores que não tocam WebM): tipo certo, pedaço com 206 e a política de segurança com media-src 'self'.
+      const htmlDoApp = await (await ctx.request.get(`${origem}/app/`)).text();
+      const endereco = /<source src="\.\.\/(videos\/anotar-gasto\.[0-9a-f]{10}\.mp4)"/.exec(htmlDoApp)?.[1];
+      const inteiro = await ctx.request.get(`${origem}/${endereco}`);
+      const pedaco = await ctx.request.get(`${origem}/${endereco}`, { headers: { Range: 'bytes=0-99' } });
+      ok('vídeos: o MP4 sai como video/mp4, guardado por um ano, com a política de segurança que aceita vídeo só do próprio site', inteiro.ok() && inteiro.headers()['content-type'] === 'video/mp4' &&
+        /immutable/.test(inteiro.headers()['cache-control'] || '') && /media-src 'self'/.test(inteiro.headers()['content-security-policy'] || ''), JSON.stringify(inteiro.headers()));
+      ok('vídeos: o servidor responde um pedaço do arquivo (206), como o navegador pede', pedaco.status() === 206 && (await pedaco.body()).length === 100 && (await pedaco.body()).subarray(4, 8).toString('latin1') === 'ftyp' && /^bytes 0-99\/\d+$/.test(pedaco.headers()['content-range'] || ''), `${pedaco.status()} ${pedaco.headers()['content-range']}`);
+      // Movimento reduzido: nada toca sozinho e nada de vídeo é baixado; a faixa rola sem animação.
+      const calmo = await navegador.newContext({ reducedMotion: 'reduce', viewport: { width: 390, height: 900 } });
+      const q = await calmo.newPage();
+      const deVideoCalmo = [];
+      q.on('request', (r) => /\/videos\//.test(r.url()) && deVideoCalmo.push(r.url()));
+      await q.goto(`${origem}/`);
+      await q.waitForTimeout(2000);
+      const parados = await q.$$eval('#em-uso ~ ul.videos video', (vs) => vs.every((v) => v.paused && v.currentTime === 0));
+      const rolagem = await q.$eval('ul.videos', (u) => getComputedStyle(u).scrollBehavior);
+      ok('vídeos com movimento reduzido: nenhum toca sozinho, nada é baixado e a faixa rola sem animação', parados && deVideoCalmo.length === 0 && rolagem === 'auto', `${parados} ${deVideoCalmo.length} ${rolagem}`);
+      await calmo.close();
+    }
+
+    // 7d. Imagens das matérias de Novidades (D-114): capa e telas ao lado das seções, do próprio site, com largura, altura e texto
+    // alternativo; a tela larga (o painel da empresa) embaixo do texto; no tema claro, a versão clara das telas.
+    {
+      const p = await pagina();
+      const lerImagens = () => p.evaluate(async () => {
+        for (const i of document.images) i.loading = 'eager';
+        await Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = r; i.onerror = r; }))));
+        return [...document.querySelectorAll('main img')].map((i) => ({
+          src: i.currentSrc || i.src, alt: i.getAttribute('alt'), largura: i.getAttribute('width'), altura: i.getAttribute('height'), natural: i.naturalWidth,
+          capa: Boolean(i.closest('.capa-post')), tela: Boolean(i.closest('.post-tela')), escura: Boolean(i.closest('picture')), legenda: i.closest('figure')?.querySelector('figcaption')?.textContent || null,
+        }));
+      });
+      for (const post of POSTS) {
+        await p.goto(`${origem}/${post}`);
+        const imgs = await lerImagens();
+        const capa = imgs.filter((i) => i.capa);
+        ok(`novidades com imagens: ${post.slice(10)} tem a imagem de capa no topo`, capa.length === 1 && capa[0].natural > 0, JSON.stringify(capa));
+        ok(`novidades com imagens: ${post.slice(10)}: toda imagem com largura, altura, texto alternativo e carregada do próprio site`,
+          imgs.length > 0 && imgs.every((i) => /^\d+$/.test(i.largura || '') && /^\d+$/.test(i.altura || '') && (i.alt || '').length > 20 && i.natural > 0 && i.src.startsWith(`${origem}/imagens/`)), JSON.stringify(imgs.filter((i) => !(i.natural > 0)).slice(0, 2)));
+        ok(`novidades com imagens: ${post.slice(10)}: as telas com a legenda "Tela da demonstração, com dados fictícios", na versão clara`,
+          imgs.filter((i) => i.escura).every((i) => i.legenda === 'Tela da demonstração, com dados fictícios' && !/-escura\./.test(i.src)), JSON.stringify(imgs.map((i) => [i.src.slice(-40), i.legenda])));
+      }
+      await p.goto(`${origem}/${POSTS[3]}`);
+      const telas = (await lerImagens()).filter((i) => i.tela).map((i) => i.src.replace(/^.*\/imagens\/(post-[a-z-]+)\..*$/, '$1'));
+      ok('novidades com imagens: em "O que chegou ao app em novembro", as telas de Investir (Desempenho), Metas, Multa e juros (fatura) e Resumo, cada uma ao lado da seção dela', JSON.stringify(telas) === JSON.stringify(['post-desempenho', 'post-metas', 'post-multa-fatura', 'post-resumo']), JSON.stringify(telas));
+      await p.setViewportSize({ width: 1280, height: 900 });
+      const lado = await p.evaluate(() => [...document.querySelectorAll('.post-secao')].map((s) => {
+        const t = s.querySelector('.post-secao-texto h2').getBoundingClientRect(); const f = s.querySelector('.post-tela').getBoundingClientRect();
+        return f.left > t.left + 400 && Math.abs(f.top - t.top) < 24;
+      }));
+      ok('novidades com imagens: em 1280 px, cada tela fica à direita do texto da seção, na altura do título', lado.length === 4 && lado.every(Boolean), JSON.stringify(lado));
+      await p.goto(`${origem}/${POSTS[2]}`);
+      const larga = await p.evaluate(() => { const f = document.querySelector('.larga.post-tela'); const t = document.querySelector('.post-corpo p'); return f && t ? Math.round(f.getBoundingClientRect().width) <= Math.round(t.getBoundingClientRect().width) + 1 && f.getBoundingClientRect().width > 600 : false; });
+      ok('novidades com imagens: o painel da empresa, largo, fica embaixo do texto, na largura dele', larga);
+      await p.setViewportSize({ width: 390, height: 900 });
+      await p.close();
+    }
+
     // 8. Espaçamento em todas as páginas (pedido do Enzo em 12/11/2026: "esse é um erro de espaçamento básico, precisamos evitar eles, em
     // toda a Clarevo"): em 360, 768, 900 e 1280 px, nenhum cartão, moldura ou bloco com fundo ou borda encosta em outro ou fica por cima
     // dele (menos de 8 px entre os dois, nos dois sentidos), e nada passa da largura da tela. Da varredura do mesmo dia: nenhum cartão
@@ -616,83 +816,7 @@ function roteiros(CALC) {
         for (const arquivo of paginas) {
           const url = `${origem}/${arquivo.replace(/\\/g, '/').replace(/index\.html$/, '').replace(/\.html$/, '')}`;
           await p.goto(url);
-          const r = await p.evaluate(() => {
-            const caixas = [...document.querySelectorAll('main *, footer *')].filter((e) => {
-              const cs = getComputedStyle(e); const b = e.getBoundingClientRect();
-              if (b.width < 120 || b.height < 56 || cs.visibility === 'hidden' || cs.display === 'none') return false;
-              if ((parseFloat(cs.borderTopLeftRadius) || 0) < 8) return false;
-              const borda = parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none';
-              const fundo = cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent';
-              return borda || fundo || cs.boxShadow !== 'none';
-            });
-            const nome = (e) => `${e.tagName.toLowerCase()}${e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).join('.') : ''} "${(e.textContent || '').trim().slice(0, 30)}"`;
-            const achados = [];
-            for (let i = 0; i < caixas.length; i++) for (let j = i + 1; j < caixas.length; j++) {
-              const a = caixas[i], b = caixas[j];
-              if (a.contains(b) || b.contains(a)) continue;
-              const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-              const gx = Math.max(rb.left - ra.right, ra.left - rb.right), gy = Math.max(rb.top - ra.bottom, ra.top - rb.bottom);
-              if (gx < 8 && gy < 8) achados.push(`${nome(a)} e ${nome(b)} (${Math.round(Math.max(gx, gy))} px)`);
-            }
-            // Varredura de 12/11/2026. Uma "caixa" é o mesmo que acima (fundo, borda ou sombra, com cantos arredondados), sem os campos.
-            const vis = (e) => { const cs = getComputedStyle(e); const b = e.getBoundingClientRect(); return cs.display !== 'none' && cs.visibility !== 'hidden' && b.width > 0 && b.height > 0; };
-            const caixa = (e) => caixas.includes(e) && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.tagName);
-            const noFluxo = (e) => vis(e) && getComputedStyle(e).position !== 'absolute';
-            const antes = (e) => { let x = e.previousElementSibling; while (x && !noFluxo(x)) x = x.previousElementSibling; return x; };
-            const depois = (e) => { let x = e.nextElementSibling; while (x && !noFluxo(x)) x = x.nextElementSibling; return x; };
-            const cartao = (f) => caixa(f) || (f.children.length === 1 && caixa(f.children[0]));
-            const gradeDeCartoes = (g) => getComputedStyle(g).display === 'grid' && g.children.length > 1 && [...g.children].filter(vis).every(cartao);
-            const sozinhos = [], titulos = [], colados = [], margens = [], dobrados = [];
-            for (const g of document.querySelectorAll('main *')) {
-              if (!vis(g) || !gradeDeCartoes(g)) continue;
-              const filhos = [...g.children].filter(vis);
-              if (filhos.length < 3) continue;
-              const linhas = new Map();
-              for (const f of filhos) { const t = Math.round(f.getBoundingClientRect().top); linhas.set(t, [...(linhas.get(t) || []), f]); }
-              const ultima = [...linhas.entries()].sort((a, b) => a[0] - b[0]).pop()[1];
-              if (linhas.size > 1 && ultima.length === 1 && ultima[0].getBoundingClientRect().width < g.getBoundingClientRect().width * 0.9) sozinhos.push(`${nome(g)} (${filhos.length} cartões)`);
-            }
-            // O rodapé não tem cartões, mas uma coluna de links sozinha na última linha é o mesmo erro (revisão de 12/11/2026).
-            for (const g of document.querySelectorAll('.rodape-grade')) {
-              const filhos = [...g.children].filter(vis);
-              const linhas = new Map();
-              for (const f of filhos) { const t = Math.round(f.getBoundingClientRect().top); linhas.set(t, [...(linhas.get(t) || []), f]); }
-              const ultima = [...linhas.entries()].sort((a, b) => a[0] - b[0]).pop()?.[1] || [];
-              if (linhas.size > 1 && ultima.length === 1 && ultima[0].getBoundingClientRect().width < g.getBoundingClientRect().width * 0.9) sozinhos.push(`rodapé (${filhos.length} colunas)`);
-            }
-            for (const h of document.querySelectorAll('main h2')) {
-              const a = vis(h) && antes(h), d = vis(h) && depois(h);
-              if (!a || !d) continue;
-              const r = h.getBoundingClientRect();
-              const acima = r.top - a.getBoundingClientRect().bottom, abaixo = d.getBoundingClientRect().top - r.bottom;
-              if (acima < 24 || acima < abaixo * 1.5) titulos.push(`${nome(h)} (${Math.round(acima)} px acima, ${Math.round(abaixo)} px até o conteúdo)`);
-            }
-            for (const e of document.querySelectorAll('main *')) {
-              if (!caixa(e) && !(vis(e) && gradeDeCartoes(e))) continue;
-              for (const [x, lado] of [[depois(e), 'depois'], [antes(e), 'antes']]) {
-                if (!x || caixa(x) || gradeDeCartoes(x) || (lado === 'antes' && /^H[1-6]$/.test(x.tagName))) continue;
-                const a = e.getBoundingClientRect(), b = x.getBoundingClientRect();
-                const gy = lado === 'depois' ? b.top - a.bottom : a.top - b.bottom;
-                if (gy < 8 && Math.max(b.left - a.right, a.left - b.right) < 8) colados.push(`${nome(e)} e ${nome(x)} (${Math.round(gy)} px)`);
-              }
-            }
-            for (const c of caixas) {
-              const cs = getComputedStyle(c);
-              if (!caixa(c) || c.tagName === 'A' || cs.display.startsWith('inline') || parseFloat(cs.paddingTop) < 4) continue;
-              const filhos = [...c.children].filter(noFluxo);
-              if (!filhos.length) continue;
-              const mt = parseFloat(getComputedStyle(filhos[0]).marginTop), mb = parseFloat(getComputedStyle(filhos[filhos.length - 1]).marginBottom);
-              if (mt > 2 || mb > 2) margens.push(`${nome(c)} (${mt} px em cima, ${mb} px embaixo)`);
-            }
-            for (const s of document.querySelectorAll('main > section:not(.capa)')) {
-              const p = depois(s);
-              if (!p || p.tagName !== 'SECTION') continue;
-              const a = getComputedStyle(s), b = getComputedStyle(p);
-              if (a.backgroundColor === b.backgroundColor && !(parseFloat(a.borderBottomWidth) > 0) && !(parseFloat(b.borderTopWidth) > 0) && parseFloat(a.paddingBottom) > 0 && parseFloat(b.paddingTop) > 0) dobrados.push(`${nome(s)} e ${nome(p)}`);
-            }
-            const tres = (l) => l.slice(0, 3);
-            return { achados: achados.slice(0, 3), largo: document.documentElement.scrollWidth > window.innerWidth + 1, sozinhos: tres(sozinhos), titulos: tres(titulos), colados: tres(colados), margens: tres(margens), dobrados: tres(dobrados) };
-          });
+          const r = await p.evaluate(varrerPagina);
           for (const x of r.achados) encostados.push(`${arquivo} em ${largura} px: ${x}`);
           if (r.largo) largos.push(`${arquivo} em ${largura} px`);
           for (const k of Object.keys(varredura)) for (const x of r[k]) varredura[k].push(`${arquivo} em ${largura} px: ${x}`);
@@ -707,6 +831,37 @@ function roteiros(CALC) {
       regra('margens', 'nenhuma caixa com o primeiro ou o último item somando margem ao respiro dela');
       regra('dobrados', 'duas seções seguidas com o mesmo fundo, sem linha entre elas, não somam os dois respiros');
       await p.close();
+    }
+
+    // 8b. Tema escuro nas páginas com vídeos e imagens novas (D-114), em 360 e 1280 px: as mesmas regras da varredura, as telas das
+    // matérias na versão escura e nenhuma imagem sem carregar.
+    {
+      const escuro = await navegador.newContext({ colorScheme: 'dark', viewport: { width: 360, height: 900 }, locale: 'pt-BR' });
+      const p = await escuro.newPage();
+      p.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && problemas.push(`${p.url()} ${m.text()}`));
+      p.on('request', (q) => !q.url().startsWith(origem) && !q.url().startsWith('data:') && pedidosDeFora.push(q.url()));
+      const achados = [];
+      const claras = [];
+      for (const largura of [360, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        for (const caminho of PAGINAS_D114) {
+          await p.goto(`${origem}/${caminho}`);
+          const imgs = await p.evaluate(async () => {
+            for (const i of document.images) i.loading = 'eager';
+            await Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = r; i.onerror = r; }))));
+            return [...document.querySelectorAll('main picture img')].map((i) => ({ src: i.currentSrc, natural: i.naturalWidth }));
+          });
+          for (const i of imgs) if (!/-escura\.[0-9a-f]{10}\.png$/.test(i.src) || !(i.natural > 0)) claras.push(`${caminho || 'início'} em ${largura} px: ${i.src}`);
+          const r = await p.evaluate(varrerPagina);
+          const fundo = await p.evaluate(() => getComputedStyle(document.body).backgroundColor);
+          if (fundo !== 'rgb(19, 30, 62)') achados.push(`${caminho || 'início'} em ${largura} px: o fundo não é o do tema escuro (${fundo})`);
+          if (r.largo) achados.push(`${caminho || 'início'} em ${largura} px: passa da largura da tela`);
+          for (const k of ['achados', 'sozinhos', 'titulos', 'colados', 'margens', 'dobrados']) for (const x of r[k]) achados.push(`${caminho || 'início'} em ${largura} px (${k}): ${x}`);
+        }
+      }
+      ok(`tema escuro: em ${PAGINAS_D114.length} páginas com vídeos e imagens novas, em 360 e 1280 px, o fundo escuro, nada passa da largura da tela e as regras de espaçamento valem`, achados.length === 0, achados.slice(0, 8).join(' | '));
+      ok('tema escuro: as telas das matérias aparecem na versão escura, carregadas do próprio site', claras.length === 0, claras.slice(0, 4).join(' | '));
+      await escuro.close();
     }
 
     if (process.env.PESOS_DAS_CALCULADORAS) console.log(`\nJavaScript carregado por página de calculadora (sem compressão):\n${Object.entries(pesos).map(([s, v]) => `  ${s.padEnd(22)} ${String(v.pedidos).padStart(3)} pedidos ${String(v.bytes).padStart(7)} B`).join('\n')}\n`);

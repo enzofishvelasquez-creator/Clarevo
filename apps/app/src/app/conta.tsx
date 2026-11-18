@@ -1,4 +1,5 @@
 import {
+  BUSINESS_TEXT,
   COMPANY_TEXT,
   DELETE_TEXT,
   EXPORT_TEXT,
@@ -28,6 +29,7 @@ import {
   MessageCircle,
   MonitorSmartphone,
   ShieldCheck,
+  Store,
   Trash2,
   Users,
 } from 'lucide-react-native';
@@ -55,6 +57,7 @@ import { signOutIntent } from '@/lib/nav';
 import { SITE_URL, openLicensesPage, openSitePage, openSupportEmail } from '@/lib/site';
 import { useCompanies } from '@/state/company';
 import { useWork } from '@/state/data';
+import { useBusiness } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { useAccountLevel } from '@/state/access';
@@ -83,6 +86,7 @@ export default function ContaScreen() {
   const level = useAccountLevel();
   const personal = useWork().data;
   const family = useFamily();
+  const business = useBusiness();
   const companies = useCompanies();
   // Avisos das telas de contas ("Conta adicionada.", "Conta salva."): lidos uma única vez, quando esta tela abre.
   const [notice] = useFlash();
@@ -246,6 +250,23 @@ export default function ContaScreen() {
             tone="soft"
             accessibilityLabel={family.data ? `${FAMILY_TEXT.accountOpen}, ${FAMILY_ROLE_LABEL[family.data.role]}` : undefined}
             onPress={() => router.push('/familia')}
+          />
+        </Card>
+
+        {/* Espaço Negócio (D-113): para quem tem CNPJ ou trabalha por conta; criar, ver como está o negócio, mudar o nome e encerrar. */}
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {BUSINESS_TEXT.accountTitle}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {business.data ? BUSINESS_TEXT.accountHintIn(business.data.name) : BUSINESS_TEXT.accountHintNone}
+          </Txt>
+          <Button
+            label={business.data ? BUSINESS_TEXT.accountOpen : BUSINESS_TEXT.accountCreate}
+            icon={Store}
+            tone="soft"
+            accessibilityLabel={business.data ? `${BUSINESS_TEXT.accountOpen}, ${business.data.name}` : undefined}
+            onPress={() => router.push(business.data ? '/negocio' : '/negocio/novo')}
           />
         </Card>
 

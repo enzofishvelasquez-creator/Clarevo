@@ -1,6 +1,6 @@
 import { DEMO_PILL_MAX_FONT_SCALE, SUMMARY_NAV_TEXT, addMonths, contextLabelFor, contextPillText, formatMonthBR } from '@clarevo/core';
 import { router } from 'expo-router';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Users } from 'lucide-react-native';
+import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Store, Users } from 'lucide-react-native';
 import { useContext, useEffect, useState, type ReactNode } from 'react';
 import { PixelRatio, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -15,6 +15,7 @@ import { WIDE_CONTENT_MAX, WIDE_TAB_MAX, useWideLayout } from '@/lib/layout';
 import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { ProfileAvatar } from '@/components/profile-photo';
 import { canGoForward, useView, type SpaceKind } from '@/state/data';
+import { useBusiness } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { LOGOTYPE_HEIGHT, LOGOTYPE_WIDTH } from '@/theme/logo-paths';
@@ -243,8 +244,10 @@ export function SubHeader({ title, onBack, right, help, plainTitle }: { title: s
 export function ContextPill({ label: given, fixed, inTab }: { label: string; fixed?: boolean; inTab?: boolean }) {
   const { auth } = useSession();
   const { space: kind } = useView();
+  const business = useBusiness();
   const demo = auth.mode === 'demo';
-  const label = fixed ? given : contextLabelFor(given, kind);
+  // No negócio (D-113), o último "Pessoal" vira o nome do negócio ("Salvando em Sacolé da Mãe").
+  const label = fixed ? given : contextLabelFor(given, kind, business.data?.name);
   // Nas abas, o selo "Demonstração" já está no cabeçalho: a pílula fica branca e diz só o contexto.
   const text = contextPillText(label, demo, inTab);
   const lime = demo && !inTab;
@@ -257,44 +260,50 @@ export function ContextPill({ label: given, fixed, inTab }: { label: string; fix
   );
 }
 
-const OPTIONS: { kind: SpaceKind; label: string }[] = [
-  { kind: 'pessoal', label: 'Pessoal' },
-  { kind: 'familia', label: 'Família' },
-];
+interface SpaceOption {
+  kind: SpaceKind;
+  label: string;
+}
 
 /**
- * Seletor Pessoal/Família nas abas (CL-V002). A pílula branca desliza em 200 ms. Só aparece para quem tem uma Família (D-055):
- * sem ela, o Pessoal é o único contexto e o seletor não ocupa lugar. A Família se cria e se administra em Conta.
+ * Seletor de espaço nas abas (CL-V002): Pessoal, a Família (D-055, quem tem uma) e o negócio (D-113, pelo nome, quem tem um). A pílula
+ * branca desliza em 200 ms. Só aparece para quem tem uma Família ou um negócio: sem eles, o Pessoal é o único contexto e o seletor não
+ * ocupa lugar. A Família e o negócio se criam e se administram em Conta.
  */
 export function ContextSwitch() {
   const family = useFamily();
-  if (!family.data) return null;
-  return <ContextSwitchTrack />;
+  const business = useBusiness();
+  if (!family.data && !business.data) return null;
+  const options: SpaceOption[] = [{ kind: 'pessoal', label: 'Pessoal' }];
+  if (family.data) options.push({ kind: 'familia', label: 'Família' });
+  if (business.data) options.push({ kind: 'negocio', label: business.data.name });
+  return <ContextSwitchTrack options={options} />;
 }
 
-function ContextSwitchTrack() {
+function ContextSwitchTrack({ options }: { options: readonly SpaceOption[] }) {
   const { space: active, setSpace } = useView();
   const reduced = useReducedMotion();
   const [width, setWidth] = useState(0);
-  const index = OPTIONS.findIndex((o) => o.kind === active);
+  const index = Math.max(0, options.findIndex((o) => o.kind === active));
   const x = useSharedValue(0);
-  const half = Math.max(0, (width - 8) / 2);
+  const part = Math.max(0, (width - 8) / options.length);
 
   useEffect(() => {
-    const target = index * half;
-    x.value = reduced || half === 0 ? target : withTiming(target, { duration: motion.context });
-  }, [index, half, reduced, x]);
+    const target = index * part;
+    x.value = reduced || part === 0 ? target : withTiming(target, { duration: motion.context });
+  }, [index, part, reduced, x]);
 
   const pill = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  const names = options.map((o) => (o.kind === 'negocio' ? 'Negócio' : o.label)).join(', ');
 
   return (
     <View
       style={styles.track}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       accessibilityRole="tablist"
-      accessibilityLabel="Espaço: Pessoal ou Família">
-      {half > 0 ? <Animated.View style={[styles.indicator, { width: half }, pill]} /> : null}
-      {OPTIONS.map((o) => {
+      accessibilityLabel={`Espaço: ${names.replace(/, ([^,]+)$/, ' ou $1')}`}>
+      {part > 0 ? <Animated.View style={[styles.indicator, { width: part }, pill]} /> : null}
+      {options.map((o) => {
         const selected = o.kind === active;
         return (
           <Pressable
@@ -302,11 +311,16 @@ function ContextSwitchTrack() {
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             aria-selected={selected}
-            accessibilityLabel={`Ver dados de ${o.label}`}
+            accessibilityLabel={o.kind === 'negocio' ? `Ver dados do negócio ${o.label}` : `Ver dados de ${o.label}`}
             onPress={() => (selected ? undefined : setSpace(o.kind))}
-            style={(s) => [styles.option, half === 0 && selected && styles.optionSelected, (s as { focused?: boolean }).focused && focusOnBrand]}>
+            style={(s) => [styles.option, part === 0 && selected && styles.optionSelected, (s as { focused?: boolean }).focused && focusOnBrand]}>
             {o.kind === 'familia' ? <Users size={18} color={selected ? colors.brand : colors.textOnBrand} /> : null}
-            <Txt variant="label" color={selected ? colors.brand : colors.textOnBrand} style={{ fontFamily: fonts.bold, fontSize: 16 }}>
+            {o.kind === 'negocio' ? <Store size={18} color={selected ? colors.brand : colors.textOnBrand} /> : null}
+            <Txt
+              variant="label"
+              numberOfLines={1}
+              color={selected ? colors.brand : colors.textOnBrand}
+              style={{ fontFamily: fonts.bold, fontSize: 16, flexShrink: 1 }}>
               {o.label}
             </Txt>
           </Pressable>
@@ -408,7 +422,7 @@ const styles = StyleSheet.create({
   pillDemo: { backgroundColor: colors.accent },
   track: { flexDirection: 'row', backgroundColor: colors.brandDeep, borderRadius: radius.md, padding: 4 },
   indicator: { position: 'absolute', left: 4, top: 4, bottom: 4, borderRadius: 13, backgroundColor: colors.surfaceOnBrand },
-  option: { flex: 1, minHeight: 48, borderRadius: 13, flexDirection: 'row', gap: space[2], alignItems: 'center', justifyContent: 'center' },
+  option: { flex: 1, minHeight: 48, minWidth: 0, borderRadius: 13, flexDirection: 'row', gap: space[2], alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[1] },
   optionSelected: { backgroundColor: colors.surfaceOnBrand },
   month: { flexDirection: 'row', alignItems: 'center', marginTop: space[5] },
   monthBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },

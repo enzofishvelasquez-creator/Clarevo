@@ -25,10 +25,10 @@ export function AccountsCard({ contextId, canWrite = true }: { contextId: string
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
         {ACCOUNTS_TEXT.title}
       </Txt>
-      {/* Com a Família escolhida (D-055), as contas são as dela: a pílula diz de qual contexto é a lista. */}
-      {kind === 'familia' ? (
+      {/* Com a Família ou o negócio escolhido (D-055, D-113), as contas são as dele: a pílula diz de qual contexto é a lista. */}
+      {kind !== 'pessoal' ? (
         <View style={{ alignSelf: 'flex-start' }}>
-          <ContextPill label="Família" fixed />
+          <ContextPill label="Pessoal" />
         </View>
       ) : null}
       <Txt variant="caption" color={colors.textSecondary}>

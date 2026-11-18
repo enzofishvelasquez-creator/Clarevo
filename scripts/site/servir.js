@@ -3,7 +3,7 @@
  * Servidor local mínimo para o teste de navegador do site (`scripts/e2e-site.js`) e para as capturas: serve a pasta `site/` como o
  * Cloudflare Pages faz (`/x` abre `x.html`, `/pasta/` abre `pasta/index.html`, 404 com `404.html`), aplica os cabeçalhos do
  * `_headers` (a política de segurança inclusive, para o navegador acusar qualquer violação, e a guarda longa de `/fontes/*`, `/imagens/*` e
- * `/marca/*` nos arquivos estáticos) e, se houver `_worker.js` (modo avançado),
+ * `/marca/*` nos arquivos estáticos), responde pedidos de um pedaço (`Range`, 206, como o Pages faz com os vídeos) e, se houver `_worker.js` (modo avançado),
  * entrega a ele só o que o `_routes.json` manda (`include` menos `exclude`, com `*` no fim ou no meio, como o Pages; sem o arquivo, tudo),
  * com um `env.ASSETS` que devolve os arquivos estáticos. O resto sai direto dos arquivos, sem passar pelo worker. Sem pacote novo: só `node:http`.
  */
@@ -22,6 +22,8 @@ const TIPOS = {
   '.ttf': 'font/ttf',
   '.xml': 'application/xml; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
 };
 
 /** Os cabeçalhos do bloco `/*` do `_headers`. */
@@ -92,12 +94,23 @@ async function servir(pasta, { porta = 0, env = {}, hostDoSite = false, fetchDoW
   const worker = fonteDoWorker ? (await import(`data:text/javascript;base64,${Buffer.from(fonteDoWorker).toString('base64')}`)).default : null;
   const pedidos = [];
   const doWorker = [];
-  const estatico = (caminho, metodo) => {
+  const estatico = (caminho, metodo, faixa = null) => {
     const arquivo = resolverArquivo(pasta, caminho);
     const naoAchou = !arquivo;
     const alvo = arquivo ?? path.join(pasta, '404.html');
+    const tipo = TIPOS[path.extname(alvo)] || 'application/octet-stream';
+    // Pedido de um pedaço (`Range: bytes=ini-fim`), como o navegador faz com os vídeos (D-114): 206 com o pedaço, como o Pages responde.
+    const pedaco = !naoAchou && faixa ? /^bytes=(\d*)-(\d*)$/.exec(faixa) : null;
+    if (pedaco && (pedaco[1] !== '' || pedaco[2] !== '')) {
+      const total = fs.statSync(alvo).size;
+      const ini = pedaco[1] === '' ? Math.max(0, total - Number(pedaco[2])) : Number(pedaco[1]);
+      const fim = pedaco[1] === '' || pedaco[2] === '' ? total - 1 : Math.min(total - 1, Number(pedaco[2]));
+      if (ini > fim || ini >= total) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${total}` } });
+      const corpo = metodo === 'HEAD' ? null : fs.readFileSync(alvo).subarray(ini, fim + 1);
+      return new Response(corpo, { status: 206, headers: { 'content-type': tipo, 'content-range': `bytes ${ini}-${fim}/${total}`, 'accept-ranges': 'bytes' } });
+    }
     const corpo = metodo === 'HEAD' ? null : fs.readFileSync(alvo);
-    return new Response(corpo, { status: naoAchou ? 404 : 200, headers: { 'content-type': TIPOS[path.extname(alvo)] || 'application/octet-stream' } });
+    return new Response(corpo, { status: naoAchou ? 404 : 200, headers: { 'content-type': tipo, ...(naoAchou ? {} : { 'accept-ranges': 'bytes' }) } });
   };
   // O worker chama o `fetch` global (Resend e Brevo). Nos testes ele é trocado pelo simulado enquanto o servidor estiver de pé, e
   // `fechar` devolve o original.
@@ -120,8 +133,8 @@ async function servir(pasta, { porta = 0, env = {}, hostDoSite = false, fetchDoW
         doWorker.push(`${q.method} ${url.pathname}`);
         resposta = await worker.fetch(requisicao, { ...variaveis, ASSETS: { fetch: (req) => Promise.resolve(estatico(new URL(req.url).pathname, req.method)) } });
       } else {
-        resposta = estatico(url.pathname, q.method);
-        if (resposta.status === 200) doCaminho = cabecalhosDoCaminho(url.pathname);
+        resposta = estatico(url.pathname, q.method, q.headers.range || null);
+        if (resposta.status === 200 || resposta.status === 206) doCaminho = cabecalhosDoCaminho(url.pathname);
       }
       const saida = { ...Object.fromEntries(resposta.headers), ...cabecalhos, ...doCaminho };
       r.writeHead(resposta.status, saida);

@@ -46,6 +46,8 @@ import { demoTrialAccess } from './plano';
  * Usado em outubro (competência): Moradia R$ 2.500,00 (o aluguel pago), Mercado R$ 1.400,00 e Lazer R$ 400,00 (a 1ª parcela do
  * tênis, R$ 200,00, e o restaurante, R$ 200,00; a compra no cartão conta no mês da compra). Limite pessoal de 60% a partir de
  * outubro (outubro 52,5% de 60%; novembro passa 13,0 pontos). Nada disso muda os totais de outubro.
+ * Espaço Negócio (D-113), só no cenário 'negocio': "Sacolé da Maria", FICTÍCIO, num contexto separado (DEMO_BUSINESS_RECORDS): nenhum
+ * total do Pessoal muda.
  */
 export const DEMO_TODAY = '2026-10-07';
 export const DEMO_EMAIL = 'demo@clarevo.app';
@@ -67,10 +69,12 @@ export const DEMO_EMAIL = 'demo@clarevo.app';
  *   R$ 3.390,00 e R$ 3.400,00).
  * - 'metas': a base de aceite, com as duas metas criadas em 01/07/2026 (DEMO_GOALS_SETUP_DAY), para o convite de rever as metas (D-105).
  * - 'nivel': o cenário 'retorno' com a regra da queda do nível contando desde DEMO_LEVEL_COUNT_DAY, para o aviso de queda (D-111).
+ * - 'negocio': a base de aceite com o negócio de exemplo "Sacolé da Maria" (D-113, DEMO_BUSINESS_RECORDS), num contexto separado: os
+ *   totais do Pessoal não mudam. O seletor de espaço aparece no Resumo, em Movimentos e em Metas, com Pessoal e o nome do negócio.
  * Conta nova nunca recebe nenhum deles.
  */
-export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao' | 'metas' | 'nivel';
-export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao', 'metas', 'nivel'];
+export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao' | 'metas' | 'nivel' | 'negocio';
+export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao', 'metas', 'nivel', 'negocio'];
 /**
  * Dia em que as duas metas de exemplo foram criadas no cenário 'metas' (D-105): a base de aceite, com a reserva e a viagem criadas (e o
  * já guardado ao criar) em 01/07/2026, três meses antes de 07/10/2026, para o convite "Quer rever as suas metas?" aparecer. O aporte de
@@ -377,9 +381,49 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   }
   today = DEMO_TODAY;
 
+  // Espaço Negócio (D-113), só no cenário 'negocio': o negócio de exemplo, FICTÍCIO, com a "Conta do negócio" e lançamentos só em
+  // setembro e outubro de 2026 (os meses que o Pessoal já tem). Mora num contexto separado: nenhum total do Pessoal muda, nem a renda
+  // comprometida, o orçamento, as metas ou os níveis. Sem retirada para o Pessoal (ela mudaria o Recebido do Pessoal): a demonstração
+  // mostra como fazer uma. Fora do cenário, a demonstração padrão não tem negócio (o seletor de espaço continua fora do Resumo) e deixa
+  // criar um, só na memória do aparelho.
+  if (opts.scenario === 'negocio') await seedDemoBusiness(repo);
+
   // A latência só passa a valer depois de semear, para a demonstração abrir rápido.
   repo.latencyMs = opts.latencyMs ?? 0;
   return repo;
+}
+
+/** O negócio de exemplo da demonstração (D-113), FICTÍCIO. */
+export const DEMO_BUSINESS_NAME = 'Sacolé da Maria';
+
+/**
+ * Lançamentos do negócio de exemplo (D-113), FICTÍCIOS. Setembro de 2026: entrou R$ 1.760,00 (quatro semanas de vendas), saiu R$ 601,00
+ * (frutas e açúcar, saquinhos e etiquetas, gás e o DAS), sobrou R$ 1.159,00. Outubro até 07/10: entrou R$ 760,00 (uma semana de vendas e
+ * uma encomenda de festa), saiu R$ 418,00 (frutas e açúcar, ajudante na festa e a taxa da maquininha), sobrou R$ 342,00. Maior saída de
+ * outubro: Material e mercadoria (R$ 280,00).
+ */
+export const DEMO_BUSINESS_RECORDS: readonly (readonly ['receita' | 'despesa', string, number, string, string])[] = [
+  ['despesa', 'Frutas e açúcar', 320, '2026-09-05', 'Material e mercadoria'],
+  ['despesa', 'Saquinhos e etiquetas', 85, '2026-09-05', 'Material e mercadoria'],
+  ['receita', 'Vendas da semana', 420, '2026-09-07', 'Vendas'],
+  ['despesa', 'Gás de cozinha', 120, '2026-09-10', 'Contas do ponto'],
+  ['receita', 'Vendas da semana', 380, '2026-09-14', 'Vendas'],
+  ['despesa', 'DAS do MEI', 76, '2026-09-20', 'Impostos e DAS'],
+  ['receita', 'Vendas da semana', 450, '2026-09-21', 'Vendas'],
+  ['receita', 'Vendas da semana', 510, '2026-09-28', 'Vendas'],
+  ['despesa', 'Frutas e açúcar', 280, '2026-10-02', 'Material e mercadoria'],
+  ['receita', 'Encomenda de festa', 300, '2026-10-03', 'Vendas'],
+  ['despesa', 'Ajudante na festa', 120, '2026-10-04', 'Funcionários e ajudantes'],
+  ['receita', 'Vendas da semana', 460, '2026-10-05', 'Vendas'],
+  ['despesa', 'Taxa da maquininha', 18, '2026-10-06', 'Taxas e maquininha'],
+];
+
+async function seedDemoBusiness(repo: MemoryRepository) {
+  const business = await repo.createBusiness(newOperationKey(), DEMO_BUSINESS_NAME);
+  const accountId = (await repo.listAccounts(business.id))[0]!.id;
+  for (const [kind, description, reais, occurredOn, category] of DEMO_BUSINESS_RECORDS) {
+    await repo.createRecord(newOperationKey(), business.id, kind, { accountId, amountCents: reais * 100, occurredOn, description, category });
+  }
 }
 
 /**

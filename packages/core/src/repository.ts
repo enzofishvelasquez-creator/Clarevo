@@ -64,6 +64,7 @@ import type { Access } from './plano';
 import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
+import type { BusinessContext, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
 import type { SignupSource, SignupSourceOption } from './signup-source';
@@ -901,6 +902,42 @@ export interface RecordsRepository {
   /** end_family. Só o titular e só sem outra pessoa ativa (familia_com_membros). Os dados ficam guardados, sem leitura por ninguém. */
   endFamily(key: string, contextId: string): Promise<void>;
 
+  // Espaço Negócio (D-113). Regras e textos em business.ts, iguais aos da migração 0042. Toda escrita leva uma chave de idempotência (o
+  // mesmo espaço das outras operações): repetir a mesma chave devolve o mesmo resultado; outro conteúdo com a mesma chave é
+  // chave_reutilizada. Criar, renomear e encerrar não contam como anotação na atividade.
+
+  /** O negócio ativo da pessoa (o primeiro, por criação), ou null. Só quem é titular ou tem vínculo lê. */
+  getBusiness(): Promise<BusinessContext | null>;
+  /**
+   * create_business. Quem cria vira titular e o negócio nasce com a "Conta do negócio". Ordem: repetição; sem_permissao (sem espaço
+   * pessoal); nome_do_negocio_invalido (1 a 60 caracteres); ja_tem_negocio (um negócio ativo por pessoa).
+   */
+  createBusiness(key: string, name: string): Promise<BusinessContext>;
+  /** rename_business. Só o titular. Ordem: repetição; nao_encontrado; contexto_invalido; sem_permissao; nome_do_negocio_invalido. */
+  renameBusiness(key: string, contextId: string, name: string): Promise<BusinessContext>;
+  /**
+   * end_business. Só o titular e só sem outra pessoa ativa (negocio_com_membros). Desliga as retiradas (os recebimentos do Pessoal ficam,
+   * como recebimentos comuns), revoga o vínculo e marca o fim; os dados ficam guardados, sem leitura, até a limpeza dos 6 meses.
+   */
+  endBusiness(key: string, contextId: string): Promise<void>;
+  /**
+   * create_business_withdrawal. O gasto "Retirada para o Pessoal" no negócio e o recebimento "Retirada do negócio" no Pessoal da pessoa,
+   * com o mesmo valor e a mesma data, ligados. Ordem: repetição; nao_encontrado; contexto_invalido (não é negócio); sem_permissao; as
+   * regras de createRecord nos dois lados (valor, descrição, data, conta ativa de cada espaço).
+   */
+  createBusinessWithdrawal(key: string, businessContextId: string, input: BusinessWithdrawalInput): Promise<BusinessWithdrawal>;
+  /**
+   * delete_business_withdrawal. Pelo lançamento de qualquer um dos lados, os dois saem juntos. Ordem: repetição; o lançamento
+   * (nao_encontrado, sem_permissao); nao_e_retirada; versao_desatualizada.
+   */
+  deleteBusinessWithdrawal(key: string, recordId: string, expectedVersion: number): Promise<BusinessWithdrawal>;
+  /**
+   * move_record. O lançamento comum é gravado de novo no outro espaço (o Pessoal da pessoa ou o negócio dela), com a categoria e a conta
+   * escolhidas, e o original sai, juntos. Ordem: repetição; o lançamento (nao_encontrado, sem_permissao); versao_desatualizada;
+   * lancamento_ligado; contexto_invalido; sem_permissao; as regras de createRecord no destino. Devolve o lançamento novo.
+   */
+  moveRecord(key: string, recordId: string, expectedVersion: number, targetContextId: string, accountId: string, category: string | null): Promise<FinancialRecord>;
+
   // Excluir minha conta (D-058, Ciclo P). Regras e textos em deletion.ts, iguais aos da migração 0015 (delete_my_account).
 
   /**
@@ -1118,6 +1155,12 @@ export type RepoErrorCode =
   | 'nao_sobre_si'
   | 'contexto_invalido'
   | 'familia_com_membros'
+  | 'nome_do_negocio_invalido'
+  | 'ja_tem_negocio'
+  | 'negocio_com_membros'
+  | 'retirada_ligada'
+  | 'nao_e_retirada'
+  | 'lancamento_ligado'
   | 'confirmacao_invalida'
   | 'transferir_antes'
   | 'email_invalido'

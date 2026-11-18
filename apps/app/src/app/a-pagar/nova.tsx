@@ -1,4 +1,4 @@
-import { CATEGORIES, DESCRIPTION_MAX, MAX_RECORD_CENTS, charCount, isValidIsoDate, type CommitmentInput } from '@clarevo/core';
+import { isChoosableExpenseCategory, DESCRIPTION_MAX, MAX_RECORD_CENTS, charCount, isValidIsoDate, type CommitmentInput } from '@clarevo/core';
 import { useLocalSearchParams } from 'expo-router';
 
 import { CommitmentForm } from '@/components/commitment-form';
@@ -17,7 +17,7 @@ function prefillFrom(p: Params): Partial<CommitmentInput> | undefined {
     if (cents >= 1 && cents <= MAX_RECORD_CENTS) out.amountCents = cents;
   }
   if (typeof p.vencimento === 'string' && isValidIsoDate(p.vencimento)) out.dueOn = p.vencimento;
-  if (typeof p.categoria === 'string' && CATEGORIES.despesa.includes(p.categoria)) out.category = p.categoria;
+  if (isChoosableExpenseCategory(p.categoria)) out.category = p.categoria;
   return Object.keys(out).length > 0 ? out : undefined;
 }
 

@@ -563,6 +563,13 @@ describe('a visão do Guardado em metas', () => {
       action: { kind: 'meta', label: 'Criar meta' },
     });
     expect(phase3Empty(view, false).action).toBeNull();
+    // No espaço Negócio (D-113a), sem "Criar meta" (o banco recusa meta no negócio): a explicação de que as metas ficam fora dele.
+    expect(phase3Empty(view, true, 'negocio')).toEqual({
+      title: 'Sem registros nestes meses',
+      body: 'Metas ficam no Pessoal e na Família. O espaço Negócio é só para o que entra e sai do negócio.',
+      action: null,
+    });
+    expect(phase3Empty(view, true, 'familia').action).toEqual({ kind: 'meta', label: 'Criar meta' });
   });
 });
 

@@ -4,8 +4,9 @@ import type { IsoDate, IsoMonth } from './dates';
 import { addMonths, formatDateBR, monthOf } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL, roundDiv } from './money';
-import type { CardEntry, FinancialAccount, FinancialRecord, RecordKind } from './records';
-import { CATEGORIES, NO_CATEGORY_LABEL } from './records';
+import { contextCategories } from './business';
+import type { CardEntry, ContextKind, FinancialAccount, FinancialRecord, RecordKind } from './records';
+import { NO_CATEGORY_LABEL } from './records';
 
 /**
  * Buscar em Movimentos (D-045, Ciclo H1; docs/08 §5 item 5). Responde "quanto paguei de luz?" e acha um lançamento antigo em
@@ -391,15 +392,18 @@ export function groupByMonth<T>(items: readonly T[], dateOf: (item: T) => IsoDat
 // Opções e rascunho
 // ---------------------------------------------------------------------------
 
-/** Categorias oferecidas para o tipo escolhido, mais "Sem categoria" no fim. */
-export function searchCategoryOptions(kind: SearchKind): string[] {
-  const list = kind === 'todos' ? [...CATEGORIES.despesa, ...CATEGORIES.receita] : [...CATEGORIES[kind]];
+/**
+ * Categorias oferecidas para o tipo escolhido, mais "Sem categoria" no fim. `context`: as do espaço (D-113a: no negócio, as categorias do
+ * negócio; no Pessoal e na Família, as de sempre).
+ */
+export function searchCategoryOptions(kind: SearchKind, context: ContextKind = 'pessoal'): string[] {
+  const list = kind === 'todos' ? [...contextCategories(context, 'despesa'), ...contextCategories(context, 'receita')] : [...contextCategories(context, kind)];
   return [...list, NO_CATEGORY_LABEL];
 }
 
-/** A categoria escolhida vale para o tipo? Se não (por exemplo, "Salário" depois de passar para Gastos), a busca a ignora. */
-export function effectiveSearchCategory(kind: SearchKind, category: string | null): string | null {
-  return category !== null && searchCategoryOptions(kind).includes(category) ? category : null;
+/** A categoria escolhida vale para o tipo (e o espaço)? Se não (por exemplo, "Salário" depois de passar para Gastos), a busca a ignora. */
+export function effectiveSearchCategory(kind: SearchKind, category: string | null, context: ContextKind = 'pessoal'): string | null {
+  return category !== null && searchCategoryOptions(kind, context).includes(category) ? category : null;
 }
 
 export interface SearchAccountOption {
@@ -452,7 +456,7 @@ function readAmount(text: string): { cents: Cents | null; error: boolean } {
  * reais válidos (até R$ 9.999.999,99) e o final não pode ser menor que o inicial. Com erro, não há busca: os textos dizem o que
  * corrigir.
  */
-export function searchFromDraft(draft: SearchDraft): { ok: true; params: SearchParams } | { ok: false; errors: SearchFieldErrors } {
+export function searchFromDraft(draft: SearchDraft, context: ContextKind = 'pessoal'): { ok: true; params: SearchParams } | { ok: false; errors: SearchFieldErrors } {
   const min = readAmount(draft.min);
   const max = readAmount(draft.max);
   const errors: SearchFieldErrors = {};
@@ -466,7 +470,7 @@ export function searchFromDraft(draft: SearchDraft): { ok: true; params: SearchP
       text: draft.text.slice(0, SEARCH_TEXT_MAX),
       kind: draft.kind,
       period: draft.period,
-      category: effectiveSearchCategory(draft.kind, draft.category),
+      category: effectiveSearchCategory(draft.kind, draft.category, context),
       accountId: draft.accountId,
       minCents: min.cents,
       maxCents: max.cents,
@@ -475,9 +479,9 @@ export function searchFromDraft(draft: SearchDraft): { ok: true; params: SearchP
 }
 
 /** Filtros dentro de "Mais filtros" que estão ligados (categoria, conta, valor inicial, valor final). */
-export function moreFiltersActive(draft: Pick<SearchDraft, 'kind' | 'category' | 'accountId' | 'min' | 'max'>): number {
+export function moreFiltersActive(draft: Pick<SearchDraft, 'kind' | 'category' | 'accountId' | 'min' | 'max'>, context: ContextKind = 'pessoal'): number {
   return (
-    (effectiveSearchCategory(draft.kind, draft.category) !== null ? 1 : 0) +
+    (effectiveSearchCategory(draft.kind, draft.category, context) !== null ? 1 : 0) +
     (draft.accountId !== null ? 1 : 0) +
     (draft.min.trim() !== '' ? 1 : 0) +
     (draft.max.trim() !== '' ? 1 : 0)

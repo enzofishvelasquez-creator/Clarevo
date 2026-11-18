@@ -89,6 +89,18 @@ import type { FamilyAction, FamilyInvite, FamilyInviteWrite, FamilyInvitePreview
 import { isFamilyAction } from './family';
 import { DELETE_CONFIRMATION_WORD } from './deletion';
 import { MemoryFamilyHub } from './memory-family';
+import type { BusinessAction, BusinessContext, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
+import {
+  BUSINESS_DEFAULT_ACCOUNT,
+  WITHDRAWAL_BUSINESS_CATEGORY,
+  WITHDRAWAL_PERSONAL_CATEGORY,
+  budgetCategoriesFor,
+  businessNameError,
+  canMoveRecord,
+  isWithdrawal,
+  normalizeBusinessName,
+  withdrawalDescriptions,
+} from './business';
 import type { Benefit, BenefitPreview, CompanyAction, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import { isCompanyAction } from './company';
 import { MemoryCompanyHub } from './memory-company';
@@ -98,7 +110,6 @@ import { referenceMonthError } from './committed';
 import { installmentInvoiceMonth } from './importar/revisao';
 import { ACCOUNTS_ACTIVE_MAX, ACCOUNT_KINDS, ACCOUNT_NAME_MAX, accountInputError, accountNameTaken, activeAccounts, normalizeAccountInput } from './accounts';
 import {
-  BUDGET_CATEGORIES,
   budgetAmountError,
   budgetMonthError,
   isBudgetCategory,
@@ -226,7 +237,8 @@ interface Operation {
     | ChatAction
     | ImportAction
     | FamilyAction
-    | CompanyAction;
+    | CompanyAction
+    | BusinessAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -249,7 +261,12 @@ interface Operation {
   importResult: ImportResult | null;
   /** O dia em que a operação foi gravada (o created_at do banco, no dia da pessoa): a última anotação dos níveis (D-111). */
   on?: IsoDate;
+  /** Negócio (D-113): o outro lançamento (target_id) da retirada (o recebimento do Pessoal) e do mover (o original). */
+  targetRecordId?: string | null;
 }
+
+/** Negócio (financial_contexts com kind 'negocio', D-113): da própria pessoa; encerrado não se lê. */
+type StoredBusiness = { id: string; name: string; createdAt: string; endedAt: string | null; ownerId: string };
 
 /** Conta (financial_accounts): exclusão lógica (fica arquivada e some da leitura). */
 type StoredAccount = FinancialAccount & { createdBy: string; createdAt: string; deletedAt?: string; deletedBy?: string };
@@ -441,6 +458,8 @@ export class MemoryRepository implements RecordsRepository {
   private goalImages = new Map<string, { imageKey: string | null; photo: { mime: string; base64: string } | null; version: number; updatedAt: string }>();
   private cards = new Map<string, StoredCard>();
   private cardEntries = new Map<string, StoredCardEntry>();
+  /** Negócios da pessoa (D-113): o modelo aceita vários (Clarevo Plus); create_business recusa o segundo ativo. */
+  private businesses = new Map<string, StoredBusiness>();
   private seq = 0;
   /** Simula falha de rede: 'antes' (nada gravado) ou 'depois' (gravado, resposta perdida). */
   failNextWrite: 'antes' | 'depois' | null = null;
@@ -517,6 +536,7 @@ export class MemoryRepository implements RecordsRepository {
       investments: new Map(this.investments),
       investmentMovements: new Map(this.investmentMovements),
       investmentPlans: new Map(this.investmentPlans),
+      businesses: new Map(this.businesses),
     };
     let result: T;
     try {
@@ -548,6 +568,7 @@ export class MemoryRepository implements RecordsRepository {
         investments: this.investments,
         investmentMovements: this.investmentMovements,
         investmentPlans: this.investmentPlans,
+        businesses: this.businesses,
       } = saved);
       throw e;
     }
@@ -562,7 +583,9 @@ export class MemoryRepository implements RecordsRepository {
   /** O espaço como o app lê: só as contas ativas (a principal primeiro), nunca as arquivadas nem as excluídas. */
   private spaceView(): PersonalSpace | null {
     if (!this.space) return null;
-    return { ...this.space, accounts: activeAccounts(this.liveAccounts().map(stripAccount)) };
+    // Só as contas do Pessoal (como getSpace no Supabase): as do negócio (D-113) e da Família ficam no contexto delas.
+    const personal = this.space.personalContextId;
+    return { ...this.space, accounts: activeAccounts(this.liveAccounts().filter((a) => a.contextId === personal).map(stripAccount)) };
   }
 
   /** Contas não excluídas por criação (ids com tamanho fixo: a ordem do texto é a de criação). */
@@ -897,6 +920,7 @@ export class MemoryRepository implements RecordsRepository {
       if (replay) return replay;
       const current = this.liveRecord(id);
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      this.assertNotPaired(current);
       const kind = input.kind ?? current.kind;
       // Subcategoria: ausente mantém a de antes se o tipo e a categoria não mudam; null ou '' tira; um texto troca.
       const subcategory =
@@ -971,6 +995,7 @@ export class MemoryRepository implements RecordsRepository {
       if (replay) return replay;
       const current = this.liveRecord(id);
       if (current.version !== expectedVersion) throw new RepoError('versao_desatualizada');
+      this.assertNotPaired(current);
       // Pagamento de fatura: o caminho é undo_invoice_payment, que também desfaz o saldo anterior.
       if (current.invoice) throw new RepoError('pagamento_de_fatura');
       const now = this.stamp();
@@ -1179,6 +1204,7 @@ export class MemoryRepository implements RecordsRepository {
       const r = this.liveRecord(seen.id);
       if (r.contextId !== current.contextId || r.kind !== 'despesa') throw new RepoError('registro_invalido');
       if (r.commitmentId || r.invoice) throw new RepoError('registro_ja_ligado');
+      this.assertNotPaired(r);
       if (r.amountCents !== seen.amountCents || r.occurredOn !== seen.occurredOn || (seen.accountId && r.accountId !== seen.accountId)) {
         throw new RepoError('versao_desatualizada', undefined, 'registro');
       }
@@ -1873,10 +1899,10 @@ export class MemoryRepository implements RecordsRepository {
     return this.read(() =>
       [...this.budgets.values()]
         .filter((b) => !b.deletedAt && b.contextId === contextId && this.canRead(b.contextId))
-        .sort(
-          (a, b) =>
-            BUDGET_CATEGORIES.indexOf(a.category) - BUDGET_CATEGORIES.indexOf(b.category) || a.fromMonth.localeCompare(b.fromMonth) || a.id.localeCompare(b.id),
-        )
+        .sort((a, b) => {
+          const order = this.budgetCategories(contextId);
+          return order.indexOf(a.category) - order.indexOf(b.category) || a.fromMonth.localeCompare(b.fromMonth) || a.id.localeCompare(b.id);
+        })
         .map(stripBudget),
     );
   }
@@ -1892,7 +1918,7 @@ export class MemoryRepository implements RecordsRepository {
       if (replayed) return stripBudget(this.budgets.get(replayed.budgetId!)!);
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
       if (typeof fromMonth !== 'string' || !isValidIsoMonth(fromMonth)) throw new RepoError('mes_invalido');
-      if (!isBudgetCategory(category)) throw new RepoError('categoria_invalida');
+      if (!isBudgetCategory(category, this.budgetCategories(contextId))) throw new RepoError('categoria_invalida');
       if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) throw new RepoError('versao_desatualizada');
       const current = [...this.budgets.values()].find((b) => !b.deletedAt && b.contextId === contextId && b.category === category && b.fromMonth === fromMonth);
       if (expectedVersion !== (current?.version ?? 0)) throw new RepoError('versao_desatualizada');
@@ -1951,7 +1977,7 @@ export class MemoryRepository implements RecordsRepository {
       const records = [...this.records.values()].filter((r) => !r.deletedAt && r.contextId === contextId);
       const entries = [...this.cardEntries.values()].filter((e) => !e.deletedAt && e.contextId === contextId);
       const cardDays = new Map([...this.cards.values()].filter((c) => c.contextId === contextId).map((c) => [c.id, { closingDay: c.closingDay, dueDay: c.dueDay }]));
-      return readMonthBudget(month, budgets, { records, entries, cardDays });
+      return readMonthBudget(month, budgets, { records, entries, cardDays }, this.budgetCategories(contextId));
     });
   }
 
@@ -2069,6 +2095,8 @@ export class MemoryRepository implements RecordsRepository {
       const replayed = this.replay(key, 'criar_meta', payload);
       if (replayed) return this.goalResult(replayed.goalId!, replayed.movementId);
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      // Metas não entram no negócio por enquanto (D-113; o gatilho goals_context_guard do banco).
+      if (this.businesses.has(contextId)) throw new RepoError('contexto_invalido');
       const today = this.opts.today();
       const code = goalInputError(norm, today) ?? initialMovementError(initialCents, initialOn, today);
       if (code) throw new RepoError(code);
@@ -2847,7 +2875,10 @@ export class MemoryRepository implements RecordsRepository {
     return this.read(() => this.chatState(channel));
   }
 
-  /** Como create_<canal>_code. Ordem: repetição (code nulo); sem_permissao (anotar no espaço); código novo no lugar do anterior do canal. */
+  /**
+   * Como create_<canal>_code. Ordem: repetição (code nulo); sem_permissao (anotar no espaço); contexto_invalido (o espaço Negócio, D-113a:
+   * o WhatsApp e o Telegram não anotam no negócio); código novo no lugar do anterior do canal.
+   */
   async createChatCode(channel: ChatChannel, key: string, contextId: string): Promise<ChatCode> {
     return this.write(() => {
       const payload = [contextId];
@@ -2855,6 +2886,7 @@ export class MemoryRepository implements RecordsRepository {
       const replayed = this.replay(key, action, payload);
       if (replayed) return { code: null, contextId: replayed.contextId, expiresAt: this.chatCodes[channel]?.expiresAt ?? null };
       if (!this.space || !this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      if (this.businesses.has(contextId)) throw new RepoError('contexto_invalido');
       let code = '';
       for (let i = 0; i < WHATSAPP_CODE_LENGTH; i++) code += WHATSAPP_CODE_ALPHABET[Math.floor(Math.random() * WHATSAPP_CODE_ALPHABET.length)];
       const expiresAt = new Date(Date.parse(this.stamp()) + WHATSAPP_CODE_MINUTES * 60_000).toISOString();
@@ -3288,6 +3320,7 @@ export class MemoryRepository implements RecordsRepository {
       if (linked) {
         if (linked.contextId !== card.contextId || linked.kind !== 'despesa' || linked.receiptKey) throw new RepoError('registro_invalido');
         if (linked.commitmentId || linked.invoice) throw new RepoError('registro_ja_ligado');
+        this.assertNotPaired(linked);
         if (linked.amountCents !== amountCents || linked.occurredOn !== paidOn) throw new RepoError('versao_desatualizada', undefined, 'registro');
       }
       if (!Number.isSafeInteger(amountCents) || amountCents < 1) throw new RepoError('valor_invalido');
@@ -4280,7 +4313,7 @@ export class MemoryRepository implements RecordsRepository {
   private checkBudgetInvariants() {
     const live = new Set<string>();
     for (const b of this.budgets.values()) {
-      if (!isBudgetCategory(b.category) || !isValidIsoMonth(b.fromMonth) || (b.amountCents !== null && budgetAmountError(b.amountCents) !== null) || b.version < 1) {
+      if (!isBudgetCategory(b.category, this.budgetCategories(b.contextId)) || !isValidIsoMonth(b.fromMonth) || (b.amountCents !== null && budgetAmountError(b.amountCents) !== null) || b.version < 1) {
         throw new Error('orcamento_inconsistente');
       }
       if (b.deletedAt) continue;
@@ -4670,7 +4703,10 @@ export class MemoryRepository implements RecordsRepository {
       action === 'gerar_codigo_telegram' ||
       action === 'desligar_telegram' ||
       isFamilyAction(action) ||
-      isCompanyAction(action)
+      isCompanyAction(action) ||
+      action === 'criar_negocio' ||
+      action === 'renomear_negocio' ||
+      action === 'encerrar_negocio'
     )
       return;
     const day = this.opts.today();
@@ -4862,12 +4898,29 @@ export class MemoryRepository implements RecordsRepository {
 
   /** O Pessoal da pessoa, ou uma Família em que ela tem vínculo ativo (Família encerrada não se lê). */
   private canRead(contextId: string) {
-    return this.space?.personalContextId === contextId || this.hub.canRead(contextId, this.opts.actorId);
+    return this.space?.personalContextId === contextId || this.liveBusiness(contextId) !== null || this.hub.canRead(contextId, this.opts.actorId);
+  }
+
+  /** O negócio ativo da pessoa com este id (D-113), ou null (encerrado, de outra pessoa ou não é negócio). */
+  private liveBusiness(contextId: string): StoredBusiness | null {
+    const b = this.businesses.get(contextId);
+    return b && !b.endedAt && b.ownerId === this.opts.actorId ? b : null;
+  }
+
+  /** As categorias do orçamento do contexto: as do negócio no negócio (D-113), as de sempre nos outros. */
+  private budgetCategories(contextId: string): readonly string[] {
+    return budgetCategoriesFor(this.businesses.has(contextId) ? 'negocio' : 'pessoal');
+  }
+
+  /** Um lado de uma retirada só muda pelas funções da retirada (o gatilho financial_records_pair_guard do banco). */
+  private assertNotPaired(r: FinancialRecord) {
+    if (isWithdrawal(r)) throw new RepoError('retirada_ligada');
   }
 
   /** No Pessoal ler e escrever equivalem; na Família, escreve quem é titular ou membro, nunca quem só vê. */
   private canWrite(contextId: string) {
     if (this.space?.personalContextId === contextId) return true;
+    if (this.liveBusiness(contextId)) return true;
     return this.hub.canWrite(contextId, this.opts.actorId);
   }
 
@@ -5039,6 +5092,190 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Espaço Negócio (D-113): as seis funções da migração 0042
+  // ---------------------------------------------------------------------------
+
+  private businessView(b: StoredBusiness): BusinessContext {
+    return { id: b.id, name: b.name, createdAt: b.createdAt };
+  }
+
+  /** Como clarevo_require_business_owner: sem leitura, nao_encontrado; não é negócio, contexto_invalido. */
+  private ownedBusiness(contextId: string): StoredBusiness {
+    if (!contextId || !this.canRead(contextId)) throw new RepoError('nao_encontrado');
+    const b = this.liveBusiness(contextId);
+    if (!b) throw new RepoError('contexto_invalido');
+    return b;
+  }
+
+  /** O negócio ativo (o primeiro, por criação), como a leitura de financial_contexts com kind 'negocio'. */
+  async getBusiness(): Promise<BusinessContext | null> {
+    return this.read(() => {
+      const live = [...this.businesses.values()].filter((b) => this.liveBusiness(b.id)).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+      return live[0] ? this.businessView(live[0]) : null;
+    });
+  }
+
+  /** Como create_business. Ordem: repetição; sem_permissao (sem Pessoal); nome_do_negocio_invalido; ja_tem_negocio. */
+  async createBusiness(key: string, name: string): Promise<BusinessContext> {
+    return this.write(() => {
+      const clean = normalizeBusinessName(name);
+      const payload = [clean];
+      const replayed = this.replay(key, 'criar_negocio', payload);
+      if (replayed) return this.businessView(this.businesses.get(replayed.contextId)!);
+      if (!this.space) throw new RepoError('sem_permissao');
+      const bad = businessNameError(clean);
+      if (bad) throw new RepoError(bad);
+      if ([...this.businesses.values()].some((b) => this.liveBusiness(b.id))) throw new RepoError('ja_tem_negocio');
+      const now = this.stamp();
+      const id = `${this.id('neg')}-${this.opts.actorId}`;
+      this.businesses.set(id, { id, name: clean, createdAt: now, endedAt: null, ownerId: this.opts.actorId });
+      const account: StoredAccount = {
+        id: this.id('conta'),
+        contextId: id,
+        name: BUSINESS_DEFAULT_ACCOUNT,
+        currency: 'BRL',
+        initialBalanceCents: null,
+        kind: 'banco',
+        status: 'ativa',
+        isDefault: true,
+        version: 1,
+        createdBy: this.opts.actorId,
+        createdAt: now,
+      };
+      this.accountsById.set(account.id, account);
+      this.saveOperation(key, 'criar_negocio', payload, { contextId: id, recordId: null, commitmentId: null });
+      return this.businessView(this.businesses.get(id)!);
+    });
+  }
+
+  /** Como rename_business. Ordem: repetição; nao_encontrado; contexto_invalido; nome_do_negocio_invalido. */
+  async renameBusiness(key: string, contextId: string, name: string): Promise<BusinessContext> {
+    return this.write(() => {
+      const clean = normalizeBusinessName(name);
+      const payload = [contextId, clean];
+      const replayed = this.replay(key, 'renomear_negocio', payload);
+      if (replayed) return this.businessView(this.businesses.get(replayed.contextId)!);
+      const b = this.ownedBusiness(contextId);
+      const bad = businessNameError(clean);
+      if (bad) throw new RepoError(bad);
+      this.businesses.set(b.id, { ...b, name: clean });
+      this.saveOperation(key, 'renomear_negocio', payload, { contextId: b.id, recordId: null, commitmentId: null });
+      return this.businessView(this.businesses.get(b.id)!);
+    });
+  }
+
+  /** Como end_business: desliga as retiradas (os dois lados), marca o fim e o negócio deixa de ser lido. Repetir não falha. */
+  async endBusiness(key: string, contextId: string): Promise<void> {
+    return this.write(() => {
+      const payload = [contextId];
+      const prev = this.operations.get(key);
+      if (prev) {
+        if (prev.action !== 'encerrar_negocio' || prev.hash !== hash(['encerrar_negocio', ...payload])) throw new RepoError('chave_reutilizada');
+        return;
+      }
+      const b = this.ownedBusiness(contextId);
+      const now = this.stamp();
+      const pairedOut = new Set([...this.records.values()].filter((r) => r.contextId === b.id).map((r) => r.id));
+      for (const r of [...this.records.values()]) {
+        if (isWithdrawal(r) && (r.contextId === b.id || pairedOut.has(r.pairedRecordId!))) {
+          const { pairedRecordId: _p, ...rest } = r;
+          this.records.set(r.id, { ...rest, updatedAt: now });
+        }
+      }
+      this.businesses.set(b.id, { ...b, endedAt: now });
+      this.saveOperation(key, 'encerrar_negocio', payload, { contextId: b.id, recordId: null, commitmentId: null });
+    });
+  }
+
+  private withdrawalResult(businessId: string, personalId: string): BusinessWithdrawal {
+    return { businessRecord: strip(this.records.get(businessId)!), personalRecord: strip(this.records.get(personalId)!) };
+  }
+
+  /** Como create_business_withdrawal: os dois lados juntos, ligados, com as regras de createRecord em cada um. */
+  async createBusinessWithdrawal(key: string, businessContextId: string, input: BusinessWithdrawalInput): Promise<BusinessWithdrawal> {
+    return this.write(() => {
+      const own = typeof input.description === 'string' && input.description.trim() !== '' ? input.description.trim() : null;
+      const payload = [businessContextId, input.businessAccountId, input.personalAccountId, input.amountCents, input.occurredOn, own];
+      const replayed = this.replay(key, 'criar_retirada_negocio', payload);
+      if (replayed) return this.withdrawalResult(replayed.recordId!, replayed.targetRecordId!);
+      if (!businessContextId || !this.canRead(businessContextId)) throw new RepoError('nao_encontrado');
+      const b = this.liveBusiness(businessContextId);
+      if (!b) throw new RepoError('contexto_invalido');
+      const personal = this.space?.personalContextId;
+      if (!personal) throw new RepoError('sem_permissao');
+      const names = withdrawalDescriptions(b.name, own);
+      const bInput = { accountId: input.businessAccountId, amountCents: input.amountCents, occurredOn: input.occurredOn, description: names.business, category: WITHDRAWAL_BUSINESS_CATEGORY };
+      const pInput = { accountId: input.personalAccountId, amountCents: input.amountCents, occurredOn: input.occurredOn, description: names.personal, category: WITHDRAWAL_PERSONAL_CATEGORY };
+      this.validate(b.id, 'despesa', bInput);
+      this.validate(personal, 'receita', pInput);
+      const now = this.stamp();
+      const businessId = this.id('reg');
+      const personalId = this.id('reg');
+      const base = { status: 'realizado' as const, currency: 'BRL' as const, commitmentId: null, invoice: null, receiptKey: null, createdBy: this.opts.actorId, version: 1, createdAt: now, updatedAt: now };
+      this.records.set(businessId, { ...base, ...bInput, id: businessId, contextId: b.id, kind: 'despesa', pairedRecordId: personalId });
+      this.records.set(personalId, { ...base, ...pInput, id: personalId, contextId: personal, kind: 'receita', pairedRecordId: businessId });
+      this.saveOperation(key, 'criar_retirada_negocio', payload, { contextId: b.id, recordId: businessId, commitmentId: null, targetRecordId: personalId });
+      return this.withdrawalResult(businessId, personalId);
+    });
+  }
+
+  /** Como delete_business_withdrawal: pelo lançamento de qualquer lado, os dois saem juntos. */
+  async deleteBusinessWithdrawal(key: string, recordId: string, expectedVersion: number): Promise<BusinessWithdrawal> {
+    return this.write(() => {
+      const payload = [recordId, expectedVersion];
+      const replayed = this.replay(key, 'excluir_retirada_negocio', payload);
+      if (replayed) return this.withdrawalResult(replayed.recordId!, replayed.targetRecordId!);
+      const r = this.liveRecord(recordId);
+      if (!isWithdrawal(r)) throw new RepoError('nao_e_retirada');
+      if (r.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${r.version}`);
+      let other: StoredRecord;
+      try {
+        other = this.liveRecord(r.pairedRecordId!);
+      } catch {
+        throw new RepoError('sem_permissao');
+      }
+      const [biz, pers] = r.kind === 'despesa' ? [r, other] : [other, r];
+      const now = this.stamp();
+      for (const x of [biz, pers]) this.records.set(x.id, { ...x, version: x.version + 1, updatedAt: now, deletedAt: now });
+      this.saveOperation(key, 'excluir_retirada_negocio', payload, { contextId: biz.contextId, recordId: biz.id, commitmentId: null, targetRecordId: pers.id });
+      return this.withdrawalResult(biz.id, pers.id);
+    });
+  }
+
+  /** Como move_record: gravado de novo no outro espaço (o Pessoal da pessoa ou o negócio dela) e o original sai, juntos. */
+  async moveRecord(key: string, recordId: string, expectedVersion: number, targetContextId: string, accountId: string, category: string | null): Promise<FinancialRecord> {
+    return this.write(() => {
+      const cat = typeof category === 'string' && category.trim() !== '' ? category.trim() : null;
+      const payload = [recordId, expectedVersion, targetContextId, accountId, cat];
+      const replayed = this.replay(key, 'mover_lancamento', payload);
+      if (replayed) return strip(this.records.get(replayed.recordId!)!);
+      const r = this.liveRecord(recordId);
+      if (r.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${r.version}`);
+      if (!canMoveRecord(r)) throw new RepoError('lancamento_ligado');
+      const personal = this.space?.personalContextId ?? null;
+      const valid =
+        personal !== null &&
+        targetContextId !== r.contextId &&
+        ((r.contextId === personal && this.businesses.has(targetContextId)) || (targetContextId === personal && this.businesses.has(r.contextId)));
+      if (!valid) throw new RepoError('contexto_invalido');
+      if (!this.canWrite(targetContextId)) throw new RepoError('sem_permissao');
+      const input = { accountId, amountCents: r.amountCents, occurredOn: r.occurredOn, description: r.description, category: cat };
+      validateCommon(input.amountCents, input.description, input.category);
+      if (r.occurredOn > this.opts.today()) throw new RepoError('data_futura');
+      const acc = this.accountsById.get(accountId);
+      if (!acc || acc.deletedAt || acc.contextId !== targetContextId || acc.status !== 'ativa') throw new RepoError('conta_invalida');
+      const now = this.stamp();
+      this.records.set(r.id, { ...r, version: r.version + 1, updatedAt: now, deletedAt: now });
+      const id = this.id('reg');
+      const { subcategory: _s, linkedPayment: _l, deletedAt: _d, ...rest } = r;
+      const moved: StoredRecord = { ...rest, id, contextId: targetContextId, accountId, category: cat, createdBy: this.opts.actorId, version: 1, createdAt: now, updatedAt: now };
+      this.records.set(id, moved);
+      this.saveOperation(key, 'mover_lancamento', payload, { contextId: targetContextId, recordId: id, commitmentId: null, targetRecordId: r.id });
+      return strip(moved);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Excluir minha conta (D-058): delete_my_account, da migração 0015
   // ---------------------------------------------------------------------------
 
@@ -5050,7 +5287,7 @@ export class MemoryRepository implements RecordsRepository {
     const ids = new Set<string>();
     const personal = this.ownPersonal;
     const add = (contextId: string) => {
-      if (contextId !== personal) ids.add(contextId);
+      if (contextId !== personal && !this.businesses.has(contextId)) ids.add(contextId);
     };
     for (const r of this.records.values()) add(r.contextId);
     for (const c of this.commitments.values()) add(c.contextId);
@@ -5107,6 +5344,7 @@ export class MemoryRepository implements RecordsRepository {
       this.investments.clear();
       this.investmentMovements.clear();
       this.investmentPlans.clear();
+      this.businesses.clear();
       this.space = null;
       this.deleted = true;
     });

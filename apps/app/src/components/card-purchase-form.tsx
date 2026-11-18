@@ -1,6 +1,5 @@
 import {
   CARDS_TEXT,
-  CATEGORIES,
   DESCRIPTION_MAX,
   ERROR_TEXT,
   MAX_RECORD_CENTS,
@@ -44,6 +43,7 @@ import { guardedWrite } from '@/lib/guarded-write';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { openOfficialUrl, receiptLinks } from '@/lib/receipt-link';
 import { useBudgetWatch, useCardOperationKey, useUpdateCardEntry, withNotice } from '@/state/data';
+import { useContextCategories } from '@/state/business';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
 
@@ -65,6 +65,7 @@ export function CardPurchaseForm({ card, month, entry, textOnly = false }: { car
   const qc = useQueryClient();
   const updateEntry = useUpdateCardEntry();
   const budgetWatch = useBudgetWatch();
+  const categories = useContextCategories(card.contextId);
   const keys = useCardOperationKey();
 
   const [initial] = useState(() => ({
@@ -276,7 +277,7 @@ export function CardPurchaseForm({ card, month, entry, textOnly = false }: { car
           )}
           <ChoiceGroup label="Categoria">
             <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-            {CATEGORIES.despesa.map((c) => (
+            {categories.map((c) => (
               <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
             ))}
           </ChoiceGroup>

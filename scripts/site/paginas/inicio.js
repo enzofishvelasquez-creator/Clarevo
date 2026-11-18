@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Início: a mensagem central (D-068), o que é a Clarevo, o apoio prático do app (bem-estar financeiro, sem promessa de resultado nem de saúde),
- * recursos com captura, para quem é, "A empresa nunca vê suas finanças", o que ela não é e as chamadas.
+ * recursos com captura, os vídeos de uso do app (D-114), para quem é, "A empresa nunca vê suas finanças", o que ela não é e as chamadas.
  */
 const { URL_APP } = require('../config');
 const { esc } = require('../texto');
@@ -9,6 +9,7 @@ const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular, dominioDe } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
+const { secaoDeVideos } = require('../videos');
 
 const ARQUIVO = 'index.html';
 /** A mensagem central (Manual v2.2, seção 19) e a frase de apoio: as mesmas de `docs/lojas/ficha.md` e das imagens de compartilhamento. */
@@ -46,7 +47,7 @@ ${cartoes}
 ${aindaNao}<p class="nota">${esc(PLANOS.texto.plansNote)} Depois do teste, sem assinatura, a conta fica só para ver e exportar: os seus dados continuam guardados. Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u('ajuda/conta.html')}#guia-assinatura">Ajuda</a>.</p>`;
 }
 
-function paginaInicial({ valores, img }) {
+function paginaInicial({ valores, img, videos }) {
   const u = (d) => rel(ARQUIVO, d);
   const temas = catalogo().publicados.filter((t) => ['organizar', 'juros', 'tempo'].includes(t.section)).length;
   const calculadoras = catalogo().CALCULADORAS.length;
@@ -113,6 +114,8 @@ ${mini}
 <p class="acoes"><a class="botao botao-principal" href="${u('app/index.html')}">Ver o app por dentro</a></p>`,
       'telas',
     ),
+    // Os vídeos de uso (D-114), gravados da demonstração, logo depois das telas.
+    secao(secaoDeVideos({ videos, img }, ARQUIVO), 'em-uso'),
     secao(
       `<h2 id="para-quem">Para quem é</h2>
 <div class="grade">

@@ -12,6 +12,7 @@
  *     - Rótulo | https://endereço        link de fonte
  *     - Rótulo | pagina.html             página do próprio site (caminho a partir da raiz)
  *     - Texto sem link
+ *   capa: post-investir                  (Novidades, opcional) a imagem de capa: id de `scripts/site/imagens.js`
  *   ---
  */
 const fs = require('node:fs');
@@ -102,6 +103,8 @@ function lerPosts(pasta, { referencia = null } = {}) {
       resumo: meta.resumo || '',
       autoria: meta.autoria || AUTORIA_PADRAO,
       fontes: (Array.isArray(meta.fontes) ? meta.fontes : []).map(lerFonte),
+      // A imagem de capa (D-114): o id de uma tela das Novidades ou de uma ilustração (`scripts/site/imagens.js`). Opcional.
+      capa: typeof meta.capa === 'string' && meta.capa !== '' ? meta.capa : null,
       corpo,
       origem: onde,
     });

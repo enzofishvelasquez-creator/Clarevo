@@ -1,7 +1,7 @@
 import {
   ANNUAL_HELP_TEXT,
   CALC_UI_TEXT,
-  CATEGORIES,
+  contextCategories,
   DEMO_TEXT,
   DESCRIPTION_MAX,
   INSTALLMENT_NATURES,
@@ -1086,7 +1086,7 @@ export function SeriesForm({
 
           <ChoiceGroup label="Categoria">
             <Chip label={NO_CATEGORY_LABEL} selected={draft.category === null} onPress={() => set('category', null)} />
-            {CATEGORIES.despesa.map((c) => (
+            {contextCategories(personal.contextKind, 'despesa').map((c) => (
               <Chip key={c} label={c} selected={draft.category === c} onPress={() => set('category', c)} />
             ))}
           </ChoiceGroup>

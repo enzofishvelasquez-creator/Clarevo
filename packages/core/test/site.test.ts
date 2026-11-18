@@ -123,7 +123,7 @@ const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;'
 
 /** Os temas de Aprender que viram página: publicados, não legados, das seções organizar, juros e tempo. */
 const TEMAS_DO_SITE = publishedTopics().filter((t) => !t.legacy && ['organizar', 'juros', 'tempo'].includes(t.section));
-const TEMAS_DA_AJUDA = ['comecar', 'organizar', 'contas', 'familia', 'beneficio', 'privacidade', 'conta'];
+const TEMAS_DA_AJUDA = ['comecar', 'organizar', 'contas', 'familia', 'negocio', 'beneficio', 'privacidade', 'conta'];
 const POSTS_INICIAIS = [
   'novidades/2026-10-23-conheca-a-clarevo.html',
   'novidades/2026-10-23-13o-salario-quando-cai-e-como-se-organizar.html',
@@ -307,7 +307,13 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     }
     expect(html, `${nome}: manipulador de evento`).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html, `${nome}: atributo style (a política de segurança não permite)`).not.toMatch(/\sstyle\s*=/i);
-    expect(html, `${nome}: iframe ou objeto`).not.toMatch(/<(iframe|object|embed|video|audio)\b/i);
+    expect(html, `${nome}: iframe ou objeto`).not.toMatch(/<(iframe|object|embed|audio)\b/i);
+    // Vídeos (D-114): só na seção "Veja o app em uso" da página inicial e de O app, do próprio site, com controles, sem baixar antes do
+    // toque e sem tocar sozinhos.
+    if (!['index.html', 'app/index.html'].includes(nome)) expect(html, `${nome}: vídeo fora da seção de vídeos`).not.toMatch(/<video\b/i);
+    for (const v of html.matchAll(/<video\b[^>]*>/gi)) {
+      expect(v[0], `${nome}: vídeo`).toMatch(/^<video controls preload="none" playsinline width="\d+" height="\d+" poster="[^"]+\.png" aria-labelledby="[^"]+" aria-describedby="[^"]+">$/);
+    }
     // Formulário só nas páginas que o interruptor liga (D-066), e sempre um POST para o próprio site.
     if (opcoes.formularios?.includes(nome)) {
       for (const m of html.matchAll(/<form\b[^>]*>/gi)) expect(m[0], `${nome}: formulário`).toMatch(/^<form class="formulario" method="post" action="\/api\/(contato|newsletter)">$/);
@@ -1389,10 +1395,10 @@ describe('site público: Ajuda, busca e perguntas do suporte', () => {
   const perguntasNasPaginas = temas.flatMap((nome) => [...h(nome).matchAll(/<article class="pergunta" id="([^"]+)"><h3>([^<]+)<\/h3>/g)].map((m) => ({ nome, id: m[1]!, pergunta: m[2]! })));
   const indice = JSON.parse(h('ajuda/indice.json')) as { i: string; t: string; a: string; u: string; k: string; x: string }[];
 
-  it('a Ajuda tem os sete temas pedidos, com a lista completa visível sem JavaScript', () => {
+  it('a Ajuda tem os oito temas (os sete pedidos e o Espaço Negócio, D-113), com a lista completa visível sem JavaScript', () => {
     const index = h('ajuda/index.html');
     expect(index).toContain('<h1>Ajuda</h1>');
-    for (const titulo of ['Começar', 'Anotar e organizar', 'Contas e cartões', 'Família', 'Benefício da empresa', 'Privacidade e segurança', 'Conta e acesso']) expect(index, titulo).toContain(titulo);
+    for (const titulo of ['Começar', 'Anotar e organizar', 'Contas e cartões', 'Família', 'Espaço Negócio', 'Benefício da empresa', 'Privacidade e segurança', 'Conta e acesso']) expect(index, titulo).toContain(titulo);
     for (const nome of temas) {
       const pagina = h(nome);
       expect(pagina).toContain('<article class="pergunta"');
@@ -1719,7 +1725,8 @@ describe('site público: imagens, tamanho e Open Graph', () => {
   const gerado = gerarSite();
 
   it('as capturas são de demonstração, com largura adequada, tamanho declarado igual ao do arquivo e peso razoável', () => {
-    const imagens = [...gerado.arquivos.keys()].filter((k) => k.startsWith('imagens/'));
+    // D-114: as ilustrações (SVG) ficam em imagens/ também e são conferidas no bloco das Novidades com imagens.
+    const imagens = [...gerado.arquivos.keys()].filter((k) => k.startsWith('imagens/') && k.endsWith('.png'));
     expect(imagens.length).toBeGreaterThanOrEqual(12);
     let total = 0;
     for (const nome of imagens) {
@@ -1737,11 +1744,17 @@ describe('site público: imagens, tamanho e Open Graph', () => {
         }
       }
     }
-    expect(total, 'peso total das capturas').toBeLessThanOrEqual(1024 * 1024);
-    // O site inteiro, sem as fontes de licença aberta, cabe com folga. Desde 12/11/2026, 5 MB: as capturas originais do kit de imprensa
-    // (só para baixar, nenhuma página as carrega) cresceram com as fotos das metas e as cinco abas; o peso das páginas segue o de antes.
-    const tudo = [...gerado.arquivos.values()].reduce((n, c) => n + Buffer.byteLength(c), 0);
-    expect(tudo).toBeLessThanOrEqual(5 * 1024 * 1024);
+    // Desde 17/11/2026 (D-114), 2 MB: entraram as telas das Novidades, cada uma no tema claro e no escuro (quem visita baixa só uma das
+    // duas), e as capas dos vídeos.
+    expect(total, 'peso total das capturas').toBeLessThanOrEqual(2 * 1024 * 1024);
+    // O site inteiro, sem os vídeos, cabe com folga. Desde 12/11/2026, 5 MB (as capturas originais do kit de imprensa, só para baixar,
+    // cresceram com as fotos das metas e as cinco abas); desde 17/11/2026, 6,5 MB, com as telas das Novidades e as capas dos vídeos.
+    const tudo = [...gerado.arquivos.entries()].filter(([k]) => !k.startsWith('videos/')).reduce((n, [, c]) => n + Buffer.byteLength(c), 0);
+    expect(tudo).toBeLessThanOrEqual(6.5 * 1024 * 1024);
+    // Com os vídeos (D-114), até 20 MB, e nenhum arquivo passa de 25 MB, o limite do Cloudflare Pages por arquivo.
+    const comVideos = [...gerado.arquivos.values()].reduce((n, c) => n + Buffer.byteLength(c), 0);
+    expect(comVideos).toBeLessThanOrEqual(20 * 1024 * 1024);
+    for (const [nome, c] of gerado.arquivos) expect(Buffer.byteLength(c), nome).toBeLessThan(25 * 1024 * 1024);
   });
 
   it('a chave do cache das imagens inclui o resumo do código de png.js e de imagens.js: mudar o método invalida o cache sozinho', () => {
@@ -1798,6 +1811,114 @@ describe('site público: imagens, tamanho e Open Graph', () => {
     expect(campo('mensagem-central')).toBe('Cuidar da vida financeira faz parte de cuidar de você.');
     expect(campo('frase-de-apoio')).toBe('Mais clareza para decidir');
     expect(`${textoDoDesenho} ${campo('mensagem-central')} ${campo('frase-de-apoio')}`).not.toMatch(/gr[áa]tis|melhor|baixe|download|R\$|ranking|#1|\bn[úu]mero 1\b/i);
+  });
+});
+
+describe('site público: vídeos de uso do app e imagens das Novidades (D-114)', () => {
+  const gerado = gerarSite();
+  const h = (nome: string) => texto(gerado.arquivos.get(nome));
+  const videos = require(join(ROOT, 'scripts', 'site', 'videos.js')) as {
+    VIDEOS: { id: string; titulo: string; frase: string; descricao: string }[];
+    LEGENDA_TELA: string;
+  };
+  const imagens = require(join(ROOT, 'scripts', 'site', 'imagens.js')) as {
+    TELAS_DAS_NOVIDADES: { id: string; origem: string; escura: string; alt: string }[];
+    ILUSTRACOES: { id: string; origem: string; alt: string }[];
+  };
+
+  it('os sete vídeos (anotar um gasto, Resumo, Metas, Investir, fatura por print, Calendário e o tema) saem em MP4 e WebM leves, do próprio site, com nome que muda com o conteúdo', () => {
+    expect(videos.VIDEOS.map((v) => v.id)).toEqual(['anotar-gasto', 'resumo-do-mes', 'metas', 'investir', 'importar-fatura-print', 'calendario-do-mes', 'tema-escuro-claro']);
+    const manifesto = JSON.parse(readFileSync(join(ROOT, 'site-src', 'videos', 'videos.json'), 'utf8')) as { videos: Record<string, { duracao: number; largura: number; altura: number }> };
+    for (const v of videos.VIDEOS) {
+      const m = manifesto.videos[v.id]!;
+      expect(m.duracao, v.id).toBeGreaterThanOrEqual(10);
+      expect(m.duracao, v.id).toBeLessThanOrEqual(25);
+      // Retrato de celular.
+      expect(m.altura, v.id).toBeGreaterThan(m.largura * 1.5);
+      const mp4 = [...gerado.arquivos.keys()].filter((k) => new RegExp(`^videos/${v.id}\\.[0-9a-f]{10}\\.mp4$`).test(k));
+      const webm = [...gerado.arquivos.keys()].filter((k) => new RegExp(`^videos/${v.id}\\.[0-9a-f]{10}\\.webm$`).test(k));
+      expect(mp4.length, v.id).toBe(1);
+      expect(webm.length, v.id).toBe(1);
+      const bytesMp4 = gerado.arquivos.get(mp4[0]!) as Buffer;
+      const bytesWebm = gerado.arquivos.get(webm[0]!) as Buffer;
+      expect(bytesMp4.subarray(4, 8).toString('latin1'), `${v.id}: MP4`).toBe('ftyp');
+      expect(bytesWebm.readUInt32BE(0), `${v.id}: WebM`).toBe(0x1a45dfa3);
+      // Leves: até 2 MB cada (o gravador baixa a qualidade até caber).
+      expect(bytesMp4.length, mp4[0]).toBeLessThanOrEqual(2 * 1000 * 1000);
+      expect(bytesWebm.length, webm[0]).toBeLessThanOrEqual(2 * 1000 * 1000);
+      // O arquivo de site-src/videos é o mesmo publicado.
+      expect(bytesMp4.equals(readFileSync(join(ROOT, 'site-src', 'videos', `${v.id}.mp4`))), v.id).toBe(true);
+      // O texto: título, frase e descrição, sem valores em reais (que só aparecem na seção Planos da página inicial).
+      for (const t of [v.titulo, v.frase, v.descricao]) expect(t, v.id).not.toMatch(/R\$\s?\d|[\u2013\u2014]|faz\w*\s+sentido/);
+      expect(v.descricao.length, v.id).toBeGreaterThan(120);
+    }
+    // A política de segurança aceita vídeo só do próprio site, e os vídeos ficam guardados por um ano no navegador.
+    expect(h('_headers')).toContain("media-src 'self'");
+    expect(h('_headers')).toContain('/videos/*\n  Cache-Control: public, max-age=31536000, immutable\n');
+  });
+
+  it('"Veja o app em uso" na página inicial e em O app: cada vídeo com a capa, os controles, sem tocar sozinho, o nome, a frase, a legenda da demonstração e a descrição em texto', () => {
+    for (const pagina of ['index.html', 'app/index.html']) {
+      const p = h(pagina);
+      const secao = /<h2 id="em-uso">Veja o app em uso<\/h2>[\s\S]*?<\/ul>/.exec(p)?.[0] ?? '';
+      expect(secao, pagina).not.toBe('');
+      expect(secao).toContain('Nenhum começa sozinho: toque no vídeo para assistir.');
+      const tags = [...secao.matchAll(/<video\b[^>]*>/g)].map((m) => m[0]);
+      expect(tags.length, pagina).toBe(videos.VIDEOS.length);
+      expect(p).not.toMatch(/\sautoplay\b|\sloop\b|<audio\b|youtube|vimeo/i);
+      for (const v of videos.VIDEOS) {
+        const item = new RegExp(`<li class="video">\\s*<figure>[\\s\\S]*?id="video-${v.id}-titulo"[\\s\\S]*?</li>`).exec(secao)?.[0] ?? '';
+        expect(item, `${pagina}: ${v.id}`).not.toBe('');
+        expect(item).toMatch(/<video controls preload="none" playsinline width="720" height="1560" poster="[^"]*imagens\/video-[a-z-]+\.[0-9a-f]{10}\.png"/);
+        expect(item).toContain(`aria-labelledby="video-${v.id}-titulo" aria-describedby="video-${v.id}-descricao"`);
+        // WebM primeiro (mais leve), depois o MP4, e um link para baixar se o navegador não tocar nenhum dos dois.
+        expect(item).toMatch(new RegExp(`<source src="[^"]*videos/${v.id}\\.[0-9a-f]{10}\\.webm" type="video/webm">\\s*<source src="[^"]*videos/${v.id}\\.[0-9a-f]{10}\\.mp4" type="video/mp4">`));
+        expect(item).toContain(`<h3 id="video-${v.id}-titulo">${esc(v.titulo)}</h3>`);
+        expect(item).toContain(`<p>${esc(v.frase)}</p>`);
+        expect(item).toMatch(new RegExp(`<p class="legenda">${videos.LEGENDA_TELA}\\. \\d+ segundos, sem som\\.</p>`));
+        expect(item).toContain(`<details class="video-descricao"><summary>Descrição do vídeo</summary><p id="video-${v.id}-descricao">${esc(v.descricao)}</p></details>`);
+      }
+    }
+    expect(videos.LEGENDA_TELA).toBe('Tela da demonstração, com dados fictícios');
+  });
+
+  it('as matérias de Novidades têm imagem de capa (tela da demonstração ou, na do 13º, a ilustração da marca) e as telas ao lado das seções, nos temas claro e escuro', () => {
+    const capas: Record<string, string> = {
+      'novidades/2026-10-23-conheca-a-clarevo.html': 'post-resumo',
+      'novidades/2026-10-23-como-a-empresa-oferece-a-clarevo-sem-ver-suas-financas.html': 'post-quem-ve',
+      'novidades/2026-11-12-o-que-chegou-ao-app-em-novembro.html': 'post-investir',
+    };
+    for (const [pagina, id] of Object.entries(capas)) {
+      const p = h(pagina);
+      expect(p, pagina).toContain('<section class="capa capa-simples capa-com-imagem">');
+      const capa = /<div class="capa-grade capa-post">[\s\S]*?<\/figure>\n<\/div>/.exec(p)?.[0] ?? '';
+      expect(capa, pagina).toContain('<figure class="celular capa-tela">');
+      expect(capa).toMatch(new RegExp(`<source srcset="[^"]*imagens/${id}-escura\\.[0-9a-f]{10}\\.png" media="\\(prefers-color-scheme: dark\\)" width="480" height="\\d+"><img src="[^"]*imagens/${id}\\.[0-9a-f]{10}\\.png" alt="[^"]{40,}" width="480" height="\\d+" loading="eager"`));
+      expect(capa).toContain('<figcaption>Tela da demonstração, com dados fictícios</figcaption>');
+    }
+    // A matéria sem tela: a ilustração da marca, em SVG feito no repositório, com largura, altura e texto alternativo.
+    const treze = h('novidades/2026-10-23-13o-salario-quando-cai-e-como-se-organizar.html');
+    expect(treze).toMatch(/<figure class="capa-ilustracao"><img src="\.\.\/imagens\/ilustracao-decimo-terceiro\.[0-9a-f]{10}\.svg" alt="Ilustração da Clarevo: [^"]+" width="400" height="400" decoding="async"><\/figure>/);
+    const svg = texto([...gerado.arquivos.entries()].find(([k]) => /^imagens\/ilustracao-decimo-terceiro\.[0-9a-f]{10}\.svg$/.test(k))?.[1]);
+    expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 400 400"/);
+    expect(svg, 'a ilustração não carrega nada de fora nem tem script').not.toMatch(/<script|<image|href=|url\(/i);
+    expect(Buffer.byteLength(svg)).toBeLessThan(8 * 1024);
+    // As telas ao lado das seções: a aba Investir (Desempenho), Metas, a fatura em Multa e juros e as cinco abas (Resumo); e o painel da
+    // empresa, largo, embaixo do texto.
+    const nov = h('novidades/2026-11-12-o-que-chegou-ao-app-em-novembro.html');
+    const secoes = [...nov.matchAll(/<div class="post-secao">\n<div class="post-secao-texto">\n<h2 id="([^"]+)">[\s\S]*?<figure class="celular post-tela">[\s\S]*?<img src="[^"]*imagens\/(post-[a-z-]+)\.[0-9a-f]{10}\.png"/g)].map((m) => `${m[1]}:${m[2]}`);
+    expect(secoes).toEqual(['a-aba-investir:post-desempenho', 'metas-com-atalhos-de-prazo-ritmo-e-marcos:post-metas', 'multa-e-juros-agora-com-a-fatura-do-cartao:post-multa-fatura', 'cinco-abas:post-resumo']);
+    const empresa = h('novidades/2026-10-23-como-a-empresa-oferece-a-clarevo-sem-ver-suas-financas.html');
+    expect(empresa).toMatch(/<figure class="larga post-tela"><div class="larga-moldura"><picture><source srcset="\.\.\/imagens\/post-empresa-painel-escura\.[0-9a-f]{10}\.png" media="\(prefers-color-scheme: dark\)" width="960" height="\d+"><img src="\.\.\/imagens\/post-empresa-painel\.[0-9a-f]{10}\.png" alt="Painel da empresa[^"]+" width="960" height="\d+" loading="lazy" decoding="async"><\/picture><\/div><figcaption>Tela da demonstração, com dados fictícios<\/figcaption><\/figure>/);
+    // Cada tela das Novidades tem a versão escura, do mesmo tamanho, e nenhuma diretiva ficou sem trocar.
+    for (const t of imagens.TELAS_DAS_NOVIDADES) {
+      expect(existsSync(join(ROOT, t.origem)), t.origem).toBe(true);
+      expect(existsSync(join(ROOT, t.escura)), t.escura).toBe(true);
+      const a = png.dimensoes(readFileSync(join(ROOT, t.origem)));
+      const b = png.dimensoes(readFileSync(join(ROOT, t.escura)));
+      expect(`${b.largura}x${b.altura}`, t.escura).toBe(`${a.largura}x${a.altura}`);
+    }
+    for (const p of [...gerado.arquivos.keys()].filter((k) => k.startsWith('novidades/') && k.endsWith('.html'))) expect(h(p), p).not.toMatch(/\{\{tela:|class="pendente">Falta a tela/);
   });
 });
 

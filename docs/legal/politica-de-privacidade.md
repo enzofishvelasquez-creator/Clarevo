@@ -85,6 +85,10 @@ O convite é um link que a própria pessoa envia pelo celular dela. A Clarevo n�
 
 Seu Pessoal continua só seu. Entrar numa Família não mostra nem copia o seu Pessoal, e você não vê o Pessoal de ninguém.
 
+### 3.3a Espaço Negócio (opcional)
+
+Se você criar um espaço Negócio, guardamos o nome que você der a ele e o que você anotar nele, como na seção 3.2. Só você vê. Não pedimos CNPJ nem dados da empresa. Encerrar o espaço tira ele do app; os lançamentos ficam guardados, sem leitura, e são apagados de vez depois de 6 meses. Excluir a conta apaga o espaço Negócio junto.
+
 ### 3.4 Benefício pela empresa
 
 Se a sua empresa oferecer a Clarevo como benefício:
@@ -287,6 +291,7 @@ A exceção é a leitura de código no Android: o componente do Google (ML Kit) 
 - **Excluir um registro, uma conta a pagar, uma meta, um cartão ou uma conta de origem** (sem excluir a conta) tira o item das listas e dos totais, e ele deixa de aparecer no app. Mas o item não é apagado na hora: a Clarevo o marca como excluído, com a data e quem excluiu, para os totais e o histórico continuarem certos. Valor, descrição, data e categoria continuam guardados por 6 meses e depois são apagados de vez, todo dia, por uma rotina do banco de dados (ou antes, se você excluir a conta). Um item excluído que ainda é usado por outro, como o pagamento de uma conta a pagar, sai junto com ele.
 - **Ao excluir a conta**, o seu Pessoal é apagado de verdade, na hora, e a sua sessão termina. Veja "Como excluir a sua conta" para o passo a passo e para o que continua (por exemplo, o que você anotou numa Família de outras pessoas, sem o seu nome).
 - **Família encerrada.** Os dados ficam guardados, sem leitura por ninguém, por 6 meses, e depois são apagados de vez.
+- **Espaço Negócio encerrado** (seção 3.3a). Os lançamentos ficam guardados, sem leitura por ninguém, por 6 meses, e depois são apagados de vez.
 - **Cópias de segurança.** O serviço de banco de dados pode manter cópias de segurança, e dados já apagados podem ficar nelas por um tempo. [A DEFINIR: prazo, previsto em 7 dias no plano contratado; confirmar no painel] Se uma cópia for restaurada, as contas excluídas depois dela serão excluídas de novo.
 - **Registros de acesso.** A Clarevo não cria registros de acesso próprios. Os do Supabase e da Cloudflare têm prazo curto, que depende do plano, e o registro de auditoria da autenticação pode manter e-mail e IP depois da exclusão da conta. [A DEFINIR: o que guardar, onde e por quanto tempo, frente à guarda de registros de acesso do Marco Civil da Internet, art. 15, e conferir nos painéis o que cada serviço mantém]
 - **Resposta de "Como você conheceu a Clarevo?"** (seção 3.6). [PROPOSTA: enquanto a conta existir; sai junto com a conta. As contagens da seção 3.7 não guardam histórico: são refeitas do que existe no momento.] [A DEFINIR: confirmar o prazo]
