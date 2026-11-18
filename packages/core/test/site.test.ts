@@ -298,21 +298,25 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     const noCalc = /^calculadoras\/[a-z-]+\.html$/.test(nome) && nome !== 'calculadoras/index.html';
     // D-106: o painel e as páginas de indicador têm o script do painel, que pergunta uma vez ao próprio site (/api/indicadores).
     const noPainel = /^indicadores\/(index|selic-hoje|cdi-hoje|ipca-12-meses|rendimento-da-poupanca|dolar-ptax-hoje)\.html$/.test(nome);
+    // D-115: a página inicial e O app têm o script dos vídeos (js/videos.js), que toca e pausa os vídeos e não pede nada a ninguém.
+    const comVideos = ['index.html', 'app/index.html'].includes(nome);
     for (const m of html.matchAll(/<script\b([^>]*)>/gi)) {
       const ld = /^\s*type="application\/ld\+json"\s*$/.test(m[1]!);
       const busca = noAjuda && /^\s*src="busca\.js"\s+defer\s*$/.test(m[1]!);
       const calculadora = noCalc && /^\s*type="module"\s+src="calculadora\.js"\s*$/.test(m[1]!);
       const painel = noPainel && /^\s*src="painel\.js"\s+defer\s*$/.test(m[1]!);
-      expect(ld || busca || calculadora || painel, `${nome}: script não permitido: ${m[0]}`).toBe(true);
+      const videos = comVideos && /^\s*src="(\.\.\/)?js\/videos\.js"\s+defer\s*$/.test(m[1]!);
+      expect(ld || busca || calculadora || painel || videos, `${nome}: script não permitido: ${m[0]}`).toBe(true);
     }
     expect(html, `${nome}: manipulador de evento`).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html, `${nome}: atributo style (a política de segurança não permite)`).not.toMatch(/\sstyle\s*=/i);
     expect(html, `${nome}: iframe ou objeto`).not.toMatch(/<(iframe|object|embed|audio)\b/i);
-    // Vídeos (D-114): só na seção "Veja o app em uso" da página inicial e de O app, do próprio site, com controles, sem baixar antes do
-    // toque e sem tocar sozinhos.
-    if (!['index.html', 'app/index.html'].includes(nome)) expect(html, `${nome}: vídeo fora da seção de vídeos`).not.toMatch(/<video\b/i);
+    // Vídeos (D-114 e D-115): só na página inicial e em O app, do próprio site, sem controles de player e sem `autoplay` (quem toca e pausa
+    // é js/videos.js, só com o vídeo na tela), sem som, em repetição e sem baixar nada antes de aparecer.
+    if (!['index.html', 'app/index.html'].includes(nome)) expect(html, `${nome}: vídeo fora da página inicial e de O app`).not.toMatch(/<video\b/i);
     for (const v of html.matchAll(/<video\b[^>]*>/gi)) {
-      expect(v[0], `${nome}: vídeo`).toMatch(/^<video controls preload="none" playsinline width="\d+" height="\d+" poster="[^"]+\.png" aria-labelledby="[^"]+" aria-describedby="[^"]+">$/);
+      expect(v[0], `${nome}: vídeo`).toMatch(/^<video muted loop playsinline preload="none" width="\d+" height="\d+" poster="[^"]+\.png" aria-labelledby="[^"]+" aria-describedby="[^"]+">$/);
+      expect(v[0], `${nome}: vídeo com controles ou autoplay`).not.toMatch(/\s(controls|autoplay)\b/);
     }
     // Formulário só nas páginas que o interruptor liga (D-066), e sempre um POST para o próprio site.
     if (opcoes.formularios?.includes(nome)) {
@@ -821,10 +825,13 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('a do aceite do convite e a do encerramento');
     expect(h).toContain('Também não vê quando você abre o app nem o que você anota.');
     expect(h).not.toContain('nem o que você faz no app');
-    // De três a quatro recursos com captura e o herói com a tela Resumo, todos com a legenda de demonstração.
-    expect(h.match(/<figure class="celular">/g)?.length).toBe(5);
-    expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(5);
-    expect(h).toMatch(/src="imagens\/resumo\.[0-9a-f]{10}\.png"/);
+    // D-115: o herói com o vídeo do Resumo e três cartões com o vídeo do que mostram (anotar, contas e cartões, metas); Aprender continua
+    // com a captura. Cada figura tem a legenda de demonstração.
+    expect(h.match(/<figure class="celular">/g)?.length).toBe(1);
+    expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(1);
+    expect(h).toMatch(/src="imagens\/aprender\.[0-9a-f]{10}\.png"/);
+    expect(h.match(/<figure class="celular celular-video" data-video /g)?.length).toBe(4);
+    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(4);
     for (const alvo of ['app/index.html', 'empresas/index.html', 'aprender/index.html', 'ajuda/index.html', 'novidades/index.html', 'seguranca.html']) expect(h, alvo).toContain(`href="${alvo}"`);
     // Sem selos das lojas, depoimento, cliente, prêmio nem número de uso inventado. Preço e "grátis" só na seção Planos (16/11/2026).
     const foraDosPlanos = h.replace(/<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/, '');
@@ -910,9 +917,11 @@ describe('site público: as páginas geradas', () => {
       const e = GUIDE_ENTRIES.find((x) => x.id === id)!;
       expect(h, id).toContain(esc(e.purpose));
     }
+    // D-115: seis recursos e o cartão do tema com o vídeo do que mostram; os outros com a captura da demonstração.
     const figuras = h.match(/<figure class="celular">/g)?.length ?? 0;
-    expect(figuras).toBeGreaterThanOrEqual(11);
+    expect(figuras).toBe(6);
     expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(figuras);
+    expect(h.match(/<figure class="celular celular-video" data-video /g)?.length).toBe(7);
     expect(h).toContain('Na web, hoje');
     // "Cada texto vem do guia" não é verdade (os pontos são do site): só a explicação de abertura vem do guia do app.
     expect(h).not.toContain('Cada texto vem do guia');
@@ -1113,12 +1122,12 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(passos).toContain('compara os meses fechados com o CDI e o IPCA do mesmo período, com os dados públicos do Banco Central. Não é recomendação de investimento.');
     expect(passos).toContain('os investimentos ficam só no seu Pessoal');
     expect(INVESTMENT_TEXT.whoSees).toContain('ficam só no seu Pessoal');
-    // A captura é a da demonstração (a mesma do guia do app), com a legenda, e o passo a passo fica na Ajuda.
-    expect(guia.screenshot).toBe('540_investimentos.png');
-    expect(secao).toMatch(/src="\.\.\/imagens\/investimentos\.[0-9a-f]{10}\.png"/);
-    expect(secao).toContain('Dados fictícios de demonstração');
+    // Desde 18/11/2026 (D-115), o vídeo de Investir (o card e o Desempenho) no lugar da captura, com a legenda da demonstração; o passo a
+    // passo fica na Ajuda. A captura antiga saiu do site (nenhuma página a usava).
+    expect(secao).toMatch(/<figure class="celular celular-video" data-video data-titulo="Investir">/);
+    expect(secao).toContain('Tela da demonstração, com dados fictícios');
     expect(secao).toContain('href="../ajuda/organizar.html#guia-investimentos"');
-    expect([...gerado.arquivos.keys()].some((k) => /^imagens\/investimentos\.[0-9a-f]{10}\.png$/.test(k))).toBe(true);
+    expect([...gerado.arquivos.keys()].some((k) => /^imagens\/investimentos\.[0-9a-f]{10}\.png$/.test(k))).toBe(false);
     // Vem depois de Metas e antes de Família, na ordem das abas, e a página diz quais são as cinco.
     expect(h.indexOf('<article class="recurso" id="metas"')).toBeGreaterThan(0);
     expect(h.indexOf('<article class="recurso" id="investir"')).toBeGreaterThan(h.indexOf('<article class="recurso" id="metas"'));
@@ -1162,7 +1171,9 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(nota.alt).not.toBe(anotar.alt);
     expect(recurso('nota')).toContain(`alt="${esc(nota.alt)}"`);
     expect(recurso('nota')).toContain('>Leitura de nota fiscal e de comprovante</h3>');
-    expect(recurso('anotar')).toContain(`alt="${esc(anotar.alt)}"`);
+    // Anotar gasto mostra o vídeo de anotar um gasto (D-115); a captura "anotar" continua no kit de imprensa.
+    expect(recurso('anotar')).toContain('data-titulo="Anotar um gasto"');
+    expect(html('imprensa.html')).toContain(`alt="${esc(anotar.alt)}"`);
     // As duas capturas não são a mesma imagem (os pixels diferem) e toda captura do site tem origem que existe.
     const daImagem = (id: string) => gerado.arquivos.get([...gerado.arquivos.keys()].find((k) => k.startsWith(`imagens/${id}.`))!) as Buffer;
     const a = png.decodificar(daImagem('anotar'));
@@ -1818,7 +1829,7 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
   const gerado = gerarSite();
   const h = (nome: string) => texto(gerado.arquivos.get(nome));
   const videos = require(join(ROOT, 'scripts', 'site', 'videos.js')) as {
-    VIDEOS: { id: string; titulo: string; frase: string; descricao: string }[];
+    VIDEOS: { id: string; titulo: string; descricao: string }[];
     LEGENDA_TELA: string;
   };
   const imagens = require(join(ROOT, 'scripts', 'site', 'imagens.js')) as {
@@ -1849,7 +1860,7 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
       // O arquivo de site-src/videos é o mesmo publicado.
       expect(bytesMp4.equals(readFileSync(join(ROOT, 'site-src', 'videos', `${v.id}.mp4`))), v.id).toBe(true);
       // O texto: título, frase e descrição, sem valores em reais (que só aparecem na seção Planos da página inicial).
-      for (const t of [v.titulo, v.frase, v.descricao]) expect(t, v.id).not.toMatch(/R\$\s?\d|[\u2013\u2014]|faz\w*\s+sentido/);
+      for (const t of [v.titulo, v.descricao]) expect(t, v.id).not.toMatch(/R\$\s?\d|[\u2013\u2014]|faz\w*\s+sentido/);
       expect(v.descricao.length, v.id).toBeGreaterThan(120);
     }
     // A política de segurança aceita vídeo só do próprio site, e os vídeos ficam guardados por um ano no navegador.
@@ -1857,28 +1868,58 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
     expect(h('_headers')).toContain('/videos/*\n  Cache-Control: public, max-age=31536000, immutable\n');
   });
 
-  it('"Veja o app em uso" na página inicial e em O app: cada vídeo com a capa, os controles, sem tocar sozinho, o nome, a frase, a legenda da demonstração e a descrição em texto', () => {
+  it('D-115: cada vídeo fica no bloco que ele mostra, na moldura de celular, sem controles nem autoplay, com a legenda da demonstração, o nome e a descrição em texto', () => {
+    // Onde cada vídeo fica: a página inicial (a capa e três cartões de "O que o app faz") e O app (seis recursos e o cartão do tema).
+    const lugares: [string, string, RegExp][] = [
+      ['index.html', 'resumo-do-mes', /<section class="capa[^"]*">[\s\S]*?<\/section>/],
+      ['index.html', 'anotar-gasto', /<article class="cartao">\n<h3>Anotar e ver o mês<\/h3>[\s\S]*?<\/article>/],
+      ['index.html', 'importar-fatura-print', /<article class="cartao">\n<h3>Contas, cartões e gastos fixos<\/h3>[\s\S]*?<\/article>/],
+      ['index.html', 'metas', /<article class="cartao">\n<h3>Metas e reserva<\/h3>[\s\S]*?<\/article>/],
+      ['app/index.html', 'resumo-do-mes', /<article class="recurso" id="resumo"[\s\S]*?<\/article>/],
+      ['app/index.html', 'anotar-gasto', /<article class="recurso" id="anotar"[\s\S]*?<\/article>/],
+      ['app/index.html', 'calendario-do-mes', /<article class="recurso" id="contas"[\s\S]*?<\/article>/],
+      ['app/index.html', 'importar-fatura-print', /<article class="recurso" id="cartoes"[\s\S]*?<\/article>/],
+      ['app/index.html', 'metas', /<article class="recurso" id="metas"[\s\S]*?<\/article>/],
+      ['app/index.html', 'investir', /<article class="recurso" id="investir"[\s\S]*?<\/article>/],
+      ['app/index.html', 'tema-escuro-claro', /<article class="cartao">\n<h3>Tema claro ou escuro<\/h3>[\s\S]*?<\/article>/],
+    ];
+    for (const [pagina, id, onde] of lugares) {
+      const p = h(pagina);
+      const v = videos.VIDEOS.find((x) => x.id === id)!;
+      const bloco = onde.exec(p)?.[0] ?? '';
+      expect(bloco, `${pagina}: ${id}`).toContain(`data-titulo="${esc(v.titulo)}"`);
+      const item = /<figure class="celular celular-video" data-video [\s\S]*?<\/figure>/.exec(bloco)?.[0] ?? '';
+      expect(item).toMatch(/<video muted loop playsinline preload="none" width="720" height="1560" poster="[^"]*imagens\/video-[a-z-]+\.[0-9a-f]{10}\.png"/);
+      expect(item).toContain(`aria-labelledby="video-${id}-nome" aria-describedby="video-${id}-descricao"`);
+      // WebM primeiro (mais leve), depois o MP4, e um link para o MP4 se o navegador não tocar nenhum dos dois.
+      expect(item).toMatch(new RegExp(`<source src="[^"]*videos/${id}\\.[0-9a-f]{10}\\.webm" type="video/webm">\\s*<source src="[^"]*videos/${id}\\.[0-9a-f]{10}\\.mp4" type="video/mp4">\\s*<a href="[^"]*videos/${id}\\.[0-9a-f]{10}\\.mp4">`));
+      expect(item).toMatch(new RegExp(`<p class="so-leitor"><span id="video-${id}-nome">Vídeo: ${esc(v.titulo)}</span>, \\d+ segundos, sem som\\. <span id="video-${id}-descricao">`));
+      expect(item).toContain(`<span id="video-${id}-descricao">${esc(v.descricao)}</span>`);
+      expect(item).toContain(`<figcaption>${videos.LEGENDA_TELA}</figcaption>`);
+      expect(item).not.toMatch(/\s(controls|autoplay)\b|<details/);
+    }
+    // Cada vídeo aparece uma vez em cada página onde fica; a seção "Veja o app em uso" saiu (D-115).
     for (const pagina of ['index.html', 'app/index.html']) {
       const p = h(pagina);
-      const secao = /<h2 id="em-uso">Veja o app em uso<\/h2>[\s\S]*?<\/ul>/.exec(p)?.[0] ?? '';
-      expect(secao, pagina).not.toBe('');
-      expect(secao).toContain('Nenhum começa sozinho: toque no vídeo para assistir.');
-      const tags = [...secao.matchAll(/<video\b[^>]*>/g)].map((m) => m[0]);
-      expect(tags.length, pagina).toBe(videos.VIDEOS.length);
-      expect(p).not.toMatch(/\sautoplay\b|\sloop\b|<audio\b|youtube|vimeo/i);
-      for (const v of videos.VIDEOS) {
-        const item = new RegExp(`<li class="video">\\s*<figure>[\\s\\S]*?id="video-${v.id}-titulo"[\\s\\S]*?</li>`).exec(secao)?.[0] ?? '';
-        expect(item, `${pagina}: ${v.id}`).not.toBe('');
-        expect(item).toMatch(/<video controls preload="none" playsinline width="720" height="1560" poster="[^"]*imagens\/video-[a-z-]+\.[0-9a-f]{10}\.png"/);
-        expect(item).toContain(`aria-labelledby="video-${v.id}-titulo" aria-describedby="video-${v.id}-descricao"`);
-        // WebM primeiro (mais leve), depois o MP4, e um link para baixar se o navegador não tocar nenhum dos dois.
-        expect(item).toMatch(new RegExp(`<source src="[^"]*videos/${v.id}\\.[0-9a-f]{10}\\.webm" type="video/webm">\\s*<source src="[^"]*videos/${v.id}\\.[0-9a-f]{10}\\.mp4" type="video/mp4">`));
-        expect(item).toContain(`<h3 id="video-${v.id}-titulo">${esc(v.titulo)}</h3>`);
-        expect(item).toContain(`<p>${esc(v.frase)}</p>`);
-        expect(item).toMatch(new RegExp(`<p class="legenda">${videos.LEGENDA_TELA}\\. \\d+ segundos, sem som\\.</p>`));
-        expect(item).toContain(`<details class="video-descricao"><summary>Descrição do vídeo</summary><p id="video-${v.id}-descricao">${esc(v.descricao)}</p></details>`);
-      }
+      expect(p).not.toContain('Veja o app em uso');
+      expect(p).not.toContain('id="em-uso"');
+      expect(p).not.toMatch(/\sautoplay\b|\scontrols\b|<audio\b|youtube|vimeo/i);
+      for (const v of videos.VIDEOS) expect((p.match(new RegExp(`id="video-${v.id}-nome"`, 'g')) ?? []).length, `${pagina}: ${v.id}`).toBeLessThanOrEqual(1);
+      expect(p).toMatch(/<script src="(\.\.\/)?js\/videos\.js" defer><\/script>/);
     }
+    expect(h('app/index.html').match(/<video\b/g)?.length).toBe(7);
+    expect(h('index.html').match(/<video\b/g)?.length).toBe(4);
+    // O cartão do tema leva à resposta da Ajuda sobre o tema.
+    expect(h('app/index.html')).toMatch(/<h3>Tema claro ou escuro<\/h3>[\s\S]*?<a href="\.\.\/ajuda\/conta\.html#p-tema">Como usar<\/a>/);
+    expect(h('ajuda/conta.html')).toContain('id="p-tema"');
+    // O script dos vídeos: do próprio site, sem rede, sem guardar nada, com o botão de pausar e tocar e as preferências de movimento e de dados.
+    const js = h('js/videos.js');
+    expect(js).toContain('IntersectionObserver');
+    expect(js).toContain('prefers-reduced-motion: reduce');
+    expect(js).toContain('saveData');
+    expect(js).toContain('Pausar o vídeo: ');
+    expect(js).toContain('Tocar o vídeo: ');
+    expect(js).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|innerHTML|eval\(/);
     expect(videos.LEGENDA_TELA).toBe('Tela da demonstração, com dados fictícios');
   });
 

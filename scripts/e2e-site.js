@@ -16,9 +16,10 @@
  *     retrato; com JavaScript, uma pergunta só ao próprio site (/api/indicadores), que troca os números e a hora e não se repete; a cópia de
  *     uma hora no servidor; a fonte fora do ar (a página fica com o retrato); nenhum pedido do navegador a outro domínio; a política de
  *     segurança; o aviso de mercado no rodapé; as duas calculadoras novas; e o resumo semanal com uma edição de teste;
- *   - os vídeos de uso do app (D-114) na página inicial e em O app: os sete, do próprio site, com controles, `preload="none"` (nenhum
- *     byte de vídeo antes do toque), sem tocar sozinhos (nem com movimento reduzido), com a capa, o nome, a frase, a legenda e a descrição;
- *     um toque toca o vídeo, e o servidor responde pedaços (206) com o tipo certo;
+ *   - os vídeos de uso do app (D-114 e D-115) na página inicial e em O app: cada um no bloco que mostra, do próprio site, sem controles nem
+ *     `autoplay`, sem som, com `preload="none"`; o script toca o que aparece na tela e pausa o que sai; o botão de pausar e tocar (nome
+ *     acessível, teclado); com movimento reduzido ou economia de dados, nada toca nem baixa até a pessoa pedir; sem JavaScript, a capa; e o
+ *     servidor responde pedaços (206) com o tipo certo;
  *   - as imagens das matérias de Novidades (D-114): capa e telas com largura, altura e texto alternativo, carregando do próprio site, e a
  *     versão escura no tema escuro;
  *   - a varredura de espaçamento e largura em todas as páginas (360, 768, 900 e 1280 px) e, no tema escuro, nas páginas com vídeos e imagens
@@ -698,45 +699,79 @@ function varrerPagina() {
       await g.close();
     }
 
-    // 7c. Vídeos de uso do app (D-114): na página inicial e em O app, os sete vídeos do próprio site, com controles, sem baixar nada antes do
-    // toque (preload="none") e sem tocar sozinhos; a capa, o nome, a frase, a legenda e a descrição de cada um; um toque toca o vídeo.
+    // 7c. Vídeos de uso do app (D-114 e D-115): cada um no bloco que mostra (a capa e três cartões da página inicial, seis recursos e o
+    // cartão do tema em O app), do próprio site, sem controles de player nem `autoplay`, sem som e em repetição. O script do site toca o
+    // vídeo que aparece na tela (pelo menos metade) e pausa o que sai; nada de vídeo baixa antes de aparecer; o botão redondo pausa e toca,
+    // pelo mouse e pelo teclado, com nome acessível; com movimento reduzido ou economia de dados, nada toca até a pessoa pedir; sem
+    // JavaScript, fica a capa.
     {
+      const LUGARES = {
+        '/': [['.capa', 'O Resumo do mês'], ['article.cartao:has(h3:text-is("Anotar e ver o mês"))', 'Anotar um gasto'], ['article.cartao:has(h3:text-is("Contas, cartões e gastos fixos"))', 'Importar fatura por print'], ['article.cartao:has(h3:text-is("Metas e reserva"))', 'Metas']],
+        '/app/': [['#resumo', 'O Resumo do mês'], ['#anotar', 'Anotar um gasto'], ['#contas', 'O Calendário do mês'], ['#cartoes', 'Importar fatura por print'], ['#metas', 'Metas'], ['#investir', 'Investir'], ['article.cartao:has(h3:text-is("Tema claro ou escuro"))', 'Do tema escuro ao claro']],
+      };
       const p = await pagina();
       const deVideo = [];
       p.on('request', (q) => /\/videos\//.test(q.url()) && deVideo.push(q.url()));
-      const lerVideos = () => p.$$eval('#em-uso ~ ul.videos video', (vs) => vs.map((v) => ({
-        controls: v.controls, preload: v.getAttribute('preload'), autoplay: v.hasAttribute('autoplay'), loop: v.hasAttribute('loop'), muted: v.muted,
+      const lerVideos = () => p.$$eval('figure[data-video] video', (vs) => vs.map((v) => ({
+        titulo: v.closest('figure').dataset.titulo, controls: v.controls || v.hasAttribute('controls'), autoplay: v.hasAttribute('autoplay'), loop: v.loop, muted: v.muted, preload: v.getAttribute('preload'),
         paused: v.paused, tempo: v.currentTime, poster: v.poster, largura: v.getAttribute('width'), altura: v.getAttribute('height'),
-        fontes: [...v.querySelectorAll('source')].map((f) => [f.src, f.type]),
+        fontes: [...v.querySelectorAll('source')].map((f) => [f.src, f.type]), reserva: v.querySelector('a') ? v.querySelector('a').href : '',
         nome: document.getElementById(v.getAttribute('aria-labelledby'))?.textContent || '',
         descricao: document.getElementById(v.getAttribute('aria-describedby'))?.textContent || '',
-        legenda: v.closest('figure')?.querySelector('.legenda')?.textContent || '',
-        frase: v.closest('figure')?.querySelector('figcaption > p:not(.legenda)')?.textContent || '',
+        legenda: v.closest('figure').querySelector('figcaption')?.textContent || '',
+        botao: v.closest('figure').querySelector('button.video-botao')?.getAttribute('aria-label') || '',
       })));
       for (const caminho of ['/', '/app/']) {
+        deVideo.length = 0;
         await p.goto(`${origem}${caminho}`);
         await p.waitForTimeout(1500);
         const vs = await lerVideos();
-        ok(`vídeos (${caminho}): a seção "Veja o app em uso" com os sete vídeos`, vs.length === 7 && (await p.textContent('#em-uso')) === 'Veja o app em uso', `${vs.length}`);
-        ok(`vídeos (${caminho}): todos com controles, preload="none", sem autoplay nem repetição, parados no começo`, vs.every((v) => v.controls && v.preload === 'none' && !v.autoplay && !v.loop && v.paused && v.tempo === 0), JSON.stringify(vs.map((v) => [v.controls, v.preload, v.autoplay, v.paused, v.tempo])));
-        ok(`vídeos (${caminho}): nenhum byte de vídeo baixado antes de alguém tocar`, deVideo.length === 0, deVideo.join(' | '));
-        ok(`vídeos (${caminho}): capa, WebM e MP4 do próprio site, com largura e altura`, vs.every((v) => v.poster.startsWith(`${origem}/imagens/video-`) && v.largura === '720' && v.altura === '1560' &&
-          v.fontes.length === 2 && v.fontes[0][1] === 'video/webm' && v.fontes[1][1] === 'video/mp4' && v.fontes.every(([u]) => u.startsWith(`${origem}/videos/`))), JSON.stringify(vs[0]));
-        ok(`vídeos (${caminho}): cada um com nome, frase, a legenda "Tela da demonstração, com dados fictícios" e a descrição em texto para leitor de tela`,
-          vs.every((v) => v.nome.length > 3 && v.frase.length > 20 && v.legenda.startsWith('Tela da demonstração, com dados fictícios. ') && /\d+ segundos, sem som\.$/.test(v.legenda) && v.descricao.length > 120), JSON.stringify(vs.map((v) => [v.nome, v.legenda, v.descricao.length])));
+        ok(`vídeos (${caminho}): ${LUGARES[caminho].length} vídeos, nenhuma seção "Veja o app em uso"`, vs.length === LUGARES[caminho].length && (await p.$('#em-uso')) === null, `${vs.length}`);
+        const lugares = [];
+        for (const [bloco, titulo] of LUGARES[caminho]) lugares.push([bloco, await p.locator(bloco).first().locator(`figure[data-video][data-titulo="${titulo}"]`).count()]);
+        ok(`vídeos (${caminho}): cada vídeo no bloco que ele mostra`, lugares.every(([, n]) => n === 1), JSON.stringify(lugares));
+        ok(`vídeos (${caminho}): nenhum com controles de player nem autoplay; todos sem som, em repetição e com preload="none"`, vs.every((v) => !v.controls && !v.autoplay && v.muted && v.loop && v.preload === 'none'), JSON.stringify(vs.map((v) => [v.titulo, v.controls, v.autoplay, v.muted, v.loop, v.preload])));
+        ok(`vídeos (${caminho}): capa, WebM e MP4 do próprio site, com largura, altura e o link para o MP4 dentro do vídeo`, vs.every((v) => v.poster.startsWith(`${origem}/imagens/video-`) && v.largura === '720' && v.altura === '1560' &&
+          v.fontes.length === 2 && v.fontes[0][1] === 'video/webm' && v.fontes[1][1] === 'video/mp4' && v.fontes.every(([u]) => u.startsWith(`${origem}/videos/`)) && v.reserva === v.fontes[1][0]), JSON.stringify(vs[0]));
+        ok(`vídeos (${caminho}): cada um com nome, a legenda "Tela da demonstração, com dados fictícios", a descrição em texto para leitor de tela e o botão de pausar e tocar`,
+          vs.every((v) => v.nome === `Vídeo: ${v.titulo}` && v.legenda === 'Tela da demonstração, com dados fictícios' && v.descricao.length > 120 && /^(Pausar|Tocar) o vídeo: /.test(v.botao) && v.botao.endsWith(v.titulo)), JSON.stringify(vs.map((v) => [v.nome, v.legenda, v.descricao.length, v.botao])));
         const capas = await Promise.all(vs.map((v) => ctx.request.get(v.poster)));
         ok(`vídeos (${caminho}): as capas carregam (PNG, guardadas por um ano)`, capas.every((r) => r.ok() && r.headers()['content-type'] === 'image/png' && /immutable/.test(r.headers()['cache-control'] || '')));
+        ok(`vídeos (${caminho}): só baixa vídeo do que aparece na tela`, deVideo.every((u) => u.startsWith(`${origem}/videos/`)) && (caminho !== '/' || deVideo.every((u) => /\/videos\/resumo-do-mes\./.test(u))), deVideo.join(' | '));
       }
-      // Um toque toca o vídeo (o WebM, que o Chromium do teste toca), e só ele.
-      const primeiro = p.locator('#em-uso ~ ul.videos video').first();
-      await primeiro.scrollIntoViewIfNeeded();
-      await primeiro.click();
+      // Na página inicial, o vídeo da capa aparece ao abrir: ele toca sozinho (o WebM do próprio site), e os de baixo ficam parados no começo.
+      await p.goto(`${origem}/`);
+      const tempoDe = (sel) => p.$eval(sel, (v) => ({ paused: v.paused, tempo: v.currentTime, src: v.currentSrc, erro: v.error && v.error.code }));
+      await p.waitForFunction(() => document.querySelector('.capa video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
+      const capa = await tempoDe('.capa video');
+      const parados = await p.$$eval('main > section:not(.capa) figure[data-video] video', (vs) => vs.every((v) => v.paused && v.currentTime === 0));
+      ok('vídeos: o da capa toca sozinho ao abrir a página (WebM do próprio site), sem erro, e os de baixo continuam parados', !capa.paused && capa.tempo > 0.5 && !capa.erro && capa.src.startsWith(`${origem}/videos/resumo-do-mes.`) && capa.src.endsWith('.webm') && parados, JSON.stringify(capa));
+      // Rolar até um cartão: o vídeo dele começa, e o da capa, fora da tela, pausa.
+      const cartao = 'article.cartao:has(h3:text-is("Metas e reserva")) video';
+      await p.locator(cartao).evaluate((v) => v.scrollIntoView({ block: 'center' }));
+      await p.waitForFunction(() => document.querySelector('[data-titulo="Metas"] video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
+      const doCartao = await p.locator(cartao).evaluate((v) => ({ paused: v.paused, tempo: v.currentTime }));
+      const capaFora = await tempoDe('.capa video');
+      ok('vídeos: ao rolar, o vídeo que aparece toca e o que saiu da tela pausa', !doCartao.paused && doCartao.tempo > 0.5 && capaFora.paused, JSON.stringify({ doCartao, capaFora }));
+      // O botão de pausar: nome acessível, 44 px, troca o nome; a pausa da pessoa vale mesmo depois de rolar para longe e voltar.
+      const botao = p.locator('[data-titulo="Metas"] button.video-botao');
+      const antes = { nome: await botao.getAttribute('aria-label'), caixa: await botao.boundingBox() };
+      await botao.click();
+      await p.waitForTimeout(300);
+      const pausado = { paused: await p.locator(cartao).evaluate((v) => v.paused), nome: await botao.getAttribute('aria-label') };
+      await p.evaluate(() => window.scrollTo(0, 0));
       await p.waitForTimeout(600);
-      if (await primeiro.evaluate((v) => v.paused)) await primeiro.evaluate((v) => v.play());
-      await p.waitForFunction(() => document.querySelector('#em-uso ~ ul.videos video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
-      const tocando = await p.$$eval('#em-uso ~ ul.videos video', (vs) => vs.map((v) => ({ paused: v.paused, tempo: v.currentTime, src: v.currentSrc, erro: v.error && v.error.code })));
-      ok('vídeos: um toque toca o primeiro vídeo (WebM do próprio site), e os outros continuam parados', tocando[0].tempo > 0.5 && !tocando[0].erro && tocando[0].src.startsWith(`${origem}/videos/anotar-gasto.`) && tocando[0].src.endsWith('.webm') && tocando.slice(1).every((v) => v.paused && v.tempo === 0), JSON.stringify(tocando.slice(0, 2)));
-      ok('vídeos: o que foi baixado veio só do próprio site', deVideo.length > 0 && deVideo.every((u) => u.startsWith(`${origem}/videos/`)), deVideo.slice(0, 3).join(' | '));
+      await p.locator(cartao).evaluate((v) => v.scrollIntoView({ block: 'center' }));
+      await p.waitForTimeout(900);
+      const continuaPausado = await p.locator(cartao).evaluate((v) => v.paused);
+      ok('vídeos: o botão "Pausar o vídeo: Metas" (44 px) pausa, passa a "Tocar o vídeo: Metas" e a pausa continua depois de rolar para longe e voltar',
+        antes.nome === 'Pausar o vídeo: Metas' && antes.caixa && antes.caixa.width >= 44 && antes.caixa.height >= 44 && pausado.paused && pausado.nome === 'Tocar o vídeo: Metas' && continuaPausado, JSON.stringify({ antes, pausado, continuaPausado }));
+      // Pelo teclado: Tab chega ao botão, com foco visível, e Espaço toca de novo.
+      await botao.focus();
+      const foco = await botao.evaluate((b) => { const cs = getComputedStyle(b); return { visivel: b.matches(':focus-visible') || document.activeElement === b, contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }; });
+      await p.keyboard.press('Space');
+      await p.waitForFunction(() => !document.querySelector('[data-titulo="Metas"] video').paused, null, { timeout: 5000 }).catch(() => {});
+      ok('vídeos: pelo teclado, o botão recebe foco visível e Espaço toca o vídeo de novo, com o nome "Pausar o vídeo: Metas"', foco.visivel && !(await p.locator(cartao).evaluate((v) => v.paused)) && (await botao.getAttribute('aria-label')) === 'Pausar o vídeo: Metas', JSON.stringify(foco));
       await p.close();
       // O MP4 (para os navegadores que não tocam WebM): tipo certo, pedaço com 206 e a política de segurança com media-src 'self'.
       const htmlDoApp = await (await ctx.request.get(`${origem}/app/`)).text();
@@ -746,17 +781,52 @@ function varrerPagina() {
       ok('vídeos: o MP4 sai como video/mp4, guardado por um ano, com a política de segurança que aceita vídeo só do próprio site', inteiro.ok() && inteiro.headers()['content-type'] === 'video/mp4' &&
         /immutable/.test(inteiro.headers()['cache-control'] || '') && /media-src 'self'/.test(inteiro.headers()['content-security-policy'] || ''), JSON.stringify(inteiro.headers()));
       ok('vídeos: o servidor responde um pedaço do arquivo (206), como o navegador pede', pedaco.status() === 206 && (await pedaco.body()).length === 100 && (await pedaco.body()).subarray(4, 8).toString('latin1') === 'ftyp' && /^bytes 0-99\/\d+$/.test(pedaco.headers()['content-range'] || ''), `${pedaco.status()} ${pedaco.headers()['content-range']}`);
-      // Movimento reduzido: nada toca sozinho e nada de vídeo é baixado; a faixa rola sem animação.
-      const calmo = await navegador.newContext({ reducedMotion: 'reduce', viewport: { width: 390, height: 900 } });
-      const q = await calmo.newPage();
-      const deVideoCalmo = [];
-      q.on('request', (r) => /\/videos\//.test(r.url()) && deVideoCalmo.push(r.url()));
-      await q.goto(`${origem}/`);
-      await q.waitForTimeout(2000);
-      const parados = await q.$$eval('#em-uso ~ ul.videos video', (vs) => vs.every((v) => v.paused && v.currentTime === 0));
-      const rolagem = await q.$eval('ul.videos', (u) => getComputedStyle(u).scrollBehavior);
-      ok('vídeos com movimento reduzido: nenhum toca sozinho, nada é baixado e a faixa rola sem animação', parados && deVideoCalmo.length === 0 && rolagem === 'auto', `${parados} ${deVideoCalmo.length} ${rolagem}`);
-      await calmo.close();
+      // Movimento reduzido (page.emulateMedia) e economia de dados: nada toca sozinho e nada de vídeo baixa; o botão toca a pedido.
+      for (const [nome, preparar] of [
+        ['movimento reduzido', async (q) => q.emulateMedia({ reducedMotion: 'reduce' })],
+        ['economia de dados', async (q) => q.addInitScript(() => Object.defineProperty(Navigator.prototype, 'connection', { configurable: true, get: () => ({ saveData: true, addEventListener() {} }) }))],
+      ]) {
+        const calmo = await navegador.newContext({ viewport: { width: 390, height: 900 } });
+        const q = await calmo.newPage();
+        const erros = [];
+        q.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && erros.push(m.text()));
+        q.on('pageerror', (e) => erros.push(e.message));
+        await preparar(q);
+        const deVideoCalmo = [];
+        q.on('request', (r) => /\/videos\//.test(r.url()) && deVideoCalmo.push(r.url()));
+        await q.goto(`${origem}/`);
+        await q.waitForTimeout(2000);
+        const tudoParado = await q.$$eval('figure[data-video] video', (vs) => vs.length === 4 && vs.every((v) => v.paused && v.currentTime === 0));
+        const nomeAntes = await q.getAttribute('.capa button.video-botao', 'aria-label');
+        const baixadosAntes = deVideoCalmo.length;
+        await q.click('.capa button.video-botao');
+        await q.waitForFunction(() => document.querySelector('.capa video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
+        const pedido = await q.$eval('.capa video', (v) => ({ paused: v.paused, tempo: v.currentTime }));
+        ok(`vídeos com ${nome}: nada toca sozinho nem baixa até a pessoa tocar no botão "Tocar o vídeo", que toca o vídeo`, tudoParado && baixadosAntes === 0 && deVideoCalmo.length > 0 && nomeAntes === 'Tocar o vídeo: O Resumo do mês' && !pedido.paused && pedido.tempo > 0.5 && erros.length === 0, JSON.stringify({ tudoParado, baixadosAntes, nomeAntes, pedido, erros }));
+        await calmo.close();
+      }
+      // Sem JavaScript: a capa aparece, sem botão, e nada quebra.
+      const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 } });
+      const r = await semJs.newPage();
+      const errosSemJs = [];
+      r.on('pageerror', (e) => errosSemJs.push(e.message));
+      await r.goto(`${origem}/app/`);
+      const semScript = await r.evaluate(() => ({ videos: document.querySelectorAll('figure[data-video] video').length, botoes: document.querySelectorAll('.video-botao').length, capas: [...document.querySelectorAll('figure[data-video] video')].every((v) => v.poster.includes('/imagens/video-')) }));
+      ok('vídeos sem JavaScript: as capas aparecem, sem botão e sem erro', semScript.videos === 7 && semScript.botoes === 0 && semScript.capas && errosSemJs.length === 0, JSON.stringify({ semScript, errosSemJs }));
+      await semJs.close();
+      // Nada passa da largura da tela em 320, 390 e 1280 px, na página inicial, em O app e numa matéria.
+      const q = await pagina();
+      const largas = [];
+      for (const largura of [320, 390, 1280]) {
+        await q.setViewportSize({ width: largura, height: 900 });
+        for (const c of ['', 'app/', POSTS[3]]) {
+          await q.goto(`${origem}/${c}`);
+          if (await q.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${c || 'início'} em ${largura} px`);
+        }
+      }
+      ok('vídeos e Fontes: nada passa da largura da tela em 320, 390 e 1280 px (início, O app e uma matéria)', largas.length === 0, largas.join(' | '));
+      await q.setViewportSize({ width: 390, height: 900 });
+      await q.close();
     }
 
     // 7d. Imagens das matérias de Novidades (D-114): capa e telas ao lado das seções, do próprio site, com largura, altura e texto

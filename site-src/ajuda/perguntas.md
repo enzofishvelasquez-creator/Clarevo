@@ -23,6 +23,13 @@ No app, abra Conta e, no último item, toque em "Excluir minha conta". Para conf
 
 Pode levar os seus gastos e recebimentos do Pessoal, e as compras no cartão à parte, em planilha (CSV) ou em resumo em PDF, escolhendo o período, em Conta, "Exportar meus dados". A exportação não leva tudo o que a Clarevo guarda, como metas e contas a pagar em aberto, e o arquivo é montado no seu aparelho.
 
+## Como escolho o tema claro ou escuro?
+
+- tema: conta
+- id: tema
+
+Por padrão, a Clarevo segue o tema do aparelho. Para escolher, abra Conta e, no card "Tema", toque em "Igual ao aparelho", "Claro" ou "Escuro". A escolha vale só para este aparelho e passa a valer na próxima vez que você abrir a Clarevo; para ver agora, toque em "Aplicar agora". Ao sair da conta, a escolha é esquecida e o app volta a seguir o tema do aparelho.
+
 ## Como funciona a Família?
 
 - tema: familia

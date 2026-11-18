@@ -50,7 +50,6 @@ const IMAGENS = [
   { id: 'cartoes', origem: `${LOJA}/04_cartoes.png`, largura: LARGURA_CELULAR, alt: 'Tela de um cartão de crédito, com o limite usado, a fatura atual e as próximas faturas.' },
   { id: 'evolucao', origem: `${LOJA}/05_evolucao.png`, largura: LARGURA_CELULAR, alt: 'Tela Evolução, com o gráfico de Recebido e Pago mês a mês, a média e a mediana.' },
   { id: 'metas', origem: `${LOJA}/07_metas.png`, largura: LARGURA_CELULAR, alt: 'Tela Metas, com a reserva para imprevistos e o quanto já foi guardado.' },
-  { id: 'investimentos', origem: `${TELAS}/540_investimentos.png`, largura: LARGURA_CELULAR, alt: 'Tela Investimentos, com o valor de hoje, o que foi aportado, o ganho e a rentabilidade dos meses fechados ao lado do CDI e do IPCA do mesmo período.' },
   { id: 'aprender', origem: `${LOJA}/08_aprender.png`, largura: LARGURA_CELULAR, alt: 'Tela Aprender, com a busca, as calculadoras e os temas de educação financeira.' },
   { id: 'familia', origem: `${TELAS}/402_familia_titular.png`, largura: LARGURA_CELULAR, alt: 'Tela Família, com o nome da Família, as pessoas, o papel de cada uma e o botão Convidar.' },
   // Era a tela Anotar gasto com o botão de escanear, quase igual à captura "anotar": desde 12/11/2026 é o comprovante já lido.

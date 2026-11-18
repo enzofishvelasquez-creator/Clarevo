@@ -4,7 +4,7 @@
  * identificados, a etiqueta "Demonstração" no alto de cada tela, nenhuma rede), na versão web de `npm --workspace apps/app run export:demo`,
  * a mesma de `scripts/video-demonstracao.js` e `scripts/gravar-redes.js`.
  *
- * Vídeos (os textos que o site mostra, a frase e a descrição de cada um, ficam em `scripts/site/videos.js`; aqui ficam os roteiros):
+ * Vídeos (os textos que o site mostra, o título e a descrição de cada um, ficam em `scripts/site/videos.js`; aqui ficam os roteiros):
  *   anotar-gasto, resumo-do-mes, metas, investir, importar-fatura-print, calendario-do-mes e tema-escuro-claro.
  * Cada um sai em retrato de celular, 720 x 1560 (o app vê 360 x 780 pontos, ampliados 2 vezes), de 10 a 25 segundos, sem som (sem trilha),
  * em MP4 (H.264, yuv420p, +faststart) e WebM (VP9), com até 2 MB por arquivo (a qualidade baixa até caber; nunca passa de 25 MB, o limite
@@ -485,7 +485,7 @@ async function gravarVideo(browser, servidor, def, manifesto, problemas, extras)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Os roteiros dos vídeos. O que cada um mostra está descrito em scripts/site/videos.js (a frase e a descrição que o site mostra).
+// Os roteiros dos vídeos. O que cada um mostra está descrito em scripts/site/videos.js (o título e a descrição que o site mostra).
 // ---------------------------------------------------------------------------------------------------------------------
 const naCapa = async (c) => { await c.rolarPara(0, 0); await c.pausa(400); };
 

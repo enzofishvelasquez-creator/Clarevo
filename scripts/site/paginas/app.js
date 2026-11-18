@@ -1,21 +1,23 @@
 'use strict';
 /**
- * O app: os vídeos de uso (D-114) e um passeio pelos recursos, cada um com a captura da DEMONSTRAÇÃO (dados fictícios). O "para que serve" de cada recurso vem do
- * guia de uso do core (`packages/core/src/guide`), então o site não promete o que o app não faz. Onde está disponível: web hoje;
- * lojas "em breve", sem selos.
+ * O app: um passeio pelos recursos, cada um com o vídeo de uso ou a captura da DEMONSTRAÇÃO (dados fictícios). O "para que serve" de cada
+ * recurso vem do guia de uso do core (`packages/core/src/guide`), então o site não promete o que o app não faz. Onde está disponível: web
+ * hoje; lojas "em breve", sem selos. Desde 18/11/2026 (D-115), cada vídeo fica no lugar da captura do recurso que ele mostra e toca
+ * sozinho enquanto aparece (`js/videos.js`), em vez de ficarem todos juntos numa seção.
  */
 const { URL_APP } = require('../config');
 const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular } = require('../modelo');
 const { catalogo } = require('../catalogo');
-const { secaoDeVideos } = require('../videos');
+const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
 
 const ARQUIVO = 'app/index.html';
 
 /**
- * Os recursos do passeio, na ordem. `guia`: ids do guia de uso (o primeiro dá o texto principal); `imagem`: id da captura; `itens`:
- * pontos curtos, escritos conferindo o código e o guia, sem repetir o que o texto do guia já diz logo acima.
+ * Os recursos do passeio, na ordem. `guia`: ids do guia de uso (o primeiro dá o texto principal); `imagem`: id da captura; `video`: o vídeo
+ * de uso que fica no lugar da captura (D-115); `itens`: pontos curtos, escritos conferindo o código e o guia, sem repetir o que o texto do
+ * guia já diz logo acima.
  */
 const RECURSOS = [
   {
@@ -23,6 +25,7 @@ const RECURSOS = [
     titulo: 'Resumo do mês',
     guia: ['resumo'],
     imagem: 'resumo',
+    video: 'resumo-do-mes',
     itens: [
       'Recebido e Pago pela data em que o dinheiro entrou ou saiu.',
       'A Diferença do mês é recebido menos pago, e o app lembra que ela não é o saldo da conta.',
@@ -34,6 +37,7 @@ const RECURSOS = [
     titulo: 'Anotar gasto e recebimento',
     guia: ['anotar-gasto'],
     imagem: 'anotar',
+    video: 'anotar-gasto',
     itens: [
       'Poucos toques, com o rascunho guardado e um aviso antes de descartar.',
       'Escolha como pagou (dinheiro, débito ou Pix, ou cartão de crédito) e de onde o dinheiro saiu.',
@@ -56,9 +60,11 @@ const RECURSOS = [
     titulo: 'Contas a pagar e gastos fixos',
     guia: ['contas-a-pagar', 'gastos-fixos', 'contas-do-ano'],
     imagem: 'contas',
+    video: 'calendario-do-mes',
     itens: [
       'O gasto só entra em Pago quando você marca a conta como paga, e dá para desfazer.',
       'Lembretes de vencimento no app para celular, no dia anterior.',
+      'No Calendário do mês, as contas, as faturas e os gastos fixos aparecem por dia, com o previsto separado do que já foi pago.',
     ],
   },
   {
@@ -66,10 +72,12 @@ const RECURSOS = [
     titulo: 'Cartões e faturas',
     guia: ['cartoes'],
     imagem: 'cartoes',
+    video: 'importar-fatura-print',
     itens: [
       'Compras à vista e parceladas, fatura atual, próximas faturas e limite usado.',
       'O app guarda só o apelido e, se você quiser, os 4 últimos dígitos. Nunca o número completo, o código de segurança nem a validade.',
       'Anote as compras ou o pagamento da fatura, nunca os dois, para o mesmo gasto não contar duas vezes.',
+      'Na tela do cartão, Importar fatura lê o arquivo ou os prints da fatura aberta no próprio aparelho, e você confere cada linha antes de importar.',
     ],
   },
   {
@@ -86,6 +94,7 @@ const RECURSOS = [
     titulo: 'Metas e reserva',
     guia: ['metas', 'plano-de-guardar'],
     imagem: 'metas',
+    video: 'metas',
     itens: [
       'Reserva para imprevistos e metas com prazo, com o valor guardado só pelo que você registra. Os atalhos de prazo (6 meses, 1 ano, 2 anos ou 5 anos) preenchem a data por você.',
       'O cartão de cada meta com valor planejado por mês mostra o ritmo: se os aportes acompanham o plano e quanto falta. Ao passar de 25%, 50% e 75% da meta, uma frase curta marca o avanço.',
@@ -97,7 +106,7 @@ const RECURSOS = [
     id: 'investir',
     titulo: 'Investir',
     guia: ['investimentos'],
-    imagem: 'investimentos',
+    video: 'investir',
     itens: [
       'Você registra o que aplicou, os aportes, os resgates, os rendimentos e o valor de hoje, como aparecem no seu extrato.',
       'A rentabilidade dos meses fechados aparece ao lado do CDI e do IPCA do mesmo período, com dados públicos do Banco Central.',
@@ -128,11 +137,16 @@ const RECURSOS = [
   },
 ];
 
-/** Recursos menores, com captura menor. Os lembretes não têm captura: são do app para celular, e a demonstração só existe no navegador, onde a tela mostra apenas o aviso de que eles não existem. */
+/**
+ * Recursos menores, com captura menor. Os lembretes não têm captura: são do app para celular, e a demonstração só existe no navegador, onde
+ * a tela mostra apenas o aviso de que eles não existem. O tema (D-112) não tem entrada no guia do app: o cartão leva o vídeo do tema (D-115)
+ * e a resposta da Ajuda do site (`ajuda`, em `site-src/ajuda/perguntas.md`).
+ */
 const MAIS = [
   { id: 'lembretes', titulo: 'Lembretes', guia: 'lembretes', imagem: null, texto: 'Um aviso no dia anterior ao vencimento de cada conta, no app para celular. Na tela bloqueada, o aviso não mostra valor nem descrição.' },
   { id: 'quem-ve', titulo: 'Quem vê estes dados', guia: 'quem-ve', imagem: 'quem-ve', texto: 'Uma tela no próprio app mostra quem tem acesso aos registros: no Pessoal, só você, entre as pessoas do app.' },
   { id: 'beneficio', titulo: 'Benefício pela empresa', guia: 'beneficio-da-empresa', imagem: 'beneficio', texto: 'Quem recebe o convite da empresa aceita pelo link. O app mostra a empresa, o plano e desde quando vale.' },
+  { id: 'tema', titulo: 'Tema claro ou escuro', ajuda: 'ajuda/conta.html#p-tema', video: 'tema-escuro-claro', texto: 'Por padrão, a Clarevo segue o tema do aparelho. Em Conta, no card Tema, dá para escolher Claro ou Escuro, e a escolha vale só para aquele aparelho.' },
 ];
 
 function paginaApp({ valores, img, videos }) {
@@ -158,18 +172,22 @@ ${propositos}
 ${r.itens.length ? `<ul>\n${r.itens.map((i) => `<li>${esc(i)}</li>`).join('\n')}\n</ul>` : ''}
 <p class="pequeno"><a href="${u(`ajuda/${require('./ajuda').temaDoGuia(r.guia[0])}.html#guia-${r.guia[0]}`)}">Como usar, passo a passo</a></p>
 </div>
-${celular(img[r.imagem], ARQUIVO)}
+${r.video ? celularComVideo(r.video, { videos, img }, ARQUIVO) : celular(img[r.imagem], ARQUIVO)}
 </article>`;
   }).join('\n');
 
   const mais = MAIS.map((m) => {
-    const e = guia(m.guia);
-    if (!e) throw new Error(`o guia do core não tem a entrada "${m.guia}" (página O app)`);
-    return `<article class="cartao${m.imagem ? '' : ' sem-captura'}">
+    let comoUsar = m.ajuda;
+    if (m.guia) {
+      if (!guia(m.guia)) throw new Error(`o guia do core não tem a entrada "${m.guia}" (página O app)`);
+      comoUsar = `ajuda/${require('./ajuda').temaDoGuia(m.guia)}.html#guia-${m.guia}`;
+    }
+    const figura = m.video ? celularComVideo(m.video, { videos, img }, ARQUIVO) : m.imagem ? celular(img[m.imagem], ARQUIVO) : '';
+    return `<article class="cartao${figura ? '' : ' sem-captura'}">
 <h3>${esc(m.titulo)}</h3>
 <p>${esc(m.texto)}</p>
-${m.imagem ? celular(img[m.imagem], ARQUIVO) : ''}
-<p class="pequeno"><a href="${u(`ajuda/${require('./ajuda').temaDoGuia(m.guia)}.html#guia-${m.guia}`)}">Como usar</a></p>
+${figura}
+<p class="pequeno"><a href="${u(comoUsar)}">Como usar</a></p>
 </article>`;
   }).join('\n');
 
@@ -182,8 +200,6 @@ ${m.imagem ? celular(img[m.imagem], ARQUIVO) : ''}
 <p class="lojas">Em breve na App Store e no Google Play.</p>`;
 
   const brutas = [
-    // Os vídeos de uso (D-114) abrem o passeio: o app em movimento, antes das telas paradas.
-    bloco(secaoDeVideos({ videos, img }, ARQUIVO), { variante: 'alt', rotulo: 'em-uso' }),
     bloco(
       `<h2 id="onde">Onde usar</h2>
 <div class="grade">
@@ -204,7 +220,7 @@ ${m.imagem ? celular(img[m.imagem], ARQUIVO) : ''}
     ),
     bloco(
       `<h2 id="recursos">Os recursos</h2>
-<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração.</p>
+<p class="lead-bloco">O app tem cinco abas: Resumo, Movimentos, Metas, Investir e Aprender. A explicação de abertura de cada recurso é a do guia de uso do próprio app, e os pontos abaixo dela resumem o que ele faz hoje. A legenda de cada tela lembra que os dados são de demonstração. Os vídeos tocam sem som enquanto aparecem na tela, e o botão redondo no canto de cada um pausa ou toca de novo.</p>
 <div class="recursos">
 ${linhas}
 </div>`,
@@ -212,7 +228,7 @@ ${linhas}
     ),
     bloco(
       `<h2 id="mais">E mais</h2>
-<div class="mini">
+<div class="mini mini-par">
 ${mais}
 </div>`,
       { rotulo: 'mais' },
@@ -237,6 +253,7 @@ ${mais}
     fonte: brutas.join('\n') + capa,
     valores,
     classeCapa: 'capa-simples',
+    scripts: [SCRIPT_DOS_VIDEOS],
   });
 }
 

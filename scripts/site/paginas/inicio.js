@@ -1,7 +1,8 @@
 'use strict';
 /**
  * Início: a mensagem central (D-068), o que é a Clarevo, o apoio prático do app (bem-estar financeiro, sem promessa de resultado nem de saúde),
- * recursos com captura, os vídeos de uso do app (D-114), para quem é, "A empresa nunca vê suas finanças", o que ela não é e as chamadas.
+ * recursos com vídeo ou captura, para quem é, "A empresa nunca vê suas finanças", o que ela não é e as chamadas. Desde 18/11/2026 (D-115),
+ * cada vídeo de uso do app fica no lugar da captura do bloco que ele mostra: o do Resumo na capa e três nos cartões de "O que o app faz".
  */
 const { URL_APP } = require('../config');
 const { esc } = require('../texto');
@@ -9,7 +10,7 @@ const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular, dominioDe } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
-const { secaoDeVideos } = require('../videos');
+const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
 
 const ARQUIVO = 'index.html';
 /** A mensagem central (Manual v2.2, seção 19) e a frase de apoio: as mesmas de `docs/lojas/ficha.md` e das imagens de compartilhamento. */
@@ -52,10 +53,11 @@ function paginaInicial({ valores, img, videos }) {
   const temas = catalogo().publicados.filter((t) => ['organizar', 'juros', 'tempo'].includes(t.section)).length;
   const calculadoras = catalogo().CALCULADORAS.length;
 
+  // `video`: o vídeo de uso que fica no lugar da captura (D-115); sem ele, a captura `id`.
   const recursos = [
-    { id: 'anotar', titulo: 'Anotar e ver o mês', texto: 'Anote um gasto ou um recebimento em poucos toques. O Resumo mostra Recebido, Pago, a diferença entre os dois e o que ainda falta pagar, com a explicação de cada número.' },
-    { id: 'contas', titulo: 'Contas, cartões e gastos fixos', texto: 'Contas a pagar com vencimentos e lembretes no aparelho. Cartões de crédito com faturas e limite usado: o app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro. Gastos fixos, parcelamentos e contas do ano, como IPVA e IPTU, aparecem sozinhos nos meses certos.' },
-    { id: 'metas', titulo: 'Metas e reserva', texto: 'Metas e reserva para imprevistos, com atalhos de prazo, o ritmo do plano no cartão de cada meta e os marcos de 25%, 50% e 75%. O plano de guardar mostra as etapas e o mês previsto, sem contar rendimento.' },
+    { id: 'anotar', video: 'anotar-gasto', titulo: 'Anotar e ver o mês', texto: 'Anote um gasto ou um recebimento em poucos toques. O Resumo mostra Recebido, Pago, a diferença entre os dois e o que ainda falta pagar, com a explicação de cada número.' },
+    { id: 'contas', video: 'importar-fatura-print', titulo: 'Contas, cartões e gastos fixos', texto: 'Contas a pagar com vencimentos e lembretes no aparelho. Cartões de crédito com faturas e limite usado: o app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro. A fatura também entra por print, lido no próprio aparelho. Gastos fixos, parcelamentos e contas do ano, como IPVA e IPTU, aparecem sozinhos nos meses certos.' },
+    { id: 'metas', video: 'metas', titulo: 'Metas e reserva', texto: 'Metas e reserva para imprevistos, com atalhos de prazo, o ritmo do plano no cartão de cada meta e os marcos de 25%, 50% e 75%. O plano de guardar mostra as etapas e o mês previsto, sem contar rendimento.' },
     { id: 'aprender', titulo: 'Aprender e simular', texto: 'Explicações curtas sobre juros, taxas e contas do dia a dia, cada uma com fonte e data de revisão. O simulador e as calculadoras usam só os números que você digita, e as calculadoras também funcionam aqui no site.' },
   ];
   const mini = recursos
@@ -63,7 +65,7 @@ function paginaInicial({ valores, img, videos }) {
       (r) => `<article class="cartao">
 <h3>${esc(r.titulo)}</h3>
 <p>${esc(r.texto)}</p>
-${celular(img[r.id], ARQUIVO)}
+${r.video ? celularComVideo(r.video, { videos, img }, ARQUIVO) : celular(img[r.id], ARQUIVO)}
 </article>`,
     )
     .join('\n');
@@ -82,7 +84,7 @@ ${celular(img[r.id], ARQUIVO)}
 </div>
 <p class="lojas">Em breve na App Store e no Google Play.</p>
 </div>
-${celular(img.resumo, ARQUIVO, { carregamento: 'eager' })}
+${celularComVideo('resumo-do-mes', { videos, img }, ARQUIVO)}
 </div>`;
 
   // O fundo alterna pela posição de cada seção.
@@ -107,15 +109,13 @@ ${celular(img.resumo, ARQUIVO, { carregamento: 'eager' })}
     ),
     secao(
       `<h2 id="telas">O que o app faz</h2>
-<p class="lead-bloco">Apoio prático para organizar o mês. Telas da demonstração da Clarevo: os dados são fictícios, e uma conta nova começa vazia.</p>
+<p class="lead-bloco">Apoio prático para organizar o mês. Vídeos curtos, sem som, e telas da demonstração da Clarevo: os dados são fictícios, e uma conta nova começa vazia.</p>
 <div class="mini mini-par">
 ${mini}
 </div>
 <p class="acoes"><a class="botao botao-principal" href="${u('app/index.html')}">Ver o app por dentro</a></p>`,
       'telas',
     ),
-    // Os vídeos de uso (D-114), gravados da demonstração, logo depois das telas.
-    secao(secaoDeVideos({ videos, img }, ARQUIVO), 'em-uso'),
     secao(
       `<h2 id="para-quem">Para quem é</h2>
 <div class="grade">
@@ -199,6 +199,9 @@ ${mini}
     fonte,
     valores,
     jsonld: [organizacao],
+    scripts: [SCRIPT_DOS_VIDEOS],
+    // A capa do vídeo do Resumo é a primeira imagem grande da página: o navegador pede logo no começo (D-115).
+    cabecalho: `<link rel="preload" as="image" href="${u(img['video-resumo-do-mes'].caminho)}" fetchpriority="high">`,
   });
 }
 
