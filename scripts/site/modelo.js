@@ -72,13 +72,21 @@ function rodapeHtml(arquivo, valores, { aviso = false } = {}) {
     (c) => `<div><h2>${esc(c.titulo)}</h2><ul>${c.links.map((l) => `<li><a href="${rel(arquivo, l.arquivo)}">${esc(l.rotulo)}</a></li>`).join('')}</ul></div>`,
   ).join('\n');
   const legal = marcadoresEmHtml(esc(RODAPE_LEGAL), valores);
+  // O tema do site (D-115): começa escondido e só aparece com o script do tema (js/tema.js); sem ele, o site segue o tema do aparelho.
+  const icone = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`;
+  const opcao = (valor, rotulo, desenho) => `<label class="tema-opcao"><input type="radio" name="tema-site" value="${valor}"><span>${icone(desenho)}${esc(rotulo)}</span></label>`;
+  const tema = `<fieldset class="tema-site" data-tema-site hidden><legend>Tema do site</legend><div class="tema-opcoes">${[
+    opcao('aparelho', 'Igual ao aparelho', '<rect x="4" y="4" width="16" height="11" rx="2"/><path d="M8 20h8M12 15v5"/>'),
+    opcao('claro', 'Claro', '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>'),
+    opcao('escuro', 'Escuro', '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
+  ].join('')}</div></fieldset>`;
   return `<footer class="rodape">
 <div class="miolo">
 <nav class="rodape-grade" aria-label="Rodapé">
 <div class="rodape-marca"><a href="${rel(arquivo, 'index.html')}" aria-label="Clarevo, página inicial"><img src="${rel(arquivo, 'marca/clarevo-logotipo-reverso.svg')}" alt="" width="130" height="26"></a><p>Cuidar da vida financeira faz parte de cuidar de você. Sem anúncios, sem venda de dados e sem recomendar produtos financeiros.</p></div>
 ${colunas}
 </nav>
-<div class="rodape-fim">${aviso ? `<p class="rodape-aviso">${esc(avisoDeMercado())}</p>` : ''}<p>${legal}</p></div>
+<div class="rodape-fim">${tema}${aviso ? `<p class="rodape-aviso">${esc(avisoDeMercado())}</p>` : ''}<p>${legal}</p></div>
 </div>
 </footer>`;
 }
@@ -93,6 +101,12 @@ ${colunas}
  * `avisoDeMercado`: as páginas de mercado (D-106) levam no rodapé "Conteúdo educativo. Não é recomendação nem análise de valores
  * mobiliários."
  */
+/**
+ * O script do tema do site (D-115), em todas as páginas, no <head> e antes do estilo, sem `defer`: ele marca o <html> com o tema escolhido
+ * antes de a página aparecer (sem piscar no tema errado). É pequeno, do próprio site e não pede nada a ninguém.
+ */
+const SCRIPT_DO_TEMA = 'js/tema.js';
+
 function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], precarga = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false, atualizada = null, avisoDeMercado: comAviso = false }) {
   const pendencias = pendenciasDoTexto(`${fonte}\n${RODAPE_LEGAL}`, valores);
   const faixa = pendencias.length
@@ -135,6 +149,7 @@ function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores,
 ${noindex ? '<meta name="robots" content="noindex">\n' : ''}${canonical}${og.join('\n')}
 <link rel="icon" href="${rel(arquivo, 'favicon.svg')}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="${rel(arquivo, 'marca/icone-app.png')}">
+<script src="${rel(arquivo, SCRIPT_DO_TEMA)}"></script>
 <link rel="stylesheet" href="${rel(arquivo, 'estilo.css')}">
 ${cabecalho ? `${cabecalho}\n` : ''}${dados ? `${dados}\n` : ''}${js ? `${js}\n` : ''}</head>
 <body>
@@ -210,4 +225,4 @@ function telaLarga(img, arquivo, { textoLegenda = null, classe = '' } = {}) {
   return `<figure class="larga${classe ? ` ${classe}` : ''}"><div class="larga-moldura">${imagemDaTela(img, arquivo, 'lazy')}</div><figcaption>${esc(textoLegenda || LEGENDA_DEMO)}</figcaption></figure>`;
 }
 
-module.exports = { montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, faixaDeConfianca, dominioDe, urlDoSite, configurarRodape };
+module.exports = { SCRIPT_DO_TEMA, montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, faixaDeConfianca, dominioDe, urlDoSite, configurarRodape };

@@ -310,7 +310,9 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
       // D-115: "Indicadores de hoje" na página inicial usa o script do painel; a página do feed RSS, o botão de copiar o endereço.
       const painelNoInicio = nome === 'index.html' && /^\s*src="indicadores\/painel\.js"\s+defer\s*$/.test(m[1]!);
       const copiar = nome === 'novidades/rss.html' && /^\s*src="\.\.\/js\/copiar\.js"\s+defer\s*$/.test(m[1]!);
-      expect(ld || busca || calculadora || painel || videos || painelNoInicio || copiar, `${nome}: script não permitido: ${m[0]}`).toBe(true);
+      // D-115: o tema do site em todas as páginas, no <head>, sem defer (marca o <html> antes de a página aparecer).
+      const tema = /^\s*src="(\/|(\.\.\/)*)js\/tema\.js"\s*$/.test(m[1]!);
+      expect(ld || busca || calculadora || painel || videos || painelNoInicio || copiar || tema, `${nome}: script não permitido: ${m[0]}`).toBe(true);
     }
     expect(html, `${nome}: manipulador de evento`).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html, `${nome}: atributo style (a política de segurança não permite)`).not.toMatch(/\sstyle\s*=/i);
@@ -329,7 +331,8 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     for (const m of html.matchAll(/<input\b[^>]*>/gi)) {
       const campoDeFormulario = opcoes.formularios?.includes(nome) && /type="(text|email|checkbox)"/.test(m[0]);
       const enderecoDoFeed = nome === 'novidades/rss.html' && /^<input id="rss-endereco" type="text" readonly /.test(m[0]);
-      expect(campoDeFormulario || enderecoDoFeed || (noAjuda && /type="search"/.test(m[0])), `${nome}: campo que não é a busca da Ajuda nem de um formulário ligado: ${m[0]}`).toBe(true);
+      const temaDoSite = /^<input type="radio" name="tema-site" value="(aparelho|claro|escuro)">$/.test(m[0]);
+      expect(campoDeFormulario || enderecoDoFeed || temaDoSite || (noAjuda && /type="search"/.test(m[0])), `${nome}: campo que não é a busca da Ajuda nem de um formulário ligado: ${m[0]}`).toBe(true);
     }
     // Recursos (src, link, preload) só locais; links de texto só para o app, as fontes citadas no catálogo, o domínio da empresa e as páginas oficiais.
     for (const m of html.matchAll(/<(?:img|link|source|script)\b[^>]*\s(?:src|href)="(https?:)?\/\/[^"]*"/gi)) {
@@ -1015,8 +1018,9 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('<a class="cartao" href="https://demo.clarevo.app.br" rel="noopener noreferrer">');
     expect(h).toContain('Abra o app com dados fictícios, no navegador. Nada é gravado fora do seu aparelho.');
     for (const m of h.matchAll(/\s(?:href|src)="([^"]*)"/g)) expect(m[1], `link com parâmetro: ${m[1]}`).not.toMatch(/[?&]|utm_|fbclid|gclid|igshid/i);
-    // Nenhum script (só dados estruturados, se houver), nenhum formulário e nenhum recurso de fora.
-    expect([...h.matchAll(/<script\b([^>]*)>/g)].filter((m) => !/application\/ld\+json/.test(m[1]!))).toEqual([]);
+    // Nenhum script (só dados estruturados, se houver, e o tema do site, que toda página tem desde D-115), nenhum formulário e nenhum
+    // recurso de fora.
+    expect([...h.matchAll(/<script\b([^>]*)>/g)].filter((m) => !/application\/ld\+json|^ src="js\/tema\.js"$/.test(m[1]!))).toEqual([]);
     expect(h).not.toMatch(/<form\b/);
     // O rodapé leva a ela, e ela entra no mapa do site quando há domínio.
     expect(html('index.html')).toContain('<a href="comece.html">Comece aqui</a>');
@@ -2109,7 +2113,16 @@ describe('site público: contraste das cores (a regra de src/contrast.ts, 4,5:1 
   const css = readFileSync(join(SITE, 'estilo.css'), 'utf8');
   const variaveis = (bloco: string) => Object.fromEntries([...bloco.matchAll(/--([a-z0-9-]+):(#[0-9A-Fa-f]{6})/g)].map((m) => [m[1]!, m[2]!]));
   const claro = variaveis(/:root\{([^}]*)\}/.exec(css)![1]!);
-  const escuro = { ...claro, ...variaveis(/@media \(prefers-color-scheme: dark\)\{\s*:root\{([^}]*)\}/.exec(css)![1]!) };
+  // D-115: as cores escuras valem com o tema do aparelho (sem a escolha "Claro") e com a escolha "Escuro"; os dois blocos são iguais.
+  const blocoEscuro = /@media \(prefers-color-scheme: dark\)\{\s*:root:not\(\[data-tema="claro"\]\)\{([^}]*)\}/.exec(css)![1]!;
+  const blocoEscolhido = /\n:root\[data-tema="escuro"\]\{([^}]*)\}/.exec(css)![1]!;
+  const escuro = { ...claro, ...variaveis(blocoEscuro) };
+  it('o tema escuro escolhido no rodapé usa exatamente as cores do tema escuro do aparelho', () => {
+    expect(variaveis(blocoEscolhido)).toEqual(variaveis(blocoEscuro));
+    expect(Object.keys(variaveis(blocoEscuro)).length).toBeGreaterThanOrEqual(12);
+    expect(css).toContain(':root[data-tema="claro"]{color-scheme:light}');
+    expect(css).toContain(':root[data-tema="escuro"]{color-scheme:dark}');
+  });
 
   /** [texto, fundo, onde aparece] */
   const TEXTOS: [string, string, string][] = [

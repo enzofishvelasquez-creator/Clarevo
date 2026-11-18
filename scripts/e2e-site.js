@@ -398,7 +398,8 @@ function varrerPagina() {
       const p = await pagina();
       const modulos = [];
       p.on('response', async (r) => {
-        if (r.url().endsWith('.js')) modulos.push({ url: r.url(), bytes: (await r.body()).length });
+        // O script do tema do site (D-115), em todas as páginas, é um script comum do <head>, não um módulo da calculadora.
+        if (r.url().endsWith('.js') && !r.url().endsWith('/js/tema.js')) modulos.push({ url: r.url(), bytes: (await r.body()).length });
       });
       await p.goto(`${origem}/calculadoras/${rot.slug}.html`);
       await p.waitForSelector('[data-pronta]');
@@ -608,7 +609,7 @@ function varrerPagina() {
       const demo = await p.$eval('main a.cartao[href^="https://"]', (a) => ({ href: a.href, rel: a.rel }));
       const comParametro = await p.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')).filter((h) => /[?&]|utm_|fbclid|igshid/i.test(h)));
       ok('comece aqui: a demonstração é link de texto com noopener, e nenhum link leva parâmetro', demo.href === 'https://demo.clarevo.app.br/' && /noopener/.test(demo.rel) && comParametro.length === 0, JSON.stringify({ demo, comParametro }));
-      ok('comece aqui: sem script (só dados estruturados, se houver) e sem formulário', (await p.$$eval('script', (ss) => ss.filter((x) => x.type !== 'application/ld+json').length)) === 0 && (await p.$$('form')).length === 0);
+      ok('comece aqui: sem script (só dados estruturados, se houver, e o tema do site) e sem formulário', (await p.$$eval('script', (ss) => ss.filter((x) => x.type !== 'application/ld+json' && !x.src.endsWith('/js/tema.js')).length)) === 0 && (await p.$$('form')).length === 0);
       await p.close();
     }
 
@@ -691,7 +692,7 @@ function varrerPagina() {
       const termos = await g.$$eval('.termo h2', (es) => es.map((e) => e.textContent));
       ok('glossário: os termos pedidos, com link para Aprender', ['CDI', 'Come-cotas', 'FGC', 'IOF', 'IPCA', 'IR regressivo', 'Liquidez', 'Marcação a mercado', 'PTAX', 'Selic'].every((t) => termos.includes(t)) && (await g.$('a[href="../aprender/fgc.html"]')) !== null, termos.join(', '));
       await g.goto(`${origem}/noticias/semana-${HOJE}`);
-      const noticia = await g.evaluate(() => ({ imagens: document.querySelectorAll('main img').length, scripts: [...document.scripts].filter((x) => x.type !== 'application/ld+json').length, link: [...document.querySelectorAll('main a[href^="https://"]')].map((a) => ({ href: a.href, rel: a.rel })) }));
+      const noticia = await g.evaluate(() => ({ imagens: document.querySelectorAll('main img').length, scripts: [...document.scripts].filter((x) => x.type !== 'application/ld+json' && !x.src.endsWith('/js/tema.js')).length, link: [...document.querySelectorAll('main a[href^="https://"]')].map((a) => ({ href: a.href, rel: a.rel })) }));
       ok('resumo semanal: a edição de teste abre, com link simples para a matéria (noopener), sem imagem nem script', noticia.imagens === 0 && noticia.scripts === 0 && noticia.link.length === 1 && noticia.link[0].href === 'https://noticias.exemplo.test/copom' && /noopener/.test(noticia.link[0].rel), JSON.stringify(noticia));
       ok('resumo semanal: o aviso de mercado no rodapé e o link no rodapé de todas as páginas', (await textoDe(g, '.rodape-aviso')) === 'Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.' && (await g.$('footer a[href="index.html"]')) !== null);
       await g.goto(`${origem}/sobre`);
@@ -1047,6 +1048,91 @@ function varrerPagina() {
       }
       ok('indicadores: o cartão "Indicadores oficiais" em Aprender e em Novidades', atalhos.every((t) => t === 'Indicadores oficiais'), JSON.stringify(atalhos));
       await p.close();
+    }
+
+    // 7c8. Tema do site (D-115): no rodapé de todas as páginas, "Igual ao aparelho" (o padrão), "Claro" e "Escuro", com nomes acessíveis
+    // e pelo teclado. A escolha muda o tema na hora, vale depois de recarregar e marca o <html> antes de a página aparecer (já no
+    // DOMContentLoaded); "Igual ao aparelho" segue o aparelho nos dois sentidos; com o armazenamento bloqueado, nada quebra; só a chave do
+    // tema fica no navegador; nada passa da largura da tela e o cabeçalho continua numa linha em 320, 390, 768, 1024, 1120 e 1280 px.
+    {
+      const FUNDO_CLARO = 'rgb(247, 249, 253)';
+      const FUNDO_ESCURO = 'rgb(19, 30, 62)';
+      const temaCtx = await navegador.newContext({ viewport: { width: 390, height: 900 }, colorScheme: 'light' });
+      await temaCtx.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { window.__temaNoInicio = document.documentElement.dataset.tema || null; }));
+      const p = await temaCtx.newPage();
+      const erros = [];
+      p.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && erros.push(m.text()));
+      p.on('pageerror', (e) => erros.push(e.message));
+      const estado = () => p.evaluate(() => ({ tema: document.documentElement.dataset.tema, inicio: window.__temaNoInicio, fundo: getComputedStyle(document.body).backgroundColor, escolhida: (document.querySelector('input[name="tema-site"]:checked') || {}).value, guardado: (() => { try { return localStorage.getItem('clarevo.site.tema.v1'); } catch (e) { return 'erro'; } })(), chaves: (() => { try { return Object.keys(localStorage); } catch (e) { return ['erro']; } })() }));
+      await p.goto(`${origem}/`);
+      const grupo = await p.evaluate(() => {
+        const f = document.querySelector('footer fieldset.tema-site');
+        return { visivel: f && !f.hidden, legenda: f && f.querySelector('legend').textContent, opcoes: f ? [...f.querySelectorAll('input[type="radio"][name="tema-site"]')].map((i) => ({ valor: i.value, nome: i.closest('label').textContent.trim() })) : [] };
+      });
+      const padrao = await estado();
+      ok('tema: o grupo "Tema do site" no rodapé, com "Igual ao aparelho" (marcado), "Claro" e "Escuro", e o site no tema do aparelho', grupo.visivel && grupo.legenda === 'Tema do site' && JSON.stringify(grupo.opcoes.map((o) => o.nome)) === JSON.stringify(['Igual ao aparelho', 'Claro', 'Escuro']) && padrao.tema === 'aparelho' && padrao.escolhida === 'aparelho' && padrao.fundo === FUNDO_CLARO && padrao.guardado === null, JSON.stringify({ grupo, padrao }));
+      // Nomes acessíveis pelo papel: cada opção é um botão de opção com o nome visível.
+      const nomes = [];
+      for (const n of ['Igual ao aparelho', 'Claro', 'Escuro']) nomes.push(await p.getByRole('radio', { name: n, exact: true }).count());
+      ok('tema: cada opção tem o papel de opção e o nome acessível visível', nomes.every((n) => n === 1), JSON.stringify(nomes));
+      await p.getByRole('radio', { name: 'Escuro', exact: true }).check();
+      const escuro = await estado();
+      await p.reload();
+      const escuroDepois = await estado();
+      ok('tema: "Escuro" muda o site na hora (aparelho claro), fica guardado e vale depois de recarregar, já marcado no DOMContentLoaded', escuro.tema === 'escuro' && escuro.fundo === FUNDO_ESCURO && escuro.guardado === 'escuro' && escuroDepois.tema === 'escuro' && escuroDepois.inicio === 'escuro' && escuroDepois.fundo === FUNDO_ESCURO && escuroDepois.escolhida === 'escuro', JSON.stringify({ escuro, escuroDepois }));
+      // Pelo teclado: o foco na opção marcada e as setas trocam a escolha (Escuro -> Igual ao aparelho volta ao começo do grupo).
+      await p.getByRole('radio', { name: 'Escuro', exact: true }).focus();
+      const focoVisivel = await p.evaluate(() => { const s = document.activeElement.nextElementSibling; return s && getComputedStyle(s).outlineStyle !== 'none'; });
+      await p.keyboard.press('ArrowLeft');
+      const claro = await estado();
+      await p.reload();
+      const claroDepois = await estado();
+      ok('tema: pelo teclado (seta), "Claro" fica escolhido, com foco visível, e vale depois de recarregar', focoVisivel && claro.tema === 'claro' && claro.fundo === FUNDO_CLARO && claroDepois.inicio === 'claro' && claroDepois.escolhida === 'claro', JSON.stringify({ focoVisivel, claro, claroDepois }));
+      // "Claro" vale mesmo com o aparelho escuro.
+      await p.emulateMedia({ colorScheme: 'dark' });
+      const claroNoEscuro = await estado();
+      // As telas das matérias seguem a escolha, e não o aparelho.
+      await p.goto(`${origem}/${POSTS[3]}`);
+      const telas = await p.evaluate(async () => { for (const i of document.images) i.loading = 'eager'; await Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = r; i.onerror = r; })))); return [...document.querySelectorAll('main picture img')].map((i) => /-escura\./.test(i.currentSrc)); });
+      ok('tema: "Claro" com o aparelho escuro deixa o site e as telas das matérias no claro', claroNoEscuro.fundo === FUNDO_CLARO && telas.length > 0 && telas.every((t) => !t), JSON.stringify({ claroNoEscuro, telas }));
+      // "Igual ao aparelho" segue o aparelho nos dois sentidos e apaga a chave.
+      await p.getByRole('radio', { name: 'Igual ao aparelho', exact: true }).check();
+      const aparelhoEscuro = await estado();
+      await p.emulateMedia({ colorScheme: 'light' });
+      const aparelhoClaro = await estado();
+      ok('tema: "Igual ao aparelho" segue o aparelho (escuro e depois claro) e não guarda nada', aparelhoEscuro.tema === 'aparelho' && aparelhoEscuro.fundo === FUNDO_ESCURO && aparelhoClaro.fundo === FUNDO_CLARO && aparelhoClaro.guardado === null && aparelhoClaro.chaves.length === 0, JSON.stringify({ aparelhoEscuro, aparelhoClaro }));
+      ok('tema: o navegador guarda só a chave do tema (clarevo.site.tema.v1), sem erro no console', escuro.chaves.length === 1 && escuro.chaves[0] === 'clarevo.site.tema.v1' && erros.length === 0, JSON.stringify({ chaves: escuro.chaves, erros }));
+      // Cabeçalho numa linha e nada passa da largura da tela.
+      const largas = [];
+      for (const largura of [320, 390, 768, 1024, 1120, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        for (const c of ['', 'novidades/rss', 'planos']) {
+          await p.goto(`${origem}/${c}`);
+          const r = await p.evaluate(() => ({ largo: document.documentElement.scrollWidth > window.innerWidth + 1, topo: Math.round(document.querySelector('.topo-i').getBoundingClientRect().height), tema: (() => { const f = document.querySelector('fieldset.tema-site .tema-opcoes'); const tops = [...f.children].map((c) => Math.round(c.getBoundingClientRect().top)); return new Set(tops).size; })() }));
+          if (r.largo || r.topo > 80 || r.tema !== 1) largas.push(`${c || 'início'} em ${largura} px ${JSON.stringify(r)}`);
+        }
+      }
+      ok('tema: em 320, 390, 768, 1024, 1120 e 1280 px, nada passa da largura da tela, o cabeçalho fica numa linha e as três opções numa linha só', largas.length === 0, largas.join(' | '));
+      await temaCtx.close();
+      // Armazenamento bloqueado: o site segue o aparelho, a escolha vale na página e nada dá erro.
+      const bloqueado = await navegador.newContext({ viewport: { width: 390, height: 900 }, colorScheme: 'dark' });
+      await bloqueado.addInitScript(() => Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new DOMException('bloqueado', 'SecurityError'); } }));
+      const q = await bloqueado.newPage();
+      const errosQ = [];
+      q.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && errosQ.push(m.text()));
+      q.on('pageerror', (e) => errosQ.push(e.message));
+      await q.goto(`${origem}/`);
+      const antes = await q.evaluate(() => ({ tema: document.documentElement.dataset.tema, fundo: getComputedStyle(document.body).backgroundColor }));
+      await q.getByRole('radio', { name: 'Claro', exact: true }).check();
+      const depois = await q.evaluate(() => ({ tema: document.documentElement.dataset.tema, fundo: getComputedStyle(document.body).backgroundColor }));
+      ok('tema com o armazenamento bloqueado: segue o aparelho, a escolha vale na página e nada dá erro', antes.tema === 'aparelho' && antes.fundo === FUNDO_ESCURO && depois.tema === 'claro' && depois.fundo === FUNDO_CLARO && errosQ.length === 0, JSON.stringify({ antes, depois, errosQ }));
+      await bloqueado.close();
+      // Sem JavaScript: sem o grupo, e o site segue o aparelho.
+      const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 }, colorScheme: 'dark' });
+      const r = await semJs.newPage();
+      await r.goto(`${origem}/`);
+      ok('tema sem JavaScript: o grupo não aparece e o site segue o tema do aparelho', await r.evaluate(() => document.querySelector('fieldset.tema-site').hidden && !document.documentElement.hasAttribute('data-tema') && getComputedStyle(document.body).backgroundColor === 'rgb(19, 30, 62)'));
+      await semJs.close();
     }
 
     // 7d. Imagens das matérias de Novidades (D-114): capa e telas ao lado das seções, do próprio site, com largura, altura e texto

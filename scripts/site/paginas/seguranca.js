@@ -154,7 +154,7 @@ ${celular(img['quem-ve'], ARQUIVO)}
     ),
     bloco(
       `<h2 id="este-site">Este site</h2>
-<p>O site não usa cookies próprios, não tem análise de acesso, não tem anúncios e não carrega fontes, imagens, scripts nem estilos de outros endereços. Os links para fontes oficiais em Aprender são só links de texto. A busca da Ajuda roda no seu navegador e não envia o que você digita. Como em qualquer site, a hospedagem recebe o endereço da página que você abre e o seu IP. Os detalhes estão na <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`,
+<p>O site não usa cookies próprios, não tem análise de acesso, não tem anúncios e não carrega fontes, imagens, scripts nem estilos de outros endereços. Os links para fontes oficiais em Aprender são só links de texto. A busca da Ajuda roda no seu navegador e não envia o que você digita. O site guarda no navegador só o tema que você escolher no rodapé (claro ou escuro), se escolher um: essa escolha nunca sai do seu aparelho e serve só para mostrar o tema escolhido. Como em qualquer site, a hospedagem recebe o endereço da página que você abre e o seu IP. Os detalhes estão na <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`,
       { variante: 'azul', rotulo: 'este-site' },
     ),
     bloco(

@@ -6,7 +6,8 @@
 # script-src e connect-src 'self' valem só para os scripts do próprio site: a busca da Ajuda (ajuda/busca.js, que lê ajuda/indice.json), as
 # calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada), o painel de indicadores (indicadores/painel.js,
 # que pergunta uma vez ao próprio site, /api/indicadores; quem consulta o Banco Central é o _worker.js, nunca o navegador) e os vídeos
-# (js/videos.js, que não pede nada a ninguém) e o botão de copiar o endereço do feed (js/copiar.js). form-action 'self' vale para os formulários de contato e de novidades, que enviam só para o
+# (js/videos.js, que não pede nada a ninguém), o botão de copiar o endereço do feed (js/copiar.js) e o tema do site (js/tema.js, que
+# guarda no navegador só a escolha de tema, quando a pessoa escolhe um). form-action 'self' vale para os formulários de contato e de novidades, que enviam só para o
 # próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
 # Referrer-Policy: same-origin (e não no-referrer): com no-referrer o navegador manda "Origin: null" nos formulários, e o worker recusa o valor null.
 # Nenhum outro site recebe o endereço da página (a política só manda o referenciador para o próprio site).

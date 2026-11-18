@@ -100,6 +100,10 @@ function post(rota: string, campos: Record<string, unknown>, opcoes: { accept?: 
 }
 const json = async (r: Response) => (await r.json()) as { ok: boolean; erro: string | null; mensagem: string; campos?: string[] };
 
+
+/** A página sem o tema do site (D-115), que toda página tem: o script do <head> e as três opções do rodapé. */
+const semTema = (html: string) => html.replace(/<script src="[^"]*js\/tema\.js"><\/script>\n?/, '').replace(/<fieldset class="tema-site"[\s\S]*?<\/fieldset>/, '');
+
 describe('site público: _worker.js, contato (Resend)', () => {
   it('sem as variáveis, a rota responde 503 com mensagem clara e não envia nada', async () => {
     const { f } = simularFetch();
@@ -724,12 +728,14 @@ describe('site público: formulários prontos e desligados', () => {
     expect(dados.formulario_contato).toBe(false);
     expect(dados.newsletter).toBe(false);
     for (const nome of [...PAGINAS_DO_CONTATO, ...PAGINAS_DA_NEWSLETTER]) expect(desligado.arquivos.has(nome), nome).toBe(false);
-    // (A busca da Ajuda é um campo `type="search"` sem formulário e sem envio: só ela e o endereço do feed, só de leitura, têm `<input>`.)
+    // (A busca da Ajuda é um campo `type="search"` sem formulário e sem envio: só ela, o endereço do feed, só de leitura, e o tema do site
+    // têm `<input>`.)
     for (const [nome, v] of desligado.arquivos) {
       if (!nome.endsWith('.html')) continue;
       expect(texto(v), nome).not.toMatch(/<form\b|<textarea\b|<select\b|\/api\/(contato|newsletter)/);
       // D-115: a página do feed RSS tem o endereço num campo só de leitura, sem formulário e sem envio.
-      for (const m of texto(v).matchAll(/<input\b[^>]*>/g)) expect(nome === 'novidades/rss.html' ? /type="text" readonly/.test(m[0]) : m[0].includes('type="search"'), `${nome}: ${m[0]}`).toBe(true);
+      // D-115: e o tema do site no rodapé, três opções sem formulário e sem envio.
+      for (const m of texto(v).matchAll(/<input\b[^>]*>/g)) expect(/^<input type="radio" name="tema-site" /.test(m[0]) || (nome === 'novidades/rss.html' ? /type="text" readonly/.test(m[0]) : m[0].includes('type="search"')), `${nome}: ${m[0]}`).toBe(true);
     }
     expect(h(desligado, 'empresas/index.html')).toContain('escreva para <a href="mailto:contato@exemplo.test">contato@exemplo.test</a>');
     expect(h(desligado, 'novidades/index.html')).not.toContain('Receber as Novidades por e-mail');
@@ -781,7 +787,7 @@ describe('site público: formulários prontos e desligados', () => {
     // O e-mail de contato continua à mão, para quem prefere.
     expect(e).toContain('escreva para <a href="mailto:contato@exemplo.test">contato@exemplo.test</a>');
     // Só há um campo de cada tipo que o gerador conhece.
-    expect([...e.matchAll(/<input\b[^>]*type="([a-z]+)"/g)].map((m) => m[1]).sort()).toEqual(['email', 'text', 'text', 'text']);
+    expect([...semTema(e).matchAll(/<input\b[^>]*type="([a-z]+)"/g)].map((m) => m[1]).sort()).toEqual(['email', 'text', 'text', 'text']);
   });
 
   it('ligado, a newsletter pede e-mail e consentimento (caixa obrigatória e desmarcada), explica a confirmação por e-mail e liga para a política', () => {
@@ -807,7 +813,7 @@ describe('site público: formulários prontos e desligados', () => {
       const p = h(ligado, nome);
       expect(p, nome).toContain(`<h1>${titulo}</h1>`);
       expect(p, nome).toContain('<meta name="robots" content="noindex">');
-      expect(p, nome).not.toMatch(/<form\b|<script\b/);
+      expect(semTema(p), nome).not.toMatch(/<form\b|<script\b/);
     }
     expect(h(ligado, 'novidades/receber-enviado.html')).toContain('Até você confirmar, não enviamos as Novidades');
     // As páginas de resposta são exatamente as que o worker usa nos redirecionamentos.
@@ -844,7 +850,7 @@ describe('site público: formulários prontos e desligados', () => {
       expect(p, arquivo).toContain(`<h1>Confira o campo ${ROTULOS[campo]}</h1>`);
       expect(p, arquivo).toContain('Nada foi guardado, e você pode tentar de novo.');
       expect(p, arquivo).toContain('<meta name="robots" content="noindex">');
-      expect(p, arquivo).not.toMatch(/<form\b|<script\b|<input\b/);
+      expect(semTema(p), arquivo).not.toMatch(/<form\b|<script\b|<input\b/);
       // O que a pessoa pode fazer: voltar ao formulário (o link existe) ou usar o outro caminho.
       expect(p, arquivo).toMatch(/<a href="(empresas\/index\.html#formulario-contato|receber\.html)">Voltar para (o formulário|a inscrição)<\/a>/);
     }
