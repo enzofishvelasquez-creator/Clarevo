@@ -339,8 +339,9 @@ function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceCho
               accessibilityLabel={o.kind === 'negocio' ? `Ver dados do negócio ${o.label}` : `Ver dados de ${o.label}`}
               onPress={() => (selected ? undefined : setSpace(o.kind))}
               style={(s) => [styles.option, part === 0 && selected && styles.optionSelected, (s as { focused?: boolean }).focused && focusOnBrand]}>
-              {o.kind === 'familia' ? <Users size={18} color={selected ? colors.brand : colors.textOnBrand} /> : null}
-              {o.kind === 'negocio' ? <Store size={18} color={selected ? colors.brand : colors.textOnBrand} /> : null}
+              {/* O ícone não encolhe: com o nome longo do negócio em 320 px, só o nome é cortado (com reticências). */}
+              {o.kind === 'familia' ? <Users size={18} color={selected ? colors.brand : colors.textOnBrand} style={{ flexShrink: 0 }} /> : null}
+              {o.kind === 'negocio' ? <Store size={18} color={selected ? colors.brand : colors.textOnBrand} style={{ flexShrink: 0 }} /> : null}
               <Txt
                 variant="label"
                 numberOfLines={1}
