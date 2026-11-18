@@ -102,6 +102,13 @@ main:focus{outline:none}
   .menu .menu-cta:hover{text-decoration:underline}
 }
 
+/* Faixa de confiança da capa (D-115): três frases curtas com ícone, num link só para Segurança e privacidade, sem caixas. */
+.confianca{margin:1rem 0 0;font-size:.9375rem;line-height:1.4}
+.confianca a{display:inline-flex;flex-direction:column;gap:.35rem;padding:.35rem 0;color:var(--sobre-topo-suave);text-decoration:none}
+.confianca a:hover .confianca-item{text-decoration:underline;text-underline-offset:.2em}
+.confianca-item{display:inline-flex;align-items:center;gap:.4rem}
+.confianca svg{flex:none;color:var(--lima)}
+
 /* Capa (herói) */
 .capa{background:var(--topo);color:var(--sobre-topo);padding:1.5rem 0 3.25rem;border-radius:0 0 32px 32px;position:relative;overflow:hidden}
 .capa::before{content:"";position:absolute;right:-14rem;top:-12rem;width:34rem;height:34rem;border-radius:50%;background:var(--disco);pointer-events:none}
@@ -241,6 +248,19 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .mini .sem-captura{align-self:start}
 /* Quatro cartões (página inicial): na largura em que caberiam três por linha, ficam dois, para nenhum sobrar sozinho. */
 @media (min-width:46rem) and (max-width:61.99rem){.mini-par{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* O celular dentro de um cartão (D-115, 18/11/2026): no centro do cartão, embaixo do texto, com a legenda junto, no mesmo tamanho de
+   sempre (antes ficava encostado à esquerda num cartão largo). Vale para captura e vídeo. */
+.cartao:has(>.celular){display:flex;flex-direction:column}
+.cartao>.celular{margin:auto auto 0}
+.cartao>p+.celular{margin-top:auto;padding-top:.5rem}
+/* Uma grade de cartões com uma tela ao lado (D-115, Segurança: "Quem vê os seus dados"): no computador, os cartões em 2 x 2 de um lado e
+   o celular do outro, no meio da altura; no celular, os cartões um embaixo do outro e o celular depois deles, no centro. Os cartões de
+   cada linha têm a mesma altura (a grade estica os dois). */
+.com-celular{display:grid;gap:1.5rem 3rem;align-items:center}
+.com-celular>.celular{justify-self:center}
+.com-celular .grade{grid-template-columns:minmax(0,1fr)}
+@media (min-width:40rem){.com-celular .grade{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:64rem){.com-celular{grid-template-columns:minmax(0,1fr) 15.5rem}}
 .larga{margin:0 0 1.5rem}
 .larga img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid var(--linha);background:#F7F9FD}
 .larga-moldura{padding:10px;border-radius:20px;background:var(--aparelho);box-shadow:0 22px 50px rgba(6,16,64,.25)}
@@ -250,6 +270,10 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .ve-nao-ve{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(20rem,100%),1fr))}
 .ve-nao-ve .cartao{border-width:2px}
 .ve-nao-ve h3{margin-top:0}
+.lista-nao-faz{border-width:2px;max-width:52rem;margin:0 0 1rem}
+.lista-nao-faz ul{list-style:none;padding:0;margin:0}
+.lista-nao-faz li{position:relative;padding-left:1.5rem}
+.lista-nao-faz li::before{content:"";position:absolute;left:0;top:.62em;width:.6rem;height:.6rem;background:var(--texto);transform:rotate(45deg);border-radius:2px}
 .ve-nao-ve ul{list-style:none;padding:0}
 .ve-nao-ve li{position:relative;padding-left:1.5rem}
 .ve-nao-ve li::before{content:"";position:absolute;left:0;top:.62em;width:.6rem;height:.6rem}

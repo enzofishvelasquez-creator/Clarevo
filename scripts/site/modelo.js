@@ -186,10 +186,28 @@ function celular(img, arquivo, { legenda = true, carregamento = 'lazy', textoLeg
   return `<figure class="celular${classe ? ` ${classe}` : ''}"><div class="celular-moldura">${imagemDaTela(img, arquivo, carregamento)}</div>${legenda ? `<figcaption>${esc(textoLegenda || LEGENDA_DEMO)}</figcaption>` : ''}</figure>`;
 }
 
+/** Os ícones da faixa de confiança, desenhados em linha (SVG no próprio HTML, sem arquivo nem estilo em atributo). */
+const ICONES_DA_CONFIANCA = {
+  banco: '<path d="M3 9.5 12 4l9 5.5M5 10v7M9.5 10v7M14.5 10v7M19 10v7M3 20h18"/>',
+  dinheiro: '<path d="M4 8h14l-3-3M20 16H6l3 3"/>',
+  cartao: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/>',
+};
+
+/**
+ * A faixa de confiança da capa (pedido do Enzo, 18/11/2026, D-115): três frases curtas com um ícone pequeno cada, no lugar das seções "O
+ * que a Clarevo não é" (página inicial) e "O que o app não faz" (O app), que eram caixas largas empilhadas. A faixa inteira é um link só
+ * para o bloco "O que a Clarevo não faz" de Segurança e privacidade, onde está o texto completo; as vírgulas e o fim escondidos da tela
+ * fazem o nome do link ser uma frase para quem usa leitor de tela.
+ */
+function faixaDeConfianca(arquivo) {
+  const item = (icone, texto) => `<span class="confianca-item"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONES_DA_CONFIANCA[icone]}</svg>${esc(texto)}</span>`;
+  return `<p class="confianca"><a href="${rel(arquivo, 'seguranca.html')}#nao-faz">${item('banco', 'Sem conexão com o seu banco')}<span class="so-leitor">, </span>${item('dinheiro', 'Não movimenta dinheiro nem oferece crédito')}<span class="so-leitor">, </span>${item('cartao', 'Não guarda os dados completos do cartão')}<span class="so-leitor">. Veja o que a Clarevo não faz, em Segurança e privacidade.</span></a></p>`;
+}
+
 /** A captura larga (painel no navegador) com a legenda de demonstração (ou `textoLegenda`). */
 function telaLarga(img, arquivo, { textoLegenda = null, classe = '' } = {}) {
   const { LEGENDA_DEMO } = require('./imagens');
   return `<figure class="larga${classe ? ` ${classe}` : ''}"><div class="larga-moldura">${imagemDaTela(img, arquivo, 'lazy')}</div><figcaption>${esc(textoLegenda || LEGENDA_DEMO)}</figcaption></figure>`;
 }
 
-module.exports = { montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, dominioDe, urlDoSite, configurarRodape };
+module.exports = { montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, faixaDeConfianca, dominioDe, urlDoSite, configurarRodape };

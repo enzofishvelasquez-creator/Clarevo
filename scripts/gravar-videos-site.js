@@ -12,7 +12,8 @@
  * (duração, tamanho e dimensões de cada arquivo), e o gerador do site copia para `site/videos/`.
  *
  * Capturas (`--capturas`): as telas que as matérias de Novidades mostram ao lado das seções e na capa (Resumo, Investir, Desempenho, Nova
- * meta com os atalhos de prazo, a calculadora Multa e juros no modo da fatura do cartão, Quem vê estes dados? e o painel da empresa), cada
+ * meta com os atalhos de prazo, a calculadora Multa e juros no modo da fatura do cartão, Quem vê estes dados? e o painel da empresa) e a
+ * tela Seu negócio do Espaço Negócio (cenário "negocio"), que O app mostra (D-115), cada
  * uma no tema claro e no escuro (o app segue o tema do aparelho), em `site-src/imagens/telas/<nome>.png` e `<nome>-escuro.png`. O gerador
  * do site as reduz (`scripts/site/imagens.js`).
  *
@@ -226,9 +227,9 @@ function ferramentas(p, { altura, largura }) {
   return { pausa, botao, aba, radio, campo, texto, esperar, rolarAte, rolarPara, tocar, digitar, mostrarToque, etiquetaVisivel };
 }
 
-/** Entra na demonstração e espera o Resumo de outubro. */
-async function entrarNaDemo(p, base, f) {
-  await p.goto(`${base}/`);
+/** Entra na demonstração e espera o Resumo de outubro. `cenario`: um cenário da demonstração (`?cenario=negocio`, D-113). */
+async function entrarNaDemo(p, base, f, cenario = null) {
+  await p.goto(`${base}/${cenario ? `?cenario=${cenario}` : ''}`);
   await f.esperar('Cuidar da vida financeira');
   const entrar = f.botao('Ver demonstração com dados fictícios');
   await entrar.waitFor({ timeout: 15000 }).catch(() => { throw new Error('o botão "Ver demonstração com dados fictícios" não apareceu: apps/app/dist não é um build de demonstração (rode com --build)'); });
@@ -774,6 +775,16 @@ const CAPTURAS = [
     },
   },
   {
+    // O Espaço Negócio (D-113, cenário "negocio", "Sacolé da Maria"), para O app (D-115). O botão aceita o nome de hoje e o novo ("Seu
+    // negócio"), que o app recebe numa frente separada: depois dela, basta gravar de novo esta captura (--capturas --telas negocio).
+    nome: 'negocio', tela: CELULAR_CAPTURA, cenario: 'negocio', exigir: ['Últimos meses', 'Sacolé da Maria'],
+    ir: async (c) => {
+      await c.p.getByRole('tab', { name: 'Ver dados do negócio Sacolé da Maria', exact: true }).filter({ visible: true }).first().click(); await c.pausa(700);
+      await c.p.getByRole('button', { name: /^Ver (como está o negócio|seu negócio)$/i }).filter({ visible: true }).first().click(); await c.esperar('Últimos meses');
+      await c.pausa(500);
+    },
+  },
+  {
     // O painel abre pela Conta, que só existe no layout de celular: a captura começa em 390 pontos e alarga para 960 com o painel aberto.
     nome: 'empresa-painel', tela: PAINEL_CAPTURA, telaInicial: { largura: 390, altura: 844 }, exigir: ['Empresa Exemplo (demonstração)'],
     ir: async (c) => {
@@ -798,7 +809,7 @@ async function gravarCapturas(browser, servidor, problemas) {
       const erros = [];
       p.on('pageerror', (e) => erros.push(e.message));
       const f = ferramentas(p, { altura, largura });
-      await entrarNaDemo(p, servidor.base, f);
+      await entrarNaDemo(p, servidor.base, f, cap.cenario);
       await cap.ir({ p, ...f });
       if (cap.telaInicial) await p.setViewportSize({ width: largura, height: altura });
       await p.waitForTimeout(700);

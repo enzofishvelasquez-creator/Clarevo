@@ -57,6 +57,9 @@ const IMAGENS = [
   { id: 'beneficio', origem: `${TELAS}/433_conta_beneficio_ativo.png`, largura: LARGURA_CELULAR, alt: 'Tela Conta de quem recebeu o benefício, com a empresa, o plano, a data de início e a situação.' },
   { id: 'quem-ve', origem: `${TELAS}/330_quem_ve.png`, largura: LARGURA_CELULAR, alt: 'Tela Quem vê estes dados, que mostra quem tem acesso aos registros.' },
   { id: 'empresa-painel', origem: `${TELAS}/421_empresa_painel_1280px.png`, largura: LARGURA_LARGA, alt: 'Painel da empresa no navegador, com o contrato, as vagas contratadas, as vagas em uso e as datas.' },
+  // O Espaço Negócio (D-113) em O app (D-115): a tela Seu negócio do cenário "negocio" da demonstração, gravada por
+  // `scripts/gravar-videos-site.js --capturas --telas negocio`, nos temas claro e escuro.
+  { id: 'negocio', origem: `${NOVIDADES}/negocio.png`, escura: `${NOVIDADES}/negocio-escuro.png`, largura: LARGURA_CELULAR, alt: 'Tela Seu negócio do Sacolé da Maria, da demonstração: quanto entrou, quanto saiu e quanto sobrou em outubro, a frase do mês, Retirada para o Pessoal e os botões para anotar entrada e saída.' },
   { id: 'empresa-licencas', origem: `${TELAS}/424_empresa_licencas.png`, largura: LARGURA_CELULAR, alt: 'Painel da empresa, lista de licenças com o e-mail convidado, a situação e a data de cada uma.' },
 ];
 

@@ -739,7 +739,9 @@ function varrerPagina() {
         ok(`vídeos (${caminho}): as capas carregam (PNG, guardadas por um ano)`, capas.every((r) => r.ok() && r.headers()['content-type'] === 'image/png' && /immutable/.test(r.headers()['cache-control'] || '')));
         ok(`vídeos (${caminho}): só baixa vídeo do que aparece na tela`, deVideo.every((u) => u.startsWith(`${origem}/videos/`)) && (caminho !== '/' || deVideo.every((u) => /\/videos\/resumo-do-mes\./.test(u))), deVideo.join(' | '));
       }
-      // Na página inicial, o vídeo da capa aparece ao abrir: ele toca sozinho (o WebM do próprio site), e os de baixo ficam parados no começo.
+      // Na página inicial, em 1280 px, o vídeo da capa aparece inteiro ao abrir: ele toca sozinho (o WebM do próprio site), e os de baixo
+      // ficam parados no começo. (Em 390 px ele começa mais abaixo da dobra e toca quando metade dele aparece.)
+      await p.setViewportSize({ width: 1280, height: 900 });
       await p.goto(`${origem}/`);
       const tempoDe = (sel) => p.$eval(sel, (v) => ({ paused: v.paused, tempo: v.currentTime, src: v.currentSrc, erro: v.error && v.error.code }));
       await p.waitForFunction(() => document.querySelector('.capa video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
@@ -769,9 +771,11 @@ function varrerPagina() {
       // Pelo teclado: Tab chega ao botão, com foco visível, e Espaço toca de novo.
       await botao.focus();
       const foco = await botao.evaluate((b) => { const cs = getComputedStyle(b); return { visivel: b.matches(':focus-visible') || document.activeElement === b, contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }; });
-      await p.keyboard.press('Space');
-      await p.waitForFunction(() => !document.querySelector('[data-titulo="Metas"] video').paused, null, { timeout: 5000 }).catch(() => {});
-      ok('vídeos: pelo teclado, o botão recebe foco visível e Espaço toca o vídeo de novo, com o nome "Pausar o vídeo: Metas"', foco.visivel && !(await p.locator(cartao).evaluate((v) => v.paused)) && (await botao.getAttribute('aria-label')) === 'Pausar o vídeo: Metas', JSON.stringify(foco));
+      await botao.press('Space');
+      await p.waitForTimeout(800);
+      const depoisDoEspaco = { paused: await p.locator(cartao).evaluate((v) => v.paused), nome: await botao.getAttribute('aria-label'), ativo: await p.evaluate(() => document.activeElement && document.activeElement.className) };
+      ok('vídeos: pelo teclado, o botão recebe foco e Espaço toca o vídeo de novo, com o nome "Pausar o vídeo: Metas"', foco.visivel && !depoisDoEspaco.paused && depoisDoEspaco.nome === 'Pausar o vídeo: Metas', JSON.stringify({ foco, depoisDoEspaco }));
+      await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
       // O MP4 (para os navegadores que não tocam WebM): tipo certo, pedaço com 206 e a política de segurança com media-src 'self'.
       const htmlDoApp = await (await ctx.request.get(`${origem}/app/`)).text();
@@ -866,6 +870,7 @@ function varrerPagina() {
       ok('planos: os dois cartões da página inicial com um link só cada, com nome claro, para planos.html#individual e #familia', JSON.stringify(cartoes) === JSON.stringify([{ links: 1, nome: 'Ver o que o plano Individual inclui', href: 'planos.html#individual' }, { links: 1, nome: 'Ver o que o plano Família inclui', href: 'planos.html#familia' }]), JSON.stringify(cartoes));
       // Clicar no cartão (fora do texto do link) abre o plano na página Planos.
       const familia = p.locator('section[aria-labelledby="planos"] article.plano-link').nth(1);
+      await familia.scrollIntoViewIfNeeded();
       const caixa = await familia.boundingBox();
       await p.mouse.click(caixa.x + caixa.width - 20, caixa.y + 20);
       await p.waitForURL(/\/planos(\.html)?#familia$/);
@@ -889,6 +894,94 @@ function varrerPagina() {
         }
       }
       ok('planos: nada passa da largura da tela em 320, 390 e 1280 px (início e Planos)', largas.length === 0, largas.join(' | '));
+      await p.close();
+    }
+
+    // 7c4. Celulares no centro dos cartões, "Quem vê os seus dados" em Segurança e a faixa de confiança da capa (D-115). Em 1280 px, a
+    // moldura de cada celular fica no centro do cartão que a tem (início, O app, Para empresas) e, em Segurança, no centro da coluna dela,
+    // ao lado dos quatro cartões em 2 x 2, com a mesma altura em cada linha. A faixa da capa (início e O app) é um link só para o bloco "O
+    // que a Clarevo não faz" de Segurança, e as seções antigas saíram. Nada passa da largura da tela em 320, 390 e 1280 px.
+    {
+      const p = await pagina();
+      await p.setViewportSize({ width: 1280, height: 900 });
+      const fora = [];
+      for (const c of ['', 'app/', 'empresas/', 'seguranca']) {
+        await p.goto(`${origem}/${c}`);
+        const r = await p.evaluate(() => [...document.querySelectorAll('.cartao > figure.celular, .com-celular > figure.celular')].map((f) => {
+          const m = f.querySelector('.celular-moldura').getBoundingClientRect();
+          const pai = f.parentElement;
+          let caixa = pai.getBoundingClientRect();
+          if (pai.classList.contains('com-celular')) {
+            const colunas = getComputedStyle(pai).gridTemplateColumns.split(' ').map(parseFloat);
+            const gap = parseFloat(getComputedStyle(pai).columnGap) || 0;
+            caixa = { left: caixa.left + colunas[0] + gap, width: colunas[1] };
+          }
+          return { nome: (pai.querySelector('h3') || pai.querySelector('h2') || { textContent: pai.className }).textContent.trim().slice(0, 30), dif: Math.abs((m.left + m.width / 2) - (caixa.left + caixa.width / 2)) };
+        }));
+        if (!r.length) fora.push(`${c || 'início'}: nenhum celular em cartão`);
+        for (const x of r) if (x.dif > 3) fora.push(`${c || 'início'}: ${x.nome} (${Math.round(x.dif)} px)`);
+      }
+      ok('celulares: em 1280 px, a moldura de cada celular fica no centro do cartão (início, O app, Para empresas) e da coluna dela (Segurança)', fora.length === 0, fora.join(' | '));
+      await p.goto(`${origem}/seguranca`);
+      const quemVe = await p.evaluate(() => {
+        const g = document.querySelector('#quem-ve ~ .com-celular .grade');
+        const cartoes = [...g.children].map((c) => c.getBoundingClientRect());
+        const f = document.querySelector('#quem-ve ~ .com-celular > figure.celular').getBoundingClientRect();
+        const linhas = {};
+        for (const c of cartoes) (linhas[Math.round(c.top)] = linhas[Math.round(c.top)] || []).push(Math.round(c.height));
+        const gr = g.getBoundingClientRect();
+        return { n: cartoes.length, linhas: Object.values(linhas), dentro: g.querySelectorAll('figure, img').length, lado: f.left > gr.right, meio: Math.abs((f.top + f.height / 2) - (gr.top + gr.height / 2)) };
+      });
+      ok('segurança: "Quem vê os seus dados" com os quatro cartões em 2 x 2, da mesma altura em cada linha, sem imagem dentro, e o celular ao lado, no meio da altura', quemVe.n === 4 && quemVe.linhas.length === 2 && quemVe.linhas.every((l) => l.length === 2 && l[0] === l[1]) && quemVe.dentro === 0 && quemVe.lado && quemVe.meio < 40, JSON.stringify(quemVe));
+      const faixas = [];
+      for (const c of ['', 'app/']) {
+        await p.goto(`${origem}/${c}`);
+        faixas.push(await p.evaluate(() => {
+          const f = document.querySelector('.capa .confianca');
+          const a = f && f.querySelectorAll('a');
+          return { links: a ? a.length : 0, href: a && a[0] ? a[0].getAttribute('href') : '', itens: f ? [...f.querySelectorAll('.confianca-item')].map((i) => i.textContent) : [], nome: a && a[0] ? a[0].textContent.replace(/\s+/g, ' ').trim() : '', antigas: document.querySelectorAll('#nao-e, #nao-faz').length };
+        }));
+      }
+      ok('faixa de confiança: na capa do início e de O app, três frases num link só para Segurança (#nao-faz), com nome em frase para leitor de tela, e sem as seções antigas',
+        faixas.every((f) => f.links === 1 && /seguranca\.html#nao-faz$/.test(f.href) && JSON.stringify(f.itens) === JSON.stringify(['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) && /cartão\. Veja o que a Clarevo não faz, em Segurança e privacidade\.$/.test(f.nome) && f.antigas === 0), JSON.stringify(faixas));
+      await p.click('.capa .confianca a');
+      await p.waitForURL(/\/seguranca(\.html)?#nao-faz$/);
+      ok('faixa de confiança: o link abre o bloco "O que a Clarevo não faz" de Segurança', (await p.textContent('#nao-faz')) === 'O que a Clarevo não faz' && (await p.$$eval('#nao-faz ~ .lista-nao-faz li', (l) => l.length)) === 5);
+      const largas = [];
+      for (const largura of [320, 390, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        for (const c of ['', 'app/', 'empresas/', 'seguranca']) {
+          await p.goto(`${origem}/${c}`);
+          const r = await p.evaluate(() => ({ largo: document.documentElement.scrollWidth > window.innerWidth + 1, faixa: [...document.querySelectorAll('.confianca-item')].some((i) => i.getBoundingClientRect().right > window.innerWidth) }));
+          if (r.largo || r.faixa) largas.push(`${c || 'início'} em ${largura} px ${JSON.stringify(r)}`);
+        }
+      }
+      ok('celulares, Segurança e faixa: nada passa da largura da tela em 320, 390 e 1280 px', largas.length === 0, largas.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
+      await p.close();
+    }
+
+    // 7c5. Espaço Negócio (D-115, a partir de D-113): o recurso em O app (#negocio), com a tela da demonstração no centro e o link da Ajuda;
+    // o cartão de "Para quem é" na página inicial, que leva a ele; a frase de docs/52 em Planos; e a entrada na Ajuda, achada pela busca.
+    {
+      const p = await pagina();
+      await p.goto(`${origem}/`);
+      await p.click('section[aria-labelledby="para-quem"] a[href="app/index.html#negocio"]');
+      await p.waitForURL(/\/app\/(index\.html)?#negocio$/);
+      const recurso = await p.evaluate(() => {
+        const a = document.querySelector('#negocio');
+        const img = a.querySelector('figure.celular img');
+        return { titulo: a.querySelector('h3').textContent, ajuda: a.querySelector('a[href="../ajuda/negocio.html#guia-negocio"]') !== null, img: img ? { ok: img.complete && img.naturalWidth > 0, alt: img.alt } : null, plano: /Incluído no plano Individual: um negócio por pessoa/.test(a.textContent) };
+      });
+      ok('Espaço Negócio: o cartão "Para quem tem um negócio" do início leva ao recurso em O app, com a tela Seu negócio, o link da Ajuda e o plano Individual', recurso.titulo === 'Espaço Negócio' && recurso.ajuda && recurso.plano && recurso.img && /^Tela Seu negócio/.test(recurso.img.alt), JSON.stringify(recurso));
+      await p.goto(`${origem}/planos`);
+      ok('Espaço Negócio: a página Planos diz que o plano Individual inclui um negócio por pessoa', /Inclui o Espaço Negócio: um negócio por pessoa, sem custo a mais\./.test(await p.textContent('#individual')) && (await p.$('a[href="ajuda/negocio.html#guia-negocio"]')) !== null);
+      await p.goto(`${origem}/ajuda/`);
+      const naAjuda = (await p.$('a[href="negocio.html"]')) !== null;
+      await p.fill('input[type="search"]', 'negócio');
+      await p.waitForFunction(() => [...document.querySelectorAll('.resultados a')].some((a) => /negocio\.html#guia-negocio/.test(a.getAttribute('href'))), null, { timeout: 5000 }).catch(() => {});
+      const naBusca = await p.$$eval('.resultados a', (as) => as.some((a) => /negocio\.html#guia-negocio/.test(a.getAttribute('href'))));
+      ok('Espaço Negócio: a Ajuda tem o tema no índice e a busca acha a entrada do guia', naAjuda && naBusca, `${naAjuda} ${naBusca}`);
       await p.close();
     }
 

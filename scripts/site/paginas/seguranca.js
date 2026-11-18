@@ -4,6 +4,10 @@
  * (as seções citadas são as da política). O que na política ainda depende da revisão jurídica (`[PROPOSTA]` e `[A DEFINIR]`) não é afirmado
  * aqui: a página manda para a política, que faz o `--final` recusar enquanto sobrar pendência.
  *
+ * "O que a Clarevo não faz" (D-115, 18/11/2026) junta o que estava nas seções "O que a Clarevo não é" da página inicial e "O que o app não
+ * faz" de O app, que viraram uma faixa curta na capa daquelas páginas, com link para cá. Em "Quem vê os seus dados", os quatro cartões
+ * ficam numa grade 2 x 2 e a tela "Quem vê estes dados?" ao lado deles (no celular, depois deles), e não dentro do primeiro cartão.
+ *
  * Em "O que guardamos", três cartões espelham a política desde 12/11/2026: investimentos (seções 3.2 e 7), assinatura e pagamento (seção
  * 3.9, sem preço nem período de teste, que o site ainda não comunica) e anotar por mensagem (seção 3.8). Quando a política mudar, mudam juntos.
  */
@@ -22,13 +26,26 @@ function paginaSeguranca({ valores, img }) {
       `<h2 id="essencial">O essencial</h2>
 <ul class="nao-e">
 <li>Guardamos só o que você, ou as pessoas da sua Família, anotam ou escolhem importar.</li>
-<li>A Clarevo não se conecta ao seu banco e não pede senha bancária.</li>
 <li>Não guardamos número completo de cartão, código de segurança, validade, CPF de nota fiscal nem imagens de notas ou comprovantes.</li>
 <li>Se a sua empresa oferecer a Clarevo como benefício, ela nunca vê as suas finanças, nem somadas às de outras pessoas.</li>
 <li>Sem anúncios, sem venda de dados e sem rastreamento para publicidade.</li>
 <li>Você pode excluir a sua conta dentro do app.</li>
 </ul>`,
       { rotulo: 'essencial' },
+    ),
+    bloco(
+      `<h2 id="nao-faz">O que a Clarevo não faz</h2>
+<div class="cartao nunca-ve lista-nao-faz">
+<ul>
+<li>Não se conecta ao seu banco e não pede senha bancária: tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família.</li>
+<li>Não é banco e não guarda o seu dinheiro.</li>
+<li>Não movimenta dinheiro: não faz pagamentos nem transferências.</li>
+<li>Não oferece crédito e não recomenda produtos financeiros.</li>
+<li>Não é atendimento de saúde e não substitui o acompanhamento de profissionais.</li>
+</ul>
+</div>
+<p class="nota">A Clarevo é uma ferramenta de organização e de educação financeira. Ela não promete resultado financeiro nem de saúde, e as simulações são exemplos feitos com os números que você digita. Os dados de cartão e de notas que nunca ficam guardados estão em <a href="#nao-guardamos">O que não guardamos</a>, e a resposta completa está na <a href="${u('ajuda/comecar.html')}#tema-o-que-a-clarevo-nao-faz">Ajuda</a>.</p>`,
+      { variante: 'azul', rotulo: 'nao-faz' },
     ),
     bloco(
       `<h2 id="guardamos">O que guardamos</h2>
@@ -98,11 +115,11 @@ function paginaSeguranca({ valores, img }) {
     ),
     bloco(
       `<h2 id="quem-ve">Quem vê os seus dados</h2>
-<div class="grade">
+<div class="com-celular">
+<div class="grade grade-2x2">
 <article class="cartao">
 <h3>Você</h3>
 <p>Entre as pessoas que usam o app, só você vê, anota, edita e exclui o que está no seu Pessoal. A tela "Quem vê estes dados?" mostra quem tem acesso em cada espaço (Pessoal ou Família).</p>
-${celular(img['quem-ve'], ARQUIVO)}
 </article>
 <article class="cartao">
 <h3>As pessoas da sua Família</h3>
@@ -116,6 +133,8 @@ ${celular(img['quem-ve'], ARQUIVO)}
 <h3>A equipe da Clarevo</h3>
 <p>A Clarevo não consulta o conteúdo financeiro de ninguém no dia a dia. Tecnicamente, pessoas da equipe com acesso ao banco de dados conseguem chegar aos dados guardados. As regras sobre isso estão na seção "Quem vê os seus dados" da <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>
 </article>
+</div>
+${celular(img['quem-ve'], ARQUIVO)}
 </div>
 <p class="nota">A Clarevo não vende dados e não compartilha dados para publicidade.</p>`,
       { variante: 'alt', rotulo: 'quem-ve' },

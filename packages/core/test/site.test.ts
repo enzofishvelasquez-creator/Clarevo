@@ -789,7 +789,7 @@ describe('site público: as páginas geradas', () => {
     }
   });
 
-  it('a página inicial traz a mensagem central, o apoio prático do app, recursos com captura, a empresa que nunca vê finanças, o que a Clarevo não é, o app web e o aviso das lojas (sem selos)', () => {
+  it('a página inicial traz a mensagem central, o apoio prático do app, recursos com vídeo e captura, a empresa que nunca vê finanças, a faixa do que a Clarevo não faz, o app web e o aviso das lojas (sem selos)', () => {
     const h = html('index.html');
     // D-068: o título é a mensagem central do Manual v2.2 (seção 19); "Mais clareza para decidir" fica como apoio, e o subtexto diz o que a Clarevo faz.
     expect(h).toContain('<h1>Cuidar da vida financeira faz parte de cuidar de você.</h1>');
@@ -807,7 +807,17 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada');
     expect(h).toContain('dificuldade financeira não é falta de disciplina');
     expect(h).not.toMatch(PROMESSAS_PROIBIDAS);
-    for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'Não recomenda produtos financeiros', 'Não é atendimento de saúde e não substitui o acompanhamento de profissionais']) expect(h, frase).toContain(frase);
+    // D-115: o que a Clarevo não faz virou a faixa curta da capa, um link só para o bloco completo de Segurança e privacidade.
+    expect(h).not.toContain('id="nao-e"');
+    const faixa = /<p class="confianca"><a href="seguranca\.html#nao-faz">[\s\S]*?<\/a><\/p>/.exec(h)?.[0] ?? '';
+    for (const frase of ['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) expect(faixa, frase).toContain(`${frase}</span>`);
+    expect(faixa.match(/<a\b/g)?.length).toBe(1);
+    expect(/<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(h)![0]).toContain(faixa);
+    const seg = html('seguranca.html');
+    const naoFaz = /<h2 id="nao-faz">O que a Clarevo não faz<\/h2>[\s\S]*?<\/section>/.exec(seg)?.[0] ?? '';
+    for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'não recomenda produtos financeiros', 'Não é atendimento de saúde e não substitui o acompanhamento de profissionais', 'Não se conecta ao seu banco e não pede senha bancária', 'tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família']) expect(naoFaz, frase).toContain(frase);
+    // Sem repetir em Segurança: o que não fica guardado continua só em "O que não guardamos", e "não se conecta ao seu banco" só neste bloco.
+    expect(seg.match(/não se conecta ao seu banco/gi)?.length).toBe(1);
     expect(h).toContain('href="https://app.clarevo.app.br"');
     expect(h).toContain('Em breve na App Store e no Google Play.');
     expect(h).toMatch(/Para pessoas/);
@@ -873,6 +883,35 @@ describe('site público: as páginas geradas', () => {
     expect(secao).not.toMatch(/[\u2013\u2014]/);
     // Com a assinatura aberta, o aviso sai.
     expect(conteudoPlanos({ ...PLANOS, aberta: true }, (d) => d)).not.toContain(ACCESS_TEXT.notOpenYet);
+  });
+
+  // Espaço Negócio no site (D-115, a partir de D-113 e docs/52): o recurso em O app, com a tela da demonstração e o link da Ajuda, o
+  // cartão de "Para quem é" na página inicial e a página Planos. A tela de visão geral chama "Seu negócio" no texto novo do site.
+  it('Espaço Negócio: o recurso em O app (com a tela do cenário "negocio" nos dois temas), o cartão na página inicial e a Ajuda', () => {
+    const app = html('app/index.html');
+    const recurso = /<article class="recurso" id="negocio" aria-labelledby="t-negocio">[\s\S]*?<\/article>/.exec(app)?.[0] ?? '';
+    const guia = GUIDE_ENTRIES.find((x) => x.id === 'negocio')!;
+    expect(recurso).toContain('<h3 id="t-negocio">Espaço Negócio</h3>');
+    expect(recurso).toContain(`<p>${esc(guia.purpose)}</p>`);
+    expect(recurso).toContain('<li>Incluído no plano Individual: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.</li>');
+    expect(recurso).toContain('Retirada para o Pessoal');
+    expect(recurso).toContain('Em Seu negócio, quanto entrou, quanto saiu e quanto sobrou');
+    expect(recurso).toContain('href="../ajuda/negocio.html#guia-negocio"');
+    expect(recurso).toMatch(/<picture><source srcset="\.\.\/imagens\/negocio-escura\.[0-9a-f]{10}\.png" media="\(prefers-color-scheme: dark\)"[^>]*><img src="\.\.\/imagens\/negocio\.[0-9a-f]{10}\.png" alt="Tela Seu negócio do Sacolé da Maria/);
+    // Depois de Família.
+    expect(app.indexOf('id="t-negocio"')).toBeGreaterThan(app.indexOf('id="t-familia"'));
+    // A Ajuda tem a entrada e a busca acha.
+    expect(html('ajuda/negocio.html')).toContain('id="guia-negocio"');
+    expect(html('ajuda/index.html')).toContain('href="negocio.html"');
+    expect(html('ajuda/indice.json')).toContain('guia-negocio');
+    // O cartão de "Para quem é" na página inicial, com o link para o recurso em O app.
+    const inicio = html('index.html');
+    const paraQuem = /<section[^>]*aria-labelledby="para-quem"[\s\S]*?<\/section>/.exec(inicio)![0];
+    expect(paraQuem.match(/<article class="cartao">/g)?.length).toBe(3);
+    expect(paraQuem).toContain('<h3>Para quem tem um negócio</h3>');
+    expect(paraQuem).toContain('<a href="app/index.html#negocio">Veja o Espaço Negócio</a>');
+    // A frase de docs/52 sobre o plano, na página Planos.
+    expect(html('planos.html')).toContain('O plano Individual inclui um negócio por pessoa, sem custo a mais.');
   });
 
   // Planos (D-115, 18/11/2026): os cartões da página inicial levam à página Planos, que diz o que muda entre os dois, o que os dois
@@ -960,16 +999,18 @@ describe('site público: as páginas geradas', () => {
       const e = GUIDE_ENTRIES.find((x) => x.id === id)!;
       expect(h, id).toContain(esc(e.purpose));
     }
-    // D-115: seis recursos e o cartão do tema com o vídeo do que mostram; os outros com a captura da demonstração.
+    // D-115: seis recursos e o cartão do tema com o vídeo do que mostram; os outros (com o Espaço Negócio) com a captura da demonstração.
     const figuras = h.match(/<figure class="celular">/g)?.length ?? 0;
-    expect(figuras).toBe(6);
+    expect(figuras).toBe(7);
     expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(figuras);
     expect(h.match(/<figure class="celular celular-video" data-video /g)?.length).toBe(7);
     expect(h).toContain('Na web, hoje');
     // "Cada texto vem do guia" não é verdade (os pontos são do site): só a explicação de abertura vem do guia do app.
     expect(h).not.toContain('Cada texto vem do guia');
     expect(h).toContain('A explicação de abertura de cada recurso é a do guia de uso do próprio app');
-    expect(h).toContain('tudo o que aparece foi anotado ou importado por você ou pelas pessoas da sua Família');
+    // O que o app não faz: a faixa curta da capa, com link para o bloco completo de Segurança e privacidade (D-115).
+    expect(h).not.toContain('id="nao-faz"');
+    expect(h).toContain('<p class="confianca"><a href="../seguranca.html#nao-faz">');
     // Lembretes são do app para celular: a única captura que existe é a da web, que só avisa que eles não existem, então não há imagem.
     expect(h).toContain('>Lembretes</h3>');
     expect(h).not.toContain('imagens/lembretes.png');

@@ -1,13 +1,14 @@
 'use strict';
 /**
  * Início: a mensagem central (D-068), o que é a Clarevo, o apoio prático do app (bem-estar financeiro, sem promessa de resultado nem de saúde),
- * recursos com vídeo ou captura, para quem é, "A empresa nunca vê suas finanças", o que ela não é e as chamadas. Desde 18/11/2026 (D-115),
+ * recursos com vídeo ou captura, para quem é, "A empresa nunca vê suas finanças" e as chamadas. O que a Clarevo não faz fica numa faixa
+ * curta na capa, com o texto completo em Segurança e privacidade (D-115). Desde 18/11/2026 (D-115),
  * cada vídeo de uso do app fica no lugar da captura do bloco que ele mostra: o do Resumo na capa e três nos cartões de "O que o app faz".
  */
 const { URL_APP } = require('../config');
 const { esc } = require('../texto');
 const { rel } = require('../util');
-const { montarPagina, marcadoresEmHtml, bloco, celular, dominioDe } = require('../modelo');
+const { montarPagina, marcadoresEmHtml, bloco, celular, faixaDeConfianca, dominioDe } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
@@ -86,6 +87,7 @@ ${r.video ? celularComVideo(r.video, { videos, img }, ARQUIVO) : celular(img[r.i
 <a class="botao botao-suave" href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>
 </div>
 <p class="lojas">Em breve na App Store e no Google Play.</p>
+${faixaDeConfianca(ARQUIVO)}
 </div>
 ${celularComVideo('resumo-do-mes', { videos, img }, ARQUIVO)}
 </div>`;
@@ -132,6 +134,11 @@ ${mini}
 <p>A empresa pode integrar o cuidado financeiro ao programa de bem-estar e oferecer a Clarevo como benefício. O painel das empresas existe só na web e mostra os e-mails convidados, a situação de cada convite ou licença, as datas e as contagens de vagas. Nunca mostra finanças.</p>
 <p><a href="${u('empresas/index.html')}">Veja como funciona para empresas</a>.</p>
 </article>
+<article class="cartao">
+<h3>Para quem tem um negócio</h3>
+<p>Quem tem CNPJ ou trabalha por conta separa as contas do negócio das pessoais no Espaço Negócio e vê quanto entrou, quanto saiu e quanto sobrou no mês. O plano Individual inclui um negócio por pessoa.</p>
+<p><a href="${u('app/index.html')}#negocio">Veja o Espaço Negócio</a>.</p>
+</article>
 </div>`,
       'para-quem',
     ),
@@ -144,19 +151,6 @@ ${mini}
 <p><a href="${u('empresas/index.html')}">Para empresas</a> · <a href="${u('seguranca.html')}">Segurança e privacidade</a></p>
 </div>`,
       'empresa-nao-ve',
-    ),
-    secao(
-      `<h2 id="nao-e">O que a Clarevo não é</h2>
-<ul class="nao-e">
-<li>Não é banco e não guarda o seu dinheiro.</li>
-<li>Não movimenta dinheiro: não faz pagamentos nem transferências.</li>
-<li>Não oferece crédito.</li>
-<li>Não recomenda produtos financeiros.</li>
-<li>Não se conecta a contas bancárias.</li>
-<li>Não é atendimento de saúde e não substitui o acompanhamento de profissionais.</li>
-</ul>
-<p class="nota">A Clarevo é uma ferramenta de organização e de educação financeira. Ela não promete resultado financeiro nem de saúde, e as simulações são exemplos feitos com os números que você digita.</p>`,
-      'nao-e',
     ),
     secao(
       `<h2 id="mais">Aprender, calcular, ficar por dentro e tirar dúvidas</h2>

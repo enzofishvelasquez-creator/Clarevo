@@ -8,7 +8,7 @@
 const { URL_APP } = require('../config');
 const { esc } = require('../texto');
 const { rel } = require('../util');
-const { montarPagina, marcadoresEmHtml, bloco, celular } = require('../modelo');
+const { montarPagina, marcadoresEmHtml, bloco, celular, faixaDeConfianca } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
 
@@ -125,6 +125,19 @@ const RECURSOS = [
     ],
   },
   {
+    // D-115: o Espaço Negócio (D-113, `docs/52_ESPACO_NEGOCIO.md`), com a tela do cenário "negocio" da demonstração.
+    id: 'negocio',
+    titulo: 'Espaço Negócio',
+    guia: ['negocio'],
+    imagem: 'negocio',
+    itens: [
+      'Categorias próprias do negócio, como Vendas, Serviços, Material e mercadoria, Taxas e maquininha e Impostos e DAS.',
+      'Em Seu negócio, quanto entrou, quanto saiu e quanto sobrou no mês e nos últimos 6 meses, numa cor só, e as maiores saídas.',
+      'A Retirada para o Pessoal leva dinheiro do negócio para casa: sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.',
+      'Incluído no plano Individual: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.',
+    ],
+  },
+  {
     id: 'aprender',
     titulo: 'Aprender e calculadoras',
     guia: ['aprender', 'calculadoras'],
@@ -197,7 +210,8 @@ ${figura}
 <a class="botao botao-principal" href="${esc(URL_APP)}" rel="noopener noreferrer">Abrir a versão web</a>
 <a class="botao botao-suave" href="${u('ajuda/index.html')}">Ver a Ajuda</a>
 </div>
-<p class="lojas">Em breve na App Store e no Google Play.</p>`;
+<p class="lojas">Em breve na App Store e no Google Play.</p>
+${faixaDeConfianca(ARQUIVO)}`;
 
   const brutas = [
     bloco(
@@ -232,16 +246,6 @@ ${linhas}
 ${mais}
 </div>`,
       { rotulo: 'mais' },
-    ),
-    bloco(
-      `<h2 id="nao-faz">O que o app não faz</h2>
-<ul class="nao-e">
-<li>Não se conecta ao seu banco: tudo o que aparece foi anotado ou importado por você ou pelas pessoas da sua Família.</li>
-<li>Não movimenta dinheiro, não oferece crédito e não recomenda produtos financeiros.</li>
-<li>Não guarda o número completo do cartão, o código de segurança, a validade nem o CPF da nota.</li>
-</ul>
-<p class="nota">Saiba mais em <a href="${u('seguranca.html')}">Segurança e privacidade</a>.</p>`,
-      { variante: 'azul', rotulo: 'nao-faz' },
     ),
   ];
   return montarPagina({
