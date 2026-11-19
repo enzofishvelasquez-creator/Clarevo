@@ -559,7 +559,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `De tempos em tempos, use ${q(INVESTMENT_TEXT.detail.updateValue)} com o valor do extrato. É com ele que a Clarevo calcula quanto rendeu.`,
       `Em ${q(DETAILS_TEXT.sectionTitle)}, conte qual é o investimento, onde está, como rende, a taxa, o vencimento e quando pode resgatar. Aparecem os próximos vencimentos, a divisão da carteira, a garantia do FGC e o imposto estimado.`,
       `Com a taxa preenchida, o investimento mostra o valor pela taxa contratada, e ${q(ESTIMATE_TEXT.use)} registra esse valor só quando você toca. ${q(INVESTMENT_PLAN_TEXT.cardTitle)} mostra o aportado do mês ao lado do que você planejou, e ${q('Resumo para a declaração')} junta os valores em 31/12 e os rendimentos do ano.`,
-      `Logo abaixo do total, o card ${q(PERFORMANCE_TEXT.title)} compara cada investimento com o CDI e o IPCA do mesmo período, com dados públicos do Banco Central. Aportes e resgates não entram em Pago nem em Recebido, e os investimentos ficam só no seu Pessoal.`,
+      `No card ${q(PERFORMANCE_TEXT.title)}, logo abaixo do total, a rentabilidade compara os meses fechados com o CDI e o IPCA do mesmo período, com os dados públicos do Banco Central. Não é recomendação de investimento. Aportes e resgates não entram em Pago nem em Recebido, e os investimentos ficam só no seu Pessoal.`,
     ],
     screenName: TAB.investimentos,
     href: '/investimentos',
