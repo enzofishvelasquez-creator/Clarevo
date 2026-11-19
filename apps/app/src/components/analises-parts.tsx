@@ -579,8 +579,11 @@ export function EvolutionTab({ contextId, month, currentMonth, onOpen }: { conte
     if (!overview.data) return null;
     try {
       const view = buildEvolutionView({ overview: overview.data, metric: 'pago', windowMonths: 12, currentMonth, hiddenMonths });
-      // A prévia (auditoria de 18/11/2026): o Pago dos últimos 6 meses até o escolhido, na mesma escala, sem cor de ranking.
-      const recent = view.points.filter((pt) => pt.month <= month).slice(-6);
+      // A prévia (auditoria de 18/11/2026): o Pago dos últimos 6 meses até o escolhido, na mesma escala, sem cor de ranking, a partir do
+      // primeiro mês com registros (sem uma fila de "Sem registros" antes do histórico começar).
+      const last = view.points.filter((pt) => pt.month <= month).slice(-6);
+      const first = last.findIndex((pt) => pt.hasValue);
+      const recent = first < 0 ? [] : last.slice(first);
       return { summary: analysesEvolutionSummary(view, month), from: view.from, recent };
     } catch {
       // Linha que o banco nunca devolveria: erro, nunca um resumo com dado parcial.

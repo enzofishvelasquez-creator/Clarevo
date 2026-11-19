@@ -42,7 +42,8 @@ Migração: `supabase/migrations/20261117000004_espaco_negocio.sql` (0042). Núc
   outubro", "Anotar saída", "Anotar entrada", os filtros "Entradas" e "Saídas" e as linhas como "Saída" e "Entrada"; os formulários e o
   detalhe dizem "Anotar saída", "Editar entrada", "Data da saída". A renda comprometida (do Pessoal e da Família) não aparece no negócio,
   e "Gastos fixos e parcelamentos" dá exemplos do negócio (aluguel do ponto, DAS, maquininha, fornecedor). Ficam para depois, ainda com
-  Recebido e Pago no negócio: Análises, Evolução, a composição dos totais, a busca e as mensagens de salvar e excluir.
+  Recebido e Pago no negócio: a tela Evolução (os rádios "Recebido" e "Pago"), a composição dos totais, a busca e as mensagens de salvar
+  e excluir (as Análises já dizem "Saiu em outubro de 2026").
 - **Categorias do negócio.** Entradas: Vendas, Serviços, Outras entradas. Saídas: Material e mercadoria, Peças e ferramentas,
   Combustível e transporte, Funcionários e ajudantes, Impostos e DAS, Aluguel do ponto, Contas do ponto, Taxas e maquininha, Outras
   saídas. Sem subcategoria no negócio (para ficar leve). O orçamento do negócio usa as 9 de saída.
