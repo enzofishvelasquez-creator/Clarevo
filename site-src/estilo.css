@@ -523,22 +523,13 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
   .post-secao .post-tela.celular{max-width:13rem;margin:2.25rem 0 1.5rem}
 }
 
-/* Vídeos de uso do app (D-114 e D-115, 18/11/2026): cada vídeo fica na moldura de celular do bloco que ele mostra, no lugar da captura, e
-   toca sozinho, sem som, enquanto aparece (js/videos.js). O botão "Pausar" ou "Tocar" fica embaixo da legenda, fora da tela do celular
-   (44 px de altura, o foco de sempre). Sem JavaScript, não há botão: fica a capa. */
+/* Vídeos de uso do app (D-114 e D-115): cada vídeo fica na moldura de celular do bloco que ele mostra, no lugar da captura, e toca
+   sozinho, sem som, enquanto aparece (js/videos.js). Sem botão de pausar (Enzo, 19/11/2026): tocar no próprio vídeo pausa e toca de
+   novo, e pelo teclado o vídeo recebe foco e Enter ou Espaço fazem o mesmo (o foco de sempre). Sem JavaScript, fica a capa. */
 .celular-moldura{position:relative}
 .celular video{display:block;width:100%;height:auto;border-radius:30px;background:#F7F9FD;object-fit:cover}
-.video-botao{display:flex;align-items:center;justify-content:center;gap:.45rem;min-height:44px;margin:.35rem auto 0;padding:0 1rem;border:1px solid var(--contorno);border-radius:999px;background:transparent;color:var(--texto);font:inherit;font-size:.875rem;font-weight:700;line-height:1;cursor:pointer}
-.video-botao:hover{border-color:var(--link)}
-.video-botao-icone{display:inline-flex;align-items:center;gap:3px}
-.video-botao-icone::before,.video-botao-icone::after{content:"";display:block}
-.video-botao[data-estado="tocando"] .video-botao-icone::before,.video-botao[data-estado="tocando"] .video-botao-icone::after{width:4px;height:12px;border-radius:1px;background:currentColor}
-.video-botao[data-estado="parado"] .video-botao-icone::before{width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;border-color:transparent transparent transparent currentColor}
-.video-botao[data-estado="parado"] .video-botao-icone::after{display:none}
-.capa .video-botao{border-color:var(--sobre-topo);color:var(--sobre-topo)}
-/* Numa linha de cartões com vídeo e com captura, a captura reserva embaixo da legenda o lugar do botão, para as molduras ficarem na mesma
-   altura (o script marca o <html> com data-videos quando põe os botões; sem JavaScript, não há botão nem reserva). */
-:root[data-videos] :is(.mini,.grade):has(.celular-video) .cartao>.celular:not(.celular-video)>figcaption::after{content:"";display:block;height:calc(44px + .35rem)}
+.celular video[tabindex]{cursor:pointer}
+.celular video:focus-visible{outline-offset:4px;border-radius:30px}
 
 /* Ajuda */
 .busca{margin:0 0 1.5rem}
@@ -647,7 +638,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 }
 
 @media print{
-  .pular,.menu,.busca,.rodape-grade,.acoes,.tema-site,.video-botao,.confianca svg{display:none!important}
+  .pular,.menu,.busca,.rodape-grade,.acoes,.tema-site,.confianca svg{display:none!important}
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa::before{display:none}
