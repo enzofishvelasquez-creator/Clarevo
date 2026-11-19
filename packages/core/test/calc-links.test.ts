@@ -44,10 +44,12 @@ describe('links de contexto: ida e volta', () => {
     expect(calcLinkParams('multa-e-juros', { valorCents: 15_000, dias: 10 })).toEqual({ valor: '15000', dias: '10' });
   });
 
-  it('quitar-antes com prazos (dias separados por vírgula; vencidos viram 0)', () => {
+  it('quitar-antes com prazos (dias separados por vírgula; vencidas com dias negativos, revisão externa de 18/11/2026)', () => {
     const params = calcLinkParams('quitar-antes', { parcelaCents: 85_000, restantes: 3, prazosEmDias: [-4, 26, 57] });
-    expect(params).toEqual({ parcela: '85000', parcelas: '3', prazos: '0,26,57' });
-    expect(calcPrefill('quitar-antes', params)).toEqual({ parcela: '850,00', restantes: '3', prazosEmDias: [0, 26, 57] });
+    expect(params).toEqual({ parcela: '85000', parcelas: '3', prazos: '-4,26,57' });
+    expect(calcPrefill('quitar-antes', params)).toEqual({ parcela: '850,00', restantes: '3', prazosEmDias: [-4, 26, 57] });
+    expect(calcPrefill('quitar-antes', { prazos: '-0,5' })).toEqual({ restantes: '2', prazosEmDias: [0, 5] });
+    expect(calcPrefill('quitar-antes', { prazos: '--4,5' })).toEqual({});
     // Sem "parcelas": restantes = quantidade de prazos.
     expect(calcPrefill('quitar-antes', { prazos: '10,40' })).toEqual({ restantes: '2', prazosEmDias: [10, 40] });
     // Quantidade diferente: prazos ignorados.

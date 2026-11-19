@@ -2295,7 +2295,7 @@ setInterval(async () => {
   await typeIn('Taxa de juros ao mês do contrato (%)', '1,5');
   ok('financiamento: "Quitar antes" com 850,00 e 36 parcelas, contadas pelos vencimentos (R$ 23.389,42)', (await h1Name()) === 'Quitar antes ou adiantar parcelas' &&
     (await field('Valor da parcela').inputValue()) === '850,00' && (await field('Parcelas que faltam').inputValue()) === '36' &&
-    (await shows('Valor estimado para quitar hoje: R$ 23.389,42', 'Prazos contados pelos vencimentos das parcelas, com 30 dias por mês.')));
+    (await shows('Valor estimado para quitar hoje: R$ 23.389,42', 'Prazos contados pelos vencimentos das parcelas, com 30 dias por mês, uma convenção')));
   await calcShot('66_calc_quitar_financiamento');
   await keepResult();
   await btn('Voltar').click(); await waitText('Pagas antes da Clarevo');
