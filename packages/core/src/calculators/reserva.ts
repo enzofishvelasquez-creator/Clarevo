@@ -8,6 +8,9 @@ import { parseCount, parseMoney, parseOptionalMoney } from './inputs';
  * 6. Reserva para imprevistos (docs/08 §3.2). alvo = essenciais × meses; cobertura em décimos de mês =
  * piso(guardado × 10 ÷ essenciais); prazo = teto((alvo − guardado) ÷ por mês), dito nas hipóteses. Sem rendimento. Não diz onde
  * guardar.
+ *
+ * Revisão externa de 18/11/2026: falta = max(reserva − guardado, 0). Com falta 0, "reserva completa" e prazo 0 (nunca negativo); com
+ * falta e R$ 0,00 por mês, não há divisão: a frase diz que não há previsão com esse valor.
  */
 export type ReservaField = 'essenciais' | 'meses' | 'guardado' | 'mensal';
 
@@ -57,9 +60,11 @@ export interface ReservaResult extends CalcTexts {
   mensalCents: Cents | null;
   /** Meses cobertos pelo que já está guardado, em décimos (piso); null sem "já guardado". */
   coverageTenths: number | null;
-  /** alvo − guardado, nunca negativo. */
+  /** max(alvo − guardado, 0). */
   missingCents: Cents;
-  /** Meses até completar guardando "por mês"; null sem esse valor ou sem nada faltando. */
+  /** O que já está guardado cobre a reserva (falta 0). */
+  reached: boolean;
+  /** Meses até completar guardando "por mês": 0 com a reserva completa; null sem valor por mês ou com R$ 0,00 por mês e algo faltando. */
   monthsToTarget: number | null;
   reference: ReservaReference;
 }
@@ -93,7 +98,9 @@ export function calcReserva(input: ReservaInput): CalcOutcome<ReservaResult, Res
   const saved = guardado ?? 0;
   const missing = Math.max(0, target - saved);
   const coverageTenths = guardado === null ? null : Math.floor((guardado * 10) / essenciais);
-  const monthsToTarget = mensal !== null && mensal > 0 && missing > 0 ? monthsToReach(missing, mensal) : null;
+  const reached = missing === 0;
+  // Com falta 0, prazo 0; com algo faltando, só com um valor por mês maior que zero (sem divisão por zero).
+  const monthsToTarget = reached ? 0 : mensal !== null && mensal > 0 ? monthsToReach(missing, mensal) : null;
 
   const resultLines = [`Com estes números, a reserva de ${monthsCount(meses)} é de ${formatBRL(target)}.`];
   if (guardado !== null && guardado > 0) {
@@ -107,14 +114,16 @@ export function calcReserva(input: ReservaInput): CalcOutcome<ReservaResult, Res
       resultLines.push(`Faltam ${formatBRL(missing)}.`);
     }
   }
-  if (monthsToTarget !== null) {
+  if (monthsToTarget !== null && monthsToTarget > 0) {
     resultLines.push(`Guardando ${formatBRL(mensal!)} por mês, a reserva fica completa em ${monthsDuration(monthsToTarget)}.`);
+  } else if (!reached && mensal === 0) {
+    resultLines.push(`Guardando ${formatBRL(0)} por mês, não há previsão para completar a reserva.`);
   }
 
   const hypotheses = ['Sem rendimento: o valor guardado não cresce com juros.', 'Gastos essenciais iguais em todos os meses.'];
   if (guardado !== null && guardado > 0 && missing > 0) hypotheses.push('Meses cobertos arredondados para baixo, em décimos de mês.');
   // Revisão de 17/11/2026: o prazo é teto(falta ÷ por mês), como em "Juntar para um objetivo"; as hipóteses agora dizem isso.
-  if (monthsToTarget !== null) {
+  if (monthsToTarget !== null && monthsToTarget > 0) {
     hypotheses.push('O mesmo valor guardado todo mês.');
     if (missing % mensal! !== 0) hypotheses.push('Prazo em meses inteiros, para cima: no último mês, falta menos que o valor de cada mês.');
   }
@@ -128,6 +137,7 @@ export function calcReserva(input: ReservaInput): CalcOutcome<ReservaResult, Res
       mensalCents: mensal,
       coverageTenths,
       missingCents: missing,
+      reached,
       monthsToTarget,
       reference: RESERVA_REFERENCIA,
       resultLines,

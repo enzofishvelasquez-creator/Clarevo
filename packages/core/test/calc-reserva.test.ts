@@ -55,8 +55,11 @@ describe('5. Reserva para imprevistos (docs/08 §3.2)', () => {
   it('guardado que já cobre, menos de 0,1 mês e plural a partir de 2 meses', () => {
     const full = run({ essenciais: '1.000,00', meses: '3', guardado: '3.500,00', mensal: '100,00' });
     expect(full.resultLines[1]).toBe('O que você já guardou cobre a reserva de 3 meses.');
-    expect(full.monthsToTarget).toBeNull();
+    // Revisão externa de 18/11/2026: reserva completa, prazo 0 (nunca negativo).
+    expect(full.monthsToTarget).toBe(0);
+    expect(full.reached).toBe(true);
     expect(full.missingCents).toBe(0);
+    expect(full.resultLines.join(' ')).not.toMatch(/fica completa em/);
     expect(run({ essenciais: '1.000,00', meses: '3', guardado: '50,00' }).resultLines[1]).toBe(
       'O que você já guardou cobre menos de 0,1 mês de gastos essenciais.',
     );
@@ -68,6 +71,13 @@ describe('5. Reserva para imprevistos (docs/08 §3.2)', () => {
     );
     // Opcionais em branco ou zero não geram linhas.
     expect(run({ essenciais: '1.000,00', meses: '3', guardado: '0', mensal: '' }).resultLines).toHaveLength(1);
+  });
+
+  it('falta algo e R$ 0,00 por mês: resposta definida, sem divisão por zero (revisão externa de 18/11/2026)', () => {
+    const r = run({ essenciais: '1.000,00', meses: '3', guardado: '500,00', mensal: '0' });
+    expect([r.missingCents, r.monthsToTarget, r.reached]).toEqual([250_000, null, false]);
+    expect(r.resultLines.at(-1)).toBe('Guardando R$ 0,00 por mês, não há previsão para completar a reserva.');
+    expect(r.resultLines.join(' ')).not.toMatch(/NaN|Infinity/);
   });
 
   it('referência com fonte: sem link enquanto o endereço não for conferido, e sem número', () => {
