@@ -61,7 +61,7 @@ const IMAGENS = [
   // O Espaço Negócio (D-113) em O app (D-115): a tela Seu negócio do cenário "negocio" da demonstração, gravada por
   // `scripts/gravar-videos-site.js --capturas --telas negocio`, só no tema claro, como as outras telas de O app (com uma versão escura
   // só nela, o tema escuro mostrava um celular escuro entre os claros).
-  { id: 'negocio', origem: `${NOVIDADES}/negocio.png`, largura: LARGURA_CELULAR, alt: 'Tela Seu negócio do Sacolé da Maria, da demonstração: quanto entrou, quanto saiu e quanto sobrou em outubro, a frase do mês, Retirada para o Pessoal e os botões para anotar entrada e saída.' },
+  { id: 'negocio', origem: `${NOVIDADES}/negocio.png`, largura: LARGURA_CELULAR, alt: 'Tela do negócio Sacolé da Maria, da demonstração: quanto entrou, quanto saiu e quanto sobrou em outubro, a frase do mês, Retirada para o Pessoal e os botões para anotar entrada e saída.' },
   { id: 'empresa-licencas', origem: `${TELAS}/424_empresa_licencas.png`, largura: LARGURA_CELULAR, alt: 'Painel da empresa, lista de licenças com o e-mail convidado, a situação e a data de cada uma.' },
 ];
 

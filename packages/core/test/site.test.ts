@@ -900,7 +900,7 @@ describe('site público: as páginas geradas', () => {
   });
 
   // Espaço Negócio no site (D-115, a partir de D-113 e docs/52): o recurso em O app, com a tela da demonstração e o link da Ajuda, o
-  // cartão de "Para quem é" na página inicial e a página Planos. A tela de visão geral chama "Seu negócio" no texto novo do site.
+  // cartão de "Para quem é" na página inicial e a página Planos. O texto do site descreve a tela de visão geral sem o nome dela, que muda no app ("Seu negócio").
   it('Espaço Negócio: o recurso em O app (com a tela do cenário "negocio" nos dois temas), o cartão na página inicial e a Ajuda', () => {
     const app = html('app/index.html');
     const recurso = /<article class="recurso" id="negocio" aria-labelledby="t-negocio">[\s\S]*?<\/article>/.exec(app)?.[0] ?? '';
@@ -911,10 +911,10 @@ describe('site público: as páginas geradas', () => {
     // O app, na página inicial e em Planos.
     expect(recurso).toContain('<li>Incluído na assinatura: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.</li>');
     expect(recurso).toContain('Retirada para o Pessoal');
-    expect(recurso).toContain('Em Seu negócio, quanto entrou, quanto saiu e quanto sobrou');
+    expect(recurso).toContain('Numa tela própria do negócio, quanto entrou, quanto saiu e quanto sobrou');
     expect(recurso).toContain('href="../ajuda/negocio.html#guia-negocio"');
     // Só no tema claro, como as outras telas de O app (revisão: um celular escuro entre os claros parecia defeito).
-    expect(recurso).toMatch(/<img src="\.\.\/imagens\/negocio\.[0-9a-f]{10}\.png" alt="Tela Seu negócio do Sacolé da Maria/);
+    expect(recurso).toMatch(/<img src="\.\.\/imagens\/negocio\.[0-9a-f]{10}\.png" alt="Tela do negócio Sacolé da Maria/);
     expect(recurso).not.toContain('<picture>');
     expect([...gerado.arquivos.keys()].some((k) => k.startsWith('imagens/negocio-escura.'))).toBe(false);
     // Depois de Família.

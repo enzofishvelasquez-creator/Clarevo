@@ -132,7 +132,7 @@ const RECURSOS = [
     imagem: 'negocio',
     itens: [
       'Categorias próprias do negócio, como "Vendas", "Serviços", "Material e mercadoria", "Taxas e maquininha" e "Impostos e DAS".',
-      'Em Seu negócio, quanto entrou, quanto saiu e quanto sobrou no mês e nos últimos 6 meses, numa cor só, e as maiores saídas.',
+      'Numa tela própria do negócio, quanto entrou, quanto saiu e quanto sobrou no mês e nos últimos 6 meses, numa cor só, e as maiores saídas.',
       'A Retirada para o Pessoal leva dinheiro do negócio para casa: sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.',
       'Incluído na assinatura: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.',
     ],
