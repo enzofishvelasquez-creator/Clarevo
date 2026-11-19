@@ -33,9 +33,13 @@ describe('6. Juntar para um objetivo (docs/08 §3.2)', () => {
   });
 
   it('já tem o valor; "já tem" opcional; meses de 1 a 600', () => {
-    expect(run({ alvo: '1.000,00', jaTem: '1.000,00', modo: 'prazo', meses: '3' }).resultLines).toEqual([
-      'Com estes números, você já tem o valor do objetivo.',
-    ]);
+    // Revisão externa de 18/11/2026: meta atingida, R$ 0,00 por mês e prazo 0, nunca negativo, também com mais que a meta.
+    for (const jaTem of ['1.000,00', '1.100,00']) {
+      const reached = run({ alvo: '1.000,00', jaTem, modo: 'prazo', meses: '3' });
+      expect(reached.resultLines).toEqual(['Com estes números, você já tem o valor do objetivo: meta atingida, sem precisar guardar mais por mês.']);
+      expect([reached.reached, reached.missingCents, reached.monthlyCents, reached.months]).toEqual([true, 0, 0, 0]);
+      expect(run({ alvo: '1.000,00', jaTem, modo: 'mensal', mensal: '100,00' }).months).toBe(0);
+    }
     expect(run({ alvo: '1.000,00', modo: 'prazo', meses: '1' }).resultLines[0]).toBe('Com estes números, são R$ 1.000,00 por mês, por 1 mês.');
     const out = calcJuntarParaObjetivo({ alvo: '1.000,00', modo: 'prazo', meses: '601' });
     expect(out.ok ? null : out.errors).toEqual({ meses: 'fora_da_faixa' });

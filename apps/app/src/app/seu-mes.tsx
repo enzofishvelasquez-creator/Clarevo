@@ -20,6 +20,7 @@ import { MonthStepper } from '@/components/month-stepper';
 import { SeuMesCardView } from '@/components/seu-mes-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { useContextChange } from '@/lib/context-change';
 import { announceOnIOS } from '@/lib/a11y';
 import { useSeuMes, useWork, useView } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -54,6 +55,8 @@ export default function SeuMesScreen() {
   const work = useWork().data;
   const contextId = work?.contextId;
   const view = useSeuMes(contextId, month);
+  // Outro espaço pela pílula (D-113b): começa de novo, no primeiro cartão.
+  useContextChange(contextId, () => setStep((s) => ({ ...s, index: 0, direction: 1 })));
   const prev = seuMesStep(month, currentMonth, -1);
   const next = seuMesStep(month, currentMonth, 1);
   const goMonth = (m: IsoMonth) => setStep({ month: m, index: 0, direction: m >= month ? 1 : -1 });
@@ -66,7 +69,7 @@ export default function SeuMesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={SEU_MES_TEXT.title} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title={SEU_MES_TEXT.title} right={<ContextPill label="Pessoal" switchable />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <View style={{ gap: space[1] }}>
           <MonthStepper

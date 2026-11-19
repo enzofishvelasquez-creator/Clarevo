@@ -159,22 +159,24 @@ lançamentos, as contas, os investimentos e as metas de teste no fim e voltar o 
 ### L. Espaço Negócio (D-113, 17/11/2026)
 
 Os números seguem depois dos da seção K. Precisa da migração 0042 aplicada (`docs/05`, passo 12ai). No fim, encerrar o negócio de teste
-(Como está o negócio > "Encerrar o espaço Negócio") e excluir a retirada e os lançamentos de teste do Pessoal.
+(Seu negócio > "Encerrar o espaço Negócio") e excluir a retirada e os lançamentos de teste do Pessoal.
 
 | # | O que fazer | O esperado |
 | --- | --- | --- |
 | 76 | Conta > card "Espaço Negócio" > "Criar o espaço Negócio" > nome "Negócio de teste" > "Criar o espaço Negócio" | O card explica para quem é (CNPJ ou trabalho por conta) e que o plano inclui um negócio por pessoa; depois de criar, o nome aparece no seletor do topo do Resumo, de Movimentos e de Metas, ao lado de "Pessoal" |
-| 77 | Escolher o negócio no seletor > Movimentos > "Registrar recebimento" de R$ 200,00 em "Vendas"; depois "Anotar gasto" de R$ 50,00 em "Material e mercadoria" | A pílula diz "Salvando em Negócio de teste"; as categorias são as do negócio (sem subcategoria); o Resumo do negócio mostra os dois lançamentos, e o Resumo do Pessoal não muda |
-| 78 | No negócio, Resumo > card "Como está o negócio" | Entrou R$ 200,00, Saiu R$ 50,00 e Sobrou R$ 150,00, numa cor só, com a frase de fato ("Neste mês, entrou R$ 150,00 a mais do que saiu."), os últimos meses, as maiores saídas e o lembrete de que a Clarevo não faz contabilidade nem cálculo de impostos; com "Ocultar valores", tudo vira R$ •••• |
-| 79 | Em "Como está o negócio" > "Retirada para o Pessoal" > R$ 100,00 > "Salvar retirada"; depois, no Pessoal, abrir o recebimento "Retirada de Negócio de teste" e excluir a retirada | O negócio mostra a retirada à parte ("Não entram em Saiu") e Saiu continua R$ 50,00; o Pessoal ganha um recebimento de R$ 100,00 que não se edita; excluir pede confirmação e tira os dois lados juntos |
+| 77 | Escolher o negócio no seletor > Movimentos > "Anotar entrada" de R$ 200,00 em "Vendas"; depois "Anotar saída" de R$ 50,00 em "Material e mercadoria" | A pílula diz "Salvando em Negócio de teste"; as categorias são as do negócio (sem subcategoria); no negócio, o vocabulário é de entradas e saídas (Entrou, Saiu, Sobrou, sem Recebido, Pago nem a renda comprometida); o Resumo do negócio mostra os dois lançamentos, e o Resumo do Pessoal não muda |
+| 78 | No negócio, Resumo > card "Seu negócio" > "Ver seu negócio" | Entrou R$ 200,00, Saiu R$ 50,00 e Sobrou R$ 150,00, numa cor só, com a frase de fato ("Neste mês, entrou R$ 150,00 a mais do que saiu."), os últimos meses, as maiores saídas e o lembrete de que a Clarevo não faz contabilidade nem cálculo de impostos; com "Ocultar valores", tudo vira R$ •••• |
+| 79 | Em "Seu negócio" > "Retirada para o Pessoal" > R$ 100,00 > "Salvar retirada"; depois, no Pessoal, abrir o recebimento "Retirada de Negócio de teste" e excluir a retirada | O negócio mostra a retirada à parte ("Não entram em Saiu") e Saiu continua R$ 50,00; o Pessoal ganha um recebimento de R$ 100,00 que não se edita; excluir pede confirmação e tira os dois lados juntos |
 | 80 | No Pessoal, um gasto comum de teste > detalhe > "Mover para o espaço Negócio" > categoria e conta do negócio > "Mover"; depois, no negócio, "Mover para o Pessoal" | O lançamento sai do Pessoal e aparece no negócio com a categoria escolhida (e volta); um pagamento de conta a pagar ou de fatura não oferece mover |
 | 81 | Com o negócio escolhido, abrir Metas e Investir; mandar "15 café" pelo Telegram (se ligado) | Metas e Investir explicam que ficam no Pessoal, com "Ir para o Pessoal"; a anotação do Telegram vai para o espaço ligado ao canal (Pessoal ou Família), nunca para o negócio, e Conta › Telegram não oferece o negócio |
+| 82 | Antes do item 76, numa conta só com o Pessoal: Resumo > o "+" ao lado de "Pessoal" (D-113b) | O seletor aparece mesmo só com o Pessoal; o "+" (nome lido "Criar um espaço: Negócio ou Família") abre a folha "Criar um espaço" com "Espaço Negócio" ("Para quem tem CNPJ ou trabalha por conta.") e "Família"; "Espaço Negócio" abre a criação do negócio; "Fechar" não muda nada |
+| 83 | Com o negócio criado, Movimentos > "Análises" > tocar na pílula "Pessoal" no alto > escolher o negócio; depois voltar ao Pessoal pela pílula | A pílula tem a seta para baixo e abre "Escolher o espaço" (Pessoal marcado, o negócio e, sem Família, "Criar um espaço" com a Família); escolher troca os números de Análises para os do negócio na mesma tela, e o seletor do Resumo acompanha; num formulário, a pílula não abre nada |
 
 ## 2. Só no iPhone (quando houver TestFlight)
 
 | # | O que fazer | O esperado |
 | --- | --- | --- |
-| 50 | Os itens 1 a 49 e 54 a 81 com o VoiceOver no lugar do TalkBack e o iCloud no lugar do Google Drive | O mesmo esperado |
+| 50 | Os itens 1 a 49 e 54 a 83 com o VoiceOver no lugar do TalkBack e o iCloud no lugar do Google Drive | O mesmo esperado |
 | 51 | Widget: tela Hoje, StandBy e tela bloqueada | Com valores ocultos, nada de valor nem nome; ligados, o iOS pode esconder (conferir) |
 | 52 | Escolher foto, compartilhar e as telas do sistema dentro do app | Em português |
 | 53 | Ler comprovante > "Tirar uma foto" | A câmera abre depois da folha, sem travar |

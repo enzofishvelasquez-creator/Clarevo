@@ -6,32 +6,56 @@ separado** ("Espaço Negócio", e não uma marca nos lançamentos), **incluído 
 mais). A Elis pediu que seja **leve e não vire contabilidade**: a pessoa dá o nome do negócio, anota o que entrou e o que saiu e vê,
 numa visão separada, quanto entrou, quanto saiu e quanto sobrou, e se o negócio está rendendo mais do que custa, sem julgamento.
 
+**D-113b (18/11/2026, retorno de quem testa).** No alto de Análises ("Pessoal · Novembro de 2026"), uma pessoa perguntou "Como eu mudo a
+versão do pessoal para o de negócios?", e o espaço Negócio só se criava por um card de Conta. Pedido do Enzo, repassado pela coordenação:
+deixar a troca de espaço à vista. Mudanças: o seletor de espaço sempre à vista nas abas, com o "+" e a folha "Criar um espaço"; a pílula
+que troca o espaço nas telas de consulta; o card de Conta junto da Família; "Tem um negócio?" em "Primeiros passos"; e o nome "Seu negócio"
+no lugar de "Como está o negócio" (detalhes na seção 1). Ainda sem linha própria em `docs/00`: registrar lá depois da confirmação do Enzo.
+
 Migração: `supabase/migrations/20261117000004_espaco_negocio.sql` (0042). Núcleo: `packages/core/src/business.ts`. Telas:
 `apps/app/src/app/negocio/` (index, novo, retirada, nome) e `apps/app/src/app/registro/[id]/mover.tsx`. Testes:
 `supabase/tests/99zzzzzzzzzzzzzzzzzzzzz_negocio.sql`, `packages/core/test/business.test.ts` e o bloco "Espaço Negócio (D-113)" de
-`scripts/e2e-web.js` (capturas 730 a 739).
+`scripts/e2e-web.js` (capturas 730 a 739 e, do seletor sempre à vista, 740 a 744).
 
 ## 1. O que a pessoa vê
 
-- **Criar.** Em Conta, o card "Espaço Negócio" explica para quem é ("Para quem tem CNPJ ou trabalha por conta: anote o que entra e o
-  que sai do negócio num espaço separado do Pessoal e veja quanto sobrou no mês. Incluído no plano, um negócio por pessoa.") e leva a
-  "Criar o espaço Negócio": só o nome (1 a 60 caracteres, por exemplo "Sacolé da Mãe"). O negócio nasce com a "Conta do negócio" (bancos
-  e carteira, D-043).
-- **Seletor de espaço.** O nome do negócio entra no seletor do topo das abas (Resumo, Movimentos e Metas), ao lado de "Pessoal" e da
-  Família, se houver. Com o negócio escolhido, as telas de sempre funcionam no negócio: gastos e recebimentos, contas a pagar, gastos
-  fixos e parcelamentos, cartões (um cartão do negócio), bancos e carteira, importação de extrato e fatura, orçamento por categoria,
-  calendário, busca, Análises e Evolução. A pílula do contexto diz o nome do negócio ("Salvando em Sacolé da Mãe").
+- **Criar.** Três caminhos (D-113b, 18/11/2026): o "+" do seletor de espaço, no topo de Resumo, Movimentos e Metas, abre a folha "Criar
+  um espaço" com "Espaço Negócio" ("Para quem tem CNPJ ou trabalha por conta.") e "Família"; a linha "Tem um negócio? Crie o espaço
+  Negócio" no fim de "Primeiros passos" (conta nova, só para quem ainda não tem negócio, sem contar como passo); e, em Conta, o card
+  "Espaço Negócio", logo depois da assinatura e ao lado do card da Família, que explica para quem é ("Para quem tem CNPJ ou trabalha por
+  conta: anote o que entra e o que sai do negócio num espaço separado do Pessoal e veja quanto sobrou no mês. Incluído no plano, um
+  negócio por pessoa."). Todos levam a "Criar o espaço Negócio": só o nome (1 a 60 caracteres, por exemplo "Sacolé da Mãe"). O negócio
+  nasce com a "Conta do negócio" (bancos e carteira, D-043).
+- **Seletor de espaço.** Sempre à vista nas abas que dependem do espaço (Resumo, Movimentos e Metas), mesmo só com o Pessoal (D-113b:
+  numa conta só com o Pessoal, ele mostra "Pessoal" escolhido e o "+", enquanto houver um espaço para criar). O nome do negócio entra no
+  seletor ao lado de "Pessoal" e da Família, se houver (nome longo cortado com reticências, inteiro no nome lido pelo leitor de tela).
+  Investir é só do Pessoal e não tem o seletor. Com o negócio escolhido, as telas de sempre funcionam no negócio: gastos e recebimentos,
+  contas a pagar, gastos fixos e parcelamentos, cartões (um cartão do negócio), bancos e carteira, importação de extrato e fatura,
+  orçamento por categoria, calendário, busca, Análises e Evolução. A pílula do contexto diz o nome do negócio ("Salvando em Sacolé da
+  Mãe"). Nas telas de consulta que leem o espaço (Análises, Calendário do mês, Evolução, Contas a pagar e Contas vencidas, Cartões,
+  Orçamento, busca, Gastos fixos e assinaturas, a composição dos totais, Seu mês e Bancos e carteira em Conta), a pílula tem uma seta para
+  baixo e abre a folha "Escolher o espaço": trocar ali troca o espaço do app todo, e a tela lê de novo os dados do espaço escolhido.
+  Formulários e detalhes mantêm a pílula fixa (o espaço não muda no meio de um preenchimento).
+- **Vocabulário do negócio (auditoria visual de 18/11/2026).** No espaço Negócio, as telas de sempre falam de entradas e saídas, como em
+  "Seu negócio": no Resumo, "Sobrou" (com retirada no mês, "Ficou no negócio"), "Entrou" e "Saiu" (com retirada, "Saiu, com retiradas",
+  porque ali a retirada conta como saída do negócio), "Saídas do mês" e "Anotar saída"; em Movimentos, "Entrou em outubro", "Saiu em
+  outubro", "Anotar saída", "Anotar entrada", os filtros "Entradas" e "Saídas" e as linhas como "Saída" e "Entrada"; os formulários e o
+  detalhe dizem "Anotar saída", "Editar entrada", "Data da saída". A renda comprometida (do Pessoal e da Família) não aparece no negócio,
+  e "Gastos fixos e parcelamentos" dá exemplos do negócio (aluguel do ponto, DAS, maquininha, fornecedor). Ficam para depois, ainda com
+  Recebido e Pago no negócio: a tela Evolução (os rádios "Recebido" e "Pago"), a composição dos totais, a busca e as mensagens de salvar
+  e excluir (as Análises já dizem "Saiu em outubro de 2026").
 - **Categorias do negócio.** Entradas: Vendas, Serviços, Outras entradas. Saídas: Material e mercadoria, Peças e ferramentas,
   Combustível e transporte, Funcionários e ajudantes, Impostos e DAS, Aluguel do ponto, Contas do ponto, Taxas e maquininha, Outras
   saídas. Sem subcategoria no negócio (para ficar leve). O orçamento do negócio usa as 9 de saída.
-- **Como está o negócio** (`/negocio`, também pelo card no Resumo do negócio e por Conta): o mês com Entrou, Saiu e Sobrou numa cor só,
+- **Seu negócio** (`/negocio`, também pelo card "Seu negócio" no Resumo do negócio e por "Ver seu negócio" em Conta; até 18/11/2026 a
+  tela se chamava "Como está o negócio"): o mês com Entrou, Saiu e Sobrou numa cor só,
   a frase de fato ("Neste mês, entrou R$ 342,00 a mais do que saiu." ou "Neste mês, saiu R$ 300,00 a mais do que entrou."), as
   retiradas à parte, os últimos 6 meses (com a frase do período: "De maio a outubro de 2026, entrou mais do que saiu em 2 dos 2 meses
   com anotações. Somando, ...") e as maiores saídas do mês por categoria. Lembrete fixo: "Os valores são os que você anotou. A Clarevo não
   faz contabilidade nem cálculo de impostos."
 - **Retirada para o Pessoal.** Quando a pessoa leva dinheiro do negócio para casa: o valor sai do negócio (gasto "Retirada para o
   Pessoal") e entra no Pessoal como recebimento ("Retirada do negócio"), os dois gravados juntos e ligados. Cada lado conta uma vez no
-  próprio espaço (no Resumo do negócio, o dinheiro saiu; no Pessoal, entrou). Em "Como está o negócio", a retirada **não entra em Saiu**
+  próprio espaço (no Resumo do negócio, o dinheiro saiu; no Pessoal, entrou). Em "Seu negócio", a retirada **não entra em Saiu**
   (não é custo do negócio): aparece à parte ("Retiradas para o Pessoal: R$ 300,00. Não entram em Saiu: é o dinheiro do negócio que foi para
   o Pessoal.") com o que ficou no negócio. A retirada não se edita: exclui-se (os dois lados saem juntos) e anota-se de novo.
 - **Mover.** No detalhe de um lançamento comum: "Mover para o espaço Negócio" (no Pessoal) ou "Mover para o Pessoal" (no negócio), para
@@ -39,7 +63,7 @@ Migração: `supabase/migrations/20261117000004_espaco_negocio.sql` (0042). Núc
   investimento ou retirada) não muda de espaço.
 - **Fora do negócio.** Metas e Investir mostram, no negócio, uma explicação curta e "Ir para o Pessoal". WhatsApp e Telegram não anotam
   no negócio (continuam no espaço ligado, Pessoal ou Família; dito na tela do negócio, e o banco recusa ligar um canal ao negócio, D-113a). Exportar meus dados ganha a escolha do espaço (Pessoal ou o negócio).
-- **Nome e encerrar.** "Mudar o nome" e "Encerrar o espaço Negócio" ficam em "Como está o negócio". Encerrar tira o espaço do app; os
+- **Nome e encerrar.** "Mudar o nome" e "Encerrar o espaço Negócio" ficam em "Seu negócio". Encerrar tira o espaço do app; os
   lançamentos ficam guardados, sem leitura, e são apagados de vez depois de 6 meses (como a Família encerrada); as retiradas que já estão
   no Pessoal continuam lá, como recebimentos comuns. Depois de encerrar, pode criar outro.
 - **Quem vê.** Só a própria pessoa. A Família não vê o negócio, e o negócio não vê a Família.
@@ -78,12 +102,13 @@ Migração: `supabase/migrations/20261117000004_espaco_negocio.sql` (0042). Núc
 
 ## 3. Demonstração
 
-A demonstração padrão **não muda** (sem seletor de espaço no Resumo, os totais de sempre): ela deixa criar um negócio, só na memória do
-aparelho. O negócio de exemplo, **"Sacolé da Maria"** (fictício), mora no cenário `?cenario=negocio`: setembro de 2026 com R$ 1.760,00 de
+A demonstração padrão não tem negócio (os totais de sempre; desde a D-113b, o seletor de espaço aparece com "Pessoal" e o "+"): ela deixa
+criar um negócio, só na memória do aparelho. O negócio de exemplo, **"Sacolé da Maria"** (fictício), mora no cenário `?cenario=negocio`: setembro de 2026 com R$ 1.760,00 de
 entradas e R$ 601,00 de saídas; outubro (até 07/10) com R$ 760,00 e R$ 418,00, maior saída Material e mercadoria. Nenhum total do Pessoal
 muda (6.000 / 3.900 / 2.100 e 650 em outubro). O cenário não traz retirada (ela mudaria o Recebido do Pessoal): o roteiro de telas cria e
-exclui uma. Motivo de não pôr o negócio na demonstração padrão: o seletor de espaço apareceria no Resumo e em Movimentos e mudaria as
-posições que dezenas de verificações de telas conferem (a barra de abas, o primeiro movimento à vista sem rolar).
+exclui uma. Motivo de não pôr o negócio na demonstração padrão: ele mudaria telas e números que dezenas de verificações de telas conferem. Com
+o seletor sempre à vista (D-113b), o mês do Resumo e de Movimentos ficou 8 px abaixo do seletor (antes 20 px), para o primeiro movimento
+continuar à vista sem rolar em 390 × 844.
 
 ## 4. O que ficou para depois
 
@@ -141,4 +166,6 @@ pessoa (a Clarevo não envia nada); se o Plus muda a relação de consumo (CDC) 
   encerrar, só ver e exportar, exclusão da conta e a limpeza dos 6 meses). As listas de funções e ações dos testes antigos ganharam as 6
   novas (113 funções do app e 91 ações no 99_exclusao).
 - Núcleo: `packages/core/test/business.test.ts` (categorias, regras, frases sem julgamento, o repositório em memória e a demonstração).
-- Telas: bloco "Espaço Negócio (D-113)" em `scripts/e2e-web.js`, logo antes do bloco do Tema (D-112), capturas 730 a 739.
+- Telas: bloco "Espaço Negócio (D-113)" em `scripts/e2e-web.js`, logo antes do bloco do Tema (D-112), capturas 730 a 739; o seletor
+  sempre à vista, o "+", a folha e a troca pela pílula de Análises (D-113b), capturas 740 a 744; a linha de "Primeiros passos" e o seletor
+  só com o Pessoal também nos blocos de "Primeiros passos" e da Família. Núcleo: `packages/core/test/spaces.test.ts`.

@@ -1,6 +1,6 @@
 import type { IsoDate } from '../dates';
 import { daysBetween } from '../dates';
-import { isCommitmentOverdue } from '../dia-util';
+import { effectiveOverdue, isCommitmentOverdue } from '../dia-util';
 import { MAX_RECORD_CENTS, centsToInput, type Cents } from '../money';
 import type { Commitment, CommitmentSeries } from '../records';
 import { DEBT_NATURES } from '../records';
@@ -106,7 +106,8 @@ export function calcLinkParams<S extends CalcSlug>(slug: S, values: CalcLinkValu
       put(out, 'parcela', x.parcelaCents);
       put(out, 'parcelas', x.restantes);
       put(out, 'modo', x.modo);
-      if (x.prazosEmDias && x.prazosEmDias.length > 0) out.prazos = x.prazosEmDias.map((d) => Math.max(0, Math.round(d))).join(',');
+      // Vencidas vão com dias negativos (revisão externa de 18/11/2026): a calculadora as separa, sem desconto.
+      if (x.prazosEmDias && x.prazosEmDias.length > 0) out.prazos = x.prazosEmDias.map((d) => Math.round(d)).join(',');
       break;
     }
     case 'multa-e-juros': {
@@ -171,9 +172,9 @@ function oneOf<T extends string>(params: RouteParams, key: string, options: read
 
 function daysList(params: RouteParams): number[] | undefined {
   const value = first(params, 'prazos');
-  if (value === undefined || !/^\d{1,5}(,\d{1,5})*$/.test(value)) return undefined;
+  if (value === undefined || !/^-?\d{1,5}(,-?\d{1,5})*$/.test(value)) return undefined;
   const list = value.split(',').map(Number);
-  return list.length <= PRAZOS_MAX && list.every((d) => d <= DAYS_MAX) ? list : undefined;
+  return list.length <= PRAZOS_MAX && list.every((d) => d <= DAYS_MAX && d >= -DAYS_MAX) ? list.map((d) => (Object.is(d, -0) ? 0 : d)) : undefined;
 }
 
 /** Tira as chaves sem valor (para os testes de ida e volta compararem só o que veio). */
@@ -253,9 +254,10 @@ export function calcPrefill(slug: string, params: RouteParams): CalcPrefill<Calc
 
 /**
  * "Quanto economizo se quitar antes?" no detalhe de um parcelamento de financiamento ou compra parcelada com parcelas
- * em aberto: valor da próxima parcela, quantas faltam e os dias até cada vencimento (as já vencidas contam 0).
- * Mesmas listas de installmentProgress. Outros tipos (gasto fixo, conta do ano, imposto ou outro parcelamento),
- * sem término ou sem parcelas faltando: null.
+ * em aberto: valor da próxima parcela, quantas faltam e os dias até cada vencimento. As já vencidas de verdade (D-061: depois do
+ * último dia em dia, que pode ser o próximo dia útil) vão com dias negativos, no mínimo -1, e a calculadora as deixa fora do
+ * desconto (revisão externa de 18/11/2026); as outras, no mínimo 0. Mesmas listas de installmentProgress. Outros tipos (gasto fixo,
+ * conta do ano, imposto ou outro parcelamento), sem término ou sem parcelas faltando: null.
  */
 export function quitarAntesLink(
   s: Pick<CommitmentSeries, 'id' | 'kind' | 'nature' | 'firstDueMonth' | 'firstNumber' | 'lastNumber' | 'partsPerYear' | 'terms' | 'skippedNumbers'> &
@@ -270,7 +272,9 @@ export function quitarAntesLink(
   return {
     parcelaCents: items[0]!.amountCents,
     restantes: items.length,
-    prazosEmDias: items.map((x) => Math.max(0, daysBetween(today, x.dueOn))),
+    prazosEmDias: items.map((x) =>
+      effectiveOverdue(x.dueOn, 'parcelamento', today) ? Math.min(-1, daysBetween(today, x.dueOn)) : Math.max(0, daysBetween(today, x.dueOn)),
+    ),
     origem: 'serie',
   };
 }

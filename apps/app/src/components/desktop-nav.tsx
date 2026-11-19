@@ -1,4 +1,4 @@
-import { BAR_TEXT, barModeFor, topicTabFor } from '@clarevo/core';
+import { BAR_TEXT, BUSINESS_WORDS, barModeFor, topicTabFor } from '@clarevo/core';
 import { router, usePathname } from 'expo-router';
 import { Eye, EyeOff, MonitorSmartphone, Plus } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -44,7 +44,8 @@ export function DesktopNav() {
       </View>
       {canWrite ? (
         <Button
-          label="Anotar gasto"
+          // No espaço Negócio, "Anotar saída" (auditoria de 18/11/2026).
+          label={work?.contextKind === 'negocio' ? BUSINESS_WORDS.addOut : 'Anotar gasto'}
           icon={Plus}
           // Com o formulário já aberto, não abre outro igual por cima.
           onPress={() => (path === '/registro/novo' ? undefined : router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } }))}

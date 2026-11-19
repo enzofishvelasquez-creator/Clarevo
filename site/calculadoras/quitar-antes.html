@@ -29,7 +29,6 @@
 <link rel="modulepreload" href="definicoes/quitar-antes.js">
 <link rel="modulepreload" href="../js/nucleo/calculators/catalog.js">
 <link rel="modulepreload" href="../js/nucleo/calculators/common.js">
-<link rel="modulepreload" href="../js/nucleo/calculators/custo-da-divida.js">
 <link rel="modulepreload" href="../js/nucleo/calculators/inputs.js">
 <link rel="modulepreload" href="../js/nucleo/calculators/quitar-antes.js">
 <link rel="modulepreload" href="../js/nucleo/dates.js">
@@ -73,7 +72,7 @@
 <ul>
 <li><strong>Valor da parcela.</strong></li>
 <li><strong>Parcelas que faltam.</strong> De 1 a 480.</li>
-<li><strong>Taxa de juros ao mês do contrato (%).</strong> Está no contrato ou no extrato.</li>
+<li><strong>Taxa de juros ao mês do contrato (%).</strong> A taxa efetiva de juros ao mês, não o CET. Está no contrato ou no extrato.</li>
 <li><strong>O que você quer simular?.</strong> Opções: Quitar tudo, Adiantar as últimas.</li>
 <li><strong>Quantas das últimas.</strong></li>
 </ul>
@@ -104,8 +103,8 @@
 <h4>Hipóteses</h4>
 <ul>
 <li>Próxima parcela em 1 mês e as outras a cada mês.</li>
-<li>Juros descontados pela taxa ao mês informada, com juros compostos.</li>
-<li>Todas as parcelas com o mesmo valor, sem tarifas e IOF.</li>
+<li>Juros descontados pela taxa efetiva de juros ao mês do contrato, com juros compostos.</li>
+<li>Parcelas e taxa fixas, sem tarifas e IOF. Em contratos pela tabela SAC, corrigidos por índice (como IPCA ou TR), com seguros variáveis ou parcelas diferentes, o valor da instituição pode ser bem diferente.</li>
 </ul>
 </section>
 <p class="nota">Tudo é calculado no seu navegador, com o mesmo código do app, e nada é enviado nem guardado. No app, algumas calculadoras também oferecem atalhos para guardar o que você calculou, como anotar um parcelamento ou criar uma meta. <a href="index.html">Ver todas as calculadoras</a>.</p>

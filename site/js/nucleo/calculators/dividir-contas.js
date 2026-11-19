@@ -39,7 +39,14 @@ export const DIVIDIR_FIELDS = {
         errors: { fora_da_faixa: 'Divida entre 2 e 6 pessoas.' },
     },
     apelido: { label: 'Apelido', hint: DIVIDIR_TEXT.nicknameHint, kind: 'texto', optional: true, errors: { longo: 'Use no máximo 20 caracteres.' } },
-    renda: moneyField('Renda', 'a renda desta pessoa', '4.000,00'),
+    renda: moneyField('Renda', 'a renda desta pessoa', '4.000,00', {
+        errors: { zero: 'Informe ao menos uma renda maior que zero, ou escolha "Em partes iguais".' },
+    }),
+};
+export const DIVIDIR_NOTES = {
+    roundedPercents: 'Percentuais arredondados com uma casa: a soma pode dar 99,9% ou 100,1%, mas os valores em reais fecham com o total.',
+    aboveIncome: 'O total das contas passa da soma das rendas informadas: a divisão pede mais de 100% da renda de cada pessoa. A conta mostra a divisão, sem dizer se dá para pagar.',
+    zeroIncome: (names) => `${names}: renda zero, então a parte é R$ 0,00.`,
 };
 const incomeShareText = (tenths) => (tenths === 0 ? 'menos de 0,1%' : `cerca de ${formatTenths(tenths)}`);
 export function calcDividirContas(input) {
@@ -54,7 +61,9 @@ export function calcDividirContas(input) {
             r.fail(`apelido.${i}`, 'longo');
         return personName(p.apelido, i);
     });
-    const incomes = modo === 'renda' ? input.pessoas.map((p, i) => r.read(`renda.${i}`, parseMoney(p.renda ?? ''))) : [];
+    const incomes = modo === 'renda' ? input.pessoas.map((p, i) => r.read(`renda.${i}`, parseMoney(p.renda ?? '', { allowZero: true }))) : [];
+    if (modo === 'renda' && incomes.length > 0 && incomes.every((x) => x === 0))
+        incomes.forEach((_, i) => r.fail(`renda.${i}`, 'zero'));
     if (!r.ok || total === undefined || modo === undefined)
         return { ok: false, errors: r.errors };
     const weights = modo === 'renda' ? incomes : names.map(() => 1);
@@ -64,12 +73,19 @@ export function calcDividirContas(input) {
         return { name: names[i], cents, tenths, line: `${names[i]}: ${formatBRL(cents)} (${formatTenths(tenths)})` };
     });
     const incomeSum = weights.reduce((a, b) => a + b, 0);
+    const incomeShare = modo === 'renda' ? percentTenths(total, incomeSum) : 0;
     const hypotheses = modo === 'iguais'
         ? ['Partes iguais. Os centavos que sobram vão para as primeiras pessoas da lista.']
         : [
-            `Cada pessoa põe a mesma parte da própria renda: ${incomeShareText(percentTenths(total, incomeSum))}.`,
+            `Cada pessoa põe a mesma parte da própria renda: ${incomeShareText(incomeShare)}.`,
             'Os centavos que sobram vão para quem tem a maior fração, para a soma fechar com o total.',
         ];
+    const zeroNames = modo === 'renda' ? names.filter((_, i) => weights[i] === 0) : [];
+    if (zeroNames.length > 0)
+        hypotheses.push(DIVIDIR_NOTES.zeroIncome(zeroNames.join(', ')));
+    if (people.reduce((sum, p) => sum + p.tenths, 0) !== 1000)
+        hypotheses.push(DIVIDIR_NOTES.roundedPercents);
+    const aboveIncome = modo === 'renda' && total > incomeSum;
     return {
         ok: true,
         result: {
@@ -78,7 +94,10 @@ export function calcDividirContas(input) {
             people,
             resultLines: ['Com estes números, a divisão fica assim:', ...people.map((p) => p.line)],
             hypotheses,
-            notes: [modo === 'renda' ? 'Os apelidos e as rendas ficam só nesta tela e não são gravados.' : 'Os apelidos ficam só nesta tela e não são gravados.'],
+            notes: [
+                ...(aboveIncome ? [DIVIDIR_NOTES.aboveIncome] : []),
+                modo === 'renda' ? 'Os apelidos e as rendas ficam só nesta tela e não são gravados.' : 'Os apelidos ficam só nesta tela e não são gravados.',
+            ],
         },
     };
 }

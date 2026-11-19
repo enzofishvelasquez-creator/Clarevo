@@ -1,6 +1,6 @@
-import { DEMO_PILL_MAX_FONT_SCALE, SUMMARY_NAV_TEXT, addMonths, contextLabelFor, contextPillText, formatMonthBR } from '@clarevo/core';
+import { DEMO_PILL_MAX_FONT_SCALE, SPACE_TEXT, SUMMARY_NAV_TEXT, addMonths, contextLabelFor, contextPillText, formatMonthBR, type SpaceChoice } from '@clarevo/core';
 import { router } from 'expo-router';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eye, EyeOff, Store, Users } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Plus, Store, Users } from 'lucide-react-native';
 import { useContext, useEffect, useState, type ReactNode } from 'react';
 import { PixelRatio, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -9,14 +9,14 @@ import { Logo } from '@/components/brand';
 import { InPanelContext } from '@/components/form-panel';
 import { HelpButton } from '@/components/help-button';
 import { yearA11yLabel } from '@/components/series-parts';
+import { SpaceSheet, useSpaceChoices } from '@/components/space-sheet';
 import { DemoPill, TopInset, Txt } from '@/components/ui';
 import type { HelpScreen } from '@/lib/guide';
 import { WIDE_CONTENT_MAX, WIDE_TAB_MAX, useWideLayout } from '@/lib/layout';
 import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { ProfileAvatar } from '@/components/profile-photo';
-import { canGoForward, useView, type SpaceKind } from '@/state/data';
+import { canGoForward, useView } from '@/state/data';
 import { useBusiness } from '@/state/business';
-import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { LOGOTYPE_HEIGHT, LOGOTYPE_WIDTH } from '@/theme/logo-paths';
 import { colors, fonts, motion, radius, space } from '@/theme/tokens';
@@ -240,53 +240,76 @@ export function SubHeader({ title, onBack, right, help, plainTitle }: { title: s
  * ("Salvando em Pessoal", "Importando em Pessoal"); com a Família escolhida no seletor (D-055), a pílula diz onde a anotação vai
  * ficar: "Salvando em Família". `fixed`: a pílula não muda, porque a tela é só do Pessoal (exportar) ou porque o rótulo já traz o
  * contexto do item aberto (pagar e editar uma conta ou um registro de outro contexto que o do seletor).
+ * `switchable` (D-113b): nas telas de consulta que leem o espaço escolhido (Análises, Calendário, Evolução, Contas a pagar, Cartões,
+ * Orçamento, busca), a pílula vira um botão com a seta para baixo, com mais de um espaço ou com um espaço para criar, e abre a folha de
+ * espaços: trocar de espaço ali recarrega a tela com os dados do espaço escolhido. O alvo de toque tem 44 px de altura; o desenho da
+ * pílula não muda. Formulários e detalhes não passam `switchable`: o espaço não muda no meio de um preenchimento.
  */
-export function ContextPill({ label: given, fixed, inTab }: { label: string; fixed?: boolean; inTab?: boolean }) {
+export function ContextPill({ label: given, fixed, inTab, switchable }: { label: string; fixed?: boolean; inTab?: boolean; switchable?: boolean }) {
   const { auth } = useSession();
   const { space: kind } = useView();
   const business = useBusiness();
+  const choices = useSpaceChoices();
+  const [open, setOpen] = useState(false);
   const demo = auth.mode === 'demo';
   // No negócio (D-113), o último "Pessoal" vira o nome do negócio ("Salvando em Sacolé da Mãe").
   const label = fixed ? given : contextLabelFor(given, kind, business.data?.name);
   // Nas abas, o selo "Demonstração" já está no cabeçalho: a pílula fica branca e diz só o contexto.
   const text = contextPillText(label, demo, inTab);
   const lime = demo && !inTab;
+  const color = lime ? colors.textOnAccent : colors.brand;
+  const canSwitch = Boolean(switchable) && !fixed && (choices.spaces.length > 1 || choices.creatable.length > 0);
+  if (!canSwitch) {
+    return (
+      <View style={[styles.pill, lime && styles.pillDemo]} accessible accessibilityLabel={`Espaço: ${text}`}>
+        <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold }}>
+          {text}
+        </Txt>
+      </View>
+    );
+  }
   return (
-    <View style={[styles.pill, lime && styles.pillDemo]} accessible accessibilityLabel={`Espaço: ${text}`}>
-      <Txt variant="caption" color={lime ? colors.textOnAccent : colors.brand} style={{ fontFamily: fonts.bold }}>
-        {text}
-      </Txt>
-    </View>
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Espaço: ${text}`}
+        accessibilityHint={SPACE_TEXT.pillHint}
+        onPress={() => setOpen(true)}
+        style={(s) => [styles.pillTarget, (s as { focused?: boolean }).focused && focusOnBrand]}>
+        {({ pressed }) => (
+          <View style={[styles.pill, styles.pillRow, lime && styles.pillDemo, pressed && { opacity: 0.85 }]}>
+            <Txt variant="caption" color={color} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
+              {text}
+            </Txt>
+            <ChevronDown size={16} color={color} strokeWidth={2.5} aria-hidden />
+          </View>
+        )}
+      </Pressable>
+      {open ? <SpaceSheet mode="trocar" onClose={() => setOpen(false)} /> : null}
+    </>
   );
 }
 
-interface SpaceOption {
-  kind: SpaceKind;
-  label: string;
-}
-
 /**
- * Seletor de espaço nas abas (CL-V002): Pessoal, a Família (D-055, quem tem uma) e o negócio (D-113, pelo nome, quem tem um). A pílula
- * branca desliza em 200 ms. Só aparece para quem tem uma Família ou um negócio: sem eles, o Pessoal é o único contexto e o seletor não
- * ocupa lugar. A Família e o negócio se criam e se administram em Conta.
+ * Seletor de espaço nas abas (CL-V002, D-113b): Pessoal, a Família (D-055, quem tem uma) e o negócio (D-113, pelo nome, quem tem um). A
+ * pílula branca desliza em 200 ms (sem animação com "reduzir movimento"). Aparece sempre nas abas que dependem do espaço (Resumo,
+ * Movimentos e Metas), mesmo só com o Pessoal (retorno de quem testa, 18/11/2026: "Como eu mudo a versão do pessoal para o de
+ * negócios?"): aí mostra o Pessoal escolhido e o "+". O "+" fica enquanto houver um espaço para criar (o Negócio e a Família) e abre a
+ * folha "Criar um espaço". Investir é só do Pessoal e não tem o seletor.
  */
 export function ContextSwitch() {
-  const family = useFamily();
-  const business = useBusiness();
-  if (!family.data && !business.data) return null;
-  const options: SpaceOption[] = [{ kind: 'pessoal', label: 'Pessoal' }];
-  if (family.data) options.push({ kind: 'familia', label: 'Família' });
-  if (business.data) options.push({ kind: 'negocio', label: business.data.name });
-  return <ContextSwitchTrack options={options} />;
+  const { spaces, creatable } = useSpaceChoices();
+  return <ContextSwitchTrack options={spaces} creatable={creatable.length > 0 ? SPACE_TEXT.createA11y(creatable) : null} />;
 }
 
-function ContextSwitchTrack({ options }: { options: readonly SpaceOption[] }) {
+function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceChoice[]; creatable: string | null }) {
   const { space: active, setSpace } = useView();
   const reduced = useReducedMotion();
   const [width, setWidth] = useState(0);
+  const [creating, setCreating] = useState(false);
   const index = Math.max(0, options.findIndex((o) => o.kind === active));
   const x = useSharedValue(0);
-  const part = Math.max(0, (width - 8) / options.length);
+  const part = Math.max(0, width / options.length);
 
   useEffect(() => {
     const target = index * part;
@@ -297,35 +320,51 @@ function ContextSwitchTrack({ options }: { options: readonly SpaceOption[] }) {
   const names = options.map((o) => (o.kind === 'negocio' ? 'Negócio' : o.label)).join(', ');
 
   return (
-    <View
-      style={styles.track}
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-      accessibilityRole="tablist"
-      accessibilityLabel={`Espaço: ${names.replace(/, ([^,]+)$/, ' ou $1')}`}>
-      {part > 0 ? <Animated.View style={[styles.indicator, { width: part }, pill]} /> : null}
-      {options.map((o) => {
-        const selected = o.kind === active;
-        return (
-          <Pressable
-            key={o.kind}
-            accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            aria-selected={selected}
-            accessibilityLabel={o.kind === 'negocio' ? `Ver dados do negócio ${o.label}` : `Ver dados de ${o.label}`}
-            onPress={() => (selected ? undefined : setSpace(o.kind))}
-            style={(s) => [styles.option, part === 0 && selected && styles.optionSelected, (s as { focused?: boolean }).focused && focusOnBrand]}>
-            {o.kind === 'familia' ? <Users size={18} color={selected ? colors.brand : colors.textOnBrand} /> : null}
-            {o.kind === 'negocio' ? <Store size={18} color={selected ? colors.brand : colors.textOnBrand} /> : null}
-            <Txt
-              variant="label"
-              numberOfLines={1}
-              color={selected ? colors.brand : colors.textOnBrand}
-              style={{ fontFamily: fonts.bold, fontSize: 16, flexShrink: 1 }}>
-              {o.label}
-            </Txt>
-          </Pressable>
-        );
-      })}
+    <View style={styles.track}>
+      <View
+        style={styles.tabs}
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+        accessibilityRole="tablist"
+        // "Escolher o espaço: Pessoal ou Família": sem o "Espaço:" das pílulas, que diz o espaço de uma tela (só o Pessoal, o nome seria igual).
+        accessibilityLabel={`${SPACE_TEXT.switchTitle}: ${names.replace(/, ([^,]+)$/, ' ou $1')}`}>
+        {/* Só com mais de um espaço a pílula branca desliza; só com o Pessoal, a opção já vem com o fundo branco (nada a animar). */}
+        {part > 0 && options.length > 1 ? <Animated.View style={[styles.indicator, { width: part }, pill]} /> : null}
+        {options.map((o) => {
+          const selected = o.kind === active;
+          return (
+            <Pressable
+              key={o.kind}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              aria-selected={selected}
+              accessibilityLabel={o.kind === 'negocio' ? `Ver dados do negócio ${o.label}` : `Ver dados de ${o.label}`}
+              onPress={() => (selected ? undefined : setSpace(o.kind))}
+              style={(s) => [styles.option, (part === 0 || options.length === 1) && selected && styles.optionSelected, (s as { focused?: boolean }).focused && focusOnBrand]}>
+              {/* O ícone não encolhe: com o nome longo do negócio em 320 px, só o nome é cortado (com reticências). */}
+              {o.kind === 'familia' ? <Users size={18} color={selected ? colors.brand : colors.textOnBrand} style={{ flexShrink: 0 }} /> : null}
+              {o.kind === 'negocio' ? <Store size={18} color={selected ? colors.brand : colors.textOnBrand} style={{ flexShrink: 0 }} /> : null}
+              <Txt
+                variant="label"
+                numberOfLines={1}
+                color={selected ? colors.brand : colors.textOnBrand}
+                style={{ fontFamily: fonts.bold, fontSize: 16, flexShrink: 1 }}>
+                {o.label}
+              </Txt>
+            </Pressable>
+          );
+        })}
+      </View>
+      {/* Fora da lista de abas: é um botão (abre a folha), não um espaço. */}
+      {creatable ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={creatable}
+          onPress={() => setCreating(true)}
+          style={(s) => [styles.add, s.pressed && { backgroundColor: colors.onBrandPressed }, (s as { focused?: boolean }).focused && focusOnBrand]}>
+          <Plus size={22} color={colors.textOnBrand} strokeWidth={2.5} aria-hidden />
+        </Pressable>
+      ) : null}
+      {creating ? <SpaceSheet mode="criar" onClose={() => setCreating(false)} /> : null}
     </View>
   );
 }
@@ -420,10 +459,17 @@ const styles = StyleSheet.create({
   // flexShrink: com letra grande, o texto quebra dentro da pílula em vez de passar da largura da tela.
   pill: { backgroundColor: colors.surfaceOnBrand, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1], marginRight: space[3], flexShrink: 1 },
   pillDemo: { backgroundColor: colors.accent },
-  track: { flexDirection: 'row', backgroundColor: colors.brandDeep, borderRadius: radius.md, padding: 4 },
-  indicator: { position: 'absolute', left: 4, top: 4, bottom: 4, borderRadius: 13, backgroundColor: colors.surfaceOnBrand },
+  // A pílula que abre a folha de espaços (D-113b): o alvo tem 44 px de altura, com a pílula do mesmo desenho no meio.
+  pillTarget: { minHeight: 44, justifyContent: 'center', flexShrink: 1, borderRadius: radius.pill },
+  pillRow: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
+  track: { flexDirection: 'row', backgroundColor: colors.brandDeep, borderRadius: radius.md, padding: 4, gap: 4 },
+  tabs: { flex: 1, minWidth: 0, flexDirection: 'row' },
+  indicator: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 13, backgroundColor: colors.surfaceOnBrand },
+  // O "+" do seletor: quadrado de 48 px, do tamanho das opções, com o desenho branco sobre o azul escuro do trilho.
+  add: { width: 48, minHeight: 48, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   option: { flex: 1, minHeight: 48, minWidth: 0, borderRadius: 13, flexDirection: 'row', gap: space[2], alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[1] },
   optionSelected: { backgroundColor: colors.surfaceOnBrand },
-  month: { flexDirection: 'row', alignItems: 'center', marginTop: space[5] },
+  // O mês vem logo abaixo do seletor de espaço (D-113b: o seletor aparece sempre): 8 px, para o primeiro movimento continuar à vista sem rolar.
+  month: { flexDirection: 'row', alignItems: 'center', marginTop: space[2] },
   monthBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 });

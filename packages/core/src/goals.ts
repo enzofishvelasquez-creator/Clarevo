@@ -951,11 +951,20 @@ export const GOALS_TEXT = {
   cardPlanned: (cents: Cents, month: IsoMonth) => `Planejado: ${formatBRL(cents)} por mês · chega lá em ${formatMonthYearBR(month)}, sem contar rendimentos`,
   reachedBadge: 'Meta alcançada',
   closedTitle: 'Concluídas e arquivadas',
-  /** Ritmo da meta (D-093): "No ritmo do plano · faltam R$ 2.400,00" ou "2 meses atrás do plano · faltam R$ 2.400,00". */
+  /**
+   * Ritmo da meta (D-093): "No ritmo do plano · faltam R$ 2.400,00". Fora do ritmo, o fato, sem cobrança (auditoria visual de 18/11/2026:
+   * "2 meses atrás do plano" soava como reprovação): com prazo, "Para chegar em julho de 2027: R$ 600,00 por mês"; sem prazo, "Faltam
+   * R$ 2.400,00 · com R$ 300,00 por mês, chega lá em junho de 2027".
+   */
   pace: {
     onTrack: 'No ritmo do plano',
-    behind: (months: number) => (months === 1 ? '1 mês atrás do plano' : `${formatInteger(months)} meses atrás do plano`),
-    line: (p: GoalPace) => `${p.onTrack ? 'No ritmo do plano' : p.monthsBehind === 1 ? '1 mês atrás do plano' : `${formatInteger(p.monthsBehind)} meses atrás do plano`} · faltam ${formatBRL(p.missingCents)}`,
+    line: (p: GoalPace) => {
+      if (p.onTrack) return `No ritmo do plano · faltam ${formatBRL(p.missingCents)}`;
+      const needed = p.targetMonth && p.targetMonth >= p.currentMonth ? monthlyNeeded(p.missingCents, p.currentMonth, p.targetMonth) : null;
+      if (p.targetMonth && needed !== null) return `Para chegar em ${formatMonthYearBR(p.targetMonth)}: ${formatBRL(needed)} por mês`;
+      const reach = monthReachedWithPlan(p.missingCents, p.plannedMonthlyCents, p.currentMonth);
+      return reach ? `Faltam ${formatBRL(p.missingCents)} · com ${formatBRL(p.plannedMonthlyCents)} por mês, chega lá em ${formatMonthYearBR(reach)}` : `Faltam ${formatBRL(p.missingCents)}`;
+    },
     /** No detalhe: de onde vem o ritmo. */
     note: (p: GoalPace) =>
       `Compara os aportes menos os resgates com o plano de ${formatBRL(p.plannedMonthlyCents)} por mês, a partir de ${formatMonthYearBR(p.fromMonth)}, só nos meses já fechados. O que já estava guardado ao criar e os rendimentos não entram.`,
@@ -1286,11 +1295,14 @@ export interface GoalPace {
   countedMonths: number;
   plannedMonthlyCents: Cents;
   missingCents: Cents;
+  /** O mês de hoje e o prazo da meta (null sem prazo): a frase fora do ritmo diz quanto por mês até o prazo, ou quando chega lá. */
+  currentMonth: IsoMonth;
+  targetMonth: IsoMonth | null;
 }
 
 export function goalPace(
   goal: Pick<Goal, 'status' | 'createdAt' | 'plannedMonthlyCents' | 'savedCents' | 'targetCents' | 'initialCents' | 'depositsCents' | 'withdrawalsCents'> &
-    Partial<Pick<Goal, 'valueSource'>>,
+    Partial<Pick<Goal, 'valueSource' | 'targetMonth'>>,
   today: IsoDate,
 ): GoalPace | null {
   // Com o valor lido dos investimentos (D-099, item 13 fase 2), os aportes acontecem nos investimentos: o ritmo pelos registros da meta não vale.
@@ -1309,7 +1321,16 @@ export function goalPace(
   const expected = Math.min(planned * countedMonths, Math.max(goal.targetCents - goal.initialCents, 0));
   const gap = expected - (goal.depositsCents - goal.withdrawalsCents);
   const monthsBehind = gap <= 0 ? 0 : ceilDiv(gap, planned);
-  return { onTrack: monthsBehind === 0, monthsBehind, fromMonth, countedMonths, plannedMonthlyCents: planned, missingCents: progress.missingCents };
+  return {
+    onTrack: monthsBehind === 0,
+    monthsBehind,
+    fromMonth,
+    countedMonths,
+    plannedMonthlyCents: planned,
+    missingCents: progress.missingCents,
+    currentMonth: monthOf(today),
+    targetMonth: goal.targetMonth ?? null,
+  };
 }
 
 /** Marcos de uma meta (D-093): uma frase curta ao passar de 25%, 50% e 75% (os 100% são "Meta alcançada"). */

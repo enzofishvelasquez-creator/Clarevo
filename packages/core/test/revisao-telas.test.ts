@@ -91,10 +91,10 @@ describe('textos novos das telas', () => {
     expect(ANALYSES_TEXT.rowA11y.startsWith(ANALYSES_TEXT.rowTitle)).toBe(true);
     expect(REPEAT_COMMITMENT_TEXT).toMatchObject({ button: 'Repetir esta conta', nextMonth: 'Só no próximo mês', monthly: 'Todo mês', yearly: 'Todo ano' });
     expect(INVESTMENT_TEXT.compare).toBe('Comparar com CDI, IPCA e poupança');
-    // O aviso único do fim da aba diz tudo o que os quatro diziam.
-    for (const part of ['A Clarevo não guarda, não movimenta nem indica investimentos.', 'não é recomendação de investimento', 'o que rendeu no passado não garante o futuro', 'não entram em Pago nem em Recebido']) {
-      expect(INVESTMENT_TEXT.closingNote).toContain(part);
-    }
+    // O aviso único do fim da aba, numa frase curta (auditoria de 18/11/2026); o resto mora no detalhe (`disclaimer` e `rule`).
+    expect(INVESTMENT_TEXT.closingNote).toBe('Os valores são os que você registra, e a Clarevo não indica investimentos.');
+    expect(INVESTMENT_TEXT.disclaimer).toBe('A rentabilidade vem dos valores que você registra; o que rendeu antes não garante o futuro.');
+    expect(INVESTMENT_TEXT.rule).toContain('não entram em Pago nem em Recebido');
     expect(CARDS_TEXT.addAnotherCard).toBe('Adicionar outro cartão');
     expect(CARDS_TEXT.invoice.payAfterClosing('2026-11-03')).toBe(
       'Esta fatura fecha em 03/11/2026. Depois disso, o pagamento pode ser registrado aqui. Se pagar antes, informe a data real do pagamento.',

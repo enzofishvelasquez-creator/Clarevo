@@ -221,7 +221,7 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={copy.title} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title={copy.title} right={<ContextPill label="Pessoal" switchable />} />
       <ScreenList
         data={cells}
         keyExtractor={(c) => c.key}

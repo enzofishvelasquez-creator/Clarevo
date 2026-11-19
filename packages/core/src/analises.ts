@@ -551,6 +551,10 @@ export const ANALYSES_TEXT = {
     outside: (from: IsoMonth): string => `A Evolução mostra os 12 meses até hoje, a partir de ${formatMonthYearBR(from)}. Este mês fica antes.`,
     action: 'Abrir Evolução',
     actionHint: 'Abre a tela Evolução, com o gráfico de linha, a média e a mediana',
+    /** A prévia da aba (auditoria de 18/11/2026: a aba era só um aviso com botão): o Pago dos últimos meses, até o mês escolhido. */
+    recentTitle: 'Últimos meses',
+    /** Mês sem registros na prévia (nunca "R$ 0,00" sem a conferência). */
+    noRecords: 'Sem registros',
   },
   upcoming: {
     /** "Previsto depois de outubro de 2026". */

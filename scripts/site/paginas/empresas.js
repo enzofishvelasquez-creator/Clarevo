@@ -13,7 +13,8 @@ const { URL_NR1 } = require('../config');
 const { montarPagina, marcadoresEmHtml, bloco, celular, telaLarga } = require('../modelo');
 const { blocoDeContato } = require('./formularios');
 
-const { AVISO_DE_SAUDE } = require('./inicio');
+// O aviso de saúde (D-115, com o texto revisado no pacote do advogado) fica na nota de ressalvas, depois de "Como funciona".
+const { AVISO_DE_SAUDE } = require('./seguranca');
 
 const ARQUIVO = 'empresas/index.html';
 

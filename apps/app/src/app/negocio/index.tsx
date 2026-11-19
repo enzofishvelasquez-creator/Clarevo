@@ -1,5 +1,6 @@
 import {
   BUSINESS_TEXT,
+  BUSINESS_WORDS,
   PAYABLES_NAV_TEXT,
   addMonths,
   businessErrorText,
@@ -36,7 +37,7 @@ import { colors, fonts, radius, space } from '@/theme/tokens';
 const T = BUSINESS_TEXT;
 
 /**
- * Como está o negócio (D-113). Sem negócio: o que é o espaço Negócio e "Criar o espaço Negócio". Com negócio: o mês (entrou, saiu e
+ * Seu negócio (D-113, D-113b). Sem negócio: o que é o espaço Negócio e "Criar o espaço Negócio". Com negócio: o mês (entrou, saiu e
  * sobrou, numa cor só, com a frase de fato), as retiradas para o Pessoal à parte, os últimos meses, as maiores saídas do mês, a retirada,
  * o nome e encerrar. Abrir esta tela escolhe o negócio no seletor: anotar daqui vai para o negócio.
  */
@@ -105,7 +106,7 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Abrir (ou voltar a) "Como está o negócio" escolhe o negócio no seletor: anotar daqui vai para o negócio. Só ao ganhar o foco
+  // Abrir (ou voltar a) "Seu negócio" escolhe o negócio no seletor: anotar daqui vai para o negócio. Só ao ganhar o foco
   // (D-113a): com esta tela embaixo na pilha, mover um lançamento para o Pessoal troca o seletor, e a troca precisa ficar.
   const activeRef = useRef(active);
   activeRef.current = active;
@@ -176,14 +177,14 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
               </Txt>
               <View style={styles.actions}>
                 <Button
-                  label="Anotar entrada"
+                  label={BUSINESS_WORDS.addIn}
                   icon={ArrowDownLeft}
                   tone="soft"
                   style={{ flexGrow: 1 }}
                   onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'receita' } })}
                 />
                 <Button
-                  label="Anotar saída"
+                  label={BUSINESS_WORDS.addOut}
                   icon={ArrowUpRight}
                   tone="soft"
                   style={{ flexGrow: 1 }}

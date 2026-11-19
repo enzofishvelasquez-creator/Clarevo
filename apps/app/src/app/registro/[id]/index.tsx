@@ -1,4 +1,5 @@
 import {
+  BUSINESS_WORDS,
   BUSINESS_TEXT,
   CARDS_TEXT,
   businessErrorText,
@@ -50,6 +51,7 @@ import { openOfficialUrl, receiptLinks } from '@/lib/receipt-link';
 import { openSummary } from '@/lib/nav';
 import { useAccounts, useCards, useCommitment, useDeleteRecord, useInvestment, useRecord, useRecordLinks, useWork, useView } from '@/state/data';
 import { useAuthorship } from '@/components/family-parts';
+import { kindLabel } from '@/components/record-row';
 import { useBusiness, useDeleteWithdrawal } from '@/state/business';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -120,6 +122,7 @@ export default function DetalheRegistro() {
       : null;
 
   const withdrawal = r ? isWithdrawal(r) : false;
+  // Também o vocabulário: no espaço Negócio, "Saída" e "Entrada" (auditoria de 18/11/2026).
   const inBusiness = Boolean(business && r && r.contextId === business.id);
   const inPersonal = Boolean(personal && r && r.contextId === personal.personalContextId);
   // Mover (D-113): o lançamento comum, entre o Pessoal e o negócio da pessoa, para quem anotou no lugar errado.
@@ -191,7 +194,7 @@ export default function DetalheRegistro() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={r ? (r.kind === 'despesa' ? 'Gasto' : 'Recebimento') : 'Registro'} onBack={toList} right={r ? <ContextPill label={by.contextName} fixed /> : <ContextPill label="Pessoal" />} />
+      <SubHeader title={r ? (inBusiness ? kindLabel(r, true) : r.kind === 'despesa' ? 'Gasto' : 'Recebimento') : 'Registro'} onBack={toList} right={r ? <ContextPill label={by.contextName} fixed /> : <ContextPill label="Pessoal" />} />
       <Screen>
         <View style={styles.body}>
           {record.isPending ? (
@@ -251,7 +254,7 @@ export default function DetalheRegistro() {
                 <View style={[styles.badge, r.kind === 'receita' && { backgroundColor: colors.successTint }]}>
                   {r.kind === 'despesa' ? <ArrowUpRight size={16} color={colors.brandText} /> : <ArrowDownLeft size={16} color={colors.successText} />}
                   <Txt variant="label" color={r.kind === 'despesa' ? colors.brandText : colors.successText} style={{ fontFamily: fonts.bold }}>
-                    {r.kind === 'despesa' ? 'Gasto pago' : 'Recebido'}
+                    {inBusiness ? kindLabel(r, true) : r.kind === 'despesa' ? 'Gasto pago' : 'Recebido'}
                   </Txt>
                 </View>
                 <Txt variant="title" style={{ fontSize: 24, lineHeight: 32 }} accessibilityRole="header" aria-level={2}>
@@ -334,7 +337,7 @@ export default function DetalheRegistro() {
                   />
                 </>
               ) : (
-                <Button label={RECORD_TEXT.edit(r.kind)} icon={Pencil} tone={justSaved ? 'soft' : 'brand'} onPress={() => router.push(`/registro/${r.id}/editar`)} />
+                <Button label={inBusiness ? (r.kind === 'despesa' ? BUSINESS_WORDS.editOut : BUSINESS_WORDS.editIn) : RECORD_TEXT.edit(r.kind)} icon={Pencil} tone={justSaved ? 'soft' : 'brand'} onPress={() => router.push(`/registro/${r.id}/editar`)} />
               )}
               {movable ? (
                 <Button

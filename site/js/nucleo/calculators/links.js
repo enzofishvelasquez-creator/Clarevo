@@ -1,6 +1,6 @@
 // Gerado por scripts/gerar-site.js a partir de packages/core/src/calculators/links.ts. Não edite: rode "node scripts/gerar-site.js".
 import { daysBetween } from '../dates.js';
-import { isCommitmentOverdue } from '../dia-util.js';
+import { effectiveOverdue, isCommitmentOverdue } from '../dia-util.js';
 import { MAX_RECORD_CENTS, centsToInput } from '../money.js';
 import { DEBT_NATURES } from '../records.js';
 import { currentTerm, remainingInstallments } from '../series.js';
@@ -44,7 +44,7 @@ export function calcLinkParams(slug, values) {
             put(out, 'parcelas', x.restantes);
             put(out, 'modo', x.modo);
             if (x.prazosEmDias && x.prazosEmDias.length > 0)
-                out.prazos = x.prazosEmDias.map((d) => Math.max(0, Math.round(d))).join(',');
+                out.prazos = x.prazosEmDias.map((d) => Math.round(d)).join(',');
             break;
         }
         case 'multa-e-juros': {
@@ -106,10 +106,10 @@ function oneOf(params, key, options) {
 }
 function daysList(params) {
     const value = first(params, 'prazos');
-    if (value === undefined || !/^\d{1,5}(,\d{1,5})*$/.test(value))
+    if (value === undefined || !/^-?\d{1,5}(,-?\d{1,5})*$/.test(value))
         return undefined;
     const list = value.split(',').map(Number);
-    return list.length <= PRAZOS_MAX && list.every((d) => d <= DAYS_MAX) ? list : undefined;
+    return list.length <= PRAZOS_MAX && list.every((d) => d <= DAYS_MAX && d >= -DAYS_MAX) ? list.map((d) => (Object.is(d, -0) ? 0 : d)) : undefined;
 }
 function compact(obj) {
     return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
@@ -180,7 +180,7 @@ export function quitarAntesLink(s, occurrences, open, today) {
     return {
         parcelaCents: items[0].amountCents,
         restantes: items.length,
-        prazosEmDias: items.map((x) => Math.max(0, daysBetween(today, x.dueOn))),
+        prazosEmDias: items.map((x) => effectiveOverdue(x.dueOn, 'parcelamento', today) ? Math.min(-1, daysBetween(today, x.dueOn)) : Math.max(0, daysBetween(today, x.dueOn))),
         origem: 'serie',
     };
 }

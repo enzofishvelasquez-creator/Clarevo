@@ -274,7 +274,7 @@ export default function GastosFixosScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title="Gastos fixos e parcelamentos" right={<ContextPill label="Pessoal" />} />
+      <SubHeader title="Gastos fixos e parcelamentos" right={<ContextPill label="Pessoal" switchable />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
         {reminder ? (

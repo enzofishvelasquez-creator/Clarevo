@@ -1,5 +1,5 @@
 import type { IsoMonth } from './dates';
-import { addMonths, formatMonthName, formatMonthSpanBR, formatMonthYearBR, parseDateBR, type IsoDate } from './dates';
+import { addMonths, formatDayMonth, formatMonthName, formatMonthSpanBR, formatMonthYearBR, monthOf, parseDateBR, type IsoDate } from './dates';
 import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL } from './money';
 import type { ContextKind, FinancialRecord, RecordKind } from './records';
@@ -201,7 +201,7 @@ export function suggestMoveCategory(category: string | null, kind: RecordKind, t
 }
 
 // ---------------------------------------------------------------------------
-// Como está o negócio: entrou, saiu e sobrou
+// Seu negócio: entrou, saiu e sobrou
 // ---------------------------------------------------------------------------
 
 /** O mês do negócio. As retiradas para o Pessoal não entram em "Saiu": ficam à parte, em withdrawnCents. */
@@ -314,7 +314,11 @@ export const BUSINESS_TEXT = {
     'Para quem tem CNPJ ou trabalha por conta: anote o que entra e o que sai do negócio num espaço separado do Pessoal e veja quanto sobrou no mês. Incluído no plano, um negócio por pessoa.',
   accountHintIn: (name: string): string => `${name}. Só você vê e anota. O Pessoal continua separado.`,
   accountCreate: 'Criar o espaço Negócio',
-  accountOpen: 'Ver como está o negócio',
+  accountOpen: 'Ver seu negócio',
+  /** A linha do espaço Negócio na folha "Criar um espaço" (D-113b): para quem é, numa frase. */
+  spaceHint: 'Para quem tem CNPJ ou trabalha por conta.',
+  /** A linha no fim de "Primeiros passos" (D-113b), para quem ainda não tem negócio: leva a criar o espaço. Não é um passo. */
+  firstStepsTip: 'Tem um negócio? Crie o espaço Negócio',
   /** Criar. */
   createTitle: 'Espaço Negócio',
   intro:
@@ -329,9 +333,9 @@ export const BUSINESS_TEXT = {
   demoOnly: 'Na demonstração, o negócio criado fica só nesta visita: recarregar a página volta a demonstração ao começo, com os dados fictícios de sempre.',
   loading: 'Carregando o espaço Negócio…',
   loadFailed: 'Não foi possível carregar o espaço Negócio. Tente de novo.',
-  /** Como está o negócio. */
-  overviewTitle: 'Como está o negócio',
-  overviewLink: 'Como está o negócio',
+  /** Seu negócio (/negocio, D-113b). */
+  overviewTitle: 'Seu negócio',
+  overviewLink: 'Seu negócio',
   overviewLinkHint: 'Entrou, saiu e sobrou no mês e nos últimos meses.',
   inLabel: 'Entrou',
   outLabel: 'Saiu',
@@ -363,7 +367,7 @@ export const BUSINESS_TEXT = {
   withdrawDescriptionHint: (name: string): string => `Sem descrição, fica "Retirada para o Pessoal" no negócio e "Retirada de ${name}" no Pessoal.`,
   withdrawSubmit: 'Salvar retirada',
   withdrawSaved: 'Retirada salva: saiu do negócio e entrou no Pessoal.',
-  withdrawalBusinessNote: 'Retirada para o Pessoal: este valor saiu do negócio e entrou no Pessoal como recebimento. Não entra em Saiu, em "Como está o negócio".',
+  withdrawalBusinessNote: 'Retirada para o Pessoal: este valor saiu do negócio e entrou no Pessoal como recebimento. Não entra em Saiu, em "Seu negócio".',
   withdrawalPersonalNote: (name: string | null): string =>
     name ? `Retirada do negócio: este valor saiu de ${name} e entrou no Pessoal.` : 'Retirada do negócio: este valor saiu do espaço Negócio e entrou no Pessoal.',
   withdrawalLocked: 'Uma retirada fica ligada nos dois espaços. Para mudar o valor ou a data, exclua a retirada e anote de novo.',
@@ -401,6 +405,54 @@ export const BUSINESS_TEXT = {
   whoSees: 'Só você vê e anota no espaço Negócio. O Pessoal e a Família, se houver, continuam separados.',
   /** O canal pode estar ligado ao Pessoal ou à Família (D-113a): a frase diz só que o negócio fica de fora. */
   chatNote: 'O WhatsApp e o Telegram não anotam no espaço Negócio.',
+} as const;
+
+/**
+ * O vocabulário do espaço Negócio nas telas de sempre (auditoria visual de 18/11/2026): entradas e saídas, como em "Seu negócio", nunca
+ * Recebido e Pago, "Anotar gasto" ou "Registrar recebimento". O Pessoal e a Família continuam com o vocabulário de sempre. No Resumo do
+ * negócio, o total da direita inclui as retiradas para o Pessoal (o dinheiro saiu do negócio); "Seu negócio" mostra Saiu sem elas e as
+ * retiradas à parte (D-113(3)). Por isso, num mês com retirada, o Resumo diz "Saiu, com retiradas" e "Ficou no negócio".
+ */
+export const BUSINESS_WORDS = {
+  in: 'Entrou',
+  out: 'Saiu',
+  outWithWithdrawals: 'Saiu, com retiradas',
+  left: 'Sobrou',
+  kept: 'Ficou no negócio',
+  /** "Entrou menos saiu até 07/10 · não é saldo" (com retirada: "Entrou menos saiu, com as retiradas, ..."). */
+  leftCaption: (viewedMonth: IsoMonth, today: IsoDate, withWithdrawals = false): string =>
+    `Entrou menos saiu${withWithdrawals ? ', com as retiradas,' : ''} ${monthOf(today) === viewedMonth ? `até ${formatDayMonth(today)}` : 'no mês'} · não é saldo`,
+  leftCaptionA11y: (viewedMonth: IsoMonth, today: IsoDate, withWithdrawals = false): string =>
+    `Entrou menos saiu${withWithdrawals ? ', com as retiradas,' : ''} ${monthOf(today) === viewedMonth ? `até ${formatDayMonth(today)}` : 'no mês'}. Não é saldo.`,
+  negative: 'Saídas acima das entradas no período',
+  inHint: 'Abre as entradas do mês',
+  outHint: 'Abre as saídas do mês, com a divisão por categoria',
+  addOut: 'Anotar saída',
+  addIn: 'Anotar entrada',
+  editOut: 'Editar saída',
+  editIn: 'Editar entrada',
+  saveOut: 'Salvar saída',
+  saveIn: 'Salvar entrada',
+  outDone: 'Saída já feita',
+  inDone: 'Entrada já feita',
+  outDate: 'Data da saída',
+  inDate: 'Data da entrada',
+  /** O tipo na linha de um lançamento ("Saída · 06/10/2026"). */
+  outRow: 'Saída',
+  inRow: 'Entrada',
+  outsTitle: 'Saídas do mês',
+  noOuts: (month: IsoMonth): string => `Nenhuma saída em ${formatMonthName(month)}`,
+  noOutsBody: 'Anote uma saída já feita para ver o efeito no mês.',
+  filterIn: 'Entradas',
+  filterOut: 'Saídas',
+  /** "Entrou em outubro" e "Saiu em outubro", nos totais de Movimentos. */
+  inMonth: (month: IsoMonth): string => `Entrou em ${formatMonthName(month)}`,
+  outMonth: (month: IsoMonth): string => `Saiu em ${formatMonthName(month)}`,
+  /** "Saiu em outubro de 2026", nas Análises do negócio. */
+  outMonthYear: (month: IsoMonth): string => `Saiu em ${formatMonthYearBR(month)}`,
+  emptyList: 'Entradas e saídas já feitas aparecem aqui, da mais recente para a mais antiga.',
+  /** Exemplos de "Gastos fixos e parcelamentos" em Organizar, no negócio. */
+  seriesExamples: 'Aluguel do ponto, DAS, maquininha e fornecedor',
 } as const;
 
 /** Textos de erro das telas do negócio (nomes e regras do banco). */

@@ -1,6 +1,5 @@
 import {
-  CALC_DISCLAIMER,
-  calcDisclaimer,
+  calcNotice,
   CALC_UI_TEXT,
   MAX_RECORD_CENTS,
   calcErrorText,
@@ -80,15 +79,15 @@ export function useOpenedOverForm(): boolean {
   return over;
 }
 
-/** Aviso fixo (CALC_DISCLAIMER, ou o da calculadora: calcDisclaimer), sem animação nem anúncio a cada mudança: é parte da tela. */
+/**
+ * Aviso fixo (CALC_NOTICE, ou o da calculadora: calcNotice), sem animação nem anúncio a cada mudança: é parte da tela. Uma linha de
+ * legenda, sem a faixa colorida (auditoria de 18/11/2026), e ainda à vista sem rolar em 360 px.
+ */
 export function CalcDisclaimer({ slug }: { slug?: CalcSlug } = {}) {
   return (
-    <View style={styles.disclaimer}>
-      <Info size={18} color={colors.brandText} style={{ marginTop: 1 }} aria-hidden />
-      <Txt variant="caption" style={{ flex: 1 }}>
-        {slug ? calcDisclaimer(slug) : CALC_DISCLAIMER}
-      </Txt>
-    </View>
+    <Txt variant="caption" color={colors.textSecondary}>
+      {calcNotice(slug)}
+    </Txt>
   );
 }
 
@@ -501,7 +500,6 @@ export function CalcNavRow({
 }
 
 const styles = StyleSheet.create({
-  disclaimer: { flexDirection: 'row', gap: space[2], padding: space[3], borderRadius: radius.md, backgroundColor: colors.brandTint, alignItems: 'flex-start' },
   note: { flexDirection: 'row', gap: space[2], padding: space[3], borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'flex-start' },
   lead: { fontFamily: fonts.extrabold, fontSize: 20, lineHeight: 28 },
   bullet: { flexDirection: 'row', gap: space[2], alignItems: 'flex-start' },

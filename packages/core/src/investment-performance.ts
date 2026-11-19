@@ -187,6 +187,9 @@ export const PERFORMANCE_TEXT = {
   title: 'Desempenho',
   intro: 'Quanto cada investimento rendeu no período, ao lado do CDI, do IPCA e da poupança no mesmo intervalo. É uma estimativa feita com os valores que você registra.',
   open: 'Ver desempenho',
+  /** O card logo abaixo do total, na aba Investir (auditoria de 18/11/2026: o desempenho só abria por um link pequeno no card azul). */
+  cardTitle: 'Desempenho: comparar com CDI, IPCA e poupança',
+  cardCaption: 'Quanto cada investimento rendeu, ao lado do CDI, do IPCA e da poupança no mesmo período.',
   openHint: 'Abre a evolução e a comparação com CDI, IPCA e poupança',
   compareTitle: INVESTMENT_TEXT.compare,
   periodLabel: 'Período',

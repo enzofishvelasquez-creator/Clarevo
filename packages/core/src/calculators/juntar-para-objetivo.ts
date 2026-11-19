@@ -4,8 +4,10 @@ import { FieldReader, countField, monthsDuration, moneyField, type CalcFieldSpec
 import { parseCount, parseMoney, parseOptionalMoney } from './inputs';
 
 /**
- * 7. Juntar para um objetivo (docs/08 §3.2). falta = alvo − já tem; por mês = teto(falta ÷ meses);
+ * 7. Juntar para um objetivo (docs/08 §3.2). falta = max(alvo − já tem, 0); por mês = teto(falta ÷ meses);
  * prazo = teto(falta ÷ por mês). Sem rendimento e sem inflação, ditos nas hipóteses (com rendimento e inflação: o simulador).
+ * Revisão externa de 18/11/2026: com o valor já guardado, "meta atingida", R$ 0,00 por mês e prazo 0 (nunca valor ou prazo negativo);
+ * no modo "Em quanto tempo", o valor por mês tem de ser maior que zero (o campo recusa zero), e nada é dividido por zero.
  */
 export type ObjetivoModo = 'prazo' | 'mensal';
 export type ObjetivoField = 'alvo' | 'jaTem' | 'modo' | 'meses' | 'mensal';
@@ -29,9 +31,9 @@ export interface ObjetivoResult extends CalcTexts {
   missingCents: Cents;
   /** Já tem o valor do objetivo. */
   reached: boolean;
-  /** Por mês (calculado no modo 'prazo', informado no modo 'mensal'); null quando já tem o valor. */
+  /** Por mês (calculado no modo 'prazo', informado no modo 'mensal'); 0 quando já tem o valor. */
   monthlyCents: Cents | null;
-  /** Meses (informado no modo 'prazo', calculado no modo 'mensal'); null quando já tem o valor. */
+  /** Meses (informado no modo 'prazo', calculado no modo 'mensal'); 0 quando já tem o valor. */
   months: number | null;
 }
 
@@ -73,7 +75,15 @@ export function calcJuntarParaObjetivo(input: ObjetivoInput): CalcOutcome<Objeti
   if (missing === 0) {
     return {
       ok: true,
-      result: { ...base, reached: true, monthlyCents: null, months: null, resultLines: ['Com estes números, você já tem o valor do objetivo.'], hypotheses, notes: [] },
+      result: {
+        ...base,
+        reached: true,
+        monthlyCents: 0,
+        months: 0,
+        resultLines: ['Com estes números, você já tem o valor do objetivo: meta atingida, sem precisar guardar mais por mês.'],
+        hypotheses,
+        notes: [],
+      },
     };
   }
   const faltam = `Faltam ${formatBRL(missing)} para chegar a ${formatBRL(alvo)}.`;

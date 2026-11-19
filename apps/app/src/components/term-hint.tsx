@@ -11,7 +11,7 @@ import { colors, fonts, motion, radius, space } from '@/theme/tokens';
 /**
  * "O que é isso?" ao lado de um termo (spec3 §3.7): `<TermHint term="Valor estimado" slug="estimativa" />`.
  * Abre no próprio lugar, sem navegar, um painel com o resumo do tema e "Ler explicação completa"; a explicação abre
- * por cima da tarefa e "Voltar à tarefa" volta para o formulário preenchido (CL C005).
+ * por cima da tarefa e "Voltar para a tarefa" volta para o formulário preenchido (CL C005).
  * Nome acessível "O que é isso? {termo}", com o estado aberto ou fechado. Tema em rascunho não desenha nada (R12).
  * O painel aparece só com esmaecimento de 200 ms, sem animar altura; com "reduzir movimento", direto.
  * `label` troca o texto visível quando a pergunta é sobre o termo ("O que é mediana?", na Evolução, D-062); o nome acessível passa a

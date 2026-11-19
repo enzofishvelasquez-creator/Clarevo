@@ -11,6 +11,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 10130,
 "lastParcelaCents": 10130,
+"lastCount": 0,
 "totalCents": 364680,
 "interestCents": 120097
 },
@@ -23,6 +24,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 20057892,
 "lastParcelaCents": 20057892,
+"lastCount": 0,
 "totalCents": 4866604434,
 "interestCents": 4680174798
 },
@@ -35,6 +37,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 7075,
 "lastParcelaCents": 7075,
+"lastCount": 0,
 "totalCents": 25458,
 "interestCents": 172
 },
@@ -45,8 +48,9 @@
 "parcelas": 480,
 "taxaBp": 0,
 "primeiraEmUmMes": true,
-"parcelaCents": 975,
-"lastParcelaCents": 778,
+"parcelaCents": 974,
+"lastParcelaCents": 975,
+"lastCount": 283,
 "totalCents": 706031,
 "interestCents": 0
 },
@@ -59,6 +63,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 79475,
 "lastParcelaCents": 79475,
+"lastCount": 0,
 "totalCents": 3814800,
 "interestCents": 796834
 },
@@ -69,8 +74,9 @@
 "parcelas": 84,
 "taxaBp": 0,
 "primeiraEmUmMes": true,
-"parcelaCents": 299657,
-"lastParcelaCents": 299624,
+"parcelaCents": 299656,
+"lastParcelaCents": 299657,
+"lastCount": 51,
 "totalCents": 54021524,
 "interestCents": 0
 },
@@ -83,6 +89,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 568748089,
 "lastParcelaCents": 568748089,
+"lastCount": 0,
 "totalCents": 34124885340,
 "interestCents": 33556080371
 },
@@ -93,8 +100,9 @@
 "parcelas": 2,
 "taxaBp": 0,
 "primeiraEmUmMes": true,
-"parcelaCents": 5626964,
-"lastParcelaCents": 5626963,
+"parcelaCents": 5626963,
+"lastParcelaCents": 5626964,
+"lastCount": 1,
 "totalCents": 25020174,
 "interestCents": 0
 },
@@ -107,6 +115,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 70127389,
 "lastParcelaCents": 70127389,
+"lastCount": 0,
 "totalCents": 90455988,
 "interestCents": 1516305
 },
@@ -119,6 +128,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 5620142,
 "lastParcelaCents": 5620142,
+"lastCount": 0,
 "totalCents": 131009115,
 "interestCents": 9877027
 },
@@ -131,6 +141,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 303084997,
 "lastParcelaCents": 303084997,
+"lastCount": 0,
 "totalCents": 303084997,
 "interestCents": 151534921
 },
@@ -143,6 +154,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 103,
 "lastParcelaCents": 103,
+"lastCount": 0,
 "totalCents": 24720,
 "interestCents": 22272
 },
@@ -155,6 +167,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 6060971,
 "lastParcelaCents": 6060971,
+"lastCount": 0,
 "totalCents": 294735942,
 "interestCents": 284865031
 },
@@ -167,6 +180,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 10195264,
 "lastParcelaCents": 10195264,
+"lastCount": 0,
 "totalCents": 5239700703,
 "interestCents": 4475723886
 },
@@ -179,6 +193,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 181310,
 "lastParcelaCents": 181310,
+"lastCount": 0,
 "totalCents": 87028800,
 "interestCents": 85032573
 },
@@ -191,6 +206,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 44,
 "lastParcelaCents": 44,
+"lastCount": 0,
 "totalCents": 5280,
 "interestCents": 2149
 },
@@ -203,6 +219,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 897494,
 "lastParcelaCents": 897494,
+"lastCount": 0,
 "totalCents": 104015629,
 "interestCents": 24039433
 },
@@ -215,6 +232,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 2175953,
 "lastParcelaCents": 2175953,
+"lastCount": 0,
 "totalCents": 29060189,
 "interestCents": 14316422
 },
@@ -227,6 +245,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 56,
 "lastParcelaCents": 56,
+"lastCount": 0,
 "totalCents": 3998,
 "interestCents": 807
 },
@@ -239,6 +258,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 797429323,
 "lastParcelaCents": 797429323,
+"lastCount": 0,
 "totalCents": 95691518760,
 "interestCents": 94894009686
 },
@@ -251,6 +271,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 20176361,
 "lastParcelaCents": 20176361,
+"lastCount": 0,
 "totalCents": 66060313,
 "interestCents": 172038
 },
@@ -263,6 +284,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 12455,
 "lastParcelaCents": 12455,
+"lastCount": 0,
 "totalCents": 5978400,
 "interestCents": 5480205
 },
@@ -275,6 +297,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 1161045,
 "lastParcelaCents": 1161045,
+"lastCount": 0,
 "totalCents": 557301600,
 "interestCents": 439910060
 },
@@ -287,6 +310,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 146402,
 "lastParcelaCents": 146402,
+"lastCount": 0,
 "totalCents": 3899065,
 "interestCents": 403568
 },
@@ -299,6 +323,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 19010,
 "lastParcelaCents": 19010,
+"lastCount": 0,
 "totalCents": 2596344,
 "interestCents": 1839938
 },
@@ -311,6 +336,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 3402356,
 "lastParcelaCents": 3402356,
+"lastCount": 0,
 "totalCents": 40828272,
 "interestCents": 4825091
 },
@@ -323,6 +349,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 2259256,
 "lastParcelaCents": 2259256,
+"lastCount": 0,
 "totalCents": 543048328,
 "interestCents": 539961958
 },
@@ -335,6 +362,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 5450,
 "lastParcelaCents": 5450,
+"lastCount": 0,
 "totalCents": 2616000,
 "interestCents": 2574218
 },
@@ -347,6 +375,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 41469233,
 "lastParcelaCents": 41469233,
+"lastCount": 0,
 "totalCents": 9372046658,
 "interestCents": 9054115871
 },
@@ -359,6 +388,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 980,
 "lastParcelaCents": 980,
+"lastCount": 0,
 "totalCents": 235200,
 "interestCents": 145557
 },
@@ -371,6 +401,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 715,
 "lastParcelaCents": 715,
+"lastCount": 0,
 "totalCents": 41123,
 "interestCents": 7104
 },
@@ -383,6 +414,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 2975,
 "lastParcelaCents": 2975,
+"lastCount": 0,
 "totalCents": 256138,
 "interestCents": 80749
 },
@@ -393,8 +425,9 @@
 "parcelas": 60,
 "taxaBp": 0,
 "primeiraEmUmMes": true,
-"parcelaCents": 43,
-"lastParcelaCents": 31,
+"parcelaCents": 42,
+"lastParcelaCents": 43,
+"lastCount": 48,
 "totalCents": 3050,
 "interestCents": 0
 },
@@ -407,6 +440,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 118633,
 "lastParcelaCents": 118633,
+"lastCount": 0,
 "totalCents": 43492490,
 "interestCents": 39569439
 },
@@ -419,6 +453,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 600,
 "lastParcelaCents": 600,
+"lastCount": 0,
 "totalCents": 120600,
 "interestCents": 115997
 },
@@ -429,8 +464,9 @@
 "parcelas": 84,
 "taxaBp": 0,
 "primeiraEmUmMes": true,
-"parcelaCents": 49940,
-"lastParcelaCents": 49927,
+"parcelaCents": 49939,
+"lastParcelaCents": 49940,
+"lastCount": 71,
 "totalCents": 4194947,
 "interestCents": 0
 },
@@ -443,6 +479,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 9162,
 "lastParcelaCents": 9162,
+"lastCount": 0,
 "totalCents": 19716,
 "interestCents": 4581
 },
@@ -455,6 +492,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 2900,
 "lastParcelaCents": 2900,
+"lastCount": 0,
 "totalCents": 439880,
 "interestCents": 58652
 },
@@ -467,6 +505,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 11190209,
 "lastParcelaCents": 11190209,
+"lastCount": 0,
 "totalCents": 418379637,
 "interestCents": 283641831
 },
@@ -479,6 +518,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 101511864,
 "lastParcelaCents": 101511864,
+"lastCount": 0,
 "totalCents": 24421797886,
 "interestCents": 24244133918
 },
@@ -491,6 +531,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 14,
 "lastParcelaCents": 14,
+"lastCount": 0,
 "totalCents": 12230,
 "interestCents": 3608
 },
@@ -503,6 +544,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 4464,
 "lastParcelaCents": 4464,
+"lastCount": 0,
 "totalCents": 9395,
 "interestCents": 44
 },
@@ -514,7 +556,8 @@
 "taxaBp": 0,
 "primeiraEmUmMes": false,
 "parcelaCents": 458,
-"lastParcelaCents": 465,
+"lastParcelaCents": 459,
+"lastCount": 7,
 "totalCents": 20618,
 "interestCents": 0
 },
@@ -527,6 +570,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 125139,
 "lastParcelaCents": 125139,
+"lastCount": 0,
 "totalCents": 15016680,
 "interestCents": 10151032
 },
@@ -539,6 +583,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 16688053,
 "lastParcelaCents": 16688053,
+"lastCount": 0,
 "totalCents": 801026544,
 "interestCents": 0
 },
@@ -551,6 +596,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 498,
 "lastParcelaCents": 498,
+"lastCount": 0,
 "totalCents": 23904,
 "interestCents": 15308
 },
@@ -563,6 +609,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 36,
 "lastParcelaCents": 36,
+"lastCount": 0,
 "totalCents": 2487,
 "interestCents": 30
 },
@@ -575,6 +622,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 3731226,
 "lastParcelaCents": 3731226,
+"lastCount": 0,
 "totalCents": 449110524,
 "interestCents": 422872283
 },
@@ -587,6 +635,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 400753,
 "lastParcelaCents": 400753,
+"lastCount": 0,
 "totalCents": 43861895,
 "interestCents": 14874754
 },
@@ -599,6 +648,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 139597,
 "lastParcelaCents": 139597,
+"lastCount": 0,
 "totalCents": 16751640,
 "interestCents": 6974460
 },
@@ -611,6 +661,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 61241808,
 "lastParcelaCents": 61241808,
+"lastCount": 0,
 "totalCents": 2939606784,
 "interestCents": 2272314292
 },
@@ -623,6 +674,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 75318,
 "lastParcelaCents": 75318,
+"lastCount": 0,
 "totalCents": 3634095,
 "interestCents": 3539938
 },
@@ -633,8 +685,9 @@
 "parcelas": 120,
 "taxaBp": 0,
 "primeiraEmUmMes": true,
-"parcelaCents": 2894312,
-"lastParcelaCents": 2894256,
+"parcelaCents": 2894311,
+"lastParcelaCents": 2894312,
+"lastCount": 64,
 "totalCents": 554062369,
 "interestCents": 0
 },
@@ -647,6 +700,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 395831,
 "lastParcelaCents": 395831,
+"lastCount": 0,
 "totalCents": 994039,
 "interestCents": 494769
 },
@@ -659,6 +713,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 605249,
 "lastParcelaCents": 605249,
+"lastCount": 0,
 "totalCents": 7262988,
 "interestCents": 450859
 },
@@ -671,6 +726,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 39614232,
 "lastParcelaCents": 39614232,
+"lastCount": 0,
 "totalCents": 966027319,
 "interestCents": 911123377
 },
@@ -683,6 +739,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 1207776,
 "lastParcelaCents": 1207776,
+"lastCount": 0,
 "totalCents": 579732480,
 "interestCents": 551179852
 },
@@ -695,6 +752,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 8844,
 "lastParcelaCents": 8844,
+"lastCount": 0,
 "totalCents": 1147248,
 "interestCents": 717407
 },
@@ -707,6 +765,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 607877070,
 "lastParcelaCents": 607877070,
+"lastCount": 0,
 "totalCents": 235493983978,
 "interestCents": 234640488226
 },
@@ -719,6 +778,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 230706,
 "lastParcelaCents": 230706,
+"lastCount": 0,
 "totalCents": 8305416,
 "interestCents": 7830215
 },
@@ -731,6 +791,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 609,
 "lastParcelaCents": 609,
+"lastCount": 0,
 "totalCents": 21924,
 "interestCents": 16028
 },
@@ -743,6 +804,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 25397,
 "lastParcelaCents": 25397,
+"lastCount": 0,
 "totalCents": 609528,
 "interestCents": 143939
 },
@@ -753,8 +815,9 @@
 "parcelas": 84,
 "taxaBp": 0,
 "primeiraEmUmMes": true,
-"parcelaCents": 80547,
-"lastParcelaCents": 80525,
+"parcelaCents": 80546,
+"lastParcelaCents": 80547,
+"lastCount": 62,
 "totalCents": 6765926,
 "interestCents": 0
 },
@@ -767,6 +830,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 99,
 "lastParcelaCents": 99,
+"lastCount": 0,
 "totalCents": 8316,
 "interestCents": 4867
 },
@@ -779,6 +843,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 1688,
 "lastParcelaCents": 1688,
+"lastCount": 0,
 "totalCents": 809090,
 "interestCents": 806082
 },
@@ -791,6 +856,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 14,
 "lastParcelaCents": 14,
+"lastCount": 0,
 "totalCents": 9304,
 "interestCents": 371
 },
@@ -803,6 +869,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 27021989,
 "lastParcelaCents": 27021989,
+"lastCount": 0,
 "totalCents": 6391871110,
 "interestCents": 5507802906
 },
@@ -815,6 +882,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 2107,
 "lastParcelaCents": 2107,
+"lastCount": 0,
 "totalCents": 86134,
 "interestCents": 8204
 },
@@ -827,6 +895,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 63287,
 "lastParcelaCents": 63287,
+"lastCount": 0,
 "totalCents": 30422463,
 "interestCents": 30198944
 },
@@ -838,7 +907,8 @@
 "taxaBp": 0,
 "primeiraEmUmMes": false,
 "parcelaCents": 111040,
-"lastParcelaCents": 111095,
+"lastParcelaCents": 111041,
+"lastCount": 55,
 "totalCents": 96208497,
 "interestCents": 0
 },
@@ -851,6 +921,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 48602,
 "lastParcelaCents": 48602,
+"lastCount": 0,
 "totalCents": 9161709,
 "interestCents": 4178843
 },
@@ -863,6 +934,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 11440,
 "lastParcelaCents": 11440,
+"lastCount": 0,
 "totalCents": 6252195,
 "interestCents": 3660855
 },
@@ -875,6 +947,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 52043943,
 "lastParcelaCents": 52043943,
+"lastCount": 0,
 "totalCents": 163947800,
 "interestCents": 1525552
 },
@@ -887,6 +960,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 8829327,
 "lastParcelaCents": 8829327,
+"lastCount": 0,
 "totalCents": 2167564810,
 "interestCents": 1311033382
 },
@@ -899,6 +973,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 3170,
 "lastParcelaCents": 3170,
+"lastCount": 0,
 "totalCents": 463515,
 "interestCents": 236063
 },
@@ -911,6 +986,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 20,
 "lastParcelaCents": 20,
+"lastCount": 0,
 "totalCents": 8999,
 "interestCents": 1
 },
@@ -923,6 +999,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 88238,
 "lastParcelaCents": 88238,
+"lastCount": 0,
 "totalCents": 107420,
 "interestCents": 11509
 },
@@ -935,6 +1012,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 317610,
 "lastParcelaCents": 317610,
+"lastCount": 0,
 "totalCents": 788664,
 "interestCents": 21441
 },
@@ -945,8 +1023,9 @@
 "parcelas": 60,
 "taxaBp": 0,
 "primeiraEmUmMes": true,
-"parcelaCents": 66,
-"lastParcelaCents": 46,
+"parcelaCents": 65,
+"lastParcelaCents": 66,
+"lastCount": 40,
 "totalCents": 6482,
 "interestCents": 0
 },
@@ -957,8 +1036,9 @@
 "parcelas": 2,
 "taxaBp": 0,
 "primeiraEmUmMes": true,
-"parcelaCents": 484,
-"lastParcelaCents": 483,
+"parcelaCents": 483,
+"lastParcelaCents": 484,
+"lastCount": 1,
 "totalCents": 2150,
 "interestCents": 0
 },
@@ -971,6 +1051,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 33994354,
 "lastParcelaCents": 33994354,
+"lastCount": 0,
 "totalCents": 83369302,
 "interestCents": 6466332
 },
@@ -983,6 +1064,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 56702433,
 "lastParcelaCents": 56702433,
+"lastCount": 0,
 "totalCents": 759848829,
 "interestCents": 41835514
 },
@@ -995,6 +1077,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 662,
 "lastParcelaCents": 662,
+"lastCount": 0,
 "totalCents": 3956,
 "interestCents": 0
 },
@@ -1007,6 +1090,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 9660709,
 "lastParcelaCents": 9660709,
+"lastCount": 0,
 "totalCents": 309813435,
 "interestCents": 24578572
 },
@@ -1019,6 +1103,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 30759,
 "lastParcelaCents": 30759,
+"lastCount": 0,
 "totalCents": 369108,
 "interestCents": 37147
 },
@@ -1031,6 +1116,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 8615843,
 "lastParcelaCents": 8615843,
+"lastCount": 0,
 "totalCents": 310170348,
 "interestCents": 50768811
 },
@@ -1043,6 +1129,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 316484,
 "lastParcelaCents": 316484,
+"lastCount": 0,
 "totalCents": 26584656,
 "interestCents": 20904314
 },
@@ -1055,6 +1142,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 79059,
 "lastParcelaCents": 79059,
+"lastCount": 0,
 "totalCents": 3293460,
 "interestCents": 1572488
 },
@@ -1067,6 +1155,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 1449564,
 "lastParcelaCents": 1449564,
+"lastCount": 0,
 "totalCents": 121763376,
 "interestCents": 39647839
 },
@@ -1079,6 +1168,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 21583,
 "lastParcelaCents": 21583,
+"lastCount": 0,
 "totalCents": 787779,
 "interestCents": 733820
 },
@@ -1091,6 +1181,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 806,
 "lastParcelaCents": 806,
+"lastCount": 0,
 "totalCents": 30294,
 "interestCents": 27934
 },
@@ -1102,7 +1193,8 @@
 "taxaBp": 0,
 "primeiraEmUmMes": false,
 "parcelaCents": 6022,
-"lastParcelaCents": 6043,
+"lastParcelaCents": 6023,
+"lastCount": 21,
 "totalCents": 292033,
 "interestCents": 0
 },
@@ -1115,6 +1207,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 138608088,
 "lastParcelaCents": 138608088,
+"lastCount": 0,
 "totalCents": 8316485280,
 "interestCents": 8039255241
 },
@@ -1127,6 +1220,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 370,
 "lastParcelaCents": 370,
+"lastCount": 0,
 "totalCents": 20230,
 "interestCents": 13726
 },
@@ -1139,6 +1233,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 3698,
 "lastParcelaCents": 3698,
+"lastCount": 0,
 "totalCents": 474994,
 "interestCents": 406744
 },
@@ -1151,6 +1246,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 57133,
 "lastParcelaCents": 57133,
+"lastCount": 0,
 "totalCents": 4799172,
 "interestCents": 4361153
 },
@@ -1163,6 +1259,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 681158,
 "lastParcelaCents": 681158,
+"lastCount": 0,
 "totalCents": 34131869,
 "interestCents": 13777681
 },
@@ -1175,6 +1272,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 115537,
 "lastParcelaCents": 115537,
+"lastCount": 0,
 "totalCents": 8890816,
 "interestCents": 3279329
 },
@@ -1187,6 +1285,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 12308941,
 "lastParcelaCents": 12308941,
+"lastCount": 0,
 "totalCents": 2926609218,
 "interestCents": 2000443369
 },
@@ -1199,6 +1298,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 6378,
 "lastParcelaCents": 6378,
+"lastCount": 0,
 "totalCents": 76536,
 "interestCents": 4753
 },
@@ -1211,6 +1311,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 5721949,
 "lastParcelaCents": 5721949,
+"lastCount": 0,
 "totalCents": 1489171379,
 "interestCents": 1094983002
 },
@@ -1222,7 +1323,8 @@
 "taxaBp": 0,
 "primeiraEmUmMes": true,
 "parcelaCents": 5938,
-"lastParcelaCents": 5940,
+"lastParcelaCents": 5939,
+"lastCount": 2,
 "totalCents": 356282,
 "interestCents": 0
 },
@@ -1235,6 +1337,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 266,
 "lastParcelaCents": 266,
+"lastCount": 0,
 "totalCents": 85652,
 "interestCents": 1488
 },
@@ -1247,6 +1350,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 2354080,
 "lastParcelaCents": 2354080,
+"lastCount": 0,
 "totalCents": 49806684,
 "interestCents": 5294244
 },
@@ -1259,6 +1363,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 448847,
 "lastParcelaCents": 448847,
+"lastCount": 0,
 "totalCents": 16354212,
 "interestCents": 15709600
 },
@@ -1271,6 +1376,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 129,
 "lastParcelaCents": 129,
+"lastCount": 0,
 "totalCents": 7740,
 "interestCents": 1937
 },
@@ -1283,6 +1389,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 46762,
 "lastParcelaCents": 46762,
+"lastCount": 0,
 "totalCents": 93524,
 "interestCents": 1370
 },
@@ -1295,6 +1402,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 9448465,
 "lastParcelaCents": 9448465,
+"lastCount": 0,
 "totalCents": 1133815800,
 "interestCents": 468667227
 },
@@ -1307,6 +1415,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 340,
 "lastParcelaCents": 340,
+"lastCount": 0,
 "totalCents": 40800,
 "interestCents": 34756
 },
@@ -1319,6 +1428,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 1323,
 "lastParcelaCents": 1323,
+"lastCount": 0,
 "totalCents": 4424,
 "interestCents": 40
 },
@@ -1331,6 +1441,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 13262172,
 "lastParcelaCents": 13262172,
+"lastCount": 0,
 "totalCents": 31726795,
 "interestCents": 180526
 },
@@ -1343,6 +1454,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 643206,
 "lastParcelaCents": 643206,
+"lastCount": 0,
 "totalCents": 10049490,
 "interestCents": 30278
 },
@@ -1355,6 +1467,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 9,
 "lastParcelaCents": 9,
+"lastCount": 0,
 "totalCents": 6611,
 "interestCents": 0
 },
@@ -1367,6 +1480,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 329845900,
 "lastParcelaCents": 329845900,
+"lastCount": 0,
 "totalCents": 27789525322,
 "interestCents": 27377176712
 },
@@ -1379,6 +1493,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 51666,
 "lastParcelaCents": 51666,
+"lastCount": 0,
 "totalCents": 24799680,
 "interestCents": 19626988
 },
@@ -1391,6 +1506,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 962457,
 "lastParcelaCents": 962457,
+"lastCount": 0,
 "totalCents": 286812186,
 "interestCents": 194756013
 },
@@ -1403,6 +1519,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 111,
 "lastParcelaCents": 111,
+"lastCount": 0,
 "totalCents": 37074,
 "interestCents": 36221
 },
@@ -1415,6 +1532,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 2708283,
 "lastParcelaCents": 2708283,
+"lastCount": 0,
 "totalCents": 1300940190,
 "interestCents": 1296118437
 },
@@ -1427,6 +1545,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 8355220,
 "lastParcelaCents": 8355220,
+"lastCount": 0,
 "totalCents": 8355220,
 "interestCents": 758875
 },
@@ -1439,6 +1558,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 2034329,
 "lastParcelaCents": 2034329,
+"lastCount": 0,
 "totalCents": 5281074,
 "interestCents": 0
 },
@@ -1451,6 +1571,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 378,
 "lastParcelaCents": 378,
+"lastCount": 0,
 "totalCents": 151956,
 "interestCents": 144932
 },
@@ -1463,6 +1584,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 361638,
 "lastParcelaCents": 361638,
+"lastCount": 0,
 "totalCents": 37754223,
 "interestCents": 30136511
 },
@@ -1475,6 +1597,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 99740,
 "lastParcelaCents": 99740,
+"lastCount": 0,
 "totalCents": 24932341,
 "interestCents": 19958633
 },
@@ -1487,6 +1610,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 311,
 "lastParcelaCents": 311,
+"lastCount": 0,
 "totalCents": 74640,
 "interestCents": 64648
 },
@@ -1499,6 +1623,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 12,
 "lastParcelaCents": 12,
+"lastCount": 0,
 "totalCents": 1644,
 "interestCents": 1166
 },
@@ -1511,6 +1636,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 27907859,
 "lastParcelaCents": 27907859,
+"lastCount": 0,
 "totalCents": 10242184253,
 "interestCents": 9962826301
 },
@@ -1523,6 +1649,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 304414729,
 "lastParcelaCents": 304414729,
+"lastCount": 0,
 "totalCents": 3652976748,
 "interestCents": 3044265583
 },
@@ -1535,6 +1662,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 7207201,
 "lastParcelaCents": 7207201,
+"lastCount": 0,
 "totalCents": 86486412,
 "interestCents": 32446441
 },
@@ -1547,6 +1675,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 63384698,
 "lastParcelaCents": 63384698,
+"lastCount": 0,
 "totalCents": 5327909942,
 "interestCents": 5243000074
 },
@@ -1559,6 +1688,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 95441,
 "lastParcelaCents": 95441,
+"lastCount": 0,
 "totalCents": 22905840,
 "interestCents": 21950477
 },
@@ -1571,6 +1701,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 15500,
 "lastParcelaCents": 15500,
+"lastCount": 0,
 "totalCents": 656927,
 "interestCents": 162292
 },
@@ -1583,6 +1714,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 460290,
 "lastParcelaCents": 460290,
+"lastCount": 0,
 "totalCents": 110469600,
 "interestCents": 68248284
 },
@@ -1595,6 +1727,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 585,
 "lastParcelaCents": 585,
+"lastCount": 0,
 "totalCents": 24703,
 "interestCents": 15399
 },
@@ -1607,6 +1740,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 1696,
 "lastParcelaCents": 1696,
+"lastCount": 0,
 "totalCents": 220005,
 "interestCents": 137576
 },
@@ -1619,6 +1753,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 70532,
 "lastParcelaCents": 70532,
+"lastCount": 0,
 "totalCents": 20162475,
 "interestCents": 12778344
 },
@@ -1631,6 +1766,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 169582,
 "lastParcelaCents": 169582,
+"lastCount": 0,
 "totalCents": 339164,
 "interestCents": 1679
 },
@@ -1643,6 +1779,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 97251,
 "lastParcelaCents": 97251,
+"lastCount": 0,
 "totalCents": 29994020,
 "interestCents": 18486337
 },
@@ -1653,8 +1790,9 @@
 "parcelas": 12,
 "taxaBp": 0,
 "primeiraEmUmMes": false,
-"parcelaCents": 112,
-"lastParcelaCents": 108,
+"parcelaCents": 111,
+"lastParcelaCents": 112,
+"lastCount": 8,
 "totalCents": 1675,
 "interestCents": 0
 },
@@ -1666,7 +1804,8 @@
 "taxaBp": 0,
 "primeiraEmUmMes": false,
 "parcelaCents": 1397725,
-"lastParcelaCents": 1397727,
+"lastParcelaCents": 1397726,
+"lastCount": 2,
 "totalCents": 67090802,
 "interestCents": 0
 },
@@ -1679,6 +1818,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 9620463,
 "lastParcelaCents": 9620463,
+"lastCount": 0,
 "totalCents": 3463366680,
 "interestCents": 2519614952
 },
@@ -1691,6 +1831,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 79347533,
 "lastParcelaCents": 79347533,
+"lastCount": 0,
 "totalCents": 1904340792,
 "interestCents": 1190886030
 },
@@ -1703,6 +1844,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 347897,
 "lastParcelaCents": 347897,
+"lastCount": 0,
 "totalCents": 37709457,
 "interestCents": 18592518
 },
@@ -1715,6 +1857,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 56610326,
 "lastParcelaCents": 56610326,
+"lastCount": 0,
 "totalCents": 85755619,
 "interestCents": 0
 },
@@ -1727,6 +1870,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 25717,
 "lastParcelaCents": 25717,
+"lastCount": 0,
 "totalCents": 2426940,
 "interestCents": 2031438
 },
@@ -1737,8 +1881,9 @@
 "parcelas": 48,
 "taxaBp": 0,
 "primeiraEmUmMes": false,
-"parcelaCents": 134,
-"lastParcelaCents": 120,
+"parcelaCents": 133,
+"lastParcelaCents": 134,
+"lastCount": 34,
 "totalCents": 8022,
 "interestCents": 0
 },
@@ -1751,6 +1896,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 18636704,
 "lastParcelaCents": 18636704,
+"lastCount": 0,
 "totalCents": 18636704,
 "interestCents": 625006
 },
@@ -1763,6 +1909,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 1958,
 "lastParcelaCents": 1958,
+"lastCount": 0,
 "totalCents": 85397,
 "interestCents": 10849
 },
@@ -1775,6 +1922,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 41494,
 "lastParcelaCents": 41494,
+"lastCount": 0,
 "totalCents": 497928,
 "interestCents": 414957
 },
@@ -1787,6 +1935,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 188000,
 "lastParcelaCents": 188000,
+"lastCount": 0,
 "totalCents": 9776000,
 "interestCents": 2181883
 },
@@ -1799,6 +1948,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 5618,
 "lastParcelaCents": 5618,
+"lastCount": 0,
 "totalCents": 2075706,
 "interestCents": 1809576
 },
@@ -1811,6 +1961,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 6133,
 "lastParcelaCents": 6133,
+"lastCount": 0,
 "totalCents": 2048422,
 "interestCents": 33574
 },
@@ -1823,6 +1974,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 19113,
 "lastParcelaCents": 19113,
+"lastCount": 0,
 "totalCents": 1618225,
 "interestCents": 1554557
 },
@@ -1835,6 +1987,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 87476,
 "lastParcelaCents": 87476,
+"lastCount": 0,
 "totalCents": 33017760,
 "interestCents": 27011848
 },
@@ -1847,6 +2000,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 1747,
 "lastParcelaCents": 1747,
+"lastCount": 0,
 "totalCents": 682933,
 "interestCents": 43929
 },
@@ -1859,6 +2013,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 7532632,
 "lastParcelaCents": 7532632,
+"lastCount": 0,
 "totalCents": 2267322232,
 "interestCents": 1551747957
 },
@@ -1871,6 +2026,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 4377,
 "lastParcelaCents": 4377,
+"lastCount": 0,
 "totalCents": 190418,
 "interestCents": 122
 },
@@ -1883,6 +2039,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 1590,
 "lastParcelaCents": 1590,
+"lastCount": 0,
 "totalCents": 572400,
 "interestCents": 10294
 },
@@ -1895,6 +2052,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 1971,
 "lastParcelaCents": 1971,
+"lastCount": 0,
 "totalCents": 57886,
 "interestCents": 4972
 },
@@ -1907,6 +2065,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 82,
 "lastParcelaCents": 82,
+"lastCount": 0,
 "totalCents": 11116,
 "interestCents": 2168
 },
@@ -1919,6 +2078,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 380,
 "lastParcelaCents": 380,
+"lastCount": 0,
 "totalCents": 14376,
 "interestCents": 7253
 },
@@ -1931,6 +2091,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 740658,
 "lastParcelaCents": 740658,
+"lastCount": 0,
 "totalCents": 40822754,
 "interestCents": 14466903
 },
@@ -1943,6 +2104,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 24733,
 "lastParcelaCents": 24733,
+"lastCount": 0,
 "totalCents": 890388,
 "interestCents": 137064
 },
@@ -1955,6 +2117,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 593276407,
 "lastParcelaCents": 593276407,
+"lastCount": 0,
 "totalCents": 21357950652,
 "interestCents": 20609525767
 },
@@ -1967,6 +2130,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 299985,
 "lastParcelaCents": 299985,
+"lastCount": 0,
 "totalCents": 14399280,
 "interestCents": 11130636
 },
@@ -1979,6 +2143,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 3460,
 "lastParcelaCents": 3460,
+"lastCount": 0,
 "totalCents": 3460,
 "interestCents": 0
 },
@@ -1991,6 +2156,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 7233744,
 "lastParcelaCents": 7233744,
+"lastCount": 0,
 "totalCents": 2604147840,
 "interestCents": 2565117420
 },
@@ -2003,6 +2169,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 56225799,
 "lastParcelaCents": 56225799,
+"lastCount": 0,
 "totalCents": 20381992842,
 "interestCents": 19678466832
 },
@@ -2015,6 +2182,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 9823152,
 "lastParcelaCents": 9823152,
+"lastCount": 0,
 "totalCents": 700893160,
 "interestCents": 143372957
 },
@@ -2027,6 +2195,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 9032,
 "lastParcelaCents": 9032,
+"lastCount": 0,
 "totalCents": 1120445,
 "interestCents": 245183
 },
@@ -2039,6 +2208,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 298405,
 "lastParcelaCents": 298405,
+"lastCount": 0,
 "totalCents": 137473151,
 "interestCents": 84452708
 },
@@ -2051,6 +2221,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 10742,
 "lastParcelaCents": 10742,
+"lastCount": 0,
 "totalCents": 483225,
 "interestCents": 660
 },
@@ -2063,6 +2234,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 73569924,
 "lastParcelaCents": 73569924,
+"lastCount": 0,
 "totalCents": 88840825,
 "interestCents": 9596077
 },
@@ -2075,6 +2247,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 546323,
 "lastParcelaCents": 546323,
+"lastCount": 0,
 "totalCents": 6774732,
 "interestCents": 5847025
 },
@@ -2087,6 +2260,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 23318,
 "lastParcelaCents": 23318,
+"lastCount": 0,
 "totalCents": 5609560,
 "interestCents": 5573000
 },
@@ -2099,6 +2273,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 4000,
 "lastParcelaCents": 4000,
+"lastCount": 0,
 "totalCents": 1788000,
 "interestCents": 1757333
 },
@@ -2111,6 +2286,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 183,
 "lastParcelaCents": 183,
+"lastCount": 0,
 "totalCents": 519956,
 "interestCents": 27468
 },
@@ -2122,7 +2298,8 @@
 "taxaBp": 0,
 "primeiraEmUmMes": true,
 "parcelaCents": 111131,
-"lastParcelaCents": 111136,
+"lastParcelaCents": 111132,
+"lastCount": 5,
 "totalCents": 6667865,
 "interestCents": 0
 },
@@ -2135,6 +2312,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 149,
 "lastParcelaCents": 149,
+"lastCount": 0,
 "totalCents": 41571,
 "interestCents": 34680
 },
@@ -2147,6 +2325,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 3509,
 "lastParcelaCents": 3509,
+"lastCount": 0,
 "totalCents": 84216,
 "interestCents": 21454
 },
@@ -2159,6 +2338,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 2975292,
 "lastParcelaCents": 2975292,
+"lastCount": 0,
 "totalCents": 714070080,
 "interestCents": 8465079
 },
@@ -2171,6 +2351,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 1005889,
 "lastParcelaCents": 1005889,
+"lastCount": 0,
 "totalCents": 60325018,
 "interestCents": 113284
 },
@@ -2183,6 +2364,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 44230,
 "lastParcelaCents": 44230,
+"lastCount": 0,
 "totalCents": 4821570,
 "interestCents": 1175743
 },
@@ -2195,6 +2377,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 37970153,
 "lastParcelaCents": 37970153,
+"lastCount": 0,
 "totalCents": 1822567344,
 "interestCents": 1746623241
 },
@@ -2207,6 +2390,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 46,
 "lastParcelaCents": 46,
+"lastCount": 0,
 "totalCents": 20251,
 "interestCents": 14267
 },
@@ -2219,6 +2403,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 259750,
 "lastParcelaCents": 259750,
+"lastCount": 0,
 "totalCents": 62654511,
 "interestCents": 61820474
 },
@@ -2231,6 +2416,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 8577,
 "lastParcelaCents": 8577,
+"lastCount": 0,
 "totalCents": 3100279,
 "interestCents": 3037484
 },
@@ -2243,6 +2429,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 334,
 "lastParcelaCents": 334,
+"lastCount": 0,
 "totalCents": 83571,
 "interestCents": 66512
 },
@@ -2255,6 +2442,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 578713989,
 "lastParcelaCents": 578713989,
+"lastCount": 0,
 "totalCents": 14033828694,
 "interestCents": 13310363904
 },
@@ -2267,6 +2455,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 18918340,
 "lastParcelaCents": 18918340,
+"lastCount": 0,
 "totalCents": 3083689420,
 "interestCents": 3042897638
 },
@@ -2279,6 +2468,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 2090260,
 "lastParcelaCents": 2090260,
+"lastCount": 0,
 "totalCents": 752493600,
 "interestCents": 547442468
 },
@@ -2291,6 +2481,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 39,
 "lastParcelaCents": 39,
+"lastCount": 0,
 "totalCents": 19702,
 "interestCents": 14788
 },
@@ -2303,6 +2494,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 1977838,
 "lastParcelaCents": 1977838,
+"lastCount": 0,
 "totalCents": 118670280,
 "interestCents": 114714407
 },
@@ -2315,6 +2507,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 2005392,
 "lastParcelaCents": 2005392,
+"lastCount": 0,
 "totalCents": 171795221,
 "interestCents": 155083754
 },
@@ -2327,6 +2520,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 15786,
 "lastParcelaCents": 15786,
+"lastCount": 0,
 "totalCents": 4724563,
 "interestCents": 44944
 },
@@ -2339,6 +2533,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 5952,
 "lastParcelaCents": 5952,
+"lastCount": 0,
 "totalCents": 214272,
 "interestCents": 156629
 },
@@ -2351,6 +2546,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 17614,
 "lastParcelaCents": 17614,
+"lastCount": 0,
 "totalCents": 3484658,
 "interestCents": 3417114
 },
@@ -2361,8 +2557,9 @@
 "parcelas": 188,
 "taxaBp": 0,
 "primeiraEmUmMes": false,
-"parcelaCents": 1143296,
-"lastParcelaCents": 1143282,
+"parcelaCents": 1143295,
+"lastParcelaCents": 1143296,
+"lastCount": 174,
 "totalCents": 248008340,
 "interestCents": 0
 },
@@ -2375,6 +2572,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 63054,
 "lastParcelaCents": 63054,
+"lastCount": 0,
 "totalCents": 30265920,
 "interestCents": 29634748
 },
@@ -2387,6 +2585,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 127865,
 "lastParcelaCents": 127865,
+"lastCount": 0,
 "totalCents": 6454190,
 "interestCents": 4870836
 },
@@ -2399,6 +2598,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 27977817,
 "lastParcelaCents": 27977817,
+"lastCount": 0,
 "totalCents": 10072014120,
 "interestCents": 9572234997
 },
@@ -2411,6 +2611,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 19020,
 "lastParcelaCents": 19020,
+"lastCount": 0,
 "totalCents": 912960,
 "interestCents": 181917
 },
@@ -2423,6 +2624,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 125,
 "lastParcelaCents": 125,
+"lastCount": 0,
 "totalCents": 10500,
 "interestCents": 6026
 },
@@ -2435,6 +2637,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 167,
 "lastParcelaCents": 167,
+"lastCount": 0,
 "totalCents": 5006,
 "interestCents": 15
 },
@@ -2447,6 +2650,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 79224,
 "lastParcelaCents": 79224,
+"lastCount": 0,
 "totalCents": 79224,
 "interestCents": 0
 },
@@ -2459,6 +2663,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 6400612,
 "lastParcelaCents": 6400612,
+"lastCount": 0,
 "totalCents": 671508022,
 "interestCents": 2224951
 },
@@ -2471,6 +2676,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 506021,
 "lastParcelaCents": 506021,
+"lastCount": 0,
 "totalCents": 37572072,
 "interestCents": 36939482
 },
@@ -2483,6 +2689,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 231278,
 "lastParcelaCents": 231278,
+"lastCount": 0,
 "totalCents": 5550672,
 "interestCents": 6930
 },
@@ -2495,6 +2702,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 1051,
 "lastParcelaCents": 1051,
+"lastCount": 0,
 "totalCents": 39576,
 "interestCents": 30873
 },
@@ -2507,6 +2715,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 120289,
 "lastParcelaCents": 120289,
+"lastCount": 0,
 "totalCents": 31860879,
 "interestCents": 5214488
 },
@@ -2517,8 +2726,9 @@
 "parcelas": 24,
 "taxaBp": 0,
 "primeiraEmUmMes": false,
-"parcelaCents": 96,
-"lastParcelaCents": 90,
+"parcelaCents": 95,
+"lastParcelaCents": 96,
+"lastCount": 18,
 "totalCents": 6035,
 "interestCents": 0
 },
@@ -2531,6 +2741,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 282565,
 "lastParcelaCents": 282565,
+"lastCount": 0,
 "totalCents": 10646576,
 "interestCents": 9889747
 },
@@ -2543,6 +2754,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 10499,
 "lastParcelaCents": 10499,
+"lastCount": 0,
 "totalCents": 721398,
 "interestCents": 264107
 },
@@ -2555,6 +2767,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 79652366,
 "lastParcelaCents": 79652366,
+"lastCount": 0,
 "totalCents": 1002394197,
 "interestCents": 96186802
 },
@@ -2567,6 +2780,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 57993507,
 "lastParcelaCents": 57993507,
+"lastCount": 0,
 "totalCents": 21107744406,
 "interestCents": 20297146939
 },
@@ -2579,6 +2793,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 310010,
 "lastParcelaCents": 310010,
+"lastCount": 0,
 "totalCents": 122960599,
 "interestCents": 94936807
 },
@@ -2591,6 +2806,7 @@
 "primeiraEmUmMes": true,
 "parcelaCents": 69523,
 "lastParcelaCents": 69523,
+"lastCount": 0,
 "totalCents": 5839932,
 "interestCents": 24725
 },
@@ -2603,6 +2819,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 501,
 "lastParcelaCents": 501,
+"lastCount": 0,
 "totalCents": 18036,
 "interestCents": 14219
 },
@@ -2615,6 +2832,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 638924,
 "lastParcelaCents": 638924,
+"lastCount": 0,
 "totalCents": 51719650,
 "interestCents": 23706622
 },
@@ -2627,6 +2845,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 453198634,
 "lastParcelaCents": 453198634,
+"lastCount": 0,
 "totalCents": 906397268,
 "interestCents": 226587986
 },
@@ -2639,6 +2858,7 @@
 "primeiraEmUmMes": false,
 "parcelaCents": 73966845,
 "lastParcelaCents": 73966845,
+"lastCount": 0,
 "totalCents": 3692005329,
 "interestCents": 2984021483
 },

@@ -445,11 +445,18 @@ describe('formulário e textos (spec2 §4.7)', () => {
     expect(never.texts.highlight).toBe('Com estes valores, a meta não é alcançada em 50 anos na hipótese informada. Mude o valor por mês ou quanto quer juntar.');
     for (const mode of ['quanto-guardar', 'em-quanto-tempo'] as const) {
       const done = ok({ mode, targetText: '4.500,00', initialText: '4.500,00', monthsText: '14', monthlyText: '100,00', rateText: '10' });
-      expect(done).toMatchObject({ reached: true, growth: null, monthlyCents: null, months: null });
+      // Revisão externa de 18/11/2026: prazo 0 e R$ 0,00 por mês, nunca negativos nem ausentes.
+      expect(done).toMatchObject({ reached: true, growth: null, monthlyCents: 0, months: 0 });
       expect(done.texts).toEqual({ intro: null, highlight: 'Com estes números, você já tem o valor que quer juntar.', lines: [] });
       expect(simulationGoalPrefill(done, DEMO_TODAY)).toBeNull();
     }
     expect(simulationGoalPrefill(never, DEMO_TODAY)).toBeNull();
+    // Com "Corrigir a meta pela inflação" em "Quanto guardar por mês", a meta da conta é a corrigida até o fim do prazo: R$ 10.000,00 já
+    // guardados não cumprem a meta de R$ 17.623,42 em 60 meses sem rendimento; faltam 7.623,42 ÷ 60 = 127,057 → R$ 127,06 por mês.
+    const adjusted = ok({ mode: 'quanto-guardar', targetText: '10.000,00', initialText: '10.000,00', monthsText: '60', rateText: '0', inflationOn: true, adjustTarget: true, inflationText: '12' });
+    expect(adjusted).toMatchObject({ reached: false, targetAdjustedCents: 1_762_342, monthlyCents: 12_706 });
+    // Em "Em quanto tempo", no mês 0 a meta corrigida é a de hoje: quem já tem R$ 10.000,00 alcança em 0 mês.
+    expect(ok({ mode: 'em-quanto-tempo', targetText: '10.000,00', initialText: '10.000,00', monthlyText: '100,00', rateText: '0', inflationOn: true, adjustTarget: true, inflationText: '12' })).toMatchObject({ reached: true, months: 0, monthlyCents: 0 });
   });
 
   it('o inicial sozinho chega lá: R$ 0,00 por mês, com a linha que explica', () => {

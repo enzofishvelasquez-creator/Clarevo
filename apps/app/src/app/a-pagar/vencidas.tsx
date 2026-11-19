@@ -44,6 +44,7 @@ import { CheckOption, yearA11y, yearA11yLabel } from '@/components/series-parts'
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
+import { useContextChange } from '@/lib/context-change';
 import { openCommitment } from '@/lib/cards';
 import { totalChange } from '@/lib/highlight';
 import { useLastAccount } from '@/lib/last-account';
@@ -175,6 +176,12 @@ export default function ContasVencidas() {
   const [pending, setPending] = useState<Pending>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ tone: 'sucesso' | 'erro'; text: string } | null>(null);
+  // Outro espaço pela pílula (D-113b): as contas marcadas eram do espaço de antes.
+  useContextChange(ctx, () => {
+    setSelected([]);
+    setPending(null);
+    setResult(null);
+  });
   /** Chave da exclusão por conta: a mesma depois de uma falha de rede, outra depois de uma recusa. */
   const deleteKeys = useRef(new Map<string, string>());
   /**
@@ -406,7 +413,7 @@ export default function ContasVencidas() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title="Contas vencidas" onBack={toList} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title="Contas vencidas" onBack={toList} right={<ContextPill label="Pessoal" switchable />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <View style={{ gap: space[1] }}>
           <Txt color={colors.textSecondary}>Marque o que você já pagou e tire o que não houve.</Txt>

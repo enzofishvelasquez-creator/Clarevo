@@ -1055,14 +1055,14 @@ function useRecordsOfMonths(contextId: string | undefined, months: readonly IsoM
   });
 }
 
-/** Como está o negócio (D-113): o mês escolhido, os últimos meses e as maiores saídas, pelos lançamentos do negócio. */
+/** Seu negócio (D-113): o mês escolhido, os últimos meses e as maiores saídas, pelos lançamentos do negócio. */
 export interface BusinessOverviewData {
   current: BusinessMonth;
   months: BusinessMonth[];
   topOut: BusinessOutLine[];
 }
 
-/** Os lançamentos dos últimos `count` meses até `month` (as chaves de useMonthRecords), resumidos para "Como está o negócio". */
+/** Os lançamentos dos últimos `count` meses até `month` (as chaves de useMonthRecords), resumidos para "Seu negócio". */
 export function useBusinessOverview(contextId: string | undefined, month: IsoMonth, count = 6) {
   const months = useMemo(() => Array.from({ length: count }, (_, i) => addMonths(month, i - count + 1)), [month, count]);
   const results = useRecordsOfMonths(contextId, months);

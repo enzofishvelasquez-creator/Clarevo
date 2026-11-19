@@ -4,6 +4,7 @@ import { ChevronRight, Coins, FileUp, Landmark, Plus, Wallet, type LucideIcon } 
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ContextPill } from '@/components/header';
+import { useSpaceChoices } from '@/components/space-sheet';
 import { ErrorState, LoadingState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
 import { Button, Card, LinkButton, Txt, clampLines } from '@/components/ui';
@@ -20,15 +21,17 @@ const ICON: Record<AccountKind, LucideIcon> = { banco: Landmark, dinheiro: Walle
 export function AccountsCard({ contextId, canWrite = true }: { contextId: string | undefined; canWrite?: boolean }) {
   const accounts = useAccounts(contextId);
   const { space: kind } = useView();
+  // Com a Família ou o negócio (D-113b), a pílula aparece também no Pessoal e troca o espaço da lista (a mesma folha das telas de consulta).
+  const several = useSpaceChoices().spaces.length > 1;
   return (
     <Card style={{ gap: space[3] }}>
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
         {ACCOUNTS_TEXT.title}
       </Txt>
       {/* Com a Família ou o negócio escolhido (D-055, D-113), as contas são as dele: a pílula diz de qual contexto é a lista. */}
-      {kind !== 'pessoal' ? (
+      {kind !== 'pessoal' || several ? (
         <View style={{ alignSelf: 'flex-start' }}>
-          <ContextPill label="Pessoal" />
+          <ContextPill label="Pessoal" switchable />
         </View>
       ) : null}
       <Txt variant="caption" color={colors.textSecondary}>
@@ -71,9 +74,7 @@ export function AccountsCard({ contextId, canWrite = true }: { contextId: string
           ) : null}
         </>
       )}
-      <Txt variant="caption" color={colors.textSecondary}>
-        {ACCOUNTS_TEXT.balanceNote}
-      </Txt>
+      {/* O saldo já está dito na introdução ("a Clarevo não guarda saldo"): sem a segunda frase (auditoria de 18/11/2026). */}
       <TermHint term="Saldo inicial" slug="saldo" />
     </Card>
   );

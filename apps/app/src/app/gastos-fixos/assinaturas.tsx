@@ -26,6 +26,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { useContextChange } from '@/lib/context-change';
 import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useMarkSubscriptionsReviewed, useSeriesList, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -122,6 +123,12 @@ export default function RevisarAssinaturas() {
   const [doneOn, setDoneOn] = useState<IsoDate | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Outro espaço pela pílula (D-113b): as marcas "Continua" eram das assinaturas do espaço de antes.
+  useContextChange(personal?.contextId, () => {
+    setKept(new Set());
+    setDoneOn(null);
+    setError(null);
+  });
   const key = useRef(newOperationKey());
 
   const all = list.data ?? [];
@@ -162,7 +169,7 @@ export default function RevisarAssinaturas() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={SUBSCRIPTION_TEXT.reviewTitle} right={<ContextPill label="Pessoal" />} />
+      <SubHeader title={SUBSCRIPTION_TEXT.reviewTitle} right={<ContextPill label="Pessoal" switchable />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         {list.isPending || !personal ? (
           <View style={{ gap: space[3] }}>

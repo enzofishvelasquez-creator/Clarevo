@@ -24,7 +24,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { AppHeader } from '@/components/header';
 import { investmentCaption } from '@/components/investment-ficha';
 import { InvestmentTotalsLines } from '@/components/investment-parts';
-import { AllocationCard, FiscalCalendarCard, IncomeCard, InvestmentLinks, InvestmentPlanCard, UpcomingDatesCard } from '@/components/investment-portfolio';
+import { AllocationCard, FiscalCalendarCard, IncomeCard, InvestmentLinks, InvestmentPlanCard, PerformanceCard, UpcomingDatesCard } from '@/components/investment-portfolio';
 import { HowCalculatedSheet, InvestmentTemplates, StaleValuesNotice } from '@/components/investment-tab-parts';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
@@ -107,6 +107,8 @@ export default function InvestimentosScreen() {
               {list.isError || movements.isError ? <StaleValuesNotice partial={!list.isError} onRetry={retry} /> : null}
               {/* A carteira é só dos ativos: os encerrados saem do total (docs/45, seção 3.2). */}
               <Summary active={active} onHow={() => setHowOpen(true)} />
+              {/* Desempenho (auditoria de 18/11/2026): card próprio logo abaixo do total, com CDI, IPCA e poupança no nome. */}
+              <PerformanceCard />
               {/* Revisão das telas (16/11/2026): "Novo investimento" logo abaixo do total, não depois da lista. */}
               {canWrite ? <Button label={T.newInvestment} icon={Plus} tone="soft" onPress={() => router.push('/investimento/novo')} /> : null}
               {moves ? <InvestmentPlanCard plan={plan.data ?? null} movements={moves} /> : null}

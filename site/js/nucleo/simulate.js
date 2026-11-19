@@ -228,11 +228,17 @@ function resultTooHigh(input) {
     const plan = planOf(input);
     return plan !== null && rawFinal(input.initialCents, plan.monthly, plan.months, input.rateBp) > SIMULATE_RESULT_MAX_CENTS;
 }
+function alreadyReached(input) {
+    if (input.mode === 'quanto-ter')
+        return false;
+    const goal = input.mode === 'quanto-guardar' ? goalOf(input, input.months) : input.targetCents;
+    return input.initialCents >= goal;
+}
 function planOf(input) {
-    const { mode, targetCents, initialCents, rateBp } = input;
+    const { mode, initialCents, rateBp } = input;
     if (mode === 'quanto-ter')
         return { monthly: input.monthlyCents, months: input.months };
-    if (initialCents >= targetCents)
+    if (alreadyReached(input))
         return null;
     if (mode === 'quanto-guardar')
         return { monthly: monthlyForTarget(goalOf(input, input.months), initialCents, input.months, rateBp), months: input.months };
@@ -269,14 +275,14 @@ export function simulate(input) {
     const growthOf = (monthly, months) => simulateGrowth({ initial: initialCents, monthly, months, rateBp, inflationBp });
     const todayLine = (g) => (g.todayValueCents === null || inflationBp === null ? [] : [T.todayValue(inflationBp, g.finalCents, g.todayValueCents)]);
     const showTip = inflationBp !== null && inflationBp > 0 && !adjust && mode !== 'quanto-ter' ? [T.adjustTip(targetCents)] : [];
-    if (mode !== 'quanto-ter' && initialCents >= targetCents) {
+    if (alreadyReached(input)) {
         return {
             ...base,
             ...empty,
             reached: true,
             unreachable: false,
-            monthlyCents: null,
-            months: null,
+            monthlyCents: 0,
+            months: 0,
             growth: null,
             texts: { intro: null, highlight: T.reached, lines: [] },
         };

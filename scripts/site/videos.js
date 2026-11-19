@@ -8,10 +8,11 @@
  * D-115 (18/11/2026, pedido do Enzo, "como no seox.com.br"): cada vídeo fica no próprio lugar, ao lado do texto do que ele mostra, no lugar
  * da captura parada, e toca sozinho, sem som e em repetição, só enquanto aparece na tela. Não há controles de player (`controls`): quem
  * começa e pausa é o script do próprio site, `js/videos.js` (`site-src/js/videos.js`), que toca o vídeo quando pelo menos metade dele
- * aparece, pausa quando ele sai da tela e põe embaixo da legenda de cada vídeo um botão "Pausar" ou "Tocar", fora da tela do celular
- * (WCAG 2.2.2). Com movimento reduzido ou
- * economia de dados, nada toca sozinho: fica a capa, e o mesmo botão toca o vídeo a pedido. Sem JavaScript, fica a capa. O vídeo não tem
- * `autoplay` (quem decide é o script) e tem `preload="none"`: nada de vídeo baixa antes de ele aparecer na tela.
+ * aparece e pausa quando ele sai da tela. D-115c (19/11/2026, Enzo: "Nenhum outro site usa isso"): sem botão de pausar. O próprio vídeo é o
+ * controle (WCAG 2.2.2): tocar nele pausa e toca de novo, e pelo teclado ele recebe foco (com o contorno de sempre) e Enter ou Espaço fazem
+ * o mesmo, com o nome "Pausar o vídeo: título" ou "Tocar o vídeo: título". Com movimento reduzido ou economia de dados, nada toca sozinho:
+ * fica a capa, e tocar no vídeo o toca a pedido. Sem JavaScript, fica a capa. O vídeo não tem `autoplay` (quem decide é o script) e tem
+ * `preload="none"`: nada de vídeo baixa antes de ele aparecer na tela.
  *
  * Os vídeos ficam no próprio site, sem serviço de terceiros (`media-src 'self'` na política de segurança). O nome de cada arquivo publicado
  * leva um resumo do conteúdo (`videos/anotar-gasto.1a2b3c4d5e.mp4`), como as capturas, para o navegador poder guardar por um ano sem mostrar
@@ -116,9 +117,11 @@ const SCRIPT_DOS_VIDEOS = 'js/videos.js';
  * demonstração. `videos` e `img` vêm de `videosDoSite().info` e `imagensDoSite().info`; `arquivo` é a página, para os caminhos relativos.
  *
  * O vídeo tem `muted`, `loop`, `playsinline` e `preload="none"`, sem `controls` e sem `autoplay`: quem toca e pausa é `js/videos.js`, que
- * acha a figura pelo `data-video` e lê o título em `data-titulo` (o nome do botão de pausar e tocar, que ele põe embaixo da legenda, fora
- * da tela do celular). O nome acessível do vídeo e a descrição em texto ficam num parágrafo `hidden`, ligado ao vídeo por `aria-labelledby`
- * e `aria-describedby`: o leitor de tela ouve os dois uma vez, pelo vídeo, e não de novo na leitura corrida da página. Dentro do vídeo,
+ * acha a figura pelo `data-video` e lê o título em `data-titulo`. Sem JavaScript, o nome acessível do vídeo ("Vídeo: título") e a
+ * descrição em texto ficam num parágrafo `hidden`, ligado ao vídeo por `aria-labelledby` e `aria-describedby`: o leitor de tela ouve os
+ * dois uma vez, pelo vídeo, e não de novo na leitura corrida da página. Com o script, o vídeo vira o controle (`role="button"`,
+ * `tabindex="0"`) e o nome passa a dizer o que um toque faz ("Pausar o vídeo: título" ou "Tocar o vídeo: título", por `aria-label`, no
+ * lugar do `aria-labelledby`); a descrição continua ligada. Dentro do vídeo,
  * para o navegador que não toca nenhum dos dois formatos, um link para o MP4. `capa`: outra imagem de capa (id de `imagensDoSite`);
  * `classe`: uma classe a mais na figura.
  */

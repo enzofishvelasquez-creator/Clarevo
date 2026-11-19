@@ -54,7 +54,7 @@ const FORM_PATHS: readonly RegExp[] = [
   /^\/importar$/,
   // Família (D-055): criar e convidar são formulários com rodapé fixo. A lista da Família (/familia) é de consulta.
   /^\/familia\/(nova|convidar)$/,
-  // Espaço Negócio (D-113): criar, a retirada para o Pessoal e o nome são formulários. "Como está o negócio" (/negocio) é de consulta.
+  // Espaço Negócio (D-113): criar, a retirada para o Pessoal e o nome são formulários. "Seu negócio" (/negocio) é de consulta.
   /^\/negocio\/(novo|retirada|nome)$/,
   // Convite para a Família: abre antes de entrar e depois de entrar, como as telas de entrada, sem barra.
   new RegExp(`^/convite/${ID}$`),
@@ -455,7 +455,7 @@ export const APP_SCREENS: readonly AppScreen[] = [
   {
     id: 'investimentos',
     title: 'Investimentos',
-    caption: 'O que você já investe: aportes, valor de hoje, rendimento, CDI e IPCA',
+    caption: 'O que você já investe: aportes, valor de hoje e rendimento',
     href: '/investimentos',
     keywords: ['investimento', 'investimentos', 'investir', 'carteira', 'rendimento', 'rentabilidade', 'aporte', 'resgate', 'cdi', 'ipca', 'extrato', 'valor atual', 'vencimento', 'fgc'],
   },
@@ -475,10 +475,11 @@ export const APP_SCREENS: readonly AppScreen[] = [
   },
   {
     id: 'investimentos-desempenho',
-    title: 'Desempenho dos investimentos',
+    // O mesmo nome do card da aba Investir (auditoria de 18/11/2026): "desempenho", "CDI", "IPCA" e "poupança" acham esta tela primeiro.
+    title: 'Desempenho: comparar com CDI, IPCA e poupança',
     caption: 'Cada investimento ao lado do CDI, do IPCA e da poupança, no mês, em 12 meses e desde o início',
     href: '/investimento/desempenho',
-    keywords: ['desempenho', 'rentabilidade', 'rendimento', '% do cdi', 'cdi', 'ipca', 'poupança', 'evolução', 'comparar', 'investimentos'],
+    keywords: ['desempenho', 'rentabilidade', 'rendimento', '% do cdi', 'cdi', 'ipca', 'poupança', 'poupanca', 'indicadores', 'inflação', 'evolução', 'comparar', 'investimentos'],
   },
   {
     id: 'investimentos-comparar',

@@ -217,8 +217,6 @@ blockquote>:last-child{margin-bottom:0}
 @media (min-width:56rem){.duas-colunas{grid-template-columns:repeat(2,minmax(0,1fr))}.duas-colunas>p{margin-bottom:0}}
 /* As ressalvas de Para empresas numa nota curta depois de "Como funciona" (revisão de 18/11/2026), e não em cartões antes dele. */
 .nota-ressalvas{max-width:52rem;font-size:.9375rem}
-/* O aviso de saúde no fim da página inicial (D-115): uma nota curta e discreta, separada do contato por uma linha. */
-.aviso-final{max-width:46rem;margin:2rem 0 0;padding-top:1rem;border-top:1px solid var(--linha);color:var(--texto-2);font-size:.875rem}
 .pequeno{font-size:.9375rem}
 
 /* Cartões e grades */
@@ -240,11 +238,12 @@ blockquote>:last-child{margin-bottom:0}
 .plano-link:has(a:focus-visible){outline:3px solid var(--foco);outline-offset:3px}
 .plano-link .ver-plano a:focus-visible{outline:none}
 @media (prefers-reduced-motion:reduce){.plano-link{transition:none}}
-/* A página Planos: os dois cartões com o que muda, os recursos em grupos e as perguntas. */
-.plano-detalhe{scroll-margin-top:1rem;display:flex;flex-direction:column}
-.plano-detalhe>:last-child{margin-top:auto}
-.plano-detalhe:target{border-color:var(--link);border-width:2px}
-.plano-detalhe ul{margin:.25rem 0 1rem}
+/* Planos (19/11/2026): em planos.html, os dois cartões com o link embaixo, na mesma altura; na página de cada plano, o preço na capa, ao
+   lado do nome, os recursos em grupos e as perguntas. */
+.plano-link{display:flex;flex-direction:column}
+.plano-link>.ver-plano{margin-top:auto}
+.preco-capa{margin:.35rem 0 .75rem;color:var(--sobre-topo-suave);font-size:1.0625rem}
+.preco-capa .preco-valor{display:block;font-size:clamp(2.1rem,6vw,2.6rem);font-weight:800;line-height:1.15;color:var(--sobre-topo);font-variant-numeric:tabular-nums}
 /* Os grupos de recursos em duas colunas equilibradas a partir de 46 rem (em vez de três colunas com uma vazia), sem partir um grupo. */
 .grupos-recursos{columns:2 21rem;column-gap:2.5rem}
 .recursos-plano{break-inside:avoid;margin:0 0 1.25rem}
@@ -323,10 +322,6 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .ve-nao-ve{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(20rem,100%),1fr))}
 .ve-nao-ve .cartao{border-width:2px}
 .ve-nao-ve h3{margin-top:0}
-.lista-nao-faz{border-width:2px;margin:0 0 1rem}
-.lista-nao-faz ul{list-style:none;padding:0;margin:0}
-.lista-nao-faz li{position:relative;padding-left:1.5rem}
-.lista-nao-faz li::before{content:"";position:absolute;left:0;top:.62em;width:.6rem;height:.6rem;background:var(--texto);transform:rotate(45deg);border-radius:2px}
 .ve-nao-ve ul{list-style:none;padding:0}
 .ve-nao-ve li{position:relative;padding-left:1.5rem}
 .ve-nao-ve li::before{content:"";position:absolute;left:0;top:.62em;width:.6rem;height:.6rem}
@@ -334,6 +329,24 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .ve li::before{border-radius:50%;background:var(--azul)}
 .nunca-ve{border-color:var(--texto)!important}
 .nunca-ve li::before{background:var(--texto);transform:rotate(45deg);border-radius:2px}
+
+/* Segurança (19/11/2026, pedido do Enzo): o que não vende fica no fim, em perguntas recolhidas (<details> fechado), sem caixa: uma linha
+   entre uma e outra, a seta que vira ao abrir e o texto inteiro dentro. Funciona sem JavaScript. */
+.duvidas{max-width:52rem;margin:.25rem 0 1.5rem;border-top:1px solid var(--linha)}
+.duvida{border-bottom:1px solid var(--linha)}
+.duvida>summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:48px;padding:.55rem 0;font-weight:700;cursor:pointer;list-style:none}
+.duvida>summary::-webkit-details-marker{display:none}
+.duvida>summary::after{content:"";flex:none;width:.55rem;height:.55rem;margin-right:.35rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.duvida[open]>summary::after{transform:translateY(2px) rotate(-135deg)}
+.duvida>summary:hover{color:var(--link)}
+.duvida-corpo{padding:0 0 1.25rem;color:var(--texto-2)}
+.duvida-corpo>:first-child{margin-top:0}
+.duvida-corpo>:last-child{margin-bottom:0}
+.duvida-corpo h3{margin:1rem 0 .35rem;font-size:1rem;color:var(--texto)}
+.duvida-corpo h3:first-child{margin-top:0}
+.duvida-corpo ul{margin:0 0 .75rem;padding-left:1.2rem}
+.duvida-corpo li{margin:.3rem 0}
+.duvidas+p{max-width:52rem}
 
 /* Tabelas dos textos jurídicos */
 .tabela table{width:100%;border-collapse:collapse;font-size:.9375rem}
@@ -523,22 +536,13 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
   .post-secao .post-tela.celular{max-width:13rem;margin:2.25rem 0 1.5rem}
 }
 
-/* Vídeos de uso do app (D-114 e D-115, 18/11/2026): cada vídeo fica na moldura de celular do bloco que ele mostra, no lugar da captura, e
-   toca sozinho, sem som, enquanto aparece (js/videos.js). O botão "Pausar" ou "Tocar" fica embaixo da legenda, fora da tela do celular
-   (44 px de altura, o foco de sempre). Sem JavaScript, não há botão: fica a capa. */
+/* Vídeos de uso do app (D-114 e D-115): cada vídeo fica na moldura de celular do bloco que ele mostra, no lugar da captura, e toca
+   sozinho, sem som, enquanto aparece (js/videos.js). Sem botão de pausar (Enzo, 19/11/2026): tocar no próprio vídeo pausa e toca de
+   novo, e pelo teclado o vídeo recebe foco e Enter ou Espaço fazem o mesmo (o foco de sempre). Sem JavaScript, fica a capa. */
 .celular-moldura{position:relative}
 .celular video{display:block;width:100%;height:auto;border-radius:30px;background:#F7F9FD;object-fit:cover}
-.video-botao{display:flex;align-items:center;justify-content:center;gap:.45rem;min-height:44px;margin:.35rem auto 0;padding:0 1rem;border:1px solid var(--contorno);border-radius:999px;background:transparent;color:var(--texto);font:inherit;font-size:.875rem;font-weight:700;line-height:1;cursor:pointer}
-.video-botao:hover{border-color:var(--link)}
-.video-botao-icone{display:inline-flex;align-items:center;gap:3px}
-.video-botao-icone::before,.video-botao-icone::after{content:"";display:block}
-.video-botao[data-estado="tocando"] .video-botao-icone::before,.video-botao[data-estado="tocando"] .video-botao-icone::after{width:4px;height:12px;border-radius:1px;background:currentColor}
-.video-botao[data-estado="parado"] .video-botao-icone::before{width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;border-color:transparent transparent transparent currentColor}
-.video-botao[data-estado="parado"] .video-botao-icone::after{display:none}
-.capa .video-botao{border-color:var(--sobre-topo);color:var(--sobre-topo)}
-/* Numa linha de cartões com vídeo e com captura, a captura reserva embaixo da legenda o lugar do botão, para as molduras ficarem na mesma
-   altura (o script marca o <html> com data-videos quando põe os botões; sem JavaScript, não há botão nem reserva). */
-:root[data-videos] :is(.mini,.grade):has(.celular-video) .cartao>.celular:not(.celular-video)>figcaption::after{content:"";display:block;height:calc(44px + .35rem)}
+.celular video[tabindex]{cursor:pointer}
+.celular video:focus-visible{outline-offset:4px;border-radius:30px}
 
 /* Ajuda */
 .busca{margin:0 0 1.5rem}
@@ -647,11 +651,11 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 }
 
 @media print{
-  .pular,.menu,.busca,.rodape-grade,.acoes,.tema-site,.video-botao,.confianca svg{display:none!important}
+  .pular,.menu,.busca,.rodape-grade,.acoes,.tema-site,.confianca svg{display:none!important}
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa::before{display:none}
-  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa a,.meta-tema,.migalha,.migalha a{color:#000}
+  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa a,.meta-tema,.migalha,.migalha a,.preco-capa,.preco-capa .preco-valor{color:#000}
   .marca .logo-tela{display:none}
   .marca .logo-papel{display:block}
   .rodape{background:#fff;color:#000}

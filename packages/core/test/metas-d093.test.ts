@@ -70,6 +70,8 @@ describe('D-093: ritmo da meta', () => {
       countedMonths: 2,
       plannedMonthlyCents: 30_000,
       missingCents: 240_000,
+      currentMonth: '2026-11',
+      targetMonth: null,
     });
     expect(goalPace(meta({ depositsCents: 30_000, savedCents: 30_000 }), TODAY)?.monthsBehind).toBe(1);
     expect(goalPace(meta(), TODAY)?.monthsBehind).toBe(2);
@@ -101,8 +103,12 @@ describe('D-093: ritmo da meta', () => {
   it('os textos dizem o ritmo, o que falta e de onde vem a conta, sem julgar', () => {
     const P = GOALS_TEXT.pace;
     expect(P.line(goalPace(meta({ depositsCents: 60_000, savedCents: 60_000 }), TODAY)!)).toBe('No ritmo do plano · faltam R$ 2.400,00');
-    expect(P.line(goalPace(meta({ depositsCents: 30_000, savedCents: 30_000 }), TODAY)!)).toBe('1 mês atrás do plano · faltam R$ 2.700,00');
-    expect(P.line(goalPace(meta(), TODAY)!)).toBe('2 meses atrás do plano · faltam R$ 3.000,00');
+    // Fora do ritmo, o fato, sem "atrás do plano" (auditoria visual de 18/11/2026): sem prazo, quando chega lá com o plano; com prazo,
+    // quanto por mês até ele.
+    expect(P.line(goalPace(meta({ depositsCents: 30_000, savedCents: 30_000 }), TODAY)!)).toBe('Faltam R$ 2.700,00 · com R$ 300,00 por mês, chega lá em julho de 2027');
+    expect(P.line(goalPace(meta(), TODAY)!)).toBe('Faltam R$ 3.000,00 · com R$ 300,00 por mês, chega lá em agosto de 2027');
+    expect(P.line(goalPace(meta({ targetMonth: '2027-06' }), TODAY)!)).toBe('Para chegar em junho de 2027: R$ 375,00 por mês');
+    for (const t of [P.line(goalPace(meta(), TODAY)!), P.line(goalPace(meta({ targetMonth: '2027-06' }), TODAY)!)]) expect(t).not.toMatch(/atrás|atrasad|plano\b.*falta/i);
     expect(P.note(goalPace(meta(), TODAY)!)).toBe(
       'Compara os aportes menos os resgates com o plano de R$ 300,00 por mês, a partir de setembro de 2026, só nos meses já fechados. O que já estava guardado ao criar e os rendimentos não entram.',
     );
@@ -209,7 +215,7 @@ describe('D-093: textos novos seguem as regras de redação', () => {
     const all = [
       ...Object.values(GOALS_TEXT.order).map((v) => (typeof v === 'function' ? v('Viagem' as never) : v)),
       GOALS_TEXT.pace.onTrack,
-      GOALS_TEXT.pace.behind(3),
+      GOALS_TEXT.pace.line(goalPace(meta(), TODAY)!),
       GOALS_TEXT.form.typeHelp,
       GOALS_TEXT.form.typeHelpBody,
       GOALS_TEXT.form.deadlineShortcuts,

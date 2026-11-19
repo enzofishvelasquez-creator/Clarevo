@@ -2185,7 +2185,8 @@ describe('textos de Exportar meus dados (D-047)', () => {
   it('os avisos que a especificação pede estão no texto', () => {
     expect(EXPORT_TEXT.valuesNote).toBe('O arquivo mostra os valores, mesmo com Ocultar valores ligado.');
     expect(EXPORT_TEXT.portability).toContain('art. 18, V, da LGPD');
-    expect(EXPORT_TEXT.portability).toContain('não é parecer jurídico');
+    // Só a referência (auditoria de 18/11/2026): a frase "Esta tela não é parecer jurídico" saiu da tela.
+    expect(EXPORT_TEXT.portability).not.toContain('parecer jurídico');
     expect(EXPORT_TEXT.intro).toContain('montado neste aparelho');
     expect(EXPORT_TEXT.intro).toContain('não guarda cópia');
     // No Android a cópia temporária fica até a próxima exportação ou até a tela abrir (o app de destino lê o arquivo depois).

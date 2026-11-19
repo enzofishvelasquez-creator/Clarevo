@@ -35,7 +35,10 @@ export const PLANO_TEXT = {
     typeHint: 'Parcelada: financiamento, compra parcelada ou outro parcelamento, com parcela fixa até o fim. Saldo com juros: rotativo do cartão, cheque especial ou outra dívida em que os juros entram todo mês sobre o que falta.',
     balanceStays: 'Com este pagamento, o saldo não diminui.',
     baselineCaption: 'Cada dívida só com os pagamentos de sempre, sem passar nada adiante.',
-    balanceStaysNote: (name, interestCents) => `${name} fica fora da comparação até o pagamento ser maior que os juros do primeiro mês (${formatBRL(interestCents)}).`,
+    balanceStaysNote: (name, interestCents) => `${name}: com o pagamento de sempre, o saldo não diminui (juros de ${formatBRL(interestCents)} no primeiro mês). A dívida continua no plano e diminui só com o valor a mais ou com o pagamento de uma dívida que acabe.`,
+    unknownRateNote: (names, many, several) => `Sem a taxa de ${names}, a conta usa só as parcelas, como se não houvesse juros. ${many
+        ? `O saldo real, os juros estimados e o lugar ${several ? 'dessas dívidas' : 'dessa dívida'} em "Maior taxa primeiro" ficam incertos, e as diferenças entre as ordens valem só com essa hipótese.`
+        : 'O saldo real e os juros estimados ficam incertos.'} Informe a taxa do contrato para comparar.`,
     savingsHint: (cents) => `No seu plano de guardar você informou ${formatBRL(cents)} por mês.`,
     noDebtCompared: 'Nenhuma dívida entra na comparação ainda.',
     noEnd: 'Com estes números, as dívidas não terminam em 50 anos.',
@@ -43,7 +46,7 @@ export const PLANO_TEXT = {
     sequenceTitle: 'Em que ordem cada dívida termina',
     detailsTitle: 'Detalhes de cada ordem',
     scenario: {
-        sem_extra: 'Sem valor a mais',
+        sem_extra: 'Pagamentos atuais, sem repasse',
         com_extra: 'Com o valor a mais',
         maior_taxa: 'Maior taxa primeiro',
         menor_divida: 'Menor dívida primeiro',
@@ -55,6 +58,7 @@ export const PLANO_TEXT = {
         end: 'Tudo termina em',
         interest: 'Juros estimados',
     },
+    baselineOne: 'Sem valor a mais',
     rowNever: {
         first: 'nenhuma em 50 anos',
         end: 'mais de 50 anos',
@@ -74,7 +78,10 @@ export const PLANO_TEXT = {
         snowballNoExtra: 'Os pagamentos das dívidas que acabam vão para a primeira dívida da ordem que ainda não acabou; o que sobrar passa para a seguinte, no mesmo mês.',
         extraOnly: 'O valor a mais vai para a dívida todo mês, além do pagamento de sempre.',
         orders: 'Maior taxa primeiro: o que sobra vai antes para a dívida com a maior taxa ao mês. Menor dívida primeiro: vai antes para a dívida com o menor saldo hoje. Empate: a outra regra, depois a ordem da lista.',
-        baseline: 'O ganho é comparado com pagar só o de sempre em cada dívida, sem o valor a mais e sem passar nada adiante.',
+        baseline: 'O ganho é comparado com os pagamentos atuais, sem repasse: cada dívida só com o pagamento de sempre, sem o valor a mais e sem passar adiante o pagamento das que acabam.',
+        baselineOne: 'O ganho é comparado com pagar só o de sempre, sem o valor a mais.',
+        twoEffects: 'Com valor a mais, o ganho junta o efeito do valor a mais e o de passar adiante os pagamentos das dívidas que acabam; a frase "Só passando adiante os pagamentos" mostra o segundo sozinho.',
+        cents: 'Juros de cada mês no centavo, metade para cima; o saldo de uma parcelada segue a tabela do contrato, arredondada uma vez por mês.',
         presentValue: 'O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada. A parcela segue a tabela do contrato e o valor a mais abate o saldo.',
         overdueOut: 'Dos seus parcelamentos, entram só as parcelas que vencem de hoje em diante; as já vencidas e em aberto ficam fora desta conta.',
         noRate: (name) => `${name}: sem juros informados, conta só as parcelas.`,
@@ -131,6 +138,7 @@ export const PLANO_FIELDS = {
     },
 };
 const BP = 10000n;
+const BALANCE_LIMIT = 10 ** 15;
 function monthInterest(balance, bp) {
     return Number(roundDivBig(BigInt(balance) * BigInt(bp), BP));
 }
@@ -153,7 +161,7 @@ export function installmentTable(parcela, bp, count) {
     }
     return table;
 }
-function simulate(debts, pool) {
+function simulate(debts, pool, trail) {
     const balance = debts.map((d) => d.initial);
     const applied = debts.map(() => 0);
     const closedAt = debts.map(() => 0);
@@ -161,31 +169,36 @@ function simulate(debts, pool) {
     let interest = 0;
     for (let month = 1; month <= PLANO_MAX_MONTHS; month++) {
         let used = 0;
+        const rows = debts.map(() => null);
         for (let i = 0; i < debts.length; i++) {
             const open = balance[i];
             if (open <= 0)
                 continue;
             const d = debts[i];
             let pay;
+            let j;
             if (d.table !== null) {
                 const grown = applied[i] + monthInterest(applied[i], d.bp);
                 const gap = d.table[Math.max(0, d.term - month)] - grown;
                 const after = Math.max(0, gap);
                 pay = Math.min(d.minimum, Math.max(0, gap + d.minimum));
                 applied[i] = grown;
-                interest += after + pay - open;
+                j = after + pay - open;
                 balance[i] = after;
             }
             else {
-                const j = monthInterest(open, d.bp);
-                interest += j;
+                j = monthInterest(open, d.bp);
                 const owed = open + j;
                 pay = Math.min(d.minimum, owed);
                 balance[i] = owed - pay;
             }
+            interest += j;
             totalPaid += pay;
             used += pay;
+            if (trail)
+                rows[i] = { index: trail.indexes[i], name: trail.names[i], openingCents: open, interestCents: j, paymentCents: pay, extraCents: 0, closingCents: balance[i] };
         }
+        let residue = 0;
         if (pool) {
             let rest = Math.max(0, pool.budget - used);
             for (const i of pool.order) {
@@ -198,16 +211,33 @@ function simulate(debts, pool) {
                     applied[i] = applied[i] + pay;
                     rest -= pay;
                     totalPaid += pay;
+                    const row = rows[i];
+                    if (row) {
+                        row.extraCents = pay;
+                        row.closingCents = balance[i];
+                    }
                 }
             }
+            residue = rest;
         }
+        if (trail)
+            trail.out.push({ month, rows: rows.filter((r) => r !== null), residueCents: residue });
         for (let i = 0; i < debts.length; i++)
             if (balance[i] === 0 && closedAt[i] === 0)
                 closedAt[i] = month;
         if (closedAt.every((c) => c > 0))
             return { months: month, totalPaid, interest, closedAt };
+        if (balance.some((b) => b > BALANCE_LIMIT))
+            break;
     }
     return { months: null, totalPaid: 0, interest: 0, closedAt };
+}
+function ordersOf(sim) {
+    const positions = sim.map((_, k) => k);
+    return {
+        byRate: [...positions].sort((a, b) => sim[b].bp - sim[a].bp || sim[a].initial - sim[b].initial || a - b),
+        bySize: [...positions].sort((a, b) => sim[a].initial - sim[b].initial || sim[b].bp - sim[a].bp || a - b),
+    };
 }
 export function planoDebtStays(d) {
     if (d.tipo !== 'saldo')
@@ -226,7 +256,7 @@ export function planoDebtName(apelido, index) {
 const lowerFirst = (text) => text.charAt(0).toLowerCase() + text.slice(1);
 const calendarMonth = (today, months) => (today === undefined ? null : addMonths(monthOf(today), months));
 function buildScenario(id, sim, included, today, caption = null, withSequence = false) {
-    const title = PLANO_TEXT.scenario[id];
+    const title = id === 'sem_extra' && included.length === 1 ? PLANO_TEXT.baselineOne : PLANO_TEXT.scenario[id];
     if (sim.months === null) {
         return {
             id,
@@ -312,9 +342,10 @@ function planStart(order, closedAt, included, extraCents) {
     const k = order.find((i) => closedAt[i] > first);
     return k === undefined ? null : included[k].name;
 }
-function buildPlan(id, title, order, sim, included, extraCents, today, base, scenario) {
+function buildPlan(id, title, order, sim, included, extraCents, today, base, scenario, repasse = null) {
+    const repasseOnly = repasse === null ? null : { months: repasse.months, interestCents: repasse.months === null ? null : repasse.interest };
     if (sim.months === null)
-        return { id, title, startName: null, steps: [PLANO_TEXT.noEnd], gain: null };
+        return { id, title, startName: null, steps: [PLANO_TEXT.noEnd], gain: null, repasseOnly };
     const many = included.length > 1;
     const startName = planStart(order, sim.closedAt, included, extraCents);
     const steps = [];
@@ -340,17 +371,43 @@ function buildPlan(id, title, order, sim, included, extraCents, today, base, sce
         steps.push(`${stepWhen(m, today)}: ${names} ${verb}. ${their} ${group.length === 1 ? 'passa' : 'passam'} para ${target}${receives !== freed ? `, que fica com ${brl(receives)} por mês além do pagamento de sempre` : ''}.`);
     }
     let gain = null;
+    const parts = (months, interestCents) => {
+        const earlier = base.months - months;
+        const saved = base.interestCents - interestCents;
+        return [...(earlier > 0 ? [`${monthsCount(earlier)} antes`] : []), ...(saved > 0 ? [`${brl(saved)} a menos de juros`] : [])];
+    };
     if (base.months === null) {
-        gain = `Só com o de sempre, ${many ? 'as dívidas não terminariam' : 'a dívida não terminaria'} em 50 anos.`;
+        gain = many
+            ? 'Com os pagamentos atuais, sem repasse, as dívidas não terminariam em 50 anos.'
+            : 'Só com o de sempre, a dívida não terminaria em 50 anos.';
     }
     else {
-        const earlier = base.months - scenario.months;
-        const saved = base.interestCents - scenario.interestCents;
-        const parts = [...(earlier > 0 ? [`${monthsCount(earlier)} antes`] : []), ...(saved > 0 ? [`${brl(saved)} a menos de juros`] : [])];
-        if (parts.length > 0)
-            gain = `Ganho estimado, em relação a pagar só o de sempre: ${parts.join(' e ')}.`;
+        const p = parts(scenario.months, scenario.interestCents);
+        if (p.length > 0) {
+            const against = !many
+                ? 'em relação a pagar só o de sempre'
+                : extraCents > 0
+                    ? 'em relação aos pagamentos atuais, sem repasse'
+                    : 'só por passar adiante os pagamentos das dívidas que acabam, sem dinheiro a mais';
+            gain = `Ganho estimado, ${against}: ${p.join(' e ')}.`;
+        }
     }
-    return { id, title, startName, steps, gain };
+    if (repasseOnly !== null) {
+        let line;
+        if (repasseOnly.months === null)
+            line = 'Só passando adiante os pagamentos, sem o valor a mais, as dívidas não terminariam em 50 anos.';
+        else if (base.months === null)
+            line = `Só passando adiante os pagamentos, sem o valor a mais, tudo terminaria em ${monthsCount(repasseOnly.months)}.`;
+        else {
+            const p = parts(repasseOnly.months, repasseOnly.interestCents);
+            line =
+                p.length > 0
+                    ? `Só passando adiante os pagamentos, sem o valor a mais, seriam ${p.join(' e ')}.`
+                    : 'Só passando adiante os pagamentos, sem o valor a mais, o fim e os juros seriam os mesmos dos pagamentos atuais.';
+        }
+        gain = gain === null ? line : `${gain} ${line}`;
+    }
+    return { id, title, startName, steps, gain, repasseOnly };
 }
 function buildComparison(orders) {
     const R = PLANO_TEXT.rows;
@@ -453,7 +510,8 @@ export function calcPlanoDividas(input, today) {
                 minimumCents: parcela,
                 firstInterestCents: Math.max(0, table[restantes - 1] + parcela - initial),
                 restantes,
-                excluded: false,
+                stays: false,
+                unknownRate: rate === null,
             });
         }
         else if (d.tipo === 'saldo') {
@@ -472,7 +530,8 @@ export function calcPlanoDividas(input, today) {
                 minimumCents: pagamento,
                 restantes: null,
                 firstInterestCents: firstInterest,
-                excluded: planoDebtStays(d),
+                stays: planoDebtStays(d),
+                unknownRate: false,
             });
         }
         else {
@@ -482,7 +541,7 @@ export function calcPlanoDividas(input, today) {
     if (!r.ok || extra === undefined)
         return { ok: false, errors: r.errors };
     const extraCents = extra ?? 0;
-    const included = infos.filter((d) => !d.excluded);
+    const included = infos;
     const sim = included.map((d) => ({
         initial: d.initialCents,
         bp: d.rateBp ?? 0,
@@ -518,19 +577,20 @@ export function calcPlanoDividas(input, today) {
             }
         }
         else {
-            const positions = sim.map((_, k) => k);
-            const byRate = [...positions].sort((a, b) => sim[b].bp - sim[a].bp || sim[a].initial - sim[b].initial || a - b);
-            const bySize = [...positions].sort((a, b) => sim[a].initial - sim[b].initial || sim[b].bp - sim[a].bp || a - b);
+            const { byRate, bySize } = ordersOf(sim);
             const runRate = simulate(sim, { order: byRate, budget });
             const runSize = simulate(sim, { order: bySize, budget });
+            const repasseBudget = budget - extraCents;
+            const repasseRate = extraCents > 0 ? simulate(sim, { order: byRate, budget: repasseBudget }) : null;
+            const repasseSize = extraCents > 0 ? simulate(sim, { order: bySize, budget: repasseBudget }) : null;
             const maior = buildScenario('maior_taxa', runRate, included, today);
             const menor = buildScenario('menor_divida', runSize, included, today);
             scenarios.push(maior, menor);
             diff = differences(maior, menor);
             same = sameOutcome(maior, menor);
             headline = headlineOf(included, extraCents, base, [maior, menor]);
-            const planRate = buildPlan('maior_taxa', maior.title, byRate, runRate, included, extraCents, today, base, maior);
-            const planSize = buildPlan('menor_divida', menor.title, bySize, runSize, included, extraCents, today, base, menor);
+            const planRate = buildPlan('maior_taxa', maior.title, byRate, runRate, included, extraCents, today, base, maior, repasseRate);
+            const planSize = buildPlan('menor_divida', menor.title, bySize, runSize, included, extraCents, today, base, menor, repasseSize);
             const cmp = buildComparison([
                 { scenario: maior, start: planRate.startName },
                 { scenario: menor, start: planSize.startName },
@@ -563,14 +623,25 @@ export function calcPlanoDividas(input, today) {
         hypotheses.push(extraCents > 0 ? H.snowballWithExtra : H.snowballNoExtra, H.orders);
     else if (included.length === 1 && extraCents > 0)
         hypotheses.push(H.extraOnly);
-    if (included.length > 1 || extraCents > 0)
+    if (included.length > 1)
         hypotheses.push(H.baseline);
+    else if (extraCents > 0)
+        hypotheses.push(H.baselineOne);
+    if (included.length > 1 && extraCents > 0)
+        hypotheses.push(H.twoEffects);
     if (included.some((d) => d.tipo === 'parcelada' && d.rateBp !== null))
         hypotheses.push(H.presentValue);
     for (const d of included)
         if (d.tipo === 'parcelada' && d.rateBp === null)
             hypotheses.push(H.noRate(d.name));
-    const notes = [PLANO_ESTIMATE_TEXT, ...infos.filter((d) => d.excluded).map((d) => PLANO_TEXT.balanceStaysNote(d.name, d.firstInterestCents))];
+    if (included.length > 0)
+        hypotheses.push(H.cents);
+    const unknown = infos.filter((d) => d.unknownRate).map((d) => d.name);
+    const notes = [
+        PLANO_ESTIMATE_TEXT,
+        ...(unknown.length > 0 ? [PLANO_TEXT.unknownRateNote(namesList(unknown), included.length > 1, unknown.length > 1)] : []),
+        ...infos.filter((d) => d.stays).map((d) => PLANO_TEXT.balanceStaysNote(d.name, d.firstInterestCents)),
+    ];
     return {
         ok: true,
         result: {
@@ -590,6 +661,40 @@ export function calcPlanoDividas(input, today) {
             notes,
         },
     };
+}
+export function planoTrail(input, scenario, options = {}) {
+    const out = calcPlanoDividas(input);
+    if (!out.ok)
+        return null;
+    const debts = out.result.debts;
+    if (debts.length === 0)
+        return null;
+    const sim = debts.map((d) => ({
+        initial: d.initialCents,
+        bp: d.rateBp ?? 0,
+        minimum: d.minimumCents,
+        term: d.restantes,
+        table: d.tipo === 'parcelada' ? installmentTable(d.minimumCents, d.rateBp ?? 0, d.restantes) : null,
+    }));
+    const extra = options.repasseOnly === true ? 0 : out.result.extraCents;
+    const budget = extra + sim.reduce((sum, d) => sum + d.minimum, 0);
+    const { byRate, bySize } = ordersOf(sim);
+    let pool;
+    if (scenario === 'sem_extra')
+        pool = null;
+    else if (scenario === 'com_extra') {
+        if (debts.length !== 1)
+            return null;
+        pool = { order: [0], budget };
+    }
+    else {
+        if (debts.length < 2)
+            return null;
+        pool = { order: scenario === 'maior_taxa' ? byRate : bySize, budget };
+    }
+    const trail = [];
+    const run = simulate(sim, pool, { names: debts.map((d) => d.name), indexes: debts.map((d) => d.index), out: trail });
+    return { months: run.months, trail };
 }
 export function seriesDebtDrafts(items, today) {
     const out = [];

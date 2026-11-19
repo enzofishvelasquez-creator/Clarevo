@@ -126,7 +126,8 @@ export const INVESTMENT_GOAL_TEXT = {
   note: 'Só informação: o valor guardado é o que você registra aqui. O valor de cada investimento vem da última atualização dele, na aba Investir.',
   /** Nos cards de Metas e no detalhe, quando o valor guardado vem dos registros: "Investimentos ligados: R$ 10.875,00, não somados ao guardado". */
   notCounted: (valueCents: Cents) => `Investimentos ligados: ${formatBRL(valueCents)}, não somados ao guardado`,
-  notCountedSee: 'Ver',
+  /** O link inteiro, sem "Ver" solto (auditoria de 18/11/2026). */
+  notCountedSee: 'Ver os investimentos ligados',
   notCountedSeeA11y: 'Ver os investimentos ligados',
   invalid: 'Esta meta não pode mais ser escolhida. Escolha outra ou deixe sem meta.',
   archivedNote: 'A meta ligada a este investimento foi arquivada. Ao salvar, a ligação sai.',

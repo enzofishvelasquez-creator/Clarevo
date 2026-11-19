@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { MULTA_CARD_TEXT, MULTA_EXACT_TEXT, MULTA_FATURA_FIELDS, MULTA_FATURA_TEXT, MULTA_FIELDS, calcErrorText, calcFields, calcMultaEJuros, calcPrefill, multaLink, type MultaInput } from '../src';
+import {
+  FATURA_CYCLE_DAYS,
+  MULTA_CARD_TEXT,
+  MULTA_CONSUMER_FINE_TEXT,
+  MULTA_EXACT_TEXT,
+  MULTA_FATURA_FIELDS,
+  MULTA_FATURA_HYPOTHESES,
+  MULTA_FATURA_TEXT,
+  MULTA_FIELDS,
+  calcErrorText,
+  calcFields,
+  calcMultaEJuros,
+  calcPrefill,
+  multaLink,
+  type MultaInput,
+} from '../src';
 
 const run = (input: MultaInput) => {
   const out = calcMultaEJuros(input);
@@ -49,6 +64,14 @@ describe('4. Multa e juros por atraso (docs/08 §3.2)', () => {
     expect(MULTA_FIELDS.jurosMesPct!.hint).toBe('Está no boleto ou no contrato.');
     const card = calcMultaEJuros({ valor: '1.722,40', multaPct: '2', jurosMesPct: '21,90', dias: '20' });
     expect(card.ok && card.result.notes).toEqual([MULTA_EXACT_TEXT, MULTA_CARD_TEXT]);
+    // Revisão externa de 18/11/2026: acima de 2%, o aviso das relações de consumo (CDC, art. 52, § 1º), sem validar nem generalizar.
+    const high = run({ valor: '200,00', multaPct: '10', jurosMesPct: '1', dias: '10' });
+    expect(high.aboveConsumerFine).toBe(true);
+    expect(high.fineCents).toBe(2_000);
+    expect(high.notes).toEqual([MULTA_CONSUMER_FINE_TEXT, MULTA_EXACT_TEXT, MULTA_CARD_TEXT]);
+    expect(MULTA_CONSUMER_FINE_TEXT).toContain('outras obrigações, como aluguel e tributos, têm regras próprias');
+    expect(MULTA_CONSUMER_FINE_TEXT).not.toMatch(/atras/i);
+    expect(run({ valor: '200,00', multaPct: '2', jurosMesPct: '1', dias: '10' }).aboveConsumerFine).toBe(false);
     // D-093: a fatura do cartão tem o modo próprio; a nota da conta aponta para ele.
     expect(MULTA_CARD_TEXT).toBe('Para a fatura do cartão, escolha "Fatura do cartão" no começo: a conta soma o rotativo, a mora, a multa e o IOF.');
     expect(calcErrorText('multa-e-juros', 'dias', 'fora_da_faixa')).toBe('Use de 1 a 3.650 dias.');
@@ -68,23 +91,57 @@ describe('Multa e juros, modo "Fatura do cartão" (D-093, era D-089 G)', () => {
       'Multa: R$ 20,00',
       'IOF estimado: R$ 6,26',
     ]);
-    expect(r.hypotheses[2]).toBe('IOF de pessoa física: 0,38% mais 0,0082% por dia, até 365 dias.');
+    // Revisão externa de 18/11/2026: sem "a fatura pode vir um pouco maior"; o IOF é uma hipótese simplificada, não o valor legal.
+    expect(r.hypotheses).toEqual([MULTA_FATURA_HYPOTHESES.interest, MULTA_FATURA_HYPOTHESES.cycle, MULTA_FATURA_HYPOTHESES.fine, MULTA_FATURA_HYPOTHESES.iof]);
+    expect(r.hypotheses.join(' ')).not.toMatch(/um pouco maior/);
+    expect(MULTA_FATURA_HYPOTHESES.iof).toContain('hipótese simplificada');
+    expect(MULTA_FATURA_HYPOTHESES.iof).toContain('Não é o valor legal');
     expect(r.notes).toEqual([MULTA_FATURA_TEXT.rotativo, MULTA_FATURA_TEXT.exact]);
+    expect([r.cycleDays, r.beyondCycle, r.aboveConsumerFine]).toEqual([30, false, false]);
     const text = [...r.resultLines, ...r.hypotheses, ...r.notes].join(' ');
     expect(text).not.toMatch(/atras/i);
   });
 
   it('teto da Lei 14.690/2023: rotativo, mora e multa param no valor não pago (o IOF fica fora do teto)', () => {
-    const r = run(fatura({ dias: '365' }));
+    // Rotativo de 99% por 30 dias: 990,00 + 10,00 de mora + 20,00 de multa passam de 1.000,00. A multa fica e os juros são reduzidos na
+    // mesma proporção até caber nos 980,00 que sobram: mora = piso(1.000 × 98.000 ÷ 100.000) = 980 centavos; rotativo = 97.020.
+    const r = run(fatura({ rotativoPct: '99' }));
     expect(r.capped).toBe(true);
+    expect([r.rotativoCents, r.moraCents, r.fineCents]).toEqual([97_020, 980, 2_000]);
     expect(r.rotativoCents! + r.moraCents! + r.fineCents).toBe(100_000);
-    expect(r.fineCents).toBe(2_000);
-    expect(r.iofCents).toBe(3_373);
-    expect(r.totalCents).toBe(200_000 + 3_373);
+    expect(r.iofCents).toBe(626);
+    expect(r.totalCents).toBe(200_000 + 626);
     expect(r.notes[0]).toBe(MULTA_FATURA_TEXT.cap);
     expect(MULTA_FATURA_TEXT.cap).toContain('Lei 14.690/2023');
-    // Bem perto do teto, ainda sem cortar.
+    // Bem longe do teto, sem reduzir.
     expect(run(fatura({ dias: '30' })).capped).toBe(false);
+  });
+
+  it('só o primeiro ciclo: com mais de 30 dias, a conta para na próxima fatura e diz que não projeta o resto (revisão externa de 18/11/2026)', () => {
+    // Antes, 365 dias aplicavam o mesmo rotativo o ano inteiro (R$ 2.033,73). O rotativo só vale até a fatura seguinte.
+    const r = run(fatura({ dias: '365' }));
+    expect(FATURA_CYCLE_DAYS).toBe(30);
+    expect([r.cycleDays, r.beyondCycle, r.dias]).toEqual([30, true, 365]);
+    expect([r.rotativoCents, r.moraCents, r.fineCents, r.iofCents, r.totalCents]).toEqual([15_000, 1_000, 2_000, 626, 118_626]);
+    expect(r.resultLines[0]).toBe('Com estes números, até a próxima fatura (30 dias depois do vencimento) a fatura fica em R$ 1.186,26.');
+    expect(r.notes[0]).toBe(MULTA_FATURA_TEXT.beyondCycle(365));
+    expect(r.notes[0]).toBe(
+      'Você informou 365 dias. O rotativo só vale até a próxima fatura: depois, o que falta passa para o parcelamento ou outra modalidade, com outra taxa e outros pagamentos, e a conta não projeta esse período. Peça o valor atualizado à instituição.',
+    );
+    expect(r.resultLines.join(' ')).not.toContain('2.033,73');
+    expect(MULTA_FATURA_FIELDS.dias!.hint).toBe('A conta vai até a próxima fatura, 30 dias depois do vencimento.');
+  });
+
+  it('IOF da hipótese simplificada: valor × (0,38% + 0,0082% × dias), conferido à mão; multa acima de 2% na fatura tem o aviso do CDC', () => {
+    // 1.000,00 × (0,0038 + 0,000082 × 10) = 1.000,00 × 0,00462 = 4,62.
+    expect(run(fatura({ dias: '10' })).iofCents).toBe(462);
+    // 2.345,67 × (0,0038 + 0,000082 × 30) = 2.345,67 × 0,00626 = 14,684... → 14,68.
+    expect(run(fatura({ valor: '2.345,67' })).iofCents).toBe(1_468);
+    const fine = run(fatura({ multaPct: '5' }));
+    expect(fine.aboveConsumerFine).toBe(true);
+    expect(fine.notes).toContain(MULTA_FATURA_TEXT.fine);
+    expect(MULTA_FATURA_TEXT.fine).not.toMatch(/atras/i);
+    expect(MULTA_FATURA_FIELDS.multaPct!.hint).toBe('Está na fatura. Na fatura do cartão, vai até 2%.');
   });
 
   it('campos do modo: o valor é o que ficou sem pagar; rotativo até 99,99%, mora e multa até 20%; erros nos campos da fatura', () => {

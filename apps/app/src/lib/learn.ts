@@ -36,7 +36,7 @@ export {
 } from '@clarevo/core';
 
 /**
- * De onde a explicação foi aberta: 'tarefa' (um formulário ou detalhe; o fechamento é "Voltar à tarefa") ou
+ * De onde a explicação foi aberta: 'tarefa' (um formulário ou detalhe; o fechamento é "Voltar para a tarefa") ou
  * 'aprender' (a aba; "Voltar para Aprender").
  */
 export type LearnOrigin = 'tarefa' | 'aprender';
