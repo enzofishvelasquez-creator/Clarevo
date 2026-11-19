@@ -2222,7 +2222,7 @@ setInterval(async () => {
   await openCalc('Quanto custa por ano?');
   await typeIn('Valor', '25,00');
   await radio('Por semana').click();
-  ok('custo por ano: 25,00 por semana → R$ 108,33 por mês e R$ 1.300,00 por ano, com "52 semanas por ano"', await shows('R$ 108,33', 'R$ 1.300,00', '52 semanas por ano.'));
+  ok('custo por ano: 25,00 por semana → R$ 108,33 por mês e R$ 1.300,00 por ano, com "52 semanas por ano (364 dias)" e a média por dia corrido', await shows('R$ 108,33', 'R$ 1.300,00', '52 semanas por ano (364 dias)', 'Média por dia corrido: R$ 3,56.'));
   await calcShot('64_calc_custo_por_ano');
   await calcWidths('custo por ano', 'Quanto custa por ano?');
   await btn('Anotar como gasto fixo').click(); await waitText('Valor por mês');
@@ -6299,8 +6299,12 @@ setInterval(async () => {
     ['Preço à vista do bem', 'Entrada', 'Número de parcelas', 'Taxa de juros ao mês (%)', 'Sua renda líquida por mês', 'Quanto você conseguiria guardar por mês', 'Rendimento ao ano (%)'].every((x) => t.includes(x)) &&
     t.includes('A primeira parcela vence em 1 mês?') && t.includes('Não: a primeira parcela é paga na compra.') && (await radio('Sim').getAttribute('aria-checked')) === 'true' && (await radio('Não').getAttribute('aria-checked')) === 'false' &&
     t.includes('Alternativa: juntar antes') && (await visibleCount('radio', 'Dar mais entrada')) === 0 && (await visibleCount('radio', 'Comprar à vista')) === 0);
-  ok('D44 a taxa e o rendimento nunca vêm preenchidos: taxa em branco, com "Está na proposta do banco ou da loja. Use o CET ao mês, se tiver."; rendimento em branco ("Em branco: sem rendimento.")',
-    (await field('Taxa de juros ao mês (%)').inputValue()) === '' && (await field('Rendimento ao ano (%)').inputValue()) === '' && t.includes('Está na proposta do banco ou da loja. Use o CET ao mês, se tiver.') && t.includes('Em branco: sem rendimento.'));
+  ok('D44 a taxa e o rendimento nunca vêm preenchidos: taxa em branco, com "Está na proposta do banco ou da loja."; rendimento em branco ("Em branco: sem rendimento.")',
+    (await field('Taxa de juros ao mês (%)').inputValue()) === '' && (await field('Rendimento ao ano (%)').inputValue()) === '' && t.includes('Está na proposta do banco ou da loja.') && !t.includes('Use o CET ao mês, se tiver.') && t.includes('Em branco: sem rendimento.'));
+  // Revisão externa de 18/11/2026: a taxa de juros do contrato e o CET são escolhas separadas ("Taxa de juros" marcada no começo).
+  ok('D44 "Qual taxa você vai informar?": "Taxa de juros" marcada e "CET ao mês" sem marcar, com a dica da simulação de custo equivalente',
+    t.includes('Qual taxa você vai informar?') && (await radio('Taxa de juros').getAttribute('aria-checked')) === 'true' && (await radio('CET ao mês').getAttribute('aria-checked')) === 'false' &&
+    t.includes('O CET soma tarifas, seguros e IOF: com ele, a conta vira uma simulação de custo equivalente.'));
   ok('D44 a renda de referência (R$ 6.000,00) entra sozinha no campo de renda, com a dica de que mudar aqui não altera a referência',
     (await field('Sua renda líquida por mês').inputValue()) === '6.000,00' && t.includes('Veio da sua renda de referência. Mudar aqui não altera a referência.'), await field('Sua renda líquida por mês').inputValue());
   ok('D44 antes de preencher: "Preencha os campos para ver o resultado.", sem botão "Calcular" e sem os blocos do resultado', t.includes('Preencha os campos para ver o resultado.') && (await visibleCount('button', /^Calcular/)) === 0 &&
@@ -6327,7 +6331,7 @@ setInterval(async () => {
     t.includes('Referência usada pela Serasa: até 30% da renda líquida com parcelas de dívidas. É uma referência geral, não uma regra para você.') &&
     t.includes('Fonte: Serasa, página sobre comprometimento de renda, consultada em 09/10/2026.') && t.includes('Estimativa. As condições oficiais são as da proposta; peça o CET.'));
   ok('D44 hipóteses visíveis: tabela Price com a primeira parcela em 1 mês, só a taxa informada, comprometido do mês atual e "O preço do bem pode mudar enquanto você junta."',
-    t.includes('Hipóteses') && t.includes('Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.') && t.includes('A conta usa só a taxa informada: com a taxa de juros, ficam de fora tarifas, seguros e IOF; com o CET ao mês, eles já estão dentro.') &&
+    t.includes('Hipóteses') && t.includes('Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.') && t.includes('Taxa de juros do contrato: tarifas, seguros e IOF ficam de fora; o CET da proposta inclui esses custos.') &&
     t.includes('O comprometido é o do mês atual, com as contas a pagar já criadas; os meses seguintes podem ser diferentes.') && t.includes('O preço do bem pode mudar enquanto você junta.'));
   ok('D44 juntar antes (o que falta para comprar à vista, sem rendimento): guardando R$ 1.041,14 por mês, junta R$ 32.000,00 em 31 meses (2 anos e 7 meses), com a comparação neutra',
     t.includes('Guardando R$ 1.041,14 por mês, sem rendimento, você junta R$ 32.000,00 em 31 meses (2 anos e 7 meses).') &&
@@ -6403,6 +6407,13 @@ setInterval(async () => {
   ok('D44 taxa acima de 99,99%: "Use uma taxa de 0% a 99,99% ao mês."', t.includes('Use uma taxa de 0% a 99,99% ao mês.'));
   await d44Fill('Taxa de juros ao mês (%)', '1,99');
   ok('D44 voltando aos números do exemplo, o resultado volta (R$ 1.041,14)', await shows('Com estes números, são 48 parcelas de R$ 1.041,14.'));
+  // Revisão externa de 18/11/2026: com "CET ao mês", a conta é uma simulação de custo equivalente e o resultado fala em custo adicional estimado.
+  await radio('CET ao mês').click(); await p.waitForTimeout(300);
+  t = await body();
+  ok('D44 com "CET ao mês": o campo vira "CET ao mês (%)" com o mesmo número, o resultado diz "Custo adicional estimado: R$ 17.974,72." e a hipótese é a da simulação de custo equivalente',
+    (await field('CET ao mês (%)').inputValue()) === '1,99' && t.includes('Custo adicional estimado: R$ 17.974,72.') && !t.includes('Juros: R$ 17.974,72.') && t.includes('Simulação de custo equivalente: o CET ao mês entra no lugar da taxa de juros'));
+  await radio('Taxa de juros').click(); await p.waitForTimeout(300);
+  ok('D44 de volta a "Taxa de juros": "Juros: R$ 17.974,72."', await shows('Juros: R$ 17.974,72.'));
 
   // ---- 5. "Fazer a conta com outra entrada": leva o foco à entrada, sem mudar nada ----
   await btn('Fazer a conta com outra entrada').click(); await p.waitForTimeout(400);
@@ -7555,7 +7566,7 @@ setInterval(async () => {
   t = await body();
   ok('H2 "Quanto custa por ano?" da linha: a calculadora abre com R$ 39,90 por mês e mostra R$ 478,80 por ano (nada é gravado)',
     urlPath() === '/calcular/custo-por-ano' && (await field('Valor').inputValue()) === '39,90' && (await radio('Por mês').getAttribute('aria-checked')) === 'true' &&
-    t.includes('Com estes números, o gasto soma R$ 478,80 por ano.') && t.includes('Por mês, fica em R$ 39,90.') && t.includes('Por dia, fica em R$ 1,31.'), `${urlPath()} ${await field('Valor').inputValue()}`);
+    t.includes('Com estes números, o gasto soma R$ 478,80 por ano.') && t.includes('Por mês, fica em R$ 39,90.') && t.includes('Média por dia corrido: R$ 1,31.'), `${urlPath()} ${await field('Valor').inputValue()}`);
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem'); await p.waitForTimeout(300);
 
   // ---- 4. O detalhe do gasto fixo marcado ----
