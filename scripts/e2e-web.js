@@ -17344,10 +17344,11 @@ setInterval(async () => {
         const area = Math.min(r.width, innerWidth) * Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
         if (r.width >= innerWidth * 0.9 && area >= innerWidth * innerHeight * 0.5) big.push(L);
         const lime = Math.abs(c[0] - 212) < 4 && Math.abs(c[1] - 240) < 4 && Math.abs(c[2] - 91) < 4;
-        // O branco por cima do azul (seletor Pessoal | Família, pílulas do cabeçalho) é de propósito, nos dois temas.
+        // O branco por cima do azul (seletor Pessoal | Família, pílulas do cabeçalho) é de propósito, nos dois temas. O trilho do seletor é o
+        // azul mais escuro (#1E4BD8, brandDeep), dentro do cabeçalho azul: com o seletor sempre à vista (D-113b), ele entra na conta.
         let under = null;
         for (let a = e.parentElement; a && !under; a = a.parentElement) under = parse(getComputedStyle(a).backgroundColor);
-        const onBrand = under && under[0] === 36 && under[1] === 87 && under[2] === 245;
+        const onBrand = under && ((under[0] === 36 && under[1] === 87 && under[2] === 245) || (under[0] === 30 && under[1] === 75 && under[2] === 216));
         if (L > 0.6 && !lime && !onBrand && area > 6000) light.push(`${(e.getAttribute('aria-label') || e.textContent || e.tagName).slice(0, 30)} ${Math.round(area)}px²`);
       }
       return { big: big.length, maxBig: big.length ? Math.max(...big) : 1, light: light.slice(0, 3) };
