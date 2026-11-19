@@ -2134,7 +2134,9 @@ setInterval(async () => {
   await typeIn('Valor da dívida', '700,00'); await typeIn('Taxa de juros ao mês (%)', '14');
   ok('dívida: rotativo de 700,00 a 14% → R$ 98,00 de juros em 1 mês', await shows('Com estes números, os juros do rotativo somam R$ 98,00 em 1 mês.', 'O valor vai para R$ 798,00 na fatura seguinte.'));
   await typeIn('Taxa do parcelamento ao mês (%)', '8'); await typeIn('Em quantas parcelas', '24');
-  ok('dívida: parcelar em 24 a 8% → total limitado a R$ 1.400,00, dizendo que o limite foi aplicado', await shows('R$ 1.818,96', 'Pelo limite da Lei 14.690/2023, juros e encargos não passam do valor original: o total fica em no máximo R$ 1.400,00.'));
+  ok('dívida: parcelar em 24 a 8% → total limitado a R$ 1.400,00, dizendo que o limite foi aplicado e qual parcela cabe nele (24 × R$ 58,33)', await shows('R$ 1.818,96',
+    'Pelo limite da Lei 14.690/2023, juros e encargos não passam do valor original: o total fica em no máximo R$ 1.400,00.',
+    'Com o limite, as 24 parcelas iguais ficam em até R$ 58,33 cada (R$ 1.399,92 no total), em vez de R$ 75,79.'));
   await calcShot('58_calc_divida', true);
   await calcWidths('dívida', 'Quanto custa uma dívida?');
   await backToCalcList();
@@ -2167,8 +2169,13 @@ setInterval(async () => {
   ok('multa e juros, fatura: R$ 1.186,26 com rotativo, mora, multa e IOF estimado', await shows('Com estes números, 30 dias depois do vencimento a fatura fica em R$ 1.186,26.',
     'Juros do rotativo: R$ 150,00', 'Juros de mora: R$ 10,00', 'Multa: R$ 20,00', 'IOF estimado: R$ 6,26', 'O rotativo vale só até a próxima fatura.'));
   await calcShot('60b_calc_multa_fatura');
+  // Revisão externa de 18/11/2026: o rotativo só vale até a próxima fatura; com 365 dias, a conta para no primeiro ciclo e diz isso.
   await typeIn('Dias depois do vencimento', '365');
-  ok('multa e juros, fatura: em 365 dias, o teto da Lei 14.690/2023 (R$ 2.033,73 com o IOF)', await shows('a fatura fica em R$ 2.033,73.', 'Lei 14.690/2023'));
+  ok('multa e juros, fatura: com 365 dias, a conta para na próxima fatura (R$ 1.186,26) e diz que não projeta o resto', await shows(
+    'Com estes números, até a próxima fatura (30 dias depois do vencimento) a fatura fica em R$ 1.186,26.', 'Você informou 365 dias. O rotativo só vale até a próxima fatura'));
+  ok('multa e juros, fatura: o IOF é uma hipótese simplificada e a frase "a fatura pode vir um pouco maior" saiu', (await shows('IOF estimado numa hipótese simplificada')) && !(await body()).includes('um pouco maior'));
+  await typeIn('Juros do rotativo ao mês (%)', '99');
+  ok('multa e juros, fatura: com 99% de rotativo, o teto da Lei 14.690/2023 (R$ 2.006,26 com o IOF)', await shows('a fatura fica em R$ 2.006,26.', 'Lei 14.690/2023'));
   await calcWidths('multa e juros, fatura', 'Multa e juros por atraso');
   await backToCalcList();
 
