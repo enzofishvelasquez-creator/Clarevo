@@ -401,8 +401,10 @@ setInterval(async () => {
   };
   const ppDone = (k) => PP[k].replace('. ', ', concluído. ');
   const ppRows = () => cardButtons('Primeiros passos');
-  // Com o primeiro passo em aberto, "Não tenho gastos fixos" vem antes de "Agora não" (D-091, docs/10 A25).
-  const ppIs = (rows) => async () => JSON.stringify(await ppRows()) === JSON.stringify([...rows, ...(rows[0] === PP.fixos ? ['Não tenho gastos fixos'] : []), 'Agora não']);
+  // Com o primeiro passo em aberto, "Não tenho gastos fixos" vem antes de "Agora não" (D-091, docs/10 A25). Quem ainda não tem negócio vê
+  // também "Tem um negócio? Crie o espaço Negócio" (D-113b), uma linha que não conta como passo, logo antes de "Agora não".
+  const PP_BUSINESS = 'Tem um negócio? Crie o espaço Negócio';
+  const ppIs = (rows) => async () => JSON.stringify(await ppRows()) === JSON.stringify([...rows, ...(rows[0] === PP.fixos ? ['Não tenho gastos fixos'] : []), PP_BUSINESS, 'Agora não']);
   await waitText('Primeiros passos');
   t = await body();
   ok('primeiros passos: conta nova vê os quatro passos (o quarto é "Planejar quanto guardar"), nenhum concluído, e "Agora não"', await ppIs([PP.fixos, PP.recebido, PP.pago, PP.guardar])() &&
@@ -430,8 +432,15 @@ setInterval(async () => {
   await p.getByRole('button', { name: /Mês anterior/ }).filter({ visible: true }).first().click(); await waitText('Setembro de 2026'); await p.waitForTimeout(600);
   ok('primeiros passos: fora do mês anterior', !(await headingShown('Primeiros passos')));
   await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026'); await waitText('Primeiros passos');
-  // Sem Família (D-055) o seletor "Pessoal | Família" não aparece; "fora de Família" é conferido no bloco "Família (D-055)", com uma Família criada.
-  ok('primeiros passos: sem Família, o Resumo não tem o seletor "Pessoal | Família" e o card fica no Pessoal', (await p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count()) === 0 && (await headingShown('Primeiros passos')));
+  // Seletor de espaço sempre à vista (D-113b): só com o Pessoal, o seletor mostra "Pessoal" escolhido e o "+" ("Criar um espaço: Negócio
+  // ou Família"); "fora de Família" é conferido no bloco "Família (D-055)", com uma Família criada.
+  ok('primeiros passos (D-113b): só com o Pessoal, o Resumo mostra o seletor com "Pessoal" escolhido e o "+", e o card fica no Pessoal',
+    JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => e.getBoundingClientRect().width > 0 && /^Ver dados d/.test(e.getAttribute('aria-label') || '')).map((e) => `${e.getAttribute('aria-label')}:${e.getAttribute('aria-selected')}`))) === JSON.stringify(['Ver dados de Pessoal:true']) &&
+    (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1 && (await headingShown('Primeiros passos')));
+  // "Tem um negócio? Crie o espaço Negócio" (D-113b) abre a criação do espaço Negócio; voltar devolve o Resumo com o card.
+  await btn(PP_BUSINESS).click(); await waitText('Nome do negócio');
+  ok('primeiros passos (D-113b): "Tem um negócio? Crie o espaço Negócio" abre "Espaço Negócio" em /negocio/novo', new URL(p.url()).pathname === '/negocio/novo' && (await h1Name()) === 'Espaço Negócio', p.url());
+  await btn('Voltar').click(); await waitText('Primeiros passos');
   // Passo 1 abre o cadastro de gasto fixo; o passo fica concluído quando existe um gasto fixo.
   await btn(PP.fixos).click(); await waitText('Demonstração · Pessoal');
   ok('primeiros passos: o passo 1 abre "Novo gasto fixo", vazio, em "Todo mês"', (await h1Name()) === 'Novo gasto fixo' && (await radio('Todo mês').getAttribute('aria-checked')) === 'true' && (await field('Descrição').inputValue()) === '');
@@ -692,10 +701,14 @@ setInterval(async () => {
   };
   // Telas empilhadas (detalhe, lista) escondem a barra de abas: volta até ela aparecer.
   // dismissTo não muda isso: depois de anotar ou pagar, a pessoa continua no detalhe, acima da lista.
+  // O Resumo e Movimentos prontos, em qualquer espaço: no espaço Negócio, o vocabulário é de entradas e saídas (auditoria de 18/11/2026:
+  // "Sobrou" ou "Ficou no negócio" no lugar de "Diferença do mês"; "Anotar entrada" no lugar de "Registrar recebimento").
+  const RESUMO_READY = /^(Diferença do mês|Sobrou|Ficou no negócio)$/;
+  const MOV_READY = /^(Registrar recebimento|Anotar entrada)$/;
   const goResumo = async () => {
     const tab = () => p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true });
     for (let i = 0; i < 5 && (await tab().count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
-    await tab().first().click(); await waitText('Diferença do mês');
+    await tab().first().click(); await waitText(RESUMO_READY);
   };
   const openToPay = async () => { await p.getByRole('button', { name: /^Ainda a pagar neste mês, R\$/ }).filter({ visible: true }).first().click(); await waitText('Contas em aberto com vencimento até o fim do mês'); };
   const openRow = (name) => p.getByRole('button', { name }).filter({ visible: true }).first().click();
@@ -744,7 +757,7 @@ setInterval(async () => {
   // Explicação preserva o rascunho
   await field('Data do pagamento').fill('07/10/2026');
   await p.getByRole('button', { name: 'Como este registro entra no mês?' }).filter({ visible: true }).first().click(); await waitText('Hipóteses do exemplo');
-  await btn('Voltar à tarefa').click(); await waitText('Será salvo em');
+  await btn('Voltar para a tarefa').click(); await waitText('Será salvo em');
   ok('voltar da explicação mantém o rascunho', (await field('Descrição').inputValue()) === 'Café' && (await field('Valor em reais').inputValue()) === '80,00');
   await shot('08_anotar_preenchido');
 
@@ -825,8 +838,9 @@ setInterval(async () => {
   const movFirst = await p.evaluate(() => {
     for (const e of document.querySelectorAll('div')) if (e.scrollTop > 0) e.scrollTop = 0;
     const vis = (e) => e.getBoundingClientRect().width > 0;
-    // A barra de abas na web não tem o papel tablist: o topo das abas (role=tab) marca onde ela começa.
-    const bar = [...document.querySelectorAll('[role=tab]')].find(vis);
+    // A barra de abas na web não tem o papel tablist: o topo das abas (role=tab) marca onde ela começa (fora as abas do seletor de espaço,
+    // "Ver dados de ...", que ficam no cabeçalho azul, D-113b).
+    const bar = [...document.querySelectorAll('[role=tab]')].find((e) => vis(e) && !/^Ver dados d/.test(e.getAttribute('aria-label') || ''));
     const row = [...document.querySelectorAll('[role=button]')].find((e) => vis(e) && /, (Pago|Recebido) · \d{2}\/\d{2}\/\d{4}/.test(e.getAttribute('aria-label') || ''));
     return row && bar ? { row: Math.round(row.getBoundingClientRect().bottom), bar: Math.round(bar.getBoundingClientRect().top), h: window.innerHeight } : null;
   });
@@ -1038,11 +1052,11 @@ setInterval(async () => {
     JSON.stringify(await sectionRows('Vencidas')));
   await btn('Quanto custa pagar depois do vencimento?').click(); await waitText('R$ 204,67');
   ok('Vencidas: "Quanto custa pagar depois do vencimento?" abre "Multa e juros por atraso", com o exemplo de R$ 204,67', new URL(p.url()).pathname === '/explicacao/multa-juros-atraso' &&
-    (await p.locator('h1').filter({ hasText: /^Multa e juros por atraso$/ }).count()) === 1 && (await visibleCount('button', 'Voltar à tarefa')) === 1, p.url());
+    (await p.locator('h1').filter({ hasText: /^Multa e juros por atraso$/ }).count()) === 1 && (await visibleCount('button', 'Voltar para a tarefa')) === 1, p.url());
   await scrollTo('Exemplo');
   await shot('92_vencidas_multa_e_juros');
-  await btn('Voltar à tarefa').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
-  ok('"Voltar à tarefa" volta para Contas a pagar', new URL(p.url()).pathname === '/a-pagar', p.url());
+  await btn('Voltar para a tarefa').click(); await waitText('Contas em aberto com vencimento até o fim do mês');
+  ok('"Voltar para a tarefa" volta para Contas a pagar', new URL(p.url()).pathname === '/a-pagar', p.url());
   await btn('Revisar vencidas').click(); await waitText('Marque o que você já pagou e tire o que não houve.');
   await waitText('Venceu em 05/10 · R$ 90,00');
   ok('revisar vencidas: cada linha com "Já paguei" e "Não houve"', (await body()).includes('Contas vencidas') &&
@@ -1235,9 +1249,16 @@ setInterval(async () => {
   await scrollTo('Ano a ano');
   await shot('37_conta_do_ano_prevista');
   await btn('Voltar').click(); await waitText('Por mês, se os valores não mudarem');
-  await btn('Quem vê estes dados?').click(); await waitText('Gastos fixos e parcelamentos também ficam só no seu Pessoal');
-  ok('"Quem vê estes dados?": gastos fixos e parcelamentos também ficam só no Pessoal, sem outra pessoa do app, e a equipe da Clarevo não olha os dados no dia a dia', (await body()).includes('Gastos fixos e parcelamentos também ficam só no seu Pessoal, sem nenhuma outra pessoa do app ver. A empresa que oferece o benefício não vê nada disso, nem em números somados aos de outras pessoas.') && (await body()).includes('Única pessoa do app que vê, anota, edita e exclui registros em Pessoal.') && (await body()).includes('A equipe da Clarevo não olha os seus dados no dia a dia. Só acessa quando a lei exigir ou para resolver um problema que você pediu.'));
-  ok('"Quem vê estes dados?": contas do ano seguem a mesma regra', (await body()).includes('Contas do ano, como IPVA, IPTU e matrícula, seguem a mesma regra.'));
+  await btn('Quem vê estes dados?').click(); await waitText('Quem não vê');
+  // Em duas listas, "Quem vê" e "Quem não vê" (auditoria de 18/11/2026), com os mesmos fatos: o Pessoal só da pessoa, inclusive gastos fixos,
+  // parcelamentos e contas do ano; a equipe não olha os dados no dia a dia; a empresa não vê nada disso, nem somado.
+  ok('"Quem vê estes dados?": "Quem vê" e "Quem não vê" (títulos de nível 2), o Pessoal só da pessoa (com gastos fixos, parcelamentos e contas do ano), a equipe e a empresa que não vê nada disso, nem somado',
+    JSON.stringify((await headingList()).filter((h) => h.startsWith('2:'))) === JSON.stringify(['2:Quem vê', '2:Quem não vê', '2:Se você excluir a conta']) &&
+    (await body()).includes('Única pessoa do app que vê, anota, edita e exclui registros em Pessoal. Vale também para gastos fixos, parcelamentos, contas do ano (como IPVA, IPTU e matrícula), renda de referência, renda comprometida, metas, simulações e o plano de guardar.') &&
+    (await body()).includes('A equipe da Clarevo não olha os seus dados no dia a dia. Só acessa quando a lei exigir ou para resolver um problema que você pediu.') &&
+    (await body()).includes('gastos fixos, parcelamentos, contas do ano, renda, simulações') && (await body()).includes('nem somados aos de outras pessoas') &&
+    ((await body()).match(/A empresa que oferece o benefício/g) ?? []).length === 2 && ((await body()).match(/[Nn]ão vê valores/g) ?? []).length === 1, JSON.stringify(await headingList()));
+  ok('"Quem vê estes dados?": as outras pessoas do app não veem o Pessoal, a data da última anotação, a revisão nem o plano de guardar', (await body()).includes('Não veem o seu Pessoal, nem a data da sua última anotação, as suas escolhas na revisão dos últimos meses, a sua resposta ao plano de guardar ou as datas em que essa pergunta volta.'));
   await btn('Entendi').click(); await waitText('Por mês, se os valores não mudarem');
 
   await openRow(/^Financiamento do carro, Parcela 13 de 48/); await waitText('Pagas antes da Clarevo');
@@ -1716,11 +1737,12 @@ setInterval(async () => {
   // Nada do que foi tirado volta (Matrícula de 2026, parcelas do Seguro residencial e do Material escolar).
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Ver a assinatura');
   // Ciclo A5: "O que é isso?" ao lado de "Saldo inicial" abre o resumo no lugar; a explicação completa abre por cima e
-  // "Voltar à tarefa" volta para a Conta.
+  // "Voltar para a tarefa" volta para a Conta.
   const saldoHint = p.getByRole('button', { name: 'O que é isso? Saldo inicial', exact: true }).filter({ visible: true }).first();
   await saldoHint.waitFor({ timeout: 8000 }).catch(() => {});
+  // O card diz uma vez que não há saldo (na introdução); a segunda frase saiu (auditoria de 18/11/2026).
   ok('/conta: "O que é isso?" de "Saldo inicial", fechado, com alvo de 44 px', (await saldoHint.getAttribute('aria-expanded')) === 'false' && ((await saldoHint.boundingBox())?.height ?? 0) >= 43.5 &&
-    (await body()).includes('A Clarevo não calcula o saldo do banco nem da carteira.'));
+    (await body()).includes('a Clarevo não guarda saldo nem movimenta dinheiro.') && !(await body()).includes('A Clarevo não calcula o saldo do banco nem da carteira.'));
   await saldoHint.click(); await waitText('Ler explicação completa');
   ok('/conta: o resumo abre no lugar, sem sair da tela', (await saldoHint.getAttribute('aria-expanded')) === 'true' && new URL(p.url()).pathname === '/conta');
   await saldoHint.evaluate((e) => e.scrollIntoView({ block: 'center' }));
@@ -1728,11 +1750,11 @@ setInterval(async () => {
   await p.setViewportSize({ width: 320, height: 800 }); await p.waitForTimeout(400);
   await layoutChecks('conta com "O que é isso?" aberto 320px');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
-  await btn('Ler explicação completa').click(); await waitText('Voltar à tarefa');
+  await btn('Ler explicação completa').click(); await waitText('Voltar para a tarefa');
   ok('"Ler explicação completa" abre "Diferença do mês e saldo da conta"', new URL(p.url()).pathname === '/explicacao/saldo' &&
     (await p.locator('h1').filter({ hasText: /^Diferença do mês e saldo da conta$/ }).count()) === 1, p.url());
-  await btn('Voltar à tarefa').click(); await waitText('Ver a assinatura');
-  ok('"Voltar à tarefa" volta para a Conta, com o resumo ainda aberto', new URL(p.url()).pathname === '/conta' && (await saldoHint.getAttribute('aria-expanded')) === 'true', p.url());
+  await btn('Voltar para a tarefa').click(); await waitText('Ver a assinatura');
+  ok('"Voltar para a tarefa" volta para a Conta, com o resumo ainda aberto', new URL(p.url()).pathname === '/conta' && (await saldoHint.getAttribute('aria-expanded')) === 'true', p.url());
   await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await expectTotals('depois de entrar de novo: outubro na base', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
@@ -1948,7 +1970,8 @@ setInterval(async () => {
   // Ciclo A6 · Achar tudo e calculadoras (D-034, D-035). Começa e termina com outubro na base: 6.000 / 3.900 / 2.100 e 650.
   // Calculadoras: o resultado aparece enquanto a pessoa digita, sem botão "Calcular", e nada é gravado (nem no repositório
   // da pessoa, nem no aparelho). Telas conferidas a 390 e a 320 px (título, largura, valores inteiros, alvos de toque).
-  const DISCLAIMER = 'Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.';
+  // A linha curta do topo das calculadoras no app (auditoria de 18/11/2026: antes, uma faixa azul com o aviso completo, que fica no site).
+  const DISCLAIMER = 'Simulação com os seus números. Não é recomendação nem oferta de crédito.';
   const INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
   const CALC_LIST = [
     ['Decidir uma compra', [['Antes de financiar', 'Parcela, juros e o que muda se juntar antes'], ['Parcelado ou à vista?', 'Descubra os juros embutidos no parcelado'], ['Quanto custa por ano?', 'Por ano, por mês e por dia']]],
@@ -2224,7 +2247,7 @@ setInterval(async () => {
   // Os links só abrem calculadoras: o repositório fica igual até o "outro aparelho" anotar a conta vencida.
   const repoBeforeLinks = await repoSnapshot();
   const writesBeforeLinks = writes.length;
-  // Sem Família (D-055) o link vive na tela Família, aberta por Conta (o seletor só aparece para quem tem uma Família).
+  // Sem Família (D-055) o link vive na tela Família, aberta por Conta (ou pelo "+" do seletor, D-113b).
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
   await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto');
   await btn('Enquanto isso, dividir as contas da casa').click();
@@ -2428,8 +2451,10 @@ setInterval(async () => {
   ok('mover para outubro: setembro volta a 3.750 / 2.250', t.includes('R$ 3.750,00') && t.includes('R$ 2.250,00'));
   await p.getByRole('button', { name: /Próximo mês/ }).filter({ visible: true }).first().click(); await waitText('Outubro de 2026');
 
-  // Família na demonstração (D-055): sem seletor, e a tela Família (por Conta) explica, sem membros simulados nem botão de anotar
-  ok('demonstração: o Resumo não mostra o seletor "Pessoal | Família"', (await p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count()) === 0);
+  // Família na demonstração (D-055): sem Família de exemplo (o seletor mostra só o Pessoal e o "+", D-113b), e a tela Família (por Conta)
+  // explica, sem membros simulados nem botão de anotar
+  ok('demonstração (D-113b): o seletor do Resumo mostra só "Pessoal", com o "+"', (await p.getByRole('tab', { name: /^Ver dados de / }).filter({ visible: true }).count()) === 1 &&
+    (await visibleCount('tab', 'Ver dados de Família')) === 0 && (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1);
   await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho');
   await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto');
   t = await body();
@@ -2684,6 +2709,11 @@ setInterval(async () => {
   await shot('89_duvida_aberta');
   await btn('Ler resposta completa').click(); await waitText('Voltar para Aprender');
   ok('"Ler resposta completa" abre a resposta', new URL(p.url()).pathname === '/explicacao/empresa-ve' && (await p.locator('h1').filter({ hasText: /^A empresa que oferece o benefício vê meus gastos\?$/ }).count()) === 1, p.url());
+  // Só com fonte interna (as decisões do projeto): a linha "Como o app da Clarevo funciona" com a data de revisão, sem códigos de decisão
+  // (auditoria visual de 18/11/2026: "Clarevo: D-006" aparecia como fonte).
+  t = await body();
+  ok('"A empresa vê meus gastos?": a fonte é "Como o app da Clarevo funciona" com "Revisado em", sem nenhum código de decisão (D-000)',
+    t.includes('Como o app da Clarevo funciona\nRevisado em ') && !/\bD-\d{3}/.test(t) && (t.match(/Revisado em /g) ?? []).length === 1, t.slice(Math.max(0, t.indexOf('Fontes') - 20), t.indexOf('Fontes') + 200));
   await learnBackToTab();
   await faq.click(); await waitGone('A empresa administra seu acesso ao plano');
 
@@ -2943,7 +2973,7 @@ setInterval(async () => {
   await shot('91_tema_indisponivel');
   await btn('Ver temas de Aprender').click(); await waitText('Comece por aqui');
   ok('"Ver temas de Aprender" abre a aba Aprender', new URL(p.url()).pathname === '/aprender' && (await h1Name()) === 'Aprender e dúvidas', p.url());
-  await viaEntry('/explicacao/reservas', 'Voltar à tarefa');
+  await viaEntry('/explicacao/reservas', 'Voltar para a tarefa');
   ok('/explicacao/reservas (apelido) abre "Reserva para imprevistos"', (await p.locator('h1').filter({ hasText: /^Reserva para imprevistos$/ }).count()) === 1, p.url());
   // ==================================================================================================================
   // Ciclo B · Renda comprometida (D-026, spec2 §2.3). Cada bloco parte de uma demonstração nova (hoje 07/10/2026; renda
@@ -4654,10 +4684,10 @@ setInterval(async () => {
   await innerChecks('seus últimos meses 320px');
   await shot('73_retomar_320px', true);
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
-  // "Entenda" abre o tema "Mês sem registro" de Aprender; "Voltar à tarefa" volta à revisão.
-  await btn('Entenda o mês sem registro').click(); await waitText('Voltar à tarefa');
+  // "Entenda" abre o tema "Mês sem registro" de Aprender; "Voltar para a tarefa" volta à revisão.
+  await btn('Entenda o mês sem registro').click(); await waitText('Voltar para a tarefa');
   ok('/retomar: "Entenda" abre o tema "Mês sem registro"', new URL(p.url()).pathname === '/explicacao/sem-registro' && (await p.locator('h1').filter({ hasText: 'Mês sem registro' }).count()) === 1, p.url());
-  await btn('Voltar à tarefa').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
+  await btn('Voltar para a tarefa').click(); await waitText('Mês sem anotação não quer dizer mês sem gastos.');
 
   // 4. "Atualizar agora", junho: lote de Aluguel e carro, Luz com o valor vazio (171,90) e Salário no modo "Dia".
   await btn('Atualizar agora').click(); await waitText('Mês 1 de 5');
@@ -4860,9 +4890,9 @@ setInterval(async () => {
   await innerChecks('detalhe do parcelamento com meses sem conta 390px');
   await scrollTo('Meses sem conta registrada');
   await shot('84_parcelamento_sem_conta_registrada');
-  await btn('Por que este mês não tem conta?').click(); await waitText('Voltar à tarefa');
+  await btn('Por que este mês não tem conta?').click(); await waitText('Voltar para a tarefa');
   ok('"Por que este mês não tem conta?" abre "Mês sem registro"', new URL(p.url()).pathname === '/explicacao/sem-registro');
-  await btn('Voltar à tarefa').click(); await waitText('Meses sem conta registrada');
+  await btn('Voltar para a tarefa').click(); await waitText('Meses sem conta registrada');
   await btn('Registrar esta parcela: Financiamento do carro de julho').click(); await waitText('Financiamento do carro de julho');
   ok('"Registrar esta parcela" abre a linha da revisão numa folha, com "Já paguei" e "Ainda não paguei"', (await visibleCount('button', 'Já paguei: Financiamento do carro de julho')) === 1 &&
     (await visibleCount('button', 'Ainda não paguei: Financiamento do carro de julho')) === 1 && (await visibleCount('button', 'Não houve: Financiamento do carro de julho')) === 0);
@@ -5421,9 +5451,11 @@ setInterval(async () => {
     await p.evaluate(() => window.scrollTo(0, 0));
     const r = await askLayout();
     // Sem reserva, o texto do card tem uma ou duas linhas e "Calcular minha reserva" vem logo depois: o botão fica à vista, acima
-    // da barra, inclusive em 360 × 640 e 320 × 640 (sem rolar).
-    ok(`nav Metas conta nova (${w}×${h}): pergunta compacta (até 230 px), "Sim, consigo" e "Não consigo" lado a lado, "Responder depois" abaixo e "Calcular minha reserva" à vista acima da barra`,
-      r.askHeight !== null && r.askHeight <= 230 && r.sameRow === true && r.laterBelow === true && r.calcBottom !== null && r.calcBottom <= r.barTop, JSON.stringify(r));
+    // da barra, inclusive em 360 × 640 (sem rolar). Em 320 × 640, o seletor de espaço sempre à vista (D-113b) ocupa a altura de uma linha
+    // do cabeçalho: ali a pergunta inteira ("Responder depois" incluído) fica à vista e "Calcular minha reserva" vem logo depois, ao rolar.
+    const tiny = w === 320 && h === 640;
+    ok(`nav Metas conta nova (${w}×${h}): pergunta compacta (até 230 px), "Sim, consigo" e "Não consigo" lado a lado, "Responder depois" abaixo e ${tiny ? '"Responder depois" à vista acima da barra (o seletor de espaço ocupa uma linha, D-113b)' : '"Calcular minha reserva" à vista acima da barra'}`,
+      r.askHeight !== null && r.askHeight <= 230 && r.sameRow === true && r.laterBelow === true && r.calcBottom !== null && (tiny ? r.laterBottom <= r.barTop : r.calcBottom <= r.barTop), JSON.stringify(r));
     await layoutChecks(`nav Metas conta nova ${w}px`);
     if (w === 390) await shot('177_metas_compacta');
     if (w === 320 && h === 800) await shot('177_metas_compacta_320px');
@@ -5534,7 +5566,7 @@ setInterval(async () => {
   await f1Open();
   ok('F1 demonstração: o texto da lista vazia nunca aparece ao abrir (só a leitura e depois a dívida)', (await p.evaluate(() => window.__f1Flash)) === false);
   ok('F1 a tela abre em /calcular/plano-dividas com o título "Em que ordem quitar as dívidas?", o aviso das calculadoras no topo e a barra inferior com Metas marcada',
-    urlPath() === '/calcular/plano-dividas' && (await h1Name()) === 'Em que ordem quitar as dívidas?' && (await body()).includes('Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.') && barOk(await barState()) && (await barState()).selected[0] === 'Metas', p.url());
+    urlPath() === '/calcular/plano-dividas' && (await h1Name()) === 'Em que ordem quitar as dívidas?' && (await body()).includes('Simulação com os seus números. Não é recomendação nem oferta de crédito.') && barOk(await barState()) && (await barState()).selected[0] === 'Metas', p.url());
   await checkBar('F1 plano', 'Metas');
   t = await body();
   ok('F1 demonstração: o Financiamento do carro vem preenchido (parcela R$ 850,00, 36 parcelas, taxa em branco) e o valor a mais fica vazio',
@@ -6175,8 +6207,8 @@ setInterval(async () => {
   await p.evaluate(() => window.scrollTo(0, 0));
   await field('Descrição').fill('Matrícula');
   await btn('O que é isso?').click(); await waitText('Contas que chegam uma vez por ano'); await p.waitForTimeout(600); t = await body();
-  ok('D42 "O que é isso?" abre o tema de Aprender "Contas que chegam uma vez por ano" (já existente, com fonte) e oferece voltar à tarefa', d42Path() === '/explicacao/contas-do-ano' && t.includes('Fontes') && (await visibleCount('button', /^Voltar à tarefa/)) >= 1, `${d42Path()} ${t.slice(0, 200)}`);
-  await btn('Voltar à tarefa').click(); await waitText('Como você paga?'); await p.waitForTimeout(500);
+  ok('D42 "O que é isso?" abre o tema de Aprender "Contas que chegam uma vez por ano" (já existente, com fonte) e oferece voltar à tarefa', d42Path() === '/explicacao/contas-do-ano' && t.includes('Fontes') && (await visibleCount('button', /^Voltar para a tarefa/)) >= 1, `${d42Path()} ${t.slice(0, 200)}`);
+  await btn('Voltar para a tarefa').click(); await waitText('Como você paga?'); await p.waitForTimeout(500);
   ok('D42 voltar do tema mantém o que a pessoa digitou no cadastro', (await field('Descrição').inputValue()) === 'Matrícula' && (await radio('Em parcelas no ano').getAttribute('aria-checked')) === 'true');
   await btn('Cancelar').click(); await p.waitForTimeout(400); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click();
   await waitText('Por ano, se os valores não mudarem');
@@ -6261,7 +6293,7 @@ setInterval(async () => {
   // ---- 2. A tela abre vazia, com a renda de referência já no campo de renda e a taxa em branco ----
   t = await body();
   ok('D44 a tela abre em /calcular/antes-de-financiar com o título "Antes de financiar", o aviso das calculadoras no topo e a barra inferior com Metas marcada',
-    urlPath() === '/calcular/antes-de-financiar' && (await h1Name()) === 'Antes de financiar' && t.includes('Simulação com os valores e as taxas que você informou. Não é recomendação de produto financeiro nem oferta de crédito.') && barOk(await barState()) && (await barState()).selected[0] === 'Metas');
+    urlPath() === '/calcular/antes-de-financiar' && (await h1Name()) === 'Antes de financiar' && t.includes('Simulação com os seus números. Não é recomendação nem oferta de crédito.') && barOk(await barState()) && (await barState()).selected[0] === 'Metas');
   await checkBar('D44 antes de financiar', 'Metas');
   ok('D44 campos: preço, entrada (opcional), parcelas, taxa ao mês, "A primeira parcela vence em 1 mês?" (Sim marcado), renda e a alternativa de juntar antes',
     ['Preço à vista do bem', 'Entrada', 'Número de parcelas', 'Taxa de juros ao mês (%)', 'Sua renda líquida por mês', 'Quanto você conseguiria guardar por mês', 'Rendimento ao ano (%)'].every((x) => t.includes(x)) &&
@@ -6955,8 +6987,8 @@ setInterval(async () => {
   const g1Initial = await g1Rows();
   ok('G1 Conta: "Bancos e carteira" lista a Conta principal (Banco, Principal) e a Carteira (Dinheiro), nessa ordem',
     JSON.stringify(g1Initial) === JSON.stringify(['Conta principal, Banco · Principal. Abrir para editar.', 'Carteira, Dinheiro. Abrir para editar.']), JSON.stringify(g1Initial));
-  ok('G1 Conta: o card diz que é só a origem (sem saldo) e que a Clarevo não calcula saldo por conta; o antigo "Nome da conta" saiu',
-    t.includes('É só a origem informada: a Clarevo não guarda saldo nem movimenta dinheiro.') && t.includes('A Clarevo não calcula o saldo do banco nem da carteira.') &&
+  ok('G1 Conta: o card diz uma vez que é só a origem (sem saldo; a frase repetida saiu, auditoria de 18/11/2026); o antigo "Nome da conta" saiu',
+    t.includes('É só a origem informada: a Clarevo não guarda saldo nem movimenta dinheiro.') && !t.includes('A Clarevo não calcula o saldo do banco nem da carteira.') &&
     (await visibleCount('textbox', 'Nome da conta')) === 0 && (await visibleCount('button', 'Salvar nome')) === 0 && (await visibleCount('button', 'Adicionar banco ou carteira')) === 1);
   ok('G1 Conta: a demonstração guarda a Carteira como dinheiro e o mercado pago nela (Mercado de setembro e de outubro)',
     (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-' && (await g1Records('Mercado')) === 'Mercado|Carteira|125000;Mercado|Carteira|140000', await g1Records('Mercado'));
@@ -7810,7 +7842,7 @@ setInterval(async () => {
   t = await h3Keep();
   ok('H3 a tela: título "Exportar meus dados" em /conta/exportar, contexto Pessoal e a introdução (montado neste aparelho, sem cópia na Clarevo)',
     urlPath() === '/conta/exportar' && (await h1Name()) === 'Exportar meus dados' && t.includes('Pessoal') && t.includes('O arquivo é montado neste aparelho') && t.includes('A Clarevo não guarda cópia dele.'), t.slice(0, 500));
-  ok('H3 a portabilidade da LGPD (art. 18, V) só como referência, sem parecer jurídico', t.includes('art. 18, V, da LGPD') && t.includes('Esta tela não é parecer jurídico.'));
+  ok('H3 a portabilidade da LGPD (art. 18, V) só como referência ("se inspira"), sem a frase "não é parecer jurídico" (auditoria de 18/11/2026)', t.includes('se inspira na portabilidade prevista no art. 18, V, da LGPD.') && !t.includes('parecer jurídico'));
   ok('H3 períodos: Este mês, Últimos 3, 6 e 12 meses, Este ano, Ano passado e Tudo; "Últimos 12 meses" marcado',
     JSON.stringify(await p.evaluate(() => [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent))) ===
       JSON.stringify(['Este mês', 'Últimos 3 meses', 'Últimos 6 meses', 'Últimos 12 meses', 'Este ano', 'Ano passado', 'Tudo', 'Planilha (CSV)', 'Resumo em PDF']) &&
@@ -9015,7 +9047,10 @@ setInterval(async () => {
   const i2ReadExpense = async (file, wait = 'Comprovante lido:') => { await i2Sheet(); await i2Pick(btn(I2_OPTION), file); await waitText(wait, 20000); await p.waitForTimeout(800); };
   const i2ReadIncome = async (file, wait = 'Comprovante lido:') => { await i2Pick(i2Line(), file); await waitText(wait, 20000); await p.waitForTimeout(800); };
   const i2NewExpense = async () => { await goResumo(); await btn('Anotar gasto').click(); await waitText('Será salvo em'); await p.waitForTimeout(500); };
-  const i2NewIncome = async () => { await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await btn('Registrar recebimento').click(); await waitText('Data do recebimento'); await p.waitForTimeout(500); };
+  const i2NewIncome = async () => {
+    await tabByName('Movimentos').click(); await waitText(MOV_READY);
+    await p.getByRole('button', { name: MOV_READY }).filter({ visible: true }).first().click(); await waitText(/^(Data do recebimento|Data da entrada)$/); await p.waitForTimeout(500);
+  };
   const i2Leave = async () => { await btn('Cancelar').click(); await p.waitForTimeout(300); if (await visibleCount('button', 'Descartar alterações')) await btn('Descartar alterações').click(); await p.waitForTimeout(400); await goResumo(); };
   const i2Records = () => otherDevice(async (repo, ctx) => (await repo.listRecords(ctx, '2026-10')).map((r) => ({ k: r.kind, c: r.amountCents, on: r.occurredOn, d: r.description, cat: r.category, key: r.receiptKey, id: r.id })).sort((a, b) => a.id.localeCompare(b.id)));
   const i2ActiveTag = () => p.evaluate(() => document.activeElement?.tagName ?? null);
@@ -9643,23 +9678,23 @@ setInterval(async () => {
   // "Concluir" volta às Análises (revisão das telas, 16/11/2026), que não têm o avatar do cabeçalho: a Conta abre a partir de Movimentos.
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
 
-  // ---- 12. Conta › "Widget na tela inicial": na web, só o texto (D-110: o interruptor "Mostrar valores no widget" vale só no celular) ----
-  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Widget na tela inicial'); await p.waitForTimeout(400);
-  await scrollTo('Widget na tela inicial');
+  // ---- 12. Conta › "Widget na tela inicial": só no app para celular. Na web, o card sai de Conta (auditoria visual de 18/11/2026: ele
+  // aparecia só para dizer que é do celular); D-110: o interruptor "Mostrar valores no widget" vale só no celular. ----
+  await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(400);
+  await scrollTo('Privacidade neste aparelho');
   t = await k1Keep();
   const k1StoreW0 = await k1Store();
-  ok('K1 Conta: o card "Widget na tela inicial" (título de nível 2) diz, na web, "Disponível no app da Clarevo para celular." (D-093) e o que o widget mostra, depois de Privacidade', (await headingShown('Widget na tela inicial')) &&
-    t.includes('Disponível no app da Clarevo para celular.') && t.includes('Mostra quanto ainda falta pagar no mês e a próxima conta a vencer, com um atalho para anotar um gasto.') &&
-    (await hideSwitch().getAttribute('aria-checked')) === 'false' && t.indexOf('Privacidade neste aparelho') < t.indexOf('Widget na tela inicial'));
+  ok('K1 Conta na web: sem o card "Widget na tela inicial" (só no app para celular; auditoria de 18/11/2026), com "Privacidade neste aparelho" e o tema',
+    !(await headingShown('Widget na tela inicial')) && !t.includes('Disponível no app da Clarevo para celular.') && (await hideSwitch().getAttribute('aria-checked')) === 'false' && t.includes('Tema'));
   ok('K1 Conta na web: sem o interruptor "Mostrar valores no widget" (sem widget no navegador, ele não teria efeito; D-110), como os lembretes',
     (await visibleCount('switch', 'Mostrar valores no widget')) === 0 && !t.includes('Desligado, o widget mostra R$ ••••'));
   await k1Shots('369_conta_widget', false, false);
-  ok('K1 Conta: abrir o card não grava nada no armazenamento do navegador', (await k1Store()) === k1StoreW0, await k1Store());
+  ok('K1 Conta: abrir Conta não grava nada no armazenamento do navegador', (await k1Store()) === k1StoreW0, await k1Store());
   await btn('Voltar').click(); await waitText('Registrar recebimento');
-  // A demonstração mostra o mesmo card (os passos seguintes continuam nela, como antes).
+  // Na demonstração, o mesmo (os passos seguintes continuam nela, como antes).
   await demoHome();
-  await openConta(); await scrollTo('Widget na tela inicial'); await p.waitForTimeout(300);
-  ok('K1 Conta na demonstração: o mesmo card, sem o interruptor', (await body()).includes('Disponível no app da Clarevo para celular.') && (await visibleCount('switch', 'Mostrar valores no widget')) === 0);
+  await openConta(); await scrollTo('Privacidade neste aparelho'); await p.waitForTimeout(300);
+  ok('K1 Conta na demonstração: sem o card do widget, sem o interruptor', !(await body()).includes('Disponível no app da Clarevo para celular.') && (await visibleCount('switch', 'Mostrar valores no widget')) === 0);
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // ---- 13. Entradas: a busca "No app" e "Como usar" de Aprender e a entrada do guia ----
@@ -9806,7 +9841,7 @@ setInterval(async () => {
   ok('K2 13º salário: sem a seção "Na Clarevo" (nenhuma calculadora nem tela ligada)', !t.includes('Na Clarevo') && !t.includes('Fazer a conta com os seus números'));
   ok('K2 13º salário: "Temas relacionados" com Férias, Declaração do Imposto de Renda e Contas que chegam uma vez por ano, nessa ordem', JSON.stringify((await cardButtons('Temas relacionados')).map((x) => x.split('. ')[0])) ===
     JSON.stringify(['Férias: pagamento, um terço e abono', 'Declaração do Imposto de Renda', 'Contas que chegam uma vez por ano']), JSON.stringify(await cardButtons('Temas relacionados')));
-  ok('K2 13º salário: "Revisado em 15/10/2026" e cada fonte com "Consultada em 15/10/2026"', t.includes('Revisado em 15/10/2026') && (t.match(/Consultada em 15\/10\/2026/g) ?? []).length === 6 && t.includes('Clarevo: D-011, D-053'));
+  ok('K2 13º salário: "Revisado em 15/10/2026" e cada fonte com "Consultada em 15/10/2026"', t.includes('Revisado em 15/10/2026') && (t.match(/Consultada em 15\/10\/2026/g) ?? []).length === 6 && t.includes('Como o app da Clarevo funciona') && !/\bD-\d{3}/.test(t));
   const k2Src13 = await k2Sources('decimo-terceiro');
   ok('K2 13º salário: seis fontes oficiais com papel de link, "Consultada em 15/10/2026" e domínio permitido (Ministério do Trabalho, Planalto, INSS e Receita)', k2Src13.n === 6 && k2Src13.bad.length === 0, `${k2Src13.n} ${k2Src13.bad.join(' | ')}`);
   await k2Shots('381_epoca_decimo_terceiro', [390, 360, 320], () => scrollTo('13º salário'));
@@ -9824,7 +9859,7 @@ setInterval(async () => {
   const k2SrcFerias = await k2Sources('ferias');
   ok('K2 Férias: quatro fontes oficiais com "Consultada em 15/10/2026" e domínio permitido', k2SrcFerias.n === 4 && k2SrcFerias.bad.length === 0, `${k2SrcFerias.n} ${k2SrcFerias.bad.join(' | ')}`);
   await k2Shots('383_epoca_ferias', [390, 320], () => scrollTo('Férias: pagamento, um terço e abono'));
-  await btn('Fazer a conta com os seus números').click(); await waitText('Simulação com os valores e as taxas que você informou.'); await p.waitForTimeout(400);
+  await btn('Fazer a conta com os seus números').click(); await waitText('Simulação com os seus números.'); await p.waitForTimeout(400);
   ok('K2 Férias: a calculadora "Juntar para um objetivo" abre (/calcular/juntar-para-objetivo)', k2Path() === '/calcular/juntar-para-objetivo' && (await h1Name()) === 'Juntar para um objetivo', `${k2Path()} ${await h1Name()}`);
   await btn('Voltar').click(); await waitText('Voltar para Aprender');
   await btn('Voltar para Aprender').click(); await waitText('Neste mês'); await p.waitForTimeout(300);
@@ -9863,7 +9898,7 @@ setInterval(async () => {
   ok('K2 card: a linha "Contas que chegam uma vez por ano" abre a explicação (/explicacao/contas-do-ano) com "Voltar para Aprender"', k2Path() === '/explicacao/contas-do-ano' && JSON.stringify(await k2H1s()) === JSON.stringify(['Contas que chegam uma vez por ano']), k2Path());
   await btn('Voltar para Aprender').click(); await waitText('Neste mês'); await p.waitForTimeout(300);
   await scrollTo('Neste mês');
-  await p.getByRole('button', { name: k2RowCalc, exact: true }).filter({ visible: true }).first().click(); await waitText('Simulação com os valores e as taxas que você informou.'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: k2RowCalc, exact: true }).filter({ visible: true }).first().click(); await waitText('Simulação com os seus números.'); await p.waitForTimeout(500);
   t = await k2Keep();
   ok('K2 card: a calculadora abre em /calcular/parcelado-ou-a-vista?modo=cota-unica com o título "Cota única ou parcelado?"', k2Path() === '/calcular/parcelado-ou-a-vista' && new URL(p.url()).searchParams.get('modo') === 'cota-unica' && (await h1Name()) === 'Cota única ou parcelado?', `${p.url()} ${await h1Name()}`);
   await shot('386_epoca_calculadora_cota_unica');
@@ -10183,12 +10218,13 @@ setInterval(async () => {
 
   // ---- 6. Widget com valores ocultos (P-027): o card em Conta (a legenda do interruptor só no celular, D-110) ----
   await j1Demo();
-  await openConta(); await scrollTo('Widget na tela inicial'); await p.waitForTimeout(300);
+  await openConta(); await scrollTo('Privacidade neste aparelho'); await p.waitForTimeout(300);
   t = await d54Keep();
-  // A legenda do interruptor (núcleo, WIDGET_TEXT.showValuesCaption) aparece só no celular: na web o card não tem o interruptor (D-110).
-  ok('D54 Conta › Widget na tela inicial: na web, só "Disponível no app da Clarevo para celular.", sem o interruptor',
-    t.includes('Disponível no app da Clarevo para celular.') && (await p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).count()) === 0);
-  await d54Shots('398_conta_widget_oculto', null, () => scrollTo('Widget na tela inicial'));
+  // O card do widget (e a legenda do interruptor, WIDGET_TEXT.showValuesCaption) só existe no celular: na web, nem o card (auditoria de
+  // 18/11/2026) nem o interruptor (D-110).
+  ok('D54 Conta › Widget na tela inicial: na web, sem o card e sem o interruptor',
+    !t.includes('Disponível no app da Clarevo para celular.') && (await p.getByRole('switch', { name: 'Mostrar valores no widget' }).filter({ visible: true }).count()) === 0);
+  await d54Shots('398_conta_widget_oculto', null, () => scrollTo('Privacidade neste aparelho'));
   await btn('Voltar').click(); await waitText('Diferença do mês');
 
   // ---- 7. "Neste mês" em Metas, depois do conteúdo principal (P-028) ----
@@ -10310,7 +10346,16 @@ setInterval(async () => {
 
   // ---- 1. Vera cria a conta: sem Família, o Resumo não tem seletor e o Pessoal é o único contexto ----
   await famCreateAccount('Vera Lima', 'vera.familia@exemplo.com');
-  ok('Família: sem Família, o Resumo não mostra o seletor "Pessoal | Família"', (await famSelectorCount()) === 0);
+  ok('Família (D-113b): sem Família, o seletor do Resumo mostra só "Pessoal" e o "+" oferece o Negócio e a Família', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0 &&
+    (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1);
+  // O "+" abre a folha "Criar um espaço": o Espaço Negócio e a Família, cada um com a frase de para quem é; "Família" abre a tela Família.
+  await btn('Criar um espaço: Negócio ou Família').click(); await p.waitForTimeout(400);
+  t = await dialogText().catch(() => '');
+  ok('Família (D-113b): a folha "Criar um espaço" tem "Espaço Negócio" e "Família", com as frases, e "Fechar"', t.includes('Criar um espaço') && t.includes('Espaço Negócio') && t.includes('Para quem tem CNPJ ou trabalha por conta.') &&
+    t.includes('Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.') && (await visibleCount('button', 'Família. Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.')) === 1 && (await visibleCount('button', 'Fechar')) === 1, t.slice(0, 300));
+  await btn('Família. Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.').click(); await waitText('Anotar a casa em conjunto'); await p.waitForTimeout(300);
+  ok('Família (D-113b): "Família" na folha abre a tela Família, com "Criar Família"', new URL(p.url()).pathname === '/familia' && (await visibleCount('button', 'Criar Família')) === 1, p.url());
+  await btn('Voltar').click(); await waitText('Diferença do mês'); await p.waitForTimeout(300);
   await famConta();
   t = await body();
   ok('Família: Conta tem o card "Família" com a explicação e "Criar Família"', t.includes('Crie uma Família para ver e anotar as contas da casa em conjunto, com até 6 pessoas.') && (await visibleCount('button', 'Criar Família')) === 1, t.slice(0, 200));
@@ -10342,7 +10387,8 @@ setInterval(async () => {
 
   // ---- 3. Com Família: o seletor aparece e cada tela usa o contexto escolhido ----
   await famTab('Resumo').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
-  ok('Com Família: o Resumo mostra o seletor "Pessoal | Família" (Pessoal marcado)', (await famSelectorCount()) === 2 && (await famTab('Ver dados de Pessoal').getAttribute('aria-selected')) === 'true');
+  ok('Com Família: o Resumo mostra o seletor "Pessoal | Família" (Pessoal marcado) e o "+" só para o Negócio (D-113b)', (await famSelectorCount()) === 2 && (await famTab('Ver dados de Pessoal').getAttribute('aria-selected')) === 'true' &&
+    (await visibleCount('button', 'Criar um espaço: Negócio')) === 1);
   await famShots('403_resumo_seletor');
   await famTab('Ver dados de Família').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
   t = await body();
@@ -10474,7 +10520,7 @@ setInterval(async () => {
   // ---- 5. Mauro recebe o link: cola em "Tenho um convite", vê a prévia e aceita ----
   await famSignOut();
   await famCreateAccount('Mauro Dias', 'mauro.familia@exemplo.com');
-  ok('Mauro (conta nova, sem Família): o Resumo não tem seletor', (await famSelectorCount()) === 0);
+  ok('Mauro (conta nova, sem Família): o seletor do Resumo mostra só "Pessoal"', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0);
   await famGoFamilia();
   await field('Link do convite').fill('isto não é um convite');
   await btn('Ver convite').click(); await waitText('Não há um convite neste texto.');
@@ -10490,7 +10536,7 @@ setInterval(async () => {
   await famKeep();
   await famShots('407_convite_previa');
   await btn('Agora não').click(); await waitText('Diferença do mês');
-  ok('Convite: "Agora não" volta ao início e não entra na Família (sem seletor)', (await famSelectorCount()) === 0);
+  ok('Convite: "Agora não" volta ao início e não entra na Família (o seletor mostra só "Pessoal")', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0);
   await famGoFamilia();
   await field('Link do convite').fill(famLink1); await btn('Ver convite').click(); await waitText('Aceitar convite');
   await btn('Aceitar convite').click(); await waitText('Você entrou na Família Casa Lima.'); await p.waitForTimeout(500);
@@ -10569,7 +10615,7 @@ setInterval(async () => {
   t = await body();
   ok('Quem vê estes dados? na Família: "Casa Lima", as três pessoas com o papel de cada uma e o que cada papel pode fazer', famPath() === '/quem-ve' && t.includes('Casa Lima') && t.includes('Vera') && t.includes('Mauro') && t.includes('Lia (você)') &&
     t.includes('Vê, anota e edita o que é de outras pessoas.') && t.includes('Vê e anota. Altera só o que anotou.') && t.includes('Só vê. Não anota nem altera nada.') && t.includes('Demonstração · Família'), t.slice(0, 500));
-  ok('Quem vê estes dados? na Família: o Pessoal de ninguém aparece, a empresa não vê e os textos do Pessoal ("só no seu Pessoal") não valem aqui', t.includes('O Pessoal de cada pessoa continua só dela') && t.includes('Se uma empresa oferecer a Clarevo como benefício') && !t.includes('Única pessoa do app que vê, anota, edita e exclui') && !t.includes('Gastos fixos e parcelamentos também ficam só no seu Pessoal.'));
+  ok('Quem vê estes dados? na Família: o Pessoal de ninguém aparece, a empresa não vê e os textos do Pessoal ("só no seu Pessoal") não valem aqui', t.includes('O Pessoal de cada pessoa continua só dela') && t.includes('Administra o seu acesso ao plano') && t.includes('nem somados aos de outras pessoas') && !t.includes('Única pessoa do app que vê, anota, edita e exclui') && !t.includes('Vale também para gastos fixos'));
   await famKeep();
   await famShots('412_quem_ve_familia');
   await btn('Entendi').click(); await p.waitForTimeout(400);
@@ -10630,7 +10676,7 @@ setInterval(async () => {
   t = await body();
   ok('Saiu: aviso e a tela volta ao estado sem Família ("Anotar a casa em conjunto", "Criar Família")', t.includes('Você saiu da Família.') && t.includes('Anotar a casa em conjunto') && (await visibleCount('button', 'Criar Família')) === 1, t.slice(0, 300));
   await famGoResumo();
-  ok('Saiu: o seletor some e o Resumo volta a ser o Pessoal', (await famSelectorCount()) === 0 && !(await body()).includes('Mercado da casa'));
+  ok('Saiu: a Família sai do seletor e o Resumo volta a ser o Pessoal', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0 && !(await body()).includes('Mercado da casa'));
   // Entrar em outra Família depois de sair é possível, e a pessoa não volta direto para o contexto Família.
 
   // ---- 8. O titular que ficou encerra a Família ----
@@ -10647,13 +10693,13 @@ setInterval(async () => {
   t = await body();
   ok('Encerrada: aviso e a tela volta ao estado sem Família, com "Criar Família"', t.includes('Família encerrada.') && t.includes('Anotar a casa em conjunto') && (await visibleCount('button', 'Criar Família')) === 1, t.slice(0, 300));
   await famGoResumo();
-  ok('Encerrada: o seletor some', (await famSelectorCount()) === 0);
+  ok('Encerrada: a Família sai do seletor (fica só "Pessoal", com o "+")', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0 && (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1);
 
   // ---- 9. A demonstração com dados fictícios: sem Família de exemplo, sem seletor e sem criar ----
   await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
   await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(500);
-  ok('Demonstração: o Resumo não tem o seletor "Pessoal | Família" e os totais seguem 6.000 / 3.900 / 2.100', (await famSelectorCount()) === 0 && (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00'));
+  ok('Demonstração: o seletor mostra só "Pessoal" (sem Família de exemplo) e os totais seguem 6.000 / 3.900 / 2.100', (await famSelectorCount()) === 1 && (await visibleCount('tab', 'Ver dados de Família')) === 0 && (await body()).includes('R$ 6.000,00') && (await body()).includes('R$ 3.900,00') && (await body()).includes('R$ 2.100,00'));
   await famConta();
   await p.getByRole('button', { name: 'Criar Família', exact: true }).filter({ visible: true }).first().click(); await waitText('Anotar a casa em conjunto'); await p.waitForTimeout(400);
   t = await body();
@@ -10922,8 +10968,8 @@ setInterval(async () => {
   // Quem vê estes dados?: a explicação do que a empresa vê.
   await p.getByRole('button', { name: 'Quem vê estes dados?' }).filter({ visible: true }).first().click(); await waitText('Entendi'); await p.waitForTimeout(400);
   t = await body();
-  ok('Quem vê estes dados?: explica o que a empresa vê (e-mails que convidou, situação e datas) e o que nunca vê (nem se ou quando a pessoa usa o app)', t.includes('A empresa que oferece o benefício vê os e-mails que ela mesma convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada) e as datas.') &&
-    t.includes('Ela não vê se ou quando você usa o app depois de aceitar.') && !/quantas entraram no app|5 pessoas ativas/.test(t) && t.includes('A empresa não vê valores, categorias, metas, contas, cartões nem a Família de ninguém, nem somados.') && t.includes('Se uma empresa oferecer a Clarevo como benefício'), t.slice(0, 600));
+  ok('Quem vê estes dados?: explica o que a empresa vê (e-mails que convidou, situação e datas) e o que nunca vê (nem se ou quando a pessoa usa o app)', t.includes('A empresa que oferece o benefício, se houver\nAdministra o seu acesso ao plano e vê os e-mails que ela mesma convidou, a situação de cada convite ou licença (convite enviado, convite cancelado, ativa ou encerrada) e as datas.') &&
+    t.includes('Também não vê se ou quando você usa o app depois de aceitar.') && !/quantas entraram no app|5 pessoas ativas/.test(t) && t.includes('Não vê valores, categorias, metas, contas, cartões, gastos fixos, parcelamentos, contas do ano, renda, simulações, a data da sua última anotação, a revisão dos últimos meses, o plano de guardar nem a Família de ninguém, nem somados aos de outras pessoas.'), t.slice(0, 600));
   await empKeep();
   await empShots('435_quem_ve_empresa');
   await btn('Entendi').click(); await waitText('Diferença do mês');
@@ -11041,6 +11087,12 @@ setInterval(async () => {
     }
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   };
+  // A Evolução abre em 3 meses quando o histórico é curto e recente (auditoria de 18/11/2026; conferido em T01). Os passos que contam 6
+  // meses (como antes) escolhem "6 meses" logo ao abrir.
+  const evSix = async () => {
+    const six = p.getByRole('radio', { name: '6 meses', exact: true }).filter({ visible: true }).first();
+    if ((await six.count()) && (await six.getAttribute('aria-checked')) !== 'true') { await six.click(); await p.waitForTimeout(700); }
+  };
   const evEnter = async (scenario) => {
     await p.goto(`http://localhost:${PORT}/${scenario ? `?cenario=${scenario}` : ''}`); await waitText('Cuidar da vida financeira');
     await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
@@ -11060,11 +11112,11 @@ setInterval(async () => {
   const evBack = async () => {
     await btn('Voltar').click(); await p.waitForTimeout(500);
     if (new URL(p.url()).pathname === '/analises') { await btn('Voltar').click(); await p.waitForTimeout(300); }
-    await waitText('Registrar recebimento');
+    await waitText(MOV_READY);
   };
   const evOpen = async () => {
-    await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
-    await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+    await tabByName('Movimentos').click(); await waitText(MOV_READY); await p.waitForTimeout(300);
+    await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   };
   // Os botões do gráfico: um por mês, com o nome que o leitor de tela diz.
   const evNames = () => p.evaluate(() => [...document.querySelectorAll('[role=group][aria-label^="Meses do gráfico"] button')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label').replace(/ /g, ' ')));
@@ -11177,7 +11229,8 @@ setInterval(async () => {
   await evShots('451_evolucao_carregando');
   await waitText('Pago por mês', 20000); await p.waitForTimeout(500);
   await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.monthsOverview = repo.__orig; });
-  ok('Evolução carregando: com a resposta, o esqueleto sai e o gráfico aparece', (await visibleCount('progressbar', 'Carregando a evolução')) === 0 && (await evNames()).length === 6);
+  // A demonstração só tem setembro e outubro: a tela abre em 3 meses (auditoria de 18/11/2026: não abrir num gráfico quase vazio).
+  ok('Evolução carregando: com a resposta, o esqueleto sai e o gráfico aparece, em 3 meses (só setembro e outubro têm registros)', (await visibleCount('progressbar', 'Carregando a evolução')) === 0 && (await evNames()).length === 3);
   await btn('Voltar').click(); await waitText('Buscar um tema ou uma função'); await p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first().fill('');
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
   await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
@@ -11187,8 +11240,20 @@ setInterval(async () => {
   let names = await evNames();
   ok('Evolução T01: a tela abre em /evolucao, de consulta, com a barra (Movimentos marcada), o título "Evolução" (h1) e o subtítulo "Valores registrados, pela data do pagamento"', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' &&
     (await p.getByRole('tab', { name: MOV_TAB, selected: true }).filter({ visible: true }).count()) === 1 && t.includes('Valores registrados, pela data do pagamento') && t.includes('Demonstração · Pessoal'), `${evPath()} ${await h1Name()}`);
-  ok('Evolução T01: "Pago" e "6 meses" marcados por padrão, com "Recebido", "3 meses" e "12 meses" ao lado', (await radio('Pago').getAttribute('aria-checked')) === 'true' && (await radio('6 meses').getAttribute('aria-checked')) === 'true' &&
-    (await radio('Recebido').getAttribute('aria-checked')) === 'false' && (await radio('3 meses').getAttribute('aria-checked')) === 'false' && (await radio('12 meses').getAttribute('aria-checked')) === 'false');
+  // Abertura (auditoria de 18/11/2026): com o histórico curto e recente da demonstração (setembro e outubro), "3 meses"; o resto do bloco
+  // segue em "6 meses", escolhido aqui. Os controles viraram dois segmentados, com os mesmos rádios.
+  ok('Evolução T01: "Pago" e "3 meses" marcados ao abrir (só setembro e outubro têm registros), com "Recebido", "6 meses" e "12 meses" ao lado, em dois grupos ("Valor" e "Período")', (await radio('Pago').getAttribute('aria-checked')) === 'true' && (await radio('3 meses').getAttribute('aria-checked')) === 'true' &&
+    (await radio('Recebido').getAttribute('aria-checked')) === 'false' && (await radio('6 meses').getAttribute('aria-checked')) === 'false' && (await radio('12 meses').getAttribute('aria-checked')) === 'false' &&
+    names.length === 3 && names[0] === 'Agosto de 2026, sem registros, fora da comparação' && (await p.getByRole('radiogroup').filter({ visible: true }).count()) >= 2, JSON.stringify(names));
+  // Os controles: o valor em duas linhas de dois e o período numa linha só (no lugar dos 9 chips em 4 linhas).
+  const evCtl = await p.evaluate(() => {
+    const tops = (re) => [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0 && re.test(e.textContent || '')).map((e) => Math.round(e.getBoundingClientRect().top));
+    return { metric: [...new Set(tops(/^(Recebido|Pago|Renda comprometida|Guardado em metas)$/))].length, window: [...new Set(tops(/^\d+ meses$/))].length };
+  });
+  ok('Evolução controles (auditoria de 18/11/2026): o valor em 2 linhas e o período em 1 linha', evCtl.metric === 2 && evCtl.window === 1, JSON.stringify(evCtl));
+  await radio('6 meses').click(); await p.waitForTimeout(700);
+  t = await evKeep();
+  names = await evNames();
   ok('Evolução T01: seis pontos, de maio a outubro de 2026, cada um um botão com mês, valor, estado e se está na comparação (T23)', names.length === 6 &&
     JSON.stringify(names) === JSON.stringify([
       'Maio de 2026, sem registros, fora da comparação',
@@ -11266,10 +11331,10 @@ setInterval(async () => {
   await field('Descrição').fill('Café da tarde'); await field('Valor em reais').fill('100'); await field('Data do pagamento').fill('06/10/2026');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
-  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   names = await evNames();
   t = await body();
-  ok('Evolução T26: depois de anotar um gasto de R$ 100,00 em Movimentos, outubro passa a R$ 4.000,00 (3.900 + 100), sem nenhuma recarga, e o total dos meses exibidos a R$ 7.750,00', names[5] === 'Outubro de 2026, R$ 4.000,00, mês em andamento, fora da comparação' && t.includes('Total dos meses exibidos\nR$ 7.750,00'), JSON.stringify(names));
+  ok('Evolução T26: depois de anotar um gasto de R$ 100,00 em Movimentos, outubro passa a R$ 4.000,00 (3.900 + 100), sem nenhuma recarga, e o total dos meses exibidos a R$ 7.750,00', names[names.length - 1] === 'Outubro de 2026, R$ 4.000,00, mês em andamento, fora da comparação' && t.includes('Total dos meses exibidos\nR$ 7.750,00'), JSON.stringify(names));
   await evBack();
 
   // ---- 7. Aprender: a busca "No app" e a entrada do guia ----
@@ -11641,7 +11706,7 @@ setInterval(async () => {
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento');
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
   await evBack(); await p.waitForTimeout(300);
-  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   await radio('12 meses').click(); await p.waitForTimeout(500);
   await evPick('Abril');
   await hiddenShows('Evolução');
@@ -11766,7 +11831,7 @@ setInterval(async () => {
   await field('Descrição').fill('Mercado de setembro'); await field('Valor em reais').fill('300'); await field('Data do pagamento').fill('15/09/2026');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
-  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   names = await evNames();
   t = await evKeep();
   ok('Evolução conta nova com um gasto de setembro: setembro R$ 300,00 na comparação, outubro sem registros, "1 de 1 mês" e total de R$ 300,00', names[4] === 'Setembro de 2026, R$ 300,00, na comparação' && names[5] === 'Outubro de 2026, sem registros, fora da comparação' &&
@@ -11775,7 +11840,7 @@ setInterval(async () => {
   await btn('Anotar gasto').click(); await waitText('Será salvo em');
   await field('Descrição').fill('Café'); await field('Valor em reais').fill('100'); await field('Data do pagamento').fill('06/10/2026');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
-  await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   names = await evNames();
   ok('Evolução conta nova: depois de outro gasto, outubro aparece como mês em andamento (R$ 100,00), fora das contas, e o total soma os dois (R$ 400,00)', names[5] === 'Outubro de 2026, R$ 100,00, mês em andamento, fora da comparação' && (await body()).includes('Total dos meses exibidos\nR$ 400,00'), JSON.stringify(names.slice(4)));
   // Setembro fora da comparação: todos fora.
@@ -11793,7 +11858,7 @@ setInterval(async () => {
   await field('Descrição').fill('Mercado da casa'); await field('Valor em reais').fill('250'); await field('Data do pagamento').fill('06/10/2026');
   await btn('Salvar gasto').click(); await waitText('Gasto salvo'); await p.waitForTimeout(500);
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
-  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   names = await evNames();
   t = await evKeep();
   ok('Evolução na Família: a pílula diz "Demonstração · Família" e os valores são os da Família (outubro R$ 250,00 em andamento), sem o setembro nem o gasto do Pessoal', t.includes('Demonstração · Família') && names.length === 6 && names[5] === 'Outubro de 2026, R$ 250,00, mês em andamento, fora da comparação' &&
@@ -11801,7 +11866,7 @@ setInterval(async () => {
   await evShots('456_evolucao_familia');
   await evBack();
   await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
-  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   names = await evNames();
   t = await body();
   ok('Evolução ao voltar ao Pessoal: os dados são os do Pessoal de novo (setembro R$ 300,00), e o setembro que estava fora da comparação voltou, porque trocar de contexto esquece a seleção', names[4] === 'Setembro de 2026, R$ 300,00, na comparação' && !t.includes('Comparação personalizada') &&
@@ -13205,14 +13270,14 @@ setInterval(async () => {
   await mmHint().first().focus(); await p.keyboard.press('Enter'); await waitText('Ler explicação completa');
   ok('Média e mediana, Evolução: pelo teclado (Enter) o painel também abre', (await mmHint().first().getAttribute('aria-expanded')) === 'true' && (await visibleCount('button', 'Ler explicação completa')) === 1);
 
-  // ---- 3. A explicação, aberta da Evolução: "Voltar à tarefa", exemplo, "Ver a conta", "No Clarevo", relacionados e fontes ----
+  // ---- 3. A explicação, aberta da Evolução: "Voltar para a tarefa", exemplo, "Ver a conta", "No Clarevo", relacionados e fontes ----
   await mmStubOpen();
-  await btn('Ler explicação completa').click(); await waitText('Voltar à tarefa'); await p.waitForTimeout(500);
+  await btn('Ler explicação completa').click(); await waitText('Voltar para a tarefa'); await p.waitForTimeout(500);
   t = await mmKeep();
   const mmTopic = t;
-  ok('Média e mediana, tema: /explicacao/media-e-mediana com o cabeçalho "Aprender", o título "Média e mediana" como cabeçalho de nível 1, "Organizar o mês · 2 min de leitura" e "Voltar à tarefa" (não "Voltar para Aprender")',
+  ok('Média e mediana, tema: /explicacao/media-e-mediana com o cabeçalho "Aprender", o título "Média e mediana" como cabeçalho de nível 1, "Organizar o mês · 2 min de leitura" e "Voltar para a tarefa" (não "Voltar para Aprender")',
     mmPath() === '/explicacao/media-e-mediana' && JSON.stringify(await mmH1s()) === JSON.stringify(['Média e mediana']) && t.includes('Organizar o mês · 2 min de leitura') && t.includes('Dois jeitos de resumir vários meses') &&
-    (await visibleCount('button', 'Voltar à tarefa')) === 1 && (await visibleCount('button', 'Voltar para Aprender')) === 0, `${mmPath()} ${JSON.stringify(await mmH1s())}`);
+    (await visibleCount('button', 'Voltar para a tarefa')) === 1 && (await visibleCount('button', 'Voltar para Aprender')) === 0, `${mmPath()} ${JSON.stringify(await mmH1s())}`);
   ok('Média e mediana, tema: o resumo e os parágrafos dizem o que é cada uma, a diferença com um mês muito diferente dos outros e o que a Evolução faz',
     t.includes(mmShort) && t.includes('A média soma todos os valores e divide pela quantidade deles.') && t.includes('com quantidade par de valores, é a média dos dois do meio') && t.includes('medidas de tendência central') &&
     t.includes('porque não é afetada por valores extremos') && t.includes('Na Evolução, a Clarevo mostra as duas lado a lado') && t.includes('Uma não é melhor que a outra') && t.includes('o mês conferido, sem lançamentos, entra como zero'));
@@ -13243,12 +13308,12 @@ setInterval(async () => {
     mmLinkNames.length === 2 && mmLinkNames.every((n) => (n ?? '').includes('Consultada em 20/10/2026') && (n ?? '').startsWith('IBGE: A M')) && JSON.stringify(mmOpened) === JSON.stringify(mmUrls) && mmOpened.every((u) => allowedSourceUrl(u, 'media-e-mediana')),
     `${JSON.stringify(mmLinkNames)} ${JSON.stringify(mmOpened)}`);
   t = await body();
-  ok('Média e mediana, tema: "Clarevo: D-057, D-062" entre as fontes, "Revisado em 20/10/2026" e nenhum aviso de investimento (a seção não tem)', t.includes('Clarevo: D-057, D-062') && t.includes('Revisado em 20/10/2026') && !t.includes('Conteúdo educativo e geral. Não é recomendação'));
+  ok('Média e mediana, tema: a fonte interna como "Como o app da Clarevo funciona", sem os códigos das decisões (auditoria de 18/11/2026), "Revisado em 20/10/2026" e nenhum aviso de investimento (a seção não tem)', t.includes('Como o app da Clarevo funciona') && !/\bD-\d{3}/.test(t) && t.includes('Revisado em 20/10/2026') && !t.includes('Conteúdo educativo e geral. Não é recomendação'));
 
-  // ---- 4. Voltar à tarefa: a Evolução como estava; com abril fora, as mesmas contas do exemplo do tema ----
-  await btn('Voltar à tarefa').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(600);
+  // ---- 4. Voltar para a tarefa: a Evolução como estava; com abril fora, as mesmas contas do exemplo do tema ----
+  await btn('Voltar para a tarefa').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(600);
   t = await mmKeep();
-  ok('Média e mediana, volta: "Voltar à tarefa" devolve a Evolução (12 meses, Pago) com a mesma média e a mesma mediana', mmPath() === '/evolucao' && (await h1Name()) === 'Evolução' && mmStat(t, 'Média dos meses na comparação') === mmAll[0] && mmStat(t, 'Mediana dos meses na comparação') === mmAll[1], `${mmPath()} ${await h1Name()}`);
+  ok('Média e mediana, volta: "Voltar para a tarefa" devolve a Evolução (12 meses, Pago) com a mesma média e a mesma mediana', mmPath() === '/evolucao' && (await h1Name()) === 'Evolução' && mmStat(t, 'Média dos meses na comparação') === mmAll[0] && mmStat(t, 'Mediana dos meses na comparação') === mmAll[1], `${mmPath()} ${await h1Name()}`);
   await evSet('Abril', false);
   t = await mmKeep();
   const mmNoApril = [mmStat(t, 'Média dos meses na comparação'), mmStat(t, 'Mediana dos meses na comparação')];
@@ -13262,14 +13327,14 @@ setInterval(async () => {
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento');
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
   await evBack(); await p.waitForTimeout(300);
-  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   await radio('12 meses').click(); await p.waitForTimeout(500);
   await mmHint().first().click(); await waitText('Ler explicação completa'); await p.waitForTimeout(300);
   t = await mmKeep();
   ok('Média e mediana, valores ocultos: a média, a mediana e o total em R$ ••••, "O que é mediana?" aberto com o mesmo resumo e nenhum valor em reais à vista', t.includes('Média dos meses na comparação\nR$ ••••\n6 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ ••••\n6 de 6 meses') && t.includes(mmShort) &&
     (await moneyLeaks()).length === 0, (await moneyLeaks()).slice(0, 3).join(' | '));
   await mmShots('564_media_mediana_valores_ocultos', mmHintScroll);
-  await btn('Ler explicação completa').click(); await waitText('Voltar à tarefa'); await p.waitForTimeout(400);
+  await btn('Ler explicação completa').click(); await waitText('Voltar para a tarefa'); await p.waitForTimeout(400);
   t = await mmKeep();
   ok('Média e mediana, valores ocultos: o exemplo do tema é fictício e segue à vista (R$ 4.125,00 e R$ 3.425,00), como nos outros temas', t.includes('A média é R$ 4.125,00') && t.includes('a mediana é R$ 3.425,00'));
 
@@ -13284,7 +13349,7 @@ setInterval(async () => {
   await mmShots('565_media_mediana_aprender', async () => { await p.getByRole('button', { name: mmRowMedia, exact: true }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'center' })); await p.waitForTimeout(250); });
   await mmStubOpen();
   await p.getByRole('button', { name: mmRowMedia, exact: true }).filter({ visible: true }).first().click(); await waitText('Voltar para Aprender'); await p.waitForTimeout(400);
-  ok('Média e mediana, Aprender: a linha abre o tema com "Voltar para Aprender" (origem Aprender) e o mesmo conteúdo', mmPath() === '/explicacao/media-e-mediana' && (await visibleCount('button', 'Voltar à tarefa')) === 0 && (await body()).includes('A média é R$ 4.125,00'));
+  ok('Média e mediana, Aprender: a linha abre o tema com "Voltar para Aprender" (origem Aprender) e o mesmo conteúdo', mmPath() === '/explicacao/media-e-mediana' && (await visibleCount('button', 'Voltar para a tarefa')) === 0 && (await body()).includes('A média é R$ 4.125,00'));
   await btn('Ver na Evolução').click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(600);
   t = await mmKeep();
   ok('Média e mediana, "Ver na Evolução": abre /evolucao com o título "Evolução" e a barra inferior das telas de consulta, que marca a aba de onde a pessoa veio (Aprender)', mmPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await p.getByRole('tab', { name: 'Aprender e dúvidas', selected: true }).filter({ visible: true }).count()) === 1 && (await p.getByRole('tab').filter({ visible: true }).count()) === 5, `${mmPath()} ${await h1Name()}`);
@@ -13995,7 +14060,7 @@ setInterval(async () => {
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento');
   await openConta(); await hideSwitch().click(); await p.waitForTimeout(300);
   await evBack(); await p.waitForTimeout(300);
-  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   await f3Pick('Guardado em metas');
   await waitText('Guardado em metas por mês', 15000);
   await evPick('Julho');
@@ -14061,7 +14126,7 @@ setInterval(async () => {
   });
   await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(300);
   await famTab('Ver dados de Família').click(); await p.waitForTimeout(500);
-  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   await f3Pick('Renda comprometida');
   await waitText('Renda comprometida por mês', 15000);
   names = await evNames();
@@ -14078,7 +14143,7 @@ setInterval(async () => {
   await evSet('Setembro', false);
   await evBack();
   await famTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
-  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900);
+  await evRow().click(); await waitText('Valores registrados, pela data do pagamento'); await p.waitForTimeout(900); await evSix();
   await f3Pick('Guardado em metas');
   t = await f3Keep();
   ok('Evolução fase 3, de volta ao Pessoal: trocar de contexto esquece os meses tirados (setembro da Família) e mostra só o Pessoal ("Sem registros nestes meses", sem meta)', t.includes('Sem registros nestes meses') && !t.includes('Comparação personalizada') && !/R\$ \d/.test(t));
@@ -15387,7 +15452,8 @@ setInterval(async () => {
     await demoHome();
     await p.setViewportSize({ width: 1280, height: 860 }); await p.waitForTimeout(700);
     const navLink = (name) => p.getByRole('navigation').getByRole('link', { name, exact: true }).filter({ visible: true }).first();
-    const visibleTabs = () => p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => e.getBoundingClientRect().width > 0).length);
+    // As abas de baixo (as do seletor de espaço, "Ver dados de ...", ficam no bloco azul também no computador, D-113b).
+    const visibleTabs = () => p.evaluate(() => [...document.querySelectorAll('[role=tab]')].filter((e) => e.getBoundingClientRect().width > 0 && !/^Ver dados d/.test(e.getAttribute('aria-label') || '')).length);
     t = await body();
     ok('Computador: barra lateral com Anotar gasto, as cinco áreas e a Conta; sem as abas de baixo',
       (await p.getByRole('navigation').filter({ visible: true }).count()) === 1 &&
@@ -15398,9 +15464,14 @@ setInterval(async () => {
     const cols = await p.evaluate(() => {
       const h = (txt) => [...document.querySelectorAll('[role=heading]')].find((e) => e.textContent === txt && e.getBoundingClientRect().width > 0);
       const a = h('Pagamentos do mês'), b = h('Metas'), c = h('Orçamento por categoria');
-      return a && b && c ? { main: a.getBoundingClientRect().left, side: b.getBoundingClientRect().left, budget: c.getBoundingClientRect().left } : null;
+      const lime = [...document.querySelectorAll('[role=button]')].find((e) => e.getBoundingClientRect().width > 0 && /^Fatura sem contar duas vezes|^Diferença do mês e saldo/.test(e.getAttribute('aria-label') || e.textContent || ''));
+      const box = (e) => e.getBoundingClientRect();
+      return a && b && c && lime ? { main: box(a).left, side: box(b).left, budget: box(c).left, budgetTop: box(c).top, paidTop: box(a).top, limeTop: box(lime).top, limeW: Math.round(box(lime).width), mainBottom: Math.round(Math.max(box(c).bottom, box(b).bottom)) } : null;
     });
-    ok('Computador: o Resumo em painel, com metas e orçamento na coluna da direita', cols !== null && cols.side > cols.main + 200 && Math.abs(cols.budget - cols.side) < 2, JSON.stringify(cols));
+    // Auditoria de 18/11/2026: o orçamento passou para a coluna principal, abaixo de "Pagamentos do mês", e o cartão lima e "Quem vê" ficam
+    // numa linha inteira, abaixo das duas colunas (antes, a coluna da esquerda acabava cedo e deixava um bloco vazio).
+    ok('Computador: o Resumo em painel, com metas na coluna da direita, o orçamento na principal (abaixo de Pagamentos do mês) e o cartão lima numa linha inteira embaixo',
+      cols !== null && cols.side > cols.main + 200 && Math.abs(cols.budget - cols.main) < 2 && cols.budgetTop > cols.paidTop && cols.limeTop > cols.mainBottom && cols.limeW > 700, JSON.stringify(cols));
     await layoutChecks('Computador, Resumo 1280px'); await shot('630_computador_resumo');
     await p.setViewportSize({ width: 1024, height: 768 }); await p.waitForTimeout(500);
     await layoutChecks('Computador, Resumo 1024px');
@@ -15713,12 +15784,12 @@ setInterval(async () => {
         (await visibleCount('button', /^R\$ 15\.955,00\. Ganho: R\$ 455,00, \+2,94% sobre o investido\. Ver desempenho$/)) === 1 &&
         ivTops.novo !== null && ivTops.lista !== null && ivTops.novo < ivTops.lista, JSON.stringify(ivTops));
     t = await body(); investTexts.push(t);
-    ok('D-093 Investimentos: título "Investimentos", contexto Pessoal fixo, total de R$ 15.955,00, de quando são os valores, aportado, ganho e a porcentagem sobre o investido',
-      (await h1Name()) === 'Investimentos' && t.includes('R$ 15.955,00') && t.includes('Valores de 06/10/2026, como você registrou.') && t.includes('Aportado: R$ 15.500,00') &&
+    ok('D-093 Investimentos: título "Investir" (o nome da aba, auditoria de 18/11/2026), contexto Pessoal fixo, total de R$ 15.955,00, de quando são os valores, aportado, ganho e a porcentagem sobre o investido',
+      (await h1Name()) === 'Investir' && t.includes('R$ 15.955,00') && t.includes('Valores de 06/10/2026, como você registrou.') && t.includes('Aportado: R$ 15.500,00') &&
         t.includes('Ganho: R$ 455,00') && t.indexOf('Ganho: R$ 455,00') < t.indexOf('+2,94% sobre o investido'), t.slice(0, 700));
-    ok('D-093 Investimentos: diz que não é recomendação, que não entra em Pago nem em Recebido e que a Família não vê, num aviso só no fim (revisão das telas)',
-      t.includes('não é recomendação de investimento') && t.includes('não entram em Pago nem em Recebido') && t.includes('Ninguém da Família nem a empresa que oferece o benefício vê.') &&
-        t.includes('A Clarevo não guarda, não movimenta nem indica investimentos.') && !t.includes('Acompanhe o que você já investe'));
+    ok('D-093 Investimentos: no fim, uma frase curta (os valores são os registrados e a Clarevo não indica investimentos; auditoria de 18/11/2026) e que a Família não vê',
+      t.includes('Os valores são os que você registra, e a Clarevo não indica investimentos.') && t.includes('Ninguém da Família nem a empresa que oferece o benefício vê.') &&
+        !t.includes('A Clarevo não guarda, não movimenta nem indica investimentos.') && !t.includes('Acompanhe o que você já investe'));
     ok('D-093 Investimentos: os dois cards com nome, tipo e valor no nome acessível',
       (await visibleCount('button', 'Aplicação do banco, CDB ou RDB · Banco Exemplo: R$ 10.875,00. Ganho: R$ 375,00.')) === 1 && (await visibleCount('button', 'Previdência, VGBL: R$ 5.080,00. Ganho: R$ 80,00.')) === 1);
     await checkBar('D-093 Investimentos', 'Investir');
@@ -16532,7 +16603,7 @@ setInterval(async () => {
       const top = (re) => { const e = [...document.querySelectorAll('[role=button]')].find((x) => vis(x) && re.test(x.getAttribute('aria-label') || '')); return e ? e.getBoundingClientRect() : null; };
       const pill = top(/^Análises do mês\. /), row = top(/, (Pago|Recebido) · \d{2}\/\d{2}\/\d{4}/);
       const title = [...document.querySelectorAll('[role=heading][aria-level="1"]')].find((h) => vis(h) && h.textContent === 'Movimentos');
-      const bar = [...document.querySelectorAll('[role=tab]')].find(vis);
+      const bar = [...document.querySelectorAll('[role=tab]')].find((e) => vis(e) && !/^Ver dados d/.test(e.getAttribute('aria-label') || ''));
       return pill && row && title && bar ? { pill: Math.round(pill.top), pillH: Math.round(pill.height), titleTop: Math.round(title.getBoundingClientRect().top), row: Math.round(row.bottom), bar: Math.round(bar.getBoundingClientRect().top) } : null;
     });
     ok('D-105 Movimentos: a pílula "Análises" fica na linha do título, acima da lista, com 44 px, e o primeiro movimento continua à vista sem rolar em 390 × 844',
@@ -16652,14 +16723,15 @@ setInterval(async () => {
 
   // ==================================================================================================================
   // Espaço Negócio (D-113, retorno de quem testa, decidido pelo Enzo em 17/11/2026): para quem tem CNPJ ou trabalha por conta, um espaço
-  // separado do Pessoal, incluído no plano (um negócio por pessoa). (1) Na demonstração padrão, nada muda (sem seletor de espaço e os totais
-  // de sempre), e Conta tem o card "Espaço Negócio" com a frase de para quem serve; criar um negócio (só na memória) põe o nome dele no
-  // seletor. (2) No cenário "negocio" (o negócio de exemplo "Sacolé da Maria", fictício), o seletor mostra Pessoal e o negócio; o Pessoal
-  // continua com os totais de sempre; o Resumo do negócio traz o card "Como está o negócio". (3) "Como está o negócio": entrou, saiu e sobrou
-  // numa cor só, a frase de fato, os últimos meses e as maiores saídas; os valores ocultos viram R$ ••••. (4) A retirada para o Pessoal: sai
+  // separado do Pessoal, incluído no plano (um negócio por pessoa). (1) Na demonstração padrão, os totais de sempre e o seletor de espaço só
+  // com "Pessoal" e o "+" (D-113b), que abre a folha "Criar um espaço" com o Espaço Negócio (leva a /negocio/novo) e a Família; Conta tem o
+  // card "Espaço Negócio" com a frase de para quem serve; criar um negócio (só na memória) põe o nome dele no seletor. (2) No cenário "negocio" (o negócio de exemplo "Sacolé da Maria", fictício), o seletor mostra Pessoal e o negócio; o Pessoal
+  // continua com os totais de sempre; o Resumo do negócio traz o card "Seu negócio". (3) "Seu negócio": entrou, saiu e sobrou
+  // numa cor só, a frase de fato, os últimos meses e as maiores saídas; os valores ocultos viram R$ ••••. (3a) D-113b: em Análises, a pílula
+  // do espaço abre a folha e troca o espaço, e a tela recarrega com os dados do espaço escolhido. (4) A retirada para o Pessoal: sai
   // do negócio (não entra em Saiu) e entra no Pessoal como recebimento, ligada nos dois lados, sem editar; excluir tira os dois. (5) Mover um
   // gasto do Pessoal para o negócio e de volta. (6) Os formulários do negócio usam as categorias do negócio; Metas e Investir explicam que
-  // ficam no Pessoal. (7) Mudar o nome e encerrar. (8) Letra grande e modo escuro em "Como está o negócio". Capturas 730 a 739. Nada vai à
+  // ficam no Pessoal. (7) Mudar o nome e encerrar. (8) Letra grande e modo escuro em "Seu negócio". Capturas 730 a 739. Nada vai à
   // rede (tudo na memória da demonstração).
   // ==================================================================================================================
   {
@@ -16681,13 +16753,40 @@ setInterval(async () => {
     // As telas empilhadas escondem a barra de abas: goResumo volta até ela aparecer e abre o Resumo.
     const ngToResumo = async () => { await goResumo(); await p.waitForTimeout(500); };
 
-    // 1. Demonstração padrão: sem seletor e os totais de sempre; o card em Conta; criar um negócio na memória.
+    // 1. Demonstração padrão: o seletor só com o Pessoal e o "+" (D-113b) e os totais de sempre; o card em Conta; criar um negócio na memória.
     await demoHome();
-    ok('Negócio (D-113), demonstração padrão: sem negócio de exemplo, o Resumo continua sem o seletor de espaço', (await ngSpaceTabs()).length === 0, JSON.stringify(await ngSpaceTabs()));
+    ok('Negócio (D-113b), demonstração padrão: sem negócio de exemplo, o seletor mostra "Pessoal" escolhido e o "+" ("Criar um espaço: Negócio ou Família")',
+      JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:true']) && (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1, JSON.stringify(await ngSpaceTabs()));
+    // O seletor cabe em 320 px (o "+" com 44 px ou mais) e a pílula do Pessoal e o "+" ficam na mesma linha.
+    await atWidths(async (w) => {
+      const sw = await p.evaluate(() => {
+        const tabs = [...document.querySelectorAll('[role=tablist]')].find((e) => e.getBoundingClientRect().width > 0 && (e.getAttribute('aria-label') || '').startsWith('Escolher o espaço:'));
+        const plus = [...document.querySelectorAll('[role=button]')].find((e) => e.getBoundingClientRect().width > 0 && (e.getAttribute('aria-label') || '').startsWith('Criar um espaço'));
+        if (!tabs || !plus) return null;
+        const a = tabs.getBoundingClientRect(), b = plus.getBoundingClientRect();
+        return { sameRow: Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) < 2, plusW: Math.round(b.width), plusH: Math.round(b.height), right: Math.round(b.right), w: window.innerWidth };
+      });
+      ok(`Negócio (D-113b): o seletor e o "+" na mesma linha, com alvo de 44 px, dentro da tela (${w}px)`, sw !== null && sw.sameRow && sw.plusW >= 44 && sw.plusH >= 44 && sw.right <= sw.w, JSON.stringify(sw));
+      await layoutChecks(`Negócio (D-113b), Resumo com o seletor e o "+" ${w}px`);
+      await shot(w === 390 ? '740_seletor_so_pessoal' : '740_seletor_so_pessoal_320px');
+    });
+    await btn('Criar um espaço: Negócio ou Família').click(); await p.waitForTimeout(500);
+    let t = await dialogText().catch(() => '');
+    const ngSheetButtons = await p.getByRole('dialog').filter({ visible: true }).last().getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent));
+    ok('Negócio (D-113b): o "+" abre a folha "Criar um espaço" com o Espaço Negócio primeiro (com "Para quem tem CNPJ ou trabalha por conta.") e a Família, e "Fechar"',
+      t.includes('Criar um espaço') && JSON.stringify(ngSheetButtons) === JSON.stringify(['Espaço Negócio. Para quem tem CNPJ ou trabalha por conta.', 'Família. Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.', 'Fechar']),
+      `${JSON.stringify(ngSheetButtons)} ${t.slice(0, 300)}`);
+    await shot('741_folha_criar_espaco');
+    await btn('Fechar').click(); await p.waitForTimeout(400);
+    ok('Negócio (D-113b): "Fechar" fecha a folha sem mudar nada', (await p.getByRole('dialog').filter({ visible: true }).count()) === 0 && JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:true']));
+    await btn('Criar um espaço: Negócio ou Família').click(); await p.waitForTimeout(400);
+    await btn('Espaço Negócio. Para quem tem CNPJ ou trabalha por conta.').click(); await waitText('Nome do negócio'); await p.waitForTimeout(300);
+    ok('Negócio (D-113b): "Espaço Negócio" na folha abre a criação do espaço Negócio (/negocio/novo)', new URL(p.url()).pathname === '/negocio/novo' && (await h1Name()) === 'Espaço Negócio', p.url());
+    await btn('Voltar').click(); await waitText('Diferença do mês'); await p.waitForTimeout(400);
     await expectTotals('Negócio, demonstração padrão: outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
     await openConta();
     await p.getByRole('heading', { name: 'Espaço Negócio', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(300);
-    let t = await ngKeep();
+    t = await ngKeep();
     ok('Negócio: em Conta, o card "Espaço Negócio" (título de nível 2) diz para quem serve (CNPJ ou trabalho por conta), que está no plano, e oferece "Criar o espaço Negócio"',
       (await p.getByRole('heading', { name: 'Espaço Negócio', level: 2 }).filter({ visible: true }).count()) === 1 &&
         t.includes('Para quem tem CNPJ ou trabalha por conta: anote o que entra e o que sai do negócio num espaço separado do Pessoal e veja quanto sobrou no mês. Incluído no plano, um negócio por pessoa.') &&
@@ -16704,13 +16803,14 @@ setInterval(async () => {
     await field('Nome do negócio').fill('Conserto de ar-condicionado');
     await btn('Criar o espaço Negócio').click(); await waitText('Espaço Negócio criado', 8000); await p.waitForTimeout(600);
     t = await ngKeep();
-    ok('Negócio, criar: volta para "Como está o negócio", com o aviso, o mês sem anotações e o seletor já no negócio',
-      (await h1Name()) === 'Como está o negócio' && t.includes('Espaço Negócio criado. Toque no nome dele, no alto da tela, para anotar no negócio.') &&
+    ok('Negócio, criar: volta para "Seu negócio", com o aviso, o mês sem anotações e o seletor já no negócio',
+      (await h1Name()) === 'Seu negócio' && t.includes('Espaço Negócio criado. Toque no nome dele, no alto da tela, para anotar no negócio.') &&
         t.includes('Nada anotado neste mês. Anote uma venda, um serviço ou um gasto do negócio em Movimentos.'), t.slice(0, 500));
     await btn('Voltar').click(); await p.waitForTimeout(500);
     await ngToResumo();
-    ok('Negócio criado: o seletor mostra Pessoal e o nome do negócio (marcado), e o Resumo do negócio começa em zero',
-      JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:false', 'Ver dados do negócio Conserto de ar-condicionado:true']) && (await body()).includes('Como está o negócio'),
+    ok('Negócio criado: o seletor mostra Pessoal e o nome do negócio (marcado), o "+" fica só para a Família (D-113b) e o Resumo do negócio começa em zero',
+      JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:false', 'Ver dados do negócio Conserto de ar-condicionado:true']) && (await body()).includes('Seu negócio') &&
+        (await visibleCount('button', 'Criar um espaço: Família')) === 1 && (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 0,
       JSON.stringify(await ngSpaceTabs()));
     await ngTab('Ver dados de Pessoal').click(); await p.waitForTimeout(600);
     await expectTotals('Negócio criado: no Pessoal, outubro segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
@@ -16722,18 +16822,18 @@ setInterval(async () => {
     await ngTab(NG_TAB).click(); await p.waitForTimeout(700);
     await expectTotals('Negócio: o Resumo do negócio em outubro, com Recebido R$ 760,00, Pago R$ 418,00 e Diferença R$ 342,00, sem contas a pagar', 'R$ 760,00', 'R$ 418,00', 'R$ 342,00', 'R$ 0,00');
     t = await ngKeep();
-    ok('Negócio: no Resumo do negócio, o card "Como está o negócio" com a frase do mês, "Ver como está o negócio" e "Retirada para o Pessoal"',
-      t.includes('Como está o negócio') && t.includes('Neste mês, entrou R$ 342,00 a mais do que saiu.') && (await visibleCount('button', 'Ver como está o negócio')) === 1 &&
+    ok('Negócio: no Resumo do negócio, o card "Seu negócio" (D-113b, o nome novo da visão do negócio) com a frase do mês, "Ver seu negócio" e "Retirada para o Pessoal"',
+      t.includes('Seu negócio') && t.includes('Neste mês, entrou R$ 342,00 a mais do que saiu.') && (await visibleCount('button', 'Ver seu negócio')) === 1 &&
         (await visibleCount('button', 'Retirada para o Pessoal')) === 1 && !t.includes('Primeiros passos'), t.slice(0, 800));
     await atWidths(async (w) => { await layoutChecks(`Negócio, Resumo do negócio ${w}px`); await shot(w === 390 ? '731_negocio_resumo' : '731_negocio_resumo_320px'); });
 
-    // 3. Como está o negócio.
-    await btn('Ver como está o negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(700);
+    // 3. Seu negócio.
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(700);
     t = await ngKeep();
-    ok('Negócio, "Como está o negócio": entrou R$ 760,00, saiu R$ 418,00 e sobrou R$ 342,00 em outubro, com a frase de fato',
-      (await h1Name()) === 'Como está o negócio' && t.includes('Entrou') && t.includes('R$ 760,00') && t.includes('Saiu') && t.includes('R$ 418,00') && t.includes('Sobrou') && t.includes('R$ 342,00') &&
+    ok('Negócio, "Seu negócio": entrou R$ 760,00, saiu R$ 418,00 e sobrou R$ 342,00 em outubro, com a frase de fato',
+      (await h1Name()) === 'Seu negócio' && t.includes('Entrou') && t.includes('R$ 760,00') && t.includes('Saiu') && t.includes('R$ 418,00') && t.includes('Sobrou') && t.includes('R$ 342,00') &&
         t.includes('Neste mês, entrou R$ 342,00 a mais do que saiu.') && t.includes('Demonstração · Sacolé da Maria'), t.slice(0, 900));
-    ok('Negócio, "Como está o negócio": os últimos meses (de maio a outubro) com a frase do período e as maiores saídas de outubro, Material e mercadoria primeiro',
+    ok('Negócio, "Seu negócio": os últimos meses (de maio a outubro) com a frase do período e as maiores saídas de outubro, Material e mercadoria primeiro',
       t.includes('Últimos meses') && t.includes('De maio a outubro de 2026, entrou mais do que saiu em 2 dos 2 meses com anotações. Somando, entrou R$ 1.501,00 a mais do que saiu.') &&
         t.includes('Maiores saídas do mês') && t.indexOf('Material e mercadoria') < t.indexOf('Funcionários e ajudantes') && t.indexOf('Funcionários e ajudantes') < t.indexOf('Taxas e maquininha') &&
         t.includes('Os valores são os que você anotou. A Clarevo não faz contabilidade nem cálculo de impostos.'), t.slice(t.indexOf('Últimos meses'), t.indexOf('Últimos meses') + 700));
@@ -16751,7 +16851,7 @@ setInterval(async () => {
     // Valores ocultos: o olho do Resumo esconde os valores também aqui.
     await btn('Voltar').click(); await ngToResumo();
     await btn('Ocultar valores').click(); await p.waitForTimeout(300);
-    await btn('Ver como está o negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(600);
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(600);
     t = await body();
     const ngHiddenLabels = await p.evaluate(() => [...document.querySelectorAll('[aria-label]')].filter((e) => e.getBoundingClientRect().width > 0 && /R\$ \d/.test(e.getAttribute('aria-label') || '')).map((e) => e.getAttribute('aria-label')).slice(0, 3));
     ok('Negócio, valores ocultos: nenhum valor em reais à vista nem nos nomes acessíveis (R$ ••••)', !/R\$ \d/.test(t) && t.includes('R$ ••••') && ngHiddenLabels.length === 0, `${ngHiddenLabels.join(' | ')} ${t.slice(0, 300)}`);
@@ -16761,8 +16861,44 @@ setInterval(async () => {
       !t.includes('a mais do que') && !t.includes('entrou mais do que saiu') && !t.includes('saiu mais do que entrou') && ngHiddenDir.length === 0 && t.includes('Últimos meses'), `${ngHiddenDir.join(' | ')} ${t.slice(0, 400)}`);
     await btn('Voltar').click(); await ngToResumo();
     t = await body();
-    ok('Negócio, valores ocultos (D-113a): o card do Resumo do negócio fica sem a frase do mês', t.includes('Como está o negócio') && !t.includes('a mais do que'), t.slice(0, 500));
+    ok('Negócio, valores ocultos (D-113a): o card do Resumo do negócio fica sem a frase do mês', t.includes('Seu negócio') && !t.includes('a mais do que'), t.slice(0, 500));
     await btn('Mostrar valores').click(); await p.waitForTimeout(300);
+
+    // 3a. D-113b: em Análises (uma tela de consulta), a pílula do espaço vira botão e abre a folha "Escolher o espaço": trocar ali recarrega a
+    // tela com os dados do espaço escolhido (outubro: R$ 3.900,00 pagos no Pessoal, R$ 418,00 no negócio). Começa no Pessoal.
+    await ngTab('Ver dados de Pessoal').click(); await p.waitForTimeout(500);
+    await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Análises/ }).filter({ visible: true }).first().click(); await waitText('Pago em outubro de 2026'); await p.waitForTimeout(600);
+    t = await body();
+    ok('Negócio (D-113b), Análises no Pessoal: a pílula "Demonstração · Pessoal" é um botão e o mês mostra R$ 3.900,00 pagos',
+      (await visibleCount('button', 'Espaço: Demonstração · Pessoal')) === 1 && t.includes('Pessoal · Outubro de 2026') && t.includes('R$ 3.900,00'), t.slice(0, 400));
+    await atWidths(async (w) => { await innerChecks(`Negócio (D-113b), Análises com a pílula que troca ${w}px`); if (w === 390) await shot('742_analises_pilula'); });
+    await btn('Espaço: Demonstração · Pessoal').click(); await p.waitForTimeout(500);
+    t = await dialogText().catch(() => '');
+    const ngRadios = await p.getByRole('dialog').filter({ visible: true }).last().getByRole('radio').evaluateAll((els) => els.map((e) => `${e.getAttribute('aria-label')}:${e.getAttribute('aria-checked')}`));
+    ok('Negócio (D-113b): a folha "Escolher o espaço" tem Pessoal (marcado) e o negócio, e oferece criar só a Família',
+      t.includes('Escolher o espaço') && JSON.stringify(ngRadios) === JSON.stringify(['Pessoal:true', `Negócio ${NG}:false`]) &&
+        (await visibleCount('button', 'Família. Para ver e anotar as contas da casa em conjunto, com até 6 pessoas.')) === 1 && (await visibleCount('button', /^Espaço Negócio\./)) === 0, `${JSON.stringify(ngRadios)} ${t.slice(0, 300)}`);
+    await shot('743_folha_escolher_espaco');
+    await radio(`Negócio ${NG}`).click(); await p.waitForTimeout(400);
+    await waitUntil(async () => (await body()).includes(`${NG} · Outubro de 2026`) && (await body()).includes('R$ 418,00'), 8000);
+    t = await body();
+    ok('Negócio (D-113b): escolher o negócio na folha fecha a folha e recarrega Análises com os dados do negócio (R$ 418,00 pagos em outubro), na mesma tela',
+      (await p.getByRole('dialog').filter({ visible: true }).count()) === 0 && new URL(p.url()).pathname === '/analises' && (await visibleCount('button', `Espaço: Demonstração · ${NG}`)) === 1 &&
+        t.includes(`${NG} · Outubro de 2026`) && t.includes('R$ 418,00') && !t.includes('R$ 3.900,00'), t.slice(0, 500));
+    await shot('744_analises_negocio');
+    await btn(`Espaço: Demonstração · ${NG}`).click(); await p.waitForTimeout(400);
+    await radio('Pessoal').click(); await p.waitForTimeout(400);
+    await waitUntil(async () => (await body()).includes('Pessoal · Outubro de 2026') && (await body()).includes('R$ 3.900,00'), 8000);
+    ok('Negócio (D-113b): de volta ao Pessoal pela pílula, Análises mostra de novo R$ 3.900,00', (await body()).includes('R$ 3.900,00') && (await visibleCount('button', 'Espaço: Demonstração · Pessoal')) === 1);
+    await btn('Voltar').click(); await p.waitForTimeout(400);
+    await ngToResumo();
+    ok('Negócio (D-113b): a troca pela pílula vale para o app todo (o seletor do Resumo está no Pessoal)', JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:true', `${NG_TAB}:false`]), JSON.stringify(await ngSpaceTabs()));
+    // Formulários e detalhes mantêm a pílula fixa (o espaço não muda no meio de um preenchimento).
+    await btn('Anotar gasto').click(); await waitText('Valor em reais'); await p.waitForTimeout(300);
+    ok('Negócio (D-113b): no formulário, a pílula continua fixa (não é botão)', (await visibleCount('button', /^Espaço: /)) === 0 && (await p.locator('[aria-label="Espaço: Demonstração · Pessoal"]').filter({ visible: true }).count()) === 1);
+    await btn('Cancelar').click(); await p.waitForTimeout(400);
+    await ngTab(NG_TAB).click(); await p.waitForTimeout(600);
 
     // 4. Retirada para o Pessoal.
     await btn('Retirada para o Pessoal').click(); await waitText('Sai de (conta do negócio)'); await p.waitForTimeout(500);
@@ -16777,8 +16913,8 @@ setInterval(async () => {
     await field('Valor em reais').fill('300');
     await btn('Salvar retirada').click(); await waitText('Retirada salva', 8000); await p.waitForTimeout(700);
     t = await ngKeep();
-    ok('Negócio, retirada salva: em "Como está o negócio", Saiu continua R$ 418,00, a retirada fica à parte e o que ficou no negócio aparece',
-      (await h1Name()) === 'Como está o negócio' && t.includes('Retirada salva: saiu do negócio e entrou no Pessoal.') && t.includes('R$ 418,00') &&
+    ok('Negócio, retirada salva: em "Seu negócio", Saiu continua R$ 418,00, a retirada fica à parte e o que ficou no negócio aparece',
+      (await h1Name()) === 'Seu negócio' && t.includes('Retirada salva: saiu do negócio e entrou no Pessoal.') && t.includes('R$ 418,00') &&
         t.includes('Retiradas para o Pessoal: R$ 300,00. Não entram em Saiu: é o dinheiro do negócio que foi para o Pessoal.') && t.includes('Ficou no negócio, depois das retiradas: R$ 42,00.'), t.slice(0, 1000));
     await layoutChecks('Negócio, com retirada 390px'); await shot('733_negocio_com_retirada');
     await btn('Voltar').click(); await ngToResumo();
@@ -16825,9 +16961,16 @@ setInterval(async () => {
 
     // 6. Formulários e abas no negócio.
     await ngTab(NG_TAB).click(); await p.waitForTimeout(600);
-    await btn('Anotar gasto').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
+    // Um vocabulário por espaço (auditoria de 18/11/2026): no negócio, entradas e saídas, como em "Seu negócio".
+    await waitText('Saídas do mês'); await p.waitForTimeout(300);
+    t = await body();
+    ok('Negócio (auditoria de 18/11/2026): o Resumo do negócio diz "Sobrou", "Entrou" e "Saiu" e "Anotar saída", sem "Diferença do mês", "Recebido", "Pago", "Anotar gasto" nem a renda comprometida',
+      t.includes('Sobrou\n') && t.includes('Entrou menos saiu até 07/10 · não é saldo') && (await visibleCount('button', /^Entrou, R\$/)) === 1 && (await visibleCount('button', /^Saiu, R\$/)) === 1 &&
+        (await visibleCount('button', 'Anotar saída')) === 1 && (await visibleCount('button', 'Anotar gasto')) === 0 && !t.includes('Diferença do mês\n') && !t.includes('Renda comprometida') && t.includes('Saídas do mês'), t.slice(0, 900));
+    await btn('Anotar saída').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
     t = await ngKeep();
-    ok('Negócio: "Anotar gasto" no negócio salva no negócio, com as categorias de saída do negócio e sem subcategoria',
+    ok('Negócio: "Anotar saída" no negócio abre "Anotar saída", salva no negócio, com as categorias de saída do negócio e sem subcategoria',
+      (await h1Name()) === 'Anotar saída' && t.includes('Data da saída') && (await visibleCount('button', 'Salvar saída')) === 1 &&
       t.includes('Demonstração · Sacolé da Maria') && JSON.stringify(await ngChips('Categoria')) === JSON.stringify(NG_OUT), JSON.stringify(await ngChips('Categoria')));
     await btn('Cancelar').click(); await p.waitForTimeout(400);
     await tabByName('Metas').click(); await waitText('Ir para o Pessoal'); await p.waitForTimeout(400);
@@ -16846,20 +16989,25 @@ setInterval(async () => {
     // 6a. Correções da revisão (D-113a): no negócio, a busca oferece as categorias do negócio, a Evolução não oferece "Criar meta" (o
     // banco recusa meta no negócio) e "Descartar o preenchimento?" diz o nome do negócio.
     await ngTab(NG_TAB).click(); await p.waitForTimeout(500);
-    await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+    await tabByName('Movimentos').click(); await waitText('Anotar entrada'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Negócio (auditoria de 18/11/2026): Movimentos do negócio com "Entrou em outubro" e "Saiu em outubro", "Anotar saída" e "Anotar entrada", os filtros "Entradas" e "Saídas", as linhas como "Saída" e os exemplos de gastos fixos do negócio',
+      t.includes('Entrou em outubro') && t.includes('Saiu em outubro') && (await visibleCount('button', 'Anotar saída')) === 1 && (await visibleCount('button', 'Anotar entrada')) === 1 &&
+        (await visibleCount('radio', 'Entradas')) === 1 && (await visibleCount('radio', 'Saídas')) === 1 && !t.includes('Registrar recebimento') && !t.includes('Recebido em outubro') &&
+        (await p.getByRole('button', { name: /, Saída · \d{2}\/\d{2}\/\d{4}/ }).filter({ visible: true }).count()) > 0 && (await p.getByRole('button', { name: /, Pago · \d{2}\/\d{2}\/\d{4}/ }).filter({ visible: true }).count()) === 0, t.slice(0, 1200));
     await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(500);
     await h1More();
     const ngSearchCats = await h1Group('Categoria').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent));
     ok('Negócio (D-113a): a busca no negócio oferece as categorias do negócio (as nove de saída e as três de entrada), sem as do Pessoal',
       JSON.stringify(ngSearchCats) === JSON.stringify(['Todas', ...NG_OUT.slice(1), 'Vendas', 'Serviços', 'Outras entradas', 'Sem categoria']), JSON.stringify(ngSearchCats));
-    await btn('Voltar').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(400);
+    await btn('Voltar').click(); await waitText('Anotar entrada'); await p.waitForTimeout(400);
     await evOpen(); await f3Pick('Guardado em metas');
     t = await ngKeep();
     ok('Negócio (D-113a): na Evolução do negócio, "Guardado em metas" explica que as metas ficam no Pessoal e na Família, sem "Criar meta"',
       t.includes('Metas ficam no Pessoal e na Família. O espaço Negócio é só para o que entra e sai do negócio.') && (await visibleCount('button', 'Criar meta')) === 0, t.slice(0, 700));
     await evBack();
     await ngToResumo();
-    await btn('Anotar gasto').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
+    await btn('Anotar saída').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
     await field('Valor em reais').fill('12');
     await btn('Cancelar').click(); await waitText('Descartar o preenchimento?');
     ok('Negócio (D-113a): "Descartar o preenchimento?" no negócio diz o nome do negócio', (await dialogText()).includes(`Você tem alterações que ainda não foram salvas em ${NG}.`), await dialogText());
@@ -16867,7 +17015,7 @@ setInterval(async () => {
     // Ler um holerite no negócio: o valor e a descrição entram, mas a categoria "Salário" (do Pessoal) não.
     await i2NewIncome();
     await i2ReadIncome(i2Holerite);
-    const ngHol = await i2Values('Data do recebimento');
+    const ngHol = await i2Values('Data da entrada');
     const ngHolChecked = await p.evaluate(() => [...document.querySelectorAll('[role=radiogroup][aria-label="Categoria"] [role=radio][aria-checked="true"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || e.textContent));
     ok('Negócio (D-113a): ler um holerite no negócio preenche o valor líquido, mas não escolhe "Salário", que não é categoria do negócio',
       ngHol.amount === '2.345,67' && (await radio('Salário').count()) === 0 && ngHolChecked.every((c) => c === 'Sem categoria') && (await body()).includes(`Demonstração · ${NG}`),
@@ -16878,11 +17026,11 @@ setInterval(async () => {
 
     // 7. Mudar o nome e encerrar.
     await ngTab(NG_TAB).click(); await p.waitForTimeout(500);
-    await btn('Ver como está o negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
     await btn('Mudar o nome').click(); await waitText('Nome do negócio'); await p.waitForTimeout(300);
     await field('Nome do negócio').fill('Sacolés e Geladinhos da Maria');
     await btn('Salvar o nome').click(); await waitText('Nome do negócio atualizado.', 8000); await p.waitForTimeout(500);
-    ok('Negócio: o nome novo aparece em "Como está o negócio"', (await body()).includes('Demonstração · Sacolés e Geladinhos da Maria'));
+    ok('Negócio: o nome novo aparece em "Seu negócio"', (await body()).includes('Demonstração · Sacolés e Geladinhos da Maria'));
     await btn('Encerrar o espaço Negócio').click(); await p.waitForTimeout(300);
     t = await body();
     ok('Negócio, encerrar: a confirmação diz o que acontece (sai do app, fica guardado sem leitura por 6 meses, as retiradas continuam no Pessoal)',
@@ -16891,13 +17039,14 @@ setInterval(async () => {
     ok('Negócio encerrado: Conta volta a oferecer "Criar o espaço Negócio"', (await visibleCount('button', 'Criar o espaço Negócio')) === 1);
     await btn('Voltar').click().catch(() => {}); await p.waitForTimeout(400);
     await ngToResumo().catch(() => {});
-    ok('Negócio encerrado: o seletor de espaço sai do Resumo', (await ngSpaceTabs()).length === 0, JSON.stringify(await ngSpaceTabs()));
+    ok('Negócio encerrado: o negócio sai do seletor (fica só "Pessoal", com o "+" para o Negócio e a Família, D-113b)', JSON.stringify(await ngSpaceTabs()) === JSON.stringify(['Ver dados de Pessoal:true']) &&
+      (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1, JSON.stringify(await ngSpaceTabs()));
     await expectTotals('Negócio encerrado: o Pessoal segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
 
-    // 8. Letra grande (1,3 vez, 360 px) e modo escuro em "Como está o negócio".
+    // 8. Letra grande (1,3 vez, 360 px) e modo escuro em "Seu negócio".
     await ngEnter();
     await ngTab(NG_TAB).click(); await p.waitForTimeout(500);
-    await btn('Ver como está o negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(500);
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(500);
     await p.setViewportSize({ width: 360, height: 800 }); await p.waitForTimeout(400);
     await p.evaluate(AC_SRC); await p.evaluate(() => window.__acc.scale(1.3)); await p.waitForTimeout(600);
     const ngBig = await p.evaluate(() => ({ o: window.__acc.overflow(), cut: window.__acc.cut(), ov: window.__acc.overlap(), t: window.__acc.targets().small }));
@@ -16914,11 +17063,11 @@ setInterval(async () => {
       await dp.goto(`http://localhost:${PORT}/?cenario=negocio`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
       await dp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
       await dp.getByRole('tab', { name: NG_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
-      await dp.getByRole('button', { name: 'Ver como está o negócio', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Últimos meses').filter({ visible: true }).first().waitFor({ timeout: 10000 });
+      await dp.getByRole('button', { name: 'Ver seu negócio', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Últimos meses').filter({ visible: true }).first().waitFor({ timeout: 10000 });
       await dp.waitForTimeout(800);
       await dp.evaluate(AC_SRC);
       const dc = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow(), bg: getComputedStyle(document.body).backgroundColor }));
-      ok(`Negócio, modo escuro: "Como está o negócio" no fundo azul-marinho, com contraste de 4,5:1 em cada texto (${dc.c.n} textos) e nada fora da tela`,
+      ok(`Negócio, modo escuro: "Seu negócio" no fundo azul-marinho, com contraste de 4,5:1 em cada texto (${dc.c.n} textos) e nada fora da tela`,
         dc.bg === 'rgb(19, 30, 62)' && dc.c.n > 20 && dc.c.bad.length === 0 && dc.o.length === 0 && dpErrors.length === 0 && dpWrites.length === 0, `${dc.bg} ${[...dc.c.bad, ...dc.o, ...dpErrors].slice(0, 4).join(' | ')}`);
       await dp.screenshot({ path: `${OUT}/739_escuro_negocio.png` });
       await ngDark.close();
@@ -16928,6 +17077,95 @@ setInterval(async () => {
     const ngBad = ngTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(preju[ií]zo|lucro|cuidado|aten[cç][aã]o|ruim|parab[eé]ns|deveria)\b/i)?.[0]).filter(Boolean);
     ok('Negócio: nas telas do espaço Negócio, nenhum termo proibido, travessão longo nem palavra de julgamento', ngTexts.length >= 12 && ngBad.length === 0, `${ngTexts.length} telas ${ngBad.join(' | ')}`);
     ok('Negócio: nada vai à rede (a demonstração grava só na memória)', writes.length === ngWrites0, writes.slice(ngWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Auditoria visual (18/11/2026): Conta em seções, com o Espaço Negócio e a Família logo depois da assinatura, sem o widget na web e
+  // com o tema numa coluna em 390 px; Movimentos com os dois totais alinhados e numa cor só; o card do Desempenho em Investir e a busca
+  // "No app" por CDI; as abas Evolução e Orçamento das Análises com prévias; as contas vencidas do Resumo sem a cor de erro; o ritmo
+  // das metas sem "atrás do plano"; a entrada no computador com a faixa e o conteúdo na mesma largura. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const auWrites0 = writes.length;
+    const RED = 'rgb(180, 35, 24)';
+    await demoHome();
+    // 1. Conta.
+    await openConta(); await p.waitForTimeout(400);
+    t = await body();
+    const auHeads = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+    const auSections = ['Plano e espaços', 'Este aparelho', 'Dados e segurança', 'Ajuda e conta'].map((x) => t.indexOf(x));
+    ok('Auditoria, Conta: em seções ("Plano e espaços", "Este aparelho", "Dados e segurança", "Ajuda e conta"), com o Espaço Negócio e a Família logo depois da assinatura e antes do benefício',
+      auSections.every((x, k) => x > 0 && (k === 0 || x > auSections[k - 1])) && auHeads.indexOf('Espaço Negócio') === auHeads.indexOf('Assinatura') + 1 && auHeads.indexOf('Família') === auHeads.indexOf('Espaço Negócio') + 1 &&
+        auHeads.indexOf('Benefício pela empresa') > auHeads.indexOf('Família') && t.indexOf('Espaço Negócio') > t.indexOf('Plano e espaços') && t.indexOf('Espaço Negócio') < t.indexOf('Este aparelho'), `${JSON.stringify(auHeads)} ${JSON.stringify(auSections)}`);
+    ok('Auditoria, Conta na web: sem o card do widget (só no app para celular)', !auHeads.includes('Widget na tela inicial'));
+    await scrollTo('Tema'); await p.waitForTimeout(300);
+    const auTheme = await p.evaluate(() => [...document.querySelectorAll('[role=radiogroup][aria-label="Tema"] [role=radio]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => Math.round(e.getBoundingClientRect().top)));
+    ok('Auditoria, Conta (390 px): as três escolhas do tema uma embaixo da outra (nunca 2 + 1)', auTheme.length === 3 && new Set(auTheme).size === 3, JSON.stringify(auTheme));
+    await shot('750_auditoria_conta_secoes');
+    await btn('Voltar').click(); await waitText('Diferença do mês');
+    // 2. Movimentos: os totais alinhados e numa cor só.
+    await tabByName('Movimentos').click(); await waitText('Registrar recebimento'); await p.waitForTimeout(500);
+    const auTotals = await p.evaluate(() => {
+      const val = (re) => { const b = [...document.querySelectorAll('[role=button]')].find((e) => e.getBoundingClientRect().width > 0 && re.test(e.getAttribute('aria-label') || '')); const m = b && [...b.querySelectorAll('div[dir="auto"]')].find((x) => /R\$/.test(x.textContent || '')); return m ? { top: Math.round(m.getBoundingClientRect().top), color: getComputedStyle(m).color } : null; };
+      return { rec: val(/^Recebido em outubro, /), pago: val(/^Pago em outubro, /) };
+    });
+    ok('Auditoria, Movimentos (390 px): os valores de Recebido e Pago na mesma altura e na mesma cor (sem verde)', auTotals.rec !== null && auTotals.pago !== null && auTotals.rec.top === auTotals.pago.top && auTotals.rec.color === auTotals.pago.color, JSON.stringify(auTotals));
+    const auRowColors = await p.evaluate(() => [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && /, Recebido · \d{2}\/\d{2}\/\d{4}/.test(e.getAttribute('aria-label') || '')).map((e) => { const m = [...e.querySelectorAll('div[dir="auto"]')].find((x) => /R\$/.test(x.textContent || '')); return m ? getComputedStyle(m).color : null; }));
+    ok('Auditoria, Movimentos: os recebimentos da lista sem verde (a mesma cor dos gastos)', auRowColors.length > 0 && auRowColors.every((c) => c === auTotals.pago?.color), JSON.stringify(auRowColors));
+    // 3. Análises: as prévias de Evolução e Orçamento.
+    await p.getByRole('button', { name: /^Análises/ }).filter({ visible: true }).first().click(); await waitText('Pago em outubro de 2026'); await p.waitForTimeout(500);
+    await p.getByRole('tab', { name: 'Evolução', exact: true }).filter({ visible: true }).first().click(); await waitText('Abrir Evolução'); await p.waitForTimeout(500);
+    t = await body();
+    ok('Auditoria, Análises › Evolução: a prévia "Últimos meses" com o Pago de cada mês desde o primeiro com registros (setembro R$ 3.750,00 e outubro R$ 3.900,00, sem a fila de meses vazios antes)', t.includes('Últimos meses') && t.includes('Setembro de 2026\nR$ 3.750,00') && t.includes('Outubro de 2026\nR$ 3.900,00') && !t.includes('Agosto de 2026\nSem registros'), t.slice(t.indexOf('Últimos meses') - 10, t.indexOf('Últimos meses') + 300));
+    await shot('751_auditoria_analises_evolucao');
+    await p.getByRole('tab', { name: 'Orçamento', exact: true }).filter({ visible: true }).first().click(); await waitText('Abrir Orçamento'); await p.waitForTimeout(500);
+    t = await body();
+    ok('Auditoria, Análises › Orçamento: cada categoria com orçamento, com o valor e a barra (Lazer R$ 400,00 de R$ 300,00)', t.includes('Lazer\nR$ 400,00 de R$ 300,00') && (await p.locator('[data-testid="barra-orcamento"]').filter({ visible: true }).count()) >= 3, t.slice(0, 900));
+    await shot('752_auditoria_analises_orcamento');
+    await btn('Voltar').click(); await p.waitForTimeout(400);
+    // 4. Investir: o card do Desempenho logo abaixo do total; a busca "No app" por CDI.
+    await tabByName('Investir').click(); await waitText('Seus investimentos hoje'); await p.waitForTimeout(500);
+    const auPerf = await p.evaluate(() => {
+      const top = (re, sel = '[role=button],[role=link]') => { const e = [...document.querySelectorAll(sel)].find((x) => x.getBoundingClientRect().width > 0 && re.test(x.getAttribute('aria-label') || x.textContent || '')); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+      return { total: top(/Ver desempenho$/), card: top(/^Desempenho: comparar com CDI, IPCA e poupança/), novo: top(/^Novo investimento$/) };
+    });
+    ok('Auditoria, Investir: o card "Desempenho: comparar com CDI, IPCA e poupança" logo abaixo do total, antes de "Novo investimento"', auPerf.total !== null && auPerf.card !== null && auPerf.novo !== null && auPerf.total < auPerf.card && auPerf.card < auPerf.novo, JSON.stringify(auPerf));
+    await shot('753_auditoria_investir_desempenho');
+    await p.getByRole('link', { name: /^Desempenho: comparar com CDI, IPCA e poupança/ }).filter({ visible: true }).first().click(); await waitText('Comparar com CDI, IPCA e poupança'); await p.waitForTimeout(500);
+    ok('Auditoria, Investir: o card abre o Desempenho (/investimento/desempenho)', new URL(p.url()).pathname === '/investimento/desempenho');
+    await btn('Voltar').click(); await p.waitForTimeout(400);
+    await tabByName('Aprender').click(); await waitText('Comece por aqui'); await p.waitForTimeout(300);
+    await p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first().fill('cdi'); await waitText('No app'); await p.waitForTimeout(500);
+    const auSearch = await p.evaluate(() => [...document.querySelectorAll('[role=button]')].filter((e) => e.getBoundingClientRect().width > 0 && /^(Desempenho|Investimentos)/.test(e.getAttribute('aria-label') || '')).map((e) => (e.getAttribute('aria-label') || '').split('.')[0]));
+    ok('Auditoria, Aprender: a busca "cdi" acha primeiro, em "No app", "Desempenho: comparar com CDI, IPCA e poupança"', auSearch[0] === 'Desempenho: comparar com CDI, IPCA e poupança', JSON.stringify(auSearch));
+    await p.getByLabel('Buscar um tema ou uma função', { exact: true }).filter({ visible: true }).first().fill('');
+    // 5. Contas vencidas no Resumo (cenário "retorno"): texto neutro, com o calendário, sem a cor de erro.
+    await p.goto(`http://localhost:${PORT}/?cenario=retorno`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(800);
+    const auRed = await p.evaluate((red) => [...document.querySelectorAll('div[dir="auto"], span')].filter((e) => e.getBoundingClientRect().width > 0 && e.children.length === 0 && getComputedStyle(e).color === red).map((e) => e.textContent.slice(0, 40)), RED);
+    t = await body();
+    ok('Auditoria, Resumo com contas vencidas: a linha das vencidas em texto neutro (sem a cor de erro), como manda a D-030', /\d+ contas? vencidas?/.test(t) && auRed.length === 0, `${auRed.join(' | ')} ${(t.match(/.{0,40}vencid.{0,40}/) ?? [''])[0]}`);
+    await shot('754_auditoria_resumo_vencidas');
+    // 6. Metas (cenário "metas"): o ritmo sem "atrás do plano".
+    await p.goto(`http://localhost:${PORT}/?cenario=metas`); await waitText('Cuidar da vida financeira');
+    await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
+    await tabByName('Metas').click(); await waitText('Suas metas'); await p.waitForTimeout(700);
+    t = await body();
+    ok('Auditoria, Metas: o ritmo das metas diz o fato ("Para chegar em ..." ou "chega lá em ..."), sem "atrás do plano"', !t.includes('atrás do plano') && /Para chegar em [a-zç]+ de \d{4}: R\$ [\d.]+,\d{2} por mês|chega lá em [a-zç]+ de \d{4}/.test(t), (t.match(/.{0,60}(Para chegar em|chega lá em).{0,60}/) ?? [''])[0]);
+    await shot('755_auditoria_metas_ritmo');
+    // 7. Computador: a entrada com a faixa e o conteúdo na mesma largura (a seta de voltar alinhada com o título).
+    await p.setViewportSize({ width: 1280, height: 860 }); await p.waitForTimeout(400);
+    await p.goto(`http://localhost:${PORT}/`); await waitText('Cuidar da vida financeira');
+    await btn('Entrar').click(); await p.getByLabel('E-mail', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 8000 }); await p.waitForTimeout(600);
+    const auAuth = await p.evaluate(() => {
+      const back = [...document.querySelectorAll('[role=button]')].find((e) => e.getBoundingClientRect().width > 0 && e.getAttribute('aria-label') === 'Voltar');
+      const h1 = [...document.querySelectorAll('h1,[role=heading][aria-level="1"]')].find((e) => e.getBoundingClientRect().width > 0);
+      return back && h1 ? { back: Math.round(back.getBoundingClientRect().left), title: Math.round(h1.getBoundingClientRect().left), w: Math.round(h1.parentElement.getBoundingClientRect().width) } : null;
+    });
+    ok('Auditoria, computador: em "Entrar", a faixa e o conteúdo com a mesma largura (560 px): a seta de voltar fica alinhada com o título', auAuth !== null && Math.abs(auAuth.back + 12 - auAuth.title) <= 14 && auAuth.w <= 560, JSON.stringify(auAuth));
+    await shot('756_auditoria_entrar_computador');
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+    ok('Auditoria: nada vai à rede', writes.length === auWrites0, writes.slice(auWrites0).join(' | '));
   }
 
   // ==================================================================================================================
@@ -16970,8 +17208,8 @@ setInterval(async () => {
     let tl = await tmLook();
     t = await body(); screenTexts.push(t);
     const tmCards = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
-    ok('Tema (D-112): o card "Tema" (título de nível 2) logo depois de "Privacidade neste aparelho" e antes do widget, com "Por padrão, a Clarevo segue o tema do aparelho."',
-      tmCards.indexOf('Tema') > 0 && tmCards.indexOf('Tema') === tmCards.indexOf('Privacidade neste aparelho') + 1 && tmCards.indexOf('Widget na tela inicial') === tmCards.indexOf('Tema') + 1 &&
+    ok('Tema (D-112): o card "Tema" (título de nível 2) logo depois de "Privacidade neste aparelho" (o widget só aparece no celular), com "Por padrão, a Clarevo segue o tema do aparelho."',
+      tmCards.indexOf('Tema') > 0 && tmCards.indexOf('Tema') === tmCards.indexOf('Privacidade neste aparelho') + 1 && tmCards.indexOf('Widget na tela inicial') === -1 &&
         t.includes('Por padrão, a Clarevo segue o tema do aparelho. A escolha vale só para este aparelho.'), tmCards.join(' | '));
     ok('Tema: "Igual ao aparelho" marcado de início, depois "Claro" e "Escuro", sem "Aplicar agora", nada guardado e o app claro (navegador claro)',
       JSON.stringify(await tmRadios()) === tmPicked('Igual ao aparelho') && (await visibleCount('button', 'Aplicar agora')) === 0 && tl.stored === null && tl.tema === null && tmIs(tl, TM_LIGHT),
