@@ -5539,7 +5539,7 @@ setInterval(async () => {
 
   // ==================================================================================================================
   // Ciclo F1 · Plano para quitar dívidas (D-040, docs/08 §5 item 10). Calculadora educativa em /calcular/plano-dividas: nada é
-  // gravado (nem no aparelho), a taxa é sempre digitada, duas ordens lado a lado e a referência "Sem valor a mais". Cada item é
+  // gravado (nem no aparelho), a taxa é sempre digitada, duas ordens lado a lado e a referência "Pagamentos atuais, sem repasse". Cada item é
   // conferido em 390 e em 320 px de largura. Capturas novas: 190 em diante. Na demonstração, hoje é 07/10/2026 (o primeiro
   // pagamento da conta é no fim de novembro) e o Financiamento do carro (parcela 13 de 48, R$ 850,00) vem preenchido.
   // ==================================================================================================================
@@ -5640,12 +5640,14 @@ setInterval(async () => {
   await f1Fill('Taxa de juros ao mês (%), Cartão azul', '1');
   await f1Fill('Quanto você paga por mês, Cartão azul', '300,00');
   t = await body();
-  ok('F1 duas dívidas: primeiro a resposta (24 meses, outubro de 2028, em vez de 36, e de R$ 2.209,96 a R$ 2.216,64 a menos de juros estimados, conforme a ordem); nos detalhes, as duas ordens e "Sem valor a mais" (juros R$ 7.135,09)',
+  ok('F1 duas dívidas: primeiro a resposta (24 meses, outubro de 2028, em vez de 36, e de R$ 2.209,96 a R$ 2.216,64 a menos de juros estimados, conforme a ordem); nos detalhes, as duas ordens e "Pagamentos atuais, sem repasse" (juros R$ 7.135,09)',
     t.includes('Com R$ 100,00 a mais por mês, tudo termina em 24 meses (outubro de 2028), em vez de 36 meses (outubro de 2029), com R$ 2.209,96 a R$ 2.216,64 a menos de juros estimados, conforme a ordem.') &&
-    t.includes('Juros estimados: R$ 7.135,09') && t.includes('Juros estimados: R$ 4.918,45') && t.includes('Juros estimados: R$ 4.925,13'), t.slice(-1800));
+    t.includes('Juros estimados: R$ 7.135,09') && t.includes('Juros estimados: R$ 4.918,45') && t.includes('Juros estimados: R$ 4.925,13') &&
+    // Revisão externa de 18/11/2026: a referência se chama "Pagamentos atuais, sem repasse", e cada ordem diz o ganho só do repasse.
+    t.includes('Pagamentos atuais, sem repasse') && t.includes('Só passando adiante os pagamentos, sem o valor a mais, seriam 9 meses antes e R$ 1.677,71 a menos de juros.'), t.slice(-1800));
   ok('F1 as diferenças como fatos neutros: juros R$ 6,68 menores em Maior taxa primeiro e a primeira dívida 2 meses antes em Menor dívida primeiro',
     t.includes('Na ordem Maior taxa primeiro, os juros estimados são R$ 6,68 menores.') && t.includes('Na ordem Menor dívida primeiro, a primeira dívida acaba 2 meses antes.'));
-  ok('F1 o plano passo a passo de cada ordem: por qual começar, quando o Cartão azul acaba e para onde vai o pagamento dele; em "Sem valor a mais", a ordem em que cada dívida termina',
+  ok('F1 o plano passo a passo de cada ordem: por qual começar, quando o Cartão azul acaba e para onde vai o pagamento dele; em "Pagamentos atuais, sem repasse", a ordem em que cada dívida termina',
     t.includes('A partir de novembro de 2026 (mês 1): o pagamento de sempre de cada dívida e os R$ 100,00 a mais em Cartão azul.') &&
     t.includes(`Abril de 2027 (mês 6): Cartão azul acaba. O pagamento dela (R$ 300,00) passa para ${F1_NAME}, que fica com R$ 400,00 por mês além do pagamento de sempre.`) &&
     t.includes(`Fevereiro de 2027 (mês 4): Cartão azul acaba. O pagamento dela (R$ 300,00) passa para ${F1_NAME}, que fica com R$ 400,00 por mês além do pagamento de sempre.`) &&
@@ -5662,11 +5664,11 @@ setInterval(async () => {
   });
   await keepText();
 
-  // Sem valor a mais (campo vazio ou zero) e 2 ou mais dívidas: a legenda de "Sem valor a mais" explica por que as ordens terminam antes.
+  // Sem valor a mais (campo vazio ou zero) e 2 ou mais dívidas: a legenda de "Pagamentos atuais, sem repasse" explica por que as ordens terminam antes.
   const F1_CAPTION = 'Cada dívida só com os pagamentos de sempre, sem passar nada adiante.';
-  ok('F1 com R$ 100,00 a mais, "Sem valor a mais" não leva a legenda', !(await body()).includes(F1_CAPTION));
+  ok('F1 com R$ 100,00 a mais, "Pagamentos atuais, sem repasse" não leva a legenda', !(await body()).includes(F1_CAPTION));
   await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '');
-  ok('F1 valor a mais vazio e duas dívidas: a legenda "sem passar nada adiante" aparece junto do título de "Sem valor a mais" (uma só vez)',
+  ok('F1 valor a mais vazio e duas dívidas: a legenda "sem passar nada adiante" aparece junto do título de "Pagamentos atuais, sem repasse" (uma só vez)',
     (await body()).split(F1_CAPTION).length === 2 && (await body()).includes('Passando adiante o pagamento de cada dívida que acaba, tudo termina em 27 meses (janeiro de 2029), em vez de 36 meses (outubro de 2029), com R$ 1.677,71 a menos de juros estimados.') &&
     (await body()).includes('Com estes números, as duas ordens dão no mesmo: o mesmo plano, o mesmo fim e os mesmos juros estimados.') && (await body()).includes('As duas ordens'));
   await f1Fill('Além do que já paga, quanto a mais por mês você consegue pôr nas dívidas?', '0');
