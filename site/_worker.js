@@ -1551,8 +1551,15 @@ function createNoticiasHandler(deps) {
         const devidas = fontes.filter((f) => t >= (proxima.get(f.id) ?? 0));
         const lidos = await Promise.all(devidas.map(async (f) => [f, await buscarFeed(f, { fetch: deps.fetch, fontes })]));
         for (const [f, itens] of lidos) {
-            if (itens) {
-                porFonte.set(f.id, { noticias: (0, index_1.prepararFonte)(f, itens, t), lidoEm: t });
+            let noticias = null;
+            try {
+                noticias = itens ? (0, index_1.prepararFonte)(f, itens, t) : null;
+            }
+            catch {
+                noticias = null;
+            }
+            if (noticias) {
+                porFonte.set(f.id, { noticias, lidoEm: t });
                 proxima.set(f.id, t + cacheMs);
             }
             else
@@ -1754,7 +1761,11 @@ function lerItensRss(itens, base, descricaoEhCorpo) {
         const conteudo = textoDe(filho(it, 'content:encoded'));
         let corpo = opcional(conteudo);
         let resumo = opcional(descricao);
-        if (!corpo && resumo && (descricaoEhCorpo || pareceCorpoInteiro(resumo))) {
+        if (descricaoEhCorpo) {
+            corpo ??= resumo;
+            resumo = null;
+        }
+        else if (!corpo && resumo && pareceCorpoInteiro(resumo)) {
             corpo = resumo;
             resumo = null;
         }
@@ -2074,7 +2085,7 @@ function montarArvore(html, base) {
                     topo().filhos.push(' ');
                 continue;
             }
-            tamanho += s.length;
+            tamanho += s.replace(/[\s\u00a0]+/g, ' ').trim().length;
             if (tamanho > exports.MAX_TEXTO_DA_MATERIA)
                 return null;
             garantirTexto();

@@ -304,7 +304,8 @@ function montarArvore(html: string, base: string | null): { raiz: No; tamanho: n
         if (dentroDeTexto() && ultimo !== ' ' && !ehQuebra(ultimo)) topo().filhos.push(' ');
         continue;
       }
-      tamanho += s.length;
+      // Conta como o texto puro conta (espaços juntados, sem as pontas), para a mesma matéria não passar no limite da lista e falhar aqui.
+      tamanho += s.replace(/[\s\u00a0]+/g, ' ').trim().length;
       if (tamanho > MAX_TEXTO_DA_MATERIA) return null;
       garantirTexto();
       topo().filhos.push(s);

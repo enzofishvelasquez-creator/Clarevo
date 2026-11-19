@@ -104,8 +104,14 @@ export function createNoticiasHandler(deps: { fetch: NoticiasFetch; agora?: () =
     const devidas = fontes.filter((f) => t >= (proxima.get(f.id) ?? 0));
     const lidos = await Promise.all(devidas.map(async (f) => [f, await buscarFeed(f, { fetch: deps.fetch, fontes })] as const));
     for (const [f, itens] of lidos) {
-      if (itens) {
-        porFonte.set(f.id, { noticias: prepararFonte(f, itens, t), lidoEm: t });
+      let noticias: NoticiaCompleta[] | null = null;
+      try {
+        noticias = itens ? prepararFonte(f, itens, t) : null;
+      } catch {
+        noticias = null; // Um erro ao preparar conta como falha do feed (e espera 5 minutos, como as outras).
+      }
+      if (noticias) {
+        porFonte.set(f.id, { noticias, lidoEm: t });
         proxima.set(f.id, t + cacheMs);
       } else proxima.set(f.id, t + falhaMs);
     }

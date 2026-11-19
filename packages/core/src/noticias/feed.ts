@@ -191,7 +191,11 @@ function lerItensRss(itens: ElXml[], base: string, descricaoEhCorpo: boolean): I
     const conteudo = textoDe(filho(it, 'content:encoded'));
     let corpo: string | null = opcional(conteudo);
     let resumo: string | null = opcional(descricao);
-    if (!corpo && resumo && (descricaoEhCorpo || pareceCorpoInteiro(resumo))) {
+    if (descricaoEhCorpo) {
+      // A fonte põe a matéria no description: ele nunca é o resumo, nem quando o corpo vem também em content:encoded.
+      corpo ??= resumo;
+      resumo = null;
+    } else if (!corpo && resumo && pareceCorpoInteiro(resumo)) {
       corpo = resumo;
       resumo = null;
     }

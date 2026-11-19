@@ -316,6 +316,13 @@ describe('notícias: entradas feitas para demorar (revisão de 19/11/2026)', () 
     expect(filtrarHtml('<p>a <strong>b</strong> c</p>')).toBe('<p>a <strong>b</strong> c</p>');
   });
 
+  it('o limite de tamanho conta o texto como a lista conta: corpo cheio de espaços perto do limite não vira "Ler aqui" sem matéria', () => {
+    const palavras = Math.floor(MAX_TEXTO_DA_MATERIA / 6);
+    const corpo = `<p>${'abcde'.concat(' '.repeat(30)).repeat(palavras)}</p>`;
+    expect(textoPuro(corpo).length).toBeLessThanOrEqual(MAX_TEXTO_DA_MATERIA);
+    expect(filtrarHtml(corpo)).not.toBeNull();
+  });
+
   it('frases: até três aspas ou parênteses depois do ponto ainda fecham a frase', () => {
     expect(frases('Ele disse: "Vamos." Depois saiu.')).toEqual(['Ele disse: "Vamos."', 'Depois saiu.']);
     expect(frases('(Veja a tabela.)) Outra.')).toEqual(['(Veja a tabela.))', 'Outra.']);
@@ -521,6 +528,9 @@ describe('notícias: crédito, licença, resumo e junção das fontes', () => {
     expect(parceiro.resumoHtml).toBeNull();
     expect(parceiro.corpoHtml).toContain('Copom');
     expect(prepararNoticia(parceiro, ab, AGORA)).toMatchObject({ resumo: null, textoCompleto: false, corpoHtml: null });
+    // Com content:encoded também, o description continua fora do resumo.
+    const comConteudo = xml('Priscila Thereso - Repórter da Rádio Nacional').replace('</description>', '</description><content:encoded>&lt;p&gt;Outro texto.&lt;/p&gt;</content:encoded>');
+    expect(lerFeed(comConteudo, { base: ab.feed, descricaoEhCorpo: true })!.itens[0]!.resumoHtml).toBeNull();
     // Sem a marca da fonte, o mesmo description curto ficaria como resumo (o caso que a marca evita).
     expect(lerFeed(xml('Priscila Thereso - Repórter da Rádio Nacional'), { base: ab.feed })!.itens[0]!.resumoHtml).not.toBeNull();
     // Da própria Agência Brasil, curta: resumo do primeiro parágrafo, sem texto inteiro (é uma chamada).
