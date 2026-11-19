@@ -16,9 +16,10 @@
  *     retrato; com JavaScript, uma pergunta só ao próprio site (/api/indicadores), que troca os números e a hora e não se repete; a cópia de
  *     uma hora no servidor; a fonte fora do ar (a página fica com o retrato); nenhum pedido do navegador a outro domínio; a política de
  *     segurança; o aviso de mercado no rodapé; as duas calculadoras novas; e o resumo semanal com uma edição de teste;
- *   - os vídeos de uso do app (D-114) na página inicial e em O app: os sete, do próprio site, com controles, `preload="none"` (nenhum
- *     byte de vídeo antes do toque), sem tocar sozinhos (nem com movimento reduzido), com a capa, o nome, a frase, a legenda e a descrição;
- *     um toque toca o vídeo, e o servidor responde pedaços (206) com o tipo certo;
+ *   - os vídeos de uso do app (D-114 e D-115) na página inicial e em O app: cada um no bloco que mostra, do próprio site, sem controles nem
+ *     `autoplay`, sem som, com `preload="none"`; o script toca o que aparece na tela e pausa o que sai; o botão de pausar e tocar (nome
+ *     acessível, teclado); com movimento reduzido ou economia de dados, nada toca nem baixa até a pessoa pedir; sem JavaScript, a capa; e o
+ *     servidor responde pedaços (206) com o tipo certo;
  *   - as imagens das matérias de Novidades (D-114): capa e telas com largura, altura e texto alternativo, carregando do próprio site, e a
  *     versão escura no tema escuro;
  *   - a varredura de espaçamento e largura em todas as páginas (360, 768, 900 e 1280 px) e, no tema escuro, nas páginas com vídeos e imagens
@@ -397,7 +398,8 @@ function varrerPagina() {
       const p = await pagina();
       const modulos = [];
       p.on('response', async (r) => {
-        if (r.url().endsWith('.js')) modulos.push({ url: r.url(), bytes: (await r.body()).length });
+        // O script do tema do site (D-115), em todas as páginas, é um script comum do <head>, não um módulo da calculadora.
+        if (r.url().endsWith('.js') && !r.url().endsWith('/js/tema.js')) modulos.push({ url: r.url(), bytes: (await r.body()).length });
       });
       await p.goto(`${origem}/calculadoras/${rot.slug}.html`);
       await p.waitForSelector('[data-pronta]');
@@ -607,7 +609,7 @@ function varrerPagina() {
       const demo = await p.$eval('main a.cartao[href^="https://"]', (a) => ({ href: a.href, rel: a.rel }));
       const comParametro = await p.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')).filter((h) => /[?&]|utm_|fbclid|igshid/i.test(h)));
       ok('comece aqui: a demonstração é link de texto com noopener, e nenhum link leva parâmetro', demo.href === 'https://demo.clarevo.app.br/' && /noopener/.test(demo.rel) && comParametro.length === 0, JSON.stringify({ demo, comParametro }));
-      ok('comece aqui: sem script (só dados estruturados, se houver) e sem formulário', (await p.$$eval('script', (ss) => ss.filter((x) => x.type !== 'application/ld+json').length)) === 0 && (await p.$$('form')).length === 0);
+      ok('comece aqui: sem script (só dados estruturados, se houver, e o tema do site) e sem formulário', (await p.$$eval('script', (ss) => ss.filter((x) => x.type !== 'application/ld+json' && !x.src.endsWith('/js/tema.js')).length)) === 0 && (await p.$$('form')).length === 0);
       await p.close();
     }
 
@@ -690,7 +692,7 @@ function varrerPagina() {
       const termos = await g.$$eval('.termo h2', (es) => es.map((e) => e.textContent));
       ok('glossário: os termos pedidos, com link para Aprender', ['CDI', 'Come-cotas', 'FGC', 'IOF', 'IPCA', 'IR regressivo', 'Liquidez', 'Marcação a mercado', 'PTAX', 'Selic'].every((t) => termos.includes(t)) && (await g.$('a[href="../aprender/fgc.html"]')) !== null, termos.join(', '));
       await g.goto(`${origem}/noticias/semana-${HOJE}`);
-      const noticia = await g.evaluate(() => ({ imagens: document.querySelectorAll('main img').length, scripts: [...document.scripts].filter((x) => x.type !== 'application/ld+json').length, link: [...document.querySelectorAll('main a[href^="https://"]')].map((a) => ({ href: a.href, rel: a.rel })) }));
+      const noticia = await g.evaluate(() => ({ imagens: document.querySelectorAll('main img').length, scripts: [...document.scripts].filter((x) => x.type !== 'application/ld+json' && !x.src.endsWith('/js/tema.js')).length, link: [...document.querySelectorAll('main a[href^="https://"]')].map((a) => ({ href: a.href, rel: a.rel })) }));
       ok('resumo semanal: a edição de teste abre, com link simples para a matéria (noopener), sem imagem nem script', noticia.imagens === 0 && noticia.scripts === 0 && noticia.link.length === 1 && noticia.link[0].href === 'https://noticias.exemplo.test/copom' && /noopener/.test(noticia.link[0].rel), JSON.stringify(noticia));
       ok('resumo semanal: o aviso de mercado no rodapé e o link no rodapé de todas as páginas', (await textoDe(g, '.rodape-aviso')) === 'Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.' && (await g.$('footer a[href="index.html"]')) !== null);
       await g.goto(`${origem}/sobre`);
@@ -698,45 +700,90 @@ function varrerPagina() {
       await g.close();
     }
 
-    // 7c. Vídeos de uso do app (D-114): na página inicial e em O app, os sete vídeos do próprio site, com controles, sem baixar nada antes do
-    // toque (preload="none") e sem tocar sozinhos; a capa, o nome, a frase, a legenda e a descrição de cada um; um toque toca o vídeo.
+    // 7c. Vídeos de uso do app (D-114 e D-115): cada um no bloco que mostra (a capa e três cartões da página inicial, seis recursos e o
+    // cartão do tema em O app), do próprio site, sem controles de player nem `autoplay`, sem som e em repetição. O script do site toca o
+    // vídeo que aparece na tela (pelo menos metade) e pausa o que sai; nada de vídeo baixa antes de aparecer; o botão redondo pausa e toca,
+    // pelo mouse e pelo teclado, com nome acessível; com movimento reduzido ou economia de dados, nada toca até a pessoa pedir; sem
+    // JavaScript, fica a capa.
     {
+      const LUGARES = {
+        '/': [['.capa', 'O Resumo do mês'], ['article.cartao:has(h3:text-is("Anotar e ver o mês"))', 'Anotar um gasto'], ['article.cartao:has(h3:text-is("Contas, cartões e gastos fixos"))', 'Importar fatura por print'], ['article.cartao:has(h3:text-is("Metas e reserva"))', 'Metas']],
+        '/app/': [['#resumo', 'O Resumo do mês'], ['#anotar', 'Anotar um gasto'], ['#contas', 'O Calendário do mês'], ['#cartoes', 'Importar fatura por print'], ['#metas', 'Metas'], ['#investir', 'Investir'], ['article.cartao:has(h3:text-is("Tema claro ou escuro"))', 'Do tema escuro ao claro']],
+      };
       const p = await pagina();
       const deVideo = [];
       p.on('request', (q) => /\/videos\//.test(q.url()) && deVideo.push(q.url()));
-      const lerVideos = () => p.$$eval('#em-uso ~ ul.videos video', (vs) => vs.map((v) => ({
-        controls: v.controls, preload: v.getAttribute('preload'), autoplay: v.hasAttribute('autoplay'), loop: v.hasAttribute('loop'), muted: v.muted,
+      const lerVideos = () => p.$$eval('figure[data-video] video', (vs) => vs.map((v) => ({
+        titulo: v.closest('figure').dataset.titulo, controls: v.controls || v.hasAttribute('controls'), autoplay: v.hasAttribute('autoplay'), loop: v.loop, muted: v.muted, preload: v.getAttribute('preload'),
         paused: v.paused, tempo: v.currentTime, poster: v.poster, largura: v.getAttribute('width'), altura: v.getAttribute('height'),
-        fontes: [...v.querySelectorAll('source')].map((f) => [f.src, f.type]),
+        fontes: [...v.querySelectorAll('source')].map((f) => [f.src, f.type]), reserva: v.querySelector('a') ? v.querySelector('a').href : '',
         nome: document.getElementById(v.getAttribute('aria-labelledby'))?.textContent || '',
         descricao: document.getElementById(v.getAttribute('aria-describedby'))?.textContent || '',
-        legenda: v.closest('figure')?.querySelector('.legenda')?.textContent || '',
-        frase: v.closest('figure')?.querySelector('figcaption > p:not(.legenda)')?.textContent || '',
+        legenda: v.closest('figure').querySelector('figcaption')?.firstChild?.textContent || '',
+        botao: v.closest('figure').querySelector('button.video-botao')?.getAttribute('aria-label') || '',
       })));
       for (const caminho of ['/', '/app/']) {
+        deVideo.length = 0;
         await p.goto(`${origem}${caminho}`);
         await p.waitForTimeout(1500);
         const vs = await lerVideos();
-        ok(`vídeos (${caminho}): a seção "Veja o app em uso" com os sete vídeos`, vs.length === 7 && (await p.textContent('#em-uso')) === 'Veja o app em uso', `${vs.length}`);
-        ok(`vídeos (${caminho}): todos com controles, preload="none", sem autoplay nem repetição, parados no começo`, vs.every((v) => v.controls && v.preload === 'none' && !v.autoplay && !v.loop && v.paused && v.tempo === 0), JSON.stringify(vs.map((v) => [v.controls, v.preload, v.autoplay, v.paused, v.tempo])));
-        ok(`vídeos (${caminho}): nenhum byte de vídeo baixado antes de alguém tocar`, deVideo.length === 0, deVideo.join(' | '));
-        ok(`vídeos (${caminho}): capa, WebM e MP4 do próprio site, com largura e altura`, vs.every((v) => v.poster.startsWith(`${origem}/imagens/video-`) && v.largura === '720' && v.altura === '1560' &&
-          v.fontes.length === 2 && v.fontes[0][1] === 'video/webm' && v.fontes[1][1] === 'video/mp4' && v.fontes.every(([u]) => u.startsWith(`${origem}/videos/`))), JSON.stringify(vs[0]));
-        ok(`vídeos (${caminho}): cada um com nome, frase, a legenda "Tela da demonstração, com dados fictícios" e a descrição em texto para leitor de tela`,
-          vs.every((v) => v.nome.length > 3 && v.frase.length > 20 && v.legenda.startsWith('Tela da demonstração, com dados fictícios. ') && /\d+ segundos, sem som\.$/.test(v.legenda) && v.descricao.length > 120), JSON.stringify(vs.map((v) => [v.nome, v.legenda, v.descricao.length])));
+        ok(`vídeos (${caminho}): ${LUGARES[caminho].length} vídeos, nenhuma seção "Veja o app em uso"`, vs.length === LUGARES[caminho].length && (await p.$('#em-uso')) === null, `${vs.length}`);
+        const lugares = [];
+        for (const [bloco, titulo] of LUGARES[caminho]) lugares.push([bloco, await p.locator(bloco).first().locator(`figure[data-video][data-titulo="${titulo}"]`).count()]);
+        ok(`vídeos (${caminho}): cada vídeo no bloco que ele mostra`, lugares.every(([, n]) => n === 1), JSON.stringify(lugares));
+        ok(`vídeos (${caminho}): nenhum com controles de player nem autoplay; todos sem som, em repetição e com preload="none"`, vs.every((v) => !v.controls && !v.autoplay && v.muted && v.loop && v.preload === 'none'), JSON.stringify(vs.map((v) => [v.titulo, v.controls, v.autoplay, v.muted, v.loop, v.preload])));
+        ok(`vídeos (${caminho}): capa, WebM e MP4 do próprio site, com largura, altura e o link para o MP4 dentro do vídeo`, vs.every((v) => v.poster.startsWith(`${origem}/imagens/video-`) && v.largura === '720' && v.altura === '1560' &&
+          v.fontes.length === 2 && v.fontes[0][1] === 'video/webm' && v.fontes[1][1] === 'video/mp4' && v.fontes.every(([u]) => u.startsWith(`${origem}/videos/`)) && v.reserva === v.fontes[1][0]), JSON.stringify(vs[0]));
+        ok(`vídeos (${caminho}): cada um com nome, a legenda "Tela da demonstração, com dados fictícios", a descrição em texto para leitor de tela e o botão de pausar e tocar`,
+          vs.every((v) => v.nome === `Vídeo: ${v.titulo}` && v.legenda === 'Tela da demonstração, com dados fictícios' && v.descricao.length > 120 && /^(Pausar|Tocar) o vídeo: /.test(v.botao) && v.botao.endsWith(v.titulo)), JSON.stringify(vs.map((v) => [v.nome, v.legenda, v.descricao.length, v.botao])));
         const capas = await Promise.all(vs.map((v) => ctx.request.get(v.poster)));
         ok(`vídeos (${caminho}): as capas carregam (PNG, guardadas por um ano)`, capas.every((r) => r.ok() && r.headers()['content-type'] === 'image/png' && /immutable/.test(r.headers()['cache-control'] || '')));
+        ok(`vídeos (${caminho}): só baixa vídeo do que aparece na tela`, deVideo.every((u) => u.startsWith(`${origem}/videos/`)) && (caminho !== '/' || deVideo.every((u) => /\/videos\/resumo-do-mes\./.test(u))), deVideo.join(' | '));
       }
-      // Um toque toca o vídeo (o WebM, que o Chromium do teste toca), e só ele.
-      const primeiro = p.locator('#em-uso ~ ul.videos video').first();
-      await primeiro.scrollIntoViewIfNeeded();
-      await primeiro.click();
+      // Na página inicial, em 1280 px, o vídeo da capa aparece inteiro ao abrir: ele toca sozinho (o WebM do próprio site), e os de baixo
+      // ficam parados no começo. (Em 390 px ele começa mais abaixo da dobra e toca quando metade dele aparece.)
+      await p.setViewportSize({ width: 1280, height: 900 });
+      await p.goto(`${origem}/`);
+      const tempoDe = (sel) => p.$eval(sel, (v) => ({ paused: v.paused, tempo: v.currentTime, src: v.currentSrc, erro: v.error && v.error.code }));
+      await p.waitForFunction(() => document.querySelector('.capa video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
+      const capa = await tempoDe('.capa video');
+      const parados = await p.$$eval('main > section:not(.capa) figure[data-video] video', (vs) => vs.every((v) => v.paused && v.currentTime === 0));
+      ok('vídeos: o da capa toca sozinho ao abrir a página (WebM do próprio site), sem erro, e os de baixo continuam parados', !capa.paused && capa.tempo > 0.5 && !capa.erro && capa.src.startsWith(`${origem}/videos/resumo-do-mes.`) && capa.src.endsWith('.webm') && parados, JSON.stringify(capa));
+      // Rolar até um cartão: o vídeo dele começa, e o da capa, fora da tela, pausa.
+      const cartao = 'article.cartao:has(h3:text-is("Metas e reserva")) video';
+      await p.locator(cartao).evaluate((v) => v.scrollIntoView({ block: 'center' }));
+      await p.waitForFunction(() => document.querySelector('[data-titulo="Metas"] video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
+      const doCartao = await p.locator(cartao).evaluate((v) => ({ paused: v.paused, tempo: v.currentTime }));
+      const capaFora = await tempoDe('.capa video');
+      ok('vídeos: ao rolar, o vídeo que aparece toca e o que saiu da tela pausa', !doCartao.paused && doCartao.tempo > 0.5 && capaFora.paused, JSON.stringify({ doCartao, capaFora }));
+      // O botão de pausar: nome acessível, 44 px, troca o nome; a pausa da pessoa vale mesmo depois de rolar para longe e voltar.
+      const botao = p.locator('[data-titulo="Metas"] button.video-botao');
+      const antes = { nome: await botao.getAttribute('aria-label'), caixa: await botao.boundingBox() };
+      await botao.click();
+      await p.waitForTimeout(300);
+      const pausado = { paused: await p.locator(cartao).evaluate((v) => v.paused), nome: await botao.getAttribute('aria-label') };
+      await p.evaluate(() => window.scrollTo(0, 0));
       await p.waitForTimeout(600);
-      if (await primeiro.evaluate((v) => v.paused)) await primeiro.evaluate((v) => v.play());
-      await p.waitForFunction(() => document.querySelector('#em-uso ~ ul.videos video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
-      const tocando = await p.$$eval('#em-uso ~ ul.videos video', (vs) => vs.map((v) => ({ paused: v.paused, tempo: v.currentTime, src: v.currentSrc, erro: v.error && v.error.code })));
-      ok('vídeos: um toque toca o primeiro vídeo (WebM do próprio site), e os outros continuam parados', tocando[0].tempo > 0.5 && !tocando[0].erro && tocando[0].src.startsWith(`${origem}/videos/anotar-gasto.`) && tocando[0].src.endsWith('.webm') && tocando.slice(1).every((v) => v.paused && v.tempo === 0), JSON.stringify(tocando.slice(0, 2)));
-      ok('vídeos: o que foi baixado veio só do próprio site', deVideo.length > 0 && deVideo.every((u) => u.startsWith(`${origem}/videos/`)), deVideo.slice(0, 3).join(' | '));
+      await p.locator(cartao).evaluate((v) => v.scrollIntoView({ block: 'center' }));
+      await p.waitForTimeout(900);
+      const continuaPausado = await p.locator(cartao).evaluate((v) => v.paused);
+      const foraDaTela = await p.$$eval('figure[data-video]', (fs) => fs.map((f) => {
+        const m = f.querySelector('.celular-moldura').getBoundingClientRect();
+        const b = f.querySelector('button.video-botao').getBoundingClientRect();
+        const legenda = f.querySelector('figcaption');
+        return { titulo: f.dataset.titulo, fora: b.top >= m.bottom, naLegenda: legenda.contains(f.querySelector('button.video-botao')), texto: f.querySelector('button.video-botao').textContent };
+      }));
+      ok('vídeos: o botão "Pausar" ou "Tocar" fica embaixo da legenda, fora da tela do celular, nunca por cima do app', foraDaTela.length === 4 && foraDaTela.every((x) => x.fora && x.naLegenda && /^(Pausar|Tocar)$/.test(x.texto)), JSON.stringify(foraDaTela));
+      ok('vídeos: o botão "Pausar o vídeo: Metas" (44 px) pausa, passa a "Tocar o vídeo: Metas" e a pausa continua depois de rolar para longe e voltar',
+        antes.nome === 'Pausar o vídeo: Metas' && antes.caixa && antes.caixa.width >= 44 && antes.caixa.height >= 44 && pausado.paused && pausado.nome === 'Tocar o vídeo: Metas' && continuaPausado, JSON.stringify({ antes, pausado, continuaPausado }));
+      // Pelo teclado: Tab chega ao botão, com foco visível, e Espaço toca de novo.
+      await botao.focus();
+      const foco = await botao.evaluate((b) => { const cs = getComputedStyle(b); return { visivel: b.matches(':focus-visible') || document.activeElement === b, contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }; });
+      await botao.press('Space');
+      await p.waitForTimeout(800);
+      const depoisDoEspaco = { paused: await p.locator(cartao).evaluate((v) => v.paused), nome: await botao.getAttribute('aria-label'), ativo: await p.evaluate(() => document.activeElement && document.activeElement.className) };
+      ok('vídeos: pelo teclado, o botão recebe foco e Espaço toca o vídeo de novo, com o nome "Pausar o vídeo: Metas"', foco.visivel && !depoisDoEspaco.paused && depoisDoEspaco.nome === 'Pausar o vídeo: Metas', JSON.stringify({ foco, depoisDoEspaco }));
+      await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
       // O MP4 (para os navegadores que não tocam WebM): tipo certo, pedaço com 206 e a política de segurança com media-src 'self'.
       const htmlDoApp = await (await ctx.request.get(`${origem}/app/`)).text();
@@ -746,17 +793,382 @@ function varrerPagina() {
       ok('vídeos: o MP4 sai como video/mp4, guardado por um ano, com a política de segurança que aceita vídeo só do próprio site', inteiro.ok() && inteiro.headers()['content-type'] === 'video/mp4' &&
         /immutable/.test(inteiro.headers()['cache-control'] || '') && /media-src 'self'/.test(inteiro.headers()['content-security-policy'] || ''), JSON.stringify(inteiro.headers()));
       ok('vídeos: o servidor responde um pedaço do arquivo (206), como o navegador pede', pedaco.status() === 206 && (await pedaco.body()).length === 100 && (await pedaco.body()).subarray(4, 8).toString('latin1') === 'ftyp' && /^bytes 0-99\/\d+$/.test(pedaco.headers()['content-range'] || ''), `${pedaco.status()} ${pedaco.headers()['content-range']}`);
-      // Movimento reduzido: nada toca sozinho e nada de vídeo é baixado; a faixa rola sem animação.
-      const calmo = await navegador.newContext({ reducedMotion: 'reduce', viewport: { width: 390, height: 900 } });
-      const q = await calmo.newPage();
-      const deVideoCalmo = [];
-      q.on('request', (r) => /\/videos\//.test(r.url()) && deVideoCalmo.push(r.url()));
+      // Movimento reduzido (page.emulateMedia) e economia de dados: nada toca sozinho e nada de vídeo baixa; o botão toca a pedido.
+      for (const [nome, preparar] of [
+        ['movimento reduzido', async (q) => q.emulateMedia({ reducedMotion: 'reduce' })],
+        ['economia de dados', async (q) => q.addInitScript(() => Object.defineProperty(Navigator.prototype, 'connection', { configurable: true, get: () => ({ saveData: true, addEventListener() {} }) }))],
+      ]) {
+        const calmo = await navegador.newContext({ viewport: { width: 390, height: 900 } });
+        const q = await calmo.newPage();
+        const erros = [];
+        q.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && erros.push(m.text()));
+        q.on('pageerror', (e) => erros.push(e.message));
+        await preparar(q);
+        const deVideoCalmo = [];
+        q.on('request', (r) => /\/videos\//.test(r.url()) && deVideoCalmo.push(r.url()));
+        await q.goto(`${origem}/`);
+        await q.waitForTimeout(2000);
+        const tudoParado = await q.$$eval('figure[data-video] video', (vs) => vs.length === 4 && vs.every((v) => v.paused && v.currentTime === 0));
+        const nomeAntes = await q.getAttribute('.capa button.video-botao', 'aria-label');
+        const baixadosAntes = deVideoCalmo.length;
+        await q.click('.capa button.video-botao');
+        await q.waitForFunction(() => document.querySelector('.capa video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
+        const pedido = await q.$eval('.capa video', (v) => ({ paused: v.paused, tempo: v.currentTime }));
+        ok(`vídeos com ${nome}: nada toca sozinho nem baixa até a pessoa tocar no botão "Tocar o vídeo", que toca o vídeo`, tudoParado && baixadosAntes === 0 && deVideoCalmo.length > 0 && nomeAntes === 'Tocar o vídeo: O Resumo do mês' && !pedido.paused && pedido.tempo > 0.5 && erros.length === 0, JSON.stringify({ tudoParado, baixadosAntes, nomeAntes, pedido, erros }));
+        await calmo.close();
+      }
+      // Sem JavaScript: a capa aparece, sem botão, e nada quebra.
+      const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 } });
+      const r = await semJs.newPage();
+      const errosSemJs = [];
+      r.on('pageerror', (e) => errosSemJs.push(e.message));
+      await r.goto(`${origem}/app/`);
+      const semScript = await r.evaluate(() => ({ videos: document.querySelectorAll('figure[data-video] video').length, botoes: document.querySelectorAll('.video-botao').length, capas: [...document.querySelectorAll('figure[data-video] video')].every((v) => v.poster.includes('/imagens/video-')) }));
+      ok('vídeos sem JavaScript: as capas aparecem, sem botão e sem erro', semScript.videos === 7 && semScript.botoes === 0 && semScript.capas && errosSemJs.length === 0, JSON.stringify({ semScript, errosSemJs }));
+      await semJs.close();
+      // Nada passa da largura da tela em 320, 390 e 1280 px, na página inicial, em O app e numa matéria.
+      const q = await pagina();
+      const largas = [];
+      for (const largura of [320, 390, 1280]) {
+        await q.setViewportSize({ width: largura, height: 900 });
+        for (const c of ['', 'app/', POSTS[3]]) {
+          await q.goto(`${origem}/${c}`);
+          if (await q.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${c || 'início'} em ${largura} px`);
+        }
+      }
+      ok('vídeos e Fontes: nada passa da largura da tela em 320, 390 e 1280 px (início, O app e uma matéria)', largas.length === 0, largas.join(' | '));
+      await q.setViewportSize({ width: 390, height: 900 });
+      await q.close();
+    }
+
+    // 7c2. As fontes das matérias (D-115): "Na Clarevo" e, quando há fonte de fora, "Fontes oficiais", em listas sem numeração e sem lista
+    // dentro de lista; cada link com texto; títulos em ordem (h2 Fontes, h3 de cada grupo); a linha da publicação e "Voltar para Novidades".
+    {
+      const p = await pagina();
+      const achados = [];
+      for (const post of POSTS) {
+        await p.goto(`${origem}/${post}`);
+        const f = await p.evaluate(() => {
+          const s = document.querySelector('.post-fontes');
+          return {
+            titulos: [...s.querySelectorAll('h2, h3')].map((h) => `${h.tagName}:${h.textContent}`),
+            aninhadas: s.querySelectorAll('li ul, li ol, ol').length,
+            semTexto: [...s.querySelectorAll('a')].filter((a) => a.textContent.trim().length < 3).length,
+            externasSemOrganizacao: [...s.querySelectorAll('#fontes-externas + ul > li')].filter((li) => !li.querySelector('strong') || !li.querySelector('a[href^="https://"]') || !/consultada em \d{2}\/\d{2}\/\d{4}$/.test(li.textContent.trim())).length,
+            temas: [...s.querySelectorAll('#fontes-clarevo + ul > li')].filter((li) => /Aprender:/.test(li.textContent)).map((li) => /revisado em \d{2}\/\d{2}\/\d{4}$/.test(li.textContent.trim())),
+            revisao: Boolean(s.querySelector('.revisao')) && /corrigimos neste mesmo texto/.test(s.querySelector('.revisao').textContent),
+            voltar: Boolean(document.querySelector('.voltar a[href="index.html"]')),
+          };
+        });
+        const comExternas = /13o-salario|novembro/.test(post);
+        const esperado = ['H2:Fontes', 'H3:Na Clarevo', ...(comExternas ? ['H3:Fontes oficiais'] : [])];
+        if (JSON.stringify(f.titulos) !== JSON.stringify(esperado)) achados.push(`${post}: títulos ${JSON.stringify(f.titulos)}`);
+        if (f.aninhadas || f.semTexto || f.externasSemOrganizacao || !f.temas.every(Boolean) || !f.revisao || !f.voltar) achados.push(`${post}: ${JSON.stringify(f)}`);
+      }
+      ok(`novidades: em ${POSTS.length} matérias, as Fontes em "Na Clarevo" e "Fontes oficiais", sem numeração nem lista dentro de lista, com a organização, o título e a data de cada fonte`, achados.length === 0, achados.join(' | '));
+      await p.close();
+    }
+
+    // 7c3. Planos (D-115): cada cartão da página inicial leva à página Planos, no plano dele; a página tem os dois planos, os recursos com
+    // links que abrem, como funciona e as perguntas; nada passa da largura da tela.
+    {
+      const p = await pagina();
+      await p.goto(`${origem}/`);
+      const cartoes = await p.$$eval('section[aria-labelledby="planos"] article.plano-link', (as) => as.map((a) => ({ links: a.querySelectorAll('a, button, input').length, nome: a.querySelector('a').textContent, href: a.querySelector('a').getAttribute('href') })));
+      ok('planos: os dois cartões da página inicial com um link só cada, com nome claro, para planos.html#individual e #familia', JSON.stringify(cartoes) === JSON.stringify([{ links: 1, nome: 'Ver o que o plano Individual inclui', href: 'planos.html#individual' }, { links: 1, nome: 'Ver o que o plano Família inclui', href: 'planos.html#familia' }]), JSON.stringify(cartoes));
+      // Clicar no cartão (fora do texto do link) abre o plano na página Planos.
+      const familia = p.locator('section[aria-labelledby="planos"] article.plano-link').nth(1);
+      await familia.scrollIntoViewIfNeeded();
+      const caixa = await familia.boundingBox();
+      await p.mouse.click(caixa.x + caixa.width - 20, caixa.y + 20);
+      await p.waitForURL(/\/planos(\.html)?#familia$/);
+      const alvo = await p.evaluate(() => { const a = document.querySelector('#familia'); const r = a.getBoundingClientRect(); return { titulo: a.querySelector('h3').textContent, visivel: r.top >= 0 && r.top < window.innerHeight, alvo: a.matches(':target') }; });
+      ok('planos: clicar em qualquer ponto do cartão Família abre a página Planos no plano Família', alvo.titulo === 'Família' && alvo.visivel && alvo.alvo, JSON.stringify(alvo));
+      const secoes = await p.$$eval('main h2', (hs) => hs.map((h) => h.id));
+      const links = await p.$$eval('#recursos ~ .grupos-recursos a, #recursos + p + .grupos-recursos a', (as) => as.map((a) => a.href));
+      const quebrados = [];
+      for (const l of links) {
+        const [endereco, ancora] = l.split('#');
+        const r = await ctx.request.get(endereco);
+        if (!r.ok() || (ancora && !(await r.text()).includes(`id="${ancora}"`))) quebrados.push(l);
+      }
+      ok('planos: a página tem os dois planos, os recursos, como funciona e as perguntas, e os 14 links dos recursos abrem no lugar certo', JSON.stringify(secoes) === JSON.stringify(['comparar', 'recursos', 'como-funciona', 'perguntas']) && links.length === 14 && quebrados.length === 0, `${secoes} ${links.length} ${quebrados.join(' | ')}`);
+      const largas = [];
+      for (const largura of [320, 390, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        for (const c of ['', 'planos']) {
+          await p.goto(`${origem}/${c}`);
+          if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${c || 'início'} em ${largura} px`);
+        }
+      }
+      ok('planos: nada passa da largura da tela em 320, 390 e 1280 px (início e Planos)', largas.length === 0, largas.join(' | '));
+      await p.close();
+    }
+
+    // 7c4. Celulares no centro dos cartões, "Quem vê os seus dados" em Segurança e a faixa de confiança da capa (D-115). Em 1280 px, a
+    // moldura de cada celular fica no centro do cartão que a tem (início, O app, Para empresas) e, em Segurança, no centro da coluna dela,
+    // ao lado dos quatro cartões em 2 x 2, com a mesma altura em cada linha. A faixa da capa (início e O app) é um link só para o bloco "O
+    // que a Clarevo não faz" de Segurança, e as seções antigas saíram. Nada passa da largura da tela em 320, 390 e 1280 px.
+    {
+      const p = await pagina();
+      await p.setViewportSize({ width: 1280, height: 900 });
+      const fora = [];
+      for (const c of ['', 'app/', 'empresas/', 'seguranca']) {
+        await p.goto(`${origem}/${c}`);
+        const r = await p.evaluate(() => [...document.querySelectorAll('.cartao > figure.celular, .com-celular > figure.celular')].map((f) => {
+          const m = f.querySelector('.celular-moldura').getBoundingClientRect();
+          const pai = f.parentElement;
+          let caixa = pai.getBoundingClientRect();
+          if (pai.classList.contains('com-celular')) {
+            const colunas = getComputedStyle(pai).gridTemplateColumns.split(' ').map(parseFloat);
+            const gap = parseFloat(getComputedStyle(pai).columnGap) || 0;
+            caixa = { left: caixa.left + colunas[0] + gap, width: colunas[1] };
+          }
+          return { nome: (pai.querySelector('h3') || pai.querySelector('h2') || { textContent: pai.className }).textContent.trim().slice(0, 30), dif: Math.abs((m.left + m.width / 2) - (caixa.left + caixa.width / 2)) };
+        }));
+        if (!r.length) fora.push(`${c || 'início'}: nenhum celular em cartão`);
+        for (const x of r) if (x.dif > 3) fora.push(`${c || 'início'}: ${x.nome} (${Math.round(x.dif)} px)`);
+      }
+      ok('celulares: em 1280 px, a moldura de cada celular fica no centro do cartão (início, O app, Para empresas) e da coluna dela (Segurança)', fora.length === 0, fora.join(' | '));
+      await p.goto(`${origem}/seguranca`);
+      const quemVe = await p.evaluate(() => {
+        const g = document.querySelector('#quem-ve ~ .com-celular .grade');
+        const cartoes = [...g.children].map((c) => c.getBoundingClientRect());
+        const f = document.querySelector('#quem-ve ~ .com-celular > figure.celular').getBoundingClientRect();
+        const linhas = {};
+        for (const c of cartoes) (linhas[Math.round(c.top)] = linhas[Math.round(c.top)] || []).push(Math.round(c.height));
+        const gr = g.getBoundingClientRect();
+        return { n: cartoes.length, linhas: Object.values(linhas), dentro: g.querySelectorAll('figure, img').length, lado: f.left > gr.right, meio: Math.abs((f.top + f.height / 2) - (gr.top + gr.height / 2)) };
+      });
+      ok('segurança: "Quem vê os seus dados" com os quatro cartões em 2 x 2, da mesma altura em cada linha, sem imagem dentro, e o celular ao lado, no meio da altura', quemVe.n === 4 && quemVe.linhas.length === 2 && quemVe.linhas.every((l) => l.length === 2 && l[0] === l[1]) && quemVe.dentro === 0 && quemVe.lado && quemVe.meio < 40, JSON.stringify(quemVe));
+      const faixas = [];
+      for (const c of ['', 'app/']) {
+        await p.goto(`${origem}/${c}`);
+        faixas.push(await p.evaluate(() => {
+          const f = document.querySelector('.capa .confianca');
+          const a = f && f.querySelectorAll('a');
+          return { links: a ? a.length : 0, href: a && a[0] ? a[0].getAttribute('href') : '', itens: f ? [...f.querySelectorAll('.confianca-item')].map((i) => i.textContent) : [], nome: a && a[0] ? a[0].textContent.replace(/\s+/g, ' ').trim() : '', antigas: document.querySelectorAll('#nao-e, #nao-faz').length };
+        }));
+      }
+      ok('faixa de confiança: na capa do início e de O app, três frases num link só para Segurança (#nao-faz), com nome em frase para leitor de tela, e sem as seções antigas',
+        faixas.every((f) => f.links === 1 && /seguranca\.html#nao-faz$/.test(f.href) && JSON.stringify(f.itens) === JSON.stringify(['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) && /cartão\. Ver o que a Clarevo não faz, em Segurança e privacidade\.$/.test(f.nome) && f.antigas === 0), JSON.stringify(faixas));
+      await p.click('.capa .confianca a');
+      await p.waitForURL(/\/seguranca(\.html)?#nao-faz$/);
+      ok('faixa de confiança: o link abre o bloco "O que a Clarevo não faz" de Segurança', (await p.textContent('#nao-faz')) === 'O que a Clarevo não faz' && (await p.$$eval('#nao-faz ~ .lista-nao-faz li', (l) => l.length)) === 5);
+      const largas = [];
+      for (const largura of [320, 390, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        for (const c of ['', 'app/', 'empresas/', 'seguranca']) {
+          await p.goto(`${origem}/${c}`);
+          const r = await p.evaluate(() => ({ largo: document.documentElement.scrollWidth > window.innerWidth + 1, faixa: [...document.querySelectorAll('.confianca-item')].some((i) => i.getBoundingClientRect().right > window.innerWidth) }));
+          if (r.largo || r.faixa) largas.push(`${c || 'início'} em ${largura} px ${JSON.stringify(r)}`);
+        }
+      }
+      ok('celulares, Segurança e faixa: nada passa da largura da tela em 320, 390 e 1280 px', largas.length === 0, largas.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
+      await p.close();
+    }
+
+    // 7c5. Espaço Negócio (D-115, a partir de D-113): o recurso em O app (#negocio), com a tela da demonstração no centro e o link da Ajuda;
+    // o cartão de "Para quem é" na página inicial, que leva a ele; a frase de docs/52 em Planos; e a entrada na Ajuda, achada pela busca.
+    {
+      const p = await pagina();
+      await p.goto(`${origem}/`);
+      await p.click('section[aria-labelledby="para-quem"] a[href="app/index.html#negocio"]');
+      await p.waitForURL(/\/app\/(index\.html)?#negocio$/);
+      const recurso = await p.evaluate(() => {
+        const a = document.querySelector('#negocio');
+        const img = a.querySelector('figure.celular img');
+        return { titulo: a.querySelector('h3').textContent, ajuda: a.querySelector('a[href="../ajuda/negocio.html#guia-negocio"]') !== null, img: img ? { ok: img.complete && img.naturalWidth > 0, alt: img.alt } : null, plano: /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(a.textContent) };
+      });
+      ok('Espaço Negócio: o cartão "Para quem tem um negócio" do início leva ao recurso em O app, com a tela do negócio, o link da Ajuda e "Incluído na assinatura"', recurso.titulo === 'Espaço Negócio' && recurso.ajuda && recurso.plano && recurso.img && /^Tela do negócio/.test(recurso.img.alt), JSON.stringify(recurso));
+      await p.goto(`${origem}/planos`);
+      ok('Espaço Negócio: em Planos, "Incluído na assinatura: um negócio por pessoa", fora das diferenças entre os planos', !/Negócio/.test(await p.textContent('#individual')) && /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(await p.textContent('#recursos ~ .grupos-recursos')) && (await p.$('a[href="ajuda/negocio.html#guia-negocio"]')) !== null);
+      await p.goto(`${origem}/ajuda/`);
+      const naAjuda = (await p.$('a[href="negocio.html"]')) !== null;
+      await p.fill('input[type="search"]', 'negócio');
+      await p.waitForFunction(() => [...document.querySelectorAll('.resultados a')].some((a) => /negocio\.html#guia-negocio/.test(a.getAttribute('href'))), null, { timeout: 5000 }).catch(() => {});
+      const naBusca = await p.$$eval('.resultados a', (as) => as.some((a) => /negocio\.html#guia-negocio/.test(a.getAttribute('href'))));
+      ok('Espaço Negócio: a Ajuda tem o tema no índice e a busca acha a entrada do guia', naAjuda && naBusca, `${naAjuda} ${naBusca}`);
+      await p.close();
+    }
+
+    // 7c6. O feed RSS (D-115): o botão "Feed RSS" das Novidades abre a página que explica o RSS, com o endereço completo do feed num campo
+    // só de leitura e "Copiar o endereço" (que copia de verdade), e "Abrir o arquivo do feed"; o feed é XML bem formado, com um item por
+    // matéria, e o link de cada item abre a matéria no endereço sem ".html", como no Cloudflare Pages. Sem JavaScript, o botão não aparece.
+    {
+      const copiando = await navegador.newContext({ viewport: { width: 390, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
+      const p = await copiando.newPage();
+      const erros = [];
+      p.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && erros.push(m.text()));
+      p.on('pageerror', (e) => erros.push(e.message));
+      await p.goto(`${origem}/novidades/`);
+      await p.click('a.botao:text-is("Feed RSS")');
+      await p.waitForURL(/\/novidades\/rss(\.html)?$/);
+      const pagina = await p.evaluate(() => {
+        const campo = document.getElementById('rss-endereco');
+        const botao = document.querySelector('button[data-copiar]');
+        return { titulo: document.querySelector('h1').textContent, valor: campo.value, soLeitura: campo.readOnly, rotulo: document.querySelector('label[for="rss-endereco"]').textContent, botao: botao && !botao.hidden ? botao.textContent : null, abrir: document.querySelector('main a[href="feed.xml"]') && !document.querySelector('main a.botao[href="feed.xml"]') ? document.querySelector('main a[href="feed.xml"]').textContent : null, alternativo: document.querySelector('link[rel="alternate"][type="application/rss+xml"]') !== null };
+      });
+      ok('rss: o botão "Feed RSS" abre "Acompanhar as Novidades por RSS", com o endereço completo do feed só de leitura, "Copiar o endereço" e o link de texto para o arquivo do feed',
+        pagina.titulo === 'Acompanhar as Novidades por RSS' && /^https:\/\/[a-z0-9.-]+\/novidades\/feed\.xml$/.test(pagina.valor) && pagina.soLeitura && pagina.rotulo === 'Endereço do feed das Novidades' && pagina.botao === 'Copiar o endereço' && pagina.abrir === 'abrir o arquivo do feed' && pagina.alternativo, JSON.stringify(pagina));
+      await p.focus('button[data-copiar]');
+      await p.keyboard.press('Enter');
+      await p.waitForFunction(() => document.getElementById('rss-estado').textContent.length > 0, null, { timeout: 5000 }).catch(() => {});
+      const copiado = { estado: await p.textContent('#rss-estado'), area: await p.evaluate(() => navigator.clipboard.readText()) };
+      ok('rss: "Copiar o endereço" (pelo teclado) copia o endereço do feed e avisa "Endereço copiado."', copiado.estado === 'Endereço copiado.' && copiado.area === pagina.valor && erros.length === 0, JSON.stringify({ copiado, erros }));
+      const xml = await (await copiando.request.get(`${origem}/novidades/feed.xml`)).text();
+      const lido = await p.evaluate((texto) => {
+        const doc = new DOMParser().parseFromString(texto, 'application/xml');
+        return { erro: doc.getElementsByTagName('parsererror').length, itens: [...doc.querySelectorAll('item')].map((i) => ({ titulo: i.querySelector('title').textContent, link: i.querySelector('link').textContent })) };
+      }, xml);
+      const abrem = [];
+      for (const i of lido.itens) {
+        const caminho = new URL(i.link).pathname;
+        const r = await copiando.request.get(`${origem}${caminho}`);
+        abrem.push(r.ok() && !/\.html$/.test(caminho) && (await r.text()).includes(`<h1>${i.titulo.replace(/&/g, '&amp;')}</h1>`));
+      }
+      ok(`rss: o feed é XML bem formado, com as ${POSTS.length} matérias, e o link de cada item abre a matéria no endereço sem ".html"`, lido.erro === 0 && lido.itens.length === POSTS.length && abrem.every(Boolean), JSON.stringify({ erro: lido.erro, n: lido.itens.length, abrem }));
+      await copiando.close();
+      const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 } });
+      const q = await semJs.newPage();
+      await q.goto(`${origem}/novidades/rss`);
+      ok('rss sem JavaScript: o campo com o endereço continua, e o botão de copiar não aparece', await q.evaluate(() => document.getElementById('rss-endereco').value.endsWith('/novidades/feed.xml') && !document.querySelector('button[data-copiar]').checkVisibility()));
+      await semJs.close();
+    }
+
+    // 7c7. Indicadores mais fáceis de achar (D-115): "Indicadores de hoje" na página inicial, com o retrato e a troca pelo painel.js (uma
+    // pergunta ao próprio site), o caminho para o painel e o glossário, e o cartão dos indicadores em Aprender e em Novidades.
+    {
+      const p = await pagina();
+      await p.goto(`${origem}/`);
+      await p.waitForFunction(() => document.querySelector('.indicadores-inicio').getAttribute('data-atualizado') === 'sim', null, { timeout: 8000 }).catch(() => {});
+      const inicio = await p.evaluate(() => {
+        const s = document.querySelector('.indicadores-inicio');
+        return { atualizado: s.getAttribute('data-atualizado'), cartoes: [...s.querySelectorAll('[data-indicador]')].map((c) => c.getAttribute('data-indicador')), selic: s.querySelector('[data-indicador="selic"] [data-campo="numero"]').textContent, fonte: /Fonte: Banco Central do Brasil\./.test(s.textContent), aviso: /Conteúdo educativo\. Não é recomendação nem análise de valores mobiliários\./.test(s.parentElement.textContent), botao: document.querySelector('a.botao[href="indicadores/index.html"]') ? document.querySelector('a.botao[href="indicadores/index.html"]').textContent : null };
+      });
+      ok('indicadores no início: os cinco números, trocados pelo painel.js (Selic 15,00%), com a fonte, o aviso e "Ver os indicadores e o glossário"', inicio.atualizado === 'sim' && JSON.stringify(inicio.cartoes) === JSON.stringify(['selic', 'cdi', 'ipca', 'poupanca', 'ptax']) && inicio.selic === '15,00%' && inicio.fonte && inicio.aviso && inicio.botao === 'Ver os indicadores e o glossário', JSON.stringify(inicio));
+      const atalhos = [];
+      for (const c of ['aprender/', 'novidades/']) {
+        await p.goto(`${origem}/${c}`);
+        atalhos.push(await p.evaluate(() => { const a = document.querySelector('main a.cartao[href="../indicadores/index.html"]'); return a ? a.querySelector('.titulo-cartao').textContent : null; }));
+      }
+      ok('indicadores: o cartão "Indicadores oficiais" em Aprender e em Novidades', atalhos.every((t) => t === 'Indicadores oficiais'), JSON.stringify(atalhos));
+      await p.close();
+    }
+
+    // 7c8. Tema do site (D-115): no rodapé de todas as páginas, "Igual ao aparelho" (o padrão), "Claro" e "Escuro", com nomes acessíveis
+    // e pelo teclado. A escolha muda o tema na hora, vale depois de recarregar e marca o <html> antes de a página aparecer (já no
+    // DOMContentLoaded); "Igual ao aparelho" segue o aparelho nos dois sentidos; com o armazenamento bloqueado, nada quebra; só a chave do
+    // tema fica no navegador; nada passa da largura da tela e o cabeçalho continua numa linha em 320, 390, 768, 1024, 1120 e 1280 px.
+    {
+      const FUNDO_CLARO = 'rgb(247, 249, 253)';
+      const FUNDO_ESCURO = 'rgb(19, 30, 62)';
+      const temaCtx = await navegador.newContext({ viewport: { width: 390, height: 900 }, colorScheme: 'light' });
+      await temaCtx.addInitScript(() => document.addEventListener('DOMContentLoaded', () => { window.__temaNoInicio = document.documentElement.dataset.tema || null; }));
+      const p = await temaCtx.newPage();
+      const erros = [];
+      p.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && erros.push(m.text()));
+      p.on('pageerror', (e) => erros.push(e.message));
+      const estado = () => p.evaluate(() => ({ tema: document.documentElement.dataset.tema, inicio: window.__temaNoInicio, fundo: getComputedStyle(document.body).backgroundColor, escolhida: (document.querySelector('input[name="tema-site"]:checked') || {}).value, guardado: (() => { try { return localStorage.getItem('clarevo.site.tema.v1'); } catch (e) { return 'erro'; } })(), chaves: (() => { try { return Object.keys(localStorage); } catch (e) { return ['erro']; } })() }));
+      await p.goto(`${origem}/`);
+      const grupo = await p.evaluate(() => {
+        const f = document.querySelector('footer fieldset.tema-site');
+        return { visivel: f && !f.hidden, legenda: f && f.querySelector('legend').textContent, opcoes: f ? [...f.querySelectorAll('input[type="radio"][name="tema-site"]')].map((i) => ({ valor: i.value, nome: i.closest('label').textContent.trim() })) : [] };
+      });
+      const padrao = await estado();
+      ok('tema: o grupo "Tema do site" no rodapé, com "Igual ao aparelho" (marcado), "Claro" e "Escuro", e o site no tema do aparelho', grupo.visivel && grupo.legenda === 'Tema do site' && JSON.stringify(grupo.opcoes.map((o) => o.nome)) === JSON.stringify(['Igual ao aparelho', 'Claro', 'Escuro']) && padrao.tema === 'aparelho' && padrao.escolhida === 'aparelho' && padrao.fundo === FUNDO_CLARO && padrao.guardado === null, JSON.stringify({ grupo, padrao }));
+      // Nomes acessíveis pelo papel: cada opção é um botão de opção com o nome visível.
+      const nomes = [];
+      for (const n of ['Igual ao aparelho', 'Claro', 'Escuro']) nomes.push(await p.getByRole('radio', { name: n, exact: true }).count());
+      ok('tema: cada opção tem o papel de opção e o nome acessível visível', nomes.every((n) => n === 1), JSON.stringify(nomes));
+      await p.getByRole('radio', { name: 'Escuro', exact: true }).check();
+      const escuro = await estado();
+      await p.reload();
+      const escuroDepois = await estado();
+      ok('tema: "Escuro" muda o site na hora (aparelho claro), fica guardado e vale depois de recarregar, já marcado no DOMContentLoaded', escuro.tema === 'escuro' && escuro.fundo === FUNDO_ESCURO && escuro.guardado === 'escuro' && escuroDepois.tema === 'escuro' && escuroDepois.inicio === 'escuro' && escuroDepois.fundo === FUNDO_ESCURO && escuroDepois.escolhida === 'escuro', JSON.stringify({ escuro, escuroDepois }));
+      // Pelo teclado: o foco na opção marcada e as setas trocam a escolha (Escuro -> Igual ao aparelho volta ao começo do grupo).
+      await p.getByRole('radio', { name: 'Escuro', exact: true }).focus();
+      const focoVisivel = await p.evaluate(() => { const s = document.activeElement.nextElementSibling; return s && getComputedStyle(s).outlineStyle !== 'none'; });
+      await p.keyboard.press('ArrowLeft');
+      const claro = await estado();
+      await p.reload();
+      const claroDepois = await estado();
+      ok('tema: pelo teclado (seta), "Claro" fica escolhido, com foco visível, e vale depois de recarregar', focoVisivel && claro.tema === 'claro' && claro.fundo === FUNDO_CLARO && claroDepois.inicio === 'claro' && claroDepois.escolhida === 'claro', JSON.stringify({ focoVisivel, claro, claroDepois }));
+      // "Claro" vale mesmo com o aparelho escuro.
+      await p.emulateMedia({ colorScheme: 'dark' });
+      const claroNoEscuro = await estado();
+      // As telas das matérias seguem a escolha, e não o aparelho.
+      await p.goto(`${origem}/${POSTS[3]}`);
+      const telas = await p.evaluate(async () => { for (const i of document.images) i.loading = 'eager'; await Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = r; i.onerror = r; })))); return [...document.querySelectorAll('main picture img')].map((i) => /-escura\./.test(i.currentSrc)); });
+      ok('tema: "Claro" com o aparelho escuro deixa o site e as telas das matérias no claro', claroNoEscuro.fundo === FUNDO_CLARO && telas.length > 0 && telas.every((t) => !t), JSON.stringify({ claroNoEscuro, telas }));
+      // "Igual ao aparelho" segue o aparelho nos dois sentidos e apaga a chave.
+      await p.getByRole('radio', { name: 'Igual ao aparelho', exact: true }).check();
+      const aparelhoEscuro = await estado();
+      await p.emulateMedia({ colorScheme: 'light' });
+      const aparelhoClaro = await estado();
+      ok('tema: "Igual ao aparelho" segue o aparelho (escuro e depois claro) e não guarda nada', aparelhoEscuro.tema === 'aparelho' && aparelhoEscuro.fundo === FUNDO_ESCURO && aparelhoClaro.fundo === FUNDO_CLARO && aparelhoClaro.guardado === null && aparelhoClaro.chaves.length === 0, JSON.stringify({ aparelhoEscuro, aparelhoClaro }));
+      ok('tema: o navegador guarda só a chave do tema (clarevo.site.tema.v1), sem erro no console', escuro.chaves.length === 1 && escuro.chaves[0] === 'clarevo.site.tema.v1' && erros.length === 0, JSON.stringify({ chaves: escuro.chaves, erros }));
+      // Cabeçalho numa linha e nada passa da largura da tela.
+      const largas = [];
+      for (const largura of [320, 390, 768, 1024, 1120, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        for (const c of ['', 'novidades/rss', 'planos']) {
+          await p.goto(`${origem}/${c}`);
+          const r = await p.evaluate(() => ({ largo: document.documentElement.scrollWidth > window.innerWidth + 1, topo: Math.round(document.querySelector('.topo-i').getBoundingClientRect().height), tema: (() => { const f = document.querySelector('fieldset.tema-site .tema-opcoes'); const tops = [...f.children].map((c) => Math.round(c.getBoundingClientRect().top)); return new Set(tops).size; })() }));
+          if (r.largo || r.topo > 80 || r.tema !== 1) largas.push(`${c || 'início'} em ${largura} px ${JSON.stringify(r)}`);
+        }
+      }
+      ok('tema: em 320, 390, 768, 1024, 1120 e 1280 px, nada passa da largura da tela, o cabeçalho fica numa linha e as três opções numa linha só', largas.length === 0, largas.join(' | '));
+      await temaCtx.close();
+      // Armazenamento bloqueado: o site segue o aparelho, o grupo não aparece (a escolha não passaria para a página seguinte) e nada dá erro.
+      const bloqueado = await navegador.newContext({ viewport: { width: 390, height: 900 }, colorScheme: 'dark' });
+      await bloqueado.addInitScript(() => Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new DOMException('bloqueado', 'SecurityError'); } }));
+      const q = await bloqueado.newPage();
+      const errosQ = [];
+      q.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && errosQ.push(m.text()));
+      q.on('pageerror', (e) => errosQ.push(e.message));
       await q.goto(`${origem}/`);
-      await q.waitForTimeout(2000);
-      const parados = await q.$$eval('#em-uso ~ ul.videos video', (vs) => vs.every((v) => v.paused && v.currentTime === 0));
-      const rolagem = await q.$eval('ul.videos', (u) => getComputedStyle(u).scrollBehavior);
-      ok('vídeos com movimento reduzido: nenhum toca sozinho, nada é baixado e a faixa rola sem animação', parados && deVideoCalmo.length === 0 && rolagem === 'auto', `${parados} ${deVideoCalmo.length} ${rolagem}`);
-      await calmo.close();
+      const antes = await q.evaluate(() => ({ tema: document.documentElement.dataset.tema, fundo: getComputedStyle(document.body).backgroundColor, grupo: document.querySelector('fieldset.tema-site').hidden }));
+      ok('tema com o armazenamento bloqueado: segue o aparelho, o grupo não aparece e nada dá erro', antes.tema === 'aparelho' && antes.fundo === FUNDO_ESCURO && antes.grupo === true && errosQ.length === 0, JSON.stringify({ antes, errosQ }));
+      // O <meta name="color-scheme"> segue a escolha (o fundo antes do estilo).
+      const meta = await navegador.newContext({ viewport: { width: 390, height: 900 }, colorScheme: 'dark' });
+      await meta.addInitScript(() => { try { localStorage.setItem('clarevo.site.tema.v1', 'claro'); } catch (e) { /* nada */ } });
+      const m = await meta.newPage();
+      await m.goto(`${origem}/`);
+      ok('tema: com "Claro" escolhido e o aparelho escuro, o <meta name="color-scheme"> diz "light"', (await m.getAttribute('meta[name="color-scheme"]', 'content')) === 'light' && (await m.evaluate(() => getComputedStyle(document.body).backgroundColor)) === FUNDO_CLARO);
+      await meta.close();
+      await bloqueado.close();
+      // Sem JavaScript: sem o grupo, e o site segue o aparelho.
+      const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 }, colorScheme: 'dark' });
+      const r = await semJs.newPage();
+      await r.goto(`${origem}/`);
+      ok('tema sem JavaScript: o grupo não aparece e o site segue o tema do aparelho', await r.evaluate(() => document.querySelector('fieldset.tema-site').hidden && !document.documentElement.hasAttribute('data-tema') && getComputedStyle(document.body).backgroundColor === 'rgb(19, 30, 62)'));
+      await semJs.close();
+    }
+
+    // 7c9. Nada de advertência na primeira tela (D-115): no início, em O app, em Planos, em Para empresas e em Sobre, nada que diga "não
+    // promete" aparece na primeira tela (390 x 844 e 1280 x 900); o aviso de saúde fica na nota do fim da página inicial e de Sobre.
+    {
+      const p = await pagina();
+      const achados = [];
+      for (const [largura, altura] of [[390, 844], [1280, 900]]) {
+        await p.setViewportSize({ width: largura, height: altura });
+        for (const c of ['', 'app/', 'planos', 'empresas/', 'sobre']) {
+          await p.goto(`${origem}/${c}`);
+          const visiveis = await p.evaluate(() => [...document.querySelectorAll('main p, main h2, main h3, main li')].filter((e) => { const r = e.getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0 && /não promete|não está incluído|não fazem parte/i.test(e.textContent); }).map((e) => e.textContent.slice(0, 60)));
+          if (visiveis.length) achados.push(`${c || 'início'} em ${largura} px: ${visiveis.join(' / ')}`);
+        }
+      }
+      ok('primeira tela: nenhuma advertência na primeira tela do início, de O app, de Planos, de Para empresas e de Sobre', achados.length === 0, achados.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
+      const fim = [];
+      for (const c of ['', 'sobre']) {
+        await p.goto(`${origem}/${c}`);
+        fim.push(await p.evaluate(() => { const a = document.querySelector('main .aviso-final'); return Boolean(a) && /não é atendimento de saúde/.test(a.textContent) && a.getBoundingClientRect().top > document.documentElement.scrollHeight * 0.6; }));
+      }
+      ok('primeira tela: o aviso de saúde fica numa nota no fim do início e de Sobre', fim.every(Boolean), JSON.stringify(fim));
+      await p.close();
     }
 
     // 7d. Imagens das matérias de Novidades (D-114): capa e telas ao lado das seções, do próprio site, com largura, altura e texto

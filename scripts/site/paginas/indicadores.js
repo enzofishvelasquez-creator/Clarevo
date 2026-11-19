@@ -47,6 +47,31 @@ function cartaoDoIndicador(arquivo, id, retrato) {
   return `<li><a class="cartao indicador" href="${rel(arquivo, arquivoDoIndicador(id))}" data-indicador="${id}"><span class="titulo-cartao">${esc(exib.nome)}</span><span class="indicador-numero">${f.numero} ${f.unidade}</span><span class="tema-meta">${f.data}</span>${f.extra}</a></li>`;
 }
 
+/**
+ * "Indicadores de hoje" na página inicial (D-115, pedido do Enzo: "não achei as informações de mercado"): os cinco números do retrato da
+ * geração em cartões compactos, trocados pelo mesmo `indicadores/painel.js` do painel (o `data-painel` e os `data-indicador` são os
+ * mesmos), a linha da hora e da fonte, o aviso de mercado e o caminho para o painel e o glossário. `arquivo`: a página, para os links.
+ */
+function secaoIndicadoresDeHoje(arquivo, retrato) {
+  const { INDICADOR_IDS, INDICADORES_TEXT: T } = catalogo().INDICADORES;
+  return `<h2 id="indicadores">Indicadores de hoje</h2>
+<p class="lead-bloco">Os números oficiais que aparecem nas contas do dia a dia e nos investimentos, com a data de cada um.</p>
+<div class="indicadores-inicio" data-painel data-consultado="${esc(retrato.consultadoEm ?? '')}">
+<p class="indicadores-estado">${linhaDaHora(retrato)}</p>
+<ul class="temas">
+${INDICADOR_IDS.map((id) => cartaoDoIndicador(arquivo, id, retrato)).join('\n')}
+</ul>
+</div>
+<p class="nota">${esc(T.avisoMercado)}</p>
+<p class="acoes"><a class="botao botao-principal" href="${rel(arquivo, ARQUIVO_PAINEL)}">Ver os indicadores e o glossário</a></p>`;
+}
+
+/** O cartão que leva ao painel de indicadores, nas páginas de Aprender e de Novidades (D-115). */
+function cartaoDosIndicadores(arquivo) {
+  const T = catalogo().INDICADORES.INDICADORES_TEXT;
+  return `<a class="cartao cartao-calculadoras" href="${rel(arquivo, ARQUIVO_PAINEL)}"><span class="titulo-cartao">${esc(T.tituloPainel)}</span><span class="tema-sub">Selic, CDI, IPCA em 12 meses, poupança e dólar PTAX, com a data de cada número e o glossário. Fonte: Banco Central do Brasil.</span></a>`;
+}
+
 /** Um link para outra página de mercado, no formato dos cartões de Aprender. */
 const cartaoDeLink = (href, titulo, sub) => `<li><a class="cartao" href="${href}"><span class="titulo-cartao">${esc(titulo)}</span><span class="tema-sub">${esc(sub)}</span></a></li>`;
 
@@ -295,4 +320,4 @@ function paginasIndicadores(ctx) {
   return [paginaDoPainel(ctx), ...m.PAGINAS_INDICADORES.map((p) => paginaDoIndicador(p, ctx)), paginaDoGlossario(ctx), ...m.explicacoesDeMercado().map((e) => paginaDaExplicacao(e, ctx))];
 }
 
-module.exports = { paginasIndicadores, ARQUIVO_PAINEL, ARQUIVO_GLOSSARIO, SCRIPT_DO_PAINEL, arquivoDoIndicador, arquivoDaExplicacao };
+module.exports = { secaoIndicadoresDeHoje, cartaoDosIndicadores, paginasIndicadores, ARQUIVO_PAINEL, ARQUIVO_GLOSSARIO, SCRIPT_DO_PAINEL, arquivoDoIndicador, arquivoDaExplicacao };

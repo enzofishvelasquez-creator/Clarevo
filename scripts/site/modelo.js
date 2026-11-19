@@ -72,13 +72,21 @@ function rodapeHtml(arquivo, valores, { aviso = false } = {}) {
     (c) => `<div><h2>${esc(c.titulo)}</h2><ul>${c.links.map((l) => `<li><a href="${rel(arquivo, l.arquivo)}">${esc(l.rotulo)}</a></li>`).join('')}</ul></div>`,
   ).join('\n');
   const legal = marcadoresEmHtml(esc(RODAPE_LEGAL), valores);
+  // O tema do site (D-115): começa escondido e só aparece com o script do tema (js/tema.js); sem ele, o site segue o tema do aparelho.
+  const icone = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`;
+  const opcao = (valor, rotulo, desenho) => `<label class="tema-opcao"><input type="radio" name="tema-site" value="${valor}"><span>${icone(desenho)}${esc(rotulo)}</span></label>`;
+  const tema = `<fieldset class="tema-site" data-tema-site hidden><legend>Tema do site</legend><div class="tema-opcoes">${[
+    opcao('aparelho', 'Igual ao aparelho', '<rect x="4" y="4" width="16" height="11" rx="2"/><path d="M8 20h8M12 15v5"/>'),
+    opcao('claro', 'Claro', '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>'),
+    opcao('escuro', 'Escuro', '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
+  ].join('')}</div></fieldset>`;
   return `<footer class="rodape">
 <div class="miolo">
 <nav class="rodape-grade" aria-label="Rodapé">
 <div class="rodape-marca"><a href="${rel(arquivo, 'index.html')}" aria-label="Clarevo, página inicial"><img src="${rel(arquivo, 'marca/clarevo-logotipo-reverso.svg')}" alt="" width="130" height="26"></a><p>Cuidar da vida financeira faz parte de cuidar de você. Sem anúncios, sem venda de dados e sem recomendar produtos financeiros.</p></div>
 ${colunas}
 </nav>
-<div class="rodape-fim">${aviso ? `<p class="rodape-aviso">${esc(avisoDeMercado())}</p>` : ''}<p>${legal}</p></div>
+<div class="rodape-fim">${tema}${aviso ? `<p class="rodape-aviso">${esc(avisoDeMercado())}</p>` : ''}<p>${legal}</p></div>
 </div>
 </footer>`;
 }
@@ -93,6 +101,12 @@ ${colunas}
  * `avisoDeMercado`: as páginas de mercado (D-106) levam no rodapé "Conteúdo educativo. Não é recomendação nem análise de valores
  * mobiliários."
  */
+/**
+ * O script do tema do site (D-115), em todas as páginas, no <head> e antes do estilo, sem `defer`: ele marca o <html> com o tema escolhido
+ * antes de a página aparecer (sem piscar no tema errado). É pequeno, do próprio site e não pede nada a ninguém.
+ */
+const SCRIPT_DO_TEMA = 'js/tema.js';
+
 function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores, jsonld = [], scripts = [], modulos = [], precarga = [], cabecalho = '', classeCapa = '', tipoOg = 'website', semIndexar = false, tituloCompleto = false, atualizada = null, avisoDeMercado: comAviso = false }) {
   const pendencias = pendenciasDoTexto(`${fonte}\n${RODAPE_LEGAL}`, valores);
   const faixa = pendencias.length
@@ -135,6 +149,7 @@ function montarPagina({ arquivo, titulo, descricao, capa, corpo, fonte, valores,
 ${noindex ? '<meta name="robots" content="noindex">\n' : ''}${canonical}${og.join('\n')}
 <link rel="icon" href="${rel(arquivo, 'favicon.svg')}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="${rel(arquivo, 'marca/icone-app.png')}">
+<script src="${rel(arquivo, SCRIPT_DO_TEMA)}"></script>
 <link rel="stylesheet" href="${rel(arquivo, 'estilo.css')}">
 ${cabecalho ? `${cabecalho}\n` : ''}${dados ? `${dados}\n` : ''}${js ? `${js}\n` : ''}</head>
 <body>
@@ -186,10 +201,28 @@ function celular(img, arquivo, { legenda = true, carregamento = 'lazy', textoLeg
   return `<figure class="celular${classe ? ` ${classe}` : ''}"><div class="celular-moldura">${imagemDaTela(img, arquivo, carregamento)}</div>${legenda ? `<figcaption>${esc(textoLegenda || LEGENDA_DEMO)}</figcaption>` : ''}</figure>`;
 }
 
+/** Os ícones da faixa de confiança, desenhados em linha (SVG no próprio HTML, sem arquivo nem estilo em atributo). */
+const ICONES_DA_CONFIANCA = {
+  banco: '<path d="M3 9.5 12 4l9 5.5M5 10v7M9.5 10v7M14.5 10v7M19 10v7M3 20h18"/>',
+  dinheiro: '<path d="M4 8h14l-3-3M20 16H6l3 3"/>',
+  cartao: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/>',
+};
+
+/**
+ * A faixa de confiança da capa (pedido do Enzo, 18/11/2026, D-115): três frases curtas com um ícone pequeno cada, no lugar das seções "O
+ * que a Clarevo não é" (página inicial) e "O que o app não faz" (O app), que eram caixas largas empilhadas. A faixa inteira é um link só
+ * para o bloco "O que a Clarevo não faz" de Segurança e privacidade, onde está o texto completo, com o convite visível "Ver o que a
+ * Clarevo não faz" sublinhado no fim; as vírgulas escondidas da tela fazem o nome do link ser uma frase para quem usa leitor de tela.
+ */
+function faixaDeConfianca(arquivo) {
+  const item = (icone, texto) => `<span class="confianca-item"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONES_DA_CONFIANCA[icone]}</svg>${esc(texto)}</span>`;
+  return `<p class="confianca"><a href="${rel(arquivo, 'seguranca.html')}#nao-faz">${item('banco', 'Sem conexão com o seu banco')}<span class="so-leitor">, </span>${item('dinheiro', 'Não movimenta dinheiro nem oferece crédito')}<span class="so-leitor">, </span>${item('cartao', 'Não guarda os dados completos do cartão')}<span class="so-leitor">. </span><span class="confianca-mais">Ver o que a Clarevo não faz<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="so-leitor">, em Segurança e privacidade.</span></a></p>`;
+}
+
 /** A captura larga (painel no navegador) com a legenda de demonstração (ou `textoLegenda`). */
 function telaLarga(img, arquivo, { textoLegenda = null, classe = '' } = {}) {
   const { LEGENDA_DEMO } = require('./imagens');
   return `<figure class="larga${classe ? ` ${classe}` : ''}"><div class="larga-moldura">${imagemDaTela(img, arquivo, 'lazy')}</div><figcaption>${esc(textoLegenda || LEGENDA_DEMO)}</figcaption></figure>`;
 }
 
-module.exports = { montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, dominioDe, urlDoSite, configurarRodape };
+module.exports = { SCRIPT_DO_TEMA, montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, faixaDeConfianca, dominioDe, urlDoSite, configurarRodape };

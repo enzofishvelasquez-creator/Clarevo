@@ -13,6 +13,8 @@ const { URL_NR1 } = require('../config');
 const { montarPagina, marcadoresEmHtml, bloco, celular, telaLarga } = require('../modelo');
 const { blocoDeContato } = require('./formularios');
 
+const { AVISO_DE_SAUDE } = require('./inicio');
+
 const ARQUIVO = 'empresas/index.html';
 
 function paginaEmpresas({ valores, img }) {
@@ -29,17 +31,7 @@ function paginaEmpresas({ valores, img }) {
     bloco(
       `<h2 id="bem-estar">O cuidado financeiro dentro do programa de bem-estar</h2>
 <p class="lead-bloco">A empresa oferece a Clarevo a quem trabalha com ela e acompanha só as vagas, os convites e as licenças. Cada pessoa usa o app para organizar o mês e acompanhar decisões financeiras pessoais e familiares, e mantém a privacidade das próprias finanças.</p>
-<div class="grade">
-<article class="cartao">
-<h3>O que a proposta inclui hoje</h3>
-<p>Uma licença da Clarevo para cada pessoa convidada, o painel de convites e licenças e o relatório de adesão, só com contagens. Escopo, implantação, privacidade e condições comerciais são combinados na apresentação.</p>
-</article>
-<article class="cartao">
-<h3>O que não está incluído</h3>
-<p>Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje. Se um deles entrar em uma proposta, só será anunciado com escopo e contratação confirmados.</p>
-</article>
-</div>
-<p class="nota">A Clarevo não promete redução de absenteísmo, de estresse nem de adoecimento, e não oferece à empresa acesso a transações, dívidas ou relatos individuais.</p>`,
+<p class="texto-bloco"><strong>O que a proposta inclui hoje:</strong> uma licença da Clarevo para cada pessoa convidada, o painel de convites e licenças e o relatório de adesão, só com contagens. Escopo, implantação, privacidade e condições comerciais são combinados na apresentação.</p>`,
       { rotulo: 'bem-estar' },
     ),
     bloco(
@@ -64,7 +56,8 @@ function paginaEmpresas({ valores, img }) {
 <li><h3>Convite por link</h3><p>Quem administra cola os e-mails, de 1 a 500 por vez, e o painel gera um link de uso único para cada e-mail. A empresa envia o link pelo canal interno dela: a Clarevo não envia e-mail de convite.</p></li>
 <li><h3>A pessoa aceita</h3><p>Para aceitar, a pessoa precisa ter conta na Clarevo com o mesmo e-mail do convite, já confirmado. Quem ativa a licença é a pessoa, ao aceitar. A empresa não escolhe quem aceita.</p></li>
 <li><h3>Acompanhamento</h3><p>No painel, a empresa vê as vagas, os convites e as licenças. Pode reenviar ou cancelar um convite pendente (o link anterior deixa de valer) e encerrar uma licença.</p></li>
-</ol>`,
+</ol>
+<p class="nota nota-ressalvas"><strong>O que fica de fora.</strong> Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje. Se um deles entrar em uma proposta, só será anunciado com escopo e contratação confirmados. A Clarevo não promete redução de absenteísmo, de estresse nem de adoecimento, e não oferece à empresa acesso a transações, dívidas ou relatos individuais. ${esc(AVISO_DE_SAUDE)}</p>`,
       { rotulo: 'como-funciona' },
     ),
     bloco(

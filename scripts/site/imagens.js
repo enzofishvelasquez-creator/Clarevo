@@ -8,7 +8,8 @@
  * Desde 12/11/2026, o nome do arquivo leva um resumo do conteúdo (`imagens/resumo.1a2b3c4d5e.png`): uma captura nova ganha outro nome,
  * e o navegador pode guardar cada imagem por um ano (`_headers`) sem mostrar a antiga a quem já visitou o site.
  *
- * Todas as legendas das capturas de O app e da página inicial dizem "Dados fictícios de demonstração" (`LEGENDA_DEMO`).
+ * Desde 18/11/2026 (D-115, revisão), toda tela da demonstração no site, captura ou vídeo, tem a mesma legenda: "Tela da demonstração, com
+ * dados fictícios" (`LEGENDA_DEMO`, igual a `LEGENDA_TELA` de `videos.js`; antes as capturas diziam "Dados fictícios de demonstração").
  *
  * D-114 (17/11/2026): as telas das matérias de Novidades (`TELAS_DAS_NOVIDADES`, gravadas da demonstração por
  * `scripts/gravar-videos-site.js --capturas` em `site-src/imagens/telas/`) têm uma versão no tema claro e outra no escuro (`escura`): a
@@ -33,8 +34,8 @@ const RESUMO_DO_CODIGO = crypto
   .digest('hex')
   .slice(0, 12);
 
-const LEGENDA_DEMO = 'Dados fictícios de demonstração';
 const { LEGENDA_TELA, VIDEOS } = require('./videos');
+const LEGENDA_DEMO = LEGENDA_TELA;
 const LOJA = 'docs/lojas/capturas/apple-iphone-6-3pol-1206x2622';
 const TELAS = 'docs/telas';
 const NOVIDADES = 'site-src/imagens/telas';
@@ -50,7 +51,6 @@ const IMAGENS = [
   { id: 'cartoes', origem: `${LOJA}/04_cartoes.png`, largura: LARGURA_CELULAR, alt: 'Tela de um cartão de crédito, com o limite usado, a fatura atual e as próximas faturas.' },
   { id: 'evolucao', origem: `${LOJA}/05_evolucao.png`, largura: LARGURA_CELULAR, alt: 'Tela Evolução, com o gráfico de Recebido e Pago mês a mês, a média e a mediana.' },
   { id: 'metas', origem: `${LOJA}/07_metas.png`, largura: LARGURA_CELULAR, alt: 'Tela Metas, com a reserva para imprevistos e o quanto já foi guardado.' },
-  { id: 'investimentos', origem: `${TELAS}/540_investimentos.png`, largura: LARGURA_CELULAR, alt: 'Tela Investimentos, com o valor de hoje, o que foi aportado, o ganho e a rentabilidade dos meses fechados ao lado do CDI e do IPCA do mesmo período.' },
   { id: 'aprender', origem: `${LOJA}/08_aprender.png`, largura: LARGURA_CELULAR, alt: 'Tela Aprender, com a busca, as calculadoras e os temas de educação financeira.' },
   { id: 'familia', origem: `${TELAS}/402_familia_titular.png`, largura: LARGURA_CELULAR, alt: 'Tela Família, com o nome da Família, as pessoas, o papel de cada uma e o botão Convidar.' },
   // Era a tela Anotar gasto com o botão de escanear, quase igual à captura "anotar": desde 12/11/2026 é o comprovante já lido.
@@ -58,6 +58,10 @@ const IMAGENS = [
   { id: 'beneficio', origem: `${TELAS}/433_conta_beneficio_ativo.png`, largura: LARGURA_CELULAR, alt: 'Tela Conta de quem recebeu o benefício, com a empresa, o plano, a data de início e a situação.' },
   { id: 'quem-ve', origem: `${TELAS}/330_quem_ve.png`, largura: LARGURA_CELULAR, alt: 'Tela Quem vê estes dados, que mostra quem tem acesso aos registros.' },
   { id: 'empresa-painel', origem: `${TELAS}/421_empresa_painel_1280px.png`, largura: LARGURA_LARGA, alt: 'Painel da empresa no navegador, com o contrato, as vagas contratadas, as vagas em uso e as datas.' },
+  // O Espaço Negócio (D-113) em O app (D-115): a tela Seu negócio do cenário "negocio" da demonstração, gravada por
+  // `scripts/gravar-videos-site.js --capturas --telas negocio`, só no tema claro, como as outras telas de O app (com uma versão escura
+  // só nela, o tema escuro mostrava um celular escuro entre os claros).
+  { id: 'negocio', origem: `${NOVIDADES}/negocio.png`, largura: LARGURA_CELULAR, alt: 'Tela do negócio Sacolé da Maria, da demonstração: quanto entrou, quanto saiu e quanto sobrou em outubro, a frase do mês, Retirada para o Pessoal e os botões para anotar entrada e saída.' },
   { id: 'empresa-licencas', origem: `${TELAS}/424_empresa_licencas.png`, largura: LARGURA_CELULAR, alt: 'Painel da empresa, lista de licenças com o e-mail convidado, a situação e a data de cada uma.' },
 ];
 

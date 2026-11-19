@@ -3,15 +3,15 @@
     "anotar-gasto": {
       "largura": 720,
       "altura": 1560,
-      "duracao": 14.84,
+      "duracao": 13.16,
       "mp4": {
         "arquivo": "anotar-gasto.mp4",
-        "bytes": 768304,
+        "bytes": 701928,
         "crf": 26
       },
       "webm": {
         "arquivo": "anotar-gasto.webm",
-        "bytes": 698690,
+        "bytes": 624157,
         "crf": 36
       },
       "capa": "anotar-gasto-capa.png"
@@ -35,15 +35,15 @@
     "metas": {
       "largura": 720,
       "altura": 1560,
-      "duracao": 16.4,
+      "duracao": 16.28,
       "mp4": {
         "arquivo": "metas.mp4",
-        "bytes": 1023763,
+        "bytes": 958834,
         "crf": 26
       },
       "webm": {
         "arquivo": "metas.webm",
-        "bytes": 894868,
+        "bytes": 872422,
         "crf": 36
       },
       "capa": "metas-capa.png"
@@ -51,15 +51,15 @@
     "investir": {
       "largura": 720,
       "altura": 1560,
-      "duracao": 16.84,
+      "duracao": 14.8,
       "mp4": {
         "arquivo": "investir.mp4",
-        "bytes": 894792,
+        "bytes": 707850,
         "crf": 26
       },
       "webm": {
         "arquivo": "investir.webm",
-        "bytes": 825360,
+        "bytes": 653748,
         "crf": 36
       },
       "capa": "investir-capa.png"
@@ -67,15 +67,15 @@
     "importar-fatura-print": {
       "largura": 720,
       "altura": 1560,
-      "duracao": 18,
+      "duracao": 18.4,
       "mp4": {
         "arquivo": "importar-fatura-print.mp4",
-        "bytes": 737358,
+        "bytes": 714808,
         "crf": 26
       },
       "webm": {
         "arquivo": "importar-fatura-print.webm",
-        "bytes": 791793,
+        "bytes": 823288,
         "crf": 36
       },
       "capa": "importar-fatura-print-capa.png"
@@ -83,15 +83,15 @@
     "calendario-do-mes": {
       "largura": 720,
       "altura": 1560,
-      "duracao": 19.16,
+      "duracao": 14.92,
       "mp4": {
         "arquivo": "calendario-do-mes.mp4",
-        "bytes": 1005741,
+        "bytes": 598567,
         "crf": 26
       },
       "webm": {
         "arquivo": "calendario-do-mes.webm",
-        "bytes": 843074,
+        "bytes": 569300,
         "crf": 36
       },
       "capa": "calendario-do-mes-capa.png"
@@ -99,15 +99,15 @@
     "tema-escuro-claro": {
       "largura": 720,
       "altura": 1560,
-      "duracao": 15.28,
+      "duracao": 13.36,
       "mp4": {
         "arquivo": "tema-escuro-claro.mp4",
-        "bytes": 800613,
+        "bytes": 709487,
         "crf": 26
       },
       "webm": {
         "arquivo": "tema-escuro-claro.webm",
-        "bytes": 952297,
+        "bytes": 806168,
         "crf": 36
       },
       "capa": "tema-escuro-claro-capa.png"

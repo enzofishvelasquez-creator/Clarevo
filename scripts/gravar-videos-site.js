@@ -4,7 +4,7 @@
  * identificados, a etiqueta "Demonstração" no alto de cada tela, nenhuma rede), na versão web de `npm --workspace apps/app run export:demo`,
  * a mesma de `scripts/video-demonstracao.js` e `scripts/gravar-redes.js`.
  *
- * Vídeos (os textos que o site mostra, a frase e a descrição de cada um, ficam em `scripts/site/videos.js`; aqui ficam os roteiros):
+ * Vídeos (os textos que o site mostra, o título e a descrição de cada um, ficam em `scripts/site/videos.js`; aqui ficam os roteiros):
  *   anotar-gasto, resumo-do-mes, metas, investir, importar-fatura-print, calendario-do-mes e tema-escuro-claro.
  * Cada um sai em retrato de celular, 720 x 1560 (o app vê 360 x 780 pontos, ampliados 2 vezes), de 10 a 25 segundos, sem som (sem trilha),
  * em MP4 (H.264, yuv420p, +faststart) e WebM (VP9), com até 2 MB por arquivo (a qualidade baixa até caber; nunca passa de 25 MB, o limite
@@ -12,7 +12,8 @@
  * (duração, tamanho e dimensões de cada arquivo), e o gerador do site copia para `site/videos/`.
  *
  * Capturas (`--capturas`): as telas que as matérias de Novidades mostram ao lado das seções e na capa (Resumo, Investir, Desempenho, Nova
- * meta com os atalhos de prazo, a calculadora Multa e juros no modo da fatura do cartão, Quem vê estes dados? e o painel da empresa), cada
+ * meta com os atalhos de prazo, a calculadora Multa e juros no modo da fatura do cartão, Quem vê estes dados? e o painel da empresa) e a
+ * tela Seu negócio do Espaço Negócio (cenário "negocio"), que O app mostra (D-115), cada
  * uma no tema claro e no escuro (o app segue o tema do aparelho), em `site-src/imagens/telas/<nome>.png` e `<nome>-escuro.png`. O gerador
  * do site as reduz (`scripts/site/imagens.js`).
  *
@@ -226,9 +227,9 @@ function ferramentas(p, { altura, largura }) {
   return { pausa, botao, aba, radio, campo, texto, esperar, rolarAte, rolarPara, tocar, digitar, mostrarToque, etiquetaVisivel };
 }
 
-/** Entra na demonstração e espera o Resumo de outubro. */
-async function entrarNaDemo(p, base, f) {
-  await p.goto(`${base}/`);
+/** Entra na demonstração e espera o Resumo de outubro. `cenario`: um cenário da demonstração (`?cenario=negocio`, D-113). */
+async function entrarNaDemo(p, base, f, cenario = null) {
+  await p.goto(`${base}/${cenario ? `?cenario=${cenario}` : ''}`);
   await f.esperar('Cuidar da vida financeira');
   const entrar = f.botao('Ver demonstração com dados fictícios');
   await entrar.waitFor({ timeout: 15000 }).catch(() => { throw new Error('o botão "Ver demonstração com dados fictícios" não apareceu: apps/app/dist não é um build de demonstração (rode com --build)'); });
@@ -485,19 +486,24 @@ async function gravarVideo(browser, servidor, def, manifesto, problemas, extras)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Os roteiros dos vídeos. O que cada um mostra está descrito em scripts/site/videos.js (a frase e a descrição que o site mostra).
+// Os roteiros dos vídeos. O que cada um mostra está descrito em scripts/site/videos.js (o título e a descrição que o site mostra).
 // ---------------------------------------------------------------------------------------------------------------------
 const naCapa = async (c) => { await c.rolarPara(0, 0); await c.pausa(400); };
 
 const ROTEIROS = {
   'anotar-gasto': {
     tomadas: [{
-      preparar: naCapa,
+      // Começa na própria tela (D-115, revisão): o formulário Anotar gasto, sem o caminho a partir do Resumo; a capa é o primeiro quadro.
+      preparar: async (c) => {
+        await naCapa(c);
+        await c.tocar(c.botao('Anotar gasto'), { antes: 0 });
+        await c.esperar('Será salvo em');
+        await c.pausa(500);
+      },
       roteiro: async (c) => {
         const { botao, campo, radio, aba, esperar, pausa, rolarPara, tocar, digitar, p } = c;
-        await pausa(1200);
-        await tocar(botao('Anotar gasto'), { antes: 300 });
-        await esperar('Será salvo em');
+        await pausa(300);
+        await c.capa(); // o formulário Anotar gasto, vazio
         await pausa(900);
         await digitar(campo('Descrição'), 'Farmácia', 80);
         await pausa(300);
@@ -510,9 +516,7 @@ const ROTEIROS = {
         await tocar(botao('Salvar gasto'), { antes: 300 });
         await esperar('Gasto salvo');
         await p.getByText('R$ 35,00').filter({ visible: true }).first().waitFor();
-        await pausa(700);
-        await c.capa(); // o gasto salvo: Farmácia, R$ 35,00, Saúde
-        await pausa(1300);
+        await pausa(2000); // o gasto salvo: Farmácia, R$ 35,00, Saúde
         await tocar(aba('Resumo'), { antes: 300 });
         await esperar('R$ 3.935,00');
         await pausa(3200); // o Pago e a Diferença do mês já com o gasto
@@ -552,7 +556,9 @@ const ROTEIROS = {
       },
       roteiro: async (c) => {
         const { p, botao, radio, campo, esperar, pausa, rolarAte, rolarPara, tocar, digitar } = c;
-        await pausa(1800); // a reserva para imprevistos e o plano de guardar
+        await pausa(300);
+        await c.capa(); // a aba Metas, com a reserva para imprevistos e o plano de guardar
+        await pausa(1500); // a reserva para imprevistos e o plano de guardar
         await rolarAte(botao('Nova meta'), 1500, 330);
         await pausa(1500); // a meta Viagem de férias
         await tocar(botao('Nova meta'), { antes: 300 });
@@ -565,9 +571,7 @@ const ROTEIROS = {
         await rolarAte(p.getByRole('radiogroup', { name: 'Atalhos de prazo' }).filter({ visible: true }).first(), 900, 260);
         await tocar(radio('1 ano: até 10/2027'), { antes: 300 });
         await p.getByText(/^Para chegar até outubro de 2027/).filter({ visible: true }).first().waitFor();
-        await pausa(500);
-        await c.capa(); // o atalho de 1 ano marcado, o prazo preenchido e quanto guardar por mês
-        await pausa(1000);
+        await pausa(1500); // o atalho de 1 ano marcado, o prazo preenchido e quanto guardar por mês
         await rolarPara('fim', 800);
         await pausa(300);
         await tocar(botao('Criar meta'), { antes: 300 });
@@ -578,13 +582,15 @@ const ROTEIROS = {
   },
   investir: {
     tomadas: [{
-      preparar: naCapa,
+      // Começa na própria tela (D-115, revisão): a aba Investir.
+      preparar: async (c) => {
+        await c.tocar(c.aba('Investir'), { antes: 0 });
+        await c.esperar('Seus investimentos hoje');
+        await naCapa(c);
+      },
       roteiro: async (c) => {
-        const { p, radio, aba, esperar, pausa, rolarAte, tocar, texto } = c;
-        await pausa(900);
-        await tocar(aba('Investir'), { antes: 300 });
-        await esperar('Seus investimentos hoje');
-        await pausa(700);
+        const { p, radio, esperar, pausa, rolarAte, tocar, texto } = c;
+        await pausa(300);
         await c.capa();
         await pausa(2400); // o valor de hoje, o aportado e o ganho
         await tocar(p.getByRole('button', { name: /\. Ver desempenho$/ }).filter({ visible: true }).first(), { antes: 300 });
@@ -611,7 +617,9 @@ const ROTEIROS = {
       },
       roteiro: async (c) => {
         const { p, botao, esperar, pausa, rolarAte, rolarPara, tocar, texto } = c;
-        await pausa(1300); // o cartão e a fatura atual
+        await pausa(300);
+        await c.capa(); // a tela do cartão, com a fatura atual
+        await pausa(1000); // o cartão e a fatura atual
         await tocar(botao('Importar fatura'), { antes: 300 });
         await esperar('Escolha o arquivo');
         await pausa(600);
@@ -625,9 +633,7 @@ const ROTEIROS = {
         await pausa(1800); // 5 linhas lidas, a repetida contada uma vez
         await tocar(botao('Revisar as linhas'), { antes: 300 });
         await esperar('Marque o que vira lançamento');
-        await pausa(900);
-        await c.capa();
-        await pausa(1600); // "Lido de imagem: confira" em cada linha
+        await pausa(2500); // "Lido de imagem: confira" em cada linha
         await rolarAte(texto('Parcela em andamento', true), 1400, 200);
         await pausa(1600);
         await tocar(botao('Importar 4 lançamentos'), { antes: 300 });
@@ -640,16 +646,17 @@ const ROTEIROS = {
   },
   'calendario-do-mes': {
     tomadas: [{
-      preparar: naCapa,
+      // Começa na própria tela (D-115, revisão): o Calendário de outubro, aberto pelo atalho do Resumo antes de gravar.
+      preparar: async (c) => {
+        const atalho = c.botao('Calendário do mês, Contas, faturas e datas de outubro de 2026');
+        await c.rolarAte(atalho, 0, 330);
+        await c.tocar(atalho, { antes: 0 });
+        await c.esperar('Previsto em contas e faturas');
+        await naCapa(c);
+      },
       roteiro: async (c) => {
         const { botao, esperar, pausa, rolarAte, rolarPara, tocar, texto, p } = c;
-        await pausa(900);
-        const atalho = botao('Calendário do mês, Contas, faturas e datas de outubro de 2026');
-        await rolarAte(atalho, 1500, 330);
-        await pausa(500);
-        await tocar(atalho, { antes: 300 });
-        await esperar('Previsto em contas e faturas');
-        await pausa(900);
+        await pausa(300);
         await c.capa();
         await pausa(1800); // o previsto do mês, separado do que já foi pago
         await rolarAte(texto('Quinta, 15 de outubro', true), 1500, 150);
@@ -673,15 +680,17 @@ const ROTEIROS = {
     tomadas: [
       {
         esquema: 'dark',
-        preparar: naCapa,
+        // Começa na própria tela (D-115, revisão): Conta, no tema escuro, com a etiqueta "Demonstração" à vista na capa; depois, o card Tema.
+        preparar: async (c) => {
+          await c.tocar(c.botao('Conta: perfil, assinatura, lembretes, privacidade e segurança'), { antes: 0 });
+          await c.esperar('Privacidade neste aparelho');
+          await naCapa(c);
+        },
         roteiro: async (c) => {
-          const { p, botao, radio, esperar, pausa, rolarAte, tocar } = c;
-          await pausa(500);
-          await c.capa();
-          await pausa(1800); // o Resumo no tema escuro
-          await tocar(botao('Conta: perfil, assinatura, lembretes, privacidade e segurança'), { antes: 300 });
-          await esperar('Privacidade neste aparelho');
-          await pausa(500);
+          const { p, botao, radio, pausa, rolarAte, tocar } = c;
+          await pausa(300);
+          await c.capa(); // Conta, no tema escuro
+          await pausa(1000);
           await rolarAte(p.getByRole('heading', { name: 'Tema', exact: true }).filter({ visible: true }).first(), 1300, 170);
           await pausa(1100); // o card Tema: "Igual ao aparelho", "Claro" e "Escuro"
           await tocar(radio('Claro'), { antes: 300 });
@@ -774,6 +783,16 @@ const CAPTURAS = [
     },
   },
   {
+    // O Espaço Negócio (D-113, cenário "negocio", "Sacolé da Maria"), para O app (D-115). O botão aceita o nome de hoje e o novo ("Seu
+    // negócio"), que o app recebe numa frente separada: depois dela, basta gravar de novo esta captura (--capturas --telas negocio).
+    nome: 'negocio', tela: CELULAR_CAPTURA, cenario: 'negocio', soClaro: true, exigir: ['Últimos meses', 'Sacolé da Maria'],
+    ir: async (c) => {
+      await c.p.getByRole('tab', { name: 'Ver dados do negócio Sacolé da Maria', exact: true }).filter({ visible: true }).first().click(); await c.pausa(700);
+      await c.p.getByRole('button', { name: /^Ver (como está o negócio|seu negócio)$/i }).filter({ visible: true }).first().click(); await c.esperar('Últimos meses');
+      await c.pausa(500);
+    },
+  },
+  {
     // O painel abre pela Conta, que só existe no layout de celular: a captura começa em 390 pontos e alarga para 960 com o painel aberto.
     nome: 'empresa-painel', tela: PAINEL_CAPTURA, telaInicial: { largura: 390, altura: 844 }, exigir: ['Empresa Exemplo (demonstração)'],
     ir: async (c) => {
@@ -787,7 +806,7 @@ async function gravarCapturas(browser, servidor, problemas) {
   fs.mkdirSync(PASTA_TELAS, { recursive: true });
   const feitas = [];
   for (const cap of CAPTURAS.filter((x) => !SO_TELAS.length || SO_TELAS.includes(x.nome))) {
-    for (const esquema of ['light', 'dark']) {
+    for (const esquema of cap.soClaro ? ['light'] : ['light', 'dark']) {
       const { largura, altura, escala } = cap.tela;
       const inicial = cap.telaInicial || cap.tela;
       const ctx = await browser.newContext({ viewport: { width: inicial.largura, height: inicial.altura }, deviceScaleFactor: escala, isMobile: largura < 800, hasTouch: largura < 800, colorScheme: esquema, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' });
@@ -798,7 +817,7 @@ async function gravarCapturas(browser, servidor, problemas) {
       const erros = [];
       p.on('pageerror', (e) => erros.push(e.message));
       const f = ferramentas(p, { altura, largura });
-      await entrarNaDemo(p, servidor.base, f);
+      await entrarNaDemo(p, servidor.base, f, cap.cenario);
       await cap.ir({ p, ...f });
       if (cap.telaInicial) await p.setViewportSize({ width: largura, height: altura });
       await p.waitForTimeout(700);

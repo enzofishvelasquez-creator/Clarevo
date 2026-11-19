@@ -64,8 +64,12 @@ ${temas.map((t) => cartaoDoTema(arquivo, t)).join('\n')}
       { variante: id === 'juros' ? 'alt' : '', rotulo: id },
     );
   });
+  // As calculadoras e, desde 18/11/2026 (D-115), os indicadores oficiais (D-106), lado a lado.
   const calculadoras = bloco(
-    `<a class="cartao cartao-calculadoras" href="${rel(arquivo, ARQUIVO_CALCULADORAS)}"><span class="titulo-cartao">${esc(c.CALC_UI.learnCardTitle)}</span><span class="tema-sub">${esc(c.CALC_UI.siteLearnCardCaption)}. A conta é feita no seu navegador.</span></a>`,
+    `<div class="grade grade-atalhos">
+<a class="cartao cartao-calculadoras" href="${rel(arquivo, ARQUIVO_CALCULADORAS)}"><span class="titulo-cartao">${esc(c.CALC_UI.learnCardTitle)}</span><span class="tema-sub">${esc(c.CALC_UI.siteLearnCardCaption)}. A conta é feita no seu navegador.</span></a>
+${require('./indicadores').cartaoDosIndicadores(arquivo)}
+</div>`,
     { rotulo: null },
   );
   const rodape = bloco(

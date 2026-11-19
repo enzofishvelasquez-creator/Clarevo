@@ -10,9 +10,9 @@ const path = require('node:path');
 const { RAIZ, SITE_SRC, MARCA, FONTES, PESOS_FONTE, PAGINAS_LEGAIS } = require('./config');
 const { lerDados, avisosDeRedacao, problemasDeTitulos } = require('./texto');
 const { dataExiste } = require('./conteudo');
-const { dominioDe, configurarRodape } = require('./modelo');
+const { dominioDe, configurarRodape, SCRIPT_DO_TEMA } = require('./modelo');
 const { imagensDoSite } = require('./imagens');
-const { videosDoSite } = require('./videos');
+const { videosDoSite, SCRIPT_DOS_VIDEOS } = require('./videos');
 const { linksQuebrados, problemasFinaisDaPagina } = require('./verificacoes');
 const { caminhoLimpo, cabecalhosDoTexto } = require('./util');
 const { paginaInicial } = require('./paginas/inicio');
@@ -29,18 +29,23 @@ const { nucleo, pacoteDoWorker } = require('./nucleo');
 const { lerRetrato, problemasDoRetrato } = require('./indicadores');
 const { paginasIndicadores, SCRIPT_DO_PAINEL } = require('./paginas/indicadores');
 const { paginasNoticias, lerEdicoes } = require('./paginas/noticias');
-const { paginasNovidades } = require('./paginas/novidades');
+const { paginasNovidades, SCRIPT_DE_COPIAR } = require('./paginas/novidades');
 const { paginasAjuda, conferirCobertura } = require('./paginas/ajuda');
 const { paginaSeguranca } = require('./paginas/seguranca');
+const { paginaPlanos } = require('./paginas/planos');
 const { paginaSobre, paginaSuporte, paginaLegal, paginaLicencas, pagina404 } = require('./paginas/outras');
 
 const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê este arquivo e não o publica.
 # Nenhum recurso de fora é permitido: o site não carrega fontes, imagens, vídeos, scripts nem estilos de outros endereços.
 # media-src 'self' (D-114, 17/11/2026): os vídeos de uso do app (videos/*.mp4 e *.webm), que ficam no próprio site, sem serviço de terceiros.
+# Desde 18/11/2026 (D-115) eles tocam sozinhos, sem som, só enquanto aparecem na tela, pelo script do próprio site (js/videos.js), com um
+# botão de pausar em cada um; com movimento reduzido ou economia de dados, nada toca sozinho.
 # script-src e connect-src 'self' valem só para os scripts do próprio site: a busca da Ajuda (ajuda/busca.js, que lê ajuda/indice.json), as
-# calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada) e o painel de indicadores (indicadores/painel.js,
-# que pergunta uma vez ao próprio site, /api/indicadores; quem consulta o Banco Central é o _worker.js, nunca o navegador). form-action 'self'
-# vale para os formulários de contato e de novidades, que enviam só para o próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
+# calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada), o painel de indicadores (indicadores/painel.js,
+# que pergunta uma vez ao próprio site, /api/indicadores; quem consulta o Banco Central é o _worker.js, nunca o navegador) e os vídeos
+# (js/videos.js, que não pede nada a ninguém), o botão de copiar o endereço do feed (js/copiar.js) e o tema do site (js/tema.js, que
+# guarda no navegador só a escolha de tema, quando a pessoa escolhe um). form-action 'self' vale para os formulários de contato e de novidades, que enviam só para o
+# próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
 # Referrer-Policy: same-origin (e não no-referrer): com no-referrer o navegador manda "Origin: null" nos formulários, e o worker recusa o valor null.
 # Nenhum outro site recebe o endereço da página (a política só manda o referenciador para o próprio site).
 # HSTS desde 29/10/2026, com o domínio clarevo.app.br abrindo por HTTPS: sem includeSubDomains e sem preload (docs/07).
@@ -157,6 +162,7 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   juntar(paginaInicial(ctx));
   juntar(paginaComece(ctx));
   juntar(paginaApp(ctx));
+  juntar(paginaPlanos(ctx));
   juntar(paginaEmpresas(ctx));
   paginasAprender(ctx).forEach(juntar);
   paginasCalculadoras(ctx).forEach(juntar);
@@ -231,6 +237,12 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   for (const [nome, texto] of nucleo()) arquivos.set(nome, texto);
   // O painel de indicadores (D-106): pergunta uma vez ao próprio site e troca os números do retrato.
   arquivos.set(SCRIPT_DO_PAINEL, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DO_PAINEL), 'utf8'));
+  // Os vídeos de uso do app (D-115): toca o vídeo que aparece na tela, pausa o que sai e põe o botão de pausar e tocar em cada um.
+  arquivos.set(SCRIPT_DOS_VIDEOS, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DOS_VIDEOS), 'utf8'));
+  // O tema do site (D-115): no <head> de todas as páginas, antes do estilo.
+  arquivos.set(SCRIPT_DO_TEMA, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DO_TEMA), 'utf8'));
+  // O botão "Copiar o endereço" da página do feed RSS (D-115).
+  arquivos.set(SCRIPT_DE_COPIAR, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DE_COPIAR), 'utf8'));
   // O kit de imprensa: SVG de docs/marca (sem mudança), os PNG que scripts/gerar-marca-imprensa.js desenha deles e as capturas originais.
   const imprensa = arquivosDaImprensa();
   avisos.push(...imprensa.avisos);

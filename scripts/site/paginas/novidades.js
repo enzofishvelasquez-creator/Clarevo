@@ -19,12 +19,17 @@ const { LEGENDA_TELA } = require('../videos');
 const { catalogo } = require('../catalogo');
 const { lerPosts, lerCabecalho } = require('../conteudo');
 const { SITE_SRC } = require('../config');
-const { fonteHtml, arquivoDoTema } = require('./aprender');
+const { arquivoDoTema } = require('./aprender');
 const { blocoDaNewsletterEmNovidades } = require('./formularios');
+const { cartaoDosIndicadores } = require('./indicadores');
 
 const PASTA_POSTS = path.join(SITE_SRC, 'novidades');
 const ARQUIVO_INDICE = 'novidades/index.html';
 const ARQUIVO_FEED = 'novidades/feed.xml';
+/** A página que explica o RSS e mostra o endereço do feed (D-115): o botão "Feed RSS" leva a ela, e não ao XML cru. */
+const ARQUIVO_RSS = 'novidades/rss.html';
+/** O script do botão "Copiar o endereço" (`site-src/js/copiar.js`). */
+const SCRIPT_DE_COPIAR = 'js/copiar.js';
 
 /** O feed só existe com domínio (feedRss): sem ele, não há link para ele nas páginas. */
 const linkDoFeed = (arquivo, valores) =>
@@ -109,11 +114,31 @@ function figuraDaCapa(post, img) {
   return { html: celular(i, post.arquivo, { textoLegenda: LEGENDA_TELA, carregamento: 'eager', classe: 'capa-tela' }), faltas: [] };
 }
 
-/** As fontes de um post como itens de lista. */
+/** "Revisado em 15/10/2026" vira "revisado em 15/10/2026", para ir no fim da linha, depois do link. */
+const minuscula = (t) => t.charAt(0).toLowerCase() + t.slice(1);
+
+/**
+ * As fontes de um post em dois grupos, para ler de relance (pedido do Enzo, 18/11/2026, D-115), sem listas numeradas dentro de listas:
+ *   - "Na Clarevo": as páginas do próprio site que o post cita (O app, Ajuda, calculadoras) e os temas de Aprender, uma linha cada, o tema
+ *     com a data de revisão em letra menor na mesma linha;
+ *   - "Fontes oficiais": as fontes de fora citadas pelo post e pelos temas dele, sem repetir o mesmo endereço, uma por linha, com a
+ *     organização em negrito, o título como link e "consultada em" em letra menor. Se entrar uma fonte que não é oficial (uma referência de
+ *     mercado ou um texto sem link), o grupo passa a se chamar "Fontes externas" e a linha diz "referência de mercado".
+ * As fontes "Regra da própria Clarevo" dos temas (sem link: dizem como o app funciona) viram uma nota curta no fim, e não itens da lista.
+ * Devolve o HTML dos grupos e os problemas (tema que não existe, endereço que não é https nem página do site).
+ */
 function fontesDoPost(post) {
   const c = catalogo();
-  const itens = [];
+  const daClarevo = [];
+  const externas = new Map();
+  let todasOficiais = true;
+  let temRegra = false;
   const problemas = [];
+  const externa = (chave, item) => {
+    const antes = externas.get(chave);
+    // A mesma página em dois temas: uma linha só, com a consulta mais recente.
+    if (!antes || (item.data && (!antes.data || item.data > antes.data))) externas.set(chave, item);
+  };
   for (const f of post.fontes) {
     if (f.tipo === 'tema') {
       const t = c.tema(f.slug);
@@ -121,18 +146,35 @@ function fontesDoPost(post) {
         problemas.push(`${post.origem}: a fonte "tema: ${f.slug}" não existe no catálogo de Aprender`);
         continue;
       }
-      // As fontes do tema ficam numa lista dentro do item do tema, e não soltas na numeração do post (12/11/2026).
-      itens.push(`<li><a href="${rel(post.arquivo, arquivoDoTema(t.slug))}">Aprender: ${esc(t.title)}</a><span class="fonte-meta">${esc(c.TEXTO.reviewedOn(t.reviewedOn))}. As fontes do tema:</span>
-<ol class="fontes">
-${t.sources.map((s) => fonteHtml(s, null)).join('\n')}
-</ol></li>`);
+      daClarevo.push(`<li><a href="${rel(post.arquivo, arquivoDoTema(t.slug))}">Aprender: ${esc(t.title)}</a> <span class="fonte-data">${esc(minuscula(c.TEXTO.reviewedOn(t.reviewedOn)))}</span></li>`);
+      for (const s of t.sources) {
+        if (s.kind === 'clarevo') temRegra = true;
+        else if (s.kind === 'obra') {
+          todasOficiais = false;
+          externa(`obra:${c.TEXTO.sourceLine(s)}`, { html: esc(c.TEXTO.sourceLine(s)), data: s.consultedOn });
+        } else {
+          if (s.kind !== 'oficial') todasOficiais = false;
+          externa(s.url, { html: `<strong>${esc(s.publisher)}</strong>: <a href="${esc(s.url)}" rel="noopener noreferrer">${esc(s.title)}</a>`, data: s.consultedOn, mercado: s.kind === 'mercado' });
+        }
+      }
     } else if (f.tipo === 'link') {
-      if (/^https:\/\//.test(f.destino)) itens.push(`<li><a href="${esc(f.destino)}" rel="noopener noreferrer">${esc(f.rotulo)}</a></li>`);
+      if (/^https:\/\//.test(f.destino)) externa(f.destino, { html: `<a href="${esc(f.destino)}" rel="noopener noreferrer">${esc(f.rotulo)}</a>`, data: null });
       else if (/^[a-z]+:/i.test(f.destino)) problemas.push(`${post.origem}: a fonte "${f.rotulo}" tem um endereço que não é https nem uma página do site`);
-      else itens.push(`<li><a href="${rel(post.arquivo, f.destino)}">${esc(f.rotulo)}</a></li>`);
-    } else itens.push(`<li>${esc(f.rotulo)}</li>`);
+      else daClarevo.push(`<li><a href="${rel(post.arquivo, f.destino)}">${esc(f.rotulo)}</a></li>`);
+    } else {
+      todasOficiais = false;
+      externa(`texto:${f.rotulo}`, { html: esc(f.rotulo), data: null });
+    }
   }
-  return { itens, problemas };
+  const linhaExterna = (x) => {
+    const meta = [x.mercado ? minuscula(c.TEXTO.marketLabel) : null, x.data ? minuscula(c.TEXTO.consultedOn(x.data)) : null].filter(Boolean);
+    return `<li>${x.html}${meta.length ? ` <span class="fonte-data">${esc(meta.join(' · '))}</span>` : ''}</li>`;
+  };
+  const grupos = [];
+  if (daClarevo.length) grupos.push(`<h3 id="fontes-clarevo">Na Clarevo</h3>\n<ul class="fontes-lista">\n${daClarevo.join('\n')}\n</ul>`);
+  if (externas.size) grupos.push(`<h3 id="fontes-externas">${todasOficiais ? 'Fontes oficiais' : 'Fontes externas'}</h3>\n<ul class="fontes-lista">\n${[...externas.values()].map(linhaExterna).join('\n')}\n</ul>`);
+  if (temRegra) grupos.push(`<p class="fontes-nota">Os temas também se apoiam em regras da própria Clarevo, que dizem como o app funciona e por isso não têm link.</p>`);
+  return { html: grupos.join('\n'), problemas };
 }
 
 function paginaDoPost(post, { valores, img }) {
@@ -141,16 +183,14 @@ function paginaDoPost(post, { valores, img }) {
   const { html: corpoHtml, faltas: faltasDoTema } = expandirDiretivas(comTelas.html, post.origem);
   const daCapa = figuraDaCapa(post, img);
   const faltas = [...comTelas.faltas, ...faltasDoTema, ...daCapa.faltas];
-  const { itens, problemas } = fontesDoPost(post);
+  const { html: fontes, problemas } = fontesDoPost(post);
   const corpo = colunaTexto(
     `<div class="post-corpo">
 ${corpoHtml}
 </div>
 <section class="post-fontes" aria-labelledby="fontes">
 <h2 id="fontes">Fontes</h2>
-<ol class="fontes">
-${itens.join('\n')}
-</ol>
+${fontes}
 <p class="revisao">Publicado em ${esc(dataPorExtensoIso(post.data))} por ${esc(post.autoria)}. Se encontrarmos um erro, corrigimos neste mesmo texto e registramos a correção aqui. Veja <a href="${rel(arquivo, 'novidades/como-escrevemos.html')}">como escrevemos</a>.</p>
 </section>
 <p class="voltar"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Voltar para Novidades</a></p>`,
@@ -204,7 +244,7 @@ function paginaIndice(posts, { valores }) {
 <p class="lead">Textos curtos da Equipe Clarevo, com data e fonte. Só publicamos o que já existe e pode ser conferido.</p>
 <div class="acoes">
 <a class="botao botao-principal" href="${rel(arquivo, 'novidades/como-escrevemos.html')}">Como escrevemos</a>
-${dominioDe(valores) ? `<a class="botao botao-suave" href="${rel(arquivo, ARQUIVO_FEED)}">Feed RSS</a>\n` : ''}</div>`;
+${dominioDe(valores) ? `<a class="botao botao-suave" href="${rel(arquivo, ARQUIVO_RSS)}">Feed RSS</a>\n` : ''}</div>`;
   const corpo = bloco(
     `<h2 id="textos">Textos publicados</h2>
 <ul class="posts">
@@ -212,12 +252,25 @@ ${cartoes}
 </ul>`,
     { rotulo: 'textos' },
   );
+  // Os indicadores oficiais (D-106) também a partir das Novidades (D-115: o Enzo não achava as informações de mercado), numa seção com
+  // título, ao lado do caminho para acompanhar por RSS (que só existe com domínio).
+  const rss = dominioDe(valores)
+    ? `<a class="cartao cartao-calculadoras" href="${rel(arquivo, ARQUIVO_RSS)}"><span class="titulo-cartao">Acompanhar por RSS</span><span class="tema-sub">O endereço do feed das Novidades, para copiar e colar no seu leitor de RSS.</span></a>`
+    : '';
+  const indicadores = bloco(
+    `<h2 id="acompanhar">Para acompanhar</h2>
+<div class="grade grade-atalhos">
+${cartaoDosIndicadores(arquivo)}
+${rss}
+</div>`.replace('\n\n</div>', '\n</div>'),
+    { rotulo: 'acompanhar' },
+  );
   const pg = montarPagina({
     arquivo,
     titulo: 'Novidades',
     descricao: 'Textos curtos da Equipe Clarevo sobre o app, a empresa como benefício e educação financeira, cada um com data e fontes.',
     capa,
-    corpo: [corpo, blocoDaNewsletterEmNovidades(valores, arquivo)].filter(Boolean).join('\n'),
+    corpo: [corpo, indicadores, blocoDaNewsletterEmNovidades(valores, arquivo)].filter(Boolean).join('\n'),
     fonte: capa,
     valores,
     classeCapa: 'capa-simples',
@@ -265,6 +318,52 @@ ${itens}
 `;
 }
 
+/** O endereço completo do feed, com o mesmo domínio e o mesmo caminho que o próprio feed usa (`null` sem domínio). */
+const enderecoDoFeed = (valores) => urlDoSite(valores, ARQUIVO_FEED);
+
+/**
+ * "Acompanhar as Novidades por RSS" (D-115): o que é RSS em poucas frases, o endereço do feed num campo só de leitura com "Copiar o
+ * endereço" (o botão aparece só com JavaScript, pelo script do próprio site, `js/copiar.js`) e o link para o arquivo do feed. Existe só
+ * com domínio, como o feed. O botão "Feed RSS" das Novidades leva para cá: aberto direto no navegador, o XML aparece sem formatação (a
+ * política de segurança não deixa o navegador aplicar o estilo do visualizador de XML).
+ */
+function paginaRss({ valores }) {
+  const endereco = enderecoDoFeed(valores);
+  if (!endereco) return null;
+  const arquivo = ARQUIVO_RSS;
+  const capa = `<p class="migalha"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Novidades</a></p>
+<h1>Acompanhar as Novidades por RSS</h1>
+<p class="lead">Receba os textos novos da Equipe Clarevo no seu leitor de RSS, sem cadastro.</p>`;
+  const corpo = colunaTexto(
+    `<p>RSS é um jeito de acompanhar sites sem precisar visitar cada um. Você escolhe um leitor de RSS, um aplicativo ou site feito para isso, cola nele o endereço do feed, e ele mostra cada texto novo com o título, a data e o resumo.</p>
+<p>Para acompanhar as Novidades da Clarevo, copie o endereço abaixo e cole no seu leitor. Não precisa de conta nem de e-mail.</p>
+<div class="copiar">
+<label for="rss-endereco">Endereço do feed das Novidades</label>
+<div class="copiar-linha">
+<input id="rss-endereco" type="text" readonly value="${esc(endereco)}" spellcheck="false" autocomplete="off">
+<button type="button" class="botao botao-principal" data-copiar="rss-endereco" data-estado="rss-estado" hidden>Copiar o endereço</button>
+</div>
+<p class="copiar-estado" id="rss-estado" role="status"></p>
+</div>
+<p class="nota">O arquivo do feed é feito para o leitor de RSS: aberto direto no navegador, ele aparece como texto, sem formatação. Se precisar dele, <a href="${rel(arquivo, ARQUIVO_FEED)}">abrir o arquivo do feed</a>.</p>
+<p class="voltar"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Voltar para Novidades</a></p>`,
+    'texto',
+  );
+  const pg = montarPagina({
+    arquivo,
+    titulo: 'Acompanhar as Novidades por RSS',
+    descricao: 'O endereço do feed RSS das Novidades da Clarevo, para copiar e colar no seu leitor de RSS, e o que é RSS em poucas frases.',
+    capa,
+    corpo,
+    fonte: capa,
+    valores,
+    classeCapa: 'capa-simples',
+    scripts: [SCRIPT_DE_COPIAR],
+    cabecalho: linkDoFeed(arquivo, valores),
+  });
+  return { arquivo, ...pg };
+}
+
 /** "Como escrevemos": as regras editoriais, de `site-src/paginas/como-escrevemos.md`. */
 function paginaComoEscrevemos({ valores }) {
   const arquivo = 'novidades/como-escrevemos.html';
@@ -291,9 +390,9 @@ function paginaComoEscrevemos({ valores }) {
 /** `ctx.referencia`: a data de hoje (ou a de `--referencia`), para recusar post com data futura. */
 function paginasNovidades(ctx) {
   const { posts, problemas } = lerPosts(ctx.pastaDePosts || PASTA_POSTS, { referencia: ctx.referencia });
-  const paginas = [paginaIndice(posts, ctx), paginaComoEscrevemos(ctx), ...posts.map((p) => paginaDoPost(p, ctx))];
+  const paginas = [paginaIndice(posts, ctx), paginaComoEscrevemos(ctx), paginaRss(ctx), ...posts.map((p) => paginaDoPost(p, ctx))].filter(Boolean);
   const avisos = [...problemas, ...paginas.flatMap((p) => p.avisos || [])];
   return { paginas, posts, feed: feedRss(posts, ctx.valores), avisos };
 }
 
-module.exports = { paginasNovidades, feedRss, campoDoTema };
+module.exports = { paginasNovidades, feedRss, campoDoTema, SCRIPT_DE_COPIAR, ARQUIVO_RSS };

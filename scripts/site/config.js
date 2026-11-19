@@ -65,6 +65,7 @@ const RODAPE_COLUNAS = [
       { arquivo: 'index.html', rotulo: 'Início' },
       { arquivo: 'comece.html', rotulo: 'Comece aqui' },
       { arquivo: 'app/index.html', rotulo: 'O app' },
+      { arquivo: 'planos.html', rotulo: 'Planos' },
       { arquivo: 'empresas/index.html', rotulo: 'Para empresas' },
       { arquivo: 'sobre.html', rotulo: 'Sobre' },
       { arquivo: 'imprensa.html', rotulo: 'Imprensa' },

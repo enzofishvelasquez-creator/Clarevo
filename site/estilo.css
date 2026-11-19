@@ -36,7 +36,7 @@
    antes, com os cartões um degrau acima do fundo (como no modo escuro do app). Contrastes: texto 14,6:1 no fundo e 12,3:1 no cartão;
    secundário 7,5:1; link 7,3:1 no cartão e 5,7:1 no azul claro; contorno 3,7:1. */
 @media (prefers-color-scheme: dark){
-  :root{
+  :root:not([data-tema="claro"]){
     --texto:#EEF2FB;
     --texto-2:#B4C0DB;
     --fundo:#131E3E;
@@ -51,10 +51,31 @@
     --erro:#FFB4AB;
   }
   /* O rodapé (#0F1838) fica quase igual ao fundo (#131E3E): uma linha em cima marca onde a página termina (12/11/2026). */
-  .rodape{border-top:1px solid var(--linha)}
-  /* No kit de imprensa, a amostra da cor de texto (#17223B) sumia no cartão escuro: o contorno dela fica no tom dos campos (duas classes, para valer sobre o contorno de .amostra, que vem depois). */
-  .amostra.amostra-texto{border-color:var(--contorno)}
+  :root:not([data-tema="claro"]) .rodape{border-top:1px solid var(--linha)}
+  /* No kit de imprensa, a amostra da cor de texto (#17223B) sumia no cartão escuro: o contorno dela fica no tom dos campos. */
+  :root:not([data-tema="claro"]) .amostra.amostra-texto{border-color:var(--contorno)}
 }
+/* O tema escolhido no rodapé (D-115, 18/11/2026; js/tema.js marca o <html> antes de a página aparecer): "Escuro" usa as mesmas cores do
+   bloco acima, qualquer que seja o tema do aparelho; "Claro" impede o bloco acima; "Igual ao aparelho" (ou sem JavaScript) segue o
+   aparelho. As cores ficam iguais às de sempre nos dois temas (o teste do site confere que os dois blocos escuros são idênticos). */
+:root[data-tema="escuro"]{
+  --texto:#EEF2FB;
+  --texto-2:#B4C0DB;
+  --fundo:#131E3E;
+  --superficie:#1D2B54;
+  --azul-claro:#283B70;
+  --lima-claro:#344019;
+  --linha:#33436F;
+  --contorno:#7484AE;
+  --link:#A3BBFF;
+  --foco:#A3BBFF;
+  --rodape:#0F1838;
+  --erro:#FFB4AB;
+}
+:root[data-tema="escuro"] .rodape{border-top:1px solid var(--linha)}
+:root[data-tema="escuro"] .amostra.amostra-texto{border-color:var(--contorno)}
+:root[data-tema="claro"]{color-scheme:light}
+:root[data-tema="escuro"]{color-scheme:dark}
 
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;color-scheme:light dark;scroll-padding-top:1rem}
@@ -101,6 +122,29 @@ main:focus{outline:none}
   .menu .menu-cta{display:inline-flex;min-height:44px;padding:0 1.1rem;background:var(--lima);color:var(--sobre-lima);border-radius:999px;font-weight:800;text-decoration:none}
   .menu .menu-cta:hover{text-decoration:underline}
 }
+
+/* Tema do site no rodapé (D-115): três opções (Igual ao aparelho, Claro e Escuro) com ícone, 44 px de altura, a escolhida em lima; o
+   foco aparece no lima do rodapé. Começa escondido e só aparece com o script do tema. */
+.tema-site{border:0;margin:0 0 1rem;padding:0;min-width:0}
+.tema-site legend{padding:0;margin:0 0 .4rem;font-weight:700;font-size:.875rem;color:var(--sobre-rodape)}
+.tema-opcoes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.4rem;max-width:22rem}
+.tema-opcao{position:relative;display:flex}
+.tema-opcao input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.tema-opcao span{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2rem;min-height:44px;padding:.45rem .5rem;border:1px solid var(--sobre-rodape-2);border-radius:14px;color:var(--sobre-rodape);font-size:.875rem;font-weight:700;line-height:1.25;text-align:center}
+/* No celular, as três opções em colunas iguais, com o ícone em cima (o grupo nunca quebra linha); a partir de 30 rem, uma linha de pílulas. */
+@media (min-width:30rem){.tema-opcoes{display:flex;flex-wrap:wrap;max-width:none}.tema-opcao span{flex-direction:row;gap:.4rem;padding:0 .9rem;border-radius:999px}}
+.tema-opcao input:checked+span{background:var(--lima);border-color:var(--lima);color:var(--sobre-lima)}
+.tema-opcao input:focus-visible+span{outline:3px solid var(--link-rodape);outline-offset:3px}
+.tema-opcao:hover span{border-color:var(--link-rodape)}
+
+/* Faixa de confiança da capa (D-115): três frases curtas com ícone, num link só para Segurança e privacidade, sem caixas. */
+.confianca{margin:1rem 0 0;font-size:.9375rem;line-height:1.4}
+.confianca a{display:inline-flex;flex-direction:column;gap:.35rem;padding:.35rem 0;color:var(--sobre-topo-suave);text-decoration:none}
+.confianca a:hover .confianca-item{text-decoration:underline;text-underline-offset:.2em}
+.confianca-item{display:inline-flex;align-items:center;gap:.4rem}
+.confianca svg{flex:none;color:var(--lima)}
+.confianca-mais{display:inline-flex;align-items:center;gap:.3rem;color:var(--sobre-topo);font-weight:700;text-decoration:underline;text-underline-offset:.2em}
+.confianca-mais svg{color:currentColor}
 
 /* Capa (herói) */
 .capa{background:var(--topo);color:var(--sobre-topo);padding:1.5rem 0 3.25rem;border-radius:0 0 32px 32px;position:relative;overflow:hidden}
@@ -164,6 +208,17 @@ blockquote>:last-child{margin-bottom:0}
 .texto{max-width:46rem}
 .texto-largo{max-width:52rem}
 .nota{color:var(--texto-2)}
+/* Um parágrafo de texto logo depois do lead de uma seção, na mesma largura (D-115: no lugar de um cartão sozinho). */
+.texto-bloco{max-width:42rem}
+/* Dois parágrafos lado a lado a partir de 56 rem (D-115, revisão: a primeira seção da página inicial ocupava só a metade da esquerda). */
+.duas-colunas{display:grid;gap:0 3rem}
+.duas-colunas>p{margin:0 0 1rem}
+.duas-colunas>p:last-child{margin-bottom:0}
+@media (min-width:56rem){.duas-colunas{grid-template-columns:repeat(2,minmax(0,1fr))}.duas-colunas>p{margin-bottom:0}}
+/* As ressalvas de Para empresas numa nota curta depois de "Como funciona" (revisão de 18/11/2026), e não em cartões antes dele. */
+.nota-ressalvas{max-width:52rem;font-size:.9375rem}
+/* O aviso de saúde no fim da página inicial (D-115): uma nota curta e discreta, separada do contato por uma linha. */
+.aviso-final{max-width:46rem;margin:2rem 0 0;padding-top:1rem;border-top:1px solid var(--linha);color:var(--texto-2);font-size:.875rem}
 .pequeno{font-size:.9375rem}
 
 /* Cartões e grades */
@@ -177,6 +232,29 @@ blockquote>:last-child{margin-bottom:0}
 .cartao h3{margin-top:0}
 .plano .preco{margin:.25rem 0 .5rem;color:var(--texto-2)}
 .plano .preco-valor{display:block;font-size:2rem;font-weight:800;line-height:1.2;color:var(--texto);font-variant-numeric:tabular-nums}
+/* Os cartões dos planos na página inicial levam à página Planos (D-115): o link do fim cobre o cartão inteiro (um link só por cartão). */
+.plano-link{position:relative;transition:border-color .15s}
+.plano-link .ver-plano a{font-weight:800}
+.plano-link .ver-plano a::after{content:"";position:absolute;inset:0;border-radius:20px}
+.plano-link:hover{border-color:var(--link)}
+.plano-link:has(a:focus-visible){outline:3px solid var(--foco);outline-offset:3px}
+.plano-link .ver-plano a:focus-visible{outline:none}
+@media (prefers-reduced-motion:reduce){.plano-link{transition:none}}
+/* A página Planos: os dois cartões com o que muda, os recursos em grupos e as perguntas. */
+.plano-detalhe{scroll-margin-top:1rem;display:flex;flex-direction:column}
+.plano-detalhe>:last-child{margin-top:auto}
+.plano-detalhe:target{border-color:var(--link);border-width:2px}
+.plano-detalhe ul{margin:.25rem 0 1rem}
+/* Os grupos de recursos em duas colunas equilibradas a partir de 46 rem (em vez de três colunas com uma vazia), sem partir um grupo. */
+.grupos-recursos{columns:2 21rem;column-gap:2.5rem}
+.recursos-plano{break-inside:avoid;margin:0 0 1.25rem}
+.recursos-plano:last-child{margin-bottom:0}
+.recursos-plano h3{margin:0 0 .4rem}
+.recursos-plano ul{margin:0;padding-left:1.2rem}
+.recursos-plano li{margin:.45rem 0}
+.perguntas-planos{max-width:46rem}
+.como-funciona{max-width:46rem}
+.como-funciona li{margin:.6rem 0}
 .cartao p:last-child,.cartao ul:last-child{margin-bottom:0}
 a.cartao{display:block;text-decoration:none;color:inherit}
 a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
@@ -222,6 +300,20 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .mini .sem-captura{align-self:start}
 /* Quatro cartões (página inicial): na largura em que caberiam três por linha, ficam dois, para nenhum sobrar sozinho. */
 @media (min-width:46rem) and (max-width:61.99rem){.mini-par{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* O celular dentro de um cartão (D-115, 18/11/2026): no centro do cartão, embaixo do texto, com a legenda junto, no mesmo tamanho de
+   sempre (antes ficava encostado à esquerda num cartão largo). Vale para captura e vídeo. */
+.cartao:has(>.celular){display:flex;flex-direction:column}
+.cartao>.celular{margin:auto auto 0}
+.cartao>p+.celular{margin-top:auto;padding-top:.5rem}
+/* Uma grade de cartões com uma tela ao lado (D-115, Segurança: "Quem vê os seus dados"): no computador, os cartões em 2 x 2 de um lado e
+   o celular do outro, no meio da altura; no celular, os cartões um embaixo do outro e o celular depois deles, no centro. Os cartões de
+   cada linha têm a mesma altura (a grade estica os dois). */
+.com-celular{display:grid;gap:1.5rem 3rem;align-items:center}
+.com-celular>.celular{justify-self:center}
+.com-celular+p{margin-top:1.25rem}
+.com-celular .grade{grid-template-columns:minmax(0,1fr)}
+@media (min-width:40rem){.com-celular .grade{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:64rem){.com-celular{grid-template-columns:minmax(0,1fr) 15.5rem}}
 .larga{margin:0 0 1.5rem}
 .larga img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid var(--linha);background:#F7F9FD}
 .larga-moldura{padding:10px;border-radius:20px;background:var(--aparelho);box-shadow:0 22px 50px rgba(6,16,64,.25)}
@@ -231,6 +323,10 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .ve-nao-ve{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(20rem,100%),1fr))}
 .ve-nao-ve .cartao{border-width:2px}
 .ve-nao-ve h3{margin-top:0}
+.lista-nao-faz{border-width:2px;margin:0 0 1rem}
+.lista-nao-faz ul{list-style:none;padding:0;margin:0}
+.lista-nao-faz li{position:relative;padding-left:1.5rem}
+.lista-nao-faz li::before{content:"";position:absolute;left:0;top:.62em;width:.6rem;height:.6rem;background:var(--texto);transform:rotate(45deg);border-radius:2px}
 .ve-nao-ve ul{list-style:none;padding:0}
 .ve-nao-ve li{position:relative;padding-left:1.5rem}
 .ve-nao-ve li::before{content:"";position:absolute;left:0;top:.62em;width:.6rem;height:.6rem}
@@ -345,6 +441,14 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .calc-cenario{display:grid;gap:.25rem;padding-top:.5rem;border-top:1px solid var(--linha)}
 .calc-exemplo-resultado{font-variant-numeric:tabular-nums}
 .cartao-calculadoras{max-width:42rem}
+.grade-atalhos .cartao-calculadoras{max-width:none}
+/* O endereço do feed RSS com "Copiar o endereço" (D-115): o campo só de leitura e o botão lado a lado; no celular, um embaixo do outro. */
+.copiar{margin:1.25rem 0 1rem;display:grid;gap:.4rem}
+.copiar label{font-weight:800}
+.copiar-linha{display:flex;flex-wrap:wrap;gap:.6rem}
+.copiar input{flex:1 1 16rem;min-width:0;min-height:52px;padding:0 1rem;border:2px solid var(--contorno);border-radius:14px;background:var(--superficie);color:var(--texto);font:inherit;font-size:1rem}
+.copiar input:focus-visible{outline:3px solid var(--foco);outline-offset:2px;border-color:var(--foco)}
+.copiar-estado{margin:0;min-height:1.5em;color:var(--texto-2);font-size:.9375rem}
 .so-leitor{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* Formulários (contato para empresas e Novidades por e-mail): prontos e desligados; o envio é um POST comum, sem JavaScript */
@@ -388,6 +492,15 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .post-corpo{max-width:46rem}
 .post-fontes{margin-top:2rem;padding-top:1rem;border-top:1px solid var(--linha)}
 .post-fontes h2{font-size:1.2rem;margin:0 0 .5rem}
+/* As fontes de um post em dois grupos (18/11/2026, D-115): "Na Clarevo" e "Fontes oficiais", uma linha por fonte, sem numeração, com a data
+   em letra menor no fim da linha e a nota das regras da própria Clarevo embaixo. */
+.post-fontes h3{margin:1.25rem 0 .35rem;font-size:1rem;color:var(--texto-2)}
+.post-fontes h2+h3{margin-top:.75rem}
+.fontes-lista{list-style:none;padding:0;margin:0 0 .5rem}
+.fontes-lista li{margin:.45rem 0;line-height:1.5}
+.fonte-data{color:var(--texto-2);font-size:.875rem;white-space:nowrap}
+.fontes-nota{margin:.75rem 0 0;color:var(--texto-2);font-size:.9375rem}
+.post-fontes .revisao{margin-top:1rem}
 /* Imagens nas matérias (D-114, 17/11/2026). A capa fica no topo, à direita do título, no lugar do disco azul vazio (no celular, embaixo
    do título e menor). As telas ficam ao lado do texto da seção que fala delas a partir de 64 rem (no celular, embaixo dele); a tela larga
    (o painel da empresa) fica embaixo do texto, na largura dele. O texto da matéria continua com até 46 rem. */
@@ -410,21 +523,22 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
   .post-secao .post-tela.celular{max-width:13rem;margin:2.25rem 0 1.5rem}
 }
 
-/* Vídeos de uso do app (D-114, 17/11/2026): uma faixa que rola para o lado (no celular, o próximo vídeo aparece pela metade, para mostrar
-   que há mais), com a capa, os controles do navegador, o título, a frase, a legenda e a descrição de cada vídeo. Nenhum toca sozinho. */
-.videos{display:flex;gap:1.5rem;margin:0;padding:.25rem .25rem 1rem;list-style:none;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scroll-padding:0 .25rem;scrollbar-color:var(--contorno) transparent}
-.videos>li{flex:0 0 14rem;margin:0;scroll-snap-align:start}
-.video figure{margin:0}
-.video-moldura{padding:6px;border-radius:32px;background:var(--aparelho);box-shadow:0 10px 24px rgba(6,16,64,.22),inset 0 0 0 2px #3A4A86}
-.video video{display:block;width:100%;height:auto;border-radius:26px;background:#F7F9FD}
-.video figcaption{margin-top:.75rem}
-.video h3{margin:0 0 .3rem;font-size:1.0625rem}
-.video p{margin:0 0 .4rem;font-size:.9375rem}
-.video .legenda{color:var(--texto-2);font-size:.875rem}
-.video-descricao summary{display:inline-flex;align-items:center;min-height:44px;cursor:pointer;font-weight:700;color:var(--link)}
-.video-descricao p{margin:0 0 .25rem;color:var(--texto-2)}
-@media (min-width:48rem){.videos>li{flex-basis:15rem}}
-@media (prefers-reduced-motion:no-preference){.videos{scroll-behavior:smooth}}
+/* Vídeos de uso do app (D-114 e D-115, 18/11/2026): cada vídeo fica na moldura de celular do bloco que ele mostra, no lugar da captura, e
+   toca sozinho, sem som, enquanto aparece (js/videos.js). O botão "Pausar" ou "Tocar" fica embaixo da legenda, fora da tela do celular
+   (44 px de altura, o foco de sempre). Sem JavaScript, não há botão: fica a capa. */
+.celular-moldura{position:relative}
+.celular video{display:block;width:100%;height:auto;border-radius:30px;background:#F7F9FD;object-fit:cover}
+.video-botao{display:flex;align-items:center;justify-content:center;gap:.45rem;min-height:44px;margin:.35rem auto 0;padding:0 1rem;border:1px solid var(--contorno);border-radius:999px;background:transparent;color:var(--texto);font:inherit;font-size:.875rem;font-weight:700;line-height:1;cursor:pointer}
+.video-botao:hover{border-color:var(--link)}
+.video-botao-icone{display:inline-flex;align-items:center;gap:3px}
+.video-botao-icone::before,.video-botao-icone::after{content:"";display:block}
+.video-botao[data-estado="tocando"] .video-botao-icone::before,.video-botao[data-estado="tocando"] .video-botao-icone::after{width:4px;height:12px;border-radius:1px;background:currentColor}
+.video-botao[data-estado="parado"] .video-botao-icone::before{width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;border-color:transparent transparent transparent currentColor}
+.video-botao[data-estado="parado"] .video-botao-icone::after{display:none}
+.capa .video-botao{border-color:var(--sobre-topo);color:var(--sobre-topo)}
+/* Numa linha de cartões com vídeo e com captura, a captura reserva embaixo da legenda o lugar do botão, para as molduras ficarem na mesma
+   altura (o script marca o <html> com data-videos quando põe os botões; sem JavaScript, não há botão nem reserva). */
+:root[data-videos] :is(.mini,.grade):has(.celular-video) .cartao>.celular:not(.celular-video)>figcaption::after{content:"";display:block;height:calc(44px + .35rem)}
 
 /* Ajuda */
 .busca{margin:0 0 1.5rem}
@@ -454,6 +568,13 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 /* Indicadores oficiais e páginas de mercado (D-106): o número em destaque, em uma cor só (nada de verde para alta ou vermelho para queda),
    com a unidade, a data e a fonte por perto. */
 .indicadores-estado{margin:0 0 1rem;color:var(--texto-2);font-size:.9375rem}
+/* "Indicadores de hoje" na página inicial (D-115): os cinco cartões do painel, mais compactos, numa linha no computador; no tablet, o
+   primeiro ocupa a linha toda e os outros ficam dois a dois (nenhum sozinho); no celular, um embaixo do outro. */
+.indicadores-inicio .temas{grid-template-columns:minmax(0,1fr)}
+@media (min-width:40rem){.indicadores-inicio .temas{grid-template-columns:repeat(2,minmax(0,1fr))}.indicadores-inicio .temas>:first-child{grid-column:span 2}}
+@media (min-width:64rem){.indicadores-inicio .temas{grid-template-columns:repeat(5,minmax(0,1fr))}.indicadores-inicio .temas>:first-child{grid-column:auto}}
+.indicadores-inicio .indicador-numero{font-size:1.5rem}
+.indicadores-inicio+.nota{margin-top:1rem}
 .cartao.indicador{text-decoration:none}
 .cartao.indicador .titulo-cartao{text-decoration:underline;text-underline-offset:.18em}
 .indicador-numero{display:block;margin:.35rem 0 .1rem;color:var(--texto);font-weight:800;font-size:1.75rem;line-height:1.2;font-variant-numeric:tabular-nums}
@@ -526,7 +647,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 }
 
 @media print{
-  .pular,.menu,.busca,.rodape-grade,.acoes,.videos{display:none}
+  .pular,.menu,.busca,.rodape-grade,.acoes,.tema-site,.video-botao,.confianca svg{display:none!important}
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa::before{display:none}

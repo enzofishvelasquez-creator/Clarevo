@@ -17,7 +17,7 @@ function paginaSobre({ valores }) {
   const brutas = [
     bloco(
       `<h2 id="move">O que move a Clarevo</h2>
-<p class="lead-bloco">Cuidar da vida financeira faz parte de cuidar de você. A Clarevo oferece apoio prático para organizar o mês e acompanhar decisões, sem julgamento e sem prometer resultado financeiro nem de saúde.</p>
+<p class="lead-bloco">Cuidar da vida financeira faz parte de cuidar de você. A Clarevo oferece apoio prático para organizar o mês e acompanhar decisões, sem julgamento.</p>
 <div class="grade">
 <article class="cartao">
 <h3>Clareza</h3>
@@ -51,7 +51,8 @@ function paginaSobre({ valores }) {
     bloco(
       `<h2 id="quem">Quem está por trás</h2>
 <p>A Clarevo é oferecida por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO].</p>
-<p>Para falar com a equipe, escreva para [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e o <a href="${u('suporte.html')}">Suporte</a>. Os dados pessoais são tratados como descreve a <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`,
+<p>Para falar com a equipe, escreva para [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e o <a href="${u('suporte.html')}">Suporte</a>. Os dados pessoais são tratados como descreve a <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>
+<p class="aviso-final">${esc(require('./inicio').AVISO_DE_SAUDE)}</p>`,
       { rotulo: 'quem' },
     ),
   ];

@@ -142,6 +142,7 @@ const PAGINAS_BASE = [
   'index.html',
   'comece.html',
   'app/index.html',
+  'planos.html',
   'empresas/index.html',
   'aprender/index.html',
   'aprender/agenda.html',
@@ -298,21 +299,30 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     const noCalc = /^calculadoras\/[a-z-]+\.html$/.test(nome) && nome !== 'calculadoras/index.html';
     // D-106: o painel e as páginas de indicador têm o script do painel, que pergunta uma vez ao próprio site (/api/indicadores).
     const noPainel = /^indicadores\/(index|selic-hoje|cdi-hoje|ipca-12-meses|rendimento-da-poupanca|dolar-ptax-hoje)\.html$/.test(nome);
+    // D-115: a página inicial e O app têm o script dos vídeos (js/videos.js), que toca e pausa os vídeos e não pede nada a ninguém.
+    const comVideos = ['index.html', 'app/index.html'].includes(nome);
     for (const m of html.matchAll(/<script\b([^>]*)>/gi)) {
       const ld = /^\s*type="application\/ld\+json"\s*$/.test(m[1]!);
       const busca = noAjuda && /^\s*src="busca\.js"\s+defer\s*$/.test(m[1]!);
       const calculadora = noCalc && /^\s*type="module"\s+src="calculadora\.js"\s*$/.test(m[1]!);
       const painel = noPainel && /^\s*src="painel\.js"\s+defer\s*$/.test(m[1]!);
-      expect(ld || busca || calculadora || painel, `${nome}: script não permitido: ${m[0]}`).toBe(true);
+      const videos = comVideos && /^\s*src="(\.\.\/)?js\/videos\.js"\s+defer\s*$/.test(m[1]!);
+      // D-115: "Indicadores de hoje" na página inicial usa o script do painel; a página do feed RSS, o botão de copiar o endereço.
+      const painelNoInicio = nome === 'index.html' && /^\s*src="indicadores\/painel\.js"\s+defer\s*$/.test(m[1]!);
+      const copiar = nome === 'novidades/rss.html' && /^\s*src="\.\.\/js\/copiar\.js"\s+defer\s*$/.test(m[1]!);
+      // D-115: o tema do site em todas as páginas, no <head>, sem defer (marca o <html> antes de a página aparecer).
+      const tema = /^\s*src="(\/|(\.\.\/)*)js\/tema\.js"\s*$/.test(m[1]!);
+      expect(ld || busca || calculadora || painel || videos || painelNoInicio || copiar || tema, `${nome}: script não permitido: ${m[0]}`).toBe(true);
     }
     expect(html, `${nome}: manipulador de evento`).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html, `${nome}: atributo style (a política de segurança não permite)`).not.toMatch(/\sstyle\s*=/i);
     expect(html, `${nome}: iframe ou objeto`).not.toMatch(/<(iframe|object|embed|audio)\b/i);
-    // Vídeos (D-114): só na seção "Veja o app em uso" da página inicial e de O app, do próprio site, com controles, sem baixar antes do
-    // toque e sem tocar sozinhos.
-    if (!['index.html', 'app/index.html'].includes(nome)) expect(html, `${nome}: vídeo fora da seção de vídeos`).not.toMatch(/<video\b/i);
+    // Vídeos (D-114 e D-115): só na página inicial e em O app, do próprio site, sem controles de player e sem `autoplay` (quem toca e pausa
+    // é js/videos.js, só com o vídeo na tela), sem som, em repetição e sem baixar nada antes de aparecer.
+    if (!['index.html', 'app/index.html'].includes(nome)) expect(html, `${nome}: vídeo fora da página inicial e de O app`).not.toMatch(/<video\b/i);
     for (const v of html.matchAll(/<video\b[^>]*>/gi)) {
-      expect(v[0], `${nome}: vídeo`).toMatch(/^<video controls preload="none" playsinline width="\d+" height="\d+" poster="[^"]+\.png" aria-labelledby="[^"]+" aria-describedby="[^"]+">$/);
+      expect(v[0], `${nome}: vídeo`).toMatch(/^<video muted loop playsinline preload="none" width="\d+" height="\d+" poster="[^"]+\.png" aria-labelledby="[^"]+" aria-describedby="[^"]+">$/);
+      expect(v[0], `${nome}: vídeo com controles ou autoplay`).not.toMatch(/\s(controls|autoplay)\b/);
     }
     // Formulário só nas páginas que o interruptor liga (D-066), e sempre um POST para o próprio site.
     if (opcoes.formularios?.includes(nome)) {
@@ -320,7 +330,9 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     } else expect(html, `${nome}: formulário`).not.toMatch(/<form\b/i);
     for (const m of html.matchAll(/<input\b[^>]*>/gi)) {
       const campoDeFormulario = opcoes.formularios?.includes(nome) && /type="(text|email|checkbox)"/.test(m[0]);
-      expect(campoDeFormulario || (noAjuda && /type="search"/.test(m[0])), `${nome}: campo que não é a busca da Ajuda nem de um formulário ligado: ${m[0]}`).toBe(true);
+      const enderecoDoFeed = nome === 'novidades/rss.html' && /^<input id="rss-endereco" type="text" readonly /.test(m[0]);
+      const temaDoSite = /^<input type="radio" name="tema-site" value="(aparelho|claro|escuro)">$/.test(m[0]);
+      expect(campoDeFormulario || enderecoDoFeed || temaDoSite || (noAjuda && /type="search"/.test(m[0])), `${nome}: campo que não é a busca da Ajuda nem de um formulário ligado: ${m[0]}`).toBe(true);
     }
     // Recursos (src, link, preload) só locais; links de texto só para o app, as fontes citadas no catálogo, o domínio da empresa e as páginas oficiais.
     for (const m of html.matchAll(/<(?:img|link|source|script)\b[^>]*\s(?:src|href)="(https?:)?\/\/[^"]*"/gi)) {
@@ -360,7 +372,7 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     else if (/^(aprender|calculadoras|novidades|ajuda)\//.test(nome)) expect(cabecalho.match(/class="secao-atual"/g)?.length, `${nome}: seção atual`).toBe(2);
     // Rodapé em todas: todas as seções, as páginas legais e "[RAZÃO SOCIAL] · CNPJ [CNPJ]" (com os valores, quando houver).
     const rodape = /<footer class="rodape">([\s\S]*?)<\/footer>/.exec(html)?.[1] ?? '';
-    for (const p of ['index.html', 'comece.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'imprensa.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
+    for (const p of ['index.html', 'comece.html', 'app/index.html', 'planos.html', 'empresas/index.html', 'aprender/index.html', 'aprender/agenda.html', 'calculadoras/index.html', 'novidades/index.html', 'novidades/como-escrevemos.html', 'ajuda/index.html', 'seguranca.html', 'sobre.html', 'imprensa.html', 'suporte.html', 'privacidade.html', 'termos.html', 'excluir-conta.html']) {
       expect(rodape, `${nome}: rodapé sem ${p}`).toContain(`<a href="${visto(nome, p)}">`);
     }
     expect(rodape, `${nome}: rodapé`).toMatch(/·\s*CNPJ\s/);
@@ -595,7 +607,9 @@ describe('site público: as páginas geradas', () => {
     expect(gerado.arquivos.has('novidades/feed.xml'), 'feed.xml só com domínio').toBe(dominio !== '');
     for (const extra of ['estilo.css', '_headers', 'robots.txt', 'ajuda/indice.json', 'ajuda/busca.js', 'favicon.svg', 'og/clarevo.png', 'marca/clarevo-logotipo-reverso.svg', 'calculadoras/calculadora.js', 'js/nucleo/calculators/catalog.js', '_worker.js', '_routes.json', 'imprensa/clarevo-logotipo.svg', 'imprensa/clarevo-logotipo.png']) expect(gerado.arquivos.has(extra), extra).toBe(true);
     const htmls = [...gerado.arquivos.keys()].filter((k) => k.endsWith('.html'));
-    expect(htmls.filter((n) => !PAGINAS.includes(n))).toEqual([]);
+    // A página do feed RSS (D-115) existe só com domínio, como o feed.
+    expect(gerado.arquivos.has('novidades/rss.html'), 'rss.html só com domínio').toBe(dominio !== '');
+    expect(htmls.filter((n) => !PAGINAS.includes(n) && n !== 'novidades/rss.html')).toEqual([]);
   });
 
   it('as páginas e os arquivos gravados em site/ estão em dia com o gerador e o conteúdo (rode: node scripts/gerar-site.js)', () => {
@@ -658,14 +672,14 @@ describe('site público: as páginas geradas', () => {
   });
 
   it('nenhuma página tem travessão, a expressão proibida, script além do permitido, atributo de evento ou endereço de fora além do permitido; um h1, títulos sem pular nível, rodapé e links internos', () => {
-    verificarPaginas(gerado.arquivos, dominio, PAGINAS);
+    verificarPaginas(gerado.arquivos, dominio, [...PAGINAS, ...(dominio ? ['novidades/rss.html'] : [])]);
   });
 
   it('com os formulários ligados (D-066), todas as páginas, inclusive as de resposta, passam nas mesmas verificações e só as três páginas com formulário têm <form>', () => {
     const g = gerarSite({ dados: { ...PREENCHIDOS, formulario_contato: true, newsletter: true }, referencia: REFERENCIA_DOS_POSTS });
     const respostas = ['contato-enviado.html', 'contato-erro.html', 'novidades/receber.html', 'novidades/receber-enviado.html', 'novidades/receber-confirmado.html', 'novidades/receber-erro.html'];
     for (const nome of respostas) expect(g.arquivos.has(nome), nome).toBe(true);
-    verificarPaginas(g.arquivos, 'exemplo.test', [...PAGINAS, ...respostas], { formularios: ['empresas/index.html', 'novidades/index.html', 'novidades/receber.html'] });
+    verificarPaginas(g.arquivos, 'exemplo.test', [...PAGINAS, 'novidades/rss.html', ...respostas], { formularios: ['empresas/index.html', 'novidades/index.html', 'novidades/receber.html'] });
     // As páginas de resposta não são indexadas nem entram no sitemap; a página da inscrição, sim.
     const sitemap = texto(g.arquivos.get('sitemap.xml'));
     for (const nome of ['contato-enviado', 'contato-erro', 'novidades/receber-enviado', 'novidades/receber-confirmado', 'novidades/receber-erro']) {
@@ -743,7 +757,9 @@ describe('site público: as páginas geradas', () => {
       expect(sitemap).toContain('<loc>https://exemplo.test/app/</loc>');
       expect(sitemap).toContain('<loc>https://exemplo.test/aprender/decimo-terceiro</loc>');
       expect(sitemap).not.toContain('404');
-      expect((sitemap.match(/<loc>/g) ?? []).length).toBe(PAGINAS.length - 1);
+      // Sem a 404 e com a página do feed RSS (D-115), que só existe com domínio.
+      expect((sitemap.match(/<loc>/g) ?? []).length).toBe(PAGINAS.length);
+      expect(sitemap).toContain('<loc>https://exemplo.test/novidades/rss</loc>');
       const robots = texto(g.arquivos.get('robots.txt'));
       expect(robots).toContain('Allow: /');
       expect(robots).toContain('Sitemap: https://exemplo.test/sitemap.xml');
@@ -762,7 +778,7 @@ describe('site público: as páginas geradas', () => {
     const dir = pastaDeExemplo();
     try {
       const g = gerarSite({ legal: dir, dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
-      verificarPaginas(g.arquivos, 'exemplo.test', PAGINAS);
+      verificarPaginas(g.arquivos, 'exemplo.test', [...PAGINAS, 'novidades/rss.html']);
       const h = texto(g.arquivos.get('privacidade.html'));
       expect(h).toContain('href="termos.html#quem-pode-usar"');
       expect(h).toContain('href="excluir-conta.html"');
@@ -784,7 +800,7 @@ describe('site público: as páginas geradas', () => {
     }
   });
 
-  it('a página inicial traz a mensagem central, o apoio prático do app, recursos com captura, a empresa que nunca vê finanças, o que a Clarevo não é, o app web e o aviso das lojas (sem selos)', () => {
+  it('a página inicial traz a mensagem central, o apoio prático do app, recursos com vídeo e captura, a empresa que nunca vê finanças, a faixa do que a Clarevo não faz, o app web e o aviso das lojas (sem selos)', () => {
     const h = html('index.html');
     // D-068: o título é a mensagem central do Manual v2.2 (seção 19); "Mais clareza para decidir" fica como apoio, e o subtexto diz o que a Clarevo faz.
     expect(h).toContain('<h1>Cuidar da vida financeira faz parte de cuidar de você.</h1>');
@@ -802,7 +818,17 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada');
     expect(h).toContain('dificuldade financeira não é falta de disciplina');
     expect(h).not.toMatch(PROMESSAS_PROIBIDAS);
-    for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'Não recomenda produtos financeiros', 'Não é atendimento de saúde e não substitui o acompanhamento de profissionais']) expect(h, frase).toContain(frase);
+    // D-115: o que a Clarevo não faz virou a faixa curta da capa, um link só para o bloco completo de Segurança e privacidade.
+    expect(h).not.toContain('id="nao-e"');
+    const faixa = /<p class="confianca"><a href="seguranca\.html#nao-faz">[\s\S]*?<\/a><\/p>/.exec(h)?.[0] ?? '';
+    for (const frase of ['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) expect(faixa, frase).toContain(`${frase}</span>`);
+    expect(faixa.match(/<a\b/g)?.length).toBe(1);
+    expect(/<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(h)![0]).toContain(faixa);
+    const seg = html('seguranca.html');
+    const naoFaz = /<h2 id="nao-faz">O que a Clarevo não faz<\/h2>[\s\S]*?<\/section>/.exec(seg)?.[0] ?? '';
+    for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'não recomenda produtos financeiros', 'Não é atendimento de saúde e não substitui o acompanhamento de profissionais', 'Não se conecta ao seu banco e não pede senha bancária', 'tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família']) expect(naoFaz, frase).toContain(frase);
+    // Sem repetir em Segurança: o que não fica guardado continua só em "O que não guardamos", e "não se conecta ao seu banco" só neste bloco.
+    expect(seg.match(/não se conecta ao seu banco/gi)?.length).toBe(1);
     expect(h).toContain('href="https://app.clarevo.app.br"');
     expect(h).toContain('Em breve na App Store e no Google Play.');
     expect(h).toMatch(/Para pessoas/);
@@ -821,14 +847,20 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('a do aceite do convite e a do encerramento');
     expect(h).toContain('Também não vê quando você abre o app nem o que você anota.');
     expect(h).not.toContain('nem o que você faz no app');
-    // De três a quatro recursos com captura e o herói com a tela Resumo, todos com a legenda de demonstração.
-    expect(h.match(/<figure class="celular">/g)?.length).toBe(5);
-    expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(5);
-    expect(h).toMatch(/src="imagens\/resumo\.[0-9a-f]{10}\.png"/);
+    // D-115: o herói com o vídeo do Resumo e três cartões com o vídeo do que mostram (anotar, contas e cartões, metas); Aprender continua
+    // com a captura. Toda tela, captura ou vídeo, tem a mesma legenda (revisão de 18/11/2026).
+    expect(h.match(/<figure class="celular">/g)?.length).toBe(1);
+    expect(h).not.toContain('Dados fictícios de demonstração');
+    expect(h).toMatch(/src="imagens\/aprender\.[0-9a-f]{10}\.png"/);
+    expect(h.match(/<figure class="celular celular-video" data-video /g)?.length).toBe(4);
+    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(5);
     for (const alvo of ['app/index.html', 'empresas/index.html', 'aprender/index.html', 'ajuda/index.html', 'novidades/index.html', 'seguranca.html']) expect(h, alvo).toContain(`href="${alvo}"`);
     // Sem selos das lojas, depoimento, cliente, prêmio nem número de uso inventado. Preço e "grátis" só na seção Planos (16/11/2026).
-    const foraDosPlanos = h.replace(/<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/, '');
-    expect(foraDosPlanos).not.toBe(h);
+    // D-115: o dólar PTAX de "Indicadores de hoje" vem do núcleo com "R$" ("R$ 5,7851"): só o cartão dele fica de fora da regra.
+    const semPtax = h.replace(/<a class="cartao indicador" href="indicadores\/dolar-ptax-hoje\.html" data-indicador="ptax">[\s\S]*?<\/a>/, '');
+    expect(semPtax).not.toBe(h);
+    const foraDosPlanos = semPtax.replace(/<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/, '');
+    expect(foraDosPlanos).not.toBe(semPtax);
     expect(h).not.toMatch(/<img[^>]*(apple|google|store|play)/i);
     expect(foraDosPlanos).not.toMatch(/R\$\s?\d|gr[áa]tis/i);
     expect(h).not.toMatch(/depoimento|milh[õo]es|\d+\s*mil\s+(pessoas|usu)|melhor|pr[êe]mio|nossos clientes/i);
@@ -867,6 +899,136 @@ describe('site público: as páginas geradas', () => {
     expect(conteudoPlanos({ ...PLANOS, aberta: true }, (d) => d)).not.toContain(ACCESS_TEXT.notOpenYet);
   });
 
+  // Espaço Negócio no site (D-115, a partir de D-113 e docs/52): o recurso em O app, com a tela da demonstração e o link da Ajuda, o
+  // cartão de "Para quem é" na página inicial e a página Planos. O texto do site descreve a tela de visão geral sem o nome dela, que muda no app ("Seu negócio").
+  it('Espaço Negócio: o recurso em O app (com a tela do cenário "negocio" nos dois temas), o cartão na página inicial e a Ajuda', () => {
+    const app = html('app/index.html');
+    const recurso = /<article class="recurso" id="negocio" aria-labelledby="t-negocio">[\s\S]*?<\/article>/.exec(app)?.[0] ?? '';
+    const guia = GUIDE_ENTRIES.find((x) => x.id === 'negocio')!;
+    expect(recurso).toContain('<h3 id="t-negocio">Espaço Negócio</h3>');
+    expect(recurso).toContain(`<p>${esc(guia.purpose)}</p>`);
+    // Revisão de 18/11/2026: o Espaço Negócio não é diferença entre os planos (o app não limita por plano), com o mesmo texto neutro em
+    // O app, na página inicial e em Planos.
+    expect(recurso).toContain('<li>Incluído na assinatura: um negócio por pessoa, sem custo a mais. É leve: a Clarevo não faz contabilidade nem cálculo de impostos.</li>');
+    expect(recurso).toContain('Retirada para o Pessoal');
+    expect(recurso).toContain('Numa tela própria do negócio, quanto entrou, quanto saiu e quanto sobrou');
+    expect(recurso).toContain('href="../ajuda/negocio.html#guia-negocio"');
+    // Só no tema claro, como as outras telas de O app (revisão: um celular escuro entre os claros parecia defeito).
+    expect(recurso).toMatch(/<img src="\.\.\/imagens\/negocio\.[0-9a-f]{10}\.png" alt="Tela do negócio Sacolé da Maria/);
+    expect(recurso).not.toContain('<picture>');
+    expect([...gerado.arquivos.keys()].some((k) => k.startsWith('imagens/negocio-escura.'))).toBe(false);
+    // Depois de Família.
+    expect(app.indexOf('id="t-negocio"')).toBeGreaterThan(app.indexOf('id="t-familia"'));
+    // A Ajuda tem a entrada e a busca acha.
+    expect(html('ajuda/negocio.html')).toContain('id="guia-negocio"');
+    expect(html('ajuda/index.html')).toContain('href="negocio.html"');
+    expect(html('ajuda/indice.json')).toContain('guia-negocio');
+    // O cartão de "Para quem é" na página inicial, com o link para o recurso em O app.
+    const inicio = html('index.html');
+    const paraQuem = /<section[^>]*aria-labelledby="para-quem"[\s\S]*?<\/section>/.exec(inicio)![0];
+    expect(paraQuem.match(/<article class="cartao">/g)?.length).toBe(3);
+    expect(paraQuem).toContain('<h3>Para quem tem um negócio</h3>');
+    expect(paraQuem).toContain('<a href="app/index.html#negocio">Veja o Espaço Negócio</a>');
+    expect(paraQuem).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
+    expect(html('planos.html')).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
+    for (const p of ['index.html', 'app/index.html', 'planos.html']) expect(html(p), p).not.toMatch(/plano Individual inclui um negócio|Inclui o Espaço Negócio|Incluído no plano Individual/);
+  });
+
+  // O aviso de saúde (revisado no pacote do advogado, seção j) sem mudar o texto, mas fora do começo das páginas (D-115, retorno de quem
+  // testa: "O negativo não deveria estar logo no começo da página. Isso é advertência, não propaganda.").
+  it('o aviso de saúde, com o mesmo texto, fica numa nota no fim da página inicial, no bloco da NR-1 de Para empresas e no fim de Sobre, e não no começo', () => {
+    const { AVISO_DE_SAUDE } = require(join(ROOT, 'scripts', 'site', 'paginas', 'inicio.js')) as { AVISO_DE_SAUDE: string };
+    expect(AVISO_DE_SAUDE).toBe('A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada.');
+    expect(readFileSync(join(ROOT, 'docs', 'legal', 'resumo-para-advogado.md'), 'utf8')).toContain('"A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade."');
+    const inicio = html('index.html');
+    const bemEstar = /<section[^>]*aria-labelledby="bem-estar"[\s\S]*?<\/section>/.exec(inicio)![0];
+    expect(bemEstar).not.toMatch(/não promete|O que a Clarevo não/);
+    expect(bemEstar).toContain('<p class="texto-bloco">Um app para anotar o que entra e o que sai');
+    expect(inicio).toContain(`<p class="aviso-final">${AVISO_DE_SAUDE}</p>`);
+    expect(inicio.indexOf('class="aviso-final"')).toBeGreaterThan(inicio.indexOf('id="contato"'));
+    const empresas = html('empresas/index.html');
+    const primeira = /<section[^>]*aria-labelledby="bem-estar"[\s\S]*?<\/section>/.exec(empresas)![0];
+    expect(primeira).not.toMatch(/não promete|não está incluído|não fazem parte/);
+    // Revisão de 18/11/2026: as ressalvas ficam numa nota curta depois de "Como funciona", e não em cartões no bloco da NR-1.
+    const nr1 = /<section[^>]*aria-labelledby="nr-1"[\s\S]*?<\/section>/.exec(empresas)![0];
+    expect(nr1).not.toMatch(/<h3>O que não está incluído<\/h3>|não é atendimento de saúde/);
+    const comoFunciona = /<section[^>]*aria-labelledby="como-funciona"[\s\S]*?<\/section>/.exec(empresas)![0];
+    const nota = /<p class="nota nota-ressalvas">[\s\S]*?<\/p>/.exec(comoFunciona)?.[0] ?? '';
+    for (const t of ['Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje.', 'não promete redução de absenteísmo, de estresse nem de adoecimento', esc(AVISO_DE_SAUDE)]) expect(nota, t).toContain(t);
+    expect(comoFunciona.indexOf('nota-ressalvas')).toBeGreaterThan(comoFunciona.indexOf('</ol>'));
+    const sobre = html('sobre.html');
+    expect(sobre).toContain(`<p class="aviso-final">${esc(AVISO_DE_SAUDE)}</p>`);
+    expect(sobre.indexOf('class="aviso-final"')).toBeGreaterThan(sobre.indexOf('id="quem"'));
+  });
+
+  // Indicadores mais fáceis de achar (D-115): "Indicadores de hoje" na página inicial, com o retrato e o script do painel, e o cartão dos
+  // indicadores em Aprender e em Novidades. O menu principal não ganhou "Indicadores": não cabe sem quebrar a linha a partir de 1120 px.
+  it('Indicadores de hoje na página inicial (os cinco números, a hora e a fonte, o aviso e o caminho para o painel) e o cartão em Aprender e em Novidades', () => {
+    const inicio = html('index.html');
+    const secao = /<section[^>]*aria-labelledby="indicadores"[\s\S]*?<\/section>/.exec(inicio)?.[0] ?? '';
+    expect(secao).toContain('<h2 id="indicadores">Indicadores de hoje</h2>');
+    expect(secao).toMatch(/<div class="indicadores-inicio" data-painel data-consultado="[^"]*">/);
+    for (const id of ['selic', 'cdi', 'ipca', 'poupanca', 'ptax']) expect(secao, id).toContain(`data-indicador="${id}"`);
+    expect(secao).toContain('Fonte: Banco Central do Brasil.');
+    expect(secao).toContain('<p class="nota">Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.</p>');
+    expect(secao).toContain('<a class="botao botao-principal" href="indicadores/index.html">Ver os indicadores e o glossário</a>');
+    // Logo depois de "O que o app faz".
+    expect(inicio.indexOf('id="indicadores"')).toBeGreaterThan(inicio.indexOf('id="telas"'));
+    expect(inicio.indexOf('id="indicadores"')).toBeLessThan(inicio.indexOf('id="para-quem"'));
+    expect(inicio).toContain('<script src="indicadores/painel.js" defer></script>');
+    for (const [pagina, alvo] of [['aprender/index.html', '../indicadores/index.html'], ['novidades/index.html', '../indicadores/index.html']] as const) {
+      expect(html(pagina), pagina).toContain(`<a class="cartao cartao-calculadoras" href="${alvo}"><span class="titulo-cartao">Indicadores oficiais</span>`);
+    }
+    const cabecalho = /<header class="topo">([\s\S]*?)<\/header>/.exec(inicio)![1]!;
+    expect(cabecalho).not.toContain('Indicadores');
+  });
+
+  // Planos (D-115, 18/11/2026): os cartões da página inicial levam à página Planos, que diz o que muda entre os dois, o que os dois
+  // incluem (cada recurso com link para a Ajuda ou O app), como funciona e algumas perguntas, com os textos do núcleo.
+  it('Planos: cada cartão da página inicial leva à página Planos, com um link só; a página tem os dois planos, os recursos, como funciona e as perguntas', () => {
+    const inicio = html('index.html');
+    const secao = /<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/.exec(inicio)![0];
+    for (const [plano, ancora] of [['individual', 'individual'], ['familiar', 'familia']] as const) {
+      const cartao = new RegExp(`<article class="cartao plano plano-link">\\n<h3>${PLAN_NAME[plano]}</h3>[\\s\\S]*?</article>`).exec(secao)?.[0] ?? '';
+      expect(cartao, plano).toContain(`<a href="planos.html#${ancora}">Ver o que o plano ${PLAN_NAME[plano]} inclui</a>`);
+      expect(cartao.match(/<a\b/g)?.length, plano).toBe(1);
+    }
+    const h = html('planos.html');
+    expect(h).toContain('<h1>Planos da Clarevo</h1>');
+    for (const [plano, ancora] of [['individual', 'individual'], ['familiar', 'familia']] as const) {
+      expect(h).toContain(`<article class="cartao plano plano-detalhe" id="${ancora}" aria-labelledby="t-${ancora}">\n<h3 id="t-${ancora}">${PLAN_NAME[plano]}</h3>`);
+      expect(h).toContain(`<span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
+    }
+    for (const id of ['comparar', 'recursos', 'como-funciona', 'perguntas']) expect(h, id).toContain(`<h2 id="${id}">`);
+    // Os textos da assinatura são os do núcleo.
+    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.howToPay, ACCESS_TEXT.benefitNote, ACCESS_TEXT.notOpenYet, ...ACCESS_TEXT.plans.map((p) => p.who)]) expect(h, t).toContain(esc(t));
+    // O plano Família é pago pela pessoa titular (D-083); o Espaço Negócio não é diferença entre os planos (revisão de 18/11/2026).
+    expect(h).toContain('Uma assinatura só, paga pela pessoa titular.');
+    expect(/<article class="cartao plano plano-detalhe" id="individual"[\s\S]*?<\/article>/.exec(h)![0]).not.toContain('Negócio');
+    expect(h).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
+    // As perguntas não repetem "Como funciona" e respondem direto.
+    const perguntas = /<h2 id="perguntas">[\s\S]*?<\/section>/.exec(h)![0];
+    expect(perguntas).toContain('<p>Não. O teste de 14 dias começa sem pedir cartão.</p>');
+    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.benefitNote]) expect(perguntas, t).not.toContain(esc(t));
+    // Cada recurso com um link interno que existe (a Ajuda ou O app), e os links de "Como usar" das entradas do guia que existem.
+    const recursos = /<h2 id="recursos">[\s\S]*?<\/section>\n<\/div>/.exec(h)![0];
+    const links = [...recursos.matchAll(/<li><a href="([^"]+)">([^<]+)<\/a>: /g)].map((m): [string, string] => [m[1]!, m[2]!]);
+    expect(links.map(([, n]) => n)).toEqual(['Anotar e Resumo', 'Contas a pagar', 'Cartões e faturas', 'Calendário do mês', 'Importar extrato e fatura', 'Ler nota, comprovante e boleto', 'Metas e reserva', 'Investir', 'Aprender, simulador e calculadoras', 'Anotar pelo Telegram', 'Espaço Negócio', 'Tema claro ou escuro', 'Ocultar valores', 'Exportar meus dados']);
+    for (const [destino] of links) {
+      const [arquivo, ancora] = destino.split('#');
+      const alvo = html(arquivo!);
+      expect(alvo, destino).toBeTruthy();
+      if (ancora) expect(alvo, destino).toContain(`id="${ancora}"`);
+    }
+    // Preço só nos dois cartões do começo; fora deles, nenhum "R$" com número.
+    const foraDosCartoes = h.replace(/<section[^>]*aria-labelledby="comparar"[\s\S]*?<\/section>/, '');
+    expect(foraDosCartoes).not.toBe(h);
+    expect(foraDosCartoes).not.toMatch(/R\$\s?\d/);
+    expect(h).not.toMatch(/[\u2013\u2014]|faz\w*\s+sentido|melhor|depoimento|milh[õo]es/i);
+    // No rodapé de todas as páginas.
+    expect(html('sobre.html')).toContain('<a href="planos.html">Planos</a>');
+  });
+
   it('Comece aqui (o link da bio, D-067): o que é a Clarevo em duas frases, o estado real do acesso e os seis caminhos, sem espera, sem data, sem script e sem rastreamento', () => {
     const h = html('comece.html');
     const principal = /<main[\s\S]*<\/main>/.exec(h)![0];
@@ -893,8 +1055,9 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('<a class="cartao" href="https://demo.clarevo.app.br" rel="noopener noreferrer">');
     expect(h).toContain('Abra o app com dados fictícios, no navegador. Nada é gravado fora do seu aparelho.');
     for (const m of h.matchAll(/\s(?:href|src)="([^"]*)"/g)) expect(m[1], `link com parâmetro: ${m[1]}`).not.toMatch(/[?&]|utm_|fbclid|gclid|igshid/i);
-    // Nenhum script (só dados estruturados, se houver), nenhum formulário e nenhum recurso de fora.
-    expect([...h.matchAll(/<script\b([^>]*)>/g)].filter((m) => !/application\/ld\+json/.test(m[1]!))).toEqual([]);
+    // Nenhum script (só dados estruturados, se houver, e o tema do site, que toda página tem desde D-115), nenhum formulário e nenhum
+    // recurso de fora.
+    expect([...h.matchAll(/<script\b([^>]*)>/g)].filter((m) => !/application\/ld\+json|^ src="js\/tema\.js"$/.test(m[1]!))).toEqual([]);
     expect(h).not.toMatch(/<form\b/);
     // O rodapé leva a ela, e ela entra no mapa do site quando há domínio.
     expect(html('index.html')).toContain('<a href="comece.html">Comece aqui</a>');
@@ -910,14 +1073,23 @@ describe('site público: as páginas geradas', () => {
       const e = GUIDE_ENTRIES.find((x) => x.id === id)!;
       expect(h, id).toContain(esc(e.purpose));
     }
+    // D-115: seis recursos e o cartão do tema com o vídeo do que mostram; os outros (com o Espaço Negócio) com a captura da demonstração.
     const figuras = h.match(/<figure class="celular">/g)?.length ?? 0;
-    expect(figuras).toBeGreaterThanOrEqual(11);
-    expect(h.match(/Dados fictícios de demonstração/g)?.length).toBe(figuras);
+    expect(figuras).toBe(7);
+    expect(h).not.toContain('Dados fictícios de demonstração');
+    expect(h.match(/<figure class="celular celular-video" data-video /g)?.length).toBe(7);
+    expect(h.match(/<figcaption>Tela da demonstração, com dados fictícios<\/figcaption>/g)?.length).toBe(figuras + 7);
+    // "E mais": os Lembretes, sem tela, num cartão só de texto na largura toda; os três cartões com celular numa linha só.
+    const mais = /<h2 id="mais">E mais<\/h2>[\s\S]*?<\/section>/.exec(h)![0];
+    expect(mais).toMatch(/^<h2 id="mais">E mais<\/h2>\n<div class="grade grade-texto">\n<article class="cartao sem-captura">\n<h3>Lembretes<\/h3>/);
+    expect(/<div class="mini">[\s\S]*?\n<\/div>/.exec(mais)![0].match(/<article class="cartao">/g)?.length).toBe(3);
     expect(h).toContain('Na web, hoje');
     // "Cada texto vem do guia" não é verdade (os pontos são do site): só a explicação de abertura vem do guia do app.
     expect(h).not.toContain('Cada texto vem do guia');
     expect(h).toContain('A explicação de abertura de cada recurso é a do guia de uso do próprio app');
-    expect(h).toContain('tudo o que aparece foi anotado ou importado por você ou pelas pessoas da sua Família');
+    // O que o app não faz: a faixa curta da capa, com link para o bloco completo de Segurança e privacidade (D-115).
+    expect(h).not.toContain('id="nao-faz"');
+    expect(h).toContain('<p class="confianca"><a href="../seguranca.html#nao-faz">');
     // Lembretes são do app para celular: a única captura que existe é a da web, que só avisa que eles não existem, então não há imagem.
     expect(h).toContain('>Lembretes</h3>');
     expect(h).not.toContain('imagens/lembretes.png');
@@ -978,7 +1150,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain(dadoDoSite('E-MAIL DE CONTATO'));
     expect(h).toContain('Ainda não há tabela de preços');
     expect(h).toMatch(/src="\.\.\/imagens\/empresa-painel\.[0-9a-f]{10}\.png"/);
-    expect(h).toContain('Dados fictícios de demonstração');
+    expect(h).toContain('Tela da demonstração, com dados fictícios');
     expect(h).not.toMatch(/R\$\s?\d|por vaga|gr[áa]tis|nossos clientes|depoimento|\d+\s*empresas/i);
   });
 
@@ -1113,12 +1285,12 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(passos).toContain('compara os meses fechados com o CDI e o IPCA do mesmo período, com os dados públicos do Banco Central. Não é recomendação de investimento.');
     expect(passos).toContain('os investimentos ficam só no seu Pessoal');
     expect(INVESTMENT_TEXT.whoSees).toContain('ficam só no seu Pessoal');
-    // A captura é a da demonstração (a mesma do guia do app), com a legenda, e o passo a passo fica na Ajuda.
-    expect(guia.screenshot).toBe('540_investimentos.png');
-    expect(secao).toMatch(/src="\.\.\/imagens\/investimentos\.[0-9a-f]{10}\.png"/);
-    expect(secao).toContain('Dados fictícios de demonstração');
+    // Desde 18/11/2026 (D-115), o vídeo de Investir (o card e o Desempenho) no lugar da captura, com a legenda da demonstração; o passo a
+    // passo fica na Ajuda. A captura antiga saiu do site (nenhuma página a usava).
+    expect(secao).toMatch(/<figure class="celular celular-video" data-video data-titulo="Investir">/);
+    expect(secao).toContain('Tela da demonstração, com dados fictícios');
     expect(secao).toContain('href="../ajuda/organizar.html#guia-investimentos"');
-    expect([...gerado.arquivos.keys()].some((k) => /^imagens\/investimentos\.[0-9a-f]{10}\.png$/.test(k))).toBe(true);
+    expect([...gerado.arquivos.keys()].some((k) => /^imagens\/investimentos\.[0-9a-f]{10}\.png$/.test(k))).toBe(false);
     // Vem depois de Metas e antes de Família, na ordem das abas, e a página diz quais são as cinco.
     expect(h.indexOf('<article class="recurso" id="metas"')).toBeGreaterThan(0);
     expect(h.indexOf('<article class="recurso" id="investir"')).toBeGreaterThan(h.indexOf('<article class="recurso" id="metas"'));
@@ -1162,7 +1334,9 @@ describe('site público: Investir, metas, segurança, títulos e acabamento (12/
     expect(nota.alt).not.toBe(anotar.alt);
     expect(recurso('nota')).toContain(`alt="${esc(nota.alt)}"`);
     expect(recurso('nota')).toContain('>Leitura de nota fiscal e de comprovante</h3>');
-    expect(recurso('anotar')).toContain(`alt="${esc(anotar.alt)}"`);
+    // Anotar gasto mostra o vídeo de anotar um gasto (D-115); a captura "anotar" continua no kit de imprensa.
+    expect(recurso('anotar')).toContain('data-titulo="Anotar um gasto"');
+    expect(html('imprensa.html')).toContain(`alt="${esc(anotar.alt)}"`);
     // As duas capturas não são a mesma imagem (os pixels diferem) e toda captura do site tem origem que existe.
     const daImagem = (id: string) => gerado.arquivos.get([...gerado.arquivos.keys()].find((k) => k.startsWith(`imagens/${id}.`))!) as Buffer;
     const a = png.decodificar(daImagem('anotar'));
@@ -1575,8 +1749,11 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     for (const nome of POSTS_INICIAIS) {
       const pagina = h(nome);
       expect(pagina, nome).toContain('<time datetime="2026-10-23">23 de outubro de 2026</time> · Equipe Clarevo');
-      const fontes = /<h2 id="fontes">Fontes<\/h2>\s*<ol class="fontes">([\s\S]*?)<\/ol>/.exec(pagina)?.[1] ?? '';
+      // D-115: as fontes em grupos ("Na Clarevo" e "Fontes oficiais"), sem numeração e sem lista dentro de lista.
+      const fontes = /<h2 id="fontes">Fontes<\/h2>([\s\S]*?)<p class="revisao">/.exec(pagina)?.[1] ?? '';
       expect((fontes.match(/<li/g) ?? []).length, `${nome}: fontes`).toBeGreaterThanOrEqual(2);
+      expect(fontes, nome).not.toMatch(/<ol\b|<li>(?:(?!<\/li>)[\s\S])*<(ul|ol)\b/);
+      expect(fontes, nome).toMatch(/^\n<h3 id="fontes-clarevo">Na Clarevo<\/h3>\n<ul class="fontes-lista">/);
       const ld = JSON.parse(/<script type="application\/ld\+json">([^<]*)<\/script>/.exec(pagina)![1]!);
       expect(ld).toMatchObject({ '@type': 'Article', datePublished: '2026-10-23', author: { name: 'Equipe Clarevo' } });
       expect(ld.headline.length).toBeGreaterThan(10);
@@ -1619,8 +1796,17 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     // As cinco abas, pelo nome.
     expect(p).toContain('cinco abas: Resumo, Movimentos, Metas, Investir e Aprender');
     // Fontes: as páginas do site e as fontes do tema.
-    const fontes = /<h2 id="fontes">Fontes<\/h2>\s*<ol class="fontes">([\s\S]*?)<\/ol>/.exec(p)?.[1] ?? '';
-    for (const destino of ['../app/index.html', '../ajuda/organizar.html#guia-investimentos', '../ajuda/organizar.html#guia-metas', '../calculadoras/multa-e-juros.html', '../seguranca.html']) expect(fontes, destino).toContain(`href="${destino}"`);
+    const fontes = /<h3 id="fontes-clarevo">Na Clarevo<\/h3>\n<ul class="fontes-lista">([\s\S]*?)<\/ul>/.exec(p)?.[1] ?? '';
+    for (const destino of ['../app/index.html', '../ajuda/organizar.html#guia-investimentos', '../ajuda/organizar.html#guia-metas', '../calculadoras/multa-e-juros.html', '../seguranca.html', '../aprender/rotativo-cartao.html']) expect(fontes, destino).toContain(`href="${destino}"`);
+    // O tema de Aprender com a data de revisão na mesma linha, e as fontes oficiais dele no outro grupo, cada uma com a organização em
+    // negrito, o título como link e a data de consulta.
+    expect(fontes).toContain(`Aprender: ${esc(tema.title)}</a> <span class="fonte-data">revisado em ${tema.reviewedOn.split('-').reverse().join('/')}</span></li>`);
+    const oficiais = /<h3 id="fontes-externas">Fontes oficiais<\/h3>\n<ul class="fontes-lista">([\s\S]*?)<\/ul>/.exec(p)?.[1] ?? '';
+    for (const s of tema.sources) {
+      if (s.kind !== 'oficial') continue;
+      expect(oficiais, s.url).toContain(`<li><strong>${esc(s.publisher)}</strong>: <a href="${esc(s.url)}" rel="noopener noreferrer">${esc(s.title)}</a> <span class="fonte-data">consultada em ${s.consultedOn!.split('-').reverse().join('/')}</span></li>`);
+    }
+    expect(p).toContain('<p class="fontes-nota">Os temas também se apoiam em regras da própria Clarevo, que dizem como o app funciona e por isso não têm link.</p>');
     // A regra vigente: nada de preço, "grátis", período de teste, data de lançamento, lojas nem convite a cadastrar, baixar ou assinar.
     const principal = /<main[\s\S]*<\/main>/.exec(p)![0];
     expect(principal).not.toMatch(/R\$\s?\d|gr[áa]tis|gratuit|14 dias|teste gr|assin(e|ar|atura)|cadastr|baix(e|ar)|crie (a )?sua conta|comece agora|em breve|App Store|Google Play|milh[õo]es|\bmelhor(es)?\b/i);
@@ -1637,13 +1823,18 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     for (const par of t.paragraphs) expect(p).toContain(`<p>${esc(par)}</p>`);
     expect(p).toContain(`<p>${esc(t.example!)}</p>`);
     expect(p).toContain(`<p>${esc(t.hypotheses!)}</p>`);
+    // As fontes dos dois temas, sem repetir endereço, cada uma numa linha com a organização em negrito e o título como link (D-115); as
+    // regras da própria Clarevo viram a nota do fim, sem os códigos internos.
     for (const s of t.sources) {
       if (s.kind === 'clarevo') {
-        expect(p).toContain('Regra da própria Clarevo');
+        expect(p).toContain('regras da própria Clarevo, que dizem como o app funciona');
         expect(p).not.toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
-      } else expect(p).toContain(esc(LEARN_UI_TEXT.sourceLine(s)));
-      if (s.kind === 'oficial') expect(p).toContain(`href="${esc(s.url)}"`);
+      } else if (s.kind === 'oficial') {
+        expect(p).toContain(`<strong>${esc(s.publisher)}</strong>: <a href="${esc(s.url)}" rel="noopener noreferrer">${esc(s.title)}</a>`);
+        expect(p.split(`href="${esc(s.url)}"`).length - 1, s.url).toBe(1);
+      }
     }
+    expect(p).not.toMatch(/<ol class="fontes">/);
     expect(p).toContain('href="../aprender/decimo-terceiro.html"');
     expect(p).not.toMatch(/\{\{/);
     // Nada sobra de diretiva: toda "{{tema:...}}" dos posts existe no catálogo.
@@ -1687,7 +1878,17 @@ describe('site público: Novidades, feed e dados estruturados', () => {
     // Com domínio, o botão e o link existem e apontam para o feed.
     const comDominio = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
     const ic = texto(comDominio.arquivos.get('novidades/index.html'));
-    expect(ic).toContain('href="feed.xml">Feed RSS</a>');
+    // D-115: o botão "Feed RSS" leva à página que explica o RSS e mostra o endereço; o <link rel="alternate"> continua no XML.
+    expect(ic).toContain('href="rss.html">Feed RSS</a>');
+    const rss = texto(comDominio.arquivos.get('novidades/rss.html'));
+    expect(rss).toContain('<h1>Acompanhar as Novidades por RSS</h1>');
+    expect(rss).toContain('<input id="rss-endereco" type="text" readonly value="https://exemplo.test/novidades/feed.xml"');
+    expect(rss).toContain('<button type="button" class="botao botao-principal" data-copiar="rss-endereco" data-estado="rss-estado" hidden>Copiar o endereço</button>');
+    // O arquivo do feed como link de texto, dentro da nota (revisão: não um botão em destaque).
+    expect(rss).toContain('<a href="feed.xml">abrir o arquivo do feed</a>.</p>');
+    expect(rss).not.toMatch(/class="botao[^"]*" href="feed\.xml"/);
+    expect(rss).not.toMatch(/xsl|stylesheet[^"]*feed/i);
+    expect(semDominio.arquivos.has('novidades/rss.html')).toBe(false);
     expect(ic).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades da Clarevo" href="feed.xml">');
     for (const nome of POSTS) expect(texto(comDominio.arquivos.get(nome)), nome).toContain('<link rel="alternate" type="application/rss+xml" title="Novidades da Clarevo" href="feed.xml">');
   });
@@ -1818,7 +2019,7 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
   const gerado = gerarSite();
   const h = (nome: string) => texto(gerado.arquivos.get(nome));
   const videos = require(join(ROOT, 'scripts', 'site', 'videos.js')) as {
-    VIDEOS: { id: string; titulo: string; frase: string; descricao: string }[];
+    VIDEOS: { id: string; titulo: string; descricao: string }[];
     LEGENDA_TELA: string;
   };
   const imagens = require(join(ROOT, 'scripts', 'site', 'imagens.js')) as {
@@ -1849,7 +2050,7 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
       // O arquivo de site-src/videos é o mesmo publicado.
       expect(bytesMp4.equals(readFileSync(join(ROOT, 'site-src', 'videos', `${v.id}.mp4`))), v.id).toBe(true);
       // O texto: título, frase e descrição, sem valores em reais (que só aparecem na seção Planos da página inicial).
-      for (const t of [v.titulo, v.frase, v.descricao]) expect(t, v.id).not.toMatch(/R\$\s?\d|[\u2013\u2014]|faz\w*\s+sentido/);
+      for (const t of [v.titulo, v.descricao]) expect(t, v.id).not.toMatch(/R\$\s?\d|[\u2013\u2014]|faz\w*\s+sentido/);
       expect(v.descricao.length, v.id).toBeGreaterThan(120);
     }
     // A política de segurança aceita vídeo só do próprio site, e os vídeos ficam guardados por um ano no navegador.
@@ -1857,28 +2058,58 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
     expect(h('_headers')).toContain('/videos/*\n  Cache-Control: public, max-age=31536000, immutable\n');
   });
 
-  it('"Veja o app em uso" na página inicial e em O app: cada vídeo com a capa, os controles, sem tocar sozinho, o nome, a frase, a legenda da demonstração e a descrição em texto', () => {
+  it('D-115: cada vídeo fica no bloco que ele mostra, na moldura de celular, sem controles nem autoplay, com a legenda da demonstração, o nome e a descrição em texto', () => {
+    // Onde cada vídeo fica: a página inicial (a capa e três cartões de "O que o app faz") e O app (seis recursos e o cartão do tema).
+    const lugares: [string, string, RegExp][] = [
+      ['index.html', 'resumo-do-mes', /<section class="capa[^"]*">[\s\S]*?<\/section>/],
+      ['index.html', 'anotar-gasto', /<article class="cartao">\n<h3>Anotar e ver o mês<\/h3>[\s\S]*?<\/article>/],
+      ['index.html', 'importar-fatura-print', /<article class="cartao">\n<h3>Contas, cartões e gastos fixos<\/h3>[\s\S]*?<\/article>/],
+      ['index.html', 'metas', /<article class="cartao">\n<h3>Metas e reserva<\/h3>[\s\S]*?<\/article>/],
+      ['app/index.html', 'resumo-do-mes', /<article class="recurso" id="resumo"[\s\S]*?<\/article>/],
+      ['app/index.html', 'anotar-gasto', /<article class="recurso" id="anotar"[\s\S]*?<\/article>/],
+      ['app/index.html', 'calendario-do-mes', /<article class="recurso" id="contas"[\s\S]*?<\/article>/],
+      ['app/index.html', 'importar-fatura-print', /<article class="recurso" id="cartoes"[\s\S]*?<\/article>/],
+      ['app/index.html', 'metas', /<article class="recurso" id="metas"[\s\S]*?<\/article>/],
+      ['app/index.html', 'investir', /<article class="recurso" id="investir"[\s\S]*?<\/article>/],
+      ['app/index.html', 'tema-escuro-claro', /<article class="cartao">\n<h3>Tema claro ou escuro<\/h3>[\s\S]*?<\/article>/],
+    ];
+    for (const [pagina, id, onde] of lugares) {
+      const p = h(pagina);
+      const v = videos.VIDEOS.find((x) => x.id === id)!;
+      const bloco = onde.exec(p)?.[0] ?? '';
+      expect(bloco, `${pagina}: ${id}`).toContain(`data-titulo="${esc(v.titulo)}"`);
+      const item = /<figure class="celular celular-video" data-video [\s\S]*?<\/figure>/.exec(bloco)?.[0] ?? '';
+      expect(item).toMatch(/<video muted loop playsinline preload="none" width="720" height="1560" poster="[^"]*imagens\/video-[a-z-]+\.[0-9a-f]{10}\.png"/);
+      expect(item).toContain(`aria-labelledby="video-${id}-nome" aria-describedby="video-${id}-descricao"`);
+      // WebM primeiro (mais leve), depois o MP4, e um link para o MP4 se o navegador não tocar nenhum dos dois.
+      expect(item).toMatch(new RegExp(`<source src="[^"]*videos/${id}\\.[0-9a-f]{10}\\.webm" type="video/webm">\\s*<source src="[^"]*videos/${id}\\.[0-9a-f]{10}\\.mp4" type="video/mp4">\\s*<a href="[^"]*videos/${id}\\.[0-9a-f]{10}\\.mp4">`));
+      expect(item).toMatch(new RegExp(`<p class="video-texto" hidden><span id="video-${id}-nome">Vídeo: ${esc(v.titulo)}</span>, \\d+ segundos, sem som\\. <span id="video-${id}-descricao">`));
+      expect(item).toContain(`<span id="video-${id}-descricao">${esc(v.descricao)}</span>`);
+      expect(item).toContain(`<figcaption>${videos.LEGENDA_TELA}</figcaption>`);
+      expect(item).not.toMatch(/\s(controls|autoplay)\b|<details/);
+    }
+    // Cada vídeo aparece uma vez em cada página onde fica; a seção "Veja o app em uso" saiu (D-115).
     for (const pagina of ['index.html', 'app/index.html']) {
       const p = h(pagina);
-      const secao = /<h2 id="em-uso">Veja o app em uso<\/h2>[\s\S]*?<\/ul>/.exec(p)?.[0] ?? '';
-      expect(secao, pagina).not.toBe('');
-      expect(secao).toContain('Nenhum começa sozinho: toque no vídeo para assistir.');
-      const tags = [...secao.matchAll(/<video\b[^>]*>/g)].map((m) => m[0]);
-      expect(tags.length, pagina).toBe(videos.VIDEOS.length);
-      expect(p).not.toMatch(/\sautoplay\b|\sloop\b|<audio\b|youtube|vimeo/i);
-      for (const v of videos.VIDEOS) {
-        const item = new RegExp(`<li class="video">\\s*<figure>[\\s\\S]*?id="video-${v.id}-titulo"[\\s\\S]*?</li>`).exec(secao)?.[0] ?? '';
-        expect(item, `${pagina}: ${v.id}`).not.toBe('');
-        expect(item).toMatch(/<video controls preload="none" playsinline width="720" height="1560" poster="[^"]*imagens\/video-[a-z-]+\.[0-9a-f]{10}\.png"/);
-        expect(item).toContain(`aria-labelledby="video-${v.id}-titulo" aria-describedby="video-${v.id}-descricao"`);
-        // WebM primeiro (mais leve), depois o MP4, e um link para baixar se o navegador não tocar nenhum dos dois.
-        expect(item).toMatch(new RegExp(`<source src="[^"]*videos/${v.id}\\.[0-9a-f]{10}\\.webm" type="video/webm">\\s*<source src="[^"]*videos/${v.id}\\.[0-9a-f]{10}\\.mp4" type="video/mp4">`));
-        expect(item).toContain(`<h3 id="video-${v.id}-titulo">${esc(v.titulo)}</h3>`);
-        expect(item).toContain(`<p>${esc(v.frase)}</p>`);
-        expect(item).toMatch(new RegExp(`<p class="legenda">${videos.LEGENDA_TELA}\\. \\d+ segundos, sem som\\.</p>`));
-        expect(item).toContain(`<details class="video-descricao"><summary>Descrição do vídeo</summary><p id="video-${v.id}-descricao">${esc(v.descricao)}</p></details>`);
-      }
+      expect(p).not.toContain('Veja o app em uso');
+      expect(p).not.toContain('id="em-uso"');
+      expect(p).not.toMatch(/\sautoplay\b|\scontrols\b|<audio\b|youtube|vimeo/i);
+      for (const v of videos.VIDEOS) expect((p.match(new RegExp(`id="video-${v.id}-nome"`, 'g')) ?? []).length, `${pagina}: ${v.id}`).toBeLessThanOrEqual(1);
+      expect(p).toMatch(/<script src="(\.\.\/)?js\/videos\.js" defer><\/script>/);
     }
+    expect(h('app/index.html').match(/<video\b/g)?.length).toBe(7);
+    expect(h('index.html').match(/<video\b/g)?.length).toBe(4);
+    // O cartão do tema leva à resposta da Ajuda sobre o tema.
+    expect(h('app/index.html')).toMatch(/<h3>Tema claro ou escuro<\/h3>[\s\S]*?<a href="\.\.\/ajuda\/conta\.html#p-tema">Como usar<\/a>/);
+    expect(h('ajuda/conta.html')).toContain('id="p-tema"');
+    // O script dos vídeos: do próprio site, sem rede, sem guardar nada, com o botão de pausar e tocar e as preferências de movimento e de dados.
+    const js = h('js/videos.js');
+    expect(js).toContain('IntersectionObserver');
+    expect(js).toContain('prefers-reduced-motion: reduce');
+    expect(js).toContain('saveData');
+    expect(js).toContain('Pausar o vídeo: ');
+    expect(js).toContain('Tocar o vídeo: ');
+    expect(js).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|innerHTML|eval\(/);
     expect(videos.LEGENDA_TELA).toBe('Tela da demonstração, com dados fictícios');
   });
 
@@ -1926,7 +2157,16 @@ describe('site público: contraste das cores (a regra de src/contrast.ts, 4,5:1 
   const css = readFileSync(join(SITE, 'estilo.css'), 'utf8');
   const variaveis = (bloco: string) => Object.fromEntries([...bloco.matchAll(/--([a-z0-9-]+):(#[0-9A-Fa-f]{6})/g)].map((m) => [m[1]!, m[2]!]));
   const claro = variaveis(/:root\{([^}]*)\}/.exec(css)![1]!);
-  const escuro = { ...claro, ...variaveis(/@media \(prefers-color-scheme: dark\)\{\s*:root\{([^}]*)\}/.exec(css)![1]!) };
+  // D-115: as cores escuras valem com o tema do aparelho (sem a escolha "Claro") e com a escolha "Escuro"; os dois blocos são iguais.
+  const blocoEscuro = /@media \(prefers-color-scheme: dark\)\{\s*:root:not\(\[data-tema="claro"\]\)\{([^}]*)\}/.exec(css)![1]!;
+  const blocoEscolhido = /\n:root\[data-tema="escuro"\]\{([^}]*)\}/.exec(css)![1]!;
+  const escuro = { ...claro, ...variaveis(blocoEscuro) };
+  it('o tema escuro escolhido no rodapé usa exatamente as cores do tema escuro do aparelho', () => {
+    expect(variaveis(blocoEscolhido)).toEqual(variaveis(blocoEscuro));
+    expect(Object.keys(variaveis(blocoEscuro)).length).toBeGreaterThanOrEqual(12);
+    expect(css).toContain(':root[data-tema="claro"]{color-scheme:light}');
+    expect(css).toContain(':root[data-tema="escuro"]{color-scheme:dark}');
+  });
 
   /** [texto, fundo, onde aparece] */
   const TEXTOS: [string, string, string][] = [
