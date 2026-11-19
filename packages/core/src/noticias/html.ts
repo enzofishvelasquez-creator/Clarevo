@@ -199,7 +199,9 @@ export function lerMarcacao(fonte: string, { xml = false }: { xml?: boolean } = 
  * outro (`javascript:`, `data:`, `mailto:`, `file:`) vira `null`.
  */
 export function resolverLink(href: string, base?: string | null): string | null {
-  const limpo = href.replace(INVISIVEIS, '').replace(/[\u0000- \u007f]+/g, '').trim();
+  // Tira os caracteres de controle (o `URL` já ignora tabulação e quebra de linha) e os espaços das pontas; um espaço no meio fica e vira
+  // %20, como no navegador. Quem barra `javascript:` e afins é a conferência do protocolo, logo abaixo.
+  const limpo = href.replace(INVISIVEIS, '').replace(/[\u0000-\u001f\u007f]+/g, '').trim();
   if (limpo === '' || limpo.length > 2000) return null;
   try {
     const u = base ? new URL(limpo, base) : new URL(limpo);
@@ -241,6 +243,8 @@ interface No {
 /** Limites: o texto inteiro de uma notícia nunca chega perto; passou disso, a matéria fica só com o link para a fonte. */
 const MAX_PROFUNDIDADE = 40;
 export const MAX_TEXTO_DA_MATERIA = 200_000;
+
+const ehQuebra = (f: No | string | undefined): boolean => typeof f === 'object' && f.tag === 'br';
 
 function montarArvore(html: string, base: string | null): { raiz: No; tamanho: number } | null {
   const raiz: No = { tag: '#raiz', filhos: [] };
@@ -295,7 +299,9 @@ function montarArvore(html: string, base: string | null): { raiz: No; tamanho: n
     if (t.tipo === 'texto') {
       const s = t.texto.replace(INVISIVEIS, '');
       if (s.trim() === '') {
-        if (dentroDeTexto()) topo().filhos.push(' ');
+        // Um espaço só, e nenhum depois de uma quebra (assim "<br> <br> <br>" também conta como quebras seguidas).
+        const ultimo = topo().filhos.at(-1);
+        if (dentroDeTexto() && ultimo !== ' ' && !ehQuebra(ultimo)) topo().filhos.push(' ');
         continue;
       }
       tamanho += s.length;
@@ -316,7 +322,8 @@ function montarArvore(html: string, base: string | null): { raiz: No; tamanho: n
       }
       if (!PERMITIDOS.has(tag)) continue; // Só enfeita: o texto de dentro fica.
       if (tag === 'br') {
-        if (dentroDeTexto()) topo().filhos.push({ tag: 'br', filhos: [] });
+        // No máximo duas quebras seguidas (uma linha em branco): uma fileira de milhares de `br` não vira trabalho nem espaço na página.
+        if (dentroDeTexto() && !(ehQuebra(topo().filhos.at(-1)) && ehQuebra(topo().filhos.at(-2)))) topo().filhos.push({ tag: 'br', filhos: [] });
         continue;
       }
       if (tag === 'p' || tag === 'h2' || tag === 'h3') {
@@ -365,6 +372,26 @@ function montarArvore(html: string, base: string | null): { raiz: No; tamanho: n
 
 const ehVazio = (s: string) => s.replace(INVISIVEIS, '').replace(/[\s\u00a0]+/g, '') === '';
 
+/**
+ * Tira os espaços e os `<br>` das pontas de um bloco, num laço que vê cada caractere uma vez (a expressão regular equivalente demora o
+ * quadrado do tamanho numa fileira de espaços ou de `<br>` no meio do texto).
+ */
+function aparar(s: string): string {
+  let ini = 0;
+  let fim = s.length;
+  for (;;) {
+    if (ini < fim && /\s/.test(s[ini]!)) ini++;
+    else if (ini + 4 <= fim && s.startsWith('<br>', ini)) ini += 4;
+    else break;
+  }
+  for (;;) {
+    if (fim > ini && /\s/.test(s[fim - 1]!)) fim--;
+    else if (fim - 4 >= ini && s.startsWith('<br>', fim - 4)) fim -= 4;
+    else break;
+  }
+  return s.slice(ini, fim);
+}
+
 /** Escreve a árvore: sem elemento vazio, sem `br` nas pontas de um bloco, espaços juntados, um bloco por linha. */
 function escrever(no: No): string {
   const partes: string[] = [];
@@ -381,7 +408,7 @@ function escrever(no: No): string {
       if (blocos.length === 0) return '';
       return `<${no.tag}>\n${blocos.join('\n')}\n</${no.tag}>`;
     }
-    dentro = dentro.replace(/^(?:\s|<br>)+|(?:\s|<br>)+$/g, '').replace(/ {2,}/g, ' ');
+    dentro = aparar(dentro).replace(/ {2,}/g, ' ');
     if (ehVazio(dentro.replace(/<[^>]+>/g, '')) && !/<(ul|ol)>/.test(dentro)) return '';
     return `<${no.tag}>${dentro}</${no.tag}>`;
   }
@@ -439,9 +466,10 @@ export const paragrafos = (html: string): string[] =>
 export function frases(texto: string): string[] {
   const t = texto.replace(/\s+/g, ' ').trim();
   if (t === '') return [];
-  // Corta depois do ponto (e das aspas ou parênteses que fecham a frase) seguido de espaço: "R$ 1.000,00" e "3.5" não cortam.
+  // Corta depois do ponto (e de até três aspas ou parênteses que fecham a frase) seguido de espaço: "R$ 1.000,00" e "3.5" não cortam. O
+  // limite de três deixa a procura para trás curta, mesmo numa fileira longa de aspas.
   return t
-    .split(/(?<=[.!?\u2026]["'\u201d\u2019)\]]*)\s+/)
+    .split(/(?<=[.!?\u2026]["'\u201d\u2019)\]]{0,3})\s+/)
     .map((f) => f.trim())
     .filter((f) => f !== '');
 }

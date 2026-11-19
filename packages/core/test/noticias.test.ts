@@ -3,11 +3,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { MAX_BYTES_DO_FEED, lerDataDoFeed, lerFeed, pareceCorpoInteiro, type ItemDoFeed } from '../src/noticias/feed';
-import { CODIGO_DE_ACAO, EMPRESAS_LISTADAS, MERCADO_NO_CORPO, PALAVRAS_DE_MERCADO, REGRAS_DE_TEMA, corpoCitaMercado, foraDaLinhaEditorial, normalizar, temaDaNoticia } from '../src/noticias/filtro';
+import { CODIGO_DE_ACAO, EMPRESAS_LISTADAS, PALAVRAS_DE_MERCADO, REGRAS_DE_TEMA, corpoCitaMercado, foraDaLinhaEditorial, normalizar, temaDaNoticia } from '../src/noticias/filtro';
 import { FONTES_NOTICIAS, FONTES_PUBLICAS, NOTICIAS_TEXT, PORTAIS_PRIVADOS, TEMAS_NOTICIAS, feedPermitido, fontesParaLer, licencaEfetiva, type FonteNoticias } from '../src/noticias/fontes';
 import { MAX_TEXTO_DA_MATERIA, decodificarEntidades, filtrarHtml, frases, lerMarcacao, resolverLink, resumir, textoPuro } from '../src/noticias/html';
-import { MAX_NOTICIAS, creditoDaAgenciaBrasil, creditoDaAutoria, idDaNoticia, juntarNoticias, prepararNoticia } from '../src/noticias';
-import { NOTICIAS_CACHE_MS, NOTICIAS_FALHA_MS, buscarFeed, corpoDaLista, createNoticiasHandler, type NoticiasFetch } from '../src/noticias/servidor';
+import { MAX_NOTICIAS, creditoDaAgenciaBrasil, creditoDaAutoria, htmlDaMateria, idDaNoticia, juntarNoticias, prepararNoticia } from '../src/noticias';
+import { NOTICIAS_CACHE_MS, NOTICIAS_FALHA_MS, NOTICIAS_VALIDADE_MS, buscarFeed, corpoDaLista, createNoticiasHandler, type NoticiasFetch } from '../src/noticias/servidor';
 
 /**
  * Notícias do site (D-117): o leitor de feeds (com amostras reais dos feeds conferidos em 19/11/2026, em `test/fixtures/noticias`), o
@@ -26,7 +26,7 @@ const AMOSTRAS: Record<string, string> = {
   'receita-federal': 'receita-federal.xml',
   'ministerio-da-fazenda': 'ministerio-da-fazenda.xml',
 };
-const ler = (id: string) => lerFeed(amostra(AMOSTRAS[id]!), { base: fonte(id).feed })!;
+const ler = (id: string) => lerFeed(amostra(AMOSTRAS[id]!), { base: fonte(id).feed, descricaoEhCorpo: fonte(id).descricaoEhCorpo === true })!;
 /** O instante das amostras: 19/11/2026, 18h em Brasília. */
 const AGORA = Date.parse('2026-11-19T21:00:00Z');
 const TRAVESSAO = /[\u2013\u2014]/;
@@ -291,6 +291,45 @@ describe('notícias: o filtro de HTML do texto inteiro', () => {
   });
 });
 
+describe('notícias: entradas feitas para demorar (revisão de 19/11/2026)', () => {
+  /** Quanto tempo uma chamada leva, em milissegundos. */
+  const tempo = (fn: () => unknown) => {
+    const t0 = performance.now();
+    fn();
+    return performance.now() - t0;
+  };
+
+  it('fileiras enormes de <br>, de espaço não separável e de aspas passam em tempo curto (sem expressão regular que demora o quadrado)', () => {
+    const N = 50_000;
+    // Antes da correção, 40 mil <br> no meio de um parágrafo levavam uns 3 segundos.
+    expect(tempo(() => filtrarHtml(`<p>a${'<br>'.repeat(N)}b</p>`))).toBeLessThan(1500);
+    expect(tempo(() => filtrarHtml(`<p>a${'&nbsp;'.repeat(N)}b</p>`))).toBeLessThan(1500);
+    expect(tempo(() => filtrarHtml(`<p>a${'<br> '.repeat(N)}b</p>`))).toBeLessThan(1500);
+    expect(tempo(() => frases(`Fim.${'"'.repeat(N)} Outra frase.`))).toBeLessThan(1500);
+    expect(tempo(() => resumir(`Fim.${')'.repeat(N)} Outra.`))).toBeLessThan(1500);
+  });
+
+  it('no máximo duas quebras seguidas, e nenhuma nas pontas do bloco', () => {
+    expect(filtrarHtml(`<p>a${'<br>'.repeat(10)}b</p>`)).toBe('<p>a<br><br>b</p>');
+    expect(filtrarHtml(`<p>a${'<br> \n '.repeat(10)}b</p>`)).toBe('<p>a<br><br> b</p>');
+    expect(filtrarHtml(`<p>${'<br>'.repeat(5)} a ${'<br>'.repeat(5)}</p>`)).toBe('<p>a</p>');
+    expect(filtrarHtml('<p>a <strong>b</strong> c</p>')).toBe('<p>a <strong>b</strong> c</p>');
+  });
+
+  it('frases: até três aspas ou parênteses depois do ponto ainda fecham a frase', () => {
+    expect(frases('Ele disse: "Vamos." Depois saiu.')).toEqual(['Ele disse: "Vamos."', 'Depois saiu.']);
+    expect(frases('(Veja a tabela.)) Outra.')).toEqual(['(Veja a tabela.))', 'Outra.']);
+  });
+
+  it('link com espaço no meio continua apontando para o mesmo lugar (vira %20); controle e espaço nas pontas saem', () => {
+    expect(resolverLink('https://www.gov.br/a b')).toBe('https://www.gov.br/a%20b');
+    expect(resolverLink('  https://www.gov.br/a\tb\n ')).toBe('https://www.gov.br/ab');
+    expect(resolverLink('java\u0001script:alert(1)')).toBeNull();
+    expect(resolverLink(' javascript:alert(1)')).toBeNull();
+    expect(resolverLink('java script:alert(1)', 'https://www.gov.br/x/')).toBe('https://www.gov.br/x/java%20script:alert(1)');
+  });
+});
+
 describe('notícias: o filtro de temas e a linha editorial da CVM', () => {
   it('as palavras ficam normalizadas, sem repetição, e cada tema tem pelo menos uma palavra', () => {
     for (const r of REGRAS_DE_TEMA) {
@@ -299,7 +338,8 @@ describe('notícias: o filtro de temas e a linha editorial da CVM', () => {
       for (const p of todas) expect(normalizar(p), `${r.tema}: ${p}`).toBe(p);
       expect(new Set(todas).size, r.tema).toBe(todas.length);
     }
-    for (const p of [...PALAVRAS_DE_MERCADO, ...MERCADO_NO_CORPO]) expect(normalizar(p), p).toBe(p);
+    for (const p of PALAVRAS_DE_MERCADO) expect(normalizar(p), p).toBe(p);
+    expect(new Set(PALAVRAS_DE_MERCADO).size).toBe(PALAVRAS_DE_MERCADO.length);
     expect(new Set(EMPRESAS_LISTADAS).size).toBe(EMPRESAS_LISTADAS.length);
   });
 
@@ -325,6 +365,7 @@ describe('notícias: o filtro de temas e a linha editorial da CVM', () => {
       ['Salário mínimo de 2027 terá aumento real', 'salario'],
       ['Segunda parcela do 13º salário deve ser paga até 20 de dezembro', 'salario'],
       ['Mais de 276 mil trabalhadores ainda não sacaram o abono salarial', 'salario'],
+      ['INSS começa a devolver descontos indevidos a aposentados', 'golpes'],
     ];
     for (const [titulo, tema] of casos) expect(temaDaNoticia(titulo), titulo).toBe(tema);
     // Palavra que, solta no resumo, fala de outra coisa só vale no título.
@@ -342,6 +383,10 @@ describe('notícias: o filtro de temas e a linha editorial da CVM', () => {
       'Ministério lembra que a caderneta de vacinação deve estar em dia',
       'Brasil simplifica exportação de cosméticos para América Latina',
       'Veja como será o cálculo da hora extra com a escala de trabalho 5x2',
+      // "Rotativo" só conta como crédito rotativo.
+      'Prefeitura muda regras do estacionamento rotativo',
+      // Fraude que não é golpe contra a pessoa (fiscalização de exportação).
+      'RFB aplica perdimento de carga de ouro após identificar fraudes em exportações',
     ]) expect(temaDaNoticia(titulo), titulo).toBeNull();
   });
 
@@ -358,6 +403,8 @@ describe('notícias: o filtro de temas e a linha editorial da CVM', () => {
       'Nubank amplia limite do cartão',
       'Americanas entra com pedido na Justiça',
       'Copom e Itaú: o que esperar',
+      'Juros futuros sobem depois da ata do Copom',
+      'Cotação do dólar fecha em alta',
     ]) expect(foraDaLinhaEditorial(texto), texto).toBe(true);
     for (const texto of [
       'Banco Central do Brasil divulga a ata do Copom',
@@ -370,16 +417,34 @@ describe('notícias: o filtro de temas e a linha editorial da CVM', () => {
     expect(CODIGO_DE_ACAO.test('KNRI11 e VALE3')).toBe(true);
     expect(CODIGO_DE_ACAO.test('IPCA15 e COP31')).toBe(false);
     expect(corpoCitaMercado('No mercado, o Ibovespa caiu 1%.')).toBe(true);
-    expect(corpoCitaMercado('A bolsa de valores reagiu.')).toBe(false);
+    expect(corpoCitaMercado('A bolsa de valores reagiu.')).toBe(true);
+    expect(corpoCitaMercado('Os acionistas receberam dividendos.')).toBe(true);
+    // Um banco citado de passagem numa matéria de consumo não tira o texto inteiro (no título, no resumo e nos assuntos, tira a notícia).
+    expect(corpoCitaMercado('A renegociação vale nas agências do Banco do Brasil e da Caixa.')).toBe(false);
   });
 });
 
 describe('notícias: crédito, licença, resumo e junção das fontes', () => {
   it('o texto inteiro da Agência Brasil só com o crédito da própria Agência Brasil, sem parceiro nem "com informações de"', () => {
-    for (const autor of ['Pedro Peduzzi - Repórter da Agência Brasil', 'Ana Cristina Campos \u2013 Repórter da Agência Brasil', 'Bruno de Freitas Moura \u2500 Repórter da Agência Brasil', 'Fabíola Sinimbú - repórter da Agência Brasil', 'Agência Brasil', ' Vitor Abdala - Repórter da Agência Brasil ']) {
+    for (const autor of ['Pedro Peduzzi - Repórter da Agência Brasil', 'Ana Cristina Campos \u2013 Repórter da Agência Brasil', 'Bruno de Freitas Moura \u2500 Repórter da Agência Brasil', 'Fabíola Sinimbú - repórter da Agência Brasil', 'Agência Brasil', ' Vitor Abdala - Repórter da Agência Brasil ', 'Fulana de Tal e Beltrano Silva - Repórteres da Agência Brasil']) {
       expect(creditoDaAgenciaBrasil(autor, 'Texto da matéria.'), autor).toBe(true);
     }
-    for (const autor of ['Wellton Máximo \u2013 Repórter da Agência Brasil*', 'Agência Brasil*', 'Dimas Soldi - Repórter da TV Brasil', 'Priscila Thereso - Repórter da Rádio Nacional', 'Redação', '', null]) {
+    for (const autor of [
+      'Wellton Máximo \u2013 Repórter da Agência Brasil*',
+      'Agência Brasil*',
+      'Dimas Soldi - Repórter da TV Brasil',
+      'Priscila Thereso - Repórter da Rádio Nacional',
+      'Redação',
+      '',
+      null,
+      // Autoria conjunta com parceiro: só título e link.
+      'Fulana - Repórter da Rádio Nacional e Beltrano - Repórter da Agência Brasil',
+      'Fulana - Repórter da TV Brasil - Repórter da Agência Brasil',
+      'Fulana (Reuters) - Repórter da Agência Brasil',
+      'Fulana, da Rádio Nacional, e Beltrano - Repórter da Agência Brasil',
+      'Fulana da TV Brasil e Beltrano - Repórteres da Agência Brasil',
+      `${'Nome '.repeat(60)}- Repórter da Agência Brasil`,
+    ]) {
       expect(creditoDaAgenciaBrasil(autor, 'Texto da matéria.'), String(autor)).toBe(false);
     }
     expect(creditoDaAgenciaBrasil('Agência Brasil', 'Texto. * com informações da Reuters')).toBe(false);
@@ -406,12 +471,15 @@ describe('notícias: crédito, licença, resumo e junção das fontes', () => {
     // Agência Brasil com crédito próprio: texto inteiro e o primeiro parágrafo como resumo.
     expect(durigan!.resumo).toBe('O ministro da Fazenda, Dario Durigan, afirmou, nesta terça-feira (17), que a implementação da reforma tributária pode gerar pequeno impacto inicial sobre a inflação. A observação foi em resposta à preocupação manifestada por senadores com uma eventual alta do índice.');
     expect(durigan!.autor).toBe('Por Pedro Peduzzi, repórter da Agência Brasil');
-    expect(durigan!.html).toContain('<h2>Tributação corporativa</h2>');
+    expect(durigan!.corpoHtml).not.toBeNull();
+    expect(htmlDaMateria(durigan!)).toContain('<h2>Tributação corporativa</h2>');
+    expect(htmlDaMateria(durigan!)).toBe(htmlDaMateria(durigan!));
     expect(durigan!.licenca).toBe(fonte('agencia-brasil-economia').linhaDeLicenca);
     // Matéria da TV Brasil republicada pela Agência Brasil: só título e link (o corpo nunca vira resumo).
-    expect(tomate).toMatchObject({ textoCompleto: false, resumo: null, html: null, autor: 'Por Dimas Soldi, repórter da TV Brasil' });
+    expect(tomate).toMatchObject({ textoCompleto: false, resumo: null, corpoHtml: null, autor: 'Por Dimas Soldi, repórter da TV Brasil' });
+    expect(htmlDaMateria(tomate!)).toBeNull();
     // Banco Central: só resumo pela licença, e o feed não traz resumo à parte, então fica só o título.
-    expect(pix).toMatchObject({ textoCompleto: false, resumo: null, html: null, autor: null, link: 'https://www.bcb.gov.br/detalhenoticia/21320/noticia' });
+    expect(pix).toMatchObject({ textoCompleto: false, resumo: null, corpoHtml: null, autor: null, link: 'https://www.bcb.gov.br/detalhenoticia/21320/noticia' });
     // De fora: a do dólar (Ibovespa e parceiro), a do BNDES (crédito para empresas), a da hora extra e as de reforma tributária do gov.br.
     const titulos = lista.map((n) => n.titulo).join('\n');
     expect(titulos).not.toMatch(/Dólar sobe|BNDES|hora extra|Cash Out|Prisma Fiscal|IBS/);
@@ -430,7 +498,8 @@ describe('notícias: crédito, licença, resumo e junção das fontes', () => {
       expect(n.textoCompleto).toBe(false);
       expect(n.fonte).toBe('Receita Federal');
       const original = itens.find((i) => i.link === n.link)!;
-      expect(n.resumo).toBe(resumir(textoPuro(original.resumoHtml!)));
+      // A linha fina inteira, sem corte (CC BY-ND 3.0: sem versão editada).
+      expect(n.resumo).toBe(textoPuro(original.resumoHtml!).replace(/\s+/g, ' ').trim());
     }
   });
 
@@ -438,9 +507,25 @@ describe('notícias: crédito, licença, resumo e junção das fontes', () => {
     const portal: FonteNoticias = { id: 'portal', nome: 'Portal de Exemplo', site: 'https://portal.exemplo.test/', feed: 'https://portal.exemplo.test/feed', hosts: ['portal.exemplo.test'], tipo: 'privada', licenca: 'texto_completo', linhaDeLicenca: 'Notícia do Portal de Exemplo.', conferido: '19/11/2026' };
     const base: ItemDoFeed = { titulo: 'Copom mantém a Selic', link: 'https://portal.exemplo.test/a', data: AGORA - 3600_000, autor: 'Repórter', categorias: [], resumoHtml: '<p>Primeira frase do portal. Segunda frase. Terceira frase que não entra.</p>', corpoHtml: `<p>${'Corpo inteiro da matéria. '.repeat(40)}</p>` };
     const n = prepararNoticia(base, portal, AGORA)!;
-    expect(n).toMatchObject({ resumo: 'Primeira frase do portal. Segunda frase.', textoCompleto: false, html: null, fonte: 'Portal de Exemplo' });
+    expect(n).toMatchObject({ resumo: 'Primeira frase do portal. Segunda frase.', textoCompleto: false, corpoHtml: null, fonte: 'Portal de Exemplo' });
     const corpoNoDescription = lerFeed(`<rss><channel><item><title>Copom mantém a Selic</title><link>https://portal.exemplo.test/b</link><pubDate>Thu, 19 Nov 2026 10:00:00 -0300</pubDate><description>${`&lt;p&gt;${'Texto da matéria. '.repeat(50)}&lt;/p&gt;`.repeat(3)}</description></item></channel></rss>`, { base: portal.feed })!.itens[0]!;
-    expect(prepararNoticia(corpoNoDescription, portal, AGORA)).toMatchObject({ resumo: null, textoCompleto: false, html: null });
+    expect(prepararNoticia(corpoNoDescription, portal, AGORA)).toMatchObject({ resumo: null, textoCompleto: false, corpoHtml: null });
+  });
+
+  it('Agência Brasil: o description é sempre o corpo, mesmo curto; matéria de parceiro curta fica só com título e link, sem resumo tirado do corpo', () => {
+    const ab = fonte('agencia-brasil-economia');
+    const curta = '&lt;p&gt;O Copom manteve a Selic em 15% ao ano nesta quarta.&lt;/p&gt;&lt;p&gt;A decisão foi unânime.&lt;/p&gt;';
+    const xml = (autor: string) =>
+      `<rss xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><item><title>Copom mantém a Selic</title><link>https://agenciabrasil.ebc.com.br/economia/x</link><pubDate>Thu, 19 Nov 2026 10:00:00 -0300</pubDate><dc:creator>${autor}</dc:creator><description>${curta}</description></item></channel></rss>`;
+    const parceiro = lerFeed(xml('Priscila Thereso - Repórter da Rádio Nacional'), { base: ab.feed, descricaoEhCorpo: true })!.itens[0]!;
+    expect(parceiro.resumoHtml).toBeNull();
+    expect(parceiro.corpoHtml).toContain('Copom');
+    expect(prepararNoticia(parceiro, ab, AGORA)).toMatchObject({ resumo: null, textoCompleto: false, corpoHtml: null });
+    // Sem a marca da fonte, o mesmo description curto ficaria como resumo (o caso que a marca evita).
+    expect(lerFeed(xml('Priscila Thereso - Repórter da Rádio Nacional'), { base: ab.feed })!.itens[0]!.resumoHtml).not.toBeNull();
+    // Da própria Agência Brasil, curta: resumo do primeiro parágrafo, sem texto inteiro (é uma chamada).
+    const propria = lerFeed(xml('Pedro Peduzzi - Repórter da Agência Brasil'), { base: ab.feed, descricaoEhCorpo: true })!.itens[0]!;
+    expect(prepararNoticia(propria, ab, AGORA)).toMatchObject({ resumo: 'O Copom manteve a Selic em 15% ao ano nesta quarta.', textoCompleto: false });
   });
 
   it('descarta notícia sem título, sem link, sem data, com data no futuro ou com link para fora dos sites da fonte; corpo curto ou com mercado fica sem texto inteiro', () => {
@@ -578,7 +663,16 @@ describe('notícias: o atendimento de /api/noticias (servidor.ts)', () => {
     expect(pedidos.length).toBe(n);
     t += 2000;
     await atender({ method: 'GET', rota: 'lista' });
-    expect(pedidos.length).toBe(n + FONTES_NOTICIAS.length);
+    // Só o feed que falhou é buscado de novo; os outros seguem a hora deles.
+    expect(pedidos.slice(n)).toEqual([fonte('agencia-brasil-economia').feed]);
+    // Fora do ar por mais de 12 horas: as notícias dele saem da lista até ele voltar.
+    const comAgencia = JSON.parse((await atender({ method: 'GET', rota: 'lista' })).body).noticias as { fonte: string }[];
+    expect(comAgencia.some((x) => x.fonte === 'Agência Brasil')).toBe(true);
+    t += NOTICIAS_VALIDADE_MS;
+    const semAgencia = JSON.parse((await atender({ method: 'GET', rota: 'lista' })).body) as { consultadoEm: string; noticias: { fonte: string }[] };
+    expect(semAgencia.noticias.length).toBeGreaterThan(0);
+    expect(semAgencia.noticias.some((x) => x.fonte === 'Agência Brasil')).toBe(false);
+    expect(semAgencia.consultadoEm).toBe(new Date(t).toISOString());
 
     // Um atendimento novo, com tudo fora do ar: 503 e nada de buscar de novo antes de 5 minutos.
     const fora: string[] = [];

@@ -89,7 +89,7 @@
     var a;
     if (n.textoCompleto === true) {
       a = elemento('a', null, lista.getAttribute('data-ler-aqui'));
-      a.href = lista.getAttribute('data-materia') + '?id=' + n.id;
+      a.href = lista.getAttribute('data-endereco-materia') + '?id=' + n.id;
       a.appendChild(soLeitor(': ' + n.titulo));
     } else {
       a = linkDeFora(linkSeguro(n.link), lista.getAttribute('data-ler-na-fonte'));

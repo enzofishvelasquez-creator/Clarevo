@@ -32,6 +32,11 @@ export interface FonteNoticias {
   licenca: LicencaNoticias;
   /** Conferência de crédito por notícia: `agencia-brasil` só deixa o texto inteiro para matéria assinada pela própria Agência Brasil. */
   credito?: 'agencia-brasil';
+  /**
+   * A fonte põe a matéria inteira no `description` do RSS (a Agência Brasil): ele é sempre o corpo, mesmo curto, e nunca vira o resumo de
+   * uma notícia que fica só com título e link.
+   */
+  descricaoEhCorpo?: boolean;
   /** A linha de licença que a página de leitura mostra (e a lista, em "De onde vêm as notícias"). */
   linhaDeLicenca: string;
   /** Quando e como o feed foi conferido. */
@@ -49,6 +54,7 @@ export const FONTES_PUBLICAS: readonly FonteNoticias[] = [
     tipo: 'publica',
     licenca: 'texto_completo',
     credito: 'agencia-brasil',
+    descricaoEhCorpo: true,
     linhaDeLicenca:
       'Texto da Agência Brasil (EBC), reproduzido sem alterações e com o crédito da autoria. A formatação foi simplificada, e fotos, vídeos e tabelas ficam só na matéria original.',
     conferido: 'RSS 2.0, 19/11/2026: 10 matérias da editoria de Economia, com o texto inteiro em <description> (HTML escapado), autoria em <dc:creator>, data em <pubDate> e assuntos em <category>.',
@@ -168,7 +174,7 @@ export const NOTICIAS_TEXT = {
   lerNaFonte: 'Ler na fonte',
   tituloDeOnde: 'De onde vêm as notícias',
   deOnde:
-    'O servidor da Clarevo lê os feeds públicos da Agência Brasil, do Banco Central do Brasil, da Receita Federal e do Ministério da Fazenda e mostra só os temas de finanças pessoais. Nada sobre empresas, ações, bolsa ou dicas de investimento. O navegador de quem visita só fala com o próprio site da Clarevo.',
+    'O servidor da Clarevo lê os feeds públicos da Agência Brasil, do Banco Central do Brasil, da Receita Federal e do Ministério da Fazenda e mostra só os temas de finanças pessoais. Notícias sobre ações, bolsa, empresas listadas ou dicas de investimento ficam de fora. O navegador de quem visita só fala com o próprio site da Clarevo.',
   comoLer:
     'Quando a licença da fonte permite, o texto aparece aqui, sem alterações e com o crédito, em "Ler aqui". Nos outros casos, a página mostra o título, a data, a fonte e um resumo curto do próprio feed, e o texto fica na fonte, em "Ler na fonte". Imagens de outros sites nunca aparecem aqui.',
   regraTextoCompleto: 'o texto pode aparecer aqui quando o feed traz a matéria inteira',

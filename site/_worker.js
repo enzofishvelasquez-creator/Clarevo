@@ -1486,16 +1486,16 @@ const __mods = [
   function (module, exports, __req) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ID_VALIDO = exports.ACEITA_FEED = exports.NOTICIAS_TIMEOUT_MS = exports.NOTICIAS_NAVEGADOR_S = exports.NOTICIAS_FALHA_MS = exports.NOTICIAS_CACHE_MS = void 0;
+exports.ID_VALIDO = exports.ACEITA_FEED = exports.NOTICIAS_TIMEOUT_MS = exports.NOTICIAS_NAVEGADOR_S = exports.NOTICIAS_VALIDADE_MS = exports.NOTICIAS_FALHA_MS = exports.NOTICIAS_CACHE_MS = void 0;
 exports.buscarFeed = buscarFeed;
 exports.corpoDaLista = corpoDaLista;
 exports.createNoticiasHandler = createNoticiasHandler;
-const dates_1 = __req(1);
-const feed_1 = __req(2);
-const fontes_1 = __req(4);
-const index_1 = __req(5);
+const feed_1 = __req(1);
+const fontes_1 = __req(3);
+const index_1 = __req(4);
 exports.NOTICIAS_CACHE_MS = 60 * 60 * 1000;
 exports.NOTICIAS_FALHA_MS = 5 * 60 * 1000;
+exports.NOTICIAS_VALIDADE_MS = 12 * 60 * 60 * 1000;
 exports.NOTICIAS_NAVEGADOR_S = 15 * 60;
 exports.NOTICIAS_TIMEOUT_MS = 8000;
 exports.ACEITA_FEED = 'application/rss+xml, application/atom+xml, application/rdf+xml;q=0.9, application/xml;q=0.8, text/xml;q=0.8';
@@ -1509,7 +1509,7 @@ async function buscarFeed(fonte, deps) {
         const xml = await r.text();
         if (typeof xml !== 'string' || xml.length > feed_1.MAX_BYTES_DO_FEED)
             return null;
-        return (0, feed_1.lerFeed)(xml, { base: fonte.feed })?.itens ?? null;
+        return (0, feed_1.lerFeed)(xml, { base: fonte.feed, descricaoEhCorpo: fonte.descricaoEhCorpo === true })?.itens ?? null;
     }
     catch {
         return null;
@@ -1528,9 +1528,10 @@ const ok = (body, metodo) => ({
 });
 exports.ID_VALIDO = /^[0-9a-f]{16}$/;
 function corpoDaLista(lista, consultadoEm, fontes = fontes_1.FONTES_NOTICIAS) {
+    const horario = (0, index_1.horarioDeBrasilia)(consultadoEm);
     return JSON.stringify({
         consultadoEm,
-        atualizado: `Atualizado em ${(0, dates_1.formatDateTimeBR)(consultadoEm, index_1.NOTICIAS_FUSO)}, horário de Brasília.`,
+        atualizado: `Atualizado em ${horario.data} às ${horario.hora}, horário de Brasília.`,
         fontes: (0, fontes_1.fontesParaLer)(fontes).map((f) => ({ nome: f.nome, site: f.site })),
         noticias: lista.map(index_1.paraLista),
     });
@@ -1539,28 +1540,36 @@ function createNoticiasHandler(deps) {
     const agora = deps.agora ?? (() => Date.now());
     const cacheMs = deps.cacheMs ?? exports.NOTICIAS_CACHE_MS;
     const falhaMs = deps.falhaMs ?? exports.NOTICIAS_FALHA_MS;
+    const validadeMs = deps.validadeMs ?? exports.NOTICIAS_VALIDADE_MS;
     const fontes = deps.fontes ?? fontes_1.FONTES_NOTICIAS;
     const porFonte = new Map();
+    const proxima = new Map();
     let copia = null;
     let emCurso = null;
-    let semNadaAte = 0;
     const consultar = async () => {
         const t = agora();
-        const lidos = await Promise.all(fontes.map(async (f) => [f, await buscarFeed(f, { fetch: deps.fetch, fontes })]));
-        let falhas = 0;
+        const devidas = fontes.filter((f) => t >= (proxima.get(f.id) ?? 0));
+        const lidos = await Promise.all(devidas.map(async (f) => [f, await buscarFeed(f, { fetch: deps.fetch, fontes })]));
         for (const [f, itens] of lidos) {
-            if (itens)
-                porFonte.set(f.id, itens);
+            if (itens) {
+                porFonte.set(f.id, { noticias: (0, index_1.prepararFonte)(f, itens, t), lidoEm: t });
+                proxima.set(f.id, t + cacheMs);
+            }
             else
-                falhas++;
+                proxima.set(f.id, t + falhaMs);
         }
-        if (falhas === fontes.length) {
-            if (copia)
-                copia = { ...copia, ate: t + falhaMs };
+        for (const [id, v] of porFonte)
+            if (t - v.lidoEm > validadeMs)
+                porFonte.delete(id);
+        const ate = Math.min(...fontes.map((f) => proxima.get(f.id) ?? t + falhaMs));
+        if (porFonte.size === 0) {
+            copia = null;
             return;
         }
-        const lista = (0, index_1.juntarNoticias)(fontes.filter((f) => porFonte.has(f.id)).map((f) => ({ fonte: f, itens: porFonte.get(f.id) })), t, fontes);
-        copia = { lista, consultadoEm: new Date(t).toISOString(), ate: t + (falhas === 0 ? cacheMs : falhaMs) };
+        const comNoticias = fontes.filter((f) => porFonte.has(f.id));
+        const lista = (0, index_1.juntarPreparadas)(comNoticias.map((f) => ({ fonte: f, noticias: porFonte.get(f.id).noticias })), fontes);
+        const lidoEm = Math.max(...comNoticias.map((f) => porFonte.get(f.id).lidoEm));
+        copia = { lista, consultadoEm: new Date(lidoEm).toISOString(), ate };
     };
     return async (req) => {
         if (req.method !== 'GET' && req.method !== 'HEAD')
@@ -1568,225 +1577,22 @@ function createNoticiasHandler(deps) {
         if (req.rota === 'materia' && !exports.ID_VALIDO.test(req.id ?? ''))
             return erro(400, 'id');
         const t = agora();
-        const valida = copia !== null && t < copia.ate;
-        if (!valida && t >= semNadaAte) {
+        if (copia === null || t >= copia.ate) {
             emCurso ??= consultar().finally(() => {
                 emCurso = null;
             });
             await emCurso;
-            if (copia === null)
-                semNadaAte = agora() + falhaMs;
         }
         if (copia === null)
             return erro(503, 'indisponivel');
         if (req.rota === 'lista')
             return ok(corpoDaLista(copia.lista, copia.consultadoEm, fontes), req.method);
         const n = copia.lista.find((x) => x.id === req.id);
-        if (!n || !n.textoCompleto || !n.html)
+        const html = n ? (0, index_1.htmlDaMateria)(n) : null;
+        if (!n || !html)
             return erro(404, 'nao-encontrada');
-        const { html, ...resto } = n;
-        return ok(JSON.stringify({ ...(0, index_1.paraLista)(n), autor: resto.autor, licenca: resto.licenca, html }), req.method);
+        return ok(JSON.stringify({ ...(0, index_1.paraLista)(n), autor: n.autor, licenca: n.licenca, html }), req.method);
     };
-}
-  },
-  // packages/core/src/dates.ts
-  function (module, exports, __req) {
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.isValidIsoDate = isValidIsoDate;
-exports.daysInMonth = daysInMonth;
-exports.parseDateBR = parseDateBR;
-exports.formatDateBR = formatDateBR;
-exports.formatDayMonth = formatDayMonth;
-exports.formatListDate = formatListDate;
-exports.formatShortDate = formatShortDate;
-exports.deviceTimeZone = deviceTimeZone;
-exports.todayIn = todayIn;
-exports.addDays = addDays;
-exports.maskDateBR = maskDateBR;
-exports.monthOf = monthOf;
-exports.isValidIsoMonth = isValidIsoMonth;
-exports.monthsBetween = monthsBetween;
-exports.dateInMonth = dateInMonth;
-exports.parseMonthBR = parseMonthBR;
-exports.formatMonthInputBR = formatMonthInputBR;
-exports.maskMonthBR = maskMonthBR;
-exports.addMonths = addMonths;
-exports.addMonthsToDate = addMonthsToDate;
-exports.addYearsClamped = addYearsClamped;
-exports.daysBetween = daysBetween;
-exports.monthRange = monthRange;
-exports.formatDateTimeBR = formatDateTimeBR;
-exports.formatDayHeader = formatDayHeader;
-exports.formatMonthName = formatMonthName;
-exports.formatMonthBR = formatMonthBR;
-exports.formatMonthYearBR = formatMonthYearBR;
-exports.formatMonthSpanBR = formatMonthSpanBR;
-const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-function isValidIsoDate(value) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    if (!m)
-        return false;
-    const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-    if (mo < 1 || mo > 12 || d < 1)
-        return false;
-    return d <= daysInMonth(y, mo);
-}
-function daysInMonth(y, mo) {
-    return new Date(Date.UTC(y, mo, 0)).getUTCDate();
-}
-function parseDateBR(input) {
-    const m = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*$/.exec(input);
-    if (!m)
-        return null;
-    const iso = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-    return isValidIsoDate(iso) ? iso : null;
-}
-function formatDateBR(iso) {
-    const [y, m, d] = iso.split('-');
-    return `${d}/${m}/${y}`;
-}
-function formatDayMonth(iso) {
-    const [, m, d] = iso.split('-');
-    return `${d}/${m}`;
-}
-function formatListDate(iso, today) {
-    return iso.slice(0, 4) === today.slice(0, 4) ? formatDayMonth(iso) : formatDateBR(iso);
-}
-function formatShortDate(iso) {
-    const [, m, d] = iso.split('-');
-    return `${Number(d)} ${(MONTHS[Number(m) - 1] ?? '').slice(0, 3)}`;
-}
-function deviceTimeZone() {
-    try {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo';
-    }
-    catch {
-        return 'America/Sao_Paulo';
-    }
-}
-function todayIn(timeZone, now = new Date()) {
-    try {
-        const parts = new Intl.DateTimeFormat('en-CA', {
-            timeZone,
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            calendar: 'gregory',
-            numberingSystem: 'latn',
-        }).formatToParts(now);
-        const get = (type) => parts.find((p) => p.type === type)?.value ?? '';
-        const iso = `${get('year')}-${get('month').padStart(2, '0')}-${get('day').padStart(2, '0')}`;
-        if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && isValidIsoDate(iso))
-            return iso;
-    }
-    catch {
-    }
-    return localIsoDate(now);
-}
-function localIsoDate(now) {
-    return `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-function addDays(date, delta) {
-    const [y, m, d] = date.split('-').map(Number);
-    return new Date(Date.UTC(y, m - 1, d + delta)).toISOString().slice(0, 10);
-}
-function maskDateBR(text) {
-    const d = text.replace(/\D/g, '').slice(0, 8);
-    return d.slice(0, 2) + (d.length > 2 ? `/${d.slice(2, 4)}` : '') + (d.length > 4 ? `/${d.slice(4)}` : '');
-}
-function monthOf(date) {
-    return date.slice(0, 7);
-}
-function isValidIsoMonth(value) {
-    return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
-}
-function monthsBetween(from, to) {
-    const [y1, m1] = from.split('-').map(Number);
-    const [y2, m2] = to.split('-').map(Number);
-    return y2 * 12 + m2 - (y1 * 12 + m1);
-}
-function dateInMonth(month, day) {
-    const [y, m] = month.split('-').map(Number);
-    return `${month}-${String(Math.min(day, daysInMonth(y, m))).padStart(2, '0')}`;
-}
-function parseMonthBR(input) {
-    const m = /^\s*(\d{1,2})\/(\d{4})\s*$/.exec(input);
-    if (!m)
-        return null;
-    const month = `${m[2]}-${m[1].padStart(2, '0')}`;
-    return isValidIsoMonth(month) ? month : null;
-}
-function formatMonthInputBR(month) {
-    const [y, m] = month.split('-');
-    return `${m}/${y}`;
-}
-function maskMonthBR(text) {
-    const d = text.replace(/\D/g, '').slice(0, 6);
-    return d.slice(0, 2) + (d.length > 2 ? `/${d.slice(2)}` : '');
-}
-function addMonths(month, delta) {
-    const [y, m] = month.split('-').map(Number);
-    const total = y * 12 + (m - 1) + delta;
-    return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
-}
-function addMonthsToDate(date, delta) {
-    const month = addMonths(monthOf(date), delta);
-    const [y, m] = month.split('-').map(Number);
-    const d = Math.min(Number(date.slice(8, 10)), daysInMonth(y, m));
-    return `${month}-${String(d).padStart(2, '0')}`;
-}
-function addYearsClamped(date, delta) {
-    return addMonthsToDate(date, delta * 12);
-}
-function daysBetween(from, to) {
-    const utc = (iso) => {
-        const [y, m, d] = iso.split('-').map(Number);
-        return Date.UTC(y, m - 1, d);
-    };
-    return Math.round((utc(to) - utc(from)) / 86_400_000);
-}
-function monthRange(month) {
-    return { start: `${month}-01`, endExclusive: `${addMonths(month, 1)}-01` };
-}
-function formatDateTimeBR(isoInstant, timeZone) {
-    const parts = new Intl.DateTimeFormat('pt-BR', {
-        timeZone,
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hourCycle: 'h23',
-    }).formatToParts(new Date(isoInstant));
-    const get = (t) => parts.find((p) => p.type === t)?.value ?? '';
-    return `${get('day')}/${get('month')}/${get('year')} às ${get('hour')}:${get('minute')}`;
-}
-function formatDayHeader(date, today) {
-    if (date === today)
-        return 'Hoje';
-    if (date === addDays(today, -1))
-        return 'Ontem';
-    const [, m, d] = date.split('-');
-    return `${Number(d)} de ${MONTHS[Number(m) - 1] ?? ''}`;
-}
-function formatMonthName(month) {
-    return MONTHS[Number(month.slice(5, 7)) - 1] ?? '';
-}
-function formatMonthBR(month) {
-    const [y, m] = month.split('-');
-    const name = MONTHS[Number(m) - 1] ?? '';
-    return `${name.charAt(0).toUpperCase()}${name.slice(1)} de ${y}`;
-}
-function formatMonthYearBR(month) {
-    return `${formatMonthName(month)} de ${month.slice(0, 4)}`;
-}
-function formatMonthSpanBR(from, to) {
-    if (from === to)
-        return `em ${formatMonthYearBR(from)}`;
-    if (from.slice(0, 4) === to.slice(0, 4))
-        return `de ${formatMonthName(from)} a ${formatMonthYearBR(to)}`;
-    return `de ${formatMonthYearBR(from)} a ${formatMonthYearBR(to)}`;
 }
   },
   // packages/core/src/noticias/feed.ts
@@ -1798,8 +1604,8 @@ exports.lerXml = lerXml;
 exports.lerDataDoFeed = lerDataDoFeed;
 exports.pareceCorpoInteiro = pareceCorpoInteiro;
 exports.lerFeed = lerFeed;
-const html_1 = __req(3);
-exports.MAX_BYTES_DO_FEED = 2 * 1024 * 1024;
+const html_1 = __req(2);
+exports.MAX_BYTES_DO_FEED = 512 * 1024;
 exports.MAX_ITENS_POR_FEED = 50;
 const MAX_ELEMENTOS = 50_000;
 const MAX_PROFUNDIDADE = 64;
@@ -1919,7 +1725,7 @@ function pareceCorpoInteiro(html) {
 }
 const limpar = (s) => s.replace(/[\u200b\u200c\u200d\u2060\ufeff]/g, '').replace(/\s+/g, ' ').trim();
 const opcional = (s) => (s.trim() === '' ? null : s);
-function lerFeed(xml, { base }) {
+function lerFeed(xml, { base, descricaoEhCorpo = false }) {
     const doc = lerXml(xml);
     if (!doc)
         return null;
@@ -1931,13 +1737,13 @@ function lerFeed(xml, { base }) {
         return { formato: 'atom', itens: lerAtom(raiz, base) };
     if (nomeDaRaiz === 'rss') {
         const canal = filho(raiz, 'channel') ?? raiz;
-        return { formato: 'rss2', itens: lerItensRss(filhos(canal, 'item'), base) };
+        return { formato: 'rss2', itens: lerItensRss(filhos(canal, 'item'), base, descricaoEhCorpo) };
     }
     if (nomeDaRaiz === 'rdf')
-        return { formato: 'rss1', itens: lerItensRss(filhos(raiz, 'item'), base) };
+        return { formato: 'rss1', itens: lerItensRss(filhos(raiz, 'item'), base, descricaoEhCorpo) };
     return null;
 }
-function lerItensRss(itens, base) {
+function lerItensRss(itens, base, descricaoEhCorpo) {
     return itens.slice(0, exports.MAX_ITENS_POR_FEED).map((it) => {
         const linkTexto = limpar(textoDe(filho(it, 'link')));
         const guid = filho(it, 'guid');
@@ -1948,7 +1754,7 @@ function lerItensRss(itens, base) {
         const conteudo = textoDe(filho(it, 'content:encoded'));
         let corpo = opcional(conteudo);
         let resumo = opcional(descricao);
-        if (!corpo && resumo && pareceCorpoInteiro(resumo)) {
+        if (!corpo && resumo && (descricaoEhCorpo || pareceCorpoInteiro(resumo))) {
             corpo = resumo;
             resumo = null;
         }
@@ -2174,7 +1980,7 @@ function lerMarcacao(fonte, { xml = false } = {}) {
     return tokens;
 }
 function resolverLink(href, base) {
-    const limpo = href.replace(INVISIVEIS, '').replace(/[\u0000- \u007f]+/g, '').trim();
+    const limpo = href.replace(INVISIVEIS, '').replace(/[\u0000-\u001f\u007f]+/g, '').trim();
     if (limpo === '' || limpo.length > 2000)
         return null;
     try {
@@ -2202,6 +2008,7 @@ const BLOCOS_DE_TEXTO = new Set(['p', 'h2', 'h3', 'li']);
 const EM_LINHA = new Set(['a', 'strong', 'em']);
 const MAX_PROFUNDIDADE = 40;
 exports.MAX_TEXTO_DA_MATERIA = 200_000;
+const ehQuebra = (f) => typeof f === 'object' && f.tag === 'br';
 function montarArvore(html, base) {
     const raiz = { tag: '#raiz', filhos: [] };
     const pilha = [raiz];
@@ -2262,7 +2069,8 @@ function montarArvore(html, base) {
         if (t.tipo === 'texto') {
             const s = t.texto.replace(INVISIVEIS, '');
             if (s.trim() === '') {
-                if (dentroDeTexto())
+                const ultimo = topo().filhos.at(-1);
+                if (dentroDeTexto() && ultimo !== ' ' && !ehQuebra(ultimo))
                     topo().filhos.push(' ');
                 continue;
             }
@@ -2287,7 +2095,7 @@ function montarArvore(html, base) {
             if (!PERMITIDOS.has(tag))
                 continue;
             if (tag === 'br') {
-                if (dentroDeTexto())
+                if (dentroDeTexto() && !(ehQuebra(topo().filhos.at(-1)) && ehQuebra(topo().filhos.at(-2))))
                     topo().filhos.push({ tag: 'br', filhos: [] });
                 continue;
             }
@@ -2342,6 +2150,27 @@ function montarArvore(html, base) {
     return { raiz, tamanho };
 }
 const ehVazio = (s) => s.replace(INVISIVEIS, '').replace(/[\s\u00a0]+/g, '') === '';
+function aparar(s) {
+    let ini = 0;
+    let fim = s.length;
+    for (;;) {
+        if (ini < fim && /\s/.test(s[ini]))
+            ini++;
+        else if (ini + 4 <= fim && s.startsWith('<br>', ini))
+            ini += 4;
+        else
+            break;
+    }
+    for (;;) {
+        if (fim > ini && /\s/.test(s[fim - 1]))
+            fim--;
+        else if (fim - 4 >= ini && s.startsWith('<br>', fim - 4))
+            fim -= 4;
+        else
+            break;
+    }
+    return s.slice(ini, fim);
+}
 function escrever(no) {
     const partes = [];
     for (const f of no.filhos) {
@@ -2362,7 +2191,7 @@ function escrever(no) {
                 return '';
             return `<${no.tag}>\n${blocos.join('\n')}\n</${no.tag}>`;
         }
-        dentro = dentro.replace(/^(?:\s|<br>)+|(?:\s|<br>)+$/g, '').replace(/ {2,}/g, ' ');
+        dentro = aparar(dentro).replace(/ {2,}/g, ' ');
         if (ehVazio(dentro.replace(/<[^>]+>/g, '')) && !/<(ul|ol)>/.test(dentro))
             return '';
         return `<${no.tag}>${dentro}</${no.tag}>`;
@@ -2418,7 +2247,7 @@ function frases(texto) {
     if (t === '')
         return [];
     return t
-        .split(/(?<=[.!?\u2026]["'\u201d\u2019)\]]*)\s+/)
+        .split(/(?<=[.!?\u2026]["'\u201d\u2019)\]]{0,3})\s+/)
         .map((f) => f.trim())
         .filter((f) => f !== '');
 }
@@ -2457,6 +2286,7 @@ exports.FONTES_PUBLICAS = [
         tipo: 'publica',
         licenca: 'texto_completo',
         credito: 'agencia-brasil',
+        descricaoEhCorpo: true,
         linhaDeLicenca: 'Texto da Agência Brasil (EBC), reproduzido sem alterações e com o crédito da autoria. A formatação foi simplificada, e fotos, vídeos e tabelas ficam só na matéria original.',
         conferido: 'RSS 2.0, 19/11/2026: 10 matérias da editoria de Economia, com o texto inteiro em <description> (HTML escapado), autoria em <dc:creator>, data em <pubDate> e assuntos em <category>.',
     },
@@ -2556,7 +2386,7 @@ exports.NOTICIAS_TEXT = {
     lerAqui: 'Ler aqui',
     lerNaFonte: 'Ler na fonte',
     tituloDeOnde: 'De onde vêm as notícias',
-    deOnde: 'O servidor da Clarevo lê os feeds públicos da Agência Brasil, do Banco Central do Brasil, da Receita Federal e do Ministério da Fazenda e mostra só os temas de finanças pessoais. Nada sobre empresas, ações, bolsa ou dicas de investimento. O navegador de quem visita só fala com o próprio site da Clarevo.',
+    deOnde: 'O servidor da Clarevo lê os feeds públicos da Agência Brasil, do Banco Central do Brasil, da Receita Federal e do Ministério da Fazenda e mostra só os temas de finanças pessoais. Notícias sobre ações, bolsa, empresas listadas ou dicas de investimento ficam de fora. O navegador de quem visita só fala com o próprio site da Clarevo.',
     comoLer: 'Quando a licença da fonte permite, o texto aparece aqui, sem alterações e com o crédito, em "Ler aqui". Nos outros casos, a página mostra o título, a data, a fonte e um resumo curto do próprio feed, e o texto fica na fonte, em "Ler na fonte". Imagens de outros sites nunca aparecem aqui.',
     regraTextoCompleto: 'o texto pode aparecer aqui quando o feed traz a matéria inteira',
     regraSoResumo: 'só título, data, link e, quando o feed traz, um resumo curto',
@@ -2580,15 +2410,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.idDaNoticia = exports.MAX_NOTICIAS = exports.NOTICIAS_FUSO = exports.licencaEfetiva = exports.fontesParaLer = exports.feedPermitido = exports.TEMAS_NOTICIAS = exports.NOTICIAS_TEXT = exports.PORTAIS_PRIVADOS = exports.FONTES_PUBLICAS = exports.FONTES_NOTICIAS = void 0;
 exports.creditoDaAgenciaBrasil = creditoDaAgenciaBrasil;
 exports.creditoDaAutoria = creditoDaAutoria;
+exports.horarioDeBrasilia = horarioDeBrasilia;
 exports.prepararNoticia = prepararNoticia;
+exports.htmlDaMateria = htmlDaMateria;
+exports.prepararFonte = prepararFonte;
+exports.juntarPreparadas = juntarPreparadas;
 exports.juntarNoticias = juntarNoticias;
 exports.paraLista = paraLista;
-const dates_1 = __req(1);
-const sha256_1 = __req(6);
-const fontes_1 = __req(4);
-const filtro_1 = __req(7);
-const html_1 = __req(3);
-var fontes_2 = __req(4);
+const sha256_1 = __req(5);
+const fontes_1 = __req(3);
+const filtro_1 = __req(6);
+const html_1 = __req(2);
+var fontes_2 = __req(3);
 Object.defineProperty(exports, "FONTES_NOTICIAS", { enumerable: true, get: function () { return fontes_2.FONTES_NOTICIAS; } });
 Object.defineProperty(exports, "FONTES_PUBLICAS", { enumerable: true, get: function () { return fontes_2.FONTES_PUBLICAS; } });
 Object.defineProperty(exports, "PORTAIS_PRIVADOS", { enumerable: true, get: function () { return fontes_2.PORTAIS_PRIVADOS; } });
@@ -2601,14 +2434,20 @@ exports.NOTICIAS_FUSO = 'America/Sao_Paulo';
 exports.MAX_NOTICIAS = 30;
 const FUTURO_MS = 2 * 24 * 60 * 60 * 1000;
 const MIN_TEXTO_DO_CORPO = 400;
+const MAX_LINHA_FINA = 600;
 const PARCEIROS = /\b(Reuters|AFP|France[- ]Presse|EFE|Lusa|ANSA|Xinhua|Bloomberg|Associated Press|Sputnik|Deutsche Welle|RFI|BBC|Agência Gov|Agência Senado|Agência Câmara|TV Brasil|Rádio Nacional|Radioagência)\b/i;
+const AUTORIA_DA_AGENCIA = /^(?:agência brasil|[^*()[\],;\-\u2010-\u2015\u2500]+?\s*[-\u2010-\u2015\u2500]\s*rep[oó]rter(?:a|es|as)? da agência brasil)$/i;
 function creditoDaAgenciaBrasil(autor, corpoTexto) {
     if (!autor)
         return false;
     const a = autor.replace(/\s+/g, ' ').trim();
-    if (a.includes('*'))
+    if (a.length > 200 || a.includes('*'))
         return false;
-    if (!/^(?:agência brasil|[^*]+?\s*[-\u2010-\u2015\u2500]\s*rep[oó]rter(?:a)? da agência brasil)$/i.test(a))
+    if (!AUTORIA_DA_AGENCIA.test(a))
+        return false;
+    if ((a.match(/rep[oó]rter/gi) ?? []).length > 1)
+        return false;
+    if (PARCEIROS.test(a))
         return false;
     if (/com informaç(?:ões|ão) d[aeo]s?\s/i.test(corpoTexto))
         return false;
@@ -2624,6 +2463,15 @@ function creditoDaAutoria(autor) {
     if (m)
         return `Por ${m[1].trim()}, ${m[2].charAt(0).toLowerCase()}${m[2].slice(1)}`;
     return a.replace(/[\u2013\u2014\u2500]/g, '-');
+}
+const BRASILIA_MS = -3 * 60 * 60 * 1000;
+const doisDigitos = (n) => String(n).padStart(2, '0');
+function horarioDeBrasilia(instante) {
+    const d = new Date(new Date(instante).getTime() + BRASILIA_MS);
+    return {
+        data: `${doisDigitos(d.getUTCDate())}/${doisDigitos(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`,
+        hora: `${doisDigitos(d.getUTCHours())}:${doisDigitos(d.getUTCMinutes())}`,
+    };
 }
 function linkNormalizado(link) {
     const u = new URL(link);
@@ -2647,14 +2495,20 @@ function prepararNoticia(item, fonte, agora) {
     }
     if (!fonte.hosts.includes(host))
         return null;
-    const corpoTexto = item.corpoHtml ? (0, html_1.textoPuro)(item.corpoHtml) : '';
+    const licencaPermite = (0, fontes_1.licencaEfetiva)(fonte) === 'texto_completo';
+    const corpoTexto = licencaPermite && item.corpoHtml ? (0, html_1.textoPuro)(item.corpoHtml) : '';
     const creditoOk = fonte.credito === 'agencia-brasil' ? creditoDaAgenciaBrasil(item.autor, corpoTexto) : true;
-    const permiteTexto = (0, fontes_1.licencaEfetiva)(fonte) === 'texto_completo' && creditoOk;
+    const permiteTexto = licencaPermite && creditoOk;
     let resumo = null;
-    if (item.resumoHtml)
-        resumo = (0, html_1.resumir)((0, html_1.textoPuro)(item.resumoHtml));
-    else if (permiteTexto && item.corpoHtml) {
-        const primeiro = (0, html_1.paragrafos)(item.corpoHtml).find((p) => p.length >= 40);
+    if (item.resumoHtml) {
+        const texto = (0, html_1.textoPuro)(item.resumoHtml).replace(/\s+/g, ' ').trim();
+        resumo = permiteTexto && texto.length <= MAX_LINHA_FINA ? texto : (0, html_1.resumir)(texto);
+    }
+    else if (permiteTexto && corpoTexto !== '') {
+        const primeiro = corpoTexto
+            .split(/\n{2,}/)
+            .map((p) => p.replace(/\s+/g, ' ').trim())
+            .find((p) => p.length >= 40);
         if (primeiro)
             resumo = (0, html_1.resumir)(primeiro);
     }
@@ -2666,37 +2520,49 @@ function prepararNoticia(item, fonte, agora) {
         return null;
     if ((0, filtro_1.foraDaLinhaEditorial)(`${titulo}. ${resumo ?? ''}. ${assuntos}`))
         return null;
-    let html = null;
-    if (permiteTexto && item.corpoHtml && corpoTexto.length >= MIN_TEXTO_DO_CORPO && !(0, filtro_1.corpoCitaMercado)(corpoTexto))
-        html = (0, html_1.filtrarHtml)(item.corpoHtml, item.link);
+    const textoCompleto = permiteTexto && item.corpoHtml !== null && corpoTexto.length >= MIN_TEXTO_DO_CORPO && corpoTexto.length <= html_1.MAX_TEXTO_DA_MATERIA && !(0, filtro_1.corpoCitaMercado)(corpoTexto);
     const data = new Date(item.data);
     return {
         id: (0, exports.idDaNoticia)(item.link),
         titulo,
         data: data.toISOString(),
-        dataTexto: (0, dates_1.formatDateBR)((0, dates_1.todayIn)(exports.NOTICIAS_FUSO, data)),
+        dataTexto: horarioDeBrasilia(data).data,
         fonte: fonte.nome,
         fonteId: fonte.id,
         link: item.link,
         resumo,
         tema,
         temaRotulo: fontes_1.TEMAS_NOTICIAS[tema],
-        textoCompleto: html !== null,
+        textoCompleto,
         autor: creditoDaAutoria(item.autor),
         licenca: fonte.linhaDeLicenca,
-        html,
+        corpoHtml: textoCompleto ? item.corpoHtml : null,
     };
 }
+const HTML_DAS_MATERIAS = new WeakMap();
+function htmlDaMateria(n) {
+    if (!n.textoCompleto || !n.corpoHtml)
+        return null;
+    if (!HTML_DAS_MATERIAS.has(n))
+        HTML_DAS_MATERIAS.set(n, (0, html_1.filtrarHtml)(n.corpoHtml, n.link));
+    return HTML_DAS_MATERIAS.get(n) ?? null;
+}
+function prepararFonte(fonte, itens, agora) {
+    const lista = [];
+    for (const item of itens) {
+        const n = prepararNoticia(item, fonte, agora);
+        if (n)
+            lista.push(n);
+    }
+    return lista;
+}
 const chaveDoTitulo = (t) => (0, filtro_1.normalizar)(t).replace(/[^a-z0-9 ]/g, '');
-function juntarNoticias(porFonte, agora, ordem = porFonte.map((p) => p.fonte)) {
+function juntarPreparadas(porFonte, ordem = porFonte.map((p) => p.fonte)) {
     const todas = [];
-    for (const { fonte, itens } of porFonte) {
+    for (const { fonte, noticias } of porFonte) {
         const posicao = Math.max(0, ordem.findIndex((f) => f.id === fonte.id));
-        for (const item of itens) {
-            const n = prepararNoticia(item, fonte, agora);
-            if (n)
-                todas.push({ n, posicao });
-        }
+        for (const n of noticias)
+            todas.push({ n, posicao });
     }
     todas.sort((a, b) => Number(b.n.textoCompleto) - Number(a.n.textoCompleto) || a.posicao - b.posicao || b.n.data.localeCompare(a.n.data));
     const links = new Set();
@@ -2713,6 +2579,9 @@ function juntarNoticias(porFonte, agora, ordem = porFonte.map((p) => p.fonte)) {
     }
     unicas.sort((a, b) => b.data.localeCompare(a.data) || a.titulo.localeCompare(b.titulo, 'pt-BR'));
     return unicas.slice(0, exports.MAX_NOTICIAS);
+}
+function juntarNoticias(porFonte, agora, ordem = porFonte.map((p) => p.fonte)) {
+    return juntarPreparadas(porFonte.map(({ fonte, itens }) => ({ fonte, noticias: prepararFonte(fonte, itens, agora) })), ordem);
 }
 function paraLista(n) {
     return {
@@ -2828,7 +2697,7 @@ function sha256Hex(text) {
   function (module, exports, __req) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.corpoCitaMercado = exports.MERCADO_NO_CORPO = exports.EMPRESAS_LISTADAS = exports.PALAVRAS_DE_MERCADO = exports.CODIGO_DE_ACAO = exports.REGRAS_DE_TEMA = void 0;
+exports.corpoCitaMercado = exports.EMPRESAS_LISTADAS = exports.PALAVRAS_DE_MERCADO = exports.CODIGO_DE_ACAO = exports.REGRAS_DE_TEMA = void 0;
 exports.normalizar = normalizar;
 exports.temaDaNoticia = temaDaNoticia;
 exports.foraDaLinhaEditorial = foraDaLinhaEditorial;
@@ -2851,6 +2720,7 @@ exports.REGRAS_DE_TEMA = [
             'golpe', 'golpista', 'fraude bancaria', 'fraude financeira', 'fraude no pix', 'fraudes no pix', 'fraude com cartao', 'fraudes com cartao',
             'fraude com cartoes', 'falsa central', 'falsas centrais', 'falso atendente', 'falso funcionario', 'falsos funcionarios', 'phishing',
             'engenharia social', 'boleto falso', 'boletos falsos', 'conta laranja', 'contas laranja', 'estelionato', 'estelionatario',
+            'fraude no inss', 'fraudes no inss', 'fraude contra aposentados', 'fraudes contra aposentados', 'desconto indevido', 'descontos indevidos',
         ],
         fora: [
             'golpe de estado', 'golpes de estado', 'tentativa de golpe', 'trama golpista', 'atos golpistas', 'ato golpista', 'golpe militar', 'golpe de 1964',
@@ -2871,7 +2741,7 @@ exports.REGRAS_DE_TEMA = [
     {
         tema: 'credito',
         fortes: [
-            'cartao de credito', 'cartoes de credito', 'rotativo', 'cheque especial', 'consignado', 'credito pessoal', 'credito ao consumidor',
+            'cartao de credito', 'cartoes de credito', 'credito rotativo', 'rotativo do cartao', 'juros do rotativo', 'cheque especial', 'consignado', 'credito pessoal', 'credito ao consumidor',
             'endividamento', 'superendividamento', 'endividado', 'endividada', 'inadimplencia', 'inadimplente', 'renegociacao de divida',
             'renegociacao de dividas', 'renegociar dividas', 'desenrola', 'limpa nome', 'nome sujo', 'juros do cartao', 'dividas atrasadas', 'dividas em atraso',
         ],
@@ -2913,6 +2783,7 @@ exports.PALAVRAS_DE_MERCADO = [
     'ipo', 'oferta publica inicial', 'preco-alvo', 'preco alvo', 'recomendacao de compra', 'recomendacao de venda', 'carteira recomendada',
     'onde investir', 'melhores acoes', 'melhores investimentos', 'melhores fundos', 'vale a pena investir', 'hora de comprar', 'small caps',
     'fundos imobiliarios', 'fundo imobiliario', 'balanco trimestral', 'resultado trimestral', 'lucro liquido', 'wall street', 'nasdaq', 'dow jones',
+    'juros futuros', 'curva de juros', 'mercado futuro', 'contratos futuros', 'dolar comercial', 'cotacao do dolar',
 ];
 exports.EMPRESAS_LISTADAS = [
     'Petrobras', 'Itau', 'Itau Unibanco', 'Bradesco', 'Banco do Brasil', 'Santander', 'BTG Pactual', 'XP Investimentos', 'XP Inc', 'Banco Inter',
@@ -2926,9 +2797,7 @@ const EMPRESAS = new RegExp(`(?<![A-Za-z0-9])(?:${exports.EMPRESAS_LISTADAS.map(
 function foraDaLinhaEditorial(texto) {
     return exports.CODIGO_DE_ACAO.test(texto) || MERCADO.test(` ${normalizar(texto)} `) || EMPRESAS.test(semAcento(texto));
 }
-exports.MERCADO_NO_CORPO = ['ibovespa', 'ifix', 'indice bovespa', 'preco-alvo', 'preco alvo', 'recomendacao de compra', 'recomendacao de venda', 'carteira recomendada', 'melhores acoes'];
-const CORPO = lista(exports.MERCADO_NO_CORPO);
-const corpoCitaMercado = (texto) => exports.CODIGO_DE_ACAO.test(texto) || CORPO.test(` ${normalizar(texto)} `);
+const corpoCitaMercado = (texto) => exports.CODIGO_DE_ACAO.test(texto) || MERCADO.test(` ${normalizar(texto)} `);
 exports.corpoCitaMercado = corpoCitaMercado;
   }
 ];

@@ -2842,7 +2842,7 @@ describe('site público: notícias de fontes públicas (D-117), prontas e deslig
     expect(pagina).toContain(esc(NOTICIAS_TEXT.deOnde));
     expect(pagina).toContain('<strong>Banco Central do Brasil</strong></a>: só título, data, link e, quando o feed traz, um resumo curto.');
     expect(pagina).toContain('<strong>Agência Brasil</strong></a>: o texto pode aparecer aqui quando o feed traz a matéria inteira.');
-    expect(pagina).toContain('data-materia="materia.html" data-ler-aqui="Ler aqui" data-ler-na-fonte="Ler na fonte"');
+    expect(pagina).toContain('data-endereco-materia="materia.html" data-ler-aqui="Ler aqui" data-ler-na-fonte="Ler na fonte"');
     expect(pagina).toContain(`<p class="rodape-aviso">${esc(AVISO)}</p>`);
     // Nenhuma notícia vem escrita na página (a lista vem da API) e nada de imagem, iframe ou script de outro site.
     expect(main(pagina)).not.toMatch(/<img\b|<iframe\b|<video\b|<li class="noticia-item"/);

@@ -48,6 +48,7 @@ export const REGRAS_DE_TEMA: readonly RegraDeTema[] = [
       'golpe', 'golpista', 'fraude bancaria', 'fraude financeira', 'fraude no pix', 'fraudes no pix', 'fraude com cartao', 'fraudes com cartao',
       'fraude com cartoes', 'falsa central', 'falsas centrais', 'falso atendente', 'falso funcionario', 'falsos funcionarios', 'phishing',
       'engenharia social', 'boleto falso', 'boletos falsos', 'conta laranja', 'contas laranja', 'estelionato', 'estelionatario',
+      'fraude no inss', 'fraudes no inss', 'fraude contra aposentados', 'fraudes contra aposentados', 'desconto indevido', 'descontos indevidos',
     ],
     fora: [
       'golpe de estado', 'golpes de estado', 'tentativa de golpe', 'trama golpista', 'atos golpistas', 'ato golpista', 'golpe militar', 'golpe de 1964',
@@ -68,7 +69,7 @@ export const REGRAS_DE_TEMA: readonly RegraDeTema[] = [
   {
     tema: 'credito',
     fortes: [
-      'cartao de credito', 'cartoes de credito', 'rotativo', 'cheque especial', 'consignado', 'credito pessoal', 'credito ao consumidor',
+      'cartao de credito', 'cartoes de credito', 'credito rotativo', 'rotativo do cartao', 'juros do rotativo', 'cheque especial', 'consignado', 'credito pessoal', 'credito ao consumidor',
       'endividamento', 'superendividamento', 'endividado', 'endividada', 'inadimplencia', 'inadimplente', 'renegociacao de divida',
       'renegociacao de dividas', 'renegociar dividas', 'desenrola', 'limpa nome', 'nome sujo', 'juros do cartao', 'dividas atrasadas', 'dividas em atraso',
     ],
@@ -119,6 +120,7 @@ export const PALAVRAS_DE_MERCADO: readonly string[] = [
   'ipo', 'oferta publica inicial', 'preco-alvo', 'preco alvo', 'recomendacao de compra', 'recomendacao de venda', 'carteira recomendada',
   'onde investir', 'melhores acoes', 'melhores investimentos', 'melhores fundos', 'vale a pena investir', 'hora de comprar', 'small caps',
   'fundos imobiliarios', 'fundo imobiliario', 'balanco trimestral', 'resultado trimestral', 'lucro liquido', 'wall street', 'nasdaq', 'dow jones',
+  'juros futuros', 'curva de juros', 'mercado futuro', 'contratos futuros', 'dolar comercial', 'cotacao do dolar',
 ];
 
 /**
@@ -145,12 +147,10 @@ export function foraDaLinhaEditorial(texto: string): boolean {
   return CODIGO_DE_ACAO.test(texto) || MERCADO.test(` ${normalizar(texto)} `) || EMPRESAS.test(semAcento(texto));
 }
 
-/** O que faz o texto inteiro de uma matéria ficar fora do site (a notícia continua na lista, com "Ler na fonte"). */
-export const MERCADO_NO_CORPO: readonly string[] = ['ibovespa', 'ifix', 'indice bovespa', 'preco-alvo', 'preco alvo', 'recomendacao de compra', 'recomendacao de venda', 'carteira recomendada', 'melhores acoes'];
-const CORPO = lista(MERCADO_NO_CORPO);
-
 /**
- * O corpo da matéria cita código de ação, índice de bolsa ou dica de mercado? Então o texto inteiro não aparece no site, mesmo com a
- * licença permitindo: a notícia fica só com o resumo e o link para a fonte.
+ * O corpo da matéria cita código de ação, bolsa, índice de bolsa, ações, dividendos ou dica de mercado (as mesmas palavras de
+ * `PALAVRAS_DE_MERCADO`)? Então o texto inteiro não aparece no site, mesmo com a licença permitindo: a notícia fica com o resumo e o link
+ * para a fonte. Os nomes de empresas não contam aqui: uma matéria de consumo pode citar um banco de passagem (no título, no resumo e nos
+ * assuntos, contam).
  */
-export const corpoCitaMercado = (texto: string): boolean => CODIGO_DE_ACAO.test(texto) || CORPO.test(` ${normalizar(texto)} `);
+export const corpoCitaMercado = (texto: string): boolean => CODIGO_DE_ACAO.test(texto) || MERCADO.test(` ${normalizar(texto)} `);

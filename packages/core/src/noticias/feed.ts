@@ -8,8 +8,8 @@ import { escaparHtml, lerMarcacao, resolverLink, textoPuro } from './html';
  * Nada aqui busca endereço nenhum: quem busca é o atendimento (`servidor.ts`), e só os feeds configurados (`fontes.ts`).
  */
 
-/** Um feed maior que isto nem é lido (os feeds conferidos têm de 10 a 90 KB). */
-export const MAX_BYTES_DO_FEED = 2 * 1024 * 1024;
+/** Um feed maior que isto nem é lido (os feeds conferidos têm de 10 a 90 KB): o teto deixa folga e limita o trabalho de um feed estranho. */
+export const MAX_BYTES_DO_FEED = 512 * 1024;
 /** No máximo tantas notícias por feed (os conferidos têm de 10 a 15). */
 export const MAX_ITENS_POR_FEED = 50;
 const MAX_ELEMENTOS = 50_000;
@@ -161,8 +161,11 @@ export function pareceCorpoInteiro(html: string): boolean {
 const limpar = (s: string) => s.replace(/[\u200b\u200c\u200d\u2060\ufeff]/g, '').replace(/\s+/g, ' ').trim();
 const opcional = (s: string): string | null => (s.trim() === '' ? null : s);
 
-/** Lê um feed. Devolve o formato e as notícias (no máximo `MAX_ITENS_POR_FEED`), ou `null` se não for um feed reconhecível. */
-export function lerFeed(xml: string, { base }: { base: string }): { formato: FormatoDoFeed; itens: ItemDoFeed[] } | null {
+/**
+ * Lê um feed. Devolve o formato e as notícias (no máximo `MAX_ITENS_POR_FEED`), ou `null` se não for um feed reconhecível.
+ * `descricaoEhCorpo`: a fonte põe a matéria no `description` (a Agência Brasil), que então é sempre o corpo, mesmo curto, e nunca o resumo.
+ */
+export function lerFeed(xml: string, { base, descricaoEhCorpo = false }: { base: string; descricaoEhCorpo?: boolean }): { formato: FormatoDoFeed; itens: ItemDoFeed[] } | null {
   const doc = lerXml(xml);
   if (!doc) return null;
   const raiz = elementos(doc)[0];
@@ -171,13 +174,13 @@ export function lerFeed(xml: string, { base }: { base: string }): { formato: For
   if (nomeDaRaiz === 'feed') return { formato: 'atom', itens: lerAtom(raiz, base) };
   if (nomeDaRaiz === 'rss') {
     const canal = filho(raiz, 'channel') ?? raiz;
-    return { formato: 'rss2', itens: lerItensRss(filhos(canal, 'item'), base) };
+    return { formato: 'rss2', itens: lerItensRss(filhos(canal, 'item'), base, descricaoEhCorpo) };
   }
-  if (nomeDaRaiz === 'rdf') return { formato: 'rss1', itens: lerItensRss(filhos(raiz, 'item'), base) };
+  if (nomeDaRaiz === 'rdf') return { formato: 'rss1', itens: lerItensRss(filhos(raiz, 'item'), base, descricaoEhCorpo) };
   return null;
 }
 
-function lerItensRss(itens: ElXml[], base: string): ItemDoFeed[] {
+function lerItensRss(itens: ElXml[], base: string, descricaoEhCorpo: boolean): ItemDoFeed[] {
   return itens.slice(0, MAX_ITENS_POR_FEED).map((it) => {
     const linkTexto = limpar(textoDe(filho(it, 'link')));
     const guid = filho(it, 'guid');
@@ -188,7 +191,7 @@ function lerItensRss(itens: ElXml[], base: string): ItemDoFeed[] {
     const conteudo = textoDe(filho(it, 'content:encoded'));
     let corpo: string | null = opcional(conteudo);
     let resumo: string | null = opcional(descricao);
-    if (!corpo && resumo && pareceCorpoInteiro(resumo)) {
+    if (!corpo && resumo && (descricaoEhCorpo || pareceCorpoInteiro(resumo))) {
       corpo = resumo;
       resumo = null;
     }

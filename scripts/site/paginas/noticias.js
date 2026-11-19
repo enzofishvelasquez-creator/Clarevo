@@ -183,7 +183,7 @@ function paginaIndice(edicoes, { valores }) {
   const { NOTICIAS_TEXT: T, FONTES_NOTICIAS, licencaEfetiva } = doNucleo();
   const capa = `<h1>${esc(T.titulo)}</h1>
 <p class="lead">${esc(T.lead)}</p>`;
-  const lista = `<section class="noticias" aria-labelledby="ultimas" data-noticias data-materia="${esc(rel(arquivo, ARQUIVO_MATERIA))}" data-ler-aqui="${esc(T.lerAqui)}" data-ler-na-fonte="${esc(T.lerNaFonte)}">
+  const lista = `<section class="noticias" aria-labelledby="ultimas" data-noticias data-endereco-materia="${esc(rel(arquivo, ARQUIVO_MATERIA))}" data-ler-aqui="${esc(T.lerAqui)}" data-ler-na-fonte="${esc(T.lerNaFonte)}">
 <h2 id="ultimas">${esc(T.tituloDaLista)}</h2>
 <p class="nota noticias-atualizado" data-noticias-atualizado hidden></p>
 ${estado('sem-js', T.semJavaScript, true)}
