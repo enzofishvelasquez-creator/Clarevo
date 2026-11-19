@@ -14,7 +14,9 @@ export const ANTES_EXTRA_ENTRY_PERCENTS = [10, 20];
 const RATE_RANGE_TEXT = 'Use uma taxa de 0% a 99,99% ao mês.';
 const YIELD_RANGE_TEXT = 'Use um rendimento de 0% a 30% ao ano, com até 2 casas.';
 export const ANTES_ESTIMATE_TEXT = 'Estimativa. As condições oficiais são as da proposta; peça o CET.';
-export const ANTES_RATE_HYPOTHESIS = 'A conta usa só a taxa informada: com a taxa de juros, ficam de fora tarifas, seguros e IOF; com o CET ao mês, eles já estão dentro.';
+export const ANTES_RATE_HYPOTHESIS = 'Taxa de juros do contrato: tarifas, seguros e IOF ficam de fora; o CET da proposta inclui esses custos.';
+export const ANTES_CET_HYPOTHESIS = 'Simulação de custo equivalente: o CET ao mês entra no lugar da taxa de juros, sobre o preço menos a entrada. A parcela e o custo podem ser diferentes dos do contrato, porque o CET também considera tarifas, seguros e IOF, que podem ser pagos à parte ou descontados do valor liberado.';
+export const ANTES_TOTAL_HYPOTHESIS = 'Total: número de parcelas vezes a parcela, no centavo; o contrato pode acertar alguns centavos na última.';
 export const ANTES_FIELDS = {
     preco: moneyField('Preço à vista do bem', 'o preço à vista', '50.000,00'),
     entrada: moneyField('Entrada', 'a entrada', '10.000,00', {
@@ -23,7 +25,17 @@ export const ANTES_FIELDS = {
         errors: { fora_da_faixa: 'A entrada não pode passar do preço à vista.' },
     }),
     parcelas: countField('Número de parcelas', 'o número de parcelas', ANTES_PARCELAS.min, ANTES_PARCELAS.max, 'Use de 1 a 480 parcelas.', 'De 1 a 480'),
-    taxaMes: rateField('Taxa de juros ao mês (%)', 'a taxa ao mês', '1,99', ANTES_RATE_RANGE.min, ANTES_RATE_RANGE.max, RATE_RANGE_TEXT, 'Está na proposta do banco ou da loja. Use o CET ao mês, se tiver.'),
+    tipoTaxa: {
+        label: 'Qual taxa você vai informar?',
+        hint: 'A taxa de juros do contrato dá a parcela. O CET soma tarifas, seguros e IOF: com ele, a conta vira uma simulação de custo equivalente.',
+        kind: 'opcao',
+        default: 'juros',
+        options: [
+            { value: 'juros', label: 'Taxa de juros' },
+            { value: 'cet', label: 'CET ao mês' },
+        ],
+    },
+    taxaMes: rateField('Taxa de juros ao mês (%)', 'a taxa ao mês', '1,99', ANTES_RATE_RANGE.min, ANTES_RATE_RANGE.max, RATE_RANGE_TEXT, 'Está na proposta do banco ou da loja.'),
     primeiraEmUmMes: {
         label: 'A primeira parcela vence em 1 mês?',
         hint: 'Não: a primeira parcela é paga na compra.',
@@ -59,6 +71,7 @@ export const ANTES_TEXT = {
     savingTitle: 'Juntar antes',
     entryTitle: 'Com uma entrada maior',
     noBiggerEntry: 'Com mais 10% do preço, a entrada já cobriria o preço inteiro.',
+    cetRateLabel: 'CET ao mês (%)',
     otherEntry: 'Fazer a conta com outra entrada',
     noteInstallment: 'Anotar como parcelamento',
     noteInstallmentHint: 'Vai fazer este financiamento? As parcelas entram nas contas a pagar deste mês e dos próximos. Você confere antes de salvar.',
@@ -121,19 +134,23 @@ function percentOfPrice(preco, percent) {
 }
 function financeSchedule(preco, entrada, taxaBp, n, firstInOneMonth) {
     const financed = preco - entrada;
-    let parcela = financePaymentCents(financed, taxaBp, n, firstInOneMonth);
-    if (taxaBp !== 0) {
+    if (taxaBp !== 0 || financed === 0) {
+        const parcela = financePaymentCents(financed, taxaBp, n, firstInOneMonth);
         const total = entrada + n * parcela;
-        return { parcela, last: parcela, total, interest: Math.max(0, total - preco) };
+        return { parcela, last: parcela, lastCount: 0, total, interest: Math.max(0, total - preco) };
     }
-    let last = financed - (n - 1) * parcela;
-    if (last < 1) {
-        parcela = Math.max(1, Math.floor(financed / n));
-        last = financed - (n - 1) * parcela;
-    }
-    if (last < 1)
-        return { parcela, last: parcela, total: entrada + n * parcela, interest: 0 };
-    return { parcela, last, total: preco, interest: 0 };
+    const base = Math.floor(financed / n);
+    const rest = financed - base * n;
+    return { parcela: base, last: rest > 0 ? base + 1 : base, lastCount: rest, total: preco, interest: 0 };
+}
+function parcelaRange(s) {
+    return s.last === s.parcela ? brl(s.parcela) : `${brl(s.parcela)} a ${brl(s.last)}`;
+}
+function installmentsText(n, s) {
+    if (s.last === s.parcela)
+        return `${n} × ${brl(s.parcela)}`;
+    const tail = s.lastCount === 1 ? `uma última de ${brl(s.last)}` : `as ${s.lastCount} últimas de ${brl(s.last)}`;
+    return `${n - s.lastCount} × ${brl(s.parcela)} e ${tail}`;
 }
 export function calcAntesDeFinanciar(input, today) {
     const r = new FieldReader();
@@ -157,6 +174,8 @@ export function calcAntesDeFinanciar(input, today) {
         return { ok: false, errors: r.errors };
     }
     const entrada = entradaRead;
+    const taxaTipo = input.tipoTaxa === 'cet' ? 'cet' : 'juros';
+    const cet = taxaTipo === 'cet';
     const firstInOneMonth = input.primeiraEmUmMes !== false;
     const financed = preco - entrada;
     const committed = input.comprometidoCents !== undefined && input.comprometidoCents !== null && Number.isSafeInteger(input.comprometidoCents) && input.comprometidoCents >= 0
@@ -173,10 +192,12 @@ export function calcAntesDeFinanciar(input, today) {
                 financedCents: 0,
                 parcelas: n,
                 taxaBp,
+                taxaTipo,
                 firstInOneMonth,
                 nothingToFinance: true,
                 parcelaCents: 0,
                 lastParcelaCents: 0,
+                lastCount: 0,
                 totalCents: entrada,
                 interestCents: 0,
                 noInterest: true,
@@ -194,55 +215,66 @@ export function calcAntesDeFinanciar(input, today) {
                 entryLines: [],
                 noteParams: null,
                 goalParams: null,
-                resultLines: ['Com a entrada igual ao preço à vista, não há o que financiar.', `Você paga ${brl(preco)} na compra, sem juros.`],
+                resultLines: [
+                    'Com a entrada igual ao preço à vista, não há o que financiar.',
+                    `Você paga ${brl(preco)} na compra, sem ${cet ? 'custo adicional' : 'juros'}.`,
+                ],
                 hypotheses: [],
                 notes: [],
             },
         };
     }
-    const { parcela, last: lastParcela, total, interest } = financeSchedule(preco, entrada, taxaBp, n, firstInOneMonth);
+    const schedule = financeSchedule(preco, entrada, taxaBp, n, firstInOneMonth);
+    const { parcela, last: lastParcela, lastCount, total, interest } = schedule;
     const noInterest = taxaBp === 0 || total <= preco;
     const lastDiffers = lastParcela !== parcela;
     const lastOffset = firstInOneMonth ? n : n - 1;
     const lastMonth = calendar(lastOffset);
+    const costName = cet ? 'custo adicional estimado' : 'juros';
     const resultLines = [];
-    resultLines.push(`Com estes números, ${n === 1 ? 'é' : 'são'} ${parcelasText(n)} de ${brl(parcela)}.`);
+    resultLines.push(`Com estes números, ${n === 1 ? 'é' : 'são'} ${parcelasText(n)} de ${parcelaRange(schedule)}.`);
     const paidAtPurchase = n === 1 && !firstInOneMonth;
     if (paidAtPurchase)
         resultLines.push('Você paga tudo na compra.');
     else
         resultLines.push(`Você paga por ${monthsDuration(n)}${firstInOneMonth ? '' : ', a primeira na compra'}${lastMonth ? `, até ${formatMonthYearBR(lastMonth)}` : ''}.`);
-    const installmentsText = lastDiffers ? `${n - 1} × ${brl(parcela)} e uma última de ${brl(lastParcela)}` : `${n} × ${brl(parcela)}`;
-    resultLines.push(`Total pago: ${brl(total)} (${entrada > 0 ? `entrada de ${brl(entrada)} mais ` : ''}${installmentsText}).`);
-    resultLines.push(noInterest ? 'Sem juros: o total pago é igual ou menor que o preço à vista.' : `Juros: ${brl(interest)}.`);
+    resultLines.push(`Total pago: ${brl(total)} (${entrada > 0 ? `entrada de ${brl(entrada)} mais ` : ''}${installmentsText(n, schedule)}).`);
+    resultLines.push(noInterest
+        ? cet
+            ? 'Sem custo adicional: o total pago é igual ou menor que o preço à vista.'
+            : 'Sem juros: o total pago é igual ou menor que o preço à vista.'
+        : cet
+            ? `Custo adicional estimado: ${brl(interest)}.`
+            : `Juros: ${brl(interest)}.`);
     let parcelaPermille = null;
     let beforePermille = null;
     let afterPermille = null;
     const notes = [estimateNote];
     const showImpact = !paidAtPurchase;
+    const heaviest = Math.max(parcela, lastParcela);
     if (showImpact && renda !== null) {
-        parcelaPermille = percentTenths(parcela, renda);
-        resultLines.push(`A parcela seria ${formatPermille(parcelaPermille, parcela)} da sua renda.`);
+        parcelaPermille = percentTenths(heaviest, renda);
+        resultLines.push(`A parcela seria ${formatPermille(parcelaPermille, heaviest)} da sua renda.`);
         if (committed !== null) {
             beforePermille = percentTenths(committed, renda);
-            afterPermille = percentTenths(committed + parcela, renda);
-            resultLines.push(`Sua renda comprometida iria de ${formatPermille(beforePermille, committed)} para ${formatPermille(afterPermille, committed + parcela)} enquanto durar o financiamento.`);
+            afterPermille = percentTenths(committed + heaviest, renda);
+            resultLines.push(`Sua renda comprometida iria de ${formatPermille(beforePermille, committed)} para ${formatPermille(afterPermille, committed + heaviest)} enquanto durar o financiamento.`);
         }
         notes.push(`${COMMITTED_TEXT.debtReference} ${COMMITTED_TEXT.debtReferenceSource}`);
     }
     else if (showImpact && committed !== null && committed > 0) {
-        resultLines.push(`O total comprometido por mês iria de ${brl(committed)} para ${brl(committed + parcela)} enquanto durar o financiamento.`);
+        resultLines.push(`O total comprometido por mês iria de ${brl(committed)} para ${brl(committed + heaviest)} enquanto durar o financiamento.`);
     }
     const target = financed;
     const guardarIsDefault = guardarRead === null;
-    const monthly = guardarRead ?? parcela;
+    const monthly = guardarRead ?? heaviest;
     const months = monthsToSave(target, monthly, rendimentoBp);
     const yieldText = rendimentoBp > 0 ? `com rendimento de ${formatBpCompact(rendimentoBp)} ao ano` : 'sem rendimento';
     const savingLines = [];
     const span = lastOffset === 0 ? '' : ` ao longo de ${monthsCount(n)}`;
     const financing = noInterest
-        ? `Financiando: você usa o bem agora e não paga juros${span}.`
-        : `Financiando: você usa o bem agora e paga ${brl(interest)} de juros${span}.`;
+        ? `Financiando: você usa o bem agora e não paga ${cet ? 'custo adicional' : 'juros'}${span}.`
+        : `Financiando: você usa o bem agora e paga ${brl(interest)} de ${costName}${span}.`;
     if (months === null) {
         savingLines.push(`Guardando ${brl(monthly)} por mês, ${yieldText}, não dá para juntar ${brl(target)} em 50 anos.`);
         savingLines.push(financing);
@@ -250,37 +282,50 @@ export function calcAntesDeFinanciar(input, today) {
     else {
         savingLines.push(`Guardando ${brl(monthly)} por mês, ${yieldText}, você junta ${brl(target)} em ${monthsDuration(months)}.`);
         savingLines.push(financing);
-        savingLines.push(`Juntando: leva ${monthsCount(months)} para juntar o que falta para comprar à vista e não paga juros do financiamento.`);
+        savingLines.push(`Juntando: leva ${monthsCount(months)} para juntar o que falta para comprar à vista e não paga ${cet ? 'o custo adicional' : 'juros'} do financiamento.`);
     }
     const biggerEntries = [];
+    const entryLines = [];
     for (const percent of ANTES_EXTRA_ENTRY_PERCENTS) {
         const extra = percentOfPrice(preco, percent);
         const novaEntrada = entrada + extra;
-        if (extra < 1 || novaEntrada >= preco)
+        if (extra < 1)
             continue;
-        const { parcela: novaParcela, interest: novoJuros } = financeSchedule(preco, novaEntrada, taxaBp, n, firstInOneMonth);
-        biggerEntries.push({
+        if (novaEntrada >= preco) {
+            if (biggerEntries.length > 0)
+                entryLines.push(`Com mais ${percent}% do preço, a entrada já cobriria o preço inteiro.`);
+            break;
+        }
+        const s = financeSchedule(preco, novaEntrada, taxaBp, n, firstInOneMonth);
+        const e = {
             percent,
             extraCents: extra,
             entradaCents: novaEntrada,
-            parcelaCents: novaParcela,
-            interestCents: novoJuros,
-            parcelaDiffCents: Math.max(0, parcela - novaParcela),
-            interestDiffCents: Math.max(0, interest - novoJuros),
-        });
-    }
-    const entryLines = biggerEntries.map((e) => {
+            parcelaCents: s.parcela,
+            interestCents: s.interest,
+            parcelaDiffCents: Math.max(0, parcela - s.parcela),
+            interestDiffCents: Math.max(0, interest - s.interest),
+        };
+        biggerEntries.push(e);
         const less = e.interestDiffCents > 0 ? ` (${brl(e.interestDiffCents)} a menos)` : '';
-        return `Com mais ${e.percent}% do preço na entrada (${brl(e.extraCents)}): parcela de ${brl(e.parcelaCents)} e juros de ${brl(e.interestCents)}${less}.`;
-    });
+        entryLines.push(`Com mais ${e.percent}% do preço na entrada (${brl(e.extraCents)}): parcela de ${parcelaRange(s)} e ${costName} de ${brl(e.interestCents)}${less}.`);
+    }
     const hypotheses = [
         firstInOneMonth ? 'Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.' : 'Parcelas iguais (tabela Price), a primeira paga na compra e as outras a cada mês.',
-        taxaBp === 0
-            ? lastDiffers
-                ? `Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo, e a última (${brl(lastParcela)}) absorve a diferença do arredondamento.`
-                : 'Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo.'
-            : ANTES_RATE_HYPOTHESIS,
     ];
+    if (taxaBp === 0) {
+        if (!lastDiffers)
+            hypotheses.push('Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo.');
+        else if (parcela === 0)
+            hypotheses.push(`Sem juros informados: com este valor, nem todas as parcelas têm valor. Só ${lastCount === 1 ? 'a última tem' : `as ${lastCount} últimas têm`} ${brl(lastParcela)}; as outras ficam em ${brl(0)}, e o total é o preço.`);
+        else
+            hypotheses.push(`Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, para baixo no centavo, e os centavos que sobram vão para ${lastCount === 1 ? 'a última' : `as ${lastCount} últimas`} (${brl(lastParcela)}), para o total ser o preço.`);
+        if (cet)
+            hypotheses.push(ANTES_CET_HYPOTHESIS);
+    }
+    else {
+        hypotheses.push(cet ? ANTES_CET_HYPOTHESIS : ANTES_RATE_HYPOTHESIS, ANTES_TOTAL_HYPOTHESIS);
+    }
     if (showImpact && renda !== null)
         hypotheses.push('Percentuais sobre a renda líquida por mês que você informou aqui.');
     if (showImpact && committed !== null)
@@ -288,7 +333,11 @@ export function calcAntesDeFinanciar(input, today) {
     hypotheses.push(entrada > 0
         ? `Juntar para comprar à vista: o valor a juntar é o que falta, o preço menos a entrada de ${brl(entrada)} que você já tem: ${brl(financed)}.`
         : `Juntar para comprar à vista: o valor a juntar é o preço inteiro, ${brl(preco)}.`);
-    hypotheses.push(guardarIsDefault ? 'Valor guardado por mês: o da parcela, a menos que você informe outro.' : 'Valor guardado por mês: o que você informou.');
+    hypotheses.push(guardarIsDefault
+        ? lastDiffers
+            ? 'Valor guardado por mês: o da maior parcela, a menos que você informe outro.'
+            : 'Valor guardado por mês: o da parcela, a menos que você informe outro.'
+        : 'Valor guardado por mês: o que você informou.');
     hypotheses.push(rendimentoBp > 0
         ? `Rendimento de ${formatBpCompact(rendimentoBp)} ao ano (${monthlyRateText(rendimentoBp)} ao mês, taxa equivalente), informado por você, constante no período e sem imposto ou taxas.`
         : 'Sem rendimento: o valor guardado não cresce.');
@@ -313,10 +362,12 @@ export function calcAntesDeFinanciar(input, today) {
             financedCents: financed,
             parcelas: n,
             taxaBp,
+            taxaTipo,
             firstInOneMonth,
             nothingToFinance: false,
             parcelaCents: parcela,
             lastParcelaCents: lastParcela,
+            lastCount,
             totalCents: total,
             interestCents: interest,
             noInterest,
@@ -333,7 +384,7 @@ export function calcAntesDeFinanciar(input, today) {
             savingLines,
             entryLines,
             noteParams: n >= 2
-                ? { tipo: 'parcelada', natureza: 'financiamento', parcelas: n, ...(parcela <= MAX_RECORD_CENTS ? { valor: parcela } : {}) }
+                ? { tipo: 'parcelada', natureza: 'financiamento', parcelas: n, ...(parcela >= 1 && parcela <= MAX_RECORD_CENTS ? { valor: parcela } : {}) }
                 : null,
             goalParams,
             resultLines,

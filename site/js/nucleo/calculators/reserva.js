@@ -38,7 +38,8 @@ export function calcReserva(input) {
     const saved = guardado ?? 0;
     const missing = Math.max(0, target - saved);
     const coverageTenths = guardado === null ? null : Math.floor((guardado * 10) / essenciais);
-    const monthsToTarget = mensal !== null && mensal > 0 && missing > 0 ? monthsToReach(missing, mensal) : null;
+    const reached = missing === 0;
+    const monthsToTarget = reached ? 0 : mensal !== null && mensal > 0 ? monthsToReach(missing, mensal) : null;
     const resultLines = [`Com estes números, a reserva de ${monthsCount(meses)} é de ${formatBRL(target)}.`];
     if (guardado !== null && guardado > 0) {
         if (missing === 0)
@@ -50,13 +51,16 @@ export function calcReserva(input) {
             resultLines.push(`Faltam ${formatBRL(missing)}.`);
         }
     }
-    if (monthsToTarget !== null) {
+    if (monthsToTarget !== null && monthsToTarget > 0) {
         resultLines.push(`Guardando ${formatBRL(mensal)} por mês, a reserva fica completa em ${monthsDuration(monthsToTarget)}.`);
+    }
+    else if (!reached && mensal === 0) {
+        resultLines.push(`Guardando ${formatBRL(0)} por mês, não há previsão para completar a reserva.`);
     }
     const hypotheses = ['Sem rendimento: o valor guardado não cresce com juros.', 'Gastos essenciais iguais em todos os meses.'];
     if (guardado !== null && guardado > 0 && missing > 0)
         hypotheses.push('Meses cobertos arredondados para baixo, em décimos de mês.');
-    if (monthsToTarget !== null) {
+    if (monthsToTarget !== null && monthsToTarget > 0) {
         hypotheses.push('O mesmo valor guardado todo mês.');
         if (missing % mensal !== 0)
             hypotheses.push('Prazo em meses inteiros, para cima: no último mês, falta menos que o valor de cada mês.');
@@ -71,6 +75,7 @@ export function calcReserva(input) {
             mensalCents: mensal,
             coverageTenths,
             missingCents: missing,
+            reached,
             monthsToTarget,
             reference: RESERVA_REFERENCIA,
             resultLines,
