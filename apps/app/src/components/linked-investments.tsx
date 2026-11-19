@@ -155,7 +155,8 @@ export function UncountedLinkedLine({ summary, onSee, onBrand = false }: { summa
 const styles = StyleSheet.create({
   uncounted: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[2] },
   // O link inteiro ("Ver os investimentos ligados"), alinhado ao texto quando desce para a linha de baixo (auditoria de 18/11/2026).
-  see: { minWidth: 44, paddingHorizontal: 0 },
+  // maxWidth e flexShrink: com letra grande, o texto do link quebra em vez de passar da largura da tela.
+  see: { minWidth: 44, paddingHorizontal: 0, maxWidth: '100%', flexShrink: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 48, paddingVertical: space[2] },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
 });

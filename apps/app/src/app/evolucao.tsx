@@ -82,7 +82,8 @@ function Segmented({ label, options, columns }: { label: string; options: { key:
             st.pressed && { opacity: 0.85 },
             (st as { focused?: boolean }).focused && styles.segFocus,
           ]}>
-          <Txt variant="label" color={o.selected ? colors.brandText : colors.text} style={{ fontFamily: fonts.bold, textAlign: 'center' }}>
+          {/* Com letra muito grande, a palavra quebra dentro da opção em vez de passar por cima da vizinha. */}
+          <Txt variant="label" color={o.selected ? colors.brandText : colors.text} style={[{ fontFamily: fonts.bold, textAlign: 'center', maxWidth: '100%' }, { overflowWrap: 'anywhere' } as object]}>
             {o.label}
           </Txt>
         </Pressable>
@@ -334,7 +335,7 @@ function Phase3EmptyCard({ view, canWrite, context, referenceFrom }: { view: Evo
 const styles = StyleSheet.create({
   filters: { flexDirection: 'row', gap: space[2], flexWrap: 'wrap' },
   segTrack: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: colors.muted, borderRadius: radius.md, padding: 4, gap: 4 },
-  segOption: { minHeight: 44, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[1], paddingVertical: space[1] },
+  segOption: { minHeight: 44, minWidth: 0, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[1], paddingVertical: space[1] },
   segSelected: { backgroundColor: colors.surface },
   segFocus: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 1 } as object,
   chartCard: { paddingHorizontal: space[1], paddingVertical: space[4] },
