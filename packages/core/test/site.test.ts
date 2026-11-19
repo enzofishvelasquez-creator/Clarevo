@@ -1088,6 +1088,8 @@ describe('site público: as páginas geradas', () => {
     const perguntas = /<h2 id="perguntas">[\s\S]*?<\/section>/.exec(familia)![0];
     expect(perguntas).toContain('Quem eu convido precisa ter conta?');
     expect(perguntas).toContain('O que acontece com o que eu anotei se eu sair da Família?');
+    // O nome de quem saiu, como o app mostra (FAMILY_TEXT.exMember: "Nina (saiu da Família)").
+    expect(perguntas).toContain('com o seu primeiro nome e "saiu da Família" ao lado');
     for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.benefitNote, 'Quem recebe o convite para a Família não paga.']) expect(perguntas, t).not.toContain(esc(t));
     expect(familia).toContain('Investir</a>: O que você já investe, só no seu Pessoal');
     // No rodapé de todas as páginas, o resumo dos planos; as páginas dos planos entram no mapa do site.

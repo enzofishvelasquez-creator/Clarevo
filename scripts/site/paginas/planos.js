@@ -187,7 +187,8 @@ ${listaDeRecursos(plano, u)}
     ...(familia
       ? [
           bloco(assinatura, { rotulo: 'assinatura' }),
-          // Duas perguntas que não repetem o resto da página: a conta de quem é convidado e o que fica na Família de quem sai (guia da Família).
+          // Duas perguntas que não repetem o resto da página: a conta de quem é convidado e o que fica na Família de quem sai (o guia da Família
+          // e `FAMILY_TEXT.exMember` de family.ts: "Nina (saiu da Família)").
           bloco(
             `<h2 id="perguntas">Perguntas sobre a Família</h2>
 <div class="perguntas-planos">
@@ -197,7 +198,7 @@ ${listaDeRecursos(plano, u)}
 </article>
 <article class="pergunta" aria-labelledby="q-sair">
 <h3 id="q-sair">O que acontece com o que eu anotei se eu sair da Família?</h3>
-<p>O que você anotou na Família continua lá, como histórico da casa, com o seu primeiro nome e a marca "ex-membro". O seu Pessoal continua só seu.</p>
+<p>O que você anotou na Família continua lá, como histórico da casa, com o seu primeiro nome e "saiu da Família" ao lado. O seu Pessoal continua só seu.</p>
 </article>
 </div>
 ${caminhos}`,
@@ -256,7 +257,7 @@ function paginaPlanos({ valores }) {
 <div class="grade">
 ${cartoes}
 </div>
-${aindaNao}<p class="nota">${esc(t.plansNote)} Na página de cada plano estão o que ele inclui, com o caminho para cada recurso, e como funciona a assinatura. Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u(ajudaDoGuia('assinatura'))}">Ajuda</a>.</p>`,
+${aindaNao}<p class="nota">${esc(t.plansNote)} A página de cada plano mostra o que ele inclui, com o caminho para cada recurso, e como funciona a assinatura. Os detalhes estão nos <a href="${u('termos.html')}">Termos de uso</a> e na <a href="${u(ajudaDoGuia('assinatura'))}">Ajuda</a>.</p>`,
       { rotulo: 'comparar' },
     ),
   ];
