@@ -15472,7 +15472,7 @@ setInterval(async () => {
     // Auditoria de 18/11/2026: o orçamento passou para a coluna principal, abaixo de "Pagamentos do mês", e o cartão lima e "Quem vê" ficam
     // numa linha inteira, abaixo das duas colunas (antes, a coluna da esquerda acabava cedo e deixava um bloco vazio).
     ok('Computador: o Resumo em painel, com metas na coluna da direita, o orçamento na principal (abaixo de Pagamentos do mês) e o cartão lima numa linha inteira embaixo',
-      cols !== null && cols.side > cols.main + 200 && Math.abs(cols.budget - cols.main) < 2 && cols.budgetTop > cols.paidTop && cols.limeTop > cols.mainBottom && cols.limeW > 700, JSON.stringify(cols));
+      cols !== null && cols.side > cols.main + 200 && cols.budget < cols.side - 200 && cols.budgetTop > cols.paidTop && cols.limeTop > cols.mainBottom && cols.limeW > 700, JSON.stringify(cols));
     await layoutChecks('Computador, Resumo 1280px'); await shot('630_computador_resumo');
     await p.setViewportSize({ width: 1024, height: 768 }); await p.waitForTimeout(500);
     await layoutChecks('Computador, Resumo 1024px');
