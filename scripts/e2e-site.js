@@ -17,9 +17,9 @@
  *     uma hora no servidor; a fonte fora do ar (a página fica com o retrato); nenhum pedido do navegador a outro domínio; a política de
  *     segurança; o aviso de mercado no rodapé; as duas calculadoras novas; e o resumo semanal com uma edição de teste;
  *   - os vídeos de uso do app (D-114 e D-115) na página inicial e em O app: cada um no bloco que mostra, do próprio site, sem controles nem
- *     `autoplay`, sem som, com `preload="none"`; o script toca o que aparece na tela e pausa o que sai; o botão de pausar e tocar (nome
- *     acessível, teclado); com movimento reduzido ou economia de dados, nada toca nem baixa até a pessoa pedir; sem JavaScript, a capa; e o
- *     servidor responde pedaços (206) com o tipo certo;
+ *     `autoplay`, sem som, com `preload="none"`; o script toca o que aparece na tela e pausa o que sai; sem botão de pausar (D-115c): o
+ *     próprio vídeo é o controle (papel de botão, nome acessível, clique e teclado); com movimento reduzido ou economia de dados, nada toca
+ *     nem baixa até a pessoa tocar no vídeo; sem JavaScript, a capa; e o servidor responde pedaços (206) com o tipo certo;
  *   - as imagens das matérias de Novidades (D-114): capa e telas com largura, altura e texto alternativo, carregando do próprio site, e a
  *     versão escura no tema escuro;
  *   - a varredura de espaçamento e largura em todas as páginas (360, 768, 900 e 1280 px) e, no tema escuro, nas páginas com vídeos e imagens
@@ -702,9 +702,9 @@ function varrerPagina() {
 
     // 7c. Vídeos de uso do app (D-114 e D-115): cada um no bloco que mostra (a capa e três cartões da página inicial, seis recursos e o
     // cartão do tema em O app), do próprio site, sem controles de player nem `autoplay`, sem som e em repetição. O script do site toca o
-    // vídeo que aparece na tela (pelo menos metade) e pausa o que sai; nada de vídeo baixa antes de aparecer; o botão redondo pausa e toca,
-    // pelo mouse e pelo teclado, com nome acessível; com movimento reduzido ou economia de dados, nada toca até a pessoa pedir; sem
-    // JavaScript, fica a capa.
+    // vídeo que aparece na tela (pelo menos metade) e pausa o que sai; nada de vídeo baixa antes de aparecer. Sem botão de pausar (D-115c,
+    // 19/11/2026): o próprio vídeo pausa e toca, pelo mouse e pelo teclado, com papel de botão e nome acessível; com movimento reduzido ou
+    // economia de dados, nada toca até a pessoa tocar no vídeo; sem JavaScript, fica a capa, com o nome "Vídeo: título".
     {
       const LUGARES = {
         '/': [['.capa', 'O Resumo do mês'], ['article.cartao:has(h3:text-is("Anotar e ver o mês"))', 'Anotar um gasto'], ['article.cartao:has(h3:text-is("Contas, cartões e gastos fixos"))', 'Importar fatura por print'], ['article.cartao:has(h3:text-is("Metas e reserva"))', 'Metas']],
@@ -717,10 +717,10 @@ function varrerPagina() {
         titulo: v.closest('figure').dataset.titulo, controls: v.controls || v.hasAttribute('controls'), autoplay: v.hasAttribute('autoplay'), loop: v.loop, muted: v.muted, preload: v.getAttribute('preload'),
         paused: v.paused, tempo: v.currentTime, poster: v.poster, largura: v.getAttribute('width'), altura: v.getAttribute('height'),
         fontes: [...v.querySelectorAll('source')].map((f) => [f.src, f.type]), reserva: v.querySelector('a') ? v.querySelector('a').href : '',
-        nome: document.getElementById(v.getAttribute('aria-labelledby'))?.textContent || '',
+        nome: v.getAttribute('aria-label') || '', rotulo: v.getAttribute('aria-labelledby'), papel: v.getAttribute('role'), tabindex: v.getAttribute('tabindex'),
         descricao: document.getElementById(v.getAttribute('aria-describedby'))?.textContent || '',
-        legenda: v.closest('figure').querySelector('figcaption')?.firstChild?.textContent || '',
-        botao: v.closest('figure').querySelector('button.video-botao')?.getAttribute('aria-label') || '',
+        legenda: v.closest('figure').querySelector('figcaption')?.textContent || '',
+        botoes: v.closest('figure').querySelectorAll('button, [class*="botao"]').length,
       })));
       for (const caminho of ['/', '/app/']) {
         deVideo.length = 0;
@@ -734,8 +734,9 @@ function varrerPagina() {
         ok(`vídeos (${caminho}): nenhum com controles de player nem autoplay; todos sem som, em repetição e com preload="none"`, vs.every((v) => !v.controls && !v.autoplay && v.muted && v.loop && v.preload === 'none'), JSON.stringify(vs.map((v) => [v.titulo, v.controls, v.autoplay, v.muted, v.loop, v.preload])));
         ok(`vídeos (${caminho}): capa, WebM e MP4 do próprio site, com largura, altura e o link para o MP4 dentro do vídeo`, vs.every((v) => v.poster.startsWith(`${origem}/imagens/video-`) && v.largura === '720' && v.altura === '1560' &&
           v.fontes.length === 2 && v.fontes[0][1] === 'video/webm' && v.fontes[1][1] === 'video/mp4' && v.fontes.every(([u]) => u.startsWith(`${origem}/videos/`)) && v.reserva === v.fontes[1][0]), JSON.stringify(vs[0]));
-        ok(`vídeos (${caminho}): cada um com nome, a legenda "Tela da demonstração, com dados fictícios", a descrição em texto para leitor de tela e o botão de pausar e tocar`,
-          vs.every((v) => v.nome === `Vídeo: ${v.titulo}` && v.legenda === 'Tela da demonstração, com dados fictícios' && v.descricao.length > 120 && /^(Pausar|Tocar) o vídeo: /.test(v.botao) && v.botao.endsWith(v.titulo)), JSON.stringify(vs.map((v) => [v.nome, v.legenda, v.descricao.length, v.botao])));
+        ok(`vídeos (${caminho}): nenhum botão dentro das figuras; o próprio vídeo é o controle (papel de botão, tabindex 0, nome "Pausar o vídeo: título" ou "Tocar o vídeo: título"), com a legenda "Tela da demonstração, com dados fictícios" e a descrição em texto para leitor de tela`,
+          vs.every((v) => v.botoes === 0 && v.papel === 'button' && v.tabindex === '0' && v.rotulo === null && /^(Pausar|Tocar) o vídeo: /.test(v.nome) && v.nome.endsWith(`: ${v.titulo}`) && v.legenda === 'Tela da demonstração, com dados fictícios' && v.descricao.length > 120),
+          JSON.stringify(vs.map((v) => [v.titulo, v.botoes, v.papel, v.tabindex, v.rotulo, v.nome, v.legenda, v.descricao.length])));
         const capas = await Promise.all(vs.map((v) => ctx.request.get(v.poster)));
         ok(`vídeos (${caminho}): as capas carregam (PNG, guardadas por um ano)`, capas.every((r) => r.ok() && r.headers()['content-type'] === 'image/png' && /immutable/.test(r.headers()['cache-control'] || '')));
         ok(`vídeos (${caminho}): só baixa vídeo do que aparece na tela`, deVideo.every((u) => u.startsWith(`${origem}/videos/`)) && (caminho !== '/' || deVideo.every((u) => /\/videos\/resumo-do-mes\./.test(u))), deVideo.join(' | '));
@@ -756,33 +757,33 @@ function varrerPagina() {
       const doCartao = await p.locator(cartao).evaluate((v) => ({ paused: v.paused, tempo: v.currentTime }));
       const capaFora = await tempoDe('.capa video');
       ok('vídeos: ao rolar, o vídeo que aparece toca e o que saiu da tela pausa', !doCartao.paused && doCartao.tempo > 0.5 && capaFora.paused, JSON.stringify({ doCartao, capaFora }));
-      // O botão de pausar: nome acessível, 44 px, troca o nome; a pausa da pessoa vale mesmo depois de rolar para longe e voltar.
-      const botao = p.locator('[data-titulo="Metas"] button.video-botao');
-      const antes = { nome: await botao.getAttribute('aria-label'), caixa: await botao.boundingBox() };
-      await botao.click();
+      // Sem botão (D-115c): clicar no próprio vídeo pausa, o nome passa a "Tocar o vídeo: Metas", e a pausa da pessoa vale mesmo depois de
+      // rolar para longe e voltar.
+      const video = p.locator(cartao);
+      const antes = await video.getAttribute('aria-label');
+      await video.click();
       await p.waitForTimeout(300);
-      const pausado = { paused: await p.locator(cartao).evaluate((v) => v.paused), nome: await botao.getAttribute('aria-label') };
+      const pausado = { paused: await video.evaluate((v) => v.paused), nome: await video.getAttribute('aria-label'), estado: await p.getAttribute('[data-titulo="Metas"]', 'data-estado') };
       await p.evaluate(() => window.scrollTo(0, 0));
       await p.waitForTimeout(600);
-      await p.locator(cartao).evaluate((v) => v.scrollIntoView({ block: 'center' }));
+      await video.evaluate((v) => v.scrollIntoView({ block: 'center' }));
       await p.waitForTimeout(900);
-      const continuaPausado = await p.locator(cartao).evaluate((v) => v.paused);
-      const foraDaTela = await p.$$eval('figure[data-video]', (fs) => fs.map((f) => {
-        const m = f.querySelector('.celular-moldura').getBoundingClientRect();
-        const b = f.querySelector('button.video-botao').getBoundingClientRect();
-        const legenda = f.querySelector('figcaption');
-        return { titulo: f.dataset.titulo, fora: b.top >= m.bottom, naLegenda: legenda.contains(f.querySelector('button.video-botao')), texto: f.querySelector('button.video-botao').textContent };
-      }));
-      ok('vídeos: o botão "Pausar" ou "Tocar" fica embaixo da legenda, fora da tela do celular, nunca por cima do app', foraDaTela.length === 4 && foraDaTela.every((x) => x.fora && x.naLegenda && /^(Pausar|Tocar)$/.test(x.texto)), JSON.stringify(foraDaTela));
-      ok('vídeos: o botão "Pausar o vídeo: Metas" (44 px) pausa, passa a "Tocar o vídeo: Metas" e a pausa continua depois de rolar para longe e voltar',
-        antes.nome === 'Pausar o vídeo: Metas' && antes.caixa && antes.caixa.width >= 44 && antes.caixa.height >= 44 && pausado.paused && pausado.nome === 'Tocar o vídeo: Metas' && continuaPausado, JSON.stringify({ antes, pausado, continuaPausado }));
-      // Pelo teclado: Tab chega ao botão, com foco visível, e Espaço toca de novo.
-      await botao.focus();
-      const foco = await botao.evaluate((b) => { const cs = getComputedStyle(b); return { visivel: b.matches(':focus-visible') || document.activeElement === b, contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }; });
-      await botao.press('Space');
+      const continuaPausado = await video.evaluate((v) => v.paused);
+      const semBotao = await p.$$eval('figure[data-video]', (fs) => fs.map((f) => f.querySelectorAll('button, .video-botao').length));
+      ok('vídeos: nenhum botão de pausar em nenhuma figura de vídeo da página inicial', semBotao.length === 4 && semBotao.every((n) => n === 0), JSON.stringify(semBotao));
+      ok('vídeos: clicar no vídeo "Pausar o vídeo: Metas" pausa, o nome passa a "Tocar o vídeo: Metas" e a pausa continua depois de rolar para longe e voltar',
+        antes === 'Pausar o vídeo: Metas' && pausado.paused && pausado.nome === 'Tocar o vídeo: Metas' && pausado.estado === 'parado' && continuaPausado, JSON.stringify({ antes, pausado, continuaPausado }));
+      // Pelo teclado: Tab chega ao vídeo, com o contorno visível do foco, e Espaço toca de novo (sem rolar a página).
+      // O foco parte do último elemento focável antes do vídeo, para o Tab ser de verdade (e o navegador mostrar o foco do teclado).
+      await video.evaluate((v) => { const anterior = [...document.querySelectorAll('a[href], button, input, [tabindex="0"]')].filter((e) => e.getClientRects().length > 0 && !e.parentElement.closest('video') && e.compareDocumentPosition(v) & Node.DOCUMENT_POSITION_FOLLOWING).pop(); if (anterior) anterior.focus(); });
+      await p.keyboard.press('Tab');
+      const foco = await video.evaluate((v) => { const cs = getComputedStyle(v); return { ativo: document.activeElement === v, visivel: v.matches(':focus-visible'), contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }; });
+      const rolagemAntes = await p.evaluate(() => window.scrollY);
+      await p.keyboard.press('Space');
       await p.waitForTimeout(800);
-      const depoisDoEspaco = { paused: await p.locator(cartao).evaluate((v) => v.paused), nome: await botao.getAttribute('aria-label'), ativo: await p.evaluate(() => document.activeElement && document.activeElement.className) };
-      ok('vídeos: pelo teclado, o botão recebe foco e Espaço toca o vídeo de novo, com o nome "Pausar o vídeo: Metas"', foco.visivel && !depoisDoEspaco.paused && depoisDoEspaco.nome === 'Pausar o vídeo: Metas', JSON.stringify({ foco, depoisDoEspaco }));
+      const depoisDoEspaco = { paused: await video.evaluate((v) => v.paused), nome: await video.getAttribute('aria-label'), ativo: await video.evaluate((v) => document.activeElement === v), rolou: Math.abs((await p.evaluate(() => window.scrollY)) - rolagemAntes) > 2 };
+      ok('vídeos: pelo teclado, o vídeo recebe foco com contorno visível e Espaço toca de novo, sem rolar a página, com o nome "Pausar o vídeo: Metas"',
+        foco.ativo && foco.visivel && foco.contorno && !depoisDoEspaco.paused && depoisDoEspaco.nome === 'Pausar o vídeo: Metas' && depoisDoEspaco.ativo && !depoisDoEspaco.rolou, JSON.stringify({ foco, depoisDoEspaco }));
       await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
       // O MP4 (para os navegadores que não tocam WebM): tipo certo, pedaço com 206 e a política de segurança com media-src 'self'.
@@ -793,7 +794,7 @@ function varrerPagina() {
       ok('vídeos: o MP4 sai como video/mp4, guardado por um ano, com a política de segurança que aceita vídeo só do próprio site', inteiro.ok() && inteiro.headers()['content-type'] === 'video/mp4' &&
         /immutable/.test(inteiro.headers()['cache-control'] || '') && /media-src 'self'/.test(inteiro.headers()['content-security-policy'] || ''), JSON.stringify(inteiro.headers()));
       ok('vídeos: o servidor responde um pedaço do arquivo (206), como o navegador pede', pedaco.status() === 206 && (await pedaco.body()).length === 100 && (await pedaco.body()).subarray(4, 8).toString('latin1') === 'ftyp' && /^bytes 0-99\/\d+$/.test(pedaco.headers()['content-range'] || ''), `${pedaco.status()} ${pedaco.headers()['content-range']}`);
-      // Movimento reduzido (page.emulateMedia) e economia de dados: nada toca sozinho e nada de vídeo baixa; o botão toca a pedido.
+      // Movimento reduzido (page.emulateMedia) e economia de dados: nada toca sozinho e nada de vídeo baixa; tocar no vídeo o toca a pedido.
       for (const [nome, preparar] of [
         ['movimento reduzido', async (q) => q.emulateMedia({ reducedMotion: 'reduce' })],
         ['economia de dados', async (q) => q.addInitScript(() => Object.defineProperty(Navigator.prototype, 'connection', { configurable: true, get: () => ({ saveData: true, addEventListener() {} }) }))],
@@ -809,22 +810,29 @@ function varrerPagina() {
         await q.goto(`${origem}/`);
         await q.waitForTimeout(2000);
         const tudoParado = await q.$$eval('figure[data-video] video', (vs) => vs.length === 4 && vs.every((v) => v.paused && v.currentTime === 0));
-        const nomeAntes = await q.getAttribute('.capa button.video-botao', 'aria-label');
+        const nomeAntes = await q.getAttribute('.capa video', 'aria-label');
+        const botoes = await q.$$eval('figure[data-video] button, .video-botao', (bs) => bs.length);
         const baixadosAntes = deVideoCalmo.length;
-        await q.click('.capa button.video-botao');
+        await q.click('.capa video');
         await q.waitForFunction(() => document.querySelector('.capa video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
-        const pedido = await q.$eval('.capa video', (v) => ({ paused: v.paused, tempo: v.currentTime }));
-        ok(`vídeos com ${nome}: nada toca sozinho nem baixa até a pessoa tocar no botão "Tocar o vídeo", que toca o vídeo`, tudoParado && baixadosAntes === 0 && deVideoCalmo.length > 0 && nomeAntes === 'Tocar o vídeo: O Resumo do mês' && !pedido.paused && pedido.tempo > 0.5 && erros.length === 0, JSON.stringify({ tudoParado, baixadosAntes, nomeAntes, pedido, erros }));
+        const pedido = await q.$eval('.capa video', (v) => ({ paused: v.paused, tempo: v.currentTime, nome: v.getAttribute('aria-label') }));
+        ok(`vídeos com ${nome}: nada toca sozinho nem baixa até a pessoa clicar no vídeo ("Tocar o vídeo: O Resumo do mês", sem botão), que então toca`, tudoParado && botoes === 0 && baixadosAntes === 0 && deVideoCalmo.length > 0 && nomeAntes === 'Tocar o vídeo: O Resumo do mês' && !pedido.paused && pedido.tempo > 0.5 && pedido.nome === 'Pausar o vídeo: O Resumo do mês' && erros.length === 0, JSON.stringify({ tudoParado, botoes, baixadosAntes, nomeAntes, pedido, erros }));
         await calmo.close();
       }
-      // Sem JavaScript: a capa aparece, sem botão, e nada quebra.
+      // Sem JavaScript: a capa aparece, sem botão nem papel de botão, com o nome "Vídeo: título" pelo aria-labelledby, e nada quebra.
       const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 } });
       const r = await semJs.newPage();
       const errosSemJs = [];
       r.on('pageerror', (e) => errosSemJs.push(e.message));
       await r.goto(`${origem}/app/`);
-      const semScript = await r.evaluate(() => ({ videos: document.querySelectorAll('figure[data-video] video').length, botoes: document.querySelectorAll('.video-botao').length, capas: [...document.querySelectorAll('figure[data-video] video')].every((v) => v.poster.includes('/imagens/video-')) }));
-      ok('vídeos sem JavaScript: as capas aparecem, sem botão e sem erro', semScript.videos === 7 && semScript.botoes === 0 && semScript.capas && errosSemJs.length === 0, JSON.stringify({ semScript, errosSemJs }));
+      const semScript = await r.evaluate(() => {
+        const vs = [...document.querySelectorAll('figure[data-video] video')];
+        return {
+          videos: vs.length, botoes: document.querySelectorAll('figure[data-video] button, .video-botao').length, capas: vs.every((v) => v.poster.includes('/imagens/video-')),
+          nomes: vs.every((v) => !v.hasAttribute('role') && !v.hasAttribute('tabindex') && !v.hasAttribute('aria-label') && document.getElementById(v.getAttribute('aria-labelledby'))?.textContent === `Vídeo: ${v.closest('figure').dataset.titulo}`),
+        };
+      });
+      ok('vídeos sem JavaScript: as capas aparecem, sem botão, com o nome "Vídeo: título" pelo aria-labelledby e sem erro', semScript.videos === 7 && semScript.botoes === 0 && semScript.capas && semScript.nomes && errosSemJs.length === 0, JSON.stringify({ semScript, errosSemJs }));
       await semJs.close();
       // Nada passa da largura da tela em 320, 390 e 1280 px, na página inicial, em O app e numa matéria.
       const q = await pagina();
@@ -869,46 +877,89 @@ function varrerPagina() {
       await p.close();
     }
 
-    // 7c3. Planos (D-115): cada cartão da página inicial leva à página Planos, no plano dele; a página tem os dois planos, os recursos com
-    // links que abrem, como funciona e as perguntas; nada passa da largura da tela.
+    // 7c3. Planos (D-115; uma página por plano desde 19/11/2026): cada cartão da página inicial leva à página do plano dele; planos.html é um
+    // resumo com os dois cartões, cada um levando à página do plano; cada página de plano mostra só o que é dele, com os recursos (links que
+    // abrem), como funciona a assinatura e os caminhos para o outro plano e o resumo; nada passa da largura da tela.
     {
       const p = await pagina();
       await p.goto(`${origem}/`);
       const cartoes = await p.$$eval('section[aria-labelledby="planos"] article.plano-link', (as) => as.map((a) => ({ links: a.querySelectorAll('a, button, input').length, nome: a.querySelector('a').textContent, href: a.querySelector('a').getAttribute('href') })));
-      ok('planos: os dois cartões da página inicial com um link só cada, com nome claro, para planos.html#individual e #familia', JSON.stringify(cartoes) === JSON.stringify([{ links: 1, nome: 'Ver o que o plano Individual inclui', href: 'planos.html#individual' }, { links: 1, nome: 'Ver o que o plano Família inclui', href: 'planos.html#familia' }]), JSON.stringify(cartoes));
-      // Clicar no cartão (fora do texto do link) abre o plano na página Planos.
+      ok('planos: os dois cartões da página inicial com um link só cada, com nome claro, para a página de cada plano', JSON.stringify(cartoes) === JSON.stringify([{ links: 1, nome: 'Ver o que o plano Individual inclui', href: 'planos/individual.html' }, { links: 1, nome: 'Ver o que o plano Família inclui', href: 'planos/familia.html' }]), JSON.stringify(cartoes));
+      // Clicar no cartão (fora do texto do link) abre a página do plano.
       const familia = p.locator('section[aria-labelledby="planos"] article.plano-link').nth(1);
       await familia.scrollIntoViewIfNeeded();
       const caixa = await familia.boundingBox();
       await p.mouse.click(caixa.x + caixa.width - 20, caixa.y + 20);
-      await p.waitForURL(/\/planos(\.html)?#familia$/);
-      const alvo = await p.evaluate(() => { const a = document.querySelector('#familia'); const r = a.getBoundingClientRect(); return { titulo: a.querySelector('h3').textContent, visivel: r.top >= 0 && r.top < window.innerHeight, alvo: a.matches(':target') }; });
-      ok('planos: clicar em qualquer ponto do cartão Família abre a página Planos no plano Família', alvo.titulo === 'Família' && alvo.visivel && alvo.alvo, JSON.stringify(alvo));
-      const secoes = await p.$$eval('main h2', (hs) => hs.map((h) => h.id));
-      const links = await p.$$eval('#recursos ~ .grupos-recursos a, #recursos + p + .grupos-recursos a', (as) => as.map((a) => a.href));
-      const quebrados = [];
-      for (const l of links) {
-        const [endereco, ancora] = l.split('#');
-        const r = await ctx.request.get(endereco);
-        if (!r.ok() || (ancora && !(await r.text()).includes(`id="${ancora}"`))) quebrados.push(l);
+      await p.waitForURL(/\/planos\/familia(\.html)?$/);
+      ok('planos: clicar em qualquer ponto do cartão Família da página inicial abre a página do plano Família', (await p.textContent('h1')) === 'Plano Família');
+      // O resumo: só os dois cartões e o que muda, sem a lista de recursos; cada cartão leva à página do plano.
+      await p.goto(`${origem}/planos`);
+      const resumo = await p.evaluate(() => ({
+        secoes: [...document.querySelectorAll('main h2')].map((h) => h.id),
+        recursos: document.querySelectorAll('.grupos-recursos, .recursos-plano').length,
+        cartoes: [...document.querySelectorAll('article.plano-link')].map((a) => ({ titulo: a.querySelector('h3').textContent, links: a.querySelectorAll('a').length, href: a.querySelector('a').getAttribute('href') })),
+      }));
+      ok('planos: planos.html é um resumo curto, com os dois cartões (um link só cada, para a página do plano) e sem a lista de recursos',
+        JSON.stringify(resumo.secoes) === JSON.stringify(['comparar']) && resumo.recursos === 0 && JSON.stringify(resumo.cartoes) === JSON.stringify([{ titulo: 'Individual', links: 1, href: 'planos/individual.html' }, { titulo: 'Família', links: 1, href: 'planos/familia.html' }]), JSON.stringify(resumo));
+      const individual = p.locator('article.plano-link').nth(0);
+      const caixaInd = await individual.boundingBox();
+      await p.mouse.click(caixaInd.x + caixaInd.width - 20, caixaInd.y + 20);
+      await p.waitForURL(/\/planos\/individual(\.html)?$/);
+      ok('planos: clicar no cartão Individual do resumo abre a página do plano Individual', (await p.textContent('h1')) === 'Plano Individual');
+      // Cada página de plano: só o que é dele, os 14 recursos com links que abrem, a assinatura e os caminhos do fim.
+      for (const [caminho, nome, outro, secoesEsperadas] of [['planos/individual', 'Individual', 'Família', ['para-quem', 'inclui', 'assinatura']], ['planos/familia', 'Família', 'Individual', ['para-quem', 'inclui', 'assinatura', 'perguntas']]]) {
+        await p.goto(`${origem}/${caminho}`);
+        const pg = await p.evaluate(() => {
+          const main = document.querySelector('main');
+          const texto = main.innerText.replace(/\u00a0/g, ' ');
+          return {
+            h1: document.querySelector('h1').textContent,
+            secoes: [...main.querySelectorAll('h2')].map((h) => h.id),
+            precos: (texto.match(/R\$ ?\d/g) || []).length,
+            precoNaCapa: (document.querySelector('.capa .preco-capa')?.textContent || '').replace(/\u00a0/g, ' '),
+            titular: /titular/i.test(texto), convite: /Convite por link/.test(texto), umaPessoa: /Para uma pessoa: a assinatura é sua\./.test(texto),
+            negocio: /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(texto), compartilha: /compartilh/i.test(texto),
+            notOpen: /A assinatura pelo app abre no lançamento\. Até lá, nada é cobrado\./.test(texto), trial: /14 dias grátis, sem cartão/.test(texto),
+            links: [...document.querySelectorAll('#inclui ~ .grupos-recursos a')].map((a) => a.href),
+            fim: [...document.querySelectorAll('main .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
+          };
+        });
+        const quebrados = [];
+        for (const l of pg.links) {
+          const [endereco, ancora] = l.split('#');
+          const r = await ctx.request.get(endereco);
+          if (!r.ok() || (ancora && !(await r.text()).includes(`id="${ancora}"`))) quebrados.push(l);
+        }
+        const familiaPg = nome === 'Família';
+        ok(`planos: a página do plano ${nome} tem o nome, o preço só na capa, para quem é, os 14 recursos com links que abrem, a assinatura (14 dias sem cartão, nada cobrado até o lançamento) e o Espaço Negócio incluído, sem negócio compartilhado`,
+          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 1 && /^R\$ \d+,\d{2} por mês$/.test(pg.precoNaCapa) && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && pg.notOpen && pg.trial,
+          JSON.stringify({ ...pg, links: pg.links.length, quebrados }));
+        ok(`planos: a página do plano ${nome} mostra só o que é do plano dele`, familiaPg ? pg.titular && pg.convite && !pg.umaPessoa : !pg.titular && !pg.convite && pg.umaPessoa, JSON.stringify({ titular: pg.titular, convite: pg.convite, umaPessoa: pg.umaPessoa }));
+        const outroHref = familiaPg ? 'individual.html' : 'familia.html';
+        ok(`planos: no fim da página do plano ${nome}, "Ver o plano ${outro}" e "Comparar os planos"`, JSON.stringify(pg.fim) === JSON.stringify([[`Ver o plano ${outro}`, outroHref], ['Comparar os planos', '../planos.html']]), JSON.stringify(pg.fim));
       }
-      ok('planos: a página tem os dois planos, os recursos, como funciona e as perguntas, e os 14 links dos recursos abrem no lugar certo', JSON.stringify(secoes) === JSON.stringify(['comparar', 'recursos', 'como-funciona', 'perguntas']) && links.length === 14 && quebrados.length === 0, `${secoes} ${links.length} ${quebrados.join(' | ')}`);
+      await p.click('main .acoes a:text-is("Comparar os planos")');
+      await p.waitForURL(/\/planos(\.html)?$/);
+      ok('planos: "Comparar os planos" volta ao resumo', (await p.textContent('h1')) === 'Planos da Clarevo');
       const largas = [];
       for (const largura of [320, 390, 1280]) {
         await p.setViewportSize({ width: largura, height: 900 });
-        for (const c of ['', 'planos']) {
+        for (const c of ['', 'planos', 'planos/individual', 'planos/familia']) {
           await p.goto(`${origem}/${c}`);
           if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${c || 'início'} em ${largura} px`);
         }
       }
-      ok('planos: nada passa da largura da tela em 320, 390 e 1280 px (início e Planos)', largas.length === 0, largas.join(' | '));
+      ok('planos: nada passa da largura da tela em 320, 390 e 1280 px (início, o resumo e as duas páginas de plano)', largas.length === 0, largas.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
     }
 
     // 7c4. Celulares no centro dos cartões, "Quem vê os seus dados" em Segurança e a faixa de confiança da capa (D-115). Em 1280 px, a
     // moldura de cada celular fica no centro do cartão que a tem (início, O app, Para empresas) e, em Segurança, no centro da coluna dela,
-    // ao lado dos quatro cartões em 2 x 2, com a mesma altura em cada linha. A faixa da capa (início e O app) é um link só para o bloco "O
-    // que a Clarevo não faz" de Segurança, e as seções antigas saíram. Nada passa da largura da tela em 320, 390 e 1280 px.
+    // ao lado dos quatro cartões em 2 x 2, com a mesma altura em cada linha. A faixa da capa (início e O app) é um link só para a página
+    // Segurança e privacidade (desde 19/11/2026; antes, para o bloco "O que a Clarevo não faz", que ficou recolhido no fim dela), e as
+    // seções antigas saíram. Em Segurança, a parte visível começa pelo essencial, quem vê, como protegemos e o que guardamos, e quatro
+    // perguntas recolhidas (fechadas) ficam no fim, com o aviso de saúde dentro da primeira. Nada passa da largura da tela em 320, 390 e 1280 px.
     {
       const p = await pagina();
       await p.setViewportSize({ width: 1280, height: 900 });
@@ -947,14 +998,32 @@ function varrerPagina() {
         faixas.push(await p.evaluate(() => {
           const f = document.querySelector('.capa .confianca');
           const a = f && f.querySelectorAll('a');
-          return { links: a ? a.length : 0, href: a && a[0] ? a[0].getAttribute('href') : '', itens: f ? [...f.querySelectorAll('.confianca-item')].map((i) => i.textContent) : [], nome: a && a[0] ? a[0].textContent.replace(/\s+/g, ' ').trim() : '', antigas: document.querySelectorAll('#nao-e, #nao-faz').length };
+          return { links: a ? a.length : 0, href: a && a[0] ? a[0].getAttribute('href') : '', itens: f ? [...f.querySelectorAll('.confianca-item')].map((i) => i.textContent) : [], mais: f && f.querySelector('.confianca-mais') ? f.querySelector('.confianca-mais').textContent : '', nome: a && a[0] ? a[0].textContent.replace(/\s+/g, ' ').trim() : '', antigas: document.querySelectorAll('#nao-e, #nao-faz').length };
         }));
       }
-      ok('faixa de confiança: na capa do início e de O app, três frases num link só para Segurança (#nao-faz), com nome em frase para leitor de tela, e sem as seções antigas',
-        faixas.every((f) => f.links === 1 && /seguranca\.html#nao-faz$/.test(f.href) && JSON.stringify(f.itens) === JSON.stringify(['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) && /cartão\. Ver o que a Clarevo não faz, em Segurança e privacidade\.$/.test(f.nome) && f.antigas === 0), JSON.stringify(faixas));
+      ok('faixa de confiança: na capa do início e de O app, três frases num link só para a página Segurança e privacidade (sem âncora), com o convite "Segurança e privacidade", nome em frase para leitor de tela, e sem as seções antigas',
+        faixas.every((f) => f.links === 1 && /(^|\/)seguranca\.html$/.test(f.href) && JSON.stringify(f.itens) === JSON.stringify(['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) && f.mais === 'Segurança e privacidade' && /cartão\. Mais em Segurança e privacidade\.$/.test(f.nome) && f.antigas === 0), JSON.stringify(faixas));
       await p.click('.capa .confianca a');
-      await p.waitForURL(/\/seguranca(\.html)?#nao-faz$/);
-      ok('faixa de confiança: o link abre o bloco "O que a Clarevo não faz" de Segurança', (await p.textContent('#nao-faz')) === 'O que a Clarevo não faz' && (await p.$$eval('#nao-faz ~ .lista-nao-faz li', (l) => l.length)) === 5);
+      await p.waitForURL(/\/seguranca(\.html)?$/);
+      const seg = await p.evaluate(() => ({
+        titulo: document.querySelector('h1').textContent,
+        topo: window.scrollY,
+        secoes: [...document.querySelectorAll('main h2')].map((h) => h.id),
+        duvidas: [...document.querySelectorAll('details.duvida')].map((d) => ({ id: d.id, resumo: d.querySelector('summary').textContent, aberta: d.open, caixa: getComputedStyle(d).borderTopLeftRadius !== '0px' || getComputedStyle(d).backgroundColor !== 'rgba(0, 0, 0, 0)' })),
+        avisoVisivel: [...document.querySelectorAll('main p')].some((e) => /não é atendimento de saúde e não promete/.test(e.textContent) && e.checkVisibility()),
+        ultimo: (() => { const s = document.querySelector('section[aria-labelledby="detalhes"] .miolo'); const l = s.lastElementChild; return l.tagName === 'P' && /^Leia também a Política de privacidade/.test(l.textContent) && l.previousElementSibling.classList.contains('duvidas'); })(),
+        links: [...document.querySelectorAll('a[href^="#"]')].map((a) => a.getAttribute('href')).filter((h) => /^#(nao-faz|nao-guardamos|este-site|excluir)$/.test(h)),
+      }));
+      ok('faixa de confiança: o link abre Segurança e privacidade no topo; a parte visível começa pelo essencial, quem vê, como protegemos e o que guardamos; as quatro perguntas do fim começam fechadas, sem caixa, e só a linha dos links vem depois delas',
+        seg.titulo === 'Segurança e privacidade' && seg.topo === 0 && JSON.stringify(seg.secoes) === JSON.stringify(['essencial', 'quem-ve', 'protecao', 'guardamos', 'detalhes']) &&
+        JSON.stringify(seg.duvidas.map((d) => [d.id, d.resumo])) === JSON.stringify([['nao-faz', 'O que a Clarevo faz e não faz'], ['nao-guardamos', 'Dados que a Clarevo não guarda'], ['este-site', 'Sobre este site'], ['excluir', 'Como excluir a conta']]) &&
+        seg.duvidas.every((d) => !d.aberta && !d.caixa) && !seg.avisoVisivel && seg.ultimo && seg.links.length === 0, JSON.stringify(seg));
+      // Abrir "O que a Clarevo faz e não faz" (pelo teclado: foco no resumo e Enter) mostra os cinco itens, a nota e o aviso de saúde.
+      const resumo = p.locator('#nao-faz > summary');
+      await resumo.focus();
+      await p.keyboard.press('Enter');
+      const aberto = await p.evaluate(() => { const d = document.querySelector('#nao-faz'); return { aberta: d.open, itens: d.querySelectorAll('li').length, aviso: [...d.querySelectorAll('p')].some((e) => /^A Clarevo não é atendimento de saúde e não promete resultado financeiro/.test(e.textContent) && e.checkVisibility()), outras: [...document.querySelectorAll('details.duvida:not(#nao-faz)')].every((x) => !x.open) }; });
+      ok('segurança: Enter no resumo abre "O que a Clarevo faz e não faz", com os cinco itens e o aviso de saúde, e as outras perguntas continuam fechadas', aberto.aberta && aberto.itens === 5 && aberto.aviso && aberto.outras, JSON.stringify(aberto));
       const largas = [];
       for (const largura of [320, 390, 1280]) {
         await p.setViewportSize({ width: largura, height: 900 });
@@ -970,7 +1039,7 @@ function varrerPagina() {
     }
 
     // 7c5. Espaço Negócio (D-115, a partir de D-113): o recurso em O app (#negocio), com a tela da demonstração no centro e o link da Ajuda;
-    // o cartão de "Para quem é" na página inicial, que leva a ele; a frase de docs/52 em Planos; e a entrada na Ajuda, achada pela busca.
+    // o cartão de "Para quem é" na página inicial, que leva a ele; a frase de docs/52 nas páginas dos planos; e a entrada na Ajuda, achada pela busca.
     {
       const p = await pagina();
       await p.goto(`${origem}/`);
@@ -982,8 +1051,12 @@ function varrerPagina() {
         return { titulo: a.querySelector('h3').textContent, ajuda: a.querySelector('a[href="../ajuda/negocio.html#guia-negocio"]') !== null, img: img ? { ok: img.complete && img.naturalWidth > 0, alt: img.alt } : null, plano: /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(a.textContent) };
       });
       ok('Espaço Negócio: o cartão "Para quem tem um negócio" do início leva ao recurso em O app, com a tela do negócio, o link da Ajuda e "Incluído na assinatura"', recurso.titulo === 'Espaço Negócio' && recurso.ajuda && recurso.plano && recurso.img && /^Tela do negócio/.test(recurso.img.alt), JSON.stringify(recurso));
-      await p.goto(`${origem}/planos`);
-      ok('Espaço Negócio: em Planos, "Incluído na assinatura: um negócio por pessoa", fora das diferenças entre os planos', !/Negócio/.test(await p.textContent('#individual')) && /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(await p.textContent('#recursos ~ .grupos-recursos')) && (await p.$('a[href="ajuda/negocio.html#guia-negocio"]')) !== null);
+      const negocioNosPlanos = [];
+      for (const c of ['planos/individual', 'planos/familia']) {
+        await p.goto(`${origem}/${c}`);
+        negocioNosPlanos.push(!/Negócio/.test(await p.textContent('#para-quem ~ ul')) && /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(await p.textContent('#inclui ~ .grupos-recursos')) && (await p.$('a[href="../ajuda/negocio.html#guia-negocio"]')) !== null);
+      }
+      ok('Espaço Negócio: na página de cada plano, "Incluído na assinatura: um negócio por pessoa", fora do que só aquele plano tem', negocioNosPlanos.every(Boolean), JSON.stringify(negocioNosPlanos));
       await p.goto(`${origem}/ajuda/`);
       const naAjuda = (await p.$('a[href="negocio.html"]')) !== null;
       await p.fill('input[type="search"]', 'negócio');
@@ -1113,7 +1186,7 @@ function varrerPagina() {
       const largas = [];
       for (const largura of [320, 390, 768, 1024, 1120, 1280]) {
         await p.setViewportSize({ width: largura, height: 900 });
-        for (const c of ['', 'novidades/rss', 'planos']) {
+        for (const c of ['', 'novidades/rss', 'planos', 'planos/familia']) {
           await p.goto(`${origem}/${c}`);
           const r = await p.evaluate(() => ({ largo: document.documentElement.scrollWidth > window.innerWidth + 1, topo: Math.round(document.querySelector('.topo-i').getBoundingClientRect().height), tema: (() => { const f = document.querySelector('fieldset.tema-site .tema-opcoes'); const tops = [...f.children].map((c) => Math.round(c.getBoundingClientRect().top)); return new Set(tops).size; })() }));
           if (r.largo || r.topo > 80 || r.tema !== 1) largas.push(`${c || 'início'} em ${largura} px ${JSON.stringify(r)}`);
@@ -1148,7 +1221,8 @@ function varrerPagina() {
     }
 
     // 7c9. Nada de advertência na primeira tela (D-115): no início, em O app, em Planos, em Para empresas e em Sobre, nada que diga "não
-    // promete" aparece na primeira tela (390 x 844 e 1280 x 900); o aviso de saúde fica na nota do fim da página inicial e de Sobre.
+    // promete" aparece na primeira tela (390 x 844 e 1280 x 900). Desde 19/11/2026, o aviso de saúde não fica mais no fim da página inicial
+    // nem de Sobre: fica dentro da pergunta recolhida de Segurança e na nota de ressalvas de Para empresas.
     {
       const p = await pagina();
       const achados = [];
@@ -1162,12 +1236,16 @@ function varrerPagina() {
       }
       ok('primeira tela: nenhuma advertência na primeira tela do início, de O app, de Planos, de Para empresas e de Sobre', achados.length === 0, achados.join(' | '));
       await p.setViewportSize({ width: 390, height: 900 });
-      const fim = [];
-      for (const c of ['', 'sobre']) {
+      const onde = {};
+      for (const c of ['', 'sobre', 'seguranca', 'empresas/']) {
         await p.goto(`${origem}/${c}`);
-        fim.push(await p.evaluate(() => { const a = document.querySelector('main .aviso-final'); return Boolean(a) && /não é atendimento de saúde/.test(a.textContent) && a.getBoundingClientRect().top > document.documentElement.scrollHeight * 0.6; }));
+        onde[c || 'início'] = await p.evaluate(() => {
+          const ps = [...document.querySelectorAll('main p')].filter((e) => /A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental/.test(e.textContent));
+          return { n: ps.length, recolhido: ps.length > 0 && ps.every((e) => e.closest('details.duvida') && !e.closest('details.duvida').open && !e.checkVisibility()), ressalvas: ps.some((e) => e.matches('.nota-ressalvas')), fimAntigo: document.querySelectorAll('.aviso-final').length };
+        });
       }
-      ok('primeira tela: o aviso de saúde fica numa nota no fim do início e de Sobre', fim.every(Boolean), JSON.stringify(fim));
+      ok('aviso de saúde: fora do início e de Sobre; em Segurança, dentro de uma pergunta recolhida (escondido até abrir); em Para empresas, na nota de ressalvas',
+        onde['início'].n === 0 && onde.sobre.n === 0 && onde['início'].fimAntigo === 0 && onde.sobre.fimAntigo === 0 && onde.seguranca.n === 1 && onde.seguranca.recolhido && onde['empresas/'].n === 1 && onde['empresas/'].ressalvas, JSON.stringify(onde));
       await p.close();
     }
 

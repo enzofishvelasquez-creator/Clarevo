@@ -1,9 +1,10 @@
 /*
  * Vídeos de uso do app no site (D-115, docs/22_SITE.md, seção 17). Cada vídeo fica na moldura de celular do bloco que ele mostra
  * (`celularComVideo` em scripts/site/videos.js) e toca sozinho, sem som e em repetição, só enquanto pelo menos metade dele aparece na
- * tela; ao sair da tela, pausa. Embaixo da legenda de cada vídeo, fora da tela do celular, um botão "Pausar" ou "Tocar" (WCAG 2.2.2:
- * movimento que começa sozinho precisa de um jeito de parar), com o nome completo para o leitor de tela ("Pausar o vídeo: título"). Com movimento reduzido (prefers-reduced-motion) ou economia de dados (navigator.connection.saveData), nada toca
- * sozinho: fica a capa, e o mesmo botão toca o vídeo a pedido. Sem JavaScript, fica a capa e nada quebra.
+ * tela; ao sair da tela, pausa. Sem botão de pausar (Enzo, 19/11/2026): tocar no próprio vídeo pausa e toca de novo, e pelo teclado o
+ * vídeo recebe foco e Enter ou Espaço fazem o mesmo, com o nome para o leitor de tela ("Pausar o vídeo: título" ou "Tocar o vídeo:
+ * título"). Com movimento reduzido (prefers-reduced-motion) ou economia de dados (navigator.connection.saveData), nada toca sozinho:
+ * fica a capa, e tocar no vídeo o toca a pedido. Sem JavaScript, fica a capa e nada quebra.
  * Este script não envia nada, não grava nada no navegador e não lê cookie.
  */
 (function () {
@@ -22,15 +23,13 @@
 
   function rotular(e) {
     var tocando = !e.video.paused && !e.video.ended;
-    e.botao.setAttribute('aria-label', (tocando ? 'Pausar o vídeo: ' : 'Tocar o vídeo: ') + e.titulo);
-    e.botao.setAttribute('data-estado', tocando ? 'tocando' : 'parado');
-    e.texto.textContent = tocando ? 'Pausar' : 'Tocar';
+    e.video.setAttribute('aria-label', (tocando ? 'Pausar o vídeo: ' : 'Tocar o vídeo: ') + e.titulo);
     e.figura.setAttribute('data-estado', tocando ? 'tocando' : 'parado');
   }
 
   function tocar(e) {
     var promessa = e.video.play();
-    // O navegador pode recusar (modo de economia de bateria, por exemplo): o vídeo fica parado na capa e o botão diz "Tocar".
+    // O navegador pode recusar (modo de economia de bateria, por exemplo): o vídeo fica parado na capa.
     if (promessa && promessa.catch) promessa.catch(function () { rotular(e); });
   }
 
@@ -41,42 +40,41 @@
     else if (!deveTocar && !e.video.paused) e.video.pause();
   }
 
+  function alternar(e) {
+    if (!e.video.paused && !e.video.ended) {
+      e.pausadoPelaPessoa = true;
+      e.pedidoPelaPessoa = false;
+      e.video.pause();
+    } else {
+      e.pausadoPelaPessoa = false;
+      e.pedidoPelaPessoa = true;
+      tocar(e);
+    }
+  }
+
   Array.prototype.forEach.call(figuras, function (figura) {
     var video = figura.querySelector('video');
-    var legenda = figura.querySelector('figcaption');
-    if (!video || !legenda) return;
+    if (!video) return;
     video.muted = true;
-    // O botão fica embaixo da legenda, fora da tela do celular: nada cobre a tela do app.
-    var botao = document.createElement('button');
-    botao.type = 'button';
-    botao.className = 'video-botao';
-    var icone = document.createElement('span');
-    icone.className = 'video-botao-icone';
-    icone.setAttribute('aria-hidden', 'true');
-    var texto = document.createElement('span');
-    botao.appendChild(icone);
-    botao.appendChild(texto);
-    var e = { figura: figura, video: video, botao: botao, texto: texto, titulo: figura.getAttribute('data-titulo') || 'demonstração', visivel: false, pausadoPelaPessoa: false, pedidoPelaPessoa: false };
-    botao.addEventListener('click', function () {
-      if (!video.paused && !video.ended) {
-        e.pausadoPelaPessoa = true;
-        e.pedidoPelaPessoa = false;
-        video.pause();
-      } else {
-        e.pausadoPelaPessoa = false;
-        e.pedidoPelaPessoa = true;
-        tocar(e);
+    var e = { figura: figura, video: video, titulo: figura.getAttribute('data-titulo') || 'demonstração', visivel: false, pausadoPelaPessoa: false, pedidoPelaPessoa: false };
+    // O próprio vídeo é o controle: recebe foco, tem papel de botão e o nome diz o que um toque faz. O nome sem script ("Vídeo: título",
+    // por aria-labelledby) dá lugar a esse; a descrição em texto continua ligada por aria-describedby.
+    video.setAttribute('tabindex', '0');
+    video.setAttribute('role', 'button');
+    video.removeAttribute('aria-labelledby');
+    video.addEventListener('click', function () { alternar(e); });
+    video.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') {
+        ev.preventDefault();
+        alternar(e);
       }
     });
     video.addEventListener('play', function () { rotular(e); });
     video.addEventListener('pause', function () { rotular(e); });
-    legenda.appendChild(botao);
     rotular(e);
     estados.push(e);
   });
 
-  // Com os botões postos, as capturas das mesmas linhas reservam o lugar do botão (estilo.css), para as molduras ficarem alinhadas.
-  if (estados.length) document.documentElement.setAttribute('data-videos', 'sim');
   if (!('IntersectionObserver' in window)) return;
   var observador = new IntersectionObserver(function (entradas) {
     entradas.forEach(function (entrada) {

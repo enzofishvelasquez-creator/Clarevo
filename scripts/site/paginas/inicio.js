@@ -1,8 +1,10 @@
 'use strict';
 /**
  * Início: a mensagem central (D-068), o que é a Clarevo, o apoio prático do app (bem-estar financeiro, sem promessa de resultado nem de saúde),
- * recursos com vídeo ou captura, para quem é, "A empresa nunca vê suas finanças" e as chamadas. O que a Clarevo não faz fica numa faixa
- * curta na capa, com o texto completo em Segurança e privacidade (D-115). Desde 18/11/2026 (D-115),
+ * recursos com vídeo ou captura, para quem é, "A empresa nunca vê suas finanças" e as chamadas. A faixa curta de confiança da capa leva a
+ * Segurança e privacidade (D-115; desde 19/11/2026, à página, e não ao bloco do que a Clarevo não faz, que lá ficou recolhido). O aviso
+ * de saúde saiu do fim desta página em 19/11/2026 (pedido do Enzo) e fica em Segurança e privacidade e em Para empresas
+ * (`AVISO_DE_SAUDE` em `seguranca.js`). Desde 18/11/2026 (D-115),
  * cada vídeo de uso do app fica no lugar da captura do bloco que ele mostra: o do Resumo na capa e três nos cartões de "O que o app faz".
  */
 const { URL_APP } = require('../config');
@@ -12,7 +14,7 @@ const { montarPagina, marcadoresEmHtml, bloco, celular, faixaDeConfianca, domini
 const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
-const { ANCORA_DOS_PLANOS } = require('./planos');
+const { PAGINA_DO_PLANO } = require('./planos');
 const { secaoIndicadoresDeHoje, SCRIPT_DO_PAINEL } = require('./indicadores');
 
 const ARQUIVO = 'index.html';
@@ -21,14 +23,6 @@ const MENSAGEM_CENTRAL = 'Cuidar da vida financeira faz parte de cuidar de você
 const FRASE_DE_APOIO = 'Mais clareza para decidir';
 const SUBTEXTO = 'A Clarevo ajuda a organizar o mês e acompanhar decisões financeiras pessoais e familiares, respeitando sua realidade.';
 const DESCRICAO = `${MENSAGEM_CENTRAL} ${SUBTEXTO} ${FRASE_DE_APOIO}.`;
-/**
- * O aviso de saúde, revisado no pacote do advogado (`docs/legal/resumo-para-advogado.md`, seção j, "Saúde"): o texto não muda. Desde
- * 18/11/2026 (D-115, retorno de quem testa: "O negativo não deveria estar logo no começo da página. Isso é advertência, não propaganda.")
- * ele sai do cartão ao lado de "O que a Clarevo oferece", no começo da página, e fica numa nota discreta no fim da página inicial, perto
- * do bloco da NR-1 em Para empresas e em Sobre.
- */
-const AVISO_DE_SAUDE = 'A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada.';
-
 /** A linha curta acima do título, que diz o que a Clarevo é antes da mensagem central (12/11/2026). */
 const O_QUE_E = 'App de finanças pessoais e da família';
 /** A descrição da página para as buscas e o compartilhamento: a mensagem central e o que é, em até 160 caracteres (a completa, `DESCRICAO`, fica nos dados estruturados). */
@@ -36,8 +30,9 @@ const DESCRICAO_CURTA = `${MENSAGEM_CENTRAL} Um app de finanças pessoais e da f
 
 /**
  * A seção Planos (pedido do Enzo, 16/11/2026): os dois planos com os nomes, os preços e as frases da tela Assinatura do app, lidos do
- * núcleo (`catalogo().PLANOS`), para o site e o app dizerem o mesmo. Desde 18/11/2026 (D-115), cada cartão leva à página Planos
- * (`planos.html#individual` e `#familia`) por um link só, que cobre o cartão inteiro (sem elemento interativo dentro de outro). Enquanto a assinatura não abre (`PLANOS.aberta`, o SUBSCRIBE_OPEN
+ * núcleo (`catalogo().PLANOS`), para o site e o app dizerem o mesmo. Desde 18/11/2026 (D-115), cada cartão tem um link só, que cobre o
+ * cartão inteiro (sem elemento interativo dentro de outro); desde 19/11/2026, ele leva direto à página do plano (`planos/individual.html`
+ * e `planos/familia.html`), com o que aquele plano inclui. Enquanto a assinatura não abre (`PLANOS.aberta`, o SUBSCRIBE_OPEN
  * do app), a seção diz, com a frase da tela Assinatura, que a assinatura abre no lançamento e que nada é cobrado até lá.
  * `u` monta o caminho relativo de um link interno.
  */
@@ -48,7 +43,7 @@ function conteudoPlanos(PLANOS, u) {
 <h3>${esc(PLANOS.nome[p.plan])}</h3>
 <p class="preco"><span class="preco-valor">${esc(PLANOS.preco(p.plan))}</span>${esc(PLANOS.porMes)}</p>
 <p>${esc(p.who)}</p>
-<p class="ver-plano"><a href="${u(`planos.html#${ANCORA_DOS_PLANOS[p.plan]}`)}">Ver o que o plano ${esc(PLANOS.nome[p.plan])} inclui</a></p>
+<p class="ver-plano"><a href="${u(PAGINA_DO_PLANO[p.plan])}">Ver o que o plano ${esc(PLANOS.nome[p.plan])} inclui</a></p>
 </article>`,
     )
     .join('\n');
@@ -173,8 +168,7 @@ ${mini}
       `<h2 id="dados">Seus dados</h2>
 <p>Sem anúncios, sem venda de dados e sem rastreamento para publicidade. A conexão é protegida. Você exclui a sua conta e os seus dados quando quiser, dentro do app, em Conta. Se não conseguir entrar no app, peça pela página <a href="${u('excluir-conta.html')}">Excluir conta</a>. Os detalhes estão na <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>
 <h2 id="contato">Contato</h2>
-<p>Para falar com a equipe, inclusive sobre o benefício para empresas: [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e a página de <a href="${u('suporte.html')}">Suporte</a>.</p>
-<p class="aviso-final">${AVISO_DE_SAUDE}</p>`,
+<p>Para falar com a equipe, inclusive sobre o benefício para empresas: [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e a página de <a href="${u('suporte.html')}">Suporte</a>.</p>`,
       'dados',
     ),
   ];
@@ -208,4 +202,4 @@ ${mini}
   });
 }
 
-module.exports = { paginaInicial, conteudoPlanos, DESCRICAO_INICIO: DESCRICAO, MENSAGEM_CENTRAL, FRASE_DE_APOIO, AVISO_DE_SAUDE };
+module.exports = { paginaInicial, conteudoPlanos, DESCRICAO_INICIO: DESCRICAO, MENSAGEM_CENTRAL, FRASE_DE_APOIO };

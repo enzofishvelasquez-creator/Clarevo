@@ -10,7 +10,8 @@
  *
  * O que sai em `site/`:
  *   index.html, app/, empresas/, aprender/ (um tema por página, vindo do catálogo do app), novidades/ (posts e, só com domínio, feed.xml), ajuda/
- *   (por tema, com indice.json e busca.js), seguranca.html, sobre.html, suporte.html, 404.html
+ *   (por tema, com indice.json e busca.js), planos.html e planos/ (o resumo e uma página por plano, D-115d), seguranca.html, sobre.html,
+ *   suporte.html, 404.html
  *   calculadoras/ (o índice, as dez calculadoras do app e as duas que por enquanto só o site mostra), js/nucleo/ (o código do core que as
  *   calculadoras rodam no navegador, transpilado por `scripts/site/nucleo.js`), imprensa.html e imprensa/ (kit de imprensa)
  *   indicadores/ (D-106: o painel de indicadores oficiais, uma página por indicador, o glossário, as duas explicações e painel.js, que
