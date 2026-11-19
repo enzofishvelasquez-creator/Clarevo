@@ -19,18 +19,21 @@ describe('2. Quanto custa uma dívida? (docs/08 §3.2)', () => {
     ]);
     // A pergunta do teste de 09/11/2026 ("a gente inclui o CET no cálculo?"): a nota diz que a conta usa só a taxa de juros.
     expect(r.notes).toEqual([DIVIDA_TEXT.cetOutNote]);
+    // Revisão externa de 18/11/2026: a diferença do CET não é necessariamente pequena ("pode ser maior", não "um pouco maior").
     expect(DIVIDA_TEXT.cetOutNote).toBe(
-      'A conta usa só a taxa de juros, sem o CET. O CET da fatura ou do extrato soma o IOF e as tarifas, por isso o custo real tende a ser um pouco maior.',
+      'A conta usa só a taxa de juros, sem o CET. O CET da fatura ou do extrato soma o IOF e as tarifas, por isso o custo real pode ser maior.',
     );
     expect(r.aboveCap).toBe(false);
+    expect(r.hypotheses).toContain('O teto de 8% ao mês vale para o cheque especial de pessoas físicas e MEI.');
   });
 
   it('cheque especial acima de 8% ao mês: aviso do teto', () => {
     const r = run({ tipo: 'cheque_especial', valor: '500,00', taxaMes: '8,01', meses: '1' });
     expect(r.aboveCap).toBe(true);
     expect(r.notes).toEqual([DIVIDA_TEXT.chequeCapNote, DIVIDA_TEXT.cetOutNote]);
+    // Revisão externa de 18/11/2026: o teto é de pessoas físicas e MEI, e a taxa acima dele é um cenário fora da regra, não validado.
     expect(r.notes[0]).toBe(
-      'A taxa informada passa do teto de 8% ao mês do cheque especial (Res. CMN 4.765/2019). Confira o extrato.',
+      'A taxa informada passa do teto de 8% ao mês do cheque especial de pessoas físicas e MEI (Res. CMN 4.765/2019). A conta mostra o cenário como simulação, fora dessa regra, sem dizer que a cobrança vale. Confira o extrato.',
     );
     expect(r.resultLines[0]).toBe('Com estes números, a dívida vai a R$ 540,05 em 1 mês.');
   });
@@ -46,16 +49,23 @@ describe('2. Quanto custa uma dívida? (docs/08 §3.2)', () => {
     expect(DIVIDA_FIELDS.taxaMes!.hint).toBe('Está na fatura, no extrato ou no contrato. Use a taxa de juros ao mês, não o CET.');
   });
 
-  it('parcelar em 24 × R$ 75,79 a 8% somaria R$ 1.818,96; o limite deixa o total em R$ 1.400,00', () => {
+  it('parcelar em 24 × R$ 75,79 a 8% somaria R$ 1.818,96; com o limite, 24 parcelas de R$ 58,33 (R$ 1.399,92), sem passar de R$ 1.400,00', () => {
     const r = run({ tipo: 'rotativo', valor: '700,00', taxaMes: '14', parcelarTaxaMes: '8', parcelarParcelas: '24' });
     const p = r.parcelamento;
     if (!p || !p.ok) throw new Error('sem parcelamento');
-    expect([p.result.installmentCents, p.result.totalCents, p.result.cappedTotalCents]).toEqual([7_579, 181_896, 140_000]);
+    // Revisão externa de 18/11/2026: 24 parcelas de R$ 75,79 e um total de R$ 1.400,00 não podem coexistir. O teto (2 × 700,00) dividido
+    // em 24 parcelas iguais, para baixo no centavo: 140.000 ÷ 24 = 5.833,3 → 5.833; 24 × 5.833 = 139.992 ≤ 140.000.
+    expect([p.result.installmentCents, p.result.totalCents, p.result.capCents, p.result.cappedInstallmentCents, p.result.cappedTotalCents]).toEqual([
+      7_579, 181_896, 140_000, 5_833, 139_992,
+    ]);
     expect(p.result.limited).toBe(true);
     expect(p.result.resultLines).toEqual([
       'Parcelar em 24 × R$ 75,79 a 8% ao mês somaria R$ 1.818,96.',
       'Pelo limite da Lei 14.690/2023, juros e encargos não passam do valor original: o total fica em no máximo R$ 1.400,00.',
+      'Com o limite, as 24 parcelas iguais ficam em até R$ 58,33 cada (R$ 1.399,92 no total), em vez de R$ 75,79.',
     ]);
+    expect(p.result.hypotheses).toContain(DIVIDA_TEXT.capSchedule);
+    expect(p.result.hypotheses).toContain(DIVIDA_TEXT.capHistory);
   });
 
   it('em 12 × R$ 105,89 o total é R$ 1.270,68, dentro do limite', () => {
@@ -65,6 +75,9 @@ describe('2. Quanto custa uma dívida? (docs/08 §3.2)', () => {
     expect([p.result.installmentCents, p.result.totalCents, p.result.chargesCents]).toEqual([10_589, 127_068, 57_068]);
     expect(p.result.limited).toBe(false);
     expect(p.result.cappedTotalCents).toBe(127_068);
+    expect(p.result.cappedInstallmentCents).toBeNull();
+    expect(p.result.hypotheses).not.toContain(DIVIDA_TEXT.capSchedule);
+    expect(p.result.hypotheses).toContain(DIVIDA_TEXT.capHistory);
     expect(p.result.resultLines[0]).toBe('Parcelar em 12 × R$ 105,89 a 8% ao mês soma R$ 1.270,68.');
   });
 

@@ -7,8 +7,12 @@ import { parseCount, parseMoney, parsePercentBp } from './inputs';
 /**
  * 3. Quanto custa uma dívida? (docs/08 §3.2; spec4 §1.2).
  * - Rotativo: 1 ciclo só (até a fatura seguinte); depois, "E se parcelar a fatura?" com taxa e parcelas (1 a 24),
- *   e juros e encargos limitados ao valor original (total máximo = 2 × valor, sem o IOF).
- * - Cheque especial: juros compostos por 1 a 24 meses; acima de 8% ao mês, o aviso do teto.
+ *   e juros e encargos limitados ao valor original (total máximo = 2 × valor, sem o IOF). Revisão externa de 18/11/2026: o teto fecha
+ *   o fluxo inteiro. Quando as parcelas passariam do teto, a conta mostra as parcelas iguais que cabem nele (teto ÷ n, para baixo no
+ *   centavo), e as parcelas vezes o valor dão o total mostrado, sem passar do teto; é um cenário novo, a partir desta fatura (numa dívida
+ *   que já vem de antes, o que já foi cobrado também entra no limite).
+ * - Cheque especial: juros compostos por 1 a 24 meses; acima de 8% ao mês, o aviso do teto, que vale para pessoas físicas e MEI, com o
+ *   cenário mostrado como simulação fora da regra, sem validar a cobrança.
  * - Empréstimo: parcela pela tabela Price, de 1 a 120 parcelas, com o lembrete do CET.
  */
 export type DividaTipo = 'rotativo' | 'cheque_especial' | 'emprestimo';
@@ -40,7 +44,11 @@ export interface ParcelarFaturaResult extends CalcTexts {
   chargesCents: Cents;
   /** O limite da Lei 14.690/2023 foi aplicado (juros e encargos acima do valor original). */
   limited: boolean;
-  /** min(total, 2 × valor original). */
+  /** Teto do total: 2 × valor original (juros e encargos do rotativo e do parcelamento somados até o valor original). */
+  capCents: Cents;
+  /** Com o limite, cada uma das parcelas iguais que cabem no teto: piso(teto ÷ parcelas); null sem o limite. */
+  cappedInstallmentCents: Cents | null;
+  /** Total reconciliado: parcelas × valor de cada uma (com o limite, cappedInstallmentCents × parcelas, nunca acima do teto). */
   cappedTotalCents: Cents;
 }
 
@@ -70,10 +78,19 @@ const RATE_HINT = 'Está na fatura, no extrato ou no contrato. Use a taxa de jur
 
 export const DIVIDA_TEXT = {
   parcelarTitle: 'E se parcelar a fatura?',
-  chequeCapNote: 'A taxa informada passa do teto de 8% ao mês do cheque especial (Res. CMN 4.765/2019). Confira o extrato.',
+  chequeCapNote:
+    'A taxa informada passa do teto de 8% ao mês do cheque especial de pessoas físicas e MEI (Res. CMN 4.765/2019). A conta mostra o cenário como simulação, fora dessa regra, sem dizer que a cobrança vale. Confira o extrato.',
   cetNote: 'O CET do contrato inclui tarifas, seguros e IOF, e pode ser maior que a taxa de juros. Confira o CET no contrato.',
   /** Rotativo e cheque especial: a pergunta do teste de 09/11/2026 ("a gente inclui o CET no cálculo?"). */
-  cetOutNote: 'A conta usa só a taxa de juros, sem o CET. O CET da fatura ou do extrato soma o IOF e as tarifas, por isso o custo real tende a ser um pouco maior.',
+  cetOutNote: 'A conta usa só a taxa de juros, sem o CET. O CET da fatura ou do extrato soma o IOF e as tarifas, por isso o custo real pode ser maior.',
+  /** Hipótese do parcelamento da fatura: a conta é um cenário novo, sem o que a dívida já cobrou antes. */
+  capHistory:
+    'Cenário novo, a partir desta fatura: numa dívida que já vem de antes, os juros e encargos já cobrados também entram no limite, e a conta não sabe deles.',
+  /** Hipótese quando o limite foi aplicado: como as parcelas foram reduzidas. */
+  capSchedule:
+    'Com o limite, a conta supõe parcelas iguais reduzidas até caber no teto, para baixo no centavo. A instituição pode aplicar o limite de outro jeito, no valor ou no número das parcelas: vale o que está no contrato.',
+  /** Cheque especial: a quem vale o teto. */
+  chequeCapScope: 'O teto de 8% ao mês vale para o cheque especial de pessoas físicas e MEI.',
 } as const;
 
 export const DIVIDA_FIELDS: Record<DividaField | ParcelarFaturaField, CalcFieldSpec> = {
@@ -124,12 +141,18 @@ function parcelarFatura(valor: Cents, saldo: Cents, input: DividaInput): CalcOut
   const totalCents = inst * n;
   const chargesCents = totalCents - valor;
   const limited = chargesCents > valor;
-  const cappedTotalCents = limited ? 2 * valor : totalCents;
+  const capCents = 2 * valor;
+  // Com o limite, as parcelas iguais que cabem no teto: o total reconciliado é parcelas × valor e nunca passa do teto.
+  const cappedInstallmentCents = limited ? Math.floor(capCents / n) : null;
+  const cappedTotalCents = cappedInstallmentCents === null ? totalCents : cappedInstallmentCents * n;
   const head = `Parcelar em ${n} × ${formatBRL(inst)} a ${formatBpCompact(bp)} ao mês`;
   const resultLines = limited
     ? [
         `${head} somaria ${formatBRL(totalCents)}.`,
-        `Pelo limite da Lei 14.690/2023, juros e encargos não passam do valor original: o total fica em no máximo ${formatBRL(cappedTotalCents)}.`,
+        `Pelo limite da Lei 14.690/2023, juros e encargos não passam do valor original: o total fica em no máximo ${formatBRL(capCents)}.`,
+        n === 1
+          ? `Com o limite, a parcela fica em até ${formatBRL(cappedInstallmentCents!)}, em vez de ${formatBRL(inst)}.`
+          : `Com o limite, as ${n} parcelas iguais ficam em até ${formatBRL(cappedInstallmentCents!)} cada (${formatBRL(cappedTotalCents)} no total), em vez de ${formatBRL(inst)}.`,
       ]
     : [
         `${head} soma ${formatBRL(totalCents)}.`,
@@ -144,11 +167,15 @@ function parcelarFatura(valor: Cents, saldo: Cents, input: DividaInput): CalcOut
       totalCents,
       chargesCents,
       limited,
+      capCents,
+      cappedInstallmentCents,
       cappedTotalCents,
       resultLines,
       hypotheses: [
         `Parcelamento do valor da fatura seguinte (${formatBRL(saldo)}), em parcelas iguais (tabela Price).`,
         'O limite vale para juros e encargos do rotativo e do parcelamento somados, sem o IOF (Lei 14.690/2023 e Res. CMN 5.112/2023).',
+        ...(limited ? [DIVIDA_TEXT.capSchedule] : []),
+        DIVIDA_TEXT.capHistory,
       ],
       notes: [],
     },
@@ -207,7 +234,7 @@ export function calcCustoDaDivida(input: DividaInput): CalcOutcome<DividaResult,
           `Juros: ${formatBRL(totalCents - valor)}`,
           annualLine,
         ],
-        hypotheses: ['Juros compostos, mês a mês, sem pagamentos no período.', 'Sem IOF e tarifas.'],
+        hypotheses: ['Juros compostos, mês a mês, sem pagamentos no período.', 'Sem IOF e tarifas.', DIVIDA_TEXT.chequeCapScope],
         notes: [...(aboveCap ? [DIVIDA_TEXT.chequeCapNote] : []), DIVIDA_TEXT.cetOutNote],
       },
     };
