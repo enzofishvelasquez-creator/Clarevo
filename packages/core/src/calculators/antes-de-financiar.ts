@@ -24,10 +24,17 @@ import { parseCount, parseMoney, parsePercentBp, type Parsed } from './inputs';
  *    no início de cada mês (monthsForTarget, D-028). Comparação com frases simétricas; o preço do bem pode mudar.
  * 4. Entrada maior. O efeito de mais 10% e 20% do preço à vista de entrada na parcela e nos juros.
  *
- * Taxa 0%: nunca há juros (juros 0 e "sem juros"). A parcela é o valor financiado ÷ n, no centavo, e a última parcela
- * absorve a diferença de arredondamento, de modo que o total pago é o preço à vista.
+ * Taxa 0%: nunca há juros (juros 0 e "sem juros"). Os centavos são distribuídos (revisão externa de 18/11/2026): cada parcela é o
+ * valor financiado ÷ n, para baixo no centavo, e os centavos que sobram vão, um a um, para as últimas parcelas. O total pago é sempre o
+ * preço à vista e nenhuma parcela fica negativa (R$ 100,00 em 3: 33,33 + 33,33 + 33,34; R$ 0,02 em 4: 0,00 + 0,00 + 0,01 + 0,01).
+ *
+ * Taxa de juros ou CET (revisão externa de 18/11/2026): o CET não é a taxa de juros do contrato. Com "CET ao mês", a conta é uma
+ * simulação de custo equivalente (o CET no lugar da taxa, sobre o preço menos a entrada) e o resultado fala em "custo adicional
+ * estimado", não em juros; a parcela pode ser diferente da do contrato, porque o CET também considera tarifas, seguros e IOF.
  */
-export type AntesField = 'preco' | 'entrada' | 'parcelas' | 'taxaMes' | 'primeiraEmUmMes' | 'renda' | 'guardar' | 'rendimento';
+export type AntesField = 'preco' | 'entrada' | 'parcelas' | 'tipoTaxa' | 'taxaMes' | 'primeiraEmUmMes' | 'renda' | 'guardar' | 'rendimento';
+/** "Taxa de juros" do contrato (padrão) ou "CET ao mês" (simulação de custo equivalente). */
+export type AntesTaxaTipo = 'juros' | 'cet';
 
 export interface AntesInput {
   preco: string;
@@ -37,6 +44,8 @@ export interface AntesInput {
   parcelas: string;
   /** 0,00% a 99,99% ao mês, digitada. */
   taxaMes: string;
+  /** Qual taxa foi digitada: 'juros' (padrão, a taxa de juros do contrato) ou 'cet' (o CET ao mês: simulação de custo equivalente). */
+  tipoTaxa?: AntesTaxaTipo | null;
   /** "A primeira parcela vence em 1 mês?" (padrão Sim); Não: a primeira é paga na compra. */
   primeiraEmUmMes?: boolean;
   /** Renda líquida por mês, opcional. */
@@ -77,15 +86,20 @@ export interface AntesResult extends CalcTexts {
   financedCents: Cents;
   parcelas: number;
   taxaBp: number;
+  /** A taxa digitada: a de juros do contrato ou o CET (com o CET, "custo adicional estimado" no lugar de "juros"). */
+  taxaTipo: AntesTaxaTipo;
   firstInOneMonth: boolean;
   /** Entrada igual ao preço: não há o que financiar (sem parcela, juros nem comparação). */
   nothingToFinance: boolean;
+  /** Valor das primeiras parcelas (com taxa 0%, o valor financiado ÷ n, para baixo no centavo; pode ser R$ 0,00 em valores mínimos). */
   parcelaCents: Cents;
-  /** Última parcela: igual à parcela, salvo com taxa 0%, em que absorve a diferença de arredondamento. */
+  /** Valor das últimas parcelas: igual à parcela, salvo com taxa 0% e divisão não exata, em que tem 1 centavo a mais. */
   lastParcelaCents: Cents;
-  /** entrada + n × parcela (com taxa 0%: o preço à vista, pela última parcela). */
+  /** Quantas parcelas (as últimas) têm o valor de lastParcelaCents quando ele é diferente da parcela; 0 quando são todas iguais. */
+  lastCount: number;
+  /** entrada + n × parcela (com taxa 0%: o preço à vista, exato, pela distribuição dos centavos). */
   totalCents: Cents;
-  /** max(0, total − preço). */
+  /** max(0, total − preço): os juros (com a taxa de juros) ou o custo adicional estimado (com o CET). */
   interestCents: Cents;
   /** Total pago igual ou menor que o preço à vista. */
   noInterest: boolean;
@@ -128,12 +142,15 @@ const YIELD_RANGE_TEXT = 'Use um rendimento de 0% a 30% ao ano, com até 2 casas
 export const ANTES_ESTIMATE_TEXT = 'Estimativa. As condições oficiais são as da proposta; peça o CET.';
 
 /**
- * Hipótese da taxa (revisão das fórmulas de 17/11/2026): a dica do campo pede o CET ao mês quando a pessoa o tem, e a hipótese antiga
- * ("Só a taxa de juros informada, sem tarifas, seguros e IOF.") contradizia isso. A conta usa a taxa que foi digitada: com a taxa de
- * juros, tarifas, seguros e IOF ficam de fora; com o CET, já estão dentro.
+ * Hipótese da taxa. Revisão externa de 18/11/2026: o CET não substitui a taxa de juros do contrato (ele soma tarifas, seguros e IOF, que
+ * podem ser pagos à parte ou descontados do valor liberado). Com a taxa de juros, a hipótese diz o que fica de fora; com o CET, que a
+ * conta é uma simulação de custo equivalente e que a parcela pode ser diferente da do contrato.
  */
-export const ANTES_RATE_HYPOTHESIS =
-  'A conta usa só a taxa informada: com a taxa de juros, ficam de fora tarifas, seguros e IOF; com o CET ao mês, eles já estão dentro.';
+export const ANTES_RATE_HYPOTHESIS = 'Taxa de juros do contrato: tarifas, seguros e IOF ficam de fora; o CET da proposta inclui esses custos.';
+export const ANTES_CET_HYPOTHESIS =
+  'Simulação de custo equivalente: o CET ao mês entra no lugar da taxa de juros, sobre o preço menos a entrada. A parcela e o custo podem ser diferentes dos do contrato, porque o CET também considera tarifas, seguros e IOF, que podem ser pagos à parte ou descontados do valor liberado.';
+/** Com taxa positiva: o total é a multiplicação da parcela arredondada, e o contrato pode acertar centavos na última. */
+export const ANTES_TOTAL_HYPOTHESIS = 'Total: número de parcelas vezes a parcela, no centavo; o contrato pode acertar alguns centavos na última.';
 
 export const ANTES_FIELDS: Record<AntesField, CalcFieldSpec> = {
   preco: moneyField('Preço à vista do bem', 'o preço à vista', '50.000,00'),
@@ -143,15 +160,17 @@ export const ANTES_FIELDS: Record<AntesField, CalcFieldSpec> = {
     errors: { fora_da_faixa: 'A entrada não pode passar do preço à vista.' },
   }),
   parcelas: countField('Número de parcelas', 'o número de parcelas', ANTES_PARCELAS.min, ANTES_PARCELAS.max, 'Use de 1 a 480 parcelas.', 'De 1 a 480'),
-  taxaMes: rateField(
-    'Taxa de juros ao mês (%)',
-    'a taxa ao mês',
-    '1,99',
-    ANTES_RATE_RANGE.min,
-    ANTES_RATE_RANGE.max,
-    RATE_RANGE_TEXT,
-    'Está na proposta do banco ou da loja. Use o CET ao mês, se tiver.',
-  ),
+  tipoTaxa: {
+    label: 'Qual taxa você vai informar?',
+    hint: 'A taxa de juros do contrato dá a parcela. O CET soma tarifas, seguros e IOF: com ele, a conta vira uma simulação de custo equivalente.',
+    kind: 'opcao',
+    default: 'juros',
+    options: [
+      { value: 'juros', label: 'Taxa de juros' },
+      { value: 'cet', label: 'CET ao mês' },
+    ],
+  },
+  taxaMes: rateField('Taxa de juros ao mês (%)', 'a taxa ao mês', '1,99', ANTES_RATE_RANGE.min, ANTES_RATE_RANGE.max, RATE_RANGE_TEXT, 'Está na proposta do banco ou da loja.'),
   primeiraEmUmMes: {
     label: 'A primeira parcela vence em 1 mês?',
     hint: 'Não: a primeira parcela é paga na compra.',
@@ -189,6 +208,8 @@ export const ANTES_TEXT = {
   savingTitle: 'Juntar antes',
   entryTitle: 'Com uma entrada maior',
   noBiggerEntry: 'Com mais 10% do preço, a entrada já cobriria o preço inteiro.',
+  /** Rótulo do campo da taxa quando a pessoa escolhe "CET ao mês". */
+  cetRateLabel: 'CET ao mês (%)',
   otherEntry: 'Fazer a conta com outra entrada',
   noteInstallment: 'Anotar como parcelamento',
   /** Logo abaixo do resultado (retorno do teste, 31/10/2026: a pessoa não achava como levar o financiamento para as contas). */
@@ -260,31 +281,42 @@ function percentOfPrice(preco: Cents, percent: number): Cents {
 }
 
 interface FinanceSchedule {
+  /** Valor das primeiras parcelas. */
   parcela: Cents;
+  /** Valor das últimas `lastCount` parcelas (igual a `parcela` quando são todas iguais). */
   last: Cents;
+  lastCount: number;
   total: Cents;
   interest: Cents;
 }
 
 /**
- * Parcelas, total e juros para uma entrada. Com taxa 0% não há juros: a parcela é o valor financiado ÷ n e a última absorve a
- * diferença de arredondamento (o total é o preço). Só quando o valor financiado tem menos centavos que parcelas é que a última
- * não pode absorver (cada parcela tem ao menos 1 centavo): o total passa do preço em centavos, ainda sem juros.
+ * Parcelas, total e juros para uma entrada. Com taxa positiva, parcelas iguais (tabela Price, metade para cima) e total = entrada +
+ * n × parcela. Com taxa 0% não há juros: os centavos são distribuídos (o valor financiado ÷ n, para baixo, e o resto, um centavo para
+ * cada uma das últimas parcelas), e o total é exatamente o preço à vista, sem parcela negativa.
  */
 function financeSchedule(preco: Cents, entrada: Cents, taxaBp: number, n: number, firstInOneMonth: boolean): FinanceSchedule {
   const financed = preco - entrada;
-  let parcela = financePaymentCents(financed, taxaBp, n, firstInOneMonth);
-  if (taxaBp !== 0) {
+  if (taxaBp !== 0 || financed === 0) {
+    const parcela = financePaymentCents(financed, taxaBp, n, firstInOneMonth);
     const total = entrada + n * parcela;
-    return { parcela, last: parcela, total, interest: Math.max(0, total - preco) };
+    return { parcela, last: parcela, lastCount: 0, total, interest: Math.max(0, total - preco) };
   }
-  let last = financed - (n - 1) * parcela;
-  if (last < 1) {
-    parcela = Math.max(1, Math.floor(financed / n));
-    last = financed - (n - 1) * parcela;
-  }
-  if (last < 1) return { parcela, last: parcela, total: entrada + n * parcela, interest: 0 };
-  return { parcela, last, total: preco, interest: 0 };
+  const base = Math.floor(financed / n);
+  const rest = financed - base * n;
+  return { parcela: base, last: rest > 0 ? base + 1 : base, lastCount: rest, total: preco, interest: 0 };
+}
+
+/** "R$ 33,33" ou, com as últimas parcelas 1 centavo maiores, "R$ 33,33 a R$ 33,34". */
+function parcelaRange(s: Pick<FinanceSchedule, 'parcela' | 'last'>): string {
+  return s.last === s.parcela ? brl(s.parcela) : `${brl(s.parcela)} a ${brl(s.last)}`;
+}
+
+/** "12 × R$ 88,85", "2 × R$ 33,33 e uma última de R$ 33,34", "8 × R$ 83,33 e as 4 últimas de R$ 83,34". */
+function installmentsText(n: number, s: Pick<FinanceSchedule, 'parcela' | 'last' | 'lastCount'>): string {
+  if (s.last === s.parcela) return `${n} × ${brl(s.parcela)}`;
+  const tail = s.lastCount === 1 ? `uma última de ${brl(s.last)}` : `as ${s.lastCount} últimas de ${brl(s.last)}`;
+  return `${n - s.lastCount} × ${brl(s.parcela)} e ${tail}`;
 }
 
 export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOutcome<AntesResult, AntesField> {
@@ -311,6 +343,8 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
   }
 
   const entrada = entradaRead;
+  const taxaTipo: AntesTaxaTipo = input.tipoTaxa === 'cet' ? 'cet' : 'juros';
+  const cet = taxaTipo === 'cet';
   const firstInOneMonth = input.primeiraEmUmMes !== false;
   const financed = preco - entrada;
   const committed =
@@ -329,10 +363,12 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
         financedCents: 0,
         parcelas: n,
         taxaBp,
+        taxaTipo,
         firstInOneMonth,
         nothingToFinance: true,
         parcelaCents: 0,
         lastParcelaCents: 0,
+        lastCount: 0,
         totalCents: entrada,
         interestCents: 0,
         noInterest: true,
@@ -350,7 +386,10 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
         entryLines: [],
         noteParams: null,
         goalParams: null,
-        resultLines: ['Com a entrada igual ao preço à vista, não há o que financiar.', `Você paga ${brl(preco)} na compra, sem juros.`],
+        resultLines: [
+          'Com a entrada igual ao preço à vista, não há o que financiar.',
+          `Você paga ${brl(preco)} na compra, sem ${cet ? 'custo adicional' : 'juros'}.`,
+        ],
         hypotheses: [],
         notes: [],
       },
@@ -358,20 +397,30 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
   }
 
   // 1. Financiar
-  const { parcela, last: lastParcela, total, interest } = financeSchedule(preco, entrada, taxaBp, n, firstInOneMonth);
+  const schedule = financeSchedule(preco, entrada, taxaBp, n, firstInOneMonth);
+  const { parcela, last: lastParcela, lastCount, total, interest } = schedule;
   const noInterest = taxaBp === 0 || total <= preco;
   const lastDiffers = lastParcela !== parcela;
   const lastOffset = firstInOneMonth ? n : n - 1;
   const lastMonth = calendar(lastOffset);
+  /** "juros" ou, com o CET, "custo adicional estimado". */
+  const costName = cet ? 'custo adicional estimado' : 'juros';
 
   const resultLines: string[] = [];
-  resultLines.push(`Com estes números, ${n === 1 ? 'é' : 'são'} ${parcelasText(n)} de ${brl(parcela)}.`);
+  resultLines.push(`Com estes números, ${n === 1 ? 'é' : 'são'} ${parcelasText(n)} de ${parcelaRange(schedule)}.`);
   const paidAtPurchase = n === 1 && !firstInOneMonth;
   if (paidAtPurchase) resultLines.push('Você paga tudo na compra.');
   else resultLines.push(`Você paga por ${monthsDuration(n)}${firstInOneMonth ? '' : ', a primeira na compra'}${lastMonth ? `, até ${formatMonthYearBR(lastMonth)}` : ''}.`);
-  const installmentsText = lastDiffers ? `${n - 1} × ${brl(parcela)} e uma última de ${brl(lastParcela)}` : `${n} × ${brl(parcela)}`;
-  resultLines.push(`Total pago: ${brl(total)} (${entrada > 0 ? `entrada de ${brl(entrada)} mais ` : ''}${installmentsText}).`);
-  resultLines.push(noInterest ? 'Sem juros: o total pago é igual ou menor que o preço à vista.' : `Juros: ${brl(interest)}.`);
+  resultLines.push(`Total pago: ${brl(total)} (${entrada > 0 ? `entrada de ${brl(entrada)} mais ` : ''}${installmentsText(n, schedule)}).`);
+  resultLines.push(
+    noInterest
+      ? cet
+        ? 'Sem custo adicional: o total pago é igual ou menor que o preço à vista.'
+        : 'Sem juros: o total pago é igual ou menor que o preço à vista.'
+      : cet
+        ? `Custo adicional estimado: ${brl(interest)}.`
+        : `Juros: ${brl(interest)}.`,
+  );
 
   // 2. Impacto na renda
   let parcelaPermille: number | null = null;
@@ -380,32 +429,35 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
   const notes: string[] = [estimateNote];
   // Uma parcela só, paga na compra, não pesa mês a mês: sem as linhas de impacto na renda nem do comprometido.
   const showImpact = !paidAtPurchase;
+  // O peso na renda usa a maior parcela (com taxa 0%, as últimas podem ter 1 centavo a mais).
+  const heaviest = Math.max(parcela, lastParcela);
   if (showImpact && renda !== null) {
-    parcelaPermille = percentTenths(parcela, renda);
-    resultLines.push(`A parcela seria ${formatPermille(parcelaPermille, parcela)} da sua renda.`);
+    parcelaPermille = percentTenths(heaviest, renda);
+    resultLines.push(`A parcela seria ${formatPermille(parcelaPermille, heaviest)} da sua renda.`);
     if (committed !== null) {
       beforePermille = percentTenths(committed, renda);
-      afterPermille = percentTenths(committed + parcela, renda);
+      afterPermille = percentTenths(committed + heaviest, renda);
       resultLines.push(
-        `Sua renda comprometida iria de ${formatPermille(beforePermille, committed)} para ${formatPermille(afterPermille, committed + parcela)} enquanto durar o financiamento.`,
+        `Sua renda comprometida iria de ${formatPermille(beforePermille, committed)} para ${formatPermille(afterPermille, committed + heaviest)} enquanto durar o financiamento.`,
       );
     }
     notes.push(`${COMMITTED_TEXT.debtReference} ${COMMITTED_TEXT.debtReferenceSource}`);
   } else if (showImpact && committed !== null && committed > 0) {
-    resultLines.push(`O total comprometido por mês iria de ${brl(committed)} para ${brl(committed + parcela)} enquanto durar o financiamento.`);
+    resultLines.push(`O total comprometido por mês iria de ${brl(committed)} para ${brl(committed + heaviest)} enquanto durar o financiamento.`);
   }
 
   // 3. Juntar antes
   const target = financed;
   const guardarIsDefault = guardarRead === null;
-  const monthly = guardarRead ?? parcela;
+  // Em branco, guarda o valor da parcela (a maior, com taxa 0%: guardando esse valor, junta o que falta em n meses).
+  const monthly = guardarRead ?? heaviest;
   const months = monthsToSave(target, monthly, rendimentoBp);
   const yieldText = rendimentoBp > 0 ? `com rendimento de ${formatBpCompact(rendimentoBp)} ao ano` : 'sem rendimento';
   const savingLines: string[] = [];
   const span = lastOffset === 0 ? '' : ` ao longo de ${monthsCount(n)}`;
   const financing = noInterest
-    ? `Financiando: você usa o bem agora e não paga juros${span}.`
-    : `Financiando: você usa o bem agora e paga ${brl(interest)} de juros${span}.`;
+    ? `Financiando: você usa o bem agora e não paga ${cet ? 'custo adicional' : 'juros'}${span}.`
+    : `Financiando: você usa o bem agora e paga ${brl(interest)} de ${costName}${span}.`;
   if (months === null) {
     savingLines.push(`Guardando ${brl(monthly)} por mês, ${yieldText}, não dá para juntar ${brl(target)} em 50 anos.`);
     savingLines.push(financing);
@@ -413,41 +465,55 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
     savingLines.push(`Guardando ${brl(monthly)} por mês, ${yieldText}, você junta ${brl(target)} em ${monthsDuration(months)}.`);
     savingLines.push(financing);
     savingLines.push(
-      `Juntando: leva ${monthsCount(months)} para juntar o que falta para comprar à vista e não paga juros do financiamento.`,
+      `Juntando: leva ${monthsCount(months)} para juntar o que falta para comprar à vista e não paga ${cet ? 'o custo adicional' : 'juros'} do financiamento.`,
     );
   }
 
-  // 4. Entrada maior
+  // 4. Entrada maior (nunca acima do preço: a que chegaria ao preço inteiro só é citada, sem conta)
   const biggerEntries: AntesEntradaMaior[] = [];
+  const entryLines: string[] = [];
   for (const percent of ANTES_EXTRA_ENTRY_PERCENTS) {
     const extra = percentOfPrice(preco, percent);
     const novaEntrada = entrada + extra;
-    if (extra < 1 || novaEntrada >= preco) continue;
-    const { parcela: novaParcela, interest: novoJuros } = financeSchedule(preco, novaEntrada, taxaBp, n, firstInOneMonth);
-    biggerEntries.push({
+    if (extra < 1) continue;
+    if (novaEntrada >= preco) {
+      // A primeira que já cobre o preço: com nenhuma linha antes, a tela mostra ANTES_TEXT.noBiggerEntry.
+      if (biggerEntries.length > 0) entryLines.push(`Com mais ${percent}% do preço, a entrada já cobriria o preço inteiro.`);
+      break;
+    }
+    const s = financeSchedule(preco, novaEntrada, taxaBp, n, firstInOneMonth);
+    const e: AntesEntradaMaior = {
       percent,
       extraCents: extra,
       entradaCents: novaEntrada,
-      parcelaCents: novaParcela,
-      interestCents: novoJuros,
-      parcelaDiffCents: Math.max(0, parcela - novaParcela),
-      interestDiffCents: Math.max(0, interest - novoJuros),
-    });
-  }
-  const entryLines = biggerEntries.map((e) => {
+      parcelaCents: s.parcela,
+      interestCents: s.interest,
+      parcelaDiffCents: Math.max(0, parcela - s.parcela),
+      interestDiffCents: Math.max(0, interest - s.interest),
+    };
+    biggerEntries.push(e);
     const less = e.interestDiffCents > 0 ? ` (${brl(e.interestDiffCents)} a menos)` : '';
-    return `Com mais ${e.percent}% do preço na entrada (${brl(e.extraCents)}): parcela de ${brl(e.parcelaCents)} e juros de ${brl(e.interestCents)}${less}.`;
-  });
+    entryLines.push(`Com mais ${e.percent}% do preço na entrada (${brl(e.extraCents)}): parcela de ${parcelaRange(s)} e ${costName} de ${brl(e.interestCents)}${less}.`);
+  }
 
   // Hipóteses, sempre visíveis
   const hypotheses: string[] = [
     firstInOneMonth ? 'Parcelas iguais (tabela Price), a primeira 1 mês depois da compra.' : 'Parcelas iguais (tabela Price), a primeira paga na compra e as outras a cada mês.',
-    taxaBp === 0
-      ? lastDiffers
-        ? `Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo, e a última (${brl(lastParcela)}) absorve a diferença do arredondamento.`
-        : 'Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo.'
-      : ANTES_RATE_HYPOTHESIS,
   ];
+  if (taxaBp === 0) {
+    if (!lastDiffers) hypotheses.push('Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, no centavo.');
+    else if (parcela === 0)
+      hypotheses.push(
+        `Sem juros informados: com este valor, nem todas as parcelas têm valor. Só ${lastCount === 1 ? 'a última tem' : `as ${lastCount} últimas têm`} ${brl(lastParcela)}; as outras ficam em ${brl(0)}, e o total é o preço.`,
+      );
+    else
+      hypotheses.push(
+        `Sem juros informados: a parcela é o valor financiado dividido pelas parcelas, para baixo no centavo, e os centavos que sobram vão para ${lastCount === 1 ? 'a última' : `as ${lastCount} últimas`} (${brl(lastParcela)}), para o total ser o preço.`,
+      );
+    if (cet) hypotheses.push(ANTES_CET_HYPOTHESIS);
+  } else {
+    hypotheses.push(cet ? ANTES_CET_HYPOTHESIS : ANTES_RATE_HYPOTHESIS, ANTES_TOTAL_HYPOTHESIS);
+  }
   if (showImpact && renda !== null) hypotheses.push('Percentuais sobre a renda líquida por mês que você informou aqui.');
   if (showImpact && committed !== null) hypotheses.push('O comprometido é o do mês atual, com as contas a pagar já criadas; os meses seguintes podem ser diferentes.');
   hypotheses.push(
@@ -455,7 +521,13 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
       ? `Juntar para comprar à vista: o valor a juntar é o que falta, o preço menos a entrada de ${brl(entrada)} que você já tem: ${brl(financed)}.`
       : `Juntar para comprar à vista: o valor a juntar é o preço inteiro, ${brl(preco)}.`,
   );
-  hypotheses.push(guardarIsDefault ? 'Valor guardado por mês: o da parcela, a menos que você informe outro.' : 'Valor guardado por mês: o que você informou.');
+  hypotheses.push(
+    guardarIsDefault
+      ? lastDiffers
+        ? 'Valor guardado por mês: o da maior parcela, a menos que você informe outro.'
+        : 'Valor guardado por mês: o da parcela, a menos que você informe outro.'
+      : 'Valor guardado por mês: o que você informou.',
+  );
   hypotheses.push(
     rendimentoBp > 0
       ? `Rendimento de ${formatBpCompact(rendimentoBp)} ao ano (${monthlyRateText(rendimentoBp)} ao mês, taxa equivalente), informado por você, constante no período e sem imposto ou taxas.`
@@ -484,10 +556,12 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
       financedCents: financed,
       parcelas: n,
       taxaBp,
+      taxaTipo,
       firstInOneMonth,
       nothingToFinance: false,
       parcelaCents: parcela,
       lastParcelaCents: lastParcela,
+      lastCount,
       totalCents: total,
       interestCents: interest,
       noInterest,
@@ -505,7 +579,7 @@ export function calcAntesDeFinanciar(input: AntesInput, today?: IsoDate): CalcOu
       entryLines,
       noteParams:
         n >= 2
-          ? { tipo: 'parcelada', natureza: 'financiamento', parcelas: n, ...(parcela <= MAX_RECORD_CENTS ? { valor: parcela } : {}) }
+          ? { tipo: 'parcelada', natureza: 'financiamento', parcelas: n, ...(parcela >= 1 && parcela <= MAX_RECORD_CENTS ? { valor: parcela } : {}) }
           : null,
       goalParams,
       resultLines,

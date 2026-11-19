@@ -5,8 +5,9 @@ em centavos inteiros, para conferir "Antes de financiar" (D-044).
 
 - Price: Fraction (aritmética racional exata). Parcela = F * i / (1 - (1 + i)^-n), com i = pontos-base / 10.000; paga na compra:
   a mesma parcela dividida por (1 + i); taxa zero: F / n. Arredondamento metade para cima, mínimo de 1 centavo.
-  total = entrada + n * parcela; juros = max(0, total - preço). Taxa zero: juros 0 e a última parcela absorve o arredondamento
-  (financiado - (n - 1) * parcela; total = preço), salvo com menos centavos que parcelas (1 centavo cada).
+  total = entrada + n * parcela; juros = max(0, total - preço). Taxa zero (revisão externa de 18/11/2026): juros 0 e os centavos
+  distribuídos: cada parcela é financiado // n e os financiado % n centavos que sobram vão, um a um, para as últimas parcelas
+  (total = preço, nenhuma parcela negativa; com menos centavos que parcelas, as primeiras ficam em 0).
 - Poupança com depósitos no início do mês: Decimal com 70 dígitos. r = (1 + a)^(1/12); depois de n meses,
   valor = mensal * r * (r^n - 1) / (r - 1); meses = menor n de 1 a 600 com valor >= alvo (None passando de 600); mensal >= alvo: 1.
   O valor ao fim dos meses é arredondado para baixo, em centavos.
@@ -73,19 +74,16 @@ for k in range(220):
     parcela = price(financed, bp, n, first)
     total = entrada + n * parcela
     last = parcela
+    last_count = 0
     interest = max(0, total - preco)
-    if bp == 0:
-        # Taxa zero: nunca há juros; a última parcela absorve o arredondamento (o total é o preço).
+    if bp == 0 and financed > 0:
+        # Taxa zero: nunca há juros; os centavos que sobram da divisão vão para as últimas parcelas (o total é o preço).
         interest = 0
-        last = financed - (n - 1) * parcela
-        if last < 1:
-            parcela = max(1, financed // n)
-            last = financed - (n - 1) * parcela
-        if last < 1:
-            last = parcela  # menos centavos que parcelas: 1 centavo cada, sem última diferente
-            total = entrada + n * parcela
-        else:
-            total = preco
+        parcela = financed // n
+        last_count = financed % n
+        last = parcela + 1 if last_count else parcela
+        total = preco
+        assert (n - last_count) * parcela + last_count * last == financed
     cases.append(
         {
             'kind': 'price',
@@ -96,6 +94,7 @@ for k in range(220):
             'primeiraEmUmMes': first,
             'parcelaCents': parcela,
             'lastParcelaCents': last,
+            'lastCount': last_count,
             'totalCents': total,
             'interestCents': interest,
         }
