@@ -217,8 +217,6 @@ blockquote>:last-child{margin-bottom:0}
 @media (min-width:56rem){.duas-colunas{grid-template-columns:repeat(2,minmax(0,1fr))}.duas-colunas>p{margin-bottom:0}}
 /* As ressalvas de Para empresas numa nota curta depois de "Como funciona" (revisão de 18/11/2026), e não em cartões antes dele. */
 .nota-ressalvas{max-width:52rem;font-size:.9375rem}
-/* O aviso de saúde no fim da página inicial (D-115): uma nota curta e discreta, separada do contato por uma linha. */
-.aviso-final{max-width:46rem;margin:2rem 0 0;padding-top:1rem;border-top:1px solid var(--linha);color:var(--texto-2);font-size:.875rem}
 .pequeno{font-size:.9375rem}
 
 /* Cartões e grades */
@@ -323,10 +321,6 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .ve-nao-ve{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(20rem,100%),1fr))}
 .ve-nao-ve .cartao{border-width:2px}
 .ve-nao-ve h3{margin-top:0}
-.lista-nao-faz{border-width:2px;margin:0 0 1rem}
-.lista-nao-faz ul{list-style:none;padding:0;margin:0}
-.lista-nao-faz li{position:relative;padding-left:1.5rem}
-.lista-nao-faz li::before{content:"";position:absolute;left:0;top:.62em;width:.6rem;height:.6rem;background:var(--texto);transform:rotate(45deg);border-radius:2px}
 .ve-nao-ve ul{list-style:none;padding:0}
 .ve-nao-ve li{position:relative;padding-left:1.5rem}
 .ve-nao-ve li::before{content:"";position:absolute;left:0;top:.62em;width:.6rem;height:.6rem}
@@ -334,6 +328,24 @@ a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
 .ve li::before{border-radius:50%;background:var(--azul)}
 .nunca-ve{border-color:var(--texto)!important}
 .nunca-ve li::before{background:var(--texto);transform:rotate(45deg);border-radius:2px}
+
+/* Segurança (19/11/2026, pedido do Enzo): o que não vende fica no fim, em perguntas recolhidas (<details> fechado), sem caixa: uma linha
+   entre uma e outra, a seta que vira ao abrir e o texto inteiro dentro. Funciona sem JavaScript. */
+.duvidas{max-width:52rem;margin:.25rem 0 1.5rem;border-top:1px solid var(--linha)}
+.duvida{border-bottom:1px solid var(--linha)}
+.duvida>summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:48px;padding:.55rem 0;font-weight:700;cursor:pointer;list-style:none}
+.duvida>summary::-webkit-details-marker{display:none}
+.duvida>summary::after{content:"";flex:none;width:.55rem;height:.55rem;margin-right:.35rem;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.duvida[open]>summary::after{transform:translateY(2px) rotate(-135deg)}
+.duvida>summary:hover{color:var(--link)}
+.duvida-corpo{padding:0 0 1.25rem;color:var(--texto-2)}
+.duvida-corpo>:first-child{margin-top:0}
+.duvida-corpo>:last-child{margin-bottom:0}
+.duvida-corpo h3{margin:1rem 0 .35rem;font-size:1rem;color:var(--texto)}
+.duvida-corpo h3:first-child{margin-top:0}
+.duvida-corpo ul{margin:0 0 .75rem;padding-left:1.2rem}
+.duvida-corpo li{margin:.3rem 0}
+.duvidas+p{max-width:52rem}
 
 /* Tabelas dos textos jurídicos */
 .tabela table{width:100%;border-collapse:collapse;font-size:.9375rem}

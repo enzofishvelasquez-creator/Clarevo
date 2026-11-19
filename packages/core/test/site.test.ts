@@ -800,7 +800,7 @@ describe('site público: as páginas geradas', () => {
     }
   });
 
-  it('a página inicial traz a mensagem central, o apoio prático do app, recursos com vídeo e captura, a empresa que nunca vê finanças, a faixa do que a Clarevo não faz, o app web e o aviso das lojas (sem selos)', () => {
+  it('a página inicial traz a mensagem central, o apoio prático do app, recursos com vídeo e captura, a empresa que nunca vê finanças, a faixa de confiança, o app web e o aviso das lojas (sem selos)', () => {
     const h = html('index.html');
     // D-068: o título é a mensagem central do Manual v2.2 (seção 19); "Mais clareza para decidir" fica como apoio, e o subtexto diz o que a Clarevo faz.
     expect(h).toContain('<h1>Cuidar da vida financeira faz parte de cuidar de você.</h1>');
@@ -814,18 +814,22 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('<a class="botao botao-principal" href="app/index.html">Conheça a Clarevo</a>');
     // O resto fala de bem-estar financeiro com apoio prático, sem prometer resultado de saúde (Playbook v2.2, "Bem-estar financeiro e saúde mental").
     expect(h).toContain('Bem-estar financeiro, com apoio prático');
-    expect(h).toContain('A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade.');
-    expect(h).toContain('é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada');
+    // O aviso de saúde saiu do fim da página inicial em 19/11/2026 (pedido do Enzo): fica em Segurança e privacidade e em Para empresas.
+    expect(h).not.toContain('não é atendimento de saúde');
+    expect(h).not.toContain('eficácia clínica');
     expect(h).toContain('dificuldade financeira não é falta de disciplina');
     expect(h).not.toMatch(PROMESSAS_PROIBIDAS);
-    // D-115: o que a Clarevo não faz virou a faixa curta da capa, um link só para o bloco completo de Segurança e privacidade.
+    // D-115: o que a Clarevo não faz virou a faixa curta da capa, um link só. Desde 19/11/2026, o link leva à página Segurança e privacidade
+    // (o convite visível é "Segurança e privacidade"), e não ao bloco do que a Clarevo não faz, que lá ficou recolhido no fim.
     expect(h).not.toContain('id="nao-e"');
-    const faixa = /<p class="confianca"><a href="seguranca\.html#nao-faz">[\s\S]*?<\/a><\/p>/.exec(h)?.[0] ?? '';
+    const faixa = /<p class="confianca"><a href="seguranca\.html">[\s\S]*?<\/a><\/p>/.exec(h)?.[0] ?? '';
     for (const frase of ['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) expect(faixa, frase).toContain(`${frase}</span>`);
     expect(faixa.match(/<a\b/g)?.length).toBe(1);
+    expect(faixa).toContain('<span class="so-leitor">. Mais em </span><span class="confianca-mais">Segurança e privacidade<svg');
+    expect(faixa).not.toContain('Ver o que a Clarevo não faz');
     expect(/<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(h)![0]).toContain(faixa);
     const seg = html('seguranca.html');
-    const naoFaz = /<h2 id="nao-faz">O que a Clarevo não faz<\/h2>[\s\S]*?<\/section>/.exec(seg)?.[0] ?? '';
+    const naoFaz = /<details class="duvida" id="nao-faz">\n<summary>O que a Clarevo faz e não faz<\/summary>[\s\S]*?<\/details>/.exec(seg)?.[0] ?? '';
     for (const frase of ['Não é banco', 'Não movimenta dinheiro', 'Não oferece crédito', 'não recomenda produtos financeiros', 'Não é atendimento de saúde e não substitui o acompanhamento de profissionais', 'Não se conecta ao seu banco e não pede senha bancária', 'tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família']) expect(naoFaz, frase).toContain(frase);
     // Sem repetir em Segurança: o que não fica guardado continua só em "O que não guardamos", e "não se conecta ao seu banco" só neste bloco.
     expect(seg.match(/não se conecta ao seu banco/gi)?.length).toBe(1);
@@ -934,18 +938,30 @@ describe('site público: as páginas geradas', () => {
     for (const p of ['index.html', 'app/index.html', 'planos.html']) expect(html(p), p).not.toMatch(/plano Individual inclui um negócio|Inclui o Espaço Negócio|Incluído no plano Individual/);
   });
 
-  // O aviso de saúde (revisado no pacote do advogado, seção j) sem mudar o texto, mas fora do começo das páginas (D-115, retorno de quem
-  // testa: "O negativo não deveria estar logo no começo da página. Isso é advertência, não propaganda.").
-  it('o aviso de saúde, com o mesmo texto, fica numa nota no fim da página inicial, no bloco da NR-1 de Para empresas e no fim de Sobre, e não no começo', () => {
-    const { AVISO_DE_SAUDE } = require(join(ROOT, 'scripts', 'site', 'paginas', 'inicio.js')) as { AVISO_DE_SAUDE: string };
+  // O aviso de saúde (revisado no pacote do advogado, seção j) sem mudar o texto, fora do começo das páginas (D-115, retorno de quem testa:
+  // "O negativo não deveria estar logo no começo da página. Isso é advertência, não propaganda."). Desde 19/11/2026 (pedido do Enzo), sai do
+  // fim da página inicial e de Sobre e fica em Segurança e privacidade, dentro da pergunta recolhida "O que a Clarevo faz e não faz", e na
+  // nota de ressalvas de Para empresas.
+  it('o aviso de saúde, com o mesmo texto, fica na pergunta recolhida de Segurança e na nota de ressalvas de Para empresas, e não na página inicial nem em Sobre', () => {
+    const { AVISO_DE_SAUDE } = require(join(ROOT, 'scripts', 'site', 'paginas', 'seguranca.js')) as { AVISO_DE_SAUDE: string };
     expect(AVISO_DE_SAUDE).toBe('A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada.');
     expect(readFileSync(join(ROOT, 'docs', 'legal', 'resumo-para-advogado.md'), 'utf8')).toContain('"A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade."');
     const inicio = html('index.html');
     const bemEstar = /<section[^>]*aria-labelledby="bem-estar"[\s\S]*?<\/section>/.exec(inicio)![0];
     expect(bemEstar).not.toMatch(/não promete|O que a Clarevo não/);
     expect(bemEstar).toContain('<p class="texto-bloco">Um app para anotar o que entra e o que sai');
-    expect(inicio).toContain(`<p class="aviso-final">${AVISO_DE_SAUDE}</p>`);
-    expect(inicio.indexOf('class="aviso-final"')).toBeGreaterThan(inicio.indexOf('id="contato"'));
+    for (const p of ['index.html', 'sobre.html', 'app/index.html', 'planos.html']) {
+      expect(html(p), p).not.toContain('eficácia clínica');
+      expect(html(p), p).not.toContain('class="aviso-final"');
+    }
+    expect(html('estilo.css')).not.toContain('.aviso-final');
+    // Em Segurança: uma vez só, dentro da pergunta recolhida (fechada) "O que a Clarevo faz e não faz", depois da nota sobre organização e educação financeira.
+    const seg = html('seguranca.html');
+    expect(seg.split(esc(AVISO_DE_SAUDE)).length - 1).toBe(1);
+    const naoFaz = /<details class="duvida" id="nao-faz">[\s\S]*?<\/details>/.exec(seg)?.[0] ?? '';
+    expect(naoFaz).toContain(`<p>${esc(AVISO_DE_SAUDE)}</p>`);
+    expect(naoFaz.indexOf(esc(AVISO_DE_SAUDE))).toBeGreaterThan(naoFaz.indexOf('A Clarevo é uma ferramenta de organização e de educação financeira.'));
+    expect(naoFaz).not.toMatch(/<details[^>]*\sopen/);
     const empresas = html('empresas/index.html');
     const primeira = /<section[^>]*aria-labelledby="bem-estar"[\s\S]*?<\/section>/.exec(empresas)![0];
     expect(primeira).not.toMatch(/não promete|não está incluído|não fazem parte/);
@@ -956,9 +972,9 @@ describe('site público: as páginas geradas', () => {
     const nota = /<p class="nota nota-ressalvas">[\s\S]*?<\/p>/.exec(comoFunciona)?.[0] ?? '';
     for (const t of ['Atendimento psicológico, mentoria, palestras, laudos, PGR e relatórios de risco não fazem parte do que a Clarevo oferece hoje.', 'não promete redução de absenteísmo, de estresse nem de adoecimento', esc(AVISO_DE_SAUDE)]) expect(nota, t).toContain(t);
     expect(comoFunciona.indexOf('nota-ressalvas')).toBeGreaterThan(comoFunciona.indexOf('</ol>'));
-    const sobre = html('sobre.html');
-    expect(sobre).toContain(`<p class="aviso-final">${esc(AVISO_DE_SAUDE)}</p>`);
-    expect(sobre.indexOf('class="aviso-final"')).toBeGreaterThan(sobre.indexOf('id="quem"'));
+    // Os Termos de uso não falam de saúde (seção 2, "O que a Clarevo não é", lista banco, dinheiro, crédito, conexão com banco, recomendação
+    // e consultoria): o aviso continua só no site, revisado no pacote do advogado. Se os Termos ganharem uma cláusula de saúde, revise este teste.
+    expect(readFileSync(join(ROOT, 'docs', 'legal', 'termos-de-uso.md'), 'utf8')).not.toMatch(/saúde/i);
   });
 
   // Indicadores mais fáceis de achar (D-115): "Indicadores de hoje" na página inicial, com o retrato e o script do painel, e o cartão dos
@@ -1089,7 +1105,7 @@ describe('site público: as páginas geradas', () => {
     expect(h).toContain('A explicação de abertura de cada recurso é a do guia de uso do próprio app');
     // O que o app não faz: a faixa curta da capa, com link para o bloco completo de Segurança e privacidade (D-115).
     expect(h).not.toContain('id="nao-faz"');
-    expect(h).toContain('<p class="confianca"><a href="../seguranca.html#nao-faz">');
+    expect(h).toContain('<p class="confianca"><a href="../seguranca.html">');
     // Lembretes são do app para celular: a única captura que existe é a da web, que só avisa que eles não existem, então não há imagem.
     expect(h).toContain('>Lembretes</h3>');
     expect(h).not.toContain('imagens/lembretes.png');
@@ -1156,7 +1172,35 @@ describe('site público: as páginas geradas', () => {
 
   it('Segurança e privacidade traz o que guardamos, o que não guardamos, quem vê, a empresa, a exclusão e o link para a política', () => {
     const h = html('seguranca.html');
-    for (const frase of ['O essencial', 'O que guardamos', 'O que não guardamos', 'Quem vê os seus dados', 'Como protegemos', 'Este site', 'Excluir a conta']) expect(h, frase).toContain(frase);
+    for (const frase of ['O essencial', 'O que guardamos', 'Dados que a Clarevo não guarda', 'Quem vê os seus dados', 'Como protegemos', 'Sobre este site', 'Como excluir a conta']) expect(h, frase).toContain(frase);
+    // Desde 19/11/2026 (pedido do Enzo): a parte visível começa pelo essencial, quem vê, como protegemos e o que guardamos; o que a Clarevo faz
+    // e não faz, os dados que ela não guarda, este site e como excluir a conta ficam em perguntas recolhidas (fechadas) no fim, com o texto
+    // inteiro, e só a linha dos links fica visível depois delas.
+    const principal = /<main[\s\S]*<\/main>/.exec(h)![0];
+    expect([...principal.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1])).toEqual(['essencial', 'quem-ve', 'protecao', 'guardamos', 'detalhes']);
+    const detalhes = /<h2 id="detalhes">Mais detalhes<\/h2>[\s\S]*?<\/section>/.exec(h)![0];
+    expect([...detalhes.matchAll(/<details class="duvida" id="([^"]+)">\n<summary>([^<]+)<\/summary>/g)].map((m) => [m[1], m[2]])).toEqual([
+      ['nao-faz', 'O que a Clarevo faz e não faz'],
+      ['nao-guardamos', 'Dados que a Clarevo não guarda'],
+      ['este-site', 'Sobre este site'],
+      ['excluir', 'Como excluir a conta'],
+    ]);
+    expect(h).not.toMatch(/<details[^>]*\sopen/);
+    expect(detalhes).not.toMatch(/class="cartao|nunca-ve|ve-nao-ve|lista-nao-faz/);
+    expect(detalhes).toMatch(/<\/details>\n<\/div>\n<p>Leia também a <a href="privacidade\.html">Política de privacidade<\/a>, os <a href="termos\.html">Termos de uso<\/a> e as respostas da <a href="ajuda\/privacidade\.html">Ajuda sobre privacidade e segurança<\/a>\. Dúvidas sobre os seus dados: /);
+    const duvida = (id: string) => new RegExp(`<details class="duvida" id="${id}">[\\s\\S]*?</details>`).exec(h)?.[0] ?? '';
+    expect(duvida('excluir')).toContain('No app, abra Conta e, no último item, toque em "Excluir minha conta". Você digita EXCLUIR e o seu Pessoal é apagado de verdade, na hora.');
+    expect(duvida('excluir')).toContain('Quem não consegue entrar no app pede pela página <a href="excluir-conta.html">Excluir conta</a>.');
+    expect(duvida('este-site')).toContain('O site guarda no navegador só o tema que você escolher no rodapé (claro ou escuro), se escolher um: essa escolha nunca sai do seu aparelho e serve só para mostrar o tema escolhido.');
+    for (const nao of ['número completo de cartão, código de segurança (CVV) e validade', 'CPF da nota fiscal', 'dados do comprovante de Pix ou de pagamento', 'fotos e imagens da câmera', 'No Android, a leitura do QR Code usa um componente do Google (ML Kit) incluído no app']) expect(duvida('nao-guardamos'), nao).toContain(nao);
+    // A página pública de exclusão de conta (as lojas pedem) continua no rodapé de todas as páginas.
+    expect(/<footer[\s\S]*<\/footer>/.exec(h)![0]).toContain('<a href="excluir-conta.html">Excluir conta</a>');
+    // Nenhum link do site leva a uma pergunta recolhida: nem os de outras páginas (seguranca.html#...) nem os de dentro da página (#...).
+    for (const [arquivo, conteudo] of gerado.arquivos) {
+      if (!arquivo.endsWith('.html')) continue;
+      expect(texto(conteudo), arquivo).not.toMatch(/seguranca(\.html)?#(nao-faz|nao-guardamos|este-site|excluir)"/);
+    }
+    expect(h).not.toMatch(/href="#(nao-faz|nao-guardamos|este-site|excluir)"/);
     for (const nao of ['número completo de cartão, código de segurança (CVV) e validade', 'CPF da nota fiscal', 'dados do comprovante de Pix ou de pagamento', 'fotos e imagens da câmera']) expect(h, nao).toContain(nao);
     expect(h).toContain('ela nunca vê as suas finanças, nem somadas às de outras pessoas');
     // O site: sem cookies próprios nem análise de acesso; a hospedagem recebe o endereço da página e o IP (não "só para entregá-las").

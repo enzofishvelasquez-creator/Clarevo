@@ -4,22 +4,42 @@
  * (as seções citadas são as da política). O que na política ainda depende da revisão jurídica (`[PROPOSTA]` e `[A DEFINIR]`) não é afirmado
  * aqui: a página manda para a política, que faz o `--final` recusar enquanto sobrar pendência.
  *
- * "O que a Clarevo não faz" (D-115, 18/11/2026) junta o que estava nas seções "O que a Clarevo não é" da página inicial e "O que o app não
- * faz" de O app, que viraram uma faixa curta na capa daquelas páginas, com link para cá. Em "Quem vê os seus dados", os quatro cartões
- * ficam numa grade 2 x 2 e a tela "Quem vê estes dados?" ao lado deles (no celular, depois deles), e não dentro do primeiro cartão.
+ * Desde 19/11/2026 (pedido do Enzo: o bloco do que a Clarevo não faz "não vende", "deixar isso mais oculto"), a parte visível começa pelo
+ * que é prático e positivo: o essencial, quem vê os seus dados (os quatro cartões em 2 x 2, com a tela "Quem vê estes dados?" ao lado),
+ * como protegemos e o que guardamos. No fim, em "Mais detalhes", quatro perguntas recolhidas (`<details>` fechado, como numa lista de
+ * perguntas, sem caixa), com o texto inteiro de antes: o que a Clarevo faz e não faz (D-115, que juntou "O que a Clarevo não é" da página
+ * inicial e "O que o app não faz" de O app; também serve a quem revisa o app nas lojas), com o aviso de saúde; os dados que a Clarevo não
+ * guarda (que espelham as seções 5 e 8 da política, palavra por palavra no parágrafo do ML Kit); este site; e como excluir a conta. Visível
+ * no fim, só a linha com os links da política, dos termos e da Ajuda. Cada `<details>` leva o `id` da seção de antes (`nao-faz`,
+ * `nao-guardamos`, `este-site`, `excluir`), mas nenhum link do site aponta para eles: a faixa de confiança da capa leva à página.
  *
  * Em "O que guardamos", três cartões espelham a política desde 12/11/2026: investimentos (seções 3.2 e 7), assinatura e pagamento (seção
  * 3.9, sem preço nem período de teste, que o site ainda não comunica) e anotar por mensagem (seção 3.8). Quando a política mudar, mudam juntos.
  */
+const { esc } = require('../texto');
 const { rel } = require('../util');
 const { montarPagina, marcadoresEmHtml, bloco, celular } = require('../modelo');
 
 const ARQUIVO = 'seguranca.html';
+/**
+ * O aviso de saúde, revisado no pacote do advogado (`docs/legal/resumo-para-advogado.md`, seção j, "Saúde"): o texto não muda. Desde
+ * 19/11/2026 (pedido do Enzo) ele sai do fim da página inicial e de Sobre e fica aqui, dentro da pergunta recolhida "O que a Clarevo faz e
+ * não faz", e na nota de ressalvas de Para empresas, depois de "Como funciona".
+ */
+const AVISO_DE_SAUDE = 'A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada.';
+
+/** Uma pergunta recolhida do fim da página: `<details>` fechado, com o `id` da seção que ela substituiu. */
+const duvida = (id, resumo, corpo) => `<details class="duvida" id="${id}">
+<summary>${resumo}</summary>
+<div class="duvida-corpo">
+${corpo}
+</div>
+</details>`;
 
 function paginaSeguranca({ valores, img }) {
   const u = (d) => rel(ARQUIVO, d);
   const capa = `<h1>Segurança e privacidade</h1>
-<p class="lead">O que a Clarevo guarda, o que não guarda e quem vê o quê, em linguagem simples. O texto completo e com valor de regra é a <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`;
+<p class="lead">Quem vê os seus dados, como protegemos e o que guardamos, em linguagem simples. O texto completo e com valor de regra é a <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`;
 
   const brutas = [
     bloco(
@@ -29,89 +49,9 @@ function paginaSeguranca({ valores, img }) {
 <li>Não guardamos número completo de cartão, código de segurança, validade, CPF de nota fiscal nem imagens de notas ou comprovantes.</li>
 <li>Se a sua empresa oferecer a Clarevo como benefício, ela nunca vê as suas finanças, nem somadas às de outras pessoas.</li>
 <li>Sem anúncios, sem venda de dados e sem rastreamento para publicidade.</li>
-<li>Você pode excluir a sua conta dentro do app.</li>
+<li>Você leva os seus gastos e recebimentos para uma planilha ou um resumo em PDF quando quiser, e pode excluir a sua conta dentro do app.</li>
 </ul>`,
       { rotulo: 'essencial' },
-    ),
-    bloco(
-      `<h2 id="nao-faz">O que a Clarevo não faz</h2>
-<div class="cartao nunca-ve lista-nao-faz">
-<ul>
-<li>Não se conecta ao seu banco e não pede senha bancária: tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família.</li>
-<li>Não é banco e não guarda o seu dinheiro.</li>
-<li>Não movimenta dinheiro: não faz pagamentos nem transferências.</li>
-<li>Não oferece crédito e não recomenda produtos financeiros.</li>
-<li>Não é atendimento de saúde e não substitui o acompanhamento de profissionais.</li>
-</ul>
-</div>
-<p class="nota">A Clarevo é uma ferramenta de organização e de educação financeira. Ela não promete resultado financeiro nem de saúde, e as simulações são exemplos feitos com os números que você digita. Os dados de cartão e de notas que nunca ficam guardados estão em <a href="#nao-guardamos">O que não guardamos</a>, e a resposta completa está na <a href="${u('ajuda/comecar.html')}#tema-o-que-a-clarevo-nao-faz">Ajuda</a>.</p>`,
-      { variante: 'azul', rotulo: 'nao-faz' },
-    ),
-    bloco(
-      `<h2 id="guardamos">O que guardamos</h2>
-<p class="lead-bloco">Tudo o que está na lista é digitado, importado ou confirmado por você ou pelas pessoas da sua Família. A Clarevo não busca esses dados em bancos.</p>
-<div class="grade">
-<article class="cartao">
-<h3>Cadastro e login</h3>
-<p>E-mail (que precisa ser confirmado), senha (tratada pelo serviço de autenticação), nome de apresentação, fuso horário e idioma.</p>
-</article>
-<article class="cartao">
-<h3>O que você anota</h3>
-<p>Gastos, recebimentos, contas a pagar, gastos fixos, parcelamentos, contas do ano, metas, cartões e o resto do que você registra. Em cartões, só o apelido e, se você quiser, os 4 últimos dígitos.</p>
-</article>
-<article class="cartao">
-<h3>Resumos matemáticos</h3>
-<p>Da chave da nota fiscal e de cada linha de extrato ou fatura importada, guardamos só um resumo (SHA-256), que serve para avisar quando a mesma nota ou linha aparece de novo. Do código de um convite também.</p>
-</article>
-<article class="cartao">
-<h3>Família e benefício</h3>
-<p>O nome da Família, o seu papel e o que cada pessoa anota nela. No benefício pela empresa, o e-mail que a empresa informou no convite, a situação da licença e as datas.</p>
-</article>
-<article class="cartao">
-<h3>Investimentos, só no seu Pessoal</h3>
-<p>Dos investimentos que você registra, o nome que você escolhe, o tipo e, se você preencher, o tipo exato, uma descrição livre, o nome da instituição, como rende, a taxa e a condição dela, a data em que a taxa muda e a taxa de depois, como em "120% do CDI até 31/03/2027, depois 100%", o vencimento e quando pode resgatar; os aportes, os resgates, os rendimentos recebidos com o tipo de cada um e os valores do extrato. Eles ficam só no seu Pessoal: ninguém da Família vê, nem a empresa que oferece o benefício.</p>
-</article>
-<article class="cartao">
-<h3>Assinatura e pagamento</h3>
-<p>A situação do seu acesso: o plano, até quando ele vale, por onde foi assinado e um resumo matemático que identifica a assinatura. Nunca guardamos número de cartão, código de segurança, validade, dados do Pix, CPF nem endereço de cobrança: esses dados ficam com a loja ou com o serviço de pagamento, pelas regras de cada um.</p>
-</article>
-<article class="cartao">
-<h3>Anotar por mensagem (opcional)</h3>
-<p>Quem liga a conta do Telegram à Clarevo pode anotar por mensagem escrita. O que vira registro é guardado como qualquer anotação. Da conta do Telegram, fica só um resumo do identificador, feito com uma chave secreta. De cada mensagem tratada, por 30 dias, ficam um resumo do identificador dela, o resultado e o registro criado, para não anotar duas vezes a mesma mensagem e para você poder desfazer. Não guardamos o texto das mensagens, o seu nome nem o seu usuário. Ao desligar, o vínculo é apagado na hora.</p>
-</article>
-<article class="cartao">
-<h3>Dados técnicos</h3>
-<p>O rastro técnico das operações, para evitar gravar duas vezes a mesma operação e para investigar problemas de segurança. Quando você exclui a conta, o rastro técnico dela é apagado junto.</p>
-</article>
-</div>`,
-      { variante: 'alt', rotulo: 'guardamos' },
-    ),
-    bloco(
-      `<h2 id="nao-guardamos">O que não guardamos</h2>
-<div class="ve-nao-ve">
-<div class="cartao nunca-ve">
-<h3>Nunca fica guardado</h3>
-<ul>
-<li>número completo de cartão, código de segurança (CVV) e validade;</li>
-<li>senha ou qualquer dado de acesso a banco;</li>
-<li>CPF da nota fiscal: ele é descartado na leitura, e da chave da nota fica só o resumo;</li>
-<li>dados do comprovante de Pix ou de pagamento, como CPF, CNPJ, chave Pix, banco, agência, conta, identificador da transação, código de autenticação e número de cartão;</li>
-<li>o saldo de cada conta.</li>
-</ul>
-</div>
-<div class="cartao nunca-ve">
-<h3>Não chega à Clarevo</h3>
-<ul>
-<li>fotos e imagens da câmera: ela só lê o código da nota;</li>
-<li>os arquivos que você escolhe ler: PDF de nota, PDF de comprovante, extrato e fatura;</li>
-<li>o código de um boleto: se você colar um, o app avisa e não o guarda;</li>
-<li>biometria, localização, contatos, fotos da galeria, microfone e identificador de publicidade.</li>
-</ul>
-</div>
-</div>
-<p class="nota">A leitura de nota, de comprovante e de extrato acontece no seu aparelho: a Clarevo não tem servidor que receba esses arquivos. O app só preenche o formulário, e nada é gravado sem você tocar em "Salvar".</p>
-<p class="nota">No Android, a leitura do QR Code usa um componente do Google (ML Kit) incluído no app. A imagem é lida no aparelho, mas o componente pode enviar ao Google dados técnicos de uso e do aparelho. Os detalhes estão nas seções 5 e 8 da <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`,
-      { rotulo: 'nao-guardamos' },
     ),
     bloco(
       `<h2 id="quem-ve">Quem vê os seus dados</h2>
@@ -153,21 +93,84 @@ ${celular(img['quem-ve'], ARQUIVO)}
       { rotulo: 'protecao' },
     ),
     bloco(
-      `<h2 id="este-site">Este site</h2>
-<p>O site não usa cookies próprios, não tem análise de acesso, não tem anúncios e não carrega fontes, imagens, scripts nem estilos de outros endereços. Os links para fontes oficiais em Aprender são só links de texto. A busca da Ajuda roda no seu navegador e não envia o que você digita. O site guarda no navegador só o tema que você escolher no rodapé (claro ou escuro), se escolher um: essa escolha nunca sai do seu aparelho e serve só para mostrar o tema escolhido. Como em qualquer site, a hospedagem recebe o endereço da página que você abre e o seu IP. Os detalhes estão na <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`,
-      { variante: 'azul', rotulo: 'este-site' },
+      `<h2 id="guardamos">O que guardamos</h2>
+<p class="lead-bloco">Tudo o que está na lista é digitado, importado ou confirmado por você ou pelas pessoas da sua Família. A Clarevo não busca esses dados em bancos.</p>
+<div class="grade">
+<article class="cartao">
+<h3>Cadastro e login</h3>
+<p>E-mail (que precisa ser confirmado), senha (tratada pelo serviço de autenticação), nome de apresentação, fuso horário e idioma.</p>
+</article>
+<article class="cartao">
+<h3>O que você anota</h3>
+<p>Gastos, recebimentos, contas a pagar, gastos fixos, parcelamentos, contas do ano, metas, cartões e o resto do que você registra. Em cartões, só o apelido e, se você quiser, os 4 últimos dígitos.</p>
+</article>
+<article class="cartao">
+<h3>Resumos matemáticos</h3>
+<p>Da chave da nota fiscal e de cada linha de extrato ou fatura importada, guardamos só um resumo (SHA-256), que serve para avisar quando a mesma nota ou linha aparece de novo. Do código de um convite também.</p>
+</article>
+<article class="cartao">
+<h3>Família e benefício</h3>
+<p>O nome da Família, o seu papel e o que cada pessoa anota nela. No benefício pela empresa, o e-mail que a empresa informou no convite, a situação da licença e as datas.</p>
+</article>
+<article class="cartao">
+<h3>Investimentos, só no seu Pessoal</h3>
+<p>Dos investimentos que você registra, o nome que você escolhe, o tipo e, se você preencher, o tipo exato, uma descrição livre, o nome da instituição, como rende, a taxa e a condição dela, a data em que a taxa muda e a taxa de depois, como em "120% do CDI até 31/03/2027, depois 100%", o vencimento e quando pode resgatar; os aportes, os resgates, os rendimentos recebidos com o tipo de cada um e os valores do extrato. Eles ficam só no seu Pessoal: ninguém da Família vê, nem a empresa que oferece o benefício.</p>
+</article>
+<article class="cartao">
+<h3>Assinatura e pagamento</h3>
+<p>A situação do seu acesso: o plano, até quando ele vale, por onde foi assinado e um resumo matemático que identifica a assinatura. Nunca guardamos número de cartão, código de segurança, validade, dados do Pix, CPF nem endereço de cobrança: esses dados ficam com a loja ou com o serviço de pagamento, pelas regras de cada um.</p>
+</article>
+<article class="cartao">
+<h3>Anotar por mensagem (opcional)</h3>
+<p>Quem liga a conta do Telegram à Clarevo pode anotar por mensagem escrita. O que vira registro é guardado como qualquer anotação. Da conta do Telegram, fica só um resumo do identificador, feito com uma chave secreta. De cada mensagem tratada, por 30 dias, ficam um resumo do identificador dela, o resultado e o registro criado, para não anotar duas vezes a mesma mensagem e para você poder desfazer. Não guardamos o texto das mensagens, o seu nome nem o seu usuário. Ao desligar, o vínculo é apagado na hora.</p>
+</article>
+<article class="cartao">
+<h3>Dados técnicos</h3>
+<p>O rastro técnico das operações, para evitar gravar duas vezes a mesma operação e para investigar problemas de segurança. Quando você exclui a conta, o rastro técnico dela é apagado junto.</p>
+</article>
+</div>`,
+      { variante: 'alt', rotulo: 'guardamos' },
     ),
     bloco(
-      `<h2 id="excluir">Excluir a conta</h2>
-<p>No app, abra Conta e, no último item, toque em "Excluir minha conta". Você digita EXCLUIR e o seu Pessoal é apagado de verdade, na hora. O que você anotou numa Família de outras pessoas continua como histórico da casa, com a autoria "Pessoa que saiu", sem o seu nome e sem e-mail. Se você tem uma licença de empresa, ela termina na hora. Quem não consegue entrar no app pede pela página <a href="${u('excluir-conta.html')}">Excluir conta</a>.</p>
+      `<h2 id="detalhes">Mais detalhes</h2>
+<div class="duvidas">
+${duvida('nao-faz', 'O que a Clarevo faz e não faz', `<ul>
+<li>Não se conecta ao seu banco e não pede senha bancária: tudo o que aparece no app foi anotado ou importado por você ou pelas pessoas da sua Família.</li>
+<li>Não é banco e não guarda o seu dinheiro.</li>
+<li>Não movimenta dinheiro: não faz pagamentos nem transferências.</li>
+<li>Não oferece crédito e não recomenda produtos financeiros.</li>
+<li>Não é atendimento de saúde e não substitui o acompanhamento de profissionais.</li>
+</ul>
+<p>A Clarevo é uma ferramenta de organização e de educação financeira. Ela não promete resultado financeiro nem de saúde, e as simulações são exemplos feitos com os números que você digita. Os dados de cartão e de notas que nunca ficam guardados estão em "Dados que a Clarevo não guarda", logo abaixo, e a resposta completa está na <a href="${u('ajuda/comecar.html')}#tema-o-que-a-clarevo-nao-faz">Ajuda</a>.</p>
+<p>${esc(AVISO_DE_SAUDE)}</p>`)}
+${duvida('nao-guardamos', 'Dados que a Clarevo não guarda', `<h3>Nunca fica guardado</h3>
+<ul>
+<li>número completo de cartão, código de segurança (CVV) e validade;</li>
+<li>senha ou qualquer dado de acesso a banco;</li>
+<li>CPF da nota fiscal: ele é descartado na leitura, e da chave da nota fica só o resumo;</li>
+<li>dados do comprovante de Pix ou de pagamento, como CPF, CNPJ, chave Pix, banco, agência, conta, identificador da transação, código de autenticação e número de cartão;</li>
+<li>o saldo de cada conta.</li>
+</ul>
+<h3>Não chega à Clarevo</h3>
+<ul>
+<li>fotos e imagens da câmera: ela só lê o código da nota;</li>
+<li>os arquivos que você escolhe ler: PDF de nota, PDF de comprovante, extrato e fatura;</li>
+<li>o código de um boleto: se você colar um, o app avisa e não o guarda;</li>
+<li>biometria, localização, contatos, fotos da galeria, microfone e identificador de publicidade.</li>
+</ul>
+<p>A leitura de nota, de comprovante e de extrato acontece no seu aparelho: a Clarevo não tem servidor que receba esses arquivos. O app só preenche o formulário, e nada é gravado sem você tocar em "Salvar".</p>
+<p>No Android, a leitura do QR Code usa um componente do Google (ML Kit) incluído no app. A imagem é lida no aparelho, mas o componente pode enviar ao Google dados técnicos de uso e do aparelho. Os detalhes estão nas seções 5 e 8 da <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`)}
+${duvida('este-site', 'Sobre este site', `<p>O site não usa cookies próprios, não tem análise de acesso, não tem anúncios e não carrega fontes, imagens, scripts nem estilos de outros endereços. Os links para fontes oficiais em Aprender são só links de texto. A busca da Ajuda roda no seu navegador e não envia o que você digita. O site guarda no navegador só o tema que você escolher no rodapé (claro ou escuro), se escolher um: essa escolha nunca sai do seu aparelho e serve só para mostrar o tema escolhido. Como em qualquer site, a hospedagem recebe o endereço da página que você abre e o seu IP. Os detalhes estão na <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`)}
+${duvida('excluir', 'Como excluir a conta', `<p>No app, abra Conta e, no último item, toque em "Excluir minha conta". Você digita EXCLUIR e o seu Pessoal é apagado de verdade, na hora. O que você anotou numa Família de outras pessoas continua como histórico da casa, com a autoria "Pessoa que saiu", sem o seu nome e sem e-mail. Se você tem uma licença de empresa, ela termina na hora. Quem não consegue entrar no app pede pela página <a href="${u('excluir-conta.html')}">Excluir conta</a>.</p>`)}
+</div>
 <p>Leia também a <a href="${u('privacidade.html')}">Política de privacidade</a>, os <a href="${u('termos.html')}">Termos de uso</a> e as respostas da <a href="${u('ajuda/privacidade.html')}">Ajuda sobre privacidade e segurança</a>. Dúvidas sobre os seus dados: [E-MAIL DE PRIVACIDADE].</p>`,
-      { variante: 'alt', rotulo: 'excluir' },
+      { rotulo: 'detalhes' },
     ),
   ];
   return montarPagina({
     arquivo: ARQUIVO,
     titulo: 'Segurança e privacidade',
-    descricao: 'O que a Clarevo guarda e não guarda, quem vê os seus dados, como protegemos e como excluir a conta, em linguagem simples.',
+    descricao: 'Quem vê os seus dados na Clarevo, como protegemos, o que guardamos e o que não guardamos e como excluir a conta, em linguagem simples.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),
     fonte: brutas.join('\n') + capa,
@@ -176,4 +179,4 @@ ${celular(img['quem-ve'], ARQUIVO)}
   });
 }
 
-module.exports = { paginaSeguranca };
+module.exports = { paginaSeguranca, AVISO_DE_SAUDE };

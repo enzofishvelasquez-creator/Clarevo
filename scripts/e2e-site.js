@@ -915,8 +915,10 @@ function varrerPagina() {
 
     // 7c4. Celulares no centro dos cartões, "Quem vê os seus dados" em Segurança e a faixa de confiança da capa (D-115). Em 1280 px, a
     // moldura de cada celular fica no centro do cartão que a tem (início, O app, Para empresas) e, em Segurança, no centro da coluna dela,
-    // ao lado dos quatro cartões em 2 x 2, com a mesma altura em cada linha. A faixa da capa (início e O app) é um link só para o bloco "O
-    // que a Clarevo não faz" de Segurança, e as seções antigas saíram. Nada passa da largura da tela em 320, 390 e 1280 px.
+    // ao lado dos quatro cartões em 2 x 2, com a mesma altura em cada linha. A faixa da capa (início e O app) é um link só para a página
+    // Segurança e privacidade (desde 19/11/2026; antes, para o bloco "O que a Clarevo não faz", que ficou recolhido no fim dela), e as
+    // seções antigas saíram. Em Segurança, a parte visível começa pelo essencial, quem vê, como protegemos e o que guardamos, e quatro
+    // perguntas recolhidas (fechadas) ficam no fim, com o aviso de saúde dentro da primeira. Nada passa da largura da tela em 320, 390 e 1280 px.
     {
       const p = await pagina();
       await p.setViewportSize({ width: 1280, height: 900 });
@@ -955,14 +957,32 @@ function varrerPagina() {
         faixas.push(await p.evaluate(() => {
           const f = document.querySelector('.capa .confianca');
           const a = f && f.querySelectorAll('a');
-          return { links: a ? a.length : 0, href: a && a[0] ? a[0].getAttribute('href') : '', itens: f ? [...f.querySelectorAll('.confianca-item')].map((i) => i.textContent) : [], nome: a && a[0] ? a[0].textContent.replace(/\s+/g, ' ').trim() : '', antigas: document.querySelectorAll('#nao-e, #nao-faz').length };
+          return { links: a ? a.length : 0, href: a && a[0] ? a[0].getAttribute('href') : '', itens: f ? [...f.querySelectorAll('.confianca-item')].map((i) => i.textContent) : [], mais: f && f.querySelector('.confianca-mais') ? f.querySelector('.confianca-mais').textContent : '', nome: a && a[0] ? a[0].textContent.replace(/\s+/g, ' ').trim() : '', antigas: document.querySelectorAll('#nao-e, #nao-faz').length };
         }));
       }
-      ok('faixa de confiança: na capa do início e de O app, três frases num link só para Segurança (#nao-faz), com nome em frase para leitor de tela, e sem as seções antigas',
-        faixas.every((f) => f.links === 1 && /seguranca\.html#nao-faz$/.test(f.href) && JSON.stringify(f.itens) === JSON.stringify(['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) && /cartão\. Ver o que a Clarevo não faz, em Segurança e privacidade\.$/.test(f.nome) && f.antigas === 0), JSON.stringify(faixas));
+      ok('faixa de confiança: na capa do início e de O app, três frases num link só para a página Segurança e privacidade (sem âncora), com o convite "Segurança e privacidade", nome em frase para leitor de tela, e sem as seções antigas',
+        faixas.every((f) => f.links === 1 && /(^|\/)seguranca\.html$/.test(f.href) && JSON.stringify(f.itens) === JSON.stringify(['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) && f.mais === 'Segurança e privacidade' && /cartão\. Mais em Segurança e privacidade\.$/.test(f.nome) && f.antigas === 0), JSON.stringify(faixas));
       await p.click('.capa .confianca a');
-      await p.waitForURL(/\/seguranca(\.html)?#nao-faz$/);
-      ok('faixa de confiança: o link abre o bloco "O que a Clarevo não faz" de Segurança', (await p.textContent('#nao-faz')) === 'O que a Clarevo não faz' && (await p.$$eval('#nao-faz ~ .lista-nao-faz li', (l) => l.length)) === 5);
+      await p.waitForURL(/\/seguranca(\.html)?$/);
+      const seg = await p.evaluate(() => ({
+        titulo: document.querySelector('h1').textContent,
+        topo: window.scrollY,
+        secoes: [...document.querySelectorAll('main h2')].map((h) => h.id),
+        duvidas: [...document.querySelectorAll('details.duvida')].map((d) => ({ id: d.id, resumo: d.querySelector('summary').textContent, aberta: d.open, caixa: getComputedStyle(d).borderTopLeftRadius !== '0px' || getComputedStyle(d).backgroundColor !== 'rgba(0, 0, 0, 0)' })),
+        avisoVisivel: [...document.querySelectorAll('main p')].some((e) => /não é atendimento de saúde e não promete/.test(e.textContent) && e.checkVisibility()),
+        ultimo: (() => { const s = document.querySelector('section[aria-labelledby="detalhes"] .miolo'); const l = s.lastElementChild; return l.tagName === 'P' && /^Leia também a Política de privacidade/.test(l.textContent) && l.previousElementSibling.classList.contains('duvidas'); })(),
+        links: [...document.querySelectorAll('a[href^="#"]')].map((a) => a.getAttribute('href')).filter((h) => /^#(nao-faz|nao-guardamos|este-site|excluir)$/.test(h)),
+      }));
+      ok('faixa de confiança: o link abre Segurança e privacidade no topo; a parte visível começa pelo essencial, quem vê, como protegemos e o que guardamos; as quatro perguntas do fim começam fechadas, sem caixa, e só a linha dos links vem depois delas',
+        seg.titulo === 'Segurança e privacidade' && seg.topo === 0 && JSON.stringify(seg.secoes) === JSON.stringify(['essencial', 'quem-ve', 'protecao', 'guardamos', 'detalhes']) &&
+        JSON.stringify(seg.duvidas.map((d) => [d.id, d.resumo])) === JSON.stringify([['nao-faz', 'O que a Clarevo faz e não faz'], ['nao-guardamos', 'Dados que a Clarevo não guarda'], ['este-site', 'Sobre este site'], ['excluir', 'Como excluir a conta']]) &&
+        seg.duvidas.every((d) => !d.aberta && !d.caixa) && !seg.avisoVisivel && seg.ultimo && seg.links.length === 0, JSON.stringify(seg));
+      // Abrir "O que a Clarevo faz e não faz" (pelo teclado: foco no resumo e Enter) mostra os cinco itens, a nota e o aviso de saúde.
+      const resumo = p.locator('#nao-faz > summary');
+      await resumo.focus();
+      await p.keyboard.press('Enter');
+      const aberto = await p.evaluate(() => { const d = document.querySelector('#nao-faz'); return { aberta: d.open, itens: d.querySelectorAll('li').length, aviso: [...d.querySelectorAll('p')].some((e) => /^A Clarevo não é atendimento de saúde e não promete resultado financeiro/.test(e.textContent) && e.checkVisibility()), outras: [...document.querySelectorAll('details.duvida:not(#nao-faz)')].every((x) => !x.open) }; });
+      ok('segurança: Enter no resumo abre "O que a Clarevo faz e não faz", com os cinco itens e o aviso de saúde, e as outras perguntas continuam fechadas', aberto.aberta && aberto.itens === 5 && aberto.aviso && aberto.outras, JSON.stringify(aberto));
       const largas = [];
       for (const largura of [320, 390, 1280]) {
         await p.setViewportSize({ width: largura, height: 900 });
@@ -1156,7 +1176,8 @@ function varrerPagina() {
     }
 
     // 7c9. Nada de advertência na primeira tela (D-115): no início, em O app, em Planos, em Para empresas e em Sobre, nada que diga "não
-    // promete" aparece na primeira tela (390 x 844 e 1280 x 900); o aviso de saúde fica na nota do fim da página inicial e de Sobre.
+    // promete" aparece na primeira tela (390 x 844 e 1280 x 900). Desde 19/11/2026, o aviso de saúde não fica mais no fim da página inicial
+    // nem de Sobre: fica dentro da pergunta recolhida de Segurança e na nota de ressalvas de Para empresas.
     {
       const p = await pagina();
       const achados = [];
@@ -1170,12 +1191,16 @@ function varrerPagina() {
       }
       ok('primeira tela: nenhuma advertência na primeira tela do início, de O app, de Planos, de Para empresas e de Sobre', achados.length === 0, achados.join(' | '));
       await p.setViewportSize({ width: 390, height: 900 });
-      const fim = [];
-      for (const c of ['', 'sobre']) {
+      const onde = {};
+      for (const c of ['', 'sobre', 'seguranca', 'empresas/']) {
         await p.goto(`${origem}/${c}`);
-        fim.push(await p.evaluate(() => { const a = document.querySelector('main .aviso-final'); return Boolean(a) && /não é atendimento de saúde/.test(a.textContent) && a.getBoundingClientRect().top > document.documentElement.scrollHeight * 0.6; }));
+        onde[c || 'início'] = await p.evaluate(() => {
+          const ps = [...document.querySelectorAll('main p')].filter((e) => /A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental/.test(e.textContent));
+          return { n: ps.length, recolhido: ps.length > 0 && ps.every((e) => e.closest('details.duvida') && !e.closest('details.duvida').open && !e.checkVisibility()), ressalvas: ps.some((e) => e.matches('.nota-ressalvas')), fimAntigo: document.querySelectorAll('.aviso-final').length };
+        });
       }
-      ok('primeira tela: o aviso de saúde fica numa nota no fim do início e de Sobre', fim.every(Boolean), JSON.stringify(fim));
+      ok('aviso de saúde: fora do início e de Sobre; em Segurança, dentro de uma pergunta recolhida (escondido até abrir); em Para empresas, na nota de ressalvas',
+        onde['início'].n === 0 && onde.sobre.n === 0 && onde['início'].fimAntigo === 0 && onde.sobre.fimAntigo === 0 && onde.seguranca.n === 1 && onde.seguranca.recolhido && onde['empresas/'].n === 1 && onde['empresas/'].ressalvas, JSON.stringify(onde));
       await p.close();
     }
 

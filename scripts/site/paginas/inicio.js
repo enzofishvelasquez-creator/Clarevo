@@ -1,8 +1,10 @@
 'use strict';
 /**
  * Início: a mensagem central (D-068), o que é a Clarevo, o apoio prático do app (bem-estar financeiro, sem promessa de resultado nem de saúde),
- * recursos com vídeo ou captura, para quem é, "A empresa nunca vê suas finanças" e as chamadas. O que a Clarevo não faz fica numa faixa
- * curta na capa, com o texto completo em Segurança e privacidade (D-115). Desde 18/11/2026 (D-115),
+ * recursos com vídeo ou captura, para quem é, "A empresa nunca vê suas finanças" e as chamadas. A faixa curta de confiança da capa leva a
+ * Segurança e privacidade (D-115; desde 19/11/2026, à página, e não ao bloco do que a Clarevo não faz, que lá ficou recolhido). O aviso
+ * de saúde saiu do fim desta página em 19/11/2026 (pedido do Enzo) e fica em Segurança e privacidade e em Para empresas
+ * (`AVISO_DE_SAUDE` em `seguranca.js`). Desde 18/11/2026 (D-115),
  * cada vídeo de uso do app fica no lugar da captura do bloco que ele mostra: o do Resumo na capa e três nos cartões de "O que o app faz".
  */
 const { URL_APP } = require('../config');
@@ -21,14 +23,6 @@ const MENSAGEM_CENTRAL = 'Cuidar da vida financeira faz parte de cuidar de você
 const FRASE_DE_APOIO = 'Mais clareza para decidir';
 const SUBTEXTO = 'A Clarevo ajuda a organizar o mês e acompanhar decisões financeiras pessoais e familiares, respeitando sua realidade.';
 const DESCRICAO = `${MENSAGEM_CENTRAL} ${SUBTEXTO} ${FRASE_DE_APOIO}.`;
-/**
- * O aviso de saúde, revisado no pacote do advogado (`docs/legal/resumo-para-advogado.md`, seção j, "Saúde"): o texto não muda. Desde
- * 18/11/2026 (D-115, retorno de quem testa: "O negativo não deveria estar logo no começo da página. Isso é advertência, não propaganda.")
- * ele sai do cartão ao lado de "O que a Clarevo oferece", no começo da página, e fica numa nota discreta no fim da página inicial, perto
- * do bloco da NR-1 em Para empresas e em Sobre.
- */
-const AVISO_DE_SAUDE = 'A Clarevo não é atendimento de saúde e não promete resultado financeiro nem efeito sobre saúde mental, sono, produtividade ou tranquilidade. A vida financeira é uma dimensão do bem-estar, entre outras, e o app não tem eficácia clínica comprovada.';
-
 /** A linha curta acima do título, que diz o que a Clarevo é antes da mensagem central (12/11/2026). */
 const O_QUE_E = 'App de finanças pessoais e da família';
 /** A descrição da página para as buscas e o compartilhamento: a mensagem central e o que é, em até 160 caracteres (a completa, `DESCRICAO`, fica nos dados estruturados). */
@@ -173,8 +167,7 @@ ${mini}
       `<h2 id="dados">Seus dados</h2>
 <p>Sem anúncios, sem venda de dados e sem rastreamento para publicidade. A conexão é protegida. Você exclui a sua conta e os seus dados quando quiser, dentro do app, em Conta. Se não conseguir entrar no app, peça pela página <a href="${u('excluir-conta.html')}">Excluir conta</a>. Os detalhes estão na <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>
 <h2 id="contato">Contato</h2>
-<p>Para falar com a equipe, inclusive sobre o benefício para empresas: [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e a página de <a href="${u('suporte.html')}">Suporte</a>.</p>
-<p class="aviso-final">${AVISO_DE_SAUDE}</p>`,
+<p>Para falar com a equipe, inclusive sobre o benefício para empresas: [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e a página de <a href="${u('suporte.html')}">Suporte</a>.</p>`,
       'dados',
     ),
   ];
@@ -208,4 +201,4 @@ ${mini}
   });
 }
 
-module.exports = { paginaInicial, conteudoPlanos, DESCRICAO_INICIO: DESCRICAO, MENSAGEM_CENTRAL, FRASE_DE_APOIO, AVISO_DE_SAUDE };
+module.exports = { paginaInicial, conteudoPlanos, DESCRICAO_INICIO: DESCRICAO, MENSAGEM_CENTRAL, FRASE_DE_APOIO };
