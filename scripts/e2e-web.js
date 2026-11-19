@@ -11363,7 +11363,8 @@ setInterval(async () => {
   // ---- 8. O endereço direto: /evolucao aberto direto, depois de entrar, abre a tela ----
   await p.goto(`http://localhost:${PORT}/evolucao`); await waitText('Cuidar da vida financeira');
   await btn('Ver demonstração com dados fictícios').click(); await waitText('Valores registrados, pela data do pagamento', 12000); await p.waitForTimeout(700);
-  ok('Evolução endereço: /evolucao aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar")', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await evNames()).length === 6 &&
+  // Na demonstração (só setembro e outubro com registros), a tela abre em 3 meses (auditoria de 18/11/2026).
+  ok('Evolução endereço: /evolucao aberto direto, depois de entrar, mostra a tela, de consulta, por cima do Resumo (com a barra inferior e o botão "Voltar"), em 3 meses', evPath() === '/evolucao' && (await h1Name()) === 'Evolução' && (await evNames()).length === 3 &&
     (await p.getByRole('tab').filter({ visible: true }).count()) === 5 && (await visibleCount('button', 'Voltar')) === 1, p.url());
 
   // ---- 9. O cenário fictício "evolucao": janeiro a junho de 2026 (EF §6) ----

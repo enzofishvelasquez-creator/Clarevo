@@ -327,7 +327,8 @@ function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceCho
         accessibilityRole="tablist"
         // "Escolher o espaço: Pessoal ou Família": sem o "Espaço:" das pílulas, que diz o espaço de uma tela (só o Pessoal, o nome seria igual).
         accessibilityLabel={`${SPACE_TEXT.switchTitle}: ${names.replace(/, ([^,]+)$/, ' ou $1')}`}>
-        {part > 0 ? <Animated.View style={[styles.indicator, { width: part }, pill]} /> : null}
+        {/* Só com mais de um espaço a pílula branca desliza; só com o Pessoal, a opção já vem com o fundo branco (nada a animar). */}
+        {part > 0 && options.length > 1 ? <Animated.View style={[styles.indicator, { width: part }, pill]} /> : null}
         {options.map((o) => {
           const selected = o.kind === active;
           return (
@@ -338,7 +339,7 @@ function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceCho
               aria-selected={selected}
               accessibilityLabel={o.kind === 'negocio' ? `Ver dados do negócio ${o.label}` : `Ver dados de ${o.label}`}
               onPress={() => (selected ? undefined : setSpace(o.kind))}
-              style={(s) => [styles.option, part === 0 && selected && styles.optionSelected, (s as { focused?: boolean }).focused && focusOnBrand]}>
+              style={(s) => [styles.option, (part === 0 || options.length === 1) && selected && styles.optionSelected, (s as { focused?: boolean }).focused && focusOnBrand]}>
               {/* O ícone não encolhe: com o nome longo do negócio em 320 px, só o nome é cortado (com reticências). */}
               {o.kind === 'familia' ? <Users size={18} color={selected ? colors.brand : colors.textOnBrand} style={{ flexShrink: 0 }} /> : null}
               {o.kind === 'negocio' ? <Store size={18} color={selected ? colors.brand : colors.textOnBrand} style={{ flexShrink: 0 }} /> : null}
