@@ -238,11 +238,12 @@ blockquote>:last-child{margin-bottom:0}
 .plano-link:has(a:focus-visible){outline:3px solid var(--foco);outline-offset:3px}
 .plano-link .ver-plano a:focus-visible{outline:none}
 @media (prefers-reduced-motion:reduce){.plano-link{transition:none}}
-/* A página Planos: os dois cartões com o que muda, os recursos em grupos e as perguntas. */
-.plano-detalhe{scroll-margin-top:1rem;display:flex;flex-direction:column}
-.plano-detalhe>:last-child{margin-top:auto}
-.plano-detalhe:target{border-color:var(--link);border-width:2px}
-.plano-detalhe ul{margin:.25rem 0 1rem}
+/* Planos (19/11/2026): em planos.html, os dois cartões com o link embaixo, na mesma altura; na página de cada plano, o preço na capa, ao
+   lado do nome, os recursos em grupos e as perguntas. */
+.plano-link{display:flex;flex-direction:column}
+.plano-link>.ver-plano{margin-top:auto}
+.preco-capa{margin:.35rem 0 .75rem;color:var(--sobre-topo-suave);font-size:1.0625rem}
+.preco-capa .preco-valor{display:block;font-size:clamp(2.1rem,6vw,2.6rem);font-weight:800;line-height:1.15;color:var(--sobre-topo);font-variant-numeric:tabular-nums}
 /* Os grupos de recursos em duas colunas equilibradas a partir de 46 rem (em vez de três colunas com uma vazia), sem partir um grupo. */
 .grupos-recursos{columns:2 21rem;column-gap:2.5rem}
 .recursos-plano{break-inside:avoid;margin:0 0 1.25rem}
@@ -654,7 +655,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa::before{display:none}
-  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa a,.meta-tema,.migalha,.migalha a{color:#000}
+  .capa h1,.capa .lead,.capa .sobretitulo,.capa .frase-apoio,.capa a,.meta-tema,.migalha,.migalha a,.preco-capa,.preco-capa .preco-valor{color:#000}
   .marca .logo-tela{display:none}
   .marca .logo-papel{display:block}
   .rodape{background:#fff;color:#000}

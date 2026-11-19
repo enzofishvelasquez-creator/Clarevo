@@ -877,39 +877,80 @@ function varrerPagina() {
       await p.close();
     }
 
-    // 7c3. Planos (D-115): cada cartão da página inicial leva à página Planos, no plano dele; a página tem os dois planos, os recursos com
-    // links que abrem, como funciona e as perguntas; nada passa da largura da tela.
+    // 7c3. Planos (D-115; uma página por plano desde 19/11/2026): cada cartão da página inicial leva à página do plano dele; planos.html é um
+    // resumo com os dois cartões, cada um levando à página do plano; cada página de plano mostra só o que é dele, com os recursos (links que
+    // abrem), como funciona a assinatura e os caminhos para o outro plano e o resumo; nada passa da largura da tela.
     {
       const p = await pagina();
       await p.goto(`${origem}/`);
       const cartoes = await p.$$eval('section[aria-labelledby="planos"] article.plano-link', (as) => as.map((a) => ({ links: a.querySelectorAll('a, button, input').length, nome: a.querySelector('a').textContent, href: a.querySelector('a').getAttribute('href') })));
-      ok('planos: os dois cartões da página inicial com um link só cada, com nome claro, para planos.html#individual e #familia', JSON.stringify(cartoes) === JSON.stringify([{ links: 1, nome: 'Ver o que o plano Individual inclui', href: 'planos.html#individual' }, { links: 1, nome: 'Ver o que o plano Família inclui', href: 'planos.html#familia' }]), JSON.stringify(cartoes));
-      // Clicar no cartão (fora do texto do link) abre o plano na página Planos.
+      ok('planos: os dois cartões da página inicial com um link só cada, com nome claro, para a página de cada plano', JSON.stringify(cartoes) === JSON.stringify([{ links: 1, nome: 'Ver o que o plano Individual inclui', href: 'planos/individual.html' }, { links: 1, nome: 'Ver o que o plano Família inclui', href: 'planos/familia.html' }]), JSON.stringify(cartoes));
+      // Clicar no cartão (fora do texto do link) abre a página do plano.
       const familia = p.locator('section[aria-labelledby="planos"] article.plano-link').nth(1);
       await familia.scrollIntoViewIfNeeded();
       const caixa = await familia.boundingBox();
       await p.mouse.click(caixa.x + caixa.width - 20, caixa.y + 20);
-      await p.waitForURL(/\/planos(\.html)?#familia$/);
-      const alvo = await p.evaluate(() => { const a = document.querySelector('#familia'); const r = a.getBoundingClientRect(); return { titulo: a.querySelector('h3').textContent, visivel: r.top >= 0 && r.top < window.innerHeight, alvo: a.matches(':target') }; });
-      ok('planos: clicar em qualquer ponto do cartão Família abre a página Planos no plano Família', alvo.titulo === 'Família' && alvo.visivel && alvo.alvo, JSON.stringify(alvo));
-      const secoes = await p.$$eval('main h2', (hs) => hs.map((h) => h.id));
-      const links = await p.$$eval('#recursos ~ .grupos-recursos a, #recursos + p + .grupos-recursos a', (as) => as.map((a) => a.href));
-      const quebrados = [];
-      for (const l of links) {
-        const [endereco, ancora] = l.split('#');
-        const r = await ctx.request.get(endereco);
-        if (!r.ok() || (ancora && !(await r.text()).includes(`id="${ancora}"`))) quebrados.push(l);
+      await p.waitForURL(/\/planos\/familia(\.html)?$/);
+      ok('planos: clicar em qualquer ponto do cartão Família da página inicial abre a página do plano Família', (await p.textContent('h1')) === 'Plano Família');
+      // O resumo: só os dois cartões e o que muda, sem a lista de recursos; cada cartão leva à página do plano.
+      await p.goto(`${origem}/planos`);
+      const resumo = await p.evaluate(() => ({
+        secoes: [...document.querySelectorAll('main h2')].map((h) => h.id),
+        recursos: document.querySelectorAll('.grupos-recursos, .recursos-plano').length,
+        cartoes: [...document.querySelectorAll('article.plano-link')].map((a) => ({ titulo: a.querySelector('h3').textContent, links: a.querySelectorAll('a').length, href: a.querySelector('a').getAttribute('href') })),
+      }));
+      ok('planos: planos.html é um resumo curto, com os dois cartões (um link só cada, para a página do plano) e sem a lista de recursos',
+        JSON.stringify(resumo.secoes) === JSON.stringify(['comparar']) && resumo.recursos === 0 && JSON.stringify(resumo.cartoes) === JSON.stringify([{ titulo: 'Individual', links: 1, href: 'planos/individual.html' }, { titulo: 'Família', links: 1, href: 'planos/familia.html' }]), JSON.stringify(resumo));
+      const individual = p.locator('article.plano-link').nth(0);
+      const caixaInd = await individual.boundingBox();
+      await p.mouse.click(caixaInd.x + caixaInd.width - 20, caixaInd.y + 20);
+      await p.waitForURL(/\/planos\/individual(\.html)?$/);
+      ok('planos: clicar no cartão Individual do resumo abre a página do plano Individual', (await p.textContent('h1')) === 'Plano Individual');
+      // Cada página de plano: só o que é dele, os 14 recursos com links que abrem, a assinatura e os caminhos do fim.
+      for (const [caminho, nome, outro, secoesEsperadas] of [['planos/individual', 'Individual', 'Família', ['para-quem', 'inclui', 'assinatura']], ['planos/familia', 'Família', 'Individual', ['para-quem', 'inclui', 'assinatura', 'perguntas']]]) {
+        await p.goto(`${origem}/${caminho}`);
+        const pg = await p.evaluate(() => {
+          const main = document.querySelector('main');
+          const texto = main.innerText.replace(/\u00a0/g, ' ');
+          return {
+            h1: document.querySelector('h1').textContent,
+            secoes: [...main.querySelectorAll('h2')].map((h) => h.id),
+            precos: (texto.match(/R\$ ?\d/g) || []).length,
+            precoNaCapa: (document.querySelector('.capa .preco-capa')?.textContent || '').replace(/\u00a0/g, ' '),
+            titular: /titular/i.test(texto), convite: /Convite por link/.test(texto), umaPessoa: /Para uma pessoa: a assinatura é sua\./.test(texto),
+            negocio: /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(texto), compartilha: /compartilh/i.test(texto),
+            notOpen: /A assinatura pelo app abre no lançamento\. Até lá, nada é cobrado\./.test(texto), trial: /14 dias grátis, sem cartão/.test(texto),
+            links: [...document.querySelectorAll('#inclui ~ .grupos-recursos a')].map((a) => a.href),
+            fim: [...document.querySelectorAll('main .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
+          };
+        });
+        const quebrados = [];
+        for (const l of pg.links) {
+          const [endereco, ancora] = l.split('#');
+          const r = await ctx.request.get(endereco);
+          if (!r.ok() || (ancora && !(await r.text()).includes(`id="${ancora}"`))) quebrados.push(l);
+        }
+        const familiaPg = nome === 'Família';
+        ok(`planos: a página do plano ${nome} tem o nome, o preço só na capa, para quem é, os 14 recursos com links que abrem, a assinatura (14 dias sem cartão, nada cobrado até o lançamento) e o Espaço Negócio incluído, sem negócio compartilhado`,
+          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 1 && /^R\$ \d+,\d{2} por mês$/.test(pg.precoNaCapa) && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && pg.notOpen && pg.trial,
+          JSON.stringify({ ...pg, links: pg.links.length, quebrados }));
+        ok(`planos: a página do plano ${nome} mostra só o que é do plano dele`, familiaPg ? pg.titular && pg.convite && !pg.umaPessoa : !pg.titular && !pg.convite && pg.umaPessoa, JSON.stringify({ titular: pg.titular, convite: pg.convite, umaPessoa: pg.umaPessoa }));
+        const outroHref = familiaPg ? 'individual.html' : 'familia.html';
+        ok(`planos: no fim da página do plano ${nome}, "Ver o plano ${outro}" e "Comparar os planos"`, JSON.stringify(pg.fim) === JSON.stringify([[`Ver o plano ${outro}`, outroHref], ['Comparar os planos', '../planos.html']]), JSON.stringify(pg.fim));
       }
-      ok('planos: a página tem os dois planos, os recursos, como funciona e as perguntas, e os 14 links dos recursos abrem no lugar certo', JSON.stringify(secoes) === JSON.stringify(['comparar', 'recursos', 'como-funciona', 'perguntas']) && links.length === 14 && quebrados.length === 0, `${secoes} ${links.length} ${quebrados.join(' | ')}`);
+      await p.click('main .acoes a:text-is("Comparar os planos")');
+      await p.waitForURL(/\/planos(\.html)?$/);
+      ok('planos: "Comparar os planos" volta ao resumo', (await p.textContent('h1')) === 'Planos da Clarevo');
       const largas = [];
       for (const largura of [320, 390, 1280]) {
         await p.setViewportSize({ width: largura, height: 900 });
-        for (const c of ['', 'planos']) {
+        for (const c of ['', 'planos', 'planos/individual', 'planos/familia']) {
           await p.goto(`${origem}/${c}`);
           if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${c || 'início'} em ${largura} px`);
         }
       }
-      ok('planos: nada passa da largura da tela em 320, 390 e 1280 px (início e Planos)', largas.length === 0, largas.join(' | '));
+      ok('planos: nada passa da largura da tela em 320, 390 e 1280 px (início, o resumo e as duas páginas de plano)', largas.length === 0, largas.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
     }
 
@@ -998,7 +1039,7 @@ function varrerPagina() {
     }
 
     // 7c5. Espaço Negócio (D-115, a partir de D-113): o recurso em O app (#negocio), com a tela da demonstração no centro e o link da Ajuda;
-    // o cartão de "Para quem é" na página inicial, que leva a ele; a frase de docs/52 em Planos; e a entrada na Ajuda, achada pela busca.
+    // o cartão de "Para quem é" na página inicial, que leva a ele; a frase de docs/52 nas páginas dos planos; e a entrada na Ajuda, achada pela busca.
     {
       const p = await pagina();
       await p.goto(`${origem}/`);
@@ -1010,8 +1051,12 @@ function varrerPagina() {
         return { titulo: a.querySelector('h3').textContent, ajuda: a.querySelector('a[href="../ajuda/negocio.html#guia-negocio"]') !== null, img: img ? { ok: img.complete && img.naturalWidth > 0, alt: img.alt } : null, plano: /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(a.textContent) };
       });
       ok('Espaço Negócio: o cartão "Para quem tem um negócio" do início leva ao recurso em O app, com a tela do negócio, o link da Ajuda e "Incluído na assinatura"', recurso.titulo === 'Espaço Negócio' && recurso.ajuda && recurso.plano && recurso.img && /^Tela do negócio/.test(recurso.img.alt), JSON.stringify(recurso));
-      await p.goto(`${origem}/planos`);
-      ok('Espaço Negócio: em Planos, "Incluído na assinatura: um negócio por pessoa", fora das diferenças entre os planos', !/Negócio/.test(await p.textContent('#individual')) && /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(await p.textContent('#recursos ~ .grupos-recursos')) && (await p.$('a[href="ajuda/negocio.html#guia-negocio"]')) !== null);
+      const negocioNosPlanos = [];
+      for (const c of ['planos/individual', 'planos/familia']) {
+        await p.goto(`${origem}/${c}`);
+        negocioNosPlanos.push(!/Negócio/.test(await p.textContent('#para-quem ~ ul')) && /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(await p.textContent('#inclui ~ .grupos-recursos')) && (await p.$('a[href="../ajuda/negocio.html#guia-negocio"]')) !== null);
+      }
+      ok('Espaço Negócio: na página de cada plano, "Incluído na assinatura: um negócio por pessoa", fora do que só aquele plano tem', negocioNosPlanos.every(Boolean), JSON.stringify(negocioNosPlanos));
       await p.goto(`${origem}/ajuda/`);
       const naAjuda = (await p.$('a[href="negocio.html"]')) !== null;
       await p.fill('input[type="search"]', 'negócio');
@@ -1141,7 +1186,7 @@ function varrerPagina() {
       const largas = [];
       for (const largura of [320, 390, 768, 1024, 1120, 1280]) {
         await p.setViewportSize({ width: largura, height: 900 });
-        for (const c of ['', 'novidades/rss', 'planos']) {
+        for (const c of ['', 'novidades/rss', 'planos', 'planos/familia']) {
           await p.goto(`${origem}/${c}`);
           const r = await p.evaluate(() => ({ largo: document.documentElement.scrollWidth > window.innerWidth + 1, topo: Math.round(document.querySelector('.topo-i').getBoundingClientRect().height), tema: (() => { const f = document.querySelector('fieldset.tema-site .tema-opcoes'); const tops = [...f.children].map((c) => Math.round(c.getBoundingClientRect().top)); return new Set(tops).size; })() }));
           if (r.largo || r.topo > 80 || r.tema !== 1) largas.push(`${c || 'início'} em ${largura} px ${JSON.stringify(r)}`);

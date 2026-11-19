@@ -143,6 +143,8 @@ const PAGINAS_BASE = [
   'comece.html',
   'app/index.html',
   'planos.html',
+  'planos/individual.html',
+  'planos/familia.html',
   'empresas/index.html',
   'aprender/index.html',
   'aprender/agenda.html',
@@ -934,8 +936,8 @@ describe('site público: as páginas geradas', () => {
     expect(paraQuem).toContain('<h3>Para quem tem um negócio</h3>');
     expect(paraQuem).toContain('<a href="app/index.html#negocio">Veja o Espaço Negócio</a>');
     expect(paraQuem).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
-    expect(html('planos.html')).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
-    for (const p of ['index.html', 'app/index.html', 'planos.html']) expect(html(p), p).not.toMatch(/plano Individual inclui um negócio|Inclui o Espaço Negócio|Incluído no plano Individual/);
+    for (const p of ['planos/individual.html', 'planos/familia.html']) expect(html(p), p).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
+    for (const p of ['index.html', 'app/index.html', 'planos.html', 'planos/individual.html', 'planos/familia.html']) expect(html(p), p).not.toMatch(/plano Individual inclui um negócio|Inclui o Espaço Negócio|Incluído no plano Individual/);
   });
 
   // O aviso de saúde (revisado no pacote do advogado, seção j) sem mudar o texto, fora do começo das páginas (D-115, retorno de quem testa:
@@ -999,50 +1001,99 @@ describe('site público: as páginas geradas', () => {
     expect(cabecalho).not.toContain('Indicadores');
   });
 
-  // Planos (D-115, 18/11/2026): os cartões da página inicial levam à página Planos, que diz o que muda entre os dois, o que os dois
-  // incluem (cada recurso com link para a Ajuda ou O app), como funciona e algumas perguntas, com os textos do núcleo.
-  it('Planos: cada cartão da página inicial leva à página Planos, com um link só; a página tem os dois planos, os recursos, como funciona e as perguntas', () => {
+  // Planos (D-115, 18/11/2026; separados por plano em 19/11/2026, pedido do Enzo: clicar num plano mostra o que aquele plano inclui, e não os
+  // dois). Os cartões da página inicial levam à página de cada plano; planos.html é um resumo curto, com os dois cartões e o que muda; cada
+  // página de plano tem o nome, o preço, para quem é, o que só ele tem, todos os recursos (com os links), como funciona a assinatura e os
+  // caminhos para o outro plano e para o resumo, com os textos do núcleo.
+  it('Planos: os cartões da página inicial levam à página de cada plano; planos.html resume os dois; cada página mostra só o próprio plano, com os recursos e a assinatura', () => {
+    const PAGINAS_DOS_PLANOS = { individual: 'planos/individual.html', familiar: 'planos/familia.html' } as const;
     const inicio = html('index.html');
     const secao = /<section[^>]*aria-labelledby="planos"[\s\S]*?<\/section>/.exec(inicio)![0];
-    for (const [plano, ancora] of [['individual', 'individual'], ['familiar', 'familia']] as const) {
+    for (const plano of ['individual', 'familiar'] as const) {
       const cartao = new RegExp(`<article class="cartao plano plano-link">\\n<h3>${PLAN_NAME[plano]}</h3>[\\s\\S]*?</article>`).exec(secao)?.[0] ?? '';
-      expect(cartao, plano).toContain(`<a href="planos.html#${ancora}">Ver o que o plano ${PLAN_NAME[plano]} inclui</a>`);
+      expect(cartao, plano).toContain(`<a href="${PAGINAS_DOS_PLANOS[plano]}">Ver o que o plano ${PLAN_NAME[plano]} inclui</a>`);
       expect(cartao.match(/<a\b/g)?.length, plano).toBe(1);
     }
+    expect(inicio).not.toMatch(/planos\.html#/);
+
+    // planos.html: o resumo curto, sem a lista de recursos.
     const h = html('planos.html');
     expect(h).toContain('<h1>Planos da Clarevo</h1>');
-    for (const [plano, ancora] of [['individual', 'individual'], ['familiar', 'familia']] as const) {
-      expect(h).toContain(`<article class="cartao plano plano-detalhe" id="${ancora}" aria-labelledby="t-${ancora}">\n<h3 id="t-${ancora}">${PLAN_NAME[plano]}</h3>`);
-      expect(h).toContain(`<span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
+    expect([...h.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1])).toEqual(['comparar']);
+    expect(h).not.toMatch(/id="recursos"|O que os dois planos incluem|grupos-recursos|recursos-plano/);
+    for (const plano of ['individual', 'familiar'] as const) {
+      const cartao = new RegExp(`<article class="cartao plano plano-link">\\n<h3>${PLAN_NAME[plano]}</h3>[\\s\\S]*?</article>`).exec(h)?.[0] ?? '';
+      expect(cartao, plano).toContain(`<span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
+      expect(cartao, plano).toContain(ACCESS_TEXT.plans.find((p) => p.plan === plano)!.who);
+      expect(cartao, plano).toContain(`<p class="ver-plano"><a href="${PAGINAS_DOS_PLANOS[plano]}">Ver o plano ${PLAN_NAME[plano]}</a></p>`);
+      expect(cartao.match(/<a\b/g)?.length, plano).toBe(1);
     }
-    for (const id of ['comparar', 'recursos', 'como-funciona', 'perguntas']) expect(h, id).toContain(`<h2 id="${id}">`);
-    // Os textos da assinatura são os do núcleo.
-    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.howToPay, ACCESS_TEXT.benefitNote, ACCESS_TEXT.notOpenYet, ...ACCESS_TEXT.plans.map((p) => p.who)]) expect(h, t).toContain(esc(t));
-    // O plano Família é pago pela pessoa titular (D-083); o Espaço Negócio não é diferença entre os planos (revisão de 18/11/2026).
     expect(h).toContain('Uma assinatura só, paga pela pessoa titular.');
-    expect(/<article class="cartao plano plano-detalhe" id="individual"[\s\S]*?<\/article>/.exec(h)![0]).not.toContain('Negócio');
-    expect(h).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
-    // As perguntas não repetem "Como funciona" e respondem direto.
-    const perguntas = /<h2 id="perguntas">[\s\S]*?<\/section>/.exec(h)![0];
-    expect(perguntas).toContain('<p>Não. O teste de 14 dias começa sem pedir cartão.</p>');
-    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.benefitNote]) expect(perguntas, t).not.toContain(esc(t));
-    // Cada recurso com um link interno que existe (a Ajuda ou O app), e os links de "Como usar" das entradas do guia que existem.
-    const recursos = /<h2 id="recursos">[\s\S]*?<\/section>\n<\/div>/.exec(h)![0];
-    const links = [...recursos.matchAll(/<li><a href="([^"]+)">([^<]+)<\/a>: /g)].map((m): [string, string] => [m[1]!, m[2]!]);
-    expect(links.map(([, n]) => n)).toEqual(['Anotar e Resumo', 'Contas a pagar', 'Cartões e faturas', 'Calendário do mês', 'Importar extrato e fatura', 'Ler nota, comprovante e boleto', 'Metas e reserva', 'Investir', 'Aprender, simulador e calculadoras', 'Anotar pelo Telegram', 'Espaço Negócio', 'Tema claro ou escuro', 'Ocultar valores', 'Exportar meus dados']);
-    for (const [destino] of links) {
-      const [arquivo, ancora] = destino.split('#');
-      const alvo = html(arquivo!);
-      expect(alvo, destino).toBeTruthy();
-      if (ancora) expect(alvo, destino).toContain(`id="${ancora}"`);
-    }
-    // Preço só nos dois cartões do começo; fora deles, nenhum "R$" com número.
+    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.notOpenYet]) expect(h, t).toContain(esc(t));
+    // Preço só nos dois cartões; fora deles, nenhum "R$" com número.
     const foraDosCartoes = h.replace(/<section[^>]*aria-labelledby="comparar"[\s\S]*?<\/section>/, '');
     expect(foraDosCartoes).not.toBe(h);
     expect(foraDosCartoes).not.toMatch(/R\$\s?\d/);
     expect(h).not.toMatch(/[\u2013\u2014]|faz\w*\s+sentido|melhor|depoimento|milh[õo]es/i);
-    // No rodapé de todas as páginas.
+
+    // A página de cada plano.
+    const NOMES_DOS_RECURSOS = ['Anotar e Resumo', 'Contas a pagar', 'Cartões e faturas', 'Calendário do mês', 'Importar extrato e fatura', 'Ler nota, comprovante e boleto', 'Metas e reserva', 'Investir', 'Aprender, simulador e calculadoras', 'Anotar pelo Telegram', 'Espaço Negócio', 'Tema claro ou escuro', 'Ocultar valores', 'Exportar meus dados'];
+    const ESPECIFICOS = {
+      individual: ['Para uma pessoa: a assinatura é sua.', 'O seu Pessoal, que só você vê.'],
+      familiar: ['Até 6 pessoas na mesma Família, contando a pessoa titular.', 'Uma assinatura só, paga pela pessoa titular. Quem recebe o convite para a Família não paga.', 'Convite por link, de uso único e válido por 7 dias, com o papel de quem anota e vê ou de quem só vê.', 'Cada pessoa continua com o próprio Pessoal, que só ela vê', 'Quem é titular muda o papel de cada pessoa, passa a titularidade ou encerra a Família, e quem quiser sai.'],
+    };
+    for (const plano of ['individual', 'familiar'] as const) {
+      const arquivo = PAGINAS_DOS_PLANOS[plano];
+      const outro = plano === 'individual' ? 'familiar' : 'individual';
+      const p = html(arquivo);
+      const capa = /<section class="capa[^"]*">[\s\S]*?<\/section>/.exec(p)![0];
+      expect(capa, arquivo).toContain('<p class="migalha"><a href="../planos.html">Planos</a></p>');
+      expect(capa, arquivo).toContain(`<h1>Plano ${PLAN_NAME[plano]}</h1>`);
+      expect(capa, arquivo).toContain(`<p class="preco-capa"><span class="preco-valor">${planPriceAmount(plano).replace('R$ ', 'R$\u00a0')}</span>${SUBSCRIPTION_SCREEN_TEXT.perMonth}</p>`);
+      expect(capa, arquivo).toContain(`<p class="lead">${esc(ACCESS_TEXT.plans.find((x) => x.plan === plano)!.who)}</p>`);
+      // Preço só na capa, e só o deste plano.
+      expect(p.replace(capa, ''), arquivo).not.toMatch(/R\$\s?\d/);
+      expect(p, arquivo).not.toContain(planPriceAmount(outro).replace('R$ ', 'R$\u00a0'));
+      expect([...p.matchAll(/<h2 id="([^"]+)">/g)].map((m) => m[1]), arquivo).toEqual(plano === 'familiar' ? ['para-quem', 'inclui', 'assinatura', 'perguntas'] : ['para-quem', 'inclui', 'assinatura']);
+      // O que só este plano tem, e nada do que só o outro tem.
+      const paraQuem = /<h2 id="para-quem">[\s\S]*?<\/section>/.exec(p)![0];
+      for (const t of ESPECIFICOS[plano]) expect(paraQuem, `${arquivo}: ${t}`).toContain(esc(t));
+      for (const t of ESPECIFICOS[outro]) expect(p, `${arquivo} sem: ${t}`).not.toContain(esc(t));
+      if (plano === 'individual') expect(p).not.toMatch(/titular|convite por link|Até 6 pessoas|papel de quem/i);
+      // Todos os recursos do app, com o link para a Ajuda ou O app, que existe.
+      const recursos = /<h2 id="inclui">[\s\S]*?<\/section>\n<\/div>/.exec(p)![0];
+      const links = [...recursos.matchAll(/<li><a href="([^"]+)">([^<]+)<\/a>: /g)].map((m): [string, string] => [m[1]!, m[2]!]);
+      expect(links.map(([, n]) => n), arquivo).toEqual(NOMES_DOS_RECURSOS);
+      for (const [destino] of links) {
+        expect(destino, destino).toMatch(/^\.\.\//);
+        const [alvoRel, ancora] = destino.split('#');
+        const alvo = html(posix.normalize(posix.join('planos', alvoRel!)));
+        expect(alvo, destino).toBeTruthy();
+        if (ancora) expect(alvo, destino).toContain(`id="${ancora}"`);
+      }
+      // O Espaço Negócio incluído na assinatura, sem prometer negócio compartilhado com a Família (D-116).
+      expect(recursos).toContain('Incluído na assinatura: um negócio por pessoa, sem custo a mais.');
+      expect(p).not.toMatch(/negócio (da|com a|em) Família|compartilh|sócio/i);
+      // Como funciona a assinatura, com os textos do núcleo.
+      const assinatura = /<h2 id="assinatura">[\s\S]*?<\/section>/.exec(p)![0];
+      for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.howToPay, ACCESS_TEXT.benefitNote, ACCESS_TEXT.notOpenYet]) expect(assinatura, `${arquivo}: ${t}`).toContain(esc(t));
+      expect(assinatura).toContain('Com Pix, você paga um mês por vez.');
+      // No fim: o outro plano e o resumo.
+      const fim = PAGINAS_DOS_PLANOS[outro].replace('planos/', '');
+      expect(p, arquivo).toContain(`<p class="acoes"><a class="botao botao-principal" href="${fim}">Ver o plano ${PLAN_NAME[outro]}</a> <a class="botao botao-suave" href="../planos.html">Comparar os planos</a></p>`);
+      expect(p).not.toMatch(/[\u2013\u2014]|faz\w*\s+sentido|melhor|depoimento|milh[õo]es/i);
+    }
+    // No Família, as perguntas não repetem o resto da página e respondem direto.
+    const familia = html('planos/familia.html');
+    const perguntas = /<h2 id="perguntas">[\s\S]*?<\/section>/.exec(familia)![0];
+    expect(perguntas).toContain('Quem eu convido precisa ter conta?');
+    expect(perguntas).toContain('O que acontece com o que eu anotei se eu sair da Família?');
+    for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.benefitNote, 'Quem recebe o convite para a Família não paga.']) expect(perguntas, t).not.toContain(esc(t));
+    expect(familia).toContain('Investir</a>: O que você já investe, só no seu Pessoal');
+    // No rodapé de todas as páginas, o resumo dos planos; as páginas dos planos entram no mapa do site.
     expect(html('sobre.html')).toContain('<a href="planos.html">Planos</a>');
+    const g = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
+    for (const loc of ['/planos', '/planos/individual', '/planos/familia']) expect(texto(g.arquivos.get('sitemap.xml')), loc).toContain(`<loc>https://exemplo.test${loc}</loc>`);
   });
 
   it('Comece aqui (o link da bio, D-067): o que é a Clarevo em duas frases, o estado real do acesso e os seis caminhos, sem espera, sem data, sem script e sem rastreamento', () => {

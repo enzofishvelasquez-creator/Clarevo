@@ -14,7 +14,7 @@ const { montarPagina, marcadoresEmHtml, bloco, celular, faixaDeConfianca, domini
 const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
-const { ANCORA_DOS_PLANOS } = require('./planos');
+const { PAGINA_DO_PLANO } = require('./planos');
 const { secaoIndicadoresDeHoje, SCRIPT_DO_PAINEL } = require('./indicadores');
 
 const ARQUIVO = 'index.html';
@@ -30,8 +30,9 @@ const DESCRICAO_CURTA = `${MENSAGEM_CENTRAL} Um app de finanças pessoais e da f
 
 /**
  * A seção Planos (pedido do Enzo, 16/11/2026): os dois planos com os nomes, os preços e as frases da tela Assinatura do app, lidos do
- * núcleo (`catalogo().PLANOS`), para o site e o app dizerem o mesmo. Desde 18/11/2026 (D-115), cada cartão leva à página Planos
- * (`planos.html#individual` e `#familia`) por um link só, que cobre o cartão inteiro (sem elemento interativo dentro de outro). Enquanto a assinatura não abre (`PLANOS.aberta`, o SUBSCRIBE_OPEN
+ * núcleo (`catalogo().PLANOS`), para o site e o app dizerem o mesmo. Desde 18/11/2026 (D-115), cada cartão tem um link só, que cobre o
+ * cartão inteiro (sem elemento interativo dentro de outro); desde 19/11/2026, ele leva direto à página do plano (`planos/individual.html`
+ * e `planos/familia.html`), com o que aquele plano inclui. Enquanto a assinatura não abre (`PLANOS.aberta`, o SUBSCRIBE_OPEN
  * do app), a seção diz, com a frase da tela Assinatura, que a assinatura abre no lançamento e que nada é cobrado até lá.
  * `u` monta o caminho relativo de um link interno.
  */
@@ -42,7 +43,7 @@ function conteudoPlanos(PLANOS, u) {
 <h3>${esc(PLANOS.nome[p.plan])}</h3>
 <p class="preco"><span class="preco-valor">${esc(PLANOS.preco(p.plan))}</span>${esc(PLANOS.porMes)}</p>
 <p>${esc(p.who)}</p>
-<p class="ver-plano"><a href="${u(`planos.html#${ANCORA_DOS_PLANOS[p.plan]}`)}">Ver o que o plano ${esc(PLANOS.nome[p.plan])} inclui</a></p>
+<p class="ver-plano"><a href="${u(PAGINA_DO_PLANO[p.plan])}">Ver o que o plano ${esc(PLANOS.nome[p.plan])} inclui</a></p>
 </article>`,
     )
     .join('\n');
