@@ -679,7 +679,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     where: [...organizar(ORGANIZE_TEXT.calculators.title), calcTitle('antes-de-financiar')],
     steps: [
       `Informe o ${q(ANTES_FIELDS.preco.label)} e a ${q(ANTES_FIELDS.entrada.label)}, se houver.`,
-      `Digite o ${q(ANTES_FIELDS.parcelas.label)} e a ${q(ANTES_FIELDS.taxaMes.label)}, que está na proposta do banco ou da loja.`,
+      `Digite o ${q(ANTES_FIELDS.parcelas.label)} e a ${q(ANTES_FIELDS.taxaMes.label)}, que está na proposta do banco ou da loja. Com ${q(ANTES_FIELDS.tipoTaxa.options![1]!.label)}, a conta vira uma simulação de custo equivalente.`,
       `Em ${q(ANTES_FIELDS.primeiraEmUmMes.label)}, escolha Sim ou Não.`,
       `Para ver quanto a parcela pesa, informe ${q(ANTES_FIELDS.renda.label)}. A renda de referência entra automaticamente, e mudar aqui não altera a referência.`,
       `Veja o total pago, os juros e a alternativa ${q(ANTES_TEXT.savingTitle)}. Se for financiar, ${q(ANTES_TEXT.noteInstallment)}, logo abaixo do resultado, leva as parcelas para as contas a pagar.`,
