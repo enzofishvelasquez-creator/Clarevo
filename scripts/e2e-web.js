@@ -5582,6 +5582,9 @@ setInterval(async () => {
   ok('F1 demonstração: sem a taxa, conta só as parcelas e diz isso; só com o pagamento de sempre termina em 36 meses (outubro de 2029) e pede o valor a mais; a dica do plano de guardar não preenche o campo',
     t.includes('Só com o pagamento de sempre, Financiamento do carro acaba em 36 meses (outubro de 2029).') && t.includes('Informe quanto a mais você consegue pôr por mês para ver o efeito.') &&
     t.includes(`${F1_NAME}: sem juros informados, conta só as parcelas.`) && t.includes('No seu plano de guardar você informou R$ 500,00 por mês.') && t.includes('Total pago: R$ 30.600,00') && t.includes('Juros estimados: R$ 0,00'));
+  // Revisão externa de 18/11/2026: sem a taxa não é taxa zero; o aviso diz que o saldo real e os juros estimados ficam incertos.
+  ok('F1 demonstração: sem a taxa, o aviso de que o saldo real e os juros estimados ficam incertos (taxa não informada não é taxa zero)',
+    t.includes(`Sem a taxa de ${F1_NAME}, a conta usa só as parcelas, como se não houvesse juros. O saldo real e os juros estimados ficam incertos. Informe a taxa do contrato para comparar.`));
   // As dicas dos campos citam as ordens (a taxa define o lugar em "Maior taxa primeiro"); o resultado não as compara.
   ok('F1 só uma dívida: não há ordem a comparar (nem a comparação lado a lado, nem o plano de cada ordem)', !t.includes('As duas ordens, lado a lado') && !t.includes('Maior taxa primeiro, passo a passo') && !t.includes('Na ordem '));
   ok('F1 no topo, para que serve a tela, em duas frases (retorno de 17/11/2026)', t.includes('Monte um plano para quitar as suas dívidas. Informe cada dívida e quanto consegue pôr a mais por mês: a conta mostra por qual começar, quando cada uma acaba e quanto de juros sai da conta, em duas ordens lado a lado.'));
@@ -5684,9 +5687,14 @@ setInterval(async () => {
   ok('F1 corrigido o apelido, o resultado volta', (await body()).includes('As duas ordens, lado a lado') && (await body()).includes('tudo termina em 24 meses (outubro de 2028)'));
   await f1Fill('Quanto você paga por mês, Cartão azul', '10,00');
   t = await body();
-  ok('F1 pagamento de R$ 10,00 para juros de R$ 15,00: "Com este pagamento, o saldo não diminui." e a dívida fica fora da comparação (só as duas linhas de uma dívida)',
-    t.includes('Com este pagamento, o saldo não diminui.') && t.includes('Cartão azul fica fora da comparação até o pagamento ser maior que os juros do primeiro mês (R$ 15,00).') &&
-    !t.includes('As duas ordens, lado a lado') && t.includes(`${F1_NAME} acaba em 32 meses (junho de 2029)`), t.slice(-1200));
+  // Revisão externa de 18/11/2026: a dívida que não diminui sozinha continua no plano (o pagamento de outra dívida ou o valor a mais pode
+  // amortizá-la); a referência sem repasse não termina, e nenhum ganho finito é inventado.
+  ok('F1 pagamento de R$ 10,00 para juros de R$ 15,00: "Com este pagamento, o saldo não diminui.", a dívida continua no plano com a nota, e a referência não termina em 50 anos',
+    t.includes('Com este pagamento, o saldo não diminui.') &&
+    t.includes('Cartão azul: com o pagamento de sempre, o saldo não diminui (juros de R$ 15,00 no primeiro mês). A dívida continua no plano e diminui só com o valor a mais ou com o pagamento de uma dívida que acabe.') &&
+    t.includes('As duas ordens, lado a lado') &&
+    t.includes('Com R$ 100,00 a mais por mês, tudo termina em 33 meses (julho de 2029) ou 34 meses (agosto de 2029), conforme a ordem; sem isso, as dívidas não terminariam em 50 anos.') &&
+    !t.includes('fica fora da comparação'), t.slice(-1200));
   await atWidths(async (w) => {
     await scrollTo('Quanto você paga por mês');
     if (w === 390) await shot('193_plano_dividas_saldo_nao_diminui');
@@ -5697,7 +5705,7 @@ setInterval(async () => {
   await f1Fill(`Parcelas que faltam, ${F1_NAME}`, '');
   t = await body();
   ok('F1 outro campo incompleto: o resultado espera ("Preencha os campos...") e o aviso "Com este pagamento, o saldo não diminui." da dívida continua à vista',
-    t.includes('Preencha os campos para ver o resultado.') && t.includes('Com este pagamento, o saldo não diminui.') && !t.includes('fica fora da comparação'), t.slice(-700));
+    t.includes('Preencha os campos para ver o resultado.') && t.includes('Com este pagamento, o saldo não diminui.') && !t.includes('A dívida continua no plano'), t.slice(-700));
   await f1Fill(`Parcelas que faltam, ${F1_NAME}`, '36');
   await f1Fill('Quanto você paga por mês, Cartão azul', '300,00');
   ok('F1 pagamento corrigido: o aviso some e as duas ordens voltam', !(await body()).includes('Com este pagamento, o saldo não diminui.') && (await body()).includes('As duas ordens, lado a lado') && (await body()).includes('tudo termina em 24 meses (outubro de 2028)'));
@@ -15438,8 +15446,10 @@ setInterval(async () => {
     ok('Revisão plano: o plano de cada ordem diz por qual começar, onde vai o valor a mais, quando cada dívida acaba e para onde vai o pagamento dela, com o ganho',
       t.includes('Maior taxa primeiro') && t.includes('A partir de novembro de 2026 (mês 1): o pagamento de sempre de cada dívida e os R$ 100,00 a mais em Financiamento do carro.') &&
       t.includes('Abril de 2027 (mês 6): Cartão azul acaba. O pagamento dela (R$ 300,00) passa para Financiamento do carro, que fica com R$ 400,00 por mês além do pagamento de sempre.') &&
-      t.includes('Ganho estimado, em relação a pagar só o de sempre: 12 meses antes e R$ 2.216,64 a menos de juros.') &&
-      t.includes('Ganho estimado, em relação a pagar só o de sempre: 12 meses antes e R$ 2.209,96 a menos de juros.'));
+      t.includes('Ganho estimado, em relação aos pagamentos atuais, sem repasse: 12 meses antes e R$ 2.216,64 a menos de juros.') &&
+      t.includes('Ganho estimado, em relação aos pagamentos atuais, sem repasse: 12 meses antes e R$ 2.209,96 a menos de juros.') &&
+      // Revisão externa de 18/11/2026: o ganho só do repasse (sem o valor a mais), para separar os dois efeitos.
+      t.includes('Só passando adiante os pagamentos, sem o valor a mais, seriam 9 meses antes e R$ 1.677,71 a menos de juros.'));
     const rvLevels = await headingList();
     ok('Revisão plano: títulos "Resultado" (2), "As duas ordens, lado a lado" e "O plano, passo a passo" (3) e uma ordem por título de nível 4',
       rvLevels.includes('2:Resultado') && rvLevels.includes('3:As duas ordens, lado a lado') && rvLevels.includes('3:O plano, passo a passo') &&

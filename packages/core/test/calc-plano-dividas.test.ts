@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  planoTrail,
   CALC_DISCLAIMER,
   DEMO_TODAY,
   PLANO_ESTIMATE_TEXT,
@@ -66,7 +67,7 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     expect(base.endMonth).toBe('2026-12');
     expect(r.initialSumCents).toBe(150_000);
     expect(base.totalPaidCents).toBe(r.initialSumCents + base.interestCents!);
-    expect(r.debts.map((d) => [d.initialCents, d.firstInterestCents, d.excluded])).toEqual([
+    expect(r.debts.map((d) => [d.initialCents, d.firstInterestCents, d.stays])).toEqual([
       [100_000, 10_000, false],
       [50_000, 2_500, false],
     ]);
@@ -190,7 +191,10 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
           'Mês 11: Dívida 2 acaba. O pagamento dela (R$ 300,00) passa para Dívida 1, que fica com R$ 500,00 por mês além do pagamento de sempre.',
           'Mês 14: Dívida 1 acaba, e tudo está quitado.',
         ],
-        gain: 'Ganho estimado, em relação a pagar só o de sempre: 42 meses antes e R$ 2.373,56 a menos de juros.',
+        // Revisão externa de 18/11/2026: a referência é "pagamentos atuais, sem repasse", e o ganho só do repasse (sem o valor a mais)
+        // aparece à parte: 56 − 27 = 29 meses e 4.085,82 − 3.621,81 = 464,01 de juros a menos.
+        gain: 'Ganho estimado, em relação aos pagamentos atuais, sem repasse: 42 meses antes e R$ 2.373,56 a menos de juros. Só passando adiante os pagamentos, sem o valor a mais, seriam 29 meses antes e R$ 464,01 a menos de juros.',
+        repasseOnly: { months: 27, interestCents: 362_181 },
       },
       {
         id: 'menor_divida',
@@ -201,7 +205,8 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
           'Mês 9: Dívida 1 acaba. O pagamento dela (R$ 60,00) passa para Dívida 2, que fica com R$ 260,00 por mês além do pagamento de sempre.',
           'Mês 15: Dívida 2 acaba, e tudo está quitado.',
         ],
-        gain: 'Ganho estimado, em relação a pagar só o de sempre: 41 meses antes e R$ 1.807,88 a menos de juros.',
+        gain: 'Ganho estimado, em relação aos pagamentos atuais, sem repasse: 41 meses antes e R$ 1.807,88 a menos de juros. Só passando adiante os pagamentos, sem o valor a mais, seriam 29 meses antes e R$ 464,01 a menos de juros.',
+        repasseOnly: { months: 27, interestCents: 362_181 },
       },
     ]);
     expect(r.resultLines).toEqual([
@@ -217,7 +222,7 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     ]);
     expect(r.tailLines).toEqual([]);
     expect(r.sameOutcome).toBe(false);
-    expect(scenario(r, 'sem_extra').summary).toBe('Sem valor a mais: tudo termina em 56 meses (4 anos e 8 meses).');
+    expect(scenario(r, 'sem_extra').summary).toBe('Pagamentos atuais, sem repasse: tudo termina em 56 meses (4 anos e 8 meses).');
   });
 
   it('as duas ordens dão no mesmo (teste de 09/11/2026: Acordo 9 × R$ 265,00 a 1% e Empréstimo 60 × R$ 100,00 a 1,88%, sem valor a mais): uma frase e um plano só', () => {
@@ -236,7 +241,8 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
       'A partir de dezembro de 2026 (mês 1): o pagamento de sempre de cada dívida.',
       'Agosto de 2027 (mês 9): Acordo acaba. O pagamento dela (R$ 265,00) passa para Empréstimo.',
       'Junho de 2028 (mês 19): Empréstimo acaba, e tudo está quitado.',
-      'Ganho estimado, em relação a pagar só o de sempre: 41 meses antes e R$ 1.495,19 a menos de juros.',
+      // Sem valor a mais, o ganho é só do repasse, sem dinheiro a mais (revisão externa de 18/11/2026).
+      'Ganho estimado, só por passar adiante os pagamentos das dívidas que acabam, sem dinheiro a mais: 41 meses antes e R$ 1.495,19 a menos de juros.',
       PLANO_TEXT.needExtra,
     ]);
     // O mesmo caso com R$ 300,00 a mais (retorno de 17/11/2026: a resposta, as ordens lado a lado e o plano): as duas ordens terminam
@@ -352,28 +358,50 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     expect(run({ dividas, extra: '0,00' }).extraCents).toBe(0);
   });
 
-  it('pagamento que não cobre os juros do primeiro mês: a dívida fica fora da comparação e diz por quê', () => {
-    // Juros do primeiro mês: R$ 1.000,00 a 8% = R$ 80,00. Pagando R$ 80,00 (igual) ou menos, o saldo não diminui.
+  it('pagamento que não cobre os juros do primeiro mês: a dívida continua no plano, a referência não termina e a nota diz por quê (revisão externa de 18/11/2026)', () => {
+    // Juros do primeiro mês: R$ 1.000,00 a 8% = R$ 80,00. Pagando R$ 80,00 (igual) ou menos, o saldo não diminui sozinho; antes a dívida
+    // saía da comparação, agora fica: o pagamento da Loja, que acaba no mês 5, passa a amortizá-la.
     for (const pagamento of ['79,99', '80,00', '10,00']) {
       const r = run({ dividas: [saldo('1.000,00', '8', pagamento, 'Rotativo'), parcelada('100,00', '5', '', 'Loja')] });
-      expect(r.debts[0]!.excluded, pagamento).toBe(true);
-      expect(r.included).toBe(1);
-      expect(r.scenarios.map((s) => s.id)).toEqual(['sem_extra']);
-      expect(r.notes).toContain('Rotativo fica fora da comparação até o pagamento ser maior que os juros do primeiro mês (R$ 80,00).');
+      expect(r.debts[0]!.stays, pagamento).toBe(true);
+      expect(r.included).toBe(2);
+      expect(r.scenarios.map((s) => s.id)).toEqual(['sem_extra', 'maior_taxa', 'menor_divida']);
+      // Na referência (sem repasse), o Rotativo não termina: nenhum ganho finito é inventado.
+      expect(scenario(r, 'sem_extra').months).toBeNull();
+      expect(r.notes).toContain(
+        `Rotativo: com o pagamento de sempre, o saldo não diminui (juros de R$ 80,00 no primeiro mês). A dívida continua no plano e diminui só com o valor a mais ou com o pagamento de uma dívida que acabe.`,
+      );
       expect(r.notes[0]).toBe(PLANO_ESTIMATE_TEXT);
-      expect(r.initialSumCents).toBe(50_000);
+      expect(r.initialSumCents).toBe(150_000);
+      for (const p of r.plans) expect(p.gain ?? '').not.toMatch(/a menos de juros/);
     }
     expect(PLANO_TEXT.balanceStays).toBe('Com este pagamento, o saldo não diminui.');
     // R$ 80,01 já diminui o saldo.
     const ok = run({ dividas: [saldo('1.000,00', '8', '80,01'), parcelada('100,00', '5')] });
-    expect(ok.debts[0]!.excluded).toBe(false);
+    expect(ok.debts[0]!.stays).toBe(false);
     expect(ok.included).toBe(2);
-    // Só dívidas fora da comparação: nenhuma conta, mas a explicação continua à vista.
-    const none = run({ dividas: [saldo('1.000,00', '8', '50,00')] });
-    expect(none.scenarios).toEqual([]);
-    expect(none.resultLines).toEqual([PLANO_TEXT.noDebtCompared]);
-    expect(none.headline).toBe(PLANO_TEXT.noDebtCompared);
-    expect(none.notes).toHaveLength(2);
+    // Sozinha e sem valor a mais, ela não termina em 50 anos; com R$ 50,00 a mais, termina.
+    const alone = run({ dividas: [saldo('1.000,00', '8', '50,00')] });
+    expect(scenario(alone, 'sem_extra').months).toBeNull();
+    expect(alone.headline).toBe('Com estes números, a dívida não termina em 50 anos.');
+    expect(alone.notes).toHaveLength(2);
+    const withExtra = run({ extra: '50,00', dividas: [saldo('1.000,00', '8', '50,00')] });
+    expect(scenario(withExtra, 'com_extra').months).not.toBeNull();
+    expect(withExtra.plans[0]!.gain).toBe('Só com o de sempre, a dívida não terminaria em 50 anos.');
+  });
+
+  it('T09: saldo R$ 1.000,00 a 10%, pagando R$ 80,00, com R$ 50,00 a mais: fica no plano e o saldo do primeiro mês é R$ 970,00', () => {
+    const input = { extra: '50,00', dividas: [saldo('1.000,00', '10', '80,00', 'Cartão')] };
+    const r = run(input);
+    expect(r.debts[0]!.stays).toBe(true);
+    const t = planoTrail(input, 'com_extra')!;
+    // Juros 1.000,00 × 10% = 100,00; 1.000,00 + 100,00 − 80,00 − 50,00 = 970,00.
+    expect(t.trail[0]!.rows).toEqual([{ index: 0, name: 'Cartão', openingCents: 100_000, interestCents: 10_000, paymentCents: 8_000, extraCents: 5_000, closingCents: 97_000 }]);
+    expect(t.months).toBe(scenario(r, 'com_extra').months);
+    expect(t.months).not.toBeNull();
+    // A referência (só os R$ 80,00) não termina, e a frase diz isso.
+    expect(scenario(r, 'sem_extra').months).toBeNull();
+    expect(r.headline).toMatch(/; sem isso, a dívida não terminaria em 50 anos\.$/);
   });
 
   it('planoDebtStays: vale com os três campos da própria dívida, mesmo com outros campos incompletos', () => {
@@ -389,7 +417,7 @@ describe('9. Em que ordem quitar as dívidas? (D-040)', () => {
     expect(planoDebtStays({ tipo: null })).toBe(false);
     // O resultado do cálculo concorda, e o aviso não depende de o resto da tela estar completo.
     const full = run({ dividas: [saldo('1.000,00', '8', '80,00'), parcelada('100,00', '5')] });
-    expect(full.debts.map((d) => d.excluded)).toEqual([true, false]);
+    expect(full.debts.map((d) => d.stays)).toEqual([true, false]);
     const incompleta = { dividas: [saldo('1.000,00', '8', '80,00'), { tipo: 'parcelada' as const }], extra: 'abc' };
     expect(errors(incompleta)).not.toBeNull();
     expect(planoDebtStays(incompleta.dividas[0]!)).toBe(true);

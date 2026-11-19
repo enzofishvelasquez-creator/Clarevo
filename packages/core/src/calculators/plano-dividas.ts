@@ -29,8 +29,22 @@ import { parseCount, parseMoney, parseOptionalMoney, parsePercentBp } from './in
  * - com o valor a mais: o total do mês é o valor a mais mais todos os pagamentos de sempre; o que as dívidas abertas não
  *   usam (por já estarem quitadas) vai para a primeira dívida aberta da ordem, e o que sobrar ao quitá-la passa para a
  *   seguinte no mesmo mês (efeito bola de neve);
- * - referência: "Sem valor a mais" paga cada dívida só com os pagamentos de sempre, sem passar nada adiante.
+ * - referência: "Pagamentos atuais, sem repasse" paga cada dívida só com os pagamentos de sempre, sem passar nada adiante.
  * Dinheiro em centavos inteiros; juros e valores presentes usam BigInt e roundDivBig, sem ponto flutuante.
+ *
+ * Revisão externa de 18/11/2026:
+ * - uma dívida com saldo cujo pagamento não passa dos juros do mês continua no plano: o valor a mais ou o pagamento de uma dívida que
+ *   acaba pode amortizá-la (saldo 1.000,00 a 10%, pagando 80,00 e com 50,00 a mais: 1.000 + 100 − 80 − 50 = 970,00 no primeiro mês).
+ *   Na referência ela não termina, e o ganho não vira um número finito inventado;
+ * - parcelada sem taxa informada não é taxa zero: a conta usa só as parcelas e o aviso diz que o saldo, os juros e o lugar dela em
+ *   "Maior taxa primeiro" ficam incertos;
+ * - a referência se chama "Pagamentos atuais, sem repasse"; com valor a mais, cada ordem diz também o ganho só do repasse (os mesmos
+ *   pagamentos passados adiante, sem o valor a mais), para separar os dois efeitos;
+ * - convenção do centavo, mês a mês: dívida com saldo, juros = saldo × i, metade para cima no centavo; parcelada, saldo da tabela
+ *   arredondado uma vez a partir do valor exato e juros = o que fecha a conta; o valor a mais aplicado numa parcelada cresce pela taxa
+ *   do contrato com juros do mês metade para cima, e o saldo líquido (tabela menos o aplicado) é o mesmo que o saldo anterior × (1 + i)
+ *   menos a parcela, a menos do arredondamento: um recurso de cálculo, não um rendimento à parte. planoTrail mostra, mês a mês, saldo
+ *   inicial, juros, pagamento de sempre, valor a mais, saldo final e o que sobrou sem uso.
  */
 export type PlanoTipo = 'parcelada' | 'saldo';
 export type PlanoCampo = 'apelido' | 'tipo' | 'parcela' | 'restantes' | 'taxaParcelada' | 'saldo' | 'taxaSaldo' | 'pagamento';
@@ -99,8 +113,19 @@ export const PLANO_TEXT = {
   balanceStays: 'Com este pagamento, o saldo não diminui.',
   /** Legenda de "Sem valor a mais" quando há 2 ou mais dívidas e nenhum valor a mais: explica por que as ordens terminam antes. */
   baselineCaption: 'Cada dívida só com os pagamentos de sempre, sem passar nada adiante.',
+  /**
+   * Revisão externa de 18/11/2026: a dívida cujo pagamento não passa dos juros continua no plano (o valor a mais ou o pagamento de outra
+   * dívida pode amortizá-la); a nota diz por que o saldo dela não diminui sozinho.
+   */
   balanceStaysNote: (name: string, interestCents: Cents) =>
-    `${name} fica fora da comparação até o pagamento ser maior que os juros do primeiro mês (${formatBRL(interestCents)}).`,
+    `${name}: com o pagamento de sempre, o saldo não diminui (juros de ${formatBRL(interestCents)} no primeiro mês). A dívida continua no plano e diminui só com o valor a mais ou com o pagamento de uma dívida que acabe.`,
+  /** Parcelada sem taxa: não é taxa zero. A conta usa só as parcelas, e o aviso diz o que fica incerto. */
+  unknownRateNote: (names: string, many: boolean, several: boolean) =>
+    `Sem a taxa de ${names}, a conta usa só as parcelas, como se não houvesse juros. ${
+      many
+        ? `O saldo real, os juros estimados e o lugar ${several ? 'dessas dívidas' : 'dessa dívida'} em "Maior taxa primeiro" ficam incertos, e as diferenças entre as ordens valem só com essa hipótese.`
+        : 'O saldo real e os juros estimados ficam incertos.'
+    } Informe a taxa do contrato para comparar.`,
   savingsHint: (cents: Cents) => `No seu plano de guardar você informou ${formatBRL(cents)} por mês.`,
   noDebtCompared: 'Nenhuma dívida entra na comparação ainda.',
   noEnd: 'Com estes números, as dívidas não terminam em 50 anos.',
@@ -108,7 +133,8 @@ export const PLANO_TEXT = {
   sequenceTitle: 'Em que ordem cada dívida termina',
   detailsTitle: 'Detalhes de cada ordem',
   scenario: {
-    sem_extra: 'Sem valor a mais',
+    /** A referência (revisão externa de 18/11/2026): os pagamentos de hoje, sem o valor a mais e sem passar adiante os das que acabam. */
+    sem_extra: 'Pagamentos atuais, sem repasse',
     com_extra: 'Com o valor a mais',
     maior_taxa: 'Maior taxa primeiro',
     menor_divida: 'Menor dívida primeiro',
@@ -122,6 +148,8 @@ export const PLANO_TEXT = {
     interest: 'Juros estimados',
   },
   /** Valores da comparação quando a ordem passa de 50 anos. */
+  /** Com uma dívida só, a referência não tem o que passar adiante. */
+  baselineOne: 'Sem valor a mais',
   rowNever: {
     first: 'nenhuma em 50 anos',
     end: 'mais de 50 anos',
@@ -145,7 +173,14 @@ export const PLANO_TEXT = {
     extraOnly: 'O valor a mais vai para a dívida todo mês, além do pagamento de sempre.',
     orders:
       'Maior taxa primeiro: o que sobra vai antes para a dívida com a maior taxa ao mês. Menor dívida primeiro: vai antes para a dívida com o menor saldo hoje. Empate: a outra regra, depois a ordem da lista.',
-    baseline: 'O ganho é comparado com pagar só o de sempre em cada dívida, sem o valor a mais e sem passar nada adiante.',
+    baseline:
+      'O ganho é comparado com os pagamentos atuais, sem repasse: cada dívida só com o pagamento de sempre, sem o valor a mais e sem passar adiante o pagamento das que acabam.',
+    baselineOne: 'O ganho é comparado com pagar só o de sempre, sem o valor a mais.',
+    /** Com valor a mais e duas ou mais dívidas: o ganho junta dois efeitos, e a linha do repasse mostra o dele sozinho. */
+    twoEffects:
+      'Com valor a mais, o ganho junta o efeito do valor a mais e o de passar adiante os pagamentos das dívidas que acabam; a frase "Só passando adiante os pagamentos" mostra o segundo sozinho.',
+    /** Convenção do centavo (revisão externa de 18/11/2026). */
+    cents: 'Juros de cada mês no centavo, metade para cima; o saldo de uma parcelada segue a tabela do contrato, arredondada uma vez por mês.',
     presentValue: 'O saldo inicial de uma dívida parcelada é o valor presente das parcelas que faltam, pela taxa informada. A parcela segue a tabela do contrato e o valor a mais abate o saldo.',
     overdueOut: 'Dos seus parcelamentos, entram só as parcelas que vencem de hoje em diante; as já vencidas e em aberto ficam fora desta conta.',
     noRate: (name: string) => `${name}: sem juros informados, conta só as parcelas.`,
@@ -246,8 +281,34 @@ export interface PlanoDebtInfo {
   restantes: number | null;
   /** Juros do primeiro mês sobre o saldo inicial. */
   firstInterestCents: Cents;
-  /** Dívida com saldo cujo pagamento não passa dos juros do primeiro mês: fora da comparação. */
-  excluded: boolean;
+  /**
+   * Dívida com saldo cujo pagamento não passa dos juros do primeiro mês: sozinha, o saldo não diminui. Continua no plano (revisão externa
+   * de 18/11/2026), porque o valor a mais ou o pagamento de outra dívida pode amortizá-la.
+   */
+  stays: boolean;
+  /** Parcelada sem taxa informada: a conta usa só as parcelas (não é taxa zero), e o aviso diz o que fica incerto. */
+  unknownRate: boolean;
+}
+
+/** Uma linha da trilha mês a mês de uma dívida (planoTrail). Sempre: final = inicial + juros − pagamento − valor a mais. */
+export interface PlanoTrailRow {
+  /** Posição na lista da pessoa (de 0). */
+  index: number;
+  name: string;
+  openingCents: Cents;
+  interestCents: Cents;
+  /** Pagamento de sempre (parcela ou o informado), limitado ao que falta. */
+  paymentCents: Cents;
+  /** Parte do valor a mais (e dos pagamentos das dívidas que acabaram) aplicada nesta dívida. */
+  extraCents: Cents;
+  closingCents: Cents;
+}
+
+/** Um mês da trilha: as dívidas abertas no começo do mês e o que sobrou sem uso (orçamento do mês que nenhuma dívida precisou). */
+export interface PlanoTrailMonth {
+  month: number;
+  rows: PlanoTrailRow[];
+  residueCents: Cents;
 }
 
 export interface PlanoSequenceItem {
@@ -309,8 +370,13 @@ export interface PlanoPlan {
   startName: string | null;
   /** "A partir de novembro de 2026 (mês 1): ...", "Abril de 2027 (mês 6): Cartão azul acaba. O pagamento dela ...". */
   steps: string[];
-  /** "Ganho estimado, em relação a pagar só o de sempre: 12 meses antes e R$ 2.216,64 a menos de juros."; null sem ganho. */
+  /** "Ganho estimado, em relação aos pagamentos atuais, sem repasse: 12 meses antes e R$ 2.216,64 a menos de juros."; null sem ganho. */
   gain: string | null;
+  /**
+   * Com valor a mais e duas ou mais dívidas: a mesma ordem só passando adiante os pagamentos, sem o valor a mais (o efeito do repasse
+   * sozinho); null nos outros casos.
+   */
+  repasseOnly: { months: number | null; interestCents: Cents | null } | null;
 }
 
 export interface PlanoResult extends CalcTexts {
@@ -356,6 +422,11 @@ interface SimOutcome {
 }
 
 const BP = 10_000n;
+/**
+ * Saldo acima disto (R$ 10 trilhões) para a conta: uma dívida que cresce sem parar (pagamento abaixo dos juros, sem nada que a amortize)
+ * não termina em 50 anos, e o número não passa do inteiro seguro do JavaScript.
+ */
+const BALANCE_LIMIT = 10 ** 15;
 
 /** Juros de um mês: saldo × taxa, metade para cima no centavo, em inteiros exatos. */
 function monthInterest(balance: Cents, bp: number): Cents {
@@ -394,7 +465,7 @@ export function installmentTable(parcela: Cents, bp: number, count: number): Cen
  * tabela do contrato menos o valor a mais já aplicado (que rende a mesma taxa); o pagamento do mês é a parcela, e os juros são
  * o que fecha a conta (saldo depois + pagamento − saldo antes). No mês `term` a tabela chega a zero e a dívida termina.
  */
-function simulate(debts: readonly SimDebt[], pool: { order: readonly number[]; budget: Cents } | null): SimOutcome {
+function simulate(debts: readonly SimDebt[], pool: { order: readonly number[]; budget: Cents } | null, trail?: { names: readonly string[]; indexes: readonly number[]; out: PlanoTrailMonth[] }): SimOutcome {
   const balance = debts.map((d) => d.initial);
   /** Parcelada: valor a mais já aplicado, com a taxa do contrato. */
   const applied = debts.map(() => 0);
@@ -403,29 +474,33 @@ function simulate(debts: readonly SimDebt[], pool: { order: readonly number[]; b
   let interest = 0;
   for (let month = 1; month <= PLANO_MAX_MONTHS; month++) {
     let used = 0;
+    const rows: (PlanoTrailRow | null)[] = debts.map(() => null);
     for (let i = 0; i < debts.length; i++) {
       const open = balance[i]!;
       if (open <= 0) continue;
       const d = debts[i]!;
       let pay: Cents;
+      let j: Cents;
       if (d.table !== null) {
         const grown = applied[i]! + monthInterest(applied[i]!, d.bp);
         const gap = d.table[Math.max(0, d.term! - month)]! - grown;
         const after = Math.max(0, gap);
         pay = Math.min(d.minimum, Math.max(0, gap + d.minimum));
         applied[i] = grown;
-        interest += after + pay - open;
+        j = after + pay - open;
         balance[i] = after;
       } else {
-        const j = monthInterest(open, d.bp);
-        interest += j;
+        j = monthInterest(open, d.bp);
         const owed = open + j;
         pay = Math.min(d.minimum, owed);
         balance[i] = owed - pay;
       }
+      interest += j;
       totalPaid += pay;
       used += pay;
+      if (trail) rows[i] = { index: trail.indexes[i]!, name: trail.names[i]!, openingCents: open, interestCents: j, paymentCents: pay, extraCents: 0, closingCents: balance[i]! };
     }
+    let residue = 0;
     if (pool) {
       let rest = Math.max(0, pool.budget - used);
       for (const i of pool.order) {
@@ -437,13 +512,31 @@ function simulate(debts: readonly SimDebt[], pool: { order: readonly number[]; b
           applied[i] = applied[i]! + pay;
           rest -= pay;
           totalPaid += pay;
+          const row = rows[i];
+          if (row) {
+            row.extraCents = pay;
+            row.closingCents = balance[i]!;
+          }
         }
       }
+      residue = rest;
     }
+    if (trail) trail.out.push({ month, rows: rows.filter((r): r is PlanoTrailRow => r !== null), residueCents: residue });
     for (let i = 0; i < debts.length; i++) if (balance[i] === 0 && closedAt[i] === 0) closedAt[i] = month;
     if (closedAt.every((c) => c > 0)) return { months: month, totalPaid, interest, closedAt };
+    // Uma dívida que só cresce (sem nada que a amortize) não termina: para antes de passar do inteiro seguro.
+    if (balance.some((b) => b > BALANCE_LIMIT)) break;
   }
   return { months: null, totalPaid: 0, interest: 0, closedAt };
+}
+
+/** As duas ordens: maior taxa (empate: menor saldo, depois a lista) e menor saldo (empate: maior taxa, depois a lista). */
+function ordersOf(sim: readonly SimDebt[]): { byRate: number[]; bySize: number[] } {
+  const positions = sim.map((_, k) => k);
+  return {
+    byRate: [...positions].sort((a, b) => sim[b]!.bp - sim[a]!.bp || sim[a]!.initial - sim[b]!.initial || a - b),
+    bySize: [...positions].sort((a, b) => sim[a]!.initial - sim[b]!.initial || sim[b]!.bp - sim[a]!.bp || a - b),
+  };
 }
 
 /**
@@ -478,7 +571,7 @@ function buildScenario(
   caption: string | null = null,
   withSequence = false,
 ): PlanoScenario {
-  const title = PLANO_TEXT.scenario[id];
+  const title = id === 'sem_extra' && included.length === 1 ? PLANO_TEXT.baselineOne : PLANO_TEXT.scenario[id];
   if (sim.months === null) {
     return {
       id,
@@ -590,8 +683,10 @@ function buildPlan(
   today: IsoDate | undefined,
   base: PlanoScenario,
   scenario: PlanoScenario,
+  repasse: SimOutcome | null = null,
 ): PlanoPlan {
-  if (sim.months === null) return { id, title, startName: null, steps: [PLANO_TEXT.noEnd], gain: null };
+  const repasseOnly = repasse === null ? null : { months: repasse.months, interestCents: repasse.months === null ? null : repasse.interest };
+  if (sim.months === null) return { id, title, startName: null, steps: [PLANO_TEXT.noEnd], gain: null, repasseOnly };
   const many = included.length > 1;
   const startName = planStart(order, sim.closedAt, included, extraCents);
   const steps: string[] = [];
@@ -624,15 +719,42 @@ function buildPlan(
     );
   }
   let gain: string | null = null;
+  // A referência que não termina não vira um ganho finito (revisão externa de 18/11/2026).
+  const parts = (months: number, interestCents: Cents): string[] => {
+    const earlier = base.months! - months;
+    const saved = base.interestCents! - interestCents;
+    return [...(earlier > 0 ? [`${monthsCount(earlier)} antes`] : []), ...(saved > 0 ? [`${brl(saved)} a menos de juros`] : [])];
+  };
   if (base.months === null) {
-    gain = `Só com o de sempre, ${many ? 'as dívidas não terminariam' : 'a dívida não terminaria'} em 50 anos.`;
+    gain = many
+      ? 'Com os pagamentos atuais, sem repasse, as dívidas não terminariam em 50 anos.'
+      : 'Só com o de sempre, a dívida não terminaria em 50 anos.';
   } else {
-    const earlier = base.months - scenario.months!;
-    const saved = base.interestCents! - scenario.interestCents!;
-    const parts = [...(earlier > 0 ? [`${monthsCount(earlier)} antes`] : []), ...(saved > 0 ? [`${brl(saved)} a menos de juros`] : [])];
-    if (parts.length > 0) gain = `Ganho estimado, em relação a pagar só o de sempre: ${parts.join(' e ')}.`;
+    const p = parts(scenario.months!, scenario.interestCents!);
+    if (p.length > 0) {
+      const against = !many
+        ? 'em relação a pagar só o de sempre'
+        : extraCents > 0
+          ? 'em relação aos pagamentos atuais, sem repasse'
+          : 'só por passar adiante os pagamentos das dívidas que acabam, sem dinheiro a mais';
+      gain = `Ganho estimado, ${against}: ${p.join(' e ')}.`;
+    }
   }
-  return { id, title, startName, steps, gain };
+  if (repasseOnly !== null) {
+    // O efeito do repasse sozinho: a mesma ordem, os mesmos pagamentos passados adiante, sem o valor a mais.
+    let line: string;
+    if (repasseOnly.months === null) line = 'Só passando adiante os pagamentos, sem o valor a mais, as dívidas não terminariam em 50 anos.';
+    else if (base.months === null) line = `Só passando adiante os pagamentos, sem o valor a mais, tudo terminaria em ${monthsCount(repasseOnly.months)}.`;
+    else {
+      const p = parts(repasseOnly.months, repasseOnly.interestCents!);
+      line =
+        p.length > 0
+          ? `Só passando adiante os pagamentos, sem o valor a mais, seriam ${p.join(' e ')}.`
+          : 'Só passando adiante os pagamentos, sem o valor a mais, o fim e os juros seriam os mesmos dos pagamentos atuais.';
+    }
+    gain = gain === null ? line : `${gain} ${line}`;
+  }
+  return { id, title, startName, steps, gain, repasseOnly };
 }
 
 /** As duas ordens lado a lado, com uma frase por ordem. */
@@ -749,7 +871,8 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
         // Pela tabela: saldo depois da primeira parcela + parcela - saldo inicial.
         firstInterestCents: Math.max(0, table[restantes - 1]! + parcela - initial),
         restantes,
-        excluded: false,
+        stays: false,
+        unknownRate: rate === null,
       });
     } else if (d.tipo === 'saldo') {
       const saldo = r.read(`saldo.${i}`, parseMoney(d.saldo ?? ''));
@@ -766,7 +889,8 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
         minimumCents: pagamento,
         restantes: null,
         firstInterestCents: firstInterest,
-        excluded: planoDebtStays(d),
+        stays: planoDebtStays(d),
+        unknownRate: false,
       });
     } else {
       r.fail(`tipo.${i}`, 'vazio');
@@ -775,7 +899,8 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
   if (!r.ok || extra === undefined) return { ok: false, errors: r.errors };
 
   const extraCents = extra ?? 0;
-  const included = infos.filter((d) => !d.excluded);
+  // Todas entram (revisão externa de 18/11/2026): a que não diminui sozinha pode ser amortizada pelo valor a mais ou pelo repasse.
+  const included = infos;
   const sim: SimDebt[] = included.map((d) => ({
     initial: d.initialCents,
     bp: d.rateBp ?? 0,
@@ -810,19 +935,21 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
         tailLines.push(PLANO_TEXT.needExtra);
       }
     } else {
-      const positions = sim.map((_, k) => k);
-      const byRate = [...positions].sort((a, b) => sim[b]!.bp - sim[a]!.bp || sim[a]!.initial - sim[b]!.initial || a - b);
-      const bySize = [...positions].sort((a, b) => sim[a]!.initial - sim[b]!.initial || sim[b]!.bp - sim[a]!.bp || a - b);
+      const { byRate, bySize } = ordersOf(sim);
       const runRate = simulate(sim, { order: byRate, budget });
       const runSize = simulate(sim, { order: bySize, budget });
+      // Com valor a mais: a mesma ordem só com o repasse (sem o valor a mais), para separar os dois efeitos.
+      const repasseBudget = budget - extraCents;
+      const repasseRate = extraCents > 0 ? simulate(sim, { order: byRate, budget: repasseBudget }) : null;
+      const repasseSize = extraCents > 0 ? simulate(sim, { order: bySize, budget: repasseBudget }) : null;
       const maior = buildScenario('maior_taxa', runRate, included, today);
       const menor = buildScenario('menor_divida', runSize, included, today);
       scenarios.push(maior, menor);
       diff = differences(maior, menor);
       same = sameOutcome(maior, menor);
       headline = headlineOf(included, extraCents, base, [maior, menor]);
-      const planRate = buildPlan('maior_taxa', maior.title, byRate, runRate, included, extraCents, today, base, maior);
-      const planSize = buildPlan('menor_divida', menor.title, bySize, runSize, included, extraCents, today, base, menor);
+      const planRate = buildPlan('maior_taxa', maior.title, byRate, runRate, included, extraCents, today, base, maior, repasseRate);
+      const planSize = buildPlan('menor_divida', menor.title, bySize, runSize, included, extraCents, today, base, menor, repasseSize);
       const cmp = buildComparison([
         { scenario: maior, start: planRate.startName },
         { scenario: menor, start: planSize.startName },
@@ -852,11 +979,19 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
   const hypotheses: string[] = [H.fixedRates, H.noFees, H.endOfMonth, H.minimums];
   if (included.length > 1) hypotheses.push(extraCents > 0 ? H.snowballWithExtra : H.snowballNoExtra, H.orders);
   else if (included.length === 1 && extraCents > 0) hypotheses.push(H.extraOnly);
-  if (included.length > 1 || extraCents > 0) hypotheses.push(H.baseline);
+  if (included.length > 1) hypotheses.push(H.baseline);
+  else if (extraCents > 0) hypotheses.push(H.baselineOne);
+  if (included.length > 1 && extraCents > 0) hypotheses.push(H.twoEffects);
   if (included.some((d) => d.tipo === 'parcelada' && d.rateBp !== null)) hypotheses.push(H.presentValue);
   for (const d of included) if (d.tipo === 'parcelada' && d.rateBp === null) hypotheses.push(H.noRate(d.name));
+  if (included.length > 0) hypotheses.push(H.cents);
 
-  const notes = [PLANO_ESTIMATE_TEXT, ...infos.filter((d) => d.excluded).map((d) => PLANO_TEXT.balanceStaysNote(d.name, d.firstInterestCents))];
+  const unknown = infos.filter((d) => d.unknownRate).map((d) => d.name);
+  const notes = [
+    PLANO_ESTIMATE_TEXT,
+    ...(unknown.length > 0 ? [PLANO_TEXT.unknownRateNote(namesList(unknown), included.length > 1, unknown.length > 1)] : []),
+    ...infos.filter((d) => d.stays).map((d) => PLANO_TEXT.balanceStaysNote(d.name, d.firstInterestCents)),
+  ];
 
   return {
     ok: true,
@@ -877,6 +1012,42 @@ export function calcPlanoDividas(input: PlanoInput, today?: IsoDate): CalcOutcom
       notes,
     },
   };
+}
+
+/**
+ * Trilha mês a mês de um cenário (revisão externa de 18/11/2026: "exigir trilha por mês com saldo inicial, juros, pagamento contratual,
+ * extra, saldo final e resíduo"). Mesmas contas de calcPlanoDividas: 'sem_extra' é a referência; 'com_extra', a dívida única com o valor a
+ * mais; 'maior_taxa' e 'menor_divida', as ordens. Com `repasseOnly`, a ordem só com o repasse (sem o valor a mais). Em cada linha,
+ * final = inicial + juros − pagamento − valor a mais, exatamente; o resíduo é o orçamento do mês que nenhuma dívida usou. null com
+ * entradas inválidas ou um cenário que a conta não tem. `months` null: passa de 600 meses (a trilha vai até onde a conta foi).
+ */
+export function planoTrail(input: PlanoInput, scenario: PlanoScenarioId, options: { repasseOnly?: boolean } = {}): { months: number | null; trail: PlanoTrailMonth[] } | null {
+  const out = calcPlanoDividas(input);
+  if (!out.ok) return null;
+  const debts = out.result.debts;
+  if (debts.length === 0) return null;
+  const sim: SimDebt[] = debts.map((d) => ({
+    initial: d.initialCents,
+    bp: d.rateBp ?? 0,
+    minimum: d.minimumCents,
+    term: d.restantes,
+    table: d.tipo === 'parcelada' ? installmentTable(d.minimumCents, d.rateBp ?? 0, d.restantes!) : null,
+  }));
+  const extra = options.repasseOnly === true ? 0 : out.result.extraCents;
+  const budget = extra + sim.reduce((sum, d) => sum + d.minimum, 0);
+  const { byRate, bySize } = ordersOf(sim);
+  let pool: { order: readonly number[]; budget: Cents } | null;
+  if (scenario === 'sem_extra') pool = null;
+  else if (scenario === 'com_extra') {
+    if (debts.length !== 1) return null;
+    pool = { order: [0], budget };
+  } else {
+    if (debts.length < 2) return null;
+    pool = { order: scenario === 'maior_taxa' ? byRate : bySize, budget };
+  }
+  const trail: PlanoTrailMonth[] = [];
+  const run = simulate(sim, pool, { names: debts.map((d) => d.name), indexes: debts.map((d) => d.index), out: trail });
+  return { months: run.months, trail };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
