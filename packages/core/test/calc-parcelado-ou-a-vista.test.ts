@@ -31,21 +31,35 @@ describe('1. Parcelado ou à vista? (docs/08 §3.2)', () => {
     expect(r.hypotheses[0]).toBe('Primeira parcela paga na compra e as outras a cada mês.');
   });
 
-  it('total igual ou menor que o preço à vista: sem juros embutidos e sem taxa', () => {
-    for (const parcela of ['108,00', '100,00']) {
-      const r = run({ parcela });
-      expect(r.noInterest).toBe(true);
-      expect(r.monthlyRate).toBeNull();
-      expect(r.resultLines[0]).toBe('Não há juros embutidos: o total parcelado é igual ou menor que o preço à vista.');
-      expect(r.resultLines.join(' ')).not.toContain('%');
-    }
+  it('total igual ao preço à vista: taxa de 0% e o adiamento dos pagamentos (revisão externa de 18/11/2026)', () => {
+    const r = run({ parcela: '108,00' });
+    expect(r.differenceCents).toBe(0);
+    expect(r.noInterest).toBe(true);
+    expect([r.monthlyRate, r.annualRate]).toEqual([0, 0]);
+    expect(r.resultLines.slice(0, 2)).toEqual([
+      'Com estes números, o total parcelado é igual ao preço à vista: a taxa embutida é de 0% ao mês.',
+      'Parcelar só adia os pagamentos, sem custo a mais em reais.',
+    ]);
+    // Com a primeira na compra, também 0%: 10 × 108,00 = 1.080,00, e o financiado (972,00) é exatamente 9 × 108,00.
+    expect(run({ parcela: '108,00', primeiraNaCompra: true }).monthlyRate).toBe(0);
+  });
+
+  it('total menor que o preço à vista: diz quanto é menor, sem "não há juros embutidos" e sem taxa negativa (revisão externa de 18/11/2026)', () => {
+    const r = run({ parcela: '100,00' });
+    expect(r.differenceCents).toBe(-8_000);
+    expect(r.noInterest).toBe(true);
+    expect(r.monthlyRate).toBeNull();
+    expect(r.resultLines.slice(0, 2)).toEqual(['Com estes números, o total parcelado é R$ 80,00 menor que o preço à vista.', 'Não há juros positivos nas parcelas.']);
+    expect(r.resultLines.join(' ')).not.toMatch(/%|Não há juros embutidos/);
   });
 
   it('primeira parcela na compra que já cobre o preço: diferença sem taxa', () => {
     const r = run({ aVista: '100,00', parcelas: '2', parcela: '100,00', primeiraNaCompra: true });
     expect(r.differenceCents).toBe(10_000);
     expect(r.monthlyRate).toBeNull();
-    expect(r.resultLines[1]).toBe('Como a primeira parcela já cobre o preço à vista, não há uma taxa ao mês para mostrar.');
+    expect(r.resultLines[1]).toBe(
+      'Como a primeira parcela já cobre o preço à vista, nenhuma taxa de juros faz as parcelas valerem o preço à vista: não há taxa ao mês para mostrar.',
+    );
   });
 
   it('taxa positiva que arredonda para 0,00% aparece como "menos de 0,01%"', () => {
@@ -86,7 +100,8 @@ describe('1. Parcelado ou à vista? (docs/08 §3.2)', () => {
     expect(r.hypotheses[0]).toBe('Primeira parcela junto com a cota única e as outras a cada mês.');
     expect(r.action).toBeNull();
     const igual = run({ modo: 'cota-unica', parcela: '108,00' });
-    expect(igual.resultLines[0]).toBe('Não há juros embutidos: o total parcelado é igual ou menor que a cota única.');
+    expect(igual.resultLines[0]).toBe('Com estes números, o total parcelado é igual à cota única: a taxa embutida é de 0% ao mês.');
+    expect(run({ modo: 'cota-unica', parcela: '100,00' }).resultLines[0]).toBe('Com estes números, o total parcelado é R$ 80,00 menor que a cota única.');
     const out = calcParceladoOuAVista({ ...base, modo: 'cota-unica', parcelas: '13' });
     expect(out.ok ? null : out.errors).toEqual({ parcelas: 'fora_da_faixa' });
     expect(calcErrorText('parcelado-ou-a-vista', 'parcelas', 'fora_da_faixa', 'cota-unica')).toBe('Use de 2 a 12 parcelas.');
