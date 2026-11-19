@@ -10,7 +10,7 @@ const path = require('node:path');
 const { RAIZ, SITE_SRC, MARCA, FONTES, PESOS_FONTE, PAGINAS_LEGAIS } = require('./config');
 const { lerDados, avisosDeRedacao, problemasDeTitulos } = require('./texto');
 const { dataExiste } = require('./conteudo');
-const { dominioDe, configurarRodape, SCRIPT_DO_TEMA } = require('./modelo');
+const { dominioDe, SCRIPT_DO_TEMA } = require('./modelo');
 const { imagensDoSite } = require('./imagens');
 const { videosDoSite, SCRIPT_DOS_VIDEOS } = require('./videos');
 const { linksQuebrados, problemasFinaisDaPagina } = require('./verificacoes');
@@ -28,7 +28,7 @@ const { catalogo: catalogoDoSite } = require('./catalogo');
 const { nucleo, pacoteDoWorker } = require('./nucleo');
 const { lerRetrato, problemasDoRetrato } = require('./indicadores');
 const { paginasIndicadores, SCRIPT_DO_PAINEL } = require('./paginas/indicadores');
-const { paginasNoticias, lerEdicoes } = require('./paginas/noticias');
+const { paginasNoticias, lerEdicoes, SCRIPT_DAS_NOTICIAS } = require('./paginas/noticias');
 const { paginasNovidades, SCRIPT_DE_COPIAR } = require('./paginas/novidades');
 const { paginasAjuda, conferirCobertura } = require('./paginas/ajuda');
 const { paginaSeguranca } = require('./paginas/seguranca');
@@ -44,8 +44,9 @@ const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê est
 # script-src e connect-src 'self' valem só para os scripts do próprio site: a busca da Ajuda (ajuda/busca.js, que lê ajuda/indice.json), as
 # calculadoras (calculadoras/calculadora.js e os módulos de js/nucleo/, que não enviam nada), o painel de indicadores (indicadores/painel.js,
 # que pergunta uma vez ao próprio site, /api/indicadores; quem consulta o Banco Central é o _worker.js, nunca o navegador) e os vídeos
-# (js/videos.js, que não pede nada a ninguém), o botão de copiar o endereço do feed (js/copiar.js) e o tema do site (js/tema.js, que
-# guarda no navegador só a escolha de tema, quando a pessoa escolhe um). form-action 'self' vale para os formulários de contato e de novidades, que enviam só para o
+# (js/videos.js, que não pede nada a ninguém), o botão de copiar o endereço do feed (js/copiar.js), o tema do site (js/tema.js, que
+# guarda no navegador só a escolha de tema, quando a pessoa escolhe um) e as notícias (noticias/noticias.js, D-117, que pergunta uma vez ao
+# próprio site, /api/noticias; quem lê os feeds das fontes é o _worker.js, e nenhuma imagem de outro site aparece). form-action 'self' vale para os formulários de contato e de novidades, que enviam só para o
 # próprio site (/api/contato e /api/newsletter, recebidos por _worker.js).
 # Referrer-Policy: same-origin (e não no-referrer): com no-referrer o navegador manda "Origin: null" nos formulários, e o worker recusa o valor null.
 # Nenhum outro site recebe o endereço da página (a política só manda o referenciador para o próprio site).
@@ -79,13 +80,14 @@ const CABECALHOS = `# Gerado por scripts/gerar-site.js. Cloudflare Pages lê est
  */
 function workerDoSite(valores) {
   const modelo = fs.readFileSync(path.join(SITE_SRC, 'worker', 'worker.js'), 'utf8');
-  const marcadores = ['/*LIMITES*/ {}', '/*CABECALHOS*/ {}', '/*ROTAS*/ {}', '/*INDICADORES*/ null'];
+  const marcadores = ['/*LIMITES*/ {}', '/*CABECALHOS*/ {}', '/*ROTAS*/ {}', '/*INDICADORES*/ null', '/*NOTICIAS*/ null'];
   for (const marcador of marcadores) if (!modelo.includes(marcador)) throw new Error(`site-src/worker/worker.js perdeu o marcador ${marcador}`);
   return modelo
     .replace('/*LIMITES*/ {}', () => JSON.stringify(LIMITES))
     .replace('/*CABECALHOS*/ {}', () => JSON.stringify(cabecalhosDoTexto(CABECALHOS)))
     .replace('/*ROTAS*/ {}', () => JSON.stringify(rotasLigadas(valores)))
-    .replace('/*INDICADORES*/ null', () => pacoteDoWorker('indicadores/servidor.ts'));
+    .replace('/*INDICADORES*/ null', () => pacoteDoWorker('indicadores/servidor.ts'))
+    .replace('/*NOTICIAS*/ null', () => pacoteDoWorker('noticias/servidor.ts'));
 }
 
 /** robots.txt: com marcador pendente (versão preliminar) nada é indexado; pronto, tudo é, e o sitemap só existe com domínio. */
@@ -147,11 +149,10 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   const doRetrato = problemasDoRetrato(lidoRetrato.retrato, referencia);
   avisos.push(...doRetrato.map((p) => `o --final recusaria: ${p}`));
   problemasFinais.push(...doRetrato);
-  // O resumo semanal de notícias: sem edição, nenhuma página e nada no rodapé nem no mapa do site.
+  // O resumo semanal de notícias: as edições entram na página de notícias (D-117), que existe sempre.
   const resumo = lerEdicoes(pastaDeNoticias, { referencia });
   avisos.push(...resumo.problemas);
   problemasFinais.push(...resumo.problemas);
-  configurarRodape({ resumoSemanal: resumo.edicoes.length > 0 });
 
   const imagens = imagensDoSite();
   // Os vídeos de uso do app (D-114): o MP4 e o WebM de cada um, de site-src/videos; a capa vem com as imagens.
@@ -239,6 +240,8 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   for (const [nome, texto] of nucleo()) arquivos.set(nome, texto);
   // O painel de indicadores (D-106): pergunta uma vez ao próprio site e troca os números do retrato.
   arquivos.set(SCRIPT_DO_PAINEL, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DO_PAINEL), 'utf8'));
+  // As notícias (D-117): a lista e a página de leitura perguntam uma vez ao próprio site (/api/noticias).
+  arquivos.set(SCRIPT_DAS_NOTICIAS, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DAS_NOTICIAS), 'utf8'));
   // Os vídeos de uso do app (D-115): toca o vídeo que aparece na tela, pausa o que sai e faz do próprio vídeo o controle de pausar e tocar (D-115c).
   arquivos.set(SCRIPT_DOS_VIDEOS, fs.readFileSync(path.join(SITE_SRC, SCRIPT_DOS_VIDEOS), 'utf8'));
   // O tema do site (D-115): no <head> de todas as páginas, antes do estilo.
@@ -249,7 +252,8 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   const imprensa = arquivosDaImprensa();
   avisos.push(...imprensa.avisos);
   for (const [nome, bytes] of imprensa.arquivos) arquivos.set(nome, bytes);
-  // O worker do Cloudflare Pages (modo avançado): recebe só /api/contato, /api/newsletter e /api/indicadores; o resto vai para os arquivos estáticos.
+  // O worker do Cloudflare Pages (modo avançado): recebe só /api/contato, /api/newsletter, /api/indicadores e as duas rotas de notícias
+  // (/api/noticias e /api/noticias/materia, desligadas sem NOTICIAS=ligado no painel); o resto vai para os arquivos estáticos.
   arquivos.set('_worker.js', workerDoSite(valores));
   arquivos.set('_routes.json', `${JSON.stringify({ version: 1, include: ['/api/*'], exclude: [] })}\n`);
   for (const peso of PESOS_FONTE) arquivos.set(`fontes/Manrope_${peso}.ttf`, ler(FONTES, `Manrope_${peso}.ttf`));

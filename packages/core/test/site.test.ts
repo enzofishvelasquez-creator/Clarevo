@@ -17,6 +17,7 @@ import { ACCESS_TEXT, PLAN_NAME, SUBSCRIBE_OPEN, SUBSCRIPTION_SCREEN_TEXT, planP
 import { SITE_CALCULATORS } from '../src/calculators';
 import { INDICADORES_TEXT, INDICADOR_IDS, exibirIndicador, type RetratoIndicadores } from '../src/indicadores';
 import { GLOSSARIO, INDICADORES_REVIEWED_ON, PAGINAS_INDICADORES, explicacoesDeMercado } from '../src/indicadores/conteudo';
+import { FONTES_NOTICIAS, NOTICIAS_TEXT, fontesParaLer } from '../src/noticias/fontes';
 
 /**
  * Site público (D-064 e D-065, `docs/22_SITE.md`): `scripts/gerar-site.js` gera o site em `site/` a partir de `docs/legal/*.md`, do
@@ -176,7 +177,12 @@ const PAGINAS_DE_MERCADO = [
   'indicadores/glossario.html',
   'indicadores/quando-a-selic-muda.html',
   'indicadores/como-ler-o-ipca.html',
+  // As notícias de fontes públicas (D-117): a lista e a página de leitura, sempre geradas (as rotas é que ligam).
+  'noticias/index.html',
+  'noticias/materia.html',
 ];
+/** As páginas fora do mapa do site e com `noindex` mesmo com tudo preenchido: a 404 e a página de leitura das notícias (o texto é da fonte). */
+const SEM_INDEXAR = ['404.html', 'noticias/materia.html'];
 const PAGINAS = [...PAGINAS_BASE, 'imprensa.html', ...PAGINAS_DE_CALCULADORAS, ...PAGINAS_DE_MERCADO, ...TEMAS_DO_SITE.map((t) => `aprender/${t.slug}.html`), ...POSTS];
 /** As páginas do menu principal (a página atual é marcada com aria-current). */
 const NO_MENU = ['index.html', 'app/index.html', 'empresas/index.html', 'aprender/index.html', 'calculadoras/index.html', 'novidades/index.html', 'ajuda/index.html', 'seguranca.html'];
@@ -301,6 +307,8 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
     const noCalc = /^calculadoras\/[a-z-]+\.html$/.test(nome) && nome !== 'calculadoras/index.html';
     // D-106: o painel e as páginas de indicador têm o script do painel, que pergunta uma vez ao próprio site (/api/indicadores).
     const noPainel = /^indicadores\/(index|selic-hoje|cdi-hoje|ipca-12-meses|rendimento-da-poupanca|dolar-ptax-hoje)\.html$/.test(nome);
+    // D-117: a lista e a página de leitura das notícias têm o script delas, que pergunta uma vez ao próprio site (/api/noticias).
+    const nasNoticias = /^noticias\/(index|materia)\.html$/.test(nome);
     // D-115: a página inicial e O app têm o script dos vídeos (js/videos.js), que toca e pausa os vídeos e não pede nada a ninguém.
     const comVideos = ['index.html', 'app/index.html'].includes(nome);
     for (const m of html.matchAll(/<script\b([^>]*)>/gi)) {
@@ -308,13 +316,14 @@ function verificarPaginas(arquivos: Map<string, string | Buffer>, dominio: strin
       const busca = noAjuda && /^\s*src="busca\.js"\s+defer\s*$/.test(m[1]!);
       const calculadora = noCalc && /^\s*type="module"\s+src="calculadora\.js"\s*$/.test(m[1]!);
       const painel = noPainel && /^\s*src="painel\.js"\s+defer\s*$/.test(m[1]!);
+      const noticias = nasNoticias && /^\s*src="noticias\.js"\s+defer\s*$/.test(m[1]!);
       const videos = comVideos && /^\s*src="(\.\.\/)?js\/videos\.js"\s+defer\s*$/.test(m[1]!);
       // D-115: "Indicadores de hoje" na página inicial usa o script do painel; a página do feed RSS, o botão de copiar o endereço.
       const painelNoInicio = nome === 'index.html' && /^\s*src="indicadores\/painel\.js"\s+defer\s*$/.test(m[1]!);
       const copiar = nome === 'novidades/rss.html' && /^\s*src="\.\.\/js\/copiar\.js"\s+defer\s*$/.test(m[1]!);
       // D-115: o tema do site em todas as páginas, no <head>, sem defer (marca o <html> antes de a página aparecer).
       const tema = /^\s*src="(\/|(\.\.\/)*)js\/tema\.js"\s*$/.test(m[1]!);
-      expect(ld || busca || calculadora || painel || videos || painelNoInicio || copiar || tema, `${nome}: script não permitido: ${m[0]}`).toBe(true);
+      expect(ld || busca || calculadora || painel || noticias || videos || painelNoInicio || copiar || tema, `${nome}: script não permitido: ${m[0]}`).toBe(true);
     }
     expect(html, `${nome}: manipulador de evento`).not.toMatch(/\son[a-z]+\s*=/i);
     expect(html, `${nome}: atributo style (a política de segurança não permite)`).not.toMatch(/\sstyle\s*=/i);
@@ -737,8 +746,8 @@ describe('site público: as páginas geradas', () => {
         expect(h, nome).not.toContain('class="pendente"');
         expect(g.pendencias.get(nome), nome).toEqual([]);
         expect(h, nome).toContain('Empresa Exemplo Ltda · CNPJ 00.000.000/0001-00');
-        if (nome === '404.html') {
-          expect(h).toContain('noindex');
+        if (SEM_INDEXAR.includes(nome)) {
+          expect(h, nome).toContain('noindex');
           continue;
         }
         expect(h, nome).not.toContain('noindex');
@@ -759,8 +768,9 @@ describe('site público: as páginas geradas', () => {
       expect(sitemap).toContain('<loc>https://exemplo.test/app/</loc>');
       expect(sitemap).toContain('<loc>https://exemplo.test/aprender/decimo-terceiro</loc>');
       expect(sitemap).not.toContain('404');
-      // Sem a 404 e com a página do feed RSS (D-115), que só existe com domínio.
-      expect((sitemap.match(/<loc>/g) ?? []).length).toBe(PAGINAS.length);
+      expect(sitemap).not.toContain('/noticias/materia');
+      // Sem a 404 e a página de leitura das notícias, e com a página do feed RSS (D-115), que só existe com domínio.
+      expect((sitemap.match(/<loc>/g) ?? []).length).toBe(PAGINAS.length - SEM_INDEXAR.length + 1);
       expect(sitemap).toContain('<loc>https://exemplo.test/novidades/rss</loc>');
       const robots = texto(g.arquivos.get('robots.txt'));
       expect(robots).toContain('Allow: /');
@@ -2613,6 +2623,8 @@ describe('site público: indicadores oficiais, páginas de mercado e resumo sema
     for (const [nome, conteudoDoArquivo] of Object.entries(arquivos)) writeFileSync(join(dir, nome), typeof conteudoDoArquivo === 'string' ? conteudoDoArquivo : JSON.stringify(conteudoDoArquivo));
     return dir;
   };
+  /** O que `noticias/` sempre tem (D-117): a lista, a página de leitura e o script delas. */
+  const NOTICIAS_SEMPRE = ['noticias/index.html', 'noticias/materia.html', 'noticias/noticias.js'];
   const NOTICIA = { titulo: 'Copom decide a meta da Selic na reunião da semana', resumo: 'O comitê do Banco Central anunciou a meta da Selic. A decisão vale a partir do dia seguinte.', veiculo: 'Agência de Exemplo', autor: 'Pessoa de Exemplo', data: '2026-11-11', link: 'https://noticias.exemplo.test/copom', tema: 'copom' };
 
   it('as páginas de mercado existem, com o aviso no rodapé, e as outras páginas não têm o aviso', () => {
@@ -2732,21 +2744,22 @@ describe('site público: indicadores oficiais, páginas de mercado e resumo sema
     expect(h(repo, 'index.html')).toContain('12 calculadoras para contas rápidas');
   });
 
-  it('resumo semanal: sem edição, nenhuma página e nada no rodapé nem no mapa do site', () => {
+  it('resumo semanal: sem edição, só a página de notícias (D-117), sem "Resumos da semana" e sem página de edição', () => {
     const pastas: string[] = [];
     try {
       const sem = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS, noticias: edicoes(pastas, {}) });
-      expect([...sem.arquivos.keys()].filter((k) => k.startsWith('noticias/'))).toEqual([]);
+      expect([...sem.arquivos.keys()].filter((k) => k.startsWith('noticias/')).sort()).toEqual(NOTICIAS_SEMPRE);
       expect(h(sem, 'index.html')).not.toContain('Resumo semanal');
-      expect(h(sem, 'sitemap.xml')).not.toContain('/noticias/');
+      expect(h(sem, 'noticias/index.html')).not.toContain('Resumos da semana');
+      expect(h(sem, 'sitemap.xml')).not.toContain('/noticias/semana-');
       expect(repo.edicoes).toEqual([]);
-      expect([...repo.arquivos.keys()].filter((k) => k.startsWith('noticias/'))).toEqual([]);
+      expect([...repo.arquivos.keys()].filter((k) => k.startsWith('noticias/')).sort()).toEqual(NOTICIAS_SEMPRE);
     } finally {
       for (const p of pastas) rmSync(p, { recursive: true, force: true });
     }
   });
 
-  it('resumo semanal: com uma edição, o índice e a página dela entram no rodapé e no mapa do site, com links simples, sem imagem nem script', () => {
+  it('resumo semanal: com uma edição, a página de notícias ganha "Resumos da semana" e a edição entra no mapa do site, com links simples, sem imagem nem script', () => {
     const pastas: string[] = [];
     try {
       const pasta = edicoes(pastas, { 'semana-2026-11-12.json': { itens: [NOTICIA] } });
@@ -2762,7 +2775,9 @@ describe('site público: indicadores oficiais, páginas de mercado e resumo sema
       const main = /<main[\s\S]*<\/main>/.exec(edicao)?.[0] ?? '';
       expect(main).not.toMatch(/<img\b|<script\b|<iframe\b/);
       expect(h(g, 'noticias/index.html')).toContain('href="semana-2026-11-12.html"');
-      expect(h(g, 'sobre.html')).toContain('<a href="noticias/index.html">Resumo semanal</a>');
+      expect(h(g, 'noticias/index.html')).toContain('<h2 id="resumos">Resumos da semana</h2>');
+      expect(edicao).toContain('<a href="index.html#resumos">Ver todas as edições</a>');
+      expect(h(g, 'sobre.html')).toContain('<a href="noticias/index.html">Notícias</a>');
       expect(h(g, 'indicadores/index.html')).toContain('href="../noticias/index.html"');
       const sitemap = h(g, 'sitemap.xml');
       expect(sitemap).toContain('<url><loc>https://exemplo.test/noticias/semana-2026-11-12</loc><lastmod>2026-11-12</lastmod></url>');
@@ -2799,11 +2814,85 @@ describe('site público: indicadores oficiais, páginas de mercado e resumo sema
         const g = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS, noticias: edicoes(pastas, arquivos) });
         expect(g.problemasFinais.join('\n'), nome).toContain(esperado);
         expect(g.avisos.join('\n'), nome).toContain(esperado);
-        expect([...g.arquivos.keys()].filter((k) => k.startsWith('noticias/')), nome).toEqual([]);
+        expect([...g.arquivos.keys()].filter((k) => k.startsWith('noticias/')).sort(), nome).toEqual(NOTICIAS_SEMPRE);
       }
     } finally {
       for (const p of pastas) rmSync(p, { recursive: true, force: true });
     }
+  });
+});
+
+describe('site público: notícias de fontes públicas (D-117), prontas e desligadas até o advogado', { timeout: 180_000 }, () => {
+  const repo = gerarSite();
+  const comDominio = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });
+  const h = (g: Gerado, nome: string) => texto(g.arquivos.get(nome));
+  const AVISO = 'Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.';
+  const main = (html: string) => /<main[\s\S]*<\/main>/.exec(html)?.[0] ?? '';
+
+  it('a lista: título, o aviso sem JavaScript com os links para as fontes, os avisos que o script mostra ("Em breve" inclusive) e de onde vêm as notícias', () => {
+    const pagina = h(repo, 'noticias/index.html');
+    expect(pagina).toContain(`<h1>${esc(NOTICIAS_TEXT.titulo)}</h1>`);
+    expect(pagina).toContain('<script src="noticias.js" defer></script>');
+    expect(pagina).toContain(`<p class="noticias-estado" data-estado="sem-js">${esc(NOTICIAS_TEXT.semJavaScript)}</p>`);
+    for (const [estado, txt] of [['carregando', NOTICIAS_TEXT.carregando], ['em-breve', NOTICIAS_TEXT.emBreve], ['falha', NOTICIAS_TEXT.falha], ['vazia', NOTICIAS_TEXT.vazia]] as const) {
+      expect(pagina, estado).toContain(`<p class="noticias-estado" data-estado="${estado}" hidden>${esc(txt)}</p>`);
+    }
+    for (const f of fontesParaLer()) expect(pagina, f.nome).toContain(`<li><a href="${esc(f.site)}" rel="noopener noreferrer">${esc(f.nome)}</a></li>`);
+    expect(pagina).toContain(`<h2 id="de-onde">${esc(NOTICIAS_TEXT.tituloDeOnde)}</h2>`);
+    expect(pagina).toContain(esc(NOTICIAS_TEXT.deOnde));
+    expect(pagina).toContain('<strong>Banco Central do Brasil</strong></a>: só título, data, link e, quando o feed traz, um resumo curto.');
+    expect(pagina).toContain('<strong>Agência Brasil</strong></a>: o texto pode aparecer aqui quando o feed traz a matéria inteira.');
+    expect(pagina).toContain('data-materia="materia.html" data-ler-aqui="Ler aqui" data-ler-na-fonte="Ler na fonte"');
+    expect(pagina).toContain(`<p class="rodape-aviso">${esc(AVISO)}</p>`);
+    // Nenhuma notícia vem escrita na página (a lista vem da API) e nada de imagem, iframe ou script de outro site.
+    expect(main(pagina)).not.toMatch(/<img\b|<iframe\b|<video\b|<li class="noticia-item"/);
+    expect(pagina).not.toMatch(PROIBIDO_TRAVESSAO);
+  });
+
+  it('a página de leitura: os lugares do título, da data e da fonte, da autoria, da licença, de "Ver a matéria original" e do texto; fora do mapa do site e sem indexar', () => {
+    const pagina = h(comDominio, 'noticias/materia.html');
+    expect(pagina).toContain('<meta name="robots" content="noindex">');
+    expect(pagina).toContain(`<h1 data-materia-titulo>${esc(NOTICIAS_TEXT.tituloDaMateria)}</h1>`);
+    expect(pagina).toContain(`data-materia data-ver-original="${esc(NOTICIAS_TEXT.verOriginal)}"`);
+    for (const lugar of ['data-materia-meta', 'data-materia-credito', 'data-materia-licenca', 'data-materia-original', 'data-materia-texto', 'data-materia-original-fim']) expect(pagina, lugar).toMatch(new RegExp(`${lugar} hidden>`));
+    expect(pagina).toContain(`data-estado="sem-js">${esc(NOTICIAS_TEXT.materiaSemJavaScript)}</p>`);
+    expect(pagina).toContain(`data-estado="em-breve" hidden>${esc(NOTICIAS_TEXT.emBreve)}</p>`);
+    expect(pagina).toContain(`data-estado="nao-encontrada" hidden>${esc(NOTICIAS_TEXT.materiaNaoEncontrada)}</p>`);
+    expect(pagina).toContain(`<p class="rodape-aviso">${esc(AVISO)}</p>`);
+    expect(h(comDominio, 'sitemap.xml')).toContain('<loc>https://exemplo.test/noticias/</loc>');
+    expect(h(comDominio, 'sitemap.xml')).not.toContain('noticias/materia');
+    expect(main(pagina)).not.toMatch(/<img\b|<iframe\b/);
+  });
+
+  it('"Notícias" no rodapé de todas as páginas; o menu principal não muda; as páginas das fontes são os únicos links novos para fora', () => {
+    for (const nome of PAGINAS) {
+      const rodape = /<footer class="rodape">([\s\S]*?)<\/footer>/.exec(h(repo, nome))?.[1] ?? '';
+      expect(rodape, nome).toContain(`<a href="${visto(nome, 'noticias/index.html')}">Notícias</a>`);
+      const cabecalho = /<header class="topo">([\s\S]*?)<\/header>/.exec(h(repo, nome))?.[1] ?? '';
+      expect(cabecalho, nome).not.toContain('noticias/');
+    }
+    const hosts = gerador.HOSTS_DE_LINK_PERMITIDOS;
+    for (const f of FONTES_NOTICIAS) expect(hosts, f.site).toContain(new URL(f.site).host);
+  });
+
+  it('o script das páginas: só pergunta ao próprio site, não grava nada, não carrega imagem e filtra de novo o texto da matéria', () => {
+    const script = h(repo, 'noticias/noticias.js');
+    expect(script).toBe(readFileSync(join(ROOT, 'site-src', 'noticias', 'noticias.js'), 'utf8'));
+    expect(script).toContain("pedir('/api/noticias')");
+    expect(script).toContain("pedir('/api/noticias/materia?id=' + id)");
+    expect(script).toContain("credentials: 'omit'");
+    expect(script).not.toMatch(/https?:\/\/|localStorage|sessionStorage|document\.cookie|innerHTML|outerHTML|insertAdjacentHTML|eval\(|new Function|createElement\('img'\)|new Image/);
+    expect(script).toContain('new window.DOMParser().parseFromString(d.html');
+    expect(script).not.toMatch(/[\u2013\u2014]/);
+  });
+
+  it('o worker gravado tem as duas rotas de notícias, desligadas sem a variável NOTICIAS=ligado (uma variável no painel liga)', () => {
+    const worker = readFileSync(join(SITE, '_worker.js'), 'utf8');
+    expect(worker).toContain("const noticiasLigadas = (env) => umaLinha(env.NOTICIAS).toLowerCase() === 'ligado';");
+    expect(worker).toContain("if (!noticiasLigadas(env)) return naoExiste();");
+    expect(worker).toContain("if (url.pathname === '/api/noticias') return noticias(request, env, url, 'lista');");
+    expect(worker).toContain("if (url.pathname === '/api/noticias/materia') return noticias(request, env, url, 'materia');");
+    expect(worker).toContain("redirect: 'manual'");
   });
 });
 

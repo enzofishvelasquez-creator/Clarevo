@@ -595,6 +595,29 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .termo-links{font-size:.9375rem}
 .noticia h2{font-size:1.3rem}
 .noticia-fonte{color:var(--texto-2);font-size:.9375rem}
+/* Notícias de fontes públicas (D-117): a lista que o script monta (data e fonte em negrito, título, resumo e "Ler aqui" ou "Ler na fonte"),
+   os avisos de estado com os links para as fontes e a página de leitura. Nenhuma imagem de outro site. */
+.noticias-estado{margin:0 0 .75rem}
+.fontes-para-ler{margin:0 0 1.5rem}
+.fontes-para-ler a,.noticia-acao a{display:inline-block;padding:.6rem 0;font-weight:700}
+.noticias-atualizado{margin:0 0 1rem;font-size:.9375rem}
+.noticias-lista{list-style:none;padding:0;margin:0 0 2.5rem}
+.noticia-item{margin:0;padding:1.1rem 0;border-top:1px solid var(--linha)}
+.noticia-item:last-child{border-bottom:1px solid var(--linha)}
+.noticia-meta{margin:0 0 .3rem;color:var(--texto-2);font-size:.9375rem}
+.noticia-meta strong{color:var(--texto)}
+.noticia-titulo{margin:0 0 .4rem;font-size:1.2rem;line-height:1.35}
+.noticia-resumo{margin:0 0 .25rem}
+.noticia-acao{margin:0}
+.noticias-fontes li{margin:.4rem 0}
+.materia-meta strong{color:var(--sobre-topo)}
+.materia-credito{margin:0 0 .35rem;font-weight:700}
+.materia-licenca{margin:0 0 1.25rem;color:var(--texto-2);font-size:.9375rem}
+.materia-original{margin:0 0 1.75rem}
+.materia-texto{margin:0 0 1.5rem}
+.materia-texto h2{font-size:1.35rem;margin:1.75rem 0 .5rem}
+.materia-texto h3{font-size:1.15rem;margin:1.5rem 0 .4rem}
+.materia-texto a{overflow-wrap:anywhere}
 .rodape-aviso{font-weight:700}
 
 /* Nenhum cartão sozinho na última linha (varredura de 12/11/2026). Com a grade automática, três cartões ficavam dois e um no tablet,

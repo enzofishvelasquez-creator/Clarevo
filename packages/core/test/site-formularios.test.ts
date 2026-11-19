@@ -602,7 +602,7 @@ describe('site público: _worker.js, o resto cai nos arquivos estáticos', () =>
     expect(codigo).not.toMatch(/\benv\.[A-Z_]+_KV\b|env\.DB\b/);
     expect(fonteDoWorker).not.toMatch(/faz\w*\s+sentido/i);
     for (const fonte of [fonteDoWorker, fonteLigada]) {
-      expect(fonte).not.toMatch(/\/\*(LIMITES|CABECALHOS|ROTAS|INDICADORES)\*\//);
+      expect(fonte).not.toMatch(/\/\*(LIMITES|CABECALHOS|ROTAS|INDICADORES|NOTICIAS)\*\//);
       expect(fonte).toContain(JSON.stringify(formularios.LIMITES));
       expect(fonte).toContain('export default');
       expect(fonte).not.toMatch(/[–—]/);
@@ -611,11 +611,21 @@ describe('site público: _worker.js, o resto cai nos arquivos estáticos', () =>
     // O worker gravado em site/ é o do repositório (formulários desligados); o outro é o gerado com os dois ligados.
     expect(fonteLigada).toContain('const ROTAS = {"contato":true,"newsletter":true};');
     expect(fonteLigada.replace(/const ROTAS = \{[^}]*\};/, '')).toBe(fonteDoWorker.replace(/const ROTAS = \{[^}]*\};/, ''));
-    // Só as duas rotas de formulário, os dois serviços de e-mail e, para /api/indicadores (D-106), a API de séries do Banco Central.
+    // Só as duas rotas de formulário, os dois serviços de e-mail, para /api/indicadores (D-106) a API de séries do Banco Central e, para
+    // /api/noticias (D-117), os feeds configurados e as páginas das fontes (que só aparecem como link de texto, nunca são buscadas).
     expect([...new Set([...fonteDoWorker.matchAll(/https:\/\/[a-z.]+\/[A-Za-z0-9/._-]*/g)].map((m) => m[0]))].sort()).toEqual([
+      'https://agenciabrasil.ebc.com.br/economia',
+      'https://agenciabrasil.ebc.com.br/rss/economia/feed.xml',
       'https://api.bcb.gov.br/dados/serie/bcdata.sgs.',
       'https://api.brevo.com/v3/contacts/doubleOptinConfirmation',
       'https://api.resend.com/emails',
+      'https://www.bcb.gov.br/',
+      'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/notasImprensa',
+      'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/noticias',
+      'https://www.gov.br/fazenda/pt-br/assuntos/noticias',
+      'https://www.gov.br/fazenda/pt-br/search_rss',
+      'https://www.gov.br/receitafederal/pt-br/assuntos/noticias',
+      'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/ultimas-noticias/atom.xml',
     ]);
     expect(readFileSync(join(SITE, '_routes.json'), 'utf8')).toBe('{"version":1,"include":["/api/*"],"exclude":[]}\n');
   });
@@ -710,6 +720,124 @@ describe('site público: _worker.js, /api/indicadores (Banco Central, D-106)', (
     const head = await pedir(w, 'HEAD');
     expect(head.status).toBe(200);
     expect(await head.text()).toBe('');
+  });
+});
+
+// ------------------------------------------------------------------------------------------------------------------------------
+// /api/noticias (D-117)
+
+describe('site público: _worker.js, /api/noticias (fontes públicas, D-117, desligada até o advogado)', () => {
+  const FIXTURES = join(ROOT, 'packages', 'core', 'test', 'fixtures', 'noticias');
+  /** Cada feed configurado e a amostra real dele. */
+  const FEEDS: Record<string, string> = {
+    'https://agenciabrasil.ebc.com.br/rss/economia/feed.xml': 'agencia-brasil-economia.xml',
+    'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/noticias': 'bcb-noticias.xml',
+    'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/notasImprensa': 'bcb-notas.xml',
+    'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/ultimas-noticias/atom.xml': 'receita-federal.xml',
+    'https://www.gov.br/fazenda/pt-br/search_rss?portal_type=collective.nitf.content&sort_on=effective&sort_order=reverse': 'ministerio-da-fazenda.xml',
+  };
+  let n = 0;
+  const workerNovo = async () => carregarWorker(`${fonteDoWorker}\n// notícias ${++n}\n`);
+  const fontesSimuladas = (opcoes: { grande?: boolean; falhar?: boolean } = {}) => {
+    const chamadas: { url: string; init: RequestInit }[] = [];
+    const f = vi.fn(async (url: string, init: RequestInit) => {
+      chamadas.push({ url: String(url), init });
+      if (opcoes.falhar) return new Response('fora do ar', { status: 503 });
+      const arquivo = FEEDS[String(url)];
+      if (!arquivo) return new Response('não é feed configurado', { status: 404 });
+      const corpo = opcoes.grande ? `<rss>${' '.repeat(3 * 1024 * 1024)}</rss>` : readFileSync(join(FIXTURES, arquivo), 'utf8');
+      return new Response(corpo, { status: 200, headers: { 'content-type': 'application/rss+xml' } });
+    });
+    vi.stubGlobal('fetch', f);
+    return { f, chamadas };
+  };
+  const LIGADO = { NOTICIAS: 'ligado' };
+  const pedir = (w: Worker, caminho: string, env: Record<string, unknown> = LIGADO, metodo = 'GET', cabecalhos: Record<string, string> = {}) =>
+    w.fetch(new Request(`https://clarevo-site.pages.dev${caminho}`, { method: metodo, headers: cabecalhos }), envCom(env));
+
+  it('desligada (sem NOTICIAS=ligado, o padrão): as duas rotas respondem 404 "desligado" e nada é buscado', async () => {
+    const w = await workerNovo();
+    const { f } = fontesSimuladas();
+    for (const env of [{}, { NOTICIAS: '' }, { NOTICIAS: 'sim' }, { NOTICIAS: 'true' }, { NOTICIAS: '1' }, { NOTICIAS: 'desligado' }]) {
+      for (const caminho of ['/api/noticias', '/api/noticias/materia?id=0123456789abcdef']) {
+        const r = await pedir(w, caminho, env);
+        expect(r.status, `${JSON.stringify(env)} ${caminho}`).toBe(404);
+        expect(await r.json()).toMatchObject({ ok: false, erro: 'desligado' });
+        expect(r.headers.get('cache-control')).toBe('no-store');
+        expect(r.headers.get('content-security-policy')).toContain("default-src 'none'");
+      }
+    }
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it('ligada: a lista vem dos feeds configurados, com os cabeçalhos de segurança, e nada de quem visita vai às fontes', async () => {
+    const w = await workerNovo();
+    const { chamadas } = fontesSimuladas();
+    const r = await pedir(w, '/api/noticias', { NOTICIAS: ' Ligado ' }, 'GET', { cookie: 'a=1', 'user-agent': 'Navegador de Teste', 'x-forwarded-for': '203.0.113.9', referer: 'https://clarevo.test/noticias/' });
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    expect(r.headers.get('cache-control')).toBe('public, max-age=900');
+    expect(r.headers.get('content-security-policy')).toContain("img-src 'self'");
+    expect(r.headers.get('x-frame-options')).toBe('DENY');
+    expect(r.headers.get('x-content-type-options')).toBe('nosniff');
+    const corpo = (await r.json()) as { noticias: { id: string; titulo: string; fonte: string; textoCompleto: boolean; link: string }[]; fontes: unknown[] };
+    expect(corpo.noticias.map((x) => x.fonte)).toEqual(['Agência Brasil', 'Agência Brasil', 'Banco Central do Brasil', 'Banco Central do Brasil', 'Banco Central do Brasil', 'Banco Central do Brasil']);
+    expect(corpo.noticias.filter((x) => x.textoCompleto).map((x) => x.titulo)).toEqual(['Durigan prevê impacto inicial da reforma tributária sobre inflação']);
+    expect(chamadas.map((c) => c.url).sort()).toEqual(Object.keys(FEEDS).sort());
+    for (const c of chamadas) {
+      expect(c.init.headers).toEqual({ Accept: 'application/rss+xml, application/atom+xml, application/rdf+xml;q=0.9, application/xml;q=0.8, text/xml;q=0.8', 'User-Agent': 'clarevo-site' });
+      expect(c.init.redirect).toBe('manual');
+      expect(c.init.signal).toBeInstanceOf(AbortSignal);
+      expect(c.init.method ?? 'GET').toBe('GET');
+      expect(c.init.body).toBeUndefined();
+    }
+  });
+
+  it('a matéria: o texto filtrado só da notícia com licença para isso; as outras 404, id inválido 400, e nenhum endereço do pedido é buscado', async () => {
+    const w = await workerNovo();
+    const { chamadas } = fontesSimuladas();
+    const lista = ((await (await pedir(w, '/api/noticias')).json()) as { noticias: { id: string; textoCompleto: boolean }[] }).noticias;
+    const comTexto = lista.find((x) => x.textoCompleto)!;
+    const soResumo = lista.find((x) => !x.textoCompleto)!;
+    const m = await pedir(w, `/api/noticias/materia?id=${comTexto.id}`);
+    expect(m.status).toBe(200);
+    expect(m.headers.get('cache-control')).toBe('public, max-age=900');
+    const materia = (await m.json()) as { html: string; autor: string; licenca: string; link: string };
+    expect(materia.html).toContain('<p><strong>O ministro da Fazenda, Dario Durigan');
+    expect(materia.html).not.toMatch(/<img|<script|<iframe|style=|jsdelivr|ebc\.png/);
+    expect(materia.autor).toBe('Por Pedro Peduzzi, repórter da Agência Brasil');
+    expect(materia.licenca).toMatch(/^Texto da Agência Brasil \(EBC\)/);
+    expect((await pedir(w, `/api/noticias/materia?id=${soResumo.id}`)).status).toBe(404);
+    for (const id of ['https%3A%2F%2F169.254.169.254%2F', 'http://localhost/', '..%2F..%2Fetc', '', 'ABCDEF0123456789']) {
+      const r = await pedir(w, `/api/noticias/materia?id=${id}`);
+      expect(r.status, id).toBe(400);
+    }
+    expect((await pedir(w, '/api/noticias/materia?url=https://exemplo.test/')).status).toBe(400);
+    // Os cinco feeds, uma vez (a cópia de uma hora): nenhuma matéria, link ou endereço do pedido.
+    expect(chamadas.map((c) => c.url).sort()).toEqual(Object.keys(FEEDS).sort());
+  });
+
+  it('só GET e HEAD; feed grande demais ou fonte fora do ar dão 503, sem cache; outra rota em /api/noticias/ vai para os arquivos', async () => {
+    const w = await workerNovo();
+    fontesSimuladas();
+    const post = await pedir(w, '/api/noticias', LIGADO, 'POST');
+    expect(post.status).toBe(405);
+    expect(post.headers.get('allow')).toBe('GET, HEAD');
+    const head = await pedir(w, '/api/noticias', LIGADO, 'HEAD');
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe('');
+    const grande = await workerNovo();
+    fontesSimuladas({ grande: true });
+    const r = await pedir(grande, '/api/noticias');
+    expect(r.status).toBe(503);
+    expect(r.headers.get('cache-control')).toBe('no-store');
+    const fora = await workerNovo();
+    fontesSimuladas({ falhar: true });
+    expect((await pedir(fora, '/api/noticias')).status).toBe(503);
+    const env = envCom(LIGADO);
+    const outra = await w.fetch(new Request('https://clarevo-site.pages.dev/api/noticias/outra'), env);
+    expect(outra.status).toBe(200);
+    expect(env.ASSETS.fetch).toHaveBeenCalledTimes(1);
   });
 });
 

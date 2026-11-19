@@ -8,6 +8,11 @@
 // Uma rota só lê dados públicos (D-106), sem variável, sem chave e sem gravar nada fora da memória:
 //   GET /api/indicadores  busca no Banco Central a Selic (meta), o CDI, o IPCA, a poupança e o dólar PTAX, guarda uma cópia na memória por
 //                         uma hora e devolve ao site. O navegador de quem visita só fala com o próprio site; o Banco Central não vê ninguém.
+// Duas rotas leem notícias de fontes públicas (D-117), do mesmo jeito, e só existem com a variável NOTICIAS=ligado no painel (sem ela, 404):
+//   GET /api/noticias          busca os feeds configurados em packages/core/src/noticias/fontes.ts (e só eles), guarda uma cópia na memória
+//                              por uma hora e devolve a lista filtrada (título, data, fonte, link, resumo e se o texto inteiro pode ser lido).
+//   GET /api/noticias/materia  ?id=<16 hexadecimais>: o texto inteiro, já filtrado, só das notícias cuja licença permite (as outras, 404).
+//                              O id só procura na cópia: nenhum endereço que venha do pedido é buscado.
 // Qualquer outra rota cai nos arquivos estáticos (env.ASSETS.fetch).
 //
 // Uma rota só existe se o interruptor dela estiver ligado em site/dados-da-empresa.json NA GERAÇÃO (`ROTAS`, abaixo): desligada, responde
@@ -16,7 +21,8 @@
 //
 // Variáveis (painel da Cloudflare, nunca no repositório): SITE_HOST (o endereço do site, sem https://, como clarevo.com.br; qualquer outro
 // endereço, como o clarevo-site.pages.dev, é recusado), RESEND_API_KEY (segredo), CONTATO_DESTINO, CONTATO_REMETENTE, BREVO_API_KEY
-// (segredo), BREVO_LISTA_ID, BREVO_MODELO_CONFIRMACAO_ID e, opcional, BREVO_URL_RETORNO.
+// (segredo), BREVO_LISTA_ID, BREVO_MODELO_CONFIRMACAO_ID e, opcional, BREVO_URL_RETORNO. E NOTICIAS: com o valor `ligado`, as rotas de
+// notícias existem; com qualquer outro valor ou sem a variável (o padrão, até a resposta do advogado), 404.
 // Sem SITE_HOST ou sem as variáveis de uma rota, ela responde 503 com mensagem clara: o formulário continua "pronto e desligado".
 
 // Tamanhos, faixas e nome do campo-isca: os mesmos que o gerador usa para desenhar os formulários.
@@ -1472,6 +1478,1470 @@ function __req(i) {
 }
 return __req(0);
 })();
+// O núcleo de /api/noticias (packages/core/src/noticias/servidor.ts e o que ele usa: as fontes, o leitor de feeds, o filtro de temas e o
+// filtro de HTML), no mesmo formato: o mesmo código que os testes do núcleo conferem.
+const NUCLEO_NOTICIAS = (() => {
+const __mods = [
+  // packages/core/src/noticias/servidor.ts
+  function (module, exports, __req) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ID_VALIDO = exports.ACEITA_FEED = exports.NOTICIAS_TIMEOUT_MS = exports.NOTICIAS_NAVEGADOR_S = exports.NOTICIAS_FALHA_MS = exports.NOTICIAS_CACHE_MS = void 0;
+exports.buscarFeed = buscarFeed;
+exports.corpoDaLista = corpoDaLista;
+exports.createNoticiasHandler = createNoticiasHandler;
+const dates_1 = __req(1);
+const feed_1 = __req(2);
+const fontes_1 = __req(4);
+const index_1 = __req(5);
+exports.NOTICIAS_CACHE_MS = 60 * 60 * 1000;
+exports.NOTICIAS_FALHA_MS = 5 * 60 * 1000;
+exports.NOTICIAS_NAVEGADOR_S = 15 * 60;
+exports.NOTICIAS_TIMEOUT_MS = 8000;
+exports.ACEITA_FEED = 'application/rss+xml, application/atom+xml, application/rdf+xml;q=0.9, application/xml;q=0.8, text/xml;q=0.8';
+async function buscarFeed(fonte, deps) {
+    if (!(0, fontes_1.feedPermitido)(fonte.feed, deps.fontes ?? fontes_1.FONTES_NOTICIAS))
+        return null;
+    try {
+        const r = await deps.fetch(fonte.feed, { timeoutMs: exports.NOTICIAS_TIMEOUT_MS, maxBytes: feed_1.MAX_BYTES_DO_FEED });
+        if (!r.ok)
+            return null;
+        const xml = await r.text();
+        if (typeof xml !== 'string' || xml.length > feed_1.MAX_BYTES_DO_FEED)
+            return null;
+        return (0, feed_1.lerFeed)(xml, { base: fonte.feed })?.itens ?? null;
+    }
+    catch {
+        return null;
+    }
+}
+const JSON_TYPE = 'application/json; charset=utf-8';
+const erro = (status, codigo, extra = {}) => ({
+    status,
+    body: JSON.stringify({ erro: codigo }),
+    headers: { 'Content-Type': JSON_TYPE, 'Cache-Control': 'no-store', ...extra },
+});
+const ok = (body, metodo) => ({
+    status: 200,
+    body: metodo === 'HEAD' ? '' : body,
+    headers: { 'Content-Type': JSON_TYPE, 'Cache-Control': `public, max-age=${exports.NOTICIAS_NAVEGADOR_S}` },
+});
+exports.ID_VALIDO = /^[0-9a-f]{16}$/;
+function corpoDaLista(lista, consultadoEm, fontes = fontes_1.FONTES_NOTICIAS) {
+    return JSON.stringify({
+        consultadoEm,
+        atualizado: `Atualizado em ${(0, dates_1.formatDateTimeBR)(consultadoEm, index_1.NOTICIAS_FUSO)}, horário de Brasília.`,
+        fontes: (0, fontes_1.fontesParaLer)(fontes).map((f) => ({ nome: f.nome, site: f.site })),
+        noticias: lista.map(index_1.paraLista),
+    });
+}
+function createNoticiasHandler(deps) {
+    const agora = deps.agora ?? (() => Date.now());
+    const cacheMs = deps.cacheMs ?? exports.NOTICIAS_CACHE_MS;
+    const falhaMs = deps.falhaMs ?? exports.NOTICIAS_FALHA_MS;
+    const fontes = deps.fontes ?? fontes_1.FONTES_NOTICIAS;
+    const porFonte = new Map();
+    let copia = null;
+    let emCurso = null;
+    let semNadaAte = 0;
+    const consultar = async () => {
+        const t = agora();
+        const lidos = await Promise.all(fontes.map(async (f) => [f, await buscarFeed(f, { fetch: deps.fetch, fontes })]));
+        let falhas = 0;
+        for (const [f, itens] of lidos) {
+            if (itens)
+                porFonte.set(f.id, itens);
+            else
+                falhas++;
+        }
+        if (falhas === fontes.length) {
+            if (copia)
+                copia = { ...copia, ate: t + falhaMs };
+            return;
+        }
+        const lista = (0, index_1.juntarNoticias)(fontes.filter((f) => porFonte.has(f.id)).map((f) => ({ fonte: f, itens: porFonte.get(f.id) })), t, fontes);
+        copia = { lista, consultadoEm: new Date(t).toISOString(), ate: t + (falhas === 0 ? cacheMs : falhaMs) };
+    };
+    return async (req) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD')
+            return erro(405, 'metodo', { Allow: 'GET, HEAD' });
+        if (req.rota === 'materia' && !exports.ID_VALIDO.test(req.id ?? ''))
+            return erro(400, 'id');
+        const t = agora();
+        const valida = copia !== null && t < copia.ate;
+        if (!valida && t >= semNadaAte) {
+            emCurso ??= consultar().finally(() => {
+                emCurso = null;
+            });
+            await emCurso;
+            if (copia === null)
+                semNadaAte = agora() + falhaMs;
+        }
+        if (copia === null)
+            return erro(503, 'indisponivel');
+        if (req.rota === 'lista')
+            return ok(corpoDaLista(copia.lista, copia.consultadoEm, fontes), req.method);
+        const n = copia.lista.find((x) => x.id === req.id);
+        if (!n || !n.textoCompleto || !n.html)
+            return erro(404, 'nao-encontrada');
+        const { html, ...resto } = n;
+        return ok(JSON.stringify({ ...(0, index_1.paraLista)(n), autor: resto.autor, licenca: resto.licenca, html }), req.method);
+    };
+}
+  },
+  // packages/core/src/dates.ts
+  function (module, exports, __req) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.isValidIsoDate = isValidIsoDate;
+exports.daysInMonth = daysInMonth;
+exports.parseDateBR = parseDateBR;
+exports.formatDateBR = formatDateBR;
+exports.formatDayMonth = formatDayMonth;
+exports.formatListDate = formatListDate;
+exports.formatShortDate = formatShortDate;
+exports.deviceTimeZone = deviceTimeZone;
+exports.todayIn = todayIn;
+exports.addDays = addDays;
+exports.maskDateBR = maskDateBR;
+exports.monthOf = monthOf;
+exports.isValidIsoMonth = isValidIsoMonth;
+exports.monthsBetween = monthsBetween;
+exports.dateInMonth = dateInMonth;
+exports.parseMonthBR = parseMonthBR;
+exports.formatMonthInputBR = formatMonthInputBR;
+exports.maskMonthBR = maskMonthBR;
+exports.addMonths = addMonths;
+exports.addMonthsToDate = addMonthsToDate;
+exports.addYearsClamped = addYearsClamped;
+exports.daysBetween = daysBetween;
+exports.monthRange = monthRange;
+exports.formatDateTimeBR = formatDateTimeBR;
+exports.formatDayHeader = formatDayHeader;
+exports.formatMonthName = formatMonthName;
+exports.formatMonthBR = formatMonthBR;
+exports.formatMonthYearBR = formatMonthYearBR;
+exports.formatMonthSpanBR = formatMonthSpanBR;
+const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+function isValidIsoDate(value) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!m)
+        return false;
+    const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    if (mo < 1 || mo > 12 || d < 1)
+        return false;
+    return d <= daysInMonth(y, mo);
+}
+function daysInMonth(y, mo) {
+    return new Date(Date.UTC(y, mo, 0)).getUTCDate();
+}
+function parseDateBR(input) {
+    const m = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*$/.exec(input);
+    if (!m)
+        return null;
+    const iso = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+    return isValidIsoDate(iso) ? iso : null;
+}
+function formatDateBR(iso) {
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+}
+function formatDayMonth(iso) {
+    const [, m, d] = iso.split('-');
+    return `${d}/${m}`;
+}
+function formatListDate(iso, today) {
+    return iso.slice(0, 4) === today.slice(0, 4) ? formatDayMonth(iso) : formatDateBR(iso);
+}
+function formatShortDate(iso) {
+    const [, m, d] = iso.split('-');
+    return `${Number(d)} ${(MONTHS[Number(m) - 1] ?? '').slice(0, 3)}`;
+}
+function deviceTimeZone() {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo';
+    }
+    catch {
+        return 'America/Sao_Paulo';
+    }
+}
+function todayIn(timeZone, now = new Date()) {
+    try {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            calendar: 'gregory',
+            numberingSystem: 'latn',
+        }).formatToParts(now);
+        const get = (type) => parts.find((p) => p.type === type)?.value ?? '';
+        const iso = `${get('year')}-${get('month').padStart(2, '0')}-${get('day').padStart(2, '0')}`;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && isValidIsoDate(iso))
+            return iso;
+    }
+    catch {
+    }
+    return localIsoDate(now);
+}
+function localIsoDate(now) {
+    return `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+function addDays(date, delta) {
+    const [y, m, d] = date.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d + delta)).toISOString().slice(0, 10);
+}
+function maskDateBR(text) {
+    const d = text.replace(/\D/g, '').slice(0, 8);
+    return d.slice(0, 2) + (d.length > 2 ? `/${d.slice(2, 4)}` : '') + (d.length > 4 ? `/${d.slice(4)}` : '');
+}
+function monthOf(date) {
+    return date.slice(0, 7);
+}
+function isValidIsoMonth(value) {
+    return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+}
+function monthsBetween(from, to) {
+    const [y1, m1] = from.split('-').map(Number);
+    const [y2, m2] = to.split('-').map(Number);
+    return y2 * 12 + m2 - (y1 * 12 + m1);
+}
+function dateInMonth(month, day) {
+    const [y, m] = month.split('-').map(Number);
+    return `${month}-${String(Math.min(day, daysInMonth(y, m))).padStart(2, '0')}`;
+}
+function parseMonthBR(input) {
+    const m = /^\s*(\d{1,2})\/(\d{4})\s*$/.exec(input);
+    if (!m)
+        return null;
+    const month = `${m[2]}-${m[1].padStart(2, '0')}`;
+    return isValidIsoMonth(month) ? month : null;
+}
+function formatMonthInputBR(month) {
+    const [y, m] = month.split('-');
+    return `${m}/${y}`;
+}
+function maskMonthBR(text) {
+    const d = text.replace(/\D/g, '').slice(0, 6);
+    return d.slice(0, 2) + (d.length > 2 ? `/${d.slice(2)}` : '');
+}
+function addMonths(month, delta) {
+    const [y, m] = month.split('-').map(Number);
+    const total = y * 12 + (m - 1) + delta;
+    return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
+}
+function addMonthsToDate(date, delta) {
+    const month = addMonths(monthOf(date), delta);
+    const [y, m] = month.split('-').map(Number);
+    const d = Math.min(Number(date.slice(8, 10)), daysInMonth(y, m));
+    return `${month}-${String(d).padStart(2, '0')}`;
+}
+function addYearsClamped(date, delta) {
+    return addMonthsToDate(date, delta * 12);
+}
+function daysBetween(from, to) {
+    const utc = (iso) => {
+        const [y, m, d] = iso.split('-').map(Number);
+        return Date.UTC(y, m - 1, d);
+    };
+    return Math.round((utc(to) - utc(from)) / 86_400_000);
+}
+function monthRange(month) {
+    return { start: `${month}-01`, endExclusive: `${addMonths(month, 1)}-01` };
+}
+function formatDateTimeBR(isoInstant, timeZone) {
+    const parts = new Intl.DateTimeFormat('pt-BR', {
+        timeZone,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+    }).formatToParts(new Date(isoInstant));
+    const get = (t) => parts.find((p) => p.type === t)?.value ?? '';
+    return `${get('day')}/${get('month')}/${get('year')} às ${get('hour')}:${get('minute')}`;
+}
+function formatDayHeader(date, today) {
+    if (date === today)
+        return 'Hoje';
+    if (date === addDays(today, -1))
+        return 'Ontem';
+    const [, m, d] = date.split('-');
+    return `${Number(d)} de ${MONTHS[Number(m) - 1] ?? ''}`;
+}
+function formatMonthName(month) {
+    return MONTHS[Number(month.slice(5, 7)) - 1] ?? '';
+}
+function formatMonthBR(month) {
+    const [y, m] = month.split('-');
+    const name = MONTHS[Number(m) - 1] ?? '';
+    return `${name.charAt(0).toUpperCase()}${name.slice(1)} de ${y}`;
+}
+function formatMonthYearBR(month) {
+    return `${formatMonthName(month)} de ${month.slice(0, 4)}`;
+}
+function formatMonthSpanBR(from, to) {
+    if (from === to)
+        return `em ${formatMonthYearBR(from)}`;
+    if (from.slice(0, 4) === to.slice(0, 4))
+        return `de ${formatMonthName(from)} a ${formatMonthYearBR(to)}`;
+    return `de ${formatMonthYearBR(from)} a ${formatMonthYearBR(to)}`;
+}
+  },
+  // packages/core/src/noticias/feed.ts
+  function (module, exports, __req) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MAX_ITENS_POR_FEED = exports.MAX_BYTES_DO_FEED = void 0;
+exports.lerXml = lerXml;
+exports.lerDataDoFeed = lerDataDoFeed;
+exports.pareceCorpoInteiro = pareceCorpoInteiro;
+exports.lerFeed = lerFeed;
+const html_1 = __req(3);
+exports.MAX_BYTES_DO_FEED = 2 * 1024 * 1024;
+exports.MAX_ITENS_POR_FEED = 50;
+const MAX_ELEMENTOS = 50_000;
+const MAX_PROFUNDIDADE = 64;
+const local = (nome) => nome.slice(nome.indexOf(':') + 1);
+function lerXml(xml) {
+    if (xml.length > exports.MAX_BYTES_DO_FEED)
+        return null;
+    const raiz = { nome: '#documento', atributos: {}, filhos: [] };
+    const pilha = [raiz];
+    let elementos = 0;
+    for (const t of (0, html_1.lerMarcacao)(xml.replace(/^\ufeff/, ''), { xml: true })) {
+        const topo = pilha[pilha.length - 1];
+        if (t.tipo === 'texto')
+            topo.filhos.push({ texto: t.texto, cru: t.cru });
+        else if (t.tipo === 'abre') {
+            if (++elementos > MAX_ELEMENTOS)
+                return null;
+            const el = { nome: t.nome, atributos: t.atributos, filhos: [] };
+            topo.filhos.push(el);
+            if (!t.sozinha && pilha.length < MAX_PROFUNDIDADE)
+                pilha.push(el);
+        }
+        else {
+            const k = pilha.map((e) => e.nome).lastIndexOf(t.nome);
+            if (k > 0)
+                pilha.length = k;
+        }
+    }
+    return raiz;
+}
+const elementos = (el) => el.filhos.filter((f) => 'nome' in f);
+const filho = (el, ...nomes) => elementos(el).find((f) => nomes.includes(f.nome));
+const filhos = (el, ...nomes) => elementos(el).filter((f) => nomes.includes(f.nome));
+function marcacao(el) {
+    return el.filhos
+        .map((f) => {
+        if (!('nome' in f))
+            return (0, html_1.escaparHtml)(f.texto);
+        const attrs = Object.entries(f.atributos)
+            .map(([k, v]) => ` ${k}="${(0, html_1.escaparHtml)(v)}"`)
+            .join('');
+        return `<${f.nome}${attrs}>${marcacao(f)}</${f.nome}>`;
+    })
+        .join('');
+}
+function textoDe(el) {
+    if (!el)
+        return '';
+    if (el.filhos.some((f) => 'nome' in f))
+        return marcacao(el);
+    return el.filhos.map((f) => ('texto' in f ? f.texto : '')).join('');
+}
+function htmlDoAtom(el) {
+    if (!el)
+        return '';
+    const tipo = (el.atributos.type ?? 'text').toLowerCase();
+    if (tipo === 'html' || tipo === 'text/html')
+        return textoDe(el);
+    if (tipo === 'xhtml' || tipo === 'application/xhtml+xml')
+        return marcacao(el);
+    return (0, html_1.escaparHtml)(textoDe(el));
+}
+const MESES = {
+    jan: 1, feb: 2, fev: 2, mar: 3, apr: 4, abr: 4, may: 5, mai: 5, jun: 6, jul: 7, aug: 8, ago: 8, sep: 9, set: 9, oct: 10, out: 10, nov: 11, dec: 12, dez: 12,
+};
+const FUSOS = { gmt: 0, ut: 0, utc: 0, z: 0, est: -300, edt: -240, cst: -360, cdt: -300, mst: -420, mdt: -360, pst: -480, pdt: -420, brt: -180, brst: -120 };
+function instante(ano, mes, dia, h, m, s, minutosDoFuso) {
+    if (!(ano >= 1990 && ano <= 2200 && mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31 && h >= 0 && h <= 23 && m >= 0 && m <= 59 && s >= 0 && s <= 60))
+        return null;
+    const t = Date.UTC(ano, mes - 1, dia, h, m, Math.min(s, 59));
+    if (new Date(t).getUTCDate() !== dia)
+        return null;
+    return t - minutosDoFuso * 60_000;
+}
+const fusoNumerico = (sinal, hh, mm = '0') => (sinal === '-' ? -1 : 1) * (Number(hh) * 60 + Number(mm));
+function lerDataDoFeed(bruto) {
+    const s = (bruto ?? '').replace(/\s+/g, ' ').trim();
+    if (s === '' || s.length > 60)
+        return null;
+    let m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:[.,]\d{1,9})?)?)?\s*(Z|[+-]\d{2}(?::?\d{2})?)?$/i.exec(s);
+    if (m) {
+        const z = m[7];
+        let fuso = -180;
+        if (z !== undefined) {
+            const digitos = z.slice(1).replace(':', '');
+            fuso = /^z$/i.test(z) ? 0 : fusoNumerico(z[0], digitos.slice(0, 2), digitos.slice(2, 4) || '0');
+        }
+        return instante(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4] ?? 0), Number(m[5] ?? 0), Number(m[6] ?? 0), fuso);
+    }
+    m = /^(?:[A-Za-zÀ-ú]{3,9}\.?,?\s+)?(\d{1,2})\s+([A-Za-zÀ-ú]{3,9})\.?\s+(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([A-Za-z]{1,5}|[+-]\d{4})?$/.exec(s);
+    if (m) {
+        const mes = MESES[m[2].slice(0, 3).toLowerCase()];
+        if (!mes)
+            return null;
+        const z = m[7];
+        let fuso = -180;
+        if (z !== undefined) {
+            if (/^[+-]\d{4}$/.test(z))
+                fuso = fusoNumerico(z[0], z.slice(1, 3), z.slice(3, 5));
+            else if (z.toLowerCase() in FUSOS)
+                fuso = FUSOS[z.toLowerCase()];
+            else
+                return null;
+        }
+        return instante(Number(m[3]), mes, Number(m[1]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0), fuso);
+    }
+    m = /^(\d{4})\/(\d{2})\/(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?(?: ?(?:GMT|UTC) ?([+-])(\d{1,2})(?::?(\d{2}))?)?$/i.exec(s);
+    if (m) {
+        const fuso = m[7] ? fusoNumerico(m[7], m[8], m[9] ?? '0') : -180;
+        return instante(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0), fuso);
+    }
+    return null;
+}
+function pareceCorpoInteiro(html) {
+    const blocos = (html.match(/<(p|div|h[1-6]|li|blockquote|table)\b/gi) ?? []).length;
+    return blocos >= 3 || (0, html_1.textoPuro)(html).length > 600;
+}
+const limpar = (s) => s.replace(/[\u200b\u200c\u200d\u2060\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+const opcional = (s) => (s.trim() === '' ? null : s);
+function lerFeed(xml, { base }) {
+    const doc = lerXml(xml);
+    if (!doc)
+        return null;
+    const raiz = elementos(doc)[0];
+    if (!raiz)
+        return null;
+    const nomeDaRaiz = local(raiz.nome);
+    if (nomeDaRaiz === 'feed')
+        return { formato: 'atom', itens: lerAtom(raiz, base) };
+    if (nomeDaRaiz === 'rss') {
+        const canal = filho(raiz, 'channel') ?? raiz;
+        return { formato: 'rss2', itens: lerItensRss(filhos(canal, 'item'), base) };
+    }
+    if (nomeDaRaiz === 'rdf')
+        return { formato: 'rss1', itens: lerItensRss(filhos(raiz, 'item'), base) };
+    return null;
+}
+function lerItensRss(itens, base) {
+    return itens.slice(0, exports.MAX_ITENS_POR_FEED).map((it) => {
+        const linkTexto = limpar(textoDe(filho(it, 'link')));
+        const guid = filho(it, 'guid');
+        const guidTexto = limpar(textoDe(guid));
+        const guidLink = guid && (guid.atributos.ispermalink ?? 'true') !== 'false' && /^https?:\/\//i.test(guidTexto) ? guidTexto : '';
+        const link = (0, html_1.resolverLink)(linkTexto || guidLink || it.atributos['rdf:about'] || '', base);
+        const descricao = textoDe(filho(it, 'description'));
+        const conteudo = textoDe(filho(it, 'content:encoded'));
+        let corpo = opcional(conteudo);
+        let resumo = opcional(descricao);
+        if (!corpo && resumo && pareceCorpoInteiro(resumo)) {
+            corpo = resumo;
+            resumo = null;
+        }
+        const autor = limpar((0, html_1.textoPuro)(textoDe(filho(it, 'dc:creator', 'author'))));
+        return {
+            titulo: limpar((0, html_1.textoPuro)(textoDe(filho(it, 'title')))),
+            link,
+            data: lerDataDoFeed(textoDe(filho(it, 'pubdate', 'dc:date'))),
+            autor: autor === '' ? null : autor,
+            categorias: filhos(it, 'category', 'dc:subject').map((c) => limpar((0, html_1.textoPuro)(textoDe(c)))).filter((c) => c !== ''),
+            resumoHtml: resumo,
+            corpoHtml: corpo,
+        };
+    });
+}
+function lerAtom(feed, baseDoFeed) {
+    const baseGeral = (0, html_1.resolverLink)(feed.atributos['xml:base'] ?? '', baseDoFeed) ?? baseDoFeed;
+    return filhos(feed, 'entry')
+        .slice(0, exports.MAX_ITENS_POR_FEED)
+        .map((e) => {
+        const base = (0, html_1.resolverLink)(e.atributos['xml:base'] ?? '', baseGeral) ?? baseGeral;
+        const links = filhos(e, 'link');
+        const alternativo = links.find((l) => (l.atributos.rel ?? 'alternate') === 'alternate') ?? links[0];
+        const link = (0, html_1.resolverLink)(alternativo?.atributos.href ?? '', base);
+        const autor = filho(e, 'author');
+        const nomeDoAutor = autor ? limpar((0, html_1.textoPuro)(textoDe(filho(autor, 'name')) || textoDe(autor))) : '';
+        let corpo = opcional(htmlDoAtom(filho(e, 'content')));
+        let resumo = opcional(htmlDoAtom(filho(e, 'summary')));
+        if (!corpo && resumo && pareceCorpoInteiro(resumo)) {
+            corpo = resumo;
+            resumo = null;
+        }
+        return {
+            titulo: limpar((0, html_1.textoPuro)(htmlDoAtom(filho(e, 'title')))),
+            link,
+            data: lerDataDoFeed(textoDe(filho(e, 'published')) || textoDe(filho(e, 'updated')) || textoDe(filho(e, 'dc:date'))),
+            autor: nomeDoAutor === '' ? null : nomeDoAutor,
+            categorias: filhos(e, 'category')
+                .map((c) => limpar(c.atributos.label ?? c.atributos.term ?? textoDe(c)))
+                .filter((c) => c !== ''),
+            resumoHtml: resumo,
+            corpoHtml: corpo,
+        };
+    });
+}
+  },
+  // packages/core/src/noticias/html.ts
+  function (module, exports, __req) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.paragrafos = exports.MAX_TEXTO_DA_MATERIA = exports.escaparHtml = void 0;
+exports.decodificarEntidades = decodificarEntidades;
+exports.lerMarcacao = lerMarcacao;
+exports.resolverLink = resolverLink;
+exports.filtrarHtml = filtrarHtml;
+exports.textoPuro = textoPuro;
+exports.frases = frases;
+exports.resumir = resumir;
+const CODIGOS = {
+    amp: 0x26, lt: 0x3c, gt: 0x3e, quot: 0x22, apos: 0x27, nbsp: 0xa0, ensp: 0x2002, emsp: 0x2003, thinsp: 0x2009, zwnj: 0x200c, zwj: 0x200d,
+    ndash: 0x2013, mdash: 0x2014, hellip: 0x2026, lsquo: 0x2018, rsquo: 0x2019, sbquo: 0x201a, ldquo: 0x201c, rdquo: 0x201d, bdquo: 0x201e,
+    laquo: 0xab, raquo: 0xbb, bull: 0x2022, middot: 0xb7, ordm: 0xba, ordf: 0xaa, deg: 0xb0, copy: 0xa9, reg: 0xae, trade: 0x2122, euro: 0x20ac,
+    cent: 0xa2, pound: 0xa3, yen: 0xa5, sect: 0xa7, para: 0xb6, shy: 0xad, times: 0xd7, divide: 0xf7, plusmn: 0xb1, frac12: 0xbd, frac14: 0xbc,
+    frac34: 0xbe, sup1: 0xb9, sup2: 0xb2, sup3: 0xb3, iexcl: 0xa1, iquest: 0xbf, micro: 0xb5, szlig: 0xdf, AElig: 0xc6, aelig: 0xe6, Oslash: 0xd8,
+    oslash: 0xf8, percnt: 0x25, dollar: 0x24, num: 0x23, excl: 0x21, quest: 0x3f, comma: 0x2c, period: 0x2e, colon: 0x3a, semi: 0x3b, lpar: 0x28,
+    rpar: 0x29, sol: 0x2f, minus: 0x2212,
+};
+const ACENTOS = { acute: [0x301, 'AEIOUYaeiouy'], grave: [0x300, 'AEIOUaeiou'], circ: [0x302, 'AEIOUaeiou'], tilde: [0x303, 'ANOano'], uml: [0x308, 'AEIOUaeiouy'], cedil: [0x327, 'Cc'], ring: [0x30a, 'Aa'] };
+const ENTIDADES = (() => {
+    const t = {};
+    for (const [nome, codigo] of Object.entries(CODIGOS))
+        t[nome] = String.fromCodePoint(codigo);
+    for (const [nome, [marca, letras]] of Object.entries(ACENTOS))
+        for (const l of letras)
+            t[`${l}${nome}`] = `${l}${String.fromCodePoint(marca)}`.normalize('NFC');
+    return t;
+})();
+const SUBSTITUICAO = String.fromCodePoint(0xfffd);
+const pontoDeCodigo = (n) => (Number.isInteger(n) && n > 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff) ? String.fromCodePoint(n) : SUBSTITUICAO);
+function decodificarEntidades(texto) {
+    if (!texto.includes('&'))
+        return texto;
+    return texto.replace(/&(#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/g, (inteira, corpo) => {
+        if (corpo[0] === '#')
+            return pontoDeCodigo(corpo[1] === 'x' || corpo[1] === 'X' ? parseInt(corpo.slice(2), 16) : parseInt(corpo.slice(1), 10));
+        return ENTIDADES[corpo] ?? inteira;
+    });
+}
+const escaparHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+exports.escaparHtml = escaparHtml;
+const INVISIVEIS = /[\u200b\u200c\u200d\u2060\ufeff]/g;
+const TEXTO_CRU = new Set(['script', 'style', 'textarea', 'title', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext']);
+const ehLetra = (c) => c !== undefined && /[A-Za-z]/.test(c);
+const ehNome = (c) => c !== undefined && /[A-Za-z0-9:_.-]/.test(c);
+const ehEspaco = (c) => c !== undefined && /[ \n\t\r\f]/.test(c);
+function lerMarcacao(fonte, { xml = false } = {}) {
+    const tokens = [];
+    const n = fonte.length;
+    let i = 0;
+    const texto = (t, cru = false) => {
+        if (t !== '')
+            tokens.push({ tipo: 'texto', texto: cru ? t : decodificarEntidades(t), cru });
+    };
+    while (i < n) {
+        const lt = fonte.indexOf('<', i);
+        if (lt === -1) {
+            texto(fonte.slice(i));
+            break;
+        }
+        if (lt > i)
+            texto(fonte.slice(i, lt));
+        if (fonte.startsWith('<!--', lt)) {
+            const fim = fonte.indexOf('-->', lt + 4);
+            i = fim === -1 ? n : fim + 3;
+            continue;
+        }
+        if (fonte.startsWith('<![CDATA[', lt)) {
+            const fim = fonte.indexOf(']]>', lt + 9);
+            const conteudo = fonte.slice(lt + 9, fim === -1 ? n : fim);
+            texto(conteudo, xml);
+            i = fim === -1 ? n : fim + 3;
+            continue;
+        }
+        const proximo = fonte[lt + 1];
+        if (proximo === '!' || proximo === '?') {
+            const fim = fonte.indexOf('>', lt + 2);
+            i = fim === -1 ? n : fim + 1;
+            continue;
+        }
+        if (proximo === '/' && ehLetra(fonte[lt + 2])) {
+            let j = lt + 2;
+            while (j < n && ehNome(fonte[j]))
+                j++;
+            const nome = fonte.slice(lt + 2, j).toLowerCase();
+            const fim = fonte.indexOf('>', j);
+            if (fim === -1)
+                break;
+            tokens.push({ tipo: 'fecha', nome });
+            i = fim + 1;
+            continue;
+        }
+        if (!ehLetra(proximo)) {
+            texto('<');
+            i = lt + 1;
+            continue;
+        }
+        let j = lt + 1;
+        while (j < n && ehNome(fonte[j]))
+            j++;
+        const nome = fonte.slice(lt + 1, j).toLowerCase();
+        const atributos = {};
+        let sozinha = false;
+        let fechou = false;
+        while (j < n) {
+            while (j < n && ehEspaco(fonte[j]))
+                j++;
+            const c = fonte[j];
+            if (c === '>') {
+                fechou = true;
+                j++;
+                break;
+            }
+            if (c === '/') {
+                if (fonte[j + 1] === '>') {
+                    sozinha = true;
+                    fechou = true;
+                    j += 2;
+                    break;
+                }
+                j++;
+                continue;
+            }
+            const ini = j;
+            while (j < n && !ehEspaco(fonte[j]) && fonte[j] !== '=' && fonte[j] !== '>' && !(fonte[j] === '/' && fonte[j + 1] === '>'))
+                j++;
+            const atributo = fonte.slice(ini, j).toLowerCase();
+            while (j < n && ehEspaco(fonte[j]))
+                j++;
+            let valor = '';
+            if (fonte[j] === '=') {
+                j++;
+                while (j < n && ehEspaco(fonte[j]))
+                    j++;
+                const aspa = fonte[j];
+                if (aspa === '"' || aspa === "'") {
+                    const fim = fonte.indexOf(aspa, j + 1);
+                    if (fim === -1) {
+                        j = n;
+                        break;
+                    }
+                    valor = fonte.slice(j + 1, fim);
+                    j = fim + 1;
+                }
+                else {
+                    const ini2 = j;
+                    while (j < n && !ehEspaco(fonte[j]) && fonte[j] !== '>')
+                        j++;
+                    valor = fonte.slice(ini2, j);
+                }
+            }
+            if (atributo !== '' && !(atributo in atributos))
+                atributos[atributo] = decodificarEntidades(valor);
+        }
+        if (!fechou)
+            break;
+        tokens.push({ tipo: 'abre', nome, atributos, sozinha });
+        i = j;
+        if (!xml && !sozinha && TEXTO_CRU.has(nome)) {
+            const procura = new RegExp(`</${nome.replace(/[.]/g, '\\.')}`, 'gi');
+            procura.lastIndex = i;
+            const achou = procura.exec(fonte);
+            const fim = achou ? achou.index : -1;
+            texto(fonte.slice(i, fim === -1 ? n : fim), true);
+            if (fim === -1) {
+                i = n;
+                break;
+            }
+            const maior = fonte.indexOf('>', fim);
+            tokens.push({ tipo: 'fecha', nome });
+            i = maior === -1 ? n : maior + 1;
+        }
+    }
+    return tokens;
+}
+function resolverLink(href, base) {
+    const limpo = href.replace(INVISIVEIS, '').replace(/[\u0000- \u007f]+/g, '').trim();
+    if (limpo === '' || limpo.length > 2000)
+        return null;
+    try {
+        const u = base ? new URL(limpo, base) : new URL(limpo);
+        if (u.protocol !== 'http:' && u.protocol !== 'https:')
+            return null;
+        if (u.username !== '' || u.password !== '')
+            return null;
+        return u.href;
+    }
+    catch {
+        return null;
+    }
+}
+const PERMITIDOS = new Set(['p', 'br', 'a', 'strong', 'em', 'ul', 'ol', 'li', 'blockquote', 'h2', 'h3']);
+const TROCAS = { b: 'strong', i: 'em', h1: 'h2', h4: 'h3', h5: 'h3', h6: 'h3', div: 'p', center: 'p', address: 'p', pre: 'p', td: 'p', th: 'p', dt: 'p', dd: 'p', caption: 'p' };
+const DESCARTADOS = new Set([
+    'script', 'style', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet', 'param', 'noscript', 'noembed', 'noframes', 'template', 'svg', 'math',
+    'video', 'audio', 'source', 'track', 'canvas', 'picture', 'figure', 'figcaption', 'img', 'map', 'area', 'form', 'input', 'button', 'select',
+    'option', 'optgroup', 'textarea', 'datalist', 'output', 'head', 'title', 'link', 'meta', 'base', 'xmp', 'plaintext', 'dialog', 'slot', 'portal',
+]);
+const VAZIOS = new Set(['br', 'hr', 'wbr', 'img', 'input', 'meta', 'link', 'source', 'track', 'area', 'col', 'base', 'embed', 'param', 'keygen']);
+const FRONTEIRAS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'colgroup', 'col', 'section', 'article', 'header', 'footer', 'main', 'aside', 'nav', 'hgroup', 'details', 'summary', 'dl', 'fieldset', 'legend', 'hr', 'menu']);
+const BLOCOS_DE_TEXTO = new Set(['p', 'h2', 'h3', 'li']);
+const EM_LINHA = new Set(['a', 'strong', 'em']);
+const MAX_PROFUNDIDADE = 40;
+exports.MAX_TEXTO_DA_MATERIA = 200_000;
+function montarArvore(html, base) {
+    const raiz = { tag: '#raiz', filhos: [] };
+    const pilha = [raiz];
+    let tamanho = 0;
+    let pulando = null;
+    const topo = () => pilha[pilha.length - 1];
+    const blocoAtual = () => {
+        for (let k = pilha.length - 1; k >= 0; k--)
+            if (!EM_LINHA.has(pilha[k].tag))
+                return pilha[k];
+        return raiz;
+    };
+    const dentroDeTexto = () => BLOCOS_DE_TEXTO.has(blocoAtual().tag);
+    const abrir = (tag, href) => {
+        if (pilha.length >= MAX_PROFUNDIDADE)
+            return null;
+        const no = href ? { tag, href, filhos: [] } : { tag, filhos: [] };
+        topo().filhos.push(no);
+        pilha.push(no);
+        return no;
+    };
+    const fecharEmLinha = () => {
+        while (pilha.length > 1 && EM_LINHA.has(topo().tag))
+            pilha.pop();
+    };
+    const fecharParagrafo = () => {
+        fecharEmLinha();
+        const b = topo();
+        if (b.tag === 'p' || b.tag === 'h2' || b.tag === 'h3')
+            pilha.pop();
+    };
+    const fecharAte = (tag) => {
+        const k = pilha.map((x) => x.tag).lastIndexOf(tag);
+        if (k > 0)
+            pilha.length = k;
+    };
+    const garantirTexto = () => {
+        if (dentroDeTexto())
+            return;
+        fecharEmLinha();
+        const b = topo();
+        abrir(b.tag === 'ul' || b.tag === 'ol' ? 'li' : 'p');
+    };
+    const prepararBloco = () => {
+        fecharParagrafo();
+        const b = topo();
+        if (b.tag === 'ul' || b.tag === 'ol')
+            abrir('li');
+    };
+    for (const t of lerMarcacao(html)) {
+        if (pulando) {
+            if (t.tipo === 'abre' && t.nome === pulando.nome && !t.sozinha && !VAZIOS.has(t.nome))
+                pulando.nivel++;
+            else if (t.tipo === 'fecha' && t.nome === pulando.nome && --pulando.nivel === 0)
+                pulando = null;
+            continue;
+        }
+        if (t.tipo === 'texto') {
+            const s = t.texto.replace(INVISIVEIS, '');
+            if (s.trim() === '') {
+                if (dentroDeTexto())
+                    topo().filhos.push(' ');
+                continue;
+            }
+            tamanho += s.length;
+            if (tamanho > exports.MAX_TEXTO_DA_MATERIA)
+                return null;
+            garantirTexto();
+            topo().filhos.push(s);
+            continue;
+        }
+        const tag = TROCAS[t.nome] ?? t.nome;
+        if (t.tipo === 'abre') {
+            if (DESCARTADOS.has(t.nome)) {
+                if (!t.sozinha && !VAZIOS.has(t.nome))
+                    pulando = { nome: t.nome, nivel: 1 };
+                continue;
+            }
+            if (FRONTEIRAS.has(t.nome)) {
+                fecharParagrafo();
+                continue;
+            }
+            if (!PERMITIDOS.has(tag))
+                continue;
+            if (tag === 'br') {
+                if (dentroDeTexto())
+                    topo().filhos.push({ tag: 'br', filhos: [] });
+                continue;
+            }
+            if (tag === 'p' || tag === 'h2' || tag === 'h3') {
+                fecharParagrafo();
+                const b = topo();
+                if (b.tag === 'ul' || b.tag === 'ol')
+                    abrir('li');
+                if (!t.sozinha)
+                    abrir(tag);
+                continue;
+            }
+            if (tag === 'li') {
+                fecharParagrafo();
+                if (topo().tag === 'li')
+                    pilha.pop();
+                const b = topo();
+                if (!t.sozinha)
+                    abrir(b.tag === 'ul' || b.tag === 'ol' ? 'li' : 'p');
+                continue;
+            }
+            if (tag === 'ul' || tag === 'ol' || tag === 'blockquote') {
+                prepararBloco();
+                if (!t.sozinha)
+                    abrir(tag);
+                continue;
+            }
+            if (t.sozinha)
+                continue;
+            if (tag === 'a') {
+                const href = resolverLink(t.atributos.href ?? '', base);
+                if (pilha.some((x) => x.tag === 'a'))
+                    fecharAte('a');
+                if (!href)
+                    continue;
+                garantirTexto();
+                abrir('a', href);
+                continue;
+            }
+            garantirTexto();
+            abrir(tag);
+            continue;
+        }
+        if (FRONTEIRAS.has(t.nome)) {
+            fecharParagrafo();
+            continue;
+        }
+        if (!PERMITIDOS.has(tag) || tag === 'br')
+            continue;
+        fecharAte(tag);
+    }
+    return { raiz, tamanho };
+}
+const ehVazio = (s) => s.replace(INVISIVEIS, '').replace(/[\s\u00a0]+/g, '') === '';
+function escrever(no) {
+    const partes = [];
+    for (const f of no.filhos) {
+        if (typeof f === 'string')
+            partes.push((0, exports.escaparHtml)(f.replace(/[\t\n\r\f ]+/g, ' ')));
+        else
+            partes.push(escrever(f));
+    }
+    if (no.tag === 'br')
+        return '<br>';
+    let dentro = partes.join('');
+    if (no.tag === '#raiz')
+        return partes.filter((p) => p !== '').join('\n');
+    if (BLOCOS_DE_TEXTO.has(no.tag) || no.tag === 'blockquote' || no.tag === 'ul' || no.tag === 'ol') {
+        if (no.tag === 'blockquote' || no.tag === 'ul' || no.tag === 'ol') {
+            const blocos = partes.filter((p) => p !== '');
+            if (blocos.length === 0)
+                return '';
+            return `<${no.tag}>\n${blocos.join('\n')}\n</${no.tag}>`;
+        }
+        dentro = dentro.replace(/^(?:\s|<br>)+|(?:\s|<br>)+$/g, '').replace(/ {2,}/g, ' ');
+        if (ehVazio(dentro.replace(/<[^>]+>/g, '')) && !/<(ul|ol)>/.test(dentro))
+            return '';
+        return `<${no.tag}>${dentro}</${no.tag}>`;
+    }
+    if (ehVazio(dentro.replace(/<[^>]+>/g, '')))
+        return /[ \u00a0]/.test(dentro) ? ' ' : '';
+    if (no.tag === 'a')
+        return `<a href="${(0, exports.escaparHtml)(no.href ?? '')}" rel="noopener noreferrer">${dentro}</a>`;
+    return `<${no.tag}>${dentro}</${no.tag}>`;
+}
+function filtrarHtml(html, base = null) {
+    const arvore = montarArvore(html, base);
+    if (!arvore)
+        return null;
+    const saida = escrever(arvore.raiz).trim();
+    return saida === '' ? null : saida;
+}
+function textoPuro(html) {
+    const linhas = [''];
+    let pulando = null;
+    const BLOCO = new Set(['p', 'div', 'li', 'ul', 'ol', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'td', 'th', 'table', 'section', 'article', 'header', 'footer', 'dt', 'dd', 'pre', 'center', 'address', 'caption']);
+    for (const t of lerMarcacao(html)) {
+        if (pulando) {
+            if (t.tipo === 'abre' && t.nome === pulando.nome && !t.sozinha && !VAZIOS.has(t.nome))
+                pulando.nivel++;
+            else if (t.tipo === 'fecha' && t.nome === pulando.nome && --pulando.nivel === 0)
+                pulando = null;
+            continue;
+        }
+        if (t.tipo === 'texto')
+            linhas[linhas.length - 1] += t.texto;
+        else if (t.tipo === 'abre' && DESCARTADOS.has(t.nome)) {
+            if (!t.sozinha && !VAZIOS.has(t.nome))
+                pulando = { nome: t.nome, nivel: 1 };
+        }
+        else if (t.nome === 'br')
+            linhas[linhas.length - 1] += '\n';
+        else if (BLOCO.has(t.nome))
+            linhas.push('');
+    }
+    return linhas
+        .map((l) => l.replace(INVISIVEIS, '').split('\n').map((x) => x.replace(/[\s\u00a0]+/g, ' ').trim()).filter((x) => x !== '').join('\n'))
+        .filter((l) => l !== '')
+        .join('\n\n');
+}
+const paragrafos = (html) => textoPuro(html)
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\s+/g, ' ').trim())
+    .filter((p) => p !== '');
+exports.paragrafos = paragrafos;
+function frases(texto) {
+    const t = texto.replace(/\s+/g, ' ').trim();
+    if (t === '')
+        return [];
+    return t
+        .split(/(?<=[.!?\u2026]["'\u201d\u2019)\]]*)\s+/)
+        .map((f) => f.trim())
+        .filter((f) => f !== '');
+}
+function resumir(texto, { maxFrases = 2, maxCaracteres = 300 } = {}) {
+    const lista = frases(texto);
+    let saida = '';
+    for (const f of lista.slice(0, maxFrases)) {
+        const junto = saida === '' ? f : `${saida} ${f}`;
+        if (junto.length > maxCaracteres)
+            break;
+        saida = junto;
+    }
+    if (saida === '' && lista.length > 0) {
+        const primeira = lista[0];
+        const corte = primeira.slice(0, maxCaracteres - 1);
+        const espaco = corte.lastIndexOf(' ');
+        saida = `${(espaco > maxCaracteres / 2 ? corte.slice(0, espaco) : corte).replace(/[\s,;:]+$/, '')}\u2026`;
+    }
+    return saida;
+}
+  },
+  // packages/core/src/noticias/fontes.ts
+  function (module, exports, __req) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.NOTICIAS_TEXT = exports.TEMAS_NOTICIAS = exports.licencaEfetiva = exports.FONTES_NOTICIAS = exports.PORTAIS_PRIVADOS = exports.FONTES_PUBLICAS = void 0;
+exports.feedPermitido = feedPermitido;
+exports.fontesParaLer = fontesParaLer;
+exports.FONTES_PUBLICAS = [
+    {
+        id: 'agencia-brasil-economia',
+        nome: 'Agência Brasil',
+        site: 'https://agenciabrasil.ebc.com.br/economia',
+        feed: 'https://agenciabrasil.ebc.com.br/rss/economia/feed.xml',
+        hosts: ['agenciabrasil.ebc.com.br'],
+        tipo: 'publica',
+        licenca: 'texto_completo',
+        credito: 'agencia-brasil',
+        linhaDeLicenca: 'Texto da Agência Brasil (EBC), reproduzido sem alterações e com o crédito da autoria. A formatação foi simplificada, e fotos, vídeos e tabelas ficam só na matéria original.',
+        conferido: 'RSS 2.0, 19/11/2026: 10 matérias da editoria de Economia, com o texto inteiro em <description> (HTML escapado), autoria em <dc:creator>, data em <pubDate> e assuntos em <category>.',
+    },
+    {
+        id: 'bcb-noticias',
+        nome: 'Banco Central do Brasil',
+        site: 'https://www.bcb.gov.br/',
+        feed: 'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/noticias',
+        hosts: ['www.bcb.gov.br'],
+        tipo: 'publica',
+        licenca: 'so_resumo',
+        linhaDeLicenca: 'Notícia do Banco Central do Brasil. Para ler o texto, abra a página do Banco Central.',
+        conferido: 'Atom, 19/11/2026: 10 notícias, com o texto inteiro em <content type="html"> (links relativos ao site do Banco Central), data em <updated>, sem autoria nem resumo.',
+    },
+    {
+        id: 'bcb-notas',
+        nome: 'Banco Central do Brasil',
+        site: 'https://www.bcb.gov.br/',
+        feed: 'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/notasImprensa',
+        hosts: ['www.bcb.gov.br'],
+        tipo: 'publica',
+        licenca: 'so_resumo',
+        linhaDeLicenca: 'Nota à imprensa do Banco Central do Brasil. Para ler o texto, abra a página do Banco Central.',
+        conferido: 'Atom, 19/11/2026: 10 notas à imprensa, no mesmo formato das notícias do Banco Central.',
+    },
+    {
+        id: 'receita-federal',
+        nome: 'Receita Federal',
+        site: 'https://www.gov.br/receitafederal/pt-br/assuntos/noticias',
+        feed: 'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/ultimas-noticias/atom.xml',
+        hosts: ['www.gov.br'],
+        tipo: 'publica',
+        licenca: 'texto_completo',
+        linhaDeLicenca: 'Conteúdo do gov.br, publicado sob a licença Creative Commons Atribuição-SemDerivações 3.0 (CC BY-ND 3.0), reproduzido sem alterações e com crédito.',
+        conferido: 'Atom, 19/11/2026: 15 notícias, só com a linha fina em <summary> (sem o texto inteiro), autoria em <author><name>, data em <published>.',
+    },
+    {
+        id: 'ministerio-da-fazenda',
+        nome: 'Ministério da Fazenda',
+        site: 'https://www.gov.br/fazenda/pt-br/assuntos/noticias',
+        feed: 'https://www.gov.br/fazenda/pt-br/search_rss?portal_type=collective.nitf.content&sort_on=effective&sort_order=reverse',
+        hosts: ['www.gov.br'],
+        tipo: 'publica',
+        licenca: 'texto_completo',
+        linhaDeLicenca: 'Conteúdo do gov.br, publicado sob a licença Creative Commons Atribuição-SemDerivações 3.0 (CC BY-ND 3.0), reproduzido sem alterações e com crédito.',
+        conferido: 'RSS 1.0 (RDF), 19/11/2026: a busca de notícias do próprio portal (as páginas de notícias do ministério não têm feed), 15 notícias, só com a linha fina em <description>, data em <dc:date> no formato "2026/11/19 11:25:40 GMT-3".',
+    },
+];
+exports.PORTAIS_PRIVADOS = [];
+exports.FONTES_NOTICIAS = [...exports.FONTES_PUBLICAS, ...exports.PORTAIS_PRIVADOS];
+const licencaEfetiva = (fonte) => (fonte.tipo === 'publica' ? fonte.licenca : 'so_resumo');
+exports.licencaEfetiva = licencaEfetiva;
+function feedPermitido(url, fontes = exports.FONTES_NOTICIAS) {
+    if (typeof url !== 'string' || url.length > 500)
+        return false;
+    let u;
+    try {
+        u = new URL(url);
+    }
+    catch {
+        return false;
+    }
+    if (u.protocol !== 'https:' || u.username !== '' || u.password !== '' || u.port !== '')
+        return false;
+    return fontes.some((f) => f.feed === url && f.hosts.includes(u.hostname) && new URL(f.feed).hostname === u.hostname);
+}
+function fontesParaLer(fontes = exports.FONTES_NOTICIAS) {
+    const vistas = new Map();
+    for (const f of fontes) {
+        const chave = `${f.nome}|${f.site}`;
+        if (!vistas.has(chave))
+            vistas.set(chave, { nome: f.nome, site: f.site, licenca: (0, exports.licencaEfetiva)(f) });
+    }
+    return [...vistas.values()];
+}
+exports.TEMAS_NOTICIAS = {
+    juros: 'Juros e Selic',
+    inflacao: 'Inflação',
+    'imposto-de-renda': 'Imposto de Renda',
+    pix: 'Pix e pagamentos',
+    credito: 'Crédito e dívidas',
+    golpes: 'Golpes e fraudes',
+    fgc: 'FGC',
+    'tesouro-e-poupanca': 'Tesouro Direto e poupança',
+    salario: 'Salário e 13º',
+};
+exports.NOTICIAS_TEXT = {
+    titulo: 'Notícias',
+    descricao: 'Notícias de fontes públicas sobre juros, inflação, Imposto de Renda, Pix, crédito, golpes e poupança, com a fonte e o link de cada uma.',
+    lead: 'Notícias de fontes públicas sobre juros, inflação, Imposto de Renda, Pix, crédito, golpes, FGC, Tesouro Direto, poupança e salário, com a fonte e o link de cada uma.',
+    tituloDaLista: 'Últimas notícias',
+    carregando: 'Carregando as notícias.',
+    semJavaScript: 'A lista de notícias usa JavaScript. Você também pode ler direto nas fontes:',
+    emBreve: 'Em breve. As notícias de fontes públicas ainda não estão ligadas neste site. Enquanto isso, você pode ler direto nas fontes:',
+    falha: 'Não foi possível carregar as notícias agora. Tente de novo mais tarde ou leia direto nas fontes:',
+    vazia: 'Nenhuma notícia dos temas acompanhados por enquanto. Você pode ler direto nas fontes:',
+    lerAqui: 'Ler aqui',
+    lerNaFonte: 'Ler na fonte',
+    tituloDeOnde: 'De onde vêm as notícias',
+    deOnde: 'O servidor da Clarevo lê os feeds públicos da Agência Brasil, do Banco Central do Brasil, da Receita Federal e do Ministério da Fazenda e mostra só os temas de finanças pessoais. Nada sobre empresas, ações, bolsa ou dicas de investimento. O navegador de quem visita só fala com o próprio site da Clarevo.',
+    comoLer: 'Quando a licença da fonte permite, o texto aparece aqui, sem alterações e com o crédito, em "Ler aqui". Nos outros casos, a página mostra o título, a data, a fonte e um resumo curto do próprio feed, e o texto fica na fonte, em "Ler na fonte". Imagens de outros sites nunca aparecem aqui.',
+    regraTextoCompleto: 'o texto pode aparecer aqui quando o feed traz a matéria inteira',
+    regraSoResumo: 'só título, data, link e, quando o feed traz, um resumo curto',
+    tituloDasFontes: 'As fontes',
+    tituloDosResumos: 'Resumos da semana',
+    tituloDaMateria: 'Notícia',
+    descricaoDaMateria: 'O texto de uma notícia de fonte pública, com a fonte, a data, a autoria e o link para a matéria original.',
+    materiaCarregando: 'Carregando a notícia.',
+    materiaSemJavaScript: 'Esta página mostra o texto de uma notícia e usa JavaScript. Veja a lista de notícias ou leia direto nas fontes:',
+    materiaFalha: 'Não foi possível carregar a notícia agora. Tente de novo mais tarde, veja a lista de notícias ou leia direto nas fontes:',
+    materiaNaoEncontrada: 'Esta notícia não está mais disponível aqui. Ela pode ter saído da lista ou ser de uma fonte que só permite o resumo. Veja a lista de notícias ou leia direto nas fontes:',
+    verOriginal: 'Ver a matéria original',
+    verTodas: 'Ver todas as notícias',
+    notaDaMateria: 'O texto é da fonte indicada no alto da página. A Clarevo não muda o conteúdo e não responde pelo que a fonte publica.',
+};
+  },
+  // packages/core/src/noticias/index.ts
+  function (module, exports, __req) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.idDaNoticia = exports.MAX_NOTICIAS = exports.NOTICIAS_FUSO = exports.licencaEfetiva = exports.fontesParaLer = exports.feedPermitido = exports.TEMAS_NOTICIAS = exports.NOTICIAS_TEXT = exports.PORTAIS_PRIVADOS = exports.FONTES_PUBLICAS = exports.FONTES_NOTICIAS = void 0;
+exports.creditoDaAgenciaBrasil = creditoDaAgenciaBrasil;
+exports.creditoDaAutoria = creditoDaAutoria;
+exports.prepararNoticia = prepararNoticia;
+exports.juntarNoticias = juntarNoticias;
+exports.paraLista = paraLista;
+const dates_1 = __req(1);
+const sha256_1 = __req(6);
+const fontes_1 = __req(4);
+const filtro_1 = __req(7);
+const html_1 = __req(3);
+var fontes_2 = __req(4);
+Object.defineProperty(exports, "FONTES_NOTICIAS", { enumerable: true, get: function () { return fontes_2.FONTES_NOTICIAS; } });
+Object.defineProperty(exports, "FONTES_PUBLICAS", { enumerable: true, get: function () { return fontes_2.FONTES_PUBLICAS; } });
+Object.defineProperty(exports, "PORTAIS_PRIVADOS", { enumerable: true, get: function () { return fontes_2.PORTAIS_PRIVADOS; } });
+Object.defineProperty(exports, "NOTICIAS_TEXT", { enumerable: true, get: function () { return fontes_2.NOTICIAS_TEXT; } });
+Object.defineProperty(exports, "TEMAS_NOTICIAS", { enumerable: true, get: function () { return fontes_2.TEMAS_NOTICIAS; } });
+Object.defineProperty(exports, "feedPermitido", { enumerable: true, get: function () { return fontes_2.feedPermitido; } });
+Object.defineProperty(exports, "fontesParaLer", { enumerable: true, get: function () { return fontes_2.fontesParaLer; } });
+Object.defineProperty(exports, "licencaEfetiva", { enumerable: true, get: function () { return fontes_2.licencaEfetiva; } });
+exports.NOTICIAS_FUSO = 'America/Sao_Paulo';
+exports.MAX_NOTICIAS = 30;
+const FUTURO_MS = 2 * 24 * 60 * 60 * 1000;
+const MIN_TEXTO_DO_CORPO = 400;
+const PARCEIROS = /\b(Reuters|AFP|France[- ]Presse|EFE|Lusa|ANSA|Xinhua|Bloomberg|Associated Press|Sputnik|Deutsche Welle|RFI|BBC|Agência Gov|Agência Senado|Agência Câmara|TV Brasil|Rádio Nacional|Radioagência)\b/i;
+function creditoDaAgenciaBrasil(autor, corpoTexto) {
+    if (!autor)
+        return false;
+    const a = autor.replace(/\s+/g, ' ').trim();
+    if (a.includes('*'))
+        return false;
+    if (!/^(?:agência brasil|[^*]+?\s*[-\u2010-\u2015\u2500]\s*rep[oó]rter(?:a)? da agência brasil)$/i.test(a))
+        return false;
+    if (/com informaç(?:ões|ão) d[aeo]s?\s/i.test(corpoTexto))
+        return false;
+    return !PARCEIROS.test(corpoTexto);
+}
+function creditoDaAutoria(autor) {
+    if (!autor)
+        return null;
+    const a = autor.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+    if (a === '')
+        return null;
+    const m = /^(.+?)\s*[-\u2010-\u2015\u2500]\s*(rep[oó]rter.*)$/i.exec(a);
+    if (m)
+        return `Por ${m[1].trim()}, ${m[2].charAt(0).toLowerCase()}${m[2].slice(1)}`;
+    return a.replace(/[\u2013\u2014\u2500]/g, '-');
+}
+function linkNormalizado(link) {
+    const u = new URL(link);
+    u.hash = '';
+    return u.href;
+}
+const idDaNoticia = (link) => (0, sha256_1.sha256Hex)(linkNormalizado(link)).slice(0, 16);
+exports.idDaNoticia = idDaNoticia;
+function prepararNoticia(item, fonte, agora) {
+    const titulo = item.titulo.slice(0, 300);
+    if (titulo === '' || !item.link || item.data === null)
+        return null;
+    if (item.data > agora + FUTURO_MS)
+        return null;
+    let host;
+    try {
+        host = new URL(item.link).hostname;
+    }
+    catch {
+        return null;
+    }
+    if (!fonte.hosts.includes(host))
+        return null;
+    const corpoTexto = item.corpoHtml ? (0, html_1.textoPuro)(item.corpoHtml) : '';
+    const creditoOk = fonte.credito === 'agencia-brasil' ? creditoDaAgenciaBrasil(item.autor, corpoTexto) : true;
+    const permiteTexto = (0, fontes_1.licencaEfetiva)(fonte) === 'texto_completo' && creditoOk;
+    let resumo = null;
+    if (item.resumoHtml)
+        resumo = (0, html_1.resumir)((0, html_1.textoPuro)(item.resumoHtml));
+    else if (permiteTexto && item.corpoHtml) {
+        const primeiro = (0, html_1.paragrafos)(item.corpoHtml).find((p) => p.length >= 40);
+        if (primeiro)
+            resumo = (0, html_1.resumir)(primeiro);
+    }
+    if (resumo === '')
+        resumo = null;
+    const assuntos = item.categorias.join('. ');
+    const tema = (0, filtro_1.temaDaNoticia)(`${titulo}. ${assuntos}`, resumo ?? '');
+    if (!tema)
+        return null;
+    if ((0, filtro_1.foraDaLinhaEditorial)(`${titulo}. ${resumo ?? ''}. ${assuntos}`))
+        return null;
+    let html = null;
+    if (permiteTexto && item.corpoHtml && corpoTexto.length >= MIN_TEXTO_DO_CORPO && !(0, filtro_1.corpoCitaMercado)(corpoTexto))
+        html = (0, html_1.filtrarHtml)(item.corpoHtml, item.link);
+    const data = new Date(item.data);
+    return {
+        id: (0, exports.idDaNoticia)(item.link),
+        titulo,
+        data: data.toISOString(),
+        dataTexto: (0, dates_1.formatDateBR)((0, dates_1.todayIn)(exports.NOTICIAS_FUSO, data)),
+        fonte: fonte.nome,
+        fonteId: fonte.id,
+        link: item.link,
+        resumo,
+        tema,
+        temaRotulo: fontes_1.TEMAS_NOTICIAS[tema],
+        textoCompleto: html !== null,
+        autor: creditoDaAutoria(item.autor),
+        licenca: fonte.linhaDeLicenca,
+        html,
+    };
+}
+const chaveDoTitulo = (t) => (0, filtro_1.normalizar)(t).replace(/[^a-z0-9 ]/g, '');
+function juntarNoticias(porFonte, agora, ordem = porFonte.map((p) => p.fonte)) {
+    const todas = [];
+    for (const { fonte, itens } of porFonte) {
+        const posicao = Math.max(0, ordem.findIndex((f) => f.id === fonte.id));
+        for (const item of itens) {
+            const n = prepararNoticia(item, fonte, agora);
+            if (n)
+                todas.push({ n, posicao });
+        }
+    }
+    todas.sort((a, b) => Number(b.n.textoCompleto) - Number(a.n.textoCompleto) || a.posicao - b.posicao || b.n.data.localeCompare(a.n.data));
+    const links = new Set();
+    const titulos = new Set();
+    const unicas = [];
+    for (const { n } of todas) {
+        const l = linkNormalizado(n.link);
+        const t = chaveDoTitulo(n.titulo);
+        if (links.has(l) || titulos.has(t))
+            continue;
+        links.add(l);
+        titulos.add(t);
+        unicas.push(n);
+    }
+    unicas.sort((a, b) => b.data.localeCompare(a.data) || a.titulo.localeCompare(b.titulo, 'pt-BR'));
+    return unicas.slice(0, exports.MAX_NOTICIAS);
+}
+function paraLista(n) {
+    return {
+        id: n.id,
+        titulo: n.titulo,
+        data: n.data,
+        dataTexto: n.dataTexto,
+        fonte: n.fonte,
+        fonteId: n.fonteId,
+        link: n.link,
+        resumo: n.resumo,
+        tema: n.tema,
+        temaRotulo: n.temaRotulo,
+        textoCompleto: n.textoCompleto,
+    };
+}
+  },
+  // packages/core/src/sha256.ts
+  function (module, exports, __req) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.utf8Bytes = utf8Bytes;
+exports.sha256HexOfBytes = sha256HexOfBytes;
+exports.sha256Hex = sha256Hex;
+const K = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be,
+    0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa,
+    0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85,
+    0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+    0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f,
+    0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+];
+function utf8Bytes(text) {
+    const bytes = [];
+    for (let i = 0; i < text.length; i++) {
+        let code = text.charCodeAt(i);
+        if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length) {
+            const low = text.charCodeAt(i + 1);
+            if (low >= 0xdc00 && low <= 0xdfff) {
+                code = 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00);
+                i++;
+            }
+        }
+        if (code >= 0xd800 && code <= 0xdfff)
+            code = 0xfffd;
+        if (code < 0x80)
+            bytes.push(code);
+        else if (code < 0x800)
+            bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+        else if (code < 0x10000)
+            bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+        else
+            bytes.push(0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+    }
+    return bytes;
+}
+const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+function sha256HexOfBytes(input) {
+    const bytes = input.slice();
+    const bitLength = bytes.length * 8;
+    bytes.push(0x80);
+    while (bytes.length % 64 !== 56)
+        bytes.push(0);
+    const high = Math.floor(bitLength / 0x100000000);
+    const low = bitLength >>> 0;
+    for (const word of [high, low])
+        bytes.push((word >>> 24) & 0xff, (word >>> 16) & 0xff, (word >>> 8) & 0xff, word & 0xff);
+    const h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+    const w = new Array(64).fill(0);
+    for (let offset = 0; offset < bytes.length; offset += 64) {
+        for (let i = 0; i < 16; i++) {
+            const j = offset + i * 4;
+            w[i] = ((bytes[j] << 24) | (bytes[j + 1] << 16) | (bytes[j + 2] << 8) | bytes[j + 3]) >>> 0;
+        }
+        for (let i = 16; i < 64; i++) {
+            const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+            const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+            w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+        }
+        let [a, b, c, d, e, f, g, hh] = h;
+        for (let i = 0; i < 64; i++) {
+            const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+            const ch = (e & f) ^ (~e & g);
+            const t1 = (hh + s1 + ch + K[i] + w[i]) >>> 0;
+            const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+            const maj = (a & b) ^ (a & c) ^ (b & c);
+            const t2 = (s0 + maj) >>> 0;
+            hh = g;
+            g = f;
+            f = e;
+            e = (d + t1) >>> 0;
+            d = c;
+            c = b;
+            b = a;
+            a = (t1 + t2) >>> 0;
+        }
+        h[0] = (h[0] + a) >>> 0;
+        h[1] = (h[1] + b) >>> 0;
+        h[2] = (h[2] + c) >>> 0;
+        h[3] = (h[3] + d) >>> 0;
+        h[4] = (h[4] + e) >>> 0;
+        h[5] = (h[5] + f) >>> 0;
+        h[6] = (h[6] + g) >>> 0;
+        h[7] = (h[7] + hh) >>> 0;
+    }
+    return h.map((x) => x.toString(16).padStart(8, '0')).join('');
+}
+function sha256Hex(text) {
+    return sha256HexOfBytes(utf8Bytes(text));
+}
+  },
+  // packages/core/src/noticias/filtro.ts
+  function (module, exports, __req) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.corpoCitaMercado = exports.MERCADO_NO_CORPO = exports.EMPRESAS_LISTADAS = exports.PALAVRAS_DE_MERCADO = exports.CODIGO_DE_ACAO = exports.REGRAS_DE_TEMA = void 0;
+exports.normalizar = normalizar;
+exports.temaDaNoticia = temaDaNoticia;
+exports.foraDaLinhaEditorial = foraDaLinhaEditorial;
+function normalizar(texto) {
+    return texto
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[\u2010-\u2015\u2212]/g, '-')
+        .replace(/[^a-z0-9$%+\-/ ]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+const lista = (palavras) => new RegExp(`(?:^|[^a-z0-9])(?:${palavras.map(escRe).join('|')})s?(?![a-z0-9])`);
+exports.REGRAS_DE_TEMA = [
+    {
+        tema: 'golpes',
+        fortes: [
+            'golpe', 'golpista', 'fraude bancaria', 'fraude financeira', 'fraude no pix', 'fraudes no pix', 'fraude com cartao', 'fraudes com cartao',
+            'fraude com cartoes', 'falsa central', 'falsas centrais', 'falso atendente', 'falso funcionario', 'falsos funcionarios', 'phishing',
+            'engenharia social', 'boleto falso', 'boletos falsos', 'conta laranja', 'contas laranja', 'estelionato', 'estelionatario',
+        ],
+        fora: [
+            'golpe de estado', 'golpes de estado', 'tentativa de golpe', 'trama golpista', 'atos golpistas', 'ato golpista', 'golpe militar', 'golpe de 1964',
+            'plano golpista', 'nucleo golpista', 'nucleos golpistas', 'acampamento golpista', 'acampamentos golpistas', 'golpe de sorte', 'golpe de mestre',
+        ],
+    },
+    { tema: 'fgc', fortes: ['fgc', 'fundo garantidor de credito', 'fundo garantidor de creditos', 'fundo garantidor'] },
+    {
+        tema: 'imposto-de-renda',
+        fortes: ['imposto de renda', 'irpf', 'malha fina', 'declaracao do ir', 'declaracao do imposto', 'restituicao do ir', 'restituicao do imposto', 'isencao do ir', 'tabela do ir'],
+        noTitulo: ['restituicao', 'restituicoes'],
+    },
+    {
+        tema: 'pix',
+        fortes: ['pix', 'pagamento instantaneo', 'pagamentos instantaneos', 'open finance', 'drex', 'tarifa bancaria', 'tarifas bancarias'],
+        noTitulo: ['boleto', 'meios de pagamento', 'meio de pagamento'],
+    },
+    {
+        tema: 'credito',
+        fortes: [
+            'cartao de credito', 'cartoes de credito', 'rotativo', 'cheque especial', 'consignado', 'credito pessoal', 'credito ao consumidor',
+            'endividamento', 'superendividamento', 'endividado', 'endividada', 'inadimplencia', 'inadimplente', 'renegociacao de divida',
+            'renegociacao de dividas', 'renegociar dividas', 'desenrola', 'limpa nome', 'nome sujo', 'juros do cartao', 'dividas atrasadas', 'dividas em atraso',
+        ],
+        noTitulo: ['contratacao de credito', 'oferta de credito', 'concessao de credito ao consumidor'],
+        fora: ['divida publica', 'dividas publicas', 'dividas dos estados', 'divida dos estados', 'dividas de estados', 'dividas dos municipios', 'divida externa', 'renegociacao das dividas dos estados'],
+    },
+    {
+        tema: 'tesouro-e-poupanca',
+        fortes: ['tesouro direto', 'poupanca', 'tesouro selic', 'tesouro ipca', 'tesouro prefixado', 'tesouro renda+', 'tesouro educa+'],
+    },
+    {
+        tema: 'salario',
+        fortes: ['salario minimo', '13o salario', 'decimo terceiro', 'abono salarial', 'fgts', 'saque-aniversario', 'saque aniversario'],
+    },
+    { tema: 'juros', fortes: ['selic', 'copom', 'taxa basica de juros', 'politica monetaria'], noTitulo: ['juros', 'juro'] },
+    { tema: 'inflacao', fortes: ['ipca', 'ipca-15', 'inpc', 'custo de vida', 'cesta basica'], noTitulo: ['inflacao', 'deflacao'] },
+];
+const COMPILADAS = exports.REGRAS_DE_TEMA.map((r) => ({
+    tema: r.tema,
+    fortes: lista(r.fortes),
+    noTitulo: r.noTitulo ? lista(r.noTitulo) : null,
+    foraGlobal: r.fora ? new RegExp(`(?:^|[^a-z0-9])(?:${r.fora.map(escRe).join('|')})s?(?![a-z0-9])`, 'g') : null,
+}));
+function temaDaNoticia(titulo, resumo = '') {
+    const t = ` ${normalizar(titulo)} `;
+    const r = ` ${normalizar(resumo)} `;
+    for (const c of COMPILADAS) {
+        const tt = c.foraGlobal ? t.replace(c.foraGlobal, ' ') : t;
+        const rr = c.foraGlobal ? r.replace(c.foraGlobal, ' ') : r;
+        if (c.fortes.test(tt) || c.fortes.test(rr) || (c.noTitulo && c.noTitulo.test(tt)))
+            return c.tema;
+    }
+    return null;
+}
+exports.CODIGO_DE_ACAO = /(?<![A-Za-z0-9])[A-Z]{4}(?:3|4|5|6|11)(?![A-Za-z0-9])/;
+exports.PALAVRAS_DE_MERCADO = [
+    'ibovespa', 'ifix', 'indice bovespa', 'bolsa de valores', 'bolsa brasileira', 'b3', 'mercado de acoes', 'acoes na bolsa', 'acoes de empresas',
+    'acoes listadas', 'acoes preferenciais', 'acoes ordinarias', 'acionista', 'dividendo', 'juros sobre capital proprio', 'valor de mercado', 'pregao',
+    'ipo', 'oferta publica inicial', 'preco-alvo', 'preco alvo', 'recomendacao de compra', 'recomendacao de venda', 'carteira recomendada',
+    'onde investir', 'melhores acoes', 'melhores investimentos', 'melhores fundos', 'vale a pena investir', 'hora de comprar', 'small caps',
+    'fundos imobiliarios', 'fundo imobiliario', 'balanco trimestral', 'resultado trimestral', 'lucro liquido', 'wall street', 'nasdaq', 'dow jones',
+];
+exports.EMPRESAS_LISTADAS = [
+    'Petrobras', 'Itau', 'Itau Unibanco', 'Bradesco', 'Banco do Brasil', 'Santander', 'BTG Pactual', 'XP Investimentos', 'XP Inc', 'Banco Inter',
+    'Nubank', 'Nu Holdings', 'Magazine Luiza', 'Magalu', 'Americanas', 'Eletrobras', 'Ambev', 'Embraer', 'JBS', 'Gerdau', 'Usiminas', 'Suzano',
+    'Raia Drogasil', 'Casas Bahia', 'Sabesp', 'Cemig', 'Copel', 'Hapvida', 'Cielo', 'PagBank', 'PagSeguro', 'Mercado Livre', 'Mercado Pago',
+    'Banco Pan', 'Banco BMG', 'Localiza', 'Vale S.A.', 'Vale S/A',
+];
+const MERCADO = lista(exports.PALAVRAS_DE_MERCADO);
+const semAcento = (s) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+const EMPRESAS = new RegExp(`(?<![A-Za-z0-9])(?:${exports.EMPRESAS_LISTADAS.map((e) => escRe(semAcento(e))).join('|')})(?![A-Za-z0-9])`);
+function foraDaLinhaEditorial(texto) {
+    return exports.CODIGO_DE_ACAO.test(texto) || MERCADO.test(` ${normalizar(texto)} `) || EMPRESAS.test(semAcento(texto));
+}
+exports.MERCADO_NO_CORPO = ['ibovespa', 'ifix', 'indice bovespa', 'preco-alvo', 'preco alvo', 'recomendacao de compra', 'recomendacao de venda', 'carteira recomendada', 'melhores acoes'];
+const CORPO = lista(exports.MERCADO_NO_CORPO);
+const corpoCitaMercado = (texto) => exports.CODIGO_DE_ACAO.test(texto) || CORPO.test(` ${normalizar(texto)} `);
+exports.corpoCitaMercado = corpoCitaMercado;
+  }
+];
+const __cache = [];
+function __req(i) {
+  if (__cache[i]) return __cache[i].exports;
+  const module = { exports: {} };
+  __cache[i] = module;
+  __mods[i](module, module.exports, __req);
+  return module.exports;
+}
+return __req(0);
+})();
 
 const LIMITE_DO_CORPO = 20 * 1024;
 /** Os serviços de e-mail pedem que quem chama diga quem é (o Resend recusa o pedido sem `User-Agent`). */
@@ -1768,6 +3238,59 @@ async function indicadores(request) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// Notícias de fontes públicas (D-117), desligadas até a resposta do advogado (perguntas 56 e 57)
+
+/** As rotas de notícias só existem com NOTICIAS=ligado no painel (uma variável, sem gerar o site de novo). */
+const noticiasLigadas = (env) => umaLinha(env.NOTICIAS).toLowerCase() === 'ligado';
+
+/** Lê o corpo de uma resposta com teto: passou de `teto` bytes, para de ler e devolve `null` (o feed é recusado). */
+async function textoComTeto(resposta, teto) {
+  if (!resposta.body) return '';
+  const leitor = resposta.body.getReader();
+  const partes = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await leitor.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > teto) {
+        leitor.cancel().catch(() => {});
+        return null;
+      }
+      partes.push(value);
+    }
+  } catch {
+    return null;
+  }
+  const bytes = new Uint8Array(total);
+  let posicao = 0;
+  for (const parte of partes) {
+    bytes.set(parte, posicao);
+    posicao += parte.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+/**
+ * O atendimento das notícias, criado uma vez por instância do worker (a cópia de uma hora fica na memória dele). Cada busca vai só a um
+ * feed configurado (o núcleo confere o endereço antes), com prazo, sem seguir redirecionamento, com teto de tamanho e só com `Accept` e
+ * `User-Agent`: nada de quem visita (IP, navegador, cabeçalhos) vai junto.
+ */
+const atenderNoticias = NUCLEO_NOTICIAS.createNoticiasHandler({
+  fetch: async (url, init) => {
+    const r = await fetch(url, { headers: { Accept: NUCLEO_NOTICIAS.ACEITA_FEED, 'User-Agent': AGENTE }, redirect: 'manual', signal: AbortSignal.timeout(init.timeoutMs) });
+    return { ok: r.ok, status: r.status, text: () => textoComTeto(r, init.maxBytes) };
+  },
+});
+
+async function noticias(request, env, url, rota) {
+  if (!noticiasLigadas(env)) return naoExiste();
+  const r = await atenderNoticias({ method: request.method, rota, id: rota === 'materia' ? url.searchParams.get('id') : null });
+  return new Response(request.method === 'HEAD' ? null : r.body, { status: r.status, headers: { ...CABECALHOS, 'X-Content-Type-Options': 'nosniff', ...r.headers } });
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 /** O arquivo estático de sempre, com os cabeçalhos de segurança do site (sem trocar os que o Pages já pôs). */
 async function estatico(request, env) {
@@ -1783,6 +3306,8 @@ export default {
     if (url.pathname === '/api/contato') return contato(request, env, url);
     if (url.pathname === '/api/newsletter') return newsletter(request, env, url);
     if (url.pathname === '/api/indicadores') return indicadores(request);
+    if (url.pathname === '/api/noticias') return noticias(request, env, url, 'lista');
+    if (url.pathname === '/api/noticias/materia') return noticias(request, env, url, 'materia');
     return estatico(request, env);
   },
 };

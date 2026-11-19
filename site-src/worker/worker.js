@@ -8,6 +8,11 @@
 // Uma rota só lê dados públicos (D-106), sem variável, sem chave e sem gravar nada fora da memória:
 //   GET /api/indicadores  busca no Banco Central a Selic (meta), o CDI, o IPCA, a poupança e o dólar PTAX, guarda uma cópia na memória por
 //                         uma hora e devolve ao site. O navegador de quem visita só fala com o próprio site; o Banco Central não vê ninguém.
+// Duas rotas leem notícias de fontes públicas (D-117), do mesmo jeito, e só existem com a variável NOTICIAS=ligado no painel (sem ela, 404):
+//   GET /api/noticias          busca os feeds configurados em packages/core/src/noticias/fontes.ts (e só eles), guarda uma cópia na memória
+//                              por uma hora e devolve a lista filtrada (título, data, fonte, link, resumo e se o texto inteiro pode ser lido).
+//   GET /api/noticias/materia  ?id=<16 hexadecimais>: o texto inteiro, já filtrado, só das notícias cuja licença permite (as outras, 404).
+//                              O id só procura na cópia: nenhum endereço que venha do pedido é buscado.
 // Qualquer outra rota cai nos arquivos estáticos (env.ASSETS.fetch).
 //
 // Uma rota só existe se o interruptor dela estiver ligado em site/dados-da-empresa.json NA GERAÇÃO (`ROTAS`, abaixo): desligada, responde
@@ -16,7 +21,8 @@
 //
 // Variáveis (painel da Cloudflare, nunca no repositório): SITE_HOST (o endereço do site, sem https://, como clarevo.com.br; qualquer outro
 // endereço, como o clarevo-site.pages.dev, é recusado), RESEND_API_KEY (segredo), CONTATO_DESTINO, CONTATO_REMETENTE, BREVO_API_KEY
-// (segredo), BREVO_LISTA_ID, BREVO_MODELO_CONFIRMACAO_ID e, opcional, BREVO_URL_RETORNO.
+// (segredo), BREVO_LISTA_ID, BREVO_MODELO_CONFIRMACAO_ID e, opcional, BREVO_URL_RETORNO. E NOTICIAS: com o valor `ligado`, as rotas de
+// notícias existem; com qualquer outro valor ou sem a variável (o padrão, até a resposta do advogado), 404.
 // Sem SITE_HOST ou sem as variáveis de uma rota, ela responde 503 com mensagem clara: o formulário continua "pronto e desligado".
 
 // Tamanhos, faixas e nome do campo-isca: os mesmos que o gerador usa para desenhar os formulários.
@@ -28,6 +34,9 @@ const ROTAS = /*ROTAS*/ {};
 // O núcleo de /api/indicadores (packages/core/src/indicadores/servidor.ts e o que ele usa), num pacote só, montado pelo gerador: os códigos
 // das séries, a leitura das respostas, as contas e a cópia de uma hora são os mesmos do gerador do site e dos testes do núcleo.
 const NUCLEO_INDICADORES = /*INDICADORES*/ null;
+// O núcleo de /api/noticias (packages/core/src/noticias/servidor.ts e o que ele usa: as fontes, o leitor de feeds, o filtro de temas e o
+// filtro de HTML), no mesmo formato: o mesmo código que os testes do núcleo conferem.
+const NUCLEO_NOTICIAS = /*NOTICIAS*/ null;
 
 const LIMITE_DO_CORPO = 20 * 1024;
 /** Os serviços de e-mail pedem que quem chama diga quem é (o Resend recusa o pedido sem `User-Agent`). */
@@ -324,6 +333,59 @@ async function indicadores(request) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// Notícias de fontes públicas (D-117), desligadas até a resposta do advogado (perguntas 56 e 57)
+
+/** As rotas de notícias só existem com NOTICIAS=ligado no painel (uma variável, sem gerar o site de novo). */
+const noticiasLigadas = (env) => umaLinha(env.NOTICIAS).toLowerCase() === 'ligado';
+
+/** Lê o corpo de uma resposta com teto: passou de `teto` bytes, para de ler e devolve `null` (o feed é recusado). */
+async function textoComTeto(resposta, teto) {
+  if (!resposta.body) return '';
+  const leitor = resposta.body.getReader();
+  const partes = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await leitor.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > teto) {
+        leitor.cancel().catch(() => {});
+        return null;
+      }
+      partes.push(value);
+    }
+  } catch {
+    return null;
+  }
+  const bytes = new Uint8Array(total);
+  let posicao = 0;
+  for (const parte of partes) {
+    bytes.set(parte, posicao);
+    posicao += parte.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+/**
+ * O atendimento das notícias, criado uma vez por instância do worker (a cópia de uma hora fica na memória dele). Cada busca vai só a um
+ * feed configurado (o núcleo confere o endereço antes), com prazo, sem seguir redirecionamento, com teto de tamanho e só com `Accept` e
+ * `User-Agent`: nada de quem visita (IP, navegador, cabeçalhos) vai junto.
+ */
+const atenderNoticias = NUCLEO_NOTICIAS.createNoticiasHandler({
+  fetch: async (url, init) => {
+    const r = await fetch(url, { headers: { Accept: NUCLEO_NOTICIAS.ACEITA_FEED, 'User-Agent': AGENTE }, redirect: 'manual', signal: AbortSignal.timeout(init.timeoutMs) });
+    return { ok: r.ok, status: r.status, text: () => textoComTeto(r, init.maxBytes) };
+  },
+});
+
+async function noticias(request, env, url, rota) {
+  if (!noticiasLigadas(env)) return naoExiste();
+  const r = await atenderNoticias({ method: request.method, rota, id: rota === 'materia' ? url.searchParams.get('id') : null });
+  return new Response(request.method === 'HEAD' ? null : r.body, { status: r.status, headers: { ...CABECALHOS, 'X-Content-Type-Options': 'nosniff', ...r.headers } });
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 
 /** O arquivo estático de sempre, com os cabeçalhos de segurança do site (sem trocar os que o Pages já pôs). */
 async function estatico(request, env) {
@@ -339,6 +401,8 @@ export default {
     if (url.pathname === '/api/contato') return contato(request, env, url);
     if (url.pathname === '/api/newsletter') return newsletter(request, env, url);
     if (url.pathname === '/api/indicadores') return indicadores(request);
+    if (url.pathname === '/api/noticias') return noticias(request, env, url, 'lista');
+    if (url.pathname === '/api/noticias/materia') return noticias(request, env, url, 'materia');
     return estatico(request, env);
   },
 };

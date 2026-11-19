@@ -1,13 +1,19 @@
 'use strict';
 /**
- * Resumo semanal de notícias (D-106, `docs/22_SITE.md`, seção 16.5): só a estrutura. Cada edição é um arquivo de dados em
- * `site-src/noticias/semana-AAAA-MM-DD.json` (a data da edição), com uma lista de notícias, cada uma com título, um resumo de uma ou
- * duas frases escrito pela Clarevo, o nome do veículo, a autoria, a data e o link. Sem edição nenhuma, nenhuma página existe e nada
- * aparece no rodapé nem no mapa do site.
+ * Notícias (D-117, `docs/22_SITE.md`, seção 18) e o resumo semanal (D-106, seção 16.5), na mesma área do site.
  *
- * O formato segue os cuidados de direito autoral do estudo: título e resumo com palavras da Clarevo, crédito ao veículo e à autoria,
- * link simples para a matéria (sem imagem de outros sites, sem script de terceiros, sem copiar o texto). Temas permitidos: Copom, IPCA,
- * regras do Tesouro, FGC e prazos do Imposto de Renda; nada sobre empresas listadas (o gerador recusa código de ação e índice de bolsa).
+ * `noticias/index.html` é a página de notícias de fontes públicas: a lista vem da `/api/noticias` (o worker busca os feeds configurados em
+ * `packages/core/src/noticias/fontes.ts`), pelo script do próprio site `noticias/noticias.js`, que pergunta uma vez ao abrir a página. Sem
+ * JavaScript, ou quando a API falha, a página mostra uma frase curta e os links para as fontes; com as rotas desligadas (sem a variável
+ * NOTICIAS=ligado no painel da Cloudflare, o padrão até a resposta do advogado), "Em breve". `noticias/materia.html?id=...` mostra o texto
+ * inteiro de uma notícia cuja licença permite, com a fonte, a data, a autoria, a linha de licença e "Ver a matéria original".
+ *
+ * O resumo semanal continua: cada edição é um arquivo de dados em `site-src/noticias/semana-AAAA-MM-DD.json` (a data da edição), com uma
+ * lista de notícias, cada uma com título, um resumo de uma ou duas frases escrito pela Clarevo, o nome do veículo, a autoria, a data e o
+ * link. Com edições, a página de notícias ganha "Resumos da semana" e cada edição tem a página dela.
+ *
+ * O formato segue os cuidados de direito autoral do estudo: crédito à fonte e à autoria, link simples para a matéria (sem imagem de outros
+ * sites, sem script de terceiros), texto inteiro só quando a licença da fonte permite. Nada sobre empresas listadas, ações ou bolsa.
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -16,9 +22,13 @@ const { esc, nfc } = require('../texto');
 const { rel, dataBR, dataPorExtensoIso } = require('../util');
 const { montarPagina, colunaTexto } = require('../modelo');
 const { dataExiste } = require('../conteudo');
+const { catalogo } = require('../catalogo');
 
 const PASTA_NOTICIAS = path.join(SITE_SRC, 'noticias');
 const ARQUIVO_INDICE = 'noticias/index.html';
+const ARQUIVO_MATERIA = 'noticias/materia.html';
+/** O script das duas páginas de notícias: pergunta uma vez ao próprio site e mostra a lista ou a matéria. */
+const SCRIPT_DAS_NOTICIAS = 'noticias/noticias.js';
 const EDICAO = /^semana-(\d{4}-\d{2}-\d{2})\.json$/;
 const arquivoDaEdicao = (data) => `noticias/semana-${data}.html`;
 
@@ -116,7 +126,7 @@ const COMO_MONTAMOS =
 
 function paginaDaEdicao(edicao, { valores }) {
   const arquivo = edicao.arquivo;
-  const capa = `<p class="migalha"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Resumo semanal</a> · ${esc(dataBR(edicao.data))}</p>
+  const capa = `<p class="migalha"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Notícias</a> · ${esc(dataBR(edicao.data))}</p>
 <h1>Resumo da semana: ${esc(dataPorExtensoIso(edicao.data))}</h1>
 <p class="lead">As notícias da semana sobre juros, inflação e regras de aplicações, em poucas palavras, com link para cada fonte.</p>`;
   const itens = edicao.itens
@@ -131,7 +141,7 @@ function paginaDaEdicao(edicao, { valores }) {
   const corpo = colunaTexto(
     `${itens}
 <p class="nota">${esc(COMO_MONTAMOS)}</p>
-<p class="voltar"><a href="${rel(arquivo, ARQUIVO_INDICE)}">Ver todas as edições</a></p>`,
+<p class="voltar"><a href="${rel(arquivo, `${ARQUIVO_INDICE}#resumos`)}">Ver todas as edições</a></p>`,
     'artigo',
   );
   const pg = montarPagina({
@@ -149,43 +159,145 @@ function paginaDaEdicao(edicao, { valores }) {
   return { arquivo, ...pg };
 }
 
+/** Os textos e as fontes das notícias, do núcleo (`packages/core/src/noticias/fontes.ts`). */
+const doNucleo = () => catalogo().NOTICIAS;
+
+/** Os links para ler direto nas fontes (sem JavaScript, com a API fora do ar ou com as notícias desligadas). */
+function linksDasFontes() {
+  const { fontesParaLer } = doNucleo();
+  return `<ul class="fontes-para-ler" data-fontes-para-ler>
+${fontesParaLer()
+  .map((f) => `<li><a href="${esc(f.site)}" rel="noopener noreferrer">${esc(f.nome)}</a></li>`)
+  .join('\n')}
+</ul>`;
+}
+
+/** Os avisos de estado: sem JavaScript (visível de saída) e os que o script mostra. */
+const estado = (nome, texto, visivel = false) => `<p class="noticias-estado" data-estado="${nome}"${visivel ? '' : ' hidden'}>${esc(texto)}</p>`;
+
+/** O host de cada fonte de notícias (os links de texto que a página tem para elas). */
+const hostsDasFontesDeNoticias = () => [...new Set(doNucleo().FONTES_NOTICIAS.map((f) => new URL(f.site).host))].sort();
+
 function paginaIndice(edicoes, { valores }) {
   const arquivo = ARQUIVO_INDICE;
-  const capa = `<h1>Resumo semanal</h1>
-<p class="lead">As notícias da semana sobre Copom, IPCA, regras do Tesouro Direto, FGC e prazos do Imposto de Renda, com um resumo escrito pela Clarevo e o link para cada fonte.</p>`;
-  const lista = edicoes
-    .map(
-      (e) =>
-        `<li><a class="cartao" href="${rel(arquivo, e.arquivo)}"><span class="titulo-cartao">Resumo da semana: ${esc(dataPorExtensoIso(e.data))}</span><span class="tema-sub">${e.itens.length === 1 ? '1 notícia' : `${e.itens.length} notícias`}</span></a></li>`,
-    )
+  const { NOTICIAS_TEXT: T, FONTES_NOTICIAS, licencaEfetiva } = doNucleo();
+  const capa = `<h1>${esc(T.titulo)}</h1>
+<p class="lead">${esc(T.lead)}</p>`;
+  const lista = `<section class="noticias" aria-labelledby="ultimas" data-noticias data-materia="${esc(rel(arquivo, ARQUIVO_MATERIA))}" data-ler-aqui="${esc(T.lerAqui)}" data-ler-na-fonte="${esc(T.lerNaFonte)}">
+<h2 id="ultimas">${esc(T.tituloDaLista)}</h2>
+<p class="nota noticias-atualizado" data-noticias-atualizado hidden></p>
+${estado('sem-js', T.semJavaScript, true)}
+${estado('carregando', T.carregando)}
+${estado('em-breve', T.emBreve)}
+${estado('falha', T.falha)}
+${estado('vazia', T.vazia)}
+${linksDasFontes()}
+<ol class="noticias-lista" data-noticias-lista hidden></ol>
+</section>`;
+  // Uma linha por fonte (as duas do Banco Central numa só), com a regra de licença em palavras simples.
+  const vistas = new Map();
+  for (const f of FONTES_NOTICIAS) {
+    const regra = licencaEfetiva(f) === 'texto_completo' ? T.regraTextoCompleto : T.regraSoResumo;
+    const linha = vistas.get(f.nome) ?? { site: f.site, regras: new Set() };
+    linha.regras.add(regra);
+    vistas.set(f.nome, linha);
+  }
+  const fontes = [...vistas]
+    .map(([nome, l]) => `<li><a href="${esc(l.site)}" rel="noopener noreferrer"><strong>${esc(nome)}</strong></a>: ${esc([...l.regras].join('; '))}.</li>`)
     .join('\n');
-  const corpo = colunaTexto(
-    `<ul class="temas">
-${lista}
+  const deOnde = `<section aria-labelledby="de-onde">
+<h2 id="de-onde">${esc(T.tituloDeOnde)}</h2>
+<p>${esc(T.deOnde)}</p>
+<p>${esc(T.comoLer)}</p>
+<ul class="noticias-fontes">
+${fontes}
 </ul>
-<p class="nota">${esc(COMO_MONTAMOS)}</p>
-<p>Os números de hoje, com data e fonte, estão em <a href="${rel(arquivo, 'indicadores/index.html')}">Indicadores oficiais</a>.</p>`,
+</section>`;
+  const resumos = edicoes.length
+    ? `<section aria-labelledby="resumos">
+<h2 id="resumos">${esc(T.tituloDosResumos)}</h2>
+<p>${esc(COMO_MONTAMOS)}</p>
+<ul class="temas">
+${edicoes
+  .map(
+    (e) =>
+      `<li><a class="cartao" href="${rel(arquivo, e.arquivo)}"><span class="titulo-cartao">Resumo da semana: ${esc(dataPorExtensoIso(e.data))}</span><span class="tema-sub">${e.itens.length === 1 ? '1 notícia' : `${e.itens.length} notícias`}</span></a></li>`,
+  )
+  .join('\n')}
+</ul>
+</section>`
+    : '';
+  const corpo = colunaTexto(
+    `${lista}
+${deOnde}
+${resumos}
+<p>Os números de hoje, com data e fonte, estão em <a href="${rel(arquivo, 'indicadores/index.html')}">Indicadores oficiais</a>.</p>`.replace(/\n{2,}/g, '\n'),
     'artigo',
   );
   const pg = montarPagina({
     arquivo,
-    titulo: 'Resumo semanal de notícias',
-    descricao: 'As notícias da semana sobre Copom, IPCA, Tesouro, FGC e Imposto de Renda, com resumo próprio da Clarevo e link para cada fonte.',
+    titulo: T.titulo,
+    descricao: T.descricao,
     capa,
     corpo,
     fonte: capa,
     valores,
     classeCapa: 'capa-simples',
+    scripts: [SCRIPT_DAS_NOTICIAS],
     avisoDeMercado: true,
     atualizada: edicoes[0]?.data ?? null,
   });
   return { arquivo, ...pg };
 }
 
-/** As páginas do resumo semanal: nenhuma sem edição; com edições, o índice e uma página por edição. */
-function paginasNoticias(edicoes, ctx) {
-  if (edicoes.length === 0) return [];
-  return [paginaIndice(edicoes, ctx), ...edicoes.map((e) => paginaDaEdicao(e, ctx))];
+/**
+ * A página de leitura (`noticias/materia.html?id=...`): o script lê o `id` do endereço, pergunta ao próprio site e mostra o título, a data,
+ * a fonte, a autoria, a linha de licença, "Ver a matéria original" e o texto filtrado. Fica fora do mapa do site e pede para não ser
+ * indexada: o conteúdo é da fonte, e o endereço original é o que vale.
+ */
+function paginaDaMateria({ valores }) {
+  const arquivo = ARQUIVO_MATERIA;
+  const { NOTICIAS_TEXT: T } = doNucleo();
+  const capa = `<p class="migalha"><a href="${rel(arquivo, ARQUIVO_INDICE)}">${esc(T.titulo)}</a></p>
+<h1 data-materia-titulo>${esc(T.tituloDaMateria)}</h1>
+<p class="lead materia-meta" data-materia-meta hidden></p>`;
+  const corpo = colunaTexto(
+    `<article class="materia" data-materia data-ver-original="${esc(T.verOriginal)}">
+${estado('sem-js', T.materiaSemJavaScript, true)}
+${estado('carregando', T.materiaCarregando)}
+${estado('em-breve', T.emBreve)}
+${estado('nao-encontrada', T.materiaNaoEncontrada)}
+${estado('falha', T.materiaFalha)}
+${linksDasFontes()}
+<p class="materia-credito" data-materia-credito hidden></p>
+<p class="materia-licenca" data-materia-licenca hidden></p>
+<p class="materia-original" data-materia-original hidden></p>
+<div class="materia-texto" data-materia-texto hidden></div>
+<p class="nota" data-materia-nota hidden>${esc(T.notaDaMateria)}</p>
+<p class="materia-original" data-materia-original-fim hidden></p>
+</article>
+<p class="voltar"><a href="${rel(arquivo, ARQUIVO_INDICE)}">${esc(T.verTodas)}</a></p>`,
+    'artigo',
+  );
+  const pg = montarPagina({
+    arquivo,
+    titulo: T.tituloDaMateria,
+    descricao: T.descricaoDaMateria,
+    capa,
+    corpo,
+    fonte: capa,
+    valores,
+    classeCapa: 'capa-simples',
+    scripts: [SCRIPT_DAS_NOTICIAS],
+    avisoDeMercado: true,
+    semIndexar: true,
+  });
+  return { arquivo, ...pg };
 }
 
-module.exports = { paginasNoticias, lerEdicoes, hostsDasEdicoes, PASTA_NOTICIAS, TEMAS_DO_RESUMO, ARQUIVO_INDICE };
+/** As páginas de notícias: a lista e a página de leitura sempre (prontas; as rotas é que ligam), e uma página por edição do resumo semanal. */
+function paginasNoticias(edicoes, ctx) {
+  return [paginaIndice(edicoes, ctx), paginaDaMateria(ctx), ...edicoes.map((e) => paginaDaEdicao(e, ctx))];
+}
+
+module.exports = { paginasNoticias, lerEdicoes, hostsDasEdicoes, hostsDasFontesDeNoticias, PASTA_NOTICIAS, TEMAS_DO_RESUMO, ARQUIVO_INDICE, ARQUIVO_MATERIA, SCRIPT_DAS_NOTICIAS };

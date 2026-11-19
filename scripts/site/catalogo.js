@@ -42,11 +42,11 @@ function carregarTs(ts, entradas) {
   }
 }
 
-/** Carrega (uma vez) `learn`, `guide`, as calculadoras, as datas, os planos da assinatura e os indicadores do core. */
+/** Carrega (uma vez) `learn`, `guide`, as calculadoras, as datas, os planos da assinatura, os indicadores e as fontes de notícias do core. */
 function catalogo() {
   if (guardado) return guardado;
   const ts = carregarTypescript();
-  const [learn, guide, calc, datas, plano, indicadores, mercado] = carregarTs(ts, [
+  const [learn, guide, calc, datas, plano, indicadores, mercado, noticias] = carregarTs(ts, [
     'learn/index.ts',
     'guide/index.ts',
     'calculators/index.ts',
@@ -54,6 +54,7 @@ function catalogo() {
     'plano.ts',
     'indicadores/index.ts',
     'indicadores/conteudo.ts',
+    'noticias/fontes.ts',
   ]);
   const publicados = learn.publishedTopics().filter((t) => !t.legacy);
   guardado = {
@@ -106,6 +107,8 @@ function catalogo() {
     /** Indicadores oficiais e páginas de mercado (D-106): os códigos, as contas e os textos de cada número, e o texto das páginas. */
     INDICADORES: indicadores,
     MERCADO: mercado,
+    /** Notícias de fontes públicas (D-117): as fontes, a regra de licença de cada uma e os textos das páginas. */
+    NOTICIAS: noticias,
   };
   return guardado;
 }
