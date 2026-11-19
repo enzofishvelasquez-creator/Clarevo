@@ -107,6 +107,8 @@ posições que dezenas de verificações de telas conferem (a barra de abas, o p
 
 Decisão do Enzo: o modelo de dados já nasce pronto; **nada do Plus aparece no app nem no site** até o Enzo definir.
 
+**Negócio da família (D-116, 19/11/2026).** O negócio compartilhado com outras pessoas (por exemplo, um comércio da família) entra no Plus, depois do lançamento. Regra: qualquer pessoa cria e chama outras; uma só pessoa administra cada negócio (quem criou), e as outras anotam e veem ou só veem. Até lá, o negócio próprio (um por pessoa, privado) fica incluído nos dois planos.
+
 **O que entraria.**
 - Vários negócios por pessoa: o banco já aceita (só `create_business` recusa o segundo, `ja_tem_negocio`); o app trocaria o nome único no
   seletor por uma lista (o seletor já monta as opções a partir dos espaços que a pessoa tem).
