@@ -6,6 +6,7 @@ import {
   centsToInput,
   monthOf,
   type AntesResult,
+  type AntesTaxaTipo,
   type CalcErrorCode,
   type CalcPrefill,
 } from '@clarevo/core';
@@ -15,6 +16,7 @@ import { useMemo, useRef, useState } from 'react';
 import { View, type TextInput } from 'react-native';
 
 import {
+  CalcChoice,
   CalcField,
   CalcNote,
   CalcResult,
@@ -53,6 +55,8 @@ export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-
   const summary = useCommittedSummary(contextId, monthOf(today));
   const form = useCalcForm<Key>(() => ({ preco: '', entrada: '', parcelas: '', taxaMes: '', renda: '', guardar: '', rendimento: '' }));
   const [first, setFirst] = useState(ANTES_FIELDS.primeiraEmUmMes!.default === true);
+  // Taxa de juros do contrato (padrão) ou CET ao mês: com o CET, a conta é uma simulação de custo equivalente (revisão externa de 18/11/2026).
+  const [tipoTaxa, setTipoTaxa] = useState<AntesTaxaTipo>(ANTES_FIELDS.tipoTaxa!.default as AntesTaxaTipo);
   const entradaRef = useRef<TextInput>(null);
   // Aberta de um cadastro ou de algo que já existe: nada a anotar nem a criar de novo.
   const fromContext = useNoteHidden(prefill.origem);
@@ -72,6 +76,7 @@ export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-
           entrada: form.values.entrada,
           parcelas: form.values.parcelas,
           taxaMes: form.values.taxaMes,
+          tipoTaxa,
           primeiraEmUmMes: first,
           renda: rendaText,
           guardar: form.values.guardar,
@@ -80,7 +85,7 @@ export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-
         },
         today,
       ),
-    [form.values, first, rendaText, committed, today],
+    [form.values, tipoTaxa, first, rendaText, committed, today],
   );
   const errors: Partial<Record<string, CalcErrorCode>> = outcome.ok ? {} : outcome.errors;
   const result = outcome.ok ? outcome.result : null;
@@ -97,7 +102,8 @@ export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-
         <CalcField calc={calc} name="preco" />
         <CalcField calc={calc} name="entrada" inputRef={entradaRef} />
         <CalcField calc={calc} name="parcelas" />
-        <CalcField calc={calc} name="taxaMes" />
+        <CalcChoice spec={fields.tipoTaxa!} value={tipoTaxa} onChange={(v) => setTipoTaxa(v === 'cet' ? 'cet' : 'juros')} />
+        <CalcField calc={calc} name="taxaMes" label={tipoTaxa === 'cet' ? ANTES_TEXT.cetRateLabel : undefined} />
         <CalcYesNo spec={fields.primeiraEmUmMes!} value={first} onChange={setFirst} />
       </Card>
 

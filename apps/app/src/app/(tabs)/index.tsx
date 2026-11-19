@@ -1,6 +1,6 @@
-import { COMMITTED_TEXT, ERROR_TEXT, SUMMARY_NAV_TEXT, committedLine, emptyMonthCaption, formatMonthBR, monthOf, payablesMonthParams, toPayCaption } from '@clarevo/core';
+import { BUSINESS_WORDS, COMMITTED_TEXT, ERROR_TEXT, SUMMARY_NAV_TEXT, businessMonth, committedLine, emptyMonthCaption, formatMonthBR, monthOf, payablesMonthParams, toPayCaption } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
-import { AlertCircle, ArrowRight, CalendarClock, ChevronRight, Plus, ShieldCheck } from 'lucide-react-native';
+import { ArrowRight, CalendarClock, CalendarX, ChevronRight, Plus, ShieldCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View, type ScrollView } from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, ReduceMotion } from 'react-native-reanimated';
@@ -79,6 +79,25 @@ export default function ResumoScreen() {
   // Só no mês e no contexto do registro: trocar de mês ou de contexto antes de o destaque sumir não leva o "+ R$" para outro lugar.
   const shownChange = change && change.month === month && change.kind === kind ? change : null;
 
+  // Espaço Negócio (auditoria de 18/11/2026): entradas e saídas, como em "Seu negócio". Num mês com retirada para o Pessoal, o total da
+  // direita inclui as retiradas (o dinheiro saiu do negócio) e o rótulo diz isso.
+  const inBusiness = kind === 'negocio';
+  const withdrawn = inBusiness && contextId && records.data ? businessMonth(records.data, contextId, month).withdrawnCents > 0 : false;
+  const words = {
+    left: inBusiness ? (withdrawn ? BUSINESS_WORDS.kept : BUSINESS_WORDS.left) : 'Diferença do mês',
+    leftCaption: inBusiness ? BUSINESS_WORDS.leftCaption(month, today, withdrawn) : SUMMARY_NAV_TEXT.differenceCaption(month, today),
+    leftCaptionA11y: inBusiness ? BUSINESS_WORDS.leftCaptionA11y(month, today, withdrawn) : SUMMARY_NAV_TEXT.differenceCaptionA11y(month, today),
+    negative: inBusiness ? BUSINESS_WORDS.negative : 'Pagamentos acima dos recebimentos no período',
+    in: inBusiness ? BUSINESS_WORDS.in : 'Recebido',
+    out: inBusiness ? (withdrawn ? BUSINESS_WORDS.outWithWithdrawals : BUSINESS_WORDS.out) : 'Pago',
+    inHint: inBusiness ? BUSINESS_WORDS.inHint : SUMMARY_NAV_TEXT.receivedHint,
+    outHint: inBusiness ? BUSINESS_WORDS.outHint : SUMMARY_NAV_TEXT.paidHint,
+    add: inBusiness ? BUSINESS_WORDS.addOut : 'Anotar gasto',
+    outsTitle: inBusiness ? BUSINESS_WORDS.outsTitle : 'Pagamentos do mês',
+    noOuts: inBusiness ? BUSINESS_WORDS.noOuts(month) : `Nenhum pagamento em ${monthName.toLowerCase()}`,
+    noOutsBody: inBusiness ? BUSINESS_WORDS.noOutsBody : 'Anote um gasto já pago para ver o efeito no mês.',
+  };
+
   // Troca de mês desliza na direção escolhida; troca de contexto só esmaece (CL-V008).
   const entering = (monthDirection > 0 ? FadeInRight : FadeInLeft).duration(motion.context).reduceMotion(ReduceMotion.System);
 
@@ -106,21 +125,21 @@ export default function ResumoScreen() {
               <>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Diferença do mês, ${moneyA11y(s.differenceCents, hidden)}. ${SUMMARY_NAV_TEXT.differenceCaptionA11y(month, today)}`}
+                  accessibilityLabel={`${words.left}, ${moneyA11y(s.differenceCents, hidden)}. ${words.leftCaptionA11y}`}
                   accessibilityHint="Mostra os registros que compõem o total"
                   onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'diferenca' } })}
                   style={(st) => (st as { focused?: boolean }).focused && styles.focusOnBrand}>
                   <Txt variant="label" color={colors.textOnBrand} style={styles.heroLabel}>
-                    Diferença do mês
+                    {words.left}
                   </Txt>
                   <FitMoney cents={s.differenceCents} color={colors.textOnBrand} />
                   <Txt variant="caption" color={colors.textOnBrandSoft}>
-                    {SUMMARY_NAV_TEXT.differenceCaption(month, today)}
+                    {words.leftCaption}
                   </Txt>
                   {/* Com valores ocultos, o valor aparece sem sinal (R$ ••••): a frase do negativo também some, para não revelar o sinal. */}
                   {s.differenceCents < 0 && !hidden ? (
                     <Txt variant="caption" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }}>
-                      Pagamentos acima dos recebimentos no período
+                      {words.negative}
                     </Txt>
                   ) : null}
                 </Pressable>
@@ -132,18 +151,18 @@ export default function ResumoScreen() {
                 ) : null}
                 <View style={styles.split}>
                   <TotalItem
-                    label="Recebido"
+                    label={words.in}
                     cents={s.receivedCents}
                     change={shownChange?.total === 'recebido' ? shownChange.deltaCents : null}
-                    hint={SUMMARY_NAV_TEXT.receivedHint}
+                    hint={words.inHint}
                     onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'recebido' } })}
                   />
                   <TotalItem
-                    label="Pago"
+                    label={words.out}
                     cents={s.paidCents}
                     alignEnd={!narrow}
                     change={shownChange?.total === 'pago' ? shownChange.deltaCents : null}
-                    hint={SUMMARY_NAV_TEXT.paidHint}
+                    hint={words.outHint}
                     onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'pago' } })}
                   />
                 </View>
@@ -165,7 +184,7 @@ export default function ResumoScreen() {
             dois está na tela.
           */}
           {canWrite && !wide ? (
-            <Button label="Anotar gasto" icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
+            <Button label={words.add} icon={Plus} onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })} />
           ) : null}
           <FlashBanner message={notice} />
           {/*
@@ -196,14 +215,15 @@ export default function ResumoScreen() {
           </NoticeQueue>
 
           <>
-            {/* Espaço Negócio (D-113): só com o negócio escolhido; o Resumo do Pessoal e da Família não muda. */}
-            {kind === 'negocio' && contextId ? <BusinessSummaryCard contextId={contextId} month={month} records={records.data} canWrite={canWrite} /> : null}
+            {/* Espaço Negócio (D-113): só com o negócio escolhido; o Resumo do Pessoal e da Família não muda. No computador, o card vai para a
+                coluna da direita, para as duas colunas terem alturas parecidas (auditoria de 18/11/2026). */}
+            {kind === 'negocio' && contextId && !wide ? <BusinessSummaryCard contextId={contextId} month={month} records={records.data} canWrite={canWrite} /> : null}
             <ToPayCard contextId={contextId} canWrite={canWrite} />
 
               <Card>
                 <View style={styles.cardHead}>
                   <Txt variant="title" accessibilityRole="header" aria-level={2}>
-                    Pagamentos do mês
+                    {words.outsTitle}
                   </Txt>
                   <LinkButton label="Ver todos" onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'pago' } })} />
                 </View>
@@ -215,7 +235,7 @@ export default function ResumoScreen() {
                 ) : records.isError || !s ? (
                   <ErrorState message={ERROR_TEXT.carregar_falhou} onRetry={() => records.refetch()} />
                 ) : s.composition.paid.length === 0 ? (
-                  <EmptyState title={`Nenhum pagamento em ${monthName.toLowerCase()}`}>Anote um gasto já pago para ver o efeito no mês.</EmptyState>
+                  <EmptyState title={words.noOuts}>{words.noOutsBody}</EmptyState>
                 ) : (
                   s.composition.paid
                     .slice(0, 3)
@@ -225,28 +245,45 @@ export default function ResumoScreen() {
               {/* Atalhos (D-105): as Análises e o calendário do mês e, no Pessoal, Investir em um toque. Sem título: os blocos aprovados seguem
                   na ordem. No computador, o cartão abre a coluna da direita, à vista sem rolar. */}
               {wide ? null : <SummaryShortcuts contextId={contextId} month={month} currentMonth={currentMonth} personal={kind === 'pessoal'} />}
+              {/* No computador, o orçamento fica na coluna principal, abaixo de "Pagamentos do mês" (auditoria de 18/11/2026: a coluna da
+                  esquerda acabava em Pagamentos e deixava um bloco vazio grande). */}
+              {wide && kind === 'pessoal' ? <BudgetPanel contextId={contextId} month={month} /> : null}
           </>
 
           </View>
           <View style={wide ? styles.sideCol : styles.stack}>
           {wide ? <SummaryShortcuts contextId={contextId} month={month} currentMonth={currentMonth} personal={kind === 'pessoal'} /> : null}
+          {wide && kind === 'negocio' && contextId ? <BusinessSummaryCard contextId={contextId} month={month} records={records.data} canWrite={canWrite} /> : null}
           {wide && kind !== 'negocio' ? <GoalsPanel contextId={contextId} /> : null}
-          {wide && kind === 'pessoal' ? <BudgetPanel contextId={contextId} month={month} /> : null}
-          <LearnCard />
-
-          <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy} hitSlop={8}>
-            <ShieldCheck size={18} color={colors.textSecondary} />
-            <Txt variant="label" color={colors.textSecondary}>
-              Quem vê estes dados?
-            </Txt>
-          </Pressable>
+          {wide ? null : <SummaryEnd />}
           </View>
           </View>
+          {/* No computador, o cartão lima e "Quem vê estes dados?" numa linha inteira, abaixo das duas colunas. */}
+          {wide ? (
+            <View style={styles.wideEnd}>
+              <SummaryEnd />
+            </View>
+          ) : null}
         </Body>
       </Screen>
       {/* Tour de boas-vindas (D-049(2)): um modal na primeira entrada, sem mudar a estrutura do Resumo. */}
       <WelcomeTour personal={kind === 'pessoal'} contextId={contextId} />
     </View>
+  );
+}
+
+/** O fim do Resumo: o cartão lima e "Quem vê estes dados?". */
+function SummaryEnd() {
+  return (
+    <>
+      <LearnCard />
+      <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy} hitSlop={8}>
+        <ShieldCheck size={18} color={colors.textSecondary} />
+        <Txt variant="label" color={colors.textSecondary}>
+          Quem vê estes dados?
+        </Txt>
+      </Pressable>
+    </>
   );
 }
 
@@ -284,7 +321,7 @@ function LearnCard() {
  */
 function ToPayCard({ contextId, canWrite }: { contextId: string | undefined; canWrite: boolean }) {
   const { today } = useSession();
-  const { month, currentMonth } = useView();
+  const { month, currentMonth, space: kind } = useView();
   const hidden = useValuesHidden();
   const commitments = useCommitments(contextId, month);
   const s = commitments.summary;
@@ -341,10 +378,12 @@ function ToPayCard({ contextId, canWrite }: { contextId: string | undefined; can
           style={(st) => [styles.toPayArea, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
           <View style={{ flex: 1, gap: space[1] }}>
             <Money cents={s.toPayCents} />
+            {/* Contas vencidas em texto neutro, em negrito, com um calendário (D-030: a cor de erro fica só para falhas ao salvar; regra de
+                não usar cor de alerta em dinheiro; auditoria de 18/11/2026). Antes, ícone de alerta e cor de erro (D-021 item 11). */}
             {allOverdue && caption.main ? (
               <View style={styles.overdueRow}>
-                <AlertCircle size={16} color={colors.error} aria-hidden />
-                <Txt variant="caption" color={colors.error} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
+                <CalendarX size={16} color={colors.text} aria-hidden />
+                <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
                   {caption.main}
                 </Txt>
               </View>
@@ -355,8 +394,8 @@ function ToPayCard({ contextId, canWrite }: { contextId: string | undefined; can
             )}
             {caption.overdue ? (
               <View style={styles.overdueRow}>
-                <AlertCircle size={16} color={colors.error} aria-hidden />
-                <Txt variant="caption" color={colors.error} style={{ fontFamily: fonts.bold }}>
+                <CalendarX size={16} color={colors.text} aria-hidden />
+                <Txt variant="caption" color={colors.text} style={{ fontFamily: fonts.bold }}>
                   {caption.overdue}
                 </Txt>
               </View>
@@ -371,7 +410,8 @@ function ToPayCard({ contextId, canWrite }: { contextId: string | undefined; can
           <CalendarClock size={22} color={colors.textSecondary} aria-hidden />
         </Pressable>
       )}
-      <CommittedRow contextId={contextId} />
+      {/* A renda comprometida é do Pessoal e da Família: no negócio, não aparece (auditoria de 18/11/2026). */}
+      {kind === 'negocio' ? null : <CommittedRow contextId={contextId} />}
       {canWrite ? <LinkButton label="Anotar conta a pagar" icon={Plus} style={styles.toPayLink} onPress={() => router.push('/a-pagar/nova')} /> : null}
     </Card>
   );
@@ -501,6 +541,7 @@ const styles = StyleSheet.create({
   dashboard: { flexDirection: 'row', alignItems: 'flex-start', gap: space[6] },
   mainCol: { flex: 3, minWidth: 0, gap: space[4] },
   sideCol: { flex: 2, minWidth: 0, gap: space[4] },
+  wideEnd: { gap: space[4], marginTop: space[4] },
   changePill: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[2], paddingVertical: 1 },
   focusOnBrand: { outlineWidth: 3, outlineColor: colors.accent, outlineStyle: 'solid', outlineOffset: 2 } as object,
   toPayArea: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3], minHeight: 44, borderRadius: radius.sm },

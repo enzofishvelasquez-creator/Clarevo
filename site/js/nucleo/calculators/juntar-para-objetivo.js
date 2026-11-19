@@ -36,7 +36,15 @@ export function calcJuntarParaObjetivo(input) {
     if (missing === 0) {
         return {
             ok: true,
-            result: { ...base, reached: true, monthlyCents: null, months: null, resultLines: ['Com estes números, você já tem o valor do objetivo.'], hypotheses, notes: [] },
+            result: {
+                ...base,
+                reached: true,
+                monthlyCents: 0,
+                months: 0,
+                resultLines: ['Com estes números, você já tem o valor do objetivo: meta atingida, sem precisar guardar mais por mês.'],
+                hypotheses,
+                notes: [],
+            },
         };
     }
     const faltam = `Faltam ${formatBRL(missing)} para chegar a ${formatBRL(alvo)}.`;

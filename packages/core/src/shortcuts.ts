@@ -12,7 +12,12 @@ import type { ToPaySummary } from './summary';
 export const ORGANIZE_TEXT = {
   title: 'Organizar',
   payables: { title: 'Contas a pagar', fallback: 'Vencidas, a vencer e próximos meses' },
-  series: { title: 'Gastos fixos e parcelamentos', fallback: 'Aluguel, escola, financiamentos e contas do ano' },
+  series: {
+    title: 'Gastos fixos e parcelamentos',
+    fallback: 'Aluguel, escola, financiamentos e contas do ano',
+    /** No espaço Negócio, exemplos do negócio (auditoria de 18/11/2026: a legenda trazia exemplos de casa). */
+    businessFallback: 'Aluguel do ponto, DAS, maquininha e fornecedor',
+  },
   calculators: { title: CALC_UI_TEXT.shortcutTitle, caption: CALC_UI_TEXT.shortcutCaption },
 } as const;
 
@@ -48,9 +53,10 @@ export function payablesCaptionFromSummary(s: Pick<ToPaySummary, 'toPayCents' | 
  * "Nenhum cadastrado. Aluguel, escola, financiamento, IPVA", "1 cadastrado", "4 cadastrados" e, com alguma conta do ano
  * entre eles, "5 cadastrados, com as contas do ano".
  */
-export function seriesCaptionShort(list: readonly Pick<CommitmentSeries, 'kind'>[]): string {
+export function seriesCaptionShort(list: readonly Pick<CommitmentSeries, 'kind'>[], business = false): string {
   const n = list.length;
-  if (n === 0) return 'Nenhum cadastrado. Aluguel, escola, financiamento, IPVA';
+  // No espaço Negócio, os exemplos são do negócio (auditoria de 18/11/2026).
+  if (n === 0) return business ? 'Nenhum cadastrado. Aluguel do ponto, DAS, maquininha, fornecedor' : 'Nenhum cadastrado. Aluguel, escola, financiamento, IPVA';
   if (n === 1) return '1 cadastrado';
   return list.some((s) => s.kind === 'anual') ? `${n} cadastrados, com as contas do ano` : `${n} cadastrados`;
 }

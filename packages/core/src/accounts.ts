@@ -49,6 +49,7 @@ export const ACCOUNTS_TEXT = {
   add: 'Adicionar banco ou carteira',
   manage: 'Gerenciar bancos e carteira',
   limitNote: 'Você tem 10 bancos e carteiras ativos. Arquive um para adicionar outro.',
+  /** No formulário de banco ou carteira. No card de Conta, a introdução já diz que não há saldo (auditoria de 18/11/2026: a frase se repetia). */
   balanceNote: 'A Clarevo não calcula o saldo do banco nem da carteira.',
   /** Tela "Sua primeira conta": não há campo de saldo (o app não calcula saldo). */
   firstAccountNote: 'A Clarevo mostra o que entrou e o que saiu no mês. Ela não mostra o saldo do banco.',

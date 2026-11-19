@@ -31,6 +31,11 @@ export const DIVIDIR_DISCLAIMER = 'Cálculo com os valores que você informou. A
 export function calcDisclaimer(slug) {
     return slug === 'dividir-contas' ? DIVIDIR_DISCLAIMER : CALC_DISCLAIMER;
 }
+export const CALC_NOTICE = 'Simulação com os seus números. Não é recomendação nem oferta de crédito.';
+export const DIVIDIR_NOTICE = 'Cálculo com os seus números. O que vale é o combinado da casa.';
+export function calcNotice(slug) {
+    return slug === 'dividir-contas' ? DIVIDIR_NOTICE : CALC_NOTICE;
+}
 export const CALC_INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
 export const COTA_UNICA_TITLE = 'Cota única ou parcelado?';
 export const COTA_UNICA_SUBTITLE = 'Descubra os juros embutidos no parcelamento da conta do ano';

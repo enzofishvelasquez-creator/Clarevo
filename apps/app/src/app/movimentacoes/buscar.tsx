@@ -34,6 +34,7 @@ import { RecordRow } from '@/components/record-row';
 import { ChoiceGroup } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, Chip, Screen, Skeleton, TextField, Txt, styles as ui } from '@/components/ui';
+import { useContextChange } from '@/lib/context-change';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { useAccounts, useCards, useRecordSearch, useWork } from '@/state/data';
@@ -80,6 +81,8 @@ export default function BuscarScreen() {
     setRecordLimit(SEARCH_PAGE);
     setPurchaseLimit(SEARCH_PAGE);
   };
+  // Outro espaço pela pílula (D-113b): a conta escolhida no filtro era do espaço de antes (a categoria já segue o espaço).
+  useContextChange(contextId, () => update({ accountId: null }));
 
   // O texto e os valores digitados só valem depois de um instante parado (o texto vai ao servidor como filtro, então não consulta a
   // cada tecla); o tipo e o período valem na hora.
@@ -170,7 +173,7 @@ export default function BuscarScreen() {
   return (
     // Android: o teclado não cobre "Valor mínimo" e "Valor máximo" (D-110), como nos outros formulários.
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={KEYBOARD_BEHAVIOR}>
-      <SubHeader title={T.title} right={<ContextPill label="Pessoal" />} help="buscar" />
+      <SubHeader title={T.title} right={<ContextPill label="Pessoal" switchable />} help="buscar" />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
         <Txt color={colors.textSecondary}>{T.intro}</Txt>

@@ -1,5 +1,6 @@
 import {
   ALLOCATION_DIMENSION_LABEL,
+  PERFORMANCE_TEXT,
   FGC_TEXT,
   INSTITUTION_FGC_TEXT,
   PLAN_REVIEW_TEXT,
@@ -25,7 +26,7 @@ import {
   type InvestmentPlan,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { Calculator, CalendarClock, ChevronRight, FileText, PiggyBank } from 'lucide-react-native';
+import { Calculator, CalendarClock, ChartLine, ChevronRight, FileText, PiggyBank } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -316,6 +317,33 @@ export function InvestmentPlanCard({ plan, movements }: { plan: InvestmentPlan |
 }
 
 /** Atalhos: o convite do plano de aportes (sem plano), o resumo para a declaração e a calculadora de rendimentos líquidos. */
+/**
+ * Desempenho (auditoria de 18/11/2026): um card próprio logo abaixo do total da aba Investir, no desenho dos atalhos do fim da aba, para a
+ * comparação com CDI, IPCA e poupança não ficar escondida num link pequeno dentro do card azul.
+ */
+export function PerformanceCard() {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityHint={PERFORMANCE_TEXT.openHint}
+      onPress={() => router.push('/investimento/desempenho')}
+      style={(st) => [ui.card, styles.linkRow, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
+      <View style={styles.linkIcon}>
+        <ChartLine size={20} color={colors.brandText} aria-hidden />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+          {PERFORMANCE_TEXT.cardTitle}
+        </Txt>
+        <Txt variant="caption" color={colors.textSecondary}>
+          {PERFORMANCE_TEXT.cardCaption}
+        </Txt>
+      </View>
+      <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
+    </Pressable>
+  );
+}
+
 export function InvestmentLinks({ showPlan = false }: { showPlan?: boolean }) {
   const link = (label: string, hint: string, Icon: typeof FileText, href: Parameters<typeof router.push>[0]) => (
     <Pressable

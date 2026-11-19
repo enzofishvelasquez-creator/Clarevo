@@ -60,20 +60,29 @@ export function calcParceladoOuAVista(input) {
     const financedCents = first ? aVista - parcela : aVista;
     const financedInstallments = first ? n - 1 : n;
     const noInterest = differenceCents <= 0;
-    const monthlyRate = noInterest || financedCents <= 0 ? null : impliedMonthlyRate(financedCents, parcela, financedInstallments);
+    const firstCovers = financedCents <= 0;
+    const monthlyRate = differenceCents === 0 ? 0 : noInterest || firstCovers ? null : impliedMonthlyRate(financedCents, parcela, financedInstallments);
     const annualRate = monthlyRate === null ? null : equivalentAnnualRate(monthlyRate);
     const base = cota ? 'a cota única' : 'o preço à vista';
     const resultLines = [];
-    if (noInterest) {
-        resultLines.push(`Não há juros embutidos: o total parcelado é igual ou menor que ${base}.`);
+    if (differenceCents === 0) {
+        resultLines.push(`Com estes números, o total parcelado é igual ${cota ? 'à cota única' : 'ao preço à vista'}: a taxa embutida é de 0% ao mês.`);
+        resultLines.push('Parcelar só adia os pagamentos, sem custo a mais em reais.');
+    }
+    else if (noInterest) {
+        resultLines.push(`Com estes números, o total parcelado é ${formatBRL(-differenceCents)} menor que ${base}.`);
+        resultLines.push('Não há juros positivos nas parcelas.');
     }
     else {
         resultLines.push(cota
             ? `Com estes números, parcelar custa ${formatBRL(differenceCents)} a mais que a cota única.`
             : `Com estes números, o parcelado custa ${formatBRL(differenceCents)} a mais.`);
-        resultLines.push(monthlyRate !== null && annualRate !== null
-            ? `Nas parcelas há juros embutidos de ${rateText(monthlyRate)} ao mês (${rateText(annualRate)} ao ano).`
-            : `Como a primeira parcela já cobre ${base}, não há uma taxa ao mês para mostrar.`);
+        resultLines.push(firstCovers
+            ? `Como a primeira parcela já cobre ${base}, nenhuma taxa de juros faz as parcelas valerem ${base}: não há taxa ao mês para mostrar.`
+            : monthlyRate !== null && annualRate !== null
+                ? `Nas parcelas há juros embutidos de ${rateText(monthlyRate)} ao mês (${rateText(annualRate)} ao ano).`
+                :
+                    'Nas parcelas há juros embutidos de mais de 10.000% ao mês.');
     }
     resultLines.push(`Total parcelado: ${formatBRL(totalCents)} (${n} × ${formatBRL(parcela)}).`);
     const hypotheses = [

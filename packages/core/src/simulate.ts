@@ -29,6 +29,16 @@ import { MAX_RECORD_CENTS, centsToInput, formatBRL, type Cents } from './money';
  *      meta corrigida. No prazo ("Em quanto tempo"), a meta corrigida depende do mês: o menor n com final(n) ≥ meta × (1 + π)^n.
  *   Exemplo do retorno: R$ 10.000,00 em 60 meses, 3,4% ao ano e inflação de 12% ao ano. Mostrando: R$ 152,92 por mês, total de
  *   R$ 10.000,63, que vale R$ 5.674,62 de hoje. Corrigindo: meta de R$ 17.623,42 e R$ 269,49 por mês (sem rendimento, R$ 293,73).
+ * - Revisão externa de 18/11/2026: o prazo com a meta corrigida pode não ser monotônico (com inflação acima do rendimento e aportes fixos,
+ *   a condição pode ficar verdadeira e depois voltar a falsa: meta de R$ 10.000,00 de hoje, R$ 1.000,00 por mês, sem rendimento e 30% de
+ *   inflação ao ano alcança no mês 14 e não alcança mais depois). Por isso o prazo examina os meses de 1 a 600 em ordem e para no
+ *   primeiro alcance, sem bisseção. Valor já guardado que cumpre a meta: prazo 0 e R$ 0,00 por mês, antes de qualquer busca (com a meta
+ *   corrigida em "Quanto guardar por mês", a meta da conta é a corrigida até o fim do prazo). A taxa da conta é a mensal equivalente
+ *   completa, nunca a arredondada da tela (0,80% para 10% ao ano é só exibição: a taxa é 0,797414...%).
+ * - Política do centavo: cada valor mostrado é calculado a partir dos valores mostrados antes dele. O total no fim é arredondado para baixo
+ *   no centavo, e o valor em dinheiro de hoje é esse total mostrado ÷ (1 + π)^n, de novo para baixo (R$ 100.728,79 ÷ 1,045^10 =
+ *   R$ 64.862,05; do total sem arredondar daria R$ 64.862,06): a pessoa refaz a conta com os números da tela. Do mesmo jeito, a meta
+ *   corrigida é arredondada no centavo e o valor por mês é o menor que alcança essa meta mostrada.
  * - Só o fator de juros usa ponto flutuante de 64 bits; entradas e saídas são centavos inteiros. O fator é calculado
  *   com log1p e expm1 ((1 + i)^n = e^(n × ln(1 + a) ÷ 12), 1 + i = e^(ln(1 + a) ÷ 12)), a mesma conta da spec2 sem a
  *   perda de precisão de (1 + i) − 1 com taxas pequenas e prazos longos.
@@ -376,15 +386,18 @@ export interface SimulationTexts {
 export interface SimulationResult {
   mode: SimulationMode;
   input: SimulationInput;
-  /** Quanto já tem ≥ quanto quer juntar: sem conta nem gráfico. */
+  /**
+   * Quanto já tem ≥ a meta da conta (a informada, ou a corrigida até o fim do prazo em "Quanto guardar por mês" com "Corrigir a meta"):
+   * sem conta nem gráfico, prazo 0 e R$ 0,00 por mês.
+   */
   reached: boolean;
   /** Não alcança em 600 meses na hipótese (só em em-quanto-tempo). */
   unreachable: boolean;
-  /** Por mês: calculado (quanto-guardar, na hipótese) ou informado. null quando reached. */
+  /** Por mês: calculado (quanto-guardar, na hipótese) ou informado; 0 quando reached. */
   monthlyCents: Cents | null;
   /** quanto-guardar: por mês sem rendimento; null nos outros modos. */
   monthlyWithoutYieldCents: Cents | null;
-  /** Prazo: calculado (em-quanto-tempo; null quando não alcança) ou informado. null quando reached. */
+  /** Prazo: calculado (em-quanto-tempo; null quando não alcança) ou informado; 0 quando reached. */
   months: number | null;
   /** em-quanto-tempo: prazo sem rendimento (null quando passa de 600 meses); null nos outros modos. */
   monthsWithoutYield: number | null;
@@ -464,11 +477,21 @@ function resultTooHigh(input: SimulationInput): boolean {
   return plan !== null && rawFinal(input.initialCents, plan.monthly, plan.months, input.rateBp) > SIMULATE_RESULT_MAX_CENTS;
 }
 
+/**
+ * O que já tem cumpre a meta da conta: em "Quanto guardar por mês", a meta até o fim do prazo (a corrigida, com "Corrigir a meta"); em
+ * "Em quanto tempo", a meta de hoje (no mês 0, a corrigida é a própria meta). Nunca em quanto-ter.
+ */
+function alreadyReached(input: SimulationInput): boolean {
+  if (input.mode === 'quanto-ter') return false;
+  const goal = input.mode === 'quanto-guardar' ? goalOf(input, input.months!) : input.targetCents!;
+  return input.initialCents >= goal;
+}
+
 /** Valor por mês e prazo da composição (calculando o que falta); null quando já alcançou ou não alcança. */
 function planOf(input: SimulationInput): { monthly: Cents; months: number } | null {
-  const { mode, targetCents, initialCents, rateBp } = input;
+  const { mode, initialCents, rateBp } = input;
   if (mode === 'quanto-ter') return { monthly: input.monthlyCents!, months: input.months! };
-  if (initialCents >= targetCents!) return null;
+  if (alreadyReached(input)) return null;
   if (mode === 'quanto-guardar') return { monthly: monthlyForTarget(goalOf(input, input.months!), initialCents, input.months!, rateBp), months: input.months! };
   const months = monthsOf(input, input.monthlyCents!, rateBp);
   return months === null ? null : { monthly: input.monthlyCents!, months };
@@ -513,14 +536,15 @@ export function simulate(input: SimulationInput): SimulationResult {
   // "Mostrar em dinheiro de hoje" com uma meta: a dica de como manter o poder de compra (a meta e o valor por mês não mudam aqui).
   const showTip = inflationBp !== null && inflationBp > 0 && !adjust && mode !== 'quanto-ter' ? [T.adjustTip(targetCents!)] : [];
 
-  if (mode !== 'quanto-ter' && initialCents >= targetCents!) {
+  if (alreadyReached(input)) {
+    // Prazo 0 e R$ 0,00 por mês, antes de qualquer busca (revisão externa de 18/11/2026).
     return {
       ...base,
       ...empty,
       reached: true,
       unreachable: false,
-      monthlyCents: null,
-      months: null,
+      monthlyCents: 0,
+      months: 0,
       growth: null,
       texts: { intro: null, highlight: T.reached, lines: [] },
     };

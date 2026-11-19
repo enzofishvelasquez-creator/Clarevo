@@ -73,7 +73,8 @@ export const EXPORT_TEXT = {
   title: 'Exportar meus dados',
   intro:
     'Leve seus gastos e recebimentos para uma planilha ou guarde um resumo em PDF. O arquivo é montado neste aparelho, com os registros que o app já lê. A Clarevo não guarda cópia dele.',
-  portability: 'Poder levar seus dados com você se inspira na portabilidade prevista no art. 18, V, da LGPD. Esta tela não é parecer jurídico.',
+  /** Só a referência (auditoria de 18/11/2026: "Esta tela não é parecer jurídico" saiu; "se inspira" já diz que é só referência). */
+  portability: 'Poder levar seus dados com você se inspira na portabilidade prevista no art. 18, V, da LGPD.',
   periodLabel: 'Período',
   periods: {
     mes: 'Este mês',

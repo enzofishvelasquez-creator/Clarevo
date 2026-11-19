@@ -179,7 +179,7 @@ describe('Espaço Negócio: categorias e regras puras (D-113)', () => {
   });
 });
 
-describe('Como está o negócio: entrou, saiu e sobrou', () => {
+describe('Seu negócio: entrou, saiu e sobrou', () => {
   const list = [
     rec({ kind: 'receita', amountCents: 120_000, category: 'Vendas' }),
     rec({ amountCents: 30_000, category: 'Material e mercadoria' }),
@@ -394,7 +394,7 @@ describe('Espaço Negócio na memória (as mesmas regras da migração 0042)', (
     expect(w.personalRecord).toMatchObject({ contextId: personal, kind: 'receita', category: 'Retirada do negócio', description: 'Retirada de Sacolé da Bia', pairedRecordId: w.businessRecord.id });
     expect(await repo.createBusinessWithdrawal(key, b.id, input)).toEqual(w);
     expect(await code(repo.createBusinessWithdrawal(key, b.id, { ...input, amountCents: 50_001 }))).toBe('chave_reutilizada');
-    // Cada lado conta uma vez, no próprio espaço; em "Como está o negócio", a retirada fica fora de Saiu.
+    // Cada lado conta uma vez, no próprio espaço; em "Seu negócio", a retirada fica fora de Saiu.
     const bRecords = await repo.listRecords(b.id, '2026-11');
     expect(summarizeMonth(bRecords, b.id, '2026-11')).toMatchObject({ receivedCents: 120_000, paidCents: 50_000 });
     expect(businessMonth(bRecords, b.id, '2026-11')).toMatchObject({ outCents: 0, leftCents: 120_000, withdrawnCents: 50_000, keptCents: 70_000 });

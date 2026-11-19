@@ -32,12 +32,12 @@ export function calcCustoPorAno(input) {
         case 'dia_util':
             monthlyCents = valor * WORKDAYS_PER_MONTH;
             yearlyCents = monthlyCents * 12;
-            hypotheses = ['22 dias úteis por mês.', '12 meses por ano.'];
+            hypotheses = [`${WORKDAYS_PER_MONTH} dias úteis por mês (${WORKDAYS_PER_MONTH * 12} por ano), sem calendário nem feriados.`, '12 meses por ano.'];
             break;
         case 'semana':
             monthlyCents = roundDiv(valor * WEEKS_PER_YEAR, 12);
             yearlyCents = valor * WEEKS_PER_YEAR;
-            hypotheses = ['52 semanas por ano.', 'Por mês, o valor do ano dividido por 12.'];
+            hypotheses = [`${WEEKS_PER_YEAR} semanas por ano (${WEEKS_PER_YEAR * 7} dias), sem contar semanas incompletas.`, 'Por mês, o valor do ano dividido por 12.'];
             break;
         case 'mes':
             monthlyCents = valor;
@@ -46,12 +46,14 @@ export function calcCustoPorAno(input) {
             break;
     }
     const dailyCents = frequencia === 'dia_util' ? null : roundDiv(yearlyCents, DAYS_PER_YEAR);
+    if (monthlyCents * 12 !== yearlyCents)
+        hypotheses.push('O total do ano é a referência: o valor por mês é arredondado, e 12 vezes ele pode diferir do ano em alguns centavos.');
     if (dailyCents !== null)
-        hypotheses.push('Por dia, o valor do ano dividido por 365.');
+        hypotheses.push(`Média por dia corrido: o valor do ano dividido por ${DAYS_PER_YEAR} dias, não o gasto de um dia de consumo.`);
     hypotheses.push('O mesmo valor em todos os períodos.');
     const resultLines = [`Com estes números, o gasto soma ${formatBRL(yearlyCents)} por ano.`, `Por mês, fica em ${formatBRL(monthlyCents)}.`];
     if (dailyCents !== null)
-        resultLines.push(`Por dia, fica em ${formatBRL(dailyCents)}.`);
+        resultLines.push(`Média por dia corrido: ${formatBRL(dailyCents)}.`);
     return {
         ok: true,
         result: {

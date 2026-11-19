@@ -1,6 +1,7 @@
 import {
   ACCOUNTS_TEXT,
   BUDGET_TEXT,
+  BUSINESS_WORDS,
   CALENDAR_TEXT,
   CARDS_TEXT,
   ERROR_TEXT,
@@ -74,6 +75,7 @@ function organizeShortcuts(
   budget: BudgetSummary | null,
   month: IsoMonth,
   currentMonth: IsoMonth,
+  business = false,
 ): Shortcut[] {
   return [
     {
@@ -93,7 +95,7 @@ function organizeShortcuts(
     {
       icon: Repeat,
       title: ORGANIZE_TEXT.series.title,
-      caption: series ?? ORGANIZE_TEXT.series.fallback,
+      caption: series ?? (business ? ORGANIZE_TEXT.series.businessFallback : ORGANIZE_TEXT.series.fallback),
       open: () => router.push('/gastos-fixos'),
     },
     {
@@ -134,6 +136,8 @@ export default function MovimentacoesScreen() {
   const work = useWork().data;
   const contextId = work?.contextId;
   const canWrite = work?.canWrite ?? true;
+  // Espaço Negócio (auditoria de 18/11/2026): entradas e saídas, como em "Seu negócio"; o Pessoal e a Família continuam como sempre.
+  const inBusiness = work?.contextKind === 'negocio';
   const records = useMonthRecords(contextId, month);
   const commitments = useCommitments(contextId, month);
   const seriesList = useSeriesList(contextId);
@@ -141,11 +145,12 @@ export default function MovimentacoesScreen() {
   const budget = useMonthBudget(contextId, month);
   const shortcuts = organizeShortcuts(
     commitments.summary ? payablesCaptionFromSummary(commitments.summary, today) : null,
-    seriesList.data ? seriesCaptionShort(seriesList.data) : null,
+    seriesList.data ? seriesCaptionShort(seriesList.data, inBusiness) : null,
     cardsCaption(cardsOverview.data ?? null, today),
     budget.summary,
     month,
     currentMonth,
+    inBusiness,
   );
   const [filter, setFilter] = useState<Filter>('todos');
   // Conta de origem (D-043): o filtro e o nome na linha só aparecem com 2 ou mais contas ativas.
@@ -174,13 +179,13 @@ export default function MovimentacoesScreen() {
   const actions = canWrite ? (
     <View style={styles.actions}>
       <Button
-        label="Anotar gasto"
+        label={inBusiness ? BUSINESS_WORDS.addOut : 'Anotar gasto'}
         icon={Plus}
         style={styles.action}
         onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })}
       />
       <Button
-        label="Registrar recebimento"
+        label={inBusiness ? BUSINESS_WORDS.addIn : 'Registrar recebimento'}
         icon={ArrowDownLeft}
         tone="soft"
         style={styles.action}
@@ -214,11 +219,12 @@ export default function MovimentacoesScreen() {
       {/* Os totais abrem a composição do mês (docs/10 A10), como o Recebido e o Pago do Resumo. */}
       {(
         [
-          { tipo: 'recebido', label: 'Recebido', cents: s.receivedCents, color: colors.success },
+          // Valores numa cor só (auditoria de 18/11/2026): a direção já está no rótulo.
+          { tipo: 'recebido', label: 'Recebido', cents: s.receivedCents, color: colors.text },
           { tipo: 'pago', label: 'Pago', cents: s.paidCents, color: undefined },
         ] as const
       ).map((t) => {
-        const title = `${t.label} em ${formatMonthBR(month).split(' ')[0]!.toLowerCase()}`;
+        const title = inBusiness ? (t.tipo === 'recebido' ? BUSINESS_WORDS.inMonth(month) : BUSINESS_WORDS.outMonth(month)) : `${t.label} em ${formatMonthBR(month).split(' ')[0]!.toLowerCase()}`;
         return (
           <Pressable
             key={t.tipo}
@@ -246,7 +252,7 @@ export default function MovimentacoesScreen() {
     <>
       <View style={styles.filterRow}>
         <View style={[styles.filters, { flex: 1 }]} accessibilityRole="radiogroup" accessibilityLabel="Mostrar">
-          {FILTERS.map((f) => (
+          {FILTERS.map((f) => ({ ...f, label: inBusiness && f.value !== 'todos' ? (f.value === 'receita' ? BUSINESS_WORDS.filterIn : BUSINESS_WORDS.filterOut) : f.label })).map((f) => (
             <Chip key={f.value} label={f.label} selected={filter === f.value} onPress={() => setFilter(f.value)} />
           ))}
         </View>
@@ -314,7 +320,9 @@ export default function MovimentacoesScreen() {
             ) : undefined
           }>
           {filter === 'todos' && accountId === null
-            ? 'Recebimentos e gastos já realizados aparecem aqui, do mais recente para o mais antigo.'
+            ? inBusiness
+              ? BUSINESS_WORDS.emptyList
+              : 'Recebimentos e gastos já realizados aparecem aqui, do mais recente para o mais antigo.'
             : accountId !== null
               ? 'Nenhum registro desta conta no mês.'
               : 'Nenhum registro deste tipo no mês.'}
@@ -462,7 +470,9 @@ const styles = StyleSheet.create({
   action: { flexGrow: 1, flexBasis: 220, alignSelf: 'auto' },
   totals: { flexDirection: 'row', gap: space[3], flexWrap: 'wrap' },
   totalPress: { flexGrow: 1, flexBasis: 140 },
-  total: { flexGrow: 1, padding: space[4], gap: space[1] },
+  // Os dois cartões ficam com a mesma altura, e o valor, embaixo: com "Recebido em outubro" em duas linhas e "Pago em outubro" em uma, os
+  // valores continuam na mesma altura (auditoria de 18/11/2026).
+  total: { flexGrow: 1, padding: space[4], gap: space[1], justifyContent: 'space-between' },
   totalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] },
   totalValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 },
   filters: { flexDirection: 'row', gap: space[2], flexWrap: 'wrap' },
@@ -474,6 +484,7 @@ const styles = StyleSheet.create({
   shortcutIcon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
   focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as object,
   wideRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[6] },
-  wideSide: { width: 340, gap: space[4] },
+  // 312 px (antes 340): a tabela da direita ganha espaço para a categoria e a conta (auditoria de 18/11/2026).
+  wideSide: { width: 312, gap: space[4] },
   wideMain: { flex: 1, minWidth: 0, gap: space[4] },
 });

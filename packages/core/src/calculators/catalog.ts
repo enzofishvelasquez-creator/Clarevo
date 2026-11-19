@@ -71,6 +71,19 @@ export function calcDisclaimer(slug: CalcSlug): string {
   return slug === 'dividir-contas' ? DIVIDIR_DISCLAIMER : CALC_DISCLAIMER;
 }
 
+/**
+ * A linha curta do topo de cada calculadora no app (auditoria de 18/11/2026: a faixa azul com o aviso vinha antes do formulário, como
+ * primeira coisa da tela). Continua visível sem rolar em 360 px, numa linha de legenda. O site usa o aviso completo (`calcDisclaimer`).
+ */
+export const CALC_NOTICE = 'Simulação com os seus números. Não é recomendação nem oferta de crédito.';
+/** A linha curta de "Dividir as contas da casa" (ali não há taxa nem crédito). */
+export const DIVIDIR_NOTICE = 'Cálculo com os seus números. O que vale é o combinado da casa.';
+
+/** A linha curta de cada calculadora no app (a lista "Calculadoras" usa CALC_NOTICE). */
+export function calcNotice(slug?: CalcSlug): string {
+  return slug === 'dividir-contas' ? DIVIDIR_NOTICE : CALC_NOTICE;
+}
+
 /** Texto de abertura da tela "Calculadoras". */
 export const CALC_INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
 

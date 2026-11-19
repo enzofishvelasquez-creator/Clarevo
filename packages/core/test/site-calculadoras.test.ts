@@ -119,7 +119,8 @@ describe('site público: núcleo das calculadoras (o código do core no navegado
     { modulo: 'quitar-antes', funcao: 'calcQuitarAntes', args: [{ parcela: '850,00', restantes: '24', taxaMes: '1,5', modo: 'ultimas', quantas: '30' }] },
     { modulo: 'multa-e-juros', funcao: 'calcMultaEJuros', args: [{ valor: '200,00', multaPct: '2', jurosMesPct: '1', dias: '15' }] },
     { modulo: 'multa-e-juros', funcao: 'calcMultaEJuros', args: [{ valor: '0', multaPct: '21', jurosMesPct: '1,234', dias: '4000' }] },
-    // O modo "Fatura do cartão" (D-093): rotativo, mora, multa e IOF; com 365 dias, o teto da Lei 14.690/2023; e os erros dos campos da fatura.
+    // O modo "Fatura do cartão" (D-093): rotativo, mora, multa e IOF; com 365 dias, só o primeiro ciclo (revisão externa de 18/11/2026); e os
+    // erros dos campos da fatura.
     { modulo: 'multa-e-juros', funcao: 'calcMultaEJuros', args: [{ modo: 'fatura', valor: '1.000,00', rotativoPct: '15', moraPct: '1', multaPct: '2', jurosMesPct: '', dias: '30' }] },
     { modulo: 'multa-e-juros', funcao: 'calcMultaEJuros', args: [{ modo: 'fatura', valor: '1.000,00', rotativoPct: '15', moraPct: '1', multaPct: '2', jurosMesPct: '', dias: '365' }] },
     { modulo: 'multa-e-juros', funcao: 'calcMultaEJuros', args: [{ modo: 'fatura', valor: '', rotativoPct: '100', moraPct: '20,01', multaPct: '2', jurosMesPct: '', dias: '30' }] },
@@ -477,17 +478,19 @@ const errosDaFatura = a.erros();
 a.preencher({ valor: '1.000,00', rotativoPct: '15', moraPct: '1', multaPct: '2', dias: '30' });
 const resultadoDaFatura = a.resultado();
 a.preencher({ dias: '365' });
+const primeiroCiclo = a.resultado();
+a.preencher({ dias: '30', rotativoPct: '99' });
 const comTeto = a.resultado();
 a.escolher('conta');
 const deVolta = semTela(a.tela());
 const b = abrir({ modo: 'fatura' });
-process.stdout.write(JSON.stringify({ conta, resultadoDaConta, fatura, modoDepois, errosDaFatura, resultadoDaFatura, comTeto, deVolta, peloEndereco: semTela(b.tela()), modoPeloEndereco: b.ctx.modo }));
+process.stdout.write(JSON.stringify({ conta, resultadoDaConta, fatura, modoDepois, errosDaFatura, resultadoDaFatura, primeiroCiclo, comTeto, deVolta, peloEndereco: semTela(b.tela()), modoPeloEndereco: b.ctx.modo }));
 `,
       );
       const r = spawnSync(process.execPath, [join(dir, 'rodar.mjs')], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
       expect(r.status, r.stderr).toBe(0);
       type Tela = { campos: string[]; rotulos: string[]; dicas: string[]; opcoes: [string, boolean][] };
-      const s = JSON.parse(r.stdout) as { conta: Tela; resultadoDaConta: string[]; fatura: Tela; modoDepois: string; errosDaFatura: Record<string, string>; resultadoDaFatura: string[]; comTeto: string[]; deVolta: Tela; peloEndereco: Tela; modoPeloEndereco: string };
+      const s = JSON.parse(r.stdout) as { conta: Tela; resultadoDaConta: string[]; fatura: Tela; modoDepois: string; errosDaFatura: Record<string, string>; resultadoDaFatura: string[]; primeiroCiclo: string[]; comTeto: string[]; deVolta: Tela; peloEndereco: Tela; modoPeloEndereco: string };
       const linhas = (entrada: Parameters<typeof calcMultaEJuros>[0]) => {
         const saida = calcMultaEJuros(entrada);
         if (!saida.ok) throw new Error(JSON.stringify(saida.errors));
@@ -517,8 +520,12 @@ process.stdout.write(JSON.stringify({ conta, resultadoDaConta, fatura, modoDepoi
       expect(s.resultadoDaFatura).toEqual(linhas({ modo: 'fatura', valor: '1.000,00', rotativoPct: '15', moraPct: '1', multaPct: '2', jurosMesPct: '', dias: '30' }));
       expect(s.resultadoDaFatura[0]).toBe('Com estes números, 30 dias depois do vencimento a fatura fica em R$ 1.186,26.');
       expect(s.resultadoDaFatura).toEqual(expect.arrayContaining(['Juros do rotativo: R$ 150,00', 'Juros de mora: R$ 10,00', 'Multa: R$ 20,00', 'IOF estimado: R$ 6,26']));
-      // Com 365 dias, a conta para no teto da Lei 14.690/2023, e o aviso aparece.
-      expect(s.comTeto).toEqual(linhas({ modo: 'fatura', valor: '1.000,00', rotativoPct: '15', moraPct: '1', multaPct: '2', jurosMesPct: '', dias: '365' }));
+      // Com 365 dias, a conta para no primeiro ciclo, até a próxima fatura (revisão externa de 18/11/2026), e diz isso.
+      expect(s.primeiroCiclo).toEqual(linhas({ modo: 'fatura', valor: '1.000,00', rotativoPct: '15', moraPct: '1', multaPct: '2', jurosMesPct: '', dias: '365' }));
+      expect(s.primeiroCiclo[0]).toBe('Com estes números, até a próxima fatura (30 dias depois do vencimento) a fatura fica em R$ 1.186,26.');
+      expect(s.primeiroCiclo).toContain(MULTA_FATURA_TEXT.beyondCycle(365));
+      // Com 99% de rotativo, a conta para no teto da Lei 14.690/2023, e o aviso aparece.
+      expect(s.comTeto).toEqual(linhas({ modo: 'fatura', valor: '1.000,00', rotativoPct: '99', moraPct: '1', multaPct: '2', jurosMesPct: '', dias: '30' }));
       expect(s.comTeto).toContain(MULTA_FATURA_TEXT.cap);
       // Voltar para "Conta ou boleto" traz os campos de antes; e ?modo=fatura (o prefill do core) já abre na fatura.
       expect(s.deVolta.campos).toEqual(s.conta.campos);

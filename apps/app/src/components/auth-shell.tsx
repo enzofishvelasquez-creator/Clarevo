@@ -74,6 +74,8 @@ const styles = StyleSheet.create({
     paddingVertical: space[5],
   },
   back: { width: 44, height: 44, marginLeft: -space[3], alignItems: 'center', justifyContent: 'center' },
-  content: { padding: space[6], gap: space[4], backgroundColor: colors.surface, flexGrow: 1 },
+  // A mesma largura da faixa (560 px) também no computador (auditoria de 18/11/2026: a faixa tinha 560 e o conteúdo, 760, e a seta de voltar
+  // não ficava alinhada com o título).
+  content: { padding: space[6], gap: space[4], backgroundColor: colors.surface, flexGrow: 1, maxWidth: 560 },
   title: { fontSize: 26, lineHeight: 34 },
 });

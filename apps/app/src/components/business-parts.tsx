@@ -12,7 +12,7 @@ import { colors, space } from '@/theme/tokens';
 const T = BUSINESS_TEXT;
 
 /**
- * No Resumo do espaço Negócio (D-113): a frase do mês (entrou, saiu e sobrou, de fato), o atalho para "Como está o negócio" e a retirada
+ * No Resumo do espaço Negócio (D-113): a frase do mês (entrou, saiu e sobrou, de fato), o atalho para "Seu negócio" e a retirada
  * para o Pessoal. Só aparece com o negócio escolhido no seletor; o Resumo do Pessoal e da Família não muda.
  */
 export function BusinessSummaryCard({ contextId, month, records, canWrite }: { contextId: string; month: IsoMonth; records: readonly FinancialRecord[] | undefined; canWrite: boolean }) {

@@ -2,6 +2,8 @@ import { ACCOUNTS_TEXT } from '../accounts';
 import { ANALYSES_TABS, ANALYSES_TEXT } from '../analises';
 import { BUDGET_TEXT, LIMIT_TEXT } from '../budget';
 import { BUSINESS_TEXT } from '../business';
+import { SPACE_TEXT } from '../spaces';
+import { PERFORMANCE_TEXT } from '../investment-performance';
 import { ANTES_FIELDS, ANTES_TEXT } from '../calculators/antes-de-financiar';
 import { CALCULATORS, CALC_GROUPS, CALC_UI_TEXT } from '../calculators/catalog';
 import { PLANO_FIELDS, PLANO_TEXT } from '../calculators/plano-dividas';
@@ -151,7 +153,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `Em ${q(ANALYSES_TEXT.tabs.categorias)}, escolha ${q(ANALYSES_TEXT.categories.views.barras)} ou ${q(ANALYSES_TEXT.categories.views.bolhas)}. As barras comparam com mais precisão; as bolhas são uma visão exploratória, com o nome e o percentual escritos em cada uma. A escolha fica só neste aparelho.`,
       `Toque em uma categoria para abrir o cartão ${q(ANALYSES_TEXT.categories.selected.title)}, com o valor, o percentual e os lançamentos do mês nela. Toque em um lançamento para abri-lo.`,
       `${q(ANALYSES_TEXT.tabs.evolucao)}, ${q(ANALYSES_TEXT.tabs['proximos-meses'])} e ${q(ANALYSES_TEXT.tabs.orcamento)} mostram um resumo do mês e um botão (${q(ANALYSES_TEXT.evolution.action)}, ${q(ANALYSES_TEXT.upcoming.action)} ou ${q(ANALYSES_TEXT.budget.action)}) para a tela completa.`,
-      'As análises só leem: nada é gravado. Os valores seguem Ocultar valores, e o espaço é o que está escolhido, Pessoal ou Família.',
+      'As análises só leem: nada é gravado. Os valores seguem Ocultar valores. O espaço é o escolhido (Pessoal, Família ou o negócio): toque na pílula do espaço, no topo da tela, para trocar.',
     ],
     screenName: ANALYSES_TEXT.title,
     href: '/analises',
@@ -436,7 +438,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Cadastra seus cartões de crédito para anotar as compras na fatura. A compra só entra em Pago quando você paga a fatura.',
     where: organizar(CARDS_TEXT.organizeRow),
     steps: [
-      `Toque em ${q(CARDS_TEXT.newCard)}. Informe o apelido, os 4 últimos dígitos (opcional) e os dias de fechamento e de vencimento. Nunca digite o número completo, o código de segurança nem a validade.`,
+      `Toque em ${q(CARDS_TEXT.newCard)} (com algum cartão, ${q(CARDS_TEXT.addAnotherCard)}, depois da lista). Informe o apelido, os 4 últimos dígitos (opcional) e os dias de fechamento e de vencimento. Nunca digite o número completo, o código de segurança nem a validade.`,
       `Para anotar uma compra, abra ${q('Anotar gasto')}, escolha ${q(CARDS_TEXT.expense.credit)} em ${q(CARDS_TEXT.screens.payHow)} e depois o cartão.`,
       `Toque no cartão para ver a ${q(CARDS_TEXT.currentInvoice)}, as anteriores e as próximas.`,
       `Na fatura, use ${q(CARDS_TEXT.invoice.addCharges)} para juros, multa ou tarifa que o banco cobrou, e ${q(CARDS_TEXT.invoice.addRefund)} para uma devolução. ${CARDS_TEXT.refundBudget.editInstead}`,
@@ -557,7 +559,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `De tempos em tempos, use ${q(INVESTMENT_TEXT.detail.updateValue)} com o valor do extrato. É com ele que a Clarevo calcula quanto rendeu.`,
       `Em ${q(DETAILS_TEXT.sectionTitle)}, conte qual é o investimento, onde está, como rende, a taxa, o vencimento e quando pode resgatar. Aparecem os próximos vencimentos, a divisão da carteira, a garantia do FGC e o imposto estimado.`,
       `Com a taxa preenchida, o investimento mostra o valor pela taxa contratada, e ${q(ESTIMATE_TEXT.use)} registra esse valor só quando você toca. ${q(INVESTMENT_PLAN_TEXT.cardTitle)} mostra o aportado do mês ao lado do que você planejou, e ${q('Resumo para a declaração')} junta os valores em 31/12 e os rendimentos do ano.`,
-      'A rentabilidade compara os meses fechados com o CDI e o IPCA do mesmo período, com os dados públicos do Banco Central. Não é recomendação de investimento. Aportes e resgates não entram em Pago nem em Recebido, e os investimentos ficam só no seu Pessoal.',
+      `No card ${q(PERFORMANCE_TEXT.title)}, logo abaixo do total, a rentabilidade compara os meses fechados com o CDI e o IPCA do mesmo período, com os dados públicos do Banco Central. Não é recomendação de investimento. Aportes e resgates não entram em Pago nem em Recebido, e os investimentos ficam só no seu Pessoal.`,
     ],
     screenName: TAB.investimentos,
     href: '/investimentos',
@@ -677,7 +679,7 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     where: [...organizar(ORGANIZE_TEXT.calculators.title), calcTitle('antes-de-financiar')],
     steps: [
       `Informe o ${q(ANTES_FIELDS.preco.label)} e a ${q(ANTES_FIELDS.entrada.label)}, se houver.`,
-      `Digite o ${q(ANTES_FIELDS.parcelas.label)} e a ${q(ANTES_FIELDS.taxaMes.label)}, que está na proposta do banco ou da loja.`,
+      `Digite o ${q(ANTES_FIELDS.parcelas.label)} e a ${q(ANTES_FIELDS.taxaMes.label)}, que está na proposta do banco ou da loja. Com ${q(ANTES_FIELDS.tipoTaxa.options![1]!.label)}, a conta vira uma simulação de custo equivalente.`,
       `Em ${q(ANTES_FIELDS.primeiraEmUmMes.label)}, escolha Sim ou Não.`,
       `Para ver quanto a parcela pesa, informe ${q(ANTES_FIELDS.renda.label)}. A renda de referência entra automaticamente, e mudar aqui não altera a referência.`,
       `Veja o total pago, os juros e a alternativa ${q(ANTES_TEXT.savingTitle)}. Se for financiar, ${q(ANTES_TEXT.noteInstallment)}, logo abaixo do resultado, leva as parcelas para as contas a pagar.`,
@@ -905,10 +907,10 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Reúne até 6 pessoas para ver e anotar as contas da casa em conjunto. O Pessoal de cada pessoa continua só dela.',
     where: [ACCOUNT_SCREEN, FAMILY_TEXT.title],
     steps: [
-      `Em Conta, no card ${q(FAMILY_TEXT.title)}, toque em ${q(FAMILY_TEXT.create)}, dê um nome e confirme. Quem cria é titular.`,
+      `Em Conta, no card ${q(FAMILY_TEXT.title)}, toque em ${q(FAMILY_TEXT.create)}, dê um nome e confirme. Quem cria é titular. Também dá para começar pelo + do seletor de espaço, no topo das abas, em ${q(SPACE_TEXT.familyOption)}.`,
       `Toque em ${q(FAMILY_TEXT.invite)}, escolha ${q('Anota e vê')} ou ${q('Só vê')} e toque em ${q(FAMILY_TEXT.inviteGenerate)}. Envie o link com ${q(FAMILY_TEXT.share)}: ele vale por 7 dias e serve uma vez.`,
       `Quem recebe o link entra ou cria a conta, vê o nome da Família e quem convidou e toca em ${q(INVITE_TEXT.accept)}.`,
-      `Com Família, o seletor ${q('Pessoal')} e ${q(FAMILY_TEXT.context)} aparece no topo das abas: cada tela usa o espaço escolhido, e os formulários dizem onde a anotação vai ficar.`,
+      `Com Família, o seletor do topo das abas mostra ${q('Pessoal')} e ${q(FAMILY_TEXT.context)}: cada tela usa o espaço escolhido, e os formulários dizem onde a anotação vai ficar. Nas telas de consulta, a pílula do espaço, no topo da tela, também troca.`,
       `Quem é titular muda o papel de cada pessoa, remove, usa ${q(FAMILY_TEXT.transfer)} ou ${q(FAMILY_TEXT.end)}. Quem não é titular usa ${q(FAMILY_TEXT.leave)}.`,
       'O que alguém anotou continua na Família depois que sai, como "ex-membro" e o primeiro nome. Quem exclui a conta fica como "Pessoa que saiu", sem nome.',
     ],
@@ -925,8 +927,8 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
     purpose: 'Para quem tem CNPJ ou trabalha por conta: separa as contas do negócio das pessoais. Você anota o que entrou e o que saiu do negócio e vê quanto sobrou no mês, sem virar contabilidade.',
     where: [ACCOUNT_SCREEN, BUSINESS_TEXT.accountTitle],
     steps: [
-      `Em Conta, no card ${q(BUSINESS_TEXT.accountTitle)}, toque em ${q(BUSINESS_TEXT.accountCreate)}, dê o nome do negócio e confirme. O plano inclui um negócio por pessoa.`,
-      `O nome do negócio aparece no seletor do topo das abas, ao lado de ${q('Pessoal')}: com ele escolhido, os gastos, recebimentos, contas a pagar, cartões e bancos e carteira são do negócio, com as categorias do negócio.`,
+      `No topo do Resumo, de Movimentos ou de Metas, toque no + ao lado de ${q('Pessoal')} e escolha ${q(SPACE_TEXT.businessOption)}, ou, em Conta, toque em ${q(BUSINESS_TEXT.accountCreate)}. Dê o nome do negócio e confirme. O plano inclui um negócio por pessoa.`,
+      `O nome do negócio aparece no seletor do topo das abas, ao lado de ${q('Pessoal')}: com ele escolhido, os gastos, recebimentos, contas a pagar, cartões e bancos e carteira são do negócio, com as categorias do negócio. Nas telas de consulta, como Análises, a pílula do espaço, no topo da tela, troca o espaço.`,
       `Em ${q(BUSINESS_TEXT.overviewTitle)}, veja quanto entrou, saiu e sobrou no mês e nos últimos meses, e as maiores saídas.`,
       `Quando levar dinheiro do negócio para casa, use ${q(BUSINESS_TEXT.withdraw)}: o valor sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.`,
       `Anotou no lugar errado? No detalhe do lançamento, toque em ${q(BUSINESS_TEXT.moveToBusiness)} ou ${q(BUSINESS_TEXT.moveToPersonal)}.`,

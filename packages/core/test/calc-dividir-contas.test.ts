@@ -41,9 +41,13 @@ describe('7. Dividir as contas da casa (docs/08 §3.2)', () => {
     };
     expect(e({ total: '10', modo: 'iguais', pessoas: [{}] })).toEqual({ pessoas: 'fora_da_faixa' });
     expect(e({ total: '10', modo: 'iguais', pessoas: Array.from({ length: 7 }, () => ({})) })).toEqual({ pessoas: 'fora_da_faixa' });
-    expect(e({ total: '10', modo: 'renda', pessoas: [{ renda: '' }, { renda: '0' }] })).toEqual({ 'renda.0': 'vazio', 'renda.1': 'zero' });
+    // Revisão externa de 18/11/2026: uma renda zero é aceita; todas zero pedem uma renda ou a divisão em partes iguais; negativa é inválida.
+    expect(e({ total: '10', modo: 'renda', pessoas: [{ renda: '' }, { renda: '0' }] })).toEqual({ 'renda.0': 'vazio' });
+    expect(e({ total: '10', modo: 'renda', pessoas: [{ renda: '1.000,00' }, { renda: '0' }] })).toBeNull();
+    expect(e({ total: '10', modo: 'renda', pessoas: [{ renda: '0' }, { renda: '0,00' }] })).toEqual({ 'renda.0': 'zero', 'renda.1': 'zero' });
+    expect(e({ total: '10', modo: 'renda', pessoas: [{ renda: '-100' }, { renda: '100' }] })).toEqual({ 'renda.0': 'invalido' });
     expect(e({ total: '10', modo: 'iguais', pessoas: [{ renda: '' }, { renda: 'x' }] })).toBeNull();
-    expect(calcErrorText('dividir-contas', 'renda.1', 'zero')).toBe('Informe um valor maior que zero, como 4.000,00.');
+    expect(calcErrorText('dividir-contas', 'renda.1', 'zero')).toBe('Informe ao menos uma renda maior que zero, ou escolha "Em partes iguais".');
     expect(calcErrorText('dividir-contas', 'pessoas', 'fora_da_faixa')).toBe('Divida entre 2 e 6 pessoas.');
   });
 

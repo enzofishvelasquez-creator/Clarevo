@@ -131,7 +131,7 @@ export function useUncountedLinkedInvestments(goal: Goal | null): LinkedInvestme
 }
 
 /**
- * "Investimentos ligados: R$ 10.875,00, não somados ao guardado" e o link "Ver" (revisão das telas, 16/11/2026), nos cards de Metas e no
+ * "Investimentos ligados: R$ 10.875,00, não somados ao guardado" e o link "Ver os investimentos ligados" (revisão das telas, 16/11/2026; auditoria de 18/11/2026), nos cards de Metas e no
  * detalhe: quem ligou um investimento à meta vê que ele não está somado, e o "Ver" leva ao card com a escolha "De onde vem o valor
  * guardado". O valor segue Ocultar valores.
  */
@@ -154,8 +154,9 @@ export function UncountedLinkedLine({ summary, onSee, onBrand = false }: { summa
 
 const styles = StyleSheet.create({
   uncounted: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[2] },
-  // "Ver" é curto: a largura mínima mantém a área de toque de 44 px (o teste de acessibilidade mede 44 x 44).
-  see: { minWidth: 44, paddingHorizontal: space[2] },
+  // O link inteiro ("Ver os investimentos ligados"), alinhado ao texto quando desce para a linha de baixo (auditoria de 18/11/2026).
+  // maxWidth e flexShrink: com letra grande, o texto do link quebra em vez de passar da largura da tela.
+  see: { minWidth: 44, paddingHorizontal: 0, maxWidth: '100%', flexShrink: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 48, paddingVertical: space[2] },
   divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
 });

@@ -48,6 +48,7 @@ import { EmptyState, ErrorState } from '@/components/states';
 import { TermHint } from '@/components/term-hint';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, FitMoney, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { useContextChange } from '@/lib/context-change';
 import { announceOnIOS } from '@/lib/a11y';
 import { openCommitment } from '@/lib/cards';
 import { DEVICE_FEATURES } from '@/lib/device';
@@ -190,6 +191,11 @@ export default function ContasAPagarScreen() {
   const [target, setTarget] = useState<Commitment | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ tone: 'sucesso' | 'erro'; text: string } | null>(null);
+  // Outro espaço pela pílula (D-113b): o aviso do último pagamento era do espaço de antes.
+  useContextChange(ctx, () => {
+    setTarget(null);
+    setResult(null);
+  });
   // Mesma conta de saída que o formulário de pagamento abre escolhida (a principal ou a última usada neste aparelho); o diálogo permite
   // trocar quando há mais de uma conta ativa, e "Mudar valor ou data" abre o formulário completo.
   const lastAccount = useLastAccount();
@@ -304,7 +310,7 @@ export default function ContasAPagarScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title="Contas a pagar" right={<ContextPill label="Pessoal" />} />
+      <SubHeader title="Contas a pagar" right={<ContextPill label="Pessoal" switchable />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <FlashBanner message={notice} />
         {showCreatedOverdue ? (

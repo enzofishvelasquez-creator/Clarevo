@@ -1,7 +1,7 @@
 import { THEME_CHOICES, THEME_TEXT, themeChoicePending, type ThemeChoice } from '@clarevo/core';
 import { RefreshCw } from 'lucide-react-native';
 import { useState } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { Banner, Button, Card, Chip, Txt } from '@/components/ui';
 import { OPENING_THEME_CHOICE, applyThemeNow, saveThemeChoice, useThemeChoice } from '@/lib/theme-choice';
@@ -20,6 +20,8 @@ export function ThemeCard() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const web = Platform.OS === 'web';
+  // As três escolhas numa linha só quando cabem; senão, uma embaixo da outra (auditoria de 18/11/2026: em 390 px ficavam 2 + 1).
+  const stacked = useWindowDimensions().width < 480;
 
   const choose = (next: ThemeChoice) => {
     setMsg(null);
@@ -43,9 +45,9 @@ export function ThemeCard() {
         {THEME_TEXT.section}
       </Txt>
       <Txt color={colors.textSecondary}>{`${THEME_TEXT.intro} ${THEME_TEXT.deviceOnly}`}</Txt>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel={THEME_TEXT.section}>
+      <View style={{ flexDirection: stacked ? 'column' : 'row', flexWrap: stacked ? 'nowrap' : 'wrap', gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel={THEME_TEXT.section}>
         {THEME_CHOICES.map((c) => (
-          <Chip key={c} label={THEME_TEXT.labels[c]} selected={choice === c} onPress={() => choose(c)} />
+          <Chip key={c} label={THEME_TEXT.labels[c]} selected={choice === c} onPress={() => choose(c)} style={stacked ? { alignSelf: 'stretch' } : undefined} />
         ))}
       </View>
       {themeChoicePending(choice, OPENING_THEME_CHOICE) ? (

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CONTACT_EMAIL, LEGAL_TEXT, PRIVACY_EMAIL, SIGNUP_CONSENT_TEXT, SITE_PAGES, SUPPORT_EMAIL, SUPPORT_TEXT, normalizeSiteUrl, signupConsentParts, sitePageUrl } from '../src/legal';
 import { COMPANY_ERROR_TEXT, COMPANY_TEXT } from '../src/company';
+import { WHO_SEES_TEXT } from '../src/who-sees';
 
 /**
  * Privacidade e termos dentro do app (D-064): os caminhos fixos das páginas do site, a regra do endereço (`EXPO_PUBLIC_SITE_URL`, lida
@@ -117,9 +118,12 @@ describe('textos de privacidade e termos no app', () => {
     expect(LEGAL_TEXT.whoSees.team).toContain('A equipe da Clarevo não olha os seus dados no dia a dia');
     expect(LEGAL_TEXT.whoSees.team).toContain('Só acessa quando a lei exigir ou para resolver um problema que você pediu.');
     expect(LEGAL_TEXT.whoSees.security).toContain('entre as pessoas do app, só você vê o espaço Pessoal');
+    // A tela em duas listas (auditoria de 18/11/2026) usa WHO_SEES_TEXT, que traz as mesmas frases da política.
     const tela = ler('apps/app/src/app/quem-ve.tsx');
-    expect(tela).toContain('LEGAL_TEXT.whoSees.personal');
-    expect(tela).toContain('LEGAL_TEXT.whoSees.team');
+    expect(tela).toContain('T.personalYou');
+    expect(tela).toContain('T.team');
+    expect(WHO_SEES_TEXT.personalYou.startsWith(LEGAL_TEXT.whoSees.personal)).toBe(true);
+    expect(WHO_SEES_TEXT.team).toBe(LEGAL_TEXT.whoSees.team);
     expect(ler('apps/app/src/app/conta.tsx')).toContain('LEGAL_TEXT.whoSees.security');
   });
 });

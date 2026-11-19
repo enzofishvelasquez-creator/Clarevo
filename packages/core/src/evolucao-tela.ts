@@ -50,6 +50,19 @@ export const EVOLUTION_WINDOWS = [3, 6, 12] as const;
 export const EVOLUTION_CASH_WINDOWS = [3, 6, 12, 24, 36] as const;
 export type EvolutionWindow = (typeof EVOLUTION_CASH_WINDOWS)[number];
 export const EVOLUTION_DEFAULT_WINDOW: EvolutionWindow = 6;
+/**
+ * A janela com que a tela abre (auditoria visual de 18/11/2026: a demonstração abria em 6 meses com 4 meses "sem registros" e dois
+ * pontos soltos). Abre em 3 meses quando, nos 6 meses até hoje, menos de 3 meses têm lançamentos e todos eles caem nos últimos 3 (o
+ * histórico é curto e recente); senão, nos 6 meses de sempre. A pessoa escolhe outra janela quando quiser. Conta Recebido e Pago.
+ */
+export function evolutionStartWindow(overview: readonly Pick<MonthOverview, 'month' | 'receivedCount' | 'paidCount'>[], currentMonth: IsoMonth): EvolutionWindow {
+  const six = evolutionMonths(currentMonth, EVOLUTION_DEFAULT_WINDOW);
+  const three = new Set(evolutionMonths(currentMonth, 3));
+  const withRecords = overview.filter((m) => six.includes(m.month) && m.receivedCount + m.paidCount > 0).map((m) => m.month);
+  if (withRecords.length > 0 && withRecords.length < 3 && withRecords.every((m) => three.has(m))) return 3;
+  return EVOLUTION_DEFAULT_WINDOW;
+}
+
 /** Quantos meses `months_overview` entrega por chamada (o banco recusa mais que 12). */
 export const EVOLUTION_MAX_MONTHS = 12;
 /** A maior janela da tela (36 meses: três leituras de 12). */

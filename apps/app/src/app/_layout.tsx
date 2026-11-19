@@ -328,7 +328,7 @@ function Navigation() {
           <Stack.Screen name="familia/index" />
           <Stack.Screen name="familia/nova" />
           <Stack.Screen name="familia/convidar" />
-          {/* Espaço Negócio (D-113): como está o negócio, criar, a retirada para o Pessoal e o nome. */}
+          {/* Espaço Negócio (D-113): Seu negócio, criar, a retirada para o Pessoal e o nome. */}
           <Stack.Screen name="negocio/index" />
           <Stack.Screen name="negocio/novo" />
           <Stack.Screen name="negocio/retirada" />

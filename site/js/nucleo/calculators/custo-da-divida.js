@@ -11,9 +11,12 @@ const RATE_RANGE_TEXT = 'Use uma taxa de 0,01% a 99,99% ao mês.';
 const RATE_HINT = 'Está na fatura, no extrato ou no contrato. Use a taxa de juros ao mês, não o CET.';
 export const DIVIDA_TEXT = {
     parcelarTitle: 'E se parcelar a fatura?',
-    chequeCapNote: 'A taxa informada passa do teto de 8% ao mês do cheque especial (Res. CMN 4.765/2019). Confira o extrato.',
+    chequeCapNote: 'A taxa informada passa do teto de 8% ao mês do cheque especial de pessoas físicas e MEI (Res. CMN 4.765/2019). A conta mostra o cenário como simulação, fora dessa regra, sem dizer que a cobrança vale. Confira o extrato.',
     cetNote: 'O CET do contrato inclui tarifas, seguros e IOF, e pode ser maior que a taxa de juros. Confira o CET no contrato.',
-    cetOutNote: 'A conta usa só a taxa de juros, sem o CET. O CET da fatura ou do extrato soma o IOF e as tarifas, por isso o custo real tende a ser um pouco maior.',
+    cetOutNote: 'A conta usa só a taxa de juros, sem o CET. O CET da fatura ou do extrato soma o IOF e as tarifas, por isso o custo real pode ser maior.',
+    capHistory: 'Cenário novo, a partir desta fatura: numa dívida que já vem de antes, os juros e encargos já cobrados também entram no limite, e a conta não sabe deles.',
+    capSchedule: 'Com o limite, a conta supõe parcelas iguais reduzidas até caber no teto, para baixo no centavo. A instituição pode aplicar o limite de outro jeito, no valor ou no número das parcelas: vale o que está no contrato.',
+    chequeCapScope: 'O teto de 8% ao mês vale para o cheque especial de pessoas físicas e MEI.',
 };
 export const DIVIDA_FIELDS = {
     tipo: {
@@ -49,12 +52,17 @@ function parcelarFatura(valor, saldo, input) {
     const totalCents = inst * n;
     const chargesCents = totalCents - valor;
     const limited = chargesCents > valor;
-    const cappedTotalCents = limited ? 2 * valor : totalCents;
+    const capCents = 2 * valor;
+    const cappedInstallmentCents = limited ? Math.floor(capCents / n) : null;
+    const cappedTotalCents = cappedInstallmentCents === null ? totalCents : cappedInstallmentCents * n;
     const head = `Parcelar em ${n} × ${formatBRL(inst)} a ${formatBpCompact(bp)} ao mês`;
     const resultLines = limited
         ? [
             `${head} somaria ${formatBRL(totalCents)}.`,
-            `Pelo limite da Lei 14.690/2023, juros e encargos não passam do valor original: o total fica em no máximo ${formatBRL(cappedTotalCents)}.`,
+            `Pelo limite da Lei 14.690/2023, juros e encargos não passam do valor original: o total fica em no máximo ${formatBRL(capCents)}.`,
+            n === 1
+                ? `Com o limite, a parcela fica em até ${formatBRL(cappedInstallmentCents)}, em vez de ${formatBRL(inst)}.`
+                : `Com o limite, as ${n} parcelas iguais ficam em até ${formatBRL(cappedInstallmentCents)} cada (${formatBRL(cappedTotalCents)} no total), em vez de ${formatBRL(inst)}.`,
         ]
         : [
             `${head} soma ${formatBRL(totalCents)}.`,
@@ -69,11 +77,15 @@ function parcelarFatura(valor, saldo, input) {
             totalCents,
             chargesCents,
             limited,
+            capCents,
+            cappedInstallmentCents,
             cappedTotalCents,
             resultLines,
             hypotheses: [
                 `Parcelamento do valor da fatura seguinte (${formatBRL(saldo)}), em parcelas iguais (tabela Price).`,
                 'O limite vale para juros e encargos do rotativo e do parcelamento somados, sem o IOF (Lei 14.690/2023 e Res. CMN 5.112/2023).',
+                ...(limited ? [DIVIDA_TEXT.capSchedule] : []),
+                DIVIDA_TEXT.capHistory,
             ],
             notes: [],
         },
@@ -131,7 +143,7 @@ export function calcCustoDaDivida(input) {
                     `Juros: ${formatBRL(totalCents - valor)}`,
                     annualLine,
                 ],
-                hypotheses: ['Juros compostos, mês a mês, sem pagamentos no período.', 'Sem IOF e tarifas.'],
+                hypotheses: ['Juros compostos, mês a mês, sem pagamentos no período.', 'Sem IOF e tarifas.', DIVIDA_TEXT.chequeCapScope],
                 notes: [...(aboveCap ? [DIVIDA_TEXT.chequeCapNote] : []), DIVIDA_TEXT.cetOutNote],
             },
         };

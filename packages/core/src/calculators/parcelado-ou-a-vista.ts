@@ -6,7 +6,16 @@ import { parseCount, parseMoney } from './inputs';
 /**
  * 1. Parcelado ou à vista? (docs/08 §3.2; spec4 §1.2). Modo 'compra' (padrão) e modo 'cota-unica' (contas do ano).
  * diferença = n × parcela − à vista; taxa i por bisseção em à vista = parcela × (1 − (1 + i)^−n) ÷ i; com a primeira
- * parcela na compra (ou junto com a cota única), financiado = à vista − parcela, em n − 1 parcelas; ao ano = (1 + i)^12 − 1.
+ * parcela na compra (ou junto com a cota única), financiado = à vista − parcela, em n − 1 parcelas; ao ano = (1 + i)^12 − 1, com a taxa
+ * ao mês completa (sem o arredondamento da tela).
+ *
+ * Casos de borda (revisão externa de 18/11/2026):
+ * - total igual ao preço à vista: taxa de 0% ao mês (parcelar só adia os pagamentos);
+ * - total menor que o preço à vista: o parcelado custa menos em reais; não há juros positivos (a taxa negativa não é mostrada), e a frase
+ *   diz a diferença ("O total parcelado é R$ X menor que o preço à vista."), nunca "não há juros embutidos";
+ * - primeira parcela na compra igual ou maior que o preço à vista: nenhuma taxa não negativa finita faz as parcelas valerem o preço, e
+ *   a busca nem começa (não há taxa arbitrária no limite da busca);
+ * - taxa enorme (parcela inicial pouco abaixo do preço): a bisseção dobra o intervalo até achar a raiz, e a tela mostra "mais de 10.000%".
  */
 export type ParceladoModo = 'compra' | 'cota-unica';
 export type FormaPagamento = 'boleto' | 'debito' | 'cartao';
@@ -32,13 +41,17 @@ export interface ParceladoResult extends CalcTexts {
   aVistaCents: Cents;
   /** n × parcela. */
   totalCents: Cents;
-  /** Total − à vista (pode ser zero ou negativo: sem juros embutidos). */
+  /** Total − à vista (zero: taxa de 0%; negativo: o parcelado custa menos, sem juros positivos). */
   differenceCents: Cents;
   /** Valor financiado e número de parcelas usados na taxa (descontada a primeira, quando paga na compra). */
   financedCents: Cents;
   financedInstallments: number;
+  /** Total igual ou menor que o preço à vista: sem juros positivos. */
   noInterest: boolean;
-  /** Taxa ao mês e ao ano (frações, sem arredondar); null sem juros ou quando a primeira parcela já cobre o preço. */
+  /**
+   * Taxa ao mês e ao ano (frações, sem arredondar). 0 com o total igual ao preço; null com o total menor que o preço (a taxa seria
+   * negativa e não é mostrada) ou quando a primeira parcela já cobre o preço (nenhuma taxa não negativa resolve).
+   */
   monthlyRate: number | null;
   annualRate: number | null;
   /**
@@ -114,13 +127,20 @@ export function calcParceladoOuAVista(input: ParceladoInput): CalcOutcome<Parcel
   const financedCents = first ? aVista - parcela : aVista;
   const financedInstallments = first ? n - 1 : n;
   const noInterest = differenceCents <= 0;
-  const monthlyRate = noInterest || financedCents <= 0 ? null : impliedMonthlyRate(financedCents, parcela, financedInstallments);
+  // A primeira parcela na compra cobre o preço: nenhuma taxa não negativa resolve, e a bisseção não é chamada.
+  const firstCovers = financedCents <= 0;
+  const monthlyRate =
+    differenceCents === 0 ? 0 : noInterest || firstCovers ? null : impliedMonthlyRate(financedCents, parcela, financedInstallments);
   const annualRate = monthlyRate === null ? null : equivalentAnnualRate(monthlyRate);
 
   const base = cota ? 'a cota única' : 'o preço à vista';
   const resultLines: string[] = [];
-  if (noInterest) {
-    resultLines.push(`Não há juros embutidos: o total parcelado é igual ou menor que ${base}.`);
+  if (differenceCents === 0) {
+    resultLines.push(`Com estes números, o total parcelado é igual ${cota ? 'à cota única' : 'ao preço à vista'}: a taxa embutida é de 0% ao mês.`);
+    resultLines.push('Parcelar só adia os pagamentos, sem custo a mais em reais.');
+  } else if (noInterest) {
+    resultLines.push(`Com estes números, o total parcelado é ${formatBRL(-differenceCents)} menor que ${base}.`);
+    resultLines.push('Não há juros positivos nas parcelas.');
   } else {
     resultLines.push(
       cota
@@ -128,9 +148,12 @@ export function calcParceladoOuAVista(input: ParceladoInput): CalcOutcome<Parcel
         : `Com estes números, o parcelado custa ${formatBRL(differenceCents)} a mais.`,
     );
     resultLines.push(
-      monthlyRate !== null && annualRate !== null
-        ? `Nas parcelas há juros embutidos de ${rateText(monthlyRate)} ao mês (${rateText(annualRate)} ao ano).`
-        : `Como a primeira parcela já cobre ${base}, não há uma taxa ao mês para mostrar.`,
+      firstCovers
+        ? `Como a primeira parcela já cobre ${base}, nenhuma taxa de juros faz as parcelas valerem ${base}: não há taxa ao mês para mostrar.`
+        : monthlyRate !== null && annualRate !== null
+          ? `Nas parcelas há juros embutidos de ${rateText(monthlyRate)} ao mês (${rateText(annualRate)} ao ano).`
+          : // Só com uma taxa acima do limite da busca (fora das faixas dos campos): o limite é dito, sem número arbitrário.
+            'Nas parcelas há juros embutidos de mais de 10.000% ao mês.',
     );
   }
   resultLines.push(`Total parcelado: ${formatBRL(totalCents)} (${n} × ${formatBRL(parcela)}).`);

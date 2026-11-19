@@ -79,7 +79,7 @@ const O_QUE_FAZ = {
   'custo-da-divida': 'Mostra quanto uma dívida custa: um ciclo do rotativo do cartão (e o que muda se a fatura for parcelada), os meses de cheque especial ou as parcelas de um empréstimo.',
   'quitar-antes': 'Estima quanto dos juros sai da conta se você quitar tudo ou adiantar as últimas parcelas, trazendo as parcelas a valor presente pela taxa do contrato.',
   'multa-e-juros':
-    'Calcula a multa e os juros de uma conta ou de um boleto pago depois do vencimento, com os percentuais que estão no boleto ou no contrato. Para a fatura do cartão, soma os juros do rotativo, os juros de mora, a multa e o IOF estimado, com os percentuais que estão na fatura.',
+    'Calcula a multa e os juros de uma conta ou de um boleto pago depois do vencimento, com os percentuais que estão no boleto ou no contrato. Para a fatura do cartão, soma, até a próxima fatura, os juros do rotativo, os juros de mora, a multa e o IOF estimado numa hipótese simplificada, com os percentuais que estão na fatura.',
   reserva: 'Calcula o tamanho da reserva para imprevistos, quantos meses o que você já tem guardado cobre e em quanto tempo ela fica completa.',
   'juntar-para-objetivo': 'Mostra quanto guardar por mês para chegar a um valor em um prazo, ou em quanto tempo você chega guardando um valor por mês.',
   'dividir-contas': 'Divide o total das contas da casa entre 2 e 6 pessoas, em partes iguais ou pela renda de cada uma.',
