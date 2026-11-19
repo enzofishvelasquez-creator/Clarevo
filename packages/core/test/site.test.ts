@@ -2102,13 +2102,19 @@ describe('site público: vídeos de uso do app e imagens das Novidades (D-114)',
     // O cartão do tema leva à resposta da Ajuda sobre o tema.
     expect(h('app/index.html')).toMatch(/<h3>Tema claro ou escuro<\/h3>[\s\S]*?<a href="\.\.\/ajuda\/conta\.html#p-tema">Como usar<\/a>/);
     expect(h('ajuda/conta.html')).toContain('id="p-tema"');
-    // O script dos vídeos: do próprio site, sem rede, sem guardar nada, com o botão de pausar e tocar e as preferências de movimento e de dados.
+    // O script dos vídeos: do próprio site, sem rede, sem guardar nada, com as preferências de movimento e de dados. Sem botão de pausar
+    // (D-115c, 19/11/2026): o próprio vídeo é o controle, com papel de botão, foco pelo teclado, Enter e Espaço e o nome que diz o que um
+    // toque faz; o nome sem script (aria-labelledby) dá lugar a esse.
     const js = h('js/videos.js');
     expect(js).toContain('IntersectionObserver');
     expect(js).toContain('prefers-reduced-motion: reduce');
     expect(js).toContain('saveData');
     expect(js).toContain('Pausar o vídeo: ');
     expect(js).toContain('Tocar o vídeo: ');
+    for (const t of ["video.setAttribute('tabindex', '0')", "video.setAttribute('role', 'button')", "video.removeAttribute('aria-labelledby')", "ev.key === 'Enter'", "ev.key === ' '", "video.addEventListener('click'"]) expect(js, t).toContain(t);
+    expect(js).not.toMatch(/createElement\('button'\)|video-botao/);
+    expect(h('estilo.css')).not.toContain('video-botao');
+    expect(h('estilo.css')).toContain('.celular video:focus-visible{');
     expect(js).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|document\.cookie|innerHTML|eval\(/);
     expect(videos.LEGENDA_TELA).toBe('Tela da demonstração, com dados fictícios');
   });

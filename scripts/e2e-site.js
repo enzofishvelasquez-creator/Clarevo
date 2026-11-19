@@ -17,9 +17,9 @@
  *     uma hora no servidor; a fonte fora do ar (a página fica com o retrato); nenhum pedido do navegador a outro domínio; a política de
  *     segurança; o aviso de mercado no rodapé; as duas calculadoras novas; e o resumo semanal com uma edição de teste;
  *   - os vídeos de uso do app (D-114 e D-115) na página inicial e em O app: cada um no bloco que mostra, do próprio site, sem controles nem
- *     `autoplay`, sem som, com `preload="none"`; o script toca o que aparece na tela e pausa o que sai; o botão de pausar e tocar (nome
- *     acessível, teclado); com movimento reduzido ou economia de dados, nada toca nem baixa até a pessoa pedir; sem JavaScript, a capa; e o
- *     servidor responde pedaços (206) com o tipo certo;
+ *     `autoplay`, sem som, com `preload="none"`; o script toca o que aparece na tela e pausa o que sai; sem botão de pausar (D-115c): o
+ *     próprio vídeo é o controle (papel de botão, nome acessível, clique e teclado); com movimento reduzido ou economia de dados, nada toca
+ *     nem baixa até a pessoa tocar no vídeo; sem JavaScript, a capa; e o servidor responde pedaços (206) com o tipo certo;
  *   - as imagens das matérias de Novidades (D-114): capa e telas com largura, altura e texto alternativo, carregando do próprio site, e a
  *     versão escura no tema escuro;
  *   - a varredura de espaçamento e largura em todas as páginas (360, 768, 900 e 1280 px) e, no tema escuro, nas páginas com vídeos e imagens
@@ -702,9 +702,9 @@ function varrerPagina() {
 
     // 7c. Vídeos de uso do app (D-114 e D-115): cada um no bloco que mostra (a capa e três cartões da página inicial, seis recursos e o
     // cartão do tema em O app), do próprio site, sem controles de player nem `autoplay`, sem som e em repetição. O script do site toca o
-    // vídeo que aparece na tela (pelo menos metade) e pausa o que sai; nada de vídeo baixa antes de aparecer; o botão redondo pausa e toca,
-    // pelo mouse e pelo teclado, com nome acessível; com movimento reduzido ou economia de dados, nada toca até a pessoa pedir; sem
-    // JavaScript, fica a capa.
+    // vídeo que aparece na tela (pelo menos metade) e pausa o que sai; nada de vídeo baixa antes de aparecer. Sem botão de pausar (D-115c,
+    // 19/11/2026): o próprio vídeo pausa e toca, pelo mouse e pelo teclado, com papel de botão e nome acessível; com movimento reduzido ou
+    // economia de dados, nada toca até a pessoa tocar no vídeo; sem JavaScript, fica a capa, com o nome "Vídeo: título".
     {
       const LUGARES = {
         '/': [['.capa', 'O Resumo do mês'], ['article.cartao:has(h3:text-is("Anotar e ver o mês"))', 'Anotar um gasto'], ['article.cartao:has(h3:text-is("Contas, cartões e gastos fixos"))', 'Importar fatura por print'], ['article.cartao:has(h3:text-is("Metas e reserva"))', 'Metas']],
@@ -717,10 +717,10 @@ function varrerPagina() {
         titulo: v.closest('figure').dataset.titulo, controls: v.controls || v.hasAttribute('controls'), autoplay: v.hasAttribute('autoplay'), loop: v.loop, muted: v.muted, preload: v.getAttribute('preload'),
         paused: v.paused, tempo: v.currentTime, poster: v.poster, largura: v.getAttribute('width'), altura: v.getAttribute('height'),
         fontes: [...v.querySelectorAll('source')].map((f) => [f.src, f.type]), reserva: v.querySelector('a') ? v.querySelector('a').href : '',
-        nome: document.getElementById(v.getAttribute('aria-labelledby'))?.textContent || '',
+        nome: v.getAttribute('aria-label') || '', rotulo: v.getAttribute('aria-labelledby'), papel: v.getAttribute('role'), tabindex: v.getAttribute('tabindex'),
         descricao: document.getElementById(v.getAttribute('aria-describedby'))?.textContent || '',
-        legenda: v.closest('figure').querySelector('figcaption')?.firstChild?.textContent || '',
-        botao: v.closest('figure').querySelector('button.video-botao')?.getAttribute('aria-label') || '',
+        legenda: v.closest('figure').querySelector('figcaption')?.textContent || '',
+        botoes: v.closest('figure').querySelectorAll('button, [class*="botao"]').length,
       })));
       for (const caminho of ['/', '/app/']) {
         deVideo.length = 0;
@@ -734,8 +734,9 @@ function varrerPagina() {
         ok(`vídeos (${caminho}): nenhum com controles de player nem autoplay; todos sem som, em repetição e com preload="none"`, vs.every((v) => !v.controls && !v.autoplay && v.muted && v.loop && v.preload === 'none'), JSON.stringify(vs.map((v) => [v.titulo, v.controls, v.autoplay, v.muted, v.loop, v.preload])));
         ok(`vídeos (${caminho}): capa, WebM e MP4 do próprio site, com largura, altura e o link para o MP4 dentro do vídeo`, vs.every((v) => v.poster.startsWith(`${origem}/imagens/video-`) && v.largura === '720' && v.altura === '1560' &&
           v.fontes.length === 2 && v.fontes[0][1] === 'video/webm' && v.fontes[1][1] === 'video/mp4' && v.fontes.every(([u]) => u.startsWith(`${origem}/videos/`)) && v.reserva === v.fontes[1][0]), JSON.stringify(vs[0]));
-        ok(`vídeos (${caminho}): cada um com nome, a legenda "Tela da demonstração, com dados fictícios", a descrição em texto para leitor de tela e o botão de pausar e tocar`,
-          vs.every((v) => v.nome === `Vídeo: ${v.titulo}` && v.legenda === 'Tela da demonstração, com dados fictícios' && v.descricao.length > 120 && /^(Pausar|Tocar) o vídeo: /.test(v.botao) && v.botao.endsWith(v.titulo)), JSON.stringify(vs.map((v) => [v.nome, v.legenda, v.descricao.length, v.botao])));
+        ok(`vídeos (${caminho}): nenhum botão dentro das figuras; o próprio vídeo é o controle (papel de botão, tabindex 0, nome "Pausar o vídeo: título" ou "Tocar o vídeo: título"), com a legenda "Tela da demonstração, com dados fictícios" e a descrição em texto para leitor de tela`,
+          vs.every((v) => v.botoes === 0 && v.papel === 'button' && v.tabindex === '0' && v.rotulo === null && /^(Pausar|Tocar) o vídeo: /.test(v.nome) && v.nome.endsWith(`: ${v.titulo}`) && v.legenda === 'Tela da demonstração, com dados fictícios' && v.descricao.length > 120),
+          JSON.stringify(vs.map((v) => [v.titulo, v.botoes, v.papel, v.tabindex, v.rotulo, v.nome, v.legenda, v.descricao.length])));
         const capas = await Promise.all(vs.map((v) => ctx.request.get(v.poster)));
         ok(`vídeos (${caminho}): as capas carregam (PNG, guardadas por um ano)`, capas.every((r) => r.ok() && r.headers()['content-type'] === 'image/png' && /immutable/.test(r.headers()['cache-control'] || '')));
         ok(`vídeos (${caminho}): só baixa vídeo do que aparece na tela`, deVideo.every((u) => u.startsWith(`${origem}/videos/`)) && (caminho !== '/' || deVideo.every((u) => /\/videos\/resumo-do-mes\./.test(u))), deVideo.join(' | '));
@@ -756,33 +757,33 @@ function varrerPagina() {
       const doCartao = await p.locator(cartao).evaluate((v) => ({ paused: v.paused, tempo: v.currentTime }));
       const capaFora = await tempoDe('.capa video');
       ok('vídeos: ao rolar, o vídeo que aparece toca e o que saiu da tela pausa', !doCartao.paused && doCartao.tempo > 0.5 && capaFora.paused, JSON.stringify({ doCartao, capaFora }));
-      // O botão de pausar: nome acessível, 44 px, troca o nome; a pausa da pessoa vale mesmo depois de rolar para longe e voltar.
-      const botao = p.locator('[data-titulo="Metas"] button.video-botao');
-      const antes = { nome: await botao.getAttribute('aria-label'), caixa: await botao.boundingBox() };
-      await botao.click();
+      // Sem botão (D-115c): clicar no próprio vídeo pausa, o nome passa a "Tocar o vídeo: Metas", e a pausa da pessoa vale mesmo depois de
+      // rolar para longe e voltar.
+      const video = p.locator(cartao);
+      const antes = await video.getAttribute('aria-label');
+      await video.click();
       await p.waitForTimeout(300);
-      const pausado = { paused: await p.locator(cartao).evaluate((v) => v.paused), nome: await botao.getAttribute('aria-label') };
+      const pausado = { paused: await video.evaluate((v) => v.paused), nome: await video.getAttribute('aria-label'), estado: await p.getAttribute('[data-titulo="Metas"]', 'data-estado') };
       await p.evaluate(() => window.scrollTo(0, 0));
       await p.waitForTimeout(600);
-      await p.locator(cartao).evaluate((v) => v.scrollIntoView({ block: 'center' }));
+      await video.evaluate((v) => v.scrollIntoView({ block: 'center' }));
       await p.waitForTimeout(900);
-      const continuaPausado = await p.locator(cartao).evaluate((v) => v.paused);
-      const foraDaTela = await p.$$eval('figure[data-video]', (fs) => fs.map((f) => {
-        const m = f.querySelector('.celular-moldura').getBoundingClientRect();
-        const b = f.querySelector('button.video-botao').getBoundingClientRect();
-        const legenda = f.querySelector('figcaption');
-        return { titulo: f.dataset.titulo, fora: b.top >= m.bottom, naLegenda: legenda.contains(f.querySelector('button.video-botao')), texto: f.querySelector('button.video-botao').textContent };
-      }));
-      ok('vídeos: o botão "Pausar" ou "Tocar" fica embaixo da legenda, fora da tela do celular, nunca por cima do app', foraDaTela.length === 4 && foraDaTela.every((x) => x.fora && x.naLegenda && /^(Pausar|Tocar)$/.test(x.texto)), JSON.stringify(foraDaTela));
-      ok('vídeos: o botão "Pausar o vídeo: Metas" (44 px) pausa, passa a "Tocar o vídeo: Metas" e a pausa continua depois de rolar para longe e voltar',
-        antes.nome === 'Pausar o vídeo: Metas' && antes.caixa && antes.caixa.width >= 44 && antes.caixa.height >= 44 && pausado.paused && pausado.nome === 'Tocar o vídeo: Metas' && continuaPausado, JSON.stringify({ antes, pausado, continuaPausado }));
-      // Pelo teclado: Tab chega ao botão, com foco visível, e Espaço toca de novo.
-      await botao.focus();
-      const foco = await botao.evaluate((b) => { const cs = getComputedStyle(b); return { visivel: b.matches(':focus-visible') || document.activeElement === b, contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }; });
-      await botao.press('Space');
+      const continuaPausado = await video.evaluate((v) => v.paused);
+      const semBotao = await p.$$eval('figure[data-video]', (fs) => fs.map((f) => f.querySelectorAll('button, .video-botao').length));
+      ok('vídeos: nenhum botão de pausar em nenhuma figura de vídeo da página inicial', semBotao.length === 4 && semBotao.every((n) => n === 0), JSON.stringify(semBotao));
+      ok('vídeos: clicar no vídeo "Pausar o vídeo: Metas" pausa, o nome passa a "Tocar o vídeo: Metas" e a pausa continua depois de rolar para longe e voltar',
+        antes === 'Pausar o vídeo: Metas' && pausado.paused && pausado.nome === 'Tocar o vídeo: Metas' && pausado.estado === 'parado' && continuaPausado, JSON.stringify({ antes, pausado, continuaPausado }));
+      // Pelo teclado: Tab chega ao vídeo, com o contorno visível do foco, e Espaço toca de novo (sem rolar a página).
+      // O foco parte do último elemento focável antes do vídeo, para o Tab ser de verdade (e o navegador mostrar o foco do teclado).
+      await video.evaluate((v) => { const anterior = [...document.querySelectorAll('a[href], button, input, [tabindex="0"]')].filter((e) => e.getClientRects().length > 0 && !e.parentElement.closest('video') && e.compareDocumentPosition(v) & Node.DOCUMENT_POSITION_FOLLOWING).pop(); if (anterior) anterior.focus(); });
+      await p.keyboard.press('Tab');
+      const foco = await video.evaluate((v) => { const cs = getComputedStyle(v); return { ativo: document.activeElement === v, visivel: v.matches(':focus-visible'), contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }; });
+      const rolagemAntes = await p.evaluate(() => window.scrollY);
+      await p.keyboard.press('Space');
       await p.waitForTimeout(800);
-      const depoisDoEspaco = { paused: await p.locator(cartao).evaluate((v) => v.paused), nome: await botao.getAttribute('aria-label'), ativo: await p.evaluate(() => document.activeElement && document.activeElement.className) };
-      ok('vídeos: pelo teclado, o botão recebe foco e Espaço toca o vídeo de novo, com o nome "Pausar o vídeo: Metas"', foco.visivel && !depoisDoEspaco.paused && depoisDoEspaco.nome === 'Pausar o vídeo: Metas', JSON.stringify({ foco, depoisDoEspaco }));
+      const depoisDoEspaco = { paused: await video.evaluate((v) => v.paused), nome: await video.getAttribute('aria-label'), ativo: await video.evaluate((v) => document.activeElement === v), rolou: Math.abs((await p.evaluate(() => window.scrollY)) - rolagemAntes) > 2 };
+      ok('vídeos: pelo teclado, o vídeo recebe foco com contorno visível e Espaço toca de novo, sem rolar a página, com o nome "Pausar o vídeo: Metas"',
+        foco.ativo && foco.visivel && foco.contorno && !depoisDoEspaco.paused && depoisDoEspaco.nome === 'Pausar o vídeo: Metas' && depoisDoEspaco.ativo && !depoisDoEspaco.rolou, JSON.stringify({ foco, depoisDoEspaco }));
       await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
       // O MP4 (para os navegadores que não tocam WebM): tipo certo, pedaço com 206 e a política de segurança com media-src 'self'.
@@ -793,7 +794,7 @@ function varrerPagina() {
       ok('vídeos: o MP4 sai como video/mp4, guardado por um ano, com a política de segurança que aceita vídeo só do próprio site', inteiro.ok() && inteiro.headers()['content-type'] === 'video/mp4' &&
         /immutable/.test(inteiro.headers()['cache-control'] || '') && /media-src 'self'/.test(inteiro.headers()['content-security-policy'] || ''), JSON.stringify(inteiro.headers()));
       ok('vídeos: o servidor responde um pedaço do arquivo (206), como o navegador pede', pedaco.status() === 206 && (await pedaco.body()).length === 100 && (await pedaco.body()).subarray(4, 8).toString('latin1') === 'ftyp' && /^bytes 0-99\/\d+$/.test(pedaco.headers()['content-range'] || ''), `${pedaco.status()} ${pedaco.headers()['content-range']}`);
-      // Movimento reduzido (page.emulateMedia) e economia de dados: nada toca sozinho e nada de vídeo baixa; o botão toca a pedido.
+      // Movimento reduzido (page.emulateMedia) e economia de dados: nada toca sozinho e nada de vídeo baixa; tocar no vídeo o toca a pedido.
       for (const [nome, preparar] of [
         ['movimento reduzido', async (q) => q.emulateMedia({ reducedMotion: 'reduce' })],
         ['economia de dados', async (q) => q.addInitScript(() => Object.defineProperty(Navigator.prototype, 'connection', { configurable: true, get: () => ({ saveData: true, addEventListener() {} }) }))],
@@ -809,22 +810,29 @@ function varrerPagina() {
         await q.goto(`${origem}/`);
         await q.waitForTimeout(2000);
         const tudoParado = await q.$$eval('figure[data-video] video', (vs) => vs.length === 4 && vs.every((v) => v.paused && v.currentTime === 0));
-        const nomeAntes = await q.getAttribute('.capa button.video-botao', 'aria-label');
+        const nomeAntes = await q.getAttribute('.capa video', 'aria-label');
+        const botoes = await q.$$eval('figure[data-video] button, .video-botao', (bs) => bs.length);
         const baixadosAntes = deVideoCalmo.length;
-        await q.click('.capa button.video-botao');
+        await q.click('.capa video');
         await q.waitForFunction(() => document.querySelector('.capa video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
-        const pedido = await q.$eval('.capa video', (v) => ({ paused: v.paused, tempo: v.currentTime }));
-        ok(`vídeos com ${nome}: nada toca sozinho nem baixa até a pessoa tocar no botão "Tocar o vídeo", que toca o vídeo`, tudoParado && baixadosAntes === 0 && deVideoCalmo.length > 0 && nomeAntes === 'Tocar o vídeo: O Resumo do mês' && !pedido.paused && pedido.tempo > 0.5 && erros.length === 0, JSON.stringify({ tudoParado, baixadosAntes, nomeAntes, pedido, erros }));
+        const pedido = await q.$eval('.capa video', (v) => ({ paused: v.paused, tempo: v.currentTime, nome: v.getAttribute('aria-label') }));
+        ok(`vídeos com ${nome}: nada toca sozinho nem baixa até a pessoa clicar no vídeo ("Tocar o vídeo: O Resumo do mês", sem botão), que então toca`, tudoParado && botoes === 0 && baixadosAntes === 0 && deVideoCalmo.length > 0 && nomeAntes === 'Tocar o vídeo: O Resumo do mês' && !pedido.paused && pedido.tempo > 0.5 && pedido.nome === 'Pausar o vídeo: O Resumo do mês' && erros.length === 0, JSON.stringify({ tudoParado, botoes, baixadosAntes, nomeAntes, pedido, erros }));
         await calmo.close();
       }
-      // Sem JavaScript: a capa aparece, sem botão, e nada quebra.
+      // Sem JavaScript: a capa aparece, sem botão nem papel de botão, com o nome "Vídeo: título" pelo aria-labelledby, e nada quebra.
       const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 } });
       const r = await semJs.newPage();
       const errosSemJs = [];
       r.on('pageerror', (e) => errosSemJs.push(e.message));
       await r.goto(`${origem}/app/`);
-      const semScript = await r.evaluate(() => ({ videos: document.querySelectorAll('figure[data-video] video').length, botoes: document.querySelectorAll('.video-botao').length, capas: [...document.querySelectorAll('figure[data-video] video')].every((v) => v.poster.includes('/imagens/video-')) }));
-      ok('vídeos sem JavaScript: as capas aparecem, sem botão e sem erro', semScript.videos === 7 && semScript.botoes === 0 && semScript.capas && errosSemJs.length === 0, JSON.stringify({ semScript, errosSemJs }));
+      const semScript = await r.evaluate(() => {
+        const vs = [...document.querySelectorAll('figure[data-video] video')];
+        return {
+          videos: vs.length, botoes: document.querySelectorAll('figure[data-video] button, .video-botao').length, capas: vs.every((v) => v.poster.includes('/imagens/video-')),
+          nomes: vs.every((v) => !v.hasAttribute('role') && !v.hasAttribute('tabindex') && !v.hasAttribute('aria-label') && document.getElementById(v.getAttribute('aria-labelledby'))?.textContent === `Vídeo: ${v.closest('figure').dataset.titulo}`),
+        };
+      });
+      ok('vídeos sem JavaScript: as capas aparecem, sem botão, com o nome "Vídeo: título" pelo aria-labelledby e sem erro', semScript.videos === 7 && semScript.botoes === 0 && semScript.capas && semScript.nomes && errosSemJs.length === 0, JSON.stringify({ semScript, errosSemJs }));
       await semJs.close();
       // Nada passa da largura da tela em 320, 390 e 1280 px, na página inicial, em O app e numa matéria.
       const q = await pagina();
