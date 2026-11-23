@@ -7054,10 +7054,10 @@ setInterval(async () => {
   await btn('Arquivar').click(); await waitText('Qual fica como principal?'); await p.waitForTimeout(400);
   t = await dialogText();
   ok('G1 Arquivar a principal: o diálogo pede a nova principal (uma escolha por conta ativa) e nada foi gravado',
-    t.includes('Escolha outra antes de arquivar esta.') && (await p.getByRole('button', { name: 'Tornar Conta principal a principal e arquivar' }).filter({ visible: true }).count()) === 1 &&
-    (await p.getByRole('button', { name: 'Tornar Carteira a principal e arquivar' }).filter({ visible: true }).count()) === 1 && (await g1Accounts()).includes('Cofre|outra|ativa|principal'));
+    t.includes('Escolha outra antes de arquivar esta.') && (await p.getByRole('button', { name: 'Escolher Conta principal e arquivar' }).filter({ visible: true }).count()) === 1 &&
+    (await p.getByRole('button', { name: 'Escolher Carteira e arquivar' }).filter({ visible: true }).count()) === 1 && (await g1Accounts()).includes('Cofre|outra|ativa|principal'));
   await shot('244_arquivar_principal');
-  await p.getByRole('button', { name: 'Tornar Conta principal a principal e arquivar' }).filter({ visible: true }).first().click(); await waitText('Arquivado.'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: 'Escolher Conta principal e arquivar' }).filter({ visible: true }).first().click(); await waitText('Arquivado.'); await p.waitForTimeout(500);
   ok('G1 Arquivar a principal escolhendo outra: o Cofre fica arquivado e a Conta principal volta a ser a principal',
     (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-;Cofre|outra|arquivada|-' && (await visibleCount('button', 'Reativar')) === 1 && (await visibleCount('button', 'Arquivar')) === 0, await g1Accounts());
   await btn('Reativar').click(); await waitText('Reativado.'); await p.waitForTimeout(500);

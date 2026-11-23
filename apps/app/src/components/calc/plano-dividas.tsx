@@ -254,7 +254,6 @@ function DebtCard({
         <LinkButton
           label={PLANO_TEXT.showValues}
           accessibilityLabel={PLANO_TEXT.showValuesA11y(name)}
-          color={colors.textSecondary}
           style={calcInlineLink}
           onPress={() => setValuesHidden(false)}
         />

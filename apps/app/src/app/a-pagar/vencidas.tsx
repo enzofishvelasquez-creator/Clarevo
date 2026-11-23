@@ -623,7 +623,7 @@ function OverdueInfo({ commitment: c, checked, onToggle }: { commitment: Commitm
   // Fatura de cartão (D-037): sem caixa de seleção; o pagamento é na própria fatura.
   if (c.invoice) {
     return (
-      <View style={styles.estimate} accessible accessibilityLabel={`${c.description}, ${due.toLowerCase()}, ${moneyA11y(c.amountCents, hidden)}`}>
+      <View style={styles.invoiceInfo} accessible accessibilityLabel={`${c.description}, ${due.toLowerCase()}, ${moneyA11y(c.amountCents, hidden)}`}>
         <Txt variant="label" style={{ fontFamily: fonts.bold }}>
           {c.description}
         </Txt>
@@ -658,6 +658,8 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   // Alinhada ao texto das linhas com caixa de seleção (caixa de 24 px + espaço).
   estimate: { gap: 2, paddingVertical: space[2], paddingLeft: 24 + space[3] },
+  // Fatura de cartão: sem caixa de seleção, então sem o recuo dela (o texto alinha com o botão "Abrir fatura").
+  invoiceInfo: { gap: 2, paddingVertical: space[2] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 140 },
   groupHead: { gap: space[2], paddingTop: space[3] },
   // Linhas de um grupo: recuo à esquerda, ligadas ao cabeçalho do ano.

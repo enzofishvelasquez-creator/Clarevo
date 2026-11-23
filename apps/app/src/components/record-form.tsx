@@ -2504,7 +2504,7 @@ function DayField({
           {...aria}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          style={styles.dayInput}
+          style={[styles.dayInput, { width: value.length === 1 ? 14 : 26 }]}
         />
         <Txt color={colors.textSecondary} style={tabular} accessibilityElementsHidden importantForAccessibility="no">
           {RETURN_TEXT.daySuffix(month)}
@@ -2527,10 +2527,9 @@ function DayField({
 
 const styles = StyleSheet.create({
   body: { padding: space[5], gap: space[4], paddingBottom: space[6] },
-  // Só o dia (2 algarismos), alinhado à direita, colado ao sufixo "/06/2026"; alvo de pelo menos 44 px.
+  // Só o dia (1 ou 2 algarismos), colado ao sufixo "/06/2026", com a largura do que está escrito (sem vão à esquerda). O alvo de toque é a
+  // caixa inteira, que leva o foco ao campo.
   dayInput: {
-    width: 44,
-    minWidth: 44,
     alignSelf: 'stretch',
     paddingVertical: space[3],
     fontFamily: fonts.medium,

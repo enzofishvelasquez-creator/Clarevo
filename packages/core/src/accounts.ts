@@ -86,7 +86,7 @@ export const ACCOUNTS_TEXT = {
   /** Arquivar a principal: escolher a nova. */
   chooseDefaultTitle: 'Qual fica como principal?',
   chooseDefaultBody: 'A opção principal vem marcada nos gastos, pagamentos e aportes. Escolha outra antes de arquivar esta.',
-  chooseDefaultChoice: (name: string): string => `Tornar ${name} a principal e arquivar`,
+  chooseDefaultChoice: (name: string): string => `Escolher ${name} e arquivar`,
   cancel: 'Cancelar',
   /** Excluir. */
   deleteTitle: 'Excluir de Bancos e carteira?',
