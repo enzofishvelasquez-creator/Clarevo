@@ -27,6 +27,9 @@
  *     nem baixa até a pessoa tocar no vídeo; sem JavaScript, a capa; e o servidor responde pedaços (206) com o tipo certo;
  *   - as imagens das matérias de Novidades (D-114): capa e telas com largura, altura e texto alternativo, carregando do próprio site, e a
  *     versão escura no tema escuro;
+ *   - "O que o plano inclui" em cartões e os atalhos da Ajuda, do Suporte e da 404 (23/11/2026): os grupos, os cartões com um link só e
+ *     sem link sublinhado, a grade em 1280, 820 e 390 px, o cartão inteiro como área de toque, o foco no cartão, nada além da largura da
+ *     tela em 360 px e o contraste AA no tema claro, no escuro do aparelho e no "Escuro" escolhido no rodapé;
  *   - a varredura de espaçamento e largura em todas as páginas (360, 768, 900 e 1280 px) e, no tema escuro, nas páginas com vídeos e imagens
  *     novas (360 e 1280 px).
  * Uso: npm run test:site   (gera o site numa pasta temporária, sobe o servidor local e percorre os fluxos; nada é gravado em `site/`)
@@ -1123,6 +1126,126 @@ function varrerPagina() {
       ok('planos: nada passa da largura da tela em 320, 390 e 1280 px (início, o resumo e as duas páginas de plano)', largas.length === 0, largas.join(' | '));
       await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
+    }
+
+    // 7c3b. "O que o plano inclui" em cartões (23/11/2026, pedido do Enzo: a lista de links sublinhados seguidos de frases longas estava
+    // "feia, pouco intuitiva e não apresentável") e os atalhos que tomaram o lugar das listas de links da Ajuda, do Suporte e da 404. Em cada
+    // página de plano: quatro grupos (h3) com 3, 3, 3 e 5 cartões; cada cartão com o ícone, um link só (o nome, num h4), "Ver como funciona"
+    // e nenhum link sublinhado; a grade com três colunas em 1280 px (o último grupo com dois e três), duas em 820 px (o primeiro na linha
+    // toda) e uma em 390 px; o clique em qualquer ponto do cartão abre o destino do link (no celular, o cartão inteiro é a área de toque); o
+    // foco aparece no cartão; nada passa da largura da tela em 360 px; e o texto dos cartões e dos atalhos com contraste AA no tema claro,
+    // no escuro do aparelho e no "Escuro" escolhido no rodapé.
+    {
+      const p = await pagina();
+      const GRUPOS = [['O dia a dia', 3], ['Cartões, extratos e notas', 3], ['Guardar, investir e aprender', 3], ['Do seu jeito', 5]];
+      const LINHAS = { 1280: [[3], [3], [3], [2, 3]], 820: [[1, 2], [1, 2], [1, 2], [1, 2, 2]], 390: [[1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1, 1, 1]] };
+      const lerCartoes = () => p.evaluate(() => {
+        const secao = document.querySelector('section[aria-labelledby="inclui"]');
+        const porLinha = (g) => { const linhas = new Map(); for (const c of g.children) { const t = Math.round(c.getBoundingClientRect().top); linhas.set(t, (linhas.get(t) || 0) + 1); } return [...linhas.entries()].sort((a, b) => a[0] - b[0]).map((x) => x[1]); };
+        return {
+          grupos: [...secao.querySelectorAll('.recursos-plano')].map((g) => [g.querySelector('h3').textContent, g.querySelectorAll('.recurso-cartao').length]),
+          cartoes: [...secao.querySelectorAll('.recurso-cartao')].map((c) => ({ links: c.querySelectorAll('a').length, nome: c.querySelector('h4 > a')?.textContent, icone: !!c.querySelector('.recurso-icone > svg[aria-hidden="true"]'), acao: c.querySelector('.recurso-acao')?.textContent })),
+          sublinhados: [...secao.querySelectorAll('a')].filter((a) => getComputedStyle(a).textDecorationLine.includes('underline')).map((a) => a.textContent),
+          linhas: [...secao.querySelectorAll('.recursos-grade')].map(porLinha),
+        };
+      });
+      const estrutura = [];
+      for (const largura of [1280, 820, 390]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        for (const caminho of ['planos/individual', 'planos/familia']) {
+          await p.goto(`${origem}/${caminho}`);
+          const e = await lerCartoes();
+          const certo = JSON.stringify(e.grupos) === JSON.stringify(GRUPOS) && e.cartoes.length === 14 && e.cartoes.every((c) => c.links === 1 && c.nome && c.icone && c.acao === 'Ver como funciona') && e.sublinhados.length === 0 && JSON.stringify(e.linhas) === JSON.stringify(LINHAS[largura]);
+          if (!certo) estrutura.push(`${caminho} em ${largura} px: ${JSON.stringify({ ...e, cartoes: e.cartoes.filter((c) => c.links !== 1 || !c.nome || !c.icone || c.acao !== 'Ver como funciona') })}`);
+        }
+      }
+      ok('planos em cartões: 4 grupos (3, 3, 3 e 5), 14 cartões com ícone, um link só (o nome) e "Ver como funciona", nenhum link sublinhado, 3 colunas em 1280 px, 2 em 820 px e 1 em 390 px, sem cartão sozinho', estrutura.length === 0, estrutura.join(' | '));
+
+      // No celular, o cartão inteiro é a área de toque: os quatro cantos de cada cartão caem no link dele.
+      await p.setViewportSize({ width: 390, height: 900 });
+      await p.goto(`${origem}/planos/familia`);
+      const foraDoLink = await p.evaluate(() => [...document.querySelectorAll('.recurso-cartao')].flatMap((c) => {
+        // Sem a rolagem suave do site, que deixaria a medida para depois da animação.
+        c.scrollIntoView({ block: 'center', behavior: 'instant' });
+        const r = c.getBoundingClientRect();
+        const link = c.querySelector('h4 > a');
+        const pontos = [[r.left + 8, r.top + 8], [r.right - 8, r.top + 8], [r.left + 8, r.bottom - 8], [r.right - 8, r.bottom - 8]];
+        return pontos.filter(([x, y]) => document.elementFromPoint(x, y)?.closest('a') !== link).map(() => `${link.textContent} (${Math.round(r.height)} px)`);
+      }));
+      ok('planos em cartões: no celular, os quatro cantos de cada cartão (todos com mais de 44 px de altura) abrem o link do cartão', foraDoLink.length === 0, [...new Set(foraDoLink)].join(' | '));
+      // No computador, clicar no canto do cartão (longe do nome) abre o destino.
+      await p.setViewportSize({ width: 1280, height: 900 });
+      await p.goto(`${origem}/planos/individual`);
+      const investir = p.locator('.recurso-cartao', { has: p.locator('h4 > a', { hasText: /^Investir$/ }) });
+      await investir.scrollIntoViewIfNeeded();
+      const caixa = await investir.boundingBox();
+      await p.mouse.click(caixa.x + caixa.width - 12, caixa.y + caixa.height - 12);
+      await p.waitForURL(/\/ajuda\/organizar(\.html)?#guia-investimentos$/);
+      ok('planos em cartões: clicar no canto do cartão Investir abre "Investir" na Ajuda', true);
+      // O foco pelo teclado aparece no cartão inteiro.
+      await p.goto(`${origem}/planos/individual`);
+      await p.evaluate(() => { const h = document.getElementById('inclui'); h.tabIndex = -1; h.focus(); });
+      await p.keyboard.press('Tab');
+      const foco = await p.evaluate(() => { const a = document.activeElement; const c = a.closest('.recurso-cartao'); const cs = c && getComputedStyle(c); return { nome: a.textContent, contorno: cs && `${cs.outlineStyle} ${cs.outlineWidth}` }; });
+      ok('planos em cartões: com Tab, o foco vai ao primeiro recurso e o contorno de 3 px aparece no cartão', foco.nome === 'Anotar e Resumo' && foco.contorno === 'solid 3px', JSON.stringify(foco));
+
+      // Os atalhos: as perguntas da Ajuda em três colunas no computador (todas as linhas cheias) e numa no celular; no Suporte, até duas;
+      // na 404, os caminhos em pílulas. Cada atalho com pelo menos 56 px e cada pílula com 44 px; nenhuma lista sublinhada sobrou.
+      const atalhos = [];
+      for (const [largura, caminho, colunas] of [[1280, 'ajuda/', 3], [390, 'ajuda/', 1], [1280, 'suporte', 2], [390, 'suporte', 1]]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        await p.goto(`${origem}/${caminho}`);
+        const a = await p.evaluate(() => {
+          const lista = document.querySelector('ul.atalhos');
+          const linhas = new Map();
+          for (const li of lista.children) { const t = Math.round(li.getBoundingClientRect().top); linhas.set(t, (linhas.get(t) || 0) + 1); }
+          const itens = [...lista.querySelectorAll('a.atalho')];
+          return { porLinha: Math.max(...linhas.values()), itens: itens.length, baixos: itens.filter((i) => i.getBoundingClientRect().height < 56).length, comTema: itens.every((i) => i.querySelector('small')?.textContent), sublinhadas: [...lista.closest('section').querySelectorAll('li > a')].filter((x) => !x.closest('.atalhos') && getComputedStyle(x).textDecorationLine.includes('underline')).length };
+        });
+        if (a.porLinha !== colunas || a.itens < 3 || a.baixos || !a.comTema || a.sublinhadas) atalhos.push(`${caminho} em ${largura} px: ${JSON.stringify(a)}`);
+      }
+      await p.goto(`${origem}/404`);
+      const pilulas = await p.evaluate(() => [...document.querySelectorAll('main .nav-temas a')].map((x) => Math.round(x.getBoundingClientRect().height)));
+      if (pilulas.length !== 5 || pilulas.some((h) => h < 44)) atalhos.push(`404: ${JSON.stringify(pilulas)}`);
+      ok('atalhos: as perguntas mais comuns da Ajuda (3 por linha no computador) e do Suporte (até 2) em caixas de 56 px com o tema, e os caminhos da 404 em pílulas de 44 px, sem lista de links sublinhados', atalhos.length === 0, atalhos.join(' | '));
+
+      // Nada passa da largura da tela em 360 px nas páginas que mudaram.
+      await p.setViewportSize({ width: 360, height: 800 });
+      const largas360 = [];
+      for (const caminho of ['planos/individual', 'planos/familia', 'ajuda/', 'suporte', '404']) {
+        await p.goto(`${origem}/${caminho}`);
+        if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas360.push(caminho);
+      }
+      ok('planos em cartões e atalhos: nada passa da largura da tela em 360 px (as duas páginas de plano, a Ajuda, o Suporte e a 404)', largas360.length === 0, largas360.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
+      await p.close();
+
+      // Contraste AA (4,5:1 para o texto; 3:1 para o ícone) no tema claro, no escuro do aparelho e no "Escuro" escolhido no rodapé.
+      const contrasteDaPagina = () => {
+        const rgb = (c) => (c.match(/[\d.]+/g) || []).map(Number);
+        const lum = ([r, g, b]) => [r, g, b].map((v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; }).reduce((t, v, i) => t + v * [0.2126, 0.7152, 0.0722][i], 0);
+        const fundoDe = (e) => { for (let x = e; x; x = x.parentElement) { const c = rgb(getComputedStyle(x).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0)) return c; } return [255, 255, 255]; };
+        const razao = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+        const baixos = [];
+        const conferir = (seletor, minimo) => { for (const e of document.querySelectorAll(seletor)) { const r = razao(rgb(getComputedStyle(e).color), fundoDe(e)); if (r < minimo) baixos.push(`${seletor} "${e.textContent.trim().slice(0, 24)}" ${r.toFixed(2)}`); } };
+        conferir('.recursos-plano h3, .recurso-cartao h4 a, .recurso-texto, .recurso-nota, .recurso-onde, .recurso-acao, .lista-marcada li, .atalho-titulo, .atalho small, main .nav-temas a', 4.5);
+        conferir('.recurso-icone, .recurso-seta', 3);
+        return { baixos, conferidos: document.querySelectorAll('.recurso-cartao, .atalho, main .nav-temas a').length };
+      };
+      const contrastes = [];
+      for (const [nome, opcoes, escolha] of [['claro', { colorScheme: 'light' }, null], ['escuro do aparelho', { colorScheme: 'dark' }, null], ['"Escuro" escolhido no rodapé', { colorScheme: 'light' }, 'escuro']]) {
+        const c = await navegador.newContext({ ...opcoes, viewport: { width: 1280, height: 900 }, locale: 'pt-BR' });
+        if (escolha) await c.addInitScript((v) => { try { localStorage.setItem('clarevo.site.tema.v1', v); } catch (e) { /* nada */ } }, escolha);
+        const q = await c.newPage();
+        for (const caminho of ['planos/individual', 'planos/familia', 'ajuda/', 'suporte', '404']) {
+          await q.goto(`${origem}/${caminho}`);
+          const r = await q.evaluate(contrasteDaPagina);
+          const fundo = await q.evaluate(() => getComputedStyle(document.body).backgroundColor);
+          if (!r.conferidos || r.baixos.length || (nome !== 'claro') !== (fundo === 'rgb(19, 30, 62)')) contrastes.push(`${caminho}, ${nome}: ${JSON.stringify({ ...r, fundo })}`);
+        }
+        await c.close();
+      }
+      ok('planos em cartões e atalhos: contraste AA do texto (4,5:1) e dos ícones (3:1) no tema claro, no escuro do aparelho e no "Escuro" escolhido no rodapé', contrastes.length === 0, contrastes.join(' | '));
     }
 
     // 7c4. Celulares no centro dos cartões, "Quem vê os seus dados" em Segurança e a faixa de confiança da capa (D-115). Em 1280 px, a

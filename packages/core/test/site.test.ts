@@ -1047,7 +1047,8 @@ describe('site público: as páginas geradas', () => {
     expect(h).not.toMatch(/[\u2013\u2014]|faz\w*\s+sentido|melhor|depoimento|milh[õo]es/i);
 
     // A página de cada plano.
-    const NOMES_DOS_RECURSOS = ['Anotar e Resumo', 'Contas a pagar', 'Cartões e faturas', 'Calendário do mês', 'Importar extrato e fatura', 'Ler nota, comprovante e boleto', 'Metas e reserva', 'Investir', 'Aprender, simulador e calculadoras', 'Anotar pelo Telegram', 'Espaço Negócio', 'Tema claro ou escuro', 'Ocultar valores', 'Exportar meus dados'];
+    // Desde 23/11/2026, "O que o plano inclui" em cartões, em quatro grupos de 3, 3, 3 e 5 (os mesmos 14 recursos e destinos de antes).
+    const NOMES_DOS_RECURSOS = ['Anotar e Resumo', 'Contas a pagar', 'Calendário do mês', 'Cartões e faturas', 'Importar extrato e fatura', 'Ler nota, comprovante e boleto', 'Metas e reserva', 'Investir', 'Aprender, simulador e calculadoras', 'Espaço Negócio', 'Anotar pelo Telegram', 'Tema claro ou escuro', 'Ocultar valores', 'Exportar meus dados'];
     const ESPECIFICOS = {
       individual: ['Para uma pessoa: a assinatura é sua.', 'O seu Pessoal, que só você vê.'],
       familiar: ['Até 6 pessoas na mesma Família, contando a pessoa titular.', 'Uma assinatura só, paga pela pessoa titular. Quem recebe o convite para a Família não paga.', 'Convite por link, de uso único e válido por 7 dias, com o papel de quem anota e vê ou de quem só vê.', 'Cada pessoa continua com o próprio Pessoal, que só ela vê', 'Quem é titular muda o papel de cada pessoa, passa a titularidade ou encerra a Família, e quem quiser sai.'],
@@ -1072,7 +1073,12 @@ describe('site público: as páginas geradas', () => {
       if (plano === 'individual') expect(p).not.toMatch(/titular|convite por link|Até 6 pessoas|papel de quem/i);
       // Todos os recursos do app, com o link para a Ajuda ou O app, que existe.
       const recursos = /<h2 id="inclui">[\s\S]*?<\/section>\n<\/div>/.exec(p)![0];
-      const links = [...recursos.matchAll(/<li><a href="([^"]+)">([^<]+)<\/a>: /g)].map((m): [string, string] => [m[1]!, m[2]!]);
+      // Cada recurso é um cartão com um link só: o nome, no título do cartão.
+      const cartoes = [...recursos.matchAll(/<li class="recurso-cartao">[\s\S]*?<\/li>/g)].map((m) => m[0]);
+      expect(cartoes.length, arquivo).toBe(14);
+      for (const c of cartoes) expect(c.match(/<a\b/g)?.length, c).toBe(1);
+      expect([...recursos.matchAll(/<h3 id="g-[^"]+">([^<]+)<\/h3>/g)].map((m) => m[1]), arquivo).toEqual(['O dia a dia', 'Cartões, extratos e notas', 'Guardar, investir e aprender', 'Do seu jeito']);
+      const links = [...recursos.matchAll(/<h4><a href="([^"]+)">([^<]+)<\/a><\/h4>/g)].map((m): [string, string] => [m[1]!, m[2]!]);
       expect(links.map(([, n]) => n), arquivo).toEqual(NOMES_DOS_RECURSOS);
       for (const [destino] of links) {
         expect(destino, destino).toMatch(/^\.\.\//);
@@ -1101,7 +1107,14 @@ describe('site público: as páginas geradas', () => {
     // O nome de quem saiu, como o app mostra (FAMILY_TEXT.exMember: "Nina (saiu da Família)").
     expect(perguntas).toContain('com o seu primeiro nome e "saiu da Família" ao lado');
     for (const t of [ACCESS_TEXT.plansNote, ACCESS_TEXT.readOnlyWhat, ACCESS_TEXT.benefitNote, 'Quem recebe o convite para a Família não paga.']) expect(perguntas, t).not.toContain(esc(t));
-    expect(familia).toContain('Investir</a>: O que você já investe, só no seu Pessoal');
+    // Onde cada recurso vale, só no Família: Investir só no Pessoal, com a ressalva de sempre.
+    const cartaoDe = (pagina: string, nome: string) => new RegExp(`<li class="recurso-cartao">\\n<div class="recurso-topo">[^\\n]*>${nome}</a></h4>[\\s\\S]*?</li>`).exec(pagina)?.[0] ?? '';
+    expect(cartaoDe(familia, 'Investir')).toContain('O que você já investe');
+    expect(cartaoDe(familia, 'Investir')).toContain('<p class="recurso-onde">Só no seu Pessoal: ninguém da Família vê.</p>');
+    expect(cartaoDe(familia, 'Investir')).toContain('Não é recomendação de investimento.');
+    expect(cartaoDe(familia, 'Espaço Negócio')).toContain('O negócio é só de quem o criou e não entra na Família.');
+    expect(cartaoDe(html('planos/individual.html'), 'Investir')).toContain('Não é recomendação de investimento.');
+    expect(html('planos/individual.html')).not.toContain('recurso-onde');
     // No rodapé de todas as páginas, o resumo dos planos; as páginas dos planos entram no mapa do site.
     expect(html('sobre.html')).toContain('<a href="planos.html">Planos</a>');
     const g = gerarSite({ dados: PREENCHIDOS, referencia: REFERENCIA_DOS_POSTS });

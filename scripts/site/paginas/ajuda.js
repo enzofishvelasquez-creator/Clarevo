@@ -8,7 +8,7 @@
 const path = require('node:path');
 const { esc, markdownParaHtml } = require('../texto');
 const { rel, textoSimples } = require('../util');
-const { montarPagina, colunaTexto, bloco } = require('../modelo');
+const { montarPagina, colunaTexto, bloco, listaDeAtalhos } = require('../modelo');
 const { catalogo } = require('../catalogo');
 const { lerPerguntas } = require('../conteudo');
 const { SITE_SRC } = require('../config');
@@ -236,9 +236,10 @@ function paginaIndice(porTema, { valores }) {
     return `<a class="cartao" href="${rel(arquivo, arquivoDoTemaDaAjuda(t.id))}"><span class="titulo-cartao">${esc(t.titulo)}</span><p>${esc(t.descricao)}</p><p class="tema-meta">${n} ${n === 1 ? 'resposta' : 'respostas'}</p></a>`;
   }).join('\n');
   const comuns = [...porTema.values()].flat().filter((r) => r.id.startsWith('p-'));
-  const linkDe = (r) => {
+  // Desde 23/11/2026, as perguntas mais comuns em atalhos (caixa, a pergunta, o tema embaixo e a seta), no lugar da lista sublinhada.
+  const atalhoDe = (r) => {
     const tema = TEMAS.find((t) => porTema.get(t.id).includes(r));
-    return `<li><a href="${rel(arquivo, `${arquivoDoTemaDaAjuda(tema.id)}#${r.id}`)}">${esc(r.pergunta)}</a></li>`;
+    return { href: rel(arquivo, `${arquivoDoTemaDaAjuda(tema.id)}#${r.id}`), texto: r.pergunta, sub: tema.titulo };
   };
   const corpo = [
     bloco(
@@ -254,9 +255,7 @@ ${cartoes}
     bloco(
       `<div data-some-na-busca>
 <h2 id="comuns">Perguntas mais comuns</h2>
-<ul>
-${comuns.map(linkDe).join('\n')}
-</ul>
+${listaDeAtalhos(comuns.map(atalhoDe), { tres: true })}
 <p>Não achou o que procurava? Veja a página de <a href="${rel(arquivo, 'suporte.html')}">Suporte</a>.</p>
 </div>`,
       { variante: 'alt', rotulo: null },

@@ -12,6 +12,13 @@
  * página do Família diz que cada pessoa tem todos eles e onde cada um vale), como funciona a assinatura, no Família duas perguntas que não
  * repetem o resto e, no fim, "Ver o plano ..." (o outro) e "Comparar os planos".
  *
+ * Desde 23/11/2026 (pedido do Enzo: "isso está feio, pouco intuitivo e não apresentável"), "O que o plano inclui" deixou de ser uma lista de
+ * links sublinhados seguidos de frases longas: cada grupo é uma seção com o título e uma linha fina ao lado, e cada recurso é um cartão com
+ * um ícone, o nome (o link, que cobre o cartão inteiro), uma frase curta, a ressalva que importa (Investir: "Não é recomendação de
+ * investimento."; Espaço Negócio: "Incluído na assinatura: ..."; Metas: o guardado é só o que você registra), no Família a etiqueta de onde
+ * o recurso vale, e "Ver como funciona" embaixo. Os grupos passaram a ter 3, 3, 3 e 5 recursos (os mesmos 14, com os mesmos destinos),
+ * para a grade fechar as linhas: uma coluna no celular, duas no tablet e três no computador.
+ *
  * Os nomes, os preços, o "por mês" e as frases da assinatura vêm do núcleo (`catalogo().PLANOS`, de `packages/core/src/plano.ts`), para o
  * site e o app dizerem o mesmo; o resto foi conferido no guia de uso do app (`packages/core/src/guide`), nas decisões de `docs/00` (D-083
  * para o plano Família pago pela pessoa titular, D-093 para o Pix mês a mês, D-105 para o calendário, D-113 e `docs/52` para o Espaço
@@ -21,7 +28,7 @@
  */
 const { esc } = require('../texto');
 const { rel } = require('../util');
-const { montarPagina, marcadoresEmHtml, bloco } = require('../modelo');
+const { montarPagina, marcadoresEmHtml, bloco, icone } = require('../modelo');
 const { catalogo } = require('../catalogo');
 
 const ARQUIVO = 'planos.html';
@@ -46,64 +53,53 @@ function pessoasNaFamilia() {
 }
 
 /**
- * Os recursos do app, em grupos, os mesmos nos dois planos. Cada um: o nome (o texto do link), o destino (Ajuda ou O app) e uma frase
- * curta, escrita conferindo o guia de uso e as decisões citadas no começo do arquivo. No plano Família, quatro frases dizem onde o recurso
- * vale: anotar no Pessoal ou na Família (o seletor do guia, com o papel de quem anota); Investir, o Telegram e o negócio só no Pessoal de
- * cada pessoa (como em Segurança, no guia e em `business.ts`; o negócio compartilhado é do Plus, D-116).
+ * Os recursos do app, em grupos, os mesmos nos dois planos. Cada um: o nome (o texto do link e o título do cartão), o destino (Ajuda ou O
+ * app), o ícone (`ICONES` de `modelo.js`), uma frase curta e, quando há, a ressalva que importa (`nota`), escritas conferindo o guia de uso e
+ * as decisões citadas no começo do arquivo. No plano Família, quatro cartões dizem onde o recurso vale (`onde`): anotar no Pessoal ou na
+ * Família (o seletor do guia, com o papel de quem anota); Investir, o Telegram e o negócio só no Pessoal de cada pessoa (como em Segurança,
+ * no guia e em `business.ts`; o negócio compartilhado é do Plus, D-116). Desde 23/11/2026, os grupos têm 3, 3, 3 e 5 recursos, para a grade
+ * de cartões fechar as linhas; no último, os dois primeiros (os maiores) ficam lado a lado no computador.
  */
 function gruposDeRecursos(plano) {
   const familia = plano === 'familiar';
+  const soNaFamilia = (texto) => (familia ? texto : null);
   return [
     {
       id: 'dia-a-dia',
       titulo: 'O dia a dia',
       itens: [
-        ['Anotar e Resumo', 'app/index.html#resumo', familia
-          ? 'Anote gastos e recebimentos em poucos toques, no seu Pessoal ou, com o papel de quem anota, na Família; o Resumo mostra o recebido, o pago e o que ainda vai vencer no mês, em cada espaço.'
-          : 'Anote gastos e recebimentos em poucos toques; o Resumo mostra o recebido, o pago e o que ainda vai vencer no mês.'],
-        ['Contas a pagar', ajudaDoGuia('contas-a-pagar'), 'As contas que ainda vão vencer, com lembrete no app para celular; quando você paga, o valor passa a contar em Pago.'],
-        ['Cartões e faturas', ajudaDoGuia('cartoes'), 'As compras na fatura de cada cartão, com o limite usado; a compra só entra em Pago quando a fatura é paga.'],
-        ['Calendário do mês', 'app/index.html#contas', 'Contas, faturas e gastos fixos do mês por dia, com o previsto separado do que já foi pago.'],
+        { nome: 'Anotar e Resumo', destino: 'app/index.html#resumo', icone: 'anotar', texto: 'Gastos e recebimentos em poucos toques. O Resumo mostra o recebido, o pago e o que ainda vai vencer no mês.', onde: soNaFamilia('No seu Pessoal e, com o papel de quem anota, na Família.') },
+        { nome: 'Contas a pagar', destino: ajudaDoGuia('contas-a-pagar'), icone: 'conta', texto: 'Os vencimentos, com lembrete no app para celular. Quando você paga, o valor passa a contar em Pago.' },
+        { nome: 'Calendário do mês', destino: 'app/index.html#contas', icone: 'calendario', texto: 'Contas, faturas e gastos fixos por dia, com o previsto separado do que já foi pago.' },
       ],
     },
     {
-      id: 'ler-e-importar',
-      titulo: 'Ler e importar, no próprio aparelho',
+      id: 'cartoes-e-notas',
+      titulo: 'Cartões, extratos e notas',
       itens: [
-        ['Importar extrato e fatura', ajudaDoGuia('importar-extrato'), 'Do arquivo do banco (PDF, OFX ou planilha) ou de prints da tela do banco, lidos no aparelho, com a revisão de cada linha antes de importar.'],
-        ['Ler nota, comprovante e boleto', ajudaDoGuia('nota-fiscal'), 'A nota fiscal, o comprovante de Pix ou de pagamento e o boleto preenchem o gasto ou a conta a pagar, e o arquivo não é guardado.'],
+        { nome: 'Cartões e faturas', destino: ajudaDoGuia('cartoes'), icone: 'cartao', texto: 'As compras na fatura de cada cartão e o limite usado. A compra só entra em Pago quando a fatura é paga.' },
+        { nome: 'Importar extrato e fatura', destino: ajudaDoGuia('importar-extrato'), icone: 'importar', texto: 'PDF, OFX, planilha ou prints do banco, lidos no aparelho, com a revisão de cada linha antes de importar.' },
+        { nome: 'Ler nota, comprovante e boleto', destino: ajudaDoGuia('nota-fiscal'), icone: 'ler', texto: 'Lidos no aparelho, preenchem o gasto ou a conta a pagar. O arquivo não é guardado.' },
       ],
     },
     {
-      id: 'guardar-e-investir',
-      titulo: 'Guardar e investir',
+      id: 'guardar-e-aprender',
+      titulo: 'Guardar, investir e aprender',
       itens: [
-        ['Metas e reserva', ajudaDoGuia('metas'), 'Metas com prazo e a reserva para imprevistos, com o guardado só pelo que você registra e o plano de guardar em etapas.'],
-        ['Investir', ajudaDoGuia('investimentos'), familia
-          ? 'O que você já investe, só no seu Pessoal, pelo valor do extrato: quanto aplicou, quanto vale e quanto rendeu, ao lado do CDI, do IPCA e da poupança. Ninguém da Família vê. Não é recomendação de investimento.'
-          : 'O que você já investe, pelo valor do extrato: quanto aplicou, quanto vale e quanto rendeu, ao lado do CDI, do IPCA e da poupança. Não é recomendação de investimento.'],
-      ],
-    },
-    {
-      id: 'aprender',
-      titulo: 'Aprender e calcular',
-      itens: [
-        ['Aprender, simulador e calculadoras', 'app/index.html#aprender', 'Explicações curtas com fonte e data de revisão, o simulador e as calculadoras, que usam só os números que você digita.'],
+        { nome: 'Metas e reserva', destino: ajudaDoGuia('metas'), icone: 'meta', texto: 'Metas com prazo e a reserva para imprevistos, com o plano de guardar em etapas.', nota: 'O guardado é só o que você registra.' },
+        { nome: 'Investir', destino: ajudaDoGuia('investimentos'), icone: 'investir', texto: 'O que você já investe, pelo valor do extrato: quanto aplicou, quanto vale e quanto rendeu, ao lado do CDI, do IPCA e da poupança.', nota: 'Não é recomendação de investimento.', onde: soNaFamilia('Só no seu Pessoal: ninguém da Família vê.') },
+        { nome: 'Aprender, simulador e calculadoras', destino: 'app/index.html#aprender', icone: 'aprender', texto: 'Explicações curtas com fonte e data de revisão. O simulador e as calculadoras usam só os números que você digita.' },
       ],
     },
     {
       id: 'do-seu-jeito',
       titulo: 'Do seu jeito',
       itens: [
-        ['Anotar pelo Telegram', ajudaDoGuia('telegram'), familia
-          ? 'Anote um gasto ou um recebimento no seu Pessoal mandando uma mensagem escrita para a Clarevo no Telegram.'
-          : 'Anote um gasto ou um recebimento mandando uma mensagem escrita para a Clarevo no Telegram.'],
-        ['Espaço Negócio', ajudaDoGuia('negocio'), familia
-          ? 'Para quem tem CNPJ ou trabalha por conta: as contas do negócio num espaço separado do Pessoal, com quanto entrou, saiu e sobrou no mês. Incluído na assinatura: um negócio por pessoa, sem custo a mais. O negócio é só de quem o criou e não entra na Família.'
-          : 'Para quem tem CNPJ ou trabalha por conta: as contas do negócio num espaço separado do Pessoal, com quanto entrou, saiu e sobrou no mês. Incluído na assinatura: um negócio por pessoa, sem custo a mais.'],
-        ['Tema claro ou escuro', 'ajuda/conta.html#p-tema', 'O app segue o tema do aparelho, e em Conta dá para escolher Claro ou Escuro.'],
-        ['Ocultar valores', ajudaDoGuia('ocultar-valores'), 'Esconde os valores em reais da tela e, no celular, pode pedir biometria ao abrir o app.'],
-        ['Exportar meus dados', ajudaDoGuia('exportar'), 'Leve os seus gastos e recebimentos para uma planilha (CSV) ou um resumo em PDF, montado no próprio aparelho.'],
+        { nome: 'Espaço Negócio', destino: ajudaDoGuia('negocio'), icone: 'negocio', texto: 'Para quem tem CNPJ ou trabalha por conta: as contas do negócio separadas do Pessoal, com quanto entrou, saiu e sobrou no mês.', nota: 'Incluído na assinatura: um negócio por pessoa, sem custo a mais.', onde: soNaFamilia('O negócio é só de quem o criou e não entra na Família.') },
+        { nome: 'Anotar pelo Telegram', destino: ajudaDoGuia('telegram'), icone: 'mensagem', texto: 'Anote um gasto ou um recebimento com uma mensagem escrita para a Clarevo.', onde: soNaFamilia('Só no seu Pessoal.') },
+        { nome: 'Tema claro ou escuro', destino: 'ajuda/conta.html#p-tema', icone: 'tema', texto: 'O app segue o tema do aparelho, e em Conta dá para escolher Claro ou Escuro.' },
+        { nome: 'Ocultar valores', destino: ajudaDoGuia('ocultar-valores'), icone: 'ocultar', texto: 'Esconde os valores em reais da tela e, no celular, pode pedir biometria ao abrir o app.' },
+        { nome: 'Exportar meus dados', destino: ajudaDoGuia('exportar'), icone: 'exportar', texto: 'Os seus gastos e recebimentos numa planilha (CSV) ou num resumo em PDF, montado no próprio aparelho.' },
       ],
     },
   ];
@@ -125,14 +121,28 @@ function oQueSoEsteTem(plano) {
   ];
 }
 
-/** Os grupos de recursos em HTML; `u` monta o caminho relativo de um link interno. */
+/**
+ * Um recurso em cartão: o ícone, o nome (um `h4` com o link, que cobre o cartão inteiro, como nos cartões dos planos: um link só, com o
+ * nome do recurso), a frase, a ressalva, a etiqueta de onde vale e "Ver como funciona" com a seta, que repete o convite do link para quem
+ * vê a tela (escondido do leitor de tela, que já ouviu o nome do link). No celular, para a lista não ficar comprida, o convite dá lugar a
+ * uma seta ao lado do nome (`.recurso-seta`).
+ */
+function cartaoDoRecurso(r, u) {
+  return `<li class="recurso-cartao">
+<div class="recurso-topo"><span class="recurso-icone">${icone(r.icone)}</span><h4><a href="${u(r.destino)}">${esc(r.nome)}</a></h4><span class="recurso-seta">${icone('seta', 20, 2)}</span></div>
+<p class="recurso-texto">${esc(r.texto)}</p>
+${r.nota ? `<p class="recurso-nota">${esc(r.nota)}</p>\n` : ''}${r.onde ? `<p class="recurso-onde">${esc(r.onde)}</p>\n` : ''}<p class="recurso-acao" aria-hidden="true">Ver como funciona${icone('seta', 18, 2)}</p>
+</li>`;
+}
+
+/** Os grupos de recursos em HTML, cada um com a grade de cartões; `u` monta o caminho relativo de um link interno. */
 function listaDeRecursos(plano, u) {
   return gruposDeRecursos(plano)
     .map(
       (g) => `<section class="recursos-plano" aria-labelledby="g-${g.id}">
 <h3 id="g-${g.id}">${esc(g.titulo)}</h3>
-<ul>
-${g.itens.map(([nome, destino, frase]) => `<li><a href="${u(destino)}">${esc(nome)}</a>: ${esc(frase)}</li>`).join('\n')}
+<ul class="recursos-grade" role="list">
+${g.itens.map((r) => cartaoDoRecurso(r, u)).join('\n')}
 </ul>
 </section>`,
     )
@@ -169,8 +179,9 @@ ${aindaNao}<p class="nota">Os detalhes estão nos <a href="${u('termos.html')}">
 
   const brutas = [
     bloco(
+      // Desde 23/11/2026, com a marca de lima de cada item (o que o plano dá), como os cartões de "O que o plano inclui" logo abaixo.
       `<h2 id="para-quem">Para quem é</h2>
-<ul class="como-funciona">
+<ul class="como-funciona lista-marcada">
 ${oQueSoEsteTem(plano).map((i) => `<li>${esc(i)}</li>`).join('\n')}
 </ul>
 <p class="pequeno"><a href="${u(ajudaDoGuia(familia ? 'familia' : 'assinatura'))}">${familia ? 'Como funciona a Família, na Ajuda' : 'Como funciona a assinatura, na Ajuda'}</a></p>`,
