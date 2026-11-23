@@ -36,10 +36,11 @@ export function RecordsTable({
   const hidden = useValuesHidden();
   const businessId = useBusiness().data?.id ?? null;
   const [width, setWidth] = useState(0);
-  // Antes de medir (largura 0), a tabela de sempre: a troca, se houver, acontece logo no primeiro desenho.
   const asRows = width > 0 && width < TABLE_MIN;
   const showAccount = accountName !== null && (width === 0 || width >= ACCOUNT_MIN);
   const onLayout = (e: { nativeEvent: { layout: { width: number } } }) => setWidth(Math.round(e.nativeEvent.layout.width));
+  // Antes da primeira medida, só o espaço (sem desenhar a tabela que talvez vire lista: a troca aparecia por dois quadros).
+  if (width === 0) return <View onLayout={onLayout} style={{ minHeight: 1 }} />;
   if (asRows) {
     return (
       <View onLayout={onLayout}>

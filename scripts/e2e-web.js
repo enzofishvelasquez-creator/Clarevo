@@ -7054,10 +7054,10 @@ setInterval(async () => {
   await btn('Arquivar').click(); await waitText('Qual fica como principal?'); await p.waitForTimeout(400);
   t = await dialogText();
   ok('G1 Arquivar a principal: o diálogo pede a nova principal (uma escolha por conta ativa) e nada foi gravado',
-    t.includes('Escolha outra antes de arquivar esta.') && (await p.getByRole('button', { name: 'Escolher Conta principal e arquivar' }).filter({ visible: true }).count()) === 1 &&
-    (await p.getByRole('button', { name: 'Escolher Carteira e arquivar' }).filter({ visible: true }).count()) === 1 && (await g1Accounts()).includes('Cofre|outra|ativa|principal'));
+    t.includes('Escolha outra antes de arquivar esta.') && (await p.getByRole('button', { name: 'Deixar Conta principal como principal e arquivar' }).filter({ visible: true }).count()) === 1 &&
+    (await p.getByRole('button', { name: 'Deixar Carteira como principal e arquivar' }).filter({ visible: true }).count()) === 1 && (await g1Accounts()).includes('Cofre|outra|ativa|principal'));
   await shot('244_arquivar_principal');
-  await p.getByRole('button', { name: 'Escolher Conta principal e arquivar' }).filter({ visible: true }).first().click(); await waitText('Arquivado.'); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: 'Deixar Conta principal como principal e arquivar' }).filter({ visible: true }).first().click(); await waitText('Arquivado.'); await p.waitForTimeout(500);
   ok('G1 Arquivar a principal escolhendo outra: o Cofre fica arquivado e a Conta principal volta a ser a principal',
     (await g1Accounts()) === 'Conta principal|banco|ativa|principal;Carteira|dinheiro|ativa|-;Cofre|outra|arquivada|-' && (await visibleCount('button', 'Reativar')) === 1 && (await visibleCount('button', 'Arquivar')) === 0, await g1Accounts());
   await btn('Reativar').click(); await waitText('Reativado.'); await p.waitForTimeout(500);
@@ -12743,7 +12743,7 @@ setInterval(async () => {
     ['10/11,', '10/12,', '10/02/2027', '10/03/2027'].every((d) => duFatura(d) !== '' && !/dia útil/.test(duFatura(d))) && duFatura('10/01/2027') === '' && duFatura('10/04/2027') === '', JSON.stringify(duDemoNext));
   // Revisão das telas (16/11/2026): em "Próximos meses", a legenda de uma linha só ("Vence segunda, 11/01/2027 (próximo dia útil)"); o sinal
   // escrito fica na tela da conta (o nome acessível da linha continua com ele).
-  ok('Dia útil, demonstração: em "Próximos meses", a legenda diz "Vence segunda, 11/01/2027 (próximo dia útil)", sem o sinal escrito embaixo (ele fica na tela da conta)', !(await body()).includes('Não é dia útil · vencimento anotado: domingo, 10/01') && (await body()).includes('Vence segunda, 11/01/2027 (próximo dia útil)'));
+  ok('Dia útil, demonstração: em "Próximos meses", a legenda diz "Vence segunda, 11/01/2027 (próximo dia útil)", sem o sinal escrito embaixo (ele fica na tela da conta)', (await duNotices()).length === 0 && (await body()).includes('Vence segunda, 11/01/2027 (próximo dia útil)'));
   ok('Dia útil, demonstração (D-061): nenhuma conta vencida em outubro (a contagem não muda: sem a palavra "vencida" no Resumo e sem a seção "Vencidas" na lista)', duResumoSemVencida && (await sectionRows('Vencidas')) === null);
   await duKeep();
 

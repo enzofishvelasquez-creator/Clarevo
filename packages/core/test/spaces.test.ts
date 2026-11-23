@@ -126,8 +126,8 @@ describe('no app (lido como código-fonte)', () => {
     // A animação de 200 ms e "reduzir movimento" continuam (revisão de 23/11/2026: a pílula branca acompanha a posição e a largura medidas
     // da opção escolhida, porque cada opção tem a largura do nome).
     expect(track).toContain('if (reduced || !placed) {');
-    expect(track).toContain('x.value = withTiming(spot.x, { duration: motion.context });');
-    expect(track).toContain('w.value = withTiming(spot.width, { duration: motion.context });');
+    expect(track).toContain('x.value = withTiming(spotX, { duration: motion.context });');
+    expect(track).toContain('w.value = withTiming(spotW, { duration: motion.context });');
     // O nome longo do negócio é cortado com reticências.
     expect(track).toContain('numberOfLines={1}');
   });

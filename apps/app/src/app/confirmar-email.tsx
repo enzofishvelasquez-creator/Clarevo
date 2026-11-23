@@ -1,8 +1,8 @@
 import { DEMO_TEXT } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, MailCheck } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Platform, View, findNodeHandle } from 'react-native';
 
 import { AuthShell } from '@/components/auth-shell';
 import { Banner, Button, LinkButton, Txt } from '@/components/ui';
@@ -48,6 +48,19 @@ export default function ConfirmarEmail() {
     }
   };
 
+  // Depois de reenviar, o botão dá lugar à contagem: o foco vai para ela, em vez de cair no começo da página (revisão de 23/11/2026).
+  const countdownRef = useRef<View>(null);
+  const [refocus, setRefocus] = useState(false);
+  useEffect(() => {
+    if (!refocus || cooldown <= 0) return;
+    setRefocus(false);
+    if (Platform.OS === 'web') (countdownRef.current as unknown as { focus?: () => void } | null)?.focus?.();
+    else {
+      const tag = findNodeHandle(countdownRef.current);
+      if (tag) AccessibilityInfo.setAccessibilityFocus(tag);
+    }
+  }, [refocus, cooldown]);
+
   const resend = async () => {
     if (cooldown > 0 || sending) return;
     setSending(true);
@@ -55,9 +68,13 @@ export default function ConfirmarEmail() {
     try {
       await auth.resendConfirmation(email);
       setCooldown(RESEND_INTERVAL_SECONDS);
+      setRefocus(true);
       setMessage({ tone: 'info', text: 'A Clarevo enviou um novo link.' });
     } catch (e) {
-      if (e instanceof AuthError && e.code === 'aguarde' && e.retryAfterSeconds) setCooldown(e.retryAfterSeconds);
+      if (e instanceof AuthError && e.code === 'aguarde' && e.retryAfterSeconds) {
+        setCooldown(e.retryAfterSeconds);
+        setRefocus(true);
+      }
       else setMessage({ tone: 'erro', text: 'Não foi possível reenviar agora. Tente de novo em instantes.' });
     } finally {
       setSending(false);
@@ -94,7 +111,7 @@ export default function ConfirmarEmail() {
         {/* Na espera, a contagem é um texto com o contraste de sempre, na altura do botão (revisão de 23/11/2026: o botão desativado, esmaecido,
             mal se lia e ainda parecia tocável). Acabada a espera, o botão volta no mesmo lugar. */}
         {cooldown > 0 ? (
-          <View style={{ minHeight: 52, justifyContent: 'center' }}>
+          <View ref={countdownRef} accessible style={{ minHeight: 52, justifyContent: 'center' }} {...({ tabIndex: -1 } as object)}>
             <Txt variant="label" color={colors.textSecondary} style={{ textAlign: 'center' }}>
               {`Você pode reenviar o e-mail em ${cooldown} s`}
             </Txt>

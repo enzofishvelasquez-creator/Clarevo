@@ -107,7 +107,9 @@ export function FormPanel({ children }: { children: ReactNode }) {
     const title = el.querySelector('[role="heading"]')?.textContent?.trim();
     if (title) el.setAttribute('aria-label', title);
     const touched: HTMLElement[] = [];
-    for (let node: HTMLElement | null = el; node && node !== document.body; node = node.parentElement) {
+    // Para no contêiner do app (filho do <body>): os portais das caixas de confirmação ficam no <body>, já montados (visible=false),
+    // e com inert não recebiam clique nem foco quando abriam por cima do painel (revisão de 23/11/2026).
+    for (let node: HTMLElement | null = el; node && node !== document.body && node.parentElement !== document.body; node = node.parentElement) {
       const parent: HTMLElement | null = node.parentElement;
       if (!parent) break;
       for (const sib of Array.from(parent.children) as HTMLElement[]) {

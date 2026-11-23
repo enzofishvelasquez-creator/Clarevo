@@ -1,5 +1,5 @@
 import { DEMO_PILL_MAX_FONT_SCALE, SPACE_TEXT, SUMMARY_NAV_TEXT, addMonths, contextLabelFor, contextPillText, formatMonthBR, normalizePath, type SpaceChoice } from '@clarevo/core';
-import { router, usePathname } from 'expo-router';
+import { router, useNavigation, usePathname } from 'expo-router';
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Plus, Store, Users } from 'lucide-react-native';
 import { Children, createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { PixelRatio, Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
@@ -207,9 +207,17 @@ export function SubHeader({ title, onBack, right, help, plainTitle }: { title: s
   const inPanel = useContext(InPanelContext);
   const pathname = usePathname();
   const card = sideNav && !inPanel;
-  // Computador: a Conta é um destino da barra lateral, como as abas, e fica sem a seta de voltar (a barra lateral já mostra onde a pessoa
-  // está e leva às outras áreas). Revisão de 23/11/2026: a seta fazia a Conta parecer uma tela aberta por cima.
-  const showBack = !(card && normalizePath(pathname) === '/conta');
+  // Computador: a Conta aberta pela barra lateral (por cima das abas) é um destino, como as abas, e fica sem a seta de voltar. Revisão de
+  // 23/11/2026: a seta fazia a Conta parecer uma tela aberta por cima. Aberta de um formulário ("Gerenciar bancos e carteira"), a seta
+  // continua: é o caminho de volta ao preenchimento (a janela instalada não tem o botão de voltar do navegador). Conferido ao abrir.
+  const navigation = useNavigation();
+  const [overTabs] = useState(() => {
+    const st = navigation.getState() as { routes?: readonly { name: string }[]; index?: number } | undefined;
+    const routes = st?.routes ?? [];
+    const i = st?.index ?? routes.length - 1;
+    return i <= 0 || routes[i - 1]?.name === '(tabs)';
+  });
+  const showBack = !(card && normalizePath(pathname) === '/conta' && overTabs);
   // Celular (e web estreita): a pílula do contexto fica sempre na linha de baixo, alinhada ao título. Antes, ia ao lado ou embaixo conforme
   // o tamanho do título, e a faixa mudava de altura de uma tela para outra (60, 80 e 95 px); em 320 px, a pílula quebrava em duas linhas.
   const stacked = !sideNav;
@@ -379,22 +387,30 @@ function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceCho
   const [placed, setPlaced] = useState(false);
   const [creating, setCreating] = useState(false);
   const index = Math.max(0, options.findIndex((o) => o.kind === active));
-  const spot = spots[options[index]?.kind ?? 'pessoal'];
+  // A posição da opção é a soma das larguras das de antes (a lista não tem espaço entre as opções): na web, onLayout só avisa quando o
+  // tamanho muda, e uma opção que só andou (um espaço novo antes dela) ficaria com a posição antiga.
+  const widths = options.map((o) => spots[o.kind]?.width);
+  const measured = widths.every((v) => v !== undefined);
+  const spotX = measured ? widths.slice(0, index).reduce<number>((a, v) => a + (v ?? 0), 0) : -1;
+  const spotW = measured ? (widths[index] ?? 0) : -1;
+  const spot = measured ? { x: spotX, width: spotW } : undefined;
   const x = useSharedValue(0);
   const w = useSharedValue(0);
   const slides = options.length > 1;
+  // Letra grande do aparelho: as opções dividem o trilho em partes iguais (como antes da revisão de 23/11/2026), com reticências.
+  const equal = !compact && PixelRatio.getFontScale() > 1.3;
 
   useEffect(() => {
-    if (!spot) return;
+    if (spotW < 0) return;
     if (reduced || !placed) {
-      x.value = spot.x;
-      w.value = spot.width;
+      x.value = spotX;
+      w.value = spotW;
       setPlaced(true);
       return;
     }
-    x.value = withTiming(spot.x, { duration: motion.context });
-    w.value = withTiming(spot.width, { duration: motion.context });
-  }, [spot, placed, reduced, x, w]);
+    x.value = withTiming(spotX, { duration: motion.context });
+    w.value = withTiming(spotW, { duration: motion.context });
+  }, [spotX, spotW, placed, reduced, x, w]);
 
   const pill = useAnimatedStyle(() => ({ width: w.value, transform: [{ translateX: x.value }] }));
   const names = options.map((o) => (o.kind === 'negocio' ? 'Negócio' : o.label)).join(', ');
@@ -419,13 +435,14 @@ function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceCho
               accessibilityLabel={o.kind === 'negocio' ? `Ver dados do negócio ${o.label}` : `Ver dados de ${o.label}`}
               onPress={() => (selected ? undefined : setSpace(o.kind))}
               onLayout={(e) => {
-                const { x: left, width } = e.nativeEvent.layout;
-                setSpots((s) => (s[o.kind]?.x === left && s[o.kind]?.width === width ? s : { ...s, [o.kind]: { x: left, width } }));
+                const { width } = e.nativeEvent.layout;
+                setSpots((s) => (s[o.kind]?.width === width ? s : { ...s, [o.kind]: { x: 0, width } }));
               }}
               style={(s) => [
                 styles.option,
                 // Só o nome do negócio (escrito pela pessoa, pode ser longo) encolhe e é cortado; "Pessoal" e "Família" ficam inteiros.
                 o.kind === 'negocio' && styles.optionShrinks,
+                equal && styles.optionEqual,
                 compact && styles.optionCompact,
                 compact && options.length > 2 && styles.optionCompactThree,
                 (!placed || !slides) && selected && styles.optionSelected,
@@ -610,6 +627,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[2],
   },
   optionShrinks: { flexShrink: 1 },
+  // Letra grande do aparelho (acima de 1,3): os nomes não cabem lado a lado; partes iguais, com reticências, para nenhum sair do trilho.
+  optionEqual: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 },
   optionSelected: { backgroundColor: colors.surfaceOnBrand },
   // O mês vem logo abaixo do seletor de espaço (D-113b: o seletor aparece sempre): 8 px, para o primeiro movimento continuar à vista sem rolar.
   month: { flexDirection: 'row', alignItems: 'center', marginTop: space[2] },

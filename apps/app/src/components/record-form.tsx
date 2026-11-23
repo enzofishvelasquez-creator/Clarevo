@@ -125,7 +125,7 @@ import { usePreventRemove } from 'expo-router/react-navigation';
 import * as Haptics from 'expo-haptics';
 import { AlertCircle, Check, Info } from 'lucide-react-native';
 import { useEffect, useId, useRef, useState } from 'react';
-import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, PixelRatio, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -2504,7 +2504,7 @@ function DayField({
           {...aria}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          style={[styles.dayInput, { width: value.length === 1 ? 14 : 26 }]}
+          style={[styles.dayInput, dayFit(value)]}
         />
         <Txt color={colors.textSecondary} style={tabular} accessibilityElementsHidden importantForAccessibility="no">
           {RETURN_TEXT.daySuffix(month)}
@@ -2525,11 +2525,25 @@ function DayField({
   );
 }
 
+/**
+ * Campo do dia: a largura do que está escrito (1 ou 2 algarismos, ou "DD"), na letra do aparelho. O campo continua com 44 px ou mais, e
+ * a margem negativa leva a parte vazia para baixo do respiro da caixa: o dia fica no começo, colado ao sufixo.
+ */
+function dayFit(value: string): { width: number; marginLeft: number } {
+  const used = (value.length === 0 ? 26 : value.length * 10) * PixelRatio.getFontScale();
+  const width = Math.max(44, Math.ceil(used) + 2);
+  return { width, marginLeft: -Math.max(0, width - Math.ceil(used) - 2) };
+}
+
 const styles = StyleSheet.create({
   body: { padding: space[5], gap: space[4], paddingBottom: space[6] },
-  // Só o dia (1 ou 2 algarismos), colado ao sufixo "/06/2026", com a largura do que está escrito (sem vão à esquerda). O alvo de toque é a
-  // caixa inteira, que leva o foco ao campo.
+  // Só o dia (1 ou 2 algarismos), alinhado à direita e colado ao sufixo "/06/2026". O campo tem pelo menos 44 px (alvo de toque), e a
+  // parte vazia à esquerda fica por baixo do respiro da caixa (dayFit), para o dia não parecer solto no meio (revisão de 23/11/2026).
+  // Sem respiro lateral próprio: no Android, o tema põe um por padrão e cortaria o número.
   dayInput: {
+    width: 44,
+    minWidth: 44,
+    paddingHorizontal: 0,
     alignSelf: 'stretch',
     paddingVertical: space[3],
     fontFamily: fonts.medium,
