@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Amostra real de https://www.gov.br/receitafederal/pt-br/assuntos/noticias/ultimas-noticias/atom.xml, baixada em 19/11/2026 e cortada (só algumas notícias, cada uma como veio), para packages/core/test/noticias.test.ts e scripts/e2e-site.js. -->
+<?xml-stylesheet href="atom.css" type="text/css"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xml:base="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/ultimas-noticias" xml:lang="pt-br">
+  <link rel="self" href="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/ultimas-noticias/atom.xml" type="application/atom+xml" />
+  <title type="html">Notícias da Receita Federal</title>
+  <subtitle>Últimas notícias da Receita Federal.</subtitle>
+  <updated>2026-09-02T22:40:02-03:00</updated>
+  <link href="atom.xml" rel="alternate" type="text/html" xml:base="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/ultimas-noticias/"/>
+  <id>urn:syndication:4bd9ef5e50dd48258259e9ccd5c115ff</id>
+  <logo>https://www.gov.br/receitafederal/logo.png</logo>
+  <icon>https://www.gov.br/receitafederal/favicon.ico</icon>
+  <generator uri="http://www.plone.org" version="1.0">plone</generator>
+  
+  
+
+  
+    <entry>
+      <title>Receita Federal, CGIBS e CFC vão orientar mais de 25 mil profissionais da contabilidade sobre destaque de CBS/IBS em documentos fiscais</title>
+      <link rel="alternate" type="text/html" href="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/novembro/receita-federal-cgibs-e-cfc-vao-orientar-mais-de-25-mil-profissionais-da-contabilidade-sobre-destaque-de-cbs-ibs-em-documentos-fiscais" />
+      
+      <id>urn:syndication:e9910cdde1bd41f7a2a379b74fa0c1db</id>
+      <summary>Profissionais de contabilidade têm papel relevante na promoção da conformidade tributária.</summary>
+      
+
+      <author>
+        
+        <name>Receita Federal</name>
+        
+      </author>
+
+      <published>2026-11-19T16:56:05-03:00</published>
+
+      <updated>2026-11-19T16:56:05-03:00</updated>
+
+      
+        <category term="RTC"/>
+      
+
+    </entry>
+
+  
+    <entry>
+      <title>RFB aplica perdimento de carga de ouro avaliada em R$ 46,5 milhões após identificar fraudes em exportações</title>
+      <link rel="alternate" type="text/html" href="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/novembro/rfb-aplica-perdimento-de-carga-de-ouro-avaliada-em-r-46-5-milhoes-apos-identificar-fraudes-em-exportacoes" />
+      
+      <id>urn:syndication:55831f28872a47b98d6567d643cd23c2</id>
+      <summary>Procedimento conduzido pela Alfândega da Receita Federal em Brasília identificou irregularidades em operações de exportação de ouro realizadas por grupo econômico sediado em Cuiabá (MT).</summary>
+      
+
+      <author>
+        
+        <name>Receita Federal</name>
+        
+      </author>
+
+      <published>2026-11-19T10:26:34-03:00</published>
+
+      <updated>2026-11-19T10:26:34-03:00</updated>
+
+      
+
+    </entry>
+
+  
+    <entry>
+      <title>Receita Federal e MPF detalham esquema revelado durante operação Cash Out</title>
+      <link rel="alternate" type="text/html" href="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/novembro/receita-federal-e-mpf-detalham-esquema-revelado-durante-operacao-cash-out" />
+      
+      <id>urn:syndication:6efbbd85fa214189adcdee1939457a18</id>
+      <summary>Grupo do ramo de apostas teria movimentado mais de R$ 11 bilhões em 2025 e ocultado da fiscalização cerca de R$ 9 bilhões.</summary>
+      
+
+      <author>
+        
+        <name>Receita Federal</name>
+        
+      </author>
+
+      <published>2026-11-18T12:02:57-03:00</published>
+
+      <updated>2026-11-18T12:02:57-03:00</updated>
+
+      
+
+    </entry>
+
+  
+
+</feed>

@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Amostra real de https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/notasImprensa, baixada em 19/11/2026 e cortada (só algumas notícias, cada uma como veio), para packages/core/test/noticias.test.ts e scripts/e2e-site.js. -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title type="text">RSS - Feeds do BC</title>
+  <subtitle type="text"></subtitle>
+  <id>sitefeeds</id>
+  <updated>2026-11-19T17:14:37-03:00</updated>
+  <category term="RSS - Feeds do BC" />
+  <category term="Itens Fora do Menu" />
+  <link rel="alternate" href="https://www.bcb.gov.br/" />
+  <entry>
+    <id>sitefeeds_21312</id>
+    <title type="text">BC divulga Ata da 282ª reunião do Copom</title>
+    <updated>2026-11-10T08:01:06-03:00</updated>
+    <link rel="alternate" href="https://www.bcb.gov.br/detalhenoticia/21312/nota" />
+    <content type="html">&lt;div class="ExternalClassC4472A097E2942028BDC3030C27A3155"&gt;&lt;div&gt;O Banco Central divulgou a Ata da 282ª reunião do Copom, realizada nos dias 3 e 4 de novembro de 2026.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;a href="/publicacoes/atascopom" target="_blank"&gt;Clique&lt;/a&gt; para ter acesso à íntegra da Ata.&lt;/div&gt;&lt;div&gt;&lt;a href="/en/publications/copomminutes" target="_blank"&gt;Clique​&lt;/a&gt;&lt;a href="/publications/copomminutes" target="_blank"&gt;​&lt;/a&gt;​​​​​​​​​​​​​ para ter acesso à versão em inglês da Ata.&lt;br&gt;&lt;/div&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>sitefeeds_21315</id>
+    <title type="text">BC divulga Relatório de Poupança de outubro</title>
+    <updated>2026-11-11T09:00:19-03:00</updated>
+    <link rel="alternate" href="https://www.bcb.gov.br/detalhenoticia/21315/nota" />
+    <content type="html">&lt;div class="ExternalClassCF62C112726E42B69C0D49369D06C9C4"&gt;&lt;p&gt;&lt;a href="/estatisticas/relatoriopoupanca" target="_blank"&gt;Clique​​​​​​​​​​&lt;/a&gt; para acessar o Relatório de Poupança de outubro de 2026.​&lt;br&gt;&lt;/p&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>sitefeeds_21323</id>
+    <title type="text">BC divulga Fluxo cambial mensal</title>
+    <updated>2026-11-18T14:31:13-03:00</updated>
+    <link rel="alternate" href="https://www.bcb.gov.br/detalhenoticia/21323/nota" />
+    <content type="html">&lt;div class="ExternalClassB0CC9E65DF10416BBDCA663479E7CA65"&gt;&lt;p&gt;Clique para ver o &lt;a href="/content/indeco/indicadoresselecionados/ies-13.xlsx"&gt;Movimento de câmbio contratado&lt;/a&gt;​ e a &lt;a href="/content/indeco/indicadoresselecionados/ies-15.xlsx"&gt;Posição de câmbio dos bancos no mercado à vista​​​​​​​.​​​​​&lt;/a&gt;​&lt;br&gt;&lt;/p&gt;&lt;/div&gt;</content>
+  </entry>
+  <entry>
+    <id>sitefeeds_21316</id>
+    <title type="text">​BC divulga IC-Br de outubro</title>
+    <updated>2026-11-11T14:30:47-03:00</updated>
+    <link rel="alternate" href="https://www.bcb.gov.br/detalhenoticia/21316/nota" />
+    <content type="html">&lt;div class="ExternalClass3D2C8313978F416590EF976D928AF6AF"&gt;&lt;p&gt;&lt;a href="/content/indeco/indicadoresselecionados/ies-04.xlsx" target="_blank"&gt;​Clique​​​​​​​​​&lt;/a&gt; para acessar os dados sobre o IC-Br de outubro de 2026.​&lt;br&gt;&lt;/p&gt;&lt;/div&gt;</content>
+  </entry>
+</feed>

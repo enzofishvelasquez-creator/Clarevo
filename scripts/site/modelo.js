@@ -40,30 +40,16 @@ function menuHtml(arquivo) {
 </nav>`;
 }
 
-/**
- * O que o rodapé de todas as páginas mostra além do fixo, decidido uma vez por geração (`configurarRodape`, chamado por `gerarSite`):
- * `resumoSemanal` liga o link do resumo semanal de notícias, que só existe quando há pelo menos uma edição (D-106).
- */
-let extrasDoRodape = { resumoSemanal: false };
-function configurarRodape({ resumoSemanal = false } = {}) {
-  extrasDoRodape = { resumoSemanal: Boolean(resumoSemanal) };
-}
-
-/** O aviso do rodapé das páginas de mercado (indicadores, glossário, explicações e resumo semanal, D-106), do núcleo. */
+/** O aviso do rodapé das páginas de mercado (indicadores, glossário, explicações, notícias e resumo semanal, D-106 e D-117), do núcleo. */
 function avisoDeMercado() {
   return require('./catalogo').catalogo().INDICADORES.INDICADORES_TEXT.avisoMercado;
 }
 
 function rodapeHtml(arquivo, valores, { aviso = false } = {}) {
-  // Com a newsletter ligada (D-066), a coluna "Aprender e ajuda" ganha o caminho para a inscrição; com edições do resumo semanal (D-106),
-  // o resumo entra depois do glossário.
+  // Com a newsletter ligada (D-066), a coluna "Aprender e ajuda" ganha o caminho para a inscrição.
   const extras = (c) => {
     if (c.titulo !== 'Aprender e ajuda') return c;
     let links = c.links;
-    if (extrasDoRodape.resumoSemanal) {
-      const i = links.findIndex((l) => l.arquivo === 'indicadores/glossario.html');
-      links = [...links.slice(0, i + 1), { arquivo: 'noticias/index.html', rotulo: 'Resumo semanal' }, ...links.slice(i + 1)];
-    }
     if (valores && valores.newsletter === true) links = [...links, { arquivo: 'novidades/receber.html', rotulo: 'Novidades por e-mail' }];
     return { ...c, links };
   };
@@ -226,4 +212,4 @@ function telaLarga(img, arquivo, { textoLegenda = null, classe = '' } = {}) {
   return `<figure class="larga${classe ? ` ${classe}` : ''}"><div class="larga-moldura">${imagemDaTela(img, arquivo, 'lazy')}</div><figcaption>${esc(textoLegenda || LEGENDA_DEMO)}</figcaption></figure>`;
 }
 
-module.exports = { SCRIPT_DO_TEMA, montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, faixaDeConfianca, dominioDe, urlDoSite, configurarRodape };
+module.exports = { SCRIPT_DO_TEMA, montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, faixaDeConfianca, dominioDe, urlDoSite };

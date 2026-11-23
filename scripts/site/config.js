@@ -77,9 +77,11 @@ const RODAPE_COLUNAS = [
       { arquivo: 'aprender/index.html', rotulo: 'Aprender' },
       { arquivo: 'aprender/agenda.html', rotulo: 'Agenda financeira' },
       { arquivo: 'calculadoras/index.html', rotulo: 'Calculadoras' },
-      // Indicadores oficiais e glossário (D-106). O resumo semanal entra logo depois, só quando há edição (modelo.js).
+      // Indicadores oficiais e glossário (D-106) e as notícias de fontes públicas (D-117), que mostram "Em breve" até a variável
+      // NOTICIAS=ligado no painel da Cloudflare; os resumos semanais, quando houver, ficam na mesma página.
       { arquivo: 'indicadores/index.html', rotulo: 'Indicadores' },
       { arquivo: 'indicadores/glossario.html', rotulo: 'Glossário' },
+      { arquivo: 'noticias/index.html', rotulo: 'Notícias' },
       { arquivo: 'novidades/index.html', rotulo: 'Novidades' },
       { arquivo: 'ajuda/index.html', rotulo: 'Ajuda' },
       { arquivo: 'suporte.html', rotulo: 'Suporte' },

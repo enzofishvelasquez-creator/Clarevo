@@ -16,6 +16,11 @@
  *     retrato; com JavaScript, uma pergunta só ao próprio site (/api/indicadores), que troca os números e a hora e não se repete; a cópia de
  *     uma hora no servidor; a fonte fora do ar (a página fica com o retrato); nenhum pedido do navegador a outro domínio; a política de
  *     segurança; o aviso de mercado no rodapé; as duas calculadoras novas; e o resumo semanal com uma edição de teste;
+ *   - as notícias de fontes públicas (D-117), com os feeds simulados no `fetch` do worker (as amostras reais de
+ *     packages/core/test/fixtures/noticias): ligadas (NOTICIAS=ligado), a lista com data, fonte em negrito, título, resumo, "Ler aqui" e "Ler
+ *     na fonte", a página de leitura com a autoria, a licença, "Ver a matéria original" e o texto filtrado, sem imagem de fora; sem
+ *     JavaScript, o aviso e os links para as fontes; desligadas (sem a variável), "Em breve"; a fonte fora do ar; nada passa da largura da
+ *     tela em 320, 390 e 1280 px;
  *   - os vídeos de uso do app (D-114 e D-115) na página inicial e em O app: cada um no bloco que mostra, do próprio site, sem controles nem
  *     `autoplay`, sem som, com `preload="none"`; o script toca o que aparece na tela e pausa o que sai; sem botão de pausar (D-115c): o
  *     próprio vídeo é o controle (papel de botão, nome acessível, clique e teclado); com movimento reduzido ou economia de dados, nada toca
@@ -70,6 +75,19 @@ const SGS = {
   'bcdata.sgs.433/': Array.from({ length: 12 }, (_, i) => ({ data: `01/${String(((9 + i) % 12) + 1).padStart(2, '0')}/${i < 3 ? 2025 : 2026}`, valor: '0.40' })),
   'bcdata.sgs.195/': [{ data: '23/10/2026', dataFim: '23/11/2026', valor: '0.6719' }],
   'bcdata.sgs.1/': [{ data: '22/10/2026', valor: '5.3870' }],
+};
+/**
+ * As notícias (D-117): cada feed configurado responde com a amostra real dele (packages/core/test/fixtures/noticias). O da Receita Federal
+ * responde com a amostra real da busca de notícias da própria Receita (RSS 1.0, com duas notícias do Imposto de Renda), para a lista ter uma
+ * notícia do gov.br com resumo e "Ler na fonte": o feed de últimas notícias do dia da amostra não tinha nenhuma dos temas acompanhados.
+ */
+const FIXTURES_NOTICIAS = path.join(RAIZ, 'packages', 'core', 'test', 'fixtures', 'noticias');
+const FEEDS_NOTICIAS = {
+  'https://agenciabrasil.ebc.com.br/rss/economia/feed.xml': 'agencia-brasil-economia.xml',
+  'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/noticias': 'bcb-noticias.xml',
+  'https://www.bcb.gov.br/api/feed/sitebcb/sitefeeds/notasImprensa': 'bcb-notas.xml',
+  'https://www.gov.br/receitafederal/pt-br/assuntos/noticias/ultimas-noticias/atom.xml': 'receita-federal-busca-restituicao.xml',
+  'https://www.gov.br/fazenda/pt-br/search_rss?portal_type=collective.nitf.content&sort_on=effective&sort_order=reverse': 'ministerio-da-fazenda.xml',
 };
 /** Uma edição de teste do resumo semanal (temas permitidos, resumo próprio, link simples). */
 const EDICAO = {
@@ -361,13 +379,20 @@ function varrerPagina() {
     const chave = Object.keys(SGS).find((k) => String(url).includes(k));
     return new Response(JSON.stringify(chave ? SGS[chave] : []), { status: 200, headers: { 'content-type': 'application/json' } });
   };
+  // As fontes de notícias simuladas (D-117): cada feed configurado responde com a amostra dele; cada busca fica em `chamadasFeeds`.
+  const chamadasFeeds = [];
   const fetchSimulado = async (url, opcoes) => {
     if (String(url).startsWith('https://api.bcb.gov.br/')) return respostaDoBanco(url, opcoes);
+    if (FEEDS_NOTICIAS[String(url)]) {
+      chamadasFeeds.push({ url: String(url), cabecalhos: opcoes && opcoes.headers, redirect: opcoes && opcoes.redirect });
+      return new Response(fs.readFileSync(path.join(FIXTURES_NOTICIAS, FEEDS_NOTICIAS[String(url)]), 'utf8'), { status: 200, headers: { 'content-type': 'application/rss+xml; charset=utf-8' } });
+    }
     chamadas.push({ url: String(url), cabecalhos: opcoes.headers, corpo: JSON.parse(opcoes.body) });
     return new Response('{}', { status: 200 });
   };
   const servidor = await servir(saida, {
-    env: { RESEND_API_KEY: 'chave-so-de-teste', CONTATO_DESTINO: 'contato@exemplo.test', CONTATO_REMETENTE: 'Clarevo <site@exemplo.test>', BREVO_API_KEY: 'chave-so-de-teste', BREVO_LISTA_ID: '7', BREVO_MODELO_CONFIRMACAO_ID: '3' },
+    // NOTICIAS=ligado (D-117): as rotas de notícias ligadas neste servidor; o desligado é conferido num servidor à parte (bloco 7e).
+    env: { RESEND_API_KEY: 'chave-so-de-teste', CONTATO_DESTINO: 'contato@exemplo.test', CONTATO_REMETENTE: 'Clarevo <site@exemplo.test>', BREVO_API_KEY: 'chave-so-de-teste', BREVO_LISTA_ID: '7', BREVO_MODELO_CONFIRMACAO_ID: '3', NOTICIAS: 'ligado' },
     hostDoSite: true,
     fetchDoWorker: fetchSimulado,
   });
@@ -696,8 +721,154 @@ function varrerPagina() {
       ok('resumo semanal: a edição de teste abre, com link simples para a matéria (noopener), sem imagem nem script', noticia.imagens === 0 && noticia.scripts === 0 && noticia.link.length === 1 && noticia.link[0].href === 'https://noticias.exemplo.test/copom' && /noopener/.test(noticia.link[0].rel), JSON.stringify(noticia));
       ok('resumo semanal: o aviso de mercado no rodapé e o link no rodapé de todas as páginas', (await textoDe(g, '.rodape-aviso')) === 'Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.' && (await g.$('footer a[href="index.html"]')) !== null);
       await g.goto(`${origem}/sobre`);
-      ok('resumo semanal: com uma edição, o rodapé ganha "Resumo semanal"', (await g.$('footer a[href="noticias/index.html"]')) !== null);
+      ok('resumo semanal: o rodapé tem "Notícias", a página que lista as edições', (await g.$('footer a[href="noticias/index.html"]')) !== null);
+      await g.goto(`${origem}/noticias/`);
+      ok('resumo semanal: a página de notícias lista a edição de teste em "Resumos da semana"', (await g.$(`#resumos ~ ul a[href="semana-${HOJE}.html"]`)) !== null);
       await g.close();
+    }
+
+    // 7e. Notícias de fontes públicas (D-117), antes da varredura de espaçamento (que abre todas as páginas): a contagem de buscas é limpa.
+    {
+      const textoDe = (p, sel) => p.$eval(sel, (e) => (e.innerText || e.textContent).replace(/\s+/g, ' ').trim());
+      const visivel = (p, sel) => p.$eval(sel, (e) => !e.hidden && e.getClientRects().length > 0).catch(() => false);
+      // Ligadas: a lista, com data, fonte em negrito, título, resumo e "Ler aqui" ou "Ler na fonte".
+      const p = await pagina();
+      const daApi = [];
+      p.on('request', (q) => q.url().startsWith(`${origem}/api/noticias`) && daApi.push(q.url()));
+      // As buscas contam desde o começo do roteiro: a primeira pode ter vindo do bloco 7b, que abre a página de notícias (a lista das
+      // edições do resumo semanal); depois dela, tudo sai da cópia de uma hora do servidor.
+      const antes = 0;
+      const respostaDaLista = p.waitForResponse((r) => r.url() === `${origem}/api/noticias`);
+      await p.goto(`${origem}/noticias/`);
+      const lista = await respostaDaLista;
+      await p.waitForSelector('[data-noticias-lista]:not([hidden]) li');
+      const itens = await p.$$eval('.noticia-item', (lis) =>
+        lis.map((li) => ({
+          meta: li.querySelector('.noticia-meta').textContent,
+          fonteEmNegrito: li.querySelector('.noticia-meta strong') ? li.querySelector('.noticia-meta strong').textContent : null,
+          data: li.querySelector('.noticia-meta time') ? li.querySelector('.noticia-meta time').getAttribute('datetime') : null,
+          titulo: li.querySelector('h3').textContent,
+          resumo: li.querySelector('.noticia-resumo') ? li.querySelector('.noticia-resumo').textContent : null,
+          acao: li.querySelector('.noticia-acao a').firstChild.textContent,
+          href: li.querySelector('.noticia-acao a').getAttribute('href'),
+          rel: li.querySelector('.noticia-acao a').getAttribute('rel'),
+        })),
+      );
+      ok('notícias, ligadas: a lista com as notícias dos temas acompanhados, a mais nova primeiro, cada uma com data e fonte em negrito', itens.length === 8 && itens.every((i) => /^\d{2}\/\d{2}\/\d{4} · .+$/.test(i.meta) && i.fonteEmNegrito && i.meta.endsWith(i.fonteEmNegrito) && i.data) && itens.map((i) => i.data).every((d, k, a) => k === 0 || a[k - 1] >= d), JSON.stringify(itens.map((i) => [i.meta, i.titulo])));
+      const durigan = itens.find((i) => i.titulo === 'Durigan prevê impacto inicial da reforma tributária sobre inflação');
+      ok('notícias: "Ler aqui" só na matéria da Agência Brasil com crédito próprio, com o primeiro parágrafo como resumo', durigan && durigan.acao === 'Ler aqui' && /^materia\.html\?id=[0-9a-f]{16}$/.test(durigan.href) && durigan.resumo.startsWith('O ministro da Fazenda, Dario Durigan, afirmou') && itens.filter((i) => i.acao === 'Ler aqui').length === 1, JSON.stringify(durigan));
+      const naFonte = itens.filter((i) => i.acao === 'Ler na fonte');
+      ok('notícias: "Ler na fonte" leva ao endereço original, com noopener e noreferrer', naFonte.length === 7 && naFonte.every((i) => /^https:\/\/(agenciabrasil\.ebc\.com\.br|www\.bcb\.gov\.br|www\.gov\.br)\//.test(i.href) && i.rel === 'noopener noreferrer'), JSON.stringify(naFonte.map((i) => [i.href, i.rel])));
+      const receita = itens.filter((i) => i.fonteEmNegrito === 'Receita Federal');
+      ok('notícias: as do gov.br (Receita Federal) com a linha fina do próprio feed como resumo e "Ler na fonte"', receita.length === 2 && receita.every((i) => i.resumo && i.acao === 'Ler na fonte'), JSON.stringify(receita));
+      ok('notícias: as do Banco Central (só resumo pela licença) sem resumo tirado do texto', itens.filter((i) => i.fonteEmNegrito === 'Banco Central do Brasil').every((i) => i.resumo === null && i.acao === 'Ler na fonte'));
+      ok('notícias: o aviso sem JavaScript e os links para as fontes somem com a lista; a hora da consulta aparece', !(await visivel(p, '[data-estado="sem-js"]')) && !(await visivel(p, '[data-fontes-para-ler]')) && /^Atualizado em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}, horário de Brasília\.$/.test(await textoDe(p, '[data-noticias-atualizado]')));
+      ok('notícias: o aviso de mercado da CVM no rodapé e a linha de onde vêm as notícias', (await textoDe(p, '.rodape-aviso')) === 'Conteúdo educativo. Não é recomendação nem análise de valores mobiliários.' && (await textoDe(p, '#de-onde + p')).startsWith('O servidor da Clarevo lê os feeds públicos'));
+      ok('/api/noticias: o servidor buscou só os cinco feeds configurados, uma vez, só com Accept e User-Agent do site e sem seguir redirecionamento', chamadasFeeds.length - antes === 5 && chamadasFeeds.slice(antes).every((c) => FEEDS_NOTICIAS[c.url] && c.cabecalhos['User-Agent'] === 'clarevo-site' && Object.keys(c.cabecalhos).sort().join() === 'Accept,User-Agent' && c.redirect === 'manual'), JSON.stringify(chamadasFeeds.slice(antes)));
+      ok('/api/noticias: JSON, guarda de 15 minutos no navegador e a política de segurança do site', lista.headers()['content-type'] === 'application/json; charset=utf-8' && lista.headers()['cache-control'] === 'public, max-age=900' && /img-src 'self'/.test(lista.headers()['content-security-policy'] || ''));
+      ok('notícias: nenhuma imagem de outro site na lista', await p.evaluate((o) => [...document.images].every((i) => i.src.startsWith(o)) && performance.getEntriesByType('resource').every((r) => r.name.startsWith(o)), origem));
+
+      // "Ler aqui": a página de leitura, com o título, a data, a fonte, a autoria, a licença, "Ver a matéria original" e o texto filtrado.
+      await p.click(`.noticia-acao a[href="${durigan.href}"]`);
+      await p.waitForSelector('[data-materia-texto]:not([hidden]) p');
+      const materia = await p.evaluate(() => ({
+        url: location.pathname + location.search,
+        h1: document.querySelector('h1').textContent,
+        titulo: document.title,
+        meta: document.querySelector('[data-materia-meta]').textContent,
+        fonte: document.querySelector('[data-materia-meta] strong').textContent,
+        credito: document.querySelector('[data-materia-credito]').textContent,
+        licenca: document.querySelector('[data-materia-licenca]').textContent,
+        originais: [...document.querySelectorAll('.materia-original a')].map((a) => ({ texto: a.textContent, href: a.href, rel: a.rel, classe: a.className })),
+        h2: [...document.querySelectorAll('[data-materia-texto] h2')].map((h) => h.textContent),
+        imagens: document.querySelectorAll('main img, main iframe, main video, main svg').length,
+        atributos: [...document.querySelectorAll('[data-materia-texto] *')].flatMap((e) => [...e.attributes].map((a) => `${e.tagName}:${a.name}`)).filter((a) => !/^A:(href|rel)$/.test(a)),
+        links: [...document.querySelectorAll('[data-materia-texto] a')].every((a) => /^https?:/.test(a.href) && a.rel === 'noopener noreferrer'),
+        nota: !document.querySelector('[data-materia-nota]').hidden,
+      }));
+      const original = 'https://agenciabrasil.ebc.com.br/economia/noticia/2026-11/durigan-preve-impacto-inicial-da-reforma-tributaria-sobre-inflacao';
+      ok('notícias: "Ler aqui" abre a página de leitura com o título, a data, a fonte em negrito e a autoria', /^\/noticias\/materia(\.html)?\?id=[0-9a-f]{16}$/.test(materia.url) && materia.h1 === durigan.titulo && materia.titulo === `${durigan.titulo} · Clarevo` && materia.meta === '17/11/2026 · Agência Brasil' && materia.fonte === 'Agência Brasil' && materia.credito === 'Por Pedro Peduzzi, repórter da Agência Brasil', JSON.stringify(materia));
+      ok('notícias: a linha de licença e "Ver a matéria original" (em destaque, no alto e no fim), para o endereço original', materia.licenca.startsWith('Texto da Agência Brasil (EBC), reproduzido sem alterações e com o crédito da autoria.') && materia.originais.length === 2 && materia.originais.every((a) => a.texto === 'Ver a matéria original' && a.href === original && a.rel === 'noopener noreferrer' && a.classe === 'botao botao-principal'), JSON.stringify(materia.originais));
+      ok('notícias: o texto filtrado, sem imagem, vídeo ou atributo além do href dos links, e a nota de que o texto é da fonte', materia.h2.includes('Tributação corporativa') && materia.imagens === 0 && materia.atributos.length === 0 && materia.links && materia.nota, JSON.stringify({ h2: materia.h2, imagens: materia.imagens, atributos: materia.atributos.slice(0, 5) }));
+      ok('notícias: nenhuma imagem de outro site na página de leitura e nenhum pedido para fora', await p.evaluate((o) => performance.getEntriesByType('resource').every((r) => r.name.startsWith(o)), origem));
+      ok('notícias: sem cookie nem armazenamento; a página pergunta uma vez à API', await p.evaluate(() => localStorage.length === 0 && sessionStorage.length === 0 && document.cookie === ''));
+      ok('notícias: cada página pergunta uma vez (lista e matéria), e a matéria sai da cópia do servidor, sem buscar os feeds de novo', daApi.length === 2 && daApi[1].endsWith(`/api/noticias/materia?id=${durigan.href.slice(-16)}`) && chamadasFeeds.length - antes === 5, daApi.join(' | '));
+      // Nada passa da largura da tela em 320, 390 e 1280 px, na lista e na página de leitura.
+      const largas = [];
+      for (const largura of [320, 390, 1280]) {
+        await p.setViewportSize({ width: largura, height: 900 });
+        for (const c of ['noticias/', `noticias/${durigan.href}`]) {
+          await p.goto(`${origem}/${c}`);
+          await p.waitForSelector(c.includes('materia') ? '[data-materia-texto]:not([hidden])' : '[data-noticias-lista]:not([hidden])');
+          if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${c} em ${largura} px`);
+        }
+      }
+      ok('notícias: nada passa da largura da tela em 320, 390 e 1280 px (lista e página de leitura)', largas.length === 0, largas.join(' | '));
+      await p.setViewportSize({ width: 390, height: 900 });
+      await p.close();
+
+      // As respostas da API que a página trata: matéria só com resumo (404), id inválido (400), POST (405).
+      const soResumo = (await (await ctx.request.get(`${origem}/api/noticias`)).json()).noticias.find((n) => !n.textoCompleto);
+      ok('/api/noticias/materia: notícia só com resumo dá 404, id inválido 400, e só GET e HEAD', (await ctx.request.get(`${origem}/api/noticias/materia?id=${soResumo.id}`)).status() === 404 && (await ctx.request.get(`${origem}/api/noticias/materia?id=https://exemplo.test/`)).status() === 400 && (await ctx.request.post(`${origem}/api/noticias`, { data: 'x' })).status() === 405 && chamadasFeeds.length - antes === 5);
+
+      /** Uma página num contexto à parte, que aceita no console só o status esperado da própria API (404 ou 503). */
+      const paginaQueEspera = async (contexto, status) => {
+        const q = await contexto.newPage();
+        const erros = [];
+        q.on('pageerror', (e) => erros.push(e.message));
+        q.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && !new RegExp(`status of ${status}`).test(m.text()) && erros.push(m.text()));
+        q.on('request', (r) => !r.url().startsWith('http://127.0.0.1') && erros.push(`pedido para fora: ${r.url()}`));
+        return { q, erros };
+      };
+      // Na página de leitura, matéria que não tem texto aqui: o aviso e os links para as fontes.
+      {
+        const { q, erros } = await paginaQueEspera(ctx, 404);
+        await q.goto(`${origem}/noticias/materia.html?id=${soResumo.id}`);
+        await q.waitForSelector('[data-estado="nao-encontrada"]:not([hidden])');
+        ok('notícias: matéria sem texto aqui mostra o aviso e os links para as fontes, sem erro', (await visivel(q, '[data-fontes-para-ler]')) && (await q.$$('[data-fontes-para-ler] a[rel="noopener noreferrer"]')).length === 4 && erros.length === 0, erros.join(' | '));
+        await q.close();
+      }
+
+      // Sem JavaScript: o aviso e os links para as fontes.
+      const semJs = await navegador.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 } });
+      const s0 = await semJs.newPage();
+      await s0.goto(`${origem}/noticias/`);
+      const fontesSemJs = await s0.$$eval('[data-fontes-para-ler] a', (as) => as.map((a) => [a.textContent, a.href, a.rel]));
+      ok('notícias, sem JavaScript: a frase curta e os links para as fontes, sem lista', (await visivel(s0, '[data-estado="sem-js"]')) && JSON.stringify(fontesSemJs.map((f) => f[0])) === JSON.stringify(['Agência Brasil', 'Banco Central do Brasil', 'Receita Federal', 'Ministério da Fazenda']) && fontesSemJs.every((f) => f[2] === 'noopener noreferrer') && !(await visivel(s0, '[data-noticias-lista]')), JSON.stringify(fontesSemJs));
+      await s0.goto(`${origem}/noticias/materia.html?id=${durigan.href.slice(-16)}`);
+      ok('notícias, sem JavaScript: a página de leitura diz que usa JavaScript e mostra as fontes', (await visivel(s0, '[data-estado="sem-js"]')) && (await visivel(s0, '[data-fontes-para-ler]')));
+      await semJs.close();
+
+      // Desligadas (o padrão até o advogado): sem NOTICIAS=ligado, a API responde 404 e a página mostra "Em breve" com as fontes.
+      const antesDesligado = chamadasFeeds.length;
+      const desligado = await servir(saida, { hostDoSite: true, fetchDoWorker: fetchSimulado });
+      try {
+        const { q, erros } = await paginaQueEspera(ctx, 404);
+        const r404 = q.waitForResponse((r) => r.url().endsWith('/api/noticias'));
+        await q.goto(`${desligado.url}/noticias/`);
+        const resposta = await r404;
+        await q.waitForSelector('[data-estado="em-breve"]:not([hidden])');
+        ok('notícias, desligadas: a API responde 404 e a página mostra "Em breve" com os links para as fontes, sem lista e sem erro', resposta.status() === 404 && (await textoDe(q, '[data-estado="em-breve"]')).startsWith('Em breve.') && (await visivel(q, '[data-fontes-para-ler]')) && !(await visivel(q, '[data-noticias-lista]')) && erros.length === 0, erros.join(' | '));
+        await q.goto(`${desligado.url}/noticias/materia.html?id=${durigan.href.slice(-16)}`);
+        await q.waitForSelector('[data-estado="em-breve"]:not([hidden])');
+        ok('notícias, desligadas: a página de leitura também mostra "Em breve"', (await visivel(q, '[data-fontes-para-ler]')) && !(await visivel(q, '[data-materia-texto]')));
+        ok('notícias, desligadas: nenhum feed é buscado', chamadasFeeds.length === antesDesligado, `${chamadasFeeds.length - antesDesligado} buscas`);
+        await q.close();
+      } finally {
+        await desligado.fechar();
+      }
+
+      // A fonte fora do ar: um servidor novo (sem cópia), ligado, com todos os feeds respondendo 503. A página mostra a falha e as fontes.
+      const foraDoAr = await servir(saida, { env: { NOTICIAS: 'ligado' }, hostDoSite: true, fetchDoWorker: async () => new Response('fora do ar', { status: 503 }) });
+      try {
+        const { q, erros } = await paginaQueEspera(ctx, 503);
+        await q.goto(`${foraDoAr.url}/noticias/`);
+        await q.waitForSelector('[data-estado="falha"]:not([hidden])');
+        ok('notícias, fontes fora do ar: a frase de falha e os links para as fontes, sem erro', (await visivel(q, '[data-fontes-para-ler]')) && erros.length === 0, erros.join(' | '));
+        await q.close();
+      } finally {
+        await foraDoAr.fechar();
+      }
     }
 
     // 7c. Vídeos de uso do app (D-114 e D-115): cada um no bloco que mostra (a capa e três cartões da página inicial, seis recursos e o

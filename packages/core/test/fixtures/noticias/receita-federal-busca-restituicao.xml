@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Amostra real de https://www.gov.br/receitafederal/pt-br/search_rss?SearchableText=restituição&portal_type=collective.nitf.content&sort_on=effective&sort_order=reverse, baixada em 19/11/2026 e cortada (só algumas notícias, cada uma como veio), para packages/core/test/noticias.test.ts e scripts/e2e-site.js. -->
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:syn="http://purl.org/rss/1.0/modules/syndication/" xmlns="http://purl.org/rss/1.0/">
+
+
+<channel rdf:about="https://www.gov.br/receitafederal/pt-br/search_rss">
+  <title>Português</title>
+  <link>https://www.gov.br/receitafederal</link>
+
+  <image rdf:resource="https://www.gov.br/receitafederal/logo.png" />
+
+  <items>
+    <rdf:Seq>
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/novembro/operacao-fronteira-em-piumhi-receita-federal-apreende-2-4-milhoes-em-mercadorias" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/novembro/operacao-fronteira-da-receita-federal-apreende-cerca-de-r-1-5-milhao-em-mercadorias-em-montes-claros-e-regiao" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/receita-federal-abre-consulta-ao-lote-residual-de-restituicao-do-irpf-2026-nesta-sexta-feira-23" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/receita-federal-bate-recordes-na-restituicao-do-irpf-e-reforca-a-orientacao-e-o-respeito-aos-direitos-dos-contribuintes" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/receita-sintonia-divulga-a-classificacao-do-3o-ciclo-de-2026" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/operacao-inflamavel-ii-da-receita-federal-apura-aproveitamento-indevido-de-creditos-de-pis-pasep-e-cofins-na-revenda-de-oleo-diesel-gasolina-e-etanol" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/setembro/receita-federal-abre-consulta-ao-lote-residual-de-restituicao-do-irpf-2026-nesta-quarta-feira-23" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/setembro/receita-federal-intercepta-tentativa-bilionaria-de-fraude-em-salario-maternidade-e-impede-prejuizo-aos-cofres-publicos" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/setembro/receita-federal-e-pgfn-publicam-novo-edital-de-transacao-para-controversia-sobre-irrf-de-investidores-nao-residentes" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/agosto/receita-federal-abre-consulta-ao-quarto-lote-de-restituicao-do-irpf-2026-nesta-segunda-feira-24" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/julho/consulta-ao-terceiro-lote-de-restituicao-do-irpf-2026-sera-aberta-amanha-24-07" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/julho/lote-especial-de-restituicao-automatica-do-irpf-sera-pago-hoje" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/julho/decisao-do-stj-reitera-entendimento-da-receita-federal-sobre-tributacao-de-combustiveis" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/julho/informacoes-sobre-a-restituicao-automatica-cashback" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/junho/com-mais-de-9-5-milhoes-de-contribuintes-contemplados-segundo-lote-de-restituicao-do-irpf-e-o-maior-da-historia" />
+      
+    </rdf:Seq>
+  </items>
+
+</channel>
+
+  <item rdf:about="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/receita-federal-abre-consulta-ao-lote-residual-de-restituicao-do-irpf-2026-nesta-sexta-feira-23">
+    <title>Receita Federal abre consulta ao lote residual de restituição do IRPF 2026 nesta sexta-feira (23)</title>
+    <link>https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/receita-federal-abre-consulta-ao-lote-residual-de-restituicao-do-irpf-2026-nesta-sexta-feira-23</link>
+    <description>Consulta ao lote residual estará disponível a partir das 9h desta sexta-feira (23); crédito de R$ 531,6 milhões será realizado em 30 de outubro, contemplando 184.442 restituições.</description>
+    
+    
+      <dc:publisher>No publisher</dc:publisher>
+      <dc:creator></dc:creator>
+    
+    <dc:rights></dc:rights>
+    
+    <dc:date>2026/10/22 12:48:09 GMT-3</dc:date>
+    <dc:type>Notícia</dc:type>
+  </item>
+
+  <item rdf:about="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/receita-federal-bate-recordes-na-restituicao-do-irpf-e-reforca-a-orientacao-e-o-respeito-aos-direitos-dos-contribuintes">
+    <title>Receita Federal bate recordes na restituição do IRPF e reforça a orientação e o respeito aos direitos dos contribuintes</title>
+    <link>https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/outubro/receita-federal-bate-recordes-na-restituicao-do-irpf-e-reforca-a-orientacao-e-o-respeito-aos-direitos-dos-contribuintes</link>
+    <description>O direito do contribuinte à orientação antes de qualquer atividade fiscalizatória é garantido em lei, com a aprovação da LC 225/2026.</description>
+    
+    
+      <dc:publisher>No publisher</dc:publisher>
+      <dc:creator></dc:creator>
+    
+    <dc:rights></dc:rights>
+    
+    <dc:date>2026/10/20 13:24:38 GMT-3</dc:date>
+    <dc:type>Notícia</dc:type>
+  </item>
+
+
+  <item rdf:about="https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/novembro/operacao-fronteira-em-piumhi-receita-federal-apreende-2-4-milhoes-em-mercadorias">
+    <title>Operação Fronteira em Piumhi: Receita Federal apreende 2,4 milhões em mercadorias</title>
+    <link>https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2026/novembro/operacao-fronteira-em-piumhi-receita-federal-apreende-2-4-milhoes-em-mercadorias</link>
+    <description>Fiscalização foi realizada em quatro estabelecimentos comerciais e um galpão.</description>
+    
+    
+      <dc:publisher>No publisher</dc:publisher>
+      <dc:creator></dc:creator>
+    
+    <dc:rights></dc:rights>
+    
+    <dc:date>2026/11/10 13:59:42 GMT-3</dc:date>
+    <dc:type>Notícia</dc:type>
+  </item>
+
+
+
+</rdf:RDF>

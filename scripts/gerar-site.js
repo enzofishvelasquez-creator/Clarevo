@@ -15,9 +15,11 @@
  *   calculadoras/ (o índice, as dez calculadoras do app e as duas que por enquanto só o site mostra), js/nucleo/ (o código do core que as
  *   calculadoras rodam no navegador, transpilado por `scripts/site/nucleo.js`), imprensa.html e imprensa/ (kit de imprensa)
  *   indicadores/ (D-106: o painel de indicadores oficiais, uma página por indicador, o glossário, as duas explicações e painel.js, que
- *   pergunta uma vez ao próprio site) e, só com pelo menos uma edição em site-src/noticias, noticias/ (o resumo semanal de notícias)
+ *   pergunta uma vez ao próprio site) e noticias/ (D-117: a página de notícias de fontes públicas, a página de leitura e noticias.js, que
+ *   pergunta uma vez ao próprio site; e, com edições em site-src/noticias, uma página por edição do resumo semanal)
  *   privacidade.html, termos.html, excluir-conta.html   convertidos de `docs/legal/*.md`
- *   estilo.css, _headers, _worker.js e _routes.json (o worker do Cloudflare Pages que recebe /api/contato, /api/newsletter e /api/indicadores), robots.txt,
+ *   estilo.css, _headers, _worker.js e _routes.json (o worker do Cloudflare Pages que recebe /api/contato, /api/newsletter, /api/indicadores e
+ *   /api/noticias, esta só com NOTICIAS=ligado no painel), robots.txt,
  *   sitemap.xml (só com domínio), imagens/, og/, fontes/, marca/, favicon.svg
  *   contato-enviado.html, contato-erro.html, novidades/receber*.html   só com os interruptores `formulario_contato` e `newsletter` em
  *                                              `site/dados-da-empresa.json` ligados (`true`); desligados, o site não tem formulário
@@ -70,7 +72,7 @@ const { montarPacote, gerarPdf } = require('./site/pdf');
 const png = require('./site/png');
 const { hostsDeFontes } = require('./site/catalogo');
 const { atualizarRetrato, ARQUIVO_RETRATO } = require('./site/indicadores');
-const { lerEdicoes, hostsDasEdicoes } = require('./site/paginas/noticias');
+const { lerEdicoes, hostsDasEdicoes, hostsDasFontesDeNoticias } = require('./site/paginas/noticias');
 
 const { RAIZ, SITE, LEGAL } = config;
 
@@ -215,10 +217,10 @@ module.exports = {
   DOCUMENTOS_DO_PACOTE: config.DOCUMENTOS_DO_PACOTE,
   /**
    * Hosts de links de texto permitidos: o app, as páginas oficiais dos textos jurídicos, as fontes citadas no catálogo de Aprender e nas
-   * páginas de mercado, e os veículos das edições do resumo semanal (D-106).
+   * páginas de mercado, os veículos das edições do resumo semanal (D-106) e as páginas das fontes de notícias (D-117).
    */
   get HOSTS_DE_LINK_PERMITIDOS() {
-    return [...config.HOSTS_BASE, ...hostsDeFontes(), ...hostsDasEdicoes(lerEdicoes().edicoes)];
+    return [...new Set([...config.HOSTS_BASE, ...hostsDeFontes(), ...hostsDasEdicoes(lerEdicoes().edicoes), ...hostsDasFontesDeNoticias()])];
   },
   markdownParaHtml: texto.markdownParaHtml,
   titulosDoMarkdown: texto.titulosDoMarkdown,

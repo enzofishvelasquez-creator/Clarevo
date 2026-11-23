@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Amostra real de https://www.gov.br/fazenda/pt-br/search_rss?portal_type=collective.nitf.content&sort_on=effective&sort_order=reverse, baixada em 19/11/2026 e cortada (só algumas notícias, cada uma como veio), para packages/core/test/noticias.test.ts e scripts/e2e-site.js. -->
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:syn="http://purl.org/rss/1.0/modules/syndication/" xmlns="http://purl.org/rss/1.0/">
+
+
+<channel rdf:about="https://www.gov.br/fazenda/pt-br/search_rss">
+  <title>Português (Brasil)</title>
+  <link>https://www.gov.br/fazenda</link>
+
+  <image rdf:resource="https://www.gov.br/fazenda/logo.png" />
+
+  <items>
+    <rdf:Seq>
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/receita-federal-e-comite-gestor-do-ibs-alinham-implementacao-da-reforma-tributaria-e-reforcam-compromisso-com-a-conformidade" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/receita-federal-divulga-quantidade-de-solicitacoes-de-opcoes-pelo-simples-nacional-e-pelo-regime-regular-do-ibs-e-da-cbs" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/receita-federal-ministerio-publico-e-policia-federal-miram-grupo-que-movimentou-r-11-bilhoes-em-2025" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/composicao/orgaos/orgaos-colegiados/crsnsp/acesso-a-informacao/noticias/2026/calendario-de-sessoes-2027-crsnsp" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/composicao/orgaos/orgaos-colegiados/crsfn/acesso-a-informacao/noticias/2026/calendario-de-sessoes-2027-crsfn" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/receita-federal-mpf-e-pf-deflagram-operacao-cash-out" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/canais_atendimento/imprensa/avisos-de-pauta/2026/novembro/receita-federal-mpf-e-spa-fazem-entrevista-coletiva-sobre-a-operacao-cash-out" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/prisma-fiscal-de-novembro-projeta-deficit-de-r-53-369-bilhoes-do-governo-central-em-2026" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/receita-federal-disponibiliza-api-para-emissao-do-recolhimento-como-adquirente-rad" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/estudo-reune-subsidios-para-o-encerramento-humanizado-de-lixoes-e-a-transicao-para-a-economia-circular" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/canais_atendimento/imprensa/notas-conjuntas/2026/novembro/anuncio-de-investimento-do-canada-no-fundo-florestas-tropicais-para-sempre-tfff-nota-conjunta-mre-mma-mf" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/operacao-fronteira-receita-federal-2026-retira-de-circulacao-r-581-milhoes-em-mercadorias-ilicitas-e-drogas" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/maior-concorrencia-em-plataformas-digitais-pode-gerar-mais-de-r-15-bilhoes-por-ano-em-beneficios-para-consumidores-e-empresas-brasileiras" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/fazenda-abre-consulta-publica-sobre-regras-para-empresas-que-vao-medir-emissoes-no-mercado-de-carbono" />
+      
+        <rdf:li rdf:resource="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/resultados-do-governo-lula-3-confirmam-equidade-de-genero-no-centro-das-politicas-economicas" />
+      
+    </rdf:Seq>
+  </items>
+
+</channel>
+
+
+  <item rdf:about="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/receita-federal-e-comite-gestor-do-ibs-alinham-implementacao-da-reforma-tributaria-e-reforcam-compromisso-com-a-conformidade">
+    <title>Receita Federal e Comitê Gestor do IBS alinham implementação da Reforma Tributária e reforçam compromisso com a conformidade</title>
+    <link>https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/receita-federal-e-comite-gestor-do-ibs-alinham-implementacao-da-reforma-tributaria-e-reforcam-compromisso-com-a-conformidade</link>
+    <description>Reunião reforçou a atuação conjunta, o programa de conformidade tributária e a oferta de canais de orientação e suporte aos contribuintes</description>
+    
+    
+      <dc:publisher>No publisher</dc:publisher>
+      <dc:creator></dc:creator>
+    
+    <dc:rights></dc:rights>
+    
+      <dc:subject>REFORMA TRIBUTÁRIA</dc:subject>
+    
+      <dc:subject>CONFORMIDADE TRIBUTÁRIA</dc:subject>
+    
+      <dc:subject>TRANSPARÊNCIA</dc:subject>
+    
+      <dc:subject>IVA DUAL</dc:subject>
+    
+    <dc:date>2026/11/19 11:25:40 GMT-3</dc:date>
+    <dc:type>Notícia</dc:type>
+  </item>
+
+  <item rdf:about="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/prisma-fiscal-de-novembro-projeta-deficit-de-r-53-369-bilhoes-do-governo-central-em-2026">
+    <title>Prisma Fiscal de novembro projeta déficit de R$ 53,369 bilhões do Governo Central em 2026</title>
+    <link>https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/prisma-fiscal-de-novembro-projeta-deficit-de-r-53-369-bilhoes-do-governo-central-em-2026</link>
+    <description>Levantamento foi divulgado na segunda-feira (16/11) pela Secretaria de Política Econômica do Ministério da Fazenda</description>
+    
+    
+      <dc:publisher>No publisher</dc:publisher>
+      <dc:creator></dc:creator>
+    
+    <dc:rights></dc:rights>
+    
+      <dc:subject>PRISMA FISCAL</dc:subject>
+    
+      <dc:subject>PROJEÇÕES DO MERCADO</dc:subject>
+    
+      <dc:subject>GOVERNO CENTRAL</dc:subject>
+    
+      <dc:subject>PRODUTO INTERNO BRUTO</dc:subject>
+    
+    <dc:date>2026/11/17 18:37:00 GMT-3</dc:date>
+    <dc:type>Notícia</dc:type>
+  </item>
+
+  <item rdf:about="https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/maior-concorrencia-em-plataformas-digitais-pode-gerar-mais-de-r-15-bilhoes-por-ano-em-beneficios-para-consumidores-e-empresas-brasileiras">
+    <title>Maior concorrência em plataformas digitais pode gerar mais de R$ 15 bilhões por ano em benefícios para consumidores e empresas brasileiras</title>
+    <link>https://www.gov.br/fazenda/pt-br/assuntos/noticias/2026/novembro/maior-concorrencia-em-plataformas-digitais-pode-gerar-mais-de-r-15-bilhoes-por-ano-em-beneficios-para-consumidores-e-empresas-brasileiras</link>
+    <description>Estudo do Ministério da Fazenda sobre o PL nº 4.675/2025 aponta potencial de redução de preços e custos, além de ganhos de produtividade para a economia brasileira</description>
+    
+    
+      <dc:publisher>No publisher</dc:publisher>
+      <dc:creator></dc:creator>
+    
+    <dc:rights></dc:rights>
+    
+      <dc:subject>TECNOLOGIA</dc:subject>
+    
+      <dc:subject>PLATAFORMAS DIGITAIS</dc:subject>
+    
+      <dc:subject>CONCORRÊNCIA</dc:subject>
+    
+      <dc:subject>ESTUDO</dc:subject>
+    
+    <dc:date>2026/11/16 18:38:53 GMT-3</dc:date>
+    <dc:type>Notícia</dc:type>
+  </item>
+
+
+
+</rdf:RDF>
