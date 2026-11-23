@@ -1,7 +1,7 @@
 import { BAR_TEXT, BUSINESS_WORDS, barModeFor, topicTabFor } from '@clarevo/core';
 import { router, usePathname } from 'expo-router';
 import { Eye, EyeOff, MonitorSmartphone, Plus } from 'lucide-react-native';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { type GestureResponderEvent, Pressable, StyleSheet, View } from 'react-native';
 
 import { Logo } from '@/components/brand';
 import { ProfileAvatar } from '@/components/profile-photo';
@@ -13,6 +13,23 @@ import { PRIVACY_TEXT, setValuesHidden, useValuesHidden } from '@/lib/privacy';
 import { useWork } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
+
+/**
+ * No navegador, cada link da barra lateral é um link de verdade (`<a href>`): Enter abre pelo teclado (num `div` com papel de link, o
+ * react-native-web espera um clique que nunca vem) e Ctrl ou Cmd + clique abre em outra aba. O clique comum navega dentro do app, sem
+ * recarregar a página. `href` não está nos tipos do React Native; o react-native-web desenha o `<a>` com ele.
+ */
+function navLink(href: string, go: () => void) {
+  return {
+    href,
+    onPress: (e: GestureResponderEvent) => {
+      const ev = e as unknown as { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; button?: number; preventDefault?: () => void };
+      if (ev.metaKey || ev.ctrlKey || ev.shiftKey || (ev.button ?? 0) !== 0) return;
+      ev.preventDefault?.();
+      go();
+    },
+  } as { onPress: (e: GestureResponderEvent) => void };
+}
 
 /**
  * A barra lateral da versão para computador (a partir de 1024 px; pedido do Enzo em 12/11/2026): o logotipo, "Anotar gasto" sempre à
@@ -39,7 +56,7 @@ export function DesktopNav() {
         <Pressable
           accessibilityRole="link"
           accessibilityLabel="Clarevo: ir para o Resumo"
-          onPress={() => (inTabs ? router.navigate('/') : router.dismissTo('/'))}
+          {...navLink('/', () => (inTabs ? router.navigate('/') : router.dismissTo('/')))}
           style={(s) => [styles.logoLink, (s as { focused?: boolean }).focused && ui.focusRing]}>
           <Logo height={26} />
         </Pressable>
@@ -70,7 +87,7 @@ export function DesktopNav() {
               accessibilityLabel={t.a11y}
               aria-current={focused ? 'page' : undefined}
               // Nas abas, troca de aba; numa tela aberta por cima, fecha as telas abertas e volta à aba (como a barra das telas de consulta).
-              onPress={() => (inTabs ? router.navigate(t.href) : router.dismissTo(t.href))}
+              {...navLink(t.href, () => (inTabs ? router.navigate(t.href) : router.dismissTo(t.href)))}
               style={(s) => [styles.item, focused && styles.itemActive, (s as { hovered?: boolean }).hovered && !focused && styles.itemHover, (s as { focused?: boolean }).focused && ui.focusRing]}>
               <Icon size={22} color={color} strokeWidth={focused ? 2.25 : 2} aria-hidden />
               <Txt variant="label" color={focused ? colors.brandText : colors.text} style={{ fontFamily: focused ? fonts.bold : fonts.semibold }}>
@@ -107,7 +124,7 @@ export function DesktopNav() {
         accessibilityRole="link"
         accessibilityLabel="Conta: perfil, assinatura, lembretes, privacidade e segurança"
         aria-current={onConta ? 'page' : undefined}
-        onPress={() => router.push('/conta')}
+        {...navLink('/conta', () => router.push('/conta'))}
         style={(s) => [styles.item, onConta && styles.itemActive, (s as { hovered?: boolean }).hovered && !onConta && styles.itemHover, (s as { focused?: boolean }).focused && ui.focusRing]}>
         <View style={styles.avatar}>
           <ProfileAvatar size={36} background={colors.onBrandSoft} color={colors.brand} textVariant="caption" />

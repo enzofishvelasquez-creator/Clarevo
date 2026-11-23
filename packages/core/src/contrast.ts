@@ -111,9 +111,10 @@ export const THEME_CONTRAST_PAIRS: readonly ContrastPair[] = [
   // Texto sobre o azul
   { use: 'Texto branco sobre o azul (cabeçalho, botão principal)', fg: 'textOnBrand', bg: 'brand', kind: 'texto' },
   { use: 'Texto branco sobre o botão principal pressionado', fg: 'textOnBrand', bg: 'brandPressed', kind: 'texto' },
-  { use: 'Texto branco sobre o trilho do seletor Pessoal | Família', fg: 'textOnBrand', bg: 'brandDeep', kind: 'texto' },
+  { use: 'Texto branco sobre o trilho do seletor Pessoal | Família e os blocos Recebido e Pago (computador)', fg: 'textOnBrand', bg: 'brandDeep', kind: 'texto' },
   { use: 'Legenda clara sobre o azul ("Recebido menos pago até 07/10")', fg: 'textOnBrandSoft', bg: 'brand', kind: 'texto' },
-  { use: 'Legenda clara sobre o trilho do seletor', fg: 'textOnBrandSoft', bg: 'brandDeep', kind: 'texto' },
+  { use: 'Legenda clara sobre o trilho do seletor e os blocos Recebido e Pago', fg: 'textOnBrandSoft', bg: 'brandDeep', kind: 'texto' },
+  { use: 'Legenda clara sobre o bloco Recebido ou Pago com o mouse em cima (computador)', fg: 'textOnBrandSoft', bg: 'brandPressed', kind: 'texto' },
   { use: 'Valor grande em branco sobre o azul (diferença do mês)', fg: 'textOnBrand', bg: 'brand', kind: 'texto grande' },
   // Avisos e valores
   { use: 'Mensagem de erro de campo e botão "Excluir"', fg: 'error', bg: 'surface', kind: 'texto' },
@@ -141,6 +142,7 @@ export const THEME_CONTRAST_PAIRS: readonly ContrastPair[] = [
   { use: 'Contorno azul do chip, da caixa e do interruptor marcados sobre o cartão', fg: 'brandText', bg: 'surface', kind: 'contorno' },
   { use: 'Anel de foco lima sobre o azul (cabeçalho)', fg: 'accent', bg: 'brand', kind: 'contorno' },
   { use: 'Anel de foco lima sobre o trilho do seletor', fg: 'accent', bg: 'brandDeep', kind: 'contorno' },
+  { use: 'Anel de foco lima sobre o bloco Recebido ou Pago com o mouse em cima', fg: 'accent', bg: 'brandPressed', kind: 'contorno' },
   { use: 'Campo em foco: contorno escuro sobre cartão branco', fg: 'text', bg: 'surface', kind: 'contorno' },
   // Estados desabilitados e o segmento em aberto
   {
