@@ -35,7 +35,14 @@ export function DesktopNav() {
   return (
     <View style={styles.nav} role="navigation" aria-label={BAR_TEXT.label}>
       <View style={styles.brandRow}>
-        <Logo height={26} />
+        {/* O logotipo leva ao Resumo, a tela inicial (pedido do Enzo, 23/11/2026), como o Resumo da lista de baixo. */}
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Clarevo: ir para o Resumo"
+          onPress={() => (inTabs ? router.navigate('/') : router.dismissTo('/'))}
+          style={(s) => [styles.logoLink, (s as { focused?: boolean }).focused && ui.focusRing]}>
+          <Logo height={26} />
+        </Pressable>
         {auth.mode === 'demo' ? (
           <View style={{ alignSelf: 'flex-start' }}>
             <DemoPill />
@@ -130,6 +137,7 @@ const styles = StyleSheet.create({
     gap: space[3],
   },
   brandRow: { gap: space[2], paddingHorizontal: space[2], marginBottom: space[2] },
+  logoLink: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', borderRadius: radius.sm },
   item: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 48, paddingHorizontal: space[3], borderRadius: radius.md },
   itemActive: { backgroundColor: colors.brandTint },
   itemHover: { backgroundColor: colors.background },
