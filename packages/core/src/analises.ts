@@ -693,8 +693,10 @@ export interface AnalysesEvolutionSummary {
   title: string;
   /** "R$ 3.900,00"; null em mês sem registros (nunca "R$ 0,00"). */
   valueText: string | null;
+  /** No lugar do valor, quando não há valor: "Sem registros" (como o título do painel da Evolução); null com valor. */
+  noValueText: string | null;
   cents: Cents;
-  /** "Com registros", "Mês em andamento" ou o aviso de mês sem registros. */
+  /** "Com registros", "Mês em andamento" ou, sem registros, "Mês sem anotação não quer dizer mês sem gastos". */
   stateText: string;
   /** "De setembro para outubro: R$ 150,00 a mais", ou o motivo de não haver variação. */
   variationText: string;
@@ -717,6 +719,7 @@ export function analysesEvolutionSummary(view: EvolutionView, month: IsoMonth): 
   return {
     title: T.title(month),
     valueText,
+    noValueText: valueText === null ? EVOLUTION_TEXT.panel.noValue : null,
     cents: point.cents,
     stateText: point.stateText,
     variationText: variation.text,

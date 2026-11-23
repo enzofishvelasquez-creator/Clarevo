@@ -51,6 +51,7 @@ import { SignupSourceAccountCard } from '@/components/signup-source';
 import { ThemeCard } from '@/components/theme-card';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Screen, Txt } from '@/components/ui';
+import { useWideLayout } from '@/lib/layout';
 import { APP_INFO } from '@/lib/app-info';
 import { AuthError, RESEND_INTERVAL_SECONDS } from '@/lib/auth';
 import { signOutIntent } from '@/lib/nav';
@@ -74,6 +75,9 @@ function SectionTitle({ children }: { children: string }) {
     </Txt>
   );
 }
+
+/** Computador: as notas pequenas dos cards param em 560 px (revisão visual de 23/11/2026: com 680 px, a linha passava de 110 letras). */
+const NOTE_WIDE = { maxWidth: 560 } as const;
 
 /** O botão da página de licenças (D5). O texto fica aqui, e não em LEGAL_TEXT, porque core/legal.ts vai nas funções do servidor. */
 const LICENSES_LABEL = 'Licenças de código aberto';
@@ -110,6 +114,7 @@ export default function ContaScreen() {
   const [supportFailed, setSupportFailed] = useState(false);
   // ?secao=lembretes (vindo de Contas a pagar) ou ?secao=contas (o atalho "Gerenciar contas de origem" dos seletores): rola até o card.
   const { secao } = useLocalSearchParams<{ secao?: string }>();
+  const note = useWideLayout() ? NOTE_WIDE : undefined;
   const scroll = useRef<ScrollView>(null);
   const [remindersY, setRemindersY] = useState<number | null>(null);
   const [accountsY, setAccountsY] = useState<number | null>(null);
@@ -191,7 +196,7 @@ export default function ContaScreen() {
           <ProfilePhotoActions />
           {auth.mode === 'demo' ? (
             <>
-              <Txt variant="caption" color={colors.textSecondary}>
+              <Txt variant="caption" color={colors.textSecondary} style={note}>
                 Demonstração: acesso simulado e dados fictícios, guardados só neste aparelho enquanto o app está aberto.
               </Txt>
               <TopicLink slug="demonstracao" label="O que é a demonstração?" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
@@ -205,7 +210,7 @@ export default function ContaScreen() {
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             {FEEDBACK_TEXT.title}
           </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
             {FEEDBACK_TEXT.hint}
           </Txt>
           <FeedbackButton label={FEEDBACK_TEXT.button} screen="/conta" />
@@ -226,7 +231,7 @@ export default function ContaScreen() {
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             {BUSINESS_TEXT.accountTitle}
           </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
             {business.data ? BUSINESS_TEXT.accountHintIn(business.data.name) : BUSINESS_TEXT.accountHintNone}
           </Txt>
           <Button
@@ -243,7 +248,7 @@ export default function ContaScreen() {
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             {FAMILY_TEXT.accountTitle}
           </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
             {family.data ? FAMILY_TEXT.accountHintIn(family.data.context.name, family.data.role) : FAMILY_TEXT.accountHintNone}
           </Txt>
           <Button
@@ -264,7 +269,7 @@ export default function ContaScreen() {
             <Txt variant="title" accessibilityRole="header" aria-level={2}>
               {COMPANY_TEXT.accountTitle}
             </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
+            <Txt variant="caption" color={colors.textSecondary} style={note}>
               {COMPANY_TEXT.accountHint}
             </Txt>
             <Button label={COMPANY_TEXT.accountOpen} icon={Building2} tone="soft" onPress={() => router.push('/empresa')} />
@@ -286,7 +291,7 @@ export default function ContaScreen() {
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             Segurança
           </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
             {LEGAL_TEXT.whoSees.security}
           </Txt>
           <Message msg={securityMsg} />
@@ -309,7 +314,7 @@ export default function ContaScreen() {
             <Txt variant="title" accessibilityRole="header" aria-level={2}>
               {TELEGRAM_TEXT.cardTitle}
             </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
+            <Txt variant="caption" color={colors.textSecondary} style={note}>
               {TELEGRAM_TEXT.cardBody}
             </Txt>
             <Button label={TELEGRAM_TEXT.cardOpen} icon={MessageCircle} tone="soft" onPress={() => router.push('/conta/telegram')} />
@@ -323,7 +328,7 @@ export default function ContaScreen() {
             <Txt variant="title" accessibilityRole="header" aria-level={2}>
               {WHATSAPP_TEXT.cardTitle}
             </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
+            <Txt variant="caption" color={colors.textSecondary} style={note}>
               {WHATSAPP_TEXT.cardBody}
             </Txt>
             <Button label={WHATSAPP_TEXT.cardOpen} icon={MessageCircle} tone="soft" onPress={() => router.push('/conta/whatsapp')} />
@@ -338,7 +343,7 @@ export default function ContaScreen() {
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             {EXPORT_TEXT.entry}
           </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
             {EXPORT_TEXT.entryHint}
           </Txt>
           <Button label={EXPORT_TEXT.entryButton} icon={FileDown} tone="soft" accessibilityLabel={EXPORT_TEXT.entryA11y} onPress={() => router.push('/conta/exportar')} />
@@ -353,7 +358,7 @@ export default function ContaScreen() {
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             {SUPPORT_TEXT.title}
           </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
             {SUPPORT_TEXT.hint}
           </Txt>
           {supportFailed ? (
@@ -372,7 +377,7 @@ export default function ContaScreen() {
             <Txt variant="title" accessibilityRole="header" aria-level={2}>
               {LEGAL_TEXT.account.title}
             </Txt>
-            <Txt variant="caption" color={colors.textSecondary}>
+            <Txt variant="caption" color={colors.textSecondary} style={note}>
               {LEGAL_TEXT.account.hint}
             </Txt>
             {siteFailed ? (
@@ -416,7 +421,7 @@ export default function ContaScreen() {
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             {DELETE_TEXT.entry}
           </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
             {DELETE_TEXT.entryHint}
           </Txt>
           <Button label={DELETE_TEXT.entryButton} icon={Trash2} tone="soft" accessibilityLabel={DELETE_TEXT.entryA11y} onPress={() => router.push('/conta/excluir')} />

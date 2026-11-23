@@ -22,7 +22,7 @@ import {
   type InvestmentMovement,
 } from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronRight, Pencil, Trash2 } from 'lucide-react-native';
+import { ChevronRight, Coins, Minus, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
@@ -37,6 +37,7 @@ import { ErrorState, LoadingState } from '@/components/states';
 import { Banner, Body, Button, Card, Screen, Txt, styles as ui } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useInvestmentReminderHolds } from '@/lib/investment-reminder-holds';
+import { useWideLayout } from '@/lib/layout';
 import { useInvalidateInvestments, useInvestment, useInvestmentMovements } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
@@ -100,6 +101,8 @@ function Detail({
   const { width, fontScale } = useWindowDimensions();
   const stacked = isStackedLayout(width, fontScale);
   const action = stacked ? styles.actionStacked : styles.action;
+  // Computador: as quatro ações em duas colunas, em vez de quatro faixas de 712 px.
+  const wide = useWideLayout();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -194,14 +197,14 @@ function Detail({
               onHold={(how) => onNotice(how === 'snooze' ? holds.snooze(reminder.kind) : holds.pause(reminder.kind))}
             />
           ) : null}
-          {/* Um botão por linha, na largura toda (revisão das telas, 16/11/2026): em duas colunas, "Registrar rendimento recebido"
-              quebrava em linhas de tamanhos diferentes. */}
+          {/* No celular, um botão por linha, na largura toda (revisão das telas, 16/11/2026): em duas colunas, "Registrar rendimento recebido"
+              quebrava em linhas de tamanhos diferentes. No computador, duas colunas. Os ícones são os das mesmas ações na meta. */}
           {active ? (
-            <View style={styles.mainActions}>
-              <Button label={D.updateValue} onPress={() => go('valor')} />
-              <Button label={D.addDeposit} tone="soft" onPress={() => go('aporte')} />
-              <Button label={D.addWithdrawal} tone="soft" onPress={() => go('resgate')} />
-              <Button label={D.addIncome} tone="soft" onPress={() => go('rendimento')} />
+            <View style={[styles.mainActions, wide && styles.mainActionsWide]}>
+              <Button label={D.updateValue} icon={RefreshCw} style={wide && styles.mainActionWide} onPress={() => go('valor')} />
+              <Button label={D.addDeposit} icon={Plus} tone="soft" style={wide && styles.mainActionWide} onPress={() => go('aporte')} />
+              <Button label={D.addWithdrawal} icon={Minus} tone="soft" style={wide && styles.mainActionWide} onPress={() => go('resgate')} />
+              <Button label={D.addIncome} icon={Coins} tone="soft" style={wide && styles.mainActionWide} onPress={() => go('rendimento')} />
             </View>
           ) : (
             <Button label={D.reopen} tone="soft" busy={busy} onPress={() => setStatus('ativo')} />
@@ -334,6 +337,8 @@ const styles = StyleSheet.create({
   hero: { backgroundColor: colors.brand, padding: space[5], gap: space[2], borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
   big: { fontFamily: fonts.extrabold, fontSize: 30, lineHeight: 38 },
   mainActions: { gap: space[2] },
+  mainActionsWide: { flexDirection: 'row', flexWrap: 'wrap' },
+  mainActionWide: { flexGrow: 1, flexShrink: 1, flexBasis: '40%' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 150 },
   actionStacked: { alignSelf: 'auto', flexGrow: 1, flexBasis: '100%' },

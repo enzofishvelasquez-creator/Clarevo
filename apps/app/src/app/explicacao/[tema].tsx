@@ -7,8 +7,10 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { SubHeader } from '@/components/header';
 import { LearnArt } from '@/components/learn-art';
 import { TopicExample } from '@/components/topic-example';
+import { EmptyArt } from '@/components/states';
 import { TopicRow } from '@/components/topic-link';
 import { Banner, Button, Card, LinkButton, Screen, Txt, styles as ui } from '@/components/ui';
+import { useWideLayout } from '@/lib/layout';
 import {
   LEARN_DISCLAIMER_SECTIONS,
   LEARN_UI_TEXT,
@@ -61,6 +63,9 @@ function TopicBody({ topic, origem }: { topic: Topic; origem: LearnOrigin }) {
   const external = topic.sources.filter((s) => s.kind !== 'clarevo');
   const hasInternal = topic.sources.some((s) => s.kind === 'clarevo');
   const onlyInternal = hasInternal && external.length === 0;
+  // Computador: a coluna de leitura fica em 640 px (com 720, as linhas passavam de 90 caracteres) e a ilustração vai ao lado do título,
+  // sem a faixa lima de 720 px (revisão de 23/11/2026). O celular segue como era.
+  const wide = useWideLayout();
 
   const openSource = (url: string) => {
     setLinkFailed(false);
@@ -69,22 +74,27 @@ function TopicBody({ topic, origem }: { topic: Topic; origem: LearnOrigin }) {
   };
 
   return (
-    <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
-      <View style={styles.art}>
-        <LearnArt section={topic.section} size={88} background={colors.surface} />
-      </View>
-      <View style={{ gap: space[1] }}>
-        <Txt
-          variant="label"
-          color={colors.textSecondary}
-          style={{ fontFamily: fonts.bold }}
-          accessibilityLabel={`${section.title}. ${LEARN_UI_TEXT.readingA11y(minutes)}`}>
-          {LEARN_UI_TEXT.sectionReading(section.title, minutes)}
-        </Txt>
-        <Txt variant="title" style={styles.title} accessibilityRole="header" aria-level={1}>
-          {topic.title}
-        </Txt>
-        {topic.subtitle ? <Txt color={colors.textSecondary}>{topic.subtitle}</Txt> : null}
+    <Screen contentStyle={[{ padding: space[5], gap: space[4] }, wide && styles.readingColumn]}>
+      {wide ? null : (
+        <View style={styles.art}>
+          <LearnArt section={topic.section} size={88} background={colors.surface} />
+        </View>
+      )}
+      <View style={wide ? styles.headWide : undefined}>
+        {wide ? <LearnArt section={topic.section} size={64} /> : null}
+        <View style={{ gap: space[1], flex: wide ? 1 : undefined, minWidth: 0 }}>
+          <Txt
+            variant="label"
+            color={colors.textSecondary}
+            style={{ fontFamily: fonts.bold }}
+            accessibilityLabel={`${section.title}. ${LEARN_UI_TEXT.readingA11y(minutes)}`}>
+            {LEARN_UI_TEXT.sectionReading(section.title, minutes)}
+          </Txt>
+          <Txt variant="title" style={styles.title} accessibilityRole="header" aria-level={1}>
+            {topic.title}
+          </Txt>
+          {topic.subtitle ? <Txt color={colors.textSecondary}>{topic.subtitle}</Txt> : null}
+        </View>
       </View>
 
       <Txt style={{ fontFamily: fonts.bold }}>{topic.short}</Txt>
@@ -210,15 +220,24 @@ function InternalSourceLine({ reviewedOn }: { reviewedOn: IsoDate | null }) {
   );
 }
 
+/**
+ * Tema que não existe ou ainda é rascunho: o mesmo desenho dos outros estados vazios (a ilustração, o título no centro e as ações).
+ * Não usa o `EmptyState` porque o título aqui é o título de nível 2 da tela (o nível 1 é "Aprender", na barra).
+ */
 function Unavailable() {
   return (
     <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
-      <Card style={{ gap: space[3] }}>
-        <Txt variant="title" accessibilityRole="header" aria-level={2}>
-          {LEARN_UI_TEXT.unavailable}
-        </Txt>
-        <Button label={LEARN_UI_TEXT.unavailableAction} onPress={() => router.navigate('/aprender')} />
-        <LinkButton label={LEARN_UI_TEXT.back} onPress={() => goBack('aprender')} />
+      <Card>
+        <View style={styles.unavailable}>
+          <EmptyArt kind="registros" />
+          <Txt variant="title" style={{ textAlign: 'center' }} accessibilityRole="header" aria-level={2}>
+            {LEARN_UI_TEXT.unavailable}
+          </Txt>
+          <View style={{ gap: space[2], alignSelf: 'stretch' }}>
+            <Button label={LEARN_UI_TEXT.unavailableAction} onPress={() => router.navigate('/aprender')} />
+            <LinkButton label={LEARN_UI_TEXT.back} style={{ alignSelf: 'center' }} onPress={() => goBack('aprender')} />
+          </View>
+        </View>
       </Card>
     </Screen>
   );
@@ -226,6 +245,10 @@ function Unavailable() {
 
 const styles = StyleSheet.create({
   art: { backgroundColor: colors.accent, borderRadius: radius.lg, height: 120, alignItems: 'center', justifyContent: 'center' },
+  // 640 px de texto mais as margens de 20 px.
+  readingColumn: { maxWidth: 680 },
+  headWide: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
+  unavailable: { alignItems: 'center', gap: space[3], paddingVertical: space[2] },
   title: { fontSize: 22, lineHeight: 30 },
   block: { gap: space[2] },
   source: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: space[3], minHeight: 56 },

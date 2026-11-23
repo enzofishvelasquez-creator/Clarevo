@@ -3209,7 +3209,7 @@ describe('textos da Evolução (D-057)', () => {
     expect(EVOLUTION_TEXT.panel.switchCaption).toBe('Tirar da comparação não apaga nem muda nenhum lançamento.');
     expect(EVOLUTION_TEXT.panel.state.com_registros).toBe('Com registros');
     expect(EVOLUTION_TEXT.panel.state.em_andamento).toBe('Mês em andamento');
-    expect(EVOLUTION_TEXT.panel.noRecords('pago')).toBe('Sem registros: mês sem anotação não quer dizer mês sem gastos');
+    expect(EVOLUTION_TEXT.panel.noRecords('pago')).toBe('Mês sem anotação não quer dizer mês sem gastos');
     expect(EVOLUTION_TEXT.states.allOutTitle).toBe('Escolha ao menos um mês para comparar');
     expect(EVOLUTION_TEXT.custom.restore).toBe('Restaurar todos');
     expect(EVOLUTION_TEXT.retry).toBe('Tentar de novo');
@@ -3302,7 +3302,7 @@ describe('textos da Evolução (D-057)', () => {
     expect(evolutionPanel(recebidoView, '2026-08', true).check!.cardNotice).toBeNull();
     // Mês sem anotação e sem conferência continua dizendo que não é mês sem gastos.
     const unchecked = buildEvolutionView({ overview: [...overview, row('2026-07', 0, 0)], metric: 'pago', windowMonths: 12, currentMonth: '2026-10', hiddenMonths: [] }).points.find((p) => p.month === '2026-07')!;
-    expect(unchecked.stateText).toBe('Sem registros: mês sem anotação não quer dizer mês sem gastos');
+    expect(unchecked.stateText).toBe('Mês sem anotação não quer dizer mês sem gastos');
     for (const text of texts) expect(text, text).not.toMatch(/\bnão gastou|\bsem gastos de verdade|\bcom certeza\b|\bgarant/i);
   });
 
@@ -3724,7 +3724,7 @@ describe('textos de "Calcular pela média" (D-062 item 2)', () => {
     expect(three.headline).toBe('Média de julho a setembro: R$ 5.200,00');
     expect(three.count).toContain('3 de 3');
     const two = incomeAverageTexts(incomeAverage([row('2026-07', 430_000), row('2026-08', 620_000)], 3, '2026-10'));
-    expect(two.count).toContain('2 de 3, setembro sem registros ficou de fora');
+    expect(two.count).toContain('2 de 3. Setembro ficou de fora porque não tem registros.');
     const none = incomeAverageTexts(incomeAverage([], 3, '2026-10'));
     expect(none.empty).toContain('pelo menos um mês fechado com recebimentos');
   });

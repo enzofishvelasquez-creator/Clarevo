@@ -16,7 +16,7 @@ import {
   type TitledRow,
 } from '@clarevo/core';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { Check, Minus, Plus } from 'lucide-react-native';
+import { Check, Plus } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -106,7 +106,8 @@ function Composicao({ kind, byCategory: startByCategory }: { kind: keyof typeof 
   const emptyAction = (k: 'receita' | 'despesa') => (
     <Button
       label={k === 'receita' ? 'Registrar recebimento' : 'Anotar gasto'}
-      icon={k === 'receita' ? Plus : Minus}
+      // O mais de "anotar", como em todo "Anotar gasto" do app (o menos parecia "tirar").
+      icon={Plus}
       tone="soft"
       onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: k } })}
     />

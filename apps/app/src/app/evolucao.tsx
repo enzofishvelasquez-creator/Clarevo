@@ -27,9 +27,9 @@ import {
   type IsoMonth,
 } from '@clarevo/core';
 import { router, type Href } from 'expo-router';
-import { Minus, Plus } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { CustomComparisonNotice, EvolutionChart, MonthPanelCard, Phase3PanelCard, StatsSection, ValuesTable } from '@/components/evolucao-parts';
 import { ContextPill, SubHeader } from '@/components/header';
@@ -62,15 +62,25 @@ const T = EVOLUTION_TEXT;
  */
 /**
  * Controle segmentado (o desenho de "Barras | Bolhas" das Análises): um trilho com as opções lado a lado, a escolhida em branco. Rádios num
- * grupo com nome; com `columns`, as opções quebram em linhas de N.
+ * grupo com nome; com `columns`, as opções quebram em linhas de N. `a11y` dá a cada opção o nome falado quando o rótulo à vista é curto
+ * (o período mostra só o número, e o leitor de tela diz "3 meses").
  */
-function Segmented({ label, options, columns }: { label: string; options: { key: string; label: string; selected: boolean; onPress: () => void }[]; columns?: number }) {
+function Segmented({
+  label,
+  options,
+  columns,
+}: {
+  label: string;
+  options: { key: string; label: string; a11y?: string; selected: boolean; onPress: () => void }[];
+  columns?: number;
+}) {
   return (
     <View style={styles.segTrack} accessibilityRole="radiogroup" accessibilityLabel={label}>
       {options.map((o) => (
         <Pressable
           key={o.key}
           accessibilityRole="radio"
+          accessibilityLabel={o.a11y}
           accessibilityState={{ checked: o.selected }}
           aria-checked={o.selected}
           onPress={o.onPress}
@@ -82,8 +92,8 @@ function Segmented({ label, options, columns }: { label: string; options: { key:
             st.pressed && { opacity: 0.85 },
             (st as { focused?: boolean }).focused && styles.segFocus,
           ]}>
-          {/* Com letra muito grande, a palavra quebra dentro da opção em vez de passar por cima da vizinha. */}
-          <Txt variant="label" color={o.selected ? colors.brandText : colors.text} style={[{ fontFamily: fonts.bold, textAlign: 'center', maxWidth: '100%' }, { overflowWrap: 'anywhere' } as object]}>
+          {/* Quebra só entre palavras; com letra muito grande, a palavra que não cabe sozinha quebra em vez de passar por cima da vizinha. */}
+          <Txt variant="label" color={o.selected ? colors.brandText : colors.text} style={[{ fontFamily: fonts.bold, textAlign: 'center', maxWidth: '100%' }, { overflowWrap: 'break-word' } as object]}>
             {o.label}
           </Txt>
         </Pressable>
@@ -209,6 +219,9 @@ export default function EvolucaoScreen() {
     setLive('');
     setMetric(m);
   };
+  // Cabem as cinco opções com "meses" por extenso numa linha (cerca de 70 px cada, mais as margens).
+  const { width: screenWidth, fontScale } = useWindowDimensions();
+  const roomy = screenWidth >= 480 * fontScale;
   const pickWindow = (w: EvolutionWindow) => {
     setLive('');
     setWindowMonths(w);
@@ -235,10 +248,20 @@ export default function EvolucaoScreen() {
             options={EVOLUTION_METRICS.map((m) => ({ key: m, label: T.metrics[m], selected: metric === m, onPress: () => pickMetric(m) }))}
             columns={2}
           />
-          <Segmented
-            label={T.windowGroup}
-            options={evolutionWindowsFor(metric).map((w) => ({ key: String(w), label: T.windowLabel[w], selected: windowMonths === w, onPress: () => pickWindow(w) }))}
-          />
+          {/* No celular, o período mostra só o número, sob a legenda "Meses mostrados" (revisão de 23/11/2026: com "3 meses" em cada opção,
+              a palavra quebrava no meio em 320 px); com espaço (tablet e computador), "3 meses" em cada opção, sem a legenda. O leitor de tela
+              diz sempre "3 meses". */}
+          <View style={{ gap: space[1] }}>
+            {roomy ? null : (
+              <Txt variant="caption" color={colors.textSecondary} style={{ fontFamily: fonts.bold }} aria-hidden accessibilityElementsHidden importantForAccessibility="no">
+                {T.windowGroup}
+              </Txt>
+            )}
+            <Segmented
+              label={T.windowGroup}
+              options={evolutionWindowsFor(metric).map((w) => ({ key: String(w), label: roomy ? T.windowLabel[w] : String(w), a11y: T.windowLabel[w], selected: windowMonths === w, onPress: () => pickWindow(w) }))}
+            />
+          </View>
           {phase3 ? (
             <Txt variant="caption" color={colors.textSecondary}>
               {T.windowPhase3Note}
@@ -266,7 +289,8 @@ export default function EvolucaoScreen() {
                 canWrite ? (
                   <Button
                     label={T.states.noRecordsAction[metric]}
-                    icon={metric === 'pago' ? Minus : Plus}
+                    icon={Plus}
+                    tone="soft"
                     onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: metric === 'pago' ? 'despesa' : 'receita' } })}
                   />
                 ) : undefined
@@ -325,7 +349,7 @@ function Phase3EmptyCard({ view, canWrite, context, referenceFrom }: { view: Evo
   };
   return (
     <Card>
-      <EmptyState title={empty.title} action={empty.action ? <Button label={empty.action.label} icon={Plus} onPress={() => go(empty.action!.kind)} /> : undefined}>
+      <EmptyState title={empty.title} action={empty.action ? <Button label={empty.action.label} icon={Plus} tone="soft" onPress={() => go(empty.action!.kind)} /> : undefined}>
         {empty.body}
       </EmptyState>
     </Card>

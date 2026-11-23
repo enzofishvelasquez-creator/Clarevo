@@ -40,7 +40,8 @@ import { ConfirmDialog } from '@/components/dialog';
 import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
-import { CheckOption, yearA11y, yearA11yLabel } from '@/components/series-parts';
+import { useWideFooter } from '@/components/form-footer';
+import { CheckOption, seriesStyles, yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicLink } from '@/components/topic-link';
 import { Banner, Button, Card, Chip, Screen, Skeleton, Txt } from '@/components/ui';
@@ -159,6 +160,8 @@ type Pending =
 export default function ContasVencidas() {
   const { today } = useSession();
   const insets = useSafeAreaInsets();
+  // Computador, fora do painel: o rodapé segue a coluna dos cartões (revisão de 23/11/2026).
+  const wideFooter = useWideFooter();
   const personal = useWork().data;
   const ctx = personal?.contextId;
   const commitments = useCommitments(ctx, monthOf(today));
@@ -475,7 +478,7 @@ export default function ContasVencidas() {
                             icon={allSelected ? Check : ListChecks}
                             tone="soft"
                             disabled={busy || allSelected}
-                            style={styles.action}
+                            style={styles.groupAction}
                             onPress={() => setSelected((cur) => [...cur, ...ids.filter((id) => !cur.includes(id))])}
                           />
                         ) : null}
@@ -484,7 +487,7 @@ export default function ContasVencidas() {
                           accessibilityLabel={`Não houve em ${yearA11y(group.label)}, ${group.description}`}
                           tone="ghost"
                           disabled={busy || !yearPlanFor(group)}
-                          style={styles.action}
+                          style={styles.groupAction}
                           onPress={() => setPending({ type: 'tirar-ano', group })}
                         />
                       </View>
@@ -507,8 +510,8 @@ export default function ContasVencidas() {
 
       {hasFooter ? (
         // Rodapé fixo: o lote fica sempre visível, com o resultado logo acima.
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
-          <View style={styles.footerInner}>
+        <View style={[styles.footer, wideFooter && seriesStyles.footerWide, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
+          <View style={[styles.footerInner, wideFooter && seriesStyles.footerInnerWide]}>
             {resultBanner}
             <Button
               label={batchLabel}
@@ -661,6 +664,9 @@ const styles = StyleSheet.create({
   // Fatura de cartão: sem caixa de seleção, então sem o recuo dela (o texto alinha com o botão "Abrir fatura").
   invoiceInfo: { gap: 2, paddingVertical: space[2] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 140 },
+  // "Selecionar as 2" e "Não houve em 2026": um embaixo do outro antes de cada um quebrar em duas linhas (revisão de 23/11/2026: lado a
+  // lado, em 390 px, os dois quebravam).
+  groupAction: { alignSelf: 'auto', flexGrow: 1, flexBasis: 200 },
   groupHead: { gap: space[2], paddingTop: space[3] },
   // Linhas de um grupo: recuo à esquerda, ligadas ao cabeçalho do ano.
   inGroup: { paddingLeft: space[3], borderLeftWidth: 3, borderLeftColor: colors.brandTint },

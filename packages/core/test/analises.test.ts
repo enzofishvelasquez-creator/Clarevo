@@ -620,7 +620,8 @@ describe('Análises: os resumos das outras abas, com os números da demonstraç�
     expect(september.variationText).toBe('Variação não disponível: não há outro mês na comparação antes deste.');
     const august = analysesEvolutionSummary(view, '2026-08')!;
     expect(august.valueText).toBeNull();
-    expect(august.stateText).toContain('Sem registros');
+    expect(august.noValueText).toBe('Sem registros');
+    expect(august.stateText).toBe('Mês sem anotação não quer dizer mês sem gastos');
     // Antes dos 12 meses que a Evolução mostra: sem resumo.
     expect(analysesEvolutionSummary(view, '2025-01')).toBeNull();
     expect(ANALYSES_TEXT.evolution.outside('2025-11')).toBe('A Evolução mostra os 12 meses até hoje, a partir de novembro de 2025. Este mês fica antes.');

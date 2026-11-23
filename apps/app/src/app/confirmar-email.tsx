@@ -91,14 +91,17 @@ export default function ConfirmarEmail() {
       ) : null}
       <View style={{ gap: space[3] }}>
         <Button label="Já confirmei meu e-mail" busy={checking} busyLabel="Conferindo…" onPress={check} />
-        <Button
-          label={cooldown > 0 ? `Reenviar e-mail em ${cooldown} s` : 'Reenviar e-mail'}
-          tone="soft"
-          disabled={cooldown > 0}
-          busy={sending}
-          busyLabel="Enviando…"
-          onPress={resend}
-        />
+        {/* Na espera, a contagem é um texto com o contraste de sempre, na altura do botão (revisão de 23/11/2026: o botão desativado, esmaecido,
+            mal se lia e ainda parecia tocável). Acabada a espera, o botão volta no mesmo lugar. */}
+        {cooldown > 0 ? (
+          <View style={{ minHeight: 52, justifyContent: 'center' }}>
+            <Txt variant="label" color={colors.textSecondary} style={{ textAlign: 'center' }}>
+              {`Você pode reenviar o e-mail em ${cooldown} s`}
+            </Txt>
+          </View>
+        ) : (
+          <Button label="Reenviar e-mail" tone="soft" busy={sending} busyLabel="Enviando…" onPress={resend} />
+        )}
       </View>
       <LinkButton label="Usar outro e-mail" onPress={() => router.replace('/criar-conta')} />
     </AuthShell>

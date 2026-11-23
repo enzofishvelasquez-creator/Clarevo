@@ -37,7 +37,7 @@ import {
 } from '@clarevo/core';
 import { Check, CircleAlert, Copy, Download, FileText, Plus } from 'lucide-react-native';
 import { useMemo, useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { ConfirmDialog } from '@/components/dialog';
 import { CheckOption, ChoiceGroup } from '@/components/series-parts';
@@ -194,7 +194,9 @@ export function InviteCard({
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
-        style={{ minHeight: 120, textAlignVertical: 'top' }}
+        // Revisão de 23/11/2026 (a primeira linha aparecia cortada na borda de cima): margem dentro da borda, fora da área que rola, e,
+        // nos navegadores que sabem fazer isso, o campo cresce com a lista até uns dez e-mails antes de rolar.
+        style={[{ minHeight: 120, textAlignVertical: 'top', marginVertical: space[2], paddingVertical: space[1] }, Platform.OS === 'web' && ({ fieldSizing: 'content', maxHeight: 264 } as object)]}
       />
       <View style={{ gap: space[1] }} accessibilityLiveRegion="polite">
         <Txt variant="label" style={{ fontFamily: fonts.bold }}>

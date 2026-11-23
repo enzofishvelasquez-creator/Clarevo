@@ -501,7 +501,9 @@ export function CalcNavRow({
 
 const styles = StyleSheet.create({
   note: { flexDirection: 'row', gap: space[2], padding: space[3], borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'flex-start' },
-  lead: { fontFamily: fonts.extrabold, fontSize: 20, lineHeight: 28 },
+  // A frase principal do resultado: negrito de 18 px com folga entre as linhas (revisão de 23/11/2026: em 20 px extranegrito, as cinco a
+  // sete linhas do plano de dívidas pesavam como um bloco).
+  lead: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 27 },
   bullet: { flexDirection: 'row', gap: space[2], alignItems: 'flex-start' },
   chip48: { minHeight: CALC_TARGET },
   link48: { minHeight: CALC_TARGET },

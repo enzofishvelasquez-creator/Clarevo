@@ -29,6 +29,7 @@ import { HowCalculatedSheet, InvestmentTemplates, StaleValuesNotice } from '@/co
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
+import { useWideLayout } from '@/lib/layout';
 import { useContextInvestmentMovements, useInvestmentPlan, useInvestments, useSpace, useView, useWorkOf } from '@/state/data';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
@@ -58,6 +59,7 @@ export default function InvestimentosScreen() {
   const plan = useInvestmentPlan(contextId);
   const [notice] = useFlash();
   const [howOpen, setHowOpen] = useState(false);
+  const wide = useWideLayout();
   const canWrite = personal.data?.canWrite ?? true;
   const all = list.data ?? [];
   const active = all.filter((i) => i.status === 'ativo');
@@ -106,11 +108,11 @@ export default function InvestimentosScreen() {
             <>
               {list.isError || movements.isError ? <StaleValuesNotice partial={!list.isError} onRetry={retry} /> : null}
               {/* A carteira é só dos ativos: os encerrados saem do total (docs/45, seção 3.2). */}
-              <Summary active={active} onHow={() => setHowOpen(true)} />
+              {wide ? <SummaryWide active={active} onHow={() => setHowOpen(true)} /> : <Summary active={active} onHow={() => setHowOpen(true)} />}
               {/* Desempenho (auditoria de 18/11/2026): card próprio logo abaixo do total, com CDI, IPCA e poupança no nome. */}
               <PerformanceCard />
               {/* Revisão das telas (16/11/2026): "Novo investimento" logo abaixo do total, não depois da lista. */}
-              {canWrite ? <Button label={T.newInvestment} icon={Plus} tone="soft" onPress={() => router.push('/investimento/novo')} /> : null}
+              {canWrite ? <Button label={T.newInvestment} icon={Plus} tone="soft" style={wide ? styles.fit : undefined} onPress={() => router.push('/investimento/novo')} /> : null}
               {moves ? <InvestmentPlanCard plan={plan.data ?? null} movements={moves} /> : null}
               <UpcomingDatesCard items={active} />
               <View style={{ gap: space[3] }}>
@@ -213,6 +215,58 @@ function Summary({ active, onHow }: { active: readonly Investment[]; onHow: () =
   );
 }
 
+/**
+ * O mesmo card no computador (revisão visual de 23/11/2026: era um segundo bloco azul logo abaixo da faixa azul da aba, com o texto todo
+ * nos 300 px da esquerda): um cartão branco, como os de baixo, com o total e as datas à esquerda e o aportado, o ganho e a porcentagem
+ * num bloco claro à direita. Os mesmos textos, os mesmos nomes acessíveis e o mesmo "Como a conta é feita".
+ */
+function SummaryWide({ active, onHow }: { active: readonly Investment[]; onHow: () => void }) {
+  const { today } = useSession();
+  const maskLabel = useMoneyLabelMask();
+  const t = portfolioTotals(active);
+  const share = gainOverInvested(t.gainCents, t.depositsCents);
+  const dates = portfolioValueDates(active, today);
+  const shareText = share !== null ? HOW_CALC_TEXT.onInvested(share) : null;
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {T.totalTitle}
+      </Txt>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={maskLabel(`${formatBRL(t.valueCents)}. ${T.gain(t.gainCents)}${shareText ? `, ${shareText}` : ''}. ${PERFORMANCE_TEXT.open}`)}
+        accessibilityHint={PERFORMANCE_TEXT.openHint}
+        onPress={() => router.push('/investimento/desempenho')}
+        style={(st) => [styles.wideRow, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
+        <View style={styles.wideMain}>
+          <MoneyTxt style={[tabular, styles.big]}>{formatBRL(t.valueCents)}</MoneyTxt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {TAB_VALUE_DATE_TEXT.card(dates)}
+          </Txt>
+          <View style={styles.openRow}>
+            <Txt variant="label" color={colors.brandText} style={{ fontFamily: fonts.bold, fontSize: 15, flexShrink: 1 }}>
+              {PERFORMANCE_TEXT.open}
+            </Txt>
+            <ChevronRight size={18} color={colors.brandText} aria-hidden />
+          </View>
+        </View>
+        <View style={styles.wideTile}>
+          <InvestmentTotalsLines depositsCents={t.depositsCents} withdrawalsCents={t.withdrawalsCents} incomeCents={t.incomeCents} gainCents={t.gainCents} />
+          {shareText ? <Txt variant="label">{shareText}</Txt> : null}
+        </View>
+      </Pressable>
+      {dates.notThisMonth.length > 0 ? (
+        <Txt variant="caption" color={colors.textSecondary}>
+          {TAB_VALUE_DATE_TEXT.notThisMonth(dates.notThisMonth)}
+        </Txt>
+      ) : null}
+      <View style={styles.sepLight} />
+      {/* O ícone alinhado com o texto do cartão (o botão tem 12 px de folga dos lados). */}
+      <Button label={HOW_CALC_TEXT.open} icon={CircleQuestionMark} tone="ghost" compact accessibilityHint={HOW_CALC_TEXT.openHint} onPress={onHow} style={{ alignSelf: 'flex-start', marginLeft: -space[3] }} />
+    </Card>
+  );
+}
+
 /** Uma linha da lista: nome, tipo, valor, ganho e de quando é o valor (D-103, item 1). */
 function InvestmentCard({ investment: i, movements }: { investment: Investment; movements: readonly InvestmentMovement[] | null }) {
   const maskLabel = useMoneyLabelMask();
@@ -260,6 +314,12 @@ const styles = StyleSheet.create({
   blue: { backgroundColor: colors.brand, borderRadius: radius.lg, padding: space[5], gap: space[2] },
   big: { fontFamily: fonts.extrabold, fontSize: 28, lineHeight: 36 },
   sep: { height: 1, backgroundColor: colors.onBrandLine, marginVertical: space[1] },
+  sepLight: { height: 1, backgroundColor: colors.border },
+  wideRow: { flexDirection: 'row', alignItems: 'center', gap: space[6], borderRadius: radius.sm },
+  wideMain: { flex: 1, minWidth: 0, gap: space[1] },
+  wideTile: { width: 260, backgroundColor: colors.background, borderRadius: radius.md, paddingVertical: space[3], paddingHorizontal: space[4], gap: space[1] },
+  // Botão que cabe no texto, à esquerda (computador): não ocupa a largura toda, como no celular.
+  fit: { alignSelf: 'flex-start', minWidth: 220 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   openRow: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 44 },
   privacy: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2] },

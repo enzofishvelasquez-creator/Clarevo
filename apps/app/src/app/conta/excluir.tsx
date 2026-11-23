@@ -17,6 +17,7 @@ import { KeyboardAvoidingView, View } from 'react-native';
 import { SubHeader } from '@/components/header';
 import { Banner, Button, Card, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { forgetDevice } from '@/lib/device-forget';
+import { useWideLayout } from '@/lib/layout';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
 import { signOutIntent } from '@/lib/nav';
 import { DEVICE_STORE, openStoreSubscriptions, storeUsedHere } from '@/lib/store-purchases';
@@ -53,6 +54,8 @@ export default function ExcluirContaScreen() {
   const repo = useRepo();
   const access = useAccess();
   const family = useFamily();
+  // Computador: as notas pequenas param em 560 px (com 720 px, a linha passava de 120 letras).
+  const note = useWideLayout() ? { maxWidth: 560 } : undefined;
   const deleteAccount = useDeleteAccount();
   const demo = auth.mode === 'demo';
   const outcome = deleteFamilyOutcome(family.data);
@@ -149,10 +152,10 @@ export default function ExcluirContaScreen() {
           ) : (
             <>
               <Txt>{deleteFamilyText(outcome, family.data?.context.name ?? '')}</Txt>
-              {outcome === 'nenhuma' ? <Txt variant="caption" color={colors.textSecondary}>{T.familyGeneral}</Txt> : null}
+              {outcome === 'nenhuma' ? <Txt variant="caption" color={colors.textSecondary} style={note}>{T.familyGeneral}</Txt> : null}
               {outcome === 'bloqueia' ? (
                 <>
-                  <Txt variant="caption" color={colors.textSecondary}>
+                  <Txt variant="caption" color={colors.textSecondary} style={note}>
                     {T.familyBlockedHow}
                   </Txt>
                   <Button label={T.familyOpen} icon={Users} tone="soft" onPress={() => router.push('/familia')} />

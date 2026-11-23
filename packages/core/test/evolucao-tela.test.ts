@@ -185,11 +185,11 @@ describe('buildEvolutionView', () => {
     const view = fromJune([], 'recebido');
     const march = view.points[2]!;
     expect(march).toMatchObject({ state: 'sem_registros', participation: 'fora_sem_registros', valueText: null, included: false, eligible: false });
-    expect(march.stateText).toBe('Sem registros: mês sem anotação não quer dizer mês sem recebimentos');
+    expect(march.stateText).toBe('Mês sem anotação não quer dizer mês sem recebimentos');
     expect(march.name).toBe('Março de 2026, sem registros, fora da comparação');
     expect(march.includedText).toBe('Fora da comparação');
     expect(fromJune().points[2]!.stateText).toBe('Com registros');
-    expect(EVOLUTION_TEXT.panel.noRecords('pago')).toBe('Sem registros: mês sem anotação não quer dizer mês sem gastos');
+    expect(EVOLUTION_TEXT.panel.noRecords('pago')).toBe('Mês sem anotação não quer dizer mês sem gastos');
     // Os 5 meses com recebimento: março não conta.
     expect(view.eligibleCount).toBe(4);
     expect(view.stats.eligibleCount).toBe(4);

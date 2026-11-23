@@ -7,6 +7,7 @@ import { MemberLine } from '@/components/family-parts';
 import { ContextPill, SubHeader } from '@/components/header';
 import { TopicLink } from '@/components/topic-link';
 import { Button, Card, LinkButton, Screen, Txt } from '@/components/ui';
+import { useWideLayout } from '@/lib/layout';
 import { useView } from '@/state/data';
 import { useBusiness } from '@/state/business';
 import { useFamily } from '@/state/family';
@@ -28,6 +29,9 @@ export default function QuemVeScreen() {
   const business = useBusiness().data;
   const inBusiness = kind === 'negocio' && business;
   const name = user?.displayName ?? '';
+  const wide = useWideLayout();
+  // Computador: as notas pequenas param em 560 px (com 720 px, a linha passava de 120 letras) e "Entendi" cabe no texto, à esquerda.
+  const note = wide ? styles.note : undefined;
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
     <SubHeader title="Quem vê estes dados?" right={<ContextPill label={kind === 'pessoal' ? 'Pessoal' : kind === 'familia' ? 'Família' : (business?.name ?? BUSINESS_TEXT.context)} fixed />} />
@@ -40,7 +44,7 @@ export default function QuemVeScreen() {
           <Txt variant="title" accessibilityRole="header" aria-level={3}>
             {family.context.name}
           </Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
             {FAMILY_TEXT.whoSeesIntro}
           </Txt>
           {family.members
@@ -48,12 +52,12 @@ export default function QuemVeScreen() {
             .map((m) => (
               <View key={m.personId} style={{ gap: 0 }}>
                 <MemberLine member={m} />
-                <Txt variant="caption" color={colors.textSecondary} style={{ marginLeft: 36 + space[3], marginTop: -space[1] }}>
+                <Txt variant="caption" color={colors.textSecondary} style={[{ marginLeft: 36 + space[3], marginTop: -space[1] }, note]}>
                   {FAMILY_ROLE_HELP[m.role]}
                 </Txt>
               </View>
             ))}
-          <Txt variant="caption" color={colors.textSecondary} style={{ marginTop: space[2] }}>
+          <Txt variant="caption" color={colors.textSecondary} style={[{ marginTop: space[2] }, note]}>
             {FAMILY_TEXT.whoSeesNote}
           </Txt>
         </Card>
@@ -84,10 +88,12 @@ export default function QuemVeScreen() {
       <Txt variant="title" accessibilityRole="header" aria-level={2}>
         {T.deletionTitle}
       </Txt>
-      <Txt color={colors.textSecondary}>{DELETE_TEXT.whoSees}</Txt>
+      <Txt color={colors.textSecondary} style={wide ? styles.para : undefined}>
+        {DELETE_TEXT.whoSees}
+      </Txt>
       <LinkButton label={DELETE_TEXT.whoSeesLink} onPress={() => router.push('/conta/excluir')} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
       <TopicLink slug="empresa-ve" label="A empresa vê meus gastos?" style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
-      <Button label="Entendi" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      <Button label="Entendi" style={wide ? styles.fit : undefined} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
     </Screen>
     </View>
   );
@@ -95,6 +101,7 @@ export default function QuemVeScreen() {
 
 /** Uma linha das listas: o ícone, quem (em negrito) e o que vê ou não vê. */
 function Item({ icon: Icon, label, text }: { icon: LucideIcon; label: string; text: string }) {
+  const wide = useWideLayout();
   return (
     <View style={styles.item}>
       <Icon size={20} color={colors.brandText} style={{ marginTop: 2 }} aria-hidden />
@@ -102,7 +109,7 @@ function Item({ icon: Icon, label, text }: { icon: LucideIcon; label: string; te
         <Txt variant="label" style={{ fontFamily: fonts.bold }}>
           {label}
         </Txt>
-        <Txt variant="caption" color={colors.textSecondary}>
+        <Txt variant="caption" color={colors.textSecondary} style={wide ? styles.note : undefined}>
           {text}
         </Txt>
       </View>
@@ -113,4 +120,8 @@ function Item({ icon: Icon, label, text }: { icon: LucideIcon; label: string; te
 const styles = StyleSheet.create({
   list: { gap: space[4] },
   item: { flexDirection: 'row', gap: space[3], alignItems: 'flex-start' },
+  note: { maxWidth: 560 },
+  // O parágrafo de 16 px em até 600 px (cerca de 80 letras por linha).
+  para: { maxWidth: 600 },
+  fit: { alignSelf: 'flex-start', minWidth: 220 },
 });

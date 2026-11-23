@@ -1,6 +1,7 @@
 import {
   GOALS_TEXT,
   GOAL_STATUS_LABEL,
+  SAVINGS_TEXT,
   goalCardCaption,
   goalPace,
   reserveCardTexts,
@@ -34,6 +35,14 @@ import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
  * `compact` (D-093): com a reserva criada e o plano de guardar já feito, o card fica curto: valor, barra, percentual, cobertura,
  * ritmo, o plano em uma linha com "Ver o plano" (o `planSlot` compacto) e as ações, sem a linha "Planejado". Assim "Suas metas"
  * sobe para a primeira tela do celular.
+ *
+ * O conteúdo vem em grupos (revisão visual de 23/11/2026: oito textos em quatro tamanhos, todos com o mesmo vão): o valor com a barra e
+ * o percentual; os fatos (cobertura, a nota do arredondamento logo abaixo dela, o ritmo e os investimentos ligados), mais juntos; o
+ * plano; as ações.
+ *
+ * `light` (computador, com a reserva criada): um cartão branco como os de baixo, em duas colunas (os números à esquerda, o plano e as
+ * ações à direita), em vez de um segundo bloco azul logo abaixo da faixa azul da aba (revisão visual de 23/11/2026). O plano de guardar
+ * vem de `planMonthlyCents`, com as cores do cartão branco (o `planSlot` é desenhado para o azul).
  */
 export function ReserveCard({
   reserve,
@@ -41,20 +50,27 @@ export function ReserveCard({
   planSlot,
   planLink,
   compact,
+  light,
+  planMonthlyCents,
 }: {
   reserve: Goal | null;
   plan: GoalPlan | null;
   planSlot?: ReactNode;
   planLink?: boolean;
   compact?: boolean;
+  light?: boolean;
+  planMonthlyCents?: number | null;
 }) {
   const { today } = useSession();
   const uncounted = useUncountedLinkedInvestments(reserve);
+  const onCard = Boolean(light) && reserve !== null && plan !== null;
+  const fg = onCard ? colors.text : colors.textOnBrand;
+  const soft = onCard ? colors.textSecondary : colors.textOnBrandSoft;
   const planAction = planLink ? (
     <LinkButton
       label="Planejar quanto guardar"
       icon={PiggyBank}
-      color={colors.textOnBrand}
+      color={onCard ? colors.brandText : colors.textOnBrand}
       style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
       onPress={() => router.push('/guardar')}
     />
@@ -80,27 +96,35 @@ export function ReserveCard({
   const t = reserveCardTexts(reserve);
   const coverage = showsCoverage(reserve) ? t.coverage : null;
   const pace = goalPace(reserve, today);
-  return (
-    <View style={styles.blue}>
-      <View style={styles.blueHead}>
+  const head = (
+    <View style={styles.blueHead}>
+      {onCard ? (
+        <View style={styles.headIcon}>
+          <ShieldCheck size={20} color={colors.brandText} strokeWidth={2.25} aria-hidden />
+        </View>
+      ) : (
         <ShieldCheck size={22} color={colors.textOnBrand} strokeWidth={2.25} aria-hidden />
-        <Txt variant="title" color={colors.textOnBrand} style={{ flex: 1 }} accessibilityRole="header" aria-level={2}>
-          {reserve.name}
-        </Txt>
-        {reserve.status !== 'ativa' ? (
-          <View style={styles.pill}>
-            <Txt variant="caption" color={colors.textOnAccent} style={{ fontFamily: fonts.bold }}>
-              {GOAL_STATUS_LABEL[reserve.status]}
-            </Txt>
-          </View>
-        ) : null}
-      </View>
-      <MoneyTxt color={colors.textOnBrand} style={[tabular, styles.amounts]}>
+      )}
+      <Txt variant="title" color={fg} style={{ flex: 1 }} accessibilityRole="header" aria-level={2}>
+        {reserve.name}
+      </Txt>
+      {reserve.status !== 'ativa' ? (
+        <View style={styles.pill}>
+          <Txt variant="caption" color={colors.textOnAccent} style={{ fontFamily: fonts.bold }}>
+            {GOAL_STATUS_LABEL[reserve.status]}
+          </Txt>
+        </View>
+      ) : null}
+    </View>
+  );
+  const value = (
+    <View style={styles.group}>
+      <MoneyTxt color={fg} style={[tabular, styles.amounts]}>
         {t.amounts}
       </MoneyTxt>
-      <GoalProgress percent={plan.progress.barPercent} tone="onBrand" label={t.a11yLabel} valueText={`${t.amounts}, ${t.percent}`} />
+      <GoalProgress percent={plan.progress.barPercent} tone={onCard ? 'light' : 'onBrand'} label={t.a11yLabel} valueText={`${t.amounts}, ${t.percent}`} />
       <View style={styles.percentRow}>
-        <Txt color={colors.textOnBrand} style={[tabular, { fontFamily: fonts.extrabold }]}>
+        <Txt color={fg} style={[tabular, { fontFamily: fonts.extrabold }]}>
           {t.percent}
         </Txt>
         {plan.progress.reached ? (
@@ -111,33 +135,75 @@ export function ReserveCard({
           </View>
         ) : null}
       </View>
+    </View>
+  );
+  // A nota do arredondamento fica no card (CL-09), logo abaixo do que ela explica: o percentual e os meses cobertos.
+  const facts = (
+    <View style={styles.facts}>
       {coverage ? (
-        <MoneyTxt variant="label" color={colors.textOnBrand}>
+        <MoneyTxt variant="label" color={fg}>
           {coverage}
         </MoneyTxt>
       ) : null}
+      <Txt variant="caption" color={soft}>
+        {t.rounding}
+      </Txt>
       {pace ? (
-        <MoneyTxt variant="label" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }}>
+        <MoneyTxt variant="label" color={fg} style={{ fontFamily: fonts.bold, marginTop: space[1] }}>
           {GOALS_TEXT.pace.line(pace)}
         </MoneyTxt>
       ) : null}
-      {uncounted ? <UncountedLinkedLine summary={uncounted} onBrand onSee={() => openLinked(reserve.id)} /> : null}
-      <Txt variant="caption" color={colors.textOnBrandSoft}>
-        {t.rounding}
-      </Txt>
+      {uncounted ? <UncountedLinkedLine summary={uncounted} onBrand={!onCard} onSee={() => openLinked(reserve.id)} /> : null}
       {!compact && t.planned ? (
-        <MoneyTxt variant="label" color={colors.textOnBrandSoft}>
+        <MoneyTxt variant="label" color={soft}>
           {t.planned}
         </MoneyTxt>
       ) : null}
+    </View>
+  );
+  const deposit = () => router.push({ pathname: '/meta/[id]/movimento', params: { id: reserve.id, tipo: 'aporte' } });
+  const details = () => router.push({ pathname: '/meta/[id]', params: { id: reserve.id } });
+  if (onCard) {
+    return (
+      <Card style={styles.light}>
+        {head}
+        <View style={styles.lightRow}>
+          <View style={styles.lightMain}>
+            {value}
+            {facts}
+          </View>
+          <View style={styles.lightSide}>
+            {planMonthlyCents != null ? (
+              <View style={styles.lightPlan}>
+                <Txt variant="label" style={{ fontFamily: fonts.extrabold }} accessibilityRole="header" aria-level={3}>
+                  {SAVINGS_TEXT.planTitle}
+                </Txt>
+                <MoneyTxt variant="label">{SAVINGS_TEXT.planMonthly(planMonthlyCents)}</MoneyTxt>
+                <View style={styles.lightLinks}>
+                  <LinkButton label="Ver o plano" style={styles.inlineLink} onPress={() => router.push('/guardar')} />
+                  <LinkButton label={SAVINGS_TEXT.changeValue} style={styles.inlineLink} onPress={() => router.push({ pathname: '/guardar', params: { editar: '1' } })} />
+                </View>
+              </View>
+            ) : null}
+            <View style={styles.lightActions}>
+              <Button label={GOALS_TEXT.addDeposit} tone="soft" compact onPress={deposit} />
+              <Button label={GOALS_TEXT.seeDetails} tone="ghost" compact onPress={details} />
+            </View>
+            {planAction}
+          </View>
+        </View>
+      </Card>
+    );
+  }
+  return (
+    <View style={styles.blue}>
+      {head}
+      {value}
+      {facts}
       {planSlot}
       <View style={styles.actions}>
-        <Button
-          label={GOALS_TEXT.addDeposit}
-          tone="onBrandSoft"
-          onPress={() => router.push({ pathname: '/meta/[id]/movimento', params: { id: reserve.id, tipo: 'aporte' } })}
-        />
-        <Button label={GOALS_TEXT.seeDetails} tone="onBrand" onPress={() => router.push({ pathname: '/meta/[id]', params: { id: reserve.id } })} />
+        <Button label={GOALS_TEXT.addDeposit} tone="onBrandSoft" onPress={deposit} />
+        <Button label={GOALS_TEXT.seeDetails} tone="onBrand" onPress={details} />
       </View>
       {planAction}
     </View>
@@ -282,9 +348,23 @@ export function ClosedGoals({ goals }: { goals: readonly Goal[] }) {
 }
 
 const styles = StyleSheet.create({
-  blue: { backgroundColor: colors.brand, borderRadius: radius.lg, padding: space[5], gap: space[3] },
+  // Entre os grupos (título, valor, fatos, plano e ações), 16 px; dentro de um grupo, menos.
+  blue: { backgroundColor: colors.brand, borderRadius: radius.lg, padding: space[5], gap: space[4] },
   blueEmpty: { padding: space[4], gap: space[2] },
   blueHead: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
+  group: { gap: space[2] },
+  facts: { gap: space[1] },
+  headIcon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
+  // Computador: o cartão branco em duas colunas; a da direita com o plano num bloco claro e as duas ações, uma embaixo da outra (lado a
+  // lado, em 280 px, "Registrar aporte" quebrava em duas linhas).
+  light: { gap: space[4] },
+  lightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[6] },
+  lightMain: { flex: 1, minWidth: 0, gap: space[4] },
+  lightSide: { width: 280, gap: space[3] },
+  lightPlan: { backgroundColor: colors.background, borderRadius: radius.md, paddingHorizontal: space[4], paddingTop: space[3], paddingBottom: space[1], gap: space[1] },
+  lightLinks: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space[5] },
+  inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  lightActions: { gap: space[1] },
   amounts: { fontFamily: fonts.extrabold, fontSize: 20, lineHeight: 28 },
   percentRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   pill: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: 2 },

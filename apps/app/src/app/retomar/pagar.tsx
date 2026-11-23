@@ -39,10 +39,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccountPicker } from '@/components/account-picker';
 import { ConfirmDialog } from '@/components/dialog';
+import { useWideFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
 import { PayRowError, codeOf, isConflict, isUncertain, openRowFrom, returnSession, useReturnWriter } from '@/components/retorno-acoes';
 import { ErrorState, LoadingState } from '@/components/states';
+import { seriesStyles } from '@/components/series-parts';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt } from '@/components/ui';
 import { UnsavedChangesText } from '@/components/context-text';
@@ -107,6 +109,8 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: WorkSp
   const { today } = useSession();
   const repo = useRepo();
   const insets = useSafeAreaInsets();
+  // Computador, fora do painel: o rodapé segue a coluna dos cartões (revisão de 23/11/2026).
+  const wideFooter = useWideFooter();
   const navigation = useNavigation();
   const writer = useReturnWriter();
   const lastAccount = useLastAccount();
@@ -356,8 +360,8 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: WorkSp
         <LinkButton label="Como o pagamento entra no mês?" color={colors.textSecondary} onPress={() => router.push(explanationHref('realizado-previsto'))} />
       </Screen>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
-        <View style={styles.footerInner}>
+      <View style={[styles.footer, wideFooter && seriesStyles.footerWide, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
+        <View style={[styles.footerInner, wideFooter && seriesStyles.footerInnerWide]}>
           {banner ? (
             <Banner tone="erro" icon={AlertCircle}>
               <Txt variant="label" color={colors.error}>
@@ -365,14 +369,14 @@ function PaymentForRow({ row, space: personal }: { row: ReviewRow; space: WorkSp
               </Txt>
             </Banner>
           ) : null}
-          <View style={styles.footerRow}>
+          <View style={[styles.footerRow, wideFooter && seriesStyles.footerRowWide]}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
             <Button
               label={partial ? RETURN_TEXT.saveAgain : RETURN_TEXT.savePayment}
               busy={busy}
               busyLabel="Salvando…"
               onPress={submit}
-              style={styles.save}
+              style={wideFooter ? seriesStyles.saveWide : styles.save}
             />
           </View>
         </View>

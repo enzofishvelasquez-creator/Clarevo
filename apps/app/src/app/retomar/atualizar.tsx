@@ -54,7 +54,8 @@ import {
   type RowOutcome,
 } from '@/components/retorno-acoes';
 import { ReturnRow, rowLayout } from '@/components/retorno-linha';
-import { yearA11y, yearA11yLabel } from '@/components/series-parts';
+import { useWideFooter } from '@/components/form-footer';
+import { seriesStyles, yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Banner, Button, Card, Chip, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { announceOnIOS } from '@/lib/a11y';
@@ -116,6 +117,8 @@ export default function AtualizarMeses() {
   const repo = useRepo();
   const qc = useQueryClient();
   const insets = useSafeAreaInsets();
+  // Computador, fora do painel: o rodapé segue a coluna dos cartões (revisão de 23/11/2026).
+  const wideFooter = useWideFooter();
   const navigation = useNavigation();
   const personal = useWork().data;
   const ctx = personal?.contextId;
@@ -693,8 +696,8 @@ export default function AtualizarMeses() {
 
       {session && step ? (
         // Rodapé fixo: o lote e o próximo passo ficam sempre visíveis, com o resultado logo acima (anunciado uma vez).
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
-          <View style={styles.footerInner}>
+        <View style={[styles.footer, wideFooter && seriesStyles.footerWide, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
+          <View style={[styles.footerInner, wideFooter && seriesStyles.footerInnerWide]}>
             {resultBanner}
             {chosen.length > 0 ? (
               <Button

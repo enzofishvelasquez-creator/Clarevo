@@ -13,12 +13,12 @@ import {
   type LookalikeRecord,
   type ReceiptDraft,
 } from '@clarevo/core';
-import { FileText, Info, QrCode } from 'lucide-react-native';
+import { ArrowLeftRight, FileText, Info, QrCode } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { MoneyTxt } from '@/components/money-text';
 import { SefazStatus } from '@/components/receipt-scan';
-import { Banner, Button, LinkButton, Txt } from '@/components/ui';
+import { Banner, LinkButton, Txt } from '@/components/ui';
 import { colors, fonts, space } from '@/theme/tokens';
 
 export type SefazState = 'idle' | 'reading' | 'done' | 'failed';
@@ -137,7 +137,9 @@ export function ProofBlock({
       {mismatch ? (
         <>
           <Txt variant="label">{mismatch.text}</Txt>
-          <Button label={mismatch.action} onPress={onSwitch} />
+          {/* Trocar de tipo tem um só desenho, o link com as setas (revisão de 23/11/2026: aqui era um botão cheio, um segundo principal
+              ao lado de "Salvar"; na nota de serviço, um link). */}
+          <LinkButton label={mismatch.action} icon={ArrowLeftRight} style={linkStyle} onPress={onSwitch} />
         </>
       ) : (
         <>
@@ -149,6 +151,7 @@ export function ProofBlock({
               <Txt variant="label">{gaps.side}</Txt>
               <LinkButton
                 label={draft.direction === 'entrada' ? COMPROVANTE_TEXT.switchToExpense : COMPROVANTE_TEXT.switchToIncome}
+                icon={ArrowLeftRight}
                 style={linkStyle}
                 onPress={onSwitch}
               />

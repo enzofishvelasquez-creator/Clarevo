@@ -11273,12 +11273,15 @@ setInterval(async () => {
   ok('Evolução T01: "Pago" e "3 meses" marcados ao abrir (só setembro e outubro têm registros), com "Recebido", "6 meses" e "12 meses" ao lado, em dois grupos ("Valor" e "Período")', (await radio('Pago').getAttribute('aria-checked')) === 'true' && (await radio('3 meses').getAttribute('aria-checked')) === 'true' &&
     (await radio('Recebido').getAttribute('aria-checked')) === 'false' && (await radio('6 meses').getAttribute('aria-checked')) === 'false' && (await radio('12 meses').getAttribute('aria-checked')) === 'false' &&
     names.length === 3 && names[0] === 'Agosto de 2026, sem registros, fora da comparação' && (await p.getByRole('radiogroup').filter({ visible: true }).count()) >= 2, JSON.stringify(names));
-  // Os controles: o valor em duas linhas de dois e o período numa linha só (no lugar dos 9 chips em 4 linhas).
+  // Os controles: o valor em duas linhas de dois e o período numa linha só (no lugar dos 9 chips em 4 linhas). Revisão de 23/11/2026: no
+  // celular o período mostra só o número ("3", com o nome "3 meses"), sob a legenda "Meses mostrados", e nenhuma palavra quebra no meio.
   const evCtl = await p.evaluate(() => {
-    const tops = (re) => [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0 && re.test(e.textContent || '')).map((e) => Math.round(e.getBoundingClientRect().top));
-    return { metric: [...new Set(tops(/^(Recebido|Pago|Renda comprometida|Guardado em metas)$/))].length, window: [...new Set(tops(/^\d+ meses$/))].length };
+    const name = (e) => e.getAttribute('aria-label') || e.textContent || '';
+    const tops = (re) => [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0 && re.test(name(e))).map((e) => Math.round(e.getBoundingClientRect().top));
+    const windows = [...document.querySelectorAll('[role=radio]')].filter((e) => e.getBoundingClientRect().width > 0 && /^\d+ meses$/.test(name(e)));
+    return { metric: [...new Set(tops(/^(Recebido|Pago|Renda comprometida|Guardado em metas)$/))].length, window: [...new Set(tops(/^\d+ meses$/))].length, shown: windows.map((e) => e.textContent).join(','), lines: Math.max(...windows.map((e) => Math.round(e.getBoundingClientRect().height))) };
   });
-  ok('Evolução controles (auditoria de 18/11/2026): o valor em 2 linhas e o período em 1 linha', evCtl.metric === 2 && evCtl.window === 1, JSON.stringify(evCtl));
+  ok('Evolução controles (auditoria de 18/11/2026): o valor em 2 linhas e o período em 1 linha, com os números "3,6,12,24,36" à vista, sem quebra (44 px de altura)', evCtl.metric === 2 && evCtl.window === 1 && evCtl.shown === '3,6,12,24,36' && evCtl.lines === 44 && (await body()).includes('Meses mostrados'), JSON.stringify(evCtl));
   await radio('6 meses').click(); await p.waitForTimeout(700);
   t = await evKeep();
   names = await evNames();
@@ -11521,7 +11524,7 @@ setInterval(async () => {
     t.includes('Média dos meses na comparação\nR$ 5.060,00\n5 de 5 meses') && t.includes('Mediana dos meses na comparação\nR$ 5.000,00\n5 de 5 meses') && t.includes('Total dos meses exibidos\nR$ 25.300,00') && t.includes('Recebido por mês'), JSON.stringify(names.slice(2, 8)));
   await evPick('Março');
   t = await evKeep();
-  ok('Evolução T10: março em Recebido: "Sem registros: mês sem anotação não quer dizer mês sem recebimentos", sem valor, sem R$ 0,00, sem interruptor, sem variação e sem "Ver lançamentos" nem categorias', t.includes('Março de 2026\nRecebido\nSem registros\nSem registros: mês sem anotação não quer dizer mês sem recebimentos') &&
+  ok('Evolução T10: março em Recebido: "Sem registros" e, sem repetir o estado, "Mês sem anotação não quer dizer mês sem recebimentos", sem valor, sem R$ 0,00, sem interruptor, sem variação e sem "Ver lançamentos" nem categorias', t.includes('Março de 2026\nRecebido\nSem registros\nMês sem anotação não quer dizer mês sem recebimentos') &&
     t.includes('Este mês fica fora da comparação porque não tem registros.') && t.includes('Variação não disponível: mês sem registros.') && !t.includes('R$ 0,00') && (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0 &&
     (await visibleCount('button', 'Ver lançamentos')) === 0 && !t.includes('Maiores categorias do mês') && (await evMark('Março')).kind === 'escolhido_traco', t.slice(700, 1300));
   await evShots('452_evolucao_recebido_sem_registros', { scroll: evScroll('Março de 2026') });
@@ -12758,9 +12761,9 @@ setInterval(async () => {
   const duLabels = {};
   for (const d of ['Escola (exemplo)', 'Oficina (exemplo)', 'Seguro da casa (exemplo)', 'Taxa do clube (exemplo)', 'Conta antiga (exemplo)']) duLabels[d] = await duRowLabel(d);
   t = await body();
-  ok('Dia útil, lista (D-061): domingo 11/10, feriado 12/10 e sábado 17/10 aparecem como "Vence terça, 13/10 (próximo dia útil)" (as duas primeiras) e "Vence segunda, 19/10 (próximo dia útil)", com o sinal "Não é dia útil · vencimento anotado: ..."',
-    t.includes('Vence terça, 13/10 (próximo dia útil)') && t.includes('Vence segunda, 19/10 (próximo dia útil)') && t.includes('Não é dia útil · vencimento anotado: domingo, 11/10') && t.includes('Não é dia útil · vencimento anotado: segunda, 12/10') &&
-    t.includes('Não é dia útil · vencimento anotado: sábado, 17/10') && duOct.filter((r) => /dia útil/.test(r)).length === 3 && (await duNotices()).filter((x) => /, (11|12|17)\/10$/.test(x)).length === 3, JSON.stringify(duOct));
+  ok('Dia útil, lista (D-061): domingo 11/10, feriado 12/10 e sábado 17/10 aparecem como "Vence terça, 13/10 (próximo dia útil)" (as duas primeiras) e "Vence segunda, 19/10 (próximo dia útil)", com o sinal curto "Não é dia útil" (revisão de 23/11/2026: a data anotada fica no aviso da conta e no nome acessível da linha)',
+    t.includes('Vence terça, 13/10 (próximo dia útil)') && t.includes('Vence segunda, 19/10 (próximo dia útil)') && !t.includes('vencimento anotado:') &&
+    duOct.filter((r) => /dia útil/.test(r)).length === 3 && (await duNotices()).filter((x) => x === 'Não é dia útil').length === 3, JSON.stringify(duOct));
   ok('Dia útil, lista: a ordem segue a data anotada (Escola 11/10, Oficina 12/10, Taxa do clube 14/10, Internet 15/10, Seguro da casa 17/10 e Condomínio 20/10), e o nome acessível diz "vence terça, 13/10 (próximo dia útil)" e "vencimento anotado domingo, 11/10"',
     JSON.stringify(duOct.filter((r) => !/^Já paguei/.test(r)).map((r) => r.split(',')[0])) === JSON.stringify(['Escola (exemplo)', 'Oficina (exemplo)', 'Taxa do clube (exemplo)', 'Internet', 'Seguro da casa (exemplo)', 'Condomínio']) &&
     /^Escola \(exemplo\), vence terça, 13\/10 \(próximo dia útil\), .*, não é dia útil, vencimento anotado domingo, 11\/10$/.test(duLabels['Escola (exemplo)'] ?? '') &&
@@ -12844,10 +12847,10 @@ setInterval(async () => {
   await btn('Ver gasto fixo').click(); await waitText('Próximas contas'); await p.waitForTimeout(600);
   t = await body();
   const duFixoRows = await p.evaluate(() => [...document.querySelectorAll('[aria-label]')].filter((e) => e.getBoundingClientRect().width > 0 && /^Clube de leitura \(exemplo\), /.test(e.getAttribute('aria-label'))).map((e) => e.getAttribute('aria-label')));
-  ok('Dia útil, detalhe do gasto fixo (D-061): a conta de 12/10 (feriado) e a prevista de 12/12 (sábado) levam o sinal "vencimento anotado" e o próximo dia útil (terça, 13/10 e segunda, 14/12); as de 12/11 e 12/01 (dias úteis), não',
-    t.includes('Não é dia útil · vencimento anotado: segunda, 12/10') && t.includes('Não é dia útil · vencimento anotado: sábado, 12/12') && t.includes('Vence terça, 13/10 (próximo dia útil)') && t.includes('Prevista · vence segunda, 14/12 (próximo dia útil)') &&
-    (await duNotices()).length === 2 && duFixoRows.length >= 3 && duFixoRows.filter((l) => /não é dia útil/.test(l)).length === 2, JSON.stringify(duFixoRows) + t.slice(0, 600));
-  ok('Dia útil, detalhe do gasto fixo: a data anotada segue 12/12/2026 no sinal, e a conta de 12/11 (quinta) fica sem sinal e sem a etiqueta', t.includes('vencimento anotado: sábado, 12/12') && duFixoRows.filter((l) => /vence em 12\/11/.test(l)).length === 1 && !duFixoRows.some((l) => /vence em 12\/11/.test(l) && /dia útil/.test(l)), t.slice(0, 800));
+  ok('Dia útil, detalhe do gasto fixo (D-061): a conta de 12/10 (feriado) e a prevista de 12/12 (sábado) levam o sinal curto "Não é dia útil" (a data anotada no nome acessível) e o próximo dia útil (terça, 13/10 e segunda, 14/12); as de 12/11 e 12/01 (dias úteis), não',
+    t.includes('Vence terça, 13/10 (próximo dia útil)') && t.includes('Prevista · vence segunda, 14/12 (próximo dia útil)') && !t.includes('vencimento anotado:') &&
+    JSON.stringify(await duNotices()) === JSON.stringify(['Não é dia útil', 'Não é dia útil']) && duFixoRows.length >= 3 && duFixoRows.filter((l) => /não é dia útil, vencimento anotado (segunda, 12\/10|sábado, 12\/12)$/.test(l)).length === 2, JSON.stringify(duFixoRows) + t.slice(0, 600));
+  ok('Dia útil, detalhe do gasto fixo: a data anotada segue 12/12/2026 no sinal (nome acessível), e a conta de 12/11 (quinta) fica sem sinal e sem a etiqueta', duFixoRows.some((l) => /vencimento anotado sábado, 12\/12$/.test(l)) && duFixoRows.filter((l) => /vence em 12\/11/.test(l)).length === 1 && !duFixoRows.some((l) => /vence em 12\/11/.test(l) && /dia útil/.test(l)), t.slice(0, 800));
   await duKeep();
   await duShots('524_dia_util_gasto_fixo', duScroll('Próximas contas'));
   await duShots('529_dia_util_gasto_fixo_proximo_dia_util', duScroll('Próximas contas'));
@@ -12861,8 +12864,8 @@ setInterval(async () => {
   await p.getByRole('button', { name: /^Seguro do ano \(exemplo\), / }).filter({ visible: true }).first().click(); await waitText('Ano a ano'); await p.waitForTimeout(700);
   t = await body();
   const duAnoRows = await p.evaluate(() => [...document.querySelectorAll('[aria-label]')].filter((e) => e.getBoundingClientRect().width > 0 && /^Seguro do ano \(exemplo\), /.test(e.getAttribute('aria-label') || '')).map((e) => e.getAttribute('aria-label')));
-  ok('Dia útil, conta do ano (25/12/2026, sexta e Natal; D-061, sem a tolerância): "Ano a ano" mostra o sinal "Não é dia útil · confira a data no carnê ou no site do órgão", sem "próximo dia útil", e a conta segue vencendo em 25/12',
-    t.includes('Não é dia útil · confira a data no carnê ou no site do órgão') && !t.includes('próximo dia útil: segunda, 28/12') && (await duNotices()).length === 1 &&
+  ok('Dia útil, conta do ano (25/12/2026, sexta e Natal; D-061, sem a tolerância): "Ano a ano" mostra o sinal curto "Não é dia útil" (o "confira a data no carnê" fica no nome acessível e no aviso da conta), sem "próximo dia útil", e a conta segue vencendo em 25/12',
+    !t.includes('Não é dia útil · confira') && !t.includes('próximo dia útil: segunda, 28/12') && JSON.stringify(await duNotices()) === JSON.stringify(['Não é dia útil']) &&
     duAnoRows.some((l) => /25\/12/.test(l) && /não é dia útil, confira a data no carnê ou no site do órgão$/.test(l) && !/próximo dia útil/.test(l)), JSON.stringify(duAnoRows) + t.slice(0, 700));
   await duKeep();
   await duShots('525_dia_util_conta_do_ano', duScroll('Ano a ano'));
@@ -12951,8 +12954,8 @@ setInterval(async () => {
   ok('Mês conferido, Evolução antes de conferir: sem marca, a média é R$ 4.125,00 e a mediana R$ 3.425,00, "6 de 6 meses", e o total R$ 24.750,00', t.includes('Média dos meses na comparação\nR$ 4.125,00\n6 de 6 meses') && t.includes('Mediana dos meses na comparação\nR$ 3.425,00\n6 de 6 meses') && mcTotalBefore === 'R$ 24.750,00', t.slice(0, 900));
   await evPick('Setembro');
   t = await mcKeep();
-  ok('Mês conferido, painel de setembro (Pago): "Sem registros: mês sem anotação não quer dizer mês sem gastos", o botão "Conferi: não houve pagamentos em setembro de 2026" e a nota "Não muda nenhum valor e você pode desfazer."',
-    t.includes('Setembro de 2026\nPago\nSem registros\nSem registros: mês sem anotação não quer dizer mês sem gastos') && (await visibleCount('button', 'Conferi: não houve pagamentos em setembro de 2026')) === 1 && t.includes('Não muda nenhum valor e você pode desfazer.') && !t.includes('Você conferiu'), t.slice(600, 1300));
+  ok('Mês conferido, painel de setembro (Pago): "Sem registros" e "Mês sem anotação não quer dizer mês sem gastos", o botão "Conferi: não houve pagamentos em setembro de 2026" e a nota "Não muda nenhum valor e você pode desfazer."',
+    t.includes('Setembro de 2026\nPago\nSem registros\nMês sem anotação não quer dizer mês sem gastos') && (await visibleCount('button', 'Conferi: não houve pagamentos em setembro de 2026')) === 1 && t.includes('Não muda nenhum valor e você pode desfazer.') && !t.includes('Você conferiu'), t.slice(600, 1300));
   ok('Mês conferido: o ponto de setembro é "sem registros" (um traço, nunca um ponto em zero) e fora da comparação', (await evNames())[10] === 'Setembro de 2026, sem registros, fora da comparação' && (await evMark('Setembro')).kind === 'escolhido_traco', JSON.stringify(await evMark('Setembro')));
   // Só o mês fechado sem registros do tipo tem o botão: abril tem registros, outubro (o mês atual) ainda não terminou, novembro de 2025 sim.
   await evPick('Abril');
@@ -12971,7 +12974,7 @@ setInterval(async () => {
   let mcNames = await evNames();
   ok('Mês conferido, Evolução depois de conferir: o nome do ponto diz "Setembro de 2026, R$ 0,00, conferido, na comparação" e o ponto entra na comparação', mcNames[10] === 'Setembro de 2026, R$ 0,00, conferido, na comparação' && (await evMark('Setembro')).kind === 'escolhido', JSON.stringify(mcNames.slice(8)));
   ok('Mês conferido, painel: "R$ 0,00", a frase "Você conferiu: não houve pagamentos em setembro de 2026." e "Desfazer a conferência", sem o botão de conferir nem a frase de mês sem anotação', t.includes('Setembro de 2026\nPago\nR$ 0,00\nVocê conferiu: não houve pagamentos em setembro de 2026.') &&
-    (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1 && (await mcConferiBtns()) === 0 && !t.includes('Sem registros: mês sem anotação'), t.slice(600, 1300));
+    (await visibleCount('button', 'Desfazer a conferência: não houve pagamentos em setembro de 2026')) === 1 && (await mcConferiBtns()) === 0 && !t.includes('Sem registros\nMês sem anotação não quer dizer'), t.slice(600, 1300));
   ok('Mês conferido: o zero entra nas médias como zero (média R$ 3.535,71, mediana R$ 3.400,00, "7 de 7 meses"), e o total dos meses exibidos não muda (R$ 24.750,00)', t.includes('Média dos meses na comparação\nR$ 3.535,71\n7 de 7 meses') &&
     t.includes('Mediana dos meses na comparação\nR$ 3.400,00\n7 de 7 meses') && t.includes('Total dos meses exibidos\nR$ 24.750,00') && !t.includes('Comparação personalizada'), t.slice(1200, 2200));
   ok('Mês conferido: o painel mostra o interruptor "Mostrar este mês na comparação" ligado, a variação até o zero ("De agosto para setembro" não existe: agosto está sem registros; o mês de comparação é junho) e nenhuma categoria nem "Entender o que mudou"',
@@ -13005,7 +13008,7 @@ setInterval(async () => {
   await radio('Recebido').click(); await p.waitForTimeout(700);
   await evPick('Setembro');
   t = await mcKeep();
-  ok('Mês conferido, Recebido: a marca de Pago não vale em Recebido (dois tipos separados); o painel de setembro pede "Conferi: não houve recebimentos em setembro de 2026"', (await evNames())[10] === 'Setembro de 2026, sem registros, fora da comparação' && t.includes('Sem registros: mês sem anotação não quer dizer mês sem recebimentos') &&
+  ok('Mês conferido, Recebido: a marca de Pago não vale em Recebido (dois tipos separados); o painel de setembro pede "Conferi: não houve recebimentos em setembro de 2026"', (await evNames())[10] === 'Setembro de 2026, sem registros, fora da comparação' && t.includes('Sem registros\nMês sem anotação não quer dizer mês sem recebimentos') &&
     (await visibleCount('button', 'Conferi: não houve recebimentos em setembro de 2026')) === 1 && (await visibleCount('button', /^Desfazer a conferência/)) === 0 && !t.includes('Você conferiu'), t.slice(500, 1200));
   await btn('Conferi: não houve recebimentos em setembro de 2026').click(); await waitText('Você conferiu: não houve recebimentos em setembro de 2026.'); await p.waitForTimeout(600);
   ok('Mês conferido, Recebido: depois de conferir, o ponto de Recebido também é "R$ 0,00, conferido" e a marca de Pago segue', (await evNames())[10] === 'Setembro de 2026, R$ 0,00, conferido, na comparação' && (await mcMarks(['2026-09', '2026-09'])) === '2026-09:RP');
@@ -13424,8 +13427,8 @@ setInterval(async () => {
   // Renda variável (D-062 item 2, Ciclo V): "Calcular pela média" no formulário da renda de referência. Para quem a renda muda de um mês para
   // o outro, a média do Recebido dos últimos 3 ou 6 meses fechados (months_overview do contexto escolhido, com a conta exata da Evolução):
   // entra o mês com recebimentos, sem reembolsos (D-026), e o mês conferido como zero (D-060); ficam de fora o mês atual e os meses sem registros. O resultado diz
-  // quais meses entraram ("Média de abril a junho: R$ 5.100,00") e quantos ("Meses usados: 3 de 6, julho, agosto e setembro sem registros
-  // ficaram de fora"), traz o aviso de estimativa e SÓ preenche o campo: quem grava é a pessoa, pela mesma set_income_reference. Sem nenhum
+  // quais meses entraram ("Média de abril a junho: R$ 5.100,00") e quantos ("Meses usados: 3 de 6. Julho, agosto e setembro ficaram de
+  // fora porque não têm registros."), traz o aviso de estimativa e SÓ preenche o campo: quem grava é a pessoa, pela mesma set_income_reference. Sem nenhum
   // mês fechado com recebimentos, o botão explica que precisa de pelo menos um. Aqui, na versão web (memória): (1) a demonstração padrão
   // (só setembro tem Recebido, R$ 6.000,00), com 3 e 6 meses e o salvar; (2) o cenário "evolucao" (abril a junho com R$ 5.200,00, 5.000,00 e
   // 5.100,00): sem mês em 3 meses, 3 de 6 em 6 meses, julho conferido como zero (4 de 6, R$ 3.825,00) e o descarte sem gravar; (3) conta
@@ -13474,7 +13477,7 @@ setInterval(async () => {
   await rvShots('550_renda_variavel_formulario');
   await field('Valor por mês').fill('1234'); await p.waitForTimeout(200);
   t = await rvCalc(3, 'Meses usados: 1 de 3');
-  ok('Renda variável, 3 meses (demonstração): "Média de setembro: R$ 6.000,00" e "Meses usados: 1 de 3, julho e agosto sem registros ficaram de fora"', t.includes('Média de setembro: R$ 6.000,00') && t.includes('Meses usados: 1 de 3, julho e agosto sem registros ficaram de fora'), t.slice(900, 1800));
+  ok('Renda variável, 3 meses (demonstração): "Média de setembro: R$ 6.000,00" e "Meses usados: 1 de 3. Julho e agosto ficaram de fora porque não têm registros."', t.includes('Média de setembro: R$ 6.000,00') && t.includes('Meses usados: 1 de 3. Julho e agosto ficaram de fora porque não têm registros.'), t.slice(900, 1800));
   ok('Renda variável: o resultado traz o aviso de estimativa e que o valor só é salvo quando a pessoa toca em salvar, sem aviso de que reembolsos entram na conta', t.includes(RV_NOTICE) && t.includes(RV_FILLED) && RV_NO_BASIS(t), t.slice(900, 1900));
   ok('Renda variável: o valor digitado (1234) foi trocado pela média no campo (R$ 6.000,00), mas nada foi gravado: nenhuma escrita no repositório nem na rede', (await rvAmount()) === '6.000,00' && JSON.stringify(await rvCalls(rvCalls0)) === '[]' && writes.length === rvWrites0, JSON.stringify(await rvCalls(rvCalls0)));
   ok('Renda variável: o resultado é dito uma vez ao leitor de tela (região viva) e o botão volta a "Calcular pela média"', (await evLive()).some((x) => x.includes('Média de setembro: R$ 6.000,00')) && (await visibleCount('button', 'Calcular pela média')) === 1);
@@ -13484,8 +13487,8 @@ setInterval(async () => {
   t = await body();
   ok('Renda variável: ao trocar a escolha, o resultado antigo some, "Últimos 6 meses" fica marcado e o campo não muda', !t.includes('Meses usados') && !t.includes('Média de setembro') && (await rvChecked(6)) === 'true' && (await rvChecked(3)) === 'false' && (await rvAmount()) === '6.000,00');
   t = await rvCalc(6, 'Meses usados: 1 de 6');
-  ok('Renda variável, 6 meses (demonstração): "Média de setembro: R$ 6.000,00" e "Meses usados: 1 de 6, abril, maio, junho, julho e agosto sem registros ficaram de fora"', t.includes('Média de setembro: R$ 6.000,00') &&
-    t.includes('Meses usados: 1 de 6, abril, maio, junho, julho e agosto sem registros ficaram de fora'), t.slice(900, 1800));
+  ok('Renda variável, 6 meses (demonstração): "Média de setembro: R$ 6.000,00" e "Meses usados: 1 de 6. Abril, maio, junho, julho e agosto ficaram de fora porque não têm registros."', t.includes('Média de setembro: R$ 6.000,00') &&
+    t.includes('Meses usados: 1 de 6. Abril, maio, junho, julho e agosto ficaram de fora porque não têm registros.'), t.slice(900, 1800));
   await rvShots('552_renda_variavel_6_meses');
   // Salvar é da pessoa: a mesma set_income_reference de sempre, e o percentual de outubro segue 52,5% (6.000,00 contra 6.000,00).
   await btn('Salvar renda de referência').click(); await waitText('Renda de referência salva. Ela vale a partir de outubro.'); await waitText('52,5%'); await p.waitForTimeout(400);
@@ -13507,8 +13510,8 @@ setInterval(async () => {
   ok('Renda variável, sem mês: nenhuma escrita, e o resultado vazio também é dito ao leitor de tela', JSON.stringify(await rvCalls(rvCalls1)) === '[]' && (await evLive()).some((x) => x.includes(RV_EMPTY_3)));
   await rvShots('553_renda_variavel_sem_meses');
   t = await rvCalc(6, 'Meses usados: 3 de 6');
-  ok('Renda variável, 6 meses (evolução): "Média de abril a junho: R$ 5.100,00" (R$ 5.200,00 + R$ 5.000,00 + R$ 5.100,00 ÷ 3), sem o reembolso de R$ 20.000,00 de maio, e "Meses usados: 3 de 6, julho, agosto e setembro sem registros ficaram de fora"', t.includes('Média de abril a junho: R$ 5.100,00') &&
-    t.includes('Meses usados: 3 de 6, julho, agosto e setembro sem registros ficaram de fora') && !t.includes('conferiu que não houve recebimentos.') && !t.includes('R$ 11.766,67') && RV_NO_BASIS(t), t.slice(900, 1800));
+  ok('Renda variável, 6 meses (evolução): "Média de abril a junho: R$ 5.100,00" (R$ 5.200,00 + R$ 5.000,00 + R$ 5.100,00 ÷ 3), sem o reembolso de R$ 20.000,00 de maio, e "Meses usados: 3 de 6. Julho, agosto e setembro ficaram de fora porque não têm registros."', t.includes('Média de abril a junho: R$ 5.100,00') &&
+    t.includes('Meses usados: 3 de 6. Julho, agosto e setembro ficaram de fora porque não têm registros.') && !t.includes('conferiu que não houve recebimentos.') && !t.includes('R$ 11.766,67') && RV_NO_BASIS(t), t.slice(900, 1800));
   ok('Renda variável (evolução): o campo ganha R$ 5.100,00, o aviso aparece e nada foi gravado', (await rvAmount()) === '5.100,00' && t.includes(RV_NOTICE) && JSON.stringify(await rvCalls(rvCalls1)) === '[]');
   await rvShots('554_renda_variavel_evolucao_6_meses');
   // Calcular não grava: sair descartando deixa a casa sem referência.
@@ -13519,8 +13522,8 @@ setInterval(async () => {
   const rvCalls2 = (await evSpyCalls()).length;
   await btn('Informar renda de referência').click(); await waitText('Valor por mês'); await p.waitForTimeout(600);
   t = await rvCalc(6, 'Meses usados: 4 de 6');
-  ok('Renda variável, julho conferido como zero: "Média de abril a julho: R$ 3.825,00" e "Meses usados: 4 de 6, agosto e setembro sem registros ficaram de fora"', t.includes('Média de abril a julho: R$ 3.825,00') &&
-    t.includes('Meses usados: 4 de 6, agosto e setembro sem registros ficaram de fora'), t.slice(900, 1900));
+  ok('Renda variável, julho conferido como zero: "Média de abril a julho: R$ 3.825,00" e "Meses usados: 4 de 6. Agosto e setembro ficaram de fora porque não têm registros."', t.includes('Média de abril a julho: R$ 3.825,00') &&
+    t.includes('Meses usados: 4 de 6. Agosto e setembro ficaram de fora porque não têm registros.'), t.slice(900, 1900));
   ok('Renda variável, julho conferido como zero: a frase "Julho entrou com R$ 0,00 porque você conferiu que não houve recebimentos." e o campo em R$ 3.825,00', t.includes('Julho entrou com R$ 0,00 porque você conferiu que não houve recebimentos.') && (await rvAmount()) === '3.825,00');
   await rvShots('555_renda_variavel_mes_conferido');
   // Só o mês conferido como zero não dá média: a referência precisa ser maior que zero, e o campo não muda.
@@ -13571,7 +13574,7 @@ setInterval(async () => {
   await famTab('Ver dados de Pessoal').click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
   await rvOpenForm();
   t = await rvCalc(3, 'Meses usados: 1 de 3');
-  ok('Renda variável, Pessoal da mesma pessoa: "Média de setembro: R$ 1.000,00", só o Pessoal, sem misturar com a Família', t.includes('Média de setembro: R$ 1.000,00') && t.includes('Meses usados: 1 de 3, julho e agosto sem registros ficaram de fora') && !t.includes('R$ 9.000,00') && (await rvAmount()) === '1.000,00', t.slice(900, 1800));
+  ok('Renda variável, Pessoal da mesma pessoa: "Média de setembro: R$ 1.000,00", só o Pessoal, sem misturar com a Família', t.includes('Média de setembro: R$ 1.000,00') && t.includes('Meses usados: 1 de 3. Julho e agosto ficaram de fora porque não têm registros.') && !t.includes('R$ 9.000,00') && (await rvAmount()) === '1.000,00', t.slice(900, 1800));
   await btn('Voltar').click(); await waitText('Descartar o preenchimento?'); await confirmIn('Descartar alterações'); await waitText('Informar renda de referência'); await p.waitForTimeout(400);
   ok('Renda variável: calcular na Família e no Pessoal não gravou nenhuma referência', (await otherDevice(async (repo, ctx) => `${(await repo.listIncomeReferences(ctx)).length} ${(await repo.listIncomeReferences((await repo.getFamily()).context.id)).length}`)) === '0 0');
   await famGoResumo(); await famSignOut();
@@ -13947,12 +13950,12 @@ setInterval(async () => {
   await evShots('573_evolucao_f3_comprometida');
   await evPick('Maio');
   t = await f3Keep();
-  ok('Evolução fase 3, painel de maio: "Sem base" no lugar do valor, o motivo, sem interruptor e a frase de que fica fora da comparação', t.includes('Maio de 2026\nRenda comprometida\nSem base\nSem base: não há renda de referência para este mês') &&
+  ok('Evolução fase 3, painel de maio: "Sem base" no lugar do valor, o motivo, sem interruptor e a frase de que fica fora da comparação', t.includes('Maio de 2026\nRenda comprometida\nSem base\nNão há renda de referência para este mês') &&
     t.includes('Este mês fica fora da comparação porque não há renda de referência para ele.') && (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0 && (await evMark('Maio')).kind === 'escolhido_traco' && !/Maio de 2026\nRenda comprometida\n[\d,]+%/.test(t), t.slice(900, 1500));
   await evShots('574_evolucao_f3_comprometida_sem_base', { scroll: evScroll('Maio de 2026') });
   await evPick('Outubro');
   t = await f3Keep();
-  ok('Evolução fase 3, painel de outubro (mês em andamento): "Mês em andamento", "Só meses já fechados", sem valor (nem o das contas que ele já tem), sem interruptor', t.includes('Outubro de 2026\nRenda comprometida\nMês em andamento\nMês em andamento: só meses já fechados entram aqui') && t.includes('Este mês fica fora da comparação até terminar.') &&
+  ok('Evolução fase 3, painel de outubro (mês em andamento): "Mês em andamento", "Só meses já fechados", sem valor (nem o das contas que ele já tem), sem interruptor', t.includes('Outubro de 2026\nRenda comprometida\nMês em andamento\nSó meses já fechados entram aqui') && t.includes('Este mês fica fora da comparação até terminar.') &&
     (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0 && !t.includes('52,5%') && (await evNames())[5] === 'Outubro de 2026, mês em andamento, fora da comparação');
   await evPick('Setembro');
   // A tabela equivalente.
@@ -14024,7 +14027,7 @@ setInterval(async () => {
   await evShots('579_evolucao_f3_guardado_zero', { scroll: evScroll('Agosto de 2026') });
   await evPick('Maio');
   t = await f3Keep();
-  ok('Evolução fase 3, painel de maio (sem registros): "Sem registros" no lugar do valor, "nenhuma meta criada até este mês", sem interruptor e sem R$ 0,00 no painel', t.includes('Maio de 2026\nGuardado em metas\nSem registros\nSem registros: nenhuma meta criada até este mês') && t.includes('Este mês fica fora da comparação porque não tem registros.') &&
+  ok('Evolução fase 3, painel de maio (sem registros): "Sem registros" no lugar do valor, "nenhuma meta criada até este mês", sem interruptor e sem R$ 0,00 no painel', t.includes('Maio de 2026\nGuardado em metas\nSem registros\nNenhuma meta criada até este mês') && t.includes('Este mês fica fora da comparação porque não tem registros.') &&
     (await visibleCount('switch', 'Mostrar este mês na comparação')) === 0 && !/Maio de 2026\nGuardado em metas\nR\$ 0,00/.test(t));
   // Julho fora da comparação: a média e a mediana mudam; o total, não.
   await evSet('Julho', false);
@@ -15653,7 +15656,7 @@ setInterval(async () => {
     // Uma tela cheia (Conta): o cabeçalho compacto também vira cartão.
     await p.getByRole('navigation').getByRole('link', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança', exact: true }).first().click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(600);
     const pdConta = await pdBand();
-    ok('Paridade 1280 px: em Conta, o cabeçalho com "Voltar" é um cartão azul com os quatro cantos de 20 px, afastado do alto e da barra lateral', pdConta !== null && pdConta.radii === '20px 20px 20px 20px' && pdConta.top >= 16 && pdConta.left >= 256 + 16, JSON.stringify(pdConta));
+    ok('Paridade 1280 px: em Conta (destino da barra lateral, sem a seta de voltar no computador), o cabeçalho é um cartão azul com os quatro cantos de 20 px, afastado do alto e da barra lateral', pdConta !== null && pdConta.radii === '20px 20px 20px 20px' && pdConta.top >= 16 && pdConta.left >= 256 + 16, JSON.stringify(pdConta));
     await layoutChecks('Paridade, Conta 1280px'); await shot('664_paridade_conta_1280');
     await p.getByRole('navigation').getByRole('link', { name: 'Resumo', exact: true }).first().click(); await waitText('Diferença do mês'); await p.waitForTimeout(500);
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(600);
@@ -16932,11 +16935,11 @@ setInterval(async () => {
     await ngTab(NG_TAB).click(); await p.waitForTimeout(600);
 
     // 4. Retirada para o Pessoal.
-    await btn('Retirada para o Pessoal').click(); await waitText('Sai de (conta do negócio)'); await p.waitForTimeout(500);
+    await btn('Retirada para o Pessoal').click(); await waitText('Sai do negócio: Conta do negócio'); await p.waitForTimeout(500);
     t = await ngKeep();
     ok('Negócio, retirada: o formulário diz o que é, com o valor, a data, a conta do negócio, a conta do Pessoal e a descrição opcional',
       (await h1Name()) === 'Retirada para o Pessoal' && t.includes('Para quando você leva dinheiro do negócio para o Pessoal. Sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.') &&
-        t.includes('Sai de (conta do negócio): Conta do negócio') && JSON.stringify(await ngChips('Entra em (conta do Pessoal)')) === JSON.stringify(['Conta principal', 'Carteira']) &&
+        t.includes('Sai do negócio: Conta do negócio') && JSON.stringify(await ngChips('Entra no Pessoal')) === JSON.stringify(['Conta principal', 'Carteira']) &&
         t.includes('Sem descrição, fica "Retirada para o Pessoal" no negócio e "Retirada de Sacolé da Maria" no Pessoal.'), t.slice(0, 900));
     await atWidths(async (w) => { await innerChecks(`Negócio, retirada ${w}px`); if (w === 390) await shot('732_negocio_retirada'); });
     await btn('Salvar retirada').click(); await p.waitForTimeout(400);

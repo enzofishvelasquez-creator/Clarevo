@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConfirmDialog } from '@/components/dialog';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt } from '@/components/money-text';
+import { useWideFooter } from '@/components/form-footer';
 import { seriesStyles as styles, yearA11y, yearA11yLabel } from '@/components/series-parts';
 import { ErrorState } from '@/components/states';
 import { SumValues } from '@/components/sum-values';
@@ -46,6 +47,8 @@ import { colors, fonts, space } from '@/theme/tokens';
 export function YearInformForm({ series: s, number, contextId }: { series: CommitmentSeries; number: number; contextId: string }) {
   const { today } = useSession();
   const insets = useSafeAreaInsets();
+  // Computador, fora do painel: o rodapé segue a coluna dos cartões (revisão de 23/11/2026).
+  const wideFooter = useWideFooter();
   const navigation = useNavigation();
   const inform = useInformSeriesYear();
   const keys = useSeriesOperationKey();
@@ -252,8 +255,8 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
         )}
       </Screen>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
-        <View style={styles.footerInner}>
+      <View style={[styles.footer, wideFooter && styles.footerWide, { paddingBottom: Math.max(insets.bottom, space[3]) }]}>
+        <View style={[styles.footerInner, wideFooter && styles.footerInnerWide]}>
           {banner ? (
             <Banner tone="erro" icon={AlertCircle}>
               <MoneyTxt variant="label" color={colors.error}>
@@ -261,7 +264,7 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
               </MoneyTxt>
             </Banner>
           ) : null}
-          <View style={styles.footerRow}>
+          <View style={[styles.footerRow, wideFooter && styles.footerRowWide]}>
             <Button label="Cancelar" tone="ghost" onPress={requestCancel} style={styles.cancel} />
             <Button
               label={retry ? 'Tentar de novo' : 'Informar valor'}
@@ -269,7 +272,7 @@ export function YearInformForm({ series: s, number, contextId }: { series: Commi
               busyLabel="Salvando…"
               disabled={!plan || (!plan.ok && !retry)}
               onPress={() => submit()}
-              style={styles.save}
+              style={wideFooter ? styles.saveWide : styles.save}
             />
           </View>
         </View>

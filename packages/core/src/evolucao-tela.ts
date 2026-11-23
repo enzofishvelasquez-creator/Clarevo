@@ -266,7 +266,8 @@ export const EVOLUTION_TEXT = {
       zero_confirmado: 'Conferido',
       em_andamento: 'Mês em andamento',
     },
-    noRecords: (metric: EvolutionMetric): string => `Sem registros: mês sem anotação não quer dizer mês sem ${THINGS[metric]}`,
+    /** Sob o título "Sem registros" do painel (que já diz o estado; revisão de 23/11/2026: o título e a frase repetiam "Sem registros"). */
+    noRecords: (metric: EvolutionMetric): string => `Mês sem anotação não quer dizer mês sem ${THINGS[metric]}`,
     switchLabel: 'Mostrar este mês na comparação',
     switchCaption: 'Tirar da comparação não apaga nem muda nenhum lançamento.',
     notEligible: {
@@ -375,19 +376,19 @@ export const EVOLUTION_TEXT = {
       guardado: 'Aportes menos resgates nas metas',
     } as Record<EvolutionPhase3Metric, string>,
     closedOnly: 'Só meses já fechados. O mês em andamento fica de fora e nada aqui é previsão.',
-    /** O que o painel diz do estado de cada mês. */
+    /** O que o painel diz do estado de cada mês. Sem valor, vem sob o título do estado ("Sem base", "Sem registros", "Mês em andamento"), sem repeti-lo. */
     state: {
       comprometida: {
         com_registros: 'Com contas no mês',
-        sem_base: 'Sem base: não há renda de referência para este mês',
-        sem_registros: 'Sem registros: mês sem conta anotada não quer dizer mês sem contas',
-        em_andamento: 'Mês em andamento: só meses já fechados entram aqui',
+        sem_base: 'Não há renda de referência para este mês',
+        sem_registros: 'Mês sem conta anotada não quer dizer mês sem contas',
+        em_andamento: 'Só meses já fechados entram aqui',
       },
       guardado: {
         com_registros: 'Com aportes ou resgates',
         zero_confirmado: 'Sem aportes nem resgates, com meta já criada neste mês',
-        sem_registros: 'Sem registros: nenhuma meta criada até este mês',
-        em_andamento: 'Mês em andamento: só meses já fechados entram aqui',
+        sem_registros: 'Nenhuma meta criada até este mês',
+        em_andamento: 'Só meses já fechados entram aqui',
       },
     },
     /** A coluna "Estado" da tabela. */

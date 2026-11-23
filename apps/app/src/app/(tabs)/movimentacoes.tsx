@@ -175,15 +175,21 @@ export default function MovimentacoesScreen() {
   // de anotar, os filtros e "Buscar", logo acima da lista. Depois da lista, "Ver análises do mês" (no lugar de "Seu mês em 30 segundos",
   // "Evolução" e "Análises": a Evolução é uma aba das Análises e o Seu mês fica logo abaixo do mês delas) e o bloco "Organizar".
 
-  /** Os botões de anotar: "+" em "Anotar gasto", como no Resumo, e a seta de entrada em "Registrar recebimento", como nas linhas. */
+  /**
+   * Os botões de anotar: "+" em "Anotar gasto", como no Resumo, e a seta de entrada em "Registrar recebimento", como nas linhas. No
+   * computador, só "Registrar recebimento": a barra lateral já tem o mesmo "Anotar gasto" ("Anotar saída" no negócio), com a mesma regra
+   * de quem pode anotar (revisão visual de 23/11/2026: eram dois botões principais iguais lado a lado).
+   */
   const actions = canWrite ? (
     <View style={styles.actions}>
-      <Button
-        label={inBusiness ? BUSINESS_WORDS.addOut : 'Anotar gasto'}
-        icon={Plus}
-        style={styles.action}
-        onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })}
-      />
+      {wide ? null : (
+        <Button
+          label={inBusiness ? BUSINESS_WORDS.addOut : 'Anotar gasto'}
+          icon={Plus}
+          style={styles.action}
+          onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa' } })}
+        />
+      )}
       <Button
         label={inBusiness ? BUSINESS_WORDS.addIn : 'Registrar recebimento'}
         icon={ArrowDownLeft}
@@ -380,9 +386,15 @@ export default function MovimentacoesScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <Screen wide>
+          {/* O seletor de espaço e o mês numa linha só, abaixo do título (revisão visual de 23/11/2026: em três linhas, o bloco azul tinha
+              208 px de altura e ficava vazio à direita). Com muitos espaços, o mês desce para a linha de baixo. */}
           <AppHeader title="Movimentos" wide action={analysesTop}>
-            <ContextSwitch />
-            <MonthSwitcher />
+            <View style={styles.wideControls}>
+              <ContextSwitch />
+              <View style={styles.wideMonth}>
+                <MonthSwitcher />
+              </View>
+            </View>
           </AppHeader>
           <Body style={{ maxWidth: WIDE_CONTENT_MAX }}>
             <FlashBanner message={notice} />
@@ -484,6 +496,9 @@ const styles = StyleSheet.create({
   shortcutIcon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },
   focusRing: { outlineWidth: 3, outlineColor: colors.brandText, outlineStyle: 'solid', outlineOffset: 2 } as object,
   wideRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[6] },
+  wideControls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[6], rowGap: space[2] },
+  // O mês traz 8 px de margem em cima (para ficar abaixo do seletor no celular); aqui, na mesma linha, a margem sai.
+  wideMonth: { marginTop: -space[2] },
   // 312 px (antes 340): a tabela da direita ganha espaço para a categoria e a conta (auditoria de 18/11/2026).
   wideSide: { width: 312, gap: space[4] },
   wideMain: { flex: 1, minWidth: 0, gap: space[4] },
