@@ -116,6 +116,7 @@ export function AppHeader({
   contextFixed,
   wide,
   action,
+  topStart,
   children,
 }: {
   title?: string;
@@ -123,6 +124,11 @@ export function AppHeader({
   contextFixed?: boolean;
   /** Versão para computador: o conteúdo da faixa acompanha a largura do painel (o Resumo). */
   wide?: boolean;
+  /**
+   * Versão para computador, sem título (o Resumo): o que fica no alto do cartão azul, à esquerda, na mesma linha de "Ocultar valores"
+   * (o seletor de espaço, pedido do Enzo de 23/11/2026: o seletor numa linha só dele, de ponta a ponta, deixava o cartão pesado).
+   */
+  topStart?: ReactNode;
   /** Um atalho à direita do título (D-105: "Análises" em Movimentos), sem aumentar a faixa. */
   action?: ReactNode;
   children?: ReactNode;
@@ -151,7 +157,8 @@ export function AppHeader({
             ) : null}
           </View>
         ) : sideNav ? (
-          <View style={styles.wideTop}>
+          <View style={[styles.wideTop, topStart ? styles.wideTopSplit : null]}>
+            {topStart ? <View style={styles.wideTopStart}>{topStart}</View> : null}
             <HideValuesButton labeled />
           </View>
         ) : null}
@@ -304,6 +311,9 @@ export function ContextSwitch() {
 
 function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceChoice[]; creatable: string | null }) {
   const { space: active, setSpace } = useView();
+  // Versão para computador (pedido do Enzo, 23/11/2026): o seletor fica compacto, com cada opção da mesma largura, em vez de ocupar o
+  // cartão de ponta a ponta (só com o Pessoal, era uma barra branca larga). No celular, continua na largura da faixa.
+  const compact = useWideLayout();
   const reduced = useReducedMotion();
   const [width, setWidth] = useState(0);
   const [creating, setCreating] = useState(false);
@@ -320,9 +330,9 @@ function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceCho
   const names = options.map((o) => (o.kind === 'negocio' ? 'Negócio' : o.label)).join(', ');
 
   return (
-    <View style={styles.track}>
+    <View style={[styles.track, compact && styles.trackCompact]}>
       <View
-        style={styles.tabs}
+        style={[styles.tabs, compact && styles.tabsCompact]}
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
         accessibilityRole="tablist"
         // "Escolher o espaço: Pessoal ou Família": sem o "Espaço:" das pílulas, que diz o espaço de uma tela (só o Pessoal, o nome seria igual).
@@ -339,7 +349,12 @@ function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceCho
               aria-selected={selected}
               accessibilityLabel={o.kind === 'negocio' ? `Ver dados do negócio ${o.label}` : `Ver dados de ${o.label}`}
               onPress={() => (selected ? undefined : setSpace(o.kind))}
-              style={(s) => [styles.option, (part === 0 || options.length === 1) && selected && styles.optionSelected, (s as { focused?: boolean }).focused && focusOnBrand]}>
+              style={(s) => [
+                styles.option,
+                compact && styles.optionCompact,
+                (part === 0 || options.length === 1) && selected && styles.optionSelected,
+                (s as { focused?: boolean }).focused && focusOnBrand,
+              ]}>
               {/* O ícone não encolhe: com o nome longo do negócio em 320 px, só o nome é cortado (com reticências). */}
               {o.kind === 'familia' ? <Users size={18} color={selected ? colors.brand : colors.textOnBrand} style={{ flexShrink: 0 }} /> : null}
               {o.kind === 'negocio' ? <Store size={18} color={selected ? colors.brand : colors.textOnBrand} style={{ flexShrink: 0 }} /> : null}
@@ -360,7 +375,12 @@ function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceCho
           accessibilityRole="button"
           accessibilityLabel={creatable}
           onPress={() => setCreating(true)}
-          style={(s) => [styles.add, s.pressed && { backgroundColor: colors.onBrandPressed }, (s as { focused?: boolean }).focused && focusOnBrand]}>
+          style={(s) => [
+            styles.add,
+            compact && styles.addCompact,
+            (s.pressed || (s as { hovered?: boolean }).hovered) && { backgroundColor: colors.onBrandPressed },
+            (s as { focused?: boolean }).focused && focusOnBrand,
+          ]}>
           <Plus size={22} color={colors.textOnBrand} strokeWidth={2.5} aria-hidden />
         </Pressable>
       ) : null}
@@ -376,11 +396,13 @@ function ContextSwitchTrack({ options, creatable }: { options: readonly SpaceCho
  */
 export function MonthSwitcher({ color = colors.textOnBrand, titleLevel = 2 }: { color?: string; titleLevel?: 1 | 2 }) {
   const { month, setMonth, currentMonth } = useView();
+  // Versão para computador: as setas ficam junto do nome do mês, à esquerda, em vez de nas pontas do cartão (pedido do Enzo, 23/11/2026).
+  const compact = useWideLayout();
   const forward = canGoForward(month, currentMonth);
   const prev = addMonths(month, -1);
   const next = addMonths(month, 1);
   return (
-    <View style={styles.month}>
+    <View style={[styles.month, compact && styles.monthCompact]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Mês anterior: ${formatMonthBR(prev)}`}
@@ -392,7 +414,7 @@ export function MonthSwitcher({ color = colors.textOnBrand, titleLevel = 2 }: { 
       <Txt
         variant="label"
         color={color}
-        style={{ flex: 1, textAlign: 'center', fontFamily: fonts.semibold }}
+        style={[{ flex: 1, textAlign: 'center', fontFamily: fonts.semibold }, compact && styles.monthLabelCompact]}
         accessibilityRole="header"
         aria-level={titleLevel}
         accessibilityLabel={titleLevel === 1 ? SUMMARY_NAV_TEXT.pageTitleA11y(month) : undefined}>
@@ -450,6 +472,9 @@ const styles = StyleSheet.create({
   eyeLabeledHover: { backgroundColor: colors.onBrandPressed },
   // Nas abas com título, o olho fica na mesma linha, encostado à direita (titleEnd); no Resumo (sem título), numa linha só dele, acima do mês.
   wideTop: { flexDirection: 'row', justifyContent: 'flex-end' },
+  // Com o seletor de espaço na mesma linha (o Resumo no computador): o seletor à esquerda, "Ocultar valores" à direita.
+  wideTopSplit: { justifyContent: 'space-between', alignItems: 'center', gap: space[4] },
+  wideTopStart: { flexShrink: 1, minWidth: 0 },
   subBand: { backgroundColor: colors.brand },
   subInner: { flexDirection: 'row', alignItems: 'center', gap: space[2], paddingTop: space[2], paddingBottom: space[3], paddingHorizontal: space[3] },
   backBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
@@ -464,6 +489,12 @@ const styles = StyleSheet.create({
   pillRow: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   track: { flexDirection: 'row', backgroundColor: colors.brandDeep, borderRadius: radius.md, padding: 4, gap: 4 },
   tabs: { flex: 1, minWidth: 0, flexDirection: 'row' },
+  // Computador: o trilho na largura das opções (cada uma com 160 px), encostado à esquerda.
+  trackCompact: { alignSelf: 'flex-start', maxWidth: '100%' },
+  // flexGrow e flexBasis um a um: `flex: 0` vira base 0 na web e as opções sumiam.
+  tabsCompact: { flexGrow: 0, flexShrink: 1, flexBasis: 'auto' },
+  optionCompact: { flexGrow: 0, flexShrink: 1, flexBasis: 'auto', width: 160, minHeight: 44 },
+  addCompact: { width: 44, minHeight: 44 },
   indicator: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 13, backgroundColor: colors.surfaceOnBrand },
   // O "+" do seletor: quadrado de 48 px, do tamanho das opções, com o desenho branco sobre o azul escuro do trilho.
   add: { width: 48, minHeight: 48, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
@@ -471,5 +502,8 @@ const styles = StyleSheet.create({
   optionSelected: { backgroundColor: colors.surfaceOnBrand },
   // O mês vem logo abaixo do seletor de espaço (D-113b: o seletor aparece sempre): 8 px, para o primeiro movimento continuar à vista sem rolar.
   month: { flexDirection: 'row', alignItems: 'center', marginTop: space[2] },
+  // Computador: o mês e as setas juntos, à esquerda; a seta da esquerda alinhada com o texto de baixo (o desenho tem 11 px de folga no botão).
+  monthCompact: { alignSelf: 'flex-start', marginLeft: -11 },
+  monthLabelCompact: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', minWidth: 176 },
   monthBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 });

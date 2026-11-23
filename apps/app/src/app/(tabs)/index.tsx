@@ -104,25 +104,46 @@ export default function ResumoScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Screen wide scrollRef={scroll}>
-        <AppHeader wide={wide}>
-          <ContextSwitch />
+        {/* No computador, o seletor de espaço sobe para a linha de "Ocultar valores" (pedido do Enzo, 23/11/2026). */}
+        <AppHeader wide={wide} topStart={wide ? <ContextSwitch /> : undefined}>
+          {wide ? null : <ContextSwitch />}
           <MonthSwitcher titleLevel={1} />
 
-          <Animated.View key={`${kind}-${month}`} entering={entering} style={styles.heroContent}>
+          <Animated.View key={`${kind}-${month}`} entering={entering} style={[styles.heroContent, wide && styles.heroContentWide]}>
             {records.isPending ? (
-              <View accessibilityRole="progressbar" accessibilityLabel="Carregando o resumo" style={{ gap: space[3] }}>
-                <Skeleton width={160} height={20} onBrand />
-                <Skeleton width="70%" height={40} onBrand />
-                <Skeleton width="85%" height={14} onBrand />
-                <View style={styles.split}>
-                  <Skeleton width={110} height={36} onBrand />
-                  <Skeleton width={110} height={36} onBrand />
+              wide ? (
+                // No computador, o carregamento tem o formato do cartão pronto (valor à esquerda, dois blocos à direita), para nada pular.
+                <View accessibilityRole="progressbar" accessibilityLabel="Carregando o resumo" style={styles.skeletonWide}>
+                  {/* A mesma altura da coluna pronta (rótulo, valor e legenda: 84 px). */}
+                  <View style={[styles.heroMain, { gap: space[2] }]}>
+                    <Skeleton width={160} height={18} onBrand />
+                    <Skeleton width="70%" height={36} onBrand />
+                    <Skeleton width="85%" height={14} onBrand />
+                  </View>
+                  <View style={[styles.split, styles.splitWide]}>
+                    <Skeleton width={164} height={TILE_HEIGHT} onBrand style={{ borderRadius: radius.md }} />
+                    <Skeleton width={164} height={TILE_HEIGHT} onBrand style={{ borderRadius: radius.md }} />
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <View accessibilityRole="progressbar" accessibilityLabel="Carregando o resumo" style={{ gap: space[3] }}>
+                  <Skeleton width={160} height={20} onBrand />
+                  <Skeleton width="70%" height={40} onBrand />
+                  <Skeleton width="85%" height={14} onBrand />
+                  <View style={styles.split}>
+                    <Skeleton width={110} height={36} onBrand />
+                    <Skeleton width={110} height={36} onBrand />
+                  </View>
+                </View>
+              )
             ) : records.isError || !s ? (
-              <ErrorState message="Não foi possível carregar o resumo." onRetry={() => records.refetch()} onBrand />
+              <View style={wide ? { flex: 1 } : undefined}>
+                <ErrorState message="Não foi possível carregar o resumo." onRetry={() => records.refetch()} onBrand />
+              </View>
             ) : (
               <>
+                {/* No computador, a diferença do mês à esquerda e Recebido e Pago em dois blocos à direita, na mesma linha. */}
+                <View style={wide ? styles.heroMain : undefined}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`${words.left}, ${moneyA11y(s.differenceCents, hidden)}. ${words.leftCaptionA11y}`}
@@ -149,9 +170,11 @@ export default function ResumoScreen() {
                     {emptyCaption}
                   </Txt>
                 ) : null}
-                <View style={styles.split}>
+                </View>
+                <View style={[styles.split, wide && styles.splitWide]}>
                   <TotalItem
                     label={words.in}
+                    tile={wide}
                     cents={s.receivedCents}
                     change={shownChange?.total === 'recebido' ? shownChange.deltaCents : null}
                     hint={words.inHint}
@@ -159,8 +182,9 @@ export default function ResumoScreen() {
                   />
                   <TotalItem
                     label={words.out}
+                    tile={wide}
                     cents={s.paidCents}
-                    alignEnd={!narrow}
+                    alignEnd={!narrow && !wide}
                     change={shownChange?.total === 'pago' ? shownChange.deltaCents : null}
                     hint={words.outHint}
                     onPress={() => router.push({ pathname: '/composicao', params: { tipo: 'pago' } })}
@@ -484,6 +508,7 @@ function TotalItem({
   cents,
   change,
   alignEnd,
+  tile,
   hint,
   onPress,
 }: {
@@ -491,6 +516,8 @@ function TotalItem({
   cents: number;
   change: number | null;
   alignEnd?: boolean;
+  /** Computador: um bloco azul mais escuro, com folga em volta (pedido do Enzo, 23/11/2026). */
+  tile?: boolean;
   hint: string;
   onPress: () => void;
 }) {
@@ -501,7 +528,13 @@ function TotalItem({
       accessibilityLabel={`${label}, ${moneyA11y(cents, hidden)}`}
       accessibilityHint={hint}
       onPress={onPress}
-      style={(st) => [styles.splitItem, alignEnd && { alignItems: 'flex-end' }, (st as { focused?: boolean }).focused && styles.focusOnBrand]}>
+      style={(st) => [
+        styles.splitItem,
+        alignEnd && { alignItems: 'flex-end' },
+        tile && styles.tile,
+        tile && ((st as { hovered?: boolean }).hovered || st.pressed) && styles.tileHover,
+        (st as { focused?: boolean }).focused && styles.focusOnBrand,
+      ]}>
       <View style={styles.totalLabelRow}>
         <Txt variant="caption" color={colors.textOnBrandSoft} style={{ fontFamily: fonts.bold }}>
           {label}
@@ -530,10 +563,21 @@ function TotalItem({
   );
 }
 
+/** Altura do bloco Recebido ou Pago no computador (12 + legenda 18 + valor 26 + 12), usada no carregamento com o mesmo formato. */
+const TILE_HEIGHT = 68;
+
 const styles = StyleSheet.create({
   heroContent: { minHeight: 150, justifyContent: 'center' },
   heroLabel: { fontFamily: fonts.extrabold, fontSize: 18 },
   split: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space[4], columnGap: space[4], rowGap: space[2], flexWrap: 'wrap' },
+  // Computador: a diferença à esquerda e os dois blocos à direita, centralizados na altura.
+  heroContentWide: { flexDirection: 'row', alignItems: 'center', gap: space[6], minHeight: 0, marginTop: space[3] },
+  heroMain: { flex: 1, minWidth: 0 },
+  splitWide: { marginTop: 0, flexWrap: 'nowrap', justifyContent: 'flex-end', columnGap: space[3] },
+  tile: { backgroundColor: colors.brandDeep, borderRadius: radius.md, paddingVertical: space[3], paddingHorizontal: space[4], minWidth: 164 },
+  // Ao passar o mouse ou tocar, o bloco escurece (o branco translúcido clareava e baixava o contraste do texto).
+  tileHover: { backgroundColor: colors.brandPressed },
+  skeletonWide: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[6] },
   splitItem: { minHeight: 44, justifyContent: 'center' },
   splitValue: { fontFamily: fonts.extrabold, fontSize: 18, lineHeight: 26 },
   totalLabelRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },

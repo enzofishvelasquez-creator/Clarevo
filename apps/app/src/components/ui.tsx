@@ -136,12 +136,13 @@ export function Screen({
   onScroll?: (offsetY: number) => void;
 }) {
   const content = useScreenContentStyle(contentStyle, bottomInset, wide);
+  const gutter = useWideLayout() ? styles.screenGutter : null;
   return (
     <ScrollView
       ref={scrollRef}
       onScroll={onScroll ? (e) => onScroll(e.nativeEvent.contentOffset.y) : undefined}
       scrollEventThrottle={onScroll ? 64 : undefined}
-      style={styles.screen}
+      style={[styles.screen, gutter]}
       contentContainerStyle={content}
       keyboardShouldPersistTaps="handled">
       {children}
@@ -178,6 +179,7 @@ export function ScreenList<T>({
   wide?: boolean;
 }) {
   const content = useScreenContentStyle(contentStyle, bottomInset, wide);
+  const gutter = useWideLayout() ? styles.screenGutter : null;
   return (
     <FlatList
       data={data}
@@ -186,7 +188,7 @@ export function ScreenList<T>({
       extraData={extraData}
       ListHeaderComponent={header}
       ListFooterComponent={footer}
-      style={styles.screen}
+      style={[styles.screen, gutter]}
       contentContainerStyle={content}
       keyboardShouldPersistTaps="handled"
       initialNumToRender={LIST_INITIAL_ROWS}
@@ -577,6 +579,9 @@ export function DemoPill() {
 
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  // Versão para computador: a barra de rolagem do navegador reserva o mesmo espaço dos dois lados, para o conteúdo que rola ficar
+  // alinhado com o cabeçalho fixo de cima (pedido do Enzo, 23/11/2026: em Conta, o cartão azul ficava meia barra à direita dos cartões).
+  screenGutter: { scrollbarGutter: 'stable both-edges' } as object,
   screenContent: { width: '100%', maxWidth: 560, alignSelf: 'center' },
   body: { width: '100%', maxWidth: 560, alignSelf: 'center', padding: space[6], gap: space[4] },
   listCell: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: space[6] },
