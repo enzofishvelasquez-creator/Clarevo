@@ -15,7 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DeviceFeatures } from '@/components/device-features';
 import { DesktopNav } from '@/components/desktop-nav';
-import { FormPanel, isPanelRoute } from '@/components/form-panel';
+import { FormPanel, NavScrim, isPanelPath, isPanelRoute } from '@/components/form-panel';
 import { BrowseTabBar } from '@/components/tab-bar';
 import { LegalGate } from '@/components/legal-gate';
 import { StoreWarmup } from '@/components/store-warmup';
@@ -259,6 +259,8 @@ function Navigation() {
       <LegalGate active={!inRecovery && status === 'pronto' && !/^\/conta\/(exportar|excluir)\/?$/.test(pathname)} />
       <View style={{ flex: 1, flexDirection: 'row' }}>
       {wide && status === 'pronto' && !inRecovery ? <DesktopNav /> : null}
+      {/* Com um painel aberto, a barra lateral escurece junto com o fundo; tocar nela fecha o painel, como tocar no fundo. */}
+      {wide && status === 'pronto' && !inRecovery && isPanelPath(pathname) ? <NavScrim /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
       <Stack
         screenOptions={({ route }) => {

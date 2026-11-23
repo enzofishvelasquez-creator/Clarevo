@@ -31,7 +31,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBrowseBarInset } from '@/lib/bar-inset';
-import { WIDE_TAB_MAX, useWideLayout } from '@/lib/layout';
+import { WIDE_GUTTER, WIDE_TAB_MAX, useWideLayout } from '@/lib/layout';
 import { HIDDEN_MONEY, HIDDEN_MONEY_A11Y, maskMoneyLabel, maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { yearA11y, yearA11yLabel } from '@/lib/years';
 import { cardShadowOpacity, colors, fonts, motion, radius, space, tabular, type } from '@/theme/tokens';
@@ -82,8 +82,11 @@ export function FitMoney({ cents, color = colors.text, maxSize = 36, minSize = 2
   const [width, setWidth] = useState(0);
   const hidden = useValuesHidden();
   const text = hidden ? HIDDEN_MONEY : formatBRL(cents);
+  // Letra grande do aparelho: o texto cresce até 1,4 vez (maxFontSizeMultiplier abaixo), e a conta precisa levar isso em conta, senão
+  // o valor quebra no meio ("R$ 2.100 / ,00"). Na web, a escala é sempre 1.
+  const scale = Math.min(PixelRatio.getFontScale() || 1, 1.4);
   // Manrope ExtraBold com números tabulares: ~0,62 em por caractere.
-  const fits = (size: number) => text.length * size * 0.62 <= width;
+  const fits = (size: number) => text.length * size * scale * 0.62 <= width;
   let size = maxSize;
   if (width > 0) while (size > minSize && !fits(size)) size -= 2;
   return (
@@ -211,9 +214,9 @@ const LIST_WINDOW = 5;
 
 /** Uma linha de `ScreenList` com a largura do `Body` (560 px, centralizada, margem de 24 px dos lados). */
 export function ListCell({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  // Versão para computador: a mesma largura do `Body` das abas e das telas de consulta (760 px).
+  // Versão para computador: a mesma largura e a mesma margem do `Body` das abas e das telas de consulta (760 px, WIDE_GUTTER).
   const wide = useWideLayout();
-  return <View style={[styles.listCell, wide && { maxWidth: WIDE_TAB_MAX }, style]}>{children}</View>;
+  return <View style={[styles.listCell, wide && { maxWidth: WIDE_TAB_MAX, paddingHorizontal: WIDE_GUTTER }, style]}>{children}</View>;
 }
 
 /**
@@ -226,10 +229,11 @@ export function CardSlice({ first, last, children, style }: { first?: boolean; l
 
 /** Conteúdo das abas abaixo do cabeçalho de ponta a ponta: limitado a 560 px e centralizado. */
 export function Body({ children, style, onLayout }: { children: ReactNode; style?: StyleProp<ViewStyle>; onLayout?: ViewProps['onLayout'] }) {
-  // Versão para computador: as abas usam mais da largura (o Resumo, em painel, passa o próprio limite em `style`).
+  // Versão para computador: as abas usam mais da largura (o Resumo, em painel, passa o próprio limite em `style`), com a margem dos lados
+  // de todas as telas (WIDE_GUTTER), para os cartões alinharem com o cartão azul de cima.
   const wide = useWideLayout();
   return (
-    <View style={[styles.body, wide && { maxWidth: WIDE_TAB_MAX, paddingTop: space[8] }, style]} onLayout={onLayout}>
+    <View style={[styles.body, wide && { maxWidth: WIDE_TAB_MAX, paddingTop: space[8], paddingHorizontal: WIDE_GUTTER }, style]} onLayout={onLayout}>
       {children}
     </View>
   );
@@ -340,7 +344,12 @@ export function Button({
           tone === 'danger' && { borderWidth: 1, borderColor: colors.border },
           !(props.disabled && !busy) && (state as { focused?: boolean }).focused && (tone === 'onBrand' ? styles.focusRingOnBrand : styles.focusRing),
         ]}>
-        {Icon ? <Icon size={20} color={t.fg} strokeWidth={2.25} /> : null}
+        {/* O ícone não encolhe quando o rótulo quebra em duas linhas (na web, o desenho encolhia até sumir). */}
+        {Icon ? (
+          <View style={styles.iconSlot}>
+            <Icon size={20} color={t.fg} strokeWidth={2.25} />
+          </View>
+        ) : null}
         <Txt variant="label" color={t.fg} style={styles.buttonText}>
           {busy && busyLabel ? busyLabel : label}
         </Txt>
@@ -363,12 +372,20 @@ export function LinkButton({
       hitSlop={10}
       {...props}
       style={(s) => [styles.link, (Icon || Trailing) && styles.linkWithIcon, style, (s as { focused?: boolean }).focused && styles.focusRing]}>
-      {Icon ? <Icon size={18} color={color} strokeWidth={2.25} /> : null}
+      {Icon ? (
+        <View style={styles.iconSlot}>
+          <Icon size={18} color={color} strokeWidth={2.25} />
+        </View>
+      ) : null}
       <Txt variant="label" color={color} style={{ fontFamily: fonts.bold, fontSize: 16, flexShrink: 1 }}>
         {label}
       </Txt>
       {/* Seta de "abre outra tela" (›): desenho, sem nome próprio. */}
-      {Trailing ? <Trailing size={18} color={color} strokeWidth={2.25} aria-hidden /> : null}
+      {Trailing ? (
+        <View style={styles.iconSlot}>
+          <Trailing size={18} color={color} strokeWidth={2.25} aria-hidden />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -613,6 +630,7 @@ export const styles = StyleSheet.create({
   buttonText: { fontFamily: fonts.bold, fontSize: 16, textAlign: 'center', flexShrink: 1 },
   link: { minHeight: 44, justifyContent: 'center', alignSelf: 'center', paddingHorizontal: space[2] },
   linkWithIcon: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  iconSlot: { flexShrink: 0 },
   focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brandText, outlineOffset: 2 },
   focusRingOnBrand: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.accent, outlineOffset: 2 },
   /**

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { spaceKeyPress, Txt } from '@/components/ui';
+import { WIDE_TAB_MAX } from '@/lib/layout';
 import { maskMoneyText, moneyA11y, moneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { yearA11y, yearA11yLabel } from '@/lib/years';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -185,6 +186,15 @@ export const seriesStyles = StyleSheet.create({
   footerRow: { flexDirection: 'row', gap: space[3], alignItems: 'center' },
   cancel: { alignSelf: 'auto', flexGrow: 0 },
   save: { alignSelf: 'auto', flex: 1 },
+  /**
+   * Telas cheias do computador (fora do painel): o miolo do rodapé segue a coluna dos cartões (760 px menos os 20 px de cada lado do
+   * conteúdo) e os botões vão para a direita. O rodapé guarda o mesmo espaço da barra de rolagem que a tela (`scrollbarGutter`), para
+   * a borda esquerda e a direita baterem com as dos cartões em qualquer largura.
+   */
+  footerWide: { overflow: 'hidden', scrollbarGutter: 'stable both-edges' } as object,
+  footerInnerWide: { maxWidth: WIDE_TAB_MAX - 2 * space[5] },
+  footerRowWide: { justifyContent: 'flex-end' },
+  saveWide: { alignSelf: 'auto', flexGrow: 0, flexShrink: 1, minWidth: 240 },
 });
 
 const styles = StyleSheet.create({

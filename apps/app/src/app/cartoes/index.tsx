@@ -9,6 +9,7 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, Screen, Skeleton, Txt } from '@/components/ui';
 import { useCardsOverview, useIncomeReferences, useWork } from '@/state/data';
+import { useWideLayout } from '@/lib/layout';
 import { useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -27,6 +28,9 @@ export default function CartoesScreen() {
   // Faturas do mês (D-042): as de todos os cartões do contexto, ativos e arquivados, como a renda comprometida as conta.
   const monthTotal = overview.data ? cardInvoicesMonth(overview.data.flatMap((o) => o.invoices), month, refs.data ?? []) : null;
   const [notice] = useFlash();
+  // Computador: os botões de adicionar cabem no texto, à esquerda (revisão visual de 23/11/2026: na largura toda, era o jeito do celular).
+  const wide = useWideLayout();
+  const fit = wide ? styles.fit : undefined;
   const list = overview.data ?? [];
   const active = list.filter((o) => o.card.status === 'ativo');
   const archived = list.filter((o) => o.card.status === 'arquivado');
@@ -54,7 +58,7 @@ export default function CartoesScreen() {
         {firstCard ? (
           <>
             <Txt color={colors.textSecondary}>{T.screens.listIntro}</Txt>
-            {canWrite ? <Button label={T.newCard} icon={Plus} onPress={() => router.push('/cartoes/novo')} /> : null}
+            {canWrite ? <Button label={T.newCard} icon={Plus} style={fit} onPress={() => router.push('/cartoes/novo')} /> : null}
           </>
         ) : null}
 
@@ -80,7 +84,7 @@ export default function CartoesScreen() {
                 {T.limitNote}
               </Txt>
             ) : null}
-            {canWrite ? <Button label={T.addAnotherCard} icon={Plus} tone="soft" onPress={() => router.push('/cartoes/novo')} /> : null}
+            {canWrite ? <Button label={T.addAnotherCard} icon={Plus} tone="soft" style={fit} onPress={() => router.push('/cartoes/novo')} /> : null}
             {archived.length > 0 ? (
               <View style={{ gap: space[3] }}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>
@@ -107,4 +111,5 @@ export default function CartoesScreen() {
 
 const styles = StyleSheet.create({
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },
+  fit: { alignSelf: 'flex-start', minWidth: 220 },
 });

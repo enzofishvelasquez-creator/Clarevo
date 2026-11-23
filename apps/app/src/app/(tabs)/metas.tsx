@@ -18,6 +18,7 @@ import { SeasonCardView } from '@/components/season-card';
 import { EmptyState, ErrorState } from '@/components/states';
 import { TopicRow } from '@/components/topic-link';
 import { Body, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { useWideLayout } from '@/lib/layout';
 import { explanationHref, isTopicPublished, seasonalCard, topicBySlug } from '@/lib/learn';
 import { useCommittedSummary, useGoalImages, useGoalsOverview, useSavingsCard, useWork, type GoalsOverview } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -45,13 +46,23 @@ export default function MetasScreen() {
   const data = overview.data;
   // "Neste mês" (D-054, P-028): o mesmo card de Aprender, só pela data de hoje; some nos meses sem tema. Nada é gravado nem pedido.
   const season = seasonalCard(today);
+  // Computador: a reserva num cartão branco, abaixo da faixa azul (um bloco azul só por tela).
+  const wide = useWideLayout();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Screen wide>
-        <AppHeader title={GOALS_TEXT.tabTitle} context="Pessoal">
-          <ContextSwitch />
-        </AppHeader>
+        {/* No computador, sem a pílula do espaço ao lado do título: o seletor logo abaixo já diz qual é, com o mesmo nome (revisão visual de
+            23/11/2026: "Pessoal" duas vezes). No celular, a pílula continua (CL-11). */}
+        {wide ? (
+          <AppHeader title={GOALS_TEXT.tabTitle}>
+            <ContextSwitch />
+          </AppHeader>
+        ) : (
+          <AppHeader title={GOALS_TEXT.tabTitle} context="Pessoal">
+            <ContextSwitch />
+          </AppHeader>
+        )}
         <Body>
           {business ? (
             // Espaço Negócio (D-113): metas ficam no Pessoal e na Família; o negócio é só o que entra e sai.
@@ -79,6 +90,8 @@ export default function MetasScreen() {
                 planSlot={<SavingsPlanInReserve contextId={contextId} card={savings} compact={data.reserve !== null} />}
                 planLink={savings.data?.state.kind === 'oculto'}
                 compact={savings.data?.state.kind === 'plano'}
+                light={wide}
+                planMonthlyCents={savings.data?.state.kind === 'plano' ? savings.data.state.monthlyCents : null}
               />
               <ReserveRefresh contextId={contextId} reserve={data.reserve} canWrite={personal.data?.canWrite ?? true} />
               <GoalsSection active={data.active} plans={data.plans} images={images.data} canWrite={personal.data?.canWrite ?? true} />
@@ -190,6 +203,7 @@ function GoalsSection({
   images: readonly GoalImage[] | undefined;
   canWrite: boolean;
 }) {
+  const wide = useWideLayout();
   return (
     <View style={{ gap: space[3] }}>
       <View style={styles.sectionHead}>
@@ -211,7 +225,7 @@ function GoalsSection({
       ) : (
         active.map((g) => <GoalCard key={g.id} goal={g} plan={plans[g.id]!} image={images?.find((i) => i.goalId === g.id) ?? null} />)
       )}
-      {canWrite ? <Button label={GOALS_TEXT.newGoal} icon={Plus} tone="soft" onPress={() => router.push('/meta/nova')} /> : null}
+      {canWrite ? <Button label={GOALS_TEXT.newGoal} icon={Plus} tone="soft" style={wide ? styles.fit : undefined} onPress={() => router.push('/meta/nova')} /> : null}
     </View>
   );
 }
@@ -241,6 +255,8 @@ function LearnCard() {
 
 const styles = StyleSheet.create({
   link: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  // Computador: o botão cabe no texto, à esquerda, em vez de ocupar a largura toda (o jeito do celular).
+  fit: { alignSelf: 'flex-start', minWidth: 220 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[2] },
   learn: { backgroundColor: colors.accent, borderRadius: radius.lg, paddingTop: space[5], paddingBottom: space[2], paddingHorizontal: space[6], gap: space[1] },
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },

@@ -5,6 +5,7 @@ import Animated, { FadeInDown, ReduceMotion, ZoomIn } from 'react-native-reanima
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { Card, Txt } from '@/components/ui';
+import { useWideLayout } from '@/lib/layout';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 const T = SUBSCRIPTION_SCREEN_TEXT;
@@ -23,16 +24,27 @@ const BADGE_ICON: Readonly<Record<Access['status'], LucideIcon>> = {
 };
 
 /**
+ * Tamanho fixo do desenho, preso ao canto de baixo à direita (revisão visual de 23/11/2026: esticado na largura do cartão, o desenho
+ * crescia 2,25 vezes no computador e o lima ficava embaixo do texto branco). Só o pedaço com as formas (`ART_BOX`), 1,2 vez o tamanho
+ * original, o que ele tinha no celular de 390 px; a caixa do desenho nunca passa da borda do cartão.
+ */
+const ART_BOX = '176 100 144 120';
+const ART_W = 173;
+const ART_H = 144;
+
+/**
  * As formas do fundo (as mesmas da ilustração do app: abertas, em lima e azul). Só decoração: o texto fica em cima do azul, nunca do lima
- * (o lima fica no canto, dentro da margem).
+ * (o lima fica no canto, dentro da margem, com o mesmo tamanho em qualquer largura).
  */
 export function HeroBackdrop() {
   return (
-    <Svg width="100%" height="100%" viewBox="0 0 320 220" preserveAspectRatio="xMaxYMax slice" style={StyleSheet.absoluteFill} accessible={false} pointerEvents="none">
-      {/* As duas formas ficam dentro da área desenhada (nada passa da largura da tela, mesmo cortado pela borda do cartão). */}
-      <Path d="M244 112C284 104 320 132 318 176C316 208 300 220 240 220C204 220 180 202 186 168C192 138 208 120 244 112Z" fill={colors.brandDeep} />
-      <Path d="M296 188C310 186 320 196 320 208C320 216 320 220 320 220L276 220C274 210 280 192 296 188Z" fill={colors.accent} />
-    </Svg>
+    <View style={styles.backdrop} pointerEvents="none" accessible={false} aria-hidden>
+      <Svg width={ART_W} height={ART_H} viewBox={ART_BOX} accessible={false} pointerEvents="none">
+        {/* As duas formas ficam dentro da área desenhada (nada passa da largura da tela, mesmo cortado pela borda do cartão). */}
+        <Path d="M244 112C284 104 320 132 318 176C316 208 300 220 240 220C204 220 180 202 186 168C192 138 208 120 244 112Z" fill={colors.brandDeep} />
+        <Path d="M296 188C310 186 320 196 320 208C320 216 320 220 320 220L276 220C274 210 280 192 296 188Z" fill={colors.accent} />
+      </Svg>
+    </View>
   );
 }
 
@@ -77,6 +89,8 @@ export function SubscriptionHero({
   const days = access.status === 'teste' ? (trialDaysLeft(access, now, timeZone) ?? 0) : null;
   const eyebrow = welcome ? T.justPaidEyebrow : canceled ? T.eyebrowCanceled : T.eyebrow[access.status];
   const title = welcome ? T.justPaidTitle(access.plan ?? 'individual') : view.situation;
+  // Computador: o texto de baixo para antes do canto do lima, qualquer que seja o tamanho da última linha.
+  const clear = useWideLayout() ? styles.clearArt : undefined;
   return (
     <Animated.View entering={FadeInDown.duration(320).reduceMotion(ReduceMotion.System)} style={styles.hero}>
       <HeroBackdrop />
@@ -115,9 +129,11 @@ export function SubscriptionHero({
           </View>
         </View>
       ) : null}
-      <Txt color={colors.textOnBrandSoft}>{view.body}</Txt>
+      <Txt color={colors.textOnBrandSoft} style={clear}>
+        {view.body}
+      </Txt>
       {celebrate ? (
-        <Txt variant="label" color={colors.textOnBrand} style={{ fontFamily: fonts.bold }}>
+        <Txt variant="label" color={colors.textOnBrand} style={[{ fontFamily: fonts.bold }, clear]}>
           {T.celebrate}
         </Txt>
       ) : null}
@@ -159,7 +175,11 @@ export function BenefitsCard({ subscribed }: { subscribed: boolean }) {
 }
 
 const styles = StyleSheet.create({
-  hero: { backgroundColor: colors.brand, borderRadius: radius.xl, padding: space[5], gap: space[3], overflow: 'hidden' },
+  // O raio dos outros blocos azuis (a faixa no computador, a reserva e o total de Investir): 20 px.
+  hero: { backgroundColor: colors.brand, borderRadius: radius.lg, padding: space[5], gap: space[3], overflow: 'hidden' },
+  backdrop: { position: 'absolute', right: 0, bottom: 0, width: ART_W, height: ART_H },
+  // O lima ocupa os 55 px da direita (46 do desenho × 1,2); com os 20 px de margem do cartão, mais 36 px tiram o texto de cima dele.
+  clearArt: { paddingRight: 36 },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space[3] },
   confetti: { position: 'absolute', top: -6, right: 40 },
   eyebrow: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[1], alignSelf: 'flex-start', flexShrink: 1 },

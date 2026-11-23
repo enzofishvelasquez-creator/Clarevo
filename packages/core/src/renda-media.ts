@@ -189,11 +189,14 @@ export const INCOME_AVERAGE_TEXT = {
   failed: ERROR_TEXT.carregar_falhou,
   /** "Média de julho a setembro: R$ 5.200,00" */
   headline: (months: readonly IsoMonth[], cents: Cents, withYear: boolean): string => `Média de ${monthsPhrase(months, withYear)}: ${formatBRL(cents)}`,
-  /** "Meses usados: 3 de 3" ou "Meses usados: 2 de 3, setembro sem registros ficou de fora" */
+  /**
+   * "Meses usados: 3 de 3" ou, com meses de fora, duas frases: "Meses usados: 2 de 3. Setembro ficou de fora porque não tem registros."
+   * (revisão de 23/11/2026: numa frase só, a lista de meses emendava na contagem).
+   */
   count: (used: number, total: number, excluded: readonly IsoMonth[], withYear: boolean): string =>
     excluded.length === 0
       ? `Meses usados: ${used} de ${total}`
-      : `Meses usados: ${used} de ${total}, ${monthsPhrase(excluded, withYear, false)} sem registros ${excluded.length === 1 ? 'ficou' : 'ficaram'} de fora`,
+      : `Meses usados: ${used} de ${total}. ${capitalize(monthsPhrase(excluded, withYear, false))} ${excluded.length === 1 ? 'ficou de fora porque não tem registros' : 'ficaram de fora porque não têm registros'}.`,
   /** "Agosto entrou com R$ 0,00 porque você conferiu que não houve recebimentos." */
   zero: (months: readonly IsoMonth[], withYear: boolean): string =>
     `${capitalize(joinList(months.map((m) => monthName(m, withYear))))} ${months.length === 1 ? 'entrou' : 'entraram'} com ${formatBRL(0)} porque você conferiu que não houve recebimentos.`,

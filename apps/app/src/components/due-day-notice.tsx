@@ -5,7 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { Banner, LinkButton, Txt } from '@/components/ui';
-import { colors, fonts, motion, radius, space } from '@/theme/tokens';
+import { colors, fonts, motion, space } from '@/theme/tokens';
 
 /**
  * Aviso de vencimento em sábado, domingo ou feriado nacional (D-060 item 3 e D-061): "Vence no domingo, 11/10/2026, que não é dia útil.
@@ -52,13 +52,19 @@ export function DueDayNotice({ notice }: { notice: Notice }) {
   );
 }
 
-/** Sinal discreto da lista, com texto: "Não é dia útil · vencimento anotado: domingo, 11/10" (conta do ano: "... · confira a data no carnê ou no site do órgão"). */
+/**
+ * Sinal discreto da lista, com texto: "Não é dia útil". Revisão de 23/11/2026: a frase longa ("· vencimento anotado: domingo, 11/10" ou
+ * "· confira a data no carnê ou no site do órgão") deixava a linha com 4 a 6 linhas; ela fica no aviso da tela da conta, e o nome
+ * acessível da linha continua dizendo tudo (`signA11y`).
+ */
 export function DueDaySign({ notice }: { notice: Notice }) {
   return (
     <View style={styles.sign}>
-      <CalendarOff size={13} color={colors.textSecondary} style={styles.signIcon} aria-hidden />
+      <View style={styles.signIcon}>
+        <CalendarOff size={14} color={colors.textSecondary} aria-hidden />
+      </View>
       <Txt variant="caption" color={colors.textSecondary} style={{ flexShrink: 1 }}>
-        {notice.signLine}
+        {notice.sign}
       </Txt>
     </View>
   );
@@ -66,15 +72,10 @@ export function DueDaySign({ notice }: { notice: Notice }) {
 
 const styles = StyleSheet.create({
   toggle: { alignSelf: 'flex-start', paddingHorizontal: 0 },
-  panel: {
-    backgroundColor: colors.accentTint,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.accent,
-    borderRadius: radius.sm,
-    paddingVertical: space[3],
-    paddingHorizontal: space[4],
-    gap: space[2],
-  },
+  // A explicação aberta fica no próprio aviso, sem outra caixa dentro dele (revisão de 23/11/2026: o painel lima com borda, dentro do
+  // aviso azul, deixava uma coluna estreita de texto em duas cores).
+  panel: { gap: space[2], paddingTop: space[1] },
   sign: { flexDirection: 'row', alignItems: 'flex-start', gap: space[1] },
-  signIcon: { marginTop: 2 },
+  // O ícone não encolhe na web e fica no meio da primeira linha (18 px de altura de linha).
+  signIcon: { flexShrink: 0, marginTop: 2 },
 });

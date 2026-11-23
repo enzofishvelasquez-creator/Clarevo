@@ -58,6 +58,7 @@ import { totalChange } from '@/lib/highlight';
 import { explanationHref } from '@/lib/learn';
 import { useCommitments, usePayCommitment, usePaymentsForecast, useSeriesList, useSeriesSync, useWork, useUpdateRecord, useView } from '@/state/data';
 import { useRepo, useSession } from '@/state/session';
+import { useWideLayout } from '@/lib/layout';
 import { colors, fonts, motion, radius, space, tabular } from '@/theme/tokens';
 
 // Linhas saem e se reacomodam devagar (CL-V008); nada anima antes da resposta do servidor.
@@ -181,6 +182,8 @@ export default function ContasAPagarScreen() {
     setMonth(payablesStartMonth(params.mes, currentMonth));
   }, [params.mes, params.abrir, currentMonth]);
   const personal = useWork().data;
+  // Computador: "Anotar conta a pagar" cabe no texto, à esquerda (revisão visual de 23/11/2026: na largura toda, era o jeito do celular).
+  const wide = useWideLayout();
   const ctx = personal?.contextId;
   const commitments = useCommitments(ctx, month);
   const seriesList = useSeriesList(ctx);
@@ -347,7 +350,7 @@ export default function ContasAPagarScreen() {
           )}
         </View>
 
-        {personal?.canWrite === false ? null : <Button label="Anotar conta a pagar" icon={Plus} onPress={() => router.push('/a-pagar/nova')} />}
+        {personal?.canWrite === false ? null : <Button label="Anotar conta a pagar" icon={Plus} style={wide ? styles.fit : undefined} onPress={() => router.push('/a-pagar/nova')} />}
         <SeriesLink count={seriesList.data?.length ?? null} />
 
         {result ? (
@@ -696,6 +699,7 @@ const styles = StyleSheet.create({
   laterMonth: { fontFamily: fonts.bold, marginTop: space[3] },
   showMore: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56, paddingVertical: space[2], marginTop: space[1], borderTopWidth: 1, borderTopColor: colors.border },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  fit: { alignSelf: 'flex-start', minWidth: 220 },
   monthRow: { flexDirection: 'row', alignItems: 'center', gap: space[1], marginHorizontal: -space[2] },
   monthBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   remindersLink: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56, paddingHorizontal: space[4], paddingVertical: space[2], borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },

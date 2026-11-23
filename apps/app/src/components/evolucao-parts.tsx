@@ -77,20 +77,23 @@ export function EvolutionChart({ view, selected, onSelect }: { view: AnyView; se
   const [width, setWidth] = useState(0);
   const points = view.points;
   const n = points.length;
-  const step = width / n;
   // Colunas estreitas (12 meses, letra grande): só a inicial do mês, que o botão e a tabela dizem por extenso.
-  const letters = width > 0 && step < 24 * fontScale;
+  const letters = width > 0 && width / n < 24 * fontScale;
   // Colunas muito estreitas (24 e 36 meses, D-105): o eixo mostra só o ano, em janeiro; pontos menores e sem os ícones sob o mês (a
   // legenda, a tabela e o nome de cada botão continuam dizendo tudo).
-  const sparse = width > 0 && step < 14 * fontScale;
+  const sparse = width > 0 && width / n < 14 * fontScale;
   const rPoint = sparse ? 3.5 : R_POINT;
   const rSelected = sparse ? 6 : R_SELECTED;
+  // Recuo dos dois lados: o anel do mês escolhido (raio mais metade do contorno) cabe inteiro no desenho mesmo na primeira e na última
+  // coluna (revisão de 23/11/2026: em 36 meses, o anel de outubro era cortado na borda do cartão). As colunas e o desenho usam o mesmo recuo.
+  const inset = width > 0 ? Math.max(0, Math.ceil(rSelected + 2 - width / n / 2)) : 0;
+  const step = (width - 2 * inset) / n;
   const firstJanuary = points.findIndex((p) => p.month.endsWith('-01'));
   const yearMarks = sparse
     ? points.flatMap((p, i) => (p.month.endsWith('-01') || (i === 0 && (firstJanuary === -1 || firstJanuary >= 6)) ? [{ i, year: p.month.slice(0, 4) }] : []))
     : [];
   const usable = BASE_Y - PAD_TOP;
-  const xOf = (i: number) => (i + 0.5) * step;
+  const xOf = (i: number) => inset + (i + 0.5) * step;
   // A escala vai de minCents (0, ou o menor mês do Guardado em metas) a maxCents; sem mês negativo é a de sempre, que parte do zero.
   const range = view.maxCents - view.minCents;
   const belowZero = view.minCents < 0;
@@ -138,7 +141,7 @@ export function EvolutionChart({ view, selected, onSelect }: { view: AnyView; se
         ) : null}
       </View>
       <View role="group" accessibilityLabel={T.chart.group} onLayout={(e) => setWidth(Math.floor(e.nativeEvent.layout.width))} style={styles.chart}>
-        <View style={styles.columns}>
+        <View style={[styles.columns, { paddingHorizontal: inset }]}>
           {points.map((p) => (
             <MonthColumn key={p.month} point={p} selected={p.month === selected} letters={letters} sparse={sparse} hiddenValues={hiddenValues} onPress={() => onSelect(p.month)} />
           ))}

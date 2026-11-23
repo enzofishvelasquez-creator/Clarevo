@@ -298,7 +298,7 @@ describe('Evolução: zero confirmado (D04)', () => {
     const march = evolutionPanel(view, '2026-03', true);
     expect(march.state).toBe('sem_registros');
     expect(march.valueText).toBeNull();
-    expect(march.stateText).toBe('Sem registros: mês sem anotação não quer dizer mês sem gastos');
+    expect(march.stateText).toBe('Mês sem anotação não quer dizer mês sem gastos');
     expect(march.check).toMatchObject({ state: 'sem_registros', version: 0, action: 'Conferi: não houve pagamentos em março de 2026', undo: null });
     expect(evolutionPanel(view, '2026-03', false).check).toMatchObject({ state: 'sem_registros', action: null });
     // Recebido: abril é o mês sem recebimentos, e o tipo é "recebimentos".

@@ -2,10 +2,13 @@ import { router, useIsFocused } from 'expo-router';
 import { createContext, useEffect, useRef, type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { SIDE_NAV_WIDTH } from '@/lib/layout';
 import { colors, radius, space } from '@/theme/tokens';
 
 /** Largura do painel dos formulários na versão para computador. */
 export const FORM_PANEL_WIDTH = 560;
+/** Distância do painel ao alto, à direita e ao pé da janela (as janelas de confirmação abertas dele usam a mesma medida). */
+export const FORM_PANEL_INSET = space[3];
 
 /**
  * Verdadeiro dentro do painel dos formulários: o cabeçalho compacto (`SubHeader`) fica preso ao alto do painel, que já tem os cantos
@@ -40,10 +43,14 @@ const PANEL_PATHS: readonly RegExp[] = [
   new RegExp(`^/cartoes/(novo|${ID}|${ID}/editar|${ID}/fatura/${MONTH}/(pagar|encargo|estorno|compra))$`),
 ];
 
+/** Endereço que, no computador, abre no painel à direita. */
+export function isPanelPath(path: string): boolean {
+  return PANEL_PATHS.some((re) => re.test(path));
+}
+
 /** Tela que, no computador, abre no painel à direita. */
 export function isPanelRoute(name: string, params: Record<string, unknown> | undefined): boolean {
-  const path = routePath(name, params);
-  return PANEL_PATHS.some((re) => re.test(path));
+  return isPanelPath(routePath(name, params));
 }
 
 /** Esc e o toque no fundo fazem o mesmo que o "voltar" da tela; sem tela atrás (endereço aberto direto), voltam ao Resumo. */
@@ -55,6 +62,18 @@ function closePanel() {
 /** Há uma janela do app aberta (confirmação, escolha) além dos painéis: o Esc é dela. */
 function otherModalOpen(): boolean {
   return Array.from(document.querySelectorAll('[aria-modal="true"]')).some((e) => !e.hasAttribute('data-form-panel'));
+}
+
+/**
+ * A tela de trás perde a barra de rolagem enquanto um painel está aberto: a do painel ficava colada à dela, duas barras lado a lado.
+ * Só a cor some (o espaço da barra continua), para o conteúdo de trás não pular de lado.
+ */
+function hideBackScrollbars() {
+  if (document.getElementById('clarevo-painel-estilo')) return;
+  const style = document.createElement('style');
+  style.id = 'clarevo-painel-estilo';
+  style.textContent = '[inert] { scrollbar-color: transparent transparent; }';
+  document.head.appendChild(style);
 }
 
 /**
@@ -82,12 +101,15 @@ export function FormPanel({ children }: { children: ReactNode }) {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const el = panel.current as unknown as HTMLElement | null;
     if (!el || typeof el.setAttribute !== 'function') return;
+    hideBackScrollbars();
     const before = document.activeElement as HTMLElement | null;
     // O nome do painel é o título da tela.
     const title = el.querySelector('[role="heading"]')?.textContent?.trim();
     if (title) el.setAttribute('aria-label', title);
     const touched: HTMLElement[] = [];
-    for (let node: HTMLElement | null = el; node && node !== document.body; node = node.parentElement) {
+    // Para no contêiner do app (filho do <body>): os portais das caixas de confirmação ficam no <body>, já montados (visible=false),
+    // e com inert não recebiam clique nem foco quando abriam por cima do painel (revisão de 23/11/2026).
+    for (let node: HTMLElement | null = el; node && node !== document.body && node.parentElement !== document.body; node = node.parentElement) {
       const parent: HTMLElement | null = node.parentElement;
       if (!parent) break;
       for (const sib of Array.from(parent.children) as HTMLElement[]) {
@@ -119,7 +141,27 @@ export function FormPanel({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * O véu sobre a barra lateral enquanto um painel está aberto (revisão de 23/11/2026: a barra ficava clara e parecia tocável, mas está
+ * fora do alcance, como o resto da tela de trás). Tocar nele faz o mesmo que tocar no fundo: fecha o painel. Fica fora do leitor de
+ * tela e do teclado (o "Fechar" do fundo e o Esc já existem); a marca `panelScrim` o livra do `inert` que o painel põe em volta.
+ */
+export function NavScrim() {
+  return (
+    <Pressable
+      style={styles.navScrim}
+      onPress={closePanel}
+      focusable={false}
+      aria-hidden
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      {...({ dataSet: { panelScrim: '' }, tabIndex: -1 } as object)}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
+  navScrim: { position: 'absolute', top: 0, bottom: 0, left: 0, width: SIDE_NAV_WIDTH, zIndex: 1, backgroundColor: colors.scrim },
   // O fundo escurecido cobre também a margem em volta do painel; só a área à esquerda fecha ao tocar.
   wrap: { flex: 1, flexDirection: 'row', backgroundColor: colors.scrim },
   scrim: { flex: 1 },
@@ -127,8 +169,8 @@ const styles = StyleSheet.create({
   panel: {
     width: FORM_PANEL_WIDTH,
     maxWidth: '100%',
-    marginVertical: space[3],
-    marginRight: space[3],
+    marginVertical: FORM_PANEL_INSET,
+    marginRight: FORM_PANEL_INSET,
     borderRadius: radius.lg,
     overflow: 'hidden',
     backgroundColor: colors.background,

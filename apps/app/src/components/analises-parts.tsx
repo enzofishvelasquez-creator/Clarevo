@@ -24,7 +24,7 @@ import {
   type IsoMonth,
   type SelectedCategoryCard,
 } from '@clarevo/core';
-import { Check, ChartPie, ChevronRight } from 'lucide-react-native';
+import { Check, ChartPie, ChevronRight, Plus } from 'lucide-react-native';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
@@ -36,6 +36,7 @@ import { EmptyState, ErrorState } from '@/components/states';
 import { Button, Card, IconBlock, LinkButton, Money, Skeleton, Txt, clampLines, spaceKeyPress, styles as ui } from '@/components/ui';
 import { useCategoryViewPref } from '@/lib/category-view';
 import { useHiddenMonths } from '@/lib/evolution-memory';
+import { useWideLayout } from '@/lib/layout';
 import { maskMoneyLabel, useValuesHidden } from '@/lib/privacy';
 import { useCategoryAnalysis, useCommittedUpcoming, useMonthBudget, useMonthCheckRow, useMonthsOverview, useView, type CategoryAnalysis } from '@/state/data';
 import { useSession } from '@/state/session';
@@ -81,11 +82,13 @@ export function AnalysesEntry({ onPress }: { onPress: () => void }) {
 
 /**
  * As quatro abas internas (Categorias, Evolução, Próximos meses e Orçamento), de 44 px de altura. A aba escolhida tem fundo azul e o
- * sinal de marcado (nunca só cor). Setas, Home e End escolhem a aba, como no padrão de abas. Em tela estreita as abas passam para a
- * segunda linha, sem rolagem de lado.
+ * sinal de marcado (nunca só cor). Setas, Home e End escolhem a aba, como no padrão de abas. No celular, duas por linha (uma grade fixa);
+ * no computador, as quatro numa linha. Sem rolagem de lado.
  */
 export function AnalysesTabs({ tab, onChange }: { tab: AnalysesTab; onChange: (tab: AnalysesTab) => void }) {
   const refs = useRef<Partial<Record<AnalysesTab, View | null>>>({});
+  // No computador, as quatro numa linha; no celular, duas por linha.
+  const wide = useWideLayout();
   const keys = (current: AnalysesTab): object =>
     Platform.OS === 'web'
       ? {
@@ -118,11 +121,13 @@ export function AnalysesTabs({ tab, onChange }: { tab: AnalysesTab; onChange: (t
             aria-selected={selected}
             onPress={() => onChange(t)}
             {...keys(t)}
-            style={(s) => [styles.tab, selected && styles.tabSelected, s.pressed && { opacity: 0.85 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
-            {selected ? <Check size={16} color={colors.textOnBrand} strokeWidth={2.5} style={{ flexShrink: 0 }} /> : null}
-            <Txt variant="label" color={selected ? colors.textOnBrand : colors.text} style={{ fontFamily: fonts.bold, flexShrink: 1 }}>
+            style={(s) => [styles.tab, wide && styles.tabWide, selected && styles.tabSelected, s.pressed && { opacity: 0.85 }, (s as { focused?: boolean }).focused && ui.focusRing]}>
+            {/* O lugar do ✓ fica reservado nos dois lados, marcada ou não: a largura e a quebra do nome não mudam ao trocar de aba. */}
+            <View style={styles.tabCheck}>{selected ? <Check size={16} color={colors.textOnBrand} strokeWidth={2.5} /> : null}</View>
+            <Txt variant="label" color={selected ? colors.textOnBrand : colors.text} style={{ fontFamily: fonts.bold, flexShrink: 1, textAlign: 'center' }}>
               {T.tabs[t]}
             </Txt>
+            <View style={styles.tabCheck} />
           </Pressable>
         );
       })}
@@ -507,7 +512,7 @@ function CategoriesBody({
           action={
             <View style={{ gap: space[3], alignSelf: 'stretch' }}>
               <MonthCheckBlock contextId={contextId} plan={plan} />
-              {canWrite && plan?.state !== 'conferido' ? <Button label={T.categories.emptyAction} onPress={onAddExpense} /> : null}
+              {canWrite && plan?.state !== 'conferido' ? <Button label={T.categories.emptyAction} icon={Plus} tone="soft" onPress={onAddExpense} /> : null}
             </View>
           }>
           {plan?.state === 'conferido' ? undefined : T.categories.emptyBody}
@@ -597,7 +602,8 @@ export function EvolutionTab({ contextId, month, currentMonth, onOpen }: { conte
     <SummaryCard title={inBusiness ? BUSINESS_WORDS.outMonthYear(month) : T.evolution.title(month)} actionLabel={T.evolution.action} actionHint={T.evolution.actionHint} onAction={onOpen}>
       {s ? (
         <View style={{ gap: space[1] }}>
-          {s.valueText !== null ? <Money cents={s.cents} /> : null}
+          {/* Sem valor, "Sem registros" no lugar dele, como no painel da Evolução (a frase abaixo explica, sem repetir o estado). */}
+          {s.valueText !== null ? <Money cents={s.cents} /> : <Txt variant="amount">{s.noValueText}</Txt>}
           <Txt color={colors.textSecondary}>{s.stateText}</Txt>
           <MoneyTxt style={{ fontFamily: fonts.bold }}>{s.variationText}</MoneyTxt>
           {s.percentText ? (
@@ -728,14 +734,20 @@ export function BudgetTab({ contextId, month, onOpen }: { contextId: string | un
 const styles = StyleSheet.create({
   entry: { gap: space[3], paddingVertical: space[2] },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  // Grade fixa de duas colunas (revisão de 23/11/2026): com a largura pelo conteúdo, a grade mudava a cada troca de aba e, em 320 px,
+  // virava 2 + 1 + 1. A base de 40% com crescimento dá metade da linha a cada aba, qualquer que seja o nome.
   tab: {
     flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: '40%',
+    minWidth: 0,
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: space[1],
-    paddingHorizontal: space[4],
+    // Folga de 4 px mais o lugar do ✓ dos dois lados: em 390 px, "Próximos meses" cabe numa linha.
+    paddingHorizontal: space[1],
     paddingVertical: space[2],
     borderRadius: radius.pill,
     borderWidth: 1.5,
@@ -743,6 +755,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   tabSelected: { backgroundColor: colors.brand, borderColor: colors.brand },
+  tabWide: { flexBasis: '20%' },
+  tabCheck: { width: 16, flexShrink: 0, alignItems: 'center' },
   recentRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   recentTrack: { height: 8, borderRadius: radius.pill, backgroundColor: colors.brandTint, overflow: 'hidden' },
   recentFill: { height: 8, borderRadius: radius.pill, backgroundColor: colors.brandMark },

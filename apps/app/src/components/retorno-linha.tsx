@@ -188,7 +188,7 @@ export function ReturnRow({
                   label={RETURN_TEXT.stillOpenButton}
                   accessibilityLabel={yearA11y(RETURN_TEXT.stillOpenA11y(short))}
                   disabled={busy}
-                  style={styles.inlineLink}
+                  style={styles.stillOpenLink}
                   onPress={() => onAction('ainda_nao_paguei')}
                 />
               ) : null}
@@ -222,6 +222,9 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   action: { alignSelf: 'auto', flexGrow: 1, flexBasis: 140 },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  // "Ainda não paguei" fica no meio, como o texto dos botões de cima e o "Voltar" da folha (revisão de 23/11/2026: à esquerda, entre os
+  // dois, a folha tinha três alinhamentos).
+  stillOpenLink: { alignSelf: 'center' },
   resolved: { flexDirection: 'row', alignItems: 'flex-start', gap: space[3] },
   doneIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.successTint, alignItems: 'center', justifyContent: 'center' },
   focusRing: { outlineWidth: 3, outlineStyle: 'solid', outlineColor: colors.brandText, outlineOffset: 2 } as object,

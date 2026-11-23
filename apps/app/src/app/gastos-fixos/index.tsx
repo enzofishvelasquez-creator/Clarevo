@@ -43,6 +43,7 @@ import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useSubscriptionSnooze } from '@/lib/subscription-reminder';
 import { useSeriesList, useWork } from '@/state/data';
 import { useSession } from '@/state/session';
+import { useWideLayout } from '@/lib/layout';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
 type Part = { text: string; a11y: string };
@@ -253,6 +254,9 @@ function SubscriptionGroup({ list, today }: { list: readonly CommitmentSeries[];
 export default function GastosFixosScreen() {
   const { today } = useSession();
   const personal = useWork().data;
+  // Computador: os dois botões de cadastrar na mesma linha, cada um do tamanho do texto (revisão visual de 23/11/2026: na largura toda,
+  // um embaixo do outro, era o jeito do celular).
+  const wide = useWideLayout();
   const list = useSeriesList(personal?.contextId);
   const [notice] = useFlash();
   const snooze = useSubscriptionSnooze();
@@ -346,10 +350,10 @@ export default function GastosFixosScreen() {
         )}
 
         {personal?.canWrite === false ? null : (
-          <View style={{ gap: space[3] }}>
-            <Button label="Novo gasto fixo ou parcelamento" icon={Plus} onPress={() => router.push('/gastos-fixos/novo')} />
+          <View style={wide ? styles.wideActions : { gap: space[3] }}>
+            <Button label="Novo gasto fixo ou parcelamento" icon={Plus} style={wide ? styles.fit : undefined} onPress={() => router.push('/gastos-fixos/novo')} />
             {/* A conta do ano à vista no topo (docs/10 A16), não só no card do fim da lista. */}
-            <Button label="Nova conta do ano" icon={CalendarSync} tone="soft" onPress={() => router.push('/gastos-fixos/novo?tipo=anual')} />
+            <Button label="Nova conta do ano" icon={CalendarSync} tone="soft" style={wide ? styles.fit : undefined} onPress={() => router.push('/gastos-fixos/novo?tipo=anual')} />
           </View>
         )}
 
@@ -430,6 +434,8 @@ const styles = StyleSheet.create({
   icon: { width: 40, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandTint },
   privacy: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: space[2], minHeight: 44 },
   inlineLink: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  wideActions: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
+  fit: { alignSelf: 'flex-start', minWidth: 220 },
   subRow: { paddingVertical: space[2] },
   subMain: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56 },
   subCalc: { alignSelf: 'flex-start', paddingLeft: 40 + space[3], minHeight: 44 },

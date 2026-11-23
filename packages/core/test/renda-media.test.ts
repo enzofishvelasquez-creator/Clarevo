@@ -431,13 +431,13 @@ describe('os textos do resultado', () => {
     });
     const some = incomeAverageTexts(incomeAverage([row('2026-07', 430_000), row('2026-08', 620_000), row('2026-09')], 3, NOW));
     expect(some.headline).toBe('Média de julho e agosto: R$ 5.250,00');
-    expect(some.count).toBe('Meses usados: 2 de 3, setembro sem registros ficou de fora');
+    expect(some.count).toBe('Meses usados: 2 de 3. Setembro ficou de fora porque não tem registros.');
     // Dois ou mais fora: plural.
     const one = incomeAverageTexts(incomeAverage([row('2026-09', 510_000)], 3, NOW));
     expect(one.headline).toBe('Média de setembro: R$ 5.100,00');
-    expect(one.count).toBe('Meses usados: 1 de 3, julho e agosto sem registros ficaram de fora');
+    expect(one.count).toBe('Meses usados: 1 de 3. Julho e agosto ficaram de fora porque não têm registros.');
     expect(incomeAverageTexts(incomeAverage([row('2026-04', 520_000), row('2026-05', 500_000), row('2026-06', 510_000)], 6, NOW)).count).toBe(
-      'Meses usados: 3 de 6, julho, agosto e setembro sem registros ficaram de fora',
+      'Meses usados: 3 de 6. Julho, agosto e setembro ficaram de fora porque não têm registros.',
     );
   });
 
@@ -469,7 +469,7 @@ describe('os textos do resultado', () => {
     expect(cross.announce).toBe('Valor por mês preenchido com R$ 5.000,00, média de novembro de 2026 a janeiro de 2027.');
     const crossSome = incomeAverageTexts(incomeAverage([row('2026-12', 500_000), row('2027-01', 600_000)], 3, '2027-02'));
     expect(crossSome.headline).toBe('Média de dezembro de 2026 e janeiro de 2027: R$ 5.500,00');
-    expect(crossSome.count).toBe('Meses usados: 2 de 3, novembro de 2026 sem registros ficou de fora');
+    expect(crossSome.count).toBe('Meses usados: 2 de 3. Novembro de 2026 ficou de fora porque não tem registros.');
   });
 
   it('sem nenhum mês com recebimentos: o botão explica que precisa de pelo menos um mês fechado com recebimentos', () => {

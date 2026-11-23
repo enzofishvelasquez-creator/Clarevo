@@ -19,6 +19,7 @@ import { View } from 'react-native';
 import { ContextPill, SubHeader } from '@/components/header';
 import { ChoiceGroup } from '@/components/series-parts';
 import { Banner, Button, Card, Chip, Screen, Txt } from '@/components/ui';
+import { useWideLayout } from '@/lib/layout';
 import { authenticate, DEVICE_FEATURES } from '@/lib/device';
 import { getPrefs, loadPrefs } from '@/lib/device-prefs';
 import { EXPORT_LOGO_SVG } from '@/lib/export-logo';
@@ -42,6 +43,7 @@ type Msg = { tone: 'erro' | 'sucesso' | 'info'; text: string } | null;
 export default function ExportarScreen() {
   const { user, auth, today } = useSession();
   const repo = useRepo();
+  const wide = useWideLayout();
   const personalId = useSpace().data?.personalContextId;
   // Espaço Negócio (D-113): quem tem um negócio escolhe o espaço do arquivo (o Pessoal, como sempre, ou o negócio).
   const business = useBusiness().data;
@@ -128,13 +130,15 @@ export default function ExportarScreen() {
   };
 
   const hint = EXPORT_NATIVE ? T.readyHint.native : T.readyHint.web;
+  // Computador: as notas pequenas param em 560 px (revisão visual de 23/11/2026: com 720 px, a linha passava de 110 letras).
+  const note = wide ? { maxWidth: 560 } : undefined;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SubHeader title={T.title} right={<ContextPill label={onBusiness ? business!.name : 'Pessoal'} fixed />} />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
         <Txt color={colors.textSecondary}>{T.intro}</Txt>
-        <Txt variant="caption" color={colors.textSecondary}>
+        <Txt variant="caption" color={colors.textSecondary} style={note}>
           {T.portability}
         </Txt>
 
@@ -162,7 +166,7 @@ export default function ExportarScreen() {
             {T.contentTitle}
           </Txt>
           <Txt color={colors.textSecondary}>{format === 'csv' ? T.contentCsv : T.contentPdf}</Txt>
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
             {onBusiness ? T.notIncludedBusiness(business!.name) : T.notIncluded}
           </Txt>
           {hidden ? (
@@ -170,11 +174,11 @@ export default function ExportarScreen() {
               <Txt variant="label">{T.valuesNote}</Txt>
             </Banner>
           ) : (
-            <Txt variant="caption" color={colors.textSecondary}>
+            <Txt variant="caption" color={colors.textSecondary} style={note}>
               {T.valuesNote}
             </Txt>
           )}
-          <Txt variant="caption" color={colors.textSecondary}>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
             {T.sensitiveNote}
           </Txt>
         </Card>
@@ -196,11 +200,11 @@ export default function ExportarScreen() {
             </Txt>
             <View style={{ gap: space[1] }} accessibilityLiveRegion="polite">
               <Txt variant="label">{T.readyCounts(ready.recordCount, ready.purchaseCount, ready.investmentCount)}</Txt>
-              <Txt variant="caption" color={colors.textSecondary}>
+              <Txt variant="caption" color={colors.textSecondary} style={note}>
                 {T.readyPeriod(ready.periodLabel)}
               </Txt>
             </View>
-            <Txt variant="caption" color={colors.textSecondary}>
+            <Txt variant="caption" color={colors.textSecondary} style={note}>
               {hint}
             </Txt>
             {ready.files.map((file) => (

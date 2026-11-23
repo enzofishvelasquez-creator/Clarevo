@@ -11,6 +11,14 @@ export const SIDE_NAV_WIDTH = 256;
 export const WIDE_CONTENT_MAX = 1080;
 /** Largura máxima do conteúdo das outras abas na versão para computador (era 560 px, a do celular). */
 export const WIDE_TAB_MAX = 760;
+/**
+ * Margem dos lados na versão para computador, a mesma em todas as telas: cartão azul, bloco de destaque e cartões de baixo (revisão de
+ * 23/11/2026: as abas usavam 24 px e as telas de consulta 20, e a faixa ficava 4 px mais larga que os cartões). 20 px é o `space[5]`
+ * que quase todas as telas de consulta já usam no conteúdo.
+ */
+export const WIDE_GUTTER = 20;
+/** Distância do cartão azul até o alto da janela, a mesma nas abas e nas outras telas (era 24 e 20: a faixa pulava ao navegar). */
+export const WIDE_TOP = 24;
 
 /** Só na web: em tablet e Chromebook, o app nativo fica como no celular (o painel dos formulários é da web). */
 export function useWideLayout(): boolean {

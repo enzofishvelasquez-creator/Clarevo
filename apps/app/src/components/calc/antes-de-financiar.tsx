@@ -129,7 +129,6 @@ export function AntesDeFinanciarCalc({ prefill }: { prefill: CalcPrefill<'antes-
             <LinkButton
               label={ANTES_TEXT.showValues}
               accessibilityLabel={ANTES_TEXT.showValuesA11y}
-              color={colors.textSecondary}
               style={calcInlineLink}
               onPress={() => setValuesHidden(false)}
             />

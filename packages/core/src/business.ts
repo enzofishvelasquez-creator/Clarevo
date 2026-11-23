@@ -361,8 +361,9 @@ export const BUSINESS_TEXT = {
   withdraw: 'Retirada para o Pessoal',
   withdrawHint: 'Para quando você leva dinheiro do negócio para o Pessoal. Sai do negócio e entra no Pessoal como recebimento, sem contar duas vezes.',
   withdrawTitle: 'Retirada para o Pessoal',
-  withdrawFrom: 'Sai de (conta do negócio)',
-  withdrawTo: 'Entra em (conta do Pessoal)',
+  /** Rótulos das contas; com uma conta só, "Sai do negócio: Conta do negócio" (revisão de 23/11/2026: era "Sai de (conta do negócio): ..."). */
+  withdrawFrom: 'Sai do negócio',
+  withdrawTo: 'Entra no Pessoal',
   withdrawDescriptionLabel: 'Descrição (opcional)',
   withdrawDescriptionHint: (name: string): string => `Sem descrição, fica "Retirada para o Pessoal" no negócio e "Retirada de ${name}" no Pessoal.`,
   withdrawSubmit: 'Salvar retirada',

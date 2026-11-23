@@ -10,6 +10,7 @@ import { SubHeader } from '@/components/header';
 import { ErrorState, LoadingState } from '@/components/states';
 import { BenefitsCard, SubscriptionHero } from '@/components/subscription-parts';
 import { Banner, Button, Card, LinkButton, Screen, Txt } from '@/components/ui';
+import { useWideLayout } from '@/lib/layout';
 import { useAccess, useReloadAccess, useWebSubscriptionStatus } from '@/state/access';
 import { useRepo } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
@@ -22,12 +23,16 @@ const W = WEB_SUBSCRIPTION_TEXT;
  * A função do servidor remove a assinatura no Asaas; o período já pago continua valendo (o aviso do Asaas recalcula até quando). Já
  * cancelada (`canceled`, lida no Asaas), o botão sai e fica o aviso de que o acesso continua até o fim do período pago (12/11/2026).
  */
+/** Computador: as notas pequenas param em 560 px (revisão visual de 23/11/2026: com 720 px, a linha passava de 110 letras). */
+const NOTE_WIDE = { maxWidth: 560 } as const;
+
 function WebCancelCard({ canceled }: { canceled: boolean }) {
   const repo = useRepo();
   const reload = useReloadAccess();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const note = useWideLayout() ? NOTE_WIDE : undefined;
   const [msg, setMsg] = useState<{ tone: 'erro' | 'sucesso'; text: string } | null>(null);
   const cancel = async () => {
     setBusy(true);
@@ -51,7 +56,7 @@ function WebCancelCard({ canceled }: { canceled: boolean }) {
   return (
     <Card style={{ gap: space[3] }}>
       {done ? null : (
-        <Txt variant="caption" color={colors.textSecondary}>
+        <Txt variant="caption" color={colors.textSecondary} style={note}>
           {W.changePlan}
         </Txt>
       )}
@@ -88,6 +93,7 @@ function WebCancelCard({ canceled }: { canceled: boolean }) {
 export default function AssinaturaScreen() {
   const access = useAccess();
   const timeZone = useAccessTimeZone();
+  const note = useWideLayout() ? NOTE_WIDE : undefined;
   const params = useLocalSearchParams<{ pagamento?: string; assinar?: string }>();
   const returned = parseWebPaymentReturn(params.pagamento);
   const webTest = Platform.OS === 'web' && params.assinar === 'teste';
@@ -130,7 +136,7 @@ export default function AssinaturaScreen() {
             <BenefitsCard subscribed={subscribed} />
             {view.showPlans ? <PlansCard access={access.data} webTest={webTest} subscribeHidden={returned === 'sucesso'} /> : null}
             {view.showPlans ? (
-              <Txt variant="caption" color={colors.textSecondary}>
+              <Txt variant="caption" color={colors.textSecondary} style={note}>
                 {T.benefitNote}
               </Txt>
             ) : null}

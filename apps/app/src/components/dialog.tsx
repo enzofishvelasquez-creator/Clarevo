@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
-import { Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useContext, type ReactNode } from 'react';
+import { Modal, ScrollView, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FORM_PANEL_INSET, FORM_PANEL_WIDTH, InPanelContext } from '@/components/form-panel';
 import { Button, Txt } from '@/components/ui';
 import { maskMoneyText, spokenText, useValuesHidden } from '@/lib/privacy';
 import { colors, radius, space } from '@/theme/tokens';
@@ -65,10 +66,28 @@ export function ConfirmDialog({
 /**
  * Margens do fundo e altura máxima da caixa dos diálogos: as barras do sistema ficam de fora (o app desenha de ponta a ponta no
  * Android) e a caixa nunca passa da altura da tela; o que não couber rola dentro dela.
+ * Aberto de dentro do painel dos formulários (computador), o fundo cobre só o painel, com os mesmos cantos, e a caixa fica no meio
+ * dele: o resto da janela já está escurecido pelo painel, e a caixa no meio da janela ficava metade sobre a borda do painel.
  */
-export function useDialogFrame() {
+export function useDialogFrame(): { backdrop: ViewStyle; box: ViewStyle } {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const inPanel = useContext(InPanelContext);
+  if (inPanel) {
+    return {
+      backdrop: {
+        position: 'absolute',
+        top: FORM_PANEL_INSET,
+        bottom: FORM_PANEL_INSET,
+        right: FORM_PANEL_INSET,
+        width: FORM_PANEL_WIDTH,
+        maxWidth: '100%',
+        borderRadius: radius.lg,
+        paddingVertical: space[6],
+      },
+      box: { maxHeight: Math.max(240, height - 2 * FORM_PANEL_INSET - 2 * space[6]) },
+    };
+  }
   const top = insets.top + space[6];
   const bottom = insets.bottom + space[6];
   return {

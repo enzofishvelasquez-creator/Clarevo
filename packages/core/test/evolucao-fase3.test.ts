@@ -448,9 +448,9 @@ describe('a visão da Renda comprometida', () => {
     expect(view.points.map((p) => p.hasValue)).toEqual([false, false, true, true, false, false]);
     expect(view.points.map((p) => p.valueText)).toEqual([null, null, '44,3%', '58,3%', null, null]);
     expect(view.points.map((p) => p.stateLabel)).toEqual(['Sem base', 'Sem base', 'Com registros', 'Com registros', 'Sem registros', 'Mês em andamento']);
-    expect(view.points[0]!.stateText).toBe('Sem base: não há renda de referência para este mês');
-    expect(view.points[4]!.stateText).toBe('Sem registros: mês sem conta anotada não quer dizer mês sem contas');
-    expect(view.points[5]!.stateText).toBe('Mês em andamento: só meses já fechados entram aqui');
+    expect(view.points[0]!.stateText).toBe('Não há renda de referência para este mês');
+    expect(view.points[4]!.stateText).toBe('Mês sem conta anotada não quer dizer mês sem contas');
+    expect(view.points[5]!.stateText).toBe('Só meses já fechados entram aqui');
   });
 
   it('média e mediana só dos meses fechados com base e contas, em percentual, com "n de N"; sem total (somar percentuais não dá percentual)', () => {
