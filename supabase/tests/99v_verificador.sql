@@ -1,5 +1,5 @@
 -- Guarda contra regressão dos ajustes do Verificador do Supabase (Security e Performance Advisor, migração 0017, 21/10/2026).
--- Parte A, só catálogo: nenhuma função do public sem search_path fixo; as visões do public sem security_invoker são só as 8 de propósito
+-- Parte A, só catálogo: nenhuma função do public sem search_path fixo; as visões do public sem security_invoker são só as 9 de propósito
 -- e todas com security_barrier; anon sem privilégio nenhum nas tabelas, visões e funções com security definer do public; nenhuma
 -- política do public com auth.uid() solto (só dentro de (select ...), a forma que o Postgres calcula uma vez por consulta); toda chave
 -- estrangeira do public com índice que começa pelas colunas da chave (o mesmo critério do verificador oficial).
@@ -44,10 +44,10 @@ begin
     'o gatilho dos registros fixa search_path = public';
 end $$;
 
--- A2. Visões do public sem security_invoker: só as 8 de propósito (filtro de permissão explícito, sem anon), todas com security_barrier.
+-- A2. Visões do public sem security_invoker: só as 9 de propósito (a 9ª, business_member_items, da 0043) (filtro de permissão explícito, sem anon), todas com security_barrier.
 do $$
 declare
-  v_oito constant text[] := array['card_entry_items', 'card_items', 'family_member_items', 'import_items', 'invoice_items',
+  v_oito constant text[] := array['business_member_items', 'card_entry_items', 'card_items', 'family_member_items', 'import_items', 'invoice_items',
                                   'my_benefit', 'receipt_items', 'series_items'];
   v_sem_invoker text[];
   v_sem_barrier text[];
@@ -55,7 +55,7 @@ begin
   select array_agg(c.relname::text order by c.relname::text collate "C") into v_sem_invoker
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public' and c.relkind in ('v', 'm') and not pg_temp.opt_on(c.reloptions, 'security_invoker');
-  assert v_sem_invoker = v_oito, 'visões sem security_invoker: só as 8 de propósito, vieram ' || coalesce(array_to_string(v_sem_invoker, ', '), '(nenhuma)');
+  assert v_sem_invoker = v_oito, 'visões sem security_invoker: só as 9 de propósito, vieram ' || coalesce(array_to_string(v_sem_invoker, ', '), '(nenhuma)');
   select array_agg(c.relname::text order by c.relname::text collate "C") into v_sem_barrier
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public' and c.relkind in ('v', 'm') and not pg_temp.opt_on(c.reloptions, 'security_invoker')
