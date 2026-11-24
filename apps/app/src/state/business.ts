@@ -1,8 +1,10 @@
 import {
   contextCategories,
   type BusinessContext,
+  type BusinessContributionInput,
   type BusinessInviteRole,
   type BusinessPeople,
+  type BusinessProfile,
   type BusinessWithdrawalInput,
   type PlusStatus,
   type RecordKind,
@@ -79,6 +81,28 @@ export function useCreateWithdrawal() {
   });
 }
 
+/** Trazer dinheiro do Pessoal (D-121): como a retirada, muda os lançamentos do negócio e do Pessoal. */
+export function useCreateContribution() {
+  const repo = useRepo();
+  const reload = useReloadRecords();
+  return useMutation({
+    mutationFn: (v: { key: string; businessContextId: string; input: BusinessContributionInput }) =>
+      repo.createBusinessContribution(v.key, v.businessContextId, v.input),
+    onSuccess: reload,
+  });
+}
+
+/** O tipo do negócio (D-121): só muda o negócio lido (textos e o limite do MEI). */
+export function useSetBusinessProfile() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; profile: BusinessProfile | null }) => repo.setBusinessProfile(v.key, v.contextId, v.profile),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['business'] }),
+  });
+}
+
+/** Excluir a retirada ou o dinheiro trazido do Pessoal (D-121): a mesma função, os dois lados juntos. */
 export function useDeleteWithdrawal() {
   const repo = useRepo();
   const reload = useReloadRecords();

@@ -3,6 +3,7 @@ import {
   BUSINESS_TEXT,
   CARDS_TEXT,
   businessErrorText,
+  businessPairKind,
   canMoveRecord,
   isChoosableExpenseCategory,
   isWithdrawal,
@@ -124,6 +125,24 @@ export default function DetalheRegistro() {
   const withdrawal = r ? isWithdrawal(r) : false;
   // Também o vocabulário: no espaço Negócio, "Saída" e "Entrada" (auditoria de 18/11/2026).
   const inBusiness = Boolean(business && r && r.contextId === business.id);
+  // O par ligado (D-121): a retirada ou o dinheiro trazido do Pessoal, pelo tipo e pelo espaço do lançamento. O lado do Pessoal é o que está
+  // no Pessoal da pessoa (o negócio pode ainda não ter carregado); o outro é o do negócio.
+  const pairInBusiness = r ? (personal ? r.contextId !== personal.personalContextId : inBusiness) : false;
+  const pair = r && withdrawal ? businessPairKind(r.kind, pairInBusiness) : null;
+  const PAIR = {
+    note: pair === 'aporte'
+      ? pairInBusiness
+        ? BUSINESS_TEXT.contributionBusinessNote
+        : BUSINESS_TEXT.contributionPersonalNote(business?.name ?? null)
+      : pairInBusiness
+        ? BUSINESS_TEXT.withdrawalBusinessNote
+        : BUSINESS_TEXT.withdrawalPersonalNote(business?.name ?? null),
+    locked: pair === 'aporte' ? BUSINESS_TEXT.contributionLocked : BUSINESS_TEXT.withdrawalLocked,
+    remove: pair === 'aporte' ? BUSINESS_TEXT.deleteContribution : BUSINESS_TEXT.deleteWithdrawal,
+    removeTitle: pair === 'aporte' ? BUSINESS_TEXT.deleteContributionTitle : BUSINESS_TEXT.deleteWithdrawalTitle,
+    removeBody: pair === 'aporte' ? BUSINESS_TEXT.deleteContributionBody : BUSINESS_TEXT.deleteWithdrawalBody,
+    removed: pair === 'aporte' ? BUSINESS_TEXT.contributionDeleted : BUSINESS_TEXT.withdrawalDeleted,
+  };
   const inPersonal = Boolean(personal && r && r.contextId === personal.personalContextId);
   // Mover (D-113): o lançamento comum, entre o Pessoal e o negócio da pessoa, para quem anotou no lugar errado.
   // Negócio compartilhado (D-120): quem só vê não encontra as ações; quem anota e vê edita, exclui e move só o que anotou (quem administra,
@@ -163,7 +182,7 @@ export default function DetalheRegistro() {
     try {
       await removeWithdrawal.mutateAsync({ key: withdrawalKey.current, recordId: r.id, version: r.version });
       setConfirmingWithdrawal(false);
-      flash.set(BUSINESS_TEXT.withdrawalDeleted);
+      flash.set(PAIR.removed);
       // Os dois lados saíram: o detalhe do outro lado, se ficou na pilha, também não existe mais.
       router.replace('/movimentacoes');
     } catch (e) {
@@ -325,20 +344,19 @@ export default function DetalheRegistro() {
                   ) : null}
                 </>
               ) : withdrawal ? (
-                // Retirada para o Pessoal (D-113): ligada nos dois espaços; muda só excluindo e anotando de novo.
+                // Retirada para o Pessoal (D-113) e dinheiro trazido do Pessoal (D-121): ligados nos dois espaços; mudam só excluindo e
+                // anotando de novo. O outro lado fica no outro espaço (pelo espaço do lançamento, não pelo tipo).
                 <>
                   <Banner tone="info" icon={HandCoins}>
-                    <Txt variant="label">
-                      {r.kind === 'despesa' ? BUSINESS_TEXT.withdrawalBusinessNote : BUSINESS_TEXT.withdrawalPersonalNote(business?.name ?? null)}
-                    </Txt>
+                    <Txt variant="label">{PAIR.note}</Txt>
                   </Banner>
                   {ownWithdrawal ? (
                     <>
                       <Txt variant="caption" color={colors.textSecondary}>
-                        {BUSINESS_TEXT.withdrawalLocked}
+                        {PAIR.locked}
                       </Txt>
                       <Button
-                        label={BUSINESS_TEXT.seeOtherSide(r.kind === 'despesa' ? 'Pessoal' : (business?.name ?? BUSINESS_TEXT.context))}
+                        label={BUSINESS_TEXT.seeOtherSide(pairInBusiness ? 'Pessoal' : (business?.name ?? BUSINESS_TEXT.context))}
                         tone="soft"
                         onPress={() => router.push(`/registro/${r.pairedRecordId}`)}
                       />
@@ -377,7 +395,7 @@ export default function DetalheRegistro() {
                 />
               )}
               {r.invoice || !access.canChange ? null : withdrawal ? (
-                ownWithdrawal ? <Button label={BUSINESS_TEXT.deleteWithdrawal} icon={Trash2} tone="danger" onPress={() => setConfirmingWithdrawal(true)} /> : null
+                ownWithdrawal ? <Button label={PAIR.remove} icon={Trash2} tone="danger" onPress={() => setConfirmingWithdrawal(true)} /> : null
               ) : (
                 <Button label={RECORD_TEXT.remove(r.kind)} icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />
               )}
@@ -401,14 +419,14 @@ export default function DetalheRegistro() {
 
               <ConfirmDialog
                 visible={confirmingWithdrawal}
-                title={BUSINESS_TEXT.deleteWithdrawalTitle}
+                title={PAIR.removeTitle}
                 cancelLabel="Cancelar"
-                confirmLabel={BUSINESS_TEXT.deleteWithdrawal}
+                confirmLabel={PAIR.remove}
                 busy={removeWithdrawal.isPending}
                 onCancel={() => setConfirmingWithdrawal(false)}
                 onConfirm={doDeleteWithdrawal}>
                 <MoneyTxt style={{ fontFamily: fonts.bold }}>{`${r.description} · ${formatBRL(r.amountCents)}`}</MoneyTxt>
-                <Txt color={colors.textSecondary}>{BUSINESS_TEXT.deleteWithdrawalBody}</Txt>
+                <Txt color={colors.textSecondary}>{PAIR.removeBody}</Txt>
               </ConfirmDialog>
 
               <ConfirmDialog

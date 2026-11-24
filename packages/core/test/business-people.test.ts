@@ -374,7 +374,7 @@ describe('negócio compartilhado na memória: aceitar (accept_business_invite)',
     await expectCode(bia.repo.acceptBusinessInvite(key(), w.code!), 'ja_no_negocio');
     const k = key();
     const joined = await caio.repo.acceptBusinessInvite(k, w.code!);
-    expect(joined).toEqual({ context: { id: b.id, name: 'Sacolé da Bia', createdAt: b.createdAt, role: 'membro' }, role: 'membro', invitedBy: 'Bia' });
+    expect(joined).toEqual({ context: { id: b.id, name: 'Sacolé da Bia', createdAt: b.createdAt, role: 'membro', businessProfile: null }, role: 'membro', invitedBy: 'Bia' });
     expect(await caio.repo.acceptBusinessInvite(k, w.code!)).toEqual(joined);
     await expectCode(caio.repo.acceptBusinessInvite(k, 'f'.repeat(32)), 'chave_reutilizada');
     // Uso único: o mesmo link não serve para outra pessoa, nem para a mesma de novo.

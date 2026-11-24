@@ -55,8 +55,9 @@ const FORM_PATHS: readonly RegExp[] = [
   // Família (D-055): criar e convidar são formulários com rodapé fixo. A lista da Família (/familia) é de consulta.
   /^\/familia\/(nova|convidar)$/,
   // Espaço Negócio (D-113): criar, a retirada para o Pessoal e o nome são formulários. "Seu negócio" (/negocio) é de consulta. Negócio
-  // compartilhado (D-116, D-120): convidar também é formulário, com rodapé fixo.
-  /^\/negocio\/(novo|retirada|nome|convidar)$/,
+  // compartilhado (D-116, D-120): convidar também é formulário, com rodapé fixo. D-121: trazer dinheiro do Pessoal é formulário; o resumo
+  // do ano (/negocio/ano) é de consulta e mostra a barra.
+  /^\/negocio\/(novo|retirada|trazer|nome|convidar)$/,
   // Convite para a Família: abre antes de entrar e depois de entrar, como as telas de entrada, sem barra.
   new RegExp(`^/convite/${ID}$`),
   // Convite para um negócio (D-116, D-120): /convite/negocio/<código>, como o da Família, sem barra.
@@ -395,9 +396,29 @@ export const APP_SCREENS: readonly AppScreen[] = [
   {
     id: 'negocio',
     title: 'Espaço Negócio',
-    caption: 'Separar as contas do negócio das pessoais e ver quanto entrou, saiu e sobrou no mês',
+    caption: 'Separar as contas do negócio das pessoais: o mês na operação, o que ficou fora dela, o resumo do ano, o tipo do negócio e o limite do MEI',
     href: '/negocio',
-    keywords: ['negócio', 'negocio', 'cnpj', 'mei', 'trabalho por conta', 'autônomo', 'loja', 'vendas', 'retirada', 'pró-labore', 'separar contas', 'contas do negócio'],
+    keywords: [
+      'negócio',
+      'negocio',
+      'cnpj',
+      'mei',
+      'limite do mei',
+      'tipo do negócio',
+      'resumo do ano',
+      'dinheiro do pessoal',
+      'trazer dinheiro',
+      'empréstimo',
+      'equipamento',
+      'trabalho por conta',
+      'autônomo',
+      'loja',
+      'vendas',
+      'retirada',
+      'pró-labore',
+      'separar contas',
+      'contas do negócio',
+    ],
   },
   {
     id: 'conta',

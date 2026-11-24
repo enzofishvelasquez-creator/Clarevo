@@ -6,6 +6,7 @@ import {
   ERROR_TEXT,
   NO_CATEGORY_LABEL,
   UNCERTAIN_TEXT,
+  cardCategories,
   cardErrorText,
   centsToInput,
   invoiceMonthLabel,
@@ -55,7 +56,8 @@ export type EntryKind = 'encargo' | 'estorno';
 export function InvoiceEntryForm({ kind, card, month, entry }: { kind: EntryKind; card: CardData; month: IsoMonth; entry?: CardEntry | null }) {
   const { today } = useSession();
   const qc = useQueryClient();
-  const categories = useContextCategories(card.contextId);
+  // Sem as saídas de fora da operação (D-121): a compra no cartão entra em "Seu negócio" pela fatura paga, na operação.
+  const categories = cardCategories(useContextCategories(card.contextId));
   const addCharge = useAddCardCharge();
   const addRefund = useAddCardRefund();
   const updateEntry = useUpdateCardEntry();

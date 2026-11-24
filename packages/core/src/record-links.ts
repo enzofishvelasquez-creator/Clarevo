@@ -381,8 +381,11 @@ export const RECORD_KIND_ERROR_TEXT: Readonly<Record<string, string>> = {
   tipo_nao_muda: 'Este gasto é o pagamento de uma conta, de uma fatura ou veio de uma nota fiscal, então continua como gasto.',
   investimento_invalido: 'Escolha um investimento ativo do espaço Pessoal.',
   investimento_encerrado: 'Este investimento está encerrado. Escolha outro ou reative o investimento.',
-  /** Espaço Negócio (D-113): um lado de uma retirada para o Pessoal só muda pela retirada (o mesmo texto de BUSINESS_TEXT.withdrawalLocked). */
-  retirada_ligada: 'Uma retirada fica ligada nos dois espaços. Para mudar o valor ou a data, exclua a retirada e anote de novo.',
+  /**
+   * Espaço Negócio (D-113, D-121): um lado de uma retirada para o Pessoal ou do dinheiro trazido do Pessoal só muda pela função dele (o mesmo
+   * texto de BUSINESS_TEXT.pairLocked).
+   */
+  retirada_ligada: 'Este lançamento está ligado a outro espaço. Para mudar o valor ou a data, exclua e anote de novo.',
 };
 
 export function recordLinkErrorText(code: string): string {

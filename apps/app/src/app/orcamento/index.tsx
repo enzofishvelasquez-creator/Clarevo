@@ -54,8 +54,12 @@ export default function OrcamentoScreen() {
   const contextId = work?.contextId;
   const [notice] = useFlash();
   const budget = useMonthBudget(contextId, month);
-  const { refunds } = useMonthRefunds(contextId, month, budgetCategoriesFor(work?.contextKind ?? 'pessoal'));
+  // As categorias que esta versão sabe orçar no espaço. Defensivo (D-121): uma categoria que o banco devolve e o app não conhece aparece com o
+  // orçamento já gravado, sem abrir o formulário, e nunca em "Definir orçamento".
+  const budgetable = budgetCategoriesFor(work?.contextKind ?? 'pessoal');
+  const { refunds } = useMonthRefunds(contextId, month, budgetable);
   const s = budget.summary;
+  const without = s ? s.without.filter((c) => budgetable.includes(c)) : [];
   const prev = payablesStep(month, currentMonth, -1);
   const next = payablesStep(month, currentMonth, 1);
 
@@ -108,10 +112,17 @@ export default function OrcamentoScreen() {
             )}
 
             {s.rows.map((r) => (
-              <CategoryCard key={r.category} row={r} month={month} currentMonth={currentMonth} refundCents={refunds?.[r.category] ?? 0} />
+              <CategoryCard
+                key={r.category}
+                row={r}
+                month={month}
+                currentMonth={currentMonth}
+                refundCents={refunds?.[r.category] ?? 0}
+                editable={budgetable.includes(r.category)}
+              />
             ))}
 
-            {s.without.length > 0 ? (
+            {without.length > 0 ? (
               <Card style={{ gap: space[1] }}>
                 <Txt variant="title" accessibilityRole="header" aria-level={2}>
                   {BUDGET_TEXT.withoutTitle}
@@ -120,7 +131,7 @@ export default function OrcamentoScreen() {
                   {BUDGET_TEXT.withoutHint}
                 </Txt>
                 <View>
-                  {s.without.map((category, i, all) => (
+                  {without.map((category, i, all) => (
                     <DefineRow key={category} category={category} last={i === all.length - 1} />
                   ))}
                 </View>
@@ -156,17 +167,32 @@ function openForm(category: string, month: IsoMonth, currentMonth: IsoMonth) {
  * Um card por categoria com orçamento: nome, percentual, barra, "usado de orçado" e o que falta (ou passa). Toque abre o formulário.
  * Fora da área tocável: o aviso de 80% com "Dispensar aviso" e a explicação do estorno, para o botão do aviso não ficar dentro de outro.
  */
-function CategoryCard({ row, month, currentMonth, refundCents }: { row: BudgetRow; month: IsoMonth; currentMonth: IsoMonth; refundCents: number }) {
+function CategoryCard({
+  row,
+  month,
+  currentMonth,
+  refundCents,
+  editable = true,
+}: {
+  row: BudgetRow;
+  month: IsoMonth;
+  currentMonth: IsoMonth;
+  refundCents: number;
+  /** Falso para uma categoria que esta versão do app não sabe orçar (D-121, defensivo): o card só mostra, sem abrir o formulário. */
+  editable?: boolean;
+}) {
   const mask = useMoneyMask();
   const notices = useBudgetNotices();
   const showNear = row.nearNotice !== null && notices.ready && !notices.isDismissed(month, row.category);
   return (
     <View style={styles.card}>
       <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={mask.label(`${row.a11yLabel} ${BUDGET_TEXT.changeButton(row.category)}.`)}
-        onPress={() => openForm(row.category, month, currentMonth)}
-        style={(st) => [styles.cardPress, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
+        accessibilityRole={editable ? 'button' : undefined}
+        accessible
+        accessibilityLabel={mask.label(editable ? `${row.a11yLabel} ${BUDGET_TEXT.changeButton(row.category)}.` : row.a11yLabel)}
+        disabled={!editable}
+        onPress={editable ? () => openForm(row.category, month, currentMonth) : undefined}
+        style={(st) => [styles.cardPress, editable && st.pressed && { opacity: 0.85 }, editable && (st as { focused?: boolean }).focused && styles.focusRing]}>
         <View style={styles.cardHead} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <Txt variant="title" style={{ flexShrink: 1 }}>
             {row.category}
@@ -175,7 +201,7 @@ function CategoryCard({ row, month, currentMonth, refundCents }: { row: BudgetRo
             <Txt variant="label" style={[tabular, { fontFamily: fonts.bold }]}>
               {row.percentText}
             </Txt>
-            <ChevronRight size={20} color={colors.textSecondary} aria-hidden />
+            {editable ? <ChevronRight size={20} color={colors.textSecondary} aria-hidden /> : null}
           </View>
         </View>
         <BudgetBar solidTenths={row.solidTenths} stripedTenths={row.stripedTenths} minimal={row.usedCents > 0} />

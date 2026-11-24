@@ -398,6 +398,37 @@ export function budgetRow(line: MonthBudgetLine & { budgetId: string; budgetVers
   };
 }
 
+/**
+ * Uma categoria de orçamento que o app pode mostrar mesmo sem conhecer (D-121, defensivo): nome de 1 a 40 caracteres. Um banco mais novo
+ * pode devolver mais categorias do que esta versão do app conhece (como a migração que vai acrescentar "Divulgação", "Contabilidade e
+ * sistemas" e "Juros e multas" ao orçamento do negócio).
+ */
+export function isBudgetCategoryName(category: unknown): category is string {
+  return typeof category === 'string' && category.trim() !== '' && [...category].length <= 40;
+}
+
+/**
+ * As linhas de month_budget que o app mostra (D-121, defensivo), por posição, ou null se a lista não é coerente (o app mostra o erro,
+ * nunca um orçamento zerado). A lista do espaço é a de `lists` (o Pessoal e a Família, ou o negócio) que tem a primeira categoria
+ * conhecida; as categorias dela precisam vir todas, na ordem, sem repetir. Uma categoria que o app não conhece (de nenhuma das listas,
+ * vinda de um banco mais novo) é aceita, mas só fica se já tiver orçamento gravado (`hasBudgetRow`): assim o total não esconde um orçamento
+ * de verdade, e esta versão nunca oferece "Definir orçamento" para uma categoria que ela não sabe gravar.
+ */
+export function budgetLinesToKeep(lines: readonly { category: string; hasBudgetRow: boolean }[], lists: readonly (readonly string[])[]): number[] | null {
+  const list = lists.find((l) => lines.some((x) => l.includes(x.category)));
+  if (!list) return null;
+  const known = lines.filter((x) => list.includes(x.category)).map((x) => x.category);
+  if (known.length !== list.length || known.some((c, i) => c !== list[i])) return null;
+  if (new Set(lines.map((x) => x.category)).size !== lines.length) return null;
+  const keep: number[] = [];
+  for (const [i, x] of lines.entries()) {
+    if (list.includes(x.category)) keep.push(i);
+    else if (!isBudgetCategoryName(x.category) || lists.some((l) => l.includes(x.category))) return null;
+    else if (x.hasBudgetRow) keep.push(i);
+  }
+  return keep;
+}
+
 /** Linha com orçamento no mês? (as outras vão para "Definir orçamento"). */
 function hasBudget(l: MonthBudgetLine): l is MonthBudgetLine & { budgetId: string; budgetVersion: number; budgetFrom: IsoMonth; budgetCents: Cents } {
   return l.budgetCents !== null && l.budgetId !== null && l.budgetVersion !== null && l.budgetFrom !== null;

@@ -1,11 +1,16 @@
 import {
   BUSINESS_PEOPLE_TEXT,
+  BUSINESS_PROFILES,
+  BUSINESS_PROFILE_LABEL,
+  BUSINESS_PROFILE_NONE_LABEL,
   BUSINESS_TEXT,
   BUSINESS_WORDS,
   PAYABLES_NAV_TEXT,
   addMonths,
   businessErrorText,
   businessPeopleVisible,
+  businessProfileSlot,
+  otherBusinessProfileSlots,
   canEndBusiness,
   businessMonthShort,
   businessPeriodText,
@@ -13,11 +18,14 @@ import {
   formatBRL,
   formatMonthBR,
   formatMonthYearBR,
+  meiLimit,
   type BusinessContext,
   type BusinessMonth,
+  type BusinessProfile,
+  type IsoMonth,
 } from '@clarevo/core';
 import { router, useFocusEffect } from 'expo-router';
-import { ArrowDownLeft, ArrowUpRight, HandCoins, Pencil, Plus, ShieldCheck, Store, Trash2 } from 'lucide-react-native';
+import { ArrowDownLeft, ArrowUpRight, CalendarRange, Download, HandCoins, Pencil, Plus, ShieldCheck, Store, Trash2, Wallet } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -29,21 +37,22 @@ import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { MonthStepper } from '@/components/month-stepper';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
-import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
+import { Banner, Button, Card, Chip, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useValuesHidden } from '@/lib/privacy';
 import { useAccessCanWrite } from '@/state/access';
-import { useBusiness, useEndBusiness, useSharedBusinessPeople } from '@/state/business';
-import { useBusinessOverview, useView } from '@/state/data';
+import { useBusiness, useEndBusiness, useSetBusinessProfile, useSharedBusinessPeople } from '@/state/business';
+import { useBusinessOverview, useBusinessYear, useView } from '@/state/data';
 import { attemptFamily, useFamilyKeys } from '@/state/family';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 const T = BUSINESS_TEXT;
 
 /**
- * Seu negócio (D-113, D-113b). Sem negócio: o que é o espaço Negócio e "Criar o espaço Negócio". Com negócio: o mês (entrou, saiu e
- * sobrou, numa cor só, com a frase de fato), as retiradas para o Pessoal à parte, os últimos meses, as maiores saídas do mês, a retirada,
- * o nome e encerrar. Abrir esta tela escolhe o negócio no seletor: anotar daqui vai para o negócio. Negócio compartilhado (D-116, D-120):
+ * Seu negócio (D-113, D-113b, D-121). Sem negócio: o que é o espaço Negócio e "Criar o espaço Negócio". Com negócio: o mês (entrou, saiu e
+ * sobrou da operação, numa cor só, com a frase de fato), o que ficou fora da operação e as retiradas para o Pessoal à parte, com o que
+ * ficou no negócio, a retirada e o dinheiro trazido do Pessoal, o limite do MEI (só com o tipo MEI), o "Resumo do ano", os últimos meses,
+ * as maiores saídas do mês, o tipo do negócio, o nome e encerrar (com a oferta de exportar antes). Abrir esta tela escolhe o negócio no seletor: anotar daqui vai para o negócio. Negócio compartilhado (D-116, D-120):
  * "Pessoas do negócio" só com o Plus aberto, para quem não administra ou quando já há outras pessoas; quem só vê não encontra as ações
  * de anotar, e só quem administra muda o nome e encerra.
  */
@@ -185,6 +194,10 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
               <Txt variant="caption" color={colors.textSecondary}>
                 {T.withdrawHint}
               </Txt>
+              <Button label={T.contribute} icon={Wallet} tone="soft" onPress={() => router.push('/negocio/trazer')} />
+              <Txt variant="caption" color={colors.textSecondary}>
+                {T.contributeHint}
+              </Txt>
               <View style={styles.actions}>
                 <Button
                   label={BUSINESS_WORDS.addIn}
@@ -203,6 +216,18 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
               </View>
             </View>
           ) : null}
+          {business.businessProfile === 'mei' ? <MeiCard contextId={business.id} month={month} currentMonth={currentMonth} /> : null}
+          <View style={{ gap: space[2] }}>
+            <Button
+              label={T.yearLink}
+              icon={CalendarRange}
+              tone="soft"
+              onPress={() => router.push({ pathname: '/negocio/ano', params: { ano: month.slice(0, 4) } })}
+            />
+            <Txt variant="caption" color={colors.textSecondary}>
+              {T.yearLinkHint}
+            </Txt>
+          </View>
           <LastMonthsCard months={overview.data.months} />
           <TopOutCard lines={overview.data.topOut} />
           <Txt variant="caption" color={colors.textSecondary}>
@@ -212,6 +237,8 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
       )}
 
       {showPeople && people.data ? <BusinessPeopleSection business={business} people={people.data} setNotice={setNotice} /> : null}
+
+      {owner && canWrite ? <ProfileCard business={business} /> : null}
 
       {owner ? (
         <Card style={{ gap: space[3] }}>
@@ -247,6 +274,18 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
         onConfirm={doEnd}>
         <Txt style={{ fontFamily: fonts.bold }}>{business.name}</Txt>
         <Txt color={colors.textSecondary}>{T.endBody}</Txt>
+        {/* D-121: antes de confirmar, a cópia dos lançamentos (a exportação de sempre, com o negócio e todo o período escolhidos). */}
+        <Txt color={colors.textSecondary}>{T.endKeep}</Txt>
+        <Button
+          label={T.endExport}
+          icon={Download}
+          tone="soft"
+          disabled={end.isPending}
+          onPress={() => {
+            setConfirmEnd(false);
+            router.push({ pathname: '/conta/exportar', params: { espaco: 'negocio', periodo: 'tudo' } });
+          }}
+        />
       </ConfirmDialog>
     </>
   );
@@ -274,20 +313,131 @@ function MonthCard({ m }: { m: BusinessMonth }) {
             <Figure label={T.leftLabel} cents={m.leftCents} strong />
           </View>
           {hidden ? null : <MoneyTxt>{businessResultText(m)}</MoneyTxt>}
-          {m.withdrawnCents > 0 ? (
+          {/* Fora da operação (D-121): o que entrou ou saiu sem ser venda nem gasto do dia a dia, com a frase do porquê. */}
+          {m.outside.length > 0 ? <OutsideBlock m={m} /> : null}
+          {m.withdrawnCents > 0 || m.outside.length > 0 ? (
             <View style={{ gap: space[1] }}>
-              <MoneyTxt variant="label" color={colors.textSecondary}>
-                {T.withdrawnLine(m.withdrawnCents)}
-              </MoneyTxt>
+              {m.withdrawnCents > 0 ? (
+                <MoneyTxt variant="label" color={colors.textSecondary}>
+                  {T.withdrawnLine(m.withdrawnCents)}
+                </MoneyTxt>
+              ) : null}
               {hidden ? null : (
                 <MoneyTxt variant="label" color={colors.textSecondary}>
-                  {T.keptLine(m.keptCents)}
+                  {T.keptLine(m.keptCents, m.outside.length > 0, m.withdrawnCents > 0)}
                 </MoneyTxt>
               )}
             </View>
           ) : null}
         </>
       )}
+    </Card>
+  );
+}
+
+/** Fora da operação no mês: cada categoria com o que entrou ou saiu, numa cor só, e a frase do porquê. */
+function OutsideBlock({ m }: { m: BusinessMonth }) {
+  const mask = useMoneyLabelMask();
+  return (
+    <View style={styles.outside}>
+      <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={3}>
+        {T.outsideTitle}
+      </Txt>
+      {m.outside.map((l) => (
+        <View key={`${l.kind}|${l.category}`} style={styles.topRow} accessible accessibilityLabel={mask(T.outsideA11y(l))}>
+          <Txt variant="label" style={{ flex: 1 }} numberOfLines={2}>
+            {`${l.kind === 'receita' ? T.outsideIn : T.outsideOut} · ${l.category}`}
+          </Txt>
+          <MoneyTxt variant="label" style={{ fontFamily: fonts.bold }}>
+            {formatBRL(l.cents)}
+          </MoneyTxt>
+        </View>
+      ))}
+      <Txt variant="caption" color={colors.textSecondary}>
+        {T.outsideWhy}
+      </Txt>
+    </View>
+  );
+}
+
+/**
+ * Limite do MEI (D-121), só com o tipo MEI: as vendas e os serviços anotados no ano do mês mostrado e a parte do limite anual, como fato,
+ * numa cor só. Acima de 100%, só o fato e "Se tiver dúvida, procure orientação de contabilidade.". Com valores ocultos, uma linha e uma frase
+ * neutras, sempre as mesmas.
+ */
+function MeiCard({ contextId, month, currentMonth }: { contextId: string; month: IsoMonth; currentMonth: IsoMonth }) {
+  const hidden = useValuesHidden();
+  const year = Number(month.slice(0, 4));
+  const data = useBusinessYear(contextId, year, currentMonth);
+  const limit = data.data ? meiLimit(year, data.data.salesCents, data.data.servicesCents) : null;
+  return (
+    <Card style={{ gap: space[2] }}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {T.meiTitle}
+      </Txt>
+      {data.isError ? (
+        <ErrorState message={T.loadFailed} onRetry={() => data.refetch()} />
+      ) : !limit ? (
+        <Skeleton width="100%" height={48} />
+      ) : (
+        <>
+          {/* Com valores ocultos, nada diz o valor, a parte do limite, se passou dele ou se não há venda anotada: a linha e a frase são sempre as mesmas. */}
+          <MoneyTxt>{hidden ? T.meiLineHidden(limit) : limit.revenueCents === 0 ? T.meiNone(year) : T.meiLine(limit)}</MoneyTxt>
+          <MoneyTxt variant="caption" color={colors.textSecondary}>
+            {hidden ? `${T.meiCounts} ${T.meiHiddenNote}` : limit.over ? T.meiOver : `${T.meiCounts} ${T.meiNote}`}
+          </MoneyTxt>
+        </>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * O tipo do negócio (D-121), opcional, só para quem administra: escolher grava na hora (set_business_profile). "Prefiro não dizer" grava
+ * nulo. Sem número de CNPJ.
+ */
+function ProfileCard({ business }: { business: BusinessContext }) {
+  const save = useSetBusinessProfile();
+  const keys = useFamilyKeys();
+  const [pending, setPending] = useState<BusinessProfile | null | undefined>(undefined);
+  // O resultado fica no próprio card (a escolha está embaixo da tela; a faixa do topo ficaria fora da vista).
+  const [saved, setSaved] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const current = pending !== undefined ? pending : business.businessProfile;
+  async function choose(profile: BusinessProfile | null) {
+    if (save.isPending || profile === business.businessProfile) return;
+    setPending(profile);
+    setError(null);
+    setSaved(null);
+    // Uma chave por opção; escolher uma solta as das outras (uma tentativa incerta em outra opção não volta a valer depois).
+    for (const slot of otherBusinessProfileSlots(business.id, profile)) keys.done(slot);
+    const r = await attemptFamily(keys, businessProfileSlot(business.id, profile), (key) => save.mutateAsync({ key, contextId: business.id, profile }));
+    setPending(undefined);
+    if (r.ok) setSaved(profile === null ? T.profileNoneSaved : T.profileSaved);
+    else setError(businessErrorText(r.code));
+  }
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {T.profileTitle}
+      </Txt>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {T.profileHint}
+      </Txt>
+      <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={T.profileTitle}>
+        {BUSINESS_PROFILES.map((p) => (
+          <Chip key={p} label={BUSINESS_PROFILE_LABEL[p]} selected={current === p} onPress={() => choose(p)} />
+        ))}
+        <Chip label={BUSINESS_PROFILE_NONE_LABEL} selected={current === null} onPress={() => choose(null)} />
+      </View>
+      <FlashBanner message={saved} />
+      {error ? (
+        <Banner tone="erro">
+          <Txt variant="label" color={colors.error}>
+            {error}
+          </Txt>
+        </Banner>
+      ) : null}
     </Card>
   );
 }
@@ -387,6 +537,8 @@ const styles = StyleSheet.create({
   monthRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: space[2], minHeight: 44 },
   rowLine: { borderBottomWidth: 1, borderBottomColor: colors.border },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
+  outside: { gap: space[2], paddingTop: space[3], borderTopWidth: 1, borderTopColor: colors.border },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
   barTrack: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden' },
   barFill: { height: 8, borderRadius: 4, backgroundColor: colors.brand },
 });

@@ -80,11 +80,15 @@ export default function ResumoScreen() {
   const shownChange = change && change.month === month && change.kind === kind ? change : null;
 
   // Espaço Negócio (auditoria de 18/11/2026): entradas e saídas, como em "Seu negócio". Num mês com retirada para o Pessoal, o total da
-  // direita inclui as retiradas (o dinheiro saiu do negócio) e o rótulo diz isso.
+  // direita inclui as retiradas (o dinheiro saiu do negócio) e o rótulo diz isso. D-121: os números do Resumo não mudam (o dinheiro entrou
+  // e saiu de verdade), mas num mês com algo fora da operação o total do meio é o que ficou no negócio, como em "Seu negócio" (lá, "Sobrou"
+  // é só da operação).
   const inBusiness = kind === 'negocio';
-  const withdrawn = inBusiness && contextId && records.data ? businessMonth(records.data, contextId, month).withdrawnCents > 0 : false;
+  const bizMonth = inBusiness && contextId && records.data ? businessMonth(records.data, contextId, month) : null;
+  const withdrawn = bizMonth ? bizMonth.withdrawnCents > 0 : false;
+  const kept = withdrawn || (bizMonth ? bizMonth.outside.length > 0 : false);
   const words = {
-    left: inBusiness ? (withdrawn ? BUSINESS_WORDS.kept : BUSINESS_WORDS.left) : 'Diferença do mês',
+    left: inBusiness ? (kept ? BUSINESS_WORDS.kept : BUSINESS_WORDS.left) : 'Diferença do mês',
     leftCaption: inBusiness ? BUSINESS_WORDS.leftCaption(month, today, withdrawn) : SUMMARY_NAV_TEXT.differenceCaption(month, today),
     leftCaptionA11y: inBusiness ? BUSINESS_WORDS.leftCaptionA11y(month, today, withdrawn) : SUMMARY_NAV_TEXT.differenceCaptionA11y(month, today),
     negative: inBusiness ? BUSINESS_WORDS.negative : 'Pagamentos acima dos recebimentos no período',

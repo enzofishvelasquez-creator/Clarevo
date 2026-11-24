@@ -2,7 +2,9 @@ import {
   ACCOUNT_KINDS,
   ACCOUNT_NAME_MAX,
   BUDGET_CATEGORIES,
-  BUSINESS_CATEGORIES,
+  BUSINESS_BUDGET_CATEGORIES,
+  budgetLinesToKeep,
+  isBudgetCategoryName,
   BUDGET_MAX_CENTS,
   BUDGET_MIN_CENTS,
   ESSENTIAL_BASE_SOURCES,
@@ -20,6 +22,7 @@ import {
   BUSINESS_MAX_PEOPLE,
   BUSINESS_NEUTRAL_NAME,
   businessFirstNameOf,
+  businessProfileOf,
   RepoError,
   SAVINGS_ANSWERS,
   SAVINGS_MIN_MONTHLY_CENTS,
@@ -185,6 +188,9 @@ import {
   type WebSubscriptionStart,
   type LegalAcceptance,
   type BusinessContext,
+  type BusinessContribution,
+  type BusinessContributionInput,
+  type BusinessProfile,
   type BusinessWithdrawal,
   type BusinessWithdrawalInput,
   type BusinessInvite,
@@ -663,6 +669,8 @@ const KNOWN: RepoErrorCode[] = [
   'retirada_ligada',
   'nao_e_retirada',
   'lancamento_ligado',
+  // Tipo do negócio (D-121, 20261124000001, migração 0044).
+  'perfil_invalido',
   // Gasto ligado, subcategoria, troca de tipo e rendimento de investimento (D-107, 20261117000002).
   'subcategoria_invalida',
   'tipo_nao_muda',
@@ -1097,23 +1105,25 @@ function toIncomeReference(r: IncomeReferenceRow): IncomeReference {
   };
 }
 
-/** As listas de categorias do orçamento: a do Pessoal e da Família e a do negócio (D-113). */
-const BUDGET_LISTS: readonly (readonly string[])[] = [BUDGET_CATEGORIES, BUSINESS_CATEGORIES.despesa];
-/** A ordem de uma categoria na lista dela (as do negócio nunca se misturam com as do Pessoal num mesmo contexto). */
+/**
+ * As listas de categorias do orçamento: a do Pessoal e da Família e a do negócio (D-113; as 9 de sempre: a D-121 acrescenta categorias de
+ * saída que ainda não entram no orçamento, e um banco mais novo que as tenha no orçamento é lido por budgetLinesToKeep).
+ */
+const BUDGET_LISTS: readonly (readonly string[])[] = [BUDGET_CATEGORIES, BUSINESS_BUDGET_CATEGORIES];
+/** A ordem de uma categoria na lista dela (as do negócio nunca se misturam com as do Pessoal num mesmo contexto); uma desconhecida no fim. */
 const budgetOrder = (category: string): number => {
   for (const list of BUDGET_LISTS) if (list.includes(category)) return list.indexOf(category);
   return 99;
 };
-
 /**
- * Orçamento de uma categoria: categoria entre as de BUDGET_CATEGORIES ou as do negócio, mês no dia 1, valor nulo ou de R$ 1,00 a
- * R$ 9.999.999,99 e versão a partir de 1.
+ * Orçamento de uma categoria: categoria com nome (das listas do app ou uma que ele ainda não conhece), mês no dia 1, valor nulo ou de
+ * R$ 1,00 a R$ 9.999.999,99 e versão a partir de 1.
  */
 function toCategoryBudget(r: CategoryBudgetRow): CategoryBudget {
   const amountCents = wholeOrNull(r.amount_cents);
   const version = whole(r.version);
   const consistent =
-    BUDGET_LISTS.some((list) => list.includes(r.category)) &&
+    isBudgetCategoryName(r.category) &&
     FIRST_DAY.test(r.from_month) &&
     (amountCents === null || (amountCents >= BUDGET_MIN_CENTS && amountCents <= BUDGET_MAX_CENTS)) &&
     version >= 1;
@@ -1149,21 +1159,26 @@ function toCommitmentLimit(r: CommitmentLimitRow): CommitmentLimit {
 }
 
 /**
- * month_budget: sempre as categorias de BUDGET_CATEGORIES (sete) ou, no negócio (D-113), as nove de gasto do negócio, na ordem delas;
+ * month_budget: as categorias de BUDGET_CATEGORIES (sete) ou, no negócio, as 9 de BUSINESS_BUDGET_CATEGORIES (D-113), na ordem delas;
  * orçamento (id, versão, mês e valor) e usado coerentes. Uma lista incompleta ou fora de ordem nunca aparece como um orçamento zerado.
+ * Defensivo (D-121, budgetLinesToKeep): uma categoria que o app não conhece (de um banco mais novo, como o que vai pôr "Divulgação",
+ * "Contabilidade e sistemas" e "Juros e multas" no orçamento do negócio) não derruba a tela: fica com o nome só se já tiver orçamento
+ * gravado, e sai da lista se não tiver (esta versão não oferece "Definir orçamento" para ela).
  */
 function toMonthBudget(month: IsoMonth, rows: readonly MonthBudgetRow[]): MonthBudgetRead {
-  const list = BUDGET_LISTS.find((l) => l.length === rows.length && l[0] === rows[0]?.category);
-  if (!list) throw new RepoError('desconhecido', 'orcamento_inconsistente');
+  const keep = budgetLinesToKeep(
+    rows.map((r) => ({ category: r.category, hasBudgetRow: r.budget_id !== null })),
+    BUDGET_LISTS,
+  );
+  if (!keep) throw new RepoError('desconhecido', 'orcamento_inconsistente');
   return {
     month,
-    lines: rows.map((r, i) => {
+    lines: keep.map((i) => rows[i]!).map((r) => {
       const budgetCents = wholeOrNull(r.budget_cents);
       const budgetVersion = wholeOrNull(r.budget_version);
       const usedCents = whole(r.used_cents);
       const hasRow = r.budget_id !== null;
       const consistent =
-        r.category === list[i] &&
         usedCents >= 0 &&
         hasRow === (r.budget_from !== null) &&
         hasRow === (budgetVersion !== null) &&
@@ -3623,20 +3638,17 @@ export class SupabaseRepository implements RecordsRepository {
    * vínculo em context_memberships (a política memberships_read deixa ler o próprio), sem nada da migração 0043.
    */
   async getBusiness(): Promise<BusinessContext | null> {
-    const { data, error } = await this.db
-      .from('financial_contexts')
-      .select('id, name, created_at')
-      .eq('kind', 'negocio')
-      .is('ended_at', null)
-      .order('created_at')
-      .order('id')
-      .limit(1);
+    const read = (columns: string) =>
+      this.db.from('financial_contexts').select(columns).eq('kind', 'negocio').is('ended_at', null).order('created_at').order('id').limit(1);
+    // O tipo do negócio (D-121) vem da coluna da migração 0044; num banco ainda sem ela (coluna desconhecida, 42703), lê sem o tipo.
+    let { data, error } = await read('id, name, created_at, business_profile');
+    if (error && (error.code === '42703' || /business_profile/.test(error.message ?? ''))) ({ data, error } = await read('id, name, created_at'));
     if (error) throw repoError(error);
-    const row = (data ?? [])[0] as { id: string; name: string; created_at: string } | undefined;
+    const row = ((data ?? []) as unknown as { id: string; name: string; created_at: string; business_profile?: unknown }[])[0];
     if (!row) return null;
     const mine = await this.myBusinessMembership(row.id);
     // Sem o próprio vínculo (não deveria acontecer: create_business e o aceite o criam), o menor papel: o banco decide o resto.
-    return { id: row.id, name: row.name, createdAt: row.created_at, role: mine?.role ?? 'leitor' };
+    return { id: row.id, name: row.name, createdAt: row.created_at, role: mine?.role ?? 'leitor', businessProfile: businessProfileOf(row.business_profile) };
   }
 
   /** O vínculo ativo da própria pessoa no negócio (context_memberships, política memberships_read): o papel e desde quando. */
@@ -3690,6 +3702,28 @@ export class SupabaseRepository implements RecordsRepository {
     const { data, error } = await this.db.rpc('delete_business_withdrawal', { p_key: key, p_record: recordId, p_expected_version: expectedVersion });
     if (error) throw repoError(error);
     return toWithdrawal(data);
+  }
+
+  /** create_business_contribution (D-121, 0044): o dinheiro trazido do Pessoal, com os dois lados no formato da retirada. */
+  async createBusinessContribution(key: string, businessContextId: string, input: BusinessContributionInput): Promise<BusinessContribution> {
+    const { data, error } = await this.db.rpc('create_business_contribution', {
+      p_key: key,
+      p_business: businessContextId,
+      p_business_account: input.businessAccountId,
+      p_personal_account: input.personalAccountId,
+      p_amount_cents: input.amountCents,
+      p_occurred_on: input.occurredOn,
+      p_description: input.description,
+    });
+    if (error) throw repoError(error);
+    return toWithdrawal(data);
+  }
+
+  /** set_business_profile (D-121, 0044): só quem administra; devolve {context: {..., business_profile}}. */
+  async setBusinessProfile(key: string, contextId: string, profile: BusinessProfile | null): Promise<BusinessContext> {
+    const { data, error } = await this.db.rpc('set_business_profile', { p_context: contextId, p_profile: profile, p_key: key });
+    if (error) throw repoError(error);
+    return toBusiness(data);
   }
 
   async moveRecord(key: string, recordId: string, expectedVersion: number, targetContextId: string, accountId: string, category: string | null): Promise<FinancialRecord> {
@@ -4229,21 +4263,28 @@ function toInvite(r: InviteRow | null | undefined): FamilyInvite {
 }
 
 /** {context: {id, name, created_at}, role, invited_by?} de create_family e accept_family_invite. */
-/** {context: {id, name, created_at}} de create_business e rename_business: só quem administra cria e renomeia. */
+/**
+ * {context: {id, name, created_at, business_profile?}} de create_business, rename_business e set_business_profile: só quem administra cria,
+ * renomeia e muda o tipo. Sem business_profile (o banco antes da 0044), o tipo é nulo.
+ */
 function toBusiness(data: unknown): BusinessContext {
-  const c = (data as { context?: { id?: unknown; name?: unknown; created_at?: unknown } } | null)?.context;
+  const c = (data as { context?: { id?: unknown; name?: unknown; created_at?: unknown; business_profile?: unknown } } | null)?.context;
   if (!c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.created_at !== 'string') throw new RepoError('desconhecido', 'negocio_inconsistente');
-  return { id: c.id, name: c.name, createdAt: c.created_at, role: 'titular' };
+  return { id: c.id, name: c.name, createdAt: c.created_at, role: 'titular', businessProfile: businessProfileOf(c.business_profile) };
 }
 
 /** {context: {id, name, created_at, ended_at}, role, invited_by} de accept_business_invite. */
 function toBusinessJoin(data: unknown): BusinessJoin {
-  const r = data as { context?: { id?: unknown; name?: unknown; created_at?: unknown }; role?: unknown; invited_by?: unknown } | null;
+  const r = data as { context?: { id?: unknown; name?: unknown; created_at?: unknown; business_profile?: unknown }; role?: unknown; invited_by?: unknown } | null;
   const c = r?.context;
   if (!r || !c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.created_at !== 'string' || !isFamilyRoleValue(r.role)) {
     throw new RepoError('desconhecido', 'negocio_inconsistente');
   }
-  return { context: { id: c.id, name: c.name, createdAt: c.created_at, role: r.role }, role: r.role, invitedBy: typeof r.invited_by === 'string' ? r.invited_by : BUSINESS_NEUTRAL_NAME };
+  return {
+    context: { id: c.id, name: c.name, createdAt: c.created_at, role: r.role, businessProfile: businessProfileOf(c.business_profile) },
+    role: r.role,
+    invitedBy: typeof r.invited_by === 'string' ? r.invited_by : BUSINESS_NEUTRAL_NAME,
+  };
 }
 
 /**

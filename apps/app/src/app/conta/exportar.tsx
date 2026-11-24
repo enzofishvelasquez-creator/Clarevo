@@ -12,6 +12,7 @@ import {
   type ExportFormat,
   type ExportPeriod,
 } from '@clarevo/core';
+import { useLocalSearchParams } from 'expo-router';
 import { AlertCircle, Check, Download, FileText, Info, Share2 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
@@ -47,14 +48,18 @@ export default function ExportarScreen() {
   const personalId = useSpace().data?.personalContextId;
   // Espaço Negócio (D-113): quem tem um negócio escolhe o espaço do arquivo (o Pessoal, como sempre, ou o negócio).
   const business = useBusiness().data;
-  const [scope, setScope] = useState<'pessoal' | 'negocio'>('pessoal');
+  // Aberta pelo "Resumo do ano" ou pelo "Encerrar o espaço Negócio" (D-121): o negócio e o período já escolhidos (?espaco=negocio&periodo=...).
+  const params = useLocalSearchParams<{ espaco?: string; periodo?: string }>();
+  const [scope, setScope] = useState<'pessoal' | 'negocio'>(params.espaco === 'negocio' ? 'negocio' : 'pessoal');
   const onBusiness = scope === 'negocio' && Boolean(business);
   const contextId = onBusiness ? business!.id : personalId;
   const hidden = useValuesHidden();
   const userId = user?.id;
   const persist = auth.mode !== 'demo';
 
-  const [period, setPeriod] = useState<ExportPeriod>(DEFAULT_EXPORT_PERIOD);
+  const [period, setPeriod] = useState<ExportPeriod>(
+    (EXPORT_PERIODS as readonly string[]).includes(params.periodo ?? '') ? (params.periodo as ExportPeriod) : DEFAULT_EXPORT_PERIOD,
+  );
   const [format, setFormat] = useState<ExportFormat>(DEFAULT_EXPORT_FORMAT);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);

@@ -99,6 +99,7 @@ import {
   type Phase3Point,
   type BusinessMonth,
   type BusinessOutLine,
+  type BusinessYear,
   type ContextKind,
   type FamilyRole,
   type FinancialRecord,
@@ -151,6 +152,7 @@ import {
   businessMonth,
   businessMonths,
   businessTopOut,
+  businessYear,
 } from '@clarevo/core';
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { createContext, use, useEffect, useMemo, useRef } from 'react';
@@ -1075,6 +1077,33 @@ export function useBusinessOverview(contextId: string | undefined, month: IsoMon
     return { current: businessMonth(all, contextId, month), months: businessMonths(all, contextId, month, count), topOut: businessTopOut(all, contextId, month) };
   }, [ready, contextId, month, count, version]); // eslint-disable-line react-hooks/exhaustive-deps
   return { data, isPending: !ready && !failed, isError: failed, refetch: () => Promise.all(results.map((q) => q.refetch())) };
+}
+
+/**
+ * O ano do negócio (D-121): os meses de janeiro até dezembro, ou até o mês de hoje no ano corrente (as chaves de useMonthRecords),
+ * resumidos para o "Resumo do ano" e o limite do MEI. Lê também janeiro do ano seguinte, se já chegou: uma venda de 30/12 marcada para o mês
+ * seguinte conta em janeiro, mas o limite do MEI a soma no ano da data dela. `year` indefinido ou `contextId` indefinido: desligado.
+ */
+export function useBusinessYear(contextId: string | undefined, year: number | undefined, currentMonth: IsoMonth) {
+  const months = useMemo(() => {
+    if (year === undefined) return [] as IsoMonth[];
+    const out: IsoMonth[] = [];
+    for (let m = 1; m <= 13; m += 1) {
+      const month = m <= 12 ? `${String(year).padStart(4, '0')}-${String(m).padStart(2, '0')}` : `${String(year + 1).padStart(4, '0')}-01`;
+      if (month > currentMonth) break;
+      out.push(month);
+    }
+    return out;
+  }, [year, currentMonth]);
+  const results = useRecordsOfMonths(contextId, months);
+  const ready = results.every((q) => q.isSuccess);
+  const failed = results.some((q) => q.isError);
+  const version = results.map((q) => q.dataUpdatedAt).join('|');
+  const data = useMemo((): BusinessYear | undefined => {
+    if (!ready || !contextId || year === undefined) return undefined;
+    return businessYear(results.flatMap((q) => q.data ?? []), contextId, year);
+  }, [ready, contextId, year, version]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { data, isPending: year !== undefined && !ready && !failed, isError: failed, refetch: () => Promise.all(results.map((q) => q.refetch())) };
 }
 
 // ---------------------------------------------------------------------------
