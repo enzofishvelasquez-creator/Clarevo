@@ -65,6 +65,7 @@ import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import type { BusinessContext, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
+import type { BusinessInvite, BusinessInvitePreview, BusinessInviteRole, BusinessInviteWrite, BusinessJoin, BusinessPeople, PlusStatus } from './business-people';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
 import type { SignupSource, SignupSourceOption } from './signup-source';
@@ -906,18 +907,22 @@ export interface RecordsRepository {
   // mesmo espaço das outras operações): repetir a mesma chave devolve o mesmo resultado; outro conteúdo com a mesma chave é
   // chave_reutilizada. Criar, renomear e encerrar não contam como anotação na atividade.
 
-  /** O negócio ativo da pessoa (o primeiro, por criação), ou null. Só quem é titular ou tem vínculo lê. */
+  /**
+   * O negócio ativo da pessoa (o primeiro, por criação), ou null, com o papel dela (D-120). Só quem é titular ou tem vínculo lê. Um
+   * negócio por pessoa por vez: o próprio ou o de outra pessoa.
+   */
   getBusiness(): Promise<BusinessContext | null>;
   /**
    * create_business. Quem cria vira titular e o negócio nasce com a "Conta do negócio". Ordem: repetição; sem_permissao (sem espaço
-   * pessoal); nome_do_negocio_invalido (1 a 60 caracteres); ja_tem_negocio (um negócio ativo por pessoa).
+   * pessoal); nome_do_negocio_invalido (1 a 60 caracteres); ja_tem_negocio (um negócio ativo por pessoa, o próprio ou o de outra pessoa).
    */
   createBusiness(key: string, name: string): Promise<BusinessContext>;
   /** rename_business. Só o titular. Ordem: repetição; nao_encontrado; contexto_invalido; sem_permissao; nome_do_negocio_invalido. */
   renameBusiness(key: string, contextId: string, name: string): Promise<BusinessContext>;
   /**
    * end_business. Só o titular e só sem outra pessoa ativa (negocio_com_membros). Desliga as retiradas (os recebimentos do Pessoal ficam,
-   * como recebimentos comuns), revoga o vínculo e marca o fim; os dados ficam guardados, sem leitura, até a limpeza dos 6 meses.
+   * como recebimentos comuns), revoga o vínculo, cancela os convites pendentes (0043) e marca o fim; os dados ficam guardados, sem leitura,
+   * até a limpeza dos 6 meses.
    */
   endBusiness(key: string, contextId: string): Promise<void>;
   /**
@@ -937,6 +942,44 @@ export interface RecordsRepository {
    * lancamento_ligado; contexto_invalido; sem_permissao; as regras de createRecord no destino. Devolve o lançamento novo.
    */
   moveRecord(key: string, recordId: string, expectedVersion: number, targetContextId: string, accountId: string, category: string | null): Promise<FinancialRecord>;
+
+  // Negócio compartilhado (D-116, Clarevo Plus; D-120: pronto e desligado). Regras e textos em business-people.ts, iguais aos da migração
+  // 0043. Toda escrita leva uma chave de idempotência (o mesmo espaço das outras operações): repetir a mesma chave devolve o mesmo
+  // resultado; outro conteúdo com a mesma chave é chave_reutilizada. Nenhuma conta como anotação na atividade. Compatibilidade: com o Plus
+  // fechado, o app não depende da migração 0043 (o banco de produção pode ainda não tê-la).
+
+  /** plus_status: o Plus está aberto? Qualquer falha (a função ainda não existe, sem conexão) conta como fechado. */
+  getPlusStatus(): Promise<PlusStatus>;
+  /**
+   * As pessoas do negócio: o papel de quem consulta (o próprio vínculo), as pessoas pela visão business_member_items (ativas, quem
+   * administra no topo, e as que saíram, só o primeiro nome) e, para quem administra, os convites ainda válidos. Só lê a visão e os
+   * convites com o Plus aberto ou para quem não administra; senão, devolve só a própria pessoa, administrando, sem convites.
+   */
+  getBusinessPeople(contextId: string): Promise<BusinessPeople>;
+  /**
+   * create_business_invite. Ordem: repetição; nao_encontrado; contexto_invalido; sem_permissao (não administra); plus_indisponivel;
+   * papel_invalido; negocio_cheio (pessoas ativas mais convites válidos já somam 6); assinatura_necessaria. O código aparece uma única
+   * vez; repetir a chave devolve o convite com code null.
+   */
+  createBusinessInvite(key: string, contextId: string, role: BusinessInviteRole): Promise<BusinessInviteWrite>;
+  /** cancel_business_invite. Só quem administra. Convite já usado: convite_ja_usado; já cancelado ou vencido: segue cancelado, sem erro. */
+  cancelBusinessInvite(key: string, inviteId: string): Promise<BusinessInvite>;
+  /**
+   * preview_business_invite (só leitura): o nome do negócio, o primeiro nome de quem convidou, o papel e a validade. Convite malformado,
+   * que não existe, usado, cancelado, vencido ou de negócio encerrado: sempre convite_invalido.
+   */
+  previewBusinessInvite(code: string): Promise<BusinessInvitePreview>;
+  /**
+   * accept_business_invite. Ordem: repetição; sem_permissao (sem espaço Pessoal); convite_invalido; ja_no_negocio (já está neste negócio);
+   * ja_tem_negocio (já participa de outro negócio, próprio ou de outra pessoa); negocio_cheio. Uso único. Não passa pela chave do Plus.
+   */
+  acceptBusinessInvite(key: string, code: string): Promise<BusinessJoin>;
+  /** leave_business. Quem anota ou só vê sai e as retiradas dela deixam de ser ligadas; quem administra recebe titular_nao_sai. */
+  leaveBusiness(key: string, contextId: string): Promise<void>;
+  /** remove_business_member. Só quem administra, nunca sobre si (nao_sobre_si); a pessoa precisa estar ativa (nao_encontrado). */
+  removeBusinessMember(key: string, contextId: string, personId: string): Promise<void>;
+  /** set_business_member_role. Só quem administra, nunca sobre si. 'membro' lê e anota; 'leitor' só lê. */
+  setBusinessMemberRole(key: string, contextId: string, personId: string, role: BusinessInviteRole): Promise<void>;
 
   // Excluir minha conta (D-058, Ciclo P). Regras e textos em deletion.ts, iguais aos da migração 0015 (delete_my_account).
 
@@ -1158,6 +1201,9 @@ export type RepoErrorCode =
   | 'nome_do_negocio_invalido'
   | 'ja_tem_negocio'
   | 'negocio_com_membros'
+  | 'plus_indisponivel'
+  | 'negocio_cheio'
+  | 'ja_no_negocio'
   | 'retirada_ligada'
   | 'nao_e_retirada'
   | 'lancamento_ligado'

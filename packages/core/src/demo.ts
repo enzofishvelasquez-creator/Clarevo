@@ -1,3 +1,4 @@
+import { MemoryBusinessHub } from './memory-business-people';
 import { MemoryCompanyHub } from './memory-company';
 import { MemoryRepository } from './memory-repository';
 import { newOperationKey } from './repository';
@@ -47,7 +48,8 @@ import { demoTrialAccess } from './plano';
  * tênis, R$ 200,00, e o restaurante, R$ 200,00; a compra no cartão conta no mês da compra). Limite pessoal de 60% a partir de
  * outubro (outubro 52,5% de 60%; novembro passa 13,0 pontos). Nada disso muda os totais de outubro.
  * Espaço Negócio (D-113), só no cenário 'negocio': "Sacolé da Maria", FICTÍCIO, num contexto separado (DEMO_BUSINESS_RECORDS): nenhum
- * total do Pessoal muda.
+ * total do Pessoal muda. Negócio compartilhado (D-116, Clarevo Plus; D-120), só nos cenários 'negocio-plus' e 'negocio-plus-membro', com
+ * o Plus aberto e pessoas FICTÍCIAS, identificadas só pelo primeiro nome.
  */
 export const DEMO_TODAY = '2026-10-07';
 export const DEMO_EMAIL = 'demo@clarevo.app';
@@ -71,10 +73,20 @@ export const DEMO_EMAIL = 'demo@clarevo.app';
  * - 'nivel': o cenário 'retorno' com a regra da queda do nível contando desde DEMO_LEVEL_COUNT_DAY, para o aviso de queda (D-111).
  * - 'negocio': a base de aceite com o negócio de exemplo "Sacolé da Maria" (D-113, DEMO_BUSINESS_RECORDS), num contexto separado: os
  *   totais do Pessoal não mudam. O seletor de espaço aparece no Resumo, em Movimentos e em Metas, com Pessoal e o nome do negócio.
+ * - 'negocio-plus': o cenário 'negocio' com o Plus aberto e o negócio compartilhado (D-116, D-120): Maria administra "Sacolé da Maria"
+ *   com Rafa ("Anota e vê", anotou duas entradas de outubro), Nina saiu do negócio (anotou o gás de setembro) e há um convite pendente
+ *   ("Só vê", vale até 14/10). Os totais do negócio e do Pessoal são os do cenário 'negocio'.
+ * - 'negocio-plus-membro': a base de aceite com o Plus aberto e Maria "Anota e vê" no negócio de outra pessoa, "Marmitas da Bia"
+ *   (DEMO_MEMBER_BUSINESS_RECORDS), que Bia administra: a visão de quem não administra.
  * Conta nova nunca recebe nenhum deles.
  */
-export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao' | 'metas' | 'nivel' | 'negocio';
-export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao', 'metas', 'nivel', 'negocio'];
+export type DemoScenario = 'padrao' | 'retorno' | 'assinaturas' | 'evolucao' | 'metas' | 'nivel' | 'negocio' | 'negocio-plus' | 'negocio-plus-membro';
+export const DEMO_SCENARIOS: readonly DemoScenario[] = ['padrao', 'retorno', 'assinaturas', 'evolucao', 'metas', 'nivel', 'negocio', 'negocio-plus', 'negocio-plus-membro'];
+
+/** Os cenários do negócio compartilhado (D-120): só neles o Plus abre na demonstração. */
+export function demoScenarioOpensPlus(scenario: DemoScenario): boolean {
+  return scenario === 'negocio-plus' || scenario === 'negocio-plus-membro';
+}
 /**
  * Dia em que as duas metas de exemplo foram criadas no cenário 'metas' (D-105): a base de aceite, com a reserva e a viagem criadas (e o
  * já guardado ao criar) em 01/07/2026, três meses antes de 07/10/2026, para o convite "Quer rever as suas metas?" aparecer. O aporte de
@@ -108,7 +120,15 @@ export function createDemoCompanyHub(adminPersonId: string = 'pessoa-demo'): Mem
   return hub;
 }
 
-export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario; cards?: boolean } = {}) {
+/**
+ * O hub dos negócios da demonstração (D-120): o dia fixo da demonstração e o Plus aberto só nos cenários do negócio compartilhado. A
+ * versão web passa o mesmo hub às contas criadas nela, para um convite do negócio poder ser aceito por outra conta no mesmo uso.
+ */
+export function createDemoBusinessHub(scenario: DemoScenario = 'padrao'): MemoryBusinessHub {
+  return new MemoryBusinessHub({ now: () => Date.parse(`${DEMO_TODAY}T12:00:00.000Z`), plusOpen: demoScenarioOpensPlus(scenario) });
+}
+
+export async function createDemoRepository(opts: { latencyMs?: number; scenario?: DemoScenario; cards?: boolean; business?: MemoryBusinessHub } = {}) {
   if (opts.scenario === 'retorno') return createReturnDemoRepository(opts.latencyMs);
   if (opts.scenario === 'nivel') return createReturnDemoRepository(opts.latencyMs, DEMO_LEVEL_COUNT_DAY);
   if (opts.scenario === 'evolucao') return createEvolutionDemoRepository(opts.latencyMs);
@@ -126,6 +146,7 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
     latencyMs: 0,
     company: createDemoCompanyHub(),
     access: () => trial,
+    business: opts.business ?? createDemoBusinessHub(opts.scenario),
   });
   const space = await repo.ensurePersonalSpace('Conta principal');
   const ctx = space.personalContextId;
@@ -387,6 +408,9 @@ export async function createDemoRepository(opts: { latencyMs?: number; scenario?
   // mostra como fazer uma. Fora do cenário, a demonstração padrão não tem negócio (o seletor de espaço continua fora do Resumo) e deixa
   // criar um, só na memória do aparelho.
   if (opts.scenario === 'negocio') await seedDemoBusiness(repo);
+  // Negócio compartilhado (D-116, D-120), só nos cenários com o Plus aberto. As pessoas são FICTÍCIAS e só existem no hub da memória.
+  if (opts.scenario === 'negocio-plus') await seedDemoSharedBusiness(repo);
+  if (opts.scenario === 'negocio-plus-membro') await seedDemoMemberBusiness(repo);
 
   // A latência só passa a valer depois de semear, para a demonstração abrir rápido.
   repo.latencyMs = opts.latencyMs ?? 0;
@@ -423,6 +447,87 @@ async function seedDemoBusiness(repo: MemoryRepository) {
   const accountId = (await repo.listAccounts(business.id))[0]!.id;
   for (const [kind, description, reais, occurredOn, category] of DEMO_BUSINESS_RECORDS) {
     await repo.createRecord(newOperationKey(), business.id, kind, { accountId, amountCents: reais * 100, occurredOn, description, category });
+  }
+  return business;
+}
+
+/**
+ * Pessoas FICTÍCIAS do negócio compartilhado da demonstração (D-120), só com o primeiro nome: Rafa anota e vê em "Sacolé da Maria", Nina
+ * saiu de lá, e Bia administra "Marmitas da Bia", o negócio em que Maria anota e vê no cenário 'negocio-plus-membro'.
+ */
+export const DEMO_BUSINESS_PEOPLE = {
+  helper: { personId: 'pessoa-rafa', firstName: 'Rafa' },
+  former: { personId: 'pessoa-nina', firstName: 'Nina' },
+  owner: { personId: 'pessoa-bia', firstName: 'Bia' },
+} as const;
+
+/** Lançamentos de "Sacolé da Maria" que, no cenário 'negocio-plus', Rafa (outubro) e Nina (setembro) anotaram: [descrição, data]. */
+export const DEMO_SHARED_AUTHORS: readonly (readonly [string, string, 'helper' | 'former'])[] = [
+  ['Encomenda de festa', '2026-10-03', 'helper'],
+  ['Vendas da semana', '2026-10-05', 'helper'],
+  ['Gás de cozinha', '2026-09-10', 'former'],
+];
+
+/** A autoria de um lançamento já gravado na memória da demonstração (quem anotou foi outra pessoa do negócio, FICTÍCIA). */
+function setDemoAuthor(repo: MemoryRepository, contextId: string, description: string, occurredOn: string, personId: string) {
+  const records = repo['records'];
+  for (const [id, r] of records) {
+    if (r.contextId === contextId && r.description === description && r.occurredOn === occurredOn) records.set(id, { ...r, createdBy: personId });
+  }
+}
+
+/**
+ * Cenário 'negocio-plus' (D-120): o negócio do cenário 'negocio' compartilhado. Rafa entra por um convite "Anota e vê"; Nina entra e sai;
+ * fica um convite "Só vê" pendente. Pelas mesmas regras do banco (convite, aceite e saída no hub). Nenhum total muda.
+ */
+async function seedDemoSharedBusiness(repo: MemoryRepository) {
+  const business = await seedDemoBusiness(repo);
+  const hub = repo['biz'];
+  const { helper, former } = DEMO_BUSINESS_PEOPLE;
+  hub.register(helper.personId, helper.firstName);
+  hub.register(former.personId, former.firstName);
+  const toHelper = await repo.createBusinessInvite(newOperationKey(), business.id, 'membro');
+  hub.accept(helper.personId, newOperationKey(), toHelper.code!);
+  const toFormer = await repo.createBusinessInvite(newOperationKey(), business.id, 'membro');
+  hub.accept(former.personId, newOperationKey(), toFormer.code!);
+  hub.leave(former.personId, newOperationKey(), business.id, () => false);
+  await repo.createBusinessInvite(newOperationKey(), business.id, 'leitor');
+  for (const [description, occurredOn, who] of DEMO_SHARED_AUTHORS) setDemoAuthor(repo, business.id, description, occurredOn, DEMO_BUSINESS_PEOPLE[who].personId);
+}
+
+/** O negócio de outra pessoa no cenário 'negocio-plus-membro' (FICTÍCIO). */
+export const DEMO_MEMBER_BUSINESS_NAME = 'Marmitas da Bia';
+
+/**
+ * Lançamentos de "Marmitas da Bia" (FICTÍCIOS): [tipo, descrição, reais, data, categoria, quem anotou]. Setembro: entrou R$ 2.100,00 e
+ * saiu R$ 760,00. Outubro até 07/10: entrou R$ 920,00 e saiu R$ 520,00; Maria anotou a entrega do escritório e as embalagens.
+ */
+export const DEMO_MEMBER_BUSINESS_RECORDS: readonly (readonly ['receita' | 'despesa', string, number, string, string, 'owner' | 'me'])[] = [
+  ['despesa', 'Ingredientes do mês', 760, '2026-09-10', 'Material e mercadoria', 'owner'],
+  ['receita', 'Marmitas do mês', 2100, '2026-09-28', 'Vendas', 'owner'],
+  ['despesa', 'Feira e mercado', 310, '2026-10-01', 'Material e mercadoria', 'owner'],
+  ['receita', 'Marmitas da semana', 640, '2026-10-02', 'Vendas', 'owner'],
+  ['despesa', 'Embalagens', 90, '2026-10-03', 'Material e mercadoria', 'me'],
+  ['despesa', 'Gás de cozinha', 120, '2026-10-04', 'Contas do ponto', 'owner'],
+  ['receita', 'Entrega para escritório', 280, '2026-10-05', 'Vendas', 'me'],
+];
+
+/**
+ * Cenário 'negocio-plus-membro' (D-120): Bia cria "Marmitas da Bia" e convida Maria para "Anota e vê"; Maria aceita pelo próprio
+ * repositório (a "Conta do negócio" de apoio nasce com o aceite). Os lançamentos ficam na memória de Maria, com a autoria de cada um.
+ */
+async function seedDemoMemberBusiness(repo: MemoryRepository) {
+  const hub = repo['biz'];
+  const { owner } = DEMO_BUSINESS_PEOPLE;
+  hub.register(owner.personId, owner.firstName);
+  const businessId = `neg-demo-${owner.personId}`;
+  hub.open(owner.personId, businessId, DEMO_MEMBER_BUSINESS_NAME, `${DEMO_TODAY}T09:00:00.000Z`);
+  const invite = hub.createInvite(owner.personId, newOperationKey(), businessId, 'membro', () => false);
+  await repo.acceptBusinessInvite(newOperationKey(), invite.code!);
+  const accountId = (await repo.listAccounts(businessId))[0]!.id;
+  for (const [kind, description, reais, occurredOn, category, who] of DEMO_MEMBER_BUSINESS_RECORDS) {
+    await repo.createRecord(newOperationKey(), businessId, kind, { accountId, amountCents: reais * 100, occurredOn, description, category });
+    if (who === 'owner') setDemoAuthor(repo, businessId, description, occurredOn, owner.personId);
   }
 }
 

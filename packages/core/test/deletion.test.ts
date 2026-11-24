@@ -179,9 +179,11 @@ describe('textos de excluir a conta (D-058)', () => {
   });
 
   it('cada erro conhecido tem texto; o que não é conhecido cai na mensagem geral', () => {
-    expect([...DELETE_ERROR_CODES]).toEqual(['confirmacao_invalida', 'transferir_antes']);
+    expect([...DELETE_ERROR_CODES]).toEqual(['confirmacao_invalida', 'transferir_antes', 'negocio_com_membros']);
     for (const code of DELETE_ERROR_CODES) expect(deleteErrorText(code)).toBe((DELETE_ERROR_TEXT as Record<string, string>)[code]);
     expect(deleteErrorText('transferir_antes')).toContain('passe a titularidade');
+    // Negócio compartilhado (0043): quem administra um negócio com outras pessoas ativas remove as pessoas antes.
+    expect(deleteErrorText('negocio_com_membros')).toBe('Antes de excluir a conta, remova as outras pessoas do seu negócio.');
     expect(deleteErrorText('rede')).toBe(DELETE_ERROR_TEXT.rede);
     expect(deleteErrorText('qualquer_outro')).toBe(DELETE_ERROR_TEXT.failed);
     expect(deleteErrorText('')).toBe(DELETE_ERROR_TEXT.failed);
@@ -212,7 +214,7 @@ describe('resposta perdida ao excluir a conta (D-058, revisão de segurança)', 
   it('só a falta de resposta deixa o resultado incerto; qualquer recusa do banco é definitiva', () => {
     expect(deleteOutcomeUncertain('rede')).toBe(true);
     expect(deleteOutcomeUncertain('desconhecido')).toBe(true);
-    for (const code of ['confirmacao_invalida', 'transferir_antes', 'chave_reutilizada', 'chave_invalida', 'sem_permissao', 'nao_autenticado', '']) {
+    for (const code of ['confirmacao_invalida', 'transferir_antes', 'negocio_com_membros', 'chave_reutilizada', 'chave_invalida', 'sem_permissao', 'nao_autenticado', '']) {
       expect(deleteOutcomeUncertain(code), code).toBe(false);
     }
   });

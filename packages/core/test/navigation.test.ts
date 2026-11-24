@@ -128,6 +128,9 @@ describe('barra inferior (D-039)', () => {
       '/familia/nova',
       '/familia/convidar',
       '/convite/0123456789abcdef0123456789abcdef',
+      // Negócio compartilhado (D-116, D-120): convidar e o convite do negócio, sem barra.
+      '/negocio/convidar',
+      '/convite/negocio/0123456789abcdef0123456789abcdef',
       // Convite da empresa (D-056): abre pelo link do RH, antes e depois de entrar, sem barra.
       '/beneficio/0123456789abcdef0123456789abcdef',
       '/entrar',
@@ -154,7 +157,7 @@ describe('barra inferior (D-039)', () => {
     const formName = /\/(novo|nova|editar|ordenar|pagar|encargo|estorno|compra|encerrar|informar|movimento|atualizar|vencidas|referencia|limite|minima|reserva|guardar|importar|convidar|excluir|mover|retirada|nome)$/;
     // O formulário do orçamento de uma categoria é a rota dinâmica /orcamento/[categoria].
     const budgetForm = /^\/orcamento\/\[categoria\]$/;
-    const entry = /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado|conta-excluida|convite\/\[codigo\]|beneficio\/\[codigo\])$/;
+    const entry = /^\/(boas-vindas|criar-conta|confirmar-email|entrar|recuperar-acesso|nova-senha|primeira-conta|carregando|confirmado|conta-excluida|convite\/\[codigo\]|convite\/negocio\/\[codigo\]|beneficio\/\[codigo\])$/;
     for (const { pattern, sample } of routes) {
       const mode = barModeFor(sample);
       if (entry.test(pattern) || formName.test(pattern) || budgetForm.test(pattern)) expect(mode, pattern).toBe('formulario');

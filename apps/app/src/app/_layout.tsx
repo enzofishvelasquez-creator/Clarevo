@@ -52,7 +52,7 @@ const NAV_THEME =
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/(editar|mover))?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura|nivel))?|familia(\/(nova|convidar))?|negocio(\/(novo|retirada|nome))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|calendario|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/(editar|mover))?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura|nivel))?|familia(\/(nova|convidar))?|negocio(\/(novo|retirada|nome|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|calendario|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -335,6 +335,8 @@ function Navigation() {
           <Stack.Screen name="negocio/novo" />
           <Stack.Screen name="negocio/retirada" />
           <Stack.Screen name="negocio/nome" />
+          {/* Negócio compartilhado (D-116, D-120): convidar, só para quem administra e com o Plus aberto. */}
+          <Stack.Screen name="negocio/convidar" />
           {/* Painel da empresa (D-056): só na web, para quem administra o benefício; a tela de consulta tem a barra inferior. */}
           <Stack.Screen name="empresa/index" />
           {/* Exportar meus dados (D-047): planilha (CSV) ou resumo em PDF, montado no aparelho. */}
@@ -412,6 +414,8 @@ function Navigation() {
         <Stack.Screen name="confirmado" />
         {/* Convite para a Família (D-055): aberto pelo link, com ou sem conta; a tela decide o que mostrar. */}
         <Stack.Screen name="convite/[codigo]" />
+        {/* Convite para um negócio (D-116, D-120): /convite/negocio/<código>, aberto pelo link, com ou sem conta, como o da Família. */}
+        <Stack.Screen name="convite/negocio/[codigo]" />
         {/* Convite da empresa (D-056): o mesmo caminho do convite da Família, aberto pelo link do RH, com ou sem conta. */}
         <Stack.Screen name="beneficio/[codigo]" />
         {/* Depois de excluir a conta (D-058): a entrada que diz "Sua conta foi excluída". Fora da proteção, como os convites: o roteador a abre

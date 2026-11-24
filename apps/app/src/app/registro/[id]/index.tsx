@@ -126,7 +126,9 @@ export default function DetalheRegistro() {
   const inBusiness = Boolean(business && r && r.contextId === business.id);
   const inPersonal = Boolean(personal && r && r.contextId === personal.personalContextId);
   // Mover (D-113): o lançamento comum, entre o Pessoal e o negócio da pessoa, para quem anotou no lugar errado.
-  const movable = Boolean(r && business && (inBusiness || inPersonal) && canMoveRecord(r) && (personal?.canWrite ?? true));
+  // Quem só vê o negócio (leitor, D-116 e D-120) não encontra editar, excluir, mover nem tornar gasto fixo: o banco recusaria.
+  const readOnly = inBusiness && business?.role === 'leitor';
+  const movable = Boolean(r && business && (inBusiness || inPersonal) && canMoveRecord(r) && (personal?.canWrite ?? true) && !readOnly);
 
   /** "Desligar da fatura" (D-107): o gasto que foi ligado depois continua, e a fatura volta a ficar em aberto. */
   const doUnlinkInvoice = async () => {
@@ -336,7 +338,7 @@ export default function DetalheRegistro() {
                     onPress={() => router.push(`/registro/${r.pairedRecordId}`)}
                   />
                 </>
-              ) : (
+              ) : readOnly ? null : (
                 <Button label={inBusiness ? (r.kind === 'despesa' ? BUSINESS_WORDS.editOut : BUSINESS_WORDS.editIn) : RECORD_TEXT.edit(r.kind)} icon={Pencil} tone={justSaved ? 'soft' : 'brand'} onPress={() => router.push(`/registro/${r.id}/editar`)} />
               )}
               {movable ? (
@@ -348,7 +350,7 @@ export default function DetalheRegistro() {
                 />
               ) : null}
               {/* Gasto anotado sem conta a pagar: pode virar um gasto fixo, que começa no próximo vencimento. */}
-              {r.kind === 'despesa' && !r.commitmentId && !r.invoice && !withdrawal ? (
+              {r.kind === 'despesa' && !r.commitmentId && !r.invoice && !withdrawal && !readOnly ? (
                 <Button label="Tornar gasto fixo" icon={Repeat} tone="soft" onPress={() => openAsSeries(r, today)} />
               ) : null}
               {r.commitmentId && !r.invoice ? (
@@ -367,7 +369,7 @@ export default function DetalheRegistro() {
                   }}
                 />
               )}
-              {r.invoice ? null : withdrawal ? (
+              {r.invoice || readOnly ? null : withdrawal ? (
                 <Button label={BUSINESS_TEXT.deleteWithdrawal} icon={Trash2} tone="danger" onPress={() => setConfirmingWithdrawal(true)} />
               ) : (
                 <Button label={RECORD_TEXT.remove(r.kind)} icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />

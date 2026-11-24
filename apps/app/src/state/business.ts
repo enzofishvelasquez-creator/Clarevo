@@ -1,4 +1,12 @@
-import { contextCategories, type BusinessContext, type BusinessWithdrawalInput, type RecordKind } from '@clarevo/core';
+import {
+  contextCategories,
+  type BusinessContext,
+  type BusinessInviteRole,
+  type BusinessPeople,
+  type BusinessWithdrawalInput,
+  type PlusStatus,
+  type RecordKind,
+} from '@clarevo/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useRepo, useSession } from '@/state/session';
@@ -86,6 +94,101 @@ export function useMoveRecord() {
   return useMutation({
     mutationFn: (v: { key: string; recordId: string; version: number; targetContextId: string; accountId: string; category: string | null }) =>
       repo.moveRecord(v.key, v.recordId, v.version, v.targetContextId, v.accountId, v.category),
+    onSuccess: reload,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Negócio compartilhado (D-116, Clarevo Plus; D-120: pronto e desligado). As escritas usam as mesmas chaves de operação da Família
+// (`useFamilyKeys` e `attemptFamily`, em state/family.ts).
+// ---------------------------------------------------------------------------
+
+/**
+ * A chave do Plus (plus_status). Qualquer falha conta como fechado (o repositório já devolve {open: false}); a leitura fica guardada por
+ * 5 minutos, para o app publicado sem a migração 0043 não pedir a função a cada tela.
+ */
+export function usePlusStatus() {
+  const { repo, user } = useSession();
+  return useQuery({
+    queryKey: ['plusStatus', user?.id ?? null],
+    queryFn: (): Promise<PlusStatus> => repo!.getPlusStatus(),
+    enabled: Boolean(repo && user),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * As pessoas do negócio (D-120): o papel de quem consulta, as pessoas e, para quem administra, os convites, mais a chave do Plus. Com o
+ * Plus fechado e quem consulta administrando, vem só a própria pessoa (o app não lê nada da migração 0043). `contextId` indefinido: desligada.
+ */
+export function useBusinessPeople(contextId: string | null | undefined) {
+  const { repo, user } = useSession();
+  return useQuery({
+    queryKey: ['businessPeople', user?.id ?? null, contextId ?? null],
+    queryFn: (): Promise<BusinessPeople> => repo!.getBusinessPeople(contextId!),
+    enabled: Boolean(repo && user && contextId),
+  });
+}
+
+/**
+ * As pessoas do negócio só quando podem existir outras (D-120): com o Plus aberto ou para quem não administra. Com o Plus fechado e quem
+ * consulta administrando (o app publicado hoje), nada é lido além da chave do Plus (guardada por 5 minutos), e a tela fica como antes.
+ */
+export function useSharedBusinessPeople(business: BusinessContext | null | undefined) {
+  const plus = usePlusStatus();
+  const enabled = Boolean(business && (business.role !== 'titular' || plus.data?.open === true));
+  return useBusinessPeople(enabled ? business!.id : null);
+}
+
+/** Convidar, cancelar, remover e mudar o papel só mudam as pessoas do negócio (e o papel de quem consulta, lido em `business`). */
+function useReloadBusinessPeople() {
+  const qc = useQueryClient();
+  return () => Promise.all([qc.invalidateQueries({ queryKey: ['businessPeople'] }), qc.invalidateQueries({ queryKey: ['business'] })]);
+}
+
+export function useCreateBusinessInvite() {
+  const repo = useRepo();
+  const reload = useReloadBusinessPeople();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; role: BusinessInviteRole }) => repo.createBusinessInvite(v.key, v.contextId, v.role),
+    onSuccess: reload,
+  });
+}
+
+export function useCancelBusinessInvite() {
+  const repo = useRepo();
+  const reload = useReloadBusinessPeople();
+  return useMutation({ mutationFn: (v: { key: string; inviteId: string }) => repo.cancelBusinessInvite(v.key, v.inviteId), onSuccess: reload });
+}
+
+/** Aceitar e sair mudam o que a pessoa lê (o seletor, as contas e os lançamentos): recarregar tudo. */
+export function useAcceptBusinessInvite() {
+  const repo = useRepo();
+  const reload = useReloadAll();
+  return useMutation({ mutationFn: (v: { key: string; code: string }) => repo.acceptBusinessInvite(v.key, v.code), onSuccess: reload });
+}
+
+export function useLeaveBusiness() {
+  const repo = useRepo();
+  const reload = useReloadAll();
+  return useMutation({ mutationFn: (v: { key: string; contextId: string }) => repo.leaveBusiness(v.key, v.contextId), onSuccess: reload });
+}
+
+export function useRemoveBusinessMember() {
+  const repo = useRepo();
+  const reload = useReloadBusinessPeople();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; personId: string }) => repo.removeBusinessMember(v.key, v.contextId, v.personId),
+    onSuccess: reload,
+  });
+}
+
+export function useSetBusinessMemberRole() {
+  const repo = useRepo();
+  const reload = useReloadBusinessPeople();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; personId: string; role: BusinessInviteRole }) =>
+      repo.setBusinessMemberRole(v.key, v.contextId, v.personId, v.role),
     onSuccess: reload,
   });
 }

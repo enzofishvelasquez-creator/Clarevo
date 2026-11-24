@@ -4,6 +4,7 @@ import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL } from './money';
 import type { ContextKind, FinancialRecord, RecordKind } from './records';
 import { CATEGORIES, NO_CATEGORY_LABEL, recordMonth } from './records';
+import type { FamilyRole } from './family';
 import type { RepoErrorCode } from './repository';
 import { charCount, DESCRIPTION_MAX, ERROR_TEXT } from './validation';
 
@@ -72,11 +73,16 @@ export function budgetCategoriesFor(context: ContextKind): readonly string[] {
   return contextCategories(context, 'despesa');
 }
 
-/** O negócio como o app lê. */
+/**
+ * O negócio como o app lê. `role` é o papel de quem consulta (D-120): quem criou administra ('titular'); com o negócio compartilhado
+ * (Clarevo Plus, business-people.ts), as outras pessoas anotam e veem ('membro') ou só veem ('leitor'). No banco, vem do vínculo da
+ * própria pessoa em context_memberships (a política memberships_read deixa ler o próprio vínculo), sem depender da migração 0043.
+ */
 export interface BusinessContext {
   id: string;
   name: string;
   createdAt: string;
+  role: FamilyRole;
 }
 
 /** Ações do negócio gravadas em record_operations. Criar, renomear e encerrar não contam como anotação na atividade. */
@@ -459,13 +465,14 @@ export const BUSINESS_WORDS = {
 /** Textos de erro das telas do negócio (nomes e regras do banco). */
 export const BUSINESS_ERROR_TEXT = {
   nome_do_negocio_invalido: 'Dê um nome de 1 a 60 caracteres para o negócio.',
-  ja_tem_negocio: 'Você já tem um espaço Negócio. O plano inclui um negócio por pessoa.',
+  /** O próprio negócio ou, no negócio compartilhado (0043), o de outra pessoa: cada pessoa participa de um por vez. */
+  ja_tem_negocio: 'Você já participa de um negócio. Cada pessoa participa de um negócio por vez.',
   negocio_com_membros: 'Só dá para encerrar o espaço Negócio quando só você participa dele.',
   retirada_ligada: BUSINESS_TEXT.withdrawalLocked,
   nao_e_retirada: ERROR_TEXT.salvar_falhou,
   lancamento_ligado: BUSINESS_TEXT.moveLinked,
   contexto_invalido: ERROR_TEXT.salvar_falhou,
-  sem_permissao: 'Só quem é titular do negócio pode fazer isto.',
+  sem_permissao: 'Só quem administra o negócio pode fazer isto.',
   nao_encontrado: 'Este espaço Negócio ou lançamento não está mais disponível. Atualize a tela.',
   chave_reutilizada: ERROR_TEXT.salvar_falhou,
   versao_desatualizada: ERROR_TEXT.versao_desatualizada,

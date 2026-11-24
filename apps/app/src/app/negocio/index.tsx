@@ -1,9 +1,12 @@
 import {
+  BUSINESS_PEOPLE_TEXT,
   BUSINESS_TEXT,
   BUSINESS_WORDS,
   PAYABLES_NAV_TEXT,
   addMonths,
   businessErrorText,
+  businessPeopleVisible,
+  canEndBusiness,
   businessMonthShort,
   businessPeriodText,
   businessResultText,
@@ -18,6 +21,7 @@ import { ArrowDownLeft, ArrowUpRight, HandCoins, Pencil, Plus, ShieldCheck, Stor
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { BusinessPeopleSection, PasteBusinessInvite } from '@/components/business-people';
 import { ConfirmDialog } from '@/components/dialog';
 import { useIsSeededDemo } from '@/components/family-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -29,7 +33,7 @@ import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/compo
 import { flash } from '@/lib/flash';
 import { useValuesHidden } from '@/lib/privacy';
 import { useAccessCanWrite } from '@/state/access';
-import { useBusiness, useEndBusiness } from '@/state/business';
+import { useBusiness, useEndBusiness, usePlusStatus, useSharedBusinessPeople } from '@/state/business';
 import { useBusinessOverview, useView } from '@/state/data';
 import { attemptFamily, useFamilyKeys } from '@/state/family';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -39,7 +43,9 @@ const T = BUSINESS_TEXT;
 /**
  * Seu negócio (D-113, D-113b). Sem negócio: o que é o espaço Negócio e "Criar o espaço Negócio". Com negócio: o mês (entrou, saiu e
  * sobrou, numa cor só, com a frase de fato), as retiradas para o Pessoal à parte, os últimos meses, as maiores saídas do mês, a retirada,
- * o nome e encerrar. Abrir esta tela escolhe o negócio no seletor: anotar daqui vai para o negócio.
+ * o nome e encerrar. Abrir esta tela escolhe o negócio no seletor: anotar daqui vai para o negócio. Negócio compartilhado (D-116, D-120):
+ * "Pessoas do negócio" só com o Plus aberto, para quem não administra ou quando já há outras pessoas; quem só vê não encontra as ações
+ * de anotar, e só quem administra muda o nome e encerra.
  */
 export default function NegocioScreen() {
   const business = useBusiness();
@@ -72,6 +78,7 @@ export default function NegocioScreen() {
 function NoBusiness({ notice }: { notice: string | null }) {
   const demo = useIsSeededDemo();
   const canWrite = useAccessCanWrite();
+  const plus = usePlusStatus();
   return (
     <>
       <FlashBanner message={notice} />
@@ -93,13 +100,19 @@ function NoBusiness({ notice }: { notice: string | null }) {
           {T.demoOnly}
         </Txt>
       ) : null}
+      {/* Negócio compartilhado (D-120): colar o link recebido, só com o Plus aberto. */}
+      {plus.data?.open ? <PasteBusinessInvite /> : null}
     </>
   );
 }
 
 function BusinessOverview({ business, notice, setNotice }: { business: BusinessContext; notice: string | null; setNotice: (t: string | null) => void }) {
   const { month, setMonth, currentMonth, space: active, setSpace } = useView();
-  const canWrite = useAccessCanWrite();
+  // Quem só vê o negócio (leitor, D-116) não anota nem retira, como na Família; só quem administra muda o nome e encerra.
+  const canWrite = useAccessCanWrite() && business.role !== 'leitor';
+  const owner = business.role === 'titular';
+  const people = useSharedBusinessPeople(business);
+  const showPeople = people.data ? businessPeopleVisible(people.data) : false;
   const overview = useBusinessOverview(business.id, month);
   const end = useEndBusiness();
   const keys = useFamilyKeys();
@@ -201,16 +214,31 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
         </>
       )}
 
-      <Card style={{ gap: space[3] }}>
-        <Txt variant="title" accessibilityRole="header" aria-level={2}>
-          {T.settingsTitle}
-        </Txt>
+      {showPeople && people.data ? <BusinessPeopleSection business={business} people={people.data} setNotice={setNotice} /> : null}
+
+      {owner ? (
+        <Card style={{ gap: space[3] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={2}>
+            {T.settingsTitle}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary}>
+            {T.chatNote}
+          </Txt>
+          {canWrite ? <Button label={T.rename} icon={Pencil} tone="soft" onPress={() => router.push('/negocio/nome')} /> : null}
+          {/* Com outras pessoas ativas, encerrar não vale (negocio_com_membros): a frase diz o que fazer antes. */}
+          {people.data && !canEndBusiness(people.data.members) ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {BUSINESS_PEOPLE_TEXT.endBlocked}
+            </Txt>
+          ) : (
+            <Button label={T.end} icon={Trash2} tone="danger" onPress={() => setConfirmEnd(true)} />
+          )}
+        </Card>
+      ) : (
         <Txt variant="caption" color={colors.textSecondary}>
           {T.chatNote}
         </Txt>
-        {canWrite ? <Button label={T.rename} icon={Pencil} tone="soft" onPress={() => router.push('/negocio/nome')} /> : null}
-        <Button label={T.end} icon={Trash2} tone="danger" onPress={() => setConfirmEnd(true)} />
-      </Card>
+      )}
 
       <ConfirmDialog
         visible={confirmEnd}

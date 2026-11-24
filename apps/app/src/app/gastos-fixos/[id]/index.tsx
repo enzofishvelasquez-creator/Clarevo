@@ -359,7 +359,7 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
         <View>
           <Row label="Espaço" value={by.contextName} />
           {s.kind === 'parcelada' ? <Row label="Tipo" value={SERIES_NATURE_LABEL[s.nature]} /> : null}
-          {by.kind === 'familia' ? <Row label="Criado por" value={by.by} /> : null}
+          {by.shared ? <Row label="Criado por" value={by.by} /> : null}
           <Row label="Categoria" value={term.category ?? NO_CATEGORY_LABEL} last />
         </View>
         {!s.generating ? (

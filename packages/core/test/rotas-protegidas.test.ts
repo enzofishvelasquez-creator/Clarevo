@@ -38,9 +38,9 @@ describe('rotas: toda tela fica dentro da guarda de sessão', () => {
     const missing = all.filter((s) => !layout.includes(`<Stack.Screen name="${s}" />`));
     expect(missing).toEqual([]);
     const outside = all.filter((s) => !guarded.has(lines.findIndex((l) => l.includes(`<Stack.Screen name="${s}" />`))));
-    // Fora da guarda de propósito: abrem sem sessão (links de convite e de benefício, a espera da sessão, a volta do e-mail
+    // Fora da guarda de propósito: abrem sem sessão (links de convite da Família e do negócio e de benefício, a espera da sessão, a volta do e-mail
     // confirmado e o aviso de conta excluída) e não pedem o repositório antes de haver sessão.
-    expect(outside).toEqual(['beneficio/[codigo]', 'carregando', 'confirmado', 'conta-excluida', 'convite/[codigo]']);
+    expect([...outside].sort()).toEqual(['beneficio/[codigo]', 'carregando', 'confirmado', 'conta-excluida', 'convite/[codigo]', 'convite/negocio/[codigo]'].sort());
     expect(guarded.has(lines.findIndex((l) => l.includes('<Stack.Screen name="(tabs)" />')))).toBe(true);
   });
 
@@ -54,6 +54,7 @@ describe('rotas: toda tela fica dentro da guarda de sessão', () => {
     // arquivo no aparelho) e Excluir minha conta.
     expect(notResumed.sort()).toEqual(
       ['beneficio/[codigo]', 'boas-vindas', 'carregando', 'confirmado', 'confirmar-email', 'conta-excluida', 'conta/excluir', 'convite/[codigo]',
+        'convite/negocio/[codigo]',
         'criar-conta', 'entrar', 'importar/index', 'nova-senha', 'primeira-conta', 'recuperar-acesso'].sort(),
     );
   });

@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, View, type TextInput } from 'react-native';
 
+import { PasteBusinessInvite } from '@/components/business-people';
 import { useIsSeededDemo } from '@/components/family-parts';
 import { FormFooter } from '@/components/form-footer';
 import { ContextPill, SubHeader } from '@/components/header';
@@ -11,7 +12,7 @@ import { ErrorState, LoadingState } from '@/components/states';
 import { Button, Card, Screen, TextField, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { KEYBOARD_BEHAVIOR } from '@/lib/keyboard';
-import { useBusiness, useCreateBusiness } from '@/state/business';
+import { useBusiness, useCreateBusiness, usePlusStatus } from '@/state/business';
 import { useView } from '@/state/data';
 import { attemptFamily, useFamilyKeys } from '@/state/family';
 import { colors, space } from '@/theme/tokens';
@@ -27,6 +28,7 @@ export default function NovoNegocioScreen() {
   const demo = useIsSeededDemo();
   const business = useBusiness();
   const create = useCreateBusiness();
+  const plus = usePlusStatus();
   const { setSpace } = useView();
   const keys = useFamilyKeys();
   const [name, setName] = useState('');
@@ -127,6 +129,8 @@ export default function NovoNegocioScreen() {
             {T.demoOnly}
           </Txt>
         ) : null}
+        {/* Negócio compartilhado (D-120): quem recebeu um link entra no negócio de outra pessoa em vez de criar um, só com o Plus aberto. */}
+        {plus.data?.open ? <PasteBusinessInvite /> : null}
       </Screen>
       <FormFooter error={error} onCancel={guard.requestCancel} submitLabel={T.createSubmit} busy={busy} onSubmit={submit} />
       {guard.dialog}

@@ -1,15 +1,25 @@
-import { BUSINESS_TEXT, DELETE_TEXT, FAMILY_ROLE_HELP, FAMILY_TEXT, WHO_SEES_TEXT } from '@clarevo/core';
+import {
+  BUSINESS_PEOPLE_TEXT,
+  BUSINESS_ROLE_HELP,
+  BUSINESS_TEXT,
+  DELETE_TEXT,
+  FAMILY_ROLE_HELP,
+  FAMILY_TEXT,
+  WHO_SEES_TEXT,
+  businessSharedNow,
+} from '@clarevo/core';
 import { router } from 'expo-router';
 import { Building2, ShieldCheck, User, Users, type LucideIcon } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 
+import { BusinessMemberLine } from '@/components/business-people';
 import { MemberLine } from '@/components/family-parts';
 import { ContextPill, SubHeader } from '@/components/header';
 import { TopicLink } from '@/components/topic-link';
 import { Button, Card, LinkButton, Screen, Txt } from '@/components/ui';
 import { useWideLayout } from '@/lib/layout';
 import { useView } from '@/state/data';
-import { useBusiness } from '@/state/business';
+import { useBusiness, useSharedBusinessPeople } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -19,7 +29,8 @@ const T = WHO_SEES_TEXT;
 /**
  * Nomes e permissões reais do contexto, sem selo genérico. Em duas listas curtas, "Quem vê" e "Quem não vê" (auditoria visual de
  * 18/11/2026: eram nove parágrafos, com "a empresa não vê" repetido quatro vezes), com os mesmos fatos (WHO_SEES_TEXT). Na Família, as
- * pessoas e o papel de cada uma; no espaço Negócio, só a própria pessoa. Depois, o que acontece ao excluir a conta.
+ * pessoas e o papel de cada uma; no espaço Negócio, só a própria pessoa, ou, com o negócio compartilhado (D-116, D-120), as pessoas do
+ * negócio e o papel de cada uma, como na Família. Depois, o que acontece ao excluir a conta.
  */
 export default function QuemVeScreen() {
   const { user } = useSession();
@@ -28,6 +39,9 @@ export default function QuemVeScreen() {
   const inFamily = kind === 'familia' && family;
   const business = useBusiness().data;
   const inBusiness = kind === 'negocio' && business;
+  const people = useSharedBusinessPeople(inBusiness ? business : null).data;
+  // Negócio com outras pessoas ativas: a lista delas, como na Família; sozinha, "só você", como antes.
+  const businessShared = Boolean(inBusiness && businessSharedNow(people));
   const name = user?.displayName ?? '';
   const wide = useWideLayout();
   // Computador: as notas pequenas param em 560 px (com 720 px, a linha passava de 120 letras) e "Entendi" cabe no texto, à esquerda.
@@ -62,8 +76,31 @@ export default function QuemVeScreen() {
           </Txt>
         </Card>
       ) : null}
+      {businessShared && business && people ? (
+        <Card style={{ gap: space[1] }}>
+          <Txt variant="title" accessibilityRole="header" aria-level={3}>
+            {business.name}
+          </Txt>
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
+            {BUSINESS_PEOPLE_TEXT.whoSeesIntro}
+          </Txt>
+          {people.members
+            .filter((m) => m.status === 'ativo')
+            .map((m) => (
+              <View key={m.personId} style={{ gap: 0 }}>
+                <BusinessMemberLine member={m} />
+                <Txt variant="caption" color={colors.textSecondary} style={[{ marginLeft: 36 + space[3], marginTop: -space[1] }, note]}>
+                  {BUSINESS_ROLE_HELP[m.role]}
+                </Txt>
+              </View>
+            ))}
+          <Txt variant="caption" color={colors.textSecondary} style={[{ marginTop: space[2] }, note]}>
+            {BUSINESS_PEOPLE_TEXT.whoSeesNote}
+          </Txt>
+        </Card>
+      ) : null}
       <Card style={styles.list}>
-        {inFamily ? null : <Item icon={User} label={T.you(name)} text={inBusiness ? BUSINESS_TEXT.whoSees : T.personalYou} />}
+        {inFamily || businessShared ? null : <Item icon={User} label={T.you(name)} text={inBusiness ? BUSINESS_TEXT.whoSees : T.personalYou} />}
         {/* O que a empresa vê (D-056): administra o acesso, os e-mails que convidou, a situação e as datas das licenças. */}
         <Item icon={Building2} label={T.companyLabel} text={T.companySees} />
         {/* A equipe da Clarevo (D-064, política seção 7, pergunta 14 ao advogado): a redação que a política propõe. */}
@@ -78,7 +115,17 @@ export default function QuemVeScreen() {
         <Item
           icon={Users}
           label={T.othersLabel}
-          text={inFamily ? FAMILY_TEXT.privacy : inBusiness ? T.othersBusiness : family ? `${T.othersPersonal} ${FAMILY_TEXT.privacy}` : T.othersPersonal}
+          text={
+            inFamily
+              ? FAMILY_TEXT.privacy
+              : businessShared
+                ? BUSINESS_PEOPLE_TEXT.whoSeesOthers
+                : inBusiness
+                  ? T.othersBusiness
+                  : family
+                    ? `${T.othersPersonal} ${FAMILY_TEXT.privacy}`
+                    : T.othersPersonal
+          }
         />
         {/* A empresa nunca vê finanças, nem somadas, nem o uso do app (D-056). */}
         <Item icon={Building2} label={T.companyLabel.replace(/, se houver$/, '')} text={T.companyNotSees} />

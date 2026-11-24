@@ -45,8 +45,11 @@ export function deleteFamilyOutcome(family: Pick<FamilyOverview, 'role' | 'membe
   return canEndFamily(family.members) ? 'encerra' : 'bloqueia';
 }
 
-/** Os códigos que `delete_my_account` lança, além dos comuns (nao_autenticado, chave_invalida, chave_reutilizada). */
-export const DELETE_ERROR_CODES: readonly RepoErrorCode[] = ['confirmacao_invalida', 'transferir_antes'];
+/**
+ * Os códigos que `delete_my_account` lança, além dos comuns (nao_autenticado, chave_invalida, chave_reutilizada). negocio_com_membros:
+ * quem administra um negócio com outras pessoas ativas (negócio compartilhado, D-116, migração 0043).
+ */
+export const DELETE_ERROR_CODES: readonly RepoErrorCode[] = ['confirmacao_invalida', 'transferir_antes', 'negocio_com_membros'];
 
 export const DELETE_TEXT = {
   /** Item de Conta (o último, sem destaque de alerta). */
@@ -116,6 +119,8 @@ export const DELETE_TEXT = {
 export const DELETE_ERROR_TEXT = {
   confirmacao_invalida: 'Digite EXCLUIR para confirmar.',
   transferir_antes: 'Antes de excluir a conta, passe a titularidade da Família para outra pessoa ou remova as outras pessoas dela.',
+  /** Quem administra um negócio com outras pessoas ativas (negócio compartilhado, 0043): não há passar a administração. */
+  negocio_com_membros: 'Antes de excluir a conta, remova as outras pessoas do seu negócio.',
   rede: 'Sem conexão no momento. Tente de novo: se a conta já tiver sido excluída, você sai dela.',
   failed: 'Não foi possível excluir a conta agora. Tente de novo.',
 } as const;

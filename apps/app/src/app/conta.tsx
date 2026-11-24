@@ -1,5 +1,7 @@
 import {
+  BUSINESS_PEOPLE_TEXT,
   BUSINESS_TEXT,
+  businessHasOthers,
   COMPANY_TEXT,
   DELETE_TEXT,
   EXPORT_TEXT,
@@ -58,7 +60,7 @@ import { signOutIntent } from '@/lib/nav';
 import { SITE_URL, openLicensesPage, openSitePage, openSupportEmail } from '@/lib/site';
 import { useCompanies } from '@/state/company';
 import { useWork } from '@/state/data';
-import { useBusiness } from '@/state/business';
+import { useBusiness, useSharedBusinessPeople } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { useAccountLevel } from '@/state/access';
@@ -103,6 +105,9 @@ export default function ContaScreen() {
   const personal = useWork().data;
   const family = useFamily();
   const business = useBusiness();
+  // Negócio compartilhado (D-116, D-120): com outras pessoas, ou sem administrar, o card diz o papel, e não "Só você vê e anota".
+  const businessPeople = useSharedBusinessPeople(business.data);
+  const businessShared = Boolean(business.data && (business.data.role !== 'titular' || businessHasOthers(businessPeople.data)));
   const companies = useCompanies();
   // Avisos das telas de contas ("Conta adicionada.", "Conta salva."): lidos uma única vez, quando esta tela abre.
   const [notice] = useFlash();
@@ -232,7 +237,11 @@ export default function ContaScreen() {
             {BUSINESS_TEXT.accountTitle}
           </Txt>
           <Txt variant="caption" color={colors.textSecondary} style={note}>
-            {business.data ? BUSINESS_TEXT.accountHintIn(business.data.name) : BUSINESS_TEXT.accountHintNone}
+            {business.data
+              ? businessShared
+                ? BUSINESS_PEOPLE_TEXT.accountHintShared(business.data.name, business.data.role)
+                : BUSINESS_TEXT.accountHintIn(business.data.name)
+              : BUSINESS_TEXT.accountHintNone}
           </Txt>
           <Button
             label={business.data ? BUSINESS_TEXT.accountOpen : BUSINESS_TEXT.accountCreate}

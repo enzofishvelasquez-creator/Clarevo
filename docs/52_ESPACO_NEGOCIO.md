@@ -134,6 +134,34 @@ Decisão do Enzo: o modelo de dados já nasce pronto; **nada do Plus aparece no 
 
 **Negócio da família (D-116, 19/11/2026).** O negócio compartilhado com outras pessoas (por exemplo, um comércio da família) entra no Plus, depois do lançamento. Regra: qualquer pessoa cria e chama outras; uma só pessoa administra cada negócio (quem criou), e as outras anotam e veem ou só veem. Até lá, o negócio próprio (um por pessoa, privado) fica incluído nos dois planos.
 
+**Pronto e desligado (D-120, 23/11/2026).** O negócio compartilhado foi feito por inteiro e fica desligado até o Enzo abrir o Plus:
+- **Banco (migração 0043, `supabase/migrations/20261123000001_negocio_compartilhado.sql`).** A chave do Plus (`plus_settings`, fechada;
+  só a equipe abre, no SQL Editor, com `clarevo_staff_set_plus`), os convites do negócio (`business_invites`, as regras do convite da
+  Família: só o resumo do código, 7 dias, uso único, cancelável), a visão `business_member_items` ("Pessoa do negócio" para quem não
+  tem nome; "Pessoa que saiu" para quem excluiu a conta) e as funções `plus_status`, `create_business_invite` (recusa
+  `plus_indisponivel` com o Plus fechado), `cancel_business_invite`, `preview_business_invite`, `accept_business_invite`,
+  `leave_business`, `remove_business_member` e `set_business_member_role`. Testes em
+  `supabase/tests/99zzzzzzzzzzzzzzzzzzzzzz_negocio_compartilhado.sql`.
+- **Regras.** Quem criou administra (convida, muda o papel, remove, renomeia e encerra; não há passar a administração e quem administra
+  não sai: `titular_nao_sai`). As outras pessoas anotam e veem ("Anota e vê") ou só veem ("Só vê"). Até 6 pessoas, contando quem
+  administra e os convites ainda válidos (`negocio_cheio`). **Um negócio por pessoa, por vez**, o próprio ou o de outra pessoa (como a
+  Família): aceitar recusa quem já participa de um negócio (`ja_tem_negocio`; do mesmo, `ja_no_negocio`) e criar recusa quem participa
+  do negócio de outra pessoa. Quem sai ou é removido perde o acesso na hora; o que anotou fica como histórico, e as retiradas dessa
+  pessoa para o Pessoal dela deixam de ser ligadas (os dois lados viram lançamentos comuns). Encerrar continua só sem outras pessoas e
+  cancela os convites. Excluir a conta: quem administra com outras pessoas recebe `negocio_com_membros` (remove as pessoas antes); quem
+  participa sai, e o que anotou fica com "Pessoa que saiu". Só convidar passa pela trava da assinatura.
+- **App.** Com o Plus fechado, nada novo aparece (nem a seção de pessoas, nem textos do Plus), e o app funciona mesmo sem a 0043
+  (`plus_status` que falha conta como fechado). Com o Plus aberto, "Seu negócio" ganha "Pessoas do negócio" (pessoas, convites,
+  "Convidar alguém", "Gerenciar" e "Sair do negócio"), o convite abre em `/convite/negocio/<código>` e as telas seguem o papel de quem
+  usa (quem só vê não anota). A demonstração liga o Plus só em `?cenario=negocio-plus` (quem administra, com uma pessoa que
+  anota, uma que saiu e um convite pendente) e `?cenario=negocio-plus-membro` (a pessoa anota no negócio de outra). Núcleo:
+  `packages/core/src/business-people.ts` e `memory-business-people.ts`; telas: `apps/app/src/components/business-people.tsx`,
+  `apps/app/src/app/negocio/convidar.tsx` e `apps/app/src/app/convite/negocio/[codigo].tsx`; roteiro de telas: bloco "Negócio
+  compartilhado (Plus, D-120)" de `scripts/e2e-web.js`, capturas 811 a 824. Na demonstração, cada conta guarda os próprios dados: uma
+  conta criada nela que entra no negócio de exemplo não vê os lançamentos de quem administra (no banco de verdade, vê).
+- **Para abrir (decisão do Enzo, com preço e lojas).** As perguntas de preço e de lojas abaixo continuam abertas; quando houver plano
+  Plus, a única conferência a trocar no banco é `clarevo_plus_allows` (hoje: o Plus aberto para todas as pessoas).
+
 **O que entraria.**
 - Vários negócios por pessoa: o banco já aceita (só `create_business` recusa o segundo, `ja_tem_negocio`); o app trocaria o nome único no
   seletor por uma lista (o seletor já monta as opções a partir dos espaços que a pessoa tem).

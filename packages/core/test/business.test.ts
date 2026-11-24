@@ -244,7 +244,7 @@ describe('Seu negócio: entrou, saiu e sobrou', () => {
       expect(t).not.toMatch(FORBIDDEN);
       expect(t).not.toMatch(JUDGMENT);
     }
-    expect(businessErrorText('ja_tem_negocio')).toBe('Você já tem um espaço Negócio. O plano inclui um negócio por pessoa.');
+    expect(businessErrorText('ja_tem_negocio')).toBe('Você já participa de um negócio. Cada pessoa participa de um negócio por vez.');
     expect(businessErrorText('qualquer')).toBe(BUSINESS_ERROR_TEXT.salvar_falhou);
     // A mesma frase da retirada travada no detalhe e na recusa do formulário de gasto e recebimento.
     expect(RECORD_KIND_ERROR_TEXT.retirada_ligada).toBe(BUSINESS_TEXT.withdrawalLocked);

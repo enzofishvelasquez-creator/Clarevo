@@ -39,6 +39,20 @@ export default function NomeNegocioScreen() {
       </View>
     );
   }
+  // Só quem administra muda o nome (D-116): para as outras pessoas do negócio, a recusa que o banco daria, sem formulário.
+  if (business.data.role !== 'titular') {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SubHeader title={T.rename} right={<ContextPill label={business.data.name} fixed />} />
+        <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
+          <Card style={{ gap: space[3] }}>
+            <Txt>{businessErrorText('sem_permissao')}</Txt>
+            <Button label={T.accountOpen} tone="soft" onPress={() => router.replace(BACK)} />
+          </Card>
+        </Screen>
+      </View>
+    );
+  }
   return <RenameForm id={business.data.id} current={business.data.name} />;
 }
 

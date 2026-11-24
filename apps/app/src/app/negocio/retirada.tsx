@@ -1,4 +1,5 @@
 import {
+  BUSINESS_ROLE_HELP,
   BUSINESS_TEXT,
   WITHDRAWAL_FIELD_ORDER,
   activeAccounts,
@@ -64,6 +65,20 @@ export default function RetiradaScreen() {
           ) : (
             <LoadingState label={T.loading} />
           )}
+        </Screen>
+      </View>
+    );
+  }
+  // Quem só vê o negócio (D-116) não retira: a recusa que o banco daria, sem formulário.
+  if (business.data!.role === 'leitor') {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SubHeader title={T.withdrawTitle} right={<ContextPill label={business.data!.name} fixed />} />
+        <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
+          <Card style={{ gap: space[3] }}>
+            <Txt>{BUSINESS_ROLE_HELP.leitor}</Txt>
+            <Button label={T.accountOpen} tone="soft" onPress={() => router.replace(BACK)} />
+          </Card>
         </Screen>
       </View>
     );
