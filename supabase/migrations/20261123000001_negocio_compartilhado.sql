@@ -26,7 +26,8 @@
 --      ainda válidos (negocio_cheio).
 --   6. Quem sai ou é removido perde o acesso na hora; o que anotou continua no negócio como histórico. As retiradas para o Pessoal
 --      dessa pessoa deixam de ser ligadas (os dois lados viram lançamentos comuns), como no encerrar: sem acesso ao negócio, ela não
---      conseguiria mais excluir o par, e quem administra não alcança o Pessoal dela.
+--      conseguiria mais excluir o par, e quem administra não alcança o Pessoal dela. O mesmo vale para quem passa a só ver.
+--      Fechar o Plus (ou o Plus deixar de valer para quem administra) invalida os convites pendentes: a prévia e o aceite os recusam.
 --   7. Encerrar (end_business) continua só sem outra pessoa ativa e agora também cancela os convites pendentes.
 --   8. Exclusão da conta (clarevo_erase_person, o corpo da 0028): quem administra um negócio com outras pessoas ativas recebe
 --      negocio_com_membros (remove as pessoas antes; não há passar a administração); os negócios entram na lista de travas; os convites
@@ -200,6 +201,19 @@ as $$
     from public.business_invites i where i.id = p_invite;
 $$;
 
+-- O primeiro nome de quem convidou, como na Família (clarevo_person_label), com o rótulo neutro do negócio: "Pessoa do negócio" no lugar
+-- de "Pessoa da Família" (nome vazio, com arroba ou igual ao início do e-mail).
+create or replace function public.clarevo_business_person_label(p_person uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case when l = 'Pessoa da Família' then 'Pessoa do negócio' else l end
+    from (select public.clarevo_person_label(p_person) as l) x;
+$$;
+
 -- Resultado de aceitar: o negócio, o papel de quem aceitou e o primeiro nome de quem convidou.
 create or replace function public.clarevo_business_accept_json(p_invite uuid)
 returns jsonb
@@ -211,7 +225,7 @@ as $$
   select jsonb_build_object(
            'context', public.clarevo_business_json(i.context_id),
            'role', public.clarevo_member_role(i.context_id, auth.uid()),
-           'invited_by', public.clarevo_person_label(i.created_by))
+           'invited_by', public.clarevo_business_person_label(i.created_by))
     from public.business_invites i where i.id = p_invite;
 $$;
 
@@ -396,7 +410,8 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 7. Prévia do convite (só leitura): o nome do negócio, o primeiro nome de quem convidou, o papel e a validade, e mais nada. Convite
 -- com formato inválido, que não existe, usado, cancelado, vencido ou de negócio encerrado responde sempre convite_invalido, sem
--- revelar qual caso. Exige sessão. Retorno: {business_name, invited_by, role, expires_at}.
+-- revelar qual caso; o mesmo quando o Plus deixou de valer para quem administra (o convite pendente não fura a chave do Plus). Exige
+-- sessão. Retorno: {business_name, invited_by, role, expires_at}.
 -- ---------------------------------------------------------------------------
 create or replace function public.preview_business_invite(p_code text)
 returns jsonb
@@ -420,12 +435,13 @@ begin
     raise exception 'convite_invalido' using errcode = 'P0002';
   end if;
   select * into v_ctx from public.financial_contexts where id = v_inv.context_id;
-  if v_ctx.id is null or v_ctx.kind <> 'negocio' or v_ctx.ended_at is not null then
+  if v_ctx.id is null or v_ctx.kind <> 'negocio' or v_ctx.ended_at is not null
+     or not public.clarevo_plus_allows(v_ctx.owner_person_id) then
     raise exception 'convite_invalido' using errcode = 'P0002';
   end if;
   return jsonb_build_object(
     'business_name', v_ctx.name,
-    'invited_by', public.clarevo_person_label(v_inv.created_by),
+    'invited_by', public.clarevo_business_person_label(v_inv.created_by),
     'role', v_inv.role,
     'expires_at', v_inv.expires_at);
 end;
@@ -434,9 +450,10 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 8. Aceitar o convite. Ordem: sessão; chave; repetição; espaço pessoal da pessoa (sem_permissao, antes de olhar o código, como na
 -- Família); convite_invalido (formato ou código que não existe); sob as travas (da pessoa, depois do negócio), tudo de novo:
--- convite_invalido (usado, cancelado, vencido, negócio encerrado); ja_no_negocio (a pessoa já está neste negócio); ja_tem_negocio (já
--- participa de outro negócio, próprio ou de outra pessoa); negocio_cheio. Uso único: marca used_at e used_by; cria (ou reativa) o
--- vínculo com o papel do convite. Aceitar não passa pela trava da assinatura nem pela chave do Plus (o convite já foi criado com ela).
+-- convite_invalido (usado, cancelado, vencido, negócio encerrado, ou o Plus que não vale mais para quem administra: fechar o Plus
+-- invalida os convites pendentes); ja_no_negocio (a pessoa já está neste negócio); ja_tem_negocio (já participa de outro negócio,
+-- próprio ou de outra pessoa); negocio_cheio. Uso único: marca used_at e used_by; cria (ou reativa) o vínculo com o papel do convite.
+-- Aceitar não passa pela trava da assinatura de quem aceita.
 -- Retorno: {context: {id, name, created_at, ended_at}, role, invited_by}.
 -- ---------------------------------------------------------------------------
 create or replace function public.accept_business_invite(p_code text, p_key text)
@@ -492,7 +509,8 @@ begin
     raise exception 'convite_invalido' using errcode = 'P0002';
   end if;
   select * into v_ctx from public.financial_contexts where id = v_inv.context_id;
-  if v_ctx.id is null or v_ctx.kind <> 'negocio' or v_ctx.ended_at is not null then
+  if v_ctx.id is null or v_ctx.kind <> 'negocio' or v_ctx.ended_at is not null
+     or not public.clarevo_plus_allows(v_ctx.owner_person_id) then
     raise exception 'convite_invalido' using errcode = 'P0002';
   end if;
   if exists (select 1 from public.context_memberships m
@@ -638,7 +656,7 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- 11. Mudar o papel de uma pessoa. Só quem administra, nunca sobre si. 'membro' lê e anota; 'leitor' só lê (papel_invalido para
--- outro valor). Retorno: {context_id, person_id, role}.
+-- outro valor); passar a 'leitor' desliga as retiradas da pessoa. Retorno: {context_id, person_id, role}.
 -- ---------------------------------------------------------------------------
 create or replace function public.set_business_member_role(p_context uuid, p_person uuid, p_role text, p_key text)
 returns jsonb
@@ -691,6 +709,11 @@ begin
   update public.context_memberships
      set can_read = true, can_write = (p_role = 'membro'), can_edit_others = false
    where context_id = p_context and person_id = p_person;
+  -- Quem passa a só ver não consegue mais excluir a própria retirada (exige escrita nos dois espaços): os dois lados viram lançamentos
+  -- comuns, como ao sair.
+  if p_role = 'leitor' then
+    perform public.clarevo_unlink_withdrawals(p_context, p_person);
+  end if;
 
   insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id, target_id)
   values (v_uid, p_key, 'alterar_papel_negocio', p_context, v_hash, null, null, p_person);
@@ -1037,6 +1060,7 @@ revoke all on function public.clarevo_business_active_count(uuid) from public, a
 revoke all on function public.clarevo_business_valid_invites(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_business_invite_json(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_business_accept_json(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.clarevo_business_person_label(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_unlink_withdrawals(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_erase_person(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_track_activity() from public, anon, authenticated, service_role;

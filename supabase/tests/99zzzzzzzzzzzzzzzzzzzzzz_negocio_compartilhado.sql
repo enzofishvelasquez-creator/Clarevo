@@ -17,6 +17,7 @@
 \set eva  '''00000000-0000-0000-0000-0000000000f6'''
 \set fabi '''00000000-0000-0000-0000-0000000000f7'''
 \set gil  '''00000000-0000-0000-0000-0000000000f8'''
+\set hugo '''00000000-0000-0000-0000-0000000000f9'''
 
 begin;
 set local clarevo.today = '2026-11-23';
@@ -99,7 +100,8 @@ begin
   end loop;
   foreach f in array array['clarevo_plus_open()', 'clarevo_plus_allows(uuid)', 'clarevo_staff_set_plus(timestamp with time zone)',
                            'clarevo_active_business_count(uuid)', 'clarevo_business_active_count(uuid)', 'clarevo_business_valid_invites(uuid)',
-                           'clarevo_business_invite_json(uuid)', 'clarevo_business_accept_json(uuid)', 'clarevo_unlink_withdrawals(uuid, uuid)',
+                           'clarevo_business_invite_json(uuid)', 'clarevo_business_accept_json(uuid)', 'clarevo_business_person_label(uuid)',
+                           'clarevo_unlink_withdrawals(uuid, uuid)',
                            'clarevo_erase_person(uuid)', 'clarevo_track_activity()', 'clarevo_write_free_actions()'] loop
     assert not has_function_privilege('authenticated', 'public.' || f, 'execute') and not has_function_privilege('anon', 'public.' || f, 'execute')
        and not has_function_privilege('service_role', 'public.' || f, 'execute'), 'auxiliar fechada: ' || f;
@@ -110,7 +112,7 @@ begin
     'só convidar passa pela trava da assinatura';
 end $$;
 
-insert into ids values ('ana', :ana), ('beto', :beto), ('cris', :cris), ('davi', :davi), ('eva', :eva), ('fabi', :fabi), ('gil', :gil);
+insert into ids values ('ana', :ana), ('beto', :beto), ('cris', :cris), ('davi', :davi), ('eva', :eva), ('fabi', :fabi), ('gil', :gil), ('hugo', :hugo);
 insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
   (:ana, 'ana.plus@exemplo.test', now(), '{"display_name":"Ana Souza"}'),
   (:beto, 'beto.plus@exemplo.test', now(), '{"display_name":"Beto"}'),
@@ -118,7 +120,8 @@ insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) value
   (:davi, 'davi.plus@exemplo.test', now(), '{"display_name":"Davi"}'),
   (:eva, 'eva.plus@exemplo.test', now(), '{}'),
   (:fabi, 'fabi.plus@exemplo.test', now(), '{"display_name":"Fabi"}'),
-  (:gil, 'gil.plus@exemplo.test', now(), '{"display_name":"Gil"}');
+  (:gil, 'gil.plus@exemplo.test', now(), '{"display_name":"Gil"}'),
+  (:hugo, 'hugo.plus@exemplo.test', now(), '{}');
 
 set role authenticated;
 
@@ -400,7 +403,16 @@ begin
     'o que o Beto anotou continua no negócio';
   assert (select status || ':' || (left_at is not null) from public.business_member_items where context_id = biz and person_id = pg_temp.id('beto')) = 'ex-membro:true',
     'o Beto aparece como quem saiu';
-  -- Remover a Cris (que anota): a pessoa precisa estar ativa.
+  -- Quem passa a só ver tem as retiradas desligadas (ela não conseguiria mais excluir o par).
+  perform set_config('request.jwt.claim.sub', pg_temp.id('cris')::text, true);
+  perform pg_temp.keep('cris_wb', (public.create_business_withdrawal('nc-m-0002', biz, pg_temp.id('biz_acc'), pg_temp.id('cris_pes_acc'), 700, '2026-11-22')
+                                   #>> '{business_record,id}')::uuid);
+  perform set_config('request.jwt.claim.sub', pg_temp.id('ana')::text, true);
+  assert (pg_temp.rec(pg_temp.id('cris_wb'))).paired_record_id is not null, 'a retirada da Cris nasce ligada';
+  perform public.set_business_member_role(biz, pg_temp.id('cris'), 'leitor', 'nc-m-0003');
+  assert (pg_temp.rec(pg_temp.id('cris_wb'))).paired_record_id is null, 'passar a só ver desliga a retirada da Cris';
+  assert (pg_temp.rec(pg_temp.id('ana_wb'))).paired_record_id = pg_temp.id('ana_wp'), 'a da Ana continua ligada';
+  -- Remover a Cris: a pessoa precisa estar ativa.
   perform pg_temp.expect_code(format('select public.remove_business_member(%L, %L, %L)', biz, pg_temp.id('beto'), 'nc-m-0001'), 'nao_encontrado', 'P0002');
   assert public.remove_business_member(biz, pg_temp.id('cris'), 'nc-m-0010') ->> 'removed' = 'true', 'a Cris foi removida';
   assert (pg_temp.member(biz, pg_temp.id('cris'))).revoked_at is not null, 'vínculo revogado';
@@ -441,8 +453,10 @@ set role authenticated;
 -- ---------------------------------------------------------------------------
 reset role;
 do $$ begin
-  assert not exists (select 1 from public.context_activity a where a.context_id = pg_temp.id('biz') and a.person_id = pg_temp.id('cris')),
-    'aceitar, ter o papel mudado e ser removida não contam como anotação';
+  assert not exists (select 1 from public.context_activity a where a.context_id = pg_temp.id('biz') and a.person_id = pg_temp.id('eva')),
+    'aceitar o convite não conta como anotação (a Eva só aceitou)';
+  assert (select count(*) from public.context_activity a where a.context_id = pg_temp.id('biz') and a.person_id = pg_temp.id('ana')) = 1,
+    'a Ana tem atividade só pela retirada (convidar, cancelar, mudar papel e remover não contam)';
   assert not exists (select 1 from public.record_operations o
                       where o.action in ('criar_convite_negocio', 'cancelar_convite_negocio', 'aceitar_convite_negocio', 'sair_negocio',
                                          'remover_membro_negocio', 'alterar_papel_negocio')
@@ -511,7 +525,39 @@ end $$;
 set role authenticated;
 
 -- ---------------------------------------------------------------------------
--- 12. Encerrar: só sem outras pessoas, e cancela os convites pendentes
+-- 12. Quem convida sem nome aparece como "Pessoa do negócio"; fechar o Plus invalida os convites pendentes
+-- ---------------------------------------------------------------------------
+select pg_temp.as_('hugo');
+do $$
+declare
+  space jsonb := public.ensure_personal_space('Conta principal');
+  biz uuid;
+begin
+  biz := (public.create_business('Bancas do Hugo', 'nc-h-0001') #>> '{context,id}')::uuid;
+  perform pg_temp.keep('hugo_biz', biz);
+  perform pg_temp.keep_code('hugo', public.create_business_invite(biz, 'membro', 'nc-h-0002') ->> 'code');
+end $$;
+select pg_temp.as_('beto');
+do $$ begin
+  assert public.preview_business_invite(pg_temp.code('hugo')) ->> 'invited_by' = 'Pessoa do negócio', 'sem nome: "Pessoa do negócio", nunca "Pessoa da Família"';
+end $$;
+reset role;
+select public.clarevo_staff_set_plus(null);
+set role authenticated;
+select pg_temp.as_('beto');
+select pg_temp.expect_code(format('select public.preview_business_invite(%L)', pg_temp.code('hugo')), 'convite_invalido', 'P0002');
+select pg_temp.expect_code(format('select public.accept_business_invite(%L, %L)', pg_temp.code('hugo'), 'nc-h-0003'), 'convite_invalido', 'P0002');
+reset role;
+select public.clarevo_staff_set_plus(now() - interval '1 minute');
+set role authenticated;
+select pg_temp.as_('beto');
+do $$ begin
+  assert public.accept_business_invite(pg_temp.code('hugo'), 'nc-h-0004') ->> 'invited_by' = 'Pessoa do negócio', 'com o Plus aberto de novo, o convite vale';
+  assert public.leave_business(pg_temp.id('hugo_biz'), 'nc-h-0005') ->> 'left' = 'true', 'o Beto sai do negócio do Hugo';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 13. Encerrar: só sem outras pessoas, e cancela os convites pendentes
 -- ---------------------------------------------------------------------------
 select pg_temp.as_('ana');
 do $$
