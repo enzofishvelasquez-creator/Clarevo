@@ -16776,8 +16776,10 @@ setInterval(async () => {
     const NG_TAB = `Ver dados do negócio ${NG}`;
     const ngTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
     const ngSpaceTabs = () => p.getByRole('tab', { name: /^Ver dados d/ }).filter({ visible: true }).evaluateAll((els) => els.map((e) => `${e.getAttribute('aria-label')}:${e.getAttribute('aria-selected')}`));
+    // D-121 (24/11/2026): as saídas do negócio ganharam "Divulgação", "Contabilidade e sistemas" e "Juros e multas" (antes de "Outras saídas")
+    // e, no fim, "Parcela de empréstimo" e "Equipamento" (fora da operação em "Seu negócio"); as entradas, "Empréstimo recebido".
     const NG_OUT = ['Sem categoria', 'Material e mercadoria', 'Peças e ferramentas', 'Combustível e transporte', 'Funcionários e ajudantes', 'Impostos e DAS',
-      'Aluguel do ponto', 'Contas do ponto', 'Taxas e maquininha', 'Outras saídas'];
+      'Aluguel do ponto', 'Contas do ponto', 'Taxas e maquininha', 'Divulgação', 'Contabilidade e sistemas', 'Juros e multas', 'Outras saídas', 'Parcela de empréstimo', 'Equipamento'];
     const ngChips = (group) => p.evaluate((g) => [...document.querySelectorAll(`[role=radiogroup][aria-label="${g}"] [role=radio]`)].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || e.textContent), group);
     const ngEnter = async () => {
       await p.goto(`http://localhost:${PORT}/?cenario=negocio`); await waitText('Cuidar da vida financeira');
@@ -17032,8 +17034,8 @@ setInterval(async () => {
     await p.getByRole('button', { name: /^Buscar\./ }).filter({ visible: true }).first().click(); await waitText('O que você procura'); await p.waitForTimeout(500);
     await h1More();
     const ngSearchCats = await h1Group('Categoria').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent));
-    ok('Negócio (D-113a): a busca no negócio oferece as categorias do negócio (as nove de saída e as três de entrada), sem as do Pessoal',
-      JSON.stringify(ngSearchCats) === JSON.stringify(['Todas', ...NG_OUT.slice(1), 'Vendas', 'Serviços', 'Outras entradas', 'Sem categoria']), JSON.stringify(ngSearchCats));
+    ok('Negócio (D-113a, D-121): a busca no negócio oferece as categorias do negócio (as catorze de saída e as quatro de entrada), sem as do Pessoal',
+      JSON.stringify(ngSearchCats) === JSON.stringify(['Todas', ...NG_OUT.slice(1), 'Vendas', 'Serviços', 'Outras entradas', 'Empréstimo recebido', 'Sem categoria']), JSON.stringify(ngSearchCats));
     await btn('Voltar').click(); await waitText('Anotar entrada'); await p.waitForTimeout(400);
     await evOpen(); await f3Pick('Guardado em metas');
     t = await ngKeep();
@@ -17111,6 +17113,274 @@ setInterval(async () => {
     const ngBad = ngTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(preju[ií]zo|lucro|cuidado|aten[cç][aã]o|ruim|parab[eé]ns|deveria)\b/i)?.[0]).filter(Boolean);
     ok('Negócio: nas telas do espaço Negócio, nenhum termo proibido, travessão longo nem palavra de julgamento', ngTexts.length >= 12 && ngBad.length === 0, `${ngTexts.length} telas ${ngBad.join(' | ')}`);
     ok('Negócio: nada vai à rede (a demonstração grava só na memória)', writes.length === ngWrites0, writes.slice(ngWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Espaço Negócio: fora da operação, tipo do negócio, limite do MEI e resumo do ano (D-121, a partir da pesquisa de 18/11/2026 sobre o que
+  // micro e pequenos negócios precisam registrar). No cenário "negocio" (os números de sempre do D-113: outubro com R$ 760,00 e R$ 418,00):
+  // (1) "Seu negócio" ganha "Trazer dinheiro do Pessoal", "Resumo do ano" e "Tipo do negócio" (quem administra; "Prefiro não dizer"
+  // marcado); sem o tipo MEI, nada do limite. (2) Trazer dinheiro do Pessoal: o formulário e, salvo, Entrou, Saiu e Sobrou da operação
+  // iguais, o bloco "Fora da operação" (com o porquê) e o que ficou no negócio; no Resumo do negócio e no Pessoal, o dinheiro entrou e saiu de
+  // verdade; o detalhe nos dois lados, sem editar; excluir tira os dois. (3) As categorias novas no formulário de saída, com a ajuda de
+  // "Contas do ponto" e de "Equipamento"; uma saída "Equipamento" fica fora da operação e fora das maiores saídas. (4) O tipo MEI e o limite
+  // (3% com os R$ 2.520,00 de vendas do ano), numa cor só; com os valores ocultos, sem o valor nem a parte do limite. (5) O resumo do ano: as
+  // categorias da operação, Vendas e Serviços separadas para o MEI ("Confira com a sua contabilidade antes de declarar."), fora da operação,
+  // retiradas e o que ficou; a troca de ano; "Exportar os lançamentos do negócio" abre a exportação com o negócio e "Este ano" escolhidos.
+  // (6) Acima de 100% do limite, só o fato e "Converse com a sua contabilidade.". (7) Encerrar oferece "Exportar os lançamentos" antes, com
+  // a frase da guarda dos registros. (8) Computador (1280 px) e modo escuro. Capturas 827 a 839. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const nmWrites0 = writes.length;
+    const nmTexts = [];
+    const nmKeep = async () => { const x = await body(); nmTexts.push(x); screenTexts.push(x); return x; };
+    const NM = 'Sacolé da Maria';
+    const NM_TAB = `Ver dados do negócio ${NM}`;
+    const NM_OUT = ['Sem categoria', 'Material e mercadoria', 'Peças e ferramentas', 'Combustível e transporte', 'Funcionários e ajudantes', 'Impostos e DAS', 'Aluguel do ponto',
+      'Contas do ponto', 'Taxas e maquininha', 'Divulgação', 'Contabilidade e sistemas', 'Juros e multas', 'Outras saídas', 'Parcela de empréstimo', 'Equipamento'];
+    const nmTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
+    const nmEnter = async () => {
+      await p.goto(`http://localhost:${PORT}/?cenario=negocio`); await waitText('Cuidar da vida financeira');
+      await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+      await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(600);
+    };
+    // As telas empilhadas escondem a barra de abas: goResumo volta até ela aparecer e abre o Resumo (no negócio, depois de "Seu negócio").
+    const nmBack = async () => { await goResumo(); await p.waitForTimeout(500); };
+    const nmOpen = async () => { await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(600); };
+    const nmRadios = (group) => p.evaluate((g) => [...document.querySelectorAll(`[role=radiogroup][aria-label="${g}"] [role=radio]`)].filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-label') || e.textContent}:${e.getAttribute('aria-checked')}`), group);
+    const nmScroll = async (name) => { await p.getByRole('heading', { name, exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(300); };
+    const nmLabel = (label) => p.locator(`[aria-label="${label}"]`).filter({ visible: true }).count();
+    // A cor de um texto à vista que começa com `x` (o limite do MEI na mesma cor do texto de sempre, sem verde, amarelo nem vermelho).
+    const nmColorOf = (x) => p.evaluate((x) => { const e = [...document.querySelectorAll('div[dir="auto"]')].find((d) => d.getBoundingClientRect().width > 0 && d.children.length === 0 && (d.textContent || '').startsWith(x)); return e ? getComputedStyle(e).color : null; }, x);
+    const nmSaved = async (title) => { await waitUntil(async () => (await h1Name()) !== title, 8000); await p.waitForTimeout(500); };
+    const nmTypes = (checked) => ['Sem CNPJ (por conta própria)', 'MEI', 'Microempresa ou empresa de pequeno porte', 'Prefiro não dizer'].map((x) => `${x}:${x === checked}`).join('|');
+
+    // 1. "Seu negócio" com as peças novas, sem o tipo MEI.
+    await nmEnter();
+    await nmTab(NM_TAB).click(); await p.waitForTimeout(600);
+    await nmOpen();
+    let t = await nmKeep();
+    ok('Negócio (D-121): "Seu negócio" com os números de sempre, "Trazer dinheiro do Pessoal", "Resumo do ano" e "Tipo do negócio" ("Prefiro não dizer" marcado), sem limite do MEI nem "Fora da operação"',
+      (await nmLabel('Entrou: R$ 760,00')) === 1 && (await nmLabel('Saiu: R$ 418,00')) === 1 && (await nmLabel('Sobrou: R$ 342,00')) === 1 &&
+        (await visibleCount('button', 'Trazer dinheiro do Pessoal')) === 1 && (await visibleCount('button', 'Resumo do ano')) === 1 &&
+        t.includes('Opcional. Muda alguns textos e, no MEI, mostra o limite anual. A Clarevo não pede o número do CNPJ.') && (await nmRadios('Tipo do negócio')).join('|') === nmTypes('Prefiro não dizer') &&
+        !t.includes('Limite do MEI') && !t.includes('Fora da operação'), t.slice(0, 700));
+
+    // 2. Trazer dinheiro do Pessoal.
+    await btn('Trazer dinheiro do Pessoal').click(); await waitText('Entra no negócio: Conta do negócio'); await p.waitForTimeout(500);
+    t = await nmKeep();
+    ok('Negócio (D-121), trazer dinheiro do Pessoal: o formulário diz o que é, com o valor, a data, a conta do Pessoal de onde sai, a do negócio e a descrição opcional, sem a barra de abas',
+      (await h1Name()) === 'Trazer dinheiro do Pessoal' && t.includes('Para quando você põe dinheiro do Pessoal no negócio. Sai do Pessoal e entra no negócio, sem contar duas vezes, e fica fora da operação em "Seu negócio".') &&
+        JSON.stringify(await nmRadios('Sai do Pessoal')) === JSON.stringify(['Conta principal:true', 'Carteira:false']) && t.indexOf('Sai do Pessoal') < t.indexOf('Entra no negócio: Conta do negócio') &&
+        t.includes('Sem descrição, fica "Dinheiro do Pessoal" no negócio e "Dinheiro para Sacolé da Maria" no Pessoal.') &&
+        t.includes('O dinheiro trazido do Pessoal fica ligado nos dois espaços. Para mudar o valor ou a data, exclua e anote de novo.') &&
+        (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0, t.slice(0, 900));
+    await atWidths(async (w) => { await innerChecks(`Negócio (D-121), trazer dinheiro do Pessoal ${w}px`); if (w === 390) await shot('827_negocio_trazer_dinheiro'); });
+    await btn('Salvar').click(); await p.waitForTimeout(400);
+    ok('Negócio (D-121), trazer dinheiro: sem valor, o erro fica no campo e nada é salvo', (await body()).includes('Informe um valor maior que zero, como 80,00.') && (await h1Name()) === 'Trazer dinheiro do Pessoal');
+    await field('Valor em reais').fill('500');
+    await btn('Salvar').click(); await waitText('Salvo: saiu do Pessoal e entrou no negócio.', 8000); await p.waitForTimeout(700);
+    t = await nmKeep();
+    ok('Negócio (D-121), dinheiro trazido: Entrou, Saiu e Sobrou da operação continuam R$ 760,00, R$ 418,00 e R$ 342,00; "Fora da operação" mostra a entrada com o porquê, e o que ficou no negócio soma tudo (R$ 842,00)',
+      (await h1Name()) === 'Seu negócio' && (await nmLabel('Entrou: R$ 760,00')) === 1 && (await nmLabel('Saiu: R$ 418,00')) === 1 && (await nmLabel('Sobrou: R$ 342,00')) === 1 &&
+        t.includes('Neste mês, entrou R$ 342,00 a mais do que saiu.') && t.includes('Fora da operação\nEntrou · Dinheiro do Pessoal\nR$ 500,00') &&
+        t.includes('Não entram em Entrou nem em Saiu: o dinheiro entrou ou saiu do negócio, mas não é venda nem gasto do dia a dia.') &&
+        t.includes('Ficou no negócio, com o que ficou fora da operação: R$ 842,00.'), t.slice(0, 1200));
+    ok('Negócio (D-121): "Fora da operação" é título de nível 3 dentro do mês, e a linha tem o nome acessível inteiro',
+      (await p.getByRole('heading', { name: 'Fora da operação', level: 3 }).filter({ visible: true }).count()) === 1 && (await nmLabel('Dinheiro do Pessoal: entrou R$ 500,00, fora da operação')) === 1);
+    await atWidths(async (w) => { await layoutChecks(`Negócio (D-121), "Seu negócio" com fora da operação ${w}px`); await shot(w === 390 ? '828_negocio_fora_da_operacao' : '828_negocio_fora_da_operacao_320px'); });
+    await btn('Voltar').click(); await nmBack();
+    await expectTotals('Negócio (D-121), dinheiro trazido: no Resumo do negócio, o dinheiro entrou de verdade (Entrou R$ 1.260,00, Ficou no negócio R$ 842,00)', 'R$ 1.260,00', 'R$ 418,00', 'R$ 842,00', 'R$ 0,00');
+    t = await body();
+    ok('Negócio (D-121): no Resumo do negócio, com algo fora da operação no mês, o total do meio se chama "Ficou no negócio" (em "Seu negócio", "Sobrou" é só da operação)',
+      t.includes('Ficou no negócio\n') && !t.includes('Sobrou\n'), t.slice(0, 500));
+    await nmTab('Ver dados de Pessoal').click(); await p.waitForTimeout(600);
+    await expectTotals('Negócio (D-121), dinheiro trazido: no Pessoal, saiu uma vez como gasto (Pago R$ 4.400,00)', 'R$ 6.000,00', 'R$ 4.400,00', 'R$ 1.600,00', 'R$ 650,00');
+    await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Dinheiro para Sacolé da Maria, / }).filter({ visible: true }).first().click(); await waitText('Dinheiro para o negócio: este valor'); await p.waitForTimeout(500);
+    t = await nmKeep();
+    ok('Negócio (D-121), no Pessoal: o gasto "Dinheiro para o negócio", ligado ao negócio, sem "Editar", "Mover" nem "Tornar gasto fixo", com "Ver em Sacolé da Maria" e "Excluir dos dois espaços"',
+      t.includes('Dinheiro para o negócio: este valor saiu do Pessoal e entrou em Sacolé da Maria.') && t.includes('O dinheiro trazido do Pessoal fica ligado nos dois espaços.') &&
+        (await visibleCount('button', 'Editar gasto')) === 0 && (await visibleCount('button', 'Mover para o espaço Negócio')) === 0 && (await visibleCount('button', 'Tornar gasto fixo')) === 0 &&
+        (await visibleCount('button', `Ver em ${NM}`)) === 1 && (await visibleCount('button', 'Excluir dos dois espaços')) === 1, t.slice(0, 900));
+    await atWidths(async (w) => { await innerChecks(`Negócio (D-121), dinheiro trazido no Pessoal ${w}px`); if (w === 390) await shot('829_negocio_dinheiro_no_pessoal'); });
+    await btn(`Ver em ${NM}`).click(); await waitText('Dinheiro do Pessoal: este valor saiu do Pessoal'); await p.waitForTimeout(400);
+    t = await nmKeep();
+    ok('Negócio (D-121): "Ver em Sacolé da Maria" abre o outro lado, a entrada "Dinheiro do Pessoal", fora da operação, com "Ver em Pessoal" e sem "Editar entrada"',
+      t.includes('Dinheiro do Pessoal: este valor saiu do Pessoal e entrou no negócio. Fica fora da operação, em "Seu negócio".') && (await visibleCount('button', 'Ver em Pessoal')) === 1 &&
+        (await visibleCount('button', 'Editar entrada')) === 0, t.slice(0, 600));
+    await btn('Excluir dos dois espaços').click(); await p.waitForTimeout(300);
+    t = await dialogText();
+    ok('Negócio (D-121), excluir: a confirmação diz que sai dos dois espaços', t.includes('Excluir o dinheiro trazido do Pessoal?') && t.includes('Sai do negócio e do Pessoal, junto.'), t);
+    await confirmIn('Excluir dos dois espaços'); await waitText('Excluído do negócio e do Pessoal.', 8000); await p.waitForTimeout(500);
+    await nmBack();
+    await nmTab('Ver dados de Pessoal').click(); await p.waitForTimeout(600);
+    await expectTotals('Negócio (D-121), dinheiro trazido excluído: o Pessoal volta a 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+
+    // 3. As categorias novas e uma saída fora da operação.
+    await nmTab(NM_TAB).click(); await p.waitForTimeout(600);
+    await expectTotals('Negócio (D-121), dinheiro trazido excluído: o Resumo do negócio volta a R$ 760,00, R$ 418,00 e R$ 342,00, com "Sobrou"', 'R$ 760,00', 'R$ 418,00', 'R$ 342,00', 'R$ 0,00');
+    ok('Negócio (D-121): sem nada fora da operação, o Resumo do negócio volta a dizer "Sobrou"', (await body()).includes('Sobrou\n'));
+    await btn('Anotar saída').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
+    const nmCats = await p.evaluate(() => [...document.querySelectorAll('[role=radiogroup][aria-label="Categoria"] [role=radio]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label') || e.textContent));
+    ok('Negócio (D-121): as saídas do negócio com "Divulgação", "Contabilidade e sistemas" e "Juros e multas" antes de "Outras saídas", e "Parcela de empréstimo" e "Equipamento" no fim',
+      JSON.stringify(nmCats) === JSON.stringify(NM_OUT), JSON.stringify(nmCats));
+    await radio('Contas do ponto').click(); await p.waitForTimeout(250);
+    ok('Negócio (D-121): "Contas do ponto" explica que vale também para a parte da casa usada no trabalho', (await body()).includes('Luz, água, internet e gás do ponto, ou da parte da casa usada no trabalho.'));
+    await radio('Equipamento').click(); await p.waitForTimeout(250);
+    t = await nmKeep();
+    ok('Negócio (D-121): "Equipamento" diz que fica fora da operação em "Seu negócio"', t.includes('Máquinas, ferramentas grandes e móveis. Fica fora da operação em "Seu negócio": é uma compra que dura.') && !t.includes('Luz, água, internet'), t.slice(0, 300));
+    await radio('Equipamento').scrollIntoViewIfNeeded(); await shot('830_negocio_categoria_equipamento');
+    await field('Valor em reais').fill('200'); await field('Descrição').fill('Freezer');
+    await btn('Salvar saída').click(); await nmSaved('Anotar saída');
+    await nmBack(); await nmOpen();
+    t = await nmKeep();
+    const nmTop = t.slice(t.indexOf('Maiores saídas do mês'), t.indexOf('Os valores são os que você anotou.'));
+    ok('Negócio (D-121): a saída "Equipamento" fica fora da operação: Saiu continua R$ 418,00, "Saiu · Equipamento" aparece à parte, fora das maiores saídas, e o que ficou no negócio desconta (R$ 142,00)',
+      (await nmLabel('Saiu: R$ 418,00')) === 1 && (await nmLabel('Sobrou: R$ 342,00')) === 1 && t.includes('Fora da operação\nSaiu · Equipamento\nR$ 200,00') &&
+        t.includes('Ficou no negócio, com o que ficou fora da operação: R$ 142,00.') && nmTop.includes('Material e mercadoria') && !nmTop.includes('Equipamento'), t.slice(0, 1200));
+    // O orçamento do negócio continua com as 9 categorias de sempre (decisão de 24/11/2026: as 3 saídas novas entram no orçamento depois, para o
+    // app publicado continuar lendo o orçamento do negócio); nada oferece orçar "Divulgação", "Contabilidade e sistemas", "Juros e multas" nem as
+    // de fora da operação.
+    await nmBack();
+    await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Orçamento por categoria, / }).filter({ visible: true }).first().click(); await waitText('Definir orçamento'); await p.waitForTimeout(500);
+    const nmDefine = await p.getByRole('button', { name: /^Definir orçamento de / }).filter({ visible: true }).evaluateAll((els) => els.map((e) => (e.getAttribute('aria-label') || '').replace('Definir orçamento de ', '')));
+    ok('Negócio (D-121): o orçamento do negócio oferece só as 9 categorias de sempre, sem as 3 saídas novas nem as de fora da operação',
+      JSON.stringify(nmDefine) === JSON.stringify(['Material e mercadoria', 'Peças e ferramentas', 'Combustível e transporte', 'Funcionários e ajudantes', 'Impostos e DAS', 'Aluguel do ponto',
+        'Contas do ponto', 'Taxas e maquininha', 'Outras saídas']), JSON.stringify(nmDefine));
+    await nmBack(); await nmOpen();
+
+    // 4. O tipo MEI e o limite.
+    await nmScroll('Tipo do negócio');
+    await radio('MEI').click(); await waitText('Tipo do negócio salvo.', 8000); await p.waitForTimeout(800);
+    t = await nmKeep();
+    ok('Negócio (D-121), tipo MEI: salvo na hora (no próprio card), e "Limite do MEI" mostra as vendas e os serviços anotados no ano (R$ 2.520,00, 3% do limite de R$ 81.000,00), com a regra do ano de abertura',
+      (await nmRadios('Tipo do negócio')).join('|') === nmTypes('MEI') && t.includes('Limite do MEI') &&
+        t.includes('Vendas e serviços anotados em 2026: R$ 2.520,00, 3% do limite anual do MEI (R$ 81.000,00).') &&
+        t.includes('Conta só as entradas em "Vendas" e "Serviços". Os valores são os que você anotou. No ano em que o MEI foi aberto, o limite é proporcional aos meses (R$ 6.750,00 por mês).') &&
+        !t.includes('Converse com a sua contabilidade'), t.slice(t.indexOf('Limite do MEI'), t.indexOf('Limite do MEI') + 400));
+    const nmMeiColor = await nmColorOf('Vendas e serviços anotados em 2026'), nmTextColor = await nmColorOf('Neste mês, entrou');
+    ok('Negócio (D-121): o limite do MEI numa cor só, a do texto de sempre (sem verde, amarelo nem vermelho)', nmMeiColor !== null && nmMeiColor === nmTextColor, `${nmMeiColor} ${nmTextColor}`);
+    ok('Negócio (D-121): "Limite do MEI" e "Tipo do negócio" são títulos de nível 2', (await p.getByRole('heading', { name: 'Limite do MEI', level: 2 }).filter({ visible: true }).count()) === 1 &&
+      (await p.getByRole('heading', { name: 'Tipo do negócio', level: 2 }).filter({ visible: true }).count()) === 1);
+    await atWidths(async (w) => { await nmScroll('Limite do MEI'); await layoutChecks(`Negócio (D-121), limite do MEI ${w}px`); await shot(w === 390 ? '831_negocio_limite_mei' : '831_negocio_limite_mei_320px'); });
+    await btn('Voltar').click(); await nmBack();
+    await btn('Ocultar valores').click(); await p.waitForTimeout(300);
+    await nmOpen(); await nmScroll('Limite do MEI');
+    t = await body();
+    ok('Negócio (D-121), valores ocultos: o limite do MEI sem o valor nem a parte do limite (nenhum "%"), e nenhum valor em reais à vista',
+      t.includes('Vendas e serviços anotados em 2026: R$ ••••. Limite anual do MEI: R$ ••••.') && !/\d+ ?%/.test(t) && !/R\$ \d/.test(t), t.slice(t.indexOf('Limite do MEI'), t.indexOf('Limite do MEI') + 300));
+    await btn('Voltar').click(); await nmBack();
+    await btn('Mostrar valores').click(); await p.waitForTimeout(300);
+
+    // 5. O resumo do ano.
+    await nmOpen();
+    await btn('Resumo do ano').click(); await waitText('Entrou na operação'); await p.waitForTimeout(700);
+    t = await nmKeep();
+    ok('Negócio (D-121), resumo do ano: 2026 com as entradas e as saídas da operação por categoria (na ordem das categorias), os totais e o que sobrou na operação',
+      (await h1Name()) === 'Resumo do ano' && t.includes('Sacolé da Maria · 2026') && t.includes('O que você anotou no negócio em 2026, até hoje.') &&
+        t.includes('Entrou na operação\nVendas\nR$ 2.520,00\nTotal\nR$ 2.520,00') &&
+        t.includes('Saiu na operação\nMaterial e mercadoria\nR$ 685,00\nFuncionários e ajudantes\nR$ 120,00\nImpostos e DAS\nR$ 76,00\nContas do ponto\nR$ 120,00\nTaxas e maquininha\nR$ 18,00\nTotal\nR$ 1.019,00') &&
+        t.includes('Sobrou na operação: R$ 1.501,00.'), t.slice(0, 1200));
+    ok('Negócio (D-121), resumo do ano: para o MEI, Vendas e Serviços separadas, com "Confira com a sua contabilidade antes de declarar."; fora da operação, retiradas e o que ficou no negócio; "Os valores são os que você anotou."',
+      t.includes('Vendas e serviços\nVendas\nR$ 2.520,00\nServiços\nR$ 0,00\nTotal\nR$ 2.520,00\nConfira com a sua contabilidade antes de declarar.') &&
+        t.includes('Fora da operação\nSaiu · Equipamento\nR$ 200,00') && t.includes('Retiradas para o Pessoal\nNenhuma retirada para o Pessoal no ano.') &&
+        t.includes('Ficou no negócio\nTotal\nR$ 1.301,00\nSomando tudo: a operação, o que ficou fora dela e as retiradas.') &&
+        t.includes('Os valores são os que você anotou. A Clarevo não faz contabilidade nem cálculo de impostos.') && !/livro[- ]caixa|declara[cç][aã]o pronta/i.test(t), t.slice(t.indexOf('Vendas e serviços'), t.indexOf('Vendas e serviços') + 900));
+    const nmH2 = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+    ok('Negócio (D-121), resumo do ano: os títulos de nível 2 na ordem', JSON.stringify(nmH2) === JSON.stringify(['Entrou na operação', 'Saiu na operação', 'Vendas e serviços', 'Fora da operação', 'Retiradas para o Pessoal', 'Ficou no negócio']), JSON.stringify(nmH2));
+    await atWidths(async (w) => {
+      await p.evaluate(() => window.scrollTo(0, 0)); await innerChecks(`Negócio (D-121), resumo do ano ${w}px`);
+      await shot(w === 390 ? '832_negocio_resumo_do_ano' : '832_negocio_resumo_do_ano_320px');
+      if (w === 390) { await nmScroll('Vendas e serviços'); await shot('833_negocio_resumo_do_ano_mei'); }
+    });
+    ok('Negócio (D-121), resumo do ano: o ano de hoje não tem "Próximo ano" ativo', (await p.getByRole('button', { name: 'Próximo ano' }).filter({ visible: true }).first().getAttribute('aria-disabled')) === 'true');
+    await btn('Ano anterior: 2025').click(); await waitText('Nada anotado no negócio em 2025.'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Negócio (D-121), resumo do ano: o ano anterior (2025) sem anotações, com "Voltar para 2026" e a exportação à vista',
+      t.includes('Sacolé da Maria · 2025') && t.includes('O que você anotou no negócio em 2025.') && (await visibleCount('button', 'Voltar para 2026')) === 1 &&
+        (await visibleCount('button', 'Próximo ano: 2026')) === 1 && (await visibleCount('button', 'Exportar os lançamentos do negócio')) === 1, t.slice(0, 400));
+    await btn('Voltar para 2026').click(); await waitText('Entrou na operação'); await p.waitForTimeout(400);
+    await btn('Exportar os lançamentos do negócio').click(); await waitText('Período'); await p.waitForTimeout(500);
+    ok('Negócio (D-121): "Exportar os lançamentos do negócio" abre a exportação de sempre, com o negócio e "Este ano" escolhidos',
+      (await h1Name()) === 'Exportar meus dados' && (await nmRadios('Espaço')).join('|') === `Pessoal:false|${NM}:true` && (await nmRadios('Período')).includes('Este ano:true'),
+      `${(await nmRadios('Espaço')).join('|')} ${(await nmRadios('Período')).join('|')}`);
+    await btn('Voltar').click(); await p.waitForTimeout(400);
+    // No computador (1280 px), o resumo do ano e "Seu negócio".
+    await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(600);
+    await layoutChecks('Negócio (D-121), resumo do ano 1280px'); await shot('834_negocio_resumo_do_ano_computador');
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+
+    // 6. Acima de 100% do limite: uma venda grande.
+    await btn('Voltar').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    await btn('Anotar entrada').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
+    await field('Valor em reais').fill('80000'); await field('Descrição').fill('Encomenda grande'); await radio('Vendas').click();
+    await btn('Salvar entrada').click(); await nmSaved('Anotar entrada');
+    await nmBack(); await nmOpen(); await nmScroll('Limite do MEI');
+    t = await nmKeep();
+    ok('Negócio (D-121), acima de 100% do limite: só o fato (R$ 82.520,00, 101%) e "Os valores são os que você anotou. Converse com a sua contabilidade.", numa cor só',
+      t.includes('Vendas e serviços anotados em 2026: R$ 82.520,00, 101% do limite anual do MEI (R$ 81.000,00).') && t.includes('Os valores são os que você anotou. Converse com a sua contabilidade.') &&
+        !t.includes('No ano em que o MEI foi aberto') && (await nmColorOf('Vendas e serviços anotados em 2026')) === nmTextColor, t.slice(t.indexOf('Limite do MEI'), t.indexOf('Limite do MEI') + 300));
+    await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(600);
+    await nmScroll('Limite do MEI'); await layoutChecks('Negócio (D-121), "Seu negócio" 1280px'); await shot('835_negocio_limite_acima_computador');
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+
+    // 7. Encerrar oferece exportar antes.
+    await nmScroll('Nome e encerrar');
+    await btn('Encerrar o espaço Negócio').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    ok('Negócio (D-121), encerrar: antes de confirmar, o diálogo oferece "Exportar os lançamentos" e diz que registros e comprovantes costumam precisar ser guardados por alguns anos',
+      t.includes('Encerrar o espaço Negócio?') && t.includes('Registros e comprovantes do negócio costumam precisar ser guardados por alguns anos. Converse com a sua contabilidade.') &&
+        t.includes('As retiradas e o dinheiro trazido do Pessoal continuam no Pessoal, como lançamentos comuns.') &&
+        (await p.getByRole('dialog').or(p.getByRole('alert')).filter({ visible: true }).last().getByRole('button', { name: 'Exportar os lançamentos', exact: true }).count()) === 1, t);
+    await shot('836_negocio_encerrar_exportar');
+    await p.getByRole('dialog').or(p.getByRole('alert')).filter({ visible: true }).last().getByRole('button', { name: 'Exportar os lançamentos', exact: true }).click(); await waitText('Período'); await p.waitForTimeout(500);
+    ok('Negócio (D-121): "Exportar os lançamentos" fecha o diálogo e abre a exportação com o negócio e "Tudo" escolhidos; o negócio continua',
+      (await h1Name()) === 'Exportar meus dados' && (await nmRadios('Espaço')).join('|') === `Pessoal:false|${NM}:true` && (await nmRadios('Período')).includes('Tudo:true'),
+      `${(await nmRadios('Espaço')).join('|')} ${(await nmRadios('Período')).join('|')}`);
+    await btn('Voltar').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    ok('Negócio (D-121): de volta a "Seu negócio", sem diálogo e com o negócio ativo', (await p.getByRole('dialog').filter({ visible: true }).count()) === 0 && (await h1Name()) === 'Seu negócio');
+    // "Prefiro não dizer" tira o tipo e o limite some.
+    await nmScroll('Tipo do negócio');
+    await radio('Prefiro não dizer').click(); await waitText('Tipo do negócio tirado.', 8000); await p.waitForTimeout(500);
+    ok('Negócio (D-121): "Prefiro não dizer" tira o tipo, e o limite do MEI some', !(await body()).includes('Limite do MEI') && (await nmRadios('Tipo do negócio')).join('|') === nmTypes('Prefiro não dizer'));
+
+    // 8. Modo escuro: "Seu negócio" com o limite do MEI e o resumo do ano.
+    {
+      const nmDark = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
+      await nmDark.addInitScript(() => { window.__clarevoSemTour = true; });
+      const dp = await nmDark.newPage();
+      const dpErrors = []; dp.on('pageerror', (e) => dpErrors.push(e.message));
+      const dpWrites = []; dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dpWrites.push(r.url()));
+      const dbtn = (name) => dp.getByRole('button', { name, exact: true }).filter({ visible: true }).first();
+      await dp.goto(`http://localhost:${PORT}/?cenario=negocio`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
+      await dbtn('Ver demonstração com dados fictícios').click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dp.getByRole('tab', { name: NM_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
+      await dbtn('Ver seu negócio').click(); await dp.getByText('Últimos meses', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 10000 });
+      await dp.getByRole('radio', { name: 'MEI', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Tipo do negócio salvo.').filter({ visible: true }).first().waitFor({ timeout: 8000 });
+      await dp.getByRole('heading', { name: 'Limite do MEI', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await dp.waitForTimeout(700);
+      await dp.evaluate(AC_SRC);
+      const dc1 = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow(), bg: getComputedStyle(document.body).backgroundColor }));
+      await dp.screenshot({ path: `${OUT}/837_escuro_negocio_limite_mei.png` });
+      await dbtn('Resumo do ano').click(); await dp.getByText('Entrou na operação').filter({ visible: true }).first().waitFor({ timeout: 10000 }); await dp.waitForTimeout(800);
+      await dp.evaluate(AC_SRC);
+      const dc2 = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow() }));
+      await dp.screenshot({ path: `${OUT}/838_escuro_negocio_resumo_do_ano.png` });
+      ok(`Negócio (D-121), modo escuro: "Seu negócio" com o limite do MEI (${dc1.c.n} textos) e o resumo do ano (${dc2.c.n} textos) no fundo azul-marinho, com contraste de 4,5:1 e nada fora da tela`,
+        dc1.bg === 'rgb(19, 30, 62)' && dc1.c.n > 20 && dc2.c.n > 20 && dc1.c.bad.length === 0 && dc2.c.bad.length === 0 && dc1.o.length === 0 && dc2.o.length === 0 && dpErrors.length === 0 && dpWrites.length === 0,
+        `${dc1.bg} ${[...dc1.c.bad, ...dc2.c.bad, ...dc1.o, ...dc2.o, ...dpErrors].slice(0, 4).join(' | ')}`);
+      await dp.setViewportSize({ width: 1280, height: 800 }); await dp.waitForTimeout(700);
+      await dp.evaluate(AC_SRC);
+      const dc3 = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow() }));
+      ok(`Negócio (D-121), modo escuro no computador (1280 px): o resumo do ano com contraste de 4,5:1 (${dc3.c.n} textos) e nada fora da tela`, dc3.c.n > 20 && dc3.c.bad.length === 0 && dc3.o.length === 0, [...dc3.c.bad, ...dc3.o].slice(0, 4).join(' | '));
+      await dp.screenshot({ path: `${OUT}/839_escuro_negocio_resumo_do_ano_computador.png` });
+      await nmDark.close();
+    }
+
+    // Textos e escritas.
+    const nmBad = nmTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(preju[ií]zo|lucro|cuidado|aten[cç][aã]o|alerta|ruim|parab[eé]ns|deveria|ultrapass\w*|estour\w*)\b|livro[- ]caixa|declara[cç][aã]o pronta/i)?.[0]).filter(Boolean);
+    ok('Negócio (D-121): nas telas novas, nenhum termo proibido, travessão longo, palavra de julgamento, "livro-caixa" nem "declaração pronta"', nmTexts.length >= 10 && nmBad.length === 0, `${nmTexts.length} telas ${nmBad.join(' | ')}`);
+    ok('Negócio (D-121): nada vai à rede (a demonstração grava só na memória)', writes.length === nmWrites0, writes.slice(nmWrites0).join(' | '));
   }
 
   // ==================================================================================================================

@@ -1,3 +1,4 @@
+import type { BusinessProfile } from './business';
 import type {
   BusinessInvite,
   BusinessInvitePreview,
@@ -38,6 +39,8 @@ interface StoredBusiness {
   createdAt: string;
   endedAt: string | null;
   ownerId: string;
+  /** O tipo do negócio (D-121), ou null ("Prefiro não dizer"). */
+  profile: BusinessProfile | null;
 }
 
 interface StoredMember {
@@ -77,6 +80,7 @@ export interface MemoryBusinessView {
   createdAt: string;
   endedAt: string | null;
   ownerId: string;
+  profile: BusinessProfile | null;
 }
 
 /** As pessoas de um negócio como quem consulta as lê (sem a chave do Plus, que o repositório junta). */
@@ -146,7 +150,7 @@ export class MemoryBusinessHub {
 
   /** create_business: o negócio nasce com quem criou administrando. As regras (nome, um por pessoa) ficam no repositório. */
   open(ownerId: string, id: string, name: string, createdAt: string): void {
-    this.businesses.set(id, { id, name, createdAt, endedAt: null, ownerId });
+    this.businesses.set(id, { id, name, createdAt, endedAt: null, ownerId, profile: null });
     this.members.set(memberKey(id, ownerId), { contextId: id, personId: ownerId, owner: true, canWrite: true, joinedAt: createdAt, leftAt: null });
   }
 
@@ -154,6 +158,12 @@ export class MemoryBusinessHub {
   rename(id: string, name: string): void {
     const b = this.businesses.get(id);
     if (b) this.businesses.set(id, { ...b, name });
+  }
+
+  /** set_business_profile (D-121): o tipo do negócio, ou null. As regras (quem administra, o valor) ficam no repositório. */
+  setProfile(id: string, profile: BusinessProfile | null): void {
+    const b = this.businesses.get(id);
+    if (b) this.businesses.set(id, { ...b, profile });
   }
 
   /** end_business: o fim do vínculo de quem administra, os convites pendentes cancelados (0043) e o negócio marcado como encerrado. */
@@ -425,7 +435,7 @@ export class MemoryBusinessHub {
   private join(contextId: string, personId: string, invitedBy: string): BusinessJoin {
     const b = this.businesses.get(contextId)!;
     const role = this.roleOfMember(this.members.get(memberKey(contextId, personId))!);
-    return { context: { id: b.id, name: b.name, createdAt: b.createdAt, role }, role, invitedBy };
+    return { context: { id: b.id, name: b.name, createdAt: b.createdAt, role, businessProfile: b.profile }, role, invitedBy };
   }
 
   /**

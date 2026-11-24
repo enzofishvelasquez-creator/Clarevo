@@ -64,7 +64,7 @@ import type { Access } from './plano';
 import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
-import type { BusinessContext, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
+import type { BusinessContext, BusinessContribution, BusinessContributionInput, BusinessProfile, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
 import type { BusinessInvite, BusinessInvitePreview, BusinessInviteRole, BusinessInviteWrite, BusinessJoin, BusinessPeople, PlusStatus } from './business-people';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
@@ -937,6 +937,18 @@ export interface RecordsRepository {
    */
   deleteBusinessWithdrawal(key: string, recordId: string, expectedVersion: number): Promise<BusinessWithdrawal>;
   /**
+   * create_business_contribution (D-121, migração 0044): trazer dinheiro do Pessoal, o inverso da retirada. A entrada "Dinheiro do Pessoal"
+   * no negócio e o gasto "Dinheiro para o negócio" no Pessoal da pessoa, com o mesmo valor e a mesma data, ligados. Descrição: a da pessoa
+   * nos dois lados, ou "Dinheiro do Pessoal" e "Dinheiro para <negócio>". As mesmas recusas da retirada. Excluir: deleteBusinessWithdrawal
+   * (o lado do negócio é o que está no espaço negócio).
+   */
+  createBusinessContribution(key: string, businessContextId: string, input: BusinessContributionInput): Promise<BusinessContribution>;
+  /**
+   * set_business_profile (D-121, migração 0044): o tipo do negócio, ou null ("Prefiro não dizer"). Só quem administra. Ordem: repetição;
+   * nao_encontrado; contexto_invalido; sem_permissao; perfil_invalido; assinatura_necessaria. Não conta como anotação. Devolve o negócio.
+   */
+  setBusinessProfile(key: string, contextId: string, profile: BusinessProfile | null): Promise<BusinessContext>;
+  /**
    * move_record. O lançamento comum é gravado de novo no outro espaço (o Pessoal da pessoa ou o negócio dela), com a categoria e a conta
    * escolhidas, e o original sai, juntos. Ordem: repetição; o lançamento (nao_encontrado, sem_permissao); versao_desatualizada;
    * lancamento_ligado; contexto_invalido; sem_permissao; as regras de createRecord no destino. Devolve o lançamento novo.
@@ -1207,6 +1219,7 @@ export type RepoErrorCode =
   | 'retirada_ligada'
   | 'nao_e_retirada'
   | 'lancamento_ligado'
+  | 'perfil_invalido'
   | 'confirmacao_invalida'
   | 'transferir_antes'
   | 'email_invalido'

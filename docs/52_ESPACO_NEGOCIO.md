@@ -198,3 +198,35 @@ pessoa (a Clarevo não envia nada); se o Plus muda a relação de consumo (CDC) 
 - Telas: bloco "Espaço Negócio (D-113)" em `scripts/e2e-web.js`, logo antes do bloco do Tema (D-112), capturas 730 a 739; o seletor
   sempre à vista, o "+", a folha e a troca pela pílula de Análises (D-113b), capturas 740 a 744; a linha de "Primeiros passos" e o seletor
   só com o Pessoal também nos blocos de "Primeiros passos" e da Família. Núcleo: `packages/core/test/spaces.test.ts`.
+
+## 7. Fora da operação, tipo do negócio, limite do MEI e resumo do ano (D-121, 24/11/2026)
+
+A partir da pesquisa de 18/11/2026 sobre o que micro e pequenos negócios precisam registrar (itens 1, 2, 4, 5, 6 e 7 da lista
+priorizada), sem virar contabilidade e sem a Clarevo calcular imposto nem dizer o que declarar.
+
+- **Fora da operação.** Dinheiro que entra ou sai do negócio sem ser venda nem gasto da operação: "Dinheiro do Pessoal" (só pela ação
+  "Trazer dinheiro do Pessoal", o inverso da retirada: um gasto "Dinheiro para o negócio" no Pessoal e uma entrada no negócio, ligados,
+  função `create_business_contribution`), "Empréstimo recebido", "Parcela de empréstimo" e "Equipamento" (categorias comuns). Em "Seu
+  negócio", Entrou, Saiu e Sobrou são só da operação; o bloco "Fora da operação" mostra o resto, com uma frase do porquê, e "Ficou no
+  negócio" soma tudo. No Resumo do negócio, o total do meio passa a se chamar "Ficou no negócio" nos meses com algo fora da operação
+  (como já acontecia com a retirada); os números não mudam. Movimentos, Análises e Evolução não mudam: o dinheiro entrou ou saiu de verdade.
+- **Tipo do negócio (opcional).** "Sem CNPJ (por conta própria)", "MEI", "Microempresa ou empresa de pequeno porte" ou "Prefiro não
+  dizer", só por quem administra (`set_business_profile`). Sem número de CNPJ.
+- **Limite do MEI.** Só com o tipo MEI: as vendas e os serviços anotados no ano contra o limite anual (R$ 81.000,00, constante no núcleo
+  com a data da regra), com a nota do ano de abertura (R$ 6.750,00 por mês). Numa cor só; acima de 100%, só o fato e "Converse com a sua
+  contabilidade".
+- **Resumo do ano** (`/negocio/ano`): o ano por categoria (operação), fora da operação, retiradas e o que ficou no negócio, com troca de
+  ano e o atalho para exportar os lançamentos do negócio. Para MEI, "Confira com a sua contabilidade antes de declarar."
+- **Categorias novas de saída:** "Divulgação", "Contabilidade e sistemas" e "Juros e multas" (contam na operação). Ainda **fora do
+  orçamento**: o app publicado antes desta rodada recusa um orçamento com outra contagem de linhas; este app já aceita, e uma migração
+  seguinte as põe no orçamento quando ele estiver em todos os aparelhos. "Contas do ponto" passa a cobrir também a parte da casa usada no
+  trabalho.
+- **Encerrar com cópia.** O diálogo de encerrar oferece "Exportar os lançamentos" e lembra que registros e comprovantes do negócio
+  costumam precisar ser guardados por alguns anos.
+- **Banco:** migração 0044 (`supabase/migrations/20261124000001_negocio_movimentos.sql`), testes em
+  `supabase/tests/99zzzzzzzzzzzzzzzzzzzzzzz_negocio_movimentos.sql`. **Antes do merge**, junto com a 0043 (docs/05, 12aj e 12ak).
+- **Telas:** `apps/app/src/app/negocio/trazer.tsx`, `negocio/ano.tsx` e `components/business-pair-form.tsx` (a retirada e o trazer
+  usam o mesmo formulário). Roteiro de telas: bloco "Espaço Negócio: fora da operação, tipo do negócio, limite do MEI e resumo do ano
+  (D-121)" de `scripts/e2e-web.js`, capturas 827 a 839.
+- **Ficou para depois** (da mesma lista): marcar se a venda teve nota e de quem veio; "a receber" (fiado e cartão); lembretes do DAS e
+  da declaração anual; as 3 categorias novas no orçamento.

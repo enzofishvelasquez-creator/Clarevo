@@ -89,17 +89,21 @@ import type { FamilyAction, FamilyInvite, FamilyInviteWrite, FamilyInvitePreview
 import { isFamilyAction } from './family';
 import { DELETE_CONFIRMATION_WORD } from './deletion';
 import { MemoryFamilyHub } from './memory-family';
-import type { BusinessAction, BusinessContext, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
+import type { BusinessAction, BusinessContext, BusinessContribution, BusinessContributionInput, BusinessProfile, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
 import type { BusinessInvite, BusinessInvitePreview, BusinessInviteRole, BusinessInviteWrite, BusinessJoin, BusinessPeople, BusinessPeopleAction, PlusStatus } from './business-people';
 import { isBusinessPeopleAction } from './business-people';
 import { MemoryBusinessHub } from './memory-business-people';
 import {
   BUSINESS_DEFAULT_ACCOUNT,
+  CONTRIBUTION_BUSINESS_CATEGORY,
+  CONTRIBUTION_PERSONAL_CATEGORY,
   WITHDRAWAL_BUSINESS_CATEGORY,
   WITHDRAWAL_PERSONAL_CATEGORY,
   budgetCategoriesFor,
   businessNameError,
   canMoveRecord,
+  contributionDescriptions,
+  isBusinessProfile,
   isWithdrawal,
   normalizeBusinessName,
   withdrawalDescriptions,
@@ -4718,7 +4722,8 @@ export class MemoryRepository implements RecordsRepository {
       isBusinessPeopleAction(action) ||
       action === 'criar_negocio' ||
       action === 'renomear_negocio' ||
-      action === 'encerrar_negocio'
+      action === 'encerrar_negocio' ||
+      action === 'definir_perfil_negocio'
     )
       return;
     const day = this.opts.today();
@@ -5116,7 +5121,7 @@ export class MemoryRepository implements RecordsRepository {
   /** O negócio como o app lê, com o papel de quem consulta (D-120); um negócio que a pessoa já não lê volta como quem o criou o via. */
   private businessView(contextId: string): BusinessContext {
     const b = this.biz.business(contextId)!;
-    return { id: b.id, name: b.name, createdAt: b.createdAt, role: this.biz.roleOf(b.id, this.opts.actorId) ?? 'titular' };
+    return { id: b.id, name: b.name, createdAt: b.createdAt, role: this.biz.roleOf(b.id, this.opts.actorId) ?? 'titular', businessProfile: b.profile };
   }
 
   /** Como clarevo_require_business_owner: sem leitura, nao_encontrado; não é negócio, contexto_invalido; não administra, sem_permissao. */
@@ -5262,11 +5267,63 @@ export class MemoryRepository implements RecordsRepository {
       } catch {
         throw new RepoError('sem_permissao');
       }
-      const [biz, pers] = r.kind === 'despesa' ? [r, other] : [other, r];
+      // O lado do negócio é o que está num espaço negócio (D-121, como a 0044): a retirada tem o gasto no negócio; o dinheiro trazido do
+      // Pessoal, a entrada.
+      const [biz, pers] = this.biz.isBusiness(r.contextId) ? [r, other] : [other, r];
       const now = this.stamp();
       for (const x of [biz, pers]) this.records.set(x.id, { ...x, version: x.version + 1, updatedAt: now, deletedAt: now });
       this.saveOperation(key, 'excluir_retirada_negocio', payload, { contextId: biz.contextId, recordId: biz.id, commitmentId: null, targetRecordId: pers.id });
       return this.withdrawalResult(biz.id, pers.id);
+    });
+  }
+
+  /**
+   * Como create_business_contribution (D-121, 0044): trazer dinheiro do Pessoal, o inverso da retirada. A entrada "Dinheiro do Pessoal" no
+   * negócio e o gasto "Dinheiro para o negócio" no Pessoal, juntos e ligados, com as regras de createRecord em cada lado. A operação guarda a
+   * entrada do negócio em recordId e o gasto do Pessoal em targetRecordId (como a retirada).
+   */
+  async createBusinessContribution(key: string, businessContextId: string, input: BusinessContributionInput): Promise<BusinessContribution> {
+    return this.write(() => {
+      const own = typeof input.description === 'string' && input.description.trim() !== '' ? input.description.trim() : null;
+      const payload = [businessContextId, input.businessAccountId, input.personalAccountId, input.amountCents, input.occurredOn, own];
+      const replayed = this.replay(key, 'criar_aporte_negocio', payload);
+      if (replayed) return this.withdrawalResult(replayed.recordId!, replayed.targetRecordId!);
+      if (!businessContextId || !this.canRead(businessContextId)) throw new RepoError('nao_encontrado');
+      const b = this.liveBusiness(businessContextId);
+      if (!b) throw new RepoError('contexto_invalido');
+      if (!this.canWrite(b.id)) throw new RepoError('sem_permissao');
+      const personal = this.space?.personalContextId;
+      if (!personal) throw new RepoError('sem_permissao');
+      const names = contributionDescriptions(b.name, own);
+      const bInput = { accountId: input.businessAccountId, amountCents: input.amountCents, occurredOn: input.occurredOn, description: names.business, category: CONTRIBUTION_BUSINESS_CATEGORY };
+      const pInput = { accountId: input.personalAccountId, amountCents: input.amountCents, occurredOn: input.occurredOn, description: names.personal, category: CONTRIBUTION_PERSONAL_CATEGORY };
+      this.validate(b.id, 'receita', bInput);
+      this.validate(personal, 'despesa', pInput);
+      const now = this.stamp();
+      const businessId = this.id('reg');
+      const personalId = this.id('reg');
+      const base = { status: 'realizado' as const, currency: 'BRL' as const, commitmentId: null, invoice: null, receiptKey: null, createdBy: this.opts.actorId, version: 1, createdAt: now, updatedAt: now };
+      this.records.set(businessId, { ...base, ...bInput, id: businessId, contextId: b.id, kind: 'receita', pairedRecordId: personalId });
+      this.records.set(personalId, { ...base, ...pInput, id: personalId, contextId: personal, kind: 'despesa', pairedRecordId: businessId });
+      this.saveOperation(key, 'criar_aporte_negocio', payload, { contextId: b.id, recordId: businessId, commitmentId: null, targetRecordId: personalId });
+      return this.withdrawalResult(businessId, personalId);
+    });
+  }
+
+  /**
+   * Como set_business_profile (D-121, 0044): o tipo do negócio, ou null. Ordem: repetição; nao_encontrado; contexto_invalido;
+   * sem_permissao (só quem administra); perfil_invalido. Não conta como anotação na atividade.
+   */
+  async setBusinessProfile(key: string, contextId: string, profile: BusinessProfile | null): Promise<BusinessContext> {
+    return this.write(() => {
+      const payload = [contextId, profile];
+      const replayed = this.replay(key, 'definir_perfil_negocio', payload);
+      if (replayed) return this.businessView(replayed.contextId);
+      const b = this.ownedBusiness(contextId);
+      if (profile !== null && !isBusinessProfile(profile)) throw new RepoError('perfil_invalido');
+      this.biz.setProfile(b.id, profile);
+      this.saveOperation(key, 'definir_perfil_negocio', payload, { contextId: b.id, recordId: null, commitmentId: null });
+      return this.businessView(b.id);
     });
   }
 

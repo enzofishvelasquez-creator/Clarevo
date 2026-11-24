@@ -91,7 +91,9 @@ const texts = (o: Record<string, unknown>): string[] =>
 
 describe('Espaço Negócio: categorias e regras puras (D-113)', () => {
   it('as categorias do negócio, as do Pessoal e as do orçamento', () => {
-    expect(BUSINESS_CATEGORIES.receita).toEqual(['Vendas', 'Serviços', 'Outras entradas']);
+    // D-121: "Empréstimo recebido" nas entradas; "Divulgação", "Contabilidade e sistemas" e "Juros e multas" antes de "Outras saídas";
+    // "Parcela de empréstimo" e "Equipamento" no fim (fora da operação e fora do orçamento).
+    expect(BUSINESS_CATEGORIES.receita).toEqual(['Vendas', 'Serviços', 'Outras entradas', 'Empréstimo recebido']);
     expect(BUSINESS_CATEGORIES.despesa).toEqual([
       'Material e mercadoria',
       'Peças e ferramentas',
@@ -101,12 +103,21 @@ describe('Espaço Negócio: categorias e regras puras (D-113)', () => {
       'Aluguel do ponto',
       'Contas do ponto',
       'Taxas e maquininha',
+      'Divulgação',
+      'Contabilidade e sistemas',
+      'Juros e multas',
       'Outras saídas',
+      'Parcela de empréstimo',
+      'Equipamento',
     ]);
     expect(contextCategories('negocio', 'despesa')).toBe(BUSINESS_CATEGORIES.despesa);
     expect(contextCategories('pessoal', 'receita')).toBe(CATEGORIES.receita);
     expect(contextCategories('familia', 'despesa')).toBe(CATEGORIES.despesa);
+    // O orçamento do negócio: as 9 de sempre, na ordem do banco (a 0044 não muda o orçamento; as 3 saídas novas ficam fora dele por enquanto).
     expect(budgetCategoriesFor('negocio')).toHaveLength(9);
+    expect(budgetCategoriesFor('negocio')).toEqual(
+      BUSINESS_CATEGORIES.despesa.filter((c) => !['Divulgação', 'Contabilidade e sistemas', 'Juros e multas', 'Parcela de empréstimo', 'Equipamento'].includes(c)),
+    );
     expect(budgetCategoriesFor('pessoal')).toEqual(CATEGORIES.despesa);
     for (const c of [...BUSINESS_CATEGORIES.receita, ...BUSINESS_CATEGORIES.despesa, WITHDRAWAL_BUSINESS_CATEGORY, WITHDRAWAL_PERSONAL_CATEGORY]) {
       expect([...c].length).toBeLessThanOrEqual(40);
@@ -192,7 +203,18 @@ describe('Seu negócio: entrou, saiu e sobrou', () => {
 
   it('as retiradas ficam fora de Saiu e o que ficou bate com a Diferença do Resumo', () => {
     const m = businessMonth(list, 'neg', '2026-10');
-    expect(m).toEqual({ month: '2026-10', inCents: 120_000, outCents: 42_600, leftCents: 77_400, withdrawnCents: 50_000, keptCents: 27_400, recordCount: 5 });
+    expect(m).toEqual({
+      month: '2026-10',
+      inCents: 120_000,
+      outCents: 42_600,
+      leftCents: 77_400,
+      outsideInCents: 0,
+      outsideOutCents: 0,
+      outside: [],
+      withdrawnCents: 50_000,
+      keptCents: 27_400,
+      recordCount: 5,
+    });
     expect(summarizeMonth(list, 'neg', '2026-10').differenceCents).toBe(m.keptCents);
   });
 
@@ -339,7 +361,7 @@ describe('Espaço Negócio na memória (as mesmas regras da migração 0042)', (
     );
     // Orçamento com as categorias do negócio.
     const budget = await repo.getMonthBudget(b.id, '2026-11');
-    expect(budget.lines.map((l) => l.category)).toEqual(BUSINESS_CATEGORIES.despesa);
+    expect(budget.lines.map((l) => l.category)).toEqual(budgetCategoriesFor('negocio'));
     expect(budget.lines.find((l) => l.category === 'Material e mercadoria')!.usedCents).toBe(30_000);
     await repo.setCategoryBudget(newOperationKey(), b.id, 'Material e mercadoria', '2026-11', 0, 40_000);
     expect(await code(repo.setCategoryBudget(newOperationKey(), b.id, 'Moradia', '2026-11', 0, 40_000))).toBe('categoria_invalida');
@@ -518,6 +540,9 @@ describe('correções da revisão independente (D-113a)', () => {
     inCents: 10_000,
     outCents: 10_000 - leftCents,
     leftCents,
+    outsideInCents: 0,
+    outsideOutCents: 0,
+    outside: [],
     withdrawnCents: 0,
     keptCents: leftCents,
     recordCount: 2,

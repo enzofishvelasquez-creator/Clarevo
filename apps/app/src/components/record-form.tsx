@@ -1,4 +1,5 @@
 import {
+  BUSINESS_TEXT,
   BUSINESS_WORDS,
   ACCOUNTS_TEXT,
   CARDS_TEXT,
@@ -2215,6 +2216,13 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               ))}
             </View>
           </View>
+          {/* No negócio (D-121), a ajuda curta da categoria escolhida: "Contas do ponto" também na parte da casa usada no trabalho, e as de fora
+              da operação dizem por que não entram em Entrou e Saiu, em "Seu negócio". */}
+          {business && BUSINESS_TEXT.categoryHint(draft.category) ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {BUSINESS_TEXT.categoryHint(draft.category)}
+            </Txt>
+          ) : null}
           {categorySuggestion ? (
             // Fora do grupo de rádios (é um botão) e sem reservar espaço: aparece quando o nome combina com uma regra ou com a memória.
             <LinkButton
