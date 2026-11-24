@@ -21,7 +21,7 @@ import { ArrowDownLeft, ArrowUpRight, HandCoins, Pencil, Plus, ShieldCheck, Stor
 import { useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { BusinessPeopleSection, PasteBusinessInvite } from '@/components/business-people';
+import { BusinessPeopleSection } from '@/components/business-people';
 import { ConfirmDialog } from '@/components/dialog';
 import { useIsSeededDemo } from '@/components/family-parts';
 import { FlashBanner, useFlash } from '@/components/flash';
@@ -33,7 +33,7 @@ import { Banner, Button, Card, LinkButton, Screen, Skeleton, Txt } from '@/compo
 import { flash } from '@/lib/flash';
 import { useValuesHidden } from '@/lib/privacy';
 import { useAccessCanWrite } from '@/state/access';
-import { useBusiness, useEndBusiness, usePlusStatus, useSharedBusinessPeople } from '@/state/business';
+import { useBusiness, useEndBusiness, useSharedBusinessPeople } from '@/state/business';
 import { useBusinessOverview, useView } from '@/state/data';
 import { attemptFamily, useFamilyKeys } from '@/state/family';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -78,7 +78,6 @@ export default function NegocioScreen() {
 function NoBusiness({ notice }: { notice: string | null }) {
   const demo = useIsSeededDemo();
   const canWrite = useAccessCanWrite();
-  const plus = usePlusStatus();
   return (
     <>
       <FlashBanner message={notice} />
@@ -100,8 +99,6 @@ function NoBusiness({ notice }: { notice: string | null }) {
           {T.demoOnly}
         </Txt>
       ) : null}
-      {/* Negócio compartilhado (D-120): colar o link recebido, só com o Plus aberto. */}
-      {plus.data?.open ? <PasteBusinessInvite /> : null}
     </>
   );
 }

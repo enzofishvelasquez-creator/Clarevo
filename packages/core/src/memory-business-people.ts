@@ -218,6 +218,11 @@ export class MemoryBusinessHub {
     return live[0]?.id ?? null;
   }
 
+  /** Há (ou houve) outra pessoa no negócio, ativa ou que saiu? O vínculo de quem saiu continua em context_memberships, revogado. */
+  hasOthers(contextId: string, personId: string): boolean {
+    return [...this.members.values()].some((m) => m.contextId === contextId && m.personId !== personId);
+  }
+
   /** Há outra pessoa ativa no negócio (negocio_com_membros ao encerrar e ao excluir a conta)? */
   hasOtherActive(contextId: string, personId: string): boolean {
     return [...this.members.values()].some((m) => m.contextId === contextId && m.leftAt === null && m.personId !== personId);
@@ -406,11 +411,14 @@ export class MemoryBusinessHub {
     return null;
   }
 
-  /** preview_business_invite. Qualquer convite que não vale (ou de negócio encerrado) responde convite_invalido, sem revelar qual caso. */
+  /**
+   * preview_business_invite. Qualquer convite que não vale (ou de negócio encerrado, ou com o Plus fechado para quem administra) responde
+   * convite_invalido, sem revelar qual caso.
+   */
   preview(code: string): BusinessInvitePreview {
     const invite = this.inviteByCode(code);
     const b = invite ? this.businesses.get(invite.contextId) : undefined;
-    if (!invite || !this.inviteValid(invite) || !b || b.endedAt !== null) throw new RepoError('convite_invalido');
+    if (!invite || !this.inviteValid(invite) || !b || b.endedAt !== null || !this.plus) throw new RepoError('convite_invalido');
     return { businessName: b.name, invitedBy: this.nameOf(invite.createdBy), role: invite.role, expiresAt: invite.expiresAt };
   }
 
@@ -422,8 +430,8 @@ export class MemoryBusinessHub {
 
   /**
    * accept_business_invite. Ordem: repetição; sem_permissao (sem o Pessoal); convite_invalido (formato, inexistente, usado, cancelado,
-   * vencido ou negócio encerrado); ja_no_negocio; ja_tem_negocio; negocio_cheio. Voltar por um convite novo reativa o mesmo vínculo, com o
-   * papel do convite. Não passa pela chave do Plus (o convite já foi criado com ela).
+   * vencido, negócio encerrado ou o Plus fechado para quem administra); ja_no_negocio; ja_tem_negocio; negocio_cheio. Voltar por um
+   * convite novo reativa o mesmo vínculo, com o papel do convite.
    */
   accept(actor: string, key: string, code: string): BusinessJoin {
     const codeHash = inviteCodeHash(code);
@@ -438,7 +446,7 @@ export class MemoryBusinessHub {
     const invite = this.inviteByCode(code);
     if (!invite) throw new RepoError('convite_invalido');
     const b = this.businesses.get(invite.contextId);
-    if (!this.inviteValid(invite) || !b || b.endedAt !== null) throw new RepoError('convite_invalido');
+    if (!this.inviteValid(invite) || !b || b.endedAt !== null || !this.plus) throw new RepoError('convite_invalido');
     if (this.activeMember(b.id, actor)) throw new RepoError('ja_no_negocio');
     if (this.activeBusinessOf(actor)) throw new RepoError('ja_tem_negocio');
     if (this.activeCount(b.id) >= BUSINESS_MAX_PEOPLE) throw new RepoError('negocio_cheio');
@@ -482,7 +490,10 @@ export class MemoryBusinessHub {
     this.save(actor, key, 'remover_membro_negocio', hash, contextId, personId);
   }
 
-  /** set_business_member_role. Ordem: repetição; quem administra; papel_invalido; pessoa informada; nao_sobre_si; vínculo ativo. */
+  /**
+   * set_business_member_role. Ordem: repetição; quem administra; papel_invalido; pessoa informada; nao_sobre_si; vínculo ativo. Ao passar
+   * para "Só vê", as retiradas da pessoa deixam de ser ligadas.
+   */
   setRole(actor: string, key: string, contextId: string, personId: string, role: BusinessInviteRole, readsOther: (contextId: string) => boolean): void {
     const hash = JSON.stringify(['alterar_papel_negocio', contextId, personId, role]);
     const prev = this.replay(actor, key, 'alterar_papel_negocio', hash);
@@ -494,6 +505,8 @@ export class MemoryBusinessHub {
     const target = this.activeMember(contextId, personId);
     if (!target || target.owner) throw new RepoError('nao_encontrado');
     target.canWrite = role === 'membro';
+    // Quem passa a só ver não exclui nem move mais as retiradas dela: os dois lados deixam de ser ligados, como ao sair (0043).
+    if (role === 'leitor') this.unlink(personId, contextId);
     this.save(actor, key, 'alterar_papel_negocio', hash, contextId, personId);
   }
 

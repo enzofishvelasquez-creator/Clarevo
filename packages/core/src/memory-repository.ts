@@ -5382,17 +5382,18 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /**
-   * As pessoas do negócio, com a mesma regra de compatibilidade do app (D-120): a lista e os convites só com o Plus aberto ou para quem não
-   * administra; senão, só a própria pessoa, administrando, sem convites. Sem vínculo ativo: nao_encontrado.
+   * As pessoas do negócio, com a mesma regra de compatibilidade do app (D-120): a lista com o Plus aberto, para quem não administra ou
+   * quando há (ou houve) outras pessoas, mesmo com o Plus fechado depois; os convites só para quem administra e só com o Plus aberto. Com o
+   * Plus fechado e ninguém mais, só a própria pessoa, administrando. Sem vínculo ativo: nao_encontrado.
    */
   async getBusinessPeople(contextId: string): Promise<BusinessPeople> {
     return this.read(() => {
       const plusOpen = this.biz.plusOpen();
       const role = this.biz.roleOf(contextId, this.opts.actorId);
       if (!role) throw new RepoError('nao_encontrado');
-      if (plusOpen || role !== 'titular') {
+      if (plusOpen || role !== 'titular' || this.biz.hasOthers(contextId, this.opts.actorId)) {
         const view = this.biz.peopleOf(contextId, this.opts.actorId)!;
-        return { role: view.role, members: view.members, invites: view.invites, plusOpen };
+        return { role: view.role, members: view.members, invites: plusOpen ? view.invites : [], plusOpen };
       }
       return { role, members: [this.biz.selfView(contextId, this.opts.actorId)!], invites: [], plusOpen };
     });

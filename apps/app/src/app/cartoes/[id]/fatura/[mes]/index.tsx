@@ -42,6 +42,7 @@ import { flash } from '@/lib/flash';
 import { guardedWrite } from '@/lib/guarded-write';
 import { totalChange } from '@/lib/highlight';
 import { useCard, useCardInvoices, useCardOperationKey, useDeleteCardEntry, useUndoInvoicePayment } from '@/state/data';
+import { useBusinessItemAccess } from '@/state/business';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -67,6 +68,8 @@ export default function FaturaScreen() {
   const month = readInvoiceMonth(mes);
   const { today } = useSession();
   const card = useCard(id);
+  // Negócio compartilhado (D-120): quem só vê o negócio não paga, não desfaz e não anota na fatura. Fora do negócio, nada muda.
+  const access = useBusinessItemAccess(card.data?.contextId, card.data?.createdBy);
   const invoices = useCardInvoices(card.data ?? null);
   const undo = useUndoInvoicePayment();
   const removeEntry = useDeleteCardEntry();
@@ -262,6 +265,7 @@ export default function FaturaScreen() {
       cardName={c.name}
       cardId={c.id}
       cardActive={c.status === 'ativo'}
+      canWrite={access.canWrite}
       invoice={invoice}
       today={today}
       notice={notice}
@@ -336,6 +340,7 @@ function InvoiceTop({
   cardName,
   cardId,
   cardActive,
+  canWrite,
   invoice,
   today,
   notice,
@@ -346,6 +351,7 @@ function InvoiceTop({
   cardName: string;
   cardId: string;
   cardActive: boolean;
+  canWrite: boolean;
   invoice: Invoice;
   today: string;
   notice: string | null;
@@ -359,8 +365,8 @@ function InvoiceTop({
   const dueNotice = invoiceDueNotice(invoice, today);
   const paid = invoice.situation === 'paga' || invoice.situation === 'paga_em_parte';
   // Só se paga fatura fechada; a aberta mostra quando poderá ser paga (t.payHint).
-  const canPay = invoiceCanBePaid(invoice);
-  const canUndo = paid && invoice.commitmentVersion !== null;
+  const canPay = invoiceCanBePaid(invoice) && canWrite;
+  const canUndo = paid && invoice.commitmentVersion !== null && canWrite;
   const calc = invoice.situation === 'paga_em_parte' ? partialPaymentCalcLink(invoice.remainingCents) : null;
   const sub = (m: string) => ({ pathname: '/cartoes/[id]/fatura/[mes]/pagar' as const, params: { id: cardId, mes: m } });
   const noteOnCard = () => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa', cartao: cardId } });
@@ -442,10 +448,10 @@ function InvoiceTop({
         <View style={{ gap: space[3] }}>
           {canPay ? <Button label={I.payInvoice} icon={Wallet} disabled={busy} onPress={() => router.push(sub(invoice.month))} /> : null}
           {canUndo ? <Button label={I.undoPayment} icon={Undo2} tone="soft" disabled={busy} onPress={onUndo} /> : null}
-          {cardActive && !paid && !canPay ? (
+          {cardActive && canWrite && !paid && !canPay ? (
             <Button label={S.noteOnCard} icon={Plus} disabled={busy} onPress={noteOnCard} />
           ) : null}
-          {!paid ? (
+          {!paid && canWrite ? (
             <View style={styles.links}>
               {cardActive && canPay ? <LinkButton label={S.noteOnCard} icon={Plus} style={styles.inlineLink} onPress={noteOnCard} /> : null}
               <LinkButton

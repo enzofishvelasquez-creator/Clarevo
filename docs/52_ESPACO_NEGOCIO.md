@@ -147,7 +147,8 @@ Decisão do Enzo: o modelo de dados já nasce pronto; **nada do Plus aparece no 
   administra e os convites ainda válidos (`negocio_cheio`). **Um negócio por pessoa, por vez**, o próprio ou o de outra pessoa (como a
   Família): aceitar recusa quem já participa de um negócio (`ja_tem_negocio`; do mesmo, `ja_no_negocio`) e criar recusa quem participa
   do negócio de outra pessoa. Quem sai ou é removido perde o acesso na hora; o que anotou fica como histórico, e as retiradas dessa
-  pessoa para o Pessoal dela deixam de ser ligadas (os dois lados viram lançamentos comuns). Encerrar continua só sem outras pessoas e
+  pessoa para o Pessoal dela deixam de ser ligadas (os dois lados viram lançamentos comuns); o mesmo vale para quem passa a
+  "Só vê" (ela não conseguiria mais excluir o par). Fechar o Plus invalida os convites pendentes (a prévia e o aceite os recusam). Encerrar continua só sem outras pessoas e
   cancela os convites. Excluir a conta: quem administra com outras pessoas recebe `negocio_com_membros` (remove as pessoas antes); quem
   participa sai, e o que anotou fica com "Pessoa que saiu". Só convidar passa pela trava da assinatura.
 - **App.** Com o Plus fechado, nada novo aparece (nem a seção de pessoas, nem textos do Plus), e o app funciona mesmo sem a 0043
@@ -157,7 +158,7 @@ Decisão do Enzo: o modelo de dados já nasce pronto; **nada do Plus aparece no 
   anota, uma que saiu e um convite pendente) e `?cenario=negocio-plus-membro` (a pessoa anota no negócio de outra). Núcleo:
   `packages/core/src/business-people.ts` e `memory-business-people.ts`; telas: `apps/app/src/components/business-people.tsx`,
   `apps/app/src/app/negocio/convidar.tsx` e `apps/app/src/app/convite/negocio/[codigo].tsx`; roteiro de telas: bloco "Negócio
-  compartilhado (Plus, D-120)" de `scripts/e2e-web.js`, capturas 811 a 824. Na demonstração, cada conta guarda os próprios dados: uma
+  compartilhado (Plus, D-120)" de `scripts/e2e-web.js`, capturas 811 a 826. Na demonstração, cada conta guarda os próprios dados: uma
   conta criada nela que entra no negócio de exemplo não vê os lançamentos de quem administra (no banco de verdade, vê).
 - **Para abrir (decisão do Enzo, com preço e lojas).** As perguntas de preço e de lojas abaixo continuam abertas; quando houver plano
   Plus, a única conferência a trocar no banco é `clarevo_plus_allows` (hoje: o Plus aberto para todas as pessoas).

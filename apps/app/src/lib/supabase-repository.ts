@@ -3711,22 +3711,50 @@ export class SupabaseRepository implements RecordsRepository {
   // não tê-la): plus_status que falha conta como fechado, e a visão e os convites só são lidos com o Plus aberto ou por quem não administra.
   // -------------------------------------------------------------------------
 
-  /** plus_status → {open}. Qualquer falha (função ausente, PGRST202/42883, sem conexão, resposta estranha) conta como fechado. */
+  /**
+   * Até quando (relógio do aparelho) a função plus_status é dada como ausente neste repositório: o banco sem a migração 0043 não ganha a
+   * função de uma hora para outra, e cada tela não precisa pedir de novo uma função que não existe.
+   */
+  private plusMissingUntil = 0;
+
+  /**
+   * plus_status → {open}. Só a função ausente (o banco sem a migração 0043: PGRST202, 42883 ou 404) conta como fechado. Qualquer outra
+   * falha (sem conexão, erro do servidor) é lançada, para a leitura ser repetida e nada ficar guardado como fechado por engano; quem
+   * mostra a tela trata a falha como fechado.
+   */
   async getPlusStatus(): Promise<PlusStatus> {
-    try {
-      const { data, error } = await this.db.rpc('plus_status');
-      if (error) return { open: false };
-      return { open: (data as { open?: unknown } | null)?.open === true };
-    } catch {
-      return { open: false };
+    if (Date.now() < this.plusMissingUntil) return { open: false };
+    const { data, error, status } = await this.db.rpc('plus_status');
+    if (error) {
+      if (error.code === 'PGRST202' || error.code === '42883' || status === 404) {
+        this.plusMissingUntil = Date.now() + 10 * 60 * 1000;
+        return { open: false };
+      }
+      throw repoError(error);
     }
+    return { open: (data as { open?: unknown } | null)?.open === true };
+  }
+
+  /**
+   * Há (ou houve) outra pessoa no negócio? Por context_memberships, que existe antes da 0043: a política memberships_read deixa quem lê o
+   * negócio ler os vínculos dele, inclusive os revogados de quem saiu.
+   */
+  private async businessHasOtherMembers(contextId: string): Promise<boolean> {
+    const { data, error } = await this.db.from('context_memberships').select('person_id').eq('context_id', contextId).neq('person_id', this.user.id).limit(1);
+    if (error) throw repoError(error);
+    return (data ?? []).length > 0;
   }
 
   async getBusinessPeople(contextId: string): Promise<BusinessPeople> {
-    const [plus, mine] = await Promise.all([this.getPlusStatus(), this.myBusinessMembership(contextId)]);
+    const [plus, mine, others] = await Promise.all([
+      // A chave do Plus só decide os convites e "Convidar": uma falha aqui não esconde as pessoas (vale fechado só nesta leitura).
+      this.getPlusStatus().catch((): PlusStatus => ({ open: false })),
+      this.myBusinessMembership(contextId),
+      this.businessHasOtherMembers(contextId),
+    ]);
     if (!mine) throw new RepoError('nao_encontrado');
-    if (!plus.open && mine.role === 'titular') {
-      // O Plus fechado e quem consulta administra: nada da 0043 é lido. Só a própria pessoa, como a visão a mostraria.
+    if (!plus.open && mine.role === 'titular' && !others) {
+      // O Plus fechado, quem consulta administra e ninguém mais: nada da 0043 é lido. Só a própria pessoa, como a visão a mostraria.
       const person = await this.db.from('persons').select('display_name').eq('id', this.user.id).maybeSingle();
       if (person.error) throw repoError(person.error);
       const me: BusinessMember = {
@@ -3757,7 +3785,8 @@ export class SupabaseRepository implements RecordsRepository {
     const active = members.filter((m) => m.status === 'ativo').sort((a, b) => Number(b.role === 'titular') - Number(a.role === 'titular') || a.joinedAt.localeCompare(b.joinedAt));
     const former = members.filter((m) => m.status === 'ex-membro').sort((a, b) => (a.leftAt ?? '').localeCompare(b.leftAt ?? ''));
     let invites: BusinessInvite[] = [];
-    if (me.role === 'titular') {
+    // Os convites só com o Plus aberto: com ele fechado, um convite pendente já não vale (preview e aceite respondem convite_invalido).
+    if (me.role === 'titular' && plus.open) {
       const { data, error } = await this.db
         .from('business_invites')
         .select(INVITE_COLUMNS)

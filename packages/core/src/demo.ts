@@ -512,9 +512,13 @@ export const DEMO_MEMBER_BUSINESS_RECORDS: readonly (readonly ['receita' | 'desp
   ['receita', 'Entrega para escritório', 280, '2026-10-05', 'Vendas', 'me'],
 ];
 
+/** A conta a pagar do negócio de Bia (FICTÍCIA), que Bia anotou: o aluguel da cozinha, R$ 400,00, vence em 15/10/2026. */
+export const DEMO_MEMBER_BUSINESS_BILL = { description: 'Aluguel da cozinha', amountCents: 40_000, dueOn: '2026-10-15', category: 'Aluguel do ponto' } as const;
+
 /**
  * Cenário 'negocio-plus-membro' (D-120): Bia cria "Marmitas da Bia" e convida Maria para "Anota e vê"; Maria aceita pelo próprio
- * repositório (a "Conta do negócio" de apoio nasce com o aceite). Os lançamentos ficam na memória de Maria, com a autoria de cada um.
+ * repositório (a "Conta do negócio" de apoio nasce com o aceite). Os lançamentos e a conta a pagar ficam na memória de Maria, com a autoria
+ * de cada um.
  */
 async function seedDemoMemberBusiness(repo: MemoryRepository) {
   const hub = repo['biz'];
@@ -529,6 +533,10 @@ async function seedDemoMemberBusiness(repo: MemoryRepository) {
     await repo.createRecord(newOperationKey(), businessId, kind, { accountId, amountCents: reais * 100, occurredOn, description, category });
     if (who === 'owner') setDemoAuthor(repo, businessId, description, occurredOn, owner.personId);
   }
+  const bill = await repo.createCommitment(newOperationKey(), businessId, { ...DEMO_MEMBER_BUSINESS_BILL });
+  const commitments = repo['commitments'];
+  const stored = commitments.get(bill.commitment.id)!;
+  commitments.set(stored.id, { ...stored, createdBy: owner.personId });
 }
 
 /**

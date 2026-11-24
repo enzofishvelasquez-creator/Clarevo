@@ -66,8 +66,8 @@ export interface BusinessInvite {
 
 /**
  * As pessoas do negócio como o app lê: o papel de quem consulta, as pessoas (ativas primeiro, quem administra no topo; depois as que
- * saíram), os convites ainda válidos (só para quem administra) e se o Plus está aberto. Com o Plus fechado e quem consulta
- * administrando, o app nem lê a lista (o banco pode não ter a migração 0043): vem só a própria pessoa, sem convites.
+ * saíram), os convites ainda válidos (só para quem administra e só com o Plus aberto) e se o Plus está aberto. Com o Plus fechado, quem
+ * administra e nenhuma outra pessoa no negócio (o banco pode não ter a migração 0043), o app não lê a lista: vem só a própria pessoa.
  */
 export interface BusinessPeople {
   role: BusinessRole;
@@ -178,8 +178,9 @@ export function businessSharedNow(people: Pick<BusinessPeople, 'members'> | null
 }
 
 /**
- * A seção "Pessoas do negócio" aparece? Só com o Plus aberto, para quem não administra ou quando já há outras pessoas. Com o Plus fechado,
- * quem administra sozinha ou sozinho vê "Seu negócio" exatamente como antes (D-120).
+ * A seção "Pessoas do negócio" aparece? Com o Plus aberto, para quem não administra ou quando há (ou houve) outras pessoas, mesmo que o Plus
+ * tenha fechado depois: quem administra continua vendo quem lê o negócio. Com o Plus fechado, quem administra sozinha ou sozinho vê "Seu
+ * negócio" exatamente como antes (D-120).
  */
 export function businessPeopleVisible(people: BusinessPeople | null | undefined): boolean {
   if (!people) return false;
@@ -219,7 +220,7 @@ export const BUSINESS_PEOPLE_TEXT = {
   /** O papel de quem consulta, no alto da seção. */
   yourRole: (role: BusinessRole): string => (role === 'titular' ? 'Você administra este negócio.' : `Seu papel: ${BUSINESS_ROLE_LABEL[role]}`),
   /** Com o Plus aberto e ninguém mais no negócio: para que serve. */
-  intro: 'Chame sócios ou ajudantes para ver e anotar o que entra e sai do negócio, com até 6 pessoas. Você convida por um link e escolhe o que cada pessoa pode fazer.',
+  intro: 'Chame quem trabalha com você para ver e anotar o que entra e sai do negócio, com até 6 pessoas. Você convida por um link e escolhe o que cada pessoa pode fazer.',
   privacy: 'O Pessoal de cada pessoa continua só dela: ninguém do negócio vê o seu, e você não vê o de ninguém.',
   oneAtATime: 'Cada pessoa participa de um negócio por vez.',
   you: 'você',
@@ -240,7 +241,7 @@ export const BUSINESS_PEOPLE_TEXT = {
   roleTitle: (firstName: string, role: BusinessInviteRole): string => `Mudar ${firstName} para "${BUSINESS_ROLE_LABEL[role]}"?`,
   roleBody: (role: BusinessInviteRole): string =>
     role === 'leitor'
-      ? 'A pessoa continua vendo o negócio, mas deixa de anotar. O que ela já anotou não muda.'
+      ? 'A pessoa continua vendo o negócio, mas deixa de anotar. O que ela já anotou não muda, e as retiradas dela para o Pessoal deixam de ser ligadas.'
       : 'A pessoa passa a ver e anotar no negócio. Ela altera só o que ela mesma anotar.',
   roleConfirm: 'Mudar o papel',
   roleChanged: 'Papel atualizado.',
@@ -327,12 +328,6 @@ export const BUSINESS_INVITE_TEXT = {
   needSpace: 'Termine de criar a sua primeira conta antes de aceitar o convite.',
   createFirst: 'Criar minha primeira conta',
   goHome: 'Ir para o início',
-  /** Quem recebeu o link e prefere colar (a tela "Seu negócio" sem negócio, com o Plus aberto). */
-  haveInvite: 'Tenho um convite para um negócio',
-  pasteLabel: 'Link do convite',
-  pasteHint: 'Cole o link que você recebeu de quem administra o negócio.',
-  pasteSubmit: 'Ver convite',
-  pasteInvalid: 'Não há um convite de negócio neste texto. Confira o link que você recebeu.',
 } as const;
 
 /** Textos de erro das ações do negócio compartilhado (nomes e regras do banco). */

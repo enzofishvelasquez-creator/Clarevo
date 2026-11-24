@@ -37,6 +37,7 @@ import {
   useDeleteCard,
   useSetCardStatus,
 } from '@/state/data';
+import { useBusinessItemAccess } from '@/state/business';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space, tabular } from '@/theme/tokens';
 
@@ -231,6 +232,9 @@ function CardBody({
   onDelete: () => void;
 }) {
   const archived = card.status === 'arquivado';
+  // Negócio compartilhado (D-120): quem só vê não anota nem importa; editar, arquivar e excluir, só quem cadastrou o cartão (ou administra).
+  // Fora do negócio (e num negócio sem outras pessoas), nada muda.
+  const access = useBusinessItemAccess(card.contextId, card.createdBy);
   const fin = finalText(card);
   const summary = invoices ? summarizeCard(card, invoices, today) : null;
   const limit = summary ? limitUsedText(summary.limitUsedCents, card.limitCents) : null;
@@ -285,14 +289,14 @@ function CardBody({
         ) : null}
         {archived ? <Txt color={colors.textSecondary}>{T.screens.archivedNote}</Txt> : null}
 
-        {!archived ? (
+        {!archived && access.canWrite ? (
           <Button
             label={T.screens.noteOnCard}
             icon={Plus}
             onPress={() => router.push({ pathname: '/registro/novo', params: { tipo: 'despesa', cartao: card.id } })}
           />
         ) : null}
-        {!archived ? (
+        {!archived && access.canWrite ? (
           // D-089 B: a fatura do banco (OFX, planilha ou PDF) entra neste cartão, com as compras parceladas em andamento.
           <Button
             label={T.screens.importInvoice}
@@ -348,21 +352,23 @@ function CardBody({
           </>
         )}
 
-        <View style={{ gap: space[3] }}>
-          <Button label={F.editTitle} icon={Pencil} tone="soft" disabled={busy} onPress={() => router.push({ pathname: '/cartoes/[id]/editar', params: { id: card.id } })} />
-          {archived ? (
-            <Button label={F.reactivate} icon={RefreshCw} tone="soft" disabled={busy} onPress={onReactivate} />
-          ) : (
-            <Button label={F.archive} icon={Archive} tone="soft" disabled={busy} onPress={onArchive} />
-          )}
-          {noEntries === true ? (
-            <Button label={F.delete} icon={Trash2} tone="danger" disabled={busy} onPress={onDelete} />
-          ) : noEntries === false ? (
-            <Txt variant="caption" color={colors.textSecondary}>
-              {T.screens.deleteBlocked}
-            </Txt>
-          ) : null}
-        </View>
+        {access.canChange ? (
+          <View style={{ gap: space[3] }}>
+            <Button label={F.editTitle} icon={Pencil} tone="soft" disabled={busy} onPress={() => router.push({ pathname: '/cartoes/[id]/editar', params: { id: card.id } })} />
+            {archived ? (
+              <Button label={F.reactivate} icon={RefreshCw} tone="soft" disabled={busy} onPress={onReactivate} />
+            ) : (
+              <Button label={F.archive} icon={Archive} tone="soft" disabled={busy} onPress={onArchive} />
+            )}
+            {noEntries === true ? (
+              <Button label={F.delete} icon={Trash2} tone="danger" disabled={busy} onPress={onDelete} />
+            ) : noEntries === false ? (
+              <Txt variant="caption" color={colors.textSecondary}>
+                {T.screens.deleteBlocked}
+              </Txt>
+            ) : null}
+          </View>
+        ) : null}
 
         <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy} hitSlop={8}>
           <ShieldCheck size={18} color={colors.textSecondary} />

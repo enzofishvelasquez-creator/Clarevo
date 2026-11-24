@@ -64,6 +64,7 @@ import {
   useCommitment,
   useCommitments,
   useDeleteCommitment,
+  useRecord,
   useSeries,
   useSeriesOccurrences,
   useSeriesOpenOccurrences,
@@ -74,6 +75,7 @@ import {
   useWorkFor,
 } from '@/state/data';
 import { useAuthorship } from '@/components/family-parts';
+import { useBusiness, useBusinessItemAccess } from '@/state/business';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -144,6 +146,13 @@ export default function DetalheContaAPagar() {
   const dueNotice = c ? commitmentDueNotice(c, today) : null;
   const paid = c?.status === 'quitado' ? c.payment : null;
   const ref = c?.series ?? null;
+  // Negócio compartilhado (D-120): quem só vê não paga nem muda a conta; quem anota e vê paga a de qualquer pessoa, mas edita e exclui só a
+  // que anotou (quem administra, qualquer uma), e desfaz só o pagamento que fez. Fora do negócio (e sem outras pessoas), nada muda.
+  const access = useBusinessItemAccess(c?.contextId, c?.createdBy);
+  const business = useBusiness().data;
+  const sharedPay = Boolean(paid && business && c && business.id === c.contextId && business.role !== 'titular');
+  const paidRecord = useRecord(sharedPay ? paid!.recordId : undefined);
+  const canUndo = access.canWrite && (!sharedPay || paidRecord.data?.createdBy === user?.id);
   const series = useSeries(ref?.id, c?.contextId);
   const annual = ref?.kind === 'anual' ? { k: ref.partsPerYear ?? 1, label: annualYearLabelOf(c!)!, part: partOfYear(c!) } : null;
   // Conta do ano com parcelas em aberto: as listas completas da série, para "Tirar todas as parcelas de 2027 em aberto".
@@ -469,7 +478,7 @@ export default function DetalheContaAPagar() {
                 </View>
               </Card>
 
-              {estimateOpen && annual && ref ? (
+              {!access.canChange ? null : estimateOpen && annual && ref ? (
                 <Banner tone="info" icon={Info} live={false}>
                   <Txt variant="label">Valor estimado pela referência da conta do ano. Quando o carnê ou o boleto chegar, informe o valor.</Txt>
                   <Button
@@ -494,21 +503,23 @@ export default function DetalheContaAPagar() {
                 <>
                   <Button label="Ver gasto registrado" tone="soft" onPress={() => router.push(`/registro/${paid.recordId}`)} />
                   {/* Conta de gasto fixo: a do próximo mês é criada pela série (D-024, regra 10). */}
-                  {ref ? null : <RepeatCommitment commitment={c} today={today} />}
+                  {ref || !access.canWrite ? null : <RepeatCommitment commitment={c} today={today} />}
                 </>
               ) : (
                 <>
-                  <Button label="Já paguei" icon={Check} onPress={() => router.push(`/a-pagar/${c.id}/pagar`)} />
-                  {notice?.split('\n')[0] === COMMITMENT_NOTICE_TEXT.saved ? (
+                  {access.canWrite ? <Button label="Já paguei" icon={Check} onPress={() => router.push(`/a-pagar/${c.id}/pagar`)} /> : null}
+                  {access.canWrite && notice?.split('\n')[0] === COMMITMENT_NOTICE_TEXT.saved ? (
                     <Button label="Anotar outra conta a pagar" icon={Plus} tone="soft" onPress={() => router.replace('/a-pagar/nova')} />
                   ) : null}
-                  <Button
-                    label="Editar conta a pagar"
-                    icon={Pencil}
-                    tone="soft"
-                    onPress={() => (ref ? setConfirming('editar') : router.push(`/a-pagar/${c.id}/editar`))}
-                  />
-                  {annual && annual.k > 1 ? (
+                  {access.canChange ? (
+                    <Button
+                      label="Editar conta a pagar"
+                      icon={Pencil}
+                      tone="soft"
+                      onPress={() => (ref ? setConfirming('editar') : router.push(`/a-pagar/${c.id}/editar`))}
+                    />
+                  ) : null}
+                  {!access.canChange ? null : annual && annual.k > 1 ? (
                     <Button label="Excluir parcela" icon={Trash2} tone="danger" onPress={() => setConfirming('excluir-escolha')} />
                   ) : (
                     <Button
@@ -521,7 +532,7 @@ export default function DetalheContaAPagar() {
                 </>
               )}
               <Button label="Ver resumo do mês" tone="soft" onPress={showSummary} />
-              {paid ? (
+              {paid && canUndo ? (
                 <View style={{ gap: space[1] }}>
                   <Txt variant="caption" color={colors.textSecondary}>
                     Para alterar esta conta a pagar, desfaça o pagamento. O gasto registrado pode ser editado em Movimentos.

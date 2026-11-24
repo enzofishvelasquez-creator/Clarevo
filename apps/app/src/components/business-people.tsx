@@ -1,11 +1,9 @@
 import {
-  BUSINESS_INVITE_TEXT,
   BUSINESS_PEOPLE_TEXT,
   BUSINESS_ROLE_HELP,
   BUSINESS_ROLE_LABEL,
   businessCanInvite,
   businessHasOthers,
-  businessInviteCodeFromText,
   businessPeopleErrorText,
   businessSeatsLeft,
   deviceTimeZone,
@@ -25,7 +23,7 @@ import { StyleSheet, View } from 'react-native';
 import { ChoiceDialog } from '@/components/choice-dialog';
 import { ConfirmDialog } from '@/components/dialog';
 import { useNowMs } from '@/components/family-parts';
-import { Banner, Button, Card, TextField, Txt } from '@/components/ui';
+import { Banner, Button, Card, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
 import { useView } from '@/state/data';
 import {
@@ -211,7 +209,8 @@ export function BusinessPeopleSection({
           </View>
         ) : null}
 
-        {owner ? (
+        {/* Os convites e "Convidar alguém" só com o Plus aberto: com ele fechado, quem administra continua vendo as pessoas (D-120). */}
+        {owner && people.plusOpen ? (
           <View style={[styles.block, styles.divider]}>
             <Txt variant="label" accessibilityRole="header" aria-level={3} style={{ fontFamily: fonts.bold }}>
               {T.invitesTitle}
@@ -238,15 +237,11 @@ export function BusinessPeopleSection({
                 );
               })
             )}
-            {people.plusOpen ? (
-              <>
-                <Txt variant="caption" color={colors.textSecondary}>
-                  {T.seats(left)}
-                </Txt>
-                {canInvite ? (
-                  <Button label={T.invite} icon={UserPlus} disabled={left === 0 || busy} onPress={() => router.push('/negocio/convidar')} />
-                ) : null}
-              </>
+            <Txt variant="caption" color={colors.textSecondary}>
+              {T.seats(left)}
+            </Txt>
+            {canInvite ? (
+              <Button label={T.invite} icon={UserPlus} disabled={left === 0 || busy} onPress={() => router.push('/negocio/convidar')} />
             ) : null}
           </View>
         ) : null}
@@ -305,44 +300,6 @@ export function BusinessPeopleSection({
         <Txt color={colors.textSecondary}>{confirmText.body}</Txt>
       </ConfirmDialog>
     </>
-  );
-}
-
-/** "Tenho um convite para um negócio": o link colado abre a tela do convite (/convite/negocio/<código>). */
-export function PasteBusinessInvite() {
-  const [pasted, setPasted] = useState('');
-  const [pasteError, setPasteError] = useState<string | undefined>();
-  function seeInvite() {
-    const code = businessInviteCodeFromText(pasted);
-    if (!code) {
-      setPasteError(BUSINESS_INVITE_TEXT.pasteInvalid);
-      return;
-    }
-    setPasteError(undefined);
-    setPasted('');
-    router.push({ pathname: '/convite/negocio/[codigo]', params: { codigo: code } });
-  }
-  return (
-    <Card style={{ gap: space[3] }}>
-      <Txt variant="title" accessibilityRole="header" aria-level={2}>
-        {BUSINESS_INVITE_TEXT.haveInvite}
-      </Txt>
-      <TextField
-        label={BUSINESS_INVITE_TEXT.pasteLabel}
-        hint={BUSINESS_INVITE_TEXT.pasteHint}
-        value={pasted}
-        onChangeText={(t) => {
-          setPasted(t);
-          setPasteError(undefined);
-        }}
-        error={pasteError}
-        autoCapitalize="none"
-        autoCorrect={false}
-        returnKeyType="go"
-        onSubmitEditing={seeInvite}
-      />
-      <Button label={BUSINESS_INVITE_TEXT.pasteSubmit} tone="soft" disabled={pasted.trim() === ''} onPress={seeInvite} />
-    </Card>
   );
 }
 

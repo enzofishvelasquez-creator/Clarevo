@@ -13,7 +13,10 @@ import {
   authorLabel,
   canSubmitDelete,
   createDeletionIntent,
+  deleteBusinessOutcome,
+  deleteBusinessText,
   deleteConfirmationError,
+  deleteErasedLines,
   deleteErrorText,
   deleteFamilyOutcome,
   deleteFamilyText,
@@ -255,5 +258,50 @@ describe('resposta perdida ao excluir a conta (D-058, revisão de segurança)', 
     expect(DELETE_TEXT.unsureBody).toContain('continuam como estavam');
     expect(DELETE_TEXT.unsureEnter).toBe('Entrar');
     expect(DELETE_TEXT.unsureTitle).not.toBe(DELETE_TEXT.doneTitle);
+  });
+});
+
+describe('excluir a conta com o negócio compartilhado (D-120)', () => {
+  const member = (personId: string, isMe: boolean, status: 'ativo' | 'ex-membro' = 'ativo') => ({ personId, isMe, status });
+  it('o resultado pelo papel e pelas pessoas: nenhum, próprio (a tela fica como antes), sai e bloqueia', () => {
+    expect(deleteBusinessOutcome(null, null)).toBe('nenhum');
+    expect(deleteBusinessOutcome(undefined, undefined)).toBe('nenhum');
+    // Quem administra sozinha (o caso de hoje, com o Plus fechado), ou só com quem já saiu: o negócio é apagado junto, como antes.
+    expect(deleteBusinessOutcome({ role: 'titular' }, { members: [member('eu', true)] })).toBe('proprio');
+    expect(deleteBusinessOutcome({ role: 'titular' }, { members: [member('eu', true), member('nina', false, 'ex-membro')] })).toBe('proprio');
+    expect(deleteBusinessOutcome({ role: 'titular' }, { members: [member('eu', true), member('rafa', false)] })).toBe('bloqueia');
+    expect(deleteBusinessOutcome({ role: 'membro' }, { members: [member('bia', false), member('eu', true)] })).toBe('sai');
+    expect(deleteBusinessOutcome({ role: 'leitor' }, null)).toBe('sai');
+    // Confirmar: o negócio com outras pessoas trava antes de qualquer cancelamento; os outros casos seguem a Família.
+    expect(canSubmitDelete('excluir', 'nenhuma', 'bloqueia')).toBe(false);
+    expect(canSubmitDelete('excluir', 'nenhuma', 'sai')).toBe(true);
+    expect(canSubmitDelete('excluir', 'nenhuma', 'proprio')).toBe(true);
+    expect(canSubmitDelete('excluir', 'bloqueia', 'proprio')).toBe(false);
+  });
+
+  it('os textos: sozinha nada muda; quem participa do negócio de outra pessoa sai e o que anotou fica; quem administra remove as pessoas antes', () => {
+    // Sem negócio ou sozinha: as linhas de sempre, com o negócio próprio entre o que é apagado, e nenhuma frase do negócio.
+    expect(deleteErasedLines('nenhum')).toBe(DELETE_TEXT.erased);
+    expect(deleteErasedLines('proprio')).toBe(DELETE_TEXT.erased);
+    expect(deleteErasedLines('bloqueia')).toBe(DELETE_TEXT.erased);
+    expect(deleteBusinessText('nenhum', 'Sacolé')).toBeNull();
+    expect(deleteBusinessText('proprio', 'Sacolé')).toBeNull();
+    // Quem participa do negócio de outra pessoa: o Pessoal é apagado, o negócio não.
+    const sai = deleteErasedLines('sai');
+    expect(sai[0]).toBe(DELETE_TEXT.erasedPersonalOnly);
+    expect(sai[0]).not.toContain('Negócio');
+    expect(sai.slice(1)).toEqual(DELETE_TEXT.erased.slice(1));
+    expect(deleteBusinessText('sai', 'Marmitas da Bia')).toBe(
+      `Você sai do negócio Marmitas da Bia. O que você anotou continua lá, como histórico, com a autoria "${FAMILY_DEPARTED_NAME}". O seu nome e o seu e-mail são apagados.`,
+    );
+    expect(deleteBusinessText('bloqueia', 'Sacolé da Maria')).toBe(
+      'Você administra o negócio Sacolé da Maria e há outras pessoas nele. Antes de excluir a conta, remova as outras pessoas do negócio.',
+    );
+    expect(DELETE_TEXT.businessBlockedHow).toBe('Em "Seu negócio", toque em "Gerenciar" ao lado de cada pessoa e escolha "Remover do negócio".');
+    expect(DELETE_TEXT.businessOpen).toBe('Ver seu negócio');
+    for (const t of [DELETE_TEXT.erasedPersonalOnly, DELETE_TEXT.businessTitle, DELETE_TEXT.businessLoading, DELETE_TEXT.businessBlockedHow, deleteBusinessText('sai', 'X')!, deleteBusinessText('bloqueia', 'X')!]) {
+      expect(t).not.toMatch(FORBIDDEN);
+      expect(t).not.toMatch(GENDERED);
+    }
   });
 });

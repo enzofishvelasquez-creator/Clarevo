@@ -1,3 +1,7 @@
+import { BUSINESS_TEXT } from './business';
+import type { BusinessContext } from './business';
+import { BUSINESS_PEOPLE_TEXT, canEndBusiness } from './business-people';
+import type { BusinessMember } from './business-people';
 import { FAMILY_DEPARTED_NAME, FAMILY_TEXT, canEndFamily } from './family';
 import type { FamilyOverview } from './family';
 import type { RepoErrorCode } from './repository';
@@ -46,6 +50,25 @@ export function deleteFamilyOutcome(family: Pick<FamilyOverview, 'role' | 'membe
 }
 
 /**
+ * O que acontece com o negócio da pessoa ao excluir a conta (negócio compartilhado, D-116 e D-120; migração 0043):
+ * - 'nenhum': não participa de nenhum negócio;
+ * - 'proprio': administra um negócio sem outras pessoas ativas (é apagado junto, como o Pessoal; a tela fica como antes);
+ * - 'sai': participa do negócio de outra pessoa (sai, e o que anotou continua lá com a autoria "Pessoa que saiu");
+ * - 'bloqueia': administra um negócio com outras pessoas ativas (remove as pessoas antes; não há passar a administração).
+ * `people` indefinido enquanto as pessoas não chegaram: quem administra conta como 'proprio' (a tela espera antes de deixar confirmar).
+ */
+export type DeleteBusinessOutcome = 'nenhum' | 'proprio' | 'sai' | 'bloqueia';
+
+export function deleteBusinessOutcome(
+  business: Pick<BusinessContext, 'role'> | null | undefined,
+  people: { members: readonly Pick<BusinessMember, 'status' | 'isMe'>[] } | null | undefined,
+): DeleteBusinessOutcome {
+  if (!business) return 'nenhum';
+  if (business.role !== 'titular') return 'sai';
+  return people && !canEndBusiness(people.members) ? 'bloqueia' : 'proprio';
+}
+
+/**
  * Os códigos que `delete_my_account` lança, além dos comuns (nao_autenticado, chave_invalida, chave_reutilizada). negocio_com_membros:
  * quem administra um negócio com outras pessoas ativas (negócio compartilhado, D-116, migração 0043).
  */
@@ -83,6 +106,18 @@ export const DELETE_TEXT = {
     `Você é titular da Família ${familyName} e há outras pessoas nela. Antes de excluir a conta, passe a titularidade para outra pessoa ou remova as pessoas da Família.`,
   familyBlockedHow: `Na Família, toque em "${FAMILY_TEXT.manage}" ao lado de uma pessoa e escolha "${FAMILY_TEXT.transfer}" ou "${FAMILY_TEXT.remove}".`,
   familyOpen: 'Abrir a Família',
+  /** O negócio de quem exclui (só com outras pessoas: sozinha, a tela fica como antes, e o negócio entra em "O que é apagado"). */
+  businessTitle: 'Espaço Negócio',
+  businessLoading: 'Conferindo o seu negócio…',
+  businessLeaves: (businessName: string): string =>
+    `Você sai do negócio ${businessName}. O que você anotou continua lá, como histórico, com a autoria "${FAMILY_DEPARTED_NAME}". O seu nome e o seu e-mail são apagados.`,
+  businessBlocked: (businessName: string): string =>
+    `Você administra o negócio ${businessName} e há outras pessoas nele. Antes de excluir a conta, remova as outras pessoas do negócio.`,
+  businessBlockedHow: `Em "${BUSINESS_TEXT.overviewTitle}", toque em "${BUSINESS_PEOPLE_TEXT.manage}" ao lado de cada pessoa e escolha "${BUSINESS_PEOPLE_TEXT.remove}".`,
+  businessOpen: BUSINESS_TEXT.accountOpen,
+  /** A primeira linha de "O que é apagado" para quem participa do negócio de outra pessoa: o negócio dela não é apagado. */
+  erasedPersonalOnly:
+    'Tudo o que você anotou no seu Pessoal, como gastos, recebimentos, contas a pagar, gastos fixos, parcelamentos e contas do ano. Os dados são apagados de verdade, não ficam só escondidos.',
   familyGeneral:
     'Para quem está em uma Família, funciona assim. Quem anota ou só vê sai da Família, e o que anotou fica lá com o nome "Pessoa que saiu". Quem é titular e tem outras pessoas na Família precisa passar a titularidade antes. Se a Família tem só a pessoa titular, a Família é apagada junto.',
   /** Exportar antes (D-047). */
@@ -144,9 +179,24 @@ export function deleteFamilyText(outcome: DeleteFamilyOutcome, familyName: strin
   }
 }
 
-/** A pessoa pode confirmar? Só com a palavra certa, sem Família que exija passar a titularidade antes, e fora da demonstração o banco decide o resto. */
-export function canSubmitDelete(input: unknown, outcome: DeleteFamilyOutcome): boolean {
-  return deleteConfirmationError(input) === null && outcome !== 'bloqueia';
+/**
+ * A pessoa pode confirmar? Só com a palavra certa, sem Família que exija passar a titularidade antes e sem negócio com outras pessoas que
+ * exija removê-las antes (D-120); fora da demonstração o banco decide o resto.
+ */
+export function canSubmitDelete(input: unknown, outcome: DeleteFamilyOutcome, business: DeleteBusinessOutcome = 'nenhum'): boolean {
+  return deleteConfirmationError(input) === null && outcome !== 'bloqueia' && business !== 'bloqueia';
+}
+
+/** As linhas de "O que é apagado": quem participa do negócio de outra pessoa não apaga aquele negócio (o que anotou fica lá). */
+export function deleteErasedLines(business: DeleteBusinessOutcome): readonly string[] {
+  return business === 'sai' ? [DELETE_TEXT.erasedPersonalOnly, ...DELETE_TEXT.erased.slice(1)] : DELETE_TEXT.erased;
+}
+
+/** A frase do negócio na tela (só para 'sai' e 'bloqueia'; nos outros casos a tela fica como antes). */
+export function deleteBusinessText(outcome: DeleteBusinessOutcome, businessName: string): string | null {
+  if (outcome === 'sai') return DELETE_TEXT.businessLeaves(businessName);
+  if (outcome === 'bloqueia') return DELETE_TEXT.businessBlocked(businessName);
+  return null;
 }
 
 /**

@@ -181,6 +181,15 @@ export function isWithdrawal(record: Pick<FinancialRecord, 'pairedRecordId'>): b
 }
 
 /**
+ * O gasto do negócio é uma retirada para o Pessoal, ligada ou não: a ligação ou a categoria "Retirada para o Pessoal", que só a função
+ * da retirada grava (fora da lista de escolha). Depois de sair do negócio, ser removida ou encerrar (D-120), os dois lados deixam de ser
+ * ligados, mas o gasto continua sendo uma retirada: "Seu negócio" não o passa para Saiu, e os meses que já passaram não mudam.
+ */
+export function isBusinessWithdrawal(record: Pick<FinancialRecord, 'pairedRecordId' | 'kind' | 'category'>): boolean {
+  return isWithdrawal(record) || (record.kind === 'despesa' && record.category === WITHDRAWAL_BUSINESS_CATEGORY);
+}
+
+/**
  * O lançamento pode mudar de espaço: o comum, sem conta a pagar, fatura, rendimento de investimento ou retirada ligados (a mesma regra
  * de move_record, lancamento_ligado).
  */
@@ -236,7 +245,7 @@ export function businessMonth(records: readonly FinancialRecord[], contextId: st
     if (r.contextId !== contextId || r.status !== 'realizado' || recordMonth(r) !== month) continue;
     recordCount += 1;
     if (r.kind === 'receita') inCents += r.amountCents;
-    else if (isWithdrawal(r)) withdrawnCents += r.amountCents;
+    else if (isBusinessWithdrawal(r)) withdrawnCents += r.amountCents;
     else outCents += r.amountCents;
   }
   const leftCents = inCents - outCents;
@@ -262,7 +271,7 @@ export function businessTopOut(records: readonly FinancialRecord[], contextId: s
   const by = new Map<string, number>();
   let total = 0;
   for (const r of records) {
-    if (r.contextId !== contextId || r.status !== 'realizado' || r.kind !== 'despesa' || isWithdrawal(r) || recordMonth(r) !== month) continue;
+    if (r.contextId !== contextId || r.status !== 'realizado' || r.kind !== 'despesa' || isBusinessWithdrawal(r) || recordMonth(r) !== month) continue;
     const key = r.category ?? NO_CATEGORY_LABEL;
     by.set(key, (by.get(key) ?? 0) + r.amountCents);
     total += r.amountCents;
@@ -465,14 +474,13 @@ export const BUSINESS_WORDS = {
 /** Textos de erro das telas do negócio (nomes e regras do banco). */
 export const BUSINESS_ERROR_TEXT = {
   nome_do_negocio_invalido: 'Dê um nome de 1 a 60 caracteres para o negócio.',
-  /** O próprio negócio ou, no negócio compartilhado (0043), o de outra pessoa: cada pessoa participa de um por vez. */
-  ja_tem_negocio: 'Você já participa de um negócio. Cada pessoa participa de um negócio por vez.',
+  ja_tem_negocio: 'Você já tem um espaço Negócio. O plano inclui um negócio por pessoa.',
   negocio_com_membros: 'Só dá para encerrar o espaço Negócio quando só você participa dele.',
   retirada_ligada: BUSINESS_TEXT.withdrawalLocked,
   nao_e_retirada: ERROR_TEXT.salvar_falhou,
   lancamento_ligado: BUSINESS_TEXT.moveLinked,
   contexto_invalido: ERROR_TEXT.salvar_falhou,
-  sem_permissao: 'Só quem administra o negócio pode fazer isto.',
+  sem_permissao: 'Só quem é titular do negócio pode fazer isto.',
   nao_encontrado: 'Este espaço Negócio ou lançamento não está mais disponível. Atualize a tela.',
   chave_reutilizada: ERROR_TEXT.salvar_falhou,
   versao_desatualizada: ERROR_TEXT.versao_desatualizada,

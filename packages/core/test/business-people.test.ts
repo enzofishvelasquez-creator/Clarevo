@@ -24,6 +24,8 @@ import {
   businessInviteCodeFromText,
   businessInviteLink,
   businessMonth,
+  businessTopOut,
+  isBusinessWithdrawal,
   businessPeopleErrorText,
   businessPeopleVisible,
   businessSeatsLeft,
@@ -224,9 +226,13 @@ describe('negócio compartilhado: regras puras (D-116, D-120)', () => {
     expect(businessPeopleErrorText('plus_indisponivel')).toBe('Convidar pessoas para o negócio ainda não está disponível.');
     expect(businessPeopleErrorText('qualquer')).toBe(BUSINESS_PEOPLE_ERROR_TEXT.salvar_falhou);
     for (const code of BUSINESS_PEOPLE_ERROR_CODES) expect((BUSINESS_PEOPLE_ERROR_TEXT as Record<string, string>)[code], code).toBeTruthy();
-    // Criar um negócio também recusa quem já participa do de outra pessoa: a mesma frase.
-    expect(BUSINESS_ERROR_TEXT.ja_tem_negocio).toBe(BUSINESS_PEOPLE_ERROR_TEXT.ja_tem_negocio);
-    expect(BUSINESS_ERROR_TEXT.sem_permissao).toBe('Só quem administra o negócio pode fazer isto.');
+    // Com o Plus fechado, criar o negócio continua com as frases de antes (D-113); as novas só nas ações do negócio compartilhado.
+    expect(BUSINESS_ERROR_TEXT.ja_tem_negocio).toBe('Você já tem um espaço Negócio. O plano inclui um negócio por pessoa.');
+    expect(BUSINESS_ERROR_TEXT.sem_permissao).toBe('Só quem é titular do negócio pode fazer isto.');
+    expect(BUSINESS_PEOPLE_ERROR_TEXT.sem_permissao).toBe('Só quem administra o negócio pode fazer isto.');
+    // Linguagem neutra no convite a sócios e ajudantes.
+    expect(BUSINESS_PEOPLE_TEXT.intro).toMatch(/^Chame quem trabalha com você/);
+    expect(BUSINESS_PEOPLE_TEXT.roleBody('leitor')).toContain('as retiradas dela para o Pessoal deixam de ser ligadas');
     // Linguagem neutra: "quem administra" e "a pessoa", e "a Clarevo" no feminino.
     expect(BUSINESS_PEOPLE_TEXT.yourRole('titular')).toBe('Você administra este negócio.');
     expect(BUSINESS_PEOPLE_TEXT.yourRole('leitor')).toBe('Seu papel: Só vê');
@@ -261,13 +267,23 @@ describe('negócio compartilhado na memória: a chave do Plus e a compatibilidad
     await expectCode(alone.getBusinessPeople('qualquer'), 'nao_encontrado');
   });
 
-  it('o Plus aberto e depois fechado de novo: quem já entrou continua, mas quem administra volta a ver só a si', async () => {
+  it('o Plus aberto e depois fechado de novo: quem já entrou continua, quem administra continua vendo as pessoas, e os convites param de valer', async () => {
     const { hub } = clock();
     const { bia, b, join } = await shared(hub);
     const caio = await person(hub, 'caio');
     await join(caio, 'leitor');
+    const pending = await bia.repo.createBusinessInvite(key(), b.id, 'membro');
     hub.setPlusOpen(false);
-    expect((await bia.repo.getBusinessPeople(b.id)).members.map((m) => m.personId)).toEqual(['bia']);
+    // Quem administra continua vendo quem lê o negócio (a frase "só você" seria falsa); os convites e "Convidar" dependem do Plus.
+    const biaView = await bia.repo.getBusinessPeople(b.id);
+    expect(biaView).toMatchObject({ role: 'titular', plusOpen: false, invites: [] });
+    expect(biaView.members.map((m) => m.personId)).toEqual(['bia', 'caio']);
+    expect(businessPeopleVisible(biaView)).toBe(true);
+    expect(businessCanInvite(biaView)).toBe(false);
+    // Com o Plus fechado, o convite pendente não vale: a prévia e o aceite respondem convite_invalido (0043, a chave de quem administra).
+    const duda = await person(hub, 'duda');
+    await expectCode(duda.repo.previewBusinessInvite(pending.code!), 'convite_invalido');
+    await expectCode(duda.repo.acceptBusinessInvite(key(), pending.code!), 'convite_invalido');
     // Quem não administra continua lendo a lista inteira (o banco já tem a migração, porque alguém entrou).
     const caioView = await caio.repo.getBusinessPeople(b.id);
     expect(caioView).toMatchObject({ role: 'leitor', plusOpen: false, invites: [] });
@@ -276,6 +292,12 @@ describe('negócio compartilhado na memória: a chave do Plus e a compatibilidad
       ['Caio', 'leitor', true],
     ]);
     expect(businessPeopleVisible(caioView)).toBe(true);
+    // Só quem saiu também conta: quem administra continua vendo o histórico.
+    await bia.repo.removeBusinessMember(key(), b.id, 'caio');
+    expect((await bia.repo.getBusinessPeople(b.id)).members.map((m) => `${m.personId}:${m.status}`)).toEqual(['bia:ativo', 'caio:ex-membro']);
+    // Abrindo de novo, o convite volta a valer (ainda está dentro dos 7 dias).
+    hub.setPlusOpen(true);
+    expect((await duda.repo.acceptBusinessInvite(key(), pending.code!)).role).toBe('membro');
   });
 });
 
@@ -472,6 +494,15 @@ describe('negócio compartilhado na memória: sair, remover, mudar o papel e enc
     await bia.repo.setBusinessMemberRole(rk, b.id, 'duda', 'membro');
     await expectCode(bia.repo.setBusinessMemberRole(rk, b.id, 'duda', 'leitor'), 'chave_reutilizada');
     expect((await duda.repo.getBusiness())!.role).toBe('membro');
+    // Passar para "Só vê" desliga as retiradas da pessoa (ela já não as exclui nem move): os dois lados viram lançamentos comuns.
+    const dudaAcc = (await duda.repo.listAccounts(b.id))[0]!.id;
+    const dudas = await duda.repo.createBusinessWithdrawal(key(), b.id, { businessAccountId: dudaAcc, personalAccountId: duda.personalAcc, amountCents: 2_500, occurredOn: '2026-11-19', description: null });
+    await bia.repo.setBusinessMemberRole(key(), b.id, 'duda', 'leitor');
+    expect((await duda.repo.getRecord(dudas.personalRecord.id))!.pairedRecordId ?? null).toBeNull();
+    expect((await duda.repo.getRecord(dudas.businessRecord.id))!.pairedRecordId ?? null).toBeNull();
+    // Continua sendo uma retirada em "Seu negócio" (a categoria), fora de Saiu.
+    expect(businessMonth(await duda.repo.listRecords(b.id, '2026-11'), b.id, '2026-11')).toMatchObject({ outCents: 0, withdrawnCents: 2_500 });
+    await bia.repo.setBusinessMemberRole(key(), b.id, 'duda', 'membro');
     // Remover: as mesmas recusas; a pessoa ativa; a retirada dela fica desligada no repositório dela.
     await expectCode(bia.repo.removeBusinessMember(key(), b.id, 'bia'), 'nao_sobre_si');
     await expectCode(caio.repo.removeBusinessMember(key(), b.id, 'duda'), 'sem_permissao');
@@ -617,6 +648,9 @@ describe('demonstração: o negócio compartilhado só nos cenários com o Plus 
     const oct = await repo.listRecords(b.id, '2026-10');
     expect(businessMonth(oct, b.id, '2026-10')).toMatchObject({ inCents: 92_000, outCents: 52_000 });
     expect(oct.filter((r) => r.createdBy === 'pessoa-demo').map((r) => r.description).sort()).toEqual(['Embalagens', 'Entrega para escritório']);
+    // A conta a pagar que Bia anotou (para a visão de quem só vê: sem "Já paguei" nem "Editar conta a pagar").
+    const bills = await repo.listCommitments(b.id, '2026-10');
+    expect(bills.map((c) => [c.description, c.amountCents, c.dueOn, c.createdBy])).toEqual([['Aluguel da cozinha', 40_000, '2026-10-15', 'pessoa-bia']]);
     await expectCode(repo.renameBusiness(key(), b.id, 'Outro'), 'sem_permissao');
     await expectCode(repo.endBusiness(key(), b.id), 'sem_permissao');
     await expectCode(repo.leaveBusiness(key(), repo !== null ? (await repo.getSpace())!.personalContextId : ''), 'contexto_invalido');
@@ -626,5 +660,39 @@ describe('demonstração: o negócio compartilhado só nos cenários com o Plus 
     expect([s.receivedCents, s.paidCents]).toEqual([600_000, 390_000]);
     await repo.leaveBusiness(key(), b.id);
     expect(await repo.getBusiness()).toBeNull();
+  });
+});
+
+describe('retiradas que deixaram de ser ligadas continuam retiradas em "Seu negócio" (D-120)', () => {
+  const base = {
+    contextId: 'neg',
+    accountId: 'acc',
+    status: 'realizado' as const,
+    currency: 'BRL' as const,
+    occurredOn: '2026-10-05',
+    commitmentId: null,
+    invoice: null,
+    receiptKey: null,
+    createdBy: 'rafa',
+    version: 1,
+    createdAt: '2026-10-05T12:00:00.000Z',
+    updatedAt: '2026-10-05T12:00:00.000Z',
+  };
+  it('o gasto "Retirada para o Pessoal" sem a ligação não entra em Saiu nem nas maiores saídas, e os números não mudam', () => {
+    const linked = [
+      { ...base, id: 'in', kind: 'receita' as const, amountCents: 10_000, description: 'Vendas', category: 'Vendas' },
+      { ...base, id: 'out', kind: 'despesa' as const, amountCents: 3_000, description: 'Frutas', category: 'Material e mercadoria' },
+      { ...base, id: 'w', kind: 'despesa' as const, amountCents: 2_000, description: 'Retirada para o Pessoal', category: 'Retirada para o Pessoal', pairedRecordId: 'p' },
+    ];
+    // Depois de sair, ser removida, passar a só ver ou encerrar: o mesmo gasto, sem a ligação.
+    const unlinked = linked.map(({ pairedRecordId: _p, ...r }: { pairedRecordId?: string } & (typeof linked)[number]) => r);
+    for (const records of [linked, unlinked]) {
+      expect(businessMonth(records, 'neg', '2026-10')).toMatchObject({ inCents: 10_000, outCents: 3_000, leftCents: 7_000, withdrawnCents: 2_000, keptCents: 5_000 });
+      expect(businessTopOut(records, 'neg', '2026-10').map((l) => l.category)).toEqual(['Material e mercadoria']);
+    }
+    expect(isBusinessWithdrawal(unlinked[2]!)).toBe(true);
+    expect(isBusinessWithdrawal(unlinked[1]!)).toBe(false);
+    // Só o gasto do negócio: um recebimento com a categoria (não existe, mas a regra é só para gasto) continua entrada.
+    expect(isBusinessWithdrawal({ kind: 'receita', category: 'Retirada para o Pessoal', pairedRecordId: undefined })).toBe(false);
   });
 });

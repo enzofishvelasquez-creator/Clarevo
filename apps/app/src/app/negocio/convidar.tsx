@@ -13,7 +13,7 @@ import {
   type BusinessInviteRole,
   type BusinessInviteWrite,
 } from '@clarevo/core';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { Check, CircleAlert, Copy, Share2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
@@ -57,8 +57,11 @@ export default function ConvidarNegocioScreen() {
   const header = <SubHeader title={T.inviteTitle} right={<ContextPill label={business.data?.name ?? BUSINESS_TEXT.context} fixed />} onBack={leave} />;
   const data = business.data;
   const list = people.data;
-  // Quem não administra, ou o Plus fechado: a recusa que o banco daria, sem formulário.
-  const refusal = data && data.role !== 'titular' ? 'sem_permissao' : data && (plus.isError || (plus.data && !plus.data.open)) ? 'plus_indisponivel' : null;
+  // Com o Plus fechado (ou sem conseguir ler a chave), a tela não existe: volta a "Seu negócio" (D-120). Quem não administra lê a recusa
+  // que o banco daria, sem formulário.
+  const closed = Boolean(data && (plus.isError || (plus.data && !plus.data.open) || (list && !list.plusOpen)));
+  if (closed) return <Redirect href={BACK} />;
+  const refusal = data && data.role !== 'titular' ? 'sem_permissao' : null;
 
   if (refusal) {
     return (

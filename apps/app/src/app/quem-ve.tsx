@@ -39,9 +39,12 @@ export default function QuemVeScreen() {
   const inFamily = kind === 'familia' && family;
   const business = useBusiness().data;
   const inBusiness = kind === 'negocio' && business;
-  const people = useSharedBusinessPeople(inBusiness ? business : null).data;
-  // Negócio com outras pessoas ativas: a lista delas, como na Família; sozinha, "só você", como antes.
+  const peopleQuery = useSharedBusinessPeople(inBusiness ? business : null);
+  const people = peopleQuery.data;
+  // Negócio com outras pessoas ativas: a lista delas, como na Família; sozinha, "só você", como antes. Enquanto as pessoas não chegam (ou
+  // se a leitura falhar), nenhuma frase diz "só você": ela seria falsa se outras pessoas leem o negócio.
   const businessShared = Boolean(inBusiness && businessSharedNow(people));
+  const businessUnknown = Boolean(inBusiness && !people);
   const name = user?.displayName ?? '';
   const wide = useWideLayout();
   // Computador: as notas pequenas param em 560 px (com 720 px, a linha passava de 120 letras) e "Entendi" cabe no texto, à esquerda.
@@ -100,7 +103,12 @@ export default function QuemVeScreen() {
         </Card>
       ) : null}
       <Card style={styles.list}>
-        {inFamily || businessShared ? null : <Item icon={User} label={T.you(name)} text={inBusiness ? BUSINESS_TEXT.whoSees : T.personalYou} />}
+        {inFamily || businessShared || (businessUnknown && !peopleQuery.isError) ? null : (
+          <Item icon={User} label={T.you(name)} text={businessUnknown ? BUSINESS_TEXT.loadFailed : inBusiness ? BUSINESS_TEXT.whoSees : T.personalYou} />
+        )}
+        {businessUnknown && peopleQuery.isError ? (
+          <LinkButton label="Tentar de novo" onPress={() => peopleQuery.refetch()} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
+        ) : null}
         {/* O que a empresa vê (D-056): administra o acesso, os e-mails que convidou, a situação e as datas das licenças. */}
         <Item icon={Building2} label={T.companyLabel} text={T.companySees} />
         {/* A equipe da Clarevo (D-064, política seção 7, pergunta 14 ao advogado): a redação que a política propõe. */}
@@ -118,7 +126,7 @@ export default function QuemVeScreen() {
           text={
             inFamily
               ? FAMILY_TEXT.privacy
-              : businessShared
+              : businessShared || businessUnknown
                 ? BUSINESS_PEOPLE_TEXT.whoSeesOthers
                 : inBusiness
                   ? T.othersBusiness

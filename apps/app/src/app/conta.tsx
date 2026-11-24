@@ -240,7 +240,10 @@ export default function ContaScreen() {
             {business.data
               ? businessShared
                 ? BUSINESS_PEOPLE_TEXT.accountHintShared(business.data.name, business.data.role)
-                : BUSINESS_TEXT.accountHintIn(business.data.name)
+                : businessPeople.data
+                  ? BUSINESS_TEXT.accountHintIn(business.data.name)
+                  : // As pessoas ainda não chegaram (ou a leitura falhou): só o nome, sem dizer "Só você vê e anota".
+                    business.data.name
               : BUSINESS_TEXT.accountHintNone}
           </Txt>
           <Button

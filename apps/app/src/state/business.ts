@@ -104,15 +104,17 @@ export function useMoveRecord() {
 // ---------------------------------------------------------------------------
 
 /**
- * A chave do Plus (plus_status). Qualquer falha conta como fechado (o repositório já devolve {open: false}); a leitura fica guardada por
- * 5 minutos, para o app publicado sem a migração 0043 não pedir a função a cada tela.
+ * A chave do Plus (plus_status), só para quem tem um negócio (quem não tem nunca pede a função). A função ausente (banco sem a migração
+ * 0043) vem como fechado; outra falha é repetida pela consulta e, enquanto isso, a tela trata como fechado (`data` indefinido). A leitura
+ * fica guardada por 5 minutos.
  */
 export function usePlusStatus() {
   const { repo, user } = useSession();
+  const business = useBusiness();
   return useQuery({
     queryKey: ['plusStatus', user?.id ?? null],
     queryFn: (): Promise<PlusStatus> => repo!.getPlusStatus(),
-    enabled: Boolean(repo && user),
+    enabled: Boolean(repo && user && business.data),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -131,13 +133,26 @@ export function useBusinessPeople(contextId: string | null | undefined) {
 }
 
 /**
- * As pessoas do negócio só quando podem existir outras (D-120): com o Plus aberto ou para quem não administra. Com o Plus fechado e quem
- * consulta administrando (o app publicado hoje), nada é lido além da chave do Plus (guardada por 5 minutos), e a tela fica como antes.
+ * As pessoas do negócio que a pessoa tem (D-120). O repositório decide o que ler: com o Plus fechado, quem administra e ninguém mais no
+ * negócio (o app publicado hoje), só o próprio vínculo e a conferência de outras pessoas, sem nada da migração 0043, e a tela fica como
+ * antes; havendo (ou tendo havido) outras pessoas, a lista vem mesmo com o Plus fechado, para quem administra continuar vendo quem lê.
  */
 export function useSharedBusinessPeople(business: BusinessContext | null | undefined) {
-  const plus = usePlusStatus();
-  const enabled = Boolean(business && (business.role !== 'titular' || plus.data?.open === true));
-  return useBusinessPeople(enabled ? business!.id : null);
+  return useBusinessPeople(business?.id ?? null);
+}
+
+/**
+ * O que a pessoa pode fazer com um item (lançamento, conta a pagar, gasto fixo, cartão) do negócio compartilhado (D-120): `canWrite`, anotar
+ * e pagar (quem administra e quem anota e vê; quem só vê, não); `canChange`, editar, excluir e mover o próprio item, ou qualquer um para
+ * quem administra (só ela edita o que é de outras pessoas). Fora do negócio (Pessoal e Família) nada muda: os dois valem. Num negócio sem
+ * outras pessoas, quem consulta administra e anotou tudo: também nada muda.
+ */
+export function useBusinessItemAccess(contextId: string | null | undefined, createdBy: string | null | undefined): { canWrite: boolean; canChange: boolean } {
+  const business = useBusiness().data;
+  const { user } = useSession();
+  if (!business || !contextId || business.id !== contextId) return { canWrite: true, canChange: true };
+  const canWrite = business.role !== 'leitor';
+  return { canWrite, canChange: canWrite && (business.role === 'titular' || (Boolean(createdBy) && createdBy === user?.id)) };
 }
 
 /** Convidar, cancelar, remover e mudar o papel só mudam as pessoas do negócio (e o papel de quem consulta, lido em `business`). */

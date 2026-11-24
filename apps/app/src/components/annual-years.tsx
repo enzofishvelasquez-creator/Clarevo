@@ -69,11 +69,16 @@ export function AnnualYears({
   onNotice,
   onError,
   onRefused,
+  canWrite = true,
+  canChange = true,
 }: {
   series: CommitmentSeries;
   occurrences: readonly Commitment[];
   open: readonly Commitment[];
   today: IsoDate;
+  /** Negócio compartilhado (D-120): quem só vê não registra nem anota; só quem criou a conta do ano (ou administra) informa e tira. */
+  canWrite?: boolean;
+  canChange?: boolean;
   /** Faixa de sucesso (anunciada) depois de gravar. */
   onNotice: (text: string) => void;
   onError: (text: string) => void;
@@ -265,7 +270,7 @@ export function AnnualYears({
                   {y.texts.paidBefore}
                 </MoneyTxt>
               ) : null}
-              {y.texts.missing && gapRows.length > 0 ? (
+              {y.texts.missing && gapRows.length > 0 && canWrite ? (
                 <View style={{ gap: space[1] }}>
                   <Txt variant="label" accessibilityLabel={yearA11yLabel(gapText)}>
                     {gapText}
@@ -286,7 +291,7 @@ export function AnnualYears({
                   ) : null}
                   <TopicLink slug="sem-registro" label={RETURN_TEXT.whyNoBill} style={styles.inlineLink} />
                 </View>
-              ) : y.texts.missing ? (
+              ) : y.texts.missing && canWrite ? (
                 // Todas as partes fora dos 11 meses fechados: o mesmo texto do caso misto (seriesGapOld ou annualGapOld),
                 // com "Anotar gasto" e o tema "Por que este mês não tem conta?".
                 <View style={{ gap: space[1] }}>
@@ -324,7 +329,7 @@ export function AnnualYears({
                 </View>
               ) : null}
 
-              {inform?.ok || remove?.ok ? (
+              {canChange && (inform?.ok || remove?.ok) ? (
                 <View style={styles.actions}>
                   {inform?.ok ? (
                     <Button
@@ -352,7 +357,7 @@ export function AnnualYears({
         })}
       </Card>
 
-      {suggestion ? (
+      {suggestion && canChange ? (
         <Card style={{ gap: space[2] }}>
           <MoneyTxt variant="label" style={tabular} accessibilityLabel={yearA11yLabel(suggestion.text)}>
             {suggestion.text}
