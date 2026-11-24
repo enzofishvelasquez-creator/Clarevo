@@ -1081,14 +1081,15 @@ export function useBusinessOverview(contextId: string | undefined, month: IsoMon
 
 /**
  * O ano do negócio (D-121): os meses de janeiro até dezembro, ou até o mês de hoje no ano corrente (as chaves de useMonthRecords),
- * resumidos para o "Resumo do ano" e o limite do MEI. `year` indefinido ou `contextId` indefinido: desligado.
+ * resumidos para o "Resumo do ano" e o limite do MEI. Lê também janeiro do ano seguinte, se já chegou: uma venda de 30/12 marcada para o mês
+ * seguinte conta em janeiro, mas o limite do MEI a soma no ano da data dela. `year` indefinido ou `contextId` indefinido: desligado.
  */
 export function useBusinessYear(contextId: string | undefined, year: number | undefined, currentMonth: IsoMonth) {
   const months = useMemo(() => {
     if (year === undefined) return [] as IsoMonth[];
     const out: IsoMonth[] = [];
-    for (let m = 1; m <= 12; m += 1) {
-      const month = `${String(year).padStart(4, '0')}-${String(m).padStart(2, '0')}`;
+    for (let m = 1; m <= 13; m += 1) {
+      const month = m <= 12 ? `${String(year).padStart(4, '0')}-${String(m).padStart(2, '0')}` : `${String(year + 1).padStart(4, '0')}-01`;
       if (month > currentMonth) break;
       out.push(month);
     }

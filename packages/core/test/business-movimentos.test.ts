@@ -28,6 +28,11 @@ import {
   businessTopOut,
   businessYear,
   barModeFor,
+  businessPeriodText,
+  businessProfileSlot,
+  businessResultText,
+  cardCategories,
+  otherBusinessProfileSlots,
   budgetLinesToKeep,
   isBudgetCategoryName,
   contextCategories,
@@ -52,8 +57,11 @@ const FORBIDDEN =
   /\b(recomendamos|recomendo|invista|aplique|tesouro|cdb|lci|lca|caixinha|cofrinho)\b|fundo de investimento|rentabilidade garantida|rendimento garantido|retorno garantido|enriquec|faz(er|endo)?\s+sentido|[\u2013\u2014]/i;
 /** Julgamento, pressão e alerta: o negócio e o limite do MEI são mostrados só com fatos. */
 const JUDGMENT = /\b(preju[ií]zo|lucro|cuidado|aten[cç][aã]o|alerta|ruim|bom|ótimo|parab[eé]ns|deveria|precisa|ultrapass|estourou|perigo)\b/i;
-/** Nada de chamar o resumo de livro-caixa nem de declaração pronta, e nada de dizer o que declarar ou pagar. */
-const NOT_TAX = /livro[- ]caixa|declara[cç][aã]o pronta|declare\b|pague\b|voc[eê] deve (declarar|pagar)/i;
+/**
+ * Nada de chamar o resumo de livro-caixa nem de declaração pronta (só a negação, "não são uma declaração pronta"), nada de dizer o que declarar
+ * ou pagar e nada de supor que a pessoa tem quem cuide da contabilidade ("a sua contabilidade").
+ */
+const NOT_TAX = /livro[- ]caixa|(?<!não são uma )declara[cç][aã]o pronta|antes de declarar|declare\b|pague\b|voc[eê] deve (declarar|pagar)|sua contabilidade/i;
 
 const rec = (over: Partial<FinancialRecord>): FinancialRecord => ({
   id: over.id ?? `r-${Math.random().toString(36).slice(2, 10)}`,
@@ -299,7 +307,9 @@ describe('resumo do ano e limite do MEI (D-121)', () => {
     const over = meiLimit(2026, 9_000_000, 0);
     expect(over).toEqual({ year: 2026, revenueCents: 9_000_000, percent: 111, over: true });
     expect(BUSINESS_TEXT.meiLine(over)).toBe('Vendas e serviços anotados em 2026: R$ 90.000,00, 111% do limite anual do MEI (R$ 81.000,00).');
-    expect(BUSINESS_TEXT.meiOver).toBe('Os valores são os que você anotou. Converse com a sua contabilidade.');
+    expect(BUSINESS_TEXT.meiOver).toBe('Os valores são os que você anotou. Se tiver dúvida, procure orientação de contabilidade.');
+    // Com valores ocultos, uma frase só: não diz se passou do limite nem se não há venda anotada.
+    expect(BUSINESS_TEXT.meiHiddenNote).toBe('Os valores são os que você anotou. Com os valores ocultos, a parte do limite não aparece.');
     expect(meiLimit(2026, 8_100_000, 0).over).toBe(false);
     // Com valores ocultos, sem a parte do limite (ela revelaria o valor).
     expect(BUSINESS_TEXT.meiLineHidden(m)).not.toMatch(/%/);
@@ -316,8 +326,15 @@ describe('textos do D-121: fatos, sem julgamento, sem orientação de imposto', 
       expect(t, t).not.toMatch(NOT_TAX);
     }
     // As frases pedidas.
-    expect(BUSINESS_TEXT.yearMeiNote).toBe('Confira com a sua contabilidade antes de declarar.');
-    expect(BUSINESS_TEXT.endKeep).toBe('Registros e comprovantes do negócio costumam precisar ser guardados por alguns anos. Converse com a sua contabilidade.');
+    expect(BUSINESS_TEXT.yearMeiNote).toBe(
+      'Pela data de cada entrada. Os valores são os que você anotou e não são uma declaração pronta. Se tiver dúvida, procure orientação de contabilidade.',
+    );
+    expect(BUSINESS_TEXT.endKeep).toBe(
+      'Registros e comprovantes do negócio costumam precisar ser guardados por alguns anos. Se tiver dúvida, procure orientação de contabilidade.',
+    );
+    // O resumo do ano neutro também no negócio compartilhado; o tipo diz o que muda (só o MEI mostra algo a mais).
+    expect(BUSINESS_TEXT.yearIntro(2026, true)).toBe('O que foi anotado no negócio em 2026, até hoje.');
+    expect(BUSINESS_TEXT.profileHint).toBe('Opcional. Com "MEI", "Seu negócio" mostra o limite anual de vendas e serviços. A Clarevo não pede o número do CNPJ.');
     expect(BUSINESS_TEXT.endExport).toBe('Exportar os lançamentos');
     expect(BUSINESS_TEXT.notAdvice.startsWith('Os valores são os que você anotou.')).toBe(true);
     expect(businessErrorText('perfil_invalido')).toBe(BUSINESS_ERROR_TEXT.salvar_falhou);
@@ -542,6 +559,90 @@ describe('orçamento do negócio: as 9 de sempre, e a leitura defensiva de um ba
     const m = businessMonth(await repo.listRecords(b.id, '2026-11'), b.id, '2026-11');
     expect([m.outCents, m.outsideOutCents]).toEqual([3_000, 0]);
     expect(businessTopOut(await repo.listRecords(b.id, '2026-11'), b.id, '2026-11').map((l) => l.category).sort()).toEqual([...NEW].sort());
+  });
+});
+
+describe('correções da revisão do D-121', () => {
+  it('a frase do mês diz "na operação", e um mês só com empréstimo ou só com retirada não vira "entrou o mesmo que saiu"', () => {
+    const loan = businessMonth([rec({ kind: 'receita', amountCents: 500_000, category: 'Empréstimo recebido' })], 'neg', '2026-10');
+    expect(businessResultText(loan)).toBe('Neste mês, nada foi anotado na operação (vendas, serviços e gastos do dia a dia).');
+    const withdrawal = businessMonth([rec({ amountCents: 10_000, category: WITHDRAWAL_BUSINESS_CATEGORY, pairedRecordId: 'p' })], 'neg', '2026-10');
+    expect(businessResultText(withdrawal)).toBe('Neste mês, nada foi anotado na operação (vendas, serviços e gastos do dia a dia).');
+    const mixed = businessMonth([rec({ kind: 'receita', amountCents: 500_000, category: 'Empréstimo recebido' }), rec({ kind: 'receita', amountCents: 20_000, category: 'Vendas' })], 'neg', '2026-10');
+    expect(businessResultText(mixed)).toBe('Neste mês, na operação, entrou R$ 200,00 a mais do que saiu.');
+    // A frase do período conta só os meses com algo da operação.
+    const months = businessMonths(
+      [rec({ kind: 'receita', amountCents: 500_000, category: 'Empréstimo recebido', occurredOn: '2026-09-10' }), rec({ kind: 'receita', amountCents: 20_000, category: 'Vendas' })],
+      'neg',
+      '2026-10',
+      2,
+    );
+    expect(businessPeriodText(months)).toBe('De setembro a outubro de 2026, só um mês tem anotações. Somando, entrou R$ 200,00 a mais do que saiu.');
+  });
+
+  it('o limite do MEI conta pela data da entrada: uma venda de 30/12 marcada para o mês seguinte fica no ano dela', () => {
+    const dec = rec({ id: 'dez', kind: 'receita', amountCents: 100_000, category: 'Vendas', occurredOn: '2026-12-30', nextMonth: true });
+    const decPrev = rec({ id: 'dez25', kind: 'receita', amountCents: 40_000, category: 'Serviços', occurredOn: '2025-12-29', nextMonth: true });
+    const jun = rec({ id: 'jun', kind: 'receita', amountCents: 300_000, category: 'Vendas', occurredOn: '2026-06-10' });
+    const all = [dec, decPrev, jun];
+    const y2026 = businessYear(all, 'neg', 2026);
+    // O mês em que conta: dezembro de 2025 marcado para o seguinte entra em janeiro de 2026; dezembro de 2026, em janeiro de 2027.
+    expect(y2026.inLines).toEqual([
+      { category: 'Vendas', cents: 300_000 },
+      { category: 'Serviços', cents: 40_000 },
+    ]);
+    // O limite do MEI: pela data de cada entrada.
+    expect([y2026.salesCents, y2026.servicesCents]).toEqual([400_000, 0]);
+    const y2025 = businessYear(all, 'neg', 2025);
+    expect([y2025.salesCents, y2025.servicesCents, y2025.recordCount]).toEqual([0, 40_000, 0]);
+    const y2027 = businessYear(all, 'neg', 2027);
+    expect([y2027.salesCents, y2027.inCents]).toEqual([0, 100_000]);
+  });
+
+  it('o tipo do negócio: uma chave por opção, e escolher uma solta as das outras (MEI incerto, ME e MEI de novo grava MEI)', async () => {
+    expect(businessProfileSlot('neg-1', 'mei')).toBe('perfil:neg-1:mei');
+    expect(businessProfileSlot('neg-1', null)).toBe('perfil:neg-1:nenhum');
+    expect(otherBusinessProfileSlots('neg-1', 'mei')).toEqual(['perfil:neg-1:sem_cnpj', 'perfil:neg-1:me_epp', 'perfil:neg-1:nenhum']);
+    // O mesmo uso de chaves da tela (useFamilyKeys e attemptFamily): sucesso ou recusa soltam a vaga; resultado incerto a mantém.
+    const { repo } = await person();
+    const b = await repo.createBusiness(newOperationKey(), 'Sacolé da Bia');
+    const keys = new Map<string, string>();
+    const choose = async (profile: 'sem_cnpj' | 'mei' | 'me_epp' | null, release: boolean) => {
+      if (release) for (const slot of otherBusinessProfileSlots(b.id, profile)) keys.delete(slot);
+      const slot = businessProfileSlot(b.id, profile);
+      const key = keys.get(slot) ?? newOperationKey();
+      keys.set(slot, key);
+      try {
+        await repo.setBusinessProfile(key, b.id, profile);
+        keys.delete(slot);
+      } catch (e) {
+        if (!(e instanceof RepoError) || (e.code !== 'rede' && e.code !== 'desconhecido')) keys.delete(slot);
+      }
+      return (await repo.getBusiness())!.businessProfile;
+    };
+    // Sem soltar: MEI grava mas a resposta se perde; ME grava; voltar a MEI repete a chave antiga e fica ME.
+    repo.failNextWrite = 'depois';
+    expect(await choose('mei', false)).toBe('mei');
+    expect(await choose('me_epp', false)).toBe('me_epp');
+    expect(await choose('mei', false)).toBe('me_epp');
+    // Soltando as outras vagas ao escolher (o que a tela faz): MEI de novo grava.
+    keys.clear();
+    repo.failNextWrite = 'depois';
+    expect(await choose('mei', true)).toBe('mei');
+    expect(await choose('me_epp', true)).toBe('me_epp');
+    expect(await choose('mei', true)).toBe('mei');
+    // Repetir a mesma opção depois de um resultado incerto continua usando a mesma chave (sem gravar duas vezes).
+    repo.failNextWrite = 'depois';
+    expect(await choose(null, true)).toBeNull();
+    expect(keys.has(businessProfileSlot(b.id, null))).toBe(true);
+    expect(await choose(null, true)).toBeNull();
+    expect(keys.size).toBe(0);
+  });
+
+  it('a compra no cartão não oferece as saídas de fora da operação (a fatura paga entra em Saiu)', () => {
+    expect(cardCategories(contextCategories('negocio', 'despesa'))).toEqual(contextCategories('negocio', 'despesa').filter((c) => c !== 'Parcela de empréstimo' && c !== 'Equipamento'));
+    expect(cardCategories(contextCategories('negocio', 'despesa'))).toContain('Divulgação');
+    expect(cardCategories(contextCategories('pessoal', 'despesa'))).toEqual(contextCategories('pessoal', 'despesa'));
   });
 });
 

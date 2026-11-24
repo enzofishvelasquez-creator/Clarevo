@@ -7,6 +7,7 @@ import {
   NOTA_TEXT,
   NO_CATEGORY_LABEL,
   UNCERTAIN_TEXT,
+  cardCategories,
   addDays,
   cardErrorText,
   centsToInput,
@@ -65,7 +66,8 @@ export function CardPurchaseForm({ card, month, entry, textOnly = false }: { car
   const qc = useQueryClient();
   const updateEntry = useUpdateCardEntry();
   const budgetWatch = useBudgetWatch();
-  const categories = useContextCategories(card.contextId);
+  // Sem as saídas de fora da operação (D-121): a compra no cartão entra em "Seu negócio" pela fatura paga, na operação.
+  const categories = cardCategories(useContextCategories(card.contextId));
   const keys = useCardOperationKey();
 
   const [initial] = useState(() => ({

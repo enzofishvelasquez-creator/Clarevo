@@ -231,10 +231,11 @@ describe('Seu negócio: entrou, saiu e sobrou', () => {
   });
 
   it('as frases, de fato e sem julgamento', () => {
-    expect(businessResultText(businessMonth(list, 'neg', '2026-10'))).toBe('Neste mês, entrou R$ 774,00 a mais do que saiu.');
-    expect(businessResultText(businessMonth([rec({ amountCents: 30_000 })], 'neg', '2026-10'))).toBe('Neste mês, saiu R$ 300,00 a mais do que entrou.');
+    // D-121: a frase diz "na operação" (Entrou, Saiu e Sobrou de "Seu negócio" não contam o que fica fora da operação nem as retiradas).
+    expect(businessResultText(businessMonth(list, 'neg', '2026-10'))).toBe('Neste mês, na operação, entrou R$ 774,00 a mais do que saiu.');
+    expect(businessResultText(businessMonth([rec({ amountCents: 30_000 })], 'neg', '2026-10'))).toBe('Neste mês, na operação, saiu R$ 300,00 a mais do que entrou.');
     expect(businessResultText(businessMonth([rec({ amountCents: 100 }), rec({ kind: 'receita', amountCents: 100 })], 'neg', '2026-10'))).toBe(
-      'Neste mês, entrou o mesmo que saiu.',
+      'Neste mês, na operação, entrou o mesmo que saiu.',
     );
     expect(businessResultText(businessMonth([], 'neg', '2026-10'))).toBe('Nada anotado neste mês.');
     for (const t of [businessResultText(businessMonth([rec({ amountCents: 30_000 })], 'neg', '2026-10')), BUSINESS_TEXT.keptLine(-500), BUSINESS_TEXT.withdrawnLine(500)]) {
@@ -269,7 +270,11 @@ describe('Seu negócio: entrou, saiu e sobrou', () => {
     expect(businessErrorText('ja_tem_negocio')).toBe('Você já tem um espaço Negócio. O plano inclui um negócio por pessoa.');
     expect(businessErrorText('qualquer')).toBe(BUSINESS_ERROR_TEXT.salvar_falhou);
     // A mesma frase da retirada travada no detalhe e na recusa do formulário de gasto e recebimento.
-    expect(RECORD_KIND_ERROR_TEXT.retirada_ligada).toBe(BUSINESS_TEXT.withdrawalLocked);
+    // D-121: genérica, para a retirada e para o dinheiro trazido do Pessoal.
+    expect(RECORD_KIND_ERROR_TEXT.retirada_ligada).toBe(BUSINESS_TEXT.pairLocked);
+    expect(BUSINESS_ERROR_TEXT.retirada_ligada).toBe(BUSINESS_TEXT.pairLocked);
+    expect(BUSINESS_TEXT.pairLocked).not.toMatch(/retirada/i);
+    expect(BUSINESS_ERROR_TEXT.nao_e_retirada).not.toMatch(/retirada/i);
     // A entrada do guia (no grupo "Conta e privacidade", logo depois da Família) e a tela no índice "No app" da busca de Aprender.
     const entry = guideEntry('negocio')!;
     const guideTexts = [entry.title, entry.purpose, ...entry.steps];

@@ -4,6 +4,7 @@ import {
   ACCOUNTS_TEXT,
   CARDS_TEXT,
   isChoosableExpenseCategory,
+  cardCategories,
   contextCategories,
   COMPROVANTE_TEXT,
   DEMO_EMAIL,
@@ -515,7 +516,12 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const contextName = personal.contextName;
   // As categorias do espaço (D-113): as do negócio no negócio, as de sempre no Pessoal e na Família.
   const business = personal.contextKind === 'negocio';
-  const categoryList = contextCategories(personal.contextKind, kind);
+  // Na compra no cartão (D-121), sem "Parcela de empréstimo" e "Equipamento": a fatura paga entra em Saiu, na operação.
+  const categoryList = cardPurchase ? cardCategories(contextCategories(personal.contextKind, kind)) : contextCategories(personal.contextKind, kind);
+  // Ao passar para o cartão, uma dessas duas já escolhida volta para "Sem categoria".
+  useEffect(() => {
+    if (cardPurchase && draftRef.current.category !== null && !categoryList.includes(draftRef.current.category)) setDraft((d) => ({ ...d, category: null }));
+  }, [cardPurchase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sair com alterações não salvas pede confirmação (voltar, gesto, botão do sistema).
   usePreventRemove(dirty && !leaveTo, ({ data }) => {

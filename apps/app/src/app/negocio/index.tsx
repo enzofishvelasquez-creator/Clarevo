@@ -9,6 +9,8 @@ import {
   addMonths,
   businessErrorText,
   businessPeopleVisible,
+  businessProfileSlot,
+  otherBusinessProfileSlots,
   canEndBusiness,
   businessMonthShort,
   businessPeriodText,
@@ -360,7 +362,8 @@ function OutsideBlock({ m }: { m: BusinessMonth }) {
 
 /**
  * Limite do MEI (D-121), só com o tipo MEI: as vendas e os serviços anotados no ano do mês mostrado e a parte do limite anual, como fato,
- * numa cor só. Acima de 100%, só o fato e "Converse com a sua contabilidade.". Com valores ocultos, sem a parte do limite.
+ * numa cor só. Acima de 100%, só o fato e "Se tiver dúvida, procure orientação de contabilidade.". Com valores ocultos, uma linha e uma frase
+ * neutras, sempre as mesmas.
  */
 function MeiCard({ contextId, month, currentMonth }: { contextId: string; month: IsoMonth; currentMonth: IsoMonth }) {
   const hidden = useValuesHidden();
@@ -378,10 +381,10 @@ function MeiCard({ contextId, month, currentMonth }: { contextId: string; month:
         <Skeleton width="100%" height={48} />
       ) : (
         <>
-          <MoneyTxt>{limit.revenueCents === 0 ? T.meiNone(year) : hidden ? T.meiLineHidden(limit) : T.meiLine(limit)}</MoneyTxt>
-          {/* Com valores ocultos, também o limite por mês fica oculto (nenhum valor em reais à vista). */}
+          {/* Com valores ocultos, nada diz o valor, a parte do limite, se passou dele ou se não há venda anotada: a linha e a frase são sempre as mesmas. */}
+          <MoneyTxt>{hidden ? T.meiLineHidden(limit) : limit.revenueCents === 0 ? T.meiNone(year) : T.meiLine(limit)}</MoneyTxt>
           <MoneyTxt variant="caption" color={colors.textSecondary}>
-            {limit.over ? T.meiOver : `${T.meiCounts} ${T.meiNote}`}
+            {hidden ? `${T.meiCounts} ${T.meiHiddenNote}` : limit.over ? T.meiOver : `${T.meiCounts} ${T.meiNote}`}
           </MoneyTxt>
         </>
       )}
@@ -406,7 +409,9 @@ function ProfileCard({ business }: { business: BusinessContext }) {
     setPending(profile);
     setError(null);
     setSaved(null);
-    const r = await attemptFamily(keys, `perfil:${business.id}:${profile ?? 'nenhum'}`, (key) => save.mutateAsync({ key, contextId: business.id, profile }));
+    // Uma chave por opção; escolher uma solta as das outras (uma tentativa incerta em outra opção não volta a valer depois).
+    for (const slot of otherBusinessProfileSlots(business.id, profile)) keys.done(slot);
+    const r = await attemptFamily(keys, businessProfileSlot(business.id, profile), (key) => save.mutateAsync({ key, contextId: business.id, profile }));
     setPending(undefined);
     if (r.ok) setSaved(profile === null ? T.profileNoneSaved : T.profileSaved);
     else setError(businessErrorText(r.code));

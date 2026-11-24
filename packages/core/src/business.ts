@@ -94,6 +94,15 @@ export const BUSINESS_OUTSIDE_CATEGORIES: Readonly<Record<RecordKind, readonly s
   despesa: ['Parcela de empréstimo', 'Equipamento'],
 };
 
+/**
+ * As categorias de uma compra no cartão (D-121): sem as saídas de fora da operação ("Parcela de empréstimo" e "Equipamento"). A compra no
+ * cartão chega a "Seu negócio" só pelo pagamento da fatura, gravado sem categoria, que entra em Saiu: oferecer essas duas no cartão diria
+ * "fora da operação" para um valor que fica na operação. Pagas por banco ou carteira (ou como conta a pagar), elas continuam à escolha.
+ */
+export function cardCategories(categories: readonly string[]): readonly string[] {
+  return categories.filter((c) => !BUSINESS_OUTSIDE_CATEGORIES.despesa.includes(c));
+}
+
 /** As categorias de escolha de um tipo de lançamento no contexto: as do negócio no negócio; as de sempre no Pessoal e na Família. */
 export function contextCategories(context: ContextKind, kind: RecordKind): readonly string[] {
   return context === 'negocio' ? BUSINESS_CATEGORIES[kind] : CATEGORIES[kind];
@@ -142,6 +151,19 @@ export const BUSINESS_PROFILE_NONE_LABEL = 'Prefiro não dizer';
 
 export function isBusinessProfile(value: unknown): value is BusinessProfile {
   return typeof value === 'string' && (BUSINESS_PROFILES as readonly string[]).includes(value);
+}
+
+/** A vaga da chave de operação de cada escolha do tipo do negócio: uma por opção (a repetição depois de um resultado incerto usa a mesma). */
+export function businessProfileSlot(businessId: string, profile: BusinessProfile | null): string {
+  return `perfil:${businessId}:${profile ?? 'nenhum'}`;
+}
+
+/**
+ * As vagas das outras opções, que a tela solta ao escolher uma: depois de um resultado incerto em "MEI", escolher outra opção e voltar a
+ * "MEI" precisa gravar de novo (com a chave antiga, o banco só repetiria a operação antiga e devolveria o tipo de agora).
+ */
+export function otherBusinessProfileSlots(businessId: string, profile: BusinessProfile | null): string[] {
+  return [...BUSINESS_PROFILES, null].filter((p) => p !== profile).map((p) => businessProfileSlot(businessId, p));
 }
 
 /** O tipo lido do banco: um dos três ou nulo (o que não for conhecido, inclusive a coluna ausente, vira nulo). */
@@ -446,12 +468,22 @@ export function businessTopOut(records: readonly FinancialRecord[], contextId: s
     .map(([category, cents]) => ({ category, cents, share: total > 0 ? cents / total : 0 }));
 }
 
-/** A frase do mês, de fato e sem julgamento. */
+/** O mês tem algo anotado na operação (vendas, serviços e gastos do dia a dia)? Todo lançamento vale R$ 0,01 ou mais. */
+function hasOperation(m: Pick<BusinessMonth, 'inCents' | 'outCents'>): boolean {
+  return m.inCents > 0 || m.outCents > 0;
+}
+
+/**
+ * A frase do mês, de fato e sem julgamento. Diz "na operação" (D-121): Entrou, Saiu e Sobrou de "Seu negócio" não contam o que fica fora da
+ * operação nem as retiradas, e o Resumo do negócio conta. Um mês só com algo fora da operação (um empréstimo, por exemplo) ou só com
+ * retiradas não vira "entrou o mesmo que saiu".
+ */
 export function businessResultText(m: BusinessMonth): string {
   if (m.recordCount === 0) return 'Nada anotado neste mês.';
-  if (m.leftCents > 0) return `Neste mês, entrou ${formatBRL(m.leftCents)} a mais do que saiu.`;
-  if (m.leftCents < 0) return `Neste mês, saiu ${formatBRL(-m.leftCents)} a mais do que entrou.`;
-  return 'Neste mês, entrou o mesmo que saiu.';
+  if (!hasOperation(m)) return 'Neste mês, nada foi anotado na operação (vendas, serviços e gastos do dia a dia).';
+  if (m.leftCents > 0) return `Neste mês, na operação, entrou ${formatBRL(m.leftCents)} a mais do que saiu.`;
+  if (m.leftCents < 0) return `Neste mês, na operação, saiu ${formatBRL(-m.leftCents)} a mais do que entrou.`;
+  return 'Neste mês, na operação, entrou o mesmo que saiu.';
 }
 
 /**
@@ -459,7 +491,8 @@ export function businessResultText(m: BusinessMonth): string {
  * custa?", respondida com fato). Nulo sem nenhum mês com anotação.
  */
 export function businessPeriodText(months: readonly BusinessMonth[]): string | null {
-  const noted = months.filter((m) => m.recordCount > 0);
+  // Os meses com algo da operação (D-121: um mês só com empréstimo ou retirada não conta como mês em que entrou o mesmo que saiu).
+  const noted = months.filter(hasOperation);
   if (noted.length === 0 || months.length === 0) return null;
   const more = noted.filter((m) => m.leftCents > 0).length;
   const span = formatMonthSpanBR(months[0]!.month, months[months.length - 1]!.month);
@@ -516,7 +549,10 @@ export interface BusinessYear {
   outsideOutCents: Cents;
   withdrawnCents: Cents;
   keptCents: Cents;
-  /** As vendas e os serviços do ano (as categorias "Vendas" e "Serviços"), para o MEI. */
+  /**
+   * As vendas e os serviços do ano (as categorias "Vendas" e "Serviços"), para o MEI, pela data de cada entrada (occurredOn), e não pelo mês em
+   * que contam: uma venda de 30/12 marcada para o mês seguinte fica no ano dela. Para isso, as leituras incluem janeiro do ano seguinte.
+   */
   salesCents: Cents;
   servicesCents: Cents;
   recordCount: number;
@@ -544,9 +580,17 @@ export function businessYear(records: readonly FinancialRecord[], contextId: str
   const outBy = new Map<string, number>();
   const prefix = `${String(year).padStart(4, '0')}-`;
   const own: FinancialRecord[] = [];
+  let salesCents = 0;
+  let servicesCents = 0;
   for (const r of records) {
-    if (r.contextId !== contextId || r.status !== 'realizado' || seen.has(r.id) || !recordMonth(r).startsWith(prefix)) continue;
+    if (r.contextId !== contextId || r.status !== 'realizado' || seen.has(r.id)) continue;
     seen.add(r.id);
+    // O limite do MEI: pela data da entrada.
+    if (r.occurredOn.startsWith(prefix) && r.kind === 'receita' && businessFlowOf(r) === 'operacao') {
+      if (r.category === 'Vendas') salesCents += r.amountCents;
+      else if (r.category === 'Serviços') servicesCents += r.amountCents;
+    }
+    if (!recordMonth(r).startsWith(prefix)) continue;
     own.push(r);
     if (businessFlowOf(r) !== 'operacao') continue;
     const key = r.category ?? NO_CATEGORY_LABEL;
@@ -567,8 +611,8 @@ export function businessYear(records: readonly FinancialRecord[], contextId: str
     outsideOutCents: total.outsideOutCents,
     withdrawnCents: total.withdrawnCents,
     keptCents: total.keptCents,
-    salesCents: inBy.get('Vendas') ?? 0,
-    servicesCents: inBy.get('Serviços') ?? 0,
+    salesCents,
+    servicesCents,
     recordCount: total.recordCount,
   };
 }
@@ -691,6 +735,10 @@ export const BUSINESS_TEXT = {
   withdrawalPersonalNote: (name: string | null): string =>
     name ? `Retirada do negócio: este valor saiu de ${name} e entrou no Pessoal.` : 'Retirada do negócio: este valor saiu do espaço Negócio e entrou no Pessoal.',
   withdrawalLocked: 'Uma retirada fica ligada nos dois espaços. Para mudar o valor ou a data, exclua a retirada e anote de novo.',
+  /** A recusa retirada_ligada, para os dois pares (a retirada e o dinheiro trazido do Pessoal, D-121). */
+  pairLocked: 'Este lançamento está ligado a outro espaço. Para mudar o valor ou a data, exclua e anote de novo.',
+  /** A recusa nao_e_retirada: o lançamento deixou de estar ligado (outra tela ou outra pessoa mudou). */
+  pairGone: 'Este lançamento não está mais ligado a outro espaço. Atualize a tela.',
   seeOtherSide: (where: string): string => `Ver em ${where}`,
   deleteWithdrawal: 'Excluir a retirada',
   deleteWithdrawalTitle: 'Excluir a retirada?',
@@ -716,7 +764,7 @@ export const BUSINESS_TEXT = {
   contributionDeleted: 'Excluído do negócio e do Pessoal.',
   /** Tipo do negócio (D-121), opcional; só quem administra muda. */
   profileTitle: 'Tipo do negócio',
-  profileHint: 'Opcional. Muda alguns textos e, no MEI, mostra o limite anual. A Clarevo não pede o número do CNPJ.',
+  profileHint: 'Opcional. Com "MEI", "Seu negócio" mostra o limite anual de vendas e serviços. A Clarevo não pede o número do CNPJ.',
   profileSaved: 'Tipo do negócio salvo.',
   profileNoneSaved: 'Tipo do negócio tirado.',
   /** Limite do MEI (D-121): só com o tipo MEI; fato, sem cor de alerta e sem julgamento. */
@@ -727,13 +775,15 @@ export const BUSINESS_TEXT = {
   meiLineHidden: (m: MeiLimit): string => `Vendas e serviços anotados em ${m.year}: ${formatBRL(m.revenueCents)}. Limite anual do MEI: ${formatBRL(MEI_ANNUAL_LIMIT_CENTS)}.`,
   meiNone: (year: number): string => `Nenhuma venda ou serviço anotado em ${year}. O limite anual do MEI é ${formatBRL(MEI_ANNUAL_LIMIT_CENTS)}.`,
   meiNote: `Os valores são os que você anotou. No ano em que o MEI foi aberto, o limite é proporcional aos meses (${formatBRL(MEI_MONTHLY_LIMIT_CENTS)} por mês).`,
-  meiOver: 'Os valores são os que você anotou. Converse com a sua contabilidade.',
+  meiOver: 'Os valores são os que você anotou. Se tiver dúvida, procure orientação de contabilidade.',
+  /** Com valores ocultos, uma frase só, que não diz se passou do limite nem se não há venda anotada. */
+  meiHiddenNote: 'Os valores são os que você anotou. Com os valores ocultos, a parte do limite não aparece.',
   meiCounts: 'Conta só as entradas em "Vendas" e "Serviços".',
   /** Resumo do ano (D-121). */
   yearLink: 'Resumo do ano',
   yearLinkHint: 'O ano por categoria, o que ficou fora da operação, as retiradas e o que ficou no negócio.',
   yearTitle: 'Resumo do ano',
-  yearIntro: (year: number, current: boolean): string => (current ? `O que você anotou no negócio em ${year}, até hoje.` : `O que você anotou no negócio em ${year}.`),
+  yearIntro: (year: number, current: boolean): string => (current ? `O que foi anotado no negócio em ${year}, até hoje.` : `O que foi anotado no negócio em ${year}.`),
   yearPrev: (year: number): string => `Ano anterior: ${year}`,
   yearNext: (year: number): string => `Próximo ano: ${year}`,
   yearBack: (year: number): string => `Voltar para ${year}`,
@@ -752,7 +802,8 @@ export const BUSINESS_TEXT = {
   yearKeptCaption: 'Somando tudo: a operação, o que ficou fora dela e as retiradas.',
   yearTotal: 'Total',
   yearMeiTitle: 'Vendas e serviços',
-  yearMeiNote: 'Confira com a sua contabilidade antes de declarar.',
+  /** Pela data de cada entrada (D-121): uma venda de 30/12 que conta no mês seguinte fica no ano dela. */
+  yearMeiNote: 'Pela data de cada entrada. Os valores são os que você anotou e não são uma declaração pronta. Se tiver dúvida, procure orientação de contabilidade.',
   yearSales: 'Vendas',
   yearServices: 'Serviços',
   yearExport: 'Exportar os lançamentos do negócio',
@@ -783,7 +834,7 @@ export const BUSINESS_TEXT = {
   endBody:
     'O espaço sai do app. Os lançamentos dele ficam guardados, sem leitura, e são apagados de vez depois de 6 meses. As retiradas e o dinheiro trazido do Pessoal continuam no Pessoal, como lançamentos comuns.',
   /** Antes de encerrar (D-121): exportar e guardar. */
-  endKeep: 'Registros e comprovantes do negócio costumam precisar ser guardados por alguns anos. Converse com a sua contabilidade.',
+  endKeep: 'Registros e comprovantes do negócio costumam precisar ser guardados por alguns anos. Se tiver dúvida, procure orientação de contabilidade.',
   endExport: 'Exportar os lançamentos',
   endConfirm: 'Encerrar',
   ended: 'Espaço Negócio encerrado.',
@@ -846,8 +897,8 @@ export const BUSINESS_ERROR_TEXT = {
   nome_do_negocio_invalido: 'Dê um nome de 1 a 60 caracteres para o negócio.',
   ja_tem_negocio: 'Você já tem um espaço Negócio. O plano inclui um negócio por pessoa.',
   negocio_com_membros: 'Só dá para encerrar o espaço Negócio quando só você participa dele.',
-  retirada_ligada: BUSINESS_TEXT.withdrawalLocked,
-  nao_e_retirada: ERROR_TEXT.salvar_falhou,
+  retirada_ligada: BUSINESS_TEXT.pairLocked,
+  nao_e_retirada: BUSINESS_TEXT.pairGone,
   lancamento_ligado: BUSINESS_TEXT.moveLinked,
   contexto_invalido: ERROR_TEXT.salvar_falhou,
   sem_permissao: 'Só quem é titular do negócio pode fazer isto.',

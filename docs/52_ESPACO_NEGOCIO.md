@@ -228,5 +228,8 @@ priorizada), sem virar contabilidade e sem a Clarevo calcular imposto nem dizer 
 - **Telas:** `apps/app/src/app/negocio/trazer.tsx`, `negocio/ano.tsx` e `components/business-pair-form.tsx` (a retirada e o trazer
   usam o mesmo formulário). Roteiro de telas: bloco "Espaço Negócio: fora da operação, tipo do negócio, limite do MEI e resumo do ano
   (D-121)" de `scripts/e2e-web.js`, capturas 827 a 839.
+- **Compatibilidade enquanto os celulares atualizam.** O app anterior a esta rodada mostra o par do "Trazer dinheiro do Pessoal" com os
+  textos da retirada (no Pessoal, "Retirada para o Pessoal" e "Excluir a retirada") e conta "Dinheiro do Pessoal" em Entrou; excluir
+  funciona. Só afeta quem usa a função nova num aparelho ainda sem a atualização pelo ar.
 - **Ficou para depois** (da mesma lista): marcar se a venda teve nota e de quem veio; "a receber" (fiado e cartão); lembretes do DAS e
   da declaração anual; as 3 categorias novas no orçamento.
