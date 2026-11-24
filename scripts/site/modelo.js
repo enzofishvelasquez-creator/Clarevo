@@ -206,10 +206,51 @@ function faixaDeConfianca(arquivo) {
   return `<p class="confianca"><a href="${rel(arquivo, 'seguranca.html')}">${item('banco', 'Sem conexão com o seu banco')}<span class="so-leitor">, </span>${item('dinheiro', 'Não movimenta dinheiro nem oferece crédito')}<span class="so-leitor">, </span>${item('cartao', 'Não guarda os dados completos do cartão')}<span class="so-leitor">. Mais em </span><span class="confianca-mais">Segurança e privacidade<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span><span class="so-leitor">.</span></a></p>`;
 }
 
+/**
+ * Os ícones de linha dos recursos (23/11/2026, "O que o plano inclui" em cartões) e a seta dos atalhos: o mesmo traço da faixa de confiança e
+ * do tema do rodapé (24 x 24, linha de 1,8, pontas redondas), no próprio HTML, sem arquivo, sem estilo em atributo e sem marca de terceiros
+ * (o Telegram é um balão de conversa). Decorativos: o nome vem sempre do texto ao lado.
+ */
+const ICONES = {
+  anotar: '<path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z"/><path d="M13.5 8.5l3 3"/>',
+  conta: '<path d="M6 3.5h12v17l-3-2-3 2-3-2-3 2z"/><path d="M9 8.5h6M9 12h6M9 15.5h3"/>',
+  calendario: '<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M14 14h2"/>',
+  cartao: ICONES_DA_CONFIANCA.cartao,
+  importar: '<path d="M14 3.5H7.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8z"/><path d="M14 3.5V8h4.5M12 11v6M9.5 14.5 12 17l2.5-2.5"/>',
+  ler: '<path d="M4 8.5V6a2 2 0 0 1 2-2h2.5M15.5 4H18a2 2 0 0 1 2 2v2.5M20 15.5V18a2 2 0 0 1-2 2h-2.5M8.5 20H6a2 2 0 0 1-2-2v-2.5"/><path d="M8 12h8"/>',
+  meta: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.75"/><circle cx="12" cy="12" r="1.25"/>',
+  investir: '<path d="M4 4v16h16"/><path d="M7.5 14.5 11 11l3 3 5-5"/>',
+  aprender: '<path d="M12 6.5C10.5 5.2 8 4.5 4 4.5v13c4 0 6.5.7 8 2 1.5-1.3 4-2 8-2v-13c-4 0-6.5.7-8 2z"/><path d="M12 6.5v13"/>',
+  mensagem: '<path d="M20 11.5a7.5 7.5 0 0 1-11.1 6.6L4 19.5l1.4-4.4A7.5 7.5 0 1 1 20 11.5z"/><path d="M9 10h6M9 13.5h4"/>',
+  negocio: '<rect x="3.5" y="7" width="17" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/>',
+  tema: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/>',
+  ocultar: '<path d="M3.5 3.5l17 17"/><path d="M10.4 5.6A9.4 9.4 0 0 1 12 5.5c4.8 0 8 4.2 9 6.5a12.6 12.6 0 0 1-2.5 3.6M6.4 7.1C4.6 8.3 3.5 10.2 3 12c1 2.3 4.2 6.5 9 6.5 1.6 0 3-.4 4.2-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  exportar: '<path d="M12 4v10.5M7.75 10.25 12 14.5l4.25-4.25"/><path d="M4.5 17v1.5A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5V17"/>',
+  seta: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+};
+
+/** Um ícone de `ICONES`, decorativo (`aria-hidden`), no tamanho pedido. */
+function icone(nome, tamanho = 24, traco = 1.8) {
+  if (!ICONES[nome]) throw new Error(`o ícone "${nome}" não existe (scripts/site/modelo.js, ICONES)`);
+  return `<svg viewBox="0 0 24 24" width="${tamanho}" height="${tamanho}" fill="none" stroke="currentColor" stroke-width="${traco}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONES[nome]}</svg>`;
+}
+
+/**
+ * Uma lista de atalhos (23/11/2026, no lugar das listas de links sublinhados de "Perguntas mais comuns" da Ajuda e de "Antes de escrever"
+ * do Suporte): cada item é um link só, numa caixa com pelo menos 56 px de altura, o texto em negrito, a linha de baixo (`sub`, o tema) em
+ * letra menor e a seta. Uma coluna no celular e duas a partir de 40 rem; com `tres`, três no computador (a página toda, como na Ajuda).
+ * A grade fecha as linhas, como a dos recursos dos planos. `itens`: `{ href, texto, sub }`.
+ */
+function listaDeAtalhos(itens, { tres = false } = {}) {
+  return `<ul class="atalhos${tres ? ' atalhos-tres' : ''}" role="list">
+${itens.map((i) => `<li><a class="atalho" href="${i.href}"><span class="atalho-texto"><span class="atalho-titulo">${esc(i.texto)}</span>${i.sub ? `<small>${esc(i.sub)}</small>` : ''}</span>${icone('seta', 18, 2)}</a></li>`).join('\n')}
+</ul>`;
+}
+
 /** A captura larga (painel no navegador) com a legenda de demonstração (ou `textoLegenda`). */
 function telaLarga(img, arquivo, { textoLegenda = null, classe = '' } = {}) {
   const { LEGENDA_DEMO } = require('./imagens');
   return `<figure class="larga${classe ? ` ${classe}` : ''}"><div class="larga-moldura">${imagemDaTela(img, arquivo, 'lazy')}</div><figcaption>${esc(textoLegenda || LEGENDA_DEMO)}</figcaption></figure>`;
 }
 
-module.exports = { SCRIPT_DO_TEMA, montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, faixaDeConfianca, dominioDe, urlDoSite };
+module.exports = { SCRIPT_DO_TEMA, montarPagina, marcadoresEmHtml, colunaTexto, bloco, celular, telaLarga, faixaDeConfianca, icone, listaDeAtalhos, dominioDe, urlDoSite };

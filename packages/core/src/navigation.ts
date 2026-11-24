@@ -54,10 +54,13 @@ const FORM_PATHS: readonly RegExp[] = [
   /^\/importar$/,
   // Família (D-055): criar e convidar são formulários com rodapé fixo. A lista da Família (/familia) é de consulta.
   /^\/familia\/(nova|convidar)$/,
-  // Espaço Negócio (D-113): criar, a retirada para o Pessoal e o nome são formulários. "Seu negócio" (/negocio) é de consulta.
-  /^\/negocio\/(novo|retirada|nome)$/,
+  // Espaço Negócio (D-113): criar, a retirada para o Pessoal e o nome são formulários. "Seu negócio" (/negocio) é de consulta. Negócio
+  // compartilhado (D-116, D-120): convidar também é formulário, com rodapé fixo.
+  /^\/negocio\/(novo|retirada|nome|convidar)$/,
   // Convite para a Família: abre antes de entrar e depois de entrar, como as telas de entrada, sem barra.
   new RegExp(`^/convite/${ID}$`),
+  // Convite para um negócio (D-116, D-120): /convite/negocio/<código>, como o da Família, sem barra.
+  new RegExp(`^/convite/negocio/${ID}$`),
   // Convite da empresa (D-056): o mesmo caminho do convite da Família, aberto pelo link do RH, sem barra.
   new RegExp(`^/beneficio/${ID}$`),
   // Excluir minha conta (D-058): o que é apagado, exportar antes e digitar EXCLUIR; sem barra, para a confirmação não se perder.

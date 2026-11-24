@@ -76,7 +76,9 @@ begin
                       where n.nspname = 'public' and p.prosrc ~ '''negocio''' and l.lanname <> 'plpgsql'), 'só plpgsql usa o valor novo';
   assert not exists (select 1 from pg_constraint where pg_get_constraintdef(oid) ~ '''negocio''::'), 'nenhuma restrição usa o valor novo';
   assert not exists (select 1 from pg_indexes where indexdef ~ '''negocio''::'), 'nenhum índice usa o valor novo';
-  assert not exists (select 1 from pg_views where schemaname = 'public' and definition ~ '''negocio''::'), 'nenhuma visão usa o valor novo';
+  -- A visão business_member_items (0043) usa o valor, mas vem numa migração aplicada depois da 0042 já confirmada: fica de fora.
+  assert not exists (select 1 from pg_views where schemaname = 'public' and definition ~ '''negocio''::'
+                       and viewname <> 'business_member_items'), 'nenhuma visão da 0042 usa o valor novo';
   foreach f in array array['create_business(text, text)', 'rename_business(uuid, text, text)', 'end_business(uuid, text)',
                            'create_business_withdrawal(text, uuid, uuid, uuid, bigint, date, text)', 'delete_business_withdrawal(text, uuid, integer)',
                            'move_record(text, uuid, integer, uuid, uuid, text)'] loop

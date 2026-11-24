@@ -9,7 +9,7 @@ import { DemoAuth } from '@/lib/demo-auth';
 import { forgetDevice } from '@/lib/device-forget';
 import { comprovanteHandoff } from '@/lib/comprovante-handoff';
 import { evolutionSelection } from '@/lib/evolution-memory';
-import { pendingBenefit, pendingInvite } from '@/lib/invite-target';
+import { pendingBenefit, pendingBusinessInvite, pendingInvite } from '@/lib/invite-target';
 import { clearNotePrefsMemory } from '@/lib/note-prefs';
 import { pendingAttempts } from '@/lib/pending-attempts';
 import { receiptLinks } from '@/lib/receipt-link';
@@ -154,6 +154,7 @@ function SessionProviderInner({ auth, children }: { auth: AuthService; children:
     pendingCredentials.clear();
     // O convite que esperava a entrada não passa para outra pessoa (D-055).
     pendingInvite.clear();
+    pendingBusinessInvite.clear();
     pendingBenefit.clear();
     // Sair da conta apaga do aparelho as preferências e memórias da pessoa e cancela os lembretes (A9, aprovada em 04/11/2026), como ao
     // excluir a conta. A sessão que termina sozinha (por tempo) não passa por aqui, e a saída depois de trocar a senha pede para manter:

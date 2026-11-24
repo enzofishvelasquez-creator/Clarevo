@@ -507,29 +507,32 @@ begin
     end if;
   end;
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 91, 'a lista vigente tem 91 ações (com as 6 do Espaço Negócio, da 0042, com a da origem do valor da meta, testada em 99zzzzzzzzzzzzzzzzzz, com as 2 do plano de aportes, testadas em 99zzzzzzzzzzzzzzzzz, com as 7 de investimentos, testadas em 99zzzzzzzzzzz, com a de ordenar as metas, testada em 99zzzzzzzzzz, com a do aceite dos termos, testada em 99zzz, 26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
+           where c.conname = 'record_operations_action_check') = 97, 'a lista vigente tem 97 ações (com as 6 do negócio compartilhado, da 0043, com as 6 do Espaço Negócio, da 0042, com a da origem do valor da meta, testada em 99zzzzzzzzzzzzzzzzzz, com as 2 do plano de aportes, testadas em 99zzzzzzzzzzzzzzzzz, com as 7 de investimentos, testadas em 99zzzzzzzzzzz, com a de ordenar as metas, testada em 99zzzzzzzzzz, com a do aceite dos termos, testada em 99zzz, 26, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''responder_guardar''::text', 'g') m
            where c.conname = 'record_operations_action_check') = 1, 'responder_guardar na lista de ações';
   -- As 25 anteriores continuam aceitas pela restrição de ação (cada caso desfeito no próprio bloco).
   assert (select array_agg(m[1] order by m[1] collate "C")
             from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
            where c.conname = 'record_operations_action_check' and m[1] <> 'responder_guardar')
-    = array['aceitar_convite_familia', 'aceitar_licenca', 'aceitar_termos', 'alterar_cartao', 'alterar_conta', 'alterar_investimento',
-            'alterar_lancamento_cartao', 'alterar_meta', 'alterar_movimento_investimento', 'alterar_movimento_meta',
-            'alterar_papel_familia', 'alterar_serie', 'cancelar_convite_familia', 'cancelar_convite_licenca', 'conta_principal',
-            'convidar_licencas', 'criar', 'criar_cartao', 'criar_compra_cartao', 'criar_compromisso', 'criar_conta',
-            'criar_convite_familia', 'criar_encargo_cartao', 'criar_estorno_cartao', 'criar_familia', 'criar_investimento', 'criar_meta', 'criar_negocio',
-            'criar_ocorrencia', 'criar_retirada_negocio', 'criar_serie', 'decidir_revisao', 'definir_limite_comprometimento', 'definir_orcamento_categoria', 'definir_plano_investimentos',
-            'definir_renda_referencia', 'desfazer_pagamento', 'desfazer_pagamento_fatura', 'desligar_telegram', 'desligar_whatsapp',
-            'desmarcar_mes_conferido', 'editar', 'editar_compromisso', 'encerrar_familia', 'encerrar_licenca', 'encerrar_negocio', 'encerrar_serie', 'excluir',
+    = array['aceitar_convite_familia', 'aceitar_convite_negocio', 'aceitar_licenca', 'aceitar_termos', 'alterar_cartao', 'alterar_conta',
+            'alterar_investimento', 'alterar_lancamento_cartao', 'alterar_meta', 'alterar_movimento_investimento',
+            'alterar_movimento_meta', 'alterar_papel_familia', 'alterar_papel_negocio', 'alterar_serie', 'cancelar_convite_familia',
+            'cancelar_convite_licenca', 'cancelar_convite_negocio', 'conta_principal', 'convidar_licencas', 'criar', 'criar_cartao',
+            'criar_compra_cartao', 'criar_compromisso', 'criar_conta', 'criar_convite_familia', 'criar_convite_negocio',
+            'criar_encargo_cartao', 'criar_estorno_cartao', 'criar_familia', 'criar_investimento', 'criar_meta', 'criar_negocio',
+            'criar_ocorrencia', 'criar_retirada_negocio', 'criar_serie', 'decidir_revisao', 'definir_limite_comprometimento',
+            'definir_orcamento_categoria', 'definir_plano_investimentos', 'definir_renda_referencia', 'desfazer_pagamento',
+            'desfazer_pagamento_fatura', 'desligar_telegram', 'desligar_whatsapp', 'desmarcar_mes_conferido', 'editar',
+            'editar_compromisso', 'encerrar_familia', 'encerrar_licenca', 'encerrar_negocio', 'encerrar_serie', 'excluir',
             'excluir_cartao', 'excluir_compromisso', 'excluir_conta', 'excluir_investimento', 'excluir_lancamento_cartao',
             'excluir_limite_comprometimento', 'excluir_meta', 'excluir_movimento_investimento', 'excluir_movimento_meta',
-            'excluir_orcamento_categoria', 'excluir_plano_investimentos', 'excluir_renda_referencia', 'excluir_retirada_negocio', 'excluir_serie', 'gerar_codigo_telegram', 'gerar_codigo_whatsapp',
-            'imagem_meta', 'importar_extrato', 'informar_ano', 'ligar_telegram', 'ligar_whatsapp', 'marcar_assinatura',
-            'marcar_mes_conferido', 'mover_lancamento', 'ordenar_metas', 'origem_valor_meta', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_investimento',
-            'registrar_movimento_meta', 'remover_membro_familia', 'renomear_negocio', 'renovar_convite_licenca', 'responder_origem_cadastro',
-            'revisar_assinaturas', 'sair_familia', 'situacao_cartao', 'situacao_conta', 'situacao_investimento', 'situacao_meta',
-            'tirar_ano', 'transferir_titularidade_familia'],
+            'excluir_orcamento_categoria', 'excluir_plano_investimentos', 'excluir_renda_referencia', 'excluir_retirada_negocio',
+            'excluir_serie', 'gerar_codigo_telegram', 'gerar_codigo_whatsapp', 'imagem_meta', 'importar_extrato', 'informar_ano',
+            'ligar_telegram', 'ligar_whatsapp', 'marcar_assinatura', 'marcar_mes_conferido', 'mover_lancamento', 'ordenar_metas',
+            'origem_valor_meta', 'pagar_compromisso', 'pagar_fatura', 'registrar_movimento_investimento', 'registrar_movimento_meta',
+            'remover_membro_familia', 'remover_membro_negocio', 'renomear_negocio', 'renovar_convite_licenca', 'responder_origem_cadastro',
+            'revisar_assinaturas', 'sair_familia', 'sair_negocio', 'situacao_cartao', 'situacao_conta', 'situacao_investimento',
+            'situacao_meta', 'tirar_ano', 'transferir_titularidade_familia'],
     'as ações anteriores continuam (as 25 de antes do guardar, as 11 de cartões, testadas em 70, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
   -- Cada resposta que gravou é uma operação sem alvo, no contexto certo, com o hash da chamada.
   assert not exists (select 1 from public.record_operations

@@ -17,6 +17,9 @@ import {
   FAMILY_MAX_PEOPLE,
   FAMILY_DEPARTED_NAME,
   FAMILY_NEUTRAL_NAME,
+  BUSINESS_MAX_PEOPLE,
+  BUSINESS_NEUTRAL_NAME,
+  businessFirstNameOf,
   RepoError,
   SAVINGS_ANSWERS,
   SAVINGS_MIN_MONTHLY_CENTS,
@@ -184,6 +187,15 @@ import {
   type BusinessContext,
   type BusinessWithdrawal,
   type BusinessWithdrawalInput,
+  type BusinessInvite,
+  type BusinessInvitePreview,
+  type BusinessInviteRole,
+  type BusinessInviteWrite,
+  type BusinessJoin,
+  type BusinessMember,
+  type BusinessPeople,
+  type BusinessRole,
+  type PlusStatus,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -644,6 +656,10 @@ const KNOWN: RepoErrorCode[] = [
   'nome_do_negocio_invalido',
   'ja_tem_negocio',
   'negocio_com_membros',
+  // Negócio compartilhado (D-116, 20261123000001, migração 0043).
+  'plus_indisponivel',
+  'negocio_cheio',
+  'ja_no_negocio',
   'retirada_ligada',
   'nao_e_retirada',
   'lancamento_ligado',
@@ -3602,7 +3618,10 @@ export class SupabaseRepository implements RecordsRepository {
   // Espaço Negócio (D-113): as seis funções da migração 0042 e a leitura de financial_contexts (kind 'negocio')
   // -------------------------------------------------------------------------
 
-  /** O negócio ativo da pessoa: a RLS só deixa ler quem tem vínculo ativo, e negócio encerrado ninguém lê. */
+  /**
+   * O negócio ativo da pessoa: a RLS só deixa ler quem tem vínculo ativo, e negócio encerrado ninguém lê. O papel (D-120) vem do próprio
+   * vínculo em context_memberships (a política memberships_read deixa ler o próprio), sem nada da migração 0043.
+   */
   async getBusiness(): Promise<BusinessContext | null> {
     const { data, error } = await this.db
       .from('financial_contexts')
@@ -3614,7 +3633,26 @@ export class SupabaseRepository implements RecordsRepository {
       .limit(1);
     if (error) throw repoError(error);
     const row = (data ?? [])[0] as { id: string; name: string; created_at: string } | undefined;
-    return row ? { id: row.id, name: row.name, createdAt: row.created_at } : null;
+    if (!row) return null;
+    const mine = await this.myBusinessMembership(row.id);
+    // Sem o próprio vínculo (não deveria acontecer: create_business e o aceite o criam), o menor papel: o banco decide o resto.
+    return { id: row.id, name: row.name, createdAt: row.created_at, role: mine?.role ?? 'leitor' };
+  }
+
+  /** O vínculo ativo da própria pessoa no negócio (context_memberships, política memberships_read): o papel e desde quando. */
+  private async myBusinessMembership(contextId: string): Promise<{ role: BusinessRole; joinedAt: string } | null> {
+    const { data, error } = await this.db
+      .from('context_memberships')
+      .select('role, can_write, created_at')
+      .eq('context_id', contextId)
+      .eq('person_id', this.user.id)
+      .is('revoked_at', null)
+      .maybeSingle();
+    if (error) throw repoError(error);
+    const m = data as { role?: unknown; can_write?: unknown; created_at?: unknown } | null;
+    if (!m) return null;
+    const role: BusinessRole = m.role === 'titular' ? 'titular' : m.can_write === true ? 'membro' : 'leitor';
+    return { role, joinedAt: typeof m.created_at === 'string' ? m.created_at : new Date(0).toISOString() };
   }
 
   async createBusiness(key: string, name: string): Promise<BusinessContext> {
@@ -3665,6 +3703,153 @@ export class SupabaseRepository implements RecordsRepository {
     });
     if (error) throw repoError(error);
     return toRecord(data as RecordRow);
+  }
+
+  // -------------------------------------------------------------------------
+  // Negócio compartilhado (D-116, Clarevo Plus; D-120): plus_status, a visão business_member_items, a tabela business_invites (só quem
+  // administra lê) e as sete funções da migração 0043. Com o Plus fechado, o app não depende da migração (o banco de produção pode ainda
+  // não tê-la): plus_status que falha conta como fechado, e a visão e os convites só são lidos com o Plus aberto ou por quem não administra.
+  // -------------------------------------------------------------------------
+
+  /**
+   * Até quando (relógio do aparelho) a função plus_status é dada como ausente neste repositório: o banco sem a migração 0043 não ganha a
+   * função de uma hora para outra, e cada tela não precisa pedir de novo uma função que não existe.
+   */
+  private plusMissingUntil = 0;
+
+  /**
+   * plus_status → {open}. Só a função ausente (o banco sem a migração 0043: PGRST202, 42883 ou 404) conta como fechado. Qualquer outra
+   * falha (sem conexão, erro do servidor) é lançada, para a leitura ser repetida e nada ficar guardado como fechado por engano; quem
+   * mostra a tela trata a falha como fechado.
+   */
+  async getPlusStatus(): Promise<PlusStatus> {
+    if (Date.now() < this.plusMissingUntil) return { open: false };
+    const { data, error, status } = await this.db.rpc('plus_status');
+    if (error) {
+      if (error.code === 'PGRST202' || error.code === '42883' || status === 404) {
+        this.plusMissingUntil = Date.now() + 10 * 60 * 1000;
+        return { open: false };
+      }
+      throw repoError(error);
+    }
+    return { open: (data as { open?: unknown } | null)?.open === true };
+  }
+
+  /**
+   * Há (ou houve) outra pessoa no negócio? Por context_memberships, que existe antes da 0043: a política memberships_read deixa quem lê o
+   * negócio ler os vínculos dele, inclusive os revogados de quem saiu.
+   */
+  private async businessHasOtherMembers(contextId: string): Promise<boolean> {
+    const { data, error } = await this.db.from('context_memberships').select('person_id').eq('context_id', contextId).neq('person_id', this.user.id).limit(1);
+    if (error) throw repoError(error);
+    return (data ?? []).length > 0;
+  }
+
+  async getBusinessPeople(contextId: string): Promise<BusinessPeople> {
+    const [plus, mine, others] = await Promise.all([
+      // A chave do Plus só decide os convites e "Convidar": uma falha aqui não esconde as pessoas (vale fechado só nesta leitura).
+      this.getPlusStatus().catch((): PlusStatus => ({ open: false })),
+      this.myBusinessMembership(contextId),
+      this.businessHasOtherMembers(contextId),
+    ]);
+    if (!mine) throw new RepoError('nao_encontrado');
+    if (!plus.open && mine.role === 'titular' && !others) {
+      // O Plus fechado, quem consulta administra e ninguém mais: nada da 0043 é lido. Só a própria pessoa, como a visão a mostraria.
+      const person = await this.db.from('persons').select('display_name').eq('id', this.user.id).maybeSingle();
+      if (person.error) throw repoError(person.error);
+      const me: BusinessMember = {
+        personId: this.user.id,
+        firstName: businessFirstNameOf(String((person.data as { display_name?: unknown } | null)?.display_name ?? '')),
+        role: 'titular',
+        status: 'ativo',
+        isMe: true,
+        joinedAt: mine.joinedAt,
+        leftAt: null,
+      };
+      return { role: 'titular', members: [me], invites: [], plusOpen: false };
+    }
+    const rows = await readAll<MemberRow>((from, to) =>
+      this.db
+        .from('business_member_items')
+        .select('person_id, first_name, role, status, is_me, joined_at, left_at')
+        .eq('context_id', contextId)
+        .order('joined_at')
+        .order('person_id')
+        .range(from, to),
+    );
+    const members = rows.map(toBusinessMember);
+    const me = members.find((m) => m.isMe && m.status === 'ativo');
+    if (!me) throw new RepoError('nao_encontrado');
+    if (members.filter((m) => m.status === 'ativo').length > BUSINESS_MAX_PEOPLE) throw new RepoError('desconhecido', 'negocio_inconsistente');
+    // Ativas primeiro (quem administra no topo), as que saíram depois: a ordem não depende do banco.
+    const active = members.filter((m) => m.status === 'ativo').sort((a, b) => Number(b.role === 'titular') - Number(a.role === 'titular') || a.joinedAt.localeCompare(b.joinedAt));
+    const former = members.filter((m) => m.status === 'ex-membro').sort((a, b) => (a.leftAt ?? '').localeCompare(b.leftAt ?? ''));
+    let invites: BusinessInvite[] = [];
+    // Os convites só com o Plus aberto: com ele fechado, um convite pendente já não vale (preview e aceite respondem convite_invalido).
+    if (me.role === 'titular' && plus.open) {
+      const { data, error } = await this.db
+        .from('business_invites')
+        .select(INVITE_COLUMNS)
+        .eq('context_id', contextId)
+        .is('used_at', null)
+        .is('cancelled_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at')
+        .order('id');
+      if (error) throw repoError(error);
+      invites = ((data ?? []) as InviteRow[]).map(toInvite);
+    }
+    return { role: me.role, members: [...active, ...former], invites, plusOpen: plus.open };
+  }
+
+  async createBusinessInvite(key: string, contextId: string, role: BusinessInviteRole): Promise<BusinessInviteWrite> {
+    const { data, error } = await this.db.rpc('create_business_invite', { p_context: contextId, p_role: role, p_key: key });
+    if (error) throw repoError(error);
+    const r = data as { invite?: unknown; code?: unknown } | null;
+    if (!r || (r.code !== null && (typeof r.code !== 'string' || !INVITE_CODE_PATTERN.test(r.code)))) throw new RepoError('desconhecido', 'convite_inconsistente');
+    return { invite: toInvite(r.invite as InviteRow), code: (r.code as string | null) ?? null };
+  }
+
+  async cancelBusinessInvite(key: string, inviteId: string): Promise<BusinessInvite> {
+    const { data, error } = await this.db.rpc('cancel_business_invite', { p_invite: inviteId, p_key: key });
+    if (error) throw repoError(error);
+    return toInvite((data as { invite?: unknown } | null)?.invite as InviteRow);
+  }
+
+  async previewBusinessInvite(code: string): Promise<BusinessInvitePreview> {
+    const normalized = normalizeInviteCode(code);
+    // Código fora do formato: a mesma resposta do banco para qualquer convite que não vale, sem ir à rede.
+    if (normalized === null) throw new RepoError('convite_invalido');
+    const { data, error } = await this.db.rpc('preview_business_invite', { p_code: normalized });
+    if (error) throw repoError(error);
+    const r = data as { business_name?: unknown; invited_by?: unknown; role?: unknown; expires_at?: unknown } | null;
+    if (!r || typeof r.business_name !== 'string' || typeof r.invited_by !== 'string' || !isInviteRoleValue(r.role) || typeof r.expires_at !== 'string') {
+      throw new RepoError('desconhecido', 'convite_inconsistente');
+    }
+    return { businessName: r.business_name, invitedBy: r.invited_by, role: r.role, expiresAt: r.expires_at };
+  }
+
+  async acceptBusinessInvite(key: string, code: string): Promise<BusinessJoin> {
+    const normalized = normalizeInviteCode(code);
+    if (normalized === null) throw new RepoError('convite_invalido');
+    const { data, error } = await this.db.rpc('accept_business_invite', { p_code: normalized, p_key: key });
+    if (error) throw repoError(error);
+    return toBusinessJoin(data);
+  }
+
+  async leaveBusiness(key: string, contextId: string): Promise<void> {
+    const { error } = await this.db.rpc('leave_business', { p_context: contextId, p_key: key });
+    if (error) throw repoError(error);
+  }
+
+  async removeBusinessMember(key: string, contextId: string, personId: string): Promise<void> {
+    const { error } = await this.db.rpc('remove_business_member', { p_context: contextId, p_person: personId, p_key: key });
+    if (error) throw repoError(error);
+  }
+
+  async setBusinessMemberRole(key: string, contextId: string, personId: string, role: BusinessInviteRole): Promise<void> {
+    const { error } = await this.db.rpc('set_business_member_role', { p_context: contextId, p_person: personId, p_role: role, p_key: key });
+    if (error) throw repoError(error);
   }
 
   // -------------------------------------------------------------------------
@@ -4044,11 +4229,41 @@ function toInvite(r: InviteRow | null | undefined): FamilyInvite {
 }
 
 /** {context: {id, name, created_at}, role, invited_by?} de create_family e accept_family_invite. */
-/** {context: {id, name, created_at}} de create_business e rename_business. */
+/** {context: {id, name, created_at}} de create_business e rename_business: só quem administra cria e renomeia. */
 function toBusiness(data: unknown): BusinessContext {
   const c = (data as { context?: { id?: unknown; name?: unknown; created_at?: unknown } } | null)?.context;
   if (!c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.created_at !== 'string') throw new RepoError('desconhecido', 'negocio_inconsistente');
-  return { id: c.id, name: c.name, createdAt: c.created_at };
+  return { id: c.id, name: c.name, createdAt: c.created_at, role: 'titular' };
+}
+
+/** {context: {id, name, created_at, ended_at}, role, invited_by} de accept_business_invite. */
+function toBusinessJoin(data: unknown): BusinessJoin {
+  const r = data as { context?: { id?: unknown; name?: unknown; created_at?: unknown }; role?: unknown; invited_by?: unknown } | null;
+  const c = r?.context;
+  if (!r || !c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.created_at !== 'string' || !isFamilyRoleValue(r.role)) {
+    throw new RepoError('desconhecido', 'negocio_inconsistente');
+  }
+  return { context: { id: c.id, name: c.name, createdAt: c.created_at, role: r.role }, role: r.role, invitedBy: typeof r.invited_by === 'string' ? r.invited_by : BUSINESS_NEUTRAL_NAME };
+}
+
+/**
+ * Linha de business_member_items: papel e situação conhecidos e primeiro nome sem espaço nem arroba (ou "Pessoa do negócio", o nome de
+ * quem não tem um, e "Pessoa que saiu", de quem excluiu a conta); qualquer outra forma é defeito, não recusa.
+ */
+function toBusinessMember(r: MemberRow): BusinessMember {
+  if (
+    !isFamilyRoleValue(r.role) ||
+    (r.status !== 'ativo' && r.status !== 'ex-membro') ||
+    typeof r.first_name !== 'string' ||
+    r.first_name === '' ||
+    (r.first_name !== BUSINESS_NEUTRAL_NAME && r.first_name !== FAMILY_DEPARTED_NAME && /\s|@/.test(r.first_name)) ||
+    (r.first_name === FAMILY_DEPARTED_NAME && r.status !== 'ex-membro') ||
+    typeof r.person_id !== 'string' ||
+    (r.status === 'ativo') !== (r.left_at === null)
+  ) {
+    throw new RepoError('desconhecido', 'negocio_inconsistente');
+  }
+  return { personId: r.person_id, firstName: r.first_name, role: r.role, status: r.status, isMe: r.is_me === true, joinedAt: r.joined_at, leftAt: r.left_at };
 }
 
 /** {business_record, personal_record} da retirada: os dois lados, ligados um ao outro. */

@@ -244,16 +244,68 @@ blockquote>:last-child{margin-bottom:0}
 .plano-link>.ver-plano{margin-top:auto}
 .preco-capa{margin:.35rem 0 .75rem;color:var(--sobre-topo-suave);font-size:1.0625rem}
 .preco-capa .preco-valor{display:block;font-size:clamp(2.1rem,6vw,2.6rem);font-weight:800;line-height:1.15;color:var(--sobre-topo);font-variant-numeric:tabular-nums}
-/* Os grupos de recursos em duas colunas equilibradas a partir de 46 rem (em vez de três colunas com uma vazia), sem partir um grupo. */
-.grupos-recursos{columns:2 21rem;column-gap:2.5rem}
-.recursos-plano{break-inside:avoid;margin:0 0 1.25rem}
-.recursos-plano:last-child{margin-bottom:0}
-.recursos-plano h3{margin:0 0 .4rem}
-.recursos-plano ul{margin:0;padding-left:1.2rem}
-.recursos-plano li{margin:.45rem 0}
+/* "O que o plano inclui" em cartões (23/11/2026, pedido do Enzo: a lista de links sublinhados com frases longas estava "feia, pouco
+   intuitiva e não apresentável"). Cada grupo é uma seção com o título e uma linha fina ao lado; cada recurso, um cartão com o ícone num
+   quadrado azul-claro, o nome (o link, que cobre o cartão inteiro, como nos cartões dos planos), uma frase curta, a ressalva, a etiqueta de
+   onde vale (no Família) e "Ver como funciona" com a seta, sempre no pé do cartão. A grade fecha todas as linhas, sem cartão sozinho: uma
+   coluna no celular; duas a partir de 40 rem, com o primeiro cartão na linha toda quando a quantidade é ímpar; três a partir de 64 rem
+   (seis trilhas, cada cartão em duas), com os dois primeiros lado a lado quando sobrariam dois na última linha e o primeiro na linha toda
+   quando sobraria um. */
+.grupos-recursos{display:grid;gap:2.25rem}
+.recursos-plano h3{display:flex;align-items:center;gap:1rem;margin:0 0 1rem;font-size:1.25rem;font-weight:800;line-height:1.3}
+.recursos-plano h3::after{content:"";flex:1 1 2rem;height:1px;background:var(--linha)}
+/* A mesma grade que fecha as linhas serve aos atalhos da Ajuda (.atalhos-tres, três colunas no computador) e do Suporte (.atalhos, até
+   duas colunas, na coluna de texto). */
+:is(.recursos-grade,.atalhos){list-style:none;margin:0;padding:0;display:grid;gap:1rem;grid-template-columns:minmax(0,1fr)}
+@media (min-width:40rem){
+  :is(.recursos-grade,.atalhos){grid-template-columns:repeat(2,minmax(0,1fr))}
+  :is(.recursos-grade,.atalhos):has(>:last-child:nth-child(odd))>:first-child{grid-column:1/-1}
+}
+@media (min-width:64rem){
+  :is(.recursos-grade,.atalhos-tres){grid-template-columns:repeat(6,minmax(0,1fr))}
+  :is(.recursos-grade,.atalhos-tres)>*,:is(.recursos-grade,.atalhos-tres):has(>:last-child:nth-child(odd))>:first-child{grid-column:span 2}
+  :is(.recursos-grade,.atalhos-tres):has(>:last-child:nth-child(3n+2))>:nth-child(-n+2){grid-column:span 3}
+  :is(.recursos-grade,.atalhos-tres):has(>:last-child:nth-child(3n+1))>:first-child{grid-column:1/-1}
+}
+.recurso-cartao{position:relative;display:flex;flex-direction:column;gap:.6rem;margin:0;padding:1.25rem;background:var(--superficie);border:1px solid var(--linha);border-radius:20px;transition:border-color .15s,box-shadow .15s}
+.bloco-alt .recurso-cartao{background:var(--fundo)}
+.recurso-cartao>*{margin:0}
+.recurso-topo{display:flex;align-items:center;gap:.8rem}
+.recurso-icone{flex:none;display:flex;align-items:center;justify-content:center;width:2.75rem;height:2.75rem;border-radius:14px;background:var(--azul-claro);color:var(--link)}
+.recurso-cartao h4{margin:0;font-size:1.0625rem;font-weight:800;line-height:1.3}
+.recurso-cartao h4 a{color:var(--texto);text-decoration:none}
+.recurso-cartao h4 a::after{content:"";position:absolute;inset:0;border-radius:20px}
+.recurso-texto{color:var(--texto-2)}
+.recurso-nota{color:var(--texto);font-size:.9375rem;font-weight:700;line-height:1.5}
+.recurso-onde{align-self:flex-start;padding:.3rem .7rem;border-radius:10px;background:var(--azul-claro);color:var(--texto);font-size:.875rem;font-weight:700;line-height:1.45}
+.recurso-acao{display:inline-flex;align-items:center;gap:.4rem;margin-top:auto!important;padding-top:.2rem;color:var(--link);font-size:.9375rem;font-weight:800}
+.recurso-acao svg{flex:none;transition:transform .15s}
+.recurso-seta{display:none;flex:none;margin-left:auto;color:var(--link)}
+.recurso-seta svg{display:block}
+/* No celular, um cartão mais baixo: menos respiro, o ícone menor e a seta ao lado do nome no lugar de "Ver como funciona". */
+@media (max-width:39.99rem){
+  .recursos-grade{gap:.75rem}
+  .recurso-cartao{gap:.5rem;padding:1rem 1.1rem}
+  .recurso-icone{width:2.5rem;height:2.5rem;border-radius:12px}
+  .recurso-acao{display:none}
+  .recurso-seta{display:block}
+}
+.recurso-cartao:hover{border-color:var(--link);box-shadow:0 12px 28px rgba(6,16,64,.10)}
+.recurso-cartao:hover h4 a{text-decoration:underline;text-underline-offset:.18em}
+.recurso-cartao:hover :is(.recurso-acao,.recurso-seta) svg{transform:translateX(3px)}
+/* O foco aparece no cartão inteiro (o link cobre o cartão); sem :has, fica o contorno do próprio link. */
+.recurso-cartao:has(a:focus-visible){outline:3px solid var(--foco);outline-offset:3px}
+@supports selector(:has(*)){.recurso-cartao h4 a:focus-visible{outline:none}}
+.recurso-seta svg{transition:transform .15s}
+@media (prefers-reduced-motion:reduce){.recurso-cartao,.recurso-cartao svg{transition:none}.recurso-cartao:hover svg{transform:none}}
 .perguntas-planos{max-width:46rem}
 .como-funciona{max-width:46rem}
 .como-funciona li{margin:.6rem 0}
+/* "Para quem é", nas páginas dos planos (23/11/2026): cada item com a marca de conferido num círculo lima (decorativa, o texto diz tudo). */
+.lista-marcada{list-style:none;padding-left:0}
+.lista-marcada li{position:relative;padding-left:2.25rem}
+.lista-marcada li::before{content:"";position:absolute;left:0;top:.15em;width:1.45rem;height:1.45rem;border-radius:50%;background:var(--lima)}
+.lista-marcada li::after{content:"";position:absolute;left:.53rem;top:.38em;width:.4rem;height:.72rem;border-right:2.5px solid var(--sobre-lima);border-bottom:2.5px solid var(--sobre-lima);transform:rotate(45deg)}
 .cartao p:last-child,.cartao ul:last-child{margin-bottom:0}
 a.cartao{display:block;text-decoration:none;color:inherit}
 a.cartao:hover h3,a.cartao:hover .titulo-cartao{text-decoration:underline}
@@ -555,6 +607,19 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 .resultados a{display:block;padding:.8rem 1rem;border:1px solid var(--linha);border-radius:14px;background:var(--superficie);text-decoration:none;color:var(--link);font-weight:800}
 .resultados a:hover{text-decoration:underline}
 .resultados small{display:block;color:var(--texto-2);font-weight:500;margin-top:.15rem}
+/* Atalhos (23/11/2026): as perguntas mais comuns da Ajuda e do Suporte, que eram uma lista de links sublinhados, no mesmo desenho dos
+   resultados da busca (caixa, texto em negrito, o tema embaixo em letra menor), com a seta à direita e pelo menos 56 px de altura, na
+   grade que fecha as linhas de "O que o plano inclui"; as caixas de uma linha têm a mesma altura. */
+.atalhos{gap:.75rem;margin-bottom:1.25rem}
+.atalhos li{display:flex;margin:0}
+.atalho{flex:1;display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-height:56px;padding:.75rem 1rem;border:1px solid var(--linha);border-radius:14px;background:var(--superficie);color:var(--link);font-weight:800;line-height:1.35;text-decoration:none;transition:border-color .15s}
+.bloco-alt .atalho{background:var(--fundo)}
+.atalho small{display:block;margin-top:.2rem;color:var(--texto-2);font-size:.875rem;font-weight:500}
+.atalho svg{flex:none;transition:transform .15s}
+.atalho:hover{border-color:var(--link)}
+.atalho:hover .atalho-titulo{text-decoration:underline;text-underline-offset:.18em}
+.atalho:hover svg{transform:translateX(3px)}
+@media (prefers-reduced-motion:reduce){.atalho,.atalho svg{transition:none}.atalho:hover svg{transform:none}}
 .ajuda-temas{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(16rem,100%),1fr))}
 .ajuda-temas .cartao p{margin:.25rem 0 0;color:var(--texto);font-size:.9375rem}
 .pergunta{padding:1.1rem 0;border-top:1px solid var(--linha);scroll-margin-top:1rem}
@@ -674,7 +739,7 @@ button.botao-texto{display:inline-flex;align-items:center;justify-self:start;min
 }
 
 @media print{
-  .pular,.menu,.busca,.rodape-grade,.acoes,.tema-site,.confianca svg{display:none!important}
+  .pular,.menu,.busca,.rodape-grade,.acoes,.tema-site,.confianca svg,.recurso-acao{display:none!important}
   body{background:#fff;color:#000}
   .topo,.capa{background:#fff;color:#000;border-radius:0}
   .capa::before{display:none}

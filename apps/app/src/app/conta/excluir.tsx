@@ -4,13 +4,17 @@ import {
   FAMILY_TEXT,
   STORE_SUBSCRIPTION_TEXT,
   WEB_SUBSCRIPTION_TEXT,
+  BUSINESS_TEXT,
   canSubmitDelete,
+  deleteBusinessOutcome,
+  deleteBusinessText,
+  deleteErasedLines,
   deleteErrorText,
   deleteFamilyOutcome,
   deleteFamilyText,
 } from '@clarevo/core';
 import { router } from 'expo-router';
-import { AlertCircle, ExternalLink, FileDown, Info, Users } from 'lucide-react-native';
+import { AlertCircle, ExternalLink, FileDown, Info, Store, Users } from 'lucide-react-native';
 import { useState } from 'react';
 import { KeyboardAvoidingView, View } from 'react-native';
 
@@ -23,6 +27,7 @@ import { signOutIntent } from '@/lib/nav';
 import { DEVICE_STORE, openStoreSubscriptions, storeUsedHere } from '@/lib/store-purchases';
 import { useAccess } from '@/state/access';
 import { useDeleteAccount } from '@/state/account';
+import { useBusiness, useSharedBusinessPeople } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useRepo, useSession } from '@/state/session';
 import { colors, fonts, space } from '@/theme/tokens';
@@ -59,10 +64,19 @@ export default function ExcluirContaScreen() {
   const deleteAccount = useDeleteAccount();
   const demo = auth.mode === 'demo';
   const outcome = deleteFamilyOutcome(family.data);
+  // Negócio compartilhado (D-120): quem administra um negócio com outras pessoas remove as pessoas antes, e a tela trava ANTES de cancelar a
+  // assinatura da web; quem participa do negócio de outra pessoa sai dele. Sozinha (o caso de hoje, com o Plus fechado), nada muda na tela.
+  const business = useBusiness();
+  const businessPeople = useSharedBusinessPeople(business.data);
+  const businessOutcome = deleteBusinessOutcome(business.data, businessPeople.data);
+  const businessText = deleteBusinessText(businessOutcome, business.data?.name ?? '');
+  // Enquanto o negócio (ou as pessoas dele) não chega, ou se a leitura falhar, não dá para confirmar: o banco recusaria depois de cancelar.
+  const businessPending = business.isPending || (Boolean(business.data) && !businessPeople.data);
+  const businessFailed = business.isError || (Boolean(business.data) && businessPeople.isError);
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
-  const canSubmit = canSubmitDelete(typed, outcome) && !family.isPending;
+  const canSubmit = canSubmitDelete(typed, outcome, businessOutcome) && !family.isPending && !businessPending && !businessFailed;
 
   const submit = async () => {
     if (busy || !canSubmit) return;
@@ -129,7 +143,7 @@ export default function ExcluirContaScreen() {
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             {T.erasedTitle}
           </Txt>
-          {T.erased.map((line) => (
+          {deleteErasedLines(businessOutcome).map((line) => (
             <Line key={line} text={line} />
           ))}
         </Card>
@@ -163,6 +177,34 @@ export default function ExcluirContaScreen() {
               ) : null}
             </>
           )}
+          {/* O negócio só aparece com outras pessoas (sai ou bloqueia) ou se a leitura falhar; sozinha, a tela fica como antes. */}
+          {businessText || businessFailed ? (
+            <>
+              <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+                {T.businessTitle}
+              </Txt>
+              {businessFailed ? (
+                <>
+                  <Txt color={colors.textSecondary}>{BUSINESS_TEXT.loadFailed}</Txt>
+                  <LinkButton
+                    label="Tentar de novo"
+                    onPress={() => (business.isError ? business.refetch() : businessPeople.refetch())}
+                    style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+                  />
+                </>
+              ) : (
+                <Txt>{businessText}</Txt>
+              )}
+              {businessOutcome === 'bloqueia' ? (
+                <>
+                  <Txt variant="caption" color={colors.textSecondary} style={note}>
+                    {T.businessBlockedHow}
+                  </Txt>
+                  <Button label={T.businessOpen} icon={Store} tone="soft" onPress={() => router.push('/negocio')} />
+                </>
+              ) : null}
+            </>
+          ) : null}
         </Card>
 
         <Card style={{ gap: space[3] }}>

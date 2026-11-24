@@ -3,6 +3,7 @@ import {
   DEMO_TODAY,
   MemoryCompanyHub,
   MemoryFamilyHub,
+  createDemoBusinessHub,
   MemoryRepository,
   createDemoRepository,
   demoTrialAccess,
@@ -57,6 +58,13 @@ export class DemoAuth implements AuthService {
    * ela tem a própria "Empresa Exemplo (demonstração)", num hub só dela. Nada disto sai da memória do app.
    */
   readonly companyHub = new MemoryCompanyHub({ now: () => Date.parse(`${DEMO_TODAY}T12:00:00.000Z`), today: () => DEMO_TODAY });
+  /**
+   * Os negócios simulados (D-113 e o negócio compartilhado, D-116 e D-120): a conta de demonstração e as contas criadas aqui compartilham
+   * um só hub, com o dia fixo da demonstração, para um convite do negócio criado por uma conta poder ser aceito por outra no mesmo uso. O
+   * Plus só abre nos cenários do negócio compartilhado ("?cenario=negocio-plus" e "?cenario=negocio-plus-membro"); na demonstração
+   * padrão e no cenário "negocio", fica fechado, como no app publicado. Nada disto sai da memória do app.
+   */
+  readonly businessHub = createDemoBusinessHub(this.scenario);
 
   constructor() {
     this.accounts.set(DEMO_EMAIL, {
@@ -149,7 +157,7 @@ export class DemoAuth implements AuthService {
 
   repositoryFor(user: AuthUser): RecordsRepository {
     if (user.email === DEMO_EMAIL) {
-      this.demoRepo ??= createDemoRepository({ latencyMs: 300, scenario: this.scenario });
+      this.demoRepo ??= createDemoRepository({ latencyMs: 300, scenario: this.scenario, business: this.businessHub });
       return lazy(this.demoRepo);
     }
     const acc = this.accounts.get(user.email)!;
@@ -162,6 +170,7 @@ export class DemoAuth implements AuthService {
       latencyMs: 300,
       family: this.familyHub,
       company: this.companyHub,
+      business: this.businessHub,
       email: user.email,
       access: () => trial,
     });

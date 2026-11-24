@@ -184,9 +184,9 @@ export interface WorkSpace extends PersonalSpace {
   familyName: string | null;
   /** O nome do negócio ("Sacolé da Mãe", D-113); nulo no Pessoal e na Família. */
   businessName: string | null;
-  /** Papel no contexto: titular no Pessoal e no negócio; titular, membro ou leitor na Família. */
+  /** Papel no contexto: titular no Pessoal; titular, membro ou leitor na Família e no negócio (D-120). */
   role: FamilyRole;
-  /** Quem só lê a Família (leitor) não anota, nem quem está em só ver e exportar (assinatura paga, D-083). */
+  /** Quem só lê a Família ou o negócio (leitor) não anota, nem quem está em só ver e exportar (assinatura paga, D-083). */
   canWrite: boolean;
 }
 
@@ -233,7 +233,7 @@ export function useWorkOf(kind: SpaceKind): WorkResult {
         canWrite: fam.role !== 'leitor' && accessCanWrite,
       };
     }
-    // Espaço Negócio (D-113): só a própria pessoa participa (titular).
+    // Espaço Negócio (D-113): quem criou administra; no negócio compartilhado (D-116, D-120), quem só vê não anota, como na Família.
     if (kind === 'negocio' && biz) {
       if (!otherAccounts) return undefined;
       return {
@@ -244,8 +244,8 @@ export function useWorkOf(kind: SpaceKind): WorkResult {
         contextName: contextName('negocio', biz.name),
         familyName: null,
         businessName: biz.name,
-        role: 'titular',
-        canWrite: accessCanWrite,
+        role: biz.role,
+        canWrite: biz.role !== 'leitor' && accessCanWrite,
       };
     }
     return {

@@ -4,7 +4,7 @@ const path = require('node:path');
 const { PAGINAS_LEGAIS, MAPA_LINKS_SITE, SITE_SRC } = require('../config');
 const { esc, emLinha, contexto, markdownParaHtml, separarTitulo, textoPuro } = require('../texto');
 const { rel } = require('../util');
-const { montarPagina, marcadoresEmHtml, colunaTexto, bloco } = require('../modelo');
+const { montarPagina, marcadoresEmHtml, colunaTexto, bloco, listaDeAtalhos } = require('../modelo');
 const { TEMAS } = require('./ajuda');
 const { lerPerguntas } = require('../conteudo');
 const { ligado } = require('../formularios');
@@ -72,12 +72,13 @@ function paginaSuporte({ valores }) {
   const arquivo = 'suporte.html';
   const u = (d) => rel(arquivo, d);
   const perguntas = lerPerguntas(path.join(SITE_SRC, 'ajuda', 'perguntas.md'));
-  const links = perguntas
-    .map((p) => {
+  // Desde 23/11/2026, em atalhos (caixa, a pergunta, o tema embaixo e a seta), como em "Perguntas mais comuns" da Ajuda.
+  const atalhos = listaDeAtalhos(
+    perguntas.map((p) => {
       const tema = TEMAS.find((t) => t.id === p.tema);
-      return `<li><a href="${u(`ajuda/${tema.id}.html#p-${p.id}`)}">${esc(p.pergunta)}</a></li>`;
-    })
-    .join('\n');
+      return { href: u(`ajuda/${tema.id}.html#p-${p.id}`), texto: p.pergunta, sub: tema.titulo };
+    }),
+  );
   const brutas = `<section class="secao" aria-labelledby="contato">
 <h2 id="contato">Como falar com o suporte</h2>
 <ul>
@@ -93,9 +94,7 @@ function paginaSuporte({ valores }) {
 <section class="secao duvida" aria-labelledby="perguntas">
 <h2 id="perguntas">Antes de escrever</h2>
 <p>A <a href="${u('ajuda/index.html')}">Ajuda</a> tem respostas por tema, com busca. As perguntas mais comuns do suporte:</p>
-<ul>
-${links}
-</ul>
+${atalhos}
 </section>`;
   const capa = `<h1>Suporte</h1>
 <p class="lead">Como falar com a equipe da Clarevo e onde achar respostas para as dúvidas mais comuns.</p>`;
@@ -214,8 +213,9 @@ function pagina404({ valores }) {
 <a class="botao botao-suave" href="${u('ajuda/index.html')}">Abrir a Ajuda</a>
 </div>`;
   const corpo = bloco(
+    // Desde 23/11/2026, os caminhos em pílulas com 44 px de altura (as mesmas dos temas da Ajuda), no lugar da lista sublinhada.
     `<h2 id="talvez">Talvez você procure</h2>
-<ul>
+<ul class="nav-temas">
 <li><a href="${u('app/index.html')}">O app</a></li>
 <li><a href="${u('aprender/index.html')}">Aprender</a></li>
 <li><a href="${u('calculadoras/index.html')}">Calculadoras</a></li>

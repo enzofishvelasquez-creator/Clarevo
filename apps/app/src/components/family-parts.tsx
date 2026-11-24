@@ -1,10 +1,21 @@
-import { DEMO_EMAIL, DEMO_TODAY, FAMILY_ROLE_LABEL, FAMILY_TEXT, authorLabel, contextName, type ContextKind, type FamilyMember } from '@clarevo/core';
+import {
+  DEMO_EMAIL,
+  DEMO_TODAY,
+  FAMILY_ROLE_LABEL,
+  FAMILY_TEXT,
+  authorLabel,
+  businessAuthorLabel,
+  businessHasOthers,
+  contextName,
+  type ContextKind,
+  type FamilyMember,
+} from '@clarevo/core';
 import { Users } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { Txt } from '@/components/ui';
-import { useBusiness } from '@/state/business';
+import { useBusiness, useSharedBusinessPeople } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
@@ -63,22 +74,28 @@ export function useNowMs(): number {
 /**
  * De qual contexto é um registro, uma conta a pagar ou um gasto fixo que a tela mostra, e quem o anotou (L-6): no Pessoal é sempre a
  * própria pessoa; na Família, o primeiro nome ("Vera (você)", "Mauro") ou "ex-membro · Nome" para quem saiu. Pelo contexto do próprio
- * item, não pelo seletor: um item aberto por um endereço continua dizendo o contexto a que pertence.
+ * item, não pelo seletor: um item aberto por um endereço continua dizendo o contexto a que pertence. No negócio com outras pessoas
+ * (D-116, D-120), o primeiro nome como na Família ("Rafa", "Maria (você)", "Nina (saiu do negócio)"); sozinha, "você", como antes.
+ * `shared`: o contexto tem outras pessoas (a tela mostra quem criou também nos gastos fixos).
  */
-export function useAuthorship(contextId: string, createdBy: string): { kind: ContextKind; contextName: string; by: string } {
+export function useAuthorship(contextId: string, createdBy: string): { kind: ContextKind; contextName: string; by: string; shared: boolean } {
   const family = useFamily().data;
   const business = useBusiness().data;
+  const inBusiness = Boolean(business && business.id === contextId);
+  const people = useSharedBusinessPeople(inBusiness ? business : null).data;
   const { user } = useSession();
   if (family && family.context.id === contextId) {
     return {
       kind: 'familia',
       contextName: contextName('familia'),
       by: authorLabel(family.members, createdBy) ?? 'outra pessoa da Família',
+      shared: true,
     };
   }
-  // Espaço Negócio (D-113): só a própria pessoa anota.
-  if (business && business.id === contextId) {
-    return { kind: 'negocio', contextName: contextName('negocio', business.name), by: createdBy === user?.id ? 'você' : 'outra pessoa' };
+  if (business && inBusiness) {
+    const shared = businessHasOthers(people);
+    const by = (shared && people ? businessAuthorLabel(people.members, createdBy) : null) ?? (createdBy === user?.id ? 'você' : 'outra pessoa do negócio');
+    return { kind: 'negocio', contextName: contextName('negocio', business.name), by, shared };
   }
-  return { kind: 'pessoal', contextName: contextName('pessoal'), by: createdBy === user?.id ? 'você' : 'outra pessoa' };
+  return { kind: 'pessoal', contextName: contextName('pessoal'), by: createdBy === user?.id ? 'você' : 'outra pessoa', shared: false };
 }

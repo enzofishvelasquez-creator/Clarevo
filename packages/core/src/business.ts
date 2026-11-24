@@ -4,6 +4,7 @@ import type { Cents } from './money';
 import { MAX_RECORD_CENTS, formatBRL, parseBRL } from './money';
 import type { ContextKind, FinancialRecord, RecordKind } from './records';
 import { CATEGORIES, NO_CATEGORY_LABEL, recordMonth } from './records';
+import type { FamilyRole } from './family';
 import type { RepoErrorCode } from './repository';
 import { charCount, DESCRIPTION_MAX, ERROR_TEXT } from './validation';
 
@@ -72,11 +73,16 @@ export function budgetCategoriesFor(context: ContextKind): readonly string[] {
   return contextCategories(context, 'despesa');
 }
 
-/** O negócio como o app lê. */
+/**
+ * O negócio como o app lê. `role` é o papel de quem consulta (D-120): quem criou administra ('titular'); com o negócio compartilhado
+ * (Clarevo Plus, business-people.ts), as outras pessoas anotam e veem ('membro') ou só veem ('leitor'). No banco, vem do vínculo da
+ * própria pessoa em context_memberships (a política memberships_read deixa ler o próprio vínculo), sem depender da migração 0043.
+ */
 export interface BusinessContext {
   id: string;
   name: string;
   createdAt: string;
+  role: FamilyRole;
 }
 
 /** Ações do negócio gravadas em record_operations. Criar, renomear e encerrar não contam como anotação na atividade. */
@@ -175,6 +181,15 @@ export function isWithdrawal(record: Pick<FinancialRecord, 'pairedRecordId'>): b
 }
 
 /**
+ * O gasto do negócio é uma retirada para o Pessoal, ligada ou não: a ligação ou a categoria "Retirada para o Pessoal", que só a função
+ * da retirada grava (fora da lista de escolha). Depois de sair do negócio, ser removida ou encerrar (D-120), os dois lados deixam de ser
+ * ligados, mas o gasto continua sendo uma retirada: "Seu negócio" não o passa para Saiu, e os meses que já passaram não mudam.
+ */
+export function isBusinessWithdrawal(record: Pick<FinancialRecord, 'pairedRecordId' | 'kind' | 'category'>): boolean {
+  return isWithdrawal(record) || (record.kind === 'despesa' && record.category === WITHDRAWAL_BUSINESS_CATEGORY);
+}
+
+/**
  * O lançamento pode mudar de espaço: o comum, sem conta a pagar, fatura, rendimento de investimento ou retirada ligados (a mesma regra
  * de move_record, lancamento_ligado).
  */
@@ -230,7 +245,7 @@ export function businessMonth(records: readonly FinancialRecord[], contextId: st
     if (r.contextId !== contextId || r.status !== 'realizado' || recordMonth(r) !== month) continue;
     recordCount += 1;
     if (r.kind === 'receita') inCents += r.amountCents;
-    else if (isWithdrawal(r)) withdrawnCents += r.amountCents;
+    else if (isBusinessWithdrawal(r)) withdrawnCents += r.amountCents;
     else outCents += r.amountCents;
   }
   const leftCents = inCents - outCents;
@@ -256,7 +271,7 @@ export function businessTopOut(records: readonly FinancialRecord[], contextId: s
   const by = new Map<string, number>();
   let total = 0;
   for (const r of records) {
-    if (r.contextId !== contextId || r.status !== 'realizado' || r.kind !== 'despesa' || isWithdrawal(r) || recordMonth(r) !== month) continue;
+    if (r.contextId !== contextId || r.status !== 'realizado' || r.kind !== 'despesa' || isBusinessWithdrawal(r) || recordMonth(r) !== month) continue;
     const key = r.category ?? NO_CATEGORY_LABEL;
     by.set(key, (by.get(key) ?? 0) + r.amountCents);
     total += r.amountCents;

@@ -1,4 +1,4 @@
-import { BUSINESS_NAME_MAX, BUSINESS_TEXT, businessErrorText, businessNameError, normalizeBusinessName } from '@clarevo/core';
+import { BUSINESS_NAME_MAX, BUSINESS_TEXT, businessErrorText, businessNameError, businessPeopleErrorText, normalizeBusinessName } from '@clarevo/core';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, View, type TextInput } from 'react-native';
@@ -35,6 +35,20 @@ export default function NomeNegocioScreen() {
               <Button label={T.accountOpen} tone="soft" onPress={() => router.replace(BACK)} />
             </Card>
           )}
+        </Screen>
+      </View>
+    );
+  }
+  // Só quem administra muda o nome (D-116): para as outras pessoas do negócio, a recusa que o banco daria, sem formulário.
+  if (business.data.role !== 'titular') {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SubHeader title={T.rename} right={<ContextPill label={business.data.name} fixed />} />
+        <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
+          <Card style={{ gap: space[3] }}>
+            <Txt>{businessPeopleErrorText('sem_permissao')}</Txt>
+            <Button label={T.accountOpen} tone="soft" onPress={() => router.replace(BACK)} />
+          </Card>
         </Screen>
       </View>
     );

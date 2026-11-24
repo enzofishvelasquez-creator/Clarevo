@@ -90,6 +90,9 @@ import { isFamilyAction } from './family';
 import { DELETE_CONFIRMATION_WORD } from './deletion';
 import { MemoryFamilyHub } from './memory-family';
 import type { BusinessAction, BusinessContext, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
+import type { BusinessInvite, BusinessInvitePreview, BusinessInviteRole, BusinessInviteWrite, BusinessJoin, BusinessPeople, BusinessPeopleAction, PlusStatus } from './business-people';
+import { isBusinessPeopleAction } from './business-people';
+import { MemoryBusinessHub } from './memory-business-people';
 import {
   BUSINESS_DEFAULT_ACCOUNT,
   WITHDRAWAL_BUSINESS_CATEGORY,
@@ -238,7 +241,8 @@ interface Operation {
     | ImportAction
     | FamilyAction
     | CompanyAction
-    | BusinessAction;
+    | BusinessAction
+    | BusinessPeopleAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -264,9 +268,6 @@ interface Operation {
   /** Negócio (D-113): o outro lançamento (target_id) da retirada (o recebimento do Pessoal) e do mover (o original). */
   targetRecordId?: string | null;
 }
-
-/** Negócio (financial_contexts com kind 'negocio', D-113): da própria pessoa; encerrado não se lê. */
-type StoredBusiness = { id: string; name: string; createdAt: string; endedAt: string | null; ownerId: string };
 
 /** Conta (financial_accounts): exclusão lógica (fica arquivada e some da leitura). */
 type StoredAccount = FinancialAccount & { createdBy: string; createdAt: string; deletedAt?: string; deletedBy?: string };
@@ -379,6 +380,13 @@ export interface MemoryRepositoryOptions {
    * nunca recebe empresa de exemplo).
    */
   company?: MemoryCompanyHub;
+  /**
+   * Negócios (D-113) e o negócio compartilhado (D-116, Clarevo Plus): o registro dos negócios, os vínculos, os convites e a chave do Plus.
+   * Repositórios de pessoas diferentes que compartilham o mesmo hub compartilham a administração dos negócios (convidar, aceitar, sair,
+   * remover e mudar o papel). Sem hub, o repositório tem o próprio, com o Plus fechado. O que cada pessoa anota no negócio fica no
+   * repositório dela.
+   */
+  business?: MemoryBusinessHub;
   /** E-mail da conta, para o convite da empresa conferir o e-mail de quem aceita. Padrão: `<pessoa>@memoria.test`. */
   email?: string;
   /**
@@ -458,8 +466,6 @@ export class MemoryRepository implements RecordsRepository {
   private goalImages = new Map<string, { imageKey: string | null; photo: { mime: string; base64: string } | null; version: number; updatedAt: string }>();
   private cards = new Map<string, StoredCard>();
   private cardEntries = new Map<string, StoredCardEntry>();
-  /** Negócios da pessoa (D-113): o modelo aceita vários (Clarevo Plus); create_business recusa o segundo ativo. */
-  private businesses = new Map<string, StoredBusiness>();
   private seq = 0;
   /** Simula falha de rede: 'antes' (nada gravado) ou 'depois' (gravado, resposta perdida). */
   failNextWrite: 'antes' | 'depois' | null = null;
@@ -474,12 +480,18 @@ export class MemoryRepository implements RecordsRepository {
   private readonly hub: MemoryFamilyHub;
   /** Empresas: compartilhada entre repositórios quando o hub vem das opções. */
   private readonly company: MemoryCompanyHub;
+  /**
+   * Negócios (D-113) e negócio compartilhado (D-116): compartilhados entre repositórios quando o hub vem das opções. O modelo aceita vários
+   * negócios (Clarevo Plus); create_business recusa o segundo ativo (o próprio ou o de outra pessoa).
+   */
+  private readonly biz: MemoryBusinessHub;
 
   constructor(private readonly opts: MemoryRepositoryOptions) {
     this.latencyMs = opts.latencyMs ?? 0;
     // Sem hub próprio, o relógio da Família é o dia da pessoa (ao meio-dia), para os convites vencerem junto com o "hoje" dos testes.
     this.hub = opts.family ?? new MemoryFamilyHub({ now: () => Date.parse(`${opts.today()}T12:00:00.000Z`) });
     this.company = opts.company ?? new MemoryCompanyHub({ now: () => Date.parse(`${opts.today()}T12:00:00.000Z`), today: opts.today });
+    this.biz = opts.business ?? new MemoryBusinessHub({ now: () => Date.parse(`${opts.today()}T12:00:00.000Z`) });
   }
 
   /** Ids com tamanho fixo: a ordem do texto é a ordem de criação (desempate das listas). */
@@ -536,7 +548,6 @@ export class MemoryRepository implements RecordsRepository {
       investments: new Map(this.investments),
       investmentMovements: new Map(this.investmentMovements),
       investmentPlans: new Map(this.investmentPlans),
-      businesses: new Map(this.businesses),
     };
     let result: T;
     try {
@@ -568,7 +579,6 @@ export class MemoryRepository implements RecordsRepository {
         investments: this.investments,
         investmentMovements: this.investmentMovements,
         investmentPlans: this.investmentPlans,
-        businesses: this.businesses,
       } = saved);
       throw e;
     }
@@ -623,6 +633,7 @@ export class MemoryRepository implements RecordsRepository {
         personalContextId: contextId,
       };
       this.hub.register(this.opts.actorId, this.opts.displayName, contextId);
+      this.biz.register(this.opts.actorId, this.opts.displayName, (business) => this.unlinkBusinessWithdrawals(business));
       this.company.register(this.opts.actorId, this.opts.email ?? `${this.opts.actorId}@memoria.test`, this.opts.displayName, this.space.timeZone);
       return this.spaceView()!;
     });
@@ -2096,7 +2107,7 @@ export class MemoryRepository implements RecordsRepository {
       if (replayed) return this.goalResult(replayed.goalId!, replayed.movementId);
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
       // Metas não entram no negócio por enquanto (D-113; o gatilho goals_context_guard do banco).
-      if (this.businesses.has(contextId)) throw new RepoError('contexto_invalido');
+      if (this.biz.isBusiness(contextId)) throw new RepoError('contexto_invalido');
       const today = this.opts.today();
       const code = goalInputError(norm, today) ?? initialMovementError(initialCents, initialOn, today);
       if (code) throw new RepoError(code);
@@ -2886,7 +2897,7 @@ export class MemoryRepository implements RecordsRepository {
       const replayed = this.replay(key, action, payload);
       if (replayed) return { code: null, contextId: replayed.contextId, expiresAt: this.chatCodes[channel]?.expiresAt ?? null };
       if (!this.space || !this.canWrite(contextId)) throw new RepoError('sem_permissao');
-      if (this.businesses.has(contextId)) throw new RepoError('contexto_invalido');
+      if (this.biz.isBusiness(contextId)) throw new RepoError('contexto_invalido');
       let code = '';
       for (let i = 0; i < WHATSAPP_CODE_LENGTH; i++) code += WHATSAPP_CODE_ALPHABET[Math.floor(Math.random() * WHATSAPP_CODE_ALPHABET.length)];
       const expiresAt = new Date(Date.parse(this.stamp()) + WHATSAPP_CODE_MINUTES * 60_000).toISOString();
@@ -4704,6 +4715,7 @@ export class MemoryRepository implements RecordsRepository {
       action === 'desligar_telegram' ||
       isFamilyAction(action) ||
       isCompanyAction(action) ||
+      isBusinessPeopleAction(action) ||
       action === 'criar_negocio' ||
       action === 'renomear_negocio' ||
       action === 'encerrar_negocio'
@@ -4896,20 +4908,26 @@ export class MemoryRepository implements RecordsRepository {
     return s;
   }
 
-  /** O Pessoal da pessoa, ou uma Família em que ela tem vínculo ativo (Família encerrada não se lê). */
+  /**
+   * O Pessoal da pessoa, uma Família em que ela tem vínculo ativo (Família encerrada não se lê) ou o negócio em que ela tem vínculo ativo
+   * (o próprio ou, no negócio compartilhado, o de outra pessoa; negócio encerrado não se lê).
+   */
   private canRead(contextId: string) {
-    return this.space?.personalContextId === contextId || this.liveBusiness(contextId) !== null || this.hub.canRead(contextId, this.opts.actorId);
+    return this.space?.personalContextId === contextId || this.biz.canRead(contextId, this.opts.actorId) || this.hub.canRead(contextId, this.opts.actorId);
   }
 
-  /** O negócio ativo da pessoa com este id (D-113), ou null (encerrado, de outra pessoa ou não é negócio). */
-  private liveBusiness(contextId: string): StoredBusiness | null {
-    const b = this.businesses.get(contextId);
-    return b && !b.endedAt && b.ownerId === this.opts.actorId ? b : null;
+  /** Contextos que a pessoa lê fora dos negócios (o Pessoal e a Família): o resto da ordem de clarevo_require_business_owner. */
+  private readonly readsOutsideBusiness = (contextId: string): boolean =>
+    this.space?.personalContextId === contextId || this.hub.canRead(contextId, this.opts.actorId);
+
+  /** O negócio ativo com este id que a pessoa lê (D-113: o dela; D-116: também o de outra pessoa), ou null. */
+  private liveBusiness(contextId: string) {
+    return this.biz.canRead(contextId, this.opts.actorId) ? this.biz.business(contextId) : null;
   }
 
   /** As categorias do orçamento do contexto: as do negócio no negócio (D-113), as de sempre nos outros. */
   private budgetCategories(contextId: string): readonly string[] {
-    return budgetCategoriesFor(this.businesses.has(contextId) ? 'negocio' : 'pessoal');
+    return budgetCategoriesFor(this.biz.isBusiness(contextId) ? 'negocio' : 'pessoal');
   }
 
   /** Um lado de uma retirada só muda pelas funções da retirada (o gatilho financial_records_pair_guard do banco). */
@@ -4917,10 +4935,10 @@ export class MemoryRepository implements RecordsRepository {
     if (isWithdrawal(r)) throw new RepoError('retirada_ligada');
   }
 
-  /** No Pessoal ler e escrever equivalem; na Família, escreve quem é titular ou membro, nunca quem só vê. */
+  /** No Pessoal ler e escrever equivalem; na Família e no negócio, escreve quem é titular (administra) ou membro, nunca quem só vê. */
   private canWrite(contextId: string) {
     if (this.space?.personalContextId === contextId) return true;
-    if (this.liveBusiness(contextId)) return true;
+    if (this.biz.canWrite(contextId, this.opts.actorId)) return true;
     return this.hub.canWrite(contextId, this.opts.actorId);
   }
 
@@ -5095,23 +5113,26 @@ export class MemoryRepository implements RecordsRepository {
   // Espaço Negócio (D-113): as seis funções da migração 0042
   // ---------------------------------------------------------------------------
 
-  private businessView(b: StoredBusiness): BusinessContext {
-    return { id: b.id, name: b.name, createdAt: b.createdAt };
+  /** O negócio como o app lê, com o papel de quem consulta (D-120); um negócio que a pessoa já não lê volta como quem o criou o via. */
+  private businessView(contextId: string): BusinessContext {
+    const b = this.biz.business(contextId)!;
+    return { id: b.id, name: b.name, createdAt: b.createdAt, role: this.biz.roleOf(b.id, this.opts.actorId) ?? 'titular' };
   }
 
-  /** Como clarevo_require_business_owner: sem leitura, nao_encontrado; não é negócio, contexto_invalido. */
-  private ownedBusiness(contextId: string): StoredBusiness {
+  /** Como clarevo_require_business_owner: sem leitura, nao_encontrado; não é negócio, contexto_invalido; não administra, sem_permissao. */
+  private ownedBusiness(contextId: string) {
     if (!contextId || !this.canRead(contextId)) throw new RepoError('nao_encontrado');
     const b = this.liveBusiness(contextId);
     if (!b) throw new RepoError('contexto_invalido');
+    if (!this.biz.isOwner(b.id, this.opts.actorId)) throw new RepoError('sem_permissao');
     return b;
   }
 
-  /** O negócio ativo (o primeiro, por criação), como a leitura de financial_contexts com kind 'negocio'. */
+  /** O negócio ativo (o primeiro, por criação), como a leitura de financial_contexts com kind 'negocio', com o papel da pessoa. */
   async getBusiness(): Promise<BusinessContext | null> {
     return this.read(() => {
-      const live = [...this.businesses.values()].filter((b) => this.liveBusiness(b.id)).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-      return live[0] ? this.businessView(live[0]) : null;
+      const id = this.biz.activeBusinessOf(this.opts.actorId);
+      return id ? this.businessView(id) : null;
     });
   }
 
@@ -5121,14 +5142,14 @@ export class MemoryRepository implements RecordsRepository {
       const clean = normalizeBusinessName(name);
       const payload = [clean];
       const replayed = this.replay(key, 'criar_negocio', payload);
-      if (replayed) return this.businessView(this.businesses.get(replayed.contextId)!);
+      if (replayed) return this.businessView(replayed.contextId);
       if (!this.space) throw new RepoError('sem_permissao');
       const bad = businessNameError(clean);
       if (bad) throw new RepoError(bad);
-      if ([...this.businesses.values()].some((b) => this.liveBusiness(b.id))) throw new RepoError('ja_tem_negocio');
+      // Um negócio por pessoa, por vez: o próprio ou o de outra pessoa (clarevo_active_business_count, 0043).
+      if (this.biz.activeBusinessOf(this.opts.actorId)) throw new RepoError('ja_tem_negocio');
       const now = this.stamp();
       const id = `${this.id('neg')}-${this.opts.actorId}`;
-      this.businesses.set(id, { id, name: clean, createdAt: now, endedAt: null, ownerId: this.opts.actorId });
       const account: StoredAccount = {
         id: this.id('conta'),
         contextId: id,
@@ -5143,8 +5164,9 @@ export class MemoryRepository implements RecordsRepository {
         createdAt: now,
       };
       this.accountsById.set(account.id, account);
+      this.biz.open(this.opts.actorId, id, clean, now);
       this.saveOperation(key, 'criar_negocio', payload, { contextId: id, recordId: null, commitmentId: null });
-      return this.businessView(this.businesses.get(id)!);
+      return this.businessView(id);
     });
   }
 
@@ -5154,17 +5176,20 @@ export class MemoryRepository implements RecordsRepository {
       const clean = normalizeBusinessName(name);
       const payload = [contextId, clean];
       const replayed = this.replay(key, 'renomear_negocio', payload);
-      if (replayed) return this.businessView(this.businesses.get(replayed.contextId)!);
+      if (replayed) return this.businessView(replayed.contextId);
       const b = this.ownedBusiness(contextId);
       const bad = businessNameError(clean);
       if (bad) throw new RepoError(bad);
-      this.businesses.set(b.id, { ...b, name: clean });
+      this.biz.rename(b.id, clean);
       this.saveOperation(key, 'renomear_negocio', payload, { contextId: b.id, recordId: null, commitmentId: null });
-      return this.businessView(this.businesses.get(b.id)!);
+      return this.businessView(b.id);
     });
   }
 
-  /** Como end_business: desliga as retiradas (os dois lados), marca o fim e o negócio deixa de ser lido. Repetir não falha. */
+  /**
+   * Como end_business: só sem outra pessoa ativa (negocio_com_membros); desliga as retiradas (os dois lados), cancela os convites
+   * pendentes (0043), marca o fim e o negócio deixa de ser lido. Repetir não falha.
+   */
   async endBusiness(key: string, contextId: string): Promise<void> {
     return this.write(() => {
       const payload = [contextId];
@@ -5174,6 +5199,7 @@ export class MemoryRepository implements RecordsRepository {
         return;
       }
       const b = this.ownedBusiness(contextId);
+      if (this.biz.hasOtherActive(b.id, this.opts.actorId)) throw new RepoError('negocio_com_membros');
       const now = this.stamp();
       const pairedOut = new Set([...this.records.values()].filter((r) => r.contextId === b.id).map((r) => r.id));
       for (const r of [...this.records.values()]) {
@@ -5182,7 +5208,7 @@ export class MemoryRepository implements RecordsRepository {
           this.records.set(r.id, { ...rest, updatedAt: now });
         }
       }
-      this.businesses.set(b.id, { ...b, endedAt: now });
+      this.biz.close(b.id, now);
       this.saveOperation(key, 'encerrar_negocio', payload, { contextId: b.id, recordId: null, commitmentId: null });
     });
   }
@@ -5201,6 +5227,8 @@ export class MemoryRepository implements RecordsRepository {
       if (!businessContextId || !this.canRead(businessContextId)) throw new RepoError('nao_encontrado');
       const b = this.liveBusiness(businessContextId);
       if (!b) throw new RepoError('contexto_invalido');
+      // Quem só vê o negócio (leitor, D-116) não retira.
+      if (!this.canWrite(b.id)) throw new RepoError('sem_permissao');
       const personal = this.space?.personalContextId;
       if (!personal) throw new RepoError('sem_permissao');
       const names = withdrawalDescriptions(b.name, own);
@@ -5256,7 +5284,7 @@ export class MemoryRepository implements RecordsRepository {
       const valid =
         personal !== null &&
         targetContextId !== r.contextId &&
-        ((r.contextId === personal && this.businesses.has(targetContextId)) || (targetContextId === personal && this.businesses.has(r.contextId)));
+        ((r.contextId === personal && this.biz.isBusiness(targetContextId)) || (targetContextId === personal && this.biz.isBusiness(r.contextId)));
       if (!valid) throw new RepoError('contexto_invalido');
       if (!this.canWrite(targetContextId)) throw new RepoError('sem_permissao');
       const input = { accountId, amountCents: r.amountCents, occurredOn: r.occurredOn, description: r.description, category: cat };
@@ -5276,6 +5304,160 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Negócio compartilhado (D-116, Clarevo Plus; D-120): as sete funções da migração 0043 e plus_status, sobre o hub dos negócios
+  // ---------------------------------------------------------------------------
+
+  /** Uma chave já usada por outra operação da pessoa (fora destas ações) é chave_reutilizada: o espaço de chaves é um só. */
+  private businessPeopleKey(key: string) {
+    const prev = this.operations.get(key);
+    if (prev && !isBusinessPeopleAction(prev.action)) throw new RepoError('chave_reutilizada');
+  }
+
+  /** Marca a chave como usada, uma vez (a repetição não grava de novo). Não conta como anotação na atividade. */
+  private businessPeopleDone(key: string, action: BusinessPeopleAction, contextId: string) {
+    if (this.operations.has(key)) return;
+    this.operations.set(key, {
+      action,
+      hash: '',
+      contextId,
+      recordId: null,
+      commitmentId: null,
+      seriesId: null,
+      referenceId: null,
+      budgetId: null,
+      goalId: null,
+      movementId: null,
+      cardId: null,
+      entryId: null,
+      accountId: null,
+      importResult: null,
+    });
+  }
+
+  /**
+   * A "Conta do negócio" no repositório de quem entra: no banco, todas as pessoas do negócio usam a conta que nasceu com ele; aqui cada
+   * pessoa guarda no próprio repositório o que anota no negócio, com uma conta de apoio de mesmo nome.
+   */
+  private ensureBusinessAccount(contextId: string) {
+    if (this.liveAccounts().some((a) => a.contextId === contextId)) return;
+    const account: StoredAccount = {
+      id: this.id('conta'),
+      contextId,
+      name: BUSINESS_DEFAULT_ACCOUNT,
+      currency: 'BRL',
+      initialBalanceCents: null,
+      kind: 'banco',
+      status: 'ativa',
+      isDefault: true,
+      version: 1,
+      createdBy: this.opts.actorId,
+      createdAt: this.stamp(),
+    };
+    this.accountsById.set(account.id, account);
+  }
+
+  /**
+   * Como clarevo_unlink_withdrawals (0043): as retiradas entre o negócio e o Pessoal desta pessoa deixam de ser ligadas (os dois lados viram
+   * lançamentos comuns; valores, datas e versões ficam). O hub chama quando a pessoa sai ou é removida.
+   */
+  private unlinkBusinessWithdrawals(contextId: string) {
+    const personal = this.ownPersonal;
+    if (!personal) return;
+    const pairs = [...this.records.values()].filter((r) => {
+      if (!isWithdrawal(r)) return false;
+      const other = this.records.get(r.pairedRecordId!);
+      return Boolean(other && ((r.contextId === contextId && other.contextId === personal) || (r.contextId === personal && other.contextId === contextId)));
+    });
+    if (pairs.length === 0) return;
+    const now = this.stamp();
+    for (const r of pairs) {
+      const { pairedRecordId: _p, ...rest } = r;
+      this.records.set(r.id, { ...rest, updatedAt: now });
+    }
+  }
+
+  /** plus_status: a chave do Plus (fechada por padrão). */
+  async getPlusStatus(): Promise<PlusStatus> {
+    return this.read(() => ({ open: this.biz.plusOpen() }));
+  }
+
+  /**
+   * As pessoas do negócio, com a mesma regra de compatibilidade do app (D-120): a lista com o Plus aberto, para quem não administra ou
+   * quando há (ou houve) outras pessoas, mesmo com o Plus fechado depois; os convites só para quem administra e só com o Plus aberto. Com o
+   * Plus fechado e ninguém mais, só a própria pessoa, administrando. Sem vínculo ativo: nao_encontrado.
+   */
+  async getBusinessPeople(contextId: string): Promise<BusinessPeople> {
+    return this.read(() => {
+      const plusOpen = this.biz.plusOpen();
+      const role = this.biz.roleOf(contextId, this.opts.actorId);
+      if (!role) throw new RepoError('nao_encontrado');
+      if (plusOpen || role !== 'titular' || this.biz.hasOthers(contextId, this.opts.actorId)) {
+        const view = this.biz.peopleOf(contextId, this.opts.actorId)!;
+        return { role: view.role, members: view.members, invites: plusOpen ? view.invites : [], plusOpen };
+      }
+      return { role, members: [this.biz.selfView(contextId, this.opts.actorId)!], invites: [], plusOpen };
+    });
+  }
+
+  async createBusinessInvite(key: string, contextId: string, role: BusinessInviteRole): Promise<BusinessInviteWrite> {
+    return this.write(() => {
+      this.businessPeopleKey(key);
+      const r = this.biz.createInvite(this.opts.actorId, key, contextId, role, this.readsOutsideBusiness);
+      this.businessPeopleDone(key, 'criar_convite_negocio', contextId);
+      return r;
+    });
+  }
+
+  async cancelBusinessInvite(key: string, inviteId: string): Promise<BusinessInvite> {
+    return this.write(() => {
+      this.businessPeopleKey(key);
+      const r = this.biz.cancelInvite(this.opts.actorId, key, inviteId, this.readsOutsideBusiness);
+      this.businessPeopleDone(key, 'cancelar_convite_negocio', r.contextId);
+      return r;
+    });
+  }
+
+  async previewBusinessInvite(code: string): Promise<BusinessInvitePreview> {
+    return this.read(() => this.biz.preview(code));
+  }
+
+  async acceptBusinessInvite(key: string, code: string): Promise<BusinessJoin> {
+    return this.write(() => {
+      this.businessPeopleKey(key);
+      // Sem o Pessoal, a pessoa ainda não existe no banco (sem_permissao), mesmo que o hub a conheça de outro repositório.
+      if (!this.space) throw new RepoError('sem_permissao');
+      const joined = this.biz.accept(this.opts.actorId, key, code);
+      this.ensureBusinessAccount(joined.context.id);
+      this.businessPeopleDone(key, 'aceitar_convite_negocio', joined.context.id);
+      return joined;
+    });
+  }
+
+  async leaveBusiness(key: string, contextId: string): Promise<void> {
+    return this.write(() => {
+      this.businessPeopleKey(key);
+      this.biz.leave(this.opts.actorId, key, contextId, this.readsOutsideBusiness);
+      this.businessPeopleDone(key, 'sair_negocio', contextId);
+    });
+  }
+
+  async removeBusinessMember(key: string, contextId: string, personId: string): Promise<void> {
+    return this.write(() => {
+      this.businessPeopleKey(key);
+      this.biz.remove(this.opts.actorId, key, contextId, personId, this.readsOutsideBusiness);
+      this.businessPeopleDone(key, 'remover_membro_negocio', contextId);
+    });
+  }
+
+  async setBusinessMemberRole(key: string, contextId: string, personId: string, role: BusinessInviteRole): Promise<void> {
+    return this.write(() => {
+      this.businessPeopleKey(key);
+      this.biz.setRole(this.opts.actorId, key, contextId, personId, role, this.readsOutsideBusiness);
+      this.businessPeopleDone(key, 'alterar_papel_negocio', contextId);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Excluir minha conta (D-058): delete_my_account, da migração 0015
   // ---------------------------------------------------------------------------
 
@@ -5287,7 +5469,7 @@ export class MemoryRepository implements RecordsRepository {
     const ids = new Set<string>();
     const personal = this.ownPersonal;
     const add = (contextId: string) => {
-      if (contextId !== personal && !this.businesses.has(contextId)) ids.add(contextId);
+      if (contextId !== personal && !this.biz.isBusiness(contextId)) ids.add(contextId);
     };
     for (const r of this.records.values()) add(r.contextId);
     for (const c of this.commitments.values()) add(c.contextId);
@@ -5304,6 +5486,25 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   /**
+   * Os negócios de outras pessoas em que este repositório tem dados (o que a pessoa anotou ali). A "Conta do negócio" que cada pessoa
+   * guarda ao entrar é só um apoio da memória e não conta como anotação.
+   */
+  private authoredBusinessContexts(): Set<string> {
+    const ids = new Set<string>();
+    const add = (contextId: string) => {
+      const b = this.biz.business(contextId);
+      if (b && b.ownerId !== this.opts.actorId) ids.add(contextId);
+    };
+    for (const r of this.records.values()) add(r.contextId);
+    for (const c of this.commitments.values()) add(c.contextId);
+    for (const x of this.seriesById.values()) add(x.contextId);
+    for (const x of this.budgets.values()) add(x.contextId);
+    for (const x of this.cards.values()) add(x.contextId);
+    for (const x of this.cardEntries.values()) add(x.contextId);
+    return ids;
+  }
+
+  /**
    * Ordem do banco: confirmação exata (confirmacao_invalida); conta já excluída (repetir responde sem erro e sem efeito); chave já
    * usada em outra operação (chave_reutilizada); transferir_antes (titular com outras pessoas ativas). Depois apaga de verdade
    * tudo o que este repositório guarda, encerra a licença ativa e tira a pessoa da Família e da empresa. O que cada pessoa anotou na
@@ -5316,7 +5517,10 @@ export class MemoryRepository implements RecordsRepository {
       if (this.deleted) return;
       if (this.operations.has(key)) throw new RepoError('chave_reutilizada');
       this.hub.assertCanErase(this.opts.actorId);
+      // Negócio compartilhado (0043): quem administra um negócio com outras pessoas ativas remove as pessoas antes.
+      this.biz.assertCanErase(this.opts.actorId);
       this.hub.erase(this.opts.actorId, this.authoredFamilyContexts());
+      this.biz.erase(this.opts.actorId, this.authoredBusinessContexts());
       this.company.erasePerson(this.opts.actorId);
       this.records.clear();
       this.commitments.clear();
@@ -5344,7 +5548,6 @@ export class MemoryRepository implements RecordsRepository {
       this.investments.clear();
       this.investmentMovements.clear();
       this.investmentPlans.clear();
-      this.businesses.clear();
       this.space = null;
       this.deleted = true;
     });

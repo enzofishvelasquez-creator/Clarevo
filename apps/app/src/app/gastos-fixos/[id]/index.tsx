@@ -68,6 +68,7 @@ import { flash } from '@/lib/flash';
 import { explanationHref } from '@/lib/learn';
 import { moneyA11y, moneyText, useValuesHidden } from '@/lib/privacy';
 import { useDeleteSeries, useSeries, useSeriesOccurrences, useSeriesOpenOccurrences, useSeriesOperationKey, useWork } from '@/state/data';
+import { useBusinessItemAccess } from '@/state/business';
 import { useAuthorship } from '@/components/family-parts';
 import { useSession } from '@/state/session';
 import { colors, fonts, space, tabular } from '@/theme/tokens';
@@ -81,6 +82,9 @@ export default function DetalheGastoFixo() {
   const personal = useWork().data;
   const ctx = personal?.contextId;
   const series = useSeries(id, ctx);
+  // Negócio compartilhado (D-120): quem só vê não muda nada; quem anota e vê muda só o que criou (quem administra, qualquer um). Fora do
+  // negócio (e num negócio sem outras pessoas), nada muda.
+  const access = useBusinessItemAccess(series.data?.contextId, series.data?.createdBy);
   const occ = useSeriesOccurrences(id, ctx);
   const openOcc = useSeriesOpenOccurrences(id, ctx);
   const remove = useDeleteSeries();
@@ -224,6 +228,8 @@ export default function DetalheGastoFixo() {
                     occ.refetch();
                     openOcc.refetch();
                   }}
+                  canWrite={access.canWrite}
+                  canChange={access.canChange}
                 />
               ) : (
                 <Occurrences
@@ -236,6 +242,8 @@ export default function DetalheGastoFixo() {
                     setActionError(null);
                     setNotice(text);
                   }}
+                  canWrite={access.canWrite}
+                  canChange={access.canChange}
                 />
               )}
 
@@ -245,13 +253,15 @@ export default function DetalheGastoFixo() {
                   : 'Contas pagas nunca mudam. Contas que você alterou só no mês delas também não mudam quando você altera o gasto fixo a partir de outro mês.'}
               </Txt>
 
-              <Actions
-                series={s}
-                today={today}
-                canDelete={s.paidCount === 0 && Boolean(deletePlan)}
-                onDelete={() => setConfirmDelete(true)}
-                onChangeForm={() => setChangeForm(true)}
-              />
+              {access.canChange ? (
+                <Actions
+                  series={s}
+                  today={today}
+                  canDelete={s.paidCount === 0 && Boolean(deletePlan)}
+                  onDelete={() => setConfirmDelete(true)}
+                  onChangeForm={() => setChangeForm(true)}
+                />
+              ) : null}
 
               <Pressable accessibilityRole="button" onPress={() => router.push('/quem-ve')} style={styles.privacy}>
                 <ShieldCheck size={18} color={colors.textSecondary} />
@@ -359,7 +369,7 @@ function Overview({ series: s, today }: { series: CommitmentSeries; today: IsoDa
         <View>
           <Row label="Espaço" value={by.contextName} />
           {s.kind === 'parcelada' ? <Row label="Tipo" value={SERIES_NATURE_LABEL[s.nature]} /> : null}
-          {by.kind === 'familia' ? <Row label="Criado por" value={by.by} /> : null}
+          {by.shared ? <Row label="Criado por" value={by.by} /> : null}
           <Row label="Categoria" value={term.category ?? NO_CATEGORY_LABEL} last />
         </View>
         {!s.generating ? (
@@ -416,10 +426,15 @@ function Occurrences({
   open: allOpen,
   today,
   onNotice,
+  canWrite,
+  canChange,
 }: {
   series: CommitmentSeries;
   /** A série é do Pessoal (a renda comprometida é só do Pessoal). */
   personalContext: boolean;
+  /** Negócio compartilhado (D-120): registrar e anotar (quem não só vê); mudar a referência (quem criou ou administra). */
+  canWrite: boolean;
+  canChange: boolean;
   /** As 60 mais recentes (abertas e pagas), por número crescente. */
   occurrences: Commitment[];
   /** Todas as em aberto, sem limite (useSeriesOpenOccurrences). */
@@ -539,7 +554,7 @@ function Occurrences({
           */}
           {missing.map((m) => {
             const row = isReviewableMonth(m.month, today) ? gapRowOf(s, occurrences, m) : null;
-            if (row) {
+            if (row && canWrite) {
               const label = s.kind === 'parcelada' ? RETURN_TEXT.registerInstallment : RETURN_TEXT.registerMonth;
               return (
                 <View key={m.number} style={styles.gapRow}>
@@ -554,7 +569,7 @@ function Occurrences({
               </Txt>
             );
           })}
-          {missing.some((m) => m.month < monthOf(today) && !isReviewableMonth(m.month, today)) ? (
+          {canWrite && missing.some((m) => m.month < monthOf(today) && !isReviewableMonth(m.month, today)) ? (
             <LinkButton label="Anotar gasto" style={styles.inlineLink} onPress={() => router.push('/registro/novo')} />
           ) : null}
           <TopicLink slug="sem-registro" label={RETURN_TEXT.whyNoBill} style={styles.inlineLink} />
@@ -579,7 +594,7 @@ function Occurrences({
               ? `Valor da última conta paga: ${formatBRL(suggestion.amountCents)}.`
               : `Média das últimas ${suggestion.count} contas pagas: ${formatBRL(suggestion.amountCents)}.`}
           </MoneyTxt>
-          {applyFrom !== null ? (
+          {applyFrom !== null && canChange ? (
             <Button
               label="Usar como novo valor de referência"
               tone="soft"

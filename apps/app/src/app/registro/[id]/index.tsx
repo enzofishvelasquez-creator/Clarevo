@@ -52,7 +52,7 @@ import { openSummary } from '@/lib/nav';
 import { useAccounts, useCards, useCommitment, useDeleteRecord, useInvestment, useRecord, useRecordLinks, useWork, useView } from '@/state/data';
 import { useAuthorship } from '@/components/family-parts';
 import { kindLabel } from '@/components/record-row';
-import { useBusiness, useDeleteWithdrawal } from '@/state/business';
+import { useBusiness, useBusinessItemAccess, useDeleteWithdrawal } from '@/state/business';
 import { useSession } from '@/state/session';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -126,7 +126,12 @@ export default function DetalheRegistro() {
   const inBusiness = Boolean(business && r && r.contextId === business.id);
   const inPersonal = Boolean(personal && r && r.contextId === personal.personalContextId);
   // Mover (D-113): o lançamento comum, entre o Pessoal e o negócio da pessoa, para quem anotou no lugar errado.
-  const movable = Boolean(r && business && (inBusiness || inPersonal) && canMoveRecord(r) && (personal?.canWrite ?? true));
+  // Negócio compartilhado (D-120): quem só vê não encontra as ações; quem anota e vê edita, exclui e move só o que anotou (quem administra,
+  // qualquer um). Uma retirada de outra pessoa não abre o Pessoal dela nem se exclui daqui. Fora do negócio (e num negócio sem outras
+  // pessoas), nada muda.
+  const access = useBusinessItemAccess(r?.contextId, r?.createdBy);
+  const ownWithdrawal = !inBusiness || (r?.createdBy ?? '') === user?.id;
+  const movable = Boolean(r && business && (inBusiness || inPersonal) && canMoveRecord(r) && (personal?.canWrite ?? true) && access.canChange);
 
   /** "Desligar da fatura" (D-107): o gasto que foi ligado depois continua, e a fatura volta a ficar em aberto. */
   const doUnlinkInvoice = async () => {
@@ -315,7 +320,7 @@ export default function DetalheRegistro() {
                     {r.linkedPayment ? RECORD_LINK_TEXT.linkedInvoiceDetail : CARDS_TEXT.screens.paymentRecordNote}
                   </Txt>
                   <Button label={CARDS_TEXT.openInvoice} onPress={() => router.push(invoiceHref(r.invoice!.cardId, r.invoice!.month))} />
-                  {r.linkedPayment ? (
+                  {r.linkedPayment && access.canChange ? (
                     <Button label={RECORD_LINK_TEXT.unlinkInvoice} tone="soft" disabled={!paidBill.data} onPress={() => setUnlinking(true)} />
                   ) : null}
                 </>
@@ -327,16 +332,20 @@ export default function DetalheRegistro() {
                       {r.kind === 'despesa' ? BUSINESS_TEXT.withdrawalBusinessNote : BUSINESS_TEXT.withdrawalPersonalNote(business?.name ?? null)}
                     </Txt>
                   </Banner>
-                  <Txt variant="caption" color={colors.textSecondary}>
-                    {BUSINESS_TEXT.withdrawalLocked}
-                  </Txt>
-                  <Button
-                    label={BUSINESS_TEXT.seeOtherSide(r.kind === 'despesa' ? 'Pessoal' : (business?.name ?? BUSINESS_TEXT.context))}
-                    tone="soft"
-                    onPress={() => router.push(`/registro/${r.pairedRecordId}`)}
-                  />
+                  {ownWithdrawal ? (
+                    <>
+                      <Txt variant="caption" color={colors.textSecondary}>
+                        {BUSINESS_TEXT.withdrawalLocked}
+                      </Txt>
+                      <Button
+                        label={BUSINESS_TEXT.seeOtherSide(r.kind === 'despesa' ? 'Pessoal' : (business?.name ?? BUSINESS_TEXT.context))}
+                        tone="soft"
+                        onPress={() => router.push(`/registro/${r.pairedRecordId}`)}
+                      />
+                    </>
+                  ) : null}
                 </>
-              ) : (
+              ) : !access.canChange ? null : (
                 <Button label={inBusiness ? (r.kind === 'despesa' ? BUSINESS_WORDS.editOut : BUSINESS_WORDS.editIn) : RECORD_TEXT.edit(r.kind)} icon={Pencil} tone={justSaved ? 'soft' : 'brand'} onPress={() => router.push(`/registro/${r.id}/editar`)} />
               )}
               {movable ? (
@@ -348,7 +357,7 @@ export default function DetalheRegistro() {
                 />
               ) : null}
               {/* Gasto anotado sem conta a pagar: pode virar um gasto fixo, que começa no próximo vencimento. */}
-              {r.kind === 'despesa' && !r.commitmentId && !r.invoice && !withdrawal ? (
+              {r.kind === 'despesa' && !r.commitmentId && !r.invoice && !withdrawal && access.canWrite ? (
                 <Button label="Tornar gasto fixo" icon={Repeat} tone="soft" onPress={() => openAsSeries(r, today)} />
               ) : null}
               {r.commitmentId && !r.invoice ? (
@@ -367,8 +376,8 @@ export default function DetalheRegistro() {
                   }}
                 />
               )}
-              {r.invoice ? null : withdrawal ? (
-                <Button label={BUSINESS_TEXT.deleteWithdrawal} icon={Trash2} tone="danger" onPress={() => setConfirmingWithdrawal(true)} />
+              {r.invoice || !access.canChange ? null : withdrawal ? (
+                ownWithdrawal ? <Button label={BUSINESS_TEXT.deleteWithdrawal} icon={Trash2} tone="danger" onPress={() => setConfirmingWithdrawal(true)} /> : null
               ) : (
                 <Button label={RECORD_TEXT.remove(r.kind)} icon={Trash2} tone="danger" onPress={() => setConfirming(true)} />
               )}

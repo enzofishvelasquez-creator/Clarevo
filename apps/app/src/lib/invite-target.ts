@@ -46,3 +46,27 @@ export const pendingBenefit = {
     pendingBenefitCode = null;
   },
 };
+
+/**
+ * Convite do negócio pendente (D-116, D-120): igual ao da Família, para quem abre o link `/convite/negocio/<código>` sem estar na conta.
+ * O código fica só na memória do app, é retomado quando o espaço da pessoa está pronto e sai da memória ao sair da conta.
+ */
+let pendingBusinessCode: string | null = null;
+
+export const pendingBusinessInvite = {
+  set(code: string) {
+    pendingBusinessCode = code;
+  },
+  /** Devolve o código guardado uma única vez. */
+  take(): string | null {
+    const code = pendingBusinessCode;
+    pendingBusinessCode = null;
+    return code;
+  },
+  has(): boolean {
+    return pendingBusinessCode !== null;
+  },
+  clear() {
+    pendingBusinessCode = null;
+  },
+};

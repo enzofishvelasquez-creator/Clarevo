@@ -17114,6 +17114,409 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
+  // Negócio compartilhado (Plus, D-120; decisão D-116): o negócio com outras pessoas, pronto e DESLIGADO até o Plus abrir. (1) Com o Plus
+  // fechado (a demonstração padrão e o cenário "negocio"), nada novo aparece: nem "Pessoas do negócio", nem "Convidar alguém", nem o
+  // campo do convite. (2) No cenário "negocio-plus" (Plus aberto; pessoas FICTÍCIAS, só com o primeiro nome), "Seu negócio" ganha a seção
+  // "Pessoas do negócio": Maria administra, Rafa anota e vê, Nina saiu e há um convite "Só vê" pendente; encerrar fica bloqueado com
+  // outras pessoas. (3) Convidar: o papel, o link /convite/negocio/<código> que aparece uma vez e "Copiar link". (4) Cancelar um convite.
+  // (5) "Gerenciar": mudar o papel e remover, com confirmação. (6) Quem anotou, nos detalhes, e "Quem vê estes dados?". (7) O convite:
+  // sem sessão, a entrada; quem administra abre o próprio link (ja_no_negocio); outra conta cria a conta, aceita e o app passa para o
+  // negócio; quem entrou sai. (8) No cenário "negocio-plus-membro", Maria anota e vê no negócio de Bia; com o papel "Só vê", as ações
+  // de anotar somem. (9) Modo escuro, computador (1280 px) e alvos de 44 px. (7a) O Plus fecha depois: as pessoas continuam à vista, os
+  // convites param de valer e a exclusão da conta trava antes; quem anota e vê muda só o que anotou. Capturas 811 a 826. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const npWrites0 = writes.length;
+    const npTexts = [];
+    const npKeep = async () => { const x = await body(); npTexts.push(x); screenTexts.push(x); return x; };
+    const NP = 'Sacolé da Maria';
+    const NP_TAB = `Ver dados do negócio ${NP}`;
+    const npTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
+    const npEnter = async (cenario) => {
+      await p.goto(`http://localhost:${PORT}/?cenario=${cenario}`); await waitText('Cuidar da vida financeira');
+      await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+      await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(600);
+    };
+    // "Seu negócio" pelo card do Resumo do negócio (o seletor no negócio).
+    const npOpen = async (tab) => {
+      await npTab(tab).click(); await p.waitForTimeout(600);
+      await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(600);
+    };
+    const npPeople = async () => {
+      await p.getByRole('heading', { name: 'Pessoas do negócio', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(300);
+    };
+    const npBack = async () => {
+      const tab = () => p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true });
+      for (let i = 0; i < 5 && (await tab().count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
+      await tab().first().click(); await p.waitForTimeout(500);
+    };
+    // Abre um endereço sem recarregar a página (recarregar zera o acesso simulado): pelo histórico, como um link aberto no app (os convites,
+    // que abrem com ou sem sessão).
+    const npGo = (path) => p.evaluate((path) => { history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }, path);
+    // Uma tela com sessão (protegida), sem recarregar: pelo navegador de rotas da árvore do React, como o bloco do modo escuro.
+    const npNav = (route, params = {}) => p.evaluate(({ route, params }) => {
+      const root = document.getElementById('root');
+      const key = Object.keys(root).find((x) => x.startsWith('__reactContainer$'));
+      const stack = [root[key].stateNode.current];
+      while (stack.length > 0) {
+        const f = stack.pop();
+        const v = f.memoizedProps?.value;
+        if (v && typeof v === 'object' && typeof v.getRootState === 'function' && typeof v.navigate === 'function') { v.navigate(route, params); return; }
+        if (f.sibling) stack.push(f.sibling);
+        if (f.child) stack.push(f.child);
+      }
+      throw new Error('navegador de rotas não encontrado');
+    }, { route, params });
+    const npLink = async () => (await body()).match(/https?:\/\/[^\s]+\/convite\/negocio\/[0-9a-f]{32}/)?.[0] ?? null;
+    const npConta = async () => { await npBack(); await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(300); };
+    const npH = (level) => p.evaluate((level) => [...document.querySelectorAll(`[role=heading][aria-level="${level}"]`)].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent), level);
+    // Nada do Plus à vista: a seção, o convite e o campo do link.
+    const NP_PLUS = /Pessoas do negócio|Convidar alguém|Tenho um convite para um negócio|Você administra este negócio|\nAdministra\n/;
+
+    // 1. Plus fechado: a demonstração padrão (negócio criado na memória) e o cenário "negocio" ficam como antes.
+    await demoHome();
+    await btn('Criar um espaço: Negócio ou Família').click(); await p.waitForTimeout(400);
+    await btn('Espaço Negócio. Para quem tem CNPJ ou trabalha por conta.').click(); await waitText('Nome do negócio'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Negócio compartilhado (D-120), Plus fechado: criar o espaço Negócio não oferece "Tenho um convite para um negócio"', !NP_PLUS.test(t), t.match(NP_PLUS)?.[0] ?? '');
+    await field('Nome do negócio').fill('Conserto do bairro');
+    await btn('Criar o espaço Negócio').click(); await waitText('Espaço Negócio criado', 8000); await p.waitForTimeout(600);
+    t = await body();
+    ok('Negócio compartilhado (D-120), Plus fechado: "Seu negócio" de um negócio criado na demonstração padrão não tem "Pessoas do negócio" nem "Convidar alguém", e encerrar continua à vista',
+      (await h1Name()) === 'Seu negócio' && !NP_PLUS.test(t) && (await visibleCount('button', 'Encerrar o espaço Negócio')) === 1 && (await visibleCount('button', 'Mudar o nome')) === 1, t.match(NP_PLUS)?.[0] ?? t.slice(0, 300));
+    await npEnter('negocio');
+    await npOpen(NP_TAB);
+    t = await npKeep();
+    ok('Negócio compartilhado (D-120), cenário "negocio": "Seu negócio" igual ao de antes (sem "Pessoas do negócio", sem convite, "Mudar o nome" e "Encerrar o espaço Negócio")',
+      !NP_PLUS.test(t) && t.includes('Nome e encerrar') && (await visibleCount('button', 'Encerrar o espaço Negócio')) === 1 && (await visibleCount('button', 'Mudar o nome')) === 1 &&
+        (await visibleCount('button', 'Retirada para o Pessoal')) === 1, t.match(NP_PLUS)?.[0] ?? '');
+    await btn('Quem vê estes dados?').click(); await waitText('Quem não vê'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Negócio compartilhado (D-120), cenário "negocio": "Quem vê estes dados?" segue com "Só você vê e anota no espaço Negócio"', t.includes('Só você vê e anota no espaço Negócio.') && !NP_PLUS.test(t) && !t.includes('Estas pessoas veem os lançamentos do negócio'), t.slice(0, 500));
+    await npConta();
+    t = await body();
+    ok('Negócio compartilhado (D-120), cenário "negocio": o card de Conta segue "Só você vê e anota"', t.includes(`${NP}. Só você vê e anota. O Pessoal continua separado.`) && !t.includes(`${NP} · Administra`));
+
+    // 2. Cenário "negocio-plus": a seção "Pessoas do negócio" de quem administra.
+    await npEnter('negocio-plus');
+    await expectTotals('Negócio compartilhado (D-120), cenário "negocio-plus": o Pessoal segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+    await npOpen(NP_TAB);
+    t = await npKeep();
+    ok('Negócio compartilhado (D-120): "Seu negócio" com os números de sempre (entrou R$ 760,00, saiu R$ 418,00) e a seção "Pessoas do negócio"',
+      t.includes('R$ 760,00') && t.includes('R$ 418,00') && t.includes('Pessoas do negócio') && t.includes('Você administra este negócio.') &&
+        t.includes('Vê, anota e edita o que é de outras pessoas. Convida, muda papéis, remove e encerra.'), t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 400));
+    ok('Negócio compartilhado (D-120): as pessoas (Maria, você, administra; Rafa anota e vê, com "Gerenciar"), quem saiu (Nina) e o convite "Só vê" pendente, com as vagas',
+      t.includes('Maria (você)\nAdministra') && t.includes('Rafa\nAnota e vê') && t.includes('Pessoas que saíram') && t.includes('Nina (saiu do negócio)') &&
+        t.includes('Só vê · vale até 14/10') && t.includes('Cabem mais 3 pessoas, contando os convites pendentes.') && (await visibleCount('button', 'Gerenciar Rafa, Anota e vê')) === 1 &&
+        (await visibleCount('button', /^Gerenciar Nina/)) === 0 && (await visibleCount('button', 'Cancelar convite para Só vê, que vale até 14/10/2026')) === 1 && (await visibleCount('button', 'Convidar alguém')) === 1,
+      t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 700));
+    ok('Negócio compartilhado (D-120): com outras pessoas, encerrar fica bloqueado com a frase do que fazer antes; o nome continua',
+      (await visibleCount('button', 'Encerrar o espaço Negócio')) === 0 && t.includes('Para encerrar o espaço Negócio, remova antes as outras pessoas.') && (await visibleCount('button', 'Mudar o nome')) === 1 &&
+        t.includes('O Pessoal de cada pessoa continua só dela: ninguém do negócio vê o seu, e você não vê o de ninguém.') && t.includes('Cada pessoa participa de um negócio por vez.'));
+    const npHeads2 = await npH(2), npHeads3 = await npH(3);
+    ok('Negócio compartilhado (D-120): "Pessoas do negócio" é título de nível 2, e "Pessoas que saíram" e "Convites", de nível 3', npHeads2.includes('Pessoas do negócio') && npHeads3.includes('Pessoas que saíram') && npHeads3.includes('Convites'), `${JSON.stringify(npHeads2)} ${JSON.stringify(npHeads3)}`);
+    await atWidths(async (w) => { await npPeople(); await innerChecks(`Negócio compartilhado, Pessoas do negócio ${w}px`); await shot(w === 390 ? '811_negocio_pessoas' : '811_negocio_pessoas_320px'); });
+
+    // 3. Convidar.
+    await npPeople();
+    await btn('Convidar alguém').click(); await waitText('O que a pessoa poderá fazer'); await p.waitForTimeout(500);
+    t = await npKeep();
+    const npRoles = await p.evaluate(() => [...document.querySelectorAll('[role=radiogroup][aria-label="O que a pessoa poderá fazer"] [role=radio]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-label') || e.textContent}:${e.getAttribute('aria-checked')}`));
+    ok('Convidar para o negócio: título, os papéis ("Anota e vê" marcado e "Só vê"), o que cada um faz, as vagas e a regra do link de uma vez',
+      (await h1Name()) === 'Convidar para o negócio' && JSON.stringify(npRoles) === JSON.stringify(['Anota e vê:true', 'Só vê:false']) && t.includes('Vê e anota. Altera só o que anotou.') &&
+        t.includes('Cabem mais 3 pessoas, contando os convites pendentes.') && t.includes('O link vale por 7 dias e serve uma única vez.') && (await visibleCount('button', 'Gerar link')) === 1, `${JSON.stringify(npRoles)} ${t.slice(0, 500)}`);
+    ok('Convidar para o negócio: formulário sem a barra de abas', (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0);
+    await radio('Só vê').click(); await p.waitForTimeout(200);
+    ok('Convidar para o negócio: "Só vê" explica que a pessoa não anota', (await body()).includes('Só vê. Não anota nem altera nada.'));
+    await atWidths(async (w) => { await innerChecks(`Negócio compartilhado, convidar ${w}px`); if (w === 390) await shot('812_negocio_convidar'); });
+    await radio('Anota e vê').click();
+    await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(500);
+    const npLink1 = await npLink();
+    t = await npKeep();
+    ok('Convidar para o negócio: o link (endereço do app mais /convite/negocio/ e 32 caracteres), "Anota e vê · vale até 14/10", "Copiar link" e a regra de ver o link só agora',
+      npLink1 !== null && npLink1.startsWith(`http://localhost:${PORT}/convite/negocio/`) && t.includes('Anota e vê · vale até 14/10') && (await visibleCount('button', 'Copiar link')) === 1 && t.includes('Ele aparece só agora'),
+      `${npLink1} ${t.slice(0, 300)}`);
+    await btn('Copiar link').click(); await waitText('Link copiado.').catch(() => {}); await p.waitForTimeout(300);
+    ok('Convidar para o negócio: "Copiar link" avisa "Link copiado."', (await body()).includes('Link copiado.'));
+    await atWidths(async (w) => { await layoutChecks(`Negócio compartilhado, link do convite ${w}px`); if (w === 390) await shot('813_negocio_link_convite'); });
+    await btn('Concluir').click(); await waitText('Últimos meses'); await p.waitForTimeout(500);
+    await npPeople();
+    t = await body();
+    ok('Convidar para o negócio: de volta a "Seu negócio", o convite novo aparece na lista, as vagas baixam e o link não aparece de novo',
+      t.includes('Anota e vê · vale até 14/10') && t.includes('Cabem mais 2 pessoas, contando os convites pendentes.') && !t.includes(npLink1.split('/').pop()), t.slice(t.indexOf('Convites'), t.indexOf('Convites') + 300));
+
+    // 4. Cancelar um convite.
+    await btn('Cancelar convite para Só vê, que vale até 14/10/2026').click(); await waitText('Convite cancelado.'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Negócio compartilhado: "Cancelar convite" tira o convite da lista, avisa "Convite cancelado." e libera a vaga',
+      t.includes('Convite cancelado.') && !t.includes('Só vê · vale até 14/10') && t.includes('Cabem mais 3 pessoas, contando os convites pendentes.'), t.slice(0, 400));
+
+    // 5. Gerenciar: mudar o papel e remover, com confirmação.
+    await btn('Gerenciar Rafa, Anota e vê').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    const npChoices = await p.getByRole('dialog').or(p.getByRole('alert')).filter({ visible: true }).last().getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent));
+    ok('Gerenciar: a folha "Ações para Rafa" com o que o papel atual permite, "Mudar para "Só vê"", "Remover do negócio" e "Cancelar"',
+      t.includes('Ações para Rafa') && t.includes('Vê e anota. Altera só o que anotou.') && JSON.stringify(npChoices) === JSON.stringify(['Mudar para "Só vê"', 'Remover do negócio', 'Cancelar']), `${JSON.stringify(npChoices)} ${t}`);
+    await shot('814_negocio_gerenciar');
+    await btn('Mudar para "Só vê"').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    ok('Gerenciar, mudar o papel: a confirmação "Mudar Rafa para "Só vê"?" diz o que muda', t.includes('Mudar Rafa para "Só vê"?') && t.includes('A pessoa continua vendo o negócio, mas deixa de anotar.') && (await visibleCount('button', 'Mudar o papel')) === 1, t);
+    await confirmIn('Mudar o papel'); await waitText('Papel atualizado.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('Gerenciar, mudar o papel: "Papel atualizado." e Rafa passa a "Só vê"', t.includes('Papel atualizado.') && t.includes('Rafa\nSó vê') && (await visibleCount('button', 'Gerenciar Rafa, Só vê')) === 1, t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 300));
+    await btn('Gerenciar Rafa, Só vê').click(); await p.waitForTimeout(400);
+    await btn('Remover do negócio').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    ok('Gerenciar, remover: a confirmação "Remover Rafa do negócio?" diz que a pessoa deixa de ver na hora, que o que anotou fica e que o Pessoal dela não muda',
+      t.includes('Remover Rafa do negócio?') && t.includes('A pessoa deixa de ver o negócio na hora. O que ela anotou continua no negócio, como histórico.') && t.includes('o Pessoal dela não muda'), t);
+    await shot('815_negocio_remover');
+    await confirmIn('Remover'); await waitText('Pessoa removida do negócio.'); await p.waitForTimeout(500);
+    t = await npKeep();
+    ok('Gerenciar, remover: Rafa vai para "Pessoas que saíram", sem "Gerenciar", e encerrar volta a valer (só quem administra ficou)',
+      t.includes('Pessoa removida do negócio.') && t.includes('Rafa (saiu do negócio)') && (await visibleCount('button', /^Gerenciar Rafa/)) === 0 && (await visibleCount('button', 'Encerrar o espaço Negócio')) === 1 &&
+        !t.includes('Para encerrar o espaço Negócio, remova antes as outras pessoas.'), t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 500));
+
+    // 6. Quem anotou e "Quem vê estes dados?".
+    await npEnter('negocio-plus');
+    await npTab(NP_TAB).click(); await p.waitForTimeout(600);
+    await tabByName('Movimentos').click(); await waitText('Anotar entrada'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Encomenda de festa, Entrada · 03\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Anotado por'); await p.waitForTimeout(400);
+    t = await npKeep();
+    ok('Negócio compartilhado: no detalhe de uma entrada que Rafa anotou, "Anotado por Rafa em ..."', /Anotado por Rafa em \d{2}\/\d{2}\/\d{4}/.test(t), t.slice(0, 600));
+    await atWidths(async (w) => { await innerChecks(`Negócio compartilhado, quem anotou ${w}px`); if (w === 390) await shot('816_negocio_anotado_por'); });
+    await btn('Voltar').click(); await waitText('Anotar entrada'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Frutas e açúcar, Saída · 02\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Anotado por'); await p.waitForTimeout(400);
+    ok('Negócio compartilhado: no que a própria pessoa anotou, "Anotado por Maria (você) em ..."', /Anotado por Maria \(você\) em /.test(await body()));
+    await npBack();
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    await btn('Quem vê estes dados?').click(); await waitText('Quem não vê'); await p.waitForTimeout(400);
+    t = await npKeep();
+    ok('Negócio compartilhado: "Quem vê estes dados?" lista as pessoas do negócio (Maria, você, administra; Rafa anota e vê), com o que cada papel faz, sem "só você"',
+      t.includes('Estas pessoas veem os lançamentos do negócio, cada uma conforme o papel que tem.') && t.includes('Maria (você)') && t.includes('Rafa') && t.includes('Vê e anota. Altera só o que anotou.') &&
+        !t.includes('Só você vê e anota no espaço Negócio.') && t.includes('Quem não está no negócio não vê o negócio. Ninguém do negócio vê o seu Pessoal.') && !t.includes('Nina'), t.slice(0, 900));
+    await atWidths(async (w) => { await innerChecks(`Negócio compartilhado, quem vê ${w}px`); if (w === 390) await shot('817_negocio_quem_ve'); });
+    await npConta();
+    ok('Negócio compartilhado: o card de Conta diz o nome e o papel ("Sacolé da Maria · Administra")', (await body()).includes(`${NP} · Administra`));
+
+    // 7. O convite: o próprio link (quem administra), um link inválido, sem sessão, e outra conta que aceita e sai.
+    await npBack();
+    await npTab(NP_TAB).click(); await p.waitForTimeout(500);
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    await npPeople();
+    await btn('Convidar alguém').click(); await waitText('O que a pessoa poderá fazer'); await p.waitForTimeout(300);
+    await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(400);
+    const npLink2 = await npLink();
+    const npCode2 = npLink2.split('/').pop();
+    await btn('Concluir').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    await npGo(`/convite/negocio/${npCode2}`); await waitText('Aceitar convite'); await p.waitForTimeout(500);
+    t = await npKeep();
+    ok('Convite para um negócio: a prévia mostra quem convidou ("Convite de Maria"), o nome do negócio, o papel, a validade e que o Pessoal de ninguém fica visível',
+      (await h1Name()) === 'Convite para um negócio' && t.includes('Convite de Maria') && t.includes(NP) && t.includes('Anota e vê. Você poderá ver e anotar o que entra e sai do negócio.') &&
+        t.includes('Vale até 14/10/2026.') && t.includes('Aceitar não mostra nem copia o seu Pessoal. Você também não vê o Pessoal de ninguém do negócio.') && !t.includes(npCode2) && !t.includes('Maria Alves'), t.slice(0, 500));
+    await btn('Aceitar convite').click(); await waitText('Você já participa deste negócio.'); await p.waitForTimeout(400);
+    ok('Convite para um negócio: quem administra, ao aceitar o próprio link, lê "Você já participa deste negócio." e nada muda', (await body()).includes('Você já participa deste negócio.') && (await h1Name()) === 'Convite para um negócio');
+    await atWidths(async (w) => { await layoutChecks(`Negócio compartilhado, convite ${w}px`); if (w === 390) await shot('818_convite_negocio'); });
+    await npGo(`/convite/negocio/${'f'.repeat(32)}`); await waitText('Convite indisponível'); await p.waitForTimeout(400);
+    ok('Convite para um negócio: um código que não existe diz "Convite indisponível" sem dizer o motivo', (await body()).includes('Este convite não está disponível. Peça um novo link a quem convidou.'));
+    // Sem sessão: a entrada, e de volta ao convite depois de criar a conta.
+    await btn('Ir para o início').click(); await p.waitForTimeout(500);
+    await npConta();
+    await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(400);
+    await npGo(`/convite/negocio/${npCode2}`); await waitText('Você recebeu um convite para um negócio'); await p.waitForTimeout(400);
+    t = await npKeep();
+    ok('Convite para um negócio, sem sessão: explica e oferece "Criar conta" e "Entrar", sem mostrar o negócio',
+      t.includes('Você recebeu um convite para um negócio na Clarevo. Entre ou crie sua conta para ver quem convidou e aceitar.') && (await visibleCount('button', 'Criar conta')) === 1 &&
+        (await visibleCount('button', 'Entrar')) === 1 && !t.includes(NP), t.slice(0, 400));
+    await atWidths(async (w) => { await layoutChecks(`Negócio compartilhado, convite sem sessão ${w}px`); if (w === 390) await shot('819_convite_negocio_sem_sessao'); });
+    await btn('Criar conta').click(); await waitText('Nome de apresentação');
+    await field('Nome de apresentação').fill('Caio Lima'); await field('E-mail').fill('caio.negocio@exemplo.com'); await field('Senha').fill('senha1234');
+    await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+    await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+    await btn('Começar meu mês').click(); await waitText('Aceitar convite', 12000); await p.waitForTimeout(500);
+    ok('Convite para um negócio: depois de criar a conta, a pessoa volta para o convite', (await h1Name()) === 'Convite para um negócio' && (await body()).includes(NP));
+    await btn('Aceitar convite').click(); await waitText(`Você entrou no negócio ${NP}.`); await p.waitForTimeout(700);
+    t = await npKeep();
+    ok('Aceitar: abre "Seu negócio" com o aviso, o papel "Anota e vê", Maria administrando e "Caio (você)", sem convites, sem "Gerenciar", sem nome e encerrar, e com "Sair do negócio"',
+      (await h1Name()) === 'Seu negócio' && t.includes(`Você entrou no negócio ${NP}.`) && t.includes('Seu papel: Anota e vê') && t.includes('Maria\nAdministra') && t.includes('Caio (você)') &&
+        !t.includes('Convites') && (await visibleCount('button', 'Convidar alguém')) === 0 && (await visibleCount('button', /^Gerenciar/)) === 0 && (await visibleCount('button', 'Mudar o nome')) === 0 &&
+        (await visibleCount('button', 'Encerrar o espaço Negócio')) === 0 && (await visibleCount('button', 'Sair do negócio')) === 1 && (await visibleCount('button', 'Retirada para o Pessoal')) === 1,
+      t.slice(0, 900));
+    await npBack();
+    ok('Aceitar: o app passa para o negócio (o seletor do Resumo marca "Sacolé da Maria")', JSON.stringify(await p.getByRole('tab', { name: /^Ver dados d/ }).filter({ visible: true }).evaluateAll((els) => els.map((e) => `${e.getAttribute('aria-label')}:${e.getAttribute('aria-selected')}`))) ===
+      JSON.stringify(['Ver dados de Pessoal:false', `${NP_TAB}:true`]) && (await visibleCount('button', 'Anotar saída')) === 1);
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    await npPeople();
+    await atWidths(async (w) => { await npPeople(); await innerChecks(`Negócio compartilhado, quem anota e vê ${w}px`); if (w === 390) await shot('820_negocio_membro'); });
+    await btn('Sair do negócio').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    ok('Sair do negócio: a confirmação diz que a pessoa deixa de ver na hora, que o que anotou fica e que as retiradas continuam no Pessoal',
+      t.includes('Sair do negócio?') && t.includes('Você deixa de ver o negócio na hora.') && t.includes('As retiradas que você levou para o Pessoal continuam no seu Pessoal'), t);
+    await confirmIn('Sair do negócio'); await waitText('Você saiu do negócio.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('Sair do negócio: Conta avisa "Você saiu do negócio." e volta a oferecer "Criar o espaço Negócio"', t.includes('Você saiu do negócio.') && (await visibleCount('button', 'Criar o espaço Negócio')) === 1, t.slice(0, 400));
+    await btn('Criar o espaço Negócio').click(); await waitText('Nome do negócio'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Sem negócio, criar o espaço Negócio fica como antes (nenhum campo de convite: quem não tem negócio não lê a chave do Plus)', !NP_PLUS.test(t) && (await h1Name()) === 'Espaço Negócio', t.match(NP_PLUS)?.[0] ?? '');
+    await btn('Voltar').click(); await p.waitForTimeout(400);
+
+    // 7a. O Plus fecha depois de haver outras pessoas: quem administra continua vendo quem lê o negócio; só os convites e "Convidar" somem,
+    // "Convidar para o negócio" volta a "Seu negócio" e um convite pendente deixa de valer. Encerrar e excluir a conta seguem travados.
+    await npEnter('negocio-plus');
+    await npOpen(NP_TAB);
+    await npPeople();
+    await btn('Convidar alguém').click(); await waitText('O que a pessoa poderá fazer'); await p.waitForTimeout(300);
+    await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(400);
+    const npLink3 = await npLink();
+    await btn('Concluir').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.biz.setPlusOpen(false); await window.__e2e.refresh(); });
+    await p.waitForTimeout(800);
+    await npPeople();
+    t = await npKeep();
+    ok('Plus fechado depois (D-120): quem administra continua vendo as pessoas (Rafa, Nina), sem "Convites" nem "Convidar alguém", e encerrar segue bloqueado',
+      t.includes('Pessoas do negócio') && t.includes('Rafa\nAnota e vê') && t.includes('Nina (saiu do negócio)') && !t.includes('Convites') && (await visibleCount('button', 'Convidar alguém')) === 0 &&
+        (await visibleCount('button', 'Encerrar o espaço Negócio')) === 0 && t.includes('Para encerrar o espaço Negócio, remova antes as outras pessoas.') && (await visibleCount('button', 'Gerenciar Rafa, Anota e vê')) === 1,
+      t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 600));
+    await npNav('negocio/convidar'); await p.waitForTimeout(1200);
+    ok('Plus fechado depois: "Convidar para o negócio" volta a "Seu negócio" (a tela não existe com o Plus fechado)', new URL(p.url()).pathname === '/negocio' && (await h1Name()) === 'Seu negócio', p.url());
+    await btn('Quem vê estes dados?').click(); await waitText('Quem não vê'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Plus fechado depois: "Quem vê estes dados?" continua listando Rafa (nenhuma frase diz "só você")', t.includes('Estas pessoas veem os lançamentos do negócio') && t.includes('Rafa') && !t.includes('Só você vê e anota no espaço Negócio.'), t.slice(0, 600));
+    await npConta();
+    ok('Plus fechado depois: o card de Conta segue "Sacolé da Maria · Administra"', (await body()).includes(`${NP} · Administra`));
+    // Excluir a conta: quem administra um negócio com outras pessoas remove as pessoas antes; a tela trava antes de qualquer cancelamento.
+    await btn('Ver o que é apagado ao excluir minha conta e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(800);
+    t = await npKeep();
+    ok('Excluir a conta (D-120): quem administra um negócio com outras pessoas lê que precisa remover as pessoas antes, com "Ver seu negócio"',
+      t.includes('Espaço Negócio\nVocê administra o negócio Sacolé da Maria e há outras pessoas nele. Antes de excluir a conta, remova as outras pessoas do negócio.') &&
+        t.includes('Em "Seu negócio", toque em "Gerenciar" ao lado de cada pessoa e escolha "Remover do negócio".') && (await visibleCount('button', 'Ver seu negócio')) === 1, t.slice(0, 1500));
+    await field('Digite EXCLUIR para confirmar').fill('EXCLUIR'); await p.waitForTimeout(300);
+    ok('Excluir a conta (D-120): com outras pessoas no negócio, "Excluir minha conta" continua desligado mesmo com EXCLUIR digitado', await btn('Excluir minha conta').isDisabled());
+    await atWidths(async (w) => { await p.getByText('Espaço Negócio', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await layoutChecks(`Negócio compartilhado, excluir a conta ${w}px`); if (w === 390) await shot('825_excluir_conta_negocio'); });
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    ok('Excluir a conta (D-120): "Ver seu negócio" abre "Seu negócio", onde as pessoas são removidas', (await h1Name()) === 'Seu negócio');
+    await npGo(new URL(npLink3).pathname); await waitText('Convite indisponível'); await p.waitForTimeout(400);
+    ok('Plus fechado depois: um convite pendente deixa de valer ("Convite indisponível", sem dizer o motivo)', (await body()).includes('Este convite não está disponível. Peça um novo link a quem convidou.'));
+    // A exclusão da conta fica como antes para quem administra sozinha (o cenário "negocio"): nada do negócio em "O que continua".
+    await npEnter('negocio');
+    await npConta();
+    await btn('Ver o que é apagado ao excluir minha conta e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(800);
+    t = await body();
+    ok('Excluir a conta, negócio sem outras pessoas: a tela de antes (o negócio entre o que é apagado, nenhuma seção "Espaço Negócio")',
+      t.includes('Tudo o que você anotou no seu Pessoal e no seu espaço Negócio, se tiver um,') && !t.includes('\nEspaço Negócio\n') && !t.includes('Você administra o negócio'), t.slice(0, 1200));
+    await field('Digite EXCLUIR para confirmar').fill('EXCLUIR'); await p.waitForTimeout(300);
+    ok('Excluir a conta, negócio sem outras pessoas: com EXCLUIR, o botão liga, como antes', !(await btn('Excluir minha conta').isDisabled()));
+
+    // 8. O negócio de outra pessoa (cenário "negocio-plus-membro"): anota e vê; com "Só vê", as ações de anotar somem.
+    const NM = 'Marmitas da Bia';
+    const NM_TAB = `Ver dados do negócio ${NM}`;
+    await npEnter('negocio-plus-membro');
+    await npOpen(NM_TAB);
+    t = await npKeep();
+    ok('Negócio de outra pessoa: Maria anota e vê em "Marmitas da Bia" (Bia administra), com "Retirada para o Pessoal" e "Sair do negócio", sem nome e encerrar',
+      t.includes('Seu papel: Anota e vê') && t.includes('Bia\nAdministra') && t.includes('Maria (você)') && (await visibleCount('button', 'Retirada para o Pessoal')) === 1 &&
+        (await visibleCount('button', 'Sair do negócio')) === 1 && !t.includes('Nome e encerrar') && t.includes('O WhatsApp e o Telegram não anotam no espaço Negócio.'), t.slice(0, 900));
+    // Quem anota e vê muda só o que anotou: no lançamento de Bia, sem editar, excluir nem mover; no próprio, com editar.
+    await npBack();
+    await tabByName('Movimentos').click(); await waitText('Anotar entrada'); await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Feira e mercado, Saída · 01\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Anotado por'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Anota e vê: no lançamento de Bia, "Anotado por Bia", sem editar, excluir nem mover (só quem anotou ou quem administra)',
+      /Anotado por Bia em /.test(t) && (await visibleCount('button', /^Editar/)) === 0 && (await visibleCount('button', /^Excluir/)) === 0 && (await visibleCount('button', /^Mover/)) === 0 && (await visibleCount('button', 'Tornar gasto fixo')) === 1, t.slice(0, 500));
+    await btn('Voltar').click(); await waitText('Anotar entrada'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /^Embalagens, Saída · 03\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Anotado por'); await p.waitForTimeout(400);
+    ok('Anota e vê: no próprio lançamento, "Anotado por Maria (você)" com "Editar saída"', /Anotado por Maria \(você\) em /.test(await body()) && (await visibleCount('button', 'Editar saída')) === 1);
+    const npBill = await p.evaluate(async () => { const repo = await window.__e2e.repo(); const b = await repo.getBusiness(); return (await repo.listCommitments(b.id, '2026-10'))[0].id; });
+    await npNav('a-pagar/[id]/index', { id: npBill }); await waitText('Aluguel da cozinha'); await p.waitForTimeout(500);
+    t = await body();
+    ok('Anota e vê: na conta a pagar de Bia, "Já paguei", sem "Editar conta a pagar" nem "Excluir conta a pagar"',
+      (await visibleCount('button', 'Já paguei')) === 1 && (await visibleCount('button', 'Editar conta a pagar')) === 0 && (await visibleCount('button', 'Excluir conta a pagar')) === 0 && /Anotada por Bia em /.test(t), t.slice(0, 600));
+    await npConta();
+    ok('Negócio de outra pessoa: o card de Conta diz "Marmitas da Bia · Anota e vê"', (await body()).includes(`${NM} · Anota e vê`));
+    // Excluir a conta: quem participa do negócio de outra pessoa sai dele, e o que anotou fica lá.
+    await btn('Ver o que é apagado ao excluir minha conta e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(800);
+    t = await npKeep();
+    ok('Excluir a conta (D-120): quem participa do negócio de outra pessoa lê que sai dele e que o que anotou fica, e o Pessoal é o que se apaga',
+      t.includes('Espaço Negócio\nVocê sai do negócio Marmitas da Bia. O que você anotou continua lá, como histórico, com a autoria "Pessoa que saiu".') &&
+        t.includes('Tudo o que você anotou no seu Pessoal, como gastos,') && !t.includes('e no seu espaço Negócio, se tiver um'), t.slice(0, 1500));
+    await field('Digite EXCLUIR para confirmar').fill('EXCLUIR'); await p.waitForTimeout(300);
+    ok('Excluir a conta (D-120): quem participa pode confirmar (o botão liga com EXCLUIR)', !(await btn('Excluir minha conta').isDisabled()));
+    await btn('Cancelar').click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(300);
+    // Bia muda o papel de Maria para "Só vê" (no hub da memória, como faria pelo app dela).
+    await p.evaluate(async () => {
+      const repo = await window.__e2e.repo();
+      const b = await repo.getBusiness();
+      repo.biz.setRole('pessoa-bia', 'e2e-papel-leitor', b.id, 'pessoa-demo', 'leitor', () => false);
+      await window.__e2e.refresh();
+    });
+    await npBack(); await p.waitForTimeout(600);
+    t = await body();
+    ok('Só vê: no Resumo do negócio, sem "Anotar saída" nem "Retirada para o Pessoal"', (await visibleCount('button', 'Anotar saída')) === 0 && (await visibleCount('button', 'Retirada para o Pessoal')) === 0 && t.includes('Seu negócio'), t.slice(0, 500));
+    await tabByName('Movimentos').click(); await p.waitForTimeout(700);
+    ok('Só vê: em Movimentos do negócio, sem "Anotar saída" nem "Anotar entrada"', (await visibleCount('button', 'Anotar saída')) === 0 && (await visibleCount('button', 'Anotar entrada')) === 0);
+    await p.getByRole('button', { name: /^Embalagens, Saída · 03\/10\/2026/ }).filter({ visible: true }).first().click(); await waitText('Anotado por'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Só vê: nem no próprio lançamento há editar, excluir, mover ou tornar gasto fixo', /Anotado por Maria \(você\) em /.test(t) && (await visibleCount('button', /^Editar/)) === 0 && (await visibleCount('button', /^Excluir/)) === 0 &&
+      (await visibleCount('button', /^Mover/)) === 0 && (await visibleCount('button', 'Tornar gasto fixo')) === 0, t.slice(0, 500));
+    await npNav('a-pagar/[id]/index', { id: npBill }); await waitText('Aluguel da cozinha'); await p.waitForTimeout(500);
+    ok('Só vê: na conta a pagar, sem "Já paguei", "Editar conta a pagar" nem "Excluir conta a pagar"',
+      (await visibleCount('button', 'Já paguei')) === 0 && (await visibleCount('button', 'Editar conta a pagar')) === 0 && (await visibleCount('button', 'Excluir conta a pagar')) === 0);
+    await atWidths(async (w) => { await innerChecks(`Negócio compartilhado, conta a pagar de quem só vê ${w}px`); if (w === 390) await shot('826_conta_a_pagar_so_ve'); });
+    await npBack();
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(500);
+    t = await npKeep();
+    ok('Só vê: "Seu negócio" mostra "Seu papel: Só vê", sem "Retirada para o Pessoal", "Anotar entrada" nem "Anotar saída", e com "Sair do negócio"',
+      t.includes('Seu papel: Só vê') && t.includes('Só vê. Não anota nem altera nada.') && (await visibleCount('button', 'Retirada para o Pessoal')) === 0 && (await visibleCount('button', 'Anotar entrada')) === 0 &&
+        (await visibleCount('button', 'Anotar saída')) === 0 && (await visibleCount('button', 'Sair do negócio')) === 1, t.slice(0, 700));
+    await atWidths(async (w) => { await npPeople(); await innerChecks(`Negócio compartilhado, só vê ${w}px`); if (w === 390) await shot('821_negocio_so_ve'); });
+
+    // 9. Modo escuro e computador (1280 px).
+    {
+      const npDark = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
+      await npDark.addInitScript(() => { window.__clarevoSemTour = true; });
+      const dp = await npDark.newPage();
+      const dpErrors = []; dp.on('pageerror', (e) => dpErrors.push(e.message));
+      const dpWrites = []; dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dpWrites.push(r.url()));
+      await dp.goto(`http://localhost:${PORT}/?cenario=negocio-plus`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
+      await dp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dp.getByRole('tab', { name: NP_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
+      await dp.getByRole('button', { name: 'Ver seu negócio', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Últimos meses').filter({ visible: true }).first().waitFor({ timeout: 10000 });
+      await dp.getByRole('heading', { name: 'Pessoas do negócio', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await dp.waitForTimeout(800);
+      await dp.evaluate(AC_SRC);
+      const dc = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow(), bg: getComputedStyle(document.body).backgroundColor }));
+      ok(`Negócio compartilhado, modo escuro: "Pessoas do negócio" no fundo azul-marinho, com contraste de 4,5:1 em cada texto (${dc.c.n} textos) e nada fora da tela`,
+        dc.bg === 'rgb(19, 30, 62)' && dc.c.n > 20 && dc.c.bad.length === 0 && dc.o.length === 0, `${dc.bg} ${[...dc.c.bad, ...dc.o].slice(0, 4).join(' | ')}`);
+      await dp.screenshot({ path: `${OUT}/822_escuro_negocio_pessoas.png` });
+      await dp.getByRole('button', { name: 'Convidar alguém', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('O que a pessoa poderá fazer').filter({ visible: true }).first().waitFor({ timeout: 8000 }); await dp.waitForTimeout(600);
+      await dp.evaluate(AC_SRC);
+      const dc2 = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow() }));
+      ok(`Negócio compartilhado, modo escuro: "Convidar para o negócio" com contraste de 4,5:1 (${dc2.c.n} textos) e nada fora da tela; sem erros e nada vai à rede`,
+        dc2.c.n > 8 && dc2.c.bad.length === 0 && dc2.o.length === 0 && dpErrors.length === 0 && dpWrites.length === 0, [...dc2.c.bad, ...dc2.o, ...dpErrors, ...dpWrites].slice(0, 4).join(' | '));
+      await dp.screenshot({ path: `${OUT}/823_escuro_negocio_convidar.png` });
+      await npDark.close();
+    }
+    await npEnter('negocio-plus');
+    await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(600);
+    await npTab(NP_TAB).click(); await p.waitForTimeout(600);
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(600);
+    await npPeople();
+    t = await body();
+    ok('Negócio compartilhado, computador (1280 px): a seção "Pessoas do negócio" com as pessoas e os convites', t.includes('Pessoas do negócio') && t.includes('Rafa') && (await visibleCount('button', 'Convidar alguém')) === 1);
+    await layoutChecks('Negócio compartilhado, Pessoas do negócio 1280px'); await shot('824_computador_negocio_pessoas');
+    await btn('Convidar alguém').click(); await waitText('O que a pessoa poderá fazer'); await p.waitForTimeout(600);
+    await layoutChecks('Negócio compartilhado, convidar 1280px'); await shot('824_computador_negocio_convidar');
+    await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(500);
+    ok('Negócio compartilhado, computador: o link do convite e "Copiar link" (sem compartilhamento do navegador, o botão principal)', (await npLink()) !== null && (await visibleCount('button', 'Copiar link')) === 1);
+    await layoutChecks('Negócio compartilhado, link do convite 1280px');
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+
+    // Textos e escritas.
+    // "titular" continua só nas frases da Família ("Se você excluir a conta" e a tela de excluir); nas telas do negócio, quem cria "administra".
+    const npBad = npTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.split('\n').filter((l) => !l.includes('Família')).join('\n').match(/\b(preju[ií]zo|lucro|cuidado|aten[cç][aã]o|ruim|parab[eé]ns|deveria|titular|plus|pre[cç]o)\b/i)?.[0]).filter(Boolean);
+    ok('Negócio compartilhado: nas telas novas, nenhum termo proibido, travessão longo, julgamento, "titular", "Plus" nem preço', npTexts.length >= 12 && npBad.length === 0, `${npTexts.length} telas ${npBad.join(' | ')}`);
+    ok('Negócio compartilhado: nada vai à rede (a demonstração grava só na memória)', writes.length === npWrites0, writes.slice(npWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
   // Auditoria visual (18/11/2026): Conta em seções, com o Espaço Negócio e a Família logo depois da assinatura, sem o widget na web e
   // com o tema numa coluna em 390 px; Movimentos com os dois totais alinhados e numa cor só; o card do Desempenho em Investir e a busca
   // "No app" por CDI; as abas Evolução e Orçamento das Análises com prévias; as contas vencidas do Resumo sem a cor de erro; o ritmo
