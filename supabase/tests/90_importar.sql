@@ -206,11 +206,11 @@ do $$ begin
     = array['uuid', 'text', 'uuid', 'uuid', 'uuid'], 'tipos de import_items';
   assert to_regprocedure('public.import_records(text, uuid, text, uuid, jsonb)') is not null, 'a assinatura de import_records';
   assert (select prosecdef from pg_proc where oid = 'public.import_records(text, uuid, text, uuid, jsonb)'::regprocedure), 'import_records é definer';
-  -- As assinaturas existentes não mudaram (o app publicado antes da 0012 segue funcionando).
-  assert to_regprocedure('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid)') is not null
+  -- As assinaturas vigentes (a 0045 acrescentou p_marks no fim de create_record e update_record, com valor padrão: a chamada do app anterior segue valendo).
+  assert to_regprocedure('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid, jsonb)') is not null
      and to_regprocedure('public.add_card_purchase(text, uuid, date, bigint, integer, text, text, text)') is not null
      and to_regprocedure('public.add_card_refund(text, uuid, date, bigint, text, text)') is not null
-     and to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean)') is not null
+     and to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean, jsonb)') is not null
      and to_regprocedure('public.pay_invoice(text, uuid, date, integer, bigint, date, uuid, uuid)') is not null, 'assinaturas anteriores intactas';
   -- record_operations: import_result só na importação, e sempre nela.
   assert (select count(*) from pg_constraint where conname = 'record_operations_import_check') = 1, 'restrição de import_result';
