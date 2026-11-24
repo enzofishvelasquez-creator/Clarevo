@@ -2,7 +2,7 @@
 -- restrição (só no negócio, sem escrever o valor 'negocio'); set_business_profile (quem administra, valores, limpar, repetição, recusas,
 -- sem contar como anotação); trazer dinheiro do Pessoal (os dois lados ligados, as categorias e descrições, cada lado uma vez no próprio
 -- espaço, o guarda, a repetição e as recusas); excluir pelo lado que for, também a retirada; encerrar desliga o par; o orçamento do
--- negócio com 12 categorias; só ver e exportar recusa os dois.
+-- negócio continua com 9 categorias; só ver e exportar recusa os dois.
 -- Pessoas FICTÍCIAS: Lia (dona do Ateliê da Lia) e Teo (de fora). Tudo em uma transação desfeita no fim.
 \set ON_ERROR_STOP 1
 \set lia '''00000000-0000-0000-0000-0000000000c7'''
@@ -198,22 +198,19 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 5. Orçamento do negócio: as 3 categorias novas valem; as de fora da operação, não
+-- 5. Orçamento do negócio: continua com as 9 de antes (o app publicado recusa outra contagem); as categorias novas são lançamentos comuns
 -- ---------------------------------------------------------------------------
 do $$
 declare
   biz uuid := pg_temp.id('biz');
 begin
-  perform public.set_category_budget('nm-o-0001', biz, 'Divulgação', '2026-11-01', 0, 20000);
+  assert (select count(*) from public.month_budget(biz, '2026-11-01')) = 9, '9 linhas, como antes';
+  perform pg_temp.expect_code(format('select public.set_category_budget(%L, %L, %L, %L, 0, 10000)', 'nm-o-0001', biz, 'Divulgação', '2026-11-01'), 'categoria_invalida', '22023');
   perform public.create_record('nm-o-0002', biz, pg_temp.id('biz_acc'), 'despesa', 5000, '2026-11-22', 'Panfletos', 'Divulgação');
-  assert (select used_cents from public.month_budget(biz, '2026-11-01') where category = 'Divulgação') = 5000
-     and (select budget_cents from public.month_budget(biz, '2026-11-01') where category = 'Divulgação') = 20000, 'orçamento da divulgação';
-  assert (select count(*) from public.month_budget(biz, '2026-11-01')) = 12, '12 linhas';
-  perform pg_temp.expect_code(format('select public.set_category_budget(%L, %L, %L, %L, 0, 10000)', 'nm-o-0003', biz, 'Equipamento', '2026-11-01'), 'categoria_invalida', '22023');
-  perform pg_temp.expect_code(format('select public.set_category_budget(%L, %L, %L, %L, 0, 10000)', 'nm-o-0004', pg_temp.id('pes'), 'Divulgação', '2026-11-01'), 'categoria_invalida', '22023');
-  -- As categorias de fora da operação são lançamentos comuns.
   perform public.create_record('nm-o-0010', biz, pg_temp.id('biz_acc'), 'despesa', 80000, '2026-11-22', 'Máquina de costura', 'Equipamento');
   perform public.create_record('nm-o-0011', biz, pg_temp.id('biz_acc'), 'receita', 100000, '2026-11-22', 'Empréstimo', 'Empréstimo recebido');
+  assert (select count(*) from public.financial_records where context_id = biz and category in ('Divulgação', 'Equipamento', 'Empréstimo recebido')) = 3,
+    'as categorias novas são lançamentos comuns';
 end $$;
 
 -- ---------------------------------------------------------------------------

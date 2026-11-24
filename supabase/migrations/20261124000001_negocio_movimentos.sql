@@ -12,13 +12,14 @@
 --      para o negócio") e uma entrada no negócio ("Dinheiro do Pessoal"), gravados juntos e ligados (paired_record_id), com o mesmo guarda
 --      da retirada (retirada_ligada). Cada lado conta uma vez no próprio espaço; em "Seu negócio" a entrada fica fora da operação (o app
 --      separa pela categoria). Excluir: delete_business_withdrawal, que agora acha o lado do negócio pelo tipo do espaço.
---   3. Orçamento do negócio com 12 categorias de saída: as 9 de antes mais "Divulgação", "Contabilidade e sistemas" e "Juros e multas",
---      antes de "Outras saídas". "Empréstimo recebido", "Parcela de empréstimo" e "Equipamento" são categorias só do app (os lançamentos
---      já aceitam qualquer categoria) e ficam fora do orçamento, como a retirada.
+--   3. As categorias novas do app ("Divulgação", "Contabilidade e sistemas", "Juros e multas", "Empréstimo recebido", "Parcela de
+--      empréstimo" e "Equipamento") não mudam nada no banco: os lançamentos já aceitam qualquer categoria. O orçamento do negócio
+--      continua com as 9 de antes. As 3 primeiras entram no orçamento numa migração seguinte, quando o app publicado já aceitar mais
+--      linhas no orçamento (o app anterior a esta rodada recusa qualquer lista que não tenha 7 ou 9 linhas).
 --   4. Duas ações novas em record_operations (99 no total): criar_aporte_negocio (conta como anotação, como a retirada) e
 --      definir_perfil_negocio (não conta). Nenhuma vale em só ver e exportar.
--- Compatibilidade: nenhuma função existente muda de assinatura e nenhum dado muda. O app publicado lê o negócio sem a coluna nova e
--- recebe 12 linhas no orçamento do negócio (as 3 novas aparecem com o nome; nenhuma conta muda). O app novo chama as funções novas:
+-- Compatibilidade: nenhuma função existente muda de assinatura e nenhum dado muda. O app publicado lê o negócio sem a coluna nova e o
+-- orçamento do negócio não muda. O app novo chama as funções novas:
 -- aplicar antes do merge, depois da 0043 (docs/05, passo 12ak), e recarregar o esquema da API. Testes em
 -- supabase/tests/99zzzzzzzzzzzzzzzzzzzzzzz_negocio_movimentos.sql.
 
@@ -259,35 +260,7 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 5. Orçamento do negócio: 12 categorias de saída, na ordem do app (as 9 de antes e Divulgação, Contabilidade e sistemas e Juros e multas,
--- antes de Outras saídas). O Pessoal e a Família continuam com as 7 de sempre.
--- ---------------------------------------------------------------------------
-alter table public.category_budgets drop constraint category_budgets_categoria;
-alter table public.category_budgets add constraint category_budgets_categoria
-  check (category in ('Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas',
-                      'Material e mercadoria', 'Peças e ferramentas', 'Combustível e transporte', 'Funcionários e ajudantes',
-                      'Impostos e DAS', 'Aluguel do ponto', 'Contas do ponto', 'Taxas e maquininha', 'Divulgação',
-                      'Contabilidade e sistemas', 'Juros e multas', 'Outras saídas'));
-
-create or replace function public.clarevo_budget_categories(p_context uuid)
-returns text[]
-language plpgsql
-stable
-security definer
-set search_path = public
-as $$
-begin
-  if public.clarevo_is_business(p_context) then
-    return array['Material e mercadoria', 'Peças e ferramentas', 'Combustível e transporte', 'Funcionários e ajudantes',
-                 'Impostos e DAS', 'Aluguel do ponto', 'Contas do ponto', 'Taxas e maquininha', 'Divulgação',
-                 'Contabilidade e sistemas', 'Juros e multas', 'Outras saídas'];
-  end if;
-  return array['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas'];
-end;
-$$;
-
--- ---------------------------------------------------------------------------
--- 6. Operações: a lista vigente (0043) mais as duas novas. criar_aporte_negocio guarda a entrada do negócio em record_id e o gasto do
+-- 5. Operações: a lista vigente (0043) mais as duas novas. criar_aporte_negocio guarda a entrada do negócio em record_id e o gasto do
 -- Pessoal em target_id (como a retirada); definir_perfil_negocio aponta para o negócio.
 -- ---------------------------------------------------------------------------
 alter table public.record_operations drop constraint record_operations_action_check;
@@ -366,7 +339,7 @@ alter table public.record_operations add constraint record_operations_target_che
       and record_id is null and commitment_id is null and target_id is null));
 
 -- ---------------------------------------------------------------------------
--- 7. Atividade (a função da 0043) sem contar definir o tipo do negócio; trazer dinheiro do Pessoal conta, como a retirada.
+-- 6. Atividade (a função da 0043) sem contar definir o tipo do negócio; trazer dinheiro do Pessoal conta, como a retirada.
 -- ---------------------------------------------------------------------------
 create or replace function public.clarevo_track_activity()
 returns trigger
@@ -404,10 +377,9 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 8. Privilégios: as duas funções novas só para authenticated; as auxiliares recriadas, para ninguém com sessão.
+-- 7. Privilégios: as duas funções novas só para authenticated; as auxiliares recriadas, para ninguém com sessão.
 -- ---------------------------------------------------------------------------
 revoke all on function public.clarevo_business_json(uuid) from public, anon, authenticated, service_role;
-revoke all on function public.clarevo_budget_categories(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_track_activity() from public, anon, authenticated, service_role;
 
 revoke all on function public.set_business_profile(uuid, text, text) from public, anon;

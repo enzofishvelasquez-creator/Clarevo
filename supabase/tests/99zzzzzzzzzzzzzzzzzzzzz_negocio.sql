@@ -191,8 +191,7 @@ begin
   assert (select array_agg(category order by 1) from (select category from public.month_budget(biz, '2026-11-01')) x) is not null, 'orçamento lê';
   assert (select array_agg(category) from public.month_budget(biz, '2026-11-01'))
        = array['Material e mercadoria', 'Peças e ferramentas', 'Combustível e transporte', 'Funcionários e ajudantes', 'Impostos e DAS',
-               'Aluguel do ponto', 'Contas do ponto', 'Taxas e maquininha', 'Divulgação', 'Contabilidade e sistemas', 'Juros e multas',
-               'Outras saídas'], 'as 12 categorias de gasto do negócio, na ordem (as 3 novas da 0044 antes de Outras saídas)';
+               'Aluguel do ponto', 'Contas do ponto', 'Taxas e maquininha', 'Outras saídas'], 'as 9 categorias de gasto do negócio, na ordem';
   assert (select array_agg(category) from public.month_budget(pg_temp.id('pes'), '2026-11-01'))
        = array['Moradia', 'Mercado', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Crédito e parcelas'], 'o Pessoal com as 7 de sempre';
   b := public.set_category_budget('ng-o-0001', biz, 'Material e mercadoria', '2026-11-01', 0, 40000);
