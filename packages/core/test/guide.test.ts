@@ -86,6 +86,14 @@ const COVERAGE_EXCEPTIONS: readonly { route: string; reason: string }[] = [
     route: '/conta/whatsapp',
     reason: 'WhatsApp (D-076): a tela só aparece quando o número da Clarevo existir (WHATSAPP_NUMBER); a entrada do guia e a captura entram junto com o número.',
   },
+  {
+    route: '/contabilidade',
+    reason: 'Negócios que você acompanha (D-123, Clarevo Plus): desligado até o Plus abrir; nada do Plus entra no guia, na busca de Aprender nem no site.',
+  },
+  {
+    route: '/contabilidade/[id]',
+    reason: 'Um negócio acompanhado como Contabilidade (D-123, Clarevo Plus): desligado até o Plus abrir, como /contabilidade.',
+  },
 ];
 
 /** Telas de consulta ou abas que nenhuma entrada cobre e que não estão na lista de exceções. */

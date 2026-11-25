@@ -1,4 +1,5 @@
 import {
+  ACCOUNTING_TEXT,
   BUSINESS_PEOPLE_TEXT,
   BUSINESS_TEXT,
   businessHasOthers,
@@ -21,6 +22,7 @@ import {
 } from '@clarevo/core';
 import {
   AlertCircle,
+  BookOpenCheck,
   Building2,
   Check,
   FileDown,
@@ -60,7 +62,7 @@ import { signOutIntent } from '@/lib/nav';
 import { SITE_URL, openLicensesPage, openSitePage, openSupportEmail } from '@/lib/site';
 import { useCompanies } from '@/state/company';
 import { useWork } from '@/state/data';
-import { useBusiness, useSharedBusinessPeople } from '@/state/business';
+import { useAccounting, useBusiness, useSharedBusinessPeople } from '@/state/business';
 import { useFamily } from '@/state/family';
 import { useSession } from '@/state/session';
 import { useAccountLevel } from '@/state/access';
@@ -108,6 +110,10 @@ export default function ContaScreen() {
   // Negócio compartilhado (D-116, D-120): com outras pessoas, ou sem administrar, o card diz o papel, e não "Só você vê e anota".
   const businessPeople = useSharedBusinessPeople(business.data);
   const businessShared = Boolean(business.data && (business.data.role !== 'titular' || businessHasOthers(businessPeople.data)));
+  // Negócios que a pessoa acompanha como Contabilidade (D-123): o cartão só com o Plus aberto e ao menos um negócio (com ele fechado, a
+  // lista vem vazia e nada aparece).
+  const accounting = useAccounting();
+  const followed = accounting.data?.plusOpen ? accounting.data.businesses : [];
   const companies = useCompanies();
   // Avisos das telas de contas ("Conta adicionada.", "Conta salva."): lidos uma única vez, quando esta tela abre.
   const [notice] = useFlash();
@@ -254,6 +260,19 @@ export default function ContaScreen() {
             onPress={() => router.push(business.data ? '/negocio' : '/negocio/novo')}
           />
         </Card>
+
+        {/* Negócios que você acompanha (D-123): a área da Contabilidade, fora dos espaços da pessoa. */}
+        {followed.length > 0 ? (
+          <Card style={{ gap: space[3] }}>
+            <Txt variant="title" accessibilityRole="header" aria-level={2}>
+              {ACCOUNTING_TEXT.accountTitle}
+            </Txt>
+            <Txt variant="caption" color={colors.textSecondary} style={note}>
+              {ACCOUNTING_TEXT.accountHint(followed.length)}
+            </Txt>
+            <Button label={ACCOUNTING_TEXT.accountOpen} icon={BookOpenCheck} tone="soft" onPress={() => router.push('/contabilidade')} />
+          </Card>
+        ) : null}
 
         {/* Família (D-055): criar, convidar e administrar; abre a tela Família. */}
         <Card style={{ gap: space[3] }}>

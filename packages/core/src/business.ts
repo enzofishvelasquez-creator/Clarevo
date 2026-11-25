@@ -133,6 +133,11 @@ export interface BusinessContext {
   role: FamilyRole;
   /** O tipo do negócio (D-121), opcional: null é "Prefiro não dizer" (e o negócio de antes da migração 0044). */
   businessProfile: BusinessProfile | null;
+  /**
+   * O negócio é uma sociedade? (D-123, migração 0046): true ou false depois que quem administra responde; null enquanto não respondeu (e no
+   * banco sem a 0046). Não muda permissão nenhuma: só mostra a frase de convidar as outras pessoas sócias e passar a administração.
+   */
+  businessPartnership: boolean | null;
 }
 
 /**
@@ -180,9 +185,13 @@ export type BusinessAction =
   | 'excluir_retirada_negocio'
   | 'mover_lancamento'
   | 'criar_aporte_negocio'
-  | 'definir_perfil_negocio';
+  | 'definir_perfil_negocio'
+  | 'definir_sociedade_negocio';
 
-/** As seis da migração 0042 e as duas da 0044 (D-121): trazer dinheiro do Pessoal (conta como anotação) e definir o tipo (não conta). */
+/**
+ * As seis da migração 0042, as duas da 0044 (D-121): trazer dinheiro do Pessoal (conta como anotação) e definir o tipo (não conta), e a da
+ * 0046 (D-123): responder se o negócio é uma sociedade (não conta).
+ */
 export const BUSINESS_ACTIONS: readonly BusinessAction[] = [
   'criar_negocio',
   'renomear_negocio',
@@ -192,6 +201,7 @@ export const BUSINESS_ACTIONS: readonly BusinessAction[] = [
   'mover_lancamento',
   'criar_aporte_negocio',
   'definir_perfil_negocio',
+  'definir_sociedade_negocio',
 ];
 
 export function isBusinessAction(action: string): action is BusinessAction {

@@ -17706,8 +17706,8 @@ setInterval(async () => {
   // Negócio compartilhado (Plus, D-120; decisão D-116): o negócio com outras pessoas, pronto e DESLIGADO até o Plus abrir. (1) Com o Plus
   // fechado (a demonstração padrão e o cenário "negocio"), nada novo aparece: nem "Pessoas do negócio", nem "Convidar alguém", nem o
   // campo do convite. (2) No cenário "negocio-plus" (Plus aberto; pessoas FICTÍCIAS, só com o primeiro nome), "Seu negócio" ganha a seção
-  // "Pessoas do negócio": Maria administra, Rafa anota e vê, Nina saiu e há um convite "Só vê" pendente; encerrar fica bloqueado com
-  // outras pessoas. (3) Convidar: o papel, o link /convite/negocio/<código> que aparece uma vez e "Copiar link". (4) Cancelar um convite.
+  // "Pessoas do negócio": Maria administra, Rafa anota e vê, Nina saiu e há um convite "Só vê" pendente (D-123: e Dora, da Contabilidade,
+  // fora das vagas); encerrar fica bloqueado com outras pessoas. (3) Convidar: o papel, o link /convite/negocio/<código> que aparece uma vez e "Copiar link". (4) Cancelar um convite.
   // (5) "Gerenciar": mudar o papel e remover, com confirmação. (6) Quem anotou, nos detalhes, e "Quem vê estes dados?". (7) O convite:
   // sem sessão, a entrada; quem administra abre o próprio link (ja_no_negocio); outra conta cria a conta, aceita e o app passa para o
   // negócio; quem entrou sai. (8) No cenário "negocio-plus-membro", Maria anota e vê no negócio de Bia; com o papel "Só vê", as ações
@@ -17811,8 +17811,9 @@ setInterval(async () => {
     await btn('Convidar alguém').click(); await waitText('O que a pessoa poderá fazer'); await p.waitForTimeout(500);
     t = await npKeep();
     const npRoles = await p.evaluate(() => [...document.querySelectorAll('[role=radiogroup][aria-label="O que a pessoa poderá fazer"] [role=radio]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-label') || e.textContent}:${e.getAttribute('aria-checked')}`));
-    ok('Convidar para o negócio: título, os papéis ("Anota e vê" marcado e "Só vê"), o que cada um faz, as vagas e a regra do link de uma vez',
-      (await h1Name()) === 'Convidar para o negócio' && JSON.stringify(npRoles) === JSON.stringify(['Anota e vê:true', 'Só vê:false']) && t.includes('Vê e anota. Altera só o que anotou.') &&
+    // D-123: a terceira opção, "Contabilidade" (bloco "Negócio com equipe").
+    ok('Convidar para o negócio: título, os papéis ("Anota e vê" marcado, "Só vê" e "Contabilidade"), o que cada um faz, as vagas e a regra do link de uma vez',
+      (await h1Name()) === 'Convidar para o negócio' && JSON.stringify(npRoles) === JSON.stringify(['Anota e vê:true', 'Só vê:false', 'Contabilidade:false']) && t.includes('Vê e anota. Altera só o que anotou.') &&
         t.includes('Cabem mais 3 pessoas, contando os convites pendentes.') && t.includes('O link vale por 7 dias e serve uma única vez.') && (await visibleCount('button', 'Gerar link')) === 1, `${JSON.stringify(npRoles)} ${t.slice(0, 500)}`);
     ok('Convidar para o negócio: formulário sem a barra de abas', (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0);
     await radio('Só vê').click(); await p.waitForTimeout(200);
@@ -17844,8 +17845,10 @@ setInterval(async () => {
     await btn('Gerenciar Rafa, Anota e vê').click(); await p.waitForTimeout(400);
     t = await dialogText();
     const npChoices = await p.getByRole('dialog').or(p.getByRole('alert')).filter({ visible: true }).last().getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent));
-    ok('Gerenciar: a folha "Ações para Rafa" com o que o papel atual permite, "Mudar para "Só vê"", "Remover do negócio" e "Cancelar"',
-      t.includes('Ações para Rafa') && t.includes('Vê e anota. Altera só o que anotou.') && JSON.stringify(npChoices) === JSON.stringify(['Mudar para "Só vê"', 'Remover do negócio', 'Cancelar']), `${JSON.stringify(npChoices)} ${t}`);
+    // D-123: com o Plus aberto, "Passar a administração" entre mudar o papel e remover (bloco "Negócio com equipe").
+    ok('Gerenciar: a folha "Ações para Rafa" com o que o papel atual permite, "Mudar para "Só vê"", "Passar a administração", "Remover do negócio" e "Cancelar"',
+      t.includes('Ações para Rafa') && t.includes('Vê e anota. Altera só o que anotou.') &&
+        JSON.stringify(npChoices) === JSON.stringify(['Mudar para "Só vê"', 'Passar a administração', 'Remover do negócio', 'Cancelar']), `${JSON.stringify(npChoices)} ${t}`);
     await shot('814_negocio_gerenciar');
     await btn('Mudar para "Só vê"').click(); await p.waitForTimeout(400);
     t = await dialogText();
@@ -17861,7 +17864,7 @@ setInterval(async () => {
     await shot('815_negocio_remover');
     await confirmIn('Remover'); await waitText('Pessoa removida do negócio.'); await p.waitForTimeout(500);
     t = await npKeep();
-    ok('Gerenciar, remover: Rafa vai para "Pessoas que saíram", sem "Gerenciar", e encerrar volta a valer (só quem administra ficou)',
+    ok('Gerenciar, remover: Rafa vai para "Pessoas que saíram", sem "Gerenciar", e encerrar volta a valer (ficaram quem administra e a Contabilidade, que não impede)',
       t.includes('Pessoa removida do negócio.') && t.includes('Rafa (saiu do negócio)') && (await visibleCount('button', /^Gerenciar Rafa/)) === 0 && (await visibleCount('button', 'Encerrar o espaço Negócio')) === 1 &&
         !t.includes('Para encerrar o espaço Negócio, remova antes as outras pessoas.'), t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 500));
 
@@ -17965,6 +17968,15 @@ setInterval(async () => {
       t.includes('Pessoas do negócio') && t.includes('Rafa\nAnota e vê') && t.includes('Nina (saiu do negócio)') && !t.includes('Convites') && (await visibleCount('button', 'Convidar alguém')) === 0 &&
         (await visibleCount('button', 'Encerrar o espaço Negócio')) === 0 && t.includes('Para encerrar o espaço Negócio, remova antes as outras pessoas.') && (await visibleCount('button', 'Gerenciar Rafa, Anota e vê')) === 1,
       t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 600));
+    // D-123 com o Plus fechado depois (com Rafa e Dora, da Contabilidade, no negócio): nada do negócio com equipe à vista.
+    ok('Plus fechado depois (D-123): sem a pergunta da sociedade, sem a linha dos acessos de Contabilidade e sem "Sair do negócio" para quem administra',
+      !t.includes('O negócio é uma sociedade?') && !t.includes('acessos de Contabilidade') && (await visibleCount('button', 'Sair do negócio')) === 0 &&
+        (await p.getByRole('radiogroup', { name: 'O negócio é uma sociedade?' }).count()) === 0, t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 900));
+    await btn('Gerenciar Rafa, Anota e vê').click(); await p.waitForTimeout(400);
+    const npClosedChoices = await p.getByRole('dialog').or(p.getByRole('alert')).filter({ visible: true }).last().getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent));
+    ok('Plus fechado depois (D-123): "Gerenciar Rafa" sem "Passar a administração" (só mudar o papel e remover)',
+      JSON.stringify(npClosedChoices) === JSON.stringify(['Mudar para "Só vê"', 'Remover do negócio', 'Cancelar']), JSON.stringify(npClosedChoices));
+    await btn('Cancelar').click(); await p.waitForTimeout(300);
     await npNav('negocio/convidar'); await p.waitForTimeout(1200);
     ok('Plus fechado depois: "Convidar para o negócio" volta a "Seu negócio" (a tela não existe com o Plus fechado)', new URL(p.url()).pathname === '/negocio' && (await h1Name()) === 'Seu negócio', p.url());
     await btn('Quem vê estes dados?').click(); await waitText('Quem não vê'); await p.waitForTimeout(400);
@@ -18103,6 +18115,397 @@ setInterval(async () => {
     const npBad = npTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.split('\n').filter((l) => !l.includes('Família')).join('\n').match(/\b(preju[ií]zo|lucro|cuidado|aten[cç][aã]o|ruim|parab[eé]ns|deveria|titular|plus|pre[cç]o)\b/i)?.[0]).filter(Boolean);
     ok('Negócio compartilhado: nas telas novas, nenhum termo proibido, travessão longo, julgamento, "titular", "Plus" nem preço', npTexts.length >= 12 && npBad.length === 0, `${npTexts.length} telas ${npBad.join(' | ')}`);
     ok('Negócio compartilhado: nada vai à rede (a demonstração grava só na memória)', writes.length === npWrites0, writes.slice(npWrites0).join(' | '));
+  }
+
+  // ==================================================================================================================
+  // Negócio com equipe (Plus, D-123): a sociedade, passar a administração e o papel Contabilidade, prontos e DESLIGADOS até o Plus abrir.
+  // (1) Com o Plus fechado (a demonstração padrão e o cenário "negocio"), nada disso aparece: nem a pergunta da sociedade, nem "Passar a
+  // administração", nem "Contabilidade", nem o cartão "Negócios que você acompanha"; as telas /contabilidade mostram o estado neutro.
+  // (2) No cenário "negocio-plus" (Plus aberto), quem administra responde "O negócio é uma sociedade?" e altera; a Contabilidade (Dora,
+  // FICTÍCIA) aparece na lista só com "Remover do negócio"; "Sair do negócio" de quem administra explica como sair; passar a
+  // administração para Rafa (confirmação, os dois papéis novos) e sair depois. (3) Convidar a Contabilidade: a opção, os 3 acessos à parte
+  // das 6 pessoas, o convite com o texto do papel, quem já está no negócio, e outra conta que aceita e cai em "Negócios que você
+  // acompanha", fora do seletor; "Deixar de acompanhar". (4) No cenário "negocio-plus-contabilidade", Maria acompanha "Ateliê da Lia" e
+  // "Oficina do Téo" (FICTÍCIOS) fora do seletor: a lista, o Resumo do ano com troca de ano, a exportação e "Deixar de acompanhar".
+  // (5) Excluir a conta com o Plus aberto: passar a administração também resolve. (6) Modo escuro, computador (1280 px), letra grande e,
+  // com o Plus fechado depois, nada à vista de novo. Capturas 860 a 879. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const eqWrites0 = writes.length;
+    const eqTexts = [];
+    const eqKeep = async () => { const x = await body(); eqTexts.push(x); screenTexts.push(x); return x; };
+    const EQ = 'Sacolé da Maria';
+    const EQ_TAB = `Ver dados do negócio ${EQ}`;
+    const eqTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
+    const eqEnter = async (cenario) => {
+      await p.goto(`http://localhost:${PORT}/?cenario=${cenario}`); await waitText('Cuidar da vida financeira');
+      await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+      await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(600);
+    };
+    const eqOpen = async () => {
+      await eqTab(EQ_TAB).click(); await p.waitForTimeout(600);
+      await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(600);
+    };
+    const eqPeople = async () => {
+      await p.getByRole('heading', { name: 'Pessoas do negócio', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(300);
+    };
+    const eqBack = async () => {
+      const tab = () => p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true });
+      for (let i = 0; i < 6 && (await tab().count()) === 0; i++) { await btn('Voltar').click(); await p.waitForTimeout(400); }
+      await tab().first().click(); await p.waitForTimeout(500);
+    };
+    const eqConta = async () => { await eqBack(); await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(400); };
+    // Abre um endereço sem recarregar (recarregar zera o acesso simulado): pelo histórico (os convites) ou pelo navegador de rotas (as telas
+    // com sessão), como no bloco do negócio compartilhado.
+    const eqGo = (path) => p.evaluate((path) => { history.pushState({}, '', path); window.dispatchEvent(new PopStateEvent('popstate')); }, path);
+    const eqNav = (route, params = {}) => p.evaluate(({ route, params }) => {
+      const root = document.getElementById('root');
+      const key = Object.keys(root).find((x) => x.startsWith('__reactContainer$'));
+      const stack = [root[key].stateNode.current];
+      while (stack.length > 0) {
+        const f = stack.pop();
+        const v = f.memoizedProps?.value;
+        if (v && typeof v === 'object' && typeof v.getRootState === 'function' && typeof v.navigate === 'function') { v.navigate(route, params); return; }
+        if (f.sibling) stack.push(f.sibling);
+        if (f.child) stack.push(f.child);
+      }
+      throw new Error('navegador de rotas não encontrado');
+    }, { route, params });
+    const eqLink = async () => (await body()).match(/https?:\/\/[^\s]+\/convite\/negocio\/[0-9a-f]{32}/)?.[0] ?? null;
+    const eqSpaces = () => p.getByRole('tab', { name: /^Ver dados d/ }).filter({ visible: true }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+    const eqChoices = () => p.getByRole('dialog').or(p.getByRole('alert')).filter({ visible: true }).last().getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent));
+    const eqPartner = (name) => p.getByRole('radiogroup', { name: 'O negócio é uma sociedade?' }).filter({ visible: true }).first().getByRole('radio', { name, exact: true });
+    // O que só existe com o Plus aberto (D-123).
+    const EQ_NEW = /sociedade|Passar a administração|Contabilidade|Negócios que você acompanha|acompanha como|Como sair do negócio/;
+
+    // 1. Plus fechado: a demonstração padrão e o cenário "negocio" ficam como antes; as telas /contabilidade, neutras.
+    await demoHome();
+    await eqConta();
+    t = await body();
+    ok('Negócio com equipe (D-123), Plus fechado: Conta da demonstração padrão sem "Negócios que você acompanha"', !EQ_NEW.test(t) && (await visibleCount('button', 'Ver os negócios que você acompanha')) === 0, t.match(EQ_NEW)?.[0] ?? '');
+    await eqEnter('negocio');
+    await eqOpen();
+    t = await eqKeep();
+    ok('Negócio com equipe (D-123), Plus fechado: "Seu negócio" do cenário "negocio" sem a pergunta da sociedade, "Contabilidade" nem "Passar a administração"',
+      !EQ_NEW.test(t) && !t.includes('Pessoas do negócio') && (await visibleCount('button', 'Sair do negócio')) === 0 && (await visibleCount('button', 'Encerrar o espaço Negócio')) === 1, t.match(EQ_NEW)?.[0] ?? '');
+    // Logo depois de abrir (enquanto a lista e a chave do Plus são lidas) e até o estado neutro: nenhum texto novo, nenhuma pílula.
+    const eqEarly = async (nav) => {
+      await nav();
+      const seen = [];
+      for (let i = 0; i < 12; i++) {
+        seen.push(await p.evaluate(() => `${document.body.innerText}\n${[...document.querySelectorAll('[aria-label^="Espaço:"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.getAttribute('aria-label')).join('|')}`));
+        await p.waitForTimeout(60);
+      }
+      return seen;
+    };
+    const eqEarlySeen = await eqEarly(() => eqNav('contabilidade/index'));
+    const eqEarlyBad = eqEarlySeen.map((x) => x.match(EQ_NEW)?.[0] ?? x.match(/Espaço: [^|\n]*Contabilidade|Carregando os negócios/)?.[0]).filter(Boolean);
+    ok('Negócio com equipe (D-123), Plus fechado: logo ao abrir /contabilidade (carregando) e depois, nenhum texto da Contabilidade nem a pílula', eqEarlyBad.length === 0, eqEarlyBad.slice(0, 3).join(' | '));
+    await waitText('Nada para mostrar'); await p.waitForTimeout(500);
+    t = await eqKeep();
+    ok('Negócio com equipe (D-123), Plus fechado: /contabilidade mostra o estado neutro ("Nada para mostrar") com a volta para Conta, sem nada do Plus',
+      (await h1Name()) === 'Nada para mostrar' && t.includes('Não há nada para mostrar nesta tela agora.') && (await visibleCount('button', 'Voltar para Conta')) === 1 && !EQ_NEW.test(t), t.slice(0, 400));
+    await atWidths(async (w) => { await layoutChecks(`Negócio com equipe, /contabilidade com o Plus fechado ${w}px`); if (w === 390) await shot('860_contabilidade_plus_fechado'); });
+    await eqNav('contabilidade/[id]', { id: 'neg-demo-pessoa-teo' }); await waitText('Nada para mostrar'); await p.waitForTimeout(400);
+    ok('Negócio com equipe (D-123), Plus fechado: /contabilidade/<id> também mostra o estado neutro', (await h1Name()) === 'Nada para mostrar' && !EQ_NEW.test(await body()));
+    await btn('Voltar para Conta').click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(400);
+    t = await body();
+    ok('Negócio com equipe (D-123), Plus fechado: "Voltar para Conta" abre Conta, sem o cartão da Contabilidade', !EQ_NEW.test(t) && t.includes(`${EQ}. Só você vê e anota.`), t.match(EQ_NEW)?.[0] ?? '');
+    await eqNav('conta/exportar', { contabilidade: 'neg-demo-pessoa-teo' }); await waitText('Período'); await p.waitForTimeout(500);
+    t = await body();
+    ok('Negócio com equipe (D-123), Plus fechado: "Exportar" com um negócio que a pessoa não acompanha fica a exportação de sempre ("Exportar meus dados", com a escolha do espaço)',
+      (await h1Name()) === 'Exportar meus dados' && t.includes('Espaço') && !EQ_NEW.test(t), t.slice(0, 400));
+
+    // 2. Cenário "negocio-plus": a sociedade, a Contabilidade na lista, como sair e passar a administração.
+    await eqEnter('negocio-plus');
+    await eqOpen();
+    await eqPeople();
+    t = await eqKeep();
+    ok('Negócio com equipe: quem administra vê "O negócio é uma sociedade?" (Sim e Não, nada marcado) e a frase de que a resposta não muda nada',
+      t.includes('O negócio é uma sociedade?') && t.includes('A resposta não muda o que cada pessoa pode fazer no negócio.') &&
+        (await eqPartner('Sim').getAttribute('aria-checked')) === 'false' && (await eqPartner('Não').getAttribute('aria-checked')) === 'false', t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 900));
+    ok('Negócio com equipe: a Contabilidade (Dora) na lista, com o papel "Contabilidade", e as vagas à parte (3 pessoas e 2 acessos de Contabilidade)',
+      t.includes('Dora\nContabilidade') && t.includes('Cabem mais 3 pessoas, contando os convites pendentes.') &&
+        t.includes('Cabem mais 2 acessos de Contabilidade, contando os convites pendentes. A Contabilidade não conta nas 6 pessoas.') && (await visibleCount('button', 'Gerenciar Dora, Contabilidade')) === 1,
+      t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 900));
+    await atWidths(async (w) => { await eqPeople(); await p.getByRole('radiogroup', { name: 'O negócio é uma sociedade?' }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await innerChecks(`Negócio com equipe, a pergunta da sociedade ${w}px`); if (w === 390) await shot('861_negocio_sociedade_pergunta'); });
+    await eqPartner('Sim').click(); await waitText('O negócio é uma sociedade.'); await p.waitForTimeout(500);
+    t = await eqKeep();
+    ok('Sociedade: "Sim" vira a linha "O negócio é uma sociedade." com "Alterar" e a frase de convidar as outras pessoas sócias e passar a administração',
+      t.includes('O negócio é uma sociedade.') && (await visibleCount('button', 'Alterar a resposta: o negócio é uma sociedade')) === 1 &&
+        t.includes('Convide as outras pessoas sócias, por exemplo com "Anota e vê". Se um dia você precisar sair, passe a administração para uma delas.') && !t.includes('O negócio é uma sociedade?'), t.slice(t.indexOf('Pessoas do negócio'), t.indexOf('Pessoas do negócio') + 900));
+    await atWidths(async (w) => { await p.getByText('O negócio é uma sociedade.', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await innerChecks(`Negócio com equipe, a resposta da sociedade ${w}px`); if (w === 390) await shot('862_negocio_sociedade_resposta'); });
+    await btn('Alterar a resposta: o negócio é uma sociedade').click(); await p.waitForTimeout(400);
+    ok('Sociedade, "Alterar": a pergunta volta com "Sim" marcado e "Cancelar"', (await eqPartner('Sim').getAttribute('aria-checked')) === 'true' && (await visibleCount('button', 'Cancelar')) >= 1);
+    await eqPartner('Não').click(); await waitText('O negócio não é uma sociedade.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('Sociedade: "Não" mostra "O negócio não é uma sociedade.", sem a frase das pessoas sócias', t.includes('O negócio não é uma sociedade.') && !t.includes('Convide as outras pessoas sócias'));
+    // Gerenciar a Contabilidade: só remover.
+    await btn('Gerenciar Dora, Contabilidade').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    const eqDora = await eqChoices();
+    ok('Gerenciar a Contabilidade: a folha "Ações para Dora" diz o que o papel faz e só oferece "Remover do negócio" (sem mudar de papel nem receber a administração)',
+      t.includes('Ações para Dora') && t.includes('Vê e exporta os lançamentos deste negócio. Não anota nem muda nada, e não vê o Pessoal nem a Família de ninguém.') &&
+        JSON.stringify(eqDora) === JSON.stringify(['Remover do negócio', 'Cancelar']), `${JSON.stringify(eqDora)} ${t}`);
+    await shot('863_negocio_gerenciar_contabilidade');
+    await btn('Remover do negócio').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    ok('Remover a Contabilidade: a confirmação diz que ela deixa de ver e exportar na hora e que nada muda nos lançamentos', t.includes('Remover Dora do negócio?') && t.includes('A Contabilidade deixa de ver e exportar o negócio na hora. Nada muda nos lançamentos do negócio.'), t);
+    await btn('Cancelar').click(); await p.waitForTimeout(400);
+    // "Sair do negócio" de quem administra: como sair.
+    await btn('Sair do negócio').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    ok('Quem administra, "Sair do negócio": "Como sair do negócio" explica passar a administração antes, em "Gerenciar", e sair depois com "Anota e vê"',
+      t.includes('Como sair do negócio') && t.includes('Antes de sair, passe a administração para outra pessoa que anota ou só vê: em "Gerenciar", ao lado da pessoa, escolha "Passar a administração".') &&
+        JSON.stringify(await eqChoices()) === JSON.stringify(['Entendi']), t);
+    await shot('864_negocio_como_sair');
+    await btn('Entendi').click(); await p.waitForTimeout(400);
+    // Passar a administração para Rafa.
+    await btn('Gerenciar Rafa, Anota e vê').click(); await p.waitForTimeout(400);
+    await btn('Passar a administração').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    ok('Passar a administração: a confirmação "Passar a administração para Rafa?" diz o que Rafa passa a fazer e que você continua com "Anota e vê"',
+      t.includes('Passar a administração para Rafa?') && t.includes('Rafa passa a convidar, mudar papéis, remover pessoas e encerrar o negócio. Você continua no negócio com "Anota e vê" e pode sair depois.') &&
+        t.includes('Para você voltar a administrar, a pessoa que passar a administrar precisa passar a administração de volta.'), t);
+    await atWidths(async (w) => { await layoutChecks(`Negócio com equipe, passar a administração ${w}px`); if (w === 390) await shot('865_negocio_passar_administracao'); });
+    await confirmIn('Passar a administração'); await waitText('A administração passou para Rafa.'); await p.waitForTimeout(700);
+    t = await eqKeep();
+    ok('Passar a administração: o aviso, "Seu papel: Anota e vê", Rafa administra, sem "Gerenciar", convites, sociedade, nome e encerrar, e com "Sair do negócio"',
+      t.includes('A administração passou para Rafa. Agora o seu papel é "Anota e vê".') && t.includes('Seu papel: Anota e vê') && t.includes('Rafa\nAdministra') && t.includes('Maria (você)\nAnota e vê') &&
+        (await visibleCount('button', /^Gerenciar/)) === 0 && (await visibleCount('button', 'Convidar alguém')) === 0 && !t.includes('O negócio não é uma sociedade.') && !t.includes('Convites') &&
+        (await visibleCount('button', 'Mudar o nome')) === 0 && (await visibleCount('button', 'Encerrar o espaço Negócio')) === 0 && (await visibleCount('button', 'Sair do negócio')) === 1 &&
+        (await visibleCount('button', 'Retirada para o Pessoal')) === 1, t.slice(0, 900));
+    await atWidths(async (w) => { await eqPeople(); await innerChecks(`Negócio com equipe, depois de passar a administração ${w}px`); if (w === 390) await shot('866_negocio_depois_de_passar'); });
+    await eqConta();
+    ok('Passar a administração: o card de Conta diz "Sacolé da Maria · Anota e vê"', (await body()).includes(`${EQ} · Anota e vê`));
+    await eqBack();
+    await eqTab(EQ_TAB).click(); await p.waitForTimeout(500);
+    await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    await btn('Sair do negócio').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    ok('Depois de passar a administração, "Sair do negócio" é a saída de quem anota e vê (com a confirmação)', t.includes('Sair do negócio?') && t.includes('Você deixa de ver o negócio na hora.'), t);
+    await confirmIn('Sair do negócio'); await waitText('Você saiu do negócio.'); await p.waitForTimeout(500);
+    ok('Depois de passar a administração: Maria sai, e Conta volta a oferecer "Criar o espaço Negócio"', (await body()).includes('Você saiu do negócio.') && (await visibleCount('button', 'Criar o espaço Negócio')) === 1);
+
+    // 3. Convidar a Contabilidade: a opção, os 3 acessos, o convite e outra conta que aceita.
+    await eqEnter('negocio-plus');
+    await eqOpen();
+    await eqPeople();
+    await btn('Convidar alguém').click(); await waitText('O que a pessoa poderá fazer'); await p.waitForTimeout(500);
+    await radio('Contabilidade').click(); await p.waitForTimeout(300);
+    t = await eqKeep();
+    ok('Convidar a Contabilidade: a terceira opção, o que ela faz, para quem é, fora das 6 pessoas, e os acessos livres',
+      (await radio('Contabilidade').getAttribute('aria-checked')) === 'true' && t.includes('Vê e exporta os lançamentos deste negócio. Não anota nem muda nada, e não vê o Pessoal nem a Família de ninguém.') &&
+        t.includes('Para o escritório ou a pessoa que cuida da contabilidade do negócio. Não conta nas 6 pessoas: são até 3 acessos de Contabilidade.') &&
+        t.includes('Cabem mais 2 acessos de Contabilidade, contando os convites pendentes.') && !t.includes('Cabem mais 3 pessoas'), t.slice(0, 900));
+    await atWidths(async (w) => { await innerChecks(`Negócio com equipe, convidar a Contabilidade ${w}px`); if (w === 390) await shot('867_negocio_convidar_contabilidade'); });
+    await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(500);
+    const eqLink1 = await eqLink();
+    t = await body();
+    ok('Convidar a Contabilidade: o link e "Contabilidade · vale até 14/10"', eqLink1 !== null && t.includes('Contabilidade · vale até 14/10'), `${eqLink1} ${t.slice(0, 300)}`);
+    await btn('Concluir').click(); await waitText('Últimos meses'); await p.waitForTimeout(500);
+    await eqPeople();
+    t = await body();
+    ok('Convidar a Contabilidade: o convite na lista e 1 acesso livre; as 6 pessoas não mudam', t.includes('Contabilidade · vale até 14/10') &&
+      t.includes('Cabe mais 1 acesso de Contabilidade, contando os convites pendentes.') && t.includes('Cabem mais 3 pessoas, contando os convites pendentes.'), t.slice(t.indexOf('Convites'), t.indexOf('Convites') + 500));
+    await btn('Convidar alguém').click(); await waitText('O que a pessoa poderá fazer'); await p.waitForTimeout(400);
+    await radio('Contabilidade').click(); await p.waitForTimeout(200);
+    await btn('Gerar link').click(); await waitText('Link do convite'); await p.waitForTimeout(400);
+    await btn('Concluir').click(); await waitText('Últimos meses'); await p.waitForTimeout(500);
+    await eqPeople();
+    t = await body();
+    ok('Contabilidade, limite de 3: com Dora e dois convites, "Os 3 acessos de Contabilidade estão em uso", e "Convidar alguém" continua (as pessoas têm vagas)',
+      t.includes('Os 3 acessos de Contabilidade estão em uso, contando os convites pendentes.') && (await visibleCount('button', 'Convidar alguém')) === 1 && !(await btn('Convidar alguém').isDisabled()));
+    await btn('Convidar alguém').click(); await waitText('O que a pessoa poderá fazer'); await p.waitForTimeout(400);
+    await radio('Contabilidade').click(); await p.waitForTimeout(300);
+    t = await body();
+    ok('Contabilidade, limite de 3: em "Convidar", com "Contabilidade", a frase dos acessos em uso e "Gerar link" desligado; com "Anota e vê", liga de novo',
+      t.includes('Os 3 acessos de Contabilidade estão em uso, contando os convites pendentes.') && (await btn('Gerar link').isDisabled()) &&
+        (await (async () => { await radio('Anota e vê').click(); await p.waitForTimeout(300); return !(await btn('Gerar link').isDisabled()); })()), t.slice(0, 600));
+    await radio('Contabilidade').click(); await p.waitForTimeout(200);
+    await shot('868_negocio_contabilidade_limite');
+    await btn('Cancelar').click(); await waitText('Últimos meses'); await p.waitForTimeout(400);
+    // O convite da Contabilidade: quem administra abre o próprio link.
+    await eqGo(new URL(eqLink1).pathname); await waitText('Aceitar convite'); await p.waitForTimeout(500);
+    t = await eqKeep();
+    ok('Convite da Contabilidade: a prévia diz o papel (ver e exportar, sem anotar nem mudar nada, sem ver o Pessoal de ninguém) e que fica fora da regra de um negócio por vez',
+      (await h1Name()) === 'Convite para um negócio' && t.includes('Convite de Maria') && t.includes(EQ) &&
+        t.includes('Contabilidade. Você vai ver e exportar os lançamentos deste negócio, sem anotar nem mudar nada, e sem ver o Pessoal de ninguém.') &&
+        t.includes('Acompanhar como Contabilidade não conta na regra de um negócio por vez') && !t.includes('Cada pessoa participa de um negócio por vez.'), t.slice(0, 900));
+    await btn('Aceitar convite').click(); await waitText('Você já participa deste negócio.'); await p.waitForTimeout(400);
+    ok('Convite da Contabilidade: quem já está no negócio (com qualquer papel) lê "Você já participa deste negócio."', (await body()).includes('Você já participa deste negócio.'));
+    await atWidths(async (w) => { await layoutChecks(`Negócio com equipe, convite da Contabilidade ${w}px`); if (w === 390) await shot('869_convite_contabilidade'); });
+    // Outra conta aceita como Contabilidade e cai em "Negócios que você acompanha", fora do seletor.
+    await btn('Agora não').click(); await p.waitForTimeout(500);
+    await eqConta();
+    await btn('Sair da conta').click(); await waitText('Cuidar da vida financeira'); await p.waitForTimeout(400);
+    await eqGo(new URL(eqLink1).pathname); await waitText('Você recebeu um convite para um negócio'); await p.waitForTimeout(400);
+    await btn('Criar conta').click(); await waitText('Nome de apresentação');
+    await field('Nome de apresentação').fill('Olga Prates'); await field('E-mail').fill('olga.contabilidade@exemplo.com'); await field('Senha').fill('senha1234');
+    await btn('Criar conta').click(); await waitText('Confira seu e-mail');
+    await btn('Simular abertura do link').click(); await btn('Já confirmei meu e-mail').click(); await waitText('Sua primeira conta');
+    await btn('Começar meu mês').click(); await waitText('Aceitar convite', 12000); await p.waitForTimeout(500);
+    await btn('Aceitar convite').click(); await waitText(`Agora você acompanha o negócio ${EQ}.`, 10000); await p.waitForTimeout(800);
+    t = await eqKeep();
+    ok('Aceitar como Contabilidade: abre o negócio na área da Contabilidade, com o aviso, quem administra, só leitura, o Resumo do ano, "Exportar os lançamentos" e "Deixar de acompanhar"',
+      (await h1Name()) === EQ && new URL(p.url()).pathname.startsWith('/contabilidade/') && t.includes(`Agora você acompanha o negócio ${EQ}.`) && t.includes('Quem administra: Maria') &&
+        t.includes('Só leitura: você vê e exporta, sem anotar nem mudar nada.') && t.includes('Resumo do ano') && (await visibleCount('button', 'Exportar os lançamentos')) === 1 &&
+        (await visibleCount('button', 'Deixar de acompanhar')) === 1 && (await visibleCount('button', 'Anotar saída')) === 0 && (await visibleCount('button', 'Retirada para o Pessoal')) === 0, t.slice(0, 900));
+    // Na demonstração, cada conta guarda os próprios dados: a conta nova não vê os lançamentos de Maria (no banco, vê).
+    ok('Aceitar como Contabilidade (demonstração): cada conta guarda os próprios dados, então o ano aparece sem lançamentos', t.includes('Nada anotado no negócio em 2026.'), t.slice(0, 900));
+    await eqBack();
+    ok('Aceitar como Contabilidade: o negócio acompanhado não entra no seletor de espaço (só "Pessoal" e o "+")',
+      JSON.stringify(await eqSpaces()) === JSON.stringify(['Ver dados de Pessoal']) && (await visibleCount('button', 'Criar um espaço: Negócio ou Família')) === 1, JSON.stringify(await eqSpaces()));
+    await p.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await waitText('Privacidade neste aparelho'); await p.waitForTimeout(400);
+    await p.getByRole('heading', { name: 'Negócios que você acompanha', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded().catch(() => {}); await p.waitForTimeout(300);
+    t = await eqKeep();
+    ok('Conta de quem acompanha: o cartão "Negócios que você acompanha" (1 negócio) e o Espaço Negócio continua oferecendo "Criar o espaço Negócio"',
+      t.includes('Negócios que você acompanha') && t.includes('Você acompanha 1 negócio como Contabilidade: vê o resumo do ano e exporta os lançamentos.') &&
+        (await visibleCount('button', 'Ver os negócios que você acompanha')) === 1 && (await visibleCount('button', 'Criar o espaço Negócio')) === 1, t.slice(0, 900));
+    await atWidths(async (w) => { await p.getByRole('heading', { name: 'Negócios que você acompanha', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await layoutChecks(`Negócio com equipe, Conta com o cartão da Contabilidade ${w}px`); if (w === 390) await shot('870_conta_negocios_que_acompanha'); });
+    await btn('Ver os negócios que você acompanha').click(); await waitText('Você acompanha estes negócios como Contabilidade'); await p.waitForTimeout(400);
+    await p.getByRole('button', { name: new RegExp(`^${EQ}\\. Quem administra: Maria`) }).filter({ visible: true }).first().click(); await waitText('Deixar de acompanhar'); await p.waitForTimeout(400);
+    await btn('Deixar de acompanhar').click(); await p.waitForTimeout(400);
+    t = await dialogText();
+    ok('"Deixar de acompanhar": a confirmação diz que a pessoa deixa de ver na hora e que nada muda no negócio', t.includes(`Deixar de acompanhar ${EQ}?`) && t.includes('Você deixa de ver este negócio na hora. Nada muda nos lançamentos do negócio'), t);
+    await confirmIn('Deixar de acompanhar'); await waitText(`Você deixou de acompanhar ${EQ}.`); await p.waitForTimeout(500);
+    t = await body();
+    ok('"Deixar de acompanhar" o último negócio: Conta com o aviso, sem o cartão da Contabilidade', t.includes(`Você deixou de acompanhar ${EQ}.`) && (await visibleCount('button', 'Ver os negócios que você acompanha')) === 0, t.slice(0, 500));
+
+    // 4. Cenário "negocio-plus-contabilidade": Maria acompanha dois negócios, fora do seletor.
+    await eqEnter('negocio-plus-contabilidade');
+    await expectTotals('Negócio com equipe, cenário "negocio-plus-contabilidade": o Pessoal segue 6.000 / 3.900 / 2.100 e 650', 'R$ 6.000,00', 'R$ 3.900,00', 'R$ 2.100,00', 'R$ 650,00');
+    ok('Negócio com equipe, cenário "negocio-plus-contabilidade": o seletor só tem o Pessoal e o negócio próprio (os acompanhados ficam fora)',
+      JSON.stringify(await eqSpaces()) === JSON.stringify(['Ver dados de Pessoal', EQ_TAB]), JSON.stringify(await eqSpaces()));
+    await eqConta();
+    await p.getByRole('heading', { name: 'Negócios que você acompanha', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await p.waitForTimeout(300);
+    t = await body();
+    ok('Conta: "Você acompanha 2 negócios como Contabilidade", e o Espaço Negócio segue com o negócio próprio', t.includes('Você acompanha 2 negócios como Contabilidade') && t.includes(`${EQ}.`) && (await visibleCount('button', `Ver seu negócio, ${EQ}`)) === 1, t.slice(0, 900));
+    await btn('Ver os negócios que você acompanha').click(); await waitText('Você acompanha estes negócios como Contabilidade'); await p.waitForTimeout(500);
+    t = await eqKeep();
+    const eqRows = await p.getByRole('button', { name: /\. Quem administra: / }).filter({ visible: true }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+    ok('"Negócios que você acompanha": a lista por nome, com quem administra (primeiro nome), o tipo e desde quando, e a frase de privacidade',
+      (await h1Name()) === 'Negócios que você acompanha' &&
+        JSON.stringify(eqRows) === JSON.stringify(['Ateliê da Lia. Quem administra: Lia. Você acompanha desde 15/06/2026', 'Oficina do Téo. Quem administra: Téo. Você acompanha desde 02/03/2026']) &&
+        t.includes('Quem administra: Téo') && t.includes('MEI') && t.includes('Você acompanha desde 02/03/2026') && t.includes('Ninguém destes negócios vê o seu Pessoal'), `${JSON.stringify(eqRows)} ${t.slice(0, 600)}`);
+    await atWidths(async (w) => { await innerChecks(`Negócio com equipe, Negócios que você acompanha ${w}px`); if (w === 390) await shot('871_contabilidade_lista'); });
+    await p.getByRole('button', { name: /^Oficina do Téo\./ }).filter({ visible: true }).first().click(); await waitText('Entrou na operação'); await p.waitForTimeout(600);
+    t = await eqKeep();
+    ok('Oficina do Téo: o Resumo do ano de 2026 (entrou R$ 3.200,00, saiu R$ 682,00, Serviços R$ 3.080,00), "Vendas e serviços" do MEI e as frases de quem acompanha, sem anotar',
+      (await h1Name()) === 'Oficina do Téo' && t.includes('Oficina do Téo · 2026') && t.includes('R$ 3.200,00') && t.includes('R$ 682,00') && t.includes('R$ 3.080,00') && t.includes('Vendas e serviços') &&
+        t.includes('Os valores são os que as pessoas do negócio anotaram. A Clarevo não faz contabilidade nem cálculo de impostos.') && !t.includes('Os valores são os que você anotou') &&
+        (await visibleCount('button', 'Anotar saída')) === 0 && (await visibleCount('button', 'Anotar entrada')) === 0, t.slice(0, 1200));
+    await atWidths(async (w) => { await innerChecks(`Negócio com equipe, o Resumo do ano de quem acompanha ${w}px`); if (w === 390) await shot('872_contabilidade_resumo_ano'); });
+    await btn('Ano anterior: 2025').click(); await waitText('Oficina do Téo · 2025'); await p.waitForTimeout(500);
+    t = await body();
+    ok('Oficina do Téo, troca de ano: 2025 com entrou R$ 850,00 e saiu R$ 260,00, e "Voltar para 2026"', t.includes('R$ 850,00') && t.includes('R$ 260,00') && (await visibleCount('button', 'Voltar para 2026')) === 1, t.slice(0, 900));
+    await btn('Voltar para 2026').click(); await waitText('Oficina do Téo · 2026'); await p.waitForTimeout(400);
+    await btn('Exportar os lançamentos').click(); await waitText('Preparar arquivo'); await p.waitForTimeout(500);
+    t = await eqKeep();
+    const eqPeriod = await p.evaluate(() => [...document.querySelectorAll('[role=radiogroup][aria-label="Período"] [role=radio]')].filter((e) => e.getAttribute('aria-checked') === 'true').map((e) => e.textContent));
+    ok('Exportar os lançamentos (Contabilidade): só este negócio (sem a escolha do espaço), "Este ano" marcado e a pílula com o nome',
+      (await h1Name()) === 'Exportar os lançamentos' && !t.includes('\nEspaço\n') && JSON.stringify(eqPeriod) === JSON.stringify(['Este ano']) && t.includes('Oficina do Téo') &&
+        t.includes('Leve os lançamentos deste negócio para uma planilha'), `${JSON.stringify(eqPeriod)} ${t.slice(0, 700)}`);
+    await btn('Preparar arquivo').click(); await waitText('Arquivo pronto', 10000); await p.waitForTimeout(400);
+    t = await body();
+    ok('Exportar os lançamentos (Contabilidade): o arquivo de 2026 com os 10 lançamentos do negócio', t.includes('Arquivo pronto') && t.includes('10 lançamentos'), t.slice(0, 900));
+    await atWidths(async (w) => { await layoutChecks(`Negócio com equipe, exportar da Contabilidade ${w}px`); if (w === 390) await shot('873_contabilidade_exportar'); });
+    await btn('Voltar').click(); await waitText('Deixar de acompanhar'); await p.waitForTimeout(400);
+    await btn('Deixar de acompanhar').click(); await p.waitForTimeout(400);
+    await shot('874_contabilidade_deixar_de_acompanhar');
+    await confirmIn('Deixar de acompanhar'); await waitText('Você deixou de acompanhar Oficina do Téo.'); await p.waitForTimeout(500);
+    t = await body();
+    ok('"Deixar de acompanhar" com outro negócio acompanhado: volta à lista, com o aviso e só "Ateliê da Lia"',
+      (await h1Name()) === 'Negócios que você acompanha' && t.includes('Você deixou de acompanhar Oficina do Téo.') && t.includes('Ateliê da Lia') && !t.includes('Oficina do Téo\n'), t.slice(0, 600));
+    await eqBack();
+    ok('Depois de deixar de acompanhar, o negócio próprio continua no seletor', JSON.stringify(await eqSpaces()) === JSON.stringify(['Ver dados de Pessoal', EQ_TAB]));
+
+    // 5. Excluir a conta com o Plus aberto: passar a administração também resolve.
+    await eqEnter('negocio-plus');
+    await eqConta();
+    await btn('Ver o que é apagado ao excluir minha conta e o que continua').click(); await waitText('O que é apagado'); await p.waitForTimeout(800);
+    t = await eqKeep();
+    ok('Excluir a conta (D-123), Plus aberto: quem administra com outras pessoas lê que pode passar a administração ou remover as pessoas, com o caminho em "Gerenciar"',
+      t.includes('Você administra o negócio Sacolé da Maria e há outras pessoas nele. Antes de excluir a conta, passe a administração para outra pessoa ou remova as outras pessoas do negócio.') &&
+        t.includes('Em "Seu negócio", toque em "Gerenciar" ao lado de uma pessoa e escolha "Passar a administração" ou "Remover do negócio".'), t.slice(0, 1500));
+    await p.getByText('Espaço Negócio', { exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await shot('875_excluir_conta_passar_administracao');
+
+    // 6. Modo escuro, computador (1280 px), letra grande e o Plus fechado depois.
+    {
+      const eqDark = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
+      await eqDark.addInitScript(() => { window.__clarevoSemTour = true; });
+      const dp = await eqDark.newPage();
+      const dpErrors = []; dp.on('pageerror', (e) => dpErrors.push(e.message));
+      const dpWrites = []; dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dpWrites.push(r.url()));
+      await dp.goto(`http://localhost:${PORT}/?cenario=negocio-plus-contabilidade`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
+      await dp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dp.getByRole('button', { name: 'Conta: perfil, assinatura, lembretes, privacidade e segurança' }).filter({ visible: true }).first().click(); await dp.getByText('Privacidade neste aparelho').filter({ visible: true }).first().waitFor({ timeout: 10000 });
+      await dp.getByRole('button', { name: 'Ver os negócios que você acompanha', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Você acompanha estes negócios como Contabilidade').filter({ visible: true }).first().waitFor({ timeout: 10000 }); await dp.waitForTimeout(700);
+      await dp.evaluate(AC_SRC);
+      const dc = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow(), bg: getComputedStyle(document.body).backgroundColor }));
+      ok(`Negócio com equipe, modo escuro: "Negócios que você acompanha" no fundo azul-marinho, com contraste de 4,5:1 (${dc.c.n} textos) e nada fora da tela`,
+        dc.bg === 'rgb(19, 30, 62)' && dc.c.n > 6 && dc.c.bad.length === 0 && dc.o.length === 0, `${dc.bg} ${[...dc.c.bad, ...dc.o].slice(0, 4).join(' | ')}`);
+      await dp.screenshot({ path: `${OUT}/876_escuro_contabilidade_lista.png` });
+      await dp.getByRole('button', { name: /^Oficina do Téo\./ }).filter({ visible: true }).first().click(); await dp.getByText('Entrou na operação').filter({ visible: true }).first().waitFor({ timeout: 10000 }); await dp.waitForTimeout(700);
+      await dp.evaluate(AC_SRC);
+      const dc2 = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow() }));
+      ok(`Negócio com equipe, modo escuro: o Resumo do ano de quem acompanha com contraste de 4,5:1 (${dc2.c.n} textos) e nada fora da tela`, dc2.c.n > 15 && dc2.c.bad.length === 0 && dc2.o.length === 0, [...dc2.c.bad, ...dc2.o].slice(0, 4).join(' | '));
+      await dp.screenshot({ path: `${OUT}/876_escuro_contabilidade_resumo_ano.png` });
+      // "Pessoas do negócio" com a pergunta da sociedade, no cenário "negocio-plus".
+      await dp.goto(`http://localhost:${PORT}/?cenario=negocio-plus`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
+      await dp.getByRole('button', { name: 'Ver demonstração com dados fictícios', exact: true }).first().click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dp.getByRole('tab', { name: EQ_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
+      await dp.getByRole('button', { name: 'Ver seu negócio', exact: true }).filter({ visible: true }).first().click(); await dp.getByText('Últimos meses').filter({ visible: true }).first().waitFor({ timeout: 10000 });
+      await dp.getByRole('radiogroup', { name: 'O negócio é uma sociedade?' }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await dp.waitForTimeout(700);
+      await dp.evaluate(AC_SRC);
+      const dc3 = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow() }));
+      ok(`Negócio com equipe, modo escuro: a pergunta da sociedade e a Contabilidade na lista com contraste de 4,5:1 (${dc3.c.n} textos); sem erros e nada vai à rede`,
+        dc3.c.n > 20 && dc3.c.bad.length === 0 && dc3.o.length === 0 && dpErrors.length === 0 && dpWrites.length === 0, [...dc3.c.bad, ...dc3.o, ...dpErrors, ...dpWrites].slice(0, 4).join(' | '));
+      await dp.screenshot({ path: `${OUT}/877_escuro_negocio_sociedade.png` });
+      await eqDark.close();
+    }
+    await eqEnter('negocio-plus-contabilidade');
+    await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(600);
+    await eqNav('contabilidade/index'); await waitText('Você acompanha estes negócios como Contabilidade'); await p.waitForTimeout(600);
+    await layoutChecks('Negócio com equipe, Negócios que você acompanha 1280px'); await shot('878_computador_contabilidade_lista');
+    await p.getByRole('button', { name: /^Ateliê da Lia\./ }).filter({ visible: true }).first().click(); await waitText('Entrou na operação'); await p.waitForTimeout(600);
+    t = await body();
+    ok('Negócio com equipe, computador: o Resumo do ano do Ateliê da Lia (entrou R$ 2.360,00, saiu R$ 1.220,00)', t.includes('Ateliê da Lia · 2026') && t.includes('R$ 2.360,00') && t.includes('R$ 1.220,00'), t.slice(0, 900));
+    await layoutChecks('Negócio com equipe, Resumo do ano de quem acompanha 1280px'); await shot('878_computador_contabilidade_resumo_ano');
+    await p.setViewportSize({ width: 360, height: 800 }); await p.waitForTimeout(400);
+    await p.evaluate(AC_SRC); await p.evaluate(() => window.__acc.scale(1.3)); await p.waitForTimeout(600);
+    const eqBig = await p.evaluate(() => ({ o: window.__acc.overflow(), cut: window.__acc.cut(), ov: window.__acc.overlap(), t: window.__acc.targets().small }));
+    ok('Negócio com equipe, letra grande (1,3 vez, 360 px): o Resumo do ano de quem acompanha sem nada fora da tela, cortado ou por cima de outro texto, e alvos de 44 px',
+      eqBig.o.length === 0 && eqBig.cut.length === 0 && eqBig.ov.length === 0 && eqBig.t.length === 0, [...eqBig.o, ...eqBig.cut, ...eqBig.ov, ...eqBig.t].slice(0, 4).join(' | '));
+    await shot('879_contabilidade_letra_grande');
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+    // O Plus fecha depois: o cartão, a lista e a pergunta da sociedade somem; as telas /contabilidade voltam ao estado neutro.
+    await eqEnter('negocio-plus-contabilidade');
+    await p.evaluate(async () => { const repo = await window.__e2e.repo(); repo.biz.setPlusOpen(false); await window.__e2e.refresh(); });
+    await p.waitForTimeout(800);
+    await eqConta();
+    t = await body();
+    ok('Plus fechado depois (D-123): Conta sem "Negócios que você acompanha"', !t.includes('Negócios que você acompanha') && (await visibleCount('button', 'Ver os negócios que você acompanha')) === 0, t.match(EQ_NEW)?.[0] ?? '');
+    await p.evaluate(() => window.__e2e.forget(['accounting']));
+    const eqLateSeen = await eqEarly(() => eqNav('contabilidade/[id]', { id: 'neg-demo-pessoa-teo' }));
+    const eqLateBad = eqLateSeen.map((x) => x.match(EQ_NEW)?.[0] ?? x.match(/Espaço: [^|\n]*Contabilidade|Oficina do Téo/)?.[0]).filter(Boolean);
+    ok('Plus fechado depois (D-123): logo ao abrir o negócio que Maria acompanhava (carregando) e depois, nada dele nem da Contabilidade', eqLateBad.length === 0, eqLateBad.slice(0, 3).join(' | '));
+    await waitText('Nada para mostrar'); await p.waitForTimeout(400);
+    ok('Plus fechado depois (D-123): o negócio acompanhado volta ao estado neutro', (await h1Name()) === 'Nada para mostrar' && !EQ_NEW.test(await body()));
+    await eqNav('conta/exportar', { contabilidade: 'neg-demo-pessoa-teo' }); await waitText('Período'); await p.waitForTimeout(600);
+    t = await body();
+    ok('Plus fechado depois (D-123): "Exportar" com o negócio que Maria acompanhava fica a exportação de sempre ("Exportar meus dados", com a escolha do espaço, sem o nome dele)',
+      (await h1Name()) === 'Exportar meus dados' && t.includes('Espaço') && !t.includes('Oficina do Téo') && !EQ_NEW.test(t), t.slice(0, 500));
+    await btn('Voltar').click(); await p.waitForTimeout(400);
+    await eqBack();
+    await eqOpen();
+    t = await body();
+    ok('Plus fechado depois (D-123): "Seu negócio" sem "Pessoas do negócio" nem a pergunta da sociedade (quem administra sozinha não vê nada novo)', !t.includes('Pessoas do negócio') && !EQ_NEW.test(t), t.match(EQ_NEW)?.[0] ?? '');
+
+    // Textos e escritas.
+    const eqBad = eqTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.split('\n').filter((l) => !l.includes('Família')).join('\n').match(/\b(preju[ií]zo|lucro|cuidado|aten[cç][aã]o|ruim|parab[eé]ns|deveria|titular|plus|pre[cç]o|declare|pague)\b|sua contabilidade/i)?.[0]).filter(Boolean);
+    ok('Negócio com equipe: nas telas novas, nenhum termo proibido, travessão longo, julgamento, "titular", "Plus", preço nem orientação contábil', eqTexts.length >= 12 && eqBad.length === 0, `${eqTexts.length} telas ${eqBad.join(' | ')}`);
+    ok('Negócio com equipe: nada vai à rede (a demonstração grava só na memória)', writes.length === eqWrites0, writes.slice(eqWrites0).join(' | '));
   }
 
   // ==================================================================================================================

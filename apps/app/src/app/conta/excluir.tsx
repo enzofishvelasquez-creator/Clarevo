@@ -6,6 +6,7 @@ import {
   WEB_SUBSCRIPTION_TEXT,
   BUSINESS_TEXT,
   canSubmitDelete,
+  deleteBusinessHow,
   deleteBusinessOutcome,
   deleteBusinessText,
   deleteErasedLines,
@@ -69,7 +70,9 @@ export default function ExcluirContaScreen() {
   const business = useBusiness();
   const businessPeople = useSharedBusinessPeople(business.data);
   const businessOutcome = deleteBusinessOutcome(business.data, businessPeople.data);
-  const businessText = deleteBusinessText(businessOutcome, business.data?.name ?? '');
+  // D-123: com o Plus aberto, passar a administração também resolve o bloqueio; com ele fechado, as frases de antes.
+  const plusOpen = businessPeople.data?.plusOpen === true;
+  const businessText = deleteBusinessText(businessOutcome, business.data?.name ?? '', plusOpen);
   // Enquanto o negócio (ou as pessoas dele) não chega, ou se a leitura falhar, não dá para confirmar: o banco recusaria depois de cancelar.
   const businessPending = business.isPending || (Boolean(business.data) && !businessPeople.data);
   const businessFailed = business.isError || (Boolean(business.data) && businessPeople.isError);
@@ -103,7 +106,7 @@ export default function ExcluirContaScreen() {
     const r = await deleteAccount(DELETE_CONFIRMATION_WORD);
     if (!r.ok) {
       setBusy(false);
-      setMsg({ tone: 'erro', text: deleteErrorText(r.code) });
+      setMsg({ tone: 'erro', text: deleteErrorText(r.code, plusOpen) });
       return;
     }
     // A conta já não existe (o hook marcou a exclusão como confirmada): o que o aparelho guardava dela sai também, a sessão termina e
@@ -198,7 +201,7 @@ export default function ExcluirContaScreen() {
               {businessOutcome === 'bloqueia' ? (
                 <>
                   <Txt variant="caption" color={colors.textSecondary} style={note}>
-                    {T.businessBlockedHow}
+                    {deleteBusinessHow(plusOpen)}
                   </Txt>
                   <Button label={T.businessOpen} icon={Store} tone="soft" onPress={() => router.push('/negocio')} />
                 </>

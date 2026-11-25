@@ -142,8 +142,8 @@ Decisão do Enzo: o modelo de dados já nasce pronto; **nada do Plus aparece no 
   `plus_indisponivel` com o Plus fechado), `cancel_business_invite`, `preview_business_invite`, `accept_business_invite`,
   `leave_business`, `remove_business_member` e `set_business_member_role`. Testes em
   `supabase/tests/99zzzzzzzzzzzzzzzzzzzzzz_negocio_compartilhado.sql`.
-- **Regras.** Quem criou administra (convida, muda o papel, remove, renomeia e encerra; não há passar a administração e quem administra
-  não sai: `titular_nao_sai`). As outras pessoas anotam e veem ("Anota e vê") ou só veem ("Só vê"). Até 6 pessoas, contando quem
+- **Regras.** Quem criou administra (convida, muda o papel, remove, renomeia e encerra; desde a D-123, seção 9, pode passar a administração;
+  quem administra não sai: `titular_nao_sai`). As outras pessoas anotam e veem ("Anota e vê") ou só veem ("Só vê"). Até 6 pessoas, contando quem
   administra e os convites ainda válidos (`negocio_cheio`). **Um negócio por pessoa, por vez**, o próprio ou o de outra pessoa (como a
   Família): aceitar recusa quem já participa de um negócio (`ja_tem_negocio`; do mesmo, `ja_no_negocio`) e criar recusa quem participa
   do negócio de outra pessoa. Quem sai ou é removido perde o acesso na hora; o que anotou fica como histórico, e as retiradas dessa
@@ -269,3 +269,83 @@ O restante da pesquisa de 18/11/2026 para o Espaço Negócio (itens 3, 8 e 9 da 
 - **Da revisão independente:** o "a receber" excluído deixa de ser lido na hora (com o nome de quem devia); as marcas e o vínculo não
   mudam num lado ligado de retirada ou de dinheiro trazido do Pessoal; alterar e excluir tomam a trava do negócio, como anotar e receber.
 - **Ficou para depois:** as marcas no PDF da exportação e no mês de "Seu negócio"; uma demonstração com alguém que só vê.
+
+## 9. Negócio com equipe: sociedade, passar a administração e Contabilidade (D-123, 26/11/2026)
+
+Pronto e **desligado até o Plus abrir** (seção 5): com o Plus fechado, nada novo aparece no app nem no site, e o app funciona igual a hoje.
+Só o Espaço Negócio compartilhado muda; o Pessoal e a Família não mudam. A Clarevo não dá orientação contábil, jurídica nem tributária.
+
+### Banco (migração 0046, `supabase/migrations/20261126000001_negocio_equipe.sql`)
+
+- **Contabilidade.** `context_memberships.accountant` (o vínculo é "membro" sem escrita, com `accountant` verdadeiro; uma regra do banco
+  impede escrita e administração nesse vínculo) e o papel `contabilidade` em `business_invites`. A leitura é a de sempre
+  (`context_permission` 'read'), só daquele negócio. Fica fora do limite de 6 pessoas (`negocio_cheio`) e da regra de um negócio por vez
+  (`ja_tem_negocio`); limite próprio de 3 acessos por negócio, contando convites válidos (`contabilidade_cheia`). `set_business_member_role`
+  e `transfer_business_admin` recusam a Contabilidade (`papel_invalido`). `business_member_items` e `clarevo_member_role` devolvem
+  `contabilidade`. `my_accounting_businesses()` (só leitura) lista os negócios ativos que a pessoa acompanha: `{id, name, business_profile,
+  admin_name, since, created_at}`, por nome.
+- **Passar a administração.** `transfer_business_admin(p_context, p_person, p_key)`, como `transfer_family_ownership`: só quem administra,
+  para uma pessoa ativa que anota ou só vê; quem administrava vira "Anota e vê"; `owner_person_id` acompanha. Não depende do Plus estar
+  aberto e vale em só ver e exportar (a saída de um negócio que ficaria preso). Os convites válidos continuam valendo; sair e ser removida
+  passam a cancelar os convites pendentes que a pessoa criou (`clarevo_cancel_business_invites_of`, como F8 da Família).
+- **Sociedade.** `financial_contexts.business_partnership` (nulo = não respondeu) e `set_business_partnership(p_context, p_partnership,
+  p_key)`, só quem administra e com o Plus aberto (`plus_indisponivel`); passa pela trava da assinatura. `clarevo_business_json` devolve
+  `business_partnership`.
+- **Encerrar e excluir a conta.** A Contabilidade não impede (`negocio_com_membros` só com pessoas que anotam ou só veem) e perde o acesso
+  junto.
+- **Operações.** 2 ações novas (105): `transferir_administracao_negocio` (vale em só ver e exportar) e `definir_sociedade_negocio`; nenhuma
+  conta como anotação. 130 funções do app. Testes em `supabase/tests/99zzzzzzzzzzzzzzzzzzzzzzzzz_negocio_equipe.sql`; roteiro em
+  `docs/05_SUPABASE.md` (12am e 21ah).
+- **Compatibilidade.** Nenhuma assinatura muda e nenhum dado muda. O app publicado continua igual enquanto o Plus estiver fechado (não
+  existe Contabilidade nem outra pessoa em negócio nenhum). **Antes de abrir o Plus, o app novo precisa estar em todos os aparelhos**: o
+  app anterior mostraria como "Seu negócio" o negócio mais antigo que a pessoa lê (que pode ser um que ela só acompanha) e não reconhece o
+  papel `contabilidade` na lista de pessoas.
+- **Da revisão independente do banco.** Sair e ser removida cancelam os convites pendentes de quem sai (antes, com passar a administração,
+  o convite de quem já saiu continuaria valendo); o teste confere que passar a administração e definir a sociedade não contam como
+  anotação.
+
+### App
+
+- **Sociedade.** Com o Plus aberto, quem administra vê em "Pessoas do negócio" a pergunta "O negócio é uma sociedade?" (Sim / Não).
+  Respondida, fica uma linha com a resposta e "Alterar"; com "Sim", a frase de convidar as outras pessoas sócias (por exemplo com "Anota e
+  vê") e de passar a administração para uma delas se um dia precisar sair. Quem não administra não vê a pergunta, nem quem administra em
+  "só ver e exportar" (a resposta passa pela trava da assinatura); a resposta não muda permissão nenhuma
+  (`BusinessContext.businessPartnership`, `setBusinessPartnership`).
+- **Passar a administração.** Em "Gerenciar" de uma pessoa ativa que anota ou só vê (nunca da Contabilidade), "Passar a administração", com
+  confirmação: a pessoa passa a convidar, mudar papéis, remover pessoas e encerrar; quem administrava continua com "Anota e vê" e pode sair
+  depois (`transferBusinessAdmin`, `canTransferTo`). Só aparece com o Plus aberto (o banco aceita sempre). Quem sai ou é removido tem os
+  convites pendentes que criou no negócio cancelados (como na Família; na memória da demonstração também). "Sair do negócio" de quem
+  administra explica como sair: passar a administração antes ou, sem ninguém para receber, encerrar. Com o Plus aberto, a exclusão da conta
+  bloqueada por outras pessoas passa a dizer "passe a administração ou remova as pessoas antes"; com o Plus fechado, a frase de antes.
+- **Contabilidade.** Terceira opção em "Convidar alguém", com a explicação do papel (só vê e exporta aquele negócio, nunca anota, não vê o
+  Pessoal nem a Família de ninguém). Fora das 6 pessoas e da regra de um negócio por vez; até 3 acessos por negócio, contando os convites
+  válidos (`contabilidade_cheia`, `accountantSeatsLeft`). Na lista, o papel "Contabilidade", só com "Remover do negócio" (não muda de
+  papel). O convite (`/convite/negocio/<código>`) diz o papel; aceitar leva a `/contabilidade/<id>` sem mudar o seletor. **A área da
+  Contabilidade é separada dos espaços**: `getBusiness` ignora os vínculos da Contabilidade (o negócio da pessoa é o primeiro em que ela não
+  é da Contabilidade; no banco sem a coluna `accountant`, todos contam como antes), e os negócios acompanhados ficam em Conta → "Negócios
+  que você acompanha" (só com o Plus aberto e ao menos um negócio): a lista (`/contabilidade`: nome, quem administra pelo primeiro nome,
+  desde quando) e cada negócio (`/contabilidade/[id]`: o Resumo do ano, o mesmo componente de "Seu negócio" → Resumo do ano,
+  `components/business-year.tsx`, só leitura e com a troca de ano a partir da criação do negócio, `created_at`; "Exportar os
+  lançamentos", a exportação de sempre com `?contabilidade=<id>`; "Deixar de acompanhar"). Com o Plus fechado ou sem negócio acompanhado,
+  essas telas mostram um estado neutro ("Nada para mostrar") com a volta para Conta; enquanto carregam, um quadro neutro ("Um momento"),
+  sem pílula nem texto da Contabilidade. O app lê primeiro `my_accounting_businesses` (ausente no banco sem a 0046: lista vazia) e só pede
+  a chave do Plus a quem acompanha algum negócio. `getBusiness` lê os vínculos da Contabilidade junto com os primeiros negócios e guarda
+  por 10 minutos as colunas ausentes (banco sem a 0046).
+- **Guia e Ajuda:** nada do Plus no guia, na busca de Aprender nem no site; `/contabilidade` e `/contabilidade/[id]` estão nas exceções de
+  cobertura de `test/guide.test.ts` (Plus desligado).
+- **Demonstração.** No `?cenario=negocio-plus`, Dora (FICTÍCIA) acompanha "Sacolé da Maria" como Contabilidade (a pergunta da sociedade,
+  passar a administração para Rafa e a Contabilidade na lista funcionam na memória). O cenário novo `?cenario=negocio-plus-contabilidade`
+  tem o Pessoal de sempre, o negócio próprio "Sacolé da Maria" (como no cenário `negocio`) e dois negócios FICTÍCIOS que Maria acompanha
+  como Contabilidade, fora do seletor: "Ateliê da Lia" (Lia administra; microempresa; 2026: entrou R$ 2.360,00, saiu R$ 1.220,00) e "Oficina
+  do Téo" (Téo administra; MEI; 2026: entrou R$ 3.200,00, saiu R$ 682,00; 2025: R$ 850,00 e R$ 260,00). Cada conta da demonstração guarda
+  os próprios dados (seção 5): a conta criada na demonstração que aceita um convite da Contabilidade vê o negócio sem os lançamentos de
+  quem administra (no banco, vê).
+- **Núcleo:** `packages/core/src/business-people.ts` (papel 'contabilidade', `canTransferTo`, `accountantSeatsLeft`, `seatsLeftFor`,
+  `businessPartnershipVisible`, `BUSINESS_PARTNERSHIP_TEXT`, `ACCOUNTING_TEXT`), `memory-business-people.ts` (as mesmas regras e recusas da
+  0046: `transfer`, `setPartnership`, o vínculo `accountant`, `accountingOf`), `repository.ts` (`transferBusinessAdmin`,
+  `setBusinessPartnership`, `listAccountingBusinesses`), `deletion.ts` (as frases com e sem o Plus) e `demo.ts`. Testes:
+  `packages/core/test/business-equipe.test.ts`.
+- **Telas:** `components/business-people.tsx`, `negocio/convidar.tsx`, `convite/negocio/[codigo].tsx`, `conta.tsx`, `conta/exportar.tsx`,
+  `conta/excluir.tsx`, `contabilidade/index.tsx`, `contabilidade/[id].tsx`, `components/accounting-parts.tsx` e
+  `components/business-year.tsx`. Roteiro de telas: bloco "Negócio com equipe (Plus, D-123)" de `scripts/e2e-web.js`, capturas 860 a 879
+  (o bloco D-120 passou a conferir a terceira opção do convite e "Passar a administração" em "Gerenciar").

@@ -54,14 +54,15 @@ export function deleteFamilyOutcome(family: Pick<FamilyOverview, 'role' | 'membe
  * - 'nenhum': não participa de nenhum negócio;
  * - 'proprio': administra um negócio sem outras pessoas ativas (é apagado junto, como o Pessoal; a tela fica como antes);
  * - 'sai': participa do negócio de outra pessoa (sai, e o que anotou continua lá com a autoria "Pessoa que saiu");
- * - 'bloqueia': administra um negócio com outras pessoas ativas (remove as pessoas antes; não há passar a administração).
+ * - 'bloqueia': administra um negócio com outras pessoas ativas que anotam ou só veem (passa a administração ou remove as pessoas
+ *   antes, D-123). A Contabilidade não bloqueia: o negócio é apagado como hoje, e ela perde o acesso.
  * `people` indefinido enquanto as pessoas não chegaram: quem administra conta como 'proprio' (a tela espera antes de deixar confirmar).
  */
 export type DeleteBusinessOutcome = 'nenhum' | 'proprio' | 'sai' | 'bloqueia';
 
 export function deleteBusinessOutcome(
   business: Pick<BusinessContext, 'role'> | null | undefined,
-  people: { members: readonly Pick<BusinessMember, 'status' | 'isMe'>[] } | null | undefined,
+  people: { members: readonly (Pick<BusinessMember, 'status' | 'isMe'> & { role?: BusinessMember['role'] })[] } | null | undefined,
 ): DeleteBusinessOutcome {
   if (!business) return 'nenhum';
   if (business.role !== 'titular') return 'sai';
@@ -114,6 +115,10 @@ export const DELETE_TEXT = {
   businessBlocked: (businessName: string): string =>
     `Você administra o negócio ${businessName} e há outras pessoas nele. Antes de excluir a conta, remova as outras pessoas do negócio.`,
   businessBlockedHow: `Em "${BUSINESS_TEXT.overviewTitle}", toque em "${BUSINESS_PEOPLE_TEXT.manage}" ao lado de cada pessoa e escolha "${BUSINESS_PEOPLE_TEXT.remove}".`,
+  /** Com o Plus aberto (D-123), passar a administração também resolve; com ele fechado, a tela fica como antes (nada novo aparece). */
+  businessBlockedPlus: (businessName: string): string =>
+    `Você administra o negócio ${businessName} e há outras pessoas nele. Antes de excluir a conta, passe a administração para outra pessoa ou remova as outras pessoas do negócio.`,
+  businessBlockedHowPlus: `Em "${BUSINESS_TEXT.overviewTitle}", toque em "${BUSINESS_PEOPLE_TEXT.manage}" ao lado de uma pessoa e escolha "${BUSINESS_PEOPLE_TEXT.transfer}" ou "${BUSINESS_PEOPLE_TEXT.remove}".`,
   businessOpen: BUSINESS_TEXT.accountOpen,
   /** A primeira linha de "O que é apagado" para quem participa do negócio de outra pessoa: o negócio dela não é apagado. */
   erasedPersonalOnly:
@@ -154,14 +159,21 @@ export const DELETE_TEXT = {
 export const DELETE_ERROR_TEXT = {
   confirmacao_invalida: 'Digite EXCLUIR para confirmar.',
   transferir_antes: 'Antes de excluir a conta, passe a titularidade da Família para outra pessoa ou remova as outras pessoas dela.',
-  /** Quem administra um negócio com outras pessoas ativas (negócio compartilhado, 0043): não há passar a administração. */
-  negocio_com_membros: 'Antes de excluir a conta, remova as outras pessoas do seu negócio.',
+  /** Quem administra um negócio com outras pessoas ativas (negócio compartilhado, 0043; passar a administração, D-123). */
+  negocio_com_membros: 'Antes de excluir a conta, passe a administração do seu negócio para outra pessoa ou remova as outras pessoas dele.',
   rede: 'Sem conexão no momento. Tente de novo: se a conta já tiver sido excluída, você sai dela.',
   failed: 'Não foi possível excluir a conta agora. Tente de novo.',
 } as const;
 
-/** Texto de um erro da tela; o que não é conhecido cai em "Não foi possível excluir a conta agora...". */
-export function deleteErrorText(code: string): string {
+/** negocio_com_membros com o Plus fechado: a frase de antes da D-123 (sem passar a administração, que só aparece com o Plus aberto). */
+const NEGOCIO_COM_MEMBROS_SEM_PLUS = 'Antes de excluir a conta, remova as outras pessoas do seu negócio.';
+
+/**
+ * Texto de um erro da tela; o que não é conhecido cai em "Não foi possível excluir a conta agora...". `plusOpen` falso: negocio_com_membros
+ * fica com a frase de antes (com o Plus fechado, nada novo aparece no app).
+ */
+export function deleteErrorText(code: string, plusOpen = true): string {
+  if (code === 'negocio_com_membros' && !plusOpen) return NEGOCIO_COM_MEMBROS_SEM_PLUS;
   return (DELETE_ERROR_TEXT as Record<string, string>)[code] ?? DELETE_ERROR_TEXT.failed;
 }
 
@@ -192,11 +204,19 @@ export function deleteErasedLines(business: DeleteBusinessOutcome): readonly str
   return business === 'sai' ? [DELETE_TEXT.erasedPersonalOnly, ...DELETE_TEXT.erased.slice(1)] : DELETE_TEXT.erased;
 }
 
-/** A frase do negócio na tela (só para 'sai' e 'bloqueia'; nos outros casos a tela fica como antes). */
-export function deleteBusinessText(outcome: DeleteBusinessOutcome, businessName: string): string | null {
+/**
+ * A frase do negócio na tela (só para 'sai' e 'bloqueia'; nos outros casos a tela fica como antes). Com o Plus aberto, o bloqueio também
+ * oferece passar a administração (D-123); com ele fechado, a frase de antes.
+ */
+export function deleteBusinessText(outcome: DeleteBusinessOutcome, businessName: string, plusOpen = false): string | null {
   if (outcome === 'sai') return DELETE_TEXT.businessLeaves(businessName);
-  if (outcome === 'bloqueia') return DELETE_TEXT.businessBlocked(businessName);
+  if (outcome === 'bloqueia') return plusOpen ? DELETE_TEXT.businessBlockedPlus(businessName) : DELETE_TEXT.businessBlocked(businessName);
   return null;
+}
+
+/** Como resolver o bloqueio, com ou sem o Plus aberto (D-123). */
+export function deleteBusinessHow(plusOpen = false): string {
+  return plusOpen ? DELETE_TEXT.businessBlockedHowPlus : DELETE_TEXT.businessBlockedHow;
 }
 
 /**

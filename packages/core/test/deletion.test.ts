@@ -186,7 +186,9 @@ describe('textos de excluir a conta (D-058)', () => {
     for (const code of DELETE_ERROR_CODES) expect(deleteErrorText(code)).toBe((DELETE_ERROR_TEXT as Record<string, string>)[code]);
     expect(deleteErrorText('transferir_antes')).toContain('passe a titularidade');
     // Negócio compartilhado (0043): quem administra um negócio com outras pessoas ativas remove as pessoas antes.
-    expect(deleteErrorText('negocio_com_membros')).toBe('Antes de excluir a conta, remova as outras pessoas do seu negócio.');
+    // D-123: passar a administração também resolve; com o Plus fechado, a frase de antes.
+    expect(deleteErrorText('negocio_com_membros')).toBe('Antes de excluir a conta, passe a administração do seu negócio para outra pessoa ou remova as outras pessoas dele.');
+    expect(deleteErrorText('negocio_com_membros', false)).toBe('Antes de excluir a conta, remova as outras pessoas do seu negócio.');
     expect(deleteErrorText('rede')).toBe(DELETE_ERROR_TEXT.rede);
     expect(deleteErrorText('qualquer_outro')).toBe(DELETE_ERROR_TEXT.failed);
     expect(deleteErrorText('')).toBe(DELETE_ERROR_TEXT.failed);

@@ -65,7 +65,17 @@ import type { PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import type { BusinessContext, BusinessContribution, BusinessContributionInput, BusinessProfile, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
-import type { BusinessInvite, BusinessInvitePreview, BusinessInviteRole, BusinessInviteWrite, BusinessJoin, BusinessPeople, PlusStatus } from './business-people';
+import type {
+  AccountingBusiness,
+  BusinessInvite,
+  BusinessInvitePreview,
+  BusinessInviteRole,
+  BusinessInviteWrite,
+  BusinessJoin,
+  BusinessMemberRole,
+  BusinessPeople,
+  PlusStatus,
+} from './business-people';
 import type { Receivable, ReceivableInput, ReceivableReceiveWrite, ReceiveInput } from './business-receivables';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
@@ -910,7 +920,8 @@ export interface RecordsRepository {
 
   /**
    * O negócio ativo da pessoa (o primeiro, por criação), ou null, com o papel dela (D-120). Só quem é titular ou tem vínculo lê. Um
-   * negócio por pessoa por vez: o próprio ou o de outra pessoa.
+   * negócio por pessoa por vez: o próprio ou o de outra pessoa. Os negócios que a pessoa acompanha como Contabilidade (D-123) NÃO contam:
+   * o negócio dela é o primeiro em que ela não é da Contabilidade (no banco sem a coluna accountant, todos os vínculos contam).
    */
   getBusiness(): Promise<BusinessContext | null>;
   /**
@@ -1002,8 +1013,9 @@ export interface RecordsRepository {
   getBusinessPeople(contextId: string): Promise<BusinessPeople>;
   /**
    * create_business_invite. Ordem: repetição; nao_encontrado; contexto_invalido; sem_permissao (não administra); plus_indisponivel;
-   * papel_invalido; negocio_cheio (pessoas ativas mais convites válidos já somam 6); assinatura_necessaria. O código aparece uma única
-   * vez; repetir a chave devolve o convite com code null.
+   * papel_invalido; negocio_cheio (pessoas ativas mais convites válidos já somam 6, sem contar a Contabilidade) ou, para 'contabilidade'
+   * (D-123), contabilidade_cheia (3 acessos de Contabilidade, contando os convites válidos); assinatura_necessaria. O código aparece uma
+   * única vez; repetir a chave devolve o convite com code null.
    */
   createBusinessInvite(key: string, contextId: string, role: BusinessInviteRole): Promise<BusinessInviteWrite>;
   /** cancel_business_invite. Só quem administra. Convite já usado: convite_ja_usado; já cancelado ou vencido: segue cancelado, sem erro. */
@@ -1014,16 +1026,37 @@ export interface RecordsRepository {
    */
   previewBusinessInvite(code: string): Promise<BusinessInvitePreview>;
   /**
-   * accept_business_invite. Ordem: repetição; sem_permissao (sem espaço Pessoal); convite_invalido; ja_no_negocio (já está neste negócio);
-   * ja_tem_negocio (já participa de outro negócio, próprio ou de outra pessoa); negocio_cheio. Uso único. Não passa pela chave do Plus.
+   * accept_business_invite. Ordem: repetição; sem_permissao (sem espaço Pessoal); convite_invalido; ja_no_negocio (já está neste negócio,
+   * com qualquer papel); ja_tem_negocio (já participa de outro negócio, próprio ou de outra pessoa); negocio_cheio. Com o papel
+   * 'contabilidade' (D-123), sem ja_tem_negocio nem negocio_cheio, e contabilidade_cheia com 3 acessos ativos. Uso único.
    */
   acceptBusinessInvite(key: string, code: string): Promise<BusinessJoin>;
   /** leave_business. Quem anota ou só vê sai e as retiradas dela deixam de ser ligadas; quem administra recebe titular_nao_sai. */
   leaveBusiness(key: string, contextId: string): Promise<void>;
   /** remove_business_member. Só quem administra, nunca sobre si (nao_sobre_si); a pessoa precisa estar ativa (nao_encontrado). */
   removeBusinessMember(key: string, contextId: string, personId: string): Promise<void>;
-  /** set_business_member_role. Só quem administra, nunca sobre si. 'membro' lê e anota; 'leitor' só lê. */
-  setBusinessMemberRole(key: string, contextId: string, personId: string, role: BusinessInviteRole): Promise<void>;
+  /**
+   * set_business_member_role. Só quem administra, nunca sobre si. 'membro' lê e anota; 'leitor' só lê. A Contabilidade não muda de papel
+   * (papel_invalido, D-123).
+   */
+  setBusinessMemberRole(key: string, contextId: string, personId: string, role: BusinessMemberRole): Promise<void>;
+  /**
+   * transfer_business_admin (D-123, migração 0046). Só quem administra. Ordem: chave_reutilizada; nao_encontrado (negócio que a pessoa não
+   * lê, ou alvo sem vínculo ativo); contexto_invalido; sem_permissao; nao_sobre_si; papel_invalido (alvo da Contabilidade). Quem
+   * administrava passa a "Anota e vê"; o alvo passa a administrar. Os convites válidos continuam. Não depende do Plus aberto.
+   */
+  transferBusinessAdmin(key: string, contextId: string, personId: string): Promise<void>;
+  /**
+   * set_business_partnership (D-123, migração 0046): o negócio é uma sociedade? true, false ou null (limpa). Só quem administra. Ordem:
+   * repetição; nao_encontrado; contexto_invalido; sem_permissao; plus_indisponivel (Plus fechado); assinatura_necessaria. Não muda
+   * permissão nenhuma nem conta como anotação. Devolve o negócio.
+   */
+  setBusinessPartnership(key: string, contextId: string, partnership: boolean | null): Promise<BusinessContext>;
+  /**
+   * my_accounting_businesses (D-123, só leitura): os negócios ativos que a pessoa acompanha como Contabilidade, por nome, com o primeiro
+   * nome de quem administra e desde quando. A função ausente (banco sem a 0046) devolve a lista vazia.
+   */
+  listAccountingBusinesses(): Promise<AccountingBusiness[]>;
 
   // Excluir minha conta (D-058, Ciclo P). Regras e textos em deletion.ts, iguais aos da migração 0015 (delete_my_account).
 
@@ -1247,6 +1280,7 @@ export type RepoErrorCode =
   | 'negocio_com_membros'
   | 'plus_indisponivel'
   | 'negocio_cheio'
+  | 'contabilidade_cheia'
   | 'ja_no_negocio'
   | 'retirada_ligada'
   | 'nao_e_retirada'

@@ -90,7 +90,18 @@ import { isFamilyAction } from './family';
 import { DELETE_CONFIRMATION_WORD } from './deletion';
 import { MemoryFamilyHub } from './memory-family';
 import type { BusinessAction, BusinessContext, BusinessContribution, BusinessContributionInput, BusinessProfile, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
-import type { BusinessInvite, BusinessInvitePreview, BusinessInviteRole, BusinessInviteWrite, BusinessJoin, BusinessPeople, BusinessPeopleAction, PlusStatus } from './business-people';
+import type {
+  AccountingBusiness,
+  BusinessInvite,
+  BusinessInvitePreview,
+  BusinessInviteRole,
+  BusinessInviteWrite,
+  BusinessJoin,
+  BusinessMemberRole,
+  BusinessPeople,
+  BusinessPeopleAction,
+  PlusStatus,
+} from './business-people';
 import { isBusinessPeopleAction } from './business-people';
 import { MemoryBusinessHub } from './memory-business-people';
 import type { RecordMarks, Receivable, ReceivableAction, ReceivableInput, ReceivableReceiveWrite, ReceiveInput } from './business-receivables';
@@ -4777,7 +4788,8 @@ export class MemoryRepository implements RecordsRepository {
       action === 'criar_negocio' ||
       action === 'renomear_negocio' ||
       action === 'encerrar_negocio' ||
-      action === 'definir_perfil_negocio'
+      action === 'definir_perfil_negocio' ||
+      action === 'definir_sociedade_negocio'
     )
       return;
     const day = this.opts.today();
@@ -5185,10 +5197,20 @@ export class MemoryRepository implements RecordsRepository {
   // Espaço Negócio (D-113): as seis funções da migração 0042
   // ---------------------------------------------------------------------------
 
-  /** O negócio como o app lê, com o papel de quem consulta (D-120); um negócio que a pessoa já não lê volta como quem o criou o via. */
+  /**
+   * O negócio como o app lê, com o papel de quem consulta (D-120) e a resposta da sociedade (D-123); um negócio que a pessoa já não lê
+   * volta como quem o criou o via.
+   */
   private businessView(contextId: string): BusinessContext {
     const b = this.biz.business(contextId)!;
-    return { id: b.id, name: b.name, createdAt: b.createdAt, role: this.biz.roleOf(b.id, this.opts.actorId) ?? 'titular', businessProfile: b.profile };
+    return {
+      id: b.id,
+      name: b.name,
+      createdAt: b.createdAt,
+      role: this.biz.contextRoleOf(b.id, this.opts.actorId) ?? 'titular',
+      businessProfile: b.profile,
+      businessPartnership: b.partnership,
+    };
   }
 
   /** Como clarevo_require_business_owner: sem leitura, nao_encontrado; não é negócio, contexto_invalido; não administra, sem_permissao. */
@@ -5390,6 +5412,24 @@ export class MemoryRepository implements RecordsRepository {
       if (profile !== null && !isBusinessProfile(profile)) throw new RepoError('perfil_invalido');
       this.biz.setProfile(b.id, profile);
       this.saveOperation(key, 'definir_perfil_negocio', payload, { contextId: b.id, recordId: null, commitmentId: null });
+      return this.businessView(b.id);
+    });
+  }
+
+  /**
+   * Como set_business_partnership (D-123, 0046): a resposta da sociedade, ou null (limpa). Ordem: repetição; nao_encontrado;
+   * contexto_invalido; sem_permissao (só quem administra); plus_indisponivel (Plus fechado). Não muda permissão nem conta como anotação.
+   */
+  async setBusinessPartnership(key: string, contextId: string, partnership: boolean | null): Promise<BusinessContext> {
+    return this.write(() => {
+      const payload = [contextId, partnership];
+      const replayed = this.replay(key, 'definir_sociedade_negocio', payload);
+      if (replayed) return this.businessView(replayed.contextId);
+      const b = this.ownedBusiness(contextId);
+      if (!this.biz.plusOpen()) throw new RepoError('plus_indisponivel');
+      if (partnership !== null && typeof partnership !== 'boolean') throw new RepoError('resposta_invalida');
+      this.biz.setPartnership(b.id, partnership);
+      this.saveOperation(key, 'definir_sociedade_negocio', payload, { contextId: b.id, recordId: null, commitmentId: null });
       return this.businessView(b.id);
     });
   }
@@ -5719,12 +5759,26 @@ export class MemoryRepository implements RecordsRepository {
     });
   }
 
-  async setBusinessMemberRole(key: string, contextId: string, personId: string, role: BusinessInviteRole): Promise<void> {
+  async setBusinessMemberRole(key: string, contextId: string, personId: string, role: BusinessMemberRole): Promise<void> {
     return this.write(() => {
       this.businessPeopleKey(key);
       this.biz.setRole(this.opts.actorId, key, contextId, personId, role, this.readsOutsideBusiness);
       this.businessPeopleDone(key, 'alterar_papel_negocio', contextId);
     });
+  }
+
+  /** transfer_business_admin (D-123): quem administrava passa a "Anota e vê", e a pessoa escolhida passa a administrar. */
+  async transferBusinessAdmin(key: string, contextId: string, personId: string): Promise<void> {
+    return this.write(() => {
+      this.businessPeopleKey(key);
+      this.biz.transfer(this.opts.actorId, key, contextId, personId, this.readsOutsideBusiness);
+      this.businessPeopleDone(key, 'transferir_administracao_negocio', contextId);
+    });
+  }
+
+  /** my_accounting_businesses (D-123): os negócios que a pessoa acompanha como Contabilidade, por nome. */
+  async listAccountingBusinesses(): Promise<AccountingBusiness[]> {
+    return this.read(() => this.biz.accountingOf(this.opts.actorId));
   }
 
   // ---------------------------------------------------------------------------
