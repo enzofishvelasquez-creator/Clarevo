@@ -1,10 +1,10 @@
 # Ficha das lojas (pt-BR)
 
-19/10/2026 (Ciclo R, D-060 item 1), revista em 25/10/2026 (Ciclo Marca 2.2, D-068: bem-estar financeiro e "a Clarevo") e em 10/11/2026 (assinatura pelas lojas, D-090, e o Telegram com compra no cartão). Textos prontos para colar no App Store Connect (Apple) e no Google Play Console. Cada campo tem o limite da loja e a contagem feita por script (`npm test` confere os limites e os termos proibidos em `packages/core/test/lojas.test.ts`). Nada aqui depende de conta de desenvolvedor, e nenhum identificador, senha ou chave foi escrito: o que for da conta de Enzo aparece entre colchetes, como "[preencher]".
+19/10/2026 (Ciclo R, D-060 item 1), revista em 25/10/2026 (Ciclo Marca 2.2, D-068: bem-estar financeiro e "a Clarevo"), em 10/11/2026 (assinatura pelas lojas, D-090, e o Telegram com compra no cartão) e em 25/11/2026 (D-125, estudo "Clarevo frente ao mercado": subtítulo com palavra de busca, primeiras linhas com a promessa, a privacidade e o preço, e a lista de recursos mais curta). Textos prontos para colar no App Store Connect (Apple) e no Google Play Console. Cada campo tem o limite da loja e a contagem feita por script (`npm test` confere os limites e os termos proibidos em `packages/core/test/lojas.test.ts`). Nada aqui depende de conta de desenvolvedor, e nenhum identificador, senha ou chave foi escrito: o que for da conta de Enzo aparece entre colchetes, como "[preencher]".
 
 **Limites.** Apple, conferidos em 19/10/2026 em `developer.apple.com/help/app-store-connect/reference/app-information/app-information` e `.../platform-version-information`: nome 30 caracteres, subtítulo 30, texto promocional 170, descrição 4000, palavras-chave 100 **bytes** (letra acentuada vale 2), notas para a revisão 4000 bytes. Google Play: título 30, descrição curta 80 e descrição completa 4000 caracteres são os limites que a página de ajuda do Play Console costuma trazer, **a conferir**: a rede desta sessão não abriu `support.google.com`, e esses valores não foram lidos da fonte oficial.
 
-**Regras de redação aplicadas** (CLAUDE.md e `docs/09`): português do Brasil, linguagem neutra de gênero, sem travessão longo, sem a expressão proibida de `docs/00`, sem prometer resultado financeiro, sem citar banco nem produto financeiro pelo nome, deixando claro que o app não se conecta a contas bancárias e que a empresa não vê os dados. A ficha descreve só o que já está no produto (README e `docs/04`). **Antes de publicar**, os textos que falam de exclusão de conta e de privacidade dependem de D-058 e de M-5 passarem pelo advogado (`docs/16`).
+**Regras de redação aplicadas** (CLAUDE.md e `docs/09`): português do Brasil, linguagem neutra de gênero, sem travessão longo, sem a expressão proibida de `docs/00`, sem prometer resultado financeiro, sem citar banco nem produto financeiro pelo nome, sem "segurança nível bancário" nem "100% seguro", sem prometer economia, dizendo que só entra no app o que a pessoa anota, importa ou manda por mensagem (o app não se conecta a contas bancárias, dito no fim, em IMPORTANTE) e que a empresa não vê os dados. A ficha descreve só o que já está no produto (README e `docs/04`). **Antes de publicar**, os textos que falam de exclusão de conta e de privacidade dependem de D-058 e de M-5 passarem pelo advogado (`docs/16`).
 
 ## Contagens conferidas
 
@@ -12,30 +12,32 @@
 |---|---|---|
 | Nome (Apple e Google) | 7 caracteres | 30 |
 | Nome, alternativa | 29 caracteres | 30 |
-| Subtítulo (Apple) | 20 caracteres | 30 |
+| Subtítulo (Apple) | 27 caracteres | 30 |
 | Mensagem central (gráfico e imagem do site) | 54 caracteres | 60 |
 | Frase de apoio (gráfico e imagem do site) | 25 caracteres | 30 |
-| Texto promocional (Apple) | 165 caracteres | 170 |
-| Palavras-chave (Apple) | 98 bytes | 100 bytes |
-| Descrição (Apple) | 3943 caracteres | 4000 |
-| Descrição curta (Google) | 79 caracteres | 80 (a conferir) |
-| Descrição completa (Google) | 3896 caracteres | 4000 (a conferir) |
-| Notas da versão (Google) | 146 caracteres | 500 (a conferir) |
-| Notas para a revisão (Apple) | 1716 bytes | 4000 bytes |
+| Texto promocional (Apple) | 156 caracteres | 170 |
+| Palavras-chave (Apple) | 97 bytes | 100 bytes |
+| Descrição (Apple) | 3278 caracteres | 4000 |
+| Descrição curta (Google) | 77 caracteres | 80 (a conferir) |
+| Descrição completa (Google) | 3231 caracteres | 4000 (a conferir) |
+| Notas da versão (Google) | 162 caracteres | 500 (a conferir) |
+| Notas para a revisão (Apple) | 1783 bytes | 4000 bytes |
 
 ## 1. Nome, subtítulo e categoria
 
 | Campo | Loja | Limite | Texto | Contagem |
 |---|---|---|---|---|
 | Nome | Apple e Google | 30 | Clarevo | 7 |
-| Nome, alternativa se "Clarevo" já estiver em uso na Apple | Apple | 30 | Clarevo: bem-estar financeiro | 29 |
-| Subtítulo | Apple | 30 | Bem-estar financeiro | 20 |
-| Mensagem central (não vai à loja) | Gráfico do Google Play e imagem do site | 60 | Cuidar da vida financeira faz parte de cuidar de você. | 54 |
+| Nome, alternativa se "Clarevo" já estiver em uso na Apple | Apple | 30 | Clarevo: controle de gastos | 27 |
+| Subtítulo | Apple | 30 | Controle de gastos e contas | 27 |
+| Mensagem central, hoje a assinatura da marca (não vai à loja) | Gráfico do Google Play e imagem do site | 60 | Cuidar da vida financeira faz parte de cuidar de você. | 54 |
 | Frase de apoio (não vai à loja) | Gráfico do Google Play e imagem do site | 30 | Mais clareza para decidir | 25 |
 | Categoria principal | Apple e Google | | Finanças | |
 | Categoria secundária (opcional) | Apple | | Educação | |
 
-**Posicionamento (25/10/2026, D-068).** A Clarevo se apresenta como solução de bem-estar financeiro (Playbook e Manual v2.2): o subtítulo da Apple e o início da descrição curta do Google dizem isso, e a mensagem central do site, "Cuidar da vida financeira faz parte de cuidar de você.", é a do gráfico de recursos do Google Play e da imagem de compartilhamento do site, que leem os campos `mensagem-central` e `frase-de-apoio` deste arquivo. "Mais clareza para decidir" (24/10/2026) continua como expressão de apoio: está na descrição e nas duas imagens, sem substituir a explicação do que o app faz, que continua logo abaixo, nas descrições. A marca é tratada no feminino ("a Clarevo"); quando o texto fala do software como objeto, diz "o app da Clarevo". Os textos não prometem resultado financeiro nem de saúde mental, sono, produtividade ou tranquilidade, e dizem que a Clarevo não é atendimento de saúde (Playbook v2.2, "Bem-estar financeiro e saúde mental").
+**Promessa concreta (25/11/2026, D-125).** O estudo "Clarevo frente ao mercado" mostrou que "Bem-estar financeiro" não é termo de busca e não diz o que o app faz. Agora o subtítulo da Apple junta a palavra de busca e o benefício ("Controle de gastos e contas"), a descrição curta do Google diz o que o app faz e o diferencial (pessoal, família e negócio separados), e as três primeiras linhas das descrições trazem a promessa, a privacidade ("Você decide o que entra") e o preço com o teste grátis. A frase "Cuidar da vida financeira faz parte de cuidar de você." continua como assinatura da marca (no fim das descrições, no rodapé do site e acima do título da página inicial), e "bem-estar financeiro" fica com a página Para empresas, que é o vocabulário que o RH compra. A lista de recursos passou de 15 itens para 10, mais curta, e cita o Espaço Negócio. O gráfico do Google Play e a imagem de compartilhamento do site ainda usam a mensagem central e a frase de apoio (campos abaixo, que não mudaram): refazer quando o Enzo escolher o título do site (o gráfico fica em `apps/app/assets/loja/` e é gerado por `node scripts/gerar-grafico-loja.js`).
+
+**Posicionamento (25/10/2026, D-068; o subtítulo e a descrição curta mudaram em 25/11/2026, D-125, acima).** A Clarevo se apresenta como solução de bem-estar financeiro (Playbook e Manual v2.2): o subtítulo da Apple e o início da descrição curta do Google dizem isso, e a mensagem central do site, "Cuidar da vida financeira faz parte de cuidar de você.", é a do gráfico de recursos do Google Play e da imagem de compartilhamento do site, que leem os campos `mensagem-central` e `frase-de-apoio` deste arquivo. "Mais clareza para decidir" (24/10/2026) continua como expressão de apoio: está na descrição e nas duas imagens, sem substituir a explicação do que o app faz, que continua logo abaixo, nas descrições. A marca é tratada no feminino ("a Clarevo"); quando o texto fala do software como objeto, diz "o app da Clarevo". Os textos não prometem resultado financeiro nem de saúde mental, sono, produtividade ou tranquilidade, e dizem que a Clarevo não é atendimento de saúde (Playbook v2.2, "Bem-estar financeiro e saúde mental").
 
 <!-- campo: apple-nome | limite: 30 | unidade: caracteres -->
 ```
@@ -44,12 +46,12 @@ Clarevo
 
 <!-- campo: apple-nome-alternativo | limite: 30 | unidade: caracteres -->
 ```
-Clarevo: bem-estar financeiro
+Clarevo: controle de gastos
 ```
 
 <!-- campo: apple-subtitulo | limite: 30 | unidade: caracteres -->
 ```
-Bem-estar financeiro
+Controle de gastos e contas
 ```
 
 <!-- campo: mensagem-central | limite: 60 | unidade: caracteres -->
@@ -68,16 +70,16 @@ Pode ser trocado a qualquer momento, sem nova versão.
 
 <!-- campo: apple-promocional | limite: 170 | unidade: caracteres -->
 ```
-Bem-estar financeiro com apoio prático: organize o mês e acompanhe contas e cartões. A Clarevo não se conecta a contas bancárias, e sua empresa não vê suas finanças.
+Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados. Você decide o que entra, sem anúncios. 14 dias grátis, sem cartão.
 ```
 
 ## 3. Palavras-chave (Apple, até 100 bytes)
 
-Separadas por vírgula, sem espaço depois da vírgula, sem repetir o nome do app e sem nome de outro app ou empresa.
+Separadas por vírgula, sem espaço depois da vírgula, sem repetir o nome do app e sem nome de outro app ou empresa. Desde 25/11/2026 (D-125), sem as palavras que já estão no subtítulo ("controle", "gastos", "contas"): a Apple junta as palavras do nome, do subtítulo e deste campo, e repetir só gasta espaço. Entraram "planilha" (de quem procura uma planilha de gastos) e "mei".
 
 <!-- campo: apple-palavras-chave | limite: 100 | unidade: bytes -->
 ```
-gastos,orçamento,contas a pagar,despesas,cartão,fatura,metas,reserva,família,finanças pessoais
+planilha,orçamento,despesas,cartão,fatura,mei,família,finanças pessoais,metas,dinheiro,boleto
 ```
 
 ## 4. Descrição (Apple, até 4000)
@@ -86,27 +88,24 @@ Texto simples, sem HTML. A mesma descrição serve de base para o Google (seçã
 
 <!-- campo: apple-descricao | limite: 4000 | unidade: caracteres -->
 ```
-A Clarevo é uma solução de bem-estar financeiro para pessoas e famílias, apoiada por um app de finanças pessoais e familiares. Cuidar da vida financeira faz parte de cuidar de você, e o app ajuda a organizar o mês e a acompanhar decisões, respeitando a sua realidade. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra. Mais clareza para decidir.
+Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados no mesmo app.
+Você decide o que entra: só aparece o que você anota, importa ou manda por mensagem. Sem anúncios e sem venda de dados.
+Individual por R$ 29,90 por mês ou Família por R$ 69,90 por mês, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão.
 
-A Clarevo não se conecta a contas bancárias. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar. Se sua empresa oferecer a Clarevo como benefício, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
+Você anota o que recebe e o que paga, e o app mostra o que entrou, o que saiu e o que ainda vai vencer, cada coisa separada da outra. Se sua empresa oferecer a Clarevo como benefício de bem-estar financeiro, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
 
 O QUE VOCÊ FAZ NA CLAREVO
 
-• Resumo do mês: Recebido, Pago, a diferença entre os dois e o que ainda falta pagar, com a explicação de cada número.
-• Anotar gasto e registrar recebimento em poucos toques, com rascunho preservado e aviso antes de descartar.
-• Contas a pagar: vencimentos, lembretes no aparelho e o gasto só entra em Pago quando você marca a conta como paga.
-• Gastos fixos, parcelamentos e contas do ano (como IPVA e IPTU), que aparecem sozinhos nos meses certos.
-• Cartões de crédito: compras à vista e parceladas, faturas e limite usado. O app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro.
-• Leitura de nota fiscal (QR Code, PDF ou a chave numa foto), de comprovantes de Pix e de pagamento, de holerite, de nota de serviço e de boleto, em PDF, print ou foto. A leitura acontece no próprio aparelho, e nenhuma foto é guardada por ela.
-• Importar extrato e fatura (PDF, OFX ou CSV), conferindo linha por linha antes de gravar.
-• Anotar pelo Telegram: mande "mercado 52,30", ou "farmácia 41 cartão" para uma compra no cartão, e o gasto entra no app na hora.
-• Evolução e Análises: Recebido e Pago mês a mês, média e mediana, categorias em barras ou em bolhas e orçamento por categoria.
-• Metas e reserva para imprevistos, com um plano de guardar que mostra as etapas e o mês previsto, sem contar rendimento.
-• Simulador e calculadoras (parcelado ou à vista, quanto custa por ano, juros e multa, entre outras), feitos com os números que você digita.
-• Família: até 6 pessoas, com os papéis Titular, "Anota e vê" e "Só vê", convite por link e a opção de sair ou encerrar quando quiser.
-• Aprender: explicações curtas sobre juros, taxas e contas do dia a dia, cada uma com fonte e data de revisão.
-• Ocultar valores na tela e pedir biometria para abrir o app.
-• Exportar seus gastos e recebimentos em CSV ou PDF e excluir a conta dentro do app.
+• Resumo do mês: o que entrou, o que saiu e o que ainda falta pagar, com a explicação de cada número.
+• Anotar em poucos toques ou pelo Telegram: mande "mercado 52,30" e o gasto entra no app na hora.
+• Ler nota fiscal, comprovante de Pix, boleto, holerite e nota de serviço, em PDF, print ou foto. A leitura acontece no próprio aparelho, e nenhuma foto é guardada por ela.
+• Importar extrato e fatura (PDF, OFX, CSV ou prints), conferindo linha por linha antes de gravar.
+• Contas a pagar com lembretes, gastos fixos, parcelamentos e contas do ano, como IPVA e IPTU.
+• Cartões de crédito com faturas e limite usado. O app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro.
+• Família: até 6 pessoas, com papéis, convite por link e o Pessoal de cada pessoa só dela.
+• Espaço Negócio, para quem trabalha por conta ou é MEI: o dinheiro do negócio separado do da casa, com retirada para o Pessoal, valores a receber e o limite do MEI.
+• Metas e reserva para imprevistos, análises do mês, Aprender e calculadoras feitas com os números que você digita.
+• Ocultar valores, biometria, exportar em CSV ou PDF e excluir a conta dentro do app.
 
 ASSINATURA
 
@@ -123,14 +122,16 @@ SEUS DADOS
 
 IMPORTANTE
 
-A Clarevo é uma ferramenta de organização e de educação financeira. Não é banco, não movimenta dinheiro, não oferece crédito e não indica produtos financeiros. Não é atendimento de saúde, não substitui acompanhamento de profissionais e não promete resultado financeiro nem de saúde. As simulações são exemplos feitos com os números que você digita e não garantem resultado.
+A Clarevo é uma ferramenta de organização e de educação financeira. Não é banco, não se conecta a contas bancárias, não movimenta dinheiro, não oferece crédito e não indica produtos financeiros. Não é atendimento de saúde, não substitui acompanhamento de profissionais e não promete resultado financeiro nem de saúde. As simulações são exemplos feitos com os números que você digita e não garantem resultado.
+
+Cuidar da vida financeira faz parte de cuidar de você.
 ```
 
 ## 5. Google Play: descrição curta (até 80)
 
 <!-- campo: google-descricao-curta | limite: 80 | unidade: caracteres -->
 ```
-Bem-estar financeiro: organize o mês e as contas. Sem ligar a contas bancárias.
+Controle de gastos e contas do mês, com pessoal, família e negócio separados.
 ```
 
 **Gráfico de recursos (Google Play, 1024 x 500): feito** (D-064). `apps/app/assets/loja/grafico-recursos-1024x500.png`, gerado por `node scripts/gerar-grafico-loja.js` com o logotipo oficial, a mensagem central e a frase de apoio desta ficha (campos `mensagem-central` e `frase-de-apoio`) e a tela Resumo da demonstração (`docs/16`, seção 6). Não leva preço, ranking, "melhor", "grátis" nem selos das lojas.
@@ -139,27 +140,24 @@ Bem-estar financeiro: organize o mês e as contas. Sem ligar a contas bancárias
 
 <!-- campo: google-descricao-completa | limite: 4000 | unidade: caracteres -->
 ```
-A Clarevo é uma solução de bem-estar financeiro para pessoas e famílias, apoiada por um app de finanças pessoais e familiares. Cuidar da vida financeira faz parte de cuidar de você, e o app ajuda a organizar o mês e a acompanhar decisões, respeitando a sua realidade. Você anota o que recebe e o que paga, e o app mostra quanto entrou, quanto saiu e quanto ainda vai vencer, cada coisa separada da outra. Mais clareza para decidir.
+Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados no mesmo app.
+Você decide o que entra: só aparece o que você anota, importa ou manda por mensagem. Sem anúncios e sem venda de dados.
+Individual por R$ 29,90 por mês ou Família por R$ 69,90 por mês, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão.
 
-A Clarevo não se conecta a contas bancárias. Tudo o que aparece no app foi anotado ou importado por você, e é você quem decide o que registrar. Se sua empresa oferecer a Clarevo como benefício, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
+Você anota o que recebe e o que paga, e o app mostra o que entrou, o que saiu e o que ainda vai vencer, cada coisa separada da outra. Se sua empresa oferecer a Clarevo como benefício de bem-estar financeiro, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
 
 O QUE VOCÊ FAZ NA CLAREVO
 
-• Resumo do mês: Recebido, Pago, a diferença entre os dois e o que ainda falta pagar, com a explicação de cada número.
-• Anotar gasto e registrar recebimento em poucos toques, com rascunho preservado e aviso antes de descartar.
-• Contas a pagar: vencimentos, lembretes no aparelho e o gasto só entra em Pago quando você marca a conta como paga.
-• Gastos fixos, parcelamentos e contas do ano (como IPVA e IPTU), que aparecem sozinhos nos meses certos.
-• Cartões de crédito: compras à vista e parceladas, faturas e limite usado. O app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro.
-• Leitura de nota fiscal (QR Code, PDF ou a chave numa foto), de comprovantes de Pix e de pagamento, de holerite, de nota de serviço e de boleto, em PDF, print ou foto. A leitura acontece no próprio aparelho, e nenhuma foto é guardada por ela.
-• Importar extrato e fatura (PDF, OFX ou CSV), conferindo linha por linha antes de gravar.
-• Anotar pelo Telegram: mande "mercado 52,30", ou "farmácia 41 cartão" para uma compra no cartão, e o gasto entra no app na hora.
-• Evolução e Análises: Recebido e Pago mês a mês, média e mediana, categorias em barras ou em bolhas e orçamento por categoria.
-• Metas e reserva para imprevistos, com um plano de guardar que mostra as etapas e o mês previsto, sem contar rendimento.
-• Simulador e calculadoras (parcelado ou à vista, quanto custa por ano, juros e multa, entre outras), feitos com os números que você digita.
-• Família: até 6 pessoas, com os papéis Titular, "Anota e vê" e "Só vê", convite por link e a opção de sair ou encerrar quando quiser.
-• Aprender: explicações curtas sobre juros, taxas e contas do dia a dia, cada uma com fonte e data de revisão.
-• Ocultar valores na tela e pedir biometria para abrir o app.
-• Exportar seus gastos e recebimentos em CSV ou PDF e excluir a conta dentro do app.
+• Resumo do mês: o que entrou, o que saiu e o que ainda falta pagar, com a explicação de cada número.
+• Anotar em poucos toques ou pelo Telegram: mande "mercado 52,30" e o gasto entra no app na hora.
+• Ler nota fiscal, comprovante de Pix, boleto, holerite e nota de serviço, em PDF, print ou foto. A leitura acontece no próprio aparelho, e nenhuma foto é guardada por ela.
+• Importar extrato e fatura (PDF, OFX, CSV ou prints), conferindo linha por linha antes de gravar.
+• Contas a pagar com lembretes, gastos fixos, parcelamentos e contas do ano, como IPVA e IPTU.
+• Cartões de crédito com faturas e limite usado. O app guarda só o apelido e, se você quiser, os 4 últimos dígitos, nunca o número inteiro.
+• Família: até 6 pessoas, com papéis, convite por link e o Pessoal de cada pessoa só dela.
+• Espaço Negócio, para quem trabalha por conta ou é MEI: o dinheiro do negócio separado do da casa, com retirada para o Pessoal, valores a receber e o limite do MEI.
+• Metas e reserva para imprevistos, análises do mês, Aprender e calculadoras feitas com os números que você digita.
+• Ocultar valores, biometria, exportar em CSV ou PDF e excluir a conta dentro do app.
 
 ASSINATURA
 
@@ -176,7 +174,9 @@ SEUS DADOS
 
 IMPORTANTE
 
-A Clarevo é uma ferramenta de organização e de educação financeira. Não é banco, não movimenta dinheiro, não oferece crédito e não indica produtos financeiros. Não é atendimento de saúde, não substitui acompanhamento de profissionais e não promete resultado financeiro nem de saúde. As simulações são exemplos feitos com os números que você digita e não garantem resultado.
+A Clarevo é uma ferramenta de organização e de educação financeira. Não é banco, não se conecta a contas bancárias, não movimenta dinheiro, não oferece crédito e não indica produtos financeiros. Não é atendimento de saúde, não substitui acompanhamento de profissionais e não promete resultado financeiro nem de saúde. As simulações são exemplos feitos com os números que você digita e não garantem resultado.
+
+Cuidar da vida financeira faz parte de cuidar de você.
 ```
 
 ## 7. Notas da versão 1.0.0
@@ -185,7 +185,7 @@ A Apple não mostra "O que há de novo" na primeira versão. No Google Play, o c
 
 <!-- campo: google-notas-da-versao | limite: 500 | unidade: caracteres -->
 ```
-Primeira versão da Clarevo: resumo do mês, contas a pagar, cartões, leitura de notas, comprovantes e boletos, Telegram, metas, Aprender e Família.
+Primeira versão da Clarevo: resumo do mês, contas a pagar, cartões, leitura de notas, comprovantes e boletos, Telegram, metas, Aprender, Família e Espaço Negócio.
 ```
 
 ## 8. Contato, links e direitos (campos para Enzo)
@@ -241,7 +241,7 @@ Resultado esperado: **4+** na Apple e a menor faixa na classificação do Google
 
 <!-- campo: apple-notas-da-revisao | limite: 4000 | unidade: bytes -->
 ```
-A Clarevo é uma solução de bem-estar financeiro apoiada por um app que organiza o dinheiro do mês (gastos, recebimentos, contas a pagar, cartões, metas) e traz explicações de educação financeira. Não se conecta a contas bancárias e não movimenta dinheiro.
+A Clarevo é um app de organização financeira: organiza o dinheiro do mês (gastos, recebimentos, contas a pagar, cartões, metas), com espaços separados para o Pessoal, a Família e o negócio de quem trabalha por conta, e traz explicações de educação financeira. Não se conecta a contas bancárias e não movimenta dinheiro.
 
 Assinatura: a Clarevo é paga por assinatura mensal, com compra dentro do app (dois produtos de assinatura automática no mesmo grupo: clarevo_individual_mensal, R$ 29,90, e clarevo_familia_mensal, R$ 69,90). Toda conta nova tem 14 dias de acesso completo grátis, dados pela própria conta, sem compra; depois, sem assinatura, a conta fica só para ver e exportar. Para ver e testar a compra: Conta, Assinatura, "Assinar o plano Individual" ou "Assinar o plano Família". "Restaurar compras" fica na mesma tela.
 

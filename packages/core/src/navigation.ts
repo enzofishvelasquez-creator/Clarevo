@@ -109,6 +109,27 @@ export function topicTabFor(pathname: string): TabRoute {
   return TAB_OF_TOPIC.find(([re]) => re.test(path))?.[1] ?? '/';
 }
 
+/**
+ * Telas que não são de nenhuma aba: Conta e o que se abre dela (assinatura, exportar, Telegram, nível, excluir), a Família, o painel da
+ * empresa e a Contabilidade. Abertas pelo avatar de qualquer aba, elas ficam sem aba marcada, sempre do mesmo jeito (estudo de 25/11/2026,
+ * sinal 21: a Conta aparecia com Resumo, Aprender ou Investir marcados, conforme o caminho). A barra lateral do computador já fazia assim.
+ */
+const NO_TAB_AREA = /^\/(conta|familia|empresa|contabilidade)(\/|$)/;
+
+/** A tela é da área de Conta (sem aba marcada)? */
+export function isNoTabArea(pathname: string): boolean {
+  return NO_TAB_AREA.test(normalizePath(pathname));
+}
+
+/**
+ * A aba marcada na barra de uma tela de consulta: nenhuma (`null`) nas telas da área de Conta e nas abertas por cima dela (`fromConta`);
+ * nas outras, a aba de onde a pessoa veio (`origin`) ou, sem ela (endereço aberto direto), a do assunto.
+ */
+export function barTabFor(pathname: string, origin: TabRoute | null, fromConta = false): TabRoute | null {
+  if (fromConta || isNoTabArea(pathname)) return null;
+  return origin ?? topicTabFor(pathname);
+}
+
 export const BAR_TEXT = {
   /** Nome acessível da barra de abas. */
   label: 'Navegação principal',

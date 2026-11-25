@@ -17,6 +17,8 @@ const { linksQuebrados, problemasFinaisDaPagina } = require('./verificacoes');
 const { caminhoLimpo, cabecalhosDoTexto } = require('./util');
 const { paginaInicial } = require('./paginas/inicio');
 const { paginaComece } = require('./paginas/comece');
+const { paginaMei } = require('./paginas/mei');
+const { estadoDoProduto, usarEstado } = require('./estado');
 const { paginaApp } = require('./paginas/app');
 const { paginaEmpresas } = require('./paginas/empresas');
 const { paginasAprender } = require('./paginas/aprender');
@@ -125,8 +127,20 @@ function hojeEmBrasilia() {
  * `novidades`: outra pasta de posts (padrão: `site-src/novidades`), para os testes.
  * `retrato` (objeto) ou `arquivoRetrato`: o retrato dos indicadores (padrão: `site-src/indicadores/retrato.json`, D-106).
  * `noticias`: outra pasta de edições do resumo semanal (padrão: `site-src/noticias`).
+ * `estado`: chaves que trocam as do estado do produto (`ESTADO_DO_PRODUTO` em `config.js`, D-125), como `{ lancado: true }`; sem ele, vale
+ * o de `config.js`. O estado vale para todas as páginas desta geração (`usarEstado`, em `estado.js`).
  */
-function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dados, arquivoDados, referencia, novidades: pastaDeNovidades, retrato: retratoDado, arquivoRetrato, noticias: pastaDeNoticias } = {}) {
+function gerarSite(opcoes = {}) {
+  const estado = estadoDoProduto(opcoes.estado || {});
+  usarEstado(estado);
+  try {
+    return gerarComEstado(opcoes, estado);
+  } finally {
+    usarEstado(null);
+  }
+}
+
+function gerarComEstado({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dados, arquivoDados, referencia, novidades: pastaDeNovidades, retrato: retratoDado, arquivoRetrato, noticias: pastaDeNoticias } = {}, estado) {
   if (referencia !== undefined && referencia !== null && !dataExiste(referencia)) throw new Error(`a data de referência "${referencia}" não é uma data válida (AAAA-MM-DD)`);
   referencia = referencia || hojeEmBrasilia();
   const avisos = [];
@@ -157,7 +171,7 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   const imagens = imagensDoSite();
   // Os vídeos de uso do app (D-114): o MP4 e o WebM de cada um, de site-src/videos; a capa vem com as imagens.
   const videos = videosDoSite();
-  const ctx = { valores, img: imagens.info, videos: videos.info, referencia, pastaDePosts: pastaDeNovidades, retrato: lidoRetrato.retrato, resumoSemanal: resumo.edicoes.length > 0 };
+  const ctx = { valores, img: imagens.info, videos: videos.info, referencia, pastaDePosts: pastaDeNovidades, retrato: lidoRetrato.retrato, resumoSemanal: resumo.edicoes.length > 0, estado };
   const paginas = [];
   const juntar = (pg) => paginas.push(pg);
 
@@ -166,6 +180,8 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   juntar(paginaApp(ctx));
   // Planos: o resumo (planos.html) e uma página por plano (planos/individual.html e planos/familia.html, desde 19/11/2026).
   paginasPlanos(ctx).forEach(juntar);
+  // A porta de quem trabalha por conta e MEI (D-125): o Espaço Negócio que já está no plano.
+  juntar(paginaMei(ctx));
   juntar(paginaEmpresas(ctx));
   paginasAprender(ctx).forEach(juntar);
   paginasCalculadoras(ctx).forEach(juntar);
@@ -272,7 +288,7 @@ function gerarSite({ raiz = RAIZ, legal = path.join(raiz, 'docs', 'legal'), dado
   const quebrados = linksQuebrados(arquivos);
   avisos.push(...quebrados);
   problemasFinais.push(...quebrados.map((q) => `link interno quebrado em ${q}`));
-  return { arquivos, avisos, pendencias, problemasFinais, valores, posts: novidades.posts, retrato: lidoRetrato.retrato, edicoes: resumo.edicoes };
+  return { arquivos, avisos, pendencias, problemasFinais, valores, posts: novidades.posts, retrato: lidoRetrato.retrato, edicoes: resumo.edicoes, estado };
 }
 
 module.exports = { gerarSite, CABECALHOS, hojeEmBrasilia, DOMINIO_VALIDO };

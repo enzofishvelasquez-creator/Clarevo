@@ -37,8 +37,9 @@ export const GUIDE_TEXT = {
   whereA11y: (path: readonly string[]): string => path.join(', '),
   /** Linha da lista do guia: "{título}. {para que serve}". */
   rowA11y: (title: string, purpose: string): string => `${title}${/[?!.]$/.test(title) ? '' : '.'} ${purpose}`,
-  tourAgain: 'Ver o tour de novo',
-  tourAgainHint: 'Mostra de novo os cinco cartões de boas-vindas.',
+  /** O tour não abre sozinho (estudo de 25/11/2026: ajuda quando a pessoa pede); fica aqui, no topo do guia. */
+  tourAgain: 'Ver o tour do app',
+  tourAgainHint: 'Mostra cinco cartões curtos com as áreas do app.',
   /** Entrada que não existe (endereço antigo ou digitado). */
   notFoundTitle: 'Esta função não está no guia.',
   notFoundAction: 'Ver o guia',

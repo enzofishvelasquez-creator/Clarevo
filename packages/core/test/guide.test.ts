@@ -24,10 +24,8 @@ import {
   guideWhere,
   normalizePath,
   searchGuide,
-  shouldShowTour,
   type GuideEntry,
   type HelpScreen,
-  type TourState,
 } from '../src';
 
 const APP_DIR = fileURLToPath(new URL('../../../apps/app/src/app/', import.meta.url));
@@ -526,9 +524,7 @@ describe('busca do guia em Aprender', () => {
   });
 });
 
-describe('tour de boas-vindas (D-049(2))', () => {
-  const base: TourState = { pathname: '/', prefsLoaded: true, seen: false, personal: true, reviewBand: 'oculta' };
-
+describe('tour do app (D-049(2)), sob pedido desde o estudo de 25/11/2026', () => {
   it('cinco cartões, na ordem do spec, cada um com título, texto e ícone', () => {
     expect(TOUR_CARDS).toHaveLength(5);
     expect(TOUR_CARDS.map((c) => c.id)).toEqual(['resumo', 'anotar', 'contas', 'metas', 'ajuda']);
@@ -563,52 +559,21 @@ describe('tour de boas-vindas (D-049(2))', () => {
     expect(TOUR_CARDS[4]!.lines).toContain('Algo deu errado ou teve uma ideia? Em Conta, Enviar sugestão ou problema.');
   });
 
-  it('aparece no Resumo, uma vez por pessoa em cada aparelho', () => {
-    expect(shouldShowTour(base)).toBe(true);
-    expect(shouldShowTour({ ...base, seen: true })).toBe(false);
-    // Enquanto as preferências do aparelho não foram lidas, espera (nunca pisca nem repete).
-    expect(shouldShowTour({ ...base, prefsLoaded: false })).toBe(false);
+  it('não abre sozinho: o Resumo não monta tour nenhum e o app não guarda mais "tour visto" (ajuda quando a pessoa pede)', () => {
+    const resumo = readFileSync(join(APP_DIR, '(tabs)', 'index.tsx'), 'utf8');
+    expect(resumo).not.toMatch(/WelcomeTour|TourDialog/);
+    const tour = readFileSync(join(APP_SRC, 'components', 'tour.tsx'), 'utf8');
+    expect(tour).not.toMatch(/export function WelcomeTour/);
+    expect(readFileSync(join(APP_SRC, 'lib', 'device-prefs.ts'), 'utf8')).not.toContain('tourSeen');
+    expect(readFileSync(join(APP_SRC, 'lib', 'guide.ts'), 'utf8')).not.toContain('__clarevoSemTour');
   });
 
-  it('nunca aparece sobre a faixa "Seus últimos meses" nem enquanto ela carrega (D-030)', () => {
-    expect(shouldShowTour({ ...base, reviewBand: 'visivel' })).toBe(false);
-    expect(shouldShowTour({ ...base, reviewBand: 'pendente' })).toBe(false);
-  });
-
-  it('nunca aparece sobre formulários, passos com rodapé fixo nem telas de entrada', () => {
-    for (const pathname of [
-      '/registro/novo',
-      '/registro/abc/editar',
-      '/a-pagar/nova',
-      '/a-pagar/vencidas',
-      '/gastos-fixos/novo',
-      '/cartoes/novo',
-      '/cartoes/abc/fatura/2026-10/pagar',
-      '/meta/nova',
-      '/guardar',
-      '/renda-comprometida/referencia',
-      '/orcamento/Mercado',
-      '/contas/nova',
-      '/importar',
-      '/retomar/atualizar',
-      '/entrar',
-      '/boas-vindas',
-      '/primeira-conta',
-    ])
-      expect(shouldShowTour({ ...base, pathname }), pathname).toBe(false);
-  });
-
-  it('também não abre sobre telas de consulta abertas por cima de uma aba, só no Resumo', () => {
-    for (const pathname of ['/a-pagar', '/cartoes', '/conta', '/retomar', '/aprender/guia']) expect(shouldShowTour({ ...base, pathname }), pathname).toBe(false);
-    // As outras abas também esperam: o tour começa pelo Resumo.
-    for (const pathname of ['/movimentacoes', '/metas', '/aprender']) expect(shouldShowTour({ ...base, pathname }), pathname).toBe(false);
-    expect(shouldShowTour({ ...base, pathname: '/' })).toBe(true);
-    expect(shouldShowTour({ ...base, pathname: '/?mes=2026-09' })).toBe(true);
-  });
-
-  it('fora do Pessoal e com o ambiente desligando, não aparece', () => {
-    expect(shouldShowTour({ ...base, personal: false })).toBe(false);
-    expect(shouldShowTour({ ...base, disabled: true })).toBe(false);
-    expect(shouldShowTour({ ...base, disabled: false })).toBe(true);
+  it('continua a um toque no guia ("Ver o tour do app", no topo de Como usar o app da Clarevo)', () => {
+    const guia = readFileSync(join(APP_DIR, 'aprender', 'guia', 'index.tsx'), 'utf8');
+    expect(guia).toContain('GUIDE_TEXT.tourAgain');
+    expect(guia).toContain('<TourDialog');
+    expect(GUIDE_TEXT.tourAgain).toBe('Ver o tour do app');
+    expect(guideEntry('ajuda')!.steps.join(' ')).toContain('Ver o tour do app');
+    expect(guideEntry('ajuda')!.purpose).not.toContain('primeira entrada');
   });
 });

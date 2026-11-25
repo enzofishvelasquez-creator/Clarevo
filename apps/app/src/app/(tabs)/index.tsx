@@ -23,7 +23,6 @@ import { SignupSourceCard } from '@/components/signup-source';
 import { EmptyState, ErrorState } from '@/components/states';
 import { ExtraSavingsCard } from '@/components/extra-savings';
 import { SummaryShortcuts } from '@/components/resumo-atalhos';
-import { WelcomeTour } from '@/components/tour';
 import { Body, Button, Card, FitMoney, LinkButton, Money, Screen, Skeleton, Txt } from '@/components/ui';
 import { totalChange, type TotalChange } from '@/lib/highlight';
 import { explanationHref, topicBySlug } from '@/lib/learn';
@@ -294,8 +293,6 @@ export default function ResumoScreen() {
           ) : null}
         </Body>
       </Screen>
-      {/* Tour de boas-vindas (D-049(2)): um modal na primeira entrada, sem mudar a estrutura do Resumo. */}
-      <WelcomeTour personal={kind === 'pessoal'} contextId={contextId} />
     </View>
   );
 }

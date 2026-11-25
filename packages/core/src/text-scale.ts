@@ -23,3 +23,14 @@ export function clampedLines(lines: number, fontScale: number): number | undefin
 
 /** Quanto o selo "Demonstração" cresce com a letra grande: só até 1,3 vez, porque o cabeçalho divide a faixa com o logotipo e o avatar. */
 export const DEMO_PILL_MAX_FONT_SCALE = 1.3;
+
+/**
+ * Abas de baixo com letra grande (estudo de 25/11/2026, sinal 20: "Resu…", "Movi…"): os rótulos crescem até 1,3 vez e encolhem para caber;
+ * acima dessa escala, a barra mostra só os ícones, e o nome de cada aba continua para o leitor de tela.
+ */
+export const TAB_LABEL_MAX_FONT_SCALE = 1.3;
+
+/** A barra de abas mostra os rótulos nesta escala de fonte? Acima de `TAB_LABEL_MAX_FONT_SCALE`, só os ícones. */
+export function tabLabelsShown(fontScale: number): boolean {
+  return !(fontScale > TAB_LABEL_MAX_FONT_SCALE);
+}

@@ -1,4 +1,5 @@
 export * from './money';
+export * from './money-input';
 export * from './dates';
 export * from './records';
 export * from './validation';
@@ -64,6 +65,7 @@ export * from './nota-flow';
 export * from './boleto';
 export * from './navigation';
 export * from './legal';
+export * from './welcome';
 export * from './budget';
 export * from './accounts';
 export * from './search';

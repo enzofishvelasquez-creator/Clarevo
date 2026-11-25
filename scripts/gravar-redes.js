@@ -313,8 +313,8 @@ function ferramentas(p, { altura, largura = LARGURA, ritmo = 1 }) {
 async function entrarNaDemo(p, base, f) {
   await p.goto(`${base}/`);
   await f.esperar('Cuidar da vida financeira');
-  const entrar = f.botao('Ver demonstração com dados fictícios');
-  await entrar.waitFor({ timeout: 15000 }).catch(() => { throw new Error('o botão "Ver demonstração com dados fictícios" não apareceu: apps/app/dist não é um build de demonstração (rode com --build)'); });
+  const entrar = f.botao('Ver a demonstração');
+  await entrar.waitFor({ timeout: 15000 }).catch(() => { throw new Error('o botão "Ver a demonstração" não apareceu: apps/app/dist não é um build de demonstração (rode com --build)'); });
   await entrar.click();
   await f.esperar('Diferença do mês');
   await f.esperar('R$ 2.100,00');

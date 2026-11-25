@@ -304,7 +304,7 @@ describe('device-features: o widget da tela inicial', () => {
 
 describe('device-features: a oferta da biometria logo depois de entrar (16/11/2026)', () => {
   const accepted = { version: core.LEGAL_VERSION, current: core.LEGAL_VERSION };
-  const prefsOk = { reminders: false, reminderHour: core.DEFAULT_REMINDER_HOUR, reminderOffered: false, biometricLock: false, biometricOffered: false, hideOnOpen: false, widgetShowValues: false, tourSeen: true };
+  const prefsOk = { reminders: false, reminderHour: core.DEFAULT_REMINDER_HOUR, reminderOffered: false, biometricLock: false, biometricOffered: false, hideOnOpen: false, widgetShowValues: false };
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   const offer = (t: Awaited<ReturnType<typeof setup>>) => t.dialogs.get('OFERTA DA BIOMETRIA');
 
@@ -319,13 +319,22 @@ describe('device-features: a oferta da biometria logo depois de entrar (16/11/20
     t.unmount();
   });
 
+  it('não espera mais o tour de boas-vindas: o tour não abre sozinho desde o estudo de 25/11/2026 (aparece depois do login, sem "tour visto")', async () => {
+    const t = await setup({ user: null, prefs: undefined, bioAvailable: true, legal: accepted });
+    await t.change({ user: { id: 'pessoa-1' }, prefs: prefsOk, signedIn: true });
+    await wait(1100);
+    await t.change({});
+    expect(offer(t)?.visible).toBe(true);
+    expect(JSON.stringify(prefsOk)).not.toContain('tourSeen');
+    t.unmount();
+  });
+
   it('não aparece para quem abre o app já com a sessão, sem biometria no aparelho, com o aceite dos termos pendente ou já oferecida', async () => {
     const cases: Partial<World>[] = [
       { bioAvailable: false },
       { legal: undefined },
       { prefs: { ...prefsOk, biometricOffered: true } },
       { prefs: { ...prefsOk, biometricLock: true } },
-      { prefs: { ...prefsOk, tourSeen: false } },
     ];
     // A sessão guardada que volta depois de o app abrir sem conexão não é uma entrada na conta: nada a oferecer.
     const back = await setup({ user: null, repo: null, offline: true, prefs: undefined, bioAvailable: true, legal: accepted });
@@ -352,7 +361,7 @@ describe('device-features: a oferta da biometria logo depois de entrar (16/11/20
 });
 
 describe('device-features: sem conexão ao abrir o app (sessão guardada no aparelho, lib/supabase.ts)', () => {
-  const lockPrefs = { reminders: true, reminderHour: core.DEFAULT_REMINDER_HOUR, reminderOffered: true, biometricLock: true, biometricOffered: true, hideOnOpen: false, widgetShowValues: false, tourSeen: true };
+  const lockPrefs = { reminders: true, reminderHour: core.DEFAULT_REMINDER_HOUR, reminderOffered: true, biometricLock: true, biometricOffered: true, hideOnOpen: false, widgetShowValues: false };
 
   it('com a sessão guardada e o espaço sem carregar: nenhum lembrete cancelado e nenhum widget "sem sessão"; com a conexão de volta, tudo segue', async () => {
     await withDemoClock(async () => {
@@ -414,7 +423,7 @@ describe('device-features: sem conexão ao abrir o app (sessão guardada no apar
 });
 
 describe('device-features: a volta de uma tela de fora não trava o app (lib/external-screen.ts)', () => {
-  const lockPrefs = { reminders: false, reminderHour: core.DEFAULT_REMINDER_HOUR, reminderOffered: true, biometricLock: true, biometricOffered: true, hideOnOpen: false, widgetShowValues: false, tourSeen: true };
+  const lockPrefs = { reminders: false, reminderHour: core.DEFAULT_REMINDER_HOUR, reminderOffered: true, biometricLock: true, biometricOffered: true, hideOnOpen: false, widgetShowValues: false };
 
   /** Fica fora do app por `ms`, em segundo plano, e volta. */
   const awayFor = async (t: Awaited<ReturnType<typeof setup>>, ms: number) => {
@@ -497,7 +506,7 @@ describe('device-features: a volta de uma tela de fora não trava o app (lib/ext
 describe('device-features: o voltar do sistema', () => {
   it('na oferta da biometria, o voltar só fecha agora, sem marcar que já foi oferecida ("Agora não" marca)', async () => {
     const accepted = { version: core.LEGAL_VERSION, current: core.LEGAL_VERSION };
-    const prefsOk = { reminders: false, reminderHour: core.DEFAULT_REMINDER_HOUR, reminderOffered: false, biometricLock: false, biometricOffered: false, hideOnOpen: false, widgetShowValues: false, tourSeen: true };
+    const prefsOk = { reminders: false, reminderHour: core.DEFAULT_REMINDER_HOUR, reminderOffered: false, biometricLock: false, biometricOffered: false, hideOnOpen: false, widgetShowValues: false };
     const t = await setup({ user: null, prefs: undefined, bioAvailable: true, legal: accepted });
     await t.change({ user: { id: 'pessoa-1' }, prefs: prefsOk, signedIn: true });
     await new Promise((resolve) => setTimeout(resolve, 1100));

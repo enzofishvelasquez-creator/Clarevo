@@ -52,17 +52,11 @@ export default function MetasScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Screen wide>
-        {/* No computador, sem a pílula do espaço ao lado do título: o seletor logo abaixo já diz qual é, com o mesmo nome (revisão visual de
-            23/11/2026: "Pessoal" duas vezes). No celular, a pílula continua (CL-11). */}
-        {wide ? (
-          <AppHeader title={GOALS_TEXT.tabTitle}>
-            <ContextSwitch />
-          </AppHeader>
-        ) : (
-          <AppHeader title={GOALS_TEXT.tabTitle} context="Pessoal">
-            <ContextSwitch />
-          </AppHeader>
-        )}
+        {/* Uma só indicação do espaço (estudo de 25/11/2026, sinal 22: "Pessoal" aparecia duas vezes): o seletor, que só aparece com mais de
+            um espaço. Sem a pílula ao lado do título, no celular e no computador. */}
+        <AppHeader title={GOALS_TEXT.tabTitle}>
+          <ContextSwitch />
+        </AppHeader>
         <Body>
           {business ? (
             // Espaço Negócio (D-113): metas ficam no Pessoal e na Família; o negócio é só o que entra e sai.

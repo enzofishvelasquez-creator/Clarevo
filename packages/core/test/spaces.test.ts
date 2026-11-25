@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { BUSINESS_TEXT, FAMILY_TEXT, GUIDE_ENTRIES, SPACE_TEXT, spaceChoices } from '../src';
+import { BUSINESS_TEXT, FAMILY_TEXT, FIRST_STEPS_TEXT, GUIDE_ENTRIES, SPACE_TEXT, spaceChoices } from '../src';
 
 /** Termos que nenhum texto do app usa (o mesmo critério de copy.test.ts). */
 const FORBIDDEN =
@@ -116,9 +116,9 @@ describe('no app (lido como código-fonte)', () => {
   const header = app('components/header.tsx');
   const sheet = app('components/space-sheet.tsx');
 
-  it('o seletor das abas não some sem Família nem negócio, e o "+" fica fora da lista de abas', () => {
+  it('o seletor das abas só aparece com mais de um espaço (D-125, sinal 22), e o "+" fica fora da lista de abas', () => {
     const fn = header.slice(header.indexOf('export function ContextSwitch()'), header.indexOf('function ContextSwitchTrack'));
-    expect(fn).not.toContain('return null');
+    expect(fn).toContain('if (spaces.length < 2) return null;');
     expect(fn).toContain('SPACE_TEXT.createA11y(creatable)');
     const track = header.slice(header.indexOf('function ContextSwitchTrack'));
     expect(track).toContain('accessibilityRole="tablist"');
@@ -134,7 +134,8 @@ describe('no app (lido como código-fonte)', () => {
 
   it('a pílula só vira botão com `switchable` e nunca com `fixed`; o nome acessível continua "Espaço: ..."', () => {
     const pill = header.slice(header.indexOf('export function ContextPill('), header.indexOf('export function ContextSwitch()'));
-    expect(pill).toContain("const canSwitch = Boolean(switchable) && !fixed && (choices.spaces.length > 1 || choices.creatable.length > 0);");
+    // Só com mais de um espaço a pílula troca (D-125, sinal 22); só com o Pessoal, ela só diz o espaço.
+    expect(pill).toContain('const canSwitch = Boolean(switchable) && !fixed && choices.spaces.length > 1;');
     expect(pill).toContain('accessibilityLabel={`Espaço: ${text}`}');
     expect(pill).toContain('<SpaceSheet mode="trocar"');
   });
@@ -186,7 +187,10 @@ describe('no app (lido como código-fonte)', () => {
     expect(BUSINESS_TEXT.firstStepsTip).toBe('Tem um negócio? Crie o espaço Negócio');
     expect(pp).toContain('const noBusiness = business.isSuccess && business.data === null;');
     expect(pp).toContain("router.push('/negocio/novo')");
-    // Os quatro passos continuam quatro.
-    expect(pp).toContain('Quatro passos para a Clarevo mostrar o seu mês de verdade.');
+    // Os quatro passos continuam quatro; os dois jeitos rápidos (importar e o Telegram) vêm antes deles, sem contar como passo.
+    expect(FIRST_STEPS_TEXT.intro).toBe('Quatro passos para a Clarevo mostrar o seu mês de verdade.');
+    expect(pp).toContain('{FIRST_STEPS_TEXT.intro}');
+    expect(pp).toContain("router.push('/importar')");
+    expect(pp).toContain("router.push('/conta/telegram')");
   });
 });

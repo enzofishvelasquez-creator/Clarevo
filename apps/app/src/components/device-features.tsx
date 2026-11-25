@@ -292,7 +292,7 @@ function NativeFeatures() {
   // ---- Oferta da biometria logo depois de entrar na conta --------------------------------------
   // Só depois de um login neste uso do app (`signInMark`; quem abre o app já com a sessão, ou com a sessão guardada que volta depois de
   // abrir sem conexão, não é perguntado), com biometria cadastrada no aparelho, uma vez por pessoa e aparelho, e sem atropelar o aviso
-  // dos termos, o tour de boas-vindas nem a tela de trava.
+  // dos termos nem a tela de trava. O tour não abre mais sozinho (estudo de 25/11/2026: ajuda quando a pessoa pede, no guia).
   const legal = useLegalAcceptance(status === 'pronto' && !demo);
   const legalPending = !legal.data || legalAcceptanceNeeded(legal.data);
   const [bioOffer, setBioOffer] = useState(false);
@@ -318,7 +318,7 @@ function NativeFeatures() {
       bioChecked.current = userId;
       return;
     }
-    if (status !== 'pronto' || locked || legalPending || !prefs.tourSeen) return;
+    if (status !== 'pronto' || locked || legalPending) return;
     bioChecked.current = userId;
     const forUser = userId;
     biometricsAvailable().then((ok) => {

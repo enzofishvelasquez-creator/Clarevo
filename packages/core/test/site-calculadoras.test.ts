@@ -557,14 +557,14 @@ process.stdout.write(JSON.stringify({ conta, resultadoDaConta, fatura, modoDepoi
     for (const m of Object.values(Object.fromEntries(gerado.arquivos)).map(texto).join('\n').matchAll(/\.\.\/calculadoras\/[a-z-]+\.html\?([^"]+)"/g)) expect(m[1]).toMatch(/^modo=[a-z_-]+$/);
   });
 
-  it('"Calculadoras" está no menu principal, no rodapé, no índice e no início de Aprender, na página inicial e na 404', () => {
+  it('"Calculadoras" está no menu principal, no rodapé, no índice e no início de Aprender e na 404', () => {
     for (const [nome, h] of [...gerado.arquivos].filter(([n]) => n.endsWith('.html')).map(([n, v]) => [n, texto(v)] as const)) {
       expect(h, `${nome}: menu`).toMatch(/<ul class="menu-lista">.*<li><a href="[^"]*index\.html"[^>]*>Calculadoras<\/a><\/li>/);
       expect(h, `${nome}: rodapé`).toMatch(/<footer class="rodape">[\s\S]*<a href="[^"]*index\.html">Calculadoras<\/a>/);
     }
     expect(pagina('aprender/index.html')).toContain(`href="../calculadoras/index.html"><span class="titulo-cartao">${esc(CALC_UI_TEXT.learnCardTitle)}</span>`);
     expect(pagina('aprender/index.html')).toContain('>Calculadoras</a>');
-    expect(pagina('index.html')).toContain('<span class="titulo-cartao">Calculadoras</span>');
+    // Desde 25/11/2026 (D-125), a página inicial não tem mais a grade de atalhos: Calculadoras fica no menu e no rodapé (conferidos acima).
     expect(pagina('404.html')).toContain('href="/calculadoras/index.html">Calculadoras</a>');
   });
 

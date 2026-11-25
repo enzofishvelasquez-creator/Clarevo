@@ -27,6 +27,7 @@ import { InvestmentTotalsLines } from '@/components/investment-parts';
 import { AllocationCard, FiscalCalendarCard, IncomeCard, InvestmentLinks, InvestmentPlanCard, PerformanceCard, UpcomingDatesCard } from '@/components/investment-portfolio';
 import { HowCalculatedSheet, InvestmentTemplates, StaleValuesNotice } from '@/components/investment-tab-parts';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
+import { useSpaceChoices } from '@/components/space-sheet';
 import { EmptyState, ErrorState } from '@/components/states';
 import { Body, Button, Card, Screen, Skeleton, Txt, styles as ui } from '@/components/ui';
 import { useWideLayout } from '@/lib/layout';
@@ -60,6 +61,7 @@ export default function InvestimentosScreen() {
   const [notice] = useFlash();
   const [howOpen, setHowOpen] = useState(false);
   const wide = useWideLayout();
+  const multiSpace = useSpaceChoices().spaces.length > 1;
   const canWrite = personal.data?.canWrite ?? true;
   const all = list.data ?? [];
   const active = all.filter((i) => i.status === 'ativo');
@@ -78,7 +80,8 @@ export default function InvestimentosScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Screen wide>
-        <AppHeader title={T.tabTitle} context="Pessoal" contextFixed />
+        {/* Investir é só do Pessoal: com mais de um espaço, a pílula diz isso; só com o Pessoal, nenhuma indicação de espaço (sinal 22). */}
+        <AppHeader title={T.tabTitle} context={multiSpace ? 'Pessoal' : undefined} contextFixed />
         <Body>
           <FlashBanner message={notice} />
           {inBusiness ? (
@@ -185,7 +188,7 @@ function Summary({ active, onHow }: { active: readonly Investment[]; onHow: () =
         accessibilityHint={PERFORMANCE_TEXT.openHint}
         onPress={() => router.push('/investimento/desempenho')}
         style={(st) => [{ gap: space[2] }, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRingOnBrand]}>
-        <MoneyTxt color={colors.textOnBrand} style={[tabular, styles.big]}>
+        <MoneyTxt fit color={colors.textOnBrand} style={[tabular, styles.big]}>
           {formatBRL(t.valueCents)}
         </MoneyTxt>
         <Txt variant="caption" color={colors.textOnBrandSoft}>
@@ -239,7 +242,7 @@ function SummaryWide({ active, onHow }: { active: readonly Investment[]; onHow: 
         onPress={() => router.push('/investimento/desempenho')}
         style={(st) => [styles.wideRow, st.pressed && { opacity: 0.85 }, (st as { focused?: boolean }).focused && ui.focusRing]}>
         <View style={styles.wideMain}>
-          <MoneyTxt style={[tabular, styles.big]}>{formatBRL(t.valueCents)}</MoneyTxt>
+          <MoneyTxt fit style={[tabular, styles.big]}>{formatBRL(t.valueCents)}</MoneyTxt>
           <Txt variant="caption" color={colors.textSecondary}>
             {TAB_VALUE_DATE_TEXT.card(dates)}
           </Txt>
@@ -295,7 +298,7 @@ function InvestmentCard({ investment: i, movements }: { investment: Investment; 
             {investmentCaption(i)}
           </Txt>
         </View>
-        <MoneyTxt variant="label" style={[tabular, { fontFamily: fonts.extrabold }]}>
+        <MoneyTxt fit variant="label" style={[tabular, { fontFamily: fonts.extrabold }]}>
           {formatBRL(i.valueCents)}
         </MoneyTxt>
         <ChevronRight size={20} color={colors.textSecondary} aria-hidden />

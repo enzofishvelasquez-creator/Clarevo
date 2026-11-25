@@ -43,6 +43,7 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 const { servir } = require('./site/servir');
 const { catalogo } = require('./site/catalogo');
+const { estadoDoProduto, textoDoAcesso } = require('./site/estado');
 
 const RAIZ = path.join(__dirname, '..');
 const HOJE = '2026-10-23';
@@ -626,14 +627,15 @@ function varrerPagina() {
       await p.close();
     }
 
-    // 7. Comece aqui (D-067): a página do link da bio abre sem violação da política de segurança, com os seis caminhos, a demonstração como
-    // link de texto (a navegação para fora é bloqueada e só conferida) e nenhum parâmetro de rastreamento em link nenhum.
+    // 7. Comece aqui (D-067): a página do link da bio abre sem violação da política de segurança, com os oito caminhos (desde D-125, também
+    // Planos e a página do MEI), o estado do acesso do estado do produto (`scripts/site/estado.js`), a demonstração como link de texto (a
+    // navegação para fora é bloqueada e só conferida) e nenhum parâmetro de rastreamento em link nenhum.
     {
       const p = await pagina();
       await p.goto(`${origem}/comece`);
-      ok('comece aqui: título, estado do acesso e seis caminhos', (await p.textContent('h1')) === 'Comece aqui' &&
-        (await p.textContent('main')).includes('A Clarevo está em fase de testes. A versão para pessoas e empresas abre no piloto; acompanhe as Novidades.') &&
-        (await p.$$eval('main a.cartao', (as) => as.map((a) => a.querySelector('.titulo-cartao').textContent))).join('|') === 'O app|Ver a demonstração|Aprender|Calculadoras|Para empresas|Ajuda');
+      ok('comece aqui: título, estado do acesso (o mesmo do estado do produto) e oito caminhos', (await p.textContent('h1')) === 'Comece aqui' &&
+        (await p.textContent('#acesso + p')) === textoDoAcesso(estadoDoProduto()) &&
+        (await p.$$eval('main a.cartao', (as) => as.map((a) => a.querySelector('.titulo-cartao').textContent))).join('|') === 'Ver a demonstração|O app|Planos|Para quem trabalha por conta e MEI|Para empresas|Aprender|Calculadoras|Ajuda');
       const demo = await p.$eval('main a.cartao[href^="https://"]', (a) => ({ href: a.href, rel: a.rel }));
       const comParametro = await p.$$eval('a[href]', (as) => as.map((a) => a.getAttribute('href')).filter((h) => /[?&]|utm_|fbclid|igshid/i.test(h)));
       ok('comece aqui: a demonstração é link de texto com noopener, e nenhum link leva parâmetro', demo.href === 'https://demo.clarevo.app.br/' && /noopener/.test(demo.rel) && comParametro.length === 0, JSON.stringify({ demo, comParametro }));
@@ -874,14 +876,15 @@ function varrerPagina() {
       }
     }
 
-    // 7c. Vídeos de uso do app (D-114 e D-115): cada um no bloco que mostra (a capa e três cartões da página inicial, seis recursos e o
+    // 7c. Vídeos de uso do app (D-114 e D-115): cada um no bloco que mostra (a capa e "Como funciona" da página inicial, seis recursos e o
     // cartão do tema em O app), do próprio site, sem controles de player nem `autoplay`, sem som e em repetição. O script do site toca o
     // vídeo que aparece na tela (pelo menos metade) e pausa o que sai; nada de vídeo baixa antes de aparecer. Sem botão de pausar (D-115c,
     // 19/11/2026): o próprio vídeo pausa e toca, pelo mouse e pelo teclado, com papel de botão e nome acessível; com movimento reduzido ou
     // economia de dados, nada toca até a pessoa tocar no vídeo; sem JavaScript, fica a capa, com o nome "Vídeo: título".
     {
       const LUGARES = {
-        '/': [['.capa', 'O Resumo do mês'], ['article.cartao:has(h3:text-is("Anotar e ver o mês"))', 'Anotar um gasto'], ['article.cartao:has(h3:text-is("Contas, cartões e gastos fixos"))', 'Importar fatura por print'], ['article.cartao:has(h3:text-is("Metas e reserva"))', 'Metas']],
+        // Desde 25/11/2026 (D-125), a página inicial tem dois vídeos: o Resumo na capa e a fatura por print em "Como funciona".
+        '/': [['.capa', 'O Resumo do mês'], ['section[aria-labelledby="como-funciona"]', 'Importar fatura por print']],
         '/app/': [['#resumo', 'O Resumo do mês'], ['#anotar', 'Anotar um gasto'], ['#contas', 'O Calendário do mês'], ['#cartoes', 'Importar fatura por print'], ['#metas', 'Metas'], ['#investir', 'Investir'], ['article.cartao:has(h3:text-is("Tema claro ou escuro"))', 'Do tema escuro ao claro']],
       };
       const p = await pagina();
@@ -924,40 +927,42 @@ function varrerPagina() {
       const capa = await tempoDe('.capa video');
       const parados = await p.$$eval('main > section:not(.capa) figure[data-video] video', (vs) => vs.every((v) => v.paused && v.currentTime === 0));
       ok('vídeos: o da capa toca sozinho ao abrir a página (WebM do próprio site), sem erro, e os de baixo continuam parados', !capa.paused && capa.tempo > 0.5 && !capa.erro && capa.src.startsWith(`${origem}/videos/resumo-do-mes.`) && capa.src.endsWith('.webm') && parados, JSON.stringify(capa));
-      // Rolar até um cartão: o vídeo dele começa, e o da capa, fora da tela, pausa.
-      const cartao = 'article.cartao:has(h3:text-is("Metas e reserva")) video';
+      // Rolar até "Como funciona": o vídeo dele começa, e o da capa, fora da tela, pausa.
+      const cartao = 'section[aria-labelledby="como-funciona"] video';
       await p.locator(cartao).evaluate((v) => v.scrollIntoView({ block: 'center' }));
-      await p.waitForFunction(() => document.querySelector('[data-titulo="Metas"] video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
+      await p.waitForFunction(() => document.querySelector('[data-titulo="Importar fatura por print"] video').currentTime > 0.5, null, { timeout: 15000 }).catch(() => {});
       const doCartao = await p.locator(cartao).evaluate((v) => ({ paused: v.paused, tempo: v.currentTime }));
       const capaFora = await tempoDe('.capa video');
       ok('vídeos: ao rolar, o vídeo que aparece toca e o que saiu da tela pausa', !doCartao.paused && doCartao.tempo > 0.5 && capaFora.paused, JSON.stringify({ doCartao, capaFora }));
-      // Sem botão (D-115c): clicar no próprio vídeo pausa, o nome passa a "Tocar o vídeo: Metas", e a pausa da pessoa vale mesmo depois de
+      // Sem botão (D-115c): clicar no próprio vídeo pausa, o nome passa a "Tocar o vídeo: ...", e a pausa da pessoa vale mesmo depois de
       // rolar para longe e voltar.
       const video = p.locator(cartao);
       const antes = await video.getAttribute('aria-label');
       await video.click();
       await p.waitForTimeout(300);
-      const pausado = { paused: await video.evaluate((v) => v.paused), nome: await video.getAttribute('aria-label'), estado: await p.getAttribute('[data-titulo="Metas"]', 'data-estado') };
+      const pausado = { paused: await video.evaluate((v) => v.paused), nome: await video.getAttribute('aria-label'), estado: await p.getAttribute('[data-titulo="Importar fatura por print"]', 'data-estado') };
       await p.evaluate(() => window.scrollTo(0, 0));
       await p.waitForTimeout(600);
       await video.evaluate((v) => v.scrollIntoView({ block: 'center' }));
       await p.waitForTimeout(900);
       const continuaPausado = await video.evaluate((v) => v.paused);
       const semBotao = await p.$$eval('figure[data-video]', (fs) => fs.map((f) => f.querySelectorAll('button, .video-botao').length));
-      ok('vídeos: nenhum botão de pausar em nenhuma figura de vídeo da página inicial', semBotao.length === 4 && semBotao.every((n) => n === 0), JSON.stringify(semBotao));
-      ok('vídeos: clicar no vídeo "Pausar o vídeo: Metas" pausa, o nome passa a "Tocar o vídeo: Metas" e a pausa continua depois de rolar para longe e voltar',
-        antes === 'Pausar o vídeo: Metas' && pausado.paused && pausado.nome === 'Tocar o vídeo: Metas' && pausado.estado === 'parado' && continuaPausado, JSON.stringify({ antes, pausado, continuaPausado }));
+      ok('vídeos: nenhum botão de pausar em nenhuma figura de vídeo da página inicial', semBotao.length === 2 && semBotao.every((n) => n === 0), JSON.stringify(semBotao));
+      ok('vídeos: clicar no vídeo "Pausar o vídeo: Importar fatura por print" pausa, o nome passa a "Tocar o vídeo: ..." e a pausa continua depois de rolar para longe e voltar',
+        antes === 'Pausar o vídeo: Importar fatura por print' && pausado.paused && pausado.nome === 'Tocar o vídeo: Importar fatura por print' && pausado.estado === 'parado' && continuaPausado, JSON.stringify({ antes, pausado, continuaPausado }));
       // Pelo teclado: Tab chega ao vídeo, com o contorno visível do foco, e Espaço toca de novo (sem rolar a página).
       // O foco parte do último elemento focável antes do vídeo, para o Tab ser de verdade (e o navegador mostrar o foco do teclado).
       await video.evaluate((v) => { const anterior = [...document.querySelectorAll('a[href], button, input, [tabindex="0"]')].filter((e) => e.getClientRects().length > 0 && !e.parentElement.closest('video') && e.compareDocumentPosition(v) & Node.DOCUMENT_POSITION_FOLLOWING).pop(); if (anterior) anterior.focus(); });
       await p.keyboard.press('Tab');
+      // O foco leva o vídeo para a tela com a rolagem suave do site: espera a rolagem parar antes de medir.
+      await p.waitForTimeout(900);
       const foco = await video.evaluate((v) => { const cs = getComputedStyle(v); return { ativo: document.activeElement === v, visivel: v.matches(':focus-visible'), contorno: cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2 }; });
       const rolagemAntes = await p.evaluate(() => window.scrollY);
       await p.keyboard.press('Space');
       await p.waitForTimeout(800);
       const depoisDoEspaco = { paused: await video.evaluate((v) => v.paused), nome: await video.getAttribute('aria-label'), ativo: await video.evaluate((v) => document.activeElement === v), rolou: Math.abs((await p.evaluate(() => window.scrollY)) - rolagemAntes) > 2 };
-      ok('vídeos: pelo teclado, o vídeo recebe foco com contorno visível e Espaço toca de novo, sem rolar a página, com o nome "Pausar o vídeo: Metas"',
-        foco.ativo && foco.visivel && foco.contorno && !depoisDoEspaco.paused && depoisDoEspaco.nome === 'Pausar o vídeo: Metas' && depoisDoEspaco.ativo && !depoisDoEspaco.rolou, JSON.stringify({ foco, depoisDoEspaco }));
+      ok('vídeos: pelo teclado, o vídeo recebe foco com contorno visível e Espaço toca de novo, sem rolar a página, com o nome "Pausar o vídeo: Importar fatura por print"',
+        foco.ativo && foco.visivel && foco.contorno && !depoisDoEspaco.paused && depoisDoEspaco.nome === 'Pausar o vídeo: Importar fatura por print' && depoisDoEspaco.ativo && !depoisDoEspaco.rolou, JSON.stringify({ foco, depoisDoEspaco }));
       await p.setViewportSize({ width: 390, height: 900 });
       await p.close();
       // O MP4 (para os navegadores que não tocam WebM): tipo certo, pedaço com 206 e a política de segurança com media-src 'self'.
@@ -983,7 +988,7 @@ function varrerPagina() {
         q.on('request', (r) => /\/videos\//.test(r.url()) && deVideoCalmo.push(r.url()));
         await q.goto(`${origem}/`);
         await q.waitForTimeout(2000);
-        const tudoParado = await q.$$eval('figure[data-video] video', (vs) => vs.length === 4 && vs.every((v) => v.paused && v.currentTime === 0));
+        const tudoParado = await q.$$eval('figure[data-video] video', (vs) => vs.length === 2 && vs.every((v) => v.paused && v.currentTime === 0));
         const nomeAntes = await q.getAttribute('.capa video', 'aria-label');
         const botoes = await q.$$eval('figure[data-video] button, .video-botao', (bs) => bs.length);
         const baixadosAntes = deVideoCalmo.length;
@@ -1106,7 +1111,7 @@ function varrerPagina() {
         }
         const familiaPg = nome === 'Família';
         ok(`planos: a página do plano ${nome} tem o nome, o preço só na capa, para quem é, os 14 recursos com links que abrem, a assinatura (14 dias sem cartão, nada cobrado até o lançamento) e o Espaço Negócio incluído, sem negócio compartilhado`,
-          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 1 && /^R\$ \d+,\d{2} por mês$/.test(pg.precoNaCapa) && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && pg.notOpen && pg.trial,
+          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 1 && /^R\$ \d+,\d{2} por mês( Preços no lançamento)?$/.test(pg.precoNaCapa) && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && pg.notOpen && pg.trial,
           JSON.stringify({ ...pg, links: pg.links.length, quebrados }));
         ok(`planos: a página do plano ${nome} mostra só o que é do plano dele`, familiaPg ? pg.titular && pg.convite && !pg.umaPessoa : !pg.titular && !pg.convite && pg.umaPessoa, JSON.stringify({ titular: pg.titular, convite: pg.convite, umaPessoa: pg.umaPessoa }));
         const outroHref = familiaPg ? 'individual.html' : 'familia.html';
@@ -1260,11 +1265,12 @@ function varrerPagina() {
       const fora = [];
       for (const c of ['', 'app/', 'empresas/', 'seguranca']) {
         await p.goto(`${origem}/${c}`);
-        const r = await p.evaluate(() => [...document.querySelectorAll('.cartao > figure.celular, .com-celular > figure.celular')].map((f) => {
+        // Desde 25/11/2026 (D-125), o celular de "Como funciona" (início) fica na coluna ao lado dos passos, como o de Segurança.
+        const r = await p.evaluate(() => [...document.querySelectorAll('.cartao > figure.celular, .com-celular > figure.celular, .passos-com-celular > figure.celular')].map((f) => {
           const m = f.querySelector('.celular-moldura').getBoundingClientRect();
           const pai = f.parentElement;
           let caixa = pai.getBoundingClientRect();
-          if (pai.classList.contains('com-celular')) {
+          if (pai.classList.contains('com-celular') || pai.classList.contains('passos-com-celular')) {
             const colunas = getComputedStyle(pai).gridTemplateColumns.split(' ').map(parseFloat);
             const gap = parseFloat(getComputedStyle(pai).columnGap) || 0;
             caixa = { left: caixa.left + colunas[0] + gap, width: colunas[1] };
@@ -1274,7 +1280,7 @@ function varrerPagina() {
         if (!r.length) fora.push(`${c || 'início'}: nenhum celular em cartão`);
         for (const x of r) if (x.dif > 3) fora.push(`${c || 'início'}: ${x.nome} (${Math.round(x.dif)} px)`);
       }
-      ok('celulares: em 1280 px, a moldura de cada celular fica no centro do cartão (início, O app, Para empresas) e da coluna dela (Segurança)', fora.length === 0, fora.join(' | '));
+      ok('celulares: em 1280 px, a moldura de cada celular fica no centro do cartão (O app, Para empresas) e da coluna dela (início, em "Como funciona", e Segurança)', fora.length === 0, fora.join(' | '));
       await p.goto(`${origem}/seguranca`);
       const quemVe = await p.evaluate(() => {
         const g = document.querySelector('#quem-ve ~ .com-celular .grade');
@@ -1296,7 +1302,7 @@ function varrerPagina() {
         }));
       }
       ok('faixa de confiança: na capa do início e de O app, três frases num link só para a página Segurança e privacidade (sem âncora), com o convite "Segurança e privacidade", nome em frase para leitor de tela, e sem as seções antigas',
-        faixas.every((f) => f.links === 1 && /(^|\/)seguranca\.html$/.test(f.href) && JSON.stringify(f.itens) === JSON.stringify(['Sem conexão com o seu banco', 'Não movimenta dinheiro nem oferece crédito', 'Não guarda os dados completos do cartão']) && f.mais === 'Segurança e privacidade' && /cartão\. Mais em Segurança e privacidade\.$/.test(f.nome) && f.antigas === 0), JSON.stringify(faixas));
+        faixas.every((f) => f.links === 1 && /(^|\/)seguranca\.html$/.test(f.href) && JSON.stringify(f.itens) === JSON.stringify(['Você decide o que entra', 'Sem anúncios e sem venda de dados', 'Não movimenta dinheiro nem oferece crédito']) && f.mais === 'Segurança e privacidade' && /crédito\. Mais em Segurança e privacidade\.$/.test(f.nome) && f.antigas === 0), JSON.stringify(faixas));
       await p.click('.capa .confianca a');
       await p.waitForURL(/\/seguranca(\.html)?$/);
       const seg = await p.evaluate(() => ({
@@ -1332,19 +1338,46 @@ function varrerPagina() {
       await p.close();
     }
 
-    // 7c5. Espaço Negócio (D-115, a partir de D-113): o recurso em O app (#negocio), com a tela da demonstração no centro e o link da Ajuda;
-    // o cartão de "Para quem é" na página inicial, que leva a ele; a frase de docs/52 nas páginas dos planos; e a entrada na Ajuda, achada pela busca.
+    // 7c5. Espaço Negócio (D-115, a partir de D-113): a porta "Quem trabalha por conta e MEI" da página inicial, que leva à página do MEI
+    // (D-125), com o que o Espaço Negócio faz hoje e nada do Clarevo Plus; o recurso em O app (#negocio), com a tela da demonstração no
+    // centro e o link da Ajuda; a frase de docs/52 nas páginas dos planos; e a entrada na Ajuda, achada pela busca.
     {
       const p = await pagina();
       await p.goto(`${origem}/`);
-      await p.click('section[aria-labelledby="para-quem"] a[href="app/index.html#negocio"]');
-      await p.waitForURL(/\/app\/(index\.html)?#negocio$/);
+      const portas = await p.$$eval('section[aria-labelledby="para-quem"] li.porta', (ls) => ls.map((l) => ({ titulo: l.querySelector('h3').textContent, links: l.querySelectorAll('a').length, href: l.querySelector('a').getAttribute('href') })));
+      ok('as três portas da página inicial: pessoas e famílias, quem trabalha por conta e MEI e empresas, cada uma com um link só',
+        JSON.stringify(portas) === JSON.stringify([{ titulo: 'Pessoas e famílias', links: 1, href: 'planos/familia.html' }, { titulo: 'Quem trabalha por conta e MEI', links: 1, href: 'mei.html' }, { titulo: 'Empresas', links: 1, href: 'empresas/index.html' }]), JSON.stringify(portas));
+      // Clicar em qualquer ponto da porta (fora do texto do link) abre a página dela.
+      const portaMei = p.locator('section[aria-labelledby="para-quem"] li.porta').nth(1);
+      await portaMei.scrollIntoViewIfNeeded();
+      const caixaMei = await portaMei.boundingBox();
+      await p.mouse.click(caixaMei.x + caixaMei.width - 16, caixaMei.y + 16);
+      await p.waitForURL(/\/mei(\.html)?$/);
+      const mei = await p.evaluate(() => {
+        const texto = document.querySelector('main').innerText;
+        return {
+          h1: document.querySelector('h1').textContent,
+          cartoes: [...document.querySelectorAll('#o-que-faz ~ .recursos-grade > li h3')].map((h) => h.textContent),
+          links: [...document.querySelectorAll('#o-que-faz ~ .recursos-grade a')].length,
+          mei: /limite anual do MEI/.test(texto) && /DAS do mês/.test(texto),
+          incluido: /Incluído na assinatura/.test(texto),
+          plus: /Plus|sóci|ajudante|compartilh|contador|Contabilidade|vários negócios/.test(texto),
+          semImposto: /não calcula imposto/.test(texto),
+          tela: (() => { const i = document.querySelector('.capa figure.celular img'); return i ? i.complete && i.naturalWidth > 0 && /^Tela do negócio/.test(i.alt) : false; })(),
+          demo: document.querySelector('.capa .acoes a[href^="https://demo."]')?.getAttribute('href'),
+          ajuda: document.querySelector('a[href="ajuda/negocio.html#guia-negocio"]') !== null,
+        };
+      });
+      ok('página do MEI: o título, os seis cartões do que o Espaço Negócio faz hoje (sem link), o limite e os lembretes do MEI, "Incluído na assinatura", a demonstração do negócio e a Ajuda, sem nada do Plus nem cálculo de imposto',
+        mei.h1 === 'O dinheiro do negócio separado do da casa.' && JSON.stringify(mei.cartoes) === JSON.stringify(['O negócio no espaço dele', 'Categorias de quem vende e presta serviço', 'Quanto entrou, saiu e sobrou', 'Retirada para o Pessoal', 'A receber', 'Nota e quem pagou']) &&
+        mei.links === 0 && mei.mei && mei.incluido && !mei.plus && mei.semImposto && mei.tela && mei.demo === 'https://demo.clarevo.app.br/?cenario=negocio' && mei.ajuda, JSON.stringify(mei));
+      await p.goto(`${origem}/app/#negocio`);
       const recurso = await p.evaluate(() => {
         const a = document.querySelector('#negocio');
         const img = a.querySelector('figure.celular img');
         return { titulo: a.querySelector('h3').textContent, ajuda: a.querySelector('a[href="../ajuda/negocio.html#guia-negocio"]') !== null, img: img ? { ok: img.complete && img.naturalWidth > 0, alt: img.alt } : null, plano: /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(a.textContent) };
       });
-      ok('Espaço Negócio: o cartão "Para quem tem um negócio" do início leva ao recurso em O app, com a tela do negócio, o link da Ajuda e "Incluído na assinatura"', recurso.titulo === 'Espaço Negócio' && recurso.ajuda && recurso.plano && recurso.img && /^Tela do negócio/.test(recurso.img.alt), JSON.stringify(recurso));
+      ok('Espaço Negócio: o recurso em O app, com a tela do negócio, o link da Ajuda e "Incluído na assinatura"', recurso.titulo === 'Espaço Negócio' && recurso.ajuda && recurso.plano && recurso.img && /^Tela do negócio/.test(recurso.img.alt), JSON.stringify(recurso));
       const negocioNosPlanos = [];
       for (const c of ['planos/individual', 'planos/familia']) {
         await p.goto(`${origem}/${c}`);
@@ -1404,17 +1437,14 @@ function varrerPagina() {
       await semJs.close();
     }
 
-    // 7c7. Indicadores mais fáceis de achar (D-115): "Indicadores de hoje" na página inicial, com o retrato e a troca pelo painel.js (uma
-    // pergunta ao próprio site), o caminho para o painel e o glossário, e o cartão dos indicadores em Aprender e em Novidades.
+    // 7c7. Indicadores mais fáceis de achar (D-115). Desde 25/11/2026 (D-125), "Indicadores de hoje" saiu da página inicial e ficou no painel
+    // (`indicadores/`, conferido no bloco 7b), com o link no rodapé de todas as páginas; o cartão dos indicadores continua em Aprender e em
+    // Novidades.
     {
       const p = await pagina();
       await p.goto(`${origem}/`);
-      await p.waitForFunction(() => document.querySelector('.indicadores-inicio').getAttribute('data-atualizado') === 'sim', null, { timeout: 8000 }).catch(() => {});
-      const inicio = await p.evaluate(() => {
-        const s = document.querySelector('.indicadores-inicio');
-        return { atualizado: s.getAttribute('data-atualizado'), cartoes: [...s.querySelectorAll('[data-indicador]')].map((c) => c.getAttribute('data-indicador')), selic: s.querySelector('[data-indicador="selic"] [data-campo="numero"]').textContent, fonte: /Fonte: Banco Central do Brasil\./.test(s.textContent), aviso: /Conteúdo educativo\. Não é recomendação nem análise de valores mobiliários\./.test(s.parentElement.textContent), botao: document.querySelector('a.botao[href="indicadores/index.html"]') ? document.querySelector('a.botao[href="indicadores/index.html"]').textContent : null };
-      });
-      ok('indicadores no início: os cinco números, trocados pelo painel.js (Selic 15,00%), com a fonte, o aviso e "Ver os indicadores e o glossário"', inicio.atualizado === 'sim' && JSON.stringify(inicio.cartoes) === JSON.stringify(['selic', 'cdi', 'ipca', 'poupanca', 'ptax']) && inicio.selic === '15,00%' && inicio.fonte && inicio.aviso && inicio.botao === 'Ver os indicadores e o glossário', JSON.stringify(inicio));
+      const inicio = await p.evaluate(() => ({ painel: document.querySelectorAll('.indicadores-inicio, [data-painel]').length, rodape: document.querySelector('.rodape a[href="indicadores/index.html"]')?.textContent || null, script: [...document.scripts].some((x) => /painel\.js/.test(x.src)) }));
+      ok('indicadores: fora da página inicial (sem painel nem script), com o link "Indicadores" no rodapé', inicio.painel === 0 && inicio.rodape === 'Indicadores' && !inicio.script, JSON.stringify(inicio));
       const atalhos = [];
       for (const c of ['aprender/', 'novidades/']) {
         await p.goto(`${origem}/${c}`);
@@ -1540,6 +1570,105 @@ function varrerPagina() {
       }
       ok('aviso de saúde: fora do início e de Sobre; em Segurança, dentro de uma pergunta recolhida (escondido até abrir); em Para empresas, na nota de ressalvas',
         onde['início'].n === 0 && onde.sobre.n === 0 && onde['início'].fimAntigo === 0 && onde.sobre.fimAntigo === 0 && onde.seguranca.n === 1 && onde.seguranca.recolhido && onde['empresas/'].n === 1 && onde['empresas/'].ressalvas, JSON.stringify(onde));
+      await p.close();
+    }
+
+    // 7c10. O estado do produto (D-125, `scripts/site/estado.js`): um só interruptor para todas as páginas. Antes do lançamento (o padrão),
+    // a capa do início leva à demonstração e a "Como ter acesso" (nada de criar conta), as páginas dizem "fase de testes" e os preços levam
+    // "Preços no lançamento", sem selo de loja. Lançado (um site gerado à parte com --estado), "Testar 14 dias grátis" leva à tela de criar
+    // conta do app web, nenhuma página fala em fase de testes nem em "Preços no lançamento", o selo aparece só para a loja com endereço e o
+    // menu diz "Testar grátis".
+    {
+      const PAGINAS_DO_ESTADO = ['', 'comece', 'app/', 'mei', 'planos', 'planos/individual', 'planos/familia', 'sobre'];
+      const lerEstado = async (q, base) => {
+        const r = {};
+        for (const c of PAGINAS_DO_ESTADO) {
+          await q.goto(`${base}/${c}`);
+          r[c || 'início'] = await q.evaluate(() => {
+            const main = document.querySelector('main').innerText.replace(/ /g, ' ');
+            return {
+              testes: /fase de testes/i.test(main), piloto: /piloto/i.test(main), precosNoLancamento: /Preços no lançamento/.test(main),
+              criarConta: document.querySelectorAll('a[href*="/criar-conta"]').length, selos: [...document.querySelectorAll('.selo-loja')].map((a) => [a.textContent, a.getAttribute('href')]),
+              capa: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
+              menu: [document.querySelector('.menu-cta')?.textContent, document.querySelector('.menu-cta')?.getAttribute('href')],
+              plus: /Clarevo Plus|plano anual|R\$ ?[\d.,]+ por ano/i.test(main),
+            };
+          });
+        }
+        return r;
+      };
+      const p = await pagina();
+      const pre = await lerEstado(p, origem);
+      await p.close();
+      const v = Object.values(pre);
+      ok('estado do produto, antes do lançamento: nenhuma página convida a criar conta nem mostra selo de loja; a capa do início leva à demonstração e a "Como ter acesso"; o menu diz "Abrir a versão web"; nada de Plus nem de plano anual',
+        v.every((x) => x.criarConta === 0 && x.selos.length === 0 && !x.plus && x.menu[0] === 'Abrir a versão web' && !x.piloto) &&
+        JSON.stringify(pre['início'].capa) === JSON.stringify([['Ver a demonstração', 'https://demo.clarevo.app.br'], ['Como ter acesso', 'comece.html#acesso']]) &&
+        JSON.stringify(pre.mei.capa) === JSON.stringify([['Ver a demonstração', 'https://demo.clarevo.app.br/?cenario=negocio'], ['Como ter acesso', 'comece.html#acesso']]), JSON.stringify(pre));
+      ok('estado do produto, antes do lançamento: "fase de testes" no início, em Comece aqui, em O app e na página do MEI; "Preços no lançamento" no início e nas três páginas de planos',
+        ['início', 'comece', 'app/', 'mei'].every((c) => pre[c].testes) && ['início', 'planos', 'planos/individual', 'planos/familia'].every((c) => pre[c].precosNoLancamento), JSON.stringify(Object.fromEntries(Object.entries(pre).map(([c, x]) => [c, [x.testes, x.precosNoLancamento]]))));
+      // O site lançado, gerado à parte com --estado (só a App Store com endereço, para conferir que o selo do Google não aparece sem o dele).
+      const arquivoEstado = path.join(dir, 'estado-lancado.json');
+      const APP_STORE = 'https://apps.apple.com/br/app/clarevo/id0000000000';
+      fs.writeFileSync(arquivoEstado, JSON.stringify({ lancado: true, lojas: { appStore: APP_STORE } }));
+      const saidaLancada = path.join(dir, 'site-lancado');
+      const g = spawnSync(process.execPath, [path.join(__dirname, 'gerar-site.js'), '--dados', path.join(dir, 'dados.json'), '--referencia', REFERENCIA_DOS_POSTS, '--retrato', path.join(dir, 'retrato.json'), '--noticias', path.join(dir, 'noticias'), '--estado', arquivoEstado, '--saida', saidaLancada], { encoding: 'utf8' });
+      ok('estado do produto: o gerador aceita --estado e grava o site lançado', g.status === 0, g.stderr.slice(-400));
+      const lancado = await servir(saidaLancada, { hostDoSite: true });
+      const outro = await navegador.newContext({ viewport: { width: 390, height: 900 }, locale: 'pt-BR' });
+      try {
+        const q = await outro.newPage();
+        const erros = [];
+        q.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && erros.push(m.text()));
+        q.on('pageerror', (e) => erros.push(e.message));
+        const pos = await lerEstado(q, lancado.url);
+        const w = Object.values(pos);
+        ok('estado do produto, lançado: nenhuma página fala em fase de testes nem em "Preços no lançamento"; o menu diz "Testar grátis" e leva à tela de criar conta',
+          w.every((x) => !x.testes && !x.piloto && !x.precosNoLancamento && !x.plus && x.menu[0] === 'Testar grátis' && x.menu[1] === 'https://app.clarevo.app.br/criar-conta') && erros.length === 0, JSON.stringify({ pos, erros }));
+        ok('estado do produto, lançado: a capa do início e a do MEI com "Testar 14 dias grátis" (criar conta) e "Ver a demonstração", e o selo só da App Store, que tem endereço',
+          JSON.stringify(pos['início'].capa) === JSON.stringify([['Testar 14 dias grátis', 'https://app.clarevo.app.br/criar-conta'], ['Ver a demonstração', 'https://demo.clarevo.app.br']]) &&
+          JSON.stringify(pos.mei.capa) === JSON.stringify([['Testar 14 dias grátis', 'https://app.clarevo.app.br/criar-conta'], ['Ver a demonstração', 'https://demo.clarevo.app.br/?cenario=negocio']]) &&
+          JSON.stringify(pos['início'].selos) === JSON.stringify([['Baixar na App Store', APP_STORE]]) && JSON.stringify(pos.comece.selos) === JSON.stringify([['Baixar na App Store', APP_STORE]]),
+          JSON.stringify({ inicio: pos['início'], mei: pos.mei.capa, comece: pos.comece.selos }));
+        await q.goto(`${lancado.url}/comece`);
+        const acesso = await q.textContent('#acesso + p');
+        ok('estado do produto, lançado: Comece aqui diz que a Clarevo está aberta, na web e na App Store, com o teste grátis', acesso === 'A Clarevo está aberta para todas as pessoas na web e na App Store. Toda conta começa com 14 dias grátis, sem cartão.', acesso);
+        const largas = [];
+        for (const largura of [320, 1280]) {
+          await q.setViewportSize({ width: largura, height: 900 });
+          for (const c of ['', 'mei', 'comece', 'app/']) {
+            await q.goto(`${lancado.url}/${c}`);
+            if (await q.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) largas.push(`${c || 'início'} em ${largura} px`);
+          }
+        }
+        ok('estado do produto, lançado: nada passa da largura da tela em 320 e 1280 px (início, MEI, Comece aqui e O app)', largas.length === 0, largas.join(' | '));
+      } finally {
+        await outro.close();
+        await lancado.fechar();
+      }
+    }
+
+    // 7c11. A página inicial em seis blocos (D-125): a capa, as três portas, como funciona, "Você decide o que entra", os planos e a chamada
+    // final, nessa ordem; o título com o benefício e a frase de marca como assinatura acima dele; os dados estruturados de app e de
+    // organização; e a página do MEI no menu e no rodapé.
+    {
+      const p = await pagina();
+      await p.goto(`${origem}/`);
+      const inicio = await p.evaluate(() => ({
+        secoes: [...document.querySelectorAll('main > section.bloco')].map((s) => s.getAttribute('aria-labelledby')),
+        h1: document.querySelector('h1').textContent,
+        assinatura: document.querySelector('.capa .assinatura-marca')?.textContent,
+        assinaturaAntes: document.querySelector('.capa .assinatura-marca')?.nextElementSibling?.tagName,
+        tipos: [...document.querySelectorAll('script[type="application/ld+json"]')].map((x) => JSON.parse(x.textContent)['@type']),
+        menu: [...document.querySelectorAll('.menu-lista a')].map((a) => a.textContent),
+        rodapeMei: document.querySelector('.rodape a[href="mei.html"]')?.textContent || null,
+        h1Tamanho: parseFloat(getComputedStyle(document.querySelector('h1')).fontSize), assinaturaTamanho: parseFloat(getComputedStyle(document.querySelector('.capa .assinatura-marca')).fontSize),
+      }));
+      ok('início: seis blocos na ordem (capa, para quem é, como funciona, você decide o que entra, planos e a chamada final), o título com o benefício e a frase de marca pequena acima dele, dados de app e de organização, "Planos" e "Para MEI" no menu e a página do MEI no rodapé',
+        JSON.stringify(inicio.secoes) === JSON.stringify(['para-quem', 'como-funciona', 'voce-decide', 'planos', 'comecar']) &&
+        inicio.h1 === 'Contas, cartões e gastos do mês em ordem, com o pessoal, a família e o negócio separados.' && inicio.assinatura === 'Cuidar da vida financeira faz parte de cuidar de você.' && inicio.assinaturaAntes === 'H1' && inicio.assinaturaTamanho < inicio.h1Tamanho / 1.5 &&
+        JSON.stringify(inicio.tipos) === JSON.stringify(['Organization', 'SoftwareApplication']) &&
+        JSON.stringify(inicio.menu) === JSON.stringify(['O app', 'Planos', 'Para MEI', 'Para empresas', 'Aprender', 'Calculadoras', 'Ajuda', 'Segurança']) && inicio.rodapeMei === 'Por conta e MEI', JSON.stringify(inicio));
       await p.close();
     }
 

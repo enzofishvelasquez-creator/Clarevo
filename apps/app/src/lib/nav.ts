@@ -23,6 +23,24 @@ export const afterLogin = {
   },
 };
 
+/**
+ * O atalho escolhido em "Sua primeira conta" (estudo de 25/11/2026, Onda 1, item 8): "Importar extrato, fatura ou print" ou "Anotar pelo
+ * Telegram" criam a conta e, com o espaço pronto, abrem a tela pedida por cima do Resumo (`app/_layout.tsx`). Só na memória do app.
+ */
+let firstStep: '/importar' | '/conta/telegram' | null = null;
+
+export const firstStepTarget = {
+  set(target: '/importar' | '/conta/telegram' | null) {
+    firstStep = target;
+  },
+  /** Devolve o destino guardado uma única vez. */
+  take(): string | null {
+    const t = firstStep;
+    firstStep = null;
+    return t;
+  },
+};
+
 export const signOutIntent = {
   mark() {
     manualSignOut = true;

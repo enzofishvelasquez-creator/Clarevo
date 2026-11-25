@@ -9,15 +9,33 @@ const { TEMAS } = require('./ajuda');
 const { lerPerguntas } = require('../conteudo');
 const { ligado } = require('../formularios');
 
-function paginaSobre({ valores }) {
+/**
+ * Sobre (D-125, 25/11/2026): a decisão do Enzo é não mostrar pessoa (nem nome, nem foto). A confiança vem do que a empresa é e faz: por que a
+ * Clarevo existe (o texto que estava em "Bem-estar financeiro, com apoio prático", na página inicial, com a voz da empresa), o que guia o
+ * produto, como a Clarevo ganha dinheiro (a assinatura e o benefício pago por empresas, e nada de anúncio, venda de dados ou indicação de
+ * produto), como pensamos o produto, os dados da empresa e os canais. O prazo de resposta só aparece quando `ESTADO_DO_PRODUTO.prazoDeResposta`
+ * (`config.js`) estiver preenchido: nenhum documento da Clarevo tem um prazo combinado (a política diz "Prazo de resposta: [A DEFINIR]").
+ * "Sede: [ENDEREÇO]" (e não "com sede em [ENDEREÇO]"): com o endereço publicado, "Rio de Janeiro, RJ", a frase antiga lia "com sede em Rio
+ * de Janeiro", e o certo seria "no Rio de Janeiro"; com o rótulo, a frase fica certa com a cidade ou com o endereço completo.
+ */
+function paginaSobre({ valores, estado = { prazoDeResposta: '' } }) {
   const arquivo = 'sobre.html';
   const u = (d) => rel(arquivo, d);
-  const capa = `<h1>Sobre a Clarevo</h1>
-<p class="lead">O que move a Clarevo e quem está por trás dela.</p>`;
+  const capa = `<p class="assinatura-marca">Cuidar da vida financeira faz parte de cuidar de você.</p>
+<h1>Sobre a Clarevo</h1>
+<p class="lead">Uma empresa brasileira que faz um app para organizar o dinheiro do mês com clareza, sem julgamento e com respeito aos dados de quem usa.</p>`;
+  const prazo = estado.prazoDeResposta ? `<li>Respondemos ${esc(estado.prazoDeResposta)}.</li>\n` : '';
   const brutas = [
     bloco(
-      `<h2 id="move">O que move a Clarevo</h2>
-<p class="lead-bloco">Cuidar da vida financeira faz parte de cuidar de você. A Clarevo oferece apoio prático para organizar o mês e acompanhar decisões, sem julgamento.</p>
+      `<h2 id="por-que">Por que a Clarevo existe</h2>
+<div class="duas-colunas">
+<p class="lead-bloco">A vida financeira de muita gente é espalhada: vários cartões, as contas da casa, um dinheiro que entra por fora, às vezes um negócio. Contas para lembrar, compras para decidir, planos para organizar: o dinheiro participa da rotina.</p>
+<p class="texto-bloco">A Clarevo existe para juntar isso num lugar só, sem misturar o que é de cada um, e para explicar cada número em linguagem simples. O app parte do que você registra e respeita a sua realidade: renda, trabalho, saúde e responsabilidades da família também limitam as escolhas, e dificuldade financeira não é falta de disciplina.</p>
+</div>`,
+      { rotulo: 'por-que' },
+    ),
+    bloco(
+      `<h2 id="move">O que nos guia</h2>
 <div class="grade">
 <article class="cartao">
 <h3>Clareza</h3>
@@ -36,12 +54,22 @@ function paginaSobre({ valores }) {
 <p>Não indicamos banco, cartão, investimento nem crédito. O conteúdo de Aprender é educativo e geral, com fonte e data de revisão.</p>
 </article>
 </div>`,
-      { rotulo: 'move' },
+      { variante: 'alt', rotulo: 'move' },
+    ),
+    bloco(
+      `<h2 id="como-ganha">Como a Clarevo ganha dinheiro</h2>
+<p class="lead-bloco">Com a assinatura de quem usa, nos planos Individual e Família, e com o benefício que empresas oferecem às pessoas da equipe. É só isso.</p>
+<ul class="como-funciona lista-marcada">
+<li>Nada de anúncio, de venda de dados ou de comissão por indicar banco, cartão, investimento ou crédito.</li>
+<li>A empresa que oferece o benefício paga pelas licenças e nunca vê as finanças de ninguém, nem somadas.</li>
+<li>Os preços estão na página <a href="${u('planos.html')}">Planos</a>, e as regras da assinatura, nos <a href="${u('termos.html')}">Termos de uso</a>.</li>
+</ul>`,
+      { rotulo: 'como-ganha' },
     ),
     bloco(
       `<h2 id="como">Como pensamos o produto</h2>
 <ul>
-<li>O app mostra o que você ou as pessoas da sua Família anotaram ou importaram. Ele não se conecta ao banco e não movimenta dinheiro.</li>
+<li>Você decide o que entra: o app mostra o que você ou as pessoas da sua Família anotaram, importaram ou mandaram por mensagem. Ele não movimenta dinheiro.</li>
 <li>A privacidade vale no banco de dados, e não só na tela: quem pode ver cada dado é decidido a cada leitura.</li>
 <li>Uma empresa pode integrar a Clarevo ao programa de bem-estar, como benefício, sem ver as finanças de ninguém. <a href="${u('empresas/index.html')}">Veja como</a>.</li>
 <li>Escrevemos de forma simples, com fonte e data, e corrigimos no próprio texto. <a href="${u('novidades/como-escrevemos.html')}">Veja como escrevemos</a>.</li>
@@ -49,17 +77,22 @@ function paginaSobre({ valores }) {
       { variante: 'alt', rotulo: 'como' },
     ),
     bloco(
-      `<h2 id="quem">Quem está por trás</h2>
-<p>A Clarevo é oferecida por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO].</p>
-<p>Para falar com a equipe, escreva para [E-MAIL DE CONTATO]. Para ajuda com o app, veja a <a href="${u('ajuda/index.html')}">Ajuda</a> e o <a href="${u('suporte.html')}">Suporte</a>. Os dados pessoais são tratados como descreve a <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>`,
+      `<h2 id="quem">A empresa e os canais</h2>
+<p>A Clarevo é a marca de [RAZÃO SOCIAL], CNPJ [CNPJ]. Sede: [ENDEREÇO].</p>
+<ul>
+<li>Para falar com a equipe, inclusive sobre o benefício para empresas: [E-MAIL DE CONTATO].</li>
+<li>Ajuda com o app: [E-MAIL DE SUPORTE], a <a href="${u('ajuda/index.html')}">Ajuda</a> e a página de <a href="${u('suporte.html')}">Suporte</a>.</li>
+<li>Dados pessoais: [E-MAIL DE PRIVACIDADE] e a <a href="${u('privacidade.html')}">Política de privacidade</a>.</li>
+${prazo}</ul>
+<p>Para saber quem vê os seus dados e como protegemos, veja <a href="${u('seguranca.html')}">Segurança e privacidade</a>.</p>`,
       { rotulo: 'quem' },
     ),
   ];
   return montarPagina({
     arquivo,
-    titulo: 'Sobre a Clarevo: o que nos move e quem está por trás',
+    titulo: 'Sobre a Clarevo: por que existimos e como a empresa funciona',
     tituloCompleto: true,
-    descricao: 'O que move a Clarevo: cuidado com a vida financeira, clareza, sem anúncio, sem venda de dados e sem recomendar produtos financeiros, e quem está por trás.',
+    descricao: 'Por que a Clarevo existe, o que guia o produto, como a empresa ganha dinheiro (a assinatura e o benefício pago por empresas) e os dados da empresa.',
     capa,
     corpo: brutas.map((b) => marcadoresEmHtml(b, valores)).join('\n'),
     fonte: brutas.join('\n') + capa,
@@ -68,7 +101,7 @@ function paginaSobre({ valores }) {
   });
 }
 
-function paginaSuporte({ valores }) {
+function paginaSuporte({ valores, estado = { prazoDeResposta: '' } }) {
   const arquivo = 'suporte.html';
   const u = (d) => rel(arquivo, d);
   const perguntas = lerPerguntas(path.join(SITE_SRC, 'ajuda', 'perguntas.md'));
@@ -85,8 +118,8 @@ function paginaSuporte({ valores }) {
 <li>Suporte do app: [E-MAIL DE SUPORTE]</li>
 <li>Dúvidas sobre dados pessoais (acesso, correção e exclusão): [E-MAIL DE PRIVACIDADE]</li>
 <li>Responsável pela Clarevo: [RAZÃO SOCIAL], CNPJ [CNPJ]</li>
-<li>Endereço: [ENDEREÇO]</li>
-</ul>
+<li>Sede: [ENDEREÇO]</li>
+${estado.prazoDeResposta ? `<li>Prazo de resposta: ${esc(estado.prazoDeResposta)}</li>\n` : ''}</ul>
 <p>Para facilitar a resposta, conte o e-mail da sua conta, o aparelho (iPhone, Android ou navegador) e o que aconteceu. Não envie sua senha, número de cartão, dados bancários nem fotos de documentos: o suporte nunca pede essas informações.</p>
 <p>Sobre como tratamos os seus dados, leia a <a href="${u('privacidade.html')}">Política de privacidade</a>.</p>
 </section>

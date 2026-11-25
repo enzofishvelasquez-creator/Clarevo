@@ -1,6 +1,6 @@
-import { BUSINESS_TEXT, DEMO_EMAIL, SAVINGS_TEXT } from '@clarevo/core';
+import { BUSINESS_TEXT, DEMO_EMAIL, FIRST_STEPS_TEXT, SAVINGS_TEXT, TELEGRAM_BOT, TELEGRAM_IN_ACCOUNT } from '@clarevo/core';
 import { router } from 'expo-router';
-import { ArrowDownLeft, ArrowUpRight, Check, ChevronRight, PiggyBank, Repeat, Store, type LucideIcon } from 'lucide-react-native';
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronRight, FileUp, MessageCircle, PiggyBank, Repeat, Store, type LucideIcon } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, ReduceMotion } from 'react-native-reanimated';
@@ -51,6 +51,27 @@ const STEPS: Step[] = [
     open: () => router.navigate('/metas'),
   },
 ];
+
+/**
+ * Os dois jeitos rápidos de começar, no alto do card (estudo de 25/11/2026, Onda 1, item 8): importar o extrato, a fatura ou um print (a
+ * importação que fica em Movimentos › Organizar) e anotar por mensagem no Telegram. Não contam como passo: levam às telas que já existem,
+ * e o que entrar por elas marca os passos de recebido e de gasto como qualquer anotação.
+ */
+interface Quick {
+  key: 'importar' | 'telegram';
+  icon: LucideIcon;
+  label: string;
+  caption: string;
+  open: () => void;
+}
+
+const QUICK: Quick[] = [
+  { key: 'importar', icon: FileUp, label: FIRST_STEPS_TEXT.importLabel, caption: FIRST_STEPS_TEXT.importCaption, open: () => router.push('/importar') },
+  { key: 'telegram', icon: MessageCircle, label: FIRST_STEPS_TEXT.telegramLabel, caption: FIRST_STEPS_TEXT.telegramCaption, open: () => router.push('/conta/telegram') },
+];
+
+/** O Telegram só aparece onde a tela existe para todas as pessoas (D-080; na demonstração, a tela explica). */
+const QUICK_SHOWN = QUICK.filter((q) => q.key !== 'telegram' || (TELEGRAM_BOT !== null && TELEGRAM_IN_ACCOUNT));
 
 /**
  * Em que pé está o card, para o aviso seguinte esperar a vez ("Como você conheceu o Clarevo?" só aparece quando este não está na tela,
@@ -140,11 +161,22 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
       <Card style={styles.card}>
         <View style={{ gap: space[1] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            Primeiros passos
+            {FIRST_STEPS_TEXT.title}
           </Txt>
           <Txt variant="caption" color={colors.textSecondary}>
-            Quatro passos para a Clarevo mostrar o seu mês de verdade.
+            {FIRST_STEPS_TEXT.intro}
           </Txt>
+        </View>
+        {/* Os jeitos rápidos vêm antes dos passos: importar e anotar por mensagem (sem dado de exemplo; só levam às telas). */}
+        <View style={{ gap: space[2] }}>
+          <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+            {FIRST_STEPS_TEXT.quickTitle}
+          </Txt>
+          <View style={styles.quickRow}>
+            {QUICK_SHOWN.map((q) => (
+              <QuickTile key={q.key} quick={q} />
+            ))}
+          </View>
         </View>
         {/* O caminho já feito (12/11/2026): a barra e a contagem, para cada passo pronto aparecer como avanço. */}
         <View style={{ gap: space[1] }}>
@@ -181,6 +213,29 @@ export function PrimeirosPassos({ contextId, onState }: { contextId: string | un
   );
 }
 
+/** Um jeito rápido de começar: ícone, rótulo e uma linha curta, num bloco tocável que leva à tela. */
+function QuickTile({ quick }: { quick: Quick }) {
+  const Icon = quick.icon;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${quick.label}. ${quick.caption}`}
+      onPress={quick.open}
+      style={(st) => [styles.quick, st.pressed && { opacity: 0.7 }, (st as { focused?: boolean }).focused && styles.focusRing]}>
+      <Icon size={20} color={colors.brandText} strokeWidth={2.25} aria-hidden />
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Txt variant="label" style={{ fontFamily: fonts.bold }}>
+          {quick.label}
+        </Txt>
+        <Txt variant="caption" color={colors.textSecondary}>
+          {quick.caption}
+        </Txt>
+      </View>
+      <ChevronRight size={20} color={colors.brandText} aria-hidden />
+    </Pressable>
+  );
+}
+
 /** Um passo: ícone (ou o sinal de concluído), título, texto curto e seta. Continua tocável depois de concluído. */
 function StepRow({ step, done, last }: { step: Step; done: boolean; last: boolean }) {
   const Icon = done ? Check : step.icon;
@@ -213,6 +268,20 @@ function StepRow({ step, done, last }: { step: Step; done: boolean; last: boolea
 
 const styles = StyleSheet.create({
   card: { gap: space[2], paddingVertical: space[4] },
+  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  // No celular, um atalho por linha (o texto inteiro à vista); no computador, lado a lado.
+  quick: {
+    flexGrow: 1,
+    flexBasis: 260,
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[3],
+    paddingVertical: space[3],
+    paddingHorizontal: space[4],
+    borderRadius: radius.md,
+    backgroundColor: colors.brandTint,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, minHeight: 56 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   icon: { width: 36, height: 36, borderRadius: radius.sm, backgroundColor: colors.brandTint, alignItems: 'center', justifyContent: 'center' },

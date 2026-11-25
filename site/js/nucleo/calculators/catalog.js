@@ -36,6 +36,10 @@ export const DIVIDIR_NOTICE = 'Cálculo com os seus números. O que vale é o co
 export function calcNotice(slug) {
     return slug === 'dividir-contas' ? DIVIDIR_NOTICE : CALC_NOTICE;
 }
+const ESTIMATE_NOTE = /estimad|estimativa|aproximad|pode ser maior|pode ser menor/i;
+export function splitCalcNotes(notes) {
+    return { shown: notes.filter((n) => ESTIMATE_NOTE.test(n)), folded: notes.filter((n) => !ESTIMATE_NOTE.test(n)) };
+}
 export const CALC_INTRO = 'Contas rápidas com os valores que você informa. Nada é gravado.';
 export const COTA_UNICA_TITLE = 'Cota única ou parcelado?';
 export const COTA_UNICA_SUBTITLE = 'Descubra os juros embutidos no parcelamento da conta do ano';
@@ -57,6 +61,8 @@ export const CALC_UI_TEXT = {
     seeAll: 'Ver todas as calculadoras',
     resultTitle: 'Resultado',
     hypothesesTitle: 'Hipóteses',
+    howTitle: 'Como a conta é feita',
+    howHint: 'Mostra os avisos e as hipóteses da conta.',
     waiting: 'Preencha os campos para ver o resultado.',
     shortcutTitle: 'Calculadoras',
     shortcutCaption: 'Parcelado ou à vista, dívidas, reserva e outras contas',

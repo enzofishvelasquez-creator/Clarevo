@@ -159,7 +159,7 @@ function Detail({
           <Txt variant="caption" color={colors.textOnBrandSoft}>
             {`${investmentCaption(i)}${active ? '' : ' · Encerrado'}`}
           </Txt>
-          <MoneyTxt color={colors.textOnBrand} style={[tabular, styles.big]}>
+          <MoneyTxt fit color={colors.textOnBrand} style={[tabular, styles.big]}>
             {formatBRL(i.valueCents)}
           </MoneyTxt>
           <InvestmentTotalsLines depositsCents={i.depositsCents} withdrawalsCents={i.withdrawalsCents} incomeCents={i.incomeCents} gainCents={investmentGain(i)} onBrand />

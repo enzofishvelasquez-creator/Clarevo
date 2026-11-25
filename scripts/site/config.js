@@ -20,6 +20,27 @@ const HOST_APP = 'app.clarevo.app.br';
 /** A demonstração do app (dados fictícios, nada é gravado fora do aparelho): o destino de "Ver a demonstração" na página Comece aqui. */
 const URL_DEMO = 'https://demo.clarevo.app.br';
 const HOST_DEMO = 'demo.clarevo.app.br';
+/** A tela de criar conta do app web (`apps/app/src/app/criar-conta.tsx`): o destino de "Testar 14 dias grátis" depois do lançamento. */
+const URL_CRIAR_CONTA = `${URL_APP}/criar-conta`;
+
+/**
+ * O estado do produto (D-125, 25/11/2026): UM interruptor para todas as páginas contarem a mesma história (`scripts/site/estado.js`,
+ * `docs/22_SITE.md`, seção 19).
+ *   - `lancado: false` (o padrão, pré-lançamento): as páginas dizem que a Clarevo está em fase de testes e que o acesso para pessoas e
+ *     famílias abre no lançamento; os planos aparecem como os preços do lançamento; as chamadas levam à demonstração e a "Como ter
+ *     acesso" (Comece aqui), sem convidar a criar conta (D-064 e `docs/44`, seção 2: o acesso de pessoas reais abre por decisão do Enzo).
+ *   - `lancado: true`: some todo texto de fase de testes; a chamada principal vira "Testar 14 dias grátis" (a tela de criar conta do app
+ *     web) e os selos das lojas aparecem, cada um só com o endereço dele preenchido em `lojas`.
+ * `lojas`: os endereços das páginas do app (só `https://apps.apple.com/...` e `https://play.google.com/...`), vazios até a publicação.
+ * `prazoDeResposta`: o prazo de resposta do atendimento que a equipe consegue cumprir sempre (por exemplo, "até 1 dia útil, de segunda a
+ * sexta"). Vazio, nenhuma página promete prazo; preenchido, entra em Sobre e em Suporte. Decisão do Enzo (pergunta do estudo de 25/11).
+ * Para testar outro estado sem mudar este arquivo: `node scripts/gerar-site.js --estado <arquivo.json>` (as chaves do JSON trocam as daqui).
+ */
+const ESTADO_DO_PRODUTO = {
+  lancado: false,
+  lojas: { appStore: '', googlePlay: '' },
+  prazoDeResposta: '',
+};
 /** A página oficial da NR-1 no site do Ministério do Trabalho e Emprego (D-068): a fonte do bloco "Bem-estar financeiro e a NR-1", em Para empresas. Endereço achado na busca de 25/10/2026 (título "Norma Regulamentadora No. 1 (NR-1)"). */
 const URL_NR1 = 'https://www.gov.br/trabalho-e-emprego/pt-br/acesso-a-informacao/participacao-social/conselhos-e-orgaos-colegiados/comissao-tripartite-partitaria-permanente/normas-regulamentadora/normas-regulamentadoras-vigentes/nr-1';
 /** Fontes do site: o corpo (500), o negrito (700) e os títulos (800). Subconjuntos Latin do app, com a licença OFL. */
@@ -31,7 +52,7 @@ const MARCADORES_EMAIL = new Set(['E-MAIL DE PRIVACIDADE', 'E-MAIL DE SUPORTE', 
  * Links de texto, sem carregar nada, que as páginas podem ter além dos das fontes do catálogo de Aprender: o app web e páginas oficiais
  * que os textos jurídicos citam. Os endereços das fontes do catálogo entram em `hostsDeFontes` (catalogo.js).
  */
-const HOSTS_BASE = [HOST_APP, HOST_DEMO, 'www.gov.br', 'www.planalto.gov.br'];
+const HOSTS_BASE = [HOST_APP, HOST_DEMO, 'www.gov.br', 'www.planalto.gov.br', 'apps.apple.com', 'play.google.com'];
 
 /** As páginas que vêm de `docs/legal/`, na ordem do rodapé. */
 const PAGINAS_LEGAIS = [
@@ -46,14 +67,18 @@ const MAPA_LINKS_SITE = Object.fromEntries(PAGINAS_LEGAIS.map((p) => [p.md, p.ar
 /** O pacote do advogado, na ordem pedida. */
 const DOCUMENTOS_DO_PACOTE = ['resumo-para-advogado.md', 'pendencias-do-lancamento.md', 'politica-de-privacidade.md', 'termos-de-uso.md', 'exclusao-de-conta.md', 'regra-de-acesso-a-dados.md', 'empresas-pontos-do-contrato.md', 'contrato-empresas-minuta.md', 'plano-de-trabalho-piloto.md'];
 
-/** O menu principal (cabeçalho). `pasta` marca a seção quando a página é uma das filhas dela. */
+/**
+ * O menu principal (cabeçalho). `pasta` marca a seção quando a página é uma das filhas dela. Desde 25/11/2026 (D-125): "Planos" e "Para MEI"
+ * no menu (as três portas: pessoas e famílias, quem trabalha por conta e MEI, empresas); "Início" saiu (o logotipo leva ao início) e
+ * "Novidades" ficou no rodapé, para o menu caber numa linha a partir de 70 rem.
+ */
 const MENU = [
-  { arquivo: 'index.html', rotulo: 'Início', pasta: null },
   { arquivo: 'app/index.html', rotulo: 'O app', pasta: 'app' },
+  { arquivo: 'planos.html', rotulo: 'Planos', pasta: 'planos' },
+  { arquivo: 'mei.html', rotulo: 'Para MEI', pasta: null },
   { arquivo: 'empresas/index.html', rotulo: 'Para empresas', pasta: 'empresas' },
   { arquivo: 'aprender/index.html', rotulo: 'Aprender', pasta: 'aprender' },
   { arquivo: 'calculadoras/index.html', rotulo: 'Calculadoras', pasta: 'calculadoras' },
-  { arquivo: 'novidades/index.html', rotulo: 'Novidades', pasta: 'novidades' },
   { arquivo: 'ajuda/index.html', rotulo: 'Ajuda', pasta: 'ajuda' },
   { arquivo: 'seguranca.html', rotulo: 'Segurança', pasta: null },
 ];
@@ -66,6 +91,7 @@ const RODAPE_COLUNAS = [
       { arquivo: 'comece.html', rotulo: 'Comece aqui' },
       { arquivo: 'app/index.html', rotulo: 'O app' },
       { arquivo: 'planos.html', rotulo: 'Planos' },
+      { arquivo: 'mei.html', rotulo: 'Por conta e MEI' },
       { arquivo: 'empresas/index.html', rotulo: 'Para empresas' },
       { arquivo: 'sobre.html', rotulo: 'Sobre' },
       { arquivo: 'imprensa.html', rotulo: 'Imprensa' },
@@ -117,6 +143,8 @@ module.exports = {
   HOST_APP,
   URL_DEMO,
   HOST_DEMO,
+  URL_CRIAR_CONTA,
+  ESTADO_DO_PRODUTO,
   URL_NR1,
   PESOS_FONTE,
   MARCADORES,
