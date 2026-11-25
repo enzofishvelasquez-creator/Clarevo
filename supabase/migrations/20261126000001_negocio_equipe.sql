@@ -529,8 +529,9 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 9. Os negócios que a pessoa acompanha como Contabilidade (só leitura), por nome: [{id, name, business_profile, admin_name, since}].
--- admin_name é o primeiro nome de quem administra ("Pessoa do negócio" sem nome); since, quando a pessoa entrou. Só negócios ativos.
+-- 9. Os negócios que a pessoa acompanha como Contabilidade (só leitura), por nome: [{id, name, business_profile, admin_name, since,
+-- created_at}]. admin_name é o primeiro nome de quem administra ("Pessoa do negócio" sem nome); since, quando a pessoa entrou;
+-- created_at, quando o negócio foi criado (os anos do Resumo do ano). Só negócios ativos.
 -- ---------------------------------------------------------------------------
 create or replace function public.my_accounting_businesses()
 returns jsonb
@@ -548,7 +549,7 @@ begin
   return coalesce((
     select jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name, 'business_profile', c.business_profile,
                                         'admin_name', public.clarevo_business_person_label(c.owner_person_id),
-                                        'since', m.created_at)
+                                        'since', m.created_at, 'created_at', c.created_at)
                      order by c.name, c.id)
       from public.context_memberships m
       join public.financial_contexts c on c.id = m.context_id

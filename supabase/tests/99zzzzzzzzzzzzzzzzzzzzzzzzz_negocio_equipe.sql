@@ -270,6 +270,7 @@ begin
      and public.my_accounting_businesses() -> 0 ->> 'name' = 'Doceria da Lia'
      and public.my_accounting_businesses() -> 0 ->> 'admin_name' = 'Lia'
      and public.my_accounting_businesses() -> 0 ->> 'since' is not null
+     and (public.my_accounting_businesses() -> 0 ->> 'created_at')::timestamptz = (pg_temp.ctx(biz)).created_at
      and public.my_accounting_businesses() -> 0 ? 'business_profile', 'my_accounting_businesses: o negócio que a Nora acompanha';
   -- Lê o negócio, nunca o Pessoal de ninguém nem os convites; não anota.
   assert (select count(*) from public.financial_contexts where id = biz) = 1, 'lê o negócio';
