@@ -191,8 +191,13 @@ begin
   assert (select count(*) from public.record_operations where action = 'definir_sociedade_negocio' and target_id = biz) = 4,
     'cada resposta grava a operação, apontando para o negócio';
 end $$;
--- Só no negócio: o Pessoal nunca guarda a resposta.
+-- Só no negócio: o Pessoal nunca guarda a resposta. E responder a sociedade não conta como anotação (a Lia só criou, respondeu e
+-- renomeou).
 reset role;
+do $$ begin
+  assert not exists (select 1 from public.context_activity a where a.context_id = pg_temp.id('biz') and a.person_id = pg_temp.id('lia')),
+    'definir a sociedade não conta como anotação';
+end $$;
 select pg_temp.expect_code(format('update public.financial_contexts set business_partnership = true where id = %L', pg_temp.id('lia_pes')),
   'new row for relation "financial_contexts" violates check constraint "financial_contexts_sociedade"', '23514');
 set role authenticated;
@@ -374,6 +379,7 @@ begin
   perform pg_temp.keep('lia_wb', (res #>> '{business_record,id}')::uuid);
   perform pg_temp.keep('lia_wp', (res #>> '{personal_record,id}')::uuid);
   perform pg_temp.keep('pend', (public.create_business_invite(biz, 'leitor', 'eq-l-0071') #>> '{invite,id}')::uuid);
+  perform pg_temp.keep('pend2', (public.create_business_invite(biz, 'membro', 'eq-l-0076') #>> '{invite,id}')::uuid);
 end $$;
 reset role;
 update public.billing_settings set enforced_from = now() - interval '40 days';
@@ -420,6 +426,8 @@ do $$ begin
   perform public.cancel_business_invite(pg_temp.id('pend'), 'eq-t-0032');
   assert public.set_business_partnership(pg_temp.id('biz'), true, 'eq-t-0033') #>> '{context,business_partnership}' = 'true',
     'quem administra agora responde a sociedade';
+  assert (pg_temp.invite(pg_temp.id('pend2'))).cancelled_at is null, 'o outro convite da Lia continua valendo enquanto ela está no negócio';
+  perform pg_temp.keep('pend3', (public.create_business_invite(pg_temp.id('biz'), 'leitor', 'eq-t-0034') #>> '{invite,id}')::uuid);
 end $$;
 -- A Lia sai; a retirada dela deixa de ser ligada, como em qualquer saída.
 select pg_temp.as_('lia');
@@ -427,6 +435,13 @@ do $$ begin
   assert public.leave_business(pg_temp.id('biz'), 'eq-l-0080') ->> 'left' = 'true', 'depois de passar a administração, a Lia sai';
   assert (pg_temp.rec(pg_temp.id('lia_wp'))).paired_record_id is null, 'a retirada da Lia deixa de ser ligada';
 end $$;
+reset role;
+do $$ begin
+  assert (pg_temp.invite(pg_temp.id('pend2'))).cancelled_at is not null and (pg_temp.invite(pg_temp.id('pend2'))).used_at is null,
+    'quem sai leva os convites pendentes que criou';
+  assert (pg_temp.invite(pg_temp.id('pend3'))).cancelled_at is null, 'os de quem administra agora continuam';
+end $$;
+set role authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 9. Com o Plus fechado, passar a administração ainda vale (Teo → Rui, que só via)
@@ -539,16 +554,25 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- 13. Nenhuma ação nova conta como anotação; as operações apontam para o alvo
 -- ---------------------------------------------------------------------------
+-- O Rui (que nunca anotou) passa a administração ao Teo, e o Teo devolve.
+select pg_temp.as_('rui');
+do $$ begin
+  assert public.transfer_business_admin(pg_temp.id('biz'), pg_temp.id('teo'), 'eq-r-0036') ->> 'role' = 'titular', 'Rui → Teo';
+end $$;
+select pg_temp.as_('teo');
+do $$ begin
+  assert public.transfer_business_admin(pg_temp.id('biz'), pg_temp.id('rui'), 'eq-t-0051') ->> 'role' = 'titular', 'Teo → Rui';
+end $$;
 reset role;
 do $$ begin
   assert not exists (select 1 from public.context_activity a where a.context_id = pg_temp.id('biz') and a.person_id = pg_temp.id('rui')),
-    'o Rui só aceitou, recebeu a administração, removeu e convidou: nada conta como anotação';
+    'o Rui aceitou, recebeu e passou a administração, removeu e convidou: nada conta como anotação';
   assert not exists (select 1 from public.context_activity a where a.context_id = pg_temp.id('biz') and a.person_id in (pg_temp.id('nora'), pg_temp.id('zeca'))),
     'a Contabilidade nunca tem atividade no negócio';
   assert not exists (select 1 from public.record_operations o
                       where o.action in ('transferir_administracao_negocio', 'definir_sociedade_negocio')
                         and (o.target_id is null or o.record_id is not null or o.commitment_id is not null)), 'toda operação aponta para o alvo';
-  assert (select count(*) from public.record_operations where action = 'transferir_administracao_negocio') = 2, 'duas passagens';
+  assert (select count(*) from public.record_operations where action = 'transferir_administracao_negocio') = 4, 'quatro passagens';
 end $$;
 set role authenticated;
 
@@ -562,6 +586,7 @@ declare
 begin
   perform pg_temp.expect_code(format('select public.end_business(%L, %L)', biz, 'eq-r-0040'), 'negocio_com_membros', 'PT409');
   perform public.remove_business_member(biz, pg_temp.id('teo'), 'eq-r-0041');
+  assert (pg_temp.invite(pg_temp.id('pend3'))).cancelled_at is not null, 'quem é removida leva os convites pendentes que criou';
   perform public.remove_business_member(biz, pg_temp.id('ivo'), 'eq-r-0042');
   assert public.end_business(biz, 'eq-r-0043') ->> 'ended' = 'true', 'só com a Contabilidade, encerrar vale';
   assert (pg_temp.member(biz, pg_temp.id('nora'))).revoked_at is not null and (pg_temp.member(biz, pg_temp.id('zeca'))).revoked_at is not null,

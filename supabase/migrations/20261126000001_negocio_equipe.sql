@@ -20,7 +20,7 @@
 --   3. Sociedade: financial_contexts.business_partnership (nulo = não respondeu) e a nova set_business_partnership (só quem administra,
 --      com o Plus aberto). clarevo_business_json passa a devolver business_partnership. A resposta não muda permissão nenhuma.
 --   4. Encerrar e excluir a conta: a Contabilidade não impede (só as pessoas que anotam ou só veem: negocio_com_membros) e perde o
---      acesso junto.
+--      acesso junto. Sair e ser removida cancelam os convites pendentes que a pessoa criou (quem já administrou pode sair).
 --   5. Duas ações novas em record_operations (105 no total): transferir_administracao_negocio (vale em só ver e exportar) e
 --      definir_sociedade_negocio (passa pela trava da assinatura); nenhuma conta como anotação. Três funções novas do app (130 no total).
 -- Compatibilidade: nenhuma função existente muda de assinatura e nenhum dado muda (as colunas novas nascem falsas ou nulas). O app
@@ -616,6 +616,138 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- 10a. Sair e remover: os corpos da 0043, e os convites pendentes que a pessoa criou são cancelados (como F8 da Família). Antes da
+-- 0046 só quem administra convidava, e quem administra nunca sai; com passar a administração, quem convidou pode sair ou ser
+-- removida depois, e o convite dela não continua valendo em nome de quem já não está no negócio.
+-- ---------------------------------------------------------------------------
+create or replace function public.clarevo_cancel_business_invites_of(p_context uuid, p_person uuid)
+returns void
+language sql
+volatile
+security definer
+set search_path = public
+as $$
+  update public.business_invites
+     set cancelled_at = now()
+   where context_id = p_context and created_by = p_person and used_at is null and cancelled_at is null;
+$$;
+
+-- Sair do negócio: o corpo da 0043, com o cancelamento dos convites de quem sai.
+create or replace function public.leave_business(p_context uuid, p_key text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_hash text;
+  v_op public.record_operations%rowtype;
+  v_m public.context_memberships%rowtype;
+begin
+  if v_uid is null then
+    raise exception 'nao_autenticado' using errcode = '42501';
+  end if;
+  perform public.clarevo_check_key(p_key);
+  v_hash := md5(jsonb_build_array('sair_negocio', p_context)::text);
+  perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_key));
+
+  select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_key;
+  if found then
+    if v_op.action <> 'sair_negocio' or v_op.request_hash <> v_hash then
+      raise exception 'chave_reutilizada' using errcode = 'PT409';
+    end if;
+    return jsonb_build_object('context_id', v_op.context_id, 'left', true);
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('familia:c:' || coalesce(p_context::text, '')));
+  if p_context is null or not public.context_permission(p_context, 'read') then
+    raise exception 'nao_encontrado' using errcode = 'P0002';
+  end if;
+  if not public.clarevo_is_business(p_context) then
+    raise exception 'contexto_invalido' using errcode = '22023';
+  end if;
+  select * into v_m from public.context_memberships where context_id = p_context and person_id = v_uid for update;
+  if not found or v_m.revoked_at is not null then
+    raise exception 'nao_encontrado' using errcode = 'P0002';
+  end if;
+  if v_m.role = 'titular' then
+    raise exception 'titular_nao_sai' using errcode = 'PT409';
+  end if;
+
+  update public.context_memberships set revoked_at = now() where context_id = p_context and person_id = v_uid;
+  perform public.clarevo_unlink_withdrawals(p_context, v_uid);
+  perform public.clarevo_cancel_business_invites_of(p_context, v_uid);
+
+  insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id, target_id)
+  values (v_uid, p_key, 'sair_negocio', p_context, v_hash, null, null, p_context);
+
+  return jsonb_build_object('context_id', p_context, 'left', true);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Remover uma pessoa: o corpo da 0043, e os convites pendentes que ela criou são cancelados. Só quem administra, nunca sobre si. O
+-- que ela anotou continua no negócio; as retiradas dela deixam de ser ligadas. Retorno: {context_id, person_id, removed: true}.
+-- ---------------------------------------------------------------------------
+create or replace function public.remove_business_member(p_context uuid, p_person uuid, p_key text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_hash text;
+  v_op public.record_operations%rowtype;
+begin
+  if v_uid is null then
+    raise exception 'nao_autenticado' using errcode = '42501';
+  end if;
+  perform public.clarevo_check_key(p_key);
+  v_hash := md5(jsonb_build_array('remover_membro_negocio', p_context, p_person)::text);
+  perform pg_advisory_xact_lock(hashtext('op:' || v_uid::text || ':' || p_key));
+
+  select * into v_op from public.record_operations where actor_id = v_uid and idempotency_key = p_key;
+  if found then
+    if v_op.action <> 'remover_membro_negocio' or v_op.request_hash <> v_hash then
+      raise exception 'chave_reutilizada' using errcode = 'PT409';
+    end if;
+    if not public.context_permission(v_op.context_id, 'read') then
+      raise exception 'nao_encontrado' using errcode = 'P0002';
+    end if;
+    return jsonb_build_object('context_id', v_op.context_id, 'person_id', v_op.target_id, 'removed', true);
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('familia:c:' || coalesce(p_context::text, '')));
+  perform public.clarevo_require_business_owner(p_context);
+  if p_person is null then
+    raise exception 'nao_encontrado' using errcode = 'P0002';
+  end if;
+  if p_person = v_uid then
+    raise exception 'nao_sobre_si' using errcode = 'PT409';
+  end if;
+  perform 1 from public.context_memberships
+   where context_id = p_context and person_id = p_person and revoked_at is null and role <> 'titular' for update;
+  if not found then
+    raise exception 'nao_encontrado' using errcode = 'P0002';
+  end if;
+
+  update public.context_memberships set revoked_at = now() where context_id = p_context and person_id = p_person;
+  perform public.clarevo_unlink_withdrawals(p_context, p_person);
+  perform public.clarevo_cancel_business_invites_of(p_context, p_person);
+
+  insert into public.record_operations (actor_id, idempotency_key, action, context_id, request_hash, record_id, commitment_id, target_id)
+  values (v_uid, p_key, 'remover_membro_negocio', p_context, v_hash, null, null, p_person);
+
+  return jsonb_build_object('context_id', p_context, 'person_id', p_person, 'removed', true);
+end;
+$$;
+
+
+-- ---------------------------------------------------------------------------
 -- 11. Exclusão da conta: o corpo da 0043 (clarevo_erase_person), e a Contabilidade não impede: quem administra com só a Contabilidade
 -- exclui a conta (o negócio é apagado como hoje e a Contabilidade perde o acesso junto); com outras pessoas que anotam ou só veem,
 -- negocio_com_membros (passa a administração ou remove as pessoas antes).
@@ -892,6 +1024,7 @@ revoke all on function public.clarevo_active_business_count(uuid) from public, a
 revoke all on function public.clarevo_business_active_count(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_business_valid_invites(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_business_accountants(uuid, boolean) from public, anon, authenticated, service_role;
+revoke all on function public.clarevo_cancel_business_invites_of(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_business_json(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_erase_person(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_track_activity() from public, anon, authenticated, service_role;
@@ -901,6 +1034,8 @@ revoke all on function public.create_business_invite(uuid, text, text) from publ
 revoke all on function public.accept_business_invite(text, text) from public, anon;
 revoke all on function public.set_business_member_role(uuid, uuid, text, text) from public, anon;
 revoke all on function public.end_business(uuid, text) from public, anon;
+revoke all on function public.leave_business(uuid, text) from public, anon;
+revoke all on function public.remove_business_member(uuid, uuid, text) from public, anon;
 revoke all on function public.transfer_business_admin(uuid, uuid, text) from public, anon;
 revoke all on function public.set_business_partnership(uuid, boolean, text) from public, anon;
 revoke all on function public.my_accounting_businesses() from public, anon;
@@ -908,6 +1043,8 @@ grant execute on function public.create_business_invite(uuid, text, text) to aut
 grant execute on function public.accept_business_invite(text, text) to authenticated;
 grant execute on function public.set_business_member_role(uuid, uuid, text, text) to authenticated;
 grant execute on function public.end_business(uuid, text) to authenticated;
+grant execute on function public.leave_business(uuid, text) to authenticated;
+grant execute on function public.remove_business_member(uuid, uuid, text) to authenticated;
 grant execute on function public.transfer_business_admin(uuid, uuid, text) to authenticated;
 grant execute on function public.set_business_partnership(uuid, boolean, text) to authenticated;
 grant execute on function public.my_accounting_businesses() to authenticated;
