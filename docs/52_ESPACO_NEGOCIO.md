@@ -173,6 +173,10 @@ Decisão do Enzo: o modelo de dados já nasce pronto; **nada do Plus aparece no 
 - Exportação para o contador: um livro-caixa simples (CSV e PDF) com entradas e saídas por categoria, mês a mês, a partir dos mesmos
   lançamentos (a exportação de hoje já escolhe o espaço; faltaria o formato do contador e, talvez, a mensagem pronta para enviar).
 
+**Decisões de 25/11/2026 (D-123), a partir do estudo do pequeno e médio no Plus.** Cobrança por pessoa ou em dois níveis (por negócio
+saiu); o app pergunta se o negócio é uma sociedade, e quem administra pode passar a administração para outra pessoa do negócio (muda a
+regra da D-116); a contabilidade tem papel próprio, só de leitura, fora do limite de 6 pessoas e da regra de um negócio por vez.
+
 **Perguntas de preço (para o Enzo).** Valor do Plus (acréscimo ao Individual ou plano próprio?); por pessoa ou por negócio; quantos
 negócios e quantas pessoas por negócio; se o Plano Família inclui o Plus; teste grátis próprio ou o mesmo de 14 dias; o que acontece com
 o segundo negócio quando o Plus acaba (só ver e exportar, como hoje no fim do teste).
