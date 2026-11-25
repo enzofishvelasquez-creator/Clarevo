@@ -120,6 +120,12 @@ import {
   saveErrorAfterUnlink,
   showPaymentLink,
   type PaymentLinkOption,
+  RECEIVABLE_TEXT,
+  RECORD_MARKS_TEXT,
+  receivableErrorText,
+  recordMarksOf,
+  recordMarksAllowed,
+  type PayerKind,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -142,6 +148,7 @@ import { AlreadyNotedBanner, CameraModal, PasteModal, ScanLine, ScanSheet, camer
 import { returnSession } from '@/components/retorno-acoes';
 import { ChoiceGroup } from '@/components/series-parts';
 import { InvestmentIncomeBlock, KindChoice, PaymentLinkBlock, SubcategoryPicker, categoryOfKind } from '@/components/record-link';
+import { RecordMarksBlock } from '@/components/record-marks';
 import { useSavedBefore } from '@/components/saved-before';
 import { SumValues } from '@/components/sum-values';
 import { Banner, Button, Card, Chip, LinkButton, Screen, TextField, Txt, styles as ui } from '@/components/ui';
@@ -199,6 +206,9 @@ type FormDraft = RecordDraft & {
   incomeOn: boolean;
   investmentId: string | null;
   linkKey: string | null;
+  /** Marcas da entrada do negócio (D-122), em "Mais detalhes": nota fiscal e quem pagou (null = não marcado). */
+  hasInvoice: boolean | null;
+  payerKind: PayerKind | null;
 };
 
 /** Valores dos campos que a leitura de uma nota preencheu (ou o que havia antes), para desfazer sem perder o que a pessoa digitou. */
@@ -385,6 +395,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             incomeOn: false,
             investmentId: null,
             linkKey: null,
+            hasInvoice: null,
+            payerKind: null,
           }
         : {
             accountId: mode.record.accountId,
@@ -401,6 +413,8 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             incomeOn: (mode.record.investmentId ?? null) !== null,
             investmentId: mode.record.investmentId ?? null,
             linkKey: linkedOptionKey(mode.record),
+            hasInvoice: recordMarksOf(mode.record).hasInvoice,
+            payerKind: recordMarksOf(mode.record).payerKind,
           },
   );
   const [dayMode, setDayMode] = useState(dayMonth !== null);
@@ -516,6 +530,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const contextName = personal.contextName;
   // As categorias do espaço (D-113): as do negócio no negócio, as de sempre no Pessoal e na Família.
   const business = personal.contextKind === 'negocio';
+  // As marcas da entrada (D-122): só na entrada da operação do negócio (Vendas, Serviços e Outras entradas), nunca num lado ligado.
+  const marksAllowed =
+    business && recordMarksAllowed({ kind, category: draft.category, pairedRecordId: mode.type === 'editar' ? (mode.record.pairedRecordId ?? null) : null });
   // Na compra no cartão (D-121), sem "Parcela de empréstimo" e "Equipamento": a fatura paga entra em Saiu, na operação.
   const categoryList = cardPurchase ? cardCategories(contextCategories(personal.contextKind, kind)) : contextCategories(personal.contextKind, kind);
   // Ao passar para o cartão, uma dessas duas já escolhida volta para "Sem categoria".
@@ -1482,18 +1499,28 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     // Gasto lido de uma nota: leva o resumo da chave (nunca a chave) para o aviso de nota repetida.
     const base: RecordInput = kind === 'receita' ? { ...v.input, nextMonth: v.input.nextMonth === true } : v.input;
     // D-107: subcategoria, tipo e rendimento de investimento entram só quando valem (o app antigo manda o de antes).
+    // Marcas da entrada do negócio (D-122): só na entrada da operação do negócio (marksAllowed); ao criar, só quando há alguma; ao editar, só
+    // quando mudam (num gasto, o banco tira as marcas sozinho). Uma entrada marcada que passa para uma categoria sem marcas leva as duas nulas.
+    const marks = marksAllowed ? { hasInvoice: draft.hasInvoice, payerKind: draft.payerKind } : { hasInvoice: null, payerKind: null };
     const extras: Partial<RecordInput> =
       mode.type === 'novo'
-        ? { ...(sub !== null ? { subcategory: sub } : {}), ...(incomeShown && draft.incomeOn && draft.investmentId ? { investmentId: draft.investmentId } : {}) }
+        ? {
+            ...(sub !== null ? { subcategory: sub } : {}),
+            ...(incomeShown && draft.incomeOn && draft.investmentId ? { investmentId: draft.investmentId } : {}),
+            ...(marksAllowed && (marks.hasInvoice !== null || marks.payerKind !== null) ? { marks } : {}),
+          }
         : (() => {
             // Só o que muda vai na chamada (sem mudança, a mesma chamada de antes): a subcategoria, quando difere do que o banco
             // manteria sozinho; o investimento, quando a ligação muda.
             const kept = kind === mode.record.kind && (effective.category ?? null) === (mode.record.category ?? null) ? (mode.record.subcategory ?? null) : null;
             const wantedInvestment = incomeShown && draft.incomeOn ? draft.investmentId : null;
+            const before = recordMarksOf(mode.record);
+            const marksChanged = marks.hasInvoice !== before.hasInvoice || marks.payerKind !== before.payerKind;
             return {
               ...(kind !== mode.record.kind ? { kind } : {}),
               ...(sub !== kept ? { subcategory: sub } : {}),
               ...(kind === 'receita' && wantedInvestment !== (mode.record.investmentId ?? null) ? { investmentId: wantedInvestment } : {}),
+              ...(business && kind === 'receita' && marksChanged ? { marks } : {}),
             };
           })();
     const withExtras: RecordInput = { ...base, ...extras };
@@ -1582,6 +1609,11 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
             setIncomeError(RECORD_KIND_ERROR_TEXT[e.code]);
             qc.invalidateQueries({ queryKey: ['investments'] });
             fail(null);
+            return;
+          }
+          // D-122: a entrada de um valor a receber continua entrada; marcas fora da entrada do negócio.
+          if (e.code === 'recebimento_ligado' || e.code === 'marcas_invalidas') {
+            fail(receivableErrorText(e.code));
             return;
           }
           if (e.code === 'versao_desatualizada' && mode.type === 'editar') {
@@ -1749,6 +1781,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
         incomeOn: next === 'receita' ? d.incomeOn : false,
         investmentId: next === 'receita' ? d.investmentId : null,
         linkKey: next === 'despesa' ? d.linkKey : null,
+        // As marcas (D-122) são só da entrada: trocar para saída as tira.
+        hasInvoice: next === 'receita' ? d.hasInvoice : null,
+        payerKind: next === 'receita' ? d.payerKind : null,
       };
     });
     setSubError(undefined);
@@ -1757,11 +1792,13 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const kindLocked =
     mode.type !== 'editar'
       ? null
-      : mode.record.receiptKey
-        ? RECORD_LINK_TEXT.kindLockedReceipt
-        : mode.record.commitmentId && draft.linkKey === currentLink
-          ? RECORD_LINK_TEXT.kindLocked
-          : null;
+      : mode.record.receivableId
+        ? RECEIVABLE_TEXT.kindLocked
+        : mode.record.receiptKey
+          ? RECORD_LINK_TEXT.kindLockedReceipt
+          : mode.record.commitmentId && draft.linkKey === currentLink
+            ? RECORD_LINK_TEXT.kindLocked
+            : null;
 
   // "Parece já anotado" (D-051): o comprovante não deixa chave no registro, então a duplicidade só se avisa por semelhança (mesmo tipo,
   // mesmo valor e data a até um dia de um registro que já existe). Vale para o que está nos campos agora, e nunca bloqueia o Salvar.
@@ -2227,6 +2264,28 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           {business && BUSINESS_TEXT.categoryHint(draft.category) ? (
             <Txt variant="caption" color={colors.textSecondary}>
               {BUSINESS_TEXT.categoryHint(draft.category)}
+            </Txt>
+          ) : null}
+          {/* Marcas da entrada do negócio (D-122): "Mais detalhes (opcional)", com "Teve nota fiscal?" e "Quem pagou". Só na entrada da
+              operação do negócio (Vendas, Serviços e Outras entradas), fora dos lados ligados; não mudam nenhum total. */}
+          {marksAllowed ? (
+            <RecordMarksBlock
+              hasInvoice={draft.hasInvoice}
+              payerKind={draft.payerKind}
+              onInvoice={(v) => setDraft((d) => ({ ...d, hasInvoice: v }))}
+              onPayer={(v) => setDraft((d) => ({ ...d, payerKind: v }))}
+            />
+          ) : null}
+          {/* Ao trocar uma entrada marcada para saída, as marcas saem (o banco também as tira). */}
+          {business && mode.type === 'editar' && kind === 'despesa' && mode.record.kind === 'receita' && (mode.record.hasInvoice != null || mode.record.payerKind != null) ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {RECORD_MARKS_TEXT.clearedOnExpense}
+            </Txt>
+          ) : null}
+          {/* Uma entrada marcada que passa para uma categoria sem marcas (fora da operação ou sem categoria): elas saem ao salvar. */}
+          {business && mode.type === 'editar' && kind === 'receita' && !marksAllowed && (mode.record.hasInvoice != null || mode.record.payerKind != null) ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {RECORD_MARKS_TEXT.clearedOnCategory}
             </Txt>
           ) : null}
           {categorySuggestion ? (

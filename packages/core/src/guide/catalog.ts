@@ -2,6 +2,8 @@ import { ACCOUNTS_TEXT } from '../accounts';
 import { ANALYSES_TABS, ANALYSES_TEXT } from '../analises';
 import { BUDGET_TEXT, LIMIT_TEXT } from '../budget';
 import { BUSINESS_TEXT } from '../business';
+import { RECEIVABLE_TEXT, RECORD_MARKS_TEXT } from '../business-receivables';
+import { MEI_REMINDER_TEXT } from '../mei-reminders';
 import { SPACE_TEXT } from '../spaces';
 import { PERFORMANCE_TEXT } from '../investment-performance';
 import { ANTES_FIELDS, ANTES_TEXT } from '../calculators/antes-de-financiar';
@@ -930,8 +932,8 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       `No topo do Resumo, de Movimentos ou de Metas, toque no + ao lado de ${q('Pessoal')} e escolha ${q(SPACE_TEXT.businessOption)}, ou, em Conta, toque em ${q(BUSINESS_TEXT.accountCreate)}. Dê o nome do negócio e confirme. O plano inclui um negócio por pessoa.`,
       `O nome do negócio aparece no seletor do topo das abas, ao lado de ${q('Pessoal')}: com ele escolhido, os gastos, recebimentos, contas a pagar, cartões e bancos e carteira são do negócio, com as categorias do negócio. Nas telas de consulta, como Análises, a pílula do espaço, no topo da tela, troca o espaço.`,
       `Em ${q(BUSINESS_TEXT.overviewTitle)}, veja quanto entrou, saiu e sobrou na operação no mês e nos últimos meses, as maiores saídas e, à parte, o que ficou ${q(BUSINESS_TEXT.outsideTitle)} (empréstimo, equipamento, dinheiro trazido do Pessoal). Em ${q(BUSINESS_TEXT.yearTitle)}, o ano por categoria. Em ${q(BUSINESS_TEXT.profileTitle)}, quem escolhe ${q('MEI')} vê também o limite anual.`,
-      `Quando levar dinheiro do negócio para casa, use ${q(BUSINESS_TEXT.withdraw)}; quando puser dinheiro do Pessoal no negócio, use ${q(BUSINESS_TEXT.contribute)}. O valor sai de um espaço e entra no outro, sem contar duas vezes.`,
-      `Anotou no lugar errado? No detalhe do lançamento, toque em ${q(BUSINESS_TEXT.moveToBusiness)} ou ${q(BUSINESS_TEXT.moveToPersonal)}.`,
+      `O cartão ${q(RECEIVABLE_TEXT.cardTitle)} junta o que o negócio ainda vai receber (fiado, venda que vai cair da maquininha ou outro valor). Quando o dinheiro entrar, toque em ${q(RECEIVABLE_TEXT.receive)}: vira uma entrada comum. Na entrada, ${q(RECORD_MARKS_TEXT.section)} tem ${q(RECORD_MARKS_TEXT.invoiceLabel)} e ${q(RECORD_MARKS_TEXT.payerLabel)}. Com o tipo ${q('MEI')}, ${q(MEI_REMINDER_TEXT.title)} tem dois avisos de data.`,
+      `Para levar dinheiro do negócio para casa, use ${q(BUSINESS_TEXT.withdraw)}; para pôr dinheiro do Pessoal no negócio, ${q(BUSINESS_TEXT.contribute)}. O valor sai de um espaço e entra no outro, sem contar duas vezes. Anotou no lugar errado? No detalhe do lançamento, toque em ${q(BUSINESS_TEXT.moveToBusiness)} ou ${q(BUSINESS_TEXT.moveToPersonal)}.`,
       `Metas e investimentos ficam no Pessoal. ${BUSINESS_TEXT.chatNote}`,
     ],
     screenName: BUSINESS_TEXT.overviewTitle,
@@ -956,8 +958,26 @@ export const GUIDE_ENTRIES: readonly GuideEntry[] = [
       'empréstimo',
       'equipamento',
       'resumo do ano',
+      'a receber',
+      'fiado',
+      'quem me deve',
+      'quem pagou',
+      'lembretes do mei',
     ],
-    routes: ['/negocio', '/negocio/novo', '/negocio/retirada', '/negocio/trazer', '/negocio/ano', '/negocio/nome', '/registro/[id]/mover'],
+    routes: [
+      '/negocio',
+      '/negocio/novo',
+      '/negocio/retirada',
+      '/negocio/trazer',
+      '/negocio/ano',
+      '/negocio/nome',
+      '/registro/[id]/mover',
+      '/negocio/a-receber',
+      '/negocio/a-receber/novo',
+      '/negocio/a-receber/[id]',
+      '/negocio/a-receber/[id]/editar',
+      '/negocio/a-receber/[id]/receber',
+    ],
     screenshot: '730_negocio_como_esta.png',
   },
   {

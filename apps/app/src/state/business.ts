@@ -7,6 +7,9 @@ import {
   type BusinessProfile,
   type BusinessWithdrawalInput,
   type PlusStatus,
+  type Receivable,
+  type ReceivableInput,
+  type ReceiveInput,
   type RecordKind,
 } from '@clarevo/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -118,6 +121,77 @@ export function useMoveRecord() {
   return useMutation({
     mutationFn: (v: { key: string; recordId: string; version: number; targetContextId: string; accountId: string; category: string | null }) =>
       repo.moveRecord(v.key, v.recordId, v.version, v.targetContextId, v.accountId, v.category),
+    onSuccess: reload,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// A receber do negócio (D-122). As escritas usam as chaves de operação da Família (`useFamilyKeys` e `attemptFamily`, em state/family.ts).
+// ---------------------------------------------------------------------------
+
+/** Os "a receber" do negócio: os em aberto e os recebidos mais recentes. `contextId` indefinido: desligada. */
+export function useReceivables(contextId: string | null | undefined) {
+  const { repo, user } = useSession();
+  return useQuery({
+    queryKey: ['receivables', user?.id ?? null, contextId ?? null],
+    queryFn: (): Promise<Receivable[]> => repo!.listReceivables(contextId!),
+    enabled: Boolean(repo && user && contextId),
+  });
+}
+
+/** Um "a receber" (o detalhe, editar e "Recebi"). */
+export function useReceivable(id: string | null | undefined) {
+  const { repo, user } = useSession();
+  return useQuery({
+    queryKey: ['receivable', user?.id ?? null, id ?? null],
+    queryFn: (): Promise<Receivable | null> => repo!.getReceivable(id!),
+    enabled: Boolean(repo && user && id),
+  });
+}
+
+/** Anotar, alterar e excluir mudam só a lista e o detalhe; receber grava também uma entrada (os lançamentos e os totais do negócio). */
+function useReloadReceivables(records = false) {
+  const qc = useQueryClient();
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['receivables'] }),
+      qc.invalidateQueries({ queryKey: ['receivable'] }),
+      ...(records ? ['records', 'record', 'returnReview'].map((k) => qc.invalidateQueries({ queryKey: [k] })) : []),
+    ]);
+}
+
+export function useCreateReceivable() {
+  const repo = useRepo();
+  const reload = useReloadReceivables();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; input: ReceivableInput }) => repo.createReceivable(v.key, v.contextId, v.input),
+    onSuccess: reload,
+  });
+}
+
+export function useUpdateReceivable() {
+  const repo = useRepo();
+  const reload = useReloadReceivables();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number; input: ReceivableInput }) => repo.updateReceivable(v.key, v.id, v.version, v.input),
+    onSuccess: reload,
+  });
+}
+
+export function useDeleteReceivable() {
+  const repo = useRepo();
+  const reload = useReloadReceivables();
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number }) => repo.deleteReceivable(v.key, v.id, v.version),
+    onSuccess: reload,
+  });
+}
+
+export function useReceiveReceivable() {
+  const repo = useRepo();
+  const reload = useReloadReceivables(true);
+  return useMutation({
+    mutationFn: (v: { key: string; id: string; version: number; input: ReceiveInput }) => repo.receiveReceivable(v.key, v.id, v.version, v.input),
     onSuccess: reload,
   });
 }

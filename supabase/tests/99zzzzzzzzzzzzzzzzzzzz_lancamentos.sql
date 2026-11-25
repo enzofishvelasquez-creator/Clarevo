@@ -59,18 +59,18 @@ do $$ begin
      and to_regprocedure('public.undo_commitment_payment(text, uuid, integer)') is null
      and to_regprocedure('public.pay_invoice(text, uuid, date, integer, bigint, date, uuid)') is null
      and to_regprocedure('public.undo_invoice_payment(text, uuid, date, integer)') is null, 'as assinaturas antigas saíram';
-  assert has_function_privilege('authenticated', 'public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid)', 'execute')
-     and has_function_privilege('authenticated', 'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean)', 'execute')
+  assert has_function_privilege('authenticated', 'public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid, jsonb)', 'execute')
+     and has_function_privilege('authenticated', 'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean, jsonb)', 'execute')
      and has_function_privilege('authenticated', 'public.pay_commitment(text, uuid, integer, uuid, bigint, date, text, uuid)', 'execute')
      and has_function_privilege('authenticated', 'public.undo_commitment_payment(text, uuid, integer, boolean)', 'execute')
      and has_function_privilege('authenticated', 'public.pay_invoice(text, uuid, date, integer, bigint, date, uuid, uuid)', 'execute')
      and has_function_privilege('authenticated', 'public.undo_invoice_payment(text, uuid, date, integer, boolean)', 'execute'), 'o app executa as seis';
-  assert not has_function_privilege('anon', 'public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid)', 'execute')
-     and not has_function_privilege('anon', 'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean)', 'execute')
+  assert not has_function_privilege('anon', 'public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid, jsonb)', 'execute')
+     and not has_function_privilege('anon', 'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean, jsonb)', 'execute')
      and not has_function_privilege('anon', 'public.pay_invoice(text, uuid, date, integer, bigint, date, uuid, uuid)', 'execute'), 'anon não';
   assert not has_function_privilege('authenticated', 'public.clarevo_check_subcategory(public.record_kind, text, text)', 'execute')
      and not has_function_privilege('authenticated', 'public.clarevo_income_investment(uuid, uuid)', 'execute'), 'auxiliares fechadas';
-  assert (select prosecdef and provolatile = 'v' from pg_proc where oid = 'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean)'::regprocedure),
+  assert (select prosecdef and provolatile = 'v' from pg_proc where oid = 'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean, jsonb)'::regprocedure),
     'update_record é definer e volátil';
   -- pay_invoice continua escolhendo a conta principal e travando a conta (A8, A9).
   assert (select prosrc from pg_proc where oid = 'public.pay_invoice(text, uuid, date, integer, bigint, date, uuid, uuid)'::regprocedure) like '%a.is_default desc%',

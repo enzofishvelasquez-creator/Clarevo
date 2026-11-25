@@ -143,7 +143,7 @@ export function CommitmentRow({
 }
 
 /** Botão secundário pequeno (alvo de 44 px), no tom suave da marca; sem cor de alerta. */
-function RowActionButton({ label, accessibilityLabel, onPress, icon: Icon = Check, disabled }: RowAction) {
+export function RowActionButton({ label, accessibilityLabel, onPress, icon: Icon = Check, disabled }: RowAction) {
   return (
     <Pressable
       accessibilityRole="button"

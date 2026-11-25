@@ -153,6 +153,8 @@ import {
   businessMonths,
   businessTopOut,
   businessYear,
+  businessYearMarks,
+  type BusinessYearMarks,
 } from '@clarevo/core';
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { createContext, use, useEffect, useMemo, useRef } from 'react';
@@ -503,6 +505,11 @@ function useInvalidate() {
     if (record.commitmentId) qc.invalidateQueries({ queryKey: ['series'] });
     // Pagamento de fatura (a conta, a data e a faturas mudam) e gasto com nota (o aviso "já anotada" muda): cartões recarregam.
     if (record.invoice || record.receiptKey) qc.invalidateQueries({ queryKey: ['cards'] });
+    // A entrada de um "a receber" (D-122): excluir a devolve para "aberto"; editar muda o valor e a data mostrados como recebidos.
+    if (record.receivableId) {
+      qc.invalidateQueries({ queryKey: ['receivables'] });
+      qc.invalidateQueries({ queryKey: ['receivable'] });
+    }
     // Toda escrita muda a revisão dos últimos meses (atividade, recebimentos e gastos do mês).
     qc.invalidateQueries({ queryKey: ['returnReview'] });
   };
@@ -1103,7 +1110,12 @@ export function useBusinessYear(contextId: string | undefined, year: number | un
     if (!ready || !contextId || year === undefined) return undefined;
     return businessYear(results.flatMap((q) => q.data ?? []), contextId, year);
   }, [ready, contextId, year, version]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { data, isPending: year !== undefined && !ready && !failed, isError: failed, refetch: () => Promise.all(results.map((q) => q.refetch())) };
+  // As entradas da operação por marca (D-122): nota fiscal e quem pagou, com os mesmos lançamentos.
+  const marks = useMemo((): BusinessYearMarks | undefined => {
+    if (!ready || !contextId || year === undefined) return undefined;
+    return businessYearMarks(results.flatMap((q) => q.data ?? []), contextId, year);
+  }, [ready, contextId, year, version]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { data, marks, isPending: year !== undefined && !ready && !failed, isError: failed, refetch: () => Promise.all(results.map((q) => q.refetch())) };
 }
 
 // ---------------------------------------------------------------------------

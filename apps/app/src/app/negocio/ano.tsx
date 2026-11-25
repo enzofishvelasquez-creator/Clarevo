@@ -1,4 +1,14 @@
-import { BUSINESS_TEXT, formatBRL, type BusinessContext, type BusinessYear, type BusinessYearLine, type ExportPeriod } from '@clarevo/core';
+import {
+  BUSINESS_TEXT,
+  RECORD_MARKS_TEXT,
+  formatBRL,
+  type BusinessContext,
+  type BusinessYear,
+  type BusinessYearLine,
+  type BusinessYearMarks,
+  type ExportPeriod,
+  type MarkLine,
+} from '@clarevo/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Download } from 'lucide-react-native';
 import { useState } from 'react';
@@ -95,7 +105,7 @@ function YearView({ business }: { business: BusinessContext }) {
           <Txt color={colors.textSecondary}>{T.yearNothing(year)}</Txt>
         </Card>
       ) : (
-        <YearCards y={data.data} mei={mei} hidden={hidden} />
+        <YearCards y={data.data} marks={data.marks} mei={mei} hidden={hidden} />
       )}
 
       <View style={{ gap: space[2] }}>
@@ -116,7 +126,7 @@ function YearView({ business }: { business: BusinessContext }) {
   );
 }
 
-function YearCards({ y, mei, hidden }: { y: BusinessYear; mei: boolean; hidden: boolean }) {
+function YearCards({ y, marks, mei, hidden }: { y: BusinessYear; marks: BusinessYearMarks | undefined; mei: boolean; hidden: boolean }) {
   return (
     <>
       <LinesCard title={T.yearInTitle} lines={y.inLines} total={y.inCents} empty={T.yearNoIn} />
@@ -138,6 +148,8 @@ function YearCards({ y, mei, hidden }: { y: BusinessYear; mei: boolean; hidden: 
           </Txt>
         </Card>
       ) : null}
+      {/* Nota e quem pagou (D-122): só quando alguma entrada da operação do ano tem marca. */}
+      {marks && marks.anyMarked ? <MarksCard marks={marks} /> : null}
       <Card style={{ gap: space[3] }}>
         <Txt variant="title" accessibilityRole="header" aria-level={2}>
           {T.outsideTitle}
@@ -177,6 +189,33 @@ function YearCards({ y, mei, hidden }: { y: BusinessYear; mei: boolean; hidden: 
         </Txt>
       </Card>
     </>
+  );
+}
+
+/** As entradas da operação do ano pelas marcas (D-122): nota fiscal (com, sem, não marcado) e quem pagou, numa cor só, sem imposto. */
+function MarksCard({ marks }: { marks: BusinessYearMarks }) {
+  const M = RECORD_MARKS_TEXT.year;
+  const lines = (title: string, list: MarkLine[]) => (
+    <View>
+      <Txt variant="label" style={{ fontFamily: fonts.bold }} accessibilityRole="header" aria-level={3}>
+        {title}
+      </Txt>
+      {list.map((l, i) => (
+        <AmountRow key={l.key} label={l.label} a11y={`${title}, ${l.label}`} cents={l.cents} line={i < list.length - 1} />
+      ))}
+    </View>
+  );
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Txt variant="title" accessibilityRole="header" aria-level={2}>
+        {M.title}
+      </Txt>
+      <Txt variant="caption" color={colors.textSecondary}>
+        {M.intro}
+      </Txt>
+      {lines(M.invoiceTitle, marks.invoice)}
+      {lines(M.payerTitle, marks.payer)}
+    </Card>
   );
 }
 

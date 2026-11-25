@@ -93,6 +93,8 @@ import type { BusinessAction, BusinessContext, BusinessContribution, BusinessCon
 import type { BusinessInvite, BusinessInvitePreview, BusinessInviteRole, BusinessInviteWrite, BusinessJoin, BusinessPeople, BusinessPeopleAction, PlusStatus } from './business-people';
 import { isBusinessPeopleAction } from './business-people';
 import { MemoryBusinessHub } from './memory-business-people';
+import type { RecordMarks, Receivable, ReceivableAction, ReceivableInput, ReceivableReceiveWrite, ReceiveInput } from './business-receivables';
+import { RECEIVED_READ_LIMIT, isPayerKind, normalizeReceivableInput, receivableInputError } from './business-receivables';
 import {
   BUSINESS_DEFAULT_ACCOUNT,
   CONTRIBUTION_BUSINESS_CATEGORY,
@@ -246,7 +248,8 @@ interface Operation {
     | FamilyAction
     | CompanyAction
     | BusinessAction
-    | BusinessPeopleAction;
+    | BusinessPeopleAction
+    | ReceivableAction;
   hash: string;
   contextId: string;
   recordId: string | null;
@@ -271,12 +274,16 @@ interface Operation {
   on?: IsoDate;
   /** Negócio (D-113): o outro lançamento (target_id) da retirada (o recebimento do Pessoal) e do mover (o original). */
   targetRecordId?: string | null;
+  /** A receber (D-122): o "a receber" (target_id) das quatro ações dele. */
+  receivableId?: string | null;
 }
 
 /** Conta (financial_accounts): exclusão lógica (fica arquivada e some da leitura). */
 type StoredAccount = FinancialAccount & { createdBy: string; createdAt: string; deletedAt?: string; deletedBy?: string };
 
 type StoredRecord = FinancialRecord & { deletedAt?: string; importKey?: string };
+/** A receber do negócio (business_receivables, D-122): exclusão lógica; a entrada que recebeu é lida do lançamento vivo ligado. */
+type StoredReceivable = Omit<Receivable, 'received'> & { deletedAt?: string; deletedBy?: string };
 /**
  * Conta a pagar guardada sem o pagamento (lido do gasto vivo vinculado) e sem os dados da série (lidos pela junção).
  * seriesSkipped: excluída só neste mês; o número nunca volta a ser criado.
@@ -470,6 +477,8 @@ export class MemoryRepository implements RecordsRepository {
   private goalImages = new Map<string, { imageKey: string | null; photo: { mime: string; base64: string } | null; version: number; updatedAt: string }>();
   private cards = new Map<string, StoredCard>();
   private cardEntries = new Map<string, StoredCardEntry>();
+  /** A receber do negócio (D-122): só os que esta pessoa anotou (como os lançamentos, cada pessoa guarda o que anota). */
+  private receivables = new Map<string, StoredReceivable>();
   private seq = 0;
   /** Simula falha de rede: 'antes' (nada gravado) ou 'depois' (gravado, resposta perdida). */
   failNextWrite: 'antes' | 'depois' | null = null;
@@ -552,6 +561,7 @@ export class MemoryRepository implements RecordsRepository {
       investments: new Map(this.investments),
       investmentMovements: new Map(this.investmentMovements),
       investmentPlans: new Map(this.investmentPlans),
+      receivables: new Map(this.receivables),
     };
     let result: T;
     try {
@@ -583,6 +593,7 @@ export class MemoryRepository implements RecordsRepository {
         investments: this.investments,
         investmentMovements: this.investmentMovements,
         investmentPlans: this.investmentPlans,
+        receivables: this.receivables,
       } = saved);
       throw e;
     }
@@ -873,11 +884,14 @@ export class MemoryRepository implements RecordsRepository {
       // Subcategoria e rendimento de investimento (D-107) entram no conteúdo só quando vêm, como no banco.
       const subcategory = normalizeSubcategory(input.subcategory);
       const investmentId = input.investmentId ?? null;
+      // Marcas da entrada do negócio (D-122): entram no conteúdo só quando vêm, como p_marks no banco.
+      const marksIn = input.marks ?? null;
       const body = {
         ...norm,
         ...(nextMonth ? { nextMonth: true } : {}),
         ...(subcategory !== null ? { subcategory } : {}),
         ...(investmentId !== null ? { investmentId } : {}),
+        ...(marksIn !== null ? { marks: { hasInvoice: marksIn.hasInvoice, payerKind: marksIn.payerKind } } : {}),
       };
       const payload = receipt === null ? [contextId, kind, body] : [contextId, kind, body, receipt];
       const replay = this.replayRecord(key, 'criar', payload);
@@ -885,6 +899,7 @@ export class MemoryRepository implements RecordsRepository {
       if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
       this.validate(contextId, kind, { ...norm, nextMonth });
       if (!subcategoryAllowed(kind, norm.category, subcategory)) throw new RepoError('subcategoria_invalida');
+      const marks = this.checkMarks(marksIn, kind, contextId);
       if (receipt !== null) {
         if (kind !== 'despesa' || !receiptKeyValid(receipt)) throw new RepoError('chave_de_nota_invalida');
         this.checkReceiptFree(contextId, receipt);
@@ -912,9 +927,10 @@ export class MemoryRepository implements RecordsRepository {
         },
         { subcategory, investmentId: investment?.id ?? null, investmentMovementId: movement?.id ?? null },
       );
-      this.records.set(record.id, record);
+      const withMarksRecord = withMarks(record, marks);
+      this.records.set(record.id, withMarksRecord);
       this.saveOperation(key, 'criar', payload, { contextId, recordId: record.id, commitmentId: null });
-      return record;
+      return withMarksRecord;
     });
   }
 
@@ -924,10 +940,12 @@ export class MemoryRepository implements RecordsRepository {
       // Mês seguinte (D-089 A): ausente mantém a marca enquanto a data nova cabe (como p_next_month nulo no banco); entra no conteúdo
       // só quando veio.
       // Os campos novos (D-107) entram no conteúdo só quando vêm, como no banco.
+      const marksIn = input.marks ?? null;
       const extras = {
         ...(input.kind !== undefined ? { kind: input.kind } : {}),
         ...(input.subcategory !== undefined ? { subcategory: input.subcategory === null ? '' : input.subcategory.trim() } : {}),
         ...(input.investmentId !== undefined ? { investmentId: input.investmentId } : {}),
+        ...(marksIn !== null ? { marks: { hasInvoice: marksIn.hasInvoice, payerKind: marksIn.payerKind } } : {}),
       };
       const base = input.nextMonth === undefined ? norm : { ...norm, nextMonth: input.nextMonth === true };
       const payload = Object.keys(extras).length === 0 ? [id, expectedVersion, base] : [id, expectedVersion, { ...base, ...extras }];
@@ -957,6 +975,15 @@ export class MemoryRepository implements RecordsRepository {
       }
       // Trocar o tipo (D-107): só sem conta a pagar, sem fatura e sem nota fiscal.
       if (kind !== current.kind && (current.commitmentId || current.receiptKey)) throw new RepoError('tipo_nao_muda');
+      // A entrada de um "a receber" (D-122) continua entrada.
+      if (kind !== 'receita' && current.receivableId) throw new RepoError('recebimento_ligado');
+      // Marcas (D-122): ausentes mantêm as de antes, menos num gasto (que não tem marca); um objeto troca.
+      const marks: RecordMarks | null =
+        marksIn === null
+          ? kind === 'receita'
+            ? { hasInvoice: current.hasInvoice ?? null, payerKind: current.payerKind ?? null }
+            : null
+          : this.checkMarks(marksIn, kind, current.contextId);
       // Ausente (o app antigo) mantém a marca só no recebimento, se a data nova continua no mesmo mês e na janela.
       const nextMonth =
         input.nextMonth === undefined
@@ -990,11 +1017,14 @@ export class MemoryRepository implements RecordsRepository {
           });
         }
       }
-      const next = withRecordExtras(withNextMonth({ ...current, ...norm, kind, version: current.version + 1, updatedAt: now }, nextMonth), {
-        subcategory,
-        investmentId: movementId !== null ? wanted : null,
-        investmentMovementId: movementId,
-      });
+      const next = withMarks(
+        withRecordExtras(withNextMonth({ ...current, ...norm, kind, version: current.version + 1, updatedAt: now }, nextMonth), {
+          subcategory,
+          investmentId: movementId !== null ? wanted : null,
+          investmentMovementId: movementId,
+        }),
+        marks,
+      );
       this.records.set(id, next);
       // Gasto de conta a pagar: a conta sobe de versão; o valor previsto não muda.
       if (current.commitmentId) this.bumpCommitment(current.commitmentId, {}, now);
@@ -1020,6 +1050,9 @@ export class MemoryRepository implements RecordsRepository {
       this.records.set(id, next);
       // Excluir o gasto de uma conta a pagar desfaz o pagamento: a conta volta a ficar em aberto.
       if (current.commitmentId) this.bumpCommitment(current.commitmentId, { status: 'aberto' }, now);
+      // Excluir a entrada de um "a receber" (D-122, gatilho financial_records_receivable_reopen) o devolve para "aberto".
+      const receivable = current.receivableId ? this.receivables.get(current.receivableId) : undefined;
+      if (receivable && receivable.status === 'recebido') this.bumpReceivable(receivable.id, { status: 'aberto' }, now);
       this.saveOperation(key, 'excluir', payload, { contextId: current.contextId, recordId: id, commitmentId: current.commitmentId });
       return strip(next);
     });
@@ -4222,6 +4255,27 @@ export class MemoryRepository implements RecordsRepository {
     this.checkInvoiceInvariants();
     this.checkReceiptInvariants();
     this.checkImportInvariants();
+    this.checkReceivableInvariants();
+  }
+
+  /**
+   * A receber (D-122, como o índice financial_records_receivable_id_vivo e as restrições da 0045): a entrada ligada é uma entrada do mesmo
+   * espaço, sem marcas fora do negócio; um "a receber" recebido tem uma entrada viva ligada (a deste repositório), e um em aberto, nenhuma.
+   * Lança Error('a_receber_inconsistente').
+   */
+  private checkReceivableInvariants() {
+    const live = new Map<string, number>();
+    for (const r of this.records.values()) {
+      if ((r.hasInvoice != null || r.payerKind != null) && (r.kind !== 'receita' || !this.biz.isBusiness(r.contextId))) throw new Error('a_receber_inconsistente');
+      if (!r.receivableId) continue;
+      const v = this.receivables.get(r.receivableId);
+      if (r.kind !== 'receita' || (v && v.contextId !== r.contextId)) throw new Error('a_receber_inconsistente');
+      if (!r.deletedAt && v) live.set(v.id, (live.get(v.id) ?? 0) + 1);
+    }
+    for (const v of this.receivables.values()) {
+      const n = live.get(v.id) ?? 0;
+      if (n > 1 || (v.status === 'aberto' && n !== 0) || (v.status === 'recebido' && !v.deletedAt && n !== 1)) throw new Error('a_receber_inconsistente');
+    }
   }
 
   /** Chave da importação (no banco: índices únicos parciais): no máximo uma linha viva por contexto e chave. Lança Error('importacao_inconsistente'). */
@@ -4935,6 +4989,19 @@ export class MemoryRepository implements RecordsRepository {
     return budgetCategoriesFor(this.biz.isBusiness(contextId) ? 'negocio' : 'pessoal');
   }
 
+  /**
+   * Como clarevo_record_marks (D-122): as marcas conferidas (nota fiscal sim, não ou nula; quem pagou pf, pj, exterior ou nulo), só em
+   * entrada do negócio (marcas_invalidas). Nulo = sem marcas.
+   */
+  private checkMarks(marks: RecordMarks | null, kind: RecordKind, contextId: string): RecordMarks | null {
+    if (marks === null) return null;
+    const hasInvoice = marks.hasInvoice ?? null;
+    const payerKind = marks.payerKind ?? null;
+    if ((hasInvoice !== null && typeof hasInvoice !== 'boolean') || (payerKind !== null && !isPayerKind(payerKind))) throw new RepoError('marcas_invalidas');
+    if ((hasInvoice !== null || payerKind !== null) && (kind !== 'receita' || !this.biz.isBusiness(contextId))) throw new RepoError('marcas_invalidas');
+    return { hasInvoice, payerKind };
+  }
+
   /** Um lado de uma retirada só muda pelas funções da retirada (o gatilho financial_records_pair_guard do banco). */
   private assertNotPaired(r: FinancialRecord) {
     if (isWithdrawal(r)) throw new RepoError('retirada_ligada');
@@ -5352,11 +5419,157 @@ export class MemoryRepository implements RecordsRepository {
       const now = this.stamp();
       this.records.set(r.id, { ...r, version: r.version + 1, updatedAt: now, deletedAt: now });
       const id = this.id('reg');
-      const { subcategory: _s, linkedPayment: _l, deletedAt: _d, ...rest } = r;
+      // As marcas de nota e de quem pagou (D-122) não vão junto: move_record grava o lançamento novo sem elas (só entrada do negócio as tem).
+      const { subcategory: _s, linkedPayment: _l, deletedAt: _d, hasInvoice: _h, payerKind: _p, ...rest } = r;
       const moved: StoredRecord = { ...rest, id, contextId: targetContextId, accountId, category: cat, createdBy: this.opts.actorId, version: 1, createdAt: now, updatedAt: now };
       this.records.set(id, moved);
       this.saveOperation(key, 'mover_lancamento', payload, { contextId: targetContextId, recordId: id, commitmentId: null, targetRecordId: r.id });
       return strip(moved);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // A receber do negócio (D-122): as quatro funções da migração 0045
+  // ---------------------------------------------------------------------------
+
+  /** O "a receber" como o app lê, com a entrada viva que o recebeu (valor, data e conta). */
+  private toReceivable(v: StoredReceivable): Receivable {
+    const { deletedAt: _d, deletedBy: _b, ...rest } = v;
+    const r = v.status === 'recebido' ? [...this.records.values()].find((x) => x.receivableId === v.id && !x.deletedAt) : undefined;
+    return { ...rest, received: r ? { recordId: r.id, amountCents: r.amountCents, receivedOn: r.occurredOn, accountId: r.accountId } : null };
+  }
+
+  /**
+   * Como clarevo_lock_receivable: vivo e lido (nao_encontrado); com escrita e, para alterar e excluir (`change`), de quem anotou ou de quem
+   * administra (sem_permissao).
+   */
+  private liveReceivable(id: string, change: boolean): StoredReceivable {
+    const v = this.receivables.get(id);
+    if (!v || v.deletedAt || !this.canRead(v.contextId)) throw new RepoError('nao_encontrado');
+    if (!this.canWrite(v.contextId) || (change && v.createdBy !== this.opts.actorId && !this.biz.isOwner(v.contextId, this.opts.actorId))) {
+      throw new RepoError('sem_permissao');
+    }
+    return v;
+  }
+
+  private bumpReceivable(id: string, changes: Partial<StoredReceivable>, now: string) {
+    const v = this.receivables.get(id)!;
+    this.receivables.set(id, { ...v, ...changes, version: v.version + 1, updatedAt: now });
+  }
+
+  /** Como a leitura de business_receivables (RLS): os em aberto (pela data) e os recebidos mudados por último (até RECEIVED_READ_LIMIT). */
+  async listReceivables(contextId: string): Promise<Receivable[]> {
+    return this.read(() => {
+      if (!this.canRead(contextId)) return [];
+      const live = [...this.receivables.values()].filter((v) => !v.deletedAt && v.contextId === contextId);
+      const open = live
+        .filter((v) => v.status === 'aberto')
+        .sort((a, b) => a.expectedOn.localeCompare(b.expectedOn) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+      const received = live
+        .filter((v) => v.status === 'recebido')
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id))
+        .slice(0, RECEIVED_READ_LIMIT);
+      return [...open, ...received].map((v) => this.toReceivable(v));
+    });
+  }
+
+  async getReceivable(id: string): Promise<Receivable | null> {
+    return this.read(() => {
+      const v = this.receivables.get(id);
+      return v && !v.deletedAt && this.canRead(v.contextId) ? this.toReceivable(v) : null;
+    });
+  }
+
+  /** Como create_receivable. Ordem: repetição; nao_encontrado; contexto_invalido; sem_permissao; os campos. */
+  async createReceivable(key: string, contextId: string, input: ReceivableInput): Promise<Receivable> {
+    return this.write(() => {
+      const n = normalizeReceivableInput(input);
+      const payload = [contextId, n.kind, n.description, n.amountCents, n.expectedOn, n.category, n.debtor];
+      const replayed = this.replay(key, 'criar_a_receber', payload);
+      if (replayed) return this.toReceivable(this.receivables.get(replayed.receivableId!)!);
+      if (!contextId || !this.canRead(contextId)) throw new RepoError('nao_encontrado');
+      if (!this.liveBusiness(contextId)) throw new RepoError('contexto_invalido');
+      if (!this.canWrite(contextId)) throw new RepoError('sem_permissao');
+      const bad = receivableInputError(n);
+      if (bad) throw new RepoError(bad);
+      const now = this.stamp();
+      const v: StoredReceivable = { id: this.id('rec'), contextId, ...n, status: 'aberto', createdBy: this.opts.actorId, version: 1, createdAt: now, updatedAt: now };
+      this.receivables.set(v.id, v);
+      this.saveOperation(key, 'criar_a_receber', payload, { contextId, recordId: null, commitmentId: null, receivableId: v.id });
+      return this.toReceivable(v);
+    });
+  }
+
+  /** Como update_receivable. Ordem: repetição; o "a receber" (nao_encontrado, sem_permissao); versão; ja_recebido; os campos. */
+  async updateReceivable(key: string, id: string, expectedVersion: number, input: ReceivableInput): Promise<Receivable> {
+    return this.write(() => {
+      const n = normalizeReceivableInput(input);
+      const payload = [id, expectedVersion, n.kind, n.description, n.amountCents, n.expectedOn, n.category, n.debtor];
+      const replayed = this.replay(key, 'alterar_a_receber', payload);
+      if (replayed) return this.toReceivable(this.receivables.get(replayed.receivableId!)!);
+      const v = this.liveReceivable(id, true);
+      if (v.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${v.version}`);
+      if (v.status !== 'aberto') throw new RepoError('ja_recebido');
+      const bad = receivableInputError(n);
+      if (bad) throw new RepoError(bad);
+      this.bumpReceivable(id, n, this.stamp());
+      this.saveOperation(key, 'alterar_a_receber', payload, { contextId: v.contextId, recordId: null, commitmentId: null, receivableId: id });
+      return this.toReceivable(this.receivables.get(id)!);
+    });
+  }
+
+  /** Como delete_receivable: exclusão lógica, só em aberto. */
+  async deleteReceivable(key: string, id: string, expectedVersion: number): Promise<Receivable> {
+    return this.write(() => {
+      const payload = [id, expectedVersion];
+      const replayed = this.replay(key, 'excluir_a_receber', payload);
+      if (replayed) return this.toReceivable(this.receivables.get(replayed.receivableId!)!);
+      const v = this.liveReceivable(id, true);
+      if (v.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${v.version}`);
+      if (v.status !== 'aberto') throw new RepoError('ja_recebido');
+      const now = this.stamp();
+      this.bumpReceivable(id, { deletedAt: now, deletedBy: this.opts.actorId }, now);
+      this.saveOperation(key, 'excluir_a_receber', payload, { contextId: v.contextId, recordId: null, commitmentId: null, receivableId: id });
+      return this.toReceivable(this.receivables.get(id)!);
+    });
+  }
+
+  /**
+   * Como receive_receivable: a entrada comum no negócio (a descrição e a categoria do "a receber", o valor, a data e a conta confirmados),
+   * ligada, e o "a receber" passa a recebido. Ordem: repetição; o "a receber" (nao_encontrado, sem_permissao); versão; ja_recebido; as
+   * regras de createRecord.
+   */
+  async receiveReceivable(key: string, id: string, expectedVersion: number, input: ReceiveInput): Promise<ReceivableReceiveWrite> {
+    return this.write(() => {
+      const payload = [id, expectedVersion, input.accountId, input.amountCents, input.receivedOn];
+      const replayed = this.replay(key, 'receber_a_receber', payload);
+      if (replayed) return { receivable: this.toReceivable(this.receivables.get(replayed.receivableId!)!), record: strip(this.records.get(replayed.recordId!)!) };
+      const v = this.liveReceivable(id, false);
+      if (v.version !== expectedVersion) throw new RepoError('versao_desatualizada', undefined, `versao_atual=${v.version}`);
+      if (v.status !== 'aberto') throw new RepoError('ja_recebido');
+      const recordInput: RecordInput = { accountId: input.accountId, amountCents: input.amountCents, occurredOn: input.receivedOn, description: v.description, category: v.category };
+      this.validate(v.contextId, 'receita', recordInput);
+      const now = this.stamp();
+      const record: StoredRecord = {
+        id: this.id('reg'),
+        contextId: v.contextId,
+        kind: 'receita',
+        status: 'realizado',
+        currency: 'BRL',
+        ...recordInput,
+        commitmentId: null,
+        invoice: null,
+        receiptKey: null,
+        receivableId: v.id,
+        createdBy: this.opts.actorId,
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.records.set(record.id, record);
+      this.bumpReceivable(id, { status: 'recebido' }, now);
+      this.saveOperation(key, 'receber_a_receber', payload, { contextId: v.contextId, recordId: record.id, commitmentId: null, receivableId: id });
+      return { receivable: this.toReceivable(this.receivables.get(id)!), record: strip(record) };
     });
   }
 
@@ -5605,6 +5818,7 @@ export class MemoryRepository implements RecordsRepository {
       this.investments.clear();
       this.investmentMovements.clear();
       this.investmentPlans.clear();
+      this.receivables.clear();
       this.space = null;
       this.deleted = true;
     });
@@ -6000,6 +6214,16 @@ function withRecordExtras<T extends object>(
 function withLinkedPayment<T extends object>(record: T, linked: boolean): T {
   const { linkedPayment: _old, ...rest } = record as T & { linkedPayment?: boolean };
   return (linked ? { ...rest, linkedPayment: true } : rest) as T;
+}
+
+/** As marcas da entrada do negócio (D-122) guardadas só quando existem, como `toRecord` lê do banco. */
+function withMarks<T extends object>(record: T, marks: RecordMarks | null): T {
+  const { hasInvoice: _h, payerKind: _p, ...rest } = record as T & { hasInvoice?: boolean | null; payerKind?: string | null };
+  return {
+    ...rest,
+    ...(marks && marks.hasInvoice !== null ? { hasInvoice: marks.hasInvoice } : {}),
+    ...(marks && marks.payerKind !== null ? { payerKind: marks.payerKind } : {}),
+  } as T;
 }
 
 function normalizeCommitment(input: CommitmentInput): CommitmentInput {

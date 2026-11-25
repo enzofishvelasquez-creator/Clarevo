@@ -7,6 +7,9 @@ import {
   DEFAULT_WIDGET_SHOW_VALUES,
   MEMORY_LIMIT,
   NO_ROUTINE_REMINDERS,
+  NO_MEI_REMINDERS,
+  parseMeiReminderChoices,
+  type MeiReminderChoices,
   isBudgetNoticeKey,
   isDepositReminderDay,
   isCategoryView,
@@ -104,6 +107,11 @@ export interface DevicePrefs {
    */
   routineReminders: RoutineReminderChoices;
   routineReminderHour: RoutineReminderHour;
+  /**
+   * Lembretes do MEI (D-122): "DAS do mês" e "Declaração anual do MEI", desligados por padrão, ligados em "Seu negócio" e agendados no
+   * horário dos lembretes do dia a dia, só com o tipo do negócio "MEI". Só neste aparelho; nada vai para o servidor.
+   */
+  meiReminders: MeiReminderChoices;
   /** Dia do lembrete para guardar para as metas (D-093), só neste aparelho. */
   depositReminderDay: DepositReminderDay;
   /**
@@ -154,6 +162,7 @@ export const DEFAULT_PREFS: DevicePrefs = {
   budgetCelebratedMonth: null,
   routineReminders: NO_ROUTINE_REMINDERS,
   routineReminderHour: DEFAULT_ROUTINE_REMINDER_HOUR,
+  meiReminders: NO_MEI_REMINDERS,
   depositReminderDay: DEFAULT_DEPOSIT_REMINDER_DAY,
   reserveRefreshDismissed: null,
   investmentPlanReviewedOn: null,
@@ -198,6 +207,7 @@ function parse(raw: string | null | undefined): DevicePrefs {
         typeof v.budgetCelebratedMonth === 'string' && /^\d{4}-\d{2}$/.test(v.budgetCelebratedMonth) ? v.budgetCelebratedMonth : null,
       routineReminders: parseRoutineReminderChoices(v.routineReminders),
       routineReminderHour: isRoutineReminderHour(v.routineReminderHour) ? v.routineReminderHour : DEFAULT_ROUTINE_REMINDER_HOUR,
+      meiReminders: parseMeiReminderChoices(v.meiReminders),
       depositReminderDay: isDepositReminderDay(v.depositReminderDay) ? v.depositReminderDay : DEFAULT_DEPOSIT_REMINDER_DAY,
       reserveRefreshDismissed:
         typeof v.reserveRefreshDismissed === 'number' && Number.isSafeInteger(v.reserveRefreshDismissed) && v.reserveRefreshDismissed > 0 ? v.reserveRefreshDismissed : null,

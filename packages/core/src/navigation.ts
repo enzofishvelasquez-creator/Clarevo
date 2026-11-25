@@ -58,6 +58,8 @@ const FORM_PATHS: readonly RegExp[] = [
   // compartilhado (D-116, D-120): convidar também é formulário, com rodapé fixo. D-121: trazer dinheiro do Pessoal é formulário; o resumo
   // do ano (/negocio/ano) é de consulta e mostra a barra.
   /^\/negocio\/(novo|retirada|trazer|nome|convidar)$/,
+  // A receber (D-122): anotar, editar e "Recebi" são formulários; a lista (/negocio/a-receber) e o detalhe são de consulta.
+  new RegExp(`^/negocio/a-receber/(novo|${ID}/(editar|receber))$`),
   // Convite para a Família: abre antes de entrar e depois de entrar, como as telas de entrada, sem barra.
   new RegExp(`^/convite/${ID}$`),
   // Convite para um negócio (D-116, D-120): /convite/negocio/<código>, como o da Família, sem barra.
@@ -419,6 +421,14 @@ export const APP_SCREENS: readonly AppScreen[] = [
       'separar contas',
       'contas do negócio',
     ],
+  },
+  {
+    // A receber (D-122): o que o negócio ainda vai receber, na lista própria de "Seu negócio".
+    id: 'a-receber',
+    title: 'A receber',
+    caption: 'O que o negócio ainda vai receber: a venda no fiado, a venda que ainda vai cair da maquininha e outros valores',
+    href: '/negocio/a-receber',
+    keywords: ['a receber', 'fiado', 'quem me deve', 'receber depois', 'venda a prazo', 'recebi', 'maquininha'],
   },
   {
     id: 'conta',

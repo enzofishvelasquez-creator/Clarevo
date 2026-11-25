@@ -1,4 +1,4 @@
-import { anyRoutineReminder, legalAcceptanceNeeded, REMINDER_ROUTE, REMINDER_TEXT, offerCaption, type PersonalSpace, type SeriesWrite } from '@clarevo/core';
+import { anyMeiReminder, anyRoutineReminder, legalAcceptanceNeeded, REMINDER_ROUTE, REMINDER_TEXT, offerCaption, type PersonalSpace, type SeriesWrite } from '@clarevo/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, usePathname, type Href } from 'expo-router';
 import { LockKeyhole } from 'lucide-react-native';
@@ -99,7 +99,9 @@ function NativeFeatures() {
     }
     if (!prefs || status !== 'pronto' || !contextId) return;
     const routine = anyRoutineReminder(prefs.routineReminders);
-    if (demo || (!prefs.reminders && !routine)) queueReminders({ enabled: false });
+    // Lembretes do MEI (D-122): no horário dos lembretes do dia a dia; o tipo do negócio é conferido na hora de agendar.
+    const mei = anyMeiReminder(prefs.meiReminders);
+    if (demo || (!prefs.reminders && !routine && !mei)) queueReminders({ enabled: false });
     else {
       queueReminders({
         enabled: true,
@@ -109,6 +111,7 @@ function NativeFeatures() {
         routine: routine
           ? { hour: prefs.routineReminderHour, choices: prefs.routineReminders, depositDay: prefs.depositReminderDay, holds: prefs.investmentReminderHolds }
           : null,
+        mei: mei ? { hour: prefs.routineReminderHour, choices: prefs.meiReminders } : null,
       });
     }
     // Widget: sempre o contexto Pessoal (nunca a Família); na demonstração, nada é gravado.
@@ -122,7 +125,7 @@ function NativeFeatures() {
   // Ao abrir, ao entrar e ao mudar uma preferência de lembrete ou um horário (e "Mostrar valores no widget").
   useEffect(() => {
     runRef.current();
-  }, [ready, userId, offline, contextId, status, prefs?.reminders, prefs?.reminderHour, prefs?.routineReminders, prefs?.routineReminderHour, prefs?.depositReminderDay, prefs?.investmentReminderHolds, prefs?.widgetShowValues, demo]);
+  }, [ready, userId, offline, contextId, status, prefs?.reminders, prefs?.reminderHour, prefs?.routineReminders, prefs?.meiReminders, prefs?.routineReminderHour, prefs?.depositReminderDay, prefs?.investmentReminderHolds, prefs?.widgetShowValues, demo]);
 
   // Ao voltar para o app, depois de qualquer escrita concluída e da geração do dia dos gastos fixos.
   useEffect(() => {

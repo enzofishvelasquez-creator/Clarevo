@@ -1988,7 +1988,7 @@ begin
     = array['alterar_cartao', 'alterar_lancamento_cartao', 'criar_cartao', 'criar_compra_cartao', 'criar_encargo_cartao', 'criar_estorno_cartao',
             'desfazer_pagamento_fatura', 'excluir_cartao', 'excluir_lancamento_cartao', 'pagar_fatura', 'situacao_cartao'], 'as 11 ações de cartão';
   assert (select count(*) from pg_constraint c, regexp_matches(pg_get_constraintdef(c.oid), '''([a-z_]+)''::text', 'g') m
-           where c.conname = 'record_operations_action_check') = 99, 'a lista vigente tem 99 ações (com as 2 dos movimentos do negócio, da 0044, as 6 do negócio compartilhado, da 0043, com as 6 do Espaço Negócio, da 0042, com a da origem do valor da meta, testada em 99zzzzzzzzzzzzzzzzzz, com as 2 do plano de aportes, testadas em 99zzzzzzzzzzzzzzzzz, com as 7 de investimentos e a de ordenar as metas, D-093) (com a do aceite dos termos, testada em 99zzz, 37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
+           where c.conname = 'record_operations_action_check') = 103, 'a lista vigente tem 103 ações (com as 4 do a receber, da 0045, as 2 dos movimentos do negócio, da 0044, as 6 do negócio compartilhado, da 0043, com as 6 do Espaço Negócio, da 0042, com a da origem do valor da meta, testada em 99zzzzzzzzzzzzzzzzzz, com as 2 do plano de aportes, testadas em 99zzzzzzzzzzzzzzzzz, com as 7 de investimentos e a de ordenar as metas, D-093) (com a do aceite dos termos, testada em 99zzz, 37, as 4 de orçamento e limite, testadas em 80, as 5 de contas, testadas em 85, as 2 de assinaturas, testadas em 88, a importação, testada em 90, as 9 da Família, testadas em 95_familia, e as 5 das licenças, testadas em 97_empresas, as 2 de conferir o mês, testadas em 48, e a de origem do cadastro, testada em 98)';
 
   -- Cada operação aponta para um cartão do mesmo contexto; a de lançamento, para um lançamento do mesmo cartão; a de fatura, para
   -- a conta e o gasto daquele cartão.
@@ -2809,24 +2809,25 @@ do $$ begin
             'add_card_purchase', 'add_card_refund', 'add_goal_movement', 'add_investment_movement', 'cancel_business_invite',
             'cancel_family_invite', 'cancel_license_invite', 'clear_month_check', 'context_permission', 'create_account',
             'create_business', 'create_business_contribution', 'create_business_invite', 'create_business_withdrawal', 'create_card',
-            'create_commitment', 'create_family', 'create_family_invite', 'create_goal', 'create_investment', 'create_record',
-            'create_series', 'create_series_occurrence', 'create_telegram_code', 'create_whatsapp_code', 'decide_return_review',
-            'delete_account', 'delete_business_withdrawal', 'delete_card', 'delete_card_entry', 'delete_category_budget',
-            'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement', 'delete_income_reference',
-            'delete_investment', 'delete_investment_movement', 'delete_my_account', 'delete_record', 'delete_series', 'end_business',
-            'end_family', 'end_license', 'end_series', 'ensure_personal_space', 'goal_photo', 'import_records', 'inform_series_year',
-            'invite_licenses', 'invoice_closing_on', 'invoice_due_on', 'invoice_month_for', 'is_org_admin', 'leave_business',
-            'leave_family', 'mark_subscriptions_reviewed', 'month_budget', 'month_committed', 'month_to_pay', 'month_totals',
-            'months_overview', 'move_record', 'my_access', 'my_account_marks', 'my_legal_acceptance', 'my_photo', 'my_telegram',
-            'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment', 'pay_invoice', 'plus_status', 'preview_business_invite',
-            'preview_family_invite', 'preview_license_invite', 'remove_business_member', 'remove_family_member', 'rename_business',
-            'renew_license_invite', 'set_account_status', 'set_business_member_role', 'set_business_profile', 'set_card_status',
-            'set_category_budget', 'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_order', 'set_goal_status',
-            'set_goal_value_source', 'set_income_reference', 'set_investment_plan', 'set_investment_status', 'set_member_role',
-            'set_month_check', 'set_my_photo', 'set_savings_answer', 'set_series_subscription', 'set_signup_source', 'skip_series_year',
-            'sync_series_occurrences', 'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'unlink_telegram',
-            'unlink_whatsapp', 'update_account', 'update_card', 'update_card_entry', 'update_commitment', 'update_goal',
-            'update_goal_movement', 'update_investment', 'update_investment_movement', 'update_record', 'update_series_from'],
+            'create_commitment', 'create_family', 'create_family_invite', 'create_goal', 'create_investment', 'create_receivable',
+            'create_record', 'create_series', 'create_series_occurrence', 'create_telegram_code', 'create_whatsapp_code',
+            'decide_return_review', 'delete_account', 'delete_business_withdrawal', 'delete_card', 'delete_card_entry',
+            'delete_category_budget', 'delete_commitment', 'delete_commitment_limit', 'delete_goal', 'delete_goal_movement',
+            'delete_income_reference', 'delete_investment', 'delete_investment_movement', 'delete_my_account', 'delete_receivable',
+            'delete_record', 'delete_series', 'end_business', 'end_family', 'end_license', 'end_series', 'ensure_personal_space',
+            'goal_photo', 'import_records', 'inform_series_year', 'invite_licenses', 'invoice_closing_on', 'invoice_due_on',
+            'invoice_month_for', 'is_org_admin', 'leave_business', 'leave_family', 'mark_subscriptions_reviewed', 'month_budget',
+            'month_committed', 'month_to_pay', 'month_totals', 'months_overview', 'move_record', 'my_access', 'my_account_marks',
+            'my_legal_acceptance', 'my_photo', 'my_telegram', 'my_today', 'my_whatsapp', 'organization_usage', 'pay_commitment',
+            'pay_invoice', 'plus_status', 'preview_business_invite', 'preview_family_invite', 'preview_license_invite',
+            'receive_receivable', 'remove_business_member', 'remove_family_member', 'rename_business', 'renew_license_invite',
+            'set_account_status', 'set_business_member_role', 'set_business_profile', 'set_card_status', 'set_category_budget',
+            'set_commitment_limit', 'set_default_account', 'set_goal_image', 'set_goal_order', 'set_goal_status', 'set_goal_value_source',
+            'set_income_reference', 'set_investment_plan', 'set_investment_status', 'set_member_role', 'set_month_check', 'set_my_photo',
+            'set_savings_answer', 'set_series_subscription', 'set_signup_source', 'skip_series_year', 'sync_series_occurrences',
+            'transfer_family_ownership', 'undo_commitment_payment', 'undo_invoice_payment', 'unlink_telegram', 'unlink_whatsapp',
+            'update_account', 'update_card', 'update_card_entry', 'update_commitment', 'update_goal', 'update_goal_movement',
+            'update_investment', 'update_investment_movement', 'update_receivable', 'update_record', 'update_series_from'],
     'authenticated executa só as 80 funções expostas (as 5 de contas, testadas em 85, as 5 de orçamento e limite, testadas em 80, as 11 de cartão, as 4 de data, a exclusão da conta, testada em 99, e as de antes)';
   assert not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                       where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')), 'anon não executa nenhuma função';
@@ -2864,8 +2865,8 @@ do $$ begin
        = 'p_idempotency_key text, p_card_id uuid, p_month date, p_expected_version integer, p_paid_cents bigint, p_paid_on date, p_account_id uuid DEFAULT NULL::uuid, p_record_id uuid DEFAULT NULL::uuid'
      and pg_get_function_arguments('public.undo_invoice_payment(text, uuid, date, integer, boolean)'::regprocedure)
        = 'p_idempotency_key text, p_card_id uuid, p_month date, p_expected_version integer, p_keep_record boolean DEFAULT false'
-     and pg_get_function_arguments('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid)'::regprocedure)
-       = 'p_idempotency_key text, p_context_id uuid, p_account_id uuid, p_kind record_kind, p_amount_cents bigint, p_occurred_on date, p_description text, p_category text DEFAULT NULL::text, p_receipt_key text DEFAULT NULL::text, p_next_month boolean DEFAULT false, p_subcategory text DEFAULT NULL::text, p_investment_id uuid DEFAULT NULL::uuid'
+     and pg_get_function_arguments('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid, jsonb)'::regprocedure)
+       = 'p_idempotency_key text, p_context_id uuid, p_account_id uuid, p_kind record_kind, p_amount_cents bigint, p_occurred_on date, p_description text, p_category text DEFAULT NULL::text, p_receipt_key text DEFAULT NULL::text, p_next_month boolean DEFAULT false, p_subcategory text DEFAULT NULL::text, p_investment_id uuid DEFAULT NULL::uuid, p_marks jsonb DEFAULT NULL::jsonb'
      and pg_get_function_arguments('public.invoice_closing_on(integer, integer, date)'::regprocedure) = 'p_closing_day integer, p_due_day integer, p_month date'
      and pg_get_function_arguments('public.invoice_due_on(integer, date)'::regprocedure) = 'p_due_day integer, p_month date'
      and pg_get_function_arguments('public.invoice_month_for(integer, integer, date)'::regprocedure) = 'p_closing_day integer, p_due_day integer, p_date date',
@@ -2964,7 +2965,7 @@ do $$ begin
   assert (select count(*) from pg_trigger t where not t.tgisinternal and t.tgname in ('cards_guard', 'card_entries_guard', 'commitments_guard', 'financial_records_guard')
             and t.tgenabled = 'O') = 4, 'guardas ligadas';
   -- As assinaturas das migrações anteriores continuam (create_record mudou de forma compatível, testado acima).
-  assert to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean)') is not null
+  assert to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean, jsonb)') is not null
      and to_regprocedure('public.delete_record(text, uuid, integer)') is not null
      and to_regprocedure('public.pay_commitment(text, uuid, integer, uuid, bigint, date, text, uuid)') is not null
      and to_regprocedure('public.undo_commitment_payment(text, uuid, integer, boolean)') is not null

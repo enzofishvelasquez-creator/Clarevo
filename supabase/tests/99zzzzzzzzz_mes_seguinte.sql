@@ -34,10 +34,10 @@ do $$ begin
                    and indexdef like '%(context_id, counted_month)%'), 'o índice do mês em que conta';
   assert to_regprocedure('public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text)') is null
      and to_regprocedure('public.update_record(text, uuid, integer, uuid, bigint, date, text, text)') is null, 'as assinaturas antigas saíram';
-  assert has_function_privilege('authenticated', 'public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid)', 'execute')
-     and has_function_privilege('authenticated', 'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean)', 'execute'), 'o app cria e edita';
-  assert not has_function_privilege('anon', 'public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid)', 'execute')
-     and not has_function_privilege('anon', 'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean)', 'execute'), 'anon não';
+  assert has_function_privilege('authenticated', 'public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid, jsonb)', 'execute')
+     and has_function_privilege('authenticated', 'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean, jsonb)', 'execute'), 'o app cria e edita';
+  assert not has_function_privilege('anon', 'public.create_record(text, uuid, uuid, public.record_kind, bigint, date, text, text, text, boolean, text, uuid, jsonb)', 'execute')
+     and not has_function_privilege('anon', 'public.update_record(text, uuid, integer, uuid, bigint, date, text, text, boolean, public.record_kind, text, uuid, boolean, jsonb)', 'execute'), 'anon não';
   assert not has_function_privilege('authenticated', 'public.clarevo_next_month_allowed(date)', 'execute')
      and not has_function_privilege('authenticated', 'public.clarevo_check_next_month(public.record_kind, date, boolean)', 'execute'), 'auxiliares fechadas';
   -- A janela: os últimos 7 dias do mês.

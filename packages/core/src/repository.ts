@@ -66,6 +66,7 @@ import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, L
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import type { BusinessContext, BusinessContribution, BusinessContributionInput, BusinessProfile, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
 import type { BusinessInvite, BusinessInvitePreview, BusinessInviteRole, BusinessInviteWrite, BusinessJoin, BusinessPeople, PlusStatus } from './business-people';
+import type { Receivable, ReceivableInput, ReceivableReceiveWrite, ReceiveInput } from './business-receivables';
 import type { ImportDestination, ImportItem, ImportResult } from './importar/tipos';
 import type { RecordSearchFilter, SearchPage } from './search';
 import type { SignupSource, SignupSourceOption } from './signup-source';
@@ -955,6 +956,37 @@ export interface RecordsRepository {
    */
   moveRecord(key: string, recordId: string, expectedVersion: number, targetContextId: string, accountId: string, category: string | null): Promise<FinancialRecord>;
 
+  // A receber do negócio (D-122). Regras e textos em business-receivables.ts, iguais aos da migração 0045. Toda escrita leva uma chave de
+  // idempotência (o mesmo espaço das outras operações): repetir a mesma chave devolve o mesmo resultado; outro conteúdo com a mesma chave é
+  // chave_reutilizada. O "a receber" não entra em total nenhum: o dinheiro entra quando é recebido (uma entrada comum, ligada).
+
+  /**
+   * Os "a receber" do negócio que a pessoa lê: todos os em aberto e os RECEIVED_READ_LIMIT recebidos mudados por último, cada recebido com a
+   * entrada viva que o recebeu (valor, data e conta). Sem leitura do contexto, nada.
+   */
+  listReceivables(contextId: string): Promise<Receivable[]>;
+  /** Um "a receber" vivo, com a entrada que o recebeu (se recebido), ou null. */
+  getReceivable(id: string): Promise<Receivable | null>;
+  /**
+   * create_receivable. Ordem: repetição; nao_encontrado (sem leitura); contexto_invalido (não é negócio); sem_permissao (quem só vê); os
+   * campos (tipo_invalido, descricao_invalida, valor_invalido, data_invalida, categoria_invalida, nome_invalido); assinatura_necessaria.
+   */
+  createReceivable(key: string, contextId: string, input: ReceivableInput): Promise<Receivable>;
+  /**
+   * update_receivable. Só em aberto (ja_recebido) e só quem anotou ou quem administra (sem_permissao). Ordem: repetição; o "a receber"
+   * (nao_encontrado, sem_permissao); versao_desatualizada (detalhe "versao_atual=N"); ja_recebido; os campos.
+   */
+  updateReceivable(key: string, id: string, expectedVersion: number, input: ReceivableInput): Promise<Receivable>;
+  /** delete_receivable: exclusão lógica, só em aberto e só de quem anotou ou de quem administra. A mesma ordem de update. */
+  deleteReceivable(key: string, id: string, expectedVersion: number): Promise<Receivable>;
+  /**
+   * receive_receivable: grava a entrada comum no negócio (a descrição e a categoria do "a receber", o valor e a data confirmados, na conta
+   * escolhida), ligada a ele, que passa a "recebido". Qualquer pessoa com escrita no negócio recebe. Ordem: repetição; o "a receber"
+   * (nao_encontrado, sem_permissao); versao_desatualizada; ja_recebido; as regras de createRecord (conta, valor, data). Desfazer: excluir
+   * a entrada (deleteRecord), que devolve o "a receber" para "aberto".
+   */
+  receiveReceivable(key: string, id: string, expectedVersion: number, input: ReceiveInput): Promise<ReceivableReceiveWrite>;
+
   // Negócio compartilhado (D-116, Clarevo Plus; D-120: pronto e desligado). Regras e textos em business-people.ts, iguais aos da migração
   // 0043. Toda escrita leva uma chave de idempotência (o mesmo espaço das outras operações): repetir a mesma chave devolve o mesmo
   // resultado; outro conteúdo com a mesma chave é chave_reutilizada. Nenhuma conta como anotação na atividade. Compatibilidade: com o Plus
@@ -1220,6 +1252,10 @@ export type RepoErrorCode =
   | 'nao_e_retirada'
   | 'lancamento_ligado'
   | 'perfil_invalido'
+  | 'ja_recebido'
+  | 'recebimento_ligado'
+  | 'marcas_invalidas'
+  | 'descricao_invalida'
   | 'confirmacao_invalida'
   | 'transferir_antes'
   | 'email_invalido'

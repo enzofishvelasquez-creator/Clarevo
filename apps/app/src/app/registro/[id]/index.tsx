@@ -30,6 +30,11 @@ import {
   monthOf,
   newOperationKey,
   recordMonth,
+  PAYER_KIND_LABEL,
+  RECEIVABLE_TEXT,
+  RECORD_MARKS_TEXT,
+  invoiceMarkText,
+  recordMarksOf,
   type FinancialRecord,
   type IsoDate,
 } from '@clarevo/core';
@@ -201,8 +206,9 @@ export default function DetalheRegistro() {
     try {
       await remove.mutateAsync({ key: deleteKey.current, id: r.id, version: r.version });
       setConfirming(false);
-      // Excluir o gasto de uma conta a pagar reabre a conta na mesma operação do banco (D-021, regra 2).
-      flash.set(r.commitmentId ? RECORD_TEXT.removedReopened : RECORD_TEXT.removed(r.kind));
+      // Excluir o gasto de uma conta a pagar reabre a conta na mesma operação do banco (D-021, regra 2); a entrada de um valor a receber
+      // (D-122) o devolve para Em aberto.
+      flash.set(r.commitmentId ? RECORD_TEXT.removedReopened : r.receivableId ? RECEIVABLE_TEXT.recordDeleted : RECORD_TEXT.removed(r.kind));
       totalChange.set({ total: r.kind === 'despesa' ? 'pago' : 'recebido', month: recordMonth(r), deltaCents: -r.amountCents });
       toList();
     } catch (e) {
@@ -298,6 +304,10 @@ export default function DetalheRegistro() {
                   {r.commitmentId ? <Row label={RECORD_LINK_TEXT.linkedRow} value={paidLabel ?? RECORD_LINK_TEXT.paidFallback} /> : null}
                   {r.investmentId ? <Row label={RECORD_LINK_TEXT.incomeRow} value={investment.data?.name ?? RECORD_LINK_TEXT.incomeFallback} /> : null}
                   {r.receiptKey ? <Row label={NOTA_FLOW_TEXT.detailRow} value={NOTA_FLOW_TEXT.detailRowValue} /> : null}
+                  {/* A receber e as marcas da entrada do negócio (D-122). */}
+                  {r.receivableId ? <Row label={RECEIVABLE_TEXT.recordOrigin} value={RECEIVABLE_TEXT.recordOriginValue} /> : null}
+                  {invoiceMarkText(recordMarksOf(r)) ? <Row label={RECORD_MARKS_TEXT.invoiceRow} value={invoiceMarkText(recordMarksOf(r))!} /> : null}
+                  {recordMarksOf(r).payerKind ? <Row label={RECORD_MARKS_TEXT.payerRow} value={PAYER_KIND_LABEL[recordMarksOf(r).payerKind!]} /> : null}
                   {/* Recebimento marcado do mês seguinte (D-089 A): conta no mês seguinte ao da data. */}
                   <Row label={RECORD_TEXT.monthRow} value={`${formatMonthBR(recordMonth(r))}${r.nextMonth ? NEXT_MONTH_TEXT.detailSuffix : ''}`} last />
                 </View>
@@ -331,6 +341,14 @@ export default function DetalheRegistro() {
                 )
               ) : null}
 
+              {/* A entrada de um valor a receber (D-122): de onde veio, que continua entrada e que excluir a devolve para Em aberto. */}
+              {r.receivableId ? (
+                <>
+                  <Banner tone="info" icon={HandCoins}>
+                    <Txt variant="label">{RECEIVABLE_TEXT.recordNote}</Txt>
+                  </Banner>
+                </>
+              ) : null}
               {/* Pagamento de fatura (D-037): só se muda ou se desfaz pela fatura. O gasto anotado antes e ligado depois (D-107) também
                   pode ser desligado aqui, e continua. */}
               {r.invoice ? (
@@ -384,6 +402,7 @@ export default function DetalheRegistro() {
               {r.investmentId ? (
                 <Button label={RECORD_LINK_TEXT.seeInvestment} tone="soft" onPress={() => router.push(`/investimento/${r.investmentId}`)} />
               ) : null}
+              {r.receivableId ? <Button label={RECEIVABLE_TEXT.recordSee} tone="soft" onPress={() => router.push(`/negocio/a-receber/${r.receivableId}`)} /> : null}
               {justSaved ? null : (
                 <Button
                   label="Ver resumo do mês"
@@ -441,6 +460,7 @@ export default function DetalheRegistro() {
                 <Txt color={colors.textSecondary}>O valor deixa de contar no resumo de {formatMonthBR(recordMonth(r)).toLowerCase()}.</Txt>
                 {r.commitmentId ? <Txt color={colors.textSecondary}>A conta a pagar ligada a este gasto volta para Ainda a pagar.</Txt> : null}
                 {r.investmentId ? <Txt color={colors.textSecondary}>{RECORD_LINK_TEXT.incomeRemovedOnDelete}</Txt> : null}
+                {r.receivableId ? <Txt color={colors.textSecondary}>{RECEIVABLE_TEXT.recordDeleteNote}</Txt> : null}
               </ConfirmDialog>
             </>
           )}

@@ -52,7 +52,7 @@ const NAV_THEME =
  * página recarregada). As telas de entrada, de confirmação e de nova senha ficam fora.
  */
 const ENTRY_PATH =
-  /^\/(registro\/(novo|[^/]+(\/(editar|mover))?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura|nivel))?|familia(\/(nova|convidar))?|negocio(\/(novo|retirada|trazer|ano|nome|convidar))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|calendario|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
+  /^\/(registro\/(novo|[^/]+(\/(editar|mover))?)|a-pagar(\/[^/]+(\/(editar|pagar))?)?|gastos-fixos(\/[^/]+(\/(editar|encerrar|informar))?)?|calcular(\/[a-z0-9-]+)?|retomar(\/(atualizar|pagar))?|composicao|renda-comprometida(\/(referencia|limite))?|orcamento(\/[^/]+)?|contas\/(nova|[^/]+\/editar)|cartoes(\/(novo|[^/]+(\/(editar|fatura\/\d{4}-\d{2}(\/(pagar|encargo|estorno|compra))?))?))?|reserva|meta\/(nova|[^/]+(\/(editar|movimento|imagem))?)|investimento\/(novo|[^/]+(\/(editar|movimento))?)|guardar(\/minima)?|simular|conta(\/(exportar|whatsapp|telegram|assinatura|nivel))?|familia(\/(nova|convidar))?|negocio(\/(novo|retirada|trazer|ano|nome|convidar|a-receber(\/(novo|[^/]+(\/(editar|receber))?))?))?|quem-ve|explicacao\/[a-z0-9-]+|movimentacoes(\/buscar)?|seu-mes|evolucao|analises|metas|investimentos|calendario|empresa|aprender(\/guia(\/[a-z0-9-]+)?)?)\/?$/;
 
 /**
  * Endereço pedido ao abrir a versão web. Sem sessão (ou enquanto a sessão é conferida), as rotas protegidas levam à
@@ -339,6 +339,12 @@ function Navigation() {
           <Stack.Screen name="negocio/nome" />
           {/* Negócio compartilhado (D-116, D-120): convidar, só para quem administra e com o Plus aberto. */}
           <Stack.Screen name="negocio/convidar" />
+          {/* A receber (D-122): a lista, anotar (rota estática, tem precedência sobre o detalhe), o detalhe, editar e "Recebi". */}
+          <Stack.Screen name="negocio/a-receber/index" />
+          <Stack.Screen name="negocio/a-receber/novo" />
+          <Stack.Screen name="negocio/a-receber/[id]/index" />
+          <Stack.Screen name="negocio/a-receber/[id]/editar" />
+          <Stack.Screen name="negocio/a-receber/[id]/receber" />
           {/* Painel da empresa (D-056): só na web, para quem administra o benefício; a tela de consulta tem a barra inferior. */}
           <Stack.Screen name="empresa/index" />
           {/* Exportar meus dados (D-047): planilha (CSV) ou resumo em PDF, montado no aparelho. */}
