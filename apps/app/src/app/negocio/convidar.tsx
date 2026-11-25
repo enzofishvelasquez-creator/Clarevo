@@ -7,8 +7,8 @@ import {
   BUSINESS_TEXT,
   businessInviteLink,
   businessPeopleErrorText,
-  businessSeatsLeft,
   deviceTimeZone,
+  seatsLeftFor,
   inviteExpiryDay,
   type BusinessInviteRole,
   type BusinessInviteWrite,
@@ -38,7 +38,8 @@ type Notice = { tone: 'sucesso' | 'erro'; text: string } | null;
 /**
  * Convidar para o negócio (D-116, D-120), só para quem administra e com o Plus aberto: escolhe o que a pessoa poderá fazer, gera o link e
  * abre o compartilhamento do aparelho. O link aparece só agora (o banco guarda apenas o resumo do código): se perder, cancela o convite e
- * gera outro. O mesmo desenho de Convidar para a Família.
+ * gera outro. O mesmo desenho de Convidar para a Família. D-123: a terceira opção, "Contabilidade" (só vê e exporta), com as vagas dela à
+ * parte (até 3 acessos, fora das 6 pessoas).
  */
 export default function ConvidarNegocioScreen() {
   const business = useBusiness();
@@ -98,7 +99,9 @@ export default function ConvidarNegocioScreen() {
     );
   }
 
-  const left = businessSeatsLeft(list, nowMs);
+  // As vagas do papel escolhido: as 6 pessoas ou os 3 acessos de Contabilidade (D-123).
+  const left = seatsLeftFor(list, role, nowMs);
+  const seatsText = role === 'contabilidade' ? BUSINESS_PEOPLE_TEXT.accountantSeats(left) : BUSINESS_PEOPLE_TEXT.seats(left);
   const expiry = result ? inviteExpiryDay(result.write.invite.expiresAt, deviceTimeZone()) : null;
 
   /** `auto`: a folha que abre sozinha depois de gerar. Se o aparelho não tem compartilhamento, o link já está à vista e nada é dito. */
@@ -191,15 +194,28 @@ export default function ConvidarNegocioScreen() {
         <Card style={{ gap: space[4] }}>
           <ChoiceGroup label={T.roleLabel}>
             {BUSINESS_INVITE_ROLES.map((r) => (
-              <Chip key={r} label={BUSINESS_ROLE_LABEL[r]} selected={role === r} onPress={() => setRole(r)} />
+              <Chip
+                key={r}
+                label={BUSINESS_ROLE_LABEL[r]}
+                selected={role === r}
+                onPress={() => {
+                  setRole(r);
+                  setError(null);
+                }}
+              />
             ))}
           </ChoiceGroup>
           <Txt variant="caption" color={colors.textSecondary}>
             {BUSINESS_ROLE_HELP[role]}
           </Txt>
+          {role === 'contabilidade' ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {T.accountantInviteNote}
+            </Txt>
+          ) : null}
         </Card>
         <Txt variant="caption" color={colors.textSecondary}>
-          {BUSINESS_PEOPLE_TEXT.seats(left)}
+          {seatsText}
         </Txt>
         <Txt variant="caption" color={colors.textSecondary}>
           {T.note}

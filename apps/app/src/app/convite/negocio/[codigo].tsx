@@ -33,7 +33,8 @@ const T = BUSINESS_INVITE_TEXT;
  * Convite para um negócio (D-116, D-120), aberto pelo link `/convite/negocio/<código>`: funciona na web e no app, como o convite da
  * Família. Sem conta, leva a entrar ou criar a conta e volta para cá; com conta, mostra a prévia (o nome do negócio, quem convidou, o que
  * a pessoa poderá fazer e até quando vale) antes de aceitar. Aceitar troca o espaço do app para o negócio. O código fica só na memória da
- * tela e do app. Um convite inexistente, usado, cancelado ou vencido diz sempre a mesma coisa.
+ * tela e do app. Um convite inexistente, usado, cancelado ou vencido diz sempre a mesma coisa. D-123: o convite da Contabilidade diz que
+ * a pessoa vai ver e exportar, sem anotar; aceitar não muda o espaço do app e leva a /contabilidade/<id> (fora dos espaços da pessoa).
  */
 export default function ConviteNegocioScreen() {
   const { codigo } = useLocalSearchParams<{ codigo?: string }>();
@@ -202,6 +203,12 @@ function Preview({ code }: { code: string }) {
     try {
       const r = await attemptFamily(keys, `aceitar-negocio:${code}`, (key) => accept.mutateAsync({ key, code }));
       if (r.ok) {
+        if (r.value.role === 'contabilidade') {
+          // A Contabilidade não ganha um espaço: o seletor não muda, e o negócio abre na área "Negócios que você acompanha".
+          flash.set(T.acceptedAccountant(r.value.context.name));
+          restoreTarget(`/contabilidade/${r.value.context.id}`);
+          return;
+        }
         // Aceitar leva ao negócio: o seletor passa para ele e "Seu negócio" abre com o aviso.
         setSpace('negocio');
         flash.set(T.accepted(r.value.context.name));
@@ -235,7 +242,7 @@ function Preview({ code }: { code: string }) {
       </Card>
       <Txt color={colors.textSecondary}>{T.privacy}</Txt>
       <Txt variant="caption" color={colors.textSecondary}>
-        {T.oneAtATime}
+        {p.role === 'contabilidade' ? T.accountantNote : T.oneAtATime}
       </Txt>
       {error ? (
         <Banner tone="erro">

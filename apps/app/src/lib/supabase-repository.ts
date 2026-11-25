@@ -19,6 +19,7 @@ import {
   FAMILY_MAX_PEOPLE,
   FAMILY_DEPARTED_NAME,
   FAMILY_NEUTRAL_NAME,
+  BUSINESS_ACCOUNTANT_MAX,
   BUSINESS_MAX_PEOPLE,
   BUSINESS_NEUTRAL_NAME,
   businessFirstNameOf,
@@ -193,15 +194,19 @@ import {
   type BusinessProfile,
   type BusinessWithdrawal,
   type BusinessWithdrawalInput,
+  type AccountingBusiness,
   type BusinessInvite,
   type BusinessInvitePreview,
   type BusinessInviteRole,
   type BusinessInviteWrite,
   type BusinessJoin,
   type BusinessMember,
+  type BusinessMemberRole,
   type BusinessPeople,
-  type BusinessRole,
   type PlusStatus,
+  isBusinessInviteRole,
+  isBusinessRole,
+  sortAccountingBusinesses,
   RECEIVED_READ_LIMIT,
   isPayerKind,
   isReceivableKind,
@@ -677,6 +682,8 @@ const KNOWN: RepoErrorCode[] = [
   // Negócio compartilhado (D-116, 20261123000001, migração 0043).
   'plus_indisponivel',
   'negocio_cheio',
+  // Negócio com equipe (D-123, 20261126000001, migração 0046): os acessos de Contabilidade.
+  'contabilidade_cheia',
   'ja_no_negocio',
   'retirada_ligada',
   'nao_e_retirada',
@@ -3660,24 +3667,94 @@ export class SupabaseRepository implements RecordsRepository {
 
   /**
    * O negócio ativo da pessoa: a RLS só deixa ler quem tem vínculo ativo, e negócio encerrado ninguém lê. O papel (D-120) vem do próprio
-   * vínculo em context_memberships (a política memberships_read deixa ler o próprio), sem nada da migração 0043.
+   * vínculo em context_memberships (a política memberships_read deixa ler o próprio), sem nada da migração 0043. Os negócios que a pessoa
+   * acompanha como Contabilidade (D-123, context_memberships.accountant) ficam de fora: o negócio dela é o primeiro ativo em que ela NÃO é
+   * da Contabilidade.
    */
   async getBusiness(): Promise<BusinessContext | null> {
-    const read = (columns: string) =>
-      this.db.from('financial_contexts').select(columns).eq('kind', 'negocio').is('ended_at', null).order('created_at').order('id').limit(1);
-    // O tipo do negócio (D-121) vem da coluna da migração 0044; num banco ainda sem ela (coluna desconhecida, 42703), lê sem o tipo.
-    let { data, error } = await read('id, name, created_at, business_profile');
-    if (error && (error.code === '42703' || /business_profile/.test(error.message ?? ''))) ({ data, error } = await read('id, name, created_at'));
-    if (error) throw repoError(error);
-    const row = ((data ?? []) as unknown as { id: string; name: string; created_at: string; business_profile?: unknown }[])[0];
+    type Row = { id: string; name: string; created_at: string; business_profile?: unknown; business_partnership?: unknown };
+    const read = (skip: readonly string[], limit: number) => {
+      let q = this.db.from('financial_contexts').select(this.businessColumns()).eq('kind', 'negocio').is('ended_at', null);
+      if (skip.length > 0) q = q.not('id', 'in', `(${skip.join(',')})`);
+      return q.order('created_at').order('id').limit(limit);
+    };
+    /** A leitura com as colunas que o banco tem: num banco sem a sociedade (0046) ou sem o tipo (0044), a coluna sai e fica guardada como ausente. */
+    const readRows = async (skip: readonly string[], limit: number): Promise<Row[]> => {
+      for (;;) {
+        const { data, error } = await read(skip, limit);
+        if (!error) return (data ?? []) as unknown as Row[];
+        if (!this.dropMissingBusinessColumn(error)) throw repoError(error);
+      }
+    };
+    // Os vínculos da Contabilidade e os primeiros negócios ativos, juntos (sem esperar um pelo outro). Na grande maioria das vezes o
+    // negócio da pessoa está entre eles; se todos forem da Contabilidade, a leitura se repete deixando-os de fora.
+    const FIRST = 20;
+    const [skip, first] = await Promise.all([this.myAccountantContexts(), readRows([], FIRST)]);
+    const skipped = new Set(skip);
+    let row: Row | undefined = first.find((r) => !skipped.has(r.id));
+    if (!row && first.length === FIRST && skip.length > 0) row = (await readRows(skip, 1))[0];
     if (!row) return null;
     const mine = await this.myBusinessMembership(row.id);
     // Sem o próprio vínculo (não deveria acontecer: create_business e o aceite o criam), o menor papel: o banco decide o resto.
-    return { id: row.id, name: row.name, createdAt: row.created_at, role: mine?.role ?? 'leitor', businessProfile: businessProfileOf(row.business_profile) };
+    return {
+      id: row.id,
+      name: row.name,
+      createdAt: row.created_at,
+      role: mine?.role ?? 'leitor',
+      businessProfile: businessProfileOf(row.business_profile),
+      businessPartnership: partnershipOf(row.business_partnership),
+    };
+  }
+
+  /**
+   * As colunas de financial_contexts que o banco tem para o negócio, guardadas por 10 minutos depois de uma coluna ausente (42703): 2, com
+   * o tipo (0044) e a sociedade (0046); 1, só com o tipo; 0, nenhuma das duas. Assim, um banco sem a 0046 não recebe a cada leitura uma
+   * consulta que falha.
+   */
+  private businessColumnsLevel = 2;
+  private businessColumnsUntil = 0;
+
+  private businessColumns(): string {
+    if (this.businessColumnsLevel < 2 && Date.now() >= this.businessColumnsUntil) this.businessColumnsLevel = 2;
+    return ['id, name, created_at', 'id, name, created_at, business_profile', 'id, name, created_at, business_profile, business_partnership'][this.businessColumnsLevel]!;
+  }
+
+  /** Uma coluna ausente (42703, ou o nome dela na mensagem): baixa um nível e devolve true para ler de novo; outro erro, false. */
+  private dropMissingBusinessColumn(error: { code?: string; message?: string }): boolean {
+    const missing = error.code === '42703' || /business_partnership|business_profile/.test(error.message ?? '');
+    if (!missing || this.businessColumnsLevel === 0) return false;
+    this.businessColumnsLevel -= 1;
+    this.businessColumnsUntil = Date.now() + 10 * 60 * 1000;
+    return true;
+  }
+
+  /** Até quando (relógio do aparelho) a coluna accountant é dada como ausente (o banco sem a migração 0046), como plus_status. */
+  private accountantMissingUntil = 0;
+
+  /**
+   * Os contextos em que a pessoa é da Contabilidade (D-123): vínculos ativos com accountant = true. Num banco sem a coluna (sem a migração
+   * 0046: 42703), nenhum: todos os vínculos contam como antes, e a coluna fica dada como ausente por 10 minutos.
+   */
+  private async myAccountantContexts(): Promise<string[]> {
+    if (Date.now() < this.accountantMissingUntil) return [];
+    const { data, error } = await this.db
+      .from('context_memberships')
+      .select('context_id')
+      .eq('person_id', this.user.id)
+      .eq('accountant', true)
+      .is('revoked_at', null);
+    if (error) {
+      if (error.code === '42703' || /accountant/.test(error.message ?? '')) {
+        this.accountantMissingUntil = Date.now() + 10 * 60 * 1000;
+        return [];
+      }
+      throw repoError(error);
+    }
+    return ((data ?? []) as { context_id?: unknown }[]).map((r) => r.context_id).filter((id): id is string => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id));
   }
 
   /** O vínculo ativo da própria pessoa no negócio (context_memberships, política memberships_read): o papel e desde quando. */
-  private async myBusinessMembership(contextId: string): Promise<{ role: BusinessRole; joinedAt: string } | null> {
+  private async myBusinessMembership(contextId: string): Promise<{ role: FamilyRole; joinedAt: string } | null> {
     const { data, error } = await this.db
       .from('context_memberships')
       .select('role, can_write, created_at')
@@ -3688,7 +3765,8 @@ export class SupabaseRepository implements RecordsRepository {
     if (error) throw repoError(error);
     const m = data as { role?: unknown; can_write?: unknown; created_at?: unknown } | null;
     if (!m) return null;
-    const role: BusinessRole = m.role === 'titular' ? 'titular' : m.can_write === true ? 'membro' : 'leitor';
+    // A Contabilidade (D-123) é um vínculo de leitura: aqui, 'leitor' (getBusiness já deixa os negócios dela de fora).
+    const role: FamilyRole = m.role === 'titular' ? 'titular' : m.can_write === true ? 'membro' : 'leitor';
     return { role, joinedAt: typeof m.created_at === 'string' ? m.created_at : new Date(0).toISOString() };
   }
 
@@ -3742,6 +3820,13 @@ export class SupabaseRepository implements RecordsRepository {
     });
     if (error) throw repoError(error);
     return toWithdrawal(data);
+  }
+
+  /** set_business_partnership (D-123, 0046): só quem administra; devolve {context: {..., business_profile, business_partnership}}. */
+  async setBusinessPartnership(key: string, contextId: string, partnership: boolean | null): Promise<BusinessContext> {
+    const { data, error } = await this.db.rpc('set_business_partnership', { p_context: contextId, p_partnership: partnership, p_key: key });
+    if (error) throw repoError(error);
+    return toBusiness(data);
   }
 
   /** set_business_profile (D-121, 0044): só quem administra; devolve {context: {..., business_profile}}. */
@@ -3957,9 +4042,18 @@ export class SupabaseRepository implements RecordsRepository {
     const members = rows.map(toBusinessMember);
     const me = members.find((m) => m.isMe && m.status === 'ativo');
     if (!me) throw new RepoError('nao_encontrado');
-    if (members.filter((m) => m.status === 'ativo').length > BUSINESS_MAX_PEOPLE) throw new RepoError('desconhecido', 'negocio_inconsistente');
-    // Ativas primeiro (quem administra no topo), as que saíram depois: a ordem não depende do banco.
-    const active = members.filter((m) => m.status === 'ativo').sort((a, b) => Number(b.role === 'titular') - Number(a.role === 'titular') || a.joinedAt.localeCompare(b.joinedAt));
+    // As 6 pessoas e, à parte, os 3 acessos de Contabilidade (D-123).
+    const activeAll = members.filter((m) => m.status === 'ativo');
+    if (activeAll.filter((m) => m.role !== 'contabilidade').length > BUSINESS_MAX_PEOPLE || activeAll.filter((m) => m.role === 'contabilidade').length > BUSINESS_ACCOUNTANT_MAX) {
+      throw new RepoError('desconhecido', 'negocio_inconsistente');
+    }
+    // Ativas primeiro (quem administra no topo, a Contabilidade por último), as que saíram depois: a ordem não depende do banco.
+    const active = activeAll.sort(
+      (a, b) =>
+        Number(b.role === 'titular') - Number(a.role === 'titular') ||
+        Number(a.role === 'contabilidade') - Number(b.role === 'contabilidade') ||
+        a.joinedAt.localeCompare(b.joinedAt),
+    );
     const former = members.filter((m) => m.status === 'ex-membro').sort((a, b) => (a.leftAt ?? '').localeCompare(b.leftAt ?? ''));
     let invites: BusinessInvite[] = [];
     // Os convites só com o Plus aberto: com ele fechado, um convite pendente já não vale (preview e aceite respondem convite_invalido).
@@ -3974,7 +4068,7 @@ export class SupabaseRepository implements RecordsRepository {
         .order('created_at')
         .order('id');
       if (error) throw repoError(error);
-      invites = ((data ?? []) as InviteRow[]).map(toInvite);
+      invites = ((data ?? []) as InviteRow[]).map(toBusinessInvite);
     }
     return { role: me.role, members: [...active, ...former], invites, plusOpen: plus.open };
   }
@@ -3984,13 +4078,13 @@ export class SupabaseRepository implements RecordsRepository {
     if (error) throw repoError(error);
     const r = data as { invite?: unknown; code?: unknown } | null;
     if (!r || (r.code !== null && (typeof r.code !== 'string' || !INVITE_CODE_PATTERN.test(r.code)))) throw new RepoError('desconhecido', 'convite_inconsistente');
-    return { invite: toInvite(r.invite as InviteRow), code: (r.code as string | null) ?? null };
+    return { invite: toBusinessInvite(r.invite as InviteRow), code: (r.code as string | null) ?? null };
   }
 
   async cancelBusinessInvite(key: string, inviteId: string): Promise<BusinessInvite> {
     const { data, error } = await this.db.rpc('cancel_business_invite', { p_invite: inviteId, p_key: key });
     if (error) throw repoError(error);
-    return toInvite((data as { invite?: unknown } | null)?.invite as InviteRow);
+    return toBusinessInvite((data as { invite?: unknown } | null)?.invite as InviteRow);
   }
 
   async previewBusinessInvite(code: string): Promise<BusinessInvitePreview> {
@@ -4000,7 +4094,7 @@ export class SupabaseRepository implements RecordsRepository {
     const { data, error } = await this.db.rpc('preview_business_invite', { p_code: normalized });
     if (error) throw repoError(error);
     const r = data as { business_name?: unknown; invited_by?: unknown; role?: unknown; expires_at?: unknown } | null;
-    if (!r || typeof r.business_name !== 'string' || typeof r.invited_by !== 'string' || !isInviteRoleValue(r.role) || typeof r.expires_at !== 'string') {
+    if (!r || typeof r.business_name !== 'string' || typeof r.invited_by !== 'string' || !isBusinessInviteRole(r.role) || typeof r.expires_at !== 'string') {
       throw new RepoError('desconhecido', 'convite_inconsistente');
     }
     return { businessName: r.business_name, invitedBy: r.invited_by, role: r.role, expiresAt: r.expires_at };
@@ -4024,9 +4118,42 @@ export class SupabaseRepository implements RecordsRepository {
     if (error) throw repoError(error);
   }
 
-  async setBusinessMemberRole(key: string, contextId: string, personId: string, role: BusinessInviteRole): Promise<void> {
+  async setBusinessMemberRole(key: string, contextId: string, personId: string, role: BusinessMemberRole): Promise<void> {
     const { error } = await this.db.rpc('set_business_member_role', { p_context: contextId, p_person: personId, p_role: role, p_key: key });
     if (error) throw repoError(error);
+  }
+
+  /** transfer_business_admin (D-123, 0046) → {context_id, person_id, role: 'titular'}: quem administrava passa a "Anota e vê". */
+  async transferBusinessAdmin(key: string, contextId: string, personId: string): Promise<void> {
+    const { data, error } = await this.db.rpc('transfer_business_admin', { p_context: contextId, p_person: personId, p_key: key });
+    if (error) throw repoError(error);
+    const r = data as { context_id?: unknown; person_id?: unknown; role?: unknown } | null;
+    if (!r || r.role !== 'titular' || r.context_id !== contextId || r.person_id !== personId) throw new RepoError('desconhecido', 'negocio_inconsistente');
+  }
+
+  /**
+   * Até quando (relógio do aparelho) a função my_accounting_businesses é dada como ausente neste repositório (o banco sem a migração 0046),
+   * como plus_status.
+   */
+  private accountingMissingUntil = 0;
+
+  /**
+   * my_accounting_businesses (D-123, 0046) → [{id, name, business_profile, admin_name, created_at, since}], por nome. A função ausente (PGRST202, 42883
+   * ou 404) devolve a lista vazia; outra falha é lançada. Uma linha em outra forma é defeito, não recusa.
+   */
+  async listAccountingBusinesses(): Promise<AccountingBusiness[]> {
+    if (Date.now() < this.accountingMissingUntil) return [];
+    const { data, error, status } = await this.db.rpc('my_accounting_businesses');
+    if (error) {
+      if (error.code === 'PGRST202' || error.code === '42883' || status === 404) {
+        this.accountingMissingUntil = Date.now() + 10 * 60 * 1000;
+        return [];
+      }
+      throw repoError(error);
+    }
+    if (data === null || data === undefined) return [];
+    if (!Array.isArray(data)) throw new RepoError('desconhecido', 'contabilidade_inconsistente');
+    return sortAccountingBusinesses(data.map(toAccountingBusiness));
   }
 
   // -------------------------------------------------------------------------
@@ -4366,6 +4493,9 @@ interface InviteRow {
 }
 
 const isInviteRoleValue = (v: unknown): v is InviteRole => v === 'membro' || v === 'leitor';
+
+/** A resposta da sociedade (D-123): true, false ou null (sem resposta, ou o banco sem a coluna). */
+const partnershipOf = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null);
 const isFamilyRoleValue = (v: unknown): v is FamilyRole => v === 'titular' || v === 'membro' || v === 'leitor';
 
 /**
@@ -4405,29 +4535,87 @@ function toInvite(r: InviteRow | null | undefined): FamilyInvite {
   };
 }
 
-/** {context: {id, name, created_at}, role, invited_by?} de create_family e accept_family_invite. */
-/**
- * {context: {id, name, created_at, business_profile?}} de create_business, rename_business e set_business_profile: só quem administra cria,
- * renomeia e muda o tipo. Sem business_profile (o banco antes da 0044), o tipo é nulo.
- */
-function toBusiness(data: unknown): BusinessContext {
-  const c = (data as { context?: { id?: unknown; name?: unknown; created_at?: unknown; business_profile?: unknown } } | null)?.context;
-  if (!c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.created_at !== 'string') throw new RepoError('desconhecido', 'negocio_inconsistente');
-  return { id: c.id, name: c.name, createdAt: c.created_at, role: 'titular', businessProfile: businessProfileOf(c.business_profile) };
+/** Convite do negócio (business_invites): os papéis da Família e, desde a D-123, 'contabilidade'. */
+function toBusinessInvite(r: InviteRow | null | undefined): BusinessInvite {
+  if (!r || !isBusinessInviteRole(r.role) || typeof r.id !== 'string' || typeof r.context_id !== 'string' || typeof r.expires_at !== 'string') {
+    throw new RepoError('desconhecido', 'convite_inconsistente');
+  }
+  return {
+    id: r.id,
+    contextId: r.context_id,
+    role: r.role,
+    createdBy: r.created_by,
+    expiresAt: r.expires_at,
+    usedAt: r.used_at ?? null,
+    cancelledAt: r.cancelled_at ?? null,
+    createdAt: r.created_at,
+  };
 }
 
-/** {context: {id, name, created_at, ended_at}, role, invited_by} de accept_business_invite. */
+/** {context: {id, name, created_at}, role, invited_by?} de create_family e accept_family_invite. */
+/**
+ * {context: {id, name, created_at, business_profile?, business_partnership?}} de create_business, rename_business, set_business_profile e
+ * set_business_partnership: só quem administra cria, renomeia, muda o tipo e responde a sociedade. Sem business_profile (o banco antes da
+ * 0044), o tipo é nulo; sem business_partnership (antes da 0046), a sociedade também.
+ */
+function toBusiness(data: unknown): BusinessContext {
+  const c = (data as { context?: { id?: unknown; name?: unknown; created_at?: unknown; business_profile?: unknown; business_partnership?: unknown } } | null)?.context;
+  if (!c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.created_at !== 'string') throw new RepoError('desconhecido', 'negocio_inconsistente');
+  return {
+    id: c.id,
+    name: c.name,
+    createdAt: c.created_at,
+    role: 'titular',
+    businessProfile: businessProfileOf(c.business_profile),
+    businessPartnership: partnershipOf(c.business_partnership),
+  };
+}
+
+/**
+ * {context: {id, name, created_at, ended_at, business_profile, business_partnership}, role, invited_by} de accept_business_invite. Com o
+ * papel 'contabilidade' (D-123), o negócio é lido como quem só vê ('leitor'): ele não vira espaço de quem acompanha.
+ */
 function toBusinessJoin(data: unknown): BusinessJoin {
-  const r = data as { context?: { id?: unknown; name?: unknown; created_at?: unknown; business_profile?: unknown }; role?: unknown; invited_by?: unknown } | null;
+  const r = data as
+    | { context?: { id?: unknown; name?: unknown; created_at?: unknown; business_profile?: unknown; business_partnership?: unknown }; role?: unknown; invited_by?: unknown }
+    | null;
   const c = r?.context;
-  if (!r || !c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.created_at !== 'string' || !isFamilyRoleValue(r.role)) {
+  if (!r || !c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.created_at !== 'string' || !isBusinessRole(r.role)) {
     throw new RepoError('desconhecido', 'negocio_inconsistente');
   }
   return {
-    context: { id: c.id, name: c.name, createdAt: c.created_at, role: r.role, businessProfile: businessProfileOf(c.business_profile) },
+    context: {
+      id: c.id,
+      name: c.name,
+      createdAt: c.created_at,
+      role: r.role === 'contabilidade' ? 'leitor' : r.role,
+      businessProfile: businessProfileOf(c.business_profile),
+      businessPartnership: partnershipOf(c.business_partnership),
+    },
     role: r.role,
     invitedBy: typeof r.invited_by === 'string' ? r.invited_by : BUSINESS_NEUTRAL_NAME,
   };
+}
+
+/** Uma linha de my_accounting_businesses (D-123): o nome e o primeiro nome de quem administra sem espaço nem arroba (ou o rótulo neutro). */
+function toAccountingBusiness(row: unknown): AccountingBusiness {
+  const r = row as { id?: unknown; name?: unknown; business_profile?: unknown; admin_name?: unknown; created_at?: unknown; since?: unknown } | null;
+  if (
+    !r ||
+    typeof r.id !== 'string' ||
+    typeof r.name !== 'string' ||
+    r.name === '' ||
+    typeof r.admin_name !== 'string' ||
+    r.admin_name === '' ||
+    (r.admin_name !== BUSINESS_NEUTRAL_NAME && /\s|@/.test(r.admin_name)) ||
+    typeof r.since !== 'string' ||
+    Number.isNaN(Date.parse(r.since)) ||
+    typeof r.created_at !== 'string' ||
+    Number.isNaN(Date.parse(r.created_at))
+  ) {
+    throw new RepoError('desconhecido', 'contabilidade_inconsistente');
+  }
+  return { id: r.id, name: r.name, businessProfile: businessProfileOf(r.business_profile), adminName: r.admin_name, createdAt: r.created_at, since: r.since };
 }
 
 /**
@@ -4436,7 +4624,7 @@ function toBusinessJoin(data: unknown): BusinessJoin {
  */
 function toBusinessMember(r: MemberRow): BusinessMember {
   if (
-    !isFamilyRoleValue(r.role) ||
+    !isBusinessRole(r.role) ||
     (r.status !== 'ativo' && r.status !== 'ex-membro') ||
     typeof r.first_name !== 'string' ||
     r.first_name === '' ||

@@ -1,8 +1,10 @@
 import {
   contextCategories,
+  type AccountingBusiness,
   type BusinessContext,
   type BusinessContributionInput,
   type BusinessInviteRole,
+  type BusinessMemberRole,
   type BusinessPeople,
   type BusinessProfile,
   type BusinessWithdrawalInput,
@@ -300,8 +302,70 @@ export function useSetBusinessMemberRole() {
   const repo = useRepo();
   const reload = useReloadBusinessPeople();
   return useMutation({
-    mutationFn: (v: { key: string; contextId: string; personId: string; role: BusinessInviteRole }) =>
+    mutationFn: (v: { key: string; contextId: string; personId: string; role: BusinessMemberRole }) =>
       repo.setBusinessMemberRole(v.key, v.contextId, v.personId, v.role),
     onSuccess: reload,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Negócio com equipe (D-123, Clarevo Plus; pronto e desligado): passar a administração, a sociedade e a Contabilidade.
+// ---------------------------------------------------------------------------
+
+/**
+ * Passar a administração: o papel de quem consulta muda (de administrar para "Anota e vê"), e com ele o que "Seu negócio" mostra; as
+ * leituras que dependem do papel (o negócio e as pessoas) voltam a ser lidas.
+ */
+export function useTransferBusinessAdmin() {
+  const repo = useRepo();
+  const reload = useReloadBusinessPeople();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; personId: string }) => repo.transferBusinessAdmin(v.key, v.contextId, v.personId),
+    onSuccess: reload,
+  });
+}
+
+/** A resposta da sociedade: só muda o negócio lido. */
+export function useSetBusinessPartnership() {
+  const repo = useRepo();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { key: string; contextId: string; partnership: boolean | null }) => repo.setBusinessPartnership(v.key, v.contextId, v.partnership),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['business'] }),
+  });
+}
+
+/** Os negócios que a pessoa acompanha como Contabilidade, com a chave do Plus: com o Plus fechado (ou sem ler a chave), a lista vem vazia. */
+export interface AccountingView {
+  plusOpen: boolean;
+  businesses: AccountingBusiness[];
+}
+
+/**
+ * "Negócios que você acompanha" (D-123). A lista primeiro (my_accounting_businesses; ausente no banco sem a 0046: vazia): quem não acompanha
+ * nenhum negócio nunca pede a chave do Plus. Com algum negócio, a chave: com o Plus fechado (ou sem conseguir lê-la), a lista vem vazia e o
+ * cartão de Conta e as telas /contabilidade não aparecem. Uma falha na lista é repetida pela consulta.
+ */
+export function useAccounting(enabled = true) {
+  const { repo, user } = useSession();
+  return useQuery({
+    queryKey: ['accounting', user?.id ?? null],
+    queryFn: async (): Promise<AccountingView> => {
+      const businesses = await repo!.listAccountingBusinesses();
+      if (businesses.length === 0) return { plusOpen: false, businesses: [] };
+      const plus = await repo!.getPlusStatus().catch(() => ({ open: false }));
+      return plus.open ? { plusOpen: true, businesses } : { plusOpen: false, businesses: [] };
+    },
+    enabled: Boolean(repo && user && enabled),
+    staleTime: 60 * 1000,
+  });
+}
+
+/**
+ * Deixar de acompanhar (sair do negócio como Contabilidade). Muda o que a pessoa lê, mas quem chama refaz as leituras só depois de sair da
+ * tela do negócio (senão ela passaria pelo estado neutro antes de sair).
+ */
+export function useLeaveAccounting() {
+  const repo = useRepo();
+  return useMutation({ mutationFn: (v: { key: string; contextId: string }) => repo.leaveBusiness(v.key, v.contextId) });
 }

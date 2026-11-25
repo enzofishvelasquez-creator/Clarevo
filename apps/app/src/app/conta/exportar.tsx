@@ -1,4 +1,5 @@
 import {
+  ACCOUNTING_TEXT,
   DEFAULT_EXPORT_FORMAT,
   DEFAULT_EXPORT_PERIOD,
   EXPORT_FORMATS,
@@ -19,6 +20,7 @@ import { View } from 'react-native';
 
 import { ContextPill, SubHeader } from '@/components/header';
 import { ChoiceGroup } from '@/components/series-parts';
+import { ErrorState } from '@/components/states';
 import { Banner, Button, Card, Chip, Screen, Txt } from '@/components/ui';
 import { useWideLayout } from '@/lib/layout';
 import { authenticate, DEVICE_FEATURES } from '@/lib/device';
@@ -27,7 +29,7 @@ import { EXPORT_LOGO_SVG } from '@/lib/export-logo';
 import { cleanupExportFiles, deliverExportFile, EXPORT_NATIVE, type DeliverResult } from '@/lib/export-share';
 import { useValuesHidden } from '@/lib/privacy';
 import { useSpace } from '@/state/data';
-import { useBusiness } from '@/state/business';
+import { useAccounting, useBusiness } from '@/state/business';
 import { useRepo, useSession } from '@/state/session';
 import { colors, space } from '@/theme/tokens';
 
@@ -39,7 +41,10 @@ type Msg = { tone: 'erro' | 'sucesso' | 'info'; text: string } | null;
  * Exportar meus dados (D-047, docs/08 §5 item 14): o período e o formato (planilha CSV ou resumo em PDF), o arquivo montado neste
  * aparelho com as leituras de sempre (nada novo vai ao servidor) e entregue pelo compartilhamento do aparelho ou, na web, por
  * download e página de impressão. O app não grava nada: nem o arquivo, nem o período escolhido. Com "Pedir biometria ao abrir"
- * ligado (D-025), a biometria é pedida antes de gerar. O arquivo sempre leva os valores, mesmo com "Ocultar valores" ligado.
+ * ligado (D-025), a biometria é pedida antes de gerar. O arquivo sempre leva os valores, mesmo com "Ocultar valores" ligado. D-123: aberta
+ * por "Negócios que você acompanha" (?contabilidade=<id>), exporta só aquele negócio, sem a escolha do espaço. Enquanto a lista dos negócios
+ * acompanhados não chega, "Preparar arquivo" fica desligado; se a leitura falhar, a tela mostra a falha com "Tentar de novo" (nada é
+ * exportado por engano). Com o Plus fechado ou sem acompanhar o negócio, o endereço abre a exportação de sempre (nada novo aparece).
  */
 export default function ExportarScreen() {
   const { user, auth, today } = useSession();
@@ -49,10 +54,19 @@ export default function ExportarScreen() {
   // Espaço Negócio (D-113): quem tem um negócio escolhe o espaço do arquivo (o Pessoal, como sempre, ou o negócio).
   const business = useBusiness().data;
   // Aberta pelo "Resumo do ano" ou pelo "Encerrar o espaço Negócio" (D-121): o negócio e o período já escolhidos (?espaco=negocio&periodo=...).
-  const params = useLocalSearchParams<{ espaco?: string; periodo?: string }>();
+  // Pela área da Contabilidade (D-123): ?contabilidade=<id>, o negócio acompanhado.
+  const params = useLocalSearchParams<{ espaco?: string; periodo?: string; contabilidade?: string }>();
+  const accountingId = typeof params.contabilidade === 'string' && params.contabilidade !== '' ? params.contabilidade : null;
+  const accounting = useAccounting(accountingId !== null);
+  const followed = accountingId && accounting.data?.plusOpen ? (accounting.data.businesses.find((b) => b.id === accountingId) ?? null) : null;
   const [scope, setScope] = useState<'pessoal' | 'negocio'>(params.espaco === 'negocio' ? 'negocio' : 'pessoal');
-  const onBusiness = scope === 'negocio' && Boolean(business);
-  const contextId = onBusiness ? business!.id : personalId;
+  // Só o negócio acompanhado (com o Plus aberto) muda a tela; um endereço com outro id fica na exportação de sempre (nada novo aparece).
+  // Enquanto a lista não chega, nada é exportado por engano.
+  const accountantMode = followed !== null;
+  const waiting = accountingId !== null && accounting.isPending;
+  const onBusiness = accountantMode || (scope === 'negocio' && Boolean(business));
+  const businessName = followed ? followed.name : (business?.name ?? '');
+  const contextId = waiting ? undefined : followed ? followed.id : onBusiness ? business!.id : personalId;
   const hidden = useValuesHidden();
   const userId = user?.id;
   const persist = auth.mode !== 'demo';
@@ -139,17 +153,34 @@ export default function ExportarScreen() {
   // Computador: as notas pequenas param em 560 px (revisão visual de 23/11/2026: com 720 px, a linha passava de 110 letras).
   const note = wide ? { maxWidth: 560 } : undefined;
 
+  // Aberta pela Contabilidade e a lista falhou: a falha, sem cair na exportação do Pessoal (o texto é o de sempre da tela).
+  if (accountingId !== null && accounting.isError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <SubHeader title={T.title} />
+        <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
+          <ErrorState message={T.loadFailed} onRetry={() => accounting.refetch()} />
+        </Screen>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SubHeader title={T.title} right={<ContextPill label={onBusiness ? business!.name : 'Pessoal'} fixed />} />
+      <SubHeader
+        title={accountantMode ? ACCOUNTING_TEXT.export : T.title}
+        right={<ContextPill label={onBusiness ? businessName : 'Pessoal'} fixed />}
+      />
       <Screen contentStyle={{ padding: space[5], gap: space[4] }}>
-        <Txt color={colors.textSecondary}>{T.intro}</Txt>
-        <Txt variant="caption" color={colors.textSecondary} style={note}>
-          {T.portability}
-        </Txt>
+        <Txt color={colors.textSecondary}>{accountantMode ? ACCOUNTING_TEXT.exportIntro : T.intro}</Txt>
+        {accountantMode ? null : (
+          <Txt variant="caption" color={colors.textSecondary} style={note}>
+            {T.portability}
+          </Txt>
+        )}
 
         <Card style={{ gap: space[4] }}>
-          {business ? (
+          {business && !accountantMode ? (
             <ChoiceGroup label={T.spaceLabel}>
               <Chip label="Pessoal" selected={!onBusiness} onPress={() => choose({ scope: 'pessoal' })} />
               <Chip label={business.name} selected={onBusiness} onPress={() => choose({ scope: 'negocio' })} />
@@ -173,7 +204,7 @@ export default function ExportarScreen() {
           </Txt>
           <Txt color={colors.textSecondary}>{format === 'csv' ? (onBusiness ? T.contentCsvBusiness : T.contentCsv) : T.contentPdf}</Txt>
           <Txt variant="caption" color={colors.textSecondary} style={note}>
-            {onBusiness ? T.notIncludedBusiness(business!.name) : T.notIncluded}
+            {onBusiness ? T.notIncludedBusiness(businessName) : T.notIncluded}
           </Txt>
           {hidden ? (
             <Banner tone="info" icon={Info} live={false}>

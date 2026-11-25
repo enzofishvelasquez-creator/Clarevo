@@ -147,7 +147,8 @@ describe('negócio compartilhado: regras puras (D-116, D-120)', () => {
     expect(businessFirstNameOf('rafa', 'rafa@exemplo.com')).toBe(BUSINESS_NEUTRAL_NAME);
     expect(BUSINESS_NEUTRAL_NAME).toBe('Pessoa do negócio');
     // Os papéis: a mesma escrita da Família, e quem cria "Administra".
-    expect(BUSINESS_ROLE_LABEL).toEqual({ titular: 'Administra', membro: FAMILY_ROLE_LABEL.membro, leitor: FAMILY_ROLE_LABEL.leitor });
+    // D-123: o papel "Contabilidade", à parte.
+    expect(BUSINESS_ROLE_LABEL).toEqual({ titular: 'Administra', membro: FAMILY_ROLE_LABEL.membro, leitor: FAMILY_ROLE_LABEL.leitor, contabilidade: 'Contabilidade' });
     expect(BUSINESS_ROLE_LABEL.membro).toBe('Anota e vê');
     expect(BUSINESS_ROLE_LABEL.leitor).toBe('Só vê');
     expect(BUSINESS_ROLE_HELP.titular).toContain('encerra');
@@ -218,7 +219,8 @@ describe('negócio compartilhado: regras puras (D-116, D-120)', () => {
     }
     // As frases pedidas para os erros novos.
     expect(businessPeopleErrorText('ja_tem_negocio', true)).toBe('Você já participa de um negócio. Cada pessoa participa de um negócio por vez.');
-    expect(businessPeopleErrorText('titular_nao_sai')).toBe('Quem administra não sai do negócio. Para encerrar, remova antes as outras pessoas.');
+    // D-123: quem administra lê como sair (passar a administração antes, ou encerrar sem ninguém para receber).
+    expect(businessPeopleErrorText('titular_nao_sai')).toBe('Quem administra passa a administração para outra pessoa do negócio antes de sair. Sem ninguém para receber, encerre o espaço Negócio.');
     expect(businessPeopleErrorText('ja_no_negocio', true)).toBe('Você já participa deste negócio.');
     expect(businessPeopleErrorText('negocio_cheio')).toContain('6 pessoas');
     expect(businessPeopleErrorText('negocio_cheio', true)).toBe('Este negócio já tem 6 pessoas. Peça a quem convidou para liberar uma vaga.');
@@ -374,7 +376,7 @@ describe('negócio compartilhado na memória: aceitar (accept_business_invite)',
     await expectCode(bia.repo.acceptBusinessInvite(key(), w.code!), 'ja_no_negocio');
     const k = key();
     const joined = await caio.repo.acceptBusinessInvite(k, w.code!);
-    expect(joined).toEqual({ context: { id: b.id, name: 'Sacolé da Bia', createdAt: b.createdAt, role: 'membro', businessProfile: null }, role: 'membro', invitedBy: 'Bia' });
+    expect(joined).toEqual({ context: { id: b.id, name: 'Sacolé da Bia', createdAt: b.createdAt, role: 'membro', businessProfile: null, businessPartnership: null }, role: 'membro', invitedBy: 'Bia' });
     expect(await caio.repo.acceptBusinessInvite(k, w.code!)).toEqual(joined);
     await expectCode(caio.repo.acceptBusinessInvite(k, 'f'.repeat(32)), 'chave_reutilizada');
     // Uso único: o mesmo link não serve para outra pessoa, nem para a mesma de novo.
@@ -433,7 +435,7 @@ describe('negócio compartilhado na memória: aceitar (accept_business_invite)',
     await bia.repo.removeBusinessMember(key(), b.id, 'gil');
     const late = await bia.repo.createBusinessInvite(key(), b.id, 'leitor');
     const members = hub['members'];
-    members.set(`${b.id}|ivo`, { contextId: b.id, personId: 'ivo', owner: false, canWrite: false, joinedAt: '2026-11-20T12:00:00.000Z', leftAt: null });
+    members.set(`${b.id}|ivo`, { contextId: b.id, personId: 'ivo', owner: false, canWrite: false, accountant: false, joinedAt: '2026-11-20T12:00:00.000Z', leftAt: null });
     const hana = await person(hub, 'hana');
     await expectCode(hana.repo.acceptBusinessInvite(key(), late.code!), 'negocio_cheio');
     members.delete(`${b.id}|ivo`);
@@ -611,9 +613,11 @@ describe('demonstração: o negócio compartilhado só nos cenários com o Plus 
     const b = (await repo.getBusiness())!;
     expect(b).toMatchObject({ name: DEMO_BUSINESS_NAME, role: 'titular' });
     const people = await repo.getBusinessPeople(b.id);
+    // D-123: Dora acompanha como Contabilidade (por último entre as ativas, fora das 6 pessoas).
     expect(people.members.map((m) => `${m.firstName}:${m.role}:${m.status}:${m.isMe}`)).toEqual([
       'Maria:titular:ativo:true',
       'Rafa:membro:ativo:false',
+      'Dora:contabilidade:ativo:false',
       'Nina:membro:ex-membro:false',
     ]);
     expect(people.invites.map((i) => [i.role, i.expiresAt])).toEqual([['leitor', '2026-10-14T12:00:00.000Z']]);
