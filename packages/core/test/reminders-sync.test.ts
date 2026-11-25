@@ -173,13 +173,18 @@ describe('lib/reminders.ts: os dois planos numa só passada', () => {
     const t = await setup();
     let profile: string | null = 'mei';
     const getBusiness = vi.fn(async () => ({ id: 'neg', name: 'Sacolé', createdAt: '', role: 'titular', businessProfile: profile }));
-    const repo = { ...(t.repo as object), getBusiness } as unknown as RecordsRepository;
+    const getAccountLevel = vi.fn(async () => {
+      throw new Error('sem leitura do nível');
+    });
+    const repo = { ...(t.repo as object), getBusiness, getAccountLevel } as unknown as RecordsRepository;
     // Só os do MEI ligados (nada de vencimento nem do dia a dia): mesmo assim agenda, sem ler contas nem registros.
     t.mod.queueReminders({ enabled: true, repo, contextId: t.contextId, due: null, routine: null, mei: { hour: 20, choices: { das: true, declaracao: true } } });
     await settle();
     expect(getBusiness).toHaveBeenCalledTimes(1);
     expect(t.listCommitments).not.toHaveBeenCalled();
     expect(t.listRecords).not.toHaveBeenCalled();
+    // Só os do MEI ligados: o aviso de queda do nível (D-111) continua só com os lembretes de antes (nem é lido).
+    expect(getAccountLevel).not.toHaveBeenCalled();
     const items = t.synced.at(-1)!;
     expect(items.map((i) => i.id)).toEqual(['clarevo-lembrete-rotina-mei-das-2026-10', 'clarevo-lembrete-rotina-mei-das-2026-11', 'clarevo-lembrete-rotina-mei-declaracao-2027']);
     for (const i of items) {
@@ -191,6 +196,25 @@ describe('lib/reminders.ts: os dois planos numa só passada', () => {
     t.mod.queueReminders({ enabled: true, repo, contextId: t.contextId, due: null, routine: null, mei: { hour: 20, choices: { das: true, declaracao: true } } });
     await settle();
     expect(t.synced.at(-1)).toEqual([]);
+    // Com um lembrete do dia a dia ligado, o nível volta a ser lido, como antes da D-122.
+    t.mod.queueReminders({
+      enabled: true,
+      repo,
+      contextId: t.contextId,
+      due: null,
+      routine: { hour: 20, choices: { ...NO_ROUTINE_REMINDERS, mapa: true } },
+      mei: { hour: 20, choices: { das: true, declaracao: false } },
+    });
+    await settle();
+    expect(getAccountLevel).toHaveBeenCalledTimes(1);
+    // Sem conexão para ler o negócio: nada é reagendado nem cancelado (os avisos já agendados ficam), como na falha das contas.
+    profile = 'mei';
+    const runs = t.synced.length;
+    getBusiness.mockRejectedValueOnce(new Error('rede'));
+    t.mod.queueReminders({ enabled: true, repo, contextId: t.contextId, due: null, routine: null, mei: { hour: 20, choices: { das: true, declaracao: true } } });
+    await settle();
+    expect(t.synced).toHaveLength(runs);
+    expect(t.cancelAllReminders).not.toHaveBeenCalled();
     // Ligar e desligar: a permissão só ao ligar, e a escolha gravada sem mexer nas outras.
     await t.mod.enableMeiReminder('pessoa-1', true, 'das');
     expect(t.prefs.meiReminders).toEqual({ das: true, declaracao: false });

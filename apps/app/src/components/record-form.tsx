@@ -124,6 +124,7 @@ import {
   RECORD_MARKS_TEXT,
   receivableErrorText,
   recordMarksOf,
+  recordMarksAllowed,
   type PayerKind,
 } from '@clarevo/core';
 import { useQueryClient } from '@tanstack/react-query';
@@ -529,6 +530,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
   const contextName = personal.contextName;
   // As categorias do espaço (D-113): as do negócio no negócio, as de sempre no Pessoal e na Família.
   const business = personal.contextKind === 'negocio';
+  // As marcas da entrada (D-122): só na entrada da operação do negócio (Vendas, Serviços e Outras entradas), nunca num lado ligado.
+  const marksAllowed =
+    business && recordMarksAllowed({ kind, category: draft.category, pairedRecordId: mode.type === 'editar' ? (mode.record.pairedRecordId ?? null) : null });
   // Na compra no cartão (D-121), sem "Parcela de empréstimo" e "Equipamento": a fatura paga entra em Saiu, na operação.
   const categoryList = cardPurchase ? cardCategories(contextCategories(personal.contextKind, kind)) : contextCategories(personal.contextKind, kind);
   // Ao passar para o cartão, uma dessas duas já escolhida volta para "Sem categoria".
@@ -1495,16 +1499,15 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
     // Gasto lido de uma nota: leva o resumo da chave (nunca a chave) para o aviso de nota repetida.
     const base: RecordInput = kind === 'receita' ? { ...v.input, nextMonth: v.input.nextMonth === true } : v.input;
     // D-107: subcategoria, tipo e rendimento de investimento entram só quando valem (o app antigo manda o de antes).
-    // Marcas da entrada do negócio (D-122): só na entrada do negócio; ao criar, só quando há alguma; ao editar, só quando mudam (num gasto,
-    // o banco tira as marcas sozinho).
-    const marksShown = business && kind === 'receita';
-    const marks = { hasInvoice: draft.hasInvoice, payerKind: draft.payerKind };
+    // Marcas da entrada do negócio (D-122): só na entrada da operação do negócio (marksAllowed); ao criar, só quando há alguma; ao editar, só
+    // quando mudam (num gasto, o banco tira as marcas sozinho). Uma entrada marcada que passa para uma categoria sem marcas leva as duas nulas.
+    const marks = marksAllowed ? { hasInvoice: draft.hasInvoice, payerKind: draft.payerKind } : { hasInvoice: null, payerKind: null };
     const extras: Partial<RecordInput> =
       mode.type === 'novo'
         ? {
             ...(sub !== null ? { subcategory: sub } : {}),
             ...(incomeShown && draft.incomeOn && draft.investmentId ? { investmentId: draft.investmentId } : {}),
-            ...(marksShown && (marks.hasInvoice !== null || marks.payerKind !== null) ? { marks } : {}),
+            ...(marksAllowed && (marks.hasInvoice !== null || marks.payerKind !== null) ? { marks } : {}),
           }
         : (() => {
             // Só o que muda vai na chamada (sem mudança, a mesma chamada de antes): a subcategoria, quando difere do que o banco
@@ -1517,7 +1520,7 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               ...(kind !== mode.record.kind ? { kind } : {}),
               ...(sub !== kept ? { subcategory: sub } : {}),
               ...(kind === 'receita' && wantedInvestment !== (mode.record.investmentId ?? null) ? { investmentId: wantedInvestment } : {}),
-              ...(marksShown && marksChanged ? { marks } : {}),
+              ...(business && kind === 'receita' && marksChanged ? { marks } : {}),
             };
           })();
     const withExtras: RecordInput = { ...base, ...extras };
@@ -2263,9 +2266,9 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
               {BUSINESS_TEXT.categoryHint(draft.category)}
             </Txt>
           ) : null}
-          {/* Marcas da entrada do negócio (D-122): "Mais detalhes (opcional)", com "Teve nota fiscal?" e "Quem pagou". Só na entrada do
-              negócio; não mudam nenhum total. */}
-          {business && kind === 'receita' ? (
+          {/* Marcas da entrada do negócio (D-122): "Mais detalhes (opcional)", com "Teve nota fiscal?" e "Quem pagou". Só na entrada da
+              operação do negócio (Vendas, Serviços e Outras entradas), fora dos lados ligados; não mudam nenhum total. */}
+          {marksAllowed ? (
             <RecordMarksBlock
               hasInvoice={draft.hasInvoice}
               payerKind={draft.payerKind}
@@ -2277,6 +2280,12 @@ export function RecordForm({ mode, space: personal }: { mode: Mode; space: WorkS
           {business && mode.type === 'editar' && kind === 'despesa' && mode.record.kind === 'receita' && (mode.record.hasInvoice != null || mode.record.payerKind != null) ? (
             <Txt variant="caption" color={colors.textSecondary}>
               {RECORD_MARKS_TEXT.clearedOnExpense}
+            </Txt>
+          ) : null}
+          {/* Uma entrada marcada que passa para uma categoria sem marcas (fora da operação ou sem categoria): elas saem ao salvar. */}
+          {business && mode.type === 'editar' && kind === 'receita' && !marksAllowed && (mode.record.hasInvoice != null || mode.record.payerKind != null) ? (
+            <Txt variant="caption" color={colors.textSecondary}>
+              {RECORD_MARKS_TEXT.clearedOnCategory}
             </Txt>
           ) : null}
           {categorySuggestion ? (

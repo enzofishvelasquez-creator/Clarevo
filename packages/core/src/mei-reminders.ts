@@ -1,4 +1,4 @@
-import { addMonths, isValidIsoDate, monthOf, type IsoDate, type IsoMonth } from './dates';
+import { addMonths, formatMonthName, isValidIsoDate, monthOf, type IsoDate, type IsoMonth } from './dates';
 import { ROUTINE_REMINDER_ID_PREFIX, isRoutineReminderHour, type RoutineReminderHour } from './routine-reminders';
 
 /**
@@ -20,10 +20,28 @@ export const MEI_REMINDER_KINDS: readonly MeiReminderKind[] = ['das', 'declaraca
 export type MeiReminderChoices = Readonly<Record<MeiReminderKind, boolean>>;
 export const NO_MEI_REMINDERS: MeiReminderChoices = { das: false, declaracao: false };
 
-/** O dia do aviso do DAS (o DAS do MEI vence no dia 20) e o dia e o mês do aviso da declaração anual (vai até 31 de maio). */
+/**
+ * As datas da regra, como o limite do MEI (business.ts, MEI_ANNUAL_LIMIT_CENTS): o DAS do MEI vence no dia 20 de cada mês, e a declaração
+ * anual do MEI (DASN-SIMEI) vai até 31 de maio. Datas em vigor em novembro de 2026, conferidas na pesquisa de 18/11/2026 (o item 9 da
+ * lista priorizada e a tabela de obrigações por perfil do relatório "Registros financeiros de pequenos negócios"). Se a regra mudar, troque aqui: os textos dos avisos e
+ * dos interruptores saem destas constantes (e os testes conferem a frase montada).
+ */
+export const MEI_DAS_DUE_DAY = 20;
+export const MEI_DECLARATION_DEADLINE_DAY = 31;
+export const MEI_DECLARATION_DEADLINE_MONTH = 5;
+
+/**
+ * Quando cada aviso sai (escolha do app, não da regra): o do DAS cinco dias antes do vencimento, no dia 15; o da declaração no começo do
+ * mês do prazo, em 2 de maio.
+ */
 export const MEI_DAS_REMINDER_DAY = 15;
-export const MEI_DECLARATION_REMINDER_MONTH = 5;
+export const MEI_DECLARATION_REMINDER_MONTH = MEI_DECLARATION_DEADLINE_MONTH;
 export const MEI_DECLARATION_REMINDER_DAY = 2;
+
+/** "maio": o nome do mês de um número de 1 a 12. */
+const monthName = (month: number): string => formatMonthName(`2000-${String(month).padStart(2, '0')}`);
+const DAS_BODY = `O DAS do MEI vence no dia ${MEI_DAS_DUE_DAY}.`;
+const DECLARATION_BODY = `A declaração anual do MEI vai até ${MEI_DECLARATION_DEADLINE_DAY} de ${monthName(MEI_DECLARATION_DEADLINE_MONTH)}.`;
 /** Meses à frente do aviso do DAS (o mês atual, se o dia ainda não passou, e o seguinte), como os mensais do dia a dia. */
 export const MEI_DAS_MONTHS = 2;
 /** No máximo 3 avisos do MEI (2 do DAS e 1 da declaração): somados aos 30 de vencimento, aos 21 do dia a dia e ao do nível, abaixo dos 64 do iOS. */
@@ -41,15 +59,15 @@ export const MEI_REMINDER_TEXT = {
   kinds: {
     das: {
       toggle: 'DAS do mês',
-      caption: 'No dia 15 de cada mês: "O DAS do MEI vence no dia 20."',
+      caption: `No dia ${MEI_DAS_REMINDER_DAY} de cada mês: "${DAS_BODY}"`,
       title: 'Seu negócio',
-      body: 'O DAS do MEI vence no dia 20.',
+      body: DAS_BODY,
     },
     declaracao: {
       toggle: 'Declaração anual do MEI',
-      caption: 'Em 2 de maio: "A declaração anual do MEI vai até 31 de maio."',
+      caption: `Em ${MEI_DECLARATION_REMINDER_DAY} de ${monthName(MEI_DECLARATION_REMINDER_MONTH)}: "${DECLARATION_BODY}"`,
       title: 'Seu negócio',
-      body: 'A declaração anual do MEI vai até 31 de maio.',
+      body: DECLARATION_BODY,
     },
   } as Readonly<Record<MeiReminderKind, { toggle: string; caption: string; title: string; body: string }>>,
 } as const;

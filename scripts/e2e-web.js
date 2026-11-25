@@ -17579,8 +17579,12 @@ setInterval(async () => {
 
     // 7. As marcas numa entrada nova, o resumo do ano e a exportação.
     await btn('Anotar entrada').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
-    ok('Negócio (D-122), anotar entrada: "Mais detalhes (opcional)" recolhido no fim', (await body()).includes('Mais detalhes (opcional)') && (await visibleCount('radio', 'Sim')) === 0);
-    await field('Descrição').fill('Bolo de festa'); await field('Valor em reais').fill('100'); await radio('Vendas').click();
+    // Revisão de 25/11/2026: as marcas só nas entradas da operação (Vendas, Serviços e Outras entradas).
+    ok('Negócio (D-122), anotar entrada: sem categoria, nada de "Mais detalhes"', !(await body()).includes('Mais detalhes (opcional)'));
+    await radio('Empréstimo recebido').click(); await p.waitForTimeout(250);
+    ok('Negócio (D-122), anotar entrada: em "Empréstimo recebido" (fora da operação), nada de "Mais detalhes"', !(await body()).includes('Mais detalhes (opcional)'));
+    await field('Descrição').fill('Bolo de festa'); await field('Valor em reais').fill('100'); await radio('Vendas').click(); await p.waitForTimeout(250);
+    ok('Negócio (D-122), anotar entrada: em "Vendas", "Mais detalhes (opcional)" recolhido', (await body()).includes('Mais detalhes (opcional)') && (await visibleCount('radio', 'Sim')) === 0);
     await btn('Mostrar mais detalhes').click(); await p.waitForTimeout(250);
     await radio('Sim').click(); await radio('Sim').click(); await radio('Não').click(); await radio('Pessoa física').click(); await p.waitForTimeout(200);
     ok('Negócio (D-122), "Mais detalhes": tocar de novo desmarca; "Não" e "Pessoa física" marcados',

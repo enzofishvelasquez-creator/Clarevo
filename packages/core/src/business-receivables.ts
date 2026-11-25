@@ -251,12 +251,17 @@ export function recentReceived<T extends Pick<Receivable, 'status' | 'received' 
     .slice(0, limit);
 }
 
-/** O cartão "A receber" de "Seu negócio": o total em aberto, quantos são, a próxima data e quantos passaram da data. */
+/**
+ * O cartão "A receber" de "Seu negócio": o total em aberto, quantos são, a próxima data (de hoje em diante), a mais antiga das que passaram
+ * e quantos passaram da data.
+ */
 export interface ReceivablesSummary {
   openCents: Cents;
   openCount: number;
-  /** A data em aberto mais próxima de hoje em diante; sem nenhuma, a mais antiga das que passaram. */
+  /** A data em aberto mais próxima de hoje em diante; null quando todas já passaram (ou não há nenhuma). */
   nextOn: IsoDate | null;
+  /** A mais antiga das datas que passaram; null quando nenhuma passou. */
+  oldestPastOn: IsoDate | null;
   pastCount: number;
 }
 
@@ -267,7 +272,8 @@ export function receivablesSummary(list: readonly Pick<Receivable, 'status' | 'e
   return {
     openCents: open.reduce((s, r) => s + r.amountCents, 0),
     openCount: open.length,
-    nextOn: coming[0] ?? past[0] ?? null,
+    nextOn: coming[0] ?? null,
+    oldestPastOn: past[0] ?? null,
     pastCount: past.length,
   };
 }
@@ -316,6 +322,20 @@ export function isPayerKind(value: unknown): value is PayerKind {
 /** As marcas de um lançamento (as ausentes contam como não marcadas). */
 export function recordMarksOf(r: Pick<FinancialRecord, 'hasInvoice' | 'payerKind'>): RecordMarks {
   return { hasInvoice: typeof r.hasInvoice === 'boolean' ? r.hasInvoice : null, payerKind: isPayerKind(r.payerKind) ? r.payerKind : null };
+}
+
+/**
+ * As categorias de entrada em que as marcas aparecem (revisão de 25/11/2026): as da operação ("Vendas", "Serviços" e "Outras entradas").
+ * Fora da operação ("Empréstimo recebido", o dinheiro trazido do Pessoal) e sem categoria, "Mais detalhes" não aparece.
+ */
+export const MARK_CATEGORIES: readonly string[] = ['Vendas', 'Serviços', 'Outras entradas'];
+
+/**
+ * O formulário oferece as marcas: só numa entrada de uma das categorias da operação e que não é um lado ligado (a retirada e o dinheiro
+ * trazido do Pessoal). O espaço (só o negócio) fica com a tela.
+ */
+export function recordMarksAllowed(r: { kind: FinancialRecord['kind']; category: string | null; pairedRecordId?: string | null }): boolean {
+  return r.kind === 'receita' && r.category !== null && MARK_CATEGORIES.includes(r.category) && !r.pairedRecordId;
 }
 
 export function hasAnyMark(m: RecordMarks): boolean {
@@ -417,9 +437,18 @@ export const RECEIVABLE_TEXT = {
   cardTitle: 'A receber',
   cardEmpty: 'Nada a receber anotado. Anote aqui a venda no fiado, a venda no cartão que ainda vai cair ou outro valor que o negócio vai receber.',
   openLabel: 'Em aberto',
-  /** "3 valores · próxima data: 15/10"; com 1, "1 valor · data: 15/10". */
-  cardCount: (count: number, nextOn: IsoDate | null, today: IsoDate): string =>
-    `${valores(count)}${nextOn ? ` · ${count === 1 ? 'data' : 'próxima data'}: ${nextOn === today ? 'hoje' : formatListDate(nextOn, today)}` : ''}`,
+  /**
+   * "3 valores · próxima data: 15/10"; com 1, "1 valor · data: 15/10" (a dele, mesmo que já tenha passado). Com mais de um e todos já
+   * passados, não há próxima data: "3 valores · data mais antiga: 05/10".
+   */
+  cardCount: (s: Pick<ReceivablesSummary, 'openCount' | 'nextOn' | 'oldestPastOn'>, today: IsoDate): string => {
+    const day = (d: IsoDate) => (d === today ? 'hoje' : formatListDate(d, today));
+    const one = s.nextOn ?? s.oldestPastOn;
+    if (s.openCount === 1 && one) return `${valores(1)} · data: ${day(one)}`;
+    if (s.nextOn) return `${valores(s.openCount)} · próxima data: ${day(s.nextOn)}`;
+    if (s.oldestPastOn) return `${valores(s.openCount)} · data mais antiga: ${day(s.oldestPastOn)}`;
+    return valores(s.openCount);
+  },
   /** Quantos passaram da data, só como fato. */
   cardPast: (count: number): string => (count === 1 ? '1 passou da data.' : `${count} passaram da data.`),
   cardA11y: (cents: Cents, count: number): string => `A receber: ${formatBRL(cents)} em aberto, ${valores(count)}`,
@@ -490,6 +519,9 @@ export const RECEIVABLE_TEXT = {
   receiveSubmit: 'Confirmar recebimento',
   receiveDone: 'Recebido: a entrada foi anotada no negócio.',
   alreadyReceived: 'Este valor já foi marcado como recebido.',
+  /** Conflito de versão (revisão de 25/11/2026): o formulário passa a mostrar o que está salvo agora, para conferir antes de salvar de novo. */
+  conflictReloaded: 'Este valor a receber mudou em outro aparelho. O formulário agora mostra o que está salvo: confira e salve de novo.',
+  receiveConflict: 'Este valor a receber mudou em outro aparelho. Confira o combinado, no alto, e confirme de novo.',
   /** A entrada que veio de um "a receber" (detalhe do lançamento). */
   recordOrigin: 'Origem',
   recordOriginValue: 'A receber',
@@ -538,6 +570,22 @@ export function receivableErrorText(code: string): string {
   return (RECEIVABLE_ERROR_TEXT as Record<string, string>)[code] ?? RECEIVABLE_ERROR_TEXT.salvar_falhou;
 }
 
+/**
+ * Depois de um conflito de versão (versao_desatualizada) ao editar ou ao receber, com o valor a receber lido de novo (`fresh`: undefined quando
+ * a leitura falhou; null quando ele não existe mais): em aberto, a tela passa a mostrar o que está salvo agora (`recarregar`), com a versão
+ * nova, para a pessoa conferir antes de salvar de novo, e nada sobrescreve a outra mudança sem ela ver; recebido ou excluído, só a mensagem;
+ * sem conseguir ler, a versão fica a de antes, e salvar recusa de novo.
+ */
+export function afterReceivableConflict(
+  fresh: Receivable | null | undefined,
+  where: 'editar' | 'receber',
+): { action: 'recarregar'; receivable: Receivable; message: string } | { action: 'manter'; message: string } {
+  if (fresh === undefined) return { action: 'manter', message: RECEIVABLE_ERROR_TEXT.versao_desatualizada };
+  if (fresh === null) return { action: 'manter', message: RECEIVABLE_ERROR_TEXT.nao_encontrado };
+  if (fresh.status !== 'aberto') return { action: 'manter', message: RECEIVABLE_ERROR_TEXT.ja_recebido };
+  return { action: 'recarregar', receivable: fresh, message: where === 'editar' ? RECEIVABLE_TEXT.conflictReloaded : RECEIVABLE_TEXT.receiveConflict };
+}
+
 /** Os campos de onde vem cada recusa do banco (o erro fica junto do campo). */
 export function receivableFieldOf(code: string): ReceivableField | null {
   switch (code) {
@@ -582,6 +630,8 @@ export const RECORD_MARKS_TEXT = {
   payerRow: 'Quem pagou',
   /** Ao trocar para gasto, as marcas saem. */
   clearedOnExpense: 'As marcas de nota fiscal e de quem pagou saem ao trocar para saída.',
+  /** Ao trocar a entrada para uma categoria fora da operação (ou sem categoria), as marcas saem ao salvar. */
+  clearedOnCategory: 'As marcas de nota fiscal e de quem pagou ficam só em Vendas, Serviços e Outras entradas. Com esta categoria, elas saem ao salvar.',
   /** Resumo do ano. */
   year: {
     title: 'Nota e quem pagou',

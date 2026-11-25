@@ -5,6 +5,12 @@ import {
   CSV_EOL,
   CSV_RECORD_HEADER,
   EXPORT_TEXT,
+  MEI_DAS_DUE_DAY,
+  MEI_DAS_REMINDER_DAY,
+  MEI_DECLARATION_DEADLINE_DAY,
+  MEI_DECLARATION_DEADLINE_MONTH,
+  MEI_DECLARATION_REMINDER_DAY,
+  MEI_DECLARATION_REMINDER_MONTH,
   MEI_REMINDER_ID_PREFIX,
   MEI_REMINDER_LIMIT,
   MEI_REMINDER_TEXT,
@@ -39,6 +45,10 @@ import {
   openReceivables,
   parseMeiReminderChoices,
   receivableCaption,
+  receivableDraftOf,
+  afterReceivableConflict,
+  recordMarksAllowed,
+  MARK_CATEGORIES,
   receivableDateText,
   receivableErrorText,
   receivableInputError,
@@ -158,7 +168,7 @@ function textsOf(obj: Record<string, unknown>, samples: unknown[][]): string[] {
 }
 
 describe('textos do D-122: fatos, numa cor só, sem cobrança e sem orientação de imposto', () => {
-  const samples: unknown[][] = [[3, '2026-11-20', TODAY], [1, null, TODAY], [12_345], [2], [open(), TODAY], [open({ kind: 'cartao' })], ['fiado'], ['cartao'], [null], [true], [false]];
+  const samples: unknown[][] = [[{ openCount: 3, nextOn: null, oldestPastOn: '2026-11-02' }, TODAY], [3, '2026-11-20', TODAY], [1, null, TODAY], [12_345], [2], [open(), TODAY], [open({ kind: 'cartao' })], ['fiado'], ['cartao'], [null], [true], [false]];
   const all = [
     ...textsOf(RECEIVABLE_TEXT as unknown as Record<string, unknown>, samples),
     ...textsOf(RECEIVABLE_ERROR_TEXT as unknown as Record<string, unknown>, samples),
@@ -190,9 +200,23 @@ describe('textos do D-122: fatos, numa cor só, sem cobrança e sem orientação
     expect(RECEIVABLE_TEXT.cardNote).toBe('Não entra em Entrou nem em Saiu: o dinheiro entra quando você marca como recebido.');
   });
 
-  it('os lembretes do MEI: datas simples, com o texto da especificação', () => {
-    expect(MEI_REMINDER_TEXT.kinds.das).toMatchObject({ toggle: 'DAS do mês', body: 'O DAS do MEI vence no dia 20.' });
-    expect(MEI_REMINDER_TEXT.kinds.declaracao).toMatchObject({ toggle: 'Declaração anual do MEI', body: 'A declaração anual do MEI vai até 31 de maio.' });
+  it('os lembretes do MEI: datas simples, com o texto da especificação, montadas das datas da regra (MEI_DAS_DUE_DAY e o prazo da declaração)', () => {
+    // As datas da regra ficam em constantes com a data da conferência (como o limite do MEI). Se a regra mudar, troque as constantes em
+    // mei-reminders.ts e as frases esperadas aqui: o teste guarda a frase inteira para a mudança ser sempre de propósito.
+    expect([MEI_DAS_DUE_DAY, MEI_DECLARATION_DEADLINE_DAY, MEI_DECLARATION_DEADLINE_MONTH]).toEqual([20, 31, 5]);
+    expect([MEI_DAS_REMINDER_DAY, MEI_DECLARATION_REMINDER_DAY, MEI_DECLARATION_REMINDER_MONTH]).toEqual([15, 2, 5]);
+    expect(MEI_REMINDER_TEXT.kinds.das).toEqual({
+      toggle: 'DAS do mês',
+      caption: 'No dia 15 de cada mês: "O DAS do MEI vence no dia 20."',
+      title: 'Seu negócio',
+      body: 'O DAS do MEI vence no dia 20.',
+    });
+    expect(MEI_REMINDER_TEXT.kinds.declaracao).toEqual({
+      toggle: 'Declaração anual do MEI',
+      caption: 'Em 2 de maio: "A declaração anual do MEI vai até 31 de maio."',
+      title: 'Seu negócio',
+      body: 'A declaração anual do MEI vai até 31 de maio.',
+    });
     expect(MEI_REMINDER_TEXT.intro).toContain('a Clarevo não calcula imposto');
   });
 
@@ -285,12 +309,17 @@ describe('regras do "a receber" (as do banco, clarevo_check_receivable)', () => 
       open({ id: 'c', amountCents: 3_000, expectedOn: '2026-11-19' }),
       open({ id: 'd', amountCents: 9_000, status: 'recebido', expectedOn: '2026-11-18' }),
     ];
-    expect(receivablesSummary(list, TODAY)).toEqual({ openCents: 6_000, openCount: 3, nextOn: '2026-11-19', pastCount: 1 });
-    expect(receivablesSummary([open({ expectedOn: '2026-11-05' })], TODAY).nextOn).toBe('2026-11-05');
-    expect(receivablesSummary([], TODAY)).toEqual({ openCents: 0, openCount: 0, nextOn: null, pastCount: 0 });
+    expect(receivablesSummary(list, TODAY)).toEqual({ openCents: 6_000, openCount: 3, nextOn: '2026-11-19', oldestPastOn: '2026-11-05', pastCount: 1 });
+    expect(receivablesSummary([open({ expectedOn: '2026-11-05' })], TODAY)).toMatchObject({ nextOn: null, oldestPastOn: '2026-11-05', pastCount: 1 });
+    expect(receivablesSummary([], TODAY)).toEqual({ openCents: 0, openCount: 0, nextOn: null, oldestPastOn: null, pastCount: 0 });
     expect(openReceivables(list).map((r) => r.id)).toEqual(['a', 'c', 'b']);
-    expect(RECEIVABLE_TEXT.cardCount(3, '2026-11-19', TODAY)).toBe('3 valores · próxima data: 19/11');
-    expect(RECEIVABLE_TEXT.cardCount(1, TODAY, TODAY)).toBe('1 valor · data: hoje');
+    expect(RECEIVABLE_TEXT.cardCount(receivablesSummary(list, TODAY), TODAY)).toBe('3 valores · próxima data: 19/11');
+    expect(RECEIVABLE_TEXT.cardCount(receivablesSummary([open({ expectedOn: TODAY })], TODAY), TODAY)).toBe('1 valor · data: hoje');
+    // Um só, que já passou: a data dele. Todos já passados: não há "próxima data", e sim a mais antiga (revisão de 25/11/2026).
+    expect(RECEIVABLE_TEXT.cardCount(receivablesSummary([open({ expectedOn: '2026-10-05' })], TODAY), TODAY)).toBe('1 valor · data: 05/10');
+    const allPast = [open({ id: 'p1', expectedOn: '2026-11-10' }), open({ id: 'p2', expectedOn: '2026-10-05' }), open({ id: 'p3', expectedOn: '2026-11-01' })];
+    expect(RECEIVABLE_TEXT.cardCount(receivablesSummary(allPast, TODAY), TODAY)).toBe('3 valores · data mais antiga: 05/10');
+    expect(RECEIVABLE_TEXT.cardPast(3)).toBe('3 passaram da data.');
     expect(RECEIVABLE_TEXT.cardPast(1)).toBe('1 passou da data.');
     const received = [
       open({ id: 'x', status: 'recebido', received: { recordId: 'r1', amountCents: 1, receivedOn: '2026-11-02', accountId: 'a' } }),
@@ -343,6 +372,27 @@ describe('"a receber" na memória (as quatro funções da 0045)', () => {
     expect(await repo.getReceivable(r.id)).toBeNull();
     expect(await repo.listReceivables(b.id)).toEqual([]);
     expect(await code(repo.deleteReceivable(newOperationKey(), r.id, 3))).toBe('nao_encontrado');
+  });
+
+  it('conflito de versão (revisão de 25/11/2026): a tela recarrega o que está salvo antes de deixar salvar de novo; recebido ou excluído, só a mensagem', async () => {
+    const { repo, b, acc } = await withBusiness();
+    const r = await repo.createReceivable(newOperationKey(), b.id, fiado());
+    // Outro aparelho muda o valor e o nome.
+    await repo.updateReceivable(newOperationKey(), r.id, 1, fiado({ amountCents: 4_500, debtor: 'Bruno' }));
+    // Esta tela, com a versão 1, tenta salvar o preenchimento antigo: recusa, e a releitura traz o de agora.
+    expect(await code(repo.updateReceivable(newOperationKey(), r.id, 1, fiado({ description: 'Meu texto' })))).toBe('versao_desatualizada');
+    const next = afterReceivableConflict(await repo.getReceivable(r.id), 'editar');
+    expect(next.action).toBe('recarregar');
+    if (next.action === 'recarregar') {
+      expect(receivableDraftOf(next.receivable)).toMatchObject({ amountText: '45,00', debtor: 'Bruno', description: '10 sacolés' });
+      expect(next.receivable.version).toBe(2);
+      expect(next.message).toBe(RECEIVABLE_TEXT.conflictReloaded);
+    }
+    expect(afterReceivableConflict(await repo.getReceivable(r.id), 'receber').message).toBe(RECEIVABLE_TEXT.receiveConflict);
+    expect(afterReceivableConflict(undefined, 'editar')).toEqual({ action: 'manter', message: RECEIVABLE_ERROR_TEXT.versao_desatualizada });
+    expect(afterReceivableConflict(null, 'editar')).toEqual({ action: 'manter', message: RECEIVABLE_ERROR_TEXT.nao_encontrado });
+    await repo.receiveReceivable(newOperationKey(), r.id, 2, { accountId: acc, amountCents: 4_500, receivedOn: TODAY });
+    expect(afterReceivableConflict(await repo.getReceivable(r.id), 'editar')).toEqual({ action: 'manter', message: RECEIVABLE_ERROR_TEXT.ja_recebido });
   });
 
   it('"Recebi": uma entrada comum no negócio, pela data em que entrou; o "a receber" passa a recebido e não muda mais', async () => {
@@ -460,6 +510,17 @@ describe('marcas da entrada do negócio (p_marks, 0045)', () => {
     const moved = await repo.moveRecord(newOperationKey(), other.id, 1, personal, personalAcc, null);
     expect(moved.hasInvoice ?? null).toBeNull();
     expect(moved.payerKind ?? null).toBeNull();
+  });
+
+  it('o formulário oferece as marcas só nas entradas da operação (Vendas, Serviços, Outras entradas), fora dos lados ligados', () => {
+    expect(MARK_CATEGORIES).toEqual(['Vendas', 'Serviços', 'Outras entradas']);
+    for (const category of ['Vendas', 'Serviços', 'Outras entradas']) expect(recordMarksAllowed({ kind: 'receita', category }), category).toBe(true);
+    expect(recordMarksAllowed({ kind: 'receita', category: 'Empréstimo recebido' })).toBe(false);
+    expect(recordMarksAllowed({ kind: 'receita', category: 'Dinheiro do Pessoal', pairedRecordId: 'p' })).toBe(false);
+    expect(recordMarksAllowed({ kind: 'receita', category: 'Vendas', pairedRecordId: 'p' })).toBe(false);
+    expect(recordMarksAllowed({ kind: 'receita', category: null })).toBe(false);
+    expect(recordMarksAllowed({ kind: 'despesa', category: 'Vendas' })).toBe(false);
+    expect(RECORD_MARKS_TEXT.clearedOnCategory).toContain('Vendas, Serviços e Outras entradas');
   });
 
   it('o resumo do ano por marca: só as entradas da operação, pelo mês em que contam; sem marca, "Não marcado"', () => {

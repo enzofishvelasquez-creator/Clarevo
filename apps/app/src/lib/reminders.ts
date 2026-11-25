@@ -81,7 +81,10 @@ export type ReminderOutcome = 'agendado' | 'desligado' | 'sem-permissao' | 'indi
 async function apply(job: ReminderJob): Promise<ReminderOutcome> {
   if (!DEVICE_FEATURES) return 'indisponivel';
   const meiOn = job.enabled && job.mei != null && anyMeiReminder(job.mei.choices);
-  if (!job.enabled || (job.due === null && (job.routine === null || !anyRoutineReminder(job.routine.choices)) && !meiOn)) {
+  // Os lembretes de antes da D-122 (vencimento e dia a dia): só com eles o aviso de queda do nível (D-111) entra, como antes. Ligar só um
+  // lembrete do MEI não agenda o aviso do nível.
+  const legacyOn = job.enabled && (job.due !== null || (job.routine !== null && anyRoutineReminder(job.routine.choices)));
+  if (!job.enabled || (!legacyOn && !meiOn)) {
     await cancelAllReminders();
     return 'desligado';
   }
@@ -177,28 +180,26 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
       items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });
     }
   }
-  // Lembretes do MEI (D-122): só com o tipo do negócio "MEI", lido agora (trocar o tipo é uma escrita, e toda escrita reagenda). Sem a
-  // leitura do negócio, seguem os outros avisos.
+  // Lembretes do MEI (D-122): só com o tipo do negócio "MEI", lido agora (trocar o tipo é uma escrita, e toda escrita reagenda). Uma falha da
+  // leitura do negócio (sem conexão) segue adiante, como a das contas e dos registros: nada é reagendado, e os avisos já agendados ficam.
   if (meiOn && job.mei) {
-    try {
-      const business = await job.repo.getBusiness();
-      const plan = meiReminderPlan(job.mei.choices, today, job.mei.hour, { mei: business?.businessProfile === 'mei', nowMinutes });
-      for (const i of plan) {
-        items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });
-      }
-    } catch {
-      // Falha de rede: o próximo gatilho tenta de novo.
+    const business = await job.repo.getBusiness();
+    const plan = meiReminderPlan(job.mei.choices, today, job.mei.hour, { mei: business?.businessProfile === 'mei', nowMinutes });
+    for (const i of plan) {
+      items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });
     }
   }
   // Aviso de queda do nível (D-111): para quem permitiu lembretes, um lembrete no dia em que o aviso começa (o 45º dia sem anotar), no
   // horário dos lembretes do dia a dia, com texto neutro (sem contagem e sem nível: uma anotação pelo WhatsApp ou pelo Telegram conta no
   // banco sem refazer este lembrete; a contagem fica só dentro do app). Com o horário de hoje já passado, o marco seguinte. Sem a leitura
-  // do nível, segue sem ele.
-  try {
-    const level = levelWarningReminder(await job.repo.getAccountLevel(), today, job.routine?.hour ?? DEFAULT_ROUTINE_REMINDER_HOUR, nowMinutes);
-    if (level) items.push({ id: level.id, date: fireDate(level), title: level.title, body: level.body, signature: routineReminderSignature(level), route: level.route, channel: 'rotina' });
-  } catch {
-    // Falha de rede: os outros avisos seguem; o próximo gatilho tenta de novo.
+  // do nível, segue sem ele. Só com um lembrete de vencimento ou do dia a dia ligado (como antes da D-122).
+  if (legacyOn) {
+    try {
+      const level = levelWarningReminder(await job.repo.getAccountLevel(), today, job.routine?.hour ?? DEFAULT_ROUTINE_REMINDER_HOUR, nowMinutes);
+      if (level) items.push({ id: level.id, date: fireDate(level), title: level.title, body: level.body, signature: routineReminderSignature(level), route: level.route, channel: 'rotina' });
+    } catch {
+      // Falha de rede: os outros avisos seguem; o próximo gatilho tenta de novo.
+    }
   }
   await syncScheduledReminders(items);
   return 'agendado';

@@ -13,6 +13,7 @@ import {
   MEI_REMINDER_TEXT,
   activeAccounts,
   addDays,
+  afterReceivableConflict,
   formatBRL,
   formatDateBR,
   maskDateBR,
@@ -113,7 +114,7 @@ export function ReceivablesCard({ business, canWrite }: { business: BusinessCont
               {formatBRL(summary.openCents)}
             </MoneyTxt>
           </View>
-          <Txt variant="label">{T.cardCount(summary.openCount, summary.nextOn, today)}</Txt>
+          <Txt variant="label">{T.cardCount(summary, today)}</Txt>
           {summary.pastCount > 0 ? (
             <Txt variant="caption" color={colors.textSecondary}>
               {T.cardPast(summary.pastCount)}
@@ -291,7 +292,8 @@ function ReceivableForm({ business, existing }: { business: BusinessContext; exi
   const update = useUpdateReceivable();
   const keys = useFamilyKeys();
   const access = useReceivableAccess(business, existing?.createdBy ?? null);
-  const initial = existing ? receivableDraftOf(existing) : EMPTY_DRAFT;
+  // O preenchimento de partida: o do valor a receber aberto ou, depois de um conflito, o que está salvo agora.
+  const [initial, setInitial] = useState<ReceivableDraft>(() => (existing ? receivableDraftOf(existing) : EMPTY_DRAFT));
   const [draft, setDraft] = useState<ReceivableDraft>(initial);
   const [errors, setErrors] = useState<Partial<Record<ReceivableField, string>>>({});
   const [error, setError] = useState<string | null>(null);
@@ -353,10 +355,17 @@ function ReceivableForm({ business, existing }: { business: BusinessContext; exi
       const field = receivableFieldOf(r.code);
       if (field) setErrors({ [field]: receivableErrorText(r.code) });
       else setError(receivableErrorText(r.code));
-      // Mudou em outro aparelho: a versão nova vale para a próxima tentativa (a pessoa confere o aviso antes de salvar de novo).
+      // Mudou em outro aparelho: o formulário passa a mostrar o que está salvo agora, com a versão nova, para a pessoa conferir antes de
+      // salvar de novo (nada sobrescreve a outra mudança sem ela ver). Sem conseguir ler, a versão fica a de antes e salvar recusa de novo.
       if (r.code === 'versao_desatualizada' && existing) {
-        const fresh = await repo.getReceivable(existing.id).catch(() => null);
-        if (fresh && fresh.status === 'aberto') setVersion(fresh.version);
+        const next = afterReceivableConflict(await repo.getReceivable(existing.id).catch(() => undefined), 'editar');
+        if (next.action === 'recarregar') {
+          const now = receivableDraftOf(next.receivable);
+          setInitial(now);
+          setDraft(now);
+          setVersion(next.receivable.version);
+        }
+        setError(next.message);
       }
     } finally {
       setBusy(false);
@@ -496,6 +505,8 @@ function ReceiveForm({ business, r, accounts }: { business: BusinessContext; r: 
   const receive = useReceiveReceivable();
   const keys = useFamilyKeys();
   const [version, setVersion] = useState(r.version);
+  // O valor a receber mostrado no alto: o aberto ou, depois de um conflito, o que está salvo agora.
+  const [current, setCurrent] = useState<Receivable>(r);
   const initial = { amountText: centsToInput(r.amountCents), dateText: formatDateBR(today), accountId: accounts[0]?.id ?? '' };
   const [draft, setDraft] = useState(initial);
   const [errors, setErrors] = useState<Partial<Record<ReceiveField, string>>>({});
@@ -547,9 +558,14 @@ function ReceiveForm({ business, r, accounts }: { business: BusinessContext; r: 
       else if (r2.code === 'data_futura' || r2.code === 'data_invalida') setErrors({ dateText: receivableErrorText(r2.code) });
       else if (r2.code === 'conta_invalida') setErrors({ accountId: receivableErrorText(r2.code) });
       else setError(receivableErrorText(r2.code));
+      // Mudou em outro aparelho: o alto da tela passa a mostrar o que está salvo agora, com a versão nova, e a pessoa confirma de novo.
       if (r2.code === 'versao_desatualizada') {
-        const fresh = await repo.getReceivable(r.id).catch(() => null);
-        if (fresh && fresh.status === 'aberto') setVersion(fresh.version);
+        const next = afterReceivableConflict(await repo.getReceivable(r.id).catch(() => undefined), 'receber');
+        if (next.action === 'recarregar') {
+          setCurrent(next.receivable);
+          setVersion(next.receivable.version);
+        }
+        setError(next.message);
       }
     } finally {
       setBusy(false);
@@ -562,14 +578,14 @@ function ReceiveForm({ business, r, accounts }: { business: BusinessContext; r: 
       <Screen contentStyle={{ padding: space[5], gap: space[4], paddingBottom: space[6] }}>
         <Card style={{ gap: space[1] }}>
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
-            {r.description}
+            {current.description}
           </Txt>
           <MoneyTxt variant="label" color={colors.textSecondary}>
-            {T.receiveExpected(r)}
+            {T.receiveExpected(current)}
           </MoneyTxt>
-          {r.debtor ? (
+          {current.debtor ? (
             <Txt variant="label" color={colors.textSecondary}>
-              {`${T.rowDebtor}: ${r.debtor}`}
+              {`${T.rowDebtor}: ${current.debtor}`}
             </Txt>
           ) : null}
         </Card>
