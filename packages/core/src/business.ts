@@ -321,11 +321,18 @@ export function businessFlowOf(record: Pick<FinancialRecord, 'pairedRecordId' | 
 }
 
 /**
- * O lançamento pode mudar de espaço: o comum, sem conta a pagar, fatura, rendimento de investimento ou retirada ligados (a mesma regra
- * de move_record, lancamento_ligado).
+ * O lançamento pode mudar de espaço: o comum, sem conta a pagar, fatura, rendimento de investimento, retirada ou "a receber" (D-122)
+ * ligados (a mesma regra de move_record, lancamento_ligado).
  */
 export function canMoveRecord(record: FinancialRecord): boolean {
-  return record.commitmentId === null && record.invoice === null && !record.investmentId && !record.investmentMovementId && !isWithdrawal(record);
+  return (
+    record.commitmentId === null &&
+    record.invoice === null &&
+    !record.investmentId &&
+    !record.investmentMovementId &&
+    !isWithdrawal(record) &&
+    !record.receivableId
+  );
 }
 
 /** Pares de categorias que se correspondem entre o Pessoal e o negócio, ao mover. */
@@ -819,7 +826,7 @@ export const BUSINESS_TEXT = {
   moveAccount: 'Banco ou carteira no outro espaço',
   moveSubmit: 'Mover',
   moved: (to: string): string => `Lançamento movido para ${to}.`,
-  moveLinked: 'Este lançamento está ligado a uma conta a pagar, uma fatura, um investimento ou uma retirada e não muda de espaço.',
+  moveLinked: 'Este lançamento está ligado a uma conta a pagar, uma fatura, um investimento, uma retirada ou um valor a receber e não muda de espaço.',
   /** Abas que não são do negócio. */
   goalsHidden: 'Metas ficam no Pessoal e na Família. O espaço Negócio é só para o que entra e sai do negócio.',
   investHidden: 'Investimentos ficam no Pessoal. O espaço Negócio é só para o que entra e sai do negócio.',

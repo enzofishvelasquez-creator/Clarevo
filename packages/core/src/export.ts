@@ -16,6 +16,7 @@ import { accountNameOf } from './accounts';
 import type { Investment, InvestmentMovement } from './investments';
 import { INVESTMENT_KIND_LABEL, INVESTMENT_TEXT } from './investments';
 import { INCOME_KIND_LABEL, SUBKIND_LABEL } from './investment-details';
+import { PAYER_KIND_LABEL, RECORD_MARKS_TEXT, recordMarksOf } from './business-receivables';
 
 /**
  * Exportar meus dados (D-047, Ciclo H3; docs/08 §5 item 14). A pessoa leva os próprios gastos e recebimentos para uma planilha
@@ -47,8 +48,11 @@ export const EXPORT_KIND_LABEL: Readonly<Record<ExportKind, string>> = {
   pagamento_fatura: 'Pagamento de fatura',
 };
 
-/** De onde veio o lançamento: anotado direto, pagamento de conta a pagar (avulsa, gasto fixo, parcelamento ou conta do ano) ou de fatura. */
-export type ExportOrigin = 'anotado' | 'conta_a_pagar' | 'gasto_fixo' | 'parcelamento' | 'conta_do_ano' | 'fatura';
+/**
+ * De onde veio o lançamento: anotado direto, pagamento de conta a pagar (avulsa, gasto fixo, parcelamento ou conta do ano) ou de fatura,
+ * ou, no negócio (D-122), a entrada de um valor a receber.
+ */
+export type ExportOrigin = 'anotado' | 'conta_a_pagar' | 'gasto_fixo' | 'parcelamento' | 'conta_do_ano' | 'fatura' | 'a_receber';
 export const EXPORT_ORIGIN_LABEL: Readonly<Record<ExportOrigin, string>> = {
   anotado: 'Anotado',
   conta_a_pagar: 'Conta a pagar',
@@ -56,6 +60,7 @@ export const EXPORT_ORIGIN_LABEL: Readonly<Record<ExportOrigin, string>> = {
   parcelamento: 'Parcelamento',
   conta_do_ano: 'Conta do ano',
   fatura: 'Fatura',
+  a_receber: 'A receber',
 };
 
 // ---------------------------------------------------------------------------
@@ -94,6 +99,9 @@ export const EXPORT_TEXT = {
   contentTitle: 'O que vai no arquivo',
   contentCsv:
     'Lançamentos: Data, Tipo, Descrição, Categoria, Subcategoria, Valor (R$), Banco ou carteira, Origem e Mês do resumo (o mês em que o lançamento conta). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga. Os movimentos dos investimentos vão em um terceiro.',
+  /** No negócio (D-122): as duas marcas das entradas no fim de cada linha. */
+  contentCsvBusiness:
+    'Lançamentos: Data, Tipo, Descrição, Categoria, Subcategoria, Valor (R$), Banco ou carteira, Origem, Mês do resumo (o mês em que o lançamento conta), Nota fiscal e Quem pagou (as marcas das entradas, vazias quando não marcadas). As compras no cartão vão em um segundo arquivo, à parte, porque o dinheiro só sai quando a fatura é paga.',
   contentPdf:
     'Resumo de cada mês e lista de lançamentos. As compras no cartão aparecem à parte e não entram em Pago, porque o dinheiro só sai quando a fatura é paga. Os investimentos aparecem no fim, também fora de Pago e de Recebido.',
   notIncluded: 'Ficam de fora a chave da nota fiscal, o número do cartão (só o final aparece) e os códigos internos da Clarevo. Só entram os seus registros do espaço Pessoal.',
@@ -227,6 +235,9 @@ export interface ExportRow {
   /** Nome da conta de origem; vazio se a conta não é conhecida. */
   account: string;
   origin: ExportOrigin;
+  /** Marcas da entrada do negócio (D-122): "Sim", "Não" ou vazio; "Pessoa física", "Empresa", "Exterior" ou vazio. */
+  invoiceMark: string;
+  payerMark: string;
 }
 
 export interface ExportPurchaseRow {
@@ -252,8 +263,9 @@ export function recordKindOf(record: Pick<FinancialRecord, 'kind' | 'invoice'>):
   return record.invoice ? 'pagamento_fatura' : 'gasto';
 }
 
-export function recordOriginOf(record: Pick<FinancialRecord, 'invoice' | 'commitmentId'>, commitments: ExportContext['commitments']): ExportOrigin {
+export function recordOriginOf(record: Pick<FinancialRecord, 'invoice' | 'commitmentId' | 'receivableId'>, commitments: ExportContext['commitments']): ExportOrigin {
   if (record.invoice) return 'fatura';
+  if (record.receivableId) return 'a_receber';
   if (!record.commitmentId) return 'anotado';
   const series = commitments.get(record.commitmentId)?.series ?? null;
   if (!series) return 'conta_a_pagar';
@@ -276,17 +288,22 @@ function oldestFirst(a: FinancialRecord, b: FinancialRecord): number {
 }
 
 export function exportRows(records: readonly FinancialRecord[], ctx: ExportContext): ExportRow[] {
-  return [...records].sort(oldestFirst).map((r) => ({
-    date: r.occurredOn,
-    month: recordMonth(r),
-    kind: recordKindOf(r),
-    description: r.description,
-    category: r.category ?? NO_CATEGORY_LABEL,
-    subcategory: r.subcategory ?? '',
-    amountCents: r.amountCents,
-    account: accountNameOf(ctx.accounts, r.accountId) ?? '',
-    origin: recordOriginOf(r, ctx.commitments),
-  }));
+  return [...records].sort(oldestFirst).map((r) => {
+    const marks = recordMarksOf(r);
+    return {
+      date: r.occurredOn,
+      month: recordMonth(r),
+      kind: recordKindOf(r),
+      description: r.description,
+      category: r.category ?? NO_CATEGORY_LABEL,
+      subcategory: r.subcategory ?? '',
+      amountCents: r.amountCents,
+      account: accountNameOf(ctx.accounts, r.accountId) ?? '',
+      origin: recordOriginOf(r, ctx.commitments),
+      invoiceMark: marks.hasInvoice === null ? '' : marks.hasInvoice ? RECORD_MARKS_TEXT.csvYes : RECORD_MARKS_TEXT.csvNo,
+      payerMark: marks.payerKind ? PAYER_KIND_LABEL[marks.payerKind] : '',
+    };
+  });
 }
 
 export function exportPurchaseRows(entries: readonly CardEntry[], ctx: Pick<ExportContext, 'cards'>): ExportPurchaseRow[] {
@@ -318,6 +335,8 @@ export const CSV_EOL = '\r\n';
 
 /** Lançamentos: a Subcategoria (D-107) vem logo depois da Categoria, vazia quando o lançamento não tem. */
 export const CSV_RECORD_HEADER: readonly string[] = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Subcategoria', 'Valor (R$)', 'Banco ou carteira', 'Origem', 'Mês do resumo'];
+/** No negócio (D-122): as duas marcas das entradas no fim (Nota fiscal e Quem pagou), vazias nas saídas e nas entradas sem marca. */
+export const CSV_BUSINESS_RECORD_HEADER: readonly string[] = [...CSV_RECORD_HEADER, RECORD_MARKS_TEXT.csvInvoice, RECORD_MARKS_TEXT.csvPayer];
 export const CSV_PURCHASE_HEADER: readonly string[] = ['Data da compra', 'Cartão', 'Descrição', 'Categoria', 'Valor total (R$)', 'Parcelas'];
 /** Investimentos (D-099): um movimento por linha, com o investimento, a ficha e o tipo do rendimento. */
 export const CSV_INVESTMENT_HEADER: readonly string[] = ['Data', 'Investimento', 'Tipo', 'Instituição', 'Movimento', 'Valor (R$)', 'Tipo do rendimento', 'Observação'];
@@ -347,10 +366,14 @@ export function csvAmount(cents: Cents): string {
 
 const csvLine = (cells: readonly string[]): string => cells.map(csvCell).join(CSV_SEPARATOR);
 
-/** O CSV de lançamentos: BOM, cabeçalho e uma linha por lançamento, do mais antigo ao mais novo. */
-export function buildRecordsCsv(rows: readonly ExportRow[]): string {
+/**
+ * O CSV de lançamentos: BOM, cabeçalho e uma linha por lançamento, do mais antigo ao mais novo. No negócio (`business`, D-122), mais as
+ * colunas Nota fiscal e Quem pagou.
+ */
+export function buildRecordsCsv(rows: readonly ExportRow[], options: { business?: boolean } = {}): string {
+  const business = options.business === true;
   const lines = [
-    csvLine(CSV_RECORD_HEADER),
+    csvLine(business ? CSV_BUSINESS_RECORD_HEADER : CSV_RECORD_HEADER),
     ...rows.map((r) =>
       csvLine([
         formatDateBR(r.date),
@@ -362,6 +385,7 @@ export function buildRecordsCsv(rows: readonly ExportRow[]): string {
         csvText(r.account),
         EXPORT_ORIGIN_LABEL[r.origin],
         formatMonthInputBR(r.month),
+        ...(business ? [r.invoiceMark, r.payerMark] : []),
       ]),
     ),
   ];
@@ -432,6 +456,8 @@ export interface ExportSource {
   invoices: readonly Pick<Invoice, 'cardId' | 'month' | 'mix'>[];
   /** Investimentos do Pessoal (D-099); ausente ou vazio: o arquivo e a seção não aparecem. */
   investments?: ExportInvestments;
+  /** O espaço é um negócio (D-122): o CSV de lançamentos leva as colunas Nota fiscal e Quem pagou. */
+  business?: boolean;
 }
 
 export interface ExportMonth {
@@ -686,7 +712,7 @@ export function buildExportFiles(source: ExportSource, format: ExportFormat, opt
       fileName: exportFileName('lancamentos', source.today),
       mime: 'text/csv;charset=utf-8',
       kind: 'csv',
-      content: buildRecordsCsv(exportRows(source.records, ctx)),
+      content: buildRecordsCsv(exportRows(source.records, ctx), { business: source.business === true }),
     });
   if (purchaseCount > 0)
     files.push({

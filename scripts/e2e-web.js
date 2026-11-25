@@ -17388,6 +17388,317 @@ setInterval(async () => {
   }
 
   // ==================================================================================================================
+  // Espaço Negócio: a receber, nota e quem pagou, lembretes do MEI (D-122, a partir da pesquisa de 18/11/2026, itens 3, 8 e 9). No cenário
+  // "negocio" (os números de sempre do D-113: outubro com R$ 760,00 e R$ 418,00), tudo criado pela tela: (1) "Seu negócio" ganha o cartão
+  // "A receber" (título de nível 2), vazio, com "Anotar valor a receber"; sem o tipo MEI, nada dos lembretes do MEI. (2) Anotar: o tipo
+  // (fiado, cartão ou outro), a descrição, o valor, a data combinada (ou prevista, no cartão), a categoria de entrada e o nome de quem deve,
+  // com a dica de não escrever CPF; os erros ficam nos campos; salvo, o cartão mostra o total em aberto, quantos são, a próxima data e quantos
+  // passaram da data, e Entrou, Saiu e Sobrou não mudam. (3) A lista /negocio/a-receber: em aberto por data, "Passou da data combinada" na
+  // mesma cor das outras legendas (sem cor de alerta). (4) "Recebi": o valor (R$ 28,00, depois da taxa), a data e a conta; vira uma entrada
+  // comum que conta em Entrou; o recebido vai para "Recebidos recentes". (5) O detalhe e a entrada: "Origem: A receber", sem "Mover" e sem a
+  // troca para gasto; as marcas em "Mais detalhes"; excluir a entrada devolve o valor para Em aberto. (6) Editar e excluir um em aberto. (7) As
+  // marcas numa entrada nova, o "Resumo do ano" com "Nota e quem pagou" e a exportação com as colunas Nota fiscal e Quem pagou. (8) O tipo MEI
+  // mostra "Lembretes do MEI" (na web, só o que são). (9) Trocar uma entrada marcada para saída tira as marcas. (10) Quem anota e vê no negócio
+  // de outra pessoa também anota um valor a receber. (11) Computador (1280 px) e modo escuro. Capturas 840 a 853. Nada vai à rede.
+  // ==================================================================================================================
+  {
+    const arWrites0 = writes.length;
+    const arTexts = [];
+    const arKeep = async () => { const x = await body(); arTexts.push(x); screenTexts.push(x); return x; };
+    const AR = 'Sacolé da Maria';
+    const AR_TAB = `Ver dados do negócio ${AR}`;
+    const arTab = (name) => p.getByRole('tab', { name, exact: true }).filter({ visible: true }).first();
+    const arEnter = async (cenario = 'negocio') => {
+      await p.goto(`http://localhost:${PORT}/?cenario=${cenario}`); await waitText('Cuidar da vida financeira');
+      await btn('Ver demonstração com dados fictícios').click(); await waitText('Diferença do mês');
+      await waitText('Ainda a pagar neste mês', 12000).catch(() => {}); await p.waitForTimeout(600);
+    };
+    const arBack = async () => { await goResumo(); await p.waitForTimeout(500); };
+    const arOpen = async () => { await btn('Ver seu negócio').click(); await waitText('Últimos meses'); await p.waitForTimeout(600); };
+    // O título no meio da tela (a barra de abas cobre o pé da tela: "se precisar" deixaria o título embaixo dela).
+    const arScroll = async (name) => { await p.getByRole('heading', { name, exact: true }).filter({ visible: true }).first().evaluate((e) => e.scrollIntoView({ block: 'center' })); await p.waitForTimeout(300); };
+    const arLabel = (label) => p.locator(`[aria-label="${label}"]`).filter({ visible: true }).count();
+    const arRadios = (group) => p.evaluate((g) => [...document.querySelectorAll(`[role=radiogroup][aria-label="${g}"] [role=radio]`)].filter((e) => e.getBoundingClientRect().width > 0).map((e) => `${e.getAttribute('aria-label') || e.textContent}:${e.getAttribute('aria-checked')}`), group);
+    const arColorOf = (x) => p.evaluate((x) => { const e = [...document.querySelectorAll('div[dir="auto"]')].find((d) => d.getBoundingClientRect().width > 0 && d.children.length === 0 && (d.textContent || '').startsWith(x)); return e ? getComputedStyle(e).color : null; }, x);
+    const arSaved = async (title) => { await waitUntil(async () => (await h1Name()) !== title, 8000); await p.waitForTimeout(500); };
+    const arRow = (start) => p.getByRole('button', { name: new RegExp(`^${start}, `) }).filter({ visible: true }).first();
+    const arCard = () => { const t = arTexts[arTexts.length - 1] ?? ''; const i = t.indexOf('A receber\n'); return i < 0 ? '' : t.slice(i, t.indexOf('Resumo do ano', i)); };
+    // Para a captura: sem foco em campo e cada área com rolagem no começo.
+    const arTop = () => p.evaluate(() => { document.activeElement?.blur?.(); for (const e of document.querySelectorAll('*')) if (e.scrollTop > 0) e.scrollTop = 0; });
+
+    // 1. "Seu negócio" com o cartão "A receber", vazio.
+    await arEnter();
+    await arTab(AR_TAB).click(); await p.waitForTimeout(600);
+    await arOpen(); await arScroll('A receber');
+    let t = await arKeep();
+    ok('Negócio (D-122): "Seu negócio" com os números de sempre e o cartão "A receber" (nível 2), vazio, com "Anotar valor a receber", sem "Lembretes do MEI"',
+      (await arLabel('Entrou: R$ 760,00')) === 1 && (await arLabel('Saiu: R$ 418,00')) === 1 && (await arLabel('Sobrou: R$ 342,00')) === 1 &&
+        (await p.getByRole('heading', { name: 'A receber', level: 2 }).filter({ visible: true }).count()) === 1 &&
+        arCard().includes('Nada a receber anotado. Anote aqui a venda no fiado, a venda no cartão que ainda vai cair ou outro valor que o negócio vai receber.') &&
+        arCard().includes('Não entra em Entrou nem em Saiu: o dinheiro entra quando você marca como recebido.') &&
+        (await visibleCount('button', 'Anotar valor a receber')) === 1 && (await visibleCount('button', 'Ver o que falta receber')) === 0 && !t.includes('Lembretes do MEI'), arCard());
+    await atWidths(async (w) => { await arScroll('A receber'); await layoutChecks(`Negócio (D-122), cartão "A receber" vazio ${w}px`); if (w === 390) await shot('840_negocio_a_receber_vazio'); });
+
+    // 2. Anotar um fiado (com a data combinada que já passou) e um cartão.
+    await btn('Anotar valor a receber').click(); await waitText('Quem deve (opcional)'); await p.waitForTimeout(500);
+    t = await arKeep();
+    ok('Negócio (D-122), anotar: o tipo (fiado marcado), a descrição, o valor, a data combinada com "Hoje", "Em 7 dias" e "Em 30 dias", a categoria de entrada e quem deve, com a dica de não escrever CPF, sem a barra de abas',
+      (await h1Name()) === 'Anotar valor a receber' &&
+        JSON.stringify(await arRadios('O que é')) === JSON.stringify(['Venda no fiado:true', 'Venda no cartão:false', 'Outro valor a receber:false']) &&
+        t.includes('Quem comprou vai pagar depois.') && t.includes('Data combinada') && (await visibleCount('radio', 'Em 30 dias')) === 1 &&
+        JSON.stringify(await arRadios('Categoria')) === JSON.stringify(['Vendas:true', 'Serviços:false', 'Outras entradas:false']) &&
+        t.includes('Só o nome ou um apelido. Não escreva CPF, telefone nem outros dados da pessoa.') &&
+        t.includes('Não entra em Entrou nem em Saiu até você marcar como recebido.') &&
+        (await p.getByRole('tab', { name: 'Resumo' }).filter({ visible: true }).count()) === 0, t.slice(0, 900));
+    await btn('Salvar').click(); await p.waitForTimeout(400);
+    t = await body();
+    ok('Negócio (D-122), anotar: sem descrição, valor e data, os erros ficam nos campos e nada é salvo',
+      t.includes('Dê uma descrição de 1 a 80 caracteres.') && t.includes('Informe um valor maior que zero, como 80,00.') && t.includes('Confira a data informada.') && (await h1Name()) === 'Anotar valor a receber');
+    await field('Descrição').fill('10 sacolés'); await field('Valor em reais').fill('30'); await field('Data combinada').fill('05102026'); await field('Quem deve (opcional)').fill('Ana');
+    await atWidths(async (w) => { await innerChecks(`Negócio (D-122), anotar valor a receber ${w}px`); if (w === 390) { await arTop(); await shot('841_negocio_a_receber_anotar'); } });
+    await btn('Salvar').click(); await waitText('Valor a receber salvo.', 8000); await p.waitForTimeout(600);
+    await arScroll('A receber');
+    t = await arKeep();
+    ok('Negócio (D-122): salvo, volta a "Seu negócio": o cartão mostra R$ 30,00 em aberto, "1 valor · data: 05/10" e "1 passou da data.", e Entrou, Saiu e Sobrou não mudam',
+      (await h1Name()) === 'Seu negócio' && arCard().includes('Em aberto\nR$ 30,00\n1 valor · data: 05/10\n1 passou da data.') &&
+        (await arLabel('A receber: R$ 30,00 em aberto, 1 valor')) === 1 &&
+        (await arLabel('Entrou: R$ 760,00')) === 1 && (await arLabel('Saiu: R$ 418,00')) === 1 && (await arLabel('Sobrou: R$ 342,00')) === 1, arCard());
+    await btn('Anotar valor a receber').click(); await waitText('Quem deve (opcional)'); await p.waitForTimeout(400);
+    await radio('Venda no cartão').click(); await p.waitForTimeout(250);
+    t = await body();
+    ok('Negócio (D-122), venda no cartão: "Data prevista", a ajuda do cartão e sem "Quem deve"',
+      t.includes('Data prevista') && t.includes('O dinheiro da venda no cartão ainda vai cair na conta.') && !t.includes('Quem deve (opcional)'), t.slice(0, 700));
+    await field('Descrição').fill('Vendas da feira no cartão'); await field('Valor em reais').fill('500'); await radio('Em 30 dias').click();
+    await btn('Salvar').click(); await waitText('Valor a receber salvo.', 8000); await p.waitForTimeout(600);
+    await arScroll('A receber');
+    t = await arKeep();
+    ok('Negócio (D-122): com dois valores, R$ 530,00 em aberto, a próxima data (06/11) e quantos passaram da data, numa cor só',
+      arCard().includes('Em aberto\nR$ 530,00\n2 valores · próxima data: 06/11\n1 passou da data.') && (await visibleCount('button', 'Ver o que falta receber')) === 1, arCard());
+    await shot('842_negocio_a_receber_cartao');
+    await arBack();
+    await expectTotals('Negócio (D-122): o "a receber" não entra no Resumo do negócio (Entrou R$ 760,00, Saiu R$ 418,00, Sobrou R$ 342,00)', 'R$ 760,00', 'R$ 418,00', 'R$ 342,00', 'R$ 0,00');
+
+    // 3. A lista.
+    await arOpen(); await arScroll('A receber');
+    await btn('Ver o que falta receber').click(); await waitText('Total em aberto'); await p.waitForTimeout(600);
+    t = await arKeep();
+    ok('Negócio (D-122), lista: "A receber" com o que é, "Total em aberto: R$ 530,00" e os em aberto pela data, com o nome de quem deve e "Recebi" em cada um',
+      (await h1Name()) === 'A receber' && t.includes('Não entra em Entrou, Saiu nem nos totais.') && t.includes('Total em aberto: R$ 530,00') &&
+        t.indexOf('10 sacolés') < t.indexOf('Vendas da feira no cartão') && t.includes('Fiado · Ana · Passou da data combinada (05/10)') && t.includes('Cartão · Prevista para 06/11') &&
+        (await visibleCount('button', 'Recebi: 10 sacolés, R$ 30,00')) === 1 && (await visibleCount('button', 'Recebi: Vendas da feira no cartão, R$ 500,00')) === 1 &&
+        (await p.getByRole('heading', { name: 'Em aberto', level: 2 }).filter({ visible: true }).count()) === 1 && t.includes('Os valores são os que você anotou.'), t.slice(0, 1000));
+    const arPast = await arColorOf('Fiado · Ana · Passou'), arFuture = await arColorOf('Cartão · Prevista');
+    ok('Negócio (D-122): "Passou da data combinada" na mesma cor das outras legendas (sem cor de alerta)', arPast !== null && arPast === arFuture, `${arPast} ${arFuture}`);
+    ok('Negócio (D-122), lista: a linha abre o detalhe, com o nome acessível inteiro', (await arRow('10 sacolés').getAttribute('aria-label')) === '10 sacolés, fiado · Ana · Passou da data combinada (05/10), R$ 30,00');
+    await atWidths(async (w) => { await layoutChecks(`Negócio (D-122), lista "A receber" ${w}px`); await shot(w === 390 ? '843_negocio_a_receber_lista' : '843_negocio_a_receber_lista_320px'); });
+
+    // 4. "Recebi".
+    await btn('Recebi: 10 sacolés, R$ 30,00').click(); await waitText('Valor recebido'); await p.waitForTimeout(500);
+    t = await arKeep();
+    ok('Negócio (D-122), "Recebi": o combinado, o valor (pode ser diferente), a data de hoje e a conta do negócio',
+      (await h1Name()) === 'Recebi' && t.includes('10 sacolés\nCombinado: R$ 30,00 para 05/10/2026\nQuem deve: Ana') &&
+        t.includes('Fica uma entrada comum no negócio, que conta pela data em que o dinheiro entrou.') &&
+        (await field('Valor recebido').inputValue()) === '30,00' && (await field('Data em que recebeu').inputValue()) === '07/10/2026' &&
+        t.includes('Pode ser diferente do combinado, por exemplo o que caiu depois da taxa do cartão.') && t.includes('Entrou em: Conta do negócio') &&
+        (await visibleCount('button', 'Confirmar recebimento')) === 1, t.slice(0, 900));
+    await atWidths(async (w) => { await innerChecks(`Negócio (D-122), "Recebi" ${w}px`); if (w === 390) { await arTop(); await shot('844_negocio_a_receber_recebi'); } });
+    await field('Data em que recebeu').fill('08102026'); await btn('Confirmar recebimento').click(); await p.waitForTimeout(400);
+    ok('Negócio (D-122), "Recebi": data depois de hoje fica no campo e nada é salvo', (await body()).includes('Use uma data até hoje.') && (await h1Name()) === 'Recebi');
+    await radio('Hoje').click();
+    await field('Valor recebido').fill('28');
+    await btn('Confirmar recebimento').click(); await waitText('Recebido: a entrada foi anotada no negócio.', 8000); await p.waitForTimeout(600);
+    t = await arKeep();
+    ok('Negócio (D-122), recebido: a lista com R$ 500,00 em aberto e "Recebidos recentes" com o fiado, recebido em 07/10, R$ 28,00',
+      (await h1Name()) === 'A receber' && t.includes('Total em aberto: R$ 500,00') && t.includes('Recebidos recentes\nCada um virou uma entrada no negócio, na data em que o dinheiro entrou.\n10 sacolés\nFiado · Ana · Recebido em 07/10\nR$ 28,00') &&
+        (await visibleCount('button', 'Recebi: 10 sacolés, R$ 30,00')) === 0, t.slice(0, 1200));
+    await shot('845_negocio_a_receber_recebido');
+    await btn('Voltar').click(); await waitText('Últimos meses'); await p.waitForTimeout(600);
+    ok('Negócio (D-122), recebido: a entrada conta em Entrou pela data em que entrou (R$ 788,00), e o que sobrou também (R$ 370,00)',
+      (await arLabel('Entrou: R$ 788,00')) === 1 && (await arLabel('Saiu: R$ 418,00')) === 1 && (await arLabel('Sobrou: R$ 370,00')) === 1);
+    await arBack();
+    await expectTotals('Negócio (D-122), recebido: no Resumo do negócio, Entrou R$ 788,00 e Sobrou R$ 370,00', 'R$ 788,00', 'R$ 418,00', 'R$ 370,00', 'R$ 0,00');
+
+    // 5. O detalhe, a entrada, as marcas e desfazer.
+    await arOpen(); await arScroll('A receber');
+    await btn('Ver o que falta receber').click(); await waitText('Recebidos recentes'); await p.waitForTimeout(500);
+    await arRow('10 sacolés').click(); await waitText('Valor recebido'); await p.waitForTimeout(500);
+    t = await arKeep();
+    ok('Negócio (D-122), detalhe do recebido: "Recebido", o que é, a data combinada, quem deve, recebido em 07/10/2026, R$ 28,00 na Conta do negócio e "Ver a entrada", sem editar nem excluir',
+      (await h1Name()) === 'Valor a receber' && t.includes('Recebido\n10 sacolés') && t.includes('O que é\nVenda no fiado') && t.includes('Data combinada\n05/10/2026') && t.includes('Quem deve\nAna') &&
+        t.includes('Recebido em\n07/10/2026\nValor recebido\nR$ 28,00\nEntrou em\nConta do negócio') && t.includes('Para desfazer, exclua a entrada: o valor volta para Em aberto.') &&
+        (await visibleCount('button', 'Ver a entrada')) === 1 && (await visibleCount('button', 'Editar')) === 0 && (await visibleCount('button', 'Excluir')) === 0, t.slice(0, 1000));
+    await btn('Ver a entrada').click(); await waitText('Origem'); await p.waitForTimeout(500);
+    t = await arKeep();
+    ok('Negócio (D-122), a entrada: "Origem: A receber", a frase do que excluir faz, "Ver o valor a receber" e "Editar entrada", sem "Mover para o Pessoal"',
+      t.includes('Origem\nA receber') && t.includes('Esta entrada veio de um valor a receber, marcado como recebido. Ela continua entrada e fica no negócio. Excluir esta entrada devolve o valor para Em aberto.') &&
+        (await visibleCount('button', 'Ver o valor a receber')) === 1 && (await visibleCount('button', 'Editar entrada')) === 1 && (await visibleCount('button', 'Mover para o Pessoal')) === 0, t.slice(0, 1000));
+    await atWidths(async (w) => { await innerChecks(`Negócio (D-122), entrada de um valor a receber ${w}px`); if (w === 390) await shot('846_negocio_a_receber_entrada'); });
+    await btn('Editar entrada').click(); await waitText('Valor em reais'); await p.waitForTimeout(500);
+    t = await arKeep();
+    ok('Negócio (D-122), editar a entrada: sem a troca para gasto (a frase diz por quê) e "Mais detalhes (opcional)" recolhido',
+      t.includes('Esta entrada veio de um valor a receber e continua entrada. Para desfazer o recebimento, exclua a entrada.') && (await visibleCount('radio', 'Gasto')) === 0 &&
+        t.includes('Mais detalhes (opcional)\nDuas marcas para você se organizar. Não mudam nenhum total.') && !t.includes('Teve nota fiscal?'), t.slice(0, 900));
+    await btn('Mostrar mais detalhes').click(); await p.waitForTimeout(300);
+    ok('Negócio (D-122), "Mais detalhes": "Teve nota fiscal?" (Sim, Não) e "Quem pagou" (Pessoa física, Empresa, Exterior), nada marcado',
+      JSON.stringify(await arRadios('Teve nota fiscal?')) === JSON.stringify(['Sim:false', 'Não:false']) &&
+        JSON.stringify(await arRadios('Quem pagou')) === JSON.stringify(['Pessoa física:false', 'Empresa:false', 'Exterior:false']) &&
+        (await p.getByRole('button', { name: 'Recolher mais detalhes' }).filter({ visible: true }).getAttribute('aria-expanded')) === 'true');
+    await radio('Sim').click(); await radio('Empresa').click(); await p.waitForTimeout(200);
+    await radio('Empresa').scrollIntoViewIfNeeded(); await shot('847_negocio_entrada_mais_detalhes');
+    await atWidths(async (w) => { await layoutChecks(`Negócio (D-122), "Mais detalhes" ${w}px`); });
+    await btn('Salvar entrada').click(); await waitText('Alterações salvas.', 8000); await p.waitForTimeout(500);
+    t = await arKeep();
+    ok('Negócio (D-122), as marcas no detalhe: "Nota fiscal: Teve nota" e "Quem pagou: Empresa"', t.includes('Nota fiscal\nTeve nota') && t.includes('Quem pagou\nEmpresa'), t.slice(0, 900));
+    await btn('Excluir recebimento').click(); await p.waitForTimeout(300);
+    t = await dialogText();
+    ok('Negócio (D-122), excluir a entrada: a confirmação diz que o valor a receber volta para Em aberto', t.includes('O valor a receber ligado a esta entrada volta para Em aberto.'), t);
+    await confirmIn('Excluir recebimento'); await waitText('Entrada excluída. O valor a receber voltou para Em aberto.', 8000); await p.waitForTimeout(600);
+    t = await arKeep();
+    ok('Negócio (D-122), desfeito: de volta ao valor a receber, "Em aberto", com "Recebi", "Editar" e "Excluir"',
+      (await h1Name()) === 'Valor a receber' && t.includes('Em aberto\n10 sacolés') && (await visibleCount('button', 'Recebi')) === 1 &&
+        (await visibleCount('button', 'Editar')) === 1 && (await visibleCount('button', 'Excluir')) === 1, t.slice(0, 700));
+
+    // 6. Editar e excluir um em aberto.
+    await btn('Ir para A receber').click(); await waitText('Total em aberto: R$ 530,00'); await p.waitForTimeout(500);
+    await arRow('Vendas da feira no cartão').click(); await waitText('Data prevista'); await p.waitForTimeout(400);
+    await btn('Editar').click(); await waitText('Editar valor a receber'); await p.waitForTimeout(400);
+    ok('Negócio (D-122), editar: o preenchimento do valor a receber, com "Salvar alterações"',
+      (await field('Valor em reais').inputValue()) === '500,00' && (await field('Data prevista').inputValue()) === '06/11/2026' && (await visibleCount('button', 'Salvar alterações')) === 1);
+    await field('Valor em reais').fill('450'); await btn('Salvar alterações').click(); await waitText('Alterações salvas.', 8000); await p.waitForTimeout(500);
+    ok('Negócio (D-122), editado: o detalhe com R$ 450,00', (await h1Name()) === 'Valor a receber' && (await body()).includes('R$ 450,00'));
+    await btn('Ir para A receber').click(); await waitText('Total em aberto'); await p.waitForTimeout(400);
+    await arRow('10 sacolés').click(); await waitText('Data combinada'); await p.waitForTimeout(400);
+    await btn('Excluir').click(); await p.waitForTimeout(300);
+    t = await dialogText();
+    ok('Negócio (D-122), excluir um em aberto: "Ele sai da lista. Nada muda em Entrou nem em Saiu."', t.includes('Excluir este valor a receber?') && t.includes('Ele sai da lista. Nada muda em Entrou nem em Saiu.'), t);
+    await confirmIn('Excluir'); await waitText('Valor a receber excluído.', 8000); await p.waitForTimeout(500);
+    t = await arKeep();
+    ok('Negócio (D-122), excluído: a lista com só a venda no cartão (R$ 450,00) e sem recebidos', (await h1Name()) === 'A receber' && t.includes('Total em aberto: R$ 450,00') && !t.includes('10 sacolés') && !t.includes('Recebidos recentes'), t.slice(0, 700));
+    await btn('Voltar').click(); await waitText('Últimos meses'); await p.waitForTimeout(500);
+    ok('Negócio (D-122): Entrou, Saiu e Sobrou voltam a R$ 760,00, R$ 418,00 e R$ 342,00', (await arLabel('Entrou: R$ 760,00')) === 1 && (await arLabel('Sobrou: R$ 342,00')) === 1);
+
+    // 7. As marcas numa entrada nova, o resumo do ano e a exportação.
+    await btn('Anotar entrada').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
+    ok('Negócio (D-122), anotar entrada: "Mais detalhes (opcional)" recolhido no fim', (await body()).includes('Mais detalhes (opcional)') && (await visibleCount('radio', 'Sim')) === 0);
+    await field('Descrição').fill('Bolo de festa'); await field('Valor em reais').fill('100'); await radio('Vendas').click();
+    await btn('Mostrar mais detalhes').click(); await p.waitForTimeout(250);
+    await radio('Sim').click(); await radio('Sim').click(); await radio('Não').click(); await radio('Pessoa física').click(); await p.waitForTimeout(200);
+    ok('Negócio (D-122), "Mais detalhes": tocar de novo desmarca; "Não" e "Pessoa física" marcados',
+      JSON.stringify(await arRadios('Teve nota fiscal?')) === JSON.stringify(['Sim:false', 'Não:true']) && (await arRadios('Quem pagou')).includes('Pessoa física:true'));
+    await btn('Salvar entrada').click(); await arSaved('Anotar entrada');
+    await arBack(); await arOpen();
+    await btn('Resumo do ano').click(); await waitText('Entrou na operação'); await p.waitForTimeout(700);
+    await arScroll('Nota e quem pagou');
+    t = await arKeep();
+    ok('Negócio (D-122), resumo do ano: "Nota e quem pagou" com as entradas da operação por marca (com nota, sem nota, não marcado; de quem veio), sem imposto',
+      t.includes('Nota e quem pagou\nAs entradas da operação do ano pelas marcas que você pôs em "Mais detalhes". Os valores são os que você anotou.\nNota fiscal\nCom nota\nR$ 0,00\nSem nota\nR$ 100,00\nNão marcado\nR$ 2.520,00\nQuem pagou\nDe pessoa física\nR$ 100,00\nDe empresa\nR$ 0,00\nDo exterior\nR$ 0,00\nNão marcado\nR$ 2.520,00'),
+      t.slice(t.indexOf('Nota e quem pagou'), t.indexOf('Nota e quem pagou') + 500));
+    const arH2 = await p.evaluate(() => [...document.querySelectorAll('[role=heading][aria-level="2"]')].filter((e) => e.getBoundingClientRect().width > 0).map((e) => e.textContent));
+    ok('Negócio (D-122), resumo do ano: "Nota e quem pagou" (nível 2) depois das saídas, com "Nota fiscal" e "Quem pagou" no nível 3',
+      JSON.stringify(arH2) === JSON.stringify(['Entrou na operação', 'Saiu na operação', 'Nota e quem pagou', 'Fora da operação', 'Retiradas para o Pessoal', 'Ficou no negócio']) &&
+        (await p.getByRole('heading', { name: 'Quem pagou', level: 3 }).filter({ visible: true }).count()) === 1, JSON.stringify(arH2));
+    ok('Negócio (D-122), resumo do ano: o nome acessível de cada linha diz a marca', (await arLabel('Nota fiscal, Sem nota: R$ 100,00')) === 1 && (await arLabel('Quem pagou, De pessoa física: R$ 100,00')) === 1);
+    await atWidths(async (w) => { await arScroll('Nota e quem pagou'); await layoutChecks(`Negócio (D-122), resumo do ano com as marcas ${w}px`); if (w === 390) { await arScroll('Nota e quem pagou'); await shot('848_negocio_resumo_do_ano_marcas'); } });
+    await btn('Exportar os lançamentos do negócio').click(); await waitText('O que vai no arquivo'); await p.waitForTimeout(500);
+    t = await arKeep();
+    ok('Negócio (D-122), exportar o negócio: "O que vai no arquivo" diz que a planilha leva Nota fiscal e Quem pagou', t.includes('Mês do resumo (o mês em que o lançamento conta), Nota fiscal e Quem pagou (as marcas das entradas, vazias quando não marcadas)'), t.slice(0, 1500));
+    await btn('Preparar arquivo').click(); await p.getByText('Arquivo pronto', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 8000 }); await p.waitForTimeout(300);
+    const [arDl] = await Promise.all([p.waitForEvent('download'), btn('Baixar lançamentos (CSV)').click()]);
+    const arCsv = fs.readFileSync(await arDl.path()).toString('utf8').replace(/^﻿/, '').split('\r\n');
+    ok('Negócio (D-122), a planilha do negócio: as colunas Nota fiscal e Quem pagou no fim, preenchidas só na entrada marcada',
+      arCsv[0] === 'Data;Tipo;Descrição;Categoria;Subcategoria;Valor (R$);Banco ou carteira;Origem;Mês do resumo;Nota fiscal;Quem pagou' &&
+        arCsv.includes('07/10/2026;Recebimento;Bolo de festa;Vendas;;100,00;Conta do negócio;Anotado;10/2026;Não;Pessoa física') &&
+        arCsv.includes('05/10/2026;Recebimento;Vendas da semana;Vendas;;460,00;Conta do negócio;Anotado;10/2026;;'), arCsv.slice(0, 3).join(' | '));
+    await btn('Voltar').click(); await p.waitForTimeout(400);
+    await btn('Voltar').click(); await waitText('Últimos meses'); await p.waitForTimeout(500);
+
+    // 8. O tipo MEI e os lembretes do MEI.
+    await arScroll('Tipo do negócio');
+    await radio('MEI').click(); await waitText('Tipo do negócio salvo.', 8000); await p.waitForTimeout(700);
+    await arScroll('Lembretes do MEI');
+    t = await arKeep();
+    ok('Negócio (D-122), tipo MEI: "Lembretes do MEI" (nível 2) com "DAS do mês" e "Declaração anual do MEI", só datas; na web, sem interruptor',
+      (await p.getByRole('heading', { name: 'Lembretes do MEI', level: 2 }).filter({ visible: true }).count()) === 1 &&
+        t.includes('Lembretes do MEI\nDois avisos opcionais neste aparelho, desligados até você ligar. São só datas: a Clarevo não calcula imposto.\nDAS do mês\nNo dia 15 de cada mês: "O DAS do MEI vence no dia 20."\nDeclaração anual do MEI\nEm 2 de maio: "A declaração anual do MEI vai até 31 de maio."\nLembretes estão disponíveis no app para celular.') &&
+        (await p.getByRole('switch').filter({ visible: true }).count()) === 0, t.slice(t.indexOf('Lembretes do MEI'), t.indexOf('Lembretes do MEI') + 500));
+    await atWidths(async (w) => { await arScroll('Lembretes do MEI'); await layoutChecks(`Negócio (D-122), lembretes do MEI ${w}px`); if (w === 390) await shot('849_negocio_lembretes_mei'); });
+    await arScroll('Tipo do negócio');
+    await radio('Prefiro não dizer').click(); await waitText('Tipo do negócio tirado.', 8000); await p.waitForTimeout(500);
+    ok('Negócio (D-122): sem o tipo MEI, "Lembretes do MEI" some', !(await body()).includes('Lembretes do MEI'));
+
+    // 9. Trocar a entrada marcada para saída tira as marcas.
+    await arBack();
+    await tabByName('Movimentos').click(); await waitText('Organizar'); await p.waitForTimeout(500);
+    await arRow('Bolo de festa').click(); await waitText('Nota fiscal'); await p.waitForTimeout(400);
+    await btn('Editar entrada').click(); await waitText('Valor em reais'); await p.waitForTimeout(400);
+    await radio('Gasto').click(); await p.waitForTimeout(300);
+    t = await body();
+    ok('Negócio (D-122): trocar a entrada marcada para saída diz que as marcas saem, e "Mais detalhes" some', t.includes('As marcas de nota fiscal e de quem pagou saem ao trocar para saída.') && !t.includes('Mais detalhes (opcional)'), t.slice(0, 900));
+    await btn('Salvar saída').click(); await waitText('Alterações salvas.', 8000); await p.waitForTimeout(500);
+    t = await body();
+    ok('Negócio (D-122): a saída sem as marcas', !t.includes('Nota fiscal') && !t.includes('Quem pagou'), t.slice(0, 700));
+
+    // 10. Quem anota e vê no negócio de outra pessoa (Plus, D-120) também anota um valor a receber.
+    await arEnter('negocio-plus-membro');
+    await arTab('Ver dados do negócio Marmitas da Bia').click(); await p.waitForTimeout(600);
+    await arOpen(); await arScroll('A receber');
+    ok('Negócio (D-122), quem anota e vê: o cartão "A receber" com "Anotar valor a receber"', (await visibleCount('button', 'Anotar valor a receber')) === 1);
+    await btn('Anotar valor a receber').click(); await waitText('Quem deve (opcional)'); await p.waitForTimeout(400);
+    await field('Descrição').fill('Marmitas da semana'); await field('Valor em reais').fill('120'); await radio('Em 7 dias').click();
+    await btn('Salvar').click(); await waitText('Valor a receber salvo.', 8000); await p.waitForTimeout(500);
+    await arScroll('A receber');
+    ok('Negócio (D-122), quem anota e vê: salvo no negócio de outra pessoa (R$ 120,00 em aberto, data 14/10)', (await body()).includes('Em aberto\nR$ 120,00\n1 valor · data: 14/10'));
+
+    // 11. Computador (1280 px) e modo escuro.
+    await btn('Ver o que falta receber').click(); await waitText('Total em aberto'); await p.waitForTimeout(500);
+    await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(600);
+    await layoutChecks('Negócio (D-122), lista "A receber" 1280px'); await shot('850_negocio_a_receber_computador');
+    await btn('Recebi: Marmitas da semana, R$ 120,00').click(); await waitText('Valor recebido'); await p.waitForTimeout(600);
+    await layoutChecks('Negócio (D-122), "Recebi" 1280px'); await arTop(); await shot('851_negocio_a_receber_recebi_computador');
+    await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400);
+    {
+      const arDark = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
+      await arDark.addInitScript(() => { window.__clarevoSemTour = true; });
+      const dp = await arDark.newPage();
+      const dpErrors = []; dp.on('pageerror', (e) => dpErrors.push(e.message));
+      const dpWrites = []; dp.on('request', (r) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(r.method()) && dpWrites.push(r.url()));
+      const dbtn = (name) => dp.getByRole('button', { name, exact: true }).filter({ visible: true }).first();
+      const dfield = (name) => dp.getByLabel(name, { exact: true }).filter({ visible: true }).first();
+      await dp.goto(`http://localhost:${PORT}/?cenario=negocio`); await dp.getByText('Cuidar da vida financeira').first().waitFor({ timeout: 10000 });
+      await dbtn('Ver demonstração com dados fictícios').click(); await dp.getByText('Diferença do mês', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 12000 });
+      await dp.getByRole('tab', { name: AR_TAB, exact: true }).filter({ visible: true }).first().click(); await dp.waitForTimeout(600);
+      await dbtn('Ver seu negócio').click(); await dp.getByText('Últimos meses', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 10000 });
+      await dbtn('Anotar valor a receber').click(); await dp.getByText('Quem deve (opcional)').filter({ visible: true }).first().waitFor({ timeout: 8000 });
+      await dfield('Descrição').fill('10 sacolés'); await dfield('Valor em reais').fill('30'); await dfield('Data combinada').fill('05102026'); await dfield('Quem deve (opcional)').fill('Ana');
+      await dp.waitForTimeout(400);
+      await dp.evaluate(AC_SRC);
+      const dc0 = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow() }));
+      await dbtn('Salvar').click(); await dp.getByText('Valor a receber salvo.').filter({ visible: true }).first().waitFor({ timeout: 8000 }); await dp.waitForTimeout(500);
+      await dp.getByRole('heading', { name: 'A receber', exact: true }).filter({ visible: true }).first().scrollIntoViewIfNeeded(); await dp.waitForTimeout(500);
+      await dp.evaluate(AC_SRC);
+      const dc1 = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow(), bg: getComputedStyle(document.body).backgroundColor }));
+      await dp.screenshot({ path: `${OUT}/852_escuro_negocio_a_receber_cartao.png` });
+      await dbtn('Ver o que falta receber').click(); await dp.getByText('Total em aberto: R$ 30,00').filter({ visible: true }).first().waitFor({ timeout: 8000 }); await dp.waitForTimeout(600);
+      await dp.evaluate(AC_SRC);
+      const dc2 = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow() }));
+      await dp.screenshot({ path: `${OUT}/853_escuro_negocio_a_receber_lista.png` });
+      ok(`Negócio (D-122), modo escuro: o formulário (${dc0.c.n} textos), o cartão (${dc1.c.n}) e a lista (${dc2.c.n}) no fundo azul-marinho, com contraste de 4,5:1 e nada fora da tela`,
+        dc1.bg === 'rgb(19, 30, 62)' && dc0.c.n > 10 && dc1.c.n > 20 && dc2.c.n > 10 && dc0.c.bad.length === 0 && dc1.c.bad.length === 0 && dc2.c.bad.length === 0 &&
+          dc0.o.length === 0 && dc1.o.length === 0 && dc2.o.length === 0 && dpErrors.length === 0 && dpWrites.length === 0,
+        `${dc1.bg} ${[...dc0.c.bad, ...dc1.c.bad, ...dc2.c.bad, ...dc0.o, ...dc1.o, ...dc2.o, ...dpErrors].slice(0, 4).join(' | ')}`);
+      await dp.setViewportSize({ width: 1280, height: 800 }); await dp.waitForTimeout(700);
+      await dp.evaluate(AC_SRC);
+      const dc3 = await dp.evaluate(() => ({ c: window.__acc.contrast(), o: window.__acc.overflow() }));
+      ok(`Negócio (D-122), modo escuro no computador (1280 px): a lista com contraste de 4,5:1 (${dc3.c.n} textos) e nada fora da tela`, dc3.c.n > 10 && dc3.c.bad.length === 0 && dc3.o.length === 0, [...dc3.c.bad, ...dc3.o].slice(0, 4).join(' | '));
+      await arDark.close();
+    }
+
+    // Textos e escritas.
+    const arBad = arTexts.map((x) => x.match(FORBIDDEN)?.[0] ?? x.match(/\b(preju[ií]zo|lucro|cuidado|aten[cç][aã]o|alerta|urgente|atrasad\w*|caloteir\w*|inadimpl\w*|devedor\w*|cobran[cç]a|parab[eé]ns|deveria)\b|livro[- ]caixa|declare\b|pague\b|sua contabilidade/i)?.[0]).filter(Boolean);
+    ok('Negócio (D-122): nas telas novas, nenhum termo proibido, travessão longo, palavra de cobrança ou de julgamento, nem orientação de imposto', arTexts.length >= 15 && arBad.length === 0, `${arTexts.length} telas ${arBad.join(' | ')}`);
+    ok('Negócio (D-122): nada vai à rede (a demonstração grava só na memória)', writes.length === arWrites0, writes.slice(arWrites0).join(' | '));
+  }
+  // ==================================================================================================================
   // Negócio compartilhado (Plus, D-120; decisão D-116): o negócio com outras pessoas, pronto e DESLIGADO até o Plus abrir. (1) Com o Plus
   // fechado (a demonstração padrão e o cenário "negocio"), nada novo aparece: nem "Pessoas do negócio", nem "Convidar alguém", nem o
   // campo do convite. (2) No cenário "negocio-plus" (Plus aberto; pessoas FICTÍCIAS, só com o primeiro nome), "Seu negócio" ganha a seção

@@ -109,7 +109,8 @@ export default function ExportarScreen() {
         setMsg({ tone: 'erro', text: T.tooMany });
         return;
       }
-      const built = buildExportFiles(load.source, format, { logoSvg: EXPORT_LOGO_SVG });
+      // No negócio (D-122), o CSV de lançamentos leva as marcas das entradas (Nota fiscal e Quem pagou).
+      const built = buildExportFiles({ ...load.source, business: onBusiness }, format, { logoSvg: EXPORT_LOGO_SVG });
       if (built.empty) setMsg({ tone: 'info', text: `${T.emptyTitle}. ${T.emptyBody}` });
       else setReady(built);
     } catch {
@@ -170,7 +171,7 @@ export default function ExportarScreen() {
           <Txt variant="title" accessibilityRole="header" aria-level={2}>
             {T.contentTitle}
           </Txt>
-          <Txt color={colors.textSecondary}>{format === 'csv' ? T.contentCsv : T.contentPdf}</Txt>
+          <Txt color={colors.textSecondary}>{format === 'csv' ? (onBusiness ? T.contentCsvBusiness : T.contentCsv) : T.contentPdf}</Txt>
           <Txt variant="caption" color={colors.textSecondary} style={note}>
             {onBusiness ? T.notIncludedBusiness(business!.name) : T.notIncluded}
           </Txt>

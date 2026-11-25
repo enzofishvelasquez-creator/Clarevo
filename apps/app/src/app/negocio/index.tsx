@@ -36,6 +36,7 @@ import { FlashBanner, useFlash } from '@/components/flash';
 import { ContextPill, SubHeader } from '@/components/header';
 import { MoneyTxt, useMoneyLabelMask } from '@/components/money-text';
 import { MonthStepper } from '@/components/month-stepper';
+import { MeiRemindersCard, ReceivablesCard } from '@/components/receivable-parts';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Banner, Button, Card, Chip, LinkButton, Screen, Skeleton, Txt } from '@/components/ui';
 import { flash } from '@/lib/flash';
@@ -52,7 +53,8 @@ const T = BUSINESS_TEXT;
  * Seu negócio (D-113, D-113b, D-121). Sem negócio: o que é o espaço Negócio e "Criar o espaço Negócio". Com negócio: o mês (entrou, saiu e
  * sobrou da operação, numa cor só, com a frase de fato), o que ficou fora da operação e as retiradas para o Pessoal à parte, com o que
  * ficou no negócio, a retirada e o dinheiro trazido do Pessoal, o limite do MEI (só com o tipo MEI), o "Resumo do ano", os últimos meses,
- * as maiores saídas do mês, o tipo do negócio, o nome e encerrar (com a oferta de exportar antes). Abrir esta tela escolhe o negócio no seletor: anotar daqui vai para o negócio. Negócio compartilhado (D-116, D-120):
+ * as maiores saídas do mês, o tipo do negócio, o nome e encerrar (com a oferta de exportar antes). D-122: o cartão "A receber" (o que o
+ * negócio ainda vai receber, fora de Entrou e Saiu) e, com o tipo MEI, os lembretes do MEI neste aparelho. Abrir esta tela escolhe o negócio no seletor: anotar daqui vai para o negócio. Negócio compartilhado (D-116, D-120):
  * "Pessoas do negócio" só com o Plus aberto, para quem não administra ou quando já há outras pessoas; quem só vê não encontra as ações
  * de anotar, e só quem administra muda o nome e encerra.
  */
@@ -216,7 +218,11 @@ function BusinessOverview({ business, notice, setNotice }: { business: BusinessC
               </View>
             </View>
           ) : null}
+          {/* A receber (D-122): o que o negócio ainda vai receber, fora de Entrou e Saiu. */}
+          <ReceivablesCard business={business} canWrite={canWrite} />
           {business.businessProfile === 'mei' ? <MeiCard contextId={business.id} month={month} currentMonth={currentMonth} /> : null}
+          {/* Lembretes do MEI (D-122): só com o tipo MEI, neste aparelho, desligados por padrão. */}
+          {business.businessProfile === 'mei' ? <MeiRemindersCard /> : null}
           <View style={{ gap: space[2] }}>
             <Button
               label={T.yearLink}

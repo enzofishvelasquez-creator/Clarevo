@@ -168,4 +168,35 @@ describe('lib/reminders.ts: os dois planos numa só passada', () => {
     expect(t.prefs.reminders).toBe(false);
     expect(t.requestNotificationPermission).toHaveBeenCalledTimes(3);
   });
+
+  it('lembretes do MEI (D-122): só com o tipo MEI, no horário do dia a dia, no canal do dia a dia, e o interruptor gravado no aparelho', async () => {
+    const t = await setup();
+    let profile: string | null = 'mei';
+    const getBusiness = vi.fn(async () => ({ id: 'neg', name: 'Sacolé', createdAt: '', role: 'titular', businessProfile: profile }));
+    const repo = { ...(t.repo as object), getBusiness } as unknown as RecordsRepository;
+    // Só os do MEI ligados (nada de vencimento nem do dia a dia): mesmo assim agenda, sem ler contas nem registros.
+    t.mod.queueReminders({ enabled: true, repo, contextId: t.contextId, due: null, routine: null, mei: { hour: 20, choices: { das: true, declaracao: true } } });
+    await settle();
+    expect(getBusiness).toHaveBeenCalledTimes(1);
+    expect(t.listCommitments).not.toHaveBeenCalled();
+    expect(t.listRecords).not.toHaveBeenCalled();
+    const items = t.synced.at(-1)!;
+    expect(items.map((i) => i.id)).toEqual(['clarevo-lembrete-rotina-mei-das-2026-10', 'clarevo-lembrete-rotina-mei-das-2026-11', 'clarevo-lembrete-rotina-mei-declaracao-2027']);
+    for (const i of items) {
+      expect(i).toMatchObject({ route: '/negocio', channel: 'rotina', title: 'Seu negócio' });
+      expect((i.date as Date).getHours()).toBe(20);
+    }
+    // Sem o tipo MEI, nenhum aviso do MEI.
+    profile = null;
+    t.mod.queueReminders({ enabled: true, repo, contextId: t.contextId, due: null, routine: null, mei: { hour: 20, choices: { das: true, declaracao: true } } });
+    await settle();
+    expect(t.synced.at(-1)).toEqual([]);
+    // Ligar e desligar: a permissão só ao ligar, e a escolha gravada sem mexer nas outras.
+    await t.mod.enableMeiReminder('pessoa-1', true, 'das');
+    expect(t.prefs.meiReminders).toEqual({ das: true, declaracao: false });
+    expect(t.prefs.routineReminders).toEqual({ ...NO_ROUTINE_REMINDERS });
+    t.mod.disableMeiReminder('pessoa-1', true, 'das');
+    expect(t.prefs.meiReminders).toEqual({ das: false, declaracao: false });
+    expect(t.requestNotificationPermission).toHaveBeenCalledTimes(1);
+  });
 });

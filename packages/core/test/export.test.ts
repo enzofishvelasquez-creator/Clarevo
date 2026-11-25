@@ -252,7 +252,9 @@ describe('CSV de lançamentos (D-047)', () => {
     expect(of({ commitmentId: 'ano' })).toBe('conta_do_ano');
     expect(of({ commitmentId: 'desconhecida' })).toBe('conta_a_pagar');
     expect(of({ commitmentId: 'fixa', invoice: { cardId: 'k1', month: '2026-11' } })).toBe('fatura');
-    expect(Object.values(EXPORT_ORIGIN_LABEL)).toEqual(['Anotado', 'Conta a pagar', 'Gasto fixo', 'Parcelamento', 'Conta do ano', 'Fatura']);
+    // D-122: a entrada de um valor a receber do negócio.
+    expect(of({ kind: 'receita', receivableId: 'rec-1' })).toBe('a_receber');
+    expect(Object.values(EXPORT_ORIGIN_LABEL)).toEqual(['Anotado', 'Conta a pagar', 'Gasto fixo', 'Parcelamento', 'Conta do ano', 'Fatura', 'A receber']);
   });
 });
 

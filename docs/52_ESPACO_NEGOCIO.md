@@ -233,3 +233,29 @@ priorizada), sem virar contabilidade e sem a Clarevo calcular imposto nem dizer 
   funciona. Só afeta quem usa a função nova num aparelho ainda sem a atualização pelo ar.
 - **Ficou para depois** (da mesma lista): marcar se a venda teve nota e de quem veio; "a receber" (fiado e cartão); lembretes do DAS e
   da declaração anual; as 3 categorias novas no orçamento.
+
+## 8. A receber, nota e quem pagou, lembretes do MEI (D-122, 25/11/2026)
+
+O restante da pesquisa de 18/11/2026 para o Espaço Negócio (itens 3, 8 e 9 da lista priorizada).
+
+- **A receber** (`/negocio/a-receber`): o dinheiro que o negócio ainda vai receber: "Venda no fiado" (com o nome de quem deve, opcional,
+  só o nome), "Venda no cartão" (o que ainda vai cair) e "Outro valor a receber", com descrição, valor, data combinada ou prevista e
+  categoria de entrada. Não entra em Entrou, Saiu nem nos totais. "Recebi" confirma o valor (pode ser diferente do combinado, por exemplo
+  depois da taxa do cartão), a data (até hoje) e a conta, e grava uma entrada comum no negócio, ligada; excluir essa entrada devolve o
+  "a receber" para "Em aberto". A entrada ligada não vira gasto nem muda de espaço. "Passou da data combinada" aparece em texto, sem cor
+  de alerta. O cartão "A receber" em "Seu negócio" mostra o total em aberto, quantos são e a próxima data. Papéis do negócio
+  compartilhado: quem só vê não anota; quem anota altera o que anotou e recebe qualquer um; quem administra altera tudo.
+- **Nota e quem pagou:** em "Mais detalhes (opcional)" das entradas do negócio, "Teve nota fiscal?" (Sim ou Não) e "Quem pagou" (Pessoa
+  física, Empresa ou Exterior). Não mudam nenhum total. Aparecem no detalhe, no "Resumo do ano" (cartão "Nota e quem pagou", só quando há
+  alguma marca) e na exportação do negócio (colunas "Nota fiscal" e "Quem pagou"). Mudar a entrada para gasto ou movê-la para o Pessoal
+  tira as marcas.
+- **Lembretes do MEI:** só com o tipo MEI, desligados até a pessoa ligar, no celular: o DAS do mês (no dia 15: o DAS do MEI vence no dia
+  20) e a declaração anual (em 2 de maio: vai até 31 de maio). Na web, o cartão só descreve os lembretes.
+- **Banco:** migração 0045 (`supabase/migrations/20261125000001_negocio_a_receber.sql`): `business_receivables`, as funções
+  `create_receivable`, `update_receivable`, `delete_receivable` e `receive_receivable`, `financial_records.receivable_id`, `has_invoice` e
+  `payer_kind`, e `p_marks` no fim de `create_record` e `update_record`. Testes em
+  `supabase/tests/99zzzzzzzzzzzzzzzzzzzzzzzz_negocio_a_receber.sql`. **Antes do merge** (docs/05, 12al e 21ag).
+- **Telas:** `apps/app/src/app/negocio/a-receber/` (lista, novo, detalhe, editar e "Recebi"), `components/receivable-parts.tsx` e
+  `components/record-marks.tsx`; núcleo em `packages/core/src/business-receivables.ts` e `mei-reminders.ts`. Roteiro de telas: bloco
+  "Espaço Negócio: a receber, nota e quem pagou, lembretes do MEI (D-122)" de `scripts/e2e-web.js`, capturas 840 a 853.
+- **Ficou para depois:** as marcas no PDF da exportação e no mês de "Seu negócio"; uma demonstração com alguém que só vê.

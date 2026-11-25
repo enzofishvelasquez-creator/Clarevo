@@ -202,6 +202,14 @@ import {
   type BusinessPeople,
   type BusinessRole,
   type PlusStatus,
+  RECEIVED_READ_LIMIT,
+  isPayerKind,
+  isReceivableKind,
+  marksPayload,
+  type Receivable,
+  type ReceivableInput,
+  type ReceivableReceiveWrite,
+  type ReceiveInput,
 } from '@clarevo/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -254,6 +262,10 @@ interface RecordRow {
   investment_movement_id?: string | null;
   /** Retirada para o Pessoal (D-113, migração 0042): o lançamento do outro lado; ausente antes dela. */
   paired_record_id?: string | null;
+  /** A receber e as marcas da entrada do negócio (D-122, migração 0045); ausentes antes dela. */
+  receivable_id?: string | null;
+  has_invoice?: boolean | null;
+  payer_kind?: string | null;
   created_by: string;
   version: number;
   created_at: string;
@@ -671,6 +683,11 @@ const KNOWN: RepoErrorCode[] = [
   'lancamento_ligado',
   // Tipo do negócio (D-121, 20261124000001, migração 0044).
   'perfil_invalido',
+  // A receber e as marcas da entrada do negócio (D-122, 20261125000001, migração 0045).
+  'ja_recebido',
+  'recebimento_ligado',
+  'marcas_invalidas',
+  'descricao_invalida',
   // Gasto ligado, subcategoria, troca de tipo e rendimento de investimento (D-107, 20261117000002).
   'subcategoria_invalida',
   'tipo_nao_muda',
@@ -902,6 +919,10 @@ function toRecord(r: RecordRow): FinancialRecord {
     ...(r.investment_id && r.investment_movement_id ? { investmentId: r.investment_id, investmentMovementId: r.investment_movement_id } : {}),
     // D-113: só quando existe, como o repositório em memória.
     ...(r.paired_record_id ? { pairedRecordId: r.paired_record_id } : {}),
+    // D-122: o "a receber" e as marcas só quando existem, como o repositório em memória (uma marca desconhecida fica de fora).
+    ...(r.receivable_id ? { receivableId: r.receivable_id } : {}),
+    ...(typeof r.has_invoice === 'boolean' ? { hasInvoice: r.has_invoice } : {}),
+    ...(isPayerKind(r.payer_kind) ? { payerKind: r.payer_kind } : {}),
     createdBy: r.created_by,
     version: r.version,
     createdAt: r.created_at,
@@ -2074,6 +2095,8 @@ export class SupabaseRepository implements RecordsRepository {
       // Subcategoria e rendimento de investimento (D-107): só quando vêm.
       ...(input.subcategory ? { p_subcategory: input.subcategory } : {}),
       ...(input.investmentId ? { p_investment_id: input.investmentId } : {}),
+      // Marcas da entrada do negócio (D-122, migração 0045): só quando vêm; sem elas, a chamada é a de antes.
+      ...(input.marks ? { p_marks: marksPayload(input.marks) } : {}),
     });
   }
 
@@ -2097,6 +2120,8 @@ export class SupabaseRepository implements RecordsRepository {
           ? { p_link_investment: false }
           : { p_link_investment: true, p_investment_id: input.investmentId }
         : {}),
+      // D-122: as marcas só quando vêm (nulo no banco mantém as de antes, menos num gasto).
+      ...(input.marks ? { p_marks: marksPayload(input.marks) } : {}),
     });
   }
 
@@ -3740,6 +3765,124 @@ export class SupabaseRepository implements RecordsRepository {
   }
 
   // -------------------------------------------------------------------------
+  // A receber do negócio (D-122, migração 0045): a tabela business_receivables (a RLS deixa ler quem lê o negócio) e as quatro funções.
+  // A entrada que recebeu vem de financial_records (receivable_id), lida à parte, como o pagamento de uma conta a pagar.
+  // -------------------------------------------------------------------------
+
+  /** As entradas vivas que receberam os "a receber" informados (a RLS esconde as excluídas), em lotes. */
+  private async receiptsOf(ids: readonly string[]): Promise<Map<string, RecordRow>> {
+    const out = new Map<string, RecordRow>();
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const { data, error } = await this.db.from('financial_records').select('*').in('receivable_id', chunk);
+      if (error) throw repoError(error);
+      for (const r of (data ?? []) as RecordRow[]) if (r.receivable_id) out.set(r.receivable_id, r);
+    }
+    return out;
+  }
+
+  private async withReceipts(rows: readonly ReceivableRow[]): Promise<Receivable[]> {
+    const received = rows.filter((r) => r.status === 'recebido').map((r) => r.id);
+    const receipts = received.length > 0 ? await this.receiptsOf(received) : new Map<string, RecordRow>();
+    return rows.map((r) => toReceivable(r, receipts.get(r.id) ?? null));
+  }
+
+  /** Os em aberto (todos, em páginas, pela data) e os RECEIVED_READ_LIMIT recebidos mudados por último, como a memória. */
+  async listReceivables(contextId: string): Promise<Receivable[]> {
+    const PAGE = 500;
+    const open: ReceivableRow[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await this.db
+        .from('business_receivables')
+        .select('*')
+        .eq('context_id', contextId)
+        .is('deleted_at', null)
+        .eq('status', 'aberto')
+        .order('expected_on')
+        .order('created_at')
+        .order('id')
+        .range(from, from + PAGE - 1);
+      if (error) throw repoError(error);
+      open.push(...((data ?? []) as ReceivableRow[]));
+      if ((data ?? []).length < PAGE) break;
+    }
+    const { data, error } = await this.db
+      .from('business_receivables')
+      .select('*')
+      .eq('context_id', contextId)
+      .is('deleted_at', null)
+      .eq('status', 'recebido')
+      .order('updated_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(RECEIVED_READ_LIMIT);
+    if (error) throw repoError(error);
+    return this.withReceipts([...open, ...((data ?? []) as ReceivableRow[])]);
+  }
+
+  async getReceivable(id: string): Promise<Receivable | null> {
+    const { data, error } = await this.db.from('business_receivables').select('*').eq('id', id).is('deleted_at', null).maybeSingle();
+    if (error) throw repoError(error);
+    if (!data) return null;
+    return (await this.withReceipts([data as ReceivableRow]))[0] ?? null;
+  }
+
+  /** As funções devolvem a linha (to_jsonb); a entrada que recebeu, quando houver, é lida à parte. */
+  private async callReceivable(fn: string, args: Record<string, unknown>): Promise<Receivable> {
+    const { data, error } = await this.db.rpc(fn, args);
+    if (error) throw repoError(error);
+    const row = data as ReceivableRow | null;
+    if (!row || typeof row.id !== 'string') throw new RepoError('desconhecido', 'a_receber_inconsistente');
+    return (await this.withReceipts([row]))[0]!;
+  }
+
+  createReceivable(key: string, contextId: string, input: ReceivableInput): Promise<Receivable> {
+    return this.callReceivable('create_receivable', {
+      p_key: key,
+      p_context: contextId,
+      p_kind: input.kind,
+      p_description: input.description,
+      p_amount_cents: input.amountCents,
+      p_expected_on: input.expectedOn,
+      p_category: input.category,
+      p_debtor: input.debtor,
+    });
+  }
+
+  updateReceivable(key: string, id: string, expectedVersion: number, input: ReceivableInput): Promise<Receivable> {
+    return this.callReceivable('update_receivable', {
+      p_key: key,
+      p_receivable: id,
+      p_expected_version: expectedVersion,
+      p_kind: input.kind,
+      p_description: input.description,
+      p_amount_cents: input.amountCents,
+      p_expected_on: input.expectedOn,
+      p_category: input.category,
+      p_debtor: input.debtor,
+    });
+  }
+
+  deleteReceivable(key: string, id: string, expectedVersion: number): Promise<Receivable> {
+    return this.callReceivable('delete_receivable', { p_key: key, p_receivable: id, p_expected_version: expectedVersion });
+  }
+
+  /** receive_receivable → {receivable, record}: o "a receber" recebido e a entrada gravada (que é a que o recebeu). */
+  async receiveReceivable(key: string, id: string, expectedVersion: number, input: ReceiveInput): Promise<ReceivableReceiveWrite> {
+    const { data, error } = await this.db.rpc('receive_receivable', {
+      p_key: key,
+      p_receivable: id,
+      p_expected_version: expectedVersion,
+      p_account: input.accountId,
+      p_amount_cents: input.amountCents,
+      p_received_on: input.receivedOn,
+    });
+    if (error) throw repoError(error);
+    const r = data as { receivable?: ReceivableRow | null; record?: RecordRow | null } | null;
+    if (!r?.receivable || !r.record) throw new RepoError('desconhecido', 'a_receber_inconsistente');
+    return { receivable: toReceivable(r.receivable, r.record), record: toRecord(r.record) };
+  }
+
+  // -------------------------------------------------------------------------
   // Negócio compartilhado (D-116, Clarevo Plus; D-120): plus_status, a visão business_member_items, a tabela business_invites (só quem
   // administra lê) e as sete funções da migração 0043. Com o Plus fechado, o app não depende da migração (o banco de produção pode ainda
   // não tê-la): plus_status que falha conta como fechado, e a visão e os convites só são lidos com o Plus aberto ou por quem não administra.
@@ -4305,6 +4448,59 @@ function toBusinessMember(r: MemberRow): BusinessMember {
     throw new RepoError('desconhecido', 'negocio_inconsistente');
   }
   return { personId: r.person_id, firstName: r.first_name, role: r.role, status: r.status, isMe: r.is_me === true, joinedAt: r.joined_at, leftAt: r.left_at };
+}
+
+/** Linha de business_receivables (D-122, migração 0045), como a tabela e o to_jsonb das funções a devolvem. */
+interface ReceivableRow {
+  id: string;
+  context_id: string;
+  kind: string;
+  description: string;
+  amount_cents: number;
+  expected_on: string;
+  category: string;
+  debtor: string | null;
+  status: string;
+  created_by: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * O "a receber" com a entrada que o recebeu (só quando recebido e a entrada viva aponta para ele). Tipo, situação, data ou valor fora do
+ * esperado é defeito, não recusa.
+ */
+function toReceivable(r: ReceivableRow, receipt: RecordRow | null): Receivable {
+  const amount = Number(r.amount_cents);
+  if (
+    !isReceivableKind(r.kind) ||
+    (r.status !== 'aberto' && r.status !== 'recebido') ||
+    typeof r.expected_on !== 'string' ||
+    !ISO_DATE.test(r.expected_on) ||
+    !Number.isSafeInteger(amount) ||
+    amount < 1 ||
+    amount > MAX_RECORD_CENTS
+  ) {
+    throw new RepoError('desconhecido', 'a_receber_inconsistente');
+  }
+  const linked = r.status === 'recebido' && receipt && receipt.receivable_id === r.id ? receipt : null;
+  return {
+    id: r.id,
+    contextId: r.context_id,
+    kind: r.kind,
+    description: r.description,
+    amountCents: amount,
+    expectedOn: r.expected_on,
+    category: r.category,
+    debtor: r.debtor ?? null,
+    status: r.status,
+    received: linked ? { recordId: linked.id, amountCents: Number(linked.amount_cents), receivedOn: linked.occurred_on, accountId: linked.account_id } : null,
+    createdBy: r.created_by,
+    version: r.version,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
 }
 
 /** {business_record, personal_record} da retirada: os dois lados, ligados um ao outro. */

@@ -1,6 +1,7 @@
 import type { IsoDate, IsoMonth } from './dates';
 import { addMonths, daysInMonth, formatMonthYearBR, monthOf } from './dates';
 import type { Cents } from './money';
+import type { PayerKind, RecordMarks } from './business-receivables';
 
 /** Pessoal (um por pessoa), Família (D-055) e Negócio (D-113, Espaço Negócio). */
 export type ContextKind = 'pessoal' | 'familia' | 'negocio';
@@ -102,6 +103,17 @@ export interface FinancialRecord {
    * Ausente ou null nos demais.
    */
   pairedRecordId?: string | null;
+  /**
+   * A receber (D-122, migração 0045): o "a receber" do negócio que esta entrada recebeu (receive_receivable). Excluir a entrada devolve o
+   * "a receber" para "aberto"; ela não vira gasto (recebimento_ligado) nem muda de espaço (lancamento_ligado). Ausente ou null nos demais.
+   */
+  receivableId?: string | null;
+  /**
+   * Marcas da entrada do negócio (D-122), opcionais: teve nota fiscal e quem pagou (pessoa física, empresa ou exterior). Só em entrada do
+   * negócio; ausentes ou null = não marcado. Não mudam nenhum total.
+   */
+  hasInvoice?: boolean | null;
+  payerKind?: PayerKind | null;
   createdBy: string;
   version: number;
   createdAt: string;
@@ -298,6 +310,12 @@ export interface RecordInput {
    * mantém a ligação de antes; null desliga (o rendimento sai do investimento); um id liga (ou troca de investimento).
    */
   investmentId?: string | null;
+  /**
+   * Marcas da entrada do negócio (D-122): nota fiscal e quem pagou. Ao criar: ausente ou null = sem marcas. Ao editar: ausente (o app
+   * antigo) mantém as de antes, menos num gasto (trocar uma entrada para gasto tira as marcas); um objeto troca (com os dois nulos, tira).
+   * Fora de entrada do negócio, marcas não nulas são recusadas (marcas_invalidas).
+   */
+  marks?: RecordMarks | null;
 }
 
 /** Gasto fixo (todo mês), parcelamento ou conta do ano (todo ano, D-029). */

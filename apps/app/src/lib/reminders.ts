@@ -25,6 +25,11 @@ import {
   type InvestmentReminderHolds,
   NO_ROUTINE_REMINDERS,
   applyInvestmentReminderHolds,
+  NO_MEI_REMINDERS,
+  anyMeiReminder,
+  meiReminderPlan,
+  type MeiReminderChoices,
+  type MeiReminderKind,
 } from '@clarevo/core';
 
 import {
@@ -64,13 +69,19 @@ export type ReminderJob =
       due: ReminderHour | null;
       /** Os lembretes do dia a dia ligados e o horário deles; nulo com todos desligados. */
       routine: { hour: RoutineReminderHour; choices: RoutineReminderChoices; depositDay: DepositReminderDay; holds?: InvestmentReminderHolds } | null;
+      /**
+       * Os lembretes do MEI (D-122) ligados, no horário dos lembretes do dia a dia; ausente ou nulo com os dois desligados. Só saem com o tipo do
+       * negócio "MEI" (lido do repositório na hora de agendar).
+       */
+      mei?: { hour: RoutineReminderHour; choices: MeiReminderChoices } | null;
     };
 
 export type ReminderOutcome = 'agendado' | 'desligado' | 'sem-permissao' | 'indisponivel';
 
 async function apply(job: ReminderJob): Promise<ReminderOutcome> {
   if (!DEVICE_FEATURES) return 'indisponivel';
-  if (!job.enabled || (job.due === null && (job.routine === null || !anyRoutineReminder(job.routine.choices)))) {
+  const meiOn = job.enabled && job.mei != null && anyMeiReminder(job.mei.choices);
+  if (!job.enabled || (job.due === null && (job.routine === null || !anyRoutineReminder(job.routine.choices)) && !meiOn)) {
     await cancelAllReminders();
     return 'desligado';
   }
@@ -166,6 +177,19 @@ async function apply(job: ReminderJob): Promise<ReminderOutcome> {
       items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });
     }
   }
+  // Lembretes do MEI (D-122): só com o tipo do negócio "MEI", lido agora (trocar o tipo é uma escrita, e toda escrita reagenda). Sem a
+  // leitura do negócio, seguem os outros avisos.
+  if (meiOn && job.mei) {
+    try {
+      const business = await job.repo.getBusiness();
+      const plan = meiReminderPlan(job.mei.choices, today, job.mei.hour, { mei: business?.businessProfile === 'mei', nowMinutes });
+      for (const i of plan) {
+        items.push({ id: i.id, date: fireDate(i), title: i.title, body: i.body, signature: routineReminderSignature(i), route: i.route, channel: 'rotina' });
+      }
+    } catch {
+      // Falha de rede: o próximo gatilho tenta de novo.
+    }
+  }
   // Aviso de queda do nível (D-111): para quem permitiu lembretes, um lembrete no dia em que o aviso começa (o 45º dia sem anotar), no
   // horário dos lembretes do dia a dia, com texto neutro (sem contagem e sem nível: uma anotação pelo WhatsApp ou pelo Telegram conta no
   // banco sem refazer este lembrete; a contagem fica só dentro do app). Com o horário de hoje já passado, o marco seguinte. Sem a leitura
@@ -229,6 +253,22 @@ export async function enableReminders(userId: string, persist: boolean, which: R
 /** Desliga um lembrete; com todos desligados, o reagendamento tira todos os avisos do Clarevo deste aparelho. */
 export function disableReminders(userId: string, persist: boolean, which: ReminderSwitch = 'contas') {
   setSwitch(userId, persist, which, false);
+}
+
+function setMeiSwitch(userId: string, persist: boolean, which: MeiReminderKind, on: boolean) {
+  const current = getPrefs(userId)?.meiReminders ?? NO_MEI_REMINDERS;
+  updatePrefs(userId, { meiReminders: { ...current, [which]: on } }, persist);
+}
+
+/** Liga um lembrete do MEI (D-122), em "Seu negócio": como os do dia a dia, a permissão do sistema só é pedida depois do toque. */
+export async function enableMeiReminder(userId: string, persist: boolean, which: MeiReminderKind): Promise<NotificationPermission> {
+  const permission = await requestNotificationPermission();
+  setMeiSwitch(userId, persist, which, true);
+  return permission;
+}
+
+export function disableMeiReminder(userId: string, persist: boolean, which: MeiReminderKind) {
+  setMeiSwitch(userId, persist, which, false);
 }
 
 export { getNotificationPermission };
