@@ -57,8 +57,9 @@ comment on table public.business_receivables is
 comment on column public.business_receivables.debtor is 'Só o nome de quem deve (opcional, até 60 caracteres); o app pede para não escrever CPF nem outros dados.';
 
 alter table public.business_receivables enable row level security;
+-- O excluído não é lido (como os lançamentos): o nome de quem devia some da leitura na hora, antes da limpeza dos 6 meses.
 create policy business_receivables_read on public.business_receivables for select to authenticated
-  using (public.context_permission(context_id, 'read'));
+  using (deleted_at is null and public.context_permission(context_id, 'read'));
 
 -- A entrada que recebeu o "a receber": uma viva por "a receber", e sempre uma entrada.
 alter table public.financial_records add column receivable_id uuid references public.business_receivables (id) on delete set null;
@@ -118,6 +119,36 @@ $$;
 create trigger financial_records_receivable_guard_insert
   before insert on public.financial_records
   for each row execute function public.financial_records_receivable_guard_insert();
+
+-- O guarda dos dois lados ligados (retirada e dinheiro trazido do Pessoal, 0042 e 0044) passa a cobrir também as colunas novas: as marcas
+-- e o vínculo com o "a receber" não mudam num lado ligado fora das funções do par.
+create or replace function public.financial_records_pair_guard()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if old.paired_record_id is not null and coalesce(current_setting('clarevo.retirada', true), '') <> 'on'
+     and (new.kind is distinct from old.kind or new.account_id is distinct from old.account_id
+          or new.amount_cents is distinct from old.amount_cents or new.occurred_on is distinct from old.occurred_on
+          or new.description is distinct from old.description or new.category is distinct from old.category
+          or new.subcategory is distinct from old.subcategory or new.deleted_at is distinct from old.deleted_at
+          or new.commitment_id is distinct from old.commitment_id or new.card_id is distinct from old.card_id
+          or new.invoice_month is distinct from old.invoice_month or new.linked_payment is distinct from old.linked_payment
+          or new.investment_id is distinct from old.investment_id or new.investment_movement_id is distinct from old.investment_movement_id
+          or new.next_month is distinct from old.next_month
+          or new.has_invoice is distinct from old.has_invoice or new.payer_kind is distinct from old.payer_kind
+          or new.receivable_id is distinct from old.receivable_id
+          or (new.paired_record_id is not null and new.paired_record_id is distinct from old.paired_record_id)) then
+    raise exception 'retirada_ligada' using errcode = 'PT409';
+  end if;
+  if old.paired_record_id is null and new.paired_record_id is not null
+     and coalesce(current_setting('clarevo.retirada', true), '') <> 'on' then
+    raise exception 'campo_imutavel' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
 
 -- Excluir a entrada ligada devolve o "a receber" para aberto.
 create or replace function public.financial_records_receivable_reopen()
@@ -348,6 +379,8 @@ begin
     return (select to_jsonb(r) from public.business_receivables r where r.id = v_op.target_id);
   end if;
 
+  -- A trava do negócio (a de end_business, como em create_receivable e receive_receivable); o espaço de um "a receber" nunca muda.
+  perform pg_advisory_xact_lock(hashtext('familia:c:' || coalesce((select context_id from public.business_receivables where id = p_receivable)::text, '')));
   v := public.clarevo_lock_receivable(p_receivable, true);
   if p_expected_version is distinct from v.version then
     raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || v.version;
@@ -405,6 +438,7 @@ begin
     return (select to_jsonb(r) from public.business_receivables r where r.id = v_op.target_id);
   end if;
 
+  perform pg_advisory_xact_lock(hashtext('familia:c:' || coalesce((select context_id from public.business_receivables where id = p_receivable)::text, '')));
   v := public.clarevo_lock_receivable(p_receivable, true);
   if p_expected_version is distinct from v.version then
     raise exception 'versao_desatualizada' using errcode = 'PT409', detail = 'versao_atual=' || v.version;
@@ -1086,6 +1120,7 @@ revoke all on function public.financial_records_receivable_guard() from public, 
 revoke all on function public.financial_records_receivable_guard_insert() from public, anon, authenticated, service_role;
 revoke all on function public.financial_records_receivable_reopen() from public, anon, authenticated, service_role;
 revoke all on function public.business_receivables_guard() from public, anon, authenticated, service_role;
+revoke all on function public.financial_records_pair_guard() from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_record_marks(jsonb, public.record_kind, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_check_receivable(text, text, bigint, date, text, text) from public, anon, authenticated, service_role;
 revoke all on function public.clarevo_lock_receivable(uuid, boolean) from public, anon, authenticated, service_role;

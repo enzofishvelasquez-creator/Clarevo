@@ -262,4 +262,10 @@ O restante da pesquisa de 18/11/2026 para o Espaço Negócio (itens 3, 8 e 9 da 
 - **Telas:** `apps/app/src/app/negocio/a-receber/` (lista, novo, detalhe, editar e "Recebi"), `components/receivable-parts.tsx` e
   `components/record-marks.tsx`; núcleo em `packages/core/src/business-receivables.ts` e `mei-reminders.ts`. Roteiro de telas: bloco
   "Espaço Negócio: a receber, nota e quem pagou, lembretes do MEI (D-122)" de `scripts/e2e-web.js`, capturas 840 a 853.
+- **Compatibilidade enquanto os celulares atualizam.** No app anterior a esta rodada, a entrada de um "a receber" aparece como entrada
+  comum: "Mover" aparece e é recusado; trocar para saída é recusado com a mensagem genérica de não salvar; excluir a entrada reabre o
+  "a receber" sem avisar; as marcas não aparecem, mas ficam ao editar. Só afeta quem usa as funções novas num aparelho ainda sem a
+  atualização pelo ar.
+- **Da revisão independente:** o "a receber" excluído deixa de ser lido na hora (com o nome de quem devia); as marcas e o vínculo não
+  mudam num lado ligado de retirada ou de dinheiro trazido do Pessoal; alterar e excluir tomam a trava do negócio, como anotar e receber.
 - **Ficou para depois:** as marcas no PDF da exportação e no mês de "Seu negócio"; uma demonstração com alguém que só vê.

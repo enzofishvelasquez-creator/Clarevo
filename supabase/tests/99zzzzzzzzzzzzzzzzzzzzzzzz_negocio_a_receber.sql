@@ -1,8 +1,8 @@
 -- A receber e marcas da entrada do negócio (D-122; migração 20261125000001_negocio_a_receber.sql). Confere: a tabela, a RLS, as
 -- guardas e as funções; anotar, alterar e excluir (recusas, repetição, versão, só em aberto); receber (a entrada ligada, a conta e a
 -- data, ja_recebido); a entrada ligada não vira gasto nem muda de espaço, e excluí-la reabre o "a receber"; as marcas (só em entrada de
--- negócio, a chamada antiga sem marcas, manter, trocar e limpar ao virar gasto); os papéis no negócio compartilhado; só ver e
--- exportar; a limpeza dos 6 meses; a exclusão da conta.
+-- negócio, a chamada antiga sem marcas, manter, trocar e limpar ao virar gasto, e o lado ligado de um par recusado); o excluído não é
+-- lido; os papéis no negócio compartilhado; só ver e exportar; a limpeza dos 6 meses; a exclusão da conta de quem anota.
 -- Pessoas FICTÍCIAS: Rosa (dona da Doceria da Rosa), Ivo (anota no negócio da Rosa), Ana (só vê) e Tom (de fora). Tudo em uma transação
 -- desfeita no fim.
 \set ON_ERROR_STOP 1
@@ -224,6 +224,7 @@ begin
   r := public.delete_receivable('ar-d-0010', pg_temp.id('r2'), 1);
   assert r ->> 'deleted_at' is not null and (r ->> 'version')::int = 2, 'excluído';
   perform pg_temp.expect_code(format('select public.delete_receivable(%L, %L, 2)', 'ar-d-0011', pg_temp.id('r2')), 'nao_encontrado', 'P0002');
+  assert (select count(*) from public.business_receivables where id = pg_temp.id('r2')) = 0, 'o excluído não é lido (nem o nome de quem devia)';
   perform pg_temp.expect_code(format('select public.receive_receivable(%L, %L, 2, %L, %s, %L)', 'ar-d-0012', pg_temp.id('r2'), pg_temp.id('biz_acc'), 100, '2026-11-25'),
                               'nao_encontrado', 'P0002');
 end $$;
@@ -265,6 +266,11 @@ begin
   assert not r.has_invoice and r.payer_kind = 'pf', 'troca as marcas';
   r := public.update_record('ar-m-0012', r.id, r.version, r.account_id, 8500, r.occurred_on, r.description, 'Outras saídas', null, 'despesa');
   assert r.kind = 'despesa' and r.has_invoice is null and r.payer_kind is null, 'virar gasto limpa as marcas';
+  -- Um lado ligado (dinheiro trazido do Pessoal) não ganha marcas fora das funções do par.
+  r := (jsonb_populate_record(null::public.financial_records,
+          public.create_business_contribution('ar-m-0020', biz, pg_temp.id('biz_acc'), pg_temp.id('pes_acc'), 1000, '2026-11-21') -> 'business_record'));
+  perform pg_temp.expect_code(format('select public.update_record(%L, %L, %s, %L, %s, %L, %L, %L, null, null, null, null, null, %L)', 'ar-m-0021', r.id, r.version, r.account_id,
+                                     r.amount_cents, r.occurred_on, r.description, r.category, '{"has_invoice": true, "payer_kind": "pf"}'), 'retirada_ligada', 'PT409');
   -- A chamada antiga, sem p_marks, segue funcionando.
   r := public.create_record('ar-m-0013', biz, pg_temp.id('biz_acc'), 'receita', 2000, '2026-11-21', 'Venda no balcão', 'Vendas');
   assert r.has_invoice is null and r.payer_kind is null, 'sem marcas';
@@ -339,6 +345,21 @@ begin
   r := public.clarevo_purge_deleted();
   assert (r ->> 'a_receber')::int >= 1 and (select count(*) from public.business_receivables where id = pg_temp.id('r2')) = 0, 'apagado de vez: ' || r::text;
   assert (select count(*) from public.business_receivables where id = pg_temp.id('r1')) = 1, 'o recebido fica';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 10. Quem anota exclui a conta: o que anotou e recebeu no negócio fica, com a autoria anônima
+-- ---------------------------------------------------------------------------
+set role authenticated;
+select pg_temp.as_('ivo');
+do $$ begin
+  perform public.delete_my_account('EXCLUIR', 'ar-x-0001');
+end $$;
+reset role;
+do $$ begin
+  assert (select count(*) from public.business_receivables where id = pg_temp.id('r4')) = 1
+     and (select deleted_at is not null from public.persons where id = pg_temp.id('ivo')), 'o a receber do Ivo fica e ele fica anônimo';
+  assert (select count(*) from public.financial_records where receivable_id = pg_temp.id('r3') and deleted_at is null) = 1, 'a entrada que ele recebeu fica';
 end $$;
 
 rollback;
