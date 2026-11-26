@@ -3,16 +3,28 @@
  * FAMILY_MAX_PEOPLE pessoas), com 14 dias grátis sem cartão. Sem assinatura depois do teste, a conta fica só para ver e exportar.
  * O benefício pela empresa (D-056) continua sem pagar. O acesso vem do banco (`my_access`, migração 0023), que é quem trava a
  * escrita (gatilho de record_operations, `assinatura_necessaria`); aqui ficam a leitura da resposta, os preços e os textos das telas.
+ * Plano anual (D-125 e D-127): R$ 269,90 por ano (Individual) ou R$ 629,90 por ano (Família), com o mesmo teste e os mesmos recursos; o
+ * período da assinatura em vigor vem de `my_access` (`period`, migração 0047).
  */
 import { addDays, daysBetween, formatDateBR, todayIn, type IsoDate } from './dates';
 import { BENEFIT_TEXT } from './company';
 import { FAMILY_MAX_PEOPLE } from './family';
 import { formatBRL } from './money';
-import { PIX_GRACE_DAYS, PIX_WARNING_DAYS } from './assinatura-web/pix';
+import { PIX_GRACE_DAYS, PIX_WARNING_DAYS_BY_PERIOD } from './assinatura-web/pix';
 import type { WebSubscriptionStatus } from './assinatura-web/app';
-import { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind } from './plano-precos';
+import {
+  BILLING_PERIODS,
+  PERIOD_MONTHS,
+  PERIOD_NAME,
+  PLAN_NAME,
+  PLAN_PERIOD_PRICE_CENTS,
+  PLAN_PRICE_CENTS,
+  parseBillingPeriod,
+  type BillingPeriod,
+  type PlanKind,
+} from './plano-precos';
 
-export { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind };
+export { BILLING_PERIODS, PERIOD_MONTHS, PERIOD_NAME, PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, PLAN_PRICE_CENTS, parseBillingPeriod, type BillingPeriod, type PlanKind };
 
 /** Dias de teste grátis (o mesmo intervalo do banco, em clarevo_access). */
 export const TRIAL_DAYS = 14;
@@ -48,6 +60,11 @@ export interface Access {
   canWrite: boolean;
   /** De onde vem a assinatura, o benefício ou a cortesia (migração 0026); nulo nas outras situações. Só a da web é cancelada pelo app. */
   provider: AccessProvider | null;
+  /**
+   * O período da assinatura em vigor, mensal ou anual (D-127, migração 0047). Só na situação "assinatura"; ausente ou nulo nas outras e
+   * com o banco de antes da 0047 (a tela então não diz o período).
+   */
+  period?: BillingPeriod | null;
 }
 
 const STATUSES: readonly AccessStatus[] = ['assinatura', 'beneficio', 'cortesia', 'familia', 'pre_lancamento', 'teste', 'leitura'];
@@ -82,7 +99,25 @@ export function parseAccess(raw: unknown): Access {
   // Só leitura nunca escreve, e nenhuma outra situação deixa de escrever.
   if (r.can_write !== (status !== 'leitura')) throw new Error('acesso_invalido');
   const provider = typeof r.provider === 'string' && (PROVIDERS as readonly string[]).includes(r.provider) ? (r.provider as AccessProvider) : null;
-  return { status: status as AccessStatus, plan, until, canWrite: r.can_write, provider };
+  // O período só vale para a assinatura (o banco o devolve nulo nas outras situações).
+  const period = status === 'assinatura' ? parseBillingPeriod(r.period) : null;
+  return { status: status as AccessStatus, plan, until, canWrite: r.can_write, provider, period };
+}
+
+/** O período da assinatura em vigor; sem ele (banco de antes da 0047 ou outra situação), mensal. */
+export function accessPeriod(access: Access): BillingPeriod {
+  return access.period === 'anual' ? 'anual' : 'mensal';
+}
+
+/** "Plano Individual", e com o período quando o banco o diz ("Plano Individual anual", D-127). */
+function subscribedSituation(access: Access): string {
+  const name = `Plano ${PLAN_NAME[access.plan ?? 'individual']}`;
+  return access.period ? `${name} ${PERIOD_NAME[access.period]}` : name;
+}
+
+/** "Assinatura ativa", e com o período quando o banco o diz ("Assinatura anual ativa"). */
+function activeSubscription(access: Access): string {
+  return access.period ? `Assinatura ${PERIOD_NAME[access.period]} ativa` : 'Assinatura ativa';
 }
 
 /** O dia de `until` no fuso da pessoa. */
@@ -125,6 +160,63 @@ export function planPrice(plan: PlanKind): string {
 export function planPriceAmount(plan: PlanKind): string {
   return formatBRL(PLAN_PRICE_CENTS[plan]);
 }
+
+/** "R$ 269,90" ou "R$ 29,90": o preço do plano no período (D-127). */
+export function planPeriodPriceAmount(plan: PlanKind, period: BillingPeriod): string {
+  return formatBRL(PLAN_PERIOD_PRICE_CENTS[plan][period]);
+}
+
+/** " por ano" ou " por mês", depois do preço. */
+export function periodSuffix(period: BillingPeriod): string {
+  return period === 'anual' ? ' por ano' : ' por mês';
+}
+
+/** "R$ 269,90 por ano" ou "R$ 29,90 por mês". */
+export function planPeriodPrice(plan: PlanKind, period: BillingPeriod): string {
+  return `${planPeriodPriceAmount(plan, period)}${periodSuffix(period)}`;
+}
+
+/**
+ * Quanto o anual equivale por mês, em centavos, arredondado ao centavo mais próximo (R$ 269,90 / 12 = R$ 22,49; R$ 629,90 / 12 = R$ 52,49).
+ * É só uma comparação: o anual é cobrado de uma vez.
+ */
+export function annualMonthlyEquivalentCents(plan: PlanKind): number {
+  return Math.round(PLAN_PERIOD_PRICE_CENTS[plan].anual / PERIOD_MONTHS.anual);
+}
+
+/** Quanto o anual custa a menos que 12 mensalidades, em centavos (R$ 358,80 - R$ 269,90 = R$ 88,90; R$ 838,80 - R$ 629,90 = R$ 208,90). */
+export function annualSavingCents(plan: PlanKind): number {
+  return PLAN_PERIOD_PRICE_CENTS[plan].mensal * PERIOD_MONTHS.anual - PLAN_PERIOD_PRICE_CENTS[plan].anual;
+}
+
+/**
+ * A escolha entre mensal e anual na tela Assinatura e no site (D-127). O anual vem primeiro, sem pressa e sem alarme: só os números, com o
+ * equivalente por mês dito como equivalente (o anual é uma cobrança só) e a diferença exata para 12 mensalidades.
+ */
+export const PLAN_PERIOD_TEXT = {
+  /** O nome do grupo de opções, para o leitor de tela. */
+  choiceLabel: 'Período da assinatura',
+  option: { anual: 'Anual', mensal: 'Mensal' } as Readonly<Record<BillingPeriod, string>>,
+  /** Abaixo do nome de cada opção. */
+  optionHint: { anual: 'Uma cobrança por ano', mensal: 'Uma cobrança por mês' } as Readonly<Record<BillingPeriod, string>>,
+  /** "Equivale a R$ 22,49 por mês". */
+  equivalent: (plan: PlanKind) => `Equivale a ${formatBRL(annualMonthlyEquivalentCents(plan))} por mês`,
+  /** "R$ 88,90 a menos que 12 mensalidades". */
+  saving: (plan: PlanKind) => `${formatBRL(annualSavingCents(plan))} a menos que 12 mensalidades`,
+  /** A outra opção, em letra menor, para os dois preços ficarem sempre à vista. */
+  other: (plan: PlanKind, period: BillingPeriod) =>
+    period === 'anual' ? `No mensal: ${planPeriodPrice(plan, 'mensal')}` : `No anual: ${planPeriodPrice(plan, 'anual')}, equivale a ${formatBRL(annualMonthlyEquivalentCents(plan))} por mês`,
+  /** O plano inteiro, lido de uma vez pelo leitor de tela. */
+  planLabel: (plan: PlanKind, period: BillingPeriod, who: string) =>
+    period === 'anual'
+      ? `Plano ${PLAN_NAME[plan]} anual, ${planPeriodPrice(plan, 'anual')}, equivale a ${formatBRL(annualMonthlyEquivalentCents(plan))} por mês. No mensal, ${planPeriodPrice(plan, 'mensal')}. ${who}`
+      : `Plano ${PLAN_NAME[plan]} mensal, ${planPeriodPrice(plan, 'mensal')}. No anual, ${planPeriodPrice(plan, 'anual')}. ${who}`,
+  /**
+   * Sem falar do teste grátis: o anual no cartão é cobrado no dia, os produtos das lojas não têm oferta de teste e a tela aparece também
+   * para quem já passou do teste (o teste da conta já está em `ACCESS_TEXT.plansNote`).
+   */
+  note: 'O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos.',
+} as const;
 
 /** Os textos fixos da assinatura (Conta, tela Assinatura e avisos). */
 export const ACCESS_TEXT = {
@@ -238,13 +330,16 @@ export function accessView(access: Access, now: Date, timeZone: string, opts: { 
       if (access.provider === 'pix') {
         const paid = pixPaidThrough(access, timeZone);
         const ended = paid !== null && paid < todayIn(timeZone, now);
+        // Pix de um ano (D-127): os mesmos avisos, com "ano" no lugar de "mês".
+        const year = access.period === 'anual';
+        const unit = year ? 'ano' : 'mês';
         return {
-          situation: `Plano ${PLAN_NAME[access.plan ?? 'individual']}`,
+          situation: subscribedSituation(access),
           body: !opts.web
             ? `Acesso completo${date ? ` até ${date}` : ''}.`
             : ended
-              ? `O mês pago com Pix terminou em ${formatDateBR(paid!)}. Para continuar anotando, pague o próximo mês aqui na tela Assinatura.`
-              : `Pago com Pix até ${paid ? formatDateBR(paid) : 'o fim do mês pago'}. O Pix não renova sozinho: pague o próximo mês até essa data, aqui na tela Assinatura.`,
+              ? `O ${unit} pago com Pix terminou em ${formatDateBR(paid!)}. Para continuar anotando, pague o próximo ${unit} aqui na tela Assinatura.`
+              : `Pago com Pix até ${paid ? formatDateBR(paid) : `o fim do ${unit} pago`}. O Pix não renova sozinho: pague o próximo ${unit} até essa data, aqui na tela Assinatura.`,
           showPlans: false,
         };
       }
@@ -252,16 +347,16 @@ export function accessView(access: Access, now: Date, timeZone: string, opts: { 
       if (access.provider === 'web' && opts.webSubscription) {
         const ws = opts.webSubscription;
         return {
-          situation: `Plano ${PLAN_NAME[access.plan ?? 'individual']}`,
+          situation: subscribedSituation(access),
           body: ws.active
-            ? `Assinatura ativa, renova em ${ws.nextDueDate ? formatDateBR(ws.nextDueDate) : (date ?? 'breve')}. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.`
+            ? `${activeSubscription(access)}, renova em ${ws.nextDueDate ? formatDateBR(ws.nextDueDate) : (date ?? 'breve')}. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.`
             : `Assinatura cancelada: o acesso completo continua${date ? ` até ${date}` : ' até o fim do período já pago'}, sem nova cobrança.`,
           showPlans: false,
         };
       }
       return {
-        situation: `Plano ${PLAN_NAME[access.plan ?? 'individual']}`,
-        body: `Assinatura ativa${date ? `, renova em ${date}` : ''}. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.`,
+        situation: subscribedSituation(access),
+        body: `${activeSubscription(access)}${date ? `, renova em ${date}` : ''}. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.`,
         showPlans: false,
       };
     case 'beneficio':
@@ -294,19 +389,21 @@ export interface AccessBanner {
 }
 
 /**
- * Aviso no Resumo: nos últimos TRIAL_WARNING_DAYS dias do teste, em só leitura e, na web, nos últimos PIX_WARNING_DAYS dias do mês pago
- * com Pix (o Pix não renova sozinho). Nulo nas outras situações.
+ * Aviso no Resumo: nos últimos TRIAL_WARNING_DAYS dias do teste, em só leitura e, na web, nos últimos dias do período pago com Pix (o Pix
+ * não renova sozinho): 7 no mensal e 14 no anual (PIX_WARNING_DAYS_BY_PERIOD, D-127). Nulo nas outras situações.
  */
 export function accessBanner(access: Access, now: Date, timeZone: string, opts: { web?: boolean } = {}): AccessBanner | null {
   if (access.status === 'assinatura' && access.provider === 'pix') {
     const paid = pixPaidThrough(access, timeZone);
     if (!opts.web || !paid) return null;
     const days = daysBetween(todayIn(timeZone, now), paid);
-    if (days > PIX_WARNING_DAYS) return null;
-    const action = 'Pagar o próximo mês';
-    if (days < 0) return { text: `O mês pago com Pix terminou em ${formatDateBR(paid)}. Para continuar anotando, pague o próximo mês.`, tone: 'aviso', action };
+    const period = accessPeriod(access);
+    if (days > PIX_WARNING_DAYS_BY_PERIOD[period]) return null;
+    const unit = period === 'anual' ? 'ano' : 'mês';
+    const action = `Pagar o próximo ${unit}`;
+    if (days < 0) return { text: `O ${unit} pago com Pix terminou em ${formatDateBR(paid)}. Para continuar anotando, pague o próximo ${unit}.`, tone: 'aviso', action };
     const when = days === 0 ? 'termina hoje' : days === 1 ? 'termina amanhã' : `vai até ${formatDateBR(paid)}`;
-    return { text: `O mês pago com Pix ${when}. Para continuar anotando depois, pague o próximo mês.`, tone: 'info', action };
+    return { text: `O ${unit} pago com Pix ${when}. Para continuar anotando depois, pague o próximo ${unit}.`, tone: 'info', action };
   }
   if (access.status === 'leitura') {
     return { text: 'Sem assinatura ativa, a conta está só para ver e exportar. Para voltar a anotar, assine um dos planos.', tone: 'aviso' };

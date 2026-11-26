@@ -24,7 +24,9 @@
  *
  * Até quando vale, em cada loja: o fim do período pago da assinatura da Clarevo, ou o fim do período de tolerância da loja, se for
  * depois; reembolso do período atual termina na data do reembolso. Na troca de plano as duas podem aparecer: valendo um Família, vale o
- * Família. As do Compartilhamento Familiar da Apple não contam. Resposta inesperada do RevenueCat é falha passageira, nunca "sem
+ * Família. Plano anual (D-127): os produtos anuais (`clarevo_individual_anual`, `clarevo_familia_anual`) valem como os mensais, até o fim do
+ * período pago que o RevenueCat devolve (um ano depois da compra ou da renovação); o período vai ao banco (`p_period` de billing_apply,
+ * migração 0047) para o app mostrar "anual". As do Compartilhamento Familiar da Apple não contam. Resposta inesperada do RevenueCat é falha passageira, nunca "sem
  * assinatura" (que encerraria o direito de quem paga). Sem assinatura daquela
  * loja, nada muda, a não ser que a pessoa já tivesse direito por ela (transferida para outra conta): aí o direito termina agora. Compras
  * de teste (sandbox, as da revisão da Apple e dos testadores) valem como as outras: só quem a Clarevo cadastra faz compra de teste, e a
@@ -38,10 +40,10 @@
  * header value" do webhook no painel do RevenueCat). SUPABASE_URL, a chave de serviço e a chave pública o Supabase fornece. Nenhum
  * segredo entra no app nem no repositório, e nenhum identificador da pessoa vai para o registro (logs).
  */
-import type { PlanKind } from '../plano-precos';
+import type { BillingPeriod, PlanKind } from '../plano-precos';
 import { obj, sameText, serviceHeaders, serviceKeyFrom } from '../servidor-comum';
 import { sha256Hex, utf8Bytes } from '../sha256';
-import { planOfStoreProduct } from './produtos';
+import { storeProductInfo } from './produtos';
 
 export const REVENUECAT_API_URL = 'https://api.revenuecat.com/v1';
 /** As chaves secretas do RevenueCat começam com sk_ (as públicas do SDK, com appl_ e goog_, não servem aqui). */
@@ -145,6 +147,8 @@ export interface StoreSubscription {
   /** O identificador do produto na loja (no Google, com o plano básico). */
   product: string;
   plan: PlanKind | null;
+  /** O período do produto (mensal ou anual, D-127); nulo fora da lista, como o plano. */
+  period: BillingPeriod | null;
   provider: StoreProvider | null;
   expiresAt: Date | null;
   graceUntil: Date | null;
@@ -182,9 +186,11 @@ export function storeSubscriptionsFrom(raw: unknown): StoreSubscription[] | null
   for (const [product, value] of Object.entries(subs)) {
     const s = obj(value);
     if (!s) continue;
+    const info = storeProductInfo(product);
     out.push({
       product,
-      plan: planOfStoreProduct(product),
+      plan: info?.plan ?? null,
+      period: info?.period ?? null,
       provider: storeProviderOf(s.store),
       expiresAt: date(s.expires_date),
       graceUntil: date(s.grace_period_expires_date),
@@ -199,6 +205,8 @@ export function storeSubscriptionsFrom(raw: unknown): StoreSubscription[] | null
 
 export interface StoreValidity {
   plan: PlanKind;
+  /** O período da assinatura escolhida (D-127). */
+  period: BillingPeriod;
   validUntil: Date;
 }
 
@@ -221,22 +229,23 @@ export function subscriptionEnd(s: StoreSubscription): Date | null {
  * a que terminou por último (o direito acaba nessa data). Sem assinatura da Clarevo nessa loja: null.
  */
 export function storeValidity(subs: readonly StoreSubscription[], provider: StoreProvider, now: Date): StoreValidity | null {
-  const ends: { plan: PlanKind; end: Date }[] = [];
+  type End = { plan: PlanKind; period: BillingPeriod; end: Date };
+  const ends: End[] = [];
   for (const s of subs) {
     if (s.provider !== provider || !s.plan || s.familyShared) continue;
     const end = subscriptionEnd(s);
-    if (end) ends.push({ plan: s.plan, end });
+    if (end) ends.push({ plan: s.plan, period: s.period ?? 'mensal', end });
   }
   if (ends.length === 0) return null;
-  const latest = (list: { plan: PlanKind; end: Date }[]) => list.reduce((a, b) => (b.end.getTime() > a.end.getTime() ? b : a));
+  const latest = (list: End[]) => list.reduce((a, b) => (b.end.getTime() > a.end.getTime() ? b : a));
   const active = ends.filter((e) => e.end.getTime() > now.getTime());
   if (active.length === 0) {
     const last = latest(ends);
-    return { plan: last.plan, validUntil: last.end };
+    return { plan: last.plan, period: last.period, validUntil: last.end };
   }
   const family = active.filter((e) => e.plan === 'familiar');
   const chosen = latest(family.length > 0 ? family : active);
-  return { plan: chosen.plan, validUntil: chosen.end };
+  return { plan: chosen.plan, period: chosen.period, validUntil: chosen.end };
 }
 
 /** O identificador guardado no banco para o direito da pessoa numa loja (o mesmo em todas as renovações e trocas de plano). */
@@ -405,7 +414,7 @@ export function createAssinaturaLojasHandler(deps: AssinaturaLojasDeps): (req: A
         const row = obj(found.json);
         const plan = row?.plan;
         if (text(row?.person_id)?.toLowerCase() !== personId || (plan !== 'individual' && plan !== 'familiar')) continue;
-        validity = { plan, validUntil: now() };
+        validity = { plan, period: row?.period === 'anual' ? 'anual' : 'mensal', validUntil: now() };
         ended = true;
       }
       const tag = sha256Hex(`${personId}:${provider}`).slice(0, 16);
@@ -414,7 +423,7 @@ export function createAssinaturaLojasHandler(deps: AssinaturaLojasDeps): (req: A
       const minute = now().toISOString().slice(0, 16);
       const id = eventId
         ? `rc:${eventId}:${tag}`
-        : `rc-app:${sha256Hex(`${personId}:${provider}:${validity.plan}:${ended ? 'fim' : validity.validUntil.toISOString()}:${minute}`).slice(0, 40)}`;
+        : `rc-app:${sha256Hex(`${personId}:${provider}:${validity.plan}:${validity.period}:${ended ? 'fim' : validity.validUntil.toISOString()}:${minute}`).slice(0, 40)}`;
       const applied = await c.rpcService('billing_apply', {
         p_event_id: id,
         p_provider: provider,
@@ -423,6 +432,9 @@ export function createAssinaturaLojasHandler(deps: AssinaturaLojasDeps): (req: A
         p_plan: validity.plan,
         p_valid_until: validity.validUntil.toISOString(),
         p_event_at: at.toISOString(),
+        // O período só vai quando é anual (D-127): sem ele, o banco grava mensal (o padrão de p_period), e a função continua funcionando
+        // com o banco de antes da migração 0047 enquanto ninguém tem o anual.
+        ...(validity.period === 'anual' ? { p_period: 'anual' } : {}),
       });
       if (applied.status !== 200) {
         log(`banco recusou a assinatura da loja ${provider} (${applied.status})`);

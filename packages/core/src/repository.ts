@@ -61,7 +61,7 @@ import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import type { AccountLevelState, AccountMarks } from './levels';
 import type { Access } from './plano';
-import type { PlanKind } from './plano-precos';
+import type { BillingPeriod, PlanKind } from './plano-precos';
 import type { Benefit, BenefitPreview, CompanyOverview, CompanyUsage, License, LicenseInviteWrite, LicenseRenewWrite } from './company';
 import type { FamilyInvite, FamilyInviteWrite, FamilyInvitePreview, FamilyJoin, FamilyOverview, InviteRole } from './family';
 import type { BusinessContext, BusinessContribution, BusinessContributionInput, BusinessProfile, BusinessWithdrawal, BusinessWithdrawalInput } from './business';
@@ -1125,12 +1125,18 @@ export interface RecordsRepository {
 
   // Assinatura na web pelo Asaas (D-084), pela função do servidor "assinatura-web" com a sessão da pessoa. Só na web.
 
-  /** "assinar": cria o Checkout do Asaas e devolve o link da página de pagamento, ou por que não (já assinante, sem necessidade...). */
-  startWebSubscription(plan: PlanKind): Promise<WebSubscriptionStart>;
+  /**
+   * "assinar": cria o Checkout do Asaas e devolve o link da página de pagamento, ou por que não (já assinante, sem necessidade...). `period`:
+   * mensal (o padrão) ou anual (D-127).
+   */
+  startWebSubscription(plan: PlanKind, period?: BillingPeriod): Promise<WebSubscriptionStart>;
   /** "cancelar": remove no Asaas a assinatura ativa feita na web; o período já pago continua valendo. */
   cancelWebSubscription(): Promise<WebSubscriptionCancel>;
-  /** "pix": cria o Checkout do Asaas de um mês com Pix (D-093, caminho B) e devolve o link, ou por que não (mês já pago, já assinante...). */
-  startPixPayment(plan: PlanKind): Promise<WebSubscriptionStart>;
+  /**
+   * "pix": cria o Checkout do Asaas de um mês (ou, no anual, de um ano, D-127) com Pix (D-093, caminho B) e devolve o link, ou por que não
+   * (período já pago, já assinante...).
+   */
+  startPixPayment(plan: PlanKind, period?: BillingPeriod): Promise<WebSubscriptionStart>;
   /** "situacao": se a assinatura no cartão ainda está ativa no Asaas (e quando renova) ou foi cancelada; null quando não deu para saber. */
   getWebSubscriptionStatus(): Promise<WebSubscriptionStatus | null>;
 

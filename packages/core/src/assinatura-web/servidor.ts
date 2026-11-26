@@ -22,6 +22,11 @@
  * WEB_GRACE_DAYS de tolerância para a renovação; cancelada, vale até o fim do período pago; estorno ou contestação tira o período da
  * cobrança na hora. Sem cobrança paga, nada vale.
  *
+ * Plano anual (D-127): "assinar" e "pix" aceitam o período (`period`: `mensal`, o padrão do app de antes, ou `anual`). No cartão, a
+ * assinatura do Asaas é anual (`cycle: YEARLY`), e o fim do período pago já segue o ciclo (`periodEnd`); a consulta das cobranças olha os
+ * últimos 14 meses numa assinatura anual (a última cobrança paga pode ter quase um ano). No Pix, um pagamento vale 12 meses (referência
+ * `clarevo-pix:<id da pessoa>:<plano>:anual`). O período vai ao banco só quando é anual (`p_period`, migração 0047; sem ele, mensal).
+ *
  * Pix mês a mês (D-093, caminho B, docs/39 seção 6): "pix" cria um Checkout do Asaas com Pix avulso (`chargeTypes: DETACHED`) de um mês,
  * com a referência `clarevo-pix:<id da pessoa>:<plano>`; a pessoa informa os dados na página do Asaas. Os avisos de cobrança sem assinatura
  * (`PAYMENT_*`) e o `CHECKOUT_PAID` levam à cobrança atual no Asaas, que acha a pessoa pela referência, pelo Checkout no banco ou pelo
@@ -35,7 +40,7 @@
  * segredo entra no app nem no repositório, e nenhum identificador da pessoa vai para o registro (logs).
  */
 import { addDays, addMonthsToDate, todayIn, type IsoDate } from '../dates';
-import { PLAN_NAME, PLAN_PRICE_CENTS, type PlanKind } from '../plano-precos';
+import { PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, type BillingPeriod, type PlanKind } from '../plano-precos';
 import { obj, sameText, serviceHeaders, serviceKeyFrom } from '../servidor-comum';
 import { sha256Hex, utf8Bytes } from '../sha256';
 import { parsePixReference, pixCanPayNext, pixReference } from './pix';
@@ -59,6 +64,21 @@ export const REQUEST_BUDGET_MS = 8500;
 export const CALL_TIMEOUT_MS = 3000;
 /** Só as cobranças com vencimento nos últimos meses interessam (a última paga e as seguintes); evita a página de 100 do Asaas. */
 export const PAYMENTS_LOOKBACK_MONTHS = 4;
+/** Na assinatura anual (D-127), a última cobrança paga pode ter vencido quase um ano antes: 14 meses cobrem o ano pago e a tolerância. */
+export const PAYMENTS_LOOKBACK_MONTHS_YEARLY = 14;
+
+/** Quantos meses de cobranças consultar numa assinatura, pelo ciclo dela. */
+export function paymentsLookbackMonths(cycle: string): number {
+  return cycle === 'YEARLY' ? PAYMENTS_LOOKBACK_MONTHS_YEARLY : PAYMENTS_LOOKBACK_MONTHS;
+}
+
+/** O período da Clarevo de uma assinatura do Asaas, pelo ciclo (a Clarevo só cria mensal e anual). */
+export function periodOfCycle(cycle: string): BillingPeriod {
+  return cycle === 'YEARLY' ? 'anual' : 'mensal';
+}
+
+/** O ciclo da assinatura do Asaas de cada período. */
+export const ASAAS_CYCLE: Readonly<Record<BillingPeriod, 'MONTHLY' | 'YEARLY'>> = { mensal: 'MONTHLY', anual: 'YEARLY' };
 /** Fuso do Asaas (datas dos avisos e vencimentos): Brasília, sem horário de verão desde 2019. */
 export const ASAAS_TIME_ZONE = 'America/Sao_Paulo';
 const ASAAS_OFFSET = '-03:00';
@@ -105,6 +125,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export interface WebReference {
   personId: string;
   plan: PlanKind;
+  /** O período (D-127): o do Pix pela referência ou pelo banco; no cartão, quem decide é o ciclo da assinatura. Sem ele, mensal. */
+  period?: BillingPeriod;
 }
 
 /** `externalReference` do Checkout e da assinatura no Asaas: a pessoa e o plano. Nunca nome nem e-mail. */
@@ -165,7 +187,10 @@ export function asaasSubscriptionFrom(raw: unknown): AsaasSubscription | null {
   };
 }
 
-/** Uma assinatura que o Asaas já não devolve (removida): só o identificador; nada vale além do período pago. */
+/**
+ * Uma assinatura que o Asaas já não devolve (removida): só o identificador; nada vale além do período pago. O ciclo mensal é provisório:
+ * o aviso troca pelo do período já aplicado no banco, depois de achar a pessoa (D-127).
+ */
 export function goneSubscription(id: string): AsaasSubscription {
   return { id, status: 'INACTIVE', deleted: true, cycle: 'MONTHLY', value: null, nextDueDate: null, externalReference: null, checkoutSession: null };
 }
@@ -193,7 +218,7 @@ export function pixPaidOn(p: AsaasPayment, today: IsoDate): IsoDate | null {
   return p.paidOn && p.paidOn <= today ? p.paidOn : today;
 }
 
-/** O fim do período que uma cobrança com vencimento `dueDate` cobre, pelo ciclo da assinatura (mensal na Clarevo). */
+/** O fim do período que uma cobrança com vencimento `dueDate` cobre, pelo ciclo da assinatura (mensal ou anual na Clarevo). */
 export function periodEnd(dueDate: IsoDate, cycle: string): IsoDate {
   switch (cycle) {
     case 'WEEKLY':
@@ -375,8 +400,11 @@ function supabaseClient(config: AssinaturaWebConfig, fetcher: HttpFetch, timeLef
   };
 }
 
-/** O corpo do Checkout recorrente: cartão, mensal, primeira cobrança hoje, a referência da pessoa e a volta para a tela Assinatura. */
-export function checkoutRequest(personId: string, plan: PlanKind, appUrl: string, today: IsoDate): Record<string, unknown> {
+/**
+ * O corpo do Checkout recorrente: cartão, mensal ou anual (D-127), primeira cobrança hoje, a referência da pessoa e a volta para a tela
+ * Assinatura. A referência é a mesma nos dois períodos: o período da assinatura é o ciclo dela no Asaas.
+ */
+export function checkoutRequest(personId: string, plan: PlanKind, appUrl: string, today: IsoDate, period: BillingPeriod = 'mensal'): Record<string, unknown> {
   const back = (result: string) => `${appUrl}/conta/assinatura?pagamento=${result}`;
   return {
     billingTypes: ['CREDIT_CARD'],
@@ -384,25 +412,44 @@ export function checkoutRequest(personId: string, plan: PlanKind, appUrl: string
     minutesToExpire: CHECKOUT_MINUTES,
     externalReference: webReference(personId, plan),
     callback: { successUrl: back('sucesso'), cancelUrl: back('cancelado'), expiredUrl: back('expirado') },
-    items: [{ name: `Clarevo, plano ${PLAN_NAME[plan]}`, description: 'Assinatura mensal', quantity: 1, value: PLAN_PRICE_CENTS[plan] / 100 }],
-    subscription: { cycle: 'MONTHLY', nextDueDate: today },
+    items: [
+      {
+        name: `Clarevo, plano ${PLAN_NAME[plan]}`,
+        description: period === 'anual' ? 'Assinatura anual' : 'Assinatura mensal',
+        quantity: 1,
+        value: PLAN_PERIOD_PRICE_CENTS[plan][period] / 100,
+      },
+    ],
+    subscription: { cycle: ASAAS_CYCLE[period], nextDueDate: today },
   };
 }
 
 /**
- * O corpo do Checkout de um mês com Pix (D-093, caminho B): Pix avulso, a referência de Pix da pessoa e a mesma volta para a tela
- * Assinatura. O nome do item tem até 30 caracteres (documentação do Asaas).
+ * O corpo do Checkout de um mês (ou, no anual, de um ano, D-127) com Pix (D-093, caminho B): Pix avulso, a referência de Pix da pessoa e a
+ * mesma volta para a tela Assinatura. O nome do item tem até 30 caracteres (documentação do Asaas).
  */
-export function checkoutPixRequest(personId: string, plan: PlanKind, appUrl: string): Record<string, unknown> {
+export function checkoutPixRequest(personId: string, plan: PlanKind, appUrl: string, period: BillingPeriod = 'mensal'): Record<string, unknown> {
   const back = (result: string) => `${appUrl}/conta/assinatura?pagamento=${result}`;
   return {
     billingTypes: ['PIX'],
     chargeTypes: ['DETACHED'],
     minutesToExpire: CHECKOUT_MINUTES,
-    externalReference: pixReference(personId, plan),
+    externalReference: pixReference(personId, plan, period),
     callback: { successUrl: back('sucesso'), cancelUrl: back('cancelado'), expiredUrl: back('expirado') },
-    items: [{ name: `Clarevo, plano ${PLAN_NAME[plan]}`, description: 'Um mês de acesso, pago com Pix', quantity: 1, value: PLAN_PRICE_CENTS[plan] / 100 }],
+    items: [
+      {
+        name: `Clarevo, plano ${PLAN_NAME[plan]}`,
+        description: period === 'anual' ? 'Um ano de acesso, pago com Pix' : 'Um mês de acesso, pago com Pix',
+        quantity: 1,
+        value: PLAN_PERIOD_PRICE_CENTS[plan][period] / 100,
+      },
+    ],
   };
+}
+
+/** O período só vai ao banco quando é anual: sem ele, o banco grava mensal, e a função segue funcionando com o banco de antes da 0047. */
+function periodArg(period: BillingPeriod | undefined): Record<string, string> {
+  return period === 'anual' ? { p_period: 'anual' } : {};
 }
 
 /** O link da página de pagamento: o que o Asaas devolve ou, sem ele, o endereço padrão com o identificador. */
@@ -480,12 +527,13 @@ function json(status: number, body: unknown, extra: Record<string, string> = {})
 /** O que a função fez com um aviso (para o registro e os testes; a resposta ao Asaas é 200 em todos). */
 export type WebhookOutcome = 'aplicado' | 'ignorado' | 'sem_referencia' | 'recusado' | 'cancelada_sem_pessoa' | 'sem_pessoa';
 
-/** A pessoa e o plano devolvidos por billing_checkout_person, billing_person_by_external_ref ou billing_pix_person. */
+/** A pessoa, o plano e o período (mensal sem ele) devolvidos por billing_checkout_person, billing_person_by_external_ref ou billing_pix_person. */
 function referenceFromRpc(r: JsonResponse): WebReference | null {
   const found = obj(r.json);
   const personId = text(found?.person_id);
   const plan = found?.plan;
-  return r.status === 200 && personId && UUID.test(personId) && (plan === 'individual' || plan === 'familiar') ? { personId: personId.toLowerCase(), plan } : null;
+  if (r.status !== 200 || !personId || !UUID.test(personId) || (plan !== 'individual' && plan !== 'familiar')) return null;
+  return { personId: personId.toLowerCase(), plan, period: found?.period === 'anual' ? 'anual' : 'mensal' };
 }
 
 export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: AssinaturaWebRequest) => Promise<AssinaturaWebResponse> {
@@ -545,7 +593,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     }
     // Só cobrança de Pix sem assinatura (revisão independente de 11/11/2026): cartão, boleto ou cobrança de assinatura não viram mês de Pix.
     if (p.subscription || (p.billingType !== null && p.billingType !== 'PIX')) return 'ignorado';
-    let ref = parsePixReference(p.externalReference);
+    let ref: WebReference | null = parsePixReference(p.externalReference);
     if (!ref && p.checkoutSession) ref = referenceFromRpc(await db.rpcService('billing_checkout_person', { p_checkout_hash: sha256Hex(p.checkoutSession) }));
     if (!ref) ref = referenceFromRpc(await db.rpcService('billing_pix_person', { p_payment_hash: sha256Hex(p.id) }));
     if (!ref) {
@@ -560,6 +608,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       p_payment_hash: sha256Hex(p.id),
       p_paid_on: pixPaidOn(p, todayIn(ASAAS_TIME_ZONE, now())),
       p_event_at: ev.at.toISOString(),
+      ...periodArg(ref.period),
     });
     if (applied.status !== 200) {
       log(`banco recusou o aviso ${ev.event} de Pix (${applied.status})`);
@@ -594,6 +643,8 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     // aviso ou, sem ele, só o que já está pago.
     const got = await asaas('GET', `/subscriptions/${encodeURIComponent(ev.subscriptionId)}`);
     let sub = got.status === 200 ? asaasSubscriptionFrom(got.json) : null;
+    // Removida e sem o objeto no aviso (os PAYMENT_* trazem só o identificador dela): o Asaas não diz o ciclo.
+    const cycleUnknown = !sub && got.status === 404 && !ev.subscription;
     if (!sub && got.status === 404) sub = ev.subscription ?? goneSubscription(ev.subscriptionId);
     if (!sub) {
       if (got.status === 200) return 'ignorado';
@@ -604,7 +655,11 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       log(`aviso ${ev.event} de assinatura sem referência da Clarevo`);
       return 'sem_referencia';
     }
-    const since = addMonthsToDate(todayIn(ASAAS_TIME_ZONE, now()), -PAYMENTS_LOOKBACK_MONTHS);
+    // Então o ciclo vem do período já aplicado no banco (billing_person_by_external_ref, D-127): numa anual removida, a consulta olha 14
+    // meses de cobranças, o período pago vai até 12 meses depois do vencimento e o banco continua com o anual (um estorno ou o
+    // PAYMENT_RECEIVED que chega 32 dias depois do cartão não a transformam em mensal). Sem o período (banco de antes da 0047), mensal.
+    if (cycleUnknown) sub = { ...sub, cycle: ASAAS_CYCLE[ref.period ?? 'mensal'] };
+    const since = addMonthsToDate(todayIn(ASAAS_TIME_ZONE, now()), -paymentsLookbackMonths(sub.cycle));
     const list = await asaas('GET', `/payments?subscription=${encodeURIComponent(sub.id)}&dueDate%5Bge%5D=${since}&limit=100`);
     if (list.status !== 200) throw new TransientError(`Asaas respondeu ${list.status} ao listar cobranças`);
     const data = obj(list.json)?.data;
@@ -618,6 +673,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       p_plan: ref.plan,
       p_valid_until: validUntil.toISOString(),
       p_event_at: ev.at.toISOString(),
+      ...periodArg(periodOfCycle(sub.cycle)),
     });
     if (applied.status !== 200) {
       // Recusa do banco (aviso inválido, assinatura de outra pessoa): repetir não resolve; fica no registro.
@@ -675,9 +731,11 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
     }
     const action = payload?.action;
     const plan = payload?.plan;
+    // O período (D-127): sem ele, mensal (o app de antes do plano anual não manda).
+    const period: BillingPeriod | null = payload?.period === undefined ? 'mensal' : payload.period === 'mensal' || payload.period === 'anual' ? payload.period : null;
     if (
       (action !== 'assinar' && action !== 'cancelar' && action !== 'pix' && action !== 'situacao') ||
-      ((action === 'assinar' || action === 'pix') && plan !== 'individual' && plan !== 'familiar')
+      ((action === 'assinar' || action === 'pix') && ((plan !== 'individual' && plan !== 'familiar') || period === null))
     ) {
       return reply(400, { result: 'pedido_invalido' });
     }
@@ -705,18 +763,21 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       if (access.status !== 200) throw new TransientError(`banco respondeu ${access.status} em my_access`);
       const current = obj(access.json);
       const status = current?.status;
-      // Quem paga com Pix pode pagar o próximo mês (só com Pix, e só nos últimos dias do mês pago); qualquer outra assinatura bloqueia.
+      // Quem paga com Pix pode pagar o próximo período (só com Pix, e só nos últimos dias do período pago: 10 no mensal, 30 no anual, pelo
+      // período em vigor, `period` de my_access); qualquer outra assinatura bloqueia.
       const paysWithPix = action === 'pix' && current?.provider === 'pix';
       if (status === 'assinatura' && !paysWithPix) return reply(200, { result: 'ja_assinante' });
       if (status === 'beneficio' || status === 'cortesia') return reply(200, { result: 'sem_necessidade' });
-      if (status === 'assinatura' && !pixCanPayNext(typeof current?.until === 'string' ? current.until : null, now())) return reply(200, { result: 'ja_pago' });
+      const currentPeriod: BillingPeriod = current?.period === 'anual' ? 'anual' : 'mensal';
+      if (status === 'assinatura' && !pixCanPayNext(typeof current?.until === 'string' ? current.until : null, now(), currentPeriod)) return reply(200, { result: 'ja_pago' });
       // Assinatura no cartão ainda ativa no Asaas: com o acesso valendo, já assinante; sem ele (cobrança recusada ou em aberto), a tela
       // oferece cancelar a do cartão antes de pagar de outro jeito (revisão independente de 11/11/2026).
       if ((await activeSubscriptions(asaas, personId)).length > 0) return reply(200, { result: status === 'assinatura' ? 'ja_assinante' : 'cartao_ativo' });
+      const chosen: BillingPeriod = period ?? 'mensal';
       const request =
         action === 'pix'
-          ? checkoutPixRequest(personId, plan as PlanKind, config.appUrl)
-          : checkoutRequest(personId, plan as PlanKind, config.appUrl, todayIn(ASAAS_TIME_ZONE, now()));
+          ? checkoutPixRequest(personId, plan as PlanKind, config.appUrl, chosen)
+          : checkoutRequest(personId, plan as PlanKind, config.appUrl, todayIn(ASAAS_TIME_ZONE, now()), chosen);
       const created = await asaas('POST', '/checkouts', request);
       const checkoutId = text(obj(created.json)?.id);
       const url = created.status === 200 ? checkoutLink(created.json, config.sandbox) : null;
@@ -728,7 +789,7 @@ export function createAssinaturaWebHandler(deps: AssinaturaWebDeps): (req: Assin
       const cancelCheckout = () => asaas('POST', `/checkouts/${encodeURIComponent(checkoutId)}/cancel`).catch(() => undefined);
       let recorded: JsonResponse;
       try {
-        recorded = await db.rpcService('billing_checkout_record', { p_checkout_hash: sha256Hex(checkoutId), p_person: personId, p_plan: plan });
+        recorded = await db.rpcService('billing_checkout_record', { p_checkout_hash: sha256Hex(checkoutId), p_person: personId, p_plan: plan, ...periodArg(chosen) });
       } catch (e) {
         await cancelCheckout();
         throw e;

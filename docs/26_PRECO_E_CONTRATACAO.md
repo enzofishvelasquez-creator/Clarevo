@@ -26,7 +26,16 @@ Alternativa para quem tem receio de baixa adesão, a decidir: cobrar só pelas *
 
 ## 3. Tabela de preços proposta
 
-**Preço de referência:** R$ 29,90 por pessoa por mês. É o valor do benefício para uma pessoa, e a empresa contrata com desconto por volume. A proposta mostra o preço de referência e o desconto. A venda direta para quem não tem o benefício entrou com a D-083 (R$ 29,90 por mês no plano Individual e R$ 69,90 no Família, 14 dias grátis; `docs/37`, seção 7).
+**Preço de referência:** R$ 29,90 por pessoa por mês. É o valor do benefício para uma pessoa, e a empresa contrata com desconto por volume. A proposta mostra o preço de referência e o desconto. A venda direta para quem não tem o benefício entrou com a D-083 (R$ 29,90 por mês no plano Individual e R$ 69,90 no Família, 14 dias grátis; `docs/37`, seção 7) e ganhou o plano anual com a D-125 e a D-127: R$ 269,90 por ano no Individual (equivale a R$ 22,49 por mês, R$ 88,90 a menos que 12 mensalidades) e R$ 629,90 por ano no Família (equivale a R$ 52,49 por mês, R$ 208,90 a menos que 12 mensalidades), com o mesmo teste grátis, pelas lojas e pela web (`docs/42` e `docs/39`, seção 7).
+
+**Venda direta (pessoas e famílias), D-083, D-125 e D-127:**
+
+| Plano | Mensal | Anual | Equivale por mês, no anual | Diferença para 12 mensalidades |
+|---|---|---|---|---|
+| Individual | R$ 29,90 | R$ 269,90 | R$ 22,49 | R$ 88,90 (cerca de 25%) |
+| Família, até 6 pessoas | R$ 69,90 | R$ 629,90 | R$ 52,49 | R$ 208,90 (cerca de 25%) |
+
+O equivalente por mês é só uma comparação: o anual é uma cobrança só, que vale por 12 meses.
 
 Preço por vaga por mês, com impostos incluídos. O preço da faixa vale para todas as vagas do contrato.
 

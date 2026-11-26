@@ -65,9 +65,9 @@ update public.persons set created_at = now() - interval '60 days' where id in (:
 -- 1. Privilégios: só a chave de serviço; ninguém lê a tabela direto; a origem 'pix' passa nas restrições.
 -- ---------------------------------------------------------------------------
 do $$ begin
-  assert has_function_privilege('service_role', 'public.billing_pix_apply(text, uuid, text, text, date, timestamptz)', 'execute')
-     and not has_function_privilege('authenticated', 'public.billing_pix_apply(text, uuid, text, text, date, timestamptz)', 'execute')
-     and not has_function_privilege('anon', 'public.billing_pix_apply(text, uuid, text, text, date, timestamptz)', 'execute'),
+  assert has_function_privilege('service_role', 'public.billing_pix_apply(text, uuid, text, text, date, timestamptz, text)', 'execute')
+     and not has_function_privilege('authenticated', 'public.billing_pix_apply(text, uuid, text, text, date, timestamptz, text)', 'execute')
+     and not has_function_privilege('anon', 'public.billing_pix_apply(text, uuid, text, text, date, timestamptz, text)', 'execute'),
     'billing_pix_apply só com a chave de serviço';
   assert has_function_privilege('service_role', 'public.billing_pix_person(text)', 'execute')
      and not has_function_privilege('authenticated', 'public.billing_pix_person(text)', 'execute')
@@ -121,7 +121,7 @@ begin
   r := public.billing_pix_apply('evt_pix_7', pg_temp.eva(), 'individual', pg_temp.sha('pay_eva_3'), pg_temp.hoje() - 2, now());
   assert pg_temp.pix_until(pg_temp.eva(), 'individual') <= now() and r #>> '{access,plan}' = 'familiar', 'o plano do pagamento fica: ' || r::text;
   -- A pessoa de um pagamento gravado.
-  assert public.billing_pix_person(pg_temp.sha('pay_eva_3')) = jsonb_build_object('person_id', pg_temp.eva(), 'plan', 'familiar'), 'a pessoa pelo resumo';
+  assert public.billing_pix_person(pg_temp.sha('pay_eva_3')) = jsonb_build_object('person_id', pg_temp.eva(), 'plan', 'familiar', 'period', 'mensal'), 'a pessoa pelo resumo';
   assert public.billing_pix_person(pg_temp.sha('outro')) is null, 'resumo desconhecido: nulo';
 end $$;
 

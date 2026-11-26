@@ -92,9 +92,9 @@ begin
   assert has_function_privilege('authenticated', 'public.my_access()', 'execute') and not has_function_privilege('anon', 'public.my_access()', 'execute'),
     'my_access só para quem entrou';
   assert (select prosecdef from pg_proc where oid = 'public.my_access()'::regprocedure), 'my_access é security definer';
-  assert has_function_privilege('service_role', 'public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz)', 'execute')
-     and not has_function_privilege('authenticated', 'public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz)', 'execute')
-     and not has_function_privilege('anon', 'public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz)', 'execute'),
+  assert has_function_privilege('service_role', 'public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz, text)', 'execute')
+     and not has_function_privilege('authenticated', 'public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz, text)', 'execute')
+     and not has_function_privilege('anon', 'public.billing_apply(text, text, uuid, text, text, timestamptz, timestamptz, text)', 'execute'),
     'billing_apply só com a chave de serviço';
   foreach f in array array['clarevo_access(uuid)', 'clarevo_write_free_actions()', 'clarevo_staff_set_billing_start(timestamptz)',
                            'clarevo_staff_grant_courtesy(text, text, timestamptz)'] loop

@@ -238,7 +238,7 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
     }
   });
 
-  it('os dados estruturados: JSON válido em todas as páginas; SoftwareApplication sem oferta antes do lançamento e com os dois planos mensais depois', () => {
+  it('os dados estruturados: JSON válido em todas as páginas; SoftwareApplication sem oferta antes do lançamento e com os dois planos, no mensal e no anual, depois', () => {
     for (const g of [pre, lancado]) {
       for (const nome of lidos(g).filter((n) => n.endsWith('.html'))) {
         for (const d of dadosEstruturados(texto(g, nome))) {
@@ -254,9 +254,12 @@ describe('site público: um só estado do produto (D-125), em todas as páginas 
       expect(appPre, nome).not.toHaveProperty('offers');
       expect(appLancado, nome).toMatchObject({ name: 'Clarevo', applicationCategory: 'FinanceApplication', operatingSystem: 'Web, iOS' });
       const ofertas = appLancado.offers as { '@type': string; name: string; price: string; priceCurrency: string }[];
+      // D-127: os dois planos no mensal e no anual, com o preço do núcleo.
       expect(ofertas.map((o) => [o['@type'], o.name, o.price, o.priceCurrency]), nome).toEqual([
         ['Offer', `Plano ${PLAN_NAME.individual}`, planPriceAmount('individual').replace(/[^\d,]/g, '').replace(',', '.'), 'BRL'],
+        ['Offer', `Plano ${PLAN_NAME.individual} anual`, '269.90', 'BRL'],
         ['Offer', `Plano ${PLAN_NAME.familiar}`, planPriceAmount('familiar').replace(/[^\d,]/g, '').replace(',', '.'), 'BRL'],
+        ['Offer', `Plano ${PLAN_NAME.familiar} anual`, '629.90', 'BRL'],
       ]);
     }
   });

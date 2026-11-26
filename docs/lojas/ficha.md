@@ -1,6 +1,6 @@
 # Ficha das lojas (pt-BR)
 
-19/10/2026 (Ciclo R, D-060 item 1), revista em 25/10/2026 (Ciclo Marca 2.2, D-068: bem-estar financeiro e "a Clarevo"), em 10/11/2026 (assinatura pelas lojas, D-090, e o Telegram com compra no cartão) e em 25/11/2026 (D-125, estudo "Clarevo frente ao mercado": subtítulo com palavra de busca, primeiras linhas com a promessa, a privacidade e o preço, e a lista de recursos mais curta). Textos prontos para colar no App Store Connect (Apple) e no Google Play Console. Cada campo tem o limite da loja e a contagem feita por script (`npm test` confere os limites e os termos proibidos em `packages/core/test/lojas.test.ts`). Nada aqui depende de conta de desenvolvedor, e nenhum identificador, senha ou chave foi escrito: o que for da conta de Enzo aparece entre colchetes, como "[preencher]".
+19/10/2026 (Ciclo R, D-060 item 1), revista em 25/10/2026 (Ciclo Marca 2.2, D-068: bem-estar financeiro e "a Clarevo"), em 10/11/2026 (assinatura pelas lojas, D-090, e o Telegram com compra no cartão) em 25/11/2026 (D-125, estudo "Clarevo frente ao mercado": subtítulo com palavra de busca, primeiras linhas com a promessa, a privacidade e o preço, e a lista de recursos mais curta) e em 27/11/2026 (D-127, plano anual: os preços por ano nas descrições e os quatro produtos nas notas para a revisão). Textos prontos para colar no App Store Connect (Apple) e no Google Play Console. Cada campo tem o limite da loja e a contagem feita por script (`npm test` confere os limites e os termos proibidos em `packages/core/test/lojas.test.ts`). Nada aqui depende de conta de desenvolvedor, e nenhum identificador, senha ou chave foi escrito: o que for da conta de Enzo aparece entre colchetes, como "[preencher]".
 
 **Limites.** Apple, conferidos em 19/10/2026 em `developer.apple.com/help/app-store-connect/reference/app-information/app-information` e `.../platform-version-information`: nome 30 caracteres, subtítulo 30, texto promocional 170, descrição 4000, palavras-chave 100 **bytes** (letra acentuada vale 2), notas para a revisão 4000 bytes. Google Play: título 30, descrição curta 80 e descrição completa 4000 caracteres são os limites que a página de ajuda do Play Console costuma trazer, **a conferir**: a rede desta sessão não abriu `support.google.com`, e esses valores não foram lidos da fonte oficial.
 
@@ -17,11 +17,11 @@
 | Frase de apoio (gráfico e imagem do site) | 25 caracteres | 30 |
 | Texto promocional (Apple) | 156 caracteres | 170 |
 | Palavras-chave (Apple) | 97 bytes | 100 bytes |
-| Descrição (Apple) | 3278 caracteres | 4000 |
+| Descrição (Apple) | 3439 caracteres | 4000 |
 | Descrição curta (Google) | 77 caracteres | 80 (a conferir) |
-| Descrição completa (Google) | 3231 caracteres | 4000 (a conferir) |
+| Descrição completa (Google) | 3392 caracteres | 4000 (a conferir) |
 | Notas da versão (Google) | 162 caracteres | 500 (a conferir) |
-| Notas para a revisão (Apple) | 1783 bytes | 4000 bytes |
+| Notas para a revisão (Apple) | 2069 bytes | 4000 bytes |
 
 ## 1. Nome, subtítulo e categoria
 
@@ -90,7 +90,7 @@ Texto simples, sem HTML. A mesma descrição serve de base para o Google (seçã
 ```
 Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar, no mesmo app.
 Você decide o que entra: só aparece o que você anota, importa ou manda por mensagem. Sem anúncios e sem venda de dados.
-Individual por R$ 29,90 por mês ou Família por R$ 69,90 por mês, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão.
+Individual por R$ 29,90 por mês ou R$ 269,90 por ano; Família por R$ 69,90 por mês ou R$ 629,90 por ano, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão.
 
 Você anota o que recebe e o que paga, e o app mostra o que entrou, o que saiu e o que ainda vai vencer, cada coisa separada da outra. Se sua empresa oferecer a Clarevo como benefício de bem-estar financeiro, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
 
@@ -109,7 +109,7 @@ O QUE VOCÊ FAZ NA CLAREVO
 
 ASSINATURA
 
-A Clarevo é paga por assinatura mensal, com dois planos e os mesmos recursos: Individual, por R$ 29,90 por mês, e Família, por R$ 69,90 por mês, para você e a sua Família na Clarevo, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão. A assinatura é feita pela App Store, com a forma de pagamento da sua conta Apple, e renova sozinha a cada mês, pelo mesmo preço, até você cancelar nos ajustes de assinatura da conta Apple, pelo menos 24 horas antes da renovação. Sem assinatura depois do teste, a conta fica só para ver e exportar, com os seus dados guardados.
+A Clarevo é paga por assinatura mensal ou anual, com dois planos e os mesmos recursos: Individual, por R$ 29,90 por mês ou R$ 269,90 por ano, e Família, por R$ 69,90 por mês ou R$ 629,90 por ano, para você e a sua Família na Clarevo, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão. A assinatura é feita pela App Store, com a forma de pagamento da sua conta Apple, e renova sozinha a cada mês ou a cada ano, conforme o período escolhido, pelo mesmo preço, até você cancelar nos ajustes de assinatura da conta Apple, pelo menos 24 horas antes da renovação. Sem assinatura depois do teste, a conta fica só para ver e exportar, com os seus dados guardados.
 
 Termos de uso: https://clarevo.app.br/termos
 Política de privacidade: https://clarevo.app.br/privacidade
@@ -142,7 +142,7 @@ Controle de gastos e contas do mês, com pessoal, família e negócio separados.
 ```
 Organize as contas, os cartões e os gastos do mês, com a vida pessoal, a família e o negócio cada um no seu lugar, no mesmo app.
 Você decide o que entra: só aparece o que você anota, importa ou manda por mensagem. Sem anúncios e sem venda de dados.
-Individual por R$ 29,90 por mês ou Família por R$ 69,90 por mês, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão.
+Individual por R$ 29,90 por mês ou R$ 269,90 por ano; Família por R$ 69,90 por mês ou R$ 629,90 por ano, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão.
 
 Você anota o que recebe e o que paga, e o app mostra o que entrou, o que saiu e o que ainda vai vencer, cada coisa separada da outra. Se sua empresa oferecer a Clarevo como benefício de bem-estar financeiro, ela vê o e-mail que convidou e a situação do convite ou da licença, com as datas: nunca vê seus gastos, seus valores nem o que você faz no app.
 
@@ -161,7 +161,7 @@ O QUE VOCÊ FAZ NA CLAREVO
 
 ASSINATURA
 
-A Clarevo é paga por assinatura mensal, com dois planos e os mesmos recursos: Individual, por R$ 29,90 por mês, e Família, por R$ 69,90 por mês, para você e a sua Família na Clarevo, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão. A assinatura é feita pelo Google Play, com a forma de pagamento da sua conta Google, e renova sozinha a cada mês, pelo mesmo preço, até você cancelar nas assinaturas do Google Play. Sem assinatura depois do teste, a conta fica só para ver e exportar, com os seus dados guardados.
+A Clarevo é paga por assinatura mensal ou anual, com dois planos e os mesmos recursos: Individual, por R$ 29,90 por mês ou R$ 269,90 por ano, e Família, por R$ 69,90 por mês ou R$ 629,90 por ano, para você e a sua Família na Clarevo, até 6 pessoas. Toda conta começa com 14 dias grátis, sem pedir cartão. A assinatura é feita pelo Google Play, com a forma de pagamento da sua conta Google, e renova sozinha a cada mês ou a cada ano, conforme o período escolhido, pelo mesmo preço, até você cancelar nas assinaturas do Google Play. Sem assinatura depois do teste, a conta fica só para ver e exportar, com os seus dados guardados.
 
 Termos de uso: https://clarevo.app.br/termos
 Política de privacidade: https://clarevo.app.br/privacidade
@@ -232,7 +232,7 @@ Resultado esperado: **4+** na Apple e a menor faixa na classificação do Google
 | Violência, conteúdo sexual, linguagem imprópria, drogas, apostas | Não |
 | As pessoas interagem ou trocam conteúdo entre si? | Só dentro da Família (convite por link, sem mensagens, sem conteúdo público). Responder conforme a pergunta aceitar: se pedir "compartilha informações do usuário com outras pessoas", responder sim e descrever a Família |
 | Compartilha a localização? | Não |
-| Permite compras de bens digitais? | Sim: a assinatura mensal, pelo Google Play (D-083, D-090) |
+| Permite compras de bens digitais? | Sim: a assinatura mensal ou anual, pelo Google Play (D-083, D-090, D-127) |
 | Acesso irrestrito à internet? | Não |
 
 ## 10. Informações para a revisão
@@ -243,7 +243,7 @@ Resultado esperado: **4+** na Apple e a menor faixa na classificação do Google
 ```
 A Clarevo é um app de organização financeira: organiza o dinheiro do mês (gastos, recebimentos, contas a pagar, cartões, metas), com espaços separados para o Pessoal, a Família e o negócio de quem trabalha por conta, e traz explicações de educação financeira. Não se conecta a contas bancárias e não movimenta dinheiro.
 
-Assinatura: a Clarevo é paga por assinatura mensal, com compra dentro do app (dois produtos de assinatura automática no mesmo grupo: clarevo_individual_mensal, R$ 29,90, e clarevo_familia_mensal, R$ 69,90). Toda conta nova tem 14 dias de acesso completo grátis, dados pela própria conta, sem compra; depois, sem assinatura, a conta fica só para ver e exportar. Para ver e testar a compra: Conta, Assinatura, "Assinar o plano Individual" ou "Assinar o plano Família". "Restaurar compras" fica na mesma tela.
+Assinatura: a Clarevo é paga por assinatura mensal ou anual, com compra dentro do app (quatro produtos de assinatura automática no mesmo grupo: clarevo_individual_mensal, R$ 29,90 por mês; clarevo_familia_mensal, R$ 69,90 por mês; clarevo_individual_anual, R$ 269,90 por ano; e clarevo_familia_anual, R$ 629,90 por ano). O anual tem os mesmos recursos do mensal; muda só o período da cobrança. Toda conta nova tem 14 dias de acesso completo grátis, dados pela própria conta, sem compra; depois, sem assinatura, a conta fica só para ver e exportar. Para ver e testar a compra: Conta, Assinatura, escolha "Anual" ou "Mensal" no alto dos planos e toque em "Assinar o plano Individual anual" (ou mensal) ou "Assinar o plano Família anual" (ou mensal). "Restaurar compras" fica na mesma tela.
 
 Para entrar, use a conta de teste informada nos campos de acesso. Todos os dados dessa conta são fictícios e estão identificados como exemplo.
 

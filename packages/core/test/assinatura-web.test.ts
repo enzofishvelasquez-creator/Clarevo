@@ -8,6 +8,10 @@ import {
   APP_URL_DEFAULT,
   ASAAS_PRODUCTION_URL,
   ASAAS_SANDBOX_URL,
+  PAYMENTS_LOOKBACK_MONTHS_YEARLY,
+  PIX_PAY_AHEAD_DAYS_BY_PERIOD,
+  PIX_WARNING_DAYS_BY_PERIOD,
+  PLAN_PERIOD_PRICE_CENTS,
   PLAN_PRICE_CENTS,
   WEB_GRACE_DAYS,
   WEB_SUBSCRIPTION_TEXT,
@@ -27,7 +31,9 @@ import {
   parseWebSubscriptionCancel,
   parseWebSubscriptionStart,
   parseWebSubscriptionStatus,
+  paymentsLookbackMonths,
   periodEnd,
+  periodOfCycle,
   pixCanPayNext,
   pixNextPaymentFrom,
   pixPaidOn,
@@ -87,13 +93,13 @@ const pay = (dueDate: string, status = 'CONFIRMED', extra: Partial<AsaasPayment>
 });
 
 /** A rede falsa: o Asaas e o banco, com o que cada endereço responde, e o registro do que foi mandado. */
-function fakeNet(answers: Partial<Record<string, (init: { method: string; body?: string }) => { status: number; body: unknown }>> = {}) {
+function fakeNet(answers: Partial<Record<string, (init: { method: string; body?: string }, url: string) => { status: number; body: unknown }>> = {}) {
   const sent: { method: string; url: string; headers: Record<string, string>; body: unknown; timeoutMs: number }[] = [];
   const fetcher: HttpFetch = async (url, init) => {
     sent.push({ method: init.method, url, headers: init.headers, body: init.body === undefined ? undefined : JSON.parse(init.body), timeoutMs: init.timeoutMs });
     const key = `${init.method} ${url.replace(/^https:\/\/[^/]+/, '').replace(/\?.*$/, '')}`;
     const match = Object.entries(answers).find(([k]) => k === key) ?? Object.entries(answers).find(([k]) => k.endsWith('*') && key.startsWith(k.slice(0, -1)));
-    const r = match?.[1]?.(init) ?? { status: 404, body: { errors: [{ code: 'not_found' }] } };
+    const r = match?.[1]?.(init, url) ?? { status: 404, body: { errors: [{ code: 'not_found' }] } };
     return { status: r.status, text: async () => (typeof r.body === 'string' ? r.body : JSON.stringify(r.body)) };
   };
   return { sent, fetcher };
@@ -258,6 +264,22 @@ describe('Assinatura na web: o pedido ao Asaas', () => {
     expect(JSON.stringify(body)).not.toMatch(/customer|email|cpf/i);
   });
 
+  it('plano anual (D-127): o Checkout recorrente com o ciclo anual e o preço do ano; a mesma referência (o período é o ciclo)', () => {
+    const body = checkoutRequest(ANA, 'individual', APP_URL_DEFAULT, '2026-11-06', 'anual') as Record<string, unknown>;
+    expect(body).toMatchObject({
+      billingTypes: ['CREDIT_CARD'],
+      chargeTypes: ['RECURRENT'],
+      externalReference: `clarevo:${ANA}:individual`,
+      items: [{ name: 'Clarevo, plano Individual', description: 'Assinatura anual', quantity: 1, value: 269.9 }],
+      subscription: { cycle: 'YEARLY', nextDueDate: '2026-11-06' },
+    });
+    expect((checkoutRequest(ANA, 'familiar', APP_URL_DEFAULT, '2026-11-06', 'anual') as { items: { value: number }[] }).items[0]!.value).toBe(629.9);
+    expect(checkoutRequest(ANA, 'familiar', APP_URL_DEFAULT, '2026-11-06', 'mensal')).toEqual(checkoutRequest(ANA, 'familiar', APP_URL_DEFAULT, '2026-11-06'));
+    expect([periodOfCycle('YEARLY'), periodOfCycle('MONTHLY'), periodOfCycle('QUALQUER')]).toEqual(['anual', 'mensal', 'mensal']);
+    // Numa assinatura anual, as cobranças dos últimos 14 meses (a última paga pode ter quase um ano); na mensal, 4.
+    expect([paymentsLookbackMonths('YEARLY'), paymentsLookbackMonths('MONTHLY'), PAYMENTS_LOOKBACK_MONTHS_YEARLY]).toEqual([14, 4, 14]);
+  });
+
   it('o link é o que o Asaas devolve (só do domínio do Asaas) ou o endereço padrão com o identificador', () => {
     expect(checkoutLink({ id: CHECKOUT, link: `https://sandbox.asaas.com/checkoutSession/show?id=${CHECKOUT}` }, true)).toBe(`https://sandbox.asaas.com/checkoutSession/show?id=${CHECKOUT}`);
     expect(checkoutLink({ id: CHECKOUT, link: null }, false)).toBe(`https://asaas.com/checkoutSession/show?id=${CHECKOUT}`);
@@ -314,6 +336,29 @@ describe('Assinatura na web: a função do servidor, avisos do Asaas', () => {
         p_plan: 'individual',
         p_valid_until: '2026-12-10T02:59:59.999Z',
         p_event_at: '2026-11-06T14:59:00.000Z',
+      },
+    ]);
+  });
+
+  it('assinatura anual (D-127): consulta 14 meses de cobranças, vale até um ano depois do vencimento pago (mais a tolerância) e manda o período ao banco', async () => {
+    // A cobrança anual paga há 10 meses: com a janela de 4 meses ela ficaria de fora e o acesso acabaria por engano.
+    const { answers, applied } = happyAnswers(sub({ cycle: 'YEARLY', value: 269.9, nextDueDate: '2027-01-06' }) as unknown as Record<string, unknown>, [pay('2026-01-06')]);
+    const net = fakeNet(answers);
+    const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW });
+    const res = await h(webhookReq(event('SUBSCRIPTION_UPDATED', { subscription: sub({ cycle: 'YEARLY' }) })).req);
+    expect(JSON.parse(res.body)).toEqual({ received: true, outcome: 'aplicado' });
+    expect(net.sent[1]?.url).toBe(`${ASAAS_SANDBOX_URL}/payments?subscription=${SUB}&dueDate%5Bge%5D=2025-09-06&limit=100`);
+    expect(applied).toEqual([
+      {
+        p_event_id: 'evt_1',
+        p_provider: 'web',
+        p_person: ANA,
+        p_external_ref: sha256Hex(SUB),
+        p_plan: 'individual',
+        // 06/01/2027 + 3 dias de tolerância, fim do dia em Brasília.
+        p_valid_until: '2027-01-10T02:59:59.999Z',
+        p_event_at: '2026-11-06T14:59:00.000Z',
+        p_period: 'anual',
       },
     ]);
   });
@@ -397,6 +442,78 @@ describe('Assinatura na web: a função do servidor, avisos do Asaas', () => {
     expect(refund.applied[0]).toMatchObject({ p_person: ANA, p_external_ref: sha256Hex(SUB), p_valid_until: NOW.toISOString() });
     // Assinatura removida não recebe PUT.
     expect(net2.sent.some((s) => s.method === 'PUT')).toBe(false);
+  });
+
+  describe('assinatura anual removida (D-127): o aviso de cobrança não traz a assinatura e o Asaas responde 404', () => {
+    // Individual anual pago no cartão em 15/01/2027 e cancelado em 01/02/2027 (a assinatura some do Asaas). A pessoa e o período vêm da
+    // assinatura já aplicada no banco (billing_person_by_external_ref); as cobranças são filtradas pelo vencimento, como no Asaas.
+    const ANNUAL_DUE = '2027-01-15';
+    async function removedAnnual(at: string, eventName: string, status: string, found: Record<string, unknown> = { person_id: ANA, plan: 'individual', period: 'anual' }) {
+      const applied: Record<string, unknown>[] = [];
+      const net = fakeNet({
+        'GET /v3/payments': (_init, url) => {
+          const since = /dueDate%5Bge%5D=(\d{4}-\d{2}-\d{2})/.exec(url)?.[1] ?? '9999-12-31';
+          return { status: 200, body: { object: 'list', data: [pay(ANNUAL_DUE, status, { id: 'pay_anual' })].filter((p) => (p.dueDate ?? '') >= since) } };
+        },
+        'POST /rest/v1/rpc/billing_person_by_external_ref': () => ({ status: 200, body: found }),
+        'POST /rest/v1/rpc/billing_apply': (init) => {
+          applied.push(JSON.parse(init.body ?? '{}'));
+          return { status: 200, body: { result: 'aplicado', access: { status: 'assinatura' } } };
+        },
+      });
+      const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => new Date(at) });
+      const res = await h(webhookReq(event(eventName, { payment: { id: 'pay_anual', status, subscription: SUB } })).req);
+      expect(JSON.parse(res.body)).toEqual({ received: true, outcome: 'aplicado' });
+      // A assinatura removida não recebe PUT, e o Checkout no banco não é consultado (o objeto removido não traz o Checkout).
+      expect(net.sent.some((s) => s.method === 'PUT' || s.url.endsWith('/rpc/billing_checkout_person'))).toBe(false);
+      return { applied, lookedSince: /dueDate%5Bge%5D=(\d{4}-\d{2}-\d{2})/.exec(net.sent.find((s) => s.url.includes('/payments?'))?.url ?? '')?.[1] };
+    }
+
+    it('PAYMENT_RECEIVED 32 dias depois do cartão: vale até o vencimento mais 12 meses, sem tolerância, e o banco continua com o anual', async () => {
+      const { applied, lookedSince } = await removedAnnual('2027-02-16T15:00:00.000Z', 'PAYMENT_RECEIVED', 'RECEIVED');
+      // 14 meses de cobranças, e não 4.
+      expect(lookedSince).toBe('2025-12-16');
+      expect(applied).toHaveLength(1);
+      // 15/01/2028, fim do dia em Brasília (removida: sem os 3 dias de tolerância), e não 15/02/2027.
+      expect(applied[0]).toMatchObject({ p_person: ANA, p_plan: 'individual', p_external_ref: sha256Hex(SUB), p_valid_until: '2028-01-16T02:59:59.999Z', p_period: 'anual' });
+    });
+
+    it('estorno e contestação do ano: o acesso acaba na hora, e o período gravado continua anual', async () => {
+      const refund = await removedAnnual('2027-03-10T15:00:00.000Z', 'PAYMENT_REFUNDED', 'REFUNDED');
+      expect(refund.applied[0]).toMatchObject({ p_valid_until: '2027-03-10T15:00:00.000Z', p_period: 'anual' });
+      const chargeback = await removedAnnual('2027-03-10T15:00:00.000Z', 'PAYMENT_CHARGEBACK_REQUESTED', 'CHARGEBACK_REQUESTED');
+      expect(chargeback.applied[0]).toMatchObject({ p_valid_until: '2027-03-10T15:00:00.000Z', p_period: 'anual' });
+    });
+
+    it('aviso 5 meses depois da cobrança anual (a contestação vencida pela Clarevo): a cobrança paga ainda é achada e o ano continua valendo', async () => {
+      const late = await removedAnnual('2027-06-20T15:00:00.000Z', 'PAYMENT_AWAITING_CHARGEBACK_REVERSAL', 'AWAITING_CHARGEBACK_REVERSAL');
+      // Com a janela de 4 meses (desde 20/02/2027), a cobrança de 15/01/2027 ficaria de fora e o acesso acabaria agora.
+      expect(late.lookedSince).toBe('2026-04-20');
+      expect(late.applied[0]).toMatchObject({ p_valid_until: '2028-01-16T02:59:59.999Z', p_period: 'anual' });
+      const updated = await removedAnnual('2027-06-20T15:00:00.000Z', 'PAYMENT_UPDATED', 'RECEIVED');
+      expect(updated.applied[0]).toMatchObject({ p_valid_until: '2028-01-16T02:59:59.999Z', p_period: 'anual' });
+    });
+
+    it('sem o período no banco (antes da 0047) continua mensal; o ciclo do objeto do aviso (SUBSCRIPTION_DELETED) vale mais que o banco', async () => {
+      const old = await removedAnnual('2027-02-16T15:00:00.000Z', 'PAYMENT_RECEIVED', 'RECEIVED', { person_id: ANA, plan: 'individual' });
+      expect(old.lookedSince).toBe('2026-10-16');
+      expect(old.applied[0]).toMatchObject({ p_valid_until: '2027-02-16T02:59:59.999Z' });
+      expect(old.applied[0]).not.toHaveProperty('p_period');
+      // O aviso de assinatura removida traz o objeto, com o ciclo anual e a referência: vale o ciclo dele.
+      const applied: Record<string, unknown>[] = [];
+      const net = fakeNet({
+        'GET /v3/payments': () => ({ status: 200, body: { object: 'list', data: [pay(ANNUAL_DUE, 'CONFIRMED')] } }),
+        'POST /rest/v1/rpc/billing_apply': (init) => {
+          applied.push(JSON.parse(init.body ?? '{}'));
+          return { status: 200, body: { result: 'aplicado' } };
+        },
+      });
+      const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => new Date('2027-02-01T15:00:00.000Z') });
+      const res = await h(webhookReq(event('SUBSCRIPTION_DELETED', { subscription: sub({ cycle: 'YEARLY', deleted: true, status: 'INACTIVE' }) })).req);
+      expect(JSON.parse(res.body)).toEqual({ received: true, outcome: 'aplicado' });
+      expect(net.sent.some((s) => s.url.endsWith('/rpc/billing_person_by_external_ref'))).toBe(false);
+      expect(applied[0]).toMatchObject({ p_valid_until: '2028-01-16T02:59:59.999Z', p_period: 'anual' });
+    });
   });
 
   it('orçamento de tempo: esgotado, responde 500 sem começar outra chamada (o Asaas entrega de novo), e nada da pessoa vai ao registro', async () => {
@@ -545,6 +662,33 @@ describe('Assinatura na web: a função do servidor, pedidos do app', () => {
     expect(net.sent[0]?.headers).toEqual({ apikey: 'sb_publishable_x', Authorization: `Bearer ${JWT}` });
     expect(net.sent[4]?.body).toMatchObject({ externalReference: `clarevo:${ANA}:familiar`, subscription: { cycle: 'MONTHLY', nextDueDate: '2026-11-06' } });
     expect(recorded).toEqual([{ p_checkout_hash: sha256Hex(CHECKOUT), p_person: ANA, p_plan: 'familiar' }]);
+  });
+
+  it('assinar o anual (D-127): o Checkout com o ciclo anual e o preço do ano, e o período gravado com o Checkout; período fora da lista, 400', async () => {
+    const recorded: unknown[] = [];
+    const net = fakeNet({
+      ...user,
+      ...access('leitura'),
+      ...noSubs,
+      'POST /v3/checkouts': () => ({ status: 200, body: { id: CHECKOUT, link: `https://sandbox.asaas.com/checkoutSession/show?id=${CHECKOUT}` } }),
+      'POST /rest/v1/rpc/billing_checkout_record': (init) => {
+        recorded.push(JSON.parse(init.body ?? '{}'));
+        return { status: 200, body: { result: 'gravado' } };
+      },
+    });
+    const h = createAssinaturaWebHandler({ config, fetch: net.fetcher, now: () => NOW });
+    const res = await h(appReq({ action: 'assinar', plan: 'familiar', period: 'anual' }).req);
+    expect(JSON.parse(res.body)).toMatchObject({ result: 'checkout' });
+    expect(net.sent.find((s) => s.url.endsWith('/checkouts'))?.body).toMatchObject({
+      externalReference: `clarevo:${ANA}:familiar`,
+      items: [{ description: 'Assinatura anual', value: 629.9 }],
+      subscription: { cycle: 'YEARLY', nextDueDate: '2026-11-06' },
+    });
+    expect(recorded).toEqual([{ p_checkout_hash: sha256Hex(CHECKOUT), p_person: ANA, p_plan: 'familiar', p_period: 'anual' }]);
+    // O mensal, pedido com o período ou sem ele (o app de antes), não manda o período ao banco.
+    await h(appReq({ action: 'assinar', plan: 'individual', period: 'mensal' }).req);
+    expect(recorded[1]).toEqual({ p_checkout_hash: sha256Hex(CHECKOUT), p_person: ANA, p_plan: 'individual' });
+    for (const period of ['semestral', 12, null]) expect((await h(appReq({ action: 'assinar', plan: 'individual', period }).req)).status, String(period)).toBe(400);
   });
 
   it('assinar com assinatura ativa (no banco ou no Asaas), benefício ou cortesia: não cria Checkout', async () => {
@@ -702,8 +846,15 @@ describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do 
 
   it('a referência de Pix é própria e só a nossa é lida; o Checkout é Pix avulso de um mês, sem assinatura, com o nome do item curto', () => {
     expect(pixReference(ANA.toUpperCase(), 'familiar')).toBe(`clarevo-pix:${ANA}:familiar`);
-    expect(parsePixReference(`clarevo-pix:${ANA}:individual`)).toEqual({ personId: ANA, plan: 'individual' });
-    for (const bad of [webReference(ANA, 'individual'), `clarevo-pix:${ANA}:anual`, 'clarevo-pix:nao-e-uuid:individual', null, 42]) expect(parsePixReference(bad)).toBeNull();
+    expect(parsePixReference(`clarevo-pix:${ANA}:individual`)).toEqual({ personId: ANA, plan: 'individual', period: 'mensal' });
+    // Pix de um ano (D-127): o período no fim da referência; sem ele, mensal (a referência de antes).
+    expect(pixReference(ANA, 'familiar', 'anual')).toBe(`clarevo-pix:${ANA}:familiar:anual`);
+    expect(pixReference(ANA, 'familiar', 'mensal')).toBe(`clarevo-pix:${ANA}:familiar`);
+    expect(parsePixReference(`clarevo-pix:${ANA}:familiar:anual`)).toEqual({ personId: ANA, plan: 'familiar', period: 'anual' });
+    expect(parsePixReference(`clarevo-pix:${ANA}:familiar:mensal`)).toEqual({ personId: ANA, plan: 'familiar', period: 'mensal' });
+    for (const bad of [webReference(ANA, 'individual'), `clarevo-pix:${ANA}:anual`, `clarevo-pix:${ANA}:individual:semestral`, 'clarevo-pix:nao-e-uuid:individual', null, 42]) {
+      expect(parsePixReference(bad)).toBeNull();
+    }
     // A referência da assinatura no cartão não confunde com a de Pix.
     expect(parseWebReference(pixReference(ANA, 'individual'))).toBeNull();
     for (const plan of ['individual', 'familiar'] as const) {
@@ -718,7 +869,14 @@ describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do 
       expect(body).not.toHaveProperty('subscription');
       expect(body.items[0]!.name.length).toBeLessThanOrEqual(30);
       expect(body.items[0]!.value).toBe(PLAN_PRICE_CENTS[plan] / 100);
+      // Pix de um ano: o preço anual, um ano de acesso e a referência com o período.
+      const year = checkoutPixRequest(ANA, plan, APP_URL_DEFAULT, 'anual') as { externalReference: string; items: { name: string; description: string; value: number }[] };
+      expect(year.externalReference).toBe(`clarevo-pix:${ANA}:${plan}:anual`);
+      expect(year.items).toEqual([{ name: body.items[0]!.name, description: 'Um ano de acesso, pago com Pix', quantity: 1, value: PLAN_PERIOD_PRICE_CENTS[plan].anual / 100 }]);
+      expect(year).not.toHaveProperty('subscription');
     }
+    expect((checkoutPixRequest(ANA, 'individual', APP_URL_DEFAULT, 'anual') as { items: { value: number }[] }).items[0]!.value).toBe(269.9);
+    expect((checkoutPixRequest(ANA, 'familiar', APP_URL_DEFAULT, 'anual') as { items: { value: number }[] }).items[0]!.value).toBe(629.9);
   });
 
   it('o dia que conta: o do pagamento (sem data ou no futuro, hoje); estornada, pendente ou removida não conta', () => {
@@ -742,6 +900,12 @@ describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do 
     expect(pixCanPayNext(until, new Date('2026-11-26T03:00:00Z'))).toBe(true);
     expect(pixCanPayNext(null, NOW)).toBe(true);
     expect(pixNextPaymentFrom(until)?.toISOString()).toBe('2026-11-26T03:00:00.000Z');
+    // No anual (D-127), a janela é de 30 dias e o aviso, de 14; a tolerância é a mesma.
+    expect(PIX_PAY_AHEAD_DAYS_BY_PERIOD).toEqual({ mensal: 10, anual: 30 });
+    expect(PIX_WARNING_DAYS_BY_PERIOD).toEqual({ mensal: 7, anual: 14 });
+    expect(pixNextPaymentFrom(until, 'anual')?.toISOString()).toBe('2026-11-06T03:00:00.000Z');
+    expect(pixCanPayNext(until, new Date('2026-11-06T02:00:00Z'), 'anual')).toBe(false);
+    expect(pixCanPayNext(until, new Date('2026-11-06T03:00:00Z'), 'anual')).toBe(true);
   });
 
   it('cobrança de Pix paga: lê a cobrança atual no Asaas e grava só o resumo do identificador e o dia do pagamento, pela referência', async () => {
@@ -757,6 +921,25 @@ describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do 
     const pending = pixNet(pixPay({ status: 'PENDING', paymentDate: null }));
     await pending.h(webhookReq(event('PAYMENT_CREATED', { payment: pixPay({ status: 'PENDING' }) })).req);
     expect(pending.applied[0]).toMatchObject({ p_paid_on: null });
+  });
+
+  it('Pix de um ano (D-127): o período vem da referência ou, sem ela, do Checkout no banco, e vai ao banco só quando é anual', async () => {
+    const byRef = pixNet(pixPay({ externalReference: pixReference(ANA, 'familiar', 'anual') }));
+    await byRef.h(webhookReq(event('PAYMENT_RECEIVED', { payment: pixPay() })).req);
+    expect(byRef.applied).toEqual([
+      { p_event_id: 'evt_1', p_person: ANA, p_plan: 'familiar', p_payment_hash: sha256Hex(PIX_PAY), p_paid_on: '2026-11-06', p_event_at: '2026-11-06T14:59:00.000Z', p_period: 'anual' },
+    ]);
+    const byCheckout = pixNet(pixPay({ externalReference: null }), {
+      'POST /rest/v1/rpc/billing_checkout_person': () => ({ status: 200, body: { person_id: ANA, plan: 'individual', period: 'anual' } }),
+    });
+    await byCheckout.h(webhookReq(event('PAYMENT_RECEIVED', { payment: pixPay() })).req);
+    expect(byCheckout.applied[0]).toMatchObject({ p_plan: 'individual', p_period: 'anual' });
+    // O banco de antes da 0047 não devolve o período: mensal, sem mandar o período.
+    const oldDb = pixNet(pixPay({ externalReference: null }), {
+      'POST /rest/v1/rpc/billing_checkout_person': () => ({ status: 200, body: { person_id: ANA, plan: 'individual' } }),
+    });
+    await oldDb.h(webhookReq(event('PAYMENT_RECEIVED', { payment: pixPay() })).req);
+    expect(oldDb.applied[0]).not.toHaveProperty('p_period');
   });
 
   it('sem a referência na cobrança: acha a pessoa pelo Checkout no banco e, depois, pelo pagamento já gravado (estorno antigo)', async () => {
@@ -861,6 +1044,28 @@ describe('Pix mês a mês (D-093, caminho B): o pedido, os avisos e o pedido do 
       expect((await t.h(appReq({ action: 'pix', plan: 'anual' }).req)).status).toBe(400);
     });
 
+    it('Pix de um ano (D-127): o Checkout com o preço do ano e a referência com o período; o próximo período só nos últimos 30 dias do ano pago', async () => {
+      const t = make(access('teste'));
+      expect(JSON.parse((await t.h(appReq({ action: 'pix', plan: 'individual', period: 'anual' }).req)).body)).toMatchObject({ result: 'checkout' });
+      expect(t.net.sent.find((s) => s.url.endsWith('/checkouts'))?.body).toMatchObject({
+        billingTypes: ['PIX'],
+        externalReference: `clarevo-pix:${ANA}:individual:anual`,
+        items: [{ description: 'Um ano de acesso, pago com Pix', value: 269.9 }],
+      });
+      expect(t.net.sent.find((s) => s.url.endsWith('/rpc/billing_checkout_record'))?.body).toEqual({ p_checkout_hash: sha256Hex(CHECKOUT), p_person: ANA, p_plan: 'individual', p_period: 'anual' });
+      // Ano pago com Pix até 25/11 (acesso até 28/11): em 06/11 já está nos últimos 30 dias; no mensal, ainda seria cedo.
+      const accessYear = (until: string, period: string) => ({
+        'POST /rest/v1/rpc/my_access': () => ({ status: 200, body: { status: 'assinatura', plan: 'individual', until, can_write: true, provider: 'pix', period } }),
+      });
+      const yearReady = make(accessYear('2026-11-29T02:59:59.999Z', 'anual'));
+      expect(JSON.parse((await yearReady.h(appReq({ action: 'pix', plan: 'individual', period: 'anual' }).req)).body)).toMatchObject({ result: 'checkout' });
+      const monthEarly = make(accessYear('2026-11-29T02:59:59.999Z', 'mensal'));
+      expect(JSON.parse((await monthEarly.h(appReq({ action: 'pix', plan: 'individual' }).req)).body)).toEqual({ result: 'ja_pago' });
+      // Ano pago até 25/12: ainda cedo, nos dois períodos do próximo pagamento.
+      const yearEarly = make(accessYear('2026-12-29T02:59:59.999Z', 'anual'));
+      expect(JSON.parse((await yearEarly.h(appReq({ action: 'pix', plan: 'individual', period: 'mensal' }).req)).body)).toEqual({ result: 'ja_pago' });
+    });
+
     it('quem paga com Pix: o próximo mês só nos últimos dias do mês pago; cartão, loja, benefício ou assinatura ativa no Asaas não abrem Pix', async () => {
       // Pago até 05/12 (acesso até 08/12): em 06/11 ainda é cedo.
       const early = make(access('assinatura', 'pix', '2026-12-09T02:59:59.999Z'));
@@ -899,9 +1104,17 @@ describe('Assinatura na web: o que o app usa', () => {
   });
 
   it('os textos seguem as regras: sem travessão longo, sem "fazer sentido", sem código de decisão, sem apontar pagamento fora da loja no celular (só a web os mostra)', () => {
-    const texts = Object.values(WEB_SUBSCRIPTION_TEXT).flatMap((v) =>
-      typeof v === 'string' ? [v] : typeof v === 'function' ? [v('individual'), v('familiar')] : Object.values(v),
-    );
+    const W = WEB_SUBSCRIPTION_TEXT;
+    const texts = [
+      ...Object.values(W).flatMap((v) => (typeof v === 'string' ? [v] : typeof v === 'object' ? Object.values(v) : [])),
+      ...(['individual', 'familiar'] as const).flatMap((p) => [W.subscribe(p), W.subscribe(p, 'anual'), W.subscribe(p, 'mensal'), W.payPix(p), W.payPix(p, 'anual')]),
+      W.payOtherPix('anual', 'individual'),
+      W.payOtherPix('mensal', 'familiar'),
+      W.payNextPix('individual'),
+      W.payNextPix('familiar', 'anual'),
+      W.pixNextFrom('01/12/2026'),
+      W.pixNextFrom('01/12/2026', 'anual'),
+    ];
     expect(texts.length).toBeGreaterThan(10);
     for (const t of texts) {
       expect(t).not.toMatch(/—|–/);
@@ -909,6 +1122,17 @@ describe('Assinatura na web: o que o app usa', () => {
       expect(t).not.toMatch(/D-0\d\d|cofrinho|caixinha/i);
     }
     expect(WEB_SUBSCRIPTION_TEXT.subscribe('familiar')).toBe('Assinar o plano Família');
+    expect(WEB_SUBSCRIPTION_TEXT.subscribe('familiar', 'anual')).toBe('Assinar o plano Família anual');
+    expect(WEB_SUBSCRIPTION_TEXT.payPix('individual', 'anual')).toBe('Pagar um ano do plano Individual com Pix');
+    expect(WEB_SUBSCRIPTION_TEXT.payPix('individual')).toBe('Pagar um mês do plano Individual com Pix');
+    expect(WEB_SUBSCRIPTION_TEXT.pixNextFrom('01/12/2026', 'anual')).toBe('Você pode pagar o próximo ano a partir de 01/12/2026.');
+    // Quem já paga com Pix vê o preço em cada botão: o do período seguinte e o do outro período, no plano em vigor (D-127).
+    expect(W.payNextPix('individual')).toBe('Pagar mais um mês com Pix (R$ 29,90)');
+    expect(W.payNextPix('individual', 'anual')).toBe('Pagar mais um ano com Pix (R$ 269,90)');
+    expect(W.payNextPix('familiar', 'mensal')).toBe('Pagar mais um mês com Pix (R$ 69,90)');
+    expect(W.payOtherPix('anual', 'individual')).toBe('Pagar um ano com Pix (R$ 269,90)');
+    expect(W.payOtherPix('anual', 'familiar')).toBe('Pagar um ano com Pix (R$ 629,90)');
+    expect(W.payOtherPix('mensal', 'familiar')).toBe('Pagar um mês com Pix (R$ 69,90)');
     expect(WEB_SUBSCRIPTION_TEXT.howItWorks).toContain('a Clarevo não vê nem guarda');
   });
 });

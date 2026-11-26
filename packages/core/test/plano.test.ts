@@ -7,7 +7,13 @@ import {
   FAMILY_MAX_PEOPLE,
   FULL_ACCESS,
   MemoryRepository,
+  PLAN_PERIOD_PRICE_CENTS,
+  PLAN_PERIOD_TEXT,
   PLAN_PRICE_CENTS,
+  annualMonthlyEquivalentCents,
+  annualSavingCents,
+  planPeriodPrice,
+  planPeriodPriceAmount,
   SUBSCRIBE_OPEN,
   TRIAL_DAYS,
   accessBanner,
@@ -42,6 +48,55 @@ describe('assinatura paga (D-083): preços e textos', () => {
     expect(TRIAL_DAYS).toBe(14);
     expect(SUBSCRIBE_OPEN).toBe(false);
     expect(ACCESS_TEXT.plans[1].who).toContain(`até ${FAMILY_MAX_PEOPLE} pessoas`);
+  });
+
+  it('plano anual (D-125): R$ 269,90 e R$ 629,90 por ano; o equivalente por mês e a diferença para 12 mensalidades, sem exagero', () => {
+    expect(PLAN_PERIOD_PRICE_CENTS).toEqual({ individual: { mensal: 2990, anual: 26990 }, familiar: { mensal: 6990, anual: 62990 } });
+    expect(PLAN_PERIOD_PRICE_CENTS.individual.mensal).toBe(PLAN_PRICE_CENTS.individual);
+    expect(PLAN_PERIOD_PRICE_CENTS.familiar.mensal).toBe(PLAN_PRICE_CENTS.familiar);
+    expect(planPeriodPrice('individual', 'anual')).toBe('R$ 269,90 por ano');
+    expect(planPeriodPrice('familiar', 'anual')).toBe('R$ 629,90 por ano');
+    expect(planPeriodPrice('individual', 'mensal')).toBe(planPrice('individual'));
+    expect(planPeriodPriceAmount('familiar', 'anual')).toBe('R$ 629,90');
+    // 269,90 / 12 = 22,4916...: R$ 22,49; 629,90 / 12 = 52,4916...: R$ 52,49 (o mais próximo, sem arredondar para baixo de propósito).
+    expect([annualMonthlyEquivalentCents('individual'), annualMonthlyEquivalentCents('familiar')]).toEqual([2249, 5249]);
+    // 12 × 29,90 = 358,80, menos 269,90 = 88,90; 12 × 69,90 = 838,80, menos 629,90 = 208,90 (a tela diz o valor exato, sem porcentagem).
+    expect([annualSavingCents('individual'), annualSavingCents('familiar')]).toEqual([8890, 20890]);
+    expect(PLAN_PERIOD_TEXT.equivalent('individual')).toBe('Equivale a R$ 22,49 por mês');
+    expect(PLAN_PERIOD_TEXT.saving('individual')).toBe('R$ 88,90 a menos que 12 mensalidades');
+    expect(PLAN_PERIOD_TEXT.saving('familiar')).toBe('R$ 208,90 a menos que 12 mensalidades');
+    expect(PLAN_PERIOD_TEXT.other('individual', 'anual')).toBe('No mensal: R$ 29,90 por mês');
+    expect(PLAN_PERIOD_TEXT.other('familiar', 'mensal')).toBe('No anual: R$ 629,90 por ano, equivale a R$ 52,49 por mês');
+    expect(PLAN_PERIOD_TEXT.planLabel('individual', 'anual', 'Para você.')).toBe(
+      'Plano Individual anual, R$ 269,90 por ano, equivale a R$ 22,49 por mês. No mensal, R$ 29,90 por mês. Para você.',
+    );
+    // A escolha: o anual primeiro, sem pressão, sem prazo e sem alarme; sem prometer economia.
+    const texts = [
+      PLAN_PERIOD_TEXT.choiceLabel,
+      PLAN_PERIOD_TEXT.note,
+      ...Object.values(PLAN_PERIOD_TEXT.option),
+      ...Object.values(PLAN_PERIOD_TEXT.optionHint),
+      ...(['individual', 'familiar'] as const).flatMap((p) => [
+        PLAN_PERIOD_TEXT.equivalent(p),
+        PLAN_PERIOD_TEXT.saving(p),
+        PLAN_PERIOD_TEXT.other(p, 'anual'),
+        PLAN_PERIOD_TEXT.other(p, 'mensal'),
+        PLAN_PERIOD_TEXT.planLabel(p, 'anual', ''),
+        PLAN_PERIOD_TEXT.planLabel(p, 'mensal', ''),
+      ]),
+    ];
+    expect(Object.keys(PLAN_PERIOD_TEXT.option)).toEqual(['anual', 'mensal']);
+    for (const t of texts) {
+      expect(t).not.toMatch(/—|–/);
+      expect(t).not.toMatch(/fa(z|ç)er? sentido|faz sentido/i);
+      expect(t).not.toMatch(/economi|aproveit|promo|só hoje|últim[oa]s? (dias|vagas)|não perca|corra|imperd|grátis por|desconto/i);
+      expect(t).not.toMatch(/\bweb\b|Pix|App Store|Google Play/);
+      // Sem prometer teste grátis ao anual: o anual no cartão é cobrado no dia, as lojas não têm oferta de teste e a escolha aparece também
+      // para quem já passou do teste (o teste da conta fica em ACCESS_TEXT.plansNote).
+      expect(t).not.toMatch(/grátis|teste/i);
+    }
+    expect(PLAN_PERIOD_TEXT.note).toBe('O anual é uma cobrança só, que vale por 12 meses. Os dois períodos têm os mesmos recursos.');
+    expect(ACCESS_TEXT.plansNote).toContain('Toda conta começa com 14 dias grátis');
   });
 
   it('a recusa do banco tem texto próprio em ERROR_TEXT (e, com ele, nos textos de cada formulário)', () => {
@@ -91,6 +146,7 @@ describe('parseAccess: a resposta de my_access', () => {
       until: '2026-11-18T13:00:00+00:00',
       canWrite: true,
       provider: null,
+      period: null,
     });
     // De onde vem o direito (migração 0026): só os valores conhecidos; o app antigo nem recebia a chave.
     expect(parseAccess({ status: 'assinatura', plan: 'individual', until: null, can_write: true, provider: 'web' }).provider).toBe('web');
@@ -106,6 +162,16 @@ describe('parseAccess: a resposta de my_access', () => {
     expect(() => parseAccess({ status: 'teste', can_write: false })).toThrow('acesso_invalido');
     // Plano ou data fora do formato viram nulos.
     expect(parseAccess({ status: 'cortesia', plan: 'outro', until: 'amanhã', can_write: true })).toMatchObject({ plan: null, until: null });
+  });
+
+  it('o período da assinatura (D-127, migração 0047): só na assinatura e só os dois valores; sem a chave (banco de antes), nulo', () => {
+    expect(parseAccess({ status: 'assinatura', plan: 'individual', until: null, can_write: true, provider: 'apple', period: 'anual' }).period).toBe('anual');
+    expect(parseAccess({ status: 'assinatura', plan: 'individual', until: null, can_write: true, provider: 'pix', period: 'mensal' }).period).toBe('mensal');
+    expect(parseAccess({ status: 'assinatura', plan: 'individual', until: null, can_write: true, provider: 'web' }).period).toBeNull();
+    expect(parseAccess({ status: 'assinatura', plan: 'individual', until: null, can_write: true, provider: 'web', period: 'semestral' }).period).toBeNull();
+    // Fora da assinatura, o período não vale (o banco o manda nulo; o app não confia no contrário).
+    expect(parseAccess({ status: 'cortesia', plan: 'individual', until: null, can_write: true, provider: 'equipe', period: 'anual' }).period).toBeNull();
+    expect(parseAccess({ status: 'familia', plan: 'familiar', until: null, can_write: true, period: 'anual' }).period).toBeNull();
   });
 });
 
@@ -147,6 +213,22 @@ describe('accessView: a tela Assinatura e o card de Conta', () => {
     );
   });
 
+  it('com o período (D-127): "Plano Individual anual" e "Assinatura anual ativa, renova em ..."; sem ele, como antes', () => {
+    const annual: Access = { ...at('assinatura', '2027-11-26T13:00:00.000Z', 'individual'), provider: 'apple', period: 'anual' };
+    expect(accessView(annual, NOW, TZ)).toEqual({
+      situation: 'Plano Individual anual',
+      body: 'Assinatura anual ativa, renova em 26/11/2027. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.',
+      showPlans: false,
+    });
+    const monthly: Access = { ...at('assinatura', '2026-12-04T13:00:00.000Z', 'familiar'), provider: 'google', period: 'mensal' };
+    expect(accessView(monthly, NOW, TZ)).toMatchObject({ situation: 'Plano Família mensal', body: expect.stringContaining('Assinatura mensal ativa, renova em 04/12/2026') });
+    // O cartão anual na web, com a situação lida no Asaas.
+    const card: Access = { ...annual, provider: 'web' };
+    expect(accessView(card, NOW, TZ, { web: true, webSubscription: { active: true, nextDueDate: '2027-11-23' } }).body).toBe(
+      'Assinatura anual ativa, renova em 23/11/2027. Para cancelar ou mudar de plano, use o mesmo lugar onde assinou.',
+    );
+  });
+
   it('teste, só leitura e as situações pagas', () => {
     expect(accessView(at('teste', '2026-11-18T13:00:00.000Z'), NOW, TZ)).toEqual({
       situation: 'Teste grátis',
@@ -177,7 +259,8 @@ describe('repositório em memória e demonstração', () => {
 
   it('a demonstração fica no teste grátis, contado do dia dela (o mesmo relógio das telas na demonstração)', () => {
     const demo = demoTrialAccess(DEMO_TODAY);
-    expect(demo).toEqual({ status: 'teste', plan: null, until: '2026-10-21T12:00:00.000Z', canWrite: true, provider: null });
+    expect(demo).toMatchObject({ status: 'teste', plan: null, until: '2026-10-21T12:00:00.000Z', canWrite: true, provider: null });
+    expect(demo.period ?? null).toBeNull();
     expect(demoInstant(DEMO_TODAY).toISOString()).toBe('2026-10-07T12:00:00.000Z');
     expect(trialDaysLeft(demo, demoInstant(DEMO_TODAY), TZ)).toBe(14);
   });
@@ -231,6 +314,33 @@ describe('Pix mês a mês (D-093, caminho B): a situação e o aviso', () => {
     for (const t of [accessBanner(pix(UNTIL), near, TZ, { web: true })!.text, accessView(pix(UNTIL), NOW, TZ, { web: true }).body]) {
       expect(t).not.toMatch(/—|–|fazer sentido/);
     }
+  });
+});
+
+describe('Pix de um ano (D-127): a situação e o aviso, com "ano" no lugar de "mês"', () => {
+  // Pago até 05/11/2027 com Pix de um ano, mais os 3 dias de tolerância: acesso até 08/11/2027 (fim do dia em Brasília).
+  const pixYear = (until: string | null): Access => ({ status: 'assinatura', plan: 'familiar', until, canWrite: true, provider: 'pix', period: 'anual' });
+  const UNTIL = '2027-11-09T02:59:59.999Z';
+
+  it('na web, "Pago com Pix até ..." e "pague o próximo ano"; no app das lojas, só até quando', () => {
+    const web = accessView(pixYear(UNTIL), NOW, TZ, { web: true });
+    expect(web.situation).toBe('Plano Família anual');
+    expect(web.body).toBe('Pago com Pix até 05/11/2027. O Pix não renova sozinho: pague o próximo ano até essa data, aqui na tela Assinatura.');
+    expect(accessView(pixYear(UNTIL), new Date('2027-11-07T13:00:00.000Z'), TZ, { web: true }).body).toBe(
+      'O ano pago com Pix terminou em 05/11/2027. Para continuar anotando, pague o próximo ano aqui na tela Assinatura.',
+    );
+    expect(accessView(pixYear(UNTIL), NOW, TZ).body).toBe('Acesso completo até 08/11/2027.');
+  });
+
+  it('o aviso no Resumo começa 14 dias antes do fim do ano pago (7 no mensal), com "Pagar o próximo ano"', () => {
+    expect(accessBanner(pixYear(UNTIL), new Date('2027-10-21T13:00:00.000Z'), TZ, { web: true })).toBeNull();
+    expect(accessBanner(pixYear(UNTIL), new Date('2027-10-22T13:00:00.000Z'), TZ, { web: true })).toEqual({
+      text: 'O ano pago com Pix vai até 05/11/2027. Para continuar anotando depois, pague o próximo ano.',
+      tone: 'info',
+      action: 'Pagar o próximo ano',
+    });
+    expect(accessBanner(pixYear(UNTIL), new Date('2027-11-07T13:00:00.000Z'), TZ, { web: true })?.tone).toBe('aviso');
+    expect(accessBanner(pixYear(UNTIL), new Date('2027-10-22T13:00:00.000Z'), TZ)).toBeNull();
   });
 });
 

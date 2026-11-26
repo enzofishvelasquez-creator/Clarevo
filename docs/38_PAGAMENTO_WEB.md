@@ -23,6 +23,10 @@ Fora da lista: **Stripe**, porque a ajuda dela diz que conta brasileira não tem
 
 O Enzo escolheu o **Asaas**.
 
+## Plano anual (D-125 e D-127, 27/11/2026)
+
+O anual usa as mesmas formas do mensal no Asaas: a assinatura no cartão com o ciclo anual e o Pix de um ano, pelo mesmo Checkout (`docs/39`, seção 7). Como as taxas são por cobrança, o anual tem uma cobrança por ano no lugar de doze. Com as taxas de referência acima (promocionais, a conferir), o cartão de um anual de R$ 269,90 custa cerca de R$ 0,49 + 1,99% = R$ 5,86 por ano (doze mensalidades de R$ 29,90 custariam cerca de R$ 13,08), e o Pix, R$ 1,99 por ano (no mensal, R$ 23,88). No Família anual de R$ 629,90, o cartão fica em cerca de R$ 13,03 por ano.
+
 ## Recomendação da equipe
 
 **Asaas.** Tem as duas formas que a Clarevo quer, com Pix Automático já documentado na API (inclusive novas tentativas quando o débito falha), cobra só quando recebe e sai mais barato nas duas formas. O Mercado Pago é a segunda opção, por ser conhecido das pessoas, mas é mais caro no cartão e não mostra a taxa do Pix Automático. O Efí cobra R$ 3,50 por Pix Automático, mais de 10% de uma assinatura de R$ 29,90.

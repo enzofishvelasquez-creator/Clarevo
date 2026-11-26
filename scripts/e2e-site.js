@@ -1064,6 +1064,10 @@ function varrerPagina() {
       await p.goto(`${origem}/`);
       const cartoes = await p.$$eval('section[aria-labelledby="planos"] article.plano-link', (as) => as.map((a) => ({ links: a.querySelectorAll('a, button, input').length, nome: a.querySelector('a').textContent, href: a.querySelector('a').getAttribute('href') })));
       ok('planos: os dois cartões da página inicial com um link só cada, com nome claro, para a página de cada plano', JSON.stringify(cartoes) === JSON.stringify([{ links: 1, nome: 'Ver o que o plano Individual inclui', href: 'planos/individual.html' }, { links: 1, nome: 'Ver o que o plano Família inclui', href: 'planos/familia.html' }]), JSON.stringify(cartoes));
+      // D-127: cada cartão mostra também o anual, logo abaixo do mensal, com o equivalente por mês dito como equivalente.
+      const anuais = await p.$$eval('section[aria-labelledby="planos"] article.plano-link', (as) => as.map((a) => [a.querySelector('.preco').textContent, a.querySelector('.preco-anual')?.textContent ?? ''].map((t) => t.replace(/\u00a0/g, ' '))));
+      ok('planos: cada cartão da página inicial com o mensal e o anual (com o equivalente por mês), do núcleo',
+        JSON.stringify(anuais) === JSON.stringify([['R$ 29,90 por mês', 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)'], ['R$ 69,90 por mês', 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês)']]), JSON.stringify(anuais));
       // Clicar no cartão (fora do texto do link) abre a página do plano.
       const familia = p.locator('section[aria-labelledby="planos"] article.plano-link').nth(1);
       await familia.scrollIntoViewIfNeeded();
@@ -1096,6 +1100,7 @@ function varrerPagina() {
             secoes: [...main.querySelectorAll('h2')].map((h) => h.id),
             precos: (texto.match(/R\$ ?\d/g) || []).length,
             precoNaCapa: (document.querySelector('.capa .preco-capa')?.textContent || '').replace(/\u00a0/g, ' '),
+            anualNaCapa: (document.querySelector('.capa .preco-capa-anual')?.textContent || '').replace(/\u00a0/g, ' '),
             titular: /titular/i.test(texto), convite: /Convite por link/.test(texto), umaPessoa: /Para uma pessoa: a assinatura é sua\./.test(texto),
             negocio: /Incluído na assinatura: um negócio por pessoa, sem custo a mais\./.test(texto), compartilha: /compartilh/i.test(texto),
             notOpen: /A assinatura pelo app abre no lançamento\. Até lá, nada é cobrado\./.test(texto), trial: /14 dias grátis, sem cartão/.test(texto),
@@ -1110,8 +1115,10 @@ function varrerPagina() {
           if (!r.ok() || (ancora && !(await r.text()).includes(`id="${ancora}"`))) quebrados.push(l);
         }
         const familiaPg = nome === 'Família';
-        ok(`planos: a página do plano ${nome} tem o nome, o preço só na capa, para quem é, os 14 recursos com links que abrem, a assinatura (14 dias sem cartão, nada cobrado até o lançamento) e o Espaço Negócio incluído, sem negócio compartilhado`,
-          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 1 && /^R\$ \d+,\d{2} por mês( Preços no lançamento)?$/.test(pg.precoNaCapa) && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && pg.notOpen && pg.trial,
+        // D-127: na capa, o mensal e, logo abaixo, o anual com o equivalente por mês (três valores, todos na capa).
+        const anualEsperado = nome === 'Família' ? 'ou R$ 629,90 por ano (equivale a R$ 52,49 por mês)' : 'ou R$ 269,90 por ano (equivale a R$ 22,49 por mês)';
+        ok(`planos: a página do plano ${nome} tem o nome, o preço mensal e o anual só na capa, para quem é, os 14 recursos com links que abrem, a assinatura (14 dias sem cartão, nada cobrado até o lançamento) e o Espaço Negócio incluído, sem negócio compartilhado`,
+          pg.h1 === `Plano ${nome}` && JSON.stringify(pg.secoes) === JSON.stringify(secoesEsperadas) && pg.precos === 3 && /^R\$ \d+,\d{2} por mês( Preços no lançamento)?$/.test(pg.precoNaCapa) && pg.anualNaCapa === anualEsperado && pg.links.length === 14 && quebrados.length === 0 && pg.negocio && !pg.compartilha && pg.notOpen && pg.trial,
           JSON.stringify({ ...pg, links: pg.links.length, quebrados }));
         ok(`planos: a página do plano ${nome} mostra só o que é do plano dele`, familiaPg ? pg.titular && pg.convite && !pg.umaPessoa : !pg.titular && !pg.convite && pg.umaPessoa, JSON.stringify({ titular: pg.titular, convite: pg.convite, umaPessoa: pg.umaPessoa }));
         const outroHref = familiaPg ? 'individual.html' : 'familia.html';
@@ -1598,7 +1605,9 @@ function varrerPagina() {
               raizDoApp: [...document.querySelectorAll('a')].filter((a) => a.href === 'https://app.clarevo.app.br/').length,
               capa: [...document.querySelectorAll('.capa .acoes a')].map((a) => [a.textContent, a.getAttribute('href')]),
               menu: [document.querySelector('.menu-cta')?.textContent, document.querySelector('.menu-cta')?.getAttribute('href')],
-              plus: /Clarevo Plus|plano anual|R\$ ?[\d.,]+ por ano/i.test(main),
+              // O plano anual existe desde a D-127 (o preço por ano nos planos); o Plus continua fora do site.
+              plus: /Clarevo Plus/i.test(main),
+              anual: /R\$ ?[\d.,]+ por ano/.test(main),
             };
           });
         }
@@ -1653,12 +1662,12 @@ function varrerPagina() {
       const pre = await lerEstado(p, origem);
       await p.close();
       const v = Object.values(pre);
-      ok('estado do produto, antes do lançamento: nenhuma página convida a criar conta, leva à tela inicial do app web nem mostra selo de loja; a capa do início leva à demonstração e a "Como ter acesso"; o menu diz "Entrar (quem testa)" e aponta para a tela de entrar; nada de Plus nem de plano anual',
+      ok('estado do produto, antes do lançamento: nenhuma página convida a criar conta, leva à tela inicial do app web nem mostra selo de loja; a capa do início leva à demonstração e a "Como ter acesso"; o menu diz "Entrar (quem testa)" e aponta para a tela de entrar; nada do Plus',
         v.every((x) => x.criarConta === 0 && x.raizDoApp === 0 && x.selos.length === 0 && !x.plus && x.menu[0] === 'Entrar (quem testa)' && x.menu[1] === `${URL_APP}/entrar` && !x.piloto) &&
         JSON.stringify(pre['início'].capa) === JSON.stringify([['Ver a demonstração', 'https://demo.clarevo.app.br'], ['Como ter acesso', 'comece.html#acesso']]) &&
         JSON.stringify(pre.mei.capa) === JSON.stringify([['Ver a demonstração', 'https://demo.clarevo.app.br/?cenario=negocio'], ['Como ter acesso', 'comece.html#acesso']]), JSON.stringify(pre));
-      ok('estado do produto, antes do lançamento: "fase de testes" no início, em Comece aqui, em O app e na página do MEI; "Preços no lançamento" no início e nas três páginas de planos',
-        ['início', 'comece', 'app/', 'mei', 'imprensa'].every((c) => pre[c].testes) && ['início', 'planos', 'planos/individual', 'planos/familia'].every((c) => pre[c].precosNoLancamento), JSON.stringify(Object.fromEntries(Object.entries(pre).map(([c, x]) => [c, [x.testes, x.precosNoLancamento]]))));
+      ok('estado do produto, antes do lançamento: "fase de testes" no início, em Comece aqui, em O app e na página do MEI; "Preços no lançamento" e o preço anual (D-127) no início e nas três páginas de planos',
+        ['início', 'comece', 'app/', 'mei', 'imprensa'].every((c) => pre[c].testes) && ['início', 'planos', 'planos/individual', 'planos/familia'].every((c) => pre[c].precosNoLancamento && pre[c].anual), JSON.stringify(Object.fromEntries(Object.entries(pre).map(([c, x]) => [c, [x.testes, x.precosNoLancamento, x.anual]]))));
       // Antes do lançamento, os cliques levam à tela de entrar (/entrar), e nunca à tela inicial do app web nem à de criar conta.
       const seguidosPre = await seguirBotoes(origem, 'Entrar na versão web');
       const destinosPre = Object.values(seguidosPre.chegou);

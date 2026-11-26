@@ -3,7 +3,7 @@ import { ACCOUNT_MARK_KEYS, LEVEL_NOTE_ACTIONS, type AccountLevelState, type Acc
 import type { WebSubscriptionCancel, WebSubscriptionStart, WebSubscriptionStatus } from './assinatura-web/app';
 import type { StoreForget, StoreSync } from './assinatura-lojas/app';
 import { FULL_ACCESS, type Access } from './plano';
-import type { PlanKind } from './plano-precos';
+import type { BillingPeriod, PlanKind } from './plano-precos';
 import { LEGAL_VERSION, type LegalAcceptance } from './aceite';
 import { addMonths, addYearsClamped, dateInMonth, isValidIsoDate, isValidIsoMonth, monthOf, monthsBetween } from './dates';
 import type { Cents } from './money';
@@ -6132,7 +6132,7 @@ export class MemoryRepository implements RecordsRepository {
   }
 
   // Assinatura na web (D-084): só existe com o Supabase e o Asaas; na demonstração e nos testes, indisponível.
-  async startWebSubscription(_plan: PlanKind): Promise<WebSubscriptionStart> {
+  async startWebSubscription(_plan: PlanKind, _period?: BillingPeriod): Promise<WebSubscriptionStart> {
     return { result: 'indisponivel' };
   }
 
@@ -6140,7 +6140,7 @@ export class MemoryRepository implements RecordsRepository {
     return 'indisponivel';
   }
 
-  async startPixPayment(_plan: PlanKind): Promise<WebSubscriptionStart> {
+  async startPixPayment(_plan: PlanKind, _period?: BillingPeriod): Promise<WebSubscriptionStart> {
     return { result: 'indisponivel' };
   }
 

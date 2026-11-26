@@ -3,7 +3,12 @@
  * aceitam app que aponte para pagamento fora da loja), então nada daqui aparece lá. A função do servidor fica em `servidor.ts` (não
  * importa este arquivo: mudar um texto da tela não muda a função).
  */
-import { PLAN_NAME, type PlanKind } from '../plano-precos';
+import { formatBRL } from '../money';
+import { PERIOD_NAME, PLAN_NAME, PLAN_PERIOD_PRICE_CENTS, type BillingPeriod, type PlanKind } from '../plano-precos';
+
+/** "mês" ou "ano", e o preço do plano no período ("R$ 29,90", "R$ 269,90"), para os botões do Pix de quem já paga com Pix. */
+const pixUnit = (period: BillingPeriod) => (period === 'anual' ? 'ano' : 'mês');
+const pixPrice = (plan: PlanKind, period: BillingPeriod) => formatBRL(PLAN_PERIOD_PRICE_CENTS[plan][period]);
 
 /** O nome da função do servidor no Supabase (Edge Functions). */
 export const WEB_SUBSCRIPTION_FUNCTION = 'assinatura-web';
@@ -49,7 +54,8 @@ export function parseWebSubscriptionCancel(raw: unknown): WebSubscriptionCancel 
 
 /** Textos da assinatura na web (tela Assinatura). */
 export const WEB_SUBSCRIPTION_TEXT = {
-  subscribe: (plan: PlanKind) => `Assinar o plano ${PLAN_NAME[plan]}`,
+  /** "Assinar o plano Individual" e, com o período (D-127), "Assinar o plano Individual anual". */
+  subscribe: (plan: PlanKind, period?: BillingPeriod) => `Assinar o plano ${PLAN_NAME[plan]}${period ? ` ${PERIOD_NAME[period]}` : ''}`,
   subscribeBusy: 'Abrindo a página de pagamento',
   /** Antes dos botões de assinar. */
   howItWorks:
@@ -59,12 +65,20 @@ export const WEB_SUBSCRIPTION_TEXT = {
   pixTitle: 'Ou pague um mês por vez, com Pix',
   pixHowItWorks:
     'Com Pix, você paga um mês por vez, na página do Asaas. Não renova sozinho: perto do fim do mês pago, a Clarevo avisa aqui para você pagar o próximo.',
-  payPix: (plan: PlanKind) => `Pagar um mês do plano ${PLAN_NAME[plan]} com Pix`,
-  payNextPix: 'Pagar mais um mês com Pix',
+  /** Pix de um ano (D-127): um pagamento vale 12 meses. */
+  pixTitleAnnual: 'Ou pague o ano de uma vez, com Pix',
+  pixHowItWorksAnnual:
+    'Com Pix, você paga um ano de uma vez, na página do Asaas. Não renova sozinho: perto do fim do ano pago, a Clarevo avisa aqui para você pagar o próximo.',
+  /** "Pagar um mês do plano Individual com Pix" ou, no anual, "Pagar um ano do plano Individual com Pix". */
+  payPix: (plan: PlanKind, period: BillingPeriod = 'mensal') => `Pagar um ${period === 'anual' ? 'ano' : 'mês'} do plano ${PLAN_NAME[plan]} com Pix`,
+  /** Quem paga com Pix, na janela do próximo período: "Pagar mais um mês com Pix (R$ 29,90)" ou "Pagar mais um ano com Pix (R$ 269,90)". */
+  payNextPix: (plan: PlanKind, period: BillingPeriod = 'mensal') => `Pagar mais um ${pixUnit(period)} com Pix (${pixPrice(plan, period)})`,
+  /** Quem paga com Pix pode trocar de período no próximo pagamento (o plano continua o mesmo), com o preço do outro período. */
+  payOtherPix: (period: BillingPeriod, plan: PlanKind) => `Pagar um ${pixUnit(period)} com Pix (${pixPrice(plan, period)})`,
   pixBusy: 'Abrindo a página do Pix',
-  /** Quem paga com Pix, antes da janela do próximo mês. */
-  pixNextFrom: (date: string) => `Você pode pagar o próximo mês a partir de ${date}.`,
-  pixChangePlan: 'Para mudar de plano ou passar para o cartão, espere o fim do mês pago e escolha de novo.',
+  /** Quem paga com Pix, antes da janela do próximo período. */
+  pixNextFrom: (date: string, period: BillingPeriod = 'mensal') => `Você pode pagar o próximo ${period === 'anual' ? 'ano' : 'mês'} a partir de ${date}.`,
+  pixChangePlan: 'Para mudar de plano ou passar para o cartão, espere o fim do período pago e escolha de novo.',
   /** A assinatura no cartão que ficou ativa sem pagar (cobrança recusada): cancelar para escolher de novo. */
   cancelCard: 'Cancelar a assinatura no cartão',
   cancelCardDone: 'Assinatura no cartão cancelada. Agora você pode escolher de novo.',
@@ -81,12 +95,12 @@ export const WEB_SUBSCRIPTION_TEXT = {
   cancelKeep: 'Manter a assinatura',
   cancelBusy: 'Cancelando',
   cancelDone: 'Assinatura cancelada. O acesso completo continua até o fim do período já pago.',
-  changePlan: 'Para mudar de plano, cancele a assinatura atual e, quando o período já pago terminar, assine o outro plano.',
+  changePlan: 'Para mudar de plano ou passar do mensal para o anual (ou do anual para o mensal), cancele a assinatura atual e, quando o período já pago terminar, assine de novo.',
   /** Excluir a conta: a assinatura da web precisa ser cancelada antes, e não deu. */
   cancelBeforeDeleteFailed: 'Não foi possível cancelar a assinatura feita na web. Tente de novo em instantes ou cancele em Conta, Assinatura, antes de excluir a conta.',
   errors: {
     ja_assinante: 'Você já tem uma assinatura ativa. Para mudar de plano, cancele a atual e assine o outro plano quando o período pago terminar.',
-    ja_pago: 'O mês já está pago. Você pode pagar o próximo nos últimos dias do mês pago.',
+    ja_pago: 'O período já está pago. Você pode pagar o próximo nos últimos dias do período pago.',
     cartao_ativo: 'Há uma assinatura no cartão ainda ativa, com a cobrança em aberto. Para escolher de novo, cancele essa assinatura primeiro.',
     sem_necessidade: 'A sua conta já tem acesso completo, sem precisar assinar.',
     muitas_tentativas: 'Muitas tentativas em pouco tempo. Tente de novo daqui a uma hora.',

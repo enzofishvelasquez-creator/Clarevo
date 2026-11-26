@@ -22,7 +22,7 @@ const { montarPagina, marcadoresEmHtml, bloco, faixaDeConfianca, dominioDe, icon
 const { catalogo } = require('../catalogo');
 const { valorDe } = require('../texto');
 const { celularComVideo, SCRIPT_DOS_VIDEOS } = require('../videos');
-const { PAGINA_DO_PLANO, dadosDoApp, pessoasNaFamilia } = require('./planos');
+const { PAGINA_DO_PLANO, dadosDoApp, linhaDoAnual, pessoasNaFamilia } = require('./planos');
 const { avisoDaAssinatura, chamadas, estadoEmVigor, linhaDaCapa, rotuloDosPrecos, selosDasLojas, textoDoAcesso } = require('../estado');
 
 const ARQUIVO = 'index.html';
@@ -47,7 +47,7 @@ const DESCRICAO_CURTA = 'Controle de gastos sem planilha: contas, cartões e gas
  * do plano. Enquanto a assinatura não abre (o SUBSCRIBE_OPEN do app, pelo estado do produto: `avisoDaAssinatura`), a frase da tela
  * Assinatura diz que nada é cobrado até o lançamento; o site lançado exige a assinatura aberta, então a frase nunca aparece nele. Desde
  * 25/11/2026 (D-125), antes do lançamento os preços levam a etiqueta "Preços no lançamento" (`estado.js`), e a seção termina em "Comparar
- * os planos". Só os planos mensais que existem hoje: o anual entra quando existir. `u` monta o caminho relativo.
+ * os planos". Desde 27/11/2026 (D-127), cada cartão mostra também o preço anual, com o equivalente por mês. `u` monta o caminho relativo.
  */
 function conteudoPlanos(PLANOS, u, estado = estadoEmVigor()) {
   const cartoes = PLANOS.texto.plans
@@ -55,6 +55,7 @@ function conteudoPlanos(PLANOS, u, estado = estadoEmVigor()) {
       (p) => `<article class="cartao plano plano-link">
 <h3>${esc(PLANOS.nome[p.plan])}</h3>
 <p class="preco"><span class="preco-valor">${esc(PLANOS.preco(p.plan))}</span>${esc(PLANOS.porMes)}</p>
+${linhaDoAnual(p.plan)}
 <p>${esc(p.who)}</p>
 <p class="ver-plano"><a href="${u(PAGINA_DO_PLANO[p.plan])}">Ver o que o plano ${esc(PLANOS.nome[p.plan])} inclui</a></p>
 </article>`,

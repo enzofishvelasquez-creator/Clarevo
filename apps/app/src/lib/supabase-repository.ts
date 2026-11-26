@@ -179,6 +179,7 @@ import {
   WEB_SUBSCRIPTION_FUNCTION,
   parseLegalAcceptance,
   type Access,
+  type BillingPeriod,
   type PlanKind,
   type StoreForget,
   type StoreSync,
@@ -4318,8 +4319,9 @@ export class SupabaseRepository implements RecordsRepository {
    * Authorization). A função responde em JSON também quando recusa (401, 503...): o corpo da recusa é lido do mesmo jeito; sem corpo,
    * "tente_de_novo".
    */
-  async startWebSubscription(plan: PlanKind): Promise<WebSubscriptionStart> {
-    const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'assinar', plan } });
+  async startWebSubscription(plan: PlanKind, period: BillingPeriod = 'mensal'): Promise<WebSubscriptionStart> {
+    // O período (D-127) vai sempre: a função de antes do plano anual o ignora e cria a assinatura mensal.
+    const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'assinar', plan, period } });
     return parseWebSubscriptionStart(error ? await functionErrorBody(error) : data);
   }
 
@@ -4334,9 +4336,9 @@ export class SupabaseRepository implements RecordsRepository {
     return error ? null : parseWebSubscriptionStatus(data);
   }
 
-  /** "pix": o Checkout do Asaas de um mês com Pix (D-093). As mesmas respostas de "assinar", mais "ja_pago". */
-  async startPixPayment(plan: PlanKind): Promise<WebSubscriptionStart> {
-    const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'pix', plan } });
+  /** "pix": o Checkout do Asaas de um mês (ou de um ano, D-127) com Pix (D-093). As mesmas respostas de "assinar", mais "ja_pago". */
+  async startPixPayment(plan: PlanKind, period: BillingPeriod = 'mensal'): Promise<WebSubscriptionStart> {
+    const { data, error } = await this.db.functions.invoke(WEB_SUBSCRIPTION_FUNCTION, { body: { action: 'pix', plan, period } });
     return parseWebSubscriptionStart(error ? await functionErrorBody(error) : data);
   }
 

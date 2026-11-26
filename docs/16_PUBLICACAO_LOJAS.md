@@ -39,7 +39,7 @@ Nenhuma destas foi tomada pelo Claude. A coluna "Proposta" é só o que está no
 | 9 | Backup automático do Android (`android.allowBackup`) | Desligado em 03/11/2026 (`"allowBackup": false`, aprovado) | Com ele ligado, o Android copia os dados do app para o Google Drive da pessoa. Para um app financeiro, a recomendação é `"allowBackup": false` em `app.json`; é uma linha, mas muda o que a pessoa recebe ao trocar de celular |
 | 10 | Os 4 últimos dígitos do cartão nas respostas de privacidade; compras no cartão e notas entram em "outras informações financeiras" nas duas lojas | Declarar por prudência (ou tirar o campo) | `docs/lojas/privacidade.md`, seções 1 a 3 |
 | 11 | Sentry (relatório de falhas) antes do lançamento? | Instalar antes, com `sendDefaultPii` desligado | Muda as respostas de diagnóstico nas duas lojas e a política |
-| 12 | Preço | Gratuito para baixar, com assinatura dentro do app (D-083, D-090; `docs/42_ASSINATURA_LOJAS.md`): `clarevo_individual_mensal` a R$ 29,90 e `clarevo_familia_mensal` a R$ 69,90 por mês | A compra dentro do app pede o contrato de apps pagos da Apple e o perfil de pagamentos do Google, com conta bancária e dados fiscais da empresa (`docs/42`, seção 4) |
+| 12 | Preço | Gratuito para baixar, com assinatura dentro do app (D-083, D-090; `docs/42_ASSINATURA_LOJAS.md`): `clarevo_individual_mensal` a R$ 29,90 e `clarevo_familia_mensal` a R$ 69,90 por mês, e, desde a D-127, `clarevo_individual_anual` a R$ 269,90 e `clarevo_familia_anual` a R$ 629,90 por ano | A compra dentro do app pede o contrato de apps pagos da Apple e o perfil de pagamentos do Google, com conta bancária e dados fiscais da empresa (`docs/42`, seção 4) |
 | 13 | Países e regiões | Brasil | |
 
 ## 3. O que já está no repositório
